@@ -207,6 +207,37 @@ impl Game {
         held
     }
 
+    /// Ticket #346 (version 0.09.1): **what the Fuel a Battle would cost is worth against the
+    /// prize.** A Battle now takes `[melee] battle_fuel` out of every tank in it, and that is the
+    /// same figure a warship must hold to hold Orbital Control, to blockade and to intercept. So a
+    /// seat whose whole armed line in the contested orbit would fall UNDER the bar by paying the
+    /// charge is about to win a fight and lose the orbit in the same breath; and where it holds
+    /// nothing at that Body, there was no ground the orbit was wanted for either. That is the
+    /// "strands its fleet for nothing" case, and it is discounted by `battle_fuel_weight`.
+    ///
+    /// A WEIGHT and never a prohibition, at the designer's word: it multiplies the ODDS the seat
+    /// reads against `attack_odds`, so a discounted Battle is one that has to look better to be
+    /// worth a tank, and at 1.0 the weighing is off and nothing about the old reading moves. It is
+    /// a figure in `ai.toml` and not an `if` in the code. Anything the
+    /// seat holds at the Body -- a Colony on the ground or a station of its own in orbit, the same
+    /// predicate the attack's own cause already reads -- makes the orbit worth the tank, and the
+    /// appetite is whole. `orbit` is the contested orbit, or None where the stance covers the
+    /// whole Body, as the stack's own reading of the contest has it.
+    pub fn ai_battle_fuel_weight(&self, seat: Seat, body: BodyId, orbit: Option<Orbit>) -> f64 {
+        let charge = self.tables.melee.battle_fuel;
+        let here = |s: &Ship| match orbit {
+            Some(o) => self.ship_in_orbit(s, body, o),
+            None => s.at == ShipAt::Body(body),
+        };
+        let line: Vec<&Ship> = self.ships.iter().filter(|s| s.seat == seat && s.kind.is_warship() && !s.escaped && here(s)).collect();
+        if line.is_empty() {
+            return 1.0;
+        }
+        let all_stranded = line.iter().all(|s| (s.fuel - charge).max(0) < charge);
+        let holds_something_here = self.colonies.iter().any(|c| c.body == body && c.control.controller() == Some(seat));
+        if all_stranded && !holds_something_here { self.tables.ai.thresholds.battle_fuel_weight } else { 1.0 }
+    }
+
     /// Ticket #335 (version 0.09.0): **the orbit a leg names before it leaves**. LOW ORBIT by
     /// default, which is the lane to the ground and the orbit Orbital Control is held in; a rival
     /// station's ring where the seat means to blockade or attack that station; its OWN station's
@@ -2429,7 +2460,16 @@ impl Game {
                             })
                     }
                 };
-                if odds >= th.attack_odds && (cause || (my_colony_here && held_against_me)) && wars_opened < 1 {
+                // Ticket #346 (version 0.09.1): **the Fuel a Battle would cost, weighed against the
+                // prize.** The odds are discounted by `ai_battle_fuel_weight` before they are read
+                // against the bar, so a Battle that would strand the fleet for nothing has to look
+                // that much better to be worth a tank. The weighing lives in the ODDS rather than
+                // in the candidate's score because only one stance candidate is ever pushed per
+                // stack (see #284 below): a multiplier on a candidate with nothing to lose to
+                // cannot change an order, and a rule that never reaches the computer seats is not
+                // built. At `battle_fuel_weight = 1.0` the weighing is off and this reads exactly
+                // as it did before the ticket.
+                if odds * self.ai_battle_fuel_weight(seat, body, contest) >= th.attack_odds && (cause || (my_colony_here && held_against_me)) && wars_opened < 1 {
                     attack = Some(odds);
                     wars_opened += 1;
                 }

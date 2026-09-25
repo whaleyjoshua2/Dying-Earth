@@ -413,6 +413,22 @@ factory_module_queue_depth = 2
 # warship leg named the richest rival station whatever the seat thought of its holder, so low orbit
 # stood empty and the ground was never shut by anybody.
 low_orbit_warships = 1
+# Ticket #346 (version 0.09.1): a Battle costs every hull in it `battle_fuel`, so a seat now weighs
+# that Fuel against the prize before it opens one. This MULTIPLIES THE ODDS the seat reads against
+# `attack_odds` above, when BOTH of these hold: paying the charge would leave every armed hull the
+# seat has in the contested orbit under the Battle bar -- unable to hold the orbit, blockade or
+# intercept, and halved in the next fight -- and the seat holds nothing at that Body, neither a
+# Colony on the ground nor a station of its own, so there is nothing the orbit was wanted for.
+# That is the "strands its fleet for nothing" case, and only that one: a seat with a place of its
+# own below pays the Fuel at full appetite, because the orbit is the thing it came for.
+#
+# A weight and not a prohibition: it is a figure here rather than an `if` in the code, and a
+# discounted Battle is one that has to look BETTER to be worth a tank, not one that is forbidden.
+# 0.2 means such a Battle would have to read 300% odds, which no Battle does, so in practice the
+# seat holds instead; 0.9 would raise the bar it reads from 60% to 67%; 1.0 turns the weighing off
+# altogether and restores the reading this ticket found. It is set low because the case it catches
+# is a fleet buying a fight it cannot then hold the orbit with, which is a bad trade at any odds.
+battle_fuel_weight = 0.2
 
 # Tech picks as Research Lead (spec 16.4): `order` first, then the cheapest available that is not
 # `never`, and `last` only when nothing else is left.

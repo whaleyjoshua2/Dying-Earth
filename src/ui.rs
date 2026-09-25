@@ -647,8 +647,10 @@ fn seat_colour(session: &Session, seat: Seat) -> Color32 {
 }
 
 /// Ticket #50: every other seat with Ships at a Body, in seat order, with its stack strength.
+/// Ticket #346 (version 0.09.1): at what its hulls would ACTUALLY fight -- a dry rival is a weaker
+/// rival, and this line is read to decide whether to attack it.
 fn rivals_at(game: &Game, seat: Seat, body: BodyId) -> Vec<(Seat, i64)> {
-    seat.others().into_iter().filter(|s| !game.ships_at(*s, body).is_empty()).map(|s| (s, game.ship_stack_strength(s, body))).collect()
+    seat.others().into_iter().filter(|s| !game.ships_at(*s, body).is_empty()).map(|s| (s, fighting_stack_strength(game, s, body))).collect()
 }
 
 /// "Prospectors 6 and Archivists 3", the Factions a Battle here would be against.
@@ -1029,6 +1031,50 @@ fn warhead_label(ui: &mut Ui, s: &Ship) {
         ui.colored_label(WARHEAD_ARMED, words);
     } else {
         ui.label(RichText::new(words).weak());
+    }
+}
+
+/// The colour a loss wears: the red-orange the stranded warning has been said in since ticket #87.
+/// Ticket #346 (version 0.09.1): and the dry warning, which is the same kind of news about the same
+/// tank -- a thing the hull can no longer do, for want of Fuel.
+const DRY_WARNING: Color32 = Color32::from_rgb(230, 120, 90);
+
+/// The same for a whole stack at a Body, and for everybody else's stacks with their Batteries.
+/// `Game::ship_stack_strength` and `Game::enemy_ship_strength` are the engine's own sums and read
+/// the undimmed figure, which is right for the weighing the computer does with them and wrong for a
+/// line a player reads before committing to a Battle.
+fn fighting_stack_strength(game: &Game, seat: Seat, body: BodyId) -> i64 {
+    game.ships.iter().filter(|s| s.seat == seat && s.at == ShipAt::Body(body)).map(|s| game.ship_fighting_strength(s)).sum()
+}
+
+fn fighting_enemy_strength(game: &Game, seat: Seat, body: BodyId) -> i64 {
+    seat.others().iter().map(|s| fighting_stack_strength(game, *s, body) + game.battery_strength_at_body(*s, body)).sum()
+}
+
+/// Ticket #346 (version 0.09.1): **what a warship under the Battle bar has lost**, said on its own
+/// row. `None` for a hull that holds the bar and for anything that is not a warship: only a Frigate
+/// and a Battleship have strength to be halved, and the three doors the bar shuts -- Orbital
+/// Control, the blockade, the contest of an orbit -- are a warship's work alone.
+///
+/// It is said ON THE ROW and not left to a hover for the reason ticket #343 gave for the Warhead
+/// word: a dry warship is the same shape of piece as a spent Missile Carrier. It still flies, still
+/// eats Fuel, still takes a hit for the stack, and can do none of the work it was built for until
+/// it refuels -- so the difference belongs where the tank is read, not under the pointer.
+fn dry_words(game: &Game, s: &Ship) -> Option<String> {
+    if !s.kind.is_warship() || game.ship_holds_the_battle_bar(s) {
+        return None;
+    }
+    Some(format!(
+        "dry: under the {} Fuel a Battle costs -- no Orbital Control, no blockade, no intercept, half strength, until it refuels",
+        game.tables.melee.battle_fuel
+    ))
+}
+
+/// Ticket #346: the dry warning as a coloured label on a Ship's row, the shape the stranded
+/// warning and the Warhead word already use.
+fn dry_label(ui: &mut Ui, game: &Game, s: &Ship) {
+    if let Some(words) = dry_words(game, s) {
+        ui.colored_label(DRY_WARNING, words);
     }
 }
 
@@ -2847,7 +2893,7 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                     // Body is in low orbit or at one of the stations, and what it can reach from
                     // there -- the ground, a station, a Battle -- follows from that alone. A stack
                     // spread over several orbits says how many; the Surface Map's band names each.
-                    let text = format!("{} x{}  str {}, {}", game.seat_name(seat), ships.len(), game.ship_stack_strength(seat, body), stack_orbit_phrase(game, seat, body));
+                    let text = format!("{} x{}  str {}, {}", game.seat_name(seat), ships.len(), fighting_stack_strength(game, seat, body), stack_orbit_phrase(game, seat, body));
                     let at = p - egui::vec2(0.0, 58.0 + row * 16.0);
                     label_kind_at(painter, at, Some(Kind::of_ships(ships.iter().filter_map(|id| game.ship(*id)))), &text, seat_colour(session, seat), 12.0);
                     hotspots.push(Hotspot { pos: at, radius: 14.0, hit: Hit::Select(Selection::ShipStack(body, seat)) });
@@ -2986,7 +3032,7 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                             if here.is_empty() {
                                 continue;
                             }
-                            let strength: i64 = here.iter().map(|s| game.ship_strength(s)).sum();
+                            let strength: i64 = here.iter().map(|s| game.ship_fighting_strength(s)).sum();
                             let text = format!("{}: {} Ship(s), strength {}, {}", game.seat_name(seat), here.len(), strength, orbit_phrase(game, body, orbit));
                             band.push(BandRow { text, colour: seat_colour(session, seat), kind: Some(Kind::of_ships(here.iter().copied())), seat: Some(seat), battle: None });
                         }
@@ -4170,13 +4216,16 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, seat: Seat, marks: boo
             let tank = game.tables.unit(s.kind).tank;
             // The working figures stay ON the row: the Roster is where a player checks whether a
             // hull can move before ordering it, and the tank is the figure that says stranded.
+            // Ticket #346 (version 0.09.1): the strength is the one the hull would FIGHT at, since
+            // a Battle halves a hull whose tank cannot pay its charge and `ship_strength` does not
+            // know it. The dry clause below says why the figure has dropped.
             let mut text = format!(
                 "{}{} ({}) at {} - strength {}, {}/{}",
                 tag("Ship"),
                 game.ship_name(s),
                 s.kind.name().to_lowercase(),
                 game.tables.body(body).name,
-                game.ship_strength(s),
+                game.ship_fighting_strength(s),
                 s.fuel,
                 tank
             );
@@ -4201,14 +4250,29 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, seat: Seat, marks: boo
             // and the stance's sentence on the hover; a Ship on Intercept was the case nobody could
             // read anywhere.
             text.push_str(&format!("  ({})", s.stance.name()));
+            // Ticket #346 (version 0.09.1): and, for a warship under the Battle bar, the four
+            // things it can no longer do -- in the Roster's clipped register, since the row is
+            // already long and the Ship card says it in full. STRANDED is about getting anywhere;
+            // this is about being worth anything when it gets there, and the two are independent:
+            // a hull fuelled enough to fly can still be too dry to fight for what it flew to.
+            if s.kind.is_warship() && !game.ship_holds_the_battle_bar(s) {
+                text.push_str(&format!(" - DRY: under {} Fuel, so no orbit, no blockade, no intercept, half strength", game.tables.melee.battle_fuel));
+            }
             if game.stranded(s.id) {
                 text.push_str(" - STRANDED: no leg affordable and no station of yours here");
             }
             // Ticket #116 (version 0.07.1): what the tank is for, and what being stranded means. A Ship
             // with no leg it can afford and no station of its own is the one piece in the game that can
             // become permanently useless, and the roster said so in four words and explained none of it.
+            // Ticket #346 (version 0.09.1): CUT to the six-line ceiling, which this hover had been
+            // over since it was written -- measured at seven on a capture. Nothing was dropped but
+            // words: "a leg costs least at a launch window" became "cheapest at a launch window",
+            // and the refuelling sentence, which had grown a clause explaining STRANDED inside a
+            // clause explaining refuelling, was split into the rule and the word it defines. The
+            // orbit clause is also more accurate than what it replaces: since ticket #335 a station
+            // fuels only a Ship in its OWN orbit, which "where the Ship sits" did not say.
             let tip = format!(
-                "{}: {} {}\nTank {} of {}. Fuel goes on transits, and a leg costs least at a launch window.\nRefuelling needs a station or Colony of yours where the Ship sits, so a Ship is STRANDED with no leg it can afford and nowhere to fill up.",
+                "{}: {} {}\nTank {} of {}. Fuel goes on transits, cheapest at a launch window.\nIt fills only at a station or Colony of yours in its own orbit. STRANDED: no leg it can pay, and nowhere to fill up.",
                 s.stance.name(),
                 s.stance.one_liner(true),
                 Stance::PERSISTS,
@@ -4774,8 +4838,11 @@ fn orbit_odds(ctx: &egui::Context, game: &Game, body: BodyId, orbit: Orbit, seat
 /// Ticket #339: the strength one Faction brings to a Battle in ONE orbit -- its Ships sitting there
 /// and its working Batteries covering it, which is exactly the line `orbit_battle_odds` fights
 /// with, so the strengths beside the figure are the strengths the figure was made from.
+/// Ticket #346 (version 0.09.1): at the strength its hulls would FIGHT at, dry ones halved, which
+/// is what `orbit_battle_odds` fights the trials with -- so the two strengths beside the figure
+/// still add up to the figure.
 fn orbit_strength(game: &Game, seat: Seat, body: BodyId, orbit: Orbit) -> i64 {
-    ships_in_orbit(game, seat, body, orbit).iter().filter(|s| !s.escaped).map(|s| game.ship_strength(s)).sum::<i64>() + game.battery_strength(seat, body, orbit)
+    ships_in_orbit(game, seat, body, orbit).iter().filter(|s| !s.escaped).map(|s| game.ship_fighting_strength(s)).sum::<i64>() + game.battery_strength(seat, body, orbit)
 }
 
 /// Ticket #339 (version 0.09.0): **the odds line of every Battle an Attack at this Body would
@@ -4788,6 +4855,9 @@ fn orbit_strength(game: &Game, seat: Seat, body: BodyId, orbit: Orbit) -> i64 {
 /// ordered at the Body fights nobody, however many rival hulls are in the sky.
 fn orbit_odds_lines(ui: &mut Ui, game: &Game, body: BodyId) {
     let mut any = false;
+    // Ticket #346 (version 0.09.1): the hulls of yours that would be IN one of these Battles, kept
+    // so the Fuel line below can say how many of them the charge would leave under the bar.
+    let mut mine_fighting: Vec<&Ship> = Vec::new();
     for orbit in orbits_of_stack(game, Seat(0), body) {
         // Whether a rival is THERE, not whether it is armed: three unarmed hulls in your orbit are
         // three things a Battle would destroy, and a strength of nought made the line say nobody
@@ -4798,17 +4868,40 @@ fn orbit_odds_lines(ui: &mut Ui, game: &Game, body: BodyId) {
             continue;
         }
         any = true;
+        mine_fighting.extend(ships_in_orbit(game, Seat(0), body, orbit).into_iter().filter(|s| !s.escaped));
         let theirs: i64 = Seat(0).others().iter().map(|s| orbit_strength(game, *s, body, orbit)).sum();
         let mine = orbit_strength(game, Seat(0), body, orbit);
         let odds = orbit_odds(ui.ctx(), game, body, orbit, Seat(0));
+        // Ticket #346 (version 0.09.1): the second sentence was cut from four rendered lines to
+        // three, which brought this hover from SEVEN rendered lines back to the standing six. It
+        // had been over since ticket #339 wrote it, and this ticket wanted to add the Fuel charge
+        // to the same moment -- so the charge went on the line below, where a label may run as
+        // long as it needs to, and the hover paid back the line it had borrowed.
         rule_tip(
             ui.label(format!("Attacking {}: {:.0}% is your chance of holding the orbit when the Battle is over (your strength {mine} against {theirs}).", orbit_phrase(game, body, orbit), odds * 100.0)),
-            "The chance that nothing of any rival's is left standing in this orbit when the Battle ends and something of yours is -- the test an Occupation makes, not the first exchange's share of the strength.\nIt is measured: the Battle is fought a thousand times over on a copy of the board, from a seed of its own, so the figure never moves and asking for it never moves the game.".to_string(),
+            "The chance that nothing of any rival's is left standing in this orbit when the Battle ends and something of yours is -- what an Occupation tests, not a share of the strength.\nIt is measured: the Battle is fought a thousand times over on a copy of the board, from a seed of its own, so the figure never moves and asking for it never moves the game.".to_string(),
         );
     }
     if !any {
         ui.label(RichText::new("No rival stands in an orbit of yours here, so an Attack ordered here fights nobody.").weak());
+        return;
     }
+    // Ticket #346 (version 0.09.1): **what the Battle costs, said before it is ordered.** The
+    // charge falls on every Ship in the orbit whether it was struck or not and whichever side it
+    // is on, so it is the one price of an Attack that is paid even when the Attack goes perfectly;
+    // and since the bar a warship must hold to hold an orbit IS the charge, a stack that wins its
+    // Battle on its last Fuel loses the orbit it just won to the next fresh Frigate. That second
+    // sentence is the one a player cannot work out from the odds figure, so it is counted for them.
+    //
+    // On the line rather than on the hover: this hover is at the six-line ceiling above, and the
+    // moment of the decision should not need a pointer held over it to be read at all.
+    let charge = game.tables.melee.battle_fuel;
+    let mut cost = format!("The Battle costs every Ship in the orbit {charge} Fuel from its own tank, yours and theirs alike, struck or not.");
+    let left_dry = mine_fighting.iter().filter(|s| s.fuel - charge < charge).count();
+    if left_dry > 0 {
+        cost.push_str(&format!(" {left_dry} Ship(s) of yours would come out of it under the bar, holding no orbit here and fighting halved until refuelled."));
+    }
+    ui.label(cost);
 }
 
 /// Ticket #309 (version 0.08.7): the hover on a button that attacks a place -- a march on a
@@ -5262,17 +5355,42 @@ fn stance_row(ui: &mut Ui, game: &Game, pending: &[Order], current: Stance, make
             // the one the stack sits in -- and the engine's one-liners were written in 0.08.5, when
             // a Blockade was a slot's business and there was no low orbit to say. The orbit rule is
             // said here, where the stance is chosen, rather than left to be found out by a refusal.
+            //
+            // Ticket #346 (version 0.09.1): **and the Fuel bar**, which is a rule about the stance
+            // and belongs beside the orbit rule. Both lines paid for it out of what they already
+            // said twice: the one-liner above opens with "Shuts the orbit it sits in" and
+            // "into its own orbit", so the words "It shuts the orbit the stack sits in and no
+            // other" and "It catches only what arrives into the orbit the stack sits in" were a
+            // second telling. Cutting them left each hover at the six-line ceiling with the bar on
+            // it rather than over the ceiling; nothing a player could not read elsewhere was lost.
+            let bar = game.tables.melee.battle_fuel;
             let orbit_rule = match (ships, st) {
-                (true, Stance::Blockade) => "\nIt shuts the orbit the stack sits in and no other: a station's own orbit starves that station, and low orbit starves the ground while you hold Orbital Control of it outright.",
-                (true, Stance::Intercept) => "\nIt catches only what arrives into the orbit the stack sits in.",
-                _ => "",
+                (true, Stance::Blockade) => format!("\nA station's own orbit starves that station; low orbit starves the ground while you hold Orbital Control of it outright.\nA warship with less than {bar} Fuel in the tank blockades nothing."),
+                (true, Stance::Intercept) => format!("\nA hull with less than {bar} Fuel in the tank catches nobody."),
+                _ => String::new(),
             };
-            let resp = rule_tip(ui.selectable_label(shown == st, st.name()), format!("{}: {}\n{}{measured}{orbit_rule}", st.name(), st.one_liner(ships), Stance::PERSISTS));
-            if resp.clicked() && shown != st {
-                let order = make(st);
-                if game.check_order(Seat(0), pending, &order).is_ok() {
-                    actions.push(Action::Place(order));
+            // Ticket #346: **a stance the engine would refuse is GREYED and says why.** Until this
+            // ticket a click on one did nothing whatever and gave no reason, which was survivable
+            // while the only refusal was "no warship of yours sits in an orbit to blockade here"
+            // -- a player with no warship could see that for themselves -- and is not survivable
+            // now that a full stack of warships can be refused a Blockade or an Intercept for a
+            // reason that lives in a tank. Both doors carry the same shape every other shut door
+            // in the game wears: greyed, with the engine's own words on the hover, through
+            // `rule_tip` so the refusal can be photographed headless and through
+            // `on_disabled_hover_ui` so a pointer finds it in play.
+            let order = make(st);
+            let check = game.check_order(Seat(0), pending, &order);
+            let resp = ui.add_enabled_ui(check.is_ok(), |ui| ui.selectable_label(shown == st, st.name())).inner;
+            let resp = match &check {
+                Ok(_) => rule_tip(resp, format!("{}: {}\n{}{measured}{orbit_rule}", st.name(), st.one_liner(ships), Stance::PERSISTS)),
+                Err(e) => {
+                    let why = format!("{}: {}", st.name(), e.0);
+                    let shown_why = why.clone();
+                    rule_tip(resp, why).on_disabled_hover_ui(move |ui| hover_with_icons(ui, &shown_why))
                 }
+            };
+            if resp.clicked() && shown != st && check.is_ok() {
+                actions.push(Action::Place(order));
             }
         }
     });
@@ -6904,10 +7022,13 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
             // Ticket #335 (version 0.09.0): a Ship's line says the ORBIT it sits in. Two Ships of one
             // stack may sit in two orbits, fight two Battles and reach two different things, so the
             // card can no longer speak of the stack as though it were all in one place.
+            // Ticket #346 (version 0.09.1): the strength it would FIGHT at, halved while its tank
+            // stands under the Battle charge. The Tanks block below says why, beside the tank it
+            // reads it from; here the figure alone has to be the true one.
             ui.label(format!(
                 "{}: strength {}, damage {}/{}{}, {}",
                 game.ship_name(s),
-                game.ship_strength(s),
+                game.ship_fighting_strength(s),
                 s.damage,
                 card.hit_points,
                 if extra.is_empty() { String::new() } else { format!(", carrying {}", extra.join(" and ")) },
@@ -6922,7 +7043,8 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         });
     }
     if session.spectator {
-        let enemy = game.enemy_ship_strength(seat, body);
+        // Ticket #346 (version 0.09.1): at the strength those hulls would fight at, dry ones halved.
+        let enemy = fighting_enemy_strength(game, seat, body);
         if enemy > 0 {
             let rivals = rivals_at(game, seat, body);
             ui.label(format!("Against {} ({} in all) if it attacked here.", rivals_text(game, &rivals), enemy));
@@ -6944,10 +7066,12 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     }
     ui.separator();
     stance_row(ui, game, &session.pending, ships[0].stance, |s| Order::ShipStance { body, stance: s }, true, actions);
-    let enemy = game.enemy_ship_strength(seat, body);
+    // Ticket #346 (version 0.09.1): the two sums an Attack is weighed with, at the strength the
+    // Battle would actually be fought at on both sides.
+    let enemy = fighting_enemy_strength(game, seat, body);
     let enemy_ships: usize = seat.others().iter().map(|s| game.ships_at(*s, body).len()).sum();
     if enemy > 0 || enemy_ships > 0 {
-        let mine = game.ship_stack_strength(Seat(0), body);
+        let mine = fighting_stack_strength(game, Seat(0), body);
         // Ticket #50: name every Faction with Ships here; the attack is against all of them at once.
         let rivals = rivals_at(game, seat, body);
         ui.label(format!("Against {} ({} in all). Your strength at the Body: {mine}.", rivals_text(game, &rivals), enemy));
@@ -7198,7 +7322,14 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     }
     // Ticket #87: a Refuel button per Ship at a Body with a station of yours, and a word for a
     // Ship that is stranded.
-    ui.label(RichText::new("Tanks").strong());
+    // Ticket #346 (version 0.09.1): and, for a warship under the Battle bar, what it has lost for
+    // want of Fuel -- said HERE, beside the tank the loss is read from, rather than beside the
+    // strength it has halved. A reader who wonders why a Frigate says strength 1 looks at its
+    // tank, and the tank is on this block's own line.
+    let tanks = ui.label(RichText::new("Tanks").strong());
+    if view.stack_scroll == Some(StackBlock::Tanks) {
+        tanks.scroll_to_me(Some(egui::Align::Min));
+    }
     for s in &ships {
         let tank = game.tables.unit(s.kind).tank;
         ui.horizontal_wrapped(|ui| {
@@ -7226,6 +7357,13 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
                 ui.label("no station of yours, or of a Refuel partner's, here to refuel at");
             }
         });
+        // Ticket #346 (version 0.09.1): the dry warning on a LINE OF ITS OWN, and not wrapped in
+        // beside the others. A hull that is both stranded and dry -- which is the common case,
+        // both being readings of the same empty tank -- ran the two warnings together into one
+        // unbroken red paragraph when they shared a line, and neither could be read. They are
+        // different news: stranded is about getting anywhere, dry is about being worth anything
+        // when it arrives.
+        dry_label(ui, game, s);
     }
     ui.label(RichText::new("Load and unload").strong());
     for s in &ships {

@@ -73,8 +73,9 @@ pub struct ShotPlan {
     pub notice: Option<String>,
     /// Ticket #59, a building aid (`load:1`): 0 nothing yet, 1 the Load screen is up, 2 captured.
     pub load_step: u8,
-    /// Ticket #335 (version 0.09.0), a building aid (`scroll:transits`, `scroll:orbits`): the Ship
-    /// stack card scrolls to that block, which a headless capture cannot do with a scrollbar.
+    /// Ticket #335 (version 0.09.0), a building aid (`scroll:transits`, `scroll:orbits`; ticket
+    /// #346 added `scroll:tanks`): the Ship stack card scrolls to that block, which a headless
+    /// capture cannot do with a scrollbar.
     pub stack_scroll: Option<StackBlock>,
     /// Ticket #337 (version 0.09.0), a building aid (`card:<event id>`): that Choice Card is the
     /// turn's question, so its modal stands in every picture of the run. The deck is stacked with
@@ -510,6 +511,33 @@ fn build_board(session: &mut Session) {
             }
             g.seats[0].stockpile.materials = 120;
             g.seats[0].stockpile.energy = 60;
+        }
+        // `drybar:1` (a building aid, ticket #346, version 0.09.1): **the board the Battle bar is
+        // photographed on.** Seat 0 keeps a DRY Frigate -- 1 Fuel, under the 2 a Battle charges --
+        // and a full Battleship in the SAME orbit over Mars, so one picture carries both readings
+        // of a Ship row side by side: the hull that has lost the orbit, the blockade, the intercept
+        // and half its strength, and the hull beside it that has lost none of them. A Frigate of
+        // seat 1's sits in that orbit with a full tank, so the Attack door, the odds line and the
+        // Fuel-cost line all have a rival to speak of, and seat 0's Blockade and Intercept are
+        // live rather than greyed -- the Battleship holds the bar for the whole stack.
+        //
+        // Nothing an AI game plays composes this. The computer does not fight in orbit at all
+        // (ticket #355 is what would change that), and the measured sweep behind this ticket found
+        // ONE orbital Battle in eighty games.
+        //
+        // `drybar:all` dries the Battleship too, so NOTHING of seat 0's at the Body holds the bar.
+        // That is the board the two NEW refusals stand on -- a Blockade and an Intercept greyed for
+        // a reason that lives in a tank -- and no other aid can reach them.
+        if let Some(mode) = std::env::args().find_map(|a| a.strip_prefix("drybar:").map(str::to_owned)) {
+            let escort = if mode == "all" { 1i64 } else { 30 };
+            g.ships.retain(|s| s.at != ShipAt::Body(BodyId::Mars));
+            for (seat, kind, fuel) in [(Seat(0), UnitKind::Frigate, 1i64), (Seat(0), UnitKind::Battleship, escort), (Seat(1), UnitKind::Frigate, 30)] {
+                let id = ShipId(g.fresh_id());
+                let built_turn = g.turn;
+                let name = g.next_ship_name(kind);
+                g.ships.push(Ship { id, name, kind, seat, damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel, slot: None });
+            }
+            g.seats[0].stockpile.fuel = 60;
         }
         // `eye:1` and `eye:0` (building aids, ticket #339, version 0.09.0): **the pair of boards the
         // eye is photographed on.** Seat 1 takes the first neighbour of seat 0's start Region and
@@ -1616,6 +1644,8 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
         plan.stack_scroll = std::env::args().find_map(|a| match a.strip_prefix("scroll:") {
             Some("transits") => Some(StackBlock::Transits),
             Some("orbits") => Some(StackBlock::ChangeOrbit),
+            // Ticket #346 (version 0.09.1): the Tanks block, which carries the dry warning.
+            Some("tanks") => Some(StackBlock::Tanks),
             _ => None,
         });
         // Ticket #337 (version 0.09.0): the turn's Choice Card stands in every picture of the run,

@@ -13794,3 +13794,338 @@ fn ticket_345_a_body_row_without_a_windfall_refuses_the_table() {
     assert!(format!("{err:?}").contains("first_windfall"), "and the refusal names the missing figure: {err:?}");
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+// ---------------------------------------------------------------- Ticket #346: Battles cost Fuel
+
+/// Ticket #346 (version 0.09.1): a Body with an empty low orbit and no station standing, so a test
+/// puts exactly the hulls it reasons about into the fight and nothing arrives to join them.
+fn empty_orbit(g: &mut Game, body: BodyId) {
+    g.ships.retain(|s| s.at != ShipAt::Body(body));
+    g.colonies.retain(|c| c.body != body);
+}
+
+/// Ticket #346 (R1): the charge. Every Ship named in any party of a SHIP Battle pays `battle_fuel`
+/// out of its own tank, once, floored at nought -- struck or not, armed or not, whichever side it
+/// is on and whether or not it opened the fight. A Battery pays nothing and never panics; a Ship
+/// that was not in the Battle pays nothing.
+#[test]
+fn a_battle_takes_fuel_from_every_hull_named_in_it() {
+    let mut g = game();
+    calm(&mut g);
+    empty_orbit(&mut g, BodyId::Mars);
+    let charge = g.tables.melee.battle_fuel;
+    assert_eq!(charge, 2, "[melee] battle_fuel");
+    let attacker = ship_in(&mut g, Seat(0), UnitKind::Frigate, BodyId::Mars, None, Stance::Attack);
+    let defender = ship_in(&mut g, Seat(1), UnitKind::Frigate, BodyId::Mars, None, Stance::Hold);
+    let hauler = ship_in(&mut g, Seat(1), UnitKind::ColonyShip, BodyId::Mars, None, Stance::Hold);
+    // A hull with less in the tank than the charge pays what it has and no more.
+    let nearly = ship_in(&mut g, Seat(1), UnitKind::Frigate, BodyId::Mars, None, Stance::Hold);
+    g.ship_mut(nearly).unwrap().fuel = 1;
+    // A Battery of the defender's, in low orbit: it stands in the line and has no tank to charge.
+    let ground = colony(&mut g, Seat(1), BodyId::Mars, &[ModuleKind::Battery], 4);
+    // And a hull at another Body, which fights nothing.
+    let elsewhere = ship_in(&mut g, Seat(2), UnitKind::Frigate, BodyId::Earth, None, Stance::Hold);
+    g.resolution_phase();
+    assert_eq!(g.war.orbit_attacks[0], 1, "one Battle was fought in Mars low orbit");
+    // The charge is taken at the head of the melee, so the counters are exact whatever the dice did.
+    assert_eq!(g.war.battle_fuel_burned[0], charge, "the aggressor's one hull paid the charge");
+    assert_eq!(g.war.battle_fuel_burned[1], charge * 2 + 1, "two full tanks paid it and the near-empty one paid the 1 it had");
+    assert_eq!(g.war.battle_fuel_burned[2], 0, "a seat that was not in the Battle paid nothing");
+    for (id, what) in [(attacker, "the aggressor"), (defender, "the defender"), (hauler, "the unarmed hull")] {
+        if let Some(s) = g.ship(id) {
+            assert_eq!(s.fuel, 30 - charge, "{what} paid the charge out of its own tank");
+        }
+    }
+    if let Some(s) = g.ship(nearly) {
+        assert_eq!(s.fuel, 0, "a tank under the charge is emptied and never goes negative");
+    }
+    assert_eq!(g.ship(elsewhere).unwrap().fuel, 30, "a Ship that fought no Battle is untouched");
+    assert!(g.colony(ground).is_some(), "the Battery's Colony stands; a Battery has no tank and is skipped");
+}
+
+/// Ticket #346 (R2): a hull that could not pay fights at half strength, whichever side it is on;
+/// and the charge and the penalty read the SAME tank, taken before the charge, so a hull that
+/// could just pay fights whole in the Battle that empties it.
+#[test]
+fn a_hull_that_could_not_pay_fights_at_half_strength() {
+    let charge = game().tables.melee.battle_fuel;
+    let share = game().tables.melee.dry_strength_share;
+    assert_eq!(share, 0.5, "[melee] dry_strength_share");
+    // A dry Frigate on each side of one Battle: both are halved, aggressor and defender alike.
+    let fight = |mine: i64, theirs: i64| -> (i64, i64) {
+        let mut g = game();
+        calm(&mut g);
+        empty_orbit(&mut g, BodyId::Mars);
+        let a = ship_in(&mut g, Seat(0), UnitKind::Frigate, BodyId::Mars, None, Stance::Attack);
+        let d = ship_in(&mut g, Seat(1), UnitKind::Frigate, BodyId::Mars, None, Stance::Hold);
+        g.ship_mut(a).unwrap().fuel = mine;
+        g.ship_mut(d).unwrap().fuel = theirs;
+        g.resolution_phase();
+        let line = g.report.battles.iter().find(|b| b.at == Some(ReportPlace::Orbit(BodyId::Mars, Orbit::Low))).expect("a Battle in Mars low orbit");
+        let of = |seat: Seat| line.parties.iter().find(|p| p.seat == Some(seat)).expect("a party").strength;
+        (of(Seat(0)), of(Seat(1)))
+    };
+    assert_eq!(fight(30, 30), (3, 3), "two fuelled Frigates fight at the card's strength");
+    assert_eq!(fight(charge - 1, 30), (1, 3), "the aggressor a Fuel short fights at floor(3 x 0.5)");
+    assert_eq!(fight(30, charge - 1), (3, 1), "and so does the defender: the penalty does not care which side");
+    assert_eq!(fight(0, 0), (1, 1), "a tank at nought is the same penalty as a tank one short");
+    // The refutation: the charge and the penalty agree about which hulls were dry. A hull with
+    // EXACTLY the charge fights whole in the Battle that empties it.
+    assert_eq!(fight(charge, charge), (3, 3), "a hull that could just pay fights whole, and is dry for the NEXT Battle");
+    // No test may assert a penalty on a Colony Ship, a Carrier or a Missile Carrier: this one
+    // asserts its absence. Half of nought is nought.
+    let mut g = game();
+    calm(&mut g);
+    empty_orbit(&mut g, BodyId::Mars);
+    ship_in(&mut g, Seat(0), UnitKind::Frigate, BodyId::Mars, None, Stance::Attack);
+    for kind in [UnitKind::ColonyShip, UnitKind::Carrier, UnitKind::MissileCarrier] {
+        let id = ship_in(&mut g, Seat(1), kind, BodyId::Mars, None, Stance::Hold);
+        g.ship_mut(id).unwrap().fuel = 0;
+        let s = g.ship(id).unwrap();
+        assert_eq!(g.ship_strength(s), 0, "{} has no strength to halve", kind.name());
+        assert_eq!(g.ship_dry_strength(s), 0, "and dry it still has none");
+    }
+    g.resolution_phase();
+    let line = g.report.battles.iter().find(|b| b.at == Some(ReportPlace::Orbit(BodyId::Mars, Orbit::Low))).expect("a Battle");
+    let unarmed = line.parties.iter().find(|p| p.seat == Some(Seat(1))).expect("the unarmed party").strength;
+    assert_eq!(unarmed, 0, "three unarmed hulls, dry, bring nought and are not penalised");
+}
+
+/// Ticket #346 (R3): the Fuel bar on a warship's work. Below `battle_fuel` a warship holds no
+/// Orbital Control, contests no orbit, blockades nothing and intercepts nobody. The bar is the
+/// Battle charge and not "more than nought", so a warship holds an orbit exactly as long as it
+/// could still fight for it.
+#[test]
+fn a_dry_warship_holds_no_orbit_blockades_nothing_and_intercepts_nobody() {
+    let mut g = game();
+    calm(&mut g);
+    empty_orbit(&mut g, BodyId::Mars);
+    let charge = g.tables.melee.battle_fuel;
+    let mine = ship_in(&mut g, Seat(0), UnitKind::Frigate, BodyId::Mars, None, Stance::Hold);
+    // Door 1: Orbital Control. At the bar exactly it holds; one under it does not.
+    g.ship_mut(mine).unwrap().fuel = charge;
+    assert_eq!(g.orbital_control(BodyId::Mars), Some(Seat(0)), "a warship AT the bar holds Orbital Control");
+    g.ship_mut(mine).unwrap().fuel = charge - 1;
+    assert_eq!(g.orbital_control(BodyId::Mars), None, "one Fuel under it, and it holds nothing");
+    // Door 2: contesting an orbit. A dry rival warship is not a rival warship for this test.
+    let rival = ship_in(&mut g, Seat(1), UnitKind::Frigate, BodyId::Mars, None, Stance::Hold);
+    g.ship_mut(mine).unwrap().fuel = 30;
+    assert!(!g.orbit_uncontested(Seat(0), BodyId::Mars, Orbit::Low), "a fuelled rival contests the orbit");
+    g.ship_mut(rival).unwrap().fuel = charge - 1;
+    assert!(g.orbit_uncontested(Seat(0), BodyId::Mars, Orbit::Low), "a DRY rival contests nothing");
+    assert_eq!(g.orbital_control(BodyId::Mars), Some(Seat(0)), "and the fuelled hull takes the Control it was denying");
+    g.ships.retain(|s| s.id != rival);
+    // Door 3: the Blockade. A station of seat 1's, and a warship of seat 0's at its ring.
+    let station = station_at(&mut g, Seat(1), BodyId::Mars);
+    let slot = g.colony(station).unwrap().slot;
+    g.ship_mut(mine).unwrap().slot = Some(slot);
+    g.ship_mut(mine).unwrap().stance = Stance::Blockade;
+    assert!(g.slot_blockaded_against(Seat(1), BodyId::Mars, slot), "a fuelled warship on Blockade shuts the ring");
+    g.ship_mut(mine).unwrap().fuel = charge - 1;
+    assert!(!g.slot_blockaded_against(Seat(1), BodyId::Mars, slot), "a dry one shuts nothing");
+    assert!(g.slot_blockaders(BodyId::Mars, slot).is_empty(), "and is no blockader of that slot");
+    // And the order itself is refused while no warship of the seat's can pay for one.
+    let err = g.check_order(Seat(0), &[], &Order::ShipStance { body: BodyId::Mars, stance: Stance::Blockade }).unwrap_err().0;
+    assert!(err.contains("Fuel"), "the refusal says the tank is why: {err}");
+    g.ships.retain(|s| s.id != mine);
+    // Door 4: the Intercept. A dry picket catches nothing.
+    let picket = ship_in(&mut g, Seat(0), UnitKind::Frigate, BodyId::Mars, None, Stance::Intercept);
+    g.ship_mut(picket).unwrap().fuel = charge - 1;
+    let inbound = ship_in(&mut g, Seat(1), UnitKind::ColonyShip, BodyId::Earth, None, Stance::Hold);
+    g.ship_mut(inbound).unwrap().at = ShipAt::Transit { from: BodyId::Earth, to: BodyId::Mars, turns_left: 1 };
+    g.resolution_phase();
+    assert_eq!(g.war.interceptions[0], 0, "a picket under the bar intercepts nobody");
+    // The same picket, fuelled, catches the same arrival.
+    let mut g = game();
+    calm(&mut g);
+    empty_orbit(&mut g, BodyId::Mars);
+    let picket = ship_in(&mut g, Seat(0), UnitKind::Frigate, BodyId::Mars, None, Stance::Intercept);
+    g.ship_mut(picket).unwrap().fuel = charge;
+    let inbound = ship_in(&mut g, Seat(1), UnitKind::ColonyShip, BodyId::Earth, None, Stance::Hold);
+    g.ship_mut(inbound).unwrap().at = ShipAt::Transit { from: BodyId::Earth, to: BodyId::Mars, turns_left: 1 };
+    g.resolution_phase();
+    assert_eq!(g.war.interceptions[0], 1, "at the bar it catches it");
+}
+
+/// Ticket #346 (R3, read live): the bar is read off the tank at the moment it is asked, as Orbital
+/// Control always has been. A fleet that spends its last Fuel winning a Battle loses the orbit it
+/// just won, and a fresh Frigate arriving next turn takes it.
+#[test]
+fn a_fleet_that_spends_its_last_fuel_winning_a_battle_loses_the_orbit_it_won() {
+    let mut g = game();
+    calm(&mut g);
+    empty_orbit(&mut g, BodyId::Mars);
+    let charge = g.tables.melee.battle_fuel;
+    let winner = ship_in(&mut g, Seat(0), UnitKind::Battleship, BodyId::Mars, None, Stance::Attack);
+    g.ship_mut(winner).unwrap().fuel = charge;
+    let loser = ship_in(&mut g, Seat(1), UnitKind::ColonyShip, BodyId::Mars, None, Stance::Hold);
+    g.ship_mut(loser).unwrap().fuel = 30;
+    assert_eq!(g.orbital_control(BodyId::Mars), Some(Seat(0)), "before the Battle it holds the orbit");
+    g.resolution_phase();
+    assert_eq!(g.ship(winner).expect("the Battleship lived").fuel, 0, "the Battle emptied its tank");
+    assert_eq!(g.orbital_control(BodyId::Mars), None, "and it lost the orbit at that moment, not a turn later");
+    assert_eq!(g.war.hulls_left_dry[0], 1, "the sweep counts the hull the Battle left dry");
+    // A fresh Frigate arriving takes what the winner can no longer hold.
+    ship_in(&mut g, Seat(2), UnitKind::Frigate, BodyId::Mars, None, Stance::Hold);
+    assert_eq!(g.orbital_control(BodyId::Mars), Some(Seat(2)), "the fresh hull takes it");
+}
+
+/// Ticket #346 (R4): `stranded` is NOT changed. The zero-Fuel trap stays exactly where it was, at
+/// the designer's word -- "for now its stranded" -- and this test pins it so a later ticket has to
+/// change it deliberately. Not one line of `stranded` moves in this ticket.
+#[test]
+fn stranded_is_not_changed_by_the_battle_charge() {
+    let mut g = game();
+    calm(&mut g);
+    // The MOON, whose cheapest leg out (6, to Earth) is three times the Battle bar: at Mars the
+    // two figures happen to be equal, and a pin written there cannot tell them apart -- measured,
+    // by wiring `stranded` to the bar on purpose and watching a Mars pin pass anyway.
+    empty_orbit(&mut g, BodyId::Moon);
+    let ship = ship_in(&mut g, Seat(0), UnitKind::Frigate, BodyId::Moon, None, Stance::Hold);
+    let cheapest = g.cheapest_leg_from(Seat(0), BodyId::Moon).expect("a leg off the Moon");
+    let bar = g.tables.melee.battle_fuel;
+    assert!(cheapest > bar, "the Moon's cheapest leg ({cheapest}) is above the Battle bar ({bar}), so the two can be told apart");
+    // A full tank flies home: nobody is stranded with fuel for the cheapest leg.
+    assert!(!g.stranded(ship), "a full tank is not stranded");
+    g.ship_mut(ship).unwrap().fuel = cheapest;
+    assert!(!g.stranded(ship), "exactly the cheapest leg is not stranded");
+    // EVERYTHING under the cheapest leg is stranded, with no station of its own -- including every
+    // tank at or above the Battle bar, which is the pin: `stranded` reads the LEG and never the
+    // bar, and a later ticket wiring the two together turns this red.
+    for fuel in 0..cheapest {
+        g.ship_mut(ship).unwrap().fuel = fuel;
+        assert!(g.stranded(ship), "a tank of {fuel} cannot pay the cheapest leg of {cheapest}, so it is stranded");
+    }
+    // A station of its own IN ANOTHER ORBIT rescues it only while the tank can pay the orbit
+    // change: at nought, with a station in sight, it is stranded. This is the trap the designer
+    // left standing -- "for now its stranded" -- and it is pinned here so a later ticket moves it
+    // on purpose.
+    let station = station_at(&mut g, Seat(0), BodyId::Moon);
+    let slot = g.colony(station).unwrap().slot;
+    let change = g.tables.orbit_change_fuel;
+    g.ship_mut(ship).unwrap().fuel = change;
+    assert!(!g.stranded(ship), "with the orbit change in the tank the station rescues it");
+    g.ship_mut(ship).unwrap().fuel = change - 1;
+    assert!(g.stranded(ship), "a Fuel short of the orbit change, and the station in sight rescues nothing");
+    // In the station's OWN orbit it is never stranded, at nought or at anything.
+    g.ship_mut(ship).unwrap().slot = Some(slot);
+    g.ship_mut(ship).unwrap().fuel = 0;
+    assert!(!g.stranded(ship), "in the station's own ring an empty tank refuels");
+}
+
+/// Ticket #346 (R5): the computer weighs the Fuel a Battle would cost against the prize, and will
+/// not open one that strands its fleet for nothing. A WEIGHT in `ai.toml`, never a prohibition.
+#[test]
+fn the_computer_weighs_the_fuel_a_battle_would_cost() {
+    let weight = game().tables.ai.thresholds.battle_fuel_weight;
+    assert!(weight > 0.0 && weight < 1.0, "a weight and not a prohibition: {weight}");
+    let board = |fuel: i64, colony_of_mine: bool| -> Game {
+        let mut g = game();
+        calm(&mut g);
+        empty_orbit(&mut g, BodyId::Mars);
+        let mine = ship_in(&mut g, Seat(0), UnitKind::Battleship, BodyId::Mars, None, Stance::Hold);
+        g.ship_mut(mine).unwrap().fuel = fuel;
+        ship_in(&mut g, Seat(1), UnitKind::ColonyShip, BodyId::Mars, None, Stance::Hold);
+        if colony_of_mine {
+            colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat], 4);
+        }
+        g.relations.score[0][1] = -8;
+        g.relations.score[1][0] = -8;
+        g
+    };
+    // Full tanks: nothing to weigh, the appetite is whole.
+    let full = board(30, false);
+    assert_eq!(full.ai_battle_fuel_weight(Seat(0), BodyId::Mars, Some(Orbit::Low)), 1.0, "a fleet that can pay and still fight weighs nothing against the attack");
+    // Tanks at exactly the charge: paying it leaves the whole line under the bar, and the seat
+    // holds nothing at the Body the orbit was wanted for.
+    let charge = full.tables.melee.battle_fuel;
+    let stranding = board(charge, false);
+    assert_eq!(stranding.ai_battle_fuel_weight(Seat(0), BodyId::Mars, Some(Orbit::Low)), weight, "a Battle that strands the fleet for nothing is discounted");
+    // The same fleet with a Colony of its own below: the orbit is the thing it came for, so it
+    // pays at full appetite.
+    let prize = board(charge, true);
+    assert_eq!(prize.ai_battle_fuel_weight(Seat(0), BodyId::Mars, Some(Orbit::Low)), 1.0, "with a Colony below, the orbit is worth the tank");
+    // And the discount reaches the orders: with the figure at 1.0 the seat opens the Battle, and
+    // with the table's own figure it does not.
+    let mut loosened = board(charge, false);
+    std::sync::Arc::make_mut(&mut loosened.tables).ai.thresholds.battle_fuel_weight = 1.0;
+    let orders = loosened.ai_orders(Seat(0));
+    assert!(
+        orders.iter().any(|o| matches!(o, Order::ShipStance { body: BodyId::Mars, stance: Stance::Attack })),
+        "unweighed, the seat opens the Battle: {orders:?}"
+    );
+    let mut weighed = board(charge, false);
+    let orders = weighed.ai_orders(Seat(0));
+    assert!(
+        !orders.iter().any(|o| matches!(o, Order::ShipStance { body: BodyId::Mars, stance: Stance::Attack })),
+        "weighed, it does not strand its fleet for nothing: {orders:?}"
+    );
+}
+
+/// Ticket #346 (R6): what the game says. The Battle's own line carries what the fight cost in Fuel
+/// and names any hull that fought dry, out of `report.toml` and never a code literal.
+#[test]
+fn the_battle_line_says_what_the_battle_cost_in_fuel() {
+    let mut g = game();
+    calm(&mut g);
+    empty_orbit(&mut g, BodyId::Mars);
+    let charge = g.tables.melee.battle_fuel;
+    ship_in(&mut g, Seat(0), UnitKind::Frigate, BodyId::Mars, None, Stance::Attack);
+    let dry = ship_in(&mut g, Seat(1), UnitKind::Frigate, BodyId::Mars, None, Stance::Hold);
+    g.ship_mut(dry).unwrap().fuel = charge - 1;
+    let dry_name = g.ship(dry).unwrap().name.clone();
+    g.resolution_phase();
+    let line = g.report.battles.iter().find(|b| b.at == Some(ReportPlace::Orbit(BodyId::Mars, Orbit::Low))).expect("a Battle in Mars low orbit");
+    assert!(line.result.contains(&format!("{} Fuel", charge * 2 - 1)), "the line says what the Battle cost in Fuel: {}", line.result);
+    assert!(line.result.contains(&dry_name), "and names the hull that fought dry: {}", line.result);
+    // Both sentences are templates in report.toml, so a change of wording is a change of data.
+    assert!(g.tables.report.phrase("battle_fuel", &[("n", "7".to_string())]).contains('7'), "the cost is a [phrase] in report.toml");
+    assert!(g.tables.report.phrase("battle_fought_dry", &[("hulls", "PMV Aurora".to_string())]).contains("PMV Aurora"), "and so is the dry hull's clause");
+    // A Battle in which nothing fought dry says the cost and nothing else.
+    let mut g = game();
+    calm(&mut g);
+    empty_orbit(&mut g, BodyId::Mars);
+    ship_in(&mut g, Seat(0), UnitKind::Frigate, BodyId::Mars, None, Stance::Attack);
+    ship_in(&mut g, Seat(1), UnitKind::Frigate, BodyId::Mars, None, Stance::Hold);
+    g.resolution_phase();
+    let line = g.report.battles.iter().find(|b| b.at == Some(ReportPlace::Orbit(BodyId::Mars, Orbit::Low))).expect("a Battle");
+    assert!(line.result.contains(&format!("{} Fuel", charge * 2)), "two full tanks, the whole charge twice: {}", line.result);
+    assert!(!line.result.contains("fought dry"), "and nothing fought dry: {}", line.result);
+}
+
+/// Ticket #346, the error cases the load check owns: `[melee]` without `battle_fuel` or without
+/// `dry_strength_share` is a rule this build cannot price, and a share outside 0..1 is not a share.
+/// The whole table is refused rather than quietly charging nothing.
+#[test]
+fn ticket_346_a_melee_without_its_fuel_figures_refuses_the_table() {
+    let src = default_data_dir();
+    let dir = std::env::temp_dir().join(format!("dying-earth-346-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).expect("a temporary data folder");
+    for entry in std::fs::read_dir(&src).expect("the data folder") {
+        let entry = entry.expect("a data file");
+        if entry.path().is_file() {
+            std::fs::copy(entry.path(), dir.join(entry.file_name())).expect("copy");
+        }
+    }
+    assert!(Tables::load(&dir).is_ok(), "the copy loads before anything is taken out of it");
+    let units = std::fs::read_to_string(dir.join("units.toml")).expect("units.toml");
+    for figure in ["battle_fuel = 2", "dry_strength_share = 0.5"] {
+        assert!(units.contains(figure), "[melee] carries {figure}");
+        let stripped: String = units.lines().filter(|l| l.trim() != figure).collect::<Vec<_>>().join("\n");
+        std::fs::write(dir.join("units.toml"), stripped).expect("write");
+        let err = Tables::load(&dir).expect_err("a [melee] missing a Fuel figure is refused");
+        let name = figure.split(' ').next().unwrap();
+        assert!(format!("{err:?}").contains(name), "and the refusal names the missing figure: {err:?}");
+    }
+    // A share outside 0..1 is refused by the check, not by serde.
+    let bad = units.replace("dry_strength_share = 0.5", "dry_strength_share = 1.5");
+    std::fs::write(dir.join("units.toml"), bad).expect("write");
+    let err = Tables::load(&dir).expect_err("a share above 1 is refused");
+    assert!(format!("{err:?}").contains("dry_strength_share"), "{err:?}");
+    let bad = units.replace("battle_fuel = 2", "battle_fuel = -1");
+    std::fs::write(dir.join("units.toml"), bad).expect("write");
+    let err = Tables::load(&dir).expect_err("a negative charge is refused");
+    assert!(format!("{err:?}").contains("battle_fuel"), "{err:?}");
+    let _ = std::fs::remove_dir_all(&dir);
+}

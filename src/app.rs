@@ -302,6 +302,10 @@ pub enum StackBlock {
     Transits,
     /// The Change orbit door, one line per other orbit at this Body.
     ChangeOrbit,
+    /// Ticket #346 (version 0.09.1): the Tanks block, where a Ship's Fuel, its Refuel button, the
+    /// stranded warning and the dry warning all stand. It is far enough down the card that no
+    /// picture had ever reached it.
+    Tanks,
 }
 
 /// Ticket #146 (version 0.07.3): what is clicked among a Region card's slot boxes -- a standing

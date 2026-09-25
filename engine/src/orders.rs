@@ -1434,15 +1434,31 @@ impl Game {
                 // 0.09.0): **the orbit it is given in** -- LOW ORBIT, which starves the ground
                 // under an outright Orbital Control, or an Orbital Slot that is not its own
                 // station's: a rival's, or an empty one held against a builder.
-                if *stance == Stance::Blockade
-                    && !self.ships.iter().any(|s| {
+                // Ticket #346 (version 0.09.1): an Intercept is a Battle opened on an arrival, so
+                // a stack with nothing in it that can pay the Battle charge catches nobody and the
+                // order is refused rather than given to no effect. This gate is NEW: the
+                // specification said Intercept had one already and it did not -- only Blockade did.
+                if *stance == Stance::Intercept
+                    && !self.ships.iter().any(|s| s.seat == seat && s.at == ShipAt::Body(*body) && !s.escaped && self.ship_holds_the_battle_bar(s))
+                {
+                    return fail(format!("no Ship of yours here holds the {} Fuel a Battle costs; a dry hull intercepts nobody", self.tables.melee.battle_fuel));
+                }
+                // Ticket #346 (version 0.09.1): and holding the Fuel bar, since a dry warship
+                // blockades nothing once the order is given. The refusal names the tank rather
+                // than the orbit where the tank is what is wrong, so the greyed button says why.
+                if *stance == Stance::Blockade {
+                    let in_place = |g: &Game, s: &Ship| {
                         s.seat == seat
                             && s.at == ShipAt::Body(*body)
                             && s.kind.is_warship()
-                            && s.slot.is_none_or(|sl| self.station_at(*body, sl).is_none_or(|c| c.control.director() != Some(seat)))
-                    })
-                {
-                    return fail("no warship of yours sits in an orbit to blockade here");
+                            && s.slot.is_none_or(|sl| g.station_at(*body, sl).is_none_or(|c| c.control.director() != Some(seat)))
+                    };
+                    if !self.ships.iter().any(|s| in_place(self, s)) {
+                        return fail("no warship of yours sits in an orbit to blockade here");
+                    }
+                    if !self.ships.iter().any(|s| in_place(self, s) && self.ship_holds_the_battle_bar(s)) {
+                        return fail(format!("no warship of yours here holds the {} Fuel a Battle costs; a dry hull blockades nothing", self.tables.melee.battle_fuel));
+                    }
                 }
                 Ok(cost)
             }

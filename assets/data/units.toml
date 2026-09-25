@@ -138,6 +138,22 @@ rolls = 3
 # millisecond or two; raise it for a steadier figure, lower it for a cheaper one.
 odds_trials = 1000
 odds_seed = 339
+# Ticket #346 (version 0.09.1): a Battle costs Fuel. Every Ship named in any party of a SHIP melee
+# pays `battle_fuel` out of its own tank, once per Battle -- struck or not, armed or not, whichever
+# side it is on and whether or not it opened the fight. A Battery pays nothing, having no tank, and
+# an Army is untouched: a ground melee is not a space Battle.
+#
+# 2, which is a third of the cheapest leg in the game (the Moon's 6) and a fifteenth of a tank.
+# Two is also the bar a warship must hold to hold an orbit at all (see below), so a hull holds an
+# orbit exactly as long as it could still fight for it.
+battle_fuel = 2
+# A hull whose tank held LESS than `battle_fuel` when the charge was taken fights that Battle at
+# `floor(strength x dry_strength_share)`, whichever side it is on. All or nothing: a hull short by
+# one Fuel is penalised exactly as hard as one at nought. It has no clock of its own -- the penalty
+# is read off the tank at every Battle -- so a hull that never refuels fights halved every turn and
+# fights whole again the turn after it fills. Half of nought is nought, so the Colony Ship, the
+# Carrier and the Missile Carrier (strength 0) are untouched by it.
+dry_strength_share = 0.5
 
 # Ticket #296 (version 0.08.6): a Region's defence is its people. Its Standing Army adds
 # `constabulary` while a working Constabulary stands there and `calm` while Unrest is under the

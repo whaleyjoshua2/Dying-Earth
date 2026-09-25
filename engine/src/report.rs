@@ -549,6 +549,9 @@ pub const PHRASE_ARGS: &[(&str, &[&str])] = &[
     ("bombard_dead", &["n"]),
     // Ticket #343 (version 0.09.1): the people a Launch killed.
     ("launch_dead", &["n"]),
+    // Ticket #346 (version 0.09.1): what a Battle cost in Fuel, and the hulls that fought dry.
+    ("battle_fuel", &["n"]),
+    ("battle_fought_dry", &["hulls"]),
     ("sea_unrest", &["rose", "unrest"]),
     ("sea_inland", &[]),
     ("sea_inland_flipped", &["what"]),

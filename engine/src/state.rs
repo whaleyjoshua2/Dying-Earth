@@ -1135,6 +1135,16 @@ pub struct WarCounters {
     pub launch_people_killed: [f64; SEAT_COUNT],
     #[serde(default)]
     pub industry_levels_lost: [u32; SEAT_COUNT],
+    /// Ticket #346 (version 0.09.1): what the Battles cost, by the seat whose tanks paid. Fuel
+    /// taken out of Ships' tanks by the Battle charge -- never more than a hull actually had, since
+    /// the charge floors at nought -- and hulls the charge itself left UNDER the Battle bar, which
+    /// is the hull that can no longer hold an orbit, blockade or intercept and will fight the next
+    /// Battle halved. A hull already under the bar when the Battle opened is not counted here: the
+    /// Battle did not put it there.
+    #[serde(default)]
+    pub battle_fuel_burned: [i64; SEAT_COUNT],
+    #[serde(default)]
+    pub hulls_left_dry: [u32; SEAT_COUNT],
 }
 
 /// Ticket #332 (version 0.09.0): Widgets, counted where they are made and spent, so the sweep can
@@ -1191,6 +1201,9 @@ impl WarCounters {
             self.launch_buildings_burned[i] += o.launch_buildings_burned[i];
             self.launch_people_killed[i] += o.launch_people_killed[i];
             self.industry_levels_lost[i] += o.industry_levels_lost[i];
+            // Ticket #346 (version 0.09.1).
+            self.battle_fuel_burned[i] += o.battle_fuel_burned[i];
+            self.hulls_left_dry[i] += o.hulls_left_dry[i];
         }
         self.battles_vs_neutral += o.battles_vs_neutral;
         self.standing_armies_lost += o.standing_armies_lost;
@@ -2539,6 +2552,43 @@ impl Game {
         base + self.tech_addition(s.seat, TechId::HardenedHulls)
     }
 
+    /// Ticket #346 (version 0.09.1): **the Fuel bar**, the one test four doors and one penalty all
+    /// read, so they can never disagree about which hull is dry. A hull holds the bar while its
+    /// tank holds at least what a Battle charges it (`[melee] battle_fuel`), which is to say while
+    /// it could still fight for the orbit it is sitting in. Below the bar a warship holds no
+    /// Orbital Control, contests no orbit, blockades nothing and intercepts nobody, and any hull
+    /// fights at `dry_strength_share` of its strength.
+    ///
+    /// Read LIVE off the tank, as Orbital Control always has been: a fleet that spends its last
+    /// Fuel winning a Battle loses the orbit at that moment, not a turn later.
+    pub fn ship_holds_the_battle_bar(&self, s: &Ship) -> bool {
+        s.fuel >= self.tables.melee.battle_fuel
+    }
+
+    /// Ticket #346: the strength a hull brings to a Battle it enters dry -- `dry_strength_share` of
+    /// its own, rounded down. Half of nought is nought, so the Colony Ship, the Carrier and the
+    /// Missile Carrier are untouched by it.
+    pub fn ship_dry_strength(&self, s: &Ship) -> i64 {
+        (self.ship_strength(s) as f64 * self.tables.melee.dry_strength_share).floor() as i64
+    }
+
+    /// Ticket #346 (version 0.09.1): **the strength this hull would fight at if a Battle opened
+    /// now** -- its own, or `ship_dry_strength` when its tank stands under the bar. This is the one
+    /// every surface that SHOWS a strength must read, so a player is never told a figure the melee
+    /// would not use.
+    ///
+    /// It is deliberately NOT what `ship_strength` returns. `ship_strength` is the card's figure
+    /// plus Hardened Hulls and knows nothing of the tank, and it must stay that way: the melee
+    /// takes ONE reading of the tanks before the charge is levied and passes the dry flag into
+    /// `ship_combatant`, so a `ship_strength` that read the tank itself would halve a hull twice --
+    /// once for being dry, and again because the charge had just emptied it.
+    ///
+    /// Half of nought is nought, so this parts company with `ship_strength` on a Frigate and a
+    /// Battleship alone.
+    pub fn ship_fighting_strength(&self, s: &Ship) -> i64 {
+        if self.ship_holds_the_battle_bar(s) { self.ship_strength(s) } else { self.ship_dry_strength(s) }
+    }
+
     /// Ticket #270 (version 0.08.4): every Army is raised here, named as it is raised.
     pub fn raise_army(&mut self, place: Place, standing: bool) -> ArmyId {
         let id = ArmyId(self.fresh_id());
@@ -3520,7 +3570,12 @@ impl Game {
     pub fn orbital_control(&self, body: BodyId) -> Option<Seat> {
         let mut holders = Seat::ALL
             .into_iter()
-            .filter(|seat| self.ships.iter().any(|s| s.seat == *seat && self.ship_in_orbit(s, body, Orbit::Low) && s.kind.is_warship() && !s.escaped));
+            // Ticket #346 (version 0.09.1): and holding the Fuel bar. A warship whose tank cannot
+            // pay the Battle charge holds nothing: it could not fight for the orbit it is sitting
+            // in, so it does not shut the ground below it either.
+            .filter(|seat| {
+                self.ships.iter().any(|s| s.seat == *seat && self.ship_in_orbit(s, body, Orbit::Low) && s.kind.is_warship() && !s.escaped && self.ship_holds_the_battle_bar(s))
+            });
         match (holders.next(), holders.next()) {
             // Ticket #324 (version 0.08.8): a rival's Battery denies it. Ticket #335: a Battery
             // covers its own orbit alone, so it is low orbit's Batteries -- the ground Colonies' --
@@ -3535,7 +3590,10 @@ impl Game {
     /// orbit's and gates the ground; THIS is what a station's own orbit asks of the Ship that
     /// would Bombard the station standing there.
     pub fn orbit_uncontested(&self, seat: Seat, body: BodyId, orbit: Orbit) -> bool {
-        let rival_warship = self.ships.iter().any(|s| s.seat != seat && s.kind.is_warship() && !s.escaped && self.ship_in_orbit(s, body, orbit));
+        // Ticket #346 (version 0.09.1): a DRY rival warship is not a rival warship for this test.
+        // It cannot pay the Battle charge, so it cannot contest what it cannot fight for.
+        let rival_warship =
+            self.ships.iter().any(|s| s.seat != seat && s.kind.is_warship() && !s.escaped && self.ship_holds_the_battle_bar(s) && self.ship_in_orbit(s, body, orbit));
         !rival_warship && !self.battery_stands_against(seat, body, orbit)
     }
 
@@ -3617,8 +3675,10 @@ impl Game {
     }
 
     /// Ticket #278: a warship on Blockade, still engaged. The one test every blockade reads.
+    /// Ticket #346 (version 0.09.1): and holding the Fuel bar, as every other door a warship's
+    /// presence opens now does. A hull that cannot pay for a Battle cannot shut a ring against one.
     fn blockading(&self, s: &Ship) -> bool {
-        s.kind.is_warship() && !s.escaped && s.stance == Stance::Blockade
+        s.kind.is_warship() && !s.escaped && s.stance == Stance::Blockade && self.ship_holds_the_battle_bar(s)
     }
 
     /// Ticket #99: the seats blockading this slot, for the card and the Report.

@@ -194,7 +194,12 @@ impl Game {
                     let interceptors: Vec<ShipId> = self
                         .ships
                         .iter()
-                        .filter(|s| s.seat == seat && self.ship_in_orbit(s, body, orbit) && s.stance == Stance::Intercept && !s.escaped)
+                        // Ticket #346 (version 0.09.1): and holding the Fuel bar. An Intercept is a
+                        // Battle opened on an arrival, so a hull whose tank cannot pay the Battle
+                        // charge catches nobody. The filter reads every Ship on the stance, as it
+                        // always has, and not only the warships: the bar is about paying for the
+                        // fight, and an unarmed hull on Intercept opens one just the same.
+                        .filter(|s| s.seat == seat && self.ship_in_orbit(s, body, orbit) && s.stance == Stance::Intercept && !s.escaped && self.ship_holds_the_battle_bar(s))
                         .map(|s| s.id)
                         .collect();
                     if interceptors.is_empty() {
@@ -516,12 +521,24 @@ impl Game {
     }
 
     /// Ticket #324 (version 0.08.8): a unit of an orbital line, Ship or Battery, as a combatant.
-    fn unit_combatant(&self, u: UnitRef) -> Combatant {
+    /// Ticket #346 (version 0.09.1): `dry` is whether this unit's tank was under the Battle bar
+    /// when the charge was taken, in which case it fights at `[melee] dry_strength_share` of its
+    /// strength. It is passed IN rather than read here so the charge and the penalty read one
+    /// reading of the tanks and can never disagree about which hulls were dry. A Battery has no
+    /// tank and an Army never reaches a Ship melee, so for both of them it is always false.
+    fn unit_combatant(&self, u: UnitRef, dry: bool) -> Combatant {
         match u {
-            UnitRef::Ship(id) => self.ship_combatant(id),
+            UnitRef::Ship(id) => self.ship_combatant(id, dry),
             UnitRef::Army(id) => self.army_combatant(id, false),
             UnitRef::Battery { colony, index } => self.battery_combatant(colony, index),
         }
+    }
+
+    /// Ticket #346 (version 0.09.1): whether a unit's tank stands under the Battle bar RIGHT NOW.
+    /// What the odds figure reads, since the odds are asked before any charge is taken and the
+    /// tanks as they stand are the tanks the fight would be fought on. A Battery is never dry.
+    fn unit_is_dry(&self, u: UnitRef) -> bool {
+        matches!(u, UnitRef::Ship(id) if self.ship(id).is_some_and(|s| !self.ship_holds_the_battle_bar(s)))
     }
 
     /// Ticket #324 (version 0.08.8): a Battery in the line: its card's strength and hit points, its
@@ -534,13 +551,17 @@ impl Game {
         Combatant::new(UnitRef::Battery { colony, index }, name, card.strength, card.hit_points, damage, 0, false).dug_in(true)
     }
 
-    fn ship_combatant(&self, id: ShipId) -> Combatant {
+    fn ship_combatant(&self, id: ShipId, dry: bool) -> Combatant {
         let s = self.ship(id).unwrap();
         let card = self.tables.unit(s.kind);
         // Ticket #281 (version 0.08.5): by name, as every other surface has it since 0.08.1.
         // Ticket #326 (version 0.08.8): a Colony Ship or a Carrier is unarmed, and its escorts take
         // the fire while any stands engaged.
-        Combatant::new(UnitRef::Ship(id), self.ship_name(s), self.ship_strength(s), card.hit_points, s.damage, card.pursuit, s.stance == Stance::Evade).armed(s.kind.is_warship())
+        // Ticket #346 (version 0.09.1): a hull that could not pay the Battle charge fights at
+        // `dry_strength_share` of its strength, whichever side of the Battle it is on. Half of
+        // nought is nought, so the Colony Ship, the Carrier and the Missile Carrier are untouched.
+        let strength = if dry { self.ship_dry_strength(s) } else { self.ship_strength(s) };
+        Combatant::new(UnitRef::Ship(id), self.ship_name(s), strength, card.hit_points, s.damage, card.pursuit, s.stance == Stance::Evade).armed(s.kind.is_warship())
     }
 
     /// `defending`: the Army is not on the aggressor's side of this melee. Ticket #302 (version
@@ -608,7 +629,7 @@ impl Game {
                 .filter(|x| x.seat == s && self.ship_in_orbit(x, body, orbit) && !x.escaped)
                 .map(|x| UnitRef::Ship(x.id))
                 .chain(self.batteries_at(s, body, orbit).into_iter().map(|(colony, index)| UnitRef::Battery { colony, index }))
-                .map(|u| self.unit_combatant(u))
+                .map(|u| self.unit_combatant(u, self.unit_is_dry(u)))
                 .collect()
         };
         let mine = line(seat);
@@ -652,13 +673,63 @@ impl Game {
                 self.offend_by(*aggressor, *other, 3);
             }
         }
-        let units: Vec<(Option<Seat>, bool, Vec<Combatant>)> =
-            parties.iter().map(|(seat, agg, ids)| (Some(*seat), *agg, ids.iter().map(|u| self.unit_combatant(*u)).collect())).collect();
+        // Ticket #346 (version 0.09.1): **the charge**, taken at the head of the Battle from ONE
+        // reading of the tanks. Every Ship named in any party pays `[melee] battle_fuel` out of its
+        // own tank, once, floored at nought -- struck or not, armed or not, whichever side it is on
+        // and whether or not it opened the fight. A Battery has no tank and is skipped; an Army
+        // never reaches this melee, a ground fight being no space Battle.
+        //
+        // The reading is taken BEFORE a drop is spent and the dry penalty below is computed from
+        // the same reading, so the charge and the penalty can never disagree about which hulls were
+        // dry: a hull with exactly the charge in its tank pays it and fights whole, and is dry for
+        // the NEXT Battle.
+        let charge = self.tables.melee.battle_fuel;
+        let hulls: Vec<(Seat, ShipId)> =
+            parties.iter().flat_map(|(seat, _, ids)| ids.iter().filter_map(move |u| if let UnitRef::Ship(id) = u { Some((*seat, *id)) } else { None })).collect();
+        let mut dry: Vec<ShipId> = Vec::new();
+        // Only a hull with strength to lose is NAMED as having fought dry: half of nought is
+        // nought, so an unarmed hull fought dry and fought no differently, and saying so would be
+        // noise in the Report.
+        let mut fought_dry: Vec<String> = Vec::new();
+        let mut takings: Vec<(Seat, ShipId, i64, bool)> = Vec::new();
+        for (seat, id) in &hulls {
+            let Some(s) = self.ship(*id) else { continue };
+            let held = self.ship_holds_the_battle_bar(s);
+            let take = s.fuel.clamp(0, charge);
+            if !held {
+                dry.push(*id);
+                if self.ship_strength(s) > 0 {
+                    fought_dry.push(self.ship_name(s));
+                }
+            }
+            takings.push((*seat, *id, take, held && s.fuel - take < charge));
+        }
+        let mut burned = 0i64;
+        for (seat, id, take, left_dry) in takings {
+            if let Some(s) = self.ship_mut(id) {
+                s.fuel -= take;
+            }
+            burned += take;
+            self.war.battle_fuel_burned[seat.index()] += take;
+            if left_dry {
+                self.war.hulls_left_dry[seat.index()] += 1;
+            }
+        }
+        let units: Vec<(Option<Seat>, bool, Vec<Combatant>)> = parties
+            .iter()
+            .map(|(seat, agg, ids)| (Some(*seat), *agg, ids.iter().map(|u| self.unit_combatant(*u, matches!(u, UnitRef::Ship(id) if dry.contains(id)))).collect()))
+            .collect();
         // Ticket #327 (version 0.08.8): one hit roll a round for every engaged armed unit present,
         // never fewer than the table's figure.
         let armed = units.iter().flat_map(|(_, _, c)| c.iter()).filter(|c| c.armed && c.engaged && !c.destroyed()).count() as u32;
         let rolls = armed.max(self.tables.melee.rolls);
         let mut line = self.run_melee(place, Some(ReportPlace::Orbit(body, orbit)), units, rolls);
+        // Ticket #346 (version 0.09.1): what the Battle took out of the tanks, and the hulls that
+        // fought it under the bar, both out of `report.toml`.
+        line.result.push_str(&self.phrase("battle_fuel", &[("n", burned.to_string())]));
+        if !fought_dry.is_empty() {
+            line.result.push_str(&self.phrase("battle_fought_dry", &[("hulls", fought_dry.join(", "))]));
+        }
         // Ticket #286 (version 0.08.5): counted by the seat that opened it.
         for (seat, _, _) in parties.iter().filter(|(_, agg, _)| *agg) {
             self.war.battles[seat.index()] += 1;

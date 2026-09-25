@@ -593,6 +593,16 @@ fn main() {
                                 warc.launch_people_killed.map(|v| v.round() as i64),
                                 warc.industry_levels_lost
                             );
+                            // Ticket #346 (version 0.09.1): what the Battles cost in Fuel, by seat,
+                            // and the hulls a Battle left under the Battle bar -- unable to hold an
+                            // orbit, blockade or intercept until they refuel.
+                            println!(
+                                "      Fuel burned in Battle over the batch, by seat {:?} ({} in all); hulls left dry by a Battle {:?} ({} in all)",
+                                warc.battle_fuel_burned,
+                                warc.battle_fuel_burned.iter().sum::<i64>(),
+                                warc.hulls_left_dry,
+                                warc.hulls_left_dry.iter().sum::<u32>()
+                            );
                             println!("      Natural Sink at the end: median {sink_med:.2} over {} games", sinks_end.len());
                             println!("      The whole Tech Tree completed in {}/{seeds} seeds (median turn {})", tree_turns.len(), median_u(&mut tree_turns));
                             println!("      Breaks fired: {}", fired.join(", "));
@@ -618,6 +628,12 @@ fn main() {
             all_warc.launch_buildings_burned.iter().sum::<u32>(),
             all_warc.launch_people_killed.iter().sum::<f64>(),
             all_warc.industry_levels_lost.iter().sum::<u32>()
+        );
+        // Ticket #346 (version 0.09.1): the same, a TOTAL over every seat of every seating.
+        println!(
+            "  Battles cost, all seats and seatings: Fuel burned in Battle {}, hulls left dry by a Battle {}",
+            all_warc.battle_fuel_burned.iter().sum::<i64>(),
+            all_warc.hulls_left_dry.iter().sum::<u32>()
         );
     }
 }

@@ -1252,6 +1252,12 @@ pub struct AiThresholds {
     /// Ticket #345: what the founding appetite is multiplied by at a Body whose first is still
     /// unclaimed -- the landing that takes a world is worth more than the landing that joins one.
     pub first_found_weight: f64,
+    /// Ticket #346 (version 0.09.1): what the orbital Attack's appetite is multiplied by when
+    /// opening the Battle would leave the seat's whole armed line in that orbit under the Battle
+    /// bar AND the seat holds nothing at the Body to hold the orbit for. A WEIGHT and never a
+    /// prohibition, at the designer's word: the attack still competes, and still wins where the
+    /// seat wants nothing else. 1.0 here and the computer seats spend the Fuel without weighing it.
+    pub battle_fuel_weight: f64,
 }
 
 /// Ticket #50: one pick list per Faction. `order` is tried first, then the cheapest available
@@ -1462,6 +1468,14 @@ pub struct MeleeCard {
     /// the FIGURE's, never the game's, so reading the odds cannot move a seeded game.
     pub odds_trials: u32,
     pub odds_seed: u64,
+    /// Ticket #346 (version 0.09.1): what one SHIP Battle takes out of every tank named in it, and
+    /// the share of its strength a hull that could not pay fights at. Neither has a serde default:
+    /// a figure missing from `[melee]` refuses the whole table at load, which is the error case the
+    /// ticket asks for. `battle_fuel` is also the bar a warship must hold to hold Orbital Control,
+    /// to contest an orbit, to blockade and to intercept, so the one figure carries both rules and
+    /// they can never drift apart.
+    pub battle_fuel: i64,
+    pub dry_strength_share: f64,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -2115,6 +2129,15 @@ impl Tables {
         // Ticket #327: a melee of no rounds or no rolls is no melee.
         if self.melee.rounds == 0 || self.melee.rolls == 0 {
             return Err(err("units.toml", "[melee] rounds and rolls must both be at least 1"));
+        }
+        // Ticket #346 (version 0.09.1): a negative charge would REFILL a tank in a Battle, and a
+        // share outside 0..1 would either wipe a dry hull's strength past nought or reward it for
+        // being dry. Absence is refused by serde, these two figures carrying no default.
+        if self.melee.battle_fuel < 0 {
+            return Err(err("units.toml", "[melee] battle_fuel cannot be negative: a Battle takes Fuel, it does not give it"));
+        }
+        if !(0.0..=1.0).contains(&self.melee.dry_strength_share) {
+            return Err(err("units.toml", "[melee] dry_strength_share must be between 0 and 1"));
         }
         for s in &self.states {
             if s.unrest < 0.0 || s.unrest > u.max {

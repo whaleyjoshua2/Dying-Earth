@@ -193,6 +193,11 @@ bombard_dead = ", {n} Colonists dead with it"
 # Ticket #343 (version 0.09.1): the people a Launch killed, counted in units of population -- one
 # unit, one million people, since ticket #333.
 launch_dead = ", {n} million dead"
+# Ticket #346 (version 0.09.1): what a Battle in orbit took out of the tanks that fought it, and
+# the hulls that fought it under the Battle bar and so at half strength. Both are clauses of the
+# Battle's own record, after the rounds and before the word on Orbital Control.
+battle_fuel = " The Battle cost {n} Fuel."
+battle_fought_dry = " {hulls} fought dry, at half strength."
 sea_unrest = " Unrest there rose by {rose} to {unrest}."
 # Ticket #276 (version 0.08.5): every rise turns one inland slot coastal, wall or no wall; an empty
 # slot first, else the oldest inland Facility with its slot.
