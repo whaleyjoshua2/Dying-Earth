@@ -12504,6 +12504,12 @@ fn low_orbit_touches_the_ground_and_a_stations_own_orbit_touches_the_station() {
     g.state_mut(StateId::EastAsia).emigrants = 4;
     let lift = Order::Load { ship: hauler, colonists: 2, from: LoadSource::State(StateId::EastAsia), army: None };
     assert!(g.check_order(Seat(0), &[], &lift).is_ok(), "at the ISS's ring it takes the lift");
+    // And the lift LANDS there: committed, it lifts at this turn's Resolution, which reads no orbit.
+    let mut lifted = g.clone();
+    lifted.commit_orders(Seat(0), std::slice::from_ref(&lift));
+    lifted.resolution_phase();
+    assert_eq!(lifted.ship(hauler).unwrap().colonists, 4, "two Pioneers lifted onto the two it carried, at the ISS's ring");
+    assert_eq!(lifted.state(StateId::EastAsia).emigrants, 2, "and two still waiting");
     g.ship_mut(hauler).unwrap().slot = None;
     assert!(g.check_order(Seat(0), &[], &lift).is_ok(), "in low orbit it takes the lift");
     // Founding a Colony on the ground: low orbit alone.
