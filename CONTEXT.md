@@ -171,7 +171,7 @@ The strip across the head of the game screen: a row of the world's and the playe
 _Avoid_: HUD, header, status bar, ribbon
 
 **Command Cluster**:
-The strip along the foot of the side panel, since version 0.07.1, holding the controls a player reaches for every turn: the Influence still unspent, Spend on whatever place is selected, Max (Defence until version 0.07.3), and End Turn. It does not scroll: the card or the Roster scrolls above it. It is the only place End Turn stands. Since version 0.08.6 the spend is set on the same slider the Smear and the Greenwash use, Max moves that slider to the bound as well as placing the order, the whole strip is a tenth larger again, and End Turn is the sun. Since version 0.08.7 the strip is two columns: the four rows (the Allotment, the slider, Spend, then Max and the every-turn tick) on the left, and the sun alone in its own column at the right, at the bottom, level with the Max row.
+The strip along the foot of the side panel, since version 0.07.1, holding the controls a player reaches for every turn: the Influence still unspent, Spend on whatever place is selected, Max (Defence until version 0.07.3), and End Turn. It does not scroll: the card or the Roster scrolls above it. It is the only place End Turn stands. Since version 0.08.6 the spend is set on the same slider the Smear and the Greenwash use, Max moves that slider to the bound as well as placing the order, the whole strip is a tenth larger again, and End Turn is the sun. Since version 0.08.7 the strip is two columns: the four rows (the Allotment, the slider, Spend, then Max and the every-turn tick) on the left, with, since version 0.09.1, the player's **Pressed** places listed under the slider, and the sun alone in its own column at the right, at the bottom, level with the Max row.
 _Avoid_: action bar, toolbar, HUD, control panel
 
 **Max**:
@@ -531,8 +531,12 @@ The Standing a Faction must reach to take a place. A Region's is a base plus a f
 _Avoid_: cost, price, target (for the Influence sense); the climate sense, which is a Break or a Sea Level threshold
 
 **Challenger line**:
-The line in a held place's Standings block, since version 0.08.4, naming the rival nearest to taking it by Influence -- nearest its own price, not the highest Standing -- and how far off it stands: *The Prospectors stand at 47; they take this at 70.* Amber, with *Spend here to stay ahead.*, when they press within two steps; the arithmetic on its hover; *No rival has a Standing here.* when nobody does.
+The line in a held place's Standings block, since version 0.08.4, naming the rival nearest to taking it by Influence -- nearest its own price, not the highest Standing -- and how far off it stands: *The Prospectors stand at 47; they take this at 70.* Amber, with *Spend here to stay ahead.*, when the place is **Pressed** (since version 0.09.1; before it, when the nearest rival alone stood within two steps); the arithmetic on its hover; *No rival has a Standing here.* when nobody does.
 _Avoid_: rival line, warning line, contest indicator
+
+**Pressed**:
+Said of a place a Faction holds, since version 0.09.1, when any rival's Standing there is within 10 of the holder's own. Being Pressed is not being about to lose it: the rival still needs the holder's Standing plus the challenge margin, and at least the threshold, to take it. It is measured against the holder's Standing and not against the rival's price, so that it comes early, since a turn's Allotment can cover 10 at once. The player's Pressed places are listed under the Influence slider in the **Command Cluster**, whatever is selected, as *Bavaria is Pressed by a rival.*, never naming the rival.
+_Avoid_: threatened, contested (an orbit is Contested), at risk, challenged
 
 **Threat line**:
 The challenger line's military counterpart on a held Region, since version 0.08.7: the rival raised Army standing in a neighbouring Region with the best first-exchange odds against the Region's defenders, named with its strength and the Region it stands in -- *The Prospectors' 2nd Russian Army, strength 3, stands next door in Russia.* -- and never with its stance, as a Region arms stance-blind. Amber, with *Dig In here to hold it.*, when their odds reach the bar the computer seats attack at, which is the computer's habit and not a rule; the arithmetic on its hover; no line at all when nobody stands next door. Regions only: a Colony has no neighbours.
