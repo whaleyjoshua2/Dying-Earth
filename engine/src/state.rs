@@ -1712,7 +1712,11 @@ impl Game {
             // Ticket #290 (version 0.08.6): and with the card's Colonists aboard, from nowhere, so a
             // starting station has Module slots to build in from turn one; bare, it had none.
             let aboard = game.tables.faction(game.kind(seat)).start_colonists;
-            game.colonies.push(Colony { id, body: BodyId::Earth, slot: slot as u32, control: Control::Controlled(seat), modules: vec![Module::new(ModuleKind::Core)], colonists: aboard, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
+            // Ticket #377 (version 0.09.2): and the `[start]` table's Modules beside the Core -- a
+            // Solar Array -- in the Faction's own versions.
+            let mut modules = vec![Module::new(ModuleKind::Core)];
+            modules.extend(game.tables.start.station_modules.iter().map(|k| Module::new(k.built_by(game.kind(seat)))));
+            game.colonies.push(Colony { id, body: BodyId::Earth, slot: slot as u32, control: Control::Controlled(seat), modules, colonists: aboard, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
         }
         // Starting positions (spec 14.3, ticket #50): the player's pick, then each AI seat in turn.
         let mut taken = vec![setup.player_start];
@@ -1722,15 +1726,23 @@ impl Game {
         }
         for (sid, seat) in taken.iter().zip(Seat::ALL) {
             game.take_control(*sid, seat);
-            game.add_start_facility(*sid, FacilityKind::LaunchSite);
-            // Ticket #181 (version 0.08.0): a Faction's start Region's Facilities come up as that
-            // Faction's own versions, the Launch Site just added included. The consequences are
-            // asymmetric and were accepted knowingly: every start Region is handed a Launch Site, so
-            // the ARKWRIGHTS hold a Spaceport from turn 1; ten of the fourteen Regions start with a
-            // Power Plant, so the ARCHIVISTS usually hold a Reactor; and neither the Bank nor the
-            // School is in any Region's start Facilities, so the PROSPECTORS and the CUSTODIANS start
-            // with nothing of theirs and must build for their clause.
+            // Ticket #377 (version 0.09.2): **equal starts.** A home Region's card list is set aside
+            // and the `[start]` table's package stands in its place -- a Power Plant, a Factory, a
+            // Mine, a Refinery and the Launch Site -- plus whatever the Faction's card adds (the
+            // Arkwrights' second Power Plant). Until this ticket the card's list stayed and a Launch
+            // Site was added to it, so the EU opened on four Facilities, India on three with no
+            // Refinery, and the US on five with a Research Lab.
             let faction = game.kind(seat);
+            game.state_mut(*sid).facilities.clear();
+            let package: Vec<FacilityKind> = game.tables.start.home_facilities.iter().chain(game.tables.faction(faction).start_extra_facilities.iter()).copied().collect();
+            for kind in package {
+                game.add_start_facility(*sid, kind);
+            }
+            // Ticket #181 (version 0.08.0): a Faction's start Region's Facilities come up as that
+            // Faction's own versions, the Launch Site included: the ARKWRIGHTS hold a Spaceport from
+            // turn 1 and the ARCHIVISTS a Reactor; neither the Bank nor the School is in the package,
+            // so the PROSPECTORS and the CUSTODIANS start with nothing of theirs and must build for
+            // their clause.
             for f in game.state_mut(*sid).facilities.iter_mut() {
                 f.kind = f.kind.built_by(faction);
             }

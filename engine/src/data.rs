@@ -640,6 +640,11 @@ pub struct FactionCard {
     /// field it fills (see **Pioneer** in `CONTEXT.md`).
     #[serde(default)]
     pub start_emigrants: u32,
+    /// Ticket #377 (version 0.09.2): Facilities this Faction's home Region starts with on top of
+    /// the standard package -- the Arkwrights' second Power Plant, in place of the Solar Array
+    /// every other seat's station carries.
+    #[serde(default)]
+    pub start_extra_facilities: Vec<FacilityKind>,
     // Ticket #51: the per-Faction figures the Arkwrights' card carries. Every one is neutral by
     // default, so a card that names none plays exactly as it did before.
     /// What a Habitat here holds, times this.
@@ -773,6 +778,13 @@ pub struct StartCard {
     pub research: i64,
     #[serde(default)]
     pub ducats: i64,
+    /// Ticket #377 (version 0.09.2): the Facilities every home Region starts with, in place of its
+    /// card's list, so the four seats open equal whatever Regions they open in.
+    #[serde(default)]
+    pub home_facilities: Vec<FacilityKind>,
+    /// Ticket #377: the Modules every starting station carries beside its Core.
+    #[serde(default)]
+    pub station_modules: Vec<ModuleKind>,
 }
 
 /// Ticket #35: what Ducats buy.
@@ -2296,6 +2308,11 @@ impl Tables {
     /// NOT adjacent to any state already taken, with the highest Industry Level, ties by population;
     /// if every free state touches a taken one, the highest Industry Level free state, ties by
     /// population. A tie the population does not settle keeps the table's order.
+    ///
+    /// Ticket #377 (version 0.09.2) tried the richest free Region instead (by GDP), which put all
+    /// four seats in the four biggest economies; the sweep collapsed 78 of 80 games where this rule
+    /// collapses 44, and the designer kept the spread. The seats' Regions stay unequal in their
+    /// economies; what #377 equalised is the Facilities every home Region starts with.
     ///
     /// Ticket #64: it lives on the tables rather than on a game, because a spectated game has to
     /// pick seat 0's start by this same rule before there is a game to ask.

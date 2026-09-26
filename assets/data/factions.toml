@@ -149,6 +149,9 @@ ship_materials_multiplier = 0.85
 # three quarters (both rounded down).
 station_materials_multiplier = 0.5
 module_materials_multiplier = 0.75
+# Ticket #377 (version 0.09.2): with no station to carry the Solar Array every other seat's
+# station starts with, a second Power Plant in the home Region.
+start_extra_facilities = ["power_plant"]
 signature = "Coach Class. A Colony Ship carries 8 Colonists, 12 with Expanded Habitats, and their Habitats hold half again as many, 6 and 12. They recruit 8 Pioneers a turn where others recruit 4, but every Pioneer takes twice the population. Every Ship costs them 15% less, a Colony Ship 25 Materials; a transit burns three quarters of the Fuel; and, starting with no station, a Space Station costs them 20 Materials and a Module three quarters."
 # Ticket #203 (version 0.08.1). The building is ticket #183's.
 unique = "Spaceport -- replaces the Launch Site, and pays +1 Influence into next turn's Allotment for every Pioneer it lifts off Earth. Off Earth, the Chorus -- replaces the Relay, and adds +1 Influence to the Allotment for every 6 Colonists at its Colony."
@@ -380,6 +383,13 @@ fuel = 20
 energy = 20
 research = 0
 ducats = 0
+# Ticket #377 (version 0.09.2): equal starts. Every home Region starts with exactly these
+# Facilities, in the Faction's own versions, whatever the Region's card lists -- the card's list
+# is what a NEUTRAL Region stands with. Before this the EU opened on four Facilities and India on
+# three with no Refinery, and the US carried a Research Lab on top.
+home_facilities = ["power_plant", "factory", "mine", "refinery", "launch_site"]
+# Ticket #377: every starting station carries these beside its Core Module.
+station_modules = ["solar_array"]
 
 # Ticket #35 (version 0.03): Ducats. A controlled Nation State makes gdp x Industry Level / 10 a turn
 # (gdp on its card); a Bank adds bank_per_gdp_tenth x gdp / 10; a Trade Post makes trade_post_base x

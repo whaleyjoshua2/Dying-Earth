@@ -246,3 +246,37 @@ Ship's card, since that is where the buttons went. No rule changes; no save chan
 **Why.** The designer: *"clean up ships at body cards - ships should each have their own card.
 bodies and orbits about which should each be their own drop down both on their own cards and the one
 listing all the ships at a body."*
+
+## 12. Equal starts
+
+The authority is [ticket #377](https://github.com/whaleyjoshua2/Dying-Earth/issues/377).
+
+**Every home Region starts with the same Facilities**: a Power Plant, a Factory, a Mine, a Refinery
+and the Launch Site, in the Faction's own versions (the Archivists' Reactor, the Arkwrights'
+Spaceport), whatever the Region's card lists and nothing more. The card's list is what a **neutral**
+Region stands with. So any Region the player picks starts with the same package; the EU, which
+opened on four, India on three with no Refinery, and the United States on five with a Research Lab,
+all open on these five. The package is the `[start]` table's `home_facilities` in `factions.toml`.
+
+**Every starting station carries a Solar Array** beside its Core Module (the `[start]` table's
+`station_modules`). **The Arkwrights, who start with no station, hold a second Power Plant** in
+their home Region in its place (`start_extra_facilities` on their card). The rest of the Arkwrights'
+start is unchanged: no station, two Pioneers at home in place of the two Colonists the other three
+have aboard; it is the Faction's written flavour, not the map's accident.
+
+**The Solar Array takes one of the station's two Module slots**, as any Module does, so a starting
+station opens with one slot free; the Prospectors' computer, which scores the Exchange above the
+opening Habitat, opens with an Exchange there.
+
+**The computer seats' Regions are unchanged**: the spread rule stands (the highest Industry Level
+*not next to a taken Region*, ties by population), so with the player in the EU the computer opens in
+China, Saudi Arabia and Australia. Taking the richest free Regions instead was tried in this ticket
+and reverted: with all four seats in the four biggest economies the sweep collapsed 78 games of 80
+where the spread collapses 44. The Regions' economies stay unequal; what is equal is the Facilities.
+The stockpile is unchanged, 80 Materials, 20 Fuel, 20 Energy, the same for all four.
+
+**Why.** The designer: *"examine starting resources/buildings and equalize."* Measured on turn 1
+with the driver, the player in the EU earned 12 Ducats a turn from four Facilities while the
+computer seats earned about one apiece from two or three; the Facilities were the small gap and
+the Region's economy the large one. The designer levelled the Facilities, added the Solar Array,
+tried the rich Regions for the computer and, on the sweep's figures, kept the spread.

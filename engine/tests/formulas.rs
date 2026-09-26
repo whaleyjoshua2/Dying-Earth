@@ -16,10 +16,16 @@ fn tables() -> Arc<Tables> {
 /// board: the start Facilities of ticket #24 are stripped (Launch Sites stay) so each test places
 /// exactly the buildings it reasons about. `fresh()` keeps the real start.
 /// Ticket #50: seat 1 is the Prospectors, seat 2 the Arkwrights, seat 3 the Archivists.
+/// Ticket #377 (version 0.09.2): the Solar Array every starting station carries is stripped for the
+/// same reason -- it makes 6 Energy a turn and holds a Module slot, and a test about a figure or a
+/// slot should place it itself; the Core Modules stay, as they have since ticket #164.
 fn game() -> Game {
     let mut g = fresh();
     for s in &mut g.states {
         s.facilities.retain(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite));
+    }
+    for c in g.colonies.iter_mut().filter(|c| c.in_orbit && c.body == BodyId::Earth && c.founded_turn == 1) {
+        c.modules.retain(|m| m.kind.does_the_job_of(ModuleKind::Core));
     }
     g
 }
@@ -575,7 +581,9 @@ fn a_station_is_built_for_materials_in_an_orbital_slot_and_holds_only_a_shipyard
     assert_eq!(g.place_name(Place::Colony(tiangong)), "Tiangong over Earth");
     assert_eq!(g.place_name(Place::Colony(axiom)), "Axiom over Earth");
     assert!(station_of(&g, Seat(2), BodyId::Earth).is_none(), "the Arkwrights start with no station");
-    // Ticket #164 (version 0.07.5): a station stands with its Core Module and nothing else.
+    // Ticket #164 (version 0.07.5): a station stands with its Core Module and nothing else. Ticket
+    // #377 (version 0.09.2): the real start adds a Solar Array beside it; `game()` strips that, so
+    // on this bare board the Core is alone.
     assert_eq!(g.colony(iss).unwrap().modules.len(), 1, "its Core Module, and no Shipyard at the start");
     assert_eq!(g.colony(iss).unwrap().modules[0].kind, ModuleKind::Core);
     assert!(g.colony(iss).unwrap().in_orbit);
@@ -1558,23 +1566,16 @@ fn building_yields_on_the_card_equal_what_income_pays() {
 // ---------------------------------------------------------------- #24 start buildings
 
 #[test]
-fn every_state_starts_with_its_start_facilities_and_the_faction_states_add_a_launch_site() {
+fn every_neutral_state_starts_with_its_start_facilities() {
     let g = fresh();
     for sid in StateId::ALL {
         let card = g.tables.state(sid);
-        let have: Vec<FacilityKind> = g.state(sid).facilities.iter().map(|f| f.kind).collect();
-        let mut want = card.start_facilities.clone();
-        // Ticket #181 (version 0.08.0): a Faction's start Region's Facilities come up as that
-        // Faction's own versions, the added Launch Site included -- so the Arkwrights' start Region
-        // carries a Spaceport and Australia's Power Plant is the Archivists' Reactor.
-        if let Some(seat) = g.state(sid).control.controller() {
-            want.push(FacilityKind::LaunchSite);
-            let faction = g.kind(seat);
-            for k in want.iter_mut() {
-                *k = k.built_by(faction);
-            }
+        // Ticket #377 (version 0.09.2): a home Region's start is the standard package, tested on
+        // its own; the card's list is what a NEUTRAL Region stands with.
+        if g.state(sid).control.controller().is_none() {
+            let have: Vec<FacilityKind> = g.state(sid).facilities.iter().map(|f| f.kind).collect();
+            assert_eq!(have, card.start_facilities, "{}", card.name);
         }
-        assert_eq!(have, want, "{}", card.name);
         // Ticket #69: North America and South-East Asia carry a Research Lab on top of the count.
         let labs = card.start_facilities.iter().filter(|k| **k == FacilityKind::ResearchLab).count() as u32;
         // Ticket #332 (version 0.09.0): and a Mine beside every start Factory, on top of the count.
@@ -1606,8 +1607,10 @@ fn start_income_flows_from_turn_one() {
     assert!(s.income_last_turn.fuel > 0, "Fuel income on turn one: {:?}", s.income_last_turn);
     // Asia's start (Factory, Power Plant, Refinery and the Launch Site) pays 7 Energy against 6 made,
     // since ticket #164 the ISS's Core Module pays 1 more, and since ticket #332 (version 0.09.0)
-    // the start Mine beside the Factory pays 2 more.
-    assert_eq!(s.income_last_turn.energy, -4, "{:?}", s.income_last_turn);
+    // the start Mine beside the Factory pays 2 more: -4. Ticket #377 (version 0.09.2): the home
+    // package is the same five buildings (Power Plant +6, Factory -2, Mine -2, Refinery -3, Launch
+    // Site -2 = -3, the Core -1), and the ISS's Solar Array makes 6 over Earth for no upkeep: +2.
+    assert_eq!(s.income_last_turn.energy, 2, "{:?}", s.income_last_turn);
     assert!(s.stockpile.energy >= 15, "no Energy starvation at the start: {:?}", s.stockpile);
 }
 
@@ -1849,6 +1852,42 @@ fn the_ai_seats_take_start_states_not_adjacent_to_any_taken_one() {
     for seat in Seat::ALL {
         let sid = held(seat)[0];
         assert!(g.state(sid).facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite)), "{seat:?} has no Launch Site");
+    }
+}
+
+/// Ticket #377: **every home Region starts with the same Facilities** -- a Power Plant, a Factory,
+/// a Mine, a Refinery and the Launch Site, whatever the Region's card lists and nothing more -- in
+/// the Faction's own versions; **every starting station carries a Solar Array** beside its Core;
+/// and **the Arkwrights, having no station, hold a second Power Plant** in its place. Measured with
+/// the player in each of the three rich Regions and in a poor one.
+#[test]
+fn every_home_region_starts_with_the_standard_facilities_and_every_starting_station_a_solar_array() {
+    let standard = [FacilityKind::PowerPlant, FacilityKind::Factory, FacilityKind::Mine, FacilityKind::Refinery, FacilityKind::LaunchSite];
+    for (player, start) in [(FactionKind::Custodians, StateId::Europe), (FactionKind::Arkwrights, StateId::SouthAsia), (FactionKind::Archivists, StateId::NorthAmerica), (FactionKind::Prospectors, StateId::ArabianPeninsula)] {
+        let g = Game::new(tables(), NewGame { seed: 7, player, player_is_ai: false, player_start: start });
+        for seat in Seat::ALL {
+            let sid = g.controlled_states(seat)[0];
+            let faction = g.kind(seat);
+            let have: Vec<FacilityKind> = g.state(sid).facilities.iter().map(|f| f.kind).collect();
+            let mut want: Vec<FacilityKind> = standard.iter().map(|k| k.built_by(faction)).collect();
+            if faction == FactionKind::Arkwrights {
+                want.push(FacilityKind::PowerPlant.built_by(faction));
+            }
+            assert_eq!(have, want, "{player:?} at {start:?}: the {faction:?}' home {sid:?}");
+            // Its start Facilities are the Faction's own versions: the Archivists' Reactor, the
+            // Arkwrights' Spaceport.
+            for f in &g.state(sid).facilities {
+                assert_eq!(f.kind.unique_to().map(|u| u == faction), f.kind.unique_to().map(|_| true), "{sid:?}: {:?} is another Faction's", f.kind);
+            }
+        }
+        // Every starting station: a Core and a Solar Array, and nothing else.
+        for c in g.colonies.iter().filter(|c| c.body == BodyId::Earth && c.in_orbit) {
+            let kinds: Vec<ModuleKind> = c.modules.iter().map(|m| m.kind).collect();
+            assert_eq!(kinds.len(), 2, "{}: {kinds:?}", c.id.0);
+            assert!(kinds[0].does_the_job_of(ModuleKind::Core), "{kinds:?}");
+            assert!(kinds[1].does_the_job_of(ModuleKind::SolarArray), "{kinds:?}");
+        }
+        assert_eq!(g.colonies.iter().filter(|c| c.body == BodyId::Earth && c.in_orbit).count(), 3, "three starting stations");
     }
 }
 
@@ -4138,7 +4177,10 @@ fn b_coastal_slots_are_two_an_exposure_capped_and_a_raise_is_inland() {
     // Peninsula (Exposure 1, two) bring six to the 34 of before.
     assert_eq!(world, 40, "40 coastal slots in the world: the 34 of version 0.05.5 and six on the two new Regions");
     // Ticket #70: Europe's Refinery and North America's Factory, third on their cards with an
-    // Exposure of 1, now stand inland from the first turn.
+    // Exposure of 1, now stand inland from the first turn. Ticket #377 (version 0.09.2): Europe is
+    // the Prospectors' home and stands with the package (Power Plant, Factory, Mine, Refinery,
+    // Launch Site) in that order, so its Refinery is fourth now and inland still; North America is
+    // neutral and reads its card.
     assert!(g.state(StateId::Europe).facilities.iter().any(|f| f.kind == FacilityKind::Refinery && !f.coastal), "Europe's Refinery went inland");
     assert!(g.state(StateId::NorthAmerica).facilities.iter().any(|f| f.kind == FacilityKind::Factory && !f.coastal), "North America's Factory went inland");
     // Central America and the Caribbean: Size 1, Industry Level 1, Coastal Exposure 2 -> 1 + 3 + 1
@@ -4164,11 +4206,13 @@ fn c_start_facilities_are_coastal_first_and_a_new_build_is_inland_first() {
     // slots, three inland.
     let sid = StateId::EastAsia;
     // East Asia is the player's start state, so its Launch Site is a start Facility too and takes
-    // the next coastal slot after the four on the card.
+    // the next coastal slot after the four on the card. Ticket #377 (version 0.09.2): a home Region
+    // stands with the `[start]` package in ITS order -- Power Plant, Factory, Mine, Refinery, Launch
+    // Site -- not the card's, so the coast reads the package's first four.
     assert_eq!(
         standing(&g, sid, true),
-        vec![FacilityKind::Factory, FacilityKind::Mine, FacilityKind::PowerPlant, FacilityKind::Refinery],
-        "the start Facilities stand on the coast, in the table's order"
+        vec![FacilityKind::PowerPlant, FacilityKind::Factory, FacilityKind::Mine, FacilityKind::Refinery],
+        "the start Facilities stand on the coast, in the package's order"
     );
     assert_eq!(standing(&g, sid, false), vec![FacilityKind::LaunchSite], "the Launch Site, fifth, stands inland: the coast holds four");
 
@@ -5584,11 +5628,16 @@ fn a_custodian_ai_behind_on_pace_builds_a_constabulary_where_unrest_has_reached_
 
 /// Ticket #69 (a): North America and South-East Asia begin with a Research Lab ADDED to their start
 /// Facilities, and a start Lab stands inland so the sea never takes the world's Research.
+///
+///
+/// Ticket #377 (version 0.09.2): the card's list is what a NEUTRAL Region stands with -- both are
+/// neutral in the fixture's seating -- and a HELD North America carries the package and no Lab.
 #[test]
 fn north_america_and_south_east_asia_start_with_an_inland_research_lab() {
     let g = fresh();
     for sid in [StateId::NorthAmerica, StateId::SouthEastAsia] {
         let st = g.state(sid);
+        assert_eq!(st.control, Control::Neutral, "{sid:?} is nobody's home in this seating");
         let labs: Vec<&Facility> = st.facilities.iter().filter(|f| f.kind == FacilityKind::ResearchLab).collect();
         assert_eq!(labs.len(), 1, "{sid:?} starts with one Lab: {:?}", st.facilities.iter().map(|f| f.kind).collect::<Vec<_>>());
         assert!(!labs[0].coastal, "{sid:?}'s start Lab stands inland");
@@ -5601,6 +5650,11 @@ fn north_america_and_south_east_asia_start_with_an_inland_research_lab() {
             assert!(!g.state(sid).facilities.iter().any(|f| f.kind == FacilityKind::ResearchLab), "{sid:?} starts with no Lab");
         }
     }
+    // Ticket #377: a player who opens in North America stands with the package, and the card's Lab
+    // is not on the board.
+    let held = Game::new(tables(), NewGame { seed: 7, player: FactionKind::Custodians, player_is_ai: false, player_start: StateId::NorthAmerica });
+    let have: Vec<FacilityKind> = held.state(StateId::NorthAmerica).facilities.iter().map(|f| f.kind).collect();
+    assert_eq!(have, vec![FacilityKind::PowerPlant, FacilityKind::Factory, FacilityKind::Mine, FacilityKind::Refinery, FacilityKind::LaunchSite], "a held North America carries the package and no Lab");
 }
 
 /// Ticket #69 (b): a Lab in a state nobody holds runs itself, pays no Energy, and pays half its
@@ -7335,6 +7389,8 @@ fn a_station_builds_nothing_until_someone_lives_on_it_and_its_core_module_holds_
     // nobody upward, so it empties the station first.
     bare_stations(&mut g);
     assert_eq!(g.colony(station).unwrap().colonists, 0, "emptied, for the rule from nought");
+    // Ticket #377 (version 0.09.2): `game()` strips the start Solar Array too, which would otherwise
+    // hold one of the slots this test counts.
     assert_eq!(g.colony(station).unwrap().modules.len(), 1, "and with its Core Module");
     assert_eq!(g.colony(station).unwrap().modules[0].kind, ModuleKind::Core);
     assert_eq!(g.module_slots(g.colony(station).unwrap()), 0, "no slots, and no people yet");
@@ -11182,6 +11238,8 @@ fn the_hold_clock_resets_on_a_change_of_hands_and_an_old_save_passes() {
 /// nowhere, so it has two Module slots free at once and two berths left in its Core Module; the
 /// Arkwrights, who have no station, open with two Pioneers waiting in their start Region, a gift
 /// outside Coach Class that takes no population. A station BUILT during the game is still bare.
+/// Ticket #377 (version 0.09.2): the Solar Array every starting station carries stands in one of
+/// those two slots, so one is free to build in.
 #[test]
 fn a_starting_station_opens_with_two_aboard_and_the_arkwrights_with_two_pioneers() {
     let g = fresh();
@@ -11190,7 +11248,8 @@ fn a_starting_station_opens_with_two_aboard_and_the_arkwrights_with_two_pioneers
         let c = g.colony(id).unwrap();
         assert_eq!(g.place_name(Place::Colony(id)), name);
         assert_eq!(c.colonists, 2, "two aboard from the start");
-        assert_eq!(g.free_module_slots(c), 2, "one slot per Colonist, so two to build in at once");
+        assert_eq!(g.module_slots(c), 2, "one slot per Colonist");
+        assert_eq!(g.free_module_slots(c), 1, "the Solar Array holds one of the two, so one to build in at once");
         assert_eq!(g.habitat_room(c) - c.colonists, 2, "two berths of the Core Module's four left");
     }
     let ark = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Arkwrights).unwrap();
@@ -11454,18 +11513,35 @@ fn a_dug_in_army_fights_two_stronger_never_disengages_and_cannot_march_until_it_
 
 /// Ticket #290 (version 0.08.6): the computer's opening. While its starting station has a slot free
 /// and under four berths empty, the Habitat is pushed at the opportunity weight, so it comes first:
-/// on turn one every seat with a station orders one there.
+/// on turn one every seat with a station ordered one there.
+///
+/// Ticket #377 (version 0.09.2): the Solar Array every starting station carries holds one of the
+/// station's two slots, so the opening has ONE slot to fill, and the Habitat takes it only where
+/// nothing outranks it. Measured on seed 7 with the player in China: the Custodians (14.0 against
+/// a Shipyard's 6.0) put the Habitat in; the Prospectors score the Exchange above it (34.5 against
+/// 30.0) and take the Exchange; the Archivists, in Australia, score their first Shipyard above it
+/// (90.0 against 42.0) and take the Shipyard. Neither orders a Habitat on turn one. The designer
+/// accepted this over exempting the Array from the slot count.
 #[test]
-fn the_computer_opens_with_a_habitat_on_its_starting_station() {
+fn the_computer_opens_its_stations_one_free_slot_with_a_habitat_an_exchange_or_a_shipyard_by_faction() {
     let mut g = fresh();
     for seat in Seat::ALL {
         let Some(id) = station_of(&g, seat, BodyId::Earth) else { continue };
+        assert_eq!(g.free_module_slots(g.colony(id).unwrap()), 1, "one slot free beside the Solar Array");
         let orders = g.ai_orders(seat);
-        assert!(
-            orders.iter().any(|o| matches!(o, Order::BuildModule { colony, kind: ModuleKind::Habitat } if *colony == id)),
-            "the {} should open with a Habitat on their station: {orders:?}",
-            g.kind(seat).name()
-        );
+        let ordered = |kind: ModuleKind| orders.iter().any(|o| matches!(o, Order::BuildModule { colony, kind: k } if *colony == id && *k == kind));
+        match g.kind(seat) {
+            FactionKind::Custodians => assert!(ordered(ModuleKind::Habitat), "the Custodians open with a Habitat on the ISS: {orders:?}"),
+            FactionKind::Prospectors => {
+                assert!(ordered(ModuleKind::Exchange), "the Prospectors take the Exchange into Tiangong's one free slot: {orders:?}");
+                assert!(!ordered(ModuleKind::Habitat), "and order no Habitat on turn one, there being no slot for it: {orders:?}");
+            }
+            FactionKind::Archivists => {
+                assert!(ordered(ModuleKind::Shipyard), "the Archivists take their first Shipyard into Axiom's one free slot: {orders:?}");
+                assert!(!ordered(ModuleKind::Habitat), "and order no Habitat on turn one, there being no slot for it: {orders:?}");
+            }
+            FactionKind::Arkwrights => unreachable!("the Arkwrights have no starting station"),
+        }
     }
 }
 
@@ -12166,14 +12242,22 @@ fn four_makers_the_factory_makes_widgets_the_mine_makes_materials_and_the_start_
     assert_eq!(g.module_yield_at(Seat(0), mars, 0).resource, Some(Resource::Widgets));
     let core = g.colony(mars).unwrap().modules.iter().position(|m| m.kind == ModuleKind::Core).unwrap();
     assert_eq!(g.module_yield_at(Seat(0), mars, core).amount, 4);
-    // The starting board: a Mine beside every start Factory, standing from turn one.
+    // The starting board: a Mine beside every start Factory, standing from turn one. Ticket #377
+    // (version 0.09.2): the card's list stands in a NEUTRAL Region; a home Region stands with the
+    // package, one Factory and one Mine, whatever its card lists (Japan's two of each included).
     let fresh = fresh();
     for sid in StateId::ALL {
         let card = fresh.tables.state(sid);
         let factories = card.start_facilities.iter().filter(|k| **k == FacilityKind::Factory).count();
         let mines = card.start_facilities.iter().filter(|k| **k == FacilityKind::Mine).count();
         assert_eq!(factories, mines, "{}: a Mine beside every Factory", card.name);
-        assert_eq!(fresh.state(sid).facilities.iter().filter(|f| f.kind == FacilityKind::Mine).count(), mines, "{}: standing", card.name);
+        let standing_mines = fresh.state(sid).facilities.iter().filter(|f| f.kind == FacilityKind::Mine).count();
+        let standing_factories = fresh.state(sid).facilities.iter().filter(|f| f.kind == FacilityKind::Factory).count();
+        if fresh.state(sid).control.controller().is_none() {
+            assert_eq!(standing_mines, mines, "{}: standing", card.name);
+        } else {
+            assert_eq!((standing_factories, standing_mines), (1, 1), "{}: a home Region's package has one of each", card.name);
+        }
     }
 }
 
