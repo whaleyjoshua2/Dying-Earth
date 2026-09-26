@@ -583,6 +583,10 @@ pub const PHRASE_ARGS: &[(&str, &[&str])] = &[
     ("cause_agitate_damped", &["faction"]),
     ("cause_relief", &["faction"]),
     ("cause_refugees", &["n"]),
+    ("cause_occupation_start", &[]),
+    ("cause_occupation", &[]),
+    ("cause_occupation_break", &[]),
+    ("cause_choice_card", &["card"]),
     ("unrest_past", &["which", "note"]),
     ("unrest_under", &["which"]),
     // Ticket #351 (version 0.09.1): the Sink's loss on the Shortfall line.

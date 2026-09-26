@@ -63,6 +63,22 @@ aid's figures read *"0.5 to 0.5"*, because the fold's fallback for its "before" 
 uses when a Resolution pass is run on its own -- was read after the pass had brought that figure up
 to date; the fold runs ahead of that now.
 
+## The review
+
+Two axes, run as sub-agents over the commit.
+
+**Standards**: no violation. Two fix-ups taken: the two card sites now use the same `unrest_cause`
+helper as the rest (it was module-private), and `resolve_unrest` takes its own "before" snapshot when
+run on its own, which removed an ordering constraint and a fallback that read a figure the pass had
+already brought up to date. The snapshot carries its Region rather than relying on index order.
+
+**Spec**: **two movers of Unrest inside the Resolution recorded no cause**, so "every change" was
+not met: an Occupation (+3 at its start, +1 a turn, +2 on a break) and a Choice Card's Unrest
+effect. Both are causes now, *"the Occupation"* and *"the Refugee Convoy card"*; neither has a test
+of its own. One edge noted and left: a Region the player Agitated that throws its holder off in the
+same turn reads its reset to 5 as if the agitation did it, beside the throw-off's own line; rare.
+The glossary's Refugees and Unrest entries carry the rule.
+
 ## The gate
 
 `cargo clippy --workspace --release --all-targets -- -D warnings` clean; engine 487 + 6, root 8.

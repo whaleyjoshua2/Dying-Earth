@@ -322,12 +322,12 @@ pub struct Pending {
     #[serde(default)]
     pub landed: Vec<ArmyId>,
     /// Ticket #371 (version 0.09.2): the turn's Unrest, folded. What each Region's Unrest stood at
-    /// when the Resolution opened, in `StateId::ALL` order, and every cause that moved it during
-    /// the Resolution -- the Region, the words, and whether the player was the one acting -- so
-    /// the Report says one net line per Region at the end instead of a line per cause in phase
-    /// order.
+    /// when the Resolution opened (or, for an Unrest pass run on its own, when the pass opened),
+    /// and every cause that moved it during the Resolution -- the Region, the words, and whether
+    /// the player was the one acting -- so the Report says one net line per Region at the end
+    /// instead of a line per cause in phase order.
     #[serde(default)]
-    pub unrest_before: Vec<f64>,
+    pub unrest_before: Vec<(StateId, f64)>,
     #[serde(default)]
     pub unrest_causes: Vec<(StateId, String, bool)>,
     #[serde(default)]

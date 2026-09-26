@@ -583,11 +583,13 @@ impl Game {
     }
 
     /// Ticket #337: a card's move on a Region's Unrest, up through the damping or down flat.
+    /// Ticket #371 (version 0.09.2): and a cause, by the card's name, for the Region's net line. The
+    /// card is the turn's own Choice Card, which `draw` holds while its answers are applied.
     fn card_unrest(&mut self, sid: StateId, amount: f64) {
-        if amount >= 0.0 {
-            self.raise_unrest(sid, amount, UnrestSource::Plain);
-        } else {
-            self.lower_unrest(sid, -amount);
+        let moved = if amount >= 0.0 { self.raise_unrest(sid, amount, UnrestSource::Plain) } else { self.lower_unrest(sid, -amount) };
+        if moved > 0.0 && let CardDraw::Choice(card) = self.draw {
+            let cause = self.phrase("cause_choice_card", &[("card", self.tables.event(card).name.clone())]);
+            self.unrest_cause(sid, cause, false);
         }
     }
 
@@ -851,7 +853,7 @@ impl Game {
             let line = format!("{}: Unrest rose by {} to {}.", self.tables.state(s).name, Game::unrest_figure(rose), self.unrest_text(s));
             self.log(line);
             let cause = self.phrase("cause_card", &[("card", self.tables.event(card).name.clone())]);
-            self.pending.unrest_causes.push((s, cause, false));
+            self.unrest_cause(s, cause, false);
         }
     }
 
@@ -1009,7 +1011,7 @@ impl Game {
                     self.log(line);
                     // Ticket #371 (version 0.09.2): a cause for the Region's one net line.
                     let cause = self.phrase("cause_unrest_card", &[]);
-                    self.pending.unrest_causes.push((s, cause, false));
+                    self.unrest_cause(s, cause, false);
                 }
             }
             (EventId::StormSurge, EventTarget::State(s)) => {

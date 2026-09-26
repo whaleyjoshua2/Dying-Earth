@@ -854,7 +854,6 @@ fn build_board(session: &mut Session) {
             && let Some(sid) = g.directed_states(Seat(0)).first().copied()
         {
             g.state_mut(sid).unrest = 3.0;
-            g.state_mut(sid).unrest_reported = 3.0;
             g.pending.agitates.push((Seat(1), sid));
             g.pending.relief.push((Seat(0), sid));
             g.resolve_unrest();

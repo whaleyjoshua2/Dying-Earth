@@ -492,7 +492,7 @@ The Industry Tech that unlocks the Sea Wall, and does nothing else.
 _Avoid_: sea defence, civil engineering, hydrology
 
 **Unrest**:
-How restive a Region's people are, a figure from 0 to 10 on its card, moving in halves. Heat, the rising sea, the Climate cards, Occupation and arriving Refugees raise it; it falls on its own every turn except the turn the state changed hands, so a rise and the fall net out, and it falls further to Relief, a Constabulary and a Scrubber. Past its first threshold the Standing Army stops replenishing, past its second the state's Facilities run at half, and at the top the state throws its controller off and goes neutral.
+How restive a Region's people are, a figure from 0 to 10 on its card, moving in halves. Heat, the rising sea, the Climate cards, Occupation and arriving Refugees raise it; it falls on its own every turn except the turn the state changed hands, so a rise and the fall net out, and it falls further to Relief, a Constabulary and a Scrubber. Past its first threshold the Standing Army stops replenishing, past its second the state's Facilities run at half, and at the top the state throws its controller off and goes neutral. Since version 0.09.2 the Report says **one line per Region** about its Unrest, from what it was to what it is with every cause named, for the player's own Regions and any the player Agitated or Relieved, and a threshold crossed is that line's ending; the natural fall alone earns no line.
 _Avoid_: unhappiness, morale, stability, dissent, revolt meter
 
 **Agitate**:
@@ -520,7 +520,7 @@ The Facility that holds a Region's Unrest down: while it stands and is online it
 _Avoid_: police, militia, garrison, barracks (that is the Colony word)
 
 **Refugees**:
-The people who leave a Region for its neighbours when the heat or the sea takes their homes, instead of simply being lost. They are added to the state that receives them, and their arrival raises its Unrest, charged on everyone who arrived rather than on the net. Since version 0.07.6 the Report says one **net migration** line per Region rather than one per flow: a Region that gained says how many it took in and what its Unrest did, one that lost names the largest cause that drove them out, and one whose flows cancel says nothing at all. The game's log keeps the whole record, one line per flow.
+The people who leave a Region for its neighbours when the heat or the sea takes their homes, instead of simply being lost. They are added to the state that receives them, and their arrival raises its Unrest, charged on everyone who arrived rather than on the net. Since version 0.07.6 the Report says one **net migration** line per Region rather than one per flow: a Region that gained says how many it took in, one that lost names the largest cause that drove them out, and one whose flows cancel says nothing at all. Since version 0.09.2 what their arrival did to the Region's Unrest is said on that Region's one Unrest line, as one cause among the others. The game's log keeps the whole record, one line per flow.
 _Avoid_: migrants, displaced, evacuees, exodus, immigration
 
 **Resettle**:

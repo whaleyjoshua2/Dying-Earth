@@ -95,7 +95,11 @@ game, having no player, says every Region's.
 **Six lines are gone**, each now a cause of that one line: a Mothball's or Decommission's, a Climate
 card's (*"a Heatwave"*, *"a Drought"*, *"the Unrest card"*), a Strip Permit's (its line keeps the
 Emissions half, which is its own news), an Agitate's (*"agitation by the Prospectors"*, or *"held to
-nothing by the Constabulary"*), a Relief's, and the threshold line. **The migration line's Unrest
+nothing by the Constabulary"*), a Relief's, and the threshold line. **Two movers that never had a
+line are causes too**: an Occupation (*"the Occupation beginning"*, *"the Occupation"* each turn,
+*"the Occupation breaking"*) and a Choice Card's Unrest effect (*"the Refugee Convoy card"*), so
+that every change inside the Resolution is named. The heat's rise is the Climate phase's, before the
+Resolution, and keeps its own line under The climate. **The migration line's Unrest
 clause is gone too**: *"India took in 0.6 people"* says only the migration, and *"5.0 people
 arriving"* is a cause on the Unrest line. The log keeps every line as it was.
 

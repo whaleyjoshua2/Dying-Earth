@@ -33,7 +33,7 @@ impl Game {
         }
         // Ticket #371 (version 0.09.2): where every Region's Unrest stands as the Resolution opens,
         // for the one net line a Region the Report says at its end.
-        self.pending.unrest_before = StateId::ALL.iter().map(|s| self.state(*s).unrest).collect();
+        self.snapshot_unrest();
         self.blackout_stances();
         self.resolve_transits(); // (a)
         self.resolve_battles(); // (b)
@@ -1408,7 +1408,11 @@ impl Game {
                         self.war.occupations_broken[occupier.index()] += 1;
                         if let Place::State(sid) = place {
                             let n = self.tables.unrest.occupation_break;
-                            self.raise_unrest(sid, n, UnrestSource::Plain);
+                            if self.raise_unrest(sid, n, UnrestSource::Plain) > 0.0 {
+                                // Ticket #371 (version 0.09.2): a cause for the Region's net line.
+                                let cause = self.phrase("cause_occupation_break", &[]);
+                                self.unrest_cause(sid, cause, false);
+                            }
                         }
                         if let Some(p) = previous {
                             self.offend_by(occupier, p, self.tables.relations.occupation_broken_offence);
@@ -1442,7 +1446,11 @@ impl Game {
                     // Ticket #52: every turn of Occupation adds one to the state's Unrest.
                     if let Place::State(sid) = place {
                         let n = self.tables.unrest.occupation_per_turn;
-                        self.raise_unrest(sid, n, UnrestSource::Plain);
+                        if self.raise_unrest(sid, n, UnrestSource::Plain) > 0.0 {
+                            // Ticket #371 (version 0.09.2): a cause for the Region's net line.
+                            let cause = self.phrase("cause_occupation", &[]);
+                            self.unrest_cause(sid, cause, false);
+                        }
                     }
                     let gain = self.occupation_gain(place, occupier);
                     self.set_place_control(place, Control::Occupied { occupier, previous, turns, banked: banked + gain });
@@ -1466,7 +1474,11 @@ impl Game {
                         // Ticket #52: an Occupation begins at +3 Unrest, damped by nothing.
                         if let Place::State(sid) = place {
                             let n = self.tables.unrest.occupation_start;
-                            self.raise_unrest(sid, n, UnrestSource::Plain);
+                            if self.raise_unrest(sid, n, UnrestSource::Plain) > 0.0 {
+                                // Ticket #371 (version 0.09.2): a cause for the Region's net line.
+                                let cause = self.phrase("cause_occupation_start", &[]);
+                                self.unrest_cause(sid, cause, false);
+                            }
                         }
                         let line = format!("The {} occupy {}.", self.seat_name(seat), self.place_name(place));
                         self.log(line);
@@ -2041,8 +2053,15 @@ impl Game {
     /// Ticket #371 (version 0.09.2): one cause of a Region's Unrest moving this Resolution, for
     /// the one net line the Report says about it at the end. `by_player` marks an act of the
     /// player's own -- an Agitate or a Relief -- which earns a rival's Region its line.
-    fn unrest_cause(&mut self, sid: StateId, cause: String, by_player: bool) {
+    pub(crate) fn unrest_cause(&mut self, sid: StateId, cause: String, by_player: bool) {
         self.pending.unrest_causes.push((sid, cause, by_player));
+    }
+
+    /// Ticket #371 (version 0.09.2): where every Region's Unrest stands, for the "before" of its one
+    /// net line. Taken as the Resolution opens; an Unrest pass run on its own (a test, a picture
+    /// aid) takes it as the pass opens, which is the same thing for what the pass does.
+    fn snapshot_unrest(&mut self) {
+        self.pending.unrest_before = StateId::ALL.iter().map(|s| (*s, self.state(*s).unrest)).collect();
     }
 
     /// Ticket #371 (version 0.09.2): **one net line per Region about its Unrest**, at the end of the
@@ -2062,7 +2081,7 @@ impl Game {
         let me = Seat(0);
         let causes = std::mem::take(&mut self.pending.unrest_causes);
         let before = std::mem::take(&mut self.pending.unrest_before);
-        for (i, sid) in StateId::ALL.into_iter().enumerate() {
+        for sid in StateId::ALL {
             let mine: Vec<&(StateId, String, bool)> = causes.iter().filter(|(s, _, _)| *s == sid).collect();
             if mine.is_empty() {
                 continue;
@@ -2072,9 +2091,8 @@ impl Game {
             if !self.spectator && !ours && !mine.iter().any(|(_, _, by_player)| *by_player) {
                 continue;
             }
-            // Without the snapshot (a Resolution pass run on its own), last turn's reported figure.
-            let was = before.get(i).copied().unwrap_or(self.state(sid).unrest_reported);
             let now = self.state(sid).unrest;
+            let was = before.iter().find(|(s, _)| *s == sid).map(|(_, v)| *v).unwrap_or(now);
             let words: Vec<String> = mine.iter().map(|(_, c, _)| c.clone()).collect();
             let ending = if now >= u.facility_threshold && was < u.facility_threshold {
                 self.phrase("unrest_past", &[("which", "second".to_string()), ("note", self.unrest_note(sid))])
@@ -2802,6 +2820,11 @@ impl Game {
 
     pub fn resolve_unrest(&mut self) {
         let u = self.tables.unrest.clone();
+        // Ticket #371 (version 0.09.2): run on its own, the pass takes the "before" of each Region's
+        // one net Unrest line here; inside a Resolution it was taken as the Resolution opened.
+        if self.pending.unrest_before.is_empty() {
+            self.snapshot_unrest();
+        }
         // The refugees the turn's flows brought, charged once so the per-turn cap counts them all.
         // Ticket #176 (version 0.07.6): Unrest is charged on the GROSS arrivals, as the rule has
         // always had it -- a Region that takes ten people and sends ten away has still absorbed ten
@@ -2910,9 +2933,7 @@ impl Game {
             let Control::Controlled(seat) = self.state(sid).control else { continue };
             self.throw_off(sid, seat);
         }
-        // Ticket #371 (version 0.09.2): the one net Unrest line a Region, before the reported figure
-        // below is brought up to date, since without the Resolution's snapshot that figure is what
-        // the line reads its "before" from.
+        // Ticket #371 (version 0.09.2): the one net Unrest line a Region.
         self.report_unrest_net();
         // The log line for crossing 4 or 7, once each way. Ticket #371 (version 0.09.2): the Report's
         // word for it is the ending of the Region's one net line, written by `report_unrest_net`.
