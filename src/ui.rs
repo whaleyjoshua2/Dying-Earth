@@ -2816,28 +2816,6 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                     let hovering = view.force_hover == Some(body)
                         || painter.ctx().pointer_latest_pos().map(|q| (q - p).length() < 40.0).unwrap_or(false);
                     let mut text = format!("{name}  {filled}/{slots} slots, {stations}/{orbital} stations");
-                    // Ticket #345 (version 0.09.1): **what a world still pays the Faction that
-                    // reaches it first, or who took that prize.** It is on this map and not only on
-                    // the planet card because this is the map a voyage is chosen from: the whole
-                    // point of the rule is that an unsettled world should be visibly worth the
-                    // crossing, and a player who has to enter a surface to find that out has already
-                    // decided where to sail. Always open, not folded into the hover as the orbital
-                    // list is, for the same reason -- a prize nobody can see is no prize.
-                    //
-                    // Earth carries nothing (Antarctica is on Earth, and claims nothing) and neither
-                    // does Venus, which has no Colony Slots for anybody to land in.
-                    //
-                    // It does NOT count into `lines` below, which spaces the label away from the
-                    // disc: Earth's Antarctic line has stood in this label unspaced since ticket #56
-                    // and a second line clears both the disc and the Orbital Control flag above it,
-                    // where a third would not. Spacing it measurably pushed Mars's label into that
-                    // flag, which is why this note is here rather than the increment.
-                    if body != BodyId::Earth && slots > 0 {
-                        match game.first_at(body) {
-                            Some((seat, _)) => text.push_str(&format!("\nfirst settled by the {}", game.seat_name(seat))),
-                            None => text.push_str(&format!("\nfirst to land: {} Influence", game.tables.body(body).first_windfall)),
-                        }
-                    }
                     // Ticket #136 (version 0.07.3): every Orbital Slot by name and holder. The
                     // designer: *"List orbital slots in the body card."* The list unfolds while the
                     // Body is under the pointer: always open, Earth's six lines lay over the Moon
@@ -2853,6 +2831,25 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                             let blockade = warship_in_slot(game, body, slot).map(|s| format!(", a {} warship in it", game.seat_name(s.seat))).unwrap_or_default();
                             text.push_str(&format!("\n{}: {holder}{blockade}", game.station_name(body, slot)));
                             lines += 1;
+                        }
+                        // Ticket #345 (version 0.09.1): what a world still pays the Faction that
+                        // reaches it first, or who took that prize. Ticket #368 (version 0.09.2):
+                        // it stood open on the map label in both states, at #345's word that a
+                        // voyage is chosen from this map; the designer took it off the open label
+                        // ("do not display 1st founding bonus on system map") and it lives here in
+                        // the hover, under the slot list, so a player pointing at a world still
+                        // sees it. The surface card's own line is untouched. Earth carries nothing
+                        // (Antarctica claims nothing) and neither does Venus, which has no slots.
+                        //
+                        // It does NOT count into `lines`, exactly as it did not when it stood open:
+                        // #345 measured that spacing it pushed Mars's label up into the Orbital
+                        // Control flag and the stack labels, and the first picture of this ticket
+                        // showed the same. Uncounted, the unfolded label stands where it did before.
+                        if body != BodyId::Earth && slots > 0 {
+                            match game.first_at(body) {
+                                Some((seat, _)) => text.push_str(&format!("\nfirst settled by the {}", game.seat_name(seat))),
+                                None => text.push_str(&format!("\nfirst to land: {} Influence", game.tables.body(body).first_windfall)),
+                            }
                         }
                     }
                     // Ticket #56: Earth says when its Antarctic slots open, until they do.

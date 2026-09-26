@@ -28,3 +28,16 @@ this a card came on turn 1 half the time, and a question before the first order 
 the designer removed. Measured before the rule over sixty seeds, thirty drew on turn 1.
 
 **Reaches the computer seats** by the same phase, so it is the same game for all four.
+
+## 2. The first-to-land line off the system map
+
+The authority is [ticket #368](https://github.com/whaleyjoshua2/Dying-Earth/issues/368).
+
+The Solar System Map's Body label **no longer carries the first-to-a-Body line** in either state,
+*"first to land: 15 Influence"* or *"first settled by the Prospectors"*. The line **lives in the
+Body's hover**, the one that unfolds the orbital-slot list while the pointer is near the Body, under
+that list. The **surface card's own line is unchanged**: the glyph, the settler's colour and the
+windfall hover stay. No rule moves; the bonus itself (§2 of 0.09.1) is untouched.
+
+**Why.** The designer: *"do not display 1st founding bonus on system map."* Kept in the hover rather
+than removed so that #345's point stands, that a voyage is chosen from this map.
