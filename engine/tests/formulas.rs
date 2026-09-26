@@ -15426,6 +15426,28 @@ fn no_card_of_either_kind_is_drawn_on_the_first_turn_and_the_deck_is_untouched()
     assert!((10..=50).contains(&drew), "turn {}: {drew} of 60 seeds drew, which is not a coin", t.events.first_draw_turn);
 }
 
+/// Ticket #376 (version 0.09.2): **the Refugee Convoy is worth taking**: a million people into the
+/// most populous Region for half a ppm, where it was 400,000 for two ppm. The figures are the
+/// card's own in `events.toml`, pinned here; the refusal and the computer's rule are unchanged.
+#[test]
+fn the_refugee_convoy_gives_a_million_people_for_half_a_ppm() {
+    let g = fresh();
+    let card = g.tables.event(EventId::RefugeeConvoy);
+    let c = card.choice.as_ref().expect("a card that asks");
+    let (mut people, mut ppm) = (None, None);
+    for e in &c.take_does {
+        match e {
+            CardEffect::PopulationToMostPopulous { population } => people = Some(*population),
+            CardEffect::EmissionsNext { ppm: n } => ppm = Some(*n),
+            other => panic!("an effect the ticket did not decide: {other:?}"),
+        }
+    }
+    assert_eq!(people, Some(1.0), "a million people, one unit");
+    assert_eq!(ppm, Some(0.5), "half a ppm, once");
+    assert!(matches!(c.refuse_does.as_slice(), [CardEffect::StandingAllHeld { standing }] if *standing == -5), "the refusal is untouched: {:?}", c.refuse_does);
+    assert!(matches!(c.take_when, CardRule::UnrestBelow { unrest } if unrest == 4.0), "the computer's rule is untouched: {:?}", c.take_when);
+}
+
 /// Ticket #375 (version 0.09.2): **a Distress Call holds a docked Ship only**, the fullest tank
 /// among them; a Ship in flight is never held; with none docked the take side is closed and says
 /// why; and the Report names the Ship held.

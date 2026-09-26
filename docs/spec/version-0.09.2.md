@@ -194,3 +194,17 @@ would hold before the answer**, in the modal and the driver, and **the Report na
 **Why.** From the playtest: *"The flying table quoted a leg at 4 turns and 17 Fuel and it cost 6
 and 26, leaving the hull stranded with an empty tank and no station to refuel at. The Distress Call
 card silently froze the only ship mid-transit."*
+
+## 10. The Refugee Convoy is worth taking
+
+The authority is [ticket #376](https://github.com/whaleyjoshua2/Dying-Earth/issues/376).
+
+**Taking the Refugee Convoy lands a million people** (one unit of population) in the Faction's most
+populous Region **for half a ppm** of emissions the next turn, where it landed 400,000 for two ppm.
+The refusal is unchanged, −5 Standing in every place the Faction holds, and so is the computer's
+rule for taking it (every held Region's Unrest under 4). The figures are the card's own in
+`events.toml`.
+
+**Why.** From the playtest: *"The Refugee Convoy trades +0.4 population against +2.0 ppm, which
+nobody would take twice."* A million people for a small, one-off ppm is a real offer that stays a
+choice, since the ppm is permanent and falls on the Custodians' measure.

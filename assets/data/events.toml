@@ -297,12 +297,14 @@ take = "Take them in"
 refuse = "Turn them away"
 # A calm Faction has room for them; a restive one does not, and pays for saying so.
 take_when = { rule = "unrest_below", unrest = 4.0 }
+# Ticket #376 (version 0.09.2): a million people for half a ppm, where it was 400,000 for two -- the
+# playtest's "which nobody would take twice". The refusal and the computer's rule are unchanged.
 [[event.choice.take_does]]
 effect = "population_to_most_populous"
-population = 0.4
+population = 1.0
 [[event.choice.take_does]]
 effect = "emissions_next"
-ppm = 2.0
+ppm = 0.5
 [[event.choice.refuse_does]]
 effect = "standing_all_held"
 standing = -5
