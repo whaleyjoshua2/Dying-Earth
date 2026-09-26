@@ -6,7 +6,10 @@ pick which ones I want to add to the plan/roadmap."*
 
 Four agents read the glossary, the specs to 0.09.2, the data files and the 0.09.0 playtest, each
 from one angle, and wrote back. Nothing here is decided, built or ticketed; every figure is a
-placeholder for the designer to set. Each item carries the agent's size of the lift. Items are
+placeholder for the designer to set.
+
+**Status, 2026-09-26:** the designer read the list and said *"hold those suggestions for a future
+iteration."* None of them is on the 0.09.2 map. They wait here for the charting of a later version. Each item carries the agent's size of the lift. Items are
 numbered S7 to S27 so a pick can name them.
 
 **What all four agents found, independently:**
