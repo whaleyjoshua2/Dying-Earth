@@ -1332,6 +1332,10 @@ fn card_from_id(name: &str) -> Option<EventId> {
 /// aid. The deck is put back as it would stand with that card drawn, so the Climate Panel's count
 /// of what is left reads a real deck.
 fn ask_the_card(g: &mut Game, id: EventId) -> bool {
+    // Ticket #367 (version 0.09.2): no card comes before `first_draw_turn`, so a fresh board (turn
+    // 1) would never draw and the aid would report the card never came. It stands on the first
+    // turn that can draw, which is what the picture then honestly reads.
+    g.turn = g.turn.max(g.tables.events.first_draw_turn);
     let deck = g.deck.clone();
     for _ in 0..200 {
         g.deck.cards = vec![Card::Event(id)];

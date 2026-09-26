@@ -13,7 +13,8 @@
 //!
 //! Ticket #337 (version 0.09.0): a Choice Card is drawn at the HEAD of the turn, before orders, and
 //! the turn cannot end while this seat owes it an answer. `show` prints the question; an
-//! `answer take` or `answer refuse` line in the order list answers it.
+//! `answer take` or `answer refuse` line in the order list answers it. Ticket #367 (version
+//! 0.09.2): no card of either kind comes on turn 1.
 
 use dying_earth_engine::data::{default_data_dir, CardEffect, CardThing, Tables};
 use dying_earth_engine::ids::*;
@@ -176,7 +177,8 @@ const GRAMMAR: &str = r#"ORDER LINES (one per line; `#` starts a comment; blank 
   answer refuse                        or refuse it.
                                        Ticket #337 (version 0.09.0): a card is drawn at the HEAD of
                                        the turn, before orders, and the turn CANNOT END while this
-                                       seat owes it an answer. Ticket #367 (0.09.2): never on turn 1. `show` prints the card, its question
+                                       seat owes it an answer.
+                                       Ticket #367 (version 0.09.2): no card comes on turn 1. `show` prints the card, its question
                                        and what each side does; a seat that cannot pay the offer may
                                        only refuse.
 

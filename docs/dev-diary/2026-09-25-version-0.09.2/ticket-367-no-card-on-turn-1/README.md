@@ -46,5 +46,38 @@ to nought; whether that is the missing turn-1 card or the seeds is not measured 
 reported as a figure, not chased. The rule reaches every seat the same way, since the phase is one
 phase for all four.
 
-One test fixture moved with the rule: three tests that force a card by rolling the Question phase
-on a fresh game now stand it on turn 2 first, since turn 1 no longer rolls.
+## The pictures
+
+Both taken headlessly with the rebuilt binary, `window:1400x900`.
+
+![Turn 1, January 2030: no card, and the Climate Panel's deck line reading "no card comes before turn 2, then one comes 50% of turns"](turn-one-earth.png)
+
+`shot:turn-one`. **Turn 1, January 2030, no modal.** The Climate Panel's penalties line now says
+*"no card comes before turn 2, then one comes 50% of turns at this Temperature (33 cards left in the
+deck, 6 of them Climate, 18 of them asking a question)"*: the deck untouched, all thirty-three dealt
+cards still in it.
+
+![The Hard Winter's modal on turn 2, March 2030, with the deck line behind it](card-modal-earth.png)
+
+`shot:card-modal card:the_hard_winter ducats:120`. **Turn 2, March 2030.** The picture aid that
+stages a card stacks the deck and rolls the game's own Question phase; on a fresh board (turn 1) it
+would now never draw, so it stands the board on the first drawing turn first. The Hard Winter is up
+with both sides, and the deck line behind it reads the ordinary *"a card comes 50% of turns"*.
+
+## The review
+
+Two axes, run as sub-agents over `git diff main...HEAD`.
+
+**Standards**: no hard violation. Three judgement calls, all taken: the driver's help clause on its
+own line; the fixture line the three card tests shared (`g.turn = g.turn.max(first_draw_turn)`)
+pulled into one helper, `stand_on_a_drawing_turn`, in the file's helper style; the loader test
+brought to the shape of its three precedents (a clean copy asserted to load before the one line is
+changed, files only, the folder removed before it is made).
+
+**Spec**: the rule correct on every point it checked. **One regression found and fixed**: the
+`shot:` card aid in `src/shot.rs` was the mirror of the test fixture and had not been moved, so
+every card picture would have failed with *"never came up in two hundred rolls"*. Four stale
+sentences fixed: the Climate Panel's *"a card comes N% of turns"* on turn 1 (now the line above),
+the `events.toml` header, the `draw_chance_base` doc comment, and the driver's module doc. One test
+gap filled: a `first_draw_turn` of 1, the rule as it stood, is accepted, as the refusal's text
+promises.

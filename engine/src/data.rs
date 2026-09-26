@@ -528,8 +528,9 @@ fn one() -> u32 {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct EventsTable {
-    /// Ticket #25: no Calm Cards; each turn a card is drawn with this chance at the base Temperature,
-    /// rising by `draw_chance_per_step` for every full `draw_chance_step_degrees` above it.
+    /// Ticket #25: no Calm Cards; each turn from `first_draw_turn` a card is drawn with this chance
+    /// at the base Temperature, rising by `draw_chance_per_step` for every full
+    /// `draw_chance_step_degrees` above it.
     pub draw_chance_base: f64,
     pub draw_chance_per_step: f64,
     pub draw_chance_step_degrees: f64,

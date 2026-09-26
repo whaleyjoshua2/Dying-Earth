@@ -9706,10 +9706,18 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
             // beside how many are Climate cards. The deck is never reshuffled, so both figures only
             // ever fall, and what is left in it is worth knowing.
             let asking = game.deck.cards.iter().filter(|c| matches!(c, Card::Event(id) if game.tables.event(*id).asks())).count();
+            // Ticket #367 (version 0.09.2): no card comes before the first drawing turn, so on turn
+            // 1 the chance is not the rule's figure but nil, and the line says which.
+            let first_draw = game.tables.events.first_draw_turn;
+            let card_clause = if game.turn < first_draw {
+                format!("no card comes before turn {first_draw}, then one comes {:.0}% of turns at this Temperature", game.draw_chance() * 100.0)
+            } else {
+                format!("a card comes {:.0}% of turns at this Temperature", game.draw_chance() * 100.0)
+            };
             ui.label(format!(
-                "Penalties in force: population growth {:+.2}% per turn; a card comes {:.0}% of turns at this Temperature ({} cards left in the deck, {} of them Climate, {} of them asking a question).",
+                "Penalties in force: population growth {:+.2}% per turn; {} ({} cards left in the deck, {} of them Climate, {} of them asking a question).",
                 growth,
-                game.draw_chance() * 100.0,
+                card_clause,
                 game.deck.cards.len(),
                 game.deck.climate_cards_left(),
                 asking

@@ -63,9 +63,7 @@ fn facility(kind: FacilityKind) -> Facility {
 /// Temperature is left where the game put it, because forcing the chance to one would need a
 /// Temperature past the Collapse line and every turn after it would be a finished game.
 fn ask_the_card(g: &mut Game, id: EventId) {
-    // Ticket #367 (version 0.09.2): nothing is drawn before `first_draw_turn`, so a test about a
-    // card stands the game on a turn that can draw one.
-    g.turn = g.turn.max(g.tables.events.first_draw_turn);
+    stand_on_a_drawing_turn(g);
     for _ in 0..200 {
         g.deck.cards = vec![Card::Event(id)];
         g.deck.drawn.clear();
@@ -75,6 +73,13 @@ fn ask_the_card(g: &mut Game, id: EventId) {
         }
     }
     panic!("{id:?} did not come in two hundred rolls at a draw chance of {:.2}", g.draw_chance());
+}
+
+/// Ticket #367 (version 0.09.2): nothing is drawn before `first_draw_turn`, so a test that rolls the
+/// Question phase for a card stands the game on a turn that can draw one -- a fresh game is on
+/// turn 1, which never rolls.
+fn stand_on_a_drawing_turn(g: &mut Game) {
+    g.turn = g.turn.max(g.tables.events.first_draw_turn);
 }
 
 /// Ticket #57: stand the game on the turn the Mars launch window falls on, where a crossing costs
@@ -1613,8 +1618,7 @@ fn only_climate_cards_scale_with_the_temperature() {
     let mut g = game();
     g.climate.temperature = 3.0; // scale 1.9 for a Climate card
     let mut seen = 0;
-    // Ticket #367 (version 0.09.2): the first turn never draws, so the roll is made on one that can.
-    g.turn = g.turn.max(g.tables.events.first_draw_turn);
+    stand_on_a_drawing_turn(&mut g);
     for id in [EventId::MeteorShower, EventId::SolarMaximum, EventId::RichSeam, EventId::Heatwave] {
         // Force the next draw to be this card; roll until the Draw Chance lets it through.
         let mut drawn = None;
@@ -15075,8 +15079,7 @@ fn a_turn_whose_loudest_line_is_a_card_answer_still_opens_with_a_headline() {
     // until a card comes.
     g.question = None;
     g.deck.off_earth_joined = true;
-    // Ticket #367 (version 0.09.2): the first turn never draws, so the roll is made on one that can.
-    g.turn = g.turn.max(g.tables.events.first_draw_turn);
+    stand_on_a_drawing_turn(&mut g);
     for _ in 0..500 {
         g.report.lines.clear();
         g.deck.cards = vec![Card::Event(card)];
@@ -15420,16 +15423,25 @@ fn no_card_of_either_kind_is_drawn_on_the_first_turn_and_the_deck_is_untouched()
 fn the_loader_refuses_a_first_draw_turn_of_nought() {
     let src = default_data_dir();
     let dir = std::env::temp_dir().join(format!("dying-earth-first-draw-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).expect("temp data dir");
     for entry in std::fs::read_dir(&src).expect("data dir") {
         let path = entry.expect("entry").path();
-        std::fs::copy(&path, dir.join(path.file_name().unwrap())).expect("copy");
+        if path.is_file() {
+            std::fs::copy(&path, dir.join(path.file_name().unwrap())).expect("copy");
+        }
     }
+    assert!(Tables::load(&dir).is_ok(), "the copy loads before anything is changed");
     let events = std::fs::read_to_string(src.join("events.toml")).expect("events.toml");
     assert!(events.contains("first_draw_turn = 2"), "the fixture reads the shipped figure");
     std::fs::write(dir.join("events.toml"), events.replace("first_draw_turn = 2", "first_draw_turn = 0")).expect("write");
     let err = Tables::load(&dir).err().map(|e| e.to_string());
-    std::fs::remove_dir_all(&dir).ok();
+    // And 1, the rule as it stood before this ticket (a draw on the first turn), is accepted, as
+    // the refusal's own text promises.
+    std::fs::write(dir.join("events.toml"), events.replace("first_draw_turn = 2", "first_draw_turn = 1")).expect("write");
+    let one = Tables::load(&dir).map(|t| t.events.first_draw_turn);
+    let _ = std::fs::remove_dir_all(&dir);
     let err = err.expect("a first_draw_turn of 0 is refused");
     assert!(err.contains("first_draw_turn"), "the refusal names the figure: {err}");
+    assert_eq!(one.ok(), Some(1), "a first_draw_turn of 1 loads");
 }

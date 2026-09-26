@@ -1,6 +1,7 @@
 # Spec section 13, amended by ticket #25 (version 0.02) and #32 (0.03): no Calm Cards. Ticket #76
-# (version 0.05.5): the deck holds FORTY cards for a thirty-six-turn game. Each turn a card is
-# drawn with draw_chance_base at +1.2 C, rising by draw_chance_per_step for every full
+# (version 0.05.5): the deck holds FORTY cards for a thirty-six-turn game. Each turn from
+# first_draw_turn (ticket #367, version 0.09.2: turn 2, never the first) a card is drawn with
+# draw_chance_base at +1.2 C, rising by draw_chance_per_step for every full
 # draw_chance_step_degrees above it (50% at +1.2, 72.5% at +3.0). The deck is never reshuffled.
 # Climate cards still scale by 1 + (Temperature - 1.2) / 2.
 #
