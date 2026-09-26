@@ -34,6 +34,11 @@ impl Game {
         // Ticket #371 (version 0.09.2): where every Region's Unrest stands as the Resolution opens,
         // for the one net line a Region the Report says at its end.
         self.snapshot_unrest();
+        // Ticket #383 (version 0.09.2): every stack standing on Attack fights NOW, before anything
+        // moves -- the computer's, whose orders were just placed, and any stack a test or a
+        // building aid stood on Attack. The player's was fought the moment it was confirmed. A hull
+        // still in flight never joins a Battle at its destination.
+        self.fight_attacks();
         self.blackout_stances();
         self.resolve_transits(); // (a)
         self.resolve_battles(); // (b)
@@ -67,6 +72,8 @@ impl Game {
         self.resolve_credits(); // (j), ticket #268: carbon credits change hands
         self.report_waiting_colonists(); // ticket #370: after every landing this turn has made
         self.pending = Pending::default();
+        // Ticket #383 (version 0.09.2): a stack that fought this turn may Attack again next turn.
+        self.fought.clear();
         for a in &mut self.armies {
             a.move_to = None;
         }
@@ -309,56 +316,108 @@ impl Game {
 
     // ------------------------------------------------------------------ (b)
 
+    /// Ticket #383 (version 0.09.2): **one orbit's Battle**, opened by `aggressors` against every
+    /// other Faction's Ships and working Batteries there. The Resolution opens one for a Battery
+    /// against a blockader; an Attack opens one the moment it is ordered (`fight_attacks`).
+    /// Ticket #50: any stack ordered Attack pulls every other Faction's Ships at that Body into one
+    /// melee; Evade stacks still try to disengage; Hold stacks fight. Ticket #335 (version 0.09.0):
+    /// **battle parties form per ORBIT**, so two Battles at one Body are two melees and two records,
+    /// and a station's Battery never fires on a fight in low orbit.
+    fn fight_orbit(&mut self, body: BodyId, orbit: Orbit, aggressors: &[Seat]) -> bool {
+        // Ticket #324 (version 0.08.8): a seat's working Batteries stand in its line after its
+        // Ships, so a stack on Attack in an orbit with nothing but a Battery in it fights the
+        // Battery, and a Battery beside its owner's stack fights with it. Ticket #335: the
+        // Batteries of THIS orbit -- a station's its own ring, a ground Colony's low orbit.
+        let parties: Vec<(Seat, bool, Vec<UnitRef>)> = Seat::ALL
+            .into_iter()
+            .filter_map(|seat| {
+                let units: Vec<UnitRef> = self
+                    .ships
+                    .iter()
+                    .filter(|s| s.seat == seat && self.ship_in_orbit(s, body, orbit) && !s.escaped)
+                    .map(|s| UnitRef::Ship(s.id))
+                    .chain(self.batteries_at(seat, body, orbit).into_iter().map(|(colony, index)| UnitRef::Battery { colony, index }))
+                    .collect();
+                if units.is_empty() {
+                    None
+                } else {
+                    Some((seat, aggressors.contains(&seat), units))
+                }
+            })
+            .collect();
+        if parties.len() < 2 {
+            return false;
+        }
+        let name = self.orbit_battle_name(body, orbit);
+        self.ship_melee(&name, body, orbit, &parties);
+        true
+    }
+
+    /// Ticket #383 (version 0.09.2): **an Attack is fought the moment it is ordered**, at the
+    /// designer's word, on the board as it stands: the seat's stack at the Body fights every orbit
+    /// it holds Ships on Attack in, the survivors stand on Hold, and the stack may not Attack again
+    /// that turn. The player's comes through `attack_now`; the computer's, which orders only at End
+    /// Turn, through `fight_attacks` the moment its orders are placed -- before the transits land,
+    /// so a hull still in flight never joins. Returns the record's place in the turn's Battles.
+    fn fight_stack(&mut self, seat: Seat, body: BodyId) -> std::ops::Range<usize> {
+        let from = self.report.battles.len();
+        for orbit in self.orbits_of(body) {
+            if self.ships.iter().any(|s| s.seat == seat && self.ship_in_orbit(s, body, orbit) && s.stance == Stance::Attack && !s.escaped) {
+                self.fight_orbit(body, orbit, &[seat]);
+            }
+        }
+        for s in self.ships.iter_mut().filter(|s| s.seat == seat && s.at == ShipAt::Body(body)) {
+            s.stance = Stance::Hold;
+        }
+        if !self.fought.contains(&(seat, body)) {
+            self.fought.push((seat, body));
+        }
+        from..self.report.battles.len()
+    }
+
+    /// Ticket #383: the player's Attack, fought as it is confirmed: the order's own check, the
+    /// stance set as the order would set it, the fight. Refused as the order would be, "fought
+    /// this turn" included.
+    pub fn attack_now(&mut self, seat: Seat, body: BodyId) -> Result<std::ops::Range<usize>, OrderError> {
+        self.check_order(seat, &[], &Order::ShipStance { body, stance: Stance::Attack })?;
+        for s in self.ships.iter_mut().filter(|s| s.seat == seat && s.at == ShipAt::Body(body)) {
+            s.stance = Stance::Attack;
+        }
+        Ok(self.fight_stack(seat, body))
+    }
+
+    /// Ticket #383: every stack standing on Attack -- the computer's, whose orders were just
+    /// placed -- fights now, seat by seat, as the Resolution opens and before it moves anything.
+    pub fn fight_attacks(&mut self) {
+        for seat in Seat::ALL {
+            for body in BodyId::ALL {
+                if self.ships.iter().any(|s| s.seat == seat && s.at == ShipAt::Body(body) && s.stance == Stance::Attack && !s.escaped) {
+                    self.fight_stack(seat, body);
+                }
+            }
+        }
+    }
+
     fn resolve_battles(&mut self) {
-        // Ship battles (ticket #50): any stack ordered Attack pulls every other Faction's Ships at
-        // that Body into one melee. Evade stacks still try to disengage; Hold stacks fight.
-        // Ticket #335 (version 0.09.0): **battle parties form per ORBIT.** An Attack fights the
-        // orbit the stack sits in, so two Battles at one Body are two melees and two records, and a
-        // station's Battery never fires on a fight in low orbit.
+        // Ticket #383 (version 0.09.2): an Attack is fought the moment it is ordered, so no stack
+        // stands on Attack by the time the Resolution runs; what opens a Battle here is a Battery.
+        // Ticket #363 (version 0.09.1): **a working Battery opens a Battle on a rival warship on
+        // Blockade in its own orbit**, at the designer's word, so a defended station under Blockade
+        // is a fight and not merely a void Blockade. Its holder is the side that opens it, and pays
+        // the offence for it as any aggressor does.
         for body in BodyId::ALL {
             for orbit in self.orbits_of(body) {
-                // Ticket #363 (version 0.09.1): **a working Battery opens a Battle on a rival warship
-                // on Blockade in its own orbit**, at the designer's word, so a defended station under
-                // Blockade is a fight and not merely a void Blockade. Its holder is the side that
-                // opens it, and pays the offence for it as any aggressor does.
                 let aggressors: Vec<Seat> = Seat::ALL
                     .into_iter()
                     .filter(|seat| {
-                        self.ships.iter().any(|s| s.seat == *seat && self.ship_in_orbit(s, body, orbit) && s.stance == Stance::Attack && !s.escaped)
-                            || (!self.batteries_at(*seat, body, orbit).is_empty()
-                                && self.ships.iter().any(|s| s.seat != *seat && self.ship_in_orbit(s, body, orbit) && s.stance == Stance::Blockade && s.kind.is_warship() && !s.escaped))
+                        !self.batteries_at(*seat, body, orbit).is_empty()
+                            && self.ships.iter().any(|s| s.seat != *seat && self.ship_in_orbit(s, body, orbit) && s.stance == Stance::Blockade && s.kind.is_warship() && !s.escaped)
                     })
                     .collect();
                 if aggressors.is_empty() {
                     continue;
                 }
-                // Ticket #324 (version 0.08.8): a seat's working Batteries stand in its line after
-                // its Ships, so a stack on Attack in an orbit with nothing but a Battery in it
-                // fights the Battery, and a Battery beside its owner's stack fights with it.
-                // Ticket #335: the Batteries of THIS orbit -- a station's its own ring, a ground
-                // Colony's low orbit.
-                let parties: Vec<(Seat, bool, Vec<UnitRef>)> = Seat::ALL
-                    .into_iter()
-                    .filter_map(|seat| {
-                        let units: Vec<UnitRef> = self
-                            .ships
-                            .iter()
-                            .filter(|s| s.seat == seat && self.ship_in_orbit(s, body, orbit) && !s.escaped)
-                            .map(|s| UnitRef::Ship(s.id))
-                            .chain(self.batteries_at(seat, body, orbit).into_iter().map(|(colony, index)| UnitRef::Battery { colony, index }))
-                            .collect();
-                        if units.is_empty() {
-                            None
-                        } else {
-                            Some((seat, aggressors.contains(&seat), units))
-                        }
-                    })
-                    .collect();
-                if parties.len() < 2 {
-                    continue;
-                }
-                let name = self.orbit_battle_name(body, orbit);
-                self.ship_melee(&name, body, orbit, &parties);
+                self.fight_orbit(body, orbit, &aggressors);
             }
         }
         // Army moves and attacks on Earth.
@@ -979,13 +1038,10 @@ impl Game {
         );
         let kind = if lost.is_empty() { LineKind::Battle } else { LineKind::DecisiveBattle };
         self.report_line(kind, line.at, text);
+        // Ticket #381 (version 0.09.2) made every Battle in orbit a Moment for one ticket; ticket
+        // #383 gave every Battle a window of its own instead, and the Moment went.
         if !lost.is_empty() {
             self.moment(MomentKind::DecisiveBattle, &[("place", line.place.clone()), ("result", outcome), ("figure", format!("{} lost", lost.len()))], line.at);
-        } else if matches!(line.at, Some(ReportPlace::Orbit(..))) {
-            // Ticket #381 (version 0.09.2): every Battle in orbit is a Moment, bloodless or not, at
-            // the designer's word -- orbital Battles are rare, seven games in eighty, and every one
-            // is news. One Moment a Battle: a fatal one already has its own above.
-            self.moment(MomentKind::OrbitalBattle, &[("place", line.place.clone()), ("result", outcome), ("figure", line.result.clone())], line.at);
         }
     }
 

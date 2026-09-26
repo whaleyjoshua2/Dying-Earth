@@ -1501,6 +1501,11 @@ impl Game {
                 if *stance == Stance::DigIn {
                     return fail("a Ship cannot dig in");
                 }
+                // Ticket #383 (version 0.09.2): an Attack is fought the moment it is ordered, and a
+                // stack fights once a turn.
+                if *stance == Stance::Attack && self.fought.contains(&(seat, *body)) {
+                    return fail("the stack fought this turn; it may Attack again next turn");
+                }
                 // Ticket #278 (version 0.08.5): a Blockade is chosen against a place, so it wants a
                 // warship of the seat's sitting in an orbit it may shut. Ticket #335 (version
                 // 0.09.0): **the orbit it is given in** -- LOW ORBIT, which starves the ground

@@ -77,6 +77,11 @@ pub enum Popup {
     /// Ticket #105 (version 0.07.0): the turn was refused, and this says why. A rule nobody can see
     /// refused by is as bad as no rule, so the refusal always speaks.
     Refused,
+    /// Ticket #383 (version 0.09.2): **a Battle, in a window of its own**, the nth of the turn's
+    /// record: the party lines, the round picture and the replay. Raised the moment the player's
+    /// Attack is fought, and at the head of the next turn for every Battle the Resolution fought,
+    /// before the Event and the Moments. The Report no longer carries the Battle Report block.
+    Battle(usize),
 }
 
 #[derive(Resource)]
@@ -244,6 +249,23 @@ impl Session {
     }
 
     /// Try to add an order; on failure remember why so the panel can show it.
+    /// Ticket #383 (version 0.09.2): the player's Attack, fought the moment it is confirmed. The
+    /// engine checks it as the order it was, fights it, and hands back where the Battles landed in
+    /// the turn's record; a refusal goes where a refused order's goes.
+    pub fn attack(&mut self, body: BodyId) -> Option<std::ops::Range<usize>> {
+        let game = self.game.as_mut()?;
+        match game.attack_now(Seat(0), body) {
+            Ok(fought) => {
+                self.last_error = None;
+                Some(fought)
+            }
+            Err(e) => {
+                self.last_error = Some(e.0);
+                None
+            }
+        }
+    }
+
     pub fn place(&mut self, order: Order) -> bool {
         let Some(game) = &self.game else { return false };
         match game.check_order(Seat(0), &self.pending, &order) {
@@ -408,6 +430,13 @@ pub struct ViewState {
     /// stack card scrolls to that block and stays there. A headless picture cannot scroll a panel,
     /// and on a card with four Ships on it both blocks sit well below the fold.
     pub stack_scroll: Option<StackBlock>,
+    /// Ticket #383 (version 0.09.2): the Battle windows' run: `Popup::Battle(i)` closes into
+    /// `Battle(i + 1)` while `i + 1 < battle_end`, and then into the turn's head chain (the note,
+    /// the card or the Event, the Moments, the Report) when `battles_then_head`, or into nothing
+    /// after a Battle fought mid-turn. `battles_then_note` is whether the tutorial's note is owed.
+    pub battle_end: usize,
+    pub battles_then_head: bool,
+    pub battles_then_note: bool,
     /// Ticket #58: which Moment kinds are switched on, remembered for the session. `None` until the
     /// player touches a checkbox, when it is filled from the defaults in `report.toml`.
     pub moments_on: Option<[bool; dying_earth_engine::MomentKind::ALL.len()]>,
@@ -471,6 +500,7 @@ impl Default for ViewState {
             credits_amount: 10,
             credits_offer: 0,
             attack_preview: false, armed_stack: None, armed_scroll: false, stack_scroll: None,
+            battle_end: 0, battles_then_head: false, battles_then_note: false,
             moments_on: None,
             force_hover: None,
             card_aside: false,

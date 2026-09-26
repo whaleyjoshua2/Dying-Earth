@@ -202,6 +202,10 @@ pub struct SavedGame {
     /// Ticket #286 (version 0.08.5): the war's counters.
     #[serde(default)]
     pub war: WarCounters,
+    /// Ticket #383 (version 0.09.2): the stacks that fought an Attack this turn, for a save taken
+    /// after one; empty in every save taken at a turn's head, which is where saves are taken.
+    #[serde(default)]
+    pub fought: Vec<(Seat, BodyId)>,
     /// Ticket #332 (version 0.09.0): the Widgets counters.
     #[serde(default)]
     pub widgets: WidgetCounters,
@@ -238,6 +242,7 @@ impl SavedGame {
             ships,
             armies,
             war,
+            fought,
             widgets,
             levies_raised,
             neutral_holds,
@@ -303,6 +308,7 @@ impl SavedGame {
             levies_raised: *levies_raised,
             neutral_holds: *neutral_holds,
             war: war.clone(),
+            fought: fought.clone(),
             widgets: widgets.clone(),
             body_firsts: body_firsts.clone(),
         }
@@ -321,6 +327,7 @@ impl SavedGame {
             ships: self.ships,
             armies: self.armies,
             war: self.war,
+            fought: self.fought,
             widgets: self.widgets,
             levies_raised: self.levies_raised,
             neutral_holds: self.neutral_holds,

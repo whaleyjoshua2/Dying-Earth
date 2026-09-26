@@ -356,3 +356,34 @@ ordinary business and is not kept.
 **Why.** The designer: *"what happens when a ship attacks a station or another ship and can we
 show it."* The one question a player could not answer was why they lost, and only a record answers
 it.
+
+## 15. An Attack is fought the moment it is ordered, and its Battle has a window of its own
+
+The authority is [ticket #383](https://github.com/whaleyjoshua2/Dying-Earth/issues/383).
+
+**An Attack is fought the moment it is confirmed**, on the board as it stands. The stack fights every
+orbit it holds Ships on Attack in, against every rival Ship and working Battery there -- an Attack
+in a station's orbit fights the station -- and the survivors stand on Hold. **A stack fights once a
+turn**: a second Attack at that Body that turn is refused, *"the stack fought this turn"*; every
+other order stays open to the survivors, so a stack that wins the orbit may land its cargo the same
+turn. The point of no return is the *Confirm Attack* button, which says so; a fought Battle cannot
+be taken back as an order can.
+
+**The computer's Attacks are fought as the Resolution opens**, the moment its orders are placed and
+before anything moves, on the same rule; the player always fights first in a turn. Because a Battle
+is fought before the transits and orbit changes land, **a hull still in flight never joins a Battle
+at its destination**, and a Ship changing orbit is not in its new orbit for one fought there. What
+the Resolution still opens itself is a Battery's Battle on a blockader, and an Intercept's on an
+arrival, as before. Ground Battles are unchanged: an Army's march into a rival place moves and
+fights at the Resolution.
+
+**Every Battle has a window of its own**: the party lines, the round picture and the replay of §14.
+The player's is raised the moment the Attack is fought; every Battle the Resolution fought is raised
+at the head of the next turn, one after another, before the tutorial's note, the card or the Event,
+the Moments and the Report. The map's Battle mark opens that Battle's window. The Report keeps its
+one-line Battle headline and loses the Battle Report block; the Moment for a bloodless orbital
+Battle that §14 added goes, the window being the news.
+
+**Why.** The designer: *"can we take the battle report off the start of turn report and put it in
+its own window when the battle resolves. change that (if its not) to resolve prior to the end of
+the turn."*

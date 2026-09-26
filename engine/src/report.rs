@@ -199,14 +199,10 @@ pub enum MomentKind {
     /// Ticket #345 (version 0.09.1): a Body settled for the first time, by anybody. It fires once
     /// per Body in a whole game, which is the rarest Moment on the list.
     FirstToABody,
-    /// Ticket #381 (version 0.09.2): a Battle in orbit that cost nobody a unit. A fatal one is a
-    /// `DecisiveBattle`; this is the other kind, fired because orbital Battles are rare and every
-    /// one is news, at the designer's word.
-    OrbitalBattle,
 }
 
 impl MomentKind {
-    pub const ALL: [MomentKind; 12] = [
+    pub const ALL: [MomentKind; 11] = [
         MomentKind::ColonyFounded,
         MomentKind::ControlChanged,
         MomentKind::ClimateThreshold,
@@ -218,7 +214,6 @@ impl MomentKind {
         MomentKind::RivalProgress,
         MomentKind::PlaceTakenByForce,
         MomentKind::FirstToABody,
-        MomentKind::OrbitalBattle,
     ];
 
     /// The key its table carries in `report.toml`.
@@ -235,7 +230,6 @@ impl MomentKind {
             MomentKind::RivalProgress => "rival_progress",
             MomentKind::PlaceTakenByForce => "taken_by_force",
             MomentKind::FirstToABody => "first_to_body",
-            MomentKind::OrbitalBattle => "orbital_battle",
         }
     }
 
@@ -253,7 +247,6 @@ impl MomentKind {
             MomentKind::RivalProgress => "A rival closing on its Victory Condition",
             MomentKind::PlaceTakenByForce => "A place taken by force",
             MomentKind::FirstToABody => "A Body settled for the first time",
-            MomentKind::OrbitalBattle => "A Battle in orbit",
         }
     }
 
@@ -269,7 +262,7 @@ impl MomentKind {
             MomentKind::LostInTransit => 2,
             MomentKind::ControlChanged => 2,
             MomentKind::ClimateThreshold | MomentKind::Antarctica => 3,
-            MomentKind::DecisiveBattle | MomentKind::PlaceTakenByForce | MomentKind::OrbitalBattle => 4,
+            MomentKind::DecisiveBattle | MomentKind::PlaceTakenByForce => 4,
             // Ticket #261: a rival about to win reads before a Tech and after a lost unit.
             MomentKind::RivalProgress => 5,
             MomentKind::TechComplete => 6,
@@ -714,8 +707,6 @@ pub const MOMENT_ARGS: &[(&str, &[&str])] = &[
     ("rival_progress", &["text", "figure"]),
     // Ticket #345 (version 0.09.1): a Body settled for the first time.
     ("first_to_body", &["faction", "body", "colony", "n"]),
-    // Ticket #381 (version 0.09.2): a Battle in orbit that cost nobody a unit.
-    ("orbital_battle", &["place", "result", "figure"]),
 ];
 
 impl ReportTable {

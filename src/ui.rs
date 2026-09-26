@@ -425,6 +425,8 @@ fn temperature_bar(ui: &mut Ui, game: &Game) {
 /// What the drawn interface asks the session to do, applied after drawing.
 enum Action {
     Place(Order),
+    /// Ticket #383 (version 0.09.2): the player's Attack at a Body, fought at once.
+    Attack(BodyId),
     Cancel(usize),
     /// Ticket #323 (version 0.08.8): a sentence for the panel's notice line, where a refusal shows.
     Notice(String),
@@ -606,6 +608,15 @@ fn card_owed(game: Option<&Game>) -> bool {
 /// to answer a question is to answer it.
 fn advance_popup(view: &mut ViewState, moments: usize, has_event: bool, card: bool) {
     view.popup = match view.popup {
+        // Ticket #383 (version 0.09.2): the Battle windows run one after another, then hand on to
+        // the turn's head when they opened it, and to nothing when one was fought mid-turn.
+        Popup::Battle(i) if i + 1 < view.battle_end => Popup::Battle(i + 1),
+        Popup::Battle(_) if !view.battles_then_head => Popup::None,
+        Popup::Battle(_) if view.battles_then_note => Popup::Tutorial,
+        Popup::Battle(_) if card => Popup::Card,
+        Popup::Battle(_) if has_event => Popup::Event,
+        Popup::Battle(_) if moments > 0 => Popup::Moment(0),
+        Popup::Battle(_) => Popup::Report,
         // Ticket #337: the card holds the screen until it is answered, and hands on to the Moments
         // and the Report the moment it is.
         Popup::Card if card => Popup::Card,
@@ -1390,6 +1401,15 @@ pub fn draw(
             Action::Place(o) => {
                 session.place(o);
             }
+            Action::Attack(body) => {
+                // Ticket #383 (version 0.09.2): fought now, and its window is the news.
+                if let Some(fought) = session.attack(body) {
+                    view.battles_then_head = false;
+                    view.battle_end = fought.end;
+                    view.popup = Popup::Battle(fought.start);
+                    view.attack_preview = false;
+                }
+            }
             Action::Notice(text) => session.last_error = Some(text),
             Action::Cancel(i) => {
                 if i < session.pending.len() {
@@ -1432,7 +1452,15 @@ pub fn draw(
                 // Ticket #169 (version 0.07.5): a tutorial game opens its first turns with a note
                 // saying what the turn is for, before the Event, the Moments and the Report.
                 let has_note = session.tutorial && session.game.as_ref().map(|g| tutorial_note(&session.tables, g.turn).is_some()).unwrap_or(false);
-                view.popup = if has_note {
+                // Ticket #383 (version 0.09.2): every Battle the Resolution fought comes first, each
+                // in a window of its own, and hands on to the rest of the head.
+                let battles = session.game.as_ref().map(|g| g.report.battles.len()).unwrap_or(0);
+                view.battle_end = battles;
+                view.battles_then_head = battles > 0;
+                view.battles_then_note = has_note;
+                view.popup = if battles > 0 {
+                    Popup::Battle(0)
+                } else if has_note {
                     Popup::Tutorial
                 } else if card_owed(session.game.as_ref()) {
                     // Ticket #337 (version 0.09.0): the turn's question, asked where the turn's
@@ -3550,7 +3578,12 @@ fn apply_hit(hit: Hit, view: &mut ViewState) {
             view.attack_preview = false;
         }
         Hit::Enter(b) => view.enter_surface(b),
-        Hit::Battle(_) => view.popup = Popup::Report,
+        // Ticket #383 (version 0.09.2): the mark opens that Battle's own window.
+        Hit::Battle(i) => {
+            view.battles_then_head = false;
+            view.battle_end = i + 1;
+            view.popup = Popup::Battle(i);
+        }
         Hit::Shield(sid) => {
             view.selection = Selection::State(sid);
             view.attack_preview = false;
@@ -5724,7 +5757,11 @@ fn stance_row(ui: &mut Ui, game: &Game, pending: &[Order], current: Stance, make
                 Err(e) => rule_tip(resp, format!("{}: {}", st.name(), e.0)),
             };
             if resp.clicked() && shown != st && check.is_ok() {
-                actions.push(Action::Place(order));
+                // Ticket #383 (version 0.09.2): a stack's Attack is fought the moment it is chosen.
+                match order {
+                    Order::ShipStance { body, stance: Stance::Attack } => actions.push(Action::Attack(body)),
+                    other => actions.push(Action::Place(other)),
+                }
             }
         }
     });
@@ -7534,8 +7571,11 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         }
         if view.attack_preview {
             ui.label(format!("Your {} Ship(s) (strength {}) against {} Ship(s) of {} (strength {} in all). Confirm?", ships.len(), mine, enemy_ships, rivals_text(game, &rivals), enemy));
-            if ui.button("Confirm Attack").clicked() {
-                actions.push(Action::Place(Order::ShipStance { body, stance: Stance::Attack }));
+            // Ticket #383 (version 0.09.2): the point of no return, and it says so: the Battle is
+            // fought the moment the button is pressed, on the board as it stands.
+            ui.label(RichText::new("The Battle is fought the moment you confirm, on the board as it stands; it cannot be taken back.").weak());
+            if ui.button("Confirm Attack: fought now").clicked() {
+                actions.push(Action::Attack(body));
                 view.attack_preview = false;
             }
         }
@@ -10504,6 +10544,44 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 });
             });
         }
+        Popup::Battle(i) => {
+            // Ticket #383 (version 0.09.2): **a Battle in a window of its own**: the party lines
+            // that stood in the Report's Battle Report block since ticket #50, then the round
+            // picture and the replay of ticket #381. One window a Battle; Close hands on to the
+            // next, or to the turn's head, through `advance_popup`.
+            if let Some(b) = game.report.battles.get(i) {
+                egui::Modal::new(egui::Id::new(("battle", i))).show(ctx, |ui| {
+                    ui.set_width(620.0);
+                    ui.label(RichText::new(format!("Battle at {}", b.place)).size(20.0).strong());
+                    ui.label(RichText::new(game.date(game.report.turn).text()).weak());
+                    egui::ScrollArea::vertical().max_height(560.0).show(ui, |ui| {
+                        for party in &b.parties {
+                            let who = party.seat.map(|s| game.seat_name(s)).unwrap_or_else(|| "Neutral".to_string());
+                            let colour = party.seat.map(|s| seat_colour(session, s)).unwrap_or(Color32::LIGHT_GRAY);
+                            // Ticket #281 (version 0.08.5): every unit by name and what it took, and
+                            // the odds the attacker faced, labelled for what they are. Ticket #339
+                            // (version 0.09.0): the whole Battle's odds, in the words the attack
+                            // button quoted them in.
+                            let attacking = match (party.aggressor, party.odds) {
+                                (true, Some(o)) => format!(", attacking at {:.0}% odds of holding the field", o * 100.0),
+                                (true, None) => ", attacking".to_string(),
+                                _ => String::new(),
+                            };
+                            ui.label(RichText::new(format!("{who}{attacking}: {} (strength {}, {} hit(s) landed)", party.units, party.strength, party.hits)).color(colour));
+                        }
+                        ui.label(&b.result);
+                        battle_log_view(ui, session, game, b);
+                    });
+                    ui.add_space(6.0);
+                    let more = i + 1 < view.battle_end;
+                    if ui.button(if more { "Next Battle" } else { "Close" }).clicked() {
+                        advance_popup(view, view.moments_of(&session.tables, &game.report).len(), game.last_event.is_some(), card_owed(Some(game)));
+                    }
+                });
+            } else {
+                view.popup = Popup::None;
+            }
+        }
         Popup::Report => {
             egui::Modal::new("report".into()).show(ctx, |ui| {
                 ui.set_width(620.0);
@@ -10594,31 +10672,10 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                         }
                         ui.add_space(4.0);
                     }
-                    if !game.report.battles.is_empty() {
-                        ui.label(RichText::new("Battle Report").strong());
-                        // Ticket #50: a Battle is a melee, so every party present takes its own line.
-                        for b in &game.report.battles {
-                            ui.label(RichText::new(&b.place).strong());
-                            for party in &b.parties {
-                                let who = party.seat.map(|s| game.seat_name(s)).unwrap_or_else(|| "Neutral".to_string());
-                                let colour = party.seat.map(|s| seat_colour(session, s)).unwrap_or(Color32::LIGHT_GRAY);
-                                // Ticket #281 (version 0.08.5): every unit by name and what it took,
-                                // and the odds the attacker faced, labelled for what they are.
-                                // Ticket #339 (version 0.09.0): the whole Battle's odds, in the
-                                // same words the attack button quoted them in.
-                                let attacking = match (party.aggressor, party.odds) {
-                                    (true, Some(o)) => format!(", attacking at {:.0}% odds of holding the field", o * 100.0),
-                                    (true, None) => ", attacking".to_string(),
-                                    _ => String::new(),
-                                };
-                                ui.label(RichText::new(format!("   {who}{attacking}: {} (strength {}, {} hit(s) landed)", party.units, party.strength, party.hits)).color(colour));
-                            }
-                            ui.label(format!("   {}", b.result));
-                            // Ticket #381 (version 0.09.2): the round log, drawn and replayed.
-                            battle_log_view(ui, session, game, b);
-                        }
-                        ui.add_space(4.0);
-                    }
+                    // Ticket #383 (version 0.09.2): the Battle Report block that stood here from
+                    // ticket #50 is a window of its own now, `Popup::Battle`, raised as the Battle is
+                    // fought and at the head of the turn before this Report; the Report keeps the
+                    // Battle's one-line headline above.
                     // Ticket #337 (version 0.09.0): **what the table answered**, the four seats
                     // together, each in its Faction's colour, immediately above what the rivals
                     // did -- which is where a player is already looking for news of them. A seat

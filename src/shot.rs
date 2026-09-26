@@ -69,6 +69,10 @@ pub struct ShotPlan {
     /// `ship:flying` the player's first Ship in flight, wherever it is bound. The `scroll:` aid
     /// scrolls this card now, since the blocks it names moved here.
     pub ship: Option<ShipId>,
+    /// Ticket #383 (version 0.09.2): `battlewindow:1` (a building aid): the first Battle of the
+    /// turn's record is raised in its own window, as the head of the turn would raise it, with
+    /// `battle_end` at the record's length so the button reads as it would in play.
+    pub battle_window: Option<usize>,
     /// `hover:<body id>` (a building aid, ticket #57): the Solar System Map draws that Body's launch
     /// window tooltip as though the pointer were on it. Nothing hovers in a headless capture.
     pub hover: Option<BodyId>,
@@ -113,8 +117,6 @@ fn moment_from_id(name: &str) -> Option<MomentKind> {
         "control" => Some(MomentKind::ControlChanged),
         "climate" => Some(MomentKind::ClimateThreshold),
         "battle" => Some(MomentKind::DecisiveBattle),
-        // Ticket #381 (version 0.09.2): a Battle in orbit that cost nobody a unit.
-        "orbit" => Some(MomentKind::OrbitalBattle),
         "antarctica" => Some(MomentKind::Antarctica),
         "archive" => Some(MomentKind::ArchiveComplete),
         "lost" => Some(MomentKind::LostInTransit),
@@ -149,6 +151,11 @@ fn apply_aids(plan: &mut ShotPlan, view: &mut ViewState) {
         view.selection = Selection::Ship(id);
     }
     view.stack_scroll = plan.stack_scroll;
+    if let Some(n) = plan.battle_window {
+        view.battle_end = n;
+        view.battles_then_head = false;
+        view.popup = Popup::Battle(0);
+    }
     // Ticket #162 (version 0.07.5): `hab:1` SELECTS seat 0's first station or Colony (the ISS on a
     // fresh board), so its card and its Module tiles are in the picture; the window it used to open
     // is gone.
@@ -1759,6 +1766,7 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
             Some(v) => v.parse().ok().map(ShipPick::Nth),
             None => None,
         });
+        plan.battle_window = std::env::args().any(|a| a == "battlewindow:1").then(|| session.game.as_ref().map(|g| g.report.battles.len()).unwrap_or(0)).filter(|n| *n > 0);
         plan.ship = pick.zip(session.game.as_ref()).and_then(|(pick, g)| match pick {
             ShipPick::Nth(n) => plan.stack.and_then(|body| g.ships_at(Seat(0), body).get(n.saturating_sub(1)).copied()),
             ShipPick::Flying => g.ships.iter().find(|s| s.seat == Seat(0) && matches!(s.at, ShipAt::Transit { .. })).map(|s| s.id),

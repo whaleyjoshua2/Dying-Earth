@@ -10867,7 +10867,7 @@ fn a_rival_closing_on_its_victory_condition_interrupts_the_player_once_a_step() 
     g.end_phase();
     assert_eq!(fired(&g), 2, "rivals only: {:?}", g.report.moments);
     assert_eq!(MomentKind::RivalProgress.rank(), 5, "between a Battle (4) and a Tech (6)");
-    assert_eq!(MomentKind::ALL.len(), 12, "ticket #281 (version 0.08.5) added a place taken by force, #345 (0.09.1) a Body settled first, and #381 (0.09.2) a Battle in orbit");
+    assert_eq!(MomentKind::ALL.len(), 11, "ticket #281 (version 0.08.5) added a place taken by force, and #345 (0.09.1) a Body settled first");
     assert!(g.tables.report.moment_on(MomentKind::RivalProgress), "on by default");
 }
 
@@ -12882,10 +12882,13 @@ fn a_new_ship_starts_in_the_orbit_of_the_yard_that_built_it() {
 
 /// Ticket #335 (R2): changing orbit. An order for a Ship at a Body, to an orbit of that Body that
 /// exists and is not the one it is in, costing `orbit_change_fuel` out of the Ship's own tank and
-/// refused below it; one order a turn like any other; resolved WITH the transits, before the
-/// Battles, so a Ship that changes orbit fights in its new one.
+/// refused below it; one order a turn like any other; resolved WITH the transits.
+/// Ticket #383 (version 0.09.2): and an Attack is fought as the Resolution opens, before the
+/// transits and the orbit changes land, so a Ship that changes orbit is NOT in its new orbit for a
+/// Battle fought there this turn. Until this ticket the move landed first and the Ship fought in
+/// its new orbit.
 #[test]
-fn an_orbit_change_costs_one_fuel_from_the_tank_and_lands_before_the_battles() {
+fn an_orbit_change_costs_one_fuel_from_the_tank_and_lands_after_the_attacks_are_fought() {
     let mut g = game();
     let fuel = g.tables.orbit_change_fuel;
     assert_eq!(fuel, 1, "bodies.toml: the sibling hop's figure");
@@ -12906,8 +12909,9 @@ fn an_orbit_change_costs_one_fuel_from_the_tank_and_lands_before_the_battles() {
     assert!(g.check_order(Seat(0), &[], &order).is_ok());
     let err = g.check_order(Seat(0), std::slice::from_ref(&order), &Order::Transit { ship, to: BodyId::Moon, slot: None }).unwrap_err().0;
     assert!(err.contains("already has an order"), "one order a turn: {err}");
-    // A rival on Attack is waiting at the ring it is moving to: the move lands first, so the Ship
-    // fights in its new orbit.
+    // A rival on Attack is waiting at the ring it is moving to: the Attack is fought as the
+    // Resolution opens, while the Ship is still in low orbit, so the rival finds nobody at the ring
+    // and the move lands after.
     ship_in(&mut g, Seat(1), UnitKind::Frigate, BodyId::Earth, Some(slot), Stance::Attack);
     g.commit_orders(Seat(0), std::slice::from_ref(&order));
     assert_eq!(g.ship(ship).unwrap().fuel, 4 - fuel, "the Fuel left the tank at the order");
@@ -12915,11 +12919,10 @@ fn an_orbit_change_costs_one_fuel_from_the_tank_and_lands_before_the_battles() {
     g.resolution_phase();
     assert_eq!(g.ship_orbit(g.ship(ship).unwrap()), Orbit::Slot(slot), "it moved with the transits");
     let at = Some(ReportPlace::Orbit(BodyId::Earth, Orbit::Slot(slot)));
-    let line = g.report.battles.iter().find(|b| b.at == at).expect("a Battle at the ring it moved to");
     assert!(
-        line.parties.iter().any(|p| p.seat == Some(Seat(0))),
-        "it fought in its new orbit: {:?}",
-        line.parties.iter().map(|p| p.seat).collect::<Vec<_>>()
+        !g.report.battles.iter().any(|b| b.at == at && b.parties.iter().any(|p| p.seat == Some(Seat(0)))),
+        "it was not at the ring when the Attack was fought: {:?}",
+        g.report.battles.iter().map(|b| b.place.clone()).collect::<Vec<_>>()
     );
     // Refused below the figure, naming it.
     g.ship_mut(ship).unwrap().fuel = 0;
@@ -15909,26 +15912,26 @@ fn start_emissions_count_the_home_package_and_the_factions_extras() {
 
 // ---------------------------------------------------------------- Ticket #381: the round log
 
-/// Ticket #381 (version 0.09.2): **every Battle in orbit is a Moment**, bloodless or not, since
-/// orbital Battles are rare (seven games in eighty) and every one is news; a Battle that cost a
-/// unit keeps its own Moment and does not fire two.
+/// Ticket #383 (version 0.09.2): **an Attack is fought the moment it is confirmed.** The stack's
+/// Battle is in the turn's record at once, the survivors stand on Hold, a second Attack that turn
+/// is refused, and every other order stays open to them.
 #[test]
-fn every_orbital_battle_is_a_moment_bloodless_or_not() {
-    let mut bloodless = 0;
-    for seed in 1..=12u64 {
-        let mut g = with_seed(seed);
-        ship_in(&mut g, Seat(0), UnitKind::Frigate, BodyId::Mars, None, Stance::Attack);
-        ship_in(&mut g, Seat(1), UnitKind::Frigate, BodyId::Mars, None, Stance::Attack);
-        g.resolution_phase();
-        let line = g.report.battles.iter().find(|b| b.at == Some(ReportPlace::Orbit(BodyId::Mars, Orbit::Low))).expect("a Battle in Mars orbit");
-        let lost = line.parties.iter().flat_map(|p| p.destroyed.iter()).count();
-        let moments = g.report.moments.iter().filter(|m| m.place == Some(ReportPlace::Orbit(BodyId::Mars, Orbit::Low))).count();
-        assert_eq!(moments, 1, "seed {seed}: one Moment for the Battle, {lost} lost: {:?}", g.report.moments);
-        if lost == 0 {
-            bloodless += 1;
-        }
+fn an_attack_is_fought_at_once_and_the_stack_fights_once_a_turn() {
+    let mut g = fresh();
+    let mine = ship_in(&mut g, Seat(0), UnitKind::Frigate, BodyId::Mars, None, Stance::Hold);
+    ship_in(&mut g, Seat(1), UnitKind::Frigate, BodyId::Mars, None, Stance::Hold);
+    let fought = g.attack_now(Seat(0), BodyId::Mars).expect("an Attack with a rival there");
+    assert_eq!(fought, 0..1, "one Battle, the first of the turn");
+    assert_eq!(g.report.battles[0].at, Some(ReportPlace::Orbit(BodyId::Mars, Orbit::Low)));
+    if let Some(s) = g.ship(mine) {
+        assert_eq!(s.stance, Stance::Hold, "the survivor stands on Hold");
+        let again = g.check_order(Seat(0), &[], &Order::ShipStance { body: BodyId::Mars, stance: Stance::Attack }).unwrap_err().0;
+        assert!(again.contains("fought this turn"), "{again}");
+        assert!(g.check_order(Seat(0), &[], &Order::Transit { ship: mine, to: BodyId::Phobos, slot: None }).is_ok(), "every other order stays open");
     }
-    assert!(bloodless > 0, "the seeds must include a bloodless Battle to mean anything");
+    // The flag clears with the Resolution.
+    g.resolution_phase();
+    assert!(g.fought.is_empty(), "the stack may Attack again next turn");
 }
 
 /// Ticket #381 (version 0.09.2): **the round log is the Battle**: its blows are the hits the
@@ -15970,4 +15973,34 @@ fn the_round_log_accounts_for_every_hit_and_ends_where_the_melee_ended() {
         }
     }
     assert!(covered_seen, "forty seeds must show the escort taking a hit for the Colony Ship");
+}
+
+// ---------------------------------------------------------------- Ticket #383: an Attack fought at once
+
+/// Ticket #383 (version 0.09.2): **an Attack is fought the moment it is ordered.** The computer
+/// orders only at End Turn, so its Attacks are fought then -- the moment its orders are placed,
+/// BEFORE the transits land -- and a hull still in flight never joins a Battle at its destination.
+/// Until this ticket the Resolution landed the transits first and fought the Battles after, so the
+/// hull arriving this turn stood in the line.
+#[test]
+fn an_attack_is_fought_before_the_transits_land() {
+    let mut g = fresh();
+    g.seats[1].ai = false;
+    let docked = ship_in(&mut g, Seat(0), UnitKind::Frigate, BodyId::Mars, None, Stance::Hold);
+    ship_in(&mut g, Seat(1), UnitKind::Frigate, BodyId::Mars, None, Stance::Attack);
+    let arriving = ShipId(g.fresh_id());
+    let name = g.next_ship_name(UnitKind::Frigate);
+    g.ships.push(Ship {
+        id: arriving, name, kind: UnitKind::Frigate, seat: Seat(0), damage: 0, at: ShipAt::Transit { from: BodyId::Earth, to: BodyId::Mars, turns_left: 1 }, colonists: 0, warhead: false,
+        colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None,
+    });
+    let arriving_name = g.ship_name(g.ship(arriving).unwrap());
+    let docked_name = g.ship_name(g.ship(docked).unwrap());
+    pick_a_tech(&mut g);
+    g.end_turn(std::array::from_fn(|_| Vec::new())).expect("the turn should end");
+    let line = g.report.battles.iter().find(|b| b.at == Some(ReportPlace::Orbit(BodyId::Mars, Orbit::Low))).expect("a Battle in Mars orbit");
+    let mine = line.parties.iter().find(|p| p.seat == Some(Seat(0))).expect("the party of seat 0");
+    assert!(mine.units.contains(&docked_name), "the docked hull fought: {}", mine.units);
+    assert!(!mine.units.contains(&arriving_name), "the hull in flight never joined: {}", mine.units);
+    assert!(g.ships.iter().any(|s| s.id == arriving && s.at == ShipAt::Body(BodyId::Mars)), "and it landed after the Battle");
 }

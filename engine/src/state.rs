@@ -1439,6 +1439,9 @@ pub struct Game {
     pub armies: Vec<Army>,
     /// Ticket #286 (version 0.08.5): the war, counted on the game so the sweep can say it.
     pub war: WarCounters,
+    /// Ticket #383 (version 0.09.2): the stacks (seat, Body) that fought an Attack this turn, which
+    /// may not Attack again until the next Resolution. Cleared as the Resolution opens.
+    pub fought: Vec<(Seat, BodyId)>,
     /// Ticket #332 (version 0.09.0): Widgets made, applied and lost, and the queues' depths.
     pub widgets: WidgetCounters,
     /// Ticket #282 (version 0.08.5): Levies raised and neutral Regions that held against an attack
@@ -1652,6 +1655,7 @@ impl Game {
             ships: Vec::new(),
             armies: Vec::new(),
             war: WarCounters::default(),
+            fought: Vec::new(),
             widgets: WidgetCounters::default(),
             levies_raised: 0,
             neutral_holds: 0,
