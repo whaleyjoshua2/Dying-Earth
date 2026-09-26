@@ -734,6 +734,9 @@ impl Game {
         for (seat, _, _) in parties.iter().filter(|(_, agg, _)| *agg) {
             self.war.battles[seat.index()] += 1;
             self.war.orbit_attacks[seat.index()] += 1;
+            if body != BodyId::Earth {
+                self.war.orbit_attacks_off_earth[seat.index()] += 1;
+            }
         }
         // Ticket #335 (version 0.09.0): Orbital Control is LOW ORBIT's, so only a Battle fought
         // there can have moved it; a fight at a station's ring says nothing about the ground.

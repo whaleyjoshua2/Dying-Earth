@@ -161,7 +161,8 @@ observatory_colonists = 8
 build_habitat = 9
 build_launch_site_or_shipyard = 9
 build_colony_ship = 9
-build_warship = 3
+# Ticket #355 (version 0.09.1): 3 to 4, at the designer's word.
+build_warship = 4
 # Ticket #343 (version 0.09.1): the Missile Carrier, and the Launch it was bought for. A seat
 # builds one only with Missile Technology standing, a rival holding a place it wants and cannot
 # take, and no carrier of its own already armed or on the ways; it fires at the richest such
@@ -218,7 +219,8 @@ observatory_colonists = 4
 build_habitat = 7
 build_launch_site_or_shipyard = 6
 build_colony_ship = 8
-build_warship = 1
+# Ticket #355 (version 0.09.1): 1 to 3, at the designer's word; the Archivists fight in orbit too.
+build_warship = 3
 # Ticket #343 (version 0.09.1): the Missile Carrier, and the Launch it was bought for. A seat
 # builds one only with Missile Technology standing, a rival holding a place it wants and cannot
 # take, and no carrier of its own already armed or on the ways; it fires at the richest such
@@ -226,7 +228,7 @@ build_warship = 1
 # that costs 60 and 16 is worth nothing until it is fired.
 build_missile_carrier = 6
 launch = 9
-# Ticket #51: the Archivists spend on the Archive and Colony Ships, never a fleet.
+# Ticket #51: the Archivists spend on the Archive and Colony Ships. Ticket #355 (version 0.09.1): "never a fleet" is gone.
 build_army_or_barracks = 4
 build_influence = 6
 influence = 8
@@ -446,11 +448,13 @@ battle_fuel_weight = 0.2
 # antecedent whose own prerequisites are unmet is skipped over this turn and taken the turn they are
 # met, so Beneficiation can stand ahead of the Deep Mining it needs without ever being picked first.
 
+# Ticket #355 (version 0.09.1): Hardened Hulls and Missile Technology close all four lists, AFTER
+# each Faction's Victory gate chain, which always comes first -- the designer's word.
 [tech_picks.prospectors]
 # Ticket #348: Beneficiation joins the list. Ticket #242 made it a prerequisite of the Extraction
 # Charter and nobody put it on the list it gates, so the Prospectors reached their own gate only by
 # taking Beneficiation as the cheapest thing left.
-order = ["beneficiation", "deep_mining", "efficient_grids", "automated_refining", "clean_propellant", "efficient_transit"]
+order = ["beneficiation", "deep_mining", "efficient_grids", "automated_refining", "clean_propellant", "efficient_transit", "hardened_hulls", "missile_technology"]
 # Ticket #348: `last = "clean_power"` is GONE. The tree is SHARED, so a Faction deferring a Tech is
 # not stating a private preference -- it is holding the whole table up. Clean Power is an antecedent
 # of BOTH the Arkwrights' and the Archivists' gates, so every turn a Prospector Lead pushed it to
@@ -481,7 +485,7 @@ order = ["beneficiation", "deep_mining", "efficient_grids", "automated_refining"
 # by the cheapest-remaining fallback -- which is exactly how The Upload got chosen in the game that
 # opened ticket #201 -- and the Custodians are the seat that most wants to keep what it holds: they
 # lose their start Region in up to 12 seeds of 20.
-order = ["public_science", "coastal_engineering", "efficient_grids", "clean_power", "green_consensus", "civil_defense", "clean_manufacturing"]
+order = ["public_science", "coastal_engineering", "efficient_grids", "clean_power", "green_consensus", "civil_defense", "clean_manufacturing", "hardened_hulls", "missile_technology"]
 
 # Ticket #51: the Arkwrights want room, cheap upkeep and cheap transits.
 # Ticket #348: Efficient Grids and Clean Power open the list. Generation Ships waits on Closed-Loop
@@ -489,7 +493,7 @@ order = ["public_science", "coastal_engineering", "efficient_grids", "clean_powe
 # the Arkwrights had the top and the bottom of that chain on their list and neither of its middle
 # two rungs. They won 1 of 80.
 [tech_picks.arkwrights]
-order = ["efficient_grids", "clean_power", "expanded_habitats", "closed_loop_colonies", "efficient_transit"]
+order = ["efficient_grids", "clean_power", "expanded_habitats", "closed_loop_colonies", "efficient_transit", "hardened_hulls", "missile_technology"]
 
 # Ticket #51: the Archivists want Research and a quiet world.
 # Ticket #348: Expanded Habitats, Clean Power and Closed-Loop Colonies open the list. Ticket #246
@@ -498,4 +502,4 @@ order = ["efficient_grids", "clean_power", "expanded_habitats", "closed_loop_col
 # and they held Efficient Grids alone of them. They won 0 of 80 and their Archive waits on this same
 # Tech, since `orders.rs` refuses the Archive order until The Upload stands.
 [tech_picks.archivists]
-order = ["expanded_habitats", "clean_power", "closed_loop_colonies", "public_science", "efficient_grids", "coastal_engineering", "green_consensus", "civil_defense"]
+order = ["expanded_habitats", "clean_power", "closed_loop_colonies", "public_science", "efficient_grids", "coastal_engineering", "green_consensus", "civil_defense", "hardened_hulls", "missile_technology"]

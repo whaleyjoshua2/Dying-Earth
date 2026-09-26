@@ -1143,6 +1143,10 @@ pub struct WarCounters {
     /// Battle did not put it there.
     #[serde(default)]
     pub battle_fuel_burned: [i64; SEAT_COUNT],
+    /// Ticket #355 (version 0.09.1): the orbital Battles a seat opened AWAY from Earth, so the
+    /// sweep can say where the orbital war is fought; `orbit_attacks` less this is over Earth.
+    #[serde(default)]
+    pub orbit_attacks_off_earth: [u32; SEAT_COUNT],
     #[serde(default)]
     pub hulls_left_dry: [u32; SEAT_COUNT],
 }
@@ -1180,6 +1184,7 @@ impl WarCounters {
             self.marches_neutral[i] += o.marches_neutral[i];
             self.marches_held[i] += o.marches_held[i];
             self.orbit_attacks[i] += o.orbit_attacks[i];
+            self.orbit_attacks_off_earth[i] += o.orbit_attacks_off_earth[i];
             self.escapes[i] += o.escapes[i];
             self.dig_ins[i] += o.dig_ins[i];
             self.armies_landed[i] += o.armies_landed[i];

@@ -72,6 +72,16 @@ fn main() {
     // Ticket #343 (version 0.09.1): the nuke's counters across every seating, so the closing
     // review has ONE total to quote rather than four blocks to add up by hand.
     let mut all_warc = dying_earth_engine::state::WarCounters::default();
+    // Ticket #355 (version 0.09.1): the orbital war PER FACTION across every seating, and the games
+    // each act happened in at all, which is the bar that ticket is judged by. Per Faction, not per
+    // seat, for ticket #348's reason: seat 0 is a different Faction in each seating.
+    let mut orb_battles = [0u32; 4];
+    let mut orb_off_earth = [0u32; 4];
+    let mut orb_blockades = [0u32; 4];
+    let mut orb_launches = [0u32; 4];
+    let mut orb_bombards = [0u32; 4];
+    let mut orb_intercepts = [0u32; 4];
+    let mut orb_games = [0u32; 3];
     let (mut all_games, mut all_collapses) = (0u32, 0u32);
     for player in players {
         println!("seat 0: {} starting in {start:?}", player.name());
@@ -319,6 +329,20 @@ fn main() {
                             warc.add(&r.war);
                             sinks_end.push(r.natural_sink_end);
                             all_warc.add(&r.war);
+                            for (i, k) in r.seat_kinds().into_iter().enumerate() {
+                                let f = FactionKind::ALL.iter().position(|x| *x == k).unwrap();
+                                orb_battles[f] += r.war.orbit_attacks[i];
+                                orb_off_earth[f] += r.war.orbit_attacks_off_earth[i];
+                                orb_blockades[f] += r.war.blockades_ordered[i];
+                                orb_launches[f] += r.war.launches[i];
+                                orb_bombards[f] += r.war.bombards[i];
+                                orb_intercepts[f] += r.war.interceptions[i];
+                            }
+                            for (g, n) in [r.war.orbit_attacks.iter().sum::<u32>(), r.war.blockades_ordered.iter().sum::<u32>(), r.war.launches.iter().sum::<u32>()].into_iter().enumerate() {
+                                if n > 0 {
+                                    orb_games[g] += 1;
+                                }
+                            }
                             if r.deck_empty {
                                 deck_empty += 1;
                             }
@@ -639,6 +663,12 @@ fn main() {
             all_warc.launch_people_killed.iter().sum::<f64>(),
             all_warc.industry_levels_lost.iter().sum::<u32>()
         );
+        // Ticket #355 (version 0.09.1): the orbital war, per FACTION, and the games it happened in.
+        println!("  the orbital war, per Faction (orbital Battles opened, of them off Earth / Blockades / Launches / Bombards / Interceptions):");
+        for (i, k) in FactionKind::ALL.into_iter().enumerate() {
+            println!("  {:>12}: {} ({} off Earth) / {} / {} / {} / {}", k.name(), orb_battles[i], orb_off_earth[i], orb_blockades[i], orb_launches[i], orb_bombards[i], orb_intercepts[i]);
+        }
+        println!("  games with an orbital Battle {} of {all_games}, with a Blockade {}, with a Launch {}", orb_games[0], orb_games[1], orb_games[2]);
         // Ticket #346 (version 0.09.1): the same, a TOTAL over every seat of every seating.
         println!(
             "  Battles cost, all seats and seatings: Fuel burned in Battle {}, hulls left dry by a Battle {}",

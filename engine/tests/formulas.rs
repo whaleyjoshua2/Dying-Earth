@@ -8145,6 +8145,11 @@ fn the_computer_orders_a_blockade_where_its_warship_sits_in_a_rival_stations_slo
         name: String::new(), id, kind: UnitKind::Frigate, seat: Seat(1), damage: 0, at: ShipAt::Body(body), colonists: 0, warhead: false, colonists_education: 1.0, army: None,
         stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: Some(slot),
     });
+    // Ticket #355 (version 0.09.1): only WITH CAUSE, at the designer's word. A calm seat holds.
+    let orders = g.ai_orders(Seat(1));
+    assert!(!orders.iter().any(|o| matches!(o, Order::ShipStance { stance: Stance::Blockade, .. })), "no cause, no Blockade: {orders:?}");
+    g.relations.score[1][0] = g.tables.ai.thresholds.war_cause - 5;
+    assert!(g.relations_score(Seat(1), Seat(0)) <= g.tables.ai.thresholds.war_cause, "cause, now");
     let orders = g.ai_orders(Seat(1));
     assert!(orders.iter().any(|o| matches!(o, Order::ShipStance { body: b, stance: Stance::Blockade } if *b == body)), "a Blockade of the station whose slot it sits in: {orders:?}");
 }
@@ -8177,6 +8182,31 @@ fn a_blockade_stops_refuelling_and_holds_an_empty_slot_against_a_builder() {
     g.ship_mut(rival).unwrap().slot = Some(free);
     let err = g.check_order(Seat(0), &[], &Order::BuildStation { body, slot: free }).unwrap_err().0;
     assert!(err.contains("rival warship"), "a warship in an empty slot denies it: {err}");
+}
+
+/// Ticket #355 (version 0.09.1): the computer reads an Attack ORBIT BY ORBIT, as it is fought. A
+/// fleet with cause at a rival's station ring, strong enough for that station's Battery, attacks --
+/// where the old reading, fixed on low orbit wherever the seat wanted the ground, saw no enemy at
+/// the ring at all. Too weak for the Battery, it holds.
+#[test]
+fn the_computer_attacks_a_defended_ring_it_can_beat() {
+    let mut g = game();
+    calm(&mut g);
+    let station = g.colonies.iter().find(|c| c.in_orbit && c.control.director() == Some(Seat(0))).map(|c| c.id).expect("a station over Earth");
+    let (body, slot) = { let c = g.colony(station).unwrap(); (c.body, c.slot) };
+    g.colony_mut(station).unwrap().modules.push(Module::new(ModuleKind::Battery));
+    g.relations.score[1][0] = g.tables.ai.thresholds.war_cause - 5;
+    // A Colony of its own on Earth's ground, so it WANTS the ground -- the case over Earth in play,
+    // and the one the old low-orbit-only reading went blind in.
+    colony(&mut g, Seat(1), BodyId::Earth, &[ModuleKind::Habitat], 2);
+    assert!(g.ai_wants_the_ground(Seat(1), body));
+    let attacks = |g: &mut Game| g.ai_orders(Seat(1)).iter().any(|o| matches!(o, Order::ShipStance { body: b, stance: Stance::Attack } if *b == body));
+    ship_in(&mut g, Seat(1), UnitKind::Frigate, body, Some(slot), Stance::Hold);
+    assert!(!attacks(&mut g), "one Frigate is no match for the Battery");
+    for _ in 0..4 {
+        ship_in(&mut g, Seat(1), UnitKind::Battleship, body, Some(slot), Stance::Hold);
+    }
+    assert!(attacks(&mut g), "a fleet that beats the Battery takes the ring");
 }
 
 /// Ticket #99: a transit names the Orbital Slot it arrives into, and refuses a slot the Body has not
