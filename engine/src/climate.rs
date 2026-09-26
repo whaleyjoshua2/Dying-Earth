@@ -243,14 +243,13 @@ impl Game {
                     if !f.working() {
                         continue;
                     }
-                    // Ticket #52: at Unrest 7 every Facility in the state emits at half.
-                    let e = t.facility(f.kind).emissions * if self.facilities_at_half(st.id) { 0.5 } else { 1.0 };
+                    // Ticket #358 (version 0.09.1): the figure the card shows, `facility_yield`, which
+                    // carries the Faction's multiplier, Clean Power and Clean Manufacturing read as
+                    // this seat reads them (at half under Provisional Findings), and Unrest 7's half
+                    // (ticket #52). This recomputed it from the table and charged a Tech only once
+                    // done, so a card could show a cut the air never got.
                     let charged = match f.kind.common().unwrap_or(f.kind) {
-                        FacilityKind::Factory | FacilityKind::Refinery => e * fr_mult * m,
-                        // Ticket #332 (version 0.09.0): the Mine's smoke is the Factory's old smoke
-                        // with no Tech to thin it; Clean Manufacturing follows the Factory.
-                        FacilityKind::Mine => e * m,
-                        FacilityKind::PowerPlant => e * pp_mult * m,
+                        FacilityKind::Factory | FacilityKind::Refinery | FacilityKind::Mine | FacilityKind::PowerPlant => self.facility_yield(d, st.id, f.kind).emissions,
                         _ => 0.0,
                     };
                     match f.kind.common().unwrap_or(f.kind) {

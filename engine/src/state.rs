@@ -3352,18 +3352,28 @@ impl Game {
             .map(|f| self.tables.facility(f.kind).influence_allotment)
             .sum();
         // Ticket #278 (version 0.08.5): a starved Colony's Relay and Chorus give nothing either.
-        let space: i64 = self
-            .owned_colonies(seat)
-            .iter()
-            .filter(|c| self.starved_by(**c).is_none())
-            // Ticket #359 (version 0.09.1): at half, rounded down, per Colony, where an occupied
-            // Habitat stands shut.
-            .map(|c| {
-                let n: i64 = self.colony(*c).into_iter().flat_map(|c| c.modules.iter()).filter(|m| m.working()).map(|m| self.tables.module(m.kind).influence_allotment).sum();
-                if self.habitat_halves(*c) { n / 2 } else { n }
-            })
-            .sum();
+        // Ticket #358 (version 0.09.1): each Module's OWN figures, `module_yield_at`, which the
+        // screen prints -- so Relay Networks is paid, and #359's shut-Habitat half is read there.
+        // This summed the raw table row, and the game showed Influence it never paid.
+        let space: i64 = self.module_allotments(seat).iter().map(|y| y.0).sum();
         earth + space
+    }
+
+    /// Ticket #358 (version 0.09.1): every working Module's Allotment for this seat, inside and
+    /// outside the Faction multiplier, from the one figure the card shows. A starved Colony gives
+    /// nothing, as ticket #278 ruled.
+    fn module_allotments(&self, seat: Seat) -> Vec<(i64, i64)> {
+        self.owned_colonies(seat)
+            .into_iter()
+            .filter(|c| self.starved_by(*c).is_none())
+            .flat_map(|c| {
+                let n = self.colony(c).map(|col| col.modules.len()).unwrap_or(0);
+                (0..n).filter(move |i| self.colony(c).is_some_and(|col| col.modules[*i].working())).map(move |i| {
+                    let y = self.module_yield_at(seat, c, i);
+                    (y.allotment, y.allotment_outside)
+                })
+            })
+            .collect()
     }
 
     /// The Allotment: the base plus every controlled state's Influence value plus the buildings,
@@ -3393,7 +3403,10 @@ impl Game {
         // must do neither: the Arkwrights get their whole 1, and a Colony with its lights out is
         // still the one that got there first.
         let firsts: i64 = self.body_firsts.iter().filter(|f| f.seat == seat && self.directs(seat, Place::Colony(f.colony))).count() as i64;
-        (base as f64 * m).floor() as i64 + self.seat(seat).spaceport_influence + self.seat(seat).first_windfall + firsts * t.first_settled_allotment
+        // Ticket #358 (version 0.09.1): and the Chorus's per-Colonist point, outside the
+        // multiplier on the Spaceport's argument, at the designer's word.
+        let outside: i64 = self.module_allotments(seat).iter().map(|y| y.1).sum();
+        (base as f64 * m).floor() as i64 + outside + self.seat(seat).spaceport_influence + self.seat(seat).first_windfall + firsts * t.first_settled_allotment
     }
 
     /// Ticket #345 (version 0.09.1): which seat was first to a Body, and at which Colony.

@@ -8259,6 +8259,52 @@ fn an_order_after_a_launch_rearm_or_bombard_is_refused() {
     }
 }
 
+/// Ticket #358 (version 0.09.1): **Relay Networks is paid.** It showed a Relay's +1 on every card and
+/// the Allotment never saw it, because the sum read the raw table row and not the Module's figures.
+#[test]
+fn relay_networks_is_paid_into_the_allotment() {
+    let mut g = game();
+    calm(&mut g);
+    colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Relay, ModuleKind::Habitat], 4);
+    let before = g.building_allotment(Seat(0));
+    with_tech(&mut g, TechId::RelayNetworks);
+    assert_eq!(g.building_allotment(Seat(0)), before + 1, "the Relay's second point reaches the Allotment");
+}
+
+/// Ticket #358: **the Chorus is paid, and its per-Colonist Influence sits OUTSIDE the Faction
+/// multiplier**, on the Spaceport's argument (#183): the Arkwrights' x0.8 does not shave it.
+#[test]
+fn the_chorus_is_paid_at_face_value() {
+    let mut g = game();
+    calm(&mut g);
+    let ark = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Arkwrights).expect("an Arkwright seat");
+    let per = g.tables.unique.chorus_colonists as u32;
+    let c = colony(&mut g, ark, BodyId::Moon, &[ModuleKind::Chorus, ModuleKind::Habitat, ModuleKind::Habitat], 1);
+    let before = g.influence_allotment(ark);
+    g.colony_mut(c).unwrap().colonists = per * 2;
+    assert_eq!(g.influence_allotment(ark), before + 2, "two more Influence for twice {per} Colonists, at face value");
+}
+
+/// Ticket #358: **Climate charges a Facility's Emissions from the figure the screen shows**, so a
+/// Clean Power read at half under the Archivists' Provisional Findings thins the smoke it shows
+/// thinned. It charged only a Tech fully done.
+#[test]
+fn climate_charges_the_emissions_the_card_shows() {
+    let mut g = game();
+    calm(&mut g);
+    let arc = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Archivists).expect("an Archivist seat");
+    let sid = g.directed_states(arc)[0];
+    g.state_mut(sid).facilities.push(Facility::new(FacilityKind::PowerPlant));
+    assert!(g.state(sid).facilities.iter().any(|f| f.kind.common().unwrap_or(f.kind) == FacilityKind::PowerPlant && f.working()), "a Power Plant to read");
+    let shown = |g: &Game| g.state(sid).facilities.iter().filter(|f| f.working()).map(|f| g.facility_yield(arc, sid, f.kind).emissions).sum::<f64>();
+    let whole = g.emissions_now().power_plants;
+    let shown_whole = shown(&g);
+    g.seats[arc.index()].provisional_findings = true;
+    g.research.findings_tech = Some(TechId::CleanPower);
+    assert!(shown(&g) < shown_whole, "the card shows the half-read Tech");
+    assert!(g.emissions_now().power_plants < whole, "and the air is charged it");
+}
+
 /// Ticket #99: a transit names the Orbital Slot it arrives into, and refuses a slot the Body has not
 /// got. The choice is made with the leg, so it is made before the Ship can see who will be there.
 #[test]
@@ -9034,7 +9080,10 @@ fn the_three_unique_modules_each_pay_their_one_clause() {
     for (people, relay, chorus) in [(5u32, 1, 1), (6, 1, 2), (13, 1, 3)] {
         g.colony_mut(cid).expect("the Colony just made").colonists = people;
         assert_eq!(g.module_yield(ark, cid, ModuleKind::Relay).allotment, relay, "a plain Relay is unmoved by {people} Colonists");
-        assert_eq!(g.module_yield(ark, cid, ModuleKind::Chorus).allotment, chorus, "a Chorus at a Colony of {people}");
+        // Ticket #358 (version 0.09.1): the base point inside the Faction multiplier, the
+        // per-Colonist points outside it; together, the figure the card prints.
+        let y = g.module_yield(ark, cid, ModuleKind::Chorus);
+        assert_eq!((y.allotment, y.allotment + y.allotment_outside), (1, chorus), "a Chorus at a Colony of {people}");
         // Standing is untouched: "+1 Influence" has meant the Allotment since ticket #232, which
         // is the Faction's budget everywhere rather than a hold on one place.
         assert_eq!(g.module_yield(ark, cid, ModuleKind::Chorus).standing, 2, "a Chorus holds its place no harder than a Relay");

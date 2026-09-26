@@ -63,6 +63,9 @@ pub struct Yield {
     pub does: Option<String>,
     /// Ticket #352 (version 0.09.1): how the figure it makes was reached, step by step.
     pub chain: Chain,
+    /// Ticket #358 (version 0.09.1): Influence Allotment paid OUTSIDE the Faction multiplier -- the
+    /// Chorus's per-Colonist point, on the Spaceport's argument (#183). `allotment` is inside it.
+    pub allotment_outside: i64,
 }
 
 /// Ticket #352 (version 0.09.1): one step of how a building's figure was reached, in the order the
@@ -212,8 +215,9 @@ impl Yield {
         if let Some(d) = &self.does {
             parts.push(d.clone());
         }
-        if self.allotment > 0 {
-            parts.push(format!("+{} Influence Allotment", self.allotment));
+        // Ticket #358 (version 0.09.1): both halves, inside and outside the multiplier, as paid.
+        if self.allotment + self.allotment_outside > 0 {
+            parts.push(format!("+{} Influence Allotment", self.allotment + self.allotment_outside));
         }
         if self.standing > 0 {
             parts.push(format!("standing here +{} a turn", self.standing));
@@ -418,7 +422,7 @@ impl Game {
         let fac = t.faction(self.kind(seat));
         let card = t.state(sid);
         let fc = t.facility(kind);
-        let mut y = Yield { resource: None, amount: 0, research: 0, upkeep: fc.energy_upkeep, emissions: 0.0, allotment: fc.influence_allotment, standing: fc.standing_per_turn, doubled_by: None, detail: None, does: fc.does.clone(), chain: Chain::default() };
+        let mut y = Yield { resource: None, amount: 0, research: 0, upkeep: fc.energy_upkeep, emissions: 0.0, allotment: fc.influence_allotment, standing: fc.standing_per_turn, doubled_by: None, detail: None, does: fc.does.clone(), chain: Chain::default(), allotment_outside: 0 };
         if let Some(p) = &fc.produces {
             match p.resource {
                 Resource::Research => {
@@ -502,7 +506,7 @@ impl Game {
         let t = &self.tables;
         let fac = t.faction(self.kind(seat));
         let mc = t.module(kind);
-        let mut y = Yield { resource: None, amount: 0, research: 0, upkeep: mc.energy_upkeep, emissions: 0.0, allotment: mc.influence_allotment, standing: mc.standing_per_turn, doubled_by: None, detail: None, does: mc.does.clone(), chain: Chain::default() };
+        let mut y = Yield { resource: None, amount: 0, research: 0, upkeep: mc.energy_upkeep, emissions: 0.0, allotment: mc.influence_allotment, standing: mc.standing_per_turn, doubled_by: None, detail: None, does: mc.does.clone(), chain: Chain::default(), allotment_outside: 0 };
         // Ticket #239 (version 0.08.3): a Unique Module does its sibling's job, so every lookup
         // keyed by kind -- the Techs that multiply it, the slot's yield, a Discovery on it --
         // reads the COMMON kind. Without this the Arkwrights' Chorus would be the one Relay in
@@ -525,7 +529,8 @@ impl Game {
         if kind == ModuleKind::Chorus && t.unique.chorus_colonists > 0 {
             let extra = col.colonists as i64 / t.unique.chorus_colonists;
             if extra > 0 {
-                y.allotment += extra;
+                // Ticket #358 (version 0.09.1): outside the Faction multiplier, at the designer's word.
+                y.allotment_outside += extra;
                 y.detail = Some(format!("{} Colonists here, {extra} more Influence", col.colonists));
             }
         }
@@ -679,7 +684,7 @@ impl Game {
     /// `doubled_modules`, named for the Facility whose mothball pays for it.
     pub fn module_yield_at(&self, seat: Seat, cid: ColonyId, index: usize) -> Yield {
         let Some(kind) = self.colony(cid).and_then(|c| c.modules.get(index)).map(|m| m.kind) else {
-            return Yield { resource: None, amount: 0, research: 0, upkeep: 0, emissions: 0.0, allotment: 0, standing: 0, doubled_by: None, detail: None, does: None, chain: Chain::default() };
+            return Yield { resource: None, amount: 0, research: 0, upkeep: 0, emissions: 0.0, allotment: 0, standing: 0, doubled_by: None, detail: None, does: None, chain: Chain::default(), allotment_outside: 0 };
         };
         let mut y = self.module_yield(seat, cid, kind);
         if self.doubled_modules(seat).contains(&(cid, index)) {
@@ -696,6 +701,9 @@ impl Game {
         if self.habitat_halves(cid) && y.resource != Some(Resource::Energy) {
             y.amount /= 2;
             y.research /= 2;
+            // Ticket #358 (version 0.09.1): and the Influence, now that the Allotment reads this.
+            y.allotment /= 2;
+            y.allotment_outside /= 2;
             y.chain.half("while a shut Habitat houses people here");
         }
         y
