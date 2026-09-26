@@ -284,3 +284,40 @@ with the driver, the player in the EU earned 12 Ducats a turn from four Faciliti
 computer seats earned about one apiece from two or three; the Facilities were the small gap and
 the Region's economy the large one. The designer levelled the Facilities, added the Solar Array,
 tried the rich Regions for the computer and, on the sweep's figures, kept the spread.
+
+## 13. Every refusal explains why on mouseover
+
+The authority is [ticket #380](https://github.com/whaleyjoshua2/Dying-Earth/issues/380).
+
+**Every control the engine can refuse shows the engine's own reason on mouseover** -- the
+`check_order` text itself, never a copy -- **the refusal first and the control's description after
+it** where the two fit the six-line ceiling, the refusal alone where they do not. This is the rule
+for every greyed order button (builds, moves, loads, repairs, Faction orders, Bombard, Launch, the
+"All that can" buttons), every greyed stance, the End Turn sun (which hovers the engine's refusal
+when it is dead) and the spectator's End Turn (*"Close the window first."*).
+
+**Why it was needed.** From version 0.08.3 (ticket #238) to this one, the shared button helpers
+sent the refusal through a hover that egui opens only on an *enabled* widget, so a greyed order
+button hovered its description or nothing, and the engine's reason never reached a pointer in play.
+The pictures in the diaries looked right because the headless picture aid forces a tooltip open
+whatever the widget's state.
+
+**The "All that can" buttons take every candidate** and place those the engine accepts, as the
+glossary has said since ticket #322; when none can, the dead button hovers the first hull's
+refusal. Before this the callers filtered the list and a dead button read *"All 0 that can"* with no
+reason, and a stack of Armies with one that could not march was greyed whole.
+
+**A slider the engine refuses holds at the last accepted setting and says why on the rail.** The
+Research Directive and the Venture share had a fault beside: a second move in one turn was checked
+against the order it was cancelling, refused as "already set this turn", and dropped without a word.
+The check runs against the orders that will stand.
+
+**Enter on a dead sun** puts the End Turn through, so the engine's refusal raises the popup of
+ticket #105 in the engine's words, as a click would; with a window open it does nothing, as before.
+
+**Unchanged, at the designer's word**: the Spend button on the Influence strip stays bare, as ticket
+#306 cut it; a door that is hidden when its order is unavailable stays hidden; a button the engine
+checks only after the click (Attack this turn, the founding doors, Declare it over, the Tech Pick)
+keeps refusing in the red line under the card; the map's right-click notices keep their words.
+
+**Why.** The designer: *"all refusals should explain why on mouseover."*
