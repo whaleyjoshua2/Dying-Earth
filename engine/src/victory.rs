@@ -171,9 +171,9 @@ impl Game {
         {
             first_held_back = Some(format!("needs {}, not yet researched", self.tables.tech(gate).name));
         }
-        // Ticket #373 (version 0.09.2): the Colonists aboard the seat's Ships, for the bars that
+        // Ticket #373 (version 0.09.2): the Colonists aboard the seat's Ships, for the parts that
         // count Colonists off Earth and no other -- a Ship in flight has no one Body to count
-        // toward, so the per-Body part carries none.
+        // toward, so the per-Body part carries none. They count toward nothing.
         let aboard = self.colonists_aboard(seat);
         let first_transit = if card.kind == VictoryFirstKind::ColonistsOffEarth { aboard } else { 0 };
         let second_transit = if second.kind == VictorySecondKind::OffWorldPresence { aboard } else { 0 };

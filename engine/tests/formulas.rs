@@ -15437,7 +15437,7 @@ fn colonists_aboard_ride_the_victory_progress_as_transit_and_count_toward_nothin
     assert_eq!((before.first_transit, before.second_transit), (0, 0), "nothing aboard at the start");
     // A Colony Ship over Earth with four aboard, and another in transit to the Moon: eight aboard,
     // wherever they are.
-    let (_, _) = colony_ship_ready(&mut g, BodyId::Earth);
+    colony_ship_ready(&mut g, BodyId::Earth);
     let (flying, _) = colony_ship_ready(&mut g, BodyId::Moon);
     g.ships.iter_mut().find(|s| s.id == flying).unwrap().at = ShipAt::Transit { from: BodyId::Earth, to: BodyId::Moon, turns_left: 2 };
     assert_eq!(g.colonists_aboard(Seat(0)), 8);
@@ -15454,7 +15454,7 @@ fn colonists_aboard_ride_the_victory_progress_as_transit_and_count_toward_nothin
     // The Arkwrights: the first part counts Colonists off Earth (thirty); the second, Bodies with
     // Colonists on them, carries no band, a Ship in flight having no one Body to count toward.
     let mut g = Game::new(tables(), NewGame { seed: 7, player: FactionKind::Arkwrights, player_is_ai: false, player_start: StateId::EastAsia });
-    let (_, _) = colony_ship_ready(&mut g, BodyId::Mars);
+    colony_ship_ready(&mut g, BodyId::Mars);
     let p = g.progress(Seat(0));
     assert_eq!((p.first_transit, p.second_transit), (4, 0), "{p:?}");
 }

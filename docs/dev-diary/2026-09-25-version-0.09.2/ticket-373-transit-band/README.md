@@ -51,6 +51,19 @@ bar's label reads *"8 of 12 Colonists living off Earth (+8 in transit)"*; the se
 **The Arkwrights.** The first bar reads *"4 of 30 (+8 in transit)"* with the band from 4 to 12; the
 per-Body bar beneath, *"0 of 3 Bodies"*, has none.
 
+## The review
+
+Two axes, run as sub-agents over the commit.
+
+**Standards**: no violation; one defect fixed, the new `colonists_aboard` having landed under
+`off_world_colonists`'s doc line, which now heads the function it describes again. The paired
+first/second twins follow the file's own shape since #51 and stay.
+
+**Spec**: the build matches the decision, nothing missing, nothing extra. For the record, the other
+places that print a Colonist bar as *"N of M"* -- the game-over box, the chronicle, the rival
+Moments, the driver's `show`, the Archive card -- stay settled-only, the decision having named the
+Victory bar and its label.
+
 ## The gate
 
 `cargo clippy --workspace --release --all-targets -- -D warnings` clean; engine 493 + 6, root 8.
