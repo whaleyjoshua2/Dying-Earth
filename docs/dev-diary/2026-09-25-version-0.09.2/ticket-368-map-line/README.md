@@ -11,8 +11,9 @@ records it.
 ## What was built
 
 One block in `src/ui.rs` moved from the always-open part of the Body label into the `hovering`
-branch, after the orbital-slot lines, and now counts into the label's line spacing as those do. No
-engine change, no data change, no save change.
+branch, after the orbital-slot lines. It is not counted into the label's line spacing, as it was
+not before, for the reason the pictures below show. No engine change, no data change, no save
+change.
 
 ## The pictures
 

@@ -473,9 +473,10 @@ fn build_board(session: &mut Session) {
         }
         // `first:1` and `first:lost` (building aids, ticket #345, version 0.09.1): **the board the
         // first-to-a-Body rule is photographed on.** Seat 0 lands on the MOON and takes its first,
-        // and Mars, Phobos and Deimos are left with theirs unclaimed -- so one picture of the Solar
-        // System Map carries a world that has been taken beside three that are still worth the
-        // crossing, which is the whole argument of the rule in one frame.
+        // and Mars, Phobos and Deimos are left with theirs unclaimed -- so the surface cards show a
+        // world that has been taken beside three that are still worth the crossing. (Until ticket
+        // #368, version 0.09.2, the Solar System Map's open labels carried the line too, and one
+        // frame held all four; now the map shows it only for the Body under the pointer.)
         //
         // The landing is driven through `end_turn` with a real Unload order rather than by pushing a
         // Colony onto the board, because everything worth photographing here is made by the engine
