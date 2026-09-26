@@ -77,3 +77,28 @@ Your works.
 ships in low orbit of any body but earth"*, then, on the ticket: any orbit, the player's own, and
 *"above your works, move the rest of the ship lines there too."* Colonists aboard count for nothing
 until landed, and nothing said so.
+
+## 5. One net Unrest line a Region
+
+The authority is [ticket #371](https://github.com/whaleyjoshua2/Dying-Earth/issues/371).
+
+**The Report says one line per Region about its Unrest**, at the end of the Resolution, by Region in
+the board's order, after the migration lines: *"India: Unrest from 3 to 5.5 (a Heatwave, agitation by
+the Prospectors, a Mothball), past the first threshold: the Standing Army no longer replenishes."* The
+figures are the Region's Unrest as the Resolution opened and as it closed; the causes are named in
+the order they landed; a threshold crossed, up or down, is the line's ending. It is said **only where
+a cause moved it**: the natural fall alone is not news. It is said for **the player's own Regions**,
+held or occupied, and for **any Region the player Agitated or Relieved** this turn; a rival's Region
+a rival acted in is silent, unless its holder is thrown off, which has its own line. A spectated
+game, having no player, says every Region's.
+
+**Six lines are gone**, each now a cause of that one line: a Mothball's or Decommission's, a Climate
+card's (*"a Heatwave"*, *"a Drought"*, *"the Unrest card"*), a Strip Permit's (its line keeps the
+Emissions half, which is its own news), an Agitate's (*"agitation by the Prospectors"*, or *"held to
+nothing by the Constabulary"*), a Relief's, and the threshold line. **The migration line's Unrest
+clause is gone too**: *"India took in 0.6 people"* says only the migration, and *"5.0 people
+arriving"* is a cause on the Unrest line. The log keeps every line as it was.
+
+**Why.** The designer: *"quiet unrest spam"*, and the playtest's *"Unrest lines in the Report run out
+of order."* The six sources wrote in phase order, so one Region's lines lay scattered among
+another's, and a Region could take six in a turn.

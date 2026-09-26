@@ -2704,7 +2704,11 @@ fn c_heat_refugees_arrive_at_the_neighbours_and_raise_unrest_per_two_and_a_half_
     assert!(said("China lost"), "China's net loss: {:?}", g.report.lines);
     assert!(said("the heat"), "the largest cause survives into the line: {:?}", g.report.lines);
     assert!(said("Russia took in"), "Russia's net gain: {:?}", g.report.lines);
-    assert!(said("Unrest rose by 1"), "and why Russia's Unrest rose: {:?}", g.report.lines);
+    // Ticket #371 (version 0.09.2): the Unrest clause left the migration line for the Region's one
+    // net Unrest line, and neutral Russia, nobody's and untouched by the player, gets none.
+    assert!(!said("Unrest rose"), "the migration line no longer carries the Unrest clause: {:?}", g.report.lines);
+    assert!(g.log.iter().any(|l| l.contains("arrived in Russia; Unrest rose by 1")), "the log still says why: {:?}", g.log);
+    assert!(!g.report.lines.iter().any(|l| l.kind == LineKind::Unrest), "a neutral Region nobody touched says nothing of its Unrest: {:?}", g.report.lines);
     assert_eq!(g.report.lines.iter().filter(|l| l.kind == LineKind::Refugees).count(), 2, "one line each, and no more");
 
     // The cap: eight people arriving in a turn is still only two, where #52 allowed three.
@@ -2763,7 +2767,8 @@ fn the_report_says_one_net_migration_line_per_region_and_only_when_it_is_worth_s
     let lines = refugee_lines(&g);
     assert_eq!(lines.len(), 1, "one line for the Region, not one per flow: {lines:?}");
     assert!(lines[0].contains("took in 3.0 people of 7.0 arriving"), "the net and the gross: {lines:?}");
-    assert!(lines[0].contains("Unrest rose by"), "and why its Unrest rose: {lines:?}");
+    // Ticket #371 (version 0.09.2): the Unrest clause is the Region's own net line's now.
+    assert!(!lines[0].contains("Unrest"), "the migration line says only the migration: {lines:?}");
 
     // A net loss to two causes: the largest survives, with `mostly`.
     let mut g = game();
@@ -10301,7 +10306,9 @@ fn agitate_raises_a_rivals_regions_unrest_for_ducats_and_influence_once_a_turn()
     g.resolution_phase();
     assert!((g.state(sid).unrest - 2.5).abs() < 1e-9, "3 + 1 - the fall of 1.5: {}", g.state(sid).unrest);
     assert!(g.relations.offended[holder.index()][0], "an offence against the holder");
-    assert!(g.report.lines.iter().any(|l| l.text.contains("agitated in")), "the Report names who paid: {:?}", g.report.lines);
+    // Ticket #371 (version 0.09.2): the Report names who paid as a cause on the Region's one net
+    // Unrest line, which a rival's Region earns when the player is the one agitating.
+    assert!(g.report.lines.iter().any(|l| l.kind == LineKind::Unrest && l.text.contains("agitation by the Custodians")), "the Report names who paid: {:?}", g.report.lines);
     // A working Constabulary halves it -- and calms a point a turn besides: 3 + 0.5 - 1.0 - 1.5.
     g.state_mut(sid).facilities.push(facility(FacilityKind::Constabulary));
     g.state_mut(sid).unrest = 3.0;
@@ -15414,6 +15421,52 @@ fn no_card_of_either_kind_is_drawn_on_the_first_turn_and_the_deck_is_untouched()
         }
     }
     assert!((10..=50).contains(&drew), "turn {}: {drew} of 60 seeds drew, which is not a coin", t.events.first_draw_turn);
+}
+
+/// Ticket #371 (version 0.09.2): **one net Unrest line a Region**, causes named in the order they
+/// landed, for the player's own Regions and any Region the player acted in; a rival's Region a
+/// rival agitated says nothing; a threshold crossed is the line's ending; the refugees a Region
+/// took in are one cause among the others.
+#[test]
+fn the_report_says_one_net_unrest_line_a_region_with_its_causes() {
+    let mut g = game();
+    calm(&mut g);
+    let unrest_lines = |g: &Game| g.report.lines.iter().filter(|l| l.kind == LineKind::Unrest).map(|l| l.text.clone()).collect::<Vec<_>>();
+    // The player's China at 3: a rival agitates (+1), the player pays Relief (-1), the turn's fall
+    // (-1.5). One line, both causes, in the order they landed, and no threshold in it.
+    g.state_mut(StateId::EastAsia).unrest = 3.0;
+    g.pending.agitates.push((Seat(1), StateId::EastAsia));
+    g.pending.relief.push((Seat(0), StateId::EastAsia));
+    // A rival's Region a rival agitates: nobody's business but theirs.
+    let theirs = StateId::ALL.into_iter().find(|s| matches!(g.state(*s).control, Control::Controlled(Seat(2)))).expect("seat 2 holds a Region");
+    g.state_mut(theirs).unrest = 3.0;
+    g.pending.agitates.push((Seat(3), theirs));
+    g.resolution_phase();
+    let lines = unrest_lines(&g);
+    assert_eq!(lines, vec!["China: Unrest from 3 to 1.5 (agitation by the Prospectors, Relief by the Custodians).".to_string()], "{lines:?}");
+    // A rise past the first threshold ends the line with what the threshold means. A Heatwave card
+    // and refugees arriving are causes too, in the order they landed; the fall is skipped, as it is
+    // in a turn the Region changed hands, so the figures read plainly.
+    let mut g = game();
+    calm(&mut g);
+    g.state_mut(StateId::EastAsia).unrest = 3.5;
+    g.state_mut(StateId::EastAsia).changed_hands = true;
+    g.state_mut(StateId::EastAsia).refugees_in = 5.0;
+    g.pending.agitates.push((Seat(1), StateId::EastAsia));
+    g.resolution_phase();
+    let lines = unrest_lines(&g);
+    assert_eq!(lines.len(), 1, "{lines:?}");
+    assert!(lines[0].starts_with("China: Unrest from 3.5 to "), "{lines:?}");
+    assert!(lines[0].contains("5.0 people arriving"), "the refugees are a cause, not a line of their own: {lines:?}");
+    assert!(lines[0].contains("agitation by the Prospectors"), "{lines:?}");
+    assert!(lines[0].contains(", past the first threshold: the Standing Army no longer replenishes."), "{lines:?}");
+    assert!(!g.report.lines.iter().any(|l| l.kind == LineKind::Refugees && l.text.contains("Unrest")), "no second line about the same Unrest: {:?}", g.report.lines);
+    // A turn in which nothing but the fall moved it says nothing: the fall alone is not news.
+    let mut g = game();
+    calm(&mut g);
+    g.state_mut(StateId::EastAsia).unrest = 3.0;
+    g.resolution_phase();
+    assert!(unrest_lines(&g).is_empty(), "{:?}", unrest_lines(&g));
 }
 
 /// Ticket #370 (version 0.09.2): **the player's Colonists still aboard off Earth are reported every

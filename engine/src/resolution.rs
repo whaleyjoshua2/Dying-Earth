@@ -31,6 +31,9 @@ impl Game {
                 m.online = !m.mothballed;
             }
         }
+        // Ticket #371 (version 0.09.2): where every Region's Unrest stands as the Resolution opens,
+        // for the one net line a Region the Report says at its end.
+        self.pending.unrest_before = StateId::ALL.iter().map(|s| self.state(*s).unrest).collect();
         self.blackout_stances();
         self.resolve_transits(); // (a)
         self.resolve_battles(); // (b)
@@ -1992,11 +1995,9 @@ impl Game {
                     Game::unrest_figure(rose),
                     self.unrest_text(sid)
                 ));
-                let text = self.say(
-                    "unrest_rose_state",
-                    &[("state", self.tables.state(sid).name.clone()), ("rose", Game::unrest_figure(rose).to_string()), ("unrest", self.unrest_text(sid))],
-                );
-                said.push((LineKind::Unrest, Some(ReportPlace::State(sid)), text));
+                // Ticket #371 (version 0.09.2): a cause for the Region's one net line, not a line.
+                let cause = self.phrase(if what == BuildingChange::Mothball { "cause_mothball" } else { "cause_decommission" }, &[]);
+                self.unrest_cause(sid, cause, false);
             }
         }
         for line in lines {
@@ -2026,13 +2027,74 @@ impl Game {
                 self.unrest_text(sid)
             );
             self.log(line);
+            // Ticket #371 (version 0.09.2): the line keeps the Emissions half, which is its own
+            // news; the Unrest half is a cause for the Region's one net line.
+            let text = self.say("strip_permit_ended", &[("state", self.tables.state(sid).name.clone()), ("baseline", format!("{:.1}", self.baseline_emissions(sid)))]);
+            self.report_line(LineKind::Note, Some(ReportPlace::State(sid)), text);
+            if rose > 0.0 {
+                let cause = self.phrase("cause_permit", &[]);
+                self.unrest_cause(sid, cause, false);
+            }
+        }
+    }
+
+    /// Ticket #371 (version 0.09.2): one cause of a Region's Unrest moving this Resolution, for
+    /// the one net line the Report says about it at the end. `by_player` marks an act of the
+    /// player's own -- an Agitate or a Relief -- which earns a rival's Region its line.
+    fn unrest_cause(&mut self, sid: StateId, cause: String, by_player: bool) {
+        self.pending.unrest_causes.push((sid, cause, by_player));
+    }
+
+    /// Ticket #371 (version 0.09.2): **one net line per Region about its Unrest**, at the end of the
+    /// Resolution, at the designer's word ("quiet unrest spam", and the playtest's "Unrest lines in
+    /// the Report run out of order"). Six sources used to write a line each in phase order --
+    /// a Mothball, a Climate card, a Strip Permit running out, an Agitate, a Relief, a threshold
+    /// crossed -- so one Region's lines lay scattered among another's and a Region could take six
+    /// in a turn. Now each is a cause, and the Report says, by Region in the board's order, *"India:
+    /// Unrest from 3 to 5.5 (a Heatwave, agitation by the Prospectors, a Mothball), past the first
+    /// threshold: the Standing Army no longer replenishes."* Only where a cause moved it: the
+    /// natural fall alone is not news. The player's own Regions (held or occupied), and any Region
+    /// the player Agitated or Relieved; a rival's is silent unless its holder is thrown off, which
+    /// has its own line. A spectated game, having no player, says every Region's. The refugees a
+    /// Region took in are one cause among the others, where they were a line of their own.
+    fn report_unrest_net(&mut self) {
+        let u = self.tables.unrest.clone();
+        let me = Seat(0);
+        let causes = std::mem::take(&mut self.pending.unrest_causes);
+        let before = std::mem::take(&mut self.pending.unrest_before);
+        for (i, sid) in StateId::ALL.into_iter().enumerate() {
+            let mine: Vec<&(StateId, String, bool)> = causes.iter().filter(|(s, _, _)| *s == sid).collect();
+            if mine.is_empty() {
+                continue;
+            }
+            let control = self.state(sid).control;
+            let ours = control.director() == Some(me) || control.controller() == Some(me);
+            if !self.spectator && !ours && !mine.iter().any(|(_, _, by_player)| *by_player) {
+                continue;
+            }
+            // Without the snapshot (a Resolution pass run on its own), last turn's reported figure.
+            let was = before.get(i).copied().unwrap_or(self.state(sid).unrest_reported);
+            let now = self.state(sid).unrest;
+            let words: Vec<String> = mine.iter().map(|(_, c, _)| c.clone()).collect();
+            let ending = if now >= u.facility_threshold && was < u.facility_threshold {
+                self.phrase("unrest_past", &[("which", "second".to_string()), ("note", self.unrest_note(sid))])
+            } else if now >= u.army_threshold && was < u.army_threshold {
+                self.phrase("unrest_past", &[("which", "first".to_string()), ("note", self.unrest_note(sid))])
+            } else if now < u.army_threshold && was >= u.army_threshold {
+                self.phrase("unrest_under", &[("which", "first".to_string())])
+            } else if now < u.facility_threshold && was >= u.facility_threshold {
+                self.phrase("unrest_under", &[("which", "second".to_string())])
+            } else {
+                String::new()
+            };
             let text = self.say(
-                "strip_permit_ended",
+                "unrest_net",
                 &[
                     ("state", self.tables.state(sid).name.clone()),
-                    ("baseline", format!("{:.1}", self.baseline_emissions(sid))),
-                    ("rose", Game::unrest_figure(rose).to_string()),
-                    ("unrest", self.unrest_text(sid)),
+                    ("before", Game::unrest_figure(was)),
+                    ("after", Game::unrest_figure(now)),
+                    ("causes", words.join(", ")),
+                    ("ending", ending),
                 ],
             );
             self.report_line(LineKind::Unrest, Some(ReportPlace::State(sid)), text);
@@ -2660,6 +2722,12 @@ impl Game {
     /// gross by the rule. Where the gross differs from the net the line names it, because otherwise
     /// the Unrest figure would be unexplained -- it is the one place the Report says why Unrest rose.
     fn report_net_migration(&mut self, sid: StateId, arrived: f64, rose: f64) {
+        // Ticket #371 (version 0.09.2): the people who arrived are a cause of the Region's Unrest
+        // moving, for its one net line, whatever the migration line below says or does not say.
+        if rose > 0.0 {
+            let cause = self.phrase("cause_refugees", &[("n", format!("{arrived:.1}"))]);
+            self.unrest_cause(sid, cause, false);
+        }
         let left: f64 = self.state(sid).refugees_out.iter().map(|(_, n)| *n).sum();
         let net = arrived - left;
         if net.abs() < self.tables.unrest.report_net_floor {
@@ -2669,19 +2737,13 @@ impl Game {
         let text = if net > 0.0 {
             let n = format!("{net:.1}");
             let gross = format!("{arrived:.1}");
-            match (rose > 0.0, (arrived - net).abs() >= self.tables.unrest.report_net_floor) {
-                // Unrest rose, and some of what arrived was cancelled by what left: name both, or
-                // the Unrest figure is charged on a number the line never gives.
-                (true, true) => self.say(
-                    "refugees_net_in_gross",
-                    &[("n", n), ("gross", gross), ("state", state), ("rose", Game::unrest_figure(rose).to_string()), ("unrest", self.unrest_text(sid))],
-                ),
-                (true, false) => self.say(
-                    "refugees_net_in",
-                    &[("n", n), ("state", state), ("rose", Game::unrest_figure(rose).to_string()), ("unrest", self.unrest_text(sid))],
-                ),
-                // Too few to move Unrest, or Unrest already at the ceiling: the arrival alone.
-                (false, _) => self.say("refugees_net_in_quiet", &[("n", n), ("state", state)]),
+            // Ticket #371 (version 0.09.2): the Unrest clause left this line for the Region's one
+            // net Unrest line, where the arrivals are one cause among the others (below). What
+            // stays is the migration: the net, and the gross where some of it was cancelled.
+            if (arrived - net).abs() >= self.tables.unrest.report_net_floor {
+                self.say("refugees_net_in_gross", &[("n", n), ("gross", gross), ("state", state)])
+            } else {
+                self.say("refugees_net_in", &[("n", n), ("state", state)])
             }
         } else {
             // The largest cause survives, at the designer's word: *why* is the most interesting word
@@ -2803,14 +2865,15 @@ impl Game {
             self.offend_by(seat, holder, 1);
             self.seat_mut(seat).agitates_issued += 1;
             let (who, name) = (self.seat_name(seat), self.tables.state(sid).name.clone());
-            let text = if rose > 0.0 {
+            // Ticket #371 (version 0.09.2): a cause for the Region's one net line, not a line.
+            let cause = if rose > 0.0 {
                 self.log(format!("The {who} agitated in {name}: Unrest rose by {} to {}.", Game::unrest_figure(rose), self.unrest_text(sid)));
-                self.say("agitate", &[("faction", who), ("state", name.clone()), ("rose", Game::unrest_figure(rose).to_string()), ("unrest", self.unrest_text(sid))])
+                self.phrase("cause_agitate", &[("faction", who)])
             } else {
                 self.log(format!("The {who} agitated in {name}; the Constabulary held it to nothing."));
-                self.say("agitate_damped", &[("faction", who), ("state", name.clone())])
+                self.phrase("cause_agitate_damped", &[("faction", who)])
             };
-            self.report_line(LineKind::Unrest, Some(ReportPlace::State(sid)), text);
+            self.unrest_cause(sid, cause, seat == Seat(0));
             self.ai_deed(seat, "agitate", &[("state", name)]);
         }
         // Relief (rule 3): one point per order, paid for in Ducats at the Orders phase.
@@ -2825,16 +2888,9 @@ impl Game {
         for (seat, sid, fell) in relieved.into_iter().filter(|(_, _, n)| *n > 0.0) {
             let line = format!("The {} paid Relief in {}: Unrest fell by {} to {}.", self.seat_name(seat), self.tables.state(sid).name, Game::unrest_figure(fell), self.unrest_text(sid));
             self.log(line);
-            let text = self.say(
-                "relief",
-                &[
-                    ("faction", self.seat_name(seat)),
-                    ("state", self.tables.state(sid).name.clone()),
-                    ("fell", Game::unrest_figure(fell).to_string()),
-                    ("unrest", self.unrest_text(sid)),
-                ],
-            );
-            self.report_line(LineKind::Unrest, Some(ReportPlace::State(sid)), text);
+            // Ticket #371 (version 0.09.2): a cause for the Region's one net line, not a line.
+            let cause = self.phrase("cause_relief", &[("faction", self.seat_name(seat))]);
+            self.unrest_cause(sid, cause, seat == Seat(0));
         }
         // What calms a state by standing in it (a Constabulary now, a Scrubber later), then the
         // natural fall. Ticket #53: the fall lands every turn, whatever else happened, so a rise
@@ -2854,7 +2910,12 @@ impl Game {
             let Control::Controlled(seat) = self.state(sid).control else { continue };
             self.throw_off(sid, seat);
         }
-        // The Report lines for crossing 4, 7 and 10, once each way.
+        // Ticket #371 (version 0.09.2): the one net Unrest line a Region, before the reported figure
+        // below is brought up to date, since without the Resolution's snapshot that figure is what
+        // the line reads its "before" from.
+        self.report_unrest_net();
+        // The log line for crossing 4 or 7, once each way. Ticket #371 (version 0.09.2): the Report's
+        // word for it is the ending of the Region's one net line, written by `report_unrest_net`.
         for sid in StateId::ALL {
             let now = self.state(sid).unrest;
             let was = self.state(sid).unrest_reported;
@@ -2862,11 +2923,6 @@ impl Game {
                 if now >= line && was < line {
                     let text = format!("{}: Unrest reached {} - {}.", self.tables.state(sid).name, self.unrest_text(sid), self.unrest_note(sid));
                     self.log(text);
-                    let said = self.say(
-                        "unrest_threshold",
-                        &[("state", self.tables.state(sid).name.clone()), ("unrest", self.unrest_text(sid)), ("note", self.unrest_note(sid))],
-                    );
-                    self.report_line(LineKind::Unrest, Some(ReportPlace::State(sid)), said);
                     break;
                 }
             }

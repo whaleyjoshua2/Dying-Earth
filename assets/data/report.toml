@@ -109,23 +109,26 @@ occupation_broken = "The {faction}' Occupation of {place} broke: it goes back to
 control_changed = "{place} now belongs to the {faction} ({why})."
 claim_tied = "{place} is claimed by {factions} at the same Standing; it stays as it is."
 threw_off = "{state} threw off the {faction}: it is neutral again, its Armies are its own, and its Unrest settles at {unrest}."
-unrest_rose_state = "{state}: Unrest rose by {rose} to {unrest}."
-unrest_card = "Unrest in {state}: its Unrest rose by {rose} to {unrest}."
-unrest_threshold = "{state}: Unrest reached {unrest} - {note}."
-relief = "The {faction} paid Relief in {state}: Unrest fell by {fell} to {unrest}."
+# Ticket #371 (version 0.09.2): ONE net line a Region about its Unrest, at the end of the Resolution,
+# at the designer's word ("quiet unrest spam"). It replaced six lines written in phase order -- a
+# Mothball's, a Climate card's, a Strip Permit's, an Agitate's, a Relief's and a threshold's -- and
+# the Unrest clause of the refugee line; each is a cause_* phrase below now. {ending} is the
+# unrest_past or unrest_under phrase where a threshold was crossed, and nothing otherwise.
+# "from 3 to 1.5" rather than an arrow: the interface's font has no arrow glyph and drew a box.
+unrest_net = "{state}: Unrest from {before} to {after} ({causes}){ending}."
 # Ticket #176 (version 0.07.6): one NET line per Region, and only when the net is worth at least
 # half a person. What a Region lost to each cause and what it took in used to speak separately, so a
 # hot turn spent up to 39 lines of a 74-line Report on refugees. Unrest is still charged on everyone
 # who arrived, so where the gross differs from the net the line names both; otherwise the Unrest
 # figure would be charged on a number the line never gives.
-refugees_net_in = "{state} took in {n} people; Unrest rose by {rose} to {unrest}."
-refugees_net_in_gross = "{state} took in {n} people of {gross} arriving; Unrest rose by {rose} to {unrest}."
-refugees_net_in_quiet = "{state} took in {n} people."
+# Ticket #371 (version 0.09.2): the Unrest clause left these two for the Region's unrest_net line.
+refugees_net_in = "{state} took in {n} people."
+refugees_net_in_gross = "{state} took in {n} people of {gross} arriving."
 refugees_net_out = "{state} lost {n} people to its neighbours: {why}."
 refugees_net_out_mostly = "{state} lost {n} people to its neighbours: mostly {why}."
 resettled = "The {faction} resettled this turn's refugees in {state} (+{standing} Standing there)."
 strip_permit = "The {faction} issued a Strip Permit in {state}: every Facility there produces double for {turns} turns."
-strip_permit_ended = "The Strip Permit in {state} ran out: its Baseline Emissions stand at {baseline} for good, and its Unrest rose by {rose} to {unrest}."
+strip_permit_ended = "The Strip Permit in {state} ran out: its Baseline Emissions stand at {baseline} for good."
 building_changed_state = "The {faction} {done} the {building} in {state}."
 building_decommissioned_state = "The {faction} decommissioned the {building} in {state}: {refund} Materials back and its slot free."
 building_changed_colony = "The {faction} {done} the {building} at {colony}."
@@ -176,8 +179,6 @@ credits_offered = "The {faction} offer {n} ppm of carbon credit a turn."
 credits_bought = "The {faction} bought {n} ppm of carbon credit from the {seller} for {ducats} Ducats: off their Blame, for good."
 credits_short = "The {faction} wanted {n} ppm of carbon credit more than was left on offer; {back} Ducats came back."
 # Ticket #269 (version 0.08.4): Agitate, named for who paid.
-agitate = "The {faction} agitated in {state}: Unrest rose by {rose} to {unrest}."
-agitate_damped = "The {faction} agitated in {state}, and the Constabulary there held it to nothing."
 break_fired = "Break at {temperature} C - {name}. {happened} {text}"
 break_coastal = "{states}: every state at Coastal Exposure {exposure} lost {percent}% of its people and took {unrest} Unrest."
 break_baseline = "{state}: its Baseline Emissions rise by {rise} for good."
@@ -225,6 +226,19 @@ waiting_part_low = "{n} in low orbit"
 waiting_part_station = "{n} at {station}"
 waiting_blocked = ", blocked by rivals' control of the orbit"
 waiting_blockaded = ", blocked by a rival's Blockade of {station}"
+# Ticket #371 (version 0.09.2): the causes a Region's unrest_net line names, in the order they
+# landed, and the ending where a threshold was crossed.
+cause_card = "a {card}"
+cause_unrest_card = "the Unrest card"
+cause_mothball = "a Mothball"
+cause_decommission = "a Decommission"
+cause_permit = "the Strip Permit running out"
+cause_agitate = "agitation by the {faction}"
+cause_agitate_damped = "agitation by the {faction}, held to nothing by the Constabulary"
+cause_relief = "Relief by the {faction}"
+cause_refugees = "{n} people arriving"
+unrest_past = ", past the {which} threshold: {note}"
+unrest_under = ", back under the {which} threshold"
 # Ticket #351 (version 0.09.1): what the Natural Sink loses with the Scrubbers a Shortfall shut.
 energy_short_sink = "; the Natural Sink loses {ppm} ppm"
 cargo_aboard = " with {n} Colonists aboard"

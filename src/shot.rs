@@ -843,6 +843,22 @@ fn build_board(session: &mut Session) {
             g.seats[0].venture_fund = n;
             g.seats[0].venture_share = 0.5;
         }
+        // `restive:1` (a building aid, ticket #371, version 0.09.2): seat 0's first Region is
+        // agitated by a rival and relieved by seat 0 in one Unrest pass, run here through the
+        // game's OWN pass, so the Report carries the one net Unrest line the pass writes --
+        // "China: Unrest from 3 to 0.5 (agitation by the Prospectors, Relief by the Custodians)", the
+        // turn's falls taking the rest -- and
+        // `menus:1` can photograph it. The board is composed after the turn is played, which is why
+        // the pass is run by hand.
+        if std::env::args().any(|a| a == "restive:1")
+            && let Some(sid) = g.directed_states(Seat(0)).first().copied()
+        {
+            g.state_mut(sid).unrest = 3.0;
+            g.state_mut(sid).unrest_reported = 3.0;
+            g.pending.agitates.push((Seat(1), sid));
+            g.pending.relief.push((Seat(0), sid));
+            g.resolve_unrest();
+        }
         // `unrest:<n>` (a building aid, ticket #52): a spread of Unrest over three states on the
         // face the Earth picture shows, so one card, the map labels and the thresholds are all
         // visible at once. The AI seldom leaves a state of the player's this restive.

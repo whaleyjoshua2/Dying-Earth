@@ -838,22 +838,20 @@ impl Game {
 
     /// Ticket #52: a Heatwave, a Wildfire or a Storm Surge landing on a state raises its Unrest
     /// as a climate source, so the green Techs and a Constabulary damp it.
-    fn climate_card_unrest(&mut self, s: StateId) {
+    fn climate_card_unrest(&mut self, s: StateId, card: EventId) {
         let n = self.tables.unrest.climate_card;
-        self.climate_unrest_by(s, n);
+        self.climate_unrest_by(s, n, card);
     }
 
-    /// Ticket #76: the same rise by a card's own figure (a Drought's).
-    fn climate_unrest_by(&mut self, s: StateId, n: f64) {
+    /// Ticket #76: the same rise by a card's own figure (a Drought's). Ticket #371 (version 0.09.2):
+    /// the card is a cause for the Region's one net Unrest line, not a line of its own.
+    fn climate_unrest_by(&mut self, s: StateId, n: f64, card: EventId) {
         let rose = self.raise_unrest(s, n, UnrestSource::Climate);
         if rose > 0.0 {
             let line = format!("{}: Unrest rose by {} to {}.", self.tables.state(s).name, Game::unrest_figure(rose), self.unrest_text(s));
             self.log(line);
-            let text = self.say(
-                "unrest_rose_state",
-                &[("state", self.tables.state(s).name.clone()), ("rose", Game::unrest_figure(rose).to_string()), ("unrest", self.unrest_text(s))],
-            );
-            self.report_line(LineKind::Unrest, Some(ReportPlace::State(s)), text);
+            let cause = self.phrase("cause_card", &[("card", self.tables.event(card).name.clone())]);
+            self.pending.unrest_causes.push((s, cause, false));
         }
     }
 
@@ -947,7 +945,7 @@ impl Game {
             (EventId::Drought, EventTarget::State(s)) => {
                 if !self.has_tech(TechId::GreenConsensus) {
                     self.state_mut(s).drought = true;
-                    self.climate_unrest_by(s, t.events.drought_unrest);
+                    self.climate_unrest_by(s, t.events.drought_unrest, id);
                 }
             }
             (EventId::Breakthrough, EventTarget::Tech) => {
@@ -959,7 +957,7 @@ impl Game {
                 let st = self.state_mut(s);
                 st.population = (st.population * (1.0 - loss * ev.scale)).max(0.0);
                 // Ticket #52: a Heatwave is one of the three Climate cards that raise Unrest.
-                self.climate_card_unrest(s);
+                self.climate_card_unrest(s, id);
             }
             (EventId::LaunchPadFire, EventTarget::State(s)) => {
                 if self.has_tech(TechId::CleanPropellant) {
@@ -1000,7 +998,7 @@ impl Game {
                     self.state_mut(s).wildfire_emissions_next += t.events.wildfire_emissions * ev.scale;
                 }
                 // Ticket #52: a Wildfire is one of the three Climate cards that raise Unrest.
-                self.climate_card_unrest(s);
+                self.climate_card_unrest(s, id);
             }
             // Ticket #52: the card is a flat rise in the state's Unrest, damped by nothing.
             (EventId::Unrest, EventTarget::State(s)) => {
@@ -1009,11 +1007,9 @@ impl Game {
                 if rose > 0.0 {
                     let line = format!("Unrest in {}: its Unrest rose by {} to {}.", t.state(s).name, Game::unrest_figure(rose), self.unrest_text(s));
                     self.log(line);
-                    let text = self.say(
-                        "unrest_card",
-                        &[("state", t.state(s).name.clone()), ("rose", Game::unrest_figure(rose).to_string()), ("unrest", self.unrest_text(s))],
-                    );
-                    self.report_line(LineKind::Unrest, Some(ReportPlace::State(s)), text);
+                    // Ticket #371 (version 0.09.2): a cause for the Region's one net line.
+                    let cause = self.phrase("cause_unrest_card", &[]);
+                    self.pending.unrest_causes.push((s, cause, false));
                 }
             }
             (EventId::StormSurge, EventTarget::State(s)) => {
@@ -1031,7 +1027,7 @@ impl Game {
                 }
                 // Ticket #52: a Storm Surge is one of the three Climate cards that raise Unrest,
                 // on top of what the threshold it brings forward costs in build slots.
-                self.climate_card_unrest(s);
+                self.climate_card_unrest(s, id);
             }
             _ => {}
         }
