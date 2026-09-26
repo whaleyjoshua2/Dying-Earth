@@ -15907,12 +15907,13 @@ fn start_emissions_count_the_home_package_and_the_factions_extras() {
     assert!((t.start_emissions(sid, faction) - (industry + people + package)).abs() < 1e-9, "{} against {}", t.start_emissions(sid, faction), industry + people + package);
 }
 
+// ---------------------------------------------------------------- Ticket #381: the round log
+
 /// Ticket #381 (version 0.09.2): **every Battle in orbit is a Moment**, bloodless or not, since
 /// orbital Battles are rare (seven games in eighty) and every one is news; a Battle that cost a
 /// unit keeps its own Moment and does not fire two.
 #[test]
 fn every_orbital_battle_is_a_moment_bloodless_or_not() {
-    let mut fired = 0;
     let mut bloodless = 0;
     for seed in 1..=12u64 {
         let mut g = with_seed(seed);
@@ -15923,12 +15924,11 @@ fn every_orbital_battle_is_a_moment_bloodless_or_not() {
         let lost = line.parties.iter().flat_map(|p| p.destroyed.iter()).count();
         let moments = g.report.moments.iter().filter(|m| m.place == Some(ReportPlace::Orbit(BodyId::Mars, Orbit::Low))).count();
         assert_eq!(moments, 1, "seed {seed}: one Moment for the Battle, {lost} lost: {:?}", g.report.moments);
-        fired += 1;
         if lost == 0 {
             bloodless += 1;
         }
     }
-    assert!(fired == 12 && bloodless > 0, "the seeds must include a bloodless Battle to mean anything: {bloodless} of {fired}");
+    assert!(bloodless > 0, "the seeds must include a bloodless Battle to mean anything");
 }
 
 /// Ticket #381 (version 0.09.2): **the round log is the Battle**: its blows are the hits the
@@ -15937,7 +15937,7 @@ fn every_orbital_battle_is_a_moment_bloodless_or_not() {
 /// landed on an armed one while the unarmed one stood engaged behind it.
 #[test]
 fn the_round_log_accounts_for_every_hit_and_ends_where_the_melee_ended() {
-    use dying_earth_engine::combat::{fight, BattleUnit, Combatant};
+    use dying_earth_engine::combat::BattleUnit;
     let mut covered_seen = false;
     for seed in 0..40u64 {
         let mut a = vec![
@@ -15945,13 +15945,13 @@ fn the_round_log_accounts_for_every_hit_and_ends_where_the_melee_ended() {
             Combatant::new(UnitRef::Ship(ShipId(2)), "TSV Beagle", 0, 3, 0, 1, false).armed(false).kind(BattleUnit::Ship(UnitKind::ColonyShip)),
         ];
         let mut d = vec![Combatant::new(UnitRef::Ship(ShipId(3)), "PMV Aurora", 7, 8, 0, 3, false).kind(BattleUnit::Ship(UnitKind::Battleship))];
-        let mut dice = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
-        let stats = fight(&mut a, &mut d, &mut dice, 3.0);
+        let mut dice = ChaCha8Rng::seed_from_u64(seed);
+        let stats = combat::fight(&mut a, &mut d, &mut dice, 3.0);
         let log = &stats.log;
-        assert_eq!(log.parties.len(), 2);
-        assert_eq!(log.parties[0][1].kind, BattleUnit::Ship(UnitKind::ColonyShip));
+        assert_eq!(log.parties.len(), 2, "the line as it opened, party by party");
+        assert_eq!(log.parties[0][1].kind, BattleUnit::Ship(UnitKind::ColonyShip), "the kind the caller set");
         assert_eq!(log.rounds.len() as u32, stats.rounds + 1, "the opening and then one entry per round fought");
-        assert!(log.rounds[0].opening && log.rounds[0].blows.is_empty());
+        assert!(log.rounds[0].opening && log.rounds[0].blows.is_empty(), "no exchange in the opening");
         let landed: u32 = log.rounds.iter().map(|r| (r.blows.len() + r.chased.len()) as u32).sum();
         assert_eq!(landed, stats.hits.iter().sum::<u32>(), "seed {seed}: every hit is a blow in the log");
         let last = log.rounds.last().unwrap();

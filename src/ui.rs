@@ -3735,10 +3735,12 @@ fn selected_ships(game: &Game, view: &ViewState) -> Option<(BodyId, Vec<ShipId>)
 /// lit for the hits it took in it, a unit that left dimmed and one destroyed crossed; then the
 /// round's blows in words. The opening -- Evade rolls and their pursuit -- is drawn only when
 /// something happened in it.
-fn battle_log_view(ui: &mut Ui, session: &Session, game: &Game, b: &BattleLine, log: &dying_earth_engine::combat::BattleLog) {
-    let party_name = |i: usize| -> String { b.parties.get(i).and_then(|p| p.seat).map(|s| game.seat_name(s)).unwrap_or_else(|| "Neutral".to_string()) };
-    let party_colour = |i: usize| -> Color32 { b.parties.get(i).and_then(|p| p.seat).map(|s| seat_colour(session, s)).unwrap_or(Color32::LIGHT_GRAY) };
-    let unit_name = |party: usize, unit: usize| -> String { log.parties.get(party).and_then(|p| p.get(unit)).map(|u| u.name.clone()).unwrap_or_default() };
+fn battle_log_view(ui: &mut Ui, session: &Session, game: &Game, b: &BattleLine) {
+    let Some(log) = &b.log else { return };
+    // A party with no seat is a Region's own Army, which is what the words call it.
+    let party_name = |i: usize| -> String { b.parties[i].seat.map(|s| game.seat_name(s)).unwrap_or_else(|| "Region's Army".to_string()) };
+    let party_colour = |i: usize| -> Color32 { b.parties[i].seat.map(|s| seat_colour(session, s)).unwrap_or(Color32::LIGHT_GRAY) };
+    let unit_name = |party: usize, unit: usize| -> &str { log.parties[party][unit].name.as_str() };
     // The damage every unit carried into each round, and whether it stood engaged: the line as it
     // opened, then each round's end.
     let mut before: Vec<Vec<u32>> = log.parties.iter().map(|p| p.iter().map(|u| u.damage).collect()).collect();
@@ -3746,7 +3748,7 @@ fn battle_log_view(ui: &mut Ui, session: &Session, game: &Game, b: &BattleLine, 
     for (ri, round) in log.rounds.iter().enumerate() {
         // The unarmed hulls a party's escort was covering this round, by name.
         let covered = |party: usize| -> String {
-            let names: Vec<String> = log.parties.get(party).map(|p| p.iter().enumerate().filter(|(ci, u)| !u.armed && engaged[party][*ci]).map(|(_, u)| u.name.clone()).collect()).unwrap_or_default();
+            let names: Vec<String> = log.parties[party].iter().enumerate().filter(|(ci, u)| !u.armed && engaged[party][*ci]).map(|(_, u)| u.name.clone()).collect();
             if names.is_empty() { "an unarmed hull".to_string() } else { Game::and_list(&names) }
         };
         let quiet = round.opening && round.left.is_empty() && round.chased.is_empty();
@@ -3758,9 +3760,9 @@ fn battle_log_view(ui: &mut Ui, session: &Session, game: &Game, b: &BattleLine, 
                     ui.add_space(12.0);
                     ui.label(RichText::new(format!("{}:", party_name(pi))).color(party_colour(pi)).size(13.0));
                     for (ci, u) in units.iter().enumerate() {
-                        let Some(state) = round.after.get(pi).and_then(|p| p.get(ci)) else { continue };
+                        let state = round.after[pi][ci];
                         let took = state.damage.saturating_sub(before[pi][ci]);
-                        battle_unit_tile(ui, u, *state, took, party_colour(pi));
+                        battle_unit_tile(ui, u, state, took);
                     }
                 });
             }
@@ -3796,8 +3798,9 @@ fn battle_log_view(ui: &mut Ui, session: &Session, game: &Game, b: &BattleLine, 
 
 /// Ticket #381: one unit of the Battle picture: its kind's glyph and a pip per hit point, the pips
 /// filled for damage carried, lit red for hits taken this round; dimmed once it has left, crossed
-/// once it is destroyed. The hover names it and says what it took.
-fn battle_unit_tile(ui: &mut Ui, u: &dying_earth_engine::combat::LogUnit, state: dying_earth_engine::combat::UnitState, took: u32, colour: Color32) {
+/// once it is destroyed. The hover names it and says what it took. The glyph is off-white, as every
+/// kind glyph on the board is -- a colour says whose, and the party's label beside the line says it.
+fn battle_unit_tile(ui: &mut Ui, u: &dying_earth_engine::combat::LogUnit, state: dying_earth_engine::combat::UnitState, took: u32) {
     use dying_earth_engine::combat::BattleUnit;
     const GLYPH: f32 = 16.0;
     const PIP: f32 = 5.0;
@@ -3812,7 +3815,7 @@ fn battle_unit_tile(ui: &mut Ui, u: &dying_earth_engine::combat::LogUnit, state:
     if kind == Kind::Army {
         shield_glyph(ui.painter(), square);
     } else if let Some(image) = kind.image(ui.ctx(), GLYPH) {
-        ui.put(square, image.tint(colour));
+        ui.put(square, image);
     }
     let painter = ui.painter();
     for i in 0..u.hit_points {
@@ -10612,9 +10615,7 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                             }
                             ui.label(format!("   {}", b.result));
                             // Ticket #381 (version 0.09.2): the round log, drawn and replayed.
-                            if let Some(log) = &b.log {
-                                battle_log_view(ui, session, game, b, log);
-                            }
+                            battle_log_view(ui, session, game, b);
                         }
                         ui.add_space(4.0);
                     }
@@ -10854,11 +10855,9 @@ fn chronicle_screen(root: &mut Ui, session: &Session, actions: &mut Vec<Action>)
             }
             ui.add_space(12.0);
 
-            // 2. The table: nine figures a row, every one of them the engine's. The Stockpile alone
-            // says least about a Faction that spent well, which is why the other five are here.
-            // Ticket #381 (version 0.09.2): a game's Battles are its story, so the ones that cost a
-            // hull or a Battery are kept and told here, one line each; an Army lost is the ground's
-            // ordinary business and is not.
+            // 2. The Battles. Ticket #381 (version 0.09.2): a game's Battles are its story, so the
+            // ones that cost a hull or a Battery are kept and told here, one line each; an Army
+            // lost is the ground's ordinary business and is not.
             ui.label(RichText::new("The Battles").size(20.0).strong());
             if game.war.fallen.is_empty() {
                 ui.label(RichText::new("No Battle cost a hull or a Battery.").size(15.0).weak());
@@ -10868,6 +10867,9 @@ fn chronicle_screen(root: &mut Ui, session: &Session, actions: &mut Vec<Action>)
                 ui.label(RichText::new(format!("{}: {} -- {} destroyed{attacked}.", game.date(f.turn).text(), f.place, Game::and_list(&f.lost))).size(15.0));
             }
             ui.add_space(12.0);
+
+            // 3. The table: nine figures a row, every one of them the engine's. The Stockpile alone
+            // says least about a Faction that spent well, which is why the other five are here.
             ui.label(RichText::new("What each Faction ended the game holding").size(20.0).strong());
             ui.add_space(4.0);
             egui::Grid::new("chronicle_table").num_columns(10).spacing((18.0, 6.0)).striped(true).show(ui, |ui| {
@@ -10902,7 +10904,7 @@ fn chronicle_screen(root: &mut Ui, session: &Session, actions: &mut Vec<Action>)
             });
             ui.add_space(14.0);
 
-            // 3. The two charts, side by side, each already built and drawn on the top bar's hovers.
+            // 4. The two charts, side by side, each already built and drawn on the top bar's hovers.
             // Neither is rewritten here: the page only says how big to draw them.
             ui.label(RichText::new("The world the game left behind").size(20.0).strong());
             ui.add_space(4.0);

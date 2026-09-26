@@ -1051,25 +1051,24 @@ pub enum Tiebreak {
     Nothing,
 }
 
-/// One party in a Battle (ticket #50): a Battle is a melee of every Faction present, so the
-/// Battle Report lists each of them rather than an attacker and a defender.
-/// Ticket #286 (version 0.08.5): the war, counted where it happens. Until this version the sweep
-/// printed no military figure of any kind and the engine's only count of Battles was a comment.
-/// Every figure is a counter incremented at the event, never a sentence scraped from the log; by
-/// seat where a seat is the actor.
 /// Ticket #381 (version 0.09.2): one Battle that cost a hull or a Battery, kept for the chronicle,
 /// since a game's Battles are its story and every Battle line is otherwise wiped at the next turn.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FallenBattle {
     pub turn: u32,
     pub place: String,
-    pub at: Option<ReportPlace>,
     /// The seats whose orders opened it; none for a Battle nobody opened.
     pub attackers: Vec<Seat>,
     /// The hulls and Batteries destroyed, by name.
     pub lost: Vec<String>,
 }
 
+/// One party in a Battle (ticket #50): a Battle is a melee of every Faction present, so the
+/// Battle Report lists each of them rather than an attacker and a defender.
+/// Ticket #286 (version 0.08.5): the war, counted where it happens. Until this version the sweep
+/// printed no military figure of any kind and the engine's only count of Battles was a comment.
+/// Every figure is a counter incremented at the event, never a sentence scraped from the log; by
+/// seat where a seat is the actor.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct WarCounters {
     /// Ticket #381 (version 0.09.2): every Battle that cost a hull or a Battery, in order.

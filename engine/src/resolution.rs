@@ -947,13 +947,13 @@ impl Game {
         if any_escape {
             self.war.battles_with_escape += 1;
         }
-        let line = BattleLine { place: place.to_string(), parties: listed, result: format!("{} round(s).", stats.rounds), at, log: Some(stats.log.clone()) };
+        let line = BattleLine { place: place.to_string(), parties: listed, result: format!("{} round(s).", stats.rounds), at, log: Some(stats.log) };
         // Ticket #381 (version 0.09.2): a Battle that cost a hull or a Battery is kept for the
         // chronicle; an Army lost is the ground's ordinary business and is not.
         let fallen: Vec<String> = parties.iter().flat_map(|(_, _, c)| c.iter()).filter(|c| c.destroyed() && !matches!(c.unit, UnitRef::Army(_))).map(|c| c.name.clone()).collect();
         if !fallen.is_empty() {
             let attackers: Vec<Seat> = parties.iter().filter(|(_, agg, _)| *agg).filter_map(|(s, _, _)| *s).collect();
-            self.war.fallen.push(FallenBattle { turn: self.turn, place: place.to_string(), at, attackers, lost: fallen });
+            self.war.fallen.push(FallenBattle { turn: self.turn, place: place.to_string(), attackers, lost: fallen });
         }
         // The Battle's own line goes in BEFORE the losses are applied, so among the rank-4 lines a
         // turn holds it is the earliest and headlines over "PMV Magellan destroyed (battle)".

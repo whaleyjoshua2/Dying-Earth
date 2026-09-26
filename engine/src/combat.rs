@@ -8,8 +8,8 @@
 use crate::orders::UnitRef;
 use crate::UnitKind;
 use rand::{Rng, SeedableRng};
-use serde::{Deserialize, Serialize};
 use rand_chacha::ChaCha8Rng;
+use serde::{Deserialize, Serialize};
 
 /// The randomness a battle needs, so a test can script it.
 pub trait Dice {
@@ -67,6 +67,8 @@ pub struct Combatant {
 impl Combatant {
     pub fn new(unit: UnitRef, name: impl Into<String>, strength: i64, hit_points: u32, damage: u32, pursuit: u32, evade: bool) -> Combatant {
         let kind = match unit {
+            // A placeholder: the melee does not know hulls, and `ship_combatant` sets the real one
+            // with `.kind`. A test that builds a hull bare gets a Frigate's glyph, and no picture.
             UnitRef::Ship(_) => BattleUnit::Ship(UnitKind::Frigate),
             UnitRef::Army(_) => BattleUnit::Army,
             UnitRef::Battery { .. } => BattleUnit::Battery,

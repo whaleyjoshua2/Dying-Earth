@@ -48,7 +48,23 @@ Headless, 1400x1000, `panel:0`, from this folder.
 
 | picture | aids | what it shows |
 |---|---|---|
-| [`report-report.png`](report-report.png) | `battle:1 cardshut:1 menus:1` | **The Battle Report** of a four-party Battle in Mars orbit that cost PMV Indomitable and ARK Implacable: the party lines as before, then *Round 1* -- four lines of hulls with their pips, the hits of the round lit -- and the blows in words: *"The Arkwrights hit TSV Valiant"*, *"The Custodians hit ARK Implacable, covering ARK Defiant"*, *"The Custodians hit PMV Indomitable, covering PMV Magellan"*; then *Round 2* below the fold. |
+| [`report-report.png`](report-report.png) | `battle:1 cardshut:1 menus:1` | **The Battle Report** of a four-party Battle in Mars orbit that cost TSV Valiant and PMV Indomitable: the party lines as before, then *Round 1* -- four lines of hulls in off-white with their pips, the hits of the round lit -- and the blows in words: *"The Arkwrights hit TSV Vanguard"*, *"The Custodians hit ARK Implacable, covering ARK Defiant"*, *"The Arkwrights hit TSV Valiant"*; then *Round 2* below the fold. The shot board rolls its own seed, so the outcome differs run to run. |
+
+## The review
+
+Two axes, run as sub-agents over the commit. Both confirmed the melee's dice and outcome untouched
+by the log (every roll in its old place; the log's helpers read and roll nothing) and both found the
+same two things: the fallen record's place field written and never read (dropped), and the
+placeholder hull kind in `Combatant::new` said nowhere (said now). **Standards** found the fallen
+record inserted between the war counters' doc comment and the struct it documents, the chronicle's
+numbered section comment displaced by the new section (both restored), the unit glyphs tinted in
+the party's colour against the board's rule that a kind glyph is off-white and a colour says whose
+(untinted; the party's label carries the colour), the log cloned onto the line where it could move,
+the Moment kind declared out of the order the kind list keeps, a serde import out of order, the
+view taking the line and its log both, and the tests without the file's section divider and
+import idiom. **Spec** found a neutral party's Army reading "The Neutral hit" (it is "the Region's
+Army" now). It also noted the log rides in a save taken during the turn it lives, as the Report
+does, and is gone at the next.
 
 ## The gate
 

@@ -196,13 +196,13 @@ pub enum MomentKind {
     /// Ticket #281 (version 0.08.5): buildings burned in the rolls after a taking. It wore the
     /// Battle's name from ticket #50 to here, and fired for a Pacified transfer that fought nobody.
     PlaceTakenByForce,
+    /// Ticket #345 (version 0.09.1): a Body settled for the first time, by anybody. It fires once
+    /// per Body in a whole game, which is the rarest Moment on the list.
+    FirstToABody,
     /// Ticket #381 (version 0.09.2): a Battle in orbit that cost nobody a unit. A fatal one is a
     /// `DecisiveBattle`; this is the other kind, fired because orbital Battles are rare and every
     /// one is news, at the designer's word.
     OrbitalBattle,
-    /// Ticket #345 (version 0.09.1): a Body settled for the first time, by anybody. It fires once
-    /// per Body in a whole game, which is the rarest Moment on the list.
-    FirstToABody,
 }
 
 impl MomentKind {
