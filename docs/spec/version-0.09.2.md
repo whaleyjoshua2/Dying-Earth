@@ -218,21 +218,27 @@ Roster, and from its label on the Solar System Map while it flies. The card hold
 one Ship's: its line (strength, damage, cargo, Warhead, stance and orbit), its **Tank** (Fuel,
 Refuel, the stranded and dry warnings), its **Transit** and change-of-orbit moves, **Load and
 unload**, **Bombard**, **Launch** and **Rearm**, and Repair. It stands **in place of** the stack
-card, with a *"← all Ships at Mars"* link back to it. **A Ship in flight has a card too**: its line,
-where it is bound, the turn and date it arrives, and its Tank, with no moves, since nothing can be
-ordered in flight.
+card, with a *"Back to all Custodians Ships at Mars"* link back to it. **A Ship in flight has a card
+too**: its line, where it is bound, the turns left and the date it lands, and its Tank, with no
+moves, since nothing can be ordered in flight; its link goes back to the Roster.
 
 **The stack card keeps only what is the whole stack's**: the heading, the Ships **grouped by
 orbit**, one drop-down per orbit of the Body that holds any of them (low orbit first, then each
-station), open by default, each row opening that Ship's card; the stance; Attack; and the
-**"All that can"** moves. Every per-Ship button leaves it, which ends the same hull appearing five
-times on one card.
+station), open by default, each row opening that Ship's card; the stance; Attack; the
+**"All that can"** moves, even for a stack of one; and Influence on the Colonies at the Body, which
+is the Body's rather than any Ship's and stood on this card before. Every per-Ship button leaves it,
+which ends the same hull appearing five times on one card.
 
-**Where a Ship can go is one drop-down per Body**, on both cards, under Transit: the closed header
-carries the turns and Fuel for a launch this turn, and inside it stands the dated quote of §9 and a
-line per orbit with its button and, where it applies, the stranding warning. **The Body the Ship is
-at comes first and is open by default**; its orbits are the change-of-orbit moves at their Fuel.
-Every other Body is closed by default. Open or shut is remembered for the session only, never saved.
+**Where a Ship can go is one drop-down per Body**, on both cards, under Transit, **nested as the sky
+is**: a planet's drop-down holds its own orbits and then its moons' drop-downs inside it, the Moon
+under Earth, Phobos and Deimos under Mars. The closed header carries the turns and Fuel for a launch
+this turn, and inside it stands the dated quote of §9 and a line per orbit with its button and, where
+it applies, the stranding warning. **The orbit lines inside a Body's drop-down do not repeat the
+Body's name** -- *"Low orbit"*, *"Ares"*; *"To low orbit"*, *"To Ares"* on the change-of-orbit door
+-- since the drop-down they stand in says it. **The planet whose group holds the Body the Ship is at
+comes first and is open by default, and so is that Body's own drop-down inside it**; its orbits are
+the change-of-orbit moves at their Fuel. Every other drop-down is closed by default. Open or shut is
+remembered for the session only, never saved.
 
 **The picture aids** that scrolled the stack card to Transits, Change orbit or Tanks now scroll the
 Ship's card, since that is where the buttons went. No rule changes; no save changes.

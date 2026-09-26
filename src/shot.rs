@@ -1750,6 +1750,8 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
             Some(v) => body_from_id(v),
             None => None,
         });
+        // Ticket #374 (version 0.09.2): `ship:<n>` counts within the `stack:` Body, so it is read
+        // after it; `ship:flying` needs no Body.
         let pick = std::env::args().find_map(|a| match a.strip_prefix("ship:") {
             Some("flying") => Some(ShipPick::Flying),
             Some(v) => v.parse().ok().map(ShipPick::Nth),

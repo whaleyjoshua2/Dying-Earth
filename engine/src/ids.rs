@@ -23,6 +23,25 @@ impl BodyId {
     pub fn index(self) -> usize {
         self as usize
     }
+    /// Ticket #374 (version 0.09.2): the planet a Body is listed under -- itself for a planet, its
+    /// primary for a satellite. The pairing `Tables::planet` reads the sky from, made a fact of the
+    /// Body so a list can nest the Moon under Earth and Phobos and Deimos under Mars.
+    pub fn primary(self) -> BodyId {
+        match self {
+            BodyId::Moon => BodyId::Earth,
+            BodyId::Phobos | BodyId::Deimos => BodyId::Mars,
+            other => other,
+        }
+    }
+    /// Ticket #374: the satellites listed under a Body, in `ALL` order; none under a satellite, and
+    /// none under Venus.
+    pub fn moons(self) -> &'static [BodyId] {
+        match self {
+            BodyId::Earth => &[BodyId::Moon],
+            BodyId::Mars => &[BodyId::Phobos, BodyId::Deimos],
+            _ => &[],
+        }
+    }
     pub fn name(self) -> &'static str {
         match self {
             BodyId::Earth => "Earth",

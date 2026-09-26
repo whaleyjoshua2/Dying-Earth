@@ -15784,3 +15784,24 @@ fn the_loader_refuses_a_first_draw_turn_of_nought() {
     assert!(err.contains("first_draw_turn"), "the refusal names the figure: {err}");
     assert_eq!(one.ok(), Some(1), "a first_draw_turn of 1 loads");
 }
+
+/// Ticket #374 (version 0.09.2): the Body tree the move drop-downs nest by. Every Body is either a
+/// planet listing its moons or a moon its planet lists, and every Body appears in the tree once.
+#[test]
+fn every_body_is_a_planet_or_listed_once_under_its_primary() {
+    let mut listed = 0;
+    for b in BodyId::ALL {
+        if b.primary() == b {
+            assert!(!b.moons().contains(&b), "{b:?} lists itself");
+            for m in b.moons() {
+                assert_eq!(m.primary(), b, "{m:?} is listed under {b:?} but names another primary");
+                assert!(m.moons().is_empty(), "a moon has moons");
+                listed += 1;
+            }
+        } else {
+            assert!(b.primary().moons().contains(&b), "{b:?} names a primary that does not list it");
+        }
+    }
+    let planets = BodyId::ALL.iter().filter(|b| b.primary() == **b).count();
+    assert_eq!(planets + listed, BodyId::ALL.len(), "every Body once");
+}

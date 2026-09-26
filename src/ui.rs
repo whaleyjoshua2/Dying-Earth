@@ -1652,8 +1652,7 @@ fn credits_screen(root: &mut Ui, session: &mut Session, icons: &Icons) {
             let mut rows: Vec<(String, String)> = crate::icons::CREDITS.iter().map(|c| (c.key(), format!("{}: \"{}\" by {}", c.resource, c.icon, c.author))).collect();
             // Ticket #135 (version 0.07.3): the game's own drawings, named so the list is complete.
             for d in crate::icons::DRAWN {
-                let name = format!("{}{}", d[..1].to_uppercase(), &d[1..]);
-                rows.push((d.to_string(), format!("{name}: drawn for Dying Earth, no credit owed")));
+                rows.push((d.to_string(), format!("{}: drawn for Dying Earth, no credit owed", capitalised(d))));
             }
             let half = rows.len().div_ceil(2);
             ui.horizontal_top(|ui| {
@@ -3622,15 +3621,18 @@ fn right_click(pos: Pos2, session: &Session, game: &Game, view: &ViewState, came
             // with the player's own Ship stack AT THIS BODY selected, which an armed Region's stack
             // never is, so the Earth march below cannot be shadowed by it.
             if let Some((orbit, ids)) = orbit_right_click(pos, game, view, origin, dir, globes, hotspots, body) {
+                let alone = ids.len() == 1;
                 let orders: Vec<Order> = ids
                     .into_iter()
                     .map(|id| Order::ChangeOrbit { ship: id, slot: orbit.slot() })
                     .filter(|o| game.check_order(Seat(0), &session.pending, o).is_ok() || session.pending.contains(o))
                     .collect();
                 if orders.is_empty() {
+                    // Ticket #374 (version 0.09.2): "it" for the one Ship whose card is open.
                     actions.push(Action::Notice(format!(
-                        "No selected Ship moves to {}: each is there already, has another order, or holds fewer than {} Fuel.",
+                        "No selected Ship moves to {}: {} there already, has another order, or holds fewer than {} Fuel.",
                         game.orbit_name(body, orbit),
+                        if alone { "it is" } else { "each is" },
                         game.tables.orbit_change_fuel
                     )));
                 }
@@ -7290,7 +7292,7 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         if here.is_empty() {
             continue;
         }
-        let header = format!("{} ({})", orbit_heading(game, body, orbit), here.len());
+        let header = format!("{} ({})", capitalised(&orbit_phrase(game, body, orbit)), here.len());
         egui::CollapsingHeader::new(RichText::new(header).strong()).id_salt(("stack_orbit", body, seat.0, orbit.slot())).default_open(true).show(ui, |ui| {
             for s in &here {
                 ship_row(ui, session, game, view, s);
@@ -7349,22 +7351,13 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     // its card, one row up.
     ui.label(RichText::new("Moves for the whole stack").strong());
     ui.label(RichText::new("Each button sends every Ship of the stack that can pay for it; a Ship's own card moves it alone.").weak());
-    move_dropdowns(ui, session, game, view, body, &ships, &format!("stack{body:?}"), actions);
+    move_dropdowns(ui, session, game, body, &ships, None, None, &format!("stack{body:?}"), actions);
     if body != BodyId::Earth {
         icon_word(ui, "influence", "Influence on Colonies here");
         for c in game.colonies.iter().filter(|c| c.body == body) {
             ui.label(game.place_name(Place::Colony(c.id)));
             influence_row(ui, game, session, view, Place::Colony(c.id), true, actions);
         }
-    }
-}
-
-/// Ticket #374: an orbit as a drop-down's heading, capitalised because it stands alone --
-/// "Low orbit", "At Tiangong" -- where `orbit_phrase` is written to sit inside a sentence.
-fn orbit_heading(game: &Game, body: BodyId, orbit: Orbit) -> String {
-    match orbit {
-        Orbit::Low => "Low orbit".to_string(),
-        Orbit::Slot(n) => format!("At {}", game.station_name(body, n)),
     }
 }
 
@@ -7376,24 +7369,9 @@ fn orbit_heading(game: &Game, body: BodyId, orbit: Orbit) -> String {
 /// Ticket #343 (version 0.09.1): and, for a Missile Carrier, the Warhead, in the coloured word the
 /// stranded tank is said in.
 fn ship_row(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, s: &Ship) {
-    let card = game.tables.unit(s.kind);
-    let mut extra = Vec::new();
-    if s.colonists > 0 {
-        extra.push(format!("{} Colonists", s.colonists));
-    }
-    if s.army.is_some() {
-        extra.push("an Army".into());
-    }
     ui.horizontal(|ui| {
         faction_glyph(ui, session, game, Some(s.seat), 16.0);
-        let text = format!(
-            "{}: strength {}, damage {}/{}{}",
-            game.ship_name(s),
-            game.ship_fighting_strength(s),
-            s.damage,
-            card.hit_points,
-            if extra.is_empty() { String::new() } else { format!(", carrying {}", extra.join(" and ")) },
-        );
+        let text = format!("{}: {}", game.ship_name(s), ship_line(game, s));
         if ui.link(text).on_hover_text(format!("{} {}. Opens the Ship's card.", s.kind.name(), s.id.0)).clicked() {
             view.selection = Selection::Ship(s.id);
             view.attack_preview = false;
@@ -7402,111 +7380,164 @@ fn ship_row(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, s
     });
 }
 
-/// Ticket #374: **the moves, one drop-down per Body**, on both the stack card and a Ship's. The
-/// Body the Ships are at comes FIRST and opens by default: its orbits are the change-of-orbit moves,
-/// at the Fuel the table charges. Every other Body is shut by default, its closed header carrying
-/// the turns and Fuel of a launch this turn, and inside it the dated quote of ticket #375 and a line
-/// per orbit with its button. Open or shut is egui's own memory, which lasts the session and is
-/// never saved; `salt` keeps one card's memory apart from another's.
-///
-/// `ships` is the whole stack or one hull. With one hull every line carries that hull's own button,
-/// its tank on the face, and the stranding warning where the leg would leave it dry; with more, one
-/// "All N that can" button a line (ticket #322, version 0.08.8) and no button per hull -- a hull
-/// alone is moved from its own card.
-#[allow(clippy::too_many_arguments)]
-fn move_dropdowns(ui: &mut Ui, session: &Session, game: &Game, view: &ViewState, body: BodyId, ships: &[&Ship], salt: &str, actions: &mut Vec<Action>) {
-    let one = (ships.len() == 1).then(|| ships[0]);
-    // Ticket #335 (version 0.09.0): **the door for `Order::ChangeOrbit`**: a Ship that wants a
-    // station's refuelling, a Blockade of a station's ring, or the low orbit a landing is made from
-    // no longer has to fly away and come back to get there.
-    let orbit_fuel = game.tables.orbit_change_fuel;
-    let here = egui::CollapsingHeader::new(RichText::new(format!("{} (here): change orbit, {orbit_fuel} Fuel", game.tables.body(body).name)).strong())
-        .id_salt(("moves", salt, body))
-        .default_open(true)
-        .show(ui, |ui| {
-            ui.label(RichText::new(format!("Moving between two orbits of {} costs {orbit_fuel} Fuel from the Ship's own tank, and lands with the transits, before the Battles.", game.tables.body(body).name)).weak());
-            for orbit in game.orbits_of(body) {
-                // Every Ship already sitting there is no candidate; a line nobody can take is not drawn.
-                let movers: Vec<&Ship> = ships.iter().copied().filter(|s| game.ship_orbit(s) != orbit).collect();
-                if movers.is_empty() {
-                    continue;
-                }
-                ui.horizontal_wrapped(|ui| {
-                    ui.label(format!("   To {}", game.orbit_name(body, orbit)));
-                    match one {
-                        Some(s) => cost_button_with_hover(
-                            ui,
-                            game,
-                            &session.pending,
-                            Order::ChangeOrbit { ship: s.id, slot: orbit.slot() },
-                            &format!("Move ({}/{} in the tank)", s.fuel, game.tables.unit(s.kind).tank),
-                            Some(format!("{} is {} now. {orbit_fuel} Fuel from its own tank, and it fights this turn's Battle in its new orbit.", game.ship_name(s), orbit_phrase(game, body, game.ship_orbit(s)))),
-                            actions,
-                        ),
-                        None => {
-                            let able: Vec<Order> = movers
-                                .iter()
-                                .map(|s| Order::ChangeOrbit { ship: s.id, slot: orbit.slot() })
-                                .filter(|o| game.check_order(Seat(0), &session.pending, o).is_ok())
-                                .collect();
-                            let n = able.len();
-                            orders_button(ui, game, &session.pending, able, &format!("All {n} that can"), Some(format!("Every Ship of the stack with {orbit_fuel} Fuel in the tank and no other order, {n} of {}, moved together.", movers.len())), actions);
-                        }
-                    }
-                });
-            }
-        });
-    if view.stack_scroll == Some(StackBlock::ChangeOrbit) {
-        here.header_response.scroll_to_me(Some(egui::Align::Min));
+/// Ticket #374: **what a Ship is, in one clause** -- "strength 3, damage 0/4, carrying 6 Colonists
+/// and an Army" -- for its row on the stack card and the line on its own card, which say the same
+/// thing after different names.
+fn ship_line(game: &Game, s: &Ship) -> String {
+    let mut extra = Vec::new();
+    if s.colonists > 0 {
+        extra.push(format!("{} Colonists", s.colonists));
     }
-    // Ticket #335: **a transit names the orbit it ends in before it leaves**, so every destination
-    // Body unfolds into its orbits -- low orbit, then one line per station -- each with its button.
-    // The leg costs the same whichever orbit it ends in; the orbit decides what the Ship can do when
-    // it gets there.
-    for to in BodyId::ALL {
-        if to == body {
-            continue;
-        }
+    if s.army.is_some() {
+        extra.push("an Army".into());
+    }
+    format!(
+        "strength {}, damage {}/{}{}",
+        game.ship_fighting_strength(s),
+        s.damage,
+        game.tables.unit(s.kind).hit_points,
+        if extra.is_empty() { String::new() } else { format!(", carrying {}", extra.join(" and ")) },
+    )
+}
+
+/// Ticket #374: **the moves, one drop-down per Body**, on both the stack card and a Ship's, **nested
+/// as the sky is**: a planet's drop-down holds its own orbits and then its moons' drop-downs inside
+/// it -- the Moon under Earth, Phobos and Deimos under Mars, at the designer's word: *"put the
+/// martian moons under mars with their orbits nested ... do that with earth and the moon too."*
+///
+/// The planet whose group holds the Body the Ships are at comes FIRST and opens by default, and so
+/// does that Body's own drop-down inside it, whose lines are the change-of-orbit moves at the Fuel
+/// the table charges. Every other drop-down is shut by default, its closed header carrying the turns
+/// and Fuel of a launch this turn, and inside it the dated quote of ticket #375 and a line per orbit
+/// with its button. Open or shut is egui's own memory, which lasts the session and is never saved;
+/// `salt` keeps one card's memory apart from another's.
+///
+/// `one` is the hull whose card this is, and then every line carries that hull's own button, its
+/// tank on the face, and the stranding warning where the leg would leave it dry. `None` is the stack
+/// card: one "All N that can" button a line (ticket #322, version 0.08.8) and no button per hull,
+/// even for a stack of one -- a hull alone is moved from its own card. `scroll` is the block a
+/// picture asked for, which only the Ship's card answers.
+#[allow(clippy::too_many_arguments)]
+fn move_dropdowns(ui: &mut Ui, session: &Session, game: &Game, body: BodyId, ships: &[&Ship], one: Option<&Ship>, scroll: Option<StackBlock>, salt: &str, actions: &mut Vec<Action>) {
+    // The planets in the sky's order, the one whose group the Ships are in pulled to the front. A
+    // stable sort, so the rest keep their order.
+    let mut planets: Vec<BodyId> = BodyId::ALL.into_iter().filter(|b| b.primary() == *b).collect();
+    planets.sort_by_key(|p| *p != body.primary());
+    for planet in planets {
+        body_dropdown(ui, session, game, body, planet, ships, one, scroll, salt, actions);
+    }
+}
+
+/// One Body's drop-down of `move_dropdowns`, and its moons' nested inside it. `to` is the Body the
+/// drop-down is for; `body` the one the Ships are at. The drop-down for `body` itself is the
+/// change-of-orbit door; every other is a transit's.
+#[allow(clippy::too_many_arguments)]
+fn body_dropdown(ui: &mut Ui, session: &Session, game: &Game, body: BodyId, to: BodyId, ships: &[&Ship], one: Option<&Ship>, scroll: Option<StackBlock>, salt: &str, actions: &mut Vec<Action>) {
+    let here = to == body;
+    // Open where the Ships are, and open the planet whose moon they are at, so the open door is
+    // never hidden inside a shut one.
+    let open = here || to.moons().contains(&body);
+    let orbit_fuel = game.tables.orbit_change_fuel;
+    let header = if here {
+        format!("{} (here): change orbit, {orbit_fuel} Fuel", game.tables.body(to).name)
+    } else {
         // Ticket #92: the player's own figure, with the Faction's and the Tech's multipliers and a
         // Mass Driver's cut on it.
         let (turns, fuel) = game.transit_cost_for(Seat(0), body, to);
-        // Ticket #375 (version 0.09.2): the quote is for a launch THIS turn, and the sky moves; the
-        // next two turns' figures stand beside it so the drift is visible -- the playtest read 4
-        // turns and 17 Fuel, launched later, and paid 6 and 26. The header carries this turn's
-        // figures; the drift is the first line inside, read before any button under it.
-        let (t1, f1) = game.transit_cost_for_at(Seat(0), body, to, game.turn + 1);
-        let (t2, f2) = game.transit_cost_for_at(Seat(0), body, to, game.turn + 2);
-        egui::CollapsingHeader::new(RichText::new(format!("To {}: {turns} turn(s), {fuel} Fuel", game.tables.body(to).name)).strong())
-            .id_salt(("moves", salt, to))
-            .default_open(false)
-            .show(ui, |ui| {
-                ui.label(RichText::new(format!("{fuel} Fuel each from the tank if launched this turn, whichever orbit it ends in (next turn {t1}t/{f1}F, then {t2}t/{f2}F).")).weak());
-                for orbit in game.orbits_of(to) {
-                    ui.horizontal_wrapped(|ui| {
-                        ui.label(format!("   {}", game.orbit_name(to, orbit)));
-                        match one {
-                            Some(s) => {
-                                // Ticket #87: the button reads the tank against the leg.
-                                cost_button(ui, game, &session.pending, Order::Transit { ship: s.id, to, slot: orbit.slot() }, &format!("Go ({}/{} in the tank)", s.fuel, game.tables.unit(s.kind).tank), actions);
-                                // Ticket #375: a warning, never a refusal, where the leg would leave
-                                // the hull stranded at the far end -- a one-way trip can be the plan.
-                                if let Some(left) = game.arrival_leaves_stranded(Seat(0), s.id, to, orbit.slot()) {
-                                    ui.colored_label(Color32::from_rgb(230, 170, 90), format!("arrives with {left} Fuel and no station of yours at {}", game.tables.body(to).name));
-                                }
-                            }
-                            None => {
-                                let able: Vec<Order> = ships
-                                    .iter()
-                                    .map(|s| Order::Transit { ship: s.id, to, slot: orbit.slot() })
-                                    .filter(|o| game.check_order(Seat(0), &session.pending, o).is_ok())
-                                    .collect();
-                                let n = able.len();
-                                orders_button(ui, game, &session.pending, able, &format!("All {n} that can"), Some(format!("Every Ship of the stack whose tank pays the leg, {n} of {}, sent together into {}.", ships.len(), game.orbit_name(to, orbit))), actions);
-                            }
-                        }
-                    });
+        format!("To {}: {turns} turn(s), {fuel} Fuel", game.tables.body(to).name)
+    };
+    let shown = egui::CollapsingHeader::new(RichText::new(header).strong()).id_salt(("moves", salt, to)).default_open(open).show(ui, |ui| {
+        if here {
+            change_orbit_lines(ui, session, game, body, ships, one, actions);
+        } else {
+            transit_lines(ui, session, game, body, to, ships, one, actions);
+        }
+        for moon in to.moons() {
+            body_dropdown(ui, session, game, body, *moon, ships, one, scroll, salt, actions);
+        }
+    });
+    if here && scroll == Some(StackBlock::ChangeOrbit) {
+        shown.header_response.scroll_to_me(Some(egui::Align::Min));
+    }
+}
+
+/// Ticket #335 (version 0.09.0): **the door for `Order::ChangeOrbit`**, one line per other orbit at
+/// the Body the Ships are at: a Ship that wants a station's refuelling, a Blockade of a station's
+/// ring, or the low orbit a landing is made from no longer has to fly away and come back to get
+/// there.
+fn change_orbit_lines(ui: &mut Ui, session: &Session, game: &Game, body: BodyId, ships: &[&Ship], one: Option<&Ship>, actions: &mut Vec<Action>) {
+    let orbit_fuel = game.tables.orbit_change_fuel;
+    ui.label(RichText::new(format!("Moving between two orbits of {} costs {orbit_fuel} Fuel from the Ship's own tank, and lands with the transits, before the Battles.", game.tables.body(body).name)).weak());
+    for orbit in game.orbits_of(body) {
+        // Every Ship already sitting there is no candidate; a line nobody can take is not drawn.
+        let movers: Vec<&Ship> = ships.iter().copied().filter(|s| game.ship_orbit(s) != orbit).collect();
+        if movers.is_empty() {
+            continue;
+        }
+        ui.horizontal_wrapped(|ui| {
+            ui.label(format!("   To {}", orbit_short(game, body, orbit)));
+            match one {
+                Some(s) => cost_button_with_hover(
+                    ui,
+                    game,
+                    &session.pending,
+                    Order::ChangeOrbit { ship: s.id, slot: orbit.slot() },
+                    &format!("Move ({}/{} in the tank)", s.fuel, game.tables.unit(s.kind).tank),
+                    Some(format!("{} is {} now. {orbit_fuel} Fuel from its own tank, and it fights this turn's Battle in its new orbit.", game.ship_name(s), orbit_phrase(game, body, game.ship_orbit(s)))),
+                    actions,
+                ),
+                None => {
+                    let able: Vec<Order> = movers
+                        .iter()
+                        .map(|s| Order::ChangeOrbit { ship: s.id, slot: orbit.slot() })
+                        .filter(|o| game.check_order(Seat(0), &session.pending, o).is_ok())
+                        .collect();
+                    let n = able.len();
+                    orders_button(ui, game, &session.pending, able, &format!("All {n} that can"), Some(format!("Every Ship of the stack with {orbit_fuel} Fuel in the tank and no other order, {n} of {}, moved together.", movers.len())), actions);
                 }
-            });
+            }
+        });
+    }
+}
+
+/// Ticket #335: **a transit names the orbit it ends in before it leaves**, so a destination Body
+/// unfolds into its orbits -- low orbit, then one line per station -- each with its button. The leg
+/// costs the same whichever orbit it ends in; the orbit decides what the Ship can do when it gets
+/// there.
+#[allow(clippy::too_many_arguments)]
+fn transit_lines(ui: &mut Ui, session: &Session, game: &Game, body: BodyId, to: BodyId, ships: &[&Ship], one: Option<&Ship>, actions: &mut Vec<Action>) {
+    // Ticket #375 (version 0.09.2): the quote is for a launch THIS turn, and the sky moves; the next
+    // two turns' figures stand beside it so the drift is visible -- the playtest read 4 turns and
+    // 17 Fuel, launched later, and paid 6 and 26. The header carries this turn's figures; the drift
+    // is the first line inside, read before any button under it.
+    let (_, fuel) = game.transit_cost_for(Seat(0), body, to);
+    let (t1, f1) = game.transit_cost_for_at(Seat(0), body, to, game.turn + 1);
+    let (t2, f2) = game.transit_cost_for_at(Seat(0), body, to, game.turn + 2);
+    ui.label(RichText::new(format!("{fuel} Fuel each from the tank if launched this turn, whichever orbit it ends in (next turn {t1}t/{f1}F, then {t2}t/{f2}F).")).weak());
+    for orbit in game.orbits_of(to) {
+        ui.horizontal_wrapped(|ui| {
+            ui.label(format!("   {}", capitalised(&orbit_short(game, to, orbit))));
+            match one {
+                Some(s) => {
+                    // Ticket #87: the button reads the tank against the leg.
+                    cost_button(ui, game, &session.pending, Order::Transit { ship: s.id, to, slot: orbit.slot() }, &format!("Go ({}/{} in the tank)", s.fuel, game.tables.unit(s.kind).tank), actions);
+                    // Ticket #375: a warning, never a refusal, where the leg would leave the hull
+                    // stranded at the far end -- a one-way trip can be the plan.
+                    if let Some(left) = game.arrival_leaves_stranded(Seat(0), s.id, to, orbit.slot()) {
+                        ui.colored_label(Color32::from_rgb(230, 170, 90), format!("arrives with {left} Fuel and no station of yours at {}", game.tables.body(to).name));
+                    }
+                }
+                None => {
+                    let able: Vec<Order> = ships
+                        .iter()
+                        .map(|s| Order::Transit { ship: s.id, to, slot: orbit.slot() })
+                        .filter(|o| game.check_order(Seat(0), &session.pending, o).is_ok())
+                        .collect();
+                    let n = able.len();
+                    orders_button(ui, game, &session.pending, able, &format!("All {n} that can"), Some(format!("Every Ship of the stack whose tank pays the leg, {n} of {}, sent together into {}.", ships.len(), game.orbit_name(to, orbit))), actions);
+                }
+            }
+        });
     }
 }
 
@@ -7543,17 +7574,9 @@ fn ship_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
             }
         }
     }
-    let mut extra = Vec::new();
-    if s.colonists > 0 {
-        extra.push(format!("{} Colonists", s.colonists));
-    }
-    if s.army.is_some() {
-        extra.push("an Army".into());
-    }
-    let carrying = if extra.is_empty() { String::new() } else { format!(", carrying {}", extra.join(" and ")) };
     // Ticket #346: the strength it would FIGHT at, dry hulls halved; the Tank block says why.
     ui.horizontal_wrapped(|ui| {
-        ui.label(format!("{}: strength {}, damage {}/{}{}", s.kind.name(), game.ship_fighting_strength(s), s.damage, card.hit_points, carrying));
+        ui.label(format!("{}: {}", s.kind.name(), ship_line(game, s)));
         warhead_label(ui, s);
     });
     match s.at {
@@ -7567,7 +7590,7 @@ fn ship_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
             // The Resolution that lands it: this turn's if one turn is left, else that many turns
             // on, less one -- and a solar storm or a grounding holds every hull where it is.
             let lands = game.date(game.turn + turns_left.saturating_sub(1)).text();
-            ui.label(format!("In transit from {} to {}, {turns_left} turn(s) left: it lands at the Resolution of {lands}, barring a solar storm.", game.tables.body(from).name, game.tables.body(to).name))
+            ui.label(format!("In transit from {} to {}, {turns_left} turn(s) left: it lands at the Resolution of {lands}, barring a solar storm or a grounding.", game.tables.body(from).name, game.tables.body(to).name))
                 .on_hover_text("A Ship in transit cannot be ordered and cannot be intercepted. It arrives Holding, with whatever Fuel it has left.");
         }
     }
@@ -7584,7 +7607,7 @@ fn ship_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
         tanks.scroll_to_me(Some(egui::Align::Min));
     }
     ui.horizontal_wrapped(|ui| {
-        ui.label(format!("{}/{} Fuel", s.fuel, card.tank));
+        let fuel = format!("{}/{} Fuel", s.fuel, card.tank);
         match s.at {
             ShipAt::Body(b) => {
                 // Ticket #335 (version 0.09.0): a station fuels only a Ship in its OWN orbit, so a
@@ -7593,6 +7616,7 @@ fn ship_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
                 // Ticket #325 (version 0.08.8): or a partner's station under a Refuel Accord,
                 // named on the hover; the Fuel is still the player's own Stockpile's.
                 if game.refuel_station_at(Seat(0), b) {
+                    ui.label(fuel);
                     let partner = if game.own_station_at(Seat(0), b) {
                         None
                     } else {
@@ -7600,13 +7624,14 @@ fn ship_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
                     };
                     cost_button_with_hover(ui, game, &session.pending, Order::Refuel { ship: s.id }, "Refuel from the Stockpile", partner, actions);
                 } else if game.stranded(s.id) {
+                    ui.label(fuel);
                     ui.colored_label(Color32::from_rgb(230, 120, 90), "stranded: no leg it can pay, and no station of yours or of a Refuel partner's here to refuel at; a station built in orbit here, or a Refuel Accord with one who holds a station here, rescues it");
                 } else {
-                    ui.label("no station of yours, or of a Refuel partner's, here to refuel at");
+                    ui.label(format!("{fuel}; no station of yours, or of a Refuel partner's, here to refuel at"));
                 }
             }
             ShipAt::Transit { .. } => {
-                ui.label("it lands with what is left");
+                ui.label(format!("{fuel}; it lands with what is left"));
             }
         }
     });
@@ -7620,7 +7645,7 @@ fn ship_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
     if view.stack_scroll == Some(StackBlock::Transits) {
         transits.scroll_to_me(Some(egui::Align::Min));
     }
-    move_dropdowns(ui, session, game, view, body, &[s], &format!("ship{}", s.id.0), actions);
+    move_dropdowns(ui, session, game, body, &[s], Some(s), view.stack_scroll, &format!("ship{}", s.id.0), actions);
     ship_cargo_block(ui, session, game, view, s, body, actions);
     if s.damage > 0 {
         ui.label(RichText::new("Repair").strong());
@@ -7628,6 +7653,16 @@ fn ship_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
         cost_button(ui, game, &session.pending, Order::RepairWithDucats { unit: UnitRef::Ship(s.id), points: s.damage }, "Repair fully with Ducats", actions);
     }
     ship_weapons_block(ui, session, game, view, s, body, actions);
+}
+
+/// Ticket #374: **an orbit named without its Body**, for a line inside that Body's drop-down, at
+/// the designer's word: *"drop the 'to [BODY]:' in the drop downs - we know its a martian orbit
+/// because its in the mars drop down."* "low orbit", or the station's name.
+fn orbit_short(game: &Game, body: BodyId, orbit: Orbit) -> String {
+    match orbit {
+        Orbit::Low => "low orbit".to_string(),
+        Orbit::Slot(n) => game.station_name(body, n),
+    }
 }
 
 /// "in low orbit" as a line's first words: "In low orbit".
