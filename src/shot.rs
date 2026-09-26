@@ -11,6 +11,15 @@ thread_local! {
     static ARCHIVE_COLONY: std::cell::Cell<Option<ColonyId>> = const { std::cell::Cell::new(None) };
 }
 
+/// Ticket #374 (version 0.09.2): which Ship the `ship:` aid opens the card of.
+#[derive(Clone, Copy, Debug)]
+enum ShipPick {
+    /// The nth of the player's Ships at the `stack:` Body, counted from one.
+    Nth(usize),
+    /// The player's first Ship in flight.
+    Flying,
+}
+
 #[derive(Resource, Default)]
 pub struct ShotPlan {
     pub step: usize,
@@ -55,6 +64,15 @@ pub struct ShotPlan {
     /// another Body, since the Launch door is photographed over EARTH, which is the one Body a
     /// Bombard could never be given over and so the one this aid had never needed to reach.
     pub stack: Option<BodyId>,
+    /// Ticket #374 (version 0.09.2): `ship:1` (a building aid): the card of the player's FIRST Ship
+    /// at the `stack:` Body, in board order, is opened in place of the stack's; `ship:<n>` the nth;
+    /// `ship:flying` the player's first Ship in flight, wherever it is bound. The `scroll:` aid
+    /// scrolls this card now, since the blocks it names moved here.
+    pub ship: Option<ShipId>,
+    /// Ticket #383 (version 0.09.2): `battlewindow:1` (a building aid): the first Battle of the
+    /// turn's record is raised in its own window, as the head of the turn would raise it, with
+    /// `battle_end` at the record's length so the button reads as it would in play.
+    pub battle_window: Option<usize>,
     /// `hover:<body id>` (a building aid, ticket #57): the Solar System Map draws that Body's launch
     /// window tooltip as though the pointer were on it. Nothing hovers in a headless capture.
     pub hover: Option<BodyId>,
@@ -129,7 +147,15 @@ fn apply_aids(plan: &mut ShotPlan, view: &mut ViewState) {
     if let Some(body) = plan.stack {
         view.selection = Selection::ShipStack(body, Seat(0));
     }
+    if let Some(id) = plan.ship {
+        view.selection = Selection::Ship(id);
+    }
     view.stack_scroll = plan.stack_scroll;
+    if let Some(n) = plan.battle_window {
+        view.battle_end = n;
+        view.battles_then_head = false;
+        view.popup = Popup::Battle(0);
+    }
     // Ticket #162 (version 0.07.5): `hab:1` SELECTS seat 0's first station or Colony (the ISS on a
     // fresh board), so its card and its Module tiles are in the picture; the window it used to open
     // is gone.
@@ -473,9 +499,10 @@ fn build_board(session: &mut Session) {
         }
         // `first:1` and `first:lost` (building aids, ticket #345, version 0.09.1): **the board the
         // first-to-a-Body rule is photographed on.** Seat 0 lands on the MOON and takes its first,
-        // and Mars, Phobos and Deimos are left with theirs unclaimed -- so one picture of the Solar
-        // System Map carries a world that has been taken beside three that are still worth the
-        // crossing, which is the whole argument of the rule in one frame.
+        // and Mars, Phobos and Deimos are left with theirs unclaimed -- so the surface cards show a
+        // world that has been taken beside three that are still worth the crossing. (Until ticket
+        // #368, version 0.09.2, the Solar System Map's open labels carried the line too, and one
+        // frame held all four; now the map shows it only for the Body under the pointer.)
         //
         // The landing is driven through `end_turn` with a real Unload order rather than by pushing a
         // Colony onto the board, because everything worth photographing here is made by the engine
@@ -645,6 +672,31 @@ fn build_board(session: &mut Session) {
             }
             g.report.moments.clear();
             g.resolution_phase();
+        }
+        // `flying:1` (a building aid, ticket #374, version 0.09.2): seat 0's Colony Ship is in
+        // FLIGHT, Earth to Mars with three turns left and six Colonists aboard, so a Ship in flight
+        // has a card to photograph (`ship:flying`) and the Solar System Map a label that opens it.
+        if std::env::args().any(|a| a == "flying:1") {
+            let id = ShipId(g.fresh_id());
+            let built_turn = g.turn;
+            let name = g.next_ship_name(UnitKind::ColonyShip);
+            g.ships.push(Ship {
+                id,
+                name,
+                kind: UnitKind::ColonyShip,
+                seat: Seat(0),
+                damage: 0,
+                at: ShipAt::Transit { from: BodyId::Earth, to: BodyId::Mars, turns_left: 3 },
+                colonists: 6,
+                colonists_education: 1.0,
+                warhead: false,
+                army: None,
+                stance: Stance::Hold,
+                escaped: false,
+                arrived_this_turn: false,
+                built_turn,
+                fuel: 12, slot: None,
+            });
         }
         // `crowded:1` (a building aid, ticket #86): the world at +2.6 C, and seat 0's Colony Ship
         // arrives at the Moon with eight aboard, four beyond its capacity; the turn is rerun on the
@@ -829,6 +881,10 @@ fn build_board(session: &mut Session) {
                 built_turn: turn,
                 fuel: g.tables.unit(UnitKind::ColonyShip).tank,
             });
+            // Ticket #370 (version 0.09.2): the board is composed after the turn is played, so the
+            // Report line the Resolution writes for Colonists waiting aboard is written here, by the
+            // same pass, so `menus:1` can photograph it under the Ships heading.
+            g.report_waiting_colonists();
         }
         // `venture:<n>` (a building aid, ticket #72): seat 0 as the Prospectors holds n Materials in
         // the Venture Capital Fund and banks half its output.
@@ -837,6 +893,21 @@ fn build_board(session: &mut Session) {
         {
             g.seats[0].venture_fund = n;
             g.seats[0].venture_share = 0.5;
+        }
+        // `restive:1` (a building aid, ticket #371, version 0.09.2): seat 0's first Region is
+        // agitated by a rival and relieved by seat 0 in one Unrest pass, run here through the
+        // game's OWN pass, so the Report carries the one net Unrest line the pass writes --
+        // "China: Unrest from 3 to 0.5 (agitation by the Prospectors, Relief by the Custodians)", the
+        // turn's falls taking the rest -- and
+        // `menus:1` can photograph it. The board is composed after the turn is played, which is why
+        // the pass is run by hand.
+        if std::env::args().any(|a| a == "restive:1")
+            && let Some(sid) = g.directed_states(Seat(0)).first().copied()
+        {
+            g.state_mut(sid).unrest = 3.0;
+            g.pending.agitates.push((Seat(1), sid));
+            g.pending.relief.push((Seat(0), sid));
+            g.resolve_unrest();
         }
         // `unrest:<n>` (a building aid, ticket #52): a spread of Unrest over three states on the
         // face the Earth picture shows, so one card, the map labels and the thresholds are all
@@ -1332,6 +1403,10 @@ fn card_from_id(name: &str) -> Option<EventId> {
 /// aid. The deck is put back as it would stand with that card drawn, so the Climate Panel's count
 /// of what is left reads a real deck.
 fn ask_the_card(g: &mut Game, id: EventId) -> bool {
+    // Ticket #367 (version 0.09.2): no card comes before `first_draw_turn`, so a fresh board (turn
+    // 1) would never draw and the aid would report the card never came. It stands on the first
+    // turn that can draw, which is what the picture then honestly reads.
+    g.turn = g.turn.max(g.tables.events.first_draw_turn);
     let deck = g.deck.clone();
     for _ in 0..200 {
         g.deck.cards = vec![Card::Event(id)];
@@ -1684,8 +1759,20 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
             Some(v) => body_from_id(v),
             None => None,
         });
+        // Ticket #374 (version 0.09.2): `ship:<n>` counts within the `stack:` Body, so it is read
+        // after it; `ship:flying` needs no Body.
+        let pick = std::env::args().find_map(|a| match a.strip_prefix("ship:") {
+            Some("flying") => Some(ShipPick::Flying),
+            Some(v) => v.parse().ok().map(ShipPick::Nth),
+            None => None,
+        });
+        plan.battle_window = std::env::args().any(|a| a == "battlewindow:1").then(|| session.game.as_ref().map(|g| g.report.battles.len()).unwrap_or(0)).filter(|n| *n > 0);
+        plan.ship = pick.zip(session.game.as_ref()).and_then(|(pick, g)| match pick {
+            ShipPick::Nth(n) => plan.stack.and_then(|body| g.ships_at(Seat(0), body).get(n.saturating_sub(1)).copied()),
+            ShipPick::Flying => g.ships.iter().find(|s| s.seat == Seat(0) && matches!(s.at, ShipAt::Transit { .. })).map(|s| s.id),
+        });
         // Ticket #335 (version 0.09.0): `scroll:transits` or `scroll:orbits`, the block of the Ship
-        // stack's card the picture is of.
+        // stack's card the picture is of. Ticket #374: of the Ship's card.
         plan.stack_scroll = std::env::args().find_map(|a| match a.strip_prefix("scroll:") {
             Some("transits") => Some(StackBlock::Transits),
             Some("orbits") => Some(StackBlock::ChangeOrbit),

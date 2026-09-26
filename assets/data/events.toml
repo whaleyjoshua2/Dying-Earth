@@ -1,6 +1,7 @@
 # Spec section 13, amended by ticket #25 (version 0.02) and #32 (0.03): no Calm Cards. Ticket #76
-# (version 0.05.5): the deck holds FORTY cards for a thirty-six-turn game. Each turn a card is
-# drawn with draw_chance_base at +1.2 C, rising by draw_chance_per_step for every full
+# (version 0.05.5): the deck holds FORTY cards for a thirty-six-turn game. Each turn from
+# first_draw_turn (ticket #367, version 0.09.2: turn 2, never the first) a card is drawn with
+# draw_chance_base at +1.2 C, rising by draw_chance_per_step for every full
 # draw_chance_step_degrees above it (50% at +1.2, 72.5% at +3.0). The deck is never reshuffled.
 # Climate cards still scale by 1 + (Temperature - 1.2) / 2.
 #
@@ -52,6 +53,11 @@ storm_surge_coastal_multiplier = 0.7
 # them found nowhere to land, chiefly these seven, each spent for the game -- the deck is never
 # reshuffled. The median first Colony is founded on turn 10.
 off_earth_join_turn = 12
+# Ticket #367 (version 0.09.2): no card of either kind on the first turn, at the designer's word
+# ("do not draw an event card on first turn"). The deck is not touched before this turn, so the
+# card on top simply waits for the first roll; nothing is lost. Before this a card came on turn 1
+# half the time, a Choice Card asking before the first order was given.
+first_draw_turn = 2
 volcanic_co2 = 5.0
 
 [[event]]
@@ -291,12 +297,14 @@ take = "Take them in"
 refuse = "Turn them away"
 # A calm Faction has room for them; a restive one does not, and pays for saying so.
 take_when = { rule = "unrest_below", unrest = 4.0 }
+# Ticket #376 (version 0.09.2): a million people for half a ppm, where it was 400,000 for two -- the
+# playtest's "which nobody would take twice". The refusal and the computer's rule are unchanged.
 [[event.choice.take_does]]
 effect = "population_to_most_populous"
-population = 0.4
+population = 1.0
 [[event.choice.take_does]]
 effect = "emissions_next"
-ppm = 2.0
+ppm = 0.5
 [[event.choice.refuse_does]]
 effect = "standing_all_held"
 standing = -5

@@ -1,7 +1,7 @@
 //! Ticket #58: the Report as a dated dispatch.
 //!
 //! Every sentence the Report says lives in `assets/data/report.toml`; this module holds the kinds
-//! a line can have, the severity order the headline and the Moments read, the four headings the
+//! a line can have, the severity order the headline and the Moments read, the five headings the
 //! rest is grouped under, and the template renderer with its validation.
 
 use crate::ids::{BodyId, ColonyId, Orbit, Place, Seat, StateId, TechId};
@@ -35,7 +35,7 @@ impl From<Place> for ReportPlace {
 // ---------------------------------------------------------------- what a line is about
 
 /// What one Report line is about. The kind decides two things: the line's place in the severity
-/// order the headline is chosen by (`headline_rank`), and which of the four headings it is grouped
+/// order the headline is chosen by (`headline_rank`), and which of the five headings it is grouped
 /// under (`section`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum LineKind {
@@ -79,17 +79,22 @@ pub enum LineKind {
     Card,
 }
 
-/// The four headings the dispatch groups its lines under, in the order they are shown.
+/// The five headings the dispatch groups its lines under, in the order they are shown (four until
+/// ticket #370, version 0.09.2, added Ships).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum Section {
     InSpace,
     OnEarth,
     TheClimate,
+    /// Ticket #370 (version 0.09.2): every Ship line, above Your works, at the designer's word --
+    /// the line for Colonists waiting aboard off Earth sits here, "and move the rest of the ship
+    /// lines there too". Until this version a Ship line read under In space.
+    Ships,
     YourWorks,
 }
 
 impl Section {
-    pub const ALL: [Section; 4] = [Section::InSpace, Section::OnEarth, Section::TheClimate, Section::YourWorks];
+    pub const ALL: [Section; 5] = [Section::InSpace, Section::OnEarth, Section::TheClimate, Section::Ships, Section::YourWorks];
     pub fn name(self) -> &'static str {
         self.name_for(false)
     }
@@ -101,6 +106,7 @@ impl Section {
             Section::InSpace => "In space",
             Section::OnEarth => "On Earth",
             Section::TheClimate => "The climate",
+            Section::Ships => "Ships",
             Section::YourWorks if spectator => "Builds and works",
             Section::YourWorks => "Your works",
         }
@@ -142,7 +148,9 @@ impl LineKind {
             Some(_) => Section::InSpace,
         };
         match self {
-            LineKind::ColonyFounded | LineKind::Ship | LineKind::Archive | LineKind::Antarctica => Section::InSpace,
+            // Ticket #370 (version 0.09.2): a Ship line reads under Ships, whoever's Ship it is.
+            LineKind::Ship => Section::Ships,
+            LineKind::ColonyFounded | LineKind::Archive | LineKind::Antarctica => Section::InSpace,
             LineKind::Unrest | LineKind::Refugees | LineKind::Army | LineKind::Occupation => Section::OnEarth,
             // Ticket #353 (version 0.09.1): the turn's card reads under The climate, where an Event
             // line has always read; only its headline rank is gone.
@@ -323,7 +331,7 @@ impl Report {
             .map(|(_, i)| i)
     }
 
-    /// Every line that is not the headline, in the order the four headings are shown.
+    /// Every line that is not the headline, in the order the five headings are shown.
     pub fn sections(&self) -> Vec<(Section, Vec<&ReportLine>)> {
         let head = self.headline_index();
         Section::ALL
@@ -403,6 +411,10 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("start_rivals", &["rivals", "condition", "collapse"]),
     ("solar_storm", &[]),
     ("ship_arrived", &["faction", "ship", "body"]),
+    // Ticket #375 (version 0.09.2): the Ship a Distress Call turned aside.
+    ("ship_held", &["faction", "ship", "body"]),
+    // Ticket #370 (version 0.09.2): the player's Colonists still aboard off Earth, one line a Body.
+    ("colonists_waiting", &["n", "where", "blocked"]),
     // Ticket #335 (version 0.09.0): a Ship that changed orbit at the Body it stands at.
     ("orbit_changed", &["faction", "ship", "orbit"]),
     ("ship_destroyed", &["faction", "ship", "why", "cargo"]),
@@ -413,7 +425,7 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("neutral_held", &["state", "n"]),
     ("battle", &["place", "faction", "odds", "outcome"]),
     ("event_damaged_ships", &["event", "n"]),
-    ("loaded", &["faction", "cargo", "body"]),
+    ("loaded", &["faction", "cargo", "body", "spaceport"]),
     ("slot_taken", &["faction"]),
     ("landing_contested", &["faction", "body"]),
     ("colony_founded", &["faction", "slot", "body", "n"]),
@@ -431,7 +443,7 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("army_ordered", &["place", "people"]),
     ("emigrants_arrived", &["n", "state", "colony"]),
     ("emigrants_returned", &["n", "state"]),
-    ("emigrants_lifted", &["n", "state", "station"]),
+    ("emigrants_lifted", &["n", "state", "station", "spaceport"]),
     // Ticket #353 (version 0.09.1): the Pioneers a clamped lift left standing in their Region.
     ("emigrants_stayed", &["n", "state", "station"]),
     ("claim_lot", &["place", "factions", "winner"]),
@@ -462,23 +474,22 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     // Ticket #299 (version 0.08.6): a broken Occupation, at a cost.
     ("occupation_broken", &["place", "faction", "holder", "unrest", "standing"]),
     ("control_changed", &["place", "faction", "why"]),
+    // Ticket #366 (version 0.09.2): a transfer and a throw-off in one Resolution, said once.
+    ("passed_and_threw_off", &["state", "faction"]),
     ("claim_tied", &["place", "factions"]),
     ("threw_off", &["state", "faction", "unrest"]),
-    ("unrest_rose_state", &["state", "rose", "unrest"]),
-    ("unrest_card", &["state", "rose", "unrest"]),
-    ("unrest_threshold", &["state", "unrest", "note"]),
-    ("relief", &["faction", "state", "fell", "unrest"]),
+    // Ticket #371 (version 0.09.2): the one net Unrest line a Region, in place of six.
+    ("unrest_net", &["state", "before", "after", "causes", "ending"]),
     // Ticket #176 (version 0.07.6): one net line per Region, in place of one per flow and one for
     // arriving. `gross` appears only where what left cancelled some of what arrived, since Unrest
     // is charged on everyone who came.
-    ("refugees_net_in", &["n", "state", "rose", "unrest"]),
-    ("refugees_net_in_gross", &["n", "gross", "state", "rose", "unrest"]),
-    ("refugees_net_in_quiet", &["n", "state"]),
+    ("refugees_net_in", &["n", "state"]),
+    ("refugees_net_in_gross", &["n", "gross", "state"]),
     ("refugees_net_out", &["n", "state", "why"]),
     ("refugees_net_out_mostly", &["n", "state", "why"]),
     ("resettled", &["faction", "state", "standing"]),
     ("strip_permit", &["faction", "state", "turns"]),
-    ("strip_permit_ended", &["state", "baseline", "rose", "unrest"]),
+    ("strip_permit_ended", &["state", "baseline"]),
     ("building_changed_state", &["faction", "done", "building", "state"]),
     ("building_decommissioned_state", &["faction", "building", "state", "refund"]),
     ("building_changed_colony", &["faction", "done", "building", "colony"]),
@@ -522,8 +533,6 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("credits_bought", &["faction", "n", "seller", "ducats"]),
     ("credits_short", &["faction", "n", "back"]),
     // Ticket #269: an Agitate landed, named for who paid.
-    ("agitate", &["faction", "state", "rose", "unrest"]),
-    ("agitate_damped", &["faction", "state"]),
     ("storm_surge_wall", &["state", "percent"]),
     ("sea_wall_unkept", &["faction", "states"]),
     ("sea_nothing_left", &["temperature", "state"]),
@@ -560,6 +569,32 @@ pub fn ordinal(n: usize) -> String {
 /// The same for `[phrase]`.
 pub const PHRASE_ARGS: &[(&str, &[&str])] = &[
     ("attacks", &[]),
+    // Ticket #370 (version 0.09.2): where the player's Colonists wait aboard, and what blocks them.
+    ("waiting_low", &["body"]),
+    ("waiting_station", &["station", "body"]),
+    ("waiting_many", &["body", "parts"]),
+    ("waiting_part_low", &["n"]),
+    ("waiting_part_station", &["n", "station"]),
+    ("waiting_blocked", &[]),
+    ("waiting_blockaded", &["station"]),
+    // Ticket #371 (version 0.09.2): the causes and endings of a Region's one net Unrest line.
+    ("cause_card", &["card"]),
+    ("cause_unrest_card", &[]),
+    ("cause_mothball", &[]),
+    ("cause_decommission", &[]),
+    ("cause_permit", &[]),
+    ("cause_agitate", &["faction"]),
+    ("cause_agitate_damped", &["faction"]),
+    ("cause_relief", &["faction"]),
+    ("cause_refugees", &["n"]),
+    ("cause_occupation_start", &[]),
+    ("cause_occupation", &[]),
+    ("cause_occupation_break", &[]),
+    ("cause_choice_card", &["card"]),
+    // Ticket #366 (version 0.09.2): what a lift earns from the Spaceport, on the lift's line.
+    ("spaceport_pays", &["n"]),
+    ("unrest_past", &["which", "note"]),
+    ("unrest_under", &["which"]),
     // Ticket #351 (version 0.09.1): the Sink's loss on the Shortfall line.
     ("energy_short_sink", &["ppm"]),
     ("cargo_aboard", &["n"]),

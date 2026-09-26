@@ -47,6 +47,12 @@ pub enum Selection {
     Colony(ColonyId),
     Slot(BodyId, u32),
     ShipStack(BodyId, Seat),
+    /// Ticket #374 (version 0.09.2): **one Ship**, with a card of its own. Everything that is one
+    /// hull's -- its tank, its moves, its loading, its weapons -- is ordered from here, where until
+    /// this ticket it was ordered from the stack's card with a button per hull under every heading,
+    /// so the same hull stood on that card five times. A Ship in flight is selectable too, for its
+    /// card alone: nothing can be ordered in flight.
+    Ship(ShipId),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -71,6 +77,11 @@ pub enum Popup {
     /// Ticket #105 (version 0.07.0): the turn was refused, and this says why. A rule nobody can see
     /// refused by is as bad as no rule, so the refusal always speaks.
     Refused,
+    /// Ticket #383 (version 0.09.2): **a Battle, in a window of its own**, the nth of the turn's
+    /// record: the party lines, the round picture and the replay. Raised the moment the player's
+    /// Attack is fought, and at the head of the next turn for every Battle the Resolution fought,
+    /// before the Event and the Moments. The Report no longer carries the Battle Report block.
+    Battle(usize),
 }
 
 #[derive(Resource)]
@@ -179,8 +190,9 @@ impl Session {
     /// The Save button: a manual save of this turn start. It is dead while an order is pending, so
     /// a save never holds half-entered orders.
     pub fn save_now(&mut self) {
-        if !save::can_save_now(self.pending.len()) {
-            self.note(save::SAVE_PENDING_HOVER.to_string());
+        let fought = self.game.as_ref().is_some_and(|g| !g.fought.is_empty());
+        if !save::can_save_now(self.pending.len(), fought) {
+            self.note(if fought { save::SAVE_FOUGHT_HOVER } else { save::SAVE_PENDING_HOVER }.to_string());
             return;
         }
         let Some(game) = &self.game else { return };
@@ -235,6 +247,23 @@ impl Session {
             self.last_error = Some(format!("{} could not be deleted: {e}", path.display()));
         }
         self.refresh_saves();
+    }
+
+    /// Ticket #383 (version 0.09.2): the player's Attack, fought the moment it is confirmed. The
+    /// engine checks it as the order it was, fights it, and hands back where the Battles landed in
+    /// the turn's record; a refusal goes where a refused order's goes.
+    pub fn attack(&mut self, body: BodyId) -> Option<std::ops::Range<usize>> {
+        let game = self.game.as_mut()?;
+        match game.attack_now(Seat(0), body) {
+            Ok(fought) => {
+                self.last_error = None;
+                Some(fought)
+            }
+            Err(e) => {
+                self.last_error = Some(e.0);
+                None
+            }
+        }
     }
 
     /// Try to add an order; on failure remember why so the panel can show it.
@@ -296,11 +325,14 @@ pub enum HabTile {
 
 /// Ticket #335 (version 0.09.0), a building aid: a block of the Ship stack's card that a headless
 /// picture asks to be scrolled to, since a capture cannot drag a scrollbar.
+/// Ticket #374 (version 0.09.2): a block of the **Ship's** card now, since that is where the
+/// buttons went; the stack card no longer has these blocks.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum StackBlock {
-    /// The Transits row, one line per destination ORBIT since this ticket.
+    /// The Transit block, one drop-down per Body since ticket #374.
     Transits,
-    /// The Change orbit door, one line per other orbit at this Body.
+    /// The change-of-orbit moves: since ticket #374 the drop-down of the Body the Ship is at,
+    /// which stands first under Transit.
     ChangeOrbit,
     /// Ticket #346 (version 0.09.1): the Tanks block, where a Ship's Fuel, its Refuel button, the
     /// stranded warning and the dry warning all stand. It is far enough down the card that no
@@ -399,6 +431,13 @@ pub struct ViewState {
     /// stack card scrolls to that block and stays there. A headless picture cannot scroll a panel,
     /// and on a card with four Ships on it both blocks sit well below the fold.
     pub stack_scroll: Option<StackBlock>,
+    /// Ticket #383 (version 0.09.2): the Battle windows' run: `Popup::Battle(i)` closes into
+    /// `Battle(i + 1)` while `i + 1 < battle_end`, and then into the turn's head chain (the note,
+    /// the card or the Event, the Moments, the Report) when `battles_then_head`, or into nothing
+    /// after a Battle fought mid-turn. `battles_then_note` is whether the tutorial's note is owed.
+    pub battle_end: usize,
+    pub battles_then_head: bool,
+    pub battles_then_note: bool,
     /// Ticket #58: which Moment kinds are switched on, remembered for the session. `None` until the
     /// player touches a checkbox, when it is filled from the defaults in `report.toml`.
     pub moments_on: Option<[bool; dying_earth_engine::MomentKind::ALL.len()]>,
@@ -462,6 +501,7 @@ impl Default for ViewState {
             credits_amount: 10,
             credits_offer: 0,
             attack_preview: false, armed_stack: None, armed_scroll: false, stack_scroll: None,
+            battle_end: 0, battles_then_head: false, battles_then_note: false,
             moments_on: None,
             force_hover: None,
             card_aside: false,

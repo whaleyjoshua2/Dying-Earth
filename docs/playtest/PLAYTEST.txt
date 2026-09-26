@@ -1,4 +1,4 @@
-DYING EARTH - playtest build, version 0.09.1
+DYING EARTH - playtest build, version 0.09.2
 ============================================
 
 Thanks for playing. This is an early build of a turn-based strategy game about colonizing
@@ -16,78 +16,78 @@ HOW TO RUN
 4. The very first launch shows a blank dark window for up to ten seconds while it
    compiles graphics. Later launches are quick.
 5. Needs Windows 10 or 11, 64-bit, and any graphics card from the last ten years.
-6. Saves from 0.09.0 and before will not load in this version: ships can now carry a
-   warhead and worlds remember who settled them first, so an old file describes a board
-   this version cannot read. The Load screen says so.
+6. Saves from 0.09.1 and before will not load in this version: battles are recorded and
+   fought differently now and every side starts differently, so an old file describes a
+   board this version cannot read. The Load screen says so.
 7. This version ships for Windows and for Linux. On Linux, read RUN-ON-LINUX.txt in the
    folder instead of steps 2 to 5.
 
-WHAT CHANGED SINCE 0.09.0
+WHAT CHANGED SINCE 0.09.1
 -------------------------
-Most of this version is the game answering for itself after its first real playtest:
-saying what it knows, and doing what it said. Every rule below the computer plays too.
+Most of this version is tidying: the game says what it does where you can see it, and
+the ship cards were rebuilt. Three rules moved, and the computer plays every one.
 
-NEW RULES
-- NUKES. A new ship, the MISSILE CARRIER, carries one warhead. It cannot fight, and it
-  needs a new Tech, Missile Technology. Fired at a country, colony or station a rival
-  holds, from an orbit you hold outright, it guts the place: most buildings burn, about
-  half the people die, and a country loses its standing army and a level of industry. It
-  can be fired over Earth. On Earth it fouls the air AND raises the natural sink a little
-  for good. A carrier reloads only at a shipyard of your own.
-- THE SINK KEEPS WHAT IT IS GIVEN. "The Sink Weakens" now takes 2.0 off the sink instead
-  of setting it to 4.0, so anything that raised the sink is not wiped out by it.
-- BEING FIRST TO A WORLD PAYS. The first side ever to found a ground colony on a world off
-  Earth gets a one-off windfall of Influence (5 at the Moon, 15 at Mars, 20 at Phobos or
-  Deimos) and +1 Influence a turn while it holds that colony. Stations and Antarctica do
-  not count; Venus has no ground to claim.
-- BATTLES IN SPACE COST FUEL: 2 from every ship in the fight, on both sides. A ship that
-  cannot pay fights at half strength until it refuels, and a warship low on fuel cannot
-  hold an orbit, blockade or intercept.
-- A LAUNCH SITE REACHES ANY ORBIT OF EARTH. You can lift pioneers and armies straight onto
-  a ship at your station's ring; you no longer have to bring it down to low orbit first.
-- A BATTERY FIRES ON A SHIP BLOCKADING ITS ORBIT, so a defended station under blockade is
-  a battle, not just a blockade that does nothing.
-- A SHUT BARRACKS raises and repairs no army. A SHUT HABITAT still houses its people, but
-  while people are living in it the whole colony makes everything but Energy at half.
-- THE ARCHIVISTS' CONDITION: 125 Research into the Archive, the old cap on it gone. The
-  Archive may now be ordered before The Upload is researched; The Upload is still needed
-  to win.
+THE RULES THAT MOVED
+- AN ATTACK IS FOUGHT THE MOMENT YOU CONFIRM IT. Order a ship stack to Attack and the
+  battle happens at once, on the board as it stands - ships still in flight toward that
+  world do not arrive in time to join. The survivors stand on Hold, and a stack fights
+  once a turn. The computer's attacks are fought when it gives its orders, before
+  anything moves. "Confirm Attack" is the point of no return; you cannot save until the
+  next turn after a battle.
+- EVERY BATTLE HAS A WINDOW OF ITS OWN, shown the moment yours is fought and at the start
+  of the next turn for the computer's. It draws each round: every side's ships with a pip
+  per hit point, the hits of the round lit, a ship that ran dimmed, one destroyed
+  crossed, and the blows in words ("The Custodians hit ARK Implacable, covering ARK
+  Defiant"). The chronicle at the end of the game lists every battle that cost a ship or
+  a battery.
+- EQUAL STARTS. Every home country now begins with the same buildings - a Power Plant, a
+  Factory, a Mine, a Refinery and the Launch Site - whatever it had on the map, and every
+  starting station carries a Solar Array. The Arkwrights, who start with no station, get a
+  second Power Plant instead. The country's ECONOMY is still its own: the EU pays about
+  twelve Ducats a turn and Saudi Arabia one.
+- THE REFUGEE CONVOY LANDS A MILLION PEOPLE for half a ppm (it was 400,000 for two).
+- NO CARD IS DRAWN ON THE FIRST TURN.
 
-THE GAME TELLS YOU WHAT IT KNOWS
-- A place you hold is PRESSED when a rival is within 10 of your Standing there. Pressed
-  places are listed under the Influence slider; click one to go there.
-- Your first Report names your own Victory Condition, with its real figures.
-- The Energy figure on the top bar TURNS RED when your next Income will shut buildings
-  down, and its hover says which, in order.
-- Pointing at a building's figure SHOWS THE ARITHMETIC: "2 base x 1.32 for 1.45B people x
-  1.10 for Education x 1.25 as the Custodians = 3.63, rounded down to 3". Education counts
-  twice in a Research Lab, and now it says so.
-- A button that is shut because your ship is in the wrong orbit SAYS WHAT TO DO: "Move
-  this Ship to Earth, at ISS, then refuel next turn."
-- On a country's card, the PIONEERS block (Recruit, and the buttons that send them) now
-  sits above the building tiles, where it can be seen.
-- The Report's "have not forgiven" lines are gone. It now tells you only when a side falls
-  to a worse mood toward you, or you toward them: "The Prospectors are now Cold toward
-  you."
+THE SHIP CARDS
+- EVERY SHIP HAS A CARD OF ITS OWN: its strength and damage, its tank, its moves, its
+  cargo, its weapons and its repair. Click a ship's row on the stack card, in the roster,
+  or its label on the solar map while it flies. The stack card keeps only what is the
+  whole stack's: the ships grouped by orbit, the stance, Attack, and "All that can".
+- WHERE A SHIP CAN GO IS ONE DROP-DOWN PER WORLD, the moons nested under their planets -
+  the Moon inside Earth's, Phobos and Deimos inside Mars's - with the orbits inside each.
+  The world you are at opens first with the change-of-orbit moves.
+- A TRANSIT QUOTE SAYS WHEN IT HOLDS ("if launched this turn; next turn 5t/23F, then
+  6t/26F"), and a leg that would leave the ship stranded at the far end says so beside its
+  button. A warning, not a refusal: a one-way trip can be the plan.
 
-SEVEN THINGS THAT WERE UNTRUE, NOW TRUE
-- A build refusal says whether a shipyard is missing, still building or shut. A founding
-  names the right site. A partial unload and a lift that ran out of room say who stayed.
-  A lift fills as far as the room goes instead of refusing. The Research Directive line
-  says what it bought. A quiet turn's Report opens with a headline. Relay Networks and the
-  Arkwrights' Chorus now actually pay the Influence they always showed.
+THE GAME SAYS WHAT IT DOES
+- EVERY GREYED BUTTON EXPLAINS WHY ON MOUSEOVER, in the engine's own words, the reason
+  first and the description after. (It turned out no greyed order button had shown its
+  reason since version 0.08.3; the pictures we checked looked right because the screenshot
+  tool forced them open. Fixed.)
+- THE VICTORY BAR COUNTS SETTLED COLONISTS, with a hatched band beyond the fill for the
+  ones still in flight.
+- THE REPORT HAS A SHIPS HEADING: colonists waiting aboard in orbit, ships held, ships
+  loaded. One net Unrest line per country instead of several.
+- A CARD'S INFLUENCE FIGURE READS THE HOLDER: "Take at 49" on a rival's place, the
+  cheapest rival's price on your own.
+- THE TRADING WINDOW SPEAKS IN GLYPHS. The "first to land" line is off the solar map and
+  on the world's hover.
+- THE ARCHIVISTS AND THE PROSPECTORS SEE THEIR FUND ON THE TOP BAR: the slider and the
+  fill bar, condensed, right of the window buttons. The full controls stay where they were.
+- THE DISTRESS CALL NAMES THE SHIP IT WOULD HOLD before you answer, and holds it for the
+  turn if you do.
 
 WHAT WE WANT TO KNOW
 --------------------
 Write down anything, however small. Especially:
 - The moment you were not sure what to do next.
 - Anything you clicked that did nothing, or did something you did not expect.
-- NUKES: did you build one? Did being nuked by a computer side feel fair, or out of
-  nowhere? Did you know how to stop one?
-- PRESSED: did you notice the list? Did it make you spend Influence to hold a place?
-- THE ARITHMETIC HOVERS: did you read them? Were they too long?
-- THE RED ENERGY FIGURE: did it warn you in time?
-- BEING FIRST TO A WORLD: did the windfall change where you sent your first colony?
+- ATTACK AT ONCE: did fighting the moment you confirm feel right? Did you want to take an
+  attack back? Did the battle window tell you why you won or lost?
+- THE SHIP CARDS: did you find a ship's moves? Were the nested drop-downs clear?
+- THE REFUSAL HOVERS: hover over a greyed button. Did it tell you what to do?
+- EQUAL STARTS: did the opening feel fair? Which country did you pick, and why?
 - Anything that still says the same thing twice.
 - The turn the game got boring, if it did, and the turn you felt you had lost.
 - Crashes: what you were doing, and the "Seed" number shown on the title screen and
@@ -102,15 +102,20 @@ first. These are known. You do not need to report them.
 
 WHAT THIS VERSION KNOWS ABOUT ITSELF
 
-- THE WIN COLUMN: Custodians 6, Prospectors 28, Arkwrights 3, Archivists 2, where last
-  version was 5 / 31 / 1 / 0. The two sides that won nothing now win something; the
-  Prospectors still take over a third of all games.
-- THE WORLD COLLAPSES IN 41 GAMES OF 80, where it was 42.
-- THE WAR IN SPACE HAS STARTED. The computer sides now blockade in 20 games of 80 and
-  fire nukes in 21 (39 launches in all). Battles in orbit are still rare: 7 games of 80.
-- THE ARCHIVISTS RARELY WIN ON THEIR CONDITION. The Archive now gets built in 12 games of
-  80 and finished in 8, but it finishes around turn 33 of 36, too late to upload the 12
-  colonists their win asks for.
+- THE WIN COLUMN TURNED OVER: Custodians 2, Prospectors 5, Arkwrights 0, Archivists 11,
+  where last version was 6 / 28 / 3 / 2. Equal starts did it: the Archivists' station
+  carries a Heliostat and their home a Reactor, and they were first to the Moon in every
+  game; the Prospectors' opening lost its habitat to an Exchange in the one slot the Solar
+  Array leaves. Every side is stronger; the Prospectors' lead is gone.
+- THE WORLD COLLAPSES IN 62 GAMES OF 80, where it was 41. Every side now starts with a
+  Refinery and a Power Plant it may not have had, and the table burns faster. The balance
+  version will look at it.
+- TWO STACKS THAT ATTACK IN ONE ORBIT IN ONE TURN FIGHT TWO BATTLES, one per attack, the
+  second against the first's survivors. Deliberate: every attack is its own fight now.
+- A COMMS BLACKOUT CANNOT STOP AN ATTACK YOU FOUGHT BEFORE THE TURN ENDED. It still stands
+  the computer's stacks down.
+- AN ARKWRIGHTS PLAYER WHO OPENS IN MEXICO has six buildings in five slots and nothing free
+  to build until an Industry Level raise.
 - NOBODY CAN ACCEPT OR DECLINE AN ACCORD OFFERED TO THEM - INCLUDING YOU. The game still
   answers on your behalf.
 - THE THREAT LINE ON A COUNTRY'S CARD STILL QUOTES THE FIRST EXCHANGE, while every other
@@ -119,8 +124,8 @@ WHAT THIS VERSION KNOWS ABOUT ITSELF
 CARRIED OVER, STILL TRUE
 
 - FUEL AND ENERGY PRICES BARELY MOVE, because the computer sides never sell goods.
-- WHERE EACH SIDE STARTS IS NOT RANDOM. The computer sides always take the richest free
-  countries in the same order.
+- WHERE EACH SIDE STARTS IS NOT RANDOM. The computer sides always take the same countries
+  in the same order.
 - RENAMING SHIPS, COLONIES AND STATIONS is still cut.
 - Antarctica's three colony sites have labels that overlap each other when you are zoomed
   out.

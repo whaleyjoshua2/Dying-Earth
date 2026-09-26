@@ -31,7 +31,17 @@ impl Game {
                 m.online = !m.mothballed;
             }
         }
+        // Ticket #371 (version 0.09.2): where every Region's Unrest stands as the Resolution opens,
+        // for the one net line a Region the Report says at its end.
+        self.snapshot_unrest();
+        // Ticket #383 (version 0.09.2): every stack standing on Attack as the Resolution opens
+        // fights NOW, before anything moves -- the computer's, whose orders were just placed; the
+        // player's was fought the moment it was confirmed. A hull still in flight never joins a
+        // Battle at its destination. The Comms Blackout stands the stacks down first, as it did
+        // when the Battles came after the transits; it cannot reach an Attack the player fought
+        // before the Event was drawn.
         self.blackout_stances();
+        self.fight_attacks();
         self.resolve_transits(); // (a)
         self.resolve_battles(); // (b)
         self.resolve_bombards(); // (b'), ticket #328: after the orbit is fought for
@@ -62,9 +72,72 @@ impl Game {
         self.resolve_strip_permits(); // (h), ticket #54: a permit that ran out charges its price
         self.resolve_unrest(); // (i), ticket #52
         self.resolve_credits(); // (j), ticket #268: carbon credits change hands
+        self.report_waiting_colonists(); // ticket #370: after every landing this turn has made
         self.pending = Pending::default();
+        // Ticket #383 (version 0.09.2): a stack that fought this turn may Attack again next turn.
+        self.fought.clear();
         for a in &mut self.armies {
             a.move_to = None;
+        }
+    }
+
+    /// Ticket #370 (version 0.09.2): **the player's Colonists still aboard a Ship off Earth are
+    /// reported every turn they wait**, one line a Body, under Ships, at the designer's word --
+    /// *"colonists wait aboard in low orbit of Mars"*, and *"blocked by rivals' control of the
+    /// orbit"* when a rival's Orbital Control shuts the ground or a blockade shuts the station they
+    /// are docked at. Any orbit off Earth counts; a Ship in transit does not, since nothing can be
+    /// done about it yet. The player's own Ships only: a rival's waiting Colonists are not the
+    /// player's business, and the Report was quieted a version ago. Runs after every landing this
+    /// turn has made, so a Ship that unloaded this turn is not reported as waiting. Nothing in a
+    /// spectated game, which has no seat of its own. Public for the picture harness, which composes
+    /// a loaded Colony Ship at a Body AFTER the turn is played and wants the line the Resolution
+    /// would have written.
+    pub fn report_waiting_colonists(&mut self) {
+        if self.spectator {
+            return;
+        }
+        let me = Seat(0);
+        for body in BodyId::ALL {
+            if body == BodyId::Earth {
+                continue;
+            }
+            // By orbit: low orbit first, then the slots in order, which is how `Orbit` sorts.
+            let mut by_orbit: std::collections::BTreeMap<Orbit, u32> = std::collections::BTreeMap::new();
+            for s in self.ships.iter().filter(|s| s.seat == me && s.colonists > 0 && s.at == ShipAt::Body(body)) {
+                *by_orbit.entry(self.ship_orbit(s)).or_insert(0) += s.colonists;
+            }
+            if by_orbit.is_empty() {
+                continue;
+            }
+            let name = self.tables.body(body).name.clone();
+            let n: u32 = by_orbit.values().sum();
+            let orbits: Vec<Orbit> = by_orbit.keys().copied().collect();
+            let where_ = match orbits.as_slice() {
+                [Orbit::Low] => self.phrase("waiting_low", &[("body", name)]),
+                [Orbit::Slot(i)] => self.phrase("waiting_station", &[("station", self.station_name(body, *i)), ("body", name)]),
+                _ => {
+                    let parts: Vec<String> = orbits
+                        .iter()
+                        .map(|o| match o {
+                            Orbit::Low => self.phrase("waiting_part_low", &[("n", by_orbit[o].to_string())]),
+                            Orbit::Slot(i) => self.phrase("waiting_part_station", &[("n", by_orbit[o].to_string()), ("station", self.station_name(body, *i))]),
+                        })
+                        .collect();
+                    self.phrase("waiting_many", &[("body", name), ("parts", parts.join(", "))])
+                }
+            };
+            // A rival's Orbital Control shuts the ground below low orbit; a rival's Blockade shuts
+            // the station a Ship is docked at. Different things in the glossary, so different words.
+            let blocked = orbits
+                .iter()
+                .find_map(|o| match o {
+                    Orbit::Low if !self.may_land(me, body) => Some(self.phrase("waiting_blocked", &[])),
+                    Orbit::Slot(i) if self.slot_blockaded_against(me, body, *i) => Some(self.phrase("waiting_blockaded", &[("station", self.station_name(body, *i))])),
+                    _ => None,
+                })
+                .unwrap_or_default();
+            let text = self.say("colonists_waiting", &[("n", n.to_string()), ("where", where_), ("blocked", blocked)]);
+            self.report_line(LineKind::Ship, Some(ReportPlace::Body(body)), text);
         }
     }
 
@@ -107,6 +180,17 @@ impl Game {
         // before the transits, which is the whole reason the card is asked before orders.
         let grounded: [bool; SEAT_COUNT] = Seat::ALL.map(|s| self.card_holds_ships(s));
         let turned_aside: Vec<ShipId> = Seat::ALL.into_iter().filter_map(|s| self.card_holds_one_ship(s)).collect();
+        // Ticket #375 (version 0.09.2): the Report names the Ship a call turned aside, which
+        // nothing did -- the playtest's only Ship froze mid-transit without a word. A held Ship is
+        // docked now, so the line points at its Body.
+        for id in &turned_aside {
+            if let Some(s) = self.ship(*id)
+                && let ShipAt::Body(body) = s.at
+            {
+                let text = self.say("ship_held", &[("faction", self.seat_name(s.seat)), ("ship", self.ship_name(s)), ("body", self.tables.body(body).name.clone())]);
+                self.report_line(LineKind::Ship, Some(ReportPlace::Body(body)), text);
+            }
+        }
         let mut arrivals: Vec<(Seat, BodyId, ShipId)> = Vec::new();
         for s in &mut self.ships {
             if let ShipAt::Transit { from, to, turns_left } = s.at {
@@ -234,56 +318,113 @@ impl Game {
 
     // ------------------------------------------------------------------ (b)
 
+    /// Ticket #383 (version 0.09.2): **one orbit's Battle**, opened by `aggressors` against every
+    /// other Faction's Ships and working Batteries there. The Resolution opens one for a Battery
+    /// against a blockader; an Attack opens one the moment it is ordered (`fight_attacks`).
+    /// Ticket #50: any stack ordered Attack pulls every other Faction's Ships at that Body into one
+    /// melee; Evade stacks still try to disengage; Hold stacks fight. Ticket #335 (version 0.09.0):
+    /// **battle parties form per ORBIT**, so two Battles at one Body are two melees and two records,
+    /// and a station's Battery never fires on a fight in low orbit.
+    fn fight_orbit(&mut self, body: BodyId, orbit: Orbit, aggressors: &[Seat]) -> bool {
+        // Ticket #324 (version 0.08.8): a seat's working Batteries stand in its line after its
+        // Ships, so a stack on Attack in an orbit with nothing but a Battery in it fights the
+        // Battery, and a Battery beside its owner's stack fights with it. Ticket #335: the
+        // Batteries of THIS orbit -- a station's its own ring, a ground Colony's low orbit.
+        let parties: Vec<(Seat, bool, Vec<UnitRef>)> = Seat::ALL
+            .into_iter()
+            .filter_map(|seat| {
+                let units: Vec<UnitRef> = self
+                    .ships
+                    .iter()
+                    .filter(|s| s.seat == seat && self.ship_in_orbit(s, body, orbit) && !s.escaped)
+                    .map(|s| UnitRef::Ship(s.id))
+                    .chain(self.batteries_at(seat, body, orbit).into_iter().map(|(colony, index)| UnitRef::Battery { colony, index }))
+                    .collect();
+                if units.is_empty() {
+                    None
+                } else {
+                    Some((seat, aggressors.contains(&seat), units))
+                }
+            })
+            .collect();
+        if parties.len() < 2 {
+            return false;
+        }
+        let name = self.orbit_battle_name(body, orbit);
+        self.ship_melee(&name, body, orbit, &parties);
+        true
+    }
+
+    /// Ticket #383 (version 0.09.2): **an Attack is fought the moment it is ordered**, at the
+    /// designer's word, on the board as it stands: the seat's stack at the Body fights every orbit
+    /// it holds Ships on Attack in, the survivors stand on Hold, and the stack may not Attack again
+    /// that turn. The player's comes through `attack_now`; the computer's, which orders only at End
+    /// Turn, through `fight_attacks` the moment its orders are placed -- before the transits land,
+    /// so a hull still in flight never joins. Returns the record's place in the turn's Battles.
+    fn fight_stack(&mut self, seat: Seat, body: BodyId) -> std::ops::Range<usize> {
+        let from = self.report.battles.len();
+        for orbit in self.orbits_of(body) {
+            if self.ships.iter().any(|s| s.seat == seat && self.ship_in_orbit(s, body, orbit) && s.stance == Stance::Attack && !s.escaped) {
+                self.fight_orbit(body, orbit, &[seat]);
+            }
+        }
+        self.set_stack_stance(seat, body, Stance::Hold);
+        if !self.fought.contains(&(seat, body)) {
+            self.fought.push((seat, body));
+        }
+        from..self.report.battles.len()
+    }
+
+    /// Ticket #383: the player's Attack, fought as it is confirmed: the order's own check, the
+    /// stance set as the order would set it, the fight. Refused as the order would be, "fought
+    /// this turn" included.
+    pub fn attack_now(&mut self, seat: Seat, body: BodyId) -> Result<std::ops::Range<usize>, OrderError> {
+        self.check_order(seat, &[], &Order::ShipStance { body, stance: Stance::Attack })?;
+        self.set_stack_stance(seat, body, Stance::Attack);
+        let fought = self.fight_stack(seat, body);
+        // The record is written into the Report the player is reading, which End Turn resets; the
+        // mark says which lines to carry into the Report the coming turn will show.
+        for b in &mut self.report.battles[fought.clone()] {
+            b.fought_now = true;
+        }
+        Ok(fought)
+    }
+
+    /// Ticket #383: every stack standing on Attack -- the computer's, whose orders were just
+    /// placed -- fights now, seat by seat, as the Resolution opens and before it moves anything.
+    /// Seat 0's stack first, then seat 1's, and so on: two stacks attacking one orbit in one turn
+    /// are two Battles, the second fought against the first's survivors standing on Hold, where
+    /// the old Resolution folded every aggressor into one melee.
+    pub fn fight_attacks(&mut self) {
+        for seat in Seat::ALL {
+            for body in BodyId::ALL {
+                if self.ships.iter().any(|s| s.seat == seat && s.at == ShipAt::Body(body) && s.stance == Stance::Attack && !s.escaped) {
+                    self.fight_stack(seat, body);
+                }
+            }
+        }
+    }
+
     fn resolve_battles(&mut self) {
-        // Ship battles (ticket #50): any stack ordered Attack pulls every other Faction's Ships at
-        // that Body into one melee. Evade stacks still try to disengage; Hold stacks fight.
-        // Ticket #335 (version 0.09.0): **battle parties form per ORBIT.** An Attack fights the
-        // orbit the stack sits in, so two Battles at one Body are two melees and two records, and a
-        // station's Battery never fires on a fight in low orbit.
+        // Ticket #383 (version 0.09.2): an Attack is fought the moment it is ordered, so no stack
+        // stands on Attack by the time the Resolution runs; what opens a Battle here is a Battery.
+        // Ticket #363 (version 0.09.1): **a working Battery opens a Battle on a rival warship on
+        // Blockade in its own orbit**, at the designer's word, so a defended station under Blockade
+        // is a fight and not merely a void Blockade. Its holder is the side that opens it, and pays
+        // the offence for it as any aggressor does.
         for body in BodyId::ALL {
             for orbit in self.orbits_of(body) {
-                // Ticket #363 (version 0.09.1): **a working Battery opens a Battle on a rival warship
-                // on Blockade in its own orbit**, at the designer's word, so a defended station under
-                // Blockade is a fight and not merely a void Blockade. Its holder is the side that
-                // opens it, and pays the offence for it as any aggressor does.
                 let aggressors: Vec<Seat> = Seat::ALL
                     .into_iter()
                     .filter(|seat| {
-                        self.ships.iter().any(|s| s.seat == *seat && self.ship_in_orbit(s, body, orbit) && s.stance == Stance::Attack && !s.escaped)
-                            || (!self.batteries_at(*seat, body, orbit).is_empty()
-                                && self.ships.iter().any(|s| s.seat != *seat && self.ship_in_orbit(s, body, orbit) && s.stance == Stance::Blockade && s.kind.is_warship() && !s.escaped))
+                        !self.batteries_at(*seat, body, orbit).is_empty()
+                            && self.ships.iter().any(|s| s.seat != *seat && self.ship_in_orbit(s, body, orbit) && s.stance == Stance::Blockade && s.kind.is_warship() && !s.escaped)
                     })
                     .collect();
                 if aggressors.is_empty() {
                     continue;
                 }
-                // Ticket #324 (version 0.08.8): a seat's working Batteries stand in its line after
-                // its Ships, so a stack on Attack in an orbit with nothing but a Battery in it
-                // fights the Battery, and a Battery beside its owner's stack fights with it.
-                // Ticket #335: the Batteries of THIS orbit -- a station's its own ring, a ground
-                // Colony's low orbit.
-                let parties: Vec<(Seat, bool, Vec<UnitRef>)> = Seat::ALL
-                    .into_iter()
-                    .filter_map(|seat| {
-                        let units: Vec<UnitRef> = self
-                            .ships
-                            .iter()
-                            .filter(|s| s.seat == seat && self.ship_in_orbit(s, body, orbit) && !s.escaped)
-                            .map(|s| UnitRef::Ship(s.id))
-                            .chain(self.batteries_at(seat, body, orbit).into_iter().map(|(colony, index)| UnitRef::Battery { colony, index }))
-                            .collect();
-                        if units.is_empty() {
-                            None
-                        } else {
-                            Some((seat, aggressors.contains(&seat), units))
-                        }
-                    })
-                    .collect();
-                if parties.len() < 2 {
-                    continue;
-                }
-                let name = self.orbit_battle_name(body, orbit);
-                self.ship_melee(&name, body, orbit, &parties);
+                self.fight_orbit(body, orbit, &aggressors);
             }
         }
         // Army moves and attacks on Earth.
@@ -569,7 +710,7 @@ impl Game {
         // `dry_strength_share` of its strength, whichever side of the Battle it is on. Half of
         // nought is nought, so the Colony Ship, the Carrier and the Missile Carrier are untouched.
         let strength = if dry { self.ship_dry_strength(s) } else { self.ship_strength(s) };
-        Combatant::new(UnitRef::Ship(id), self.ship_name(s), strength, card.hit_points, s.damage, card.pursuit, s.stance == Stance::Evade).armed(s.kind.is_warship())
+        Combatant::new(UnitRef::Ship(id), self.ship_name(s), strength, card.hit_points, s.damage, card.pursuit, s.stance == Stance::Evade).armed(s.kind.is_warship()).kind(combat::BattleUnit::Ship(s.kind))
     }
 
     /// `defending`: the Army is not on the aggressor's side of this melee. Ticket #302 (version
@@ -872,7 +1013,14 @@ impl Game {
         if any_escape {
             self.war.battles_with_escape += 1;
         }
-        let line = BattleLine { place: place.to_string(), parties: listed, result: format!("{} round(s).", stats.rounds), at };
+        let line = BattleLine { place: place.to_string(), parties: listed, result: format!("{} round(s).", stats.rounds), at, log: Some(stats.log), fought_now: false };
+        // Ticket #381 (version 0.09.2): a Battle that cost a hull or a Battery is kept for the
+        // chronicle; an Army lost is the ground's ordinary business and is not.
+        let fallen: Vec<String> = parties.iter().flat_map(|(_, _, c)| c.iter()).filter(|c| c.destroyed() && !matches!(c.unit, UnitRef::Army(_))).map(|c| c.name.clone()).collect();
+        if !fallen.is_empty() {
+            let attackers: Vec<Seat> = parties.iter().filter(|(_, agg, _)| *agg).filter_map(|(s, _, _)| *s).collect();
+            self.war.fallen.push(FallenBattle { turn: self.turn, place: place.to_string(), attackers, lost: fallen });
+        }
         // The Battle's own line goes in BEFORE the losses are applied, so among the rank-4 lines a
         // turn holds it is the earliest and headlines over "PMV Magellan destroyed (battle)".
         self.battle_line_and_moment(&line);
@@ -886,7 +1034,7 @@ impl Game {
     /// with a Ship destroyed when a unit died, unranked when nobody lost one -- and a Moment when a
     /// unit died, naming it. Until now a Battle was a block at the foot of the dispatch and nothing
     /// else: no headline, and no Moment unless a building burned.
-    fn battle_line_and_moment(&mut self, line: &BattleLine) {
+    pub(crate) fn battle_line_and_moment(&mut self, line: &BattleLine) {
         let lost: Vec<String> = line.parties.iter().flat_map(|p| p.destroyed.iter().cloned()).collect();
         let aggressors: Vec<String> = line.parties.iter().filter(|p| p.aggressor).map(|p| p.seat.map(|s| self.seat_name(s)).unwrap_or_else(|| "neutral".to_string())).collect();
         let odds = line.parties.iter().find(|p| p.aggressor).and_then(|p| p.odds).unwrap_or(0.0);
@@ -897,6 +1045,8 @@ impl Game {
         );
         let kind = if lost.is_empty() { LineKind::Battle } else { LineKind::DecisiveBattle };
         self.report_line(kind, line.at, text);
+        // Ticket #381 (version 0.09.2) made every Battle in orbit a Moment for one ticket; ticket
+        // #383 gave every Battle a window of its own instead, and the Moment went.
         if !lost.is_empty() {
             self.moment(MomentKind::DecisiveBattle, &[("place", line.place.clone()), ("result", outcome), ("figure", format!("{} lost", lost.len()))], line.at);
         }
@@ -1178,6 +1328,8 @@ impl Game {
                 ],
                 result: text,
                 at,
+                log: None,
+                fought_now: false,
             });
         }
     }
@@ -1309,6 +1461,8 @@ impl Game {
                 ],
                 result: text,
                 at,
+                log: None,
+                fought_now: false,
             });
         }
     }
@@ -1344,7 +1498,11 @@ impl Game {
                         self.war.occupations_broken[occupier.index()] += 1;
                         if let Place::State(sid) = place {
                             let n = self.tables.unrest.occupation_break;
-                            self.raise_unrest(sid, n, UnrestSource::Plain);
+                            if self.raise_unrest(sid, n, UnrestSource::Plain) > 0.0 {
+                                // Ticket #371 (version 0.09.2): a cause for the Region's net line.
+                                let cause = self.phrase("cause_occupation_break", &[]);
+                                self.unrest_cause(sid, cause, false);
+                            }
                         }
                         if let Some(p) = previous {
                             self.offend_by(occupier, p, self.tables.relations.occupation_broken_offence);
@@ -1378,7 +1536,11 @@ impl Game {
                     // Ticket #52: every turn of Occupation adds one to the state's Unrest.
                     if let Place::State(sid) = place {
                         let n = self.tables.unrest.occupation_per_turn;
-                        self.raise_unrest(sid, n, UnrestSource::Plain);
+                        if self.raise_unrest(sid, n, UnrestSource::Plain) > 0.0 {
+                            // Ticket #371 (version 0.09.2): a cause for the Region's net line.
+                            let cause = self.phrase("cause_occupation", &[]);
+                            self.unrest_cause(sid, cause, false);
+                        }
                     }
                     let gain = self.occupation_gain(place, occupier);
                     self.set_place_control(place, Control::Occupied { occupier, previous, turns, banked: banked + gain });
@@ -1402,7 +1564,11 @@ impl Game {
                         // Ticket #52: an Occupation begins at +3 Unrest, damped by nothing.
                         if let Place::State(sid) = place {
                             let n = self.tables.unrest.occupation_start;
-                            self.raise_unrest(sid, n, UnrestSource::Plain);
+                            if self.raise_unrest(sid, n, UnrestSource::Plain) > 0.0 {
+                                // Ticket #371 (version 0.09.2): a cause for the Region's net line.
+                                let cause = self.phrase("cause_occupation_start", &[]);
+                                self.unrest_cause(sid, cause, false);
+                            }
                         }
                         let line = format!("The {} occupy {}.", self.seat_name(seat), self.place_name(place));
                         self.log(line);
@@ -1537,6 +1703,9 @@ impl Game {
             &[("place", self.place_name(place)), ("faction", self.seat_name(seat)), ("why", why.to_string())],
         );
         self.report_line(LineKind::ControlChanged, Some(place.into()), text);
+        // Ticket #366 (version 0.09.2): where this line stands, so a throw-off in the same
+        // Resolution can say both in its place.
+        self.pending.transfer_lines.push((place, self.report.lines.len() - 1));
         self.moment(
             MomentKind::ControlChanged,
             &[("place", self.place_name(place)), ("faction", self.seat_name(seat))],
@@ -1931,11 +2100,9 @@ impl Game {
                     Game::unrest_figure(rose),
                     self.unrest_text(sid)
                 ));
-                let text = self.say(
-                    "unrest_rose_state",
-                    &[("state", self.tables.state(sid).name.clone()), ("rose", Game::unrest_figure(rose).to_string()), ("unrest", self.unrest_text(sid))],
-                );
-                said.push((LineKind::Unrest, Some(ReportPlace::State(sid)), text));
+                // Ticket #371 (version 0.09.2): a cause for the Region's one net line, not a line.
+                let cause = self.phrase(if what == BuildingChange::Mothball { "cause_mothball" } else { "cause_decommission" }, &[]);
+                self.unrest_cause(sid, cause, false);
             }
         }
         for line in lines {
@@ -1965,13 +2132,80 @@ impl Game {
                 self.unrest_text(sid)
             );
             self.log(line);
+            // Ticket #371 (version 0.09.2): the line keeps the Emissions half, which is its own
+            // news; the Unrest half is a cause for the Region's one net line.
+            let text = self.say("strip_permit_ended", &[("state", self.tables.state(sid).name.clone()), ("baseline", format!("{:.1}", self.baseline_emissions(sid)))]);
+            self.report_line(LineKind::Note, Some(ReportPlace::State(sid)), text);
+            if rose > 0.0 {
+                let cause = self.phrase("cause_permit", &[]);
+                self.unrest_cause(sid, cause, false);
+            }
+        }
+    }
+
+    /// Ticket #371 (version 0.09.2): one cause of a Region's Unrest moving this Resolution, for
+    /// the one net line the Report says about it at the end. `by_player` marks an act of the
+    /// player's own -- an Agitate or a Relief -- which earns a rival's Region its line.
+    pub(crate) fn unrest_cause(&mut self, sid: StateId, cause: String, by_player: bool) {
+        self.pending.unrest_causes.push((sid, cause, by_player));
+    }
+
+    /// Ticket #371 (version 0.09.2): where every Region's Unrest stands, for the "before" of its one
+    /// net line. Taken as the Resolution opens; an Unrest pass run on its own (a test, a picture
+    /// aid) takes it as the pass opens, which is the same thing for what the pass does.
+    fn snapshot_unrest(&mut self) {
+        self.pending.unrest_before = StateId::ALL.iter().map(|s| (*s, self.state(*s).unrest)).collect();
+    }
+
+    /// Ticket #371 (version 0.09.2): **one net line per Region about its Unrest**, at the end of the
+    /// Resolution, at the designer's word ("quiet unrest spam", and the playtest's "Unrest lines in
+    /// the Report run out of order"). Six sources used to write a line each in phase order --
+    /// a Mothball, a Climate card, a Strip Permit running out, an Agitate, a Relief, a threshold
+    /// crossed -- so one Region's lines lay scattered among another's and a Region could take six
+    /// in a turn. Now each is a cause, and the Report says, by Region in the board's order, *"India:
+    /// Unrest from 3 to 5.5 (a Heatwave, agitation by the Prospectors, a Mothball), past the first
+    /// threshold: the Standing Army no longer replenishes."* Only where a cause moved it: the
+    /// natural fall alone is not news. The player's own Regions (held or occupied), and any Region
+    /// the player Agitated or Relieved; a rival's is silent unless its holder is thrown off, which
+    /// has its own line. A spectated game, having no player, says every Region's. The refugees a
+    /// Region took in are one cause among the others, where they were a line of their own.
+    fn report_unrest_net(&mut self) {
+        let u = self.tables.unrest.clone();
+        let me = Seat(0);
+        let causes = std::mem::take(&mut self.pending.unrest_causes);
+        let before = std::mem::take(&mut self.pending.unrest_before);
+        for sid in StateId::ALL {
+            let mine: Vec<&(StateId, String, bool)> = causes.iter().filter(|(s, _, _)| *s == sid).collect();
+            if mine.is_empty() {
+                continue;
+            }
+            let control = self.state(sid).control;
+            let ours = control.director() == Some(me) || control.controller() == Some(me);
+            if !self.spectator && !ours && !mine.iter().any(|(_, _, by_player)| *by_player) {
+                continue;
+            }
+            let now = self.state(sid).unrest;
+            let was = before.iter().find(|(s, _)| *s == sid).map(|(_, v)| *v).unwrap_or(now);
+            let words: Vec<String> = mine.iter().map(|(_, c, _)| c.clone()).collect();
+            let ending = if now >= u.facility_threshold && was < u.facility_threshold {
+                self.phrase("unrest_past", &[("which", "second".to_string()), ("note", self.unrest_note(sid))])
+            } else if now >= u.army_threshold && was < u.army_threshold {
+                self.phrase("unrest_past", &[("which", "first".to_string()), ("note", self.unrest_note(sid))])
+            } else if now < u.army_threshold && was >= u.army_threshold {
+                self.phrase("unrest_under", &[("which", "first".to_string())])
+            } else if now < u.facility_threshold && was >= u.facility_threshold {
+                self.phrase("unrest_under", &[("which", "second".to_string())])
+            } else {
+                String::new()
+            };
             let text = self.say(
-                "strip_permit_ended",
+                "unrest_net",
                 &[
                     ("state", self.tables.state(sid).name.clone()),
-                    ("baseline", format!("{:.1}", self.baseline_emissions(sid))),
-                    ("rose", Game::unrest_figure(rose).to_string()),
-                    ("unrest", self.unrest_text(sid)),
+                    ("before", Game::unrest_figure(was)),
+                    ("after", Game::unrest_figure(now)),
+                    ("causes", words.join(", ")),
+                    ("ending", ending),
                 ],
             );
             self.report_line(LineKind::Unrest, Some(ReportPlace::State(sid)), text);
@@ -2357,6 +2591,8 @@ impl Game {
                 Order::Load { ship, colonists, from, army } => {
                     let Some(s) = self.ship(ship) else { continue };
                     let ShipAt::Body(body) = s.at else { continue };
+                    // Ticket #366 (version 0.09.2): what the Spaceport paid for this lift, for the line.
+                    let mut paid = 0;
                     if colonists > 0 {
                         match from {
                             LoadSource::State(st) => {
@@ -2371,7 +2607,7 @@ impl Game {
                                 // Ticket #189 (version 0.08.0): what they know goes aboard with them.
                                 let taught = self.take_emigrants(st, colonists);
                                 // Ticket #183 (version 0.08.0): a lift onto a Ship is a launch too.
-                                self.pay_spaceport(seat, st, colonists);
+                                paid = self.pay_spaceport(seat, st, colonists);
                                 self.load_people(ship, colonists, taught);
                             }
                             LoadSource::Colony(c) => {
@@ -2398,9 +2634,10 @@ impl Game {
                     let cargo: String = if colonists > 0 { format!("{colonists} Colonists") } else { "an Army".into() };
                     let line = format!("{} loaded {} at {}.", self.seat_name(seat), cargo, self.tables.body(body).name);
                     self.log(line);
+                    let spaceport = if paid > 0 { self.phrase("spaceport_pays", &[("n", paid.to_string())]) } else { String::new() };
                     let text = self.say(
                         "loaded",
-                        &[("faction", self.seat_name(seat)), ("cargo", cargo), ("body", self.tables.body(body).name.clone())],
+                        &[("faction", self.seat_name(seat)), ("cargo", cargo), ("body", self.tables.body(body).name.clone()), ("spaceport", spaceport)],
                     );
                     self.report_line_of(seat, LineKind::YourWorks, LineKind::Ship, Some(ReportPlace::Body(body)), text);
                 }
@@ -2599,6 +2836,12 @@ impl Game {
     /// gross by the rule. Where the gross differs from the net the line names it, because otherwise
     /// the Unrest figure would be unexplained -- it is the one place the Report says why Unrest rose.
     fn report_net_migration(&mut self, sid: StateId, arrived: f64, rose: f64) {
+        // Ticket #371 (version 0.09.2): the people who arrived are a cause of the Region's Unrest
+        // moving, for its one net line, whatever the migration line below says or does not say.
+        if rose > 0.0 {
+            let cause = self.phrase("cause_refugees", &[("n", format!("{arrived:.1}"))]);
+            self.unrest_cause(sid, cause, false);
+        }
         let left: f64 = self.state(sid).refugees_out.iter().map(|(_, n)| *n).sum();
         let net = arrived - left;
         if net.abs() < self.tables.unrest.report_net_floor {
@@ -2608,19 +2851,13 @@ impl Game {
         let text = if net > 0.0 {
             let n = format!("{net:.1}");
             let gross = format!("{arrived:.1}");
-            match (rose > 0.0, (arrived - net).abs() >= self.tables.unrest.report_net_floor) {
-                // Unrest rose, and some of what arrived was cancelled by what left: name both, or
-                // the Unrest figure is charged on a number the line never gives.
-                (true, true) => self.say(
-                    "refugees_net_in_gross",
-                    &[("n", n), ("gross", gross), ("state", state), ("rose", Game::unrest_figure(rose).to_string()), ("unrest", self.unrest_text(sid))],
-                ),
-                (true, false) => self.say(
-                    "refugees_net_in",
-                    &[("n", n), ("state", state), ("rose", Game::unrest_figure(rose).to_string()), ("unrest", self.unrest_text(sid))],
-                ),
-                // Too few to move Unrest, or Unrest already at the ceiling: the arrival alone.
-                (false, _) => self.say("refugees_net_in_quiet", &[("n", n), ("state", state)]),
+            // Ticket #371 (version 0.09.2): the Unrest clause left this line for the Region's one
+            // net Unrest line, where the arrivals are one cause among the others (below). What
+            // stays is the migration: the net, and the gross where some of it was cancelled.
+            if (arrived - net).abs() >= self.tables.unrest.report_net_floor {
+                self.say("refugees_net_in_gross", &[("n", n), ("gross", gross), ("state", state)])
+            } else {
+                self.say("refugees_net_in", &[("n", n), ("state", state)])
             }
         } else {
             // The largest cause survives, at the designer's word: *why* is the most interesting word
@@ -2679,6 +2916,11 @@ impl Game {
 
     pub fn resolve_unrest(&mut self) {
         let u = self.tables.unrest.clone();
+        // Ticket #371 (version 0.09.2): run on its own, the pass takes the "before" of each Region's
+        // one net Unrest line here; inside a Resolution it was taken as the Resolution opened.
+        if self.pending.unrest_before.is_empty() {
+            self.snapshot_unrest();
+        }
         // The refugees the turn's flows brought, charged once so the per-turn cap counts them all.
         // Ticket #176 (version 0.07.6): Unrest is charged on the GROSS arrivals, as the rule has
         // always had it -- a Region that takes ten people and sends ten away has still absorbed ten
@@ -2742,14 +2984,15 @@ impl Game {
             self.offend_by(seat, holder, 1);
             self.seat_mut(seat).agitates_issued += 1;
             let (who, name) = (self.seat_name(seat), self.tables.state(sid).name.clone());
-            let text = if rose > 0.0 {
+            // Ticket #371 (version 0.09.2): a cause for the Region's one net line, not a line.
+            let cause = if rose > 0.0 {
                 self.log(format!("The {who} agitated in {name}: Unrest rose by {} to {}.", Game::unrest_figure(rose), self.unrest_text(sid)));
-                self.say("agitate", &[("faction", who), ("state", name.clone()), ("rose", Game::unrest_figure(rose).to_string()), ("unrest", self.unrest_text(sid))])
+                self.phrase("cause_agitate", &[("faction", who)])
             } else {
                 self.log(format!("The {who} agitated in {name}; the Constabulary held it to nothing."));
-                self.say("agitate_damped", &[("faction", who), ("state", name.clone())])
+                self.phrase("cause_agitate_damped", &[("faction", who)])
             };
-            self.report_line(LineKind::Unrest, Some(ReportPlace::State(sid)), text);
+            self.unrest_cause(sid, cause, seat == Seat(0));
             self.ai_deed(seat, "agitate", &[("state", name)]);
         }
         // Relief (rule 3): one point per order, paid for in Ducats at the Orders phase.
@@ -2764,16 +3007,9 @@ impl Game {
         for (seat, sid, fell) in relieved.into_iter().filter(|(_, _, n)| *n > 0.0) {
             let line = format!("The {} paid Relief in {}: Unrest fell by {} to {}.", self.seat_name(seat), self.tables.state(sid).name, Game::unrest_figure(fell), self.unrest_text(sid));
             self.log(line);
-            let text = self.say(
-                "relief",
-                &[
-                    ("faction", self.seat_name(seat)),
-                    ("state", self.tables.state(sid).name.clone()),
-                    ("fell", Game::unrest_figure(fell).to_string()),
-                    ("unrest", self.unrest_text(sid)),
-                ],
-            );
-            self.report_line(LineKind::Unrest, Some(ReportPlace::State(sid)), text);
+            // Ticket #371 (version 0.09.2): a cause for the Region's one net line, not a line.
+            let cause = self.phrase("cause_relief", &[("faction", self.seat_name(seat))]);
+            self.unrest_cause(sid, cause, seat == Seat(0));
         }
         // What calms a state by standing in it (a Constabulary now, a Scrubber later), then the
         // natural fall. Ticket #53: the fall lands every turn, whatever else happened, so a rise
@@ -2793,7 +3029,10 @@ impl Game {
             let Control::Controlled(seat) = self.state(sid).control else { continue };
             self.throw_off(sid, seat);
         }
-        // The Report lines for crossing 4, 7 and 10, once each way.
+        // Ticket #371 (version 0.09.2): the one net Unrest line a Region.
+        self.report_unrest_net();
+        // The log line for crossing 4 or 7, once each way. Ticket #371 (version 0.09.2): the Report's
+        // word for it is the ending of the Region's one net line, written by `report_unrest_net`.
         for sid in StateId::ALL {
             let now = self.state(sid).unrest;
             let was = self.state(sid).unrest_reported;
@@ -2801,11 +3040,6 @@ impl Game {
                 if now >= line && was < line {
                     let text = format!("{}: Unrest reached {} - {}.", self.tables.state(sid).name, self.unrest_text(sid), self.unrest_note(sid));
                     self.log(text);
-                    let said = self.say(
-                        "unrest_threshold",
-                        &[("state", self.tables.state(sid).name.clone()), ("unrest", self.unrest_text(sid)), ("note", self.unrest_note(sid))],
-                    );
-                    self.report_line(LineKind::Unrest, Some(ReportPlace::State(sid)), said);
                     break;
                 }
             }
@@ -2842,15 +3076,27 @@ impl Game {
             Game::unrest_figure(back)
         );
         self.log(line);
-        let text = self.say(
-            "threw_off",
-            &[
-                ("state", self.tables.state(sid).name.clone()),
-                ("faction", self.seat_name(seat)),
-                ("unrest", Game::unrest_figure(back).to_string()),
-            ],
-        );
-        self.report_line(LineKind::ControlChanged, Some(ReportPlace::State(sid)), text);
+        // Ticket #366 (version 0.09.2): a place that passed to a Faction THIS Resolution (an
+        // Occupation's transfer) and threw them off in the same pass said "now belongs to the X"
+        // in the headline over a board reading neutral, the throw-off sunk below it. One line
+        // says both, in the place of the transfer's.
+        let folded = self.say("passed_and_threw_off", &[("state", self.tables.state(sid).name.clone()), ("faction", self.seat_name(seat))]);
+        let transfer = self.pending.transfer_lines.iter().rev().find(|(p, _)| *p == Place::State(sid)).map(|(_, i)| *i);
+        if let Some(i) = transfer
+            && let Some(earlier) = self.report.lines.get_mut(i)
+        {
+            earlier.text = folded;
+        } else {
+            let text = self.say(
+                "threw_off",
+                &[
+                    ("state", self.tables.state(sid).name.clone()),
+                    ("faction", self.seat_name(seat)),
+                    ("unrest", Game::unrest_figure(back).to_string()),
+                ],
+            );
+            self.report_line(LineKind::ControlChanged, Some(ReportPlace::State(sid)), text);
+        }
         self.moment(
             MomentKind::ControlChanged,
             &[("place", self.tables.state(sid).name.clone()), ("faction", "nobody".to_string())],

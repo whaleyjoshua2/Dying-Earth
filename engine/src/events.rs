@@ -76,6 +76,12 @@ impl Game {
     pub fn question_phase(&mut self) {
         self.question = None;
         self.draw = CardDraw::NoCard;
+        // Ticket #367 (version 0.09.2): no card of either kind before `first_draw_turn` (turn 2).
+        // The deck is not touched: nothing rolled, nothing spent, so the card on top waits for the
+        // first roll. The first turn is for reading the Condition and giving the first orders.
+        if self.turn < self.tables.events.first_draw_turn {
+            return;
+        }
         self.join_off_earth_cards();
         if !self.rolls_a_card() {
             return;
@@ -92,7 +98,7 @@ impl Game {
             return;
         }
         self.draw = CardDraw::Choice(id);
-        let mut q = Question { card: id, answers: [None; SEAT_COUNT] };
+        let mut q = Question { card: id, answers: [None; SEAT_COUNT], held: [None; SEAT_COUNT] };
         for seat in Seat::ALL {
             // A seat the card cannot touch is NOT asked: its answer is recorded as nothing to
             // decide, it never holds the turn, and the Report says so for it.
@@ -136,11 +142,17 @@ impl Game {
         // Ticket #337: the offer is closed to a seat that cannot pay it, and taking is refused at
         // the door rather than silently turned into a refusal.
         if taken && !self.may_take_card(seat) {
-            return Err(format!("The {} cannot pay what {name} asks; they may only refuse.", self.seat_name(seat)));
+            // Ticket #366 (version 0.09.2): name the good and the shortfall, where this said "cannot
+            // pay" of a Fuel Contract that wanted Fuel, not Ducats.
+            let why = self.card_shortfall(seat).unwrap_or_else(|| "they cannot pay what it asks".to_string());
+            return Err(format!("The {} cannot take {name}: {why}; they may only refuse.", self.seat_name(seat)));
         }
         let answer = if taken { CardAnswer::Taken } else { CardAnswer::Refused };
+        // Ticket #375 (version 0.09.2): the Ship a taken call turns aside, pinned now.
+        let held = if taken && self.tables.event(q.card).choice.as_ref().is_some_and(|c| c.holds_a_ship()) { self.card_would_hold(seat) } else { None };
         if let Some(q) = self.question.as_mut() {
             q.answers[seat.index()] = Some(answer);
+            q.held[seat.index()] = held;
         }
         if taken {
             self.choice_taken[seat.index()] += 1;
@@ -227,16 +239,44 @@ impl Game {
         c.take_does.iter().all(|e| self.card_effect_affordable(e, seat))
     }
 
+    /// Ticket #366 (version 0.09.2): what this seat lacks to take the card's offer, named -- *"you
+    /// have 12 Fuel of the 20 it asks"* -- or nothing where it can pay. The one place the "closed
+    /// offer" texts of the engine, the driver and the interface take their reason from, so none of
+    /// them can say "cannot pay" of an offer that wants goods.
+    pub fn card_shortfall(&self, seat: Seat) -> Option<String> {
+        let q = self.question.as_ref()?;
+        let c = self.tables.event(q.card).choice.as_ref()?;
+        let parts: Vec<String> = c.take_does.iter().flat_map(|e| self.card_effect_shortfall(e, seat)).collect();
+        if parts.is_empty() { None } else { Some(format!("you have {}", parts.join(" and "))) }
+    }
+
     /// Ticket #337: the price half of `card_effect_can_land`. Only an effect that costs something
-    /// can answer no; everything else is free to choose whether or not it does anything.
+    /// can answer no; everything else is free to choose whether or not it does anything. Ticket
+    /// #366 (version 0.09.2): ONE truth with `card_effect_shortfall`, so a cost effect added later
+    /// cannot shut the offer while the reason says nothing.
     fn card_effect_affordable(&self, e: &CardEffect, seat: Seat) -> bool {
+        self.card_effect_shortfall(e, seat).is_empty()
+    }
+
+    /// Ticket #366 (version 0.09.2): what this seat lacks to pay one effect of a card's offer, one
+    /// part per good short -- "12 Fuel of the 20 it asks" -- and nothing where it can pay.
+    fn card_effect_shortfall(&self, e: &CardEffect, seat: Seat) -> Vec<String> {
         let s = self.seat(seat);
         match e {
-            CardEffect::Resources { materials, fuel, energy, ducats, research: _ } => {
-                s.stockpile.materials + materials >= 0 && s.stockpile.fuel + fuel >= 0 && s.stockpile.energy + energy >= 0 && s.stockpile.ducats + ducats >= 0
+            CardEffect::Resources { materials, fuel, energy, ducats, research: _ } => [(s.stockpile.materials, *materials, "Materials"), (s.stockpile.fuel, *fuel, "Fuel"), (s.stockpile.energy, *energy, "Energy"), (s.stockpile.ducats, *ducats, "Ducats")]
+                .into_iter()
+                .filter(|(have, ask, _)| have + ask < 0)
+                .map(|(have, ask, name)| format!("{have} {name} of the {} it asks", -ask))
+                .collect(),
+            CardEffect::PerUnitCost { per, resource, amount } => {
+                let need = self.card_things(seat, *per) as i64 * amount;
+                let have = self.stock_of(seat, *resource);
+                if have < need { vec![format!("{have} {} of the {need} it asks", resource.name())] } else { Vec::new() }
             }
-            CardEffect::PerUnitCost { per, resource, amount } => self.stock_of(seat, *resource) >= self.card_things(seat, *per) as i64 * amount,
-            _ => true,
+            // Ticket #375 (version 0.09.2): a call is answered by a docked Ship; with every hull in
+            // flight the offer is closed, and this is why.
+            CardEffect::HoldOneShip if self.card_would_hold(seat).is_none() => vec!["no Ship docked to answer it".to_string()],
+            _ => Vec::new(),
         }
     }
 
@@ -352,17 +392,23 @@ impl Game {
     }
 
     /// Ticket #337: the one Ship this seat turned aside to answer a call, and so holds this turn.
-    ///
-    /// **An implementation choice, not the designer's, named here for correction**: it is the
-    /// seat's Ship with the most Fuel in its tank, ties to the lower id, so the pick is
-    /// deterministic and a seeded game is not moved by it.
+    /// Ticket #375 (version 0.09.2): pinned at the answer (`Question::held`), so the Ship the card
+    /// named is the one held whatever is ordered after; `check_order` refuses its moves this turn,
+    /// which is what "answering costs you a hull for the turn" means for a docked hull.
     pub fn card_holds_one_ship(&self, seat: Seat) -> Option<ShipId> {
-        if !self.card_effects(seat).iter().any(|e| matches!(e, CardEffect::HoldOneShip)) {
-            return None;
-        }
+        self.question.as_ref().and_then(|q| q.held[seat.index()])
+    }
+
+    /// Ticket #375 (version 0.09.2): the Ship a Distress Call WOULD hold for this seat, answered or
+    /// not, so the card can name it before the answer: **a docked Ship only**, at the designer's
+    /// word -- a crew mid-transit is in no place to answer a call, and a hull frozen in flight was
+    /// the playtest's silent stranding. With none docked the take side is closed. Which docked hull
+    /// is an implementation choice, not the designer's, named here for correction: the fullest
+    /// tank, ties to the lower id, so a seeded game is not moved by the pick.
+    pub fn card_would_hold(&self, seat: Seat) -> Option<ShipId> {
         self.ships
             .iter()
-            .filter(|s| s.seat == seat)
+            .filter(|s| s.seat == seat && matches!(s.at, ShipAt::Body(_)))
             .max_by_key(|s| (s.fuel, std::cmp::Reverse(s.id.0)))
             .map(|s| s.id)
     }
@@ -577,11 +623,13 @@ impl Game {
     }
 
     /// Ticket #337: a card's move on a Region's Unrest, up through the damping or down flat.
+    /// Ticket #371 (version 0.09.2): and a cause, by the card's name, for the Region's net line. The
+    /// card is the turn's own Choice Card, which `draw` holds while its answers are applied.
     fn card_unrest(&mut self, sid: StateId, amount: f64) {
-        if amount >= 0.0 {
-            self.raise_unrest(sid, amount, UnrestSource::Plain);
-        } else {
-            self.lower_unrest(sid, -amount);
+        let moved = if amount >= 0.0 { self.raise_unrest(sid, amount, UnrestSource::Plain) } else { self.lower_unrest(sid, -amount) };
+        if moved > 0.0 && let CardDraw::Choice(card) = self.draw {
+            let cause = self.phrase("cause_choice_card", &[("card", self.tables.event(card).name.clone())]);
+            self.unrest_cause(sid, cause, false);
         }
     }
 
@@ -832,22 +880,20 @@ impl Game {
 
     /// Ticket #52: a Heatwave, a Wildfire or a Storm Surge landing on a state raises its Unrest
     /// as a climate source, so the green Techs and a Constabulary damp it.
-    fn climate_card_unrest(&mut self, s: StateId) {
+    fn climate_card_unrest(&mut self, s: StateId, card: EventId) {
         let n = self.tables.unrest.climate_card;
-        self.climate_unrest_by(s, n);
+        self.climate_unrest_by(s, n, card);
     }
 
-    /// Ticket #76: the same rise by a card's own figure (a Drought's).
-    fn climate_unrest_by(&mut self, s: StateId, n: f64) {
+    /// Ticket #76: the same rise by a card's own figure (a Drought's). Ticket #371 (version 0.09.2):
+    /// the card is a cause for the Region's one net Unrest line, not a line of its own.
+    fn climate_unrest_by(&mut self, s: StateId, n: f64, card: EventId) {
         let rose = self.raise_unrest(s, n, UnrestSource::Climate);
         if rose > 0.0 {
             let line = format!("{}: Unrest rose by {} to {}.", self.tables.state(s).name, Game::unrest_figure(rose), self.unrest_text(s));
             self.log(line);
-            let text = self.say(
-                "unrest_rose_state",
-                &[("state", self.tables.state(s).name.clone()), ("rose", Game::unrest_figure(rose).to_string()), ("unrest", self.unrest_text(s))],
-            );
-            self.report_line(LineKind::Unrest, Some(ReportPlace::State(s)), text);
+            let cause = self.phrase("cause_card", &[("card", self.tables.event(card).name.clone())]);
+            self.unrest_cause(s, cause, false);
         }
     }
 
@@ -941,7 +987,7 @@ impl Game {
             (EventId::Drought, EventTarget::State(s)) => {
                 if !self.has_tech(TechId::GreenConsensus) {
                     self.state_mut(s).drought = true;
-                    self.climate_unrest_by(s, t.events.drought_unrest);
+                    self.climate_unrest_by(s, t.events.drought_unrest, id);
                 }
             }
             (EventId::Breakthrough, EventTarget::Tech) => {
@@ -953,7 +999,7 @@ impl Game {
                 let st = self.state_mut(s);
                 st.population = (st.population * (1.0 - loss * ev.scale)).max(0.0);
                 // Ticket #52: a Heatwave is one of the three Climate cards that raise Unrest.
-                self.climate_card_unrest(s);
+                self.climate_card_unrest(s, id);
             }
             (EventId::LaunchPadFire, EventTarget::State(s)) => {
                 if self.has_tech(TechId::CleanPropellant) {
@@ -994,7 +1040,7 @@ impl Game {
                     self.state_mut(s).wildfire_emissions_next += t.events.wildfire_emissions * ev.scale;
                 }
                 // Ticket #52: a Wildfire is one of the three Climate cards that raise Unrest.
-                self.climate_card_unrest(s);
+                self.climate_card_unrest(s, id);
             }
             // Ticket #52: the card is a flat rise in the state's Unrest, damped by nothing.
             (EventId::Unrest, EventTarget::State(s)) => {
@@ -1003,11 +1049,9 @@ impl Game {
                 if rose > 0.0 {
                     let line = format!("Unrest in {}: its Unrest rose by {} to {}.", t.state(s).name, Game::unrest_figure(rose), self.unrest_text(s));
                     self.log(line);
-                    let text = self.say(
-                        "unrest_card",
-                        &[("state", t.state(s).name.clone()), ("rose", Game::unrest_figure(rose).to_string()), ("unrest", self.unrest_text(s))],
-                    );
-                    self.report_line(LineKind::Unrest, Some(ReportPlace::State(s)), text);
+                    // Ticket #371 (version 0.09.2): a cause for the Region's one net line.
+                    let cause = self.phrase("cause_unrest_card", &[]);
+                    self.unrest_cause(s, cause, false);
                 }
             }
             (EventId::StormSurge, EventTarget::State(s)) => {
@@ -1025,7 +1069,7 @@ impl Game {
                 }
                 // Ticket #52: a Storm Surge is one of the three Climate cards that raise Unrest,
                 // on top of what the threshold it brings forward costs in build slots.
-                self.climate_card_unrest(s);
+                self.climate_card_unrest(s, id);
             }
             _ => {}
         }

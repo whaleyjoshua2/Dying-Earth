@@ -169,7 +169,17 @@ impl Game {
         let mut all: [Vec<Order>; SEAT_COUNT] = std::array::from_fn(|_| Vec::new());
         // Report for the coming turn starts collecting now, before the AI seats order, so their
         // scored lists survive into it (ticket #50: three AI seats write to it, one after another).
+        // Ticket #383 (version 0.09.2): a Battle the player fought this turn was written into the
+        // Report they were reading, which is about to be reset. It is carried into the Report the
+        // coming turn will show, its headline and its Moment written again, so the head of the
+        // turn, the map's mark and the Report all have it.
+        let carried: Vec<BattleLine> = self.report.battles.iter().filter(|b| b.fought_now).cloned().collect();
         self.report = Report::default();
+        for mut line in carried {
+            line.fought_now = false;
+            self.battle_line_and_moment(&line);
+            self.report.battles.push(line);
+        }
         // Ticket #178: stamped HERE as well as in `report_phase`, because a game that ends this turn
         // returns below without reaching either `self.turn += 1` or `report_phase`, and the heading is
         // drawn from `report.turn`. Without it the last Report of every game read January 2030. A turn

@@ -386,6 +386,14 @@ impl EventCard {
 /// with its own figures in this table. They are rows instead: a side is a LIST of effects, an
 /// effect is a tagged entry carrying its own figures, and the engine holds one mechanism rather
 /// than eighteen. Nothing here is a code literal -- every figure the cards move is a field below.
+impl ChoiceCard {
+    /// Ticket #375 (version 0.09.2): whether taking this card turns a Ship aside -- the one test
+    /// the engine, the driver and the modal all ask.
+    pub fn holds_a_ship(&self) -> bool {
+        self.take_does.iter().any(|e| matches!(e, CardEffect::HoldOneShip))
+    }
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct ChoiceCard {
     /// What the modal asks.
@@ -528,8 +536,9 @@ fn one() -> u32 {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct EventsTable {
-    /// Ticket #25: no Calm Cards; each turn a card is drawn with this chance at the base Temperature,
-    /// rising by `draw_chance_per_step` for every full `draw_chance_step_degrees` above it.
+    /// Ticket #25: no Calm Cards; each turn from `first_draw_turn` a card is drawn with this chance
+    /// at the base Temperature, rising by `draw_chance_per_step` for every full
+    /// `draw_chance_step_degrees` above it.
     pub draw_chance_base: f64,
     pub draw_chance_per_step: f64,
     pub draw_chance_step_degrees: f64,
@@ -558,6 +567,11 @@ pub struct EventsTable {
     pub storm_surge_coastal_multiplier: f64,
     /// Ticket #259: the turn the off-Earth cards are shuffled into the deck.
     pub off_earth_join_turn: u32,
+    /// Ticket #367 (version 0.09.2): the first turn a card may be drawn at all. Before it the deck
+    /// is not touched -- nothing is rolled, nothing is spent -- so the first turn is the player's,
+    /// with their Condition to read and their first orders to give, and no card of either kind in
+    /// the way. Never below one.
+    pub first_draw_turn: u32,
     pub event: Vec<EventCard>,
 }
 
@@ -626,6 +640,11 @@ pub struct FactionCard {
     /// field it fills (see **Pioneer** in `CONTEXT.md`).
     #[serde(default)]
     pub start_emigrants: u32,
+    /// Ticket #377 (version 0.09.2): Facilities this Faction's home Region starts with on top of
+    /// the standard package -- the Arkwrights' second Power Plant, in place of the Solar Array
+    /// every other seat's station carries.
+    #[serde(default)]
+    pub start_extra_facilities: Vec<FacilityKind>,
     // Ticket #51: the per-Faction figures the Arkwrights' card carries. Every one is neutral by
     // default, so a card that names none plays exactly as it did before.
     /// What a Habitat here holds, times this.
@@ -759,6 +778,13 @@ pub struct StartCard {
     pub research: i64,
     #[serde(default)]
     pub ducats: i64,
+    /// Ticket #377 (version 0.09.2): the Facilities every home Region starts with, in place of its
+    /// card's list, so the four seats open equal whatever Regions they open in.
+    #[serde(default)]
+    pub home_facilities: Vec<FacilityKind>,
+    /// Ticket #377: the Modules every starting station carries beside its Core.
+    #[serde(default)]
+    pub station_modules: Vec<ModuleKind>,
 }
 
 /// Ticket #35: what Ducats buy.
@@ -1944,6 +1970,21 @@ impl Tables {
         self.report.check().map_err(|m| err("report.toml", m))?;
         // Every fixed id must have exactly one row, in the engine's order.
         check_rows("bodies.toml", &BodyId::ALL, self.bodies.iter().map(|b| b.id))?;
+        // Ticket #377 (version 0.09.2): the home package stands IN PLACE of a Region's card list, so
+        // a table without one would open every home Region bare, Launch Site included; and every
+        // seat's home has carried a Launch Site since ticket #24, which is where lifts come from.
+        if !self.start.home_facilities.iter().any(|k| k.does_the_job_of(FacilityKind::LaunchSite)) {
+            return Err(err("factions.toml", "[start] home_facilities must name a launch_site".to_string()));
+        }
+        // Ticket #374 (version 0.09.2): the `parent` column is the tree `BodyId::primary` knows and
+        // nothing else -- a satellite priced from one parent and listed under another would be two
+        // skies, so the table is refused rather than read.
+        for b in &self.bodies {
+            let want = (b.id.primary() != b.id).then(|| b.id.primary());
+            if b.parent != want {
+                return Err(err("bodies.toml", format!("{} has parent {:?}; the engine's tree says {:?}", b.name, b.parent, want)));
+            }
+        }
         check_rows("nation_states.toml", &StateId::ALL, self.states.iter().map(|s| s.id))?;
         check_rows("facilities.toml", &FacilityKind::ALL, self.facilities.iter().map(|f| f.id))?;
         check_rows("modules.toml", &ModuleKind::ALL, self.modules.iter().map(|m| m.id))?;
@@ -2031,10 +2072,12 @@ impl Tables {
             if s.population < 0.0 || s.education_level <= 0.0 {
                 return Err(err("nation_states.toml", format!("row {}: population or education out of range", s.name)));
             }
-            // A Launch Site is added for a Faction start state, so leave one slot for it.
+            // The card's list must fit the Region's own slots. Ticket #377 (version 0.09.2): it no
+            // longer leaves one for a Launch Site, since a home Region stands with the `[start]`
+            // package in place of the list; the package is a gift and is not checked against slots.
             let start_slots = s.size + s.industry_level + self.base_slots;
-            if s.start_facilities.len() as u32 + 1 > start_slots {
-                return Err(err("nation_states.toml", format!("row {}: {} start_facilities do not fit its {} build slots with a Launch Site", s.name, s.start_facilities.len(), start_slots)));
+            if s.start_facilities.len() as u32 > start_slots {
+                return Err(err("nation_states.toml", format!("row {}: {} start_facilities do not fit its {} build slots", s.name, s.start_facilities.len(), start_slots)));
             }
             // Ticket #56: every state keeps at least one coastal slot and one inland slot, so the
             // sea always has something to take and a raise always has somewhere to go.
@@ -2230,6 +2273,11 @@ impl Tables {
         if !(0.0..=1.0).contains(&self.events.draw_chance_base) || self.events.draw_chance_step_degrees <= 0.0 {
             return Err(err("events.toml", "draw_chance_base must be between 0 and 1 and draw_chance_step_degrees positive"));
         }
+        // Ticket #367 (version 0.09.2): turn 0 is not a turn, and a figure of nought would read as
+        // "draw before the game starts".
+        if self.events.first_draw_turn == 0 {
+            return Err(err("events.toml", "first_draw_turn must be 1 or more (1 draws on the first turn; 2 holds the first turn quiet)"));
+        }
         // Ticket #337 (version 0.09.0): a choice card with nothing on either side would be drawn,
         // asked and answered to no purpose, and nobody reading the table would see it. The load
         // refuses it rather than dealing it.
@@ -2255,12 +2303,9 @@ impl Tables {
     }
     /// Ticket #57: the elements a Body reads its place in the sky from. A satellite reads its
     /// parent's row: at this scale the Moon stands where Earth stands, and Phobos where Mars does.
+    /// Ticket #374 (version 0.09.2): the pairing is `BodyId::primary`'s, not a second copy here.
     pub fn planet(&self, id: BodyId) -> &PlanetElements {
-        let want = match id {
-            BodyId::Moon => BodyId::Earth,
-            BodyId::Phobos | BodyId::Deimos => BodyId::Mars,
-            other => other,
-        };
+        let want = id.primary();
         self.planets.iter().find(|p| p.id == want).expect("validate() checked Earth and Mars have rows")
     }
     pub fn state(&self, id: StateId) -> &StateCard {
@@ -2271,6 +2316,11 @@ impl Tables {
     /// NOT adjacent to any state already taken, with the highest Industry Level, ties by population;
     /// if every free state touches a taken one, the highest Industry Level free state, ties by
     /// population. A tie the population does not settle keeps the table's order.
+    ///
+    /// Ticket #377 (version 0.09.2) tried the richest free Region instead (by GDP), which put all
+    /// four seats in the four biggest economies; the sweep collapsed 78 of 80 games where this rule
+    /// collapses 44, and the designer kept the spread. The seats' Regions stay unequal in their
+    /// economies; what #377 equalised is the Facilities every home Region starts with.
     ///
     /// Ticket #64: it lives on the tables rather than on a game, because a spectated game has to
     /// pick seat 0's start by this same rule before there is a game to ask.
@@ -2441,16 +2491,20 @@ impl Tables {
         (self.base_ducats(sid, self.state(sid).industry_level) as f64 * self.faction(faction).ducats_multiplier).floor() as i64
     }
 
-    /// What a Region emits a turn as the game opens under `faction`: its industry, its people and
-    /// its start Facilities, each times the Faction's Emissions multiplier, as `emissions_now` will
-    /// count them at turn 1 before any Tech, Strip Permit or Leapfrog has moved a figure.
+    /// What a Region emits a turn as the game opens under `faction`, as that Faction's home: its
+    /// industry, its people and the Facilities it will stand with, each times the Faction's
+    /// Emissions multiplier, as `emissions_now` will count them at turn 1 before any Tech, Strip
+    /// Permit or Leapfrog has moved a figure.
+    /// Ticket #377 (version 0.09.2): the Facilities are the home package and the Faction's extras,
+    /// in the Faction's own versions, not the card's list -- a home Region no longer stands with
+    /// its card's list, and the setup card's figure has to count what the board will.
     pub fn start_emissions(&self, sid: StateId, faction: FactionKind) -> f64 {
         let card = self.state(sid);
         let c = &self.climate;
         let m = self.faction(faction).emissions_multiplier;
         let industry = card.baseline_emissions * card.industry_level as f64 * m;
         let people = (c.population_emissions_base + c.population_emissions_per_level * card.industry_level as f64) * card.population * m;
-        let facilities: f64 = card.start_facilities.iter().map(|k| self.facility(*k).emissions * m).sum();
+        let facilities: f64 = self.start.home_facilities.iter().chain(self.faction(faction).start_extra_facilities.iter()).map(|k| self.facility(k.built_by(faction)).emissions * m).sum();
         industry + people + facilities
     }
 }

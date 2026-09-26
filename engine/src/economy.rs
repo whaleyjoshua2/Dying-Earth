@@ -242,6 +242,15 @@ enum ProducerPlace {
 }
 
 impl Game {
+    /// Where a producer stands, for a player to read: *"in China"*, *"at Tiangong over Earth"*.
+    /// Ticket #366 (version 0.09.2): the one wording, for the alarm's hover and the Energy line.
+    fn producer_place_text(&self, p: &Producer) -> String {
+        match p.place {
+            ProducerPlace::Facility(sid, _) => format!("in {}", self.tables.state(sid).name),
+            ProducerPlace::Module(cid, _) => format!("at {}", self.place_name(Place::Colony(cid))),
+        }
+    }
+
     /// Phase 1: Income. Standing Armies replenish, producers produce, upkeep is paid with the shortfall rule.
     pub fn income_phase(&mut self) {
         // Ticket #51: Provisional Findings holds this turn only if last turn's Research went to the
@@ -1048,14 +1057,7 @@ impl Game {
         let short_by = -self.energy_balance(seat, &self.producers_of(seat), stored);
         let dark = shut
             .into_iter()
-            .map(|i| {
-                let p = &producers[i];
-                let at = match p.place {
-                    ProducerPlace::Facility(sid, _) => format!("in {}", self.tables.state(sid).name),
-                    ProducerPlace::Module(cid, _) => format!("at {}", self.place_name(Place::Colony(cid))),
-                };
-                GoesDark { name: p.name.to_string(), at }
-            })
+            .map(|i| GoesDark { name: producers[i].name.to_string(), at: self.producer_place_text(&producers[i]) })
             .collect();
         Some(ShortfallForecast { short_by, dark })
     }
@@ -1144,7 +1146,9 @@ impl Game {
     fn income_for(&mut self, seat: Seat) {
         let mut producers = self.producers_of(seat);
         let (balance, shut_at) = self.apply_shortfall(seat, &mut producers, self.seat(seat).stockpile.energy);
-        let shut: Vec<String> = shut_at.iter().map(|i| producers[*i].name.to_string()).collect();
+        // Ticket #366 (version 0.09.2): each building WITH its place -- "Spaceport in China" -- as
+        // the alarm's hover names them (#351); the playtest could not tell which Region went dark.
+        let shut: Vec<String> = shut_at.iter().map(|i| format!("{} {}", producers[*i].name, self.producer_place_text(&producers[*i]))).collect();
         // Ticket #351 (version 0.09.1): what the Natural Sink loses with the Scrubbers shut, which the
         // Report line names -- the case where a Custodian loses the game without noticing. Only where
         // the Region has a controller, which is where `scrubber_removal_by_seat` counts it: one in a

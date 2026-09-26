@@ -805,6 +805,10 @@ impl CardAnswer {
 pub struct Question {
     pub card: EventId,
     pub answers: [Option<CardAnswer>; SEAT_COUNT],
+    /// Ticket #375 (version 0.09.2): the Ship each seat's answer turned aside to answer a call,
+    /// pinned at the answer so the one the card named is the one held, whatever is ordered after.
+    #[serde(default)]
+    pub held: [Option<ShipId>; SEAT_COUNT],
 }
 
 impl Question {
@@ -1047,6 +1051,18 @@ pub enum Tiebreak {
     Nothing,
 }
 
+/// Ticket #381 (version 0.09.2): one Battle that cost a hull or a Battery, kept for the chronicle,
+/// since a game's Battles are its story and every Battle line is otherwise wiped at the next turn.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FallenBattle {
+    pub turn: u32,
+    pub place: String,
+    /// The seats whose orders opened it; none for a Battle nobody opened.
+    pub attackers: Vec<Seat>,
+    /// The hulls and Batteries destroyed, by name.
+    pub lost: Vec<String>,
+}
+
 /// One party in a Battle (ticket #50): a Battle is a melee of every Faction present, so the
 /// Battle Report lists each of them rather than an attacker and a defender.
 /// Ticket #286 (version 0.08.5): the war, counted where it happens. Until this version the sweep
@@ -1055,6 +1071,9 @@ pub enum Tiebreak {
 /// seat where a seat is the actor.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct WarCounters {
+    /// Ticket #381 (version 0.09.2): every Battle that cost a hull or a Battery, in order.
+    #[serde(default)]
+    pub fallen: Vec<FallenBattle>,
     /// Battles opened, by the seat that opened them; and Battles fought against a neutral Region's own Army.
     pub battles: [u32; SEAT_COUNT],
     pub battles_vs_neutral: u32,
@@ -1249,6 +1268,15 @@ pub struct BattleLine {
     /// above stays for the log and old saves.
     #[serde(default)]
     pub at: Option<ReportPlace>,
+    /// Ticket #381 (version 0.09.2): the round log, for the Battle Report to replay and draw. None
+    /// for a bombardment or a Launch, which are a roll and not a melee. It lives the one turn the
+    /// line lives.
+    #[serde(default)]
+    pub log: Option<crate::combat::BattleLog>,
+    /// Ticket #383 (version 0.09.2): fought by the player mid-turn, into the Report they were
+    /// reading; End Turn carries such a line into the Report the coming turn shows. Cleared there.
+    #[serde(default)]
+    pub fought_now: bool,
 }
 
 impl BattleLine {
@@ -1415,6 +1443,10 @@ pub struct Game {
     pub armies: Vec<Army>,
     /// Ticket #286 (version 0.08.5): the war, counted on the game so the sweep can say it.
     pub war: WarCounters,
+    /// Ticket #383 (version 0.09.2): the stacks (seat, Body) that fought an Attack this turn, which
+    /// may not Attack again until the next Resolution. Cleared as the Resolution ends, beside
+    /// `pending`.
+    pub fought: Vec<(Seat, BodyId)>,
     /// Ticket #332 (version 0.09.0): Widgets made, applied and lost, and the queues' depths.
     pub widgets: WidgetCounters,
     /// Ticket #282 (version 0.08.5): Levies raised and neutral Regions that held against an attack
@@ -1628,6 +1660,7 @@ impl Game {
             ships: Vec::new(),
             armies: Vec::new(),
             war: WarCounters::default(),
+            fought: Vec::new(),
             widgets: WidgetCounters::default(),
             levies_raised: 0,
             neutral_holds: 0,
@@ -1708,7 +1741,11 @@ impl Game {
             // Ticket #290 (version 0.08.6): and with the card's Colonists aboard, from nowhere, so a
             // starting station has Module slots to build in from turn one; bare, it had none.
             let aboard = game.tables.faction(game.kind(seat)).start_colonists;
-            game.colonies.push(Colony { id, body: BodyId::Earth, slot: slot as u32, control: Control::Controlled(seat), modules: vec![Module::new(ModuleKind::Core)], colonists: aboard, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
+            // Ticket #377 (version 0.09.2): and the `[start]` table's Modules beside the Core -- a
+            // Solar Array -- in the Faction's own versions.
+            let mut modules = vec![Module::new(ModuleKind::Core)];
+            modules.extend(game.tables.start.station_modules.iter().map(|k| Module::new(k.built_by(game.kind(seat)))));
+            game.colonies.push(Colony { id, body: BodyId::Earth, slot: slot as u32, control: Control::Controlled(seat), modules, colonists: aboard, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
         }
         // Starting positions (spec 14.3, ticket #50): the player's pick, then each AI seat in turn.
         let mut taken = vec![setup.player_start];
@@ -1718,15 +1755,23 @@ impl Game {
         }
         for (sid, seat) in taken.iter().zip(Seat::ALL) {
             game.take_control(*sid, seat);
-            game.add_start_facility(*sid, FacilityKind::LaunchSite);
-            // Ticket #181 (version 0.08.0): a Faction's start Region's Facilities come up as that
-            // Faction's own versions, the Launch Site just added included. The consequences are
-            // asymmetric and were accepted knowingly: every start Region is handed a Launch Site, so
-            // the ARKWRIGHTS hold a Spaceport from turn 1; ten of the fourteen Regions start with a
-            // Power Plant, so the ARCHIVISTS usually hold a Reactor; and neither the Bank nor the
-            // School is in any Region's start Facilities, so the PROSPECTORS and the CUSTODIANS start
-            // with nothing of theirs and must build for their clause.
+            // Ticket #377 (version 0.09.2): **equal starts.** A home Region's card list is set aside
+            // and the `[start]` table's package stands in its place -- a Power Plant, a Factory, a
+            // Mine, a Refinery and the Launch Site -- plus whatever the Faction's card adds (the
+            // Arkwrights' second Power Plant). Until this ticket the card's list stayed and a Launch
+            // Site was added to it, so the EU opened on four Facilities, India on three with no
+            // Refinery, and the US on five with a Research Lab.
             let faction = game.kind(seat);
+            game.state_mut(*sid).facilities.clear();
+            let package: Vec<FacilityKind> = game.tables.start.home_facilities.iter().chain(game.tables.faction(faction).start_extra_facilities.iter()).copied().collect();
+            for kind in package {
+                game.add_start_facility(*sid, kind);
+            }
+            // Ticket #181 (version 0.08.0): a Faction's start Region's Facilities come up as that
+            // Faction's own versions, the Launch Site included: the ARKWRIGHTS hold a Spaceport from
+            // turn 1 and the ARCHIVISTS a Reactor; neither the Bank nor the School is in the package,
+            // so the PROSPECTORS and the CUSTODIANS start with nothing of theirs and must build for
+            // their clause.
             for f in game.state_mut(*sid).facilities.iter_mut() {
                 f.kind = f.kind.built_by(faction);
             }
@@ -2105,7 +2150,8 @@ impl Game {
     /// Ticket #90: whether the seat already holds a Trade Post, standing or on order, at this Body.
     pub fn trade_post_at_body(&self, seat: Seat, body: BodyId) -> bool {
         self.colonies.iter().filter(|c| c.body == body && c.control.director() == Some(seat)).any(|c| {
-            c.modules.iter().any(|m| m.kind == ModuleKind::TradePost) || c.queue.iter().any(|b| b.item == BuildItem::Module(ModuleKind::TradePost))
+            // Ticket #366 (version 0.09.2): by the job, so an Exchange counts as the Trade Post it is.
+            c.modules.iter().any(|m| m.kind.does_the_job_of(ModuleKind::TradePost)) || c.queue.iter().any(|b| matches!(b.item, BuildItem::Module(k) if k.does_the_job_of(ModuleKind::TradePost)))
         })
     }
 
@@ -2139,7 +2185,14 @@ impl Game {
 
     /// Ticket #87: the cheapest leg a seat's Ship can fly from this Body today, in Fuel.
     pub fn cheapest_leg_from(&self, seat: Seat, body: BodyId) -> Option<i64> {
-        BodyId::ALL.into_iter().filter(|b| *b != body).map(|b| self.transit_cost_for(seat, body, b).1).min()
+        self.cheapest_leg_from_at(seat, body, self.turn)
+    }
+
+    /// Ticket #375 (version 0.09.2): the same on a given turn, and only over legs that can be flown
+    /// at all -- the one rule for both, where `cheapest_leg_from` priced a Venus-to-Phobos leg no
+    /// Ship can take.
+    pub fn cheapest_leg_from_at(&self, seat: Seat, body: BodyId, turn: u32) -> Option<i64> {
+        BodyId::ALL.into_iter().filter(|b| *b != body && Self::leg_allowed(body, *b)).map(|b| self.transit_cost_for_at(seat, body, b, turn).1).min()
     }
 
     /// Ticket #87: a Ship at a Body whose tank cannot pay any leg from there, with no station of
@@ -2160,6 +2213,30 @@ impl Game {
             Some(cheapest) => s.fuel < cheapest,
             None => false,
         }
+    }
+
+    /// Ticket #375 (version 0.09.2): whether a leg flown THIS turn would leave the Ship stranded on
+    /// arrival -- the tank after the leg under the cheapest leg out of the far Body, priced for the
+    /// turn it lands, and no station there of its own or of a Refuel partner's -- and if so, what
+    /// the tank would hold. A warning's figure, never a refusal's: a one-way trip can be the plan.
+    ///
+    /// The station test is `stranded`'s: a station that fuels for the seat in the orbit the leg
+    /// ends in rescues it outright; one in another orbit of the far Body only while the tank left
+    /// can still pay the orbit change that would reach it.
+    pub fn arrival_leaves_stranded(&self, seat: Seat, ship: ShipId, to: BodyId, slot: Option<u32>) -> Option<i64> {
+        let s = self.ship(ship)?;
+        let ShipAt::Body(from) = s.at else { return None };
+        let (turns, fuel) = self.transit_cost_for(seat, from, to);
+        let left = s.fuel - fuel;
+        if left < 0 {
+            return None;
+        }
+        let station_in_orbit = slot.is_some_and(|sl| self.station_at(to, sl).is_some_and(|c| self.fuels_for(c, seat)));
+        if station_in_orbit || (self.refuel_station_at(seat, to) && left >= self.tables.orbit_change_fuel) {
+            return None;
+        }
+        let cheapest = self.cheapest_leg_from_at(seat, to, self.turn + turns)?;
+        if left < cheapest { Some(left) } else { None }
     }
 
     /// Ticket #86 (version 0.06.0): how many Colonists a Colony Ship at Earth may take beyond its
@@ -2985,6 +3062,14 @@ impl Game {
         c.body != BodyId::Earth || c.in_orbit
     }
 
+    /// Ticket #373 (version 0.09.2): the seat's Colonists still aboard its Ships, anywhere -- in
+    /// transit, in any orbit, a Ship loaded and sitting over Earth included -- at the designer's
+    /// word. They count toward no Victory bar; the Victory window draws them as a band beyond the
+    /// settled fill, so a player sees what is on its way.
+    pub fn colonists_aboard(&self, seat: Seat) -> u32 {
+        self.ships.iter().filter(|s| s.seat == seat).map(|s| s.colonists).sum()
+    }
+
     /// Colonists living in Habitats off Earth, for one seat (spec 15).
     pub fn off_world_colonists(&self, seat: Seat) -> u32 {
         // Ticket #44: Colonists in Antarctica live on Earth. Ticket #81: those on a station over
@@ -3051,6 +3136,14 @@ impl Game {
     /// everywhere, so this hands the strongest Faction a second permanent advantage against the
     /// weakest -- worth about +1 on 45% of turns against the Prospectors, +2 once deeds stack on.
     pub fn challenge_margin_for(&self, challenger: Option<Seat>, target: Target) -> i64 {
+        let (base, relations, garrison) = self.challenge_margin_parts(challenger, target);
+        base + relations + garrison
+    }
+
+    /// Ticket #372 (version 0.09.2): the challenge margin in its three parts -- the base, the
+    /// relations term, and the Constabulary's -- so the interface can name them without
+    /// re-deriving any of them. `challenge_margin_for` is their sum, and nothing else.
+    pub fn challenge_margin_parts(&self, challenger: Option<Seat>, target: Target) -> (i64, i64, i64) {
         let t = &self.tables.influence;
         let relations = match (challenger, self.place_control(target).controller()) {
             (Some(ch), Some(holder)) if ch != holder => {
@@ -3065,7 +3158,7 @@ impl Game {
         // helps whoever holds a garrisoned Region and hinders whoever wants one, which is the same
         // asymmetry the Constabulary itself has carried since ticket #190.
         let garrison = if self.has_tech(TechId::CivilDefense) { t.constabulary_margin_defended } else { t.constabulary_margin };
-        t.challenge_margin + relations + if guarded { garrison } else { 0 }
+        (t.challenge_margin, relations, if guarded { garrison } else { 0 })
     }
 
     /// Ticket #263 (version 0.08.4): what a seat has under way -- every build it has begun, with
@@ -3470,14 +3563,20 @@ impl Game {
     /// not the building -- and only where the seat CONTROLS the Region, per ticket #181. There is no
     /// cap: the designer's word was that the muster limit is the brake, "8 a turn is already the
     /// brake".
-    pub fn pay_spaceport(&mut self, seat: Seat, from: StateId, n: u32) {
+    ///
+    /// Ticket #366 (version 0.09.2): returns what it paid, so the lift's Report line can say
+    /// *"(+2 Influence next turn from the Spaceport)"*. The playtest lifted Pioneers and saw no
+    /// Influence; the pay lands a turn late and was itemised nowhere, so nothing told them.
+    #[must_use]
+    pub fn pay_spaceport(&mut self, seat: Seat, from: StateId, n: u32) -> u32 {
         if n == 0 || self.state(from).control != Control::Controlled(seat) {
-            return;
+            return 0;
         }
         if !self.state(from).facilities.iter().any(|f| f.kind == FacilityKind::Spaceport && f.working()) {
-            return;
+            return 0;
         }
         self.seats[seat.index()].spaceport_influence += n as i64;
+        n
     }
 
     pub fn ships_at(&self, seat: Seat, body: BodyId) -> Vec<ShipId> {

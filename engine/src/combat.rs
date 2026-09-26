@@ -6,8 +6,10 @@
 //! old one: with parties a and d, the attacker's chance to land a hit is a / (a + d).
 
 use crate::orders::UnitRef;
+use crate::UnitKind;
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
+use serde::{Deserialize, Serialize};
 
 /// The randomness a battle needs, so a test can script it.
 pub trait Dice {
@@ -57,11 +59,27 @@ pub struct Combatant {
     /// and its unarmed ones are neither struck nor pursued: the escort takes the fire. Set by the
     /// caller from the hull, since the melee does not know kinds; true unless it says otherwise.
     pub armed: bool,
+    /// Ticket #381 (version 0.09.2): what the unit is, for the picture of the Battle. A hull is
+    /// set by the caller from its card; an Army and a Battery are read off the reference.
+    pub kind: BattleUnit,
 }
 
 impl Combatant {
     pub fn new(unit: UnitRef, name: impl Into<String>, strength: i64, hit_points: u32, damage: u32, pursuit: u32, evade: bool) -> Combatant {
-        Combatant { unit, name: name.into(), strength, hit_points, damage, pursuit, evade, engaged: true, escaped: false, pursued: false, dug_in: false, armed: true }
+        let kind = match unit {
+            // A placeholder: the melee does not know hulls, and `ship_combatant` sets the real one
+            // with `.kind`. A test that builds a hull bare gets a Frigate's glyph, and no picture.
+            UnitRef::Ship(_) => BattleUnit::Ship(UnitKind::Frigate),
+            UnitRef::Army(_) => BattleUnit::Army,
+            UnitRef::Battery { .. } => BattleUnit::Battery,
+        };
+        Combatant { unit, name: name.into(), strength, hit_points, damage, pursuit, evade, engaged: true, escaped: false, pursued: false, dug_in: false, armed: true, kind }
+    }
+
+    /// Ticket #381: the same unit, of this kind -- a hull's caller says which hull.
+    pub fn kind(mut self, kind: BattleUnit) -> Combatant {
+        self.kind = kind;
+        self
     }
 
     /// Ticket #297: the same unit, dug in.
@@ -97,6 +115,90 @@ pub struct BattleStats {
     pub hits: Vec<u32>,
     pub destroyed: Vec<Vec<String>>,
     pub escaped: Vec<Vec<String>>,
+    /// Ticket #381 (version 0.09.2): the blow-by-blow record.
+    pub log: BattleLog,
+}
+
+/// Ticket #381 (version 0.09.2): what a unit of a Battle is, for the picture the Report draws of
+/// it. The Report is drawn after the destroyed are gone from the board, so the record carries the
+/// kind itself rather than a reference to look it up by.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum BattleUnit {
+    Ship(UnitKind),
+    Army,
+    Battery,
+}
+
+/// Ticket #381 (version 0.09.2): **the round log**, the blow-by-blow record of a Battle, at the
+/// designer's word: *"what happens when a ship attacks a station or another ship and can we show
+/// it."* Until this ticket the melee mutated its units in place and kept totals alone -- rounds,
+/// hits per party, the destroyed and the escaped -- so nothing could show HOW a Battle went, only
+/// how it ended, and the one question a player could not answer was why they lost. Every unit is
+/// named by its party and its place in the line, which is how the picture finds it.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct BattleLog {
+    /// The line as it stood before the first blow, party by party, in the parties' order.
+    pub parties: Vec<Vec<LogUnit>>,
+    /// The opening -- the Evade rolls and their pursuit, before any exchange -- and then one entry
+    /// per round fought.
+    pub rounds: Vec<LogRound>,
+}
+
+/// One unit as the Battle opened.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LogUnit {
+    pub name: String,
+    pub kind: BattleUnit,
+    pub hit_points: u32,
+    /// The damage it brought to the Battle.
+    pub damage: u32,
+    pub armed: bool,
+}
+
+/// One round of the log: what was struck, who left and was chased, and where every unit stood
+/// when it was over.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct LogRound {
+    /// True for the opening, in which only Evade rolls and their pursuit happen.
+    pub opening: bool,
+    /// The hits of the exchange, in the order they landed.
+    pub blows: Vec<Blow>,
+    /// The units that disengaged this round, by party and place in the line.
+    pub left: Vec<(usize, usize)>,
+    /// The pursuit's hits on the leavers.
+    pub chased: Vec<Blow>,
+    /// Every unit's state when the round was over, party by party.
+    pub after: Vec<Vec<UnitState>>,
+}
+
+/// One hit: the party that landed it, and the unit it landed on. `covering` is the escort rule at
+/// work -- the party struck still had an unarmed hull engaged, and the hit went to an armed one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Blow {
+    pub by: usize,
+    pub party: usize,
+    pub unit: usize,
+    pub covering: bool,
+}
+
+/// Where one unit stood at the end of a round.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UnitState {
+    pub damage: u32,
+    pub engaged: bool,
+    pub escaped: bool,
+    pub destroyed: bool,
+}
+
+/// Ticket #381: every unit's state now, party by party.
+fn snapshot(parties: &[&mut [Combatant]]) -> Vec<Vec<UnitState>> {
+    parties.iter().map(|p| p.iter().map(|c| UnitState { damage: c.damage, engaged: c.engaged, escaped: c.escaped, destroyed: c.destroyed() }).collect()).collect()
+}
+
+/// Ticket #381: whether a hit on this party is the escort taking it -- an unarmed unit of the
+/// party stands engaged behind an armed one.
+fn covering(side: &[Combatant]) -> bool {
+    escorted(side) && side.iter().any(|c| c.engaged && !c.destroyed() && !c.armed)
 }
 
 impl BattleStats {
@@ -242,22 +344,32 @@ pub fn fight(attackers: &mut [Combatant], defenders: &mut [Combatant], dice: &mu
 /// melee rolls the table's figure.
 pub fn melee(parties: &mut [&mut [Combatant]], dice: &mut dyn Dice, divisor: f64, rounds: u32, rolls: u32) -> BattleStats {
     let n = parties.len();
-    let mut stats = BattleStats { rounds: 0, hits: vec![0; n], destroyed: vec![Vec::new(); n], escaped: vec![Vec::new(); n] };
+    // Ticket #381 (version 0.09.2): the line as it opened, for the log.
+    let opened: Vec<Vec<LogUnit>> = parties
+        .iter()
+        .map(|p| p.iter().map(|c| LogUnit { name: c.name.clone(), kind: c.kind, hit_points: c.hit_points, damage: c.damage, armed: c.armed }).collect())
+        .collect();
+    let mut stats = BattleStats { rounds: 0, hits: vec![0; n], destroyed: vec![Vec::new(); n], escaped: vec![Vec::new(); n], log: BattleLog { parties: opened, rounds: Vec::new() } };
     // Evade rolls at the start of the battle, at current damage (spec 9.2).
-    for party in parties.iter_mut() {
-        for c in party.iter_mut().filter(|c| c.engaged && c.evade && !c.destroyed()) {
+    let mut opening = LogRound { opening: true, ..Default::default() };
+    for (pi, party) in parties.iter_mut().enumerate() {
+        for (ci, c) in party.iter_mut().enumerate().filter(|(_, c)| c.engaged && c.evade && !c.destroyed()) {
             if dice.chance(0.5) {
                 c.engaged = false;
                 c.escaped = true;
+                opening.left.push((pi, ci));
             }
         }
     }
-    pursue(parties, dice, &mut stats);
+    pursue(parties, dice, &mut stats, &mut opening.chased);
+    opening.after = snapshot(parties);
+    stats.log.rounds.push(opening);
     for _round in 0..rounds {
         if parties.iter().filter(|p| any_engaged(p)).count() < 2 {
             break;
         }
         stats.rounds += 1;
+        let mut round = LogRound::default();
         // Strengths and the engaged parties are read once, at the start of the round, as the
         // two-sided battle read A and D once.
         let strengths: Vec<i64> = parties.iter().map(|p| total_strength(p)).collect();
@@ -271,21 +383,24 @@ pub fn melee(parties: &mut [&mut [Combatant]], dice: &mut dyn Dice, divisor: f64
             let targets: Vec<usize> = live.iter().copied().filter(|i| *i != hitter).collect();
             let Some(target) = pick_weighted(&strengths, &targets, dice) else { continue };
             if let Some(i) = random_engaged(parties[target], dice) {
+                let covered = covering(parties[target]);
                 parties[target][i].damage += 1;
                 stats.hits[hitter] += 1;
+                round.blows.push(Blow { by: hitter, party: target, unit: i, covering: covered });
             }
         }
         // Disengage. Ticket #297 (version 0.08.6): a dug-in unit never rolls.
-        for party in parties.iter_mut() {
-            for c in party.iter_mut().filter(|c| c.engaged && !c.destroyed() && !c.dug_in) {
+        for (pi, party) in parties.iter_mut().enumerate() {
+            for (ci, c) in party.iter_mut().enumerate().filter(|(_, c)| c.engaged && !c.destroyed() && !c.dug_in) {
                 let p = disengage_chance(c, divisor);
                 if p > 0.0 && dice.chance(p) {
                     c.engaged = false;
                     c.escaped = true;
+                    round.left.push((pi, ci));
                 }
             }
         }
-        pursue(parties, dice, &mut stats);
+        pursue(parties, dice, &mut stats, &mut round.chased);
         // Remove destroyed units.
         for party in parties.iter_mut() {
             for c in party.iter_mut() {
@@ -295,6 +410,8 @@ pub fn melee(parties: &mut [&mut [Combatant]], dice: &mut dyn Dice, divisor: f64
                 }
             }
         }
+        round.after = snapshot(parties);
+        stats.log.rounds.push(round);
     }
     for (i, party) in parties.iter().enumerate() {
         for c in party.iter() {
@@ -335,7 +452,7 @@ fn pick_weighted(strengths: &[i64], live: &[usize], dice: &mut dyn Dice) -> Opti
 /// Units that have just disengaged (escaped, not yet pursued) are chased by the enemy's best
 /// pursuer. Ticket #50: the pursuer is the highest Pursuit among all enemy units still engaged,
 /// whichever party it belongs to.
-fn pursue(parties: &mut [&mut [Combatant]], dice: &mut dyn Dice, stats: &mut BattleStats) {
+fn pursue(parties: &mut [&mut [Combatant]], dice: &mut dyn Dice, stats: &mut BattleStats, chased: &mut Vec<Blow>) {
     let n = parties.len();
     for i in 0..n {
         let leaver_idx: Vec<usize> = parties[i]
@@ -374,6 +491,7 @@ fn pursue(parties: &mut [&mut [Combatant]], dice: &mut dyn Dice, stats: &mut Bat
                 if dice.chance(p) {
                     parties[i][li].damage += 1;
                     stats.hits[party] += 1;
+                    chased.push(Blow { by: party, party: i, unit: li, covering: false });
                 }
             }
         }

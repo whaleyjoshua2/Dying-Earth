@@ -213,8 +213,10 @@ fn the_load_list_reads_every_save_off_the_folder() {
 /// any order is pending.
 #[test]
 fn a_manual_save_is_refused_while_orders_are_pending() {
-    assert!(save::can_save_now(0), "with nothing ordered, a save may be taken");
-    assert!(!save::can_save_now(1), "one pending order is enough to refuse a save");
-    assert!(!save::can_save_now(7), "so is seven");
+    assert!(save::can_save_now(0, false), "with nothing ordered, a save may be taken");
+    assert!(!save::can_save_now(1, false), "one pending order is enough to refuse a save");
+    assert!(!save::can_save_now(7, false), "so is seven");
+    // Ticket #383 (version 0.09.2): and a fought Attack is no turn start.
+    assert!(!save::can_save_now(0, true), "a Battle fought this turn refuses a save");
     assert!(save::SAVE_PENDING_HOVER.contains("beginning of a turn"), "the hover says why");
 }

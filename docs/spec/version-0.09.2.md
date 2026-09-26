@@ -1,0 +1,465 @@
+# Dying Earth — version 0.09.2, the tidy-up version
+
+Amendments to the specification, one section per decision. Each section names the ticket whose
+resolution comment is the authority; where this document and a ticket disagree, the ticket is right.
+The map is [Map: version 0.09.2](https://github.com/whaleyjoshua2/Dying-Earth/issues/365), and the
+pictures and batches that decided it are in
+[`docs/dev-diary/2026-09-25-version-0.09.2/`](../dev-diary/2026-09-25-version-0.09.2/).
+
+**What the version is.** Version 0.09.1 with the designer's list, which is mostly the game saying
+what it does where the player can see it, and then three things the list grew into. **The tidying**:
+no card on the first turn (§1), the first-to-land line off the map (§2), glyphs in the Trading
+window (§3), Colonists waiting aboard told in the Report under a Ships heading (§4), one net Unrest
+line a Region (§5), seven defects from the list (§6), a card's Influence figure that reads the
+holder (§7), a Victory bar that counts settled Colonists with a band for those in transit (§8), a
+transit quote that says when it holds, a warning before a stranding and a Distress Call that names
+its Ship (§9), and a Refugee Convoy worth taking (§10). **The cards**: a card for every Ship, with
+Bodies and orbits in drop-downs nested as the sky is (§11), and every refusal explaining why on
+mouseover -- which found that no greyed order button had shown its refusal since 0.08.3 (§13).
+**The rules that moved**: equal starts, every home Region opening with the same Facilities and every
+starting station with a Solar Array (§12); every Battle keeping a round log, drawn and replayed
+(§14); **an Attack fought the moment it is ordered**, with a window of its own (§15); and the fund
+at a glance on the top bar (§16).
+
+**What it did to the win column** (80 games, per Faction, at the shipped climate cell):
+
+| | 0.09.1 | 0.09.2 |
+|---|---|---|
+| Custodians | 6 | 2 |
+| Prospectors | 28 | 5 |
+| Arkwrights | 3 | 0 |
+| Archivists | 2 | 11 |
+| collapses | 41 | 62 |
+
+---
+
+## 1. No card on the first turn
+
+The authority is [ticket #367](https://github.com/whaleyjoshua2/Dying-Earth/issues/367).
+
+**No card of either kind is drawn on the first turn.** The Draw Chance is not rolled before
+`first_draw_turn` (2, in `events.toml`), and the Event Deck is **not touched** before it: nothing is
+rolled and nothing is spent, so the card on top waits for turn 2's ordinary roll and no card is
+lost. Both kinds are held off, the Choice Card that would ask before the first order and the
+ordinary Event that would land in the first Resolution. The loader refuses a figure of nought. The
+off-Earth join on turn 12 is unchanged.
+
+**Why.** The first turn is where a player reads their Condition and gives their first orders; before
+this a card came on turn 1 half the time, and a question before the first order was the interruption
+the designer removed. Measured before the rule over sixty seeds, thirty drew on turn 1.
+
+**Reaches the computer seats** by the same phase, so it is the same game for all four.
+
+## 2. The first-to-land line off the system map
+
+The authority is [ticket #368](https://github.com/whaleyjoshua2/Dying-Earth/issues/368).
+
+The Solar System Map's Body label **no longer carries the first-to-a-Body line** in either state,
+*"first to land: 15 Influence"* or *"first settled by the Prospectors"*. The line **lives in the
+Body's hover**, the one that unfolds the orbital-slot list while the pointer is near the Body, under
+that list. The **surface card's own line is unchanged**: the glyph, the settler's colour and the
+windfall hover stay. No rule moves; the bonus itself (§2 of 0.09.1) is untouched.
+
+**Why.** The designer: *"do not display 1st founding bonus on system map."* Kept in the hover rather
+than removed so that #345's point stands, that a voyage is chosen from this map.
+
+## 3. Glyphs in the Trading window
+
+The authority is [ticket #369](https://github.com/whaleyjoshua2/Dying-Earth/issues/369).
+
+The Trading window **reads as the top bar does**: a glyph at the head of each row before the good's
+name, and a glyph on every figure -- the header's Ducats, the price, the sell price, and the faces of
+the Buy and Sell buttons -- by the game's one rule for glyphs, a word traded for its glyph only
+directly after a number. The Buildings sentence and the Trades-this-turn list are drawn by the same
+rule. No word is dropped: a row still carries the good's name. No price, rule or figure moves.
+
+**Why.** The designer: *"glyphs in market window."* Every good the window trades and the currency it
+trades in already had a glyph; the window alone drew none.
+
+## 4. Colonists waiting aboard off Earth, and a Ships heading in the Report
+
+The authority is [ticket #370](https://github.com/whaleyjoshua2/Dying-Earth/issues/370).
+
+**The player's own Colonists still aboard a Ship in any orbit off Earth are reported every turn
+they wait**, one line a Body: *"4 Colonists wait aboard in low orbit of Mars."*, or *"at Ares over
+Mars"*, or, in more than one orbit, *"at Mars: 2 in low orbit, 2 at Ares"*. When a rival's Orbital
+Control shuts the ground, or a rival blockade shuts the station they are docked at, the line ends
+*", blocked by rivals' control of the orbit"*. A Ship in transit is not reported; a rival's Ships
+are never reported; a spectated game, having no seat of its own, has no line. It is written after
+every landing the turn has made, so a Ship that unloaded this turn is not said to wait. It never
+takes the headline.
+
+**The Report has a fifth heading, Ships, above Your works**, and every Ship line reads under it --
+arrivals, orbit changes, losses, holds, the waiting line -- whoever's Ship it is. Until this version
+a Ship line read under In space. The order of headings is In space, On Earth, The climate, Ships,
+Your works.
+
+**Why.** The designer: *"add report line about colonist waiting to be settled for those still in
+ships in low orbit of any body but earth"*, then, on the ticket: any orbit, the player's own, and
+*"above your works, move the rest of the ship lines there too."* Colonists aboard count for nothing
+until landed, and nothing said so.
+
+## 5. One net Unrest line a Region
+
+The authority is [ticket #371](https://github.com/whaleyjoshua2/Dying-Earth/issues/371).
+
+**The Report says one line per Region about its Unrest**, at the end of the Resolution, by Region in
+the board's order, after the migration lines: *"India: Unrest from 3 to 5.5 (a Heatwave, agitation by
+the Prospectors, a Mothball), past the first threshold: the Standing Army no longer replenishes."* The
+figures are the Region's Unrest as the Resolution opened and as it closed; the causes are named in
+the order they landed; a threshold crossed, up or down, is the line's ending. It is said **only where
+a cause moved it**: the natural fall alone is not news. It is said for **the player's own Regions**,
+held or occupied, and for **any Region the player Agitated or Relieved** this turn; a rival's Region
+a rival acted in is silent, unless its holder is thrown off, which has its own line. A spectated
+game, having no player, says every Region's.
+
+**Six lines are gone**, each now a cause of that one line: a Mothball's or Decommission's, a Climate
+card's (*"a Heatwave"*, *"a Drought"*, *"the Unrest card"*), a Strip Permit's (its line keeps the
+Emissions half, which is its own news), an Agitate's (*"agitation by the Prospectors"*, or *"held to
+nothing by the Constabulary"*), a Relief's, and the threshold line. **Two movers that never had a
+line are causes too**: an Occupation (*"the Occupation beginning"*, *"the Occupation"* each turn,
+*"the Occupation breaking"*) and a Choice Card's Unrest effect (*"the Refugee Convoy card"*), so
+that every change inside the Resolution is named. The heat's rise is the Climate phase's, before the
+Resolution, and keeps its own line under The climate. **The migration line's Unrest
+clause is gone too**: *"India took in 0.6 people"* says only the migration, and *"5.0 people
+arriving"* is a cause on the Unrest line. The log keeps every line as it was.
+
+**Why.** The designer: *"quiet unrest spam"*, and the playtest's *"Unrest lines in the Report run out
+of order."* The six sources wrote in phase order, so one Region's lines lay scattered among
+another's, and a Region could take six in a turn.
+
+## 6. Seven defects from the list
+
+The authority is [ticket #366](https://github.com/whaleyjoshua2/Dying-Earth/issues/366). Nothing
+here is a design decision; each is a thing the game said or did that was untrue or unreachable.
+
+1. **The Exchange stands on a station, and the Heliostat too.** A station's build check reads the one
+   predicate that answers by the job, so a Faction's own kind of a common Module follows it; the
+   check was a second list of kinds that left both out, while the build buttons offered them. The
+   Exchange is under the one-Trade-Post-per-Body cap, being the Trade Post it is.
+2. **The driver takes a Region by its name or its id**, case and separators ignored (`india`,
+   `"the united states"`, `southasia`), and its error lists the names the board prints.
+3. **A place that passed to a Faction and threw them off in the same Resolution says both in one
+   line**, *"India passed to the Custodians and threw them off at once; it stands neutral."*, in the
+   transfer's place; and the driver's note on an occupied place reads *"you hold it in name on 47
+   Standing; the Custodians occupy it."*
+4. **A rival's founding names the slot**, as the player's own has since 0.09.1.
+5. **A closed card side names the good and the shortfall**, *"you have 12 Fuel of the 20 it asks"*,
+   in the engine's refusal, the driver and the card modal alike, from one place.
+6. **The lift line says what the Spaceport will pay and when**, *"(+2 Influence next turn from the
+   Spaceport)"*, and **the Energy line names where each shut building stands**, *"Spaceport in
+   China"*. The playtest's guess, that the Spaceport was shut for Energy, cannot be the cause: a
+   shut Spaceport refuses the lift outright; the pay lands a turn late and was itemised nowhere.
+7. **The unanswered Tech pick is not reproduced.** The refusal yields only when no Tech is left to
+   research, not on an empty shortlist, and the suite holds a test of it; a Tech completing inside
+   End Turn owes a fresh pick that blocks the *next* End Turn, which reads as "did not block" to a
+   player who saw the prompt appear mid-turn. Nothing changed.
+
+## 7. The Influence figure on a card reads the holder
+
+The authority is [ticket #372](https://github.com/whaleyjoshua2/Dying-Earth/issues/372).
+
+On a Region, Colony or station card, **the standings row's figure on a held place is the price to
+take it**, read by the rule that takes it -- the greater of the challenger's threshold and the
+holder's Standing plus the margin: *"Take at 67"* on a rival's place, and on the player's own place
+*"A rival takes it at 67"*, the lowest price any rival pays. *"Threshold 50"* stays on a place nobody
+holds. **Every hover that explains the margin uses the real one**, from the function the rule runs:
+*"a margin of 27 (20, +2 for cold relations, +5 for the Constabulary)"*. No rule moves.
+
+**Why.** The designer: *"update influence thresholds on cards to reflect current holders influence."*
+The row printed the fixed formula whatever the holder stood at, so a place held on 47 read
+*"Threshold 50"* when the price was 67, and its hovers quoted the flat base of 20 where a
+Constabulary and cold relations had raised it by up to 12.
+
+## 8. The Victory bar counts settled Colonists, with a band for those in transit
+
+The authority is [ticket #373](https://github.com/whaleyjoshua2/Dying-Earth/issues/373).
+
+**Settled is as it was**: a Colonist counts toward a Victory bar when they live in a Colony off Earth,
+a station over Earth included; nobody aboard a Ship counts. **Every bar that counts Colonists** --
+the Custodians' and Prospectors' twelve off Earth, the Arkwrights' thirty -- **draws a band beyond
+its settled fill for the Colonists in transit**: everyone aboard the Faction's Ships, anywhere, a
+Ship loaded and sitting over Earth included. The band is the fill's hue darker, with thin lines at
+45 degrees, and stops at the bar's end; the label reads *"9 of 12 (+3 in transit)"*. **The band
+never counts toward winning.** The Arkwrights' per-Body bar carries no band, a Ship in flight having
+no one Body to count toward. The temperature bar's committed band stays flat.
+
+**Why.** The designer: *"victory bar should only count settled colonist but add a extra area to
+represent those in transit, similar to the temperature bar, make the in transit darker and add lines
+at 45 degrees."* Colonists aboard counted for nobody and were shown nowhere on the bar, so a Colony
+Ship on its way looked like no progress at all.
+
+## 9. A quote that says when it holds, a warning before a stranding, and a Distress Call that names its Ship
+
+The authority is [ticket #375](https://github.com/whaleyjoshua2/Dying-Earth/issues/375).
+
+**A crossing's quote is for a launch this turn, and says so**, with the next two turns' figures
+beside it: *"To Mars: 5 turn(s), 20 Fuel each from the tank if launched this turn (next turn 5t/23F,
+then 6t/26F)"*, in the Ship card's Transit block and the driver's flying table alike. The quote was
+always exact on the turn it was read; the sky moves about thirty degrees a turn, and a player who
+read it and launched later paid more.
+
+**A leg that would leave the hull stranded at the far end is named beside its button** -- *"arrives
+with 0 Fuel and no station of yours at Venus"* -- where the tank after the leg is under the cheapest
+leg out of the far Body, priced for the turn it lands, and no station of the Faction's own or a Refuel
+partner's stands there. **A warning, never a refusal**: a one-way trip can be the plan.
+
+**The Distress Call holds a docked Ship only**, the fullest tank among them; a Ship in flight is never
+held. **The held Ship is pinned at the answer and stays where it is that turn**: a Transit or a change
+of orbit for it is refused, *"held this turn, answering the Distress Call"*, which is what answering
+costs. With every hull in flight the take side is closed and says why (*"you have no Ship docked to
+answer it"*); a Faction with no Ship at all is not asked, as before. **The card names the Ship it
+would hold before the answer**, in the modal and the driver, and **the Report names the Ship held**:
+*"Custodians CSV Valiant held at Earth this turn, answering the call."*
+
+**Why.** From the playtest: *"The flying table quoted a leg at 4 turns and 17 Fuel and it cost 6
+and 26, leaving the hull stranded with an empty tank and no station to refuel at. The Distress Call
+card silently froze the only ship mid-transit."*
+
+## 10. The Refugee Convoy is worth taking
+
+The authority is [ticket #376](https://github.com/whaleyjoshua2/Dying-Earth/issues/376).
+
+**Taking the Refugee Convoy lands a million people** (one unit of population) in the Faction's most
+populous Region **for half a ppm** of emissions the next turn, where it landed 400,000 for two ppm.
+The refusal is unchanged, −5 Standing in every place the Faction holds, and so is the computer's
+rule for taking it (every held Region's Unrest under 4). The figures are the card's own in
+`events.toml`.
+
+**Why.** From the playtest: *"The Refugee Convoy trades +0.4 population against +2.0 ppm, which
+nobody would take twice."* A million people for a small, one-off ppm is a real offer that stays a
+choice, since the ppm is permanent and falls on the Custodians' measure.
+
+## 11. A card for every Ship, with Bodies and orbits in drop-downs
+
+The authority is [ticket #374](https://github.com/whaleyjoshua2/Dying-Earth/issues/374).
+
+**Every Ship has a card of its own**, opened from its row on the stack card, from its row in the
+Roster, and from its label on the Solar System Map while it flies. The card holds everything that is
+one Ship's: its line (strength, damage, cargo, Warhead, stance and orbit), its **Tank** (Fuel,
+Refuel, the stranded and dry warnings), its **Transit** and change-of-orbit moves, **Load and
+unload**, **Bombard**, **Launch** and **Rearm**, and Repair. It stands **in place of** the stack
+card, with a *"Back to all Custodians Ships at Mars"* link back to it. **A Ship in flight has a card
+too**: its line, where it is bound, the turns left and the date it lands, and its Tank, with no
+moves, since nothing can be ordered in flight; its link goes back to the Roster.
+
+**The stack card keeps only what is the whole stack's**: the heading, the Ships **grouped by
+orbit**, one drop-down per orbit of the Body that holds any of them (low orbit first, then each
+station), open by default, each row opening that Ship's card; the stance; Attack; the
+**"All that can"** moves, even for a stack of one; and Influence on the Colonies at the Body, which
+is the Body's rather than any Ship's and stood on this card before. Every per-Ship button leaves it,
+which ends the same hull appearing five times on one card.
+
+**Where a Ship can go is one drop-down per Body**, on both cards, under Transit, **nested as the sky
+is**: a planet's drop-down holds its own orbits and then its moons' drop-downs inside it, the Moon
+under Earth, Phobos and Deimos under Mars. The closed header carries the turns and Fuel for a launch
+this turn, and inside it stands the dated quote of §9 and a line per orbit with its button and, where
+it applies, the stranding warning. **The orbit lines inside a Body's drop-down do not repeat the
+Body's name** -- *"Low orbit"*, *"Ares"*; *"To low orbit"*, *"To Ares"* on the change-of-orbit door
+-- since the drop-down they stand in says it. **The planet whose group holds the Body the Ship is at
+comes first and is open by default, and so is that Body's own drop-down inside it**; its orbits are
+the change-of-orbit moves at their Fuel. Every other drop-down is closed by default. Open or shut is
+remembered for the session only, never saved.
+
+**The picture aids** that scrolled the stack card to Transits, Change orbit or Tanks now scroll the
+Ship's card, since that is where the buttons went. No rule changes; no save changes.
+
+**Why.** The designer: *"clean up ships at body cards - ships should each have their own card.
+bodies and orbits about which should each be their own drop down both on their own cards and the one
+listing all the ships at a body."*
+
+## 12. Equal starts
+
+The authority is [ticket #377](https://github.com/whaleyjoshua2/Dying-Earth/issues/377).
+
+**Every home Region starts with the same Facilities**: a Power Plant, a Factory, a Mine, a Refinery
+and the Launch Site, in the Faction's own versions (the Archivists' Reactor, the Arkwrights'
+Spaceport), whatever the Region's card lists and nothing more. The card's list is what a **neutral**
+Region stands with. So any Region the player picks starts with the same package; the EU, which
+opened on four, India on three with no Refinery, and the United States on five with a Research Lab,
+all open on these five. The package is the `[start]` table's `home_facilities` in `factions.toml`,
+and the loader refuses a table whose package has no Launch Site. The package is a gift and takes
+no account of the Region's slots: every Region has room for the five, and only Mexico (five slots)
+has none for the Arkwrights' six, so an Arkwrights player who opens there has no free slot until
+an Industry Level raise adds one.
+
+**Every starting station carries a Solar Array** beside its Core Module (the `[start]` table's
+`station_modules`). **The Arkwrights, who start with no station, hold a second Power Plant** in
+their home Region in its place (`start_extra_facilities` on their card). The rest of the Arkwrights'
+start is unchanged: no station, two Pioneers at home in place of the two Colonists the other three
+have aboard; it is the Faction's written flavour, not the map's accident.
+
+**The Solar Array takes one of the station's two Module slots**, as any Module does, so a starting
+station opens with one slot free; the Prospectors' computer, which scores the Exchange above the
+opening Habitat, opens with an Exchange there.
+
+**The computer seats' Regions are unchanged**: the spread rule stands (the highest Industry Level
+*not next to a taken Region*, ties by population), so with the player in the EU the computer opens in
+China, Saudi Arabia and Australia. Taking the richest free Regions instead was tried in this ticket
+and reverted: with all four seats in the four biggest economies the sweep collapsed 78 games of 80
+where the spread collapses 44. The Regions' economies stay unequal; what is equal is the Facilities.
+The stockpile is unchanged, 80 Materials, 20 Fuel, 20 Energy, the same for all four.
+
+**Why.** The designer: *"examine starting resources/buildings and equalize."* Measured on turn 1
+with the driver, the player in the EU earned 12 Ducats a turn from four Facilities while the
+computer seats earned about one apiece from two or three; the Facilities were the small gap and
+the Region's economy the large one. The designer levelled the Facilities, added the Solar Array,
+tried the rich Regions for the computer and, on the sweep's figures, kept the spread.
+
+## 13. Every refusal explains why on mouseover
+
+The authority is [ticket #380](https://github.com/whaleyjoshua2/Dying-Earth/issues/380).
+
+**Every control the engine can refuse shows the engine's own reason on mouseover** -- the
+`check_order` text itself, never a copy -- **the refusal first and the control's description after
+it** where the two fit the six-line ceiling, the refusal alone where they do not. This is the rule
+for every greyed order button (builds, moves, loads, repairs, Faction orders, Bombard, Launch, the
+"All that can" buttons), every greyed stance, the End Turn sun (which hovers the engine's refusal
+when it is dead) and the spectator's End Turn (*"Close the window first."*).
+
+**Why it was needed.** From version 0.08.3 (ticket #238) to this one, the shared button helpers
+sent the refusal through a hover that egui opens only on an *enabled* widget, so a greyed order
+button hovered its description or nothing, and the engine's reason never reached a pointer in play.
+The pictures in the diaries looked right because the headless picture aid forces a tooltip open
+whatever the widget's state.
+
+**The "All that can" buttons take every candidate** and place those the engine accepts, as the
+glossary has said since ticket #322; when none can, the dead button hovers the first hull's
+refusal. Before this the callers filtered the list and a dead button read *"All 0 that can"* with no
+reason, and a stack of Armies with one that could not march was greyed whole.
+
+**A slider the engine refuses holds at the last accepted setting and says why on the rail.** The
+Research Directive and the Venture share had a fault beside: a second move in one turn was checked
+against the order it was cancelling, refused as "already set this turn", and dropped without a word.
+The check runs against the orders that will stand.
+
+**Enter on a dead sun** puts the End Turn through, so the engine's refusal raises the popup of
+ticket #105 in the engine's words, as a click would; with a window open it does nothing, as before.
+
+**Unchanged, at the designer's word**: the Spend button on the Influence strip stays bare, as ticket
+#306 cut it; a door that is hidden when its order is unavailable stays hidden; a button the engine
+checks only after the click (Attack this turn, the founding doors, Declare it over, the Tech Pick)
+keeps refusing in the red line under the card; the map's right-click notices keep their words.
+
+**Why.** The designer: *"all refusals should explain why on mouseover."*
+
+## 14. What happens when a Ship attacks, and the game shows it
+
+The authority is [ticket #381](https://github.com/whaleyjoshua2/Dying-Earth/issues/381).
+
+**What happens is unchanged**: Attack is a stance on a stack; a Battle opens per orbit among every
+party there; up to three rounds of hits drawn by strength, the escort taking the fire for an
+unarmed hull, a damaged unit disengaging and being chased; every Ship in the orbit pays two Fuel;
+a destroyed Ship is gone with everyone aboard; a station whose defenders lose is untouched until
+it is bombarded, blockaded or landed on. What changes is what the game can show of it.
+
+**Every Battle keeps a round log**: the line as it opened, and for the opening and each round
+fought, every hit (which party landed it, on which unit, and whether the escort took it for an
+unarmed hull), every unit that disengaged and every pursuit hit, and where every unit stood when
+the round was over. Ground Battles keep the same log, the melee being one melee.
+
+**The Battle Report replays it and draws it.** Under each Battle's party lines, a picture per
+round: each party's line of units in the party's colour, a glyph and a row of pips per unit, the
+pips filled for the damage it carried and lit for the hits it took that round, a unit that left
+dimmed and a unit destroyed crossed; and under the picture the round's blows in words --
+*"The Prospectors hit TSV Valiant, covering TSV Beagle"*, *"TSV Beagle disengaged; the Prospectors
+gave chase and hit it"*.
+
+**The record lives one turn**, as every Battle line does, and is not saved beyond it.
+
+**Every Battle in orbit is a Moment**, bloodless or not (*"A Battle in orbit at Mars, low orbit:
+nobody lost a unit"*); a Battle that cost a unit keeps its own Moment and fires one, not two.
+
+**The chronicle keeps every Battle that cost a hull or a Battery**: one line each, with the date,
+the place, what was lost and who attacked, in a section of its own. An Army lost is the ground's
+ordinary business and is not kept.
+
+**Why.** The designer: *"what happens when a ship attacks a station or another ship and can we
+show it."* The one question a player could not answer was why they lost, and only a record answers
+it.
+
+## 15. An Attack is fought the moment it is ordered, and its Battle has a window of its own
+
+The authority is [ticket #383](https://github.com/whaleyjoshua2/Dying-Earth/issues/383).
+
+**An Attack is fought the moment it is confirmed**, on the board as it stands. The stack fights every
+orbit it holds Ships on Attack in, against every rival Ship and working Battery there -- an Attack
+in a station's orbit fights the station -- and the survivors stand on Hold. **A stack fights once a
+turn**: a second Attack at that Body that turn is refused, *"the stack fought this turn"*; every
+other order stays open to the survivors, so a stack that wins the orbit may land its cargo the same
+turn. The point of no return is the *Confirm Attack* button, which says so, and it is the only
+one: the stance row's Attack opens that confirm rather than fighting on a click. A fought Battle
+cannot be taken back as an order can, and **the Save button is dead for the rest of the turn**, a
+save being a turn start. **An Attack with nobody to fight is refused** -- no rival Ship or working
+Battery in any orbit the stack holds a Ship in -- rather than fought against nothing and counted as
+the turn's.
+
+**The computer's Attacks are fought as the Resolution opens**, the moment its orders are placed and
+before anything moves, on the same rule; the player always fights first in a turn. Because a Battle
+is fought before the transits and orbit changes land, **a hull still in flight never joins a Battle
+at its destination**, and a Ship changing orbit is not in its new orbit for one fought there. What
+the Resolution still opens itself is a Battery's Battle on a blockader, and an Intercept's on an
+arrival, as before. Ground Battles are unchanged: an Army's march into a rival place moves and
+fights at the Resolution. **Two stacks that Attack in one orbit in one turn fight two Battles**,
+one per Attack, the second against the first's survivors on Hold, where the old Resolution folded
+every aggressor into one melee. The Comms Blackout Event still stands the computer's stacks down
+before their Attacks are fought; it cannot reach a player's Attack fought before the Event was
+drawn.
+
+**Every Battle has a window of its own**: the party lines, the round picture and the replay of §14.
+The player's is raised the moment the Attack is fought; every Battle the Resolution fought is raised
+at the head of the next turn, one after another, before the tutorial's note, the card or the Event,
+the Moments and the Report. A Battle the player fought mid-turn is carried into that next Report
+with its headline, so the head of the turn, the map's mark and the Report all have it. The map's
+Battle mark opens that Battle's window. The Report keeps its
+one-line Battle headline and loses the Battle Report block; the Moment for a bloodless orbital
+Battle that §14 added goes, the window being the news.
+
+**Why.** The designer: *"can we take the battle report off the start of turn report and put it in
+its own window when the battle resolves. change that (if its not) to resolve prior to the end of
+the turn."*
+
+## 16. A condensed fund slider and fill bar in the top bar
+
+The authority is [ticket #382](https://github.com/whaleyjoshua2/Dying-Earth/issues/382).
+
+**The two Factions that bank a figure toward their Victory see it on the top bar's second row, to
+the right of the window buttons**: the Archivists their Archive fund, fed by the Research
+Directive; the Prospectors their Venture Capital Fund, fed by the Venture share. The widget is the
+fund's glyph and the setting, a rail a hundred and twenty pixels long with the same dimmed bound as
+the full control (the Prospectors' unreachable fifth), and a fill bar of the same width reading
+*"fund of bar"* in the Faction's colour, with the full control's sentence on hover. No Withdraw; that
+stays in the Victory window. **The Custodians and the Arkwrights see nothing**: their Directive pays
+out at once and banks nothing.
+
+**The condensed rail places the same order as the full one** -- `SetResearchDirective`,
+`SetVentureShare` -- through one shared placer, so the two never disagree and a refusal is held
+and said on either rail as ticket #380 decided. **The full controls stay unchanged** in the Tech
+Tree and the Victory window.
+
+**At a narrow width the row wraps**, as it already does, rather than clipping; at 1280 the widget
+still fits the second row.
+
+**Why.** The designer: *"for factions that have victory funds I'd like to see a condensed version of
+the slider and fill bar in the top bar (second row to the right of the window buttons)."*
+
+## What the closing sweep says
+
+`sweep -- 20 --seatings --balance --steps=300 --sinks=6`, eighty games, the per-Faction totals read at
+the foot of [`sweeps/final-0.09.2.txt`](../dev-diary/2026-09-25-version-0.09.2/sweeps/final-0.09.2.txt).
+
+- **Wins** Custodians 2, Prospectors 5, Arkwrights 0, Archivists 11; **collapses 62** (0.09.1: 6 / 28
+  / 3 / 2, collapses 41). The column turned over at equal starts (§12): the Archivists' starting
+  station carries a Heliostat and their home a Reactor, and they were first to the Moon in every
+  seed; the Prospectors' opening lost its Habitat to the Exchange in the one slot the Solar Array
+  leaves, and the two poor Regions the spread rule deals now carry the Refinery and Factory they
+  lacked, so every seat is stronger and the Prospectors' lead went.
+- **Victory gates completed** 73 / 68 / 64 / 65 of 80, median turns 23 / 25 / 24 / 23 -- every gate
+  earlier and more often than 0.09.1's 73 / 58 / 50 / 40.
+- **The Archive** stood in 18 of 20 seeds of the first seating (median turn 23) and was complete in
+  17, where 0.09.1 built it in 12 of 80 and finished 8.
+- **The orbital war**: Missile Carriers built 51 and 31 Launches over the eighty games; orbital
+  Battles opened 48, every Attack its own fight since §15.
+- Collapses moved within the version: 41 → 44 (#367) → 44 (#366) → 44 (#375) → 44 (#376) → 62 (#377)
+  → 62 (#383). A rising collapse rate is reported as a figure: every seat opens with a Refinery and
+  a Power Plant it may not have had, and the table burns faster.

@@ -321,10 +321,21 @@ pub struct Pending {
     /// second ground pass that lets them fight the turn they land.
     #[serde(default)]
     pub landed: Vec<ArmyId>,
+    /// Ticket #371 (version 0.09.2): the turn's Unrest, folded. What each Region's Unrest stood at
+    /// when the Resolution opened (or, for an Unrest pass run on its own, when the pass opened),
+    /// and every cause that moved it during the Resolution -- the Region, the words, and whether
+    /// the player was the one acting -- so the Report says one net line per Region at the end
+    /// instead of a line per cause in phase order.
+    #[serde(default)]
+    pub unrest_before: Vec<(StateId, f64)>,
+    #[serde(default)]
+    pub unrest_causes: Vec<(StateId, String, bool)>,
+    /// Ticket #366 (version 0.09.2): where each transfer's Report line stands this Resolution, so a
+    /// throw-off of the same place in the same pass can say both in that line's place.
+    #[serde(default)]
+    pub transfer_lines: Vec<(Place, usize)>,
     #[serde(default)]
     pub credit_buys: Vec<(Seat, i64, i64)>,
-    /// Attack orders in the order given, for battle ordering (spec 10.1).
-    pub attack_sequence: u32,
 }
 
 /// Ticket #343 (version 0.09.1): where a Missile Carrier may load another Warhead, or why it may
@@ -1032,10 +1043,13 @@ impl Game {
                 // Ticket #332 (version 0.09.0): and the Factory Module, since the designer's word was
                 // that a station has a Widget maker of its own; without it a station's Core made
                 // one Widget a turn for the whole game and a Shipyard there took eight turns.
-                if col.in_orbit
-                    && !matches!(kind, ModuleKind::Shipyard | ModuleKind::Habitat | ModuleKind::Observatory | ModuleKind::SolarArray | ModuleKind::TradePost | ModuleKind::Institute | ModuleKind::Academy | ModuleKind::Battery | ModuleKind::Factory)
-                {
-                    return fail("a station holds only a Shipyard, Habitats, Observatories, Solar Arrays, a Trade Post, an Institute, Batteries and Factories");
+                // Ticket #366 (version 0.09.2): the ONE predicate, `stands_on_a_station`, which answers
+                // by the job and so follows every Faction's own kind of a common Module. This was a
+                // second list of kinds, and a list of kinds cannot know about a Unique: the Exchange
+                // was refused on Tiangong while the build button offered it, and the Heliostat,
+                // station-only, could be built nowhere at all.
+                if col.in_orbit && !kind.stands_on_a_station() {
+                    return fail("a station holds only a Shipyard, Habitats, Observatories, Solar Arrays, a Trade Post, an Institute, Batteries and Factories, or a Faction's own kind of one");
                 }
                 // Ticket #186 (version 0.08.0): nobody but the Custodians builds an Academy off
                 // Earth either, captured ones included.
@@ -1057,8 +1071,9 @@ impl Game {
                     return fail(format!("a {} stands only on a station", kind.name()));
                 }
                 // Ticket #90: one Trade Post per Faction per Body, on the ground or in orbit.
-                if *kind == ModuleKind::TradePost
-                    && (self.trade_post_at_body(seat, col.body) || pending.iter().any(|o| o.build_module().map(|(c, k)| k == ModuleKind::TradePost && self.colony(c).map(|x| x.body == col.body).unwrap_or(false)).unwrap_or(false)))
+                // Ticket #366 (version 0.09.2): read by the job, so the Exchange is under the cap too.
+                if kind.does_the_job_of(ModuleKind::TradePost)
+                    && (self.trade_post_at_body(seat, col.body) || pending.iter().any(|o| o.build_module().map(|(c, k)| k.does_the_job_of(ModuleKind::TradePost) && self.colony(c).map(|x| x.body == col.body).unwrap_or(false)).unwrap_or(false)))
                 {
                     return fail(format!("you already hold a Trade Post at {}; one per Body", self.tables.body(col.body).name));
                 }
@@ -1257,6 +1272,11 @@ impl Game {
                 if s.seat != seat {
                     return fail("not your Ship");
                 }
+                // Ticket #375 (version 0.09.2): the hull a taken Distress Call turned aside stays
+                // this turn, which is what answering costs.
+                if self.card_holds_one_ship(seat) == Some(*ship) {
+                    return fail("held this turn, answering the Distress Call");
+                }
                 let ShipAt::Body(from) = s.at else { return fail("already in transit") };
                 if from == *to {
                     return fail("already there");
@@ -1291,6 +1311,10 @@ impl Game {
                 let Some(s) = self.ship(*ship) else { return fail("no such Ship") };
                 if s.seat != seat {
                     return fail("not your Ship");
+                }
+                // Ticket #375 (version 0.09.2): as a Transit, the held hull stays this turn.
+                if self.card_holds_one_ship(seat) == Some(*ship) {
+                    return fail("held this turn, answering the Distress Call");
                 }
                 let ShipAt::Body(body) = s.at else { return fail("a Ship in transit is between orbits") };
                 let want = Orbit::of(*slot);
@@ -1474,6 +1498,15 @@ impl Game {
                 // Ticket #297 (version 0.08.6): Dig In is an Army's stance.
                 if *stance == Stance::DigIn {
                     return fail("a Ship cannot dig in");
+                }
+                // Ticket #383 (version 0.09.2): an Attack is fought the moment it is ordered, and a
+                // stack fights once a turn; and an Attack with nobody to fight is refused rather
+                // than fought against nothing and counted as the turn's.
+                if *stance == Stance::Attack && self.fought.contains(&(seat, *body)) {
+                    return fail("the stack fought this turn; it may Attack again next turn");
+                }
+                if *stance == Stance::Attack && !self.attack_has_a_target(seat, *body) {
+                    return fail("no rival Ship or Battery in any orbit your Ships hold there");
                 }
                 // Ticket #278 (version 0.08.5): a Blockade is chosen against a place, so it wants a
                 // warship of the seat's sitting in an orbit it may shut. Ticket #335 (version
@@ -2021,6 +2054,26 @@ impl Game {
     }
 
     /// Validate a whole order list in sequence.
+    /// Ticket #383 (version 0.09.2): **a stack's stance, set as the order sets it**, for the order's
+    /// commit, for an Attack fought at once, and for the survivors standing down after. Ticket #278
+    /// (version 0.08.5): only a warship can blockade; the rest of a stack ordered to Blockade holds.
+    pub(crate) fn set_stack_stance(&mut self, seat: Seat, body: BodyId, stance: Stance) {
+        for s in self.ships.iter_mut().filter(|s| s.seat == seat && s.at == ShipAt::Body(body)) {
+            s.stance = if stance == Stance::Blockade && !s.kind.is_warship() { Stance::Hold } else { stance };
+        }
+    }
+
+    /// Ticket #383: whether an Attack at this Body has anything to fight -- a rival Ship or a rival
+    /// working Battery in some orbit the seat holds a Ship in. The "Attack this turn" button hides
+    /// itself on the same condition; the order is refused on it.
+    pub(crate) fn attack_has_a_target(&self, seat: Seat, body: BodyId) -> bool {
+        self.orbits_of(body).into_iter().any(|orbit| {
+            self.ships.iter().any(|s| s.seat == seat && self.ship_in_orbit(s, body, orbit) && !s.escaped)
+                && (self.ships.iter().any(|s| s.seat != seat && self.ship_in_orbit(s, body, orbit) && !s.escaped)
+                    || seat.others().iter().any(|o| !self.batteries_at(*o, body, orbit).is_empty()))
+        })
+    }
+
     pub fn check_orders(&self, seat: Seat, orders: &[Order]) -> Result<(), (usize, OrderError)> {
         for (i, o) in orders.iter().enumerate() {
             self.check_order(seat, &orders[..i], o).map_err(|e| (i, e))?;
@@ -2203,14 +2256,7 @@ impl Game {
                     self.log(format!("{} refuels {} with {} Fuel{}.", self.seat_name(seat), ship, amount, if at_partner { " at a partner's station" } else { "" }));
                 }
                 Order::ShipStance { body, stance } => {
-                    for s in self.ships.iter_mut().filter(|s| s.seat == seat && s.at == ShipAt::Body(*body)) {
-                        // Ticket #278 (version 0.08.5): only a warship can blockade; the rest of a
-                        // stack ordered to Blockade holds.
-                        s.stance = if *stance == Stance::Blockade && !s.kind.is_warship() { Stance::Hold } else { *stance };
-                    }
-                    if *stance == Stance::Attack {
-                        self.pending.attack_sequence += 1;
-                    }
+                    self.set_stack_stance(seat, *body, *stance);
                     // Ticket #335 (version 0.09.0): counted, so the sweep can say how often a
                     // Blockade is given now that a human can give one at all.
                     if *stance == Stance::Blockade {
@@ -2379,12 +2425,14 @@ impl Game {
                     let taught = self.take_emigrants(*state, n);
                     self.climate.launches_pending[seat.index()] += 1;
                     // Ticket #183 (version 0.08.0): a Spaceport earns for every Emigrant it lifts.
-                    self.pay_spaceport(seat, *state, n);
+                    let paid = self.pay_spaceport(seat, *state, n);
                     self.settle_people(*colony, n, taught);
                     let station = self.place_name(Place::Colony(*colony));
                     let line = format!("{} Pioneers lifted from {} to {}, for the {}.", n, self.tables.state(*state).name, station, self.seat_name(seat));
                     self.log(line);
-                    let text = self.say("emigrants_lifted", &[("n", n.to_string()), ("state", self.tables.state(*state).name.clone()), ("station", station.clone())]);
+                    // Ticket #366 (version 0.09.2): and what the Spaceport will pay for them, when.
+                    let spaceport = if paid > 0 { self.phrase("spaceport_pays", &[("n", paid.to_string())]) } else { String::new() };
+                    let text = self.say("emigrants_lifted", &[("n", n.to_string()), ("state", self.tables.state(*state).name.clone()), ("station", station.clone()), ("spaceport", spaceport)]);
                     self.report_line_of(seat, LineKind::YourWorks, LineKind::Note, Some(ReportPlace::Colony(*colony)), text);
                     // Ticket #353 (version 0.09.1): and WHO STAYED. A lift fills as far as the
                     // station's Habitat room goes now, where it refused the whole order before, so
@@ -2773,7 +2821,12 @@ impl Game {
             }
             Order::Unload { into, .. } => {
                 let where_ = match into {
-                    UnloadTarget::Slot(b, i) => format!("{} slot {}", self.tables.body(*b).name, i + 1),
+                    // Ticket #366 (version 0.09.2): the slot's NAME, as the founding line has said
+                    // since #353; this read "slot 1" for slot 0, the one 1-based figure left.
+                    UnloadTarget::Slot(b, i) => match self.tables.body(*b).slots.get(*i as usize) {
+                        Some(slot) => format!("{} on {}", slot.name, self.tables.body(*b).name),
+                        None => format!("{} slot {i}", self.tables.body(*b).name),
+                    },
                     UnloadTarget::Colony(c) => place(Place::Colony(*c)),
                 };
                 r("unload", &[("place", where_)])

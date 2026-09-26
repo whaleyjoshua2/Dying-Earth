@@ -23,6 +23,23 @@ impl BodyId {
     pub fn index(self) -> usize {
         self as usize
     }
+    /// Ticket #374 (version 0.09.2): the planet a Body is listed under -- itself for a planet, its
+    /// primary for a satellite. The ONE place the pairing is written: `Tables::planet` reads the
+    /// sky from it, `moons` is derived from it, and the loader refuses a `bodies.toml` whose
+    /// `parent` column disagrees with it, so a list can nest the Moon under Earth and Phobos and
+    /// Deimos under Mars and know the legs are priced the same way.
+    pub fn primary(self) -> BodyId {
+        match self {
+            BodyId::Moon => BodyId::Earth,
+            BodyId::Phobos | BodyId::Deimos => BodyId::Mars,
+            other => other,
+        }
+    }
+    /// Ticket #374: the satellites listed under a Body, in `ALL` order, read off `primary`; none
+    /// under a satellite, and none under Venus.
+    pub fn moons(self) -> Vec<BodyId> {
+        BodyId::ALL.into_iter().filter(|m| *m != self && m.primary() == self).collect()
+    }
     pub fn name(self) -> &'static str {
         match self {
             BodyId::Earth => "Earth",
