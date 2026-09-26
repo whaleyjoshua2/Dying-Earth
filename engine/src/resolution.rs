@@ -644,7 +644,7 @@ impl Game {
         // `dry_strength_share` of its strength, whichever side of the Battle it is on. Half of
         // nought is nought, so the Colony Ship, the Carrier and the Missile Carrier are untouched.
         let strength = if dry { self.ship_dry_strength(s) } else { self.ship_strength(s) };
-        Combatant::new(UnitRef::Ship(id), self.ship_name(s), strength, card.hit_points, s.damage, card.pursuit, s.stance == Stance::Evade).armed(s.kind.is_warship())
+        Combatant::new(UnitRef::Ship(id), self.ship_name(s), strength, card.hit_points, s.damage, card.pursuit, s.stance == Stance::Evade).armed(s.kind.is_warship()).kind(combat::BattleUnit::Ship(s.kind))
     }
 
     /// `defending`: the Army is not on the aggressor's side of this melee. Ticket #302 (version
@@ -947,7 +947,14 @@ impl Game {
         if any_escape {
             self.war.battles_with_escape += 1;
         }
-        let line = BattleLine { place: place.to_string(), parties: listed, result: format!("{} round(s).", stats.rounds), at };
+        let line = BattleLine { place: place.to_string(), parties: listed, result: format!("{} round(s).", stats.rounds), at, log: Some(stats.log.clone()) };
+        // Ticket #381 (version 0.09.2): a Battle that cost a hull or a Battery is kept for the
+        // chronicle; an Army lost is the ground's ordinary business and is not.
+        let fallen: Vec<String> = parties.iter().flat_map(|(_, _, c)| c.iter()).filter(|c| c.destroyed() && !matches!(c.unit, UnitRef::Army(_))).map(|c| c.name.clone()).collect();
+        if !fallen.is_empty() {
+            let attackers: Vec<Seat> = parties.iter().filter(|(_, agg, _)| *agg).filter_map(|(s, _, _)| *s).collect();
+            self.war.fallen.push(FallenBattle { turn: self.turn, place: place.to_string(), at, attackers, lost: fallen });
+        }
         // The Battle's own line goes in BEFORE the losses are applied, so among the rank-4 lines a
         // turn holds it is the earliest and headlines over "PMV Magellan destroyed (battle)".
         self.battle_line_and_moment(&line);
@@ -974,6 +981,11 @@ impl Game {
         self.report_line(kind, line.at, text);
         if !lost.is_empty() {
             self.moment(MomentKind::DecisiveBattle, &[("place", line.place.clone()), ("result", outcome), ("figure", format!("{} lost", lost.len()))], line.at);
+        } else if matches!(line.at, Some(ReportPlace::Orbit(..))) {
+            // Ticket #381 (version 0.09.2): every Battle in orbit is a Moment, bloodless or not, at
+            // the designer's word -- orbital Battles are rare, seven games in eighty, and every one
+            // is news. One Moment a Battle: a fatal one already has its own above.
+            self.moment(MomentKind::OrbitalBattle, &[("place", line.place.clone()), ("result", outcome), ("figure", line.result.clone())], line.at);
         }
     }
 
@@ -1253,6 +1265,7 @@ impl Game {
                 ],
                 result: text,
                 at,
+                log: None,
             });
         }
     }
@@ -1384,6 +1397,7 @@ impl Game {
                 ],
                 result: text,
                 at,
+                log: None,
             });
         }
     }

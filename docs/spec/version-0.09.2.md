@@ -321,3 +321,38 @@ checks only after the click (Attack this turn, the founding doors, Declare it ov
 keeps refusing in the red line under the card; the map's right-click notices keep their words.
 
 **Why.** The designer: *"all refusals should explain why on mouseover."*
+
+## 14. What happens when a Ship attacks, and the game shows it
+
+The authority is [ticket #381](https://github.com/whaleyjoshua2/Dying-Earth/issues/381).
+
+**What happens is unchanged**: Attack is a stance on a stack; a Battle opens per orbit among every
+party there; up to three rounds of hits drawn by strength, the escort taking the fire for an
+unarmed hull, a damaged unit disengaging and being chased; every Ship in the orbit pays two Fuel;
+a destroyed Ship is gone with everyone aboard; a station whose defenders lose is untouched until
+it is bombarded, blockaded or landed on. What changes is what the game can show of it.
+
+**Every Battle keeps a round log**: the line as it opened, and for the opening and each round
+fought, every hit (which party landed it, on which unit, and whether the escort took it for an
+unarmed hull), every unit that disengaged and every pursuit hit, and where every unit stood when
+the round was over. Ground Battles keep the same log, the melee being one melee.
+
+**The Battle Report replays it and draws it.** Under each Battle's party lines, a picture per
+round: each party's line of units in the party's colour, a glyph and a row of pips per unit, the
+pips filled for the damage it carried and lit for the hits it took that round, a unit that left
+dimmed and a unit destroyed crossed; and under the picture the round's blows in words --
+*"The Prospectors hit TSV Valiant, covering TSV Beagle"*, *"TSV Beagle disengaged; the Prospectors
+gave chase and hit it"*.
+
+**The record lives one turn**, as every Battle line does, and is not saved beyond it.
+
+**Every Battle in orbit is a Moment**, bloodless or not (*"A Battle in orbit at Mars, low orbit:
+nobody lost a unit"*); a Battle that cost a unit keeps its own Moment and fires one, not two.
+
+**The chronicle keeps every Battle that cost a hull or a Battery**: one line each, with the date,
+the place, what was lost and who attacked, in a section of its own. An Army lost is the ground's
+ordinary business and is not kept.
+
+**Why.** The designer: *"what happens when a ship attacks a station or another ship and can we
+show it."* The one question a player could not answer was why they lost, and only a record answers
+it.

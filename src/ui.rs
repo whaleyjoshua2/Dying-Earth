@@ -3728,6 +3728,124 @@ fn selected_ships(game: &Game, view: &ViewState) -> Option<(BodyId, Vec<ShipId>)
     }
 }
 
+/// Ticket #381 (version 0.09.2): **the Battle drawn and replayed**, under its lines in the Battle
+/// Report, at the designer's word: *"what happens when a ship attacks a station or another ship
+/// and can we show it."* One block per round of the log: each party's line of units in its colour,
+/// a glyph and a row of pips a unit, the pips filled for the damage it carried into the round and
+/// lit for the hits it took in it, a unit that left dimmed and one destroyed crossed; then the
+/// round's blows in words. The opening -- Evade rolls and their pursuit -- is drawn only when
+/// something happened in it.
+fn battle_log_view(ui: &mut Ui, session: &Session, game: &Game, b: &BattleLine, log: &dying_earth_engine::combat::BattleLog) {
+    let party_name = |i: usize| -> String { b.parties.get(i).and_then(|p| p.seat).map(|s| game.seat_name(s)).unwrap_or_else(|| "Neutral".to_string()) };
+    let party_colour = |i: usize| -> Color32 { b.parties.get(i).and_then(|p| p.seat).map(|s| seat_colour(session, s)).unwrap_or(Color32::LIGHT_GRAY) };
+    let unit_name = |party: usize, unit: usize| -> String { log.parties.get(party).and_then(|p| p.get(unit)).map(|u| u.name.clone()).unwrap_or_default() };
+    // The damage every unit carried into each round, and whether it stood engaged: the line as it
+    // opened, then each round's end.
+    let mut before: Vec<Vec<u32>> = log.parties.iter().map(|p| p.iter().map(|u| u.damage).collect()).collect();
+    let mut engaged: Vec<Vec<bool>> = log.parties.iter().map(|p| p.iter().map(|u| u.damage < u.hit_points).collect()).collect();
+    for (ri, round) in log.rounds.iter().enumerate() {
+        // The unarmed hulls a party's escort was covering this round, by name.
+        let covered = |party: usize| -> String {
+            let names: Vec<String> = log.parties.get(party).map(|p| p.iter().enumerate().filter(|(ci, u)| !u.armed && engaged[party][*ci]).map(|(_, u)| u.name.clone()).collect()).unwrap_or_default();
+            if names.is_empty() { "an unarmed hull".to_string() } else { Game::and_list(&names) }
+        };
+        let quiet = round.opening && round.left.is_empty() && round.chased.is_empty();
+        if !quiet {
+            ui.add_space(2.0);
+            ui.label(RichText::new(if round.opening { "   The opening".to_string() } else { format!("   Round {ri}") }).strong().size(13.0));
+            for (pi, units) in log.parties.iter().enumerate() {
+                ui.horizontal(|ui| {
+                    ui.add_space(12.0);
+                    ui.label(RichText::new(format!("{}:", party_name(pi))).color(party_colour(pi)).size(13.0));
+                    for (ci, u) in units.iter().enumerate() {
+                        let Some(state) = round.after.get(pi).and_then(|p| p.get(ci)) else { continue };
+                        let took = state.damage.saturating_sub(before[pi][ci]);
+                        battle_unit_tile(ui, u, *state, took, party_colour(pi));
+                    }
+                });
+            }
+            // The blows in words, in the order they landed.
+            for blow in &round.blows {
+                let covering = if blow.covering { format!(", covering {}", covered(blow.party)) } else { String::new() };
+                ui.label(RichText::new(format!("      The {} hit {}{covering}.", party_name(blow.by), unit_name(blow.party, blow.unit))).weak().size(13.0));
+            }
+            for (pi, ci) in &round.left {
+                let chase = round.chased.iter().find(|c| c.party == *pi && c.unit == *ci);
+                let words = match chase {
+                    Some(c) => format!("{} disengaged; the {} gave chase and hit it.", unit_name(*pi, *ci), party_name(c.by)),
+                    None => format!("{} disengaged and got away.", unit_name(*pi, *ci)),
+                };
+                ui.label(RichText::new(format!("      {words}")).weak().size(13.0));
+            }
+            for (pi, units) in round.after.iter().enumerate() {
+                for (ci, s) in units.iter().enumerate() {
+                    if s.destroyed && before[pi][ci] < log.parties[pi][ci].hit_points {
+                        ui.label(RichText::new(format!("      {} destroyed.", unit_name(pi, ci))).color(Color32::from_rgb(230, 120, 90)).size(13.0));
+                    }
+                }
+            }
+        }
+        for (pi, units) in round.after.iter().enumerate() {
+            for (ci, s) in units.iter().enumerate() {
+                before[pi][ci] = s.damage;
+                engaged[pi][ci] = s.engaged && !s.destroyed;
+            }
+        }
+    }
+}
+
+/// Ticket #381: one unit of the Battle picture: its kind's glyph and a pip per hit point, the pips
+/// filled for damage carried, lit red for hits taken this round; dimmed once it has left, crossed
+/// once it is destroyed. The hover names it and says what it took.
+fn battle_unit_tile(ui: &mut Ui, u: &dying_earth_engine::combat::LogUnit, state: dying_earth_engine::combat::UnitState, took: u32, colour: Color32) {
+    use dying_earth_engine::combat::BattleUnit;
+    const GLYPH: f32 = 16.0;
+    const PIP: f32 = 5.0;
+    let pips_w = u.hit_points as f32 * (PIP + 1.0);
+    let (rect, resp) = ui.allocate_exact_size(egui::vec2(GLYPH + 4.0 + pips_w + 6.0, GLYPH + 2.0), egui::Sense::hover());
+    let square = egui::Rect::from_min_size(rect.min + egui::vec2(0.0, 1.0), egui::vec2(GLYPH, GLYPH));
+    let kind = match u.kind {
+        BattleUnit::Ship(k) => Kind::of_unit(k),
+        BattleUnit::Army => Kind::Army,
+        BattleUnit::Battery => Kind::Station,
+    };
+    if kind == Kind::Army {
+        shield_glyph(ui.painter(), square);
+    } else if let Some(image) = kind.image(ui.ctx(), GLYPH) {
+        ui.put(square, image.tint(colour));
+    }
+    let painter = ui.painter();
+    for i in 0..u.hit_points {
+        let x = rect.min.x + GLYPH + 4.0 + i as f32 * (PIP + 1.0);
+        let pip = egui::Rect::from_min_size(egui::pos2(x, rect.center().y - PIP / 2.0), egui::vec2(PIP, PIP));
+        let hit_before = i < state.damage.saturating_sub(took);
+        let hit_now = !hit_before && i < state.damage;
+        let fill = if hit_now {
+            Color32::from_rgb(230, 80, 60)
+        } else if hit_before {
+            Color32::from_rgb(120, 60, 50)
+        } else {
+            Color32::from_gray(70)
+        };
+        painter.rect_filled(pip, 1.0, fill);
+    }
+    if state.destroyed {
+        let s = egui::Stroke::new(2.0, Color32::from_rgb(230, 80, 60));
+        painter.line_segment([square.left_top(), square.right_bottom()], s);
+        painter.line_segment([square.right_top(), square.left_bottom()], s);
+    } else if state.escaped || !state.engaged {
+        painter.rect_filled(rect, 2.0, Color32::from_rgba_unmultiplied(20, 20, 24, 150));
+    }
+    let fate = if state.destroyed {
+        "destroyed"
+    } else if state.escaped {
+        "left the Battle"
+    } else {
+        "engaged"
+    };
+    resp.on_hover_text(format!("{}: took {took} this round, damage {} of {}, {fate}.", u.name, state.damage, u.hit_points));
+}
+
 /// Ticket #311 (version 0.08.7): what the Battle ring's hover says, read from the record: who
 /// attacked, how long it ran, and each party's line, within the six-line rule.
 fn battle_summary(game: &Game, i: usize) -> String {
@@ -10493,6 +10611,10 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                                 ui.label(RichText::new(format!("   {who}{attacking}: {} (strength {}, {} hit(s) landed)", party.units, party.strength, party.hits)).color(colour));
                             }
                             ui.label(format!("   {}", b.result));
+                            // Ticket #381 (version 0.09.2): the round log, drawn and replayed.
+                            if let Some(log) = &b.log {
+                                battle_log_view(ui, session, game, b, log);
+                            }
                         }
                         ui.add_space(4.0);
                     }
@@ -10734,6 +10856,18 @@ fn chronicle_screen(root: &mut Ui, session: &Session, actions: &mut Vec<Action>)
 
             // 2. The table: nine figures a row, every one of them the engine's. The Stockpile alone
             // says least about a Faction that spent well, which is why the other five are here.
+            // Ticket #381 (version 0.09.2): a game's Battles are its story, so the ones that cost a
+            // hull or a Battery are kept and told here, one line each; an Army lost is the ground's
+            // ordinary business and is not.
+            ui.label(RichText::new("The Battles").size(20.0).strong());
+            if game.war.fallen.is_empty() {
+                ui.label(RichText::new("No Battle cost a hull or a Battery.").size(15.0).weak());
+            }
+            for f in &game.war.fallen {
+                let attacked = if f.attackers.is_empty() { String::new() } else { format!("; the {} attacked", Game::and_list(&f.attackers.iter().map(|s| game.seat_name(*s)).collect::<Vec<_>>())) };
+                ui.label(RichText::new(format!("{}: {} -- {} destroyed{attacked}.", game.date(f.turn).text(), f.place, Game::and_list(&f.lost))).size(15.0));
+            }
+            ui.add_space(12.0);
             ui.label(RichText::new("What each Faction ended the game holding").size(20.0).strong());
             ui.add_space(4.0);
             egui::Grid::new("chronicle_table").num_columns(10).spacing((18.0, 6.0)).striped(true).show(ui, |ui| {

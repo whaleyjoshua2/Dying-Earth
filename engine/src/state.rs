@@ -1057,8 +1057,24 @@ pub enum Tiebreak {
 /// printed no military figure of any kind and the engine's only count of Battles was a comment.
 /// Every figure is a counter incremented at the event, never a sentence scraped from the log; by
 /// seat where a seat is the actor.
+/// Ticket #381 (version 0.09.2): one Battle that cost a hull or a Battery, kept for the chronicle,
+/// since a game's Battles are its story and every Battle line is otherwise wiped at the next turn.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FallenBattle {
+    pub turn: u32,
+    pub place: String,
+    pub at: Option<ReportPlace>,
+    /// The seats whose orders opened it; none for a Battle nobody opened.
+    pub attackers: Vec<Seat>,
+    /// The hulls and Batteries destroyed, by name.
+    pub lost: Vec<String>,
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct WarCounters {
+    /// Ticket #381 (version 0.09.2): every Battle that cost a hull or a Battery, in order.
+    #[serde(default)]
+    pub fallen: Vec<FallenBattle>,
     /// Battles opened, by the seat that opened them; and Battles fought against a neutral Region's own Army.
     pub battles: [u32; SEAT_COUNT],
     pub battles_vs_neutral: u32,
@@ -1253,6 +1269,11 @@ pub struct BattleLine {
     /// above stays for the log and old saves.
     #[serde(default)]
     pub at: Option<ReportPlace>,
+    /// Ticket #381 (version 0.09.2): the round log, for the Battle Report to replay and draw. None
+    /// for a bombardment or a Launch, which are a roll and not a melee. It lives the one turn the
+    /// line lives.
+    #[serde(default)]
+    pub log: Option<crate::combat::BattleLog>,
 }
 
 impl BattleLine {

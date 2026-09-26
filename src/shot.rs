@@ -113,6 +113,8 @@ fn moment_from_id(name: &str) -> Option<MomentKind> {
         "control" => Some(MomentKind::ControlChanged),
         "climate" => Some(MomentKind::ClimateThreshold),
         "battle" => Some(MomentKind::DecisiveBattle),
+        // Ticket #381 (version 0.09.2): a Battle in orbit that cost nobody a unit.
+        "orbit" => Some(MomentKind::OrbitalBattle),
         "antarctica" => Some(MomentKind::Antarctica),
         "archive" => Some(MomentKind::ArchiveComplete),
         "lost" => Some(MomentKind::LostInTransit),

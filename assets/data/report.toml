@@ -383,6 +383,13 @@ on = true
 text = "A Battle at {place}: {result}"
 figure = "{figure}"
 
+# Ticket #381 (version 0.09.2): every Battle in orbit stops the turn, bloodless or not; a fatal one
+# is the decisive Battle above.
+[moments.orbital_battle]
+on = true
+text = "A Battle in orbit at {place}: {result}"
+figure = "{figure}"
+
 # Ticket #281 (version 0.08.5): buildings burned on a taking, under their own name. The Battle's
 # Moment fires when a unit dies now, an Army included, and names it.
 [moments.taken_by_force]
