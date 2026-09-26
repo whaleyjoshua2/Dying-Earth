@@ -397,3 +397,27 @@ Battle that §14 added goes, the window being the news.
 **Why.** The designer: *"can we take the battle report off the start of turn report and put it in
 its own window when the battle resolves. change that (if its not) to resolve prior to the end of
 the turn."*
+
+## 16. A condensed fund slider and fill bar in the top bar
+
+The authority is [ticket #382](https://github.com/whaleyjoshua2/Dying-Earth/issues/382).
+
+**The two Factions that bank a figure toward their Victory see it on the top bar's second row, to
+the right of the window buttons**: the Archivists their Archive fund, fed by the Research
+Directive; the Prospectors their Venture Capital Fund, fed by the Venture share. The widget is the
+fund's glyph and the setting, a rail a hundred and twenty pixels long with the same dimmed bound as
+the full control (the Prospectors' unreachable fifth), and a fill bar of the same width reading
+*"fund of bar"* in the Faction's colour, with the full control's sentence on hover. No Withdraw; that
+stays in the Victory window. **The Custodians and the Arkwrights see nothing**: their Directive pays
+out at once and banks nothing.
+
+**The condensed rail places the same order as the full one** -- `SetResearchDirective`,
+`SetVentureShare` -- through one shared placer, so the two never disagree and a refusal is held
+and said on either rail as ticket #380 decided. **The full controls stay unchanged** in the Tech
+Tree and the Victory window.
+
+**At a narrow width the row wraps**, as it already does, rather than clipping; at 1280 the widget
+still fits the second row.
+
+**Why.** The designer: *"for factions that have victory funds I'd like to see a condensed version of
+the slider and fill bar in the top bar (second row to the right of the window buttons)."*

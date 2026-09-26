@@ -2770,6 +2770,8 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
                     }
                 }
             }
+            // Ticket #382 (version 0.09.2): the fund at a glance, to the right of the buttons.
+            condensed_fund(ui, session, game, actions);
         });
     });
     // Ticket #292 (version 0.08.6): the bar's foot, measured, for every window that opens under it.
@@ -9239,6 +9241,186 @@ An Accord stands: {}.", terms.join(", ")));
 ///
 /// The Archivists' cap is 100 and everyone else's 50. Theirs was a switch until this version and
 /// that switch always sent ALL of it, so the slider keeps the reach.
+/// Ticket #382 (version 0.09.2): **the Research Directive's order, placed from either rail** -- the
+/// Tech Tree's full one or the top bar's condensed one -- so the two are one control drawn twice.
+/// The rail's response carries a refusal remembered until the next accepted setting (ticket #380).
+#[allow(clippy::too_many_arguments)]
+fn place_research_directive(ui: &mut Ui, session: &Session, game: &Game, actions: &mut Vec<Action>, resp: egui::Response, contribution: u8, standing: u8, pending_set: Option<u8>) {
+    let me = Seat(0);
+    let directive = 100 - contribution;
+    let refused = egui::Id::new("research_directive_refused");
+    if contribution != pending_set.unwrap_or(standing) {
+        // The cancel of this turn's earlier setting lands only with an accepted one, or on a return
+        // to the standing figure; a refused setting leaves the earlier one pending.
+        let earlier = session.pending.iter().position(|o| matches!(o, Order::SetResearchDirective { .. }));
+        if contribution != standing {
+            // Checked against the orders that will STAND once the one above is cancelled. Checked
+            // against `session.pending` as it is, the engine saw the order being cancelled and
+            // refused the new one as "already set this turn", so a second move of the slider in one
+            // turn was dropped without a word and the rail snapped back. A setting the engine still
+            // refuses holds the rail at the last accepted one -- `contribution` is read afresh each
+            // frame -- and says why on the rail.
+            let standing_orders: Vec<Order> = session.pending.iter().filter(|o| !matches!(o, Order::SetResearchDirective { .. })).cloned().collect();
+            let order = Order::SetResearchDirective { percent: directive };
+            match game.check_order(me, &standing_orders, &order) {
+                Ok(_) => {
+                    ui.ctx().data_mut(|d| d.remove_temp::<String>(refused));
+                    if let Some(i) = earlier {
+                        actions.push(Action::Cancel(i));
+                    }
+                    actions.push(Action::Place(order));
+                }
+                Err(e) => {
+                    ui.ctx().data_mut(|d| d.insert_temp(refused, e.0));
+                }
+            }
+        } else {
+            ui.ctx().data_mut(|d| d.remove_temp::<String>(refused));
+            if let Some(i) = earlier {
+                actions.push(Action::Cancel(i));
+            }
+        }
+    }
+    if let Some(why) = ui.ctx().data(|d| d.get_temp::<String>(refused)) {
+        rule_tip(resp, why);
+    }
+}
+
+/// Ticket #382: **the Venture share's order, placed from either rail**, as the Directive's above.
+#[allow(clippy::too_many_arguments)]
+fn place_venture_share(ui: &mut Ui, session: &Session, game: &Game, actions: &mut Vec<Action>, resp: egui::Response, share: u32, standing: u32, pending_set: Option<u32>) {
+    let me = Seat(0);
+    let refused = egui::Id::new("venture_share_refused");
+    if share != pending_set.unwrap_or(standing) {
+        let earlier = session.pending.iter().position(|o| matches!(o, Order::SetVentureShare { .. }));
+        if share != standing {
+            let standing_orders: Vec<Order> = session.pending.iter().filter(|o| !matches!(o, Order::SetVentureShare { .. })).cloned().collect();
+            let order = Order::SetVentureShare { share };
+            match game.check_order(me, &standing_orders, &order) {
+                Ok(_) => {
+                    ui.ctx().data_mut(|d| d.remove_temp::<String>(refused));
+                    if let Some(i) = earlier {
+                        actions.push(Action::Cancel(i));
+                    }
+                    actions.push(Action::Place(order));
+                }
+                Err(e) => {
+                    ui.ctx().data_mut(|d| d.insert_temp(refused, e.0));
+                }
+            }
+        } else {
+            ui.ctx().data_mut(|d| d.remove_temp::<String>(refused));
+            if let Some(i) = earlier {
+                actions.push(Action::Cancel(i));
+            }
+        }
+    }
+    if let Some(why) = ui.ctx().data(|d| d.get_temp::<String>(refused)) {
+        rule_tip(resp, why);
+    }
+}
+
+/// Ticket #382 (version 0.09.2): **the fund at a glance, on the top bar's second row**, at the
+/// designer's word: *"for factions that have victory funds I'd like to see a condensed version of
+/// the slider and fill bar in the top bar (second row to the right of the window buttons)."* For
+/// the two Factions that bank a figure toward their Victory -- the Archivists' Archive fund, fed by
+/// the Research Directive, and the Prospectors' Venture Capital Fund, fed by the Venture share --
+/// and nobody else: the fund's glyph and the setting, a rail a hundred and twenty pixels long with
+/// the same dimmed bounds as the full one, and a fill bar of the fund against its bar in the
+/// Faction's colour. It places the same order the full control places, through the same placer, so
+/// the two never disagree; the full control stays where it was, with the Withdraw. The row wraps,
+/// so at a narrow width the widget drops to a line of its own rather than clipping.
+fn condensed_fund(ui: &mut Ui, session: &Session, game: &Game, actions: &mut Vec<Action>) {
+    if session.spectator || session.screen != Screen::Playing {
+        return;
+    }
+    let me = Seat(0);
+    const RAIL: f32 = 120.0;
+    let colour = seat_colour(session, me);
+    match game.kind(me) {
+        FactionKind::Archivists => {
+            let cap = game.research_directive_cap(me);
+            let floor = 100 - cap;
+            let standing = 100 - game.seat(me).research_directive;
+            let pending_set = session.pending.iter().find_map(|o| match o {
+                Order::SetResearchDirective { percent } => Some(100 - *percent),
+                _ => None,
+            });
+            let mut contribution = pending_set.unwrap_or(standing);
+            ui.add_space(10.0);
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = 6.0;
+                icon_word(ui, "research", format!("{contribution}%")).on_hover_text(DIRECTIVE_SENTENCE);
+                let resp = condensed_rail(ui, &mut contribution, RAIL, |r, painter| {
+                    // The unreachable part below the floor, dimmed as the full rail dims it.
+                    if floor > 0 {
+                        let dim = egui::Rect::from_min_max(egui::pos2(r.min.x, r.center().y - 4.0), egui::pos2(r.min.x + r.width() * floor as f32 / 100.0, r.center().y + 4.0));
+                        painter.rect_filled(dim, 2.0, Color32::from_rgb(124, 104, 104));
+                    }
+                });
+                contribution = contribution.max(floor);
+                let fund = game.seat(me).archive_fund;
+                fund_bar(ui, colour, fund, game.tables.archive.research, RAIL, "The Archive fund");
+                place_research_directive(ui, session, game, actions, resp, contribution, standing, pending_set);
+            });
+        }
+        FactionKind::Prospectors => {
+            let cap = (game.tables.venture.max_share * 100.0).round() as u32;
+            let standing = (game.seat(me).venture_share * 100.0).round() as u32;
+            let pending_set = session.pending.iter().find_map(|o| if let Order::SetVentureShare { share } = o { Some(*share) } else { None });
+            let mut share = pending_set.unwrap_or(standing);
+            ui.add_space(10.0);
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = 6.0;
+                icon_word(ui, "ducats", format!("{share}%")).on_hover_text(VENTURE_SENTENCE);
+                let resp = condensed_rail(ui, &mut share, RAIL, |r, painter| {
+                    // The fifth no share may reach, dimmed as the full rail dims it.
+                    if cap < 100 {
+                        let dim = egui::Rect::from_min_max(egui::pos2(r.min.x + r.width() * cap as f32 / 100.0, r.center().y - 4.0), egui::pos2(r.max.x, r.center().y + 4.0));
+                        painter.rect_filled(dim, 2.0, Color32::from_rgb(124, 104, 104));
+                    }
+                });
+                share = share.min(cap);
+                let fund = game.seat(me).venture_fund;
+                fund_bar(ui, colour, fund, game.tables.faction(FactionKind::Prospectors).victory_first.bar as i64, RAIL, "The Venture Capital Fund");
+                place_venture_share(ui, session, game, actions, resp, share, standing, pending_set);
+            });
+        }
+        _ => {}
+    }
+}
+
+/// Ticket #382: the condensed rail, `width` long and a shade thinner than the full one, with the
+/// caller painting its dimmed bound over it.
+fn condensed_rail<T: egui::emath::Numeric>(ui: &mut Ui, value: &mut T, width: f32, dim: impl FnOnce(egui::Rect, &egui::Painter)) -> egui::Response {
+    let (was_width, was_interact) = (ui.spacing().slider_width, ui.spacing().interact_size);
+    ui.spacing_mut().slider_width = width;
+    ui.spacing_mut().interact_size.y = 16.0;
+    let resp = ui.add(egui::Slider::new(value, T::from_f64(0.0)..=T::from_f64(100.0)).show_value(false));
+    ui.spacing_mut().slider_width = was_width;
+    ui.spacing_mut().interact_size = was_interact;
+    dim(resp.rect, ui.painter());
+    resp
+}
+
+/// Ticket #382: **the fill bar**, the fund against its bar in the Faction's colour, the figures
+/// written on it, `width` by fourteen -- the shape of `research_race_bar`.
+fn fund_bar(ui: &mut Ui, colour: Color32, fund: i64, bar: i64, width: f32, what: &str) {
+    let (rect, resp) = ui.allocate_exact_size(egui::vec2(width, 14.0), egui::Sense::hover());
+    let painter = ui.painter_at(rect);
+    painter.rect_filled(rect, 3.0, Color32::from_gray(45));
+    let share = if bar > 0 { (fund as f32 / bar as f32).clamp(0.0, 1.0) } else { 0.0 };
+    if share > 0.0 {
+        painter.rect_filled(egui::Rect::from_min_size(rect.min, egui::vec2(rect.width() * share, rect.height())), 3.0, colour);
+    }
+    painter.text(rect.center(), egui::Align2::CENTER_CENTER, format!("{fund} of {bar}"), egui::FontId::proportional(11.0), Color32::from_gray(235));
+    resp.on_hover_text(format!("{what}: {fund} of the {bar} the Victory Condition asks."));
+}
+
+/// Ticket #382: the two full controls' own sentences, on the condensed widget's hover.
+const DIRECTIVE_SENTENCE: &str = "The share of your Research that goes to the shared Tech, from the next Income until you set it again. What you keep back never reaches the Tech, so it counts nothing toward the Research Lead -- and the Lead is the only seat that picks what the table researches next.";
+const VENTURE_SENTENCE: &str = "The share of each turn's Ducat income that goes into the Fund at Income, before you can spend a coin of it, from the next Income until you set it again. Ducats got by selling are not income and never reach it.";
+
 fn research_directive_control(ui: &mut Ui, session: &Session, game: &Game, actions: &mut Vec<Action>) {
     let me = Seat(0);
     let cap = game.research_directive_cap(me);
@@ -9255,9 +9437,7 @@ fn research_directive_control(ui: &mut Ui, session: &Session, game: &Game, actio
     });
     let mut contribution = pending_set.unwrap_or(standing);
 
-    ui.label(RichText::new(format!("Research Directive: {contribution}%")).strong()).on_hover_text(
-        "The share of your Research that goes to the shared Tech, from the next Income until you set it again. What you keep back never reaches the Tech, so it counts nothing toward the Research Lead -- and the Lead is the only seat that picks what the table researches next.",
-    );
+    ui.label(RichText::new(format!("Research Directive: {contribution}%")).strong()).on_hover_text(DIRECTIVE_SENTENCE);
 
     // The scale is 0 to 100 for EVERY Faction, so the four controls read alike and the Archivists'
     // extra reach is visible rather than implied: their slider runs the whole way, and everyone
@@ -9330,42 +9510,7 @@ fn research_directive_control(ui: &mut Ui, session: &Session, game: &Game, actio
 
     // Ticket #380 (version 0.09.2): a refused setting is remembered on the rail until the next
     // accepted one, so a rail that snapped back still says why when the pointer returns to it.
-    let refused = egui::Id::new("research_directive_refused");
-    if contribution != pending_set.unwrap_or(standing) {
-        // The cancel of this turn's earlier setting lands only with an accepted one, or on a return
-        // to the standing figure; a refused setting leaves the earlier one pending.
-        let earlier = session.pending.iter().position(|o| matches!(o, Order::SetResearchDirective { .. }));
-        if contribution != standing {
-            // Checked against the orders that will STAND once the one above is cancelled. Checked
-            // against `session.pending` as it is, the engine saw the order being cancelled and
-            // refused the new one as "already set this turn", so a second move of the slider in one
-            // turn was dropped without a word and the rail snapped back. A setting the engine still
-            // refuses holds the rail at the last accepted one -- `contribution` is read afresh each
-            // frame -- and says why on the rail.
-            let standing_orders: Vec<Order> = session.pending.iter().filter(|o| !matches!(o, Order::SetResearchDirective { .. })).cloned().collect();
-            let order = Order::SetResearchDirective { percent: directive };
-            match game.check_order(me, &standing_orders, &order) {
-                Ok(_) => {
-                    ui.ctx().data_mut(|d| d.remove_temp::<String>(refused));
-                    if let Some(i) = earlier {
-                        actions.push(Action::Cancel(i));
-                    }
-                    actions.push(Action::Place(order));
-                }
-                Err(e) => {
-                    ui.ctx().data_mut(|d| d.insert_temp(refused, e.0));
-                }
-            }
-        } else {
-            ui.ctx().data_mut(|d| d.remove_temp::<String>(refused));
-            if let Some(i) = earlier {
-                actions.push(Action::Cancel(i));
-            }
-        }
-    }
-    if let Some(why) = ui.ctx().data(|d| d.get_temp::<String>(refused)) {
-        rule_tip(resp, why);
-    }
+    place_research_directive(ui, session, game, actions, resp, contribution, standing, pending_set);
 }
 
 /// Ticket #256 (version 0.08.4): **the Venture Capital Fund's controls** on the Victory window, the
@@ -9390,9 +9535,7 @@ fn venture_fund_control(ui: &mut Ui, session: &Session, game: &Game, view: &mut 
     let pending_set = session.pending.iter().find_map(|o| if let Order::SetVentureShare { share } = o { Some(*share) } else { None });
     let mut share = pending_set.unwrap_or(standing);
 
-    ui.label(RichText::new(format!("Venture Capital Fund: banking {share}% of Ducat income")).strong()).on_hover_text(
-        "The share of each turn's Ducat income that goes into the Fund at Income, before you can spend a coin of it, from the next Income until you set it again. Ducats got by selling are not income and never reach it.",
-    );
+    ui.label(RichText::new(format!("Venture Capital Fund: banking {share}% of Ducat income")).strong()).on_hover_text(VENTURE_SENTENCE);
     // The same rail the Research Directive draws, a fifth larger than egui's default in both
     // dimensions; see `research_directive_control` for why both figures matter.
     let full = ui.available_width();
@@ -9430,34 +9573,7 @@ fn venture_fund_control(ui: &mut Ui, session: &Session, game: &Game, view: &mut 
     // Ticket #380 (version 0.09.2): as the Research Directive's rail, which this copies: the check
     // runs against the orders that will stand, and a refusal holds the rail and is remembered on
     // it until the next accepted setting.
-    let refused = egui::Id::new("venture_share_refused");
-    if share != pending_set.unwrap_or(standing) {
-        let earlier = session.pending.iter().position(|o| matches!(o, Order::SetVentureShare { .. }));
-        if share != standing {
-            let standing_orders: Vec<Order> = session.pending.iter().filter(|o| !matches!(o, Order::SetVentureShare { .. })).cloned().collect();
-            let order = Order::SetVentureShare { share };
-            match game.check_order(me, &standing_orders, &order) {
-                Ok(_) => {
-                    ui.ctx().data_mut(|d| d.remove_temp::<String>(refused));
-                    if let Some(i) = earlier {
-                        actions.push(Action::Cancel(i));
-                    }
-                    actions.push(Action::Place(order));
-                }
-                Err(e) => {
-                    ui.ctx().data_mut(|d| d.insert_temp(refused, e.0));
-                }
-            }
-        } else {
-            ui.ctx().data_mut(|d| d.remove_temp::<String>(refused));
-            if let Some(i) = earlier {
-                actions.push(Action::Cancel(i));
-            }
-        }
-    }
-    if let Some(why) = ui.ctx().data(|d| d.get_temp::<String>(refused)) {
-        rule_tip(resp, why);
-    }
+    place_venture_share(ui, session, game, actions, resp, share, standing, pending_set);
 
     // Withdraw: a field and a button, the Influence cluster's shape.
     ui.horizontal(|ui| {
