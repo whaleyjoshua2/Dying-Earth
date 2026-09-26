@@ -55,6 +55,27 @@ is what carries it to a pointer.
 |---|---|---|
 | [`dry-mars.png`](dry-mars.png) | `refuel:1 stack:1 ship:2 "tip:orbit change needs"` | **A dry Frigate's card** (TSV Vanguard, 0 of 30 Fuel): its three Move buttons greyed, and the hover reading the engine's refusal first, *"the tank holds 0 Fuel; an orbit change needs 1"*, then the door's description under it. |
 
+## The review
+
+Two axes, run as sub-agents over the commit, and both found the same latent bug the new Enter path
+reaches: the End Turn handler set the Refused popup of ticket #105 and then ran on into the
+post-turn chain, which overwrote it with last turn's Event or Report and cleared the selection --
+never seen before, since nothing reached the handler while the engine refused. The refusal branch
+is exclusive now. Both also found the sliders' refusal attached only on the frame of the drag, which
+egui never shows a tooltip on; a refused setting is remembered on the rail until the next accepted
+one. **Spec** found beside: the cancel of an earlier setting landing before the check, so a refused
+setting dropped the rail to the committed figure rather than the earlier accepted one (the cancel
+lands only with an accepted setting now); and ten greyed buttons outside the shared helpers hovering
+the refusal alone, not composed and not through `rule_tip` (composed and routed now). It noted three
+hand-written reasons -- the Max button's "Nothing left to spend", the loader's "Nobody is waiting",
+the card modal's shortfall sentence -- on controls with no engine order to check at that moment; they
+are the interface's own conditions and stand. **Standards** found the Army stack's march measuring
+its odds over every Army where the button now sends those that can (measured over the able set, and
+the face says "2 of 3" when it is not the whole stack), the hover width constant living apart from
+the line estimate that depends on it (together now), a stale doc on `orders_button` and on the
+`tip:` aid, a needless clone in `rule_tip`, and the sun and the spectator's button saying different
+things about an open window (one sentence now).
+
 ## The gate
 
 `cargo clippy --workspace --release --all-targets -- -D warnings` clean; engine 499 + 6, root 8.

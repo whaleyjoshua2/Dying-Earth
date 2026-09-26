@@ -1419,7 +1419,13 @@ pub fn draw(
                     // Ticket #337 (version 0.09.0): a turn refused because a card is still asking
                     // raises the CARD, not the refusal, so the answer it wants is one click away.
                     // Every other refusal speaks for itself, as it has since #105.
+                    // Ticket #380 (version 0.09.2): and NOTHING ELSE happens. The post-turn chain
+                    // below used to run on after this and overwrite the popup with last turn's
+                    // Event or Report and clear the selection, since the game had not moved. It was
+                    // never seen, because until this ticket nothing reached here while the engine
+                    // refused; Enter on a dead sun does now.
                     view.popup = if card_owed(session.game.as_ref()) { Popup::Card } else { Popup::Refused };
+                    continue;
                 }
                 view.selection = Selection::None;
                 let moments = session.game.as_ref().map(|g| view.moments_of(&session.tables, &g.report).len()).unwrap_or(0);
@@ -3890,7 +3896,8 @@ fn command_cluster(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewS
                         let check = game.check_order(Seat(0), &session.pending, &order);
                         let resp = ui.add_enabled(check.is_ok(), egui::Button::new(format!("Spend {amount} on {name}")));
                         if let Err(e) = &check {
-                            resp.clone().on_disabled_hover_text(&e.0);
+                            // Ticket #380 (version 0.09.2): through `rule_tip`, as every refusal.
+                            rule_tip(resp.clone(), e.0.clone());
                         }
                         if resp.on_hover_text(format!("Raise your Standing on {name}. Its card shows what it would take to hold or take it.")).clicked() {
                             actions.push(Action::Place(order));
@@ -3918,7 +3925,8 @@ fn command_cluster(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewS
                         let check = game.check_order(Seat(0), &session.pending, &order);
                         let resp = ui.add_enabled(check.is_ok(), button);
                         if let Err(e) = &check {
-                            resp.clone().on_disabled_hover_text(&e.0);
+                            // Ticket #380 (version 0.09.2): through `rule_tip`, as every refusal.
+                            rule_tip(resp.clone(), e.0.clone());
                         }
                         if resp.on_hover_text(format!("Spend all {influence_left} left this turn on {name}.")).clicked() {
                             view.influence_amount = influence_left;
@@ -3984,7 +3992,13 @@ fn command_cluster(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewS
             // Ticket #380 (version 0.09.2): the sun is drawn in an enabled Ui with `Sense::hover`
             // when dead, so to egui it is never disabled and `on_disabled_hover_text` never fired:
             // a dead sun hovered "End the turn" and no reason. One hover, chosen by the state.
-            let tip = if can_end_turn(game, view) { "End the turn (Enter).".to_string() } else { refusal };
+            let tip = if can_end_turn(game, view) {
+                "End the turn (Enter).".to_string()
+            } else if view.popup != Popup::None {
+                "Close the window first.".to_string()
+            } else {
+                refusal
+            };
             if resp.on_hover_text(tip).clicked() {
                 press_end_turn(session, game, view, actions);
             }
@@ -4741,31 +4755,28 @@ fn rule_tip(response: egui::Response, text: String) -> egui::Response {
     // so a greyed order button showed its description or nothing, and the engine's reason never
     // reached a pointer in play. The pictures looked right because the `tip:` aid above forces the
     // tooltip open whatever the state. The designer's rule: every refusal explains why on mouseover.
-    let shown = text.clone();
-    response.on_hover_ui(|ui| hover_with_icons(ui, &text)).on_disabled_hover_ui(|ui| hover_with_icons(ui, &shown))
+    response.on_hover_ui(|ui| hover_with_icons(ui, &text)).on_disabled_hover_ui(|ui| hover_with_icons(ui, &text))
 }
 
 /// Ticket #380 (version 0.09.2): **a greyed door's hover: the refusal first, the description after
 /// it if the two fit the six-line ceiling, the refusal alone if not.** The ceiling is estimated from
-/// the text -- a hover in the side panel wraps at about fifty-five characters -- since nothing here
-/// can measure a tooltip before it is drawn; the pictures are the check.
+/// the text (`hover_lines_estimate`), since nothing here can measure a tooltip before it is drawn;
+/// the pictures are the check.
 fn refusal_hover(refusal: &str, description: Option<&str>) -> String {
-    const CEILING: usize = 6;
     match description {
-        Some(d) if hover_lines_estimate(refusal) + 1 + hover_lines_estimate(d) <= CEILING => format!("{refusal}\n\n{d}"),
+        Some(d) if hover_lines_estimate(refusal) + 1 + hover_lines_estimate(d) <= HOVER_LINE_CEILING => format!("{refusal}\n\n{d}"),
         _ => refusal.to_string(),
     }
 }
 
 /// How many rendered lines a hover text takes, estimated: each newline-separated line wraps at
-/// about fifty-five characters at the side panel's width.
+/// `HOVER_CHARS_PER_LINE`, which is `HOVER_WIDTH` in the hover's face.
 fn hover_lines_estimate(text: &str) -> usize {
-    const CHARS_PER_LINE: usize = 55;
-    text.split('\n').map(|l| l.chars().count().div_ceil(CHARS_PER_LINE).max(1)).sum()
+    text.split('\n').map(|l| l.chars().count().div_ceil(HOVER_CHARS_PER_LINE).max(1)).sum()
 }
 
 /// Ticket #337 (version 0.09.0): the `tip:<word>` aid for a tooltip that is NOT a `rule_tip` -- the
-/// End Turn sun's, which is drawn by `on_hover_text` and `on_disabled_hover_text` and so never
+/// End Turn sun's, which is drawn by `on_hover_text` and so never
 /// passes through the function above. The reason a greyed End Turn gives is exactly the kind of
 /// thing that has to be photographed, and headless nothing hovers.
 fn forced_tip(text: &str) -> bool {
@@ -4872,8 +4883,16 @@ fn glyph_row(ui: &mut Ui, parts: &[RowPart], size: f32) {
 /// designer's rule is that the icons are used EXCLUSIVELY on mouse-overs -- the words stay
 /// everywhere a player reads at a glance, and the tooltips, which are the wordiest thing in the
 /// interface, trade them for pictures. Where an icon is missing the word comes straight back.
+/// Every hover in the game wraps at this width, whichever panel or window it hangs off.
+const HOVER_WIDTH: f32 = 360.0;
+/// Ticket #380 (version 0.09.2): about how many characters of the 14-point hover face fit in
+/// `HOVER_WIDTH`, for estimating a hover's rendered lines before it is drawn.
+const HOVER_CHARS_PER_LINE: usize = 55;
+/// The six-line ceiling every tooltip is held to; see `rule_tip`.
+const HOVER_LINE_CEILING: usize = 6;
+
 fn hover_with_icons(ui: &mut Ui, text: &str) {
-    ui.set_max_width(360.0);
+    ui.set_max_width(HOVER_WIDTH);
     text_with_icons(ui, text, 14.0, Color32::from_rgb(225, 220, 210));
 }
 
@@ -5451,9 +5470,10 @@ fn building_tip(game: &Game, session: &Session, place: Place, index: usize, b: &
 /// *"that's already stated"* -- and *"Once it stands"* became the turn count: `Ready next turn:` or
 /// `Ready in 2 turns:`, from the building's own card. Eight of the ten Facilities take one turn.
 /// Ticket #322 (version 0.08.8): a button that places SEVERAL orders at once -- a stack's march,
-/// a stack's transit, a Repair all -- at the designer's word that Armies stack for orders. It is
-/// enabled when every order it holds is legal on its own, priced at their sum, and its refusal is
-/// the first order's, since a stack is refused for one reason at a time.
+/// a stack's transit, a Repair all -- at the designer's word that Armies stack for orders.
+/// Ticket #380 (version 0.09.2): it is enabled when ANY order it holds is legal, places those,
+/// priced at their sum; greyed, it hovers the first refusal. Until this ticket it was enabled only
+/// when every order was legal, which greyed a whole march for one Army that could not go.
 fn orders_button(ui: &mut Ui, game: &Game, pending: &[Order], orders: Vec<Order>, label: &str, hover: Option<String>, actions: &mut Vec<Action>) {
     // Ticket #380 (version 0.09.2): the button takes EVERY candidate and places those the engine
     // accepts, which is what the glossary has said of a stack's buttons since ticket #322 -- "one
@@ -5624,9 +5644,11 @@ fn influence_row(ui: &mut Ui, game: &Game, session: &Session, view: &mut ViewSta
             let spend = ui.add_enabled(ok.is_ok(), egui::Button::new("Spend"));
             let needed = game.influence_needed_for(Seat(0), target);
             let mine = game.seat(Seat(0)).influence.get(&target).copied().unwrap_or(0);
+            let words = format!("Adds the figure beside it to your Standing here, now {mine}. You take this place at {needed}.");
+            // Ticket #380 (version 0.09.2): greyed, the refusal first and these words after it.
             let spend = match &ok {
-                Ok(_) => rule_tip(spend, format!("Adds the figure beside it to your Standing here, now {mine}. You take this place at {needed}.")),
-                Err(e) => spend.on_disabled_hover_text(e.0.clone()),
+                Ok(_) => rule_tip(spend, words),
+                Err(e) => rule_tip(spend, refusal_hover(&e.0, Some(&words))),
             };
             if spend.clicked() {
                 actions.push(Action::Place(order));
@@ -6640,6 +6662,7 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
                     let passage = matches!(ctrl, Control::Controlled(h) if h != Seat(0) && game.accord_has(Seat(0), h, Term::Passage));
                     let name = &game.tables.state(*n).name;
                     let label = format!("{} {name}", if own || passage { "move to" } else { "attack" });
+                    let able: Vec<ArmyId> = stack.iter().filter(|a| game.check_order(Seat(0), &session.pending, &Order::MoveArmy { army: a.id, to: *n }).is_ok()).map(|a| a.id).collect();
                     let hover = if own {
                         format!("{name}: held by you. Moving costs nothing; the stack keeps its stance.")
                     } else if let (true, Control::Controlled(h)) = (passage, ctrl) {
@@ -6647,8 +6670,12 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
                     } else {
                         // Ticket #339 (version 0.09.0): the whole stack marches, so the whole stack
                         // is what the Battle is measured with.
-                        attack_hover(ui.ctx(), game, Place::State(*n), name, &marching, false)
+                        // Ticket #380 (version 0.09.2): measured over the Armies that CAN go, since
+                        // the button now sends those and leaves the rest; the face says how many
+                        // when it is not the whole stack.
+                        attack_hover(ui.ctx(), game, Place::State(*n), name, if able.is_empty() { &marching } else { &able }, false)
                     };
+                    let label = if able.is_empty() || able.len() == marching.len() { label } else { format!("{label} ({} of {})", able.len(), marching.len()) };
                     let orders: Vec<Order> = stack.iter().map(|a| Order::MoveArmy { army: a.id, to: *n }).collect();
                     orders_button(ui, game, &session.pending, orders, &label, Some(hover), actions);
                 }
@@ -6657,9 +6684,9 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
             if hurt.len() > 1 {
                 ui.horizontal_wrapped(|ui| {
                     let repairs: Vec<Order> = hurt.iter().map(|a| Order::Repair { unit: UnitRef::Army(a.id), points: a.damage }).collect();
-                    orders_button(ui, game, &session.pending, repairs, "Repair all", Some("Every damaged Army of the stack repaired fully, for Materials.".to_string()), actions);
+                    orders_button(ui, game, &session.pending, repairs, "Repair all", Some("Every damaged Army of the stack the Materials cover, repaired fully.".to_string()), actions);
                     let repairs: Vec<Order> = hurt.iter().map(|a| Order::RepairWithDucats { unit: UnitRef::Army(a.id), points: a.damage }).collect();
-                    orders_button(ui, game, &session.pending, repairs, "Repair all with Ducats", Some("Every damaged Army of the stack repaired fully, for Ducats.".to_string()), actions);
+                    orders_button(ui, game, &session.pending, repairs, "Repair all with Ducats", Some("Every damaged Army of the stack the Ducats cover, repaired fully.".to_string()), actions);
                 });
             }
         }
@@ -7206,12 +7233,13 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
                 let materials = game.order_cost(Seat(0), &order).materials;
                 let check = game.check_order(Seat(0), &session.pending, &order);
                 let label = format!("Build the Archive ({materials} Materials)");
-                let resp = ui
-                    .add_enabled(check.is_ok(), egui::Button::new(label))
-                    .on_hover_text(format!("{}; then the fund opens to the full {research} Research", build_words(game, &order).unwrap_or_default()));
-                if let Err(e) = &check {
-                    resp.clone().on_disabled_hover_text(&e.0);
-                }
+                let words = format!("{}; then the fund opens to the full {research} Research", build_words(game, &order).unwrap_or_default());
+                let resp = ui.add_enabled(check.is_ok(), egui::Button::new(label));
+                // Ticket #380 (version 0.09.2): one hover for the state, the refusal first when greyed.
+                let resp = match &check {
+                    Ok(_) => rule_tip(resp, words),
+                    Err(e) => rule_tip(resp, refusal_hover(&e.0, Some(&words))),
+                };
                 if resp.clicked() {
                     actions.push(Action::Place(order));
                 }
@@ -8098,7 +8126,8 @@ fn credits_offer_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut V
         let check = game.check_order(me, &session.pending, &order);
         let resp = ui.add_enabled(check.is_ok(), egui::Button::new(format!("Offer {} ppm a turn", view.credits_offer)));
         if let Err(e) = &check {
-            resp.clone().on_disabled_hover_text(&e.0);
+            // Ticket #380 (version 0.09.2): through `rule_tip`, as every refusal.
+            rule_tip(resp.clone(), e.0.clone());
         }
         if resp.on_hover_text("Stands from next turn until you set it again; nought refuses everyone.").clicked() {
             actions.push(Action::Place(order));
@@ -8130,7 +8159,8 @@ fn credits_request_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut
                 let check = game.check_order(me, &session.pending, &order);
                 let resp = ui.add_enabled(check.is_ok(), egui::Button::new(format!("Request {} ppm for {cost} Ducats", view.credits_amount)));
                 if let Err(e) = &check {
-                    resp.clone().on_disabled_hover_text(&e.0);
+                    // Ticket #380 (version 0.09.2): through `rule_tip`, as every refusal.
+                    rule_tip(resp.clone(), e.0.clone());
                 }
                 if resp.on_hover_text("Off your Blame at End Turn. If others request first and the offer runs out, the Ducats for what you did not get come back.").clicked() {
                     actions.push(Action::Place(order));
@@ -9120,26 +9150,43 @@ fn research_directive_control(ui: &mut Ui, session: &Session, game: &Game, actio
     };
     ui.label(RichText::new(pot_text).color(pot_colour));
 
+    // Ticket #380 (version 0.09.2): a refused setting is remembered on the rail until the next
+    // accepted one, so a rail that snapped back still says why when the pointer returns to it.
+    let refused = egui::Id::new("research_directive_refused");
     if contribution != pending_set.unwrap_or(standing) {
-        if let Some(i) = session.pending.iter().position(|o| matches!(o, Order::SetResearchDirective { .. })) {
-            actions.push(Action::Cancel(i));
-        }
+        // The cancel of this turn's earlier setting lands only with an accepted one, or on a return
+        // to the standing figure; a refused setting leaves the earlier one pending.
+        let earlier = session.pending.iter().position(|o| matches!(o, Order::SetResearchDirective { .. }));
         if contribution != standing {
-            // Ticket #380 (version 0.09.2): checked against the orders that will STAND once the
-            // one above is cancelled. Checked against `session.pending` as it is, the engine saw
-            // the order being cancelled and refused the new one as "already set this turn", so a
-            // second move of the slider in one turn was dropped without a word and the rail snapped
-            // back. A setting the engine still refuses holds the rail at the last accepted one --
-            // `contribution` is read afresh each frame -- and says why on the rail.
+            // Checked against the orders that will STAND once the one above is cancelled. Checked
+            // against `session.pending` as it is, the engine saw the order being cancelled and
+            // refused the new one as "already set this turn", so a second move of the slider in one
+            // turn was dropped without a word and the rail snapped back. A setting the engine still
+            // refuses holds the rail at the last accepted one -- `contribution` is read afresh each
+            // frame -- and says why on the rail.
             let standing_orders: Vec<Order> = session.pending.iter().filter(|o| !matches!(o, Order::SetResearchDirective { .. })).cloned().collect();
             let order = Order::SetResearchDirective { percent: directive };
             match game.check_order(me, &standing_orders, &order) {
-                Ok(_) => actions.push(Action::Place(order)),
+                Ok(_) => {
+                    ui.ctx().data_mut(|d| d.remove_temp::<String>(refused));
+                    if let Some(i) = earlier {
+                        actions.push(Action::Cancel(i));
+                    }
+                    actions.push(Action::Place(order));
+                }
                 Err(e) => {
-                    rule_tip(resp, e.0);
+                    ui.ctx().data_mut(|d| d.insert_temp(refused, e.0));
                 }
             }
+        } else {
+            ui.ctx().data_mut(|d| d.remove_temp::<String>(refused));
+            if let Some(i) = earlier {
+                actions.push(Action::Cancel(i));
+            }
         }
+    }
+    if let Some(why) = ui.ctx().data(|d| d.get_temp::<String>(refused)) {
+        rule_tip(resp, why);
     }
 }
 
@@ -9202,22 +9249,36 @@ fn venture_fund_control(ui: &mut Ui, session: &Session, game: &Game, view: &mut 
         ))
         .weak(),
     );
+    // Ticket #380 (version 0.09.2): as the Research Directive's rail, which this copies: the check
+    // runs against the orders that will stand, and a refusal holds the rail and is remembered on
+    // it until the next accepted setting.
+    let refused = egui::Id::new("venture_share_refused");
     if share != pending_set.unwrap_or(standing) {
-        if let Some(i) = session.pending.iter().position(|o| matches!(o, Order::SetVentureShare { .. })) {
-            actions.push(Action::Cancel(i));
-        }
+        let earlier = session.pending.iter().position(|o| matches!(o, Order::SetVentureShare { .. }));
         if share != standing {
-            // Ticket #380 (version 0.09.2): as the Research Directive's rail, which this copies: the
-            // check runs against the orders that will stand, and a refusal holds the rail and says why.
             let standing_orders: Vec<Order> = session.pending.iter().filter(|o| !matches!(o, Order::SetVentureShare { .. })).cloned().collect();
             let order = Order::SetVentureShare { share };
             match game.check_order(me, &standing_orders, &order) {
-                Ok(_) => actions.push(Action::Place(order)),
+                Ok(_) => {
+                    ui.ctx().data_mut(|d| d.remove_temp::<String>(refused));
+                    if let Some(i) = earlier {
+                        actions.push(Action::Cancel(i));
+                    }
+                    actions.push(Action::Place(order));
+                }
                 Err(e) => {
-                    rule_tip(resp, e.0);
+                    ui.ctx().data_mut(|d| d.insert_temp(refused, e.0));
                 }
             }
+        } else {
+            ui.ctx().data_mut(|d| d.remove_temp::<String>(refused));
+            if let Some(i) = earlier {
+                actions.push(Action::Cancel(i));
+            }
         }
+    }
+    if let Some(why) = ui.ctx().data(|d| d.get_temp::<String>(refused)) {
+        rule_tip(resp, why);
     }
 
     // Withdraw: a field and a button, the Influence cluster's shape.
@@ -9229,7 +9290,8 @@ fn venture_fund_control(ui: &mut Ui, session: &Session, game: &Game, view: &mut 
         let back = (view.venture_withdraw as f64 * v.draw_return).floor() as i64;
         let resp = ui.add_enabled(check.is_ok(), egui::Button::new("Withdraw from the Fund"));
         if let Err(e) = &check {
-            resp.clone().on_disabled_hover_text(&e.0);
+            // Ticket #380 (version 0.09.2): through `rule_tip`, as every refusal.
+            rule_tip(resp.clone(), e.0.clone());
         }
         if resp.on_hover_text(format!("{back} Ducats come back to the Stockpile at End Turn; a tenth is lost on the way out.")).clicked() {
             actions.push(Action::Place(order));
@@ -9329,7 +9391,8 @@ fn smear_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     let check = game.check_order(me, &session.pending, &order);
     let resp = ui.add_enabled(check.is_ok(), egui::Button::new(format!("Smear the {} with {amount} Influence", game.seat_name(other))));
     if let Err(e) = &check {
-        resp.clone().on_disabled_hover_text(&e.0);
+        // Ticket #380 (version 0.09.2): through `rule_tip`, as every refusal.
+        rule_tip(resp.clone(), e.0.clone());
     }
     if resp.on_hover_text(format!("{:.0} ppm on their Blame at End Turn.", amount as f64 * rate)).clicked() {
         actions.push(Action::Place(order));
@@ -9376,7 +9439,8 @@ fn greenwash_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewS
     let check = game.check_order(me, &session.pending, &order);
     let resp = ui.add_enabled(check.is_ok(), egui::Button::new(format!("Greenwash with {amount} Influence for {} Ducats", amount * per)));
     if let Err(e) = &check {
-        resp.clone().on_disabled_hover_text(&e.0);
+        // Ticket #380 (version 0.09.2): through `rule_tip`, as every refusal.
+        rule_tip(resp.clone(), e.0.clone());
     }
     if resp.on_hover_text(format!("{:.0} ppm off your Blame at End Turn.", amount as f64 * rate)).clicked() {
         actions.push(Action::Place(order));
@@ -9448,9 +9512,11 @@ fn accords_block(ui: &mut Ui, session: &Session, game: &Game, other: Seat, actio
         } else {
             let ok = game.check_order(me, &session.pending, &order);
             let resp = ui.add_enabled(ok.is_ok(), egui::Button::new(format!("Offer the {} an Accord", game.seat_name(other))));
+            let words = "They answer this turn, by their own reckoning. A refusal costs you nothing: it is not an offence.";
+            // Ticket #380 (version 0.09.2): greyed, the refusal first and these words after it.
             let resp = match &ok {
-                Ok(_) => resp.on_hover_text("They answer this turn, by their own reckoning. A refusal costs you nothing: it is not an offence."),
-                Err(e) => resp.on_disabled_hover_text(e.0.clone()),
+                Ok(_) => rule_tip(resp, words.to_string()),
+                Err(e) => rule_tip(resp, refusal_hover(&e.0, Some(words))),
             };
             if resp.clicked() {
                 actions.push(Action::Place(order));
