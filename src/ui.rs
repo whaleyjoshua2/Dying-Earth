@@ -8332,15 +8332,14 @@ fn battery_rules(game: &Game, col: &Colony) -> String {
     // station's ring, a ground Colony's low orbit -- which narrows what ticket #324 gave it, at the
     // designer's word. The hover names the orbit, and says what denying that one orbit is worth.
     let orbit = game.orbit_name(col.body, game.colony_orbit(col));
+    // Ticket #363 (version 0.09.1): cut to three short lines to fit the six a hover is allowed, and
+    // a station's Battery now fires on a blockader in its orbit.
     let worth = if col.in_orbit {
-        "no rival's Blockade shuts this station"
+        "no rival's Blockade shuts this station, and a blockader here is fired on"
     } else {
-        "no rival holds Orbital Control, which is of low orbit, so none may land on the ground"
+        "no rival holds Orbital Control of low orbit, so none may land"
     };
-    format!(
-        "\nA Battery covers ONE orbit, its own: {orbit}. It stands in the line of any Battle fought there, on Hold, and never disengages, and it denies nothing in any other orbit of this Body. While it stands and works, {worth}; its owner gains no Control by it. Repaired with Materials here, as a Ship is; at {} hits it is destroyed.",
-        card.hit_points
-    )
+    format!("\nCovers {orbit} alone, and fights in any Battle there.\nWhile it works, {worth}.\nRepaired here with Materials; destroyed at {} hits.", card.hit_points)
 }
 
 /// The words a box's hover adds to an offline building's line, and nothing for a working or a
@@ -8446,7 +8445,9 @@ fn module_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
         // hit points on its label, as a shield wears an Army's.
         let mut label = m.kind.name().to_string();
         if m.kind == ModuleKind::Battery {
-            tip.push_str(&battery_rules(game, col));
+            // Ticket #363 (version 0.09.1): the heading and the Battery's own rules alone. With the
+            // generic Energy and Mothball sentences it ran to thirteen rendered lines against six.
+            tip = format!("{}{}{}", module_line(game, col, cid, mi, director), module_offline_words(col, m), battery_rules(game, col));
             if m.damage > 0 {
                 let hp = game.tables.module(ModuleKind::Battery).hit_points;
                 label = format!("Battery {}/{}", hp.saturating_sub(m.damage), hp);

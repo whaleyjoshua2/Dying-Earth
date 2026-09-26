@@ -182,7 +182,17 @@ impl Game {
         // landing both wait on low orbit.
         let settling = !self.free_slots_on(body).is_empty() && self.ships.iter().any(|s| bound_here(s) && s.colonists > 0);
         let landing = self.ships.iter().any(|s| bound_here(s) && s.army.is_some());
-        on_the_ground || settling || landing
+        // Ticket #363 (version 0.09.1): an armed Missile Carrier of its own here with a target on the
+        // ground -- a Region, over Earth, or a ground Colony -- fires from low orbit held outright, so
+        // the garrison that holds it stays. Traced: in 12 of 14 turns an armed carrier sat ready in
+        // Earth's low orbit, its seat's warships left for a ring in the same turn and the Launch
+        // failed at Resolution with the orbit no longer held.
+        let firing = self.ships.iter().any(|s| bound_here(s) && s.kind == UnitKind::MissileCarrier && s.warhead)
+            && self.nuke_targets(seat).iter().any(|t| match t {
+                Place::State(_) => body == BodyId::Earth,
+                Place::Colony(c) => self.colony(*c).is_some_and(|c| c.body == body && !c.in_orbit),
+            });
+        on_the_ground || settling || landing || firing
     }
 
     /// Ticket #335 (version 0.09.0): this seat's warships holding low orbit at a Body, counting the
@@ -1490,7 +1500,15 @@ impl Game {
                 } else if best_yard != Some(cid) {
                     continue;
                 }
-                push(vec![Order::BuildShip { site: Place::Colony(cid), kind: uk }], cat, self.base_weight(seat, cat), gap_for(cat, None), if cat == Cat::Warship { war_threat } else { 1.0 }, 1.0, format!("build {} at {}", uk.name(), self.place_name(Place::Colony(cid))), None);
+                // Ticket #363 (version 0.09.1): a wanted Missile Carrier takes the threat's lift, as a
+                // warship with cause does. Measured before: after the Tech, a seat had a target and a
+                // yard in 561 seat-turns and never once queued a carrier.
+                let lift = match cat {
+                    Cat::Warship => war_threat,
+                    Cat::MissileCarrier => m.threat,
+                    _ => 1.0,
+                };
+                push(vec![Order::BuildShip { site: Place::Colony(cid), kind: uk }], cat, self.base_weight(seat, cat), gap_for(cat, None), lift, 1.0, format!("build {} at {}", uk.name(), self.place_name(Place::Colony(cid))), None);
             }
         }
 
@@ -2195,7 +2213,17 @@ impl Game {
             // Refuel is offered where the Ship already sits at one; the orbit change that reaches
             // it is the candidate below.
             let orbit = self.ship_orbit(s);
-            if s.fuel < card.tank && self.refuelling_station(seat, body, orbit) && self.seat(seat).stockpile.fuel > 0 {
+            // Ticket #363 (version 0.09.1): an armed Missile Carrier with a target in reach of the
+            // orbit it sits in fires rather than tops up: a Ship takes one order a turn, and a
+            // carrier that went to refuel on the turn it fired was the whole reason no computer
+            // Launch ever landed.
+            let ready_to_fire = s.kind == UnitKind::MissileCarrier
+                && s.warhead
+                && self.nuke_targets(seat).iter().any(|t| match t {
+                    Place::State(_) => body == BodyId::Earth && orbit.is_low(),
+                    Place::Colony(c) => self.colony(*c).is_some_and(|c| c.body == body && self.colony_orbit(c) == orbit),
+                });
+            if s.fuel < card.tank && self.refuelling_station(seat, body, orbit) && self.seat(seat).stockpile.fuel > 0 && !ready_to_fire {
                 push(
                     vec![Order::Refuel { ship: s.id }],
                     Cat::Transit,
@@ -2218,7 +2246,14 @@ impl Game {
             // Mars unfounded, and a move toward that station must not reopen it.
             if s.fuel >= self.tables.orbit_change_fuel {
                 let mut wants: Vec<(Orbit, String, Cat, f64)> = Vec::new();
-                if s.fuel < card.tank && self.seat(seat).stockpile.fuel > 0 && !self.refuelling_station(seat, body, orbit) {
+                // Ticket #363 (version 0.09.1): a warship HOLDING THE LANE -- the low-orbit garrison of a
+                // Body whose ground the seat wants -- does not leave it to top up a tank that can
+                // still pay for a Battle. Traced: every warship holding Earth's low orbit for a
+                // ready Missile Carrier changed orbit to its own station's ring to refuel on the
+                // very turn the carrier fired, and the Launch failed with the orbit given up.
+                let on_the_lane = s.kind.is_warship() && orbit.is_low() && self.ai_wants_the_ground(seat, body) && self.ai_low_orbit_garrison(seat, body).contains(&s.id);
+                let can_fight = s.fuel >= self.tables.melee.battle_fuel;
+                if s.fuel < card.tank && self.seat(seat).stockpile.fuel > 0 && !self.refuelling_station(seat, body, orbit) && !(on_the_lane && can_fight) && !ready_to_fire {
                     for c in self.colonies.iter().filter(|c| c.body == body && self.fuels_for(c, seat)) {
                         wants.push((Orbit::Slot(c.slot), format!("to refuel at {}", self.place_name(Place::Colony(c.id))), Cat::Transit, self.base_weight(seat, Cat::Transit)));
                     }

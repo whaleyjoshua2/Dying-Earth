@@ -1268,7 +1268,7 @@ impl Game {
                 if s.arrived_this_turn {
                     return fail("arrived this turn; it may act next turn");
                 }
-                if pending.iter().any(|o| matches!(o, Order::Transit { ship: x, .. } | Order::Load { ship: x, .. } | Order::Unload { ship: x, .. } | Order::Refuel { ship: x } | Order::ChangeOrbit { ship: x, .. } if x == ship)) {
+                if pending.iter().any(|o| matches!(o, Order::Transit { ship: x, .. } | Order::Load { ship: x, .. } | Order::Unload { ship: x, .. } | Order::Refuel { ship: x } | Order::Launch { ship: x, .. } | Order::Rearm { ship: x } | Order::Bombard { ship: x, .. } | Order::ChangeOrbit { ship: x, .. } if x == ship)) {
                     return fail("this Ship already has an order");
                 }
                 // Ticket #99 (version 0.07.0): the Orbital Slot it arrives into, chosen with the leg.
@@ -1309,7 +1309,7 @@ impl Game {
                     return fail(format!("the tank holds {} Fuel; an orbit change needs {fuel}", s.fuel));
                 }
                 if pending.iter().any(|o| {
-                    matches!(o, Order::Transit { ship: x, .. } | Order::Load { ship: x, .. } | Order::Unload { ship: x, .. } | Order::Refuel { ship: x } | Order::Bombard { ship: x, .. } | Order::ChangeOrbit { ship: x, .. } if x == ship)
+                    matches!(o, Order::Transit { ship: x, .. } | Order::Load { ship: x, .. } | Order::Unload { ship: x, .. } | Order::Refuel { ship: x } | Order::Bombard { ship: x, .. } | Order::Launch { ship: x, .. } | Order::Rearm { ship: x } | Order::ChangeOrbit { ship: x, .. } if x == ship)
                 }) {
                     return fail("this Ship already has an order");
                 }
@@ -1346,7 +1346,7 @@ impl Game {
                 if cost.fuel <= 0 {
                     return fail("no Fuel in the Stockpile to fill it with");
                 }
-                if pending.iter().any(|o| matches!(o, Order::Transit { ship: x, .. } | Order::Refuel { ship: x } | Order::ChangeOrbit { ship: x, .. } if x == ship)) {
+                if pending.iter().any(|o| matches!(o, Order::Transit { ship: x, .. } | Order::Refuel { ship: x } | Order::Launch { ship: x, .. } | Order::Rearm { ship: x } | Order::Bombard { ship: x, .. } | Order::ChangeOrbit { ship: x, .. } if x == ship)) {
                     return fail("this Ship already has an order");
                 }
                 Ok(cost)

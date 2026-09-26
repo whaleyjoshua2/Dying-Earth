@@ -242,9 +242,17 @@ impl Game {
         // station's Battery never fires on a fight in low orbit.
         for body in BodyId::ALL {
             for orbit in self.orbits_of(body) {
+                // Ticket #363 (version 0.09.1): **a working Battery opens a Battle on a rival warship
+                // on Blockade in its own orbit**, at the designer's word, so a defended station under
+                // Blockade is a fight and not merely a void Blockade. Its holder is the side that
+                // opens it, and pays the offence for it as any aggressor does.
                 let aggressors: Vec<Seat> = Seat::ALL
                     .into_iter()
-                    .filter(|seat| self.ships.iter().any(|s| s.seat == *seat && self.ship_in_orbit(s, body, orbit) && s.stance == Stance::Attack && !s.escaped))
+                    .filter(|seat| {
+                        self.ships.iter().any(|s| s.seat == *seat && self.ship_in_orbit(s, body, orbit) && s.stance == Stance::Attack && !s.escaped)
+                            || (!self.batteries_at(*seat, body, orbit).is_empty()
+                                && self.ships.iter().any(|s| s.seat != *seat && self.ship_in_orbit(s, body, orbit) && s.stance == Stance::Blockade && s.kind.is_warship() && !s.escaped))
+                    })
                     .collect();
                 if aggressors.is_empty() {
                     continue;

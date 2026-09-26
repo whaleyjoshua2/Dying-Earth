@@ -241,7 +241,8 @@ const GRAMMAR: &str = r#"ORDER LINES (one per line; `#` starts a comment; blank 
   at it, blockading it, attacking it. A LIFT FROM A LAUNCH SITE reaches ANY orbit of Earth (ticket
   #357, version 0.09.1). A refusal that a change of orbit would cure names the move first. Orbital Control is
   of LOW orbit and gates the ground. A BLOCKADE IS A STANCE, chosen (`ship-stance <body> blockade`)
-  and shutting the orbit the stack sits in -- never a side effect of arriving anywhere. `show` names
+  and shutting the orbit the stack sits in -- never a side effect of arriving anywhere. A
+  rival's working Battery in that orbit opens a Battle on a blockader (ticket #363). `show` names
   the orbit every Ship sits in, and lists each Body's orbits under FREE SLOTS.
 
   bombard <ship> <colony>              a Battleship of yours breaks one Module of a RIVAL'S Colony,

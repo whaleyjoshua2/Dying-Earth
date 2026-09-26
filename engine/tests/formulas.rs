@@ -8209,6 +8209,56 @@ fn the_computer_attacks_a_defended_ring_it_can_beat() {
     assert!(attacks(&mut g), "a fleet that beats the Battery takes the ring");
 }
 
+/// Ticket #363 (version 0.09.1): a working Battery opens a Battle on a rival warship on BLOCKADE in
+/// its own orbit, at the designer's word -- a defended station under Blockade is a fight, where the
+/// Battery once merely voided the Blockade. Its holder opens it. A warship merely holding there, or a
+/// mothballed Battery, starts nothing.
+#[test]
+fn a_battery_fires_on_a_blockader_in_its_orbit() {
+    let board = |stance: Stance, battery_works: bool| {
+        let mut g = game();
+        calm(&mut g);
+        let station = g.colonies.iter().find(|c| c.in_orbit && c.control.director() == Some(Seat(0))).map(|c| c.id).expect("a station over Earth");
+        let slot = g.colony(station).unwrap().slot;
+        let mut bat = Module::new(ModuleKind::Battery);
+        bat.mothballed = !battery_works;
+        g.colony_mut(station).unwrap().modules.push(bat);
+        ship_in(&mut g, Seat(1), UnitKind::Frigate, BodyId::Earth, Some(slot), stance);
+        g.resolution_phase();
+        g
+    };
+    let g = board(Stance::Blockade, true);
+    assert_eq!(g.war.orbit_attacks[0], 1, "the Battery's holder opened a Battle on the blockader");
+    assert_eq!(board(Stance::Hold, true).war.orbit_attacks, [0; 4], "a warship holding there is not fired on");
+    assert_eq!(board(Stance::Blockade, false).war.orbit_attacks, [0; 4], "a mothballed Battery fires on nobody");
+}
+
+/// Ticket #363 (version 0.09.1): **a Ship takes one order a turn, whichever is given first.** A
+/// Launch refused a move given before it, but a move, a Refuel or a Transit given AFTER a Launch,
+/// Rearm or Bombard was accepted -- so a carrier could fire and leave in one turn, and the move,
+/// resolving first, carried it out of the orbit its Launch was given from. Traced: every computer
+/// Launch over eighty games failed that way.
+#[test]
+fn an_order_after_a_launch_rearm_or_bombard_is_refused() {
+    let mut g = game();
+    let iss = g.colonies.iter().find(|c| c.in_orbit && c.body == BodyId::Earth && c.control.director() == Some(Seat(0))).map(|c| c.slot).expect("the ISS");
+    let ship = carrier_in(&mut g, Seat(0), BodyId::Earth, Some(iss), true);
+    g.seats[0].stockpile.fuel = 100;
+    g.ship_mut(ship).unwrap().fuel = 10;
+    // Each of the three is lawful on its own, so a refusal can only be the one-order rule.
+    for t in [Order::ChangeOrbit { ship, slot: None }, Order::Transit { ship, to: BodyId::Moon, slot: None }, Order::Refuel { ship }] {
+        assert!(g.check_order(Seat(0), &[], &t).is_ok(), "{t:?} alone is lawful");
+    }
+    let first = [Order::Launch { ship, target: Place::State(StateId::SouthAsia) }, Order::Rearm { ship }];
+    let then = [Order::ChangeOrbit { ship, slot: None }, Order::Transit { ship, to: BodyId::Moon, slot: None }, Order::Refuel { ship }];
+    for f in &first {
+        for t in &then {
+            let err = g.check_order(Seat(0), std::slice::from_ref(f), t).err().map(|e| e.0).unwrap_or_default();
+            assert!(err.contains("already has an order"), "{t:?} after {f:?} must be refused, got {err:?}");
+        }
+    }
+}
+
 /// Ticket #99: a transit names the Orbital Slot it arrives into, and refuses a slot the Body has not
 /// got. The choice is made with the leg, so it is made before the Ship can see who will be there.
 #[test]

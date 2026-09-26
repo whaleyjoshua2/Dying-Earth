@@ -300,7 +300,8 @@ standing_per_turn = 2
 # Battle fought in that orbit, on Hold, at these figures; it never disengages and Hardened Hulls
 # does not reach it. While one stands and works, no rival holds Control in the orbit it covers and
 # no Blockade shuts it, so a ground Colony's Battery is what keeps a fleet off the surface; the
-# owner gains no Control by it. Damage is repaired with Materials as a Ship's is, at the Colony
+# owner gains no Control by it. Ticket #363 (version 0.09.1): and it opens a Battle on a rival
+# warship on Blockade in its orbit. Damage is repaired with Materials as a Ship's is, at the Colony
 # itself; destroyed, it is gone. Appended last, as the Core Module was.
 [[module]]
 id = "battery"
