@@ -142,7 +142,10 @@ impl Game {
         // Ticket #337: the offer is closed to a seat that cannot pay it, and taking is refused at
         // the door rather than silently turned into a refusal.
         if taken && !self.may_take_card(seat) {
-            return Err(format!("The {} cannot pay what {name} asks; they may only refuse.", self.seat_name(seat)));
+            // Ticket #366 (version 0.09.2): name the good and the shortfall, where this said "cannot
+            // pay" of a Fuel Contract that wanted Fuel, not Ducats.
+            let why = self.card_shortfall(seat).unwrap_or_else(|| "they cannot pay what it asks".to_string());
+            return Err(format!("The {} cannot take {name}: {why}; they may only refuse.", self.seat_name(seat)));
         }
         let answer = if taken { CardAnswer::Taken } else { CardAnswer::Refused };
         if let Some(q) = self.question.as_mut() {
@@ -231,6 +234,37 @@ impl Game {
         let Some(q) = self.question.as_ref() else { return false };
         let Some(c) = self.tables.event(q.card).choice.as_ref() else { return false };
         c.take_does.iter().all(|e| self.card_effect_affordable(e, seat))
+    }
+
+    /// Ticket #366 (version 0.09.2): what this seat lacks to take the card's offer, named -- *"you
+    /// have 12 Fuel of the 20 it asks"* -- or nothing where it can pay. The one place the "closed
+    /// offer" texts of the engine, the driver and the interface take their reason from, so none of
+    /// them can say "cannot pay" of an offer that wants goods.
+    pub fn card_shortfall(&self, seat: Seat) -> Option<String> {
+        let q = self.question.as_ref()?;
+        let c = self.tables.event(q.card).choice.as_ref()?;
+        let s = self.seat(seat);
+        let mut parts: Vec<String> = Vec::new();
+        for e in &c.take_does {
+            match e {
+                CardEffect::Resources { materials, fuel, energy, ducats, .. } => {
+                    for (have, ask, name) in [(s.stockpile.materials, *materials, "Materials"), (s.stockpile.fuel, *fuel, "Fuel"), (s.stockpile.energy, *energy, "Energy"), (s.stockpile.ducats, *ducats, "Ducats")] {
+                        if ask < 0 && have + ask < 0 {
+                            parts.push(format!("{have} {name} of the {} it asks", -ask));
+                        }
+                    }
+                }
+                CardEffect::PerUnitCost { per, resource, amount } => {
+                    let need = self.card_things(seat, *per) as i64 * amount;
+                    let have = self.stock_of(seat, *resource);
+                    if have < need {
+                        parts.push(format!("{have} {} of the {need} it asks", resource.name()));
+                    }
+                }
+                _ => {}
+            }
+        }
+        if parts.is_empty() { None } else { Some(format!("you have {}", parts.join(" and "))) }
     }
 
     /// Ticket #337: the price half of `card_effect_can_land`. Only an effect that costs something

@@ -1041,10 +1041,13 @@ impl Game {
                 // Ticket #332 (version 0.09.0): and the Factory Module, since the designer's word was
                 // that a station has a Widget maker of its own; without it a station's Core made
                 // one Widget a turn for the whole game and a Shipyard there took eight turns.
-                if col.in_orbit
-                    && !matches!(kind, ModuleKind::Shipyard | ModuleKind::Habitat | ModuleKind::Observatory | ModuleKind::SolarArray | ModuleKind::TradePost | ModuleKind::Institute | ModuleKind::Academy | ModuleKind::Battery | ModuleKind::Factory)
-                {
-                    return fail("a station holds only a Shipyard, Habitats, Observatories, Solar Arrays, a Trade Post, an Institute, Batteries and Factories");
+                // Ticket #366 (version 0.09.2): the ONE predicate, `stands_on_a_station`, which answers
+                // by the job and so follows every Faction's own kind of a common Module. This was a
+                // second list of kinds, and a list of kinds cannot know about a Unique: the Exchange
+                // was refused on Tiangong while the build button offered it, and the Heliostat,
+                // station-only, could be built nowhere at all.
+                if col.in_orbit && !kind.stands_on_a_station() {
+                    return fail("a station holds only a Shipyard, Habitats, Observatories, Solar Arrays, a Trade Post, an Institute, Batteries and Factories, or a Faction's own kind of one");
                 }
                 // Ticket #186 (version 0.08.0): nobody but the Custodians builds an Academy off
                 // Earth either, captured ones included.
@@ -1066,8 +1069,9 @@ impl Game {
                     return fail(format!("a {} stands only on a station", kind.name()));
                 }
                 // Ticket #90: one Trade Post per Faction per Body, on the ground or in orbit.
-                if *kind == ModuleKind::TradePost
-                    && (self.trade_post_at_body(seat, col.body) || pending.iter().any(|o| o.build_module().map(|(c, k)| k == ModuleKind::TradePost && self.colony(c).map(|x| x.body == col.body).unwrap_or(false)).unwrap_or(false)))
+                // Ticket #366 (version 0.09.2): read by the job, so the Exchange is under the cap too.
+                if kind.does_the_job_of(ModuleKind::TradePost)
+                    && (self.trade_post_at_body(seat, col.body) || pending.iter().any(|o| o.build_module().map(|(c, k)| k.does_the_job_of(ModuleKind::TradePost) && self.colony(c).map(|x| x.body == col.body).unwrap_or(false)).unwrap_or(false)))
                 {
                     return fail(format!("you already hold a Trade Post at {}; one per Body", self.tables.body(col.body).name));
                 }
@@ -2388,12 +2392,14 @@ impl Game {
                     let taught = self.take_emigrants(*state, n);
                     self.climate.launches_pending[seat.index()] += 1;
                     // Ticket #183 (version 0.08.0): a Spaceport earns for every Emigrant it lifts.
-                    self.pay_spaceport(seat, *state, n);
+                    let paid = self.pay_spaceport(seat, *state, n);
                     self.settle_people(*colony, n, taught);
                     let station = self.place_name(Place::Colony(*colony));
                     let line = format!("{} Pioneers lifted from {} to {}, for the {}.", n, self.tables.state(*state).name, station, self.seat_name(seat));
                     self.log(line);
-                    let text = self.say("emigrants_lifted", &[("n", n.to_string()), ("state", self.tables.state(*state).name.clone()), ("station", station.clone())]);
+                    // Ticket #366 (version 0.09.2): and what the Spaceport will pay for them, when.
+                    let spaceport = if paid > 0 { self.phrase("spaceport_pays", &[("n", paid.to_string())]) } else { String::new() };
+                    let text = self.say("emigrants_lifted", &[("n", n.to_string()), ("state", self.tables.state(*state).name.clone()), ("station", station.clone()), ("spaceport", spaceport)]);
                     self.report_line_of(seat, LineKind::YourWorks, LineKind::Note, Some(ReportPlace::Colony(*colony)), text);
                     // Ticket #353 (version 0.09.1): and WHO STAYED. A lift fills as far as the
                     // station's Habitat room goes now, where it refused the whole order before, so
@@ -2782,7 +2788,12 @@ impl Game {
             }
             Order::Unload { into, .. } => {
                 let where_ = match into {
-                    UnloadTarget::Slot(b, i) => format!("{} slot {}", self.tables.body(*b).name, i + 1),
+                    // Ticket #366 (version 0.09.2): the slot's NAME, as the founding line has said
+                    // since #353; this read "slot 1" for slot 0, the one 1-based figure left.
+                    UnloadTarget::Slot(b, i) => match self.tables.body(*b).slots.get(*i as usize) {
+                        Some(slot) => format!("{} on {}", slot.name, self.tables.body(*b).name),
+                        None => format!("{} slot {i}", self.tables.body(*b).name),
+                    },
                     UnloadTarget::Colony(c) => place(Place::Colony(*c)),
                 };
                 r("unload", &[("place", where_)])

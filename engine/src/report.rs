@@ -423,7 +423,7 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("neutral_held", &["state", "n"]),
     ("battle", &["place", "faction", "odds", "outcome"]),
     ("event_damaged_ships", &["event", "n"]),
-    ("loaded", &["faction", "cargo", "body"]),
+    ("loaded", &["faction", "cargo", "body", "spaceport"]),
     ("slot_taken", &["faction"]),
     ("landing_contested", &["faction", "body"]),
     ("colony_founded", &["faction", "slot", "body", "n"]),
@@ -441,7 +441,7 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("army_ordered", &["place", "people"]),
     ("emigrants_arrived", &["n", "state", "colony"]),
     ("emigrants_returned", &["n", "state"]),
-    ("emigrants_lifted", &["n", "state", "station"]),
+    ("emigrants_lifted", &["n", "state", "station", "spaceport"]),
     // Ticket #353 (version 0.09.1): the Pioneers a clamped lift left standing in their Region.
     ("emigrants_stayed", &["n", "state", "station"]),
     ("claim_lot", &["place", "factions", "winner"]),
@@ -472,6 +472,8 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     // Ticket #299 (version 0.08.6): a broken Occupation, at a cost.
     ("occupation_broken", &["place", "faction", "holder", "unrest", "standing"]),
     ("control_changed", &["place", "faction", "why"]),
+    // Ticket #366 (version 0.09.2): a transfer and a throw-off in one Resolution, said once.
+    ("passed_and_threw_off", &["state", "faction"]),
     ("claim_tied", &["place", "factions"]),
     ("threw_off", &["state", "faction", "unrest"]),
     // Ticket #371 (version 0.09.2): the one net Unrest line a Region, in place of six.
@@ -587,6 +589,7 @@ pub const PHRASE_ARGS: &[(&str, &[&str])] = &[
     ("cause_occupation", &[]),
     ("cause_occupation_break", &[]),
     ("cause_choice_card", &["card"]),
+    ("spaceport_pays", &["n"]),
     ("unrest_past", &["which", "note"]),
     ("unrest_under", &["which"]),
     // Ticket #351 (version 0.09.1): the Sink's loss on the Shortfall line.

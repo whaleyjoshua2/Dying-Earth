@@ -15388,6 +15388,9 @@ fn ticket_351_a_scrubber_the_sink_never_counted_names_no_loss() {
     g.income_phase();
     let line = g.report.lines.iter().find(|l| l.text.contains("Energy ran short")).map(|l| l.text.clone()).unwrap_or_else(|| panic!("{:?}", g.report.lines));
     assert!(line.contains("Scrubber"), "it is shut: {line}");
+    // Ticket #366 (version 0.09.2): and the line says WHERE, since a Region's building going dark
+    // is news about that Region.
+    assert!(line.contains("Scrubber in China"), "the line names the Region: {line}");
     assert!(!line.contains("Natural Sink"), "and costs the Sink nothing: {line}");
 }
 
@@ -15421,6 +15424,93 @@ fn no_card_of_either_kind_is_drawn_on_the_first_turn_and_the_deck_is_untouched()
         }
     }
     assert!((10..=50).contains(&drew), "turn {}: {drew} of 60 seeds drew, which is not a coin", t.events.first_draw_turn);
+}
+
+/// Ticket #366 (version 0.09.2), defect 1: **the Exchange stands on a station and the Heliostat
+/// too**, since the station's list is the one predicate now; and the Exchange is under the
+/// one-Trade-Post-per-Body cap, being the Trade Post it is.
+#[test]
+fn the_exchange_and_the_heliostat_stand_on_a_station_and_the_exchange_is_under_the_trade_post_cap() {
+    let mut g = Game::new(tables(), NewGame { seed: 7, player: FactionKind::Prospectors, player_is_ai: false, player_start: StateId::EastAsia });
+    let tiangong = g.colonies.iter().find(|c| c.in_orbit && c.control.controller() == Some(Seat(0))).map(|c| c.id).expect("the Prospectors start with Tiangong");
+    let exchange = Order::BuildModule { colony: tiangong, kind: ModuleKind::Exchange };
+    assert!(g.check_order(Seat(0), &[], &exchange).is_ok(), "{:?}", g.check_order(Seat(0), &[], &exchange));
+    // Pending, it counts under the cap: a second Exchange at the same Body is refused as a Trade Post.
+    let refused = g.check_order(Seat(0), std::slice::from_ref(&exchange), &exchange).expect_err("one per Body");
+    assert!(refused.0.contains("already hold a Trade Post"), "{}", refused.0);
+    // Standing, the same.
+    g.colony_mut(tiangong).unwrap().modules.push(Module::new(ModuleKind::Exchange));
+    let refused = g.check_order(Seat(0), &[], &exchange).expect_err("one per Body, standing");
+    assert!(refused.0.contains("already hold a Trade Post"), "{}", refused.0);
+    // The Archivists' Heliostat, station-only, on their own Axiom.
+    let g = Game::new(tables(), NewGame { seed: 7, player: FactionKind::Archivists, player_is_ai: false, player_start: StateId::EastAsia });
+    let axiom = g.colonies.iter().find(|c| c.in_orbit && c.control.controller() == Some(Seat(0))).map(|c| c.id).expect("the Archivists start with Axiom");
+    let heliostat = Order::BuildModule { colony: axiom, kind: ModuleKind::Heliostat };
+    assert!(g.check_order(Seat(0), &[], &heliostat).is_ok(), "{:?}", g.check_order(Seat(0), &[], &heliostat));
+}
+
+/// Ticket #366, defect 3: **a place that passed to a Faction and threw them off in the same
+/// Resolution says both in one line**, where it headlined "now belongs to" over a neutral board.
+#[test]
+fn a_transfer_thrown_off_in_the_same_resolution_is_one_line() {
+    let mut g = game();
+    calm(&mut g);
+    let europe = StateId::Europe;
+    g.transfer_control(Place::State(europe), Seat(0), "Pacified");
+    assert!(g.state(europe).changed_hands, "the fixture: it changed hands this turn");
+    g.state_mut(europe).unrest = g.tables.unrest.throw_off_threshold;
+    g.resolve_unrest();
+    assert_eq!(g.state(europe).control, Control::Neutral, "thrown off");
+    let lines: Vec<String> = g.report.lines.iter().filter(|l| l.kind == LineKind::ControlChanged && l.place == Some(ReportPlace::State(europe))).map(|l| l.text.clone()).collect();
+    assert_eq!(lines.len(), 1, "one line, not a transfer and a throw-off: {lines:?}");
+    assert!(lines[0].contains("passed to the Custodians and threw them off at once; it stands neutral"), "{lines:?}");
+}
+
+/// Ticket #366, defect 4: **a rival's founding names the slot**, where it said "slot 1" of slot 0.
+#[test]
+fn a_rivals_unload_into_a_slot_names_the_slot() {
+    let mut g = fresh();
+    let (ship, _) = colony_ship_ready(&mut g, BodyId::Moon);
+    let deed = g.rival_deed(Seat(0), &Order::Unload { ship, colonists: 4, army: false, into: UnloadTarget::Slot(BodyId::Moon, 0) }).expect("a deed");
+    let slot = g.tables.body(BodyId::Moon).slots[0].name.clone();
+    assert!(deed.contains(&format!("{slot} on the Moon")), "{deed}");
+    assert!(!deed.contains("slot 1"), "{deed}");
+}
+
+/// Ticket #366, defect 5: **a closed card side names the good and the shortfall** -- the Fuel
+/// Contract wants 20 Fuel, and a seat with 12 was told it "cannot pay".
+#[test]
+fn a_closed_card_side_names_the_good_it_lacks() {
+    let mut g = fresh();
+    ask_the_card(&mut g, EventId::FuelContract);
+    g.seats[0].stockpile.fuel = 12;
+    assert!(!g.may_take_card(Seat(0)), "the fixture: 12 Fuel cannot sell 20");
+    assert_eq!(g.card_shortfall(Seat(0)).as_deref(), Some("you have 12 Fuel of the 20 it asks"));
+    let err = g.answer_card(Seat(0), true).expect_err("the take side is shut");
+    assert!(err.contains("you have 12 Fuel of the 20 it asks"), "{err}");
+    g.seats[0].stockpile.fuel = 20;
+    assert_eq!(g.card_shortfall(Seat(0)), None, "and nothing where it can pay");
+}
+
+/// Ticket #366, defect 6: **the Spaceport says what it pays, and when**, on the lift's own line --
+/// the pay lands a turn late and was itemised nowhere, which is why a playtester saw none.
+#[test]
+fn the_lift_line_says_what_the_spaceport_will_pay() {
+    let mut g = fresh();
+    let home = StateId::EastAsia;
+    g.state_mut(home).facilities.push(facility(FacilityKind::Spaceport));
+    g.state_mut(home).emigrants = 2;
+    let iss = g.colonies.iter().find(|c| c.in_orbit && c.control.controller() == Some(Seat(0))).map(|c| c.id).expect("the ISS");
+    assert_eq!(g.pay_spaceport(Seat(0), home, 3), 3, "a working Spaceport pays per Pioneer");
+    g.seats[0].spaceport_influence = 0;
+    let lift = Order::LiftToStation { state: home, n: 2, colony: iss };
+    assert!(g.check_order(Seat(0), &[], &lift).is_ok(), "{:?}", g.check_order(Seat(0), &[], &lift));
+    g.commit_orders(Seat(0), &[lift]);
+    let line = g.report.lines.iter().find(|l| l.text.contains("Pioneers lifted")).map(|l| l.text.clone()).expect("the lift line");
+    assert!(line.ends_with("(+2 Influence next turn from the Spaceport)."), "{line}");
+    // A shut Spaceport pays nothing, and the line says nothing of it.
+    g.state_mut(home).facilities.iter_mut().find(|f| f.kind == FacilityKind::Spaceport).unwrap().mothballed = true;
+    assert_eq!(g.pay_spaceport(Seat(0), home, 3), 0);
 }
 
 /// Ticket #371 (version 0.09.2): **one net Unrest line a Region**, causes named in the order they

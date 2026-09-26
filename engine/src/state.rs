@@ -2105,7 +2105,8 @@ impl Game {
     /// Ticket #90: whether the seat already holds a Trade Post, standing or on order, at this Body.
     pub fn trade_post_at_body(&self, seat: Seat, body: BodyId) -> bool {
         self.colonies.iter().filter(|c| c.body == body && c.control.director() == Some(seat)).any(|c| {
-            c.modules.iter().any(|m| m.kind == ModuleKind::TradePost) || c.queue.iter().any(|b| b.item == BuildItem::Module(ModuleKind::TradePost))
+            // Ticket #366 (version 0.09.2): by the job, so an Exchange counts as the Trade Post it is.
+            c.modules.iter().any(|m| m.kind.does_the_job_of(ModuleKind::TradePost)) || c.queue.iter().any(|b| matches!(b.item, BuildItem::Module(k) if k.does_the_job_of(ModuleKind::TradePost)))
         })
     }
 
@@ -3470,14 +3471,19 @@ impl Game {
     /// not the building -- and only where the seat CONTROLS the Region, per ticket #181. There is no
     /// cap: the designer's word was that the muster limit is the brake, "8 a turn is already the
     /// brake".
-    pub fn pay_spaceport(&mut self, seat: Seat, from: StateId, n: u32) {
+    ///
+    /// Ticket #366 (version 0.09.2): returns what it paid, so the lift's Report line can say
+    /// *"(+2 Influence next turn from the Spaceport)"*. The playtest lifted Pioneers and saw no
+    /// Influence; the pay lands a turn late and was itemised nowhere, so nothing told them.
+    pub fn pay_spaceport(&mut self, seat: Seat, from: StateId, n: u32) -> u32 {
         if n == 0 || self.state(from).control != Control::Controlled(seat) {
-            return;
+            return 0;
         }
         if !self.state(from).facilities.iter().any(|f| f.kind == FacilityKind::Spaceport && f.working()) {
-            return;
+            return 0;
         }
         self.seats[seat.index()].spaceport_influence += n as i64;
+        n
     }
 
     pub fn ships_at(&self, seat: Seat, body: BodyId) -> Vec<ShipId> {

@@ -9913,7 +9913,12 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                         let text = format!("{face}\n{}", card_side_text(does));
                         let button = egui::Button::new(RichText::new(text).size(14.0)).wrap_mode(egui::TextWrapMode::Wrap).min_size(egui::vec2(width, 68.0));
                         let live = !taken || may_take;
-                        let why = "You cannot pay what this side of the card asks. Refusing is your only move this turn.";
+                        // Ticket #366 (version 0.09.2): the good and the shortfall, named.
+                        let why_text = match game.card_shortfall(Seat(0)) {
+                            Some(s) => format!("You cannot take this side of the card: {s}. Refusing is your only move this turn."),
+                            None => "You cannot pay what this side of the card asks. Refusing is your only move this turn.".to_string(),
+                        };
+                        let why = why_text.as_str();
                         let resp = ui.add_enabled(live, button);
                         if !live && forced_tip(why) {
                             resp.clone().show_tooltip_text(why);

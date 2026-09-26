@@ -99,6 +99,27 @@ fn seat_of(g: &Game, word: &str) -> Result<Seat, String> {
     Ok(Seat::ALL[kinds.iter().position(|k| *k == kind).unwrap_or(0)])
 }
 
+/// Ticket #366 (version 0.09.2): the board's Region NAMES, as `nation_states.toml` gives them, set
+/// once the tables are loaded, so an order can say `india` where the card says India. The ids
+/// (`southasia`) still work, and the error lists the names, which is what the board prints.
+static STATE_NAMES: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::new();
+
+/// A Region by its name on the board or by its id, case and separators ignored: `india`,
+/// `"the united states"`, `southasia` and `SouthAsia` are all one Region.
+fn pick_state(word: &str) -> Result<StateId, String> {
+    let w = norm(word);
+    let names = STATE_NAMES.get();
+    if let Some(names) = names
+        && let Some(i) = names.iter().position(|n| norm(n) == w)
+    {
+        return Ok(StateId::ALL[i]);
+    }
+    pick(&StateId::ALL, word).map_err(|e| match names {
+        Some(names) if !e.contains("short for") => format!("{word:?} is not a Region; the board's are {}", names.join(", ")),
+        _ => e,
+    })
+}
+
 /// `europe`, `state:europe`, `colony:3`, `c:3` or a bare colony number.
 fn place(word: &str) -> Result<Place, String> {
     let w = word.to_ascii_lowercase();
@@ -106,12 +127,12 @@ fn place(word: &str) -> Result<Place, String> {
         return Ok(Place::Colony(ColonyId(count(rest)?)));
     }
     if let Some(rest) = w.strip_prefix("state:").or_else(|| w.strip_prefix("s:")) {
-        return Ok(Place::State(pick(&StateId::ALL, rest)?));
+        return Ok(Place::State(pick_state(rest)?));
     }
     if let Ok(n) = w.parse::<u32>() {
         return Ok(Place::Colony(ColonyId(n)));
     }
-    Ok(Place::State(pick(&StateId::ALL, &w)?))
+    Ok(Place::State(pick_state(&w)?))
 }
 
 /// `ship:4`, `army:2`, `ship4`, `army2`, or -- ticket #324 (version 0.08.8) -- `battery:<colony>:<n>`
@@ -419,8 +440,8 @@ fn parse_line(g: &Game, line: &str) -> Result<Line, String> {
         "build" => {
             let what = at(1)?.to_ascii_lowercase();
             match what.as_str() {
-                "facility" => Order::BuildFacility { state: pick(&StateId::ALL, at(2)?)?, kind: pick(&FacilityKind::ALL, at(3)?)? },
-                "facility-ducats" => Order::BuildFacilityWithDucats { state: pick(&StateId::ALL, at(2)?)?, kind: pick(&FacilityKind::ALL, at(3)?)? },
+                "facility" => Order::BuildFacility { state: pick_state(at(2)?)?, kind: pick(&FacilityKind::ALL, at(3)?)? },
+                "facility-ducats" => Order::BuildFacilityWithDucats { state: pick_state(at(2)?)?, kind: pick(&FacilityKind::ALL, at(3)?)? },
                 "module" => Order::BuildModule { colony: colony_id(at(2)?)?, kind: pick(&ModuleKind::BUILDABLE, at(3)?)? },
                 "module-ducats" => Order::BuildModuleWithDucats { colony: colony_id(at(2)?)?, kind: pick(&ModuleKind::BUILDABLE, at(3)?)? },
                 "ship" => Order::BuildShip { site: place(at(2)?)?, kind: pick(&UnitKind::SHIPS, at(3)?)? },
@@ -430,7 +451,7 @@ fn parse_line(g: &Game, line: &str) -> Result<Line, String> {
                 _ => return Err(format!("`build {what}` is not one of facility, module, ship, army, station, archive")),
             }
         }
-        "industry" => Order::RaiseIndustry { state: pick(&StateId::ALL, at(1)?)? },
+        "industry" => Order::RaiseIndustry { state: pick_state(at(1)?)? },
         // Ticket #332 (version 0.09.0): a build another seat began at a place that has changed hands.
         "cancel-build" => Order::CancelBuild { place: place(at(1)?)?, index: count(at(2)?)? as usize },
         "transit" => Order::Transit {
@@ -477,7 +498,7 @@ fn parse_line(g: &Game, line: &str) -> Result<Line, String> {
             let i = rest.iter().position(|x| x.eq_ignore_ascii_case("into")).ok_or("unload wants `into ...`")?;
             Order::Unload { ship, colonists, army, into: unload_target(&rest[i + 1..])? }
         }
-        "move-army" => Order::MoveArmy { army: army_id(at(1)?)?, to: pick(&StateId::ALL, at(2)?)? },
+        "move-army" => Order::MoveArmy { army: army_id(at(1)?)?, to: pick_state(at(2)?)? },
         "ship-stance" => Order::ShipStance { body: pick(&BodyId::ALL, at(1)?)?, stance: pick(&STANCES, at(2)?)? },
         "army-stance" => Order::ArmyStance { place: place(at(1)?)?, stance: pick(&STANCES, at(2)?)? },
         "repair" => Order::Repair { unit: unit_ref(at(1)?)?, points: count(at(2)?)? },
@@ -539,20 +560,20 @@ fn parse_line(g: &Game, line: &str) -> Result<Line, String> {
         }
         "buy" => Order::Buy { resource: pick(&RESOURCES, at(1)?)?, amount: number(at(2)?)? },
         "sell" => Order::Sell { resource: pick(&RESOURCES, at(1)?)?, amount: number(at(2)?)? },
-        "relief" => Order::Relief { state: pick(&StateId::ALL, at(1)?)? },
+        "relief" => Order::Relief { state: pick_state(at(1)?)? },
         // Ticket #269 (version 0.08.4): Relief's mirror, on a Region a rival holds.
-        "agitate" => Order::Agitate { state: pick(&StateId::ALL, at(1)?)? },
-        "resettle" => Order::Resettle { state: pick(&StateId::ALL, at(1)?)? },
-        "emigrants" => Order::BuildEmigrants { state: pick(&StateId::ALL, at(1)?)?, n: count(at(2)?)? },
-        "send-antarctica" => Order::SendToAntarctica { state: pick(&StateId::ALL, at(1)?)?, n: count(at(2)?)?, into: unload_target(&w[3..])? },
+        "agitate" => Order::Agitate { state: pick_state(at(1)?)? },
+        "resettle" => Order::Resettle { state: pick_state(at(1)?)? },
+        "emigrants" => Order::BuildEmigrants { state: pick_state(at(1)?)?, n: count(at(2)?)? },
+        "send-antarctica" => Order::SendToAntarctica { state: pick_state(at(1)?)?, n: count(at(2)?)?, into: unload_target(&w[3..])? },
         // Version 0.07.3 (ticket #141): Pioneers lifted from a Launch Site onto a station over Earth.
-        "lift" => Order::LiftToStation { state: pick(&StateId::ALL, at(1)?)?, n: count(at(2)?)?, colony: colony_id(at(3)?)? },
+        "lift" => Order::LiftToStation { state: pick_state(at(1)?)?, n: count(at(2)?)?, colony: colony_id(at(3)?)? },
         "change" => {
             let what = at(1)?.to_ascii_lowercase();
             let index = count(at(3)?)? as usize;
             let change = pick(&CHANGES, at(4)?)?;
             let building = match what.as_str() {
-                "facility" => BuildingRef::Facility(pick(&StateId::ALL, at(2)?)?, index),
+                "facility" => BuildingRef::Facility(pick_state(at(2)?)?, index),
                 "module" => BuildingRef::Module(colony_id(at(2)?)?, index),
                 _ => return Err("`change` wants `facility` or `module`".into()),
             };
@@ -568,10 +589,10 @@ fn parse_line(g: &Game, line: &str) -> Result<Line, String> {
         "upload" => Order::Upload { colony: colony_id(at(1)?)?, n: count(at(2)?)? },
         "venture-share" => Order::SetVentureShare { share: count(at(1)?)? },
         "draw-venture" => Order::DrawVenture { amount: number(at(1)?)? },
-        "leapfrog" => Order::Leapfrog { state: pick(&StateId::ALL, at(1)?)? },
-        "strip-permit" => Order::StripPermit { state: pick(&StateId::ALL, at(1)?)? },
+        "leapfrog" => Order::Leapfrog { state: pick_state(at(1)?)? },
+        "strip-permit" => Order::StripPermit { state: pick_state(at(1)?)? },
         // Ticket #237 (version 0.08.3): the Arkwrights' remaking of a country.
-        "exodus-call" => Order::ExodusCall { state: pick(&StateId::ALL, at(1)?)? },
+        "exodus-call" => Order::ExodusCall { state: pick_state(at(1)?)? },
         _ => return Err(format!("`{verb}` is not an order; run `help` for the list")),
     };
     Ok(Line::Order(Box::new(o)))
@@ -677,7 +698,8 @@ fn print_question(g: &Game) {
     match q.answer_of(me) {
         Some(a) => println!("  Your answer is given: you {a_word}.", a_word = a.word()),
         None if !g.may_take_card(me) => {
-            println!("  *** THE OFFER IS CLOSED TO YOU: you cannot pay what it asks, so `answer refuse` is your only move. ***")
+            // Ticket #366 (version 0.09.2): the good and the shortfall, named.
+            println!("  *** THE OFFER IS CLOSED TO YOU: {}, so `answer refuse` is your only move. ***", g.card_shortfall(me).unwrap_or_else(|| "you cannot pay what it asks".to_string()))
         }
         None => println!("  *** UNANSWERED. Both sides are open to you. The turn cannot end until an `answer` line is given. ***"),
     }
@@ -697,9 +719,9 @@ fn owed_answer(g: &Game) -> Option<String> {
         "{} is asking you: {question}\n  Put `answer take` or `answer refuse` in the order list. {}",
         card.name,
         if g.may_take_card(Seat(0)) {
-            "Either side is open to you."
+            "Either side is open to you.".to_string()
         } else {
-            "You cannot pay what it asks, so `answer refuse` is your only move."
+            format!("You cannot take it: {}, so `answer refuse` is your only move.", g.card_shortfall(Seat(0)).unwrap_or_else(|| "you cannot pay what it asks".to_string()))
         }
     ))
 }
@@ -714,7 +736,12 @@ fn standing_note(g: &Game, seat: Seat, target: Target) -> String {
         Some(c) if c == seat => {
             // A rival's own bar is its threshold or this Standing plus the margin, whichever is
             // greater; the threshold half is the rival's to know, so only the margin is named.
-            format!("you hold it on {} Standing, over which a rival must climb by the challenge margin", mine)
+            // Ticket #366 (version 0.09.2): and an OCCUPIED place says so here, where "you hold
+            // it" beside "occupied by the Custodians" read as a contradiction.
+            match g.place_control(target) {
+                Control::Occupied { occupier, .. } => format!("you hold it in name on {} Standing; the {} occupy it", mine, g.seat_name(occupier)),
+                _ => format!("you hold it on {} Standing, over which a rival must climb by the challenge margin", mine),
+            }
         }
         Some(c) => format!("{} needed to take it from the {}", need, g.seat_name(c)),
         None => format!("{need} needed to take it"),
@@ -1293,6 +1320,8 @@ fn main() {
         return;
     }
     let tables = Arc::new(Tables::load(&default_data_dir()).expect("tables"));
+    // Ticket #366 (version 0.09.2): the Regions' names, for `pick_state`.
+    STATE_NAMES.set(StateId::ALL.iter().map(|s| tables.state(*s).name.clone()).collect()).ok();
     let path = PathBuf::from(flag(&args, "save").unwrap_or_else(|| {
         eprintln!("--save <file> is wanted");
         std::process::exit(2);
@@ -1307,7 +1336,7 @@ fn main() {
             });
             let start = match flag(&args, "start") {
                 None => StateId::EastAsia,
-                Some(s) => pick(&StateId::ALL, &s).unwrap_or_else(|e| {
+                Some(s) => pick_state(&s).unwrap_or_else(|e| {
                     eprintln!("{e}");
                     std::process::exit(2);
                 }),

@@ -2498,6 +2498,8 @@ impl Game {
                 Order::Load { ship, colonists, from, army } => {
                     let Some(s) = self.ship(ship) else { continue };
                     let ShipAt::Body(body) = s.at else { continue };
+                    // Ticket #366 (version 0.09.2): what the Spaceport paid for this lift, for the line.
+                    let mut paid = 0;
                     if colonists > 0 {
                         match from {
                             LoadSource::State(st) => {
@@ -2512,7 +2514,7 @@ impl Game {
                                 // Ticket #189 (version 0.08.0): what they know goes aboard with them.
                                 let taught = self.take_emigrants(st, colonists);
                                 // Ticket #183 (version 0.08.0): a lift onto a Ship is a launch too.
-                                self.pay_spaceport(seat, st, colonists);
+                                paid = self.pay_spaceport(seat, st, colonists);
                                 self.load_people(ship, colonists, taught);
                             }
                             LoadSource::Colony(c) => {
@@ -2539,9 +2541,10 @@ impl Game {
                     let cargo: String = if colonists > 0 { format!("{colonists} Colonists") } else { "an Army".into() };
                     let line = format!("{} loaded {} at {}.", self.seat_name(seat), cargo, self.tables.body(body).name);
                     self.log(line);
+                    let spaceport = if paid > 0 { self.phrase("spaceport_pays", &[("n", paid.to_string())]) } else { String::new() };
                     let text = self.say(
                         "loaded",
-                        &[("faction", self.seat_name(seat)), ("cargo", cargo), ("body", self.tables.body(body).name.clone())],
+                        &[("faction", self.seat_name(seat)), ("cargo", cargo), ("body", self.tables.body(body).name.clone()), ("spaceport", spaceport)],
                     );
                     self.report_line_of(seat, LineKind::YourWorks, LineKind::Ship, Some(ReportPlace::Body(body)), text);
                 }
@@ -2980,15 +2983,26 @@ impl Game {
             Game::unrest_figure(back)
         );
         self.log(line);
-        let text = self.say(
-            "threw_off",
-            &[
-                ("state", self.tables.state(sid).name.clone()),
-                ("faction", self.seat_name(seat)),
-                ("unrest", Game::unrest_figure(back).to_string()),
-            ],
-        );
-        self.report_line(LineKind::ControlChanged, Some(ReportPlace::State(sid)), text);
+        // Ticket #366 (version 0.09.2): a place that passed to a Faction THIS Resolution (an
+        // Occupation's transfer) and threw them off in the same pass said "now belongs to the X"
+        // in the headline over a board reading neutral, the throw-off sunk below it. One line
+        // says both, in the place of the transfer's.
+        let folded = self.say("passed_and_threw_off", &[("state", self.tables.state(sid).name.clone()), ("faction", self.seat_name(seat))]);
+        if self.state(sid).changed_hands
+            && let Some(earlier) = self.report.lines.iter_mut().rev().find(|l| l.kind == LineKind::ControlChanged && l.place == Some(ReportPlace::State(sid)))
+        {
+            earlier.text = folded;
+        } else {
+            let text = self.say(
+                "threw_off",
+                &[
+                    ("state", self.tables.state(sid).name.clone()),
+                    ("faction", self.seat_name(seat)),
+                    ("unrest", Game::unrest_figure(back).to_string()),
+                ],
+            );
+            self.report_line(LineKind::ControlChanged, Some(ReportPlace::State(sid)), text);
+        }
         self.moment(
             MomentKind::ControlChanged,
             &[("place", self.tables.state(sid).name.clone()), ("faction", "nobody".to_string())],

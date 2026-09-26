@@ -46,7 +46,7 @@ neutral_held = "{state} held against the attack, and arms: its Standing Army wil
 # exchange's share of the strength.
 battle = "Battle at {place}: the {faction} attacked at {odds}% odds of holding the field; {outcome}."
 event_damaged_ships = "{event} damaged {n} Ship(s)."
-loaded = "{faction} loaded {cargo} at {body}."
+loaded = "{faction} loaded {cargo} at {body}{spaceport}."
 slot_taken = "{faction}: another Faction took that Colony Slot first."
 landing_contested = "{faction} could not land at {body}: the orbit is contested."
 # Ticket #353 (version 0.09.1): the slot is NAMED. "in slot 3 on the Moon" named a place no player
@@ -68,7 +68,7 @@ emigrants_mustered = "{n} Pioneers recruited in {state}; its Unrest fell by {fel
 army_ordered = "An Army began at {place}: {people} under arms."
 emigrants_arrived = "{n} Pioneers from {state} landed in Antarctica and joined {colony}."
 emigrants_returned = "{n} Pioneers from {state} found no room in Antarctica and came home."
-emigrants_lifted = "{n} Pioneers lifted from {state} to {station}."
+emigrants_lifted = "{n} Pioneers lifted from {state} to {station}{spaceport}."
 # Ticket #353 (version 0.09.1): and who did NOT go. A lift fills as far as the station's Habitat
 # room goes since this ticket, where it used to refuse the whole order, so a lift can now move
 # fewer people than it asked for and the ones left behind are still standing in their Region. The
@@ -107,6 +107,8 @@ occupation_ended = "Occupation of {place} by the {faction} ended."
 # Ticket #299 (version 0.08.6): a break costs. {holder} is the previous holder, or nobody.
 occupation_broken = "The {faction}' Occupation of {place} broke: it goes back to the {holder} at +{unrest} Unrest, an offence against them, and the {standing} Standing the Occupation had won is gone."
 control_changed = "{place} now belongs to the {faction} ({why})."
+# Ticket #366 (version 0.09.2): a transfer and a throw-off in one Resolution, said once.
+passed_and_threw_off = "{state} passed to the {faction} and threw them off at once; it stands neutral."
 claim_tied = "{place} is claimed by {factions} at the same Standing; it stays as it is."
 threw_off = "{state} threw off the {faction}: it is neutral again, its Armies are its own, and its Unrest settles at {unrest}."
 # Ticket #371 (version 0.09.2): ONE net line a Region about its Unrest, at the end of the Resolution,
@@ -241,6 +243,8 @@ cause_occupation_start = "the Occupation beginning"
 cause_occupation = "the Occupation"
 cause_occupation_break = "the Occupation breaking"
 cause_choice_card = "the {card} card"
+# Ticket #366 (version 0.09.2): what a lift earns from the Spaceport, and when it lands.
+spaceport_pays = " (+{n} Influence next turn from the Spaceport)"
 unrest_past = ", past the {which} threshold: {note}"
 unrest_under = ", back under the {which} threshold"
 # Ticket #351 (version 0.09.1): what the Natural Sink loses with the Scrubbers a Shortfall shut.

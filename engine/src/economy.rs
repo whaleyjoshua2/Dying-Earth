@@ -1144,7 +1144,18 @@ impl Game {
     fn income_for(&mut self, seat: Seat) {
         let mut producers = self.producers_of(seat);
         let (balance, shut_at) = self.apply_shortfall(seat, &mut producers, self.seat(seat).stockpile.energy);
-        let shut: Vec<String> = shut_at.iter().map(|i| producers[*i].name.to_string()).collect();
+        // Ticket #366 (version 0.09.2): each building WITH its place -- "Spaceport in China" -- as
+        // the alarm's hover names them (#351); the playtest could not tell which Region went dark.
+        let shut: Vec<String> = shut_at
+            .iter()
+            .map(|i| {
+                let p = &producers[*i];
+                match p.place {
+                    ProducerPlace::Facility(sid, _) => format!("{} in {}", p.name, self.tables.state(sid).name),
+                    ProducerPlace::Module(cid, _) => format!("{} at {}", p.name, self.place_name(Place::Colony(cid))),
+                }
+            })
+            .collect();
         // Ticket #351 (version 0.09.1): what the Natural Sink loses with the Scrubbers shut, which the
         // Report line names -- the case where a Custodian loses the game without noticing. Only where
         // the Region has a controller, which is where `scrubber_removal_by_seat` counts it: one in a

@@ -106,3 +106,30 @@ arriving"* is a cause on the Unrest line. The log keeps every line as it was.
 **Why.** The designer: *"quiet unrest spam"*, and the playtest's *"Unrest lines in the Report run out
 of order."* The six sources wrote in phase order, so one Region's lines lay scattered among
 another's, and a Region could take six in a turn.
+
+## 6. Seven defects from the list
+
+The authority is [ticket #366](https://github.com/whaleyjoshua2/Dying-Earth/issues/366). Nothing
+here is a design decision; each is a thing the game said or did that was untrue or unreachable.
+
+1. **The Exchange stands on a station, and the Heliostat too.** A station's build check reads the one
+   predicate that answers by the job, so a Faction's own kind of a common Module follows it; the
+   check was a second list of kinds that left both out, while the build buttons offered them. The
+   Exchange is under the one-Trade-Post-per-Body cap, being the Trade Post it is.
+2. **The driver takes a Region by its name or its id**, case and separators ignored (`india`,
+   `"the united states"`, `southasia`), and its error lists the names the board prints.
+3. **A place that passed to a Faction and threw them off in the same Resolution says both in one
+   line**, *"India passed to the Custodians and threw them off at once; it stands neutral."*, in the
+   transfer's place; and the driver's note on an occupied place reads *"you hold it in name on 47
+   Standing; the Custodians occupy it."*
+4. **A rival's founding names the slot**, as the player's own has since 0.09.1.
+5. **A closed card side names the good and the shortfall**, *"you have 12 Fuel of the 20 it asks"*,
+   in the engine's refusal, the driver and the card modal alike, from one place.
+6. **The lift line says what the Spaceport will pay and when**, *"(+2 Influence next turn from the
+   Spaceport)"*, and **the Energy line names where each shut building stands**, *"Spaceport in
+   China"*. The playtest's guess, that the Spaceport was shut for Energy, cannot be the cause: a
+   shut Spaceport refuses the lift outright; the pay lands a turn late and was itemised nowhere.
+7. **The unanswered Tech pick is not reproduced.** The refusal yields only when no Tech is left to
+   research, not on an empty shortlist, and the suite holds a test of it; a Tech completing inside
+   End Turn owes a fresh pick that blocks the *next* End Turn, which reads as "did not block" to a
+   player who saw the prompt appear mid-turn. Nothing changed.
