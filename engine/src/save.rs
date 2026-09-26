@@ -21,7 +21,7 @@ use std::sync::Arc;
 
 /// The stamp at the head of every save. A file whose stamp is not this one is refused with a plain
 /// message; a save is never migrated between versions.
-pub const SAVE_VERSION: u32 = 5;
+pub const SAVE_VERSION: u32 = 6;
 
 /// The rules version this executable plays, named beside the file's own in a refusal.
 ///
@@ -94,7 +94,18 @@ pub const SAVE_VERSION: u32 = 5;
 /// first already claimed and would hand the next founder a windfall the game had already paid.
 /// Every Body row carries a `first_windfall` besides, so a board from before was played under a
 /// rule this version does not have. A refusal naming both versions is the right answer.
-pub const GAME_VERSION: &str = "0.09.1";
+/// Ticket #378 (version 0.09.2, the closing ticket): moved to **6**, and `GAME_VERSION` to 0.09.2
+/// for the whole version. What a 0.09.1 save would not understand: the war's counters carry the
+/// **Battles that cost a hull or a Battery**, which the chronicle tells (#381), so a board loaded
+/// from an older file would have forgotten every one already fought; a Battle line carries its
+/// **round log** and whether the player fought it mid-turn (#381, #383); the game carries the
+/// **stacks that fought this turn** (#383); and the rules moved under the board -- every home
+/// Region opened with its card's list where this version deals a package (#377), a stack's Attack
+/// stood as a stance where this version fights it the moment it is ordered (#383), and the
+/// Refugee Convoy landed 0.4 for 2 ppm where it lands 1.0 for half (#376). Every new field has a
+/// default, so the file would parse; it would parse into a board this version was not playing. A
+/// refusal naming both versions is the right answer, and a silent partial load is not.
+pub const GAME_VERSION: &str = "0.09.2";
 
 /// The game autosaves at the start of the Report phase of every third turn.
 pub const AUTOSAVE_EVERY: u32 = 3;

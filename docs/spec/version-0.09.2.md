@@ -7,8 +7,29 @@ pictures and batches that decided it are in
 [`docs/dev-diary/2026-09-25-version-0.09.2/`](../dev-diary/2026-09-25-version-0.09.2/).
 
 **What the version is.** Version 0.09.1 with the designer's list, which is mostly the game saying
-what it does, where the player can see it. Sections are added here as each ticket closes; the
-closing ticket writes the summary and the win column.
+what it does where the player can see it, and then three things the list grew into. **The tidying**:
+no card on the first turn (§1), the first-to-land line off the map (§2), glyphs in the Trading
+window (§3), Colonists waiting aboard told in the Report under a Ships heading (§4), one net Unrest
+line a Region (§5), seven defects from the list (§6), a card's Influence figure that reads the
+holder (§7), a Victory bar that counts settled Colonists with a band for those in transit (§8), a
+transit quote that says when it holds, a warning before a stranding and a Distress Call that names
+its Ship (§9), and a Refugee Convoy worth taking (§10). **The cards**: a card for every Ship, with
+Bodies and orbits in drop-downs nested as the sky is (§11), and every refusal explaining why on
+mouseover -- which found that no greyed order button had shown its refusal since 0.08.3 (§13).
+**The rules that moved**: equal starts, every home Region opening with the same Facilities and every
+starting station with a Solar Array (§12); every Battle keeping a round log, drawn and replayed
+(§14); **an Attack fought the moment it is ordered**, with a window of its own (§15); and the fund
+at a glance on the top bar (§16).
+
+**What it did to the win column** (80 games, per Faction, at the shipped climate cell):
+
+| | 0.09.1 | 0.09.2 |
+|---|---|---|
+| Custodians | 6 | 2 |
+| Prospectors | 28 | 5 |
+| Arkwrights | 3 | 0 |
+| Archivists | 2 | 11 |
+| collapses | 41 | 62 |
 
 ---
 
@@ -421,3 +442,24 @@ still fits the second row.
 
 **Why.** The designer: *"for factions that have victory funds I'd like to see a condensed version of
 the slider and fill bar in the top bar (second row to the right of the window buttons)."*
+
+## What the closing sweep says
+
+`sweep -- 20 --seatings --balance --steps=300 --sinks=6`, eighty games, the per-Faction totals read at
+the foot of [`sweeps/final-0.09.2.txt`](../dev-diary/2026-09-25-version-0.09.2/sweeps/final-0.09.2.txt).
+
+- **Wins** Custodians 2, Prospectors 5, Arkwrights 0, Archivists 11; **collapses 62** (0.09.1: 6 / 28
+  / 3 / 2, collapses 41). The column turned over at equal starts (§12): the Archivists' starting
+  station carries a Heliostat and their home a Reactor, and they were first to the Moon in every
+  seed; the Prospectors' opening lost its Habitat to the Exchange in the one slot the Solar Array
+  leaves, and the two poor Regions the spread rule deals now carry the Refinery and Factory they
+  lacked, so every seat is stronger and the Prospectors' lead went.
+- **Victory gates completed** 73 / 68 / 64 / 65 of 80, median turns 23 / 25 / 24 / 23 -- every gate
+  earlier and more often than 0.09.1's 73 / 58 / 50 / 40.
+- **The Archive** stood in 18 of 20 seeds of the first seating (median turn 23) and was complete in
+  17, where 0.09.1 built it in 12 of 80 and finished 8.
+- **The orbital war**: Missile Carriers built 51 and 31 Launches over the eighty games; orbital
+  Battles opened 48, every Attack its own fight since §15.
+- Collapses moved within the version: 41 → 44 (#367) → 44 (#366) → 44 (#375) → 44 (#376) → 62 (#377)
+  → 62 (#383). A rising collapse rate is reported as a figure: every seat opens with a Refinery and
+  a Power Plant it may not have had, and the table burns faster.
