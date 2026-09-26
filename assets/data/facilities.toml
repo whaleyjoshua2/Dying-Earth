@@ -52,7 +52,7 @@ name = "Launch Site"
 materials = 30
 widgets = 8
 energy_upkeep = 2
-does = "lifts Pioneers and Armies from here to orbit and to a Space Station over Earth, and a station over Earth can be built from here"
+does = "lifts Pioneers and Armies from here to any orbit of Earth and to a Space Station over Earth, and a station over Earth can be built from here"
 emissions = 0.0
 
 # Ticket #35 (version 0.03). Its output is 4 x the state's gdp / 10 Ducats; `amount` here is that 4.

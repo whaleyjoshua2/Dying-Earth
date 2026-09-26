@@ -111,9 +111,16 @@ impl Game {
             VictoryFirstKind::StabilizationRun => s.stabilization_run as f64,
             VictoryFirstKind::ColonistsOffEarth => self.off_world_colonists(seat) as f64,
             VictoryFirstKind::ResearchProduced => s.research_total as f64,
-            // Ticket #68: the Research paid into the Archive, which the fund holds only a quarter of
-            // until the Module stands; the bar only tells while the Archive is running.
-            VictoryFirstKind::ArchiveResearch => s.archive_fund.min(self.archive_fund_cap(seat)) as f64,
+            // Ticket #68: the Research paid into the Archive; the bar only tells while the Archive
+            // is running.
+            // Ticket #347 (version 0.09.1): the fund, whole and unclamped. This read used to be
+            // `.min(self.archive_fund_cap(seat))`, and with the cap at a quarter of the figure until
+            // the Module stood the Archivists' first part could not pass 0.25 however much they
+            // banked -- 0 wins of 80 across eighty measured games, with the fund at exactly the cap
+            // in every seating. The clamp is removed rather than left standing now that the cap is
+            // the Archive's own figure, because a clamp that looks live and is not is the thing a
+            // reader trusts and a future change breaks.
+            VictoryFirstKind::ArchiveResearch => s.archive_fund as f64,
         };
         // Ticket #51: the second part is whatever the card names, at the card's own figures.
         let second = self.tables.faction(s.kind).victory_second;

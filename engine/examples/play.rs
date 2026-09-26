@@ -195,7 +195,11 @@ const GRAMMAR: &str = r#"ORDER LINES (one per line; `#` starts a comment; blank 
                                        0.09.0): a Region loses population for it, a Colony a
                                        Colonist, and a place without the people to spare is refused.
   build station <body> <slot>          e.g. build station moon 0; Materials alone, no Widgets
-  build archive <colony>               the Archivists only
+  build archive <colony>               the Archivists only, at a Colony OFF EARTH (neither Antarctica
+                                       nor a station over Earth), where four Colonists already live.
+                                       Both are checked at the order and never again. The Upload
+                                       gates the Archivists' WIN, not this order (ticket #361,
+                                       version 0.09.1, undoing ticket #199).
   industry <state>                     raise the Industry Level
   cancel-build <place> <index>         cancel a build ANOTHER seat began at a place you now direct,
                                        which is what a conquest leaves behind: its Materials come
@@ -232,11 +236,13 @@ const GRAMMAR: &str = r#"ORDER LINES (one per line; `#` starts a comment; blank 
 
   A BODY'S ORBITS (ticket #335, version 0.09.0) are LOW ORBIT and one per Orbital Slot, and every
   Ship at a Body sits in exactly one of them; there is no Body at large. LOW ORBIT is what touches
-  the ground: landing an Army at a ground Colony, unloading Colonists into one, founding one,
-  Bombarding one, and receiving a lift from a Launch Site. A STATION'S OWN ORBIT is what touches
-  that station: unloading into it, refuelling at it, blockading it, attacking it. Orbital Control is
+  the ground: landing an Army at a ground Colony, unloading Colonists into one, founding one, and
+  Bombarding one. A STATION'S OWN ORBIT is what touches that station: unloading into it, refuelling
+  at it, blockading it, attacking it. A LIFT FROM A LAUNCH SITE reaches ANY orbit of Earth (ticket
+  #357, version 0.09.1). A refusal that a change of orbit would cure names the move first. Orbital Control is
   of LOW orbit and gates the ground. A BLOCKADE IS A STANCE, chosen (`ship-stance <body> blockade`)
-  and shutting the orbit the stack sits in -- never a side effect of arriving anywhere. `show` names
+  and shutting the orbit the stack sits in -- never a side effect of arriving anywhere. A
+  rival's working Battery in that orbit opens a Battle on a blockader (ticket #363). `show` names
   the orbit every Ship sits in, and lists each Body's orbits under FREE SLOTS.
 
   bombard <ship> <colony>              a Battleship of yours breaks one Module of a RIVAL'S Colony,
@@ -247,6 +253,16 @@ const GRAMMAR: &str = r#"ORDER LINES (one per line; `#` starts a comment; blank 
                                        hold no rival warship and no rival working Battery. Move the
                                        Battleship there first with `change-orbit`, and in an EARLIER
                                        turn: a Ship takes one order a turn, and a Bombard is one.
+
+  launch <ship> <place>                a Missile Carrier of yours fires its one Warhead at a RIVAL'S
+                                       Region, ground Colony or Space Station. Ticket #343 (version
+                                       0.09.1): the same orbit rule a Bombard reads -- low orbit for
+                                       the ground (and Orbital Control of that Body outright), a
+                                       station's own orbit for a station -- but EARTH IS NOT
+                                       EXCEPTED, and a Region is a lawful target. Free.
+  rearm <ship>                         load another Warhead, at a Colony or station of yours with a
+                                       working Shipyard, in that place's own orbit. It is a build
+                                       in that yard's queue: Materials now, Widgets over the turns.
 
   influence <place> <amount>
   buy-influence <amount>
@@ -432,6 +448,10 @@ fn parse_line(g: &Game, line: &str) -> Result<Line, String> {
         // Ticket #328 (version 0.08.8), and ticket #335 (version 0.09.0) for the orbit: the
         // Battleship acts in the orbit it sits in, so the line names no orbit of its own.
         "bombard" => Order::Bombard { ship: ship_id(at(1)?)?, colony: colony_id(at(2)?)? },
+        // Ticket #343 (version 0.09.1): the Missile Carrier fires its one Warhead, and loads
+        // another at a yard of its own. Both act in the orbit the hull sits in.
+        "launch" => Order::Launch { ship: ship_id(at(1)?)?, target: place(at(2)?)? },
+        "rearm" => Order::Rearm { ship: ship_id(at(1)?)? },
         "load" => {
             let ship = ship_id(at(1)?)?;
             let colonists = count(at(2)?)?;
@@ -945,6 +965,14 @@ fn print_board(g: &Game) {
     let sources: Vec<String> = s.income_sources.iter().map(|(what, r, n)| format!("{what} {n:+}{}", &r.name()[..1])).collect();
     if !sources.is_empty() {
         println!("  from: {}", sources.join(", "));
+    }
+    // Ticket #351 (version 0.09.1): the Shortfall alarm the top bar shows in red, in the same words.
+    // The playtest met the Shortfall through this driver, so it is where a tester will meet it again.
+    if let Some(f) = g.shortfall_forecast(me, &[]) {
+        println!("  ENERGY ALARM: next Income is {} Energy short. These go dark, in this order:", f.short_by);
+        for d in &f.dark {
+            println!("    the {} {}", d.name.strip_prefix("The ").unwrap_or(&d.name), d.at);
+        }
     }
     println!("Influence allotment this turn: {}", g.influence_allotment(me));
     println!(

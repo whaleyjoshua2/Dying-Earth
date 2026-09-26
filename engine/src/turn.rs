@@ -68,7 +68,13 @@ impl Game {
             .collect();
         let text = self.say(
             "start_rivals",
-            &[("rivals", rivals.join(", ")), ("collapse", format!("{:.1}", self.tables.climate.collapse_line))],
+            // Ticket #350 (version 0.09.1): the player's own Condition, where every Faction was told
+            // the same twelve Colonists.
+            &[
+                ("rivals", rivals.join(", ")),
+                ("condition", self.tables.victory_short(self.kind(Seat(0)))),
+                ("collapse", format!("{:.1}", self.tables.climate.collapse_line)),
+            ],
         );
         self.report_line(LineKind::Note, None, text);
         if self.seat(Seat(0)).ai {
@@ -95,8 +101,12 @@ impl Game {
     fn report_phase(&mut self) {
         self.report.turn = self.turn;
         // The drawn card is already in the log where it was drawn, so it is not logged twice.
+        // Ticket #353 (version 0.09.1): the card's own lines moved to `LineKind::Card`, so both kinds
+        // are named here. Every Event line that is left -- the off-Earth join, a Storm Surge the Sea
+        // Wall held -- is logged at its own site too, which is why the skip was written by kind and
+        // not by sentence, and the log reads exactly as it did before this ticket.
         for l in self.report.lines.clone() {
-            if l.kind == LineKind::Event {
+            if l.kind == LineKind::Event || l.kind == LineKind::Card {
                 continue;
             }
             self.log(format!("  Report: {}", l.text));

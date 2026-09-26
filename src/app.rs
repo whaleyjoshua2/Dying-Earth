@@ -302,6 +302,10 @@ pub enum StackBlock {
     Transits,
     /// The Change orbit door, one line per other orbit at this Body.
     ChangeOrbit,
+    /// Ticket #346 (version 0.09.1): the Tanks block, where a Ship's Fuel, its Refuel button, the
+    /// stranded warning and the dry warning all stand. It is far enough down the card that no
+    /// picture had ever reached it.
+    Tanks,
 }
 
 /// Ticket #146 (version 0.07.3): what is clicked among a Region card's slot boxes -- a standing
@@ -367,6 +371,12 @@ pub struct ViewState {
     /// Ticket #204 (version 0.08.1): the Region a Colony's own loader draws from, kept apart from
     /// `load_state` so that choosing a Region on a Ship's card does not move it on a station's.
     pub lift_state: Option<StateId>,
+    /// Ticket #343 (version 0.09.1): the place a Launch is aimed at, chosen on the Ship stack's
+    /// card. A Launch carries a `Place` -- a Region, a ground Colony or a station -- and over Earth
+    /// there are more lawful targets than a button apiece would fit, so the target is CHOSEN once
+    /// and every carrier's button fires at it. Dropped back to the first lawful target whenever the
+    /// one remembered is no longer one.
+    pub launch_target: Option<Place>,
     pub influence_amount: i64,
     /// Ticket #256 (version 0.08.4): the Ducats the Withdraw field on the Victory window asks for,
     /// kept as `influence_amount` is so the field remembers what was typed between frames.
@@ -444,6 +454,7 @@ impl Default for ViewState {
             trade_amounts: [5, 10, 10, 10],
             load_state: None,
             lift_state: None,
+            launch_target: None,
             influence_amount: 5,
             venture_withdraw: 10,
             smear_amount: 5,

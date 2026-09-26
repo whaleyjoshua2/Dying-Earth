@@ -55,6 +55,13 @@ build_habitat = 5
 build_launch_site_or_shipyard = 6
 build_colony_ship = 6
 build_warship = 5
+# Ticket #343 (version 0.09.1): the Missile Carrier, and the Launch it was bought for. A seat
+# builds one only with Missile Technology standing, a rival holding a place it wants and cannot
+# take, and no carrier of its own already armed or on the ways; it fires at the richest such
+# place it can reach and hold the orbit of. Both weights sit above a warship's, since a hull
+# that costs 60 and 16 is worth nothing until it is fired.
+build_missile_carrier = 6
+launch = 9
 build_army_or_barracks = 5
 build_influence = 6
 influence = 5
@@ -101,6 +108,13 @@ build_habitat = 7
 build_launch_site_or_shipyard = 6
 build_colony_ship = 8
 build_warship = 3
+# Ticket #343 (version 0.09.1): the Missile Carrier, and the Launch it was bought for. A seat
+# builds one only with Missile Technology standing, a rival holding a place it wants and cannot
+# take, and no carrier of its own already armed or on the ways; it fires at the richest such
+# place it can reach and hold the orbit of. Both weights sit above a warship's, since a hull
+# that costs 60 and 16 is worth nothing until it is fired.
+build_missile_carrier = 6
+launch = 9
 build_army_or_barracks = 4
 build_influence = 6
 influence = 8
@@ -147,7 +161,15 @@ observatory_colonists = 8
 build_habitat = 9
 build_launch_site_or_shipyard = 9
 build_colony_ship = 9
-build_warship = 3
+# Ticket #355 (version 0.09.1): 3 to 4, at the designer's word.
+build_warship = 4
+# Ticket #343 (version 0.09.1): the Missile Carrier, and the Launch it was bought for. A seat
+# builds one only with Missile Technology standing, a rival holding a place it wants and cannot
+# take, and no carrier of its own already armed or on the ways; it fires at the richest such
+# place it can reach and hold the orbit of. Both weights sit above a warship's, since a hull
+# that costs 60 and 16 is worth nothing until it is fired.
+build_missile_carrier = 6
+launch = 9
 build_army_or_barracks = 4
 build_influence = 6
 influence = 5
@@ -197,8 +219,16 @@ observatory_colonists = 4
 build_habitat = 7
 build_launch_site_or_shipyard = 6
 build_colony_ship = 8
-build_warship = 1
-# Ticket #51: the Archivists spend on the Archive and Colony Ships, never a fleet.
+# Ticket #355 (version 0.09.1): 1 to 3, at the designer's word; the Archivists fight in orbit too.
+build_warship = 3
+# Ticket #343 (version 0.09.1): the Missile Carrier, and the Launch it was bought for. A seat
+# builds one only with Missile Technology standing, a rival holding a place it wants and cannot
+# take, and no carrier of its own already armed or on the ways; it fires at the richest such
+# place it can reach and hold the orbit of. Both weights sit above a warship's, since a hull
+# that costs 60 and 16 is worth nothing until it is fired.
+build_missile_carrier = 6
+launch = 9
+# Ticket #51: the Archivists spend on the Archive and Colony Ships. Ticket #355 (version 0.09.1): "never a fleet" is gone.
 build_army_or_barracks = 4
 build_influence = 6
 influence = 8
@@ -249,13 +279,15 @@ investment_bank_per_fund = 0.002
 # better there than at any figure measured so far: Custodians 43, Prospectors 13, Arkwrights 7,
 # Archivists 5, against the 58 / 18 / 3 / 0 this version started from, with no seat left on nothing.
 #
-# The lever held in reserve, if the Archivists are ever to be lifted without loosening the rule, is
-# `banked_before_built` in modules.toml. It caps the Archive fund at a quarter of the 80 the Archive
-# wants until the Module physically stands, and the sweeps show the fund sitting at exactly that cap
-# -- 20 -- in three seatings of four. So the Archivists now spend the journey with their Labs'
-# Research frozen as well as their Archive unplaceable: the rule charges them twice for one trip.
-# That cap was set when the Archive was ordered on turn 1 in Earth orbit, where there was no journey
-# to fund through, so its premise is gone even though the figure has not moved.
+# That lever has been pulled. Ticket #347 (version 0.09.1) removed `banked_before_built` from
+# modules.toml outright: it capped the Archive fund at a quarter of what the Archive wanted until the
+# Module physically stood, the sweeps showed the fund sitting at exactly that cap -- 20 -- in every
+# seating, and the Archivists' first Victory part read the fund THROUGH the cap, so their score
+# could not pass a quarter however much they banked. The Archivists spent the journey with their
+# Labs' Research frozen as well as their Archive unplaceable: the rule charged them twice for one
+# trip, and its premise was gone from the moment the Archive stopped being ordered on turn 1 in
+# Earth orbit. The fund now holds the whole figure -- 125, the Archive's cost and their Victory bar
+# in one -- from the first turn, and the seat directs its Research until the fund is full.
 archive_needs_a_place = 5.0
 # Ticket #332 (version 0.09.0): a build is ordered where the place's Widgets finish it soonest, the
 # queue's depth as the gap. Every build candidate is weighed against the SAME build at the seat's
@@ -308,6 +340,20 @@ first = [[10, 20], [18, 40], [26, 60], [32, 80]]
 colonists = [[12, 4], [22, 12]]
 
 [thresholds]
+# Ticket #345 (version 0.09.1): FIRST TO A BODY, on the computer's side. `first_windfall_worth`
+# is what one Influence of an unclaimed Body's windfall counts for when a seat picks where to
+# send a loaded Colony Ship, in the units a Colony Slot's yields are weighed in -- a slot is worth
+# 0.5 to 1.75 on that scale, so this figure times 15 (Mars) or 20 (the Mars moons) is what has to
+# outweigh the Moon's better ground and its one-turn leg. `first_found_weight` multiplies the
+# founding appetite itself at a Body still unclaimed, so a Ship that has arrived commits to the
+# ground rather than parking its load in a Colony of its own.
+#
+# Without these two the rule would not exist in play: the destination list was yields against
+# flight time, the Moon won it from turn one, and no computer seat founded a Colony anywhere in
+# the Mars system in eighty measured games. Both fall away the moment a Body is claimed, so the
+# pull is toward whatever world is still unsettled and never toward one that is.
+first_windfall_worth = 0.12
+first_found_weight = 1.5
 attack_odds = 0.6
 # Ticket #284 (version 0.08.5): every seat may attack a place it did not lose, on the odds, given a
 # cause: a neutral place needs none, and a place a rival holds wants Relations toward that rival at
@@ -371,14 +417,65 @@ factory_module_queue_depth = 2
 # warship leg named the richest rival station whatever the seat thought of its holder, so low orbit
 # stood empty and the ground was never shut by anybody.
 low_orbit_warships = 1
+# Ticket #346 (version 0.09.1): a Battle costs every hull in it `battle_fuel`, so a seat now weighs
+# that Fuel against the prize before it opens one. This MULTIPLIES THE ODDS the seat reads against
+# `attack_odds` above, when BOTH of these hold: paying the charge would leave every armed hull the
+# seat has in the contested orbit under the Battle bar -- unable to hold the orbit, blockade or
+# intercept, and halved in the next fight -- and the seat holds nothing at that Body, neither a
+# Colony on the ground nor a station of its own, so there is nothing the orbit was wanted for.
+# That is the "strands its fleet for nothing" case, and only that one: a seat with a place of its
+# own below pays the Fuel at full appetite, because the orbit is the thing it came for.
+#
+# A weight and not a prohibition: it is a figure here rather than an `if` in the code, and a
+# discounted Battle is one that has to look BETTER to be worth a tank, not one that is forbidden.
+# 0.2 means such a Battle would have to read 300% odds, which no Battle does, so in practice the
+# seat holds instead; 0.9 would raise the bar it reads from 60% to 67%; 1.0 turns the weighing off
+# altogether and restores the reading this ticket found. It is set low because the case it catches
+# is a fleet buying a fight it cannot then hold the orbit with, which is a bad trade at any odds.
+battle_fuel_weight = 0.2
 
 # Tech picks as Research Lead (spec 16.4): `order` first, then the cheapest available that is not
 # `never`, and `last` only when nothing else is left.
+#
+# Ticket #348 (version 0.09.1): EVERY LIST OPENS WITH ITS OWN VICTORY GATE'S CHAIN, cheapest first.
+# Before this only the Custodians could reach their own gate: theirs is three Techs and 98 Research
+# with every antecedent on their list, where the other three are five Techs and 148 and each was
+# missing antecedents from its own. Measured over eighty games at the 0.09.1 baseline: wins
+# Custodians 3, Prospectors 30, Arkwrights 1, Archivists 0.
+#
+# An antecedent a list already held is NOT repeated -- it keeps the place it had. The additions are
+# ordered by cost and not by the tree, because the list is read against what is AVAILABLE: an
+# antecedent whose own prerequisites are unmet is skipped over this turn and taken the turn they are
+# met, so Beneficiation can stand ahead of the Deep Mining it needs without ever being picked first.
 
+# Ticket #355 (version 0.09.1): Hardened Hulls and Missile Technology close all four lists, AFTER
+# each Faction's Victory gate chain, which always comes first -- the designer's word.
 [tech_picks.prospectors]
-order = ["deep_mining", "efficient_grids", "automated_refining", "clean_propellant", "efficient_transit"]
-last = "clean_power"
-never = "green_consensus"
+# Ticket #348: Beneficiation joins the list. Ticket #242 made it a prerequisite of the Extraction
+# Charter and nobody put it on the list it gates, so the Prospectors reached their own gate only by
+# taking Beneficiation as the cheapest thing left.
+order = ["beneficiation", "deep_mining", "efficient_grids", "automated_refining", "clean_propellant", "efficient_transit", "hardened_hulls", "missile_technology"]
+# Ticket #348: `last = "clean_power"` is GONE. The tree is SHARED, so a Faction deferring a Tech is
+# not stating a private preference -- it is holding the whole table up. Clean Power is an antecedent
+# of BOTH the Arkwrights' and the Archivists' gates, so every turn a Prospector Lead pushed it to
+# the back it stalled two rivals' Victory Conditions without the Prospectors ever choosing to.
+#
+# `never = "green_consensus"` IS GONE TOO, and for the same reason one layer down. It was kept at
+# first on a build specification that claimed Green Consensus was nobody else's antecedent. It is
+# the CUSTODIANS' ONLY rung-2 antecedent -- Planetary Stewardship needs it and nothing else in the
+# tree does -- so the Prospectors were refusing to fund the one chain the weakest Faction on the
+# board has, in a game where they win 30 of 80 and the Custodians 3.
+#
+# `never` is the gentler of the two levers and it is worth saying what it did, since the difference
+# is why it survived one round. `last` governs what a Faction PICKS while it holds the Research
+# Lead, which stalls the whole table at once. `never` governs its RESEARCH DIRECTIVE: for as long
+# as the table researches that Tech, the Faction diverts its own Research out of the shared pot and
+# into its coffers. It starves the Tech more slowly, it costs the Prospectors their contribution to
+# everything else, and it arrives at the same place.
+#
+# The Prospectors now carry neither lever. A Faction refusing to fund a rival is a fine idea and
+# this is not a ruling against it; it is a ruling that the target must not be the only road another
+# Faction has to its Victory Condition.
 
 # Ticket #77 (version 0.05.5): Coastal Engineering second, so the Sea Wall (10 Research on rung 1
 # since ticket #69) arrives before the sea takes the coast around turn 13, not around turn 17 as
@@ -388,12 +485,21 @@ never = "green_consensus"
 # by the cheapest-remaining fallback -- which is exactly how The Upload got chosen in the game that
 # opened ticket #201 -- and the Custodians are the seat that most wants to keep what it holds: they
 # lose their start Region in up to 12 seeds of 20.
-order = ["public_science", "coastal_engineering", "efficient_grids", "clean_power", "green_consensus", "civil_defense", "clean_manufacturing"]
+order = ["public_science", "coastal_engineering", "efficient_grids", "clean_power", "green_consensus", "civil_defense", "clean_manufacturing", "hardened_hulls", "missile_technology"]
 
 # Ticket #51: the Arkwrights want room, cheap upkeep and cheap transits.
+# Ticket #348: Efficient Grids and Clean Power open the list. Generation Ships waits on Closed-Loop
+# Colonies, which waits on Expanded Habitats AND Clean Power, which waits on Efficient Grids -- and
+# the Arkwrights had the top and the bottom of that chain on their list and neither of its middle
+# two rungs. They won 1 of 80.
 [tech_picks.arkwrights]
-order = ["expanded_habitats", "closed_loop_colonies", "efficient_transit"]
+order = ["efficient_grids", "clean_power", "expanded_habitats", "closed_loop_colonies", "efficient_transit", "hardened_hulls", "missile_technology"]
 
 # Ticket #51: the Archivists want Research and a quiet world.
+# Ticket #348: Expanded Habitats, Clean Power and Closed-Loop Colonies open the list. Ticket #246
+# moved The Upload on to Closed-Loop Colonies and warned in `techs.toml` that the gate had gone from
+# one antecedent to four; nothing then put those four on the list of the Faction whose gate it is,
+# and they held Efficient Grids alone of them. They won 0 of 80 and their Archive waits on this same
+# Tech, since `orders.rs` refuses the Archive order until The Upload stands.
 [tech_picks.archivists]
-order = ["public_science", "efficient_grids", "coastal_engineering", "green_consensus", "civil_defense"]
+order = ["expanded_habitats", "clean_power", "closed_loop_colonies", "public_science", "efficient_grids", "coastal_engineering", "green_consensus", "civil_defense", "hardened_hulls", "missile_technology"]

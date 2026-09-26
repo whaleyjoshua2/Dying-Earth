@@ -65,6 +65,11 @@ pub struct BodyCard {
     /// Ticket #140 (version 0.07.3): the fourth yield is Research, multiplying an Observatory; it
     /// was the Habitat yield, which multiplied a Habitat's room, until the designer traded it.
     pub research_yield: f64,
+    /// Ticket #345 (version 0.09.1): the Influence the Faction that founds this Body's FIRST ground
+    /// Colony is paid, once, in the Income after the landing. No `#[serde(default)]` on purpose: a
+    /// Body row that has not been given a figure is a rule this build cannot price, and the load
+    /// refuses the whole table rather than pay nothing quietly. See `bodies.toml`.
+    pub first_windfall: i64,
 }
 
 impl BodyCard {
@@ -308,6 +313,12 @@ pub struct UnitCard {
     pub tank: i64,
     pub carries_colonists: u32,
     pub carries_army: bool,
+    /// Ticket #343 (version 0.09.1): the Tech that must stand before this Ship can be ordered, if
+    /// any -- the Missile Carrier's Missile Technology, and nothing else's. The Facility card
+    /// (`needs_tech` above) and the Module card have carried one since tickets #56 and #92; a unit
+    /// card never did until this ticket, so every other row simply leaves it out.
+    #[serde(default)]
+    pub needs_tech: Option<TechId>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -585,6 +596,11 @@ pub struct FactionCard {
     pub unique: String,
     /// The Victory Condition in prose, for the cards and the panel.
     pub victory: String,
+    /// Ticket #350 (version 0.09.1): the Victory Condition in one clause, for the turn-1 Report line,
+    /// which told every Faction to "get twelve Colonists off Earth" -- half of two Factions'
+    /// Conditions and wrong for the other two. Its figures are placeholders filled from the bars
+    /// below (`{first}`, `{second}`, `{bodies}`), never typed, so a moved bar cannot leave it lying.
+    pub victory_short: String,
     /// Ticket #50: the first part of the Victory Condition, in figures.
     pub victory_first: VictoryFirstCard,
     /// Ticket #51: the second part, generalised the way #50 generalised the first.
@@ -799,8 +815,10 @@ pub enum BreakEffect {
     /// `emissions` ppm join the world's Emissions in this and every later Climate phase, on their
     /// own line: nobody's Blame, and never counted against a Stabilization run.
     EmissionsPerTurn,
-    /// The Natural Sink falls to `sink_after` for good. This one does bear on Stabilization: the
-    /// Sink is the bar the run is measured against.
+    /// `sink_cut` comes off the Natural Sink for good. This one does bear on Stabilization: the
+    /// Sink is the bar the run is measured against. Ticket #343 (version 0.09.1): a SUBTRACTION,
+    /// where until this version the Break assigned `sink_after` and so erased anything that had
+    /// raised the Sink. 6.0 - 2.0 = 4.0 on an untouched game, exactly where the assignment put it.
     WeakenSink,
     /// One Sea Level threshold's slot loss, displacement and Unrest lands at once on every state,
     /// out of sequence. The scheduled thresholds still fire on their own turns.
@@ -831,7 +849,7 @@ pub struct BreakCard {
     #[serde(default)]
     pub emissions: f64,
     #[serde(default)]
-    pub sink_after: f64,
+    pub sink_cut: f64,
     #[serde(default)]
     pub co2: f64,
     #[serde(default)]
@@ -891,6 +909,9 @@ pub struct InfluenceTable {
     pub decay_controlled: i64,
     /// Version 0.04 (ticket #41): a challenger needs the controller's standing plus this.
     pub challenge_margin: i64,
+    /// Ticket #349 (version 0.09.1): a held place is **Pressed** while any rival's Standing there is
+    /// within this of the holder's own. It tells the player; no rule reads it.
+    pub pressed_band: i64,
     /// Ticket #224 (version 0.08.2): the most the Relations term may add to a challenge margin. Two,
     /// which is also its true maximum: the shown score clamps at -10 and the term is `|score| / 4`.
     #[serde(default = "relations_margin_cap_default")]
@@ -903,6 +924,10 @@ pub struct InfluenceTable {
     /// ticket #336 (version 0.09.0) rather than on top of it.
     #[serde(default)]
     pub station_threshold_base: i64,
+    /// Ticket #345 (version 0.09.1): what the Core of a Colony that was first to its Body adds to
+    /// its founder's Allotment, after the Faction multiplier and at face value, every turn the
+    /// founder still directs it. See `influence.toml`.
+    pub first_settled_allotment: i64,
     pub occupation_turns: u32,
     pub destruction_chance: f64,
     /// Ticket #187 (version 0.08.0): how far a place's schooling bends what an outsider's Influence
@@ -1093,6 +1118,11 @@ pub struct AiWeights {
     pub build_launch_site_or_shipyard: f64,
     pub build_colony_ship: f64,
     pub build_warship: f64,
+    /// Ticket #343 (version 0.09.1): the Missile Carrier, weighted apart from a warship, since it
+    /// is not one: it never fights, it is dearer than a Battleship, and a seat wants at most one
+    /// at a time. And the Launch itself, which is what the hull was bought for.
+    pub build_missile_carrier: f64,
+    pub launch: f64,
     pub build_army_or_barracks: f64,
     /// Ticket #36: an Embassy or a Relay.
     pub build_influence: f64,
@@ -1223,6 +1253,19 @@ pub struct AiThresholds {
     /// Ticket #335 (version 0.09.0): how many warships a seat wants holding LOW ORBIT at a Body
     /// whose ground it wants, before the next hull's leg names a rival station's ring instead.
     pub low_orbit_warships: u32,
+    /// Ticket #345 (version 0.09.1): what ONE Influence of an unclaimed Body's `first_windfall` is
+    /// worth to the AI when it picks where to send a loaded Colony Ship, in the units a Colony
+    /// Slot's yields are weighed in. Nought here and the computer seats never read the new rule.
+    pub first_windfall_worth: f64,
+    /// Ticket #345: what the founding appetite is multiplied by at a Body whose first is still
+    /// unclaimed -- the landing that takes a world is worth more than the landing that joins one.
+    pub first_found_weight: f64,
+    /// Ticket #346 (version 0.09.1): what the orbital Attack's appetite is multiplied by when
+    /// opening the Battle would leave the seat's whole armed line in that orbit under the Battle
+    /// bar AND the seat holds nothing at the Body to hold the orbit for. A WEIGHT and never a
+    /// prohibition, at the designer's word: the attack still competes, and still wins where the
+    /// seat wants nothing else. 1.0 here and the computer seats spend the Fuel without weighing it.
+    pub battle_fuel_weight: f64,
 }
 
 /// Ticket #50: one pick list per Faction. `order` is tried first, then the cheapest available
@@ -1331,8 +1374,11 @@ struct FacilitiesFile {
     unique: UniqueCard,
 }
 /// Ticket #51: the Archive. Its Materials, build turns and Energy upkeep sit on its Module row.
-/// Ticket #68 (version 0.05.5): the Research it requires in all, and the share of it the fund may
-/// hold before the Module stands.
+/// Ticket #68 (version 0.05.5): the Research it requires in all.
+/// Ticket #347 (version 0.09.1): `banked_before_built`, the share of that figure the fund could
+/// hold before the Module stood, is gone; the fund holds the whole of it from the first turn.
+/// `deny_unknown_fields` because the removed key would otherwise sit on in the data file, read by
+/// nothing and contradicting the rule beside it, with every test still green.
 /// Ticket #97 (version 0.07.0): the Modules a Colony or a Space Station may hold: `base` free, and
 /// one more for every `per_colonist` Colonists living there.
 #[derive(Debug, Clone, Deserialize)]
@@ -1342,9 +1388,9 @@ pub struct SlotsCard {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ArchiveCard {
     pub research: i64,
-    pub banked_before_built: f64,
     /// Ticket #192 (version 0.08.0): Colonists who must live at the place before it may be ORDERED.
     pub colonists_to_order: u32,
 }
@@ -1433,6 +1479,14 @@ pub struct MeleeCard {
     /// the FIGURE's, never the game's, so reading the odds cannot move a seeded game.
     pub odds_trials: u32,
     pub odds_seed: u64,
+    /// Ticket #346 (version 0.09.1): what one SHIP Battle takes out of every tank named in it, and
+    /// the share of its strength a hull that could not pay fights at. Neither has a serde default:
+    /// a figure missing from `[melee]` refuses the whole table at load, which is the error case the
+    /// ticket asks for. `battle_fuel` is also the bar a warship must hold to hold Orbital Control,
+    /// to contest an orbit, to blockade and to intercept, so the one figure carries both rules and
+    /// they can never drift apart.
+    pub battle_fuel: i64,
+    pub dry_strength_share: f64,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -1445,6 +1499,33 @@ struct UnitsFile {
     standing_army: StandingArmyCard,
     dig_in: DigInCard,
     army: ArmyCard,
+    nuke: NukeCard,
+}
+
+/// Ticket #343 (version 0.09.1): every figure a Launch reads (`units.toml`). They live in
+/// `units.toml` rather than a file of their own because the carrier is a unit and its row is here:
+/// the destruction chance, the share of the people, the Industry Level, the offence, what a strike
+/// does to Earth's air and Earth's Sink, and what a rearm costs. NOTHING here has a serde default:
+/// a `nuke` figure missing from the table refuses the whole table at load, which is the error case
+/// the ticket asks for.
+#[derive(Debug, Clone, Deserialize)]
+pub struct NukeCard {
+    /// The chance each building at the struck place is destroyed, rolled independently. The
+    /// Occupation's own 0.25 stays in `influence.destruction_chance`; this is not it.
+    pub destruction_chance: f64,
+    /// The share of the place's people that dies, drawn once per strike between the two.
+    pub people_min: f64,
+    pub people_max: f64,
+    /// At a Region only: the Industry Levels the strike takes off, floored at the state card's own.
+    pub industry_lost: u32,
+    /// The offence weight against the holder: rung 4, a weight and not an enum.
+    pub offence: i64,
+    /// On Earth only: the ppm into the war bucket, and the permanent rise in the Natural Sink.
+    pub war_ppm: f64,
+    pub sink_rise: f64,
+    /// What a Rearm costs at a Shipyard of the firing Faction.
+    pub rearm_materials: i64,
+    pub rearm_widgets: u32,
 }
 
 /// Ticket #86 (version 0.06.0): a warming Earth fills the Colony Ships. `per_step` Colonists
@@ -1710,6 +1791,8 @@ pub struct Tables {
     pub dig_in: DigInCard,
     /// Ticket #334 (version 0.09.0): the people a raised Army takes.
     pub army: ArmyCard,
+    /// Ticket #343 (version 0.09.1): every figure a Launch reads.
+    pub nuke: NukeCard,
     pub techs: Vec<TechCard>,
     pub events: EventsTable,
     pub factions: Vec<FactionCard>,
@@ -1830,6 +1913,7 @@ impl Tables {
             standing_army: units.standing_army,
             dig_in: units.dig_in,
             army: units.army,
+            nuke: units.nuke,
             techs: techs.tech,
             shortlist: techs.shortlist,
             events,
@@ -1865,7 +1949,7 @@ impl Tables {
         check_rows("modules.toml", &ModuleKind::ALL, self.modules.iter().map(|m| m.id))?;
         check_rows(
             "units.toml",
-            &[UnitKind::ColonyShip, UnitKind::Frigate, UnitKind::Battleship, UnitKind::Carrier, UnitKind::Army],
+            &[UnitKind::ColonyShip, UnitKind::Frigate, UnitKind::Battleship, UnitKind::Carrier, UnitKind::Army, UnitKind::MissileCarrier],
             self.units.iter().map(|u| u.id),
         )?;
         check_rows("techs.toml", &TechId::ALL, self.techs.iter().map(|t| t.id))?;
@@ -1908,6 +1992,18 @@ impl Tables {
             };
             if !second_ok {
                 return Err(err("factions.toml", format!("row {}: victory_second needs a positive bar, or bodies and colonists_each", f.name)));
+            }
+            // Ticket #350: every placeholder in the short Condition must be one this Faction's own
+            // Victory kinds can fill, or the turn-1 line would print a brace to the player.
+            let fillable: &[&str] = match f.victory_second.kind {
+                VictorySecondKind::OffWorldPresence | VictorySecondKind::ColonistsUploaded => &["first", "second"],
+                VictorySecondKind::ColoniesOnBodies => &["first", "bodies"],
+            };
+            if f.victory_short.trim().is_empty() {
+                return Err(err("factions.toml", format!("row {}: victory_short is empty", f.name)));
+            }
+            if let Some(p) = crate::report::placeholders(&f.victory_short).into_iter().find(|p| !fillable.contains(&p.as_str())) {
+                return Err(err("factions.toml", format!("row {}: victory_short uses {{{p}}}, which its Victory Condition cannot fill", f.name)));
             }
             for (what, m) in [
                 ("habitat_capacity_multiplier", f.habitat_capacity_multiplier),
@@ -1974,6 +2070,20 @@ impl Tables {
         if self.army.population_each <= 0.0 || !self.army.population_each.is_finite() || self.army.colonists_each == 0 {
             return Err(err("units.toml", "[army] population_each must be positive and colonists_each at least 1"));
         }
+        // Ticket #343 (version 0.09.1): a `nuke` figure that is absent refuses the table at the
+        // parse, since no field of `NukeCard` has a default; these are the figures that are present
+        // and out of range. A share of the people outside 0..1, or a band the wrong way round,
+        // would draw a share nobody wrote.
+        let n = &self.nuke;
+        if !(0.0..=1.0).contains(&n.destruction_chance) {
+            return Err(err("units.toml", "[nuke] destruction_chance must be between 0 and 1"));
+        }
+        if !(0.0..=1.0).contains(&n.people_min) || !(0.0..=1.0).contains(&n.people_max) || n.people_min > n.people_max {
+            return Err(err("units.toml", "[nuke] people_min and people_max must be between 0 and 1, and people_min no greater than people_max"));
+        }
+        if n.offence <= 0 || n.war_ppm < 0.0 || n.sink_rise < 0.0 || n.rearm_materials < 0 || n.rearm_widgets == 0 {
+            return Err(err("units.toml", "[nuke] offence and rearm_widgets must be positive, and war_ppm, sink_rise and rearm_materials not negative"));
+        }
         for t in &self.techs {
             for n in &t.needs {
                 if *n == t.id {
@@ -2006,7 +2116,7 @@ impl Tables {
             let figures = match b.effect {
                 BreakEffect::CoastalUnrest => b.unrest > 0.0 || b.population_loss > 0.0,
                 BreakEffect::EmissionsPerTurn => b.emissions > 0.0,
-                BreakEffect::WeakenSink => b.sink_after > 0.0,
+                BreakEffect::WeakenSink => b.sink_cut > 0.0,
                 BreakEffect::SeaLevelThreshold => true,
                 BreakEffect::CarbonPulse => b.co2 > 0.0 || (b.baseline_rise > 0.0 && b.state.is_some()),
             };
@@ -2043,6 +2153,15 @@ impl Tables {
         if self.melee.rounds == 0 || self.melee.rolls == 0 {
             return Err(err("units.toml", "[melee] rounds and rolls must both be at least 1"));
         }
+        // Ticket #346 (version 0.09.1): a negative charge would REFILL a tank in a Battle, and a
+        // share outside 0..1 would either wipe a dry hull's strength past nought or reward it for
+        // being dry. Absence is refused by serde, these two figures carrying no default.
+        if self.melee.battle_fuel < 0 {
+            return Err(err("units.toml", "[melee] battle_fuel cannot be negative: a Battle takes Fuel, it does not give it"));
+        }
+        if !(0.0..=1.0).contains(&self.melee.dry_strength_share) {
+            return Err(err("units.toml", "[melee] dry_strength_share must be between 0 and 1"));
+        }
         for s in &self.states {
             if s.unrest < 0.0 || s.unrest > u.max {
                 return Err(err("nation_states.toml", format!("row {}: unrest {} is outside 0..={}", s.name, s.unrest, u.max)));
@@ -2065,8 +2184,22 @@ impl Tables {
         if let Some(m) = self.modules.iter().find(|m| m.strength > 0 && m.hit_points == 0) {
             return Err(err("modules.toml", format!("[[module]] {} has strength and no hit_points", m.name)));
         }
-        if self.archive.research <= 0 || !(0.0..=1.0).contains(&self.archive.banked_before_built) {
-            return Err(err("modules.toml", "[archive] needs research above zero and banked_before_built from 0 to 1"));
+        if self.archive.research <= 0 {
+            return Err(err("modules.toml", "[archive] needs research above zero"));
+        }
+        // Ticket #347 (version 0.09.1): the Archive's cost and the Archivists' Victory bar are ONE
+        // figure written in two files. Apart, one of them is unreachable: a bar above the Archive's
+        // figure can never be met, because the fund is capped at the Archive's figure, and a bar
+        // below it is met by a fund that has not paid for the Module.
+        if self.faction(FactionKind::Archivists).victory_first.bar != self.archive.research as f64 {
+            return Err(err(
+                "factions.toml",
+                format!(
+                    "the Archivists' victory_first.bar is {} and modules.toml [archive] research is {}: they are one figure",
+                    self.faction(FactionKind::Archivists).victory_first.bar,
+                    self.archive.research
+                ),
+            ));
         }
         if !(1..=12).contains(&self.victory.months_per_turn) {
             return Err(err("victory.toml", format!("months_per_turn {} must be from 1 to 12", self.victory.months_per_turn)));
@@ -2178,6 +2311,20 @@ impl Tables {
     pub fn faction(&self, kind: FactionKind) -> &FactionCard {
         &self.factions[kind as usize]
     }
+    /// Ticket #350 (version 0.09.1): the Faction's Victory Condition in one clause, its figures
+    /// filled from its own bars -- a bar under ten in words and a thousand with its comma, so the
+    /// Custodians read "three Climate phases" and the Prospectors "2,500 Ducats".
+    pub fn victory_short(&self, kind: FactionKind) -> String {
+        let f = self.faction(kind);
+        crate::report::render(
+            &f.victory_short,
+            &[
+                ("first", figure(f.victory_first.bar)),
+                ("second", figure(f.victory_second.bar)),
+                ("bodies", figure(f.victory_second.bodies as f64)),
+            ],
+        )
+    }
     pub fn ai_weights(&self, kind: FactionKind) -> &AiWeights {
         &self.ai.weights[&kind]
     }
@@ -2191,6 +2338,28 @@ impl Tables {
     /// Ticket #84 (version 0.06.0): the Tech that opens this Faction's Victory Condition, if one does.
     pub fn victory_gate(&self, kind: FactionKind) -> Option<TechId> {
         self.techs.iter().find(|t| t.gate_for == Some(kind)).map(|t| t.id)
+    }
+
+    /// Ticket #348 (version 0.09.1): every Tech that stands between this Faction and its own
+    /// Victory gate, found by walking `needs` from the gate down to its roots. The gate itself is
+    /// not in the answer.
+    ///
+    /// Answered CHEAPEST FIRST, ties broken by the Tech's place in the tree, so two antecedents
+    /// costing the same never move a seeded game between them. An empty answer is a gate with no
+    /// antecedents at all -- a shape the tree may take, and one no rule here may assume away.
+    pub fn gate_chain(&self, kind: FactionKind) -> Vec<TechId> {
+        let Some(gate) = self.victory_gate(kind) else { return Vec::new() };
+        let mut chain: Vec<TechId> = Vec::new();
+        let mut edge: Vec<TechId> = self.tech(gate).needs.clone();
+        while let Some(t) = edge.pop() {
+            if t == gate || chain.contains(&t) {
+                continue;
+            }
+            chain.push(t);
+            edge.extend(self.tech(t).needs.iter().copied());
+        }
+        chain.sort_by_key(|t| (self.tech(*t).cost, t.index()));
+        chain
     }
 }
 
@@ -2330,4 +2499,23 @@ fn accord_kept_default() -> u32 {
 /// Ticket #227 (version 0.08.2).
 fn accord_weight_default() -> f64 {
     3.0
+}
+
+/// Ticket #350 (version 0.09.1): a Victory figure as a sentence says it -- under ten in words,
+/// a thousand or more with its comma, anything else in digits.
+pub fn figure(n: f64) -> String {
+    const WORDS: [&str; 10] = ["nought", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"];
+    let n = n.round() as i64;
+    if (0..10).contains(&n) {
+        return WORDS[n as usize].to_string();
+    }
+    let digits = n.abs().to_string();
+    let mut out = String::new();
+    for (i, c) in digits.chars().enumerate() {
+        if i > 0 && (digits.len() - i).is_multiple_of(3) {
+            out.push(',');
+        }
+        out.push(c);
+    }
+    if n < 0 { format!("-{out}") } else { out }
 }

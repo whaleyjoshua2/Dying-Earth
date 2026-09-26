@@ -178,6 +178,11 @@ pub enum BuildItem {
     IndustryLevel,
     Module(ModuleKind),
     Unit(UnitKind),
+    /// Ticket #343 (version 0.09.1): a **Warhead** for a Missile Carrier that has fired, loaded at
+    /// a Shipyard of its Faction. It is a build and not an instant order because it is paid in
+    /// Widgets as well as Materials, and Widgets are a place's rate: it sits in the yard's queue
+    /// like anything else and lands at the Resolution the yard has made it.
+    Warhead(ShipId),
 }
 
 impl BuildItem {
@@ -187,6 +192,7 @@ impl BuildItem {
             BuildItem::IndustryLevel => "Industry Level".to_string(),
             BuildItem::Module(k) => k.name().to_string(),
             BuildItem::Unit(k) => k.name().to_string(),
+            BuildItem::Warhead(_) => "Warhead".to_string(),
         }
     }
 }
@@ -431,6 +437,19 @@ pub struct Colony {
     pub in_orbit: bool,
 }
 
+/// Ticket #345 (version 0.09.1): who was FIRST to a Body, and where. One row per Body at most,
+/// written at the founding of the first ground Colony that Body ever carried and never rewritten
+/// afterwards: a first is claimed once and for good, whatever becomes of the Colony. The Colony id
+/// is kept beside the seat because the Core's standing +1 is keyed to that one place -- it sleeps
+/// while a rival holds it, wakes when the founder takes it back, and never hops to a second Colony
+/// of the founder's on the same Body.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BodyFirst {
+    pub body: BodyId,
+    pub seat: Seat,
+    pub colony: ColonyId,
+}
+
 /// Ticket #263 (version 0.08.4): a seat's builds begun and Ships in transit, soonest first --
 /// `(what, where, turns until it lands)` and `(name, from, to, turns left)`.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -480,6 +499,12 @@ pub struct Ship {
     /// Ship built at a Shipyard starts in the orbit of the yard that built it.
     #[serde(default)]
     pub slot: Option<u32>,
+    /// Ticket #343 (version 0.09.1): the **Warhead** aboard a Missile Carrier -- true at the build,
+    /// false once it is fired, and true again when a Rearm completes at a Shipyard of its Faction.
+    /// The first one-shot anything in this game carries. False on every other hull, which has no
+    /// Warhead to carry and can never be given one.
+    #[serde(default)]
+    pub warhead: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -909,6 +934,14 @@ pub struct SeatState {
     /// Earth this turn, waiting to be paid into NEXT turn's Allotment. Read and cleared at Income.
     #[serde(default)]
     pub spaceport_influence: i64,
+    /// Ticket #345 (version 0.09.1): Influence this seat's first landings on a Body have earned this
+    /// turn, waiting to be paid into NEXT turn's Allotment. Read and cleared at Income, exactly as
+    /// `spaceport_influence` above is, and for exactly its reason: the Income ASSIGNS the Allotment,
+    /// so a windfall written straight into `allotment` during the Resolution is wiped by the very
+    /// next Income and pays nothing at all. Held here, it is spendable in the turn after the
+    /// landing, which is the first turn anything can be spent.
+    #[serde(default)]
+    pub first_windfall: i64,
     /// Ticket #192 (version 0.08.0): Colonists uploaded into the Archive, all told. The Archivists'
     /// second Victory part counts this rather than who happens to be living beside the Module, and
     /// it only ever climbs: an uploaded Colonist cannot be lost to a raid, a crowding death or a
@@ -1088,6 +1121,34 @@ pub struct WarCounters {
     pub takes_by_influence_colonies: [u32; SEAT_COUNT],
     #[serde(default)]
     pub takes_by_influence_stations: [u32; SEAT_COUNT],
+    /// Ticket #343 (version 0.09.1): the nuke, by the seat that fired it -- Missile Carriers
+    /// completed, Launches resolved, buildings burned by them, and Industry Levels taken off a
+    /// Region. `people_killed` is in units of POPULATION, one unit being one million people since
+    /// ticket #333, so a Region's share and a Colony's Colonists are counted in the same coin.
+    #[serde(default)]
+    pub missile_carriers_built: [u32; SEAT_COUNT],
+    #[serde(default)]
+    pub launches: [u32; SEAT_COUNT],
+    #[serde(default)]
+    pub launch_buildings_burned: [u32; SEAT_COUNT],
+    #[serde(default)]
+    pub launch_people_killed: [f64; SEAT_COUNT],
+    #[serde(default)]
+    pub industry_levels_lost: [u32; SEAT_COUNT],
+    /// Ticket #346 (version 0.09.1): what the Battles cost, by the seat whose tanks paid. Fuel
+    /// taken out of Ships' tanks by the Battle charge -- never more than a hull actually had, since
+    /// the charge floors at nought -- and hulls the charge itself left UNDER the Battle bar, which
+    /// is the hull that can no longer hold an orbit, blockade or intercept and will fight the next
+    /// Battle halved. A hull already under the bar when the Battle opened is not counted here: the
+    /// Battle did not put it there.
+    #[serde(default)]
+    pub battle_fuel_burned: [i64; SEAT_COUNT],
+    /// Ticket #355 (version 0.09.1): the orbital Battles a seat opened AWAY from Earth, so the
+    /// sweep can say where the orbital war is fought; `orbit_attacks` less this is over Earth.
+    #[serde(default)]
+    pub orbit_attacks_off_earth: [u32; SEAT_COUNT],
+    #[serde(default)]
+    pub hulls_left_dry: [u32; SEAT_COUNT],
 }
 
 /// Ticket #332 (version 0.09.0): Widgets, counted where they are made and spent, so the sweep can
@@ -1123,6 +1184,7 @@ impl WarCounters {
             self.marches_neutral[i] += o.marches_neutral[i];
             self.marches_held[i] += o.marches_held[i];
             self.orbit_attacks[i] += o.orbit_attacks[i];
+            self.orbit_attacks_off_earth[i] += o.orbit_attacks_off_earth[i];
             self.escapes[i] += o.escapes[i];
             self.dig_ins[i] += o.dig_ins[i];
             self.armies_landed[i] += o.armies_landed[i];
@@ -1138,6 +1200,15 @@ impl WarCounters {
             self.takes_by_influence_states[i] += o.takes_by_influence_states[i];
             self.takes_by_influence_colonies[i] += o.takes_by_influence_colonies[i];
             self.takes_by_influence_stations[i] += o.takes_by_influence_stations[i];
+            // Ticket #343 (version 0.09.1).
+            self.missile_carriers_built[i] += o.missile_carriers_built[i];
+            self.launches[i] += o.launches[i];
+            self.launch_buildings_burned[i] += o.launch_buildings_burned[i];
+            self.launch_people_killed[i] += o.launch_people_killed[i];
+            self.industry_levels_lost[i] += o.industry_levels_lost[i];
+            // Ticket #346 (version 0.09.1).
+            self.battle_fuel_burned[i] += o.battle_fuel_burned[i];
+            self.hulls_left_dry[i] += o.hulls_left_dry[i];
         }
         self.battles_vs_neutral += o.battles_vs_neutral;
         self.standing_armies_lost += o.standing_armies_lost;
@@ -1399,6 +1470,9 @@ pub struct Game {
     pub market: Market,
     /// Ticket #226 (version 0.08.2): the Accords standing between pairs of Factions.
     pub accords: Vec<Accord>,
+    /// Ticket #345 (version 0.09.1): who was first to each Body, one row per Body at most,
+    /// appended when a first is claimed and never rewritten. In the save.
+    pub body_firsts: Vec<BodyFirst>,
 }
 
 /// Ticket #50: every game seats all four Factions. The player picks one Faction and a start
@@ -1438,6 +1512,7 @@ impl Game {
             bought_units: 0,
             sold_units: 0,
             spaceport_influence: 0,
+            first_windfall: 0,
             uploaded: 0,
             stabilization_run: 0,
             influence: BTreeMap::new(),
@@ -1613,6 +1688,7 @@ impl Game {
             relations: Relations::default(),
             market: Market::default(),
             accords: Vec::new(),
+            body_firsts: Vec::new(),
             tables,
         };
         // Ticket #57: every Colony Slot on every Body draws its own four yields, in Body order then
@@ -1851,11 +1927,15 @@ impl Game {
         self.colonies.iter().flat_map(|c| c.queue.iter()).any(|b| b.seat == seat && b.item == BuildItem::Module(ModuleKind::Archive))
     }
 
-    /// Ticket #68: what the Archive fund may hold. The whole requirement once the Module stands;
-    /// only `banked_before_built` of it (a quarter) until then.
-    pub fn archive_fund_cap(&self, seat: Seat) -> i64 {
-        let a = &self.tables.archive;
-        if self.archive_built(seat) { a.research } else { (a.research as f64 * a.banked_before_built).floor() as i64 }
+    /// Ticket #68: what the Archive fund may hold -- the whole requirement, so nobody banks more
+    /// Research than the Archive needs.
+    /// Ticket #347 (version 0.09.1): it is that from the first turn. Until this ticket it held only
+    /// `banked_before_built` of the figure (a quarter) until the Module physically stood, and the
+    /// Archivists' first Victory part was read THROUGH this cap, so their score could not pass 0.25
+    /// however much they banked. The Module no longer opens the fund: it was never the Module the
+    /// fund was waiting for, and the cap charged the Archivists twice for one journey.
+    pub fn archive_fund_cap(&self, _seat: Seat) -> i64 {
+        self.tables.archive.research
     }
 
     /// Ticket #68: the Archive Module stands and every point of its Research is paid.
@@ -2481,6 +2561,43 @@ impl Game {
         base + self.tech_addition(s.seat, TechId::HardenedHulls)
     }
 
+    /// Ticket #346 (version 0.09.1): **the Fuel bar**, the one test four doors and one penalty all
+    /// read, so they can never disagree about which hull is dry. A hull holds the bar while its
+    /// tank holds at least what a Battle charges it (`[melee] battle_fuel`), which is to say while
+    /// it could still fight for the orbit it is sitting in. Below the bar a warship holds no
+    /// Orbital Control, contests no orbit, blockades nothing and intercepts nobody, and any hull
+    /// fights at `dry_strength_share` of its strength.
+    ///
+    /// Read LIVE off the tank, as Orbital Control always has been: a fleet that spends its last
+    /// Fuel winning a Battle loses the orbit at that moment, not a turn later.
+    pub fn ship_holds_the_battle_bar(&self, s: &Ship) -> bool {
+        s.fuel >= self.tables.melee.battle_fuel
+    }
+
+    /// Ticket #346: the strength a hull brings to a Battle it enters dry -- `dry_strength_share` of
+    /// its own, rounded down. Half of nought is nought, so the Colony Ship, the Carrier and the
+    /// Missile Carrier are untouched by it.
+    pub fn ship_dry_strength(&self, s: &Ship) -> i64 {
+        (self.ship_strength(s) as f64 * self.tables.melee.dry_strength_share).floor() as i64
+    }
+
+    /// Ticket #346 (version 0.09.1): **the strength this hull would fight at if a Battle opened
+    /// now** -- its own, or `ship_dry_strength` when its tank stands under the bar. This is the one
+    /// every surface that SHOWS a strength must read, so a player is never told a figure the melee
+    /// would not use.
+    ///
+    /// It is deliberately NOT what `ship_strength` returns. `ship_strength` is the card's figure
+    /// plus Hardened Hulls and knows nothing of the tank, and it must stay that way: the melee
+    /// takes ONE reading of the tanks before the charge is levied and passes the dry flag into
+    /// `ship_combatant`, so a `ship_strength` that read the tank itself would halve a hull twice --
+    /// once for being dry, and again because the charge had just emptied it.
+    ///
+    /// Half of nought is nought, so this parts company with `ship_strength` on a Frigate and a
+    /// Battleship alone.
+    pub fn ship_fighting_strength(&self, s: &Ship) -> i64 {
+        if self.ship_holds_the_battle_bar(s) { self.ship_strength(s) } else { self.ship_dry_strength(s) }
+    }
+
     /// Ticket #270 (version 0.08.4): every Army is raised here, named as it is raised.
     pub fn raise_army(&mut self, place: Place, standing: bool) -> ArmyId {
         let id = ArmyId(self.fresh_id());
@@ -2805,6 +2922,12 @@ impl Game {
     }
 
     pub fn habitat_room(&self, c: &Colony) -> u32 {
+        self.room_of(c, false)
+    }
+
+    /// The room `habitat_room` names, or with `working_only` the room its WORKING Habitats give,
+    /// which is what ticket #359's occupied test reads.
+    fn room_of(&self, c: &Colony, working_only: bool) -> u32 {
         // Ticket #51: Expanded Habitats and the Faction's own Habitat capacity are read for whoever
         // holds the Colony, since Provisional Findings gives the Archivists half the Tech early.
         let seat = c.control.controller();
@@ -2816,13 +2939,23 @@ impl Game {
         // Ticket #140 (version 0.07.3): a Habitat holds the same everywhere. It read the slot's
         // Habitat yield on a surface (ticket #57) and 1.0 in orbit (ticket #46) until the designer
         // traded that yield for a Research one.
-        let habitats = c.modules.iter().filter(|m| m.kind == ModuleKind::Habitat).count() as f64;
+        let habitats = c.modules.iter().filter(|m| m.kind == ModuleKind::Habitat && (!working_only || m.working())).count() as f64;
         // Ticket #164 (version 0.07.5): the Core Module holds people too, and holds a FLAT figure --
         // Expanded Habitats and the Arkwrights' capacity multiplier reach a Habitat and not this, at
         // the designer's word: *"yes everyone arkwrights can always build habitats."* It is what
         // lets a station founded this turn take its first four before anything is built.
         let core: u32 = c.modules.iter().filter(|m| m.kind == ModuleKind::Core).map(|_| self.tables.module(ModuleKind::Core).holds_colonists).sum();
         (habitats * per.max(0) as f64 * faction).floor() as u32 + core
+    }
+
+    /// Ticket #359 (version 0.09.1): whether a SHUT Habitat here -- mothballed, or dark for want of
+    /// Energy -- is OCCUPIED: the Colony holds more Colonists than its working Habitats and its Core
+    /// can house. It still houses them, and while it does the Colony makes everything at half EXCEPT
+    /// Energy, at the designer's word: *"no one likes to be shot while they're down."* Half once,
+    /// however many are shut; a spare Habitat standing empty costs nothing.
+    pub fn habitat_halves(&self, cid: ColonyId) -> bool {
+        let Some(c) = self.colony(cid) else { return false };
+        c.modules.iter().any(|m| m.kind == ModuleKind::Habitat && !m.working()) && c.colonists > self.room_of(c, true)
     }
 
     /// Ticket #140 (version 0.07.3): what an Observatory here is multiplied by -- the slot's own
@@ -2986,6 +3119,32 @@ impl Game {
             // differ when Blame or Relations move one rival's price and not another's, and the
             // nearer one takes the place first, which is what the line is warning of.
             .min_by_key(|(_, standing, price)| *price - *standing)
+    }
+
+    /// Ticket #349 (version 0.09.1): **Pressed** -- a held place where ANY rival's Standing is within
+    /// `pressed_band` of the holder's own. Every rival is tested, not only `nearest_challenger`'s
+    /// pick, which is nearest its own price and can be a different seat. Read against the board as
+    /// last resolved, as the card reads it: Influence ordered this turn does not clear it. A telling,
+    /// not a rule: nothing in the engine acts on it.
+    pub fn pressed(&self, place: Place) -> bool {
+        let Some(holder) = self.place_control(place).controller() else {
+            return false;
+        };
+        let standing_of = |s: Seat| self.seat(s).influence.get(&place).copied().unwrap_or(0);
+        let mine = standing_of(holder);
+        let band = self.tables.influence.pressed_band;
+        Seat::ALL.into_iter().filter(|s| *s != holder).map(standing_of).any(|theirs| theirs > 0 && theirs >= mine - band)
+    }
+
+    /// Ticket #349: every place `seat` holds that is Pressed, Regions first and then Colonies, each in
+    /// id order, so the Command Cluster's list does not reshuffle from one frame to the next.
+    pub fn pressed_places(&self, seat: Seat) -> Vec<Place> {
+        let regions = self.states.iter().map(|s| Place::State(s.id));
+        let colonies = self.colonies.iter().map(|c| Place::Colony(c.id));
+        let mut held: Vec<Place> = regions.chain(colonies).filter(|p| self.place_control(*p).controller() == Some(seat)).collect();
+        held.sort();
+        held.retain(|p| self.pressed(*p));
+        held
     }
 
     /// Ticket #311 (version 0.08.7): the Battle of the last Resolution fought at this place, as an
@@ -3193,15 +3352,28 @@ impl Game {
             .map(|f| self.tables.facility(f.kind).influence_allotment)
             .sum();
         // Ticket #278 (version 0.08.5): a starved Colony's Relay and Chorus give nothing either.
-        let space: i64 = self
-            .owned_colonies(seat)
-            .iter()
-            .filter(|c| self.starved_by(**c).is_none())
-            .flat_map(|c| self.colony(*c).into_iter().flat_map(|c| c.modules.iter()))
-            .filter(|m| m.working())
-            .map(|m| self.tables.module(m.kind).influence_allotment)
-            .sum();
+        // Ticket #358 (version 0.09.1): each Module's OWN figures, `module_yield_at`, which the
+        // screen prints -- so Relay Networks is paid, and #359's shut-Habitat half is read there.
+        // This summed the raw table row, and the game showed Influence it never paid.
+        let space: i64 = self.module_allotments(seat).iter().map(|y| y.0).sum();
         earth + space
+    }
+
+    /// Ticket #358 (version 0.09.1): every working Module's Allotment for this seat, inside and
+    /// outside the Faction multiplier, from the one figure the card shows. A starved Colony gives
+    /// nothing, as ticket #278 ruled.
+    fn module_allotments(&self, seat: Seat) -> Vec<(i64, i64)> {
+        self.owned_colonies(seat)
+            .into_iter()
+            .filter(|c| self.starved_by(*c).is_none())
+            .flat_map(|c| {
+                let n = self.colony(c).map(|col| col.modules.len()).unwrap_or(0);
+                (0..n).filter(move |i| self.colony(c).is_some_and(|col| col.modules[*i].working())).map(move |i| {
+                    let y = self.module_yield_at(seat, c, i);
+                    (y.allotment, y.allotment_outside)
+                })
+            })
+            .collect()
     }
 
     /// The Allotment: the base plus every controlled state's Influence value plus the buildings,
@@ -3217,7 +3389,75 @@ impl Game {
         // they are bad at diplomacy, and this clause says they are good at moving people, which is a
         // different kind of Influence. Applying their designed weakness to the rule written to mend
         // it would be the rule arguing with itself.
-        (base as f64 * m).floor() as i64 + self.seat(seat).spaceport_influence
+        // Ticket #345 (version 0.09.1): and beside it the two halves of the first-to-a-Body clause,
+        // both after the multiplier at face value and for the same argument. Reaching a world before
+        // anybody else is not diplomacy, so the Arkwrights' x0.8 has no business shaving it.
+        //
+        // `first_windfall` is the accumulator the seat's landings have filled since the last Income,
+        // built in the Spaceport's shape because the Income ASSIGNS this figure to `allotment`: a
+        // windfall written straight into the Allotment at the Resolution would be wiped by the next
+        // Income before a single point of it could be spent.
+        //
+        // The Core's standing +1 is counted here rather than in `building_allotment` on purpose. That
+        // function sits INSIDE the multiplier and skips a starved Colony's Modules, and this clause
+        // must do neither: the Arkwrights get their whole 1, and a Colony with its lights out is
+        // still the one that got there first.
+        let firsts: i64 = self.body_firsts.iter().filter(|f| f.seat == seat && self.directs(seat, Place::Colony(f.colony))).count() as i64;
+        // Ticket #358 (version 0.09.1): and the Chorus's per-Colonist point, outside the
+        // multiplier on the Spaceport's argument, at the designer's word.
+        let outside: i64 = self.module_allotments(seat).iter().map(|y| y.1).sum();
+        (base as f64 * m).floor() as i64 + outside + self.seat(seat).spaceport_influence + self.seat(seat).first_windfall + firsts * t.first_settled_allotment
+    }
+
+    /// Ticket #345 (version 0.09.1): which seat was first to a Body, and at which Colony.
+    pub fn first_at(&self, body: BodyId) -> Option<(Seat, ColonyId)> {
+        self.body_firsts.iter().find(|f| f.body == body).map(|f| (f.seat, f.colony))
+    }
+
+    /// Ticket #345: every Body this seat was first to, in the order it claimed them.
+    pub fn firsts_of(&self, seat: Seat) -> Vec<BodyFirst> {
+        self.body_firsts.iter().copied().filter(|f| f.seat == seat).collect()
+    }
+
+    /// Ticket #345 (version 0.09.1): R2. A founding claims its Body's first, if there is one left to
+    /// claim. Called at BOTH ground-founding sites -- the sea to Antarctica and the Colony Ship's
+    /// unload -- though only the second can ever succeed: the first is on Earth, and Earth is
+    /// excluded because Antarctica is on Earth and reaching it is not reaching a new world.
+    ///
+    /// A Space Station claims nothing and closes nothing: a station standing over Mars leaves the
+    /// ground of Mars unclaimed. Venus can never be claimed, having no ground slots at all; no code
+    /// says so, and the day Venus is given a slot the rule turns on by itself.
+    ///
+    /// Returns whether the first was claimed, and pays the windfall into the seat's accumulator when
+    /// it was. It is paid once: losing the Colony and taking it back never pays it again.
+    pub fn claim_first(&mut self, seat: Seat, body: BodyId, colony: ColonyId) -> bool {
+        if body == BodyId::Earth {
+            return false;
+        }
+        // A station is no settling; a Colony id that names nothing is no settling either.
+        if self.colony(colony).map(|c| c.in_orbit || c.body != body).unwrap_or(true) {
+            return false;
+        }
+        if self.first_at(body).is_some() {
+            return false;
+        }
+        // A Colony is never removed from the board, so a ground Colony raised on an earlier turn is
+        // proof a ground Colony has stood here. The ones raised THIS turn are the contenders, and
+        // which of them claims it has already been settled by the caller.
+        if self.colonies.iter().any(|c| c.body == body && !c.in_orbit && c.id != colony && c.founded_turn < self.turn) {
+            return false;
+        }
+        self.body_firsts.push(BodyFirst { body, seat, colony });
+        let windfall = self.tables.body(body).first_windfall;
+        self.seats[seat.index()].first_windfall += windfall;
+        let (faction, place, body_name) = (self.seat_name(seat), self.place_name(Place::Colony(colony)), self.tables.body(body).name.clone());
+        let line = format!("{} is the first Faction to settle {}: {} Influence.", faction, body_name, windfall);
+        self.log(line);
+        let args = [("faction", faction), ("body", body_name), ("colony", place), ("n", windfall.to_string())];
+        let text = self.say("first_to_body", &args);
+        self.report_line(LineKind::ColonyFounded, Some(ReportPlace::Colony(colony)), text);
+        self.moment(MomentKind::FirstToABody, &args, Some(ReportPlace::Colony(colony)));
+        true
     }
 
     /// Ticket #183 (version 0.08.0): the Spaceport's clause. +1 Influence for every Emigrant it lifts
@@ -3379,6 +3619,13 @@ impl Game {
         }
     }
 
+    /// Ticket #357 (version 0.09.1): a door the orbit shuts says the move that opens it FIRST and the
+    /// rule after, at the designer's word -- *"move ship to low earth orbit to load"*. "Next turn",
+    /// because a Ship takes one order a turn and the move spends it.
+    pub fn move_first(&self, body: BodyId, orbit: Orbit, act: &str, rule: &str) -> String {
+        format!("Move this Ship to {}, then {act} next turn: {rule}", self.orbit_name(body, orbit))
+    }
+
     /// Ticket #335: the same orbit as a Battle's place. Low orbit keeps the wording every Battle
     /// record has had -- "Mars orbit" -- and a station's orbit names the station.
     pub fn orbit_battle_name(&self, body: BodyId, orbit: Orbit) -> String {
@@ -3397,7 +3644,12 @@ impl Game {
     pub fn orbital_control(&self, body: BodyId) -> Option<Seat> {
         let mut holders = Seat::ALL
             .into_iter()
-            .filter(|seat| self.ships.iter().any(|s| s.seat == *seat && self.ship_in_orbit(s, body, Orbit::Low) && s.kind.is_warship() && !s.escaped));
+            // Ticket #346 (version 0.09.1): and holding the Fuel bar. A warship whose tank cannot
+            // pay the Battle charge holds nothing: it could not fight for the orbit it is sitting
+            // in, so it does not shut the ground below it either.
+            .filter(|seat| {
+                self.ships.iter().any(|s| s.seat == *seat && self.ship_in_orbit(s, body, Orbit::Low) && s.kind.is_warship() && !s.escaped && self.ship_holds_the_battle_bar(s))
+            });
         match (holders.next(), holders.next()) {
             // Ticket #324 (version 0.08.8): a rival's Battery denies it. Ticket #335: a Battery
             // covers its own orbit alone, so it is low orbit's Batteries -- the ground Colonies' --
@@ -3412,7 +3664,10 @@ impl Game {
     /// orbit's and gates the ground; THIS is what a station's own orbit asks of the Ship that
     /// would Bombard the station standing there.
     pub fn orbit_uncontested(&self, seat: Seat, body: BodyId, orbit: Orbit) -> bool {
-        let rival_warship = self.ships.iter().any(|s| s.seat != seat && s.kind.is_warship() && !s.escaped && self.ship_in_orbit(s, body, orbit));
+        // Ticket #346 (version 0.09.1): a DRY rival warship is not a rival warship for this test.
+        // It cannot pay the Battle charge, so it cannot contest what it cannot fight for.
+        let rival_warship =
+            self.ships.iter().any(|s| s.seat != seat && s.kind.is_warship() && !s.escaped && self.ship_holds_the_battle_bar(s) && self.ship_in_orbit(s, body, orbit));
         !rival_warship && !self.battery_stands_against(seat, body, orbit)
     }
 
@@ -3494,8 +3749,10 @@ impl Game {
     }
 
     /// Ticket #278: a warship on Blockade, still engaged. The one test every blockade reads.
+    /// Ticket #346 (version 0.09.1): and holding the Fuel bar, as every other door a warship's
+    /// presence opens now does. A hull that cannot pay for a Battle cannot shut a ring against one.
     fn blockading(&self, s: &Ship) -> bool {
-        s.kind.is_warship() && !s.escaped && s.stance == Stance::Blockade
+        s.kind.is_warship() && !s.escaped && s.stance == Stance::Blockade && self.ship_holds_the_battle_bar(s)
     }
 
     /// Ticket #99: the seats blockading this slot, for the card and the Report.
@@ -4315,6 +4572,9 @@ impl Game {
     /// goodwill would mostly be between Factions on opposite sides of the board who have never met.
     pub fn settle_relations(&mut self) {
         let c = self.tables.relations.clone();
+        // Ticket #362 (version 0.09.1): the named level of every pair involving the player, read
+        // before the update, so a fall into a worse level can be told without a field in the save.
+        let before: [[&'static str; SEAT_COUNT]; SEAT_COUNT] = std::array::from_fn(|v| std::array::from_fn(|o| if v == o { "" } else { self.relations_level(Seat(v as u8), Seat(o as u8)) }));
         for victim in Seat::ALL {
             for offender in Seat::ALL {
                 if victim == offender {
@@ -4372,16 +4632,37 @@ impl Game {
                 self.relations.credited[v][o] = false;
             }
         }
-        // The Report line goes in the OFFENDER's paragraph: it is what sends a player to the grid.
-        for victim in Seat::ALL {
-            for offender in Seat::ALL {
-                if victim == offender || !self.relations.fell[victim.index()][offender.index()] {
-                    continue;
-                }
-                let text = self.say("relations_fell", &[("victim", self.seat_name(victim)), ("offender", self.seat_name(offender))]);
-                self.log(text.clone());
-                self.report_line_of(offender, LineKind::YourWorks, LineKind::Note, None, text);
-            }
+        // Ticket #362 (version 0.09.1): **only a pair involving the player, only a fall into a worse
+        // named level, both ways, folded one line each.** Ticket #191's line went to the offender's
+        // paragraph for every pair whose score fell a point, rivals' quarrels included -- 1.5 lines a
+        // turn on average and twelve at worst, measured over eighty games. A spectator has no player.
+        if self.spectator {
+            return;
+        }
+        let rank = |l: &str| ["Hostile", "Cold", "Wary", "Neutral", "Cordial", "Friendly"].iter().position(|x| *x == l).unwrap_or(0);
+        let me = Seat(0);
+        let worse = |g: &Game, v: Seat, o: Seat| {
+            let now = g.relations_level(v, o);
+            (rank(now) < rank(before[v.index()][o.index()])).then_some(now)
+        };
+        // They think worse of the player.
+        let they: Vec<(String, &'static str)> = me.others().into_iter().filter_map(|r| worse(self, r, me).map(|l| (self.seat_name(r), l))).collect();
+        if let Some((first, level)) = they.first().cloned() {
+            let more: String = they[1..].iter().map(|(who, l)| format!(", the {who} {l}")).collect();
+            let text = self.say("relations_they", &[("first", first), ("level", level.to_string()), ("more", more)]);
+            self.log(text.clone());
+            self.report_line_of(me, LineKind::YourWorks, LineKind::Note, None, text);
+        }
+        // The player thinks worse of them: who has been crossing the player.
+        let you: Vec<String> = me
+            .others()
+            .into_iter()
+            .filter_map(|r| worse(self, me, r).map(|l| format!("{l} {} the {}", if l == "Wary" { "of" } else { "toward" }, self.seat_name(r))))
+            .collect();
+        if !you.is_empty() {
+            let text = self.say("relations_you", &[("list", you.join(", "))]);
+            self.log(text.clone());
+            self.report_line_of(me, LineKind::YourWorks, LineKind::Note, None, text);
         }
     }
 

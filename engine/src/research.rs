@@ -137,6 +137,22 @@ impl Game {
     /// denied a rival's gate but never its own; the rest are drawn from what is available, from the
     /// game's own generator. Fewer available than the list holds means the list is all of them,
     /// which is the same free choice an empty list gives.
+    ///
+    /// Ticket #348 (version 0.09.1): and the NEXT RUNG of the Lead's chain is drawn while the gate
+    /// itself is still out of reach. Ticket #98's guarantee fired only once the gate was available,
+    /// and a Tech is available only once its prerequisites are done -- so the promise that a
+    /// Faction is never denied its own gate could not be kept until the chain had already been
+    /// climbed by luck. The Custodians' chain is two Techs and every one of them was on their list;
+    /// the other three are four Techs and each was missing some of its own.
+    ///
+    /// THE RESERVED PLACE IS STILL ONE OF THREE. The gate is available only when every antecedent
+    /// is done, and a rung is owed only when some antecedent is not, so at most one of the two
+    /// clauses below can ever fire. They are written as two independent `if`s rather than an
+    /// `else`, because the claim belongs in a test that can watch it rather than in a branch that
+    /// hides it: `a_draw_never_forces_both_the_gate_and_its_chain`.
+    ///
+    /// This reaches the HUMAN Lead too, which is the point of it: the Lead's draw is the Lead's
+    /// draw whoever holds the seat.
     pub fn draw_shortlist(&mut self, lead: Seat) {
         let available = self.available_techs();
         let size = self.tables.shortlist.size;
@@ -150,6 +166,10 @@ impl Game {
         {
             drawn.push(gate);
         }
+        // Ticket #348: the next rung of the chain, which is owed exactly when the gate is not.
+        if let Some(rung) = self.next_gate_rung(lead) {
+            drawn.push(rung);
+        }
         let mut rest: Vec<TechId> = available.into_iter().filter(|t| !drawn.contains(t)).collect();
         while drawn.len() < size && !rest.is_empty() {
             let i = crate::combat::Dice::pick(&mut self.rng, rest.len());
@@ -158,6 +178,29 @@ impl Game {
         // In tree order, so the panel reads the same way twice running.
         drawn.sort_by_key(|t| t.index());
         self.research.shortlist = drawn;
+    }
+
+    /// Ticket #348 (version 0.09.1): the next rung of this seat's OWN gate chain -- the cheapest
+    /// Tech standing between it and its Victory gate that is not yet researched and whose own
+    /// prerequisites are met. Ties on cost break by the Tech's place in the tree, so a seeded game
+    /// is not moved by two antecedents costing the same.
+    ///
+    /// `None` once the chain is climbed, which is EXACTLY when the gate itself becomes available:
+    /// the gate is available only when every antecedent is done, and an unresearched antecedent
+    /// exists only when some antecedent is not. The two are mutually exclusive, which is why the
+    /// shortlist can reserve a place for whichever of them applies without ever reserving two.
+    /// `a_draw_never_forces_both_the_gate_and_its_chain` is the test that says so.
+    ///
+    /// The cheapest unresearched antecedent may not be available -- its own prerequisites may be
+    /// unmet, or it may be the Tech under research this minute -- and then the cheapest one that IS
+    /// available is taken, and nothing at all if none is.
+    pub fn next_gate_rung(&self, seat: Seat) -> Option<TechId> {
+        let gate = self.tables.victory_gate(self.kind(seat))?;
+        if self.research.done.contains(&gate) {
+            return None;
+        }
+        let available = self.available_techs();
+        self.tables.gate_chain(self.kind(seat)).into_iter().find(|t| !self.research.done.contains(t) && available.contains(t))
     }
 
     /// Ticket #98: the Techs `seat` may pick right now. An empty shortlist is a free choice of

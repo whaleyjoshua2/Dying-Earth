@@ -243,14 +243,13 @@ impl Game {
                     if !f.working() {
                         continue;
                     }
-                    // Ticket #52: at Unrest 7 every Facility in the state emits at half.
-                    let e = t.facility(f.kind).emissions * if self.facilities_at_half(st.id) { 0.5 } else { 1.0 };
+                    // Ticket #358 (version 0.09.1): the figure the card shows, `facility_yield`, which
+                    // carries the Faction's multiplier, Clean Power and Clean Manufacturing read as
+                    // this seat reads them (at half under Provisional Findings), and Unrest 7's half
+                    // (ticket #52). This recomputed it from the table and charged a Tech only once
+                    // done, so a card could show a cut the air never got.
                     let charged = match f.kind.common().unwrap_or(f.kind) {
-                        FacilityKind::Factory | FacilityKind::Refinery => e * fr_mult * m,
-                        // Ticket #332 (version 0.09.0): the Mine's smoke is the Factory's old smoke
-                        // with no Tech to thin it; Clean Manufacturing follows the Factory.
-                        FacilityKind::Mine => e * m,
-                        FacilityKind::PowerPlant => e * pp_mult * m,
+                        FacilityKind::Factory | FacilityKind::Refinery | FacilityKind::Mine | FacilityKind::PowerPlant => self.facility_yield(d, st.id, f.kind).emissions,
                         _ => 0.0,
                     };
                     match f.kind.common().unwrap_or(f.kind) {
@@ -747,7 +746,13 @@ impl Game {
             // Permafrost Thaw: its own Emissions line from now on, the world's and nobody's Blame.
             BreakEffect::EmissionsPerTurn => self.climate.permafrost += b.emissions,
             // The Sink Weakens: the bar Stabilization is measured against comes down with it.
-            BreakEffect::WeakenSink => self.climate.natural_sink = b.sink_after,
+            // Ticket #343 (version 0.09.1): it SUBTRACTS `sink_cut` now where it used to assign
+            // `sink_after`. An assignment overwrote the figure and erased whatever had raised it --
+            // the Custodians' Research Directive, and from this version a nuke's soot -- and this
+            // Break fires in every game by about turn 20, so nothing that moved the Sink before
+            // then survived it. On an untouched game the outcome is identical, 6.0 - 2.0 = 4.0,
+            // so no existing measurement moves.
+            BreakEffect::WeakenSink => self.climate.natural_sink = (self.climate.natural_sink - b.sink_cut).max(0.0),
             // Ice Sheets Committed: a Sea Level threshold at once, for every state, out of sequence.
             BreakEffect::SeaLevelThreshold => {
                 for sid in StateId::ALL {
@@ -824,7 +829,12 @@ impl Game {
                 fired[i] = true;
                 match b.effect {
                     BreakEffect::EmissionsPerTurn => permafrost += b.emissions,
-                    BreakEffect::WeakenSink => sink = b.sink_after + e.scrubbers,
+                    // Ticket #343 (version 0.09.1): the projection subtracts, as the live Break
+                    // does. NOTE THE SCRUBBERS: the assignment it replaces had to re-add them,
+                    // because it threw the running figure away; a subtraction must NOT, since
+                    // `sink` already carries them from where it was set up. Re-adding them here
+                    // would count them twice and the forecast would lie.
+                    BreakEffect::WeakenSink => sink = (sink - b.sink_cut).max(0.0),
                     BreakEffect::CarbonPulse => co2 += b.co2,
                     // Neither the reefs nor the ice sheets move the carbon; they cost people and coasts.
                     BreakEffect::CoastalUnrest | BreakEffect::SeaLevelThreshold => {}

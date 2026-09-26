@@ -2,9 +2,12 @@
 # be given a name when made e.g. USS Challenger USS Magellan draw from two list one for warships
 # another for colony"*.
 #
-# Two lists, and four Ship kinds. A **Colony Ship** draws from `colony`; a **Frigate** and a
-# **Battleship** draw from `warship`; and so does the **Carrier**, at the designer's word, because it
-# sails with a fleet and an explorer's name would read oddly beside a Battleship.
+# Two lists, and five Ship kinds since ticket #343 (version 0.09.1). A **Colony Ship** draws from
+# `colony`; a **Frigate** and a **Battleship** draw from `warship`; and so does the **Carrier**, at
+# the designer's word, because it sails with a fleet and an explorer's name would read oddly beside
+# a Battleship. The **Missile Carrier** draws from `warship` too: it cannot fight, but it sails to
+# a war and is named for one. Anything that is not a Colony Ship takes the warship list, so the
+# rule needed no code of its own.
 #
 # HOW A NAME IS PICKED, and why it is not random. Ship ids are sequential and deterministic, so the
 # first unused name in list order is a deterministic choice that draws no randomness at all. That

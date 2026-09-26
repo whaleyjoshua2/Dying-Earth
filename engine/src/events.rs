@@ -107,7 +107,10 @@ impl Game {
         };
         self.log(format!("Question: {name}: {question}"));
         let text = self.say("card_asked", &[("card", name), ("question", question)]);
-        self.report_line(LineKind::Event, None, text);
+        // Ticket #353 (version 0.09.1): `LineKind::Card`, which never headlines. The Card modal holds
+        // the screen with this very sentence until the seat answers it, and the Report then opened by
+        // repeating it back; the dispatch's headline is for news the player has not read yet.
+        self.report_line(LineKind::Card, None, text);
         self.question = Some(q);
     }
 
@@ -410,7 +413,13 @@ impl Game {
             }
             let word = if taken { CardAnswer::Taken } else { CardAnswer::Refused }.word();
             let text = self.say("card_answered", &[("card", name.clone()), ("faction", self.seat_name(seat)), ("answer", word.to_string())]);
-            self.report_line_of(seat, LineKind::YourWorks, LineKind::Event, None, text);
+            // Ticket #353 (version 0.09.1): a rival's answer is `LineKind::Card`, which has no
+            // headline rank, where it was an Event line at rank 7 and headlined a quiet turn. The
+            // interface filtered it out of `headline()` afterwards and got `None` back, so the
+            // dispatch opened with NO headline at all. The kind carries the rule now and the
+            // interface's guard is gone. The player's own answer stays under Your works, which never
+            // headlined either; the four are drawn together in their own block below.
+            self.report_line_of(seat, LineKind::YourWorks, LineKind::Card, None, text);
         }
         // A seat that was never asked is named too, so the Report does not simply pass it over.
         for seat in Seat::ALL {
@@ -419,7 +428,7 @@ impl Game {
                     "card_answered",
                     &[("card", name.clone()), ("faction", self.seat_name(seat)), ("answer", CardAnswer::NothingToDecide.word().to_string())],
                 );
-                self.report_line_of(seat, LineKind::YourWorks, LineKind::Event, None, text);
+                self.report_line_of(seat, LineKind::YourWorks, LineKind::Card, None, text);
             }
         }
     }
@@ -613,7 +622,11 @@ impl Game {
         self.log(format!("Event: {}", drawn.text));
         self.report.event = Some(drawn.text.clone());
         let text = self.say("event_drawn", &[("text", drawn.text.clone())]);
-        self.report_line(LineKind::Event, None, text);
+        // Ticket #353 (version 0.09.1): `LineKind::Card`, as the question above it is. The Event
+        // modal, headed "Event drawn", shows this exact sentence and waits for Continue; the driver
+        // then printed it twice over, once as the headline and once as EVENT. It still reads under
+        // The climate, and `report.event` still carries it where the interface wants it whole.
+        self.report_line(LineKind::Card, None, text);
         self.last_event = Some(drawn);
     }
 

@@ -4,6 +4,25 @@ use crate::data::VictoryFirstKind;
 use crate::ids::*;
 use crate::state::*;
 
+/// Ticket #351 (version 0.09.1): what the next Income's Shortfall would do, for the alarm on the
+/// top bar and the driver's summary.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ShortfallForecast {
+    /// How far short of the bill the seat stands with everything running.
+    pub short_by: i64,
+    /// What goes dark, in the order the rule shuts it.
+    pub dark: Vec<GoesDark>,
+}
+
+/// One building the Shortfall would shut: its name and where it stands (*"in China"*, *"at
+/// Tiangong over Earth"*). What a Scrubber costs the Natural Sink is left to the Report line after
+/// the fact, at the designer's word: the alarm's job is what goes dark.
+#[derive(Debug, Clone, PartialEq)]
+pub struct GoesDark {
+    pub name: String,
+    pub at: String,
+}
+
 /// One producer the shortfall rule can shut down, in the order it shuts them.
 #[derive(Debug, Clone)]
 struct Producer {
@@ -42,6 +61,130 @@ pub struct Yield {
     /// "no output" was written before, at the designer's word. Static prose from the data, so a
     /// figure in it is a data figure and cannot drift as a hand-written hover did.
     pub does: Option<String>,
+    /// Ticket #352 (version 0.09.1): how the figure it makes was reached, step by step.
+    pub chain: Chain,
+    /// Ticket #358 (version 0.09.1): Influence Allotment paid OUTSIDE the Faction multiplier -- the
+    /// Chorus's per-Colonist point, on the Spaceport's argument (#183). `allotment` is inside it.
+    pub allotment_outside: i64,
+}
+
+/// Ticket #352 (version 0.09.1): one step of how a building's figure was reached, in the order the
+/// rule takes it. The designer: *"mouseover explains math for research output"*, and every
+/// multiplied figure with it.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Step {
+    Base(f64, String),
+    Times(f64, String),
+    Over(f64, String),
+    Plus(i64, String),
+    Floor,
+    Round,
+    Half(String),
+}
+
+/// Ticket #352: the arithmetic of a yield, kept as it is DONE. `facility_yield` and `module_yield`
+/// compute their figures through this, so the hover that prints it is the rule itself and cannot
+/// drift from it. A factor of exactly 1 multiplies and records nothing.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct Chain {
+    pub steps: Vec<Step>,
+    v: f64,
+}
+
+impl Chain {
+    pub fn base(v: f64, why: impl Into<String>) -> Chain {
+        Chain { steps: vec![Step::Base(v, why.into())], v }
+    }
+    pub fn times(&mut self, f: f64, why: impl FnOnce() -> String) {
+        self.v *= f;
+        if (f - 1.0).abs() > 1e-9 {
+            self.steps.push(Step::Times(f, why()));
+        }
+    }
+    pub fn over(&mut self, d: f64, why: impl Into<String>) {
+        self.v /= d;
+        self.steps.push(Step::Over(d, why.into()));
+    }
+    pub fn plus(&mut self, n: i64, why: impl Into<String>) -> i64 {
+        self.v += n as f64;
+        self.steps.push(Step::Plus(n, why.into()));
+        self.v as i64
+    }
+    pub fn floor(&mut self) -> i64 {
+        self.steps.push(Step::Floor);
+        self.v = self.v.floor();
+        self.v as i64
+    }
+    pub fn round(&mut self) -> i64 {
+        self.steps.push(Step::Round);
+        self.v = self.v.round();
+        self.v as i64
+    }
+    /// Integer half, rounded down, as the rule halves a whole figure.
+    pub fn half(&mut self, why: impl Into<String>) -> i64 {
+        self.v = ((self.v as i64) / 2) as f64;
+        self.steps.push(Step::Half(why.into()));
+        self.v as i64
+    }
+    /// Whether anything multiplied the base, which is when the chain is worth showing.
+    pub fn multiplied(&self) -> bool {
+        self.steps.iter().any(|s| matches!(s, Step::Times(..) | Step::Over(..) | Step::Plus(..) | Step::Half(_)))
+    }
+
+    /// The chain as a hover's lines, at most `max`: the base, every step, and "= 3.63, rounded down
+    /// to 3" where the rule rounds. Past `max` the later steps share a line, as ticket #352 asked.
+    pub fn lines(&self, max: usize) -> Vec<String> {
+        // Two places, as the approved example reads ("x 1.10"), and a whole number bare ("2 base").
+        let fig = |f: f64| if (f - f.round()).abs() < 1e-9 { format!("{}", f.round() as i64) } else { format!("{f:.2}") };
+        let mut out: Vec<String> = Vec::new();
+        let mut steps: Vec<String> = Vec::new();
+        let mut v = 0.0;
+        let flush = |out: &mut Vec<String>, steps: &mut Vec<String>| {
+            out.append(steps);
+        };
+        for s in &self.steps {
+            match s {
+                Step::Base(b, why) => {
+                    v = *b;
+                    out.push(if why.is_empty() { format!("{} base", fig(*b)) } else { format!("{} {why}", fig(*b)) });
+                }
+                Step::Times(f, why) => {
+                    v *= f;
+                    steps.push(format!("× {} {why}", fig(*f)));
+                }
+                Step::Over(d, why) => {
+                    v /= d;
+                    steps.push(if why.is_empty() { format!("÷ {}", fig(*d)) } else { format!("÷ {} {why}", fig(*d)) });
+                }
+                Step::Plus(n, why) => {
+                    flush(&mut out, &mut steps);
+                    v += *n as f64;
+                    out.push(format!("+ {n} {why}"));
+                }
+                Step::Floor | Step::Round => {
+                    flush(&mut out, &mut steps);
+                    let n = if matches!(s, Step::Floor) { v.floor() } else { v.round() };
+                    let how = if matches!(s, Step::Floor) { "rounded down" } else { "rounded" };
+                    out.push(if (n - v).abs() < 1e-9 { format!("= {}", fig(n)) } else { format!("= {}, {how} to {}", fig(v), fig(n)) });
+                    v = n;
+                }
+                Step::Half(why) => {
+                    flush(&mut out, &mut steps);
+                    v = ((v as i64) / 2) as f64;
+                    out.push(format!("halved {why}: {}", fig(v)));
+                }
+            }
+        }
+        flush(&mut out, &mut steps);
+        // Too long: fold the "×" lines together from the end, two at a time, until it fits.
+        while out.len() > max {
+            let Some(i) = (1..out.len()).rev().find(|&i| i > 1 && out[i].starts_with('×') && out[i - 1].starts_with('×')) else { break };
+            let joined = format!("{}, {}", out[i - 1], out[i]);
+            out[i - 1] = joined;
+            out.remove(i);
+        }
+        out
+    }
 }
 
 impl Yield {
@@ -72,8 +215,9 @@ impl Yield {
         if let Some(d) = &self.does {
             parts.push(d.clone());
         }
-        if self.allotment > 0 {
-            parts.push(format!("+{} Influence Allotment", self.allotment));
+        // Ticket #358 (version 0.09.1): both halves, inside and outside the multiplier, as paid.
+        if self.allotment + self.allotment_outside > 0 {
+            parts.push(format!("+{} Influence Allotment", self.allotment + self.allotment_outside));
         }
         if self.standing > 0 {
             parts.push(format!("standing here +{} a turn", self.standing));
@@ -173,6 +317,10 @@ impl Game {
             // Ticket #183 (version 0.08.0): last turn's Spaceport Influence has now been paid into
             // this Allotment, so the tally is cleared and begins again.
             s.spaceport_influence = 0;
+            // Ticket #345 (version 0.09.1): and so has the first-to-a-Body windfall, on the same
+            // line and for the same reason. It is paid once; the accumulator begins again at nought
+            // and stays there until the seat is first to another Body.
+            s.first_windfall = 0;
         }
     }
 
@@ -274,7 +422,7 @@ impl Game {
         let fac = t.faction(self.kind(seat));
         let card = t.state(sid);
         let fc = t.facility(kind);
-        let mut y = Yield { resource: None, amount: 0, research: 0, upkeep: fc.energy_upkeep, emissions: 0.0, allotment: fc.influence_allotment, standing: fc.standing_per_turn, doubled_by: None, detail: None, does: fc.does.clone() };
+        let mut y = Yield { resource: None, amount: 0, research: 0, upkeep: fc.energy_upkeep, emissions: 0.0, allotment: fc.influence_allotment, standing: fc.standing_per_turn, doubled_by: None, detail: None, does: fc.does.clone(), chain: Chain::default(), allotment_outside: 0 };
         if let Some(p) = &fc.produces {
             match p.resource {
                 Resource::Research => {
@@ -284,32 +432,43 @@ impl Game {
                         y.research = 0;
                     } else {
                         // Ticket #185 (version 0.08.0): the LIVE Education Level, which a School moves.
-                        let mut r = p.amount as f64 * self.population_factor(sid) * self.education_level(sid) * fac.research_multiplier;
-                        r *= self.tech_multiplier(seat, TechId::PublicScience);
+                        // Ticket #352 (version 0.09.1): through the chain, in the rule's order.
+                        let edu = self.education_level(sid);
+                        let mut r = Chain::base(p.amount as f64, "base");
+                        r.times(self.population_factor(sid), || format!("for {} people, weighted by Education", t.people_text(self.state(sid).population)));
+                        r.times(edu, || format!("for Education {edu:.2}"));
+                        r.times(fac.research_multiplier, || format!("as the {}", fac.name));
+                        r.times(self.tech_multiplier(seat, TechId::PublicScience), || t.tech(TechId::PublicScience).name.clone());
                         // Ticket #84: the Upload stacks on Public Science.
-                        r *= self.tech_multiplier(seat, TechId::TheUpload);
-                        y.research = r.floor() as i64;
+                        r.times(self.tech_multiplier(seat, TechId::TheUpload), || t.tech(TechId::TheUpload).name.clone());
+                        y.research = r.floor();
+                        y.chain = r;
                     }
                 }
                 Resource::Ducats => {
                     // A Bank (ticket #35): its amount times the state's gdp / 10.
-                    let v = p.amount as f64 * card.gdp as f64 / 10.0 * fac.output_multiplier;
+                    let mut v = Chain::base(p.amount as f64, "base");
+                    v.times(card.gdp as f64, || "for GDP".to_string());
+                    v.over(10.0, "");
+                    v.times(fac.output_multiplier, || format!("as the {}", fac.name));
                     y.resource = Some(Resource::Ducats);
-                    y.amount = v.floor() as i64;
+                    y.amount = v.floor();
+                    y.chain = v;
                 }
                 // Ticket #332 (version 0.09.0): a Factory's Widgets come through here too, so the
                 // Faction's output multiplier, the Strip Permit and Unrest 7 below reach them. No
                 // Region leans Widgets and no Tech lifts them, so the lean and Deep Mining stay
                 // Materials rules and reach the Mine alone.
                 res => {
-                    let mut v = p.amount as f64;
+                    let mut v = Chain::base(p.amount as f64, "base");
                     if card.resource_lean == res {
-                        v *= 1.5;
+                        v.times(1.5, || format!("as this Region leans {}", res.name()));
                     }
-                    v *= fac.output_multiplier;
-                    v *= self.tech_output_multiplier_facility(seat, kind);
+                    v.times(fac.output_multiplier, || format!("as the {}", fac.name));
+                    v.times(self.tech_output_multiplier_facility(seat, kind), || "for Techs".to_string());
                     y.resource = Some(res);
-                    y.amount = v.floor() as i64;
+                    y.amount = v.floor();
+                    y.chain = v;
                 }
             }
         }
@@ -328,6 +487,8 @@ impl Game {
             let m = self.tables.strip_permit.multiplier;
             y.amount = (y.amount as f64 * m).floor() as i64;
             y.research = (y.research as f64 * m).floor() as i64;
+            y.chain.times(m, || "for the Strip Permit".to_string());
+            y.chain.floor();
         }
         // Ticket #52: at Unrest 7 every Facility in the state produces at half, rounded down, and
         // emits at half. What it adds to the Allotment and to the standing is untouched.
@@ -335,6 +496,7 @@ impl Game {
             y.amount /= 2;
             y.research /= 2;
             y.emissions *= 0.5;
+            y.chain.half("at Unrest 7");
         }
         y
     }
@@ -344,7 +506,7 @@ impl Game {
         let t = &self.tables;
         let fac = t.faction(self.kind(seat));
         let mc = t.module(kind);
-        let mut y = Yield { resource: None, amount: 0, research: 0, upkeep: mc.energy_upkeep, emissions: 0.0, allotment: mc.influence_allotment, standing: mc.standing_per_turn, doubled_by: None, detail: None, does: mc.does.clone() };
+        let mut y = Yield { resource: None, amount: 0, research: 0, upkeep: mc.energy_upkeep, emissions: 0.0, allotment: mc.influence_allotment, standing: mc.standing_per_turn, doubled_by: None, detail: None, does: mc.does.clone(), chain: Chain::default(), allotment_outside: 0 };
         // Ticket #239 (version 0.08.3): a Unique Module does its sibling's job, so every lookup
         // keyed by kind -- the Techs that multiply it, the slot's yield, a Discovery on it --
         // reads the COMMON kind. Without this the Arkwrights' Chorus would be the one Relay in
@@ -367,7 +529,8 @@ impl Game {
         if kind == ModuleKind::Chorus && t.unique.chorus_colonists > 0 {
             let extra = col.colonists as i64 / t.unique.chorus_colonists;
             if extra > 0 {
-                y.allotment += extra;
+                // Ticket #358 (version 0.09.1): outside the Faction multiplier, at the designer's word.
+                y.allotment_outside += extra;
                 y.detail = Some(format!("{} Colonists here, {extra} more Influence", col.colonists));
             }
         }
@@ -382,17 +545,20 @@ impl Game {
                 let others = self.bodies_held(seat).into_iter().filter(|b| *b != col.body).count() as i64;
                 let per_other = t.trade_post.per_other_body;
                 let raw = p.amount * here + per_other * others;
+                let mut v = Chain::base(raw as f64, format!("from {} x {here} Colonists + {per_other} x {others} Bodies", p.amount));
+                v.times(fac.output_multiplier, || format!("as the {}", fac.name));
                 y.resource = Some(Resource::Ducats);
-                y.amount = (raw as f64 * fac.output_multiplier).floor() as i64;
+                y.amount = v.floor();
                 y.detail = Some(format!("{} x {here} Colonists + {per_other} x {others} Bodies", p.amount));
                 // Ticket #239 (version 0.08.3): the Prospectors' Exchange pays one more, flat and
                 // AFTER the multiplier, for the Academy's reason -- 1 through the largest output
                 // multiplier in the game floors back to 1, so a captured Exchange pays its captor
                 // exactly what it paid its builder.
                 if kind == ModuleKind::Exchange {
-                    y.amount += t.unique.exchange_ducats;
+                    y.amount = v.plus(t.unique.exchange_ducats, "for the Exchange");
                     y.detail = Some(format!("{} x {here} Colonists + {per_other} x {others} Bodies, and {} for the Exchange", p.amount, t.unique.exchange_ducats));
                 }
+                y.chain = v;
             } else if p.resource == Resource::Research {
                 // Ticket #80 (version 0.06.0): the Observatory. No Body yield and no output
                 // multiplier: its amount, plus one per cent for every Colonist at its Colony, times
@@ -411,11 +577,16 @@ impl Game {
                 // Ticket #188 (version 0.08.0): and the per-Colonist bonus is moderated by the
                 // Colony's schooling too, exactly as a Region's population bonus is, so the rule
                 // reads the same in both halves of the game.
-                let mut r = p.amount as f64 * science * col.education * (1.0 + col.colonists as f64 * per * col.education) * research_multiplier;
-                r *= self.tech_multiplier(seat, TechId::PublicScience);
+                let mut r = Chain::base(p.amount as f64, "base");
+                r.times(science, || "for this site's science".to_string());
+                r.times(col.education, || format!("for Education {:.2}", col.education));
+                r.times(1.0 + col.colonists as f64 * per * col.education, || format!("for {} Colonists, weighted by Education", col.colonists));
+                r.times(research_multiplier, || format!("as the {}", fac.name));
+                r.times(self.tech_multiplier(seat, TechId::PublicScience), || t.tech(TechId::PublicScience).name.clone());
                 // Ticket #84: the Upload stacks on Public Science.
-                r *= self.tech_multiplier(seat, TechId::TheUpload);
-                y.research = r.floor() as i64;
+                r.times(self.tech_multiplier(seat, TechId::TheUpload), || t.tech(TechId::TheUpload).name.clone());
+                y.research = r.floor();
+                y.chain = r;
             } else {
                 // Ticket #89: a sun-scaled Module (the Solar Array) reads the sunlight where its
                 // Body stands instead of a Body yield, is silenced by a Solar Storm turn, and
@@ -430,29 +601,33 @@ impl Game {
                 } else {
                     self.colony_yields(col).of_module(job)
                 };
-                let mut v = p.amount as f64 * yield_ * fac.output_multiplier * self.tech_output_multiplier_module(seat, job);
+                let mut v = Chain::base(p.amount as f64, "base");
+                v.times(yield_, || if mc.sun_scaled { "for the sunlight here".to_string() } else { "for this site's yield".to_string() });
+                v.times(fac.output_multiplier, || format!("as the {}", fac.name));
+                v.times(self.tech_output_multiplier_module(seat, job), || "for Techs".to_string());
                 for d in &self.discoveries {
                     if d.body == col.body && d.kind == job {
-                        v *= d.multiplier;
+                        v.times(d.multiplier, || "for a Discovery".to_string());
                     }
                 }
                 if mc.sun_scaled && self.event_is(EventId::SolarStorm) {
-                    v = 0.0;
+                    v.times(0.0, || "in a Solar Storm".to_string());
                 }
                 y.resource = Some(p.resource);
-                y.amount = if mc.sun_scaled { v.round() as i64 } else { v.floor() as i64 };
+                y.amount = if mc.sun_scaled { v.round() } else { v.floor() };
                 // Ticket #239 (version 0.08.3): the Archivists' Heliostat makes one more, added
                 // AFTER the inverse square scaling and after the rounding, so the point is worth
                 // the same at every distance rather than 0.43 at Mars and 1.91 at Venus. A Solar
                 // Storm silences a Heliostat as it silences a Solar Array: nothing is added to nought.
                 if kind == ModuleKind::Heliostat && y.amount > 0 {
-                    y.amount += t.unique.heliostat_energy;
+                    y.amount = v.plus(t.unique.heliostat_energy, "for the Heliostat");
                 }
                 // Ticket #92: a working Mass Driver at the Colony gives each Mine there more, after
                 // everything.
                 if job == ModuleKind::Mine && col.modules.iter().any(|m| m.kind == ModuleKind::MassDriver && m.working()) {
-                    y.amount += t.mass_driver.mine_bonus;
+                    y.amount = v.plus(t.mass_driver.mine_bonus, "for the Mass Driver");
                 }
+                y.chain = v;
             }
         }
         // Ticket #92: a Mass Driver makes nothing itself; the card says what it does.
@@ -509,7 +684,7 @@ impl Game {
     /// `doubled_modules`, named for the Facility whose mothball pays for it.
     pub fn module_yield_at(&self, seat: Seat, cid: ColonyId, index: usize) -> Yield {
         let Some(kind) = self.colony(cid).and_then(|c| c.modules.get(index)).map(|m| m.kind) else {
-            return Yield { resource: None, amount: 0, research: 0, upkeep: 0, emissions: 0.0, allotment: 0, standing: 0, doubled_by: None, detail: None, does: None };
+            return Yield { resource: None, amount: 0, research: 0, upkeep: 0, emissions: 0.0, allotment: 0, standing: 0, doubled_by: None, detail: None, does: None, chain: Chain::default(), allotment_outside: 0 };
         };
         let mut y = self.module_yield(seat, cid, kind);
         if self.doubled_modules(seat).contains(&(cid, index)) {
@@ -517,6 +692,19 @@ impl Game {
             y.amount *= 2;
             y.research *= 2;
             y.doubled_by = pairs.iter().find(|(_, m)| **m == kind).map(|(f, _)| f.name());
+            let by = y.doubled_by.unwrap_or("Facility");
+            y.chain.times(2.0, || format!("for an idle {by} on Earth"));
+        }
+        // Ticket #359 (version 0.09.1): an occupied Habitat standing shut halves everything but
+        // the Energy. Ticket #352 (version 0.09.1): applied HERE, on the one figure every reader
+        // takes, so the Module's hover shows it; it was applied at Income and on the Widget sum.
+        if self.habitat_halves(cid) && y.resource != Some(Resource::Energy) {
+            y.amount /= 2;
+            y.research /= 2;
+            // Ticket #358 (version 0.09.1): and the Influence, now that the Allotment reads this.
+            y.allotment /= 2;
+            y.allotment_outside /= 2;
+            y.chain.half("while a shut Habitat houses people here");
         }
         y
     }
@@ -621,7 +809,7 @@ impl Game {
                     is_module: true,
                     upkeep: y.upkeep,
                     output: if starved { None } else { y.resource.map(|r| (r, y.amount)) },
-                    // Ticket #80: an Observatory's Research.
+                    // Ticket #80: an Observatory's Research. Ticket #359: halved in `module_yield_at`.
                     research: if starved { 0 } else { y.research },
                     online: !col.grid_failed && !m.offline_until_resolution && !(m.kind == ModuleKind::Archive && occupied),
                     doubled_by: y.doubled_by,
@@ -727,6 +915,8 @@ impl Game {
                         n += y.amount;
                     }
                 }
+                // Ticket #359 (version 0.09.1): at half under an occupied Habitat standing shut,
+                // per Module in `module_yield_at`.
                 n
             }
         }
@@ -745,6 +935,9 @@ impl Game {
             BuildItem::Module(k) => (t.module(k).widgets, fac.module_materials_multiplier),
             BuildItem::Unit(UnitKind::Army) => (t.unit(UnitKind::Army).widgets, 1.0),
             BuildItem::Unit(k) => (t.unit(k).widgets, fac.ship_materials_multiplier),
+            // Ticket #343 (version 0.09.1): a Warhead is priced flat, the Faction's Ship discount
+            // left out. The discount is a shipwright's, and reloading is not shipbuilding.
+            BuildItem::Warhead(_) => (t.nuke.rearm_widgets, 1.0),
         };
         ((row as f64 * m).floor() as u32).max(1)
     }
@@ -805,6 +998,8 @@ impl Game {
             (BuildItem::Module(k), Place::State(_)) => self.module_materials(seat, k),
             (BuildItem::Unit(UnitKind::Army), _) => self.tables.unit(UnitKind::Army).materials,
             (BuildItem::Unit(k), _) => self.ship_materials(seat, k),
+            // Ticket #343 (version 0.09.1): the rearm's flat price, for the same reason.
+            (BuildItem::Warhead(_), _) => self.tables.nuke.rearm_materials,
         }
     }
 
@@ -832,8 +1027,37 @@ impl Game {
     /// The names of producers shut down by the shortfall rule, in the order they would be shut.
     pub fn shortfall_order(&self, seat: Seat) -> Vec<String> {
         let mut producers = self.producers_of(seat);
-        let (_, shut) = self.apply_shortfall(seat, &mut producers);
-        shut
+        let (_, shut) = self.apply_shortfall(seat, &mut producers, self.seat(seat).stockpile.energy);
+        shut.into_iter().map(|i| producers[i].name.to_string()).collect()
+    }
+
+    /// Ticket #351 (version 0.09.1): **the Shortfall forecast** -- what the next Income would shut,
+    /// run by the Income rule itself on the Energy left after this turn's `pending` orders, as the
+    /// top bar's figure reads it -- today that is a purchase of Energy, which clears or shrinks the
+    /// alarm the turn it is ordered, since no order spends Energy and it cannot be sold. None when
+    /// nothing would go dark. The designer: *"alarm when there is a
+    /// projected energy deficit and buildings will go offline next turn."*
+    pub fn shortfall_forecast(&self, seat: Seat, pending: &[crate::orders::Order]) -> Option<ShortfallForecast> {
+        let stored = self.remaining(seat, pending).0.energy;
+        let mut producers = self.producers_of(seat);
+        let (_, shut) = self.apply_shortfall(seat, &mut producers, stored);
+        if shut.is_empty() {
+            return None;
+        }
+        // The deficit is the balance with everything still running, read before a single thing is shut.
+        let short_by = -self.energy_balance(seat, &self.producers_of(seat), stored);
+        let dark = shut
+            .into_iter()
+            .map(|i| {
+                let p = &producers[i];
+                let at = match p.place {
+                    ProducerPlace::Facility(sid, _) => format!("in {}", self.tables.state(sid).name),
+                    ProducerPlace::Module(cid, _) => format!("at {}", self.place_name(Place::Colony(cid))),
+                };
+                GoesDark { name: p.name.to_string(), at }
+            })
+            .collect();
+        Some(ShortfallForecast { short_by, dark })
     }
 
     /// Runs the shortfall rule over a producer list; returns the final Energy balance and what was shut.
@@ -876,15 +1100,22 @@ impl Game {
         bill - (bill as f64 * self.tables.unique.reactor_upkeep).floor() as i64
     }
 
-    fn apply_shortfall(&self, seat: Seat, producers: &mut [Producer]) -> (i64, Vec<String>) {
+    /// The Energy left after Income with these producers as they stand: `stored`, plus what the
+    /// online ones make, less their upkeep and the Ships' and Armies', plus the Reactor's relief.
+    fn energy_balance(&self, seat: Seat, ps: &[Producer], stored: i64) -> i64 {
+        let energy_in: i64 = ps.iter().filter(|p| p.online).filter_map(|p| p.output.filter(|(r, _)| *r == Resource::Energy).map(|(_, v)| v)).sum();
+        let upkeep: i64 = ps.iter().filter(|p| p.online).map(|p| p.upkeep).sum();
+        stored + energy_in - upkeep - self.unit_upkeep(seat) + self.reactor_relief(seat, ps)
+    }
+
+    /// Ticket #351 (version 0.09.1): the rule starts from `stored` rather than reading the stockpile,
+    /// so the forecast can run it on the Energy left after this turn's orders; Income passes the
+    /// stockpile itself. It returns the balance after, and the INDEX of each producer it shut, in
+    /// the order it shut them.
+    fn apply_shortfall(&self, seat: Seat, producers: &mut [Producer], stored: i64) -> (i64, Vec<usize>) {
         // Ticket #184: the balance is recomputed from scratch whenever a building goes dark, because
         // the Reactor's relief is a share of the bill and shrinks with it.
-        let balance_now = |g: &Self, ps: &[Producer]| -> i64 {
-            let energy_in: i64 = ps.iter().filter(|p| p.online).filter_map(|p| p.output.filter(|(r, _)| *r == Resource::Energy).map(|(_, v)| v)).sum();
-            let upkeep: i64 = ps.iter().filter(|p| p.online).map(|p| p.upkeep).sum();
-            g.seat(seat).stockpile.energy + energy_in - upkeep - g.unit_upkeep(seat) + g.reactor_relief(seat, ps)
-        };
-        let mut balance = balance_now(self, producers);
+        let mut balance = self.energy_balance(seat, producers, stored);
         // Ticket #164 (version 0.07.5): the Core Module is never shut for want of Energy. It is the
         // walls of the place rather than a building in it -- it cannot be mothballed either -- so
         // its upkeep is paid whatever else goes dark.
@@ -904,15 +1135,29 @@ impl Game {
                 break;
             }
             producers[i].online = false;
-            shut.push(producers[i].name.to_string());
-            balance = balance_now(self, producers);
+            shut.push(i);
+            balance = self.energy_balance(seat, producers, stored);
         }
         (balance, shut)
     }
 
     fn income_for(&mut self, seat: Seat) {
         let mut producers = self.producers_of(seat);
-        let (balance, shut) = self.apply_shortfall(seat, &mut producers);
+        let (balance, shut_at) = self.apply_shortfall(seat, &mut producers, self.seat(seat).stockpile.energy);
+        let shut: Vec<String> = shut_at.iter().map(|i| producers[*i].name.to_string()).collect();
+        // Ticket #351 (version 0.09.1): what the Natural Sink loses with the Scrubbers shut, which the
+        // Report line names -- the case where a Custodian loses the game without noticing. Only where
+        // the Region has a controller, which is where `scrubber_removal_by_seat` counts it: one in a
+        // Region occupied from neutral never added to the Sink, so shutting it takes nothing off.
+        let sink_lost = self.tables.facility(FacilityKind::Scrubber).sink_per_turn
+            * shut_at
+                .iter()
+                .filter(|i| {
+                    matches!(producers[**i].place, ProducerPlace::Facility(sid, f)
+                        if self.state(sid).control.controller().is_some()
+                            && self.state(sid).facilities.get(f).map(|x| x.kind == FacilityKind::Scrubber).unwrap_or(false))
+                })
+                .count() as f64;
         let mut gained = Stockpile::default();
         let mut research = 0;
         let mut off_earth = 0;
@@ -1140,7 +1385,8 @@ impl Game {
         if !shut.is_empty() {
             let line = format!("{}: Energy ran short; shut down {}.", self.seat_name(seat), shut.join(", "));
             self.log(line);
-            let text = self.say("energy_short", &[("faction", self.seat_name(seat)), ("buildings", shut.join(", "))]);
+            let sink = if sink_lost > 0.0 { self.phrase("energy_short_sink", &[("ppm", format!("{sink_lost:.1}"))]) } else { String::new() };
+            let text = self.say("energy_short", &[("faction", self.seat_name(seat)), ("buildings", shut.join(", ")), ("sink", sink)]);
             self.report_line_of(seat, LineKind::YourWorks, LineKind::Note, None, text);
         }
         if balance < 0 {

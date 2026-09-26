@@ -22,6 +22,13 @@ decay_controlled = 1
 # (version 0.05.5): 10 to 20, beside a start Standing on every Faction's home state equal to its
 # threshold, after the Custodian AI took seat 0's start state on turn 7 in every seed.
 challenge_margin = 20
+# Ticket #349 (version 0.09.1): a place you hold is PRESSED while any rival's Standing there is
+# within this of yours -- the designer's "within 10 your influence". It is measured against YOUR
+# Standing, not the rival's price, so it comes early: they still need your Standing plus the margin
+# above to take it, and a turn's Allotment can cover 10 at once. It moves no rule; it is what the
+# Command Cluster lists and what turns a card's challenger line amber. It replaced the card's old
+# reading of the computer's `influence_step` x 2, an AI tuning figure doing the interface's job.
+pressed_band = 10
 # Ticket #190 (version 0.08.0): what a Constabulary standing and online adds to the challenge margin
 # in its Region, for EVERY challenger, whoever built it -- a police force serves the government of
 # the day. Nothing on a neutral Region, which has no margin at all: the price there is the threshold.
@@ -45,6 +52,17 @@ constabulary_margin_defended = 10
 # N is, where it was dearer by 20 since stations existed. The designer chose that over keeping the
 # distinction.
 station_threshold_base = 40
+# Ticket #345 (version 0.09.1): what the Core of a Colony that was FIRST to its Body adds to its
+# FOUNDER'S Allotment, every turn the founder still directs that Colony. One, a standing trickle
+# rather than a second windfall, because the windfall above is the prize for arriving and this is
+# the prize for staying. It is added AFTER the Faction multiplier at face value, beside the
+# Spaceport's clause and for the Spaceport's reason: being first to a world is not diplomacy, and
+# the Arkwrights' x0.8 has no business shaving it. It never pays a rival who takes the place, and
+# it wakes again if the founder takes it back; it is keyed to that one Colony, so a second Colony
+# of the founder's on the same Body pays nothing; and it keeps paying while the Colony is starved
+# of Energy, where a Relay or a Chorus goes quiet -- being there first is not a thing the lights
+# going out undoes.
+first_settled_allotment = 1
 occupation_turns = 3
 # Spec 8.5: each building at a place rolls this to be destroyed. Ticket #298 (version 0.08.6): on
 # ONE occasion only -- a place transferring by the three-turn clock. A Battle burns nothing, a

@@ -17,7 +17,9 @@
 # Turn 1 only: the headline that explains the table.
 seating = "{date}. You play the {faction} from {state}; the computer plays {rivals}."
 start_holding = "You hold {state} with a Launch Site and its Standing Army. The Stockpile holds {materials} Materials, {fuel} Fuel and {energy} Energy."
-start_rivals = "Your rivals are {rivals}. Build, spread Influence, and get twelve Colonists off Earth before the Temperature reaches +{collapse} C."
+# Ticket #350 (version 0.09.1): {condition} is the player's own Victory Condition in one clause,
+# `victory_short` in factions.toml. It said "get twelve Colonists off Earth" to every Faction.
+start_rivals = "Your rivals are {rivals}. Build, spread Influence, and {condition} before the Temperature reaches +{collapse} C."
 
 # In space
 solar_storm = "Solar Storm: no transit advanced this turn."
@@ -41,7 +43,15 @@ event_damaged_ships = "{event} damaged {n} Ship(s)."
 loaded = "{faction} loaded {cargo} at {body}."
 slot_taken = "{faction}: another Faction took that Colony Slot first."
 landing_contested = "{faction} could not land at {body}: the orbit is contested."
-colony_founded = "The {faction} founded a Colony in slot {slot} on {body} with {n} Colonists."
+# Ticket #353 (version 0.09.1): the slot is NAMED. "in slot 3 on the Moon" named a place no player
+# could find on the board; {slot} now carries the slot's own name, which is the Colony's name too.
+colony_founded = "The {faction} founded a Colony at {slot} on {body} with {n} Colonists."
+# Ticket #353 (version 0.09.1): who did not land, at every place the engine clamps an arrival to the
+# Habitat room it found -- a founding by sea, a founding by Colony Ship, a join and a disembarkation.
+# One phrase for all four, because it is one rule.
+no_habitat_room = "{n} more found no Habitat room at {place} and did not land."
+# Ticket #345 (version 0.09.1): the first Colony a world has ever carried, and what it pays.
+first_to_body = "The {faction} are the first Faction ever to settle {body}. {colony} claims a windfall of {n} Influence, and its Core will pay while they hold it."
 disembarked = "{n} Colonists disembarked into {colony}."
 station_built = "{faction} built {station}."
 antarctica_opens = "The Antarctic ice opens: {n} Colony Slots on Earth."
@@ -53,6 +63,12 @@ army_ordered = "An Army began at {place}: {people} under arms."
 emigrants_arrived = "{n} Pioneers from {state} landed in Antarctica and joined {colony}."
 emigrants_returned = "{n} Pioneers from {state} found no room in Antarctica and came home."
 emigrants_lifted = "{n} Pioneers lifted from {state} to {station}."
+# Ticket #353 (version 0.09.1): and who did NOT go. A lift fills as far as the station's Habitat
+# room goes since this ticket, where it used to refuse the whole order, so a lift can now move
+# fewer people than it asked for and the ones left behind are still standing in their Region. The
+# partial-unload phrase above will not serve: that one is about people who arrived somewhere and
+# could not land, and these never left the ground.
+emigrants_stayed = "{n} more found no Habitat room at {station} and are still waiting in {state}."
 neutral_research = "The Labs of {states}, in no one's hands, added {n} Research to the Tech under research."
 archive_built = "The {faction} raised the Archive at {place}; it wants {left} more Research."
 archive_complete = "The {faction} completed the Archive at {place}: it stands, and every point of its Research is paid."
@@ -77,6 +93,9 @@ units_destroyed = "{place} was {why}: {lost} destroyed."
 # Ticket #328 (version 0.08.8): a Bombard from orbit, hit or miss; {dead} is `bombard_dead` or nothing.
 bombard_hit = "The {faction} bombarded {place} from {ship}: the {module} destroyed{dead}."
 bombard_miss = "The {faction} bombarded {place} from {ship}: the {module} was struck and stands."
+# Ticket #343 (version 0.09.1): a Launch, hit or miss; {dead} is `launch_dead` or nothing.
+launch_hit = "The {faction} launched a Warhead from {ship} at {place}: {lost} destroyed{dead}."
+launch_miss = "The {faction} launched a Warhead from {ship} at {place}: nothing of it burned{dead}."
 occupation_begun = "The {faction} occupy {place}."
 occupation_ended = "Occupation of {place} by the {faction} ended."
 # Ticket #299 (version 0.08.6): a break costs. {holder} is the previous holder, or nobody.
@@ -113,7 +132,11 @@ colonists_no_room = "{n} Colonists at {colony} had nowhere to live and were lost
 # them fell, so a player is sent to the grid on the Victory window rather than expected to watch it.
 # Ticket #192 (version 0.08.0): the Upload, in the Report.
 uploaded = "{n} Colonists were uploaded into the Archive at {colony}: {total} in all."
-relations_fell = "The {victim} have not forgiven the {offender}."
+# Ticket #362 (version 0.09.1): only a pair INVOLVING THE PLAYER, only when it falls into a worse
+# named level, both directions, folded one line each -- at the designer's word, "quiet the 'has
+# not forgiven' spam". `relations_fell` ("The {victim} have not forgiven the {offender}.") is retired.
+relations_they = "The {first} are now {level} toward you{more}."
+relations_you = "You are now {list}."
 # Ticket #332 (version 0.09.0): the fire takes the turn's Widgets from its Region, so nothing there
 # moves; before, it pushed a due Ship back a turn.
 launch_pad_fire = "Launch Pad Fire: {place} applies no Widgets this turn; {widgets} lost."
@@ -177,14 +200,26 @@ build_complete = "{faction} completed {building} at {place}."
 # Ticket #332 (version 0.09.0): a build under way at a place that changed hands, cancelled by its
 # new holder: the Materials are the holder's prize, at the holder's own price.
 build_cancelled = "{faction} cancelled the {building} under way at {place}: {refund} Materials to their Stockpile."
-energy_short = "{faction}: Energy ran short; shut down {buildings}."
+# Ticket #351 (version 0.09.1): {sink} is `energy_short_sink` below when Scrubbers were shut, and
+# empty otherwise -- a Custodian lost three Scrubbers this way in the playtest with nothing said.
+energy_short = "{faction}: Energy ran short; shut down {buildings}{sink}."
 energy_zero = "{faction}: Energy fell to zero even with every producer off."
 
 # ---------------------------------------------------------------- fragments other sentences use
 [phrase]
 attacks = " and attacks"
+# Ticket #351 (version 0.09.1): what the Natural Sink loses with the Scrubbers a Shortfall shut.
+energy_short_sink = "; the Natural Sink loses {ppm} ppm"
 cargo_aboard = " with {n} Colonists aboard"
 bombard_dead = ", {n} Colonists dead with it"
+# Ticket #343 (version 0.09.1): the people a Launch killed, counted in units of population -- one
+# unit, one million people, since ticket #333.
+launch_dead = ", {n} million dead"
+# Ticket #346 (version 0.09.1): what a Battle in orbit took out of the tanks that fought it, and
+# the hulls that fought it under the Battle bar and so at half strength. Both are clauses of the
+# Battle's own record, after the rounds and before the word on Orbital Control.
+battle_fuel = " The Battle cost {n} Fuel."
+battle_fought_dry = " {hulls} fought dry, at half strength."
 sea_unrest = " Unrest there rose by {rose} to {unrest}."
 # Ticket #276 (version 0.08.5): every rise turns one inland slot coastal, wall or no wall; an empty
 # slot first, else the oldest inland Facility with its slot.
@@ -224,7 +259,15 @@ build_station = "began a Space Station over {body}"
 build_archive = "began the Archive at {colony}"
 # Ticket #192 (version 0.08.0): the Upload, in the rival-deeds paragraph.
 upload = "uploaded {n} Colonists into the Archive at {colony}"
+# Ticket #353 (version 0.09.1): `fund_archive` is the ARCHIVISTS' clause and theirs alone. It was
+# said of all four, so three Factions in four were reported as paying into a fund they cannot hold.
+# The other three name what their own Directive really buys, in the words the Report line for each
+# has used since #235: the Natural Sink, their coffers, propellant. `unfund_archive` is true of all
+# four alike, because nought sends the whole of it to the shared Tech whoever ordered it.
 fund_archive = "set its Labs to pay the Archive fund from the next Income"
+directive_sink_order = "directed its Research into the Natural Sink from the next Income"
+directive_ducats_order = "directed its Research into its coffers from the next Income"
+directive_fuel_order = "directed its Research into propellant from the next Income"
 unfund_archive = "set its Labs back to the shared Tech from the next Income"
 max_on = "set its whole Allotment to go to {place} every turn"
 max_off = "set its Influence to be placed by hand again"
@@ -242,6 +285,8 @@ change_orbit = "moved a {unit} to {orbit}"
 # Ticket #87 (version 0.06.0): the Refuel order.
 refuel = "refuelled {unit} at {body}"
 bombard = "bombarded {colony}"
+launch = "launched a Warhead at {place}"
+rearm = "rearmed a Missile Carrier"
 ship_stance = "set its Ships at {body} to {stance}"
 army_stance = "set its Armies at {place} to {stance}"
 move_army = "moved {army} into {state}"
@@ -275,6 +320,12 @@ founded = "founded {colony}"
 on = true
 text = "The {faction} founded {colony}, {note}."
 figure = "{n} Colonists"
+
+# Ticket #345 (version 0.09.1): the first Faction to put a Colony on the ground of a world.
+[moments.first_to_body]
+on = true
+text = "The {faction} are the first to settle {body}. {colony} is theirs."
+figure = "{n} Influence"
 
 [moments.control_changed]
 on = true

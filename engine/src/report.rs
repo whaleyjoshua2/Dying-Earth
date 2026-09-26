@@ -69,6 +69,14 @@ pub enum LineKind {
     YourWorks,
     /// Anything with no better home.
     Note,
+    /// Ticket #353 (version 0.09.1): **the turn's card, and a rival's answer to it.** A kind with
+    /// NO headline rank, because every one of these lines has already been read: the question and
+    /// the drawn card each held the screen in a modal of their own before the Report opened, and the
+    /// four answers are drawn together in their own block inside it. The interface used to filter an
+    /// answer out of `headline()` after the fact, which turned `Some` into `None` and opened the
+    /// dispatch with nothing at all; filing the line under a kind that never headlines lets the next
+    /// line by rank fall through on its own. Added LAST so a save written before it still loads.
+    Card,
 }
 
 /// The four headings the dispatch groups its lines under, in the order they are shown.
@@ -136,7 +144,9 @@ impl LineKind {
         match self {
             LineKind::ColonyFounded | LineKind::Ship | LineKind::Archive | LineKind::Antarctica => Section::InSpace,
             LineKind::Unrest | LineKind::Refugees | LineKind::Army | LineKind::Occupation => Section::OnEarth,
-            LineKind::Break | LineKind::SeaLevel | LineKind::Event | LineKind::Development | LineKind::Climate => Section::TheClimate,
+            // Ticket #353 (version 0.09.1): the turn's card reads under The climate, where an Event
+            // line has always read; only its headline rank is gone.
+            LineKind::Break | LineKind::SeaLevel | LineKind::Event | LineKind::Development | LineKind::Climate | LineKind::Card => Section::TheClimate,
             LineKind::TechComplete | LineKind::YourBuild | LineKind::YourWorks => Section::YourWorks,
             LineKind::ControlChanged | LineKind::DecisiveBattle | LineKind::Battle | LineKind::BuildComplete | LineKind::Note | LineKind::Seating => by_place(),
         }
@@ -178,10 +188,13 @@ pub enum MomentKind {
     /// Ticket #281 (version 0.08.5): buildings burned in the rolls after a taking. It wore the
     /// Battle's name from ticket #50 to here, and fired for a Pacified transfer that fought nobody.
     PlaceTakenByForce,
+    /// Ticket #345 (version 0.09.1): a Body settled for the first time, by anybody. It fires once
+    /// per Body in a whole game, which is the rarest Moment on the list.
+    FirstToABody,
 }
 
 impl MomentKind {
-    pub const ALL: [MomentKind; 10] = [
+    pub const ALL: [MomentKind; 11] = [
         MomentKind::ColonyFounded,
         MomentKind::ControlChanged,
         MomentKind::ClimateThreshold,
@@ -192,6 +205,7 @@ impl MomentKind {
         MomentKind::LostInTransit,
         MomentKind::RivalProgress,
         MomentKind::PlaceTakenByForce,
+        MomentKind::FirstToABody,
     ];
 
     /// The key its table carries in `report.toml`.
@@ -207,6 +221,7 @@ impl MomentKind {
             MomentKind::LostInTransit => "lost_in_transit",
             MomentKind::RivalProgress => "rival_progress",
             MomentKind::PlaceTakenByForce => "taken_by_force",
+            MomentKind::FirstToABody => "first_to_body",
         }
     }
 
@@ -223,6 +238,7 @@ impl MomentKind {
             MomentKind::LostInTransit => "Colonists lost in transit",
             MomentKind::RivalProgress => "A rival closing on its Victory Condition",
             MomentKind::PlaceTakenByForce => "A place taken by force",
+            MomentKind::FirstToABody => "A Body settled for the first time",
         }
     }
 
@@ -230,6 +246,9 @@ impl MomentKind {
     /// crossed; the Archive completed is a build completed.
     pub fn rank(self) -> u8 {
         match self {
+            // Ticket #345 (version 0.09.1): the first landing on a world reads with the founding
+            // it came out of, and before it, since it is the rarer half of the same news.
+            MomentKind::FirstToABody => 0,
             MomentKind::ColonyFounded => 1,
             // Ticket #86: lives lost read before a place changing hands.
             MomentKind::LostInTransit => 2,
@@ -381,7 +400,7 @@ pub fn placeholders(template: &str) -> Vec<String> {
 pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("seating", &["date", "faction", "state", "rivals"]),
     ("start_holding", &["state", "materials", "fuel", "energy"]),
-    ("start_rivals", &["rivals", "collapse"]),
+    ("start_rivals", &["rivals", "condition", "collapse"]),
     ("solar_storm", &[]),
     ("ship_arrived", &["faction", "ship", "body"]),
     // Ticket #335 (version 0.09.0): a Ship that changed orbit at the Body it stands at.
@@ -398,6 +417,10 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("slot_taken", &["faction"]),
     ("landing_contested", &["faction", "body"]),
     ("colony_founded", &["faction", "slot", "body", "n"]),
+    // Ticket #353 (version 0.09.1): who the Habitat room had no place for, at all four clamp sites.
+    ("no_habitat_room", &["n", "place"]),
+    // Ticket #345 (version 0.09.1): a Body settled for the first time.
+    ("first_to_body", &["faction", "body", "colony", "n"]),
     ("disembarked", &["n", "colony"]),
     ("station_built", &["faction", "station"]),
     ("antarctica_opens", &["n"]),
@@ -409,6 +432,8 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("emigrants_arrived", &["n", "state", "colony"]),
     ("emigrants_returned", &["n", "state"]),
     ("emigrants_lifted", &["n", "state", "station"]),
+    // Ticket #353 (version 0.09.1): the Pioneers a clamped lift left standing in their Region.
+    ("emigrants_stayed", &["n", "state", "station"]),
     ("claim_lot", &["place", "factions", "winner"]),
     ("archive_built", &["faction", "place", "left"]),
     ("archive_complete", &["faction", "place"]),
@@ -429,6 +454,9 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     // Ticket #328 (version 0.08.8): a Bombard, hit or miss.
     ("bombard_hit", &["faction", "ship", "place", "module", "dead"]),
     ("bombard_miss", &["faction", "ship", "place", "module"]),
+    // Ticket #343 (version 0.09.1): a Launch, hit or miss.
+    ("launch_hit", &["faction", "ship", "place", "lost", "dead"]),
+    ("launch_miss", &["faction", "ship", "place", "dead"]),
     ("occupation_begun", &["faction", "place"]),
     ("occupation_ended", &["place", "faction"]),
     // Ticket #299 (version 0.08.6): a broken Occupation, at a cost.
@@ -459,8 +487,10 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     // Ticket #332 (version 0.09.0): a rival's build cancelled by the place's new holder.
     ("build_cancelled", &["faction", "building", "place", "refund"]),
     ("colonists_no_room", &["n", "colony"]),
-    // Ticket #191 (version 0.08.0): Relations, said in the offender's paragraph.
-    ("relations_fell", &["victim", "offender"]),
+    // Ticket #191 (version 0.08.0): Relations. Ticket #362 (version 0.09.1): a fall into a worse
+    // level of a pair involving the player, one line each way.
+    ("relations_they", &["first", "level", "more"]),
+    ("relations_you", &["list"]),
     ("uploaded", &["n", "colony", "total"]),
     // Ticket #332 (version 0.09.0): the fire takes the Region's Widgets for the turn.
     ("launch_pad_fire", &["place", "widgets"]),
@@ -507,7 +537,7 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("leapfrog", &["faction", "state", "coefficient"]),
     ("tech_complete", &["tech", "faction", "shares"]),
     ("build_complete", &["faction", "building", "place"]),
-    ("energy_short", &["faction", "buildings"]),
+    ("energy_short", &["faction", "buildings", "sink"]),
     ("energy_zero", &["faction"]),
 ];
 
@@ -530,9 +560,16 @@ pub fn ordinal(n: usize) -> String {
 /// The same for `[phrase]`.
 pub const PHRASE_ARGS: &[(&str, &[&str])] = &[
     ("attacks", &[]),
+    // Ticket #351 (version 0.09.1): the Sink's loss on the Shortfall line.
+    ("energy_short_sink", &["ppm"]),
     ("cargo_aboard", &["n"]),
     // Ticket #328 (version 0.08.8): the Colonists a burned Habitat took with it.
     ("bombard_dead", &["n"]),
+    // Ticket #343 (version 0.09.1): the people a Launch killed.
+    ("launch_dead", &["n"]),
+    // Ticket #346 (version 0.09.1): what a Battle cost in Fuel, and the hulls that fought dry.
+    ("battle_fuel", &["n"]),
+    ("battle_fought_dry", &["hulls"]),
     ("sea_unrest", &["rose", "unrest"]),
     ("sea_inland", &[]),
     ("sea_inland_flipped", &["what"]),
@@ -570,6 +607,11 @@ pub const RIVAL_ARGS: &[(&str, &[&str])] = &[
     // Ticket #192 (version 0.08.0): the Upload.
     ("upload", &["n", "colony"]),
     ("fund_archive", &[]),
+    // Ticket #353 (version 0.09.1): the Archive fund is the Archivists' clause; the other three
+    // Factions' Directives name what they themselves buy.
+    ("directive_sink_order", &[]),
+    ("directive_ducats_order", &[]),
+    ("directive_fuel_order", &[]),
     ("unfund_archive", &[]),
     ("max_on", &["place"]),
     ("max_off", &[]),
@@ -584,6 +626,9 @@ pub const RIVAL_ARGS: &[(&str, &[&str])] = &[
     ("change_orbit", &["unit", "orbit"]),
     ("refuel", &["unit", "body"]),
     ("bombard", &["colony"]),
+    // Ticket #343 (version 0.09.1).
+    ("launch", &["place"]),
+    ("rearm", &[]),
     ("ship_stance", &["body", "stance"]),
     ("army_stance", &["place", "stance"]),
     // Ticket #339 (version 0.09.0): the march and the loading name the Army.
@@ -625,6 +670,8 @@ pub const MOMENT_ARGS: &[(&str, &[&str])] = &[
     ("archive_complete", &["faction", "place", "research"]),
     // Ticket #261 (version 0.08.4): the sentence is a line card, as the climate threshold's is.
     ("rival_progress", &["text", "figure"]),
+    // Ticket #345 (version 0.09.1): a Body settled for the first time.
+    ("first_to_body", &["faction", "body", "colony", "n"]),
 ];
 
 impl ReportTable {

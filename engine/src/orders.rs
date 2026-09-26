@@ -72,6 +72,16 @@ pub enum Order {
     /// there outright bombards a rival's Colony at that Body: one Module drawn at random rolls the
     /// destruction chance. Never over Earth.
     Bombard { ship: ShipId, colony: ColonyId },
+    /// Ticket #343 (version 0.09.1): **Launch**. A Missile Carrier carrying its Warhead, in the
+    /// orbit that touches the target and holding that orbit outright, fires it at a Region, a
+    /// ground Colony or a Space Station a rival directs. Free to order -- the price was paid at
+    /// the build and is paid again at the Rearm -- and, unlike a Bombard, LAWFUL OVER EARTH: a
+    /// nuke on Earth is the point of the weapon.
+    Launch { ship: ShipId, target: Place },
+    /// Ticket #343 (version 0.09.1): **Rearm**. A Missile Carrier that has fired loads another
+    /// Warhead at a Colony or station of its Faction with a working Shipyard, in that place's own
+    /// orbit. It is a BUILD in that yard's queue, since it is paid in Widgets as well as Materials.
+    Rearm { ship: ShipId },
     ArmyStance { place: Place, stance: Stance },
     MoveArmy { army: ArmyId, to: StateId },
     Load { ship: ShipId, colonists: u32, from: LoadSource, army: Option<ArmyId> },
@@ -277,6 +287,11 @@ pub struct Pending {
     /// which Colony -- resolved after the orbital Battles.
     #[serde(default)]
     pub bombards: Vec<(Seat, ShipId, ColonyId)>,
+    /// Ticket #343 (version 0.09.1): Launches ordered this turn -- who, from which Missile
+    /// Carrier, at which place -- resolved after the orbital Battles beside the Bombards, and for
+    /// the same reason: the Battles just fought may have sunk the hull or taken the orbit.
+    #[serde(default)]
+    pub launches: Vec<(Seat, ShipId, Place)>,
     /// Ticket #335 (version 0.09.0): orbit changes ordered this turn -- who, which Ship, the orbit
     /// it moves to (`None` is low orbit) -- resolved with the transits, before the Battles. The
     /// Fuel left the tank at the order.
@@ -312,7 +327,34 @@ pub struct Pending {
     pub attack_sequence: u32,
 }
 
+/// Ticket #343 (version 0.09.1): where a Missile Carrier may load another Warhead, or why it may
+/// not. Two refusals rather than one, so the message names what is missing: there is no place of
+/// the seat's in this orbit at all, or there is one and it has no working Shipyard.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RearmSite {
+    Yard(ColonyId),
+    NoPlace,
+    NoShipyard,
+}
+
 impl Game {
+    /// Ticket #343 (version 0.09.1): the Colony or station a Rearm would be built at -- one this
+    /// seat directs, at the Body the Ship stands at, IN THE SHIP'S OWN ORBIT (a station's ring, or
+    /// low orbit for a Colony on the ground), with a working Shipyard standing in it.
+    pub fn rearm_site(&self, seat: Seat, ship: ShipId) -> RearmSite {
+        let Some(s) = self.ship(ship) else { return RearmSite::NoPlace };
+        let ShipAt::Body(body) = s.at else { return RearmSite::NoPlace };
+        let orbit = self.ship_orbit(s);
+        let here: Vec<&Colony> = self.colonies.iter().filter(|c| c.body == body && c.control.director() == Some(seat) && self.colony_orbit(c) == orbit).collect();
+        if here.is_empty() {
+            return RearmSite::NoPlace;
+        }
+        match here.iter().find(|c| c.modules.iter().any(|m| m.kind == ModuleKind::Shipyard && m.working())) {
+            Some(c) => RearmSite::Yard(c.id),
+            None => RearmSite::NoShipyard,
+        }
+    }
+
     /// The cost of one order for a seat, before legality.
     pub fn order_cost(&self, seat: Seat, order: &Order) -> Cost {
         let t = &self.tables;
@@ -337,6 +379,11 @@ impl Game {
             Order::ChangeOrbit { .. } => Cost::default(),
             // Ticket #328 (version 0.08.8): a Bombard costs nothing but the offence.
             Order::Bombard { .. } => Cost::default(),
+            // Ticket #343 (version 0.09.1): a Launch costs nothing but the offence; the Warhead was
+            // paid for at the build. A Rearm costs the table's Materials, and its Widgets are the
+            // build's, paid by the yard's place over the turns it takes.
+            Order::Launch { .. } => Cost::default(),
+            Order::Rearm { .. } => Cost { materials: t.nuke.rearm_materials, ..Default::default() },
             Order::Refuel { ship } => Cost { fuel: self.refuel_amount(seat, *ship), ..Default::default() },
             Order::Influence { amount, .. } => Cost { influence: *amount, ..Default::default() },
             Order::Smear { amount, .. } => Cost { influence: *amount, ..Default::default() },
@@ -708,14 +755,19 @@ impl Game {
                     return fail("the Research Directive is already there");
                 }
                 // Ticket #68: at the cap there is nothing to declare, and the Research stays with
-                // the shared Tech; until the Module stands the cap is a quarter of the requirement.
+                // the shared Tech.
                 // Ticket #235: the Archivists alone, since they are the only Faction whose
                 // directive fills a fund that can be full.
+                // Ticket #347 (version 0.09.1): the refusal stands, and its wording changes. It said
+                // "the Archive fund holds its quarter (20) until the Archive stands at a Colony off
+                // Earth", which is false in every clause now the quarter is gone: the fund is simply
+                // full, and a full fund before the Module stands is a fund that has paid the
+                // Archive's whole Research in advance.
                 if *percent > 0 && self.kind(seat) == FactionKind::Archivists && self.seat(seat).archive_fund >= self.archive_fund_cap(seat) {
                     return if self.archive_built(seat) {
                         fail("the Archive's Research is paid in full")
                     } else {
-                        fail(format!("the Archive fund holds its quarter ({}) until the Archive stands at a Colony off Earth", self.archive_fund_cap(seat)))
+                        fail(format!("the Archive fund is full at {}", self.archive_fund_cap(seat)))
                     };
                 }
                 Ok(cost)
@@ -756,11 +808,11 @@ impl Game {
                 // the other is solved: the four Colonists arrive at a median turn 11 and The Upload at
                 // a median 15, so a player told to fetch people who is then told to wait for a Tech
                 // has been led on.
-                if let Some(gate) = self.tables.victory_gate(FactionKind::Archivists)
-                    && !self.has_tech(gate)
-                {
-                    return fail(format!("the Archive waits on {}, which the world has not researched yet", self.tables.tech(gate).name));
-                }
+                //
+                // Ticket #361 (version 0.09.1): **UNDONE, at the designer's word.** The premise
+                // reversed: measured over eighty games, The Upload now lands at a median turn 28 and
+                // an Archivist Colony off Earth at 22, so the order-gate cost them six turns and
+                // gated nothing else. The Upload gates their WIN (ticket #84), as before #199.
                 // Ticket #192 (version 0.08.0): the gate. Checked ONCE, here, at the order; neither
                 // the three-turn build nor the standing Module cares afterwards. A build that could
                 // stall halfway would be a new state to hold in the save, draw on the card and say in
@@ -819,7 +871,10 @@ impl Game {
                 };
                 if !foothold {
                     return fail(if *body == BodyId::Earth {
-                        "needs a Nation State of yours with a Launch Site"
+                        // Ticket #353 (version 0.09.1): the gate reads `working()`, so the refusal
+                        // says WORKING. Without the word a seat whose only Launch Site stands
+                        // mothballed is told to get a Launch Site it already has.
+                        "needs a Nation State of yours with a working Launch Site"
                     } else if self.tables.body(*body).colony_slots() == 0 {
                         // Ticket #93: Venus.
                         "needs a Ship of yours in orbit here; there is no ground to build from"
@@ -1048,6 +1103,14 @@ impl Game {
                 if !UnitKind::SHIPS.contains(kind) {
                     return fail("not a Ship");
                 }
+                // Ticket #343 (version 0.09.1): a Ship whose card names a Tech waits for it, in the
+                // shape the Facility and the Module gates already use. The Missile Carrier is the
+                // first unit row that has ever named one; every other row leaves the field out.
+                if let Some(t) = self.tables.unit(*kind).needs_tech
+                    && !self.has_tech(t)
+                {
+                    return fail(format!("a {} needs {} first", kind.name(), self.tables.tech(t).name));
+                }
                 match site {
                     // Ticket #46: Ships are built only at Shipyards, on a station or a Colony.
                     Place::State(_) => return fail("Ships are built at a Shipyard, on a station or a Colony"),
@@ -1056,8 +1119,21 @@ impl Game {
                         if col.control.director() != Some(seat) {
                             return fail("you do not direct this Colony");
                         }
+                        // Ticket #353 (version 0.09.1): **a refusal names what is missing.** One
+                        // test of `working()` said "no Shipyard here" over a Shipyard the player
+                        // could see standing at the very Colony they had open, mothballed or dark.
+                        // Three cases, three refusals, the shape `rearm_site` has carried since
+                        // #343: no Shipyard at all, one still in the queue, and one standing shut.
+                        // The shut one names BOTH of its reasons, because `working()` is one bit and
+                        // the player is owed the pair of doors it stands for.
                         if !col.modules.iter().any(|m| m.kind == ModuleKind::Shipyard && m.working()) {
-                            return fail("no Shipyard here");
+                            return fail(if col.modules.iter().any(|m| m.kind == ModuleKind::Shipyard) {
+                                "the Shipyard here is shut: mothballed, or dark for want of Energy"
+                            } else if col.queue.iter().any(|b| b.item == BuildItem::Module(ModuleKind::Shipyard)) {
+                                "the Shipyard here is still building"
+                            } else {
+                                "no Shipyard here"
+                            });
                         }
                     }
                 }
@@ -1075,8 +1151,17 @@ impl Game {
                         if col.control.director() != Some(seat) {
                             return fail("you do not direct this Colony");
                         }
-                        if !col.modules.iter().any(|m| m.kind == ModuleKind::Barracks) {
-                            return fail("no Barracks here");
+                        // Ticket #359 (version 0.09.1): a WORKING Barracks, as every other building
+                        // door reads it; a mothballed or dark one raised Armies while it merely
+                        // stood. Three refusals, in the Shipyard's shape.
+                        if !col.modules.iter().any(|m| m.kind == ModuleKind::Barracks && m.working()) {
+                            return fail(if col.modules.iter().any(|m| m.kind == ModuleKind::Barracks) {
+                                "the Barracks here is shut: mothballed, or dark for want of Energy"
+                            } else if col.queue.iter().any(|b| b.item == BuildItem::Module(ModuleKind::Barracks)) {
+                                "the Barracks here is still building"
+                            } else {
+                                "no Barracks here"
+                            });
                         }
                         let has_army = self.armies.iter().any(|a| a.home == ArmyHome::Colony(*c))
                             || col.queue.iter().any(|b| b.item == BuildItem::Unit(UnitKind::Army))
@@ -1108,7 +1193,10 @@ impl Game {
                         }
                         let ShipAt::Body(body) = ship.at else { return fail("a Ship in transit cannot be repaired") };
                         if !self.has_repair_yard(seat, body) {
-                            return fail("needs a Launch Site or Shipyard at this Body");
+                            // Ticket #353 (version 0.09.1): `has_repair_yard` reads `working()` at
+                            // both ends, so the refusal says WORKING, as the three lift refusals
+                            // above it already do.
+                            return fail("needs a working Launch Site or Shipyard at this Body");
                         }
                         if pending.iter().any(|o| matches!(o, Order::Transit { ship: s, .. } | Order::ChangeOrbit { ship: s, .. } if s == id)) {
                             return fail("a Ship cannot repair and move in one turn");
@@ -1129,12 +1217,18 @@ impl Game {
                                 }
                             }
                             ArmyAt::Place(Place::Colony(c)) => {
-                                let ok = self
-                                    .colony(c)
-                                    .map(|c| c.control.director() == Some(seat) && c.modules.iter().any(|m| m.kind == ModuleKind::Barracks))
-                                    .unwrap_or(false);
-                                if !ok {
-                                    return fail("an Army repairs only at a Colony with a Barracks");
+                                let Some(col) = self.colony(c).filter(|c| c.control.director() == Some(seat)) else {
+                                    return fail("an Army repairs only at a Colony of yours with a Barracks");
+                                };
+                                // Ticket #359 (version 0.09.1): a WORKING Barracks, the raise's door.
+                                if !col.modules.iter().any(|m| m.kind == ModuleKind::Barracks && m.working()) {
+                                    return fail(if col.modules.iter().any(|m| m.kind == ModuleKind::Barracks) {
+                                        "the Barracks here is shut: mothballed, or dark for want of Energy"
+                                    } else if col.queue.iter().any(|b| b.item == BuildItem::Module(ModuleKind::Barracks)) {
+                                        "the Barracks here is still building"
+                                    } else {
+                                        "no Barracks here"
+                                    });
                                 }
                             }
                             ArmyAt::Aboard(_) => return fail("an Army aboard a Ship cannot repair"),
@@ -1174,7 +1268,7 @@ impl Game {
                 if s.arrived_this_turn {
                     return fail("arrived this turn; it may act next turn");
                 }
-                if pending.iter().any(|o| matches!(o, Order::Transit { ship: x, .. } | Order::Load { ship: x, .. } | Order::Unload { ship: x, .. } | Order::Refuel { ship: x } | Order::ChangeOrbit { ship: x, .. } if x == ship)) {
+                if pending.iter().any(|o| matches!(o, Order::Transit { ship: x, .. } | Order::Load { ship: x, .. } | Order::Unload { ship: x, .. } | Order::Refuel { ship: x } | Order::Launch { ship: x, .. } | Order::Rearm { ship: x } | Order::Bombard { ship: x, .. } | Order::ChangeOrbit { ship: x, .. } if x == ship)) {
                     return fail("this Ship already has an order");
                 }
                 // Ticket #99 (version 0.07.0): the Orbital Slot it arrives into, chosen with the leg.
@@ -1215,7 +1309,7 @@ impl Game {
                     return fail(format!("the tank holds {} Fuel; an orbit change needs {fuel}", s.fuel));
                 }
                 if pending.iter().any(|o| {
-                    matches!(o, Order::Transit { ship: x, .. } | Order::Load { ship: x, .. } | Order::Unload { ship: x, .. } | Order::Refuel { ship: x } | Order::Bombard { ship: x, .. } | Order::ChangeOrbit { ship: x, .. } if x == ship)
+                    matches!(o, Order::Transit { ship: x, .. } | Order::Load { ship: x, .. } | Order::Unload { ship: x, .. } | Order::Refuel { ship: x } | Order::Bombard { ship: x, .. } | Order::Launch { ship: x, .. } | Order::Rearm { ship: x } | Order::ChangeOrbit { ship: x, .. } if x == ship)
                 }) {
                     return fail("this Ship already has an order");
                 }
@@ -1234,10 +1328,17 @@ impl Game {
                 // Ticket #99 (version 0.07.0): a blockaded station fuels nothing. Ticket #335
                 // (version 0.09.0): nor does one in another orbit -- a station's own orbit is what
                 // touches that station, refuelling included, so a Ship in low orbit or at another
-                // station's ring fuels at nothing until it has changed orbit. One rule, one refusal.
+                // station's ring fuels at nothing until it has changed orbit. Ticket #357 (version
+                // 0.09.1): split in two, so the move is offered only where a move would open the door
+                // -- a station that fuels this seat, open, in another orbit -- and a blockade says
+                // itself.
                 let orbit = self.ship_orbit(s);
                 if !self.refuelling_station(seat, body, orbit) {
-                    return fail(format!("no station fuels a Ship in {}: it is in another orbit, or blockaded", self.orbit_name(body, orbit)));
+                    let open = self.colonies.iter().find(|c| c.body == body && self.fuels_for(c, seat) && c.control.director().is_some_and(|d| !self.slot_blockaded_against(d, body, c.slot)));
+                    return fail(match open {
+                        Some(c) => self.move_first(body, Orbit::Slot(c.slot), "refuel", "a station fuels a Ship in its own orbit alone."),
+                        None => format!("every station that fuels you over {} is blockaded", self.tables.body(body).name),
+                    });
                 }
                 if s.fuel >= self.tables.unit(s.kind).tank {
                     return fail("the tank is full");
@@ -1245,7 +1346,7 @@ impl Game {
                 if cost.fuel <= 0 {
                     return fail("no Fuel in the Stockpile to fill it with");
                 }
-                if pending.iter().any(|o| matches!(o, Order::Transit { ship: x, .. } | Order::Refuel { ship: x } | Order::ChangeOrbit { ship: x, .. } if x == ship)) {
+                if pending.iter().any(|o| matches!(o, Order::Transit { ship: x, .. } | Order::Refuel { ship: x } | Order::Launch { ship: x, .. } | Order::Rearm { ship: x } | Order::Bombard { ship: x, .. } | Order::ChangeOrbit { ship: x, .. } if x == ship)) {
                     return fail("this Ship already has an order");
                 }
                 Ok(cost)
@@ -1277,7 +1378,7 @@ impl Game {
                 // warship and no rival working Battery standing in it.
                 let orbit = self.colony_orbit(col);
                 if !self.ship_in_orbit(s, body, orbit) {
-                    return fail(format!("a Bombard is given from {}", self.orbit_name(body, orbit)));
+                    return fail(self.move_first(body, orbit, "Bombard", "a Bombard is given from the orbit that touches its target."));
                 }
                 if orbit.is_low() {
                     if self.orbital_control(body) != Some(seat) {
@@ -1287,6 +1388,81 @@ impl Game {
                     return fail(format!("a rival still stands in {}", self.orbit_name(body, orbit)));
                 }
                 if pending.iter().any(|o| matches!(o, Order::Bombard { ship: x, .. } | Order::Transit { ship: x, .. } | Order::ChangeOrbit { ship: x, .. } if x == ship)) {
+                    return fail("this Ship already has an order");
+                }
+                Ok(cost)
+            }
+            // Ticket #343 (version 0.09.1): Launch, from a Missile Carrier carrying its Warhead and
+            // holding the orbit that touches the target outright. The gate is the Bombard's, with
+            // two differences that are the weapon's whole point: a REGION is a lawful target, and
+            // EARTH IS NOT EXCEPTED -- "no Bombard over Earth" is a Bombard's rule and does not
+            // carry over. Re-read at the Resolution, as the Bombard's is.
+            Order::Launch { ship, target } => {
+                let Some(s) = self.ship(*ship) else { return fail("no such Ship") };
+                if s.seat != seat {
+                    return fail("not your Ship");
+                }
+                if s.kind != UnitKind::MissileCarrier {
+                    return fail("only a Missile Carrier can Launch");
+                }
+                if !s.warhead {
+                    return fail("this Missile Carrier has fired its Warhead; Rearm it at a Shipyard of yours");
+                }
+                let ShipAt::Body(body) = s.at else { return fail("in transit") };
+                // The orbit that touches the target: a Colony's own ring for a station and low
+                // orbit for a Colony on the ground, and low orbit for a Region, which is Earth's
+                // ground.
+                let (at_body, orbit) = match target {
+                    Place::State(_) => (BodyId::Earth, Orbit::Low),
+                    Place::Colony(c) => {
+                        let Some(col) = self.colony(*c) else { return fail("no such Colony") };
+                        (col.body, self.colony_orbit(col))
+                    }
+                };
+                if at_body != body {
+                    return fail("that place is not at this Body");
+                }
+                match self.place_director(*target) {
+                    Some(d) if d != seat => {}
+                    _ => return fail("not a rival's place"),
+                }
+                if !self.ship_in_orbit(s, body, orbit) {
+                    return fail(self.move_first(body, orbit, "Launch", "a Launch is given from the orbit that touches its target."));
+                }
+                if orbit.is_low() {
+                    if self.orbital_control(body) != Some(seat) {
+                        return fail(format!("you do not hold Orbital Control of {} outright", self.tables.body(body).name));
+                    }
+                } else if !self.orbit_uncontested(seat, body, orbit) {
+                    return fail(format!("a rival still stands in {}", self.orbit_name(body, orbit)));
+                }
+                if pending.iter().any(|o| matches!(o, Order::Launch { ship: x, .. } | Order::Rearm { ship: x } | Order::Transit { ship: x, .. } | Order::ChangeOrbit { ship: x, .. } if x == ship)) {
+                    return fail("this Ship already has an order");
+                }
+                Ok(cost)
+            }
+            // Ticket #343 (version 0.09.1): Rearm, at a Colony or station of the seat's Faction with
+            // a working Shipyard, in that place's own orbit. It is queued as a build there.
+            Order::Rearm { ship } => {
+                let Some(s) = self.ship(*ship) else { return fail("no such Ship") };
+                if s.seat != seat {
+                    return fail("not your Ship");
+                }
+                if s.kind != UnitKind::MissileCarrier {
+                    return fail("only a Missile Carrier carries a Warhead");
+                }
+                if s.warhead {
+                    return fail("this Missile Carrier already carries its Warhead");
+                }
+                if !matches!(s.at, ShipAt::Body(_)) {
+                    return fail("in transit");
+                }
+                match self.rearm_site(seat, *ship) {
+                    RearmSite::Yard(_) => {}
+                    RearmSite::NoPlace => return fail("no place of yours in this orbit to rearm at"),
+                    RearmSite::NoShipyard => return fail("no working Shipyard here"),
+                }
+                if pending.iter().any(|o| matches!(o, Order::Launch { ship: x, .. } | Order::Rearm { ship: x } | Order::Transit { ship: x, .. } | Order::ChangeOrbit { ship: x, .. } if x == ship)) {
                     return fail("this Ship already has an order");
                 }
                 Ok(cost)
@@ -1304,15 +1480,31 @@ impl Game {
                 // 0.09.0): **the orbit it is given in** -- LOW ORBIT, which starves the ground
                 // under an outright Orbital Control, or an Orbital Slot that is not its own
                 // station's: a rival's, or an empty one held against a builder.
-                if *stance == Stance::Blockade
-                    && !self.ships.iter().any(|s| {
+                // Ticket #346 (version 0.09.1): an Intercept is a Battle opened on an arrival, so
+                // a stack with nothing in it that can pay the Battle charge catches nobody and the
+                // order is refused rather than given to no effect. This gate is NEW: the
+                // specification said Intercept had one already and it did not -- only Blockade did.
+                if *stance == Stance::Intercept
+                    && !self.ships.iter().any(|s| s.seat == seat && s.at == ShipAt::Body(*body) && !s.escaped && self.ship_holds_the_battle_bar(s))
+                {
+                    return fail(format!("no Ship of yours here holds the {} Fuel a Battle costs; a dry hull intercepts nobody", self.tables.melee.battle_fuel));
+                }
+                // Ticket #346 (version 0.09.1): and holding the Fuel bar, since a dry warship
+                // blockades nothing once the order is given. The refusal names the tank rather
+                // than the orbit where the tank is what is wrong, so the greyed button says why.
+                if *stance == Stance::Blockade {
+                    let in_place = |g: &Game, s: &Ship| {
                         s.seat == seat
                             && s.at == ShipAt::Body(*body)
                             && s.kind.is_warship()
-                            && s.slot.is_none_or(|sl| self.station_at(*body, sl).is_none_or(|c| c.control.director() != Some(seat)))
-                    })
-                {
-                    return fail("no warship of yours sits in an orbit to blockade here");
+                            && s.slot.is_none_or(|sl| g.station_at(*body, sl).is_none_or(|c| c.control.director() != Some(seat)))
+                    };
+                    if !self.ships.iter().any(|s| in_place(self, s)) {
+                        return fail("no warship of yours sits in an orbit to blockade here");
+                    }
+                    if !self.ships.iter().any(|s| in_place(self, s) && self.ship_holds_the_battle_bar(s)) {
+                        return fail(format!("no warship of yours here holds the {} Fuel a Battle costs; a dry hull blockades nothing", self.tables.melee.battle_fuel));
+                    }
                 }
                 Ok(cost)
             }
@@ -1393,12 +1585,10 @@ impl Game {
                             if self.state(*st).emigrants < *colonists {
                                 return fail(format!("only {} Pioneers are waiting there", self.state(*st).emigrants));
                             }
-                            // Ticket #335 (version 0.09.0): low orbit is what touches the ground, a
-                            // lift from a Launch Site included; a Ship at a station's ring is out
-                            // of the Launch Site's reach.
-                            if !self.ship_in_orbit(s, body, Orbit::Low) {
-                                return fail(format!("a lift from a Launch Site reaches {} alone", self.orbit_name(body, Orbit::Low)));
-                            }
+                            // Ticket #357 (version 0.09.1): a lift from a Launch Site reaches ANY
+                            // orbit of Earth, at the designer's word, where ticket #335 held it to
+                            // low orbit. A place with no Launch Site -- a Colony on the ground --
+                            // is still reached from low orbit alone, below.
                         }
                         LoadSource::Colony(c) => {
                             let Some(col) = self.colony(*c) else { return fail("no such Colony") };
@@ -1408,7 +1598,7 @@ impl Game {
                             // Ticket #335 (version 0.09.0): a place is touched from its own orbit,
                             // taking people off it as much as putting them on.
                             if !self.ship_may_touch(s, col) {
-                                return fail(format!("{} is reached from {}", self.place_name(Place::Colony(*c)), self.orbit_name(body, self.colony_orbit(col))));
+                                return fail(self.move_first(body, self.colony_orbit(col), "load", &format!("{} is reached from there alone.", self.place_name(Place::Colony(*c)))));
                             }
                             if col.colonists < *colonists {
                                 return fail("not enough Colonists there");
@@ -1442,15 +1632,20 @@ impl Game {
                         return fail("a Colony's Army never leaves");
                     }
                     // Ticket #335 (version 0.09.0): and the Ship is in the orbit that touches the
-                    // Army's place -- low orbit for a Region or a Colony on the ground, a station's
-                    // own orbit for an Army aboard that station.
-                    let here = match a.at {
-                        ArmyAt::Place(Place::State(_)) => body == BodyId::Earth && self.ship_in_orbit(s, body, Orbit::Low),
-                        ArmyAt::Place(Place::Colony(c)) => self.colony(c).map(|c| c.body == body && self.ship_may_touch(s, c)).unwrap_or(false),
-                        ArmyAt::Aboard(_) => false,
-                    };
-                    if !here {
-                        return fail("that Army is not at this Body, or not in this Ship's orbit");
+                    // Army's place -- low orbit for a Colony on the ground, a station's own orbit
+                    // for an Army aboard that station. Ticket #357 (version 0.09.1): a Region lifts
+                    // by its Launch Site into ANY orbit of Earth; and the refusal is split, so the
+                    // move is offered only where the Army is at this Body and a move would reach it.
+                    match a.at {
+                        ArmyAt::Place(Place::State(_)) if body == BodyId::Earth => {}
+                        ArmyAt::Place(Place::Colony(c)) if self.colony(c).is_some_and(|c| c.body == body) => {
+                            let col = self.colony(c).unwrap();
+                            if !self.ship_may_touch(s, col) {
+                                return fail(self.move_first(body, self.colony_orbit(col), "load", &format!("{} is reached from there alone.", self.place_name(Place::Colony(c)))));
+                            }
+                        }
+                        ArmyAt::Aboard(_) => return fail("that Army is aboard a Ship"),
+                        _ => return fail("that Army is not at this Body"),
                     }
                 }
                 Ok(cost)
@@ -1481,7 +1676,7 @@ impl Game {
                         // Ticket #335 (version 0.09.0): founding a Colony is touching the ground,
                         // and low orbit is what touches the ground.
                         if !self.ship_in_orbit(s, body, Orbit::Low) {
-                            return fail(format!("a Colony is founded from {}", self.orbit_name(body, Orbit::Low)));
+                            return fail(self.move_first(body, Orbit::Low, "found the Colony", "a Colony is founded from low orbit alone."));
                         }
                         if s.kind != UnitKind::ColonyShip || *colonists == 0 {
                             return fail("only a Colony Ship with Colonists founds a Colony");
@@ -1502,7 +1697,7 @@ impl Game {
                         // Ticket #335 (version 0.09.0): a station is unloaded into from its own
                         // orbit, a Colony on the ground from low orbit.
                         if !self.ship_may_touch(s, col) {
-                            return fail(format!("{} is reached from {}", self.place_name(Place::Colony(*c)), self.orbit_name(body, self.colony_orbit(col))));
+                            return fail(self.move_first(body, self.colony_orbit(col), "unload", &format!("{} is reached from there alone.", self.place_name(Place::Colony(*c)))));
                         }
                         if *colonists > 0 {
                             if col.control.director() != Some(seat) {
@@ -1664,9 +1859,16 @@ impl Game {
                     return fail("a rival warship blockades that station's slot");
                 }
                 let bound: u32 = pending.iter().map(|o| if let Order::LiftToStation { colony: c, n, .. } = o { if c == colony { *n } else { 0 } } else { 0 }).sum();
+                // Ticket #353 (version 0.09.1): **a lift FILLS AS FAR AS THE ROOM GOES**, which is
+                // what the headless driver's own help has promised since #141 -- "as far as its
+                // Habitat room goes". The order refused outright instead. The graphical client
+                // pre-clamps its button, so the lie was only ever reachable from the driver, which
+                // is where a playtester met it. The Resolution does the clamping; only an order that
+                // would move NOBODY is refused, since that is not an order, and the refusal names
+                // the room it found.
                 let room = self.habitat_room(col).saturating_sub(col.colonists).saturating_sub(bound);
-                if *n > room {
-                    return fail(format!("{} has Habitat room for {room} more", self.place_name(Place::Colony(*colony))));
+                if room == 0 {
+                    return fail(format!("{} has Habitat room for nobody more", self.place_name(Place::Colony(*colony))));
                 }
                 Ok(cost)
             }
@@ -1935,6 +2137,18 @@ impl Game {
                 Order::Repair { unit, points } => self.pending.repairs.push((seat, *unit, *points)),
                 // Ticket #328 (version 0.08.8): resolved after the orbital Battles.
                 Order::Bombard { ship, colony } => self.pending.bombards.push((seat, *ship, *colony)),
+                // Ticket #343 (version 0.09.1): resolved after the orbital Battles, beside the Bombards.
+                Order::Launch { ship, target } => self.pending.launches.push((seat, *ship, *target)),
+                // Ticket #343: the Warhead is a build in the yard's queue, so it takes the yard's
+                // Widgets in queue order like anything else and lands at the Resolution they reach it.
+                Order::Rearm { ship } => {
+                    if let RearmSite::Yard(c) = self.rearm_site(seat, *ship) {
+                        let widgets = self.build_widgets(seat, BuildItem::Warhead(*ship));
+                        if let Some(col) = self.colony_mut(c) {
+                            col.queue.push(Build { item: BuildItem::Warhead(*ship), seat, widgets, done: 0, coastal: false });
+                        }
+                    }
+                }
                 Order::Transit { ship, to, slot } => {
                     let from = match self.ship(*ship).map(|s| s.at) {
                         Some(ShipAt::Body(b)) => b,
@@ -2148,17 +2362,42 @@ impl Game {
                 // Ticket #141 (version 0.07.3): Emigrants lift straight to the seat's station over
                 // Earth. A launch, as a lift onto a Ship is; they are aboard at this Resolution.
                 Order::LiftToStation { state, n, colony } => {
+                    // Ticket #353 (version 0.09.1): **as far as the room goes.** The order is no
+                    // longer refused for asking for more seats than the Habitats hold; the ones who
+                    // do not fit never leave the Region and are still waiting there next turn, and
+                    // every figure below -- the launch, the Spaceport's fee, the log and the Report
+                    // line -- reads the number that actually flew.
+                    let room = self.colony(*colony).map(|c| self.habitat_room(c).saturating_sub(c.colonists)).unwrap_or(0);
+                    // Ticket #353 (version 0.09.1): what was ASKED for, kept before the clamp
+                    // shadows it, so the line below can say how many were left standing.
+                    let asked = *n;
+                    let n = asked.min(room);
+                    if n == 0 {
+                        continue;
+                    }
                     // Ticket #189 (version 0.08.0): a lift carries their schooling to the station.
-                    let taught = self.take_emigrants(*state, *n);
+                    let taught = self.take_emigrants(*state, n);
                     self.climate.launches_pending[seat.index()] += 1;
                     // Ticket #183 (version 0.08.0): a Spaceport earns for every Emigrant it lifts.
-                    self.pay_spaceport(seat, *state, *n);
-                    self.settle_people(*colony, *n, taught);
+                    self.pay_spaceport(seat, *state, n);
+                    self.settle_people(*colony, n, taught);
                     let station = self.place_name(Place::Colony(*colony));
                     let line = format!("{} Pioneers lifted from {} to {}, for the {}.", n, self.tables.state(*state).name, station, self.seat_name(seat));
                     self.log(line);
-                    let text = self.say("emigrants_lifted", &[("n", n.to_string()), ("state", self.tables.state(*state).name.clone()), ("station", station)]);
+                    let text = self.say("emigrants_lifted", &[("n", n.to_string()), ("state", self.tables.state(*state).name.clone()), ("station", station.clone())]);
                     self.report_line_of(seat, LineKind::YourWorks, LineKind::Note, Some(ReportPlace::Colony(*colony)), text);
+                    // Ticket #353 (version 0.09.1): and WHO STAYED. A lift fills as far as the
+                    // station's Habitat room goes now, where it refused the whole order before, so
+                    // it can move fewer people than it asked for -- and the ones left behind are
+                    // standing in their Region with nothing anywhere saying why. That silence is
+                    // the same one this ticket set out to end for a partial unload, one step
+                    // earlier in the journey. At the designer's word, asked whether a clamped lift
+                    // should say who stayed: "yes".
+                    let left = asked.saturating_sub(n);
+                    if left > 0 {
+                        let text = self.say("emigrants_stayed", &[("n", left.to_string()), ("state", self.tables.state(*state).name.clone()), ("station", station)]);
+                        self.report_line_of(seat, LineKind::YourWorks, LineKind::Note, Some(ReportPlace::State(*state)), text);
+                    }
                 }
                 // Ticket #72: the Fund's orders land now; the share is read at the next Income.
                 Order::SetVentureShare { share } => {
@@ -2409,7 +2648,9 @@ impl Game {
     /// Ticket #58: one clause saying what a rival Faction did with one order it committed. Only
     /// what the board or its cards would show: nothing the AI scored, waited for or skipped. `None`
     /// for an order that leaves no visible mark.
-    pub fn rival_deed(&self, _seat: Seat, order: &Order) -> Option<String> {
+    /// Ticket #353 (version 0.09.1): `seat` is read now. The Research Directive's clause depends on
+    /// which Faction gave it, because each of the four spends it somewhere else.
+    pub fn rival_deed(&self, seat: Seat, order: &Order) -> Option<String> {
         let r = |key: &str, args: &[(&str, String)]| Some(self.tables.report.rival(key, args));
         let place = |p: Place| self.place_name(p);
         let building = |b: BuildingRef| -> String {
@@ -2465,7 +2706,25 @@ impl Game {
             }
             Order::BuildArchive { colony } => r("build_archive", &[("colony", place(Place::Colony(*colony)))]),
             Order::Upload { colony, n } => r("upload", &[("n", n.to_string()), ("colony", place(Place::Colony(*colony)))]),
-            Order::SetResearchDirective { percent } => r(if *percent == 0 { "unfund_archive" } else { "fund_archive" }, &[]),
+            // Ticket #353 (version 0.09.1): the Directive NAMES WHAT IT BOUGHT. One clause said "set
+            // its Labs to pay the Archive fund" of all four Factions, and only the Archivists have an
+            // Archive fund: a Custodian's Directive feeds the Natural Sink, a Prospector's their
+            // coffers and an Arkwright's propellant, which is what `spend_research_directive` does
+            // with it and what the Report line for each has said since #235. Nought is the shared
+            // Tech for every Faction alike, so that clause stays one clause.
+            Order::SetResearchDirective { percent } => r(
+                if *percent == 0 {
+                    "unfund_archive"
+                } else {
+                    match self.kind(seat) {
+                        FactionKind::Archivists => "fund_archive",
+                        FactionKind::Custodians => "directive_sink_order",
+                        FactionKind::Prospectors => "directive_ducats_order",
+                        FactionKind::Arkwrights => "directive_fuel_order",
+                    }
+                },
+                &[],
+            ),
             Order::SetMaxStanding { target } => match target {
                 Some(p) => r("max_on", &[("place", place(*p))]),
                 None => r("max_off", &[]),
@@ -2492,6 +2751,9 @@ impl Game {
             Order::ShipStance { stance: Stance::Hold, .. } | Order::ArmyStance { stance: Stance::Hold, .. } => None,
             // Ticket #328 (version 0.08.8).
             Order::Bombard { colony, .. } => r("bombard", &[("colony", place(Place::Colony(*colony)))]),
+            // Ticket #343 (version 0.09.1).
+            Order::Launch { target, .. } => r("launch", &[("place", place(*target))]),
+            Order::Rearm { .. } => r("rearm", &[]),
             Order::ShipStance { body, stance } => {
                 r("ship_stance", &[("body", self.tables.body(*body).name.clone()), ("stance", stance.name().to_string())])
             }

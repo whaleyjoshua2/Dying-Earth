@@ -70,6 +70,10 @@ pub struct SimResult {
     /// Ticket #54: the world's net Emissions at the Climate phase of turn 12, and at the last turn.
     pub net_at_twelve: Option<f64>,
     pub net_at_end: f64,
+    /// Ticket #343 (version 0.09.1): the Natural Sink at the end of the game. Worth reading now
+    /// that two rules move it -- a nuke on Earth raises it for good, and the Sink Weakens
+    /// SUBTRACTS instead of assigning, so what raised it is no longer erased.
+    pub natural_sink_end: f64,
     /// Ticket #55: the turn each Break fired, by index into `climate.toml`'s list, None if it never
     /// did; and the Last Turn the Climate Panel showed at turn 1 and at turn 12.
     pub break_turns: Vec<Option<u32>>,
@@ -114,6 +118,10 @@ pub struct SimResult {
     /// Ticket #57: the turn the first Colony in the Mars system was founded, and the turn the Mars
     /// launch window falls on, which the ephemeris fixes and no seed moves.
     pub first_mars_colony_turn: Option<u32>,
+    /// Ticket #345 (version 0.09.1): every Body settled first in this game -- the Body, the
+    /// FACTION that took it (never the seat: seat 0 rotates between Factions across seatings) and
+    /// the turn its Colony was founded.
+    pub firsts: Vec<(BodyId, FactionKind, u32)>,
     pub window_turn: u32,
     /// Ticket #68: the turn the Archive Module first stood, the turn the Archive was complete, and
     /// the Archivists' fund at the end.
@@ -483,6 +491,7 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
     let leapfrogs = game.log.iter().filter(|l| l.contains(" Leapfrogged ")).count() as u32;
     let strip_permits = game.log.iter().filter(|l| l.contains(" issued a Strip Permit in ")).count() as u32;
     let net_at_end = game.climate.last.net();
+    let natural_sink_end = game.climate.natural_sink;
     // Ticket #60: the Techs the world finished and the highest rung it reached.
     let techs_completed = game.research.done.len() as u32;
     // Ticket #227 (version 0.08.2): the six figures above, read off the finished board.
@@ -599,6 +608,7 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         longest_stabilization,
         net_at_twelve,
         net_at_end,
+        natural_sink_end,
         break_turns,
         last_turn_at_one,
         last_turn_at_twelve,
@@ -629,6 +639,11 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         antarctica_turn,
         antarctic_colonies,
         first_mars_colony_turn,
+        firsts: game
+            .body_firsts
+            .iter()
+            .map(|f| (f.body, game.kind(f.seat), game.colony(f.colony).map(|c| c.founded_turn).unwrap_or(0)))
+            .collect(),
         window_turn,
         archive_built_turn,
         archive_complete_turn,
