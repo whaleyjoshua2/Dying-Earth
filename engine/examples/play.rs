@@ -694,9 +694,9 @@ fn print_question(g: &Game) {
     println!("\n=== THE TURN'S QUESTION: {} ===", card.name);
     println!("{}", c.question);
     // Ticket #375 (version 0.09.2): a card that holds a Ship names the one it would hold.
-    if c.take_does.iter().any(|e| matches!(e, CardEffect::HoldOneShip)) {
+    if c.holds_a_ship() {
         match g.card_would_hold(me).and_then(|id| g.ship(id)) {
-            Some(s) => println!("  The Ship it would hold: {} ({}).", g.ship_name(s), ship_at_text(g, s)),
+            Some(s) => println!("  The Ship it would hold: {} ({}); it stays there this turn.", g.ship_name(s), ship_at_text(g, s)),
             None => println!("  No Ship of yours is docked to answer it; a Ship in flight cannot."),
         }
     }
@@ -1246,7 +1246,7 @@ fn print_board(g: &Game) {
         if sh.seat == me {
             let dry: Vec<String> = BodyId::ALL
                 .into_iter()
-                .filter_map(|to| g.arrival_leaves_stranded(me, sh.id, to).map(|left| format!("{} ({left} Fuel left, no station of yours)", to.name())))
+                .filter_map(|to| g.arrival_leaves_stranded(me, sh.id, to, None).map(|left| format!("{} ({left} Fuel left, no station of yours in low orbit)", to.name())))
                 .collect();
             if !dry.is_empty() {
                 println!("         would arrive stranded at: {}", dry.join("; "));

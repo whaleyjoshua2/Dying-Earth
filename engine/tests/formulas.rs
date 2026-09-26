@@ -15061,7 +15061,7 @@ fn a_turn_whose_loudest_line_is_a_card_answer_still_opens_with_a_headline() {
     // The engine files them there itself: every seat's answer, and the question that was asked.
     let card = EventId::ALL.into_iter().find(|id| g.tables.event(*id).asks()).expect("a card that asks");
     g.report.lines.clear();
-    g.question = Some(Question { card, answers: [Some(CardAnswer::Refused); SEAT_COUNT] });
+    g.question = Some(Question { card, answers: [Some(CardAnswer::Refused); SEAT_COUNT], held: [None; SEAT_COUNT] });
     g.apply_card_answers();
     assert_eq!(g.report.lines.len(), SEAT_COUNT, "four answers: {:?}", g.report.lines.iter().map(|l| &l.text).collect::<Vec<_>>());
     for l in &g.report.lines {
@@ -15443,7 +15443,14 @@ fn a_distress_call_holds_a_docked_ship_and_names_it() {
     assert_eq!(g.card_would_hold(Seat(0)), Some(docked), "the docked Ship, though the one in flight is fuller");
     assert!(g.may_take_card(Seat(0)));
     g.answer_card(Seat(0), true).expect("taken");
-    assert_eq!(g.card_holds_one_ship(Seat(0)), Some(docked));
+    assert_eq!(g.card_holds_one_ship(Seat(0)), Some(docked), "pinned at the answer");
+    // Answering costs the hull its turn: the held Ship cannot be ordered away, and the pin holds
+    // whatever is ordered after (the review found the pick recomputed at Resolution, so a hull
+    // ordered to fly slipped the hold and it fell on another, unnamed).
+    let away = g.check_order(Seat(0), &[], &Order::Transit { ship: docked, to: BodyId::Moon, slot: None }).expect_err("held");
+    assert!(away.0.contains("held this turn, answering the Distress Call"), "{}", away.0);
+    let shift = g.check_order(Seat(0), &[], &Order::ChangeOrbit { ship: docked, slot: Some(0) }).expect_err("held");
+    assert!(shift.0.contains("held this turn"), "{}", shift.0);
     g.resolution_phase();
     assert_eq!(g.ship(flying).map(|s| s.at), Some(ShipAt::Transit { from: BodyId::Earth, to: BodyId::Moon, turns_left: 1 }), "the flight went on");
     let line = g.report.lines.iter().find(|l| l.text.contains("held at")).map(|l| l.text.clone()).expect("the Report names the held Ship");
@@ -15472,14 +15479,18 @@ fn a_leg_that_would_strand_the_ship_at_the_far_end_is_named() {
     let (_, fuel) = g.transit_cost_for(Seat(0), BodyId::Earth, BodyId::Mars);
     // Just enough for the leg and nothing after it: stranded on arrival, no station of ours at Mars.
     g.ships.iter_mut().find(|s| s.id == ship).unwrap().fuel = fuel;
-    assert_eq!(g.arrival_leaves_stranded(Seat(0), ship, BodyId::Mars), Some(0), "arrives with nought and no way out");
+    assert_eq!(g.arrival_leaves_stranded(Seat(0), ship, BodyId::Mars, None), Some(0), "arrives with nought and no way out");
     // A station of ours at Mars rescues it.
     let id = ColonyId(g.fresh_id());
     g.colonies.push(Colony { id, body: BodyId::Mars, slot: 0, control: Control::Controlled(Seat(0)), modules: vec![Module::new(ModuleKind::Core)], colonists: 0, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
-    assert_eq!(g.arrival_leaves_stranded(Seat(0), ship, BodyId::Mars), None, "a station of ours there refuels it");
+    // Into that station's own orbit it refuels on arrival; into low orbit with nought in the tank
+    // it cannot pay the orbit change to reach it, so it is stranded in sight of a station, as
+    // `stranded` has it.
+    assert_eq!(g.arrival_leaves_stranded(Seat(0), ship, BodyId::Mars, Some(0)), None, "a station of ours in that orbit refuels it");
+    assert_eq!(g.arrival_leaves_stranded(Seat(0), ship, BodyId::Mars, None), Some(0), "in low orbit with nought, the station is out of reach");
     // A tank that cannot pay the leg at all is the check's business, not this warning's.
     g.ships.iter_mut().find(|s| s.id == ship).unwrap().fuel = 0;
-    assert_eq!(g.arrival_leaves_stranded(Seat(0), ship, BodyId::Moon), None);
+    assert_eq!(g.arrival_leaves_stranded(Seat(0), ship, BodyId::Moon, None), None);
 }
 
 /// Ticket #373 (version 0.09.2): **the Colonists aboard a seat's Ships ride the Victory progress as

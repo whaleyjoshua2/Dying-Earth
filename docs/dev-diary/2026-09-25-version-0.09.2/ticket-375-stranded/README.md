@@ -54,7 +54,8 @@ warning, since Phobos and Deimos are two Fuel away and a Frigate that reaches th
 ![The Distress Call modal: "The Ship it would hold: TSV Valiant, at Mars."](call-earth.png)
 
 `shot:call card:distress_call panel:0`. **The Distress Call.** Under the question, *"The Ship it would
-hold: TSV Valiant, at Mars."*, before either side is chosen.
+hold: TSV Valiant, at Mars; it stays there this turn."*, before either side is chosen. (Re-taken
+after the review, which added the last clause.)
 
 ## The sweep
 
@@ -62,6 +63,24 @@ The Distress Call's pick is a rule the computer plays to, so the sweep was run:
 [`../sweeps/after-375.txt`](../sweeps/after-375.txt), 20 seeds x four seatings at the shipped cell:
 **7 / 24 / 1 / 4, collapses 44 of 80**, the same as after #366. The computer takes the card only when
 nothing of its own is in transit, so a docked Ship was always the one held for it.
+
+## The review
+
+Two axes, run as sub-agents over the commit.
+
+**Spec found a real hole.** With the pick docked-only, the hold cost nothing: the only thing it ever
+did was freeze a Ship in flight, and a docked held Ship could be ordered away the same turn, whereupon
+the pick, recomputed at Resolution, fell on another hull the modal never named. **Fixed**: the held
+Ship is pinned at the answer (`Question::held`), a Transit or change of orbit for it is refused that
+turn (*"held this turn, answering the Distress Call"*), the modal and the driver say it stays, and the
+test orders it away and is refused.
+
+**Standards**: two more, both taken. The warning's "cheapest leg out" was re-derived beside the
+older `cheapest_leg_from`, and only the new copy skipped legs that cannot be flown; one function
+now, with the filter, and the older `stranded` reads it too. And the warning ignored a station in
+another orbit of the far Body that the tank could still reach, where `stranded` allows for it; the
+warning takes the landing orbit now and applies the same rule, tested both ways. The card's
+"holds a Ship" test is one method on the card, read by the engine, the driver and the modal.
 
 ## The gate
 

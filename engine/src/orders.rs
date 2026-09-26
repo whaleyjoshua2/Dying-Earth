@@ -1274,6 +1274,11 @@ impl Game {
                 if s.seat != seat {
                     return fail("not your Ship");
                 }
+                // Ticket #375 (version 0.09.2): the hull a taken Distress Call turned aside stays
+                // this turn, which is what answering costs.
+                if self.card_holds_one_ship(seat) == Some(*ship) {
+                    return fail("held this turn, answering the Distress Call");
+                }
                 let ShipAt::Body(from) = s.at else { return fail("already in transit") };
                 if from == *to {
                     return fail("already there");
@@ -1308,6 +1313,10 @@ impl Game {
                 let Some(s) = self.ship(*ship) else { return fail("no such Ship") };
                 if s.seat != seat {
                     return fail("not your Ship");
+                }
+                // Ticket #375 (version 0.09.2): as a Transit, the held hull stays this turn.
+                if self.card_holds_one_ship(seat) == Some(*ship) {
+                    return fail("held this turn, answering the Distress Call");
                 }
                 let ShipAt::Body(body) = s.at else { return fail("a Ship in transit is between orbits") };
                 let want = Orbit::of(*slot);

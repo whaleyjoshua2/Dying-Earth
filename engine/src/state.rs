@@ -805,6 +805,10 @@ impl CardAnswer {
 pub struct Question {
     pub card: EventId,
     pub answers: [Option<CardAnswer>; SEAT_COUNT],
+    /// Ticket #375 (version 0.09.2): the Ship each seat's answer turned aside to answer a call,
+    /// pinned at the answer so the one the card named is the one held, whatever is ordered after.
+    #[serde(default)]
+    pub held: [Option<ShipId>; SEAT_COUNT],
 }
 
 impl Question {
@@ -2140,7 +2144,14 @@ impl Game {
 
     /// Ticket #87: the cheapest leg a seat's Ship can fly from this Body today, in Fuel.
     pub fn cheapest_leg_from(&self, seat: Seat, body: BodyId) -> Option<i64> {
-        BodyId::ALL.into_iter().filter(|b| *b != body).map(|b| self.transit_cost_for(seat, body, b).1).min()
+        self.cheapest_leg_from_at(seat, body, self.turn)
+    }
+
+    /// Ticket #375 (version 0.09.2): the same on a given turn, and only over legs that can be flown
+    /// at all -- the one rule for both, where `cheapest_leg_from` priced a Venus-to-Phobos leg no
+    /// Ship can take.
+    pub fn cheapest_leg_from_at(&self, seat: Seat, body: BodyId, turn: u32) -> Option<i64> {
+        BodyId::ALL.into_iter().filter(|b| *b != body && Self::leg_allowed(body, *b)).map(|b| self.transit_cost_for_at(seat, body, b, turn).1).min()
     }
 
     /// Ticket #87: a Ship at a Body whose tank cannot pay any leg from there, with no station of
@@ -2167,16 +2178,23 @@ impl Game {
     /// arrival -- the tank after the leg under the cheapest leg out of the far Body, priced for the
     /// turn it lands, and no station there of its own or of a Refuel partner's -- and if so, what
     /// the tank would hold. A warning's figure, never a refusal's: a one-way trip can be the plan.
-    pub fn arrival_leaves_stranded(&self, seat: Seat, ship: ShipId, to: BodyId) -> Option<i64> {
+    ///
+    /// The station test is `stranded`'s: a station that fuels for the seat in the orbit the leg
+    /// ends in rescues it outright; one in another orbit of the far Body only while the tank left
+    /// can still pay the orbit change that would reach it.
+    pub fn arrival_leaves_stranded(&self, seat: Seat, ship: ShipId, to: BodyId, slot: Option<u32>) -> Option<i64> {
         let s = self.ship(ship)?;
         let ShipAt::Body(from) = s.at else { return None };
         let (turns, fuel) = self.transit_cost_for(seat, from, to);
         let left = s.fuel - fuel;
-        if left < 0 || self.refuel_station_at(seat, to) {
+        if left < 0 {
             return None;
         }
-        let arrives = self.turn + turns;
-        let cheapest = BodyId::ALL.into_iter().filter(|b| *b != to && Self::leg_allowed(to, *b)).map(|b| self.transit_cost_for_at(seat, to, b, arrives).1).min()?;
+        let station_in_orbit = slot.is_some_and(|sl| self.station_at(to, sl).is_some_and(|c| self.fuels_for(c, seat)));
+        if station_in_orbit || (self.refuel_station_at(seat, to) && left >= self.tables.orbit_change_fuel) {
+            return None;
+        }
+        let cheapest = self.cheapest_leg_from_at(seat, to, self.turn + turns)?;
         if left < cheapest { Some(left) } else { None }
     }
 

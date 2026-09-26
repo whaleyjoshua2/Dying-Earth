@@ -386,6 +386,14 @@ impl EventCard {
 /// with its own figures in this table. They are rows instead: a side is a LIST of effects, an
 /// effect is a tagged entry carrying its own figures, and the engine holds one mechanism rather
 /// than eighteen. Nothing here is a code literal -- every figure the cards move is a field below.
+impl ChoiceCard {
+    /// Ticket #375 (version 0.09.2): whether taking this card turns a Ship aside -- the one test
+    /// the engine, the driver and the modal all ask.
+    pub fn holds_a_ship(&self) -> bool {
+        self.take_does.iter().any(|e| matches!(e, CardEffect::HoldOneShip))
+    }
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct ChoiceCard {
     /// What the modal asks.

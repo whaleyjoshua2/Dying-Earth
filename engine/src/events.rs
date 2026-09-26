@@ -98,7 +98,7 @@ impl Game {
             return;
         }
         self.draw = CardDraw::Choice(id);
-        let mut q = Question { card: id, answers: [None; SEAT_COUNT] };
+        let mut q = Question { card: id, answers: [None; SEAT_COUNT], held: [None; SEAT_COUNT] };
         for seat in Seat::ALL {
             // A seat the card cannot touch is NOT asked: its answer is recorded as nothing to
             // decide, it never holds the turn, and the Report says so for it.
@@ -148,8 +148,11 @@ impl Game {
             return Err(format!("The {} cannot take {name}: {why}; they may only refuse.", self.seat_name(seat)));
         }
         let answer = if taken { CardAnswer::Taken } else { CardAnswer::Refused };
+        // Ticket #375 (version 0.09.2): the Ship a taken call turns aside, pinned now.
+        let held = if taken && self.tables.event(q.card).choice.as_ref().is_some_and(|c| c.holds_a_ship()) { self.card_would_hold(seat) } else { None };
         if let Some(q) = self.question.as_mut() {
             q.answers[seat.index()] = Some(answer);
+            q.held[seat.index()] = held;
         }
         if taken {
             self.choice_taken[seat.index()] += 1;
@@ -389,22 +392,19 @@ impl Game {
     }
 
     /// Ticket #337: the one Ship this seat turned aside to answer a call, and so holds this turn.
-    ///
-    /// **An implementation choice, not the designer's, named here for correction**: it is the
-    /// seat's Ship with the most Fuel in its tank, ties to the lower id, so the pick is
-    /// deterministic and a seeded game is not moved by it.
+    /// Ticket #375 (version 0.09.2): pinned at the answer (`Question::held`), so the Ship the card
+    /// named is the one held whatever is ordered after; `check_order` refuses its moves this turn,
+    /// which is what "answering costs you a hull for the turn" means for a docked hull.
     pub fn card_holds_one_ship(&self, seat: Seat) -> Option<ShipId> {
-        if !self.card_effects(seat).iter().any(|e| matches!(e, CardEffect::HoldOneShip)) {
-            return None;
-        }
-        self.card_would_hold(seat)
+        self.question.as_ref().and_then(|q| q.held[seat.index()])
     }
 
     /// Ticket #375 (version 0.09.2): the Ship a Distress Call WOULD hold for this seat, answered or
     /// not, so the card can name it before the answer: **a docked Ship only**, at the designer's
     /// word -- a crew mid-transit is in no place to answer a call, and a hull frozen in flight was
-    /// the playtest's silent stranding. Of the docked, the fullest tank, ties to the lower id, so a
-    /// seeded game is not moved by the pick. With none docked the take side is closed.
+    /// the playtest's silent stranding. With none docked the take side is closed. Which docked hull
+    /// is an implementation choice, not the designer's, named here for correction: the fullest
+    /// tank, ties to the lower id, so a seeded game is not moved by the pick.
     pub fn card_would_hold(&self, seat: Seat) -> Option<ShipId> {
         self.ships
             .iter()

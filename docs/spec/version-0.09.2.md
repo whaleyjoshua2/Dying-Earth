@@ -184,7 +184,9 @@ leg out of the far Body, priced for the turn it lands, and no station of the Fac
 partner's stands there. **A warning, never a refusal**: a one-way trip can be the plan.
 
 **The Distress Call holds a docked Ship only**, the fullest tank among them; a Ship in flight is never
-held. With every hull in flight the take side is closed and says why (*"you have no Ship docked to
+held. **The held Ship is pinned at the answer and stays where it is that turn**: a Transit or a change
+of orbit for it is refused, *"held this turn, answering the Distress Call"*, which is what answering
+costs. With every hull in flight the take side is closed and says why (*"you have no Ship docked to
 answer it"*); a Faction with no Ship at all is not asked, as before. **The card names the Ship it
 would hold before the answer**, in the modal and the driver, and **the Report names the Ship held**:
 *"Custodians CSV Valiant held at Earth this turn, answering the call."*

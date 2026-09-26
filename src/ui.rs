@@ -7519,7 +7519,7 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
                     cost_button(ui, game, &session.pending, Order::Transit { ship: s.id, to, slot: orbit.slot() }, &format!("{} ({}/{} in the tank)", game.ship_name(s), s.fuel, game.tables.unit(s.kind).tank), actions);
                     // Ticket #375 (version 0.09.2): a warning, never a refusal, where the leg
                     // would leave the hull stranded at the far end -- a one-way trip can be the plan.
-                    if let Some(left) = game.arrival_leaves_stranded(Seat(0), s.id, to) {
+                    if let Some(left) = game.arrival_leaves_stranded(Seat(0), s.id, to, orbit.slot()) {
                         ui.colored_label(Color32::from_rgb(230, 170, 90), format!("arrives with {left} Fuel and no station of yours at {}", game.tables.body(to).name));
                     }
                 }
@@ -10012,10 +10012,10 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 // Ticket #375 (version 0.09.2): a card that holds a Ship names the one it would hold
                 // BEFORE the answer, where the modal said only "one Ship of yours holds this turn"
                 // and the playtest's only Ship froze mid-transit without a word.
-                if choice.take_does.iter().any(|e| matches!(e, CardEffect::HoldOneShip)) {
-                    let held = match game.card_would_hold(Seat(0)).and_then(|id| game.ship(id)) {
-                        Some(s) => format!("The Ship it would hold: {}, at {}.", game.ship_name(s), game.tables.body(match s.at { ShipAt::Body(b) => b, _ => BodyId::Earth }).name),
-                        None => "No Ship of yours is docked to answer it; a Ship in flight cannot.".to_string(),
+                if choice.holds_a_ship() {
+                    let held = match game.card_would_hold(Seat(0)).and_then(|id| game.ship(id)).map(|s| (s, s.at)) {
+                        Some((s, ShipAt::Body(b))) => format!("The Ship it would hold: {}, at {}; it stays there this turn.", game.ship_name(s), game.tables.body(b).name),
+                        _ => "No Ship of yours is docked to answer it; a Ship in flight cannot.".to_string(),
                     };
                     ui.label(RichText::new(held).weak());
                 }
