@@ -2987,6 +2987,14 @@ impl Game {
     }
 
     /// Colonists living in Habitats off Earth, for one seat (spec 15).
+    /// Ticket #373 (version 0.09.2): the seat's Colonists still aboard its Ships, anywhere -- in
+    /// transit, in any orbit, a Ship loaded and sitting over Earth included -- at the designer's
+    /// word. They count toward no Victory bar; the Victory window draws them as a band beyond the
+    /// settled fill, so a player sees what is on its way.
+    pub fn colonists_aboard(&self, seat: Seat) -> u32 {
+        self.ships.iter().filter(|s| s.seat == seat).map(|s| s.colonists).sum()
+    }
+
     pub fn off_world_colonists(&self, seat: Seat) -> u32 {
         // Ticket #44: Colonists in Antarctica live on Earth. Ticket #81: those on a station over
         // Earth do not.

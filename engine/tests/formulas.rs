@@ -15426,6 +15426,39 @@ fn no_card_of_either_kind_is_drawn_on_the_first_turn_and_the_deck_is_untouched()
     assert!((10..=50).contains(&drew), "turn {}: {drew} of 60 seeds drew, which is not a coin", t.events.first_draw_turn);
 }
 
+/// Ticket #373 (version 0.09.2): **the Colonists aboard a seat's Ships ride the Victory progress as
+/// a figure of their own**, for the parts that count Colonists off Earth and no other, and count
+/// toward nothing -- the fraction, the bar and the win are untouched by them.
+#[test]
+fn colonists_aboard_ride_the_victory_progress_as_transit_and_count_toward_nothing() {
+    // The Custodians: the second part counts Colonists off Earth (twelve), the first does not.
+    let mut g = fresh();
+    let before = g.progress(Seat(0));
+    assert_eq!((before.first_transit, before.second_transit), (0, 0), "nothing aboard at the start");
+    // A Colony Ship over Earth with four aboard, and another in transit to the Moon: eight aboard,
+    // wherever they are.
+    let (_, _) = colony_ship_ready(&mut g, BodyId::Earth);
+    let (flying, _) = colony_ship_ready(&mut g, BodyId::Moon);
+    g.ships.iter_mut().find(|s| s.id == flying).unwrap().at = ShipAt::Transit { from: BodyId::Earth, to: BodyId::Moon, turns_left: 2 };
+    assert_eq!(g.colonists_aboard(Seat(0)), 8);
+    let p = g.progress(Seat(0));
+    assert_eq!(p.first_transit, 0, "the Stabilization run counts no Colonists");
+    assert_eq!(p.second_transit, 8, "Off-world Presence does");
+    assert_eq!(p.second_value, before.second_value, "and they count toward nothing");
+    assert_eq!(p.second_fraction(), before.second_fraction());
+    assert!(p.second_transit_fraction() > 0.0, "the band has width");
+    assert!((p.second_fraction() + p.second_transit_fraction() - ((p.second_value + 8.0) / p.second_bar).min(1.0)).abs() < 1e-9, "fill and band together reach settled plus aboard, clipped at the bar");
+    assert!(!p.met(), "nobody aboard wins anything");
+    // A rival's Ships are the rival's.
+    assert_eq!(g.colonists_aboard(Seat(1)), 0);
+    // The Arkwrights: the first part counts Colonists off Earth (thirty); the second, Bodies with
+    // Colonists on them, carries no band, a Ship in flight having no one Body to count toward.
+    let mut g = Game::new(tables(), NewGame { seed: 7, player: FactionKind::Arkwrights, player_is_ai: false, player_start: StateId::EastAsia });
+    let (_, _) = colony_ship_ready(&mut g, BodyId::Mars);
+    let p = g.progress(Seat(0));
+    assert_eq!((p.first_transit, p.second_transit), (4, 0), "{p:?}");
+}
+
 /// Ticket #366 (version 0.09.2), defect 1: **the Exchange stands on a station and the Heliostat
 /// too**, since the station's list is the one predicate now; and the Exchange is under the
 /// one-Trade-Post-per-Body cap, being the Trade Post it is.

@@ -296,6 +296,36 @@ fn temperature_history(ui: &mut Ui, game: &Game, size: egui::Vec2) {
     painter.text(Pos2::new(plot.right() + 3.0, y(end)), egui::Align2::LEFT_CENTER, format!("{end:+.1}"), FontId::proportional(11.0), LINE);
 }
 
+/// Ticket #373 (version 0.09.2): a Victory bar drawn by hand -- the settled fill, then a band beyond
+/// it for the Colonists in transit, in the fill's hue darkened and hatched with lines at 45 degrees,
+/// at the designer's word ("make the in transit darker and add lines at 45 degrees"). The band is
+/// clipped to the bar and counts toward nothing; egui's own `ProgressBar`, which this replaces,
+/// cannot hold a second segment. `fraction` is the settled fill and `transit` the band's width
+/// beyond it, both of the whole bar.
+fn victory_bar(ui: &mut Ui, fraction: f32, transit: f32) {
+    let (rect, _) = ui.allocate_exact_size(egui::vec2(ui.available_width(), 16.0), egui::Sense::hover());
+    let painter = ui.painter_at(rect);
+    let fill = ui.visuals().selection.bg_fill;
+    painter.rect_filled(rect, 3.0, Color32::from_rgb(38, 38, 44));
+    let at = |f: f32| rect.left() + f.clamp(0.0, 1.0) * rect.width();
+    if transit > 0.0 {
+        let band = egui::Rect::from_min_max(egui::pos2(at(fraction), rect.top()), egui::pos2(at(fraction + transit), rect.bottom()));
+        let dark = Color32::from_rgb(fill.r() / 2, fill.g() / 2, fill.b() / 2);
+        painter.rect_filled(band, 0.0, dark);
+        // Lines at 45 degrees, clipped to the band: one every six pixels, running up and to the right.
+        let hatch = ui.painter_at(band);
+        let step = 6.0;
+        let mut x = band.left() - band.height();
+        while x < band.right() {
+            hatch.line_segment([egui::pos2(x, band.bottom()), egui::pos2(x + band.height(), band.top())], egui::Stroke::new(1.0, fill));
+            x += step;
+        }
+    }
+    if fraction > 0.0 {
+        painter.rect_filled(egui::Rect::from_min_max(rect.min, egui::pos2(at(fraction), rect.bottom())), 3.0, fill);
+    }
+}
+
 fn temperature_bar(ui: &mut Ui, game: &Game) {
     const BREAK: Color32 = Color32::from_rgb(236, 88, 76);
     const SEA: Color32 = Color32::from_rgb(96, 156, 236);
@@ -9888,14 +9918,17 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 // Ticket #306 (version 0.08.7): the Victory Condition sentence that stood here is
                 // cut, at the designer's word, as a restatement of the two labelled bars beneath
                 // it; the Rulebook keeps its copy.
+                // Ticket #373 (version 0.09.2): "(+N in transit)" on a label whose bar counts
+                // Colonists, and the band on the bar for them.
+                let in_transit = |n: u32| if n > 0 { format!(" (+{n} in transit)") } else { String::new() };
                 ui.label(match &p.first_held_back {
-                    Some(why) => format!("{}: {:.0} of {:.0} - {}", p.first_name, p.first_value, p.first_bar, why),
-                    None => format!("{}: {:.0} of {:.0}", p.first_name, p.first_value, p.first_bar),
+                    Some(why) => format!("{}: {:.0} of {:.0}{} - {}", p.first_name, p.first_value, p.first_bar, in_transit(p.first_transit), why),
+                    None => format!("{}: {:.0} of {:.0}{}", p.first_name, p.first_value, p.first_bar, in_transit(p.first_transit)),
                 });
-                ui.add(egui::ProgressBar::new(p.first_fraction() as f32));
+                victory_bar(ui, p.first_fraction() as f32, p.first_transit_fraction() as f32);
                 // Ticket #51: the second part in the words its own card uses.
-                ui.label(format!("{}: {}", p.second_name, p.second_text));
-                ui.add(egui::ProgressBar::new(p.second_fraction() as f32));
+                ui.label(format!("{}: {}{}", p.second_name, p.second_text, in_transit(p.second_transit)));
+                victory_bar(ui, p.second_fraction() as f32, p.second_transit_fraction() as f32);
                 // Ticket #72: the Prospectors set their Venture Capital Fund's share here, and draw.
                 // Ticket #256 (version 0.08.4): a slider and a Withdraw field, in their own function.
                 if seat == Seat(0) && !session.spectator && game.kind(Seat(0)) == FactionKind::Prospectors {

@@ -9,10 +9,16 @@ pub struct Progress {
     pub first_name: String,
     pub first_value: f64,
     pub first_bar: f64,
+    /// Ticket #373 (version 0.09.2): the Colonists aboard the seat's Ships, for a first part that
+    /// counts Colonists off Earth, and nought for any other. Counts toward nothing; the Victory
+    /// window draws it as a band beyond the settled fill.
+    pub first_transit: u32,
     /// Ticket #51: the second part is a Faction figure too, not Off-world Presence for everyone.
     pub second_name: String,
     pub second_value: f64,
     pub second_bar: f64,
+    /// Ticket #373: as `first_transit`, for a second part that counts Colonists off Earth.
+    pub second_transit: u32,
     /// The second part in the words of the Faction's card, for the panel.
     pub second_text: String,
     /// Ticket #51: the first part is at its bar but something else denies it (the Archive is
@@ -26,6 +32,14 @@ impl Progress {
     }
     pub fn second_fraction(&self) -> f64 {
         (self.second_value / self.second_bar).clamp(0.0, 1.0)
+    }
+    /// Ticket #373 (version 0.09.2): how much of the bar the Colonists in transit would fill beyond
+    /// the settled fill, clipped at the bar's end. Nought where the part counts no Colonists.
+    pub fn first_transit_fraction(&self) -> f64 {
+        ((self.first_value + self.first_transit as f64) / self.first_bar).clamp(0.0, 1.0) - self.first_fraction()
+    }
+    pub fn second_transit_fraction(&self) -> f64 {
+        ((self.second_value + self.second_transit as f64) / self.second_bar).clamp(0.0, 1.0) - self.second_fraction()
     }
     /// The lower fraction of the two parts.
     pub fn score(&self) -> f64 {
@@ -157,13 +171,21 @@ impl Game {
         {
             first_held_back = Some(format!("needs {}, not yet researched", self.tables.tech(gate).name));
         }
+        // Ticket #373 (version 0.09.2): the Colonists aboard the seat's Ships, for the bars that
+        // count Colonists off Earth and no other -- a Ship in flight has no one Body to count
+        // toward, so the per-Body part carries none.
+        let aboard = self.colonists_aboard(seat);
+        let first_transit = if card.kind == VictoryFirstKind::ColonistsOffEarth { aboard } else { 0 };
+        let second_transit = if second.kind == VictorySecondKind::OffWorldPresence { aboard } else { 0 };
         Progress {
             first_name: card.kind.name().to_string(),
             first_value,
             first_bar: card.bar,
+            first_transit,
             second_name: second.kind.name().to_string(),
             second_value,
             second_bar,
+            second_transit,
             second_text,
             first_held_back,
         }

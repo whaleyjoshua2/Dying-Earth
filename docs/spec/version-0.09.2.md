@@ -149,3 +149,21 @@ holds. **Every hover that explains the margin uses the real one**, from the func
 The row printed the fixed formula whatever the holder stood at, so a place held on 47 read
 *"Threshold 50"* when the price was 67, and its hovers quoted the flat base of 20 where a
 Constabulary and cold relations had raised it by up to 12.
+
+## 8. The Victory bar counts settled Colonists, with a band for those in transit
+
+The authority is [ticket #373](https://github.com/whaleyjoshua2/Dying-Earth/issues/373).
+
+**Settled is as it was**: a Colonist counts toward a Victory bar when they live in a Colony off Earth,
+a station over Earth included; nobody aboard a Ship counts. **Every bar that counts Colonists** --
+the Custodians' and Prospectors' twelve off Earth, the Arkwrights' thirty -- **draws a band beyond
+its settled fill for the Colonists in transit**: everyone aboard the Faction's Ships, anywhere, a
+Ship loaded and sitting over Earth included. The band is the fill's hue darker, with thin lines at
+45 degrees, and stops at the bar's end; the label reads *"9 of 12 (+3 in transit)"*. **The band
+never counts toward winning.** The Arkwrights' per-Body bar carries no band, a Ship in flight having
+no one Body to count toward. The temperature bar's committed band stays flat.
+
+**Why.** The designer: *"victory bar should only count settled colonist but add a extra area to
+represent those in transit, similar to the temperature bar, make the in transit darker and add lines
+at 45 degrees."* Colonists aboard counted for nobody and were shown nowhere on the bar, so a Colony
+Ship on its way looked like no progress at all.
