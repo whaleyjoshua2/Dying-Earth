@@ -243,40 +243,34 @@ impl Game {
     pub fn card_shortfall(&self, seat: Seat) -> Option<String> {
         let q = self.question.as_ref()?;
         let c = self.tables.event(q.card).choice.as_ref()?;
-        let s = self.seat(seat);
-        let mut parts: Vec<String> = Vec::new();
-        for e in &c.take_does {
-            match e {
-                CardEffect::Resources { materials, fuel, energy, ducats, .. } => {
-                    for (have, ask, name) in [(s.stockpile.materials, *materials, "Materials"), (s.stockpile.fuel, *fuel, "Fuel"), (s.stockpile.energy, *energy, "Energy"), (s.stockpile.ducats, *ducats, "Ducats")] {
-                        if ask < 0 && have + ask < 0 {
-                            parts.push(format!("{have} {name} of the {} it asks", -ask));
-                        }
-                    }
-                }
-                CardEffect::PerUnitCost { per, resource, amount } => {
-                    let need = self.card_things(seat, *per) as i64 * amount;
-                    let have = self.stock_of(seat, *resource);
-                    if have < need {
-                        parts.push(format!("{have} {} of the {need} it asks", resource.name()));
-                    }
-                }
-                _ => {}
-            }
-        }
+        let parts: Vec<String> = c.take_does.iter().flat_map(|e| self.card_effect_shortfall(e, seat)).collect();
         if parts.is_empty() { None } else { Some(format!("you have {}", parts.join(" and "))) }
     }
 
     /// Ticket #337: the price half of `card_effect_can_land`. Only an effect that costs something
-    /// can answer no; everything else is free to choose whether or not it does anything.
+    /// can answer no; everything else is free to choose whether or not it does anything. Ticket
+    /// #366 (version 0.09.2): ONE truth with `card_effect_shortfall`, so a cost effect added later
+    /// cannot shut the offer while the reason says nothing.
     fn card_effect_affordable(&self, e: &CardEffect, seat: Seat) -> bool {
+        self.card_effect_shortfall(e, seat).is_empty()
+    }
+
+    /// Ticket #366 (version 0.09.2): what this seat lacks to pay one effect of a card's offer, one
+    /// part per good short -- "12 Fuel of the 20 it asks" -- and nothing where it can pay.
+    fn card_effect_shortfall(&self, e: &CardEffect, seat: Seat) -> Vec<String> {
         let s = self.seat(seat);
         match e {
-            CardEffect::Resources { materials, fuel, energy, ducats, research: _ } => {
-                s.stockpile.materials + materials >= 0 && s.stockpile.fuel + fuel >= 0 && s.stockpile.energy + energy >= 0 && s.stockpile.ducats + ducats >= 0
+            CardEffect::Resources { materials, fuel, energy, ducats, research: _ } => [(s.stockpile.materials, *materials, "Materials"), (s.stockpile.fuel, *fuel, "Fuel"), (s.stockpile.energy, *energy, "Energy"), (s.stockpile.ducats, *ducats, "Ducats")]
+                .into_iter()
+                .filter(|(have, ask, _)| have + ask < 0)
+                .map(|(have, ask, name)| format!("{have} {name} of the {} it asks", -ask))
+                .collect(),
+            CardEffect::PerUnitCost { per, resource, amount } => {
+                let need = self.card_things(seat, *per) as i64 * amount;
+                let have = self.stock_of(seat, *resource);
+                if have < need { vec![format!("{have} {} of the {need} it asks", resource.name())] } else { Vec::new() }
             }
-            CardEffect::PerUnitCost { per, resource, amount } => self.stock_of(seat, *resource) >= self.card_things(seat, *per) as i64 * amount,
-            _ => true,
+            _ => Vec::new(),
         }
     }
 

@@ -115,8 +115,8 @@ fn pick_state(word: &str) -> Result<StateId, String> {
         return Ok(StateId::ALL[i]);
     }
     pick(&StateId::ALL, word).map_err(|e| match names {
-        Some(names) if !e.contains("short for") => format!("{word:?} is not a Region; the board's are {}", names.join(", ")),
-        _ => e,
+        Some(names) => format!("{word:?} is not a Region; the board's are {}", names.join(", ")),
+        None => e,
     })
 }
 

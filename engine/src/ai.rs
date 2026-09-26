@@ -1225,7 +1225,8 @@ impl Game {
                 }
                 // Ticket #90: one Trade Post per Body; worth more once a second Body is held, since
                 // the network is what it pays for.
-                if mk == ModuleKind::TradePost && self.trade_post_at_body(seat, col.body) {
+                // Ticket #366 (version 0.09.2): by the job, so the Prospectors' Exchange is under it.
+                if mk.does_the_job_of(ModuleKind::TradePost) && self.trade_post_at_body(seat, col.body) {
                     continue;
                 }
                 // Ticket #89: a station-only Module stands on no ground Colony.

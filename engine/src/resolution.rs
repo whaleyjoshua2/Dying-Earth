@@ -1613,6 +1613,9 @@ impl Game {
             &[("place", self.place_name(place)), ("faction", self.seat_name(seat)), ("why", why.to_string())],
         );
         self.report_line(LineKind::ControlChanged, Some(place.into()), text);
+        // Ticket #366 (version 0.09.2): where this line stands, so a throw-off in the same
+        // Resolution can say both in its place.
+        self.pending.transfer_lines.push((place, self.report.lines.len() - 1));
         self.moment(
             MomentKind::ControlChanged,
             &[("place", self.place_name(place)), ("faction", self.seat_name(seat))],
@@ -2988,8 +2991,9 @@ impl Game {
         // in the headline over a board reading neutral, the throw-off sunk below it. One line
         // says both, in the place of the transfer's.
         let folded = self.say("passed_and_threw_off", &[("state", self.tables.state(sid).name.clone()), ("faction", self.seat_name(seat))]);
-        if self.state(sid).changed_hands
-            && let Some(earlier) = self.report.lines.iter_mut().rev().find(|l| l.kind == LineKind::ControlChanged && l.place == Some(ReportPlace::State(sid)))
+        let transfer = self.pending.transfer_lines.iter().rev().find(|(p, _)| *p == Place::State(sid)).map(|(_, i)| *i);
+        if let Some(i) = transfer
+            && let Some(earlier) = self.report.lines.get_mut(i)
         {
             earlier.text = folded;
         } else {

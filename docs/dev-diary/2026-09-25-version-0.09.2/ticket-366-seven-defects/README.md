@@ -63,6 +63,22 @@ Iran, Japan, Saudi Arabia*.
 that was not a name, because a blanket replace of the old call had turned its own fallback into a
 call to itself. The suite does not run the driver; only running it found it.
 
+## The review
+
+Two axes, run as sub-agents over the commit.
+
+**Standards**: no violation. Four fix-ups taken: a card's price has one truth (`card_effect_affordable`
+reads `card_effect_shortfall`, so a cost effect added later cannot shut the offer while the reason
+says nothing); the throw-off fold finds the transfer's line by an index recorded when it was written
+rather than by searching the Report; one helper names a producer's place for the alarm's hover and
+the Energy line alike; the driver's `pick_state` no longer reads `pick`'s error text to choose its
+own. `pay_spaceport` is `#[must_use]`.
+
+**Spec**: correct on all seven. One computer-seat loose end fixed: the computer's Trade Post
+pre-filter read the kind, so a computer Prospector proposed a second Exchange the engine then
+refused; it reads the job now. (Its weight already did: the weighing runs on the common job.) Defects 6 and 7 were closed by reading rather than by a driver
+reproduction, which the review noted; the reading is in the spec.
+
 ## The gate
 
 `cargo clippy --workspace --release --all-targets -- -D warnings` clean; engine 492 + 6, root 8.

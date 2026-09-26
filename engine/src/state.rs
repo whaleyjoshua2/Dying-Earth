@@ -3475,6 +3475,7 @@ impl Game {
     /// Ticket #366 (version 0.09.2): returns what it paid, so the lift's Report line can say
     /// *"(+2 Influence next turn from the Spaceport)"*. The playtest lifted Pioneers and saw no
     /// Influence; the pay lands a turn late and was itemised nowhere, so nothing told them.
+    #[must_use]
     pub fn pay_spaceport(&mut self, seat: Seat, from: StateId, n: u32) -> u32 {
         if n == 0 || self.state(from).control != Control::Controlled(seat) {
             return 0;

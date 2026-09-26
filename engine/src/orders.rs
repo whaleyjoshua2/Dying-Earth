@@ -330,6 +330,10 @@ pub struct Pending {
     pub unrest_before: Vec<(StateId, f64)>,
     #[serde(default)]
     pub unrest_causes: Vec<(StateId, String, bool)>,
+    /// Ticket #366 (version 0.09.2): where each transfer's Report line stands this Resolution, so a
+    /// throw-off of the same place in the same pass can say both in that line's place.
+    #[serde(default)]
+    pub transfer_lines: Vec<(Place, usize)>,
     #[serde(default)]
     pub credit_buys: Vec<(Seat, i64, i64)>,
     /// Attack orders in the order given, for battle ordering (spec 10.1).

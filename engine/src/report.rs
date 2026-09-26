@@ -589,6 +589,7 @@ pub const PHRASE_ARGS: &[(&str, &[&str])] = &[
     ("cause_occupation", &[]),
     ("cause_occupation_break", &[]),
     ("cause_choice_card", &["card"]),
+    // Ticket #366 (version 0.09.2): what a lift earns from the Spaceport, on the lift's line.
     ("spaceport_pays", &["n"]),
     ("unrest_past", &["which", "note"]),
     ("unrest_under", &["which"]),
