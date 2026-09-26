@@ -1970,6 +1970,12 @@ impl Tables {
         self.report.check().map_err(|m| err("report.toml", m))?;
         // Every fixed id must have exactly one row, in the engine's order.
         check_rows("bodies.toml", &BodyId::ALL, self.bodies.iter().map(|b| b.id))?;
+        // Ticket #377 (version 0.09.2): the home package stands IN PLACE of a Region's card list, so
+        // a table without one would open every home Region bare, Launch Site included; and every
+        // seat's home has carried a Launch Site since ticket #24, which is where lifts come from.
+        if !self.start.home_facilities.iter().any(|k| k.does_the_job_of(FacilityKind::LaunchSite)) {
+            return Err(err("factions.toml", "[start] home_facilities must name a launch_site".to_string()));
+        }
         // Ticket #374 (version 0.09.2): the `parent` column is the tree `BodyId::primary` knows and
         // nothing else -- a satellite priced from one parent and listed under another would be two
         // skies, so the table is refused rather than read.
@@ -2066,10 +2072,12 @@ impl Tables {
             if s.population < 0.0 || s.education_level <= 0.0 {
                 return Err(err("nation_states.toml", format!("row {}: population or education out of range", s.name)));
             }
-            // A Launch Site is added for a Faction start state, so leave one slot for it.
+            // The card's list must fit the Region's own slots. Ticket #377 (version 0.09.2): it no
+            // longer leaves one for a Launch Site, since a home Region stands with the `[start]`
+            // package in place of the list; the package is a gift and is not checked against slots.
             let start_slots = s.size + s.industry_level + self.base_slots;
-            if s.start_facilities.len() as u32 + 1 > start_slots {
-                return Err(err("nation_states.toml", format!("row {}: {} start_facilities do not fit its {} build slots with a Launch Site", s.name, s.start_facilities.len(), start_slots)));
+            if s.start_facilities.len() as u32 > start_slots {
+                return Err(err("nation_states.toml", format!("row {}: {} start_facilities do not fit its {} build slots", s.name, s.start_facilities.len(), start_slots)));
             }
             // Ticket #56: every state keeps at least one coastal slot and one inland slot, so the
             // sea always has something to take and a raise always has somewhere to go.
@@ -2483,16 +2491,20 @@ impl Tables {
         (self.base_ducats(sid, self.state(sid).industry_level) as f64 * self.faction(faction).ducats_multiplier).floor() as i64
     }
 
-    /// What a Region emits a turn as the game opens under `faction`: its industry, its people and
-    /// its start Facilities, each times the Faction's Emissions multiplier, as `emissions_now` will
-    /// count them at turn 1 before any Tech, Strip Permit or Leapfrog has moved a figure.
+    /// What a Region emits a turn as the game opens under `faction`, as that Faction's home: its
+    /// industry, its people and the Facilities it will stand with, each times the Faction's
+    /// Emissions multiplier, as `emissions_now` will count them at turn 1 before any Tech, Strip
+    /// Permit or Leapfrog has moved a figure.
+    /// Ticket #377 (version 0.09.2): the Facilities are the home package and the Faction's extras,
+    /// in the Faction's own versions, not the card's list -- a home Region no longer stands with
+    /// its card's list, and the setup card's figure has to count what the board will.
     pub fn start_emissions(&self, sid: StateId, faction: FactionKind) -> f64 {
         let card = self.state(sid);
         let c = &self.climate;
         let m = self.faction(faction).emissions_multiplier;
         let industry = card.baseline_emissions * card.industry_level as f64 * m;
         let people = (c.population_emissions_base + c.population_emissions_per_level * card.industry_level as f64) * card.population * m;
-        let facilities: f64 = card.start_facilities.iter().map(|k| self.facility(*k).emissions * m).sum();
+        let facilities: f64 = self.start.home_facilities.iter().chain(self.faction(faction).start_extra_facilities.iter()).map(|k| self.facility(k.built_by(faction)).emissions * m).sum();
         industry + people + facilities
     }
 }

@@ -116,6 +116,28 @@ Headless, 1400x1000, `panel:0`, from this folder.
 | [`home-earth.png`](home-earth.png) | `select:eastasia` | **The home Region's card**, China as the Custodians: Power Plant, Factory, Mine, Refinery, Launch Site, and four slots free. |
 | [`station-earth.png`](station-earth.png) | `hab:1` | **The starting station's card**, the ISS: the Core Module and a Solar Array, one slot free. |
 
+## The review
+
+Two axes, run as sub-agents over the commit. **Spec** found the build matching §12 on every claim
+and three things beside it: a stale comment in the computer's early-Mine lane, which still said the
+Arkwrights start with no Mine (reworded); the loader accepting a `[start]` table with no
+`home_facilities`, which would open every home Region bare (it refuses a package with no Launch
+Site now, witnessed red); and one edge §12 did not cover, an Arkwrights player opening in Mexico,
+whose five slots cannot hold their six-piece package, so they open with no free slot until an
+Industry Level raise. §12 says so now. **Standards** found the real defect: `start_emissions`, the
+figure the setup card shows for a Region's opening Emissions, still summed the card's list where
+the board would hold the package; it sums the package and the Faction's extras now, in the
+Faction's own versions, pinned by a test written against the old body:
+
+    the package and the card must differ for the test to mean anything  -- passes on the old body, then:
+    panicked: 5.74 against 8.74
+
+and green on the new. The rest were words: the old slot check's comment still leaving room for a
+Launch Site the setup no longer adds; a test's doc quoting the computer's scores as if derived;
+one test's sentence describing the old coastal order before the new; a convoluted assert spelled
+as the file's own idiom; and the `[start]` comment saying "exactly these" two hundred lines from
+the Arkwrights' extra.
+
 ## The gate
 
-`cargo clippy --workspace --release --all-targets -- -D warnings` clean; engine 498 + 6, root 8.
+`cargo clippy --workspace --release --all-targets -- -D warnings` clean; engine 499 + 6, root 8.

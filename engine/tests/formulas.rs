@@ -1877,7 +1877,7 @@ fn every_home_region_starts_with_the_standard_facilities_and_every_starting_stat
             // Its start Facilities are the Faction's own versions: the Archivists' Reactor, the
             // Arkwrights' Spaceport.
             for f in &g.state(sid).facilities {
-                assert_eq!(f.kind.unique_to().map(|u| u == faction), f.kind.unique_to().map(|_| true), "{sid:?}: {:?} is another Faction's", f.kind);
+                assert!(f.kind.unique_to().map(|o| o == faction).unwrap_or(true), "{sid:?}: {:?} is another Faction's", f.kind);
             }
         }
         // Every starting station: a Core and a Solar Array, and nothing else.
@@ -4205,10 +4205,10 @@ fn c_start_facilities_are_coastal_first_and_a_new_build_is_inland_first() {
     // East Asia: four start Facilities (ticket #332: a Mine beside the Factory), six coastal
     // slots, three inland.
     let sid = StateId::EastAsia;
-    // East Asia is the player's start state, so its Launch Site is a start Facility too and takes
-    // the next coastal slot after the four on the card. Ticket #377 (version 0.09.2): a home Region
-    // stands with the `[start]` package in ITS order -- Power Plant, Factory, Mine, Refinery, Launch
-    // Site -- not the card's, so the coast reads the package's first four.
+    // East Asia is the player's start state. Ticket #377 (version 0.09.2): a home Region stands with
+    // the `[start]` package in ITS order -- Power Plant, Factory, Mine, Refinery, Launch Site -- not
+    // the card's, so the coast reads the package's first four and the Launch Site, fifth, takes the
+    // slot after them.
     assert_eq!(
         standing(&g, sid, true),
         vec![FacilityKind::PowerPlant, FacilityKind::Factory, FacilityKind::Mine, FacilityKind::Refinery],
@@ -5628,7 +5628,6 @@ fn a_custodian_ai_behind_on_pace_builds_a_constabulary_where_unrest_has_reached_
 
 /// Ticket #69 (a): North America and South-East Asia begin with a Research Lab ADDED to their start
 /// Facilities, and a start Lab stands inland so the sea never takes the world's Research.
-///
 ///
 /// Ticket #377 (version 0.09.2): the card's list is what a NEUTRAL Region stands with -- both are
 /// neutral in the fixture's seating -- and a HELD North America carries the package and no Lab.
@@ -11517,11 +11516,10 @@ fn a_dug_in_army_fights_two_stronger_never_disengages_and_cannot_march_until_it_
 ///
 /// Ticket #377 (version 0.09.2): the Solar Array every starting station carries holds one of the
 /// station's two slots, so the opening has ONE slot to fill, and the Habitat takes it only where
-/// nothing outranks it. Measured on seed 7 with the player in China: the Custodians (14.0 against
-/// a Shipyard's 6.0) put the Habitat in; the Prospectors score the Exchange above it (34.5 against
-/// 30.0) and take the Exchange; the Archivists, in Australia, score their first Shipyard above it
-/// (90.0 against 42.0) and take the Shipyard. Neither orders a Habitat on turn one. The designer
-/// accepted this over exempting the Array from the slot count.
+/// nothing outranks it. Measured on seed 7 with the player in China: the Custodians put the
+/// Habitat in; the Prospectors score the Exchange above it and take the Exchange; the Archivists,
+/// in Australia, score their first Shipyard above it and take the Shipyard. Neither orders a
+/// Habitat on turn one. The designer accepted this over exempting the Array from the slot count.
 #[test]
 fn the_computer_opens_its_stations_one_free_slot_with_a_habitat_an_exchange_or_a_shipyard_by_faction() {
     let mut g = fresh();
@@ -15888,4 +15886,23 @@ fn every_body_is_a_planet_or_listed_once_under_its_primary() {
     }
     let planets = BodyId::ALL.iter().filter(|b| b.primary() == **b).count();
     assert_eq!(planets + listed, BodyId::ALL.len(), "every Body once");
+}
+
+/// Ticket #377 (version 0.09.2): **the setup card's opening Emissions count the home package**, not
+/// the Region's card list, since a home Region no longer stands with its list. India's card has
+/// no Refinery; as the Arkwrights' home it holds one, and a second Power Plant, and the figure the
+/// setup card shows has to be the one `emissions_now` will read on turn 1.
+#[test]
+fn start_emissions_count_the_home_package_and_the_factions_extras() {
+    let t = tables();
+    let sid = StateId::SouthAsia;
+    let faction = FactionKind::Arkwrights;
+    let card = t.state(sid);
+    let m = t.faction(faction).emissions_multiplier;
+    let industry = card.baseline_emissions * card.industry_level as f64 * m;
+    let people = (t.climate.population_emissions_base + t.climate.population_emissions_per_level * card.industry_level as f64) * card.population * m;
+    let package: f64 = t.start.home_facilities.iter().chain(t.faction(faction).start_extra_facilities.iter()).map(|k| t.facility(k.built_by(faction)).emissions * m).sum();
+    let from_card: f64 = card.start_facilities.iter().map(|k| t.facility(*k).emissions * m).sum();
+    assert!((package - from_card).abs() > 1e-9, "the package and the card must differ for the test to mean anything");
+    assert!((t.start_emissions(sid, faction) - (industry + people + package)).abs() < 1e-9, "{} against {}", t.start_emissions(sid, faction), industry + people + package);
 }

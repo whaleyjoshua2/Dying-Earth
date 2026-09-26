@@ -968,8 +968,10 @@ impl Game {
         // Mining, a Strip Permit, Unrest 7 all read) is the one; the first on the list among equals.
         // The Mine there takes the gap and the opportunity below, as the opening Habitat of ticket
         // #290 does, so it comes before the Labs and Scrubbers it used to lose to at a plain
-        // Producer's weight. The probe that opened this lane found the Arkwrights, who start with
-        // no Mine, holding fifteen Materials and earning none from turn 2 to turn 7.
+        // Producer's weight. The probe that opened this lane found the Arkwrights, who then started
+        // with no Mine, holding fifteen Materials and earning none from turn 2 to turn 7; since
+        // ticket #377 (version 0.09.2) every home Region opens with one, and the lane is for the
+        // second.
         let earth_mines: u32 = self
             .directed_states(seat)
             .iter()

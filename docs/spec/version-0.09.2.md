@@ -256,7 +256,11 @@ and the Launch Site, in the Faction's own versions (the Archivists' Reactor, the
 Spaceport), whatever the Region's card lists and nothing more. The card's list is what a **neutral**
 Region stands with. So any Region the player picks starts with the same package; the EU, which
 opened on four, India on three with no Refinery, and the United States on five with a Research Lab,
-all open on these five. The package is the `[start]` table's `home_facilities` in `factions.toml`.
+all open on these five. The package is the `[start]` table's `home_facilities` in `factions.toml`,
+and the loader refuses a table whose package has no Launch Site. The package is a gift and takes
+no account of the Region's slots: every Region has room for the five, and only Mexico (five slots)
+has none for the Arkwrights' six, so an Arkwrights player who opens there has no free slot until
+an Industry Level raise adds one.
 
 **Every starting station carries a Solar Array** beside its Core Module (the `[start]` table's
 `station_modules`). **The Arkwrights, who start with no station, hold a second Power Plant** in

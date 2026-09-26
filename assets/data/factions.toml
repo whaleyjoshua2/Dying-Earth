@@ -383,8 +383,8 @@ fuel = 20
 energy = 20
 research = 0
 ducats = 0
-# Ticket #377 (version 0.09.2): equal starts. Every home Region starts with exactly these
-# Facilities, in the Faction's own versions, whatever the Region's card lists -- the card's list
+# Ticket #377 (version 0.09.2): equal starts. Every home Region starts with these Facilities, plus
+# whatever the Faction's card adds, in the Faction's own versions, whatever the Region's card lists -- the card's list
 # is what a NEUTRAL Region stands with. Before this the EU opened on four Facilities and India on
 # three with no Refinery, and the US carried a Research Lab on top.
 home_facilities = ["power_plant", "factory", "mine", "refinery", "launch_site"]
