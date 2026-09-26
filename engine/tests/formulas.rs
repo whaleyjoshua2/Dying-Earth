@@ -12321,6 +12321,93 @@ fn a_colonys_army_takes_one_colonist_and_is_refused_at_one() {
     assert!(g.check_order(Seat(0), &[], &raise).is_ok(), "at two it may: one stays with the Core");
 }
 
+/// Ticket #359 (version 0.09.1): a SHUT Barracks -- mothballed, or dark for want of Energy -- raises
+/// no Army and repairs none, where it did both while it merely stood. Three refusals in the
+/// Shipyard's shape: none, still building, shut. An Army already standing is untouched.
+#[test]
+fn a_shut_barracks_raises_and_repairs_no_army() {
+    let mut g = game();
+    g.seats[0].stockpile.materials = 2000;
+    let c = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Barracks, ModuleKind::Mine], 4);
+    let raise = Order::BuildArmy { place: Place::Colony(c) };
+    assert!(g.check_order(Seat(0), &[], &raise).is_ok(), "a working Barracks raises");
+    g.colony_mut(c).unwrap().modules[0].mothballed = true;
+    assert_eq!(g.check_order(Seat(0), &[], &raise).unwrap_err().0, "the Barracks here is shut: mothballed, or dark for want of Energy");
+    g.colony_mut(c).unwrap().modules[0].mothballed = false;
+    g.colony_mut(c).unwrap().modules[0].online = false;
+    assert_eq!(g.check_order(Seat(0), &[], &raise).unwrap_err().0, "the Barracks here is shut: mothballed, or dark for want of Energy", "dark counts as shut");
+    g.colony_mut(c).unwrap().modules.remove(0);
+    assert_eq!(g.check_order(Seat(0), &[], &raise).unwrap_err().0, "no Barracks here");
+    build_now(&mut g, Place::Colony(c), BuildItem::Module(ModuleKind::Barracks), Seat(0));
+    assert_eq!(g.check_order(Seat(0), &[], &raise).unwrap_err().0, "the Barracks here is still building");
+    // Repair: the same three doors, on an Army standing at the Colony, which a shut Barracks
+    // leaves standing.
+    g.colony_mut(c).unwrap().queue.clear();
+    g.colony_mut(c).unwrap().modules.insert(0, Module::new(ModuleKind::Barracks));
+    let army = ArmyId(g.fresh_id());
+    g.armies.push(Army { id: army, name: "the 1st".to_string(), home: ArmyHome::Colony(c), at: ArmyAt::Place(Place::Colony(c)), damage: 2, standing: false, stance: Stance::Hold, escaped: false, move_to: None, levy: false, raised_strength: 3 });
+    let repair = Order::Repair { unit: UnitRef::Army(army), points: 1 };
+    assert!(g.check_order(Seat(0), &[], &repair).is_ok(), "a working Barracks repairs");
+    g.colony_mut(c).unwrap().modules[0].mothballed = true;
+    assert_eq!(g.check_order(Seat(0), &[], &repair).unwrap_err().0, "the Barracks here is shut: mothballed, or dark for want of Energy");
+    assert!(g.army(army).is_some(), "the garrison stands");
+}
+
+/// Ticket #359 (version 0.09.1): a shut Habitat still houses its people, and while it is OCCUPIED --
+/// more Colonists than the working Habitats and the Core can hold -- the Colony makes everything at
+/// half EXCEPT Energy, at the designer's word. An empty spare Habitat mothballed costs nothing, and
+/// two shut Habitats halve once.
+#[test]
+fn an_occupied_shut_habitat_halves_the_colony_but_its_energy() {
+    let setup = |colonists: u32, shut: &[usize]| {
+        let mut g = game();
+        calm(&mut g);
+        g.seats[0].stockpile.energy = 500;
+        let c = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Mine, ModuleKind::Mine, ModuleKind::Generator, ModuleKind::Relay], colonists);
+        for i in shut {
+            g.colony_mut(c).unwrap().modules[*i].mothballed = true;
+        }
+        (g, c)
+    };
+    let gain = |mut g: Game| {
+        let (m, e) = (g.seats[0].stockpile.materials, g.seats[0].stockpile.energy);
+        g.income_phase();
+        (g.seats[0].stockpile.materials - m, g.seats[0].stockpile.energy - e, g.seats[0].allotment)
+    };
+    // Room: two Habitats of 4 and the Core's 4, twelve. Ten live here.
+    let (g, c) = setup(10, &[]);
+    assert_eq!(g.habitat_room(g.colony(c).unwrap()), 12);
+    assert!(!g.habitat_halves(c), "every Habitat working");
+    let (whole_m, whole_e, whole_a) = gain(g);
+    // One shut: eight of room working, ten living. Occupied: half.
+    let (g, c) = setup(10, &[0]);
+    assert_eq!(g.habitat_room(g.colony(c).unwrap()), 12, "a shut Habitat still houses them: room unchanged");
+    assert!(g.habitat_halves(c));
+    let (half_m, half_e, half_a) = gain(g);
+    // The Moon's Mines are the only Materials this seat makes off Earth; the rest is Earth's, whole.
+    let (earth, _) = setup(0, &[]);
+    let (earth_m, _, _) = {
+        let mut e = earth;
+        e.colonies.retain(|col| col.body != BodyId::Moon);
+        gain(e)
+    };
+    assert_eq!(half_m - earth_m, (whole_m - earth_m) / 2, "the Colony's Materials at half, rounded down");
+    assert_eq!(half_e, whole_e + 2, "Energy untouched -- the Generator whole, and the shut Habitat's 2 upkeep saved");
+    assert!(half_a < whole_a, "the Relay's Allotment at half: {half_a} against {whole_a}");
+    // Dark counts as shut.
+    let (mut g, c) = setup(10, &[]);
+    g.colony_mut(c).unwrap().modules[0].online = false;
+    assert!(g.habitat_halves(c), "a dark Habitat is shut");
+    // An empty spare: eight living on eight of working room. Not occupied, nothing halved.
+    let (g, c) = setup(8, &[0]);
+    assert!(!g.habitat_halves(c), "a spare Habitat standing empty costs nothing");
+    // Two shut halve once, not twice.
+    let (g, c) = setup(10, &[0, 1]);
+    assert!(g.habitat_halves(c));
+    let (twice_m, _, _) = gain(g);
+    assert_eq!(twice_m, half_m, "half once, however many are shut");
+}
+
 /// Ticket #334 (c): the Standing Army is the state's, and takes nobody -- neither when the game
 /// begins nor when it is raised again two Incomes after it dies.
 #[test]

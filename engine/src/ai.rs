@@ -1421,7 +1421,8 @@ impl Game {
                 let (pull, opp) = if opening || speeds_the_queue { (gap, m.opportunity) } else { (gap_for(cat, Some(mk.name())), 1.0) };
                 push(vec![Order::BuildModule { colony: cid, kind: mk }], cat, base, pull, t, opp, format!("build {} at {}", mk.name(), self.place_name(Place::Colony(cid))), None);
             }
-            if col.modules.iter().any(|m| m.kind == ModuleKind::Barracks) && !self.armies.iter().any(|a| a.home == ArmyHome::Colony(cid)) {
+            // Ticket #359 (version 0.09.1): a WORKING Barracks, which is what the raise's door reads.
+            if col.modules.iter().any(|m| m.kind == ModuleKind::Barracks && m.working()) && !self.armies.iter().any(|a| a.home == ArmyHome::Colony(cid)) {
                 push(vec![Order::BuildArmy { place: Place::Colony(cid) }], Cat::ArmyOrBarracks, self.base_weight(seat, Cat::ArmyOrBarracks), 1.0, threat, 1.0, format!("build Army at {}", self.place_name(Place::Colony(cid))), None);
             }
         }
@@ -1912,7 +1913,8 @@ impl Game {
                 for (i, md) in col.modules.iter().enumerate() {
                     // Ticket #56: never the Shipyard either; a mothballed one starved the
                     // Custodian AI of every Colony Ship while its Scrubbers ate the Energy.
-                    if md.kind == ModuleKind::Archive || md.kind == ModuleKind::Shipyard {
+                    // Ticket #359 (version 0.09.1): nor a Habitat, whose people it houses.
+                    if md.kind == ModuleKind::Archive || md.kind == ModuleKind::Shipyard || md.kind == ModuleKind::Habitat {
                         continue;
                     }
                     let produces = self.tables.module(md.kind).produces.is_some();

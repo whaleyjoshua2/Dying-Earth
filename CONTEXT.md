@@ -328,7 +328,7 @@ Retired in version 0.08.6. From version 0.08.5 it was the second Army a neutral 
 _Avoid_: militia, reserves, conscripts, second Standing Army
 
 **Barracks**:
-The Module that lets a Colony hold and build a defensive Army. A Colony without one has no defenders. Since version 0.08.6 the Army it raises is worth the rounded average Industry Level of the Regions its Faction holds, plus one, fixed at the raise; the Barracks is not a police force, so that Army defends with Dig In alone. Since version 0.09.0 the raise takes one Colonist from the Colony (`colonists_each` in `units.toml`), refused at fewer than two, and the Colonist does not come back.
+The Module that lets a Colony hold and build a defensive Army. A Colony without one has no defenders. Since version 0.08.6 the Army it raises is worth the rounded average Industry Level of the Regions its Faction holds, plus one, fixed at the raise; the Barracks is not a police force, so that Army defends with Dig In alone. Since version 0.09.0 the raise takes one Colonist from the Colony (`colonists_each` in `units.toml`), refused at fewer than two, and the Colonist does not come back. Since version 0.09.1 it must be **working** to raise or repair an Army -- a mothballed or dark Barracks does neither, though an Army already standing stays.
 _Avoid_: fort, garrison, base
 
 **Battery**:
@@ -407,7 +407,7 @@ It is a **delay, not a prohibition**. Measured before it was adopted, the Prospe
 _Avoid_: cooldown, lockout, occupation, tenure, grace period
 
 **Mothball**:
-The Orders-phase order that stands a Facility or a Module down. A mothballed building produces nothing, pays no Energy upkeep, emits nothing, is online for no rule, and keeps its slot. It is free, it takes effect at the Resolution, it raises the Unrest of a Region it happens in, and only a Restart brings the building back, for Materials and a turn.
+The Orders-phase order that stands a Facility or a Module down. A mothballed building produces nothing, pays no Energy upkeep, emits nothing, is online for no rule, and keeps its slot. It is free, it takes effect at the Resolution, it raises the Unrest of a Region it happens in, and only a Restart brings the building back, for Materials and a turn. The one exception since version 0.09.1 is the **Habitat**, which still houses its Colonists mothballed or dark; while more live in its Colony than the working Habitats and the Core can hold, the Colony makes everything but Energy at half.
 _Avoid_: pause, disable, switch off, idle, shut down (that is the Energy shortfall rule)
 
 **Offline**:

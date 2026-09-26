@@ -1151,8 +1151,17 @@ impl Game {
                         if col.control.director() != Some(seat) {
                             return fail("you do not direct this Colony");
                         }
-                        if !col.modules.iter().any(|m| m.kind == ModuleKind::Barracks) {
-                            return fail("no Barracks here");
+                        // Ticket #359 (version 0.09.1): a WORKING Barracks, as every other building
+                        // door reads it; a mothballed or dark one raised Armies while it merely
+                        // stood. Three refusals, in the Shipyard's shape.
+                        if !col.modules.iter().any(|m| m.kind == ModuleKind::Barracks && m.working()) {
+                            return fail(if col.modules.iter().any(|m| m.kind == ModuleKind::Barracks) {
+                                "the Barracks here is shut: mothballed, or dark for want of Energy"
+                            } else if col.queue.iter().any(|b| b.item == BuildItem::Module(ModuleKind::Barracks)) {
+                                "the Barracks here is still building"
+                            } else {
+                                "no Barracks here"
+                            });
                         }
                         let has_army = self.armies.iter().any(|a| a.home == ArmyHome::Colony(*c))
                             || col.queue.iter().any(|b| b.item == BuildItem::Unit(UnitKind::Army))
@@ -1208,12 +1217,18 @@ impl Game {
                                 }
                             }
                             ArmyAt::Place(Place::Colony(c)) => {
-                                let ok = self
-                                    .colony(c)
-                                    .map(|c| c.control.director() == Some(seat) && c.modules.iter().any(|m| m.kind == ModuleKind::Barracks))
-                                    .unwrap_or(false);
-                                if !ok {
-                                    return fail("an Army repairs only at a Colony with a Barracks");
+                                let Some(col) = self.colony(c).filter(|c| c.control.director() == Some(seat)) else {
+                                    return fail("an Army repairs only at a Colony of yours with a Barracks");
+                                };
+                                // Ticket #359 (version 0.09.1): a WORKING Barracks, the raise's door.
+                                if !col.modules.iter().any(|m| m.kind == ModuleKind::Barracks && m.working()) {
+                                    return fail(if col.modules.iter().any(|m| m.kind == ModuleKind::Barracks) {
+                                        "the Barracks here is shut: mothballed, or dark for want of Energy"
+                                    } else if col.queue.iter().any(|b| b.item == BuildItem::Module(ModuleKind::Barracks)) {
+                                        "the Barracks here is still building"
+                                    } else {
+                                        "no Barracks here"
+                                    });
                                 }
                             }
                             ArmyAt::Aboard(_) => return fail("an Army aboard a Ship cannot repair"),

@@ -2917,6 +2917,12 @@ impl Game {
     }
 
     pub fn habitat_room(&self, c: &Colony) -> u32 {
+        self.room_of(c, false)
+    }
+
+    /// The room `habitat_room` names, or with `working_only` the room its WORKING Habitats give,
+    /// which is what ticket #359's occupied test reads.
+    fn room_of(&self, c: &Colony, working_only: bool) -> u32 {
         // Ticket #51: Expanded Habitats and the Faction's own Habitat capacity are read for whoever
         // holds the Colony, since Provisional Findings gives the Archivists half the Tech early.
         let seat = c.control.controller();
@@ -2928,13 +2934,23 @@ impl Game {
         // Ticket #140 (version 0.07.3): a Habitat holds the same everywhere. It read the slot's
         // Habitat yield on a surface (ticket #57) and 1.0 in orbit (ticket #46) until the designer
         // traded that yield for a Research one.
-        let habitats = c.modules.iter().filter(|m| m.kind == ModuleKind::Habitat).count() as f64;
+        let habitats = c.modules.iter().filter(|m| m.kind == ModuleKind::Habitat && (!working_only || m.working())).count() as f64;
         // Ticket #164 (version 0.07.5): the Core Module holds people too, and holds a FLAT figure --
         // Expanded Habitats and the Arkwrights' capacity multiplier reach a Habitat and not this, at
         // the designer's word: *"yes everyone arkwrights can always build habitats."* It is what
         // lets a station founded this turn take its first four before anything is built.
         let core: u32 = c.modules.iter().filter(|m| m.kind == ModuleKind::Core).map(|_| self.tables.module(ModuleKind::Core).holds_colonists).sum();
         (habitats * per.max(0) as f64 * faction).floor() as u32 + core
+    }
+
+    /// Ticket #359 (version 0.09.1): whether a SHUT Habitat here -- mothballed, or dark for want of
+    /// Energy -- is OCCUPIED: the Colony holds more Colonists than its working Habitats and its Core
+    /// can house. It still houses them, and while it does the Colony makes everything at half EXCEPT
+    /// Energy, at the designer's word: *"no one likes to be shot while they're down."* Half once,
+    /// however many are shut; a spare Habitat standing empty costs nothing.
+    pub fn habitat_halves(&self, cid: ColonyId) -> bool {
+        let Some(c) = self.colony(cid) else { return false };
+        c.modules.iter().any(|m| m.kind == ModuleKind::Habitat && !m.working()) && c.colonists > self.room_of(c, true)
     }
 
     /// Ticket #140 (version 0.07.3): what an Observatory here is multiplied by -- the slot's own
@@ -3335,9 +3351,12 @@ impl Game {
             .owned_colonies(seat)
             .iter()
             .filter(|c| self.starved_by(**c).is_none())
-            .flat_map(|c| self.colony(*c).into_iter().flat_map(|c| c.modules.iter()))
-            .filter(|m| m.working())
-            .map(|m| self.tables.module(m.kind).influence_allotment)
+            // Ticket #359 (version 0.09.1): at half, rounded down, per Colony, where an occupied
+            // Habitat stands shut.
+            .map(|c| {
+                let n: i64 = self.colony(*c).into_iter().flat_map(|c| c.modules.iter()).filter(|m| m.working()).map(|m| self.tables.module(m.kind).influence_allotment).sum();
+                if self.habitat_halves(*c) { n / 2 } else { n }
+            })
             .sum();
         earth + space
     }

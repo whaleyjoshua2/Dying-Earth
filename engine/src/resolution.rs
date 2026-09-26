@@ -1601,6 +1601,8 @@ impl Game {
         for col in &self.colonies {
             if let Some(c) = col.control.controller() {
                 let r: i64 = col.modules.iter().filter(|m| m.working()).map(|m| self.tables.module(m.kind).standing_per_turn).sum();
+                // Ticket #359 (version 0.09.1): at half under an occupied Habitat standing shut.
+                let r = if self.habitat_halves(col.id) { r / 2 } else { r };
                 if r > 0 {
                     rises.push((c, Place::Colony(col.id), r));
                 }

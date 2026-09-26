@@ -6883,6 +6883,14 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
             "A warship stack ordered to Blockade a station's own orbit starves that station; a Colony on the ground starves while one rival holds Orbital Control of low orbit outright and has a stack on Blockade in low orbit. Every Module makes nothing and pays its upkeep; nobody dies and nothing is destroyed. Each turn of it is an offence against you.",
         );
     }
+    // Ticket #359 (version 0.09.1): an occupied Habitat standing shut halves the Colony, and the
+    // Module rows below still read their whole figures, so the card says so where the starved
+    // line says its own squeeze.
+    if game.habitat_halves(cid) {
+        ui.label(RichText::new("A shut Habitat houses people here: everything but Energy at half.").color(Color32::from_rgb(230, 170, 90))).on_hover_text(
+            "A Habitat mothballed, or dark for want of Energy, still houses its Colonists. While more live here than the working Habitats and the Core can hold, the Colony makes everything at half but its Energy. Restart it, or keep an empty one to mothball.",
+        );
+    }
     // Ticket #164 (version 0.07.5): the room is the Core Module's four and the Habitats' eight
     // each, so the line no longer names Habitats alone.
     ui.label(format!("Colonists {} of {} room", col.colonists, game.habitat_room(col)));

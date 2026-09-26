@@ -631,6 +631,10 @@ impl Game {
             // makes NOTHING and still pays its upkeep, at the designer's word: the squeeze is the
             // point, and the offline switch below, which forgives the upkeep, is the wrong shape.
             let starved = self.starved_by(cid).is_some();
+            // Ticket #359 (version 0.09.1): an occupied Habitat standing shut halves everything the
+            // Colony makes but its Energy, rounded down.
+            let halves = self.habitat_halves(cid);
+            let half = |v: i64| if halves { v / 2 } else { v };
             for (i, m) in col.modules.iter().enumerate() {
                 // Ticket #54: a mothballed Module, the same way.
                 if m.mothballed {
@@ -643,9 +647,9 @@ impl Game {
                     name: m.kind.name(),
                     is_module: true,
                     upkeep: y.upkeep,
-                    output: if starved { None } else { y.resource.map(|r| (r, y.amount)) },
+                    output: if starved { None } else { y.resource.map(|r| (r, if r == Resource::Energy { y.amount } else { half(y.amount) })) },
                     // Ticket #80: an Observatory's Research.
-                    research: if starved { 0 } else { y.research },
+                    research: if starved { 0 } else { half(y.research) },
                     online: !col.grid_failed && !m.offline_until_resolution && !(m.kind == ModuleKind::Archive && occupied),
                     doubled_by: y.doubled_by,
                 });
@@ -750,7 +754,8 @@ impl Game {
                         n += y.amount;
                     }
                 }
-                n
+                // Ticket #359 (version 0.09.1): at half under an occupied Habitat standing shut.
+                if self.habitat_halves(cid) { n / 2 } else { n }
             }
         }
     }

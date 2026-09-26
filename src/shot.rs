@@ -762,6 +762,19 @@ fn build_board(session: &mut Session) {
         {
             g.colony_mut(id).unwrap().modules.push(Module::new(ModuleKind::Habitat));
         }
+        // `shut:1` (a building aid, ticket #359, version 0.09.1), given with `barracks:1`: that Moon
+        // Colony's Habitat and Barracks are mothballed and six live there, two more than the Core
+        // alone holds -- so its card (`hab:ground`) shows the half line and the Build Army door
+        // greyed with the shut Barracks' refusal. Nothing else mothballs before the first Resolution.
+        if std::env::args().any(|a| a == "shut:1")
+            && let Some(id) = g.colonies.iter().find(|c| !c.in_orbit && c.body == BodyId::Moon && c.control.director() == Some(Seat(0))).map(|c| c.id)
+        {
+            let col = g.colony_mut(id).unwrap();
+            for m in col.modules.iter_mut().filter(|m| matches!(m.kind, ModuleKind::Habitat | ModuleKind::Barracks)) {
+                m.mothballed = true;
+            }
+            col.colonists = 6;
+        }
         // `ship:1` (a building aid, ticket #193, version 0.08.0): a Colony Ship of seat 0's sits at
         // Earth, so the Region card's "Send N to Colony Ship" button can be photographed. The
         // computer almost never has one parked at Earth with Emigrants waiting -- about 1.8 Colony
