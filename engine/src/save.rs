@@ -94,7 +94,7 @@ pub const SAVE_VERSION: u32 = 5;
 /// first already claimed and would hand the next founder a windfall the game had already paid.
 /// Every Body row carries a `first_windfall` besides, so a board from before was played under a
 /// rule this version does not have. A refusal naming both versions is the right answer.
-pub const GAME_VERSION: &str = "0.09.0";
+pub const GAME_VERSION: &str = "0.09.1";
 
 /// The game autosaves at the start of the Report phase of every third turn.
 pub const AUTOSAVE_EVERY: u32 = 3;

@@ -1,4 +1,4 @@
-DYING EARTH - playtest build, version 0.09.0
+DYING EARTH - playtest build, version 0.09.1
 ============================================
 
 Thanks for playing. This is an early build of a turn-based strategy game about colonizing
@@ -16,153 +16,78 @@ HOW TO RUN
 4. The very first launch shows a blank dark window for up to ten seconds while it
    compiles graphics. Later launches are quick.
 5. Needs Windows 10 or 11, 64-bit, and any graphics card from the last ten years.
-6. Saves from 0.08.8 and before will not load in this version: what a building costs,
-   what a unit of population means and where a ship sits all changed under them, so an
-   old file describes a board this version cannot read. The Load screen says so. This
-   version ships for Windows only.
+6. Saves from 0.09.0 and before will not load in this version: ships can now carry a
+   warhead and worlds remember who settled them first, so an old file describes a board
+   this version cannot read. The Load screen says so.
+7. This version ships for Windows and for Linux. On Linux, read RUN-ON-LINUX.txt in the
+   folder instead of steps 2 to 5.
 
-WHAT CHANGED SINCE 0.08.8
+WHAT CHANGED SINCE 0.09.0
 -------------------------
-The economy. Last version was about fighting; this one is about paying for things. Every
-rule below the computer plays too.
+Most of this version is the game answering for itself after its first real playtest:
+saying what it knows, and doing what it said. Every rule below the computer plays too.
 
-- EVERYTHING YOU BUILD NOW COSTS WORK AS WELL AS ORE. The ore is Materials, as before,
-  paid in full when you give the order. The work is a new thing called WIDGETS, drawn as
-  a cog. A place makes so many Widgets a turn and pours them into whatever it is
-  building; a building is finished when enough work has gone into it, instead of after a
-  fixed number of turns. Widgets are not saved up, not traded and never go in your
-  stockpile: whatever a place does not use this turn is gone.
-- SO MINES AND FACTORIES DO DIFFERENT JOBS NOW. A Mine digs the ore. A Factory does the
-  work. On Earth the Mine is a new building; every country that started with a Factory
-  now starts with a Mine beside it, so you dig exactly what you always did and the work
-  is new on top. Off Earth the Factory is a new building for a colony or a station, where
-  before a colony's core did all the work itself.
-- A PLACE BUILDS SOMETHING EVEN WITH NO FACTORY. A country makes four Widgets a turn on
-  its own, and one more for every level of industry it has built up; a colony or station
-  makes four from its core. So a bare country still puts up a one-turn building in a
-  turn, as it always did, and a built-up one goes a little faster.
-- YOU MAY ORDER AS MANY BUILDS AS YOU LIKE AT A PLACE, and they are worked on IN THE
-  ORDER YOU GAVE THEM: the turn's work fills the first one and flows on to the next.
-  Nothing is split. Every build button, every tile and the top bar's cog say where a
-  build has got to - "3 of 8" - and how long it should take at that place's rate. Paying
-  Ducats outright still jumps the queue.
-- ONE POPULATION POINT IS NOW ONE MILLION PEOPLE, where it was five million. Every
-  country's figure went up fivefold to match and nothing else about the world changed,
-  so China reads 1454.4 (1.45B) where it read 290.9. One colonist is still one point -
-  now a million people instead of five million.
-- ARMIES ARE RAISED FROM PEOPLE. Raising an army in a country takes a million of its
-  people, on top of its Materials and its Widgets, and is refused if the country has not
-  got them. At a colony it takes one colonist, and is refused if only one lives there.
-  The people do not come back: an army that dies takes them with it. A country's own
-  standing army is the state's and costs you nobody.
-- SHIPS GO TO A PARTICULAR ORBIT. Every world now has several named orbits: LOW ORBIT,
-  hugging the ground, and one for each station slot. You choose which one when you send a
-  ship, and the Transits list on the ship card has a line for every one. Moving between
-  orbits once you are there costs 1 fuel from the ship's own tank.
-  - LOW ORBIT IS THE LANE TO THE GROUND: armies land from it, colonists unload into a
-    ground colony from it, a new colony is founded from it, and a lift from a launch site
-    arrives in it. Orbital control is held there and nowhere else.
-  - A STATION IS ONLY REACHED FROM ITS OWN ORBIT: to unload into it, refuel at it,
-    attack it or blockade it, your ship has to be sitting in that orbit.
-  - SO YOU CAN BLOCKADE A STATION AT LAST. In every version before this one the order
-    needed a warship already parked in the station's slot and no button ever sent one
-    there, so no human player could ever give it.
-  - A BATTERY NOW COVERS ONE ORBIT, not the whole sky. On a ground colony it holds low
-    orbit, which is what keeps a fleet off your surface. On a station it shields that
-    station. This is narrower than last version gave it, on purpose.
-  - A BATTLE IS FOUGHT INSIDE ONE ORBIT, so two fights over one world are two battles,
-    two records and two marks on the map.
-- TAKING A COLONY OR A STATION WITH INFLUENCE COSTS TWICE AS MUCH. A colonist is worth 20
-  where it was 10, and there is now a flat 40 under every place off Earth, so an empty
-  colony is no longer nearly free. A station and a ground colony with the same crew now
-  cost the same, which they never did before. Taking countries on Earth is unchanged, and
-  so is the extra you must beat a current holder by.
-- NEARLY HALF THE EVENT CARDS NOW ASK YOU A QUESTION. The deck is still forty cards, but
-  every duplicate has been cut and eighteen new cards put in their places, so no two
-  cards in the deck are the same. Eighteen of them offer you a bargain with a cost on
-  each side - pay the relief, or go without and take the unrest. A card like that is dealt
-  AT THE START OF THE TURN, before you give any orders, so you can play the turn knowing
-  the answer, and THE TURN WILL NOT END UNTIL YOU HAVE ANSWERED. Every side at the table
-  is asked the same card in the same turn, and the Report tells you what they each said.
-  If you cannot afford the offer you are asked anyway, with that button dead. The other
-  twenty-two cards are the old kind and still simply happen after orders.
-- THE GAME ENDS ON A PAGE THAT SAYS HOW IT WENT. A "Chronicle" button on the game-over box
-  opens it: the four sides RANKED rather than listed in seat order, with the tiebreak
-  named where one decided it and a sentence each saying how they ended and what held them
-  back; a table of their final materials, fuel, energy, Ducats, colonists off Earth,
-  countries, colonies, research and blame; and the population and temperature charts.
-- THE ODDS YOU ARE SHOWN BEFORE A FIGHT ARE NOW THE WHOLE BATTLE'S. This is the biggest
-  fix in the version. Every odds figure in the game - on an attack button's hover, on a
-  ship stack's card, in the battle record afterwards - used to be the chance of winning
-  THE FIRST EXCHANGE, which is not what anybody wants to know. It was wrong in both
-  directions: on one board it read 19.8% where the real chance of winning was 1%, and on
-  another 61% where it was 86%. It now says "the chance of holding the field when the
-  battle is over", and it means it.
-- A REFUSAL NOW TELLS YOU THE RULE, NOT THE PRICE. Ordering something that is not allowed
-  used to answer with what it would have cost. It answers with why you may not.
-- THE REPORT NAMES YOUR ARMIES. Armies have had names for four versions and the march
-  lines never used them.
-- A RELAY OR AN EMBASSY IS AN EYE. One working Embassy in a country you hold lets you read
-  every rival's income on Earth building by building, on their own card; one working Relay
-  at a colony or station does the same for everything at that world. No eye, no figures.
-- SMALLER THINGS: the top bar reads "20 / 20" instead of "20 of 20"; the temperature reads
-  "+1.7 C" with the heading-to figure moved onto its hover; the End Turn sun has room on
-  its left; and the four yields on a "found a colony" button sit beside the words instead
-  of under them.
+NEW RULES
+- NUKES. A new ship, the MISSILE CARRIER, carries one warhead. It cannot fight, and it
+  needs a new Tech, Missile Technology. Fired at a country, colony or station a rival
+  holds, from an orbit you hold outright, it guts the place: most buildings burn, about
+  half the people die, and a country loses its standing army and a level of industry. It
+  can be fired over Earth. On Earth it fouls the air AND raises the natural sink a little
+  for good. A carrier reloads only at a shipyard of your own.
+- THE SINK KEEPS WHAT IT IS GIVEN. "The Sink Weakens" now takes 2.0 off the sink instead
+  of setting it to 4.0, so anything that raised the sink is not wiped out by it.
+- BEING FIRST TO A WORLD PAYS. The first side ever to found a ground colony on a world off
+  Earth gets a one-off windfall of Influence (5 at the Moon, 15 at Mars, 20 at Phobos or
+  Deimos) and +1 Influence a turn while it holds that colony. Stations and Antarctica do
+  not count; Venus has no ground to claim.
+- BATTLES IN SPACE COST FUEL: 2 from every ship in the fight, on both sides. A ship that
+  cannot pay fights at half strength until it refuels, and a warship low on fuel cannot
+  hold an orbit, blockade or intercept.
+- A LAUNCH SITE REACHES ANY ORBIT OF EARTH. You can lift pioneers and armies straight onto
+  a ship at your station's ring; you no longer have to bring it down to low orbit first.
+- A BATTERY FIRES ON A SHIP BLOCKADING ITS ORBIT, so a defended station under blockade is
+  a battle, not just a blockade that does nothing.
+- A SHUT BARRACKS raises and repairs no army. A SHUT HABITAT still houses its people, but
+  while people are living in it the whole colony makes everything but Energy at half.
+- THE ARCHIVISTS' CONDITION: 125 Research into the Archive, the old cap on it gone. The
+  Archive may now be ordered before The Upload is researched; The Upload is still needed
+  to win.
 
-HOW TO PLAY, IN SHORT
----------------------
-- Pick a side on the start screen, then pick where on Earth you begin. Each side wins a
-  different way; its card says how.
-- Click a region or a colony to select it. Its card appears on the right.
-- A region's buildings are the row of boxes on its card. Click an empty box to build.
-- A colony's buildings are the grid of tiles on its card. Click an empty tile to build.
-- EVERY BUILD COSTS MATERIALS AND WIDGETS. The Materials leave your stockpile at once; the
-  Widgets are the work the place puts in, four a turn for every old build turn. The card
-  shows the place's rate and the queue; the tile shows "3 of 8"; the top bar's cog shows
-  what all your places make and what they used.
-- INFLUENCE is how you win regions over. Set the amount on the slider at the bottom right
-  and press Spend, or Max. Off Earth it now costs twice what it did.
-- ARMIES are raised from a region's card, and cost a million of that region's people as
-  well as Materials and Widgets. They march to a neighbouring region from the Armies list
-  on that card. Arriving in a region you do not hold is an attack; hover the button first
-  - the percentage is your chance of holding the field when the whole battle is over.
-  A region's own standing army can march too, but away from home it loses its people's
-  defence.
-- WARSHIPS are built at a shipyard and fight in orbit. Send one to a NAMED ORBIT: low
-  orbit for the ground, a station's own orbit to touch that station. A warship sitting in
-  a rival station's orbit can be ordered to Blockade.
-- The FACTION WINDOW (F) has a page for each side: what they have, what they think of you,
-  what they have under way, what bargains stand between them, where you smear them, and
-  where you request carbon credits. Your own page is where you greenwash.
-- The VICTORY panel (V) shows how far each side is along its own path, and holds your
-  Research Directive slider (and the Prospectors' Fund slider).
-- The TRADING window (R) buys and sells goods.
-- The TECH TREE (T) is shared: everyone's research goes into the same tree unless they
-  keep some back.
-- The roster on the right lists everything you own. An open ring at the end of a row
-  means it is still waiting for an order from you this turn.
-- End Turn - the sun at the bottom right, or press Enter. Thirty-six turns. Watch the
-  temperature in the top bar: at +3.0 C the world collapses and nobody wins.
+THE GAME TELLS YOU WHAT IT KNOWS
+- A place you hold is PRESSED when a rival is within 10 of your Standing there. Pressed
+  places are listed under the Influence slider; click one to go there.
+- Your first Report names your own Victory Condition, with its real figures.
+- The Energy figure on the top bar TURNS RED when your next Income will shut buildings
+  down, and its hover says which, in order.
+- Pointing at a building's figure SHOWS THE ARITHMETIC: "2 base x 1.32 for 1.45B people x
+  1.10 for Education x 1.25 as the Custodians = 3.63, rounded down to 3". Education counts
+  twice in a Research Lab, and now it says so.
+- A button that is shut because your ship is in the wrong orbit SAYS WHAT TO DO: "Move
+  this Ship to Earth, at ISS, then refuel next turn."
+- On a country's card, the PIONEERS block (Recruit, and the buttons that send them) now
+  sits above the building tiles, where it can be seen.
+- The Report's "have not forgiven" lines are gone. It now tells you only when a side falls
+  to a worse mood toward you, or you toward them: "The Prospectors are now Cold toward
+  you."
+
+SEVEN THINGS THAT WERE UNTRUE, NOW TRUE
+- A build refusal says whether a shipyard is missing, still building or shut. A founding
+  names the right site. A partial unload and a lift that ran out of room say who stayed.
+  A lift fills as far as the room goes instead of refusing. The Research Directive line
+  says what it bought. A quiet turn's Report opens with a headline. Relay Networks and the
+  Arkwrights' Chorus now actually pay the Influence they always showed.
 
 WHAT WE WANT TO KNOW
 --------------------
 Write down anything, however small. Especially:
 - The moment you were not sure what to do next.
 - Anything you clicked that did nothing, or did something you did not expect.
-- WIDGETS: did you work out what the cog meant without being told? Did you ever wonder
-  why a building was taking so long? Did you notice work being wasted at a place with
-  nothing to build?
-- THE BUILD QUEUE: did you expect the first thing you ordered to be finished first? Did
-  you want to reorder it?
-- THE CARDS THAT ASK: was the question clear? Did you feel the two sides were a real
-  choice, or was one obviously right every time? Was being unable to end the turn
-  annoying or fair?
-- ORBITS: did you know which orbit to send a ship to? Did you find the blockade? Was the
-  Transits list, with a line for every orbit, too long?
-- THE ATTACK ODDS: now that the number is the whole battle, did it match what happened?
-- THE CHRONICLE at the end: did you read it? Was anything you wanted missing?
-- ARMIES COSTING PEOPLE: did you feel it? Did a refusal ever surprise you?
+- NUKES: did you build one? Did being nuked by a computer side feel fair, or out of
+  nowhere? Did you know how to stop one?
+- PRESSED: did you notice the list? Did it make you spend Influence to hold a place?
+- THE ARITHMETIC HOVERS: did you read them? Were they too long?
+- THE RED ENERGY FIGURE: did it warn you in time?
+- BEING FIRST TO A WORLD: did the windfall change where you sent your first colony?
 - Anything that still says the same thing twice.
 - The turn the game got boring, if it did, and the turn you felt you had lost.
 - Crashes: what you were doing, and the "Seed" number shown on the title screen and
@@ -177,55 +102,26 @@ first. These are known. You do not need to report them.
 
 WHAT THIS VERSION KNOWS ABOUT ITSELF
 
-- THE WIN COLUMN MOVED HARD, AND WE KNOW WHY. Custodians 5, Prospectors 31, Arkwrights 1,
-  Archivists 0, where last version was 43 / 22 / 1 / 0. THE CUSTODIANS ARE WINNING FAR
-  LESS THAN THEY WERE. It is not the pace of building: it is Earth's emissions. Pulling
-  the Mine out of the Factory means two buildings pollute on Earth where one did, and the
-  games used to end a hair under the collapse line. The next version is about balance and
-  this is its first lever.
-- THE WORLD COLLAPSES IN 42 GAMES OF 80, where it was 14, for the same reason.
-- THE WAR IN SPACE IS QUIET. In eighty games the computer sides ordered TWO blockades and
-  opened effectively no battles in orbit at all. A side keeps about one warship and the
-  new rule rightly parks it in low orbit, where no station sits, so it is never next to
-  anything to shut. No army was landed from a carrier, no interception was fought and no
-  bombard was fired. These rules are there for YOU.
+- THE WIN COLUMN: Custodians 6, Prospectors 28, Arkwrights 3, Archivists 2, where last
+  version was 5 / 31 / 1 / 0. The two sides that won nothing now win something; the
+  Prospectors still take over a third of all games.
+- THE WORLD COLLAPSES IN 41 GAMES OF 80, where it was 42.
+- THE WAR IN SPACE HAS STARTED. The computer sides now blockade in 20 games of 80 and
+  fire nukes in 21 (39 launches in all). Battles in orbit are still rare: 7 games of 80.
+- THE ARCHIVISTS RARELY WIN ON THEIR CONDITION. The Archive now gets built in 12 games of
+  80 and finished in 8, but it finishes around turn 33 of 36, too late to upload the 12
+  colonists their win asks for.
+- NOBODY CAN ACCEPT OR DECLINE AN ACCORD OFFERED TO THEM - INCLUDING YOU. The game still
+  answers on your behalf.
 - THE THREAT LINE ON A COUNTRY'S CARD STILL QUOTES THE FIRST EXCHANGE, while every other
-  odds figure in the game is now the whole battle's. This was left alone deliberately:
-  that figure is the one the computer's own attack decision compares against, and moving
-  one without the other would make the amber warning a lie. It will move when both do.
-- THE SHIP STACK CARD'S "FOUND A COLONY" BUTTONS ARE RAGGED down their right edge, now
-  that the four yields sit beside the words instead of under them. Cosmetic, and known.
-- NOBODY CAN ACCEPT OR DECLINE AN ACCORD OFFERED TO THEM - INCLUDING YOU. When a side
-  offers you a bargain the game answers on your behalf by the same rule it uses for the
-  computer sides. There has never been a button. So diplomacy is one-sided in a way no
-  rule ever decided, and it wants a ticket of its own.
-- AN ARMED WARSHIP AGAINST THREE UNARMED HULLS READS ABOUT 24%, which looks wrong and is
-  not: holding an orbit means clearing every hull out of it, which is not the same thing
-  as taking orbital control.
+  odds figure is the whole battle's. Deliberate, until both move together.
 
 CARRIED OVER, STILL TRUE
 
-- ONLY NON-AGGRESSION BARGAINS STAND between computer sides at the end of a game. Passage
-  is still never struck between them - they never get warm enough with each other at the
-  moment they offer - and no refuel was ever drawn at a partner's station in eighty
-  games. You can strike either with them.
-- CARDS CAN STILL FIND NOTHING TO HIT: about two a game now, roughly half what it was,
-  because with no duplicate copies a card spent off Earth cannot come round again.
-- THE COMPUTER ALMOST NEVER BUILDS THE ARCHIVISTS' HELIOSTAT OR THE CUSTODIANS' ACADEMY
-  (none and one, in eighty games). You can build either by hand.
-- FUEL AND ENERGY PRICES BARELY MOVE, because the computer sides never sell goods. As
-  last version.
+- FUEL AND ENERGY PRICES BARELY MOVE, because the computer sides never sell goods.
 - WHERE EACH SIDE STARTS IS NOT RANDOM. The computer sides always take the richest free
-  countries in the same order, so the third and fourth sides are dealt the leftovers.
+  countries in the same order.
 - RENAMING SHIPS, COLONIES AND STATIONS is still cut.
-- On an 800-pixel-tall window the Faction window is taller than the screen and opens at
-  the very top; on a taller window it sits under the top bar.
-- A station ring can be edge-on for a moment as you turn the globe; it comes back as
-  you keep turning.
-- The list of station slots on the Solar System Map appears only while you point at
-  the world, because open all the time it covered the Moon.
-- A region's name at the very edge of the globe on the start screen can sit half under
-  the panel. Turn the globe a little.
 - Antarctica's three colony sites have labels that overlap each other when you are zoomed
   out.
 - No sound.
