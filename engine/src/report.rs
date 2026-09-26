@@ -1,7 +1,7 @@
 //! Ticket #58: the Report as a dated dispatch.
 //!
 //! Every sentence the Report says lives in `assets/data/report.toml`; this module holds the kinds
-//! a line can have, the severity order the headline and the Moments read, the four headings the
+//! a line can have, the severity order the headline and the Moments read, the five headings the
 //! rest is grouped under, and the template renderer with its validation.
 
 use crate::ids::{BodyId, ColonyId, Orbit, Place, Seat, StateId, TechId};
@@ -35,7 +35,7 @@ impl From<Place> for ReportPlace {
 // ---------------------------------------------------------------- what a line is about
 
 /// What one Report line is about. The kind decides two things: the line's place in the severity
-/// order the headline is chosen by (`headline_rank`), and which of the four headings it is grouped
+/// order the headline is chosen by (`headline_rank`), and which of the five headings it is grouped
 /// under (`section`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum LineKind {
@@ -79,7 +79,8 @@ pub enum LineKind {
     Card,
 }
 
-/// The four headings the dispatch groups its lines under, in the order they are shown.
+/// The five headings the dispatch groups its lines under, in the order they are shown (four until
+/// ticket #370, version 0.09.2, added Ships).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum Section {
     InSpace,
@@ -330,7 +331,7 @@ impl Report {
             .map(|(_, i)| i)
     }
 
-    /// Every line that is not the headline, in the order the four headings are shown.
+    /// Every line that is not the headline, in the order the five headings are shown.
     pub fn sections(&self) -> Vec<(Section, Vec<&ReportLine>)> {
         let head = self.headline_index();
         Section::ALL
@@ -412,7 +413,6 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("ship_arrived", &["faction", "ship", "body"]),
     // Ticket #370 (version 0.09.2): the player's Colonists still aboard off Earth, one line a Body.
     ("colonists_waiting", &["n", "where", "blocked"]),
-    ("waiting_blocked", &[]),
     // Ticket #335 (version 0.09.0): a Ship that changed orbit at the Body it stands at.
     ("orbit_changed", &["faction", "ship", "orbit"]),
     ("ship_destroyed", &["faction", "ship", "why", "cargo"]),
@@ -570,6 +570,14 @@ pub fn ordinal(n: usize) -> String {
 /// The same for `[phrase]`.
 pub const PHRASE_ARGS: &[(&str, &[&str])] = &[
     ("attacks", &[]),
+    // Ticket #370 (version 0.09.2): where the player's Colonists wait aboard, and what blocks them.
+    ("waiting_low", &["body"]),
+    ("waiting_station", &["station", "body"]),
+    ("waiting_many", &["body", "parts"]),
+    ("waiting_part_low", &["n"]),
+    ("waiting_part_station", &["n", "station"]),
+    ("waiting_blocked", &[]),
+    ("waiting_blockaded", &["station"]),
     // Ticket #351 (version 0.09.1): the Sink's loss on the Shortfall line.
     ("energy_short_sink", &["ppm"]),
     ("cargo_aboard", &["n"]),

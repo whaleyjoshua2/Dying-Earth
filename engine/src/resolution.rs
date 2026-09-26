@@ -84,42 +84,46 @@ impl Game {
         if self.spectator {
             return;
         }
-        let seat = Seat(0);
+        let me = Seat(0);
         for body in BodyId::ALL {
             if body == BodyId::Earth {
                 continue;
             }
-            // By orbit, low orbit first and then the slots in order, which is how `Option<u32>` sorts.
-            let mut by_orbit: std::collections::BTreeMap<Option<u32>, u32> = std::collections::BTreeMap::new();
-            for s in self.ships.iter().filter(|s| s.seat == seat && s.colonists > 0 && s.at == ShipAt::Body(body)) {
-                *by_orbit.entry(s.slot).or_insert(0) += s.colonists;
+            // By orbit: low orbit first, then the slots in order, which is how `Orbit` sorts.
+            let mut by_orbit: std::collections::BTreeMap<Orbit, u32> = std::collections::BTreeMap::new();
+            for s in self.ships.iter().filter(|s| s.seat == me && s.colonists > 0 && s.at == ShipAt::Body(body)) {
+                *by_orbit.entry(self.ship_orbit(s)).or_insert(0) += s.colonists;
             }
             if by_orbit.is_empty() {
                 continue;
             }
             let name = self.tables.body(body).name.clone();
-            let phrase = |g: &Game, slot: Option<u32>| match slot {
-                None => format!("in low orbit of {name}"),
-                Some(n) => format!("at {} over {name}", g.station_name(body, n)),
-            };
             let n: u32 = by_orbit.values().sum();
-            let where_ = if by_orbit.len() == 1 {
-                phrase(self, *by_orbit.keys().next().unwrap())
-            } else {
-                let parts: Vec<String> = by_orbit
-                    .iter()
-                    .map(|(slot, k)| match slot {
-                        None => format!("{k} in low orbit"),
-                        Some(i) => format!("{k} at {}", self.station_name(body, *i)),
-                    })
-                    .collect();
-                format!("at {name}: {}", parts.join(", "))
+            let orbits: Vec<Orbit> = by_orbit.keys().copied().collect();
+            let where_ = match orbits.as_slice() {
+                [Orbit::Low] => self.phrase("waiting_low", &[("body", name)]),
+                [Orbit::Slot(i)] => self.phrase("waiting_station", &[("station", self.station_name(body, *i)), ("body", name)]),
+                _ => {
+                    let parts: Vec<String> = orbits
+                        .iter()
+                        .map(|o| match o {
+                            Orbit::Low => self.phrase("waiting_part_low", &[("n", by_orbit[o].to_string())]),
+                            Orbit::Slot(i) => self.phrase("waiting_part_station", &[("n", by_orbit[o].to_string()), ("station", self.station_name(body, *i))]),
+                        })
+                        .collect();
+                    self.phrase("waiting_many", &[("body", name), ("parts", parts.join(", "))])
+                }
             };
-            let blocked = by_orbit.keys().any(|slot| match slot {
-                None => !self.may_land(seat, body),
-                Some(i) => self.slot_blockaded_against(seat, body, *i),
-            });
-            let blocked = if blocked { self.say("waiting_blocked", &[]) } else { String::new() };
+            // A rival's Orbital Control shuts the ground below low orbit; a rival's Blockade shuts
+            // the station a Ship is docked at. Different things in the glossary, so different words.
+            let blocked = orbits
+                .iter()
+                .find_map(|o| match o {
+                    Orbit::Low if !self.may_land(me, body) => Some(self.phrase("waiting_blocked", &[])),
+                    Orbit::Slot(i) if self.slot_blockaded_against(me, body, *i) => Some(self.phrase("waiting_blockaded", &[("station", self.station_name(body, *i))])),
+                    _ => None,
+                })
+                .unwrap_or_default();
             let text = self.say("colonists_waiting", &[("n", n.to_string()), ("where", where_), ("blocked", blocked)]);
             self.report_line(LineKind::Ship, Some(ReportPlace::Body(body)), text);
         }

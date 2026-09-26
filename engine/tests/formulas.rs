@@ -15416,29 +15416,6 @@ fn no_card_of_either_kind_is_drawn_on_the_first_turn_and_the_deck_is_untouched()
     assert!((10..=50).contains(&drew), "turn {}: {drew} of 60 seeds drew, which is not a coin", t.events.first_draw_turn);
 }
 
-/// Ticket #370 (version 0.09.2): a warship of `seat` standing in low orbit of `body`, fuelled, on
-/// Hold -- enough, alone, to hold Orbital Control there.
-fn frigate_in_low_orbit(g: &mut Game, seat: Seat, body: BodyId) -> ShipId {
-    let id = ShipId(g.fresh_id());
-    let turn = g.turn;
-    g.ships.push(Ship {
-        id,
-        name: String::new(),
-        kind: UnitKind::Frigate,
-        seat,
-        damage: 0,
-        at: ShipAt::Body(body),
-        colonists: 0, warhead: false, colonists_education: 1.0,
-        army: None,
-        stance: Stance::Hold,
-        escaped: false,
-        arrived_this_turn: false,
-        built_turn: turn,
-        fuel: 30, slot: None,
-    });
-    id
-}
-
 /// Ticket #370 (version 0.09.2): **the player's Colonists still aboard off Earth are reported every
 /// turn they wait**, one line a Body, under Ships; a rival's are not; and the line says when a
 /// rival's Orbital Control stops the landing.
@@ -15471,7 +15448,7 @@ fn colonists_waiting_aboard_off_earth_are_reported_every_turn_under_ships() {
     // A rival warship takes Orbital Control of the Moon, and the line says the landing is blocked.
     // The Resolution is run by hand, since the computer plays seat 1 and would order the frigate
     // elsewhere in a whole turn; the Report is cleared first, as a new turn clears it.
-    frigate_in_low_orbit(&mut g, Seat(1), BodyId::Moon);
+    ship_in(&mut g, Seat(1), UnitKind::Frigate, BodyId::Moon, None, Stance::Hold);
     assert_eq!(g.orbital_control(BodyId::Moon), Some(Seat(1)), "the fixture: the rival holds the orbit");
     g.report.lines.clear();
     g.resolution_phase();

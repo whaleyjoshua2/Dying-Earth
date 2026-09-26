@@ -10015,7 +10015,7 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 }
                 ui.separator();
                 egui::ScrollArea::vertical().max_height(520.0).show(ui, |ui| {
-                    // The four headings, empty ones left out; every line with a place is a way there.
+                    // The five headings, empty ones left out; every line with a place is a way there.
                     for (section, lines) in game.report.sections() {
                         // Ticket #337 (version 0.09.0): a seat's ANSWER to the turn's Choice Card is
                         // lifted out of the heading it landed under -- the player's own under Your

@@ -46,6 +46,24 @@ the right lists at Mars with 8 Colonists aboard.
 Ship after the turn is played, so the Resolution never saw it. The `settler:` aid now writes the
 line itself through the same pass the Resolution runs, and says so in its comment.
 
+## The review
+
+Two axes, run as sub-agents over the commit.
+
+**Standards**: two breaches, both fixed. The `{where}` fragments a player reads were built in Rust
+with `format!`; they are seven `waiting_*` phrases in `report.toml`'s `[phrase]` table now, as every
+other fragment is. The test's frigate fixture duplicated the tree's own `ship_in`; it uses it. Three
+judgement calls taken: the pass keys its orbits on `Orbit` rather than the raw slot, drops a closure
+that took the game it already had, and names the player `me` as the file does elsewhere.
+
+**Spec**: nothing missing against the decision. **One collision with the glossary, fixed**: a rival's
+Blockade of a station's orbit had the same ending as a rival's Orbital Control of low orbit, and the
+glossary insists they are different things; a docked Ship shut by a Blockade now reads *", blocked by
+a rival's Blockade of Ares"*. That arm has no test of its own. Six comments still said "four
+headings"; they say five. **One reading left for the designer**: the player's own *loaded* and
+*disembarked* lines are filed as works of the player's (Your works) and did not move; a rival's did.
+If those count as Ship lines, it is one word each to move them.
+
 ## The gate
 
 `cargo clippy --workspace --release --all-targets -- -D warnings` clean; engine 486 + 6, root 8.

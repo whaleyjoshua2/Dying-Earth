@@ -1,7 +1,8 @@
 # Ticket #58: every sentence the Report says.
 #
 # The Report is a dated dispatch: one headline chosen by severity, then the lines that are left
-# grouped under In space, On Earth, The climate and Your works, then what each rival Faction did in
+# grouped under In space, On Earth, The climate, Ships (ticket #370, version 0.09.2) and Your works,
+# then what each rival Faction did in
 # plain words. Every one of those sentences is a template here, with named placeholders in braces.
 #
 # The engine declares, per key, the placeholders it supplies (`report::TEMPLATE_ARGS`). Loading the
@@ -26,11 +27,9 @@ solar_storm = "Solar Storm: no transit advanced this turn."
 ship_arrived = "{faction} {ship} arrived at {body}."
 # Ticket #370 (version 0.09.2): the player's own Colonists still aboard a Ship off Earth, every turn
 # they wait, one line a Body, in the designer's words -- "colonists wait aboard in low orbit of
-# Mars", with "blocked by rivals' control of the orbit" when a rival's Orbital Control or blockade
-# stops the landing. {where} is "in low orbit of Mars" or "at Ares over Mars", or, when they wait
-# in more than one orbit, "at Mars: 2 in low orbit, 2 at Ares".
+# Mars", with "blocked by rivals' control of the orbit" when a rival's Orbital Control shuts the
+# ground. {where} and {blocked} are the waiting_* phrases below.
 colonists_waiting = "{n} Colonists wait aboard {where}{blocked}."
-waiting_blocked = ", blocked by rivals' control of the orbit"
 # Ticket #335 (version 0.09.0): a Ship that changed orbit rather than flying away.
 orbit_changed = "{faction} {ship} moved to {orbit}."
 ship_destroyed = "{faction} {ship} destroyed ({why}){cargo}."
@@ -215,6 +214,17 @@ energy_zero = "{faction}: Energy fell to zero even with every producer off."
 # ---------------------------------------------------------------- fragments other sentences use
 [phrase]
 attacks = " and attacks"
+# Ticket #370 (version 0.09.2): where the player's Colonists wait aboard, and what blocks them. One
+# orbit reads "in low orbit of Mars" or "at Ares over Mars"; more than one, "at Mars: 2 in low
+# orbit, 2 at Ares". A rival's Orbital Control of low orbit shuts the ground, in the designer's
+# words; a rival's Blockade of a station's orbit is a different thing in the glossary and says so.
+waiting_low = "in low orbit of {body}"
+waiting_station = "at {station} over {body}"
+waiting_many = "at {body}: {parts}"
+waiting_part_low = "{n} in low orbit"
+waiting_part_station = "{n} at {station}"
+waiting_blocked = ", blocked by rivals' control of the orbit"
+waiting_blockaded = ", blocked by a rival's Blockade of {station}"
 # Ticket #351 (version 0.09.1): what the Natural Sink loses with the Scrubbers a Shortfall shut.
 energy_short_sink = "; the Natural Sink loses {ppm} ppm"
 cargo_aboard = " with {n} Colonists aboard"
