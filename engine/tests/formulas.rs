@@ -8305,6 +8305,55 @@ fn climate_charges_the_emissions_the_card_shows() {
     assert!(g.emissions_now().power_plants < whole, "and the air is charged it");
 }
 
+/// Ticket #362 (version 0.09.1): the Report tells the player of a pair INVOLVING THEM that fell into
+/// a worse named level, both directions, folded one line each -- and nothing of a point's slide
+/// within a level, nor of rivals' quarrels between themselves. The designer: *"quiet the 'has not
+/// forgiven' spam."*
+#[test]
+fn the_report_tells_only_a_fall_into_a_worse_level_involving_the_player() {
+    let mut g = game();
+    calm(&mut g);
+    let names: Vec<String> = Seat::ALL.iter().map(|s| g.seat_name(*s)).collect();
+    // Seat 1 sits at the foot of Wary toward the player, and falls into Cold.
+    g.relations.score[1][0] = -5;
+    g.offend_by(Seat(0), Seat(1), 2);
+    // Seat 2 sits in the middle of Cold toward the player, and slides a point within it.
+    g.relations.score[2][0] = -6;
+    g.offend_by(Seat(0), Seat(2), 1);
+    // The player sits at Neutral's foot toward seat 3 and falls into Wary.
+    g.relations.score[0][3] = -2;
+    g.offend_by(Seat(3), Seat(0), 2);
+    // Seats 1 and 2 quarrel between themselves, into Cold.
+    g.relations.score[2][1] = -5;
+    g.offend_by(Seat(1), Seat(2), 2);
+    // The level a player reads carries the Blame term on top of the deeds, so each starting score is
+    // walked until the LEVEL is the one this test means.
+    for (v, o, want, edge) in [(1usize, 0usize, "Wary", true), (2, 0, "Cold", false), (0, 3, "Neutral", true), (2, 1, "Wary", true)] {
+        while g.relations_level(Seat(v as u8), Seat(o as u8)) != want {
+            g.relations.score[v][o] += if ["Hostile", "Cold", "Wary", "Neutral", "Cordial", "Friendly"].iter().position(|x| *x == g.relations_level(Seat(v as u8), Seat(o as u8))).unwrap() < ["Hostile", "Cold", "Wary", "Neutral", "Cordial", "Friendly"].iter().position(|x| *x == want).unwrap() { 1 } else { -1 };
+        }
+        // At a level's foot, one point takes it down; in the middle, one point does not.
+        if edge {
+            while g.relations_level(Seat(v as u8), Seat(o as u8)) == want {
+                g.relations.score[v][o] -= 1;
+            }
+            g.relations.score[v][o] += 1;
+        } else {
+            g.relations.score[v][o] -= 1;
+            assert_eq!(g.relations_level(Seat(v as u8), Seat(o as u8)), want, "still inside {want}");
+            g.relations.score[v][o] += 1;
+        }
+    }
+    g.report.lines.clear();
+    g.settle_relations();
+    let texts: Vec<String> = g.report.lines.iter().map(|l| l.text.clone()).collect();
+    assert!(texts.iter().any(|t| t == &format!("The {} are now Cold toward you.", names[1])), "a rival's fall into Cold: {texts:?}");
+    assert!(texts.iter().any(|t| t == &format!("You are now Wary of the {}.", names[3])), "the player's own fall into Wary: {texts:?}");
+    assert!(!texts.iter().any(|t| t.contains(&names[2]) && t.contains("toward you")), "a slide within Cold says nothing: {texts:?}");
+    assert!(!texts.iter().any(|t| t.contains("forgiven")), "the old line is retired: {texts:?}");
+    assert_eq!(texts.iter().filter(|t| t.contains("are now") || t.contains("You are now")).count(), 2, "rivals' own quarrel says nothing: {texts:?}");
+}
+
 /// Ticket #99: a transit names the Orbital Slot it arrives into, and refuses a slot the Body has not
 /// got. The choice is made with the leg, so it is made before the Ship can see who will be there.
 #[test]

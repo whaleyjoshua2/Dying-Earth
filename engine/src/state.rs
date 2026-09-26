@@ -4572,6 +4572,9 @@ impl Game {
     /// goodwill would mostly be between Factions on opposite sides of the board who have never met.
     pub fn settle_relations(&mut self) {
         let c = self.tables.relations.clone();
+        // Ticket #362 (version 0.09.1): the named level of every pair involving the player, read
+        // before the update, so a fall into a worse level can be told without a field in the save.
+        let before: [[&'static str; SEAT_COUNT]; SEAT_COUNT] = std::array::from_fn(|v| std::array::from_fn(|o| if v == o { "" } else { self.relations_level(Seat(v as u8), Seat(o as u8)) }));
         for victim in Seat::ALL {
             for offender in Seat::ALL {
                 if victim == offender {
@@ -4629,16 +4632,37 @@ impl Game {
                 self.relations.credited[v][o] = false;
             }
         }
-        // The Report line goes in the OFFENDER's paragraph: it is what sends a player to the grid.
-        for victim in Seat::ALL {
-            for offender in Seat::ALL {
-                if victim == offender || !self.relations.fell[victim.index()][offender.index()] {
-                    continue;
-                }
-                let text = self.say("relations_fell", &[("victim", self.seat_name(victim)), ("offender", self.seat_name(offender))]);
-                self.log(text.clone());
-                self.report_line_of(offender, LineKind::YourWorks, LineKind::Note, None, text);
-            }
+        // Ticket #362 (version 0.09.1): **only a pair involving the player, only a fall into a worse
+        // named level, both ways, folded one line each.** Ticket #191's line went to the offender's
+        // paragraph for every pair whose score fell a point, rivals' quarrels included -- 1.5 lines a
+        // turn on average and twelve at worst, measured over eighty games. A spectator has no player.
+        if self.spectator {
+            return;
+        }
+        let rank = |l: &str| ["Hostile", "Cold", "Wary", "Neutral", "Cordial", "Friendly"].iter().position(|x| *x == l).unwrap_or(0);
+        let me = Seat(0);
+        let worse = |g: &Game, v: Seat, o: Seat| {
+            let now = g.relations_level(v, o);
+            (rank(now) < rank(before[v.index()][o.index()])).then_some(now)
+        };
+        // They think worse of the player.
+        let they: Vec<(String, &'static str)> = me.others().into_iter().filter_map(|r| worse(self, r, me).map(|l| (self.seat_name(r), l))).collect();
+        if let Some((first, level)) = they.first().cloned() {
+            let more: String = they[1..].iter().map(|(who, l)| format!(", the {who} {l}")).collect();
+            let text = self.say("relations_they", &[("first", first), ("level", level.to_string()), ("more", more)]);
+            self.log(text.clone());
+            self.report_line_of(me, LineKind::YourWorks, LineKind::Note, None, text);
+        }
+        // The player thinks worse of them: who has been crossing the player.
+        let you: Vec<String> = me
+            .others()
+            .into_iter()
+            .filter_map(|r| worse(self, me, r).map(|l| format!("{l} {} the {}", if l == "Wary" { "of" } else { "toward" }, self.seat_name(r))))
+            .collect();
+        if !you.is_empty() {
+            let text = self.say("relations_you", &[("list", you.join(", "))]);
+            self.log(text.clone());
+            self.report_line_of(me, LineKind::YourWorks, LineKind::Note, None, text);
         }
     }
 

@@ -132,7 +132,11 @@ colonists_no_room = "{n} Colonists at {colony} had nowhere to live and were lost
 # them fell, so a player is sent to the grid on the Victory window rather than expected to watch it.
 # Ticket #192 (version 0.08.0): the Upload, in the Report.
 uploaded = "{n} Colonists were uploaded into the Archive at {colony}: {total} in all."
-relations_fell = "The {victim} have not forgiven the {offender}."
+# Ticket #362 (version 0.09.1): only a pair INVOLVING THE PLAYER, only when it falls into a worse
+# named level, both directions, folded one line each -- at the designer's word, "quiet the 'has
+# not forgiven' spam". `relations_fell` ("The {victim} have not forgiven the {offender}.") is retired.
+relations_they = "The {first} are now {level} toward you{more}."
+relations_you = "You are now {list}."
 # Ticket #332 (version 0.09.0): the fire takes the turn's Widgets from its Region, so nothing there
 # moves; before, it pushed a due Ship back a turn.
 launch_pad_fire = "Launch Pad Fire: {place} applies no Widgets this turn; {widgets} lost."

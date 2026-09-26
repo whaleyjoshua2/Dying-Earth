@@ -487,8 +487,10 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     // Ticket #332 (version 0.09.0): a rival's build cancelled by the place's new holder.
     ("build_cancelled", &["faction", "building", "place", "refund"]),
     ("colonists_no_room", &["n", "colony"]),
-    // Ticket #191 (version 0.08.0): Relations, said in the offender's paragraph.
-    ("relations_fell", &["victim", "offender"]),
+    // Ticket #191 (version 0.08.0): Relations. Ticket #362 (version 0.09.1): a fall into a worse
+    // level of a pair involving the player, one line each way.
+    ("relations_they", &["first", "level", "more"]),
+    ("relations_you", &["list"]),
     ("uploaded", &["n", "colony", "total"]),
     // Ticket #332 (version 0.09.0): the fire takes the Region's Widgets for the turn.
     ("launch_pad_fire", &["place", "widgets"]),
