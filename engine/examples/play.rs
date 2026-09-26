@@ -196,10 +196,10 @@ const GRAMMAR: &str = r#"ORDER LINES (one per line; `#` starts a comment; blank 
                                        Colonist, and a place without the people to spare is refused.
   build station <body> <slot>          e.g. build station moon 0; Materials alone, no Widgets
   build archive <colony>               the Archivists only, at a Colony OFF EARTH (neither Antarctica
-                                       nor a station over Earth), where four Colonists already live,
-                                       and only once The Upload stands. All three are checked at the
-                                       order and never again (ticket #199); this entry named none of
-                                       the three until ticket #353, version 0.09.1.
+                                       nor a station over Earth), where four Colonists already live.
+                                       Both are checked at the order and never again. The Upload
+                                       gates the Archivists' WIN, not this order (ticket #361,
+                                       version 0.09.1, undoing ticket #199).
   industry <state>                     raise the Industry Level
   cancel-build <place> <index>         cancel a build ANOTHER seat began at a place you now direct,
                                        which is what a conquest leaves behind: its Materials come

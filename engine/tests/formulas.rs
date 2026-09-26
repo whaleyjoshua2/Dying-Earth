@@ -2249,12 +2249,11 @@ fn ticket_347_moves_the_archives_money_and_none_of_its_other_gates() {
     assert_eq!((card.materials, card.widgets, card.energy_upkeep), (50, 12, 12), "50 Materials, 12 Widgets, 12 Energy");
     assert_eq!(g.tables.archive.colonists_to_order, 4, "four Colonists must live there at the order");
     assert_eq!(g.tables.victory_gate(FactionKind::Archivists), Some(TechId::TheUpload), "The Upload is still the gate");
-    // And the three refusals the order still makes: the gate Tech, the Colonists, and Earth.
+    // And the refusals the order still makes: the Colonists and Earth. Ticket #361 (version 0.09.1)
+    // took the gate Tech off the order at the designer's word; it gates the win.
     g.seats[3].stockpile.materials = 200;
     let mars = colony(&mut g, Seat(3), BodyId::Mars, &[ModuleKind::Habitat], 4);
-    assert!(g.check_order(Seat(3), &[], &Order::BuildArchive { colony: mars }).unwrap_err().0.contains("The Upload"), "the gate Tech");
-    the_upload(&mut g);
-    assert!(g.check_order(Seat(3), &[], &Order::BuildArchive { colony: mars }).is_ok(), "four Colonists off Earth, with the Tech: allowed");
+    assert!(g.check_order(Seat(3), &[], &Order::BuildArchive { colony: mars }).is_ok(), "four Colonists off Earth, with or without the Tech: allowed");
     g.colony_mut(mars).unwrap().colonists = 3;
     assert!(g.check_order(Seat(3), &[], &Order::BuildArchive { colony: mars }).unwrap_err().0.contains("4 Colonists"), "three is not four");
     let home = colony(&mut g, Seat(3), BodyId::Earth, &[ModuleKind::Habitat], 8);
@@ -2515,13 +2514,11 @@ fn the_archivist_ai_builds_its_way_off_earth_and_then_the_archive() {
     // Tech takes would be worse than the gate itself. Both are guaranteed by the validator rather
     // than by a guard in the AI: `check_order` drops the candidate and `check_order_legality` stops
     // it reserving. The place has its four Colonists here, so the Tech is all that is left.
+    // Ticket #361 (version 0.09.1): The Upload no longer gates the ORDER, so with four Colonists
+    // living on Mars the computer orders the Archive at once, Tech or no Tech.
     assert!(!g.has_tech(TechId::TheUpload), "the premise: the world has not researched it yet");
     let orders = g.ai_orders(arc);
-    assert!(!orders.iter().any(|o| matches!(o, Order::BuildArchive { .. })), "it should not order what the Tech refuses: {orders:?}");
-    assert!(
-        orders.iter().any(|o| matches!(o, Order::BuildFacility { .. } | Order::BuildModule { .. })),
-        "and it should get on with something else rather than hold its Materials for an Archive it cannot order: {orders:?}"
-    );
+    assert!(orders.iter().any(|o| matches!(o, Order::BuildArchive { .. })), "it orders the Archive before The Upload: {orders:?}");
     the_upload(&mut g);
     let axiom = station_of(&g, arc, BodyId::Earth).unwrap();
     // Ticket #192 (version 0.08.0): the Archive goes to the oldest place that can take it, and since
@@ -8354,6 +8351,42 @@ fn the_report_tells_only_a_fall_into_a_worse_level_involving_the_player() {
     assert_eq!(texts.iter().filter(|t| t.contains("are now") || t.contains("You are now")).count(), 2, "rivals' own quarrel says nothing: {texts:?}");
 }
 
+/// Ticket #361 (version 0.09.1): **the Archivists ferry.** While their uploads are short of the bar,
+/// a loaded Colony Ship of theirs at Earth crosses to a Body off Earth rather than landing in
+/// Antarctica or at their station over Earth, neither of which holds the Archive. Measured before: a
+/// Colony on another Body stood in 19 games of 80.
+#[test]
+fn the_archivists_ferry_their_people_off_earth() {
+    let mut g = game();
+    calm(&mut g);
+    g.antarctica_open = true;
+    let arc = seat_of(&g, FactionKind::Archivists);
+    let station = station_of(&g, arc, BodyId::Earth).expect("their station over Earth");
+    g.colony_mut(station).unwrap().modules.push(Module::new(ModuleKind::Habitat));
+    g.colony_mut(station).unwrap().colonists = 0;
+    let slot = g.colony(station).unwrap().slot;
+    // The Archive's Colony already stands on the Moon, so the homeless lift of #68 no longer applies
+    // and only the ferry keeps the Ships crossing.
+    colony(&mut g, arc, BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Habitat], 4);
+    let low = ship_in(&mut g, arc, UnitKind::ColonyShip, BodyId::Earth, None, Stance::Hold);
+    g.ship_mut(low).unwrap().colonists = 4;
+    let ring = ship_in(&mut g, arc, UnitKind::ColonyShip, BodyId::Earth, Some(slot), Stance::Hold);
+    g.ship_mut(ring).unwrap().colonists = 4;
+    // With a crossing on offer the old computer crossed too, so the case that parts them is the
+    // one where no leg can be paid: the old computer's foothold rule then landed them on Earth
+    // ("taken when the Ship cannot go anywhere better"); a ferrying Archivist holds them aboard.
+    g.ship_mut(low).unwrap().fuel = 0;
+    g.ship_mut(ring).unwrap().fuel = 0;
+    g.seats[arc.index()].stockpile.fuel = 0;
+    let orders = g.ai_orders(arc);
+    let lands_on_earth = orders.iter().any(|o| match o {
+        Order::Unload { ship, into: UnloadTarget::Slot(BodyId::Earth, _), .. } => *ship == low || *ship == ring,
+        Order::Unload { ship, into: UnloadTarget::Colony(c), .. } => (*ship == low || *ship == ring) && *c == station,
+        _ => false,
+    });
+    assert!(!lands_on_earth, "no landing on or over Earth while they ferry: {orders:?}");
+}
+
 /// Ticket #99: a transit names the Orbital Slot it arrives into, and refuses a slot the Body has not
 /// got. The choice is made with the leg, so it is made before the Ship can see who will be there.
 #[test]
@@ -9614,17 +9647,13 @@ fn ordering_the_archive_wants_four_colonists_at_the_place_and_only_at_the_order(
     let cid = colony(&mut g, arc, BodyId::Mars, &[ModuleKind::Habitat], 0);
     let order = Order::BuildArchive { colony: cid };
 
-    // Ticket #199 (version 0.08.0): the gate Tech is named FIRST of the two refusals, because it is
-    // the one still true after the other is solved -- four Colonists arrive at a median turn 11 and
-    // The Upload at a median 15.
+    // Ticket #361 (version 0.09.1): The Upload gates the WIN, not the order, at the designer's word
+    // -- as before ticket #199, whose premise reversed: measured, The Upload now lands at a median
+    // turn 28 and an Archivist Colony off Earth at 22. The order stands without it.
+    assert!(!g.has_tech(TechId::TheUpload), "the premise: The Upload is not researched");
     g.colony_mut(cid).unwrap().colonists = 4;
-    assert_eq!(
-        g.check_order(arc, &[], &order).unwrap_err().0,
-        "the Archive waits on The Upload, which the world has not researched yet"
-    );
-    g.colony_mut(cid).unwrap().colonists = 0;
-    assert_eq!(g.check_order(arc, &[], &order).unwrap_err().0.split(',').next().unwrap(), "the Archive waits on The Upload");
-    the_upload(&mut g);
+    assert!(g.check_order(arc, &[], &order).is_ok(), "the Archive is ordered before The Upload");
+    assert!(g.tables.victory_gate(FactionKind::Archivists) == Some(TechId::TheUpload), "and The Upload still gates their win");
 
     assert_eq!(g.tables.archive.colonists_to_order, 4, "the card figure");
     for (living, expected) in [

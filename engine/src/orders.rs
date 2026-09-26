@@ -808,11 +808,11 @@ impl Game {
                 // the other is solved: the four Colonists arrive at a median turn 11 and The Upload at
                 // a median 15, so a player told to fetch people who is then told to wait for a Tech
                 // has been led on.
-                if let Some(gate) = self.tables.victory_gate(FactionKind::Archivists)
-                    && !self.has_tech(gate)
-                {
-                    return fail(format!("the Archive waits on {}, which the world has not researched yet", self.tables.tech(gate).name));
-                }
+                //
+                // Ticket #361 (version 0.09.1): **UNDONE, at the designer's word.** The premise
+                // reversed: measured over eighty games, The Upload now lands at a median turn 28 and
+                // an Archivist Colony off Earth at 22, so the order-gate cost them six turns and
+                // gated nothing else. The Upload gates their WIN (ticket #84), as before #199.
                 // Ticket #192 (version 0.08.0): the gate. Checked ONCE, here, at the order; neither
                 // the three-turn build nor the standing Module cares afterwards. A build that could
                 // stall halfway would be a new state to hold in the save, draw on the card and say in

@@ -871,9 +871,30 @@ impl Game {
         // deliberately rather than hoped for.
         let homeless_archive = self.archive_is_homeless(seat);
         let homeless_bonus = self.tables.ai.multipliers.archive_needs_a_place;
+        // Ticket #361 (version 0.09.1): **the Archivists FERRY until their uploads are made.** A
+        // Colony on another Body stood in 19 games of 80 -- the homeless lift above raised a landing
+        // in Antarctica or at a station over Earth as much as a crossing, and neither holds the
+        // Archive -- and where the Archive did complete, the uploads it needs stopped at four or
+        // eight for want of people arriving. While their uploads are short of the second part's
+        // bar, a loaded Colony Ship does not land on Earth's ground or over it, and it crosses to the
+        // Archive's Body (or the best Body off Earth while there is none) at the homeless lift.
+        let ferrying = kind == FactionKind::Archivists && (self.seat(seat).uploaded as f64) < self.tables.faction(kind).victory_second.bar;
+        // The ferry's SPENDING lift pauses while a site is ready and the Archive is not yet ordered:
+        // measured, its Colony Ships spent every Material, and the 50 the Archive wants was never in
+        // hand. The route does not pause -- nobody is landed where the Archive cannot use them.
+        let site_ready = kind == FactionKind::Archivists && !homeless_archive && !self.archive_ordered(seat) && !self.archive_built(seat);
+        let ferry_lift = ferrying && !site_ready;
+        let archive_body: Option<BodyId> = if kind == FactionKind::Archivists {
+            self.archive_colony(seat)
+                .and_then(|c| self.colony(c))
+                .or_else(|| self.colonies.iter().filter(|c| c.control.director() == Some(seat) && self.may_hold_archive(c)).max_by_key(|c| c.colonists))
+                .map(|c| c.body)
+        } else {
+            None
+        };
 
         let mut push = |orders: Vec<Order>, cat: Cat, base: f64, gap: f64, threat: f64, opportunity: f64, note: String, stack: Option<String>| {
-            let base = if homeless_archive && matches!(cat, Cat::ColonyShip | Cat::Transit | Cat::FoundColony | Cat::LoadUnload | Cat::LaunchSiteOrShipyard) {
+            let base = if (homeless_archive || ferry_lift) && matches!(cat, Cat::ColonyShip | Cat::Transit | Cat::FoundColony | Cat::LoadUnload | Cat::LaunchSiteOrShipyard) {
                 base * homeless_bonus
             } else {
                 base
@@ -1347,6 +1368,10 @@ impl Game {
                     // Ticket #51: the Archive is never an ordinary Module build; it has its own order.
                     // Ticket #164 (version 0.07.5): nor is the Core Module, which a founding gives.
                     ModuleKind::Archive | ModuleKind::Core => continue,
+                    // Ticket #361 (version 0.09.1): the ferrying Archivists make ROOM at the Archive's
+                    // Colony, where the ferry lands and the uploads draw. Measured: no eligible Colony
+                    // ever held more than the Core's four, so a ferry had nowhere to land them.
+                    ModuleKind::Habitat if ferry_lift && archive_body == Some(col.body) && self.may_hold_archive(&col) => (Cat::Habitat, self.base_weight(seat, Cat::Habitat) * homeless_bonus),
                     ModuleKind::Habitat => (Cat::Habitat, self.base_weight(seat, Cat::Habitat)),
                     ModuleKind::Shipyard => {
                         if col.modules.iter().any(|m| m.kind == ModuleKind::Shipyard) {
@@ -2183,7 +2208,8 @@ impl Game {
             // With the ice open, waiting Emigrants go to Antarctica by sea: a free slot first, else
             // a Colony of the seat's with room. A foothold, not Presence: half weight and no gap,
             // as a Ship's unload there.
-            if self.antarctica_open {
+            // Ticket #361: the ferrying Archivists send nobody to the ice, which holds no Archive.
+            if self.antarctica_open && !ferrying {
                 for sid in self.directed_states(seat) {
                     let n = self.state(sid).emigrants;
                     if n == 0 {
@@ -2349,7 +2375,7 @@ impl Game {
                 }
                 // Ticket #44: Antarctica, Earth's slots. A foothold, not Presence: half weight and no gap,
                 // so it is taken when the Ship cannot go anywhere better.
-                if s.colonists > 0 && body == BodyId::Earth && orbit.is_low() {
+                if s.colonists > 0 && body == BodyId::Earth && orbit.is_low() && !ferrying {
                     // Ticket #56: Antarctica is shut until the ice opens; a loaded Ship goes elsewhere.
                     if let Some(slot) = self.best_slot_for(seat, BodyId::Earth, behind).filter(|_| self.antarctica_open) {
                         push(vec![Order::Unload { ship: s.id, colonists: s.colonists, army: false, into: UnloadTarget::Slot(body, slot) }], Cat::FoundColony, self.base_weight(seat, Cat::FoundColony) * 0.5, 1.0, 1.0, 1.0, format!("found a Colony at {}", self.tables.body(BodyId::Earth).slots[slot as usize].name), None);
@@ -2367,7 +2393,8 @@ impl Game {
                 // the Ship cannot go anywhere better.
                 if s.colonists > 0 {
                     // Ticket #335 (version 0.09.0): and only into a place this Ship's orbit touches.
-                    for c in self.colonies.iter().filter(|c| c.body == body && c.control.director() == Some(seat) && (c.in_orbit || c.body != BodyId::Earth) && self.ship_may_touch(s, c)) {
+                    // Ticket #361: nor into a station over Earth while the Archivists ferry.
+                    for c in self.colonies.iter().filter(|c| c.body == body && c.control.director() == Some(seat) && (c.in_orbit || c.body != BodyId::Earth) && self.ship_may_touch(s, c) && !(ferrying && c.body == BodyId::Earth)) {
                         let room = self.habitat_room(c).saturating_sub(c.colonists);
                         if room > 0 {
                             let n = room.min(s.colonists);
@@ -2379,7 +2406,8 @@ impl Game {
                     }
                 }
                 if s.colonists > 0 && body == BodyId::Earth {
-                    let dest = self.best_body_for(seat, behind);
+                    // Ticket #361: a ferrying Archivist crosses to its Archive's Body first.
+                    let dest = if ferrying { archive_body.unwrap_or_else(|| self.best_body_for(seat, behind)) } else { self.best_body_for(seat, behind) };
                     let own_room = self.colonies.iter().any(|c| c.control.director() == Some(seat) && self.habitat_room(c) > c.colonists);
                     let mut dests = vec![dest];
                     if own_room {
