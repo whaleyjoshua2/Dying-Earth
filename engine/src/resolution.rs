@@ -171,6 +171,17 @@ impl Game {
         // before the transits, which is the whole reason the card is asked before orders.
         let grounded: [bool; SEAT_COUNT] = Seat::ALL.map(|s| self.card_holds_ships(s));
         let turned_aside: Vec<ShipId> = Seat::ALL.into_iter().filter_map(|s| self.card_holds_one_ship(s)).collect();
+        // Ticket #375 (version 0.09.2): the Report names the Ship a call turned aside, which
+        // nothing did -- the playtest's only Ship froze mid-transit without a word. A held Ship is
+        // docked now, so the line points at its Body.
+        for id in &turned_aside {
+            if let Some(s) = self.ship(*id)
+                && let ShipAt::Body(body) = s.at
+            {
+                let text = self.say("ship_held", &[("faction", self.seat_name(s.seat)), ("ship", self.ship_name(s)), ("body", self.tables.body(body).name.clone())]);
+                self.report_line(LineKind::Ship, Some(ReportPlace::Body(body)), text);
+            }
+        }
         let mut arrivals: Vec<(Seat, BodyId, ShipId)> = Vec::new();
         for s in &mut self.ships {
             if let ShipAt::Transit { from, to, turns_left } = s.at {

@@ -167,3 +167,28 @@ no one Body to count toward. The temperature bar's committed band stays flat.
 represent those in transit, similar to the temperature bar, make the in transit darker and add lines
 at 45 degrees."* Colonists aboard counted for nobody and were shown nowhere on the bar, so a Colony
 Ship on its way looked like no progress at all.
+
+## 9. A quote that says when it holds, a warning before a stranding, and a Distress Call that names its Ship
+
+The authority is [ticket #375](https://github.com/whaleyjoshua2/Dying-Earth/issues/375).
+
+**A crossing's quote is for a launch this turn, and says so**, with the next two turns' figures
+beside it: *"To Mars: 5 turn(s), 20 Fuel each from the tank if launched this turn (next turn 5t/23F,
+then 6t/26F)"*, in the Ship card's Transit block and the driver's flying table alike. The quote was
+always exact on the turn it was read; the sky moves about thirty degrees a turn, and a player who
+read it and launched later paid more.
+
+**A leg that would leave the hull stranded at the far end is named beside its button** -- *"arrives
+with 0 Fuel and no station of yours at Venus"* -- where the tank after the leg is under the cheapest
+leg out of the far Body, priced for the turn it lands, and no station of the Faction's own or a Refuel
+partner's stands there. **A warning, never a refusal**: a one-way trip can be the plan.
+
+**The Distress Call holds a docked Ship only**, the fullest tank among them; a Ship in flight is never
+held. With every hull in flight the take side is closed and says why (*"you have no Ship docked to
+answer it"*); a Faction with no Ship at all is not asked, as before. **The card names the Ship it
+would hold before the answer**, in the modal and the driver, and **the Report names the Ship held**:
+*"Custodians CSV Valiant held at Earth this turn, answering the call."*
+
+**Why.** From the playtest: *"The flying table quoted a leg at 4 turns and 17 Fuel and it cost 6
+and 26, leaving the hull stranded with an empty tank and no station to refuel at. The Distress Call
+card silently froze the only ship mid-transit."*

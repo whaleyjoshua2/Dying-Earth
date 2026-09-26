@@ -411,6 +411,8 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("start_rivals", &["rivals", "condition", "collapse"]),
     ("solar_storm", &[]),
     ("ship_arrived", &["faction", "ship", "body"]),
+    // Ticket #375 (version 0.09.2): the Ship a Distress Call turned aside.
+    ("ship_held", &["faction", "ship", "body"]),
     // Ticket #370 (version 0.09.2): the player's Colonists still aboard off Earth, one line a Body.
     ("colonists_waiting", &["n", "where", "blocked"]),
     // Ticket #335 (version 0.09.0): a Ship that changed orbit at the Body it stands at.

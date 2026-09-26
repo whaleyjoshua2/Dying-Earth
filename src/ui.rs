@@ -7494,7 +7494,12 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         // Ticket #92: the player's own figure, with the Faction's and the Tech's multipliers and a
         // Mass Driver's cut on it.
         let (turns, fuel) = game.transit_cost_for(Seat(0), body, to);
-        ui.label(format!("To {}: {} turn(s), {} Fuel each from the tank, whichever orbit it ends in", game.tables.body(to).name, turns, fuel));
+        // Ticket #375 (version 0.09.2): the quote is for a launch THIS turn, and the sky moves; the
+        // next two turns' figures stand beside it so the drift is visible -- the playtest read 4
+        // turns and 17 Fuel, launched later, and paid 6 and 26.
+        let (t1, f1) = game.transit_cost_for_at(Seat(0), body, to, game.turn + 1);
+        let (t2, f2) = game.transit_cost_for_at(Seat(0), body, to, game.turn + 2);
+        ui.label(format!("To {}: {} turn(s), {} Fuel each from the tank if launched this turn (next turn {t1}t/{f1}F, then {t2}t/{f2}F), whichever orbit it ends in", game.tables.body(to).name, turns, fuel));
         for orbit in game.orbits_of(to) {
             ui.horizontal_wrapped(|ui| {
                 ui.label(format!("   {}", game.orbit_name(to, orbit)));
@@ -7512,6 +7517,11 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
                 for s in &ships {
                     // Ticket #87: the button reads the tank against the leg.
                     cost_button(ui, game, &session.pending, Order::Transit { ship: s.id, to, slot: orbit.slot() }, &format!("{} ({}/{} in the tank)", game.ship_name(s), s.fuel, game.tables.unit(s.kind).tank), actions);
+                    // Ticket #375 (version 0.09.2): a warning, never a refusal, where the leg
+                    // would leave the hull stranded at the far end -- a one-way trip can be the plan.
+                    if let Some(left) = game.arrival_leaves_stranded(Seat(0), s.id, to) {
+                        ui.colored_label(Color32::from_rgb(230, 170, 90), format!("arrives with {left} Fuel and no station of yours at {}", game.tables.body(to).name));
+                    }
                 }
             });
         }
@@ -9999,6 +10009,16 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 ui.label(RichText::new("A card that asks. Every Faction at the table is asked it this turn, and the turn cannot end until you have answered.").weak());
                 ui.add_space(6.0);
                 ui.label(RichText::new(&choice.question).size(16.0));
+                // Ticket #375 (version 0.09.2): a card that holds a Ship names the one it would hold
+                // BEFORE the answer, where the modal said only "one Ship of yours holds this turn"
+                // and the playtest's only Ship froze mid-transit without a word.
+                if choice.take_does.iter().any(|e| matches!(e, CardEffect::HoldOneShip)) {
+                    let held = match game.card_would_hold(Seat(0)).and_then(|id| game.ship(id)) {
+                        Some(s) => format!("The Ship it would hold: {}, at {}.", game.ship_name(s), game.tables.body(match s.at { ShipAt::Body(b) => b, _ => BodyId::Earth }).name),
+                        None => "No Ship of yours is docked to answer it; a Ship in flight cannot.".to_string(),
+                    };
+                    ui.label(RichText::new(held).weak());
+                }
                 ui.add_space(10.0);
                 let sides = [(&choice.take, &choice.take_does, true), (&choice.refuse, &choice.refuse_does, false)];
                 ui.columns(2, |cols| {

@@ -693,6 +693,13 @@ fn print_question(g: &Game) {
     let Some(c) = card.choice.as_ref() else { return };
     println!("\n=== THE TURN'S QUESTION: {} ===", card.name);
     println!("{}", c.question);
+    // Ticket #375 (version 0.09.2): a card that holds a Ship names the one it would hold.
+    if c.take_does.iter().any(|e| matches!(e, CardEffect::HoldOneShip)) {
+        match g.card_would_hold(me).and_then(|id| g.ship(id)) {
+            Some(s) => println!("  The Ship it would hold: {} ({}).", g.ship_name(s), ship_at_text(g, s)),
+            None => println!("  No Ship of yours is docked to answer it; a Ship in flight cannot."),
+        }
+    }
     println!("  `answer take`    {}: {}", c.take, card_side_text(&c.take_does));
     println!("  `answer refuse`  {}: {}", c.refuse, card_side_text(&c.refuse_does));
     match q.answer_of(me) {
@@ -1234,6 +1241,17 @@ fn print_board(g: &Game) {
             sh.stance.name(),
             if g.stranded(sh.id) { "  *** STRANDED ***" } else { "" }
         );
+        // Ticket #375 (version 0.09.2): the legs that would leave this hull stranded at the far end,
+        // a warning and never a refusal.
+        if sh.seat == me {
+            let dry: Vec<String> = BodyId::ALL
+                .into_iter()
+                .filter_map(|to| g.arrival_leaves_stranded(me, sh.id, to).map(|left| format!("{} ({left} Fuel left, no station of yours)", to.name())))
+                .collect();
+            if !dry.is_empty() {
+                println!("         would arrive stranded at: {}", dry.join("; "));
+            }
+        }
     }
     for a in &g.armies {
         let at = match a.at {
@@ -1251,14 +1269,18 @@ fn print_board(g: &Game) {
         );
     }
 
-    println!("\n--- FLYING (turns/Fuel, at your Faction's rate, from this turn) ---");
+    // Ticket #375 (version 0.09.2): a quote is for a launch THIS turn, and the sky moves; the next
+    // two turns' figures ride beside it in brackets.
+    println!("\n--- FLYING (turns/Fuel, at your Faction's rate, if launched this turn; in brackets, next turn and the one after) ---");
     for from in BodyId::ALL {
         let legs: Vec<String> = BodyId::ALL
             .iter()
             .filter(|to| **to != from && Game::leg_allowed(from, **to))
             .map(|to| {
                 let (turns, fuel) = g.transit_cost_for(me, from, *to);
-                format!("{} {}t/{}F", to.name(), turns, fuel)
+                let (t1, f1) = g.transit_cost_for_at(me, from, *to, g.turn + 1);
+                let (t2, f2) = g.transit_cost_for_at(me, from, *to, g.turn + 2);
+                format!("{} {}t/{}F ({t1}t/{f1}F, {t2}t/{f2}F)", to.name(), turns, fuel)
             })
             .collect();
         if !legs.is_empty() {

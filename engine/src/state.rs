@@ -2163,6 +2163,23 @@ impl Game {
         }
     }
 
+    /// Ticket #375 (version 0.09.2): whether a leg flown THIS turn would leave the Ship stranded on
+    /// arrival -- the tank after the leg under the cheapest leg out of the far Body, priced for the
+    /// turn it lands, and no station there of its own or of a Refuel partner's -- and if so, what
+    /// the tank would hold. A warning's figure, never a refusal's: a one-way trip can be the plan.
+    pub fn arrival_leaves_stranded(&self, seat: Seat, ship: ShipId, to: BodyId) -> Option<i64> {
+        let s = self.ship(ship)?;
+        let ShipAt::Body(from) = s.at else { return None };
+        let (turns, fuel) = self.transit_cost_for(seat, from, to);
+        let left = s.fuel - fuel;
+        if left < 0 || self.refuel_station_at(seat, to) {
+            return None;
+        }
+        let arrives = self.turn + turns;
+        let cheapest = BodyId::ALL.into_iter().filter(|b| *b != to && Self::leg_allowed(to, *b)).map(|b| self.transit_cost_for_at(seat, to, b, arrives).1).min()?;
+        if left < cheapest { Some(left) } else { None }
+    }
+
     /// Ticket #86 (version 0.06.0): how many Colonists a Colony Ship at Earth may take beyond its
     /// capacity, from the Temperature: `per_step` for every full `step` degrees above `above`, at
     /// most `cap`; the same for every Faction.

@@ -25,6 +25,8 @@ start_rivals = "Your rivals are {rivals}. Build, spread Influence, and {conditio
 # In space
 solar_storm = "Solar Storm: no transit advanced this turn."
 ship_arrived = "{faction} {ship} arrived at {body}."
+# Ticket #375 (version 0.09.2): the Ship a Distress Call turned aside, named, where nothing named it.
+ship_held = "{faction} {ship} held at {body} this turn, answering the call."
 # Ticket #370 (version 0.09.2): the player's own Colonists still aboard a Ship off Earth, every turn
 # they wait, one line a Body, in the designer's words -- "colonists wait aboard in low orbit of
 # Mars", with "blocked by rivals' control of the orbit" when a rival's Orbital Control shuts the

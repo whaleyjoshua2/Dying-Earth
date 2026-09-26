@@ -15426,6 +15426,62 @@ fn no_card_of_either_kind_is_drawn_on_the_first_turn_and_the_deck_is_untouched()
     assert!((10..=50).contains(&drew), "turn {}: {drew} of 60 seeds drew, which is not a coin", t.events.first_draw_turn);
 }
 
+/// Ticket #375 (version 0.09.2): **a Distress Call holds a docked Ship only**, the fullest tank
+/// among them; a Ship in flight is never held; with none docked the take side is closed and says
+/// why; and the Report names the Ship held.
+#[test]
+fn a_distress_call_holds_a_docked_ship_and_names_it() {
+    let mut g = fresh();
+    g.start();
+    // A Frigate in flight to the Moon with a full tank, and a Colony Ship docked over Earth with
+    // less: the docked one is held, not the fuller one in flight.
+    let flying = ship_in(&mut g, Seat(0), UnitKind::Frigate, BodyId::Earth, None, Stance::Hold);
+    g.ships.iter_mut().find(|s| s.id == flying).unwrap().at = ShipAt::Transit { from: BodyId::Earth, to: BodyId::Moon, turns_left: 2 };
+    let (docked, _) = colony_ship_ready(&mut g, BodyId::Earth);
+    g.ships.iter_mut().find(|s| s.id == docked).unwrap().fuel = 10;
+    ask_the_card(&mut g, EventId::DistressCall);
+    assert_eq!(g.card_would_hold(Seat(0)), Some(docked), "the docked Ship, though the one in flight is fuller");
+    assert!(g.may_take_card(Seat(0)));
+    g.answer_card(Seat(0), true).expect("taken");
+    assert_eq!(g.card_holds_one_ship(Seat(0)), Some(docked));
+    g.resolution_phase();
+    assert_eq!(g.ship(flying).map(|s| s.at), Some(ShipAt::Transit { from: BodyId::Earth, to: BodyId::Moon, turns_left: 1 }), "the flight went on");
+    let line = g.report.lines.iter().find(|l| l.text.contains("held at")).map(|l| l.text.clone()).expect("the Report names the held Ship");
+    assert!(line.contains(&g.ship_name(g.ship(docked).unwrap())), "{line}");
+    assert!(line.contains("answering the call"), "{line}");
+    // With every hull in flight, the take side is closed and says why.
+    let mut g = fresh();
+    g.start();
+    let only = ship_in(&mut g, Seat(0), UnitKind::Frigate, BodyId::Earth, None, Stance::Hold);
+    g.ships.iter_mut().find(|s| s.id == only).unwrap().at = ShipAt::Transit { from: BodyId::Earth, to: BodyId::Moon, turns_left: 2 };
+    ask_the_card(&mut g, EventId::DistressCall);
+    assert!(g.pending_question().map(|q| q.answer_of(Seat(0)).is_none()).unwrap_or(false), "asked, since a Ship exists");
+    assert_eq!(g.card_would_hold(Seat(0)), None);
+    assert!(!g.may_take_card(Seat(0)), "the take side is closed");
+    assert_eq!(g.card_shortfall(Seat(0)).as_deref(), Some("you have no Ship docked to answer it"));
+}
+
+/// Ticket #375: **a leg that would leave the hull stranded at the far end is named as such**, a
+/// warning's figure, and only where no station of the Ship's own or a partner's stands there.
+#[test]
+fn a_leg_that_would_strand_the_ship_at_the_far_end_is_named() {
+    let mut g = fresh();
+    g.start();
+    at_window(&mut g);
+    let ship = ship_in(&mut g, Seat(0), UnitKind::Frigate, BodyId::Earth, None, Stance::Hold);
+    let (_, fuel) = g.transit_cost_for(Seat(0), BodyId::Earth, BodyId::Mars);
+    // Just enough for the leg and nothing after it: stranded on arrival, no station of ours at Mars.
+    g.ships.iter_mut().find(|s| s.id == ship).unwrap().fuel = fuel;
+    assert_eq!(g.arrival_leaves_stranded(Seat(0), ship, BodyId::Mars), Some(0), "arrives with nought and no way out");
+    // A station of ours at Mars rescues it.
+    let id = ColonyId(g.fresh_id());
+    g.colonies.push(Colony { id, body: BodyId::Mars, slot: 0, control: Control::Controlled(Seat(0)), modules: vec![Module::new(ModuleKind::Core)], colonists: 0, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
+    assert_eq!(g.arrival_leaves_stranded(Seat(0), ship, BodyId::Mars), None, "a station of ours there refuels it");
+    // A tank that cannot pay the leg at all is the check's business, not this warning's.
+    g.ships.iter_mut().find(|s| s.id == ship).unwrap().fuel = 0;
+    assert_eq!(g.arrival_leaves_stranded(Seat(0), ship, BodyId::Moon), None);
+}
+
 /// Ticket #373 (version 0.09.2): **the Colonists aboard a seat's Ships ride the Victory progress as
 /// a figure of their own**, for the parts that count Colonists off Earth and no other, and count
 /// toward nothing -- the fraction, the bar and the win are untouched by them.

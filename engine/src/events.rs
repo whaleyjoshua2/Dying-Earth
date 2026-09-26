@@ -270,6 +270,9 @@ impl Game {
                 let have = self.stock_of(seat, *resource);
                 if have < need { vec![format!("{have} {} of the {need} it asks", resource.name())] } else { Vec::new() }
             }
+            // Ticket #375 (version 0.09.2): a call is answered by a docked Ship; with every hull in
+            // flight the offer is closed, and this is why.
+            CardEffect::HoldOneShip if self.card_would_hold(seat).is_none() => vec!["no Ship docked to answer it".to_string()],
             _ => Vec::new(),
         }
     }
@@ -394,9 +397,18 @@ impl Game {
         if !self.card_effects(seat).iter().any(|e| matches!(e, CardEffect::HoldOneShip)) {
             return None;
         }
+        self.card_would_hold(seat)
+    }
+
+    /// Ticket #375 (version 0.09.2): the Ship a Distress Call WOULD hold for this seat, answered or
+    /// not, so the card can name it before the answer: **a docked Ship only**, at the designer's
+    /// word -- a crew mid-transit is in no place to answer a call, and a hull frozen in flight was
+    /// the playtest's silent stranding. Of the docked, the fullest tank, ties to the lower id, so a
+    /// seeded game is not moved by the pick. With none docked the take side is closed.
+    pub fn card_would_hold(&self, seat: Seat) -> Option<ShipId> {
         self.ships
             .iter()
-            .filter(|s| s.seat == seat)
+            .filter(|s| s.seat == seat && matches!(s.at, ShipAt::Body(_)))
             .max_by_key(|s| (s.fuel, std::cmp::Reverse(s.id.0)))
             .map(|s| s.id)
     }
