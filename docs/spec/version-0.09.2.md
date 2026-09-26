@@ -41,3 +41,16 @@ windfall hover stay. No rule moves; the bonus itself (§2 of 0.09.1) is untouche
 
 **Why.** The designer: *"do not display 1st founding bonus on system map."* Kept in the hover rather
 than removed so that #345's point stands, that a voyage is chosen from this map.
+
+## 3. Glyphs in the Trading window
+
+The authority is [ticket #369](https://github.com/whaleyjoshua2/Dying-Earth/issues/369).
+
+The Trading window **reads as the top bar does**: a glyph at the head of each row before the good's
+name, and a glyph on every figure -- the header's Ducats, the price, the sell price, and the faces of
+the Buy and Sell buttons -- by the game's one rule for glyphs, a word traded for its glyph only
+directly after a number. The Buildings sentence and the Trades-this-turn list are drawn by the same
+rule. No word is dropped: a row still carries the good's name. No price, rule or figure moves.
+
+**Why.** The designer: *"glyphs in market window."* Every good the window trades and the currency it
+trades in already had a glyph; the window alone drew none.

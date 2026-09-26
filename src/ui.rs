@@ -7646,10 +7646,19 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
 /// bought for Ducats from their own build buttons.
 fn trading_window(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, actions: &mut Vec<Action>) {
     let (left, _) = game.remaining(Seat(0), &session.pending);
-    ui.label(RichText::new(format!("Ducats {} to spend this turn (+{} last Income).", left.ducats, game.seat(Seat(0)).income_last_turn.ducats)).strong());
+    // Ticket #369 (version 0.09.2): **glyphs in the Trading window**, at the designer's word. The
+    // window was words end to end while every good it trades and the currency it trades in already
+    // had a glyph on the top bar. Now it reads as the top bar does: a glyph at the head of each row
+    // before the good's name, and a glyph on every figure -- the header's Ducats, the price, the
+    // sell price, and both button faces -- by the one number-then-word rule of `draw_with_icons`.
+    // The Buy and Sell buttons go through `priced_button`, which is how a glyph gets onto a button
+    // face at all; the Cost it is handed is Ducats alone, so the face reads "Buy for 48 [ducats]".
+    let ink = ui.visuals().strong_text_color();
+    let body = ui.visuals().text_color();
+    text_with_icons(ui, &format!("{} Ducats to spend this turn (+{} Ducats last Income).", left.ducats, game.seat(Seat(0)).income_last_turn.ducats), 14.0, ink);
     ui.label("What you buy is yours at once, for this turn's orders. Ducats come from your Regions' economies, Banks and Trade Posts.");
     ui.separator();
-    let lines: [(usize, Option<dying_earth_engine::Resource>, &str); 4] = [(0, None, "Influence"), (1, Some(dying_earth_engine::Resource::Materials), "Materials"), (2, Some(dying_earth_engine::Resource::Fuel), "Fuel"), (3, Some(dying_earth_engine::Resource::Energy), "Energy")];
+    let lines: [(usize, Option<dying_earth_engine::Resource>, &str, &str); 4] = [(0, None, "influence", "Influence"), (1, Some(dying_earth_engine::Resource::Materials), "materials", "Materials"), (2, Some(dying_earth_engine::Resource::Fuel), "fuel", "Fuel"), (3, Some(dying_earth_engine::Resource::Energy), "energy", "Energy")];
     egui::Grid::new("trade_grid").num_columns(5).spacing((12.0, 6.0)).show(ui, |ui| {
         ui.label(RichText::new("Line").strong());
         ui.label(RichText::new("Price").strong());
@@ -7657,18 +7666,25 @@ fn trading_window(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSt
         ui.label(RichText::new("Buy").strong());
         ui.label(RichText::new("Sell").strong());
         ui.end_row();
-        for (i, res, name) in lines {
+        for (i, res, key, name) in lines {
             let per = match res {
                 None => game.tables.ducats.per_influence,
                 Some(r) => game.trade_price(r).unwrap_or(0),
             };
-            ui.label(name);
+            icon_word(ui, key, name);
             let sells = matches!(res, Some(dying_earth_engine::Resource::Materials) | Some(dying_earth_engine::Resource::Fuel));
             // Ticket #83: the Prospectors' 15% off is taken over the lot, so the button's figure is
             // the price; the line says so.
             let off = game.tables.faction(game.kind(Seat(0))).market_multiplier;
             let discount = if res.is_some() && off != 1.0 { format!(" (x{off} for you, over the lot)") } else { String::new() };
-            ui.label(if sells { format!("{per} Ducats each; sells for {:.1}{discount}", per as f64 / game.tables.ducats.sell_divisor.max(1) as f64) } else { format!("{per} Ducats each{discount}") });
+            let price = if sells { format!("{per} Ducats each; sells for {:.1} Ducats{discount}", per as f64 / game.tables.ducats.sell_divisor.max(1) as f64) } else { format!("{per} Ducats each{discount}") };
+            // The glyph line wraps at the width it is given, and a Grid cell has none until its
+            // content has one, so left alone it wrapped one word to a line (the first picture of
+            // ticket #369). The Prospectors' discount clause is the longest the cell ever holds.
+            ui.scope(|ui| {
+                ui.set_min_width(340.0);
+                text_with_icons(ui, &price, 14.0, body);
+            });
             ui.add(egui::DragValue::new(&mut view.trade_amounts[i]).range(1..=999).speed(1.0));
             let n = view.trade_amounts[i].max(1);
             let buy = match res {
@@ -7677,7 +7693,7 @@ fn trading_window(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSt
             };
             let cost = game.order_cost(Seat(0), &buy).ducats;
             let ok = game.check_order(Seat(0), &session.pending, &buy);
-            let mut resp = ui.add_enabled(ok.is_ok(), egui::Button::new(format!("Buy for {cost} Ducats")));
+            let mut resp = priced_button(ui, ok.is_ok(), "Buy for", &dying_earth_engine::Cost { ducats: cost, ..Default::default() }, 0);
             if let Err(e) = &ok {
                 resp = resp.on_disabled_hover_text(&e.0);
             }
@@ -7688,7 +7704,7 @@ fn trading_window(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSt
                 let sell = Order::Sell { resource: r, amount: n };
                 let gain = -game.order_cost(Seat(0), &sell).ducats;
                 let ok = game.check_order(Seat(0), &session.pending, &sell);
-                let mut resp = ui.add_enabled(ok.is_ok(), egui::Button::new(format!("Sell for {gain} Ducats")));
+                let mut resp = priced_button(ui, ok.is_ok(), "Sell for", &dying_earth_engine::Cost { ducats: gain, ..Default::default() }, 0);
                 if let Err(e) = &ok {
                     resp = resp.on_disabled_hover_text(&e.0);
                 }
@@ -7705,13 +7721,16 @@ fn trading_window(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSt
     // Ticket #285 (version 0.08.5): the carbon-credit line is gone from here; the Custodians offer
     // from their own Faction page and everyone else requests from theirs.
     ui.separator();
-    ui.label(format!("Buildings: every build button on a Region or Colony card has an \"or\" beside it that buys the building outright for Ducats, at {} times its Materials cost.", game.tables.ducats.per_building_material));
+    // Ticket #369: drawn by the same rule; no figure in this sentence is a quantity of a good, so no
+    // glyph lands in it, and that is the rule working rather than a gap.
+    text_with_icons(ui, &format!("Buildings: every build button on a Region or Colony card has an \"or\" beside it that buys the building outright for Ducats, at {} times its Materials cost.", game.tables.ducats.per_building_material), 14.0, body);
     let trades: Vec<String> = session.pending.iter().filter(|o| matches!(o, Order::Buy { .. } | Order::Sell { .. } | Order::BuyInfluence { .. } | Order::BuildFacilityWithDucats { .. } | Order::BuildModuleWithDucats { .. } | Order::BuyCredits { .. } | Order::OfferCredits { .. })).map(|o| order_text(game, o)).collect();
     if !trades.is_empty() {
         ui.separator();
         ui.label(RichText::new("Trades this turn (undo them in the orders list)").strong());
         for t in trades {
-            ui.label(t);
+            // Ticket #369: "Buy 12 Materials for 48 Ducats" wears both glyphs.
+            text_with_icons(ui, &t, 14.0, body);
         }
     }
 }

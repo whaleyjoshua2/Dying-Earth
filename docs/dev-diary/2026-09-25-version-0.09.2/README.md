@@ -17,4 +17,5 @@ never the per-seating arrays.
 |---|---|---|
 | [`ticket-367-no-card-on-turn-1/`](ticket-367-no-card-on-turn-1/README.md) | [No Event card on the first turn](https://github.com/whaleyjoshua2/Dying-Earth/issues/367) | The rule, the red witness over sixty seeds, and the sweep after it. |
 | [`ticket-368-map-line/`](ticket-368-map-line/README.md) | [The first-to-land line off the system map](https://github.com/whaleyjoshua2/Dying-Earth/issues/368) | The open map without the line, and Mars hovered with it under the slot list. |
+| [`ticket-369-trading-glyphs/`](ticket-369-trading-glyphs/README.md) | [Glyphs in the Trading window](https://github.com/whaleyjoshua2/Dying-Earth/issues/369) | The window as the Custodians and as the Prospectors, every figure wearing its glyph. |
 | [`sweeps/`](sweeps/) | each ticket | One sweep file per ticket that could move the win column, 20 seeds x four seatings at the shipped climate cell. |
