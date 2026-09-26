@@ -830,6 +830,10 @@ fn build_board(session: &mut Session) {
                 built_turn: turn,
                 fuel: g.tables.unit(UnitKind::ColonyShip).tank,
             });
+            // Ticket #370 (version 0.09.2): the board is composed after the turn is played, so the
+            // Report line the Resolution writes for Colonists waiting aboard is written here, by the
+            // same pass, so `menus:1` can photograph it under the Ships heading.
+            g.report_waiting_colonists();
         }
         // `venture:<n>` (a building aid, ticket #72): seat 0 as the Prospectors holds n Materials in
         // the Venture Capital Fund and banks half its output.

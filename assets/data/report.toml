@@ -24,6 +24,13 @@ start_rivals = "Your rivals are {rivals}. Build, spread Influence, and {conditio
 # In space
 solar_storm = "Solar Storm: no transit advanced this turn."
 ship_arrived = "{faction} {ship} arrived at {body}."
+# Ticket #370 (version 0.09.2): the player's own Colonists still aboard a Ship off Earth, every turn
+# they wait, one line a Body, in the designer's words -- "colonists wait aboard in low orbit of
+# Mars", with "blocked by rivals' control of the orbit" when a rival's Orbital Control or blockade
+# stops the landing. {where} is "in low orbit of Mars" or "at Ares over Mars", or, when they wait
+# in more than one orbit, "at Mars: 2 in low orbit, 2 at Ares".
+colonists_waiting = "{n} Colonists wait aboard {where}{blocked}."
+waiting_blocked = ", blocked by rivals' control of the orbit"
 # Ticket #335 (version 0.09.0): a Ship that changed orbit rather than flying away.
 orbit_changed = "{faction} {ship} moved to {orbit}."
 ship_destroyed = "{faction} {ship} destroyed ({why}){cargo}."

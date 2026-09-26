@@ -15416,6 +15416,103 @@ fn no_card_of_either_kind_is_drawn_on_the_first_turn_and_the_deck_is_untouched()
     assert!((10..=50).contains(&drew), "turn {}: {drew} of 60 seeds drew, which is not a coin", t.events.first_draw_turn);
 }
 
+/// Ticket #370 (version 0.09.2): a warship of `seat` standing in low orbit of `body`, fuelled, on
+/// Hold -- enough, alone, to hold Orbital Control there.
+fn frigate_in_low_orbit(g: &mut Game, seat: Seat, body: BodyId) -> ShipId {
+    let id = ShipId(g.fresh_id());
+    let turn = g.turn;
+    g.ships.push(Ship {
+        id,
+        name: String::new(),
+        kind: UnitKind::Frigate,
+        seat,
+        damage: 0,
+        at: ShipAt::Body(body),
+        colonists: 0, warhead: false, colonists_education: 1.0,
+        army: None,
+        stance: Stance::Hold,
+        escaped: false,
+        arrived_this_turn: false,
+        built_turn: turn,
+        fuel: 30, slot: None,
+    });
+    id
+}
+
+/// Ticket #370 (version 0.09.2): **the player's Colonists still aboard off Earth are reported every
+/// turn they wait**, one line a Body, under Ships; a rival's are not; and the line says when a
+/// rival's Orbital Control stops the landing.
+#[test]
+fn colonists_waiting_aboard_off_earth_are_reported_every_turn_under_ships() {
+    let mut g = fresh();
+    g.start();
+    let waiting = |g: &Game| g.report.lines.iter().filter(|l| l.text.contains("wait aboard")).cloned().collect::<Vec<_>>();
+    // A Colony Ship of the player's with four aboard in low orbit of the Moon, never unloaded.
+    let (_, _) = colony_ship_ready(&mut g, BodyId::Moon);
+    // And a rival's, the same, over Mars: not the player's business.
+    let (theirs, _) = colony_ship_ready(&mut g, BodyId::Mars);
+    g.ships.iter_mut().find(|s| s.id == theirs).unwrap().seat = Seat(1);
+    let quiet_turn = |g: &mut Game| {
+        pick_a_tech(g);
+        answer_the_card(g);
+        g.end_turn(std::array::from_fn(|_| Vec::new())).expect("the turn should end");
+    };
+    quiet_turn(&mut g);
+    let lines = waiting(&g);
+    assert_eq!(lines.len(), 1, "one line, the player's, not the rival's: {lines:?}");
+    assert_eq!(lines[0].text, "4 Colonists wait aboard in low orbit of the Moon.");
+    assert_eq!(lines[0].kind, LineKind::Ship);
+    assert_eq!(lines[0].place, Some(ReportPlace::Body(BodyId::Moon)), "the line points at the Body");
+    assert_eq!(lines[0].section(), Section::Ships, "under Ships");
+    assert_eq!(lines[0].kind.headline_rank(), None, "never the headline");
+    // Every turn they wait, not only the first.
+    quiet_turn(&mut g);
+    assert_eq!(waiting(&g).len(), 1, "said again the next turn");
+    // A rival warship takes Orbital Control of the Moon, and the line says the landing is blocked.
+    // The Resolution is run by hand, since the computer plays seat 1 and would order the frigate
+    // elsewhere in a whole turn; the Report is cleared first, as a new turn clears it.
+    frigate_in_low_orbit(&mut g, Seat(1), BodyId::Moon);
+    assert_eq!(g.orbital_control(BodyId::Moon), Some(Seat(1)), "the fixture: the rival holds the orbit");
+    g.report.lines.clear();
+    g.resolution_phase();
+    let lines = waiting(&g);
+    assert_eq!(lines.len(), 1, "{lines:?}");
+    assert_eq!(lines[0].text, "4 Colonists wait aboard in low orbit of the Moon, blocked by rivals' control of the orbit.");
+}
+
+/// Ticket #370: **every Ship line reads under Ships**, a heading of its own above Your works, where
+/// it read under In space before; the four other headings keep their order.
+#[test]
+fn ship_lines_read_under_ships_above_your_works() {
+    assert_eq!(LineKind::Ship.section(Some(ReportPlace::Body(BodyId::Mars))), Section::Ships);
+    assert_eq!(LineKind::Ship.section(None), Section::Ships);
+    assert_eq!(Section::ALL, [Section::InSpace, Section::OnEarth, Section::TheClimate, Section::Ships, Section::YourWorks]);
+    assert_eq!(Section::Ships.name_for(false), "Ships");
+    assert_eq!(Section::Ships.name_for(true), "Ships");
+    // A Ship's arrival, the oldest Ship line, files there through a whole turn.
+    let mut g = fresh();
+    g.start();
+    let (id, _) = colony_ship_ready(&mut g, BodyId::Earth);
+    let mut orders: [Vec<Order>; SEAT_COUNT] = std::array::from_fn(|_| Vec::new());
+    orders[0] = vec![Order::Transit { ship: id, to: BodyId::Moon, slot: None }];
+    pick_a_tech(&mut g);
+    answer_the_card(&mut g);
+    g.end_turn(orders).expect("the turn should end");
+    // A Report lives one turn, so the arrival is read on the turn it happens.
+    let mut arrived = None;
+    for _ in 0..9 {
+        if let Some(l) = g.report.lines.iter().find(|l| l.text.contains("arrived at")) {
+            arrived = Some(l.clone());
+            break;
+        }
+        pick_a_tech(&mut g);
+        answer_the_card(&mut g);
+        g.end_turn(std::array::from_fn(|_| Vec::new())).expect("the turn should end");
+    }
+    let arrived = arrived.expect("the Colony Ship arrived at the Moon within nine turns");
+    assert_eq!(arrived.section(), Section::Ships, "{}", arrived.text);
+}
+
 /// Ticket #367: the loader refuses a `first_draw_turn` of nought, since turn 0 is not a turn and
 /// the figure would read as "draw before the game starts". Read from a copy of the data folder
 /// with that one line changed, so the test is about the loader and not about a hand-built table.

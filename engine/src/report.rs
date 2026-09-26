@@ -85,11 +85,15 @@ pub enum Section {
     InSpace,
     OnEarth,
     TheClimate,
+    /// Ticket #370 (version 0.09.2): every Ship line, above Your works, at the designer's word --
+    /// the line for Colonists waiting aboard off Earth sits here, "and move the rest of the ship
+    /// lines there too". Until this version a Ship line read under In space.
+    Ships,
     YourWorks,
 }
 
 impl Section {
-    pub const ALL: [Section; 4] = [Section::InSpace, Section::OnEarth, Section::TheClimate, Section::YourWorks];
+    pub const ALL: [Section; 5] = [Section::InSpace, Section::OnEarth, Section::TheClimate, Section::Ships, Section::YourWorks];
     pub fn name(self) -> &'static str {
         self.name_for(false)
     }
@@ -101,6 +105,7 @@ impl Section {
             Section::InSpace => "In space",
             Section::OnEarth => "On Earth",
             Section::TheClimate => "The climate",
+            Section::Ships => "Ships",
             Section::YourWorks if spectator => "Builds and works",
             Section::YourWorks => "Your works",
         }
@@ -142,7 +147,9 @@ impl LineKind {
             Some(_) => Section::InSpace,
         };
         match self {
-            LineKind::ColonyFounded | LineKind::Ship | LineKind::Archive | LineKind::Antarctica => Section::InSpace,
+            // Ticket #370 (version 0.09.2): a Ship line reads under Ships, whoever's Ship it is.
+            LineKind::Ship => Section::Ships,
+            LineKind::ColonyFounded | LineKind::Archive | LineKind::Antarctica => Section::InSpace,
             LineKind::Unrest | LineKind::Refugees | LineKind::Army | LineKind::Occupation => Section::OnEarth,
             // Ticket #353 (version 0.09.1): the turn's card reads under The climate, where an Event
             // line has always read; only its headline rank is gone.
@@ -403,6 +410,9 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("start_rivals", &["rivals", "condition", "collapse"]),
     ("solar_storm", &[]),
     ("ship_arrived", &["faction", "ship", "body"]),
+    // Ticket #370 (version 0.09.2): the player's Colonists still aboard off Earth, one line a Body.
+    ("colonists_waiting", &["n", "where", "blocked"]),
+    ("waiting_blocked", &[]),
     // Ticket #335 (version 0.09.0): a Ship that changed orbit at the Body it stands at.
     ("orbit_changed", &["faction", "ship", "orbit"]),
     ("ship_destroyed", &["faction", "ship", "why", "cargo"]),

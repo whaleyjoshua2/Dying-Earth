@@ -62,9 +62,66 @@ impl Game {
         self.resolve_strip_permits(); // (h), ticket #54: a permit that ran out charges its price
         self.resolve_unrest(); // (i), ticket #52
         self.resolve_credits(); // (j), ticket #268: carbon credits change hands
+        self.report_waiting_colonists(); // ticket #370: after every landing this turn has made
         self.pending = Pending::default();
         for a in &mut self.armies {
             a.move_to = None;
+        }
+    }
+
+    /// Ticket #370 (version 0.09.2): **the player's Colonists still aboard a Ship off Earth are
+    /// reported every turn they wait**, one line a Body, under Ships, at the designer's word --
+    /// *"colonists wait aboard in low orbit of Mars"*, and *"blocked by rivals' control of the
+    /// orbit"* when a rival's Orbital Control shuts the ground or a blockade shuts the station they
+    /// are docked at. Any orbit off Earth counts; a Ship in transit does not, since nothing can be
+    /// done about it yet. The player's own Ships only: a rival's waiting Colonists are not the
+    /// player's business, and the Report was quieted a version ago. Runs after every landing this
+    /// turn has made, so a Ship that unloaded this turn is not reported as waiting. Nothing in a
+    /// spectated game, which has no seat of its own. Public for the picture harness, which composes
+    /// a loaded Colony Ship at a Body AFTER the turn is played and wants the line the Resolution
+    /// would have written.
+    pub fn report_waiting_colonists(&mut self) {
+        if self.spectator {
+            return;
+        }
+        let seat = Seat(0);
+        for body in BodyId::ALL {
+            if body == BodyId::Earth {
+                continue;
+            }
+            // By orbit, low orbit first and then the slots in order, which is how `Option<u32>` sorts.
+            let mut by_orbit: std::collections::BTreeMap<Option<u32>, u32> = std::collections::BTreeMap::new();
+            for s in self.ships.iter().filter(|s| s.seat == seat && s.colonists > 0 && s.at == ShipAt::Body(body)) {
+                *by_orbit.entry(s.slot).or_insert(0) += s.colonists;
+            }
+            if by_orbit.is_empty() {
+                continue;
+            }
+            let name = self.tables.body(body).name.clone();
+            let phrase = |g: &Game, slot: Option<u32>| match slot {
+                None => format!("in low orbit of {name}"),
+                Some(n) => format!("at {} over {name}", g.station_name(body, n)),
+            };
+            let n: u32 = by_orbit.values().sum();
+            let where_ = if by_orbit.len() == 1 {
+                phrase(self, *by_orbit.keys().next().unwrap())
+            } else {
+                let parts: Vec<String> = by_orbit
+                    .iter()
+                    .map(|(slot, k)| match slot {
+                        None => format!("{k} in low orbit"),
+                        Some(i) => format!("{k} at {}", self.station_name(body, *i)),
+                    })
+                    .collect();
+                format!("at {name}: {}", parts.join(", "))
+            };
+            let blocked = by_orbit.keys().any(|slot| match slot {
+                None => !self.may_land(seat, body),
+                Some(i) => self.slot_blockaded_against(seat, body, *i),
+            });
+            let blocked = if blocked { self.say("waiting_blocked", &[]) } else { String::new() };
+            let text = self.say("colonists_waiting", &[("n", n.to_string()), ("where", where_), ("blocked", blocked)]);
+            self.report_line(LineKind::Ship, Some(ReportPlace::Body(body)), text);
         }
     }
 
