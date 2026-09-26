@@ -52,6 +52,11 @@ storm_surge_coastal_multiplier = 0.7
 # them found nowhere to land, chiefly these seven, each spent for the game -- the deck is never
 # reshuffled. The median first Colony is founded on turn 10.
 off_earth_join_turn = 12
+# Ticket #367 (version 0.09.2): no card of either kind on the first turn, at the designer's word
+# ("do not draw an event card on first turn"). The deck is not touched before this turn, so the
+# card on top simply waits for the first roll; nothing is lost. Before this a card came on turn 1
+# half the time, a Choice Card asking before the first order was given.
+first_draw_turn = 2
 volcanic_co2 = 5.0
 
 [[event]]

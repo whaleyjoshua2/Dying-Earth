@@ -143,7 +143,7 @@ The deck a card may be drawn from each turn: forty cards since version 0.05.5 fo
 _Avoid_: event pool, random table, encounter deck, calm card (retired in version 0.02)
 
 **Draw Chance**:
-The chance each turn that a card is drawn from the Event Deck: half at +1.2 C, rising a little for every full fifth of a degree the Temperature stands above it. It replaced the Calm Cards of the First Playable, so the danger in a turn is a percentage rather than a count of blanks.
+The chance each turn that a card is drawn from the Event Deck: half at +1.2 C, rising a little for every full fifth of a degree the Temperature stands above it. It replaced the Calm Cards of the First Playable, so the danger in a turn is a percentage rather than a count of blanks. **It is never rolled on the first turn** (since version 0.09.2): no card of either kind comes before turn 2, and the deck is not touched, so the card on top simply waits.
 _Avoid_: event probability, calm cards, event rate
 
 **Tech**:

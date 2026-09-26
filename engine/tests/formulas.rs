@@ -63,6 +63,9 @@ fn facility(kind: FacilityKind) -> Facility {
 /// Temperature is left where the game put it, because forcing the chance to one would need a
 /// Temperature past the Collapse line and every turn after it would be a finished game.
 fn ask_the_card(g: &mut Game, id: EventId) {
+    // Ticket #367 (version 0.09.2): nothing is drawn before `first_draw_turn`, so a test about a
+    // card stands the game on a turn that can draw one.
+    g.turn = g.turn.max(g.tables.events.first_draw_turn);
     for _ in 0..200 {
         g.deck.cards = vec![Card::Event(id)];
         g.deck.drawn.clear();
@@ -1610,6 +1613,8 @@ fn only_climate_cards_scale_with_the_temperature() {
     let mut g = game();
     g.climate.temperature = 3.0; // scale 1.9 for a Climate card
     let mut seen = 0;
+    // Ticket #367 (version 0.09.2): the first turn never draws, so the roll is made on one that can.
+    g.turn = g.turn.max(g.tables.events.first_draw_turn);
     for id in [EventId::MeteorShower, EventId::SolarMaximum, EventId::RichSeam, EventId::Heatwave] {
         // Force the next draw to be this card; roll until the Draw Chance lets it through.
         let mut drawn = None;
@@ -15070,6 +15075,8 @@ fn a_turn_whose_loudest_line_is_a_card_answer_still_opens_with_a_headline() {
     // until a card comes.
     g.question = None;
     g.deck.off_earth_joined = true;
+    // Ticket #367 (version 0.09.2): the first turn never draws, so the roll is made on one that can.
+    g.turn = g.turn.max(g.tables.events.first_draw_turn);
     for _ in 0..500 {
         g.report.lines.clear();
         g.deck.cards = vec![Card::Event(card)];
@@ -15372,4 +15379,57 @@ fn ticket_351_a_scrubber_the_sink_never_counted_names_no_loss() {
     let line = g.report.lines.iter().find(|l| l.text.contains("Energy ran short")).map(|l| l.text.clone()).unwrap_or_else(|| panic!("{:?}", g.report.lines));
     assert!(line.contains("Scrubber"), "it is shut: {line}");
     assert!(!line.contains("Natural Sink"), "and costs the Sink nothing: {line}");
+}
+
+/// Ticket #367 (version 0.09.2): **no card of either kind on the first turn.** The deck is not
+/// touched before `first_draw_turn`, so the card on top waits for the first roll and nothing is
+/// lost. Sixty seeds, because the roll is a coin at the base Temperature: before the rule about
+/// thirty of them drew on turn 1, and one is enough to fail this.
+#[test]
+fn no_card_of_either_kind_is_drawn_on_the_first_turn_and_the_deck_is_untouched() {
+    let t = tables();
+    assert_eq!(t.events.first_draw_turn, 2, "the figure in events.toml");
+    for seed in 1..=60 {
+        let mut g = with_seed(seed);
+        let dealt = g.deck.cards.len();
+        g.start();
+        assert_eq!(g.turn, 1);
+        assert_eq!(g.draw, CardDraw::NoCard, "seed {seed}: turn 1 drew {:?}", g.draw);
+        assert!(g.pending_question().is_none(), "seed {seed}: turn 1 asked a question");
+        assert_eq!(g.deck.cards.len(), dealt, "seed {seed}: the deck is untouched on turn 1");
+        assert!(g.deck.drawn.is_empty(), "seed {seed}: nothing is in the drawn pile");
+    }
+    // And on the first turn that may draw, the roll is the ordinary one: over sixty seeds some
+    // draw and some do not, so the rule holds off turn 1 alone and does not silence the deck.
+    let mut drew = 0;
+    for seed in 1..=60 {
+        let mut g = with_seed(seed);
+        g.turn = t.events.first_draw_turn;
+        g.question_phase();
+        if g.draw != CardDraw::NoCard {
+            drew += 1;
+        }
+    }
+    assert!((10..=50).contains(&drew), "turn {}: {drew} of 60 seeds drew, which is not a coin", t.events.first_draw_turn);
+}
+
+/// Ticket #367: the loader refuses a `first_draw_turn` of nought, since turn 0 is not a turn and
+/// the figure would read as "draw before the game starts". Read from a copy of the data folder
+/// with that one line changed, so the test is about the loader and not about a hand-built table.
+#[test]
+fn the_loader_refuses_a_first_draw_turn_of_nought() {
+    let src = default_data_dir();
+    let dir = std::env::temp_dir().join(format!("dying-earth-first-draw-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).expect("temp data dir");
+    for entry in std::fs::read_dir(&src).expect("data dir") {
+        let path = entry.expect("entry").path();
+        std::fs::copy(&path, dir.join(path.file_name().unwrap())).expect("copy");
+    }
+    let events = std::fs::read_to_string(src.join("events.toml")).expect("events.toml");
+    assert!(events.contains("first_draw_turn = 2"), "the fixture reads the shipped figure");
+    std::fs::write(dir.join("events.toml"), events.replace("first_draw_turn = 2", "first_draw_turn = 0")).expect("write");
+    let err = Tables::load(&dir).err().map(|e| e.to_string());
+    std::fs::remove_dir_all(&dir).ok();
+    let err = err.expect("a first_draw_turn of 0 is refused");
+    assert!(err.contains("first_draw_turn"), "the refusal names the figure: {err}");
 }

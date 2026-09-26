@@ -558,6 +558,11 @@ pub struct EventsTable {
     pub storm_surge_coastal_multiplier: f64,
     /// Ticket #259: the turn the off-Earth cards are shuffled into the deck.
     pub off_earth_join_turn: u32,
+    /// Ticket #367 (version 0.09.2): the first turn a card may be drawn at all. Before it the deck
+    /// is not touched -- nothing is rolled, nothing is spent -- so the first turn is the player's,
+    /// with their Condition to read and their first orders to give, and no card of either kind in
+    /// the way. Never below one.
+    pub first_draw_turn: u32,
     pub event: Vec<EventCard>,
 }
 
@@ -2229,6 +2234,11 @@ impl Tables {
         }
         if !(0.0..=1.0).contains(&self.events.draw_chance_base) || self.events.draw_chance_step_degrees <= 0.0 {
             return Err(err("events.toml", "draw_chance_base must be between 0 and 1 and draw_chance_step_degrees positive"));
+        }
+        // Ticket #367 (version 0.09.2): turn 0 is not a turn, and a figure of nought would read as
+        // "draw before the game starts".
+        if self.events.first_draw_turn == 0 {
+            return Err(err("events.toml", "first_draw_turn must be 1 or more (1 draws on the first turn; 2 holds the first turn quiet)"));
         }
         // Ticket #337 (version 0.09.0): a choice card with nothing on either side would be drawn,
         // asked and answered to no purpose, and nobody reading the table would see it. The load

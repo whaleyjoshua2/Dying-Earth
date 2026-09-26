@@ -76,6 +76,12 @@ impl Game {
     pub fn question_phase(&mut self) {
         self.question = None;
         self.draw = CardDraw::NoCard;
+        // Ticket #367 (version 0.09.2): no card of either kind before `first_draw_turn` (turn 2).
+        // The deck is not touched: nothing rolled, nothing spent, so the card on top waits for the
+        // first roll. The first turn is for reading the Condition and giving the first orders.
+        if self.turn < self.tables.events.first_draw_turn {
+            return;
+        }
         self.join_off_earth_cards();
         if !self.rolls_a_card() {
             return;
