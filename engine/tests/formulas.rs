@@ -12408,6 +12408,67 @@ fn an_occupied_shut_habitat_halves_the_colony_but_its_energy() {
     assert_eq!(twice_m, half_m, "half once, however many are shut");
 }
 
+/// Ticket #352 (version 0.09.1): a Research Lab's hover is its arithmetic, in the rule's order, with
+/// the rounding last -- the designer's *"mouseover explains math for research output"*. The words
+/// are pinned for the Custodians' China on turn 1, the example the ticket was decided on.
+#[test]
+fn a_research_labs_hover_is_its_arithmetic() {
+    let g = game();
+    assert_eq!(g.kind(Seat(0)), FactionKind::Custodians);
+    let y = g.facility_yield(Seat(0), StateId::EastAsia, FacilityKind::ResearchLab);
+    assert_eq!(y.research, 3);
+    assert_eq!(
+        y.chain.lines(6),
+        vec![
+            "2 base".to_string(),
+            "× 1.32 for 1.44B people, weighted by Education".to_string(),
+            "× 1.10 for Education 1.10".to_string(),
+            "× 1.25 as the Custodians".to_string(),
+            "= 3.62, rounded down to 3".to_string(),
+        ]
+    );
+    // Past the ceiling the later factors share a line rather than any being dropped.
+    let short = y.chain.lines(4);
+    assert_eq!(short.len(), 4);
+    assert_eq!(short[2], "× 1.10 for Education 1.10, × 1.25 as the Custodians");
+}
+
+/// Ticket #352: the chain IS the figure. For every Facility kind in every Region, and every Module
+/// kind at a Colony, the chain's last value is what the game pays -- so no hover can say one thing
+/// while Income does another.
+#[test]
+fn every_chain_ends_on_the_figure_the_game_pays() {
+    let mut g = game();
+    let c = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Mine, ModuleKind::Generator, ModuleKind::Observatory, ModuleKind::TradePost, ModuleKind::SolarArray, ModuleKind::Refinery], 6);
+    let settle = |y: &Yield| {
+        let v = if y.research > 0 { y.research } else { y.amount };
+        let last = y.chain.lines(99).last().cloned().unwrap_or_default();
+        (v, last)
+    };
+    let mut checked = 0;
+    for sid in StateId::ALL {
+        for fk in FacilityKind::ALL {
+            let y = g.facility_yield(Seat(0), sid, fk);
+            if !y.chain.multiplied() {
+                continue;
+            }
+            let (v, last) = settle(&y);
+            assert!(last.ends_with(&format!(" {v}")) || last == format!("= {v}"), "{fk:?} in {sid:?} pays {v} and its chain ends {last:?}");
+            checked += 1;
+        }
+    }
+    for (i, m) in g.colony(c).unwrap().modules.clone().iter().enumerate() {
+        let y = g.module_yield_at(Seat(0), c, i);
+        if !y.chain.multiplied() {
+            continue;
+        }
+        let (v, last) = settle(&y);
+        assert!(last.ends_with(&format!(" {v}")) || last == format!("= {v}"), "{:?} pays {v} and its chain ends {last:?}", m.kind);
+        checked += 1;
+    }
+    assert!(checked > 50, "the board was actually walked: {checked}");
+}
+
 /// Ticket #334 (c): the Standing Army is the state's, and takes nobody -- neither when the game
 /// begins nor when it is raised again two Incomes after it dies.
 #[test]

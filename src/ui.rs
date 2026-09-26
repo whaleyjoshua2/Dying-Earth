@@ -5855,6 +5855,24 @@ fn facility_figures(game: &Game, sid: StateId, f: &Facility, director: Option<Se
     }
 }
 
+/// Ticket #352 (version 0.09.1): a building's hover with its ARITHMETIC. The first line of
+/// `with_rules` (its heading), then the chain the engine computed the figure by -- the same steps,
+/// so the hover cannot drift from the rule. The designer: *"mouseover explains math for research
+/// output"*, and for every multiplied figure. The rules sentences under the heading are CUT: each
+/// wraps to two or three rendered lines, and with them a Mine's hover ran to nine against the six
+/// a tooltip is allowed. They stay on every hover without a chain.
+fn chain_tip(with_rules: &str, chain: &Chain) -> String {
+    let mut lines: Vec<String> = with_rules.lines().next().map(str::to_string).into_iter().collect();
+    lines.extend(chain.lines(5));
+    lines.join("\n")
+}
+
+/// Ticket #352: a build hover's figures, and their chain where they are multiplied, in the four
+/// lines a build hover has left under its own two.
+fn yield_with_chain(y: &Yield) -> String {
+    if y.chain.multiplied() { format!("{}\n{}", y.text(), y.chain.lines(4).join("\n")) } else { y.text() }
+}
+
 /// Ticket #116 (version 0.07.1): what the two figures on a Facility's line actually DO. Upkeep
 /// and Emissions are the numbers a player weighs a building by, and neither said what it cost to
 /// fail to pay them. The first line is the heading the hover opens with.
@@ -5888,7 +5906,13 @@ fn facility_row(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, i: us
             colour,
             &[],
         );
-        rule_tip(resp, facility_rules(f.kind.name(), f.coastal));
+        // Ticket #352 (version 0.09.1): with its arithmetic, where the figure is multiplied.
+        let rules = facility_rules(f.kind.name(), f.coastal);
+        let tip = match director.filter(|_| !f.mothballed).map(|d| game.facility_yield(d, sid, f.kind).chain).filter(|c| c.multiplied()) {
+            Some(chain) => chain_tip(&rules, &chain),
+            None => rules,
+        };
+        rule_tip(resp, tip);
         if mine && f.change.is_none() && ui.available_width() >= CHANGE_BUTTONS_WIDTH {
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 change_buttons(ui, game, &session.pending, BuildingRef::Facility(sid, i), f.mothballed, true, actions);
@@ -5922,7 +5946,8 @@ fn facility_build_buttons(ui: &mut Ui, session: &Session, game: &Game, sid: Stat
         if game.tables.facility(fk).needs_tech.map(|t| !game.has_tech(t)).unwrap_or(false) {
             continue;
         }
-        let hover = game.facility_yield(Seat(0), sid, fk).text();
+        // Ticket #352 (version 0.09.1): and how the figure is reached, where it is multiplied.
+        let hover = yield_with_chain(&game.facility_yield(Seat(0), sid, fk));
         ui.horizontal(|ui| {
             cost_button_with_hover(ui, game, &session.pending, Order::BuildFacility { state: sid, kind: fk }, fk.name(), Some(hover), actions);
             // Ticket #42: the same building bought outright for Ducats.
@@ -6107,6 +6132,11 @@ fn slot_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
                 let state = if f.mothballed { TileState::Mothballed } else if !f.online { TileState::Offline } else { TileState::Standing };
                 let heading = format!("{} ({side}): {}{}", f.kind.name(), facility_figures(game, sid, f, director), facility_offline_words(f));
                 let tip = facility_rules(&heading, f.coastal);
+                // Ticket #352 (version 0.09.1): with its arithmetic, where the figure is multiplied.
+                let tip = match director.filter(|_| !f.mothballed).map(|d| game.facility_yield(d, sid, f.kind).chain).filter(|c| c.multiplied()) {
+                    Some(chain) => chain_tip(&tip, &chain),
+                    None => tip,
+                };
                 if hab_tile(ui, rect, id, Some(crate::icons::facility_icon(f.kind)), f.kind.name(), state, view.slot_box == Some(SlotBox::Facility(*i)), edge, tip).clicked() {
                     view.slot_box = Some(SlotBox::Facility(*i));
                 }
@@ -6282,10 +6312,13 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     // Region's resistance to Influence, and what Colonists carry away with them.
     let live = game.education_level(sid);
     let schooled = live - card.education_level;
+    // Ticket #352 (version 0.09.1): it counts TWICE in a Research Lab, which looks like a defect
+    // until it is said; the Lab's own hover says it too.
+    const EDU: &str = "It counts twice in a Research Lab: once weighting how many people it has, and once on its own. It also stiffens this Region against an outsider's Influence, and goes with any Colonist recruited here.";
     let hover = if schooled > 0.005 {
-        format!("{:.2} on the card, and {:+.2} from a School. It multiplies a Research Lab twice over, stiffens this Region against an outsider's Influence, and goes with any Colonist recruited here.", card.education_level, schooled)
+        format!("{:.2} on the card, and {:+.2} from a School.\n{EDU}", card.education_level, schooled)
     } else {
-        format!("{:.2} on the card, and no School standing. It multiplies a Research Lab twice over, stiffens this Region against an outsider's Influence, and goes with any Colonist recruited here.", card.education_level)
+        format!("{:.2} on the card, and no School standing.\n{EDU}", card.education_level)
     };
     rule_tip(ui.label(format!("Education Level {live:.2}")), hover);
     // Ticket #52: Unrest, and what it is doing here in words.
@@ -8405,6 +8438,10 @@ fn module_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
         // Ticket #150 (version 0.07.4): the tile's hover -- the figures its strip line carries and
         // the Module rules, which the old rows never had.
         let mut tip = module_rules(m.kind, &format!("{}{}", module_line(game, col, cid, mi, director), module_offline_words(col, m)));
+        // Ticket #352 (version 0.09.1): with its arithmetic, where the figure is multiplied.
+        if let Some(chain) = director.filter(|_| !m.mothballed).map(|d| game.module_yield_at(d, cid, mi).chain).filter(|c| c.multiplied()) {
+            tip = chain_tip(&tip, &chain);
+        }
         // Ticket #324 (version 0.08.8): a Battery's hover carries its rules; a damaged one wears its
         // hit points on its label, as a shield wears an Army's.
         let mut label = m.kind.name().to_string();
@@ -8482,7 +8519,11 @@ fn module_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
         Some(HabTile::Module(mi)) if mi < col.modules.len() => {
             let m = &col.modules[mi];
             let colour = if m.mothballed { Color32::from_rgb(170, 170, 190) } else { ui.visuals().text_color() };
-            figures_with_icons(ui, &module_line(game, col, cid, mi, director), 14.0, colour, &[]);
+            let line = figures_with_icons(ui, &module_line(game, col, cid, mi, director), 14.0, colour, &[]);
+            // Ticket #352 (version 0.09.1): the strip's line carries the arithmetic too.
+            if let Some(chain) = director.filter(|_| !m.mothballed).map(|d| game.module_yield_at(d, cid, mi).chain).filter(|c| c.multiplied()) {
+                rule_tip(line, chain_tip(&module_rules(m.kind, &module_line(game, col, cid, mi, director)), &chain));
+            }
             if mine && m.kind != ModuleKind::Archive {
                 change_row(ui, game, &session.pending, BuildingRef::Module(cid, mi), m.mothballed, m.change, actions);
             }
@@ -8535,7 +8576,8 @@ fn module_build_buttons(ui: &mut Ui, session: &Session, game: &Game, cid: Colony
         if !col.in_orbit && game.tables.module(mk).station_only {
             continue;
         }
-        let hover = game.module_yield(Seat(0), cid, mk).text();
+        // Ticket #352 (version 0.09.1): and how the figure is reached, where it is multiplied.
+        let hover = yield_with_chain(&game.module_yield(Seat(0), cid, mk));
         ui.horizontal(|ui| {
             cost_button_with_hover(ui, game, &session.pending, Order::BuildModule { colony: cid, kind: mk }, mk.name(), Some(hover), actions);
             cost_button(ui, game, &session.pending, Order::BuildModuleWithDucats { colony: cid, kind: mk }, "or", actions);
