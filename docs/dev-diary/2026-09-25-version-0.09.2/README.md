@@ -11,6 +11,12 @@ The baseline every sweep here is read against is 0.09.1's closing sweep,
 **6 / 28 / 3 / 2**, collapses 41 of 80. Read the per-Faction totals at the foot of a sweep file,
 never the per-seating arrays.
 
+**The close.** The closing sweep read 2 / 5 / 0 / 11 with 62 collapses of 80 against the baseline's
+6 / 28 / 3 / 2 and 41; the column turned over at equal starts. `GAME_VERSION` moved to 0.09.2 and
+`SAVE_VERSION` to 6. The Windows kit was built here into `dist/dying-earth-0.09.2-windows/` and
+zipped; the Linux kit by the `release-kits` workflow on the branch; both carry
+[`docs/playtest/PLAYTEST.txt`](../../playtest/PLAYTEST.txt) as their README.
+
 **Every folder here is listed.**
 
 | folder | ticket | what is in it |
