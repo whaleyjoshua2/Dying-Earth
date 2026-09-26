@@ -5552,8 +5552,8 @@ fn influence_row(ui: &mut Ui, game: &Game, session: &Session, view: &mut ViewSta
     let explain = match game.place_control(target).controller() {
         Some(Seat(0)) => format!(
             "A rival takes it at {}: your Standing plus {}, and at least their threshold. Decays {} a turn.",
-            rival_take_price(game, target),
-            margin_words(game, None, target),
+            cheapest_rival(game, target).1,
+            margin_words(game, Some(cheapest_rival(game, target).0), target),
             game.tables.influence.decay_controlled
         ),
         Some(_) => format!("You take it at {}: their Standing plus {}, and at least your threshold. Decays {} a turn.", game.influence_needed_for(Seat(0), target), margin_words(game, Some(Seat(0)), target), game.tables.influence.decay),
@@ -5636,12 +5636,18 @@ fn threshold_breakdown(ui: &mut Ui, game: &Game, target: Place) {
     // The second line: what the holder's Standing and the margin make of it.
     if let Some(c) = game.place_control(target).controller() {
         let standing = game.seat(c).influence.get(&target).copied().unwrap_or(0);
-        let margin = game.challenge_margin_at(target);
-        let base = t.challenge_margin;
-        let guard = margin - base;
+        // Ticket #372 (version 0.09.2): the margin and the price of the challenger the row names --
+        // the player on a rival's place, the cheapest rival on the player's own -- in the engine's
+        // parts, where this read the margin with no challenger and the player's own price on the
+        // player's own place, which agreed with the row only by coincidence.
+        let (challenger, needed) = if c == Seat(0) { cheapest_rival(game, target) } else { (Seat(0), game.influence_needed_for(Seat(0), target)) };
+        let (base, relations, guard) = game.challenge_margin_parts(Some(challenger), target);
+        let margin = base + relations + guard;
         let held = if c == Seat(0) { "Held by you".to_string() } else { format!("Held by the {}", game.seat_name(c)) };
-        let needed = game.influence_needed_for(Seat(0), target);
         let mut second = format!("{held}: {needed} - {standing} + {base} (margin)");
+        if relations > 0 {
+            second.push_str(&format!(" + {relations} (relations)"));
+        }
         if guard > 0 {
             second.push_str(&format!(" + {guard} (Constabulary)"));
         }
@@ -5743,28 +5749,20 @@ Spending here raises the bar; doing nothing lowers it, yours decaying {} a turn 
     );
 }
 
-/// Ticket #50: four seats, so the Standings are chips in Faction colours, and only where there is
-/// a Standing to show. Ticket #64: the spectator's cards carry the same row. Ticket #137 (version
-/// 0.07.3): the row ends with `· Threshold N` and carries the whole explanation of what it takes to
-/// hold or take the place as a hover on the line -- the figure (ticket #60: the engine's own, which
-/// the Resolution and the AI read too) stays in view, and the reasoning is one hover away.
-/// Ticket #372 (version 0.09.2): the lowest price any rival pays to take a place of the player's,
+/// Ticket #372 (version 0.09.2): the rival who takes a place of the player's cheapest, and the price,
 /// each rival's read by the rule that takes it (`influence_needed_for`), since the margin differs
-/// per challenger with relations and the threshold with Blame.
-fn rival_take_price(game: &Game, target: Place) -> i64 {
-    Seat(0).others().iter().map(|r| game.influence_needed_for(*r, target)).min().unwrap_or(0)
+/// per challenger with relations and the threshold with Blame. A four-seat game always has three.
+fn cheapest_rival(game: &Game, target: Place) -> (Seat, i64) {
+    Seat(0).others().iter().map(|r| (*r, game.influence_needed_for(*r, target))).min_by_key(|(_, price)| *price).expect("three rivals")
 }
 
-/// Ticket #372: the challenge margin in words, from the function the rule runs, so a hover cannot
-/// quote the flat base where a Constabulary or cold relations have raised it: *"a margin of 27 (20,
-/// +2 for cold relations, +5 for the Constabulary)"*.
+/// Ticket #372 (version 0.09.2): the challenge margin in words, in the parts the engine keeps it
+/// in, so a hover cannot quote the flat base where a Constabulary or cold relations have raised
+/// it: *"a margin of 27 (20, +2 for cold relations, +5 for the Constabulary)"*.
 fn margin_words(game: &Game, challenger: Option<Seat>, target: Place) -> String {
-    let t = &game.tables.influence;
-    let whole = game.challenge_margin_for(challenger, target);
-    let guarded = matches!(target, Place::State(s) if game.state(s).facilities.iter().any(|f| f.kind == FacilityKind::Constabulary && f.working()));
-    let garrison = if guarded { if game.has_tech(TechId::CivilDefense) { t.constabulary_margin_defended } else { t.constabulary_margin } } else { 0 };
-    let relations = whole - t.challenge_margin - garrison;
-    let mut parts = vec![format!("{}", t.challenge_margin)];
+    let (base, relations, garrison) = game.challenge_margin_parts(challenger, target);
+    let whole = base + relations + garrison;
+    let mut parts = vec![format!("{base}")];
     if relations > 0 {
         parts.push(format!("+{relations} for cold relations"));
     }
@@ -5774,6 +5772,12 @@ fn margin_words(game: &Game, challenger: Option<Seat>, target: Place) -> String 
     if parts.len() == 1 { format!("a margin of {whole}") } else { format!("a margin of {whole} ({})", parts.join(", ")) }
 }
 
+/// Ticket #50: four seats, so the Standings are chips in Faction colours, and only where there is
+/// a Standing to show. Ticket #64: the spectator's cards carry the same row. Ticket #137 (version
+/// 0.07.3): the row ends with `· Threshold N` and carries the whole explanation of what it takes to
+/// hold or take the place as a hover on the line -- the figure (ticket #60: the engine's own, which
+/// the Resolution and the AI read too) stays in view, and the reasoning is one hover away.
+/// Ticket #372 (version 0.09.2): on a held place the figure is the price to take it.
 fn standings_row(ui: &mut Ui, game: &Game, session: &Session, target: Place, threshold: i64, explain: String) {
     let row = ui.horizontal_wrapped(|ui| {
         // Ticket #116 (version 0.07.1): what a Standing IS, which the row shows four of and never
@@ -5808,9 +5812,16 @@ fn standings_row(ui: &mut Ui, game: &Game, session: &Session, target: Place, thr
                 match nearest {
                     Some((r, n)) => {
                         let price = game.influence_needed_for(r, target);
-                        format!("The {} take it at {price}: your Standing plus {}. They stand at {n}, {} short. Every point you add here adds one to that.", game.seat_name(r), margin_words(game, Some(r), target), (price - n).max(0))
+                        // "Every point you add adds one" is true only while your Standing plus the
+                        // margin is what binds; under their threshold, the threshold does.
+                        let how = if price == v + game.challenge_margin_for(Some(r), target) {
+                            format!("your Standing plus {}. Every point you add here adds one to that.", margin_words(game, Some(r), target))
+                        } else {
+                            "their threshold, which stands over your Standing plus the margin.".to_string()
+                        };
+                        format!("The {} take it at {price}: {how} They stand at {n}, {} short.", game.seat_name(r), (price - n).max(0))
                     }
-                    None => format!("No rival has any Standing here; one would need {}, your Standing plus {}.", v + game.challenge_margin_for(None, target), margin_words(game, None, target)),
+                    None => format!("No rival has any Standing here; one would need {}.", cheapest_rival(game, target).1),
                 }
             } else if holder == Some(s) {
                 "They hold this place.".to_string()
@@ -5850,26 +5861,20 @@ fn standings_row(ui: &mut Ui, game: &Game, session: &Session, target: Place, thr
         // is the lowest price a rival pays; on nobody's it is still the threshold.
         let holder = game.place_control(target).controller();
         let (label, tip) = match holder {
-            Some(Seat(0)) if !session.spectator => (
-                format!("A rival takes it at {}", rival_take_price(game, target)),
-                format!(
-                    "The lowest price a rival pays to take this place from you: the greater of their threshold and your Standing plus {}.\nThe threshold here is {threshold}: {from}",
-                    margin_words(game, None, target)
-                ),
-            ),
+            Some(Seat(0)) if !session.spectator => {
+                let (r, price) = cheapest_rival(game, target);
+                (
+                    format!("A rival takes it at {price}"),
+                    format!("The lowest price a rival pays to take this from you: the {}, at the greater of their threshold and your Standing plus {}.\nThreshold: {from}", game.seat_name(r), margin_words(game, Some(r), target)),
+                )
+            }
             Some(_) if !session.spectator => (
                 format!("Take at {}", game.influence_needed_for(Seat(0), target)),
-                format!(
-                    "What your Standing must reach to take this place: the greater of your threshold and the holder's Standing plus {}.\nYour threshold here is {threshold}: {from}\nGreen Consensus cuts a quarter off the threshold; your Blame adds to it on every place you do not hold.",
-                    margin_words(game, Some(Seat(0)), target)
-                ),
+                format!("The greater of your threshold, {threshold}, and the holder's Standing plus {}.\nThreshold: {from}\nGreen Consensus cuts a quarter off it; your Blame adds to it.", margin_words(game, Some(Seat(0)), target)),
             ),
             _ => (
                 format!("Threshold {threshold}"),
-                format!(
-                    "What a Standing must reach to take this place: {from}\nGreen Consensus cuts a quarter off it; your Blame adds to the one you read, on every place you do not hold.\nA held place also wants the holder's Standing plus {}.",
-                    margin_words(game, None, target)
-                ),
+                format!("What a Standing must reach to take this place: {from}\nGreen Consensus cuts a quarter off it; your Blame adds to it on places you do not hold.\nA held place also wants the holder's Standing plus {}.", margin_words(game, None, target)),
             ),
         };
         rule_tip(ui.label(label), tip);
@@ -6278,10 +6283,11 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     // Ticket #161 (version 0.07.5): who holds a Region, and by what rule they keep or lose it.
     let owner_tip = match st.control {
         Control::Neutral => "Nobody holds it. The first Standing to reach the threshold takes it; two arriving level are settled by lot.".to_string(),
+        // Ticket #372 (version 0.09.2): the margin as the rule reads it, not the flat base.
         Control::Controlled(s) => format!(
             "The {} hold it, and take its Influence value into their Allotment each turn.\nA rival needs their Standing plus {}, and at least its own threshold.",
             game.seat_name(s),
-            game.tables.influence.challenge_margin
+            margin_words(game, None, Place::State(st.id))
         ),
         Control::Occupied { occupier, .. } => format!(
             "An Army of the {} beat its defenders: they choose what is built here but do not direct its Armies.\nControl passes after {} turns, or sooner once the occupier's Influence, gained each turn and halved while Unrest is high, passes the threshold.",
@@ -6435,9 +6441,10 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         // the influence portion of the nation card."*
         rule_tip(
             icon_word(ui, "influence", "Influence"),
+            // Ticket #372 (version 0.09.2): the margin as the rule reads it here, not the flat base.
             format!(
                 "Your claim here: spend from the corner's Allotment and it becomes your Standing, which survives any change of hands.\nHighest Standing at the threshold takes a free place; a held one wants the holder's plus {}.\nDecays {} a turn for the holder, {} for everyone else.",
-                game.tables.influence.challenge_margin,
+                margin_words(game, Some(Seat(0)), Place::State(sid)),
                 game.tables.influence.decay_controlled,
                 game.tables.influence.decay
             ),

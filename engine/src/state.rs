@@ -3052,6 +3052,14 @@ impl Game {
     /// everywhere, so this hands the strongest Faction a second permanent advantage against the
     /// weakest -- worth about +1 on 45% of turns against the Prospectors, +2 once deeds stack on.
     pub fn challenge_margin_for(&self, challenger: Option<Seat>, target: Target) -> i64 {
+        let (base, relations, garrison) = self.challenge_margin_parts(challenger, target);
+        base + relations + garrison
+    }
+
+    /// Ticket #372 (version 0.09.2): the challenge margin in its three parts -- the base, the
+    /// relations term, and the Constabulary's -- so the interface can name them without
+    /// re-deriving any of them. `challenge_margin_for` is their sum, and nothing else.
+    pub fn challenge_margin_parts(&self, challenger: Option<Seat>, target: Target) -> (i64, i64, i64) {
         let t = &self.tables.influence;
         let relations = match (challenger, self.place_control(target).controller()) {
             (Some(ch), Some(holder)) if ch != holder => {
@@ -3066,7 +3074,7 @@ impl Game {
         // helps whoever holds a garrisoned Region and hinders whoever wants one, which is the same
         // asymmetry the Constabulary itself has carried since ticket #190.
         let garrison = if self.has_tech(TechId::CivilDefense) { t.constabulary_margin_defended } else { t.constabulary_margin };
-        t.challenge_margin + relations + if guarded { garrison } else { 0 }
+        (t.challenge_margin, relations, if guarded { garrison } else { 0 })
     }
 
     /// Ticket #263 (version 0.08.4): what a seat has under way -- every build it has begun, with
