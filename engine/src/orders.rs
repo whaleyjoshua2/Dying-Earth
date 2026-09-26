@@ -336,8 +336,6 @@ pub struct Pending {
     pub transfer_lines: Vec<(Place, usize)>,
     #[serde(default)]
     pub credit_buys: Vec<(Seat, i64, i64)>,
-    /// Attack orders in the order given, for battle ordering (spec 10.1).
-    pub attack_sequence: u32,
 }
 
 /// Ticket #343 (version 0.09.1): where a Missile Carrier may load another Warhead, or why it may
@@ -1502,9 +1500,13 @@ impl Game {
                     return fail("a Ship cannot dig in");
                 }
                 // Ticket #383 (version 0.09.2): an Attack is fought the moment it is ordered, and a
-                // stack fights once a turn.
+                // stack fights once a turn; and an Attack with nobody to fight is refused rather
+                // than fought against nothing and counted as the turn's.
                 if *stance == Stance::Attack && self.fought.contains(&(seat, *body)) {
                     return fail("the stack fought this turn; it may Attack again next turn");
+                }
+                if *stance == Stance::Attack && !self.attack_has_a_target(seat, *body) {
+                    return fail("no rival Ship or Battery in any orbit your Ships hold there");
                 }
                 // Ticket #278 (version 0.08.5): a Blockade is chosen against a place, so it wants a
                 // warship of the seat's sitting in an orbit it may shut. Ticket #335 (version
@@ -2052,6 +2054,26 @@ impl Game {
     }
 
     /// Validate a whole order list in sequence.
+    /// Ticket #383 (version 0.09.2): **a stack's stance, set as the order sets it**, for the order's
+    /// commit, for an Attack fought at once, and for the survivors standing down after. Ticket #278
+    /// (version 0.08.5): only a warship can blockade; the rest of a stack ordered to Blockade holds.
+    pub(crate) fn set_stack_stance(&mut self, seat: Seat, body: BodyId, stance: Stance) {
+        for s in self.ships.iter_mut().filter(|s| s.seat == seat && s.at == ShipAt::Body(body)) {
+            s.stance = if stance == Stance::Blockade && !s.kind.is_warship() { Stance::Hold } else { stance };
+        }
+    }
+
+    /// Ticket #383: whether an Attack at this Body has anything to fight -- a rival Ship or a rival
+    /// working Battery in some orbit the seat holds a Ship in. The "Attack this turn" button hides
+    /// itself on the same condition; the order is refused on it.
+    pub(crate) fn attack_has_a_target(&self, seat: Seat, body: BodyId) -> bool {
+        self.orbits_of(body).into_iter().any(|orbit| {
+            self.ships.iter().any(|s| s.seat == seat && self.ship_in_orbit(s, body, orbit) && !s.escaped)
+                && (self.ships.iter().any(|s| s.seat != seat && self.ship_in_orbit(s, body, orbit) && !s.escaped)
+                    || seat.others().iter().any(|o| !self.batteries_at(*o, body, orbit).is_empty()))
+        })
+    }
+
     pub fn check_orders(&self, seat: Seat, orders: &[Order]) -> Result<(), (usize, OrderError)> {
         for (i, o) in orders.iter().enumerate() {
             self.check_order(seat, &orders[..i], o).map_err(|e| (i, e))?;
@@ -2234,14 +2256,7 @@ impl Game {
                     self.log(format!("{} refuels {} with {} Fuel{}.", self.seat_name(seat), ship, amount, if at_partner { " at a partner's station" } else { "" }));
                 }
                 Order::ShipStance { body, stance } => {
-                    for s in self.ships.iter_mut().filter(|s| s.seat == seat && s.at == ShipAt::Body(*body)) {
-                        // Ticket #278 (version 0.08.5): only a warship can blockade; the rest of a
-                        // stack ordered to Blockade holds.
-                        s.stance = if *stance == Stance::Blockade && !s.kind.is_warship() { Stance::Hold } else { *stance };
-                    }
-                    if *stance == Stance::Attack {
-                        self.pending.attack_sequence += 1;
-                    }
+                    self.set_stack_stance(seat, *body, *stance);
                     // Ticket #335 (version 0.09.0): counted, so the sweep can say how often a
                     // Blockade is given now that a human can give one at all.
                     if *stance == Stance::Blockade {

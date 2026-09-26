@@ -15985,7 +15985,7 @@ fn the_round_log_accounts_for_every_hit_and_ends_where_the_melee_ended() {
 #[test]
 fn an_attack_is_fought_before_the_transits_land() {
     let mut g = fresh();
-    g.seats[1].ai = false;
+    g.seats[1].ai = false; // so its stance is the one set here, not one the computer orders
     let docked = ship_in(&mut g, Seat(0), UnitKind::Frigate, BodyId::Mars, None, Stance::Hold);
     ship_in(&mut g, Seat(1), UnitKind::Frigate, BodyId::Mars, None, Stance::Attack);
     let arriving = ShipId(g.fresh_id());
@@ -16003,4 +16003,27 @@ fn an_attack_is_fought_before_the_transits_land() {
     assert!(mine.units.contains(&docked_name), "the docked hull fought: {}", mine.units);
     assert!(!mine.units.contains(&arriving_name), "the hull in flight never joined: {}", mine.units);
     assert!(g.ships.iter().any(|s| s.id == arriving && s.at == ShipAt::Body(BodyId::Mars)), "and it landed after the Battle");
+}
+
+/// Ticket #383 (version 0.09.2), from the review: **a Battle the player fought mid-turn is carried
+/// into the Report the next turn shows**, with its headline written again, since it was written
+/// into the Report the player was reading and End Turn resets that one; and **an Attack with
+/// nobody to fight is refused** rather than fought against nothing and counted as the turn's.
+#[test]
+fn a_battle_fought_mid_turn_is_carried_into_the_next_report_and_an_empty_attack_is_refused() {
+    let mut g = fresh();
+    ship_in(&mut g, Seat(0), UnitKind::Frigate, BodyId::Venus, None, Stance::Hold);
+    let alone = g.attack_now(Seat(0), BodyId::Venus).unwrap_err().0;
+    assert!(alone.contains("no rival"), "{alone}");
+    assert!(g.fought.is_empty(), "a refused Attack is not the turn's fight");
+    ship_in(&mut g, Seat(0), UnitKind::Frigate, BodyId::Mars, None, Stance::Hold);
+    ship_in(&mut g, Seat(1), UnitKind::Frigate, BodyId::Mars, None, Stance::Hold);
+    let fought = g.attack_now(Seat(0), BodyId::Mars).expect("a rival there");
+    assert!(g.report.battles[fought.start].fought_now, "marked for the carry");
+    pick_a_tech(&mut g);
+    g.end_turn(std::array::from_fn(|_| Vec::new())).expect("the turn should end");
+    let carried: Vec<&BattleLine> = g.report.battles.iter().filter(|b| b.at == Some(ReportPlace::Orbit(BodyId::Mars, Orbit::Low))).collect();
+    assert!(!carried.is_empty(), "the Battle stands in the next turn's Report: {:?}", g.report.battles.iter().map(|b| b.place.clone()).collect::<Vec<_>>());
+    assert!(carried.iter().all(|b| !b.fought_now), "and is not carried twice");
+    assert!(g.report.lines.iter().any(|l| l.text.starts_with("Battle at Mars orbit")), "with its headline written again");
 }

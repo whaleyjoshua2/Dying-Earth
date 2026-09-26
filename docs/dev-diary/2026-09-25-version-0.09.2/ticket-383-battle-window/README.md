@@ -78,6 +78,23 @@ Headless, 1400x1000, `panel:0`, from this folder.
 |---|---|---|
 | [`window-mars.png`](window-mars.png) | `battle:1 cardshut:1 battlewindow:1` | **The Battle window**: *Battle at Mars orbit*, dated, the four party lines, the result, the three rounds drawn and replayed, and *Next Battle* at the foot, since the turn fought two. |
 
+## The review
+
+Two axes, run as sub-agents over the commit, and both found the same hole: the player's fought
+Battle was written into the Report the player was reading, which End Turn resets, so the next
+turn's headline, Report and map mark never had it and only the window at the moment of the fight
+ever showed it. End Turn carries such a Battle into the coming Report with its headline written
+again, pinned by a test. Both also found an Attack with nobody to fight standing the stack down,
+counting as its fight and raising a window on nothing; the order is refused now, *"no rival Ship or
+Battery in any orbit your Ships hold there"*. **Spec** found the stance row's Attack a second point
+of no return that said nothing (it opens the confirm now, and its hover says what confirming does
+in place of the persistence line), and the Comms Blackout Event no longer reaching the computer's
+Attacks (it stands them down first again). **Standards** found the Save button live after a fought
+Attack against the rule that a save is a turn start (dead now, and says why), the stance-setting
+loop written three times (one helper), a dead Attack counter (gone), a doc comment left heading
+the wrong function, the fought-flag doc saying the wrong end of the Resolution, the Battle modal's
+id unlike the others', and the chain's doc without its Battle paragraph.
+
 ## The gate
 
-`cargo clippy --workspace --release --all-targets -- -D warnings` clean; engine 502 + 6, root 8.
+`cargo clippy --workspace --release --all-targets -- -D warnings` clean; engine 503 + 6, root 8.

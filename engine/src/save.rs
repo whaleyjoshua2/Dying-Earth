@@ -202,8 +202,9 @@ pub struct SavedGame {
     /// Ticket #286 (version 0.08.5): the war's counters.
     #[serde(default)]
     pub war: WarCounters,
-    /// Ticket #383 (version 0.09.2): the stacks that fought an Attack this turn, for a save taken
-    /// after one; empty in every save taken at a turn's head, which is where saves are taken.
+    /// Ticket #383 (version 0.09.2): the stacks that fought an Attack this turn. Empty in every
+    /// save the game writes, since the Save button is dead after a fought Attack; carried for the
+    /// driver and the tests, which may save at any point.
     #[serde(default)]
     pub fought: Vec<(Seat, BodyId)>,
     /// Ticket #332 (version 0.09.0): the Widgets counters.
@@ -514,6 +515,11 @@ pub fn autosave(dir: &Path, game: &Game) -> Option<Result<PathBuf, String>> {
 }
 
 /// Ticket #59: a Save captures a turn start, so the Save button is dead while any order is pending.
-pub fn can_save_now(pending_orders: usize) -> bool {
-    pending_orders == 0
+/// Ticket #383 (version 0.09.2): and while a stack has fought an Attack this turn, which cannot be
+/// taken back as an order can; the save waits for the next turn's head.
+pub fn can_save_now(pending_orders: usize, fought: bool) -> bool {
+    pending_orders == 0 && !fought
 }
+
+/// Ticket #383: why the Save button is dead after a fought Attack.
+pub const SAVE_FOUGHT_HOVER: &str = "A Battle was fought this turn, so this is no longer a turn start; save at the next.";

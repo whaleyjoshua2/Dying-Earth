@@ -34,12 +34,14 @@ impl Game {
         // Ticket #371 (version 0.09.2): where every Region's Unrest stands as the Resolution opens,
         // for the one net line a Region the Report says at its end.
         self.snapshot_unrest();
-        // Ticket #383 (version 0.09.2): every stack standing on Attack fights NOW, before anything
-        // moves -- the computer's, whose orders were just placed, and any stack a test or a
-        // building aid stood on Attack. The player's was fought the moment it was confirmed. A hull
-        // still in flight never joins a Battle at its destination.
-        self.fight_attacks();
+        // Ticket #383 (version 0.09.2): every stack standing on Attack as the Resolution opens
+        // fights NOW, before anything moves -- the computer's, whose orders were just placed; the
+        // player's was fought the moment it was confirmed. A hull still in flight never joins a
+        // Battle at its destination. The Comms Blackout stands the stacks down first, as it did
+        // when the Battles came after the transits; it cannot reach an Attack the player fought
+        // before the Event was drawn.
         self.blackout_stances();
+        self.fight_attacks();
         self.resolve_transits(); // (a)
         self.resolve_battles(); // (b)
         self.resolve_bombards(); // (b'), ticket #328: after the orbit is fought for
@@ -366,9 +368,7 @@ impl Game {
                 self.fight_orbit(body, orbit, &[seat]);
             }
         }
-        for s in self.ships.iter_mut().filter(|s| s.seat == seat && s.at == ShipAt::Body(body)) {
-            s.stance = Stance::Hold;
-        }
+        self.set_stack_stance(seat, body, Stance::Hold);
         if !self.fought.contains(&(seat, body)) {
             self.fought.push((seat, body));
         }
@@ -380,14 +380,21 @@ impl Game {
     /// this turn" included.
     pub fn attack_now(&mut self, seat: Seat, body: BodyId) -> Result<std::ops::Range<usize>, OrderError> {
         self.check_order(seat, &[], &Order::ShipStance { body, stance: Stance::Attack })?;
-        for s in self.ships.iter_mut().filter(|s| s.seat == seat && s.at == ShipAt::Body(body)) {
-            s.stance = Stance::Attack;
+        self.set_stack_stance(seat, body, Stance::Attack);
+        let fought = self.fight_stack(seat, body);
+        // The record is written into the Report the player is reading, which End Turn resets; the
+        // mark says which lines to carry into the Report the coming turn will show.
+        for b in &mut self.report.battles[fought.clone()] {
+            b.fought_now = true;
         }
-        Ok(self.fight_stack(seat, body))
+        Ok(fought)
     }
 
     /// Ticket #383: every stack standing on Attack -- the computer's, whose orders were just
     /// placed -- fights now, seat by seat, as the Resolution opens and before it moves anything.
+    /// Seat 0's stack first, then seat 1's, and so on: two stacks attacking one orbit in one turn
+    /// are two Battles, the second fought against the first's survivors standing on Hold, where
+    /// the old Resolution folded every aggressor into one melee.
     pub fn fight_attacks(&mut self) {
         for seat in Seat::ALL {
             for body in BodyId::ALL {
@@ -1006,7 +1013,7 @@ impl Game {
         if any_escape {
             self.war.battles_with_escape += 1;
         }
-        let line = BattleLine { place: place.to_string(), parties: listed, result: format!("{} round(s).", stats.rounds), at, log: Some(stats.log) };
+        let line = BattleLine { place: place.to_string(), parties: listed, result: format!("{} round(s).", stats.rounds), at, log: Some(stats.log), fought_now: false };
         // Ticket #381 (version 0.09.2): a Battle that cost a hull or a Battery is kept for the
         // chronicle; an Army lost is the ground's ordinary business and is not.
         let fallen: Vec<String> = parties.iter().flat_map(|(_, _, c)| c.iter()).filter(|c| c.destroyed() && !matches!(c.unit, UnitRef::Army(_))).map(|c| c.name.clone()).collect();
@@ -1027,7 +1034,7 @@ impl Game {
     /// with a Ship destroyed when a unit died, unranked when nobody lost one -- and a Moment when a
     /// unit died, naming it. Until now a Battle was a block at the foot of the dispatch and nothing
     /// else: no headline, and no Moment unless a building burned.
-    fn battle_line_and_moment(&mut self, line: &BattleLine) {
+    pub(crate) fn battle_line_and_moment(&mut self, line: &BattleLine) {
         let lost: Vec<String> = line.parties.iter().flat_map(|p| p.destroyed.iter().cloned()).collect();
         let aggressors: Vec<String> = line.parties.iter().filter(|p| p.aggressor).map(|p| p.seat.map(|s| self.seat_name(s)).unwrap_or_else(|| "neutral".to_string())).collect();
         let odds = line.parties.iter().find(|p| p.aggressor).and_then(|p| p.odds).unwrap_or(0.0);
@@ -1322,6 +1329,7 @@ impl Game {
                 result: text,
                 at,
                 log: None,
+                fought_now: false,
             });
         }
     }
@@ -1454,6 +1462,7 @@ impl Game {
                 result: text,
                 at,
                 log: None,
+                fought_now: false,
             });
         }
     }

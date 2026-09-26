@@ -190,8 +190,9 @@ impl Session {
     /// The Save button: a manual save of this turn start. It is dead while an order is pending, so
     /// a save never holds half-entered orders.
     pub fn save_now(&mut self) {
-        if !save::can_save_now(self.pending.len()) {
-            self.note(save::SAVE_PENDING_HOVER.to_string());
+        let fought = self.game.as_ref().is_some_and(|g| !g.fought.is_empty());
+        if !save::can_save_now(self.pending.len(), fought) {
+            self.note(if fought { save::SAVE_FOUGHT_HOVER } else { save::SAVE_PENDING_HOVER }.to_string());
             return;
         }
         let Some(game) = &self.game else { return };
@@ -248,7 +249,6 @@ impl Session {
         self.refresh_saves();
     }
 
-    /// Try to add an order; on failure remember why so the panel can show it.
     /// Ticket #383 (version 0.09.2): the player's Attack, fought the moment it is confirmed. The
     /// engine checks it as the order it was, fights it, and hands back where the Battles landed in
     /// the turn's record; a refusal goes where a refused order's goes.
@@ -266,6 +266,7 @@ impl Session {
         }
     }
 
+    /// Try to add an order; on failure remember why so the panel can show it.
     pub fn place(&mut self, order: Order) -> bool {
         let Some(game) = &self.game else { return false };
         match game.check_order(Seat(0), &self.pending, &order) {

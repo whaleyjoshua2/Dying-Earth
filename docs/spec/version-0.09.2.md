@@ -366,8 +366,12 @@ orbit it holds Ships on Attack in, against every rival Ship and working Battery 
 in a station's orbit fights the station -- and the survivors stand on Hold. **A stack fights once a
 turn**: a second Attack at that Body that turn is refused, *"the stack fought this turn"*; every
 other order stays open to the survivors, so a stack that wins the orbit may land its cargo the same
-turn. The point of no return is the *Confirm Attack* button, which says so; a fought Battle cannot
-be taken back as an order can.
+turn. The point of no return is the *Confirm Attack* button, which says so, and it is the only
+one: the stance row's Attack opens that confirm rather than fighting on a click. A fought Battle
+cannot be taken back as an order can, and **the Save button is dead for the rest of the turn**, a
+save being a turn start. **An Attack with nobody to fight is refused** -- no rival Ship or working
+Battery in any orbit the stack holds a Ship in -- rather than fought against nothing and counted as
+the turn's.
 
 **The computer's Attacks are fought as the Resolution opens**, the moment its orders are placed and
 before anything moves, on the same rule; the player always fights first in a turn. Because a Battle
@@ -375,12 +379,18 @@ is fought before the transits and orbit changes land, **a hull still in flight n
 at its destination**, and a Ship changing orbit is not in its new orbit for one fought there. What
 the Resolution still opens itself is a Battery's Battle on a blockader, and an Intercept's on an
 arrival, as before. Ground Battles are unchanged: an Army's march into a rival place moves and
-fights at the Resolution.
+fights at the Resolution. **Two stacks that Attack in one orbit in one turn fight two Battles**,
+one per Attack, the second against the first's survivors on Hold, where the old Resolution folded
+every aggressor into one melee. The Comms Blackout Event still stands the computer's stacks down
+before their Attacks are fought; it cannot reach a player's Attack fought before the Event was
+drawn.
 
 **Every Battle has a window of its own**: the party lines, the round picture and the replay of §14.
 The player's is raised the moment the Attack is fought; every Battle the Resolution fought is raised
 at the head of the next turn, one after another, before the tutorial's note, the card or the Event,
-the Moments and the Report. The map's Battle mark opens that Battle's window. The Report keeps its
+the Moments and the Report. A Battle the player fought mid-turn is carried into that next Report
+with its headline, so the head of the turn, the map's mark and the Report all have it. The map's
+Battle mark opens that Battle's window. The Report keeps its
 one-line Battle headline and loses the Battle Report block; the Moment for a bloodless orbital
 Battle that §14 added goes, the window being the news.
 

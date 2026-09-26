@@ -1273,6 +1273,10 @@ pub struct BattleLine {
     /// line lives.
     #[serde(default)]
     pub log: Option<crate::combat::BattleLog>,
+    /// Ticket #383 (version 0.09.2): fought by the player mid-turn, into the Report they were
+    /// reading; End Turn carries such a line into the Report the coming turn shows. Cleared there.
+    #[serde(default)]
+    pub fought_now: bool,
 }
 
 impl BattleLine {
@@ -1440,7 +1444,8 @@ pub struct Game {
     /// Ticket #286 (version 0.08.5): the war, counted on the game so the sweep can say it.
     pub war: WarCounters,
     /// Ticket #383 (version 0.09.2): the stacks (seat, Body) that fought an Attack this turn, which
-    /// may not Attack again until the next Resolution. Cleared as the Resolution opens.
+    /// may not Attack again until the next Resolution. Cleared as the Resolution ends, beside
+    /// `pending`.
     pub fought: Vec<(Seat, BodyId)>,
     /// Ticket #332 (version 0.09.0): Widgets made, applied and lost, and the queues' depths.
     pub widgets: WidgetCounters,

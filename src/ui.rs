@@ -425,8 +425,11 @@ fn temperature_bar(ui: &mut Ui, game: &Game) {
 /// What the drawn interface asks the session to do, applied after drawing.
 enum Action {
     Place(Order),
-    /// Ticket #383 (version 0.09.2): the player's Attack at a Body, fought at once.
+    /// Ticket #383 (version 0.09.2): the player's Attack at a Body, fought at once -- from the
+    /// Confirm button alone; the stance row's Attack opens that confirm (`PreviewAttack`), so the
+    /// point of no return is one button that says so.
     Attack(BodyId),
+    PreviewAttack,
     Cancel(usize),
     /// Ticket #323 (version 0.08.8): a sentence for the panel's notice line, where a refusal shows.
     Notice(String),
@@ -606,6 +609,9 @@ fn card_owed(game: Option<&Game>) -> bool {
 /// Event and before the Moments, because it is asked at the head of the turn and the turn cannot
 /// end until it is answered; and while it is owed **nothing hands on past it**, since the only way
 /// to answer a question is to answer it.
+/// Ticket #383 (version 0.09.2): the Battle windows come before all of these at the head of a turn,
+/// one per Battle the Resolution fought, and hand on to whatever the turn would have opened with;
+/// a window raised for a Battle fought mid-turn hands on to nothing.
 fn advance_popup(view: &mut ViewState, moments: usize, has_event: bool, card: bool) {
     view.popup = match view.popup {
         // Ticket #383 (version 0.09.2): the Battle windows run one after another, then hand on to
@@ -1372,7 +1378,7 @@ pub fn draw(
     {
         match key {
             HotKey::Save => {
-                if dying_earth_engine::save::can_save_now(session.pending.len()) {
+                if dying_earth_engine::save::can_save_now(session.pending.len(), session.game.as_ref().is_some_and(|g| !g.fought.is_empty())) {
                     actions.push(Action::Save);
                 }
             }
@@ -1401,6 +1407,7 @@ pub fn draw(
             Action::Place(o) => {
                 session.place(o);
             }
+            Action::PreviewAttack => view.attack_preview = true,
             Action::Attack(body) => {
                 // Ticket #383 (version 0.09.2): fought now, and its window is the news.
                 if let Some(fought) = session.attack(body) {
@@ -2721,9 +2728,12 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
             // Ticket #59: a Save writes this turn start to a file. It is dead while an order is
             // pending, because a save captures a turn start and never half-entered orders. A
             // spectated game saves the same way.
-            let can_save = dying_earth_engine::save::can_save_now(session.pending.len()) && session.screen == Screen::Playing;
+            // Ticket #383 (version 0.09.2): and dead after a fought Attack, which is no turn start.
+            let fought = session.game.as_ref().is_some_and(|g| !g.fought.is_empty());
+            let can_save = dying_earth_engine::save::can_save_now(session.pending.len(), fought) && session.screen == Screen::Playing;
             let save = ui.add_enabled(can_save, bar_button("Save (Ctrl+S)"));
-            if save.on_disabled_hover_text(dying_earth_engine::save::SAVE_PENDING_HOVER).on_hover_text("Write this turn start to a file. Load it again from the title screen.").clicked() {
+            let why_dead = if fought { dying_earth_engine::save::SAVE_FOUGHT_HOVER } else { dying_earth_engine::save::SAVE_PENDING_HOVER };
+            if save.on_disabled_hover_text(why_dead).on_hover_text("Write this turn start to a file. Load it again from the title screen.").clicked() {
                 actions.push(Action::Save);
             }
             if let Some((text, _)) = &session.save_notice {
@@ -3762,7 +3772,8 @@ fn selected_ships(game: &Game, view: &ViewState) -> Option<(BodyId, Vec<ShipId>)
 }
 
 /// Ticket #381 (version 0.09.2): **the Battle drawn and replayed**, under its lines in the Battle
-/// Report, at the designer's word: *"what happens when a ship attacks a station or another ship
+/// window (`Popup::Battle`, ticket #383; until then in the Report's Battle Report block), at the
+/// designer's word: *"what happens when a ship attacks a station or another ship
 /// and can we show it."* One block per round of the log: each party's line of units in its colour,
 /// a glyph and a row of pips a unit, the pips filled for the damage it carried into the round and
 /// lit for the hits it took in it, a unit that left dimmed and one destroyed crossed; then the
@@ -5700,6 +5711,9 @@ fn cost_button_with_hover(ui: &mut Ui, game: &Game, pending: &[Order], order: Or
     }
 }
 
+/// Ticket #383 (version 0.09.2): what a Ship stack's Attack does, in place of the persistence line.
+const ATTACK_FIGHTS_NOW: &str = "The Battle is fought the moment you confirm, on the board as it stands; the survivors stand on Hold.";
+
 fn stance_row(ui: &mut Ui, game: &Game, pending: &[Order], current: Stance, make: impl Fn(Stance) -> Order, ships: bool, actions: &mut Vec<Action>) {
     ui.horizontal(|ui| {
         ui.label("Stance:");
@@ -5753,13 +5767,16 @@ fn stance_row(ui: &mut Ui, game: &Game, pending: &[Order], current: Stance, make
             let check = game.check_order(Seat(0), pending, &order);
             let resp = ui.add_enabled_ui(check.is_ok(), |ui| ui.selectable_label(shown == st, st.name())).inner;
             let resp = match &check {
-                Ok(_) => rule_tip(resp, format!("{}: {}\n{}{measured}{orbit_rule}", st.name(), st.one_liner(ships), Stance::PERSISTS)),
+                // Ticket #383 (version 0.09.2): a Ship stack's Attack does not persist -- it is
+                // fought on confirm and the survivors stand on Hold -- so its line says that instead.
+                Ok(_) => rule_tip(resp, format!("{}: {}\n{}{measured}{orbit_rule}", st.name(), st.one_liner(ships), if ships && st == Stance::Attack { ATTACK_FIGHTS_NOW } else { Stance::PERSISTS })),
                 Err(e) => rule_tip(resp, format!("{}: {}", st.name(), e.0)),
             };
             if resp.clicked() && shown != st && check.is_ok() {
-                // Ticket #383 (version 0.09.2): a stack's Attack is fought the moment it is chosen.
+                // Ticket #383 (version 0.09.2): a stack's Attack is fought the moment it is
+                // CONFIRMED, so the row opens the confirm rather than fighting on a click.
                 match order {
-                    Order::ShipStance { body, stance: Stance::Attack } => actions.push(Action::Attack(body)),
+                    Order::ShipStance { stance: Stance::Attack, .. } => actions.push(Action::PreviewAttack),
                     other => actions.push(Action::Place(other)),
                 }
             }
@@ -10550,7 +10567,7 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
             // picture and the replay of ticket #381. One window a Battle; Close hands on to the
             // next, or to the turn's head, through `advance_popup`.
             if let Some(b) = game.report.battles.get(i) {
-                egui::Modal::new(egui::Id::new(("battle", i))).show(ctx, |ui| {
+                egui::Modal::new("battle".into()).show(ctx, |ui| {
                     ui.set_width(620.0);
                     ui.label(RichText::new(format!("Battle at {}", b.place)).size(20.0).strong());
                     ui.label(RichText::new(game.date(game.report.turn).text()).weak());
