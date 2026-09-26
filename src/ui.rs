@@ -9230,17 +9230,6 @@ An Accord stands: {}.", terms.join(", ")));
     });
 }
 
-/// Ticket #235 (version 0.08.3): the **Research Directive** -- the share of a Faction's Research
-/// that goes somewhere other than the shared Tech, chosen as a percentage and standing until it is
-/// changed.
-///
-/// A PERCENTAGE rather than a count of points, because Research grows all game: a setting made on
-/// turn 5 in points is meaningless by turn 25, where a share keeps its meaning and reads directly
-/// against the shared-pot rule -- the player sees what they are contributing, not just what they
-/// are taking.
-///
-/// The Archivists' cap is 100 and everyone else's 50. Theirs was a switch until this version and
-/// that switch always sent ALL of it, so the slider keeps the reach.
 /// Ticket #382 (version 0.09.2): **the Research Directive's order, placed from either rail** -- the
 /// Tech Tree's full one or the top bar's condensed one -- so the two are one control drawn twice.
 /// The rail's response carries a refusal remembered until the next accepted setting (ticket #380).
@@ -9352,10 +9341,10 @@ fn condensed_fund(ui: &mut Ui, session: &Session, game: &Game, actions: &mut Vec
                 ui.spacing_mut().item_spacing.x = 6.0;
                 icon_word(ui, "research", format!("{contribution}%")).on_hover_text(DIRECTIVE_SENTENCE);
                 let resp = condensed_rail(ui, &mut contribution, RAIL, |r, painter| {
-                    // The unreachable part below the floor, dimmed as the full rail dims it.
+                    // The unreachable part below the floor, dimmed as the full rail dims it; the
+                    // Archivists' floor is nought with the shipped table, so nothing paints.
                     if floor > 0 {
-                        let dim = egui::Rect::from_min_max(egui::pos2(r.min.x, r.center().y - 4.0), egui::pos2(r.min.x + r.width() * floor as f32 / 100.0, r.center().y + 4.0));
-                        painter.rect_filled(dim, 2.0, Color32::from_rgb(124, 104, 104));
+                        dim_rail(painter, r, 0.0, floor as f32 / 100.0, 4.0);
                     }
                 });
                 contribution = contribution.max(floor);
@@ -9376,8 +9365,7 @@ fn condensed_fund(ui: &mut Ui, session: &Session, game: &Game, actions: &mut Vec
                 let resp = condensed_rail(ui, &mut share, RAIL, |r, painter| {
                     // The fifth no share may reach, dimmed as the full rail dims it.
                     if cap < 100 {
-                        let dim = egui::Rect::from_min_max(egui::pos2(r.min.x + r.width() * cap as f32 / 100.0, r.center().y - 4.0), egui::pos2(r.max.x, r.center().y + 4.0));
-                        painter.rect_filled(dim, 2.0, Color32::from_rgb(124, 104, 104));
+                        dim_rail(painter, r, cap as f32 / 100.0, 1.0, 4.0);
                     }
                 });
                 share = share.min(cap);
@@ -9388,6 +9376,16 @@ fn condensed_fund(ui: &mut Ui, session: &Session, game: &Game, actions: &mut Vec
         }
         _ => {}
     }
+}
+
+/// Ticket #382: **the dimmed part of a rail** -- the settings a Faction may not reach -- painted
+/// between two fractions of its length, `half` tall about its centre, in the grey the Research
+/// Directive chose (ticket #251): `from_gray(110)`, the unattributed segment of the race bar,
+/// leaned a little red to say "not yours to take" rather than "nothing here". The full rails add
+/// a tick at the bound; the condensed ones are too small for it.
+fn dim_rail(painter: &egui::Painter, r: egui::Rect, from: f32, to: f32, half: f32) {
+    let dim = egui::Rect::from_min_max(egui::pos2(r.min.x + r.width() * from, r.center().y - half), egui::pos2(r.min.x + r.width() * to, r.center().y + half));
+    painter.rect_filled(dim, 2.0, Color32::from_rgb(124, 104, 104));
 }
 
 /// Ticket #382: the condensed rail, `width` long and a shade thinner than the full one, with the
@@ -9403,8 +9401,9 @@ fn condensed_rail<T: egui::emath::Numeric>(ui: &mut Ui, value: &mut T, width: f3
     resp
 }
 
-/// Ticket #382: **the fill bar**, the fund against its bar in the Faction's colour, the figures
-/// written on it, `width` by fourteen -- the shape of `research_race_bar`.
+/// Ticket #382: **the fill bar**, the fund against its bar in the Faction's colour, `width` by
+/// fourteen with the figures beside it -- the shape of `research_race_bar`, figures and all. Not
+/// written on the fill: no text reads on both Factions' fills, and the race bar sets the precedent.
 fn fund_bar(ui: &mut Ui, colour: Color32, fund: i64, bar: i64, width: f32, what: &str) {
     let (rect, resp) = ui.allocate_exact_size(egui::vec2(width, 14.0), egui::Sense::hover());
     let painter = ui.painter_at(rect);
@@ -9413,14 +9412,27 @@ fn fund_bar(ui: &mut Ui, colour: Color32, fund: i64, bar: i64, width: f32, what:
     if share > 0.0 {
         painter.rect_filled(egui::Rect::from_min_size(rect.min, egui::vec2(rect.width() * share, rect.height())), 3.0, colour);
     }
-    painter.text(rect.center(), egui::Align2::CENTER_CENTER, format!("{fund} of {bar}"), egui::FontId::proportional(11.0), Color32::from_gray(235));
-    resp.on_hover_text(format!("{what}: {fund} of the {bar} the Victory Condition asks."));
+    painter.rect_stroke(rect, 3.0, egui::Stroke::new(1.0, Color32::from_gray(120)), egui::StrokeKind::Inside);
+    let hover = format!("{what}: {fund} of the {bar} the Victory Condition asks.");
+    resp.on_hover_text(hover.clone());
+    ui.label(RichText::new(format!("{fund} of {bar}")).weak()).on_hover_text(hover);
 }
 
 /// Ticket #382: the two full controls' own sentences, on the condensed widget's hover.
 const DIRECTIVE_SENTENCE: &str = "The share of your Research that goes to the shared Tech, from the next Income until you set it again. What you keep back never reaches the Tech, so it counts nothing toward the Research Lead -- and the Lead is the only seat that picks what the table researches next.";
 const VENTURE_SENTENCE: &str = "The share of each turn's Ducat income that goes into the Fund at Income, before you can spend a coin of it, from the next Income until you set it again. Ducats got by selling are not income and never reach it.";
 
+/// Ticket #235 (version 0.08.3): the **Research Directive** -- the share of a Faction's Research
+/// that goes somewhere other than the shared Tech, chosen as a percentage and standing until it is
+/// changed.
+///
+/// A PERCENTAGE rather than a count of points, because Research grows all game: a setting made on
+/// turn 5 in points is meaningless by turn 25, where a share keeps its meaning and reads directly
+/// against the shared-pot rule -- the player sees what they are contributing, not just what they
+/// are taking.
+///
+/// The Archivists' cap is 100 and everyone else's 50. Theirs was a switch until this version and
+/// that switch always sent ALL of it, so the slider keeps the reach.
 fn research_directive_control(ui: &mut Ui, session: &Session, game: &Game, actions: &mut Vec<Action>) {
     let me = Seat(0);
     let cap = game.research_directive_cap(me);
@@ -9465,15 +9477,9 @@ fn research_directive_control(ui: &mut Ui, session: &Session, game: &Game, actio
         // `from_gray(110)`, the unattributed segment of the race bar a few lines above -- leaned a
         // little red to say "not yours to take" rather than "nothing here".
         let r = resp.rect;
-        let dim = egui::Rect::from_min_max(
-            egui::pos2(r.min.x, r.center().y - ui.spacing().slider_rail_height * 0.6),
-            egui::pos2(r.min.x + r.width() * floor as f32 / 100.0, r.center().y + ui.spacing().slider_rail_height * 0.6),
-        );
-        ui.painter().rect_filled(dim, 2.0, Color32::from_rgb(124, 104, 104));
-        ui.painter().line_segment(
-            [egui::pos2(dim.max.x, r.center().y - 9.0), egui::pos2(dim.max.x, r.center().y + 9.0)],
-            egui::Stroke::new(1.5, Color32::from_gray(120)),
-        );
+        dim_rail(ui.painter(), r, 0.0, floor as f32 / 100.0, ui.spacing().slider_rail_height * 0.6);
+        let bound = r.min.x + r.width() * floor as f32 / 100.0;
+        ui.painter().line_segment([egui::pos2(bound, r.center().y - 9.0), egui::pos2(bound, r.center().y + 9.0)], egui::Stroke::new(1.5, Color32::from_gray(120)));
     }
     contribution = contribution.max(floor);
 
@@ -9550,15 +9556,9 @@ fn venture_fund_control(ui: &mut Ui, session: &Session, game: &Game, view: &mut 
     if cap < 100 {
         // The fifth no share may reach, painted over the rail's top end in the Directive's grey.
         let r = resp.rect;
-        let dim = egui::Rect::from_min_max(
-            egui::pos2(r.min.x + r.width() * cap as f32 / 100.0, r.center().y - ui.spacing().slider_rail_height * 0.6),
-            egui::pos2(r.max.x, r.center().y + ui.spacing().slider_rail_height * 0.6),
-        );
-        ui.painter().rect_filled(dim, 2.0, Color32::from_rgb(124, 104, 104));
-        ui.painter().line_segment(
-            [egui::pos2(dim.min.x, r.center().y - 9.0), egui::pos2(dim.min.x, r.center().y + 9.0)],
-            egui::Stroke::new(1.5, Color32::from_gray(120)),
-        );
+        dim_rail(ui.painter(), r, cap as f32 / 100.0, 1.0, ui.spacing().slider_rail_height * 0.6);
+        let bound = r.min.x + r.width() * cap as f32 / 100.0;
+        ui.painter().line_segment([egui::pos2(bound, r.center().y - 9.0), egui::pos2(bound, r.center().y + 9.0)], egui::Stroke::new(1.5, Color32::from_gray(120)));
     }
     share = share.min(cap);
     let fund = game.seat(me).venture_fund;
