@@ -133,3 +133,19 @@ here is a design decision; each is a thing the game said or did that was untrue 
    research, not on an empty shortlist, and the suite holds a test of it; a Tech completing inside
    End Turn owes a fresh pick that blocks the *next* End Turn, which reads as "did not block" to a
    player who saw the prompt appear mid-turn. Nothing changed.
+
+## 7. The Influence figure on a card reads the holder
+
+The authority is [ticket #372](https://github.com/whaleyjoshua2/Dying-Earth/issues/372).
+
+On a Region, Colony or station card, **the standings row's figure on a held place is the price to
+take it**, read by the rule that takes it -- the greater of the challenger's threshold and the
+holder's Standing plus the margin: *"Take at 67"* on a rival's place, and on the player's own place
+*"A rival takes it at 67"*, the lowest price any rival pays. *"Threshold 50"* stays on a place nobody
+holds. **Every hover that explains the margin uses the real one**, from the function the rule runs:
+*"a margin of 27 (20, +2 for cold relations, +5 for the Constabulary)"*. No rule moves.
+
+**Why.** The designer: *"update influence thresholds on cards to reflect current holders influence."*
+The row printed the fixed formula whatever the holder stood at, so a place held on 47 read
+*"Threshold 50"* when the price was 67, and its hovers quoted the flat base of 20 where a
+Constabulary and cold relations had raised it by up to 12.
