@@ -7437,23 +7437,22 @@ fn body_dropdown(ui: &mut Ui, session: &Session, game: &Game, body: BodyId, to: 
     // Open where the Ships are, and open the planet whose moon they are at, so the open door is
     // never hidden inside a shut one.
     let open = here || to.moons().contains(&body);
-    let orbit_fuel = game.tables.orbit_change_fuel;
+    // Ticket #92: the player's own figure, with the Faction's and the Tech's multipliers and a Mass
+    // Driver's cut on it; read once, for the header and the drift line inside.
+    let (turns, fuel) = game.transit_cost_for(Seat(0), body, to);
     let header = if here {
-        format!("{} (here): change orbit, {orbit_fuel} Fuel", game.tables.body(to).name)
+        format!("{} (here): change orbit, {} Fuel", game.tables.body(to).name, game.tables.orbit_change_fuel)
     } else {
-        // Ticket #92: the player's own figure, with the Faction's and the Tech's multipliers and a
-        // Mass Driver's cut on it.
-        let (turns, fuel) = game.transit_cost_for(Seat(0), body, to);
         format!("To {}: {turns} turn(s), {fuel} Fuel", game.tables.body(to).name)
     };
     let shown = egui::CollapsingHeader::new(RichText::new(header).strong()).id_salt(("moves", salt, to)).default_open(open).show(ui, |ui| {
         if here {
             change_orbit_lines(ui, session, game, body, ships, one, actions);
         } else {
-            transit_lines(ui, session, game, body, to, ships, one, actions);
+            transit_lines(ui, session, game, body, to, fuel, ships, one, actions);
         }
         for moon in to.moons() {
-            body_dropdown(ui, session, game, body, *moon, ships, one, scroll, salt, actions);
+            body_dropdown(ui, session, game, body, moon, ships, one, scroll, salt, actions);
         }
     });
     if here && scroll == Some(StackBlock::ChangeOrbit) {
@@ -7505,12 +7504,11 @@ fn change_orbit_lines(ui: &mut Ui, session: &Session, game: &Game, body: BodyId,
 /// costs the same whichever orbit it ends in; the orbit decides what the Ship can do when it gets
 /// there.
 #[allow(clippy::too_many_arguments)]
-fn transit_lines(ui: &mut Ui, session: &Session, game: &Game, body: BodyId, to: BodyId, ships: &[&Ship], one: Option<&Ship>, actions: &mut Vec<Action>) {
+fn transit_lines(ui: &mut Ui, session: &Session, game: &Game, body: BodyId, to: BodyId, fuel: i64, ships: &[&Ship], one: Option<&Ship>, actions: &mut Vec<Action>) {
     // Ticket #375 (version 0.09.2): the quote is for a launch THIS turn, and the sky moves; the next
     // two turns' figures stand beside it so the drift is visible -- the playtest read 4 turns and
     // 17 Fuel, launched later, and paid 6 and 26. The header carries this turn's figures; the drift
     // is the first line inside, read before any button under it.
-    let (_, fuel) = game.transit_cost_for(Seat(0), body, to);
     let (t1, f1) = game.transit_cost_for_at(Seat(0), body, to, game.turn + 1);
     let (t2, f2) = game.transit_cost_for_at(Seat(0), body, to, game.turn + 2);
     ui.label(RichText::new(format!("{fuel} Fuel each from the tank if launched this turn, whichever orbit it ends in (next turn {t1}t/{f1}F, then {t2}t/{f2}F).")).weak());

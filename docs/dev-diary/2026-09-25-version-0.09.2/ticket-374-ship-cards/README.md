@@ -74,6 +74,17 @@ list did not name it (kept, since it is the Body's and not any Ship's; the spec 
 reading for the designer: a stranded hull inside a stack of several is now read on its own card or
 its Roster row, not on the stack card, since the Tank is the Ship's.
 
+The nesting, built after those two reviews, had a review of its own. It found the planet-moon
+pairing written in three places with nothing tying them: `bodies.toml`'s `parent` column (which
+prices the legs), `Tables::planet`'s own match (which reads the sky), and the new `BodyId::primary`
+and `moons`. Now `primary` is the one place: `Tables::planet` reads it, `moons` is derived from it,
+and the loader refuses a table whose `parent` disagrees. Witnessed red by setting the Moon's parent
+to Mars in the data:
+
+    tables load: DataError { file: "bodies.toml", message: "the Moon has parent Some(Mars); the engine's tree says Some(Earth)" }
+
+and green on the restored data. It also had a transit's quote read twice per drop-down; once now.
+
 ## The gate
 
 `cargo clippy --workspace --release --all-targets -- -D warnings` clean; engine 497 + 6, root 8.

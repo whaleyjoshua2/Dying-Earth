@@ -1958,6 +1958,15 @@ impl Tables {
         self.report.check().map_err(|m| err("report.toml", m))?;
         // Every fixed id must have exactly one row, in the engine's order.
         check_rows("bodies.toml", &BodyId::ALL, self.bodies.iter().map(|b| b.id))?;
+        // Ticket #374 (version 0.09.2): the `parent` column is the tree `BodyId::primary` knows and
+        // nothing else -- a satellite priced from one parent and listed under another would be two
+        // skies, so the table is refused rather than read.
+        for b in &self.bodies {
+            let want = (b.id.primary() != b.id).then(|| b.id.primary());
+            if b.parent != want {
+                return Err(err("bodies.toml", format!("{} has parent {:?}; the engine's tree says {:?}", b.name, b.parent, want)));
+            }
+        }
         check_rows("nation_states.toml", &StateId::ALL, self.states.iter().map(|s| s.id))?;
         check_rows("facilities.toml", &FacilityKind::ALL, self.facilities.iter().map(|f| f.id))?;
         check_rows("modules.toml", &ModuleKind::ALL, self.modules.iter().map(|m| m.id))?;
@@ -2274,12 +2283,9 @@ impl Tables {
     }
     /// Ticket #57: the elements a Body reads its place in the sky from. A satellite reads its
     /// parent's row: at this scale the Moon stands where Earth stands, and Phobos where Mars does.
+    /// Ticket #374 (version 0.09.2): the pairing is `BodyId::primary`'s, not a second copy here.
     pub fn planet(&self, id: BodyId) -> &PlanetElements {
-        let want = match id {
-            BodyId::Moon => BodyId::Earth,
-            BodyId::Phobos | BodyId::Deimos => BodyId::Mars,
-            other => other,
-        };
+        let want = id.primary();
         self.planets.iter().find(|p| p.id == want).expect("validate() checked Earth and Mars have rows")
     }
     pub fn state(&self, id: StateId) -> &StateCard {
