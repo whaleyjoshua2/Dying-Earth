@@ -43,6 +43,13 @@ a million people where 400,000 landed, half a ppm where two did. The sweep does 
 Convoy alone; over the four batches the computer seats took 1,400 card offers of all kinds and
 refused 564.
 
+## The review
+
+Two axes, run as sub-agents over the commit: **Standards** found no violation (the card comment and
+the test follow the file's idiom; the panic on an unknown effect is the established guard);
+**Spec** found the build matches the decision, with 1.0 landing as 0.4 did (no rounding or cap) and
+0.5 ppm flowing as 2.0 did, and no live quote of the old figures anywhere.
+
 ## The gate
 
 `cargo clippy --workspace --release --all-targets -- -D warnings` clean; engine 496 + 6, root 8.
