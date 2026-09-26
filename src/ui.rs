@@ -788,6 +788,12 @@ fn kind_glyph(ui: &mut Ui, kind: Kind, size: f32) {
 /// a little short of the truth costs the words a word.
 const YIELD_ROW_W: f32 = 220.0;
 
+/// Ticket #369 (version 0.09.2): the floor under the Trading window's price cell, so its glyph line
+/// has a width to wrap at (a Grid cell has none until its content has one, and without this the
+/// line wrapped one word to a line). Sized to the longest line the cell ever holds, the Prospectors'
+/// "1 [ducats] each; sells for 0.5 [ducats] (x0.85 for you, over the lot)", read off the picture.
+const TRADE_PRICE_W: f32 = 340.0;
+
 fn found_button(ui: &mut Ui, yields: &dying_earth_engine::SlotYields, label: &str) -> egui::Response {
     ui.scope_builder(egui::UiBuilder::new().sense(egui::Sense::click()), |ui| {
         let resp = ui.response();
@@ -7644,6 +7650,25 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
 /// Ticket #42: the trading window. Ducats buy Influence, Materials, Fuel and Energy at the table
 /// prices, spendable in this turn's orders; Materials and Fuel sell back at half; buildings are
 /// bought for Ducats from their own build buttons.
+/// Ticket #369 (version 0.09.2): a Trading window button whose face is a verb and a Ducat figure
+/// with its glyph -- "Buy for 48 [ducats]" -- greyed with the engine's refusal on hover when the
+/// order is refused. Through `priced_button`, which is how a glyph reaches a button face; but that
+/// helper drops a nought from a price, and a nought is reachable here (Materials at 1 Ducat, one
+/// unit, the Prospectors' 15% off), so a nought is written out in words rather than leaving the
+/// face reading a bare "Buy for".
+fn ducat_button(ui: &mut Ui, game: &Game, session: &Session, verb: &str, ducats: i64, order: &Order) -> egui::Response {
+    let ok = game.check_order(Seat(0), &session.pending, order);
+    let mut resp = if ducats > 0 {
+        priced_button(ui, ok.is_ok(), verb, &dying_earth_engine::Cost { ducats, ..Default::default() }, 0)
+    } else {
+        ui.add_enabled(ok.is_ok(), egui::Button::new(format!("{verb} 0 Ducats")))
+    };
+    if let Err(e) = &ok {
+        resp = resp.on_disabled_hover_text(&e.0);
+    }
+    resp
+}
+
 fn trading_window(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, actions: &mut Vec<Action>) {
     let (left, _) = game.remaining(Seat(0), &session.pending);
     // Ticket #369 (version 0.09.2): **glyphs in the Trading window**, at the designer's word. The
@@ -7653,9 +7678,9 @@ fn trading_window(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSt
     // sell price, and both button faces -- by the one number-then-word rule of `draw_with_icons`.
     // The Buy and Sell buttons go through `priced_button`, which is how a glyph gets onto a button
     // face at all; the Cost it is handed is Ducats alone, so the face reads "Buy for 48 [ducats]".
-    let ink = ui.visuals().strong_text_color();
+    let head = ui.visuals().strong_text_color();
     let body = ui.visuals().text_color();
-    text_with_icons(ui, &format!("{} Ducats to spend this turn (+{} Ducats last Income).", left.ducats, game.seat(Seat(0)).income_last_turn.ducats), 14.0, ink);
+    text_with_icons(ui, &format!("{} Ducats to spend this turn (+{} Ducats last Income).", left.ducats, game.seat(Seat(0)).income_last_turn.ducats), 14.0, head);
     ui.label("What you buy is yours at once, for this turn's orders. Ducats come from your Regions' economies, Banks and Trade Posts.");
     ui.separator();
     let lines: [(usize, Option<dying_earth_engine::Resource>, &str, &str); 4] = [(0, None, "influence", "Influence"), (1, Some(dying_earth_engine::Resource::Materials), "materials", "Materials"), (2, Some(dying_earth_engine::Resource::Fuel), "fuel", "Fuel"), (3, Some(dying_earth_engine::Resource::Energy), "energy", "Energy")];
@@ -7680,9 +7705,9 @@ fn trading_window(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSt
             let price = if sells { format!("{per} Ducats each; sells for {:.1} Ducats{discount}", per as f64 / game.tables.ducats.sell_divisor.max(1) as f64) } else { format!("{per} Ducats each{discount}") };
             // The glyph line wraps at the width it is given, and a Grid cell has none until its
             // content has one, so left alone it wrapped one word to a line (the first picture of
-            // ticket #369). The Prospectors' discount clause is the longest the cell ever holds.
+            // ticket #369).
             ui.scope(|ui| {
-                ui.set_min_width(340.0);
+                ui.set_min_width(TRADE_PRICE_W);
                 text_with_icons(ui, &price, 14.0, body);
             });
             ui.add(egui::DragValue::new(&mut view.trade_amounts[i]).range(1..=999).speed(1.0));
@@ -7692,23 +7717,13 @@ fn trading_window(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSt
                 Some(r) => Order::Buy { resource: r, amount: n },
             };
             let cost = game.order_cost(Seat(0), &buy).ducats;
-            let ok = game.check_order(Seat(0), &session.pending, &buy);
-            let mut resp = priced_button(ui, ok.is_ok(), "Buy for", &dying_earth_engine::Cost { ducats: cost, ..Default::default() }, 0);
-            if let Err(e) = &ok {
-                resp = resp.on_disabled_hover_text(&e.0);
-            }
-            if resp.clicked() {
+            if ducat_button(ui, game, session, "Buy for", cost, &buy).clicked() {
                 actions.push(Action::Place(buy));
             }
             if let Some(r) = res.filter(|_| sells) {
                 let sell = Order::Sell { resource: r, amount: n };
                 let gain = -game.order_cost(Seat(0), &sell).ducats;
-                let ok = game.check_order(Seat(0), &session.pending, &sell);
-                let mut resp = priced_button(ui, ok.is_ok(), "Sell for", &dying_earth_engine::Cost { ducats: gain, ..Default::default() }, 0);
-                if let Err(e) = &ok {
-                    resp = resp.on_disabled_hover_text(&e.0);
-                }
-                if resp.clicked() {
+                if ducat_button(ui, game, session, "Sell for", gain, &sell).clicked() {
                     actions.push(Action::Place(sell));
                 }
             } else {
