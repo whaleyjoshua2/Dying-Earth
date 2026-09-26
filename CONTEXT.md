@@ -290,6 +290,10 @@ _Avoid_: slogan, tagline, catchphrase
 The name a Ship is given when it is built, since version 0.08.1, drawn from one of two lists -- the ships of exploration for a Colony Ship, the ships of the line for a Frigate, a Battleship, the Carrier and, since version 0.09.1, the Missile Carrier. It is unique across the whole board and is taken as the first unused name in list order, which draws no randomness and so cannot shift a seeded game. The **prefix** in front of it belongs to whoever flies the ship and is its Faction's -- TSV, PMV, ARK, ACV -- where the name belongs to the hull. The Ship's id survives on every hover, since a save file, a log line and the Report all speak in ids.
 _Avoid_: callsign, registry, hull number, designation
 
+**Ship card**:
+The selection card of one Ship, since version 0.09.2, opened from its row on the stack's card, from its row in the Roster, or from its label on the Solar System Map while it flies. It holds everything that is one Ship's -- its strength, damage and cargo, its Tank, its Transit and change-of-orbit moves, its loading and unloading, its Bombard, Launch and Rearm, and its repair -- and stands in place of the stack's card with a link back to it. A Ship in flight has one too, for its line, where it is bound and its Tank, with no moves. The stack's card keeps only what is the whole stack's: its Ships grouped by orbit, the stance, Attack and the moves that send every Ship that can pay. Before this every one of these stood on the stack's card once per Ship.
+_Avoid_: ship panel, unit card, vessel sheet
+
 **Colony Ship**:
 The Ship type that carries Colonists, and nothing else since version 0.04. It cannot attack and is weak if caught. Since version 0.06.0 a warming Earth crowds it: lifting at Earth it may take Colonists beyond its capacity, one for every fifth of a degree the Temperature stands above +1.8, at most four, and each of those crowded aboard may die when it arrives.
 _Avoid_: transport, colony (that is the settlement), settler ship

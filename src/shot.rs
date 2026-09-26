@@ -11,6 +11,15 @@ thread_local! {
     static ARCHIVE_COLONY: std::cell::Cell<Option<ColonyId>> = const { std::cell::Cell::new(None) };
 }
 
+/// Ticket #374 (version 0.09.2): which Ship the `ship:` aid opens the card of.
+#[derive(Clone, Copy, Debug)]
+enum ShipPick {
+    /// The nth of the player's Ships at the `stack:` Body, counted from one.
+    Nth(usize),
+    /// The player's first Ship in flight.
+    Flying,
+}
+
 #[derive(Resource, Default)]
 pub struct ShotPlan {
     pub step: usize,
@@ -55,6 +64,11 @@ pub struct ShotPlan {
     /// another Body, since the Launch door is photographed over EARTH, which is the one Body a
     /// Bombard could never be given over and so the one this aid had never needed to reach.
     pub stack: Option<BodyId>,
+    /// Ticket #374 (version 0.09.2): `ship:1` (a building aid): the card of the player's FIRST Ship
+    /// at the `stack:` Body, in board order, is opened in place of the stack's; `ship:<n>` the nth;
+    /// `ship:flying` the player's first Ship in flight, wherever it is bound. The `scroll:` aid
+    /// scrolls this card now, since the blocks it names moved here.
+    pub ship: Option<ShipId>,
     /// `hover:<body id>` (a building aid, ticket #57): the Solar System Map draws that Body's launch
     /// window tooltip as though the pointer were on it. Nothing hovers in a headless capture.
     pub hover: Option<BodyId>,
@@ -128,6 +142,9 @@ fn apply_aids(plan: &mut ShotPlan, view: &mut ViewState) {
     }
     if let Some(body) = plan.stack {
         view.selection = Selection::ShipStack(body, Seat(0));
+    }
+    if let Some(id) = plan.ship {
+        view.selection = Selection::Ship(id);
     }
     view.stack_scroll = plan.stack_scroll;
     // Ticket #162 (version 0.07.5): `hab:1` SELECTS seat 0's first station or Colony (the ISS on a
@@ -646,6 +663,31 @@ fn build_board(session: &mut Session) {
             }
             g.report.moments.clear();
             g.resolution_phase();
+        }
+        // `flying:1` (a building aid, ticket #374, version 0.09.2): seat 0's Colony Ship is in
+        // FLIGHT, Earth to Mars with three turns left and six Colonists aboard, so a Ship in flight
+        // has a card to photograph (`ship:flying`) and the Solar System Map a label that opens it.
+        if std::env::args().any(|a| a == "flying:1") {
+            let id = ShipId(g.fresh_id());
+            let built_turn = g.turn;
+            let name = g.next_ship_name(UnitKind::ColonyShip);
+            g.ships.push(Ship {
+                id,
+                name,
+                kind: UnitKind::ColonyShip,
+                seat: Seat(0),
+                damage: 0,
+                at: ShipAt::Transit { from: BodyId::Earth, to: BodyId::Mars, turns_left: 3 },
+                colonists: 6,
+                colonists_education: 1.0,
+                warhead: false,
+                army: None,
+                stance: Stance::Hold,
+                escaped: false,
+                arrived_this_turn: false,
+                built_turn,
+                fuel: 12, slot: None,
+            });
         }
         // `crowded:1` (a building aid, ticket #86): the world at +2.6 C, and seat 0's Colony Ship
         // arrives at the Moon with eight aboard, four beyond its capacity; the turn is rerun on the
@@ -1708,8 +1750,17 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
             Some(v) => body_from_id(v),
             None => None,
         });
+        let pick = std::env::args().find_map(|a| match a.strip_prefix("ship:") {
+            Some("flying") => Some(ShipPick::Flying),
+            Some(v) => v.parse().ok().map(ShipPick::Nth),
+            None => None,
+        });
+        plan.ship = pick.zip(session.game.as_ref()).and_then(|(pick, g)| match pick {
+            ShipPick::Nth(n) => plan.stack.and_then(|body| g.ships_at(Seat(0), body).get(n.saturating_sub(1)).copied()),
+            ShipPick::Flying => g.ships.iter().find(|s| s.seat == Seat(0) && matches!(s.at, ShipAt::Transit { .. })).map(|s| s.id),
+        });
         // Ticket #335 (version 0.09.0): `scroll:transits` or `scroll:orbits`, the block of the Ship
-        // stack's card the picture is of.
+        // stack's card the picture is of. Ticket #374: of the Ship's card.
         plan.stack_scroll = std::env::args().find_map(|a| match a.strip_prefix("scroll:") {
             Some("transits") => Some(StackBlock::Transits),
             Some("orbits") => Some(StackBlock::ChangeOrbit),

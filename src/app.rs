@@ -47,6 +47,12 @@ pub enum Selection {
     Colony(ColonyId),
     Slot(BodyId, u32),
     ShipStack(BodyId, Seat),
+    /// Ticket #374 (version 0.09.2): **one Ship**, with a card of its own. Everything that is one
+    /// hull's -- its tank, its moves, its loading, its weapons -- is ordered from here, where until
+    /// this ticket it was ordered from the stack's card with a button per hull under every heading,
+    /// so the same hull stood on that card five times. A Ship in flight is selectable too, for its
+    /// card alone: nothing can be ordered in flight.
+    Ship(ShipId),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -296,11 +302,14 @@ pub enum HabTile {
 
 /// Ticket #335 (version 0.09.0), a building aid: a block of the Ship stack's card that a headless
 /// picture asks to be scrolled to, since a capture cannot drag a scrollbar.
+/// Ticket #374 (version 0.09.2): a block of the **Ship's** card now, since that is where the
+/// buttons went; the stack card no longer has these blocks.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum StackBlock {
-    /// The Transits row, one line per destination ORBIT since this ticket.
+    /// The Transit block, one drop-down per Body since ticket #374.
     Transits,
-    /// The Change orbit door, one line per other orbit at this Body.
+    /// The change-of-orbit moves: since ticket #374 the drop-down of the Body the Ship is at,
+    /// which stands first under Transit.
     ChangeOrbit,
     /// Ticket #346 (version 0.09.1): the Tanks block, where a Ship's Fuel, its Refuel button, the
     /// stranded warning and the dry warning all stand. It is far enough down the card that no
