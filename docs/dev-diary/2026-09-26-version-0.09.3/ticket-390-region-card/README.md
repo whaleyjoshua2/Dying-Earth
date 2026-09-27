@@ -27,12 +27,33 @@ and the build strip under the boxes, the Armies, and Orders with Build Army at t
 ![The rearranged Region card](region-card.png)
 
 **The same card with a Sea Wall standing**, the `walls:1` aid (two coastal slots taken, the wall
-holding): the completed row between the boxes and the strip, one line -- *Sea Wall: holds the sea
-off; 1 rise held, 0.5 Materials a turn to keep* -- with its Mothball and Decommission beside it,
-then the strip and the Scrubber's capped button under it. The `scrub:` aid placed no Scrubber on
-this board, so the Scrubber's one-line row is witnessed by the same code path and not pictured.
+holding) with `tip:Surge` forcing the row's hover: the completed row between the boxes and the
+strip, one line -- *Sea Wall: holds the sea off; 1 rise held, 0.5 Materials a turn to keep* -- with
+its Mothball and Decommission beside it, and its hover the whole sentence, five lines, within the
+six-line ceiling.
 
 ![The card with a Sea Wall standing](region-card-walls.png)
+
+**The same card with two Scrubbers standing**, the `scrub:2` aid alone (it placed none beside
+`walls:1`): two one-line rows, *Scrubber: +3.0 ppm Sink, 1 off Unrest a turn, 3 Energy upkeep*,
+glyph-rendered, each with its Mothball and Decommission, and the Scrubber's button reading *(2 of
+7)*.
+
+![The card with two Scrubbers standing](region-card-scrubbers.png)
+
+## The review
+
+Two axes, standards and spec. What they found and what changed: the short row's hover had the
+row's whole sentence and the rules text both, which put a Sea Wall's hover past the six-line
+ceiling; the hover is the sentence alone now, six lines at most. The Sea Wall's keep clause was
+written twice, in the short row and the full sentence; it is one helper now, and the row's words
+are the resolution's (*nothing held yet*, *unkept this turn*). A doc comment had landed on the
+wrong function, three comments still named the old layout, and two blank lines doubled. The
+glossary gained a **Policies** entry and says where the Army and Ship builds live. Two departures
+from the resolution's wording the spec now names plainly: the slotless buttons stand under the
+strip rather than "among" it, since the strip shows buttons only while a free box is clicked; and
+the *or* the resolution said should go is the Ducat-price button every build button carries, so it
+stays. The Scrubber's one-line row, unpictured in the first pass, is pictured below.
 
 ## No rule moved
 

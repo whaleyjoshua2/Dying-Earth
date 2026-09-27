@@ -656,6 +656,10 @@ _Avoid_: step, stage, segment
 The phase in which a Faction commits everything it will do that turn: building, raising Industry Level, allocating the Influence Allotment, lifting, setting transits and Stances, and ordering attacks and landings. Any order can be cancelled and fully refunded until End Turn is pressed, save a Ship stack's Attack, which since version 0.09.2 is fought when confirmed and cannot be taken back.
 _Avoid_: commands, moves, actions, player phase
 
+**Policies**:
+The block on a Region's card, since version 0.09.3, holding what the player may set for the Region rather than build in it: the Custodians' Leapfrog, the Arkwrights' Exodus Call, the Prospectors' Strip Permit, Raise Industry Level, Relief and Resettle. It stands between the Pioneers and the Facilities. The card's Orders block, at its foot, holds Build Army alone; a Colony's Orders block holds Build Army and Ships, since every Army and Ship build lives in an Orders block on both cards.
+_Avoid_: orders (for these), decrees, edicts
+
 **Refusal**:
 The engine's own reason an order cannot be placed, in its own words. Since version 0.09.2 every greyed control shows it on mouseover, the reason first and the control's description after, within the six-line ceiling every hover keeps; a control the engine checks only after the click refuses in the red line under the card.
 _Avoid_: error, warning (a stranding warning is not a refusal), block message

@@ -259,7 +259,11 @@ the Prospectors' Strip Permit, Raise Industry Level, and Relief and Resettle wit
 subheading they stood under; Widgets and the queue; **Facilities**: the slot boxes, then the
 completed Sea Wall and Scrubber rows, then the build strip, then the Scrubber's and the Sea Wall's
 build buttons; **Armies**: the stance, the stack and the Army rows; and **Orders**, holding **Build
-Army**, since *"all army/ship builds should be in orders sections for both"* cards. The Colony
+Army**, since *"all army/ship builds should be in orders sections for both"* cards. One departure
+from the resolution's wording, which put the two slotless buttons "among" the strip's: the strip
+shows its buttons only while a free box is clicked, and a Scrubber or Sea Wall takes no slot, so
+their buttons stand under the strip whatever box is clicked; with a free box clicked they read as
+the last two of the list. The Colony
 card's Orders section stays as it is, holding Build Army (Barracks) and Ships (Shipyard).
 
 **What a completed Sea Wall or Scrubber row says**: one glyph-rendered line, *Scrubber: +3.0 ppm
@@ -269,5 +273,8 @@ the row's whole sentence is its hover. The separate *N Scrubbers here take …* 
 is gone, the rows saying it.
 
 **Their build buttons**: *Scrubber (2 of 3)*, the state's cap in the label where a sentence stood
-after it, and *Sea Wall*, each priced as every build button is with its Ducat price beside it (the
-*or* is the Ducat price, on every button, and stays).
+after it, and *Sea Wall*, each priced as every build button is with its Ducat price beside it. The
+resolution said "the *or* words go"; the *or* turned out to be the Ducat-price button every build
+button carries (*or 60 Ducats*), which the ticket's charting had misread as filler, so it stays on
+these two as on the rest. That is an override of the resolution's line and is said here for the
+designer's eye.

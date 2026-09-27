@@ -6184,6 +6184,34 @@ fn standings_row(ui: &mut Ui, game: &Game, session: &Session, target: Place, thr
     rule_tip(row.response, explain);
 }
 
+/// Ticket #390 (version 0.09.3): what a standing Scrubber or Sea Wall says on its one line --
+/// *Scrubber: +3.0 ppm Sink, 1 off Unrest a turn, 3 Energy upkeep*; *Sea Wall: holds the sea off; 3
+/// rises held, 1.5 Materials a turn to keep* (or *nothing held yet*, and *unkept this turn* when it
+/// is) -- the figures the data holds, glyph-rendered by the row, in the resolution's words.
+fn no_slot_figures(game: &Game, f: &Facility) -> String {
+    let card = game.tables.facility(f.kind);
+    match f.kind {
+        FacilityKind::SeaWall => format!("holds the sea off; {}{}", sea_wall_keep(game, f), sea_wall_unkept(f)),
+        _ => format!("+{:.1} ppm Sink, {} off Unrest a turn, {} Energy upkeep", card.sink_per_turn, Game::unrest_figure(game.tables.unrest.scrubber_fall), card.energy_upkeep),
+    }
+}
+
+/// Ticket #390: a Sea Wall's keep in words, read by its short row and its full sentence alike --
+/// *3 rises held, 1.5 Materials a turn to keep*, or *nothing held yet* -- so the keep rule is
+/// written once.
+fn sea_wall_keep(game: &Game, f: &Facility) -> String {
+    let keep = f.rises_held as f64 * game.tables.sea_wall.upkeep_per_rise;
+    match f.rises_held {
+        0 => "nothing held yet".to_string(),
+        1 => format!("1 rise held, {} Materials a turn to keep", figure(keep)),
+        n => format!("{n} rises held, {} Materials a turn to keep", figure(keep)),
+    }
+}
+
+/// Ticket #390: the clause a Sea Wall left unkept this turn adds, and nothing otherwise.
+fn sea_wall_unkept(f: &Facility) -> &'static str {
+    if !f.online && !f.mothballed { "; unkept this turn" } else { "" }
+}
 
 /// Ticket #146 (version 0.07.3): one Facility's line -- its figures with their glyphs, the hover
 /// naming the rule, and the Mothball / Restart / Decommission buttons on the line (ticket #138).
@@ -6192,27 +6220,6 @@ fn standings_row(ui: &mut Ui, game: &Game, session: &Session, target: Place, thr
 /// The figures a Facility's line carries: what it makes, its upkeep and its Emissions, or the
 /// sentence a mothballed or undirected one shows instead. Read by the row and, since ticket #150
 /// (version 0.07.4), by the slot box's hover.
-/// Ticket #390 (version 0.09.3): what a standing Scrubber or Sea Wall says on its one line --
-/// *Scrubber: +3.0 ppm Sink, 1 off Unrest a turn, 3 Energy upkeep*; *Sea Wall: holds the sea off; 3
-/// rises held, 1.5 Materials a turn to keep* (or *no rise held yet*, and *unkept this turn* when it
-/// is) -- the figures the data holds, glyph-rendered by the row.
-fn no_slot_figures(game: &Game, f: &Facility) -> String {
-    let card = game.tables.facility(f.kind);
-    match f.kind {
-        FacilityKind::SeaWall => {
-            let keep = f.rises_held as f64 * game.tables.sea_wall.upkeep_per_rise;
-            let held = match f.rises_held {
-                0 => "no rise held yet".to_string(),
-                1 => format!("1 rise held, {} Materials a turn to keep", figure(keep)),
-                n => format!("{n} rises held, {} Materials a turn to keep", figure(keep)),
-            };
-            let unkept = if !f.online { "; unkept this turn, holding nothing" } else { "" };
-            format!("holds the sea off; {held}{unkept}")
-        }
-        _ => format!("+{:.1} ppm Sink, {} off Unrest a turn, {} Energy upkeep", card.sink_per_turn, Game::unrest_figure(game.tables.unrest.scrubber_fall), card.energy_upkeep),
-    }
-}
-
 fn facility_figures(game: &Game, sid: StateId, f: &Facility, director: Option<Seat>) -> String {
     // Ticket #54: a mothballed Facility says so rather than showing figures it is not making.
     if f.mothballed {
@@ -6224,14 +6231,8 @@ fn facility_figures(game: &Game, sid: StateId, f: &Facility, director: Option<Se
     // Ticket #257 (version 0.08.4): a Sea Wall says what it has held back and what that costs.
     if f.kind == FacilityKind::SeaWall {
         let yield_text = director.map(|d| game.facility_yield(d, sid, f.kind).text()).unwrap_or_else(|| "idle, nobody directs this state".to_string());
-        let keep = f.rises_held as f64 * game.tables.sea_wall.upkeep_per_rise;
-        let held = match f.rises_held {
-            0 => "has held back no rise yet".to_string(),
-            1 => format!("has held back 1 rise: {} Materials a turn to keep", figure(keep)),
-            n => format!("has held back {n} rises: {} Materials a turn to keep", figure(keep)),
-        };
-        let unkept = if !f.online && !f.mothballed { "; unkept this turn, holding nothing" } else { "" };
-        return format!("{yield_text}; {held}{unkept}");
+        // Ticket #390 (version 0.09.3): the keep clause the short row reads too, written once.
+        return format!("{yield_text}; {}{}", sea_wall_keep(game, f), sea_wall_unkept(f));
     }
     match director {
         Some(d) if world_lab => format!("{} (the Lab works for the world: {} Research a turn to the Tech under research)", game.facility_yield(d, sid, f.kind).text(), game.world_lab_yield(sid) / 2),
@@ -6297,8 +6298,9 @@ fn facility_row(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, i: us
             &[],
         );
         // Ticket #352 (version 0.09.1): with its arithmetic, where the figure is multiplied.
-        let rules = facility_rules(f.kind.name(), f.coastal);
-        let rules = if short.is_some() { format!("{full}\n{rules}") } else { rules };
+        // Ticket #390 (version 0.09.3): a short row's hover is its whole sentence and nothing else,
+        // so the Sea Wall's, the longest in the data, stays within the six-line ceiling.
+        let rules = if short.is_some() { full.clone() } else { facility_rules(f.kind.name(), f.coastal) };
         let tip = match director.filter(|_| !f.mothballed).map(|d| game.facility_yield(d, sid, f.kind).chain).filter(|c| c.multiplied()) {
             Some(chain) => chain_tip(&rules, &chain),
             None => rules,
@@ -6329,7 +6331,7 @@ fn facility_build_buttons(ui: &mut Ui, session: &Session, game: &Game, sid: Stat
         }
         // Ticket #54: the Scrubber has its own button, with the state's cap on it. Ticket #154
         // (version 0.07.4): so does the Sea Wall -- neither takes a slot, so neither is offered
-        // for a free box; both stand under the boxes in `no_slot_section`.
+        // for a free box; both stand under the strip, in `no_slot_buttons` (ticket #390).
         if !game.takes_slot(fk) {
             continue;
         }
@@ -6348,12 +6350,10 @@ fn facility_build_buttons(ui: &mut Ui, session: &Session, game: &Game, sid: Stat
 }
 
 /// Ticket #154 (version 0.07.4): **the Facilities that take no slot** -- the Scrubber and the Sea
-/// Wall -- under the boxes, in the Facilities section: each a row when it stands, a line while it
-/// builds, and a build button pair when it may be built here. The designer: *"scrubber sea wall
-/// need to stay but put them in the same section as the tiles just below them."* The Scrubber's
-/// pair carries the state's cap; the Sea Wall's appears once Coastal Engineering is in and while
-/// none stands or builds, one being the most a state may hold.
-#[allow(clippy::too_many_arguments)]
+/// Wall -- under the boxes, in the Facilities section, each a row when it stands. The designer:
+/// *"scrubber sea wall need to stay but put them in the same section as the tiles just below
+/// them."* Ticket #390 (version 0.09.3): the rows here, between the boxes and the strip, and the
+/// build buttons in `no_slot_buttons` under the strip; one built is on the card's queue (#332).
 fn no_slot_rows(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, mine: bool, director: Option<Seat>, actions: &mut Vec<Action>) {
     let st = game.state(sid);
     for (i, f) in st.facilities.iter().enumerate() {
@@ -6458,7 +6458,6 @@ fn slot_strip(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
         }
     }
 }
-
 
 /// Ticket #146 (version 0.07.3): **a Region's build slots as boxes**, in the Hab View's language.
 /// The designer: *"represent them as boxes inland and costal differ in line used for the box …
