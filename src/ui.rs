@@ -6192,6 +6192,27 @@ fn standings_row(ui: &mut Ui, game: &Game, session: &Session, target: Place, thr
 /// The figures a Facility's line carries: what it makes, its upkeep and its Emissions, or the
 /// sentence a mothballed or undirected one shows instead. Read by the row and, since ticket #150
 /// (version 0.07.4), by the slot box's hover.
+/// Ticket #390 (version 0.09.3): what a standing Scrubber or Sea Wall says on its one line --
+/// *Scrubber: +3.0 ppm Sink, 1 off Unrest a turn, 3 Energy upkeep*; *Sea Wall: holds the sea off; 3
+/// rises held, 1.5 Materials a turn to keep* (or *no rise held yet*, and *unkept this turn* when it
+/// is) -- the figures the data holds, glyph-rendered by the row.
+fn no_slot_figures(game: &Game, f: &Facility) -> String {
+    let card = game.tables.facility(f.kind);
+    match f.kind {
+        FacilityKind::SeaWall => {
+            let keep = f.rises_held as f64 * game.tables.sea_wall.upkeep_per_rise;
+            let held = match f.rises_held {
+                0 => "no rise held yet".to_string(),
+                1 => format!("1 rise held, {} Materials a turn to keep", figure(keep)),
+                n => format!("{n} rises held, {} Materials a turn to keep", figure(keep)),
+            };
+            let unkept = if !f.online { "; unkept this turn, holding nothing" } else { "" };
+            format!("holds the sea off; {held}{unkept}")
+        }
+        _ => format!("+{:.1} ppm Sink, {} off Unrest a turn, {} Energy upkeep", card.sink_per_turn, Game::unrest_figure(game.tables.unrest.scrubber_fall), card.energy_upkeep),
+    }
+}
+
 fn facility_figures(game: &Game, sid: StateId, f: &Facility, director: Option<Seat>) -> String {
     // Ticket #54: a mothballed Facility says so rather than showing figures it is not making.
     if f.mothballed {
@@ -6250,7 +6271,11 @@ fn facility_rules(heading: &str, coastal: bool) -> String {
 
 #[allow(clippy::too_many_arguments)]
 fn facility_row(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, i: usize, f: &Facility, mine: bool, director: Option<Seat>, actions: &mut Vec<Action>) {
-    let figures = facility_figures(game, sid, f, director);
+    let full = facility_figures(game, sid, f, director);
+    // Ticket #390 (version 0.09.3): a Scrubber or Sea Wall row is one short line, at the designer's
+    // word ("reduce verbiage for sea wall and scrubber"); its whole sentence is the row's hover.
+    let short = if game.takes_slot(f.kind) || f.mothballed { None } else { Some(no_slot_figures(game, f)) };
+    let figures = short.clone().unwrap_or_else(|| full.clone());
     let colour = if f.mothballed { Color32::from_rgb(170, 170, 190) } else { ui.visuals().text_color() };
     // Ticket #112 (version 0.07.1): the glyphs come down into the Facility list, where the
     // figures are compared building against building and the words are most of the width.
@@ -6273,6 +6298,7 @@ fn facility_row(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, i: us
         );
         // Ticket #352 (version 0.09.1): with its arithmetic, where the figure is multiplied.
         let rules = facility_rules(f.kind.name(), f.coastal);
+        let rules = if short.is_some() { format!("{full}\n{rules}") } else { rules };
         let tip = match director.filter(|_| !f.mothballed).map(|d| game.facility_yield(d, sid, f.kind).chain).filter(|c| c.multiplied()) {
             Some(chain) => chain_tip(&rules, &chain),
             None => rules,
@@ -6328,13 +6354,20 @@ fn facility_build_buttons(ui: &mut Ui, session: &Session, game: &Game, sid: Stat
 /// pair carries the state's cap; the Sea Wall's appears once Coastal Engineering is in and while
 /// none stands or builds, one being the most a state may hold.
 #[allow(clippy::too_many_arguments)]
-fn no_slot_section(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, mine: bool, director: Option<Seat>, actions: &mut Vec<Action>) {
+fn no_slot_rows(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, mine: bool, director: Option<Seat>, actions: &mut Vec<Action>) {
     let st = game.state(sid);
     for (i, f) in st.facilities.iter().enumerate() {
         if !game.takes_slot(f.kind) {
             facility_row(ui, session, game, sid, i, f, mine, director, actions);
         }
     }
+}
+
+/// Ticket #390 (version 0.09.3): the two slotless build buttons, under the strip, labelled as every
+/// other build button is and the Scrubber's carrying the state's cap in its label -- *Scrubber (2 of
+/// 3)* -- where a sentence stood after it; the Ducat price beside each as on every button.
+fn no_slot_buttons(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, mine: bool, actions: &mut Vec<Action>) {
+    let st = game.state(sid);
     // Ticket #332 (version 0.09.0): a Scrubber or Sea Wall under way is on the card's queue, under
     // its Widgets line, with every other build; the line that stood here said it twice.
     if !mine {
@@ -6349,12 +6382,11 @@ fn no_slot_section(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, mi
                 game,
                 &session.pending,
                 Order::BuildFacility { state: sid, kind: FacilityKind::Scrubber },
-                "Scrubber",
+                &format!("Scrubber ({} of {})", game.scrubbers_committed(sid), game.scrubber_cap(sid)),
                 Some(game.facility_yield(Seat(0), sid, FacilityKind::Scrubber).text()),
                 actions,
             );
             cost_button(ui, game, &session.pending, Order::BuildFacilityWithDucats { state: sid, kind: FacilityKind::Scrubber }, "or", actions);
-            ui.label(RichText::new(format!("{} of {} this state may hold", game.scrubbers_committed(sid), game.scrubber_cap(sid))).weak());
         });
     }
     if game.has_tech(TechId::CoastalEngineering) {
@@ -6406,6 +6438,27 @@ enum SlotBoxKind {
     Free,
     Flooded(Option<FacilityKind>),
 }
+/// Ticket #390 (version 0.09.3): the strip under the boxes, drawn after the completed slotless rows
+/// so the card reads boxes, then what stands without a slot, then what may be built.
+#[allow(clippy::too_many_arguments)]
+fn slot_strip(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, sid: StateId, mine: bool, director: Option<Seat>, actions: &mut Vec<Action>) {
+    let st = game.state(sid);
+    ui.add_space(4.0);
+    // The strip: the clicked box's line, or the build buttons for a free one.
+    match view.slot_box {
+        Some(SlotBox::Facility(i)) if i < st.facilities.len() && game.takes_slot(st.facilities[i].kind) => {
+            facility_row(ui, session, game, sid, i, &st.facilities[i], mine, director, actions);
+        }
+        Some(SlotBox::Free) if mine => {
+            ui.label(RichText::new("Build here").strong());
+            facility_build_buttons(ui, session, game, sid, actions);
+        }
+        _ => {
+            ui.label(RichText::new("Click a box for its figures and controls.").weak());
+        }
+    }
+}
+
 
 /// Ticket #146 (version 0.07.3): **a Region's build slots as boxes**, in the Hab View's language.
 /// The designer: *"represent them as boxes inland and costal differ in line used for the box …
@@ -6546,20 +6599,6 @@ fn slot_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
                 );
                 hab_tile(ui, rect, id, k.map(crate::icons::facility_icon), k.map(|k| k.name()).unwrap_or(""), TileState::Flooded, false, edge, tip);
             }
-        }
-    }
-    ui.add_space(4.0);
-    // The strip: the clicked box's line, or the build buttons for a free one.
-    match view.slot_box {
-        Some(SlotBox::Facility(i)) if i < st.facilities.len() && game.takes_slot(st.facilities[i].kind) => {
-            facility_row(ui, session, game, sid, i, &st.facilities[i], mine, director, actions);
-        }
-        Some(SlotBox::Free) if mine => {
-            ui.label(RichText::new("Build here").strong());
-            facility_build_buttons(ui, session, game, sid, actions);
-        }
-        _ => {
-            ui.label(RichText::new("Click a box for its figures and controls.").weak());
         }
     }
 }
@@ -6760,31 +6799,24 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         if game.stadium_online(sid) {
             ui.label(RichText::new(if game.constabulary_online(sid) { "A Stadium here halves what the Constabulary leaves of a climate rise: a heat rise of one lands as a quarter." } else { "A Stadium here halves what the climate adds to the Unrest." }).weak());
         }
-        // Ticket #54: a Scrubber calms its state as well as the air.
-        if game.scrubbers_online(sid) > 0 {
-            ui.label(
-                RichText::new(format!(
-                    "{} Scrubber(s) here take {} off the Sink and {} off the Unrest every turn.",
-                    game.scrubbers_online(sid),
-                    format_args!("{:.1} ppm", game.tables.facility(FacilityKind::Scrubber).sink_per_turn * game.scrubbers_online(sid) as f64),
-                    Game::unrest_figure(game.tables.unrest.scrubber_fall)
-                ))
-                .weak(),
-            );
-        }
+        // Ticket #390 (version 0.09.3): the Scrubbers' note that stood here is gone; each
+        // Scrubber's own row under the boxes says what it does.
+    }
+    let director = st.control.director();
+    // Ticket #64: a spectator reads every card and orders on none of them.
+    let mine = !session.spectator && st.control.director() == Some(Seat(0));
+    // Ticket #356 (version 0.09.1): the Pioneers, above the Facilities heading and out of Orders.
+    // Ticket #390 (version 0.09.3): and the Policies under them, at the designer's word -- *"the
+    // subsection called orders is now called policies and go between Pioneer and Facilities"*.
+    if mine {
+        pioneers_block(ui, session, game, sid, actions);
+        policies_block(ui, session, game, sid, actions);
     }
     // Ticket #332 (version 0.09.0): what this Region makes in Widgets a turn, and its queue.
     widgets_block(ui, game, Place::State(sid));
     // Ticket #339 (version 0.09.0): and what an Embassy of yours on Earth reads of a rival's income
     // here, above the slot boxes the Facilities it names are drawn in.
     eye_block(ui, session, game, Place::State(sid));
-    let director = st.control.director();
-    // Ticket #64: a spectator reads every card and orders on none of them.
-    let mine = !session.spectator && st.control.director() == Some(Seat(0));
-    // Ticket #356 (version 0.09.1): the Pioneers, above the Facilities heading and out of Orders.
-    if mine {
-        pioneers_block(ui, session, game, sid, actions);
-    }
     // Ticket #146 (version 0.07.3): the slots the sea took are drawn under water among the boxes
     // below, so the sea-blue count that stood here is gone.
     // Ticket #56: the two rows of slots, with what stands in each and what the sea has taken.
@@ -6803,8 +6835,12 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         ),
     );
     // Ticket #146 (version 0.07.3): the slots as boxes, with the clicked box's line beneath them.
+    // Ticket #390 (version 0.09.3): the completed Sea Wall and Scrubber rows between the boxes and
+    // the build strip, at the designer's word, and their build buttons with the strip's.
     slot_boxes(ui, session, game, view, sid, mine, director, actions);
-    no_slot_section(ui, session, game, sid, mine, director, actions);
+    no_slot_rows(ui, session, game, sid, mine, director, actions);
+    slot_strip(ui, session, game, view, sid, mine, director, actions);
+    no_slot_buttons(ui, session, game, sid, mine, actions);
     // Ticket #312 (version 0.08.7): the Armies block holds the Army orders too, at the designer's
     // word -- *"Move the Army orders block up the card and into the Armies list"*: the stance row
     // under the heading (it is per place, so it belongs to the list and not to any row), and under
@@ -6949,59 +6985,67 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     ui.separator();
     if mine {
         // Ticket #154 (version 0.07.4): the per-kind build list is gone from here -- a Facility is
-        // built by clicking a free box -- and the Scrubber and Sea Wall buttons stand under the
-        // boxes; what is left is orders, and the header says so. The designer: *"remove redundant
-        // build list from the region cards."*
+        // built by clicking a free box. Ticket #390 (version 0.09.3): and the policies are their own
+        // block above the Facilities now; what is left here is the Army, at the designer's word --
+        // *"all army/ship builds should be in orders sections for both"* cards.
         ui.label(RichText::new("Orders").strong());
-        // Ticket #54: the Custodians' Leapfrog, and the Prospectors' Strip Permit.
-        if game.kind(Seat(0)) == FactionKind::Custodians {
-            ui.horizontal(|ui| {
-                cost_button(ui, game, &session.pending, Order::Leapfrog { state: sid }, "Leapfrog", actions);
-                ui.label(RichText::new(format!("lowers its people to {:.2} per hundred million, for good", (game.population_coefficient(sid) - game.tables.climate.population_emissions_per_level).max(game.tables.climate.population_emissions_base) * game.tables.units_per_hundred_million())).weak());
-            });
-        }
-        // Ticket #237 (version 0.08.3): the Arkwrights' own order, beside the Custodians' Leapfrog
-        // and the Prospectors' Strip Permit, and guarded the same way -- once per state, ever.
-        if game.kind(Seat(0)) == FactionKind::Arkwrights && !st.exodus_call_used {
-            let t = &game.tables.exodus_call;
-            ui.horizontal(|ui| {
-                cost_button(ui, game, &session.pending, Order::ExodusCall { state: sid }, "Exodus Call", actions);
-                ui.label(
-                    RichText::new(format!(
-                        "{} turns recruiting {} Pioneers here instead of {}, and each costs this Region the ordinary population rather than your double. Once per Region, ever.",
-                        t.turns,
-                        game.emigrants_per_turn(Seat(0)) * t.muster_multiplier,
-                        game.emigrants_per_turn(Seat(0))
-                    ))
-                    .weak(),
-                );
-            });
-        }
-        if game.kind(Seat(0)) == FactionKind::Prospectors && !st.strip_permit_used {
-            let t = &game.tables.strip_permit;
-            ui.horizontal(|ui| {
-                cost_button(ui, game, &session.pending, Order::StripPermit { state: sid }, "Strip Permit", actions);
-                ui.label(RichText::new(format!("{} turns of double output here, then +{:.1} Baseline Emissions and +{} Unrest, for good", t.turns, t.baseline_rise, Game::unrest_figure(t.unrest))).weak());
-            });
-        }
-        cost_button(ui, game, &session.pending, Order::RaiseIndustry { state: sid }, "Raise Industry Level", actions);
-        ui.label(RichText::new("Raising the Industry Level adds an inland slot.").weak());
         cost_button(ui, game, &session.pending, Order::BuildArmy { place: Place::State(sid) }, "Build Army", actions);
-        // Ticket #356 (version 0.09.1): the Pioneers that stood here are above the Facilities heading.
-        // Ticket #52: Relief and Resettle, with their prices on the buttons.
-        ui.label(RichText::new("Unrest").strong());
-        ui.horizontal(|ui| {
-            cost_button(ui, game, &session.pending, Order::Relief { state: sid }, "Relief: Unrest -1", actions);
-            cost_button(ui, game, &session.pending, Order::Resettle { state: sid }, "Resettle here", actions);
-        });
-        ui.label(
-            RichText::new(
-                "Relief may be paid any number of times a turn. Resettle sends every refugee leaving your states here this turn, once a turn, and raises your Standing here by 5.",
-            )
-            .weak(),
-        );
-        // Ticket #312 (version 0.08.7): the Army orders that stood here are in the Armies block.
     }
+}
+
+/// Ticket #390 (version 0.09.3): **the Policies block**, between the Pioneers and the Facilities, at
+/// the designer's word -- what the card's Orders block held before, less the Army: the Custodians'
+/// Leapfrog, the Arkwrights' Exodus Call, the Prospectors' Strip Permit, Raise Industry Level, and
+/// Relief and Resettle without the Unrest subheading they stood under (the card's Unrest figure is
+/// a few lines up). Drawn only on a Region the player directs.
+fn policies_block(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, actions: &mut Vec<Action>) {
+    let st = game.state(sid);
+    ui.separator();
+    ui.label(RichText::new("Policies").strong());
+    // Ticket #54: the Custodians' Leapfrog, and the Prospectors' Strip Permit.
+    if game.kind(Seat(0)) == FactionKind::Custodians {
+        ui.horizontal(|ui| {
+            cost_button(ui, game, &session.pending, Order::Leapfrog { state: sid }, "Leapfrog", actions);
+            ui.label(RichText::new(format!("lowers its people to {:.2} per hundred million, for good", (game.population_coefficient(sid) - game.tables.climate.population_emissions_per_level).max(game.tables.climate.population_emissions_base) * game.tables.units_per_hundred_million())).weak());
+        });
+    }
+    // Ticket #237 (version 0.08.3): the Arkwrights' own order, beside the Custodians' Leapfrog
+    // and the Prospectors' Strip Permit, and guarded the same way -- once per state, ever.
+    if game.kind(Seat(0)) == FactionKind::Arkwrights && !st.exodus_call_used {
+        let t = &game.tables.exodus_call;
+        ui.horizontal(|ui| {
+            cost_button(ui, game, &session.pending, Order::ExodusCall { state: sid }, "Exodus Call", actions);
+            ui.label(
+                RichText::new(format!(
+                    "{} turns recruiting {} Pioneers here instead of {}, and each costs this Region the ordinary population rather than your double. Once per Region, ever.",
+                    t.turns,
+                    game.emigrants_per_turn(Seat(0)) * t.muster_multiplier,
+                    game.emigrants_per_turn(Seat(0))
+                ))
+                .weak(),
+            );
+        });
+    }
+    if game.kind(Seat(0)) == FactionKind::Prospectors && !st.strip_permit_used {
+        let t = &game.tables.strip_permit;
+        ui.horizontal(|ui| {
+            cost_button(ui, game, &session.pending, Order::StripPermit { state: sid }, "Strip Permit", actions);
+            ui.label(RichText::new(format!("{} turns of double output here, then +{:.1} Baseline Emissions and +{} Unrest, for good", t.turns, t.baseline_rise, Game::unrest_figure(t.unrest))).weak());
+        });
+    }
+    cost_button(ui, game, &session.pending, Order::RaiseIndustry { state: sid }, "Raise Industry Level", actions);
+    ui.label(RichText::new("Raising the Industry Level adds an inland slot.").weak());
+    // Ticket #52: Relief and Resettle, with their prices on the buttons.
+    ui.horizontal(|ui| {
+        cost_button(ui, game, &session.pending, Order::Relief { state: sid }, "Relief: Unrest -1", actions);
+        cost_button(ui, game, &session.pending, Order::Resettle { state: sid }, "Resettle here", actions);
+    });
+    ui.label(
+        RichText::new(
+            "Relief may be paid any number of times a turn. Resettle sends every refugee leaving your states here this turn, once a turn, and raises your Standing here by 5.",
+        )
+        .weak(),
+    );
 }
 
 /// Ticket #356 (version 0.09.1): the Pioneers block, lifted out of the Orders block and drawn above

@@ -247,3 +247,27 @@ restive Region, since it drains as well as damps; the Stadium is the second.
 **The sweep** (20 seeds x four seatings at the shipped cell): **6 / 4 / 1 / 9, collapses 60**,
 against 6 / 4 / 1 / 7 and 62 after §5, within noise; the computer built 42 Stadiums over the four
 seatings against 404 Constabularies.
+
+## 8. The Region card rearranged
+
+The authority is [ticket #390](https://github.com/whaleyjoshua2/Dying-Earth/issues/390). Nothing
+here moves a rule; it is where things stand on the card.
+
+**The order of the card**: the header and its figures; **Influence**; **Pioneers**; **Policies**,
+the block that was called Orders, holding the Custodians' Leapfrog, the Arkwrights' Exodus Call,
+the Prospectors' Strip Permit, Raise Industry Level, and Relief and Resettle without the Unrest
+subheading they stood under; Widgets and the queue; **Facilities**: the slot boxes, then the
+completed Sea Wall and Scrubber rows, then the build strip, then the Scrubber's and the Sea Wall's
+build buttons; **Armies**: the stance, the stack and the Army rows; and **Orders**, holding **Build
+Army**, since *"all army/ship builds should be in orders sections for both"* cards. The Colony
+card's Orders section stays as it is, holding Build Army (Barracks) and Ships (Shipyard).
+
+**What a completed Sea Wall or Scrubber row says**: one glyph-rendered line, *Scrubber: +3.0 ppm
+Sink, 1 off Unrest a turn, 3 Energy upkeep* and *Sea Wall: holds the sea off; 3 rises held, 1.5
+Materials a turn to keep* (*no rise held yet*; *unkept this turn, holding nothing* when unkept);
+the row's whole sentence is its hover. The separate *N Scrubbers here take …* note under Influence
+is gone, the rows saying it.
+
+**Their build buttons**: *Scrubber (2 of 3)*, the state's cap in the label where a sentence stood
+after it, and *Sea Wall*, each priced as every build button is with its Ducat price beside it (the
+*or* is the Ducat price, on every button, and stays).
