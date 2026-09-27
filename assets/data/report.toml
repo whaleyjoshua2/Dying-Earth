@@ -60,6 +60,9 @@ colony_founded = "The {faction} founded a Colony at {slot} on {body} with {n} Co
 no_habitat_room = "{n} more found no Habitat room at {place} and did not land."
 # Ticket #345 (version 0.09.1): the first Colony a world has ever carried, and what it pays.
 first_to_body = "The {faction} are the first Faction ever to settle {body}. {colony} claims a windfall of {n} Influence, and its Core will pay while they hold it."
+# Ticket #395 (version 0.09.3): the world eases at the news, half a point off every Region's Unrest,
+# said once for the whole Earth under the Unrest heading; the Moment carries it too.
+first_to_body_eases = "The first Colony on {body} eased Unrest by {ease} in every Region on Earth."
 disembarked = "{n} Colonists disembarked into {colony}."
 station_built = "{faction} built {station}."
 antarctica_opens = "The Antarctic ice opens: {n} Colony Slots on Earth."
@@ -365,7 +368,8 @@ figure = "{n} Colonists"
 # Ticket #345 (version 0.09.1): the first Faction to put a Colony on the ground of a world.
 [moments.first_to_body]
 on = true
-text = "The {faction} are the first to settle {body}. {colony} is theirs."
+# Ticket #395 (version 0.09.3): and the world eases at the news.
+text = "The {faction} are the first to settle {body}. {colony} is theirs, and Unrest eased by {ease} in every Region on Earth."
 figure = "{n} Influence"
 
 [moments.control_changed]

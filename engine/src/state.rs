@@ -3579,9 +3579,19 @@ impl Game {
         let (faction, place, body_name) = (self.seat_name(seat), self.place_name(Place::Colony(colony)), self.tables.body(body).name.clone());
         let line = format!("{} is the first Faction to settle {}: {} Influence.", faction, body_name, windfall);
         self.log(line);
-        let args = [("faction", faction), ("body", body_name), ("colony", place), ("n", windfall.to_string())];
+        // Ticket #395 (version 0.09.3): the first ground Colony ever founded on a Body eases Unrest
+        // by half a point in EVERY Region at once, whoever holds it, once a Body -- the designer's
+        // "very small reduction in unrest globally". One table-wide line says it; the per-Region
+        // net lines stay quiet, since fourteen lines the same turn is the spam #371 quieted.
+        let ease = self.tables.unrest.first_colony_ease;
+        for sid in StateId::ALL {
+            self.lower_unrest(sid, ease);
+        }
+        let args = [("faction", faction), ("body", body_name.clone()), ("colony", place), ("n", windfall.to_string()), ("ease", figure(ease))];
         let text = self.say("first_to_body", &args);
         self.report_line(LineKind::ColonyFounded, Some(ReportPlace::Colony(colony)), text);
+        let eased = self.say("first_to_body_eases", &[("body", body_name), ("ease", figure(ease))]);
+        self.report_line(LineKind::Unrest, None, eased);
         self.moment(MomentKind::FirstToABody, &args, Some(ReportPlace::Colony(colony)));
         true
     }

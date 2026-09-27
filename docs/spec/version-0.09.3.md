@@ -117,3 +117,24 @@ lists; each is now reached only as the cheapest left.
 against 5 / 6 / 1 / 9 and 59 after §2. The gates completed in 67 / 58 / 50 / 49 of 80 against
 71 / 69 / 66 / 63, and the orbital war quietened (Missile Carriers built 32 where 69 were); the
 figures are in the ticket's diary page.
+
+## 4. The first Colony on each Body eases Unrest everywhere
+
+The authority is [ticket #395](https://github.com/whaleyjoshua2/Dying-Earth/issues/395).
+
+**The first ground Colony ever founded on a Body takes half a point off every Region's Unrest at
+once**, whoever holds the Region or nobody, the moment the founding is claimed. It happens **once
+for each Body**: the Moon's first, then Mars's, Phobos's, Deimos's and Venus's, each again. A
+second Colony on a Body that already has one eases nothing; a Space Station is no settling;
+Antarctica is on Earth and does not count. The figure is `first_colony_ease` in `unrest.toml`, the
+smallest step Unrest moves in.
+
+**What is said.** One line for the whole Earth under the Report's Unrest heading, *"The first
+Colony on the Moon eased Unrest by 0.5 in every Region on Earth."*, and the First to a Body Moment
+carries the clause; the per-Region net Unrest lines stay quiet, so the easing never writes
+fourteen lines the same turn.
+
+**The computer seats** are reached by the rule itself, their Regions easing with everyone's.
+
+**The sweep** (20 seeds x four seatings at the shipped cell): **6 / 6 / 1 / 5, collapses 62**,
+against 5 / 6 / 1 / 7 and 61 after §3; within a seed's noise, as half a point once a game would be.

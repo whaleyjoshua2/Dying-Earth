@@ -16251,3 +16251,29 @@ fn nuclear_rockets_shortens_mars_on_every_turn_and_venus_on_thirty_one() {
     }
     assert_eq!((mars_shorter, venus_shorter), (36, 31), "Mars on every turn, Venus on thirty-one of thirty-six");
 }
+
+/// Ticket #395 (version 0.09.3): **the first ground Colony ever founded on a Body eases Unrest by
+/// half a point in every Region on Earth**, whoever holds it, once a Body -- the Moon's first, then
+/// Mars's, each again. A second Colony on the same Body does not, nor a station, nor Antarctica,
+/// which is on Earth. One table-wide Report line says it; the per-Region net lines stay quiet.
+#[test]
+fn the_first_colony_on_each_body_eases_unrest_everywhere_by_a_half() {
+    let mut g = game();
+    for s in StateId::ALL {
+        g.state_mut(s).unrest = 4.0;
+    }
+    let moon = colony(&mut g, Seat(0), BodyId::Moon, &[], 4);
+    assert!(g.claim_first(Seat(0), BodyId::Moon, moon), "the premise: the Moon's first");
+    for s in StateId::ALL {
+        assert_eq!(g.state(s).unrest, 3.5, "{s:?}: half a point off, held or not");
+    }
+    assert!(g.report.lines.iter().any(|l| l.text.contains("eased") && l.text.contains("every Region")), "one line for the whole Earth: {:?}", g.report.lines);
+    assert_eq!(g.report.lines.iter().filter(|l| l.text.contains("eased")).count(), 1, "and only one");
+    let second = colony(&mut g, Seat(1), BodyId::Moon, &[], 4);
+    assert!(!g.claim_first(Seat(1), BodyId::Moon, second), "a second Colony on the Moon claims nothing");
+    assert_eq!(g.state(StateId::Europe).unrest, 3.5, "and eases nothing");
+    let mars = colony(&mut g, Seat(2), BodyId::Mars, &[], 4);
+    assert!(g.claim_first(Seat(2), BodyId::Mars, mars), "Mars's first");
+    assert_eq!(g.state(StateId::Europe).unrest, 3.0, "eases the world again");
+    assert_eq!(g.tables.unrest.first_colony_ease, 0.5, "the figure lives in unrest.toml");
+}

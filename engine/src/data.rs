@@ -1034,6 +1034,9 @@ pub struct UnrestTable {
     pub constabulary_fall: f64,
     /// The hook a Scrubber joins on its own ticket; nothing reads it yet.
     pub scrubber_fall: f64,
+    /// Ticket #395 (version 0.09.3): what the first ground Colony ever founded on a Body takes off
+    /// every Region's Unrest at once, whoever holds it, once a Body.
+    pub first_colony_ease: f64,
     pub green_techs_two: f64,
     pub green_techs_four: f64,
     pub constabulary_damping: f64,
