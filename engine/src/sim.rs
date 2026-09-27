@@ -170,6 +170,15 @@ pub struct SimResult {
     /// Ticket #93: stations at Venus at the end, all seats, and Colonists living there.
     pub venus_stations: u32,
     pub venus_colonists: u32,
+    /// Version 0.09.3, at the designer's word ("lets add it"): **ground Colonies off Earth at the
+    /// end, by Body**, indexed by `BodyId::index` (Earth's slot always nought, since Antarctica is
+    /// on Earth), and **the turn the first ground Colony standing on each Body was founded**, so a
+    /// sweep can say how many worlds a game settles and when, which "first Colony" (Antarctica,
+    /// turn 9, every game) and the Mars-system line alone could not.
+    pub ground_colonies_by_body: [u32; 6],
+    pub first_ground_colony_turn_by_body: [Option<u32>; 6],
+    /// The same for stations, by Body, Earth's slot nought.
+    pub stations_by_body: [u32; 6],
     /// Ticket #72: the Prospectors' Venture Capital Fund at the end.
     pub venture_fund_at_end: f64,
     /// Ticket #76: cards drawn over the game, and whether the deck ran dry.
@@ -671,6 +680,9 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         martian_moon_colonies: game.colonies.iter().filter(|c| !c.in_orbit && matches!(c.body, BodyId::Phobos | BodyId::Deimos)).count() as u32,
         venus_stations: game.colonies.iter().filter(|c| c.body == BodyId::Venus).count() as u32,
         venus_colonists: game.colonies.iter().filter(|c| c.body == BodyId::Venus).map(|c| c.colonists).sum(),
+        ground_colonies_by_body: BodyId::ALL.map(|b| if b == BodyId::Earth { 0 } else { game.colonies.iter().filter(|c| !c.in_orbit && c.body == b).count() as u32 }),
+        first_ground_colony_turn_by_body: BodyId::ALL.map(|b| if b == BodyId::Earth { None } else { game.colonies.iter().filter(|c| !c.in_orbit && c.body == b).map(|c| c.founded_turn).min() }),
+        stations_by_body: BodyId::ALL.map(|b| if b == BodyId::Earth { 0 } else { game.colonies.iter().filter(|c| c.in_orbit && c.body == b).count() as u32 }),
         venture_fund_at_end: Seat::ALL.into_iter().find(|s| game.kind(*s) == FactionKind::Prospectors).map(|s| game.seat(s).venture_fund).unwrap_or(0.0),
         cards_drawn: game.deck.drawn.len() as u32,
         deck_empty: game.deck.cards.is_empty(),

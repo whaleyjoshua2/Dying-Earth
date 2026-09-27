@@ -11,6 +11,14 @@ The baseline every sweep here is read against is 0.09.2's closing sweep,
 **2 / 5 / 0 / 11**, collapses 62 of 80. Read the per-Faction totals at the foot of a sweep file,
 never the per-seating arrays.
 
+**The sweep gained a line on 2026-09-26**, at the designer's word after the Nuclear Rockets
+sweep: *Off Earth at the end over the batch*, the ground Colonies and stations by Body, the median
+ground Colonies off Earth a game, and for each Body the games whose first ground Colony stood at
+the end with the median turn it was founded. Before it the sweep had only Antarctica's first
+founding (turn 9, every game), the Moon's first prize, and the Mars system's first founding. The
+sweep after #393 was re-run to carry it (the same seeds, the same figures); the earlier files do
+not have it.
+
 **Every folder here is listed.**
 
 | folder | ticket | what is in it |

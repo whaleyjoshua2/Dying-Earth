@@ -27,6 +27,7 @@ sink  step  perm  after | collapses/20 | collapse turns (median, min..max) | tem
       Unique Modules standing at the end over the batch: Academy 0, Heliostat 29, Exchange 22, Chorus 7
       Batteries standing at the end over the batch, by seat [7, 0, 7, 3]
       Venus: 1 stations at the end over the batch, 0 Colonists living there
+      Off Earth at the end over the batch: ground Colonies the Moon 56, Mars 10, Phobos 0, Deimos 3, Venus 0 (median 4 a game); stations the Moon 8, Mars 3, Phobos 0, Deimos 1, Venus 1; first ground Colony founded: the Moon in 20/20 (median turn 15); Mars in 4/20 (median turn 25); Phobos in 0/20 (median turn -); Deimos in 3/20 (median turn 28); Venus in 0/20 (median turn -)
       Mars system: a Colony founded in 6/20 seeds, median first turn 25; Antarctic Colonies founded 60
       The Archive: standing in 15/20 seeds (median turn 23), complete in 14/20 (median turn 23), median fund at the end 125
       Neutral Labs paid a median 19 Research a game; Coastal Engineering complete in 20/20 seeds (median turn 14)
@@ -95,6 +96,7 @@ sink  step  perm  after | collapses/20 | collapse turns (median, min..max) | tem
       Unique Modules standing at the end over the batch: Academy 2, Heliostat 29, Exchange 20, Chorus 14
       Batteries standing at the end over the batch, by seat [0, 0, 8, 0]
       Venus: 0 stations at the end over the batch, 0 Colonists living there
+      Off Earth at the end over the batch: ground Colonies the Moon 68, Mars 0, Phobos 0, Deimos 2, Venus 0 (median 4 a game); stations the Moon 3, Mars 0, Phobos 0, Deimos 0, Venus 0; first ground Colony founded: the Moon in 20/20 (median turn 15); Mars in 0/20 (median turn -); Phobos in 0/20 (median turn -); Deimos in 2/20 (median turn 30); Venus in 0/20 (median turn -)
       Mars system: a Colony founded in 2/20 seeds, median first turn 30; Antarctic Colonies founded 60
       The Archive: standing in 16/20 seeds (median turn 23), complete in 13/20 (median turn 23), median fund at the end 125
       Neutral Labs paid a median 30 Research a game; Coastal Engineering complete in 20/20 seeds (median turn 14)
@@ -163,6 +165,7 @@ sink  step  perm  after | collapses/20 | collapse turns (median, min..max) | tem
       Unique Modules standing at the end over the batch: Academy 1, Heliostat 25, Exchange 25, Chorus 42
       Batteries standing at the end over the batch, by seat [2, 3, 0, 2]
       Venus: 0 stations at the end over the batch, 0 Colonists living there
+      Off Earth at the end over the batch: ground Colonies the Moon 64, Mars 8, Phobos 2, Deimos 1, Venus 0 (median 4 a game); stations the Moon 4, Mars 1, Phobos 1, Deimos 0, Venus 0; first ground Colony founded: the Moon in 20/20 (median turn 14); Mars in 4/20 (median turn 25); Phobos in 1/20 (median turn 23); Deimos in 1/20 (median turn 29); Venus in 0/20 (median turn -)
       Mars system: a Colony founded in 6/20 seeds, median first turn 25; Antarctic Colonies founded 60
       The Archive: standing in 17/20 seeds (median turn 20), complete in 16/20 (median turn 23), median fund at the end 125
       Neutral Labs paid a median 19 Research a game; Coastal Engineering complete in 20/20 seeds (median turn 15)
@@ -231,6 +234,7 @@ sink  step  perm  after | collapses/20 | collapse turns (median, min..max) | tem
       Unique Modules standing at the end over the batch: Academy 1, Heliostat 26, Exchange 21, Chorus 3
       Batteries standing at the end over the batch, by seat [1, 1, 0, 2]
       Venus: 0 stations at the end over the batch, 0 Colonists living there
+      Off Earth at the end over the batch: ground Colonies the Moon 76, Mars 0, Phobos 0, Deimos 1, Venus 0 (median 4 a game); stations the Moon 3, Mars 0, Phobos 0, Deimos 1, Venus 0; first ground Colony founded: the Moon in 20/20 (median turn 15); Mars in 0/20 (median turn -); Phobos in 0/20 (median turn -); Deimos in 1/20 (median turn 27); Venus in 0/20 (median turn -)
       Mars system: a Colony founded in 1/20 seeds, median first turn 27; Antarctic Colonies founded 60
       The Archive: standing in 18/20 seeds (median turn 20), complete in 18/20 (median turn 20), median fund at the end 125
       Neutral Labs paid a median 24 Research a game; Coastal Engineering complete in 19/20 seeds (median turn 15)
@@ -281,6 +285,7 @@ ACROSS ALL FOUR SEATINGS, 80 games:
    Prospectors: Victory gate completed in 58 of 80 games, median turn 26
     Arkwrights: Victory gate completed in 50 of 80 games, median turn 26
     Archivists: Victory gate completed in 49 of 80 games, median turn 24
+  Off Earth at the end over the batch: ground Colonies the Moon 264, Mars 18, Phobos 2, Deimos 7, Venus 0 (median 4 a game); stations the Moon 18, Mars 4, Phobos 1, Deimos 2, Venus 1; first ground Colony founded: the Moon in 80/80 (median turn 15); Mars in 8/80 (median turn 25); Phobos in 1/80 (median turn 23); Deimos in 7/80 (median turn 29); Venus in 0/80 (median turn -)
   the nuke, all seats and seatings: Missile Carriers built 32, Launches 20, buildings burned 143, people killed 129, Industry Levels lost 0
   the orbital war, per Faction (orbital Battles opened, of them off Earth / Blockades / Launches / Bombards / Interceptions):
     Custodians: 0 (0 off Earth) / 0 / 0 / 0 / 0
