@@ -172,3 +172,42 @@ the two sides.
 **The computer seats** see the put-back too, since it is keyed to the whole table. **The sweep**
 (20 seeds x four seatings at the shipped cell): **6 / 4 / 1 / 7, collapses 62**, against
 6 / 6 / 1 / 5 and 62 after §4; within a seed's noise.
+
+## 6. The Unrest lines quieter again
+
+The authority is [ticket #400](https://github.com/whaleyjoshua2/Dying-Earth/issues/400). Version
+0.09.2 folded six sources of Unrest lines into one net line a Region; what it left was the heat,
+which wrote a line for every Region on the board whose Unrest rose that Climate phase, whoever held
+it, and the sea, which ended every threshold line with an Unrest clause. Measured over eighty games
+played by the computer, the heat was twenty thousand of the thirty-two thousand lines that carried
+an Unrest figure.
+
+**The heat is a cause on the net line.** A Region whose people the heat took and whose Unrest rose
+has *the heat* among the causes on its one net line (*"India: Unrest from 4 to 5 (the heat, 3.0
+people arriving)"*), for the player's own Regions and any they acted in, as every cause is; and
+the whole board is **one line**, *"The heat raised Unrest in 9 Regions and took people from 4."*,
+under The climate. The per-Region heat lines are gone.
+
+**The sea is a cause on the net line** in the same way, and the sea-level threshold line keeps the
+flooding and the people lost with no Unrest clause after it.
+
+**What keeps a line of its own**: the coral Break, a Region throwing its holder off, an Occupation
+ending, and Pioneers mustered, each an event and not a figure.
+
+**Where the net line is written.** It was written at the Resolution's end, before the Climate
+phase raised the heat and the sea; it is written after the Climate phase now, still from the
+snapshot the Resolution opened with, so its before and after span the whole turn, and the causes
+the Resolution pushed (an Agitate, Relief, refugees, an Occupation) are carried across to it.
+
+**The measure**, every Report line carrying an Unrest figure, eighty games (20 seeds x four
+seatings, seat 0 played by the computer, so every Region's net line is written), 2,351 turns:
+
+| | before | after |
+|---|---|---|
+| Unrest-bearing lines a turn | **13.54** (31,842) | **4.72** (11,099) |
+| of them the Climate kind | 20,433 | 1,472 |
+| of them the net line | 3,594 | 5,819 |
+| most in one turn | 39 | 16 |
+
+The net lines grew because the heat and the sea now write to them; a human player sees only their
+own Regions' net lines, so their Report is quieter still. No rule moved.

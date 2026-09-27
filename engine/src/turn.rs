@@ -88,6 +88,9 @@ impl Game {
         self.income_phase();
         self.log("Phase 2: Climate");
         self.climate_phase();
+        // Ticket #400 (version 0.09.3): the net Unrest lines are written here, after the Climate
+        // phase, so the heat and the sea are causes on them; they stood at the Resolution's end.
+        self.report_unrest_net();
         self.log("Phase 3: Report");
         self.report_phase();
         // Ticket #337 (version 0.09.0): the turn's card is drawn HERE, at the head of the turn and
@@ -268,6 +271,9 @@ impl Game {
         self.income_phase();
         self.log("Phase 2: Climate");
         self.climate_phase();
+        // Ticket #400 (version 0.09.3): the net Unrest lines are written here, after the Climate
+        // phase, so the heat and the sea are causes on them; they stood at the Resolution's end.
+        self.report_unrest_net();
         self.log("Phase 3: Report");
         self.report_phase();
         // Ticket #337 (version 0.09.0): the next turn's card, drawn before its orders are given.

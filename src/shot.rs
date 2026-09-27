@@ -908,6 +908,9 @@ fn build_board(session: &mut Session) {
             g.pending.agitates.push((Seat(1), sid));
             g.pending.relief.push((Seat(0), sid));
             g.resolve_unrest();
+            // Ticket #400 (version 0.09.3): the net line is written after the Climate phase now,
+            // not by the pass; the aid writes it as the turn would.
+            g.report_unrest_net();
         }
         // `unrest:<n>` (a building aid, ticket #52): a spread of Unrest over three states on the
         // face the Earth picture shows, so one card, the map labels and the thresholds are all

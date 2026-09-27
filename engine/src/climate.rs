@@ -421,8 +421,10 @@ impl Game {
         }
         if rose > 0.0 {
             headline.push_str(&format!(" Unrest there rose by {} to {}.", Game::unrest_figure(rose), self.unrest_text(sid)));
-            let suffix = self.phrase("sea_unrest", &[("rose", Game::unrest_figure(rose).to_string()), ("unrest", self.unrest_text(sid))]);
-            said.push_str(&suffix);
+            // Ticket #400 (version 0.09.3): a cause on the Region's net Unrest line, where the
+            // threshold line carried it as a suffix; the line keeps the sea and the people lost.
+            let cause = self.phrase("cause_sea", &[]);
+            self.unrest_cause(sid, cause, false);
         }
         self.log(headline);
         self.report_line(LineKind::SeaLevel, Some(ReportPlace::State(sid)), said.clone());
@@ -535,6 +537,10 @@ impl Game {
         // same turn's growth; then the Unrest and the flow, state by state, so the Report reads
         // "population fell here, and this many left for there".
         let mut fell: Vec<(StateId, f64, f64)> = Vec::new();
+        // Ticket #400 (version 0.09.3): the heat is a CAUSE on each Region's one net Unrest line and
+        // the whole board is one line, where it wrote a line for every Region whoever held it --
+        // twenty thousand of the thirty-two thousand Unrest-bearing lines in eighty games.
+        let (mut heat_regions, mut fell_regions) = (0u32, 0u32);
         for sid in StateId::ALL {
             let before = self.state(sid).population;
             let after = (before * (1.0 + rate)).max(0.0);
@@ -565,20 +571,19 @@ impl Game {
                     self.unrest_text(sid)
                 );
                 self.log(line);
-                let text = self.say(
-                    if nothing_to_see { "heat_unrest_only" } else { "heat_population" },
-                    &[
-                        ("state", self.tables.state(sid).name.clone()),
-                        ("percent", format!("{percent:.1}")),
-                        ("after", format!("{after:.1}")),
-                        ("rose", Game::unrest_figure(rose).to_string()),
-                        ("unrest", self.unrest_text(sid)),
-                    ],
-                );
-                self.report_line(LineKind::Climate, Some(ReportPlace::State(sid)), text);
+                let cause = self.phrase("cause_heat", &[]);
+                self.unrest_cause(sid, cause, false);
+                heat_regions += 1;
+                if !nothing_to_see {
+                    fell_regions += 1;
+                }
             }
             // Ticket #52: half of what the heat took moves to the neighbours instead of vanishing.
             self.move_refugees(sid, lost * u.heat_share, "the heat");
+        }
+        if heat_regions > 0 {
+            let text = self.say("heat_board", &[("n", heat_regions.to_string()), ("m", fell_regions.to_string())]);
+            self.report_line(LineKind::Climate, None, text);
         }
     }
 

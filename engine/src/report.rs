@@ -551,8 +551,8 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("sea_nothing_left", &["temperature", "state"]),
     ("sea_took", &["n", "slots", "state", "temperature"]),
     ("sea_took_destroying", &["n", "slots", "state", "temperature", "destroyed"]),
-    ("heat_population", &["state", "percent", "after", "rose", "unrest"]),
-    ("heat_unrest_only", &["state", "rose", "unrest"]),
+    // Ticket #400 (version 0.09.3): the heat is a cause on the net line; the board is one line.
+    ("heat_board", &["n", "m"]),
     ("development", &["state", "level"]),
     ("development_woke", &["state", "level", "building"]),
     ("scrubbers_destroyed", &["n", "state", "why"]),
@@ -600,6 +600,9 @@ pub const PHRASE_ARGS: &[(&str, &[&str])] = &[
     ("cause_agitate_damped", &["faction"]),
     ("cause_relief", &["faction"]),
     ("cause_refugees", &["n"]),
+    // Ticket #400 (version 0.09.3): the heat and the sea, where each wrote a line of its own.
+    ("cause_heat", &[]),
+    ("cause_sea", &[]),
     ("cause_occupation_start", &[]),
     ("cause_occupation", &[]),
     ("cause_occupation_break", &[]),
@@ -618,7 +621,6 @@ pub const PHRASE_ARGS: &[(&str, &[&str])] = &[
     // Ticket #346 (version 0.09.1): what a Battle cost in Fuel, and the hulls that fought dry.
     ("battle_fuel", &["n"]),
     ("battle_fought_dry", &["hulls"]),
-    ("sea_unrest", &["rose", "unrest"]),
     ("sea_inland", &[]),
     ("sea_inland_flipped", &["what"]),
     ("first_colony", &[]),

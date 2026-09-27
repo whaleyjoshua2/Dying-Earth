@@ -2687,7 +2687,11 @@ fn b_a_sea_level_threshold_raises_two_a_slot_and_displaces_five_percent_an_expos
     assert!((g.state(StateId::Russia).population - moved * 0.75).abs() < 1e-9, "Russia {}", g.state(StateId::Russia).population);
     assert!((g.state(StateId::SouthAsia).population - moved * 0.25).abs() < 1e-9, "South Asia {}", g.state(StateId::SouthAsia).population);
     assert_eq!(g.state(StateId::SouthEastAsia).population, 0.0, "an Industry Level of 0 takes none while another has some");
-    assert!(g.report.lines.iter().any(|l| l.text.contains("Unrest there rose")), "the Report says so: {:?}", g.report.lines);
+    // Ticket #400 (version 0.09.3): the sea is a cause on the Region's net Unrest line, written after
+    // the Climate phase, where the threshold line used to carry it as a suffix.
+    assert!(!g.report.lines.iter().any(|l| l.text.contains("Unrest there rose")), "no suffix on the threshold line: {:?}", g.report.lines);
+    g.report_unrest_net();
+    assert!(g.report.lines.iter().any(|l| l.kind == LineKind::Unrest && l.text.starts_with("China: Unrest") && l.text.contains("the sea")), "the Report says so on the net line: {:?}", g.report.lines);
 }
 
 /// (c) Heat refugees: half of what a state lost arrives at its neighbours and raises their Unrest
@@ -10364,7 +10368,10 @@ fn agitate_raises_a_rivals_regions_unrest_for_ducats_and_influence_once_a_turn()
     assert!((g.state(sid).unrest - 2.5).abs() < 1e-9, "3 + 1 - the fall of 1.5: {}", g.state(sid).unrest);
     assert!(g.relations.offended[holder.index()][0], "an offence against the holder");
     // Ticket #371 (version 0.09.2): the Report names who paid as a cause on the Region's one net
-    // Unrest line, which a rival's Region earns when the player is the one agitating.
+    // Unrest line, which a rival's Region earns when the player is the one agitating. Ticket #400
+    // (version 0.09.3): the line is written after the Climate phase, so a turn run as its
+    // Resolution alone writes it here.
+    g.report_unrest_net();
     assert!(g.report.lines.iter().any(|l| l.kind == LineKind::Unrest && l.text.contains("agitation by the Custodians")), "the Report names who paid: {:?}", g.report.lines);
     // A working Constabulary halves it -- and calms a point a turn besides: 3 + 0.5 - 1.0 - 1.5.
     g.state_mut(sid).facilities.push(facility(FacilityKind::Constabulary));
@@ -15765,6 +15772,9 @@ fn the_report_says_one_net_unrest_line_a_region_with_its_causes() {
     g.state_mut(theirs).unrest = 3.0;
     g.pending.agitates.push((Seat(3), theirs));
     g.resolution_phase();
+    // Ticket #400 (version 0.09.3): the lines are written after the Climate phase, so a turn run as
+    // its Resolution alone writes them here.
+    g.report_unrest_net();
     let lines = unrest_lines(&g);
     assert_eq!(lines, vec!["China: Unrest from 3 to 1.5 (agitation by the Prospectors, Relief by the Custodians).".to_string()], "{lines:?}");
     // A rise past the first threshold ends the line with what the threshold means. A Heatwave card
@@ -15777,6 +15787,7 @@ fn the_report_says_one_net_unrest_line_a_region_with_its_causes() {
     g.state_mut(StateId::EastAsia).refugees_in = 5.0;
     g.pending.agitates.push((Seat(1), StateId::EastAsia));
     g.resolution_phase();
+    g.report_unrest_net();
     let lines = unrest_lines(&g);
     assert_eq!(lines.len(), 1, "{lines:?}");
     assert!(lines[0].starts_with("China: Unrest from 3.5 to "), "{lines:?}");
@@ -15789,6 +15800,7 @@ fn the_report_says_one_net_unrest_line_a_region_with_its_causes() {
     calm(&mut g);
     g.state_mut(StateId::EastAsia).unrest = 3.0;
     g.resolution_phase();
+    g.report_unrest_net();
     assert!(unrest_lines(&g).is_empty(), "{:?}", unrest_lines(&g));
 }
 
@@ -16370,4 +16382,49 @@ fn a_card_is_put_back_once_a_turn_and_a_deck_of_one_gives_it_back() {
     }
     assert_eq!(g.draw, CardDraw::Choice(EventId::DeepSurvey), "it comes straight back up");
     assert!(g.deck.cards.is_empty(), "and the deck is spent");
+}
+
+/// Ticket #400 (version 0.09.3): **the heat is a cause on the net Unrest line, not a line a Region.**
+/// On a hot turn every Region's people fall and its Unrest rises; the Report used to write one
+/// Climate line for each of the fourteen, whoever held it. Now the player's own Region carries
+/// *the heat* among the causes on its one net line, the whole board is one line (*"The heat raised
+/// Unrest in 14 Regions ..."*), and no Region has a heat line of its own.
+#[test]
+fn the_heat_is_a_cause_on_the_net_line_and_the_board_is_one_line() {
+    let mut g = game();
+    pick_a_tech(&mut g);
+    answer_the_card(&mut g);
+    g.climate.temperature = 2.6;
+    let home = g.controlled_states(Seat(0))[0];
+    let before = g.state(home).unrest;
+    g.end_turn(std::array::from_fn(|_| Vec::new())).expect("the turn ends");
+    let texts: Vec<&String> = g.report.lines.iter().map(|l| &l.text).collect();
+    assert!(g.state(home).unrest > before || texts.iter().any(|t| t.contains("the heat")), "the premise: a hot turn raised Unrest at home: {texts:?}");
+    let per_region: Vec<&&String> = texts.iter().filter(|t| t.contains("the heat raised Unrest by") || t.contains("Unrest rose by")).collect();
+    assert!(per_region.is_empty(), "no Region has a heat line of its own: {per_region:?}");
+    let board: Vec<&&String> = texts.iter().filter(|t| t.starts_with("The heat raised Unrest in")).collect();
+    assert_eq!(board.len(), 1, "one line for the whole board: {texts:?}");
+    let home_name = g.tables.state(home).name.clone();
+    let net: Vec<&&String> = texts.iter().filter(|t| t.starts_with(&format!("{home_name}: Unrest from")) && t.contains("the heat")).collect();
+    assert_eq!(net.len(), 1, "the player's Region names the heat among its causes: {texts:?}");
+}
+
+/// Ticket #400 (the build's finding): **a cause pushed inside the Resolution still reaches the net
+/// line written after the Climate phase.** The Resolution resets its pending state at its end;
+/// moving the net line later would have dropped every Agitate, Relief, refugee and Occupation cause
+/// on the floor. A rival's Agitate on the player's Region in a full turn names itself.
+#[test]
+fn a_cause_from_the_resolution_survives_to_the_net_line_after_the_climate_phase() {
+    let mut g = game();
+    pick_a_tech(&mut g);
+    answer_the_card(&mut g);
+    calm(&mut g);
+    let home = g.controlled_states(Seat(0))[0];
+    g.state_mut(home).unrest = 3.0;
+    g.pending.agitates.push((Seat(1), home));
+    g.end_turn(std::array::from_fn(|_| Vec::new())).expect("the turn ends");
+    let name = g.tables.state(home).name.clone();
+    let net: Vec<&String> = g.report.lines.iter().map(|l| &l.text).filter(|t| t.starts_with(&format!("{name}: Unrest from"))).collect();
+    assert_eq!(net.len(), 1, "one net line for home: {:?}", g.report.lines);
+    assert!(net[0].contains("agitation by the Prospectors"), "and the Agitate is a cause on it: {}", net[0]);
 }

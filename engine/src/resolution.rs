@@ -73,7 +73,12 @@ impl Game {
         self.resolve_unrest(); // (i), ticket #52
         self.resolve_credits(); // (j), ticket #268: carbon credits change hands
         self.report_waiting_colonists(); // ticket #370: after every landing this turn has made
-        self.pending = Pending::default();
+        // Ticket #400 (version 0.09.3): the Unrest causes and the snapshot outlive the Resolution,
+        // since the net lines are written after the Climate phase, where the heat and the sea join
+        // them; everything else pending is spent here as it always was.
+        let unrest_causes = std::mem::take(&mut self.pending.unrest_causes);
+        let unrest_before = std::mem::take(&mut self.pending.unrest_before);
+        self.pending = Pending { unrest_causes, unrest_before, ..Pending::default() };
         // Ticket #383 (version 0.09.2): a stack that fought this turn may Attack again next turn.
         self.fought.clear();
         for a in &mut self.armies {
@@ -2172,7 +2177,9 @@ impl Game {
     /// the player Agitated or Relieved; a rival's is silent unless its holder is thrown off, which
     /// has its own line. A spectated game, having no player, says every Region's. The refugees a
     /// Region took in are one cause among the others, where they were a line of their own.
-    fn report_unrest_net(&mut self) {
+    /// Public since ticket #400 so a test that runs the Resolution or a Climate pass on its own can
+    /// write the lines the turn would.
+    pub fn report_unrest_net(&mut self) {
         let u = self.tables.unrest.clone();
         let me = Seat(0);
         let causes = std::mem::take(&mut self.pending.unrest_causes);
@@ -2189,7 +2196,14 @@ impl Game {
             }
             let now = self.state(sid).unrest;
             let was = before.iter().find(|(s, _)| *s == sid).map(|(_, v)| *v).unwrap_or(now);
-            let words: Vec<String> = mine.iter().map(|(_, c, _)| c.clone()).collect();
+            // Ticket #400 (version 0.09.3): a cause named once, however many times it pushed -- three
+            // sea thresholds in one turn read "the sea, the sea, the sea" before.
+            let mut words: Vec<String> = Vec::new();
+            for (_, c, _) in &mine {
+                if !words.contains(c) {
+                    words.push(c.clone());
+                }
+            }
             let ending = if now >= u.facility_threshold && was < u.facility_threshold {
                 self.phrase("unrest_past", &[("which", "second".to_string()), ("note", self.unrest_note(sid))])
             } else if now >= u.army_threshold && was < u.army_threshold {
@@ -3033,8 +3047,9 @@ impl Game {
             let Control::Controlled(seat) = self.state(sid).control else { continue };
             self.throw_off(sid, seat);
         }
-        // Ticket #371 (version 0.09.2): the one net Unrest line a Region.
-        self.report_unrest_net();
+        // Ticket #371 (version 0.09.2): the one net Unrest line a Region is written by
+        // `report_unrest_net`, since ticket #400 (version 0.09.3) after the Climate phase rather
+        // than here, so the heat and the sea are causes on it.
         // The log line for crossing 4 or 7, once each way. Ticket #371 (version 0.09.2): the Report's
         // word for it is the ending of the Region's one net line, written by `report_unrest_net`.
         for sid in StateId::ALL {
