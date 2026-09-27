@@ -604,23 +604,28 @@ impl Game {
                 // Ticket #90 (version 0.06.0): trade is a network. `amount` Ducats per Colonist of
                 // the Faction at this Body, plus `per_other_body` for every other Body the Faction
                 // holds; no Body yield; the Faction's output multiplier applies.
+                // Ticket #397 (version 0.09.3): each other Body held pays ITS OWN figure, by its
+                // distance from Earth (`trade_pays` on the Body's row), where a flat 3 stood -- the
+                // designer's "money reason to go far". The arithmetic names each Body with its figure.
                 let here = self.colonists_at_body(seat, col.body) as i64;
-                let others = self.bodies_held(seat).into_iter().filter(|b| *b != col.body).count() as i64;
-                let per_other = t.trade_post.per_other_body;
-                let raw = p.amount * here + per_other * others;
-                let mut v = Chain::base(raw as f64, format!("from {} x {here} Colonists + {per_other} x {others} Bodies", p.amount));
+                let held: Vec<BodyId> = self.bodies_held(seat).into_iter().filter(|b| *b != col.body).collect();
+                let far: f64 = held.iter().map(|b| t.body(*b).trade_pays).sum();
+                let raw = p.amount as f64 * here as f64 + far;
+                let bodies = held.iter().map(|b| format!("{} for {}", figure(t.body(*b).trade_pays), b.name())).collect::<Vec<_>>().join(" + ");
+                let arithmetic = if held.is_empty() { format!("{} x {here} Colonists", p.amount) } else { format!("{} x {here} Colonists + {bodies}", p.amount) };
+                let mut v = Chain::base(raw, format!("from {arithmetic}"));
                 v.times(fac.output_multiplier, || format!("as the {}", fac.name));
                 y.resource = Some(Resource::Ducats);
                 // Ticket #387 (version 0.09.3): to the tenth, where it was floored.
                 y.amount = v.tenth();
-                y.detail = Some(format!("{} x {here} Colonists + {per_other} x {others} Bodies", p.amount));
+                y.detail = Some(arithmetic.clone());
                 // Ticket #239 (version 0.08.3): the Prospectors' Exchange pays one more, flat and
                 // AFTER the multiplier, for the Academy's reason -- 1 through the largest output
                 // multiplier in the game floors back to 1, so a captured Exchange pays its captor
                 // exactly what it paid its builder.
                 if kind == ModuleKind::Exchange {
                     y.amount = v.plus(t.unique.exchange_ducats, "for the Exchange");
-                    y.detail = Some(format!("{} x {here} Colonists + {per_other} x {others} Bodies, and {} for the Exchange", p.amount, t.unique.exchange_ducats));
+                    y.detail = Some(format!("{arithmetic}, and {} for the Exchange", t.unique.exchange_ducats));
                 }
                 y.chain = v;
             } else if p.resource == Resource::Research {

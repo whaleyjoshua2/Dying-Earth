@@ -504,12 +504,13 @@ fn a_controlled_state_pays_ducats_from_gdp_times_industry_and_a_bank_adds_more()
     assert_eq!(g.facility_yield(Seat(0), StateId::NorthAfrica, FacilityKind::Bank).amount, 0.4); // Ticket #387: 4 x 1 / 10 to the tenth, where it floored to nothing
     assert_eq!(income_of(&mut g, Seat(0)).ducats, 17.0); // Ticket #387: 10.2 + 6.8
     // A Trade Post followed the Habitat yield; ticket #90 (version 0.06.0): it pays 2 per Colonist
-    // at its Body plus 3 per other Body held. Empty Colonies on the Moon and Mars, with Earth held:
-    // each sees two other Bodies, so 6.
+    // at its Body plus a figure per other Body held. Empty Colonies on the Moon and Mars, with Earth
+    // held: each sees two other Bodies. Ticket #397 (version 0.09.3): by distance from Earth, so the
+    // Moon's post is paid Earth's 3 and Mars's 5, the Mars post Earth's 3 and the Moon's 3.5.
     let moon = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::TradePost], 0);
     let mars = colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::TradePost], 0);
-    assert_eq!(g.module_yield(Seat(0), moon, ModuleKind::TradePost).amount, 6.0);
-    assert_eq!(g.module_yield(Seat(0), mars, ModuleKind::TradePost).amount, 6.0);
+    assert_eq!(g.module_yield(Seat(0), moon, ModuleKind::TradePost).amount, 8.0);
+    assert_eq!(g.module_yield(Seat(0), mars, ModuleKind::TradePost).amount, 6.5);
     // Ticket #72 had it that Ducats are not Materials output, so a Bank banked nothing in the
     // Venture Capital Fund however high the share was set. Ticket #240 (version 0.08.3) turns that
     // exactly around: the Fund banks DUCAT INCOME, so a Bank is now one of the things filling it.
@@ -7002,11 +7003,12 @@ fn a_trade_post_pays_for_colonists_at_its_body_and_every_other_body_held() {
     let y = g.module_yield(cus, mars, ModuleKind::TradePost);
     assert_eq!((y.resource, y.amount), (Some(Resource::Ducats), (2 * 12 + 3) as f64), "12 Colonists at Mars, one other Body (Earth)");
     assert!(y.detail.as_deref().unwrap_or("").contains("2 x 12"), "{:?}", y.detail);
+    // Ticket #397 (version 0.09.3): the Moon pays its own 3.5 beside Earth's 3.
     colony(&mut g, cus, BodyId::Moon, &[], 0);
-    assert_eq!(g.module_yield(cus, mars, ModuleKind::TradePost).amount, 24.0 + 6.0, "the Moon is a second other Body");
+    assert_eq!(g.module_yield(cus, mars, ModuleKind::TradePost).amount, 24.0 + 6.5, "the Moon is a second other Body");
     let over_mars = station_at(&mut g, cus, BodyId::Mars);
     g.colony_mut(over_mars).unwrap().colonists = 3;
-    assert_eq!(g.module_yield(cus, mars, ModuleKind::TradePost).amount, 30.0 + 6.0, "three more Colonists at the Body, on the station");
+    assert_eq!(g.module_yield(cus, mars, ModuleKind::TradePost).amount, 30.0 + 6.5, "three more Colonists at the Body, on the station");
     let pro = Seat(1);
     let theirs = colony(&mut g, pro, BodyId::Mars, &[ModuleKind::TradePost, ModuleKind::Habitat], 8);
     assert_eq!(g.module_yield(pro, theirs, ModuleKind::TradePost).amount, tenth((16 + 3) as f64 * 1.25), "the Prospectors' x1.25, to the tenth"); // Ticket #387
@@ -16752,4 +16754,37 @@ fn a_colony_with_a_working_refinery_refuels_its_low_orbit_and_rescues_a_stranded
     g.ship_mut(far).unwrap().fuel = 1.0;
     g.ship_mut(far).unwrap().slot = Some(0);
     assert!(g.check_order(Seat(0), &[], &refuel).is_err(), "in an empty ring, nothing fuels it");
+}
+
+/// Ticket #397 (version 0.09.3): **a Trade Post pays by distance from Earth**: each other Body the
+/// holder holds pays its own figure -- Earth 3, the Moon 3.5, Venus 4, Mars 5, Phobos 6, Deimos 6,
+/// the designer's -- wherever the Trade Post stands, beside the 2 a Colonist at its Body pays; the
+/// Exchange follows with its flat 1.
+#[test]
+fn a_trade_post_pays_each_other_body_held_by_its_distance_from_earth() {
+    let mut g = fresh();
+    let seat = Seat(0);
+    let m = g.tables.faction(g.kind(seat)).output_multiplier;
+    // A Mars Trade Post holding Earth (the home Region), the Moon and Venus: 3 + 3.5 + 4 beside
+    // 2 x 4 Colonists here.
+    let mars = colony(&mut g, seat, BodyId::Mars, &[ModuleKind::TradePost], 4);
+    colony(&mut g, seat, BodyId::Moon, &[], 0);
+    station_at(&mut g, seat, BodyId::Venus);
+    let y = g.module_yield(seat, mars, ModuleKind::TradePost);
+    assert!((y.amount - tenth((2.0 * 4.0 + 3.0 + 3.5 + 4.0) * m)).abs() < 1e-9, "Mars post: {} against {}", y.amount, (8.0 + 10.5) * m);
+    let detail = y.detail.clone().unwrap_or_default();
+    assert!(detail.contains("3.5 for the Moon") && detail.contains("4 for Venus") && detail.contains("3 for Earth"), "the arithmetic names each Body: {detail}");
+    // A Moon Trade Post holding Earth, Mars and Venus: 3 + 5 + 4; the Moon's own 3.5 is not paid to itself.
+    let moon = g.colonies.iter().find(|c| c.body == BodyId::Moon && c.control.director() == Some(seat)).map(|c| c.id).unwrap();
+    g.colony_mut(moon).unwrap().modules.push(Module::new(ModuleKind::TradePost));
+    let y = g.module_yield(seat, moon, ModuleKind::TradePost);
+    assert!((y.amount - tenth((3.0 + 5.0 + 4.0) * m)).abs() < 1e-9, "Moon post with nobody living there: {}", y.amount);
+    // Phobos and Deimos held pay 6 each.
+    colony(&mut g, seat, BodyId::Phobos, &[], 0);
+    colony(&mut g, seat, BodyId::Deimos, &[], 0);
+    let y = g.module_yield(seat, moon, ModuleKind::TradePost);
+    assert!((y.amount - tenth((3.0 + 5.0 + 4.0 + 6.0 + 6.0) * m)).abs() < 1e-9, "the far rocks pay most: {}", y.amount);
+    // The Exchange follows, its flat 1 after the multiplier.
+    let ex = g.module_yield(seat, moon, ModuleKind::Exchange);
+    assert!((ex.amount - (y.amount + g.tables.unique.exchange_ducats as f64)).abs() < 1e-9, "the Exchange: {} against {}", ex.amount, y.amount);
 }

@@ -390,3 +390,31 @@ sweep's Tanks line now counts Refuels at a Refinery Colony beside those at a par
 
 **Figures.** None move. The sweep before is the yard's (6 / 4 / 1 / 9, collapses 60; hulls left dry
 by a Battle 8, Fuel burned in Battle 163.2); the sweep after is in the diary.
+
+## 13. Trade Posts that pay by distance
+
+The authority is [ticket #397](https://github.com/whaleyjoshua2/Dying-Earth/issues/397). **A rule
+moves.** The designer's words, suggestion S14 of the space round: *"A Trade Post's flat 3 Ducats
+per other Body held becomes a figure per Body ... A money reason to go far."*
+
+**The rule** (Q1, A). A Trade Post still pays 2 Ducats a turn for every Colonist of its Faction at
+its Body, and for every other Body the Faction holds (a Colony, a station or, on Earth, a Region);
+each such Body now pays **its own figure, by its distance from Earth, wherever the Trade Post
+stands**: a Mars Trade Post holding the Moon is paid the Moon's figure, an Earth station's Trade
+Post holding Mars is paid Mars's. The Body a Trade Post stands at pays nothing to it, as before.
+The Faction's output multiplier applies to the whole, as before, and the figure is to the tenth.
+
+**The figures** (Q2, the designer's: *"moon 3.5 then as suggested"*): **Earth 3, the Moon 3.5,
+Venus 4, Mars 5, Phobos 6, Deimos 6**, each on its Body's row in `bodies.toml` as `trade_pays`,
+where a flat `per_other_body` of 3 stood in `modules.toml`. Nothing pays less than before; the Moon
+pays a half more, the far Bodies up to twice.
+
+**The Exchange** (Q3, A) follows: the same figures, its flat 1 after the multiplier, as before.
+
+**Where it is said.** The Trade Post's hover and its chain name each Body held with its figure:
+*2 x 4 Colonists + 3 for Earth + 3.5 for the Moon*, where they said *3 x 2 Bodies*. The computer
+seats build Trade Posts and hold Bodies through the same yield; nothing changes for them by hand.
+
+**Figures.** The sweep before is the depot's (6 / 4 / 1 / 9, collapses 60; the Prospectors' Fund
+at the end median 1231 of 2500 in the first seating); the sweep after is in the diary, the
+Prospectors' wins and Fund the figures to watch.

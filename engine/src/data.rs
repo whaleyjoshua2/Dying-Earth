@@ -59,6 +59,9 @@ pub struct BodyCard {
     /// Ticket #92 (version 0.06.0): a small world, where a Mass Driver may stand.
     #[serde(default)]
     pub low_gravity: bool,
+    /// Ticket #397 (version 0.09.3): what a Trade Post anywhere is paid a turn for its Faction
+    /// holding this Body, by distance from Earth; a flat figure for every Body before.
+    pub trade_pays: f64,
     pub mine_yield: f64,
     pub generator_yield: f64,
     pub refinery_yield: f64,
@@ -1450,13 +1453,6 @@ pub struct InSituCard {
     pub floor: f64,
 }
 
-/// Ticket #90 (version 0.06.0): the Trade Post's network figure, Ducats for every other Body the
-/// Faction holds; the per-Colonist figure is the row's `produces.amount`.
-#[derive(Debug, Clone, Deserialize)]
-pub struct TradePostCard {
-    pub per_other_body: i64,
-}
-
 #[derive(Debug, Clone, Deserialize)]
 struct ModulesFile {
     module: Vec<ModuleCard>,
@@ -1464,7 +1460,6 @@ struct ModulesFile {
     archive: ArchiveCard,
     observatory: ObservatoryCard,
     in_situ: InSituCard,
-    trade_post: TradePostCard,
     mass_driver: MassDriverCard,
 }
 /// Ticket #295 (version 0.08.6): the disengage roll's figure, in data at last. After every round a
@@ -1812,8 +1807,6 @@ pub struct Tables {
     pub observatory: ObservatoryCard,
     /// Ticket #88: the discount a Colony's working Mines give its Modules.
     pub in_situ: InSituCard,
-    /// Ticket #90: the Trade Post's network figure.
-    pub trade_post: TradePostCard,
     /// Ticket #92: the Mass Driver's Fuel cut and Mine bonus.
     pub mass_driver: MassDriverCard,
     pub units: Vec<UnitCard>,
@@ -1941,7 +1934,6 @@ impl Tables {
             archive: modules.archive,
             observatory: modules.observatory,
             in_situ: modules.in_situ,
-            trade_post: modules.trade_post,
             mass_driver: modules.mass_driver,
             modules: modules.module,
             units: units.unit,

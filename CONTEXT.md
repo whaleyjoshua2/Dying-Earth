@@ -265,7 +265,7 @@ The Facility that makes Ducats in a Region, in proportion to the state's GDP. Si
 _Avoid_: treasury, mint, exchange
 
 **Trade Post**:
-The Module that makes Ducats off Earth. Since version 0.06.0 trade is a network: a Trade Post pays for every Colonist of its Faction at its Body and for every other Body where the Faction holds a Colony, a Space Station or, on Earth, a Region, so it pays for the shape of an empire rather than its size. One per Faction per Body, on the ground or on a station.
+The Module that makes Ducats off Earth. Since version 0.06.0 trade is a network: a Trade Post pays for every Colonist of its Faction at its Body and for every other Body where the Faction holds a Colony, a Space Station or, on Earth, a Region, so it pays for the shape of an empire rather than its size. Since version 0.09.3 each Body held pays by its distance from Earth, wherever the Trade Post stands (Earth 3, the Moon 3.5, Venus 4, Mars 5, Phobos and Deimos 6 Ducats a turn), where every Body paid a flat 3 before: a money reason to go far. One per Faction per Body, on the ground or on a station.
 _Avoid_: market, exchange, shop
 
 **Embassy**:

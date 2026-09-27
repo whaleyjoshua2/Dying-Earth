@@ -46,6 +46,10 @@ first_windfall = 0
 # Its Colonists live on Earth (no Off-world Presence) and its Modules emit like Facilities.
 transit_turns = 0
 transit_fuel = 0
+# Ticket #397 (version 0.09.3): what a Trade Post anywhere is paid a turn for the Faction holding
+# this Body (a Colony, a station or, on Earth, a Region), by its distance from Earth: the designer's
+# Earth 3, the Moon 3.5, Venus 4, Mars 5, Phobos 6, Deimos 6, where a flat 3 stood for every Body.
+trade_pays = 3
 # Ticket #56 (version 0.05): abundant ore and Fuel under the ice, and Habitats that work as well as
 # anywhere. The slots stay shut until the Temperature has stood at antarctica_opens_at (climate.toml).
 mine_yield = 1.75
@@ -71,6 +75,7 @@ local_turns = 1
 local_fuel = 6
 transit_turns = 1
 transit_fuel = 6
+trade_pays = 3.5
 # Ticket #72 (version 0.05.5): all four up a tenth (1.5, 1.25, 0.5, 1.0 before).
 mine_yield = 1.65
 generator_yield = 1.375
@@ -91,6 +96,7 @@ name = "Mars"
 first_windfall = 15
 transit_turns = 4
 transit_fuel = 20
+trade_pays = 5
 mine_yield = 1.25
 generator_yield = 0.75
 refinery_yield = 1.5
@@ -119,6 +125,7 @@ local_turns = 1
 local_fuel = 2
 transit_turns = 5
 transit_fuel = 24
+trade_pays = 6
 mine_yield = 1.75
 generator_yield = 0.75
 refinery_yield = 0.5
@@ -140,6 +147,7 @@ local_turns = 1
 local_fuel = 2
 transit_turns = 5
 transit_fuel = 24
+trade_pays = 6
 mine_yield = 1.0
 generator_yield = 1.0
 refinery_yield = 0.25
@@ -163,6 +171,7 @@ name = "Venus"
 first_windfall = 0
 transit_turns = 3
 transit_fuel = 16
+trade_pays = 4
 mine_yield = 1.0
 generator_yield = 1.0
 refinery_yield = 1.0
