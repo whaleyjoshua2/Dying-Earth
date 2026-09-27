@@ -50,9 +50,26 @@ everything every card wants.
 - `a_seat_the_card_cannot_reach_is_told_why_and_that_neither_side_applied`: red with the old
   *"The Custodians had nothing to decide."* line and no reason; green after.
 
-One existing test that asserted the old line moved to the reason, marked with the ticket. The suite
-is 518 in the engine, 8 and 6 in the root crate; the clippy gate
+One existing test that asserted the old line moved to the reason, marked with the ticket. After the
+review two more: `a_card_is_put_back_once_a_turn_and_a_deck_of_one_gives_it_back` in the engine,
+and `the_players_passed_by_line_is_found_as_the_players_answer` in the root crate, red at *left
+Some((GroundedFleet, None)), right Some((GroundedFleet, Some(Seat(0))))* against the old seat test,
+green after. The suite is 519 in the engine, 9 and 6 in the root crate; the clippy gate
 `cargo clippy --workspace --release --all-targets -- -D warnings` is clean.
+
+## The review
+
+Two axes, standards and spec. **One defect**, which the pictures could not show because the
+fixture's player has everything every card wants: the Report window finds a card line's seat by
+the Faction's name, and the player's new line names none (*You have no Ship …*), so it fell out of
+the answers block into a bare line under Your works. The window now takes a second-person line for
+the player's; a test in the root crate witnessed it red. Also from the review: the reach test and
+the reason were two matches over the same effects, merged into one (`card_effect_lack`, which the
+draw decides by and the Report explains by); the line's voice chosen by the same test the Report
+files the line under; the driver's line made the Report's line word for word; the once-a-turn rule
+and the one-card case, which the first witness did not prove, stated in the spec and witnessed by a
+second test; the glossary's Event Deck entry, which still said every drawn card is spent; the
+sweep's not-asked counter's doc.
 
 ## The sweep
 

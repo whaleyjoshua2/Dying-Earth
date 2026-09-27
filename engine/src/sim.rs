@@ -107,6 +107,8 @@ pub struct SimResult {
     /// the third being the cards neither of whose sides reached its board.
     pub choice_taken: [u32; SEAT_COUNT],
     pub choice_refused: [u32; SEAT_COUNT],
+    /// Ticket #388 (version 0.09.3): counted per card DRAWN; a card that reached nobody at the table
+    /// and went back to the bottom unspent counts for no seat.
     pub choice_not_asked: [u32; SEAT_COUNT],
     pub coastal_slots_lost: u32,
     pub facilities_drowned: u32,

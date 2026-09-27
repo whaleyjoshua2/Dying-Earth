@@ -252,18 +252,7 @@ impl Game {
     /// draw decided by. Nothing where the card reaches the seat.
     pub fn card_lack(&self, id: EventId, seat: Seat) -> Option<String> {
         let c = self.tables.event(id).choice.as_ref()?;
-        let e = c.take_does.iter().chain(c.refuse_does.iter()).find(|e| !self.card_effect_has_target(e, seat))?;
-        let t = &self.tables;
-        Some(match e {
-            CardEffect::PerUnitCost { per: CardThing::Facility(kind), .. } | CardEffect::FacilityOutputMultiplier { facility: kind, .. } => self.say("lack_facility", &[("facility", t.facility(*kind).name.clone())]),
-            CardEffect::PerUnitCost { per: CardThing::ShipInOrbit, .. } | CardEffect::DamageShips { in_orbit: true, .. } => self.say("lack_ship_in_orbit", &[]),
-            CardEffect::HoldShips | CardEffect::HoldOneShip | CardEffect::DamageShips { .. } => self.say("lack_ship", &[]),
-            CardEffect::StandingAllHeld { .. } | CardEffect::UnrestAllHeld { .. } => self.say("lack_region", &[]),
-            CardEffect::UnrestAtBusiest { .. } | CardEffect::WidgetsNow { .. } => self.say("lack_busy_region", &[]),
-            CardEffect::DiscoveryAtColony { module, .. } => self.say("lack_colony_module", &[("module", t.module(*module).name.clone())]),
-            CardEffect::FreeBuilding { module: Some(k), army: false } => self.say("lack_colony_room", &[("module", t.module(*k).name.clone())]),
-            _ => self.say("lack_populated_region", &[]),
-        })
+        c.take_does.iter().chain(c.refuse_does.iter()).find_map(|e| self.card_effect_lack(e, seat))
     }
 
     /// Ticket #337: whether this seat could PAY for the card's offer, which is a different question
@@ -321,31 +310,41 @@ impl Game {
     /// asked about here: whether the seat can PAY is `card_effect_affordable`, and a seat that
     /// cannot pay is still asked the card.
     fn card_effect_has_target(&self, e: &CardEffect, seat: Seat) -> bool {
+        self.card_effect_lack(e, seat).is_none()
+    }
+
+    /// Ticket #388 (version 0.09.3): ONE test of whether an effect has something of the seat's to
+    /// land on, answering with what the seat LACKS when it has not -- a `lack_*` phrase from
+    /// `report.toml` -- and nothing when it has. The draw decides by it (`card_effect_has_target`)
+    /// and the Report explains by it (`card_lack`), so the two can never disagree.
+    fn card_effect_lack(&self, e: &CardEffect, seat: Seat) -> Option<String> {
+        let t = &self.tables;
+        let lacks = |has: bool, key: &str, args: &[(&str, String)]| if has { None } else { Some(self.say(key, args)) };
         match e {
-            CardEffect::Resources { .. } => true,
-            CardEffect::PerUnitCost { per, .. } => self.card_things(seat, *per) > 0,
-            CardEffect::PopulationToMostPopulous { .. } | CardEffect::StandingAtMostPopulous { .. } | CardEffect::UnrestAtMostPopulous { .. } | CardEffect::PioneersFree { .. } => {
-                self.card_most_populous(seat).is_some()
+            CardEffect::Resources { .. } | CardEffect::EmissionsNext { .. } | CardEffect::TradePrice { .. } | CardEffect::RelationsAllRivals { .. } | CardEffect::BlamePpm { .. } => None,
+            CardEffect::PerUnitCost { per: CardThing::Facility(kind), .. } => lacks(self.card_things(seat, CardThing::Facility(*kind)) > 0, "lack_facility", &[("facility", t.facility(*kind).name.clone())]),
+            CardEffect::PerUnitCost { per: CardThing::ShipInOrbit, .. } => lacks(self.card_things(seat, CardThing::ShipInOrbit) > 0, "lack_ship_in_orbit", &[]),
+            CardEffect::PopulationToMostPopulous { .. } | CardEffect::StandingAtMostPopulous { .. } | CardEffect::UnrestAtMostPopulous { .. } | CardEffect::PioneersFree { .. } | CardEffect::FreeBuilding { army: true, .. } => {
+                lacks(self.card_most_populous(seat).is_some(), "lack_populated_region", &[])
             }
-            CardEffect::StandingAllHeld { .. } | CardEffect::UnrestAllHeld { .. } => !self.controlled_states(seat).is_empty(),
-            CardEffect::UnrestAtBusiest { .. } | CardEffect::WidgetsNow { .. } => self.card_busiest(seat).is_some(),
-            CardEffect::EmissionsNext { .. } | CardEffect::TradePrice { .. } | CardEffect::RelationsAllRivals { .. } | CardEffect::BlamePpm { .. } => true,
-            CardEffect::HoldShips | CardEffect::HoldOneShip => self.ships.iter().any(|s| s.seat == seat),
-            CardEffect::DamageShips { in_orbit, .. } => self.ships.iter().any(|s| s.seat == seat && (!in_orbit || matches!(s.at, ShipAt::Body(_)))),
-            CardEffect::FacilityOutputMultiplier { facility, .. } => self
-                .directed_states(seat)
-                .iter()
-                .any(|sid| self.state(*sid).facilities.iter().any(|f| f.kind.does_the_job_of(*facility))),
-            CardEffect::DiscoveryAtColony { module, .. } => self.card_discovery_body(seat, *module).is_some(),
-            CardEffect::FreeBuilding { module, army } => {
-                if *army {
-                    self.card_most_populous(seat).is_some()
-                } else if let Some(k) = module {
-                    self.card_smallest_colony(seat, *k).is_some()
-                } else {
-                    false
-                }
-            }
+            CardEffect::StandingAllHeld { .. } | CardEffect::UnrestAllHeld { .. } => lacks(!self.controlled_states(seat).is_empty(), "lack_region", &[]),
+            CardEffect::UnrestAtBusiest { .. } | CardEffect::WidgetsNow { .. } => lacks(self.card_busiest(seat).is_some(), "lack_busy_region", &[]),
+            CardEffect::HoldShips | CardEffect::HoldOneShip => lacks(self.ships.iter().any(|s| s.seat == seat), "lack_ship", &[]),
+            CardEffect::DamageShips { in_orbit, .. } => lacks(
+                self.ships.iter().any(|s| s.seat == seat && (!in_orbit || matches!(s.at, ShipAt::Body(_)))),
+                if *in_orbit { "lack_ship_in_orbit" } else { "lack_ship" },
+                &[],
+            ),
+            CardEffect::FacilityOutputMultiplier { facility, .. } => lacks(
+                self.directed_states(seat).iter().any(|sid| self.state(*sid).facilities.iter().any(|f| f.kind.does_the_job_of(*facility))),
+                "lack_facility",
+                &[("facility", t.facility(*facility).name.clone())],
+            ),
+            CardEffect::DiscoveryAtColony { module, .. } => lacks(self.card_discovery_body(seat, *module).is_some(), "lack_colony_module", &[("module", t.module(*module).name.clone())]),
+            CardEffect::FreeBuilding { module: Some(k), army: false } => lacks(self.card_smallest_colony(seat, *k).is_some(), "lack_colony_room", &[("module", t.module(*k).name.clone())]),
+            // A free building that is neither a Module nor an Army names nothing to give; no card in
+            // the data is written so, and one that were would reach nobody.
+            CardEffect::FreeBuilding { module: None, army: false } => Some(self.say("lack_region", &[])),
         }
     }
 
@@ -511,7 +510,9 @@ impl Game {
                 let lack = self.card_lack(q.card, seat).unwrap_or_else(|| CardAnswer::NothingToDecide.word().to_string());
                 // Capitalised, as the answers are: the Report draws the four together under the
                 // card's name and takes the "{card}: " off the front of each.
-                let (who, them) = if self.seat(seat).ai || self.spectator { (format!("The {}", self.seat_name(seat)), "them".to_string()) } else { ("You".to_string(), "you".to_string()) };
+                // The player's own line is second person, by the same test `line_kind_of` files it under
+                // Your works by: seat 0, and nobody's when the computer plays all four.
+                let (who, them) = if seat == Seat(0) && !self.spectator { ("You".to_string(), "you".to_string()) } else { (format!("The {}", self.seat_name(seat)), "them".to_string()) };
                 let text = self.say("card_passed_by", &[("card", name.clone()), ("who", who), ("lack", lack), ("them", them)]);
                 self.report_line_of(seat, LineKind::YourWorks, LineKind::Card, None, text);
             }

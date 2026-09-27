@@ -153,7 +153,9 @@ could not answer, and a Report line with no reason.
 **A card that reaches no seat at all is put back.** When the Question phase draws a Choice Card
 that neither side can reach for any of the four seats, the card goes to the **bottom of the deck
 unspent** and the next card is the turn's draw, whatever it is; once a turn, so the deck cannot
-loop. The Report says so in one line: *"Orbital Debris reached nobody at the table and went to the
+loop, and a second unreachable card in a row is drawn and passes everyone by. When the deck holds
+only that one card it comes straight back up and is drawn the same way. The Report says so in one
+line: *"Orbital Debris reached nobody at the table and went to the
 bottom of the deck unspent; the next card was drawn."* A card that reaches a rival but not the
 player is **still drawn**, and the rival is asked.
 

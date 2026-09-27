@@ -16334,3 +16334,40 @@ fn a_seat_the_card_cannot_reach_is_told_why_and_that_neither_side_applied() {
     assert!(!g.report.lines.iter().any(|l| l.text.contains("had nothing to decide")), "the old blank line is gone: {:?}", g.report.lines);
     assert_eq!(g.state(StateId::Europe).unrest, europe, "and nothing was applied to the player");
 }
+
+/// Ticket #388 (the review's finding): **the put-back happens once a turn, and a deck of one card
+/// gives that card back.** Two cards nobody can reach, the Deep Survey over Orbital Debris: the
+/// Survey goes to the bottom, the Debris is drawn and passes every seat by, and the Survey is not
+/// put back a second time. A deck holding only the Survey draws the Survey.
+#[test]
+fn a_card_is_put_back_once_a_turn_and_a_deck_of_one_gives_it_back() {
+    let mut g = game();
+    g.ships.clear();
+    g.colonies.retain(|c| c.in_orbit);
+    stand_on_a_drawing_turn(&mut g);
+    for _ in 0..200 {
+        g.deck.cards = vec![Card::Event(EventId::OrbitalDebris), Card::Event(EventId::DeepSurvey)];
+        g.deck.drawn.clear();
+        g.report.lines.clear();
+        g.question_phase();
+        if g.draw != CardDraw::NoCard {
+            break;
+        }
+    }
+    assert_eq!(g.draw, CardDraw::Choice(EventId::OrbitalDebris), "the second unreachable card is drawn all the same");
+    assert_eq!(g.deck.cards, vec![Card::Event(EventId::DeepSurvey)], "the Survey went to the bottom, once");
+    assert_eq!(g.report.lines.iter().filter(|l| l.text.contains("bottom of the deck")).count(), 1, "one put-back line: {:?}", g.report.lines);
+    let q = g.pending_question().expect("the Debris is the question");
+    assert!(Seat::ALL.into_iter().all(|s| q.answer_of(s) == Some(CardAnswer::NothingToDecide)), "and passes everyone by");
+    // A deck of one.
+    for _ in 0..200 {
+        g.deck.cards = vec![Card::Event(EventId::DeepSurvey)];
+        g.deck.drawn.clear();
+        g.question_phase();
+        if g.draw != CardDraw::NoCard {
+            break;
+        }
+    }
+    assert_eq!(g.draw, CardDraw::Choice(EventId::DeepSurvey), "it comes straight back up");
+    assert!(g.deck.cards.is_empty(), "and the deck is spent");
+}

@@ -10159,12 +10159,16 @@ fn card_effect_text(e: &CardEffect) -> String {
 /// which open with the card's name, and an answer names the Faction that gave it. So a line is the
 /// card's if it opens with the name of a card that asks, and an answer if a Faction is named in it:
 /// no card is named for a Faction and no Faction for a card, so neither test can catch the other's.
-fn card_report_line(game: &Game, text: &str) -> Option<(EventId, Option<Seat>)> {
+pub(crate) fn card_report_line(game: &Game, text: &str) -> Option<(EventId, Option<Seat>)> {
     let id = EventId::ALL.into_iter().find(|id| {
         let card = game.tables.event(*id);
         card.asks() && text.strip_prefix(card.name.as_str()).map(|rest| rest.starts_with(": ")).unwrap_or(false)
     })?;
-    Some((id, Seat::ALL.into_iter().find(|s| text.contains(&game.seat_name(*s)))))
+    let rest = &text[game.tables.event(id).name.len() + 2..];
+    // Ticket #388 (version 0.09.3): the player's own line for a card that passed them by is second
+    // person ("You have no Ship, so it passed you by") and names no Faction; it is seat 0's.
+    let seat = Seat::ALL.into_iter().find(|s| text.contains(&game.seat_name(*s))).or_else(|| (!game.spectator && rest.starts_with("You ")).then_some(Seat(0)));
+    Some((id, seat))
 }
 
 /// Ticket #337: whether a Report line is one seat's answer to the turn's Choice Card.
@@ -10811,8 +10815,9 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                     // Ticket #337 (version 0.09.0): **what the table answered**, the four seats
                     // together, each in its Faction's colour, immediately above what the rivals
                     // did -- which is where a player is already looking for news of them. A seat
-                    // neither side of the card could reach is here too, saying it had nothing to
-                    // decide, so a small Faction is never passed over in silence.
+                    // neither side of the card could reach is here too, saying why it passed them
+                    // by (ticket #388, version 0.09.3), so a small Faction is never passed over in
+                    // silence.
                     let answers = card_answers(game);
                     if let Some((card, _, _)) = answers.first() {
                         ui.label(RichText::new(format!("{}: what the table answered", game.tables.event(*card).name)).strong());

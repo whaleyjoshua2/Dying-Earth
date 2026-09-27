@@ -696,7 +696,7 @@ fn print_question(g: &Game) {
     // Ticket #388 (version 0.09.3): a card that cannot reach this seat is not spelled out side by
     // side, since there is nothing to answer; it says why it passed you by and stops.
     if q.answer_of(me) == Some(CardAnswer::NothingToDecide) {
-        println!("  It passed you by: you {}, so neither side applies to you. No `answer` line is needed.", g.card_lack(q.card, me).unwrap_or_else(|| "had nothing to decide".to_string()));
+        println!("  You {}, so it passed you by; neither side applied. No `answer` line is needed.", g.card_lack(q.card, me).unwrap_or_else(|| "had nothing to decide".to_string()));
         return;
     }
     // Ticket #375 (version 0.09.2): a card that holds a Ship names the one it would hold.
