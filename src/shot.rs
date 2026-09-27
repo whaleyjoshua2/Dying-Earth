@@ -1358,6 +1358,25 @@ fn build_board(session: &mut Session) {
             m.online = false;
         }
     }
+    // Ticket #399 (version 0.09.3): `foe:low` and `foe:ring` (building aids): a Frigate of seat 0's
+    // in Mars's low orbit, and one of seat 1's in the same orbit (`low`) or in the first station's
+    // ring (`ring`), so a Frigate's own card can be photographed with an Attack it may give and
+    // with one the engine refuses; every other hull at Mars is cleared. `stack:1 ship:1` opens
+    // the Frigate's card.
+    if let Some(where_) = std::env::args().find_map(|a| a.strip_prefix("foe:").map(str::to_owned))
+        && let Some(g) = session.game.as_mut()
+    {
+        // Every other hull at Mars is cleared, the unarmed ones too: an unarmed rival in low orbit
+        // is a target an Attack may be given against, which would spoil the `ring` picture.
+        g.ships.retain(|s| s.at != ShipAt::Body(BodyId::Mars));
+        let rival_slot = if where_ == "ring" { Some(0) } else { None };
+        for (seat, slot) in [(Seat(0), None), (Seat(1), rival_slot)] {
+            let id = ShipId(g.fresh_id());
+            let name = g.next_ship_name(UnitKind::Frigate);
+            let built_turn = g.turn;
+            g.ships.push(Ship { id, name, kind: UnitKind::Frigate, seat, damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: 30.0, slot });
+        }
+    }
     // Ticket #398 (version 0.09.3): `yard:1` (a building aid): seat 0's first ground Colony gains a
     // working Mine and a Shipyard, so the Build Where You Dig note and the Ship buttons at a
     // low-gravity yard's price can be photographed; with `first:1 hab:ground` that is the Moon. The

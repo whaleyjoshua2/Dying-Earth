@@ -7666,6 +7666,57 @@ fn slot_panel(ui: &mut Ui, session: &Session, game: &Game, body: BodyId, slot: u
 /// per orbit (open by default, each row opening the Ship's card), the stance, Attack, the
 /// whole-stack moves under one drop-down per Body, and Influence on the Colonies here. Everything
 /// else went to `ship_panel`.
+/// Ticket #399 (version 0.09.3): **the stack's stance and its Attack, on the stack card and on
+/// every warship's own card** -- the designer: *"would appear there is no actual way to order a
+/// frigate or battle ship to attack now that each ship has its own card."* The order is the
+/// stack's, keyed by Body, and stays so; a Ship's card says so in its heading and offers it. The
+/// Attack button asks the engine's own question (`attack_has_a_target`, a rival in an orbit one of
+/// the seat's Ships holds) where the stack card asked a Body-wide one, which showed the button with
+/// the rival in another orbit and left the confirm to be refused; greyed, the button's hover
+/// carries the refusal, as every refusal has since ticket #380.
+#[allow(clippy::too_many_arguments)]
+fn attack_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, body: BodyId, ships: &[&Ship], on_ship_card: bool, actions: &mut Vec<Action>) {
+    let seat = Seat(0);
+    if on_ship_card {
+        ui.label(RichText::new(format!("The stack's stance and Attack: all {} Ship(s) of yours at {}", ships.len(), game.tables.body(body).name)).strong());
+    }
+    stance_row(ui, game, &session.pending, ships[0].stance, |s| Order::ShipStance { body, stance: s }, true, actions);
+    // Ticket #346 (version 0.09.1): the two sums an Attack is weighed with, at the strength the
+    // Battle would actually be fought at on both sides.
+    let enemy = fighting_enemy_strength(game, seat, body);
+    let enemy_ships: usize = seat.others().iter().map(|s| game.ships_at(*s, body).len()).sum();
+    if enemy > 0 || enemy_ships > 0 {
+        let mine = fighting_stack_strength(game, seat, body);
+        // Ticket #50: name every Faction with Ships here; the attack is against all of them at once.
+        let rivals = rivals_at(game, seat, body);
+        ui.label(format!("Against {} ({} in all). Your strength at the Body: {mine}.", rivals_text(game, &rivals), enemy));
+        // Ticket #339 (version 0.09.0): the odds of each Battle an Attack here would start, one
+        // per orbit, and the whole Battle's rather than its first round's.
+        orbit_odds_lines(ui, game, body);
+        let attack = Order::ShipStance { body, stance: Stance::Attack };
+        let check = game.check_order(seat, &session.pending, &attack);
+        let label = if on_ship_card { format!("Attack with all {} Ship(s) at {}", ships.len(), game.tables.body(body).name) } else { "Attack this turn".to_string() };
+        let mut button = ui.add_enabled(check.is_ok(), egui::Button::new(label));
+        button = rule_tip(button, match &check {
+            Ok(_) => ATTACK_FIGHTS_NOW.to_string(),
+            Err(e) => refusal_hover(&e.0, Some(ATTACK_FIGHTS_NOW)),
+        });
+        if button.clicked() {
+            view.attack_preview = true;
+        }
+        if view.attack_preview && check.is_ok() {
+            ui.label(format!("Your {} Ship(s) (strength {}) against {} Ship(s) of {} (strength {} in all). Confirm?", ships.len(), mine, enemy_ships, rivals_text(game, &rivals), enemy));
+            // Ticket #383 (version 0.09.2): the point of no return, and it says so: the Battle is
+            // fought the moment the button is pressed, on the board as it stands.
+            ui.label(RichText::new("The Battle is fought the moment you confirm, on the board as it stands; it cannot be taken back.").weak());
+            if ui.button("Confirm Attack: fought now").clicked() {
+                actions.push(Action::Attack(body));
+                view.attack_preview = false;
+            }
+        }
+    }
+}
+
 fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, body: BodyId, seat: Seat, actions: &mut Vec<Action>) {
     let ships: Vec<&Ship> = game.ships.iter().filter(|s| s.seat == seat && s.at == ShipAt::Body(body)).collect();
     ui.horizontal(|ui| {
@@ -7716,33 +7767,7 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         return;
     }
     ui.separator();
-    stance_row(ui, game, &session.pending, ships[0].stance, |s| Order::ShipStance { body, stance: s }, true, actions);
-    // Ticket #346 (version 0.09.1): the two sums an Attack is weighed with, at the strength the
-    // Battle would actually be fought at on both sides.
-    let enemy = fighting_enemy_strength(game, seat, body);
-    let enemy_ships: usize = seat.others().iter().map(|s| game.ships_at(*s, body).len()).sum();
-    if enemy > 0 || enemy_ships > 0 {
-        let mine = fighting_stack_strength(game, Seat(0), body);
-        // Ticket #50: name every Faction with Ships here; the attack is against all of them at once.
-        let rivals = rivals_at(game, seat, body);
-        ui.label(format!("Against {} ({} in all). Your strength at the Body: {mine}.", rivals_text(game, &rivals), enemy));
-        // Ticket #339 (version 0.09.0): the odds of each Battle an Attack here would start, one
-        // per orbit, and the whole Battle's rather than its first round's.
-        orbit_odds_lines(ui, game, body);
-        if ui.button("Attack this turn").clicked() {
-            view.attack_preview = true;
-        }
-        if view.attack_preview {
-            ui.label(format!("Your {} Ship(s) (strength {}) against {} Ship(s) of {} (strength {} in all). Confirm?", ships.len(), mine, enemy_ships, rivals_text(game, &rivals), enemy));
-            // Ticket #383 (version 0.09.2): the point of no return, and it says so: the Battle is
-            // fought the moment the button is pressed, on the board as it stands.
-            ui.label(RichText::new("The Battle is fought the moment you confirm, on the board as it stands; it cannot be taken back.").weak());
-            if ui.button("Confirm Attack: fought now").clicked() {
-                actions.push(Action::Attack(body));
-                view.attack_preview = false;
-            }
-        }
-    }
+    attack_block(ui, session, game, view, body, &ships, false, actions);
     // Ticket #322 (version 0.08.8): one button moves every Ship of the stack that can pay the leg.
     // Ticket #374: those buttons are the ONLY move buttons here now; a hull on its own is moved from
     // its card, one row up.
@@ -7973,8 +7998,16 @@ fn ship_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
         ShipAt::Body(b) => {
             // Ticket #313 (version 0.08.7): the stance, with its sentence on the hover, and the
             // orbit -- the stance is the STACK'S, set on the stack card, and the line says so.
+            // Ticket #399 (version 0.09.3): a warship's card sets the stance and gives the Attack
+            // below, so the hover sends nobody to the stack card for those.
+            let fighter = !session.spectator && s.seat == Seat(0) && (s.kind.is_warship() || s.kind == UnitKind::MissileCarrier);
+            let where_set = if fighter { "set below, for the whole stack" } else { "set on the stack card or on a warship's card" };
             ui.label(format!("{}, on {}", capitalised(&orbit_phrase(game, b, game.ship_orbit(s))), s.stance.name()))
-                .on_hover_text(format!("{} {} The stance is the whole stack's, set on the stack card.", s.stance.one_liner(true), Stance::PERSISTS));
+                .on_hover_text(format!("{} {} The stance is the whole stack's, {where_set}.", s.stance.one_liner(true), Stance::PERSISTS));
+            if fighter {
+                let stack: Vec<&Ship> = game.ships.iter().filter(|x| x.seat == Seat(0) && x.at == ShipAt::Body(b)).collect();
+                attack_block(ui, session, game, view, b, &stack, true, actions);
+            }
         }
         ShipAt::Transit { from, to, turns_left } => {
             // The Resolution that lands it: this turn's if one turn is left, else that many turns

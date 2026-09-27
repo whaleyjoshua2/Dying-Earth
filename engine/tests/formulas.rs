@@ -16840,3 +16840,21 @@ fn a_computer_seat_wants_a_rivals_fat_colony_more_than_its_lean_one() {
     g.colony_mut(neutral).unwrap().control = Control::Neutral;
     assert!((g.ai_bounty(neutral) - 1.0).abs() < 1e-9, "a place nobody directs");
 }
+
+/// Ticket #399 (version 0.09.3): **the Attack button asks the engine's own question.** An Attack
+/// at a Body has a target only where a rival Ship or working Battery shares an orbit with one of
+/// the seat's Ships: a rival in the station's ring while the seat's Frigate sits in low orbit is
+/// no target, and the order is refused, where the stack card's Body-wide test showed the button.
+#[test]
+fn an_attack_has_a_target_only_in_an_orbit_the_seat_shares_with_a_rival() {
+    let mut g = game();
+    let mine = ship_in(&mut g, Seat(0), UnitKind::Frigate, BodyId::Mars, None, Stance::Hold);
+    let rival = ship_in(&mut g, Seat(1), UnitKind::Frigate, BodyId::Mars, Some(0), Stance::Hold);
+    let attack = Order::ShipStance { body: BodyId::Mars, stance: Stance::Attack };
+    assert!(!g.attack_has_a_target(Seat(0), BodyId::Mars), "a rival in the ring, mine in low orbit: nothing to fight");
+    assert!(g.check_order(Seat(0), &[], &attack).is_err(), "and the order is refused");
+    g.ship_mut(rival).unwrap().slot = None;
+    assert!(g.attack_has_a_target(Seat(0), BodyId::Mars), "the same orbit: a target");
+    assert!(g.check_order(Seat(0), &[], &attack).is_ok(), "and the order stands");
+    let _ = mine;
+}

@@ -471,3 +471,26 @@ a lean Colony of two is the least, 1. The sweep before is the Trade Post's (6 / 
 after is in the diary, with the set-aside shapes' sweeps beside it: with the least at 0 the computer took fewer
 Colonies (1 / 0 / 5 / 5 by seating), since its own lean places fell under the 1 they had, which is
 why the least is 1.
+
+## 15. Attack from a Ship's own card
+
+The authority is [ticket #399](https://github.com/whaleyjoshua2/Dying-Earth/issues/399). No rule
+moves. The designer: *"would appear there is no actual way to order a frigate or battle ship to
+attack now that each ship has its own card."*
+
+**Where Attack lives** (Q1, A). The Attack is the stack's stance, keyed by Body, and stays so. It is
+offered on the stack card as before, and now **on a warship's own card too**: a Frigate's, a
+Battleship's or a Missile Carrier's card of the player's, at a Body, carries the stack's stance row
+and the Attack block under its orbit line, headed *The stack's stance and Attack: all N Ship(s) of
+yours at the Moon*, the button reading *Attack with all N Ship(s) at the Moon*, and acting on the
+Body exactly as the stack card's does. The roster opens the Ship card, so a player who reaches a
+Frigate that way can attack from it.
+
+**A Ship with no weapons** (Q2, B): a Colony Ship's or a Carrier's card carries no stance row and no
+Attack; its stance line's hover says where the stance is set.
+
+**The button's condition.** The button asks the engine's own question, whether a rival Ship or a
+working Battery shares an orbit with one of the seat's Ships (`attack_has_a_target`), where the
+stack card asked a Body-wide one and could show a button whose confirm was then refused. Greyed,
+the button's hover carries the refusal, as every refusal has since 0.09.2; the preview and confirm
+appear only when the order would stand.

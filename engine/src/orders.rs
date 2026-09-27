@@ -2077,8 +2077,10 @@ impl Game {
 
     /// Ticket #383: whether an Attack at this Body has anything to fight -- a rival Ship or a rival
     /// working Battery in some orbit the seat holds a Ship in. The "Attack this turn" button hides
-    /// itself on the same condition; the order is refused on it.
-    pub(crate) fn attack_has_a_target(&self, seat: Seat, body: BodyId) -> bool {
+    /// itself on the same condition; the order is refused on it. Ticket #399 (version 0.09.3):
+    /// public, so the button asks this rather than its own Body-wide test, which showed the button
+    /// with the rival in another orbit and left the confirm to be refused.
+    pub fn attack_has_a_target(&self, seat: Seat, body: BodyId) -> bool {
         self.orbits_of(body).into_iter().any(|orbit| {
             self.ships.iter().any(|s| s.seat == seat && self.ship_in_orbit(s, body, orbit) && !s.escaped)
                 && (self.ships.iter().any(|s| s.seat != seat && self.ship_in_orbit(s, body, orbit) && !s.escaped)
