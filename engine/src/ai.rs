@@ -810,34 +810,44 @@ impl Game {
     /// turn -- the Output row's figures summed, Energy only where it makes more than it eats.
     pub fn ai_place_size(&self, cid: ColonyId) -> f64 {
         let Some(col) = self.colony(cid) else { return 0.0 };
-        let output = self.place_output(Place::Colony(cid)).map(|o| o.materials + o.widgets + o.fuel + o.energy.max(0.0) + o.ducats + o.research).unwrap_or(0.0);
-        col.colonists as f64 + output
+        col.colonists as f64 + self.place_output(Place::Colony(cid)).map(|o| o.made()).unwrap_or(0.0)
     }
 
-    /// Ticket #394 (version 0.09.3): **the prize a rival's Colony or station is**, rescaled to the
-    /// board at the designer's word: `prize_top` x its size / the largest size any directed place
-    /// has, never dividing by less than `prize_floor` -- so the fattest outpost on the board is the
+    /// Ticket #394 (version 0.09.3): the largest size any directed Colony or station on the board
+    /// has, computed once a plan (the review's fix-up: computing it inside every bounty walked every
+    /// place's yields once per rival Colony, R x D x Y a plan).
+    pub fn ai_board_largest_size(&self) -> f64 {
+        self.colonies.iter().filter(|c| c.control.director().is_some()).map(|c| self.ai_place_size(c.id)).fold(0.0, f64::max)
+    }
+
+    /// Ticket #394 (version 0.09.3): **the bounty a rival's Colony or station is**, rescaled to the
+    /// board at the designer's word: `bounty_top` x its size / the largest size any directed place
+    /// has, never dividing by less than `bounty_floor` -- so the fattest Colony or station on the board is the
     /// top once anything has reached the floor, and every other place is measured against it. The
     /// designer's counter to a player who founds one place and simply loads people and builds on
     /// it: the computer's appetite to take it grows with it. Multiplies the price rank of spending
     /// Influence on it and the base weight of landing an Army at it; 1 for a place nobody directs.
     /// Linear in the size, with no "1 +": measured with 1 + 0.05 x size the price term (80 / a price
-    /// that grows 20 a Colonist) fell faster than the prize rose, and a Colony of eight people and
+    /// that grows 20 a Colonist) fell faster than the bounty rose, and a Colony of eight people and
     /// three Modules still ranked below one of two people and nothing built.
-    pub fn ai_prize(&self, cid: ColonyId) -> f64 {
+    pub fn ai_bounty(&self, cid: ColonyId) -> f64 {
+        self.ai_bounty_against(cid, self.ai_board_largest_size())
+    }
+
+    /// The bounty with the board's largest size already in hand, for the planner's loops.
+    fn ai_bounty_against(&self, cid: ColonyId, largest: f64) -> f64 {
         let m = &self.tables.ai.multipliers;
         let Some(col) = self.colony(cid) else { return 1.0 };
         if col.control.director().is_none() {
             return 1.0;
         }
-        let largest = self.colonies.iter().filter(|c| c.control.director().is_some()).map(|c| self.ai_place_size(c.id)).fold(0.0, f64::max);
-        (m.prize_top * self.ai_place_size(cid) / largest.max(m.prize_floor)).max(m.prize_least)
+        (m.bounty_top * self.ai_place_size(cid) / largest.max(m.bounty_floor)).max(m.bounty_least)
     }
 
     /// Ticket #394 (version 0.09.3): the places a computer seat weighs spending Influence on, best
     /// first -- extracted from the planner so the order can be witnessed. A Region by its Influence
     /// value and Industry Level, closest first, a held one at a fraction of a neutral one (#75); a
-    /// rival's Colony by the price this seat would pay, cheapest first (#336), times its prize (#394).
+    /// rival's Colony by the price this seat would pay, cheapest first (#336), times its bounty (#394).
     pub fn ai_influence_targets(&self, seat: Seat) -> Vec<(Place, f64)> {
         let th = &self.tables.ai.thresholds;
         let mut targets: Vec<(Place, f64)> = Vec::new();
@@ -861,16 +871,20 @@ impl Game {
         // Colonists first, and the threshold never read at all. With the thresholds off Earth
         // doubled that rule would have had the seats ranking a place they cannot afford above one
         // they can, which would read as a balance change and be a defect. The pivot is the price of
-        // a starting two-Colonist place, so the band is the one the old rule ran in and a Colony's
-        // worth against a Region's is unmoved; the ceiling is the old rule's own 3.0.
-        // Ticket #394 (version 0.09.3): times its prize (the designer's Q5 A), so a fat Colony is
+        // a starting two-Colonist place, so the band was the one the old rule ran in, its ceiling
+        // the old rule's own 3.0.
+        // Ticket #394 (version 0.09.3): times its bounty (the designer's Q5 A), so a fat Colony is
         // wanted despite its price, which still ranks and so still gates what the seat can afford.
-        // Measured with the prize alone and no price: the seats spent on places they could not
-        // afford, and collapses went from 60 to 69 of 80.
+        // The band moves: the product can reach 9 on paper, about 2.5 in play (a Colony of n
+        // Colonists holds n Modules, so its price rises with its size), which is under a neutral
+        // Region's 5 to 10 still and above a held Region's 1.5 to 3 now. Measured with the bounty
+        // alone and no price: the seats spent on places they could not afford, and collapses went
+        // from 60 to 69 of 80.
+        let largest = self.ai_board_largest_size();
         for c in &self.colonies {
             if c.control.controller().map(|o| o != seat).unwrap_or(false) {
                 let price = self.influence_needed_for(seat, Place::Colony(c.id)).max(1) as f64;
-                targets.push((Place::Colony(c.id), (th.colony_price_pivot / price).min(3.0) * self.ai_prize(c.id)));
+                targets.push((Place::Colony(c.id), (th.colony_price_pivot / price).min(3.0) * self.ai_bounty_against(c.id, largest)));
             }
         }
         targets.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
@@ -914,6 +928,8 @@ impl Game {
         let (gap, behind) = self.victory_gap(seat);
         let kind = self.kind(seat);
         let m = self.tables.ai.multipliers.clone();
+        // Ticket #394 (version 0.09.3): the board's largest place, once a plan, for the bounties.
+        let largest_on_board = self.ai_board_largest_size();
         let th = self.tables.ai.thresholds.clone();
         let first_kind = self.first_kind(seat);
         let scarce = self.scarcest(seat);
@@ -1667,7 +1683,7 @@ impl Game {
         // --- Influence, in units of 5 (spec 16.1), on the target rule of 16.4.
         let step = th.influence_step;
         // Ticket #394 (version 0.09.3): the targets in `ai_influence_targets`, a rival's Colony
-        // weighed by its prize.
+        // weighed by its bounty.
         let targets = self.ai_influence_targets(seat);
         for (rank, (target, _)) in targets.iter().enumerate() {
             let have = self.seat(seat).influence.get(target).copied().unwrap_or(0);
@@ -2584,9 +2600,9 @@ impl Game {
                                 if enemy && odds < th.attack_odds {
                                     continue;
                                 }
-                                // Ticket #394 (version 0.09.3): a rival's Colony at its prize, so a
+                                // Ticket #394 (version 0.09.3): a rival's Colony at its bounty, so a
                                 // seat with cause and an Army goes for the fat one it can beat.
-                                let base = self.base_weight(seat, Cat::LoadUnload) * if enemy { self.ai_prize(c.id) } else { 1.0 };
+                                let base = self.base_weight(seat, Cat::LoadUnload) * if enemy { self.ai_bounty_against(c.id, largest_on_board) } else { 1.0 };
                                 push(vec![Order::Unload { ship: s.id, colonists: 0, army: true, into: UnloadTarget::Colony(c.id) }], Cat::LoadUnload, base, 1.0, if mine { m.threat } else { 1.0 }, 1.0, format!("land an Army at {}", self.place_name(Place::Colony(c.id))), None);
                             }
                         }

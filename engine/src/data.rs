@@ -1242,14 +1242,18 @@ pub struct AiMultipliers {
     /// on a low-gravity Body with a working Mine, where Build Where You Dig reaches the Ships it
     /// builds; 1 everywhere else.
     pub low_gravity_yard: f64,
-    /// Ticket #394 (version 0.09.3): the prize the board's fattest outpost is (its size: Colonists
-    /// plus its output a turn), every other place proportional; and the size an outpost must reach
-    /// before it is that prize, below which the scale is fixed.
-    pub prize_top: f64,
-    pub prize_floor: f64,
-    /// The least a prize can be: 0 leaves the rescaling bare, 1 keeps a lean place at the weight
-    /// it had before the prize and lifts only the fat ones.
-    pub prize_least: f64,
+    /// Ticket #394 (version 0.09.3): the bounty the board's fattest Colony or station is (its size: Colonists
+    /// plus its output a turn), every other place proportional; and the size a Colony or station must reach
+    /// before it is that bounty, below which the scale is fixed (26, the designer's figure, a little
+    /// above a Colony of eight with a Mine, a Generator and a Factory).
+    pub bounty_top: f64,
+    /// Ticket #394 (version 0.09.3): the size a Colony or station must reach before it is the
+    /// board's top; below it the scale is fixed. The designer's 26.
+    pub bounty_floor: f64,
+    /// Ticket #394 (version 0.09.3): the least a bounty can be. At 1, the designer's word, a lean
+    /// place keeps the weight it had and only the fat ones rise; at 0 the rescaling is bare, and
+    /// measured so the computer took fewer Colonies.
+    pub bounty_least: f64,
 }
 
 /// Ticket #50: one pace schedule per Faction. `first` is the schedule for the Faction's first

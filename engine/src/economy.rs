@@ -272,6 +272,14 @@ enum ProducerPlace {
 /// Ticket #391 (version 0.09.3): one place's output this turn, for the *Output* row on its card:
 /// the four stockpile resources settled to a tenth, Energy net of the place's own upkeep, and the
 /// Widgets and Research made there, whole.
+impl PlaceOutput {
+    /// Ticket #394 (version 0.09.3): what the place makes a turn as one figure -- the row summed,
+    /// Energy only where the place makes more than it eats (the figure is net of upkeep).
+    pub fn made(&self) -> f64 {
+        self.materials + self.widgets + self.fuel + self.energy.max(0.0) + self.ducats + self.research
+    }
+}
+
 #[derive(Debug, Clone, Copy, Default)]
 pub struct PlaceOutput {
     pub materials: f64,

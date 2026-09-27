@@ -431,42 +431,43 @@ rival's Colony was ranked cheapest first, so the fattest Colony was the last a c
 on; by force a landing's weight was flat; the one trace of size was the Blockade's tie-break among
 a rival's stations at one Body.
 
-**The prize** (Q1 A, Q4, Q5 A, Q6). A place's **size** is **its Colonists plus what it makes a
+**The bounty** (Q1 A, Q4, Q5 A, Q6). A place's **size** is **its Colonists plus what it makes a
 turn**: the card's Output row summed (Materials, Widgets, Fuel, Ducats, Research, and Energy only
-where the place makes more than it eats). Its **prize is rescaled to the board**, the designer's
-shape: `prize_top` x its size / the largest size any directed Colony or station has, never dividing
-by less than `prize_floor`, so the fattest outpost on the board is the top once anything has reached
-the floor, and every other place is measured against it. The floor is **26**, a Colony of eight
-with a Mine, a Generator and a Factory (Q6, the designer's *"make it 26 and give it a factory
-too"*); the top is 3, the old price rank's ceiling; and **a prize is never under 1** (Q7, A), so a
+where the place makes more than it eats). Its **bounty is rescaled to the board**, the designer's
+shape: `bounty_top` x its size / the largest size any directed Colony or station has, never dividing
+by less than `bounty_floor`, so the fattest Colony or station on the board is the top once anything has reached
+the floor, and every other place is measured against it. The floor is **26** (Q6, the designer's
+*"make it 26 and give it a factory too"*, given as a Colony of eight with a Mine, a Generator and a
+Factory; on the data such a Colony sizes about 21, so the floor sits a little above it); the top
+is 3, the old price rank's ceiling; and **a bounty is never under 1** (Q7, A), so a
 lean place keeps the weight it had and only a place fatter than the board's usual rises. A place
-nobody directs is no prize. The founding-appetite reading of the ticket's sentence is dropped.
+nobody directs is no bounty. The founding-appetite reading of the ticket's sentence is dropped.
 
 **By Influence** (Q2 A, Q5 A). The weight of spending Influence on a rival's Colony is **its price
-rank times its prize**, so a fat Colony is wanted despite its price, and the price still ranks and
+rank times its bounty**, so a fat Colony is wanted despite its price, and the price still ranks and
 so still gates what the seat can afford. Regions rank as they did. Two shapes were measured and
-set aside on the way: a prize of 1 + 0.05 x size multiplying the price rank left a Colony of eight
+set aside on the way: a bounty of 1 + 0.05 x size multiplying the price rank left a Colony of eight
 people and three Modules below one of two people and nothing built, since the price term (80 over
-a price that grows 20 a Colonist) falls faster than that prize rises; and the prize alone, with no
+a price that grows 20 a Colonist) falls faster than that bounty rises; and the bounty alone, with no
 price, had the seats spending on places they could not afford, collapses 69 of 80 against 60. The
-rescaled prize is linear in the size, with no "1 +", which is what lets the fat place win the rank
+rescaled bounty is linear in the size, with no "1 +", which is what lets the fat place win the rank
 while the price still counts.
 
 **The reach of the lift by Influence.** The price rank is 80 over a price that grows 20 a
-Colonist, and the prize tops at 3, so by Influence a fat Colony outranks a lean one only up to
+Colonist, and the bounty tops at 3, so by Influence a fat Colony outranks a lean one only up to
 nine Colonists; a fatter one is wanted three times what it was, and still less than a lean one, and
 the take by Influence of such a place is the Army's to make. That is the shape decided (Q5 A:
 the price still ranks), and the limit is named here so nobody reads the counter as unbounded.
 
-**By force** (Q3 A). The weight of landing an Army at a rival's Colony is multiplied by its prize,
+**By force** (Q3 A). The weight of landing an Army at a rival's Colony is multiplied by its bounty,
 so a seat with cause and a Carrier goes for the fat one it can beat. The Bombard is unchanged: it
 burns rather than takes.
 
-**Figures.** `ai.toml` `[multipliers]`: `prize_top` 3.0, `prize_floor` 26.0, `prize_least` 1.0, new:
-under the floor a starting station (two Colonists, four Widgets, six Energy: size 12) is a prize of
-1.4 and a Colony of eight making twenty a turn 3.0, the board's top; a lean Colony of two is the
-least, 1. The sweep before is the Trade Post's (6 / 5 / 1 / 8, collapses 60; places taken by
-Influence 276 in a seating, of them 4 to 7 Colonies; taken by force 3 to 50); the sweep after is in
-the diary, with the set-aside shapes' sweeps beside it: with the least at 0 the computer took fewer
+**Figures.** `ai.toml` `[multipliers]`: `bounty_top` 3.0, `bounty_floor` 26.0, `bounty_least` 1.0, new:
+under the floor a starting station (two Colonists, four Widgets, five Energy net of the Core's
+upkeep: size 11) is a bounty of 1.3 and a Colony of eight making twenty a turn 3.0, the board's top;
+a lean Colony of two is the least, 1. The sweep before is the Trade Post's (6 / 5 / 1 / 8, collapses
+60; Colonies taken by Influence 5 to 22 a seating, places taken by force 0 to 51 a seat); the sweep
+after is in the diary, with the set-aside shapes' sweeps beside it: with the least at 0 the computer took fewer
 Colonies (1 / 0 / 5 / 5 by seating), since its own lean places fell under the 1 they had, which is
 why the least is 1.
