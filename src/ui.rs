@@ -4608,7 +4608,7 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, seat: Seat, marks: boo
             // orbit clause is also more accurate than what it replaces: since ticket #335 a station
             // fuels only a Ship in its OWN orbit, which "where the Ship sits" did not say.
             let tip = format!(
-                "{}: {} {}\nTank {} of {}. Fuel goes on transits, cheapest at a launch window.\nIt fills only at a station or Colony of yours in its own orbit. STRANDED: no leg it can pay, and nowhere to fill up.",
+                "{}: {} {}\nTank {} of {}. Fuel goes on transits, cheapest at a launch window.\nIt fills at a station of yours in that station's orbit, or in low orbit over a Colony of yours with a working Refinery; a Refuel partner's serve too. STRANDED: no leg it can pay, and nowhere to fill up.",
                 s.stance.name(),
                 s.stance.one_liner(true),
                 Stance::PERSISTS,
@@ -8007,7 +8007,8 @@ fn ship_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
                 // named on the hover; the Fuel is still the player's own Stockpile's.
                 if game.refuel_station_at(Seat(0), b) {
                     ui.label(fuel);
-                    let partner = if game.own_station_at(Seat(0), b) {
+                    // Ticket #396 (version 0.09.3): one's own Refinery Colony is no partner's.
+                    let partner = if game.own_depot_at(Seat(0), b) {
                         None
                     } else {
                         game.colonies.iter().filter(|c| c.body == b && game.fuels_for(c, Seat(0))).find_map(|c| c.control.director()).map(|d| format!("At the station or Refinery Colony of the {}, under your Refuel Accord: the Fuel is your own Stockpile's, drawn there.", game.seat_name(d)))
@@ -8016,7 +8017,7 @@ fn ship_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
                 } else if game.stranded(s.id) {
                     ui.label(fuel);
                     // Ticket #396 (version 0.09.3): or a Refinery Colony under low orbit.
-                    ui.colored_label(Color32::from_rgb(230, 120, 90), "stranded: no leg it can pay, and no station or Refinery Colony of yours or of a Refuel partner's here to refuel at; a station built in orbit here, a working Refinery at a Colony of yours on the ground, or a Refuel Accord with one who holds either, rescues it");
+                    ui.colored_label(Color32::from_rgb(230, 120, 90), "stranded: no leg it can pay, and nothing of yours or of a Refuel partner's here to refuel at. A station in orbit here, a working Refinery at a Colony of yours on the ground, or a Refuel Accord with one who holds either, rescues it.");
                 } else {
                     ui.label(format!("{fuel}; no station or Refinery Colony of yours, or of a Refuel partner's, here to refuel at"));
                 }

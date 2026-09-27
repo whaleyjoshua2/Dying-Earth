@@ -296,6 +296,8 @@ impl Game {
         }
         // The refuel, and the dock: a tank that will not pay the way back off this leg wants the
         // ring of a station that fills it, since a station fuels only a Ship in its own orbit.
+        // Ticket #396 (version 0.09.3): a Refinery Colony's depot is low orbit, which is where a
+        // leg lands when no ring is named, so it needs no choice here.
         if let ShipAt::Body(from) = ship.at {
             let cost = self.transit_cost_for(seat, from, to).1;
             if ship.fuel - cost < cost && let Some(c) = self.colonies.iter().find(|c| c.in_orbit && c.body == to && self.fuels_for(c, seat)) {
@@ -478,8 +480,9 @@ impl Game {
     /// term would change what its Ships can do.
     pub fn refuel_worth_offering(&self, seat: Seat, other: Seat) -> bool {
         BodyId::ALL.into_iter().any(|body| {
-            self.own_station_at(other, body)
-                && !self.own_station_at(seat, body)
+            // Ticket #396 (version 0.09.3): a Refinery Colony's depot counts as a station does.
+            self.own_depot_at(other, body)
+                && !self.own_depot_at(seat, body)
                 && (self.ships.iter().any(|s| s.seat == seat && s.at == ShipAt::Body(body)) || self.colonies.iter().any(|c| c.body == body && c.control.director() == Some(seat)))
         })
     }

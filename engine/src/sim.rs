@@ -151,7 +151,8 @@ pub struct SimResult {
     /// the end (a station over Earth is not one), all seats.
     pub stranded_at_end: [u32; 4],
     pub refuels: u32,
-    /// Ticket #325 (version 0.08.8): of those, refuels at a partner's station under a Refuel Accord.
+    /// Ticket #325 (version 0.08.8): of those, refuels at a partner's under a Refuel Accord -- a
+    /// station's, or since ticket #396 a Refinery Colony's.
     pub partner_refuels: u32,
     /// Ticket #396 (version 0.09.3): of those, refuels in a Refinery Colony's low orbit.
     pub colony_refuels: u32,

@@ -1370,7 +1370,7 @@ impl Game {
                 // there shuts it; the move offered is to whichever orbit the open depot touches.
                 let orbit = self.ship_orbit(s);
                 if !self.refuelling_station(seat, body, orbit) {
-                    let open = self.colonies.iter().find(|c| c.body == body && self.fuels_for(c, seat) && c.control.director().is_some_and(|d| !self.orbit_blockaded_against(d, body, self.colony_orbit(c))));
+                    let open = self.orbits_of(body).into_iter().find_map(|o| self.open_depot_in_orbit(seat, body, o));
                     return fail(match open {
                         Some(c) => self.move_first(body, self.colony_orbit(c), "refuel", "a station fuels a Ship in its own orbit alone, a Refinery Colony its low orbit."),
                         None => format!("every station or Refinery Colony that fuels you over {} is blockaded", self.tables.body(body).name),

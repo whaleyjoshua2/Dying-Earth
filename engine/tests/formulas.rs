@@ -16724,12 +16724,32 @@ fn a_colony_with_a_working_refinery_refuels_its_low_orbit_and_rescues_a_stranded
     assert!(g.stranded(far), "and the Ship is stranded again");
     g.colony_mut(depot).unwrap().modules[i].mothballed = false;
     // A rival stack on Blockade in low orbit shuts the depot, as it shuts a station's ring.
-    let rival = ShipId(g.fresh_id());
-    g.ships.push(Ship { name: String::new(), id: rival, kind: UnitKind::Frigate, seat: Seat(1), damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Blockade, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None });
+    let rival = ship_in(&mut g, Seat(1), UnitKind::Frigate, BodyId::Mars, None, Stance::Blockade);
     let err = g.check_order(Seat(0), &[], &refuel).unwrap_err().0;
     assert!(err.contains("blockaded"), "a Blockade of low orbit shuts it: {err}");
-    // A station's ring still fuels only a Ship in that ring: the depot is low orbit's alone.
+    // A Battery of the holder's at the Colony covers low orbit and lifts the Blockade, as a
+    // station's own Battery lifts the Blockade of its ring.
+    g.colony_mut(depot).unwrap().modules.push(Module::new(ModuleKind::Battery));
+    assert!(g.check_order(Seat(0), &[], &refuel).is_ok(), "the Colony's Battery lifts the Blockade of low orbit");
+    g.colony_mut(depot).unwrap().modules.retain(|m| m.kind != ModuleKind::Battery);
     g.ships.retain(|s| s.id != rival);
+    // A leg that lands in low orbit over the depot leaves nobody stranded at the far end.
+    let (home, _) = colony_ship_ready(&mut g, BodyId::Earth);
+    g.ship_mut(home).unwrap().fuel = g.transit_cost_for(Seat(0), BodyId::Earth, BodyId::Mars).1 + 1.0;
+    assert_eq!(g.arrival_leaves_stranded(Seat(0), home, BodyId::Mars, None), None, "the depot under low orbit rescues the arrival");
+    g.colony_mut(depot).unwrap().modules[i].mothballed = true;
+    assert!(g.arrival_leaves_stranded(Seat(0), home, BodyId::Mars, None).is_some(), "without it the arrival is stranded");
+    g.colony_mut(depot).unwrap().modules[i].mothballed = false;
+    // A partner's Refinery Colony under a Refuel Accord serves too, from the refueller's own Stockpile.
+    g.colony_mut(depot).unwrap().control = Control::Controlled(Seat(1));
+    assert!(g.check_order(Seat(0), &[], &refuel).is_err(), "a rival's depot, no Accord: nothing");
+    g.strike_accord(Seat(0), Seat(1), vec![Term::NonAggression, Term::Refuel]).expect("struck");
+    assert!(g.check_order(Seat(0), &[], &refuel).is_ok(), "under the Accord the partner's Refinery Colony fuels it");
+    g.commit_orders(Seat(0), std::slice::from_ref(&refuel));
+    assert!(g.log.iter().any(|l| l.contains("at a partner's Refinery Colony")), "the log says whose: {:?}", g.log.last());
+    g.colony_mut(depot).unwrap().control = Control::Controlled(Seat(0));
+    // A station's ring still fuels only a Ship in that ring: the depot is low orbit's alone.
+    g.ship_mut(far).unwrap().fuel = 1.0;
     g.ship_mut(far).unwrap().slot = Some(0);
     assert!(g.check_order(Seat(0), &[], &refuel).is_err(), "in an empty ring, nothing fuels it");
 }

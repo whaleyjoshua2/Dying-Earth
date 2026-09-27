@@ -39,6 +39,21 @@ partner's, over Mars to refuel at* before the build), the tank fills from the St
 says where; the Refinery mothballed refuses it and strands the Ship again; a rival Frigate on
 Blockade in low orbit shuts it; and an empty ring still fuels nothing.
 
+## The review
+
+The spec review found the Ship card's partner hover keyed on an own *station*, so one's own
+Refinery Colony read as a partner's; the computer's Refuel Accord appetite read the same
+station-only test; and the roster hover still said *in its own orbit*, which a ground Colony's
+low orbit is only by the code's convention. All three now read the depot (`own_depot_at`, the
+hover reworded). The standards review found the order's check and its refusal spelling *an open
+depot* two ways, which with two ground depots in one low orbit could refuse a move to the orbit
+the Ship sits in: one `open_depot_in_orbit` serves both. The glossary gains a **Depot** headword
+and the Blockade entry says what a Blockade of low orbit now shuts; the witness gained the
+partner's Refinery Colony, the Colony's Battery lifting a low-orbit Blockade, and the arrival
+that a depot rescues, and builds its rival with the file's helper. One line in §12 is derived
+rather than the designer's: that a Battery of the holder's lifts the Blockade, which follows from
+the ring rule and is witnessed.
+
 ## The sweep
 
 [`sweeps/after-396.txt`](../sweeps/after-396.txt) against the yard's

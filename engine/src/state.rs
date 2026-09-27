@@ -4009,7 +4009,23 @@ impl Game {
     /// Ticket #396 (version 0.09.3): or a Refinery Colony under low orbit (`depot_in_orbit`); a
     /// Blockade of that low orbit shuts it as a Blockade of a ring shuts the station there.
     pub fn refuelling_station(&self, seat: Seat, body: BodyId, orbit: Orbit) -> bool {
-        self.depot_in_orbit(seat, body, orbit).is_some_and(|c| c.control.director().is_some_and(|d| !self.orbit_blockaded_against(d, body, orbit)))
+        self.open_depot_in_orbit(seat, body, orbit).is_some()
+    }
+
+    /// Ticket #396 (version 0.09.3): the depot in this orbit that fuels this seat AND is open this
+    /// turn -- its holder not blockaded there. One test for the order's check and its refusal,
+    /// since low orbit can hold two ground depots (one's own and a partner's) and the first found
+    /// may be shut while the second is open (the review's fix-up).
+    pub fn open_depot_in_orbit(&self, seat: Seat, body: BodyId, orbit: Orbit) -> Option<&Colony> {
+        self.colonies
+            .iter()
+            .find(|c| c.body == body && self.colony_orbit(c) == orbit && self.fuels_for(c, seat) && c.control.director().is_some_and(|d| !self.orbit_blockaded_against(d, body, orbit)))
+    }
+
+    /// Ticket #396 (version 0.09.3): whether this seat holds a depot of its own at the Body -- a
+    /// station, or a Refinery Colony on the ground -- so a Refuel there is not a partner's.
+    pub fn own_depot_at(&self, seat: Seat, body: BodyId) -> bool {
+        self.colonies.iter().any(|c| c.body == body && c.control.director() == Some(seat) && self.refuel_depot(c))
     }
 
     /// Ticket #335 (version 0.09.0): whether a Ship sits in the orbit that touches this Colony --
