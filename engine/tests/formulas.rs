@@ -4439,8 +4439,9 @@ fn f_coastal_engineering_is_the_thirteenth_tech() {
     let g = fresh();
     // Ticket #201 (version 0.08.1): eighteen, with Civil Defense on Society rung 2.
     // Ticket #343 (version 0.09.1): twenty-one, with Missile Technology on Propulsion rung 3.
-    assert_eq!(TechId::ALL.len(), 21, "thirteen Techs, the four gates, Civil Defense, #232's two, and Missile Technology");
-    assert_eq!(g.tables.techs.len(), 21, "and twenty-one rows in techs.toml");
+    // Ticket #393 (version 0.09.3): twenty-two, with Nuclear Rockets on Propulsion rung 2.
+    assert_eq!(TechId::ALL.len(), 22, "thirteen Techs, the four gates, Civil Defense, #232's two, Missile Technology and Nuclear Rockets");
+    assert_eq!(g.tables.techs.len(), 22, "and twenty-two rows in techs.toml");
     let c = g.tables.tech(TechId::CoastalEngineering);
     assert_eq!(c.name, "Coastal Engineering");
     assert_eq!(c.branch, "Industry");
@@ -6515,7 +6516,7 @@ fn the_four_gates_stand_on_rung_three_at_one_price_with_their_prerequisites() {
         assert_eq!(card.needs, needs, "{t:?}");
         assert_eq!(g.tables.victory_gate(kind), Some(t));
     }
-    assert_eq!(TechId::ALL.len(), 21, "eighteen, Beneficiation and Relay Networks since ticket #232, and Missile Technology since #343");
+    assert_eq!(TechId::ALL.len(), 22, "eighteen, Beneficiation and Relay Networks since ticket #232, Missile Technology since #343, Nuclear Rockets since #393");
     // Version 0.08.3 moved three of the four gates' prerequisites in three separate tickets, and
     // nothing watched how deep each gate ended up. Counted as Techs that must stand before the
     // gate is reachable, the gate excluded.
@@ -9983,7 +9984,9 @@ fn the_tree_costs_eighteen_thirty_two_and_forty_eight_by_rung() {
     let g = game();
     for t in TechId::ALL {
         let card = g.tables.tech(t);
-        if t == TechId::CoastalEngineering {
+        // Ticket #393 (version 0.09.3): Nuclear Rockets is priced above its rung on purpose, 38 where
+        // rung 2 is 32, at the designer's word; Coastal Engineering below it, at 15.
+        if t == TechId::CoastalEngineering || t == TechId::NuclearRockets {
             continue;
         }
         let want = match card.rung {
@@ -9994,7 +9997,8 @@ fn the_tree_costs_eighteen_thirty_two_and_forty_eight_by_rung() {
         assert_eq!(card.cost, want, "rung {} costs {want}: {t:?}", card.rung);
     }
     let total: i64 = TechId::ALL.into_iter().map(|t| g.tables.tech(t).cost).sum();
-    assert_eq!(total, 697, "the whole tree since ticket #343's Missile Technology (48 on rung 3); 649 from #232, 585 from #231, 554 from #201, 507 before that");
+    assert_eq!(g.tables.tech(TechId::NuclearRockets).cost, 38, "priced above its rung");
+    assert_eq!(total, 735, "the whole tree since ticket #393's Nuclear Rockets (38 on rung 2); 697 from #343, 649 from #232, 585 from #231, 554 from #201, 507 before that");
 }
 
 // ------------------------------------------------------- 0.08.1 ticket #208: the School's step
@@ -16142,4 +16146,63 @@ fn tenths_the_helper_settles_exactly_and_figure_prints_whole_when_whole() {
     assert_eq!(figure(0.3), "0.3");
     assert_eq!(figure(-2.5), "-2.5");
     assert_eq!(figure(tenth(0.1 + 0.2)), "0.3");
+}
+
+/// Ticket #393 (version 0.09.3): **Nuclear Rockets cuts a crossing's days by a fifth before the
+/// rounding up to turns.** At the window Mars is 259 days, five turns of sixty; with the Tech 207,
+/// four. Venus's 146 days, three turns, become 117, two. Phobos rides the Mars crossing and gains
+/// the same turn. A one-turn hop inside a system stays one, and the Fuel of every leg is untouched.
+#[test]
+fn nuclear_rockets_takes_a_turn_off_a_crossing_and_none_off_a_hop() {
+    let mut g = game();
+    let window = g.next_window_turn(1);
+    // Venus's window is the turn its crossing is cheapest in turns AND Fuel (turn 9); turn 8 is three
+    // turns too, but eleven degrees off, and stays three with the Tech.
+    let venus_window = (1..=g.tables.victory.turns).min_by_key(|t| { let (turns, fuel) = g.transit_cost_at(BodyId::Earth, BodyId::Venus, *t); (turns, (fuel * 10.0) as i64) }).unwrap();
+    assert_eq!(venus_window, 9, "the premise: Venus's first window");
+    let mars = g.transit_cost_at(BodyId::Earth, BodyId::Mars, window);
+    let phobos = g.transit_cost_at(BodyId::Earth, BodyId::Phobos, window);
+    let venus = g.transit_cost_at(BodyId::Earth, BodyId::Venus, venus_window);
+    assert_eq!((mars.0, phobos.0, venus.0), (5, 5, 3), "the premise: five, five and three turns at the windows");
+    g.research.done.push(TechId::NuclearRockets);
+    assert_eq!(g.transit_cost_at(BodyId::Earth, BodyId::Mars, window), (4, mars.1), "Mars: a turn off, the Fuel as it was");
+    assert_eq!(g.transit_cost_at(BodyId::Earth, BodyId::Phobos, window), (4, phobos.1), "Phobos rides the same crossing");
+    assert_eq!(g.transit_cost_at(BodyId::Earth, BodyId::Venus, venus_window), (2, venus.1), "Venus: a turn off");
+    assert_eq!(g.transit_cost_at(BodyId::Earth, BodyId::Moon, window).0, 1, "a hop stays one turn");
+    assert_eq!(g.transit_cost_at(BodyId::Mars, BodyId::Phobos, window).0, 1, "and so does a moon's");
+    // The seat's own quote reads the same turns, and the Fuel multipliers as before.
+    assert_eq!(g.transit_cost_for_at(Seat(0), BodyId::Earth, BodyId::Mars, window).0, 4);
+}
+
+/// Ticket #393: **Hardened Hulls needs Efficient Transit AND Nuclear Rockets**, the two rung-2
+/// Propulsion Techs side by side, each needing Clean Propellant alone.
+#[test]
+fn hardened_hulls_needs_both_rung_two_propulsion_techs() {
+    let mut g = game();
+    g.research.done.push(TechId::CleanPropellant);
+    assert!(g.available_techs().contains(&TechId::EfficientTransit) && g.available_techs().contains(&TechId::NuclearRockets), "both open off Clean Propellant");
+    g.research.done.push(TechId::EfficientTransit);
+    assert!(!g.available_techs().contains(&TechId::HardenedHulls), "Efficient Transit alone does not open Hardened Hulls");
+    g.research.done.push(TechId::NuclearRockets);
+    assert!(g.available_techs().contains(&TechId::HardenedHulls), "both do");
+    assert_eq!(g.tables.tech(TechId::NuclearRockets).cost, 38, "priced above its rung on purpose");
+}
+
+/// Ticket #393: **a computer seat picks its Victory gate chain, then the Propulsion chain, then the
+/// cheapest Tech left** -- the designer's order for every list. A Custodian Lead with its chain's
+/// antecedents done takes Clean Propellant ahead of the cheaper Coastal Engineering.
+#[test]
+fn a_computer_seat_picks_its_gate_chain_then_propulsion_then_the_cheapest() {
+    let mut g = game();
+    let seat = Seat(0);
+    assert_eq!(g.kind(seat), FactionKind::Custodians);
+    g.research.done.push(TechId::PublicScience);
+    g.research.done.push(TechId::GreenConsensus);
+    g.research.shortlist.clear();
+    assert!(g.available_techs().contains(&TechId::CoastalEngineering), "the cheapest Tech on the board is open");
+    assert_eq!(g.ai_tech_pick(seat), TechId::CleanPropellant, "Propulsion comes before the cheapest");
+    g.research.done.push(TechId::CleanPropellant);
+    assert_eq!(g.ai_tech_pick(seat), TechId::EfficientTransit, "then the rung-2 pair, Efficient Transit first");
+    g.research.done.push(TechId::EfficientTransit);
+    assert_eq!(g.ai_tech_pick(seat), TechId::NuclearRockets);
 }

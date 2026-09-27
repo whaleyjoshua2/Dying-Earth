@@ -111,8 +111,9 @@ pub const SAVE_VERSION: u32 = 7;
 /// keep accumulator, since the half is paid each turn. An older file would in fact parse (the
 /// reader takes a whole number as a float and passes over a field it no longer knows), into a
 /// board the economy no longer plays: every price and income would then move under it. The
-/// refusal rests on the stamp, as every move of it does, and names both versions. `GAME_VERSION`
-/// is NOT moved here: the version's closing ticket moves it for the whole version.
+/// refusal rests on the stamp, as every move of it does, and names both versions. Ticket #393
+/// (the same version) appends a twenty-second Tech, Nuclear Rockets, and rides the same move.
+/// `GAME_VERSION` is NOT moved here: the version's closing ticket moves it for the whole version.
 pub const GAME_VERSION: &str = "0.09.2";
 
 /// The game autosaves at the start of the Report phase of every third turn.

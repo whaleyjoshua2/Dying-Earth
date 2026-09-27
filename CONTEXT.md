@@ -131,7 +131,7 @@ The 3D view of the solar system, where Bodies, Ship stacks, transits and Orbital
 _Avoid_: space view, orbital map, star map
 
 **Launch Window**:
-The months in which the flight between the Earth system and the Mars system is cheap, because the two worlds stand where a minimum-energy transfer wants them. On the window a crossing takes the shortest flight there is and costs the Fuel on the card; away from it it takes longer and costs more, the further off the dearer, up to a limit. Since version 0.06.0 there are two windows in the game, Mars's and Venus's, each on its own sky; a hop inside the Earth system or inside the Mars system does not have one, and no leg runs between Venus and the Mars system. Since version 0.09.2 a crossing's quote is for a launch this turn and says so, with the next two turns' figures beside it (*next turn 5t/23F, then 6t/26F*).
+The months in which the flight between the Earth system and the Mars system is cheap, because the two worlds stand where a minimum-energy transfer wants them. On the window a crossing takes the shortest flight there is and costs the Fuel on the card; away from it it takes longer and costs more, the further off the dearer, up to a limit. Since version 0.06.0 there are two windows in the game, Mars's and Venus's, each on its own sky; a hop inside the Earth system or inside the Mars system does not have one, and no leg runs between Venus and the Mars system. Since version 0.09.2 a crossing's quote is for a launch this turn and says so, with the next two turns' figures beside it (*next turn 5t/23F, then 6t/26F*). Since version 0.09.3 Nuclear Rockets cuts the flight's days by a fifth before they become turns.
 _Avoid_: transfer window, launch period, alignment, conjunction
 
 **Event**:
@@ -159,12 +159,16 @@ A Choice Card offering a Faction a convoy of climate refugees. Taken, since vers
 _Avoid_: Refugees (the migration rule), migrant card
 
 **Tech**:
-An advance on the Tech Tree that changes an output, a capacity, an upkeep, a Ship strength, an Influence cost or how much a source emits, or since version 0.09.1 opens a Ship type (Missile Technology, the Missile Carrier). When a Tech completes, every Faction has it.
+An advance on the Tech Tree that changes an output, a capacity, an upkeep, a Ship strength, an Influence cost or how much a source emits, since version 0.09.1 opens a Ship type (Missile Technology, the Missile Carrier), or since version 0.09.3 shortens a Transit (Nuclear Rockets). When a Tech completes, every Faction has it.
 _Avoid_: research, upgrade, invention
 
 **Missile Technology**:
 The game's first weapon Tech, since version 0.09.1: Propulsion, rung 3, after Hardened Hulls, and the first Tech that gates a Ship -- it opens the Missile Carrier and does nothing else. Like every Tech it is the whole table's once researched, so the Research Lead decides whether to open the door at all.
 _Avoid_: nukes, nuclear weapons, weapons tech
+
+**Nuclear Rockets**:
+The Tech, since version 0.09.3, that shortens a Transit: Propulsion, rung 2, beside Efficient Transit and needing Clean Propellant as it does, priced at 38 Research where its rung is 32, on purpose. It cuts a crossing's days by a fifth before the days are rounded up to turns, so a Mars crossing at the Launch Window takes four turns where it took five; a one-turn hop inside a system stays one; the Fuel of a leg is untouched, and a flight already under way keeps its turns. Hardened Hulls needs it and Efficient Transit both.
+_Avoid_: nuclear drive, NTR, fast transit, engines
 
 **opens_on**:
 The Region a Faction's card names for the start screen's globe to face. It has one reader and one job: pointing the camera. It is not a starting position -- any Region may be chosen -- which is why it stopped being called `home` in version 0.08.0.

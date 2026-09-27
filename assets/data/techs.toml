@@ -1,4 +1,4 @@
-# COSTS BY RUNG: 18, 32, 48. Coastal Engineering, priced off the rungs, is 15.
+# COSTS BY RUNG: 18, 32, 48. Coastal Engineering, priced off the rungs, is 15; Nuclear Rockets, priced above its rung on purpose (ticket #393), is 38.
 #
 # Ticket #231 (version 0.08.3): rungs 2 and 3 went 30 to 32 and 45 to 48, and Coastal Engineering
 # 14 to 15, at the designer word. RUNG 1 IS UNCHANGED AT 18, deliberately: the first Tech of the
@@ -111,7 +111,8 @@ name = "Hardened Hulls"
 branch = "Propulsion"
 rung = 3
 cost = 48
-needs = ["efficient_transit"]
+# Ticket #393 (version 0.09.3): needs BOTH rung-2 Propulsion Techs, at the designer's word.
+needs = ["efficient_transit", "nuclear_rockets"]
 effect = "Every Ship +2 strength; immune to Radiation Surge"
 value = 2.0
 
@@ -355,3 +356,21 @@ cost = 48
 needs = ["hardened_hulls"]
 effect = "Unlocks the Missile Carrier: the first weapon Tech, and the whole table sees it"
 value = 0.0
+
+# Ticket #393 (version 0.09.3): the twenty-second Tech, appended last with its enum variant, as
+# every Tech since #232 has been. Propulsion rung 2 BESIDE Efficient Transit (both need Clean
+# Propellant; Hardened Hulls now needs both), and priced at 38 where the rung is 32, at the
+# designer's word: "i want to be costlier". It is the one Tech that touches a transit's TURNS: the
+# crossing's days are multiplied by `value` before the rounding up to sixty-day turns, so Mars at
+# the window is four turns where it was five and Venus two where it was three, and a one-turn hop
+# inside a system stays one. The Fuel of a leg is untouched; a flight already under way keeps its
+# turns. The Archivists' Provisional Findings read it at half, 0.9, as they read every Tech.
+[[tech]]
+id = "nuclear_rockets"
+name = "Nuclear Rockets"
+branch = "Propulsion"
+rung = 2
+cost = 38
+needs = ["clean_propellant"]
+effect = "Transit times x0.8 (a Mars crossing four turns at the window, Venus two); Fuel unchanged"
+value = 0.8

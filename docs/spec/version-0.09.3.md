@@ -88,3 +88,32 @@ been.
 **The sweep** (20 seeds x four seatings at the shipped cell): **5 / 6 / 1 / 9, collapses 59**,
 against 0.09.2's 2 / 5 / 0 / 11 and 62. Every seat earns slightly more Ducats, the floors on the
 Bank's, the Trade Post's and every Region's economy having gone.
+
+## 3. Nuclear Rockets, a rung-2 Tech that cuts transit times by a fifth
+
+The authority is [ticket #393](https://github.com/whaleyjoshua2/Dying-Earth/issues/393).
+
+**Nuclear Rockets** is the twenty-second Tech: Propulsion, rung 2, **beside Efficient Transit**,
+each needing Clean Propellant alone, and **Hardened Hulls needs both**. It costs **38 Research**
+where its rung costs 32, priced above its rung on purpose, as Coastal Engineering is priced below.
+
+**What it does.** A crossing between systems is worked in days from the launch window and rounded
+up to sixty-day turns; Nuclear Rockets **cuts the days by a fifth before the rounding up**. So a
+Mars crossing at the window is four turns where it was five, and Venus at its window two where it
+was three. Measured over the game's thirty-six turns, it takes a turn off the Mars crossing on every
+turn (two on the worst), and off the Venus crossing on thirty-one of thirty-six. A one-turn hop
+inside a system stays one turn. **The Fuel of a leg is unchanged**, and a flight already under way
+keeps its turns; the Tech reaches the next order. The Archivists' Provisional Findings read it at
+half, as they read every Tech. Like every Tech it is the whole table's once researched.
+
+**The computer's pick lists** are now the designer's order for every Faction: **its Victory gate
+chain, then the Propulsion chain** (Clean Propellant, Efficient Transit, Nuclear Rockets, Hardened
+Hulls, Missile Technology), **then the cheapest Tech left**. That dropped the Custodians' Coastal
+Engineering, Efficient Grids, Clean Power, Civil Defense and Clean Manufacturing, and the
+Archivists' Public Science, Coastal Engineering, Green Consensus and Civil Defense, from the named
+lists; each is now reached only as the cheapest left.
+
+**The sweep** (20 seeds x four seatings at the shipped cell): **5 / 6 / 1 / 7, collapses 61**,
+against 5 / 6 / 1 / 9 and 59 after §2. The gates completed in 67 / 58 / 50 / 49 of 80 against
+71 / 69 / 66 / 63, and the orbital war quietened (Missile Carriers built 32 where 69 were); the
+figures are in the ticket's diary page.

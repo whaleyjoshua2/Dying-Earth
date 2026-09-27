@@ -17,4 +17,5 @@ never the per-seating arrays.
 |---|---|---|
 | [`ticket-386-defects/`](ticket-386-defects/README.md) | [Defects from the list, and the Tech tree audit](https://github.com/whaleyjoshua2/Dying-Earth/issues/386) | The fund's lines to Ducats, End Turn's refusal naming both things owed (pictured on the sun's hover), the audit's finding, and the red witness. |
 | [`ticket-387-tenths/`](ticket-387-tenths/README.md) | [Energy, Ducats and Materials carried to a tenth](https://github.com/whaleyjoshua2/Dying-Earth/issues/387) | The four resources in tenths: the Trading window and the top bar pictured, four floored figures witnessed red, and the sweep after (5 / 6 / 1 / 9, collapses 59). |
+| [`ticket-393-nuclear-rockets/`](ticket-393-nuclear-rockets/README.md) | [Nuclear Rockets: a rung-2 Tech that cuts transit times by a fifth](https://github.com/whaleyjoshua2/Dying-Earth/issues/393) | The Tech on the tree pictured, the crossing turn by turn before and after, three red witnesses, the pick lists in the designer's order, and the sweep after. |
 | [`sweeps/`](sweeps/) | | Every sweep of the version, one file per ticket that moved a rule, and the closing sweep. |

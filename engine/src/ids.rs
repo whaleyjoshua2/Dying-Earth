@@ -578,10 +578,16 @@ pub enum TechId {
     /// unlock the Missile Carrier. The tree is shared, so every seat sees it researched: opening
     /// this door is a public act, which is the point.
     MissileTechnology,
+    /// Ticket #393 (version 0.09.3): Propulsion rung 2 beside Efficient Transit, priced above its
+    /// rung at the designer's word ("i want to be costlier"). A crossing's days are cut by a fifth
+    /// before the rounding up to turns, so Mars at the window is four turns where it was five and
+    /// Venus two where it was three; a one-turn hop stays one; the Fuel is untouched. Hardened
+    /// Hulls needs this AND Efficient Transit.
+    NuclearRockets,
 }
 
 impl TechId {
-    pub const ALL: [TechId; 21] = [
+    pub const ALL: [TechId; 22] = [
         TechId::EfficientGrids,
         TechId::CleanPower,
         TechId::CleanManufacturing,
@@ -603,6 +609,7 @@ impl TechId {
         TechId::Beneficiation,
         TechId::RelayNetworks,
         TechId::MissileTechnology,
+        TechId::NuclearRockets,
     ];
     pub fn index(self) -> usize {
         self as usize
