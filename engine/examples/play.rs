@@ -1039,9 +1039,9 @@ fn print_board(g: &Game) {
     // the board says the choice is open rather than owed, and a second `tech` line in the same turn
     // is now accepted where it used to be refused. The driver and the game have to agree.
     // Ticket #386 (version 0.09.3): "MUST" is the engine's word, not the driver's. Only a pick the
-    // engine's End Turn refuses without is owed; a tree with nothing chosen is open, not owed, and
-    // the banner says which, so the driver and the refusal never disagree.
-    let must = g.research.awaiting_pick == Some(me) && !g.available_techs().is_empty();
+    // engine's End Turn refuses without is owed, read from the engine's own predicate; a tree with
+    // nothing chosen is open, not owed, and the banner says which, so the two never disagree.
+    let must = g.tech_owed_by() == Some(me);
     let open = !must && g.research.current.is_none() && !g.available_techs().is_empty();
     let changeable = g.research.current.is_some() && !g.research.pick_committed;
     if must || open || changeable {
@@ -1055,7 +1055,10 @@ fn print_board(g: &Game) {
                 if drawn { "The Research Lead's shortlist:" } else { "A free choice of everything available:" }
             );
         } else {
-            println!("  *** A TECH IS OPEN TO PICK (a `tech <name>` line); the turn can end without it. Everything available: ***");
+            println!(
+                "  *** A TECH IS OPEN TO PICK (a `tech <name>` line); the turn can end without it. {} ***",
+                if drawn { "The Research Lead's shortlist:" } else { "Everything available:" }
+            );
         }
         for x in g.pickable_techs() {
             let c = t.tech(x);

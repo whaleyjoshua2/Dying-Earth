@@ -142,10 +142,7 @@ impl Game {
                 }
             }
         }
-        if let Some(lead) = self.research.awaiting_pick
-            && !self.seat(lead).ai
-            && !self.available_techs().is_empty()
-        {
+        if let Some(lead) = self.tech_owed_by() {
             owed.push(format!(
                 "The {} hold the Research Lead and owe the table a Tech. Choose what the world researches next.",
                 self.seat_name(lead)
@@ -156,10 +153,19 @@ impl Game {
             1 => Some(format!("{} The turn cannot end until you do.", owed[0])),
             n => Some(format!(
                 "{} things before the turn can end:\n{}",
-                match n { 2 => "Two", 3 => "Three", 4 => "Four", _ => "Several" },
+                if n == 2 { "Two" } else { "Several" },
                 owed.iter().map(|line| format!("- {line}")).collect::<Vec<_>>().join("\n")
             )),
         }
+    }
+
+    /// The human seat that owes the table a Tech, if any: the Research Lead awaiting a pick while
+    /// a Tech is left to research. A computer Lead picks the moment it leads and never appears
+    /// here. Ticket #386 (version 0.09.3): the one predicate End Turn's refusal and the headless
+    /// driver's banner both read, so the two cannot drift apart again.
+    pub fn tech_owed_by(&self) -> Option<Seat> {
+        let lead = self.research.awaiting_pick?;
+        (!self.seat(lead).ai && !self.available_techs().is_empty()).then_some(lead)
     }
 
     /// End Turn: the player's orders are committed, the AI orders, and the turn runs to the next Orders phase.
