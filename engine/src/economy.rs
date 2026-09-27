@@ -272,7 +272,7 @@ enum ProducerPlace {
 /// Ticket #391 (version 0.09.3): one place's output this turn, for the *Output* row on its card:
 /// the four stockpile resources settled to a tenth, Energy net of the place's own upkeep, and the
 /// Widgets and Research made there, whole.
-#[derive(Debug, Clone, Copy, Default, PartialEq)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct PlaceOutput {
     pub materials: f64,
     pub fuel: f64,
@@ -825,8 +825,12 @@ impl Game {
     /// Ticket #391 (version 0.09.3): **what one place made this turn**, for the *Output* row under
     /// its population line -- the director's working buildings there, at the multipliers the Income
     /// pass applies (the Drought, a Storm Surge, a card), with Energy net of the place's own upkeep
-    /// and a Region's economy in its Ducats. A building shut for Energy or mothballed makes nothing,
-    /// as the Income pass left it. Nothing for a place nobody directs.
+    /// and a Region's economy in its Ducats -- only while the Region is controlled: an occupied one's
+    /// economy pays nobody (`controlled_states` skips it), so its row carries none. A building shut
+    /// for Energy or mothballed makes nothing, as the Income pass left it. The Energy is before a
+    /// Reactor's relief and a seat's unit upkeep, which are the seat's and no place's, so a
+    /// one-Region seat with a lit Reactor reads a row lower than the top bar's Energy income by the
+    /// relief. Nothing for a place nobody directs.
     pub fn place_output(&self, place: Place) -> Option<PlaceOutput> {
         let director = match place {
             Place::State(sid) => self.state(sid).control.director(),
@@ -856,7 +860,9 @@ impl Game {
             out.research += p.research as f64;
             out.energy -= p.upkeep;
         }
-        if let Place::State(sid) = place {
+        if let Place::State(sid) = place
+            && matches!(self.state(sid).control, Control::Controlled(_))
+        {
             out.ducats += self.state_ducats(sid);
         }
         out.widgets = self.widgets_at(place) as f64;

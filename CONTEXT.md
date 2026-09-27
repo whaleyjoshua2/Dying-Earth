@@ -252,6 +252,10 @@ _Avoid_: central bank, per-world stocks, inventory
 Money, the fourth resource since version 0.03. A controlled Region pays them from its GDP figure times its Industry Level; a Bank on Earth and a Trade Post in a Colony make more. They buy Influence at two for one, added to this turn's Allotment, and pay for Relief, Resettle, a Leapfrog, a tribute and repair points in place of Materials. What they buy in the Trading window moves in price since version 0.08.2, and every good there costs one more than it did.
 _Avoid_: Ducketts, credits, money, gold, cash
 
+**Output** (of a place):
+What one place made this turn, since version 0.09.3: the row under a Region's, Colony's or Space Station's population line carrying its Materials, Widgets, Fuel, Energy, Ducats and Research at this turn's multipliers, the Energy net of the place's own upkeep, a controlled Region's economy in its Ducats. A building Offline or mothballed made nothing. A Reactor's relief and the Ships' and Armies' upkeep are the Faction's, not any place's. The Faction window's *Output* is a different thing: the Faction's multiplier on every building's yield.
+_Avoid_: production, income (for a place; Income is the Faction's phase), yield (one building's, not the place's)
+
 **Bank**:
 The Facility that makes Ducats in a Region, in proportion to the state's GDP. Since version 0.08.0 the Prospectors build the Investment Bank in its place, which makes the same Ducats and pays interest besides.
 _Avoid_: treasury, mint, exchange

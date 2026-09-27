@@ -285,12 +285,14 @@ The authority is [ticket #391](https://github.com/whaleyjoshua2/Dying-Earth/issu
 moves; the total is a read of the engine.
 
 **The Output row.** Under *Region population* on a Region's card and under *Colonists N of M room*
-on a Colony's or station's, one glyph row, *Output:*, carrying Materials, Energy, Fuel, Ducats,
-Widgets and Research as the place makes them this turn, in the top bar's order, a figure only
+on a Colony's or station's, one glyph row, *Output:*, carrying Materials, Widgets, Fuel, Energy,
+Ducats and Research as the place makes them this turn, in the top bar's order, a figure only
 where the place makes any (*nothing this turn* when it makes none). **Energy is net of the place's
 own upkeep**, so a home Region whose Facilities eat more than its Power Plant makes reads a minus;
-the other figures are gross. **A Region's Ducats include its economy**, and **the Widgets are the
-place's whole figure**, the Industry Level's or the Core Module's with the Factory's, the same
+the other figures are gross. A Reactor's relief and the Ships' and Armies' upkeep are the seat's,
+no place's, so they are in the top bar and in no row. **A Region's Ducats include its economy**
+while it is controlled (an occupied Region's economy pays nobody, so its row carries none), and
+**the Widgets are the place's whole figure**, the Industry Level's or the Core Module's with the Factory's, the same
 figure the card's *Widgets N a turn* line says. The row is what the place
 made this turn, at this turn's multipliers (the Drought's, a Storm Surge's, a card's), summed from
 the same per-building yields the Income pass uses: **a building shut for Energy or mothballed made

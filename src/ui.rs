@@ -5500,20 +5500,16 @@ fn queue_line(game: &Game, place: Place, b: &Build, turns: u32) -> String {
     format!("{} {} of {}, {}{whose}", b.item.name(), b.done, b.widgets, estimate_words(turns))
 }
 
-/// Ticket #332: **the Widgets block on a card**, Region, Colony and station alike, at the
-/// designer's word: `Widgets 6 a turn`, the base and each maker named on its hover, and the
-/// queue under it, each item `Habitat 3 of 8` with its estimate. The queue is drawn on the tiles
-/// too; here it is in order, which the tiles cannot say.
 /// Ticket #391 (version 0.09.3): **the place's output this turn**, one glyph row under its
 /// population line at the designer's word -- *"place cards need to show total output - put in first
-/// section under region population"*: Materials, Energy, Fuel, Ducats, Widgets and Research as the
+/// section under region population"*: Materials, Widgets, Fuel, Energy, Ducats and Research as the
 /// place makes them, in the top bar's order, a figure only where the place makes any; Energy net of
 /// the place's own upkeep. Nothing on a place nobody directs.
 fn output_row(ui: &mut Ui, game: &Game, place: Place) {
     let Some(o) = game.place_output(place) else { return };
-    let hover = "What this place made this turn, at this turn's multipliers: a building shut for Energy or mothballed made nothing. Energy is net of the place's own upkeep; a Region's Ducats include its economy.".to_string();
+    let hover = "What this place made this turn, at this turn's multipliers: a building shut for Energy or mothballed made nothing. Energy is net of the place's own upkeep, before any Reactor's relief, which is the seat's; a Region's Ducats include its economy.".to_string();
     let mut parts: Vec<RowPart> = Vec::new();
-    for (v, icon) in [(o.materials, "materials"), (o.energy, "energy"), (o.fuel, "fuel"), (o.ducats, "ducats"), (o.widgets, "widgets"), (o.research, "research")] {
+    for (v, icon) in [(o.materials, "materials"), (o.widgets, "widgets"), (o.fuel, "fuel"), (o.energy, "energy"), (o.ducats, "ducats"), (o.research, "research")] {
         if v.abs() > 1e-9 {
             parts.push(RowPart { before: figure(v), icon: Some(icon), after: String::new(), hover: Some(hover.clone()) });
         }
@@ -5523,11 +5519,15 @@ fn output_row(ui: &mut Ui, game: &Game, place: Place) {
         if parts.is_empty() {
             ui.label(RichText::new("nothing this turn").weak());
         } else {
-            glyph_row(ui, &parts, 14.0);
+            glyph_row(ui, &parts, 15.0);
         }
     });
 }
 
+/// Ticket #332: **the Widgets block on a card**, Region, Colony and station alike, at the
+/// designer's word: `Widgets 6 a turn`, the base and each maker named on its hover, and the
+/// queue under it, each item `Habitat 3 of 8` with its estimate. The queue is drawn on the tiles
+/// too; here it is in order, which the tiles cannot say.
 fn widgets_block(ui: &mut Ui, game: &Game, place: Place) {
     let rate = game.widgets_at(place);
     let makers = widget_makers(game, place);

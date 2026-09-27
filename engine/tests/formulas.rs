@@ -16598,3 +16598,19 @@ fn a_places_output_is_its_working_buildings_summed_with_energy_net_of_upkeep() {
     let neutral = StateId::ALL.into_iter().find(|s| matches!(g.state(*s).control, Control::Neutral)).expect("a neutral Region");
     assert!(g.place_output(Place::State(neutral)).is_none());
 }
+
+/// Ticket #391 (version 0.09.3), the review's fix-up: an occupied Region's economy pays nobody
+/// (`controlled_states` skips it), so the row an occupier reads must not carry it -- the row is
+/// what the place made this turn, and its economy made nothing for anyone.
+#[test]
+fn an_occupied_regions_output_row_leaves_out_the_economy_nobody_is_paid() {
+    let mut g = fresh();
+    let sid = g.controlled_states(Seat(0))[0];
+    let economy = g.state_ducats(sid);
+    assert!(economy > 0.0, "the premise: a home Region's economy pays: {economy}");
+    let held = g.place_output(Place::State(sid)).unwrap();
+    g.state_mut(sid).control = Control::Occupied { occupier: Seat(1), previous: Some(Seat(0)), turns: 1, banked: 0 };
+    let occupied = g.place_output(Place::State(sid)).expect("the occupier directs it, so it has a row");
+    assert!((held.ducats - occupied.ducats - economy).abs() < 1e-9, "the economy drops out: {} held, {} occupied, economy {}", held.ducats, occupied.ducats, economy);
+    assert!(!g.controlled_states(Seat(1)).contains(&sid) && !g.controlled_states(Seat(0)).contains(&sid), "and the Income pass pays its economy to nobody");
+}
