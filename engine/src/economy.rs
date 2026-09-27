@@ -57,7 +57,7 @@ pub struct Yield {
     /// one does (the Custodians' signature).
     pub doubled_by: Option<&'static str>,
     /// Ticket #90 (version 0.06.0): how the figure was reached, for the card ("2 x 12 Colonists +
-    /// 3 x 2 Bodies"), when a Module's arithmetic is worth showing.
+    /// Earth 3 + Moon 3.5" since ticket #397), when a Module's arithmetic is worth showing.
     pub detail: Option<String>,
     /// Ticket #280 (version 0.08.5): what the building DOES when that is not a resource, or beside
     /// one -- the `does` sentence on its row in `facilities.toml` or `modules.toml`, written where
@@ -602,18 +602,21 @@ impl Game {
         if let Some(p) = &mc.produces {
             if job == ModuleKind::TradePost {
                 // Ticket #90 (version 0.06.0): trade is a network. `amount` Ducats per Colonist of
-                // the Faction at this Body, plus `per_other_body` for every other Body the Faction
-                // holds; no Body yield; the Faction's output multiplier applies.
+                // the Faction at this Body, plus a figure for every other Body the Faction holds; no
+                // Body yield; the Faction's output multiplier applies.
                 // Ticket #397 (version 0.09.3): each other Body held pays ITS OWN figure, by its
                 // distance from Earth (`trade_pays` on the Body's row), where a flat 3 stood -- the
-                // designer's "money reason to go far". The arithmetic names each Body with its figure.
+                // designer's "money reason to go far". The arithmetic names each Body with its
+                // figure, short ("Moon 3.5"), and the chain's base line counts rather than repeats
+                // it, so the build hover with every Body held stays within the six-line ceiling
+                // (the review's estimate: eight lines with the long form).
                 let here = self.colonists_at_body(seat, col.body) as i64;
                 let held: Vec<BodyId> = self.bodies_held(seat).into_iter().filter(|b| *b != col.body).collect();
                 let far: f64 = held.iter().map(|b| t.body(*b).trade_pays).sum();
                 let raw = p.amount as f64 * here as f64 + far;
-                let bodies = held.iter().map(|b| format!("{} for {}", figure(t.body(*b).trade_pays), b.name())).collect::<Vec<_>>().join(" + ");
+                let bodies = held.iter().map(|b| format!("{} {}", b.name().trim_start_matches("the "), figure(t.body(*b).trade_pays))).collect::<Vec<_>>().join(" + ");
                 let arithmetic = if held.is_empty() { format!("{} x {here} Colonists", p.amount) } else { format!("{} x {here} Colonists + {bodies}", p.amount) };
-                let mut v = Chain::base(raw, format!("from {arithmetic}"));
+                let mut v = Chain::base(raw, format!("from {here} Colonists here and {} other Bodies held", held.len()));
                 v.times(fac.output_multiplier, || format!("as the {}", fac.name));
                 y.resource = Some(Resource::Ducats);
                 // Ticket #387 (version 0.09.3): to the tenth, where it was floored.

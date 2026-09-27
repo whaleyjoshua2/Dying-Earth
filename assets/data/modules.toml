@@ -273,7 +273,6 @@ widgets = 4
 energy_upkeep = 2
 does = "pays 1 Ducat more a turn than a Trade Post"
 produces = { resource = "ducats", amount = 2 }
-per_other_body = 3
 fuel_off = 4
 fuel_min = 1
 mine_bonus = 1

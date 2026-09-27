@@ -16773,7 +16773,7 @@ fn a_trade_post_pays_each_other_body_held_by_its_distance_from_earth() {
     let y = g.module_yield(seat, mars, ModuleKind::TradePost);
     assert!((y.amount - tenth((2.0 * 4.0 + 3.0 + 3.5 + 4.0) * m)).abs() < 1e-9, "Mars post: {} against {}", y.amount, (8.0 + 10.5) * m);
     let detail = y.detail.clone().unwrap_or_default();
-    assert!(detail.contains("3.5 for the Moon") && detail.contains("4 for Venus") && detail.contains("3 for Earth"), "the arithmetic names each Body: {detail}");
+    assert!(detail.contains("Moon 3.5") && detail.contains("Venus 4") && detail.contains("Earth 3"), "the arithmetic names each Body: {detail}");
     // A Moon Trade Post holding Earth, Mars and Venus: 3 + 5 + 4; the Moon's own 3.5 is not paid to itself.
     let moon = g.colonies.iter().find(|c| c.body == BodyId::Moon && c.control.director() == Some(seat)).map(|c| c.id).unwrap();
     g.colony_mut(moon).unwrap().modules.push(Module::new(ModuleKind::TradePost));

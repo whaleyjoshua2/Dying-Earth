@@ -407,12 +407,14 @@ The Faction's output multiplier applies to the whole, as before, and the figure 
 **The figures** (Q2, the designer's: *"moon 3.5 then as suggested"*): **Earth 3, the Moon 3.5,
 Venus 4, Mars 5, Phobos 6, Deimos 6**, each on its Body's row in `bodies.toml` as `trade_pays`,
 where a flat `per_other_body` of 3 stood in `modules.toml`. Nothing pays less than before; the Moon
-pays a half more, the far Bodies up to twice.
+pays half a Ducat more, the far Bodies up to twice.
 
 **The Exchange** (Q3, A) follows: the same figures, its flat 1 after the multiplier, as before.
 
-**Where it is said.** The Trade Post's hover and its chain name each Body held with its figure:
-*2 x 4 Colonists + 3 for Earth + 3.5 for the Moon*, where they said *3 x 2 Bodies*. The computer
+**Where it is said.** The Trade Post's hover names each Body held with its figure: *2 x 4
+Colonists + Earth 3 + Moon 3.5*, where it said *3 x 2 Bodies*; the chain's base line counts them
+(*from 4 Colonists here and 2 other Bodies held*) so the hover with every Body held keeps within
+the six-line ceiling. The computer
 seats build Trade Posts and hold Bodies through the same yield; nothing changes for them by hand.
 
 **Figures.** The sweep before is the depot's (6 / 4 / 1 / 9, collapses 60; the Prospectors' Fund
