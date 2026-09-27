@@ -111,7 +111,7 @@ The Orders-phase order that fills a Ship's Tank from the Stockpile, as far as th
 _Avoid_: resupply, top up, tanker
 
 **Transit**:
-The order that sends a Ship from one Body to another, paid from its Tank and taking the turns the sky sets; nothing can be ordered for a Ship in flight. Since version 0.09.2 it is given from the Ship card's drop-down for the Body, whose quote holds for a launch this turn and names a leg that would leave the hull stranded.
+The order that sends a Ship from one Body to another, paid from its Tank and taking the turns the sky sets, a fifth fewer days of them under Nuclear Rockets since version 0.09.3; nothing can be ordered for a Ship in flight. Since version 0.09.2 it is given from the Ship card's drop-down for the Body, whose quote holds for a launch this turn and names a leg that would leave the hull stranded.
 _Avoid_: flight, voyage, jump, move
 
 **Trading window**:

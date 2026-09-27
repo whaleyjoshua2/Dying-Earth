@@ -67,6 +67,27 @@ cell, against the sweep after #387:
 | Archivists | 9 | 7 |
 | collapses of 80 | 59 | 61 |
 
+## The review
+
+Two axes, standards and spec, and both found the one defect: **under the Archivists' Provisional
+Findings the quote and the flight disagreed.** The seat's quote read Nuclear Rockets at half (259
+x 0.9 = 233 days, four turns) while the order fixed the hull's turns from the table-wide cost
+(five); before this Tech nothing touched a transit's turns per seat, so the two paths had never
+parted. The order now takes its turns from the seat's own cost, as it already took the Fuel, and
+the in-flight marker reads the same. Witnessed red by
+`a_flight_flies_the_turns_its_seat_was_quoted_under_provisional_findings` (five flown against four
+quoted), green after. The spec's turn-by-turn figures, which only a throwaway table had backed, are
+now a committed test. Also from the review: the days factor renamed from `speed`, which read
+backwards; two doc comments refreshed; the glossary's Transit entry amended, which this page had
+claimed and the build had missed; a magic ten out of a test.
+
+**The pick lists are an interpretation both reviewers asked to have named.** The designer's words
+were *"priority to victory chain, then propulsion chain, then to lowest"*, given in answer to where
+Nuclear Rockets goes; the build read them as the whole order of every list, which dropped the
+Custodians' and the Archivists' preferences outside their chains (the Custodians' Coastal
+Engineering, kept since ticket #77 so the Sea Wall arrives before the sea takes the coast, among
+them). The sweep below is what that reading measured.
+
 The win column barely moved. What did: **the Victory gates completed in 67 / 58 / 50 / 49 of 80
 games against 71 / 69 / 66 / 63**, and the orbital war quietened, Missile Carriers built 32 (69),
 Launches 20 (40), games with an orbital Battle 22 of 80 (35). Two things changed under this ticket

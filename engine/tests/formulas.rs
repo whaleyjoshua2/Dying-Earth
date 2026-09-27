@@ -16158,7 +16158,7 @@ fn nuclear_rockets_takes_a_turn_off_a_crossing_and_none_off_a_hop() {
     let window = g.next_window_turn(1);
     // Venus's window is the turn its crossing is cheapest in turns AND Fuel (turn 9); turn 8 is three
     // turns too, but eleven degrees off, and stays three with the Tech.
-    let venus_window = (1..=g.tables.victory.turns).min_by_key(|t| { let (turns, fuel) = g.transit_cost_at(BodyId::Earth, BodyId::Venus, *t); (turns, (fuel * 10.0) as i64) }).unwrap();
+    let venus_window = (1..=g.tables.victory.turns).min_by(|a, b| { let (ta, fa) = g.transit_cost_at(BodyId::Earth, BodyId::Venus, *a); let (tb, fb) = g.transit_cost_at(BodyId::Earth, BodyId::Venus, *b); (ta, fa).partial_cmp(&(tb, fb)).unwrap() }).unwrap();
     assert_eq!(venus_window, 9, "the premise: Venus's first window");
     let mars = g.transit_cost_at(BodyId::Earth, BodyId::Mars, window);
     let phobos = g.transit_cost_at(BodyId::Earth, BodyId::Phobos, window);
@@ -16205,4 +16205,49 @@ fn a_computer_seat_picks_its_gate_chain_then_propulsion_then_the_cheapest() {
     assert_eq!(g.ai_tech_pick(seat), TechId::EfficientTransit, "then the rung-2 pair, Efficient Transit first");
     g.research.done.push(TechId::EfficientTransit);
     assert_eq!(g.ai_tech_pick(seat), TechId::NuclearRockets);
+}
+
+/// Ticket #393 (the review's finding): **a flight flies the turns it was quoted, Provisional
+/// Findings included.** An Archivist seat reading Nuclear Rockets at half sees a Mars crossing of
+/// 259 x 0.9 = 233 days, four turns, on its quote; the order used to fix the flight from the
+/// table-wide cost, five turns, so the quote and the hull disagreed the moment the order was given.
+#[test]
+fn a_flight_flies_the_turns_its_seat_was_quoted_under_provisional_findings() {
+    let mut g = game();
+    let arc = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Archivists).expect("an Archivist seat");
+    g.turn = g.next_window_turn(1);
+    g.seats[arc.index()].provisional_findings = true;
+    g.research.findings_tech = Some(TechId::NuclearRockets);
+    let quoted = g.transit_cost_for(arc, BodyId::Earth, BodyId::Mars).0;
+    assert_eq!((g.transit_cost(BodyId::Earth, BodyId::Mars).0, quoted), (5, 4), "the premise: the table reads five, the seat four");
+    let ship = a_colony_ship(&mut g, arc, BodyId::Earth);
+    g.ship_mut(ship).unwrap().fuel = g.tables.unit(UnitKind::ColonyShip).tank as f64;
+    let o = Order::Transit { ship, to: BodyId::Mars, slot: None };
+    g.check_order(arc, &[], &o).expect("a full tank at the window can fly to Mars");
+    g.commit_orders(arc, std::slice::from_ref(&o));
+    match g.ship(ship).unwrap().at {
+        ShipAt::Transit { turns_left, .. } => assert_eq!(turns_left, quoted, "the hull flies what the quote said"),
+        other => panic!("not in flight: {other:?}"),
+    }
+}
+
+/// Ticket #393: **what the Tech does turn by turn**, the figures the spec quotes. Over the game's
+/// thirty-six turns the Mars crossing loses a turn on every one of them and the Venus crossing on
+/// thirty-one; neither ever gains one, and a leg's Fuel never moves.
+#[test]
+fn nuclear_rockets_shortens_mars_on_every_turn_and_venus_on_thirty_one() {
+    let mut g = game();
+    let turns = g.tables.victory.turns;
+    let before: Vec<((u32, f64), (u32, f64))> = (1..=turns).map(|t| (g.transit_cost_at(BodyId::Earth, BodyId::Mars, t), g.transit_cost_at(BodyId::Earth, BodyId::Venus, t))).collect();
+    g.research.done.push(TechId::NuclearRockets);
+    let (mut mars_shorter, mut venus_shorter) = (0, 0);
+    for t in 1..=turns {
+        let (m, v) = (g.transit_cost_at(BodyId::Earth, BodyId::Mars, t), g.transit_cost_at(BodyId::Earth, BodyId::Venus, t));
+        let (bm, bv) = before[(t - 1) as usize];
+        assert!(m.0 <= bm.0 && v.0 <= bv.0, "turn {t}: never longer");
+        assert_eq!((m.1, v.1), (bm.1, bv.1), "turn {t}: the Fuel as it was");
+        mars_shorter += (m.0 < bm.0) as u32;
+        venus_shorter += (v.0 < bv.0) as u32;
+    }
+    assert_eq!((mars_shorter, venus_shorter), (36, 31), "Mars on every turn, Venus on thirty-one of thirty-six");
 }

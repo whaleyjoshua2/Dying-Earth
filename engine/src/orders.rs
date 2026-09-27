@@ -2212,9 +2212,11 @@ impl Game {
                         Some(ShipAt::Body(b)) => b,
                         _ => continue,
                     };
-                    let (turns, _) = self.transit_cost(from, *to);
                     // Ticket #87: the leg's Fuel, with the Faction's and the Tech's multipliers, from the tank.
-                    let (_, fuel) = self.transit_cost_for(seat, from, *to);
+                    // Ticket #393 (version 0.09.3): and the turns as the seat was quoted them, since Nuclear
+                    // Rockets read at half under Provisional Findings shortens the quote; the table-wide
+                    // cost flew a turn longer than the card said.
+                    let (turns, fuel) = self.transit_cost_for(seat, from, *to);
                     let name = self.tables.body(*to).name.clone();
                     if let Some(s) = self.ship_mut(*ship) {
                         s.at = ShipAt::Transit { from, to: *to, turns_left: turns };

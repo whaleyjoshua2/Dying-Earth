@@ -293,7 +293,8 @@ pub fn sync_scene(
                 let colour = session.colours()[s.seat.index()];
                 let c = Color::srgb(colour[0], colour[1], colour[2]);
                 gizmos.line(a, b, c);
-                let (total, _) = game.transit_cost(from, to);
+                // Ticket #393 (version 0.09.3): the seat's own turns, as the order fixed them.
+                let (total, _) = game.transit_cost_for(s.seat, from, to);
                 let f = 1.0 - turns_left as f32 / total.max(1) as f32;
                 let p = a.lerp(b, f.clamp(0.05, 0.95)) + Vec3::Y * 0.12;
                 gizmos.sphere(Isometry3d::from_translation(p), 0.06, c);

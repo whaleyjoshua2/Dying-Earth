@@ -3973,13 +3973,14 @@ impl Game {
     /// The same at any turn, for the window tooltip and the AI's planning.
     pub fn transit_cost_at(&self, from: BodyId, to: BodyId, turn: u32) -> (u32, f64) {
         let tech = if self.has_tech(TechId::EfficientTransit) { self.tables.tech(TechId::EfficientTransit).value } else { 1.0 };
-        let speed = if self.has_tech(TechId::NuclearRockets) { self.tables.tech(TechId::NuclearRockets).value } else { 1.0 };
-        self.transit_cost_with(from, to, 1.0, tech, speed, turn)
+        let days_factor = if self.has_tech(TechId::NuclearRockets) { self.tables.tech(TechId::NuclearRockets).value } else { 1.0 };
+        self.transit_cost_with(from, to, 1.0, tech, days_factor, turn)
     }
 
     /// The transit as one seat pays it (ticket #51): the Faction's own Fuel multiplier first, then
     /// Efficient Transit, multiplicative, settled to the tenth once at the end (ticket #387,
-    /// version 0.09.3; rounded down before).
+    /// version 0.09.3; rounded down before). Ticket #393: and the turns as the seat reads Nuclear
+    /// Rockets, at half under Provisional Findings, so the quote, the order and the flight agree.
     pub fn transit_cost_for(&self, seat: Seat, from: BodyId, to: BodyId) -> (u32, f64) {
         self.transit_cost_for_at(seat, from, to, self.turn)
     }
@@ -4004,10 +4005,11 @@ impl Game {
             .any(|c| c.modules.iter().any(|m| m.kind == ModuleKind::MassDriver && m.working()))
     }
 
-    /// Ticket #393 (version 0.09.3): `speed` is Nuclear Rockets' factor on a crossing's DAYS, applied
-    /// before the rounding up to turns, so a long crossing loses a turn and a one-turn hop never
-    /// does. It is the one thing that touches a transit's turns.
-    fn transit_cost_with(&self, from: BodyId, to: BodyId, faction: f64, tech: f64, speed: f64, turn: u32) -> (u32, f64) {
+    /// Ticket #393 (version 0.09.3): `days_factor` is Nuclear Rockets' factor on a crossing's DAYS
+    /// (0.8, or 0.9 read at half), applied before the rounding up to turns, so a long crossing loses
+    /// a turn and a one-turn hop never does. It is the one thing that touches a transit's turns;
+    /// `faction` and `tech` (Efficient Transit) touch the Fuel alone.
+    fn transit_cost_with(&self, from: BodyId, to: BodyId, faction: f64, tech: f64, days_factor: f64, turn: u32) -> (u32, f64) {
         let t = &self.tables;
         let parent = |b: BodyId| t.body(b).parent;
         let near_earth = |b: BodyId| b == BodyId::Earth || parent(b) == Some(BodyId::Earth);
@@ -4032,7 +4034,7 @@ impl Game {
         let (turns, fuel) = match self.crossing(from, to, turn) {
             None => (turns, fuel as f64),
             Some((offset, tr)) => {
-                let days = (tr.days_at_window + tr.days_per_degree * offset.abs()) * speed;
+                let days = (tr.days_at_window + tr.days_per_degree * offset.abs()) * days_factor;
                 let turns = ((days / tr.days_per_turn).ceil() as u32).clamp(1, tr.max_turns);
                 (turns, fuel as f64 * (1.0 + tr.fuel_per_degree * offset.abs()))
             }
