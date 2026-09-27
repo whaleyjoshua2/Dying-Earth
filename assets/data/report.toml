@@ -264,6 +264,7 @@ cause_choice_card = "the {card} card"
 # Ticket #400 (version 0.09.3): the heat and the sea, where each wrote a line of its own.
 cause_heat = "the heat"
 cause_sea = "the sea"
+cause_break = "the {name}"
 # Ticket #366 (version 0.09.2): what a lift earns from the Spaceport, and when it lands.
 spaceport_pays = " (+{n} Influence next turn from the Spaceport)"
 unrest_past = ", past the {which} threshold: {note}"

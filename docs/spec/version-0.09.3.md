@@ -189,15 +189,21 @@ the whole board is **one line**, *"The heat raised Unrest in 9 Regions and took 
 under The climate. The per-Region heat lines are gone.
 
 **The sea is a cause on the net line** in the same way, and the sea-level threshold line keeps the
-flooding and the people lost with no Unrest clause after it.
+slots the sea took with no Unrest clause after it; the people it moved are the migration line's.
 
 **What keeps a line of its own**: the coral Break, a Region throwing its holder off, an Occupation
-ending, and Pioneers mustered, each an event and not a figure.
+ending, and Pioneers mustered, each an event and not a figure. The Break's own rise in Unrest,
+which the moved net line would otherwise fold silently, is a cause on the net line too, named for
+the Break.
 
 **Where the net line is written.** It was written at the Resolution's end, before the Climate
 phase raised the heat and the sea; it is written after the Climate phase now, still from the
-snapshot the Resolution opened with, so its before and after span the whole turn, and the causes
-the Resolution pushed (an Agitate, Relief, refugees, an Occupation) are carried across to it.
+snapshot the Resolution opened with (or, on a first turn with no Resolution before it, from the
+Climate phase's head), so its before and after span the whole turn, and the causes the Resolution
+pushed (an Agitate, Relief, refugees, an Occupation) are carried across to it. A cause is named
+once on the line however many times it pushed in the turn: three sea thresholds in one turn read
+*the sea* once, where the build first read *the sea, the sea, the sea*. This dedupe was not in the
+resolution and is named here for the designer's eye.
 
 **The measure**, every Report line carrying an Unrest figure, eighty games (20 seeds x four
 seatings, seat 0 played by the computer, so every Region's net line is written), 2,351 turns:
@@ -209,5 +215,6 @@ seatings, seat 0 played by the computer, so every Region's net line is written),
 | of them the net line | 3,594 | 5,819 |
 | most in one turn | 39 | 16 |
 
-The net lines grew because the heat and the sea now write to them; a human player sees only their
-own Regions' net lines, so their Report is quieter still. No rule moved.
+The net lines grew because the heat and the sea now write to them; a human player sees only the
+net lines of their own Regions and of any they acted in, so their Report is quieter still. No rule
+moved.

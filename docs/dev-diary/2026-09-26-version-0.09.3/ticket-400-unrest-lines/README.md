@@ -34,10 +34,29 @@ computer, so every Region's net line is written) and counted the Report's lines 
 | SeaLevel kind (the suffix) | 4,007 | 0 |
 | Unrest kind (the net line) | 3,594 | 5,819 |
 | Note kind (Pioneers mustered) | 2,644 | 2,644 |
+| the other kinds (a throw-off, an Occupation's end, a Break, a card, a work of the player's) | 1,164 | 1,164 |
 | most in one turn | 39 | 16 |
 
 The net lines grew by what the heat and the sea now write to them; a human player sees only their
 own Regions', so their Report is quieter than the count says.
+
+## The review
+
+Two axes, standards and spec. **The substantive finding**: moving the net line after the Climate
+phase put the coral Break's own rise in Unrest inside the line's window, and the Break pushed no
+cause, so a Region hit by it would have read *"from 4 to 6.5 (the heat)"* with the Break unnamed,
+or earned no line at all. The Break's rise is a cause now, named for the Break, and the Break keeps
+its line; witnessed red by `a_breaks_rise_is_a_cause_on_the_net_line_and_the_break_keeps_its_line`
+against the Climate code before the fix. Also from the review: the board line's *took people from
+m* counted only Regions whose Unrest rose, so a Region whose rise a Constabulary damped to nothing
+was dropped from the count though its people fell; it counts every visible fall now, and the line
+is written when either figure is above nought. A first turn with no Resolution before it had no
+snapshot for the line's *before*; the Climate phase takes one when none stands. Four stale doc
+comments that still put the line at the Resolution's end, and one that promised the deleted
+shorter sentence, corrected; the spec's "the people lost" on the sea line, which names slots,
+corrected; the diary's table given the row that makes its columns add up. One thing the build did
+that the resolution did not ask for, named in the spec for the designer: a cause is named once on
+the net line however many times it pushed in a turn.
 
 ## The picture
 

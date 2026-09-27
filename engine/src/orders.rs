@@ -325,9 +325,10 @@ pub struct Pending {
     pub landed: Vec<ArmyId>,
     /// Ticket #371 (version 0.09.2): the turn's Unrest, folded. What each Region's Unrest stood at
     /// when the Resolution opened (or, for an Unrest pass run on its own, when the pass opened),
-    /// and every cause that moved it during the Resolution -- the Region, the words, and whether
-    /// the player was the one acting -- so the Report says one net line per Region at the end
-    /// instead of a line per cause in phase order.
+    /// and every cause that moved it this turn -- the Region, the words, and whether the player
+    /// was the one acting -- so the Report says one net line per Region instead of a line per
+    /// cause in phase order. Ticket #400 (version 0.09.3): both outlive the Resolution's reset,
+    /// since the line is written after the Climate phase, where the heat and the sea join them.
     #[serde(default)]
     pub unrest_before: Vec<(StateId, f64)>,
     #[serde(default)]

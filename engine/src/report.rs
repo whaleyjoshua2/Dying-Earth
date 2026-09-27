@@ -603,6 +603,7 @@ pub const PHRASE_ARGS: &[(&str, &[&str])] = &[
     // Ticket #400 (version 0.09.3): the heat and the sea, where each wrote a line of its own.
     ("cause_heat", &[]),
     ("cause_sea", &[]),
+    ("cause_break", &["name"]),
     ("cause_occupation_start", &[]),
     ("cause_occupation", &[]),
     ("cause_occupation_break", &[]),

@@ -2151,8 +2151,9 @@ impl Game {
         }
     }
 
-    /// Ticket #371 (version 0.09.2): one cause of a Region's Unrest moving this Resolution, for
-    /// the one net line the Report says about it at the end. `by_player` marks an act of the
+    /// Ticket #371 (version 0.09.2): one cause of a Region's Unrest moving this turn, for the one
+    /// net line the Report says about it after the Climate phase (ticket #400, version 0.09.3; at
+    /// the Resolution's end before). `by_player` marks an act of the
     /// player's own -- an Agitate or a Relief -- which earns a rival's Region its line.
     pub(crate) fn unrest_cause(&mut self, sid: StateId, cause: String, by_player: bool) {
         self.pending.unrest_causes.push((sid, cause, by_player));
@@ -2161,12 +2162,13 @@ impl Game {
     /// Ticket #371 (version 0.09.2): where every Region's Unrest stands, for the "before" of its one
     /// net line. Taken as the Resolution opens; an Unrest pass run on its own (a test, a picture
     /// aid) takes it as the pass opens, which is the same thing for what the pass does.
-    fn snapshot_unrest(&mut self) {
+    pub(crate) fn snapshot_unrest(&mut self) {
         self.pending.unrest_before = StateId::ALL.iter().map(|s| (*s, self.state(*s).unrest)).collect();
     }
 
-    /// Ticket #371 (version 0.09.2): **one net line per Region about its Unrest**, at the end of the
-    /// Resolution, at the designer's word ("quiet unrest spam", and the playtest's "Unrest lines in
+    /// Ticket #371 (version 0.09.2): **one net line per Region about its Unrest**, written after
+    /// the Climate phase since ticket #400 (version 0.09.3) and at the Resolution's end before, at
+    /// the designer's word ("quiet unrest spam", and the playtest's "Unrest lines in
     /// the Report run out of order"). Six sources used to write a line each in phase order --
     /// a Mothball, a Climate card, a Strip Permit running out, an Agitate, a Relief, a threshold
     /// crossed -- so one Region's lines lay scattered among another's and a Region could take six

@@ -26,6 +26,12 @@ pub struct Projection {
 impl Game {
     /// Phase 2: Climate.
     pub fn climate_phase(&mut self) {
+        // Ticket #400 (version 0.09.3): the net Unrest lines are written after this phase from the
+        // snapshot the Resolution opened with; the first turn has no Resolution before it, so the
+        // snapshot is taken here when none stands, or a hot start would read "from 5 to 5".
+        if self.pending.unrest_before.is_empty() {
+            self.snapshot_unrest();
+        }
         // Ticket #52: the turn's Unrest bookkeeping starts here, since the Climate phase opens the
         // turn's rises and the falls are settled at the end of its Resolution.
         for s in &mut self.states {
@@ -422,7 +428,7 @@ impl Game {
         if rose > 0.0 {
             headline.push_str(&format!(" Unrest there rose by {} to {}.", Game::unrest_figure(rose), self.unrest_text(sid)));
             // Ticket #400 (version 0.09.3): a cause on the Region's net Unrest line, where the
-            // threshold line carried it as a suffix; the line keeps the sea and the people lost.
+            // threshold line carried it as a suffix; the line keeps the slots the sea took.
             let cause = self.phrase("cause_sea", &[]);
             self.unrest_cause(sid, cause, false);
         }
@@ -555,13 +561,15 @@ impl Game {
             let big = lost / before > u.population_fall_big_fraction;
             let n = if big { u.population_fall_big } else { u.population_fall };
             let rose = self.raise_unrest(sid, n, UnrestSource::Climate);
+            // Ticket #106 (version 0.07.0): a fall that rounds to nothing is not a fall the board
+            // line counts; ticket #400 (version 0.09.3): counted from every fall, damped or not,
+            // since the heat took the people whatever a Constabulary did to the Unrest.
+            let percent = 100.0 * lost / before;
+            let visible = percent >= 0.05;
+            if visible {
+                fell_regions += 1;
+            }
             if rose > 0.0 {
-                // Ticket #106 (version 0.07.0): a fall that rounds to nothing has nothing to say.
-                // Late in a game twelve of these arrived a turn, most of them reading "population
-                // fell 0.0%", which is a line spent to report that a country was fine. The Unrest
-                // it raised is still told, by the shorter sentence.
-                let percent = 100.0 * lost / before;
-                let nothing_to_see = percent < 0.05;
                 let line = format!(
                     "{}: population fell {:.1}% to {:.1}; Unrest rose by {} to {}.",
                     self.tables.state(sid).name,
@@ -574,14 +582,11 @@ impl Game {
                 let cause = self.phrase("cause_heat", &[]);
                 self.unrest_cause(sid, cause, false);
                 heat_regions += 1;
-                if !nothing_to_see {
-                    fell_regions += 1;
-                }
             }
             // Ticket #52: half of what the heat took moves to the neighbours instead of vanishing.
             self.move_refugees(sid, lost * u.heat_share, "the heat");
         }
-        if heat_regions > 0 {
+        if heat_regions > 0 || fell_regions > 0 {
             let text = self.say("heat_board", &[("n", heat_regions.to_string()), ("m", fell_regions.to_string())]);
             self.report_line(LineKind::Climate, None, text);
         }
@@ -717,7 +722,13 @@ impl Game {
                     if self.tables.state(sid).coastal_exposure != b.exposure {
                         continue;
                     }
-                    self.raise_unrest(sid, b.unrest, UnrestSource::Climate);
+                    // Ticket #400 (version 0.09.3): a cause on the Region's net line, which is
+                    // written after the Climate phase now and would fold this rise silently.
+                    let rose = self.raise_unrest(sid, b.unrest, UnrestSource::Climate);
+                    if rose > 0.0 {
+                        let cause = self.phrase("cause_break", &[("name", b.name.clone())]);
+                        self.unrest_cause(sid, cause, false);
+                    }
                     hit.push(self.tables.state(sid).name.clone());
                     let lost = self.state(sid).population * b.population_loss;
                     if lost <= 0.0 {

@@ -1,7 +1,7 @@
 //! The formula tests spec 19.4 asks for, one per pinned rule.
 
 use dying_earth_engine::combat::{self, Combatant, Dice};
-use dying_earth_engine::data::{default_data_dir, CardEffect, CardRule, Tables};
+use dying_earth_engine::data::{default_data_dir, BreakEffect, CardEffect, CardRule, Tables};
 use dying_earth_engine::*;
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
@@ -16427,4 +16427,31 @@ fn a_cause_from_the_resolution_survives_to_the_net_line_after_the_climate_phase(
     let net: Vec<&String> = g.report.lines.iter().map(|l| &l.text).filter(|t| t.starts_with(&format!("{name}: Unrest from"))).collect();
     assert_eq!(net.len(), 1, "one net line for home: {:?}", g.report.lines);
     assert!(net[0].contains("agitation by the Prospectors"), "and the Agitate is a cause on it: {}", net[0]);
+}
+
+/// Ticket #400 (the review's finding): **a coral Break's rise is a cause on the net line**, since the
+/// line is written after the Climate phase now and would otherwise fold the Break's Unrest in
+/// silently; the Break keeps its own line beside it. And the board's heat line counts the people
+/// taken from every Region that fell, whatever a Constabulary did to the Unrest.
+#[test]
+fn a_breaks_rise_is_a_cause_on_the_net_line_and_the_break_keeps_its_line() {
+    let mut g = game();
+    pick_a_tech(&mut g);
+    answer_the_card(&mut g);
+    let home = g.controlled_states(Seat(0))[0];
+    let coastal = g.tables.state(home).coastal_exposure;
+    let b = g.tables.climate.breaks.iter().find(|b| matches!(b.effect, BreakEffect::CoastalUnrest) && b.exposure == coastal).cloned().expect("a coastal Break at home's exposure");
+    // Past the Break's Temperature before the turn, the CO2 Stock set to hold it there as the
+    // picture aid does, so the Climate phase fires the Break this turn.
+    let c = g.tables.climate.clone();
+    let target = b.temperature + 0.3;
+    g.climate.temperature = target;
+    g.climate.co2 = c.starting_co2 + (target - c.base_temperature) * c.ppm_step / c.degrees_per_ppm_step;
+    g.end_turn(std::array::from_fn(|_| Vec::new())).expect("the turn ends");
+    let texts: Vec<&String> = g.report.lines.iter().map(|l| &l.text).collect();
+    assert!(texts.iter().any(|t| t.starts_with("Break at") && t.contains(&b.name)), "the premise: the Break fired and keeps its line: {texts:?}");
+    let name = g.tables.state(home).name.clone();
+    let net: Vec<&&String> = texts.iter().filter(|t| t.starts_with(&format!("{name}: Unrest from"))).collect();
+    assert_eq!(net.len(), 1, "one net line for home: {texts:?}");
+    assert!(net[0].contains(&format!("the {}", b.name)), "the Break is a cause on it: {}", net[0]);
 }
