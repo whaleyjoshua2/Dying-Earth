@@ -1115,7 +1115,8 @@ impl Game {
             (BuildItem::Module(k), Place::Colony(c)) => self.module_materials_at(seat, c, k),
             (BuildItem::Module(k), Place::State(_)) => self.module_materials(seat, k),
             (BuildItem::Unit(UnitKind::Army), _) => self.tables.unit(UnitKind::Army).materials as f64,
-            (BuildItem::Unit(k), _) => self.ship_materials(seat, k),
+            // Ticket #398 (version 0.09.3): a Ship at the yard's price, Build Where You Dig included.
+            (BuildItem::Unit(k), site) => self.ship_materials_at(seat, site, k),
             // Ticket #343 (version 0.09.1): the rearm's flat price, for the same reason.
             (BuildItem::Warhead(_), _) => self.tables.nuke.rearm_materials as f64,
         }

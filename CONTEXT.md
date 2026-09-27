@@ -103,7 +103,7 @@ Said of a Ship at a Body whose Tank cannot pay any leg from there and that has n
 _Avoid_: out of fuel, dry (that is a warship under the Battle charge), marooned, adrift
 
 **Build Where You Dig**:
-The rule, since version 0.06.0, that a Module built at a Colony with a working Mine costs less: three quarters of its price with one Mine, three fifths with two or more, on top of the Faction's own discount and never below half the row. The Archive takes it; a Ship built at a Shipyard there and a Space Station built into orbit do not. A mothballed Mine, or one still building, counts for nothing.
+The rule, since version 0.06.0, that a Module built at a Colony with a working Mine costs less: three quarters of its price with one Mine, three fifths with two or more, on top of the Faction's own discount and never below half the row. The Archive takes it, and since version 0.09.3 so does a Ship of any kind built at a Shipyard on the Moon, Phobos or Deimos, the low-gravity Bodies, on its Materials alone; a Ship built anywhere else and a Space Station built into orbit do not. A mothballed Mine, or one still building, counts for nothing.
 _Avoid_: in-situ discount, local build bonus, mining discount
 
 **Refuel**:

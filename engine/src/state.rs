@@ -2492,8 +2492,8 @@ impl Game {
 
     /// Ticket #88: what a Module costs this seat at this Colony: the row times the Faction's
     /// multiplier, times the in-situ step for the Colony's working Mines, never below the floor of
-    /// the row. Ships and stations never take it. Ticket #387 (version 0.09.3): to the tenth, where
-    /// it was rounded down.
+    /// the row. Stations never take it; Ships take it at a low-gravity yard since ticket #398
+    /// (`ship_materials_at`). Ticket #387 (version 0.09.3): to the tenth, where it was rounded down.
     pub fn module_materials_at(&self, seat: Seat, colony: ColonyId, kind: ModuleKind) -> f64 {
         let row = self.tables.module(kind).materials as f64;
         let faction = self.tables.faction(self.kind(seat)).module_materials_multiplier;
@@ -2531,6 +2531,34 @@ impl Game {
             _ => self.tables.unit(kind).materials,
         };
         tenth(base as f64 * card.ship_materials_multiplier)
+    }
+
+    /// Ticket #398 (version 0.09.3): **what a Ship costs this seat at this yard.** Build Where You
+    /// Dig reaches a Ship built at a Shipyard on a low-gravity Body -- the Moon, Phobos, Deimos --
+    /// at the Module's own steps (`in_situ`: one working Mine there, two or more, never under the
+    /// floor of the row), on top of the Faction's discount, for every kind of Ship (the designer,
+    /// Q1 A) and on Materials alone: the tank's Fuel is untouched. A station is in orbit and holds
+    /// no Mine; a Mars or Venus yard pays the seat's price (Q2 A); a mothballed Mine counts for
+    /// nothing. The Faction window still says the seat's price through `ship_materials`.
+    pub fn ship_materials_at(&self, seat: Seat, site: Place, kind: UnitKind) -> f64 {
+        let seat_price = self.ship_materials(seat, kind);
+        let Place::Colony(cid) = site else { return seat_price };
+        let Some(col) = self.colony(cid) else { return seat_price };
+        if col.in_orbit || !self.tables.body(col.body).low_gravity {
+            return seat_price;
+        }
+        let t = &self.tables.in_situ;
+        let step = match self.working_mines(col) {
+            0 => return seat_price,
+            1 => t.one_mine,
+            _ => t.two_mines,
+        };
+        let card = self.tables.faction(self.kind(seat));
+        let row = match (kind, card.colony_ship_materials) {
+            (UnitKind::ColonyShip, Some(m)) => m,
+            _ => self.tables.unit(kind).materials,
+        } as f64;
+        tenth((row * card.ship_materials_multiplier * step).max(row * t.floor))
     }
 
     /// Which seat an Army fights for, if any: it follows its home (spec 8.4).

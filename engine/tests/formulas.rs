@@ -16614,3 +16614,44 @@ fn an_occupied_regions_output_row_leaves_out_the_economy_nobody_is_paid() {
     assert!((held.ducats - occupied.ducats - economy).abs() < 1e-9, "the economy drops out: {} held, {} occupied, economy {}", held.ducats, occupied.ducats, economy);
     assert!(!g.controlled_states(Seat(1)).contains(&sid) && !g.controlled_states(Seat(0)).contains(&sid), "and the Income pass pays its economy to nobody");
 }
+
+/// Ticket #398 (version 0.09.3): **Build Where You Dig reaches a Ship built at a Shipyard on the
+/// Moon, Phobos or Deimos** with a working Mine there, at the Module's own steps (0.75 with one
+/// Mine, 0.6 with two or more, never under half the row, on top of the Faction's discount), on
+/// Materials alone. A Mars yard, a station over the Moon, and a Moon yard whose Mine is mothballed
+/// pay the full price; the tank's Fuel is untouched.
+#[test]
+fn a_ship_built_at_a_low_gravity_yard_with_a_working_mine_takes_build_where_you_dig() {
+    let mut g = fresh();
+    let t = g.tables.clone();
+    let full = g.ship_materials(Seat(0), UnitKind::Frigate);
+    let row = t.unit(UnitKind::Frigate).materials as f64;
+    let faction = t.faction(g.kind(Seat(0))).ship_materials_multiplier;
+    let price = |g: &Game, site: Place, kind: UnitKind| g.order_cost(Seat(0), &Order::BuildShip { site, kind });
+    // The Moon, one working Mine: three quarters.
+    let moon = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Mine, ModuleKind::Shipyard], 4);
+    let c = price(&g, Place::Colony(moon), UnitKind::Frigate);
+    assert!((c.materials - tenth(row * faction * t.in_situ.one_mine)).abs() < 1e-9, "one Mine on the Moon: {} against {} full", c.materials, full);
+    assert!((c.fuel - t.unit(UnitKind::Frigate).tank as f64).abs() < 1e-9, "the tank's Fuel is untouched: {}", c.fuel);
+    // Every kind, the Missile Carrier and the Colony Ship included (Q1, A).
+    for k in UnitKind::SHIPS {
+        let c = price(&g, Place::Colony(moon), k);
+        assert!(c.materials < g.ship_materials(Seat(0), k), "{} is cheaper at the Moon yard: {} against {}", k.name(), c.materials, g.ship_materials(Seat(0), k));
+    }
+    // Two Mines: three fifths, never under half the row.
+    let two = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Mine, ModuleKind::Mine, ModuleKind::Shipyard], 4);
+    let c = price(&g, Place::Colony(two), UnitKind::Frigate);
+    assert!((c.materials - tenth((row * faction * t.in_situ.two_mines).max(row * t.in_situ.floor))).abs() < 1e-9, "two Mines: {}", c.materials);
+    // The Mine mothballed: the full price.
+    let i = g.colony(moon).unwrap().modules.iter().position(|m| m.kind == ModuleKind::Mine).unwrap();
+    g.colony_mut(moon).unwrap().modules[i].mothballed = true;
+    assert!((price(&g, Place::Colony(moon), UnitKind::Frigate).materials - full).abs() < 1e-9, "a mothballed Mine counts for nothing");
+    // Mars is not a low-gravity Body (Q2, A): full price with a Mine.
+    let mars = colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Mine, ModuleKind::Shipyard], 4);
+    assert!((price(&g, Place::Colony(mars), UnitKind::Frigate).materials - full).abs() < 1e-9, "a Mars yard pays in full");
+    // A station over the Moon is in orbit, with no Mine: full price.
+    let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
+    assert!((price(&g, Place::Colony(iss), UnitKind::Frigate).materials - full).abs() < 1e-9, "a station pays in full");
+    // And a Region's Shipyard on Earth.
+    assert!((price(&g, Place::State(StateId::EastAsia), UnitKind::Frigate).materials - full).abs() < 1e-9, "Earth pays in full");
+}

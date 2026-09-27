@@ -1358,6 +1358,16 @@ fn build_board(session: &mut Session) {
             m.online = false;
         }
     }
+    // Ticket #398 (version 0.09.3): `yard:1` (a building aid): seat 0's first ground Colony gains a
+    // working Mine and a Shipyard, so the Build Where You Dig note and the Ship buttons at a
+    // low-gravity yard's price can be photographed; with `first:1 hab:ground` that is the Moon.
+    if std::env::args().any(|a| a == "yard:1")
+        && let Some(g) = session.game.as_mut()
+        && let Some(c) = g.colonies.iter_mut().find(|c| !c.in_orbit && c.control.director() == Some(Seat(0)))
+    {
+        c.modules.push(Module::new(ModuleKind::Mine));
+        c.modules.push(Module::new(ModuleKind::Shipyard));
+    }
     // Ticket #337 (version 0.09.0): `ducats:<n>` (a building aid): seat 0 holds exactly n Ducats.
     // A card whose offer costs more than a seat holds greys its take button, and that is the state
     // a third of the table is in when a card is drawn; a fresh board is never poor enough to show

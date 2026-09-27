@@ -331,3 +331,28 @@ a Mine's *0.6 Emissions*, a Solar Array's *+9 Energy* and a Generator's *+5.9 En
 hover with the chain under them, since the line break rode inside the word beside it and no word
 ending a line ever matched the glyph list. A line break is now a piece of its own, so the word
 before it is bare and takes its glyph, on every glyph line in the game.
+
+## 11. Build Where You Dig reaches Ships built on the Moon, Phobos or Deimos
+
+The authority is [ticket #398](https://github.com/whaleyjoshua2/Dying-Earth/issues/398). **A rule
+moves.** The designer's words: *"Build Where You Dig, which excludes Ships, reaches Ships built at a
+Shipyard on the Moon, Phobos or Deimos when that Colony has a working Mine."*
+
+**The rule.** A Ship of **every kind** (Q1, A: Colony Ship, Carrier, Frigate, Battleship, Missile
+Carrier) built at a Shipyard on a ground Colony on a **low-gravity Body** (Q2, A: the Moon, Phobos
+and Deimos, the Bodies `low_gravity` names, the same flag the Mass Driver reads) takes Build Where
+You Dig at **the Module's own steps** (Q3, A): 0.75 of its price with one working Mine there, 0.6
+with two or more, never under half the row, on top of the Faction's own Ship discount, and on
+**Materials alone**: the tank's Fuel is what it was. A Shipyard on a station is in orbit, holds no
+Mine, and pays the seat's price; so does a yard on Mars or Venus, and a Moon yard whose Mine is
+mothballed or still building. The computer seats price a Ship through the same order cost and take
+the discount by themselves.
+
+**Where it is said** (Q4, A): the Shipyard's Ship buttons carry the yard's price, and the Colony
+card's note under the Widgets line reads *One working Mine here: Modules and Ships cost x0.75* on
+the three Bodies, *Modules* alone elsewhere. The Faction window's Ship prices are the seat's, as
+before.
+
+**Figures.** In `modules.toml` `[in_situ]`: `one_mine` 0.75, `two_mines` 0.6, `floor` 0.5, unchanged.
+The sweep before is the Stadium's (6 / 4 / 1 / 9, collapses 60; Missile Carriers built 40, games
+with an orbital Battle 27 of 80); the sweep after is in the diary.

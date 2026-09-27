@@ -7480,13 +7480,16 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     // Ticket #88: build it where you dig. Ticket #162 (version 0.07.5): the note stands above the
     // tiles, where a free one is clicked to build, rather than under a Build header that no longer
     // offers a Module.
+    // Ticket #398 (version 0.09.3): and Ships, at a yard on a low-gravity Body (the Moon, Phobos,
+    // Deimos), which the note says where it holds.
+    let what = if !col.in_orbit && game.tables.body(col.body).low_gravity { "Modules and Ships" } else { "Modules" };
     match game.working_mines(col) {
         0 => {}
         1 => {
-            ui.label(RichText::new(format!("One working Mine here: Modules cost x{} (never under half the row).", game.tables.in_situ.one_mine)).weak());
+            ui.label(RichText::new(format!("One working Mine here: {what} cost x{} (never under half the row).", game.tables.in_situ.one_mine)).weak());
         }
         n => {
-            ui.label(RichText::new(format!("{n} working Mines here: Modules cost x{} (never under half the row).", game.tables.in_situ.two_mines)).weak());
+            ui.label(RichText::new(format!("{n} working Mines here: {what} cost x{} (never under half the row).", game.tables.in_situ.two_mines)).weak());
         }
     }
     let mine_here = !session.spectator && col.control.director() == Some(Seat(0));
