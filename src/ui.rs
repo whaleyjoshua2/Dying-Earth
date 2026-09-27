@@ -5504,6 +5504,30 @@ fn queue_line(game: &Game, place: Place, b: &Build, turns: u32) -> String {
 /// designer's word: `Widgets 6 a turn`, the base and each maker named on its hover, and the
 /// queue under it, each item `Habitat 3 of 8` with its estimate. The queue is drawn on the tiles
 /// too; here it is in order, which the tiles cannot say.
+/// Ticket #391 (version 0.09.3): **the place's output this turn**, one glyph row under its
+/// population line at the designer's word -- *"place cards need to show total output - put in first
+/// section under region population"*: Materials, Energy, Fuel, Ducats, Widgets and Research as the
+/// place makes them, in the top bar's order, a figure only where the place makes any; Energy net of
+/// the place's own upkeep. Nothing on a place nobody directs.
+fn output_row(ui: &mut Ui, game: &Game, place: Place) {
+    let Some(o) = game.place_output(place) else { return };
+    let hover = "What this place made this turn, at this turn's multipliers: a building shut for Energy or mothballed made nothing. Energy is net of the place's own upkeep; a Region's Ducats include its economy.".to_string();
+    let mut parts: Vec<RowPart> = Vec::new();
+    for (v, icon) in [(o.materials, "materials"), (o.energy, "energy"), (o.fuel, "fuel"), (o.ducats, "ducats"), (o.widgets, "widgets"), (o.research, "research")] {
+        if v.abs() > 1e-9 {
+            parts.push(RowPart { before: figure(v), icon: Some(icon), after: String::new(), hover: Some(hover.clone()) });
+        }
+    }
+    ui.horizontal(|ui| {
+        rule_tip(ui.label(RichText::new("Output:").weak()), hover.clone());
+        if parts.is_empty() {
+            ui.label(RichText::new("nothing this turn").weak());
+        } else {
+            glyph_row(ui, &parts, 14.0);
+        }
+    });
+}
+
 fn widgets_block(ui: &mut Ui, game: &Game, place: Place) {
     let rate = game.widgets_at(place);
     let makers = widget_makers(game, place);
@@ -6645,6 +6669,8 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     // something like Population 12.2 (339M)."* Ticket #333 (version 0.09.0): units of one million,
     // read off the tables, the same shape: `Region population 1454.5 (1.45B)`.
     icon_word(ui, "population", format!("Region population {}, Industry Level {}, leans {:?}", game.tables.population_text(st.population), st.industry_level, card.resource_lean));
+    // Ticket #391 (version 0.09.3): what the Region made this turn, under its population.
+    output_row(ui, game, Place::State(sid));
     // Ticket #161 (version 0.07.5): what an Allotment is, which this line names and never explains.
     // Ticket #345 (version 0.09.1): and what ELSE an Allotment is. This hover named the base and the
     // Regions and stopped there, so it had been wrong since ticket #36 built the Embassy -- it left
@@ -7282,6 +7308,11 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
         faction_glyph(ui, session, game, col.control.controller(), 22.0);
         ui.label(RichText::new(game.place_name(Place::Colony(cid))).size(22.0).strong());
     });
+    // Ticket #391 (version 0.09.3): the date it was founded, under its name, at the designer's word
+    // -- *"each colony/station card has the date it was founded under its name in the header"*. A
+    // station is built and a Colony founded, as the glossary has them; a starting station reads
+    // the game's first date.
+    ui.label(RichText::new(format!("{} {}", if col.in_orbit { "Built" } else { "Founded" }, game.date(col.founded_turn).text())).weak().small());
     // Ticket #283 (version 0.08.5): what the ground is worth, under the heading, in glyphs. A
     // station reads the Body's figures, which the planet card shows, so it carries no row.
     if !col.in_orbit {
@@ -7346,6 +7377,8 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     // Ticket #164 (version 0.07.5): the room is the Core Module's four and the Habitats' eight
     // each, so the line no longer names Habitats alone.
     ui.label(format!("Colonists {} of {} room", col.colonists, game.habitat_room(col)));
+    // Ticket #391 (version 0.09.3): what the Colony made this turn, under its people.
+    output_row(ui, game, Place::Colony(cid));
     // Ticket #204 (version 0.08.1): the receiver's door, against the figure it changes.
     emigrant_loader(ui, session, game, view, col, actions);
     // Ticket #97 (version 0.07.0): the Module cap, shown beside the Colonists that buy it, so a

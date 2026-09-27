@@ -16553,3 +16553,48 @@ fn a_computer_seat_does_not_offer_a_stadium_under_unrest_five() {
     let orders = g.ai_orders(Seat(1));
     assert!(!orders.iter().any(|o| matches!(o, Order::BuildFacility { kind: FacilityKind::Stadium, .. })), "under five, never: {orders:?}");
 }
+
+/// Ticket #391 (version 0.09.3): **a place's output row reads what its working buildings made this
+/// turn**, summed from the same per-building yields the Income pass uses, Energy net of the place's
+/// own upkeep, a Region's economy in its Ducats; a mothballed building drops out; a place nobody
+/// directs shows nothing.
+#[test]
+fn a_places_output_is_its_working_buildings_summed_with_energy_net_of_upkeep() {
+    let mut g = fresh();
+    let sid = g.controlled_states(Seat(0))[0];
+    let out = g.place_output(Place::State(sid)).expect("a directed Region has an output");
+    let mut want = (0.0f64, 0.0f64, 0.0f64, 0.0f64);
+    for f in &g.state(sid).facilities {
+        if !f.working() {
+            continue;
+        }
+        let y = g.facility_yield(Seat(0), sid, f.kind);
+        match y.resource {
+            Some(Resource::Materials) => want.0 += y.amount,
+            Some(Resource::Fuel) => want.1 += y.amount,
+            Some(Resource::Energy) => want.2 += y.amount,
+            _ => {}
+        }
+        want.2 -= y.upkeep;
+    }
+    want.3 = g.state_ducats(sid);
+    assert!((out.materials - tenth(want.0)).abs() < 1e-9, "Materials: {} against {}", out.materials, want.0);
+    assert!((out.fuel - tenth(want.1)).abs() < 1e-9, "Fuel: {} against {}", out.fuel, want.1);
+    assert!((out.energy - tenth(want.2)).abs() < 1e-9, "Energy net of upkeep: {} against {}", out.energy, want.2);
+    assert!((out.ducats - tenth(want.3)).abs() < 1e-9, "Ducats, the economy's: {} against {}", out.ducats, want.3);
+    assert!(out.energy < 0.0, "the premise: a home Region's Facilities eat more Energy than its Power Plant makes: {}", out.energy);
+    // The Widgets are the place's own figure, the Industry Level's with the Factory's -- the card's
+    // "Widgets 11 a turn" -- not the Factory's alone (the first picture showed 4 against 11).
+    assert_eq!(out.widgets, g.widgets_at(Place::State(sid)) as f64, "the Widgets a turn the card already says");
+    assert!(out.widgets > g.facility_yield(Seat(0), sid, FacilityKind::Factory).amount, "more than the Factory's alone");
+    // A mothballed Mine makes nothing and pays nothing.
+    let before = out;
+    let i = g.state(sid).facilities.iter().position(|f| f.kind == FacilityKind::Mine).expect("a Mine at home");
+    g.state_mut(sid).facilities[i].mothballed = true;
+    let after = g.place_output(Place::State(sid)).unwrap();
+    assert!(after.materials < before.materials, "the Mine's Materials drop out: {} against {}", after.materials, before.materials);
+    assert!(after.energy > before.energy, "and its upkeep: {} against {}", after.energy, before.energy);
+    // Nobody's Region: nothing.
+    let neutral = StateId::ALL.into_iter().find(|s| matches!(g.state(*s).control, Control::Neutral)).expect("a neutral Region");
+    assert!(g.place_output(Place::State(neutral)).is_none());
+}

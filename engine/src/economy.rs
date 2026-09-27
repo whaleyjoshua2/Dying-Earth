@@ -269,6 +269,19 @@ enum ProducerPlace {
     Module(ColonyId, usize),
 }
 
+/// Ticket #391 (version 0.09.3): one place's output this turn, for the *Output* row on its card:
+/// the four stockpile resources settled to a tenth, Energy net of the place's own upkeep, and the
+/// Widgets and Research made there, whole.
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct PlaceOutput {
+    pub materials: f64,
+    pub fuel: f64,
+    pub energy: f64,
+    pub ducats: f64,
+    pub widgets: f64,
+    pub research: f64,
+}
+
 impl Game {
     /// Where a producer stands, for a player to read: *"in China"*, *"at Tiangong over Earth"*.
     /// Ticket #366 (version 0.09.2): the one wording, for the alarm's hover and the Energy line.
@@ -807,6 +820,47 @@ impl Game {
             let text = self.say("starved", &[("place", place), ("faction", who)]);
             self.report_line(LineKind::Note, Some(ReportPlace::Colony(cid)), text);
         }
+    }
+
+    /// Ticket #391 (version 0.09.3): **what one place made this turn**, for the *Output* row under
+    /// its population line -- the director's working buildings there, at the multipliers the Income
+    /// pass applies (the Drought, a Storm Surge, a card), with Energy net of the place's own upkeep
+    /// and a Region's economy in its Ducats. A building shut for Energy or mothballed makes nothing,
+    /// as the Income pass left it. Nothing for a place nobody directs.
+    pub fn place_output(&self, place: Place) -> Option<PlaceOutput> {
+        let director = match place {
+            Place::State(sid) => self.state(sid).control.director(),
+            Place::Colony(cid) => self.colony(cid)?.control.director(),
+        }?;
+        let mut out = PlaceOutput::default();
+        for p in self.producers_of(director) {
+            let (here, working) = match p.place {
+                ProducerPlace::Facility(sid, i) => (place == Place::State(sid), self.state(sid).facilities[i].working()),
+                ProducerPlace::Module(cid, i) => (place == Place::Colony(cid), self.colony(cid).map(|c| c.modules[i].working()).unwrap_or(false)),
+            };
+            if !here || !working || !p.online {
+                continue;
+            }
+            if let Some((r, v)) = p.output {
+                match r {
+                    Resource::Materials => out.materials += v,
+                    Resource::Fuel => out.fuel += v,
+                    Resource::Energy => out.energy += v,
+                    Resource::Ducats => out.ducats += v,
+                    Resource::Research => out.research += v,
+                    // The Widgets are the place's own figure below: a Factory's are only part of
+                    // them, the Industry Level or the Core Module making the rest.
+                    Resource::Widgets => {}
+                }
+            }
+            out.research += p.research as f64;
+            out.energy -= p.upkeep;
+        }
+        if let Place::State(sid) = place {
+            out.ducats += self.state_ducats(sid);
+        }
+        out.widgets = self.widgets_at(place) as f64;
+        Some(PlaceOutput { materials: tenth(out.materials), fuel: tenth(out.fuel), energy: tenth(out.energy), ducats: tenth(out.ducats), widgets: out.widgets, research: out.research })
     }
 
     fn producers_of(&self, seat: Seat) -> Vec<Producer> {

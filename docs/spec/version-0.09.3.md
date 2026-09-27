@@ -278,3 +278,24 @@ resolution said "the *or* words go"; the *or* turned out to be the Ducat-price b
 button carries (*or 60 Ducats*), which the ticket's charting had misread as filler, so it stays on
 these two as on the rest. That is an override of the resolution's line and is said here for the
 designer's eye.
+
+## 9. Every place card says its output, and a Colony's founding date
+
+The authority is [ticket #391](https://github.com/whaleyjoshua2/Dying-Earth/issues/391). No rule
+moves; the total is a read of the engine.
+
+**The Output row.** Under *Region population* on a Region's card and under *Colonists N of M room*
+on a Colony's or station's, one glyph row, *Output:*, carrying Materials, Energy, Fuel, Ducats,
+Widgets and Research as the place makes them this turn, in the top bar's order, a figure only
+where the place makes any (*nothing this turn* when it makes none). **Energy is net of the place's
+own upkeep**, so a home Region whose Facilities eat more than its Power Plant makes reads a minus;
+the other figures are gross. **A Region's Ducats include its economy**, and **the Widgets are the
+place's whole figure**, the Industry Level's or the Core Module's with the Factory's, the same
+figure the card's *Widgets N a turn* line says. The row is what the place
+made this turn, at this turn's multipliers (the Drought's, a Storm Surge's, a card's), summed from
+the same per-building yields the Income pass uses: **a building shut for Energy or mothballed made
+nothing**, and the hover says so. A place nobody directs shows no row.
+
+**The founding date.** Under a Colony's or station's name in its card's header, small: *Founded
+July 2032* on a ground Colony, *Built July 2032* on a station, since the glossary has a station
+built and a Colony founded; a starting station reads the game's first date. No date on a Region.
