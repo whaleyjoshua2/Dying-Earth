@@ -124,15 +124,18 @@ The authority is [ticket #395](https://github.com/whaleyjoshua2/Dying-Earth/issu
 
 **The first ground Colony ever founded on a Body takes half a point off every Region's Unrest at
 once**, whoever holds the Region or nobody, the moment the founding is claimed. It happens **once
-for each Body**: the Moon's first, then Mars's, Phobos's, Deimos's and Venus's, each again. A
-second Colony on a Body that already has one eases nothing; a Space Station is no settling;
-Antarctica is on Earth and does not count. The figure is `first_colony_ease` in `unrest.toml`, the
-smallest step Unrest moves in.
+for each Body**: the Moon's first, then Mars's, Phobos's and Deimos's, each again; Venus has no
+ground to claim. A second Colony on a Body that already has one eases nothing; a Space Station is
+no settling; Antarctica is on Earth and does not count. The figure is `first_colony_ease` in
+`unrest.toml`, the smallest step Unrest moves in. It lands in the Resolution's cargo step, before
+the Unrest step, so a Region at the top eased to nine and a half does not throw its holder off that
+turn.
 
-**What is said.** One line for the whole Earth under the Report's Unrest heading, *"The first
+**What is said.** One line for the whole Earth, filed under the Report's *On Earth*, *"The first
 Colony on the Moon eased Unrest by 0.5 in every Region on Earth."*, and the First to a Body Moment
 carries the clause; the per-Region net Unrest lines stay quiet, so the easing never writes
-fourteen lines the same turn.
+fourteen lines the same turn. A Region whose net line has a named cause that turn carries the half
+unnamed inside its figures, as it carries the natural fall.
 
 **The computer seats** are reached by the rule itself, their Regions easing with everyone's.
 

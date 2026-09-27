@@ -16275,5 +16275,13 @@ fn the_first_colony_on_each_body_eases_unrest_everywhere_by_a_half() {
     let mars = colony(&mut g, Seat(2), BodyId::Mars, &[], 4);
     assert!(g.claim_first(Seat(2), BodyId::Mars, mars), "Mars's first");
     assert_eq!(g.state(StateId::Europe).unrest, 3.0, "eases the world again");
+    // A station over an unclaimed Body is no settling, and Antarctica is on Earth.
+    let station = ColonyId(g.fresh_id());
+    g.colonies.push(Colony { id: station, body: BodyId::Phobos, slot: 0, control: Control::Controlled(Seat(3)), modules: vec![Module::new(ModuleKind::Core)], colonists: 4, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
+    assert!(!g.claim_first(Seat(3), BodyId::Phobos, station), "a station claims nothing");
+    let antarctic = colony(&mut g, Seat(3), BodyId::Earth, &[], 4);
+    assert!(!g.claim_first(Seat(3), BodyId::Earth, antarctic), "Antarctica is on Earth");
+    assert_eq!(g.state(StateId::Europe).unrest, 3.0, "neither eases anything");
+    assert_eq!(g.report.lines.iter().filter(|l| l.text.contains("eased")).count(), 2, "one line a Body claimed");
     assert_eq!(g.tables.unrest.first_colony_ease, 0.5, "the figure lives in unrest.toml");
 }

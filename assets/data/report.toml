@@ -61,7 +61,7 @@ no_habitat_room = "{n} more found no Habitat room at {place} and did not land."
 # Ticket #345 (version 0.09.1): the first Colony a world has ever carried, and what it pays.
 first_to_body = "The {faction} are the first Faction ever to settle {body}. {colony} claims a windfall of {n} Influence, and its Core will pay while they hold it."
 # Ticket #395 (version 0.09.3): the world eases at the news, half a point off every Region's Unrest,
-# said once for the whole Earth under the Unrest heading; the Moment carries it too.
+# said once for the whole Earth, filed under On Earth; the Moment carries it too.
 first_to_body_eases = "The first Colony on {body} eased Unrest by {ease} in every Region on Earth."
 disembarked = "{n} Colonists disembarked into {colony}."
 station_built = "{faction} built {station}."

@@ -33,6 +33,20 @@ same test holds a second Moon Colony to nothing and Mars's first to another half
 in the engine, 8 and 6 in the root crate; the clippy gate
 `cargo clippy --workspace --release --all-targets -- -D warnings` is clean.
 
+## The review
+
+Two axes, standards and spec; the build matched the resolution on all four points. What the review
+corrected: the spec had listed Venus among the Bodies whose first Colony eases, which the glossary
+rules out (Venus has no ground to claim); the spec and a data comment said "under the Unrest
+heading", and the Report has no such heading (the line is filed under *On Earth*); the hook's doc
+comment did not say it now moves Unrest; the easing wrote no log line where every other Unrest move
+does; the Report line's registry carried an argument its text never uses; and the test's doc
+comment claimed a station and Antarctica, which it now asserts. Two consequences the review named
+and the spec now states: the easing lands before the turn's Unrest step, so a Region at the top
+eased to nine and a half does not throw its holder off that turn; and a Region whose net line has a
+named cause that turn carries the half unnamed inside its figures, as it carries the natural fall,
+which the glossary's Unrest entry now says.
+
 ## The sweep
 
 [`../sweeps/after-395.txt`](../sweeps/after-395.txt), 20 seeds x four seatings at the shipped

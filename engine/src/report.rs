@@ -431,9 +431,9 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("colony_founded", &["faction", "slot", "body", "n"]),
     // Ticket #353 (version 0.09.1): who the Habitat room had no place for, at all four clamp sites.
     ("no_habitat_room", &["n", "place"]),
-    // Ticket #345 (version 0.09.1): a Body settled for the first time. Ticket #395 (version
-    // 0.09.3): and the world eases at the news, one line for the whole Earth.
-    ("first_to_body", &["faction", "body", "colony", "n", "ease"]),
+    // Ticket #345 (version 0.09.1): a Body settled for the first time.
+    ("first_to_body", &["faction", "body", "colony", "n"]),
+    // Ticket #395 (version 0.09.3): and the world eases at the news, one line for the whole Earth.
     ("first_to_body_eases", &["body", "ease"]),
     ("disembarked", &["n", "colony"]),
     ("station_built", &["faction", "station"]),

@@ -3556,6 +3556,12 @@ impl Game {
     ///
     /// Returns whether the first was claimed, and pays the windfall into the seat's accumulator when
     /// it was. It is paid once: losing the Colony and taking it back never pays it again.
+    ///
+    /// Ticket #395 (version 0.09.3): a claim also eases the world -- half a point off every Region's
+    /// Unrest, held or nobody's, once a Body -- said in one line for the whole Earth. It lands in
+    /// the Resolution's cargo step, before the Unrest step, so a Region at the top eased to nine
+    /// and a half does not throw its holder off that turn, and a Region whose net line has a named
+    /// cause carries the half unnamed inside its figures, as the natural fall does.
     pub fn claim_first(&mut self, seat: Seat, body: BodyId, colony: ColonyId) -> bool {
         if body == BodyId::Earth {
             return false;
@@ -3587,6 +3593,7 @@ impl Game {
         for sid in StateId::ALL {
             self.lower_unrest(sid, ease);
         }
+        self.log(format!("The first Colony on {body_name} eased Unrest by {} in every Region on Earth.", figure(ease)));
         let args = [("faction", faction), ("body", body_name.clone()), ("colony", place), ("n", windfall.to_string()), ("ease", figure(ease))];
         let text = self.say("first_to_body", &args);
         self.report_line(LineKind::ColonyFounded, Some(ReportPlace::Colony(colony)), text);
