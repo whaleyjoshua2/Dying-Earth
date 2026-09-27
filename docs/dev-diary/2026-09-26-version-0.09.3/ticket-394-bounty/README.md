@@ -51,6 +51,21 @@ twenty-one, under the floor, and with the least at 1 a bounty of 2.4 at a price 
 against the lean one's 1.0: the same arithmetic that bounds the lift by Influence at nine
 Colonists, named in the spec.
 
+## The review
+
+The standards review found the word: *prize* is the glossary's First to a Body windfall, so this
+is the **bounty** throughout the tree (the ticket's comments keep the word the rounds were held
+in); and *outpost*, an avoided synonym, is *Colony or station* in the tree's own prose. It found the
+board's largest size computed inside every bounty, every place's yields walked once per rival
+Colony: computed once a plan now and passed in. It found the old block's claim that a Colony's
+worth against a Region's was unmoved, moved verbatim above the line that moves it: reworded with
+the new band (about 2.5 in play, under a neutral Region's 5 to 10, above a held Region's 1.5 to 3).
+The sum of a place's output is one method on the Output row (`PlaceOutput::made`), which the size
+and the witness read. The spec review found the floor's gloss wrong by five (a Colony of eight with
+a Mine, a Generator and a Factory sizes about 21 on the data, so the designer's 26 sits a little
+above it), the starting station's size counted with gross Energy, and the before-sweep's ranges
+misquoted: all three corrected.
+
 ## The sweep
 
 [`sweeps/after-394-least-zero.txt`](../sweeps/after-394-least-zero.txt), the rescaled bounty with
