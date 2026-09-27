@@ -30,6 +30,8 @@ enum Cat {
     Accord,
     /// Ticket #52: a Constabulary, Relief and Resettle.
     Constabulary,
+    /// Ticket #389 (version 0.09.3): a Stadium, after a Constabulary.
+    Stadium,
     Relief,
     Resettle,
     /// Ticket #267 (version 0.08.4): a Smear campaign against a rival.
@@ -319,6 +321,7 @@ impl Game {
             Cat::ArmyOrBarracks => w.build_army_or_barracks,
             Cat::BuildInfluence => w.build_influence,
             Cat::Constabulary => w.build_constabulary,
+            Cat::Stadium => w.build_stadium,
             Cat::Relief => w.relief,
             Cat::Resettle => w.resettle,
             Cat::Smear => w.smear,
@@ -1028,6 +1031,15 @@ impl Game {
                             }
                             (Cat::Constabulary, self.base_weight(seat, Cat::Constabulary))
                         }
+                        // Ticket #389 (version 0.09.3): the Stadium after the Constabulary, at the
+                        // designer's word -- only where one already stands and Unrest is still 5 or
+                        // more, the second answer to a Region that stays restive.
+                        FacilityKind::Stadium => {
+                            if self.state(sid).unrest < 5.0 || !self.constabulary_online(sid) {
+                                continue;
+                            }
+                            (Cat::Stadium, self.base_weight(seat, Cat::Stadium))
+                        }
                         FacilityKind::LaunchSite => {
                             if has_launch {
                                 continue;
@@ -1075,7 +1087,10 @@ impl Game {
                         && !self.state(sid).queue.iter().any(|b| b.item == BuildItem::Facility(FacilityKind::Embassy));
                     // Ticket #52: a Constabulary in a state the seat has just Occupied is worth more:
                     // Occupation is what put the Unrest there, and Pacification halves above 4.
-                    let just_occupied = fk == FacilityKind::Constabulary && self.state(sid).control.is_occupied();
+                    // Ticket #389 (version 0.09.3): the Stadium takes the Constabulary's multipliers
+                    // here and below, being its second answer to the same Region.
+                    let calms = matches!(fk, FacilityKind::Constabulary | FacilityKind::Stadium);
+                    let just_occupied = calms && self.state(sid).control.is_occupied();
                     let sway = if (first_embassy && self.standing_pressed(seat, Place::State(sid))) || just_occupied { m.threat } else { 1.0 };
                     // Ticket #56: a Facility that waits on a Tech is not offered until it is in.
                     if self.tables.facility(fk).needs_tech.map(|t| !self.has_tech(t)).unwrap_or(false) {
@@ -1088,7 +1103,7 @@ impl Game {
                     let sea_close = fk == FacilityKind::SeaWall && self.sea_is_close(sid);
                     // Ticket #332 (version 0.09.0): and the early Mine, in the one Region chosen above.
                     let early_mine = job == FacilityKind::Mine && early_mine_region == Some(sid);
-                    let seizes_the_moment = sea_close || early_mine || (fk == FacilityKind::Constabulary && self.state(sid).unrest >= 9.0);
+                    let seizes_the_moment = sea_close || early_mine || (calms && self.state(sid).unrest >= 9.0);
                     let opportunity = if seizes_the_moment { m.opportunity } else { 1.0 };
                     // Ticket #70 (version 0.05.5): the rising sea is a threat to the state, so a Sea
                     // Wall with the sea close takes the threat multiplier as well.
@@ -1103,7 +1118,7 @@ impl Game {
                     // 5, so it competes with the Scrubber on even terms. The Research ticket of
                     // 0.05.5 found Coastal Engineering done by turn 16 to 18 in every seed and no
                     // Sea Wall ever built: the Custodian AI held its Materials for a Scrubber every time.
-                    let pull = if fk == FacilityKind::Constabulary || sea_close || early_mine { gap } else { gap_for(cat, Some(name)) };
+                    let pull = if calms || sea_close || early_mine { gap } else { gap_for(cat, Some(name)) };
                     let note = if early_mine { format!("build {} in {} (the early Mine)", name, self.tables.state(sid).name) } else { format!("build {} in {}", name, self.tables.state(sid).name) };
                     push(vec![Order::BuildFacility { state: sid, kind: fk }], cat, base, pull, sway, opportunity, note, None);
                 }

@@ -6756,6 +6756,10 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         if game.constabulary_online(sid) {
             ui.label(RichText::new("A Constabulary here takes 1 off every turn and damps what the climate and the refugees add.").weak());
         }
+        // Ticket #389 (version 0.09.3): the Stadium damps the climate's rises, and stacks with the police.
+        if game.stadium_online(sid) {
+            ui.label(RichText::new(if game.constabulary_online(sid) { "A Stadium here halves what is left of the climate's rises after the Constabulary: a quarter lands." } else { "A Stadium here halves what the climate adds to the Unrest." }).weak());
+        }
         // Ticket #54: a Scrubber calms its state as well as the air.
         if game.scrubbers_online(sid) > 0 {
             ui.label(

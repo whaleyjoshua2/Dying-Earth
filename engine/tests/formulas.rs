@@ -4463,8 +4463,9 @@ fn f_coastal_engineering_is_the_thirteenth_tech() {
     // 0.08.0: ten through version 0.07, the School on ticket #185, and the four Unique Facilities on
     // tickets #182 to #186 -- the Investment Bank, the Spaceport, the Reactor and the Academy.
     assert_eq!(g.tables.facility(FacilityKind::SeaWall).needs_tech, Some(TechId::CoastalEngineering));
-    // Ticket #332 (version 0.09.0): and the Mine, sixteen.
-    assert_eq!(FacilityKind::ALL.len(), 16, "sixteen Facilities");
+    // Ticket #332 (version 0.09.0): and the Mine, sixteen. Ticket #389 (version 0.09.3): and the
+    // Stadium, seventeen.
+    assert_eq!(FacilityKind::ALL.len(), 17, "seventeen Facilities");
 }
 
 /// (g) Antarctica opens the first Climate phase the Temperature stands at +1.6, stays open, and its
@@ -12209,7 +12210,9 @@ fn the_queue_is_served_in_order_and_a_launch_pad_fire_takes_the_turns_widgets() 
 fn four_makers_the_factory_makes_widgets_the_mine_makes_materials_and_the_start_board_has_both() {
     let mut g = game();
     calm(&mut g);
-    assert_eq!(FacilityKind::ALL.last(), Some(&FacilityKind::Mine), "appended last");
+    // Ticket #389 (version 0.09.3): the Stadium stands after the Mine now, appended last in its turn.
+    assert_eq!(FacilityKind::ALL[FacilityKind::ALL.len() - 2], FacilityKind::Mine, "appended after every kind before it");
+    assert_eq!(FacilityKind::ALL.last(), Some(&FacilityKind::Stadium), "appended last");
     assert_eq!(ModuleKind::ALL.last(), Some(&ModuleKind::Factory), "appended last");
     assert!(ModuleKind::BUILDABLE.contains(&ModuleKind::Factory));
     assert_eq!((FacilityKind::Mine.name(), ModuleKind::Factory.name()), ("Mine", "Factory"), "one name in both lists");
@@ -16454,4 +16457,66 @@ fn a_breaks_rise_is_a_cause_on_the_net_line_and_the_break_keeps_its_line() {
     let net: Vec<&&String> = texts.iter().filter(|t| t.starts_with(&format!("{name}: Unrest from"))).collect();
     assert_eq!(net.len(), 1, "one net line for home: {texts:?}");
     assert!(net[0].contains(&format!("the {}", b.name)), "the Break is a cause on it: {}", net[0]);
+}
+
+/// Ticket #389 (version 0.09.3): **the Stadium halves what the climate adds to its Region's
+/// Unrest, a quarter where a Constabulary stands too, and touches no Agitate.** It damps, it does
+/// not drain: the Constabulary takes its half point off first, the Stadium halves what is left.
+#[test]
+fn a_stadium_halves_a_climate_rise_and_quarters_it_with_a_constabulary() {
+    let mut g = game();
+    let sid = StateId::Europe;
+    g.state_mut(sid).facilities.push(facility(FacilityKind::Stadium));
+    g.state_mut(sid).unrest = 3.0;
+    assert_eq!(g.raise_unrest(sid, 1.0, UnrestSource::Climate), 0.5, "a heat rise of 1 lands as a half");
+    assert_eq!(g.raise_unrest(sid, 2.0, UnrestSource::Climate), 1.0, "a sea rise of 2 lands as 1");
+    assert_eq!(g.raise_unrest(sid, 1.0, UnrestSource::Agitate), 1.0, "an Agitate is untouched");
+    assert_eq!(g.raise_unrest(sid, 1.0, UnrestSource::Refugees), 1.0, "and so are refugees");
+    g.state_mut(sid).facilities.push(facility(FacilityKind::Constabulary));
+    assert_eq!(g.raise_unrest(sid, 1.0, UnrestSource::Climate), 0.25, "with a Constabulary a heat rise of 1 lands as a quarter");
+    assert_eq!(g.raise_unrest(sid, 1.0, UnrestSource::Agitate), 0.5, "the Constabulary alone damps an Agitate");
+    assert_eq!(g.tables.unrest.stadium_factor, 0.5, "the figure lives in unrest.toml");
+    let row = g.tables.facility(FacilityKind::Stadium);
+    assert_eq!((row.materials, row.widgets, row.energy_upkeep, row.no_slot, row.needs_tech.is_some()), (20, 4, 1, false, false), "the cheaper row, a slot, no Tech");
+}
+
+/// Ticket #389: **one Stadium to a Region**, as one Constabulary; the second is refused at the door,
+/// whether one stands, is building, or is ordered in the same list.
+#[test]
+fn a_stadium_is_one_to_a_region() {
+    let mut g = game();
+    let sid = g.controlled_states(Seat(0))[0];
+    g.seat_mut(Seat(0)).stockpile.materials = 500.0;
+    let o = Order::BuildFacility { state: sid, kind: FacilityKind::Stadium };
+    g.check_order(Seat(0), &[], &o).expect("the first Stadium is allowed");
+    let err = g.check_order(Seat(0), std::slice::from_ref(&o), &o).unwrap_err().0;
+    assert!(err.contains("Stadium"), "a second in the same list is refused: {err}");
+    g.state_mut(sid).facilities.push(facility(FacilityKind::Stadium));
+    let err = g.check_order(Seat(0), &[], &o).unwrap_err().0;
+    assert!(err.contains("Stadium"), "a second beside one standing is refused: {err}");
+}
+
+/// Ticket #389: **a computer seat raises a Stadium only where a Constabulary already stands and
+/// Unrest is still 5 or more**, the designer's order for the two: the Constabulary first, since it
+/// drains and damps and raises the Influence bar; the Stadium the second answer to a Region that
+/// stays restive.
+#[test]
+fn a_computer_seat_raises_a_stadium_only_after_a_constabulary_where_unrest_stays_high() {
+    let restive = |with_constabulary: bool, unrest: f64| {
+        let mut g = game();
+        calm(&mut g);
+        g.take_control(StateId::NorthAfrica, Seat(1));
+        g.seats[1].stockpile.ducats = 200.0;
+        g.seats[1].stockpile.materials = 300.0;
+        g.seats[1].venture_fund = 1500.0;
+        if with_constabulary {
+            g.state_mut(StateId::NorthAfrica).facilities.push(facility(FacilityKind::Constabulary));
+        }
+        g.state_mut(StateId::NorthAfrica).unrest = unrest;
+        g.ai_orders(Seat(1))
+    };
+    let stadium = |orders: &[Order]| orders.iter().any(|o| matches!(o, Order::BuildFacility { state: StateId::NorthAfrica, kind: FacilityKind::Stadium }));
+    assert!(!stadium(&restive(false, 9.0)), "no Stadium before a Constabulary stands, however restive");
+    assert!(!stadium(&restive(true, 3.0)), "no Stadium in a calm Region");
+    assert!(stadium(&restive(true, 9.0)), "a Stadium where a Constabulary stands and Unrest is still high: {:?}", restive(true, 9.0));
 }

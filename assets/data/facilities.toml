@@ -326,3 +326,19 @@ per_industry_level = 1
 # when the divisor was a code literal in the engine, and 50 hundred-million before ticket #143.
 [population_factor]
 population_per_point = 5000.0
+
+# Ticket #389 (version 0.09.3): the Stadium, the designer's "entertainment themed" building that
+# lowers Unrest. It DAMPS rather than drains: it halves what the climate adds to its state's Unrest
+# (the heat, the sea, a Break, a Climate card) and touches no Agitate, a rise quartered where a
+# Constabulary stands too -- the Constabulary takes its half point off first and the Stadium halves
+# what is left (`stadium_factor` in unrest.toml). Cheaper than the Constabulary at the designer's
+# word ("q3 b"), one to a state, every Faction's alike (no versions this version, "q4 a"). Appended
+# last with its enum variant, as every kind since the Mine.
+[[facility]]
+id = "stadium"
+name = "Stadium"
+materials = 20
+widgets = 4
+energy_upkeep = 1
+does = "halves what the climate adds to this state's Unrest (a quarter with a Constabulary); an Agitate is untouched"
+emissions = 0.0

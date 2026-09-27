@@ -90,6 +90,10 @@ first_colony_ease = 0.5
 green_techs_two = 0.5
 green_techs_four = 1.0
 constabulary_damping = 0.5
+# Ticket #389 (version 0.09.3): a working Stadium multiplies what is left of a climate rise after the
+# damping above by this -- half, so a heat rise of 1 lands as 0.5 with a Stadium and 0.25 with a
+# Constabulary beside it. Refugees and an Agitate are not the climate and are untouched.
+stadium_factor = 0.5
 
 # ---- thresholds (rule 5 of #52)
 # At `army_threshold` the Standing Army stops replenishing; at `facility_threshold` every Facility

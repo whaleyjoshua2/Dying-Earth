@@ -35,6 +35,8 @@ pub struct SimResult {
     pub throw_offs: u32,
     pub peak_unrest: f64,
     pub constabularies: u32,
+    /// Ticket #389 (version 0.09.3): Stadiums completed over the game, all seats.
+    pub stadiums: u32,
     pub relief_orders: u32,
     pub population_moved: f64,
     /// Ticket #53: each seat's Blame at the end, its share of the table's, and the multiplier its
@@ -471,6 +473,7 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
     // population the refugee flows carried (to the tenth the line prints).
     let throw_offs = game.log.iter().filter(|l| l.contains("threw off the")).count() as u32;
     let constabularies = game.log.iter().filter(|l| l.contains("completed Constabulary at")).count() as u32;
+    let stadiums = game.log.iter().filter(|l| l.contains("completed Stadium at")).count() as u32;
     let mines_completed = game.log.iter().filter(|l| l.contains("completed Mine at")).count() as u32;
     let factories_completed = game.log.iter().filter(|l| l.contains("completed Factory at")).count() as u32;
     let relief_orders = game.log.iter().filter(|l| l.trim_start().starts_with("take") && l.contains("pay Relief in")).count() as u32;
@@ -596,6 +599,7 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         throw_offs,
         peak_unrest,
         constabularies,
+        stadiums,
         relief_orders,
         population_moved,
         blame,

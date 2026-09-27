@@ -139,6 +139,8 @@ fn main() {
                         let mut wins = [0u32; 4];
                         // Ticket #60: the balance counters, for the one-cell runs of the balance report.
                         let (mut draws, mut scrubbers, mut leapfrogs, mut constabularies, mut sea_walls) = (0u32, 0u32, 0u32, 0u32, 0u32);
+                        // Ticket #389 (version 0.09.3): Stadiums, beside the Constabularies they follow.
+                        let mut stadiums = 0u32;
                         let (mut first_colony, mut off_earth, mut techs) = (Vec::new(), Vec::new(), Vec::new());
                         let mut breaks_fired = vec![0u32; tables.climate.breaks.len()];
                         let mut highest_rung = 0u32;
@@ -279,6 +281,7 @@ fn main() {
                             scrubbers += r.scrubbers;
                             leapfrogs += r.leapfrogs;
                             constabularies += r.constabularies;
+                            stadiums += r.stadiums;
                             sea_walls += r.sea_walls_built;
                             if let Some(t) = r.first_colony_turn {
                                 first_colony.push(t);
@@ -449,7 +452,7 @@ fn main() {
                             println!("      draws {draws}, collapses {}/{seeds}, median collapse turn {median}", turns.len());
                             println!("      median turn of first Colony {}", median_u(&mut first_colony));
                             println!("      median Colonists off Earth at the end, all seats {}", median_u(&mut off_earth));
-                            println!("      Scrubbers {scrubbers}, Leapfrogs {leapfrogs}, Constabularies {constabularies}, Sea Walls {sea_walls}");
+                            println!("      Scrubbers {scrubbers}, Leapfrogs {leapfrogs}, Constabularies {constabularies}, Stadiums {stadiums}, Sea Walls {sea_walls}");
                             println!("      Techs: median {} completed, highest rung reached {highest_rung}", median_u(&mut techs));
                             println!(
                                 "      Observatories standing at the end, all seeds, by seat {observatories:?}; median Research made off Earth a game, by seat {:?}",

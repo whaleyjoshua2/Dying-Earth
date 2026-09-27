@@ -1040,6 +1040,9 @@ pub struct UnrestTable {
     pub green_techs_two: f64,
     pub green_techs_four: f64,
     pub constabulary_damping: f64,
+    /// Ticket #389 (version 0.09.3): what a working Stadium multiplies a climate rise by, after the
+    /// damping above; half, a quarter of the rise where a Constabulary stands too.
+    pub stadium_factor: f64,
     pub army_threshold: f64,
     pub facility_threshold: f64,
     pub throw_off_threshold: f64,
@@ -1165,6 +1168,9 @@ pub struct AiWeights {
     pub relief: f64,
     /// Ticket #52: raise a Constabulary in a restive state.
     pub build_constabulary: f64,
+    /// Ticket #389 (version 0.09.3): the Stadium, raised only where a Constabulary already stands
+    /// and Unrest is still 5 or more.
+    pub build_stadium: f64,
     /// Ticket #267 (version 0.08.4): smear a rival the seat is Cold or Hostile toward whose Blame
     /// share stands above the fair quarter.
     pub smear: f64,

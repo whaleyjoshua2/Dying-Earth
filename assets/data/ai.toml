@@ -31,6 +31,8 @@ leapfrog = 0
 strip_permit = 7
 relief = 4
 build_constabulary = 5
+# Ticket #389 (version 0.09.3): the Stadium, raised only where a Constabulary already stands and Unrest is still 5 or more.
+build_stadium = 5
 resettle = 2
 # Ticket #267 (version 0.08.4): smear a rival the seat is Cold or Hostile toward, above a fair share.
 smear = 4
@@ -88,6 +90,8 @@ leapfrog = 10
 strip_permit = 0
 relief = 6
 build_constabulary = 6
+# Ticket #389 (version 0.09.3): the Stadium, raised only where a Constabulary already stands and Unrest is still 5 or more.
+build_stadium = 6
 resettle = 2
 # Ticket #267 (version 0.08.4): smear a rival the seat is Cold or Hostile toward, above a fair share.
 smear = 4
@@ -142,6 +146,8 @@ leapfrog = 0
 strip_permit = 0
 relief = 4
 build_constabulary = 4
+# Ticket #389 (version 0.09.3): the Stadium, raised only where a Constabulary already stands and Unrest is still 5 or more.
+build_stadium = 4
 resettle = 2
 # Ticket #267 (version 0.08.4): smear a rival the seat is Cold or Hostile toward, above a fair share.
 smear = 4
@@ -196,6 +202,8 @@ leapfrog = 0
 strip_permit = 0
 relief = 5
 build_constabulary = 5
+# Ticket #389 (version 0.09.3): the Stadium, raised only where a Constabulary already stands and Unrest is still 5 or more.
+build_stadium = 5
 resettle = 2
 # Ticket #267 (version 0.08.4): smear a rival the seat is Cold or Hostile toward, above a fair share.
 smear = 4

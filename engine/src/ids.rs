@@ -181,10 +181,16 @@ pub enum FacilityKind {
     /// follow the Materials here; Clean Manufacturing stays with the Factory. Appended last:
     /// `Tables::facility` indexes this enum by discriminant.
     Mine,
+    /// Ticket #389 (version 0.09.3): the **Stadium**, the designer's "entertainment themed"
+    /// building that lowers Unrest -- by damping, not draining: it halves what the climate adds to
+    /// its Region's Unrest (the heat, the sea, a Break, a Climate card), a quarter where a
+    /// Constabulary stands too, and touches no Agitate. Cheaper than the Constabulary, one to a
+    /// Region, every Faction's alike. Appended last, as every kind since the Mine.
+    Stadium,
 }
 
 impl FacilityKind {
-    pub const ALL: [FacilityKind; 16] = [
+    pub const ALL: [FacilityKind; 17] = [
         FacilityKind::Factory,
         FacilityKind::PowerPlant,
         FacilityKind::Refinery,
@@ -201,6 +207,7 @@ impl FacilityKind {
         FacilityKind::Reactor,
         FacilityKind::Academy,
         FacilityKind::Mine,
+        FacilityKind::Stadium,
     ];
     pub fn name(self) -> &'static str {
         match self {
@@ -221,6 +228,7 @@ impl FacilityKind {
             FacilityKind::Academy => "Academy",
             // Ticket #332 (version 0.09.0): one name in both lists, by the Refinery precedent.
             FacilityKind::Mine => "Mine",
+            FacilityKind::Stadium => "Stadium",
         }
     }
 

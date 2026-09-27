@@ -4347,6 +4347,11 @@ impl Game {
         self.state(s).facilities.iter().any(|f| f.kind == FacilityKind::Constabulary && f.working())
     }
 
+    /// Ticket #389 (version 0.09.3): a working Stadium here, which halves what the climate adds.
+    pub fn stadium_online(&self, s: StateId) -> bool {
+        self.state(s).facilities.iter().any(|f| f.kind == FacilityKind::Stadium && f.working())
+    }
+
     /// How much smaller a rise from `source` is here (rule 4 of #52, widened on #53 so the green
     /// Techs moderate arriving refugees as well as the climate). Never below zero; never a fall.
     pub fn unrest_damping(&self, s: StateId, source: UnrestSource) -> f64 {
@@ -4375,7 +4380,13 @@ impl Game {
         if amount <= 0.0 {
             return 0.0;
         }
-        let damped = (amount - self.unrest_damping(s, source)).max(0.0);
+        let mut damped = (amount - self.unrest_damping(s, source)).max(0.0);
+        // Ticket #389 (version 0.09.3): a working Stadium halves what is left of a CLIMATE rise
+        // after the damping above -- a heat rise of 1 lands as a half, a quarter with a
+        // Constabulary beside it -- and touches no Agitate and no refugees.
+        if source == UnrestSource::Climate && self.stadium_online(s) {
+            damped *= self.tables.unrest.stadium_factor;
+        }
         if damped <= 0.0 {
             return 0.0;
         }
