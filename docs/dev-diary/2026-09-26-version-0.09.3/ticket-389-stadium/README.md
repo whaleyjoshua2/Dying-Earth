@@ -36,6 +36,20 @@ them to compile):
   no Stadium among the seat's orders at Unrest 9 beside a Constabulary, until the Stadium took the
   Constabulary's multipliers as well as its weight; green after.
 
+## The review
+
+Two axes, standards and spec, and both found the same thing: **the quarter is exact only for a rise
+of one.** The Constabulary's damping is a flat half point off, not a halving, so with the Stadium's
+halving after it a heat rise of one lands as a quarter but the sea's rise of two as three quarters;
+and a quarter breaks the scale the whole game printed in, "Unrest moves in halves", so 3.25 printed
+as 3.2. Put to the designer with three options; the answer was **Unrest moves in quarters** from
+here, printing to two places where it needs them, and the glossary's "in halves" amended. The data
+row, the card note and two doc comments that claimed a quarter for every rise now say a heat rise of
+one; a witness pins the sea's three quarters and the printing. The review also named the
+Constabulary's multipliers, which the resolution's "weight" had not covered and without which the
+computer never chose a Stadium; the designer kept them. A second computer-seat witness pins the
+gate at five.
+
 ## The sweep
 
 [`../sweeps/after-389.txt`](../sweeps/after-389.txt), 20 seeds x four seatings at the shipped

@@ -340,5 +340,5 @@ name = "Stadium"
 materials = 20
 widgets = 4
 energy_upkeep = 1
-does = "halves what the climate adds to this state's Unrest (a quarter with a Constabulary); an Agitate is untouched"
+does = "halves what the climate adds to this state's Unrest, after a Constabulary takes its half point off (a heat rise of one lands as a quarter with both); an Agitate is untouched"
 emissions = 0.0

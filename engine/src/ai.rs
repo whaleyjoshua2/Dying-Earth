@@ -1088,7 +1088,8 @@ impl Game {
                     // Ticket #52: a Constabulary in a state the seat has just Occupied is worth more:
                     // Occupation is what put the Unrest there, and Pacification halves above 4.
                     // Ticket #389 (version 0.09.3): the Stadium takes the Constabulary's multipliers
-                    // here and below, being its second answer to the same Region.
+                    // here and below, at the designer's word: its second answer to the same Region,
+                    // which in a Region just Occupied is the same restive Region the Occupation made.
                     let calms = matches!(fk, FacilityKind::Constabulary | FacilityKind::Stadium);
                     let just_occupied = calms && self.state(sid).control.is_occupied();
                     let sway = if (first_embassy && self.standing_pressed(seat, Place::State(sid))) || just_occupied { m.threat } else { 1.0 };

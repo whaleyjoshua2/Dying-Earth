@@ -16520,3 +16520,36 @@ fn a_computer_seat_raises_a_stadium_only_after_a_constabulary_where_unrest_stays
     assert!(!stadium(&restive(true, 3.0)), "no Stadium in a calm Region");
     assert!(stadium(&restive(true, 9.0)), "a Stadium where a Constabulary stands and Unrest is still high: {:?}", restive(true, 9.0));
 }
+
+/// Ticket #389 (the review's finding): **Unrest moves in quarters where a Stadium and a Constabulary
+/// stand together**, at the designer's word. The Constabulary's half point is flat and the Stadium's
+/// halving is of what is left, so the sea's rise of two lands as three quarters, not a half; and the
+/// card prints a quarter to two places where it prints a half to one.
+#[test]
+fn unrest_moves_in_quarters_beside_a_stadium_and_prints_them() {
+    let mut g = game();
+    let sid = StateId::Europe;
+    g.state_mut(sid).facilities.push(facility(FacilityKind::Stadium));
+    g.state_mut(sid).facilities.push(facility(FacilityKind::Constabulary));
+    g.state_mut(sid).unrest = 3.0;
+    assert_eq!(g.raise_unrest(sid, 2.0, UnrestSource::Climate), 0.75, "the sea's two: (2 - 0.5) x 0.5");
+    assert_eq!(Game::unrest_figure(g.state(sid).unrest), "3.75", "a quarter prints to two places");
+    assert_eq!(Game::unrest_figure(3.5), "3.5", "a half to one");
+    assert_eq!(Game::unrest_figure(3.0), "3", "a whole bare");
+    assert_eq!(g.unrest_text(sid), "3.75", "and the card reads the same");
+}
+
+/// Ticket #389: **the computer's gate for a Stadium is Unrest 5**, as the Constabulary's is; under
+/// it the candidate is never offered, so it can never be chosen.
+#[test]
+fn a_computer_seat_does_not_offer_a_stadium_under_unrest_five() {
+    let mut g = game();
+    calm(&mut g);
+    g.take_control(StateId::NorthAfrica, Seat(1));
+    g.seats[1].stockpile.materials = 300.0;
+    g.seats[1].venture_fund = 1500.0;
+    g.state_mut(StateId::NorthAfrica).facilities.push(facility(FacilityKind::Constabulary));
+    g.state_mut(StateId::NorthAfrica).unrest = 4.5;
+    let orders = g.ai_orders(Seat(1));
+    assert!(!orders.iter().any(|o| matches!(o, Order::BuildFacility { kind: FacilityKind::Stadium, .. })), "under five, never: {orders:?}");
+}

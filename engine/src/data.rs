@@ -1041,7 +1041,7 @@ pub struct UnrestTable {
     pub green_techs_four: f64,
     pub constabulary_damping: f64,
     /// Ticket #389 (version 0.09.3): what a working Stadium multiplies a climate rise by, after the
-    /// damping above; half, a quarter of the rise where a Constabulary stands too.
+    /// damping above; half, so a heat rise of one lands as a quarter where a Constabulary stands too.
     pub stadium_factor: f64,
     pub army_threshold: f64,
     pub facility_threshold: f64,

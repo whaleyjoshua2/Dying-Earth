@@ -183,8 +183,9 @@ pub enum FacilityKind {
     Mine,
     /// Ticket #389 (version 0.09.3): the **Stadium**, the designer's "entertainment themed"
     /// building that lowers Unrest -- by damping, not draining: it halves what the climate adds to
-    /// its Region's Unrest (the heat, the sea, a Break, a Climate card), a quarter where a
-    /// Constabulary stands too, and touches no Agitate. Cheaper than the Constabulary, one to a
+    /// its Region's Unrest (the heat, the sea, a Break, a Climate card) after a Constabulary takes
+    /// its half point off, so a heat rise of one lands as a quarter with both, and touches no
+    /// Agitate. Cheaper than the Constabulary, one to a
     /// Region, every Faction's alike. Appended last, as every kind since the Mine.
     Stadium,
 }

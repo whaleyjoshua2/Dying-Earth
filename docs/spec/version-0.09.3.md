@@ -227,8 +227,11 @@ Regions carry Unrest, so the building is a Region Facility.
 **The Stadium damps, it does not drain.** While it stands and is online it **halves what the
 climate adds** to its Region's Unrest: the heat, the rising sea, a Break, a Climate card. It
 touches neither an Agitate nor arriving Refugees. **It stacks with a Constabulary**: the
-Constabulary takes its half point off a rise first, and the Stadium halves what is left, so a heat
-rise of one lands as a quarter where both stand (`stadium_factor` in `unrest.toml`).
+Constabulary takes its half point off a rise first (a flat half, whatever the rise), and the
+Stadium halves what is left, so a heat rise of one lands as a quarter where both stand, and the
+sea's rise of two as three quarters (`stadium_factor` in `unrest.toml`). **Unrest therefore moves
+in quarters** from this version, at the designer's word after the review, where it moved in halves;
+a quarter prints to two places (*3.25*) and every other figure as before.
 
 **Its row**: 20 Materials, 4 Widgets, 1 Energy upkeep, a build slot, one to a Region, no Tech, no
 Emissions; cheaper and lighter than the Constabulary's 25, 4 and 2, at the designer's word. **Every
@@ -236,9 +239,10 @@ Faction builds the same Stadium**; no Faction versions this version. A second in
 refused at the door as a second Constabulary is.
 
 **The computer seats** raise a Stadium only where a Constabulary already stands and Unrest is
-still 5 or more, at the Constabulary's weight and with its multipliers (the threat multiplier in a
-Region just Occupied, the opportunity multiplier at Unrest 9): the Constabulary is the first
-answer to a restive Region, since it drains as well as damps; the Stadium is the second.
+still 5 or more, at the Constabulary's weight and, at the designer's word after the review, with
+its multipliers (the threat multiplier in a Region just Occupied, the opportunity multiplier at
+Unrest 9), without which the computer never chose one: the Constabulary is the first answer to a
+restive Region, since it drains as well as damps; the Stadium is the second.
 
 **The sweep** (20 seeds x four seatings at the shipped cell): **6 / 4 / 1 / 9, collapses 60**,
 against 6 / 4 / 1 / 7 and 62 after §5, within noise; the computer built 42 Stadiums over the four

@@ -4320,9 +4320,12 @@ impl Game {
         self.state(s).unrest
     }
 
-    /// Ticket #53: Unrest moves in halves, so print the fraction only when there is one.
+    /// Ticket #53: Unrest moves in halves, so print the fraction only when there is one. Ticket #389
+    /// (version 0.09.3): and in quarters where a Stadium halves what a Constabulary left of a climate
+    /// rise, at the designer's word, so a quarter prints to two places (3.25) and nothing else does.
     pub fn unrest_figure(v: f64) -> String {
-        figure(v)
+        let tenths = (v * 10.0).round() / 10.0;
+        if (v - tenths).abs() < 1e-9 { figure(v) } else { format!("{v:.2}") }
     }
 
     /// A state's Unrest as the card and the map print it.
