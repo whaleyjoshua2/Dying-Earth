@@ -141,3 +141,32 @@ unnamed inside its figures, as it carries the natural fall.
 
 **The sweep** (20 seeds x four seatings at the shipped cell): **6 / 6 / 1 / 5, collapses 62**,
 against 5 / 6 / 1 / 7 and 61 after §3; within a seed's noise, as half a point once a game would be.
+
+## 5. A Choice Card the player cannot engage with
+
+The authority is [ticket #388](https://github.com/whaleyjoshua2/Dying-Earth/issues/388). The
+designer's complaint was three Ship cards in one game for a seat with no Ships, each printing
+*"you had nothing to decide"* without saying why. The reading first: such a card **never held the
+turn** in the engine; what the player saw was the headless driver printing both sides of a card it
+could not answer, and a Report line with no reason.
+
+**A card that reaches no seat at all is put back.** When the Question phase draws a Choice Card
+that neither side can reach for any of the four seats, the card goes to the **bottom of the deck
+unspent** and the next card is the turn's draw, whatever it is; once a turn, so the deck cannot
+loop. The Report says so in one line: *"Orbital Debris reached nobody at the table and went to the
+bottom of the deck unspent; the next card was drawn."* A card that reaches a rival but not the
+player is **still drawn**, and the rival is asked.
+
+**A seat the card cannot reach is told why.** The Report line for such a seat names the reason in
+the engine's own words, read off the first effect on either side with nothing of the seat's to land
+on, and the outcome: *"Grounded Fleet: you have no Ship, so it passed you by; neither side
+applied."* (*"the Prospectors have no Ship, so it passed them by"* for a rival). The reasons are
+phrases in `report.toml`: no Ship, no Ship in orbit, no Region, no Region with people in it, no
+Region making Widgets, no such Facility, no Colony with a given Module, no Colony with room for
+one. **Neither side is applied** to such a seat, as before; the line now says it. The headless
+driver prints the card's name, its question and that one line for a seat it passed by, and not
+the two sides.
+
+**The computer seats** see the put-back too, since it is keyed to the whole table. **The sweep**
+(20 seeds x four seatings at the shipped cell): **6 / 4 / 1 / 7, collapses 62**, against
+6 / 6 / 1 / 5 and 62 after §4; within a seed's noise.

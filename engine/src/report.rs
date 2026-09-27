@@ -514,6 +514,17 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     // Ticket #337 (version 0.09.0): the card that asks a question, and what each seat answered.
     ("card_asked", &["card", "question"]),
     ("card_answered", &["card", "faction", "answer"]),
+    // Ticket #388 (version 0.09.3): why a card passed a seat by, and a card put back unspent.
+    ("card_passed_by", &["card", "who", "lack", "them"]),
+    ("card_put_back", &["card"]),
+    ("lack_ship", &[]),
+    ("lack_ship_in_orbit", &[]),
+    ("lack_region", &[]),
+    ("lack_populated_region", &[]),
+    ("lack_busy_region", &[]),
+    ("lack_facility", &["facility"]),
+    ("lack_colony_module", &["module"]),
+    ("lack_colony_room", &["module"]),
     ("break_fired", &["temperature", "name", "happened", "text"]),
     ("break_coastal", &["states", "exposure", "percent", "unrest"]),
     ("break_baseline", &["state", "rise"]),

@@ -170,6 +170,20 @@ card_asked = "{card}: {question}"
 # Report draws the four answers together under the card's own name and takes the "{card}: " off
 # the front of each; the whole line stands unaltered in the log and anywhere else it is read.
 card_answered = "{card}: The {faction} {answer}."
+# Ticket #388 (version 0.09.3): a seat neither side of the card reaches is told WHY it passed them by
+# and that neither side applied, in the engine's own reason ({who} is "You" or "The Prospectors",
+# {them} "you" or "them", {lack} one of the lack_* phrases below); and a card that reaches nobody at
+# the table is put back at the bottom unspent and the next card drawn, said once.
+card_passed_by = "{card}: {who} {lack}, so it passed {them} by; neither side applied."
+card_put_back = "{card} reached nobody at the table and went to the bottom of the deck unspent; the next card was drawn."
+lack_ship = "have no Ship"
+lack_ship_in_orbit = "have no Ship in orbit"
+lack_region = "hold no Region"
+lack_populated_region = "hold no Region with people in it"
+lack_busy_region = "hold no Region making Widgets"
+lack_facility = "have no {facility}"
+lack_colony_module = "have no Colony with a {module}"
+lack_colony_room = "have no Colony with room for a {module}"
 # Ticket #259 (version 0.08.4): the turn the off-Earth cards are shuffled into the deck.
 deck_joined = "The {n} Events that can only land off Earth join the deck: Grid Failure, Reactor Leak, Dust Storm, Moonquake, Helium-3 Vein, Rich Seam and Ice Deposit."
 # Ticket #261 (version 0.08.4): the rival's Moment, two steps. {part} is the part still short.

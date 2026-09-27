@@ -86,12 +86,29 @@ impl Game {
         if !self.rolls_a_card() {
             return;
         }
-        let Some(card) = self.deck.cards.pop() else {
-            self.draw = CardDraw::DeckEmpty;
-            return;
+        // Ticket #388 (version 0.09.3): a Choice Card that reaches NO seat at all is put back at
+        // the bottom of the deck, unspent, and the next card is the turn's draw -- once a turn, so
+        // the deck cannot loop; the card that comes next is the draw whatever it is. A card that
+        // reaches a rival but not the player is still drawn: the designer's choice, C of three.
+        let mut put_back = false;
+        let (card, id) = loop {
+            let Some(card) = self.deck.cards.pop() else {
+                self.draw = CardDraw::DeckEmpty;
+                return;
+            };
+            let Card::Event(id) = card;
+            if !put_back && self.tables.event(id).asks() && !Seat::ALL.into_iter().any(|s| self.card_reaches(id, s)) {
+                self.deck.cards.insert(0, card);
+                put_back = true;
+                let name = self.tables.event(id).name.clone();
+                self.log(format!("{name} reached nobody at the table and went to the bottom of the deck unspent."));
+                let text = self.say("card_put_back", &[("card", name)]);
+                self.report_line(LineKind::Card, None, text);
+                continue;
+            }
+            break (card, id);
         };
         self.deck.drawn.push(card);
-        let Card::Event(id) = card;
         if !self.tables.event(id).asks() {
             // One of the 22: held, unannounced, for the Event phase.
             self.draw = CardDraw::Ordinary(id);
@@ -227,6 +244,26 @@ impl Game {
 
     fn side_reaches(&self, side: &[CardEffect], seat: Seat) -> bool {
         !side.is_empty() && side.iter().all(|e| self.card_effect_has_target(e, seat))
+    }
+
+    /// Ticket #388 (version 0.09.3): WHY a card cannot reach this seat, in the engine's own words
+    /// -- "have no Ship in orbit", "hold no Region" -- read off the first effect on either side
+    /// with nothing of the seat's to land on, so the Report and the driver say the same reason the
+    /// draw decided by. Nothing where the card reaches the seat.
+    pub fn card_lack(&self, id: EventId, seat: Seat) -> Option<String> {
+        let c = self.tables.event(id).choice.as_ref()?;
+        let e = c.take_does.iter().chain(c.refuse_does.iter()).find(|e| !self.card_effect_has_target(e, seat))?;
+        let t = &self.tables;
+        Some(match e {
+            CardEffect::PerUnitCost { per: CardThing::Facility(kind), .. } | CardEffect::FacilityOutputMultiplier { facility: kind, .. } => self.say("lack_facility", &[("facility", t.facility(*kind).name.clone())]),
+            CardEffect::PerUnitCost { per: CardThing::ShipInOrbit, .. } | CardEffect::DamageShips { in_orbit: true, .. } => self.say("lack_ship_in_orbit", &[]),
+            CardEffect::HoldShips | CardEffect::HoldOneShip | CardEffect::DamageShips { .. } => self.say("lack_ship", &[]),
+            CardEffect::StandingAllHeld { .. } | CardEffect::UnrestAllHeld { .. } => self.say("lack_region", &[]),
+            CardEffect::UnrestAtBusiest { .. } | CardEffect::WidgetsNow { .. } => self.say("lack_busy_region", &[]),
+            CardEffect::DiscoveryAtColony { module, .. } => self.say("lack_colony_module", &[("module", t.module(*module).name.clone())]),
+            CardEffect::FreeBuilding { module: Some(k), army: false } => self.say("lack_colony_room", &[("module", t.module(*k).name.clone())]),
+            _ => self.say("lack_populated_region", &[]),
+        })
     }
 
     /// Ticket #337: whether this seat could PAY for the card's offer, which is a different question
@@ -468,12 +505,14 @@ impl Game {
             self.report_line_of(seat, LineKind::YourWorks, LineKind::Card, None, text);
         }
         // A seat that was never asked is named too, so the Report does not simply pass it over.
+        // Ticket #388 (version 0.09.3): with the reason, and that neither side applied.
         for seat in Seat::ALL {
             if q.answers[seat.index()] == Some(CardAnswer::NothingToDecide) {
-                let text = self.say(
-                    "card_answered",
-                    &[("card", name.clone()), ("faction", self.seat_name(seat)), ("answer", CardAnswer::NothingToDecide.word().to_string())],
-                );
+                let lack = self.card_lack(q.card, seat).unwrap_or_else(|| CardAnswer::NothingToDecide.word().to_string());
+                // Capitalised, as the answers are: the Report draws the four together under the
+                // card's name and takes the "{card}: " off the front of each.
+                let (who, them) = if self.seat(seat).ai || self.spectator { (format!("The {}", self.seat_name(seat)), "them".to_string()) } else { ("You".to_string(), "you".to_string()) };
+                let text = self.say("card_passed_by", &[("card", name.clone()), ("who", who), ("lack", lack), ("them", them)]);
                 self.report_line_of(seat, LineKind::YourWorks, LineKind::Card, None, text);
             }
         }

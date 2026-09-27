@@ -13652,7 +13652,9 @@ fn the_report_names_every_seats_answer_and_the_game_counts_them() {
     let said = |who: &str, what: &str| lines.iter().any(|l| l.contains("Hard Winter") && l.contains(who) && l.contains(what));
     assert!(said(&g.seat_name(Seat(0)), "took it"), "the Report names the seat that took it: {lines:?}");
     assert!(said(&g.seat_name(Seat(1)), "refused it"), "and the seat that refused: {lines:?}");
-    assert!(said(&g.seat_name(Seat(3)), "nothing to decide"), "and says so for the seat that was not asked: {lines:?}");
+    // Ticket #388 (version 0.09.3): the seat that was not asked is told why -- the Hard Winter
+    // raises Unrest in every Region held, and this seat holds none -- and that neither side applied.
+    assert!(said(&g.seat_name(Seat(3)), "hold no Region") && said(&g.seat_name(Seat(3)), "neither side applied"), "and says why for the seat that was not asked: {lines:?}");
     assert_eq!(g.choice_taken[0], 1, "one taken by seat 0");
     assert_eq!(g.choice_refused[1], 1, "one refused by seat 1");
     assert_eq!(g.choice_not_asked[3], 1, "one never asked of seat 3");
@@ -16284,4 +16286,51 @@ fn the_first_colony_on_each_body_eases_unrest_everywhere_by_a_half() {
     assert_eq!(g.state(StateId::Europe).unrest, 3.0, "neither eases anything");
     assert_eq!(g.report.lines.iter().filter(|l| l.text.contains("eased")).count(), 2, "one line a Body claimed");
     assert_eq!(g.tables.unrest.first_colony_ease, 0.5, "the figure lives in unrest.toml");
+}
+
+/// Ticket #388 (version 0.09.3): **a card that reaches no seat at all is put back and the next card
+/// drawn.** Orbital Debris speaks only to a seat with a Ship in orbit; with no Ship on the board it
+/// goes to the bottom of the deck unspent, the card under it is the turn's draw, and the Report says
+/// so in one line. A card that reaches a rival but not the player is still drawn (the next test).
+#[test]
+fn a_card_that_reaches_nobody_goes_to_the_bottom_and_the_next_is_drawn() {
+    let mut g = game();
+    g.ships.clear();
+    stand_on_a_drawing_turn(&mut g);
+    for _ in 0..200 {
+        // `pop` takes the last card, so Orbital Debris is on top and Salvage Rights under it.
+        g.deck.cards = vec![Card::Event(EventId::SalvageRights), Card::Event(EventId::OrbitalDebris)];
+        g.deck.drawn.clear();
+        g.report.lines.clear();
+        g.question_phase();
+        if g.draw != CardDraw::NoCard {
+            break;
+        }
+    }
+    assert_eq!(g.draw, CardDraw::Choice(EventId::SalvageRights), "the card under it is the draw");
+    assert_eq!(g.deck.cards, vec![Card::Event(EventId::OrbitalDebris)], "and Orbital Debris waits at the bottom, unspent");
+    assert_eq!(g.deck.drawn, vec![Card::Event(EventId::SalvageRights)], "only the card drawn counts as drawn");
+    assert!(g.report.lines.iter().any(|l| l.text.contains("Orbital Debris") && l.text.contains("bottom of the deck")), "{:?}", g.report.lines);
+}
+
+/// Ticket #388: **a seat the card cannot reach is told why it passed them by, and that neither side
+/// applied.** The Grounded Fleet reaches a rival with a Ship and not the player without one; the
+/// player's line reads the reason in the engine's own words, the card is still drawn for the rival.
+#[test]
+fn a_seat_the_card_cannot_reach_is_told_why_and_that_neither_side_applied() {
+    let mut g = game();
+    g.ships.clear();
+    a_colony_ship(&mut g, Seat(1), BodyId::Earth);
+    ask_the_card(&mut g, EventId::GroundedFleet);
+    let q = g.pending_question().expect("the Grounded Fleet is asked, since the rival has a Ship");
+    assert_eq!(q.answer_of(Seat(0)), Some(CardAnswer::NothingToDecide), "the player has no Ship");
+    assert_eq!(q.answer_of(Seat(1)), None, "the rival is asked");
+    let europe = g.state(StateId::Europe).unrest;
+    g.answer_card(Seat(1), true).expect("the rival takes it");
+    g.apply_card_answers();
+    let mine: Vec<&String> = g.report.lines.iter().map(|l| &l.text).filter(|t| t.contains("Grounded Fleet") && t.contains("passed you by")).collect();
+    assert_eq!(mine.len(), 1, "one line for the player: {:?}", g.report.lines);
+    assert!(mine[0].contains("You have no Ship") && mine[0].contains("neither side applied"), "the reason and the outcome: {}", mine[0]);
+    assert!(!g.report.lines.iter().any(|l| l.text.contains("had nothing to decide")), "the old blank line is gone: {:?}", g.report.lines);
+    assert_eq!(g.state(StateId::Europe).unrest, europe, "and nothing was applied to the player");
 }
