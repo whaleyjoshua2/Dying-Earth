@@ -1,0 +1,35 @@
+running 5 tests
+. 1/5
+tenths_a_prospector_facility_price_keeps_its_tenth --- FAILED
+tenths_a_prospector_region_keeps_the_tenth_of_its_ducats --- FAILED
+tenths_the_fund_banks_its_share_to_the_tenth --- FAILED
+tenths_a_refinery_under_automated_refining_yields_four_and_a_half --- FAILED
+failures:
+---- tenths_a_prospector_facility_price_keeps_its_tenth stdout ----
+thread 'tenths_a_prospector_facility_price_keeps_its_tenth' (16308) panicked at engine\tests\formulas.rs:16114:5:
+assertion `left == right` failed: 25 x 0.85 = 21.25, to the nearest tenth
+  left: 21.0
+ right: 21.3
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+---- tenths_a_prospector_region_keeps_the_tenth_of_its_ducats stdout ----
+thread 'tenths_a_prospector_region_keeps_the_tenth_of_its_ducats' (22260) panicked at engine\tests\formulas.rs:16066:5:
+assertion `left == right` failed: 12 x 1.2, to the tenth
+  left: 14.0
+ right: 14.4
+---- tenths_the_fund_banks_its_share_to_the_tenth stdout ----
+thread 'tenths_the_fund_banks_its_share_to_the_tenth' (20288) panicked at engine\tests\formulas.rs:16097:5:
+assertion `left == right` failed: 30% of 24, to the tenth
+  left: 7.0
+ right: 7.2
+---- tenths_a_refinery_under_automated_refining_yields_four_and_a_half stdout ----
+thread 'tenths_a_refinery_under_automated_refining_yields_four_and_a_half' (6744) panicked at engine\tests\formulas.rs:16081:5:
+assertion `left == right` failed: 3 x 1.5, to the tenth
+  left: 4.0
+ right: 4.5
+failures:
+    tenths_a_prospector_facility_price_keeps_its_tenth
+    tenths_a_prospector_region_keeps_the_tenth_of_its_ducats
+    tenths_a_refinery_under_automated_refining_yields_four_and_a_half
+    tenths_the_fund_banks_its_share_to_the_tenth
+test result: FAILED. 1 passed; 4 failed; 0 ignored; 0 measured; 504 filtered out; finished in 0.01s
+error: test failed, to rerun pass `-p dying-earth-engine --test formulas`

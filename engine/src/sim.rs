@@ -171,7 +171,7 @@ pub struct SimResult {
     pub venus_stations: u32,
     pub venus_colonists: u32,
     /// Ticket #72: the Prospectors' Venture Capital Fund at the end.
-    pub venture_fund_at_end: i64,
+    pub venture_fund_at_end: f64,
     /// Ticket #76: cards drawn over the game, and whether the deck ran dry.
     pub cards_drawn: u32,
     pub deck_empty: bool,
@@ -212,14 +212,14 @@ pub struct SimResult {
     /// price anything: the Prospectors' Victory Condition is now counted in Ducats, and the price
     /// rise of 0.08.2 has never been shown to be what moved the collapse rate. Spending is measured
     /// rather than inferred -- held before the turn, plus the turn's income, less held after.
-    pub ducats_made: [i64; SEAT_COUNT],
+    pub ducats_made: [f64; SEAT_COUNT],
     /// Ticket #332 (version 0.09.0): Materials income summed over the game, by seat, and the Mines
     /// and Factories completed (Earth and off it together, by the log line), so a Materials-starved
     /// column can be told from a Widgets-starved one.
-    pub materials_made: [i64; SEAT_COUNT],
+    pub materials_made: [f64; SEAT_COUNT],
     pub mines_completed: u32,
     pub factories_completed: u32,
-    pub ducats_spent: [i64; SEAT_COUNT],
+    pub ducats_spent: [f64; SEAT_COUNT],
     /// Ticket #241: the **Research Directive** each seat actually ran, as the mean percentage kept
     /// back from the shared pot over the game, and the turns it sat below the 85% contribution the
     /// shared-pot rule asks for. Tickets #235 and #236 cannot be read without these two.
@@ -303,8 +303,8 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
     // Ticket #58: what the Moments did over the game.
     let (mut moments_earned, mut moments_shown, mut turns_with_moment, mut most_moments_in_a_turn) = (0u32, 0u32, 0u32, 0u32);
     // Ticket #241 (version 0.08.3): the figures 0.08.2 named as missing, and this version's own.
-    let (mut ducats_made, mut ducats_spent) = ([0i64; SEAT_COUNT], [0i64; SEAT_COUNT]);
-    let mut materials_made = [0i64; SEAT_COUNT];
+    let (mut ducats_made, mut ducats_spent) = ([0f64; SEAT_COUNT], [0f64; SEAT_COUNT]);
+    let mut materials_made = [0f64; SEAT_COUNT];
     let (mut directive_sum, mut directive_turns_below, mut directive_samples) = ([0f64; SEAT_COUNT], [0u32; SEAT_COUNT], 0u32);
     // Ticket #290 (version 0.08.6): the opening, sampled once turn three has resolved.
     let mut opening_modules = [0u32; SEAT_COUNT];
@@ -314,7 +314,7 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         guard += 1;
         // Ticket #105: every seat here is an AI, which picks the moment it leads, so the refusal
         // cannot fire. If it ever did, the loop would spin, so it stops.
-        let held_before: [i64; SEAT_COUNT] = Seat::ALL.map(|s| game.seat(s).stockpile.ducats);
+        let held_before: [f64; SEAT_COUNT] = Seat::ALL.map(|s| game.seat(s).stockpile.ducats);
         if let Err(why) = game.end_turn(std::array::from_fn(|_| Vec::new())) {
             game.log(format!("simulate stopped: {why}"));
             break;
@@ -328,7 +328,7 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
             let income = game.seat(s_).income_last_turn.ducats;
             ducats_made[i] += income;
             materials_made[i] += game.seat(s_).income_last_turn.materials;
-            ducats_spent[i] += (held_before[i] + income - game.seat(s_).stockpile.ducats).max(0);
+            ducats_spent[i] += (held_before[i] + income - game.seat(s_).stockpile.ducats).max(0.0);
             // The share KEPT BACK from the shared pot, sampled every turn, and the turns spent
             // under the 85% contribution the shared-pot rule asks for.
             let kept = game.seat(s_).directive_last_income as f64;
@@ -671,7 +671,7 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         martian_moon_colonies: game.colonies.iter().filter(|c| !c.in_orbit && matches!(c.body, BodyId::Phobos | BodyId::Deimos)).count() as u32,
         venus_stations: game.colonies.iter().filter(|c| c.body == BodyId::Venus).count() as u32,
         venus_colonists: game.colonies.iter().filter(|c| c.body == BodyId::Venus).map(|c| c.colonists).sum(),
-        venture_fund_at_end: Seat::ALL.into_iter().find(|s| game.kind(*s) == FactionKind::Prospectors).map(|s| game.seat(s).venture_fund).unwrap_or(0),
+        venture_fund_at_end: Seat::ALL.into_iter().find(|s| game.kind(*s) == FactionKind::Prospectors).map(|s| game.seat(s).venture_fund).unwrap_or(0.0),
         cards_drawn: game.deck.drawn.len() as u32,
         deck_empty: game.deck.cards.is_empty(),
         start_state_lost_turn,

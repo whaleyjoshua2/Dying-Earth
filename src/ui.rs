@@ -2415,7 +2415,7 @@ const SHORT_RED: Color32 = Color32::from_rgb(255, 90, 80);
 /// line after the fact keeps it.
 fn shortfall_hover(f: &dying_earth_engine::ShortfallForecast) -> String {
     const SHOWN: usize = 3;
-    let mut lines = vec![format!("Next Income is {} Energy short. These go dark, in this order:", f.short_by)];
+    let mut lines = vec![format!("Next Income is {} Energy short. These go dark, in this order:", figure(f.short_by))];
     for d in f.dark.iter().take(SHOWN) {
         // The Archive's name carries its own article.
         lines.push(format!("the {} {}", d.name.strip_prefix("The ").unwrap_or(&d.name), d.at));
@@ -2481,13 +2481,14 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
             let s = game.seat(Seat(0));
             let (left, influence_left) = game.remaining(Seat(0), &session.pending);
             let inc = s.income_last_turn;
-            let signed = |v: i64| if v >= 0 { format!("+{v}") } else { format!("{v}") };
+            // Ticket #387 (version 0.09.3): whole when whole, one decimal otherwise, as `figure` prints.
+            let signed = |v: f64| if v >= 0.0 { format!("+{}", figure(v)) } else { figure(v) };
             // Hover a resource for last Income by source (ticket #31).
             let sources = |res: dying_earth_engine::Resource| -> String {
-                let lines: Vec<String> = s.income_sources.iter().filter(|(_, r, _)| *r == res).map(|(name, _, v)| format!("{v:+}  {name}")).collect();
+                let lines: Vec<String> = s.income_sources.iter().filter(|(_, r, _)| *r == res).map(|(name, _, v)| format!("{}  {name}", signed(*v))).collect();
                 if lines.is_empty() { "No income from buildings last turn.".to_string() } else { format!("Last Income:\n{}", lines.join("\n")) }
             };
-            bar_resource(ui, icons, "materials", "Materials", format!("{} ({})", left.materials, signed(inc.materials)), sources(dying_earth_engine::Resource::Materials));
+            bar_resource(ui, icons, "materials", "Materials", format!("{} ({})", figure(left.materials), signed(inc.materials)), sources(dying_earth_engine::Resource::Materials));
             ui.separator();
             // Ticket #332 (version 0.09.0): Widgets, the work half of every build, beside the
             // Materials half. The figure is MADE / APPLIED -- what every place the player directs
@@ -2516,12 +2517,12 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
                 rule_tip(resp, widgets_bar_hover(game, made, applied));
                 ui.separator();
             }
-            bar_resource(ui, icons, "fuel", "Fuel", format!("{} ({})", left.fuel, signed(inc.fuel)), sources(dying_earth_engine::Resource::Fuel));
+            bar_resource(ui, icons, "fuel", "Fuel", format!("{} ({})", figure(left.fuel), signed(inc.fuel)), sources(dying_earth_engine::Resource::Fuel));
             ui.separator();
             // Ticket #351 (version 0.09.1): the Shortfall alarm. While the next Income would shut
             // anything -- counting what this turn's orders do to the Energy -- the figure turns red and
             // its hover names what goes dark, in order, in place of the Last Income breakdown.
-            let energy = format!("{} ({})", left.energy, signed(inc.energy));
+            let energy = format!("{} ({})", figure(left.energy), signed(inc.energy));
             match (!session.spectator).then(|| game.shortfall_forecast(Seat(0), &session.pending)).flatten() {
                 Some(f) => {
                     let resp = ui
@@ -2544,7 +2545,7 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
                 None => bar_resource(ui, icons, "energy", "Energy", energy, sources(dying_earth_engine::Resource::Energy)),
             }
             ui.separator();
-            bar_resource(ui, icons, "ducats", "Ducats", format!("{} ({})", left.ducats, signed(inc.ducats)), sources(dying_earth_engine::Resource::Ducats));
+            bar_resource(ui, icons, "ducats", "Ducats", format!("{} ({})", figure(left.ducats), signed(inc.ducats)), sources(dying_earth_engine::Resource::Ducats));
             // Ticket #72: the Prospectors' Fund stood beside their Materials from version 0.05.5,
             // when the Fund held Materials. Ticket #308 (version 0.08.7): moved beside Ducats as a
             // progress bar, then CUT on the designer's seeing it -- *"let's just cut it, the
@@ -4784,7 +4785,7 @@ fn order_text(game: &Game, o: &Order) -> String {
                 None => format!("Move {ship} to another orbit"),
             }
         }
-        Order::Refuel { ship } => format!("Refuel {} ({} Fuel from the Stockpile)", ship, game.refuel_amount(Seat(0), *ship)),
+        Order::Refuel { ship } => format!("Refuel {} ({} Fuel from the Stockpile)", ship, figure(game.refuel_amount(Seat(0), *ship))),
         Order::ShipStance { body, stance } => format!("Ships at {}: {}", game.tables.body(*body).name, stance.name()),
         Order::Bombard { ship, colony } => format!("Bombard {} from {}", game.place_name(Place::Colony(*colony)), ship),
         // Ticket #343 (version 0.09.1): the engine lane's two new orders, so the order list can
@@ -5269,6 +5270,7 @@ fn orbit_odds_lines(ui: &mut Ui, game: &Game, body: BodyId) {
     // moment of the decision should not need a pointer held over it to be read at all.
     let charge = game.tables.melee.battle_fuel;
     let mut cost = format!("The Battle costs every Ship in the orbit {charge} Fuel from its own tank, yours and theirs alike, struck or not.");
+    let charge = charge as f64;
     let left_dry = mine_fighting.iter().filter(|s| s.fuel - charge < charge).count();
     if left_dry > 0 {
         cost.push_str(&format!(" {left_dry} Ship(s) of yours would come out of it under the bar, holding no orbit here and fighting halved until refuelled."));
@@ -5343,9 +5345,9 @@ fn attack_hover(ctx: &egui::Context, game: &Game, place: Place, name: &str, atta
 /// `8 [cog]` -- the second half of what a build costs, on the face beside the first -- and nought
 /// for an order that builds nothing.
 fn priced_button(ui: &mut Ui, enabled: bool, label: &str, cost: &dying_earth_engine::Cost, widgets: u32) -> egui::Response {
-    let parts: Vec<(&str, i64)> = [("materials", cost.materials), ("fuel", cost.fuel), ("energy", cost.energy), ("influence", cost.influence), ("ducats", cost.ducats), ("widgets", widgets as i64)]
+    let parts: Vec<(&str, f64)> = [("materials", cost.materials), ("fuel", cost.fuel), ("energy", cost.energy), ("influence", cost.influence as f64), ("ducats", cost.ducats), ("widgets", widgets as f64)]
         .into_iter()
-        .filter(|(_, n)| *n > 0)
+        .filter(|(_, n)| *n > 0.0)
         .collect();
     if parts.is_empty() {
         return ui.add_enabled(enabled, egui::Button::new(label));
@@ -5364,7 +5366,7 @@ fn priced_button(ui: &mut Ui, enabled: bool, label: &str, cost: &dying_earth_eng
                         ui.spacing_mut().item_spacing.x = 4.0;
                         ui.label(RichText::new(label).color(visuals.text_color()));
                         for (key, n) in &parts {
-                            ui.label(RichText::new(n.to_string()).color(visuals.text_color()));
+                            ui.label(RichText::new(figure(*n)).color(visuals.text_color()));
                             match Icons::from_ctx(ui.ctx(), key, 14.0) {
                                 Some(image) => {
                                     ui.add(image);
@@ -5467,7 +5469,7 @@ fn widget_makers(game: &Game, place: Place) -> Vec<(String, i64)> {
                 for f in st.facilities.iter().filter(|f| f.working()) {
                     let y = game.facility_yield(seat, sid, f.kind);
                     if y.resource == Some(dying_earth_engine::Resource::Widgets) {
-                        parts.push((format!("the {}", f.kind.name()), y.amount));
+                        parts.push((format!("the {}", f.kind.name()), y.amount as i64));
                     }
                 }
             }
@@ -5485,7 +5487,7 @@ fn widget_makers(game: &Game, place: Place) -> Vec<(String, i64)> {
                 let y = game.module_yield_at(seat, cid, i);
                 if y.resource == Some(dying_earth_engine::Resource::Widgets) {
                     let name = if y.doubled_by.is_some() { format!("the {}, doubled", m.kind.name()) } else { format!("the {}", m.kind.name()) };
-                    parts.push((name, y.amount));
+                    parts.push((name, y.amount as i64));
                 }
             }
         }
@@ -7696,7 +7698,7 @@ fn body_dropdown(ui: &mut Ui, session: &Session, game: &Game, body: BodyId, to: 
     let header = if here {
         format!("{} (here): change orbit, {} Fuel", game.tables.body(to).name, game.tables.orbit_change_fuel)
     } else {
-        format!("To {}: {turns} turn(s), {fuel} Fuel", game.tables.body(to).name)
+        format!("To {}: {turns} turn(s), {} Fuel", game.tables.body(to).name, figure(fuel))
     };
     let shown = egui::CollapsingHeader::new(RichText::new(header).strong()).id_salt(("moves", salt, to)).default_open(open).show(ui, |ui| {
         if here {
@@ -7734,7 +7736,7 @@ fn change_orbit_lines(ui: &mut Ui, session: &Session, game: &Game, body: BodyId,
                     game,
                     &session.pending,
                     Order::ChangeOrbit { ship: s.id, slot: orbit.slot() },
-                    &format!("Move ({}/{} in the tank)", s.fuel, game.tables.unit(s.kind).tank),
+                    &format!("Move ({}/{} in the tank)", figure(s.fuel), game.tables.unit(s.kind).tank),
                     Some(format!("{} is {} now. {orbit_fuel} Fuel from its own tank, and it fights this turn's Battle in its new orbit.", game.ship_name(s), orbit_phrase(game, body, game.ship_orbit(s)))),
                     actions,
                 ),
@@ -7755,25 +7757,25 @@ fn change_orbit_lines(ui: &mut Ui, session: &Session, game: &Game, body: BodyId,
 /// costs the same whichever orbit it ends in; the orbit decides what the Ship can do when it gets
 /// there.
 #[allow(clippy::too_many_arguments)]
-fn transit_lines(ui: &mut Ui, session: &Session, game: &Game, body: BodyId, to: BodyId, fuel: i64, ships: &[&Ship], one: Option<&Ship>, actions: &mut Vec<Action>) {
+fn transit_lines(ui: &mut Ui, session: &Session, game: &Game, body: BodyId, to: BodyId, fuel: f64, ships: &[&Ship], one: Option<&Ship>, actions: &mut Vec<Action>) {
     // Ticket #375 (version 0.09.2): the quote is for a launch THIS turn, and the sky moves; the next
     // two turns' figures stand beside it so the drift is visible -- the playtest read 4 turns and
     // 17 Fuel, launched later, and paid 6 and 26. The header carries this turn's figures; the drift
     // is the first line inside, read before any button under it.
     let (t1, f1) = game.transit_cost_for_at(Seat(0), body, to, game.turn + 1);
     let (t2, f2) = game.transit_cost_for_at(Seat(0), body, to, game.turn + 2);
-    ui.label(RichText::new(format!("{fuel} Fuel each from the tank if launched this turn, whichever orbit it ends in (next turn {t1}t/{f1}F, then {t2}t/{f2}F).")).weak());
+    ui.label(RichText::new(format!("{} Fuel each from the tank if launched this turn, whichever orbit it ends in (next turn {t1}t/{}F, then {t2}t/{}F).", figure(fuel), figure(f1), figure(f2))).weak());
     for orbit in game.orbits_of(to) {
         ui.horizontal_wrapped(|ui| {
             ui.label(format!("   {}", capitalised(&orbit_short(game, to, orbit))));
             match one {
                 Some(s) => {
                     // Ticket #87: the button reads the tank against the leg.
-                    cost_button(ui, game, &session.pending, Order::Transit { ship: s.id, to, slot: orbit.slot() }, &format!("Go ({}/{} in the tank)", s.fuel, game.tables.unit(s.kind).tank), actions);
+                    cost_button(ui, game, &session.pending, Order::Transit { ship: s.id, to, slot: orbit.slot() }, &format!("Go ({}/{} in the tank)", figure(s.fuel), game.tables.unit(s.kind).tank), actions);
                     // Ticket #375: a warning, never a refusal, where the leg would leave the hull
                     // stranded at the far end -- a one-way trip can be the plan.
                     if let Some(left) = game.arrival_leaves_stranded(Seat(0), s.id, to, orbit.slot()) {
-                        ui.colored_label(Color32::from_rgb(230, 170, 90), format!("arrives with {left} Fuel and no station of yours at {}", game.tables.body(to).name));
+                        ui.colored_label(Color32::from_rgb(230, 170, 90), format!("arrives with {} Fuel and no station of yours at {}", figure(left), game.tables.body(to).name));
                     }
                 }
                 None => {
@@ -7853,7 +7855,7 @@ fn ship_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
         tanks.scroll_to_me(Some(egui::Align::Min));
     }
     ui.horizontal_wrapped(|ui| {
-        let fuel = format!("{}/{} Fuel", s.fuel, card.tank);
+        let fuel = format!("{}/{} Fuel", figure(s.fuel), card.tank);
         match s.at {
             ShipAt::Body(b) => {
                 // Ticket #335 (version 0.09.0): a station fuels only a Ship in its OWN orbit, so a
@@ -8181,9 +8183,9 @@ fn ship_weapons_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut Vi
 /// helper drops a nought from a price, and a nought is reachable here (Materials at 1 Ducat, one
 /// unit, the Prospectors' 15% off), so a nought is written out in words rather than leaving the
 /// face reading a bare "Buy for".
-fn ducat_button(ui: &mut Ui, game: &Game, session: &Session, verb: &str, ducats: i64, order: &Order) -> egui::Response {
+fn ducat_button(ui: &mut Ui, game: &Game, session: &Session, verb: &str, ducats: f64, order: &Order) -> egui::Response {
     let ok = game.check_order(Seat(0), &session.pending, order);
-    let mut resp = if ducats > 0 {
+    let mut resp = if ducats > 0.0 {
         priced_button(ui, ok.is_ok(), verb, &dying_earth_engine::Cost { ducats, ..Default::default() }, 0)
     } else {
         ui.add_enabled(ok.is_ok(), egui::Button::new(format!("{verb} 0 Ducats")))
@@ -8205,7 +8207,7 @@ fn trading_window(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSt
     // face at all; the Cost it is handed is Ducats alone, so the face reads "Buy for 48 [ducats]".
     let head = ui.visuals().strong_text_color();
     let body = ui.visuals().text_color();
-    text_with_icons(ui, &format!("{} Ducats to spend this turn (+{} Ducats last Income).", left.ducats, game.seat(Seat(0)).income_last_turn.ducats), 14.0, head);
+    text_with_icons(ui, &format!("{} Ducats to spend this turn (+{} Ducats last Income).", figure(left.ducats), figure(game.seat(Seat(0)).income_last_turn.ducats)), 14.0, head);
     ui.label("What you buy is yours at once, for this turn's orders. Ducats come from your Regions' economies, Banks and Trade Posts.");
     ui.separator();
     let lines: [(usize, Option<dying_earth_engine::Resource>, &str, &str); 4] = [(0, None, "influence", "Influence"), (1, Some(dying_earth_engine::Resource::Materials), "materials", "Materials"), (2, Some(dying_earth_engine::Resource::Fuel), "fuel", "Fuel"), (3, Some(dying_earth_engine::Resource::Energy), "energy", "Energy")];
@@ -8227,7 +8229,7 @@ fn trading_window(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSt
             // the price; the line says so.
             let off = game.tables.faction(game.kind(Seat(0))).market_multiplier;
             let discount = if res.is_some() && off != 1.0 { format!(" (x{off} for you, over the lot)") } else { String::new() };
-            let price = if sells { format!("{per} Ducats each; sells for {:.1} Ducats{discount}", per as f64 / game.tables.ducats.sell_divisor.max(1) as f64) } else { format!("{per} Ducats each{discount}") };
+            let price = if sells { format!("{per} Ducats each; sells for {} Ducats{discount}", figure(per as f64 / game.tables.ducats.sell_divisor.max(1) as f64)) } else { format!("{per} Ducats each{discount}") };
             // The glyph line wraps at the width it is given, and a Grid cell has none until its
             // content has one, so left alone it wrapped one word to a line (the first picture of
             // ticket #369).
@@ -8331,7 +8333,7 @@ fn credits_request_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut
             ui.label(RichText::new(format!("The Custodians are not selling this turn. They are {level} toward you (x{m}).")).weak());
         }
         Some(m) => {
-            ui.label(format!("The Custodians offer {offer} ppm this turn. They are {level} toward you, so a ppm costs {} Ducats (x{m}).", game.credit_cost(me, 1).unwrap_or(0)));
+            ui.label(format!("The Custodians offer {offer} ppm this turn. They are {level} toward you, so a ppm costs {} Ducats (x{m}).", figure(game.credit_cost(me, 1).unwrap_or(0.0))));
             ui.horizontal(|ui| {
                 ui.add(egui::DragValue::new(&mut view.credits_amount).range(1..=c.cap_per_turn.max(1)));
                 let order = Order::BuyCredits { ppm: view.credits_amount };
@@ -9349,7 +9351,7 @@ fn condensed_fund(ui: &mut Ui, session: &Session, game: &Game, actions: &mut Vec
                 });
                 contribution = contribution.max(floor);
                 let fund = game.seat(me).archive_fund;
-                fund_bar(ui, colour, fund, game.tables.archive.research, RAIL, "The Archive fund");
+                fund_bar(ui, colour, fund as f64, game.tables.archive.research as f64, RAIL, "The Archive fund");
                 place_research_directive(ui, session, game, actions, resp, contribution, standing, pending_set);
             });
         }
@@ -9370,7 +9372,7 @@ fn condensed_fund(ui: &mut Ui, session: &Session, game: &Game, actions: &mut Vec
                 });
                 share = share.min(cap);
                 let fund = game.seat(me).venture_fund;
-                fund_bar(ui, colour, fund, game.tables.faction(FactionKind::Prospectors).victory_first.bar as i64, RAIL, "The Venture Capital Fund");
+                fund_bar(ui, colour, fund, game.tables.faction(FactionKind::Prospectors).victory_first.bar, RAIL, "The Venture Capital Fund");
                 place_venture_share(ui, session, game, actions, resp, share, standing, pending_set);
             });
         }
@@ -9404,18 +9406,18 @@ fn condensed_rail<T: egui::emath::Numeric>(ui: &mut Ui, value: &mut T, width: f3
 /// Ticket #382: **the fill bar**, the fund against its bar in the Faction's colour, `width` by
 /// fourteen with the figures beside it -- the shape of `research_race_bar`, figures and all. Not
 /// written on the fill: no text reads on both Factions' fills, and the race bar sets the precedent.
-fn fund_bar(ui: &mut Ui, colour: Color32, fund: i64, bar: i64, width: f32, what: &str) {
+fn fund_bar(ui: &mut Ui, colour: Color32, fund: f64, bar: f64, width: f32, what: &str) {
     let (rect, resp) = ui.allocate_exact_size(egui::vec2(width, 14.0), egui::Sense::hover());
     let painter = ui.painter_at(rect);
     painter.rect_filled(rect, 3.0, Color32::from_gray(45));
-    let share = if bar > 0 { (fund as f32 / bar as f32).clamp(0.0, 1.0) } else { 0.0 };
+    let share = if bar > 0.0 { (fund / bar).clamp(0.0, 1.0) as f32 } else { 0.0 };
     if share > 0.0 {
         painter.rect_filled(egui::Rect::from_min_size(rect.min, egui::vec2(rect.width() * share, rect.height())), 3.0, colour);
     }
     painter.rect_stroke(rect, 3.0, egui::Stroke::new(1.0, Color32::from_gray(120)), egui::StrokeKind::Inside);
-    let hover = format!("{what}: {fund} of the {bar} the Victory Condition asks.");
+    let hover = format!("{what}: {} of the {} the Victory Condition asks.", figure(fund), figure(bar));
     resp.on_hover_text(hover.clone());
-    ui.label(RichText::new(format!("{fund} of {bar}")).weak()).on_hover_text(hover);
+    ui.label(RichText::new(format!("{} of {}", figure(fund), figure(bar))).weak()).on_hover_text(hover);
 }
 
 /// Ticket #382: the two full controls' own sentences, on the condensed widget's hover.
@@ -9577,7 +9579,7 @@ fn venture_fund_control(ui: &mut Ui, session: &Session, game: &Game, view: &mut 
 
     // Withdraw: a field and a button, the Influence cluster's shape.
     ui.horizontal(|ui| {
-        let most = fund - session.pending.iter().map(|o| if let Order::DrawVenture { amount } = o { *amount } else { 0 }).sum::<i64>();
+        let most = (fund - session.pending.iter().map(|o| if let Order::DrawVenture { amount } = o { *amount } else { 0 }).sum::<i64>() as f64).floor() as i64;
         ui.add(egui::DragValue::new(&mut view.venture_withdraw).range(1..=most.max(1)));
         let order = Order::DrawVenture { amount: view.venture_withdraw };
         let check = game.check_order(me, &session.pending, &order);
@@ -9722,10 +9724,10 @@ fn greenwash_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewS
     // grey where they bite before the Influence does, and the line under it naming which bites.
     let (whole, left) = influence_this_turn(game, session);
     let (stock, _) = game.remaining(me, &session.pending);
-    let by_ducats = if per > 0 { Some((stock.ducats / per).max(0)) } else { None };
+    let by_ducats = if per > 0 { Some(((stock.ducats / per as f64).floor() as i64).max(0)) } else { None };
     let amount = influence_rail(ui, &mut view.greenwash_amount, whole, left, by_ducats);
     let bites = match by_ducats {
-        Some(d) if d < left => format!("your {} Ducats cover {d} of it, which is the bound", stock.ducats),
+        Some(d) if d < left => format!("your {} Ducats cover {d} of it, which is the bound", figure(stock.ducats)),
         _ => format!("{left} not yet ordered elsewhere, and the Ducats cover it"),
     };
     ui.label(RichText::new(format!("{amount} of your {whole} Influence this turn; {bites}.")).weak());
@@ -9896,12 +9898,13 @@ fn faction_window(ctx: &egui::Context, session: &Session, game: &Game, view: &mu
         let s = game.seat(seat);
         let inc = s.income_last_turn;
         let breakdown = session.spectator || seat == Seat(0);
-        let signed = |v: i64| if v >= 0 { format!("+{v}") } else { format!("{v}") };
+        // Ticket #387 (version 0.09.3): whole when whole, one decimal otherwise, as `figure` prints.
+        let signed = |v: f64| if v >= 0.0 { format!("+{}", figure(v)) } else { figure(v) };
         let hover = |res: dying_earth_engine::Resource, word: &str| -> String {
             if !breakdown {
                 return format!("{word}. A rival's income is shown as a total only.");
             }
-            let lines: Vec<String> = s.income_sources.iter().filter(|(_, r, _)| *r == res).map(|(name, _, v)| format!("{v:+}  {name}")).collect();
+            let lines: Vec<String> = s.income_sources.iter().filter(|(_, r, _)| *r == res).map(|(name, _, v)| format!("{}  {name}", signed(*v))).collect();
             if lines.is_empty() {
                 format!("{word}. No income from buildings last turn.")
             } else {
@@ -9910,7 +9913,7 @@ fn faction_window(ctx: &egui::Context, session: &Session, game: &Game, view: &mu
         };
         // Research is not in the Stockpile -- it is spent the turn it is made -- so its total is
         // gathered from the sources. That is still a total, and gives nothing away.
-        let research: i64 = s.income_sources.iter().filter(|(_, r, _)| *r == dying_earth_engine::Resource::Research).map(|(_, _, v)| v).sum();
+        let research: f64 = s.income_sources.iter().filter(|(_, r, _)| *r == dying_earth_engine::Resource::Research).map(|(_, _, v)| v).sum();
         ui.label(RichText::new("Income last turn").strong());
         glyph_row(
             ui,
@@ -11080,10 +11083,10 @@ fn chronicle_screen(root: &mut Ui, session: &Session, actions: &mut Vec<Action>)
                 for (seat, _) in &ranking {
                     let s = game.seat(*seat);
                     ui.label(RichText::new(game.seat_name(*seat)).strong().color(seat_colour(session, *seat)));
-                    ui.label(format!("{}", s.stockpile.materials));
-                    ui.label(format!("{}", s.stockpile.fuel));
-                    ui.label(format!("{}", s.stockpile.energy));
-                    ui.label(format!("{}", s.stockpile.ducats));
+                    ui.label(figure(s.stockpile.materials));
+                    ui.label(figure(s.stockpile.fuel));
+                    ui.label(figure(s.stockpile.energy));
+                    ui.label(figure(s.stockpile.ducats));
                     ui.label(format!("{}", game.off_world_colonists(*seat)));
                     ui.label(format!("{}", game.directed_states(*seat).len()));
                     ui.label(format!("{}", game.directed_colonies(*seat).len()));

@@ -21,7 +21,7 @@ use std::sync::Arc;
 
 /// The stamp at the head of every save. A file whose stamp is not this one is refused with a plain
 /// message; a save is never migrated between versions.
-pub const SAVE_VERSION: u32 = 6;
+pub const SAVE_VERSION: u32 = 7;
 
 /// The rules version this executable plays, named beside the file's own in a refusal.
 ///
@@ -105,6 +105,12 @@ pub const SAVE_VERSION: u32 = 6;
 /// Refugee Convoy landed 0.4 for 2 ppm where it lands 1.0 for half (#376). Every new field has a
 /// default, so the file would parse; it would parse into a board this version was not playing. A
 /// refusal naming both versions is the right answer, and a silent partial load is not.
+/// Ticket #387 (version 0.09.3): moved to **7**. Every Stockpile figure, the Venture Capital Fund,
+/// a Ship's tank, a seat's income and its income lines are carried to a **tenth** and written as
+/// floats where an older file writes whole numbers, so a 0.09.2 board would not parse at all; and
+/// a seat no longer carries the Sea Walls' keep accumulator, since the half is paid each turn. A
+/// refusal naming both versions is the right answer. `GAME_VERSION` is NOT moved here: the
+/// version's closing ticket moves it for the whole version.
 pub const GAME_VERSION: &str = "0.09.2";
 
 /// The game autosaves at the start of the Report phase of every third turn.

@@ -184,7 +184,7 @@ impl Game {
         match rule {
             CardRule::Always => true,
             CardRule::Never => false,
-            CardRule::DucatsAtLeast { ducats } => self.seat(seat).stockpile.ducats >= *ducats,
+            CardRule::DucatsAtLeast { ducats } => self.seat(seat).stockpile.ducats >= *ducats as f64,
             CardRule::UnrestAtLeast { unrest } => self.controlled_states(seat).iter().any(|s| self.state(*s).unrest >= *unrest),
             CardRule::UnrestBelow { unrest } => self.controlled_states(seat).iter().all(|s| self.state(*s).unrest < *unrest),
             CardRule::BlameAtLeast { blame } => self.blame(seat) >= *blame,
@@ -265,13 +265,13 @@ impl Game {
         match e {
             CardEffect::Resources { materials, fuel, energy, ducats, research: _ } => [(s.stockpile.materials, *materials, "Materials"), (s.stockpile.fuel, *fuel, "Fuel"), (s.stockpile.energy, *energy, "Energy"), (s.stockpile.ducats, *ducats, "Ducats")]
                 .into_iter()
-                .filter(|(have, ask, _)| have + ask < 0)
-                .map(|(have, ask, name)| format!("{have} {name} of the {} it asks", -ask))
+                .filter(|(have, ask, _)| (have + *ask as f64) < 0.0)
+                .map(|(have, ask, name)| format!("{} {name} of the {} it asks", figure(have), -ask))
                 .collect(),
             CardEffect::PerUnitCost { per, resource, amount } => {
                 let need = self.card_things(seat, *per) as i64 * amount;
                 let have = self.stock_of(seat, *resource);
-                if have < need { vec![format!("{have} {} of the {need} it asks", resource.name())] } else { Vec::new() }
+                if have < need as f64 { vec![format!("{} {} of the {need} it asks", figure(have), resource.name())] } else { Vec::new() }
             }
             // Ticket #375 (version 0.09.2): a call is answered by a docked Ship; with every hull in
             // flight the offer is closed, and this is why.
@@ -324,7 +324,7 @@ impl Game {
         }
     }
 
-    fn stock_of(&self, seat: Seat, r: Resource) -> i64 {
+    fn stock_of(&self, seat: Seat, r: Resource) -> f64 {
         let s = &self.seat(seat).stockpile;
         match r {
             Resource::Materials => s.materials,
@@ -332,7 +332,7 @@ impl Game {
             Resource::Energy => s.energy,
             Resource::Ducats => s.ducats,
             // Research is the table's pool and never a seat's stock, so nothing is ever held in it.
-            Resource::Research | Resource::Widgets => 0,
+            Resource::Research | Resource::Widgets => 0.0,
         }
     }
 
@@ -409,7 +409,7 @@ impl Game {
         self.ships
             .iter()
             .filter(|s| s.seat == seat && matches!(s.at, ShipAt::Body(_)))
-            .max_by_key(|s| (s.fuel, std::cmp::Reverse(s.id.0)))
+            .max_by(|a, b| a.fuel.total_cmp(&b.fuel).then(b.id.0.cmp(&a.id.0)))
             .map(|s| s.id)
     }
 
@@ -482,23 +482,25 @@ impl Game {
     fn apply_card_effect(&mut self, seat: Seat, e: &CardEffect) {
         match e {
             CardEffect::Resources { materials, fuel, energy, ducats, research } => {
+                // Ticket #387 (version 0.09.3): a card's figures are whole numbers from the data,
+                // added to a stockpile carried to a tenth.
                 let s = &mut self.seat_mut(seat).stockpile;
-                s.materials = (s.materials + materials).max(0);
-                s.fuel = (s.fuel + fuel).max(0);
-                s.energy = (s.energy + energy).max(0);
-                s.ducats = (s.ducats + ducats).max(0);
+                s.materials = tenth((s.materials + *materials as f64).max(0.0));
+                s.fuel = tenth((s.fuel + *fuel as f64).max(0.0));
+                s.energy = tenth((s.energy + *energy as f64).max(0.0));
+                s.ducats = tenth((s.ducats + *ducats as f64).max(0.0));
                 if *research != 0 {
                     self.add_research_unattributed(*research);
                 }
             }
             CardEffect::PerUnitCost { per, resource, amount } => {
-                let bill = self.card_things(seat, *per) as i64 * amount;
+                let bill = (self.card_things(seat, *per) as i64 * amount) as f64;
                 let s = &mut self.seat_mut(seat).stockpile;
                 match resource {
-                    Resource::Materials => s.materials = (s.materials - bill).max(0),
-                    Resource::Fuel => s.fuel = (s.fuel - bill).max(0),
-                    Resource::Energy => s.energy = (s.energy - bill).max(0),
-                    Resource::Ducats => s.ducats = (s.ducats - bill).max(0),
+                    Resource::Materials => s.materials = tenth((s.materials - bill).max(0.0)),
+                    Resource::Fuel => s.fuel = tenth((s.fuel - bill).max(0.0)),
+                    Resource::Energy => s.energy = tenth((s.energy - bill).max(0.0)),
+                    Resource::Ducats => s.ducats = tenth((s.ducats - bill).max(0.0)),
                     Resource::Research | Resource::Widgets => {}
                 }
             }
@@ -954,7 +956,7 @@ impl Game {
                     }
                     if let Some(h) = holder {
                         let s = &mut self.seat_mut(h).stockpile;
-                        s.energy = (s.energy - t.events.reactor_leak_energy).max(0);
+                        s.energy = tenth((s.energy - t.events.reactor_leak_energy as f64).max(0.0));
                     }
                 }
             }

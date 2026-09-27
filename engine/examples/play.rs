@@ -922,9 +922,9 @@ fn print_costs(g: &Game) {
     );
     println!(
         "Market: Materials {}, Fuel {}, Energy {} Ducats each; Influence {} Ducats a point; Relief {} Ducats",
-        g.market_price(me, g.trade_price(Resource::Materials).unwrap_or(0)),
-        g.market_price(me, g.trade_price(Resource::Fuel).unwrap_or(0)),
-        g.market_price(me, g.trade_price(Resource::Energy).unwrap_or(0)),
+        figure(g.market_price(me, g.trade_price(Resource::Materials).unwrap_or(0) as f64)),
+        figure(g.market_price(me, g.trade_price(Resource::Fuel).unwrap_or(0) as f64)),
+        figure(g.market_price(me, g.trade_price(Resource::Energy).unwrap_or(0) as f64)),
         g.tables.ducats.per_influence,
         g.tables.unrest.relief_ducats
     );

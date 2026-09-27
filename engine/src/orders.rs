@@ -228,13 +228,15 @@ impl Order {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+/// Ticket #387 (version 0.09.3): the four resources are carried to a tenth, so a cost is too; the
+/// Influence stays whole.
+#[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
 pub struct Cost {
-    pub materials: i64,
-    pub fuel: i64,
-    pub energy: i64,
+    pub materials: f64,
+    pub fuel: f64,
+    pub energy: f64,
     pub influence: i64,
-    pub ducats: i64,
+    pub ducats: f64,
 }
 
 impl Cost {
@@ -247,20 +249,20 @@ impl Cost {
     }
     pub fn text(&self) -> String {
         let mut parts = Vec::new();
-        if self.materials > 0 {
-            parts.push(format!("{} Materials", self.materials));
+        if self.materials > 0.0 {
+            parts.push(format!("{} Materials", figure(self.materials)));
         }
-        if self.fuel > 0 {
-            parts.push(format!("{} Fuel", self.fuel));
+        if self.fuel > 0.0 {
+            parts.push(format!("{} Fuel", figure(self.fuel)));
         }
-        if self.energy > 0 {
-            parts.push(format!("{} Energy", self.energy));
+        if self.energy > 0.0 {
+            parts.push(format!("{} Energy", figure(self.energy)));
         }
         if self.influence > 0 {
             parts.push(format!("{} Influence", self.influence));
         }
-        if self.ducats > 0 {
-            parts.push(format!("{} Ducats", self.ducats));
+        if self.ducats > 0.0 {
+            parts.push(format!("{} Ducats", figure(self.ducats)));
         }
         if parts.is_empty() { "free".to_string() } else { parts.join(", ") }
     }
@@ -335,7 +337,7 @@ pub struct Pending {
     #[serde(default)]
     pub transfer_lines: Vec<(Place, usize)>,
     #[serde(default)]
-    pub credit_buys: Vec<(Seat, i64, i64)>,
+    pub credit_buys: Vec<(Seat, i64, f64)>,
 }
 
 /// Ticket #343 (version 0.09.1): where a Missile Carrier may load another Warhead, or why it may
@@ -377,10 +379,10 @@ impl Game {
             // Ticket #88: and the Colony's working Mines take more off.
             Order::BuildModule { colony, kind } => Cost { materials: self.module_materials_at(seat, *colony, *kind), ..Default::default() },
             // Ticket #87: a Ship is built with a full tank, its Fuel paid at the build.
-            Order::BuildShip { kind, .. } => Cost { materials: self.ship_materials(seat, *kind), fuel: t.unit(*kind).tank, ..Default::default() },
-            Order::BuildArmy { .. } => Cost { materials: t.unit(UnitKind::Army).materials, ..Default::default() },
+            Order::BuildShip { kind, .. } => Cost { materials: self.ship_materials(seat, *kind), fuel: t.unit(*kind).tank as f64, ..Default::default() },
+            Order::BuildArmy { .. } => Cost { materials: t.unit(UnitKind::Army).materials as f64, ..Default::default() },
             Order::Repair { points, .. } => {
-                Cost { materials: t.repair.materials_per_point * *points as i64, ..Default::default() }
+                Cost { materials: (t.repair.materials_per_point * *points as i64) as f64, ..Default::default() }
             }
             // Ticket #87: a transit spends the Ship's tank, not the Stockpile; a Refuel takes from
             // the Stockpile what the tank wants and the Stockpile can pay.
@@ -394,52 +396,52 @@ impl Game {
             // paid for at the build. A Rearm costs the table's Materials, and its Widgets are the
             // build's, paid by the yard's place over the turns it takes.
             Order::Launch { .. } => Cost::default(),
-            Order::Rearm { .. } => Cost { materials: t.nuke.rearm_materials, ..Default::default() },
+            Order::Rearm { .. } => Cost { materials: t.nuke.rearm_materials as f64, ..Default::default() },
             Order::Refuel { ship } => Cost { fuel: self.refuel_amount(seat, *ship), ..Default::default() },
             Order::Influence { amount, .. } => Cost { influence: *amount, ..Default::default() },
             Order::Smear { amount, .. } => Cost { influence: *amount, ..Default::default() },
-            Order::Greenwash { amount } => Cost { influence: *amount, ducats: *amount * self.tables.influence.greenwash.ducats_per_influence, ..Default::default() },
-            Order::BuyCredits { ppm } => Cost { ducats: self.credit_cost(seat, *ppm).unwrap_or(0), ..Default::default() },
+            Order::Greenwash { amount } => Cost { influence: *amount, ducats: (*amount * self.tables.influence.greenwash.ducats_per_influence) as f64, ..Default::default() },
+            Order::BuyCredits { ppm } => Cost { ducats: self.credit_cost(seat, *ppm).unwrap_or(0.0), ..Default::default() },
             // Ticket #54: a Mothball and a Strip Permit are free; a Restart costs Materials and a
             // Leapfrog Ducats; a Decommission pays Materials back, which arrive at its Resolution.
-            Order::Change { what: BuildingChange::Restart, .. } => Cost { materials: t.mothball.restart_materials, ..Default::default() },
-            Order::Leapfrog { .. } => Cost { ducats: t.ducats.per_leapfrog, ..Default::default() },
-            Order::ExodusCall { .. } => Cost { ducats: t.ducats.per_exodus_call, ..Default::default() },
-            Order::BuyInfluence { amount } => Cost { ducats: t.ducats.per_influence * *amount, ..Default::default() },
+            Order::Change { what: BuildingChange::Restart, .. } => Cost { materials: t.mothball.restart_materials as f64, ..Default::default() },
+            Order::Leapfrog { .. } => Cost { ducats: t.ducats.per_leapfrog as f64, ..Default::default() },
+            Order::ExodusCall { .. } => Cost { ducats: t.ducats.per_exodus_call as f64, ..Default::default() },
+            Order::BuyInfluence { amount } => Cost { ducats: (t.ducats.per_influence * *amount) as f64, ..Default::default() },
             // A purchase is a negative cost in the resource bought, so `remaining` and `commit_orders`
             // add it without a special case; a sale is the mirror, with a negative Ducat cost.
             Order::Buy { resource, amount } => {
                 // Ticket #83: the lot's price, times the seat's market multiplier, rounded down.
-                let ducats = self.market_price(seat, self.trade_price(*resource).unwrap_or(0) * *amount);
+                let ducats = self.market_price(seat, (self.trade_price(*resource).unwrap_or(0) * *amount) as f64);
                 match resource {
-                    Resource::Materials => Cost { materials: -*amount, ducats, ..Default::default() },
-                    Resource::Fuel => Cost { fuel: -*amount, ducats, ..Default::default() },
-                    Resource::Energy => Cost { energy: -*amount, ducats, ..Default::default() },
+                    Resource::Materials => Cost { materials: -*amount as f64, ducats, ..Default::default() },
+                    Resource::Fuel => Cost { fuel: -*amount as f64, ducats, ..Default::default() },
+                    Resource::Energy => Cost { energy: -*amount as f64, ducats, ..Default::default() },
                     _ => Cost::default(),
                 }
             }
             Order::Sell { resource, amount } => {
                 let ducats = -self.sale_price(*resource, *amount);
                 match resource {
-                    Resource::Materials => Cost { materials: *amount, ducats, ..Default::default() },
-                    Resource::Fuel => Cost { fuel: *amount, ducats, ..Default::default() },
+                    Resource::Materials => Cost { materials: *amount as f64, ducats, ..Default::default() },
+                    Resource::Fuel => Cost { fuel: *amount as f64, ducats, ..Default::default() },
                     _ => Cost::default(),
                 }
             }
-            Order::BuildFacilityWithDucats { kind, .. } => Cost { ducats: self.market_price(seat, self.facility_materials(seat, *kind) * t.ducats.per_building_material), ..Default::default() },
+            Order::BuildFacilityWithDucats { kind, .. } => Cost { ducats: self.market_price(seat, self.facility_materials(seat, *kind) * t.ducats.per_building_material as f64), ..Default::default() },
             // Ticket #332 (version 0.09.0): the refund is a negative cost, as a purchase is, so
             // `remaining` and `commit_orders` credit it without a special case.
             Order::CancelBuild { place, index } => Cost { materials: -self.cancel_refund(seat, *place, *index), ..Default::default() },
             Order::BuildStation { .. } => Cost { materials: self.station_materials(seat), ..Default::default() },
-            Order::BuildModuleWithDucats { colony, kind } => Cost { ducats: self.market_price(seat, self.module_materials_at(seat, *colony, *kind) * t.ducats.per_building_material), ..Default::default() },
+            Order::BuildModuleWithDucats { colony, kind } => Cost { ducats: self.market_price(seat, self.module_materials_at(seat, *colony, *kind) * t.ducats.per_building_material as f64), ..Default::default() },
             // Ticket #68: the Archive Module costs its row's Materials; the Research comes after.
             // Ticket #88: the Archive is a Module, so its Colony's working Mines take off too.
             Order::BuildArchive { colony } => Cost { materials: self.module_materials_at(seat, *colony, ModuleKind::Archive), ..Default::default() },
             // Ticket #52: Relief and Resettle are paid in Ducats.
-            Order::Relief { .. } => Cost { ducats: t.unrest.relief_ducats, ..Default::default() },
-            Order::Agitate { .. } => Cost { ducats: t.unrest.agitate_ducats, influence: t.unrest.agitate_influence, ..Default::default() },
-            Order::Resettle { .. } => Cost { ducats: t.unrest.resettle_ducats, ..Default::default() },
-            Order::RepairWithDucats { points, .. } => Cost { ducats: t.ducats.per_repair_point * *points as i64, ..Default::default() },
+            Order::Relief { .. } => Cost { ducats: t.unrest.relief_ducats as f64, ..Default::default() },
+            Order::Agitate { .. } => Cost { ducats: t.unrest.agitate_ducats as f64, influence: t.unrest.agitate_influence, ..Default::default() },
+            Order::Resettle { .. } => Cost { ducats: t.unrest.resettle_ducats as f64, ..Default::default() },
+            Order::RepairWithDucats { points, .. } => Cost { ducats: (t.ducats.per_repair_point * *points as i64) as f64, ..Default::default() },
             _ => Cost::default(),
         }
     }
@@ -526,22 +528,25 @@ impl Game {
     }
 
     /// Ticket #83 (version 0.06.0): what the window charges this seat for a lot priced at `ducats`:
-    /// times the Faction's market multiplier (the Prospectors' 0.85), rounded down.
-    pub fn market_price(&self, seat: Seat, ducats: i64) -> i64 {
-        (ducats as f64 * self.tables.faction(self.kind(seat)).market_multiplier).floor() as i64
+    /// times the Faction's market multiplier (the Prospectors' 0.85). Ticket #387 (version 0.09.3):
+    /// to the tenth, where it was rounded down: 30 x 0.85 is 25.5.
+    pub fn market_price(&self, seat: Seat, ducats: f64) -> f64 {
+        tenth(ducats * self.tables.faction(self.kind(seat)).market_multiplier)
     }
 
-    /// Ticket #42: what the window pays for a lot, or None for what it does not buy back.
-    pub fn sale_price(&self, resource: Resource, amount: i64) -> i64 {
+    /// Ticket #42: what the window pays for a lot, or None for what it does not buy back. Ticket
+    /// #387 (version 0.09.3): to the tenth, where the division was whole: one Material at 3 Ducats
+    /// over the divisor of 2 sells for 1.5, where the whole division paid 1 and lost the half.
+    pub fn sale_price(&self, resource: Resource, amount: i64) -> f64 {
         if !matches!(resource, Resource::Materials | Resource::Fuel) {
-            return 0;
+            return 0.0;
         }
         let d = &self.tables.ducats;
         let per = self.trade_price(resource).unwrap_or(0);
         if d.sell_divisor <= 0 {
-            return 0;
+            return 0.0;
         }
-        per * amount / d.sell_divisor
+        tenth((per * amount) as f64 / d.sell_divisor as f64)
     }
 
     pub fn remaining(&self, seat: Seat, pending: &[Order]) -> (Stockpile, i64) {
@@ -554,8 +559,9 @@ impl Game {
             }
         }
         let s = self.seat(seat).stockpile;
+        // Ticket #387 (version 0.09.3): settled to the tenth, as every stockpile figure is.
         (
-            Stockpile { materials: s.materials - cost.materials, fuel: s.fuel - cost.fuel, energy: s.energy - cost.energy, ducats: s.ducats - cost.ducats },
+            Stockpile { materials: tenth(s.materials - cost.materials), fuel: tenth(s.fuel - cost.fuel), energy: tenth(s.energy - cost.energy), ducats: tenth(s.ducats - cost.ducats) },
             self.seat(seat).allotment + bought - cost.influence,
         )
     }
@@ -622,7 +628,7 @@ impl Game {
             return fail(format!("needs {} Materials, {} left", cost.materials, left.materials));
         }
         if cost.fuel > left.fuel {
-            return fail(format!("needs {} Fuel, {} left", cost.fuel, left.fuel));
+            return fail(format!("needs {} Fuel, {} left", figure(cost.fuel), figure(left.fuel)));
         }
         if cost.energy > left.energy {
             return fail(format!("needs {} Energy, {} left", cost.energy, left.energy));
@@ -684,10 +690,10 @@ impl Game {
                 }
                 let t = &self.tables.relations;
                 let s = self.seat(seat).stockpile;
-                if *materials && s.materials < t.tribute_materials {
+                if *materials && s.materials < t.tribute_materials as f64 {
                     return fail("not enough Materials for a tribute");
                 }
-                if !*materials && s.ducats < t.tribute_ducats {
+                if !*materials && s.ducats < t.tribute_ducats as f64 {
                     return fail("not enough Ducats for a tribute");
                 }
                 if pending.iter().any(|o| matches!(o, Order::Tribute { to: x, .. } if x == to)) {
@@ -1301,7 +1307,7 @@ impl Game {
                 // Ticket #87: the leg is paid from the tank.
                 let (_, fuel) = self.transit_cost_for(seat, from, *to);
                 if s.fuel < fuel {
-                    return fail(format!("the tank holds {} Fuel of {}; this leg needs {fuel}", s.fuel, self.tables.unit(s.kind).tank));
+                    return fail(format!("the tank holds {} Fuel of {}; this leg needs {}", figure(s.fuel), self.tables.unit(s.kind).tank, figure(fuel)));
                 }
                 Ok(cost)
             }
@@ -1328,9 +1334,9 @@ impl Game {
                 if s.arrived_this_turn {
                     return fail("arrived this turn; it may act next turn");
                 }
-                let fuel = self.tables.orbit_change_fuel;
+                let fuel = self.tables.orbit_change_fuel as f64;
                 if s.fuel < fuel {
-                    return fail(format!("the tank holds {} Fuel; an orbit change needs {fuel}", s.fuel));
+                    return fail(format!("the tank holds {} Fuel; an orbit change needs {}", figure(s.fuel), figure(fuel)));
                 }
                 if pending.iter().any(|o| {
                     matches!(o, Order::Transit { ship: x, .. } | Order::Load { ship: x, .. } | Order::Unload { ship: x, .. } | Order::Refuel { ship: x } | Order::Bombard { ship: x, .. } | Order::Launch { ship: x, .. } | Order::Rearm { ship: x } | Order::ChangeOrbit { ship: x, .. } if x == ship)
@@ -1364,10 +1370,10 @@ impl Game {
                         None => format!("every station that fuels you over {} is blockaded", self.tables.body(body).name),
                     });
                 }
-                if s.fuel >= self.tables.unit(s.kind).tank {
+                if s.fuel >= self.tables.unit(s.kind).tank as f64 {
                     return fail("the tank is full");
                 }
-                if cost.fuel <= 0 {
+                if cost.fuel <= 0.0 {
                     return fail("no Fuel in the Stockpile to fill it with");
                 }
                 if pending.iter().any(|o| matches!(o, Order::Transit { ship: x, .. } | Order::Refuel { ship: x } | Order::Launch { ship: x, .. } | Order::Rearm { ship: x } | Order::Bombard { ship: x, .. } | Order::ChangeOrbit { ship: x, .. } if x == ship)) {
@@ -1926,9 +1932,9 @@ impl Game {
                     return fail("only the Prospectors have a Venture Capital Fund");
                 }
                 let drawn: i64 = pending.iter().map(|o| if let Order::DrawVenture { amount } = o { *amount } else { 0 }).sum();
-                let fund = self.seat(seat).venture_fund - drawn;
-                if *amount <= 0 || *amount > fund {
-                    return fail(format!("the Fund holds {}", fund.max(0)));
+                let fund = self.seat(seat).venture_fund - drawn as f64;
+                if *amount <= 0 || *amount as f64 > fund {
+                    return fail(format!("the Fund holds {}", figure(fund.max(0.0))));
                 }
                 Ok(cost)
             }
@@ -2084,8 +2090,8 @@ impl Game {
     /// Ticket #332 (version 0.09.0): what a `CancelBuild` at this place and index would pay the
     /// canceller: the item's Materials at the canceller's own price, or nought if there is no
     /// such build. The check refuses the order in that case; this only prices it.
-    pub fn cancel_refund(&self, seat: Seat, place: Place, index: usize) -> i64 {
-        self.queue_at(place).get(index).map(|b| self.item_materials(seat, place, b.item)).unwrap_or(0)
+    pub fn cancel_refund(&self, seat: Seat, place: Place, index: usize) -> f64 {
+        self.queue_at(place).get(index).map(|b| self.item_materials(seat, place, b.item)).unwrap_or(0.0)
     }
 
     /// Pay for and record every order of a seat at End Turn (spec 7.3: costs are paid at once).
@@ -2213,42 +2219,42 @@ impl Game {
                     let name = self.tables.body(*to).name.clone();
                     if let Some(s) = self.ship_mut(*ship) {
                         s.at = ShipAt::Transit { from, to: *to, turns_left: turns };
-                        s.fuel = (s.fuel - fuel).max(0);
+                        s.fuel = tenth((s.fuel - fuel).max(0.0));
                         // Ticket #99: it arrives into the orbit the leg named. Ticket #335
                         // (version 0.09.0): a leg that names none arrives in LOW ORBIT, which is
                         // what `None` has always meant and is now drawn and named.
                         s.slot = *slot;
                     }
-                    self.log(format!("{} launches {} toward {} ({} turns, {} Fuel from the tank).", self.seat_name(seat), ship, name, turns, fuel));
+                    self.log(format!("{} launches {} toward {} ({} turns, {} Fuel from the tank).", self.seat_name(seat), ship, name, turns, figure(fuel)));
                 }
                 // Ticket #335 (version 0.09.0): the Fuel leaves the tank now, as a transit's does,
                 // and the Ship moves at the Resolution WITH the transits, before the Battles, so a
                 // Ship that changes orbit fights in its new one.
                 Order::ChangeOrbit { ship, slot } => {
-                    let fuel = self.tables.orbit_change_fuel;
+                    let fuel = self.tables.orbit_change_fuel as f64;
                     let body = self.ship(*ship).and_then(|s| match s.at {
                         ShipAt::Body(b) => Some(b),
                         _ => None,
                     });
                     if let Some(s) = self.ship_mut(*ship) {
-                        s.fuel = (s.fuel - fuel).max(0);
+                        s.fuel = tenth((s.fuel - fuel).max(0.0));
                     }
                     self.pending.orbit_changes.push((seat, *ship, *slot));
                     if let Some(b) = body {
                         let to = self.orbit_name(b, Orbit::of(*slot));
-                        self.log(format!("{} moves {} to {} ({} Fuel from the tank).", self.seat_name(seat), ship, to, fuel));
+                        self.log(format!("{} moves {} to {} ({} Fuel from the tank).", self.seat_name(seat), ship, to, figure(fuel)));
                     }
                 }
                 // Ticket #87: the Fuel came out of the Stockpile with the order's cost; it goes into the tank.
                 Order::Refuel { ship } => {
                     let amount = cost.fuel;
-                    let tank = self.ship(*ship).map(|s| self.tables.unit(s.kind).tank).unwrap_or(0);
+                    let tank = self.ship(*ship).map(|s| self.tables.unit(s.kind).tank as f64).unwrap_or(0.0);
                     let body = self.ship(*ship).and_then(|s| match s.at {
                         ShipAt::Body(b) => Some(b),
                         _ => None,
                     });
                     if let Some(s) = self.ship_mut(*ship) {
-                        s.fuel = (s.fuel + amount).min(tank);
+                        s.fuel = tenth((s.fuel + amount).min(tank));
                     }
                     // Ticket #325 (version 0.08.8): said when it is a partner's station, so the
                     // sweep can count it apart from a refuel at one's own.
@@ -2350,7 +2356,7 @@ impl Game {
                 Order::Greenwash { amount } => self.pending.greenwashes.push((seat, *amount)),
                 Order::OfferCredits { ppm } => self.pending.credit_offers.push((seat, *ppm)),
                 Order::BuyCredits { ppm } => {
-                    let paid = self.credit_cost(seat, *ppm).unwrap_or(0);
+                    let paid = self.credit_cost(seat, *ppm).unwrap_or(0.0);
                     self.pending.credit_buys.push((seat, *ppm, paid));
                 }
                 // Ticket #54: the change is written on the building itself and lands at the
@@ -2454,15 +2460,16 @@ impl Game {
                     self.log(line);
                 }
                 Order::DrawVenture { amount } => {
-                    let back = (*amount as f64 * self.tables.venture.draw_return).floor() as i64;
+                    // Ticket #387 (version 0.09.3): to the tenth, where it was rounded down.
+                    let back = tenth(*amount as f64 * self.tables.venture.draw_return);
                     {
                         let s = self.seat_mut(seat);
-                        s.venture_fund -= amount;
+                        s.venture_fund = tenth(s.venture_fund - *amount as f64);
                         // Ticket #240 (version 0.08.3): the Fund holds Ducats, so a draw returns
                         // Ducats. `draw_return` is unchanged: a tenth is still lost on the way out.
-                        s.stockpile.ducats += back;
+                        s.stockpile.ducats = tenth(s.stockpile.ducats + back);
                     }
-                    let line = format!("The {} withdrew {} Ducats from the Venture Capital Fund; {} came back to the Stockpile.", self.seat_name(seat), amount, back);
+                    let line = format!("The {} withdrew {} Ducats from the Venture Capital Fund; {} came back to the Stockpile.", self.seat_name(seat), amount, figure(back));
                     self.log(line);
                 }
                 Order::Leapfrog { state } => {
@@ -2553,11 +2560,11 @@ impl Game {
                     // flat act_gain, not scaled by the gift, which is why the price is fixed.
                     let t = self.tables.relations.clone();
                     if *materials {
-                        self.seat_mut(seat).stockpile.materials -= t.tribute_materials;
-                        self.seat_mut(*to).stockpile.materials += t.tribute_materials;
+                        self.seat_mut(seat).stockpile.materials = tenth(self.seat(seat).stockpile.materials - t.tribute_materials as f64);
+                        self.seat_mut(*to).stockpile.materials = tenth(self.seat(*to).stockpile.materials + t.tribute_materials as f64);
                     } else {
-                        self.seat_mut(seat).stockpile.ducats -= t.tribute_ducats;
-                        self.seat_mut(*to).stockpile.ducats += t.tribute_ducats;
+                        self.seat_mut(seat).stockpile.ducats = tenth(self.seat(seat).stockpile.ducats - t.tribute_ducats as f64);
+                        self.seat_mut(*to).stockpile.ducats = tenth(self.seat(*to).stockpile.ducats + t.tribute_ducats as f64);
                     }
                     self.credit(seat, *to);
                     self.log(format!("{} paid tribute to {}.", self.seat_name(seat), self.seat_name(*to)));

@@ -9,7 +9,7 @@ use crate::state::*;
 #[derive(Debug, Clone, PartialEq)]
 pub struct ShortfallForecast {
     /// How far short of the bill the seat stands with everything running.
-    pub short_by: i64,
+    pub short_by: f64,
     /// What goes dark, in the order the rule shuts it.
     pub dark: Vec<GoesDark>,
 }
@@ -29,8 +29,8 @@ struct Producer {
     place: ProducerPlace,
     name: &'static str,
     is_module: bool,
-    upkeep: i64,
-    output: Option<(Resource, i64)>,
+    upkeep: f64,
+    output: Option<(Resource, f64)>,
     /// Materials or Fuel from a Mine, Refinery or Factory count toward the Extraction Total.
     research: i64,
     online: bool,
@@ -43,9 +43,12 @@ struct Producer {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Yield {
     pub resource: Option<Resource>,
-    pub amount: i64,
+    /// Ticket #387 (version 0.09.3): to a tenth for the four stockpile resources; a Widget figure
+    /// is still a whole number, floored as it was.
+    pub amount: f64,
     pub research: i64,
-    pub upkeep: i64,
+    /// Ticket #387: Energy upkeep, to a tenth once a multiplier has touched it.
+    pub upkeep: f64,
     pub emissions: f64,
     /// Ticket #36: Influence Allotment added while it stands, and standing raised each turn.
     pub allotment: i64,
@@ -79,6 +82,9 @@ pub enum Step {
     Plus(i64, String),
     Floor,
     Round,
+    /// Ticket #387 (version 0.09.3): settled to the nearest tenth, where a resource figure was
+    /// floored to a whole before.
+    Tenth,
     Half(String),
 }
 
@@ -89,11 +95,14 @@ pub enum Step {
 pub struct Chain {
     pub steps: Vec<Step>,
     v: f64,
+    /// Ticket #387: whether the figure has been settled to a whole (Research, Widgets), so a
+    /// later halving halves whole; after `tenth` it halves to the tenth.
+    whole: bool,
 }
 
 impl Chain {
     pub fn base(v: f64, why: impl Into<String>) -> Chain {
-        Chain { steps: vec![Step::Base(v, why.into())], v }
+        Chain { steps: vec![Step::Base(v, why.into())], v, whole: false }
     }
     pub fn times(&mut self, f: f64, why: impl FnOnce() -> String) {
         self.v *= f;
@@ -105,26 +114,37 @@ impl Chain {
         self.v /= d;
         self.steps.push(Step::Over(d, why.into()));
     }
-    pub fn plus(&mut self, n: i64, why: impl Into<String>) -> i64 {
+    pub fn plus(&mut self, n: i64, why: impl Into<String>) -> f64 {
         self.v += n as f64;
         self.steps.push(Step::Plus(n, why.into()));
-        self.v as i64
+        self.v
     }
-    pub fn floor(&mut self) -> i64 {
+    pub fn floor(&mut self) -> f64 {
         self.steps.push(Step::Floor);
         self.v = self.v.floor();
-        self.v as i64
+        self.whole = true;
+        self.v
     }
-    pub fn round(&mut self) -> i64 {
+    pub fn round(&mut self) -> f64 {
         self.steps.push(Step::Round);
         self.v = self.v.round();
-        self.v as i64
+        self.whole = true;
+        self.v
     }
-    /// Integer half, rounded down, as the rule halves a whole figure.
-    pub fn half(&mut self, why: impl Into<String>) -> i64 {
-        self.v = ((self.v as i64) / 2) as f64;
+    /// Ticket #387 (version 0.09.3): settled to the nearest tenth, the rounding the four stockpile
+    /// resources take now.
+    pub fn tenth(&mut self) -> f64 {
+        self.steps.push(Step::Tenth);
+        self.v = tenth(self.v);
+        self.whole = false;
+        self.v
+    }
+    /// Half: rounded down where the figure is a whole one (Research, Widgets), as the rule halves a
+    /// whole figure; to the tenth where it is a resource figure (ticket #387).
+    pub fn half(&mut self, why: impl Into<String>) -> f64 {
+        self.v = if self.whole { ((self.v as i64) / 2) as f64 } else { tenth(self.v / 2.0) };
         self.steps.push(Step::Half(why.into()));
-        self.v as i64
+        self.v
     }
     /// Whether anything multiplied the base, which is when the chain is worth showing.
     pub fn multiplied(&self) -> bool {
@@ -134,11 +154,14 @@ impl Chain {
     /// The chain as a hover's lines, at most `max`: the base, every step, and "= 3.63, rounded down
     /// to 3" where the rule rounds. Past `max` the later steps share a line, as ticket #352 asked.
     pub fn lines(&self, max: usize) -> Vec<String> {
-        // Two places, as the approved example reads ("x 1.10"), and a whole number bare ("2 base").
+        // Two places for a factor, as the approved example reads ("x 1.10"), and a whole number bare
+        // ("2 base"). Ticket #387 (version 0.09.3): a settled figure prints as the top bar prints
+        // it, whole when whole and one place otherwise (`figure`).
         let fig = |f: f64| if (f - f.round()).abs() < 1e-9 { format!("{}", f.round() as i64) } else { format!("{f:.2}") };
         let mut out: Vec<String> = Vec::new();
         let mut steps: Vec<String> = Vec::new();
         let mut v = 0.0;
+        let mut whole = false;
         let flush = |out: &mut Vec<String>, steps: &mut Vec<String>| {
             out.append(steps);
         };
@@ -146,7 +169,7 @@ impl Chain {
             match s {
                 Step::Base(b, why) => {
                     v = *b;
-                    out.push(if why.is_empty() { format!("{} base", fig(*b)) } else { format!("{} {why}", fig(*b)) });
+                    out.push(if why.is_empty() { format!("{} base", figure(*b)) } else { format!("{} {why}", figure(*b)) });
                 }
                 Step::Times(f, why) => {
                     v *= f;
@@ -161,17 +184,22 @@ impl Chain {
                     v += *n as f64;
                     out.push(format!("+ {n} {why}"));
                 }
-                Step::Floor | Step::Round => {
+                Step::Floor | Step::Round | Step::Tenth => {
                     flush(&mut out, &mut steps);
-                    let n = if matches!(s, Step::Floor) { v.floor() } else { v.round() };
+                    let n = match s {
+                        Step::Floor => v.floor(),
+                        Step::Round => v.round(),
+                        _ => tenth(v),
+                    };
                     let how = if matches!(s, Step::Floor) { "rounded down" } else { "rounded" };
-                    out.push(if (n - v).abs() < 1e-9 { format!("= {}", fig(n)) } else { format!("= {}, {how} to {}", fig(v), fig(n)) });
+                    out.push(if (n - v).abs() < 1e-9 { format!("= {}", figure(n)) } else { format!("= {}, {how} to {}", fig(v), figure(n)) });
+                    whole = !matches!(s, Step::Tenth);
                     v = n;
                 }
                 Step::Half(why) => {
                     flush(&mut out, &mut steps);
-                    v = ((v as i64) / 2) as f64;
-                    out.push(format!("halved {why}: {}", fig(v)));
+                    v = if whole { ((v as i64) / 2) as f64 } else { tenth(v / 2.0) };
+                    out.push(format!("halved {why}: {}", figure(v)));
                 }
             }
         }
@@ -192,12 +220,12 @@ impl Yield {
     pub fn text(&self) -> String {
         let mut parts = Vec::new();
         match self.resource {
-            Some(Resource::Materials) => parts.push(format!("+{} Materials", self.amount)),
-            Some(Resource::Fuel) => parts.push(format!("+{} Fuel", self.amount)),
-            Some(Resource::Energy) => parts.push(format!("+{} Energy", self.amount)),
-            Some(Resource::Ducats) => parts.push(format!("+{} Ducats", self.amount)),
+            Some(Resource::Materials) => parts.push(format!("+{} Materials", figure(self.amount))),
+            Some(Resource::Fuel) => parts.push(format!("+{} Fuel", figure(self.amount))),
+            Some(Resource::Energy) => parts.push(format!("+{} Energy", figure(self.amount))),
+            Some(Resource::Ducats) => parts.push(format!("+{} Ducats", figure(self.amount))),
             // Ticket #332 (version 0.09.0): a Factory's Widgets, the work half of every build.
-            Some(Resource::Widgets) => parts.push(format!("+{} Widgets", self.amount)),
+            Some(Resource::Widgets) => parts.push(format!("+{} Widgets", figure(self.amount))),
             Some(Resource::Research) | None => {}
         }
         if self.research > 0 {
@@ -225,8 +253,8 @@ impl Yield {
         if parts.is_empty() {
             parts.push("no output".to_string());
         }
-        if self.upkeep > 0 {
-            parts.push(format!("{} Energy upkeep", self.upkeep));
+        if self.upkeep > 0.0 {
+            parts.push(format!("{} Energy upkeep", figure(self.upkeep)));
         }
         if self.emissions > 0.0 {
             parts.push(format!("{:.1} Emissions", self.emissions));
@@ -431,7 +459,7 @@ impl Game {
         let fac = t.faction(self.kind(seat));
         let card = t.state(sid);
         let fc = t.facility(kind);
-        let mut y = Yield { resource: None, amount: 0, research: 0, upkeep: fc.energy_upkeep, emissions: 0.0, allotment: fc.influence_allotment, standing: fc.standing_per_turn, doubled_by: None, detail: None, does: fc.does.clone(), chain: Chain::default(), allotment_outside: 0 };
+        let mut y = Yield { resource: None, amount: 0.0, research: 0, upkeep: fc.energy_upkeep as f64, emissions: 0.0, allotment: fc.influence_allotment, standing: fc.standing_per_turn, doubled_by: None, detail: None, does: fc.does.clone(), chain: Chain::default(), allotment_outside: 0 };
         if let Some(p) = &fc.produces {
             match p.resource {
                 Resource::Research => {
@@ -450,7 +478,7 @@ impl Game {
                         r.times(self.tech_multiplier(seat, TechId::PublicScience), || t.tech(TechId::PublicScience).name.clone());
                         // Ticket #84: the Upload stacks on Public Science.
                         r.times(self.tech_multiplier(seat, TechId::TheUpload), || t.tech(TechId::TheUpload).name.clone());
-                        y.research = r.floor();
+                        y.research = r.floor() as i64;
                         y.chain = r;
                     }
                 }
@@ -461,7 +489,8 @@ impl Game {
                     v.over(10.0, "");
                     v.times(fac.output_multiplier, || format!("as the {}", fac.name));
                     y.resource = Some(Resource::Ducats);
-                    y.amount = v.floor();
+                    // Ticket #387 (version 0.09.3): to the tenth, where it was floored.
+                    y.amount = v.tenth();
                     y.chain = v;
                 }
                 // Ticket #332 (version 0.09.0): a Factory's Widgets come through here too, so the
@@ -476,7 +505,9 @@ impl Game {
                     v.times(fac.output_multiplier, || format!("as the {}", fac.name));
                     v.times(self.tech_output_multiplier_facility(seat, kind), || "for Techs".to_string());
                     y.resource = Some(res);
-                    y.amount = v.floor();
+                    // Ticket #387 (version 0.09.3): the four stockpile resources keep a tenth, where
+                    // they were floored; Widgets stay whole, floored as they were.
+                    y.amount = if res == Resource::Widgets { v.floor() } else { v.tenth() };
                     y.chain = v;
                 }
             }
@@ -494,18 +525,28 @@ impl Game {
         // multiplies the output, never the Emissions: the price is paid once, when the permit ends.
         if self.strip_permit_running(sid) {
             let m = self.tables.strip_permit.multiplier;
-            y.amount = (y.amount as f64 * m).floor() as i64;
-            y.research = (y.research as f64 * m).floor() as i64;
             y.chain.times(m, || "for the Strip Permit".to_string());
-            y.chain.floor();
+            y.research = (y.research as f64 * m).floor() as i64;
+            // Ticket #387 (version 0.09.3): a resource figure keeps its tenth; Widgets and
+            // Research stay whole.
+            if y.resource.is_some_and(|r| r != Resource::Widgets) {
+                y.amount = y.chain.tenth();
+            } else {
+                y.amount = (y.amount * m).floor();
+                y.chain.floor();
+            }
         }
         // Ticket #52: at Unrest 7 every Facility in the state produces at half, rounded down, and
         // emits at half. What it adds to the Allotment and to the standing is untouched.
+        // Ticket #387 (version 0.09.3): a resource figure halves to the tenth (`Chain::half`);
+        // Research and Widgets halve whole as before.
         if self.facilities_at_half(sid) {
-            y.amount /= 2;
             y.research /= 2;
             y.emissions *= 0.5;
-            y.chain.half("at Unrest 7");
+            let half = y.chain.half("at Unrest 7");
+            if y.resource.is_some() {
+                y.amount = half;
+            }
         }
         y
     }
@@ -515,7 +556,7 @@ impl Game {
         let t = &self.tables;
         let fac = t.faction(self.kind(seat));
         let mc = t.module(kind);
-        let mut y = Yield { resource: None, amount: 0, research: 0, upkeep: mc.energy_upkeep, emissions: 0.0, allotment: mc.influence_allotment, standing: mc.standing_per_turn, doubled_by: None, detail: None, does: mc.does.clone(), chain: Chain::default(), allotment_outside: 0 };
+        let mut y = Yield { resource: None, amount: 0.0, research: 0, upkeep: mc.energy_upkeep as f64, emissions: 0.0, allotment: mc.influence_allotment, standing: mc.standing_per_turn, doubled_by: None, detail: None, does: mc.does.clone(), chain: Chain::default(), allotment_outside: 0 };
         // Ticket #239 (version 0.08.3): a Unique Module does its sibling's job, so every lookup
         // keyed by kind -- the Techs that multiply it, the slot's yield, a Discovery on it --
         // reads the COMMON kind. Without this the Arkwrights' Chorus would be the one Relay in
@@ -557,7 +598,8 @@ impl Game {
                 let mut v = Chain::base(raw as f64, format!("from {} x {here} Colonists + {per_other} x {others} Bodies", p.amount));
                 v.times(fac.output_multiplier, || format!("as the {}", fac.name));
                 y.resource = Some(Resource::Ducats);
-                y.amount = v.floor();
+                // Ticket #387 (version 0.09.3): to the tenth, where it was floored.
+                y.amount = v.tenth();
                 y.detail = Some(format!("{} x {here} Colonists + {per_other} x {others} Bodies", p.amount));
                 // Ticket #239 (version 0.08.3): the Prospectors' Exchange pays one more, flat and
                 // AFTER the multiplier, for the Academy's reason -- 1 through the largest output
@@ -594,7 +636,7 @@ impl Game {
                 r.times(self.tech_multiplier(seat, TechId::PublicScience), || t.tech(TechId::PublicScience).name.clone());
                 // Ticket #84: the Upload stacks on Public Science.
                 r.times(self.tech_multiplier(seat, TechId::TheUpload), || t.tech(TechId::TheUpload).name.clone());
-                y.research = r.floor();
+                y.research = r.floor() as i64;
                 y.chain = r;
             } else {
                 // Ticket #89: a sun-scaled Module (the Solar Array) reads the sunlight where its
@@ -623,12 +665,14 @@ impl Game {
                     v.times(0.0, || "in a Solar Storm".to_string());
                 }
                 y.resource = Some(p.resource);
-                y.amount = if mc.sun_scaled { v.round() } else { v.floor() };
+                // Ticket #387 (version 0.09.3): a resource figure keeps its tenth, the sun-scaled
+                // one included (it rounded to the whole); a Widget figure stays whole, floored.
+                y.amount = if p.resource == Resource::Widgets { v.floor() } else { v.tenth() };
                 // Ticket #239 (version 0.08.3): the Archivists' Heliostat makes one more, added
                 // AFTER the inverse square scaling and after the rounding, so the point is worth
                 // the same at every distance rather than 0.43 at Mars and 1.91 at Venus. A Solar
                 // Storm silences a Heliostat as it silences a Solar Array: nothing is added to nought.
-                if kind == ModuleKind::Heliostat && y.amount > 0 {
+                if kind == ModuleKind::Heliostat && y.amount > 0.0 {
                     y.amount = v.plus(t.unique.heliostat_energy, "for the Heliostat");
                 }
                 // Ticket #92: a working Mass Driver at the Colony gives each Mine there more, after
@@ -648,9 +692,10 @@ impl Game {
         // standing with its Research paid in full. Until then it costs nothing to run.
         if kind == ModuleKind::Archive {
             let complete = self.seat(seat).archive_fund >= t.archive.research;
-            y.upkeep = if complete { mc.energy_upkeep } else { 0 };
+            y.upkeep = if complete { mc.energy_upkeep as f64 } else { 0.0 };
         }
-        y.upkeep = (y.upkeep as f64 * self.tech_multiplier(seat, TechId::ClosedLoopColonies)).floor() as i64;
+        // Ticket #387 (version 0.09.3): to the tenth, where it was floored.
+        y.upkeep = tenth(y.upkeep * self.tech_multiplier(seat, TechId::ClosedLoopColonies));
         y
     }
 
@@ -670,7 +715,7 @@ impl Game {
             if idle == 0 {
                 continue;
             }
-            let mut candidates: Vec<((ColonyId, usize), i64)> = Vec::new();
+            let mut candidates: Vec<((ColonyId, usize), f64)> = Vec::new();
             for cid in self.directed_colonies(seat) {
                 let col = self.colony(cid).unwrap();
                 if !self.off_earth(col) {
@@ -679,11 +724,11 @@ impl Game {
                 for (i, m) in col.modules.iter().enumerate() {
                     if m.kind == *mk && !m.mothballed {
                         let y = self.module_yield(seat, cid, *mk);
-                        candidates.push(((cid, i), y.amount.max(y.research)));
+                        candidates.push(((cid, i), y.amount.max(y.research as f64)));
                     }
                 }
             }
-            candidates.sort_by_key(|c| std::cmp::Reverse(c.1));
+            candidates.sort_by(|a, b| b.1.total_cmp(&a.1));
             out.extend(candidates.into_iter().take(idle).map(|(k, _)| k));
         }
         out
@@ -693,12 +738,12 @@ impl Game {
     /// `doubled_modules`, named for the Facility whose mothball pays for it.
     pub fn module_yield_at(&self, seat: Seat, cid: ColonyId, index: usize) -> Yield {
         let Some(kind) = self.colony(cid).and_then(|c| c.modules.get(index)).map(|m| m.kind) else {
-            return Yield { resource: None, amount: 0, research: 0, upkeep: 0, emissions: 0.0, allotment: 0, standing: 0, doubled_by: None, detail: None, does: None, chain: Chain::default(), allotment_outside: 0 };
+            return Yield { resource: None, amount: 0.0, research: 0, upkeep: 0.0, emissions: 0.0, allotment: 0, standing: 0, doubled_by: None, detail: None, does: None, chain: Chain::default(), allotment_outside: 0 };
         };
         let mut y = self.module_yield(seat, cid, kind);
         if self.doubled_modules(seat).contains(&(cid, index)) {
             let pairs = &self.tables.faction(self.kind(seat)).mothball_pairs;
-            y.amount *= 2;
+            y.amount *= 2.0;
             y.research *= 2;
             y.doubled_by = pairs.iter().find(|(_, m)| **m == kind).map(|(f, _)| f.name());
             let by = y.doubled_by.unwrap_or("Facility");
@@ -708,12 +753,14 @@ impl Game {
         // the Energy. Ticket #352 (version 0.09.1): applied HERE, on the one figure every reader
         // takes, so the Module's hover shows it; it was applied at Income and on the Widget sum.
         if self.habitat_halves(cid) && y.resource != Some(Resource::Energy) {
-            y.amount /= 2;
             y.research /= 2;
             // Ticket #358 (version 0.09.1): and the Influence, now that the Allotment reads this.
             y.allotment /= 2;
             y.allotment_outside /= 2;
-            y.chain.half("while a shut Habitat houses people here");
+            let half = y.chain.half("while a shut Habitat houses people here");
+            if y.resource.is_some() {
+                y.amount = half;
+            }
         }
         y
     }
@@ -783,14 +830,16 @@ impl Game {
                 // kind, which is what the Strike and the Emergency Shutdown both want.
                 let card = self.card_facility_multiplier(seat, f.kind);
                 let scale = dry * surge * card;
-                let halve = |v: i64| if scale < 1.0 { (v as f64 * scale).floor() as i64 } else { v };
+                // Ticket #387 (version 0.09.3): to the tenth, where it was floored; Research whole.
+                let halve = |v: f64| if scale < 1.0 { tenth(v * scale) } else { v };
+                let halve_whole = |v: i64| if scale < 1.0 { (v as f64 * scale).floor() as i64 } else { v };
                 out.push(Producer {
                     place: ProducerPlace::Facility(sid, i),
                     name: f.kind.name(),
                     is_module: false,
                     upkeep: y.upkeep,
-                    output: y.resource.map(|r| (r, halve(y.amount))),
-                    research: halve(y.research),
+                    output: y.resource.map(|r| (r, if r == Resource::Widgets { halve(y.amount).floor() } else { halve(y.amount) })),
+                    research: halve_whole(y.research),
                     online: !f.offline_until_resolution,
                     doubled_by: None,
                 });
@@ -902,7 +951,7 @@ impl Game {
                     for f in st.facilities.iter().filter(|f| f.working()) {
                         let y = self.facility_yield(seat, sid, f.kind);
                         if y.resource == Some(Resource::Widgets) {
-                            n += y.amount;
+                            n += y.amount as i64;
                         }
                     }
                 }
@@ -921,7 +970,7 @@ impl Game {
                     }
                     let y = self.module_yield_at(seat, cid, i);
                     if y.resource == Some(Resource::Widgets) {
-                        n += y.amount;
+                        n += y.amount as i64;
                     }
                 }
                 // Ticket #359 (version 0.09.1): at half under an occupied Habitat standing shut,
@@ -999,30 +1048,31 @@ impl Game {
     /// Ticket #332: what `item` costs `seat` in Materials at `place` -- the Faction's own price, a
     /// Module's with the Colony's working Mines taken off. The refund a cancelled build pays its
     /// canceller, at the CANCELLER's price rather than the builder's.
-    pub fn item_materials(&self, seat: Seat, place: Place, item: BuildItem) -> i64 {
+    pub fn item_materials(&self, seat: Seat, place: Place, item: BuildItem) -> f64 {
         match (item, place) {
             (BuildItem::Facility(k), _) => self.facility_materials(seat, k),
             (BuildItem::IndustryLevel, _) => self.industry_cost(seat),
             (BuildItem::Module(k), Place::Colony(c)) => self.module_materials_at(seat, c, k),
             (BuildItem::Module(k), Place::State(_)) => self.module_materials(seat, k),
-            (BuildItem::Unit(UnitKind::Army), _) => self.tables.unit(UnitKind::Army).materials,
+            (BuildItem::Unit(UnitKind::Army), _) => self.tables.unit(UnitKind::Army).materials as f64,
             (BuildItem::Unit(k), _) => self.ship_materials(seat, k),
             // Ticket #343 (version 0.09.1): the rearm's flat price, for the same reason.
-            (BuildItem::Warhead(_), _) => self.tables.nuke.rearm_materials,
+            (BuildItem::Warhead(_), _) => self.tables.nuke.rearm_materials as f64,
         }
     }
 
     /// A controlled state's base Ducats a turn (ticket #35): gdp x Industry Level / 10, rounded down,
     /// the formula living in `Tables::base_ducats` since ticket #132 so the start screen reads the same one.
     /// Ticket #83 (version 0.06.0): times its controller's `ducats_multiplier` (the Prospectors' 1.2).
-    pub fn state_ducats(&self, sid: StateId) -> i64 {
+    /// Ticket #387 (version 0.09.3): to the tenth, where it was floored: 12 x 1.2 pays 14.4.
+    pub fn state_ducats(&self, sid: StateId) -> f64 {
         let base = self.tables.base_ducats(sid, self.state(sid).industry_level);
         let m = self.state(sid).control.controller().map(|s| self.tables.faction(self.kind(s)).ducats_multiplier).unwrap_or(1.0);
-        (base as f64 * m).floor() as i64
+        tenth(base * m)
     }
 
     /// Upkeep of every Ship and non-standing Army of a seat; always paid first (spec 7.2).
-    pub fn unit_upkeep(&self, seat: Seat) -> i64 {
+    pub fn unit_upkeep(&self, seat: Seat) -> f64 {
         let ships: i64 = self.ships.iter().filter(|s| s.seat == seat).map(|s| self.tables.unit(s.kind).energy_upkeep).sum();
         let armies: i64 = self
             .armies
@@ -1030,7 +1080,7 @@ impl Game {
             .filter(|a| !a.standing && self.army_seat(a) == Some(seat))
             .map(|_| self.tables.unit(UnitKind::Army).energy_upkeep)
             .sum();
-        ships + armies
+        (ships + armies) as f64
     }
 
     /// The names of producers shut down by the shortfall rule, in the order they would be shut.
@@ -1088,33 +1138,34 @@ impl Game {
         }
     }
 
-    fn reactor_relief(&self, seat: Seat, producers: &[Producer]) -> i64 {
+    fn reactor_relief(&self, seat: Seat, producers: &[Producer]) -> f64 {
         let lit = producers.iter().any(|p| {
             p.online
                 && p.name == FacilityKind::Reactor.name()
                 && matches!(p.place, ProducerPlace::Facility(sid, _) if self.state(sid).control == Control::Controlled(seat))
         });
         if !lit {
-            return 0;
+            return 0.0;
         }
         let archive = ModuleKind::Archive.name();
-        let bill: i64 = producers.iter().filter(|p| p.online && p.name != archive).map(|p| p.upkeep).sum();
-        bill - (bill as f64 * self.tables.unique.reactor_upkeep).floor() as i64
+        let bill: f64 = producers.iter().filter(|p| p.online && p.name != archive).map(|p| p.upkeep).sum();
+        // Ticket #387 (version 0.09.3): to the tenth, where it was floored once.
+        bill - tenth(bill * self.tables.unique.reactor_upkeep)
     }
 
     /// The Energy left after Income with these producers as they stand: `stored`, plus what the
     /// online ones make, less their upkeep and the Ships' and Armies', plus the Reactor's relief.
-    fn energy_balance(&self, seat: Seat, ps: &[Producer], stored: i64) -> i64 {
-        let energy_in: i64 = ps.iter().filter(|p| p.online).filter_map(|p| p.output.filter(|(r, _)| *r == Resource::Energy).map(|(_, v)| v)).sum();
-        let upkeep: i64 = ps.iter().filter(|p| p.online).map(|p| p.upkeep).sum();
-        stored + energy_in - upkeep - self.unit_upkeep(seat) + self.reactor_relief(seat, ps)
+    fn energy_balance(&self, seat: Seat, ps: &[Producer], stored: f64) -> f64 {
+        let energy_in: f64 = ps.iter().filter(|p| p.online).filter_map(|p| p.output.filter(|(r, _)| *r == Resource::Energy).map(|(_, v)| v)).sum();
+        let upkeep: f64 = ps.iter().filter(|p| p.online).map(|p| p.upkeep).sum();
+        tenth(stored + energy_in - upkeep - self.unit_upkeep(seat) + self.reactor_relief(seat, ps))
     }
 
     /// Ticket #351 (version 0.09.1): the rule starts from `stored` rather than reading the stockpile,
     /// so the forecast can run it on the Energy left after this turn's orders; Income passes the
     /// stockpile itself. It returns the balance after, and the INDEX of each producer it shut, in
     /// the order it shut them.
-    fn apply_shortfall(&self, seat: Seat, producers: &mut [Producer], stored: i64) -> (i64, Vec<usize>) {
+    fn apply_shortfall(&self, seat: Seat, producers: &mut [Producer], stored: f64) -> (f64, Vec<usize>) {
         // Ticket #184: the balance is recomputed from scratch whenever a building goes dark, because
         // the Reactor's relief is a share of the bill and shrinks with it.
         let mut balance = self.energy_balance(seat, producers, stored);
@@ -1122,18 +1173,18 @@ impl Game {
         // walls of the place rather than a building in it -- it cannot be mothballed either -- so
         // its upkeep is paid whatever else goes dark.
         let mut order: Vec<usize> =
-            (0..producers.len()).filter(|i| producers[*i].online && producers[*i].upkeep > 0 && producers[*i].name != ModuleKind::Core.name()).collect();
+            (0..producers.len()).filter(|i| producers[*i].online && producers[*i].upkeep > 0.0 && producers[*i].name != ModuleKind::Core.name()).collect();
         order.sort_by(|a, b| {
             let pa = &producers[*a];
             let pb = &producers[*b];
             pb.upkeep
-                .cmp(&pa.upkeep)
+                .total_cmp(&pa.upkeep)
                 .then_with(|| pb.is_module.cmp(&pa.is_module))
                 .then_with(|| pa.name.cmp(pb.name))
         });
         let mut shut = Vec::new();
         for i in order {
-            if balance >= 0 {
+            if balance >= 0.0 {
                 break;
             }
             producers[i].online = false;
@@ -1166,7 +1217,7 @@ impl Game {
         let mut research = 0;
         let mut off_earth = 0;
         let mut doubled_turns = 0;
-        let mut sources: Vec<(String, Resource, i64)> = Vec::new();
+        let mut sources: Vec<(String, Resource, f64)> = Vec::new();
         for p in &producers {
             let where_ = match p.place {
                 ProducerPlace::Facility(sid, i) => {
@@ -1193,7 +1244,7 @@ impl Game {
             };
             research += p.research;
             if p.research > 0 {
-                sources.push((format!("{} in {}", p.name, where_), Resource::Research, p.research));
+                sources.push((format!("{} in {}", p.name, where_), Resource::Research, p.research as f64));
                 // Ticket #80: Research made off Earth, for the measurement.
                 if let ProducerPlace::Module(cid, _) = p.place
                     && self.colony(cid).map(|c| self.off_earth(c)).unwrap_or(false)
@@ -1214,18 +1265,18 @@ impl Game {
                 }
                 sources.push((format!("{} in {}", p.name, where_), res, v));
             }
-            if p.upkeep > 0 {
+            if p.upkeep > 0.0 {
                 sources.push((format!("{} in {} (upkeep)", p.name, where_), Resource::Energy, -p.upkeep));
             }
         }
         let unit_upkeep = self.unit_upkeep(seat);
-        if unit_upkeep > 0 {
+        if unit_upkeep > 0.0 {
             sources.push(("Ships and Armies (upkeep)".to_string(), Resource::Energy, -unit_upkeep));
         }
         // Ticket #35: every controlled state's economy pays Ducats, gdp x Industry Level / 10.
         for sid in self.controlled_states(seat) {
             let v = self.state_ducats(sid);
-            if v > 0 {
+            if v > 0.0 {
                 gained.ducats += v;
                 sources.push((format!("Economy of {}", self.tables.state(sid).name), Resource::Ducats, v));
             }
@@ -1239,8 +1290,8 @@ impl Game {
             .iter()
             .filter(|p| p.online && p.name == FacilityKind::Academy.name() && self.controls_producer(seat, p.place))
             .count() as i64;
-        let academy_ducats = academies * self.tables.unique.academy_ducats;
-        if academy_ducats > 0 {
+        let academy_ducats = (academies * self.tables.unique.academy_ducats) as f64;
+        if academy_ducats > 0.0 {
             gained.ducats += academy_ducats;
             let word = if academies == 1 { "Academy" } else { "Academies" };
             sources.push((format!("{academies} {word}"), Resource::Ducats, academy_ducats));
@@ -1266,7 +1317,7 @@ impl Game {
         }
         let u_interest = self.tables.unique.investment_bank_interest;
         let u_floor = self.tables.unique.investment_bank_floor;
-        let mut interest_to_fund = 0i64;
+        let mut interest_to_fund = 0.0;
         if !paying_regions.is_empty() {
             let n = paying_regions.len() as i64;
             if self.tables.faction(self.kind(seat)).victory_first.kind == VictoryFirstKind::VentureFund {
@@ -1274,12 +1325,13 @@ impl Game {
                 // in Ducats. The rate and the floor were fitted against a Materials fund and are
                 // left where they are; the bar was set against a measured Fund that already
                 // carried them, so moving both at once would have priced neither.
-                let per = (self.seat(seat).venture_fund as f64 * u_interest).floor() as i64;
-                interest_to_fund = (n * per).max(u_floor);
+                // Ticket #387 (version 0.09.3): to the tenth, where it was floored.
+                let per = tenth(self.seat(seat).venture_fund * u_interest);
+                interest_to_fund = tenth(n as f64 * per).max(u_floor as f64);
                 sources.push((format!("{n} Investment Bank (interest banked)"), Resource::Ducats, interest_to_fund));
             } else {
-                let per = ((gained.ducats as f64 * u_interest).floor() as i64).max(u_floor);
-                let paid = n * per;
+                let per = tenth(gained.ducats * u_interest).max(u_floor as f64);
+                let paid = tenth(n as f64 * per);
                 gained.ducats += paid;
                 sources.push((format!("{n} Investment Bank (interest)"), Resource::Ducats, paid));
             }
@@ -1296,9 +1348,10 @@ impl Game {
         // FIVE Ducats, so a Ducat share competes with the seat's whole economy -- Influence bought,
         // Relief paid, repairs. "Bank it or spend it" is the decision, which is what a venture fund
         // actually is, and it is why the bar could not simply be converted at the market rate.
+        // Ticket #387 (version 0.09.3): to the tenth, where it was floored: 30% of 24 banks 7.2.
         let share = self.seat(seat).venture_share;
-        let banked = if share > 0.0 { (gained.ducats as f64 * share).floor() as i64 } else { 0 };
-        if banked > 0 {
+        let banked = if share > 0.0 { tenth(gained.ducats * share) } else { 0.0 };
+        if banked > 0.0 {
             gained.ducats -= banked;
             sources.push(("Venture Capital Fund (banked)".to_string(), Resource::Ducats, -banked));
         }
@@ -1311,50 +1364,46 @@ impl Game {
         if agreement > 1.0 && research > 0 {
             let lifted = (research as f64 * agreement).floor() as i64;
             if lifted > research {
-                sources.push(("Research agreement".to_string(), Resource::Research, lifted - research));
+                sources.push(("Research agreement".to_string(), Resource::Research, (lifted - research) as f64));
                 research = lifted;
             }
         }
         // Ticket #257 (version 0.08.4): the Sea Walls' keep. Each rise a working wall has held adds
-        // `upkeep_per_rise` Materials a turn -- half a Material, which is not a whole number, so the
-        // fraction is carried on the seat and whole Materials are paid as they accrue; nothing is
-        // lost to rounding. Paid out of this Income's Materials, and short of Materials the walls
-        // stand unkept this turn and hold nothing -- the Energy shortfall rule's shape, for
-        // Materials, since a wall nobody pays for is a wall nobody mans.
+        // `upkeep_per_rise` Materials a turn -- half a Material. Paid out of this Income's Materials,
+        // and short of Materials the walls stand unkept this turn and hold nothing -- the Energy
+        // shortfall rule's shape, for Materials, since a wall nobody pays for is a wall nobody mans.
+        // Ticket #387 (version 0.09.3): Materials are carried to a tenth, so the half is simply
+        // paid each turn; the accumulator that carried it until a whole Material accrued is gone.
         let rises: u32 = self.directed_states(seat).iter().flat_map(|sid| self.state(*sid).facilities.iter()).filter(|f| f.kind == FacilityKind::SeaWall && f.working()).map(|f| f.rises_held).sum();
-        let mut keep_due = 0i64;
+        let mut keep_due = 0.0;
         if rises > 0 {
-            let per = self.tables.sea_wall.upkeep_per_rise;
-            let s = self.seat_mut(seat);
-            s.sea_wall_upkeep_owed += rises as f64 * per;
-            keep_due = s.sea_wall_upkeep_owed.floor() as i64;
-            if keep_due > 0 {
-                s.sea_wall_upkeep_owed -= keep_due as f64;
+            keep_due = tenth(rises as f64 * self.tables.sea_wall.upkeep_per_rise);
+            if keep_due > 0.0 {
                 sources.push(("Sea Walls (keep)".to_string(), Resource::Materials, -keep_due));
             }
         }
-        let keep_short = keep_due > 0 && self.seat(seat).stockpile.materials + gained.materials < keep_due;
+        let keep_short = keep_due > 0.0 && self.seat(seat).stockpile.materials + gained.materials < keep_due;
         if keep_short {
-            // Nothing is paid: the Materials stay, the walls go unkept, and the fraction they would
-            // have paid is not owed twice.
+            // Nothing is paid: the Materials stay and the walls go unkept.
             sources.retain(|(n, _, _)| n != "Sea Walls (keep)");
-            self.seat_mut(seat).sea_wall_upkeep_owed = 0.0;
-            keep_due = 0;
+            keep_due = 0.0;
         }
         gained.materials -= keep_due;
+        // Ticket #387 (version 0.09.3): every figure written is settled to the tenth.
+        gained = Stockpile { materials: tenth(gained.materials), fuel: tenth(gained.fuel), energy: tenth(gained.energy), ducats: tenth(gained.ducats) };
         self.seat_mut(seat).income_sources = sources;
         let before = self.seat(seat).stockpile;
-        let clamped = balance.max(0);
+        let clamped = balance.max(0.0);
         {
             let s = self.seat_mut(seat);
-            s.stockpile.materials += gained.materials;
-            s.stockpile.fuel += gained.fuel;
+            s.stockpile.materials = tenth(s.stockpile.materials + gained.materials);
+            s.stockpile.fuel = tenth(s.stockpile.fuel + gained.fuel);
             s.stockpile.energy = clamped;
-            s.stockpile.ducats += gained.ducats;
+            s.stockpile.ducats = tenth(s.stockpile.ducats + gained.ducats);
             s.income_last_turn = Stockpile {
                 materials: gained.materials,
                 fuel: gained.fuel,
-                energy: clamped - before.energy,
+                energy: tenth(clamped - before.energy),
                 ducats: gained.ducats,
             };
             s.research_last_turn = research;
@@ -1363,7 +1412,7 @@ impl Game {
             s.research_total += research;
             s.research_off_earth_total += off_earth;
             s.doubled_module_turns += doubled_turns;
-            s.venture_fund += banked + interest_to_fund;
+            s.venture_fund = tenth(s.venture_fund + banked + interest_to_fund);
             s.venture_banked_last_turn = banked;
         }
         if keep_short {
@@ -1393,7 +1442,7 @@ impl Game {
             let text = self.say("energy_short", &[("faction", self.seat_name(seat)), ("buildings", shut.join(", ")), ("sink", sink)]);
             self.report_line_of(seat, LineKind::YourWorks, LineKind::Note, None, text);
         }
-        if balance < 0 {
+        if balance < 0.0 {
             let line = format!("{}: Energy fell to zero even with every producer off.", self.seat_name(seat));
             self.log(line);
             let text = self.say("energy_zero", &[("faction", self.seat_name(seat))]);
@@ -1407,10 +1456,10 @@ impl Game {
         self.log(format!(
             "Income {}: +{} Materials, +{} Fuel, Energy {} -> {}, Research {}.",
             self.seat_name(seat),
-            gained.materials,
-            gained.fuel,
-            before.energy,
-            clamped,
+            figure(gained.materials),
+            figure(gained.fuel),
+            figure(before.energy),
+            figure(clamped),
             research
         ));
     }

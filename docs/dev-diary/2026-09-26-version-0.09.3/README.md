@@ -16,3 +16,5 @@ never the per-seating arrays.
 | folder | ticket | what is in it |
 |---|---|---|
 | [`ticket-386-defects/`](ticket-386-defects/README.md) | [Defects from the list, and the Tech tree audit](https://github.com/whaleyjoshua2/Dying-Earth/issues/386) | The fund's lines to Ducats, End Turn's refusal naming both things owed (pictured on the sun's hover), the audit's finding, and the red witness. |
+| [`ticket-387-tenths/`](ticket-387-tenths/README.md) | [Energy, Ducats and Materials carried to a tenth](https://github.com/whaleyjoshua2/Dying-Earth/issues/387) | The four resources in tenths: the Trading window and the top bar pictured, four floored figures witnessed red, and the sweep after (5 / 6 / 1 / 9, collapses 59). |
+| [`sweeps/`](sweeps/) | | Every sweep of the version, one file per ticket that moved a rule, and the closing sweep. |

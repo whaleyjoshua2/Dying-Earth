@@ -2481,14 +2481,16 @@ impl Tables {
     /// at the start; ticket #139 (version 0.07.3) made it **GDP x Industry Level / 5, rounded down,
     /// never below 1** -- the designer: *"Saudi Arabia can't pay 0"* -- so every Region pays, the
     /// rich pay double, and a small economy pays a flat one until GDP x Industry reaches 10.
-    pub fn base_ducats(&self, sid: StateId, industry_level: u32) -> i64 {
-        ((self.state(sid).gdp * industry_level as i64) / 5).max(1)
+    /// Ticket #387 (version 0.09.3): **to the tenth**, where the division was rounded down: East
+    /// Asia's 17 x 3 / 5 pays 10.2. The floor of one stands.
+    pub fn base_ducats(&self, sid: StateId, industry_level: u32) -> f64 {
+        crate::state::tenth((self.state(sid).gdp * industry_level as i64) as f64 / 5.0).max(1.0)
     }
 
     /// What a Region's economy would pay `faction` a turn as the game opens: the base at the card's
-    /// Industry Level, times the Faction's Ducats multiplier (ticket #83).
-    pub fn start_ducats(&self, sid: StateId, faction: FactionKind) -> i64 {
-        (self.base_ducats(sid, self.state(sid).industry_level) as f64 * self.faction(faction).ducats_multiplier).floor() as i64
+    /// Industry Level, times the Faction's Ducats multiplier (ticket #83). Ticket #387: to the tenth.
+    pub fn start_ducats(&self, sid: StateId, faction: FactionKind) -> f64 {
+        crate::state::tenth(self.base_ducats(sid, self.state(sid).industry_level) * self.faction(faction).ducats_multiplier)
     }
 
     /// What a Region emits a turn as the game opens under `faction`, as that Faction's home: its

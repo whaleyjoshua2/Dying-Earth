@@ -8,13 +8,33 @@ use rand_chacha::ChaCha8Rng;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+/// Ticket #387 (version 0.09.3): the four stockpile resources are carried to a **tenth**, at the
+/// designer's word -- "Energy, Ducats and Materials carried to a tenth", and Fuel with them. A whole
+/// price, output or upkeep stays whole, since nothing partial arises from it; a computed figure
+/// that used to be floored to a whole keeps its tenth instead. Every write goes through `tenth`, so
+/// the stored figure is always an exact tenth and no float drift accumulates.
+#[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
 pub struct Stockpile {
-    pub materials: i64,
-    pub fuel: i64,
-    pub energy: i64,
+    pub materials: f64,
+    pub fuel: f64,
+    pub energy: f64,
     /// Version 0.03 (ticket #35).
-    pub ducats: i64,
+    pub ducats: f64,
+}
+
+/// Ticket #387 (version 0.09.3): a resource figure rounded to the nearest tenth. Applied wherever a
+/// Materials, Fuel, Energy or Ducats figure is written -- a stockpile, the Fund, a tank, an income
+/// line, a price -- so what is stored is always an exact tenth: 0.1 + 0.2 reads 0.3, never
+/// 0.30000000000000004. The one rounding these four resources take now, where a floor to a whole
+/// stood before.
+pub fn tenth(x: f64) -> f64 {
+    (x * 10.0).round() / 10.0
+}
+
+/// Ticket #387 (version 0.09.3): a resource figure as the interface prints it: whole when whole,
+/// one decimal otherwise -- "80", "80.4". The rule `unrest_figure` already followed for Unrest.
+pub fn figure(v: f64) -> String {
+    if (v - v.round()).abs() < 1e-9 { format!("{}", v.round() as i64) } else { format!("{v:.1}") }
 }
 
 /// A Nation State is neutral, controlled, or occupied (spec 8.1, 8.5).
@@ -491,7 +511,7 @@ pub struct Ship {
     /// Ticket #87 (version 0.06.0): the Fuel in its tank. Filled at the yard, spent by transits,
     /// refilled only by a Refuel order at a Body with a station of its own.
     #[serde(default)]
-    pub fuel: i64,
+    pub fuel: f64,
     /// Ticket #99 (version 0.07.0): the Orbital Slot this Ship sits in, chosen with the leg that
     /// brought it. Ticket #335 (version 0.09.0): `None` is **low orbit**, one of the Body's orbits
     /// like any other and no longer "the Body at large"; read it through `Game::ship_orbit`, which
@@ -872,16 +892,11 @@ pub struct SeatState {
     /// first Victory part), the share of Ducat income banked each Income, and what last
     /// Income banked. The running Extraction Total this replaces is retired.
     #[serde(default)]
-    pub venture_fund: i64,
+    pub venture_fund: f64,
     #[serde(default)]
     pub venture_share: f64,
     #[serde(default)]
-    pub venture_banked_last_turn: i64,
-    /// Ticket #257 (version 0.08.4): Materials the seat's Sea Walls are owed in keep and have not yet
-    /// paid. Half a Material a turn per rise held is not a whole number, so the fraction is carried
-    /// here and the whole Materials are paid as they accrue; nothing is lost to rounding.
-    #[serde(default)]
-    pub sea_wall_upkeep_owed: f64,
+    pub venture_banked_last_turn: f64,
     /// Ticket #261 (version 0.08.4): which steps of the rival's Moment this seat has fired -- three
     /// quarters of the way, and one part met. Once each, so a seat that dips and recrosses is not
     /// announced twice.
@@ -973,7 +988,7 @@ pub struct SeatState {
     pub lost_in_transit: i64,
     pub income_last_turn: Stockpile,
     /// Last Income by source (ticket #31): "Factory in Asia", the resource, the amount; upkeep as negatives.
-    pub income_sources: Vec<(String, Resource, i64)>,
+    pub income_sources: Vec<(String, Resource, f64)>,
     /// Ticket #51: Research banked for the Archive, capped at what its remaining stages still need.
     pub archive_fund: i64,
     /// Ticket #51: Fund the Archive was ordered this turn, so this turn's Lab Research went to the
@@ -1161,7 +1176,8 @@ pub struct WarCounters {
     /// Battle halved. A hull already under the bar when the Battle opened is not counted here: the
     /// Battle did not put it there.
     #[serde(default)]
-    pub battle_fuel_burned: [i64; SEAT_COUNT],
+    /// Ticket #387 (version 0.09.3): to a tenth, as a tank is.
+    pub battle_fuel_burned: [f64; SEAT_COUNT],
     /// Ticket #355 (version 0.09.1): the orbital Battles a seat opened AWAY from Earth, so the
     /// sweep can say where the orbital war is fought; `orbit_attacks` less this is over Earth.
     #[serde(default)]
@@ -1225,8 +1241,8 @@ impl WarCounters {
             self.launch_buildings_burned[i] += o.launch_buildings_burned[i];
             self.launch_people_killed[i] += o.launch_people_killed[i];
             self.industry_levels_lost[i] += o.industry_levels_lost[i];
-            // Ticket #346 (version 0.09.1).
-            self.battle_fuel_burned[i] += o.battle_fuel_burned[i];
+            // Ticket #346 (version 0.09.1). Ticket #387 (version 0.09.3): settled, as every Fuel figure is.
+            self.battle_fuel_burned[i] = tenth(self.battle_fuel_burned[i] + o.battle_fuel_burned[i]);
             self.hulls_left_dry[i] += o.hulls_left_dry[i];
         }
         self.battles_vs_neutral += o.battles_vs_neutral;
@@ -1520,15 +1536,14 @@ pub struct NewGame {
 impl Game {
     pub fn new(tables: std::sync::Arc<Tables>, setup: NewGame) -> Game {
         let mut rng = ChaCha8Rng::seed_from_u64(setup.seed);
-        let start = Stockpile { materials: tables.start.materials, fuel: tables.start.fuel, energy: tables.start.energy, ducats: tables.start.ducats };
+        let start = Stockpile { materials: tables.start.materials as f64, fuel: tables.start.fuel as f64, energy: tables.start.energy as f64, ducats: tables.start.ducats as f64 };
         let seat = |kind: FactionKind, ai: bool| SeatState {
             kind,
             ai,
             stockpile: start,
-            venture_fund: 0,
+            venture_fund: 0.0,
             venture_share: 0.0,
-            venture_banked_last_turn: 0,
-            sea_wall_upkeep_owed: 0.0,
+            venture_banked_last_turn: 0.0,
             rival_steps_announced: [false; 2],
             victory_history: Vec::new(),
             directive_sink: 0.0,
@@ -2177,22 +2192,22 @@ impl Game {
 
     /// Ticket #87: what a Refuel order takes from the Stockpile: what the tank wants, as far as
     /// the Stockpile can pay.
-    pub fn refuel_amount(&self, seat: Seat, ship: ShipId) -> i64 {
-        let Some(s) = self.ship(ship) else { return 0 };
-        let want = (self.tables.unit(s.kind).tank - s.fuel).max(0);
-        want.min(self.seat(seat).stockpile.fuel.max(0))
+    pub fn refuel_amount(&self, seat: Seat, ship: ShipId) -> f64 {
+        let Some(s) = self.ship(ship) else { return 0.0 };
+        let want = (self.tables.unit(s.kind).tank as f64 - s.fuel).max(0.0);
+        tenth(want.min(self.seat(seat).stockpile.fuel.max(0.0)))
     }
 
     /// Ticket #87: the cheapest leg a seat's Ship can fly from this Body today, in Fuel.
-    pub fn cheapest_leg_from(&self, seat: Seat, body: BodyId) -> Option<i64> {
+    pub fn cheapest_leg_from(&self, seat: Seat, body: BodyId) -> Option<f64> {
         self.cheapest_leg_from_at(seat, body, self.turn)
     }
 
     /// Ticket #375 (version 0.09.2): the same on a given turn, and only over legs that can be flown
     /// at all -- the one rule for both, where `cheapest_leg_from` priced a Venus-to-Phobos leg no
     /// Ship can take.
-    pub fn cheapest_leg_from_at(&self, seat: Seat, body: BodyId, turn: u32) -> Option<i64> {
-        BodyId::ALL.into_iter().filter(|b| *b != body && Self::leg_allowed(body, *b)).map(|b| self.transit_cost_for_at(seat, body, b, turn).1).min()
+    pub fn cheapest_leg_from_at(&self, seat: Seat, body: BodyId, turn: u32) -> Option<f64> {
+        BodyId::ALL.into_iter().filter(|b| *b != body && Self::leg_allowed(body, *b)).map(|b| self.transit_cost_for_at(seat, body, b, turn).1).min_by(|a, b| a.total_cmp(b))
     }
 
     /// Ticket #87: a Ship at a Body whose tank cannot pay any leg from there, with no station of
@@ -2205,7 +2220,7 @@ impl Game {
         // in another orbit rescues this Ship only while the tank can still pay the orbit change
         // that would reach it. A dry tank in the wrong orbit is stranded with a station in sight.
         if self.refuel_station_at(s.seat, body)
-            && (self.ship_orbit(s).slot().is_some_and(|sl| self.station_at(body, sl).is_some_and(|c| self.fuels_for(c, s.seat))) || s.fuel >= self.tables.orbit_change_fuel)
+            && (self.ship_orbit(s).slot().is_some_and(|sl| self.station_at(body, sl).is_some_and(|c| self.fuels_for(c, s.seat))) || s.fuel >= self.tables.orbit_change_fuel as f64)
         {
             return false;
         }
@@ -2223,16 +2238,16 @@ impl Game {
     /// The station test is `stranded`'s: a station that fuels for the seat in the orbit the leg
     /// ends in rescues it outright; one in another orbit of the far Body only while the tank left
     /// can still pay the orbit change that would reach it.
-    pub fn arrival_leaves_stranded(&self, seat: Seat, ship: ShipId, to: BodyId, slot: Option<u32>) -> Option<i64> {
+    pub fn arrival_leaves_stranded(&self, seat: Seat, ship: ShipId, to: BodyId, slot: Option<u32>) -> Option<f64> {
         let s = self.ship(ship)?;
         let ShipAt::Body(from) = s.at else { return None };
         let (turns, fuel) = self.transit_cost_for(seat, from, to);
-        let left = s.fuel - fuel;
-        if left < 0 {
+        let left = tenth(s.fuel - fuel);
+        if left < 0.0 {
             return None;
         }
         let station_in_orbit = slot.is_some_and(|sl| self.station_at(to, sl).is_some_and(|c| self.fuels_for(c, seat)));
-        if station_in_orbit || (self.refuel_station_at(seat, to) && left >= self.tables.orbit_change_fuel) {
+        if station_in_orbit || (self.refuel_station_at(seat, to) && left >= self.tables.orbit_change_fuel as f64) {
             return None;
         }
         let cheapest = self.cheapest_leg_from_at(seat, to, self.turn + turns)?;
@@ -2449,10 +2464,11 @@ impl Game {
         per.min(afford)
     }
 
-    /// What a Colony Module costs this seat in Materials, rounded down (ticket #51).
-    pub fn module_materials(&self, seat: Seat, kind: ModuleKind) -> i64 {
+    /// What a Colony Module costs this seat in Materials (ticket #51). Ticket #387 (version
+    /// 0.09.3): to the tenth, where it was rounded down.
+    pub fn module_materials(&self, seat: Seat, kind: ModuleKind) -> f64 {
         let base = self.tables.module(kind).materials as f64;
-        (base * self.tables.faction(self.kind(seat)).module_materials_multiplier).floor() as i64
+        tenth(base * self.tables.faction(self.kind(seat)).module_materials_multiplier)
     }
 
     /// Ticket #88 (version 0.06.0): the working Mines a Colony holds (not mothballed, not still
@@ -2462,9 +2478,10 @@ impl Game {
     }
 
     /// Ticket #88: what a Module costs this seat at this Colony: the row times the Faction's
-    /// multiplier, times the in-situ step for the Colony's working Mines, rounded down, never
-    /// below the floor of the row. Ships and stations never take it.
-    pub fn module_materials_at(&self, seat: Seat, colony: ColonyId, kind: ModuleKind) -> i64 {
+    /// multiplier, times the in-situ step for the Colony's working Mines, never below the floor of
+    /// the row. Ships and stations never take it. Ticket #387 (version 0.09.3): to the tenth, where
+    /// it was rounded down.
+    pub fn module_materials_at(&self, seat: Seat, colony: ColonyId, kind: ModuleKind) -> f64 {
         let row = self.tables.module(kind).materials as f64;
         let faction = self.tables.faction(self.kind(seat)).module_materials_multiplier;
         let t = &self.tables.in_situ;
@@ -2474,32 +2491,33 @@ impl Game {
             _ => t.two_mines,
         };
         let price = (row * faction * step).max(row * t.floor);
-        price.floor() as i64
+        tenth(price)
     }
 
-    /// What a Space Station costs this seat in Materials, rounded down (ticket #51).
     /// Ticket #72 (version 0.05.5): what a Facility costs this seat in Materials: the row's figure
-    /// times the Faction's multiplier (the Prospectors' 0.85), rounded down.
-    pub fn facility_materials(&self, seat: Seat, kind: FacilityKind) -> i64 {
+    /// times the Faction's multiplier (the Prospectors' 0.85). Ticket #387 (version 0.09.3): to the
+    /// tenth, where it was rounded down: 25 x 0.85 is 21.3.
+    pub fn facility_materials(&self, seat: Seat, kind: FacilityKind) -> f64 {
         let base = self.tables.facility(kind).materials as f64;
-        (base * self.tables.faction(self.kind(seat)).facility_materials_multiplier).floor() as i64
+        tenth(base * self.tables.faction(self.kind(seat)).facility_materials_multiplier)
     }
 
-    pub fn station_materials(&self, seat: Seat) -> i64 {
+    /// What a Space Station costs this seat in Materials (ticket #51); ticket #387: to the tenth.
+    pub fn station_materials(&self, seat: Seat) -> f64 {
         let base = self.tables.station_materials as f64;
-        (base * self.tables.faction(self.kind(seat)).station_materials_multiplier).floor() as i64
+        tenth(base * self.tables.faction(self.kind(seat)).station_materials_multiplier)
     }
 
     /// What a Ship costs this seat: the units.toml figure, or the Faction's own Colony Ship price;
-    /// ticket #83 (version 0.06.0): times the Faction's Ship multiplier, rounded down (the
-    /// Arkwrights' 0.85).
-    pub fn ship_materials(&self, seat: Seat, kind: UnitKind) -> i64 {
+    /// ticket #83 (version 0.06.0): times the Faction's Ship multiplier (the Arkwrights' 0.85).
+    /// Ticket #387 (version 0.09.3): to the tenth, where it was rounded down.
+    pub fn ship_materials(&self, seat: Seat, kind: UnitKind) -> f64 {
         let card = self.tables.faction(self.kind(seat));
         let base = match (kind, card.colony_ship_materials) {
             (UnitKind::ColonyShip, Some(m)) => m,
             _ => self.tables.unit(kind).materials,
         };
-        (base as f64 * card.ship_materials_multiplier).floor() as i64
+        tenth(base as f64 * card.ship_materials_multiplier)
     }
 
     /// Which seat an Army fights for, if any: it follows its home (spec 8.4).
@@ -2648,7 +2666,7 @@ impl Game {
     /// Read LIVE off the tank, as Orbital Control always has been: a fleet that spends its last
     /// Fuel winning a Battle loses the orbit at that moment, not a turn later.
     pub fn ship_holds_the_battle_bar(&self, s: &Ship) -> bool {
-        s.fuel >= self.tables.melee.battle_fuel
+        s.fuel >= self.tables.melee.battle_fuel as f64
     }
 
     /// Ticket #346: the strength a hull brings to a Battle it enters dry -- `dry_strength_share` of
@@ -3350,10 +3368,12 @@ impl Game {
     }
 
     /// Ticket #268: what `ppm` of carbon credit costs `buyer` in Ducats, at the table price times
-    /// the seller's view of them, rounded up so a lot is never free.
-    pub fn credit_cost(&self, buyer: Seat, ppm: i64) -> Option<i64> {
+    /// the seller's view of them. Ticket #387 (version 0.09.3): to the tenth, where it was rounded
+    /// up to the whole; a lot is still never free, since the table price is whole and the
+    /// multiplier never nought.
+    pub fn credit_cost(&self, buyer: Seat, ppm: i64) -> Option<f64> {
         let m = self.credit_price_multiplier(buyer)?;
-        Some(((ppm * self.tables.carbon_credits.price_per_ppm) as f64 * m).ceil() as i64)
+        Some(tenth((ppm * self.tables.carbon_credits.price_per_ppm) as f64 * m))
     }
 
     /// Ticket #53: the four Factions' Blame added together.
@@ -3933,30 +3953,30 @@ impl Game {
     /// sibling hop; Earth and the Moon reach anything else at that Body's card figures; anything else
     /// (a moon of Mars to the Moon, say) is the farther card. Ticket #57: a crossing between the
     /// Earth system and the Mars system pays what the phase angle this turn makes it pay instead.
-    pub fn transit_cost(&self, from: BodyId, to: BodyId) -> (u32, i64) {
+    pub fn transit_cost(&self, from: BodyId, to: BodyId) -> (u32, f64) {
         self.transit_cost_at(from, to, self.turn)
     }
 
     /// The same at any turn, for the window tooltip and the AI's planning.
-    pub fn transit_cost_at(&self, from: BodyId, to: BodyId, turn: u32) -> (u32, i64) {
+    pub fn transit_cost_at(&self, from: BodyId, to: BodyId, turn: u32) -> (u32, f64) {
         let tech = if self.has_tech(TechId::EfficientTransit) { self.tables.tech(TechId::EfficientTransit).value } else { 1.0 };
         self.transit_cost_with(from, to, 1.0, tech, turn)
     }
 
     /// The transit as one seat pays it (ticket #51): the Faction's own Fuel multiplier first, then
     /// Efficient Transit, multiplicative, rounded down once at the end.
-    pub fn transit_cost_for(&self, seat: Seat, from: BodyId, to: BodyId) -> (u32, i64) {
+    pub fn transit_cost_for(&self, seat: Seat, from: BodyId, to: BodyId) -> (u32, f64) {
         self.transit_cost_for_at(seat, from, to, self.turn)
     }
 
-    pub fn transit_cost_for_at(&self, seat: Seat, from: BodyId, to: BodyId, turn: u32) -> (u32, i64) {
+    pub fn transit_cost_for_at(&self, seat: Seat, from: BodyId, to: BodyId, turn: u32) -> (u32, f64) {
         let faction = self.tables.faction(self.kind(seat)).transit_fuel_multiplier;
         let (turns, fuel) = self.transit_cost_with(from, to, faction, self.tech_multiplier(seat, TechId::EfficientTransit), turn);
         // Ticket #92 (version 0.06.0): a working Mass Driver of the seat's at the Body it leaves
         // takes a flat figure off, after the multipliers, never below the minimum.
         if self.mass_driver_at(seat, from) {
             let md = &self.tables.mass_driver;
-            return (turns, (fuel - md.fuel_off).max(md.fuel_min));
+            return (turns, (fuel - md.fuel_off as f64).max(md.fuel_min as f64));
         }
         (turns, fuel)
     }
@@ -3969,7 +3989,7 @@ impl Game {
             .any(|c| c.modules.iter().any(|m| m.kind == ModuleKind::MassDriver && m.working()))
     }
 
-    fn transit_cost_with(&self, from: BodyId, to: BodyId, faction: f64, tech: f64, turn: u32) -> (u32, i64) {
+    fn transit_cost_with(&self, from: BodyId, to: BodyId, faction: f64, tech: f64, turn: u32) -> (u32, f64) {
         let t = &self.tables;
         let parent = |b: BodyId| t.body(b).parent;
         let near_earth = |b: BodyId| b == BodyId::Earth || parent(b) == Some(BodyId::Earth);
@@ -3999,7 +4019,8 @@ impl Game {
                 (turns, fuel as f64 * (1.0 + tr.fuel_per_degree * offset.abs()))
             }
         };
-        let fuel = (fuel * faction * tech).floor() as i64;
+        // Ticket #387 (version 0.09.3): to the tenth, where it was rounded down.
+        let fuel = tenth(fuel * faction * tech);
         (turns.max(1), fuel)
     }
 
@@ -4245,10 +4266,10 @@ impl Game {
     }
 
     /// Cheap Industry, the Prospectors' signature rule (spec 14.2).
-    pub fn industry_cost(&self, seat: Seat) -> i64 {
+    pub fn industry_cost(&self, seat: Seat) -> f64 {
         match self.kind(seat) {
-            FactionKind::Prospectors => self.tables.industry_level.materials_cheap_industry,
-            _ => self.tables.industry_level.materials,
+            FactionKind::Prospectors => self.tables.industry_level.materials_cheap_industry as f64,
+            _ => self.tables.industry_level.materials as f64,
         }
     }
 
@@ -4264,7 +4285,7 @@ impl Game {
 
     /// Ticket #53: Unrest moves in halves, so print the fraction only when there is one.
     pub fn unrest_figure(v: f64) -> String {
-        if (v - v.round()).abs() < 1e-9 { format!("{}", v.round() as i64) } else { format!("{v:.1}") }
+        figure(v)
     }
 
     /// A state's Unrest as the card and the map print it.

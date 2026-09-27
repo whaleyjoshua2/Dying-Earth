@@ -255,7 +255,7 @@ impl Game {
         if line.is_empty() {
             return 1.0;
         }
-        let all_stranded = line.iter().all(|s| (s.fuel - charge).max(0) < charge);
+        let all_stranded = line.iter().all(|s| (s.fuel - charge as f64).max(0.0) < charge as f64);
         let holds_something_here = self.colonies.iter().any(|c| c.body == body && c.control.controller() == Some(seat));
         if all_stranded && !holds_something_here { self.tables.ai.thresholds.battle_fuel_weight } else { 1.0 }
     }
@@ -555,7 +555,7 @@ impl Game {
         // 47 Fuel of a 30 tank) is not a destination either; before this the AI named it as its
         // one choice, the Transit was refused at the check, and the Ship sat at Earth.
         let tank = t.units.iter().map(|u| u.tank).max().unwrap_or(0);
-        let payable = |b: BodyId| self.transit_cost_for(seat, BodyId::Earth, b).1 <= tank;
+        let payable = |b: BodyId| self.transit_cost_for(seat, BodyId::Earth, b).1 <= tank as f64;
         // Ticket #93: Venus, with no Colony Slots, is a destination when the seat holds a station
         // there with room, or when a slot is free in its orbit and the Stockpile could raise one.
         let venus_open = |b: BodyId| {
@@ -623,7 +623,7 @@ impl Game {
 
     /// Every Energy upkeep the seat pays now: Facilities, Modules, Ships and Armies.
     fn total_upkeep(&self, seat: Seat) -> i64 {
-        self.unit_upkeep(seat)
+        self.unit_upkeep(seat) as i64
             // Ticket #54: a mothballed building pays no upkeep, so it is no part of the drain.
             + self.directed_states(seat).iter().flat_map(|s| self.state(*s).facilities.iter()).filter(|f| !f.mothballed).map(|f| self.tables.facility(f.kind).energy_upkeep).sum::<i64>()
             + self.directed_colonies(seat).iter().flat_map(|c| self.colony(*c).unwrap().modules.iter()).filter(|m| !m.mothballed).map(|m| self.tables.module(m.kind).energy_upkeep).sum::<i64>()
@@ -670,14 +670,14 @@ impl Game {
             costs.push((u.materials, u.energy_upkeep));
         }
         costs.sort();
-        let next: Vec<(i64, i64)> = costs.into_iter().filter(|(m, _)| *m <= s.materials.max(20)).take(3).collect();
+        let next: Vec<(i64, i64)> = costs.into_iter().filter(|(m, _)| *m as f64 <= s.materials.max(20.0)).take(3).collect();
         let need_materials: i64 = next.iter().map(|(m, _)| *m).sum::<i64>().max(1);
         let need_upkeep: i64 = next.iter().map(|(_, u)| *u).sum::<i64>();
         let drain = (self.total_upkeep(seat) + need_upkeep - self.energy_production(seat)).max(0);
-        let energy_ratio = if drain == 0 { f64::INFINITY } else { s.energy as f64 / (3.0 * drain as f64) };
-        let materials_ratio = s.materials as f64 / need_materials as f64;
+        let energy_ratio = if drain == 0 { f64::INFINITY } else { s.energy / (3.0 * drain as f64) };
+        let materials_ratio = s.materials / need_materials as f64;
         let has_ships = self.ships.iter().any(|x| x.seat == seat);
-        let fuel_ratio = if has_ships { s.fuel as f64 / 6.0 } else { f64::INFINITY };
+        let fuel_ratio = if has_ships { s.fuel / 6.0 } else { f64::INFINITY };
         if energy_ratio <= materials_ratio && energy_ratio <= fuel_ratio {
             Resource::Energy
         } else if materials_ratio <= fuel_ratio {
@@ -784,7 +784,7 @@ impl Game {
     /// Spec 16.2: the Energy balance is within one turn's upkeep of zero.
     fn energy_tight(&self, seat: Seat) -> bool {
         let drain = self.total_upkeep(seat) - self.energy_production(seat);
-        self.seat(seat).stockpile.energy - drain <= self.total_upkeep(seat)
+        self.seat(seat).stockpile.energy - drain as f64 <= self.total_upkeep(seat) as f64
     }
 
     /// Ticket #332 (version 0.09.0): the place and item a build order would queue, for the pace
@@ -815,7 +815,7 @@ impl Game {
         let allotment = self.seat(seat).allotment;
         let materials_income = self.seat(seat).income_last_turn.materials;
         // Ticket #332 (version 0.09.0): on Earth it is the Mine that makes Materials now.
-        let no_materials_income = materials_income == 0
+        let no_materials_income = materials_income <= 0.0
             && !self.directed_states(seat).iter().any(|s| self.state(*s).facilities.iter().any(|f| f.kind == FacilityKind::Mine))
             && !self.directed_colonies(seat).iter().any(|c| self.colony(*c).unwrap().modules.iter().any(|m| m.kind == ModuleKind::Mine))
             && !self.states.iter().flat_map(|s| s.queue.iter()).any(|b| b.seat == seat && b.item == BuildItem::Facility(FacilityKind::Mine));
@@ -848,10 +848,10 @@ impl Game {
             .into_iter()
             .filter(|s| self.leapfrog_would_bite(*s))
             .max_by(|a, b| self.state(*a).population.partial_cmp(&self.state(*b).population).unwrap_or(std::cmp::Ordering::Equal));
-        let output_of = |sid: StateId| -> i64 {
+        let output_of = |sid: StateId| -> f64 {
             self.state(sid).facilities.iter().filter(|f| !f.mothballed).map(|f| self.facility_yield(seat, sid, f.kind).amount).sum()
         };
-        let highest_output = self.controlled_states(seat).into_iter().filter(|s| !self.state(*s).strip_permit_used).max_by_key(|s| output_of(*s));
+        let highest_output = self.controlled_states(seat).into_iter().filter(|s| !self.state(*s).strip_permit_used).max_by(|a, b| output_of(*a).total_cmp(&output_of(*b)));
         // Ticket #54: behind on the first part's pace itself, whichever part the seat is furthest
         // behind on overall: the Strip Permit is bought against that schedule (ticket #72: the
         // Venture Capital Fund's).
@@ -979,7 +979,7 @@ impl Game {
             .sum::<usize>() as u32;
         let early_mine_region: Option<StateId> = if self.turn <= th.early_mine_turn && earth_mines < th.early_mines {
             // `max_by_key` keeps the LAST of equals, so the list is walked backwards to keep the first.
-            self.directed_states(seat).into_iter().filter(|s| self.free_slots(*s) > 0).rev().max_by_key(|s| self.facility_yield(seat, *s, FacilityKind::Mine).amount)
+            self.directed_states(seat).into_iter().filter(|s| self.free_slots(*s) > 0).rev().max_by(|a, b| self.facility_yield(seat, *a, FacilityKind::Mine).amount.total_cmp(&self.facility_yield(seat, *b, FacilityKind::Mine).amount))
         } else {
             None
         };
@@ -1052,7 +1052,7 @@ impl Game {
                     // outbidding one on its own merits once the Fund is in the hundreds.
                     if fk.unique_to().is_some() {
                         base *= if fk == FacilityKind::InvestmentBank {
-                            1.0 + self.seat(seat).venture_fund as f64 * m.investment_bank_per_fund
+                            1.0 + self.seat(seat).venture_fund * m.investment_bank_per_fund
                         } else {
                             m.unique_bias
                         };
@@ -1142,7 +1142,7 @@ impl Game {
             // Ticket #54: Leapfrog, the Custodians' other clause, on the most populous state they
             // hold once they have Ducats to spare.
             if kind == FactionKind::Custodians
-                && self.seat(seat).stockpile.ducats + 3 * self.seat(seat).income_last_turn.ducats >= self.tables.ducats.per_leapfrog
+                && self.seat(seat).stockpile.ducats + 3.0 * self.seat(seat).income_last_turn.ducats >= self.tables.ducats.per_leapfrog as f64
                 && self.state(sid).control == Control::Controlled(seat)
                 && self.leapfrog_would_bite(sid)
                 && most_populous == Some(sid)
@@ -1303,7 +1303,7 @@ impl Game {
                     // ticket #232's first attempt at the Mine put 329 Mines on the board.
                     ModuleKind::TradePost => {
                         let bare = self.tables.module(ModuleKind::TradePost).produces.as_ref().map(|p| p.amount).unwrap_or(1).max(1) as f64;
-                        let with = self.module_yield(seat, cid, ModuleKind::TradePost).amount as f64;
+                        let with = self.module_yield(seat, cid, ModuleKind::TradePost).amount;
                         (Cat::Producer, self.base_weight(seat, Cat::Producer) * (with / bare).clamp(0.25, 2.0))
                     }
                     // Ticket #92: a Mass Driver at a low-gravity ground Colony with a Mine, once the
@@ -1341,7 +1341,7 @@ impl Game {
                         w *= self.tech_output_multiplier_module(seat, ModuleKind::Mine);
                         if col.modules.iter().any(|m| m.kind == ModuleKind::MassDriver && m.working()) {
                             // The yield here already carries the bonus; weigh it against the bare figure.
-                            let with = self.module_yield(seat, cid, ModuleKind::Mine).amount as f64;
+                            let with = self.module_yield(seat, cid, ModuleKind::Mine).amount;
                             let plain = (with - self.tables.mass_driver.mine_bonus as f64).max(1.0);
                             w *= with / plain;
                         }
@@ -1580,7 +1580,7 @@ impl Game {
             let needed = self.influence_needed_for(seat, *target);
             let base = self.base_weight(seat, Cat::Influence) * (1.0 - 0.15 * rank as f64).max(0.3);
             let opp = if needed - have <= step { m.opportunity } else { 1.0 };
-            let bought = if self.tables.ducats.per_influence > 0 { self.seat(seat).stockpile.ducats / self.tables.ducats.per_influence } else { 0 };
+            let bought = if self.tables.ducats.per_influence > 0 { (self.seat(seat).stockpile.ducats / self.tables.ducats.per_influence as f64).floor() as i64 } else { 0 };
             let copies = ((allotment + bought) / step).max(0);
             for _ in 0..copies {
                 push(vec![Order::Influence { target: *target, amount: step }], Cat::Influence, base, 1.0, 1.0, opp, format!("spend {} Influence on {}", step, self.place_name(*target)), None);
@@ -1589,7 +1589,7 @@ impl Game {
         // Buy Influence with Ducats (ticket #35), in units of the step, weighted like Influence itself.
         let ducats = self.seat(seat).stockpile.ducats;
         let per = self.tables.ducats.per_influence;
-        let buys = if per > 0 { ducats / (per * step) } else { 0 };
+        let buys = if per > 0 { (ducats / (per * step) as f64).floor() as i64 } else { 0 };
         for _ in 0..buys {
             push(vec![Order::BuyInfluence { amount: step }], Cat::Influence, self.base_weight(seat, Cat::Influence) * 0.9, 1.0, 1.0, 1.0, format!("buy {} Influence for {} Ducats", step, per * step), None);
         }
@@ -1597,7 +1597,7 @@ impl Game {
         // need), Ducats buy them in lots of 10 at a producer's weight; the AI does not sell.
         let per_materials = self.tables.ducats.per_materials;
         if (scarce == Resource::Materials || needs.contains(&Resource::Materials)) && per_materials > 0 {
-            let lots = self.seat(seat).stockpile.ducats / (per_materials * 10);
+            let lots = (self.seat(seat).stockpile.ducats / (per_materials * 10) as f64).floor() as i64;
             for _ in 0..lots.min(4) {
                 push(vec![Order::Buy { resource: Resource::Materials, amount: 10 }], Cat::Producer, self.base_weight(seat, Cat::Producer) * 1.5, 1.0, 1.0, 1.0, format!("buy 10 Materials for {} Ducats", per_materials * 10), None);
             }
@@ -1616,7 +1616,7 @@ impl Game {
         // threshold, nor count the decay), and measured by the sweep on the ticket.
         let mut owned: Vec<Place> = self.controlled_states(seat).into_iter().map(Place::State).collect();
         owned.extend(self.colonies.iter().filter(|c| c.control.controller() == Some(seat)).map(|c| Place::Colony(c.id)));
-        let bought_steps = if per > 0 { ducats / per } else { 0 };
+        let bought_steps = if per > 0 { (ducats / per as f64).floor() as i64 } else { 0 };
         for place in owned {
             let rival = self.rival_standing(seat, place);
             let mine = self.seat(seat).influence.get(&place).copied().unwrap_or(0);
@@ -1771,7 +1771,7 @@ impl Game {
             if n < 6.0 {
                 continue;
             }
-            let points = if u.relief_ducats > 0 { (ducats / u.relief_ducats).min(n.ceil() as i64) } else { 0 };
+            let points = if u.relief_ducats > 0 { ((ducats / u.relief_ducats as f64).floor() as i64).min(n.ceil() as i64) } else { 0 };
             let opp = if n >= 9.0 { m.opportunity } else { 1.0 };
             for _ in 0..points {
                 push(
@@ -1792,7 +1792,7 @@ impl Game {
         // Allotment, which is the whole price of it.
         {
             let ag = self.tables.unrest.clone();
-            if ducats >= ag.agitate_ducats && allotment >= ag.agitate_influence {
+            if ducats >= ag.agitate_ducats as f64 && allotment >= ag.agitate_influence {
                 for sid in StateId::ALL {
                     let Some(holder) = self.state(sid).control.controller() else { continue };
                     if holder == seat || self.relations_score(seat, holder) > -5 {
@@ -1882,7 +1882,7 @@ impl Game {
             let over = self.blame_share(seat) - fair;
             let step = th.influence_step;
             let price = step * g.ducats_per_influence;
-            if over > 0.0 && !credits_to_be_had && allotment >= step && self.seat(seat).stockpile.ducats >= price + g.ai_ducats_reserve {
+            if over > 0.0 && !credits_to_be_had && allotment >= step && self.seat(seat).stockpile.ducats >= (price + g.ai_ducats_reserve) as f64 {
                 push(
                     vec![Order::Greenwash { amount: step }],
                     Cat::Greenwash,
@@ -1960,14 +1960,14 @@ impl Game {
         // standing and a run of nothing mothballs its dirtiest Facility instead, since its own
         // industry is what is keeping the net above the Sink.
         {
-            let upkeep_of = |b: &BuildingRef| -> i64 {
+            let upkeep_of = |b: &BuildingRef| -> f64 {
                 match b {
-                    BuildingRef::Facility(sid, i) => self.state(*sid).facilities.get(*i).map(|f| self.tables.facility(f.kind).energy_upkeep).unwrap_or(0),
+                    BuildingRef::Facility(sid, i) => self.state(*sid).facilities.get(*i).map(|f| self.tables.facility(f.kind).energy_upkeep as f64).unwrap_or(0.0),
                     BuildingRef::Module(cid, i) => self
                         .colony(*cid)
                         .and_then(|c| c.modules.get(*i))
                         .map(|md| self.module_yield(seat, *cid, md.kind).upkeep)
-                        .unwrap_or(0),
+                        .unwrap_or(0.0),
                 }
             };
             let mut standing: Vec<(BuildingRef, &'static str, bool, bool, f64)> = Vec::new();
@@ -1996,7 +1996,7 @@ impl Game {
             }
             // The one to mothball for Energy: standing, working, making nothing, dearest to run.
             let idle_cost: Option<&(BuildingRef, &str, bool, bool, f64)> =
-                standing.iter().filter(|(b, _, moth, produces, _)| !*moth && !*produces && upkeep_of(b) > 0).max_by_key(|(b, _, _, _, _)| upkeep_of(b));
+                standing.iter().filter(|(b, _, moth, produces, _)| !*moth && !*produces && upkeep_of(b) > 0.0).max_by(|(x, ..), (y, ..)| upkeep_of(x).total_cmp(&upkeep_of(y)));
             if tight && let Some((b, name, _, _, _)) = idle_cost {
                 push(
                     vec![Order::Change { building: *b, what: BuildingChange::Mothball }],
@@ -2041,7 +2041,7 @@ impl Game {
                 if idle > 0 && paired >= idle {
                     in_use.push(*fk);
                 }
-                let mut best_undoubled: Option<i64> = None;
+                let mut best_undoubled: Option<f64> = None;
                 for cid in self.directed_colonies(seat) {
                     let col = self.colony(cid).unwrap();
                     if !self.off_earth(col) {
@@ -2050,7 +2050,7 @@ impl Game {
                     for (i, md) in col.modules.iter().enumerate() {
                         if md.kind == *mk && !md.mothballed && !doubled.contains(&(cid, i)) {
                             let y = self.module_yield_at(seat, cid, i);
-                            let out = y.amount.max(y.research);
+                            let out = y.amount.max(y.research as f64);
                             best_undoubled = Some(best_undoubled.map_or(out, |b| b.max(out)));
                         }
                     }
@@ -2062,7 +2062,7 @@ impl Game {
                             continue;
                         }
                         let y = self.facility_yield(seat, sid, f.kind);
-                        let out = y.amount.max(y.research);
+                        let out = y.amount.max(y.research as f64);
                         // The 0.06.0 AI sweep (ticket #94): an even trade is a win for the Custodians,
                         // since the idled Facility's Emissions leave Earth with the output.
                         if out <= best {
@@ -2073,7 +2073,7 @@ impl Game {
                                 1.0,
                                 1.0,
                                 m.opportunity,
-                                format!("mothball the {} in {} (a {} off Earth making {} would double)", f.kind.name(), self.tables.state(sid).name, mk.name(), best),
+                                format!("mothball the {} in {} (a {} off Earth making {} would double)", f.kind.name(), self.tables.state(sid).name, mk.name(), figure(best)),
                                 None,
                             );
                         }
@@ -2081,7 +2081,7 @@ impl Game {
                 }
             }
             // Restart once Energy is back above two turns of upkeep; otherwise scrap it for half.
-            let restart_ok = self.seat(seat).stockpile.energy > 2 * self.total_upkeep(seat);
+            let restart_ok = self.seat(seat).stockpile.energy > 2.0 * self.total_upkeep(seat) as f64;
             for (b, name, mothballed, _, _) in standing.iter().filter(|(_, _, moth, _, _)| *moth) {
                 // Ticket #82: not a Facility whose idleness is doubling a Module off Earth.
                 if let BuildingRef::Facility(sid, i) = b
@@ -2132,7 +2132,7 @@ impl Game {
         // most where there are most people to take -- and since the measured problem is that their
         // home state runs from 20 units to 1 over a game, spending the Call on a small Region
         // wastes it. Not sounded at all while they already have more waiting than they can lift.
-        if kind == FactionKind::Arkwrights && self.seat(seat).stockpile.ducats >= self.tables.ducats.per_exodus_call {
+        if kind == FactionKind::Arkwrights && self.seat(seat).stockpile.ducats >= self.tables.ducats.per_exodus_call as f64 {
             let waiting_now: u32 = self.directed_states(seat).iter().map(|s| self.state(*s).emigrants).sum();
             let best = self
                 .directed_states(seat)
@@ -2252,7 +2252,7 @@ impl Game {
                     Place::State(_) => body == BodyId::Earth && orbit.is_low(),
                     Place::Colony(c) => self.colony(*c).is_some_and(|c| c.body == body && self.colony_orbit(c) == orbit),
                 });
-            if s.fuel < card.tank && self.refuelling_station(seat, body, orbit) && self.seat(seat).stockpile.fuel > 0 && !ready_to_fire {
+            if s.fuel < card.tank as f64 && self.refuelling_station(seat, body, orbit) && self.seat(seat).stockpile.fuel > 0.0 && !ready_to_fire {
                 push(
                     vec![Order::Refuel { ship: s.id }],
                     Cat::Transit,
@@ -2260,7 +2260,7 @@ impl Game {
                     gap_for(Cat::Transit, None),
                     1.0,
                     1.0,
-                    format!("refuel {} at {} ({} of {} in the tank)", ship_name, self.orbit_name(body, orbit), s.fuel, card.tank),
+                    format!("refuel {} at {} ({} of {} in the tank)", ship_name, self.orbit_name(body, orbit), figure(s.fuel), card.tank),
                     None,
                 );
             }
@@ -2273,7 +2273,7 @@ impl Game {
             // never outranks the thing it enables: the 0.06.0 sweep found that a loaded Colony Ship
             // offered its own station over Earth at full weight parked every load there and left
             // Mars unfounded, and a move toward that station must not reopen it.
-            if s.fuel >= self.tables.orbit_change_fuel {
+            if s.fuel >= self.tables.orbit_change_fuel as f64 {
                 let mut wants: Vec<(Orbit, String, Cat, f64)> = Vec::new();
                 // Ticket #363 (version 0.09.1): a warship HOLDING THE LANE -- the low-orbit garrison of a
                 // Body whose ground the seat wants -- does not leave it to top up a tank that can
@@ -2281,8 +2281,8 @@ impl Game {
                 // ready Missile Carrier changed orbit to its own station's ring to refuel on the
                 // very turn the carrier fired, and the Launch failed with the orbit given up.
                 let on_the_lane = s.kind.is_warship() && orbit.is_low() && self.ai_wants_the_ground(seat, body) && self.ai_low_orbit_garrison(seat, body).contains(&s.id);
-                let can_fight = s.fuel >= self.tables.melee.battle_fuel;
-                if s.fuel < card.tank && self.seat(seat).stockpile.fuel > 0 && !self.refuelling_station(seat, body, orbit) && !(on_the_lane && can_fight) && !ready_to_fire {
+                let can_fight = s.fuel >= self.tables.melee.battle_fuel as f64;
+                if s.fuel < card.tank as f64 && self.seat(seat).stockpile.fuel > 0.0 && !self.refuelling_station(seat, body, orbit) && !(on_the_lane && can_fight) && !ready_to_fire {
                     for c in self.colonies.iter().filter(|c| c.body == body && self.fuels_for(c, seat)) {
                         wants.push((Orbit::Slot(c.slot), format!("to refuel at {}", self.place_name(Place::Colony(c.id))), Cat::Transit, self.base_weight(seat, Cat::Transit)));
                     }
@@ -2902,15 +2902,15 @@ impl Game {
         for c in cands.iter().filter(|c| c.stack.is_none()) {
             let mut ok = true;
             let mut trial = chosen.clone();
-            let ducats_cost: i64 = c.orders.iter().map(|o| self.order_cost(seat, o).ducats).sum();
-            if ducats_cost > 0 {
+            let ducats_cost: f64 = c.orders.iter().map(|o| self.order_cost(seat, o).ducats).sum();
+            if ducats_cost > 0.0 {
                 if let Some(note) = &ducat_reserve {
                     lines.push(format!("  save  {:6.1}  {} (holding Ducats for {})", c.score(), c.note, note));
                     continue;
                 }
                 let (left, _) = self.remaining(seat, &chosen);
                 if ducats_cost > left.ducats
-                    && ducats_cost <= left.ducats + 3 * ducat_income
+                    && ducats_cost <= left.ducats + 3.0 * ducat_income
                     && c.orders.iter().all(|o| self.check_order_legality(seat, &chosen, o).is_ok())
                 {
                     ducat_reserve = Some(c.note.clone());
@@ -2922,14 +2922,14 @@ impl Game {
             // #87: and a Refuel, which is how the crossing's Fuel reaches the tank now.
             if let Some(note) = &fuel_held_for
                 && *note != c.note
-                && c.orders.iter().map(|o| self.order_cost(seat, o).fuel).sum::<i64>() > 0
+                && c.orders.iter().map(|o| self.order_cost(seat, o).fuel).sum::<f64>() > 0.0
                 && !c.orders.iter().any(|o| matches!(o, Order::Refuel { .. }))
             {
                 lines.push(format!("  save  {:6.1}  {} (banking Fuel for {})", c.score(), c.note, note));
                 continue;
             }
-            let materials_cost: i64 = c.orders.iter().map(|o| self.order_cost(seat, o).materials).sum();
-            if materials_cost > 0 {
+            let materials_cost: f64 = c.orders.iter().map(|o| self.order_cost(seat, o).materials).sum();
+            if materials_cost > 0.0 {
                 if let Some(note) = &reserve {
                     lines.push(format!("  save  {:6.1}  {} (holding Materials for {})", c.score(), c.note, note));
                     continue;
@@ -2938,7 +2938,7 @@ impl Game {
                 // Ticket #68: an Archivist on four Materials a turn never has a 50-Materials Module
                 // or a 35-Materials Shipyard within four turns of income, so for the steps of the
                 // Archive's own path the horizon is twelve turns.
-                let horizon = if first_kind == VictoryFirstKind::ArchiveResearch && advances_first(c.cat, None) { 12 } else { 4 };
+                let horizon = if first_kind == VictoryFirstKind::ArchiveResearch && advances_first(c.cat, None) { 12.0 } else { 4.0 };
                 if materials_cost > left.materials
                     && materials_cost <= left.materials + horizon * materials_income
                     && c.orders.iter().all(|o| self.check_order_legality(seat, &chosen, o).is_ok())
@@ -3004,7 +3004,7 @@ impl Game {
             let share = self.blame_share(seat);
             let credit = self.blame_credit(seat).floor() as i64;
             let mut offer = if share < fair { credit } else { 0 };
-            if share < fair / 2.0 && self.seat(seat).stockpile.ducats < c.ai_oversell_when_ducats_below {
+            if share < fair / 2.0 && self.seat(seat).stockpile.ducats < c.ai_oversell_when_ducats_below as f64 {
                 offer += c.cap_per_turn;
             }
             if offer != self.seat(seat).credits_offered {
@@ -3034,8 +3034,8 @@ impl Game {
             // repairs. It matters more than it did: measured over 120 games every seat ends every
             // game holding about five Ducats, so an over-large share starves the whole economy
             // where an over-large Materials share only slowed a build.
-            let gross = (s0.income_last_turn.ducats + s0.venture_banked_last_turn).max(0) as f64;
-            let need = (bar - s0.venture_fund as f64).max(0.0);
+            let gross = (s0.income_last_turn.ducats + s0.venture_banked_last_turn).max(0.0);
+            let need = (bar - s0.venture_fund).max(0.0);
             let share = if self.turn < first_waypoint || need <= 0.0 {
                 0.0
             } else {

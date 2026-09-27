@@ -46,3 +46,42 @@ moves in this section; each item is a thing the game said untruly or said badly.
    to leave those lines as the headline effect. **The Launch Pad Fire's text says the live rule**:
    *"Its Launch Site is offline until the next Resolution, so nothing lifts to orbit from there,
    and the Region loses the turn's Widgets"*, where it had said a due Ship completes next turn.
+
+## 2. Materials, Fuel, Energy and Ducats carried to a tenth
+
+The authority is [ticket #387](https://github.com/whaleyjoshua2/Dying-Earth/issues/387). This is
+the version's one change under everything else: every later figure is written on top of it.
+
+**The four resources are carried to a tenth**, and with them the Venture Capital Fund, a Ship's
+Fuel tank, last turn's income and every cost. A figure is settled to the nearest tenth whenever it
+is written, so a tenth is the finest step a stockpile ever moves in and no drift accumulates.
+
+**Nothing in the data changed, and nothing whole became partial.** A whole price, output or upkeep
+is still whole, because nothing partial arises from it. **What was partial and floored away is now
+kept**: a Faction's multiplier on an output, an upkeep or a price (the Prospectors' Factory costs
+21.3 where it cost 21; a Refinery under Automated Refining makes 4.5 Fuel where it made 4); a
+Region's economy, which was a fifth of its GDP figure times its Industry Level rounded down and
+now keeps its tenth (East Asia pays 10.2 where it paid 10); the Bank's and the Investment Bank's
+Ducats and interest; the Fund's banked share and its withdrawal; the Drought's, the Storm Surge's
+and a card's halvings; the Solar Array's sun-scaled Energy, the one figure that was rounded rather
+than floored; Closed-Loop and Reactor upkeeps; Build Where You Dig's and a station's and a Ship's
+prices; transit Fuel; the market's price and the sale price; carbon credits; a decommission's
+refund; the Research Directive's Ducats and Fuel. **The Sea Wall's keep is paid each turn to the
+tenth** (half a Materials a rise) where it was saved up and paid when it reached a whole.
+
+**What stays whole.** Widgets, Research, Influence, Standing and every count of people and things.
+The computer seats' own estimate of a Region's Energy, which is an estimate and not a rule, keeps
+its floors, and their thresholds (*20 Ducats or more*) read the tenths as they are; no rule for
+them moved.
+
+**How a figure is shown**: whole when whole and one decimal otherwise, *80* and *80.4*, wherever a
+stockpile, an income, a price or a cost is printed: the top bar and its hovers, the seat table, the
+Faction window's income row, the Trading window, the fund bar, the yield hovers (which printed two
+decimals and now print one), the Report and the headless driver.
+
+**The save moved**: `SAVE_VERSION` 7; a 0.09.2 save is refused, as every save-version move has
+been.
+
+**The sweep** (20 seeds x four seatings at the shipped cell): **5 / 6 / 1 / 9, collapses 59**,
+against 0.09.2's 2 / 5 / 0 / 11 and 62. Every seat earns slightly more Ducats, the floors on the
+Bank's, the Trade Post's and every Region's economy having gone.

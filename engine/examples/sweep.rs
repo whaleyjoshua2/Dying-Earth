@@ -20,7 +20,7 @@
 use dying_earth_engine::data::BreakEffect;
 use dying_earth_engine::data::{default_data_dir, Tables};
 use dying_earth_engine::ids::{BodyId, FactionKind, Seat, StateId};
-use dying_earth_engine::state::Outcome;
+use dying_earth_engine::state::{figure, tenth, Outcome};
 use std::sync::Arc;
 
 fn list(flag: &str, default: &[f64]) -> Vec<f64> {
@@ -275,11 +275,11 @@ fn main() {
                             ground_modules += r.ground_modules;
                             ground_colonies += r.ground_colonies;
                             solar_arrays += r.solar_arrays;
-                            d_made.push(r.ducats_made);
-                            m_made.push(r.materials_made);
+                            d_made.push(r.ducats_made.map(|v| v.round() as i64));
+                            m_made.push(r.materials_made.map(|v| v.round() as i64));
                             mines_done += r.mines_completed;
                             factories_done += r.factories_completed;
-                            d_spent.push(r.ducats_spent);
+                            d_spent.push(r.ducats_spent.map(|v| v.round() as i64));
                             d_mean.push(r.directive_mean);
                             ex_calls += r.exodus_calls;
                             ex_pioneers += r.exodus_pioneers;
@@ -310,8 +310,8 @@ fn main() {
                             slots_lost.push(r.coastal_slots_lost);
                             drowned.push(r.facilities_drowned);
                             converted.push(r.slots_converted);
-                            venture.push(r.venture_fund_at_end.max(0) as u32);
-                            if r.venture_fund_at_end as f64 >= base.faction(FactionKind::Prospectors).victory_first.bar {
+                            venture.push(r.venture_fund_at_end.max(0.0).round() as u32);
+                            if r.venture_fund_at_end >= base.faction(FactionKind::Prospectors).victory_first.bar {
                                 fund_met += 1;
                             }
                             walls_standing += r.sea_walls_standing;
@@ -626,10 +626,12 @@ fn main() {
                             // Ticket #346 (version 0.09.1): what the Battles cost in Fuel, by seat,
                             // and the hulls a Battle left under the Battle bar -- unable to hold an
                             // orbit, blockade or intercept until they refuel.
+                            // Ticket #387 (version 0.09.3): Fuel is tenths now, so the sums are
+                            // settled and printed as the game prints a figure, or the drift shows.
                             println!(
-                                "      Fuel burned in Battle over the batch, by seat {:?} ({} in all); hulls left dry by a Battle {:?} ({} in all)",
-                                warc.battle_fuel_burned,
-                                warc.battle_fuel_burned.iter().sum::<i64>(),
+                                "      Fuel burned in Battle over the batch, by seat [{}] ({} in all); hulls left dry by a Battle {:?} ({} in all)",
+                                warc.battle_fuel_burned.iter().map(|f| figure(*f)).collect::<Vec<_>>().join(", "),
+                                figure(tenth(warc.battle_fuel_burned.iter().sum::<f64>())),
                                 warc.hulls_left_dry,
                                 warc.hulls_left_dry.iter().sum::<u32>()
                             );
@@ -672,7 +674,7 @@ fn main() {
         // Ticket #346 (version 0.09.1): the same, a TOTAL over every seat of every seating.
         println!(
             "  Battles cost, all seats and seatings: Fuel burned in Battle {}, hulls left dry by a Battle {}",
-            all_warc.battle_fuel_burned.iter().sum::<i64>(),
+            figure(tenth(all_warc.battle_fuel_burned.iter().sum::<f64>())),
             all_warc.hulls_left_dry.iter().sum::<u32>()
         );
     }
