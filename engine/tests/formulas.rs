@@ -16793,9 +16793,10 @@ fn a_trade_post_pays_each_other_body_held_by_its_distance_from_earth() {
 /// its size** -- its Colonists plus its output a turn -- the designer's counter to a player who
 /// founds one place and simply loads people and builds on it. The prize is rescaled to the board
 /// (Q5 A, Q6): prize_top x size / the largest size on the board, never dividing by less than the
-/// floor, so the fattest outpost is the top. A fat Colony outranks a lean one among a seat's
-/// Influence targets despite its higher price (before: cheapest first, so the fat one ranked
-/// last); red with prize_top at 0, where every Colony weighs nothing and none outranks another.
+/// floor, so the fattest outpost is the top, and never under prize_least (Q7 A), so a lean place
+/// keeps the weight it had. A fat Colony outranks a lean one among a seat's Influence targets
+/// despite its higher price (before: cheapest first, so the fat one ranked last); red with
+/// prize_top at 0, where every Colony is the least and the price ranks the lean one first again.
 #[test]
 fn a_computer_seat_wants_a_rivals_fat_colony_more_than_its_lean_one() {
     let mut g = fresh();
@@ -16803,19 +16804,22 @@ fn a_computer_seat_wants_a_rivals_fat_colony_more_than_its_lean_one() {
     let m = &t.ai.multipliers;
     assert!(m.prize_top > 0.0 && m.prize_floor > 0.0, "the premise: the prize is a lift");
     // Two Colonies of seat 1's on Mars: a lean one (two Colonists, nothing built) and a fat one
-    // (eight Colonists, a Mine, a Generator and a Factory).
+    // (eight Colonists, a Mine, a Generator, a Factory and a Refinery), fat enough to be the
+    // board's top: its size reaches the floor.
     let lean = colony(&mut g, Seat(1), BodyId::Mars, &[], 2);
-    let fat = colony(&mut g, Seat(1), BodyId::Mars, &[ModuleKind::Mine, ModuleKind::Generator, ModuleKind::Factory, ModuleKind::Habitat], 8);
+    let fat = colony(&mut g, Seat(1), BodyId::Mars, &[ModuleKind::Mine, ModuleKind::Generator, ModuleKind::Factory, ModuleKind::Refinery, ModuleKind::Habitat], 8);
     let size = |g: &Game, c: ColonyId| {
         let col = g.colony(c).unwrap();
         let o = g.place_output(Place::Colony(c)).unwrap();
         col.colonists as f64 + o.materials + o.widgets + o.fuel + o.energy.max(0.0) + o.ducats + o.research
     };
+    assert!(size(&g, fat) >= m.prize_floor, "the premise: the fat one reaches the floor: {} against {}", size(&g, fat), m.prize_floor);
     assert!(size(&g, fat) > size(&g, lean) + 6.0, "the premise: the fat one is fatter: {} against {}", size(&g, fat), size(&g, lean));
     // The board's largest place is the ISS or the fat Colony; the divisor is that or the floor.
     let largest = g.colonies.iter().filter(|c| c.control.director().is_some()).map(|c| size(&g, c.id)).fold(0.0, f64::max).max(m.prize_floor);
-    assert!((g.ai_prize(lean) - m.prize_top * size(&g, lean) / largest).abs() < 1e-9, "the lean one's prize");
-    assert!((g.ai_prize(fat) - m.prize_top * size(&g, fat) / largest).abs() < 1e-9, "the fat one's prize");
+    // Never under the least (Q7, A): a lean place keeps the weight it had.
+    assert!((g.ai_prize(lean) - (m.prize_top * size(&g, lean) / largest).max(m.prize_least)).abs() < 1e-9, "the lean one's prize");
+    assert!((g.ai_prize(fat) - (m.prize_top * size(&g, fat) / largest).max(m.prize_least)).abs() < 1e-9, "the fat one's prize");
     assert!(g.ai_prize(fat) > g.ai_prize(lean), "the fat one is the bigger prize");
     // Once a place reaches the floor it is the board's top, and a fatter one takes the top from it.
     let fatter = colony(&mut g, Seat(1), BodyId::Moon, &[ModuleKind::Mine, ModuleKind::Generator, ModuleKind::Factory, ModuleKind::Refinery, ModuleKind::Habitat, ModuleKind::Habitat], 12);

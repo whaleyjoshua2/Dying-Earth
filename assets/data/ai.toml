@@ -336,10 +336,12 @@ low_gravity_yard = 1.5
 # seats spent on places they could not afford and collapses went from 60 to 69.
 prize_top = 3.0
 prize_floor = 26.0
-# The least a prize can be: 0 leaves the rescaling as decided (a lean place weighs under the 1 it
-# had); 1 keeps every lean place at the weight it had and lifts only the fat ones. Measured both
-# ways (the sweeps beside the ticket's diary); the figure is the designer's to set.
-prize_least = 0.0
+# The least a prize can be, 1 at the designer's word (Q7, A): a lean place keeps the weight it had
+# and only a place fatter than the board's usual rises toward the top. Measured at 0: a computer's
+# lean Colony weighed about 0.7 against the board's fattest and the seats took fewer Colonies
+# (1 / 0 / 5 / 5 by seating against 6 / 5 / 7 / 22); at 1 the sweep is the baseline to the Colony,
+# the counter waiting for the fat place it is aimed at.
+prize_least = 1.0
 
 # Pace (spec 16.3), stretched to twenty-four turns on ticket #27 and keyed per Faction on #50.
 # `first` is the Faction's first Victory part by turn, as [turn, value]; a Faction whose first part

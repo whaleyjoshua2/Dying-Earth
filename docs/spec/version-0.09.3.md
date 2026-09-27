@@ -438,8 +438,9 @@ shape: `prize_top` x its size / the largest size any directed Colony or station 
 by less than `prize_floor`, so the fattest outpost on the board is the top once anything has reached
 the floor, and every other place is measured against it. The floor is **26**, a Colony of eight
 with a Mine, a Generator and a Factory (Q6, the designer's *"make it 26 and give it a factory
-too"*); the top is 3, the old price rank's ceiling. A place nobody directs is no prize. The
-founding-appetite reading of the ticket's sentence is dropped.
+too"*); the top is 3, the old price rank's ceiling; and **a prize is never under 1** (Q7, A), so a
+lean place keeps the weight it had and only a place fatter than the board's usual rises. A place
+nobody directs is no prize. The founding-appetite reading of the ticket's sentence is dropped.
 
 **By Influence** (Q2 A, Q5 A). The weight of spending Influence on a rival's Colony is **its price
 rank times its prize**, so a fat Colony is wanted despite its price, and the price still ranks and
@@ -451,12 +452,21 @@ price, had the seats spending on places they could not afford, collapses 69 of 8
 rescaled prize is linear in the size, with no "1 +", which is what lets the fat place win the rank
 while the price still counts.
 
+**The reach of the lift by Influence.** The price rank is 80 over a price that grows 20 a
+Colonist, and the prize tops at 3, so by Influence a fat Colony outranks a lean one only up to
+nine Colonists; a fatter one is wanted three times what it was, and still less than a lean one, and
+the take by Influence of such a place is the Army's to make. That is the shape decided (Q5 A:
+the price still ranks), and the limit is named here so nobody reads the counter as unbounded.
+
 **By force** (Q3 A). The weight of landing an Army at a rival's Colony is multiplied by its prize,
 so a seat with cause and a Carrier goes for the fat one it can beat. The Bombard is unchanged: it
 burns rather than takes.
 
-**Figures.** `ai.toml` `[multipliers]`: `prize_top` 3.0, `prize_floor` 26.0, new: under the floor a
-starting station (two Colonists, four Widgets, six Energy: size 12) is a prize of 1.4 and a Colony
-of eight making twenty a turn 3.0, the board's top. The sweep before is the Trade Post's (6 / 5 /
-1 / 8, collapses 60; places taken by Influence 276 in a seating, of them 4 to 7 Colonies; taken by
-force 3 to 50); the sweep after is in the diary, with the set-aside shape's sweep beside it.
+**Figures.** `ai.toml` `[multipliers]`: `prize_top` 3.0, `prize_floor` 26.0, `prize_least` 1.0, new:
+under the floor a starting station (two Colonists, four Widgets, six Energy: size 12) is a prize of
+1.4 and a Colony of eight making twenty a turn 3.0, the board's top; a lean Colony of two is the
+least, 1. The sweep before is the Trade Post's (6 / 5 / 1 / 8, collapses 60; places taken by
+Influence 276 in a seating, of them 4 to 7 Colonies; taken by force 3 to 50); the sweep after is in
+the diary, with the set-aside shapes' sweeps beside it: with the least at 0 the computer took fewer
+Colonies (1 / 0 / 5 / 5 by seating), since its own lean places fell under the 1 they had, which is
+why the least is 1.

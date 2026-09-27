@@ -43,28 +43,27 @@ while the price still counts.
 Mars, one of two Colonists and nothing built, one of eight with a Mine, a Generator, a Factory and
 a Habitat; the fat one's price by Influence is higher, and it outranks the lean one among the
 seat's Influence targets all the same; and once a place reaches the floor it is the board's top,
-a fatter one measured at 3 and the fat one under it. Red with `prize_top` at 0, where every Colony
-weighs nothing and none outranks another; green at 3.
+a fatter one measured at 3 and the fat one under it; and no prize under the least, so the lean one
+keeps the weight it had. Red with `prize_top` at 0, where every Colony is the least and the price
+ranks the lean one first again; green at 3. The fat Colony carries a Refinery as well, since the
+witness's first board (a Mine, a Generator and a Factory on a Mars slot) came to a size of
+twenty-one, under the floor, and with the least at 1 a prize of 2.4 at a price of 200 weighed 0.97
+against the lean one's 1.0: the same arithmetic that bounds the lift by Influence at nine
+Colonists, named in the spec.
 
 ## The sweep
 
-[`sweeps/after-394.txt`](../sweeps/after-394.txt), the rescaled prize as decided, against the
-Trade Post's [`sweeps/after-397.txt`](../sweeps/after-397.txt): **8 / 3 / 1 / 7, collapses 61**
-(6 / 5 / 1 / 8, 60 before). Colonies taken by Influence, by seating: **1 / 0 / 5 / 5, against 6 / 5
-/ 7 / 22 before**; stations 0 / 1 / 0 / 2 (1 / 0 / 2 / 2); places taken by force 23 / 40 / 5 / 0,
-51 / 37 / 7 / 1, 16 / 46 / 16 / 1, 4 / 39 / 24 / 15 (21 / 39 / 5 / 0, 51 / 37 / 6 / 1, 17 / 44 /
-13 / 2, 3 / 37 / 23 / 11 before). **The computer takes fewer Colonies than before**, and the reason
-is in the shape: the prize is linear and measured against the board's fattest outpost, so a lean
-Colony (a computer's usual, size six or so against a floor of 26) is a prize of about 0.7, under
-the 1 it weighed before, while the fat place the counter is aimed at is the 3. In a sweep of
-computer seats there is no fat turtle to covet, so the lean places lose weight and nothing gains
-it. The witness proves the ordering the designer asked for; the sweep cannot see the player it is
-aimed at. Reported to the designer, with a measured alternative: the same prize never under 1
-(`prize_least`), so the lean places keep the weight they had and only the fat ones rise.
+[`sweeps/after-394-least-zero.txt`](../sweeps/after-394-least-zero.txt), the rescaled prize with
+no least, against the Trade Post's [`sweeps/after-397.txt`](../sweeps/after-397.txt): **8 / 3 / 1 /
+7, collapses 61** (6 / 5 / 1 / 8, 60 before); Colonies taken by Influence, by seating, **1 / 0 / 5 /
+5 against 6 / 5 / 7 / 22 before**. The computer took fewer Colonies, and the reason is in the
+shape: the prize is linear and measured against the board's fattest outpost, so a lean Colony (a
+computer's usual, size six or so against a floor of 26) weighed about 0.7, under the 1 it had,
+while the fat place the counter is aimed at does not exist in a game of four computer seats. Put
+to the designer with a measured alternative, the prize never under 1; their answer, Q7 A.
 
-[`sweeps/after-394-least-one.txt`](../sweeps/after-394-least-one.txt), the same prize never under 1
-(`prize_least` 1): **7 / 5 / 1 / 7, collapses 60**; Colonies taken by Influence 6 / 5 / 7 / 21,
-stations 1 / 0 / 2 / 2, places taken by force 21 / 39 / 5 / 0, 51 / 37 / 7 / 1, 17 / 44 / 16 / 1,
-3 / 37 / 24 / 11: the baseline to the Colony. With the least at 1 the prize touches nothing a
-computer game contains and waits for the fat place it is aimed at. Which of the two the designer
-wants is theirs to say; the tree carries the figure at 0, as decided, until they do.
+[`sweeps/after-394.txt`](../sweeps/after-394.txt), **the ticket's sweep**, the prize never under 1:
+**7 / 5 / 1 / 7, collapses 60**; Colonies taken by Influence 6 / 5 / 7 / 21, stations 1 / 0 / 2 / 2,
+places taken by force 21 / 39 / 5 / 0, 51 / 37 / 7 / 1, 17 / 44 / 16 / 1, 3 / 37 / 24 / 11: the
+baseline to the Colony. The counter touches nothing a computer game contains and waits for the fat
+place it is aimed at, which the witness proves it covets.
