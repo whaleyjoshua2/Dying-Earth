@@ -16655,3 +16655,31 @@ fn a_ship_built_at_a_low_gravity_yard_with_a_working_mine_takes_build_where_you_
     // And a Region's Shipyard on Earth.
     assert!((price(&g, Place::State(StateId::EastAsia), UnitKind::Frigate).materials - full).abs() < 1e-9, "Earth pays in full");
 }
+
+/// Ticket #398 (version 0.09.3), the designer's Q5 A: **the computer seeks the yard the rule
+/// reaches.** A Ship is offered at the yard where it costs least, the most Widgets among equals,
+/// so a Moon yard with a working Mine beats an Earth station's yard with more Widgets; with the
+/// Mine mothballed the station's Widgets decide again. And a Shipyard's weight on such a Colony is
+/// multiplied by `low_gravity_yard`, 1 on a station or a Mars Colony.
+#[test]
+fn a_computer_seat_builds_its_ships_at_the_cheapest_yard_and_seeks_a_yard_on_the_moon() {
+    let mut g = fresh();
+    let t = g.tables.clone();
+    let seat = Seat(1);
+    // An Earth station's yard with a Factory: more Widgets than the Moon Colony's Core.
+    let station = ColonyId(g.fresh_id());
+    g.colonies.push(Colony { id: station, body: BodyId::Earth, slot: 3, control: Control::Controlled(seat), modules: vec![Module::new(ModuleKind::Core), Module::new(ModuleKind::Shipyard), Module::new(ModuleKind::Factory)], colonists: 4, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
+    let moon = colony(&mut g, seat, BodyId::Moon, &[ModuleKind::Mine, ModuleKind::Shipyard], 4);
+    assert!(g.widgets_at(Place::Colony(station)) > g.widgets_at(Place::Colony(moon)), "the premise: the station makes more Widgets");
+    assert_eq!(g.ai_ship_yard(seat), Some(moon), "the Moon yard is cheaper, so it is the yard");
+    assert!((g.ai_shipyard_bonus(moon) - t.ai.multipliers.low_gravity_yard).abs() < 1e-9, "a Shipyard is sought on the Moon with a Mine");
+    assert!(t.ai.multipliers.low_gravity_yard > 1.0, "and the figure is a lift");
+    assert!((g.ai_shipyard_bonus(station) - 1.0).abs() < 1e-9, "not on a station");
+    let mars = colony(&mut g, seat, BodyId::Mars, &[ModuleKind::Mine], 4);
+    assert!((g.ai_shipyard_bonus(mars) - 1.0).abs() < 1e-9, "not on Mars");
+    // The Mine mothballed: the prices are equal again, and the Widgets decide.
+    let i = g.colony(moon).unwrap().modules.iter().position(|m| m.kind == ModuleKind::Mine).unwrap();
+    g.colony_mut(moon).unwrap().modules[i].mothballed = true;
+    assert_eq!(g.ai_ship_yard(seat), Some(station), "equal prices: the most Widgets");
+    assert!((g.ai_shipyard_bonus(moon) - 1.0).abs() < 1e-9, "and no bonus without a working Mine");
+}

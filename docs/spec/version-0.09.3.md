@@ -353,6 +353,15 @@ card's note under the Widgets line reads *One working Mine here: Modules and Shi
 the three Bodies, *Modules* alone elsewhere. The Faction window's Ship prices are the seat's, as
 before.
 
+**The computer seeks the yard** (Q5, A). The first sweep after the rule was the sweep before, line
+for line: no computer seat ever held a Shipyard on the three Bodies (measured over 24 computer
+games), and each offered its Ships at the yard with the most Widgets (the queue ticket's rule), so
+the price never reached it. Now a Shipyard's weight on a ground Colony on a low-gravity Body with a
+working Mine is multiplied by `low_gravity_yard`, and a Ship is offered **at the yard where it
+costs least, the most Widgets among equals**; a Carrier still goes to the Earth yard with the most
+Widgets, where Armies board.
+
 **Figures.** In `modules.toml` `[in_situ]`: `one_mine` 0.75, `two_mines` 0.6, `floor` 0.5, unchanged.
-The sweep before is the Stadium's (6 / 4 / 1 / 9, collapses 60; Missile Carriers built 40, games
-with an orbital Battle 27 of 80); the sweep after is in the diary.
+In `ai.toml` `[multipliers]`: `low_gravity_yard` 1.5, new. The sweep before is the Stadium's
+(6 / 4 / 1 / 9, collapses 60; Missile Carriers built 40, games with an orbital Battle 27 of 80);
+the sweep after is in the diary.

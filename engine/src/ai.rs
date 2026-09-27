@@ -803,6 +803,32 @@ impl Game {
         }
     }
 
+    /// Ticket #398 (version 0.09.3): the seat's Colonies with a working Shipyard.
+    fn ai_working_yards(&self, seat: Seat) -> Vec<ColonyId> {
+        self.directed_colonies(seat).into_iter().filter(|c| self.colony(*c).unwrap().modules.iter().any(|m| m.kind == ModuleKind::Shipyard && m.working())).collect()
+    }
+
+    /// Ticket #398 (version 0.09.3): **the yard a computer seat builds its Ships at**: the one
+    /// where a Ship costs least (Build Where You Dig at a low-gravity yard with a working Mine), the
+    /// most Widgets among equals, the first on the list among those. The discount is one factor for
+    /// every kind, so the Frigate's price ranks the yards for all of them. Before this ticket the
+    /// yard was the most Widgets alone (ticket #332), which never landed on the Moon.
+    pub fn ai_ship_yard(&self, seat: Seat) -> Option<ColonyId> {
+        let yards = self.ai_working_yards(seat);
+        let price = |c: ColonyId| (self.ship_materials_at(seat, Place::Colony(c), UnitKind::Frigate) * 10.0).round() as i64;
+        yards.iter().copied().rev().min_by_key(|c| (price(*c), std::cmp::Reverse(self.widgets_at(Place::Colony(*c)))))
+    }
+
+    /// Ticket #398 (version 0.09.3): what a Shipyard's weight is multiplied by at this Colony --
+    /// `low_gravity_yard` on a ground Colony on the Moon, Phobos or Deimos with a working Mine,
+    /// where Build Where You Dig reaches the Ships it would build; 1 everywhere else.
+    pub fn ai_shipyard_bonus(&self, cid: ColonyId) -> f64 {
+        match self.colony(cid) {
+            Some(col) if !col.in_orbit && self.tables.body(col.body).low_gravity && self.working_mines(col) > 0 => self.tables.ai.multipliers.low_gravity_yard,
+            _ => 1.0,
+        }
+    }
+
     pub fn ai_orders(&mut self, seat: Seat) -> Vec<Order> {
         // Ticket #337 (version 0.09.0): the seat answers this turn's choice card HERE, before it
         // reads its own board for anything else, so a held fleet or a paid bill is already true of
@@ -1396,7 +1422,8 @@ impl Game {
                         if col.modules.iter().any(|m| m.kind == ModuleKind::Shipyard) {
                             continue;
                         }
-                        (Cat::LaunchSiteOrShipyard, self.base_weight(seat, Cat::LaunchSiteOrShipyard))
+                        // Ticket #398 (version 0.09.3): sought where Build Where You Dig reaches its Ships.
+                        (Cat::LaunchSiteOrShipyard, self.base_weight(seat, Cat::LaunchSiteOrShipyard) * self.ai_shipyard_bonus(cid))
                     }
                     ModuleKind::Barracks => {
                         if col.modules.iter().any(|m| m.kind == ModuleKind::Barracks) {
@@ -1510,9 +1537,13 @@ impl Game {
         // above, after ticket #97's `continue` on a Colony with no Module slot free, so a full yard
         // offered no Ships at all; a yard's Ships take no Module slot, and they are enumerated here
         // whatever the yard's slots.
-        let yards: Vec<ColonyId> = self.directed_colonies(seat).into_iter().filter(|c| self.colony(*c).unwrap().modules.iter().any(|m| m.kind == ModuleKind::Shipyard && m.working())).collect();
+        // Ticket #398 (version 0.09.3): the yard where a Ship costs LEAST, the most Widgets among
+        // equals (`ai_ship_yard`), so a Moon yard with a Mine is the fleet yard once it stands --
+        // the designer's answer (Q5, A) to a sweep the rule never reached. A Carrier still goes to
+        // the Earth yard with the most Widgets.
+        let yards = self.ai_working_yards(seat);
         let most_widgets = |list: &[ColonyId]| list.iter().copied().rev().max_by_key(|c| self.widgets_at(Place::Colony(*c)));
-        let best_yard = most_widgets(&yards);
+        let best_yard = self.ai_ship_yard(seat);
         let best_earth_yard = most_widgets(&yards.iter().copied().filter(|c| self.colony(*c).unwrap().body == BodyId::Earth).collect::<Vec<_>>());
         for cid in yards {
             let col = self.colony(cid).unwrap();

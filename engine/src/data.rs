@@ -1235,6 +1235,10 @@ pub struct AiMultipliers {
     /// would finish it behind its queue: the soonest place at full weight, every other at
     /// soonest / turns, never below this floor. A place that makes no Widgets is at the floor.
     pub build_pace_floor: f64,
+    /// Ticket #398 (version 0.09.3): what a Shipyard's weight is multiplied by on a ground Colony
+    /// on a low-gravity Body with a working Mine, where Build Where You Dig reaches the Ships it
+    /// builds; 1 everywhere else.
+    pub low_gravity_yard: f64,
 }
 
 /// Ticket #50: one pace schedule per Faction. `first` is the schedule for the Faction's first

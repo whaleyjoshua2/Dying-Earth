@@ -313,6 +313,13 @@ archive_needs_a_place = 5.0
 # Factory on Earth and the Factory Module -- are exempt, since a slow place is exactly where one is
 # wanted; so is the early Mine, whose Region is chosen by its lean.
 build_pace_floor = 0.25
+# Ticket #398 (version 0.09.3): Build Where You Dig reaches a Ship built at a Shipyard on the Moon,
+# Phobos or Deimos with a working Mine, and the designer's answer (Q5, A) is that the computer SEEKS
+# such a yard: a Shipyard's weight on such a Colony is multiplied by this, and a Ship is offered at
+# the yard where it costs least, the most Widgets among equals. Measured before: over 24 computer
+# games no seat ever held a Shipyard on those three Bodies, and the sweep after the rule was the
+# sweep before, line for line.
+low_gravity_yard = 1.5
 
 # Pace (spec 16.3), stretched to twenty-four turns on ticket #27 and keyed per Faction on #50.
 # `first` is the Faction's first Victory part by turn, as [turn, value]; a Faction whose first part
