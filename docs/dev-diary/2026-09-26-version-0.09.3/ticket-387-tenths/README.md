@@ -70,3 +70,17 @@ its baseline from the closing sweep.
 
 The sweep's own per-seat Fuel sums printed float drift on the first run (*4.800000000000001*),
 the sweep adding tenths without settling them; fixed in the same commit.
+
+## The review
+
+Two axes, standards and spec. **Two writes were not settled**: the main pay site in
+`commit_orders` and a Module decommission's refund stored raw subtraction, so 69.4 less 21.3 sat
+in the stockpile as 48.10000000000001 until the next Income resettled it; a threshold read the same
+turn would have read it wrong. Witnessed red by `tenths_paying_a_cost_leaves_an_exact_tenth`
+against the unsettled site, green with both writes through one `Stockpile::settled`. Also from the
+review: **Widgets under the Drought had gained a tenth's rounding before their floor** (17 x 0.35
+would have read 6 where it reads 5), put back as they were; six bare prints and two `{:.1}` prints
+moved to `figure`; three stale doc comments and the save's history line corrected; the glossary's
+Exchange and Spillover sentences, which spoke of floors, corrected; and two consequences named in
+the spec for the designer's eye: the Sea Wall's keep paid each turn to the tenth, and a Friendly ppm
+of carbon credits costing half a Ducat where its half was rounded up to one.

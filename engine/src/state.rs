@@ -22,6 +22,14 @@ pub struct Stockpile {
     pub ducats: f64,
 }
 
+impl Stockpile {
+    /// Ticket #387 (version 0.09.3): every figure settled to a tenth, the one shape a stockpile is
+    /// ever stored in. A pay, a refund and an income all come through here.
+    pub fn settled(self) -> Stockpile {
+        Stockpile { materials: tenth(self.materials), fuel: tenth(self.fuel), energy: tenth(self.energy), ducats: tenth(self.ducats) }
+    }
+}
+
 /// Ticket #387 (version 0.09.3): a resource figure rounded to the nearest tenth. Applied wherever a
 /// Materials, Fuel, Energy or Ducats figure is written -- a stockpile, the Fund, a tank, an income
 /// line, a price -- so what is stored is always an exact tenth: 0.1 + 0.2 reads 0.3, never
@@ -35,6 +43,11 @@ pub fn tenth(x: f64) -> f64 {
 /// one decimal otherwise -- "80", "80.4". The rule `unrest_figure` already followed for Unrest.
 pub fn figure(v: f64) -> String {
     if (v - v.round()).abs() < 1e-9 { format!("{}", v.round() as i64) } else { format!("{v:.1}") }
+}
+
+/// Ticket #387 (version 0.09.3): a resource figure with its sign, as an income reads: "+4", "-2.5".
+pub fn signed(v: f64) -> String {
+    if v >= 0.0 { format!("+{}", figure(v)) } else { figure(v) }
 }
 
 /// A Nation State is neutral, controlled, or occupied (spec 8.1, 8.5).
@@ -3964,7 +3977,8 @@ impl Game {
     }
 
     /// The transit as one seat pays it (ticket #51): the Faction's own Fuel multiplier first, then
-    /// Efficient Transit, multiplicative, rounded down once at the end.
+    /// Efficient Transit, multiplicative, settled to the tenth once at the end (ticket #387,
+    /// version 0.09.3; rounded down before).
     pub fn transit_cost_for(&self, seat: Seat, from: BodyId, to: BodyId) -> (u32, f64) {
         self.transit_cost_for_at(seat, from, to, self.turn)
     }

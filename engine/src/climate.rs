@@ -368,8 +368,8 @@ impl Game {
         let mut headline = if let Some(i) = wall {
             self.state_mut(sid).facilities[i].rises_held += 1;
             let keep = self.state(sid).facilities[i].rises_held as f64 * self.tables.sea_wall.upkeep_per_rise;
-            said = self.say("sea_wall", &[("temperature", temperature.clone()), ("state", name.clone()), ("keep", format!("{keep:.1}"))]);
-            format!("Sea level at {thr:+.1} C: the Sea Wall in {name} took the sea and stands; it costs {keep:.1} Materials a turn to keep now.")
+            said = self.say("sea_wall", &[("temperature", temperature.clone()), ("state", name.clone()), ("keep", crate::state::figure(keep))]);
+            format!("Sea level at {thr:+.1} C: the Sea Wall in {name} took the sea and stands; it costs {} Materials a turn to keep now.", crate::state::figure(keep))
         } else {
             // Ticket #56: the sea takes COASTAL slots only, and nothing once they are gone.
             let take = exposure.min(self.coastal_slots(sid));

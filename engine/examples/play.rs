@@ -992,13 +992,13 @@ fn print_board(g: &Game) {
     println!("\n--- YOU: seat 0, the {} ---", g.seat_name(me));
     println!(
         "Stockpile: {} Materials, {} Fuel, {} Energy, {} Ducats",
-        s.stockpile.materials, s.stockpile.fuel, s.stockpile.energy, s.stockpile.ducats
+        figure(s.stockpile.materials), figure(s.stockpile.fuel), figure(s.stockpile.energy), figure(s.stockpile.ducats)
     );
     println!(
         "Last income: {}M {}F {}E {}D",
-        s.income_last_turn.materials, s.income_last_turn.fuel, s.income_last_turn.energy, s.income_last_turn.ducats
+        figure(s.income_last_turn.materials), figure(s.income_last_turn.fuel), figure(s.income_last_turn.energy), figure(s.income_last_turn.ducats)
     );
-    let sources: Vec<String> = s.income_sources.iter().map(|(what, r, n)| format!("{what} {n:+}{}", &r.name()[..1])).collect();
+    let sources: Vec<String> = s.income_sources.iter().map(|(what, r, n)| format!("{what} {}{}", signed(*n), &r.name()[..1])).collect();
     if !sources.is_empty() {
         println!("  from: {}", sources.join(", "));
     }
@@ -1069,7 +1069,7 @@ fn print_board(g: &Game) {
     if s.kind == FactionKind::Prospectors {
         println!(
             "Venture Capital Fund: {} Ducats, banking {:.0}% of Ducat income ({} banked last turn)",
-            s.venture_fund,
+            figure(s.venture_fund),
             s.venture_share * 100.0,
             s.venture_banked_last_turn
         );

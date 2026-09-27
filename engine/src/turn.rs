@@ -54,9 +54,9 @@ impl Game {
             "start_holding",
             &[
                 ("state", home),
-                ("materials", self.seat(Seat(0)).stockpile.materials.to_string()),
-                ("fuel", self.seat(Seat(0)).stockpile.fuel.to_string()),
-                ("energy", self.seat(Seat(0)).stockpile.energy.to_string()),
+                ("materials", figure(self.seat(Seat(0)).stockpile.materials)),
+                ("fuel", figure(self.seat(Seat(0)).stockpile.fuel)),
+                ("energy", figure(self.seat(Seat(0)).stockpile.energy)),
             ],
         );
         self.report_line(LineKind::YourWorks, Some(ReportPlace::State(self.controlled_states(Seat(0))[0])), holding);

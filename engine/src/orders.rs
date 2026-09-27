@@ -411,7 +411,8 @@ impl Game {
             // A purchase is a negative cost in the resource bought, so `remaining` and `commit_orders`
             // add it without a special case; a sale is the mirror, with a negative Ducat cost.
             Order::Buy { resource, amount } => {
-                // Ticket #83: the lot's price, times the seat's market multiplier, rounded down.
+                // Ticket #83: the lot's price, times the seat's market multiplier; ticket #387
+                // (version 0.09.3): to the tenth, where it was rounded down.
                 let ducats = self.market_price(seat, (self.trade_price(*resource).unwrap_or(0) * *amount) as f64);
                 match resource {
                     Resource::Materials => Cost { materials: -*amount as f64, ducats, ..Default::default() },
@@ -561,7 +562,7 @@ impl Game {
         let s = self.seat(seat).stockpile;
         // Ticket #387 (version 0.09.3): settled to the tenth, as every stockpile figure is.
         (
-            Stockpile { materials: tenth(s.materials - cost.materials), fuel: tenth(s.fuel - cost.fuel), energy: tenth(s.energy - cost.energy), ducats: tenth(s.ducats - cost.ducats) },
+            Stockpile { materials: s.materials - cost.materials, fuel: s.fuel - cost.fuel, energy: s.energy - cost.energy, ducats: s.ducats - cost.ducats }.settled(),
             self.seat(seat).allotment + bought - cost.influence,
         )
     }
@@ -625,13 +626,13 @@ impl Game {
         }
         let (left, influence_left) = self.remaining(seat, pending);
         if cost.materials > left.materials {
-            return fail(format!("needs {} Materials, {} left", cost.materials, left.materials));
+            return fail(format!("needs {} Materials, {} left", figure(cost.materials), figure(left.materials)));
         }
         if cost.fuel > left.fuel {
             return fail(format!("needs {} Fuel, {} left", figure(cost.fuel), figure(left.fuel)));
         }
         if cost.energy > left.energy {
-            return fail(format!("needs {} Energy, {} left", cost.energy, left.energy));
+            return fail(format!("needs {} Energy, {} left", figure(cost.energy), figure(left.energy)));
         }
         if cost.influence > influence_left {
             return fail(format!("needs {} Influence, {} left", cost.influence, influence_left));
@@ -2099,11 +2100,9 @@ impl Game {
         for order in orders {
             let cost = self.order_cost(seat, order);
             {
+                // Ticket #387 (version 0.09.3): settled, so a tenth paid from a tenth leaves a tenth.
                 let st = &mut self.seat_mut(seat).stockpile;
-                st.materials -= cost.materials;
-                st.fuel -= cost.fuel;
-                st.energy -= cost.energy;
-                st.ducats -= cost.ducats;
+                *st = Stockpile { materials: st.materials - cost.materials, fuel: st.fuel - cost.fuel, energy: st.energy - cost.energy, ducats: st.ducats - cost.ducats }.settled();
             }
             self.seat_mut(seat).allotment -= cost.influence;
             let turn = self.turn;
@@ -2188,8 +2187,8 @@ impl Game {
                     if let Some(b) = removed {
                         let refund = -cost.materials;
                         let (who, name, at) = (self.seat_name(seat), b.item.name(), self.place_name(*place));
-                        self.log(format!("{who} cancelled the {name} under way at {at}: {refund} Materials to their Stockpile."));
-                        let text = self.say("build_cancelled", &[("faction", who), ("building", name), ("place", at), ("refund", refund.to_string())]);
+                        self.log(format!("{who} cancelled the {name} under way at {at}: {} Materials to their Stockpile.", figure(refund)));
+                        let text = self.say("build_cancelled", &[("faction", who), ("building", name), ("place", at), ("refund", figure(refund))]);
                         self.report_line_of(seat, LineKind::YourWorks, LineKind::Note, Some((*place).into()), text);
                     }
                 }

@@ -2481,8 +2481,6 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
             let s = game.seat(Seat(0));
             let (left, influence_left) = game.remaining(Seat(0), &session.pending);
             let inc = s.income_last_turn;
-            // Ticket #387 (version 0.09.3): whole when whole, one decimal otherwise, as `figure` prints.
-            let signed = |v: f64| if v >= 0.0 { format!("+{}", figure(v)) } else { figure(v) };
             // Hover a resource for last Income by source (ticket #31).
             let sources = |res: dying_earth_engine::Resource| -> String {
                 let lines: Vec<String> = s.income_sources.iter().filter(|(_, r, _)| *r == res).map(|(name, _, v)| format!("{}  {name}", signed(*v))).collect();
@@ -4564,7 +4562,7 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, seat: Seat, marks: boo
                 s.kind.name().to_lowercase(),
                 game.tables.body(body).name,
                 game.ship_fighting_strength(s),
-                s.fuel,
+                figure(s.fuel),
                 tank
             );
             if s.colonists > 0 {
@@ -4614,7 +4612,7 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, seat: Seat, marks: boo
                 s.stance.name(),
                 s.stance.one_liner(true),
                 Stance::PERSISTS,
-                s.fuel,
+                figure(s.fuel),
                 tank
             );
             // Ticket #374 (version 0.09.2): the row opens the SHIP'S card, now that a Ship has one.
@@ -6208,8 +6206,8 @@ fn facility_figures(game: &Game, sid: StateId, f: &Facility, director: Option<Se
         let keep = f.rises_held as f64 * game.tables.sea_wall.upkeep_per_rise;
         let held = match f.rises_held {
             0 => "has held back no rise yet".to_string(),
-            1 => format!("has held back 1 rise: {keep:.1} Materials a turn to keep"),
-            n => format!("has held back {n} rises: {keep:.1} Materials a turn to keep"),
+            1 => format!("has held back 1 rise: {} Materials a turn to keep", figure(keep)),
+            n => format!("has held back {n} rises: {} Materials a turn to keep", figure(keep)),
         };
         let unkept = if !f.online && !f.mothballed { "; unkept this turn, holding nothing" } else { "" };
         return format!("{yield_text}; {held}{unkept}");
@@ -9898,8 +9896,6 @@ fn faction_window(ctx: &egui::Context, session: &Session, game: &Game, view: &mu
         let s = game.seat(seat);
         let inc = s.income_last_turn;
         let breakdown = session.spectator || seat == Seat(0);
-        // Ticket #387 (version 0.09.3): whole when whole, one decimal otherwise, as `figure` prints.
-        let signed = |v: f64| if v >= 0.0 { format!("+{}", figure(v)) } else { figure(v) };
         let hover = |res: dying_earth_engine::Resource, word: &str| -> String {
             if !breakdown {
                 return format!("{word}. A rival's income is shown as a total only.");

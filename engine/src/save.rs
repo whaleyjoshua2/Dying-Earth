@@ -107,10 +107,12 @@ pub const SAVE_VERSION: u32 = 7;
 /// refusal naming both versions is the right answer, and a silent partial load is not.
 /// Ticket #387 (version 0.09.3): moved to **7**. Every Stockpile figure, the Venture Capital Fund,
 /// a Ship's tank, a seat's income and its income lines are carried to a **tenth** and written as
-/// floats where an older file writes whole numbers, so a 0.09.2 board would not parse at all; and
-/// a seat no longer carries the Sea Walls' keep accumulator, since the half is paid each turn. A
-/// refusal naming both versions is the right answer. `GAME_VERSION` is NOT moved here: the
-/// version's closing ticket moves it for the whole version.
+/// floats where an older file writes whole numbers, and a seat no longer carries the Sea Walls'
+/// keep accumulator, since the half is paid each turn. An older file would in fact parse (the
+/// reader takes a whole number as a float and passes over a field it no longer knows), into a
+/// board the economy no longer plays: every price and income would then move under it. The
+/// refusal rests on the stamp, as every move of it does, and names both versions. `GAME_VERSION`
+/// is NOT moved here: the version's closing ticket moves it for the whole version.
 pub const GAME_VERSION: &str = "0.09.2";
 
 /// The game autosaves at the start of the Report phase of every third turn.

@@ -2038,7 +2038,8 @@ impl Game {
                     }
                     BuildingChange::Decommission => {
                         col.modules.remove(i);
-                        self.seat_mut(change.seat).stockpile.materials += refund;
+                        let st = &mut self.seat_mut(change.seat).stockpile;
+                        st.materials = tenth(st.materials + refund);
                     }
                 }
                 let where_ = self.place_name(Place::Colony(cid));

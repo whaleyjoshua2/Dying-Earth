@@ -241,7 +241,7 @@ What happens at Income when a Faction's stored Energy, plus what its buildings m
 _Avoid_: blackout, brownout, power cut, deficit (for the rule; a deficit is the figure it answers)
 
 **Stockpile**:
-The single shared pool holding all Materials, Fuel, Energy and, since version 0.03, Ducats; never Widgets, which are made and spent where they stand. It is not divided by Body, so ore mined on Mars is immediately spendable on Earth. Since version 0.06.0 its Fuel reaches a Ship only through a Refuel at a Space Station of the Ship's Faction, or at the build.
+The single shared pool holding all Materials, Fuel, Energy and, since version 0.03, Ducats; never Widgets, which are made and spent where they stand. It is not divided by Body, so ore mined on Mars is immediately spendable on Earth. Since version 0.06.0 its Fuel reaches a Ship only through a Refuel at a Space Station of the Ship's Faction, or at the build. Since version 0.09.3 each of its four figures is carried to a **tenth**, the finest step it moves in: a whole price, output or upkeep stays whole, and a figure a multiplier or a share leaves partial keeps its tenth where it was rounded down before; a figure is shown whole when it is whole and to one decimal otherwise.
 _Avoid_: central bank, per-world stocks, inventory
 
 **Ducats**:
@@ -427,7 +427,7 @@ The Archivists' Unique Module since version 0.08.3, replacing the Solar Array at
 _Avoid_: mirror, solar farm, collector, panel
 
 **Exchange**:
-The Prospectors' Unique Module since version 0.08.3, replacing the Trade Post at the common price and paying by the same network rule. Its clause is **one more Ducat a turn, flat, added after the output multiplier** — flat for the Academy's reason: one run through the largest output multiplier in the game floors back to one, so a captured Exchange pays its captor exactly what it paid its builder. One per Faction per Body still applies.
+The Prospectors' Unique Module since version 0.08.3, replacing the Trade Post at the common price and paying by the same network rule. Its clause is **one more Ducat a turn, flat, added after the output multiplier** — flat for the Academy's reason: added after the multiplier, a captured Exchange pays its captor exactly what it paid its builder. One per Faction per Body still applies.
 _Avoid_: market, bourse, trading house, the Trading window (which is a different thing entirely)
 
 **Chorus**:
@@ -617,7 +617,7 @@ _Avoid_: influence budget, diplomacy pool, action points
 
 **Research Directive**:
 The share of a Faction's Research, chosen as a percentage and standing until it is changed, that goes somewhere other than the shared Tech. Read at Income before a point reaches the Tech, so what is directed **contributes nothing to the Research Lead** -- and the Lead is the only seat that picks what the table researches next. That is the price, and it is what makes the directive a decision rather than free income.
-Each Faction's goes somewhere of its own: the **Custodians** enlarge the **Natural Sink**, permanently, by 0.01 ppm a point -- truly so only since version 0.09.1, before which The Sink Weakens set the Sink to a figure and wiped what they had added; the **Prospectors** take 0.8 **Ducats** a point; the **Arkwrights** take a **Fuel** for every five points; and the **Archivists** pay the **Archive** fund, which they have done since version 0.07.0 and which was the only version of this until 0.08.3. Fractions of a Ducat or a Fuel are carried between turns rather than floored away.
+Each Faction's goes somewhere of its own: the **Custodians** enlarge the **Natural Sink**, permanently, by 0.01 ppm a point -- truly so only since version 0.09.1, before which The Sink Weakens set the Sink to a figure and wiped what they had added; the **Prospectors** take 0.8 **Ducats** a point; the **Arkwrights** take a **Fuel** for every five points; and the **Archivists** pay the **Archive** fund, which they have done since version 0.07.0 and which was the only version of this until 0.08.3. It is paid to the tenth since version 0.09.3 (whole before, the fraction carried), and what is under a tenth is still carried between turns rather than floored away.
 Every Faction may direct up to **half**. The **Archivists alone may direct all of it**, because their switch always sent all of it and the slider that replaced it keeps that reach.
 Since version 0.08.3 **Provisional Findings** takes a threshold rather than a yes or no: it holds while at least **75%** of last turn's Research still went to the shared Tech, so a directive of 25 or less keeps the rule and anything above trades it away.
 Since version 0.08.3 the table has an opinion about it: see **the shared pot**.

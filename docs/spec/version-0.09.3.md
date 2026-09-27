@@ -66,8 +66,11 @@ Ducats and interest; the Fund's banked share and its withdrawal; the Drought's, 
 and a card's halvings; the Solar Array's sun-scaled Energy, the one figure that was rounded rather
 than floored; Closed-Loop and Reactor upkeeps; Build Where You Dig's and a station's and a Ship's
 prices; transit Fuel; the market's price and the sale price; carbon credits; a decommission's
-refund; the Research Directive's Ducats and Fuel. **The Sea Wall's keep is paid each turn to the
-tenth** (half a Materials a rise) where it was saved up and paid when it reached a whole.
+refund; the Research Directive's Ducats and Fuel. Two consequences to name: **the Sea Wall's keep
+is paid each turn to the tenth** (half a Materials a rise) where it was saved up and paid when it
+reached a whole, the same Materials over time; and **a Friendly ppm of carbon credits costs half a
+Ducat** where its half was rounded up to one. A withdrawal from the Fund stays a whole number of
+Ducats, being whole already.
 
 **What stays whole.** Widgets, Research, Influence, Standing and every count of people and things.
 The computer seats' own estimate of a Region's Energy, which is an estimate and not a rule, keeps

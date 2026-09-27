@@ -16113,6 +16113,21 @@ fn tenths_a_prospector_facility_price_keeps_its_tenth() {
     assert_eq!(g.order_cost(pro, &Order::BuildFacility { state: StateId::Europe, kind: FacilityKind::PowerPlant }).text(), "21.3 Materials");
 }
 
+/// Ticket #387 (the review's finding): **paying a cost settles the stockpile too.** 69.4 less 21.3
+/// is 48.099999999999994 in floating point, and the pay site stored that raw; a threshold read the
+/// same turn (the Sea Wall's keep, a computer seat's `ducats_at_least`) would read it wrong.
+#[test]
+fn tenths_paying_a_cost_leaves_an_exact_tenth() {
+    let mut g = game();
+    let pro = Seat(1);
+    g.seat_mut(pro).stockpile.materials = 69.4;
+    let o = Order::BuildFacility { state: StateId::Europe, kind: FacilityKind::PowerPlant };
+    assert_eq!(g.order_cost(pro, &o).materials, 21.3, "the premise: a price in tenths");
+    g.check_order(pro, &[], &o).expect("the Prospectors may build a Power Plant in Europe");
+    g.commit_orders(pro, std::slice::from_ref(&o));
+    assert_eq!(g.seat(pro).stockpile.materials, 48.1, "an exact tenth, not 48.099999999999994");
+}
+
 /// Ticket #387: `tenth` settles a figure to an exact tenth, so 0.1 + 0.2 stored reads 0.3 and never
 /// 0.30000000000000004; `figure` prints a whole figure bare and a partial one to one place.
 #[test]

@@ -838,7 +838,7 @@ impl Game {
                     name: f.kind.name(),
                     is_module: false,
                     upkeep: y.upkeep,
-                    output: y.resource.map(|r| (r, if r == Resource::Widgets { halve(y.amount).floor() } else { halve(y.amount) })),
+                    output: y.resource.map(|r| (r, if r == Resource::Widgets { (y.amount * scale).floor() } else { halve(y.amount) })),
                     research: halve_whole(y.research),
                     online: !f.offline_until_resolution,
                     doubled_by: None,
@@ -1061,8 +1061,9 @@ impl Game {
         }
     }
 
-    /// A controlled state's base Ducats a turn (ticket #35): gdp x Industry Level / 10, rounded down,
-    /// the formula living in `Tables::base_ducats` since ticket #132 so the start screen reads the same one.
+    /// A controlled state's base Ducats a turn (ticket #35): gdp x Industry Level / 5, to the tenth
+    /// since ticket #387 (version 0.09.3) where it was rounded down, the formula living in
+    /// `Tables::base_ducats` since ticket #132 so the start screen reads the same one.
     /// Ticket #83 (version 0.06.0): times its controller's `ducats_multiplier` (the Prospectors' 1.2).
     /// Ticket #387 (version 0.09.3): to the tenth, where it was floored: 12 x 1.2 pays 14.4.
     pub fn state_ducats(&self, sid: StateId) -> f64 {
@@ -1390,7 +1391,7 @@ impl Game {
         }
         gained.materials -= keep_due;
         // Ticket #387 (version 0.09.3): every figure written is settled to the tenth.
-        gained = Stockpile { materials: tenth(gained.materials), fuel: tenth(gained.fuel), energy: tenth(gained.energy), ducats: tenth(gained.ducats) };
+        gained = gained.settled();
         self.seat_mut(seat).income_sources = sources;
         let before = self.seat(seat).stockpile;
         let clamped = balance.max(0.0);
