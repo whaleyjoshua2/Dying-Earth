@@ -320,6 +320,26 @@ build_pace_floor = 0.25
 # games no seat ever held a Shipyard on those three Bodies, and the sweep after the rule was the
 # sweep before, line for line.
 low_gravity_yard = 1.5
+# Ticket #394 (version 0.09.3): **the prize.** The designer's counter to a player who founds one
+# Colony or station and simply loads people and builds on it: a computer seat's appetite to TAKE a
+# rival's Colony or station scales with its size, measured as its Colonists plus what it makes a
+# turn (the card's Output row summed, Energy only where it makes more than it eats), RESCALED TO
+# THE BOARD at the designer's word: the prize is prize_top x size / the largest size any directed
+# Colony or station has, never dividing by less than prize_floor, so the fattest outpost on the
+# board is the prize_top once anything has reached the floor and every other place is measured
+# against it. prize_floor 26 is a Colony of eight with a Mine, a Generator and a Factory. The weight
+# of spending Influence on a rival's Colony is its price rank times its prize; of landing an Army
+# at it, the base times its prize. Measured before: by Influence a rival's Colony was ranked
+# cheapest first, so the fattest Colony was the LAST a seat spent on; by force the landing's weight
+# was flat. Measured with a prize of 1 + 0.05 x size instead: the price term fell faster than the
+# prize rose and the fat Colony still ranked below a lean one; with the prize alone, no price, the
+# seats spent on places they could not afford and collapses went from 60 to 69.
+prize_top = 3.0
+prize_floor = 26.0
+# The least a prize can be: 0 leaves the rescaling as decided (a lean place weighs under the 1 it
+# had); 1 keeps every lean place at the weight it had and lifts only the fat ones. Measured both
+# ways (the sweeps beside the ticket's diary); the figure is the designer's to set.
+prize_least = 0.0
 
 # Pace (spec 16.3), stretched to twenty-four turns on ticket #27 and keyed per Faction on #50.
 # `first` is the Faction's first Victory part by turn, as [turn, value]; a Faction whose first part

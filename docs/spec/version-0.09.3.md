@@ -420,3 +420,43 @@ seats build Trade Posts and hold Bodies through the same yield; nothing changes 
 **Figures.** The sweep before is the depot's (6 / 4 / 1 / 9, collapses 60; the Prospectors' Fund
 at the end median 1231 of 2500 in the first seating); the sweep after is in the diary, the
 Prospectors' wins and Fund the figures to watch.
+
+## 14. The computer's appetite for a rival's Colony scales with its size
+
+The authority is [ticket #394](https://github.com/whaleyjoshua2/Dying-Earth/issues/394). **Measured
+behaviour moves, no rule.** The designer's intent, given on the ticket: *"a counter check to
+founding one colony or station and just loading people and building on it ... I'd like the AIs to
+want to take possession of a colony with high population."* Not in play before: by Influence a
+rival's Colony was ranked cheapest first, so the fattest Colony was the last a computer seat spent
+on; by force a landing's weight was flat; the one trace of size was the Blockade's tie-break among
+a rival's stations at one Body.
+
+**The prize** (Q1 A, Q4, Q5 A, Q6). A place's **size** is **its Colonists plus what it makes a
+turn**: the card's Output row summed (Materials, Widgets, Fuel, Ducats, Research, and Energy only
+where the place makes more than it eats). Its **prize is rescaled to the board**, the designer's
+shape: `prize_top` x its size / the largest size any directed Colony or station has, never dividing
+by less than `prize_floor`, so the fattest outpost on the board is the top once anything has reached
+the floor, and every other place is measured against it. The floor is **26**, a Colony of eight
+with a Mine, a Generator and a Factory (Q6, the designer's *"make it 26 and give it a factory
+too"*); the top is 3, the old price rank's ceiling. A place nobody directs is no prize. The
+founding-appetite reading of the ticket's sentence is dropped.
+
+**By Influence** (Q2 A, Q5 A). The weight of spending Influence on a rival's Colony is **its price
+rank times its prize**, so a fat Colony is wanted despite its price, and the price still ranks and
+so still gates what the seat can afford. Regions rank as they did. Two shapes were measured and
+set aside on the way: a prize of 1 + 0.05 x size multiplying the price rank left a Colony of eight
+people and three Modules below one of two people and nothing built, since the price term (80 over
+a price that grows 20 a Colonist) falls faster than that prize rises; and the prize alone, with no
+price, had the seats spending on places they could not afford, collapses 69 of 80 against 60. The
+rescaled prize is linear in the size, with no "1 +", which is what lets the fat place win the rank
+while the price still counts.
+
+**By force** (Q3 A). The weight of landing an Army at a rival's Colony is multiplied by its prize,
+so a seat with cause and a Carrier goes for the fat one it can beat. The Bombard is unchanged: it
+burns rather than takes.
+
+**Figures.** `ai.toml` `[multipliers]`: `prize_top` 3.0, `prize_floor` 26.0, new: under the floor a
+starting station (two Colonists, four Widgets, six Energy: size 12) is a prize of 1.4 and a Colony
+of eight making twenty a turn 3.0, the board's top. The sweep before is the Trade Post's (6 / 5 /
+1 / 8, collapses 60; places taken by Influence 276 in a seating, of them 4 to 7 Colonies; taken by
+force 3 to 50); the sweep after is in the diary, with the set-aside shape's sweep beside it.

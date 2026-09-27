@@ -1242,6 +1242,14 @@ pub struct AiMultipliers {
     /// on a low-gravity Body with a working Mine, where Build Where You Dig reaches the Ships it
     /// builds; 1 everywhere else.
     pub low_gravity_yard: f64,
+    /// Ticket #394 (version 0.09.3): the prize the board's fattest outpost is (its size: Colonists
+    /// plus its output a turn), every other place proportional; and the size an outpost must reach
+    /// before it is that prize, below which the scale is fixed.
+    pub prize_top: f64,
+    pub prize_floor: f64,
+    /// The least a prize can be: 0 leaves the rescaling bare, 1 keeps a lean place at the weight
+    /// it had before the prize and lifts only the fat ones.
+    pub prize_least: f64,
 }
 
 /// Ticket #50: one pace schedule per Faction. `first` is the schedule for the Faction's first

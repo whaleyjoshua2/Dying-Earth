@@ -806,6 +806,77 @@ impl Game {
         }
     }
 
+    /// Ticket #394 (version 0.09.3): **the size of a place**, its Colonists plus what it makes a
+    /// turn -- the Output row's figures summed, Energy only where it makes more than it eats.
+    pub fn ai_place_size(&self, cid: ColonyId) -> f64 {
+        let Some(col) = self.colony(cid) else { return 0.0 };
+        let output = self.place_output(Place::Colony(cid)).map(|o| o.materials + o.widgets + o.fuel + o.energy.max(0.0) + o.ducats + o.research).unwrap_or(0.0);
+        col.colonists as f64 + output
+    }
+
+    /// Ticket #394 (version 0.09.3): **the prize a rival's Colony or station is**, rescaled to the
+    /// board at the designer's word: `prize_top` x its size / the largest size any directed place
+    /// has, never dividing by less than `prize_floor` -- so the fattest outpost on the board is the
+    /// top once anything has reached the floor, and every other place is measured against it. The
+    /// designer's counter to a player who founds one place and simply loads people and builds on
+    /// it: the computer's appetite to take it grows with it. Multiplies the price rank of spending
+    /// Influence on it and the base weight of landing an Army at it; 1 for a place nobody directs.
+    /// Linear in the size, with no "1 +": measured with 1 + 0.05 x size the price term (80 / a price
+    /// that grows 20 a Colonist) fell faster than the prize rose, and a Colony of eight people and
+    /// three Modules still ranked below one of two people and nothing built.
+    pub fn ai_prize(&self, cid: ColonyId) -> f64 {
+        let m = &self.tables.ai.multipliers;
+        let Some(col) = self.colony(cid) else { return 1.0 };
+        if col.control.director().is_none() {
+            return 1.0;
+        }
+        let largest = self.colonies.iter().filter(|c| c.control.director().is_some()).map(|c| self.ai_place_size(c.id)).fold(0.0, f64::max);
+        (m.prize_top * self.ai_place_size(cid) / largest.max(m.prize_floor)).max(m.prize_least)
+    }
+
+    /// Ticket #394 (version 0.09.3): the places a computer seat weighs spending Influence on, best
+    /// first -- extracted from the planner so the order can be witnessed. A Region by its Influence
+    /// value and Industry Level, closest first, a held one at a fraction of a neutral one (#75); a
+    /// rival's Colony by the price this seat would pay, cheapest first (#336), times its prize (#394).
+    pub fn ai_influence_targets(&self, seat: Seat) -> Vec<(Place, f64)> {
+        let th = &self.tables.ai.thresholds;
+        let mut targets: Vec<(Place, f64)> = Vec::new();
+        let my_states = self.controlled_states(seat);
+        for sid in StateId::ALL {
+            let st = self.state(sid);
+            if st.control.controller() == Some(seat) {
+                continue;
+            }
+            let card = self.tables.state(sid);
+            let near = card.neighbours.iter().any(|n| my_states.contains(n));
+            // Ticket #34: the state's Influence value plus its Industry Level, closest first.
+            let value = (self.state_influence_value(sid) + st.industry_level as i64) as f64 + if near { 2.0 } else { 0.0 };
+            // Ticket #75: a held place counts a fraction of a neutral one (0.3), so it is attacked
+            // only when no neutral one is worth having.
+            let neutral_bonus = if st.control == Control::Neutral { 1.0 } else { th.held_state_weight };
+            targets.push((Place::State(sid), value * neutral_bonus));
+        }
+        // Ticket #50: any rival's Colony. Ticket #336 (version 0.09.0): weighed by THE PRICE THIS
+        // SEAT WOULD PAY, cheapest first, where the rule was `3.0 - min(colonists, 2)` -- fewest
+        // Colonists first, and the threshold never read at all. With the thresholds off Earth
+        // doubled that rule would have had the seats ranking a place they cannot afford above one
+        // they can, which would read as a balance change and be a defect. The pivot is the price of
+        // a starting two-Colonist place, so the band is the one the old rule ran in and a Colony's
+        // worth against a Region's is unmoved; the ceiling is the old rule's own 3.0.
+        // Ticket #394 (version 0.09.3): times its prize (the designer's Q5 A), so a fat Colony is
+        // wanted despite its price, which still ranks and so still gates what the seat can afford.
+        // Measured with the prize alone and no price: the seats spent on places they could not
+        // afford, and collapses went from 60 to 69 of 80.
+        for c in &self.colonies {
+            if c.control.controller().map(|o| o != seat).unwrap_or(false) {
+                let price = self.influence_needed_for(seat, Place::Colony(c.id)).max(1) as f64;
+                targets.push((Place::Colony(c.id), (th.colony_price_pivot / price).min(3.0) * self.ai_prize(c.id)));
+            }
+        }
+        targets.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        targets
+    }
+
     /// Ticket #398 (version 0.09.3): the seat's Colonies with a working Shipyard, the list a Ship
     /// can be offered at, in one place so the planner and `ai_ship_yard` read the same yards.
     fn ai_working_yards(&self, seat: Seat) -> Vec<ColonyId> {
@@ -1595,36 +1666,9 @@ impl Game {
 
         // --- Influence, in units of 5 (spec 16.1), on the target rule of 16.4.
         let step = th.influence_step;
-        let mut targets: Vec<(Place, f64)> = Vec::new();
-        let my_states = self.controlled_states(seat);
-        for sid in StateId::ALL {
-            let st = self.state(sid);
-            if st.control.controller() == Some(seat) {
-                continue;
-            }
-            let card = self.tables.state(sid);
-            let near = card.neighbours.iter().any(|n| my_states.contains(n));
-            // Ticket #34: the state's Influence value plus its Industry Level, closest first.
-            let value = (self.state_influence_value(sid) + st.industry_level as i64) as f64 + if near { 2.0 } else { 0.0 };
-            // Ticket #75: a held place counts a fraction of a neutral one (0.3), so it is attacked
-            // only when no neutral one is worth having.
-            let neutral_bonus = if st.control == Control::Neutral { 1.0 } else { th.held_state_weight };
-            targets.push((Place::State(sid), value * neutral_bonus));
-        }
-        // Ticket #50: any rival's Colony. Ticket #336 (version 0.09.0): weighed by THE PRICE THIS
-        // SEAT WOULD PAY, cheapest first, where the rule was `3.0 - min(colonists, 2)` -- fewest
-        // Colonists first, and the threshold never read at all. With the thresholds off Earth
-        // doubled that rule would have had the seats ranking a place they cannot afford above one
-        // they can, which would read as a balance change and be a defect. The pivot is the price of
-        // a starting two-Colonist place, so the band is the one the old rule ran in and a Colony's
-        // worth against a Region's is unmoved; the ceiling is the old rule's own 3.0.
-        for c in &self.colonies {
-            if c.control.controller().map(|o| o != seat).unwrap_or(false) {
-                let price = self.influence_needed_for(seat, Place::Colony(c.id)).max(1) as f64;
-                targets.push((Place::Colony(c.id), (th.colony_price_pivot / price).min(3.0)));
-            }
-        }
-        targets.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        // Ticket #394 (version 0.09.3): the targets in `ai_influence_targets`, a rival's Colony
+        // weighed by its prize.
+        let targets = self.ai_influence_targets(seat);
         for (rank, (target, _)) in targets.iter().enumerate() {
             let have = self.seat(seat).influence.get(target).copied().unwrap_or(0);
             // Ticket #33: a controlled place needs a standing above the controller's as well, by the
@@ -2540,7 +2584,9 @@ impl Game {
                                 if enemy && odds < th.attack_odds {
                                     continue;
                                 }
-                                let base = self.base_weight(seat, Cat::LoadUnload);
+                                // Ticket #394 (version 0.09.3): a rival's Colony at its prize, so a
+                                // seat with cause and an Army goes for the fat one it can beat.
+                                let base = self.base_weight(seat, Cat::LoadUnload) * if enemy { self.ai_prize(c.id) } else { 1.0 };
                                 push(vec![Order::Unload { ship: s.id, colonists: 0, army: true, into: UnloadTarget::Colony(c.id) }], Cat::LoadUnload, base, 1.0, if mine { m.threat } else { 1.0 }, 1.0, format!("land an Army at {}", self.place_name(Place::Colony(c.id))), None);
                             }
                         }
