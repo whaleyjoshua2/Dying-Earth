@@ -153,6 +153,8 @@ pub struct SimResult {
     pub refuels: u32,
     /// Ticket #325 (version 0.08.8): of those, refuels at a partner's station under a Refuel Accord.
     pub partner_refuels: u32,
+    /// Ticket #396 (version 0.09.3): of those, refuels in a Refinery Colony's low orbit.
+    pub colony_refuels: u32,
     pub stations_off_earth: u32,
     /// Ticket #290 (version 0.08.6): Modules standing beyond the Core Module on each seat's
     /// STARTING station at the end of turn three, so the batch can say whether the opening -- two
@@ -674,7 +676,8 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         lost_in_transit: Seat::ALL.map(|s| game.seat(s).lost_in_transit),
         stranded_at_end: Seat::ALL.map(|s| game.ships.iter().filter(|sh| sh.seat == s && game.stranded(sh.id)).count() as u32),
         refuels: game.log.iter().filter(|l| l.contains(" refuels ")).count() as u32,
-        partner_refuels: game.log.iter().filter(|l| l.contains(" refuels ") && l.contains("at a partner's station")).count() as u32,
+        partner_refuels: game.log.iter().filter(|l| l.contains(" refuels ") && l.contains("at a partner's")).count() as u32,
+        colony_refuels: game.log.iter().filter(|l| l.contains(" refuels ") && l.contains("Refinery Colony")).count() as u32,
         stations_off_earth: game.colonies.iter().filter(|c| c.in_orbit && c.body != BodyId::Earth).count() as u32,
         opening_modules,
         deep_colonies: game.colonies.iter().filter(|c| !c.in_orbit && game.working_mines(c) >= 2).count() as u32,

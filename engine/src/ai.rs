@@ -2333,8 +2333,9 @@ impl Game {
                 let on_the_lane = s.kind.is_warship() && orbit.is_low() && self.ai_wants_the_ground(seat, body) && self.ai_low_orbit_garrison(seat, body).contains(&s.id);
                 let can_fight = s.fuel >= self.tables.melee.battle_fuel as f64;
                 if s.fuel < card.tank as f64 && self.seat(seat).stockpile.fuel > 0.0 && !self.refuelling_station(seat, body, orbit) && !(on_the_lane && can_fight) && !ready_to_fire {
+                    // Ticket #396 (version 0.09.3): a Refinery Colony's depot is its low orbit.
                     for c in self.colonies.iter().filter(|c| c.body == body && self.fuels_for(c, seat)) {
-                        wants.push((Orbit::Slot(c.slot), format!("to refuel at {}", self.place_name(Place::Colony(c.id))), Cat::Transit, self.base_weight(seat, Cat::Transit)));
+                        wants.push((self.colony_orbit(c), format!("to refuel at {}", self.place_name(Place::Colony(c.id))), Cat::Transit, self.base_weight(seat, Cat::Transit)));
                     }
                 }
                 if s.colonists > 0 {

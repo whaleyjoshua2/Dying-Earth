@@ -99,7 +99,7 @@ The Fuel a Ship carries, since version 0.06.0: a figure per Ship type, filled at
 _Avoid_: fuel tank, propellant, range, fuel level
 
 **Stranded**:
-Said of a Ship at a Body whose Tank cannot pay any leg from there and that has no station to fill it: none of its own Faction's, or a partner's under a Refuel Accord, in its own orbit or reachable by a change of orbit it can still pay for. A Ship at nought Fuel with its own station in another orbit is stranded, since the change of orbit costs one Fuel. Since version 0.09.1 a Battle's two-Fuel charge makes it far commoner. It lasts until a station stands where the Ship can reach it. Since version 0.09.2 a leg that would leave the hull stranded at the far end is named beside its button (*arrives with 0 Fuel and no station of yours at Venus*), a warning and never a refusal.
+Said of a Ship at a Body whose Tank cannot pay any leg from there and that has nothing to fill it: no station of its own Faction's, or a partner's under a Refuel Accord, in its own orbit or reachable by a change of orbit it can still pay for, and since version 0.09.3 no ground Colony with a working Refinery under a low orbit it sits in or can reach. A Ship at nought Fuel with its own station in another orbit is stranded, since the change of orbit costs one Fuel. Since version 0.09.1 a Battle's two-Fuel charge makes it far commoner. It lasts until a station, or such a Colony, stands where the Ship can reach it. Since version 0.09.2 a leg that would leave the hull stranded at the far end is named beside its button (*arrives with 0 Fuel and no station of yours at Venus*), a warning and never a refusal.
 _Avoid_: out of fuel, dry (that is a warship under the Battle charge), marooned, adrift
 
 **Build Where You Dig**:
@@ -107,7 +107,7 @@ The rule, since version 0.06.0, that a Module built at a Colony with a working M
 _Avoid_: in-situ discount, local build bonus, mining discount
 
 **Refuel**:
-The Orders-phase order that fills a Ship's Tank from the Stockpile, as far as the Stockpile can pay, in the orbit of a Space Station its Faction holds or, since version 0.08.8, one a partner holds under a Refuel Accord -- since version 0.09.0 the Ship must be in that station's own orbit, where before any orbit at the Body would do: the Fuel is always the refueller's own Stockpile's, and a partner's station is only where it is drawn. A station blockaded against its holder fuels nobody. A Ship with no such station and no leg its tank can pay is stranded.
+The Orders-phase order that fills a Ship's Tank from the Stockpile, as far as the Stockpile can pay, in the orbit of a Space Station its Faction holds or, since version 0.08.8, one a partner holds under a Refuel Accord -- since version 0.09.0 the Ship must be in that station's own orbit, where before any orbit at the Body would do: the Fuel is always the refueller's own Stockpile's, and a partner's station is only where it is drawn. A station blockaded against its holder fuels nobody. Since version 0.09.3 a ground Colony with a working Refinery is a depot too: it fills a Ship in its Body's low orbit from the Stockpile as a station does, its holder's Ship or a Refuel partner's, and a Blockade of that low orbit shuts it; the Refinery is the reason, not the source. A Ship with no such depot and no leg its tank can pay is stranded.
 _Avoid_: resupply, top up, tanker
 
 **Transit**:

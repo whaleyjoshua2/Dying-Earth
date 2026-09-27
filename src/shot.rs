@@ -1369,6 +1369,22 @@ fn build_board(session: &mut Session) {
         c.modules.push(Module::new(ModuleKind::Mine));
         c.modules.push(Module::new(ModuleKind::Shipyard));
     }
+    // Ticket #396 (version 0.09.3): `depot:1` (a building aid): seat 0's first ground Colony gains a
+    // working Refinery and a Frigate of seat 0's with half a tank sits in its Body's low orbit, so
+    // the Ship card can be photographed offering the Refuel from a Refinery Colony's depot; with
+    // `first:1 hab:ground` that is the Moon. Pushed without regard to the Colony's room.
+    if std::env::args().any(|a| a == "depot:1")
+        && let Some(g) = session.game.as_mut()
+        && let Some(body) = g.colonies.iter().find(|c| !c.in_orbit && c.control.director() == Some(Seat(0))).map(|c| c.body)
+    {
+        if let Some(c) = g.colonies.iter_mut().find(|c| !c.in_orbit && c.body == body && c.control.director() == Some(Seat(0))) {
+            c.modules.push(Module::new(ModuleKind::Refinery));
+        }
+        let id = ShipId(g.fresh_id());
+        let name = g.next_ship_name(UnitKind::Frigate);
+        let built_turn = g.turn;
+        g.ships.push(Ship { id, name, kind: UnitKind::Frigate, seat: Seat(0), damage: 0, at: ShipAt::Body(body), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: 15.0, slot: None });
+    }
     // Ticket #337 (version 0.09.0): `ducats:<n>` (a building aid): seat 0 holds exactly n Ducats.
     // A card whose offer costs more than a seat holds greys its take button, and that is the state
     // a third of the table is in when a card is drawn; a fresh board is never poor enough to show

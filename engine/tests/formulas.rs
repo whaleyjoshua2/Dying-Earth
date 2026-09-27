@@ -13009,7 +13009,8 @@ fn a_door_the_orbit_shuts_says_the_move_first() {
     let tanker = ship_in(&mut g, Seat(0), UnitKind::Frigate, BodyId::Earth, None, Stance::Hold);
     g.ship_mut(tanker).unwrap().fuel = 2.0;
     g.seats[0].stockpile.fuel = 100.0;
-    assert_eq!(refusal(&g, &Order::Refuel { ship: tanker }), format!("Move this Ship to {iss_orbit}, then refuel next turn: a station fuels a Ship in its own orbit alone."));
+    // Ticket #396 (version 0.09.3): the reason names the Refinery Colony's low orbit too.
+    assert_eq!(refusal(&g, &Order::Refuel { ship: tanker }), format!("Move this Ship to {iss_orbit}, then refuel next turn: a station fuels a Ship in its own orbit alone, a Refinery Colony its low orbit."));
     // Blockaded, no move helps: the refusal says so and offers none.
     let rival = ship_in(&mut g, Seat(1), UnitKind::Frigate, BodyId::Earth, Some(slot), Stance::Blockade);
     let err = refusal(&g, &Order::Refuel { ship: tanker });
@@ -16690,4 +16691,45 @@ fn a_computer_seat_builds_its_ships_at_the_cheapest_yard_and_seeks_a_yard_on_the
     g.colony_mut(twin).unwrap().colonists = 4;
     assert_eq!(g.widgets_at(Place::Colony(twin)), g.widgets_at(Place::Colony(station)), "the premise: twins");
     assert_eq!(g.ai_ship_yard(seat), Some(station), "the first on the list among equals");
+}
+
+/// Ticket #396 (version 0.09.3): **a ground Colony with a working Refinery refuels its low orbit**
+/// from its holder's Stockpile, as a station does in its own slot: a Refuel in low orbit over such
+/// a Colony is taken and fills the tank; a Refinery mothballed refuses it; the Ship is no longer
+/// Stranded while the depot stands; and a rival stack on Blockade in that low orbit shuts it.
+#[test]
+fn a_colony_with_a_working_refinery_refuels_its_low_orbit_and_rescues_a_stranded_ship() {
+    let mut g = game();
+    g.seats[0].stockpile.fuel = 50.0;
+    let (far, _) = colony_ship_ready(&mut g, BodyId::Mars);
+    g.ship_mut(far).unwrap().fuel = 1.0;
+    g.ship_mut(far).unwrap().slot = None;
+    let refuel = Order::Refuel { ship: far };
+    assert!(g.check_order(Seat(0), &[], &refuel).is_err(), "nothing of ours at Mars: no Refuel");
+    assert!(g.stranded(far), "1 in the tank, no depot");
+    // A Colony on the ground with a Refinery: the depot for low orbit.
+    let depot = colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Refinery], 4);
+    assert!(g.check_order(Seat(0), &[], &refuel).is_ok(), "a working Refinery below fuels low orbit: {:?}", g.check_order(Seat(0), &[], &refuel));
+    assert!(!g.stranded(far), "the depot rescues it");
+    assert_eq!(g.order_cost(Seat(0), &refuel).fuel, 29.0, "30 - 1 wanted, 50 held");
+    g.commit_orders(Seat(0), std::slice::from_ref(&refuel));
+    assert_eq!(g.ship(far).unwrap().fuel, 30.0, "filled from the Stockpile");
+    assert_eq!(g.seats[0].stockpile.fuel, 21.0);
+    assert!(g.log.iter().any(|l| l.contains(" refuels ") && l.contains("at a Refinery Colony")), "the log says where: {:?}", g.log.last());
+    // The Refinery mothballed: the depot is shut.
+    g.ship_mut(far).unwrap().fuel = 1.0;
+    let i = g.colony(depot).unwrap().modules.iter().position(|m| m.kind == ModuleKind::Refinery).unwrap();
+    g.colony_mut(depot).unwrap().modules[i].mothballed = true;
+    assert!(g.check_order(Seat(0), &[], &refuel).is_err(), "a mothballed Refinery fuels nothing");
+    assert!(g.stranded(far), "and the Ship is stranded again");
+    g.colony_mut(depot).unwrap().modules[i].mothballed = false;
+    // A rival stack on Blockade in low orbit shuts the depot, as it shuts a station's ring.
+    let rival = ShipId(g.fresh_id());
+    g.ships.push(Ship { name: String::new(), id: rival, kind: UnitKind::Frigate, seat: Seat(1), damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Blockade, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None });
+    let err = g.check_order(Seat(0), &[], &refuel).unwrap_err().0;
+    assert!(err.contains("blockaded"), "a Blockade of low orbit shuts it: {err}");
+    // A station's ring still fuels only a Ship in that ring: the depot is low orbit's alone.
+    g.ships.retain(|s| s.id != rival);
+    g.ship_mut(far).unwrap().slot = Some(0);
+    assert!(g.check_order(Seat(0), &[], &refuel).is_err(), "in an empty ring, nothing fuels it");
 }

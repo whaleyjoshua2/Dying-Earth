@@ -1261,7 +1261,7 @@ fn print_board(g: &Game) {
         if sh.seat == me {
             let dry: Vec<String> = BodyId::ALL
                 .into_iter()
-                .filter_map(|to| g.arrival_leaves_stranded(me, sh.id, to, None).map(|left| format!("{} ({left} Fuel left, no station of yours in low orbit)", to.name())))
+                .filter_map(|to| g.arrival_leaves_stranded(me, sh.id, to, None).map(|left| format!("{} ({left} Fuel left, nothing of yours to refuel at in low orbit)", to.name())))
                 .collect();
             if !dry.is_empty() {
                 println!("         would arrive stranded at: {}", dry.join("; "));

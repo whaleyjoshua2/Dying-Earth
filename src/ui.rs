@@ -8010,14 +8010,15 @@ fn ship_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
                     let partner = if game.own_station_at(Seat(0), b) {
                         None
                     } else {
-                        game.colonies.iter().filter(|c| c.body == b && game.fuels_for(c, Seat(0))).find_map(|c| c.control.director()).map(|d| format!("At the station of the {}, under your Refuel Accord: the Fuel is your own Stockpile's, drawn there.", game.seat_name(d)))
+                        game.colonies.iter().filter(|c| c.body == b && game.fuels_for(c, Seat(0))).find_map(|c| c.control.director()).map(|d| format!("At the station or Refinery Colony of the {}, under your Refuel Accord: the Fuel is your own Stockpile's, drawn there.", game.seat_name(d)))
                     };
                     cost_button_with_hover(ui, game, &session.pending, Order::Refuel { ship: s.id }, "Refuel from the Stockpile", partner, actions);
                 } else if game.stranded(s.id) {
                     ui.label(fuel);
-                    ui.colored_label(Color32::from_rgb(230, 120, 90), "stranded: no leg it can pay, and no station of yours or of a Refuel partner's here to refuel at; a station built in orbit here, or a Refuel Accord with one who holds a station here, rescues it");
+                    // Ticket #396 (version 0.09.3): or a Refinery Colony under low orbit.
+                    ui.colored_label(Color32::from_rgb(230, 120, 90), "stranded: no leg it can pay, and no station or Refinery Colony of yours or of a Refuel partner's here to refuel at; a station built in orbit here, a working Refinery at a Colony of yours on the ground, or a Refuel Accord with one who holds either, rescues it");
                 } else {
-                    ui.label(format!("{fuel}; no station of yours, or of a Refuel partner's, here to refuel at"));
+                    ui.label(format!("{fuel}; no station or Refinery Colony of yours, or of a Refuel partner's, here to refuel at"));
                 }
             }
             ShipAt::Transit { .. } => {

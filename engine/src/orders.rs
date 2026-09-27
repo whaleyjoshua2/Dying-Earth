@@ -1357,7 +1357,7 @@ impl Game {
                 let ShipAt::Body(body) = s.at else { return fail("in transit") };
                 // Ticket #325 (version 0.08.8): or a partner's station under a Refuel Accord.
                 if !self.refuel_station_at(seat, body) {
-                    return fail(format!("no station of yours, or of a Refuel partner's, over {} to refuel at", self.tables.body(body).name));
+                    return fail(format!("no station or Refinery Colony of yours, or of a Refuel partner's, over {} to refuel at", self.tables.body(body).name));
                 }
                 // Ticket #99 (version 0.07.0): a blockaded station fuels nothing. Ticket #335
                 // (version 0.09.0): nor does one in another orbit -- a station's own orbit is what
@@ -1366,12 +1366,14 @@ impl Game {
                 // 0.09.1): split in two, so the move is offered only where a move would open the door
                 // -- a station that fuels this seat, open, in another orbit -- and a blockade says
                 // itself.
+                // Ticket #396 (version 0.09.3): a Refinery Colony's depot is low orbit, and a Blockade
+                // there shuts it; the move offered is to whichever orbit the open depot touches.
                 let orbit = self.ship_orbit(s);
                 if !self.refuelling_station(seat, body, orbit) {
-                    let open = self.colonies.iter().find(|c| c.body == body && self.fuels_for(c, seat) && c.control.director().is_some_and(|d| !self.slot_blockaded_against(d, body, c.slot)));
+                    let open = self.colonies.iter().find(|c| c.body == body && self.fuels_for(c, seat) && c.control.director().is_some_and(|d| !self.orbit_blockaded_against(d, body, self.colony_orbit(c))));
                     return fail(match open {
-                        Some(c) => self.move_first(body, Orbit::Slot(c.slot), "refuel", "a station fuels a Ship in its own orbit alone."),
-                        None => format!("every station that fuels you over {} is blockaded", self.tables.body(body).name),
+                        Some(c) => self.move_first(body, self.colony_orbit(c), "refuel", "a station fuels a Ship in its own orbit alone, a Refinery Colony its low orbit."),
+                        None => format!("every station or Refinery Colony that fuels you over {} is blockaded", self.tables.body(body).name),
                     });
                 }
                 if s.fuel >= self.tables.unit(s.kind).tank as f64 {
@@ -2253,17 +2255,23 @@ impl Game {
                 Order::Refuel { ship } => {
                     let amount = cost.fuel;
                     let tank = self.ship(*ship).map(|s| self.tables.unit(s.kind).tank as f64).unwrap_or(0.0);
-                    let body = self.ship(*ship).and_then(|s| match s.at {
-                        ShipAt::Body(b) => Some(b),
-                        _ => None,
-                    });
                     if let Some(s) = self.ship_mut(*ship) {
                         s.fuel = tenth((s.fuel + amount).min(tank));
                     }
                     // Ticket #325 (version 0.08.8): said when it is a partner's station, so the
-                    // sweep can count it apart from a refuel at one's own.
-                    let at_partner = body.is_some_and(|b| !self.own_station_at(seat, b));
-                    self.log(format!("{} refuels {} with {} Fuel{}.", self.seat_name(seat), ship, amount, if at_partner { " at a partner's station" } else { "" }));
+                    // sweep can count it apart from a refuel at one's own. Ticket #396 (version
+                    // 0.09.3): and when it is a Refinery Colony's low orbit, for the same count.
+                    let depot = self.ship(*ship).and_then(|s| match s.at {
+                        ShipAt::Body(b) => self.depot_in_orbit(seat, b, self.ship_orbit(s)).map(|c| (c.in_orbit, c.control.director() != Some(seat))),
+                        _ => None,
+                    });
+                    let where_ = match depot {
+                        Some((true, true)) => " at a partner's station",
+                        Some((false, false)) => " at a Refinery Colony",
+                        Some((false, true)) => " at a partner's Refinery Colony",
+                        _ => "",
+                    };
+                    self.log(format!("{} refuels {} with {} Fuel{}.", self.seat_name(seat), ship, amount, where_));
                 }
                 Order::ShipStance { body, stance } => {
                     self.set_stack_stance(seat, *body, *stance);

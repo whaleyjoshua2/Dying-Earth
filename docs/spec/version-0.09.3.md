@@ -365,3 +365,28 @@ Widgets, where Armies board.
 In `ai.toml` `[multipliers]`: `low_gravity_yard` 1.5, new. The sweep before is the Stadium's
 (6 / 4 / 1 / 9, collapses 60; Missile Carriers built 40, games with an orbital Battle 27 of 80);
 the sweep after is in the diary.
+
+## 12. A Colony with a working Refinery refuels its low orbit
+
+The authority is [ticket #396](https://github.com/whaleyjoshua2/Dying-Earth/issues/396). **A rule
+moves.** The designer's words: *"colonies with a refinery can refuel ships."*
+
+**The rule** (Q1, A). A ground Colony with a **working** Refinery (online, not mothballed, not still
+building) is a depot: it refuels its holder's Ships **in its Body's low orbit**, from the holder's
+own Stockpile, exactly as a station does in its own slot; a partner's Ships too under a Refuel
+Accord, the Fuel the partner's own; **a Blockade of that low orbit shuts it**, as a Blockade of a
+ring shuts the station there, and a Battery of the holder's in that orbit lifts it. Nothing is
+made at the Colony for it: the Refinery is the reason, not the source. A station's ring still
+fuels only a Ship in that ring, and a Refinery Colony only a Ship in low orbit. A Refinery stands
+only on the ground, so a station is never a depot by this rule.
+
+**Stranded** (Q2, A). A Ship is no longer Stranded while such a Colony stands under the low orbit
+it sits in, or under one it can still pay the orbit change to reach, the same as a station; the
+glossary's entry says so, and the Ship card's stranded line names the way out.
+
+**The computer seats** (Q3, A) plan their Refuels and orbit changes through the one predicate, so a
+depot is used the moment one stands; no weight is added for building a Refinery to make one. The
+sweep's Tanks line now counts Refuels at a Refinery Colony beside those at a partner's.
+
+**Figures.** None move. The sweep before is the yard's (6 / 4 / 1 / 9, collapses 60; hulls left dry
+by a Battle 8, Fuel burned in Battle 163.2); the sweep after is in the diary.

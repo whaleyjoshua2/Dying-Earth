@@ -2193,12 +2193,30 @@ impl Game {
     /// partner's under a Refuel Accord. The Fuel is the refueller's own Stockpile's either way;
     /// the partner's station is only where it is drawn.
     pub fn fuels_for(&self, c: &Colony, seat: Seat) -> bool {
-        c.in_orbit && c.control.director().is_some_and(|d| d == seat || self.accord_has(seat, d, Term::Refuel))
+        self.refuel_depot(c) && c.control.director().is_some_and(|d| d == seat || self.accord_has(seat, d, Term::Refuel))
+    }
+
+    /// Ticket #396 (version 0.09.3): **a place that fills a tank**: a station, in its own slot, or
+    /// a ground Colony with a working Refinery (online, not mothballed, not still building), in its
+    /// Body's low orbit -- the designer's *"colonies with a refinery can refuel ships"*. The Fuel is
+    /// the Stockpile's either way; the Refinery is the reason, not the source.
+    pub fn refuel_depot(&self, c: &Colony) -> bool {
+        c.in_orbit || c.modules.iter().any(|m| m.kind == ModuleKind::Refinery && m.working())
+    }
+
+    /// Ticket #396: the depot that touches this orbit and fuels this seat -- the station standing in
+    /// a slot, or a Refinery Colony on the ground under low orbit -- blockaded or not.
+    pub fn depot_in_orbit(&self, seat: Seat, body: BodyId, orbit: Orbit) -> Option<&Colony> {
+        match orbit {
+            Orbit::Slot(slot) => self.station_at(body, slot).filter(|c| self.fuels_for(c, seat)),
+            Orbit::Low => self.colonies.iter().find(|c| c.body == body && !c.in_orbit && self.fuels_for(c, seat)),
+        }
     }
 
     /// Ticket #325: a station at the Body the seat may Refuel at, its own or a partner's, blockaded
     /// or not -- the test that says whether a Ship is stranded and whether the card offers a
-    /// Refuel at all; `refuelling_station` says whether one is open this turn.
+    /// Refuel at all; `refuelling_station` says whether one is open this turn. Ticket #396
+    /// (version 0.09.3): or a Refinery Colony on the ground there (`refuel_depot`).
     pub fn refuel_station_at(&self, seat: Seat, body: BodyId) -> bool {
         self.colonies.iter().any(|c| c.body == body && self.fuels_for(c, seat))
     }
@@ -2232,9 +2250,8 @@ impl Game {
         // Ticket #335 (version 0.09.0): a station fuels only a Ship in its own orbit, so a station
         // in another orbit rescues this Ship only while the tank can still pay the orbit change
         // that would reach it. A dry tank in the wrong orbit is stranded with a station in sight.
-        if self.refuel_station_at(s.seat, body)
-            && (self.ship_orbit(s).slot().is_some_and(|sl| self.station_at(body, sl).is_some_and(|c| self.fuels_for(c, s.seat))) || s.fuel >= self.tables.orbit_change_fuel as f64)
-        {
+        // Ticket #396 (version 0.09.3): or a Refinery Colony under the low orbit it sits in.
+        if self.refuel_station_at(s.seat, body) && (self.depot_in_orbit(s.seat, body, self.ship_orbit(s)).is_some() || s.fuel >= self.tables.orbit_change_fuel as f64) {
             return false;
         }
         match self.cheapest_leg_from(s.seat, body) {
@@ -2259,8 +2276,9 @@ impl Game {
         if left < 0.0 {
             return None;
         }
-        let station_in_orbit = slot.is_some_and(|sl| self.station_at(to, sl).is_some_and(|c| self.fuels_for(c, seat)));
-        if station_in_orbit || (self.refuel_station_at(seat, to) && left >= self.tables.orbit_change_fuel as f64) {
+        // Ticket #396 (version 0.09.3): a Refinery Colony under low orbit is a depot too.
+        let depot_in_orbit = self.depot_in_orbit(seat, to, Orbit::of(slot)).is_some();
+        if depot_in_orbit || (self.refuel_station_at(seat, to) && left >= self.tables.orbit_change_fuel as f64) {
             return None;
         }
         let cheapest = self.cheapest_leg_from_at(seat, to, self.turn + turns)?;
@@ -3911,17 +3929,22 @@ impl Game {
     /// needs to be positively chosen, not just the presence of a ship" -- and a blockaded station
     /// makes nothing (`starved_by`).
     pub fn slot_blockaded_against(&self, seat: Seat, body: BodyId, slot: u32) -> bool {
+        self.orbit_blockaded_against(seat, body, Orbit::Slot(slot))
+    }
+
+    /// Ticket #396 (version 0.09.3): the same test for any orbit, low orbit included, since a
+    /// Refinery Colony's depot in low orbit is shut by a Blockade there as a station's is in its
+    /// ring. `slot_blockaded_against` reads this for a ring.
+    pub fn orbit_blockaded_against(&self, seat: Seat, body: BodyId, orbit: Orbit) -> bool {
         // Ticket #324 (version 0.08.8): nor a seat with a Battery standing in that orbit; ticket
         // #335: its own orbit is the one a Battery covers, so it is the station's own Battery that
         // lifts the Blockade of the station's own slot.
-        if !self.batteries_at(seat, body, Orbit::Slot(slot)).is_empty() {
+        if !self.batteries_at(seat, body, orbit).is_empty() {
             return false;
         }
         // Ticket #320 (version 0.08.8): a Blockade does not shut out a partner under Passage.
         // Ticket #335: the blockading stack sits in the orbit it shuts, as it always had to.
-        self.ships
-            .iter()
-            .any(|s| s.seat != seat && !self.accord_has(seat, s.seat, Term::Passage) && self.blockading(s) && self.ship_in_orbit(s, body, Orbit::Slot(slot)))
+        self.ships.iter().any(|s| s.seat != seat && !self.accord_has(seat, s.seat, Term::Passage) && self.blockading(s) && self.ship_in_orbit(s, body, orbit))
     }
 
     /// Ticket #278: a warship on Blockade, still engaged. The one test every blockade reads.
@@ -3982,10 +4005,11 @@ impl Game {
     /// Ticket #335 (version 0.09.0): **in the orbit the Ship sits in**. A station's own orbit is
     /// what touches that station, refuelling included, so a Ship in low orbit fuels at nothing and
     /// a Ship at one station's ring cannot draw from another's.
+    ///
+    /// Ticket #396 (version 0.09.3): or a Refinery Colony under low orbit (`depot_in_orbit`); a
+    /// Blockade of that low orbit shuts it as a Blockade of a ring shuts the station there.
     pub fn refuelling_station(&self, seat: Seat, body: BodyId, orbit: Orbit) -> bool {
-        let Some(slot) = orbit.slot() else { return false };
-        self.station_at(body, slot)
-            .is_some_and(|c| self.fuels_for(c, seat) && c.control.director().is_some_and(|d| !self.slot_blockaded_against(d, body, slot)))
+        self.depot_in_orbit(seat, body, orbit).is_some_and(|c| c.control.director().is_some_and(|d| !self.orbit_blockaded_against(d, body, orbit)))
     }
 
     /// Ticket #335 (version 0.09.0): whether a Ship sits in the orbit that touches this Colony --
