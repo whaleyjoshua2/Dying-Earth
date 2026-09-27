@@ -479,7 +479,7 @@ moves. The designer: *"would appear there is no actual way to order a frigate or
 attack now that each ship has its own card."*
 
 **Where Attack lives** (Q1, A). The Attack is the stack's stance, keyed by Body, and stays so. It is
-offered on the stack card as before, and now **on a warship's own card too**: a Frigate's, a
+offered on the stack card as before, and now **on an armed Ship's own card too**: a Frigate's, a
 Battleship's or a Missile Carrier's card of the player's, at a Body, carries the stack's stance row
 and the Attack block under its orbit line, headed *The stack's stance and Attack: all N Ship(s) of
 yours at the Moon*, the button reading *Attack with all N Ship(s) at the Moon*, and acting on the
@@ -493,4 +493,11 @@ Attack; its stance line's hover says where the stance is set.
 working Battery shares an orbit with one of the seat's Ships (`attack_has_a_target`), where the
 stack card asked a Body-wide one and could show a button whose confirm was then refused. Greyed,
 the button's hover carries the refusal, as every refusal has since 0.09.2; the preview and confirm
-appear only when the order would stand.
+appear only when the order would stand (a consequence of the greyed button, not a decision of the
+ticket's).
+
+**A click outside the card.** At the designer's word before the ticket closed (*"clicking outside
+of the ship card [should] revert to the ship roster the same way when viewing a nation and
+clicking outside of the card will revert to the earth card"*): on the Solar System Map a click on
+nothing clears the selection, as it always has on a Surface Map, so a Ship's card gives way to the
+roster. Until this the Solar System Map kept whatever card was open.

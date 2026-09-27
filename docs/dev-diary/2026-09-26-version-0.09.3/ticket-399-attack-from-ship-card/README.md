@@ -10,11 +10,17 @@ records it.
 ## What was built
 
 The stack card's stance row and Attack block are one function, `attack_block`, drawn on the stack
-card as before and on a Frigate's, Battleship's or Missile Carrier's own card under its orbit line,
-headed as the stack's. The Attack button asks the engine's `attack_has_a_target`, made public, so
+card as before and on an armed Ship's own card (a Frigate's, a Battleship's or a Missile Carrier's,
+`UnitKind::is_armed`) under its orbit line, headed as the stack's. The Attack button asks the engine's `attack_has_a_target`, made public, so
 it is greyed with the refusal on its hover where the stack card's Body-wide test showed it live and
 left the confirm to be refused. A picture aid, `foe:low` and `foe:ring`, puts a Frigate of the
 player's in Mars's low orbit and a rival's in the same orbit or in a station's ring.
+
+**A click outside the card**, at the designer's word before the ticket closed: on a Surface Map a
+click that misses the globe has always cleared the selection, so a Region's card gives way to the
+Earth Map and the roster; on the Solar System Map a click on nothing did nothing, and a Ship's card
+opened from the roster stayed open. It clears the selection there now too, so the Ship's card gives
+way to the roster. A click, so no headless picture: the change is one arm of the map's pick.
 
 ## Before
 
@@ -40,8 +46,9 @@ odds, and *Attack with all 1 Ship(s) at Mars*, live.
 ![The Frigate's card after: the stack's stance and a live Attack](after-ship-card-live.png)
 
 **The same card with the rival in the station's ring**, `foe:ring`, the button's hover forced
-(`tip:no rival Ship`): the button greyed, its hover *Attack: no rival Ship or Battery in any orbit
-your Ships hold there*, the engine's own refusal.
+(`tip:no rival Ship#2`, the second match, since the stance row's own *Attack* label carries the same
+refusal and draws first): the button greyed, its hover the engine's own refusal, *no rival Ship or
+Battery in any orbit your Ships hold there*, and under it what an Attack is.
 
 ![The Frigate's card after: the Attack greyed with the reason](after-ship-card-refused.png)
 
@@ -49,6 +56,19 @@ your Ships hold there*, the engine's own refusal.
 is greyed with the same reason.
 
 ![The stack card after: the Attack greyed with the reason](after-stack-card-refused.png)
+
+## The review
+
+The standards review found the Attack block's doc comment appended to the stack card's, so both
+hung on the wrong function: put right. It found the glossary's *Ship card* and *Stack* entries
+still saying the stance and Attack are the stack card's alone, and the word *warship* used for a
+card the Missile Carrier gets though it is no warship: the entries say what is so, and the three
+kinds are one named predicate, `UnitKind::is_armed`, *an armed Ship*. And it found the two
+refused-button pictures showing the stance row's own *Attack* label's hover, which carries the same
+refusal and draws first, not the button's: re-taken with the picture aid's second match, so the
+button's hover is what is shown. The spec review found nothing missing and one sentence in §15
+past the resolution's words, the preview shown only when the order stands, now marked as a
+consequence of the greyed button rather than a decision.
 
 ## The red witness
 

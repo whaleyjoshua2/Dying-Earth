@@ -16848,7 +16848,7 @@ fn a_computer_seat_wants_a_rivals_fat_colony_more_than_its_lean_one() {
 #[test]
 fn an_attack_has_a_target_only_in_an_orbit_the_seat_shares_with_a_rival() {
     let mut g = game();
-    let mine = ship_in(&mut g, Seat(0), UnitKind::Frigate, BodyId::Mars, None, Stance::Hold);
+    ship_in(&mut g, Seat(0), UnitKind::Frigate, BodyId::Mars, None, Stance::Hold);
     let rival = ship_in(&mut g, Seat(1), UnitKind::Frigate, BodyId::Mars, Some(0), Stance::Hold);
     let attack = Order::ShipStance { body: BodyId::Mars, stance: Stance::Attack };
     assert!(!g.attack_has_a_target(Seat(0), BodyId::Mars), "a rival in the ring, mine in low orbit: nothing to fight");
@@ -16856,5 +16856,4 @@ fn an_attack_has_a_target_only_in_an_orbit_the_seat_shares_with_a_rival() {
     g.ship_mut(rival).unwrap().slot = None;
     assert!(g.attack_has_a_target(Seat(0), BodyId::Mars), "the same orbit: a target");
     assert!(g.check_order(Seat(0), &[], &attack).is_ok(), "and the order stands");
-    let _ = mine;
 }

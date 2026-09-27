@@ -3540,8 +3540,14 @@ fn pick(pos: Pos2, session: &Session, game: &Game, view: &mut ViewState, camera:
                     nearest = Some((t, body));
                 }
             }
-            if let Some((_, body)) = nearest {
-                view.enter_surface(body);
+            match nearest {
+                Some((_, body)) => view.enter_surface(body),
+                // Ticket #399 (version 0.09.3): a click on nothing clears the selection here as it
+                // does on a Surface Map, so a Ship's card gives way to the roster -- the designer:
+                // *"clicking outside of the ship card [should] revert to the ship roster the same
+                // way when viewing a nation and clicking outside of the card will revert to the
+                // earth card."* Until this the Solar System Map kept whatever card was open.
+                None => view.selection = Selection::None,
             }
         }
         View::Surface(body) => {
@@ -7656,18 +7662,8 @@ fn slot_panel(ui: &mut Ui, session: &Session, game: &Game, body: BodyId, slot: u
     }
 }
 
-/// Ticket #374 (version 0.09.2): **the stack card holds what is the whole stack's**, and nothing
-/// that is one hull's. Until this ticket it was one flat column with a button per Ship under every
-/// heading -- Transits, Change orbit, Tanks, Load and unload, Bombard, Launch -- so the same hull
-/// stood on the card five times, and the designer asked for each Ship to have a card of its own:
-/// *"clean up ships at body cards - ships should each have their own card. bodies and orbits about
-/// which should each be their own drop down both on their own cards and the one listing all the
-/// ships at a body."* What stays here: the heading, the Ships **grouped by orbit** in one drop-down
-/// per orbit (open by default, each row opening the Ship's card), the stance, Attack, the
-/// whole-stack moves under one drop-down per Body, and Influence on the Colonies here. Everything
-/// else went to `ship_panel`.
 /// Ticket #399 (version 0.09.3): **the stack's stance and its Attack, on the stack card and on
-/// every warship's own card** -- the designer: *"would appear there is no actual way to order a
+/// every armed Ship's own card** (`UnitKind::is_armed`) -- the designer: *"would appear there is no actual way to order a
 /// frigate or battle ship to attack now that each ship has its own card."* The order is the
 /// stack's, keyed by Body, and stays so; a Ship's card says so in its heading and offers it. The
 /// Attack button asks the engine's own question (`attack_has_a_target`, a rival in an orbit one of
@@ -7717,6 +7713,16 @@ fn attack_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     }
 }
 
+/// Ticket #374 (version 0.09.2): **the stack card holds what is the whole stack's**, and nothing
+/// that is one hull's. Until this ticket it was one flat column with a button per Ship under every
+/// heading -- Transits, Change orbit, Tanks, Load and unload, Bombard, Launch -- so the same hull
+/// stood on the card five times, and the designer asked for each Ship to have a card of its own:
+/// *"clean up ships at body cards - ships should each have their own card. bodies and orbits about
+/// which should each be their own drop down both on their own cards and the one listing all the
+/// ships at a body."* What stays here: the heading, the Ships **grouped by orbit** in one drop-down
+/// per orbit (open by default, each row opening the Ship's card), the stance, Attack, the
+/// whole-stack moves under one drop-down per Body, and Influence on the Colonies here. Everything
+/// else went to `ship_panel`.
 fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, body: BodyId, seat: Seat, actions: &mut Vec<Action>) {
     let ships: Vec<&Ship> = game.ships.iter().filter(|s| s.seat == seat && s.at == ShipAt::Body(body)).collect();
     ui.horizontal(|ui| {
@@ -8000,8 +8006,8 @@ fn ship_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
             // orbit -- the stance is the STACK'S, set on the stack card, and the line says so.
             // Ticket #399 (version 0.09.3): a warship's card sets the stance and gives the Attack
             // below, so the hover sends nobody to the stack card for those.
-            let fighter = !session.spectator && s.seat == Seat(0) && (s.kind.is_warship() || s.kind == UnitKind::MissileCarrier);
-            let where_set = if fighter { "set below, for the whole stack" } else { "set on the stack card or on a warship's card" };
+            let fighter = !session.spectator && s.seat == Seat(0) && s.kind.is_armed();
+            let where_set = if fighter { "set below, for the whole stack" } else { "set on the stack card or on an armed Ship's card" };
             ui.label(format!("{}, on {}", capitalised(&orbit_phrase(game, b, game.ship_orbit(s))), s.stance.name()))
                 .on_hover_text(format!("{} {} The stance is the whole stack's, {where_set}.", s.stance.one_liner(true), Stance::PERSISTS));
             if fighter {

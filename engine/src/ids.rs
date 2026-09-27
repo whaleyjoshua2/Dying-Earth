@@ -513,6 +513,14 @@ impl UnitKind {
     pub fn is_warship(self) -> bool {
         matches!(self, UnitKind::Frigate | UnitKind::Battleship)
     }
+
+    /// Ticket #399 (version 0.09.3): **an armed Ship**, whose own card carries the stack's stance
+    /// and its Attack: a warship, or a Missile Carrier, which is no warship (#343) but fights by
+    /// its Launch and is given its stance as one. A Colony Ship's or a Carrier's card carries
+    /// neither (the designer, Q2 B).
+    pub fn is_armed(self) -> bool {
+        self.is_warship() || self == UnitKind::MissileCarrier
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
