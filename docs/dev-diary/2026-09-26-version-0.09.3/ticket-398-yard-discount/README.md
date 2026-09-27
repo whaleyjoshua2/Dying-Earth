@@ -22,16 +22,25 @@ same order cost. A building aid, `yard:1`, gives seat 0's first ground Colony a 
 **A Moon yard with one working Mine**, `seed:7 first:1 hab:ground yard:1 panel:0 window:1400x1700`:
 the note *One working Mine here: Modules and Ships cost x0.75*, and the Ship buttons at three
 quarters: *Frigate 18.8* against the row's 25, *Battleship 37.5* against 50, *Missile Carrier 45*
-against 60. The buttons are greyed on this fresh Colony for want of Energy, the Shipyard newly
-standing; the price is what the picture is for.
+against 60. The buttons are greyed on this fresh Colony because a build fills the tank and the
+seat holds 26 Fuel against a tank of 30 (the review read the refusal); the price is what the
+picture is for.
 
 ![The Moon yard's card with the note and the discounted Ship buttons](moon-yard.png)
 
-**The Faction window's Ship prices**, `seed:7 menus:1`, the seat's, unchanged.
+## The review
 
-![The Faction window's Ship prices](faction-prices.png)
+The standards review found the yard's tie order reversed (the first cut kept the LAST yard on the
+list among equals, where the queue ticket had the first): fixed, with a tie case added to the
+witness, red at *the first on the list among equals* and green. It also folded the Ship's row
+choice into one place and named the review's lesser points (a data comment still saying *rounded
+down*, the picture aid's disregard of a Colony's room). The spec review read the greyed buttons'
+refusal (Fuel, not Energy) and found the second picture was the Faction choice screen, which
+carries no Ship price: it is dropped, the seat's price being the witness's. It also named two
+things decided without the designer's word, said in the closing report: the Carrier still built at
+the Earth yard with the most Widgets, where Armies board, and the figure 1.5.
 
-## The red witness
+## The red witnesses
 
 `a_ship_built_at_a_low_gravity_yard_with_a_working_mine_takes_build_where_you_dig`: a Frigate at a
 Moon Colony with one working Mine at three quarters (red at the full price before the build), every

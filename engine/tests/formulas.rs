@@ -16667,8 +16667,9 @@ fn a_computer_seat_builds_its_ships_at_the_cheapest_yard_and_seeks_a_yard_on_the
     let t = g.tables.clone();
     let seat = Seat(1);
     // An Earth station's yard with a Factory: more Widgets than the Moon Colony's Core.
-    let station = ColonyId(g.fresh_id());
-    g.colonies.push(Colony { id: station, body: BodyId::Earth, slot: 3, control: Control::Controlled(seat), modules: vec![Module::new(ModuleKind::Core), Module::new(ModuleKind::Shipyard), Module::new(ModuleKind::Factory)], colonists: 4, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
+    let station = station_at(&mut g, seat, BodyId::Earth);
+    g.colony_mut(station).unwrap().modules = vec![Module::new(ModuleKind::Core), Module::new(ModuleKind::Shipyard), Module::new(ModuleKind::Factory)];
+    g.colony_mut(station).unwrap().colonists = 4;
     let moon = colony(&mut g, seat, BodyId::Moon, &[ModuleKind::Mine, ModuleKind::Shipyard], 4);
     assert!(g.widgets_at(Place::Colony(station)) > g.widgets_at(Place::Colony(moon)), "the premise: the station makes more Widgets");
     assert_eq!(g.ai_ship_yard(seat), Some(moon), "the Moon yard is cheaper, so it is the yard");
@@ -16682,4 +16683,11 @@ fn a_computer_seat_builds_its_ships_at_the_cheapest_yard_and_seeks_a_yard_on_the
     g.colony_mut(moon).unwrap().modules[i].mothballed = true;
     assert_eq!(g.ai_ship_yard(seat), Some(station), "equal prices: the most Widgets");
     assert!((g.ai_shipyard_bonus(moon) - 1.0).abs() < 1e-9, "and no bonus without a working Mine");
+    // Equal in price and Widgets: the first on the list, as the queue ticket had it (the review's
+    // fix-up: the first cut kept the last).
+    let twin = station_at(&mut g, seat, BodyId::Earth);
+    g.colony_mut(twin).unwrap().modules = vec![Module::new(ModuleKind::Core), Module::new(ModuleKind::Shipyard), Module::new(ModuleKind::Factory)];
+    g.colony_mut(twin).unwrap().colonists = 4;
+    assert_eq!(g.widgets_at(Place::Colony(twin)), g.widgets_at(Place::Colony(station)), "the premise: twins");
+    assert_eq!(g.ai_ship_yard(seat), Some(station), "the first on the list among equals");
 }

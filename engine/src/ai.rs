@@ -803,7 +803,8 @@ impl Game {
         }
     }
 
-    /// Ticket #398 (version 0.09.3): the seat's Colonies with a working Shipyard.
+    /// Ticket #398 (version 0.09.3): the seat's Colonies with a working Shipyard, the list a Ship
+    /// can be offered at, in one place so the planner and `ai_ship_yard` read the same yards.
     fn ai_working_yards(&self, seat: Seat) -> Vec<ColonyId> {
         self.directed_colonies(seat).into_iter().filter(|c| self.colony(*c).unwrap().modules.iter().any(|m| m.kind == ModuleKind::Shipyard && m.working())).collect()
     }
@@ -814,9 +815,11 @@ impl Game {
     /// every kind, so the Frigate's price ranks the yards for all of them. Before this ticket the
     /// yard was the most Widgets alone (ticket #332), which never landed on the Moon.
     pub fn ai_ship_yard(&self, seat: Seat) -> Option<ColonyId> {
-        let yards = self.ai_working_yards(seat);
-        let price = |c: ColonyId| (self.ship_materials_at(seat, Place::Colony(c), UnitKind::Frigate) * 10.0).round() as i64;
-        yards.iter().copied().rev().min_by_key(|c| (price(*c), std::cmp::Reverse(self.widgets_at(Place::Colony(*c)))))
+        let price = |c: ColonyId| self.ship_materials_at(seat, Place::Colony(c), UnitKind::Frigate);
+        let widgets = |c: ColonyId| self.widgets_at(Place::Colony(c));
+        // `min_by` keeps the FIRST of equals, so the first on the list wins a tie (the review's
+        // fix-up: the first cut reversed the list and kept the last).
+        self.ai_working_yards(seat).into_iter().min_by(|a, b| price(*a).total_cmp(&price(*b)).then(widgets(*b).cmp(&widgets(*a))))
     }
 
     /// Ticket #398 (version 0.09.3): what a Shipyard's weight is multiplied by at this Colony --

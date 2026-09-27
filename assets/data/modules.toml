@@ -329,7 +329,7 @@ earth_emissions = 1.0
 
 # Ticket #88 (version 0.06.0): build it where you dig. A Module (the Archive included) built at a
 # Colony with one working Mine costs `one_mine` of its price, with two or more `two_mines`,
-# multiplicative with the Faction's own discount, rounded down, never below `floor` of the row.
+# multiplicative with the Faction's own discount, to the tenth (ticket #387), never below `floor` of the row.
 # A mothballed or unfinished Mine counts for nothing; Antarctica counts; stations do not take it.
 # Ticket #398 (version 0.09.3): a Ship built at a Shipyard on a low-gravity Body (the Moon, Phobos,
 # Deimos) takes it at the same steps, every kind, on Materials alone.

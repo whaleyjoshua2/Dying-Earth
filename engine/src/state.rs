@@ -2525,12 +2525,16 @@ impl Game {
     /// ticket #83 (version 0.06.0): times the Faction's Ship multiplier (the Arkwrights' 0.85).
     /// Ticket #387 (version 0.09.3): to the tenth, where it was rounded down.
     pub fn ship_materials(&self, seat: Seat, kind: UnitKind) -> f64 {
-        let card = self.tables.faction(self.kind(seat));
-        let base = match (kind, card.colony_ship_materials) {
+        tenth(self.ship_row(seat, kind) * self.tables.faction(self.kind(seat)).ship_materials_multiplier)
+    }
+
+    /// The row a Ship is priced from: the units.toml figure, or the Faction's own Colony Ship price.
+    fn ship_row(&self, seat: Seat, kind: UnitKind) -> f64 {
+        let row = match (kind, self.tables.faction(self.kind(seat)).colony_ship_materials) {
             (UnitKind::ColonyShip, Some(m)) => m,
             _ => self.tables.unit(kind).materials,
         };
-        tenth(base as f64 * card.ship_materials_multiplier)
+        row as f64
     }
 
     /// Ticket #398 (version 0.09.3): **what a Ship costs this seat at this yard.** Build Where You
@@ -2541,24 +2545,19 @@ impl Game {
     /// no Mine; a Mars or Venus yard pays the seat's price (Q2 A); a mothballed Mine counts for
     /// nothing. The Faction window still says the seat's price through `ship_materials`.
     pub fn ship_materials_at(&self, seat: Seat, site: Place, kind: UnitKind) -> f64 {
-        let seat_price = self.ship_materials(seat, kind);
-        let Place::Colony(cid) = site else { return seat_price };
-        let Some(col) = self.colony(cid) else { return seat_price };
+        let Place::Colony(cid) = site else { return self.ship_materials(seat, kind) };
+        let Some(col) = self.colony(cid) else { return self.ship_materials(seat, kind) };
         if col.in_orbit || !self.tables.body(col.body).low_gravity {
-            return seat_price;
+            return self.ship_materials(seat, kind);
         }
         let t = &self.tables.in_situ;
         let step = match self.working_mines(col) {
-            0 => return seat_price,
+            0 => return self.ship_materials(seat, kind),
             1 => t.one_mine,
             _ => t.two_mines,
         };
-        let card = self.tables.faction(self.kind(seat));
-        let row = match (kind, card.colony_ship_materials) {
-            (UnitKind::ColonyShip, Some(m)) => m,
-            _ => self.tables.unit(kind).materials,
-        } as f64;
-        tenth((row * card.ship_materials_multiplier * step).max(row * t.floor))
+        let row = self.ship_row(seat, kind);
+        tenth((row * self.tables.faction(self.kind(seat)).ship_materials_multiplier * step).max(row * t.floor))
     }
 
     /// Which seat an Army fights for, if any: it follows its home (spec 8.4).
