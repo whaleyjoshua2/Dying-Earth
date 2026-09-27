@@ -114,7 +114,10 @@ pub const SAVE_VERSION: u32 = 7;
 /// refusal rests on the stamp, as every move of it does, and names both versions. Ticket #393
 /// (the same version) appends a twenty-second Tech, Nuclear Rockets, and rides the same move.
 /// `GAME_VERSION` is NOT moved here: the version's closing ticket moves it for the whole version.
-pub const GAME_VERSION: &str = "0.09.2";
+/// Ticket #401 (version 0.09.3, the closing ticket): moved to 0.09.3. `SAVE_VERSION` moved once for
+/// the version, to 7, at the tenths (#387) and carries the Stadium (#389), the seventeenth Facility
+/// kind, besides: a 0.09.2 file knows neither.
+pub const GAME_VERSION: &str = "0.09.3";
 
 /// The game autosaves at the start of the Report phase of every third turn.
 pub const AUTOSAVE_EVERY: u32 = 3;

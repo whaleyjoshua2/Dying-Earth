@@ -19,6 +19,15 @@ founding (turn 9, every game), the Moon's first prize, and the Mars system's fir
 sweep after #393 was re-run to carry it (the same seeds, the same figures); the earlier files do
 not have it.
 
+**The close.** The closing sweep,
+[`sweeps/final-0.09.3.txt`](sweeps/final-0.09.3.txt), read 7 / 5 / 1 / 7 with 60 collapses of 80
+against the baseline's 2 / 5 / 0 / 11 and 62, line for line the bounty's sweep, since the last
+ticket moved no rule. `GAME_VERSION` moved to 0.09.3; `SAVE_VERSION` had moved once, to 7, at the
+tenths. The glossary was audited against the fifteen sections: sixteen entries amended, none
+added. The Windows kit was built here into `dist/dying-earth-0.09.3-windows/` and zipped, and ran
+once headless from its own folder; the Linux kit by the `release-kits` workflow on the branch;
+both carry [`docs/playtest/PLAYTEST.txt`](../../playtest/PLAYTEST.txt) as their README.
+
 **Every folder here is listed.**
 
 | folder | ticket | what is in it |

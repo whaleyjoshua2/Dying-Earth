@@ -6,18 +6,37 @@ The map is [Map: version 0.09.3](https://github.com/whaleyjoshua2/Dying-Earth/is
 pictures and batches that decided it are in
 [`docs/dev-diary/2026-09-26-version-0.09.3/`](../dev-diary/2026-09-26-version-0.09.3/).
 
-**What the version is.** Version 0.09.2 with the designer's list. The sections are written as the
-tickets close; the summary is written when the last one does.
+**What the version is.** Version 0.09.2 with the designer's list, most of it pointed off Earth.
+**The economy**: every stockpile figure carried to a tenth, where whole numbers floored a partial
+price or yield away (§2), and two defects from the list (§1). **The frontier**: Nuclear Rockets,
+a rung-2 Tech that cuts every transit by a fifth (§3); the first Colony on each Body easing Unrest
+everywhere (§4); Build Where You Dig reaching Ships built on the Moon, Phobos and Deimos (§11); a
+ground Colony with a working Refinery a depot for its low orbit (§12); and Trade Posts that pay by
+how far the Bodies held are from Earth (§13). **Unrest**: a Stadium that halves what the climate
+adds, so Unrest moves in quarters (§7), and its Report lines quieter again (§6). **The cards**: a
+Choice Card that reaches nobody put back and the reason it passed each seat said (§5); the Region
+card rearranged (§8); every place card saying its output and a Colony its founding date (§9);
+glyphs on the build hover, with a line's last figure fixed (§10); and the Attack on an armed Ship's
+own card, with a click on nothing giving way to the roster (§15). **The computer**: its appetite to
+take a rival's Colony grows with that Colony's size, the designer's counter to a player who founds
+one place and simply builds on it (§14).
 
 **What it did to the win column** (80 games, per Faction, at the shipped climate cell):
 
 | | 0.09.2 | 0.09.3 |
 |---|---|---|
-| Custodians | 2 | |
-| Prospectors | 5 | |
-| Arkwrights | 0 | |
-| Archivists | 11 | |
-| collapses | 62 | |
+| Custodians | 2 | 7 |
+| Prospectors | 5 | 5 |
+| Arkwrights | 0 | 1 |
+| Archivists | 11 | 7 |
+| collapses | 62 | 60 |
+
+The closing sweep is
+[`sweeps/final-0.09.3.txt`](../dev-diary/2026-09-26-version-0.09.3/sweeps/final-0.09.3.txt). Most
+of the move came with the tenths (§2): the first sweep after them read 5 / 6 / 1 / 9, collapses 59.
+The rest came in small steps, a ticket at a time, each sweep filed beside the closing one; the
+last ticket to move a figure was the bounty (§14), and the Attack on a Ship's card (§15) moved none,
+so the closing sweep is the bounty's line for line.
 
 ---
 
@@ -53,7 +72,7 @@ The authority is [ticket #387](https://github.com/whaleyjoshua2/Dying-Earth/issu
 the version's one change under everything else: every later figure is written on top of it.
 
 **The four resources are carried to a tenth**, and with them the Venture Capital Fund, a Ship's
-Fuel tank, last turn's income and every cost. A figure is settled to the nearest tenth whenever it
+Tank, last turn's income and every cost. A figure is settled to the nearest tenth whenever it
 is written, so a tenth is the finest step a stockpile ever moves in and no drift accumulates.
 
 **Nothing in the data changed, and nothing whole became partial.** A whole price, output or upkeep
@@ -102,7 +121,7 @@ up to sixty-day turns; Nuclear Rockets **cuts the days by a fifth before the rou
 Mars crossing at the window is four turns where it was five, and Venus at its window two where it
 was three. Measured over the game's thirty-six turns, it takes a turn off the Mars crossing on every
 turn (two on the worst), and off the Venus crossing on thirty-one of thirty-six. A one-turn hop
-inside a system stays one turn. **The Fuel of a leg is unchanged**, and a flight already under way
+inside a system stays one turn. **The Fuel of a leg is unchanged**, and a Transit already under way
 keeps its turns; the Tech reaches the next order. The Archivists' Provisional Findings read it at
 half, as they read every Tech. Like every Tech it is the whole table's once researched.
 
@@ -272,7 +291,7 @@ Materials a turn to keep* (*no rise held yet*; *unkept this turn, holding nothin
 the row's whole sentence is its hover. The separate *N Scrubbers here take …* note under Influence
 is gone, the rows saying it.
 
-**Their build buttons**: *Scrubber (2 of 3)*, the state's cap in the label where a sentence stood
+**Their build buttons**: *Scrubber (2 of 3)*, the Region's cap in the label where a sentence stood
 after it, and *Sea Wall*, each priced as every build button is with its Ducat price beside it. The
 resolution said "the *or* words go"; the *or* turned out to be the Ducat-price button every build
 button carries (*or 60 Ducats*), which the ticket's charting had misread as filler, so it stays on
