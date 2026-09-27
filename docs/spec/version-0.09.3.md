@@ -301,3 +301,33 @@ nothing**, and the hover says so. A place nobody directs shows no row.
 **The founding date.** Under a Colony's or station's name in its card's header, small: *Founded
 July 2032* on a ground Colony, *Built July 2032* on a station, since the glossary has a station
 built and a Colony founded; a starting station reads the game's first date. No date on a Region.
+
+## 10. Glyphs on the build hover
+
+The authority is [ticket #392](https://github.com/whaleyjoshua2/Dying-Earth/issues/392). No rule
+moves. The designer: *"mouseover when selecting a building to build needs to use glyphs for
+outputs."*
+
+**Already so, for every figure.** The build hover on a Region's, a Colony's and a station's build
+list is `{cost}. Once it stands: {yield}` plus the chain where a figure is multiplied, and every
+figure in it wears its glyph by the one rule the game has for glyphs (a word directly after a
+number): *20 [ore] 4 [cog], ready next turn here. Once it stands: +4 [cog], 2 [bolt] upkeep, 0.6
+[chimney]*. Every button on the three lists was pictured (the diary folder holds them) and none
+shows a resource figure as a word. **The sentences stay sentences** (Q3, A): a building that does
+rather than makes (the Launch Site, the Constabulary, the Stadium, the Habitat, the Shipyard, the
+Battery) is described in prose with its upkeep glyphed at the end, and the sentences are not
+rewritten to lead with figures.
+
+**Two words gain a glyph** (Q2, A): *Colonists* after a number, on a Habitat's *holds 4 Colonists*
+and a Trade Post's *(2 x 4 Colonists + 3 x 1 Bodies)*, wears the head Earth's population does, since
+a Colonist is a person; and the singular *Ducat* an Academy or Exchange pays (*pays 1 Ducat a turn*)
+wears the coin its plural does, which read as a word only for being one. *Bodies* stays a word: no
+glyph exists for a Body and one figure does not earn an icon. The glyph rule is unchanged: a word is
+traded for a glyph only where it follows a figure, so *Colonists* as a sentence's subject stays a
+word.
+
+**One defect the pictures found, fixed.** A figure's word at the end of a line drew as a word:
+a Mine's *0.6 Emissions*, a Solar Array's *+9 Energy* and a Generator's *+5.9 Energy* on a build
+hover with the chain under them, since the line break rode inside the word beside it and no word
+ending a line ever matched the glyph list. A line break is now a piece of its own, so the word
+before it is bare and takes its glyph, on every glyph line in the game.

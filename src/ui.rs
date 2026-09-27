@@ -4902,17 +4902,27 @@ fn rule_tip(response: egui::Response, text: String) -> egui::Response {
     // that word is shown WITHOUT a hover, so a headless picture can be taken of one. A tooltip is
     // otherwise unreachable in a shot: the window sits off-screen and no pointer ever enters it,
     // which would leave every tooltip in the game unlooked-at.
-    if let Some(word) = std::env::args().find_map(|a| a.strip_prefix("tip:").map(str::to_owned))
-        && text.contains(&word)
-    {
-        // Once a frame: a card of twelve build buttons all match "Ready", and twelve tooltips at
-        // once is a picture of nothing.
-        let pass = response.ctx.cumulative_pass_nr();
-        let fired: Option<u64> = response.ctx.data(|d| d.get_temp(egui::Id::new("tip_fired")));
-        if fired != Some(pass) {
-            response.ctx.data_mut(|d| d.insert_temp(egui::Id::new("tip_fired"), pass));
-            response.show_tooltip_ui(|ui| hover_with_icons(ui, &text));
-            return response;
+    // Ticket #392 (version 0.09.3): `tip:<word>#<k>` shows the k-th tooltip containing the word,
+    // so a build list whose every hover reads "Once it stands" can be pictured button by button.
+    if let Some(arg) = std::env::args().find_map(|a| a.strip_prefix("tip:").map(str::to_owned)) {
+        let (word, wanted) = match arg.rsplit_once('#') {
+            Some((w, k)) if k.parse::<u32>().is_ok() => (w.to_string(), k.parse::<u32>().unwrap_or(1)),
+            _ => (arg.clone(), 1),
+        };
+        if text.contains(&word) {
+            // Once a frame: a card of twelve build buttons all match "Ready", and twelve tooltips at
+            // once is a picture of nothing. The count of matches so far this frame rides with the
+            // frame number, so the k-th can be told from the first.
+            let pass = response.ctx.cumulative_pass_nr();
+            let (seen_pass, seen): (u64, u32) = response.ctx.data(|d| d.get_temp(egui::Id::new("tip_seen"))).unwrap_or((u64::MAX, 0));
+            let seen = if seen_pass == pass { seen } else { 0 };
+            let fired: Option<u64> = response.ctx.data(|d| d.get_temp(egui::Id::new("tip_fired")));
+            response.ctx.data_mut(|d| d.insert_temp(egui::Id::new("tip_seen"), (pass, seen + 1)));
+            if fired != Some(pass) && seen + 1 == wanted {
+                response.ctx.data_mut(|d| d.insert_temp(egui::Id::new("tip_fired"), pass));
+                response.show_tooltip_ui(|ui| hover_with_icons(ui, &text));
+                return response;
+            }
         }
     }
     // Ticket #380 (version 0.09.2): on BOTH states of the widget. egui's `on_hover_ui` opens only
@@ -5066,18 +5076,24 @@ fn hover_with_icons(ui: &mut Ui, text: &str) {
 /// resources and Influence are capitalised as defined terms; population and emissions are written
 /// in lower case mid-sentence, so both forms have to be looked for.
 /// Ticket #332 (version 0.09.0): and Widgets, the eleventh, so `8 Widgets` wears the cog.
-const ICON_WORDS: [(&str, &str); 11] = [
+/// Ticket #392 (version 0.09.3): and Colonists, who are people, so `4 Colonists` on a Habitat's or
+/// a Trade Post's hover wears the head Earth's population does; and the singular `1 Ducat` an
+/// Academy pays, which read as a word beside the `+6.8 Ducats` a Bank makes only for its number.
+const ICON_WORDS: [(&str, &str); 14] = [
     ("Materials", "materials"),
     ("Widgets", "widgets"),
     ("Fuel", "fuel"),
     ("Energy", "energy"),
     ("Research", "research"),
     ("Ducats", "ducats"),
+    ("Ducat", "ducats"),
     ("Population", "population"),
     ("Influence", "influence"),
     ("Emissions", "emissions"),
     ("population", "population"),
     ("emissions", "emissions"),
+    ("Colonists", "population"),
+    ("Colonist", "population"),
 ];
 
 /// Ticket #112 (version 0.07.1): a line of text with every figure's word traded for its glyph.
@@ -5111,13 +5127,54 @@ fn figures_with_icons(ui: &mut Ui, text: &str, size: f32, tint: Color32, extra: 
 /// old one. Ticket #116 then found the other half of the same fault: in prose where a resource is a
 /// sentence's SUBJECT, "Fuel goes on transits" came out as a jerrycan and a verb. The designer's
 /// answer was to narrow everything to the list rule, so there is now one rule and no flag.
+/// Ticket #392 (version 0.09.3): a glyph line's pieces -- its words, split on spaces, and its line
+/// breaks as pieces of their own, so a word at the end of a line is the bare word and can take its
+/// glyph. Before this a break rode inside the word beside it ("Emissions\n4") and no word ending a
+/// line ever matched.
+#[derive(Debug, PartialEq)]
+enum GlyphToken<'a> {
+    Word(&'a str),
+    Break,
+}
+
+fn glyph_tokens(text: &str) -> Vec<GlyphToken<'_>> {
+    let mut out = Vec::new();
+    for (i, line) in text.split('\n').enumerate() {
+        if i > 0 {
+            out.push(GlyphToken::Break);
+        }
+        out.extend(line.split(' ').map(GlyphToken::Word));
+    }
+    out
+}
+
+/// The rule's one decision, apart from the drawing, so a test can put a word to it: the glyph a
+/// bare word takes when it follows a figure (`after_figure`), or none. Ticket #392 (version 0.09.3).
+fn glyph_for<'a>(after_figure: bool, bare: &str, extra: &[(&str, &'a str)]) -> Option<&'a str> {
+    if !after_figure {
+        return None;
+    }
+    ICON_WORDS.iter().chain(extra.iter()).find(|(w, _)| *w == bare).map(|(_, key)| *key)
+}
+
 fn draw_with_icons(ui: &mut Ui, text: &str, size: f32, tint: Color32, extra: &[(&str, &str)]) -> egui::Response {
     // Ticket #116 (version 0.07.1): the row's own response comes back, so a caller can hang a
     // tooltip on a whole line of glyphs and figures.
     ui.horizontal_wrapped(|ui| {
         ui.spacing_mut().item_spacing.x = 3.0;
         let mut previous_was_a_figure = false;
-        for token in text.split(' ') {
+        for piece in glyph_tokens(text) {
+            let token = match piece {
+                GlyphToken::Word(w) => w,
+                // Ticket #392 (version 0.09.3): a line break in the text ends the row here, where
+                // before it rode inside the word beside it -- so "0.6 Emissions" at the end of a
+                // Mine's hover, with its chain under it, never matched "Emissions" and drew as a word.
+                GlyphToken::Break => {
+                    ui.end_row();
+                    previous_was_a_figure = false;
+                    continue;
+                }
+            };
             // Keep whatever punctuation rides on the word, so "30 Materials," still reads. Ticket
             // #132 (version 0.07.3): a closing bracket rides too, so "(44 Research)" on a Faction
             // card and "(a Colony Ship 25 Materials)" take their glyphs.
@@ -5129,12 +5186,7 @@ fn draw_with_icons(ui: &mut Ui, text: &str, size: f32, tint: Color32, extra: &[(
             // 9 of 30. Fuel goes on transits", where it would leave a jerrycan standing as the
             // subject of a verb.
             previous_was_a_figure = bare.ends_with(|c: char| c.is_ascii_digit()) && !token.ends_with(['.', ';', ':']);
-            match ICON_WORDS
-                .iter()
-                .chain(extra.iter())
-                .find(|(w, _)| allowed && *w == bare)
-                .and_then(|(_, key)| Icons::from_ctx(ui.ctx(), key, size))
-            {
+            match glyph_for(allowed, bare, extra).and_then(|key| Icons::from_ctx(ui.ctx(), key, size)) {
                 Some(image) => {
                     if tail.is_empty() {
                         ui.add(image);
@@ -11284,5 +11336,36 @@ mod tests {
         let further = tech_edge_path(from, to, gap_x, ROW, &[blocker, below]);
         assert!(!crosses(&further, blocker) && !crosses(&further, below), "both boxes cleared");
         assert_eq!(further.last(), Some(&to.left_center()));
+    }
+}
+
+#[cfg(test)]
+mod glyph_words {
+    use super::{glyph_for, glyph_tokens, GlyphToken};
+
+    /// Ticket #392 (version 0.09.3): the word ending a line is a bare word, so the Mine's `0.6
+    /// Emissions` above its chain takes the chimney. Red with the old split on spaces alone, which
+    /// gave `Emissions\n4` as one word.
+    #[test]
+    fn a_word_ending_a_line_is_bare_and_the_break_is_its_own_piece() {
+        use GlyphToken::*;
+        assert_eq!(glyph_tokens("2 upkeep, 0.6 Emissions\n4 base"), vec![Word("2"), Word("upkeep,"), Word("0.6"), Word("Emissions"), Break, Word("4"), Word("base")]);
+        assert_eq!(glyph_tokens("+6 Energy"), vec![Word("+6"), Word("Energy")]);
+    }
+
+    /// Ticket #392 (version 0.09.3): the words the build hover carries after a figure and the glyph
+    /// each takes. `4 Colonists` wears the head Earth's population does (Q2, A); the singular
+    /// `1 Ducat` an Academy pays wears the coin its plural does; `Bodies` stays a word; and no word
+    /// takes a glyph where it is not a figure's.
+    #[test]
+    fn colonists_and_a_single_ducat_take_their_glyphs_after_a_figure_and_bodies_stay_a_word() {
+        assert_eq!(glyph_for(true, "Colonists", &[]), Some("population"), "4 Colonists");
+        assert_eq!(glyph_for(true, "Colonist", &[]), Some("population"), "1 Colonist");
+        assert_eq!(glyph_for(true, "Ducat", &[]), Some("ducats"), "1 Ducat");
+        assert_eq!(glyph_for(true, "Ducats", &[]), Some("ducats"), "6.8 Ducats");
+        assert_eq!(glyph_for(true, "Bodies", &[]), None, "3 x 1 Bodies stays a word");
+        assert_eq!(glyph_for(false, "Colonists", &[]), None, "Colonists as a sentence's subject");
+        assert_eq!(glyph_for(true, "ppm", &[("ppm", "emissions")]), Some("emissions"), "the Blame block's extra word");
+        assert_eq!(glyph_for(true, "ppm", &[]), None, "and ppm nowhere else");
     }
 }

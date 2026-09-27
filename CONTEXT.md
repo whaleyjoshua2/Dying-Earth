@@ -381,7 +381,7 @@ The one Module that fights, since version 0.08.8, on a Colony or a Space Station
 _Avoid_: turret, gun, defence platform, orbital defence, fort
 
 **Colonist**:
-A person counted in the population of a Colony or Region. Since version 0.05.5 Colonists are built: they are recruited in a Region as Pioneers, are carried by Ships and held by Habitats, and are never spent as a resource. One Colonist is one unit of population -- one million people since version 0.09.0 (the designer: *"pop 1 per million"*), five million from version 0.07.3 until then -- and the top bar counts every Colonist living off Earth as the space population beside Earth's. The unit is `people_per_unit` in `climate.toml` since 0.09.0, a code constant before.
+A person counted in the population of a Colony or Region. Since version 0.05.5 Colonists are built: they are recruited in a Region as Pioneers, are carried by Ships and held by Habitats, and are never spent as a resource. One Colonist is one unit of population -- one million people since version 0.09.0 (the designer: *"pop 1 per million"*), five million from version 0.07.3 until then -- and the top bar counts every Colonist living off Earth as the space population beside Earth's. The unit is `people_per_unit` in `climate.toml` since 0.09.0, a code constant before. Since version 0.09.3 a count of Colonists after a figure (*holds 4 Colonists*) wears the same head glyph population does.
 _Avoid_: settler, crew, worker, population resource
 
 **Pioneer**:
