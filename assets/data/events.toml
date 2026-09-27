@@ -94,7 +94,7 @@ id = "launch_pad_fire"
 name = "Launch Pad Fire"
 kind = "failure"
 target = "nation_state_with_launch_site"
-effect = "Its Launch Site is offline until the next Resolution; any Ship due there this turn completes next turn instead"
+effect = "Its Launch Site is offline until the next Resolution, so nothing lifts to orbit from there, and the Region loses the turn's Widgets"
 blunted_by = "clean_propellant"
 copies = 1
 

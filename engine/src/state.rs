@@ -868,8 +868,8 @@ pub struct SeatState {
     pub kind: FactionKind,
     pub ai: bool,
     pub stockpile: Stockpile,
-    /// Ticket #72 (version 0.05.5): Materials banked in the Venture Capital Fund (the Prospectors'
-    /// first Victory part), the share of Materials output banked each Income, and what last
+    /// Ticket #72 (version 0.05.5): Ducats banked in the Venture Capital Fund (the Prospectors'
+    /// first Victory part), the share of Ducat income banked each Income, and what last
     /// Income banked. The running Extraction Total this replaces is retired.
     #[serde(default)]
     pub venture_fund: i64,

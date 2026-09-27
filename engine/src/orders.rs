@@ -173,10 +173,10 @@ pub enum Order {
     /// emigrates from earths surface directly to stations that it orbits - similar to the
     /// Antarctica is handled."*
     LiftToStation { state: StateId, n: u32, colony: ColonyId },
-    /// Version 0.05.5 (ticket #72): the Prospectors set the share of their Materials output the
+    /// Version 0.05.5 (ticket #72): the Prospectors set the share of their Ducat income the
     /// Venture Capital Fund banks each Income, in whole percent (a step of 10, 0 to 80).
     SetVentureShare { share: u32 },
-    /// Version 0.05.5 (ticket #72): the Prospectors take Materials back out of the Fund, nine
+    /// Version 0.05.5 (ticket #72): the Prospectors take Ducats back out of the Fund, nine
     /// tenths of them returning to the Stockpile.
     DrawVenture { amount: i64 },
     /// Version 0.05 (ticket #52): Relief. Ducats spent on a Nation State you direct, lowering its

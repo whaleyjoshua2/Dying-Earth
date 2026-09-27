@@ -13536,6 +13536,28 @@ fn the_turn_will_not_end_while_a_human_seat_owes_this_turns_card_an_answer() {
     assert!(s.end_turn_refusal().is_none(), "every seat is an AI here");
 }
 
+/// Ticket #386 (version 0.09.3): **End Turn's refusal names everything owed at once.** It used to
+/// stop at the first thing found, the card before the Tech, so a player fixed the card and only
+/// then discovered the Tech. Now one message carries both, one line each, and clears only when
+/// both are paid.
+#[test]
+fn the_refusal_names_everything_owed_at_once() {
+    let mut g = game();
+    assert_eq!(g.research.awaiting_pick, Some(Seat(0)), "the first Tech of the game is seat 0's to pick");
+    ask_the_card(&mut g, EventId::SalvageRights);
+    let why = g.end_turn_refusal().expect("a card and a Tech are owed, so the turn is refused");
+    assert!(why.contains("Salvage Rights"), "the one message names the card: {why}");
+    assert!(why.contains("Research Lead"), "and the Tech: {why}");
+    assert!(why.starts_with("Two things"), "and says there are two: {why}");
+    assert_eq!(g.end_turn(std::array::from_fn(|_| Vec::new())), Err(why), "the turn refuses with the same words");
+    // Paying one leaves the other, named alone.
+    g.answer_card(Seat(0), true).expect("the offer can be taken");
+    let why = g.end_turn_refusal().expect("the Tech is still owed");
+    assert!(why.contains("Research Lead") && !why.contains("Salvage Rights") && !why.starts_with("Two things"), "{why}");
+    pick_a_tech(&mut g);
+    assert!(g.end_turn_refusal().is_none(), "both paid, the turn may end");
+}
+
 /// Ticket #337 R3: **the two sides are lists of effects composed in data, and every figure is a
 /// field of `events.toml`.** The Hard Winter is read out of the table and both answers are played
 /// on identical boards: the spec is wrong if two seats answering the same card differently produce

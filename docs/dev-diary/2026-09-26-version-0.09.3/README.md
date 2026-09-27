@@ -1,0 +1,18 @@
+# 2026-09-26: version 0.09.3, the frontier version
+
+The dev diary for version 0.09.3, charted as wayfinder map
+[#385](https://github.com/whaleyjoshua2/Dying-Earth/issues/385). As 0.09.2's, this folder is a record
+of the **build**: one folder per ticket, written as each was resolved, holding the pictures,
+specifications and measurements that decided it. The rules as decided are in
+[`docs/spec/version-0.09.3.md`](../../spec/version-0.09.3.md), a section per ticket.
+
+The baseline every sweep here is read against is 0.09.2's closing sweep,
+[`../2026-09-25-version-0.09.2/sweeps/final-0.09.2.txt`](../2026-09-25-version-0.09.2/sweeps/final-0.09.2.txt):
+**2 / 5 / 0 / 11**, collapses 62 of 80. Read the per-Faction totals at the foot of a sweep file,
+never the per-seating arrays.
+
+**Every folder here is listed.**
+
+| folder | ticket | what is in it |
+|---|---|---|
+| [`ticket-386-defects/`](ticket-386-defects/README.md) | [Defects from the list, and the Tech tree audit](https://github.com/whaleyjoshua2/Dying-Earth/issues/386) | The fund's lines to Ducats, End Turn's refusal naming both things owed (pictured on the sun's hover), the audit's finding, and the red witness. |

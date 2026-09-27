@@ -125,26 +125,41 @@ impl Game {
     /// Ticket #337 (version 0.09.0): and while a human seat owes this turn's choice card an answer,
     /// in the same shape and through the same door, so the interface needs no new mechanism for it.
     /// A computer seat never appears here: it answers when its orders are computed.
+    ///
+    /// Ticket #386 (version 0.09.3): everything owed is named at once, one line each. It used to
+    /// stop at the first thing found, so a player answered the card and only then learned of the
+    /// Tech, or, in the driver, the reverse.
     pub fn end_turn_refusal(&self) -> Option<String> {
+        let mut owed: Vec<String> = Vec::new();
         if let Some(q) = self.pending_question() {
             for seat in Seat::ALL {
                 if !self.seat(seat).ai && q.answer_of(seat).is_none() {
-                    return Some(format!(
-                        "{} is asking the {} a question, and it has not been answered. Take the offer or refuse it; the turn cannot end until you do.",
+                    owed.push(format!(
+                        "{} is asking the {} a question, and it has not been answered. Take the offer or refuse it.",
                         self.tables.event(q.card).name,
                         self.seat_name(seat)
                     ));
                 }
             }
         }
-        let owed = self.research.awaiting_pick?;
-        if self.seat(owed).ai || self.available_techs().is_empty() {
-            return None;
+        if let Some(lead) = self.research.awaiting_pick
+            && !self.seat(lead).ai
+            && !self.available_techs().is_empty()
+        {
+            owed.push(format!(
+                "The {} hold the Research Lead and owe the table a Tech. Choose what the world researches next.",
+                self.seat_name(lead)
+            ));
         }
-        Some(format!(
-            "The {} hold the Research Lead and owe the table a Tech. Choose what the world researches next; the turn cannot end until you do.",
-            self.seat_name(owed)
-        ))
+        match owed.len() {
+            0 => None,
+            1 => Some(format!("{} The turn cannot end until you do.", owed[0])),
+            n => Some(format!(
+                "{} things before the turn can end:\n{}",
+                match n { 2 => "Two", 3 => "Three", 4 => "Four", _ => "Several" },
+                owed.iter().map(|line| format!("- {line}")).collect::<Vec<_>>().join("\n")
+            )),
+        }
     }
 
     /// End Turn: the player's orders are committed, the AI orders, and the turn runs to the next Orders phase.

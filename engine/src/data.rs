@@ -703,7 +703,7 @@ fn one_f64() -> f64 {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum VictoryFirstKind {
-    /// Ticket #72 (version 0.05.5): Materials banked in the Prospectors' Venture Capital Fund; the
+    /// Ticket #72 (version 0.05.5): Ducats banked in the Prospectors' Venture Capital Fund; the
     /// running Extraction Total it replaces is retired.
     VentureFund,
     StabilizationRun,
@@ -1213,7 +1213,7 @@ pub struct AiMultipliers {
     pub energy_shortage_bonus: f64,
     /// Ticket #181 (version 0.08.0): the slight bias a seat gets toward its own Unique Facility.
     pub unique_bias: f64,
-    /// Ticket #182: what one Material in the Venture Capital Fund adds to the Prospectors' appetite
+    /// Ticket #182: what one Ducat in the Venture Capital Fund adds to the Prospectors' appetite
     /// for an Investment Bank, since the building's worth is a share of that balance.
     pub investment_bank_per_fund: f64,
     /// Ticket #209 (version 0.08.1): what the Archivists' appetite for the whole off-Earth chain --

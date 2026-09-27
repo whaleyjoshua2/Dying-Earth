@@ -1038,18 +1038,24 @@ fn print_board(g: &Game) {
     // Ticket #173 (version 0.07.6): a pick made this turn is not locked in until the turn ends, so
     // the board says the choice is open rather than owed, and a second `tech` line in the same turn
     // is now accepted where it used to be refused. The driver and the game have to agree.
-    let owed = (g.research.awaiting_pick == Some(me) || g.research.current.is_none()) && !g.available_techs().is_empty();
+    // Ticket #386 (version 0.09.3): "MUST" is the engine's word, not the driver's. Only a pick the
+    // engine's End Turn refuses without is owed; a tree with nothing chosen is open, not owed, and
+    // the banner says which, so the driver and the refusal never disagree.
+    let must = g.research.awaiting_pick == Some(me) && !g.available_techs().is_empty();
+    let open = !must && g.research.current.is_none() && !g.available_techs().is_empty();
     let changeable = g.research.current.is_some() && !g.research.pick_committed;
-    if owed || changeable {
+    if must || open || changeable {
         let drawn = !g.research.shortlist.is_empty();
         if changeable {
             let name = g.research.current.map(|x| t.tech(x).name.clone()).unwrap_or_default();
             println!("  *** {name} IS CHOSEN FOR THIS TURN, and not locked in until the turn ends. Another `tech <name>` line changes it. ***");
-        } else {
+        } else if must {
             println!(
-                "  *** YOU MUST PICK THE NEXT TECH (a `tech <name>` line). {} ***",
+                "  *** YOU MUST PICK THE NEXT TECH (a `tech <name>` line); the turn cannot end until you do. {} ***",
                 if drawn { "The Research Lead's shortlist:" } else { "A free choice of everything available:" }
             );
+        } else {
+            println!("  *** A TECH IS OPEN TO PICK (a `tech <name>` line); the turn can end without it. Everything available: ***");
         }
         for x in g.pickable_techs() {
             let c = t.tech(x);
@@ -1059,7 +1065,7 @@ fn print_board(g: &Game) {
     println!("  {}", g.research_lead_text());
     if s.kind == FactionKind::Prospectors {
         println!(
-            "Venture Capital Fund: {} Materials, banking {:.0}% of output ({} banked last turn)",
+            "Venture Capital Fund: {} Ducats, banking {:.0}% of Ducat income ({} banked last turn)",
             s.venture_fund,
             s.venture_share * 100.0,
             s.venture_banked_last_turn
@@ -1452,9 +1458,14 @@ fn main() {
             // Ticket #337 (version 0.09.0): the turn's question holds End Turn. The engine refuses
             // in its own words; this says which card is asking and what line answers it, because a
             // line is the only door the driver has and a raw refusal names none.
-            let owed = owed_answer(&game);
+            // Ticket #386 (version 0.09.3): the engine's refusal, which names everything owed at
+            // once, is what is printed; the driver adds only the line that answers a card.
+            let owed = game.end_turn_refusal();
             if let Some(why) = &owed {
                 println!("\nSTILL OWED: {why}");
+                if let Some(how) = owed_answer(&game) {
+                    println!("  {how}");
+                }
             }
             if command == "check" {
                 return;

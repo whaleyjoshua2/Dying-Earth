@@ -886,7 +886,7 @@ fn build_board(session: &mut Session) {
             // same pass, so `menus:1` can photograph it under the Ships heading.
             g.report_waiting_colonists();
         }
-        // `venture:<n>` (a building aid, ticket #72): seat 0 as the Prospectors holds n Materials in
+        // `venture:<n>` (a building aid, ticket #72): seat 0 as the Prospectors holds n Ducats in
         // the Venture Capital Fund and banks half its output.
         if let Some(n) = std::env::args().find_map(|a| a.strip_prefix("venture:").and_then(|v| v.parse::<i64>().ok()))
             && g.kind(Seat(0)) == FactionKind::Prospectors
