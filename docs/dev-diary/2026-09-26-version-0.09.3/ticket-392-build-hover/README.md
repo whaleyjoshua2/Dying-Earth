@@ -21,7 +21,7 @@ make, and two figures with no glyph, *Colonists* and *Bodies*.
 | [`before-constabulary.png`](before-constabulary.png) | five lines of sentence, *2 [bolt] upkeep* at the end |
 | [`before-launch-site.png`](before-launch-site.png) | four lines of sentence, *2 [bolt] upkeep* at the end |
 | [`before-trade-post.png`](before-trade-post.png) | *+16 [coin], (2 x 8 Colonists + 3 x 0 Bodies), 2 [bolt] upkeep*: two figures as words |
-| [`before-mine-tile.png`](before-mine-tile.png) | a standing Mine's tile hover with its chain: *4 base, × 1.50 as this Region leans Materials, = 6* |
+| [`before-mine-tile.png`](before-mine-tile.png) | a standing Mine's tile hover with its chain: *4 base, × 1.50 as this Region leans Materials, = 6*; its *0.6 Emissions* above the chain is a word, the defect below, which the same drawer fixes on the tiles too |
 
 ## What was built
 
@@ -49,7 +49,7 @@ on Coastal Engineering, so it is not offered on turn 1).
 
 ![Every build hover on a Region's list](after-region-list.png)
 
-**A station's list**, `seed:7 turns:6 hab:1 habtile:free`: seven of nine, the Observatory greyed
+**A station's list**, `seed:7 turns:6 hab:1 habtile:free`: seven of eight, the Observatory greyed
 (one is under way) with its hover the refusal alone, since its five-line chain would not fit under
 it within the six-line ceiling.
 
@@ -69,3 +69,14 @@ them; `a_word_ending_a_line_is_bare_and_the_break_is_its_own_piece` against the 
 whose red is the three pictures above as first taken. The suite is 529 in the engine, 11 and 6 in
 the root crate; the clippy gate `cargo clippy --workspace --release --all-targets -- -D warnings`
 is clean. No rule moved; no sweep.
+
+## The review
+
+The standards review found the `tip:` aid parsed in three places with the new `#k` grammar in one,
+now one parser (`tip_aid`) and one once-a-pass counter (`tip_fires`) for all three; and that two
+row ends in a row, a refusal's blank line before its description, would collapse to the row
+spacing: an empty line now keeps a line's height, the greyed Shipyard's hover re-taken to show it.
+The spec review counted the station's list at eight, not nine as first written here, and found the
+glossary's *Figure* entry still naming eight figures without Widgets or Colonists, now amended. It
+also flagged the singular *Ducat* as a glyph decision the resolution names but the designer's Q2
+answer did not: it stays, and the closing report says so.

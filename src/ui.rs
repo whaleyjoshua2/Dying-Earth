@@ -4897,33 +4897,43 @@ const CHANGE_BUTTONS_WIDTH: f32 = 196.0;
 /// **A tooltip may run to a short list and no further.** Six lines is the ceiling; the Income
 /// breakdown is about that long and still works. Anything longer covers the thing it explains, which
 /// makes it a worse tooltip than none, and belongs on the card.
+/// `tip:<word>` or `tip:<word>#<k>` (a building aid, not part of the spec): the word a tooltip's
+/// text must contain to be forced open in a headless picture, and which match to open, the first
+/// unless a `#k` says otherwise. Ticket #392 (version 0.09.3): one parser for the three places
+/// that read the aid, where each had its own and the `#k` grammar reached only one of them.
+fn tip_aid() -> Option<(String, u32)> {
+    let arg = std::env::args().find_map(|a| a.strip_prefix("tip:").map(str::to_owned))?;
+    Some(match arg.rsplit_once('#').and_then(|(w, k)| k.parse::<u32>().ok().map(|k| (w.to_string(), k))) {
+        Some(parsed) => parsed,
+        None => (arg, 1),
+    })
+}
+
+/// Whether this tooltip is the one the `tip:` aid forces open on this pass: its text contains the
+/// word, and it is the k-th such tooltip drawn this pass. The count rides with the pass number, so
+/// a card of twelve build buttons all reading "Once it stands" opens exactly one of them, and the
+/// `#k` picks which; egui's sizing pass has a pass number of its own, so it counts afresh.
+fn tip_fires(ctx: &egui::Context, text: &str) -> bool {
+    let Some((word, wanted)) = tip_aid() else { return false };
+    if !text.contains(&word) {
+        return false;
+    }
+    let pass = ctx.cumulative_pass_nr();
+    let (seen_pass, seen): (u64, u32) = ctx.data(|d| d.get_temp(egui::Id::new("tip_seen"))).unwrap_or((u64::MAX, 0));
+    let seen = if seen_pass == pass { seen } else { 0 };
+    ctx.data_mut(|d| d.insert_temp(egui::Id::new("tip_seen"), (pass, seen + 1)));
+    seen + 1 == wanted
+}
+
 fn rule_tip(response: egui::Response, text: String) -> egui::Response {
-    // `tip:<word>` (a building aid, not part of the spec): the first tooltip whose text contains
-    // that word is shown WITHOUT a hover, so a headless picture can be taken of one. A tooltip is
+    // `tip:<word>` (a building aid, not part of the spec): the tooltip whose text contains that
+    // word is shown WITHOUT a hover, so a headless picture can be taken of one. A tooltip is
     // otherwise unreachable in a shot: the window sits off-screen and no pointer ever enters it,
-    // which would leave every tooltip in the game unlooked-at.
-    // Ticket #392 (version 0.09.3): `tip:<word>#<k>` shows the k-th tooltip containing the word,
-    // so a build list whose every hover reads "Once it stands" can be pictured button by button.
-    if let Some(arg) = std::env::args().find_map(|a| a.strip_prefix("tip:").map(str::to_owned)) {
-        let (word, wanted) = match arg.rsplit_once('#') {
-            Some((w, k)) if k.parse::<u32>().is_ok() => (w.to_string(), k.parse::<u32>().unwrap_or(1)),
-            _ => (arg.clone(), 1),
-        };
-        if text.contains(&word) {
-            // Once a frame: a card of twelve build buttons all match "Ready", and twelve tooltips at
-            // once is a picture of nothing. The count of matches so far this frame rides with the
-            // frame number, so the k-th can be told from the first.
-            let pass = response.ctx.cumulative_pass_nr();
-            let (seen_pass, seen): (u64, u32) = response.ctx.data(|d| d.get_temp(egui::Id::new("tip_seen"))).unwrap_or((u64::MAX, 0));
-            let seen = if seen_pass == pass { seen } else { 0 };
-            let fired: Option<u64> = response.ctx.data(|d| d.get_temp(egui::Id::new("tip_fired")));
-            response.ctx.data_mut(|d| d.insert_temp(egui::Id::new("tip_seen"), (pass, seen + 1)));
-            if fired != Some(pass) && seen + 1 == wanted {
-                response.ctx.data_mut(|d| d.insert_temp(egui::Id::new("tip_fired"), pass));
-                response.show_tooltip_ui(|ui| hover_with_icons(ui, &text));
-                return response;
-            }
-        }
+    // which would leave every tooltip in the game unlooked-at. Ticket #392 (version 0.09.3): the
+    // k-th match, through `tip_fires`, so a build list can be pictured button by button.
+    if tip_fires(&response.ctx, &text) {
+        response.show_tooltip_ui(|ui| hover_with_icons(ui, &text));
+        return response;
     }
     // Ticket #380 (version 0.09.2): on BOTH states of the widget. egui's `on_hover_ui` opens only
     // on an enabled widget and `on_disabled_hover_ui` only on a greyed one, and from ticket #238
@@ -4956,23 +4966,16 @@ fn hover_lines_estimate(text: &str) -> usize {
 /// passes through the function above. The reason a greyed End Turn gives is exactly the kind of
 /// thing that has to be photographed, and headless nothing hovers.
 fn forced_tip(text: &str) -> bool {
-    std::env::args().find_map(|a| a.strip_prefix("tip:").map(str::to_owned)).map(|word| text.contains(&word)).unwrap_or(false)
+    tip_aid().is_some_and(|(word, _)| text.contains(&word))
 }
 
 /// Ticket #153 (version 0.07.4): `rule_tip` for a tooltip that DRAWS rather than says -- the
 /// Emissions history. `word` is what the `tip:` aid matches against, so the hover can be
 /// photographed headlessly like any other; the same once-a-frame guard applies.
 fn rule_tip_ui(response: egui::Response, word: &str, add: impl Fn(&mut Ui)) -> egui::Response {
-    if let Some(wanted) = std::env::args().find_map(|a| a.strip_prefix("tip:").map(str::to_owned))
-        && word.contains(&wanted)
-    {
-        let pass = response.ctx.cumulative_pass_nr();
-        let fired: Option<u64> = response.ctx.data(|d| d.get_temp(egui::Id::new("tip_fired")));
-        if fired != Some(pass) {
-            response.ctx.data_mut(|d| d.insert_temp(egui::Id::new("tip_fired"), pass));
-            response.show_tooltip_ui(|ui| add(ui));
-            return response;
-        }
+    if tip_fires(&response.ctx, word) {
+        response.show_tooltip_ui(|ui| add(ui));
+        return response;
     }
     response.on_hover_ui(|ui| add(ui))
 }
@@ -5072,7 +5075,7 @@ fn hover_with_icons(ui: &mut Ui, text: &str) {
     text_with_icons(ui, text, 14.0, Color32::from_rgb(225, 220, 210));
 }
 
-/// The eight figures that have a glyph, in both the spellings the game's prose uses. The five
+/// The figures that have a glyph (eight when this was written), in both the spellings the game's prose uses. The five
 /// resources and Influence are capitalised as defined terms; population and emissions are written
 /// in lower case mid-sentence, so both forms have to be looked for.
 /// Ticket #332 (version 0.09.0): and Widgets, the eleventh, so `8 Widgets` wears the cog.
@@ -5165,6 +5168,12 @@ fn draw_with_icons(ui: &mut Ui, text: &str, size: f32, tint: Color32, extra: &[(
         let mut previous_was_a_figure = false;
         for piece in glyph_tokens(text) {
             let token = match piece {
+                // The review's fix-up: an empty line -- a refusal's blank line before its description --
+                // keeps a line's height, where two bare row ends would leave only the row spacing.
+                GlyphToken::Word("") => {
+                    ui.label(" ");
+                    continue;
+                }
                 GlyphToken::Word(w) => w,
                 // Ticket #392 (version 0.09.3): a line break in the text ends the row here, where
                 // before it rode inside the word beside it -- so "0.6 Emissions" at the end of a

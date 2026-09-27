@@ -211,7 +211,7 @@ Retired in version 0.07.5; see Module. It was the window, from version 0.07.3, t
 _Avoid_: using it for the tiles on a Colony's card, which have no name of their own; module window, colony screen, base view, habitat panel
 
 **Figure**:
-One of the eight things the board counts and draws a glyph for: Materials, Fuel, Energy, Research, Ducats, population, Influence and Emissions. A figure's glyph carries one fill wherever it is drawn, decided by which figure it is and never by the colour of the text around it, and a word is traded for its glyph only where it names a figure -- which is to say only directly after a number, or, since version 0.07.3, where it heads a multiplier (`[research] x1.25` on a Faction card, `leans [materials]` on the start globe), with the phrase the glyph replaced on its hover.
+One of the things the board counts and draws a glyph for: Materials, Widgets (since version 0.09.0), Fuel, Energy, Research, Ducats, population (and, since version 0.09.3, a count of Colonists, who wear the same head), Influence and Emissions. A figure's glyph carries one fill wherever it is drawn, decided by which figure it is and never by the colour of the text around it, and a word is traded for its glyph only where it names a figure -- which is to say only directly after a number, or, since version 0.07.3, where it heads a multiplier (`[research] x1.25` on a Faction card, `leans [materials]` on the start globe), with the phrase the glyph replaced on its hover.
 _Avoid_: stat, counter, metric, indicator
 
 **Roster**:
