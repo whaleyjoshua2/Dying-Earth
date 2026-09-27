@@ -20,13 +20,38 @@
 use dying_earth_engine::data::BreakEffect;
 use dying_earth_engine::data::{default_data_dir, Tables};
 use dying_earth_engine::ids::{BodyId, FactionKind, Seat, StateId};
-use dying_earth_engine::state::Outcome;
+use dying_earth_engine::state::{figure, tenth, Outcome};
 use std::sync::Arc;
 
 fn list(flag: &str, default: &[f64]) -> Vec<f64> {
     std::env::args()
         .find_map(|a| a.strip_prefix(flag).map(|s| s.split(',').filter_map(|x| x.parse().ok()).collect::<Vec<f64>>()))
         .unwrap_or_else(|| default.to_vec())
+}
+
+/// Version 0.09.3, at the designer's word: the worlds settled at the end of a batch of games. Ground
+/// Colonies and stations by Body over the batch, the median ground Colonies off Earth a game, and
+/// for each Body the games whose first ground Colony there stood at the end with the median turn it
+/// was founded -- the pace of settlement, which "first Colony" (Antarctica, by sea) never gave.
+fn off_earth_line(tables: &Tables, ground: &[u32; 6], stations: &[u32; 6], first: &mut [Vec<u32>; 6], per_game: &mut [u32], games: u64) -> String {
+    let name = |b: BodyId| tables.body(b).name.clone();
+    let bodies: Vec<BodyId> = BodyId::ALL.into_iter().filter(|b| *b != BodyId::Earth).collect();
+    let ground_s: Vec<String> = bodies.iter().map(|b| format!("{} {}", name(*b), ground[b.index()])).collect();
+    let stations_s: Vec<String> = bodies.iter().map(|b| format!("{} {}", name(*b), stations[b.index()])).collect();
+    let first_s: Vec<String> = bodies
+        .iter()
+        .map(|b| {
+            let v = &mut first[b.index()];
+            format!("{} in {}/{games} (median turn {})", name(*b), v.len(), median_u(v))
+        })
+        .collect();
+    format!(
+        "Off Earth at the end over the batch: ground Colonies {} (median {} a game); stations {}; first ground Colony founded: {}",
+        ground_s.join(", "),
+        median_u(per_game),
+        stations_s.join(", "),
+        first_s.join("; ")
+    )
 }
 
 fn median_u(v: &mut [u32]) -> String {
@@ -72,6 +97,11 @@ fn main() {
     // Ticket #343 (version 0.09.1): the nuke's counters across every seating, so the closing
     // review has ONE total to quote rather than four blocks to add up by hand.
     let mut all_warc = dying_earth_engine::state::WarCounters::default();
+    // Version 0.09.3: off Earth at the end, by Body, over every seating.
+    let mut all_ground_by_body = [0u32; 6];
+    let mut all_stations_by_body = [0u32; 6];
+    let mut all_first_by_body: [Vec<u32>; 6] = Default::default();
+    let mut all_ground_off_earth_per_game: Vec<u32> = Vec::new();
     // Ticket #355 (version 0.09.1): the orbital war PER FACTION across every seating, and the games
     // each act happened in at all, which is the bar that ticket is judged by. Per Faction, not per
     // seat, for ticket #348's reason: seat 0 is a different Faction in each seating.
@@ -109,6 +139,8 @@ fn main() {
                         let mut wins = [0u32; 4];
                         // Ticket #60: the balance counters, for the one-cell runs of the balance report.
                         let (mut draws, mut scrubbers, mut leapfrogs, mut constabularies, mut sea_walls) = (0u32, 0u32, 0u32, 0u32, 0u32);
+                        // Ticket #389 (version 0.09.3): Stadiums, beside the Constabularies they follow.
+                        let mut stadiums = 0u32;
                         let (mut first_colony, mut off_earth, mut techs) = (Vec::new(), Vec::new(), Vec::new());
                         let mut breaks_fired = vec![0u32; tables.climate.breaks.len()];
                         let mut highest_rung = 0u32;
@@ -179,7 +211,7 @@ fn main() {
                         let mut lost_in_transit = [0i64; 4];
                         // Ticket #87: stranded Ships at the end, Refuel orders and stations off Earth.
                         let mut stranded = [0u32; 4];
-                        let (mut refuels, mut partner_refuels, mut stations_off_earth) = (0u32, 0u32, 0u32);
+                        let (mut refuels, mut partner_refuels, mut colony_refuels, mut stations_off_earth) = (0u32, 0u32, 0u32, 0u32);
                         // Ticket #290 (version 0.08.6): Modules beyond the Core on a starting
                         // station at the end of turn three, per seat, summed over the batch.
                         let mut opening_modules = [0u32; 4];
@@ -204,6 +236,12 @@ fn main() {
                         let (mut mass_drivers, mut martian_moon_colonies) = (0u32, 0u32);
                         // Ticket #93: stations at Venus at the end, and Colonists living there.
                         let (mut venus_stations, mut venus_colonists) = (0u32, 0u32);
+                        // Version 0.09.3: off Earth at the end, by Body -- ground Colonies, stations,
+                        // and the turn each Body's first ground Colony was founded, over the batch.
+                        let mut ground_by_body = [0u32; 6];
+                        let mut stations_by_body = [0u32; 6];
+                        let mut first_by_body: [Vec<u32>; 6] = Default::default();
+                        let mut ground_off_earth_per_game: Vec<u32> = Vec::new();
                         // Ticket #75: seat 0's start state.
                         let mut home_lost = Vec::new();
                         for seed in 1..=seeds {
@@ -243,6 +281,7 @@ fn main() {
                             scrubbers += r.scrubbers;
                             leapfrogs += r.leapfrogs;
                             constabularies += r.constabularies;
+                            stadiums += r.stadiums;
                             sea_walls += r.sea_walls_built;
                             if let Some(t) = r.first_colony_turn {
                                 first_colony.push(t);
@@ -267,6 +306,7 @@ fn main() {
                             queue_depths.push(r.queue_depth_median);
                             refuels += r.refuels;
                             partner_refuels += r.partner_refuels;
+                            colony_refuels += r.colony_refuels;
                             stations_off_earth += r.stations_off_earth;
                             for (i, n) in opening_modules.iter_mut().enumerate() {
                                 *n += r.opening_modules[i];
@@ -275,11 +315,11 @@ fn main() {
                             ground_modules += r.ground_modules;
                             ground_colonies += r.ground_colonies;
                             solar_arrays += r.solar_arrays;
-                            d_made.push(r.ducats_made);
-                            m_made.push(r.materials_made);
+                            d_made.push(r.ducats_made.map(|v| v.round() as i64));
+                            m_made.push(r.materials_made.map(|v| v.round() as i64));
                             mines_done += r.mines_completed;
                             factories_done += r.factories_completed;
-                            d_spent.push(r.ducats_spent);
+                            d_spent.push(r.ducats_spent.map(|v| v.round() as i64));
                             d_mean.push(r.directive_mean);
                             ex_calls += r.exodus_calls;
                             ex_pioneers += r.exodus_pioneers;
@@ -294,6 +334,18 @@ fn main() {
                             martian_moon_colonies += r.martian_moon_colonies;
                             venus_stations += r.venus_stations;
                             venus_colonists += r.venus_colonists;
+                            for b in 0..6 {
+                                ground_by_body[b] += r.ground_colonies_by_body[b];
+                                stations_by_body[b] += r.stations_by_body[b];
+                                all_ground_by_body[b] += r.ground_colonies_by_body[b];
+                                all_stations_by_body[b] += r.stations_by_body[b];
+                                if let Some(t) = r.first_ground_colony_turn_by_body[b] {
+                                    first_by_body[b].push(t);
+                                    all_first_by_body[b].push(t);
+                                }
+                            }
+                            ground_off_earth_per_game.push(r.ground_colonies_by_body.iter().sum());
+                            all_ground_off_earth_per_game.push(r.ground_colonies_by_body.iter().sum());
                             if let Some(t) = r.first_mars_colony_turn {
                                 mars_turns.push(t);
                             }
@@ -310,8 +362,8 @@ fn main() {
                             slots_lost.push(r.coastal_slots_lost);
                             drowned.push(r.facilities_drowned);
                             converted.push(r.slots_converted);
-                            venture.push(r.venture_fund_at_end.max(0) as u32);
-                            if r.venture_fund_at_end as f64 >= base.faction(FactionKind::Prospectors).victory_first.bar {
+                            venture.push(r.venture_fund_at_end.max(0.0).round() as u32);
+                            if r.venture_fund_at_end >= base.faction(FactionKind::Prospectors).victory_first.bar {
                                 fund_met += 1;
                             }
                             walls_standing += r.sea_walls_standing;
@@ -401,7 +453,7 @@ fn main() {
                             println!("      draws {draws}, collapses {}/{seeds}, median collapse turn {median}", turns.len());
                             println!("      median turn of first Colony {}", median_u(&mut first_colony));
                             println!("      median Colonists off Earth at the end, all seats {}", median_u(&mut off_earth));
-                            println!("      Scrubbers {scrubbers}, Leapfrogs {leapfrogs}, Constabularies {constabularies}, Sea Walls {sea_walls}");
+                            println!("      Scrubbers {scrubbers}, Leapfrogs {leapfrogs}, Constabularies {constabularies}, Stadiums {stadiums}, Sea Walls {sea_walls}");
                             println!("      Techs: median {} completed, highest rung reached {highest_rung}", median_u(&mut techs));
                             println!(
                                 "      Observatories standing at the end, all seeds, by seat {observatories:?}; median Research made off Earth a game, by seat {:?}",
@@ -425,7 +477,7 @@ fn main() {
                                 gate_turns.iter_mut().map(|v| median_u(v)).collect::<Vec<_>>()
                             );
                             println!("      Crowded ships: Colonists lost in transit over the batch, by seat {lost_in_transit:?}");
-                            println!("      Tanks: Ships stranded at the end over the batch, by seat {stranded:?}; {refuels} Refuel orders ({partner_refuels} at a partner's station); {stations_off_earth} stations standing off Earth at the end");
+                            println!("      Tanks: Ships stranded at the end over the batch, by seat {stranded:?}; {refuels} Refuel orders ({partner_refuels} at a partner's, {colony_refuels} at a Refinery Colony); {stations_off_earth} stations standing off Earth at the end");
                             println!("      The opening: Modules beyond the Core on a starting station at the end of turn 3 over the batch, by seat {opening_modules:?}");
                             println!(
                                 "      Build it where you dig: {deep_colonies} ground Colonies with two or more working Mines at the end over the batch; {:.1} Modules per ground Colony",
@@ -446,6 +498,7 @@ fn main() {
                             println!("      Unique Modules standing at the end over the batch: Academy {}, Heliostat {}, Exchange {}, Chorus {}", uniq[0], uniq[1], uniq[2], uniq[3]);
                             println!("      Batteries standing at the end over the batch, by seat {batteries:?}");
                             println!("      Venus: {venus_stations} stations at the end over the batch, {venus_colonists} Colonists living there");
+                            println!("      {}", off_earth_line(&tables, &ground_by_body, &stations_by_body, &mut first_by_body, &mut ground_off_earth_per_game, seeds));
                             println!(
                                 "      Mars system: a Colony founded in {}/{seeds} seeds, median first turn {}; Antarctic Colonies founded {antarctic}",
                                 mars_turns.len(),
@@ -626,10 +679,12 @@ fn main() {
                             // Ticket #346 (version 0.09.1): what the Battles cost in Fuel, by seat,
                             // and the hulls a Battle left under the Battle bar -- unable to hold an
                             // orbit, blockade or intercept until they refuel.
+                            // Ticket #387 (version 0.09.3): Fuel is tenths now, so the sums are
+                            // settled and printed as the game prints a figure, or the drift shows.
                             println!(
-                                "      Fuel burned in Battle over the batch, by seat {:?} ({} in all); hulls left dry by a Battle {:?} ({} in all)",
-                                warc.battle_fuel_burned,
-                                warc.battle_fuel_burned.iter().sum::<i64>(),
+                                "      Fuel burned in Battle over the batch, by seat [{}] ({} in all); hulls left dry by a Battle {:?} ({} in all)",
+                                warc.battle_fuel_burned.iter().map(|f| figure(*f)).collect::<Vec<_>>().join(", "),
+                                figure(tenth(warc.battle_fuel_burned.iter().sum::<f64>())),
                                 warc.hulls_left_dry,
                                 warc.hulls_left_dry.iter().sum::<u32>()
                             );
@@ -653,6 +708,8 @@ fn main() {
         for (i, k) in FactionKind::ALL.into_iter().enumerate() {
             println!("  {:>12}: Victory gate completed in {:2} of {all_games} games, median turn {}", k.name(), all_gate_turns[i].len(), median_u(&mut all_gate_turns[i]));
         }
+        // Version 0.09.3: the worlds settled, over every seating.
+        println!("  {}", off_earth_line(&base, &all_ground_by_body, &all_stations_by_body, &mut all_first_by_body, &mut all_ground_off_earth_per_game, all_games as u64));
         // Ticket #343 (version 0.09.1): summed over every seat of every seating -- a TOTAL, never
         // a per-Faction figure, since seat 0 is a different Faction in each seating.
         println!(
@@ -672,7 +729,7 @@ fn main() {
         // Ticket #346 (version 0.09.1): the same, a TOTAL over every seat of every seating.
         println!(
             "  Battles cost, all seats and seatings: Fuel burned in Battle {}, hulls left dry by a Battle {}",
-            all_warc.battle_fuel_burned.iter().sum::<i64>(),
+            figure(tenth(all_warc.battle_fuel_burned.iter().sum::<f64>())),
             all_warc.hulls_left_dry.iter().sum::<u32>()
         );
     }

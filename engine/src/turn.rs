@@ -54,9 +54,9 @@ impl Game {
             "start_holding",
             &[
                 ("state", home),
-                ("materials", self.seat(Seat(0)).stockpile.materials.to_string()),
-                ("fuel", self.seat(Seat(0)).stockpile.fuel.to_string()),
-                ("energy", self.seat(Seat(0)).stockpile.energy.to_string()),
+                ("materials", figure(self.seat(Seat(0)).stockpile.materials)),
+                ("fuel", figure(self.seat(Seat(0)).stockpile.fuel)),
+                ("energy", figure(self.seat(Seat(0)).stockpile.energy)),
             ],
         );
         self.report_line(LineKind::YourWorks, Some(ReportPlace::State(self.controlled_states(Seat(0))[0])), holding);
@@ -88,6 +88,9 @@ impl Game {
         self.income_phase();
         self.log("Phase 2: Climate");
         self.climate_phase();
+        // Ticket #400 (version 0.09.3): the net Unrest lines are written here, after the Climate
+        // phase, so the heat and the sea are causes on them; they stood at the Resolution's end.
+        self.report_unrest_net();
         self.log("Phase 3: Report");
         self.report_phase();
         // Ticket #337 (version 0.09.0): the turn's card is drawn HERE, at the head of the turn and
@@ -125,26 +128,47 @@ impl Game {
     /// Ticket #337 (version 0.09.0): and while a human seat owes this turn's choice card an answer,
     /// in the same shape and through the same door, so the interface needs no new mechanism for it.
     /// A computer seat never appears here: it answers when its orders are computed.
+    ///
+    /// Ticket #386 (version 0.09.3): everything owed is named at once, one line each. It used to
+    /// stop at the first thing found, so a player answered the card and only then learned of the
+    /// Tech, or, in the driver, the reverse.
     pub fn end_turn_refusal(&self) -> Option<String> {
+        let mut owed: Vec<String> = Vec::new();
         if let Some(q) = self.pending_question() {
             for seat in Seat::ALL {
                 if !self.seat(seat).ai && q.answer_of(seat).is_none() {
-                    return Some(format!(
-                        "{} is asking the {} a question, and it has not been answered. Take the offer or refuse it; the turn cannot end until you do.",
+                    owed.push(format!(
+                        "{} is asking the {} a question, and it has not been answered. Take the offer or refuse it.",
                         self.tables.event(q.card).name,
                         self.seat_name(seat)
                     ));
                 }
             }
         }
-        let owed = self.research.awaiting_pick?;
-        if self.seat(owed).ai || self.available_techs().is_empty() {
-            return None;
+        if let Some(lead) = self.tech_owed_by() {
+            owed.push(format!(
+                "The {} hold the Research Lead and owe the table a Tech. Choose what the world researches next.",
+                self.seat_name(lead)
+            ));
         }
-        Some(format!(
-            "The {} hold the Research Lead and owe the table a Tech. Choose what the world researches next; the turn cannot end until you do.",
-            self.seat_name(owed)
-        ))
+        match owed.len() {
+            0 => None,
+            1 => Some(format!("{} The turn cannot end until you do.", owed[0])),
+            n => Some(format!(
+                "{} things before the turn can end:\n{}",
+                if n == 2 { "Two" } else { "Several" },
+                owed.iter().map(|line| format!("- {line}")).collect::<Vec<_>>().join("\n")
+            )),
+        }
+    }
+
+    /// The human seat that owes the table a Tech, if any: the Research Lead awaiting a pick while
+    /// a Tech is left to research. A computer Lead picks the moment it leads and never appears
+    /// here. Ticket #386 (version 0.09.3): the one predicate End Turn's refusal and the headless
+    /// driver's banner both read, so the two cannot drift apart again.
+    pub fn tech_owed_by(&self) -> Option<Seat> {
+        let lead = self.research.awaiting_pick?;
+        (!self.seat(lead).ai && !self.available_techs().is_empty()).then_some(lead)
     }
 
     /// End Turn: the player's orders are committed, the AI orders, and the turn runs to the next Orders phase.
@@ -247,6 +271,9 @@ impl Game {
         self.income_phase();
         self.log("Phase 2: Climate");
         self.climate_phase();
+        // Ticket #400 (version 0.09.3): the net Unrest lines are written here, after the Climate
+        // phase, so the heat and the sea are causes on them; they stood at the Resolution's end.
+        self.report_unrest_net();
         self.log("Phase 3: Report");
         self.report_phase();
         // Ticket #337 (version 0.09.0): the next turn's card, drawn before its orders are given.

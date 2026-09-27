@@ -693,6 +693,12 @@ fn print_question(g: &Game) {
     let Some(c) = card.choice.as_ref() else { return };
     println!("\n=== THE TURN'S QUESTION: {} ===", card.name);
     println!("{}", c.question);
+    // Ticket #388 (version 0.09.3): a card that cannot reach this seat is not spelled out side by
+    // side, since there is nothing to answer; it says why it passed you by and stops.
+    if q.answer_of(me) == Some(CardAnswer::NothingToDecide) {
+        println!("  You {}, so it passed you by; neither side applied. No `answer` line is needed.", g.card_lack(q.card, me).unwrap_or_else(|| "had nothing to decide".to_string()));
+        return;
+    }
     // Ticket #375 (version 0.09.2): a card that holds a Ship names the one it would hold.
     if c.holds_a_ship() {
         match g.card_would_hold(me).and_then(|id| g.ship(id)) {
@@ -922,9 +928,9 @@ fn print_costs(g: &Game) {
     );
     println!(
         "Market: Materials {}, Fuel {}, Energy {} Ducats each; Influence {} Ducats a point; Relief {} Ducats",
-        g.market_price(me, g.trade_price(Resource::Materials).unwrap_or(0)),
-        g.market_price(me, g.trade_price(Resource::Fuel).unwrap_or(0)),
-        g.market_price(me, g.trade_price(Resource::Energy).unwrap_or(0)),
+        figure(g.market_price(me, g.trade_price(Resource::Materials).unwrap_or(0) as f64)),
+        figure(g.market_price(me, g.trade_price(Resource::Fuel).unwrap_or(0) as f64)),
+        figure(g.market_price(me, g.trade_price(Resource::Energy).unwrap_or(0) as f64)),
         g.tables.ducats.per_influence,
         g.tables.unrest.relief_ducats
     );
@@ -992,13 +998,13 @@ fn print_board(g: &Game) {
     println!("\n--- YOU: seat 0, the {} ---", g.seat_name(me));
     println!(
         "Stockpile: {} Materials, {} Fuel, {} Energy, {} Ducats",
-        s.stockpile.materials, s.stockpile.fuel, s.stockpile.energy, s.stockpile.ducats
+        figure(s.stockpile.materials), figure(s.stockpile.fuel), figure(s.stockpile.energy), figure(s.stockpile.ducats)
     );
     println!(
         "Last income: {}M {}F {}E {}D",
-        s.income_last_turn.materials, s.income_last_turn.fuel, s.income_last_turn.energy, s.income_last_turn.ducats
+        figure(s.income_last_turn.materials), figure(s.income_last_turn.fuel), figure(s.income_last_turn.energy), figure(s.income_last_turn.ducats)
     );
-    let sources: Vec<String> = s.income_sources.iter().map(|(what, r, n)| format!("{what} {n:+}{}", &r.name()[..1])).collect();
+    let sources: Vec<String> = s.income_sources.iter().map(|(what, r, n)| format!("{what} {}{}", signed(*n), &r.name()[..1])).collect();
     if !sources.is_empty() {
         println!("  from: {}", sources.join(", "));
     }
@@ -1038,17 +1044,26 @@ fn print_board(g: &Game) {
     // Ticket #173 (version 0.07.6): a pick made this turn is not locked in until the turn ends, so
     // the board says the choice is open rather than owed, and a second `tech` line in the same turn
     // is now accepted where it used to be refused. The driver and the game have to agree.
-    let owed = (g.research.awaiting_pick == Some(me) || g.research.current.is_none()) && !g.available_techs().is_empty();
+    // Ticket #386 (version 0.09.3): "MUST" is the engine's word, not the driver's. Only a pick the
+    // engine's End Turn refuses without is owed, read from the engine's own predicate; a tree with
+    // nothing chosen is open, not owed, and the banner says which, so the two never disagree.
+    let must = g.tech_owed_by() == Some(me);
+    let open = !must && g.research.current.is_none() && !g.available_techs().is_empty();
     let changeable = g.research.current.is_some() && !g.research.pick_committed;
-    if owed || changeable {
+    if must || open || changeable {
         let drawn = !g.research.shortlist.is_empty();
         if changeable {
             let name = g.research.current.map(|x| t.tech(x).name.clone()).unwrap_or_default();
             println!("  *** {name} IS CHOSEN FOR THIS TURN, and not locked in until the turn ends. Another `tech <name>` line changes it. ***");
+        } else if must {
+            println!(
+                "  *** YOU MUST PICK THE NEXT TECH (a `tech <name>` line); the turn cannot end until you do. {} ***",
+                if drawn { "The Research Lead's shortlist:" } else { "A free choice of everything available:" }
+            );
         } else {
             println!(
-                "  *** YOU MUST PICK THE NEXT TECH (a `tech <name>` line). {} ***",
-                if drawn { "The Research Lead's shortlist:" } else { "A free choice of everything available:" }
+                "  *** A TECH IS OPEN TO PICK (a `tech <name>` line); the turn can end without it. {} ***",
+                if drawn { "The Research Lead's shortlist:" } else { "Everything available:" }
             );
         }
         for x in g.pickable_techs() {
@@ -1059,8 +1074,8 @@ fn print_board(g: &Game) {
     println!("  {}", g.research_lead_text());
     if s.kind == FactionKind::Prospectors {
         println!(
-            "Venture Capital Fund: {} Materials, banking {:.0}% of output ({} banked last turn)",
-            s.venture_fund,
+            "Venture Capital Fund: {} Ducats, banking {:.0}% of Ducat income ({} banked last turn)",
+            figure(s.venture_fund),
             s.venture_share * 100.0,
             s.venture_banked_last_turn
         );
@@ -1246,7 +1261,7 @@ fn print_board(g: &Game) {
         if sh.seat == me {
             let dry: Vec<String> = BodyId::ALL
                 .into_iter()
-                .filter_map(|to| g.arrival_leaves_stranded(me, sh.id, to, None).map(|left| format!("{} ({left} Fuel left, no station of yours in low orbit)", to.name())))
+                .filter_map(|to| g.arrival_leaves_stranded(me, sh.id, to, None).map(|left| format!("{} ({left} Fuel left, nothing of yours to refuel at in low orbit)", to.name())))
                 .collect();
             if !dry.is_empty() {
                 println!("         would arrive stranded at: {}", dry.join("; "));
@@ -1452,9 +1467,14 @@ fn main() {
             // Ticket #337 (version 0.09.0): the turn's question holds End Turn. The engine refuses
             // in its own words; this says which card is asking and what line answers it, because a
             // line is the only door the driver has and a raw refusal names none.
-            let owed = owed_answer(&game);
+            // Ticket #386 (version 0.09.3): the engine's refusal, which names everything owed at
+            // once, is what is printed; the driver adds only the line that answers a card.
+            let owed = game.end_turn_refusal();
             if let Some(why) = &owed {
                 println!("\nSTILL OWED: {why}");
+                if let Some(how) = owed_answer(&game) {
+                    println!("  {how}");
+                }
             }
             if command == "check" {
                 return;

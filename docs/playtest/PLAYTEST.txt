@@ -1,4 +1,4 @@
-DYING EARTH - playtest build, version 0.09.2
+DYING EARTH - playtest build, version 0.09.3
 ============================================
 
 Thanks for playing. This is an early build of a turn-based strategy game about colonizing
@@ -16,78 +16,62 @@ HOW TO RUN
 4. The very first launch shows a blank dark window for up to ten seconds while it
    compiles graphics. Later launches are quick.
 5. Needs Windows 10 or 11, 64-bit, and any graphics card from the last ten years.
-6. Saves from 0.09.1 and before will not load in this version: battles are recorded and
-   fought differently now and every side starts differently, so an old file describes a
-   board this version cannot read. The Load screen says so.
+6. Saves from 0.09.2 and before will not load in this version: every stockpile figure is
+   kept to a tenth now and there is a new building, so an old file describes a board this
+   version cannot read. The Load screen says so.
 7. This version ships for Windows and for Linux. On Linux, read RUN-ON-LINUX.txt in the
    folder instead of steps 2 to 5.
 
-WHAT CHANGED SINCE 0.09.1
+WHAT CHANGED SINCE 0.09.2
 -------------------------
-Most of this version is tidying: the game says what it does where you can see it, and
-the ship cards were rebuilt. Three rules moved, and the computer plays every one.
+Most of this version points off Earth: reasons to go far, and a way to fill a tank when
+you get there. Eight rules moved, and the computer plays every one.
 
 THE RULES THAT MOVED
-- AN ATTACK IS FOUGHT THE MOMENT YOU CONFIRM IT. Order a ship stack to Attack and the
-  battle happens at once, on the board as it stands - ships still in flight toward that
-  world do not arrive in time to join. The survivors stand on Hold, and a stack fights
-  once a turn. The computer's attacks are fought when it gives its orders, before
-  anything moves. "Confirm Attack" is the point of no return; you cannot save until the
-  next turn after a battle.
-- EVERY BATTLE HAS A WINDOW OF ITS OWN, shown the moment yours is fought and at the start
-  of the next turn for the computer's. It draws each round: every side's ships with a pip
-  per hit point, the hits of the round lit, a ship that ran dimmed, one destroyed
-  crossed, and the blows in words ("The Custodians hit ARK Implacable, covering ARK
-  Defiant"). The chronicle at the end of the game lists every battle that cost a ship or
-  a battery.
-- EQUAL STARTS. Every home country now begins with the same buildings - a Power Plant, a
-  Factory, a Mine, a Refinery and the Launch Site - whatever it had on the map, and every
-  starting station carries a Solar Array. The Arkwrights, who start with no station, get a
-  second Power Plant instead. The country's ECONOMY is still its own: the EU pays about
-  twelve Ducats a turn and Saudi Arabia one.
-- THE REFUGEE CONVOY LANDS A MILLION PEOPLE for half a ppm (it was 400,000 for two).
-- NO CARD IS DRAWN ON THE FIRST TURN.
+- EVERY RESOURCE IS KEPT TO A TENTH. Materials, Fuel, Energy and Ducats show one decimal
+  where they have one (a Bank pays 6.8, not 6). A price or an upkeep that was whole stays
+  whole; nothing is rounded away any more.
+- NUCLEAR ROCKETS, a new rung-2 Tech (cost 38), cut every transit by a fifth. Hardened
+  Hulls now needs it as well as Efficient Transit.
+- THE FIRST COLONY ON EACH WORLD CALMS EVERYONE. The first ground colony ever founded on a
+  world takes half a point of Unrest off every country on Earth, whoever holds it.
+- THE STADIUM, a new building, halves what the climate adds to a country's Unrest (the
+  heat, the sea, a climate break or card). With a Constabulary as well, Unrest now moves
+  in quarters.
+- A COLONY WITH A WORKING REFINERY REFUELS SHIPS in its world's low orbit, from your
+  stockpile, as a station does in its own orbit. A blockade of that orbit shuts it, and a
+  ship that can reach one is no longer stranded.
+- TRADE POSTS PAY BY DISTANCE. Each world you hold pays a Trade Post anywhere by how far
+  it is from Earth: Earth 3 Ducats, the Moon 3.5, Venus 4, Mars 5, Phobos and Deimos 6.
+- SHIPS BUILT ON THE MOON, PHOBOS OR DEIMOS COST LESS with a working mine there: three
+  quarters of their materials with one mine, three fifths with two.
+- THE COMPUTER COVETS A BIG COLONY. The more people and output a colony has, the more a
+  computer side wants to take it, by influence or by landing an army.
+- A CHOICE CARD THAT REACHES NOBODY goes back to the bottom of the deck and the next card
+  is drawn; the report says why it passed each side by.
 
-THE SHIP CARDS
-- EVERY SHIP HAS A CARD OF ITS OWN: its strength and damage, its tank, its moves, its
-  cargo, its weapons and its repair. Click a ship's row on the stack card, in the roster,
-  or its label on the solar map while it flies. The stack card keeps only what is the
-  whole stack's: the ships grouped by orbit, the stance, Attack, and "All that can".
-- WHERE A SHIP CAN GO IS ONE DROP-DOWN PER WORLD, the moons nested under their planets -
-  the Moon inside Earth's, Phobos and Deimos inside Mars's - with the orbits inside each.
-  The world you are at opens first with the change-of-orbit moves.
-- A TRANSIT QUOTE SAYS WHEN IT HOLDS ("if launched this turn; next turn 5t/23F, then
-  6t/26F"), and a leg that would leave the ship stranded at the far end says so beside its
-  button. A warning, not a refusal: a one-way trip can be the plan.
-
-THE GAME SAYS WHAT IT DOES
-- EVERY GREYED BUTTON EXPLAINS WHY ON MOUSEOVER, in the engine's own words, the reason
-  first and the description after. (It turned out no greyed order button had shown its
-  reason since version 0.08.3; the pictures we checked looked right because the screenshot
-  tool forced them open. Fixed.)
-- THE VICTORY BAR COUNTS SETTLED COLONISTS, with a hatched band beyond the fill for the
-  ones still in flight.
-- THE REPORT HAS A SHIPS HEADING: colonists waiting aboard in orbit, ships held, ships
-  loaded. One net Unrest line per country instead of several.
-- A CARD'S INFLUENCE FIGURE READS THE HOLDER: "Take at 49" on a rival's place, the
-  cheapest rival's price on your own.
-- THE TRADING WINDOW SPEAKS IN GLYPHS. The "first to land" line is off the solar map and
-  on the world's hover.
-- THE ARCHIVISTS AND THE PROSPECTORS SEE THEIR FUND ON THE TOP BAR: the slider and the
-  fill bar, condensed, right of the window buttons. The full controls stay where they were.
-- THE DISTRESS CALL NAMES THE SHIP IT WOULD HOLD before you answer, and holds it for the
-  turn if you do.
+THE CARDS
+- A SHIP'S OWN CARD CAN ATTACK. A frigate's, a battleship's or a missile carrier's card
+  carries the stack's stance and its Attack button; the attack is still the whole stack's.
+  Clicking empty space on the solar map closes a ship's card and brings back the roster.
+- EVERY PLACE CARD SAYS ITS OUTPUT under its population, and a colony or station card its
+  founding date under its name.
+- THE COUNTRY CARD IS REARRANGED: Influence, Pioneers, Policies, the buildings, Armies,
+  then Orders. A finished sea wall or scrubber is one line; hover it for the rest.
+- THE BUILD HOVER USES GLYPHS for every figure, colonists included.
+- END TURN NAMES EVERYTHING STILL OWED at once, and the Unrest lines in the report are
+  quieter: one net line a country, with its causes named.
 
 WHAT WE WANT TO KNOW
 --------------------
 Write down anything, however small. Especially:
 - The moment you were not sure what to do next.
 - Anything you clicked that did nothing, or did something you did not expect.
-- ATTACK AT ONCE: did fighting the moment you confirm feel right? Did you want to take an
-  attack back? Did the battle window tell you why you won or lost?
-- THE SHIP CARDS: did you find a ship's moves? Were the nested drop-downs clear?
-- THE REFUSAL HOVERS: hover over a greyed button. Did it tell you what to do?
-- EQUAL STARTS: did the opening feel fair? Which country did you pick, and why?
+- GOING FAR: did Nuclear Rockets, the distance pay or a refinery colony make Mars or the
+  small moons worth the trip?
+- THE TENTHS: were the decimals easy to read, or noise?
+- A BIG COLONY: if you built one place up, did the computer come for it? Did it feel fair?
+- THE STADIUM: did you build one, and could you tell it was working?
 - Anything that still says the same thing twice.
 - The turn the game got boring, if it did, and the turn you felt you had lost.
 - Crashes: what you were doing, and the "Seed" number shown on the title screen and
@@ -102,24 +86,21 @@ first. These are known. You do not need to report them.
 
 WHAT THIS VERSION KNOWS ABOUT ITSELF
 
-- THE WIN COLUMN TURNED OVER: Custodians 2, Prospectors 5, Arkwrights 0, Archivists 11,
-  where last version was 6 / 28 / 3 / 2. Equal starts did it: the Archivists' station
-  carries a Heliostat and their home a Reactor, and they were first to the Moon in every
-  game; the Prospectors' opening lost its habitat to an Exchange in the one slot the Solar
-  Array leaves. Every side is stronger; the Prospectors' lead is gone.
-- THE WORLD COLLAPSES IN 62 GAMES OF 80, where it was 41. Every side now starts with a
-  Refinery and a Power Plant it may not have had, and the table burns faster. The balance
-  version will look at it.
-- TWO STACKS THAT ATTACK IN ONE ORBIT IN ONE TURN FIGHT TWO BATTLES, one per attack, the
-  second against the first's survivors. Deliberate: every attack is its own fight now.
-- A COMMS BLACKOUT CANNOT STOP AN ATTACK YOU FOUGHT BEFORE THE TURN ENDED. It still stands
-  the computer's stacks down.
+- THE WIN COLUMN: Custodians 7, Prospectors 5, Arkwrights 1, Archivists 7, where last
+  version was 2 / 5 / 0 / 11. Most of the move came with the tenths.
+- THE WORLD COLLAPSES IN 60 GAMES OF 80, where it was 62.
+- THE COMPUTER ALMOST NEVER BUILDS A SHIPYARD ON THE MOON, PHOBOS OR DEIMOS, so the
+  cheaper ships there are yours alone for now.
+- THE COMPUTER'S APPETITE FOR A BIG COLONY is only visible when someone builds one; the
+  computer sides do not build big colonies themselves, so the eighty games cannot show it.
+- TWO STACKS THAT ATTACK IN ONE ORBIT IN ONE TURN FIGHT TWO BATTLES, one per attack.
+- A COMMS BLACKOUT CANNOT STOP AN ATTACK YOU FOUGHT BEFORE THE TURN ENDED.
 - AN ARKWRIGHTS PLAYER WHO OPENS IN MEXICO has six buildings in five slots and nothing free
   to build until an Industry Level raise.
 - NOBODY CAN ACCEPT OR DECLINE AN ACCORD OFFERED TO THEM - INCLUDING YOU. The game still
   answers on your behalf.
 - THE THREAT LINE ON A COUNTRY'S CARD STILL QUOTES THE FIRST EXCHANGE, while every other
-  odds figure is the whole battle's. Deliberate, until both move together.
+  odds figure is the whole battle's.
 
 CARRIED OVER, STILL TRUE
 

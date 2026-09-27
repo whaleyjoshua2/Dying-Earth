@@ -401,15 +401,15 @@ impl Game {
             }
             FactionKind::Prospectors => {
                 let paid = self.pay_directive_remainder(seat, want as f64 * t.prospectors_ducats_per_point);
-                self.seat_mut(seat).stockpile.ducats += paid;
-                let text = self.say("directive_ducats", &[("faction", name), ("research", want.to_string()), ("n", paid.to_string())]);
+                self.seat_mut(seat).stockpile.ducats = tenth(self.seat(seat).stockpile.ducats + paid);
+                let text = self.say("directive_ducats", &[("faction", name), ("research", want.to_string()), ("n", figure(paid))]);
                 self.report_line_of(seat, LineKind::YourWorks, LineKind::Note, None, text);
                 want
             }
             FactionKind::Arkwrights => {
                 let paid = self.pay_directive_remainder(seat, want as f64 * t.arkwrights_fuel_per_point);
-                self.seat_mut(seat).stockpile.fuel += paid;
-                let text = self.say("directive_fuel", &[("faction", name), ("research", want.to_string()), ("n", paid.to_string())]);
+                self.seat_mut(seat).stockpile.fuel = tenth(self.seat(seat).stockpile.fuel + paid);
+                let text = self.say("directive_fuel", &[("faction", name), ("research", want.to_string()), ("n", figure(paid))]);
                 self.report_line_of(seat, LineKind::YourWorks, LineKind::Note, None, text);
                 want
             }
@@ -419,12 +419,14 @@ impl Game {
     /// Ticket #235: pay out a fractional rate, carrying what is left over to the next turn. The
     /// Prospectors earn 0.8 of a Ducat a point and the Arkwrights 0.2 of a Fuel, so flooring every
     /// turn would quietly lose up to a fifth of everything diverted.
-    fn pay_directive_remainder(&mut self, seat: Seat, earned: f64) -> i64 {
+    /// Ticket #387 (version 0.09.3): paid to the TENTH, where whole Ducats or Fuel were paid and
+    /// the fraction carried; what is under a tenth is still carried, so nothing is lost.
+    fn pay_directive_remainder(&mut self, seat: Seat, earned: f64) -> f64 {
         let s = self.seat_mut(seat);
         s.directive_remainder += earned;
-        let whole = s.directive_remainder.floor();
-        s.directive_remainder -= whole;
-        whole as i64
+        let paid = (s.directive_remainder * 10.0 + 1e-9).floor() / 10.0;
+        s.directive_remainder -= paid;
+        paid
     }
 
     /// Ticket #235: the most this seat may direct away from the shared Tech. The Archivists' runs

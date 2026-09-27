@@ -76,6 +76,11 @@ constabulary_fall = 1.0
 # A Scrubber standing and online there, every turn, on top of the natural fall (ticket #54); it
 # joins the Constabulary in `calming_fall`, and a state with both gets both.
 scrubber_fall = 1.0
+# Ticket #395 (version 0.09.3): the first ground Colony ever founded on a Body -- the Moon's first,
+# then Mars's, each once -- takes this off EVERY Region's Unrest at once, whoever holds it, the
+# designer's "very small reduction in unrest globally". Half a point. Antarctica is on Earth and
+# does not count; a station is no settling.
+first_colony_ease = 0.5
 
 # ---- damping (rule 4 of #52, widened on #53)
 # While two of the four green Techs are complete every climate-source AND refugee rise is this much
@@ -85,6 +90,12 @@ scrubber_fall = 1.0
 green_techs_two = 0.5
 green_techs_four = 1.0
 constabulary_damping = 0.5
+# Ticket #389 (version 0.09.3): a working Stadium multiplies what is left of a climate rise after the
+# damping above by this -- half, so a heat rise of 1 lands as 0.5 with a Stadium and 0.25 with a
+# Constabulary beside it (and the sea's 2 as 0.75, the Constabulary's half point being flat). Unrest
+# moves in quarters from here, at the designer's word, where it moved in halves. Refugees and an
+# Agitate are not the climate and are untouched.
+stadium_factor = 0.5
 
 # ---- thresholds (rule 5 of #52)
 # At `army_threshold` the Standing Army stops replenishing; at `facility_threshold` every Facility

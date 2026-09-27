@@ -181,10 +181,17 @@ pub enum FacilityKind {
     /// follow the Materials here; Clean Manufacturing stays with the Factory. Appended last:
     /// `Tables::facility` indexes this enum by discriminant.
     Mine,
+    /// Ticket #389 (version 0.09.3): the **Stadium**, the designer's "entertainment themed"
+    /// building that lowers Unrest -- by damping, not draining: it halves what the climate adds to
+    /// its Region's Unrest (the heat, the sea, a Break, a Climate card) after a Constabulary takes
+    /// its half point off, so a heat rise of one lands as a quarter with both, and touches no
+    /// Agitate. Cheaper than the Constabulary, one to a
+    /// Region, every Faction's alike. Appended last, as every kind since the Mine.
+    Stadium,
 }
 
 impl FacilityKind {
-    pub const ALL: [FacilityKind; 16] = [
+    pub const ALL: [FacilityKind; 17] = [
         FacilityKind::Factory,
         FacilityKind::PowerPlant,
         FacilityKind::Refinery,
@@ -201,6 +208,7 @@ impl FacilityKind {
         FacilityKind::Reactor,
         FacilityKind::Academy,
         FacilityKind::Mine,
+        FacilityKind::Stadium,
     ];
     pub fn name(self) -> &'static str {
         match self {
@@ -221,6 +229,7 @@ impl FacilityKind {
             FacilityKind::Academy => "Academy",
             // Ticket #332 (version 0.09.0): one name in both lists, by the Refinery precedent.
             FacilityKind::Mine => "Mine",
+            FacilityKind::Stadium => "Stadium",
         }
     }
 
@@ -504,6 +513,14 @@ impl UnitKind {
     pub fn is_warship(self) -> bool {
         matches!(self, UnitKind::Frigate | UnitKind::Battleship)
     }
+
+    /// Ticket #399 (version 0.09.3): **an armed Ship**, whose own card carries the stack's stance
+    /// and its Attack: a warship, or a Missile Carrier, which is no warship (#343) but fights by
+    /// its Launch and is given its stance as one. A Colony Ship's or a Carrier's card carries
+    /// neither (the designer, Q2 B).
+    pub fn is_armed(self) -> bool {
+        self.is_warship() || self == UnitKind::MissileCarrier
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
@@ -578,10 +595,16 @@ pub enum TechId {
     /// unlock the Missile Carrier. The tree is shared, so every seat sees it researched: opening
     /// this door is a public act, which is the point.
     MissileTechnology,
+    /// Ticket #393 (version 0.09.3): Propulsion rung 2 beside Efficient Transit, priced above its
+    /// rung at the designer's word ("i want to be costlier"). A crossing's days are cut by a fifth
+    /// before the rounding up to turns, so Mars at the window is four turns where it was five and
+    /// Venus two where it was three; a one-turn hop stays one; the Fuel is untouched. Hardened
+    /// Hulls needs this AND Efficient Transit.
+    NuclearRockets,
 }
 
 impl TechId {
-    pub const ALL: [TechId; 21] = [
+    pub const ALL: [TechId; 22] = [
         TechId::EfficientGrids,
         TechId::CleanPower,
         TechId::CleanManufacturing,
@@ -603,6 +626,7 @@ impl TechId {
         TechId::Beneficiation,
         TechId::RelayNetworks,
         TechId::MissileTechnology,
+        TechId::NuclearRockets,
     ];
     pub fn index(self) -> usize {
         self as usize

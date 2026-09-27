@@ -60,6 +60,9 @@ colony_founded = "The {faction} founded a Colony at {slot} on {body} with {n} Co
 no_habitat_room = "{n} more found no Habitat room at {place} and did not land."
 # Ticket #345 (version 0.09.1): the first Colony a world has ever carried, and what it pays.
 first_to_body = "The {faction} are the first Faction ever to settle {body}. {colony} claims a windfall of {n} Influence, and its Core will pay while they hold it."
+# Ticket #395 (version 0.09.3): the world eases at the news, half a point off every Region's Unrest,
+# said once for the whole Earth, filed under On Earth; the Moment carries it too.
+first_to_body_eases = "The first Colony on {body} eased Unrest by {ease} in every Region on Earth."
 disembarked = "{n} Colonists disembarked into {colony}."
 station_built = "{faction} built {station}."
 antarctica_opens = "The Antarctic ice opens: {n} Colony Slots on Earth."
@@ -167,6 +170,20 @@ card_asked = "{card}: {question}"
 # Report draws the four answers together under the card's own name and takes the "{card}: " off
 # the front of each; the whole line stands unaltered in the log and anywhere else it is read.
 card_answered = "{card}: The {faction} {answer}."
+# Ticket #388 (version 0.09.3): a seat neither side of the card reaches is told WHY it passed them by
+# and that neither side applied, in the engine's own reason ({who} is "You" or "The Prospectors",
+# {them} "you" or "them", {lack} one of the lack_* phrases below); and a card that reaches nobody at
+# the table is put back at the bottom unspent and the next card drawn, said once.
+card_passed_by = "{card}: {who} {lack}, so it passed {them} by; neither side applied."
+card_put_back = "{card} reached nobody at the table and went to the bottom of the deck unspent; the next card was drawn."
+lack_ship = "have no Ship"
+lack_ship_in_orbit = "have no Ship in orbit"
+lack_region = "hold no Region"
+lack_populated_region = "hold no Region with people in it"
+lack_busy_region = "hold no Region making Widgets"
+lack_facility = "have no {facility}"
+lack_colony_module = "have no Colony with a {module}"
+lack_colony_room = "have no Colony with room for a {module}"
 # Ticket #259 (version 0.08.4): the turn the off-Earth cards are shuffled into the deck.
 deck_joined = "The {n} Events that can only land off Earth join the deck: Grid Failure, Reactor Leak, Dust Storm, Moonquake, Helium-3 Vein, Rich Seam and Ice Deposit."
 # Ticket #261 (version 0.08.4): the rival's Moment, two steps. {part} is the part still short.
@@ -195,11 +212,10 @@ sea_wall_unkept = "Materials ran short: the Sea Wall in {states} stands unkept t
 sea_nothing_left = "Sea level at {temperature} C: {state} has no coastal slots left to lose."
 sea_took = "The sea took {n} coastal {slots} from {state} at {temperature} C."
 sea_took_destroying = "The sea took {n} coastal {slots} from {state} at {temperature} C: {destroyed}."
-heat_population = "{state}: population fell {percent}% to {after}; Unrest rose by {rose} to {unrest}."
-# Ticket #106 (version 0.07.0): the same event where the fall rounds to nothing. Late in a game a
-# dozen of these arrived a turn saying "population fell 0.0%", which spends a line to report that a
-# country was fine; what actually moved was the Unrest, so that is all this says.
-heat_unrest_only = "{state}: the heat raised Unrest by {rose} to {unrest}."
+# Ticket #400 (version 0.09.3): the per-Region heat lines are GONE -- one for every Region on the
+# board whoever held it, twenty thousand of the thirty-two thousand Unrest-bearing lines in eighty
+# games. The heat is a cause on each Region's net line (cause_heat) and the board is this one line.
+heat_board = "The heat raised Unrest in {n} Regions and took people from {m}."
 development = "{state} raised its Industry Level to {level}."
 development_woke = "{state} raised its Industry Level to {level} and brought a {building} online."
 scrubbers_destroyed = "{n} Scrubber(s) in {state} were destroyed when the state {why}."
@@ -245,6 +261,10 @@ cause_occupation_start = "the Occupation beginning"
 cause_occupation = "the Occupation"
 cause_occupation_break = "the Occupation breaking"
 cause_choice_card = "the {card} card"
+# Ticket #400 (version 0.09.3): the heat and the sea, where each wrote a line of its own.
+cause_heat = "the heat"
+cause_sea = "the sea"
+cause_break = "the {name}"
 # Ticket #366 (version 0.09.2): what a lift earns from the Spaceport, and when it lands.
 spaceport_pays = " (+{n} Influence next turn from the Spaceport)"
 unrest_past = ", past the {which} threshold: {note}"
@@ -261,7 +281,7 @@ launch_dead = ", {n} million dead"
 # Battle's own record, after the rounds and before the word on Orbital Control.
 battle_fuel = " The Battle cost {n} Fuel."
 battle_fought_dry = " {hulls} fought dry, at half strength."
-sea_unrest = " Unrest there rose by {rose} to {unrest}."
+# Ticket #400 (version 0.09.3): the sea's Unrest is a cause on the net line (cause_sea); the suffix is gone.
 # Ticket #276 (version 0.08.5): every rise turns one inland slot coastal, wall or no wall; an empty
 # slot first, else the oldest inland Facility with its slot.
 sea_inland = " The coast now reaches one slot further in."
@@ -315,7 +335,7 @@ max_off = "set its Influence to be placed by hand again"
 build_emigrants = "recruited {n} Pioneers in {state}"
 send_antarctica = "sent {n} Pioneers from {state} to Antarctica by sea"
 lift_station = "lifted {n} Pioneers from {state} to {station}"
-set_venture_share = "set the Venture Capital Fund to bank {share}% of its Materials output"
+set_venture_share = "set the Venture Capital Fund to bank {share}% of its Ducat income"
 # Ticket #256 (version 0.08.4): "withdrew", and DUCATS -- this line still said Materials a version
 # after ticket #240 moved the Fund, which nobody saw because no sweep reads the Report.
 draw_venture = "withdrew {n} Ducats from the Venture Capital Fund"
@@ -365,7 +385,8 @@ figure = "{n} Colonists"
 # Ticket #345 (version 0.09.1): the first Faction to put a Colony on the ground of a world.
 [moments.first_to_body]
 on = true
-text = "The {faction} are the first to settle {body}. {colony} is theirs."
+# Ticket #395 (version 0.09.3): and the world eases at the news.
+text = "The {faction} are the first to settle {body}. {colony} is theirs, and Unrest eased by {ease} in every Region on Earth."
 figure = "{n} Influence"
 
 [moments.control_changed]

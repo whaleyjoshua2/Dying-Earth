@@ -8,13 +8,46 @@ use rand_chacha::ChaCha8Rng;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+/// Ticket #387 (version 0.09.3): the four stockpile resources are carried to a **tenth**, at the
+/// designer's word -- "Energy, Ducats and Materials carried to a tenth", and Fuel with them. A whole
+/// price, output or upkeep stays whole, since nothing partial arises from it; a computed figure
+/// that used to be floored to a whole keeps its tenth instead. Every write goes through `tenth`, so
+/// the stored figure is always an exact tenth and no float drift accumulates.
+#[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
 pub struct Stockpile {
-    pub materials: i64,
-    pub fuel: i64,
-    pub energy: i64,
+    pub materials: f64,
+    pub fuel: f64,
+    pub energy: f64,
     /// Version 0.03 (ticket #35).
-    pub ducats: i64,
+    pub ducats: f64,
+}
+
+impl Stockpile {
+    /// Ticket #387 (version 0.09.3): every figure settled to a tenth, the one shape a stockpile is
+    /// ever stored in. A pay, a refund and an income all come through here.
+    pub fn settled(self) -> Stockpile {
+        Stockpile { materials: tenth(self.materials), fuel: tenth(self.fuel), energy: tenth(self.energy), ducats: tenth(self.ducats) }
+    }
+}
+
+/// Ticket #387 (version 0.09.3): a resource figure rounded to the nearest tenth. Applied wherever a
+/// Materials, Fuel, Energy or Ducats figure is written -- a stockpile, the Fund, a tank, an income
+/// line, a price -- so what is stored is always an exact tenth: 0.1 + 0.2 reads 0.3, never
+/// 0.30000000000000004. The one rounding these four resources take now, where a floor to a whole
+/// stood before.
+pub fn tenth(x: f64) -> f64 {
+    (x * 10.0).round() / 10.0
+}
+
+/// Ticket #387 (version 0.09.3): a resource figure as the interface prints it: whole when whole,
+/// one decimal otherwise -- "80", "80.4". The rule `unrest_figure` already followed for Unrest.
+pub fn figure(v: f64) -> String {
+    if (v - v.round()).abs() < 1e-9 { format!("{}", v.round() as i64) } else { format!("{v:.1}") }
+}
+
+/// Ticket #387 (version 0.09.3): a resource figure with its sign, as an income reads: "+4", "-2.5".
+pub fn signed(v: f64) -> String {
+    if v >= 0.0 { format!("+{}", figure(v)) } else { figure(v) }
 }
 
 /// A Nation State is neutral, controlled, or occupied (spec 8.1, 8.5).
@@ -491,7 +524,7 @@ pub struct Ship {
     /// Ticket #87 (version 0.06.0): the Fuel in its tank. Filled at the yard, spent by transits,
     /// refilled only by a Refuel order at a Body with a station of its own.
     #[serde(default)]
-    pub fuel: i64,
+    pub fuel: f64,
     /// Ticket #99 (version 0.07.0): the Orbital Slot this Ship sits in, chosen with the leg that
     /// brought it. Ticket #335 (version 0.09.0): `None` is **low orbit**, one of the Body's orbits
     /// like any other and no longer "the Body at large"; read it through `Game::ship_orbit`, which
@@ -868,20 +901,15 @@ pub struct SeatState {
     pub kind: FactionKind,
     pub ai: bool,
     pub stockpile: Stockpile,
-    /// Ticket #72 (version 0.05.5): Materials banked in the Venture Capital Fund (the Prospectors'
-    /// first Victory part), the share of Materials output banked each Income, and what last
+    /// Ticket #72 (version 0.05.5): Ducats banked in the Venture Capital Fund (the Prospectors'
+    /// first Victory part), the share of Ducat income banked each Income, and what last
     /// Income banked. The running Extraction Total this replaces is retired.
     #[serde(default)]
-    pub venture_fund: i64,
+    pub venture_fund: f64,
     #[serde(default)]
     pub venture_share: f64,
     #[serde(default)]
-    pub venture_banked_last_turn: i64,
-    /// Ticket #257 (version 0.08.4): Materials the seat's Sea Walls are owed in keep and have not yet
-    /// paid. Half a Material a turn per rise held is not a whole number, so the fraction is carried
-    /// here and the whole Materials are paid as they accrue; nothing is lost to rounding.
-    #[serde(default)]
-    pub sea_wall_upkeep_owed: f64,
+    pub venture_banked_last_turn: f64,
     /// Ticket #261 (version 0.08.4): which steps of the rival's Moment this seat has fired -- three
     /// quarters of the way, and one part met. Once each, so a seat that dips and recrosses is not
     /// announced twice.
@@ -973,7 +1001,7 @@ pub struct SeatState {
     pub lost_in_transit: i64,
     pub income_last_turn: Stockpile,
     /// Last Income by source (ticket #31): "Factory in Asia", the resource, the amount; upkeep as negatives.
-    pub income_sources: Vec<(String, Resource, i64)>,
+    pub income_sources: Vec<(String, Resource, f64)>,
     /// Ticket #51: Research banked for the Archive, capped at what its remaining stages still need.
     pub archive_fund: i64,
     /// Ticket #51: Fund the Archive was ordered this turn, so this turn's Lab Research went to the
@@ -1161,7 +1189,8 @@ pub struct WarCounters {
     /// Battle halved. A hull already under the bar when the Battle opened is not counted here: the
     /// Battle did not put it there.
     #[serde(default)]
-    pub battle_fuel_burned: [i64; SEAT_COUNT],
+    /// Ticket #387 (version 0.09.3): to a tenth, as a tank is.
+    pub battle_fuel_burned: [f64; SEAT_COUNT],
     /// Ticket #355 (version 0.09.1): the orbital Battles a seat opened AWAY from Earth, so the
     /// sweep can say where the orbital war is fought; `orbit_attacks` less this is over Earth.
     #[serde(default)]
@@ -1225,8 +1254,8 @@ impl WarCounters {
             self.launch_buildings_burned[i] += o.launch_buildings_burned[i];
             self.launch_people_killed[i] += o.launch_people_killed[i];
             self.industry_levels_lost[i] += o.industry_levels_lost[i];
-            // Ticket #346 (version 0.09.1).
-            self.battle_fuel_burned[i] += o.battle_fuel_burned[i];
+            // Ticket #346 (version 0.09.1). Ticket #387 (version 0.09.3): settled, as every Fuel figure is.
+            self.battle_fuel_burned[i] = tenth(self.battle_fuel_burned[i] + o.battle_fuel_burned[i]);
             self.hulls_left_dry[i] += o.hulls_left_dry[i];
         }
         self.battles_vs_neutral += o.battles_vs_neutral;
@@ -1520,15 +1549,14 @@ pub struct NewGame {
 impl Game {
     pub fn new(tables: std::sync::Arc<Tables>, setup: NewGame) -> Game {
         let mut rng = ChaCha8Rng::seed_from_u64(setup.seed);
-        let start = Stockpile { materials: tables.start.materials, fuel: tables.start.fuel, energy: tables.start.energy, ducats: tables.start.ducats };
+        let start = Stockpile { materials: tables.start.materials as f64, fuel: tables.start.fuel as f64, energy: tables.start.energy as f64, ducats: tables.start.ducats as f64 };
         let seat = |kind: FactionKind, ai: bool| SeatState {
             kind,
             ai,
             stockpile: start,
-            venture_fund: 0,
+            venture_fund: 0.0,
             venture_share: 0.0,
-            venture_banked_last_turn: 0,
-            sea_wall_upkeep_owed: 0.0,
+            venture_banked_last_turn: 0.0,
             rival_steps_announced: [false; 2],
             victory_history: Vec::new(),
             directive_sink: 0.0,
@@ -2165,34 +2193,52 @@ impl Game {
     /// partner's under a Refuel Accord. The Fuel is the refueller's own Stockpile's either way;
     /// the partner's station is only where it is drawn.
     pub fn fuels_for(&self, c: &Colony, seat: Seat) -> bool {
-        c.in_orbit && c.control.director().is_some_and(|d| d == seat || self.accord_has(seat, d, Term::Refuel))
+        self.refuel_depot(c) && c.control.director().is_some_and(|d| d == seat || self.accord_has(seat, d, Term::Refuel))
+    }
+
+    /// Ticket #396 (version 0.09.3): **a place that fills a tank**: a station, in its own slot, or
+    /// a ground Colony with a working Refinery (online, not mothballed, not still building), in its
+    /// Body's low orbit -- the designer's *"colonies with a refinery can refuel ships"*. The Fuel is
+    /// the Stockpile's either way; the Refinery is the reason, not the source.
+    pub fn refuel_depot(&self, c: &Colony) -> bool {
+        c.in_orbit || c.modules.iter().any(|m| m.kind == ModuleKind::Refinery && m.working())
+    }
+
+    /// Ticket #396: the depot that touches this orbit and fuels this seat -- the station standing in
+    /// a slot, or a Refinery Colony on the ground under low orbit -- blockaded or not.
+    pub fn depot_in_orbit(&self, seat: Seat, body: BodyId, orbit: Orbit) -> Option<&Colony> {
+        match orbit {
+            Orbit::Slot(slot) => self.station_at(body, slot).filter(|c| self.fuels_for(c, seat)),
+            Orbit::Low => self.colonies.iter().find(|c| c.body == body && !c.in_orbit && self.fuels_for(c, seat)),
+        }
     }
 
     /// Ticket #325: a station at the Body the seat may Refuel at, its own or a partner's, blockaded
     /// or not -- the test that says whether a Ship is stranded and whether the card offers a
-    /// Refuel at all; `refuelling_station` says whether one is open this turn.
+    /// Refuel at all; `refuelling_station` says whether one is open this turn. Ticket #396
+    /// (version 0.09.3): or a Refinery Colony on the ground there (`refuel_depot`).
     pub fn refuel_station_at(&self, seat: Seat, body: BodyId) -> bool {
         self.colonies.iter().any(|c| c.body == body && self.fuels_for(c, seat))
     }
 
     /// Ticket #87: what a Refuel order takes from the Stockpile: what the tank wants, as far as
     /// the Stockpile can pay.
-    pub fn refuel_amount(&self, seat: Seat, ship: ShipId) -> i64 {
-        let Some(s) = self.ship(ship) else { return 0 };
-        let want = (self.tables.unit(s.kind).tank - s.fuel).max(0);
-        want.min(self.seat(seat).stockpile.fuel.max(0))
+    pub fn refuel_amount(&self, seat: Seat, ship: ShipId) -> f64 {
+        let Some(s) = self.ship(ship) else { return 0.0 };
+        let want = (self.tables.unit(s.kind).tank as f64 - s.fuel).max(0.0);
+        tenth(want.min(self.seat(seat).stockpile.fuel.max(0.0)))
     }
 
     /// Ticket #87: the cheapest leg a seat's Ship can fly from this Body today, in Fuel.
-    pub fn cheapest_leg_from(&self, seat: Seat, body: BodyId) -> Option<i64> {
+    pub fn cheapest_leg_from(&self, seat: Seat, body: BodyId) -> Option<f64> {
         self.cheapest_leg_from_at(seat, body, self.turn)
     }
 
     /// Ticket #375 (version 0.09.2): the same on a given turn, and only over legs that can be flown
     /// at all -- the one rule for both, where `cheapest_leg_from` priced a Venus-to-Phobos leg no
     /// Ship can take.
-    pub fn cheapest_leg_from_at(&self, seat: Seat, body: BodyId, turn: u32) -> Option<i64> {
-        BodyId::ALL.into_iter().filter(|b| *b != body && Self::leg_allowed(body, *b)).map(|b| self.transit_cost_for_at(seat, body, b, turn).1).min()
+    pub fn cheapest_leg_from_at(&self, seat: Seat, body: BodyId, turn: u32) -> Option<f64> {
+        BodyId::ALL.into_iter().filter(|b| *b != body && Self::leg_allowed(body, *b)).map(|b| self.transit_cost_for_at(seat, body, b, turn).1).min_by(|a, b| a.total_cmp(b))
     }
 
     /// Ticket #87: a Ship at a Body whose tank cannot pay any leg from there, with no station of
@@ -2204,9 +2250,8 @@ impl Game {
         // Ticket #335 (version 0.09.0): a station fuels only a Ship in its own orbit, so a station
         // in another orbit rescues this Ship only while the tank can still pay the orbit change
         // that would reach it. A dry tank in the wrong orbit is stranded with a station in sight.
-        if self.refuel_station_at(s.seat, body)
-            && (self.ship_orbit(s).slot().is_some_and(|sl| self.station_at(body, sl).is_some_and(|c| self.fuels_for(c, s.seat))) || s.fuel >= self.tables.orbit_change_fuel)
-        {
+        // Ticket #396 (version 0.09.3): or a Refinery Colony under the low orbit it sits in.
+        if self.refuel_station_at(s.seat, body) && (self.depot_in_orbit(s.seat, body, self.ship_orbit(s)).is_some() || s.fuel >= self.tables.orbit_change_fuel as f64) {
             return false;
         }
         match self.cheapest_leg_from(s.seat, body) {
@@ -2223,16 +2268,17 @@ impl Game {
     /// The station test is `stranded`'s: a station that fuels for the seat in the orbit the leg
     /// ends in rescues it outright; one in another orbit of the far Body only while the tank left
     /// can still pay the orbit change that would reach it.
-    pub fn arrival_leaves_stranded(&self, seat: Seat, ship: ShipId, to: BodyId, slot: Option<u32>) -> Option<i64> {
+    pub fn arrival_leaves_stranded(&self, seat: Seat, ship: ShipId, to: BodyId, slot: Option<u32>) -> Option<f64> {
         let s = self.ship(ship)?;
         let ShipAt::Body(from) = s.at else { return None };
         let (turns, fuel) = self.transit_cost_for(seat, from, to);
-        let left = s.fuel - fuel;
-        if left < 0 {
+        let left = tenth(s.fuel - fuel);
+        if left < 0.0 {
             return None;
         }
-        let station_in_orbit = slot.is_some_and(|sl| self.station_at(to, sl).is_some_and(|c| self.fuels_for(c, seat)));
-        if station_in_orbit || (self.refuel_station_at(seat, to) && left >= self.tables.orbit_change_fuel) {
+        // Ticket #396 (version 0.09.3): a Refinery Colony under low orbit is a depot too.
+        let depot_in_orbit = self.depot_in_orbit(seat, to, Orbit::of(slot)).is_some();
+        if depot_in_orbit || (self.refuel_station_at(seat, to) && left >= self.tables.orbit_change_fuel as f64) {
             return None;
         }
         let cheapest = self.cheapest_leg_from_at(seat, to, self.turn + turns)?;
@@ -2449,10 +2495,11 @@ impl Game {
         per.min(afford)
     }
 
-    /// What a Colony Module costs this seat in Materials, rounded down (ticket #51).
-    pub fn module_materials(&self, seat: Seat, kind: ModuleKind) -> i64 {
+    /// What a Colony Module costs this seat in Materials (ticket #51). Ticket #387 (version
+    /// 0.09.3): to the tenth, where it was rounded down.
+    pub fn module_materials(&self, seat: Seat, kind: ModuleKind) -> f64 {
         let base = self.tables.module(kind).materials as f64;
-        (base * self.tables.faction(self.kind(seat)).module_materials_multiplier).floor() as i64
+        tenth(base * self.tables.faction(self.kind(seat)).module_materials_multiplier)
     }
 
     /// Ticket #88 (version 0.06.0): the working Mines a Colony holds (not mothballed, not still
@@ -2462,9 +2509,10 @@ impl Game {
     }
 
     /// Ticket #88: what a Module costs this seat at this Colony: the row times the Faction's
-    /// multiplier, times the in-situ step for the Colony's working Mines, rounded down, never
-    /// below the floor of the row. Ships and stations never take it.
-    pub fn module_materials_at(&self, seat: Seat, colony: ColonyId, kind: ModuleKind) -> i64 {
+    /// multiplier, times the in-situ step for the Colony's working Mines, never below the floor of
+    /// the row. Stations never take it; Ships take it at a low-gravity yard since ticket #398
+    /// (`ship_materials_at`). Ticket #387 (version 0.09.3): to the tenth, where it was rounded down.
+    pub fn module_materials_at(&self, seat: Seat, colony: ColonyId, kind: ModuleKind) -> f64 {
         let row = self.tables.module(kind).materials as f64;
         let faction = self.tables.faction(self.kind(seat)).module_materials_multiplier;
         let t = &self.tables.in_situ;
@@ -2474,32 +2522,60 @@ impl Game {
             _ => t.two_mines,
         };
         let price = (row * faction * step).max(row * t.floor);
-        price.floor() as i64
+        tenth(price)
     }
 
-    /// What a Space Station costs this seat in Materials, rounded down (ticket #51).
     /// Ticket #72 (version 0.05.5): what a Facility costs this seat in Materials: the row's figure
-    /// times the Faction's multiplier (the Prospectors' 0.85), rounded down.
-    pub fn facility_materials(&self, seat: Seat, kind: FacilityKind) -> i64 {
+    /// times the Faction's multiplier (the Prospectors' 0.85). Ticket #387 (version 0.09.3): to the
+    /// tenth, where it was rounded down: 25 x 0.85 is 21.3.
+    pub fn facility_materials(&self, seat: Seat, kind: FacilityKind) -> f64 {
         let base = self.tables.facility(kind).materials as f64;
-        (base * self.tables.faction(self.kind(seat)).facility_materials_multiplier).floor() as i64
+        tenth(base * self.tables.faction(self.kind(seat)).facility_materials_multiplier)
     }
 
-    pub fn station_materials(&self, seat: Seat) -> i64 {
+    /// What a Space Station costs this seat in Materials (ticket #51); ticket #387: to the tenth.
+    pub fn station_materials(&self, seat: Seat) -> f64 {
         let base = self.tables.station_materials as f64;
-        (base * self.tables.faction(self.kind(seat)).station_materials_multiplier).floor() as i64
+        tenth(base * self.tables.faction(self.kind(seat)).station_materials_multiplier)
     }
 
     /// What a Ship costs this seat: the units.toml figure, or the Faction's own Colony Ship price;
-    /// ticket #83 (version 0.06.0): times the Faction's Ship multiplier, rounded down (the
-    /// Arkwrights' 0.85).
-    pub fn ship_materials(&self, seat: Seat, kind: UnitKind) -> i64 {
-        let card = self.tables.faction(self.kind(seat));
-        let base = match (kind, card.colony_ship_materials) {
+    /// ticket #83 (version 0.06.0): times the Faction's Ship multiplier (the Arkwrights' 0.85).
+    /// Ticket #387 (version 0.09.3): to the tenth, where it was rounded down.
+    pub fn ship_materials(&self, seat: Seat, kind: UnitKind) -> f64 {
+        tenth(self.ship_row(seat, kind) * self.tables.faction(self.kind(seat)).ship_materials_multiplier)
+    }
+
+    /// The row a Ship is priced from: the units.toml figure, or the Faction's own Colony Ship price.
+    fn ship_row(&self, seat: Seat, kind: UnitKind) -> f64 {
+        let row = match (kind, self.tables.faction(self.kind(seat)).colony_ship_materials) {
             (UnitKind::ColonyShip, Some(m)) => m,
             _ => self.tables.unit(kind).materials,
         };
-        (base as f64 * card.ship_materials_multiplier).floor() as i64
+        row as f64
+    }
+
+    /// Ticket #398 (version 0.09.3): **what a Ship costs this seat at this yard.** Build Where You
+    /// Dig reaches a Ship built at a Shipyard on a low-gravity Body -- the Moon, Phobos, Deimos --
+    /// at the Module's own steps (`in_situ`: one working Mine there, two or more, never under the
+    /// floor of the row), on top of the Faction's discount, for every kind of Ship (the designer,
+    /// Q1 A) and on Materials alone: the tank's Fuel is untouched. A station is in orbit and holds
+    /// no Mine; a Mars or Venus yard pays the seat's price (Q2 A); a mothballed Mine counts for
+    /// nothing. The Faction window still says the seat's price through `ship_materials`.
+    pub fn ship_materials_at(&self, seat: Seat, site: Place, kind: UnitKind) -> f64 {
+        let Place::Colony(cid) = site else { return self.ship_materials(seat, kind) };
+        let Some(col) = self.colony(cid) else { return self.ship_materials(seat, kind) };
+        if col.in_orbit || !self.tables.body(col.body).low_gravity {
+            return self.ship_materials(seat, kind);
+        }
+        let t = &self.tables.in_situ;
+        let step = match self.working_mines(col) {
+            0 => return self.ship_materials(seat, kind),
+            1 => t.one_mine,
+            _ => t.two_mines,
+        };
+        let row = self.ship_row(seat, kind);
+        tenth((row * self.tables.faction(self.kind(seat)).ship_materials_multiplier * step).max(row * t.floor))
     }
 
     /// Which seat an Army fights for, if any: it follows its home (spec 8.4).
@@ -2648,7 +2724,7 @@ impl Game {
     /// Read LIVE off the tank, as Orbital Control always has been: a fleet that spends its last
     /// Fuel winning a Battle loses the orbit at that moment, not a turn later.
     pub fn ship_holds_the_battle_bar(&self, s: &Ship) -> bool {
-        s.fuel >= self.tables.melee.battle_fuel
+        s.fuel >= self.tables.melee.battle_fuel as f64
     }
 
     /// Ticket #346: the strength a hull brings to a Battle it enters dry -- `dry_strength_share` of
@@ -3350,10 +3426,12 @@ impl Game {
     }
 
     /// Ticket #268: what `ppm` of carbon credit costs `buyer` in Ducats, at the table price times
-    /// the seller's view of them, rounded up so a lot is never free.
-    pub fn credit_cost(&self, buyer: Seat, ppm: i64) -> Option<i64> {
+    /// the seller's view of them. Ticket #387 (version 0.09.3): to the tenth, where it was rounded
+    /// up to the whole; a lot is still never free, since the table price is whole and the
+    /// multiplier never nought.
+    pub fn credit_cost(&self, buyer: Seat, ppm: i64) -> Option<f64> {
         let m = self.credit_price_multiplier(buyer)?;
-        Some(((ppm * self.tables.carbon_credits.price_per_ppm) as f64 * m).ceil() as i64)
+        Some(tenth((ppm * self.tables.carbon_credits.price_per_ppm) as f64 * m))
     }
 
     /// Ticket #53: the four Factions' Blame added together.
@@ -3523,6 +3601,12 @@ impl Game {
     ///
     /// Returns whether the first was claimed, and pays the windfall into the seat's accumulator when
     /// it was. It is paid once: losing the Colony and taking it back never pays it again.
+    ///
+    /// Ticket #395 (version 0.09.3): a claim also eases the world -- half a point off every Region's
+    /// Unrest, held or nobody's, once a Body -- said in one line for the whole Earth. It lands in
+    /// the Resolution's cargo step, before the Unrest step, so a Region at the top eased to nine
+    /// and a half does not throw its holder off that turn, and a Region whose net line has a named
+    /// cause carries the half unnamed inside its figures, as the natural fall does.
     pub fn claim_first(&mut self, seat: Seat, body: BodyId, colony: ColonyId) -> bool {
         if body == BodyId::Earth {
             return false;
@@ -3546,9 +3630,20 @@ impl Game {
         let (faction, place, body_name) = (self.seat_name(seat), self.place_name(Place::Colony(colony)), self.tables.body(body).name.clone());
         let line = format!("{} is the first Faction to settle {}: {} Influence.", faction, body_name, windfall);
         self.log(line);
-        let args = [("faction", faction), ("body", body_name), ("colony", place), ("n", windfall.to_string())];
+        // Ticket #395 (version 0.09.3): the first ground Colony ever founded on a Body eases Unrest
+        // by half a point in EVERY Region at once, whoever holds it, once a Body -- the designer's
+        // "very small reduction in unrest globally". One table-wide line says it; the per-Region
+        // net lines stay quiet, since fourteen lines the same turn is the spam #371 quieted.
+        let ease = self.tables.unrest.first_colony_ease;
+        for sid in StateId::ALL {
+            self.lower_unrest(sid, ease);
+        }
+        self.log(format!("The first Colony on {body_name} eased Unrest by {} in every Region on Earth.", figure(ease)));
+        let args = [("faction", faction), ("body", body_name.clone()), ("colony", place), ("n", windfall.to_string()), ("ease", figure(ease))];
         let text = self.say("first_to_body", &args);
         self.report_line(LineKind::ColonyFounded, Some(ReportPlace::Colony(colony)), text);
+        let eased = self.say("first_to_body_eases", &[("body", body_name), ("ease", figure(ease))]);
+        self.report_line(LineKind::Unrest, None, eased);
         self.moment(MomentKind::FirstToABody, &args, Some(ReportPlace::Colony(colony)));
         true
     }
@@ -3834,17 +3929,22 @@ impl Game {
     /// needs to be positively chosen, not just the presence of a ship" -- and a blockaded station
     /// makes nothing (`starved_by`).
     pub fn slot_blockaded_against(&self, seat: Seat, body: BodyId, slot: u32) -> bool {
+        self.orbit_blockaded_against(seat, body, Orbit::Slot(slot))
+    }
+
+    /// Ticket #396 (version 0.09.3): the same test for any orbit, low orbit included, since a
+    /// Refinery Colony's depot in low orbit is shut by a Blockade there as a station's is in its
+    /// ring. `slot_blockaded_against` reads this for a ring.
+    pub fn orbit_blockaded_against(&self, seat: Seat, body: BodyId, orbit: Orbit) -> bool {
         // Ticket #324 (version 0.08.8): nor a seat with a Battery standing in that orbit; ticket
         // #335: its own orbit is the one a Battery covers, so it is the station's own Battery that
         // lifts the Blockade of the station's own slot.
-        if !self.batteries_at(seat, body, Orbit::Slot(slot)).is_empty() {
+        if !self.batteries_at(seat, body, orbit).is_empty() {
             return false;
         }
         // Ticket #320 (version 0.08.8): a Blockade does not shut out a partner under Passage.
         // Ticket #335: the blockading stack sits in the orbit it shuts, as it always had to.
-        self.ships
-            .iter()
-            .any(|s| s.seat != seat && !self.accord_has(seat, s.seat, Term::Passage) && self.blockading(s) && self.ship_in_orbit(s, body, Orbit::Slot(slot)))
+        self.ships.iter().any(|s| s.seat != seat && !self.accord_has(seat, s.seat, Term::Passage) && self.blockading(s) && self.ship_in_orbit(s, body, orbit))
     }
 
     /// Ticket #278: a warship on Blockade, still engaged. The one test every blockade reads.
@@ -3905,10 +4005,27 @@ impl Game {
     /// Ticket #335 (version 0.09.0): **in the orbit the Ship sits in**. A station's own orbit is
     /// what touches that station, refuelling included, so a Ship in low orbit fuels at nothing and
     /// a Ship at one station's ring cannot draw from another's.
+    ///
+    /// Ticket #396 (version 0.09.3): or a Refinery Colony under low orbit (`depot_in_orbit`); a
+    /// Blockade of that low orbit shuts it as a Blockade of a ring shuts the station there.
     pub fn refuelling_station(&self, seat: Seat, body: BodyId, orbit: Orbit) -> bool {
-        let Some(slot) = orbit.slot() else { return false };
-        self.station_at(body, slot)
-            .is_some_and(|c| self.fuels_for(c, seat) && c.control.director().is_some_and(|d| !self.slot_blockaded_against(d, body, slot)))
+        self.open_depot_in_orbit(seat, body, orbit).is_some()
+    }
+
+    /// Ticket #396 (version 0.09.3): the depot in this orbit that fuels this seat AND is open this
+    /// turn -- its holder not blockaded there. One test for the order's check and its refusal,
+    /// since low orbit can hold two ground depots (one's own and a partner's) and the first found
+    /// may be shut while the second is open (the review's fix-up).
+    pub fn open_depot_in_orbit(&self, seat: Seat, body: BodyId, orbit: Orbit) -> Option<&Colony> {
+        self.colonies
+            .iter()
+            .find(|c| c.body == body && self.colony_orbit(c) == orbit && self.fuels_for(c, seat) && c.control.director().is_some_and(|d| !self.orbit_blockaded_against(d, body, orbit)))
+    }
+
+    /// Ticket #396 (version 0.09.3): whether this seat holds a depot of its own at the Body -- a
+    /// station, or a Refinery Colony on the ground -- so a Refuel there is not a partner's.
+    pub fn own_depot_at(&self, seat: Seat, body: BodyId) -> bool {
+        self.colonies.iter().any(|c| c.body == body && c.control.director() == Some(seat) && self.refuel_depot(c))
     }
 
     /// Ticket #335 (version 0.09.0): whether a Ship sits in the orbit that touches this Colony --
@@ -3933,30 +4050,33 @@ impl Game {
     /// sibling hop; Earth and the Moon reach anything else at that Body's card figures; anything else
     /// (a moon of Mars to the Moon, say) is the farther card. Ticket #57: a crossing between the
     /// Earth system and the Mars system pays what the phase angle this turn makes it pay instead.
-    pub fn transit_cost(&self, from: BodyId, to: BodyId) -> (u32, i64) {
+    pub fn transit_cost(&self, from: BodyId, to: BodyId) -> (u32, f64) {
         self.transit_cost_at(from, to, self.turn)
     }
 
     /// The same at any turn, for the window tooltip and the AI's planning.
-    pub fn transit_cost_at(&self, from: BodyId, to: BodyId, turn: u32) -> (u32, i64) {
+    pub fn transit_cost_at(&self, from: BodyId, to: BodyId, turn: u32) -> (u32, f64) {
         let tech = if self.has_tech(TechId::EfficientTransit) { self.tables.tech(TechId::EfficientTransit).value } else { 1.0 };
-        self.transit_cost_with(from, to, 1.0, tech, turn)
+        let days_factor = if self.has_tech(TechId::NuclearRockets) { self.tables.tech(TechId::NuclearRockets).value } else { 1.0 };
+        self.transit_cost_with(from, to, 1.0, tech, days_factor, turn)
     }
 
     /// The transit as one seat pays it (ticket #51): the Faction's own Fuel multiplier first, then
-    /// Efficient Transit, multiplicative, rounded down once at the end.
-    pub fn transit_cost_for(&self, seat: Seat, from: BodyId, to: BodyId) -> (u32, i64) {
+    /// Efficient Transit, multiplicative, settled to the tenth once at the end (ticket #387,
+    /// version 0.09.3; rounded down before). Ticket #393: and the turns as the seat reads Nuclear
+    /// Rockets, at half under Provisional Findings, so the quote, the order and the flight agree.
+    pub fn transit_cost_for(&self, seat: Seat, from: BodyId, to: BodyId) -> (u32, f64) {
         self.transit_cost_for_at(seat, from, to, self.turn)
     }
 
-    pub fn transit_cost_for_at(&self, seat: Seat, from: BodyId, to: BodyId, turn: u32) -> (u32, i64) {
+    pub fn transit_cost_for_at(&self, seat: Seat, from: BodyId, to: BodyId, turn: u32) -> (u32, f64) {
         let faction = self.tables.faction(self.kind(seat)).transit_fuel_multiplier;
-        let (turns, fuel) = self.transit_cost_with(from, to, faction, self.tech_multiplier(seat, TechId::EfficientTransit), turn);
+        let (turns, fuel) = self.transit_cost_with(from, to, faction, self.tech_multiplier(seat, TechId::EfficientTransit), self.tech_multiplier(seat, TechId::NuclearRockets), turn);
         // Ticket #92 (version 0.06.0): a working Mass Driver of the seat's at the Body it leaves
         // takes a flat figure off, after the multipliers, never below the minimum.
         if self.mass_driver_at(seat, from) {
             let md = &self.tables.mass_driver;
-            return (turns, (fuel - md.fuel_off).max(md.fuel_min));
+            return (turns, (fuel - md.fuel_off as f64).max(md.fuel_min as f64));
         }
         (turns, fuel)
     }
@@ -3969,7 +4089,11 @@ impl Game {
             .any(|c| c.modules.iter().any(|m| m.kind == ModuleKind::MassDriver && m.working()))
     }
 
-    fn transit_cost_with(&self, from: BodyId, to: BodyId, faction: f64, tech: f64, turn: u32) -> (u32, i64) {
+    /// Ticket #393 (version 0.09.3): `days_factor` is Nuclear Rockets' factor on a crossing's DAYS
+    /// (0.8, or 0.9 read at half), applied before the rounding up to turns, so a long crossing loses
+    /// a turn and a one-turn hop never does. It is the one thing that touches a transit's turns;
+    /// `faction` and `tech` (Efficient Transit) touch the Fuel alone.
+    fn transit_cost_with(&self, from: BodyId, to: BodyId, faction: f64, tech: f64, days_factor: f64, turn: u32) -> (u32, f64) {
         let t = &self.tables;
         let parent = |b: BodyId| t.body(b).parent;
         let near_earth = |b: BodyId| b == BodyId::Earth || parent(b) == Some(BodyId::Earth);
@@ -3994,12 +4118,13 @@ impl Game {
         let (turns, fuel) = match self.crossing(from, to, turn) {
             None => (turns, fuel as f64),
             Some((offset, tr)) => {
-                let days = tr.days_at_window + tr.days_per_degree * offset.abs();
+                let days = (tr.days_at_window + tr.days_per_degree * offset.abs()) * days_factor;
                 let turns = ((days / tr.days_per_turn).ceil() as u32).clamp(1, tr.max_turns);
                 (turns, fuel as f64 * (1.0 + tr.fuel_per_degree * offset.abs()))
             }
         };
-        let fuel = (fuel * faction * tech).floor() as i64;
+        // Ticket #387 (version 0.09.3): to the tenth, where it was rounded down.
+        let fuel = tenth(fuel * faction * tech);
         (turns.max(1), fuel)
     }
 
@@ -4245,10 +4370,10 @@ impl Game {
     }
 
     /// Cheap Industry, the Prospectors' signature rule (spec 14.2).
-    pub fn industry_cost(&self, seat: Seat) -> i64 {
+    pub fn industry_cost(&self, seat: Seat) -> f64 {
         match self.kind(seat) {
-            FactionKind::Prospectors => self.tables.industry_level.materials_cheap_industry,
-            _ => self.tables.industry_level.materials,
+            FactionKind::Prospectors => self.tables.industry_level.materials_cheap_industry as f64,
+            _ => self.tables.industry_level.materials as f64,
         }
     }
 
@@ -4262,9 +4387,12 @@ impl Game {
         self.state(s).unrest
     }
 
-    /// Ticket #53: Unrest moves in halves, so print the fraction only when there is one.
+    /// Ticket #53: Unrest moves in halves, so print the fraction only when there is one. Ticket #389
+    /// (version 0.09.3): and in quarters where a Stadium halves what a Constabulary left of a climate
+    /// rise, at the designer's word, so a quarter prints to two places (3.25) and nothing else does.
     pub fn unrest_figure(v: f64) -> String {
-        if (v - v.round()).abs() < 1e-9 { format!("{}", v.round() as i64) } else { format!("{v:.1}") }
+        let tenths = (v * 10.0).round() / 10.0;
+        if (v - tenths).abs() < 1e-9 { figure(v) } else { format!("{v:.2}") }
     }
 
     /// A state's Unrest as the card and the map print it.
@@ -4287,6 +4415,11 @@ impl Game {
     /// A Constabulary standing and online in the state.
     pub fn constabulary_online(&self, s: StateId) -> bool {
         self.state(s).facilities.iter().any(|f| f.kind == FacilityKind::Constabulary && f.working())
+    }
+
+    /// Ticket #389 (version 0.09.3): a working Stadium here, which halves what the climate adds.
+    pub fn stadium_online(&self, s: StateId) -> bool {
+        self.state(s).facilities.iter().any(|f| f.kind == FacilityKind::Stadium && f.working())
     }
 
     /// How much smaller a rise from `source` is here (rule 4 of #52, widened on #53 so the green
@@ -4317,7 +4450,13 @@ impl Game {
         if amount <= 0.0 {
             return 0.0;
         }
-        let damped = (amount - self.unrest_damping(s, source)).max(0.0);
+        let mut damped = (amount - self.unrest_damping(s, source)).max(0.0);
+        // Ticket #389 (version 0.09.3): a working Stadium halves what is left of a CLIMATE rise
+        // after the damping above -- a heat rise of 1 lands as a half, a quarter with a
+        // Constabulary beside it -- and touches no Agitate and no refugees.
+        if source == UnrestSource::Climate && self.stadium_online(s) {
+            damped *= self.tables.unrest.stadium_factor;
+        }
         if damped <= 0.0 {
             return 0.0;
         }

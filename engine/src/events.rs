@@ -86,12 +86,29 @@ impl Game {
         if !self.rolls_a_card() {
             return;
         }
-        let Some(card) = self.deck.cards.pop() else {
-            self.draw = CardDraw::DeckEmpty;
-            return;
+        // Ticket #388 (version 0.09.3): a Choice Card that reaches NO seat at all is put back at
+        // the bottom of the deck, unspent, and the next card is the turn's draw -- once a turn, so
+        // the deck cannot loop; the card that comes next is the draw whatever it is. A card that
+        // reaches a rival but not the player is still drawn: the designer's choice, C of three.
+        let mut put_back = false;
+        let (card, id) = loop {
+            let Some(card) = self.deck.cards.pop() else {
+                self.draw = CardDraw::DeckEmpty;
+                return;
+            };
+            let Card::Event(id) = card;
+            if !put_back && self.tables.event(id).asks() && !Seat::ALL.into_iter().any(|s| self.card_reaches(id, s)) {
+                self.deck.cards.insert(0, card);
+                put_back = true;
+                let name = self.tables.event(id).name.clone();
+                self.log(format!("{name} reached nobody at the table and went to the bottom of the deck unspent."));
+                let text = self.say("card_put_back", &[("card", name)]);
+                self.report_line(LineKind::Card, None, text);
+                continue;
+            }
+            break (card, id);
         };
         self.deck.drawn.push(card);
-        let Card::Event(id) = card;
         if !self.tables.event(id).asks() {
             // One of the 22: held, unannounced, for the Event phase.
             self.draw = CardDraw::Ordinary(id);
@@ -184,7 +201,7 @@ impl Game {
         match rule {
             CardRule::Always => true,
             CardRule::Never => false,
-            CardRule::DucatsAtLeast { ducats } => self.seat(seat).stockpile.ducats >= *ducats,
+            CardRule::DucatsAtLeast { ducats } => self.seat(seat).stockpile.ducats >= *ducats as f64,
             CardRule::UnrestAtLeast { unrest } => self.controlled_states(seat).iter().any(|s| self.state(*s).unrest >= *unrest),
             CardRule::UnrestBelow { unrest } => self.controlled_states(seat).iter().all(|s| self.state(*s).unrest < *unrest),
             CardRule::BlameAtLeast { blame } => self.blame(seat) >= *blame,
@@ -229,6 +246,15 @@ impl Game {
         !side.is_empty() && side.iter().all(|e| self.card_effect_has_target(e, seat))
     }
 
+    /// Ticket #388 (version 0.09.3): WHY a card cannot reach this seat, in the engine's own words
+    /// -- "have no Ship in orbit", "hold no Region" -- read off the first effect on either side
+    /// with nothing of the seat's to land on, so the Report and the driver say the same reason the
+    /// draw decided by. Nothing where the card reaches the seat.
+    pub fn card_lack(&self, id: EventId, seat: Seat) -> Option<String> {
+        let c = self.tables.event(id).choice.as_ref()?;
+        c.take_does.iter().chain(c.refuse_does.iter()).find_map(|e| self.card_effect_lack(e, seat))
+    }
+
     /// Ticket #337: whether this seat could PAY for the card's offer, which is a different question
     /// from whether the offer has anything to land on. A seat that cannot pay is asked all the same
     /// (the designer's word when the first build skipped it): the offer is closed to it and refusing
@@ -265,13 +291,13 @@ impl Game {
         match e {
             CardEffect::Resources { materials, fuel, energy, ducats, research: _ } => [(s.stockpile.materials, *materials, "Materials"), (s.stockpile.fuel, *fuel, "Fuel"), (s.stockpile.energy, *energy, "Energy"), (s.stockpile.ducats, *ducats, "Ducats")]
                 .into_iter()
-                .filter(|(have, ask, _)| have + ask < 0)
-                .map(|(have, ask, name)| format!("{have} {name} of the {} it asks", -ask))
+                .filter(|(have, ask, _)| (have + *ask as f64) < 0.0)
+                .map(|(have, ask, name)| format!("{} {name} of the {} it asks", figure(have), -ask))
                 .collect(),
             CardEffect::PerUnitCost { per, resource, amount } => {
                 let need = self.card_things(seat, *per) as i64 * amount;
                 let have = self.stock_of(seat, *resource);
-                if have < need { vec![format!("{have} {} of the {need} it asks", resource.name())] } else { Vec::new() }
+                if have < need as f64 { vec![format!("{} {} of the {need} it asks", figure(have), resource.name())] } else { Vec::new() }
             }
             // Ticket #375 (version 0.09.2): a call is answered by a docked Ship; with every hull in
             // flight the offer is closed, and this is why.
@@ -284,31 +310,41 @@ impl Game {
     /// asked about here: whether the seat can PAY is `card_effect_affordable`, and a seat that
     /// cannot pay is still asked the card.
     fn card_effect_has_target(&self, e: &CardEffect, seat: Seat) -> bool {
+        self.card_effect_lack(e, seat).is_none()
+    }
+
+    /// Ticket #388 (version 0.09.3): ONE test of whether an effect has something of the seat's to
+    /// land on, answering with what the seat LACKS when it has not -- a `lack_*` phrase from
+    /// `report.toml` -- and nothing when it has. The draw decides by it (`card_effect_has_target`)
+    /// and the Report explains by it (`card_lack`), so the two can never disagree.
+    fn card_effect_lack(&self, e: &CardEffect, seat: Seat) -> Option<String> {
+        let t = &self.tables;
+        let lacks = |has: bool, key: &str, args: &[(&str, String)]| if has { None } else { Some(self.say(key, args)) };
         match e {
-            CardEffect::Resources { .. } => true,
-            CardEffect::PerUnitCost { per, .. } => self.card_things(seat, *per) > 0,
-            CardEffect::PopulationToMostPopulous { .. } | CardEffect::StandingAtMostPopulous { .. } | CardEffect::UnrestAtMostPopulous { .. } | CardEffect::PioneersFree { .. } => {
-                self.card_most_populous(seat).is_some()
+            CardEffect::Resources { .. } | CardEffect::EmissionsNext { .. } | CardEffect::TradePrice { .. } | CardEffect::RelationsAllRivals { .. } | CardEffect::BlamePpm { .. } => None,
+            CardEffect::PerUnitCost { per: CardThing::Facility(kind), .. } => lacks(self.card_things(seat, CardThing::Facility(*kind)) > 0, "lack_facility", &[("facility", t.facility(*kind).name.clone())]),
+            CardEffect::PerUnitCost { per: CardThing::ShipInOrbit, .. } => lacks(self.card_things(seat, CardThing::ShipInOrbit) > 0, "lack_ship_in_orbit", &[]),
+            CardEffect::PopulationToMostPopulous { .. } | CardEffect::StandingAtMostPopulous { .. } | CardEffect::UnrestAtMostPopulous { .. } | CardEffect::PioneersFree { .. } | CardEffect::FreeBuilding { army: true, .. } => {
+                lacks(self.card_most_populous(seat).is_some(), "lack_populated_region", &[])
             }
-            CardEffect::StandingAllHeld { .. } | CardEffect::UnrestAllHeld { .. } => !self.controlled_states(seat).is_empty(),
-            CardEffect::UnrestAtBusiest { .. } | CardEffect::WidgetsNow { .. } => self.card_busiest(seat).is_some(),
-            CardEffect::EmissionsNext { .. } | CardEffect::TradePrice { .. } | CardEffect::RelationsAllRivals { .. } | CardEffect::BlamePpm { .. } => true,
-            CardEffect::HoldShips | CardEffect::HoldOneShip => self.ships.iter().any(|s| s.seat == seat),
-            CardEffect::DamageShips { in_orbit, .. } => self.ships.iter().any(|s| s.seat == seat && (!in_orbit || matches!(s.at, ShipAt::Body(_)))),
-            CardEffect::FacilityOutputMultiplier { facility, .. } => self
-                .directed_states(seat)
-                .iter()
-                .any(|sid| self.state(*sid).facilities.iter().any(|f| f.kind.does_the_job_of(*facility))),
-            CardEffect::DiscoveryAtColony { module, .. } => self.card_discovery_body(seat, *module).is_some(),
-            CardEffect::FreeBuilding { module, army } => {
-                if *army {
-                    self.card_most_populous(seat).is_some()
-                } else if let Some(k) = module {
-                    self.card_smallest_colony(seat, *k).is_some()
-                } else {
-                    false
-                }
-            }
+            CardEffect::StandingAllHeld { .. } | CardEffect::UnrestAllHeld { .. } => lacks(!self.controlled_states(seat).is_empty(), "lack_region", &[]),
+            CardEffect::UnrestAtBusiest { .. } | CardEffect::WidgetsNow { .. } => lacks(self.card_busiest(seat).is_some(), "lack_busy_region", &[]),
+            CardEffect::HoldShips | CardEffect::HoldOneShip => lacks(self.ships.iter().any(|s| s.seat == seat), "lack_ship", &[]),
+            CardEffect::DamageShips { in_orbit, .. } => lacks(
+                self.ships.iter().any(|s| s.seat == seat && (!in_orbit || matches!(s.at, ShipAt::Body(_)))),
+                if *in_orbit { "lack_ship_in_orbit" } else { "lack_ship" },
+                &[],
+            ),
+            CardEffect::FacilityOutputMultiplier { facility, .. } => lacks(
+                self.directed_states(seat).iter().any(|sid| self.state(*sid).facilities.iter().any(|f| f.kind.does_the_job_of(*facility))),
+                "lack_facility",
+                &[("facility", t.facility(*facility).name.clone())],
+            ),
+            CardEffect::DiscoveryAtColony { module, .. } => lacks(self.card_discovery_body(seat, *module).is_some(), "lack_colony_module", &[("module", t.module(*module).name.clone())]),
+            CardEffect::FreeBuilding { module: Some(k), army: false } => lacks(self.card_smallest_colony(seat, *k).is_some(), "lack_colony_room", &[("module", t.module(*k).name.clone())]),
+            // A free building that is neither a Module nor an Army names nothing to give; no card in
+            // the data is written so, and one that were would reach nobody.
+            CardEffect::FreeBuilding { module: None, army: false } => Some(self.say("lack_region", &[])),
         }
     }
 
@@ -324,7 +360,7 @@ impl Game {
         }
     }
 
-    fn stock_of(&self, seat: Seat, r: Resource) -> i64 {
+    fn stock_of(&self, seat: Seat, r: Resource) -> f64 {
         let s = &self.seat(seat).stockpile;
         match r {
             Resource::Materials => s.materials,
@@ -332,7 +368,7 @@ impl Game {
             Resource::Energy => s.energy,
             Resource::Ducats => s.ducats,
             // Research is the table's pool and never a seat's stock, so nothing is ever held in it.
-            Resource::Research | Resource::Widgets => 0,
+            Resource::Research | Resource::Widgets => 0.0,
         }
     }
 
@@ -409,7 +445,7 @@ impl Game {
         self.ships
             .iter()
             .filter(|s| s.seat == seat && matches!(s.at, ShipAt::Body(_)))
-            .max_by_key(|s| (s.fuel, std::cmp::Reverse(s.id.0)))
+            .max_by(|a, b| a.fuel.total_cmp(&b.fuel).then(b.id.0.cmp(&a.id.0)))
             .map(|s| s.id)
     }
 
@@ -468,12 +504,16 @@ impl Game {
             self.report_line_of(seat, LineKind::YourWorks, LineKind::Card, None, text);
         }
         // A seat that was never asked is named too, so the Report does not simply pass it over.
+        // Ticket #388 (version 0.09.3): with the reason, and that neither side applied.
         for seat in Seat::ALL {
             if q.answers[seat.index()] == Some(CardAnswer::NothingToDecide) {
-                let text = self.say(
-                    "card_answered",
-                    &[("card", name.clone()), ("faction", self.seat_name(seat)), ("answer", CardAnswer::NothingToDecide.word().to_string())],
-                );
+                let lack = self.card_lack(q.card, seat).unwrap_or_else(|| CardAnswer::NothingToDecide.word().to_string());
+                // Capitalised, as the answers are: the Report draws the four together under the
+                // card's name and takes the "{card}: " off the front of each.
+                // The player's own line is second person, by the same test `line_kind_of` files it under
+                // Your works by: seat 0, and nobody's when the computer plays all four.
+                let (who, them) = if seat == Seat(0) && !self.spectator { ("You".to_string(), "you".to_string()) } else { (format!("The {}", self.seat_name(seat)), "them".to_string()) };
+                let text = self.say("card_passed_by", &[("card", name.clone()), ("who", who), ("lack", lack), ("them", them)]);
                 self.report_line_of(seat, LineKind::YourWorks, LineKind::Card, None, text);
             }
         }
@@ -482,23 +522,25 @@ impl Game {
     fn apply_card_effect(&mut self, seat: Seat, e: &CardEffect) {
         match e {
             CardEffect::Resources { materials, fuel, energy, ducats, research } => {
+                // Ticket #387 (version 0.09.3): a card's figures are whole numbers from the data,
+                // added to a stockpile carried to a tenth.
                 let s = &mut self.seat_mut(seat).stockpile;
-                s.materials = (s.materials + materials).max(0);
-                s.fuel = (s.fuel + fuel).max(0);
-                s.energy = (s.energy + energy).max(0);
-                s.ducats = (s.ducats + ducats).max(0);
+                s.materials = tenth((s.materials + *materials as f64).max(0.0));
+                s.fuel = tenth((s.fuel + *fuel as f64).max(0.0));
+                s.energy = tenth((s.energy + *energy as f64).max(0.0));
+                s.ducats = tenth((s.ducats + *ducats as f64).max(0.0));
                 if *research != 0 {
                     self.add_research_unattributed(*research);
                 }
             }
             CardEffect::PerUnitCost { per, resource, amount } => {
-                let bill = self.card_things(seat, *per) as i64 * amount;
+                let bill = (self.card_things(seat, *per) as i64 * amount) as f64;
                 let s = &mut self.seat_mut(seat).stockpile;
                 match resource {
-                    Resource::Materials => s.materials = (s.materials - bill).max(0),
-                    Resource::Fuel => s.fuel = (s.fuel - bill).max(0),
-                    Resource::Energy => s.energy = (s.energy - bill).max(0),
-                    Resource::Ducats => s.ducats = (s.ducats - bill).max(0),
+                    Resource::Materials => s.materials = tenth((s.materials - bill).max(0.0)),
+                    Resource::Fuel => s.fuel = tenth((s.fuel - bill).max(0.0)),
+                    Resource::Energy => s.energy = tenth((s.energy - bill).max(0.0)),
+                    Resource::Ducats => s.ducats = tenth((s.ducats - bill).max(0.0)),
                     Resource::Research | Resource::Widgets => {}
                 }
             }
@@ -954,7 +996,7 @@ impl Game {
                     }
                     if let Some(h) = holder {
                         let s = &mut self.seat_mut(h).stockpile;
-                        s.energy = (s.energy - t.events.reactor_leak_energy).max(0);
+                        s.energy = tenth((s.energy - t.events.reactor_leak_energy as f64).max(0.0));
                     }
                 }
             }

@@ -2415,7 +2415,7 @@ const SHORT_RED: Color32 = Color32::from_rgb(255, 90, 80);
 /// line after the fact keeps it.
 fn shortfall_hover(f: &dying_earth_engine::ShortfallForecast) -> String {
     const SHOWN: usize = 3;
-    let mut lines = vec![format!("Next Income is {} Energy short. These go dark, in this order:", f.short_by)];
+    let mut lines = vec![format!("Next Income is {} Energy short. These go dark, in this order:", figure(f.short_by))];
     for d in f.dark.iter().take(SHOWN) {
         // The Archive's name carries its own article.
         lines.push(format!("the {} {}", d.name.strip_prefix("The ").unwrap_or(&d.name), d.at));
@@ -2481,13 +2481,12 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
             let s = game.seat(Seat(0));
             let (left, influence_left) = game.remaining(Seat(0), &session.pending);
             let inc = s.income_last_turn;
-            let signed = |v: i64| if v >= 0 { format!("+{v}") } else { format!("{v}") };
             // Hover a resource for last Income by source (ticket #31).
             let sources = |res: dying_earth_engine::Resource| -> String {
-                let lines: Vec<String> = s.income_sources.iter().filter(|(_, r, _)| *r == res).map(|(name, _, v)| format!("{v:+}  {name}")).collect();
+                let lines: Vec<String> = s.income_sources.iter().filter(|(_, r, _)| *r == res).map(|(name, _, v)| format!("{}  {name}", signed(*v))).collect();
                 if lines.is_empty() { "No income from buildings last turn.".to_string() } else { format!("Last Income:\n{}", lines.join("\n")) }
             };
-            bar_resource(ui, icons, "materials", "Materials", format!("{} ({})", left.materials, signed(inc.materials)), sources(dying_earth_engine::Resource::Materials));
+            bar_resource(ui, icons, "materials", "Materials", format!("{} ({})", figure(left.materials), signed(inc.materials)), sources(dying_earth_engine::Resource::Materials));
             ui.separator();
             // Ticket #332 (version 0.09.0): Widgets, the work half of every build, beside the
             // Materials half. The figure is MADE / APPLIED -- what every place the player directs
@@ -2516,12 +2515,12 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
                 rule_tip(resp, widgets_bar_hover(game, made, applied));
                 ui.separator();
             }
-            bar_resource(ui, icons, "fuel", "Fuel", format!("{} ({})", left.fuel, signed(inc.fuel)), sources(dying_earth_engine::Resource::Fuel));
+            bar_resource(ui, icons, "fuel", "Fuel", format!("{} ({})", figure(left.fuel), signed(inc.fuel)), sources(dying_earth_engine::Resource::Fuel));
             ui.separator();
             // Ticket #351 (version 0.09.1): the Shortfall alarm. While the next Income would shut
             // anything -- counting what this turn's orders do to the Energy -- the figure turns red and
             // its hover names what goes dark, in order, in place of the Last Income breakdown.
-            let energy = format!("{} ({})", left.energy, signed(inc.energy));
+            let energy = format!("{} ({})", figure(left.energy), signed(inc.energy));
             match (!session.spectator).then(|| game.shortfall_forecast(Seat(0), &session.pending)).flatten() {
                 Some(f) => {
                     let resp = ui
@@ -2544,7 +2543,7 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
                 None => bar_resource(ui, icons, "energy", "Energy", energy, sources(dying_earth_engine::Resource::Energy)),
             }
             ui.separator();
-            bar_resource(ui, icons, "ducats", "Ducats", format!("{} ({})", left.ducats, signed(inc.ducats)), sources(dying_earth_engine::Resource::Ducats));
+            bar_resource(ui, icons, "ducats", "Ducats", format!("{} ({})", figure(left.ducats), signed(inc.ducats)), sources(dying_earth_engine::Resource::Ducats));
             // Ticket #72: the Prospectors' Fund stood beside their Materials from version 0.05.5,
             // when the Fund held Materials. Ticket #308 (version 0.08.7): moved beside Ducats as a
             // progress bar, then CUT on the designer's seeing it -- *"let's just cut it, the
@@ -3541,8 +3540,14 @@ fn pick(pos: Pos2, session: &Session, game: &Game, view: &mut ViewState, camera:
                     nearest = Some((t, body));
                 }
             }
-            if let Some((_, body)) = nearest {
-                view.enter_surface(body);
+            match nearest {
+                Some((_, body)) => view.enter_surface(body),
+                // Ticket #399 (version 0.09.3): a click on nothing clears the selection here as it
+                // does on a Surface Map, so a Ship's card gives way to the roster -- the designer:
+                // *"clicking outside of the ship card [should] revert to the ship roster the same
+                // way when viewing a nation and clicking outside of the card will revert to the
+                // earth card."* Until this the Solar System Map kept whatever card was open.
+                None => view.selection = Selection::None,
             }
         }
         View::Surface(body) => {
@@ -4563,7 +4568,7 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, seat: Seat, marks: boo
                 s.kind.name().to_lowercase(),
                 game.tables.body(body).name,
                 game.ship_fighting_strength(s),
-                s.fuel,
+                figure(s.fuel),
                 tank
             );
             if s.colonists > 0 {
@@ -4609,11 +4614,11 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, seat: Seat, marks: boo
             // orbit clause is also more accurate than what it replaces: since ticket #335 a station
             // fuels only a Ship in its OWN orbit, which "where the Ship sits" did not say.
             let tip = format!(
-                "{}: {} {}\nTank {} of {}. Fuel goes on transits, cheapest at a launch window.\nIt fills only at a station or Colony of yours in its own orbit. STRANDED: no leg it can pay, and nowhere to fill up.",
+                "{}: {} {}\nTank {} of {}. Fuel goes on transits, cheapest at a launch window.\nIt fills at a station of yours in that station's orbit, or in low orbit over a Colony of yours with a working Refinery; a Refuel partner's serve too. STRANDED: no leg it can pay, and nowhere to fill up.",
                 s.stance.name(),
                 s.stance.one_liner(true),
                 Stance::PERSISTS,
-                s.fuel,
+                figure(s.fuel),
                 tank
             );
             // Ticket #374 (version 0.09.2): the row opens the SHIP'S card, now that a Ship has one.
@@ -4784,7 +4789,7 @@ fn order_text(game: &Game, o: &Order) -> String {
                 None => format!("Move {ship} to another orbit"),
             }
         }
-        Order::Refuel { ship } => format!("Refuel {} ({} Fuel from the Stockpile)", ship, game.refuel_amount(Seat(0), *ship)),
+        Order::Refuel { ship } => format!("Refuel {} ({} Fuel from the Stockpile)", ship, figure(game.refuel_amount(Seat(0), *ship))),
         Order::ShipStance { body, stance } => format!("Ships at {}: {}", game.tables.body(*body).name, stance.name()),
         Order::Bombard { ship, colony } => format!("Bombard {} from {}", game.place_name(Place::Colony(*colony)), ship),
         // Ticket #343 (version 0.09.1): the engine lane's two new orders, so the order list can
@@ -4898,23 +4903,43 @@ const CHANGE_BUTTONS_WIDTH: f32 = 196.0;
 /// **A tooltip may run to a short list and no further.** Six lines is the ceiling; the Income
 /// breakdown is about that long and still works. Anything longer covers the thing it explains, which
 /// makes it a worse tooltip than none, and belongs on the card.
+/// `tip:<word>` or `tip:<word>#<k>` (a building aid, not part of the spec): the word a tooltip's
+/// text must contain to be forced open in a headless picture, and which match to open, the first
+/// unless a `#k` says otherwise. Ticket #392 (version 0.09.3): one parser for the three places
+/// that read the aid, where each had its own and the `#k` grammar reached only one of them.
+fn tip_aid() -> Option<(String, u32)> {
+    let arg = std::env::args().find_map(|a| a.strip_prefix("tip:").map(str::to_owned))?;
+    Some(match arg.rsplit_once('#').and_then(|(w, k)| k.parse::<u32>().ok().map(|k| (w.to_string(), k))) {
+        Some(parsed) => parsed,
+        None => (arg, 1),
+    })
+}
+
+/// Whether this tooltip is the one the `tip:` aid forces open on this pass: its text contains the
+/// word, and it is the k-th such tooltip drawn this pass. The count rides with the pass number, so
+/// a card of twelve build buttons all reading "Once it stands" opens exactly one of them, and the
+/// `#k` picks which; egui's sizing pass has a pass number of its own, so it counts afresh.
+fn tip_fires(ctx: &egui::Context, text: &str) -> bool {
+    let Some((word, wanted)) = tip_aid() else { return false };
+    if !text.contains(&word) {
+        return false;
+    }
+    let pass = ctx.cumulative_pass_nr();
+    let (seen_pass, seen): (u64, u32) = ctx.data(|d| d.get_temp(egui::Id::new("tip_seen"))).unwrap_or((u64::MAX, 0));
+    let seen = if seen_pass == pass { seen } else { 0 };
+    ctx.data_mut(|d| d.insert_temp(egui::Id::new("tip_seen"), (pass, seen + 1)));
+    seen + 1 == wanted
+}
+
 fn rule_tip(response: egui::Response, text: String) -> egui::Response {
-    // `tip:<word>` (a building aid, not part of the spec): the first tooltip whose text contains
-    // that word is shown WITHOUT a hover, so a headless picture can be taken of one. A tooltip is
+    // `tip:<word>` (a building aid, not part of the spec): the tooltip whose text contains that
+    // word is shown WITHOUT a hover, so a headless picture can be taken of one. A tooltip is
     // otherwise unreachable in a shot: the window sits off-screen and no pointer ever enters it,
-    // which would leave every tooltip in the game unlooked-at.
-    if let Some(word) = std::env::args().find_map(|a| a.strip_prefix("tip:").map(str::to_owned))
-        && text.contains(&word)
-    {
-        // Once a frame: a card of twelve build buttons all match "Ready", and twelve tooltips at
-        // once is a picture of nothing.
-        let pass = response.ctx.cumulative_pass_nr();
-        let fired: Option<u64> = response.ctx.data(|d| d.get_temp(egui::Id::new("tip_fired")));
-        if fired != Some(pass) {
-            response.ctx.data_mut(|d| d.insert_temp(egui::Id::new("tip_fired"), pass));
-            response.show_tooltip_ui(|ui| hover_with_icons(ui, &text));
-            return response;
-        }
+    // which would leave every tooltip in the game unlooked-at. Ticket #392 (version 0.09.3): the
+    // k-th match, through `tip_fires`, so a build list can be pictured button by button.
+    if tip_fires(&response.ctx, &text) {
+        response.show_tooltip_ui(|ui| hover_with_icons(ui, &text));
+        return response;
     }
     // Ticket #380 (version 0.09.2): on BOTH states of the widget. egui's `on_hover_ui` opens only
     // on an enabled widget and `on_disabled_hover_ui` only on a greyed one, and from ticket #238
@@ -4947,23 +4972,16 @@ fn hover_lines_estimate(text: &str) -> usize {
 /// passes through the function above. The reason a greyed End Turn gives is exactly the kind of
 /// thing that has to be photographed, and headless nothing hovers.
 fn forced_tip(text: &str) -> bool {
-    std::env::args().find_map(|a| a.strip_prefix("tip:").map(str::to_owned)).map(|word| text.contains(&word)).unwrap_or(false)
+    tip_aid().is_some_and(|(word, _)| text.contains(&word))
 }
 
 /// Ticket #153 (version 0.07.4): `rule_tip` for a tooltip that DRAWS rather than says -- the
 /// Emissions history. `word` is what the `tip:` aid matches against, so the hover can be
 /// photographed headlessly like any other; the same once-a-frame guard applies.
 fn rule_tip_ui(response: egui::Response, word: &str, add: impl Fn(&mut Ui)) -> egui::Response {
-    if let Some(wanted) = std::env::args().find_map(|a| a.strip_prefix("tip:").map(str::to_owned))
-        && word.contains(&wanted)
-    {
-        let pass = response.ctx.cumulative_pass_nr();
-        let fired: Option<u64> = response.ctx.data(|d| d.get_temp(egui::Id::new("tip_fired")));
-        if fired != Some(pass) {
-            response.ctx.data_mut(|d| d.insert_temp(egui::Id::new("tip_fired"), pass));
-            response.show_tooltip_ui(|ui| add(ui));
-            return response;
-        }
+    if tip_fires(&response.ctx, word) {
+        response.show_tooltip_ui(|ui| add(ui));
+        return response;
     }
     response.on_hover_ui(|ui| add(ui))
 }
@@ -5063,22 +5081,28 @@ fn hover_with_icons(ui: &mut Ui, text: &str) {
     text_with_icons(ui, text, 14.0, Color32::from_rgb(225, 220, 210));
 }
 
-/// The eight figures that have a glyph, in both the spellings the game's prose uses. The five
+/// The figures that have a glyph (eight when this was written), in both the spellings the game's prose uses. The five
 /// resources and Influence are capitalised as defined terms; population and emissions are written
 /// in lower case mid-sentence, so both forms have to be looked for.
 /// Ticket #332 (version 0.09.0): and Widgets, the eleventh, so `8 Widgets` wears the cog.
-const ICON_WORDS: [(&str, &str); 11] = [
+/// Ticket #392 (version 0.09.3): and Colonists, who are people, so `4 Colonists` on a Habitat's or
+/// a Trade Post's hover wears the head Earth's population does; and the singular `1 Ducat` an
+/// Academy pays, which read as a word beside the `+6.8 Ducats` a Bank makes only for its number.
+const ICON_WORDS: [(&str, &str); 14] = [
     ("Materials", "materials"),
     ("Widgets", "widgets"),
     ("Fuel", "fuel"),
     ("Energy", "energy"),
     ("Research", "research"),
     ("Ducats", "ducats"),
+    ("Ducat", "ducats"),
     ("Population", "population"),
     ("Influence", "influence"),
     ("Emissions", "emissions"),
     ("population", "population"),
     ("emissions", "emissions"),
+    ("Colonists", "population"),
+    ("Colonist", "population"),
 ];
 
 /// Ticket #112 (version 0.07.1): a line of text with every figure's word traded for its glyph.
@@ -5112,13 +5136,60 @@ fn figures_with_icons(ui: &mut Ui, text: &str, size: f32, tint: Color32, extra: 
 /// old one. Ticket #116 then found the other half of the same fault: in prose where a resource is a
 /// sentence's SUBJECT, "Fuel goes on transits" came out as a jerrycan and a verb. The designer's
 /// answer was to narrow everything to the list rule, so there is now one rule and no flag.
+/// Ticket #392 (version 0.09.3): a glyph line's pieces -- its words, split on spaces, and its line
+/// breaks as pieces of their own, so a word at the end of a line is the bare word and can take its
+/// glyph. Before this a break rode inside the word beside it ("Emissions\n4") and no word ending a
+/// line ever matched.
+#[derive(Debug, PartialEq)]
+enum GlyphToken<'a> {
+    Word(&'a str),
+    Break,
+}
+
+fn glyph_tokens(text: &str) -> Vec<GlyphToken<'_>> {
+    let mut out = Vec::new();
+    for (i, line) in text.split('\n').enumerate() {
+        if i > 0 {
+            out.push(GlyphToken::Break);
+        }
+        out.extend(line.split(' ').map(GlyphToken::Word));
+    }
+    out
+}
+
+/// The rule's one decision, apart from the drawing, so a test can put a word to it: the glyph a
+/// bare word takes when it follows a figure (`after_figure`), or none. Ticket #392 (version 0.09.3).
+fn glyph_for<'a>(after_figure: bool, bare: &str, extra: &[(&str, &'a str)]) -> Option<&'a str> {
+    if !after_figure {
+        return None;
+    }
+    ICON_WORDS.iter().chain(extra.iter()).find(|(w, _)| *w == bare).map(|(_, key)| *key)
+}
+
 fn draw_with_icons(ui: &mut Ui, text: &str, size: f32, tint: Color32, extra: &[(&str, &str)]) -> egui::Response {
     // Ticket #116 (version 0.07.1): the row's own response comes back, so a caller can hang a
     // tooltip on a whole line of glyphs and figures.
     ui.horizontal_wrapped(|ui| {
         ui.spacing_mut().item_spacing.x = 3.0;
         let mut previous_was_a_figure = false;
-        for token in text.split(' ') {
+        for piece in glyph_tokens(text) {
+            let token = match piece {
+                // The review's fix-up: an empty line -- a refusal's blank line before its description --
+                // keeps a line's height, where two bare row ends would leave only the row spacing.
+                GlyphToken::Word("") => {
+                    ui.label(" ");
+                    continue;
+                }
+                GlyphToken::Word(w) => w,
+                // Ticket #392 (version 0.09.3): a line break in the text ends the row here, where
+                // before it rode inside the word beside it -- so "0.6 Emissions" at the end of a
+                // Mine's hover, with its chain under it, never matched "Emissions" and drew as a word.
+                GlyphToken::Break => {
+                    ui.end_row();
+                    previous_was_a_figure = false;
+                    continue;
+                }
+            };
             // Keep whatever punctuation rides on the word, so "30 Materials," still reads. Ticket
             // #132 (version 0.07.3): a closing bracket rides too, so "(44 Research)" on a Faction
             // card and "(a Colony Ship 25 Materials)" take their glyphs.
@@ -5130,12 +5201,7 @@ fn draw_with_icons(ui: &mut Ui, text: &str, size: f32, tint: Color32, extra: &[(
             // 9 of 30. Fuel goes on transits", where it would leave a jerrycan standing as the
             // subject of a verb.
             previous_was_a_figure = bare.ends_with(|c: char| c.is_ascii_digit()) && !token.ends_with(['.', ';', ':']);
-            match ICON_WORDS
-                .iter()
-                .chain(extra.iter())
-                .find(|(w, _)| allowed && *w == bare)
-                .and_then(|(_, key)| Icons::from_ctx(ui.ctx(), key, size))
-            {
+            match glyph_for(allowed, bare, extra).and_then(|key| Icons::from_ctx(ui.ctx(), key, size)) {
                 Some(image) => {
                     if tail.is_empty() {
                         ui.add(image);
@@ -5269,6 +5335,7 @@ fn orbit_odds_lines(ui: &mut Ui, game: &Game, body: BodyId) {
     // moment of the decision should not need a pointer held over it to be read at all.
     let charge = game.tables.melee.battle_fuel;
     let mut cost = format!("The Battle costs every Ship in the orbit {charge} Fuel from its own tank, yours and theirs alike, struck or not.");
+    let charge = charge as f64;
     let left_dry = mine_fighting.iter().filter(|s| s.fuel - charge < charge).count();
     if left_dry > 0 {
         cost.push_str(&format!(" {left_dry} Ship(s) of yours would come out of it under the bar, holding no orbit here and fighting halved until refuelled."));
@@ -5343,9 +5410,9 @@ fn attack_hover(ctx: &egui::Context, game: &Game, place: Place, name: &str, atta
 /// `8 [cog]` -- the second half of what a build costs, on the face beside the first -- and nought
 /// for an order that builds nothing.
 fn priced_button(ui: &mut Ui, enabled: bool, label: &str, cost: &dying_earth_engine::Cost, widgets: u32) -> egui::Response {
-    let parts: Vec<(&str, i64)> = [("materials", cost.materials), ("fuel", cost.fuel), ("energy", cost.energy), ("influence", cost.influence), ("ducats", cost.ducats), ("widgets", widgets as i64)]
+    let parts: Vec<(&str, f64)> = [("materials", cost.materials), ("fuel", cost.fuel), ("energy", cost.energy), ("influence", cost.influence as f64), ("ducats", cost.ducats), ("widgets", widgets as f64)]
         .into_iter()
-        .filter(|(_, n)| *n > 0)
+        .filter(|(_, n)| *n > 0.0)
         .collect();
     if parts.is_empty() {
         return ui.add_enabled(enabled, egui::Button::new(label));
@@ -5364,7 +5431,7 @@ fn priced_button(ui: &mut Ui, enabled: bool, label: &str, cost: &dying_earth_eng
                         ui.spacing_mut().item_spacing.x = 4.0;
                         ui.label(RichText::new(label).color(visuals.text_color()));
                         for (key, n) in &parts {
-                            ui.label(RichText::new(n.to_string()).color(visuals.text_color()));
+                            ui.label(RichText::new(figure(*n)).color(visuals.text_color()));
                             match Icons::from_ctx(ui.ctx(), key, 14.0) {
                                 Some(image) => {
                                     ui.add(image);
@@ -5467,7 +5534,7 @@ fn widget_makers(game: &Game, place: Place) -> Vec<(String, i64)> {
                 for f in st.facilities.iter().filter(|f| f.working()) {
                     let y = game.facility_yield(seat, sid, f.kind);
                     if y.resource == Some(dying_earth_engine::Resource::Widgets) {
-                        parts.push((format!("the {}", f.kind.name()), y.amount));
+                        parts.push((format!("the {}", f.kind.name()), y.amount as i64));
                     }
                 }
             }
@@ -5485,7 +5552,7 @@ fn widget_makers(game: &Game, place: Place) -> Vec<(String, i64)> {
                 let y = game.module_yield_at(seat, cid, i);
                 if y.resource == Some(dying_earth_engine::Resource::Widgets) {
                     let name = if y.doubled_by.is_some() { format!("the {}, doubled", m.kind.name()) } else { format!("the {}", m.kind.name()) };
-                    parts.push((name, y.amount));
+                    parts.push((name, y.amount as i64));
                 }
             }
         }
@@ -5498,6 +5565,30 @@ fn widget_makers(game: &Game, place: Place) -> Vec<(String, i64)> {
 fn queue_line(game: &Game, place: Place, b: &Build, turns: u32) -> String {
     let whose = if game.place_director(place) == Some(b.seat) { String::new() } else { format!(", begun by the {}", game.seat_name(b.seat)) };
     format!("{} {} of {}, {}{whose}", b.item.name(), b.done, b.widgets, estimate_words(turns))
+}
+
+/// Ticket #391 (version 0.09.3): **the place's output this turn**, one glyph row under its
+/// population line at the designer's word -- *"place cards need to show total output - put in first
+/// section under region population"*: Materials, Widgets, Fuel, Energy, Ducats and Research as the
+/// place makes them, in the top bar's order, a figure only where the place makes any; Energy net of
+/// the place's own upkeep. Nothing on a place nobody directs.
+fn output_row(ui: &mut Ui, game: &Game, place: Place) {
+    let Some(o) = game.place_output(place) else { return };
+    let hover = "What this place made this turn, at this turn's multipliers: a building shut for Energy or mothballed made nothing. Energy is net of the place's own upkeep, before any Reactor's relief, which is the seat's; a Region's Ducats include its economy.".to_string();
+    let mut parts: Vec<RowPart> = Vec::new();
+    for (v, icon) in [(o.materials, "materials"), (o.widgets, "widgets"), (o.fuel, "fuel"), (o.energy, "energy"), (o.ducats, "ducats"), (o.research, "research")] {
+        if v.abs() > 1e-9 {
+            parts.push(RowPart { before: figure(v), icon: Some(icon), after: String::new(), hover: Some(hover.clone()) });
+        }
+    }
+    ui.horizontal(|ui| {
+        rule_tip(ui.label(RichText::new("Output:").weak()), hover.clone());
+        if parts.is_empty() {
+            ui.label(RichText::new("nothing this turn").weak());
+        } else {
+            glyph_row(ui, &parts, 15.0);
+        }
+    });
 }
 
 /// Ticket #332: **the Widgets block on a card**, Region, Colony and station alike, at the
@@ -6184,6 +6275,34 @@ fn standings_row(ui: &mut Ui, game: &Game, session: &Session, target: Place, thr
     rule_tip(row.response, explain);
 }
 
+/// Ticket #390 (version 0.09.3): what a standing Scrubber or Sea Wall says on its one line --
+/// *Scrubber: +3.0 ppm Sink, 1 off Unrest a turn, 3 Energy upkeep*; *Sea Wall: holds the sea off; 3
+/// rises held, 1.5 Materials a turn to keep* (or *nothing held yet*, and *unkept this turn* when it
+/// is) -- the figures the data holds, glyph-rendered by the row, in the resolution's words.
+fn no_slot_figures(game: &Game, f: &Facility) -> String {
+    let card = game.tables.facility(f.kind);
+    match f.kind {
+        FacilityKind::SeaWall => format!("holds the sea off; {}{}", sea_wall_keep(game, f), sea_wall_unkept(f)),
+        _ => format!("+{:.1} ppm Sink, {} off Unrest a turn, {} Energy upkeep", card.sink_per_turn, Game::unrest_figure(game.tables.unrest.scrubber_fall), card.energy_upkeep),
+    }
+}
+
+/// Ticket #390: a Sea Wall's keep in words, read by its short row and its full sentence alike --
+/// *3 rises held, 1.5 Materials a turn to keep*, or *nothing held yet* -- so the keep rule is
+/// written once.
+fn sea_wall_keep(game: &Game, f: &Facility) -> String {
+    let keep = f.rises_held as f64 * game.tables.sea_wall.upkeep_per_rise;
+    match f.rises_held {
+        0 => "nothing held yet".to_string(),
+        1 => format!("1 rise held, {} Materials a turn to keep", figure(keep)),
+        n => format!("{n} rises held, {} Materials a turn to keep", figure(keep)),
+    }
+}
+
+/// Ticket #390: the clause a Sea Wall left unkept this turn adds, and nothing otherwise.
+fn sea_wall_unkept(f: &Facility) -> &'static str {
+    if !f.online && !f.mothballed { "; unkept this turn" } else { "" }
+}
 
 /// Ticket #146 (version 0.07.3): one Facility's line -- its figures with their glyphs, the hover
 /// naming the rule, and the Mothball / Restart / Decommission buttons on the line (ticket #138).
@@ -6203,14 +6322,8 @@ fn facility_figures(game: &Game, sid: StateId, f: &Facility, director: Option<Se
     // Ticket #257 (version 0.08.4): a Sea Wall says what it has held back and what that costs.
     if f.kind == FacilityKind::SeaWall {
         let yield_text = director.map(|d| game.facility_yield(d, sid, f.kind).text()).unwrap_or_else(|| "idle, nobody directs this state".to_string());
-        let keep = f.rises_held as f64 * game.tables.sea_wall.upkeep_per_rise;
-        let held = match f.rises_held {
-            0 => "has held back no rise yet".to_string(),
-            1 => format!("has held back 1 rise: {keep:.1} Materials a turn to keep"),
-            n => format!("has held back {n} rises: {keep:.1} Materials a turn to keep"),
-        };
-        let unkept = if !f.online && !f.mothballed { "; unkept this turn, holding nothing" } else { "" };
-        return format!("{yield_text}; {held}{unkept}");
+        // Ticket #390 (version 0.09.3): the keep clause the short row reads too, written once.
+        return format!("{yield_text}; {}{}", sea_wall_keep(game, f), sea_wall_unkept(f));
     }
     match director {
         Some(d) if world_lab => format!("{} (the Lab works for the world: {} Research a turn to the Tech under research)", game.facility_yield(d, sid, f.kind).text(), game.world_lab_yield(sid) / 2),
@@ -6250,7 +6363,11 @@ fn facility_rules(heading: &str, coastal: bool) -> String {
 
 #[allow(clippy::too_many_arguments)]
 fn facility_row(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, i: usize, f: &Facility, mine: bool, director: Option<Seat>, actions: &mut Vec<Action>) {
-    let figures = facility_figures(game, sid, f, director);
+    let full = facility_figures(game, sid, f, director);
+    // Ticket #390 (version 0.09.3): a Scrubber or Sea Wall row is one short line, at the designer's
+    // word ("reduce verbiage for sea wall and scrubber"); its whole sentence is the row's hover.
+    let short = if game.takes_slot(f.kind) || f.mothballed { None } else { Some(no_slot_figures(game, f)) };
+    let figures = short.clone().unwrap_or_else(|| full.clone());
     let colour = if f.mothballed { Color32::from_rgb(170, 170, 190) } else { ui.visuals().text_color() };
     // Ticket #112 (version 0.07.1): the glyphs come down into the Facility list, where the
     // figures are compared building against building and the words are most of the width.
@@ -6272,7 +6389,9 @@ fn facility_row(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, i: us
             &[],
         );
         // Ticket #352 (version 0.09.1): with its arithmetic, where the figure is multiplied.
-        let rules = facility_rules(f.kind.name(), f.coastal);
+        // Ticket #390 (version 0.09.3): a short row's hover is its whole sentence and nothing else,
+        // so the Sea Wall's, the longest in the data, stays within the six-line ceiling.
+        let rules = if short.is_some() { full.clone() } else { facility_rules(f.kind.name(), f.coastal) };
         let tip = match director.filter(|_| !f.mothballed).map(|d| game.facility_yield(d, sid, f.kind).chain).filter(|c| c.multiplied()) {
             Some(chain) => chain_tip(&rules, &chain),
             None => rules,
@@ -6303,7 +6422,7 @@ fn facility_build_buttons(ui: &mut Ui, session: &Session, game: &Game, sid: Stat
         }
         // Ticket #54: the Scrubber has its own button, with the state's cap on it. Ticket #154
         // (version 0.07.4): so does the Sea Wall -- neither takes a slot, so neither is offered
-        // for a free box; both stand under the boxes in `no_slot_section`.
+        // for a free box; both stand under the strip, in `no_slot_buttons` (ticket #390).
         if !game.takes_slot(fk) {
             continue;
         }
@@ -6322,19 +6441,24 @@ fn facility_build_buttons(ui: &mut Ui, session: &Session, game: &Game, sid: Stat
 }
 
 /// Ticket #154 (version 0.07.4): **the Facilities that take no slot** -- the Scrubber and the Sea
-/// Wall -- under the boxes, in the Facilities section: each a row when it stands, a line while it
-/// builds, and a build button pair when it may be built here. The designer: *"scrubber sea wall
-/// need to stay but put them in the same section as the tiles just below them."* The Scrubber's
-/// pair carries the state's cap; the Sea Wall's appears once Coastal Engineering is in and while
-/// none stands or builds, one being the most a state may hold.
-#[allow(clippy::too_many_arguments)]
-fn no_slot_section(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, mine: bool, director: Option<Seat>, actions: &mut Vec<Action>) {
+/// Wall -- under the boxes, in the Facilities section, each a row when it stands. The designer:
+/// *"scrubber sea wall need to stay but put them in the same section as the tiles just below
+/// them."* Ticket #390 (version 0.09.3): the rows here, between the boxes and the strip, and the
+/// build buttons in `no_slot_buttons` under the strip; one built is on the card's queue (#332).
+fn no_slot_rows(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, mine: bool, director: Option<Seat>, actions: &mut Vec<Action>) {
     let st = game.state(sid);
     for (i, f) in st.facilities.iter().enumerate() {
         if !game.takes_slot(f.kind) {
             facility_row(ui, session, game, sid, i, f, mine, director, actions);
         }
     }
+}
+
+/// Ticket #390 (version 0.09.3): the two slotless build buttons, under the strip, labelled as every
+/// other build button is and the Scrubber's carrying the state's cap in its label -- *Scrubber (2 of
+/// 3)* -- where a sentence stood after it; the Ducat price beside each as on every button.
+fn no_slot_buttons(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, mine: bool, actions: &mut Vec<Action>) {
+    let st = game.state(sid);
     // Ticket #332 (version 0.09.0): a Scrubber or Sea Wall under way is on the card's queue, under
     // its Widgets line, with every other build; the line that stood here said it twice.
     if !mine {
@@ -6349,12 +6473,11 @@ fn no_slot_section(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, mi
                 game,
                 &session.pending,
                 Order::BuildFacility { state: sid, kind: FacilityKind::Scrubber },
-                "Scrubber",
+                &format!("Scrubber ({} of {})", game.scrubbers_committed(sid), game.scrubber_cap(sid)),
                 Some(game.facility_yield(Seat(0), sid, FacilityKind::Scrubber).text()),
                 actions,
             );
             cost_button(ui, game, &session.pending, Order::BuildFacilityWithDucats { state: sid, kind: FacilityKind::Scrubber }, "or", actions);
-            ui.label(RichText::new(format!("{} of {} this state may hold", game.scrubbers_committed(sid), game.scrubber_cap(sid))).weak());
         });
     }
     if game.has_tech(TechId::CoastalEngineering) {
@@ -6405,6 +6528,26 @@ enum SlotBoxKind {
     Ordered(FacilityKind, usize),
     Free,
     Flooded(Option<FacilityKind>),
+}
+/// Ticket #390 (version 0.09.3): the strip under the boxes, drawn after the completed slotless rows
+/// so the card reads boxes, then what stands without a slot, then what may be built.
+#[allow(clippy::too_many_arguments)]
+fn slot_strip(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, sid: StateId, mine: bool, director: Option<Seat>, actions: &mut Vec<Action>) {
+    let st = game.state(sid);
+    ui.add_space(4.0);
+    // The strip: the clicked box's line, or the build buttons for a free one.
+    match view.slot_box {
+        Some(SlotBox::Facility(i)) if i < st.facilities.len() && game.takes_slot(st.facilities[i].kind) => {
+            facility_row(ui, session, game, sid, i, &st.facilities[i], mine, director, actions);
+        }
+        Some(SlotBox::Free) if mine => {
+            ui.label(RichText::new("Build here").strong());
+            facility_build_buttons(ui, session, game, sid, actions);
+        }
+        _ => {
+            ui.label(RichText::new("Click a box for its figures and controls.").weak());
+        }
+    }
 }
 
 /// Ticket #146 (version 0.07.3): **a Region's build slots as boxes**, in the Hab View's language.
@@ -6548,20 +6691,6 @@ fn slot_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
             }
         }
     }
-    ui.add_space(4.0);
-    // The strip: the clicked box's line, or the build buttons for a free one.
-    match view.slot_box {
-        Some(SlotBox::Facility(i)) if i < st.facilities.len() && game.takes_slot(st.facilities[i].kind) => {
-            facility_row(ui, session, game, sid, i, &st.facilities[i], mine, director, actions);
-        }
-        Some(SlotBox::Free) if mine => {
-            ui.label(RichText::new("Build here").strong());
-            facility_build_buttons(ui, session, game, sid, actions);
-        }
-        _ => {
-            ui.label(RichText::new("Click a box for its figures and controls.").weak());
-        }
-    }
 }
 
 fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, sid: StateId, actions: &mut Vec<Action>) {
@@ -6607,6 +6736,8 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     // something like Population 12.2 (339M)."* Ticket #333 (version 0.09.0): units of one million,
     // read off the tables, the same shape: `Region population 1454.5 (1.45B)`.
     icon_word(ui, "population", format!("Region population {}, Industry Level {}, leans {:?}", game.tables.population_text(st.population), st.industry_level, card.resource_lean));
+    // Ticket #391 (version 0.09.3): what the Region made this turn, under its population.
+    output_row(ui, game, Place::State(sid));
     // Ticket #161 (version 0.07.5): what an Allotment is, which this line names and never explains.
     // Ticket #345 (version 0.09.1): and what ELSE an Allotment is. This hover named the base and the
     // Regions and stopped there, so it had been wrong since ticket #36 built the Embassy -- it left
@@ -6756,31 +6887,28 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         if game.constabulary_online(sid) {
             ui.label(RichText::new("A Constabulary here takes 1 off every turn and damps what the climate and the refugees add.").weak());
         }
-        // Ticket #54: a Scrubber calms its state as well as the air.
-        if game.scrubbers_online(sid) > 0 {
-            ui.label(
-                RichText::new(format!(
-                    "{} Scrubber(s) here take {} off the Sink and {} off the Unrest every turn.",
-                    game.scrubbers_online(sid),
-                    format_args!("{:.1} ppm", game.tables.facility(FacilityKind::Scrubber).sink_per_turn * game.scrubbers_online(sid) as f64),
-                    Game::unrest_figure(game.tables.unrest.scrubber_fall)
-                ))
-                .weak(),
-            );
+        // Ticket #389 (version 0.09.3): the Stadium damps the climate's rises, and stacks with the police.
+        if game.stadium_online(sid) {
+            ui.label(RichText::new(if game.constabulary_online(sid) { "A Stadium here halves what the Constabulary leaves of a climate rise: a heat rise of one lands as a quarter." } else { "A Stadium here halves what the climate adds to the Unrest." }).weak());
         }
+        // Ticket #390 (version 0.09.3): the Scrubbers' note that stood here is gone; each
+        // Scrubber's own row under the boxes says what it does.
+    }
+    let director = st.control.director();
+    // Ticket #64: a spectator reads every card and orders on none of them.
+    let mine = !session.spectator && st.control.director() == Some(Seat(0));
+    // Ticket #356 (version 0.09.1): the Pioneers, above the Facilities heading and out of Orders.
+    // Ticket #390 (version 0.09.3): and the Policies under them, at the designer's word -- *"the
+    // subsection called orders is now called policies and go between Pioneer and Facilities"*.
+    if mine {
+        pioneers_block(ui, session, game, sid, actions);
+        policies_block(ui, session, game, sid, actions);
     }
     // Ticket #332 (version 0.09.0): what this Region makes in Widgets a turn, and its queue.
     widgets_block(ui, game, Place::State(sid));
     // Ticket #339 (version 0.09.0): and what an Embassy of yours on Earth reads of a rival's income
     // here, above the slot boxes the Facilities it names are drawn in.
     eye_block(ui, session, game, Place::State(sid));
-    let director = st.control.director();
-    // Ticket #64: a spectator reads every card and orders on none of them.
-    let mine = !session.spectator && st.control.director() == Some(Seat(0));
-    // Ticket #356 (version 0.09.1): the Pioneers, above the Facilities heading and out of Orders.
-    if mine {
-        pioneers_block(ui, session, game, sid, actions);
-    }
     // Ticket #146 (version 0.07.3): the slots the sea took are drawn under water among the boxes
     // below, so the sea-blue count that stood here is gone.
     // Ticket #56: the two rows of slots, with what stands in each and what the sea has taken.
@@ -6799,8 +6927,12 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         ),
     );
     // Ticket #146 (version 0.07.3): the slots as boxes, with the clicked box's line beneath them.
+    // Ticket #390 (version 0.09.3): the completed Sea Wall and Scrubber rows between the boxes and
+    // the build strip, at the designer's word, and their build buttons with the strip's.
     slot_boxes(ui, session, game, view, sid, mine, director, actions);
-    no_slot_section(ui, session, game, sid, mine, director, actions);
+    no_slot_rows(ui, session, game, sid, mine, director, actions);
+    slot_strip(ui, session, game, view, sid, mine, director, actions);
+    no_slot_buttons(ui, session, game, sid, mine, actions);
     // Ticket #312 (version 0.08.7): the Armies block holds the Army orders too, at the designer's
     // word -- *"Move the Army orders block up the card and into the Armies list"*: the stance row
     // under the heading (it is per place, so it belongs to the list and not to any row), and under
@@ -6945,59 +7077,67 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     ui.separator();
     if mine {
         // Ticket #154 (version 0.07.4): the per-kind build list is gone from here -- a Facility is
-        // built by clicking a free box -- and the Scrubber and Sea Wall buttons stand under the
-        // boxes; what is left is orders, and the header says so. The designer: *"remove redundant
-        // build list from the region cards."*
+        // built by clicking a free box. Ticket #390 (version 0.09.3): and the policies are their own
+        // block above the Facilities now; what is left here is the Army, at the designer's word --
+        // *"all army/ship builds should be in orders sections for both"* cards.
         ui.label(RichText::new("Orders").strong());
-        // Ticket #54: the Custodians' Leapfrog, and the Prospectors' Strip Permit.
-        if game.kind(Seat(0)) == FactionKind::Custodians {
-            ui.horizontal(|ui| {
-                cost_button(ui, game, &session.pending, Order::Leapfrog { state: sid }, "Leapfrog", actions);
-                ui.label(RichText::new(format!("lowers its people to {:.2} per hundred million, for good", (game.population_coefficient(sid) - game.tables.climate.population_emissions_per_level).max(game.tables.climate.population_emissions_base) * game.tables.units_per_hundred_million())).weak());
-            });
-        }
-        // Ticket #237 (version 0.08.3): the Arkwrights' own order, beside the Custodians' Leapfrog
-        // and the Prospectors' Strip Permit, and guarded the same way -- once per state, ever.
-        if game.kind(Seat(0)) == FactionKind::Arkwrights && !st.exodus_call_used {
-            let t = &game.tables.exodus_call;
-            ui.horizontal(|ui| {
-                cost_button(ui, game, &session.pending, Order::ExodusCall { state: sid }, "Exodus Call", actions);
-                ui.label(
-                    RichText::new(format!(
-                        "{} turns recruiting {} Pioneers here instead of {}, and each costs this Region the ordinary population rather than your double. Once per Region, ever.",
-                        t.turns,
-                        game.emigrants_per_turn(Seat(0)) * t.muster_multiplier,
-                        game.emigrants_per_turn(Seat(0))
-                    ))
-                    .weak(),
-                );
-            });
-        }
-        if game.kind(Seat(0)) == FactionKind::Prospectors && !st.strip_permit_used {
-            let t = &game.tables.strip_permit;
-            ui.horizontal(|ui| {
-                cost_button(ui, game, &session.pending, Order::StripPermit { state: sid }, "Strip Permit", actions);
-                ui.label(RichText::new(format!("{} turns of double output here, then +{:.1} Baseline Emissions and +{} Unrest, for good", t.turns, t.baseline_rise, Game::unrest_figure(t.unrest))).weak());
-            });
-        }
-        cost_button(ui, game, &session.pending, Order::RaiseIndustry { state: sid }, "Raise Industry Level", actions);
-        ui.label(RichText::new("Raising the Industry Level adds an inland slot.").weak());
         cost_button(ui, game, &session.pending, Order::BuildArmy { place: Place::State(sid) }, "Build Army", actions);
-        // Ticket #356 (version 0.09.1): the Pioneers that stood here are above the Facilities heading.
-        // Ticket #52: Relief and Resettle, with their prices on the buttons.
-        ui.label(RichText::new("Unrest").strong());
-        ui.horizontal(|ui| {
-            cost_button(ui, game, &session.pending, Order::Relief { state: sid }, "Relief: Unrest -1", actions);
-            cost_button(ui, game, &session.pending, Order::Resettle { state: sid }, "Resettle here", actions);
-        });
-        ui.label(
-            RichText::new(
-                "Relief may be paid any number of times a turn. Resettle sends every refugee leaving your states here this turn, once a turn, and raises your Standing here by 5.",
-            )
-            .weak(),
-        );
-        // Ticket #312 (version 0.08.7): the Army orders that stood here are in the Armies block.
     }
+}
+
+/// Ticket #390 (version 0.09.3): **the Policies block**, between the Pioneers and the Facilities, at
+/// the designer's word -- what the card's Orders block held before, less the Army: the Custodians'
+/// Leapfrog, the Arkwrights' Exodus Call, the Prospectors' Strip Permit, Raise Industry Level, and
+/// Relief and Resettle without the Unrest subheading they stood under (the card's Unrest figure is
+/// a few lines up). Drawn only on a Region the player directs.
+fn policies_block(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, actions: &mut Vec<Action>) {
+    let st = game.state(sid);
+    ui.separator();
+    ui.label(RichText::new("Policies").strong());
+    // Ticket #54: the Custodians' Leapfrog, and the Prospectors' Strip Permit.
+    if game.kind(Seat(0)) == FactionKind::Custodians {
+        ui.horizontal(|ui| {
+            cost_button(ui, game, &session.pending, Order::Leapfrog { state: sid }, "Leapfrog", actions);
+            ui.label(RichText::new(format!("lowers its people to {:.2} per hundred million, for good", (game.population_coefficient(sid) - game.tables.climate.population_emissions_per_level).max(game.tables.climate.population_emissions_base) * game.tables.units_per_hundred_million())).weak());
+        });
+    }
+    // Ticket #237 (version 0.08.3): the Arkwrights' own order, beside the Custodians' Leapfrog
+    // and the Prospectors' Strip Permit, and guarded the same way -- once per state, ever.
+    if game.kind(Seat(0)) == FactionKind::Arkwrights && !st.exodus_call_used {
+        let t = &game.tables.exodus_call;
+        ui.horizontal(|ui| {
+            cost_button(ui, game, &session.pending, Order::ExodusCall { state: sid }, "Exodus Call", actions);
+            ui.label(
+                RichText::new(format!(
+                    "{} turns recruiting {} Pioneers here instead of {}, and each costs this Region the ordinary population rather than your double. Once per Region, ever.",
+                    t.turns,
+                    game.emigrants_per_turn(Seat(0)) * t.muster_multiplier,
+                    game.emigrants_per_turn(Seat(0))
+                ))
+                .weak(),
+            );
+        });
+    }
+    if game.kind(Seat(0)) == FactionKind::Prospectors && !st.strip_permit_used {
+        let t = &game.tables.strip_permit;
+        ui.horizontal(|ui| {
+            cost_button(ui, game, &session.pending, Order::StripPermit { state: sid }, "Strip Permit", actions);
+            ui.label(RichText::new(format!("{} turns of double output here, then +{:.1} Baseline Emissions and +{} Unrest, for good", t.turns, t.baseline_rise, Game::unrest_figure(t.unrest))).weak());
+        });
+    }
+    cost_button(ui, game, &session.pending, Order::RaiseIndustry { state: sid }, "Raise Industry Level", actions);
+    ui.label(RichText::new("Raising the Industry Level adds an inland slot.").weak());
+    // Ticket #52: Relief and Resettle, with their prices on the buttons.
+    ui.horizontal(|ui| {
+        cost_button(ui, game, &session.pending, Order::Relief { state: sid }, "Relief: Unrest -1", actions);
+        cost_button(ui, game, &session.pending, Order::Resettle { state: sid }, "Resettle here", actions);
+    });
+    ui.label(
+        RichText::new(
+            "Relief may be paid any number of times a turn. Resettle sends every refugee leaving your states here this turn, once a turn, and raises your Standing here by 5.",
+        )
+        .weak(),
+    );
 }
 
 /// Ticket #356 (version 0.09.1): the Pioneers block, lifted out of the Orders block and drawn above
@@ -7235,6 +7375,11 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
         faction_glyph(ui, session, game, col.control.controller(), 22.0);
         ui.label(RichText::new(game.place_name(Place::Colony(cid))).size(22.0).strong());
     });
+    // Ticket #391 (version 0.09.3): the date it was founded, under its name, at the designer's word
+    // -- *"each colony/station card has the date it was founded under its name in the header"*. A
+    // station is built and a Colony founded, as the glossary has them; a starting station reads
+    // the game's first date.
+    ui.label(RichText::new(format!("{} {}", if col.in_orbit { "Built" } else { "Founded" }, game.date(col.founded_turn).text())).weak().small());
     // Ticket #283 (version 0.08.5): what the ground is worth, under the heading, in glyphs. A
     // station reads the Body's figures, which the planet card shows, so it carries no row.
     if !col.in_orbit {
@@ -7299,6 +7444,8 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     // Ticket #164 (version 0.07.5): the room is the Core Module's four and the Habitats' eight
     // each, so the line no longer names Habitats alone.
     ui.label(format!("Colonists {} of {} room", col.colonists, game.habitat_room(col)));
+    // Ticket #391 (version 0.09.3): what the Colony made this turn, under its people.
+    output_row(ui, game, Place::Colony(cid));
     // Ticket #204 (version 0.08.1): the receiver's door, against the figure it changes.
     emigrant_loader(ui, session, game, view, col, actions);
     // Ticket #97 (version 0.07.0): the Module cap, shown beside the Colonists that buy it, so a
@@ -7339,13 +7486,16 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     // Ticket #88: build it where you dig. Ticket #162 (version 0.07.5): the note stands above the
     // tiles, where a free one is clicked to build, rather than under a Build header that no longer
     // offers a Module.
+    // Ticket #398 (version 0.09.3): and Ships, at a yard on a low-gravity Body (the Moon, Phobos,
+    // Deimos), which the note says where it holds.
+    let what = if !col.in_orbit && game.tables.body(col.body).low_gravity { "Modules and Ships" } else { "Modules" };
     match game.working_mines(col) {
         0 => {}
         1 => {
-            ui.label(RichText::new(format!("One working Mine here: Modules cost x{} (never under half the row).", game.tables.in_situ.one_mine)).weak());
+            ui.label(RichText::new(format!("One working Mine here: {what} cost x{} (never under half the row).", game.tables.in_situ.one_mine)).weak());
         }
         n => {
-            ui.label(RichText::new(format!("{n} working Mines here: Modules cost x{} (never under half the row).", game.tables.in_situ.two_mines)).weak());
+            ui.label(RichText::new(format!("{n} working Mines here: {what} cost x{} (never under half the row).", game.tables.in_situ.two_mines)).weak());
         }
     }
     let mine_here = !session.spectator && col.control.director() == Some(Seat(0));
@@ -7512,6 +7662,57 @@ fn slot_panel(ui: &mut Ui, session: &Session, game: &Game, body: BodyId, slot: u
     }
 }
 
+/// Ticket #399 (version 0.09.3): **the stack's stance and its Attack, on the stack card and on
+/// every armed Ship's own card** (`UnitKind::is_armed`) -- the designer: *"would appear there is no actual way to order a
+/// frigate or battle ship to attack now that each ship has its own card."* The order is the
+/// stack's, keyed by Body, and stays so; a Ship's card says so in its heading and offers it. The
+/// Attack button asks the engine's own question (`attack_has_a_target`, a rival in an orbit one of
+/// the seat's Ships holds) where the stack card asked a Body-wide one, which showed the button with
+/// the rival in another orbit and left the confirm to be refused; greyed, the button's hover
+/// carries the refusal, as every refusal has since ticket #380.
+#[allow(clippy::too_many_arguments)]
+fn attack_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, body: BodyId, ships: &[&Ship], on_ship_card: bool, actions: &mut Vec<Action>) {
+    let seat = Seat(0);
+    if on_ship_card {
+        ui.label(RichText::new(format!("The stack's stance and Attack: all {} Ship(s) of yours at {}", ships.len(), game.tables.body(body).name)).strong());
+    }
+    stance_row(ui, game, &session.pending, ships[0].stance, |s| Order::ShipStance { body, stance: s }, true, actions);
+    // Ticket #346 (version 0.09.1): the two sums an Attack is weighed with, at the strength the
+    // Battle would actually be fought at on both sides.
+    let enemy = fighting_enemy_strength(game, seat, body);
+    let enemy_ships: usize = seat.others().iter().map(|s| game.ships_at(*s, body).len()).sum();
+    if enemy > 0 || enemy_ships > 0 {
+        let mine = fighting_stack_strength(game, seat, body);
+        // Ticket #50: name every Faction with Ships here; the attack is against all of them at once.
+        let rivals = rivals_at(game, seat, body);
+        ui.label(format!("Against {} ({} in all). Your strength at the Body: {mine}.", rivals_text(game, &rivals), enemy));
+        // Ticket #339 (version 0.09.0): the odds of each Battle an Attack here would start, one
+        // per orbit, and the whole Battle's rather than its first round's.
+        orbit_odds_lines(ui, game, body);
+        let attack = Order::ShipStance { body, stance: Stance::Attack };
+        let check = game.check_order(seat, &session.pending, &attack);
+        let label = if on_ship_card { format!("Attack with all {} Ship(s) at {}", ships.len(), game.tables.body(body).name) } else { "Attack this turn".to_string() };
+        let mut button = ui.add_enabled(check.is_ok(), egui::Button::new(label));
+        button = rule_tip(button, match &check {
+            Ok(_) => ATTACK_FIGHTS_NOW.to_string(),
+            Err(e) => refusal_hover(&e.0, Some(ATTACK_FIGHTS_NOW)),
+        });
+        if button.clicked() {
+            view.attack_preview = true;
+        }
+        if view.attack_preview && check.is_ok() {
+            ui.label(format!("Your {} Ship(s) (strength {}) against {} Ship(s) of {} (strength {} in all). Confirm?", ships.len(), mine, enemy_ships, rivals_text(game, &rivals), enemy));
+            // Ticket #383 (version 0.09.2): the point of no return, and it says so: the Battle is
+            // fought the moment the button is pressed, on the board as it stands.
+            ui.label(RichText::new("The Battle is fought the moment you confirm, on the board as it stands; it cannot be taken back.").weak());
+            if ui.button("Confirm Attack: fought now").clicked() {
+                actions.push(Action::Attack(body));
+                view.attack_preview = false;
+            }
+        }
+    }
+}
+
 /// Ticket #374 (version 0.09.2): **the stack card holds what is the whole stack's**, and nothing
 /// that is one hull's. Until this ticket it was one flat column with a button per Ship under every
 /// heading -- Transits, Change orbit, Tanks, Load and unload, Bombard, Launch -- so the same hull
@@ -7572,33 +7773,7 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         return;
     }
     ui.separator();
-    stance_row(ui, game, &session.pending, ships[0].stance, |s| Order::ShipStance { body, stance: s }, true, actions);
-    // Ticket #346 (version 0.09.1): the two sums an Attack is weighed with, at the strength the
-    // Battle would actually be fought at on both sides.
-    let enemy = fighting_enemy_strength(game, seat, body);
-    let enemy_ships: usize = seat.others().iter().map(|s| game.ships_at(*s, body).len()).sum();
-    if enemy > 0 || enemy_ships > 0 {
-        let mine = fighting_stack_strength(game, Seat(0), body);
-        // Ticket #50: name every Faction with Ships here; the attack is against all of them at once.
-        let rivals = rivals_at(game, seat, body);
-        ui.label(format!("Against {} ({} in all). Your strength at the Body: {mine}.", rivals_text(game, &rivals), enemy));
-        // Ticket #339 (version 0.09.0): the odds of each Battle an Attack here would start, one
-        // per orbit, and the whole Battle's rather than its first round's.
-        orbit_odds_lines(ui, game, body);
-        if ui.button("Attack this turn").clicked() {
-            view.attack_preview = true;
-        }
-        if view.attack_preview {
-            ui.label(format!("Your {} Ship(s) (strength {}) against {} Ship(s) of {} (strength {} in all). Confirm?", ships.len(), mine, enemy_ships, rivals_text(game, &rivals), enemy));
-            // Ticket #383 (version 0.09.2): the point of no return, and it says so: the Battle is
-            // fought the moment the button is pressed, on the board as it stands.
-            ui.label(RichText::new("The Battle is fought the moment you confirm, on the board as it stands; it cannot be taken back.").weak());
-            if ui.button("Confirm Attack: fought now").clicked() {
-                actions.push(Action::Attack(body));
-                view.attack_preview = false;
-            }
-        }
-    }
+    attack_block(ui, session, game, view, body, &ships, false, actions);
     // Ticket #322 (version 0.08.8): one button moves every Ship of the stack that can pay the leg.
     // Ticket #374: those buttons are the ONLY move buttons here now; a hull on its own is moved from
     // its card, one row up.
@@ -7696,7 +7871,7 @@ fn body_dropdown(ui: &mut Ui, session: &Session, game: &Game, body: BodyId, to: 
     let header = if here {
         format!("{} (here): change orbit, {} Fuel", game.tables.body(to).name, game.tables.orbit_change_fuel)
     } else {
-        format!("To {}: {turns} turn(s), {fuel} Fuel", game.tables.body(to).name)
+        format!("To {}: {turns} turn(s), {} Fuel", game.tables.body(to).name, figure(fuel))
     };
     let shown = egui::CollapsingHeader::new(RichText::new(header).strong()).id_salt(("moves", salt, to)).default_open(open).show(ui, |ui| {
         if here {
@@ -7734,7 +7909,7 @@ fn change_orbit_lines(ui: &mut Ui, session: &Session, game: &Game, body: BodyId,
                     game,
                     &session.pending,
                     Order::ChangeOrbit { ship: s.id, slot: orbit.slot() },
-                    &format!("Move ({}/{} in the tank)", s.fuel, game.tables.unit(s.kind).tank),
+                    &format!("Move ({}/{} in the tank)", figure(s.fuel), game.tables.unit(s.kind).tank),
                     Some(format!("{} is {} now. {orbit_fuel} Fuel from its own tank, and it fights this turn's Battle in its new orbit.", game.ship_name(s), orbit_phrase(game, body, game.ship_orbit(s)))),
                     actions,
                 ),
@@ -7755,25 +7930,25 @@ fn change_orbit_lines(ui: &mut Ui, session: &Session, game: &Game, body: BodyId,
 /// costs the same whichever orbit it ends in; the orbit decides what the Ship can do when it gets
 /// there.
 #[allow(clippy::too_many_arguments)]
-fn transit_lines(ui: &mut Ui, session: &Session, game: &Game, body: BodyId, to: BodyId, fuel: i64, ships: &[&Ship], one: Option<&Ship>, actions: &mut Vec<Action>) {
+fn transit_lines(ui: &mut Ui, session: &Session, game: &Game, body: BodyId, to: BodyId, fuel: f64, ships: &[&Ship], one: Option<&Ship>, actions: &mut Vec<Action>) {
     // Ticket #375 (version 0.09.2): the quote is for a launch THIS turn, and the sky moves; the next
     // two turns' figures stand beside it so the drift is visible -- the playtest read 4 turns and
     // 17 Fuel, launched later, and paid 6 and 26. The header carries this turn's figures; the drift
     // is the first line inside, read before any button under it.
     let (t1, f1) = game.transit_cost_for_at(Seat(0), body, to, game.turn + 1);
     let (t2, f2) = game.transit_cost_for_at(Seat(0), body, to, game.turn + 2);
-    ui.label(RichText::new(format!("{fuel} Fuel each from the tank if launched this turn, whichever orbit it ends in (next turn {t1}t/{f1}F, then {t2}t/{f2}F).")).weak());
+    ui.label(RichText::new(format!("{} Fuel each from the tank if launched this turn, whichever orbit it ends in (next turn {t1}t/{}F, then {t2}t/{}F).", figure(fuel), figure(f1), figure(f2))).weak());
     for orbit in game.orbits_of(to) {
         ui.horizontal_wrapped(|ui| {
             ui.label(format!("   {}", capitalised(&orbit_short(game, to, orbit))));
             match one {
                 Some(s) => {
                     // Ticket #87: the button reads the tank against the leg.
-                    cost_button(ui, game, &session.pending, Order::Transit { ship: s.id, to, slot: orbit.slot() }, &format!("Go ({}/{} in the tank)", s.fuel, game.tables.unit(s.kind).tank), actions);
+                    cost_button(ui, game, &session.pending, Order::Transit { ship: s.id, to, slot: orbit.slot() }, &format!("Go ({}/{} in the tank)", figure(s.fuel), game.tables.unit(s.kind).tank), actions);
                     // Ticket #375: a warning, never a refusal, where the leg would leave the hull
                     // stranded at the far end -- a one-way trip can be the plan.
                     if let Some(left) = game.arrival_leaves_stranded(Seat(0), s.id, to, orbit.slot()) {
-                        ui.colored_label(Color32::from_rgb(230, 170, 90), format!("arrives with {left} Fuel and no station of yours at {}", game.tables.body(to).name));
+                        ui.colored_label(Color32::from_rgb(230, 170, 90), format!("arrives with {} Fuel and no station of yours at {}", figure(left), game.tables.body(to).name));
                     }
                 }
                 None => {
@@ -7829,8 +8004,16 @@ fn ship_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
         ShipAt::Body(b) => {
             // Ticket #313 (version 0.08.7): the stance, with its sentence on the hover, and the
             // orbit -- the stance is the STACK'S, set on the stack card, and the line says so.
+            // Ticket #399 (version 0.09.3): a warship's card sets the stance and gives the Attack
+            // below, so the hover sends nobody to the stack card for those.
+            let fighter = !session.spectator && s.seat == Seat(0) && s.kind.is_armed();
+            let where_set = if fighter { "set below, for the whole stack" } else { "set on the stack card or on an armed Ship's card" };
             ui.label(format!("{}, on {}", capitalised(&orbit_phrase(game, b, game.ship_orbit(s))), s.stance.name()))
-                .on_hover_text(format!("{} {} The stance is the whole stack's, set on the stack card.", s.stance.one_liner(true), Stance::PERSISTS));
+                .on_hover_text(format!("{} {} The stance is the whole stack's, {where_set}.", s.stance.one_liner(true), Stance::PERSISTS));
+            if fighter {
+                let stack: Vec<&Ship> = game.ships.iter().filter(|x| x.seat == Seat(0) && x.at == ShipAt::Body(b)).collect();
+                attack_block(ui, session, game, view, b, &stack, true, actions);
+            }
         }
         ShipAt::Transit { from, to, turns_left } => {
             // The Resolution that lands it: this turn's if one turn is left, else that many turns
@@ -7853,7 +8036,7 @@ fn ship_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
         tanks.scroll_to_me(Some(egui::Align::Min));
     }
     ui.horizontal_wrapped(|ui| {
-        let fuel = format!("{}/{} Fuel", s.fuel, card.tank);
+        let fuel = format!("{}/{} Fuel", figure(s.fuel), card.tank);
         match s.at {
             ShipAt::Body(b) => {
                 // Ticket #335 (version 0.09.0): a station fuels only a Ship in its OWN orbit, so a
@@ -7863,17 +8046,19 @@ fn ship_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
                 // named on the hover; the Fuel is still the player's own Stockpile's.
                 if game.refuel_station_at(Seat(0), b) {
                     ui.label(fuel);
-                    let partner = if game.own_station_at(Seat(0), b) {
+                    // Ticket #396 (version 0.09.3): one's own Refinery Colony is no partner's.
+                    let partner = if game.own_depot_at(Seat(0), b) {
                         None
                     } else {
-                        game.colonies.iter().filter(|c| c.body == b && game.fuels_for(c, Seat(0))).find_map(|c| c.control.director()).map(|d| format!("At the station of the {}, under your Refuel Accord: the Fuel is your own Stockpile's, drawn there.", game.seat_name(d)))
+                        game.colonies.iter().filter(|c| c.body == b && game.fuels_for(c, Seat(0))).find_map(|c| c.control.director()).map(|d| format!("At the station or Refinery Colony of the {}, under your Refuel Accord: the Fuel is your own Stockpile's, drawn there.", game.seat_name(d)))
                     };
                     cost_button_with_hover(ui, game, &session.pending, Order::Refuel { ship: s.id }, "Refuel from the Stockpile", partner, actions);
                 } else if game.stranded(s.id) {
                     ui.label(fuel);
-                    ui.colored_label(Color32::from_rgb(230, 120, 90), "stranded: no leg it can pay, and no station of yours or of a Refuel partner's here to refuel at; a station built in orbit here, or a Refuel Accord with one who holds a station here, rescues it");
+                    // Ticket #396 (version 0.09.3): or a Refinery Colony under low orbit.
+                    ui.colored_label(Color32::from_rgb(230, 120, 90), "stranded: no leg it can pay, and nothing of yours or of a Refuel partner's here to refuel at. A station in orbit here, a working Refinery at a Colony of yours on the ground, or a Refuel Accord with one who holds either, rescues it.");
                 } else {
-                    ui.label(format!("{fuel}; no station of yours, or of a Refuel partner's, here to refuel at"));
+                    ui.label(format!("{fuel}; no station or Refinery Colony of yours, or of a Refuel partner's, here to refuel at"));
                 }
             }
             ShipAt::Transit { .. } => {
@@ -8181,9 +8366,9 @@ fn ship_weapons_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut Vi
 /// helper drops a nought from a price, and a nought is reachable here (Materials at 1 Ducat, one
 /// unit, the Prospectors' 15% off), so a nought is written out in words rather than leaving the
 /// face reading a bare "Buy for".
-fn ducat_button(ui: &mut Ui, game: &Game, session: &Session, verb: &str, ducats: i64, order: &Order) -> egui::Response {
+fn ducat_button(ui: &mut Ui, game: &Game, session: &Session, verb: &str, ducats: f64, order: &Order) -> egui::Response {
     let ok = game.check_order(Seat(0), &session.pending, order);
-    let mut resp = if ducats > 0 {
+    let mut resp = if ducats > 0.0 {
         priced_button(ui, ok.is_ok(), verb, &dying_earth_engine::Cost { ducats, ..Default::default() }, 0)
     } else {
         ui.add_enabled(ok.is_ok(), egui::Button::new(format!("{verb} 0 Ducats")))
@@ -8205,7 +8390,7 @@ fn trading_window(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSt
     // face at all; the Cost it is handed is Ducats alone, so the face reads "Buy for 48 [ducats]".
     let head = ui.visuals().strong_text_color();
     let body = ui.visuals().text_color();
-    text_with_icons(ui, &format!("{} Ducats to spend this turn (+{} Ducats last Income).", left.ducats, game.seat(Seat(0)).income_last_turn.ducats), 14.0, head);
+    text_with_icons(ui, &format!("{} Ducats to spend this turn (+{} Ducats last Income).", figure(left.ducats), figure(game.seat(Seat(0)).income_last_turn.ducats)), 14.0, head);
     ui.label("What you buy is yours at once, for this turn's orders. Ducats come from your Regions' economies, Banks and Trade Posts.");
     ui.separator();
     let lines: [(usize, Option<dying_earth_engine::Resource>, &str, &str); 4] = [(0, None, "influence", "Influence"), (1, Some(dying_earth_engine::Resource::Materials), "materials", "Materials"), (2, Some(dying_earth_engine::Resource::Fuel), "fuel", "Fuel"), (3, Some(dying_earth_engine::Resource::Energy), "energy", "Energy")];
@@ -8227,7 +8412,7 @@ fn trading_window(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSt
             // the price; the line says so.
             let off = game.tables.faction(game.kind(Seat(0))).market_multiplier;
             let discount = if res.is_some() && off != 1.0 { format!(" (x{off} for you, over the lot)") } else { String::new() };
-            let price = if sells { format!("{per} Ducats each; sells for {:.1} Ducats{discount}", per as f64 / game.tables.ducats.sell_divisor.max(1) as f64) } else { format!("{per} Ducats each{discount}") };
+            let price = if sells { format!("{per} Ducats each; sells for {} Ducats{discount}", figure(per as f64 / game.tables.ducats.sell_divisor.max(1) as f64)) } else { format!("{per} Ducats each{discount}") };
             // The glyph line wraps at the width it is given, and a Grid cell has none until its
             // content has one, so left alone it wrapped one word to a line (the first picture of
             // ticket #369).
@@ -8331,7 +8516,7 @@ fn credits_request_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut
             ui.label(RichText::new(format!("The Custodians are not selling this turn. They are {level} toward you (x{m}).")).weak());
         }
         Some(m) => {
-            ui.label(format!("The Custodians offer {offer} ppm this turn. They are {level} toward you, so a ppm costs {} Ducats (x{m}).", game.credit_cost(me, 1).unwrap_or(0)));
+            ui.label(format!("The Custodians offer {offer} ppm this turn. They are {level} toward you, so a ppm costs {} Ducats (x{m}).", figure(game.credit_cost(me, 1).unwrap_or(0.0))));
             ui.horizontal(|ui| {
                 ui.add(egui::DragValue::new(&mut view.credits_amount).range(1..=c.cap_per_turn.max(1)));
                 let order = Order::BuyCredits { ppm: view.credits_amount };
@@ -9349,7 +9534,7 @@ fn condensed_fund(ui: &mut Ui, session: &Session, game: &Game, actions: &mut Vec
                 });
                 contribution = contribution.max(floor);
                 let fund = game.seat(me).archive_fund;
-                fund_bar(ui, colour, fund, game.tables.archive.research, RAIL, "The Archive fund");
+                fund_bar(ui, colour, fund as f64, game.tables.archive.research as f64, RAIL, "The Archive fund");
                 place_research_directive(ui, session, game, actions, resp, contribution, standing, pending_set);
             });
         }
@@ -9370,7 +9555,7 @@ fn condensed_fund(ui: &mut Ui, session: &Session, game: &Game, actions: &mut Vec
                 });
                 share = share.min(cap);
                 let fund = game.seat(me).venture_fund;
-                fund_bar(ui, colour, fund, game.tables.faction(FactionKind::Prospectors).victory_first.bar as i64, RAIL, "The Venture Capital Fund");
+                fund_bar(ui, colour, fund, game.tables.faction(FactionKind::Prospectors).victory_first.bar, RAIL, "The Venture Capital Fund");
                 place_venture_share(ui, session, game, actions, resp, share, standing, pending_set);
             });
         }
@@ -9404,18 +9589,18 @@ fn condensed_rail<T: egui::emath::Numeric>(ui: &mut Ui, value: &mut T, width: f3
 /// Ticket #382: **the fill bar**, the fund against its bar in the Faction's colour, `width` by
 /// fourteen with the figures beside it -- the shape of `research_race_bar`, figures and all. Not
 /// written on the fill: no text reads on both Factions' fills, and the race bar sets the precedent.
-fn fund_bar(ui: &mut Ui, colour: Color32, fund: i64, bar: i64, width: f32, what: &str) {
+fn fund_bar(ui: &mut Ui, colour: Color32, fund: f64, bar: f64, width: f32, what: &str) {
     let (rect, resp) = ui.allocate_exact_size(egui::vec2(width, 14.0), egui::Sense::hover());
     let painter = ui.painter_at(rect);
     painter.rect_filled(rect, 3.0, Color32::from_gray(45));
-    let share = if bar > 0 { (fund as f32 / bar as f32).clamp(0.0, 1.0) } else { 0.0 };
+    let share = if bar > 0.0 { (fund / bar).clamp(0.0, 1.0) as f32 } else { 0.0 };
     if share > 0.0 {
         painter.rect_filled(egui::Rect::from_min_size(rect.min, egui::vec2(rect.width() * share, rect.height())), 3.0, colour);
     }
     painter.rect_stroke(rect, 3.0, egui::Stroke::new(1.0, Color32::from_gray(120)), egui::StrokeKind::Inside);
-    let hover = format!("{what}: {fund} of the {bar} the Victory Condition asks.");
+    let hover = format!("{what}: {} of the {} the Victory Condition asks.", figure(fund), figure(bar));
     resp.on_hover_text(hover.clone());
-    ui.label(RichText::new(format!("{fund} of {bar}")).weak()).on_hover_text(hover);
+    ui.label(RichText::new(format!("{} of {}", figure(fund), figure(bar))).weak()).on_hover_text(hover);
 }
 
 /// Ticket #382: the two full controls' own sentences, on the condensed widget's hover.
@@ -9577,7 +9762,7 @@ fn venture_fund_control(ui: &mut Ui, session: &Session, game: &Game, view: &mut 
 
     // Withdraw: a field and a button, the Influence cluster's shape.
     ui.horizontal(|ui| {
-        let most = fund - session.pending.iter().map(|o| if let Order::DrawVenture { amount } = o { *amount } else { 0 }).sum::<i64>();
+        let most = (fund - session.pending.iter().map(|o| if let Order::DrawVenture { amount } = o { *amount } else { 0 }).sum::<i64>() as f64).floor() as i64;
         ui.add(egui::DragValue::new(&mut view.venture_withdraw).range(1..=most.max(1)));
         let order = Order::DrawVenture { amount: view.venture_withdraw };
         let check = game.check_order(me, &session.pending, &order);
@@ -9722,10 +9907,10 @@ fn greenwash_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewS
     // grey where they bite before the Influence does, and the line under it naming which bites.
     let (whole, left) = influence_this_turn(game, session);
     let (stock, _) = game.remaining(me, &session.pending);
-    let by_ducats = if per > 0 { Some((stock.ducats / per).max(0)) } else { None };
+    let by_ducats = if per > 0 { Some(((stock.ducats / per as f64).floor() as i64).max(0)) } else { None };
     let amount = influence_rail(ui, &mut view.greenwash_amount, whole, left, by_ducats);
     let bites = match by_ducats {
-        Some(d) if d < left => format!("your {} Ducats cover {d} of it, which is the bound", stock.ducats),
+        Some(d) if d < left => format!("your {} Ducats cover {d} of it, which is the bound", figure(stock.ducats)),
         _ => format!("{left} not yet ordered elsewhere, and the Ducats cover it"),
     };
     ui.label(RichText::new(format!("{amount} of your {whole} Influence this turn; {bites}.")).weak());
@@ -9896,12 +10081,11 @@ fn faction_window(ctx: &egui::Context, session: &Session, game: &Game, view: &mu
         let s = game.seat(seat);
         let inc = s.income_last_turn;
         let breakdown = session.spectator || seat == Seat(0);
-        let signed = |v: i64| if v >= 0 { format!("+{v}") } else { format!("{v}") };
         let hover = |res: dying_earth_engine::Resource, word: &str| -> String {
             if !breakdown {
                 return format!("{word}. A rival's income is shown as a total only.");
             }
-            let lines: Vec<String> = s.income_sources.iter().filter(|(_, r, _)| *r == res).map(|(name, _, v)| format!("{v:+}  {name}")).collect();
+            let lines: Vec<String> = s.income_sources.iter().filter(|(_, r, _)| *r == res).map(|(name, _, v)| format!("{}  {name}", signed(*v))).collect();
             if lines.is_empty() {
                 format!("{word}. No income from buildings last turn.")
             } else {
@@ -9910,7 +10094,7 @@ fn faction_window(ctx: &egui::Context, session: &Session, game: &Game, view: &mu
         };
         // Research is not in the Stockpile -- it is spent the turn it is made -- so its total is
         // gathered from the sources. That is still a total, and gives nothing away.
-        let research: i64 = s.income_sources.iter().filter(|(_, r, _)| *r == dying_earth_engine::Resource::Research).map(|(_, _, v)| v).sum();
+        let research: f64 = s.income_sources.iter().filter(|(_, r, _)| *r == dying_earth_engine::Resource::Research).map(|(_, _, v)| v).sum();
         ui.label(RichText::new("Income last turn").strong());
         glyph_row(
             ui,
@@ -10160,12 +10344,16 @@ fn card_effect_text(e: &CardEffect) -> String {
 /// which open with the card's name, and an answer names the Faction that gave it. So a line is the
 /// card's if it opens with the name of a card that asks, and an answer if a Faction is named in it:
 /// no card is named for a Faction and no Faction for a card, so neither test can catch the other's.
-fn card_report_line(game: &Game, text: &str) -> Option<(EventId, Option<Seat>)> {
+pub(crate) fn card_report_line(game: &Game, text: &str) -> Option<(EventId, Option<Seat>)> {
     let id = EventId::ALL.into_iter().find(|id| {
         let card = game.tables.event(*id);
         card.asks() && text.strip_prefix(card.name.as_str()).map(|rest| rest.starts_with(": ")).unwrap_or(false)
     })?;
-    Some((id, Seat::ALL.into_iter().find(|s| text.contains(&game.seat_name(*s)))))
+    let rest = &text[game.tables.event(id).name.len() + 2..];
+    // Ticket #388 (version 0.09.3): the player's own line for a card that passed them by is second
+    // person ("You have no Ship, so it passed you by") and names no Faction; it is seat 0's.
+    let seat = Seat::ALL.into_iter().find(|s| text.contains(&game.seat_name(*s))).or_else(|| (!game.spectator && rest.starts_with("You ")).then_some(Seat(0)));
+    Some((id, seat))
 }
 
 /// Ticket #337: whether a Report line is one seat's answer to the turn's Choice Card.
@@ -10812,8 +11000,9 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                     // Ticket #337 (version 0.09.0): **what the table answered**, the four seats
                     // together, each in its Faction's colour, immediately above what the rivals
                     // did -- which is where a player is already looking for news of them. A seat
-                    // neither side of the card could reach is here too, saying it had nothing to
-                    // decide, so a small Faction is never passed over in silence.
+                    // neither side of the card could reach is here too, saying why it passed them
+                    // by (ticket #388, version 0.09.3), so a small Faction is never passed over in
+                    // silence.
                     let answers = card_answers(game);
                     if let Some((card, _, _)) = answers.first() {
                         ui.label(RichText::new(format!("{}: what the table answered", game.tables.event(*card).name)).strong());
@@ -11080,10 +11269,10 @@ fn chronicle_screen(root: &mut Ui, session: &Session, actions: &mut Vec<Action>)
                 for (seat, _) in &ranking {
                     let s = game.seat(*seat);
                     ui.label(RichText::new(game.seat_name(*seat)).strong().color(seat_colour(session, *seat)));
-                    ui.label(format!("{}", s.stockpile.materials));
-                    ui.label(format!("{}", s.stockpile.fuel));
-                    ui.label(format!("{}", s.stockpile.energy));
-                    ui.label(format!("{}", s.stockpile.ducats));
+                    ui.label(figure(s.stockpile.materials));
+                    ui.label(figure(s.stockpile.fuel));
+                    ui.label(figure(s.stockpile.energy));
+                    ui.label(figure(s.stockpile.ducats));
                     ui.label(format!("{}", game.off_world_colonists(*seat)));
                     ui.label(format!("{}", game.directed_states(*seat).len()));
                     ui.label(format!("{}", game.directed_colonies(*seat).len()));
@@ -11200,5 +11389,36 @@ mod tests {
         let further = tech_edge_path(from, to, gap_x, ROW, &[blocker, below]);
         assert!(!crosses(&further, blocker) && !crosses(&further, below), "both boxes cleared");
         assert_eq!(further.last(), Some(&to.left_center()));
+    }
+}
+
+#[cfg(test)]
+mod glyph_words {
+    use super::{glyph_for, glyph_tokens, GlyphToken};
+
+    /// Ticket #392 (version 0.09.3): the word ending a line is a bare word, so the Mine's `0.6
+    /// Emissions` above its chain takes the chimney. Red with the old split on spaces alone, which
+    /// gave `Emissions\n4` as one word.
+    #[test]
+    fn a_word_ending_a_line_is_bare_and_the_break_is_its_own_piece() {
+        use GlyphToken::*;
+        assert_eq!(glyph_tokens("2 upkeep, 0.6 Emissions\n4 base"), vec![Word("2"), Word("upkeep,"), Word("0.6"), Word("Emissions"), Break, Word("4"), Word("base")]);
+        assert_eq!(glyph_tokens("+6 Energy"), vec![Word("+6"), Word("Energy")]);
+    }
+
+    /// Ticket #392 (version 0.09.3): the words the build hover carries after a figure and the glyph
+    /// each takes. `4 Colonists` wears the head Earth's population does (Q2, A); the singular
+    /// `1 Ducat` an Academy pays wears the coin its plural does; `Bodies` stays a word; and no word
+    /// takes a glyph where it is not a figure's.
+    #[test]
+    fn colonists_and_a_single_ducat_take_their_glyphs_after_a_figure_and_bodies_stay_a_word() {
+        assert_eq!(glyph_for(true, "Colonists", &[]), Some("population"), "4 Colonists");
+        assert_eq!(glyph_for(true, "Colonist", &[]), Some("population"), "1 Colonist");
+        assert_eq!(glyph_for(true, "Ducat", &[]), Some("ducats"), "1 Ducat");
+        assert_eq!(glyph_for(true, "Ducats", &[]), Some("ducats"), "6.8 Ducats");
+        assert_eq!(glyph_for(true, "Bodies", &[]), None, "3 x 1 Bodies stays a word");
+        assert_eq!(glyph_for(false, "Colonists", &[]), None, "Colonists as a sentence's subject");
+        assert_eq!(glyph_for(true, "ppm", &[("ppm", "emissions")]), Some("emissions"), "the Blame block's extra word");
+        assert_eq!(glyph_for(true, "ppm", &[]), None, "and ppm nowhere else");
     }
 }

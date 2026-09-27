@@ -613,3 +613,30 @@ mod tests {
     }
 
 }
+
+#[cfg(test)]
+mod card_lines {
+    use dying_earth_engine::data::{default_data_dir, Tables};
+    use dying_earth_engine::ids::{EventId, FactionKind, Seat, StateId};
+    use dying_earth_engine::state::{Game, NewGame};
+    use std::sync::Arc;
+
+    /// Ticket #388 (version 0.09.3, the review's finding): **the Report window knows the player's own
+    /// passed-by line.** It finds a card line's seat by the Faction named in it, and the player's
+    /// line for a card that passed them by names none ("You have no Ship, so it passed you by"), so
+    /// it fell out of the answers block into a bare line under Your works. A second-person line is
+    /// seat 0's; a rival's names them; the computer playing all four names everyone.
+    #[test]
+    fn the_players_passed_by_line_is_found_as_the_players_answer() {
+        let tables = Arc::new(Tables::load(&default_data_dir()).expect("tables"));
+        let g = Game::new(tables.clone(), NewGame { seed: 7, player: FactionKind::Custodians, player_is_ai: false, player_start: StateId::EastAsia });
+        let mine = "Grounded Fleet: You have no Ship, so it passed you by; neither side applied.";
+        assert_eq!(crate::ui::card_report_line(&g, mine), Some((EventId::GroundedFleet, Some(Seat(0)))), "the player's line is seat 0's");
+        let rival = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Prospectors).expect("a Prospector seat");
+        let theirs = format!("Grounded Fleet: The {} have no Ship, so it passed them by; neither side applied.", g.seat_name(rival));
+        assert_eq!(crate::ui::card_report_line(&g, &theirs), Some((EventId::GroundedFleet, Some(rival))), "a rival's line names them");
+        let mut s = Game::spectate(tables, 7);
+        s.start();
+        assert_eq!(crate::ui::card_report_line(&s, mine), Some((EventId::GroundedFleet, None)), "nobody's, when the computer plays all four");
+    }
+}

@@ -433,6 +433,8 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("no_habitat_room", &["n", "place"]),
     // Ticket #345 (version 0.09.1): a Body settled for the first time.
     ("first_to_body", &["faction", "body", "colony", "n"]),
+    // Ticket #395 (version 0.09.3): and the world eases at the news, one line for the whole Earth.
+    ("first_to_body_eases", &["body", "ease"]),
     ("disembarked", &["n", "colony"]),
     ("station_built", &["faction", "station"]),
     ("antarctica_opens", &["n"]),
@@ -512,6 +514,17 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     // Ticket #337 (version 0.09.0): the card that asks a question, and what each seat answered.
     ("card_asked", &["card", "question"]),
     ("card_answered", &["card", "faction", "answer"]),
+    // Ticket #388 (version 0.09.3): why a card passed a seat by, and a card put back unspent.
+    ("card_passed_by", &["card", "who", "lack", "them"]),
+    ("card_put_back", &["card"]),
+    ("lack_ship", &[]),
+    ("lack_ship_in_orbit", &[]),
+    ("lack_region", &[]),
+    ("lack_populated_region", &[]),
+    ("lack_busy_region", &[]),
+    ("lack_facility", &["facility"]),
+    ("lack_colony_module", &["module"]),
+    ("lack_colony_room", &["module"]),
     ("break_fired", &["temperature", "name", "happened", "text"]),
     ("break_coastal", &["states", "exposure", "percent", "unrest"]),
     ("break_baseline", &["state", "rise"]),
@@ -538,8 +551,8 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("sea_nothing_left", &["temperature", "state"]),
     ("sea_took", &["n", "slots", "state", "temperature"]),
     ("sea_took_destroying", &["n", "slots", "state", "temperature", "destroyed"]),
-    ("heat_population", &["state", "percent", "after", "rose", "unrest"]),
-    ("heat_unrest_only", &["state", "rose", "unrest"]),
+    // Ticket #400 (version 0.09.3): the heat is a cause on the net line; the board is one line.
+    ("heat_board", &["n", "m"]),
     ("development", &["state", "level"]),
     ("development_woke", &["state", "level", "building"]),
     ("scrubbers_destroyed", &["n", "state", "why"]),
@@ -587,6 +600,10 @@ pub const PHRASE_ARGS: &[(&str, &[&str])] = &[
     ("cause_agitate_damped", &["faction"]),
     ("cause_relief", &["faction"]),
     ("cause_refugees", &["n"]),
+    // Ticket #400 (version 0.09.3): the heat and the sea, where each wrote a line of its own.
+    ("cause_heat", &[]),
+    ("cause_sea", &[]),
+    ("cause_break", &["name"]),
     ("cause_occupation_start", &[]),
     ("cause_occupation", &[]),
     ("cause_occupation_break", &[]),
@@ -605,7 +622,6 @@ pub const PHRASE_ARGS: &[(&str, &[&str])] = &[
     // Ticket #346 (version 0.09.1): what a Battle cost in Fuel, and the hulls that fought dry.
     ("battle_fuel", &["n"]),
     ("battle_fought_dry", &["hulls"]),
-    ("sea_unrest", &["rose", "unrest"]),
     ("sea_inland", &[]),
     ("sea_inland_flipped", &["what"]),
     ("first_colony", &[]),
@@ -705,8 +721,9 @@ pub const MOMENT_ARGS: &[(&str, &[&str])] = &[
     ("archive_complete", &["faction", "place", "research"]),
     // Ticket #261 (version 0.08.4): the sentence is a line card, as the climate threshold's is.
     ("rival_progress", &["text", "figure"]),
-    // Ticket #345 (version 0.09.1): a Body settled for the first time.
-    ("first_to_body", &["faction", "body", "colony", "n"]),
+    // Ticket #345 (version 0.09.1): a Body settled for the first time; ticket #395 (version
+    // 0.09.3): with the world's easing in the same breath.
+    ("first_to_body", &["faction", "body", "colony", "n", "ease"]),
 ];
 
 impl ReportTable {

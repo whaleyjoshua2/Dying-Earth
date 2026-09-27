@@ -59,6 +59,9 @@ pub struct BodyCard {
     /// Ticket #92 (version 0.06.0): a small world, where a Mass Driver may stand.
     #[serde(default)]
     pub low_gravity: bool,
+    /// Ticket #397 (version 0.09.3): what a Trade Post anywhere is paid a turn for its Faction
+    /// holding this Body, by distance from Earth; a flat figure for every Body before.
+    pub trade_pays: f64,
     pub mine_yield: f64,
     pub generator_yield: f64,
     pub refinery_yield: f64,
@@ -703,7 +706,7 @@ fn one_f64() -> f64 {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum VictoryFirstKind {
-    /// Ticket #72 (version 0.05.5): Materials banked in the Prospectors' Venture Capital Fund; the
+    /// Ticket #72 (version 0.05.5): Ducats banked in the Prospectors' Venture Capital Fund; the
     /// running Extraction Total it replaces is retired.
     VentureFund,
     StabilizationRun,
@@ -1034,9 +1037,15 @@ pub struct UnrestTable {
     pub constabulary_fall: f64,
     /// The hook a Scrubber joins on its own ticket; nothing reads it yet.
     pub scrubber_fall: f64,
+    /// Ticket #395 (version 0.09.3): what the first ground Colony ever founded on a Body takes off
+    /// every Region's Unrest at once, whoever holds it, once a Body.
+    pub first_colony_ease: f64,
     pub green_techs_two: f64,
     pub green_techs_four: f64,
     pub constabulary_damping: f64,
+    /// Ticket #389 (version 0.09.3): what a working Stadium multiplies a climate rise by, after the
+    /// damping above; half, so a heat rise of one lands as a quarter where a Constabulary stands too.
+    pub stadium_factor: f64,
     pub army_threshold: f64,
     pub facility_threshold: f64,
     pub throw_off_threshold: f64,
@@ -1162,6 +1171,9 @@ pub struct AiWeights {
     pub relief: f64,
     /// Ticket #52: raise a Constabulary in a restive state.
     pub build_constabulary: f64,
+    /// Ticket #389 (version 0.09.3): the Stadium, raised only where a Constabulary already stands
+    /// and Unrest is still 5 or more.
+    pub build_stadium: f64,
     /// Ticket #267 (version 0.08.4): smear a rival the seat is Cold or Hostile toward whose Blame
     /// share stands above the fair quarter.
     pub smear: f64,
@@ -1213,7 +1225,7 @@ pub struct AiMultipliers {
     pub energy_shortage_bonus: f64,
     /// Ticket #181 (version 0.08.0): the slight bias a seat gets toward its own Unique Facility.
     pub unique_bias: f64,
-    /// Ticket #182: what one Material in the Venture Capital Fund adds to the Prospectors' appetite
+    /// Ticket #182: what one Ducat in the Venture Capital Fund adds to the Prospectors' appetite
     /// for an Investment Bank, since the building's worth is a share of that balance.
     pub investment_bank_per_fund: f64,
     /// Ticket #209 (version 0.08.1): what the Archivists' appetite for the whole off-Earth chain --
@@ -1226,6 +1238,22 @@ pub struct AiMultipliers {
     /// would finish it behind its queue: the soonest place at full weight, every other at
     /// soonest / turns, never below this floor. A place that makes no Widgets is at the floor.
     pub build_pace_floor: f64,
+    /// Ticket #398 (version 0.09.3): what a Shipyard's weight is multiplied by on a ground Colony
+    /// on a low-gravity Body with a working Mine, where Build Where You Dig reaches the Ships it
+    /// builds; 1 everywhere else.
+    pub low_gravity_yard: f64,
+    /// Ticket #394 (version 0.09.3): the bounty the board's fattest Colony or station is (its size: Colonists
+    /// plus its output a turn), every other place proportional; and the size a Colony or station must reach
+    /// before it is that bounty, below which the scale is fixed (26, the designer's figure, a little
+    /// above a Colony of eight with a Mine, a Generator and a Factory).
+    pub bounty_top: f64,
+    /// Ticket #394 (version 0.09.3): the size a Colony or station must reach before it is the
+    /// board's top; below it the scale is fixed. The designer's 26.
+    pub bounty_floor: f64,
+    /// Ticket #394 (version 0.09.3): the least a bounty can be. At 1, the designer's word, a lean
+    /// place keeps the weight it had and only the fat ones rise; at 0 the rescaling is bare, and
+    /// measured so the computer took fewer Colonies.
+    pub bounty_least: f64,
 }
 
 /// Ticket #50: one pace schedule per Faction. `first` is the schedule for the Faction's first
@@ -1437,13 +1465,6 @@ pub struct InSituCard {
     pub floor: f64,
 }
 
-/// Ticket #90 (version 0.06.0): the Trade Post's network figure, Ducats for every other Body the
-/// Faction holds; the per-Colonist figure is the row's `produces.amount`.
-#[derive(Debug, Clone, Deserialize)]
-pub struct TradePostCard {
-    pub per_other_body: i64,
-}
-
 #[derive(Debug, Clone, Deserialize)]
 struct ModulesFile {
     module: Vec<ModuleCard>,
@@ -1451,7 +1472,6 @@ struct ModulesFile {
     archive: ArchiveCard,
     observatory: ObservatoryCard,
     in_situ: InSituCard,
-    trade_post: TradePostCard,
     mass_driver: MassDriverCard,
 }
 /// Ticket #295 (version 0.08.6): the disengage roll's figure, in data at last. After every round a
@@ -1799,8 +1819,6 @@ pub struct Tables {
     pub observatory: ObservatoryCard,
     /// Ticket #88: the discount a Colony's working Mines give its Modules.
     pub in_situ: InSituCard,
-    /// Ticket #90: the Trade Post's network figure.
-    pub trade_post: TradePostCard,
     /// Ticket #92: the Mass Driver's Fuel cut and Mine bonus.
     pub mass_driver: MassDriverCard,
     pub units: Vec<UnitCard>,
@@ -1928,7 +1946,6 @@ impl Tables {
             archive: modules.archive,
             observatory: modules.observatory,
             in_situ: modules.in_situ,
-            trade_post: modules.trade_post,
             mass_driver: modules.mass_driver,
             modules: modules.module,
             units: units.unit,
@@ -2481,14 +2498,16 @@ impl Tables {
     /// at the start; ticket #139 (version 0.07.3) made it **GDP x Industry Level / 5, rounded down,
     /// never below 1** -- the designer: *"Saudi Arabia can't pay 0"* -- so every Region pays, the
     /// rich pay double, and a small economy pays a flat one until GDP x Industry reaches 10.
-    pub fn base_ducats(&self, sid: StateId, industry_level: u32) -> i64 {
-        ((self.state(sid).gdp * industry_level as i64) / 5).max(1)
+    /// Ticket #387 (version 0.09.3): **to the tenth**, where the division was rounded down: East
+    /// Asia's 17 x 3 / 5 pays 10.2. The floor of one stands.
+    pub fn base_ducats(&self, sid: StateId, industry_level: u32) -> f64 {
+        crate::state::tenth((self.state(sid).gdp * industry_level as i64) as f64 / 5.0).max(1.0)
     }
 
     /// What a Region's economy would pay `faction` a turn as the game opens: the base at the card's
-    /// Industry Level, times the Faction's Ducats multiplier (ticket #83).
-    pub fn start_ducats(&self, sid: StateId, faction: FactionKind) -> i64 {
-        (self.base_ducats(sid, self.state(sid).industry_level) as f64 * self.faction(faction).ducats_multiplier).floor() as i64
+    /// Industry Level, times the Faction's Ducats multiplier (ticket #83). Ticket #387: to the tenth.
+    pub fn start_ducats(&self, sid: StateId, faction: FactionKind) -> f64 {
+        crate::state::tenth(self.base_ducats(sid, self.state(sid).industry_level) * self.faction(faction).ducats_multiplier)
     }
 
     /// What a Region emits a turn as the game opens under `faction`, as that Faction's home: its

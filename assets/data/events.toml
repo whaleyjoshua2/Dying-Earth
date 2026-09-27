@@ -94,7 +94,9 @@ id = "launch_pad_fire"
 name = "Launch Pad Fire"
 kind = "failure"
 target = "nation_state_with_launch_site"
-effect = "Its Launch Site is offline until the next Resolution; any Ship due there this turn completes next turn instead"
+# Ticket #386 (version 0.09.3): the text said a due Ship completes next turn, which ticket #332 (version
+# 0.09.0) had replaced with the Widgets lost; the effect line now says the live rule.
+effect = "Its Launch Site is offline until the next Resolution, so nothing lifts to orbit from there, and the Region loses the turn's Widgets"
 blunted_by = "clean_propellant"
 copies = 1
 

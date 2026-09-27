@@ -73,7 +73,12 @@ impl Game {
         self.resolve_unrest(); // (i), ticket #52
         self.resolve_credits(); // (j), ticket #268: carbon credits change hands
         self.report_waiting_colonists(); // ticket #370: after every landing this turn has made
-        self.pending = Pending::default();
+        // Ticket #400 (version 0.09.3): the Unrest causes and the snapshot outlive the Resolution,
+        // since the net lines are written after the Climate phase, where the heat and the sea join
+        // them; everything else pending is spent here as it always was.
+        let unrest_causes = std::mem::take(&mut self.pending.unrest_causes);
+        let unrest_before = std::mem::take(&mut self.pending.unrest_before);
+        self.pending = Pending { unrest_causes, unrest_before, ..Pending::default() };
         // Ticket #383 (version 0.09.2): a stack that fought this turn may Attack again next turn.
         self.fought.clear();
         for a in &mut self.armies {
@@ -832,7 +837,7 @@ impl Game {
         // the same reading, so the charge and the penalty can never disagree about which hulls were
         // dry: a hull with exactly the charge in its tank pays it and fights whole, and is dry for
         // the NEXT Battle.
-        let charge = self.tables.melee.battle_fuel;
+        let charge = self.tables.melee.battle_fuel as f64;
         let hulls: Vec<(Seat, ShipId)> =
             parties.iter().flat_map(|(seat, _, ids)| ids.iter().filter_map(move |u| if let UnitRef::Ship(id) = u { Some((*seat, *id)) } else { None })).collect();
         let mut dry: Vec<ShipId> = Vec::new();
@@ -840,11 +845,11 @@ impl Game {
         // nought, so an unarmed hull fought dry and fought no differently, and saying so would be
         // noise in the Report.
         let mut fought_dry: Vec<String> = Vec::new();
-        let mut takings: Vec<(Seat, ShipId, i64, bool)> = Vec::new();
+        let mut takings: Vec<(Seat, ShipId, f64, bool)> = Vec::new();
         for (seat, id) in &hulls {
             let Some(s) = self.ship(*id) else { continue };
             let held = self.ship_holds_the_battle_bar(s);
-            let take = s.fuel.clamp(0, charge);
+            let take = s.fuel.clamp(0.0, charge);
             if !held {
                 dry.push(*id);
                 if self.ship_strength(s) > 0 {
@@ -853,13 +858,13 @@ impl Game {
             }
             takings.push((*seat, *id, take, held && s.fuel - take < charge));
         }
-        let mut burned = 0i64;
+        let mut burned = 0.0;
         for (seat, id, take, left_dry) in takings {
             if let Some(s) = self.ship_mut(id) {
-                s.fuel -= take;
+                s.fuel = tenth(s.fuel - take);
             }
             burned += take;
-            self.war.battle_fuel_burned[seat.index()] += take;
+            self.war.battle_fuel_burned[seat.index()] = tenth(self.war.battle_fuel_burned[seat.index()] + take);
             if left_dry {
                 self.war.hulls_left_dry[seat.index()] += 1;
             }
@@ -875,7 +880,7 @@ impl Game {
         let mut line = self.run_melee(place, Some(ReportPlace::Orbit(body, orbit)), units, rolls);
         // Ticket #346 (version 0.09.1): what the Battle took out of the tanks, and the hulls that
         // fought it under the bar, both out of `report.toml`.
-        line.result.push_str(&self.phrase("battle_fuel", &[("n", burned.to_string())]));
+        line.result.push_str(&self.phrase("battle_fuel", &[("n", figure(tenth(burned)))]));
         if !fought_dry.is_empty() {
             line.result.push_str(&self.phrase("battle_fought_dry", &[("hulls", fought_dry.join(", "))]));
         }
@@ -1963,7 +1968,8 @@ impl Game {
             for i in due {
                 let change = self.state(sid).facilities[i].change.unwrap();
                 let kind = self.state(sid).facilities[i].kind;
-                let refund = self.tables.facility(kind).materials / 2;
+                // Ticket #387 (version 0.09.3): to the tenth, where it was rounded down: 12.5 of 25.
+                let refund = tenth(self.tables.facility(kind).materials as f64 / 2.0);
                 let f = &mut self.state_mut(sid).facilities[i];
                 f.change = None;
                 match change.what {
@@ -1977,7 +1983,7 @@ impl Game {
                     }
                     BuildingChange::Decommission => {
                         self.state_mut(sid).facilities.remove(i);
-                        self.seat_mut(change.seat).stockpile.materials += refund;
+                        self.seat_mut(change.seat).stockpile.materials = tenth(self.seat(change.seat).stockpile.materials + refund);
                     }
                 }
                 let where_ = self.tables.state(sid).name.clone();
@@ -1987,7 +1993,7 @@ impl Game {
                         self.seat_name(change.seat),
                         kind.name(),
                         where_,
-                        refund
+                        figure(refund)
                     ),
                     w => format!("The {} {} the {} in {}.", self.seat_name(change.seat), w.done(), kind.name(), where_),
                 });
@@ -1996,7 +2002,7 @@ impl Game {
                     ("done", change.what.done().to_string()),
                     ("building", kind.name().to_string()),
                     ("state", where_.clone()),
-                    ("refund", refund.to_string()),
+                    ("refund", figure(refund)),
                 ];
                 let text = match change.what {
                     BuildingChange::Decommission => self.say("building_decommissioned_state", &args),
@@ -2021,7 +2027,8 @@ impl Game {
             for i in due {
                 let change = self.colony(cid).unwrap().modules[i].change.unwrap();
                 let kind = self.colony(cid).unwrap().modules[i].kind;
-                let refund = self.module_materials(change.seat, kind) / 2;
+                // Ticket #387 (version 0.09.3): to the tenth, where it was rounded down.
+                let refund = tenth(self.module_materials(change.seat, kind) / 2.0);
                 let col = self.colony_mut(cid).unwrap();
                 let m = &mut col.modules[i];
                 m.change = None;
@@ -2036,13 +2043,14 @@ impl Game {
                     }
                     BuildingChange::Decommission => {
                         col.modules.remove(i);
-                        self.seat_mut(change.seat).stockpile.materials += refund;
+                        let st = &mut self.seat_mut(change.seat).stockpile;
+                        st.materials = tenth(st.materials + refund);
                     }
                 }
                 let where_ = self.place_name(Place::Colony(cid));
                 lines.push(match change.what {
                     BuildingChange::Decommission => {
-                        format!("The {} decommissioned the {} at {}: {} Materials back.", self.seat_name(change.seat), kind.name(), where_, refund)
+                        format!("The {} decommissioned the {} at {}: {} Materials back.", self.seat_name(change.seat), kind.name(), where_, figure(refund))
                     }
                     w => format!("The {} {} the {} at {}.", self.seat_name(change.seat), w.done(), kind.name(), where_),
                 });
@@ -2051,7 +2059,7 @@ impl Game {
                     ("done", change.what.done().to_string()),
                     ("building", kind.name().to_string()),
                     ("colony", where_.clone()),
-                    ("refund", refund.to_string()),
+                    ("refund", figure(refund)),
                 ];
                 let text = match change.what {
                     BuildingChange::Decommission => self.say("building_decommissioned_colony", &args),
@@ -2143,8 +2151,9 @@ impl Game {
         }
     }
 
-    /// Ticket #371 (version 0.09.2): one cause of a Region's Unrest moving this Resolution, for
-    /// the one net line the Report says about it at the end. `by_player` marks an act of the
+    /// Ticket #371 (version 0.09.2): one cause of a Region's Unrest moving this turn, for the one
+    /// net line the Report says about it after the Climate phase (ticket #400, version 0.09.3; at
+    /// the Resolution's end before). `by_player` marks an act of the
     /// player's own -- an Agitate or a Relief -- which earns a rival's Region its line.
     pub(crate) fn unrest_cause(&mut self, sid: StateId, cause: String, by_player: bool) {
         self.pending.unrest_causes.push((sid, cause, by_player));
@@ -2153,12 +2162,13 @@ impl Game {
     /// Ticket #371 (version 0.09.2): where every Region's Unrest stands, for the "before" of its one
     /// net line. Taken as the Resolution opens; an Unrest pass run on its own (a test, a picture
     /// aid) takes it as the pass opens, which is the same thing for what the pass does.
-    fn snapshot_unrest(&mut self) {
+    pub(crate) fn snapshot_unrest(&mut self) {
         self.pending.unrest_before = StateId::ALL.iter().map(|s| (*s, self.state(*s).unrest)).collect();
     }
 
-    /// Ticket #371 (version 0.09.2): **one net line per Region about its Unrest**, at the end of the
-    /// Resolution, at the designer's word ("quiet unrest spam", and the playtest's "Unrest lines in
+    /// Ticket #371 (version 0.09.2): **one net line per Region about its Unrest**, written after
+    /// the Climate phase since ticket #400 (version 0.09.3) and at the Resolution's end before, at
+    /// the designer's word ("quiet unrest spam", and the playtest's "Unrest lines in
     /// the Report run out of order"). Six sources used to write a line each in phase order --
     /// a Mothball, a Climate card, a Strip Permit running out, an Agitate, a Relief, a threshold
     /// crossed -- so one Region's lines lay scattered among another's and a Region could take six
@@ -2169,7 +2179,9 @@ impl Game {
     /// the player Agitated or Relieved; a rival's is silent unless its holder is thrown off, which
     /// has its own line. A spectated game, having no player, says every Region's. The refugees a
     /// Region took in are one cause among the others, where they were a line of their own.
-    fn report_unrest_net(&mut self) {
+    /// Public since ticket #400 so a test that runs the Resolution or a Climate pass on its own can
+    /// write the lines the turn would.
+    pub fn report_unrest_net(&mut self) {
         let u = self.tables.unrest.clone();
         let me = Seat(0);
         let causes = std::mem::take(&mut self.pending.unrest_causes);
@@ -2186,7 +2198,14 @@ impl Game {
             }
             let now = self.state(sid).unrest;
             let was = before.iter().find(|(s, _)| *s == sid).map(|(_, v)| *v).unwrap_or(now);
-            let words: Vec<String> = mine.iter().map(|(_, c, _)| c.clone()).collect();
+            // Ticket #400 (version 0.09.3): a cause named once, however many times it pushed -- three
+            // sea thresholds in one turn read "the sea, the sea, the sea" before.
+            let mut words: Vec<String> = Vec::new();
+            for (_, c, _) in &mine {
+                if !words.contains(c) {
+                    words.push(c.clone());
+                }
+            }
             let ending = if now >= u.facility_threshold && was < u.facility_threshold {
                 self.phrase("unrest_past", &[("which", "second".to_string()), ("note", self.unrest_note(sid))])
             } else if now >= u.army_threshold && was < u.army_threshold {
@@ -2332,7 +2351,7 @@ impl Game {
                     arrived_this_turn: false,
                     built_turn: turn,
                     // Ticket #87: built with a full tank, paid at the build.
-                    fuel: self.tables.unit(kind).tank,
+                    fuel: self.tables.unit(kind).tank as f64,
                 });
             }
             _ => {}
@@ -2890,11 +2909,12 @@ impl Game {
         let mut left = self.seat(seller).credits_offered;
         for (buyer, ppm, paid) in std::mem::take(&mut self.pending.credit_buys) {
             let take = ppm.min(left).max(0);
-            let kept = if ppm > 0 { paid * take / ppm } else { 0 };
-            let back = paid - kept;
-            if back > 0 {
-                self.seat_mut(buyer).stockpile.ducats += back;
-                let text = self.say("credits_short", &[("faction", self.seat_name(buyer)), ("n", (ppm - take).to_string()), ("back", back.to_string())]);
+            // Ticket #387 (version 0.09.3): to the tenth, where the share was rounded down.
+            let kept = if ppm > 0 { tenth(paid * take as f64 / ppm as f64) } else { 0.0 };
+            let back = tenth(paid - kept);
+            if back > 0.0 {
+                self.seat_mut(buyer).stockpile.ducats = tenth(self.seat(buyer).stockpile.ducats + back);
+                let text = self.say("credits_short", &[("faction", self.seat_name(buyer)), ("n", (ppm - take).to_string()), ("back", figure(back))]);
                 self.report_line_of(buyer, LineKind::YourWorks, LineKind::Note, None, text);
             }
             if take <= 0 {
@@ -2903,12 +2923,12 @@ impl Game {
             left -= take;
             self.seat_mut(buyer).credits_bought += take as f64;
             self.seat_mut(seller).credits_sold += take as f64;
-            self.seat_mut(seller).stockpile.ducats += kept;
+            self.seat_mut(seller).stockpile.ducats = tenth(self.seat(seller).stockpile.ducats + kept);
             self.credit(buyer, seller);
             self.credit(seller, buyer);
             let (who, whom) = (self.seat_name(buyer), self.seat_name(seller));
-            self.log(format!("The {who} bought {take} ppm of carbon credit from the {whom} for {kept} Ducats."));
-            let text = self.say("credits_bought", &[("faction", who), ("n", take.to_string()), ("seller", whom), ("ducats", kept.to_string())]);
+            self.log(format!("The {who} bought {take} ppm of carbon credit from the {whom} for {} Ducats.", figure(kept)));
+            let text = self.say("credits_bought", &[("faction", who), ("n", take.to_string()), ("seller", whom), ("ducats", figure(kept))]);
             self.report_line(LineKind::Note, None, text);
             self.ai_deed(buyer, "buy_credits", &[("n", take.to_string())]);
         }
@@ -3029,8 +3049,9 @@ impl Game {
             let Control::Controlled(seat) = self.state(sid).control else { continue };
             self.throw_off(sid, seat);
         }
-        // Ticket #371 (version 0.09.2): the one net Unrest line a Region.
-        self.report_unrest_net();
+        // Ticket #371 (version 0.09.2): the one net Unrest line a Region is written by
+        // `report_unrest_net`, since ticket #400 (version 0.09.3) after the Climate phase rather
+        // than here, so the heat and the sea are causes on it.
         // The log line for crossing 4 or 7, once each way. Ticket #371 (version 0.09.2): the Report's
         // word for it is the ending of the Region's one net line, written by `report_unrest_net`.
         for sid in StateId::ALL {

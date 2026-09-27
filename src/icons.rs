@@ -122,6 +122,8 @@ pub fn facility_icon(kind: dying_earth_engine::FacilityKind) -> &'static str {
         Bank => "facility_bank",
         Embassy => "facility_embassy",
         Constabulary => "facility_constabulary",
+        // Ticket #389 (version 0.09.3): the Stadium, a bowl of tiers round a field.
+        Stadium => "facility_stadium",
         SeaWall => "facility_sea_wall",
         Scrubber => "facility_scrubber",
         // Ticket #185 (version 0.08.0): the School.
@@ -223,7 +225,7 @@ pub fn faction_symbol(kind: dying_earth_engine::FactionKind) -> &'static str {
 /// credit. game-icons.net's missiles were passed over for the reason the Academy's telescope was:
 /// the Colony Ship already wears Lorc's upright Rocket, and a second upright rocket at sixteen
 /// pixels is the same silhouette twice. The DIAGONAL is what tells the two apart across a roster.
-pub const DRAWN: [&str; 6] = ["station", "facility_school", "battle", "module_battery", "widgets", "missile_carrier"];
+pub const DRAWN: [&str; 7] = ["station", "facility_school", "battle", "module_battery", "widgets", "missile_carrier", "facility_stadium"];
 
 impl Credit {
     /// The file stem in `assets/icons/` this credit is for: the name, lower-cased, spaces to
