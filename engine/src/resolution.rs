@@ -1698,6 +1698,7 @@ impl Game {
             let text = self.say("archive_destroyed", &[("place", self.place_name(place)), ("faction", whose)]);
             self.report_line(LineKind::Archive, Some(place.into()), text);
         }
+        let before = self.place_control(place).controller();
         self.set_place_control(place, Control::Controlled(seat));
         // Standings persist through a transfer (ticket #33): the old controller keeps its own and
         // can contest the place back.
@@ -1708,6 +1709,9 @@ impl Game {
             &[("place", self.place_name(place)), ("faction", self.seat_name(seat)), ("why", why.to_string())],
         );
         self.report_line(LineKind::ControlChanged, Some(place.into()), text);
+        // Ticket #404 (version 0.09.4): a place that became the player's, or stopped being theirs,
+        // is their news: listed under Your works as well as under its place.
+        self.mark_mine(&[Some(seat), before]);
         // Ticket #366 (version 0.09.2): where this line stands, so a throw-off in the same
         // Resolution can say both in its place.
         self.pending.transfer_lines.push((place, self.report.lines.len() - 1));
@@ -3107,6 +3111,8 @@ impl Game {
             && let Some(earlier) = self.report.lines.get_mut(i)
         {
             earlier.text = folded;
+            // Ticket #404: the player thrown off is the player's news, whoever it passed from.
+            earlier.mine |= !self.spectator && seat == Seat(0);
         } else {
             let text = self.say(
                 "threw_off",
@@ -3117,6 +3123,7 @@ impl Game {
                 ],
             );
             self.report_line(LineKind::ControlChanged, Some(ReportPlace::State(sid)), text);
+            self.mark_mine(&[Some(seat)]);
         }
         self.moment(
             MomentKind::ControlChanged,

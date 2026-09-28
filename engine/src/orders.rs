@@ -248,6 +248,12 @@ impl Cost {
         self.ducats += other.ducats;
     }
     pub fn text(&self) -> String {
+        let parts = self.parts();
+        if parts.is_empty() { "free".to_string() } else { parts.join(", ") }
+    }
+    /// Ticket #404 (version 0.09.4): each figure the Stockpile pays, in words, for a caller that
+    /// adds what the Stockpile does not pay.
+    pub fn parts(&self) -> Vec<String> {
         let mut parts = Vec::new();
         if self.materials > 0.0 {
             parts.push(format!("{} Materials", figure(self.materials)));
@@ -264,7 +270,7 @@ impl Cost {
         if self.ducats > 0.0 {
             parts.push(format!("{} Ducats", figure(self.ducats)));
         }
-        if parts.is_empty() { "free".to_string() } else { parts.join(", ") }
+        parts
     }
 }
 
@@ -366,6 +372,49 @@ impl Game {
         match here.iter().find(|c| c.modules.iter().any(|m| m.kind == ModuleKind::Shipyard && m.working())) {
             Some(c) => RearmSite::Yard(c.id),
             None => RearmSite::NoShipyard,
+        }
+    }
+
+    /// Ticket #404 (version 0.09.4): **everything an order pays, in words**, where the confirm said
+    /// only the Stockpile's part: the `Cost`, then the Widgets a build takes from its place's rate,
+    /// the people an Army takes, and the Fuel a move draws from the Ship's tank. `free` only where
+    /// nothing at all is spent. An Army read `costs 25 Materials` and hid the million people.
+    pub fn order_price_text(&self, seat: Seat, order: &Order, cost: Cost) -> String {
+        let mut parts = cost.parts();
+        let own = self.kind(seat);
+        // A build bought outright in Ducats starts done, so its Widgets are not the place's to pay.
+        let item = match order {
+            Order::BuildFacility { kind, .. } => Some(BuildItem::Facility(kind.built_by(own))),
+            Order::RaiseIndustry { .. } => Some(BuildItem::IndustryLevel),
+            Order::BuildModule { kind, .. } => Some(BuildItem::Module(kind.built_by(own))),
+            Order::BuildArchive { .. } => Some(BuildItem::Module(ModuleKind::Archive)),
+            Order::BuildShip { kind, .. } => Some(BuildItem::Unit(*kind)),
+            Order::BuildArmy { .. } => Some(BuildItem::Unit(UnitKind::Army)),
+            Order::Rearm { ship } => Some(BuildItem::Warhead(*ship)),
+            _ => None,
+        };
+        if let Some(item) = item {
+            let n = self.build_widgets(seat, item);
+            parts.push(format!("{n} Widget{}", if n == 1 { "" } else { "s" }));
+        }
+        if let Order::BuildArmy { place } = order {
+            parts.push(self.army_people_text(*place));
+        }
+        let tank = match order {
+            Order::Transit { ship, to, .. } => self.ship(*ship).and_then(|s| match s.at {
+                ShipAt::Body(from) => Some(self.transit_cost_for(seat, from, *to).1),
+                _ => None,
+            }),
+            Order::ChangeOrbit { .. } => Some(self.tables.orbit_change_fuel as f64),
+            _ => None,
+        };
+        if let Some(fuel) = tank.filter(|f| *f > 0.0) {
+            parts.push(format!("{} Fuel from the tank", figure(fuel)));
+        }
+        match parts.split_last() {
+            None => "free".to_string(),
+            Some((last, [])) => last.clone(),
+            Some((last, rest)) => format!("{} and {last}", rest.join(", ")),
         }
     }
 
@@ -490,6 +539,40 @@ impl Game {
     pub fn banded_price_at(&self, row: usize) -> i64 {
         let p = self.market.price[row];
         if p <= 0 { self.market_base(row) } else { p }
+    }
+
+    /// Ticket #404 (version 0.09.4): the Market as the headless driver prints it every turn, at the
+    /// seat's own price, **a price a card has set named with the card and the turns it has left**.
+    /// A price moves a step a turn inside its band; a card is what swings it from 4 to 1.
+    pub fn market_line(&self, seat: Seat) -> String {
+        let price = |r: Resource, name: &str| {
+            let p = self.market_price(seat, self.trade_price(r).unwrap_or(0) as f64);
+            let note = Game::market_row(r).and_then(|row| self.market_card_note(row)).map(|n| format!(" ({n})")).unwrap_or_default();
+            format!("{name} {}{note}", figure(p))
+        };
+        format!(
+            "Market: {}, {}, {} Ducats each; Influence {} Ducats a point; Relief {} Ducats",
+            price(Resource::Materials, "Materials"),
+            price(Resource::Fuel, "Fuel"),
+            price(Resource::Energy, "Energy"),
+            self.tables.ducats.per_influence,
+            self.tables.unrest.relief_ducats
+        )
+    }
+
+    /// Ticket #404: the card standing over a row's price this turn and how long it has left, or
+    /// `None` where the band is the price. A save from before names no card.
+    pub fn market_card_note(&self, row: usize) -> Option<String> {
+        let m = &self.market;
+        if m.card_price[row] <= 0 || self.turn > m.card_price_until[row] {
+            return None;
+        }
+        let name = m.card_price_by[row].map(|id| self.tables.event(id).name.clone()).unwrap_or_else(|| "a card".to_string());
+        Some(match m.card_price_until[row] - self.turn {
+            0 => format!("{name}, its last turn"),
+            1 => format!("{name}, 1 more turn"),
+            n => format!("{name}, {n} more turns"),
+        })
     }
 
     /// Ticket #220 (version 0.08.2): the turn's trading moves each price, once, at the settle.

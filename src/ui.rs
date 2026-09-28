@@ -4323,7 +4323,8 @@ fn side_panel(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
             let mut cancel: Option<usize> = None;
             for (i, o) in session.pending.iter().enumerate() {
                 ui.horizontal(|ui| {
-                    ui.label(format!("{} ({})", order_text(game, o), game.order_cost(Seat(0), o).text()));
+                    // Ticket #404 (version 0.09.4): everything the order pays, as the driver's confirm says it.
+                    ui.label(format!("{} ({})", order_text(game, o), game.order_price_text(Seat(0), o, game.order_cost(Seat(0), o))));
                     if ui.small_button("cancel").clicked() {
                         cancel = Some(i);
                     }

@@ -1424,6 +1424,10 @@ pub struct Market {
     pub card_price: [i64; 3],
     #[serde(default)]
     pub card_price_until: [u32; 3],
+    /// Ticket #404 (version 0.09.4): the card that set each override, so the Market line can name
+    /// it. A save from before names none.
+    #[serde(default)]
+    pub card_price_by: [Option<EventId>; 3],
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -4562,7 +4566,18 @@ impl Game {
     /// Add one line to the dispatch, with the kind that places it in the severity order and under
     /// its heading, and the place it takes the player to when it is clicked.
     pub fn report_line(&mut self, kind: LineKind, place: Option<ReportPlace>, text: String) {
-        self.report.lines.push(ReportLine { kind, place, text });
+        self.report.lines.push(ReportLine { kind, place, text, mine: false });
+    }
+
+    /// Ticket #404 (version 0.09.4): mark the last line written as the player's news when `seats`
+    /// holds seat 0, so it is listed under Your works too. A spectator has no seat of their own.
+    pub fn mark_mine(&mut self, seats: &[Option<Seat>]) {
+        if !self.spectator
+            && seats.contains(&Some(Seat(0)))
+            && let Some(l) = self.report.lines.last_mut()
+        {
+            l.mine = true;
+        }
     }
 
     /// The same, for a line that belongs to the player when seat 0 did it and to the board

@@ -5200,7 +5200,9 @@ fn every_report_line_carries_its_kind_and_place_and_falls_under_the_right_headin
     assert_eq!(LineKind::BuildComplete.section(Some(ReportPlace::Body(BodyId::Mars))), Section::InSpace);
     assert_eq!(LineKind::Unrest.section(Some(ReportPlace::State(StateId::Europe))), Section::OnEarth);
 
-    // The headings partition the report: every line but the headline appears exactly once.
+    // The headings partition the report: every line but the headline appears exactly once. Ticket
+    // #404 (version 0.09.4): a place changing hands to or from the player is under Your works as
+    // well; this report has none, so the partition still holds.
     let grouped: usize = g.report.sections().iter().map(|(_, l)| l.len()).sum();
     assert_eq!(grouped, g.report.lines.len() - 1, "every line but the headline is under a heading");
     let names: Vec<&str> = g.report.sections().iter().map(|(s, _)| s.name()).collect();
@@ -16856,4 +16858,143 @@ fn an_attack_has_a_target_only_in_an_orbit_the_seat_shares_with_a_rival() {
     g.ship_mut(rival).unwrap().slot = None;
     assert!(g.attack_has_a_target(Seat(0), BodyId::Mars), "the same orbit: a target");
     assert!(g.check_order(Seat(0), &[], &attack).is_ok(), "and the order stands");
+}
+
+/// Ticket #404 (version 0.09.4) (1): **a confirm names everything the order pays.** An Army costs
+/// its Materials from the Stockpile, its Widgets from the place's rate and its people at the
+/// Resolution; the driver said `costs 25 Materials` and hid the other two, which are the version's
+/// headline rule. A Region pays a million people, a Colony one Colonist.
+#[test]
+fn a_confirm_names_everything_an_army_pays() {
+    use dying_earth_engine::state::figure;
+    let mut g = game();
+    g.seats[0].stockpile.materials = 2000.0;
+    let army = g.tables.unit(UnitKind::Army).clone();
+    let raise = Order::BuildArmy { place: Place::State(StateId::EastAsia) };
+    let cost = g.check_order(Seat(0), &[], &raise).expect("East Asia can raise an Army");
+    assert_eq!(g.order_price_text(Seat(0), &raise, cost), format!("{} Materials, {} Widgets and 1M people", figure(army.materials as f64), army.widgets));
+    let c = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Barracks], 3);
+    let raise = Order::BuildArmy { place: Place::Colony(c) };
+    let cost = g.check_order(Seat(0), &[], &raise).expect("a Colony with a Barracks and three Colonists can raise one");
+    assert_eq!(g.order_price_text(Seat(0), &raise, cost), format!("{} Materials, {} Widgets and one Colonist", figure(army.materials as f64), army.widgets));
+}
+
+/// Ticket #404 (5): **a move that spends the tank says so**, where the driver said `costs free`. A
+/// transit and an orbit change draw on the Ship's tank, not the Stockpile; a Launch and a Bombard
+/// spend nothing and stay free.
+#[test]
+fn a_move_that_spends_the_tank_says_so() {
+    use dying_earth_engine::state::figure;
+    let mut g = game();
+    let ship = ship_in(&mut g, Seat(0), UnitKind::Frigate, BodyId::Earth, None, Stance::Hold);
+    let leg = Order::Transit { ship, to: BodyId::Moon, slot: None };
+    let (_, fuel) = g.transit_cost_for(Seat(0), BodyId::Earth, BodyId::Moon);
+    assert!(fuel > 0.0, "the premise: the leg costs Fuel");
+    let cost = g.check_order(Seat(0), &[], &leg).expect("the Moon is in reach");
+    assert_eq!(cost.fuel, 0.0, "the Stockpile pays nothing");
+    assert_eq!(g.order_price_text(Seat(0), &leg, cost), format!("{} Fuel from the tank", figure(fuel)));
+    let iss = station_of(&g, Seat(0), BodyId::Earth).expect("the ISS");
+    let change = Order::ChangeOrbit { ship, slot: Some(g.colony(iss).unwrap().slot) };
+    let cost = g.check_order(Seat(0), &[], &change).expect("the ISS's ring is an orbit of Earth");
+    assert_eq!(g.order_price_text(Seat(0), &change, cost), format!("{} Fuel from the tank", figure(g.tables.orbit_change_fuel as f64)));
+    // An order that spends nothing at all is free.
+    assert_eq!(g.order_price_text(Seat(0), &Order::ShipStance { body: BodyId::Earth, stance: Stance::Hold }, Cost::default()), "free");
+}
+
+/// Ticket #404 (4): **the Market line names a price a card has set, and the turns it has left.**
+/// A price moves at most a step a turn inside its band, but the Cheap Ore Offer puts Materials at 1
+/// for two turns; the driver printed no price at all after the first turn.
+#[test]
+fn the_market_line_names_a_price_a_card_has_set() {
+    let mut g = game();
+    let line = g.market_line(Seat(0));
+    assert!(line.starts_with("Market: Materials "), "the line: {line}");
+    assert!(!line.contains('('), "no card over any price: {line}");
+    g.seats[0].stockpile.ducats = 100.0;
+    ask_the_card(&mut g, EventId::CheapOreOffer);
+    g.answer_card(Seat(0), false).expect("the offer can be refused");
+    g.apply_card_answers();
+    g.settle_market();
+    g.turn += 1;
+    let line = g.market_line(Seat(0));
+    assert!(line.contains("Materials 1 (Cheap Ore Offer, 1 more turn)"), "the first turn of two: {line}");
+    g.turn += 1;
+    let line = g.market_line(Seat(0));
+    assert!(line.contains("Materials 1 (Cheap Ore Offer, its last turn)"), "the second: {line}");
+    g.turn += 1;
+    assert!(!g.market_line(Seat(0)).contains("Cheap Ore Offer"), "and spent after");
+}
+
+/// Ticket #404 (6, Q7): **a place changing hands to or from the player is also listed under Your
+/// works**, as well as under its place; the headline's ranking is unchanged. A rival's change of
+/// hands is not the player's news.
+#[test]
+fn a_change_of_hands_to_or_from_the_player_is_also_under_your_works() {
+    let mut g = game();
+    g.report.lines.clear();
+    let works = |g: &Game| g.report.sections().into_iter().find(|(s, _)| *s == Section::YourWorks).map(|(_, l)| l.iter().map(|l| l.text.clone()).collect::<Vec<_>>()).unwrap_or_default();
+    let earth = |g: &Game| g.report.sections().into_iter().find(|(s, _)| *s == Section::OnEarth).map(|(_, l)| l.iter().map(|l| l.text.clone()).collect::<Vec<_>>()).unwrap_or_default();
+    // A founding outranks the change of hands, so the change of hands is not the headline and is
+    // listed in the sections.
+    g.report_line(LineKind::ColonyFounded, None, "A Colony was founded.".to_string());
+    g.transfer_control(Place::State(StateId::NorthAfrica), Seat(0), "Pacified");
+    let gained = g.report.lines.iter().find(|l| l.kind == LineKind::ControlChanged).expect("the change of hands").text.clone();
+    assert_eq!(g.report.headline().map(|h| h.kind), Some(LineKind::ColonyFounded), "the ranking is unchanged");
+    assert!(works(&g).contains(&gained), "a gain is under Your works: {:?}", works(&g));
+    assert!(earth(&g).contains(&gained), "and still under its place: {:?}", earth(&g));
+    // Lost to a rival: the player's news too.
+    g.report.lines.retain(|l| l.kind != LineKind::ControlChanged);
+    g.transfer_control(Place::State(StateId::NorthAfrica), Seat(1), "Influence");
+    let lost = g.report.lines.iter().find(|l| l.kind == LineKind::ControlChanged).expect("the change of hands").text.clone();
+    assert!(works(&g).contains(&lost), "a loss is under Your works: {:?}", works(&g));
+    // Between two rivals: not the player's.
+    g.report.lines.retain(|l| l.kind != LineKind::ControlChanged);
+    g.transfer_control(Place::State(StateId::NorthAfrica), Seat(2), "Influence");
+    let theirs = g.report.lines.iter().find(|l| l.kind == LineKind::ControlChanged).expect("the change of hands").text.clone();
+    assert!(!works(&g).contains(&theirs), "a rival's change of hands is not the player's: {:?}", works(&g));
+    assert!(earth(&g).contains(&theirs), "and is under its place");
+}
+
+/// Ticket #404 (after review): **the confirm's edges.** A build bought outright in Ducats starts
+/// done, so it names no Widgets; a Faction's own Facility is priced in its own Widgets; a Launch
+/// spends no Fuel, and says free.
+#[test]
+fn a_confirm_names_no_widgets_for_a_ducat_buy_and_a_launch_is_free() {
+    let g = game();
+    let (with_widgets, with_ducats) = (Order::BuildFacility { state: StateId::EastAsia, kind: FacilityKind::Factory }, Order::BuildFacilityWithDucats { state: StateId::EastAsia, kind: FacilityKind::Factory });
+    let w = g.build_widgets(Seat(0), BuildItem::Facility(FacilityKind::Factory));
+    assert!(g.order_price_text(Seat(0), &with_widgets, g.order_cost(Seat(0), &with_widgets)).ends_with(&format!("and {w} Widgets")), "a queued build names its Widgets");
+    assert!(!g.order_price_text(Seat(0), &with_ducats, g.order_cost(Seat(0), &with_ducats)).contains("Widget"), "a Ducat buy starts done");
+    // The Custodians' Institute order raises an Academy, at the Academy's Widgets.
+    let institute = Order::BuildModule { colony: ColonyId(0), kind: ModuleKind::Institute };
+    let own = ModuleKind::Institute.built_by(FactionKind::Custodians);
+    let w = g.build_widgets(Seat(0), BuildItem::Module(own));
+    assert!(g.order_price_text(Seat(0), &institute, Cost::default()).contains(&format!("{w} Widget")), "the Faction's own Module's Widgets");
+    let launch = Order::Launch { ship: ShipId(0), target: Place::State(StateId::Europe) };
+    assert_eq!(g.order_price_text(Seat(0), &launch, g.order_cost(Seat(0), &launch)), "free", "a Launch draws nothing from the tank");
+}
+
+/// Ticket #404 (after review): **a throw-off of the player is under Your works; a rival's is not,
+/// and a spectated game marks nothing.**
+#[test]
+fn a_throw_off_of_the_player_is_under_your_works() {
+    let works = |g: &Game| g.report.sections().into_iter().find(|(s, _)| *s == Section::YourWorks).map(|(_, l)| l.len()).unwrap_or(0);
+    for (seat, mine) in [(Seat(0), true), (Seat(1), false)] {
+        let mut g = game();
+        let sid = StateId::NorthAfrica;
+        g.take_control(sid, seat);
+        g.report.lines.clear();
+        g.report_line(LineKind::ColonyFounded, None, "A Colony was founded.".to_string());
+        g.state_mut(sid).unrest = g.tables.unrest.throw_off_threshold;
+        g.state_mut(sid).changed_hands = true;
+        g.resolve_unrest();
+        assert_eq!(g.state(sid).control, Control::Neutral, "the premise: it threw its holder off");
+        let line = g.report.lines.iter().find(|l| l.kind == LineKind::ControlChanged).expect("the throw-off's line");
+        assert_eq!(line.mine, mine, "seat {seat:?}: {}", line.text);
+        assert_eq!(works(&g) > 0, mine, "seat {seat:?}: under Your works only when it was the player's");
+    }
+    let mut g = Game::spectate(tables(), 7);
+    g.report.lines.clear();
+    g.transfer_control(Place::State(StateId::NorthAfrica), Seat(0), "Pacified");
+    assert!(g.report.lines.iter().all(|l| !l.mine), "a spectator has no seat of their own");
 }

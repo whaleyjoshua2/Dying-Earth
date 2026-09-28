@@ -610,6 +610,8 @@ impl Game {
                 // The effect lands at this turn's Resolution, after this turn's trading, so the
                 // turns it names are the ones that follow it.
                 self.market.card_price_until[row] = self.turn + turns;
+                // Ticket #404 (version 0.09.4): and which card, for the Market line.
+                self.market.card_price_by[row] = self.question.as_ref().map(|q| q.card);
             }
             CardEffect::RelationsAllRivals { relations } => {
                 let c = self.tables.relations.clone();

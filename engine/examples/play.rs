@@ -920,20 +920,17 @@ fn print_costs(g: &Game) {
         })
         .collect();
     println!("Ships: {}", u.join(" | "));
+    // Ticket #404 (version 0.09.4): the Army's Widgets and people beside its Materials, as a Ship's
+    // Widgets are.
     println!(
-        "Army {}M | Space Station {}M | Industry Level {}M",
+        "Army {}M/{}w and {} people (a Colony's, one Colonist) | Space Station {}M | Industry Level {}M",
         g.tables.unit(UnitKind::Army).materials,
+        g.build_widgets(me, BuildItem::Unit(UnitKind::Army)),
+        g.tables.people_text(g.tables.army.population_each),
         g.station_materials(me),
         g.industry_cost(me)
     );
-    println!(
-        "Market: Materials {}, Fuel {}, Energy {} Ducats each; Influence {} Ducats a point; Relief {} Ducats",
-        figure(g.market_price(me, g.trade_price(Resource::Materials).unwrap_or(0) as f64)),
-        figure(g.market_price(me, g.trade_price(Resource::Fuel).unwrap_or(0) as f64)),
-        figure(g.market_price(me, g.trade_price(Resource::Energy).unwrap_or(0) as f64)),
-        g.tables.ducats.per_influence,
-        g.tables.unrest.relief_ducats
-    );
+    // Ticket #404 (version 0.09.4): the Market line is on the board every turn, so not here too.
 }
 
 fn print_report(g: &Game) {
@@ -944,12 +941,13 @@ fn print_report(g: &Game) {
     if let Some(e) = &g.report.event {
         println!("EVENT: {e}");
     }
-    let head = g.report.headline_index();
-    for (i, l) in g.report.lines.iter().enumerate() {
-        if Some(i) == head {
-            continue;
+    // Ticket #404 (version 0.09.4): under the window's headings, so a place that changed hands to
+    // or from you reads under Your works as well as under its place.
+    for (section, lines) in g.report.sections() {
+        println!("  -- {} --", section.name_for(g.spectator));
+        for l in lines {
+            println!("  [{:?}] {}", l.kind, l.text);
         }
-        println!("  [{:?}] {}", l.kind, l.text);
     }
     for b in &g.report.battles {
         println!("  [Battle] {}", b.text(&|s| g.seat_name(s), "a neutral force"));
@@ -1000,6 +998,8 @@ fn print_board(g: &Game) {
         "Stockpile: {} Materials, {} Fuel, {} Energy, {} Ducats",
         figure(s.stockpile.materials), figure(s.stockpile.fuel), figure(s.stockpile.energy), figure(s.stockpile.ducats)
     );
+    // Ticket #404 (version 0.09.4): the Market every turn, a card's price named with the card.
+    println!("{}", g.market_line(me));
     println!(
         "Last income: {}M {}F {}E {}D",
         figure(s.income_last_turn.materials), figure(s.income_last_turn.fuel), figure(s.income_last_turn.energy), figure(s.income_last_turn.ducats)
@@ -1243,7 +1243,7 @@ fn print_board(g: &Game) {
         // Ticket #335 (version 0.09.0): the ORBIT, not the bare Body and a slot number, so a Ship at
         // a station's ring can be told from one in low orbit without doing the arithmetic.
         println!(
-            "ship {:<3} {:<12} seat {} at {:<34} tank {}/{} | colonists {} | army {:?} | hp {} | {}{}",
+            "ship {:<3} {:<12} seat {} at {:<34} tank {}/{} | colonists {} | army {} | hp {} | {}{}",
             sh.id.0,
             sh.kind.name(),
             sh.seat.0,
@@ -1251,7 +1251,8 @@ fn print_board(g: &Game) {
             sh.fuel,
             t.unit(sh.kind).tank,
             sh.colonists,
-            sh.army.map(|a| a.0),
+            // Ticket #404 (version 0.09.4): a number or a dash, never `Some(2)`.
+            sh.army.map(|a| a.0.to_string()).unwrap_or_else(|| "-".to_string()),
             t.unit(sh.kind).hit_points as i64 - sh.damage as i64,
             sh.stance.name(),
             if g.stranded(sh.id) { "  *** STRANDED ***" } else { "" }
@@ -1274,9 +1275,10 @@ fn print_board(g: &Game) {
             ArmyAt::Aboard(s) => format!("aboard ship {}", s.0),
         };
         println!(
-            "army {:<3} seat {:?} at {:<26} hp {} | {}{}",
+            "army {:<3} seat {} at {:<26} hp {} | {}{}",
             a.id.0,
-            g.army_seat(a).map(|s| s.0),
+            // Ticket #404 (version 0.09.4): `seat 0` as a Ship row prints it, `seat -` for nobody's.
+            g.army_seat(a).map(|s| s.0.to_string()).unwrap_or_else(|| "-".to_string()),
             at,
             t.unit(UnitKind::Army).hit_points as i64 - a.damage as i64,
             a.stance.name(),
@@ -1444,7 +1446,8 @@ fn main() {
                     },
                     Ok(Line::Order(o)) => match game.check_order(Seat(0), &kept, &o) {
                         Ok(cost) => {
-                            println!("line {}: ok `{line}` costs {}", n + 1, cost.text());
+                            // Ticket #404 (version 0.09.4): everything the order pays, not only the Stockpile's part.
+                            println!("line {}: ok `{line}` costs {}", n + 1, game.order_price_text(Seat(0), &o, cost));
                             kept.push(*o);
                         }
                         Err(e) => {
@@ -1480,11 +1483,11 @@ fn main() {
                 return;
             }
             if bad > 0 && !args.iter().any(|a| a == "--force") {
-                eprintln!("\nThe turn was NOT ended: {bad} line(s) were refused. Fix them, or pass --force to end the turn with the rest.");
+                eprintln!("\nThe turn did NOT end: {bad} line(s) were refused. Fix them, or pass --force to end the turn with the rest.");
                 std::process::exit(1);
             }
             if let Some(why) = owed {
-                eprintln!("\nThe turn was NOT ended: {why}");
+                eprintln!("\nThe turn did NOT end: {why}");
                 std::process::exit(1);
             }
             let mut all: [Vec<Order>; SEAT_COUNT] = std::array::from_fn(|_| Vec::new());
@@ -1492,8 +1495,7 @@ fn main() {
             // Ticket #105 (version 0.07.0): the engine owns the rule, so the driver is bound by it
             // too. This is the whole point: what the driver measures is what the game does.
             if let Err(why) = game.end_turn(all) {
-                eprintln!("
-The turn did NOT end: {why}");
+                eprintln!("\nThe turn did NOT end: {why}");
                 std::process::exit(1);
             }
             store(&game, &path);

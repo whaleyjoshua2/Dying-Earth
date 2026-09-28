@@ -167,6 +167,11 @@ pub struct ReportLine {
     pub kind: LineKind,
     pub place: Option<ReportPlace>,
     pub text: String,
+    /// Ticket #404 (version 0.09.4): a place that changed hands to or from the player. Such a line
+    /// is listed under Your works as well as under its place; the headline's rank is unchanged. A
+    /// save from before marks none.
+    #[serde(default)]
+    pub mine: bool,
 }
 
 impl ReportLine {
@@ -331,14 +336,15 @@ impl Report {
             .map(|(_, i)| i)
     }
 
-    /// Every line that is not the headline, in the order the five headings are shown.
+    /// Every line that is not the headline, in the order the five headings are shown. Ticket #404
+    /// (version 0.09.4): a line marked the player's is under Your works too.
     pub fn sections(&self) -> Vec<(Section, Vec<&ReportLine>)> {
         let head = self.headline_index();
         Section::ALL
             .into_iter()
             .map(|s| {
                 let lines: Vec<&ReportLine> =
-                    self.lines.iter().enumerate().filter(|(i, l)| Some(*i) != head && l.section() == s).map(|(_, l)| l).collect();
+                    self.lines.iter().enumerate().filter(|(i, l)| Some(*i) != head && (l.section() == s || (l.mine && s == Section::YourWorks))).map(|(_, l)| l).collect();
                 (s, lines)
             })
             .filter(|(_, l)| !l.is_empty())
