@@ -988,6 +988,10 @@ pub struct SeatState {
     /// landing, which is the first turn anything can be spent.
     #[serde(default)]
     pub first_windfall: i64,
+    /// Ticket #412 (version 0.09.4): Influence won by leading a Tech, paid into the next Allotment
+    /// as the first-to-a-Body windfall is; a Tech completed during the Income is paid that turn.
+    #[serde(default)]
+    pub lead_windfall: i64,
     /// Ticket #192 (version 0.08.0): Colonists uploaded into the Archive, all told. The Archivists'
     /// second Victory part counts this rather than who happens to be living beside the Module, and
     /// it only ever climbs: an uploaded Colonist cannot be lost to a raid, a crowding death or a
@@ -1591,6 +1595,7 @@ impl Game {
             sold_units: 0,
             spaceport_influence: 0,
             first_windfall: 0,
+            lead_windfall: 0,
             uploaded: 0,
             stabilization_run: 0,
             influence: BTreeMap::new(),
@@ -3599,7 +3604,7 @@ impl Game {
         // Ticket #358 (version 0.09.1): and the Chorus's per-Colonist point, outside the
         // multiplier on the Spaceport's argument, at the designer's word.
         let outside: i64 = self.module_allotments(seat).iter().map(|y| y.1).sum();
-        (base as f64 * m).floor() as i64 + outside + self.seat(seat).spaceport_influence + self.seat(seat).first_windfall + firsts * t.first_settled_allotment
+        (base as f64 * m).floor() as i64 + outside + self.seat(seat).spaceport_influence + self.seat(seat).first_windfall + self.seat(seat).lead_windfall + firsts * t.first_settled_allotment
     }
 
     /// Ticket #345 (version 0.09.1): which seat was first to a Body, and at which Colony.

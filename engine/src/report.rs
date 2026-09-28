@@ -574,6 +574,9 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("scrubbers_destroyed", &["n", "state", "why"]),
     ("leapfrog", &["faction", "state", "coefficient"]),
     ("tech_complete", &["tech", "faction", "shares"]),
+    // Ticket #412 (version 0.09.4): the same, with what leading paid.
+    ("tech_complete_rewarded", &["tech", "faction", "shares", "influence", "ease"]),
+    ("tech_complete_rewarded_influence", &["tech", "faction", "shares", "influence", "ease"]),
     ("build_complete", &["faction", "building", "place"]),
     ("energy_short", &["faction", "buildings", "sink"]),
     ("energy_zero", &["faction"]),

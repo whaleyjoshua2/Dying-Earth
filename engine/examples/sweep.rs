@@ -103,6 +103,8 @@ fn main() {
     // and seat 0's start state lost, to a throw-off or to a taking.
     let mut all_unrest = [[0u32; 3]; 4];
     let mut all_throw_offs = [0u32; 4];
+    // Ticket #412 (version 0.09.4): the Techs each Faction led, over the batch.
+    let mut all_leads = [0u32; 4];
     let mut all_start_lost = [[0u32; 2]; 4];
     // Ticket #343 (version 0.09.1): the nuke's counters across every seating, so the closing
     // review has ONE total to quote rather than four blocks to add up by hand.
@@ -189,6 +191,7 @@ fn main() {
                         let mut cell_places = [[0u32; 4]; 4];
                         let mut cell_unrest = [[0u32; 3]; 4];
                         let mut cell_throw_offs = [0u32; 4];
+                        let mut cell_leads = [0u32; 4];
                         let mut cell_start_lost = [0u32; 2];
                         let mut war_ppm: [Vec<f64>; 4] = Default::default();
                         let mut war_nobody: Vec<f64> = Vec::new();
@@ -404,6 +407,7 @@ fn main() {
                                     *c += n;
                                 }
                                 cell_throw_offs[s.index()] += r.throw_offs_by_seat[s.index()];
+                                cell_leads[s.index()] += r.leads_by_seat[s.index()];
                                 cell_scores[s.index()].push(r.final_score[s.index()]);
                                 cell_places[s.index()][(r.final_place[s.index()].clamp(1, 4) - 1) as usize] += 1;
                             }
@@ -472,6 +476,7 @@ fn main() {
                                     *a += n;
                                 }
                                 all_throw_offs[at] += cell_throw_offs[s.index()];
+                                all_leads[at] += cell_leads[s.index()];
                                 if s == Seat(0) {
                                     for (a, n) in all_start_lost[at].iter_mut().zip(cell_start_lost) {
                                         *a += n;
@@ -767,6 +772,10 @@ fn main() {
             let pct = |n: u32| if u[0] == 0 { 0.0 } else { 100.0 * n as f64 / u[0] as f64 };
             println!("  {:>12}: {} held; {} at 4+ ({:.0}%); {} at 7+ ({:.0}%); {} throw-offs; start lost {} / {}", k.name(), u[0], u[1], pct(u[1]), u[2], pct(u[2]), all_throw_offs[i], all_start_lost[i][0], all_start_lost[i][1]);
         }
+        println!(
+            "  Techs led over the batch, per Faction: {}",
+            FactionKind::ALL.into_iter().enumerate().map(|(i, k)| format!("{} {}", k.name(), all_leads[i])).collect::<Vec<_>>().join(", ")
+        );
         println!("  the world under the Natural Sink at least once in {} of {all_games} games (median first turn {})", all_under_sink.len(), median_u(&mut all_under_sink));
         // Version 0.09.3: the worlds settled, over every seating.
         println!("  {}", off_earth_line(&base, &all_ground_by_body, &all_stations_by_body, &mut all_first_by_body, &mut all_ground_off_earth_per_game, all_games as u64));

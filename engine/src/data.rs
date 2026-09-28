@@ -605,6 +605,12 @@ pub struct FactionCard {
     #[serde(default)]
     pub mothball_pairs: std::collections::BTreeMap<FacilityKind, ModuleKind>,
     pub signature: String,
+    /// Ticket #412 (version 0.09.4): what the Faction wins each time it leads a Tech to completion,
+    /// in Influence and in Unrest off every Region it holds. Nought for all but the Archivists.
+    #[serde(default)]
+    pub lead_influence: i64,
+    #[serde(default)]
+    pub lead_unrest_ease: f64,
     /// Ticket #203 (version 0.08.1): the Faction's Unique Facility in one sentence -- what it is,
     /// what it replaces, and what it does beyond the common building's job. It was on no card until
     /// the Faction window went in: the four Unique Facilities arrived in version 0.08.0 (tickets

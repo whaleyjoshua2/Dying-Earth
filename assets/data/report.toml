@@ -228,6 +228,9 @@ leapfrog = "The {faction} Leapfrogged {state}: its people now emit {coefficient}
 
 # Your works
 tech_complete = "{tech} is complete. The {faction} led and pick the next Tech."
+# Ticket #412 (version 0.09.4): the same, where leading pays the Lead (the Archivists).
+tech_complete_rewarded = "{tech} is complete. The {faction} led and pick the next Tech: +{influence} Influence, -{ease} Unrest."
+tech_complete_rewarded_influence = "{tech} is complete. The {faction} led and pick the next Tech: +{influence} Influence."
 build_complete = "{faction} completed {building} at {place}."
 # Ticket #332 (version 0.09.0): a build under way at a place that changed hands, cancelled by its
 # new holder: the Materials are the holder's prize, at the holder's own price.

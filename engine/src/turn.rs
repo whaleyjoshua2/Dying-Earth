@@ -267,6 +267,11 @@ impl Game {
         // the turn is still being ordered, and a Lead that may change its pick would otherwise
         // re-price orders already placed.
         self.research.findings_tech = self.research.current;
+        // Ticket #412 (version 0.09.4): a lead's Influence won since the last Income was paid when
+        // it was won; only what the coming Income wins rides its refill.
+        for s in &mut self.seats {
+            s.lead_windfall = 0;
+        }
         self.log("Phase 1: Income");
         self.income_phase();
         self.log("Phase 2: Climate");

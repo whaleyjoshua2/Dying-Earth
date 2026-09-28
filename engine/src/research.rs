@@ -88,10 +88,43 @@ impl Game {
                 shares.join(", ")
             );
             self.log(line);
-            let text = self.say(
-                "tech_complete",
-                &[("tech", self.tables.tech(tech).name.clone()), ("faction", self.seat_name(lead)), ("shares", shares.join(", "))],
-            );
+            // Ticket #412 (version 0.09.4): the Archivists are paid for leading: Influence into the
+            // Allotment and Unrest off every Region they hold, said on the same line.
+            let (influence, ease) = {
+                let f = self.tables.faction(self.kind(lead));
+                (f.lead_influence, f.lead_unrest_ease)
+            };
+            // At once, whenever the Tech completes: paid straight into the Allotment, and held in
+            // `lead_windfall` too so the Income's refill, if it comes later this turn, pays it again
+            // in its place rather than wiping it. End Turn clears it before the next Income.
+            if influence > 0 {
+                let s = self.seat_mut(lead);
+                s.allotment += influence;
+                s.lead_windfall += influence;
+            }
+            let mut eased = 0.0;
+            if ease > 0.0 {
+                for sid in self.controlled_states(lead) {
+                    eased += self.lower_unrest(sid, ease);
+                }
+            }
+            if influence > 0 || eased > 0.0 {
+                self.log(format!("The {} led {}: +{} Influence, {} Unrest eased in the Regions they hold.", self.seat_name(lead), self.tables.tech(tech).name, influence, crate::state::figure(eased)));
+            }
+            let args = [
+                ("tech", self.tables.tech(tech).name.clone()),
+                ("faction", self.seat_name(lead)),
+                ("shares", shares.join(", ")),
+                ("influence", influence.to_string()),
+                ("ease", crate::state::figure(ease)),
+            ];
+            // The line says only what happened: no Unrest where nothing was eased.
+            let key = match (influence > 0, eased > 0.0) {
+                (_, true) => "tech_complete_rewarded",
+                (true, false) => "tech_complete_rewarded_influence",
+                _ => "tech_complete",
+            };
+            let text = self.say(key, &args);
             self.report_line(LineKind::TechComplete, None, text);
             // Ticket #58: the Tech Moment names the Lead and the margin, and says what the AI picked
             // and why. It is filled in before the pick, so the note can name the Tech chosen.

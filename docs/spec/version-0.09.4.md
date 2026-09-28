@@ -253,3 +253,23 @@ Custodians' falls are within the noise of twenty seeds a seating. Constabularies
 
 **What would show this wrong**: a computer seat offering no Constabulary at Unrest 4; a Stadium
 alone in a Region with slots to spare; the share at 7+ rising in the closing sweep.
+
+## 8. The Archivists' reward for leading a Tech
+
+The authority is [ticket #412](https://github.com/whaleyjoshua2/Dying-Earth/issues/412).
+
+**Each time the Archivists lead a Tech to completion they win 5 Influence and half a point of Unrest
+off every Region they hold** (`lead_influence`, `lead_unrest_ease` on their card in
+`factions.toml`; nought for the other three). The Influence is paid into the Allotment **at once**,
+whenever the Tech completes, and never twice. The Tech's line says it, and says only what happened
+(holding no Region, *"…: +5 Influence."*): *"Coastal Engineering is
+complete. The Archivists led and pick the next Tech: +5 Influence, -0.5 Unrest."* Their computer
+seat's Research Directive is unchanged.
+
+**Measured** (the sweep gained a line, the Techs each Faction led): the Archivists led **126 of
+1,656** Techs over 80 games before, **130** after; their held Region-turns at Unrest 7+ fell 11% to
+9%; their wins 5 and 5. The win column 7 / 6 / 1 / 5 to 8 / 4 / 0 / 5, collapses 61 to 63, within
+the noise of twenty seeds a seating.
+
+**What would show this wrong**: a Lead other than the Archivists paid; the Influence missing from
+the next Allotment; a Region they hold not eased.

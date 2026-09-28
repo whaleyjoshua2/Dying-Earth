@@ -17427,3 +17427,58 @@ fn a_computer_seat_prices_a_mothball_and_weighs_relief_by_unrest() {
     assert_eq!(g.ai_relief_weight(9.0), Some(2.0));
     assert_eq!(g.ai_relief_weight(10.0), Some(2.0), "and no higher");
 }
+
+/// Ticket #412 (version 0.09.4): **the Archivists win 5 Influence and ease every Region they hold
+/// by a half each time they lead a Tech to completion**, said on the Tech's line; nobody else does.
+/// Seat 3 is the Archivists.
+#[test]
+fn the_archivists_are_paid_for_leading_a_tech() {
+    for (lead, paid) in [(Seat(3), true), (Seat(1), false)] {
+        let mut g = game();
+        let held = g.controlled_states(lead);
+        assert!(!held.is_empty(), "the premise: they hold a Region");
+        for sid in &held {
+            g.state_mut(*sid).unrest = 4.0;
+        }
+        let tech = *g.pickable_techs().first().expect("a Tech to research");
+        g.research.current = Some(tech);
+        g.report.lines.clear();
+        let before = g.influence_allotment(lead);
+        let cost = g.tables.tech(tech).cost;
+        g.accrue_research(lead, cost);
+        assert_eq!(g.research.last_lead, Some(lead), "the premise: {lead:?} led");
+        let f = g.tables.faction(g.kind(lead));
+        assert_eq!(g.influence_allotment(lead) - before, if paid { f.lead_influence } else { 0 }, "{lead:?}: the Influence");
+        for sid in &held {
+            assert_eq!(g.state(*sid).unrest, if paid { 4.0 - f.lead_unrest_ease } else { 4.0 }, "{lead:?}: {sid:?}'s Unrest");
+        }
+        let line = g.report.lines.iter().find(|l| l.kind == LineKind::TechComplete).expect("the Tech's line").text.clone();
+        assert_eq!(line.contains("+5 Influence, -0.5 Unrest"), paid, "{line}");
+    }
+    let t = tables();
+    assert_eq!((t.faction(FactionKind::Archivists).lead_influence, t.faction(FactionKind::Archivists).lead_unrest_ease), (5, 0.5), "the designer's figures");
+    // At once, and once: a lead outside the Income is spendable now, and the next Income does not
+    // pay it again.
+    let mut g = game();
+    let tech = *g.pickable_techs().first().unwrap();
+    g.research.current = Some(tech);
+    let before = g.seat(Seat(3)).allotment;
+    g.accrue_research(Seat(3), g.tables.tech(tech).cost);
+    assert_eq!(g.seat(Seat(3)).allotment - before, 5, "spendable at once");
+    pick_a_tech(&mut g);
+    answer_the_card(&mut g);
+    g.end_turn(std::array::from_fn(|_| Vec::new())).expect("the turn ends");
+    assert_eq!(g.seat(Seat(3)).lead_windfall, 0);
+    assert_eq!(g.seat(Seat(3)).allotment, g.influence_allotment(Seat(3)), "the next Allotment carries no second five");
+    // Holding no Region, the line claims no Unrest.
+    let mut g = game();
+    for sid in g.controlled_states(Seat(3)) {
+        g.state_mut(sid).control = Control::Neutral;
+    }
+    let tech = *g.pickable_techs().first().unwrap();
+    g.research.current = Some(tech);
+    g.report.lines.clear();
+    g.accrue_research(Seat(3), g.tables.tech(tech).cost);
+    let line = g.report.lines.iter().find(|l| l.kind == LineKind::TechComplete).unwrap().text.clone();
+    assert!(line.ends_with("+5 Influence."), "{line}");
+}

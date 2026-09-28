@@ -207,6 +207,8 @@ pub struct SimResult {
     /// Regions that threw it off; and whether seat 0's start state was lost to a throw-off.
     pub unrest_turns: [[u32; 3]; SEAT_COUNT],
     pub throw_offs_by_seat: [u32; SEAT_COUNT],
+    /// Ticket #412 (version 0.09.4): the Techs each seat led to completion.
+    pub leads_by_seat: [u32; SEAT_COUNT],
     pub start_lost_to_throw_off: bool,
     pub final_place: [u8; SEAT_COUNT],
     /// Ticket #58: how many Moments the turns of this game earned, how many the cap of two and the
@@ -599,6 +601,10 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
     let batteries: [u32; SEAT_COUNT] =
         std::array::from_fn(|i| game.colonies.iter().filter(|c| c.control.director() == Some(Seat(i as u8))).map(|c| c.modules.iter().filter(|m| m.kind == ModuleKind::Battery).count() as u32).sum());
     let directive_mean: [f64; SEAT_COUNT] = std::array::from_fn(|i| if directive_samples == 0 { 0.0 } else { directive_sum[i] / directive_samples as f64 });
+    let leads_by_seat = Seat::ALL.map(|s| {
+        let tail = format!(" The {} led (", game.seat_name(s));
+        game.log.iter().filter(|l| l.contains("is complete; every Faction has it.") && l.contains(&tail)).count() as u32
+    });
     let throw_offs_by_seat = Seat::ALL.map(|s| {
         let tail = format!(" threw off the {}:", game.seat_name(s));
         game.log.iter().filter(|l| l.contains(&tail)).count() as u32
@@ -741,6 +747,7 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         final_place,
         unrest_turns,
         throw_offs_by_seat,
+        leads_by_seat,
         start_lost_to_throw_off,
         emigrant_batches: game.log.iter().filter(|l| l.contains("Pioneers recruited in")).count() as u32,
         antarctic_by_sea: game.log.iter().filter(|l| l.contains("in Antarctica with")).count() as u32,

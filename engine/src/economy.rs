@@ -379,6 +379,8 @@ impl Game {
             // line and for the same reason. It is paid once; the accumulator begins again at nought
             // and stays there until the seat is first to another Body.
             s.first_windfall = 0;
+            // Ticket #412 (version 0.09.4): and so has what leading a Tech won.
+            s.lead_windfall = 0;
         }
     }
 
