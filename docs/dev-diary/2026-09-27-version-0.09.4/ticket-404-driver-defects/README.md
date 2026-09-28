@@ -23,6 +23,16 @@ unmarked, a Ducat buy given Widgets) before they passed:
 - `a_confirm_names_no_widgets_for_a_ducat_buy_and_a_launch_is_free`: *a Ducat buy starts done*.
 - `a_throw_off_of_the_player_is_under_your_works`: the player's throw-off line unmarked.
 
+**The designer's second round** (Q8 to Q10, after the review): an Occupation begun or broken on the
+player's side is under Your works; a Launch costs the Warhead; a tribute and a muster of emigrants
+name what they take. From the driver: `tribute prospectors materials` *costs 15 Materials* and is
+counted in the running total; `emigrants china 4` *costs 4M people*. Two tests were watched red
+first (*the Warhead* where it said *free*; an Occupation begun by the player unmarked). **The second
+review** found an Occupation of the player's ended by a third Faction's Influence left unmarked;
+fixed, and its test watched red with the occupier left out of the mark. Known and left: a muster
+during an Exodus Call is checked against a different people figure than it takes, which predates
+this ticket.
+
 **No picture.** The window's two changes are the list of the turn's orders, which reads the same
 engine text as the driver's confirm, and the Report's Your works heading, which reads the same
 `sections()` the fourth test checks. A player's change of hands cannot be staged in `shot:` mode

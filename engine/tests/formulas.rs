@@ -16956,10 +16956,10 @@ fn a_change_of_hands_to_or_from_the_player_is_also_under_your_works() {
 }
 
 /// Ticket #404 (after review): **the confirm's edges.** A build bought outright in Ducats starts
-/// done, so it names no Widgets; a Faction's own Facility is priced in its own Widgets; a Launch
-/// spends no Fuel, and says free.
+/// done, so it names no Widgets; a Faction's own Module is priced in its own Widgets; a Launch
+/// spends no Fuel, and names its Warhead.
 #[test]
-fn a_confirm_names_no_widgets_for_a_ducat_buy_and_a_launch_is_free() {
+fn a_confirm_names_no_widgets_for_a_ducat_buy_and_a_launch_names_its_warhead() {
     let g = game();
     let (with_widgets, with_ducats) = (Order::BuildFacility { state: StateId::EastAsia, kind: FacilityKind::Factory }, Order::BuildFacilityWithDucats { state: StateId::EastAsia, kind: FacilityKind::Factory });
     let w = g.build_widgets(Seat(0), BuildItem::Facility(FacilityKind::Factory));
@@ -16971,7 +16971,9 @@ fn a_confirm_names_no_widgets_for_a_ducat_buy_and_a_launch_is_free() {
     let w = g.build_widgets(Seat(0), BuildItem::Module(own));
     assert!(g.order_price_text(Seat(0), &institute, Cost::default()).contains(&format!("{w} Widget")), "the Faction's own Module's Widgets");
     let launch = Order::Launch { ship: ShipId(0), target: Place::State(StateId::Europe) };
-    assert_eq!(g.order_price_text(Seat(0), &launch, g.order_cost(Seat(0), &launch)), "free", "a Launch draws nothing from the tank");
+    assert_eq!(g.order_price_text(Seat(0), &launch, g.order_cost(Seat(0), &launch)), "the Warhead", "a Launch draws nothing from the tank; it spends its Warhead (Q9)");
+    let bombard = Order::Bombard { ship: ShipId(0), colony: ColonyId(0) };
+    assert_eq!(g.order_price_text(Seat(0), &bombard, g.order_cost(Seat(0), &bombard)), "free", "a Bombard spends nothing");
 }
 
 /// Ticket #404 (after review): **a throw-off of the player is under Your works; a rival's is not,
@@ -16997,4 +16999,83 @@ fn a_throw_off_of_the_player_is_under_your_works() {
     g.report.lines.clear();
     g.transfer_control(Place::State(StateId::NorthAfrica), Seat(0), "Pacified");
     assert!(g.report.lines.iter().all(|l| !l.mine), "a spectator has no seat of their own");
+}
+
+/// Ticket #404 (Q8): **an Occupation begun or broken, on the player's place or by the player, is
+/// under Your works too.** The controller does not change, but who directs the place does. One
+/// between two rivals is not the player's.
+#[test]
+fn an_occupation_begun_or_broken_by_the_player_is_under_your_works() {
+    let occupation = |g: &Game| g.report.lines.iter().find(|l| l.kind == LineKind::Occupation).map(|l| (l.mine, l.text.clone())).expect("an Occupation line");
+    for (home, mine) in [(StateId::EastAsia, true), (StateId::Australia, false)] {
+        let mut g = game();
+        g.armies.retain(|a| a.home != ArmyHome::State(StateId::Europe));
+        let army = occupier_in(&mut g, home, StateId::Europe);
+        g.report.lines.clear();
+        g.resolution_phase();
+        assert!(matches!(g.state(StateId::Europe).control, Control::Occupied { .. }), "the premise: it is occupied");
+        let (marked, text) = occupation(&g);
+        assert_eq!(marked, mine, "begun from {home:?}: {text}");
+        // The army goes, and the Occupation breaks.
+        g.armies.retain(|a| a.id != army);
+        g.report.lines.clear();
+        g.resolution_phase();
+        assert!(!matches!(g.state(StateId::Europe).control, Control::Occupied { .. }), "the premise: it broke");
+        let (marked, text) = occupation(&g);
+        assert_eq!(marked, mine, "broken from {home:?}: {text}");
+    }
+}
+
+/// Ticket #404 (Q9, Q10): **a Launch costs the Warhead; a tribute its Materials or Ducats, in the
+/// running total; emigrants their people.**
+#[test]
+fn a_launch_a_tribute_and_emigrants_name_what_they_take() {
+    use dying_earth_engine::state::figure;
+    let mut g = game();
+    g.seats[0].stockpile.materials = 500.0;
+    let launch = Order::Launch { ship: ShipId(0), target: Place::State(StateId::Europe) };
+    assert_eq!(g.order_price_text(Seat(0), &launch, g.order_cost(Seat(0), &launch)), "the Warhead");
+    let tribute = Order::Tribute { to: Seat(1), materials: true };
+    let m = g.tables.relations.tribute_materials as f64;
+    let cost = g.check_order(Seat(0), &[], &tribute).expect("a tribute can be paid");
+    assert_eq!(g.order_price_text(Seat(0), &tribute, cost), format!("{} Materials", figure(m)));
+    let (left, _) = g.remaining(Seat(0), std::slice::from_ref(&tribute));
+    assert!((left.materials - (500.0 - m)).abs() < 1e-9, "the running total counts it: {}", left.materials);
+    let (mine, theirs) = (g.seats[0].stockpile.materials, g.seats[1].stockpile.materials);
+    g.commit_orders(Seat(0), std::slice::from_ref(&tribute));
+    assert!((g.seats[0].stockpile.materials - (mine - m)).abs() < 1e-9, "paid once, not twice: {}", g.seats[0].stockpile.materials);
+    assert!((g.seats[1].stockpile.materials - (theirs + m)).abs() < 1e-9, "and received");
+    let muster = Order::BuildEmigrants { state: StateId::EastAsia, n: 4 };
+    let people = g.muster_population_in(Seat(0), StateId::EastAsia, 4);
+    let text = g.order_price_text(Seat(0), &muster, g.order_cost(Seat(0), &muster));
+    assert!(text.ends_with(&format!("{} people", g.tables.people_text(people))), "the people mustered: {text}");
+    // And the figure named is the figure taken.
+    let before = g.state(StateId::EastAsia).population;
+    g.commit_orders(Seat(0), std::slice::from_ref(&muster));
+    assert!((before - g.state(StateId::EastAsia).population - people).abs() < 1e-9, "the Region gave up what the confirm named");
+}
+
+/// Ticket #404 (Q8, after the second review): **the player's own place occupied by a rival, and
+/// an Occupation of the player's ended by a third Faction's Influence, are the player's news.**
+#[test]
+fn an_occupation_on_the_players_place_and_one_taken_from_them_are_under_your_works() {
+    let mut g = game();
+    let sid = StateId::NorthAfrica;
+    g.take_control(sid, Seat(0));
+    g.armies.retain(|a| a.home != ArmyHome::State(sid));
+    occupier_in(&mut g, StateId::Europe, sid);
+    g.report.lines.clear();
+    g.resolution_phase();
+    assert!(matches!(g.state(sid).control, Control::Occupied { occupier: Seat(1), previous: Some(Seat(0)), .. }), "the premise: the Prospectors occupy the player's Region");
+    let line = g.report.lines.iter().find(|l| l.kind == LineKind::Occupation).expect("the Occupation line");
+    assert!(line.mine, "the player's place, occupied: {}", line.text);
+    // The player occupies a rival's Region, and a third Faction takes it by Influence.
+    let mut g = game();
+    let sid = StateId::NorthAfrica;
+    g.take_control(sid, Seat(1));
+    g.state_mut(sid).control = Control::Occupied { occupier: Seat(0), previous: Some(Seat(1)), turns: 1, banked: 0 };
+    g.report.lines.clear();
+    g.transfer_control(Place::State(sid), Seat(2), "Influence");
+    let line = g.report.lines.iter().find(|l| l.kind == LineKind::ControlChanged).expect("the change of hands");
+    assert!(line.mine, "the player's Occupation, ended by a third Faction: {}", line.text);
 }

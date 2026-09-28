@@ -1532,6 +1532,9 @@ impl Game {
                             ],
                         );
                         self.report_line(LineKind::Occupation, Some(place.into()), text);
+                        // Ticket #404 (version 0.09.4): who directs the place changed, so it is the
+                        // player's news when the player occupied it or holds it.
+                        self.mark_mine(&[Some(occupier), previous]);
                         continue;
                     }
                     if !self.defenders_at(place, occupier).is_empty() {
@@ -1579,6 +1582,8 @@ impl Game {
                         self.log(line);
                         let text = self.say("occupation_begun", &[("faction", self.seat_name(seat)), ("place", self.place_name(place))]);
                         self.report_line(LineKind::Occupation, Some(place.into()), text);
+                        // Ticket #404 (version 0.09.4): as a change of hands, the player's news.
+                        self.mark_mine(&[Some(seat), previous]);
                         let gain = self.occupation_gain(place, seat);
                         self.set_place_control(place, Control::Occupied { occupier: seat, previous, turns: 1, banked: gain });
                         let have = self.seat(seat).influence.get(&place).copied().unwrap_or(0);
@@ -1698,7 +1703,7 @@ impl Game {
             let text = self.say("archive_destroyed", &[("place", self.place_name(place)), ("faction", whose)]);
             self.report_line(LineKind::Archive, Some(place.into()), text);
         }
-        let before = self.place_control(place).controller();
+        let (before, directed) = (self.place_control(place).controller(), self.place_control(place).director());
         self.set_place_control(place, Control::Controlled(seat));
         // Standings persist through a transfer (ticket #33): the old controller keeps its own and
         // can contest the place back.
@@ -1711,7 +1716,8 @@ impl Game {
         self.report_line(LineKind::ControlChanged, Some(place.into()), text);
         // Ticket #404 (version 0.09.4): a place that became the player's, or stopped being theirs,
         // is their news: listed under Your works as well as under its place.
-        self.mark_mine(&[Some(seat), before]);
+        // An occupier whose Occupation a third Faction's Influence ends loses the place too.
+        self.mark_mine(&[Some(seat), before, directed]);
         // Ticket #366 (version 0.09.2): where this line stands, so a throw-off in the same
         // Resolution can say both in its place.
         self.pending.transfer_lines.push((place, self.report.lines.len() - 1));

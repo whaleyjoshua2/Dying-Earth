@@ -393,12 +393,19 @@ impl Game {
             Order::Rearm { ship } => Some(BuildItem::Warhead(*ship)),
             _ => None,
         };
+        // A Launch spends the Warhead and no Fuel.
+        if let Order::Launch { .. } = order {
+            parts.push("the Warhead".to_string());
+        }
         if let Some(item) = item {
             let n = self.build_widgets(seat, item);
             parts.push(format!("{n} Widget{}", if n == 1 { "" } else { "s" }));
         }
         if let Order::BuildArmy { place } = order {
             parts.push(self.army_people_text(*place));
+        }
+        if let Order::BuildEmigrants { state, n } = order {
+            parts.push(format!("{} people", self.tables.people_text(self.muster_population_in(seat, *state, *n))));
         }
         let tank = match order {
             Order::Transit { ship, to, .. } => self.ship(*ship).and_then(|s| match s.at {
@@ -448,6 +455,11 @@ impl Game {
             // build's, paid by the yard's place over the turns it takes.
             Order::Launch { .. } => Cost::default(),
             Order::Rearm { .. } => Cost { materials: t.nuke.rearm_materials as f64, ..Default::default() },
+            // Ticket #404 (version 0.09.4): a tribute is paid from the Stockpile with the order's
+            // cost, so the confirm names it and the running total counts it; it was taken at the
+            // commit, outside the cost, and the driver said `costs free`.
+            Order::Tribute { materials: true, .. } => Cost { materials: t.relations.tribute_materials as f64, ..Default::default() },
+            Order::Tribute { materials: false, .. } => Cost { ducats: t.relations.tribute_ducats as f64, ..Default::default() },
             Order::Refuel { ship } => Cost { fuel: self.refuel_amount(seat, *ship), ..Default::default() },
             Order::Influence { amount, .. } => Cost { influence: *amount, ..Default::default() },
             Order::Smear { amount, .. } => Cost { influence: *amount, ..Default::default() },
@@ -2656,11 +2668,10 @@ impl Game {
                     // Ticket #223/#226: one of the two acts that raise Relations. The gain is the
                     // flat act_gain, not scaled by the gift, which is why the price is fixed.
                     let t = self.tables.relations.clone();
+                    // Ticket #404 (version 0.09.4): the payer's side left with the order's cost, above.
                     if *materials {
-                        self.seat_mut(seat).stockpile.materials = tenth(self.seat(seat).stockpile.materials - t.tribute_materials as f64);
                         self.seat_mut(*to).stockpile.materials = tenth(self.seat(*to).stockpile.materials + t.tribute_materials as f64);
                     } else {
-                        self.seat_mut(seat).stockpile.ducats = tenth(self.seat(seat).stockpile.ducats - t.tribute_ducats as f64);
                         self.seat_mut(*to).stockpile.ducats = tenth(self.seat(*to).stockpile.ducats + t.tribute_ducats as f64);
                     }
                     self.credit(seat, *to);
