@@ -472,7 +472,14 @@ pub fn load_from(path: &Path, tables: Arc<Tables>) -> Result<Game, String> {
     }
     let (_, body) = split(&text)?;
     let saved: SavedGame = ron::from_str(body).map_err(|e| format!("This save is damaged and cannot be loaded ({e})."))?;
-    Ok(saved.into_game(tables))
+    let mut game = saved.into_game(tables);
+    // Ticket #405 (version 0.09.4): a save from before the latch, written while the world stood
+    // under the Sink, has had its first turn under it; it must not be announced again. A save
+    // written since carries the latch set whenever the run is above nought, so this changes nothing.
+    if game.seats.iter().any(|s| s.stabilization_run > 0) {
+        game.climate.under_sink_eased = true;
+    }
+    Ok(game)
 }
 
 /// Every save in the folder, newest first. A folder that is not there, and a file that is not a

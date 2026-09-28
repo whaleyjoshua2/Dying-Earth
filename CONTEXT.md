@@ -787,7 +787,7 @@ The change is more than a change of units. A share of Materials output skimmed a
 _Avoid_: the pool, savings, treasury, war chest, bank
 
 **Stabilization**:
-The Custodians' measure: Climate phases in a row in which the Emissions that count -- everything but the Event cards and the permafrost -- stand under the Natural Sink and the Scrubbers together, three for their Victory. One phase over resets the run. The figure is not the net the Climate Panel prints, which counts the cards and the permafrost as well.
+The Custodians' measure: Climate phases in a row in which the Emissions that count -- everything but the Event cards and the permafrost -- stand under the Natural Sink and the Scrubbers together, three for their Victory. One phase over resets the run. The figure is not the net the Climate Panel prints, which counts the cards and the permafrost as well. Since version 0.09.4 the first phase the world is ever under the Sink by this measure is news of its own, **Under the Sink**, once a game, whatever the next phase does: every Region's Unrest eases by half a point, a Region the Custodians hold by a whole point instead.
 _Avoid_: carbon neutral, balance, equilibrium
 
 **Off-world Presence**:

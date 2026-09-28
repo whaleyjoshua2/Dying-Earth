@@ -123,6 +123,8 @@ fn moment_from_id(name: &str) -> Option<MomentKind> {
         "rival" => Some(MomentKind::RivalProgress),
         // Ticket #345 (version 0.09.1): a Body settled for the first time.
         "first" => Some(MomentKind::FirstToABody),
+        // Ticket #405 (version 0.09.4): staged by the `moment:sink` aid.
+        "sink" => Some(MomentKind::UnderTheSink),
         _ => None,
     }
 }
@@ -1191,6 +1193,14 @@ fn build_board(session: &mut Session) {
                 fuel: 30.0,
                 slot: None,
             });
+        }
+        // `moment:sink` (a building aid, ticket #405, version 0.09.4): the Natural Sink raised past
+        // anything the board emits, so the turn's Climate phase is the world's first under it and
+        // the Report carries the Moment. The turn a world first gets under is not one an aid can choose.
+        if std::env::args().any(|a| a == "moment:sink") {
+            g.climate.natural_sink = 1000.0;
+            refuse_any_card(g);
+            g.end_turn(std::array::from_fn(|_| Vec::new())).expect("the screenshot harness picks a Tech before it drives turns");
         }
         // `moment:tech` (a building aid, ticket #58): a rival seat pushes the Tech under research
         // over the line, so the Report carries a Tech Moment with the Lead, the margin and the AI's

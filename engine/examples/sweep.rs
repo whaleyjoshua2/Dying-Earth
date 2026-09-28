@@ -94,6 +94,8 @@ fn main() {
     // different Faction in every seating, so the gate figure this ticket is judged by cannot be
     // read off it without adding four arrays up by hand.
     let mut all_gate_turns: [Vec<u32>; 4] = Default::default();
+    // Ticket #405 (version 0.09.4): the turn the world was first under the Sink, every seating.
+    let mut all_under_sink: Vec<u32> = Vec::new();
     // Ticket #343 (version 0.09.1): the nuke's counters across every seating, so the closing
     // review has ONE total to quote rather than four blocks to add up by hand.
     let mut all_warc = dying_earth_engine::state::WarCounters::default();
@@ -174,6 +176,7 @@ fn main() {
                         let mut warc = dying_earth_engine::state::WarCounters::default();
                         // Ticket #343 (version 0.09.1): the Natural Sink at the end of each game.
                         let mut sinks_end: Vec<f64> = Vec::new();
+                        let mut under_sink: Vec<u32> = Vec::new();
                         let mut war_ppm: [Vec<f64>; 4] = Default::default();
                         let mut war_nobody: Vec<f64> = Vec::new();
                         let mut walls_standing = 0u32;
@@ -380,6 +383,10 @@ fn main() {
                             neutral_holds += r.neutral_holds;
                             warc.add(&r.war);
                             sinks_end.push(r.natural_sink_end);
+                            if let Some(t) = r.first_under_sink_turn {
+                                under_sink.push(t);
+                                all_under_sink.push(t);
+                            }
                             all_warc.add(&r.war);
                             for (i, k) in r.seat_kinds().into_iter().enumerate() {
                                 let f = FactionKind::ALL.iter().position(|x| *x == k).unwrap();
@@ -689,6 +696,7 @@ fn main() {
                                 warc.hulls_left_dry.iter().sum::<u32>()
                             );
                             println!("      Natural Sink at the end: median {sink_med:.2} over {} games", sinks_end.len());
+                            println!("      The world under the Natural Sink at least once in {}/{seeds} seeds (median first turn {})", under_sink.len(), median_u(&mut under_sink));
                             println!("      The whole Tech Tree completed in {}/{seeds} seeds (median turn {})", tree_turns.len(), median_u(&mut tree_turns));
                             println!("      Breaks fired: {}", fired.join(", "));
                         }
@@ -708,6 +716,7 @@ fn main() {
         for (i, k) in FactionKind::ALL.into_iter().enumerate() {
             println!("  {:>12}: Victory gate completed in {:2} of {all_games} games, median turn {}", k.name(), all_gate_turns[i].len(), median_u(&mut all_gate_turns[i]));
         }
+        println!("  the world under the Natural Sink at least once in {} of {all_games} games (median first turn {})", all_under_sink.len(), median_u(&mut all_under_sink));
         // Version 0.09.3: the worlds settled, over every seating.
         println!("  {}", off_earth_line(&base, &all_ground_by_body, &all_stations_by_body, &mut all_first_by_body, &mut all_ground_off_earth_per_game, all_games as u64));
         // Ticket #343 (version 0.09.1): summed over every seat of every seating -- a TOTAL, never

@@ -1040,6 +1040,10 @@ pub struct UnrestTable {
     /// Ticket #395 (version 0.09.3): what the first ground Colony ever founded on a Body takes off
     /// every Region's Unrest at once, whoever holds it, once a Body.
     pub first_colony_ease: f64,
+    /// Ticket #405 (version 0.09.4): what the first Climate phase the world is ever under the
+    /// Natural Sink takes off every Region's Unrest, and off a Region the Custodians hold instead.
+    pub under_sink_ease: f64,
+    pub under_sink_ease_custodians: f64,
     pub green_techs_two: f64,
     pub green_techs_four: f64,
     pub constabulary_damping: f64,

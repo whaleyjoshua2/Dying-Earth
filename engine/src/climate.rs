@@ -81,6 +81,12 @@ impl Game {
                 s.stabilization_run = 0;
             }
         }
+        // Ticket #405 (version 0.09.4): the first Climate phase the world is EVER under the Sink,
+        // by the same test, eases every Region's Unrest once a game, whatever the next turn does.
+        if stabilized && !self.climate.under_sink_eased {
+            self.climate.under_sink_eased = true;
+            self.ease_under_the_sink();
+        }
         // Temperature follows the stock with a lag.
         let target = self.target_temperature();
         let temp = self.climate.temperature + (target - self.climate.temperature) * c.temperature_lag_fraction;
@@ -858,5 +864,28 @@ impl Game {
             }
         }
         false
+    }
+
+    /// Ticket #405 (version 0.09.4): the world is under the Natural Sink for the first time. Every
+    /// Region's Unrest eases by `under_sink_ease`, held or nobody's, and a Region the Custodians
+    /// hold by `under_sink_ease_custodians` instead -- the designer's ".5 / 1 for custodians". One
+    /// line for the whole Earth, as the first Colony's ease is said, and a Moment of its own.
+    fn ease_under_the_sink(&mut self) {
+        let (ease, theirs) = (self.tables.unrest.under_sink_ease, self.tables.unrest.under_sink_ease_custodians);
+        for sid in StateId::ALL {
+            let custodians = self.state(sid).control.controller().map(|s| self.kind(s) == FactionKind::Custodians).unwrap_or(false);
+            self.lower_unrest(sid, if custodians { theirs } else { ease });
+        }
+        self.log(format!("The world is under the Natural Sink for the first time: Unrest eased by {} in every Region, {} in the Custodians'.", figure(ease), figure(theirs)));
+        // The designer's words, "a half" and "a whole point", where the figures are those.
+        let words = |n: f64| match n {
+            0.5 => "a half".to_string(),
+            1.0 => "a whole point".to_string(),
+            n => figure(n),
+        };
+        let args = [("ease", words(ease)), ("custodians", words(theirs))];
+        let text = self.say("under_the_sink_eases", &args);
+        self.report_line(LineKind::Unrest, None, text);
+        self.moment(MomentKind::UnderTheSink, &args, None);
     }
 }

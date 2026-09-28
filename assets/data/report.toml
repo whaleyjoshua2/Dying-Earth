@@ -63,6 +63,8 @@ first_to_body = "The {faction} are the first Faction ever to settle {body}. {col
 # Ticket #395 (version 0.09.3): the world eases at the news, half a point off every Region's Unrest,
 # said once for the whole Earth, filed under On Earth; the Moment carries it too.
 first_to_body_eases = "The first Colony on {body} eased Unrest by {ease} in every Region on Earth."
+# Ticket #405 (version 0.09.4): the world under the Natural Sink for the first time, once a game.
+under_the_sink_eases = "The world is under the Natural Sink for the first time: Unrest eased by {ease} in every Region on Earth, {custodians} in the Custodians'."
 disembarked = "{n} Colonists disembarked into {colony}."
 station_built = "{faction} built {station}."
 antarctica_opens = "The Antarctic ice opens: {n} Colony Slots on Earth."
@@ -393,6 +395,12 @@ figure = "{n} Influence"
 on = true
 text = "{place} changed hands."
 figure = "the {faction}"
+
+# Ticket #405 (version 0.09.4): the climate's first good news, in the designer's words.
+[moments.under_the_sink]
+on = true
+text = "For the first time, the world takes more carbon out of the air than it puts in. Unrest eases by {ease} in every Region, {custodians} in the Custodians'."
+figure = "Under the Sink"
 
 [moments.climate_threshold]
 on = true

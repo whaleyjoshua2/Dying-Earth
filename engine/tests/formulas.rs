@@ -10881,7 +10881,7 @@ fn a_rival_closing_on_its_victory_condition_interrupts_the_player_once_a_step() 
     g.end_phase();
     assert_eq!(fired(&g), 2, "rivals only: {:?}", g.report.moments);
     assert_eq!(MomentKind::RivalProgress.rank(), 5, "between a Battle (4) and a Tech (6)");
-    assert_eq!(MomentKind::ALL.len(), 11, "ticket #281 (version 0.08.5) added a place taken by force, and #345 (0.09.1) a Body settled first");
+    assert_eq!(MomentKind::ALL.len(), 12, "ticket #281 (version 0.08.5) added a place taken by force, #345 (0.09.1) a Body settled first, and #405 (0.09.4) the world under the Sink");
     assert!(g.tables.report.moment_on(MomentKind::RivalProgress), "on by default");
 }
 
@@ -17078,4 +17078,93 @@ fn an_occupation_on_the_players_place_and_one_taken_from_them_are_under_your_wor
     g.transfer_control(Place::State(sid), Seat(2), "Influence");
     let line = g.report.lines.iter().find(|l| l.kind == LineKind::ControlChanged).expect("the change of hands");
     assert!(line.mine, "the player's Occupation, ended by a third Faction: {}", line.text);
+}
+
+/// Ticket #405 (version 0.09.4): **the first turn the world is under the Natural Sink eases every
+/// Region's Unrest, once a game**: by a half, by a whole point where the Custodians hold it. The
+/// test is the Stabilization test, and it fires on that turn whatever the next does. A copy of the
+/// game whose ease is already spent is the control, so whatever else the Climate phase does to
+/// Unrest cancels out.
+#[test]
+fn the_first_turn_under_the_sink_eases_every_region_once() {
+    let base = || {
+        let mut g = game();
+        for sid in StateId::ALL {
+            g.state_mut(sid).unrest = 4.0;
+        }
+        g.climate.natural_sink = 1000.0;
+        g
+    };
+    let (mut g, mut control) = (base(), base());
+    control.climate.under_sink_eased = true;
+    g.report.lines.clear();
+    g.climate_phase();
+    control.climate_phase();
+    assert_eq!(g.seat(Seat(0)).stabilization_run, 1, "the premise: the world is under the Sink");
+    let u = &g.tables.unrest;
+    let custodians = |g: &Game, sid: StateId| g.state(sid).control.controller().map(|s| g.kind(s) == FactionKind::Custodians).unwrap_or(false);
+    let (mut theirs, mut others) = (0, 0);
+    for sid in StateId::ALL {
+        let want = if custodians(&g, sid) { theirs += 1; u.under_sink_ease_custodians } else { others += 1; u.under_sink_ease };
+        let eased = control.state(sid).unrest - g.state(sid).unrest;
+        assert!((eased - want).abs() < 1e-9, "{sid:?} eased by {eased}, not {want}");
+    }
+    assert!(theirs > 0 && others > 0, "the premise: both kinds of Region on the board");
+    assert_eq!((u.under_sink_ease, u.under_sink_ease_custodians), (0.5, 1.0), "the designer's figures");
+    assert!(g.report.lines.iter().any(|l| l.kind == LineKind::Unrest && l.place.is_none()), "one line for the whole Earth: {:?}", g.report.lines);
+    assert!(g.report.moments.iter().any(|m| m.kind == MomentKind::UnderTheSink), "and its Moment");
+    // Once a game: a second turn under the Sink eases nothing more.
+    for sid in StateId::ALL {
+        g.state_mut(sid).unrest = 4.0;
+        control.state_mut(sid).unrest = 4.0;
+    }
+    g.climate_phase();
+    control.climate_phase();
+    assert_eq!(g.seat(Seat(0)).stabilization_run, 2);
+    for sid in StateId::ALL {
+        assert_eq!(g.state(sid).unrest, control.state(sid).unrest, "{sid:?}: nothing the second time");
+    }
+}
+
+/// Ticket #405 (after review): **"under the Sink" is the Stabilization test, not the Climate
+/// Panel's net**, and **once a game survives a broken run.** Counted Emissions under the Sink with
+/// the Permafrost pushing the full net over it still eases; a run that breaks and starts again does
+/// not ease a second time.
+#[test]
+fn the_sink_ease_reads_the_stabilization_test_and_survives_a_broken_run() {
+    let mut g = game();
+    for sid in StateId::ALL {
+        g.state_mut(sid).unrest = 4.0;
+    }
+    let counted = g.emissions_now().counted();
+    g.climate.natural_sink = counted + 1.0;
+    g.climate.permafrost = 100.0;
+    let mut control = g.clone();
+    control.climate.under_sink_eased = true;
+    g.climate_phase();
+    control.climate_phase();
+    assert!(g.climate.last.net() > 0.0, "the premise: the Climate Panel's net is over the Sink: {}", g.climate.last.net());
+    assert_eq!(g.seat(Seat(0)).stabilization_run, 1, "the premise: the Stabilization test is under");
+    assert!(g.state(StateId::SubSaharanAfrica).unrest < control.state(StateId::SubSaharanAfrica).unrest, "the ease reads the Stabilization test");
+    // Over the Sink, the run breaks; under again, the run starts again, and nothing more eases.
+    g.climate.natural_sink = 0.0;
+    control.climate.natural_sink = 0.0;
+    g.climate_phase();
+    control.climate_phase();
+    assert_eq!(g.seat(Seat(0)).stabilization_run, 0, "the premise: the run broke");
+    for sid in StateId::ALL {
+        g.state_mut(sid).unrest = 4.0;
+        control.state_mut(sid).unrest = 4.0;
+    }
+    g.climate.natural_sink = 1000.0;
+    control.climate.natural_sink = 1000.0;
+    g.climate_phase();
+    control.climate_phase();
+    assert_eq!(g.seat(Seat(0)).stabilization_run, 1, "the premise: a new run");
+    for sid in StateId::ALL {
+        assert_eq!(g.state(sid).unrest, control.state(sid).unrest, "{sid:?}: nothing on a second run");
+    }
+    assert_eq!(g.report.moments.iter().filter(|m| m.kind == MomentKind::UnderTheSink).count(), 1, "one Moment over the three phases");
+    let words = g.report.moments.iter().find(|m| m.kind == MomentKind::UnderTheSink).map(|m| m.text.clone()).expect("the Moment of the first turn");
+    assert!(words.contains("by a half in every Region, a whole point in the Custodians'"), "the designer's words: {words}");
 }

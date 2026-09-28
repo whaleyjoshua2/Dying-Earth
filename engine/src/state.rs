@@ -695,6 +695,10 @@ pub struct Climate {
     pub natural_sink: f64,
     /// Ticket #55: ppm the Permafrost Thaw Break adds to the world's Emissions every Climate phase.
     pub permafrost: f64,
+    /// Ticket #405 (version 0.09.4): the world has been under the Natural Sink once, and every
+    /// Region's Unrest has eased for it; it eases once a game. A save from before carries false.
+    #[serde(default)]
+    pub under_sink_eased: bool,
     /// Ticket #55: which Breaks have fired, by index into `climate.toml`'s list. Each fires once.
     pub breaks_fired: Vec<bool>,
 }
@@ -1708,6 +1712,7 @@ impl Game {
                 war_nobody_total: 0.0,
                 natural_sink: tables.climate.natural_sink,
                 permafrost: 0.0,
+                under_sink_eased: false,
                 breaks_fired: vec![false; tables.climate.breaks.len()],
             },
             research: Research {

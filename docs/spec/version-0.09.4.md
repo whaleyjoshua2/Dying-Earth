@@ -53,3 +53,39 @@ with them (item 1, the tribute).
 confirm reading *free*; a Market line with no card named on the turns a Cheap Ore Offer's price
 stands; a player's lost Region, or a player's Occupation begun, broken or taken by a third Faction,
 missing from Your works; a Launch confirm reading *free*; a tribute missing from the running total.
+
+## 2. The first turn under the Sink eases Unrest everywhere
+
+The authority is [ticket #405](https://github.com/whaleyjoshua2/Dying-Earth/issues/405).
+
+**The first Climate phase the world is ever under the Natural Sink eases every Region's Unrest,
+once a game.** "Under the Sink" is the Stabilization test: the Emissions that count (everything
+but the Climate cards and the Permafrost) against the Natural Sink and the Scrubbers, so the ease
+and the Custodians' run never disagree. It fires on that phase whatever the next does; it does not
+wait for a run of three.
+
+- **Every Region on Earth, held or nobody's, eases by a half** (`under_sink_ease = 0.5`); **a
+  Region the Custodians hold eases by a whole point instead** (`under_sink_ease_custodians = 1.0`),
+  in `unrest.toml`. Nothing falls below nought.
+- The Climate phase is the second phase of a turn and the throw-off comes in that turn's
+  Resolution, so the ease lands **before this turn's throw-off**, as the first Colony's does.
+- A save from before this version, written while the world stood under the Sink, counts the ease
+  as spent, so it is never announced twice.
+- **One line for the whole Earth** under On Earth: *"The world is under the Natural Sink for the
+  first time: Unrest eased by a half in every Region on Earth, a whole point in the Custodians'."*
+- **A Moment of its own, *Under the Sink***, switchable in the Moments corner like the others,
+  ranked with a Break, in the designer's words: *"For the first time, the world takes more carbon
+  out of the air than it puts in. Unrest eases by a half in every Region, a whole point in the
+  Custodians'."*
+- **The computer seats** have no new weight; the ease falls where the Custodians' Scrubber and
+  Leapfrog weights already push.
+
+**Measured** (20 seeds x four seatings, the shipped cell; the sweep gained a line counting the games
+in which the world was ever under the Sink): the world got under in **10 of 80 games, median first
+turn 28**, before and after, since the ease follows the fact; the win column **7 / 5 / 1 / 7,
+collapses 60**, unmoved. The ease moved small things (Constabularies built in the first seating 79
+to 77, Agitates landed a few either way) and nothing a Faction's result turns on.
+
+**What would show this wrong**: a Region's Unrest unchanged on the first turn under the Sink; a
+second ease on a later turn under it; a Custodian Region eased by a half, or a rival's by a whole
+point.
