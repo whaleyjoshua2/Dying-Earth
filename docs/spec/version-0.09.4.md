@@ -167,3 +167,34 @@ Decommission +2, whoever holds it, and nothing damps either; in a Colony neither
 
 **What would show this wrong**: a Mothball button with no hover in a Region; a confirm reading
 `free` for a Mothball; a figure in any Faction's text that the data contradicts.
+
+## 5. Cut the language
+
+The authority is [ticket #408](https://github.com/whaleyjoshua2/Dying-Earth/issues/408). No rule moves.
+
+Five Report lines cut to what they must say, in the designer's words:
+
+| Line | Now |
+|---|---|
+| A Tech completed | *"Coastal Engineering is complete. The Prospectors led and pick the next Tech."* |
+| An Occupation broken | *"The Prospectors' Occupation of Egypt broke: +2 Unrest."* |
+| First to a Body | *"The Archivists are first to settle the Moon: +5 Influence."* |
+| A throw-off | *"Egypt threw off the Custodians."* |
+| A Sea Wall holding | *"China's Sea Wall held the sea; keep now 4 Materials."* |
+
+The log keeps the Tech's shares; the Report does not. The first-to-a-Body line no longer names the
+Colony; it points at it, and the Moment names it. **The Constabulary's and the Stadium's sentences
+on the Region card are dropped**, nothing in their place; each building's own box says what it does,
+and the Constabulary's now says it as the engine does it (*"takes 1 off this state's Unrest a turn
+and half a point off each rise from the climate, refugees or an Agitate"*), where it said *halves*
+and left refugees out. The Unrest figure's hover says Unrest moves *in quarters*, where it said *in
+halves*.
+
+Two cases the cut exposed: **an Occupation that breaks where nothing rose** (a Colony, which has no
+Unrest, or a Region already at the top) says only *"The Prospectors' Occupation of Tycho on the Moon
+broke."*, where the figure had been claimed regardless; and **a Region whose name ends in s** takes
+an apostrophe alone (*"The United States' Sea Wall"*). The Sea Wall's line keeps the coast's suffix
+when a rise turns an inland slot coastal (*"… The coast now reaches one slot further in."*).
+
+**What would show this wrong**: any of the five lines in its old words; a Colony's broken
+Occupation claiming Unrest; a Constabulary's box saying *halves*.

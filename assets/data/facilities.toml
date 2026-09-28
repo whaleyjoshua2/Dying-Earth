@@ -86,7 +86,9 @@ name = "Constabulary"
 materials = 25
 widgets = 4
 energy_upkeep = 2
-does = "takes 1 off this state's Unrest a turn, halves what the climate and an Agitate add to it, and adds 5 to what a rival must reach to take this state (10 with Civil Defense)"
+# Ticket #408 (version 0.09.4): said as the engine does it, a flat half point off each rise, refugees
+# included, now that the card's own sentence is gone.
+does = "takes 1 off this state's Unrest a turn and half a point off each rise from the climate, refugees or an Agitate; adds 5 to what a rival must reach to take this state (10 with Civil Defense)"
 emissions = 0.0
 
 # Ticket #54 (version 0.05): the Scrubber, the Custodians' signature Facility, which replaces
@@ -340,5 +342,5 @@ name = "Stadium"
 materials = 20
 widgets = 4
 energy_upkeep = 1
-does = "halves what the climate adds to this state's Unrest, after a Constabulary takes its half point off (a heat rise of one lands as a quarter with both); an Agitate is untouched"
+does = "halves what the climate adds to this state's Unrest, after a Constabulary's half point (a heat rise of one lands as a quarter with both); an Agitate is untouched"
 emissions = 0.0

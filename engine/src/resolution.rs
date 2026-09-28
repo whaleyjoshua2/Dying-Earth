@@ -1501,9 +1501,13 @@ impl Game {
                         };
                         self.set_place_control(place, back);
                         self.war.occupations_broken[occupier.index()] += 1;
+                        // Ticket #408 (version 0.09.4): what actually rose, so the cut line never claims
+                        // Unrest a Colony has not got.
+                        let mut rose = 0.0;
                         if let Place::State(sid) = place {
                             let n = self.tables.unrest.occupation_break;
-                            if self.raise_unrest(sid, n, UnrestSource::Plain) > 0.0 {
+                            rose = self.raise_unrest(sid, n, UnrestSource::Plain);
+                            if rose > 0.0 {
                                 // Ticket #371 (version 0.09.2): a cause for the Region's net line.
                                 let cause = self.phrase("cause_occupation_break", &[]);
                                 self.unrest_cause(sid, cause, false);
@@ -1522,12 +1526,12 @@ impl Game {
                         let line = format!("Occupation of {} by the {} broke: back to the {} at +{:.0} Unrest, an offence.", self.place_name(place), self.seat_name(occupier), holder, self.tables.unrest.occupation_break);
                         self.log(line);
                         let text = self.say(
-                            "occupation_broken",
+                            if rose > 0.0 { "occupation_broken" } else { "occupation_broken_quiet" },
                             &[
                                 ("place", self.place_name(place)),
                                 ("faction", self.seat_name(occupier)),
                                 ("holder", holder),
-                                ("unrest", Game::unrest_figure(self.tables.unrest.occupation_break)),
+                                ("unrest", Game::unrest_figure(rose)),
                                 ("standing", banked.to_string()),
                             ],
                         );

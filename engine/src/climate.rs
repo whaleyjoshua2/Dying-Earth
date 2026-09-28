@@ -392,7 +392,9 @@ impl Game {
         let mut headline = if let Some(i) = wall {
             self.state_mut(sid).facilities[i].rises_held += 1;
             let keep = self.state(sid).facilities[i].rises_held as f64 * self.tables.sea_wall.upkeep_per_rise;
-            said = self.say("sea_wall", &[("temperature", temperature.clone()), ("state", name.clone()), ("keep", crate::state::figure(keep))]);
+            // Ticket #408 (version 0.09.4): "The United States' Sea Wall", not "…States's".
+            let whose = if name.ends_with('s') { format!("{name}'") } else { format!("{name}'s") };
+            said = self.say("sea_wall", &[("temperature", temperature.clone()), ("state", name.clone()), ("whose", whose), ("keep", crate::state::figure(keep))]);
             format!("Sea level at {thr:+.1} C: the Sea Wall in {name} took the sea and stands; it costs {} Materials a turn to keep now.", crate::state::figure(keep))
         } else {
             // Ticket #56: the sea takes COASTAL slots only, and nothing once they are gone.

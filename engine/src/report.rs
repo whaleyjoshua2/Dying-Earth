@@ -489,6 +489,8 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("occupation_ended", &["place", "faction"]),
     // Ticket #299 (version 0.08.6): a broken Occupation, at a cost.
     ("occupation_broken", &["place", "faction", "holder", "unrest", "standing"]),
+    // Ticket #408 (version 0.09.4): the same where nothing rose.
+    ("occupation_broken_quiet", &["place", "faction", "holder", "unrest", "standing"]),
     ("control_changed", &["place", "faction", "why"]),
     // Ticket #366 (version 0.09.2): a transfer and a throw-off in one Resolution, said once.
     ("passed_and_threw_off", &["state", "faction"]),
@@ -543,7 +545,7 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("break_coastal", &["states", "exposure", "percent", "unrest"]),
     ("break_baseline", &["state", "rise"]),
     // Ticket #257 (version 0.08.4): the wall stands and its keep rises; a surge it holds; a keep unpaid.
-    ("sea_wall", &["temperature", "state", "keep"]),
+    ("sea_wall", &["temperature", "state", "whose", "keep"]),
     // Ticket #259 (version 0.08.4): the off-Earth cards join the deck.
     ("deck_joined", &["n"]),
     // Ticket #261: the two steps a rival's Moment fires on.

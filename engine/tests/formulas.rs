@@ -4334,7 +4334,7 @@ fn d2_every_rise_turns_one_inland_slot_coastal_wall_or_no_wall() {
     g.apply_sea_threshold(sid, 1);
     assert_eq!(g.state(sid).facilities.len(), before, "the wall held: nothing drowned");
     assert_eq!((g.coastal_slots(sid), g.inland_slots(sid)), (4, 1), "and one more inland slot turned coastal behind it");
-    assert!(g.report.lines.iter().any(|l| l.text.contains("took the sea") && l.text.contains("one slot further in")), "the held-rise line says both: {:?}", g.report.lines);
+    assert!(g.report.lines.iter().any(|l| l.text.contains("held the sea") && l.text.contains("one slot further in")), "the held-rise line says both: {:?}", g.report.lines);
 
     // No empty inland slot left: the oldest inland Facility turns with its slot.
     g.apply_sea_threshold(sid, 2);
@@ -4402,7 +4402,7 @@ fn e_the_sea_wall_needs_its_tech_takes_no_slot_and_takes_one_threshold() {
     assert_eq!(g.coastal_slots(sid), before + 1, "and one inland slot turned coastal behind it, wall or no wall");
     let wall = g.state(sid).facilities.iter().find(|f| f.kind == FacilityKind::SeaWall).expect("the wall stands");
     assert_eq!(wall.rises_held, 1, "and counts the rise it held");
-    assert!(g.report.lines.iter().any(|l| l.text.contains("Sea Wall") && l.text.contains("dearer to keep")), "the Report says so: {:?}", g.report.lines);
+    assert!(g.report.lines.iter().any(|l| l.text.contains("Sea Wall held the sea")), "the Report says so: {:?}", g.report.lines);
     // The next one is held too.
     g.apply_sea_threshold(sid, 1);
     assert_eq!(g.state(sid).lost_slots, 0, "the wall holds every threshold, not one");
@@ -14611,7 +14611,9 @@ fn ticket_345_the_report_and_the_moment_name_the_faction_the_body_and_the_colony
     let texts: Vec<String> = g.report.lines.iter().map(|l| l.text.clone()).collect();
     let line = texts.iter().find(|t| t.contains(&body) && t.contains("first")).unwrap_or_else(|| panic!("a Report line says who was first: {texts:?}"));
     assert!(line.contains(&faction), "the line names the Faction: {line}");
-    assert!(line.contains(&place), "and the Colony: {line}");
+    // Ticket #408 (version 0.09.4): the line no longer names the Colony, at the designer's word;
+    // it points at it, and the Moment names it.
+    assert!(!line.contains(&place), "the cut line names no Colony: {line}");
     assert!(line.contains(&g.tables.body(BodyId::Deimos).first_windfall.to_string()), "and what it pays: {line}");
     let moment = g.report.moments.iter().find(|m| m.kind == MomentKind::FirstToABody).expect("a Moment stops the turn for it");
     assert!(moment.text.contains(&faction), "the Moment names the Faction: {}", moment.text);
@@ -17295,4 +17297,35 @@ fn the_custodians_text_reads_its_figures_from_the_data_and_says_the_lever() {
         let text = t.signature(k);
         assert!(!text.contains('{') && !text.contains('}'), "{k:?}: {text}");
     }
+}
+
+/// Ticket #408 (version 0.09.4): **five Report lines cut to what they must say**, in the designer's
+/// words: the Tech completed, an Occupation broken, the first to a Body, a throw-off, a Sea Wall.
+#[test]
+fn the_cut_report_lines_say_only_what_they_must() {
+    let g = game();
+    let say = |key: &str, args: &[(&str, &str)]| g.say(key, &args.iter().map(|(k, v)| (*k, v.to_string())).collect::<Vec<_>>());
+    assert_eq!(say("tech_complete", &[("tech", "Coastal Engineering"), ("faction", "Prospectors"), ("shares", "Prospectors 6")]), "Coastal Engineering is complete. The Prospectors led and pick the next Tech.");
+    assert_eq!(
+        say("occupation_broken", &[("faction", "Prospectors"), ("place", "Egypt"), ("holder", "Custodians"), ("unrest", "2"), ("standing", "6")]),
+        "The Prospectors' Occupation of Egypt broke: +2 Unrest."
+    );
+    assert_eq!(say("first_to_body", &[("faction", "Archivists"), ("body", "the Moon"), ("colony", "Tycho"), ("n", "5"), ("ease", "0.5")]), "The Archivists are first to settle the Moon: +5 Influence.");
+    assert_eq!(say("threw_off", &[("state", "Egypt"), ("faction", "Custodians"), ("unrest", "5")]), "Egypt threw off the Custodians.");
+    assert_eq!(say("sea_wall", &[("state", "China"), ("whose", "China's"), ("temperature", "1.8"), ("keep", "4")]), "China's Sea Wall held the sea; keep now 4 Materials.");
+    assert_eq!(say("occupation_broken_quiet", &[("faction", "Prospectors"), ("place", "Tycho on the Moon"), ("holder", "Custodians"), ("unrest", "0"), ("standing", "0")]), "The Prospectors' Occupation of Tycho on the Moon broke.");
+}
+
+/// Ticket #408 (after review): **an Occupation of a Colony that breaks claims no Unrest**, since a
+/// Colony has none; the line says the break alone.
+#[test]
+fn an_occupation_of_a_colony_that_breaks_claims_no_unrest() {
+    let mut g = game();
+    let c = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Mine], 3);
+    g.colony_mut(c).unwrap().control = Control::Occupied { occupier: Seat(1), previous: Some(Seat(0)), turns: 1, banked: 0 };
+    g.report.lines.clear();
+    g.resolution_phase();
+    assert!(!matches!(g.colony(c).unwrap().control, Control::Occupied { .. }), "the premise: with no Army there, it broke");
+    let line = g.report.lines.iter().find(|l| l.kind == LineKind::Occupation).map(|l| l.text.clone()).expect("the break's line");
+    assert!(line.ends_with("broke.") && !line.contains("Unrest"), "{line}");
 }

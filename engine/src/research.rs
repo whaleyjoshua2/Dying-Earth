@@ -81,6 +81,7 @@ impl Game {
             self.research.last_lead = Some(lead);
             let shares: Vec<String> = Seat::ALL.into_iter().map(|s| format!("{} {}", self.seat_name(s), c[s.index()])).collect();
             let line = format!(
+                // Ticket #408 (version 0.09.4): the log keeps the shares; the Report does not.
                 "{} is complete; every Faction has it. The {} led ({}) and pick the next Tech.",
                 self.tables.tech(tech).name,
                 self.seat_name(lead),

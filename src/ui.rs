@@ -6836,7 +6836,7 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         rule_tip(
             ui.colored_label(colour, format!("Unrest {}: {}", game.unrest_text(sid), game.unrest_note(sid))),
             format!(
-                "Unrest runs 0 to {:.0}, in halves, with three thresholds:\nat {:.0} the Standing Army stops replenishing,\nat {:.0} every Facility here runs at half,\nat {:.0} the state throws its controller off.\nIt falls {:.1} a turn on its own, except the turn the state changed hands.",
+                "Unrest runs 0 to {:.0}, in quarters, with three thresholds:\nat {:.0} the Standing Army stops replenishing,\nat {:.0} every Facility here runs at half,\nat {:.0} the state throws its controller off.\nIt falls {:.1} a turn on its own, except the turn the state changed hands.",
                 u.max, u.army_threshold, u.facility_threshold, u.max, u.natural_fall
             ),
         );
@@ -6887,13 +6887,8 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         );
         influence_row(ui, game, session, view, Place::State(sid), false, actions);
         ui.separator();
-        if game.constabulary_online(sid) {
-            ui.label(RichText::new("A Constabulary here takes 1 off every turn and damps what the climate and the refugees add.").weak());
-        }
-        // Ticket #389 (version 0.09.3): the Stadium damps the climate's rises, and stacks with the police.
-        if game.stadium_online(sid) {
-            ui.label(RichText::new(if game.constabulary_online(sid) { "A Stadium here halves what the Constabulary leaves of a climate rise: a heat rise of one lands as a quarter." } else { "A Stadium here halves what the climate adds to the Unrest." }).weak());
-        }
+        // Ticket #408 (version 0.09.4): the Constabulary's and the Stadium's sentences that stood here
+        // are dropped, at the designer's word; each building's own box says what it does.
         // Ticket #390 (version 0.09.3): the Scrubbers' note that stood here is gone; each
         // Scrubber's own row under the boxes says what it does.
     }
