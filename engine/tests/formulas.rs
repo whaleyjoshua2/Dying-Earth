@@ -17514,7 +17514,7 @@ fn orbital_refuelling_stacks_with_nuclear_rockets_and_clean_propellant_widens_th
     // The spec's table: at the window, Mars 5 / 4 / 4 / 4 and Venus 3 / 3 / 2 / 2.
     let window = |g: &Game, to: BodyId| (1..=36).map(|turn| g.transit_cost_at(BodyId::Earth, to, turn).0).min().unwrap();
     let mut t = game();
-    let mut row = |t: &mut Game, techs: &[TechId]| {
+    let row = |t: &mut Game, techs: &[TechId]| {
         t.research.done.retain(|x| *x != TechId::NuclearRockets && *x != TechId::OrbitalRefuelling);
         t.research.done.extend_from_slice(techs);
         (window(t, BodyId::Mars), window(t, BodyId::Venus))
