@@ -17244,3 +17244,55 @@ fn the_stabilization_row_says_the_gap_in_ppm_beside_the_run() {
     assert!(under.contains("ppm under the Sink") && under.ends_with("run 1 of 3"), "{under}");
     assert!(g.progress(Seat(1)).first_label.is_none(), "the Prospectors' row is their own");
 }
+
+/// Ticket #407 (version 0.09.4): **a Mothball and a Decommission say their price, in as few words
+/// as carry it**: *"+1 Unrest"*, *"+2 Unrest, 10 Materials back"* in a Region; nothing in a
+/// Colony, where neither costs Unrest. The driver's confirm says the Unrest.
+#[test]
+fn a_mothball_and_a_decommission_say_their_price() {
+    use dying_earth_engine::state::figure;
+    let mut g = game();
+    g.state_mut(StateId::EastAsia).facilities.push(Facility { online: true, ..Facility::new(FacilityKind::Factory) });
+    let i = g.state(StateId::EastAsia).facilities.len() - 1;
+    let b = BuildingRef::Facility(StateId::EastAsia, i);
+    let half = figure(g.tables.facility(FacilityKind::Factory).materials as f64 / 2.0);
+    let u = g.tables.unrest.clone();
+    assert_eq!(g.change_price_text(b, BuildingChange::Mothball), Some(format!("+{} Unrest", figure(u.per_mothball))));
+    assert_eq!(g.change_price_text(b, BuildingChange::Decommission), Some(format!("+{} Unrest, {half} Materials back", figure(u.per_decommission))));
+    assert_eq!(g.change_price_text(b, BuildingChange::Restart), None, "a Restart's button says its own price");
+    let mothball = Order::Change { building: b, what: BuildingChange::Mothball };
+    let cost = g.check_order(Seat(0), &[], &mothball).expect("a Factory of theirs can be mothballed");
+    assert_eq!(g.order_price_text(Seat(0), &mothball, cost), format!("+{} Unrest", figure(u.per_mothball)));
+    let decommission = Order::Change { building: b, what: BuildingChange::Decommission };
+    let cost = g.check_order(Seat(0), &[], &decommission).expect("and decommissioned");
+    assert_eq!(g.order_price_text(Seat(0), &decommission, cost), format!("+{} Unrest", figure(u.per_decommission)));
+    // The Materials back the hover names are what the Resolution pays.
+    let before = g.seats[0].stockpile.materials;
+    g.commit_orders(Seat(0), std::slice::from_ref(&decommission));
+    for _ in 0..g.tables.mothball.decommission_turns.max(1) {
+        g.resolution_phase();
+        g.turn += 1;
+    }
+    assert_eq!(figure(g.seats[0].stockpile.materials - before), half, "the refund the hover promised");
+    let c = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Mine], 2);
+    let m = BuildingRef::Module(c, g.colony(c).unwrap().modules.len() - 1);
+    assert_eq!(g.change_price_text(m, BuildingChange::Mothball), None, "no Unrest in a Colony, so nothing said");
+    assert_eq!(g.change_price_text(m, BuildingChange::Decommission), None);
+}
+
+/// Ticket #407 (version 0.09.4): **the Custodians' text reads its figures from the data** and says
+/// their lever and its price; no Faction's text is left with a brace unfilled.
+#[test]
+fn the_custodians_text_reads_its_figures_from_the_data_and_says_the_lever() {
+    use dying_earth_engine::state::figure;
+    let t = tables();
+    let s = t.facility(FacilityKind::Scrubber);
+    let text = t.signature(FactionKind::Custodians);
+    assert!(text.contains(&format!("{} Materials, {} Widgets, {} Energy upkeep", s.materials, s.widgets, s.energy_upkeep)), "{text}");
+    assert!(text.contains(&format!("each Mothball there costs +{} Unrest", figure(t.unrest.per_mothball))), "{text}");
+    assert!(t.signature(FactionKind::Archivists).contains(&format!("at least {}%", t.research_directive.provisional_min_contribution)));
+    for k in FactionKind::ALL {
+        let text = t.signature(k);
+        assert!(!text.contains('{') && !text.contains('}'), "{k:?}: {text}");
+    }
+}

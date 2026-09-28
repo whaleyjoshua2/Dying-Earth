@@ -79,6 +79,12 @@ Write down anything, however small. Especially:
 
 Screenshots help. Print Screen, then paste into a message.
 
+PLAYING THE CUSTODIANS
+----------------------
+Your lever on Earth is switching industry off. Mothball a Factory, Mine, Power Plant or
+Refinery, at home or in a country you have taken, and it emits nothing. Each Mothball
+costs that country +1 Unrest.
+
 KNOWN ROUGH EDGES
 -----------------
 All the numbers below come from eighty computer-only games, twenty with each side going

@@ -2022,7 +2022,8 @@ fn faction_rulebook(ui: &mut Ui, session: &Session, kind: FactionKind) {
     ui.add_space(6.0);
     let ink = ui.visuals().text_color();
     ui.label(RichText::new("Signature rule").strong());
-    draw_with_icons(ui, &card.signature, 14.0, ink, &[]);
+    // Ticket #407 (version 0.09.4): with its figures read from the data.
+    draw_with_icons(ui, &session.tables.signature(kind), 14.0, ink, &[]);
     ui.add_space(6.0);
     ui.label(RichText::new("Victory Condition").strong());
     draw_with_icons(ui, &card.victory, 14.0, ink, &[]);
@@ -4883,7 +4884,8 @@ fn change_buttons(ui: &mut Ui, game: &Game, pending: &[Order], b: BuildingRef, m
         pair.reverse();
     }
     for what in pair {
-        cost_button(ui, game, pending, Order::Change { building: b, what }, what.name(), actions);
+        // Ticket #407 (version 0.09.4): the price in a Region, "+1 Unrest"; nothing in a Colony.
+        cost_button_with_hover(ui, game, pending, Order::Change { building: b, what }, what.name(), game.change_price_text(b, what), actions);
     }
 }
 

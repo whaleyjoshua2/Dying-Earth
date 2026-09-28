@@ -140,3 +140,28 @@ Prospectors to the Custodians; collapses 60, unmoved. The Arkwrights, whose scor
 **What would show this wrong**: a Custodian score falling when the gap widens again; a run of two
 worth less than two thirds once broken; the gap credit reaching a third; the Victory row and the
 Climate Panel quoting different figures.
+
+## 4. Say Conquer-and-Mothball, and its price
+
+The authority is [ticket #407](https://github.com/whaleyjoshua2/Dying-Earth/issues/407). No rule moves.
+
+**The price is the order's, not conquest's**: a Mothball in a Region costs +1 Unrest there and a
+Decommission +2, whoever holds it, and nothing damps either; in a Colony neither costs Unrest.
+
+- **The buttons say it, in as few words as carry it** (the designer: *"way way fewer words"*): the
+  Mothball button's hover *"+1 Unrest"*, the Decommission button's *"+2 Unrest, 10 Materials back"*,
+  half the building's Materials, the figure its own. In a Colony, no hover.
+- **The headless driver's confirm** says `costs +1 Unrest`, or `+2 Unrest`.
+- **The Custodians' Faction text says the idea**, as its last sentence: *"Their lever on Earth is
+  switching industry off, at home or in a Region they have taken: each Mothball there costs +1
+  Unrest."* Its Scrubber and Leapfrog figures are read from the data, so it cannot go stale: it said
+  4 Energy upkeep and 2 turns, where the Scrubber costs 3 and is paid in 8 Widgets.
+- **The playtest note** carries a short *Playing the Custodians* section saying the same.
+- **The other three texts were audited against the data**; two were stale and are corrected: the
+  Arkwrights' Colony Ship carries 16 with Generation Ships too and costs them 25.5 Materials; the
+  Archivists' Provisional Findings holds while at least 75% of their Research went to the shared
+  Tech last turn (the figure read from the data, as the Scrubber's cap now is in the Custodians'
+  text), and keeping back more switches it off for the turn after.
+
+**What would show this wrong**: a Mothball button with no hover in a Region; a confirm reading
+`free` for a Mothball; a figure in any Faction's text that the data contradicts.

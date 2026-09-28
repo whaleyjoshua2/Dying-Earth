@@ -464,7 +464,7 @@ It is a **delay, not a prohibition**. Measured before it was adopted, the Prospe
 _Avoid_: cooldown, lockout, occupation, tenure, grace period
 
 **Mothball**:
-The Orders-phase order that stands a Facility or a Module down. A mothballed building produces nothing, pays no Energy upkeep, emits nothing, is online for no rule, and keeps its slot. It is free, it takes effect at the Resolution, it raises the Unrest of a Region it happens in, and only a Restart brings the building back, for Materials and a turn. The one exception since version 0.09.1 is the **Habitat**, which still houses its Colonists mothballed or dark; while more live in its Colony than the working Habitats and the Core can hold, the Colony makes everything but Energy at half.
+The Orders-phase order that stands a Facility or a Module down. A mothballed building produces nothing, pays no Energy upkeep, emits nothing, is online for no rule, and keeps its slot. It is free, it takes effect at the Resolution, it raises the Unrest of a Region it happens in by a point, whoever holds the Region (a Decommission by two; a Colony has no Unrest to raise), and only a Restart brings the building back, for Materials and a turn. The one exception since version 0.09.1 is the **Habitat**, which still houses its Colonists mothballed or dark; while more live in its Colony than the working Habitats and the Core can hold, the Colony makes everything but Energy at half.
 _Avoid_: pause, disable, switch off, idle, shut down (that is the Energy shortfall rule)
 
 **Offline**:

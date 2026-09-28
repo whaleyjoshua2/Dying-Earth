@@ -2399,6 +2399,28 @@ impl Tables {
             ],
         )
     }
+    /// Ticket #407 (version 0.09.4): a Faction's signature rule with its figures read from the
+    /// data, so the text cannot go stale: the Scrubber's price, upkeep, Sink and cap, the Leapfrog's
+    /// price and a Mothball's Unrest. A text that names none of them reads as written.
+    pub fn signature(&self, kind: FactionKind) -> String {
+        let s = self.facility(FacilityKind::Scrubber);
+        crate::report::render(
+            &self.faction(kind).signature,
+            &[
+                ("scrubber_materials", crate::state::figure(s.materials as f64)),
+                ("scrubber_widgets", crate::state::figure(s.widgets as f64)),
+                ("scrubber_upkeep", crate::state::figure(s.energy_upkeep as f64)),
+                ("scrubber_sink", format!("{:.1}", s.sink_per_turn)),
+                ("scrubber_fall", crate::state::figure(self.unrest.scrubber_fall)),
+                ("scrubber_min", self.scrubber.min.to_string()),
+                ("scrubber_max", self.scrubber.max.to_string()),
+                ("leapfrog", self.ducats.per_leapfrog.to_string()),
+                ("mothball", crate::state::figure(self.unrest.per_mothball)),
+                ("scrubber_people", self.people_text(self.scrubber.per_population)),
+                ("provisional", self.research_directive.provisional_min_contribution.to_string()),
+            ],
+        )
+    }
     pub fn ai_weights(&self, kind: FactionKind) -> &AiWeights {
         &self.ai.weights[&kind]
     }

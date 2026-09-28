@@ -404,6 +404,11 @@ impl Game {
         if let Order::BuildArmy { place } = order {
             parts.push(self.army_people_text(*place));
         }
+        // Ticket #407 (version 0.09.4): a Mothball's or a Decommission's Unrest in a Region.
+        if let Order::Change { building: BuildingRef::Facility(..), what: what @ (BuildingChange::Mothball | BuildingChange::Decommission) } = order {
+            let u = &self.tables.unrest;
+            parts.push(format!("+{} Unrest", figure(if *what == BuildingChange::Mothball { u.per_mothball } else { u.per_decommission })));
+        }
         if let Order::BuildEmigrants { state, n } = order {
             parts.push(format!("{} people", self.tables.people_text(self.muster_population_in(seat, *state, *n))));
         }
@@ -422,6 +427,23 @@ impl Game {
             None => "free".to_string(),
             Some((last, [])) => last.clone(),
             Some((last, rest)) => format!("{} and {last}", rest.join(", ")),
+        }
+    }
+
+    /// Ticket #407 (version 0.09.4): what a Mothball or a Decommission costs, in as few words as
+    /// carry it, for the button's hover and the driver's confirm: *"+1 Unrest"*, *"+2 Unrest, 10
+    /// Materials back"*. In a Colony neither costs Unrest, and nothing is said; a Restart's button
+    /// says its own price.
+    pub fn change_price_text(&self, building: BuildingRef, what: BuildingChange) -> Option<String> {
+        let BuildingRef::Facility(sid, i) = building else { return None };
+        let u = &self.tables.unrest;
+        match what {
+            BuildingChange::Mothball => Some(format!("+{} Unrest", figure(u.per_mothball))),
+            BuildingChange::Decommission => {
+                let kind = self.state(sid).facilities.get(i)?.kind;
+                Some(format!("+{} Unrest, {} Materials back", figure(u.per_decommission), figure(tenth(self.tables.facility(kind).materials as f64 / 2.0))))
+            }
+            BuildingChange::Restart => None,
         }
     }
 
