@@ -8749,7 +8749,9 @@ fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, ac
     // path keeps its green line, so the lit path shows what is left. `techhover:<tech id>` (a
     // building aid) lights one in a headless picture, where no pointer ever enters the window.
     let forced = std::env::args().find_map(|a| a.strip_prefix("techhover:").map(|s| s.replace('_', ""))).and_then(|id| TechId::ALL.into_iter().find(|t| format!("{t:?}").eq_ignore_ascii_case(&id)));
-    let hovered = forced.or_else(|| ui.ctx().pointer_hover_pos().and_then(|p| boxes.iter().find(|(_, r)| r.contains(p)).map(|(t, _)| *t)));
+    // Through this Ui's own layer and clip, so a box scrolled out of sight, or under another window,
+    // lights nothing while the pointer is elsewhere.
+    let hovered = forced.or_else(|| boxes.iter().find(|(_, r)| ui.rect_contains_pointer(*r)).map(|(t, _)| *t));
     let path: Vec<TechId> = hovered.map(|h| game.tables.tech_path(h)).unwrap_or_default();
     let faded = |t: TechId| !path.is_empty() && !path.contains(&t);
     let fade = |c: Color32, t: TechId| if faded(t) { c.gamma_multiply(0.33) } else { c };
@@ -8810,8 +8812,10 @@ fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, ac
         let needs = if card.needs.is_empty() { "nothing".to_string() } else { card.needs.iter().map(|n| game.tables.tech(*n).name.clone()).collect::<Vec<_>>().join(" and ") };
         ui.interact(r, ui.id().with(format!("tech-{t:?}")), egui::Sense::hover()).on_hover_text(format!("{} (rung {}, cost {} Research)\n{}\nNeeds: {}", card.name, card.rung, card.cost, card.effect, needs));
         if must_pick && available.contains(&t) && game.research.current != Some(t) {
-            let b = egui::Rect::from_center_size(r.center_bottom() - egui::vec2(0.0, 9.0), egui::vec2(50.0, 15.0));
-            if ui.put(b, egui::Button::new(RichText::new("Pick").size(10.0))).clicked() {
+            let b = egui::Rect::from_center_size(r.center_bottom() - egui::vec2(0.0, 10.0), egui::vec2(50.0, 14.0));
+            // Ticket #414 (version 0.09.4): faded off the lit path with its box.
+            let pick = if faded(t) { egui::Button::new(RichText::new("Pick").size(10.0).color(Color32::from_gray(90))).fill(Color32::from_gray(35)) } else { egui::Button::new(RichText::new("Pick").size(10.0)) };
+            if ui.put(b, pick).clicked() {
                 actions.push(Action::PickTech(t));
             }
         }
@@ -11406,8 +11410,9 @@ mod tests {
     /// coming back because the routing had no idea what a box was: its one detour fired only for a
     /// box whose middle sat within a pixel of the needed box's middle.
     ///
-    /// The fixture is the tree's own grid, three columns 144 apart and rows 86 apart with 122x58
-    /// boxes in them, so the figures a reader checks are the figures `tech_tree` uses. The
+    /// The fixture is the tree's grid as it stood before ticket #414 made it a tenth smaller
+    /// (three columns 144 apart, rows 86 apart, 122x58 boxes); the routing reads `ROW` and the box
+    /// rects it is given, so the shape it checks holds at any size. The
     /// obstacle is put squarely on the straight elbow's path, which is the shape both #245 and #246
     /// drew: a line from rung 1 to rung 3 running through whatever stands on rung 2.
     #[test]
