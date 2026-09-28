@@ -198,3 +198,24 @@ when a rise turns an inland slot coastal (*"… The coast now reaches one slot f
 
 **What would show this wrong**: any of the five lines in its old words; a Colony's broken
 Occupation claiming Unrest; a Constabulary's box saying *halves*.
+
+## 6. A Colony Ship unloads any count of Colonists
+
+The authority is [ticket #409](https://github.com/whaleyjoshua2/Dying-Earth/issues/409). No rule moves;
+the engine already took any count.
+
+- **A slider picks how many**, from 1 to the most the place will take (the designer: *"up to max
+  number the outpost will take"*): into a Colony, the Colonists aboard or the room left in its
+  Habitats, whichever is fewer; onto a free slot, what a new Colony's Core holds (4). No slider
+  where only one fits.
+- **Founding too**: one slider over a Ship's founding buttons, the same on every slot, the button
+  reading *"Found a Colony at Tycho with 2"*; an Army aboard lands with the founding, as before.
+  The rest stay aboard.
+- **The computer seats unload any whole number**, as many as fit, founding or disembarking, so
+  they never stick on a count; a founding now asks for what lands (it asked for the whole load and
+  the Resolution landed what fitted, so nothing changes in play).
+- The turn's order list names the count (*"Found a Colony at Tycho on the Moon with 2 from …"*), and
+  one Colonist is *"1 Colonist"*. The founding slider remembers its count per Ship.
+
+**What would show this wrong**: a slider running past the room left; a founding that lands more
+than the Core holds; a computer seat's Unload asking for more than fits.

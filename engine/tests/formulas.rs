@@ -17329,3 +17329,52 @@ fn an_occupation_of_a_colony_that_breaks_claims_no_unrest() {
     let line = g.report.lines.iter().find(|l| l.kind == LineKind::Occupation).map(|l| l.text.clone()).expect("the break's line");
     assert!(line.ends_with("broke.") && !line.contains("Unrest"), "{line}");
 }
+
+/// Ticket #409 (version 0.09.4): **a Colony Ship unloads any whole number of Colonists, up to what
+/// the place will take**: into a Colony, the Colonists aboard or the room left in its Habitats; onto
+/// a free slot, what a new Colony's Core holds. The rest stay aboard. The computer seats unload as
+/// many as fit, so they never stick on a count.
+#[test]
+fn a_colony_ship_unloads_any_count_up_to_what_the_place_will_take() {
+    let mut g = game();
+    let ship = ship_in(&mut g, Seat(0), UnitKind::ColonyShip, BodyId::Moon, None, Stance::Hold);
+    g.ship_mut(ship).unwrap().colonists = 7;
+    let ground = g.free_slots_on(BodyId::Moon)[0];
+    let core = g.tables.module(ModuleKind::Core).holds_colonists;
+    assert_eq!(g.unload_most(ship, UnloadTarget::Slot(BodyId::Moon, ground)), core.min(7), "a new Colony takes what its Core holds");
+    // Found with two: two land, five stay aboard.
+    let found = Order::Unload { ship, colonists: 2, army: false, into: UnloadTarget::Slot(BodyId::Moon, ground) };
+    assert!(g.check_order(Seat(0), &[], &found).is_ok());
+    g.commit_orders(Seat(0), std::slice::from_ref(&found));
+    g.resolution_phase();
+    let c = g.colonies.iter().find(|c| c.body == BodyId::Moon && c.slot == ground).expect("founded").id;
+    assert_eq!(g.colony(c).unwrap().colonists, 2, "two founded it");
+    assert_eq!(g.ship(ship).unwrap().colonists, 5, "five stay aboard");
+    // Into that Colony: as many as the room left, one at a time if wished.
+    let room = g.habitat_room(g.colony(c).unwrap()) - 2;
+    assert_eq!(g.unload_most(ship, UnloadTarget::Colony(c)), room.min(5));
+    g.ship_mut(ship).unwrap().arrived_this_turn = false;
+    let one = Order::Unload { ship, colonists: 1, army: false, into: UnloadTarget::Colony(c) };
+    assert!(g.check_order(Seat(0), &[], &one).is_ok(), "one Colonist is an order");
+    // A computer seat never asks for more than fits, founding or disembarking, and every Unload it
+    // gives stands: it cannot stick on a count.
+    g.seats[0].ai = true;
+    let check = |g: &mut Game| {
+        let mut unloads = 0;
+        for o in g.ai_orders(Seat(0)) {
+            if let Order::Unload { ship: sid, colonists, into, .. } = o {
+                unloads += 1;
+                assert!(colonists <= g.unload_most(sid, into), "the computer asks for {colonists} into {into:?}, more than fits");
+                assert!(g.check_order(Seat(0), &[], &o).is_ok(), "and the order stands: {:?}", g.check_order(Seat(0), &[], &o));
+            }
+        }
+        unloads
+    };
+    assert!(check(&mut g) > 0, "the premise: the computer founds with what is aboard");
+    // With every other slot on the Moon taken, the only door is to disembark into its own Colony.
+    for _ in g.free_slots_on(BodyId::Moon) {
+        colony(&mut g, Seat(1), BodyId::Moon, &[], 1);
+    }
+    assert!(g.free_slots_on(BodyId::Moon).is_empty(), "the premise: no slot left");
+    assert!(check(&mut g) > 0, "the premise: the computer disembarks");
+}

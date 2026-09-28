@@ -4802,8 +4802,9 @@ fn order_text(game: &Game, o: &Order) -> String {
         Order::MoveArmy { army, to } => format!("{} to {}", army, game.tables.state(*to).name),
         Order::Load { ship, colonists, army, .. } => format!("Load {} onto {}", if *colonists > 0 { format!("{colonists} Colonists") } else { format!("{}", army.unwrap_or(ArmyId(0))) }, ship),
         Order::Unload { ship, colonists, army, into } => match into {
-            UnloadTarget::Slot(b, s) => format!("Found a Colony at {} on {} from {}", game.tables.body(*b).slots[*s as usize].name, game.tables.body(*b).name, ship),
-            UnloadTarget::Colony(c) => format!("Unload {} from {} into {}", if *colonists > 0 { format!("{colonists} Colonists") } else if *army { "the Army".into() } else { "nothing".into() }, ship, game.place_name(Place::Colony(*c))),
+            // Ticket #409 (version 0.09.4): with the count the slider chose.
+            UnloadTarget::Slot(b, s) => format!("Found a Colony at {} on {} with {} from {}", game.tables.body(*b).slots[*s as usize].name, game.tables.body(*b).name, colonists_word(*colonists), ship),
+            UnloadTarget::Colony(c) => format!("Unload {} from {} into {}", if *colonists > 0 { colonists_word(*colonists) } else if *army { "the Army".into() } else { "nothing".into() }, ship, game.place_name(Place::Colony(*c))),
         },
         Order::Influence { target, amount } => format!("{} Influence on {}", amount, game.place_name(*target)),
         Order::BuyInfluence { amount } => format!("Buy {} Influence with Ducats", amount),
@@ -7649,12 +7650,15 @@ fn slot_panel(ui: &mut Ui, session: &Session, game: &Game, body: BodyId, slot: u
         slot_yield_row(ui, slot_yield_figures(&y), 14.0, ink);
     });
     for s in game.ships.iter().filter(|s| !session.spectator && s.seat == Seat(0) && s.at == ShipAt::Body(body) && s.kind == UnitKind::ColonyShip && s.colonists > 0) {
-        let order = Order::Unload { ship: s.id, colonists: s.colonists, army: s.army.is_some(), into: UnloadTarget::Slot(body, slot) };
+        // Ticket #409 (version 0.09.4): how many land, on a slider up to what a new Colony takes.
+        let into = UnloadTarget::Slot(body, slot);
+        let k = unload_count(ui, s.id, "found", game.unload_most(s.id, into));
+        let order = Order::Unload { ship: s.id, colonists: k, army: s.army.is_some(), into };
         // Ticket #211 (version 0.08.1): what the site is worth, at the moment of choosing it. The
         // four yields are drawn under every slot on the Body view already, but the moment of the
         // DECISION said nothing about them. In glyphs, at the designer's word -- each figure's word
         // heads its multiplier, which is the form the one glyph rule reads (ticket #132).
-        if found_button(ui, &game.slot_yields(body, slot), &format!("Found a Colony here with the {} Colonists aboard {}", s.colonists, game.ship_name(s))).clicked() {
+        if found_button(ui, &game.slot_yields(body, slot), &format!("Found a Colony here with {} from {}", colonists_word(k), game.ship_name(s))).clicked() {
             actions.push(Action::Place(order));
         }
     }
@@ -8180,10 +8184,12 @@ fn ship_cargo_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut View
         for c in game.colonies.iter().filter(|c| c.body == body) {
             let own = c.control.director() == Some(Seat(0));
             if s.colonists > 0 && own {
-                let room = game.habitat_room(c).saturating_sub(c.colonists);
-                let k = s.colonists.min(room);
-                if k > 0 {
-                    cost_button(ui, game, &session.pending, Order::Unload { ship: s.id, colonists: k, army: false, into: UnloadTarget::Colony(c.id) }, &format!("Unload {} Colonists into {}", k, game.tables.body(c.body).slots[c.slot as usize].name), actions);
+                // Ticket #409 (version 0.09.4): any count up to the room left, on a slider.
+                let into = UnloadTarget::Colony(c.id);
+                let most = game.unload_most(s.id, into);
+                if most > 0 {
+                    let k = unload_count(ui, s.id, &format!("into {:?}", c.id), most);
+                    cost_button(ui, game, &session.pending, Order::Unload { ship: s.id, colonists: k, army: false, into }, &format!("Unload {} into {}", colonists_word(k), game.tables.body(c.body).slots[c.slot as usize].name), actions);
                 }
             }
             if let Some(aid) = s.army {
@@ -8201,17 +8207,41 @@ fn ship_cargo_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut View
             }
         }
         if s.kind == UnitKind::ColonyShip && s.colonists > 0 && body != BodyId::Earth {
-            for slot in game.free_slots_on(body) {
+            // Ticket #409 (version 0.09.4): how many land, on ONE slider over the founding buttons,
+            // up to what a new Colony takes, which is the same on every slot.
+            let slots = game.free_slots_on(body);
+            let k = slots.first().map(|slot| unload_count(ui, s.id, "found", game.unload_most(s.id, UnloadTarget::Slot(body, *slot)))).unwrap_or(0);
+            for slot in slots {
                 // Both founding doors read the same, at the designer's word: the same decision
                 // reached two ways should not want learning twice.
-                let order = Order::Unload { ship: s.id, colonists: s.colonists, army: s.army.is_some(), into: UnloadTarget::Slot(body, slot) };
-                let label = format!("Found a Colony at {}", game.tables.body(body).slots[slot as usize].name);
+                let into = UnloadTarget::Slot(body, slot);
+                let order = Order::Unload { ship: s.id, colonists: k, army: s.army.is_some(), into };
+                let label = format!("Found a Colony at {} with {}", game.tables.body(body).slots[slot as usize].name, k);
                 if found_button(ui, &game.slot_yields(body, slot), &label).clicked() {
                     actions.push(Action::Place(order));
                 }
             }
         }
     }
+}
+
+/// Ticket #409 (version 0.09.4): how many Colonists to unload, on a slider from 1 to the most the
+/// place will take, remembered per Ship and place. The designer: *"up to max number the outpost will
+/// take"*. No slider where only one fits.
+/// Ticket #409 (version 0.09.4): "1 Colonist", "4 Colonists", now that one is a routine count.
+fn colonists_word(n: u32) -> String {
+    if n == 1 { "1 Colonist".to_string() } else { format!("{n} Colonists") }
+}
+
+fn unload_count(ui: &mut Ui, ship: ShipId, key: &str, most: u32) -> u32 {
+    let most = most.max(1);
+    let id = egui::Id::new(("unload_count", ship, key));
+    let mut n: u32 = ui.data(|d| d.get_temp(id)).unwrap_or(most).clamp(1, most);
+    if most > 1 {
+        ui.add(egui::Slider::new(&mut n, 1..=most).text("Colonists"));
+    }
+    ui.data_mut(|d| d.insert_temp(id, n));
+    n
 }
 
 /// Ticket #374: **Bombard, Launch and Rearm for one Ship**, moved from the stack card. Nothing is

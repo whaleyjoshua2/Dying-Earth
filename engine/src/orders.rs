@@ -447,6 +447,18 @@ impl Game {
         }
     }
 
+    /// Ticket #409 (version 0.09.4): the most Colonists this Ship can unload there, which the
+    /// window's slider runs up to: the Colonists aboard, or the room left in the Colony's Habitats,
+    /// whichever is fewer; onto a free slot, what a new Colony's Core holds.
+    pub fn unload_most(&self, ship: ShipId, into: UnloadTarget) -> u32 {
+        let Some(s) = self.ship(ship) else { return 0 };
+        let room = match into {
+            UnloadTarget::Colony(c) => self.colony(c).map(|col| self.habitat_room(col).saturating_sub(col.colonists)).unwrap_or(0),
+            UnloadTarget::Slot(..) => self.tables.module(ModuleKind::Core).holds_colonists,
+        };
+        s.colonists.min(room)
+    }
+
     /// The cost of one order for a seat, before legality.
     pub fn order_cost(&self, seat: Seat, order: &Order) -> Cost {
         let t = &self.tables;
