@@ -301,3 +301,18 @@ Carriers built 40 to 32, games with an orbital Battle 28 to 21.
 
 **What would show this wrong**: a crossing slower with both Techs than with Nuclear Rockets alone; a
 new Ship built at 30 once Clean Propellant stands; a Tech that needs Orbital Refuelling.
+
+## 10. The Tech tree: the path lit on a hover, the boxes a tenth smaller
+
+The authority is [ticket #414](https://github.com/whaleyjoshua2/Dying-Earth/issues/414). No rule moves.
+
+- **A hover lights the path back to the root**: the hovered Tech and every Tech it needs, all the
+  way down, and the lines between them, drawn at full strength with a bright border and a thicker
+  line; everything else fades to a third. A Tech done on the path keeps its green line. Nothing
+  changes until the hover.
+- **The whole tree a tenth smaller**: boxes 110 x 52 on a 130 x 77 grid, where they were 122 x 58
+  on 144 x 86. The type stays 12 point; a name that no longer fits its box (*Planetary
+  Stewardship*, *The Extraction Charter*) comes down only as far as it must.
+
+**What would show this wrong**: a hover lighting a Tech the hovered one does not need; a lit path
+missing a Tech it does; a name spilling out of its box.

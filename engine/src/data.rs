@@ -2438,6 +2438,21 @@ impl Tables {
             ],
         )
     }
+    /// Ticket #414 (version 0.09.4): a Tech and every Tech it needs, all the way down -- the path
+    /// the Tech tree lights on a hover.
+    pub fn tech_path(&self, t: TechId) -> Vec<TechId> {
+        let mut v = vec![t];
+        let mut i = 0;
+        while i < v.len() {
+            for n in &self.tech(v[i]).needs {
+                if !v.contains(n) {
+                    v.push(*n);
+                }
+            }
+            i += 1;
+        }
+        v
+    }
     pub fn ai_weights(&self, kind: FactionKind) -> &AiWeights {
         &self.ai.weights[&kind]
     }

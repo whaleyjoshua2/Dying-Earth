@@ -17535,3 +17535,17 @@ fn orbital_refuelling_stacks_with_nuclear_rockets_and_clean_propellant_widens_th
     let s = g.ships.iter().rfind(|s| s.seat == Seat(0) && s.kind == UnitKind::Frigate).expect("built");
     assert_eq!(s.fuel, tank + 5.0, "a new Ship is built full");
 }
+
+/// Ticket #414 (version 0.09.4): **the path a hover lights is the Tech and everything it needs, all
+/// the way down**; a Tech it does not need stays dark even beside it on the tree.
+#[test]
+fn the_tech_trees_lit_path_is_everything_a_tech_needs() {
+    let t = tables();
+    let path = t.tech_path(TechId::MissileTechnology);
+    for want in [TechId::MissileTechnology, TechId::HardenedHulls, TechId::EfficientTransit, TechId::NuclearRockets, TechId::CleanPropellant] {
+        assert!(path.contains(&want), "{want:?} is on Missile Technology's path: {path:?}");
+    }
+    assert!(!path.contains(&TechId::OrbitalRefuelling), "Orbital Refuelling, beside it, is not");
+    assert_eq!(path.len(), 5);
+    assert_eq!(t.tech_path(TechId::CleanPropellant), vec![TechId::CleanPropellant], "a rung-1 Tech lights itself alone");
+}

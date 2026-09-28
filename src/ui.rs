@@ -8644,10 +8644,13 @@ fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, ac
     // inside a box with them. Box text is drawn centred and is NOT clipped, so a name that no
     // longer fits spills over the box edge rather than being cut -- "Closed-Loop Colonies" and
     // "The Extraction Charter" are the two that would have shown it.
-    const COL: f32 = 144.0;
-    const ROW: f32 = 86.0;
-    const BOX_W: f32 = 122.0;
-    const BOX_H: f32 = 58.0;
+    //
+    // Ticket #414 (version 0.09.4): a tenth smaller again, the whole tree, at the designer's word
+    // ("reduce box size by 10%"): 122 x 58 on 144 x 86 to 110 x 52 on 130 x 77.
+    const COL: f32 = 130.0;
+    const ROW: f32 = 77.0;
+    const BOX_W: f32 = 110.0;
+    const BOX_H: f32 = 52.0;
     /// The row-heading column on the left, wide enough for "Off-world Living".
     const HEAD_W: f32 = 128.0;
     // Ticket #250 (version 0.08.3): the order the BANDS are drawn in, settled over five turns of
@@ -8741,6 +8744,15 @@ fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, ac
     // it instead (`tech_edge_path`). Every box in the tree is an obstacle to every line but the two
     // the line joins.
     let boxes: Vec<(TechId, egui::Rect)> = TechId::ALL.into_iter().map(|t| (t, box_of(t))).collect();
+    // Ticket #414 (version 0.09.4): a hover lights the path BACK to the root -- the hovered Tech and
+    // every Tech it needs, all the way down -- and fades the rest to a third; a Tech done on the
+    // path keeps its green line, so the lit path shows what is left. `techhover:<tech id>` (a
+    // building aid) lights one in a headless picture, where no pointer ever enters the window.
+    let forced = std::env::args().find_map(|a| a.strip_prefix("techhover:").map(|s| s.replace('_', ""))).and_then(|id| TechId::ALL.into_iter().find(|t| format!("{t:?}").eq_ignore_ascii_case(&id)));
+    let hovered = forced.or_else(|| ui.ctx().pointer_hover_pos().and_then(|p| boxes.iter().find(|(_, r)| r.contains(p)).map(|(t, _)| *t)));
+    let path: Vec<TechId> = hovered.map(|h| game.tables.tech_path(h)).unwrap_or_default();
+    let faded = |t: TechId| !path.is_empty() && !path.contains(&t);
+    let fade = |c: Color32, t: TechId| if faded(t) { c.gamma_multiply(0.33) } else { c };
     for t in TechId::ALL {
         for n in &game.tables.tech(t).needs {
             let to_box = box_of(t);
@@ -8750,7 +8762,9 @@ fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, ac
             let lane = branches.iter().position(|x| *x == game.tables.tech(*n).branch).unwrap_or(0) as f32;
             let gap_x = to_box.min.x - 4.0 - lane * 3.5;
             let colour = if game.research.done.contains(n) { Color32::from_rgb(120, 200, 120) } else { Color32::from_gray(150) };
-            let stroke = egui::Stroke::new(2.0, colour);
+            // A line is on the lit path when the Tech it enters is.
+            let colour = fade(colour, t);
+            let stroke = egui::Stroke::new(if !path.is_empty() && !faded(t) { 3.0 } else { 2.0 }, colour);
             let obstacles: Vec<egui::Rect> = boxes.iter().filter(|(o, _)| *o != t && *o != *n).map(|(_, r)| *r).collect();
             let path = tech_edge_path(from_box, to_box, gap_x, ROW, &obstacles);
             for leg in path.windows(2) {
@@ -8781,13 +8795,22 @@ fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, ac
             Some(k) => egui::Stroke::new(3.0, rgb(game.tables.faction(k).colour)),
             None => egui::Stroke::new(1.0, Color32::from_gray(200)),
         };
-        painter.rect(r, 6.0, fill, stroke, egui::StrokeKind::Inside);
-        painter.text(r.center_top() + egui::vec2(0.0, 13.0), egui::Align2::CENTER_CENTER, &card.name, FontId::proportional(12.0), Color32::WHITE);
-        painter.text(r.center_top() + egui::vec2(0.0, 29.0), egui::Align2::CENTER_CENTER, format!("cost {} - {}", card.cost, status), FontId::proportional(10.0), Color32::from_gray(230));
+        // Ticket #414 (version 0.09.4): on the lit path a bright border, off it a third.
+        let lit = !path.is_empty() && !faded(t);
+        let stroke = if lit && card.gate_for.is_none() { egui::Stroke::new(2.5, Color32::WHITE) } else { egui::Stroke::new(stroke.width, fade(stroke.color, t)) };
+        painter.rect(r, 6.0, fade(fill, t), stroke, egui::StrokeKind::Inside);
+        // Ticket #414 (version 0.09.4): the type stays 12 unless a name no longer fits the box, and
+        // then it comes down only as far as it must.
+        let name_size = {
+            let wide = painter.layout_no_wrap(card.name.clone(), FontId::proportional(12.0), Color32::WHITE).size().x;
+            if wide > BOX_W - 6.0 { (12.0 * (BOX_W - 6.0) / wide).max(9.0) } else { 12.0 }
+        };
+        painter.text(r.center_top() + egui::vec2(0.0, 12.0), egui::Align2::CENTER_CENTER, &card.name, FontId::proportional(name_size), fade(Color32::WHITE, t));
+        painter.text(r.center_top() + egui::vec2(0.0, 27.0), egui::Align2::CENTER_CENTER, format!("cost {} - {}", card.cost, status), FontId::proportional(10.0), fade(Color32::from_gray(230), t));
         let needs = if card.needs.is_empty() { "nothing".to_string() } else { card.needs.iter().map(|n| game.tables.tech(*n).name.clone()).collect::<Vec<_>>().join(" and ") };
         ui.interact(r, ui.id().with(format!("tech-{t:?}")), egui::Sense::hover()).on_hover_text(format!("{} (rung {}, cost {} Research)\n{}\nNeeds: {}", card.name, card.rung, card.cost, card.effect, needs));
         if must_pick && available.contains(&t) && game.research.current != Some(t) {
-            let b = egui::Rect::from_center_size(r.center_bottom() - egui::vec2(0.0, 10.0), egui::vec2(50.0, 16.0));
+            let b = egui::Rect::from_center_size(r.center_bottom() - egui::vec2(0.0, 9.0), egui::vec2(50.0, 15.0));
             if ui.put(b, egui::Button::new(RichText::new("Pick").size(10.0))).clicked() {
                 actions.push(Action::PickTech(t));
             }
