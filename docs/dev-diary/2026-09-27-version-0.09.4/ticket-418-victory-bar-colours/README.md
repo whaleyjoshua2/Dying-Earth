@@ -10,3 +10,13 @@ Archivists' pink, each its heading's colour. No Colonists were in transit in thi
 darkened band is not pictured; it is darkened from the same fill.
 
 ![The Victory window](victory-window.png)
+
+## The review, and the band
+
+An agent that did not build it found no defect, and asked that the in-transit band be seen in a
+Faction's colour, the Arkwrights' purple darkened being the faintest against the empty bar.
+`shot: player:arkwrights victory:1 settler:mars turns:6 cardanswer:refuse panel:0 seed:7`: the
+Arkwrights' first bar, *10 of 30 (+8 in transit)*, the band beyond the fill reading plainly as purple
+hatching.
+
+![The Arkwrights' band](arkwrights-band-in-transit.png)
