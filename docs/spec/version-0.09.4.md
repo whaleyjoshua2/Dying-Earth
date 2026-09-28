@@ -66,7 +66,9 @@ wait for a run of three.
 
 - **Every Region on Earth, held or nobody's, eases by a half** (`under_sink_ease = 0.5`); **a
   Region the Custodians hold eases by a whole point instead** (`under_sink_ease_custodians = 1.0`),
-  in `unrest.toml`. Nothing falls below nought.
+  in `unrest.toml`. Nothing falls below nought. **An occupied Region is still its holder's** until
+  the Occupation completes: a Custodian Region under a rival's Occupation eases by a whole point, a
+  Region the Custodians are occupying by a half.
 - The Climate phase is the second phase of a turn and the throw-off comes in that turn's
   Resolution, so the ease lands **before this turn's throw-off**, as the first Colony's does.
 - A save from before this version, written while the world stood under the Sink, counts the ease
