@@ -17378,3 +17378,52 @@ fn a_colony_ship_unloads_any_count_up_to_what_the_place_will_take() {
     assert!(g.free_slots_on(BodyId::Moon).is_empty(), "the premise: no slot left");
     assert!(check(&mut g) > 0, "the premise: the computer disembarks");
 }
+
+/// Ticket #410 (version 0.09.4): **a computer seat offers a Constabulary from Unrest 4**, where
+/// the Standing Army stops replenishing, not a point past it; and **a Stadium alone where the Region
+/// has one slot left**, which the Constabulary cannot have too.
+#[test]
+fn a_computer_seat_answers_unrest_from_four_and_raises_a_stadium_alone_where_slots_are_short() {
+    let mut g = game();
+    let sid = StateId::NorthAfrica;
+    g.take_control(sid, Seat(1));
+    let offers = |g: &mut Game, unrest: f64, kind: FacilityKind| {
+        g.state_mut(sid).unrest = unrest;
+        g.ai_offers_calming(sid, kind)
+    };
+    assert!(offers(&mut g, 4.0, FacilityKind::Constabulary), "a Constabulary at four");
+    assert!(!offers(&mut g, 3.75, FacilityKind::Constabulary), "none under four");
+    assert!(g.free_slots(sid) > 1, "the premise: slots to spare");
+    assert!(!offers(&mut g, 9.0, FacilityKind::Stadium), "no Stadium alone while slots are free");
+    while g.free_slots(sid) > 1 {
+        g.state_mut(sid).facilities.push(facility(FacilityKind::Mine));
+    }
+    assert!(offers(&mut g, 5.0, FacilityKind::Stadium), "one slot left: a Stadium alone");
+    assert!(!offers(&mut g, 4.75, FacilityKind::Stadium), "and never under five");
+    // A Constabulary on order already has that slot: no Stadium alone beside it.
+    let widgets = g.build_widgets(Seat(1), BuildItem::Facility(FacilityKind::Constabulary));
+    g.state_mut(sid).queue.push(Build { item: BuildItem::Facility(FacilityKind::Constabulary), seat: Seat(1), widgets, done: 0, coastal: false });
+    assert!(!offers(&mut g, 9.0, FacilityKind::Stadium), "a Constabulary on order takes the last slot");
+}
+
+/// Ticket #410 (version 0.09.4): **the Mothball is priced in a restive Region, and Relief rises
+/// with Unrest**: a Region Facility's Mothball weighs a quarter from Unrest 5, a Colony's is
+/// untouched; Relief is offered from 5 at one, rising in a line to double at 9 and no higher.
+#[test]
+fn a_computer_seat_prices_a_mothball_and_weighs_relief_by_unrest() {
+    let mut g = game();
+    let sid = StateId::NorthAfrica;
+    g.state_mut(sid).facilities.push(facility(FacilityKind::Mine));
+    let b = BuildingRef::Facility(sid, g.state(sid).facilities.len() - 1);
+    g.state_mut(sid).unrest = 4.75;
+    assert_eq!(g.ai_mothball_price(b), 1.0, "calm enough: no price");
+    g.state_mut(sid).unrest = 5.0;
+    assert_eq!(g.ai_mothball_price(b), 0.25, "restive: a quarter");
+    let c = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Mine], 2);
+    assert_eq!(g.ai_mothball_price(BuildingRef::Module(c, 0)), 1.0, "a Colony has no Unrest to raise");
+    assert_eq!(g.ai_relief_weight(4.75), None, "no Relief under five");
+    assert_eq!(g.ai_relief_weight(5.0), Some(1.0));
+    assert_eq!(g.ai_relief_weight(7.0), Some(1.5), "halfway to double at seven");
+    assert_eq!(g.ai_relief_weight(9.0), Some(2.0));
+    assert_eq!(g.ai_relief_weight(10.0), Some(2.0), "and no higher");
+}

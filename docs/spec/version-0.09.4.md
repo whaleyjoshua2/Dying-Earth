@@ -219,3 +219,37 @@ the engine already took any count.
 
 **What would show this wrong**: a slider running past the room left; a founding that lands more
 than the Core holds; a computer seat's Unload asking for more than fits.
+
+## 7. How the computer seats manage Unrest
+
+The authority is [ticket #410](https://github.com/whaleyjoshua2/Dying-Earth/issues/410). **The
+computer's play moves; no rule does.** Measured first, the sweep gaining a line per Faction (the
+Region-turns it held, those at Unrest 4 or more and at 7 or more, the throw-offs it suffered, and
+seat 0's start Region lost to a throw-off or to a taking).
+
+Four changes, their figures in `ai.toml` `[thresholds]`:
+
+- **A Constabulary from Unrest 4**, where the Standing Army stops replenishing, not 5.
+- **A Mothball priced**: in a Region at Unrest 5 or more its weight is a quarter, since the point of
+  Unrest it adds is damped by nothing.
+- **Relief from 5**, its weight rising from one at 5 to double at 9, where it stood at one from 6 and
+  double from 9.
+- **A Stadium without a Constabulary** where the Region has one slot left and no Constabulary on
+  order to take it, from Unrest 5 as before (`stadium_from`).
+
+**Measured** (20 seeds x four seatings, the shipped cell):
+
+| | held at 7+ before | after | throw-offs before | after |
+|---|---|---|---|---|
+| Custodians | 14% | 9% | 61 | 57 |
+| Prospectors | 19% | 14% | 20 | 12 |
+| Arkwrights | 13% | 5% | 13 | 10 |
+| Archivists | 17% | 11% | 9 | 4 |
+
+Held at 4+: 38 / 39 / 35 / 44% to 32 / 37 / 25 / 41%. Start Regions lost to a throw-off 17 of 45
+to 11 of 44. Wins **8 / 4 / 1 / 7 to 7 / 6 / 1 / 5**, collapses 60 to 61; the Archivists' and the
+Custodians' falls are within the noise of twenty seeds a seating. Constabularies built fell (77 to
+52 in the Custodians' seating, 148 to 122 in the Prospectors'); why is not measured.
+
+**What would show this wrong**: a computer seat offering no Constabulary at Unrest 4; a Stadium
+alone in a Region with slots to spare; the share at 7+ rising in the closing sweep.

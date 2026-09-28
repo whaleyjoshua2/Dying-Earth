@@ -377,6 +377,45 @@ impl Game {
         self.tables.faction(self.kind(seat)).victory_first.kind
     }
 
+    /// Ticket #410 (version 0.09.4): whether a computer seat offers a Constabulary or a Stadium in
+    /// this Region at all: a Constabulary from `constabulary_from`; a Stadium from `stadium_from`,
+    /// where a Constabulary stands, or where the Region has `stadium_alone_free_slots` slot left and
+    /// no Constabulary on order to take it.
+    pub fn ai_offers_calming(&self, sid: StateId, kind: FacilityKind) -> bool {
+        let th = &self.tables.ai.thresholds;
+        let unrest = self.state(sid).unrest;
+        match kind {
+            FacilityKind::Constabulary => unrest >= th.constabulary_from,
+            FacilityKind::Stadium => {
+                let queued = self.state(sid).queue.iter().any(|b| matches!(b.item, BuildItem::Facility(k) if k.does_the_job_of(FacilityKind::Constabulary)));
+                unrest >= th.stadium_from && (self.constabulary_online(sid) || (!queued && self.free_slots(sid) <= th.stadium_alone_free_slots))
+            }
+            _ => false,
+        }
+    }
+
+    /// Ticket #410 (version 0.09.4): a Mothball's weight in a restive Region, where the point of
+    /// Unrest it adds, which nothing damps, costs most. In a Colony, or a calm Region, no change.
+    pub fn ai_mothball_price(&self, b: BuildingRef) -> f64 {
+        let th = &self.tables.ai.thresholds;
+        match b {
+            BuildingRef::Facility(sid, _) if self.state(sid).unrest >= th.mothball_restive_from => th.mothball_restive_factor,
+            _ => 1.0,
+        }
+    }
+
+    /// Ticket #410 (version 0.09.4): Relief's weight at this Unrest: none under `relief_from`, one
+    /// there, rising in a line to double at `relief_double_at` (the Facilities' 7 and the throw-off's
+    /// 10 either side of it) and no higher.
+    pub fn ai_relief_weight(&self, unrest: f64) -> Option<f64> {
+        let th = &self.tables.ai.thresholds;
+        if unrest < th.relief_from {
+            return None;
+        }
+        let span = th.relief_double_at - th.relief_from;
+        Some(if span <= 0.0 { 2.0 } else { (1.0 + (unrest - th.relief_from) / span).min(2.0) })
+    }
+
     /// Victory gap multiplier and the part it applies to.
     fn victory_gap(&self, seat: Seat) -> (f64, Behind) {
         let pace = self.tables.ai_pace(self.kind(seat));
@@ -1144,8 +1183,9 @@ impl Game {
                         }
                         FacilityKind::Embassy => (Cat::BuildInfluence, self.base_weight(seat, Cat::BuildInfluence)),
                         // Ticket #52: a Constabulary is worth raising only where Unrest has taken hold.
+                        // Ticket #410 (version 0.09.4): from where the Standing Army stops, not past it.
                         FacilityKind::Constabulary => {
-                            if self.state(sid).unrest < 5.0 {
+                            if !self.ai_offers_calming(sid, FacilityKind::Constabulary) {
                                 continue;
                             }
                             (Cat::Constabulary, self.base_weight(seat, Cat::Constabulary))
@@ -1153,8 +1193,10 @@ impl Game {
                         // Ticket #389 (version 0.09.3): the Stadium after the Constabulary, at the
                         // designer's word -- only where one already stands and Unrest is still 5 or
                         // more, the second answer to a Region that stays restive.
+                        // Ticket #410 (version 0.09.4): or alone, where the Region has one slot left
+                        // and the Constabulary cannot have it too.
                         FacilityKind::Stadium => {
-                            if self.state(sid).unrest < 5.0 || !self.constabulary_online(sid) {
+                            if !self.ai_offers_calming(sid, FacilityKind::Stadium) {
                                 continue;
                             }
                             (Cat::Stadium, self.base_weight(seat, Cat::Stadium))
@@ -1230,8 +1272,8 @@ impl Game {
                     let sway = if sea_close { m.threat } else { sway };
                     // Ticket #60: #52 and #53 measured no Constabulary in any AI game -- a building
                     // that fixes nothing economic never beat a producer under the victory-gap
-                    // multiplier, so it never won a build slot while the gap was wide. From Unrest 5
-                    // (the only Unrest at which the candidate is offered at all, above) it takes the
+                    // multiplier, so it never won a build slot while the gap was wide. From the Unrest
+                    // the candidate is offered at (`ai_offers_calming`, 4 since ticket #410) it takes the
                     // multiplier too, because a state at 7 halves every Facility's output and every
                     // Facility's Emissions: calming it advances whatever the seat is behind on.
                     // Ticket #70: and the victory-gap multiplier, as the Constabulary does at Unrest
@@ -1875,17 +1917,14 @@ impl Game {
         }
 
         // --- Ticket #52: Relief where Unrest has taken hold, and Resettle into a calm state of
-        // the seat's own. Relief is one point per 10 Ducats the seat can spare, from Unrest 6, at
-        // the opportunity multiplier from 9, where one more turn would throw the seat off.
+        // the seat's own. Relief is one point per 10 Ducats the seat can spare, its weight read by
+        // `ai_relief_weight` (ticket #410: from 5, double by 9).
         let u = self.tables.unrest.clone();
         let ducats = self.seat(seat).stockpile.ducats;
         for sid in self.directed_states(seat) {
             let n = self.state(sid).unrest;
-            if n < 6.0 {
-                continue;
-            }
+            let Some(opp) = self.ai_relief_weight(n) else { continue };
             let points = if u.relief_ducats > 0 { ((ducats / u.relief_ducats as f64).floor() as i64).min(n.ceil() as i64) } else { 0 };
-            let opp = if n >= 9.0 { m.opportunity } else { 1.0 };
             for _ in 0..points {
                 push(
                     vec![Order::Relief { state: sid }],
@@ -2114,7 +2153,7 @@ impl Game {
                 push(
                     vec![Order::Change { building: *b, what: BuildingChange::Mothball }],
                     Cat::Mothball,
-                    self.base_weight(seat, Cat::Mothball),
+                    self.base_weight(seat, Cat::Mothball) * self.ai_mothball_price(*b),
                     1.0,
                     1.0,
                     m.opportunity,
@@ -2133,7 +2172,7 @@ impl Game {
                     push(
                         vec![Order::Change { building: *b, what: BuildingChange::Mothball }],
                         Cat::Mothball,
-                        self.base_weight(seat, Cat::Mothball),
+                        self.base_weight(seat, Cat::Mothball) * self.ai_mothball_price(*b),
                         gap_for(Cat::Scrubber, None),
                         1.0,
                         1.0,
@@ -2182,7 +2221,7 @@ impl Game {
                             push(
                                 vec![Order::Change { building: BuildingRef::Facility(sid, i), what: BuildingChange::Mothball }],
                                 Cat::Mothball,
-                                self.base_weight(seat, Cat::Mothball),
+                                self.base_weight(seat, Cat::Mothball) * self.ai_mothball_price(BuildingRef::Facility(sid, i)),
                                 1.0,
                                 1.0,
                                 m.opportunity,

@@ -202,6 +202,12 @@ pub struct SimResult {
     /// Ticket #406 (version 0.09.4): each seat's Victory score at the end, and its place in the
     /// final ranking, one to four.
     pub final_score: [f64; SEAT_COUNT],
+    /// Ticket #410 (version 0.09.4): per seat, the Region-turns it held, those at Unrest 4 or more
+    /// (its Standing Army stops replenishing) and at 7 or more (its Facilities run at half); the
+    /// Regions that threw it off; and whether seat 0's start state was lost to a throw-off.
+    pub unrest_turns: [[u32; 3]; SEAT_COUNT],
+    pub throw_offs_by_seat: [u32; SEAT_COUNT],
+    pub start_lost_to_throw_off: bool,
     pub final_place: [u8; SEAT_COUNT],
     /// Ticket #58: how many Moments the turns of this game earned, how many the cap of two and the
     /// defaults in `report.toml` actually showed, how many turns stopped for at least one, and the
@@ -321,6 +327,8 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
     let home = game.controlled_states(Seat(0)).first().copied();
     let mut start_state_lost_turn: Option<u32> = None;
     let mut first_under_sink_turn: Option<u32> = None;
+    let mut unrest_turns = [[0u32; 3]; SEAT_COUNT];
+    let mut start_lost_to_throw_off = false;
     let window_turn = game.next_window_turn(1);
     let max_turns = tables.victory.turns;
     let mut guard = 0;
@@ -423,8 +431,21 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
                 archive_complete_turn = Some(game.turn);
             }
         }
+        for st in &game.states {
+            if let Control::Controlled(s) = st.control {
+                let row = &mut unrest_turns[s.index()];
+                row[0] += 1;
+                if st.unrest >= game.tables.unrest.army_threshold {
+                    row[1] += 1;
+                }
+                if st.unrest >= game.tables.unrest.facility_threshold {
+                    row[2] += 1;
+                }
+            }
+        }
         if start_state_lost_turn.is_none() && home.map(|h| game.state(h).control.controller() != Some(Seat(0))).unwrap_or(false) {
             start_state_lost_turn = Some(game.turn);
+            start_lost_to_throw_off = home.map(|h| game.state(h).control == Control::Neutral).unwrap_or(false);
         }
         if first_under_sink_turn.is_none() && game.seat(Seat(0)).stabilization_run > 0 {
             first_under_sink_turn = Some(game.turn);
@@ -578,6 +599,10 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
     let batteries: [u32; SEAT_COUNT] =
         std::array::from_fn(|i| game.colonies.iter().filter(|c| c.control.director() == Some(Seat(i as u8))).map(|c| c.modules.iter().filter(|m| m.kind == ModuleKind::Battery).count() as u32).sum());
     let directive_mean: [f64; SEAT_COUNT] = std::array::from_fn(|i| if directive_samples == 0 { 0.0 } else { directive_sum[i] / directive_samples as f64 });
+    let throw_offs_by_seat = Seat::ALL.map(|s| {
+        let tail = format!(" threw off the {}:", game.seat_name(s));
+        game.log.iter().filter(|l| l.contains(&tail)).count() as u32
+    });
     let ranking = game.ranking();
     let final_score = Seat::ALL.map(|s| game.progress(s).score());
     let final_place = Seat::ALL.map(|s| ranking.iter().position(|(r, _)| *r == s).map(|i| i as u8 + 1).unwrap_or(4));
@@ -714,6 +739,9 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         first_under_sink_turn,
         final_score,
         final_place,
+        unrest_turns,
+        throw_offs_by_seat,
+        start_lost_to_throw_off,
         emigrant_batches: game.log.iter().filter(|l| l.contains("Pioneers recruited in")).count() as u32,
         antarctic_by_sea: game.log.iter().filter(|l| l.contains("in Antarctica with")).count() as u32,
         moments_earned,

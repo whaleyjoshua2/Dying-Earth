@@ -1282,6 +1282,14 @@ pub struct AiPace {
 #[derive(Debug, Clone, Deserialize)]
 pub struct AiThresholds {
     pub attack_odds: f64,
+    /// Ticket #410 (version 0.09.4): the Unrest the computer seats act on (see `ai.toml`).
+    pub constabulary_from: f64,
+    pub stadium_from: f64,
+    pub stadium_alone_free_slots: u32,
+    pub relief_from: f64,
+    pub relief_double_at: f64,
+    pub mothball_restive_from: f64,
+    pub mothball_restive_factor: f64,
     /// Ticket #284 (version 0.08.5): the Relations score at or below which a seat has cause to
     /// attack a place a rival holds -- Cold or worse.
     pub war_cause: i64,

@@ -99,6 +99,11 @@ fn main() {
     // Ticket #406 (version 0.09.4): each Faction's score at the end and its place in the ranking.
     let mut all_scores: [Vec<f64>; 4] = Default::default();
     let mut all_places = [[0u32; 4]; 4];
+    // Ticket #410 (version 0.09.4): Unrest per Faction: Region-turns held / at 4+ / at 7+, throw-offs,
+    // and seat 0's start state lost, to a throw-off or to a taking.
+    let mut all_unrest = [[0u32; 3]; 4];
+    let mut all_throw_offs = [0u32; 4];
+    let mut all_start_lost = [[0u32; 2]; 4];
     // Ticket #343 (version 0.09.1): the nuke's counters across every seating, so the closing
     // review has ONE total to quote rather than four blocks to add up by hand.
     let mut all_warc = dying_earth_engine::state::WarCounters::default();
@@ -182,6 +187,9 @@ fn main() {
                         let mut under_sink: Vec<u32> = Vec::new();
                         let mut cell_scores: [Vec<f64>; 4] = Default::default();
                         let mut cell_places = [[0u32; 4]; 4];
+                        let mut cell_unrest = [[0u32; 3]; 4];
+                        let mut cell_throw_offs = [0u32; 4];
+                        let mut cell_start_lost = [0u32; 2];
                         let mut war_ppm: [Vec<f64>; 4] = Default::default();
                         let mut war_nobody: Vec<f64> = Vec::new();
                         let mut walls_standing = 0u32;
@@ -388,7 +396,14 @@ fn main() {
                             neutral_holds += r.neutral_holds;
                             warc.add(&r.war);
                             sinks_end.push(r.natural_sink_end);
+                            if r.start_state_lost_turn.is_some() {
+                                cell_start_lost[if r.start_lost_to_throw_off { 0 } else { 1 }] += 1;
+                            }
                             for s in Seat::ALL {
+                                for (c, n) in cell_unrest[s.index()].iter_mut().zip(r.unrest_turns[s.index()]) {
+                                    *c += n;
+                                }
+                                cell_throw_offs[s.index()] += r.throw_offs_by_seat[s.index()];
                                 cell_scores[s.index()].push(r.final_score[s.index()]);
                                 cell_places[s.index()][(r.final_place[s.index()].clamp(1, 4) - 1) as usize] += 1;
                             }
@@ -453,6 +468,15 @@ fn main() {
                                 let at = FactionKind::ALL.into_iter().position(|k| k == order[s.index()]).unwrap_or(0);
                                 all_wins[at] += wins[s.index()];
                                 all_scores[at].extend(cell_scores[s.index()].iter().copied());
+                                for (a, n) in all_unrest[at].iter_mut().zip(cell_unrest[s.index()]) {
+                                    *a += n;
+                                }
+                                all_throw_offs[at] += cell_throw_offs[s.index()];
+                                if s == Seat(0) {
+                                    for (a, n) in all_start_lost[at].iter_mut().zip(cell_start_lost) {
+                                        *a += n;
+                                    }
+                                }
                                 for p in 0..4 {
                                     all_places[at][p] += cell_places[s.index()][p];
                                 }
@@ -736,6 +760,12 @@ fn main() {
             let nought = v.iter().filter(|s| **s <= 0.0).count();
             let p = all_places[i];
             println!("  {:>12}: score at the end median {med:.2}, nought in {nought}; placed 1st / 2nd / 3rd / 4th in {} / {} / {} / {}", k.name(), p[0], p[1], p[2], p[3]);
+        }
+        println!("  Unrest, per Faction over the batch (Region-turns held; at 4 or more; at 7 or more; throw-offs; start state lost as seat 0, to a throw-off / to a taking):");
+        for (i, k) in FactionKind::ALL.into_iter().enumerate() {
+            let u = all_unrest[i];
+            let pct = |n: u32| if u[0] == 0 { 0.0 } else { 100.0 * n as f64 / u[0] as f64 };
+            println!("  {:>12}: {} held; {} at 4+ ({:.0}%); {} at 7+ ({:.0}%); {} throw-offs; start lost {} / {}", k.name(), u[0], u[1], pct(u[1]), u[2], pct(u[2]), all_throw_offs[i], all_start_lost[i][0], all_start_lost[i][1]);
         }
         println!("  the world under the Natural Sink at least once in {} of {all_games} games (median first turn {})", all_under_sink.len(), median_u(&mut all_under_sink));
         // Version 0.09.3: the worlds settled, over every seating.
