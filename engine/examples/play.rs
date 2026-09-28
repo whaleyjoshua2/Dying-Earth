@@ -1105,13 +1105,13 @@ fn print_board(g: &Game) {
             .map(|x| format!("{} {}", t.tech(x).name, if g.has_tech(x) { "DONE" } else { "not yet" }))
             .unwrap_or_default();
         let held = if p.met() { " MET".to_string() } else { p.first_held_back.clone().map(|r| format!(" (held: {r})")).unwrap_or_default() };
+        // Ticket #406 (version 0.09.4): the Custodians' row in ppm, as the Victory window says it.
+        let first = p.first_label.clone().unwrap_or_else(|| format!("{}: {:.0}/{:.0}", p.first_name, p.first_value, p.first_bar));
         println!(
-            "seat {} the {:<12} {}: {:.0}/{:.0} | {} | score {:.2}{} | gate: {}",
+            "seat {} the {:<12} {} | {} | score {:.2}{} | gate: {}",
             seat.0,
             g.seat_name(seat),
-            p.first_name,
-            p.first_value,
-            p.first_bar,
+            first,
             p.second_text,
             p.score(),
             held,

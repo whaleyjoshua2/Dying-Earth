@@ -10658,7 +10658,8 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
             };
             ui.label(RichText::new(line).size(16.0).strong().color(Color32::from_rgb(255, 200, 120)));
             ui.separator();
-            ui.label(format!("Stabilization run: {} consecutive turn(s) under the Sink.", game.seat(Seat(0)).stabilization_run));
+            // Ticket #406 (version 0.09.4): the Victory window's own row, so the two never disagree.
+            ui.label(game.stabilization_text());
             // Ticket #53: Blame, Faction by Faction, in the panel that attributes the Emissions.
             ui.separator();
             ui.label(RichText::new("Blame: the CO2 each Faction is answerable for").strong()).on_hover_text("Blame is the CO2 this Faction is answerable for: everything the sources it controlled emitted, less everything it removed.\nWhat it removed -- its Scrubbers, and for the Custodians what their Research Directive adds to the Natural Sink -- is its Blame credit.\nTwo rules read Blame: a share above a fair quarter raises this Faction's Influence thresholds on every Region it does not hold, up to half again;\nand every rival thinks a point worse of it for each step its share stands above that quarter, each by its own measure.");
@@ -10711,9 +10712,11 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 // Ticket #373 (version 0.09.2): "(+N in transit)" on a label whose bar counts
                 // Colonists, and the band on the bar for them.
                 let in_transit = |n: u32| if n > 0 { format!(" (+{n} in transit)") } else { String::new() };
+                // Ticket #406 (version 0.09.4): the Custodians' row says the gap in ppm beside the run.
+                let first = p.first_label.clone().unwrap_or_else(|| format!("{}: {:.0} of {:.0}{}", p.first_name, p.first_value, p.first_bar, in_transit(p.first_transit)));
                 ui.label(match &p.first_held_back {
-                    Some(why) => format!("{}: {:.0} of {:.0}{} - {}", p.first_name, p.first_value, p.first_bar, in_transit(p.first_transit), why),
-                    None => format!("{}: {:.0} of {:.0}{}", p.first_name, p.first_value, p.first_bar, in_transit(p.first_transit)),
+                    Some(why) => format!("{first} - {why}"),
+                    None => first,
                 });
                 victory_bar(ui, p.first_fraction() as f32, p.first_transit_fraction() as f32);
                 // Ticket #51: the second part in the words its own card uses.

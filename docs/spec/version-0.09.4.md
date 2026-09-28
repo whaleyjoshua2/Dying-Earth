@@ -91,3 +91,50 @@ to 77, Agitates landed a few either way) and nothing a Faction's result turns on
 **What would show this wrong**: a Region's Unrest unchanged on the first turn under the Sink; a
 second ease on a later turn under it; a Custodian Region eased by a half, or a rival's by a whole
 point.
+
+## 3. The Custodians' Victory line in ppm, and partial credit for the run
+
+The authority is [ticket #406](https://github.com/whaleyjoshua2/Dying-Earth/issues/406).
+
+**The row says the gap.** The Custodians' first Victory row reads *"Stabilization: 21.3 ppm over
+the Sink (counted 27.6, Sink 6.3), run 0 of 3"*, and *"… ppm under the Sink …, run 2 of 3"* once
+under, off the last Climate phase and by the Stabilization test (counted Emissions against the
+Natural Sink and the Scrubbers). The Climate Panel's Stabilization line and the headless driver's
+Victory row print the same words, so no two screens disagree. A game opens **30.9 ppm over** (36.9
+counted against a Sink of 6).
+
+**The run earns partial credit.** The Custodians' first part is worth the greater of:
+
+- **the best run of the game** over its bar of 3, never falling back; and
+- **three tenths of the best share of the opening gap ever closed** (`stabilization_gap_cap = 0.3`
+  in `victory.toml`), the opening gap being the counted gap at the game's first Climate phase, and
+  never falling back.
+
+Three tenths is under the third one turn of run is worth, so a real run always beats any cut. **The
+Condition does not change**: a win is still three phases in a row. The score (the lower of the two
+parts) orders the final ranking and picks the turn-36 winner when nobody has met a Condition, as it
+does for the other three Factions, so **the Custodians can now win at turn 36 on score**. A save
+from before opens its gap at the next Climate phase.
+
+**The computer seats** play as before: their Custodian pace already reads the gap in ppm, and
+where they read how near a Faction is to its Condition (the Lead's pick of its gate Tech past half
+the first part, and refusing an Accord to a Faction at the door) they read the part **as it
+stands**, not the partial credit. The Rival Moment and the Victory chart carry the credit, as the
+score does.
+
+**Measured** (20 seeds x four seatings, the shipped cell; the sweep gained a line per Faction, its
+score at the end and its places in the final ranking):
+
+| Custodians | before | after |
+|---|---|---|
+| score at the end, median | 0.00 | 0.13 |
+| games at nought | 73 | 12 |
+| placed 1st / 2nd / 3rd / 4th | 7 / 0 / 6 / 67 | 8 / 14 / 43 / 15 |
+
+The win column moved **7 / 5 / 1 / 7 to 8 / 4 / 1 / 7**, one turn-36 win passing from the
+Prospectors to the Custodians; collapses 60, unmoved. The Arkwrights, whose score is nought in 75 of
+80, now take the last place in 54 games where they took it in 11.
+
+**What would show this wrong**: a Custodian score falling when the gap widens again; a run of two
+worth less than two thirds once broken; the gap credit reaching a third; the Victory row and the
+Climate Panel quoting different figures.

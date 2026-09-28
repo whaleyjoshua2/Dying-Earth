@@ -199,6 +199,10 @@ pub struct SimResult {
     /// Ticket #405 (version 0.09.4): the turn the world was first under the Natural Sink (the
     /// Stabilization test), None if never.
     pub first_under_sink_turn: Option<u32>,
+    /// Ticket #406 (version 0.09.4): each seat's Victory score at the end, and its place in the
+    /// final ranking, one to four.
+    pub final_score: [f64; SEAT_COUNT],
+    pub final_place: [u8; SEAT_COUNT],
     /// Ticket #58: how many Moments the turns of this game earned, how many the cap of two and the
     /// defaults in `report.toml` actually showed, how many turns stopped for at least one, and the
     /// most any one turn showed.
@@ -574,6 +578,9 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
     let batteries: [u32; SEAT_COUNT] =
         std::array::from_fn(|i| game.colonies.iter().filter(|c| c.control.director() == Some(Seat(i as u8))).map(|c| c.modules.iter().filter(|m| m.kind == ModuleKind::Battery).count() as u32).sum());
     let directive_mean: [f64; SEAT_COUNT] = std::array::from_fn(|i| if directive_samples == 0 { 0.0 } else { directive_sum[i] / directive_samples as f64 });
+    let ranking = game.ranking();
+    let final_score = Seat::ALL.map(|s| game.progress(s).score());
+    let final_place = Seat::ALL.map(|s| ranking.iter().position(|(r, _)| *r == s).map(|i| i as u8 + 1).unwrap_or(4));
     let tree_done_turn = if game.research.done.len() == game.tables.techs.len() { Some(game.turn) } else { None };
     let highest_rung = game.research.done.iter().map(|t| tables.tech(*t).rung).max().unwrap_or(0);
     // Ticket #56, read off the log as the #52 to #55 figures are.
@@ -705,6 +712,8 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         deck_empty: game.deck.cards.is_empty(),
         start_state_lost_turn,
         first_under_sink_turn,
+        final_score,
+        final_place,
         emigrant_batches: game.log.iter().filter(|l| l.contains("Pioneers recruited in")).count() as u32,
         antarctic_by_sea: game.log.iter().filter(|l| l.contains("in Antarctica with")).count() as u32,
         moments_earned,

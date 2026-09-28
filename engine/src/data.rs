@@ -1068,6 +1068,9 @@ pub struct UnrestTable {
 #[derive(Debug, Clone, Deserialize)]
 pub struct VictoryTable {
     pub stabilization_turns: u32,
+    /// Ticket #406 (version 0.09.4): what closing the whole counted gap is worth to the
+    /// Custodians' first part, short of a run.
+    pub stabilization_gap_cap: f64,
     pub off_world_presence: u32,
     pub turns: u32,
     /// Ticket #57: the game begins on the first of this month. Ticket #67 (version 0.05.5): a Turn

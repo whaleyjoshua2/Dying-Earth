@@ -302,7 +302,8 @@ impl Game {
         {
             let th = &self.tables.ai.thresholds;
             let p = self.progress(seat);
-            if p.first_fraction() >= th.gate_pick_fraction || self.turn >= th.gate_pick_turn {
+            // Ticket #406 (version 0.09.4): how near the Condition stands, not the partial credit.
+            if p.first_fraction_as_it_stands() >= th.gate_pick_fraction || self.turn >= th.gate_pick_turn {
                 return (gate, "pick_first_choice");
             }
         }

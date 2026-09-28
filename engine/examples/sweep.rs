@@ -96,6 +96,9 @@ fn main() {
     let mut all_gate_turns: [Vec<u32>; 4] = Default::default();
     // Ticket #405 (version 0.09.4): the turn the world was first under the Sink, every seating.
     let mut all_under_sink: Vec<u32> = Vec::new();
+    // Ticket #406 (version 0.09.4): each Faction's score at the end and its place in the ranking.
+    let mut all_scores: [Vec<f64>; 4] = Default::default();
+    let mut all_places = [[0u32; 4]; 4];
     // Ticket #343 (version 0.09.1): the nuke's counters across every seating, so the closing
     // review has ONE total to quote rather than four blocks to add up by hand.
     let mut all_warc = dying_earth_engine::state::WarCounters::default();
@@ -177,6 +180,8 @@ fn main() {
                         // Ticket #343 (version 0.09.1): the Natural Sink at the end of each game.
                         let mut sinks_end: Vec<f64> = Vec::new();
                         let mut under_sink: Vec<u32> = Vec::new();
+                        let mut cell_scores: [Vec<f64>; 4] = Default::default();
+                        let mut cell_places = [[0u32; 4]; 4];
                         let mut war_ppm: [Vec<f64>; 4] = Default::default();
                         let mut war_nobody: Vec<f64> = Vec::new();
                         let mut walls_standing = 0u32;
@@ -383,6 +388,10 @@ fn main() {
                             neutral_holds += r.neutral_holds;
                             warc.add(&r.war);
                             sinks_end.push(r.natural_sink_end);
+                            for s in Seat::ALL {
+                                cell_scores[s.index()].push(r.final_score[s.index()]);
+                                cell_places[s.index()][(r.final_place[s.index()].clamp(1, 4) - 1) as usize] += 1;
+                            }
                             if let Some(t) = r.first_under_sink_turn {
                                 under_sink.push(t);
                                 all_under_sink.push(t);
@@ -443,6 +452,10 @@ fn main() {
                             for s in Seat::ALL {
                                 let at = FactionKind::ALL.into_iter().position(|k| k == order[s.index()]).unwrap_or(0);
                                 all_wins[at] += wins[s.index()];
+                                all_scores[at].extend(cell_scores[s.index()].iter().copied());
+                                for p in 0..4 {
+                                    all_places[at][p] += cell_places[s.index()][p];
+                                }
                                 all_gate_turns[at].extend(gate_turns[s.index()].iter().copied());
                             }
                             all_games += seeds as u32;
@@ -715,6 +728,14 @@ fn main() {
         // Ticket #348: per FACTION, which is the figure that ticket is judged by.
         for (i, k) in FactionKind::ALL.into_iter().enumerate() {
             println!("  {:>12}: Victory gate completed in {:2} of {all_games} games, median turn {}", k.name(), all_gate_turns[i].len(), median_u(&mut all_gate_turns[i]));
+        }
+        for (i, k) in FactionKind::ALL.into_iter().enumerate() {
+            let mut v = all_scores[i].clone();
+            v.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            let med = v.get(v.len() / 2).copied().unwrap_or(0.0);
+            let nought = v.iter().filter(|s| **s <= 0.0).count();
+            let p = all_places[i];
+            println!("  {:>12}: score at the end median {med:.2}, nought in {nought}; placed 1st / 2nd / 3rd / 4th in {} / {} / {} / {}", k.name(), p[0], p[1], p[2], p[3]);
         }
         println!("  the world under the Natural Sink at least once in {} of {all_games} games (median first turn {})", all_under_sink.len(), median_u(&mut all_under_sink));
         // Version 0.09.3: the worlds settled, over every seating.

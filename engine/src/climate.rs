@@ -81,6 +81,18 @@ impl Game {
                 s.stabilization_run = 0;
             }
         }
+        // Ticket #406 (version 0.09.4): the Custodians' partial credit. The counted gap at the first
+        // Climate phase is the opening figure; the best share of it closed since, and the longest
+        // run, are kept and never fall back.
+        let gap = breakdown.counted() - breakdown.total_sink();
+        if self.climate.opening_gap <= 0.0 && gap > 0.0 {
+            self.climate.opening_gap = gap;
+        }
+        if self.climate.opening_gap > 0.0 {
+            let closed = ((self.climate.opening_gap - gap) / self.climate.opening_gap).clamp(0.0, 1.0);
+            self.climate.best_gap_closed = self.climate.best_gap_closed.max(closed);
+        }
+        self.climate.best_run = self.climate.best_run.max(self.seat(Seat(0)).stabilization_run);
         // Ticket #405 (version 0.09.4): the first Climate phase the world is EVER under the Sink,
         // by the same test, eases every Region's Unrest once a game, whatever the next turn does.
         if stabilized && !self.climate.under_sink_eased {

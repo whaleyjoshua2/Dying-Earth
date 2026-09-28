@@ -17168,3 +17168,79 @@ fn the_sink_ease_reads_the_stabilization_test_and_survives_a_broken_run() {
     let words = g.report.moments.iter().find(|m| m.kind == MomentKind::UnderTheSink).map(|m| m.text.clone()).expect("the Moment of the first turn");
     assert!(words.contains("by a half in every Region, a whole point in the Custodians'"), "the designer's words: {words}");
 }
+
+/// Ticket #406 (version 0.09.4): **the Custodians' first part earns partial credit**: the greater
+/// of the best run of the game over its bar and three tenths of the best share of the counted gap
+/// closed since the game's opening figure. Neither falls back; the Condition is still three turns in
+/// a row. Seat 0 is the Custodians.
+#[test]
+fn the_custodians_run_earns_partial_credit_for_the_best_run_and_the_gap_closed() {
+    let mut g = game();
+    let cap = g.tables.victory.stabilization_gap_cap;
+    assert_eq!(cap, 0.3, "the designer's three tenths");
+    let gap = |g: &Game| g.climate.last.counted() - g.climate.last.total_sink();
+    // The opening Climate phase sets the figure every later gap is measured against.
+    g.climate_phase();
+    let open = gap(&g);
+    assert!(open > 0.0, "the premise: the world opens over the Sink: {open}");
+    assert_eq!(g.climate.opening_gap, open);
+    assert_eq!(g.progress(Seat(0)).first_fraction(), 0.0, "nothing closed yet");
+    // Raise the Sink by half the gap: half of it closed.
+    g.climate.natural_sink += open / 2.0;
+    g.climate_phase();
+    let closed = (open - gap(&g)) / open;
+    assert!(closed > 0.3 && closed < 0.7, "the premise: about half closed: {closed}");
+    assert!((g.progress(Seat(0)).first_fraction() - cap * closed).abs() < 1e-9, "three tenths of the share closed: {}", g.progress(Seat(0)).first_fraction());
+    // Worse again: the best stands.
+    g.climate.natural_sink = 0.0;
+    g.climate_phase();
+    assert!((g.progress(Seat(0)).first_fraction() - cap * closed).abs() < 1e-9, "the best never falls back");
+    // Two turns under, then over: the best run of two stands, over the gap's credit.
+    g.climate.natural_sink = 1000.0;
+    g.climate_phase();
+    g.climate_phase();
+    g.climate.natural_sink = 0.0;
+    g.climate_phase();
+    let p = g.progress(Seat(0));
+    assert_eq!(g.seat(Seat(0)).stabilization_run, 0, "the premise: the run broke");
+    assert!((p.first_fraction() - 2.0 / 3.0).abs() < 1e-9, "the best run of two: {}", p.first_fraction());
+    // Another Faction's first part is untouched.
+    assert_eq!(g.progress(Seat(1)).first_partial, 0.0);
+    // A run of three that breaks fills the first part and still meets nothing, the gate Tech standing
+    // so nothing but the broken run holds it back.
+    g.research.done.push(TechId::PlanetaryStewardship);
+    g.climate.natural_sink = 1000.0;
+    for _ in 0..3 {
+        g.climate_phase();
+    }
+    g.climate.natural_sink = 0.0;
+    g.climate_phase();
+    let p = g.progress(Seat(0));
+    assert_eq!(p.first_fraction(), 1.0, "the best run of three");
+    assert!(p.first_held_back.is_none(), "the premise: the gate stands");
+    assert!(!p.first_met() && !p.met(), "the Condition is still three in a row, as it stands");
+    assert_eq!(p.first_fraction_as_it_stands(), 0.0, "and the computer seats read the run as it stands");
+    // The credit is the score: at turn 36 with nobody met, the Custodians rank first and win on it.
+    assert!(p.second_fraction() > 0.0, "the premise: Colonists off Earth");
+    assert!(Seat::ALL.iter().skip(1).all(|s| g.progress(*s).score() < p.score()), "the premise: the rivals score less");
+    assert_eq!(g.ranking()[0].0, Seat(0), "first in the final ranking");
+    g.turn = g.tables.victory.turns;
+    g.end_phase();
+    assert!(matches!(g.outcome, Some(Outcome::Win { seat: Seat(0), .. })), "and the turn-36 winner: {:?}", g.outcome);
+}
+
+/// Ticket #406 (version 0.09.4): **the Custodians' Victory row says the gap in ppm beside the
+/// run**, by the Stabilization test, over or under; the other Factions' rows are their own.
+#[test]
+fn the_stabilization_row_says_the_gap_in_ppm_beside_the_run() {
+    let mut g = game();
+    g.climate_phase();
+    let (c, s) = (g.climate.last.counted(), g.climate.last.total_sink());
+    let over = g.progress(Seat(0)).first_label.expect("the Custodians' row");
+    assert_eq!(over, format!("Stabilization: {:.1} ppm over the Sink (counted {c:.1}, Sink {s:.1}), run 0 of 3", c - s));
+    g.climate.natural_sink = 1000.0;
+    g.climate_phase();
+    let under = g.progress(Seat(0)).first_label.expect("the Custodians' row");
+    assert!(under.contains("ppm under the Sink") && under.ends_with("run 1 of 3"), "{under}");
+    assert!(g.progress(Seat(1)).first_label.is_none(), "the Prospectors' row is their own");
+}

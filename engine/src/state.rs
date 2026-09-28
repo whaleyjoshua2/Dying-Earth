@@ -699,6 +699,16 @@ pub struct Climate {
     /// Region's Unrest has eased for it; it eases once a game. A save from before carries false.
     #[serde(default)]
     pub under_sink_eased: bool,
+    /// Ticket #406 (version 0.09.4): the counted gap over the Sink at the game's first Climate
+    /// phase; the best share of it closed since, never falling back; and the longest Stabilization
+    /// run of the game. The Custodians' partial credit. A save from before opens its gap at the next
+    /// Climate phase.
+    #[serde(default)]
+    pub opening_gap: f64,
+    #[serde(default)]
+    pub best_gap_closed: f64,
+    #[serde(default)]
+    pub best_run: u32,
     /// Ticket #55: which Breaks have fired, by index into `climate.toml`'s list. Each fires once.
     pub breaks_fired: Vec<bool>,
 }
@@ -1713,6 +1723,9 @@ impl Game {
                 natural_sink: tables.climate.natural_sink,
                 permafrost: 0.0,
                 under_sink_eased: false,
+                opening_gap: 0.0,
+                best_gap_closed: 0.0,
+                best_run: 0,
                 breaks_fired: vec![false; tables.climate.breaks.len()],
             },
             research: Research {
@@ -4787,7 +4800,8 @@ impl Game {
     /// report Accords struck, by term and by seat.
     pub fn accord_acceptable(&self, seat: Seat, from: Seat, terms: &[Term]) -> bool {
         // Never help somebody already at the door.
-        if self.progress(from).score() >= 0.95 {
+        // Ticket #406 (version 0.09.4): how near the door stands, not the Custodians' partial credit.
+        if self.progress(from).score_as_it_stands() >= 0.95 {
             return false;
         }
         let view = self.relations_score(seat, from);
