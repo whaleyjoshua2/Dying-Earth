@@ -599,8 +599,9 @@ impl Game {
         // The 0.06.0 AI sweep (ticket #94): a leg no tank could pay (Mars off its window can ask
         // 47 Fuel of a 30 tank) is not a destination either; before this the AI named it as its
         // one choice, the Transit was refused at the check, and the Ship sat at Earth.
-        let tank = t.units.iter().map(|u| u.tank).max().unwrap_or(0);
-        let payable = |b: BodyId| self.transit_cost_for(seat, BodyId::Earth, b).1 <= tank as f64;
+        // Ticket #413 (version 0.09.4): the seat's own tanks, Clean Propellant's Fuel included.
+        let tank = UnitKind::SHIPS.iter().map(|k| self.tank_of(seat, *k)).fold(0.0, f64::max);
+        let payable = |b: BodyId| self.transit_cost_for(seat, BodyId::Earth, b).1 <= tank;
         // Ticket #93: Venus, with no Colony Slots, is a destination when the seat holds a station
         // there with room, or when a slot is free in its orbit and the Stockpile could raise one.
         let venus_open = |b: BodyId| {
@@ -2404,7 +2405,7 @@ impl Game {
                     Place::State(_) => body == BodyId::Earth && orbit.is_low(),
                     Place::Colony(c) => self.colony(*c).is_some_and(|c| c.body == body && self.colony_orbit(c) == orbit),
                 });
-            if s.fuel < card.tank as f64 && self.refuelling_station(seat, body, orbit) && self.seat(seat).stockpile.fuel > 0.0 && !ready_to_fire {
+            if s.fuel < self.tank_of(seat, s.kind) && self.refuelling_station(seat, body, orbit) && self.seat(seat).stockpile.fuel > 0.0 && !ready_to_fire {
                 push(
                     vec![Order::Refuel { ship: s.id }],
                     Cat::Transit,
@@ -2412,7 +2413,7 @@ impl Game {
                     gap_for(Cat::Transit, None),
                     1.0,
                     1.0,
-                    format!("refuel {} at {} ({} of {} in the tank)", ship_name, self.orbit_name(body, orbit), figure(s.fuel), card.tank),
+                    format!("refuel {} at {} ({} of {} in the tank)", ship_name, self.orbit_name(body, orbit), figure(s.fuel), figure(self.tank_of(seat, s.kind))),
                     None,
                 );
             }
@@ -2434,7 +2435,7 @@ impl Game {
                 // very turn the carrier fired, and the Launch failed with the orbit given up.
                 let on_the_lane = s.kind.is_warship() && orbit.is_low() && self.ai_wants_the_ground(seat, body) && self.ai_low_orbit_garrison(seat, body).contains(&s.id);
                 let can_fight = s.fuel >= self.tables.melee.battle_fuel as f64;
-                if s.fuel < card.tank as f64 && self.seat(seat).stockpile.fuel > 0.0 && !self.refuelling_station(seat, body, orbit) && !(on_the_lane && can_fight) && !ready_to_fire {
+                if s.fuel < self.tank_of(seat, s.kind) && self.seat(seat).stockpile.fuel > 0.0 && !self.refuelling_station(seat, body, orbit) && !(on_the_lane && can_fight) && !ready_to_fire {
                     // Ticket #396 (version 0.09.3): a Refinery Colony's depot is its low orbit.
                     for c in self.colonies.iter().filter(|c| c.body == body && self.fuels_for(c, seat)) {
                         wants.push((self.colony_orbit(c), format!("to refuel at {}", self.place_name(Place::Colony(c.id))), Cat::Transit, self.base_weight(seat, Cat::Transit)));

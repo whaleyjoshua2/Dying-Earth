@@ -273,3 +273,31 @@ the noise of twenty seeds a seating.
 
 **What would show this wrong**: a Lead other than the Archivists paid; the Influence missing from
 the next Allotment; a Region they hold not eased.
+
+## 9. Orbital Refuelling, and Clean Propellant's bigger tanks
+
+The authority is [ticket #413](https://github.com/whaleyjoshua2/Dying-Earth/issues/413).
+
+**Orbital Refuelling** is the twenty-third Tech: Propulsion, **rung 1 beside Clean Propellant,
+needing nothing and needed by nothing**, priced at **22 Research** where its rung costs 18, on
+purpose. It **cuts a crossing's days by a tenth before the rounding up**, and where Nuclear Rockets
+stands too the two multiply (0.72). At the Launch Window:
+
+| | neither | Orbital Refuelling | Nuclear Rockets | both |
+|---|---|---|---|---|
+| Earth to Mars | 5 turns | 4 | 4 | 4 |
+| Earth to Venus | 3 | 3 | 2 | 2 |
+
+So the stacking gains only off the window, where a crossing is longer. The Fuel of a leg is
+unchanged. **Clean Propellant adds 5 Fuel to every Ship's tank** (30 to 35), a Ship already flying
+gaining the room empty and a new Ship built full at 35; at half under Provisional Findings, as every
+addition is. **The computer seats pick Orbital Refuelling first in the Propulsion chain**, after
+each Victory gate chain. The whole tree now costs **757 Research**, where it cost 735.
+
+**Measured** (20 seeds x four seatings, against the sweep after §8): wins **8 / 4 / 0 / 5 to
+9 / 5 / 0 / 9**, collapses **63 to 57**; Victory gates completed 66 / 61 / 58 to 60 / 51 / 52 of
+80 (Prospectors, Arkwrights, Archivists; the Custodians' 70 to 69), a cause not measured; Missile
+Carriers built 40 to 32, games with an orbital Battle 28 to 21.
+
+**What would show this wrong**: a crossing slower with both Techs than with Nuclear Rockets alone; a
+new Ship built at 30 once Clean Propellant stands; a Tech that needs Orbital Refuelling.

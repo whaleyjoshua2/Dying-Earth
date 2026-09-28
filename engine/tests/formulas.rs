@@ -4445,8 +4445,9 @@ fn f_coastal_engineering_is_the_thirteenth_tech() {
     // Ticket #201 (version 0.08.1): eighteen, with Civil Defense on Society rung 2.
     // Ticket #343 (version 0.09.1): twenty-one, with Missile Technology on Propulsion rung 3.
     // Ticket #393 (version 0.09.3): twenty-two, with Nuclear Rockets on Propulsion rung 2.
-    assert_eq!(TechId::ALL.len(), 22, "thirteen Techs, the four gates, Civil Defense, #232's two, Missile Technology and Nuclear Rockets");
-    assert_eq!(g.tables.techs.len(), 22, "and twenty-two rows in techs.toml");
+    // Ticket #413 (version 0.09.4): twenty-three, with Orbital Refuelling on Propulsion rung 1.
+    assert_eq!(TechId::ALL.len(), 23, "thirteen Techs, the four gates, Civil Defense, #232's two, Missile Technology, Nuclear Rockets and Orbital Refuelling");
+    assert_eq!(g.tables.techs.len(), 23, "and twenty-three rows in techs.toml");
     let c = g.tables.tech(TechId::CoastalEngineering);
     assert_eq!(c.name, "Coastal Engineering");
     assert_eq!(c.branch, "Industry");
@@ -6524,7 +6525,7 @@ fn the_four_gates_stand_on_rung_three_at_one_price_with_their_prerequisites() {
         assert_eq!(card.needs, needs, "{t:?}");
         assert_eq!(g.tables.victory_gate(kind), Some(t));
     }
-    assert_eq!(TechId::ALL.len(), 22, "eighteen, Beneficiation and Relay Networks since ticket #232, Missile Technology since #343, Nuclear Rockets since #393");
+    assert_eq!(TechId::ALL.len(), 23, "eighteen, Beneficiation and Relay Networks since ticket #232, Missile Technology since #343, Nuclear Rockets since #393, Orbital Refuelling since #413");
     // Version 0.08.3 moved three of the four gates' prerequisites in three separate tickets, and
     // nothing watched how deep each gate ended up. Counted as Techs that must stand before the
     // gate is reachable, the gate excluded.
@@ -7453,7 +7454,8 @@ fn the_research_lead_picks_from_a_shortlist_of_three() {
     let mut g = game();
     // The opening is a free choice of the whole of rung 1: nothing is drawn for it.
     assert!(g.research.shortlist.is_empty(), "the first Tech of the game is not drawn for");
-    assert_eq!(g.pickable_techs().len(), 6, "all six of rung 1");
+    // Ticket #413 (version 0.09.4): seven, with Orbital Refuelling.
+    assert_eq!(g.pickable_techs().len(), 7, "all seven of rung 1");
     g.pick_tech(Seat(0), TechId::PublicScience).unwrap();
     // Seat 0 is the human here, and the only contributor, so it leads and is asked to pick.
     let cost = g.tables.tech(TechId::PublicScience).cost;
@@ -9995,7 +9997,8 @@ fn the_tree_costs_eighteen_thirty_two_and_forty_eight_by_rung() {
         let card = g.tables.tech(t);
         // Ticket #393 (version 0.09.3): Nuclear Rockets is priced above its rung on purpose, 38 where
         // rung 2 is 32, at the designer's word; Coastal Engineering below it, at 15.
-        if t == TechId::CoastalEngineering || t == TechId::NuclearRockets {
+        // Ticket #413 (version 0.09.4): and Orbital Refuelling, 22 where its rung is 18.
+        if t == TechId::CoastalEngineering || t == TechId::NuclearRockets || t == TechId::OrbitalRefuelling {
             continue;
         }
         let want = match card.rung {
@@ -10007,7 +10010,8 @@ fn the_tree_costs_eighteen_thirty_two_and_forty_eight_by_rung() {
     }
     let total: i64 = TechId::ALL.into_iter().map(|t| g.tables.tech(t).cost).sum();
     assert_eq!(g.tables.tech(TechId::NuclearRockets).cost, 38, "priced above its rung");
-    assert_eq!(total, 735, "the whole tree since ticket #393's Nuclear Rockets (38 on rung 2); 697 from #343, 649 from #232, 585 from #231, 554 from #201, 507 before that");
+    assert_eq!(g.tables.tech(TechId::OrbitalRefuelling).cost, 22, "priced above its rung");
+    assert_eq!(total, 757, "the whole tree since ticket #413's Orbital Refuelling (22 on rung 1); 735 from #393, 697 from #343, 649 from #232, 585 from #231, 554 from #201, 507 before that");
 }
 
 // ------------------------------------------------------- 0.08.1 ticket #208: the School's step
@@ -16224,7 +16228,10 @@ fn a_computer_seat_picks_its_gate_chain_then_propulsion_then_the_cheapest() {
     g.research.done.push(TechId::GreenConsensus);
     g.research.shortlist.clear();
     assert!(g.available_techs().contains(&TechId::CoastalEngineering), "the cheapest Tech on the board is open");
-    assert_eq!(g.ai_tech_pick(seat), TechId::CleanPropellant, "Propulsion comes before the cheapest");
+    // Ticket #413 (version 0.09.4): Orbital Refuelling heads the Propulsion chain.
+    assert_eq!(g.ai_tech_pick(seat), TechId::OrbitalRefuelling, "Propulsion comes before the cheapest");
+    g.research.done.push(TechId::OrbitalRefuelling);
+    assert_eq!(g.ai_tech_pick(seat), TechId::CleanPropellant, "then Clean Propellant");
     g.research.done.push(TechId::CleanPropellant);
     assert_eq!(g.ai_tech_pick(seat), TechId::EfficientTransit, "then the rung-2 pair, Efficient Transit first");
     g.research.done.push(TechId::EfficientTransit);
@@ -17481,4 +17488,50 @@ fn the_archivists_are_paid_for_leading_a_tech() {
     g.accrue_research(Seat(3), g.tables.tech(tech).cost);
     let line = g.report.lines.iter().find(|l| l.kind == LineKind::TechComplete).unwrap().text.clone();
     assert!(line.ends_with("+5 Influence."), "{line}");
+}
+
+/// Ticket #413 (version 0.09.4): **Orbital Refuelling**, Propulsion rung 1 at 22, needing nothing,
+/// cuts a crossing's days by a tenth before the rounding up and multiplies with Nuclear Rockets;
+/// **Clean Propellant adds 5 to every Ship's tank**, a new Ship built full.
+#[test]
+fn orbital_refuelling_stacks_with_nuclear_rockets_and_clean_propellant_widens_the_tank() {
+    let mut g = game();
+    let card = g.tables.tech(TechId::OrbitalRefuelling).clone();
+    assert_eq!((card.rung, card.cost, card.needs.len(), card.value), (1, 22, 0, 0.9));
+    assert!(g.tables.techs.iter().all(|t| !t.needs.contains(&TechId::OrbitalRefuelling)), "needed by nothing");
+    // The multipliers stack: 0.9 alone, 0.72 with Nuclear Rockets.
+    let turns = |g: &Game, turn: u32| g.transit_cost_for_at(Seat(0), BodyId::Earth, BodyId::Mars, turn).0;
+    let base: Vec<u32> = (1..=36).map(|t| turns(&g, t)).collect();
+    g.research.done.push(TechId::NuclearRockets);
+    let nuclear: Vec<u32> = (1..=36).map(|t| turns(&g, t)).collect();
+    g.research.done.push(TechId::OrbitalRefuelling);
+    let both: Vec<u32> = (1..=36).map(|t| turns(&g, t)).collect();
+    assert!(both.iter().zip(&nuclear).all(|(b, n)| b <= n), "the stack never slows a crossing");
+    assert!(both.iter().zip(&nuclear).any(|(b, n)| b < n), "and somewhere off the window it gains a turn: {nuclear:?} -> {both:?}");
+    g.research.done.retain(|t| *t != TechId::NuclearRockets);
+    let alone: Vec<u32> = (1..=36).map(|t| turns(&g, t)).collect();
+    assert!(alone.iter().zip(&base).any(|(a, b)| a < b), "Orbital Refuelling alone shortens a crossing");
+    // The spec's table: at the window, Mars 5 / 4 / 4 / 4 and Venus 3 / 3 / 2 / 2.
+    let window = |g: &Game, to: BodyId| (1..=36).map(|turn| g.transit_cost_at(BodyId::Earth, to, turn).0).min().unwrap();
+    let mut t = game();
+    let mut row = |t: &mut Game, techs: &[TechId]| {
+        t.research.done.retain(|x| *x != TechId::NuclearRockets && *x != TechId::OrbitalRefuelling);
+        t.research.done.extend_from_slice(techs);
+        (window(t, BodyId::Mars), window(t, BodyId::Venus))
+    };
+    assert_eq!(row(&mut t, &[]), (5, 3));
+    assert_eq!(row(&mut t, &[TechId::OrbitalRefuelling]), (4, 3));
+    assert_eq!(row(&mut t, &[TechId::NuclearRockets]), (4, 2));
+    assert_eq!(row(&mut t, &[TechId::NuclearRockets, TechId::OrbitalRefuelling]), (4, 2));
+    // The tank.
+    let tank = g.tables.unit(UnitKind::Frigate).tank as f64;
+    assert_eq!(g.tank_of(Seat(0), UnitKind::Frigate), tank);
+    g.research.done.push(TechId::CleanPropellant);
+    assert_eq!(g.tank_of(Seat(0), UnitKind::Frigate), tank + 5.0, "Clean Propellant: +5");
+    assert_eq!(g.tank_of(Seat(0), UnitKind::Army), 0.0, "an Army has no tank");
+    let yard = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Shipyard], 3);
+    build_now(&mut g, Place::Colony(yard), BuildItem::Unit(UnitKind::Frigate), Seat(0));
+    g.resolution_phase();
+    let s = g.ships.iter().rfind(|s| s.seat == Seat(0) && s.kind == UnitKind::Frigate).expect("built");
+    assert_eq!(s.fuel, tank + 5.0, "a new Ship is built full");
 }

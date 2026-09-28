@@ -4557,7 +4557,7 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, seat: Seat, marks: boo
             let ordered = pending.iter().any(|o| {
                 matches!(o, Order::Transit { ship, .. } | Order::Load { ship, .. } | Order::Unload { ship, .. } | Order::Repair { unit: UnitRef::Ship(ship), .. } if *ship == s.id)
             }) || pending.iter().any(|o| matches!(o, Order::ShipStance { body: b, .. } if *b == body));
-            let tank = game.tables.unit(s.kind).tank;
+            let tank = figure(game.tank_of(s.seat, s.kind));
             // The working figures stay ON the row: the Roster is where a player checks whether a
             // hull can move before ordering it, and the tank is the figure that says stranded.
             // Ticket #346 (version 0.09.1): the strength is the one the hull would FIGHT at, since
@@ -7911,7 +7911,7 @@ fn change_orbit_lines(ui: &mut Ui, session: &Session, game: &Game, body: BodyId,
                     game,
                     &session.pending,
                     Order::ChangeOrbit { ship: s.id, slot: orbit.slot() },
-                    &format!("Move ({}/{} in the tank)", figure(s.fuel), game.tables.unit(s.kind).tank),
+                    &format!("Move ({}/{} in the tank)", figure(s.fuel), figure(game.tank_of(s.seat, s.kind))),
                     Some(format!("{} is {} now. {orbit_fuel} Fuel from its own tank, and it fights this turn's Battle in its new orbit.", game.ship_name(s), orbit_phrase(game, body, game.ship_orbit(s)))),
                     actions,
                 ),
@@ -7946,7 +7946,7 @@ fn transit_lines(ui: &mut Ui, session: &Session, game: &Game, body: BodyId, to: 
             match one {
                 Some(s) => {
                     // Ticket #87: the button reads the tank against the leg.
-                    cost_button(ui, game, &session.pending, Order::Transit { ship: s.id, to, slot: orbit.slot() }, &format!("Go ({}/{} in the tank)", figure(s.fuel), game.tables.unit(s.kind).tank), actions);
+                    cost_button(ui, game, &session.pending, Order::Transit { ship: s.id, to, slot: orbit.slot() }, &format!("Go ({}/{} in the tank)", figure(s.fuel), figure(game.tank_of(s.seat, s.kind))), actions);
                     // Ticket #375: a warning, never a refusal, where the leg would leave the hull
                     // stranded at the far end -- a one-way trip can be the plan.
                     if let Some(left) = game.arrival_leaves_stranded(Seat(0), s.id, to, orbit.slot()) {
@@ -7975,7 +7975,6 @@ fn ship_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
         view.selection = Selection::None;
         return;
     };
-    let card = game.tables.unit(s.kind);
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 8.0;
         faction_glyph(ui, session, game, Some(s.seat), 22.0);
@@ -8038,7 +8037,7 @@ fn ship_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
         tanks.scroll_to_me(Some(egui::Align::Min));
     }
     ui.horizontal_wrapped(|ui| {
-        let fuel = format!("{}/{} Fuel", figure(s.fuel), card.tank);
+        let fuel = format!("{}/{} Fuel", figure(s.fuel), figure(game.tank_of(s.seat, s.kind)));
         match s.at {
             ShipAt::Body(b) => {
                 // Ticket #335 (version 0.09.0): a station fuels only a Ship in its OWN orbit, so a

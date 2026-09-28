@@ -601,10 +601,14 @@ pub enum TechId {
     /// Venus two where it was three; a one-turn hop stays one; the Fuel is untouched. Hardened
     /// Hulls needs this AND Efficient Transit.
     NuclearRockets,
+    /// Ticket #413 (version 0.09.4): Propulsion rung 1 beside Clean Propellant, needing nothing and
+    /// needed by nothing, priced at 22 above its rung. A crossing's days x0.9 before the rounding
+    /// up, multiplied with Nuclear Rockets' x0.8 when both stand (0.72).
+    OrbitalRefuelling,
 }
 
 impl TechId {
-    pub const ALL: [TechId; 22] = [
+    pub const ALL: [TechId; 23] = [
         TechId::EfficientGrids,
         TechId::CleanPower,
         TechId::CleanManufacturing,
@@ -627,6 +631,7 @@ impl TechId {
         TechId::RelayNetworks,
         TechId::MissileTechnology,
         TechId::NuclearRockets,
+        TechId::OrbitalRefuelling,
     ];
     pub fn index(self) -> usize {
         self as usize

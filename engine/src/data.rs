@@ -346,6 +346,9 @@ pub struct TechCard {
     /// every other Tech in the tree.
     #[serde(default)]
     pub habitat_colonists: Option<f64>,
+    /// Ticket #413 (version 0.09.4): Fuel this Tech adds to every Ship's tank (Clean Propellant).
+    #[serde(default)]
+    pub tank_fuel: f64,
     #[serde(default)]
     pub influence_threshold_multiplier: Option<f64>,
     /// Ticket #84 (version 0.06.0): the Faction whose Victory Condition this Tech opens, if any.

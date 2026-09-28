@@ -2364,8 +2364,9 @@ impl Game {
                     escaped: false,
                     arrived_this_turn: false,
                     built_turn: turn,
-                    // Ticket #87: built with a full tank, paid at the build.
-                    fuel: self.tables.unit(kind).tank as f64,
+                    // Ticket #87: built with a full tank, paid at the build. Ticket #413 (version
+                    // 0.09.4): the seat's tank, Clean Propellant's Fuel included.
+                    fuel: self.tank_of(b.seat, kind),
                 });
             }
             _ => {}

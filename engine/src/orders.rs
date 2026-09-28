@@ -471,7 +471,7 @@ impl Game {
             Order::BuildModule { colony, kind } => Cost { materials: self.module_materials_at(seat, *colony, *kind), ..Default::default() },
             // Ticket #87: a Ship is built with a full tank, its Fuel paid at the build.
             // Ticket #398 (version 0.09.3): at the yard's price, so a low-gravity yard with a Mine is cheaper.
-            Order::BuildShip { site, kind } => Cost { materials: self.ship_materials_at(seat, *site, *kind), fuel: t.unit(*kind).tank as f64, ..Default::default() },
+            Order::BuildShip { site, kind } => Cost { materials: self.ship_materials_at(seat, *site, *kind), fuel: self.tank_of(seat, *kind), ..Default::default() },
             Order::BuildArmy { .. } => Cost { materials: t.unit(UnitKind::Army).materials as f64, ..Default::default() },
             Order::Repair { points, .. } => {
                 Cost { materials: (t.repair.materials_per_point * *points as i64) as f64, ..Default::default() }
@@ -1440,7 +1440,7 @@ impl Game {
                 // Ticket #87: the leg is paid from the tank.
                 let (_, fuel) = self.transit_cost_for(seat, from, *to);
                 if s.fuel < fuel {
-                    return fail(format!("the tank holds {} Fuel of {}; this leg needs {}", figure(s.fuel), self.tables.unit(s.kind).tank, figure(fuel)));
+                    return fail(format!("the tank holds {} Fuel of {}; this leg needs {}", figure(s.fuel), figure(self.tank_of(seat, s.kind)), figure(fuel)));
                 }
                 Ok(cost)
             }
@@ -1505,7 +1505,7 @@ impl Game {
                         None => format!("every station or Refinery Colony that fuels you over {} is blockaded", self.tables.body(body).name),
                     });
                 }
-                if s.fuel >= self.tables.unit(s.kind).tank as f64 {
+                if s.fuel >= self.tank_of(seat, s.kind) {
                     return fail("the tank is full");
                 }
                 if cost.fuel <= 0.0 {
@@ -2385,7 +2385,7 @@ impl Game {
                 // Ticket #87: the Fuel came out of the Stockpile with the order's cost; it goes into the tank.
                 Order::Refuel { ship } => {
                     let amount = cost.fuel;
-                    let tank = self.ship(*ship).map(|s| self.tables.unit(s.kind).tank as f64).unwrap_or(0.0);
+                    let tank = self.ship(*ship).map(|s| self.tank_of(seat, s.kind)).unwrap_or(0.0);
                     if let Some(s) = self.ship_mut(*ship) {
                         s.fuel = tenth((s.fuel + amount).min(tank));
                     }

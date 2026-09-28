@@ -92,8 +92,11 @@ branch = "Propulsion"
 rung = 1
 cost = 18
 needs = []
-effect = "Launch Emissions 0.8; a Launch Pad Fire closes no Launch Site"
+effect = "Launch Emissions 0.8; a Launch Pad Fire closes no Launch Site; every Ship's tank +5 Fuel"
 value = 0.8
+# Ticket #413 (version 0.09.4): and every Ship's tank holds this much more Fuel, a Ship already
+# flying gaining the room empty and a new one built full.
+tank_fuel = 5.0
 
 [[tech]]
 id = "efficient_transit"
@@ -374,3 +377,18 @@ cost = 38
 needs = ["clean_propellant"]
 effect = "Transit times x0.8 (a Mars crossing four turns at the window, Venus two); Fuel unchanged"
 value = 0.8
+
+# Ticket #413 (version 0.09.4): the twenty-third Tech, appended last with its enum variant.
+# Propulsion rung 1 BESIDE Clean Propellant, needing nothing and needed by nothing, priced at 22
+# where the rung is 18, at the designer's word. A crossing's days are multiplied by `value` before
+# the rounding up, and by Nuclear Rockets' as well where both stand (0.72): at the window Mars is
+# four turns where it was five with either or both, and the stacking gains off the window.
+[[tech]]
+id = "orbital_refuelling"
+name = "Orbital Refuelling"
+branch = "Propulsion"
+rung = 1
+cost = 22
+needs = []
+effect = "Transit times x0.9; stacks with Nuclear Rockets"
+value = 0.9

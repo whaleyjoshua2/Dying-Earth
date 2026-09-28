@@ -854,7 +854,7 @@ fn build_board(session: &mut Session) {
                 escaped: false,
                 arrived_this_turn: false,
                 built_turn: turn,
-                fuel: g.tables.unit(UnitKind::ColonyShip).tank as f64,
+                fuel: g.tank_of(Seat(0), UnitKind::ColonyShip),
             });
         }
         // `settler:<body id>` (a building aid, ticket #258, version 0.08.4): a Colony Ship of seat 0's
@@ -881,7 +881,7 @@ fn build_board(session: &mut Session) {
                 escaped: false,
                 arrived_this_turn: false,
                 built_turn: turn,
-                fuel: g.tables.unit(UnitKind::ColonyShip).tank as f64,
+                fuel: g.tank_of(Seat(0), UnitKind::ColonyShip),
             });
             // Ticket #370 (version 0.09.2): the board is composed after the turn is played, so the
             // Report line the Resolution writes for Colonists waiting aboard is written here, by the
@@ -963,7 +963,7 @@ fn build_board(session: &mut Session) {
                 escaped: false,
                 arrived_this_turn: false,
                 built_turn: turn,
-                fuel: g.tables.unit(UnitKind::Frigate).tank as f64,
+                fuel: g.tank_of(Seat(0), UnitKind::Frigate),
             });
         }
         // `queue:1` (a building aid, ticket #332, version 0.09.0): seat 0's start Region has three
@@ -1412,7 +1412,7 @@ fn build_board(session: &mut Session) {
         let id = ShipId(g.fresh_id());
         let name = g.next_ship_name(UnitKind::Frigate);
         let built_turn = g.turn;
-        let half = g.tables.unit(UnitKind::Frigate).tank as f64 / 2.0;
+        let half = g.tank_of(Seat(0), UnitKind::Frigate) / 2.0;
         g.ships.push(Ship { id, name, kind: UnitKind::Frigate, seat: Seat(0), damage: 0, at: ShipAt::Body(body), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: half, slot: None });
     }
     // Ticket #337 (version 0.09.0): `ducats:<n>` (a building aid): seat 0 holds exactly n Ducats.

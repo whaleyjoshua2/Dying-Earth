@@ -1978,6 +1978,17 @@ impl Game {
         }
     }
 
+    /// Ticket #413 (version 0.09.4): what a Ship of this kind holds for this seat: the card's tank
+    /// and Clean Propellant's Fuel on top (at half under Provisional Findings, as every addition
+    /// is). An Army has no tank and gains none.
+    pub fn tank_of(&self, seat: Seat, kind: UnitKind) -> f64 {
+        let base = self.tables.unit(kind).tank as f64;
+        if base <= 0.0 {
+            return 0.0;
+        }
+        base + self.tech_addition_of(seat, TechId::CleanPropellant, self.tables.tech(TechId::CleanPropellant).tank_fuel) as f64
+    }
+
     /// An additive Tech read for one seat: its full value once done, half rounded down under
     /// Provisional Findings, and 0 otherwise.
     pub fn tech_addition(&self, seat: Seat, t: TechId) -> i64 {
@@ -2252,7 +2263,7 @@ impl Game {
     /// the Stockpile can pay.
     pub fn refuel_amount(&self, seat: Seat, ship: ShipId) -> f64 {
         let Some(s) = self.ship(ship) else { return 0.0 };
-        let want = (self.tables.unit(s.kind).tank as f64 - s.fuel).max(0.0);
+        let want = (self.tank_of(s.seat, s.kind) - s.fuel).max(0.0);
         tenth(want.min(self.seat(seat).stockpile.fuel.max(0.0)))
     }
 
@@ -4084,7 +4095,9 @@ impl Game {
     /// The same at any turn, for the window tooltip and the AI's planning.
     pub fn transit_cost_at(&self, from: BodyId, to: BodyId, turn: u32) -> (u32, f64) {
         let tech = if self.has_tech(TechId::EfficientTransit) { self.tables.tech(TechId::EfficientTransit).value } else { 1.0 };
-        let days_factor = if self.has_tech(TechId::NuclearRockets) { self.tables.tech(TechId::NuclearRockets).value } else { 1.0 };
+        // Ticket #413 (version 0.09.4): Orbital Refuelling's tenth multiplies Nuclear Rockets' fifth.
+        let days = |t: TechId| if self.has_tech(t) { self.tables.tech(t).value } else { 1.0 };
+        let days_factor = days(TechId::NuclearRockets) * days(TechId::OrbitalRefuelling);
         self.transit_cost_with(from, to, 1.0, tech, days_factor, turn)
     }
 
@@ -4098,7 +4111,7 @@ impl Game {
 
     pub fn transit_cost_for_at(&self, seat: Seat, from: BodyId, to: BodyId, turn: u32) -> (u32, f64) {
         let faction = self.tables.faction(self.kind(seat)).transit_fuel_multiplier;
-        let (turns, fuel) = self.transit_cost_with(from, to, faction, self.tech_multiplier(seat, TechId::EfficientTransit), self.tech_multiplier(seat, TechId::NuclearRockets), turn);
+        let (turns, fuel) = self.transit_cost_with(from, to, faction, self.tech_multiplier(seat, TechId::EfficientTransit), self.tech_multiplier(seat, TechId::NuclearRockets) * self.tech_multiplier(seat, TechId::OrbitalRefuelling), turn);
         // Ticket #92 (version 0.06.0): a working Mass Driver of the seat's at the Body it leaves
         // takes a flat figure off, after the multipliers, never below the minimum.
         if self.mass_driver_at(seat, from) {

@@ -916,7 +916,7 @@ fn print_costs(g: &Game) {
         .iter()
         .map(|k| {
             let c = g.tables.unit(*k);
-            format!("{} {}M+{}F/{}w tank {} hp {}", k.name(), g.ship_materials(me, *k), c.tank, g.build_widgets(me, BuildItem::Unit(*k)), c.tank, c.hit_points)
+            format!("{} {}M+{}F/{}w tank {} hp {}", k.name(), g.ship_materials(me, *k), figure(g.tank_of(me, *k)), g.build_widgets(me, BuildItem::Unit(*k)), figure(g.tank_of(me, *k)), c.hit_points)
         })
         .collect();
     println!("Ships: {}", u.join(" | "));
@@ -1249,7 +1249,7 @@ fn print_board(g: &Game) {
             sh.seat.0,
             ship_at_text(g, sh),
             sh.fuel,
-            t.unit(sh.kind).tank,
+            figure(g.tank_of(sh.seat, sh.kind)),
             sh.colonists,
             // Ticket #404 (version 0.09.4): a number or a dash, never `Some(2)`.
             sh.army.map(|a| a.0.to_string()).unwrap_or_else(|| "-".to_string()),
