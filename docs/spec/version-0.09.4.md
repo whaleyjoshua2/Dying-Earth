@@ -108,7 +108,9 @@ counted against a Sink of 6).
 - **the best run of the game** over its bar of 3, never falling back; and
 - **three tenths of the best share of the opening gap ever closed** (`stabilization_gap_cap = 0.3`
   in `victory.toml`), the opening gap being the counted gap at the game's first Climate phase, and
-  never falling back.
+  never falling back. **The opening figure, not the worst the gap has been**, at the designer's
+  word: a gap that grows through the middle game and is cut back earns nothing until it is under
+  where the game began, since measuring from the peak would pay for letting Emissions climb first.
 
 Three tenths is under the third one turn of run is worth, so a real run always beats any cut. **The
 Condition does not change**: a win is still three phases in a row. The score (the lower of the two
