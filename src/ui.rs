@@ -8799,7 +8799,12 @@ fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, ac
         };
         // Ticket #414 (version 0.09.4): on the lit path a bright border, off it a third.
         let lit = !path.is_empty() && !faded(t);
-        let stroke = if lit && card.gate_for.is_none() { egui::Stroke::new(2.5, Color32::WHITE) } else { egui::Stroke::new(stroke.width, fade(stroke.color, t)) };
+        // A lit Victory gate keeps its Faction's colour, a little thicker (the designer, Q4).
+        let stroke = match (lit, card.gate_for.is_some()) {
+            (true, false) => egui::Stroke::new(2.5, Color32::WHITE),
+            (true, true) => egui::Stroke::new(4.5, stroke.color),
+            _ => egui::Stroke::new(stroke.width, fade(stroke.color, t)),
+        };
         painter.rect(r, 6.0, fade(fill, t), stroke, egui::StrokeKind::Inside);
         // Ticket #414 (version 0.09.4): the type stays 12 unless a name no longer fits the box, and
         // then it comes down only as far as it must.

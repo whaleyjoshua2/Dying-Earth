@@ -308,8 +308,8 @@ The authority is [ticket #414](https://github.com/whaleyjoshua2/Dying-Earth/issu
 
 - **A hover lights the path back to the root**: the hovered Tech and every Tech it needs, all the
   way down, and the lines between them, drawn at full strength with a bright border and a thicker
-  line; everything else fades to a third. A Tech done on the path keeps its green line. Nothing
-  changes until the hover.
+  line; everything else fades to a third. A Tech done on the path keeps its green line; a Victory
+  gate on the path keeps its Faction's border, thicker. Nothing changes until the hover.
 - **The whole tree a tenth smaller**: boxes 110 x 52 on a 130 x 77 grid, where they were 122 x 58
   on 144 x 86. The type stays 12 point; a name that no longer fits its box (*Planetary
   Stewardship*, *The Extraction Charter*) comes down only as far as it must.

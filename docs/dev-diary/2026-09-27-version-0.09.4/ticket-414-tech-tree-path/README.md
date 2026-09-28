@@ -31,7 +31,7 @@ An agent that did not build it found one real defect, fixed: **the hover read th
 on the whole screen**, so a box scrolled out of the window, or under another window over the tree,
 lit the path while the pointer was on the map or on a slider; it reads the pointer through the
 tree's own layer and clip now. Also fixed: the Pick buttons on faded boxes fade with them; a stale
-test comment on the old grid. **A lit Victory gate keeps its Faction's border** rather than the
-white one, put to the designer.
+test comment on the old grid. **A lit Victory gate keeps its Faction's border**, drawn thicker, at
+the designer's word (Q4, A): The Upload below, pink and heavier.
 
 ![The Upload lit](tech-tree-lit-the-upload.png)
