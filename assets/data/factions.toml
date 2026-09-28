@@ -198,7 +198,7 @@ influence_multiplier = 1.0
 # which the text had never said.
 signature = "Provisional Findings. While at least {provisional}% of their Research went to the shared Tech last turn, they already have half the effect of the Tech under research: a multiplier x reads 1 + (x - 1) / 2, an addition reads half rounded down, and immunities do not carry. Keeping back more switches it off for the turn after. Their Research is x1.5 on Earth and x1.75 off it, an Observatory on a station over Earth counting as off."
 # Ticket #203 (version 0.08.1). The building is ticket #184's.
-unique = "Reactor -- replaces the Power Plant, and takes 75% off the Energy upkeep of everything its holder owns, the Archive excepted. Off Earth, the Heliostat -- replaces the Solar Array, and makes 1 more Energy wherever it stands."
+unique = "Reactor -- replaces the Power Plant, and takes a quarter off the Energy upkeep of everything its holder owns, the Archive excepted. Off Earth, the Heliostat -- replaces the Solar Array, and makes 1 more Energy wherever it stands."
 # Ticket #68 (version 0.05.5): the first part is the Research paid into the Archive.
 # Ticket #347 (version 0.09.1): 125 of it, and the fund holds the whole figure from the first turn.
 # This bar IS `[archive] research` in modules.toml -- one figure written in two files, the Archive's

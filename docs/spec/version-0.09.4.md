@@ -161,7 +161,9 @@ Decommission +2, whoever holds it, and nothing damps either; in a Colony neither
   Arkwrights' Colony Ship carries 16 with Generation Ships too and costs them 25.5 Materials; the
   Archivists' Provisional Findings holds while at least 75% of their Research went to the shared
   Tech last turn (the figure read from the data, as the Scrubber's cap now is in the Custodians'
-  text), and keeping back more switches it off for the turn after.
+  text), and keeping back more switches it off for the turn after. **The Reactor takes a quarter
+  off** its holder's Energy upkeep, as the code and its own line have it; the Archivists' text said
+  75% off, and the designer ruled the code right.
 
 **What would show this wrong**: a Mothball button with no hover in a Region; a confirm reading
 `free` for a Mothball; a figure in any Faction's text that the data contradicts.

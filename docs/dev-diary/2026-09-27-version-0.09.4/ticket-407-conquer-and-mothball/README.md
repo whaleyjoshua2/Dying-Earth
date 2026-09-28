@@ -43,3 +43,5 @@ million"* and the Archivists' *75%* are read from the data now; *"one for one"* 
 Production Moved; the test now decommissions and checks the Materials the Resolution pays against
 the hover, and checks the Decommission's confirm. The turn's order list reads *(+1 Unrest)* for a
 Mothball where it read *(free)*, as ticket #404 made every confirm do.
+
+The designer ruled the Reactor's code right (Q4, A): the Archivists' text now says *a quarter off*.
