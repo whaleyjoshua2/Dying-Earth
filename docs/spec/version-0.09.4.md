@@ -316,3 +316,12 @@ The authority is [ticket #414](https://github.com/whaleyjoshua2/Dying-Earth/issu
 
 **What would show this wrong**: a hover lighting a Tech the hovered one does not need; a lit path
 missing a Tech it does; a name spilling out of its box.
+
+## 11. The Victory window's bars in the Faction's colour
+
+The authority is [ticket #418](https://github.com/whaleyjoshua2/Dying-Earth/issues/418), added to the
+map by the designer on 2026-09-28. No rule moves.
+
+**Each Faction's two Victory bars are filled in its own colour**, its heading's, where every bar was
+the theme's one blue (as the glossary's *Victory bar* entry had always said they were); **the
+Colonists-in-transit band is that colour darkened**, hatched as before.

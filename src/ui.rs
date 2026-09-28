@@ -302,10 +302,11 @@ fn temperature_history(ui: &mut Ui, game: &Game, size: egui::Vec2) {
 /// clipped to the bar and counts toward nothing; egui's own `ProgressBar`, which this replaces,
 /// cannot hold a second segment. `fraction` is the settled fill and `transit` the band's width
 /// beyond it, both of the whole bar.
-fn victory_bar(ui: &mut Ui, fraction: f32, transit: f32) {
+/// Ticket #418 (version 0.09.4): filled in the Faction's own colour, its heading's, where every bar
+/// was the theme's one blue; the in-transit band is that colour darkened.
+fn victory_bar(ui: &mut Ui, fraction: f32, transit: f32, fill: Color32) {
     let (rect, _) = ui.allocate_exact_size(egui::vec2(ui.available_width(), 16.0), egui::Sense::hover());
     let painter = ui.painter_at(rect);
-    let fill = ui.visuals().selection.bg_fill;
     painter.rect_filled(rect, 3.0, Color32::from_rgb(38, 38, 44));
     let at = |f: f32| rect.left() + f.clamp(0.0, 1.0) * rect.width();
     if transit > 0.0 {
@@ -10776,10 +10777,10 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                     Some(why) => format!("{first} - {why}"),
                     None => first,
                 });
-                victory_bar(ui, p.first_fraction() as f32, p.first_transit_fraction() as f32);
+                victory_bar(ui, p.first_fraction() as f32, p.first_transit_fraction() as f32, seat_colour(session, seat));
                 // Ticket #51: the second part in the words its own card uses.
                 ui.label(format!("{}: {}{}", p.second_name, p.second_text, in_transit(p.second_transit)));
-                victory_bar(ui, p.second_fraction() as f32, p.second_transit_fraction() as f32);
+                victory_bar(ui, p.second_fraction() as f32, p.second_transit_fraction() as f32, seat_colour(session, seat));
                 // Ticket #72: the Prospectors set their Venture Capital Fund's share here, and draw.
                 // Ticket #256 (version 0.08.4): a slider and a Withdraw field, in their own function.
                 if seat == Seat(0) && !session.spectator && game.kind(Seat(0)) == FactionKind::Prospectors {
