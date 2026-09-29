@@ -64,3 +64,8 @@ designer: a Drought, a Storm Surge, a card's Facility cut and a Strip Permit rea
 share now, not the Region's own; the computer seats still skip a School where no Lab stands.
 The sweep reads a Tech's turn after the turn's end, one past the turn it completed, as its other
 measures do. The closing sweep is [`after-416.txt`](../sweeps/after-416.txt).
+
+The designer answered both: *"q11 leave it q12 drop it"*. The School now waits for no Lab;
+`the_ai_builds_a_school_where_no_lab_stands` was watched red with the gate put back. Swept after
+([`after-416-schools.txt`](../sweeps/after-416-schools.txt)): the tree complete in 78 of 80, median
+turn 24; collapses 43; wins 7 / 9 / 3 / 17.

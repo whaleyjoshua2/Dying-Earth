@@ -413,14 +413,17 @@ and no Faction's; one Report line, *"Regions in no one's hands added N Research.
 **On the card**: the Output row's Research hover lists *population and Education* and *Research
 Lab*; the Lab's box reads *x1.5 this Region's Research*, its hover the Region's figure times the
 Lab's share; the Education Level's hover says it counts twice *in this Region's Research*. The
-computer seats' weights are unchanged (the designer, Q8).
+computer seats' weights are unchanged (the designer, Q8), but they **no longer wait for a Lab
+before a School** (Q12, *"drop it"*). A Drought, a Storm Surge, a card's Facility cut and a Strip
+Permit reach a Lab's share and not a Region's own (Q11, *"leave it"*).
 
 **Measured.** The sweep now records the turn the tree's LAST Tech completed (it recorded the game's
 last turn for a game whose tree was complete at the end), each Tech's turn, and the world's Research
 by source. Before: the tree complete in **47 of 80** games, median turn **28**; the world's Research
 35.4 a turn, Labs 20.7. After: **76 of 80, median turn 24**; 48.9 a turn, the Regions' own 26.7,
 Labs 6.7, Observatories 13.2, neutral Regions and occupied Labs 2.3; collapses **57 to 38**; wins
-7 / 6 / 0 / 10 to 13 / 13 / 1 / 15. The designer's ideal was 60 of 80; the figures that land nearer
+7 / 6 / 0 / 10 to 13 / 13 / 1 / 15. With the School gate dropped: **78 of 80, median turn 24**;
+50.7 a turn; collapses 43; wins 7 / 9 / 3 / 17. The designer's ideal was 60 of 80; the figures that land nearer
 it (base 0.8, 59 of 80) were put and declined.
 
 **What would show this wrong**: a Region with no Lab making no Research; a Lab in a small Region

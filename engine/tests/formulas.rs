@@ -2520,6 +2520,26 @@ fn an_ai_with_no_station_over_earth_orders_one_from_its_launch_site() {
     );
 }
 
+/// Ticket #416 (version 0.09.4): every Region makes Research from its Education now, so the
+/// computer seats weigh a School where no Lab stands; until this ticket they waited for a Lab.
+#[test]
+fn the_ai_builds_a_school_where_no_lab_stands() {
+    let mut schools = 0;
+    for seed in 1..=12u64 {
+        let mut g = Game::new(tables(), NewGame { seed, player: FactionKind::Custodians, player_is_ai: true, player_start: StateId::EastAsia });
+        for st in &mut g.states {
+            st.facilities.retain(|f| f.kind != FacilityKind::ResearchLab);
+        }
+        for s in Seat::ALL {
+            g.seats[s.index()].stockpile.materials = 500.0;
+            g.seats[s.index()].stockpile.energy = 500.0;
+            g.seats[s.index()].stockpile.ducats = 500.0;
+            schools += g.ai_orders(s).iter().filter(|o| matches!(o, Order::BuildFacility { kind: FacilityKind::School, .. } | Order::BuildFacilityWithDucats { kind: FacilityKind::School, .. })).count();
+        }
+    }
+    assert!(schools > 0, "no seat ordered a School in 48 seatings with no Lab on Earth");
+}
+
 #[test]
 fn the_archivist_ai_funds_the_archive_before_it_holds_a_colony() {
     // Ticket #51: the fund can start on turn one; only the stage needs a Colony off Earth.
