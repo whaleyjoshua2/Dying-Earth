@@ -1114,8 +1114,9 @@ impl Game {
                     return fail("this Nation State already has a School");
                 }
                 // Ticket #52: at most one Constabulary per Nation State. Ticket #389 (version
-                // 0.09.3): and one Stadium, by the same door.
-                if matches!(kind, FacilityKind::Constabulary | FacilityKind::Stadium)
+                // 0.09.3): and one Stadium, by the same door; ticket #411 (version 0.09.4): and one
+                // Nature Reserve.
+                if matches!(kind, FacilityKind::Constabulary | FacilityKind::Stadium | FacilityKind::NatureReserve)
                     && (self.state(*state).facilities.iter().any(|f| f.kind == *kind)
                         || self.state(*state).queue.iter().any(|b| b.item == BuildItem::Facility(*kind))
                         || pending.iter().any(|o| matches!(o.build_state(), Some(s) if s == *state) && matches!(o, Order::BuildFacility { kind: k, .. } | Order::BuildFacilityWithDucats { kind: k, .. } if k == kind)))

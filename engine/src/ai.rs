@@ -32,6 +32,8 @@ enum Cat {
     Constabulary,
     /// Ticket #389 (version 0.09.3): a Stadium, after a Constabulary.
     Stadium,
+    /// Ticket #411 (version 0.09.4): a Nature Reserve.
+    NatureReserve,
     Relief,
     Resettle,
     /// Ticket #267 (version 0.08.4): a Smear campaign against a rival.
@@ -324,6 +326,7 @@ impl Game {
             Cat::BuildInfluence => w.build_influence,
             Cat::Constabulary => w.build_constabulary,
             Cat::Stadium => w.build_stadium,
+            Cat::NatureReserve => w.build_nature_reserve,
             Cat::Relief => w.relief,
             Cat::Resettle => w.resettle,
             Cat::Smear => w.smear,
@@ -1098,7 +1101,7 @@ impl Game {
                         || cat == Cat::Observatory
                 }
                 // Ticket #54: a Scrubber is what a Custodian buys Stabilization with now.
-                VictoryFirstKind::StabilizationRun => cat == Cat::Scrubber || cat == Cat::Leapfrog || cat == Cat::ResearchLab || cat == Cat::Observatory,
+                VictoryFirstKind::StabilizationRun => cat == Cat::Scrubber || cat == Cat::Leapfrog || cat == Cat::ResearchLab || cat == Cat::Observatory || cat == Cat::NatureReserve,
                 // Version 0.07.0: the Research Lab and Observatory join the list for the same
                 // reason as the Venture Fund's: Generation Ships gates this win.
                 VictoryFirstKind::ColonistsOffEarth => {
@@ -1220,6 +1223,14 @@ impl Game {
                             }
                             (Cat::Stadium, self.base_weight(seat, Cat::Stadium))
                         }
+                        // Ticket #411 (version 0.09.4): the Nature Reserve, a little for everyone and
+                        // on the Sink gap for the Custodians; part of every seat's Unrest management
+                        // at the designer's word, at the Stadium's weight from Unrest 4.
+                        FacilityKind::NatureReserve => {
+                            let base = self.base_weight(seat, Cat::NatureReserve);
+                            let restive = self.state(sid).unrest >= self.tables.ai.thresholds.constabulary_from;
+                            (Cat::NatureReserve, if restive { base.max(self.base_weight(seat, Cat::Stadium)) } else { base })
+                        }
                         FacilityKind::LaunchSite => {
                             if has_launch {
                                 continue;
@@ -1270,7 +1281,8 @@ impl Game {
                     // Ticket #389 (version 0.09.3): the Stadium takes the Constabulary's multipliers
                     // here and below, at the designer's word: its second answer to the same Region,
                     // which in a Region just Occupied is the same restive Region the Occupation made.
-                    let calms = matches!(fk, FacilityKind::Constabulary | FacilityKind::Stadium);
+                    let calms = matches!(fk, FacilityKind::Constabulary | FacilityKind::Stadium)
+                        || (fk == FacilityKind::NatureReserve && self.state(sid).unrest >= self.tables.ai.thresholds.constabulary_from);
                     let just_occupied = calms && self.state(sid).control.is_occupied();
                     let sway = if (first_embassy && self.standing_pressed(seat, Place::State(sid))) || just_occupied { m.threat } else { 1.0 };
                     // Ticket #56: a Facility that waits on a Tech is not offered until it is in.

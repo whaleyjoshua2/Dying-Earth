@@ -366,3 +366,25 @@ sentence is gone.
 
 **What would show this wrong**: a figure whose listed sources do not add up to it; a hover past six
 lines.
+
+## 14. A Nature Reserve that grows the Natural Sink
+
+The authority is [ticket #411](https://github.com/whaleyjoshua2/Dying-Earth/issues/411).
+
+**The Nature Reserve**, a Region Facility every Faction may build: **30 Materials, 5 Widgets**, no
+Energy upkeep, no Emissions, **a slot, one to a Region**, no Tech. While it stands it adds **1 ppm a
+turn to the Natural Sink**, credited to its holder's Blame removal as a Scrubber's is, and takes **a
+sixth off what the climate adds to its Region's Unrest** (a third of the Stadium's half,
+`nature_reserve_factor` in `unrest.toml`), multiplying with a Stadium's where both stand. Its icon
+is a beech (game-icons.net, Lorc), chosen by the designer from a sheet of seven.
+
+**The computer seats** weigh it at `build_nature_reserve` (the Custodians 5, on their Sink gap as
+the Scrubber; the rest 2), and **as part of every seat's Unrest management**: in a Region at Unrest
+4 or more it weighs as a Stadium does and takes the calming buildings' multipliers.
+
+**Measured** (against the sweep after §12): **97 Reserves built** over 80 games (23 / 36 / 11 / 27 by
+seating); wins **9 / 5 / 0 / 9 to 7 / 6 / 0 / 10**, collapses 57 unmoved; the world under the Sink
+in 15 of 80 games before and after; the Unrest figures within a point or two.
+
+**What would show this wrong**: a Reserve adding nothing to the Sink or to its holder's removal; a
+second Reserve in one Region; a Plain or Agitate rise damped by it.

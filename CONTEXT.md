@@ -828,6 +828,10 @@ _Avoid_: progress graph, score chart, victory log
 The amount of CO2 the oceans and forests remove from the CO2 Stock every turn. Net emissions below it stabilize the stock. Every Scrubber standing and online enlarges it while it stands; the Custodians' Research Directive can add to it for good; and since version 0.09.1 a Launch on or over Earth raises it by a quarter of a ppm for good, the soot of a nuke at home dimming the sky. Since version 0.05 a Break can weaken it for good, and since version 0.09.1 that Break **takes 2 ppm off** it, never below nothing, rather than setting it to 4, so a Sink somebody has raised keeps what it was given.
 _Avoid_: absorption, offset, carbon capture
 
+**Nature Reserve**:
+A Region Facility, since version 0.09.4, any Faction may build, one to a Region: land given back. While it stands it adds 1 ppm a turn to the Natural Sink, credited to its holder as removal, and it takes a sixth off what the climate adds to its Region's Unrest, a third of what a Stadium does.
+_Avoid_: park, forest, wilderness
+
 **Sea Level**:
 How far the oceans have risen with the Temperature. It is drawn on the globe as a band of drowned land along every coast, widening with each threshold, and at each of its thresholds it permanently takes Coastal Slots from every Region, as many as the state's Coastal Exposure and never more than it has left, and then, since version 0.08.5, turns one Inland Slot coastal, wall or no wall, so a coast never runs out. It takes nothing else and takes nothing from a state with no Coastal Slots left that rise, but it reaches every state that has a coast at all.
 _Avoid_: flooding, water line, ocean rise

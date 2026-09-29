@@ -4466,8 +4466,8 @@ fn f_coastal_engineering_is_the_thirteenth_tech() {
     // tickets #182 to #186 -- the Investment Bank, the Spaceport, the Reactor and the Academy.
     assert_eq!(g.tables.facility(FacilityKind::SeaWall).needs_tech, Some(TechId::CoastalEngineering));
     // Ticket #332 (version 0.09.0): and the Mine, sixteen. Ticket #389 (version 0.09.3): and the
-    // Stadium, seventeen.
-    assert_eq!(FacilityKind::ALL.len(), 17, "seventeen Facilities");
+    // Stadium, seventeen. Ticket #411 (version 0.09.4): and the Nature Reserve, eighteen.
+    assert_eq!(FacilityKind::ALL.len(), 18, "eighteen Facilities");
 }
 
 /// (g) Antarctica opens the first Climate phase the Temperature stands at +1.6, stays open, and its
@@ -12218,9 +12218,11 @@ fn the_queue_is_served_in_order_and_a_launch_pad_fire_takes_the_turns_widgets() 
 fn four_makers_the_factory_makes_widgets_the_mine_makes_materials_and_the_start_board_has_both() {
     let mut g = game();
     calm(&mut g);
-    // Ticket #389 (version 0.09.3): the Stadium stands after the Mine now, appended last in its turn.
-    assert_eq!(FacilityKind::ALL[FacilityKind::ALL.len() - 2], FacilityKind::Mine, "appended after every kind before it");
-    assert_eq!(FacilityKind::ALL.last(), Some(&FacilityKind::Stadium), "appended last");
+    // Ticket #389 (version 0.09.3): the Stadium stands after the Mine now, appended last in its turn;
+    // ticket #411 (version 0.09.4): and the Nature Reserve after it.
+    assert_eq!(FacilityKind::ALL[FacilityKind::ALL.len() - 3], FacilityKind::Mine, "appended after every kind before it");
+    assert_eq!(FacilityKind::ALL[FacilityKind::ALL.len() - 2], FacilityKind::Stadium);
+    assert_eq!(FacilityKind::ALL.last(), Some(&FacilityKind::NatureReserve), "appended last");
     assert_eq!(ModuleKind::ALL.last(), Some(&ModuleKind::Factory), "appended last");
     assert!(ModuleKind::BUILDABLE.contains(&ModuleKind::Factory));
     assert_eq!((FacilityKind::Mine.name(), ModuleKind::Factory.name()), ("Mine", "Factory"), "one name in both lists");
@@ -17653,4 +17655,29 @@ fn the_output_rows_sources_add_up_to_its_figures() {
     let s = g.place_output_sources(home).unwrap();
     assert!(s.iter().any(|(r, n, v)| *r == Resource::Energy && n == "upkeep" && *v < 0.0), "the upkeep as one line below nought");
     assert!(s.iter().any(|(r, n, _)| *r == Resource::Ducats && n == "the economy"), "a Region's economy");
+}
+
+/// Ticket #411 (version 0.09.4): **the Nature Reserve** adds 1 to the Sink while it stands,
+/// credited to its holder, and takes a sixth off a climate rise to its Region's Unrest (a third of
+/// the Stadium's half), multiplying with a Stadium's; one to a Region; 30 Materials and 5 Widgets.
+#[test]
+fn a_nature_reserve_grows_the_sink_and_calms_a_climate_rise() {
+    let mut g = game();
+    let sid = StateId::EastAsia;
+    let card = g.tables.facility(FacilityKind::NatureReserve).clone();
+    assert_eq!((card.materials, card.widgets, card.energy_upkeep, card.sink_per_turn), (30, 5, 0, 1.0), "the designer's figures");
+    let before = g.scrubber_removal_by_seat()[0];
+    g.state_mut(sid).facilities.push(facility(FacilityKind::NatureReserve));
+    assert!((g.scrubber_removal_by_seat()[0] - before - 1.0).abs() < 1e-9, "+1 on the Sink, the holder's");
+    assert!((g.emissions_now().scrubbers - g.scrubber_removal()).abs() < 1e-9, "and in the Climate phase's Sink");
+    g.state_mut(sid).unrest = 3.0;
+    let rose = g.raise_unrest(sid, 1.2, UnrestSource::Climate);
+    assert!((rose - 1.0).abs() < 1e-6, "a sixth off a climate rise of 1.2 lands 1.0: {rose}");
+    assert_eq!(g.raise_unrest(sid, 1.0, UnrestSource::Plain), 1.0, "nothing off a plain rise");
+    g.state_mut(sid).facilities.push(facility(FacilityKind::Stadium));
+    let rose = g.raise_unrest(sid, 1.2, UnrestSource::Climate);
+    assert!((rose - 0.5).abs() < 1e-6, "with a Stadium the two multiply, 1.2 to 0.5: {rose}");
+    g.seats[0].stockpile.materials = 500.0;
+    let again = Order::BuildFacility { state: sid, kind: FacilityKind::NatureReserve };
+    assert!(g.check_order(Seat(0), &[], &again).unwrap_err().0.contains("already has a Nature Reserve"), "one to a Region");
 }

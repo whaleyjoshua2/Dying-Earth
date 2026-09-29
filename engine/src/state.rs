@@ -4353,10 +4353,13 @@ impl Game {
     /// Scrubber belongs to whoever controls its state, and counts as removal for that seat's Blame.
     pub fn scrubber_removal_by_seat(&self) -> [f64; SEAT_COUNT] {
         let per = self.tables.facility(FacilityKind::Scrubber).sink_per_turn;
+        // Ticket #411 (version 0.09.4): and every working Nature Reserve's, credited to its holder.
+        let reserve = self.tables.facility(FacilityKind::NatureReserve).sink_per_turn;
         let mut out = [0.0; SEAT_COUNT];
         for st in &self.states {
             let Some(seat) = st.control.controller() else { continue };
             out[seat.index()] += per * self.scrubbers_online(st.id) as f64;
+            out[seat.index()] += reserve * st.facilities.iter().filter(|f| f.kind == FacilityKind::NatureReserve && f.working()).count() as f64;
         }
         out
     }
@@ -4457,6 +4460,11 @@ impl Game {
         self.state(s).facilities.iter().any(|f| f.kind == FacilityKind::Constabulary && f.working())
     }
 
+    /// Ticket #411 (version 0.09.4): a working Nature Reserve here.
+    pub fn nature_reserve_online(&self, s: StateId) -> bool {
+        self.state(s).facilities.iter().any(|f| f.kind == FacilityKind::NatureReserve && f.working())
+    }
+
     /// Ticket #389 (version 0.09.3): a working Stadium here, which halves what the climate adds.
     pub fn stadium_online(&self, s: StateId) -> bool {
         self.state(s).facilities.iter().any(|f| f.kind == FacilityKind::Stadium && f.working())
@@ -4496,6 +4504,11 @@ impl Game {
         // Constabulary beside it -- and touches no Agitate and no refugees.
         if source == UnrestSource::Climate && self.stadium_online(s) {
             damped *= self.tables.unrest.stadium_factor;
+        }
+        // Ticket #411 (version 0.09.4): and a working Nature Reserve takes a third of that effect,
+        // multiplying with the Stadium's where both stand.
+        if source == UnrestSource::Climate && self.nature_reserve_online(s) {
+            damped *= self.tables.unrest.nature_reserve_factor;
         }
         if damped <= 0.0 {
             return 0.0;

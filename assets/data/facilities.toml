@@ -344,3 +344,18 @@ widgets = 4
 energy_upkeep = 1
 does = "halves what the climate adds to this state's Unrest, after a Constabulary's half point (a heat rise of one lands as a quarter with both); an Agitate is untouched"
 emissions = 0.0
+
+# Ticket #411 (version 0.09.4): the Nature Reserve, the designer's "new building ... that increases
+# the natural sink - all factions can build". +1 ppm on the Natural Sink a turn while it stands,
+# credited to its holder's Blame removal as a Scrubber's is; and a third of the Stadium's effect on
+# Unrest (`nature_reserve_factor` in unrest.toml). A slot, one to a Region, every Faction's alike.
+# Appended last with its enum variant.
+[[facility]]
+id = "nature_reserve"
+name = "Nature Reserve"
+materials = 30
+widgets = 5
+energy_upkeep = 0
+does = "+1 ppm on the Natural Sink a turn; a sixth off what the climate adds to Unrest here"
+emissions = 0.0
+sink_per_turn = 1.0
