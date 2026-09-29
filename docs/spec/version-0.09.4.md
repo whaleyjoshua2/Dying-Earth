@@ -464,12 +464,15 @@ output may carry a fraction now. **The three low-gravity worlds' Refinery yields
 the Moon 0.6875, Phobos 0.625, Deimos 0.3125. **The market's Fuel is 3 Ducats** (4 before), its band
 2 to 4; what it pays for Fuel sold is half, 1.5. **The computer seats buy Fuel** when short of what a
 Colony Ship's tank or a Refuel they weigh wants: the purchase rides in the same candidate, at its
-weight, and where their Ducats cannot pay for it the candidate is weighed as before.
+weight, beside the plain Refuel from what is held. **A Refuel is priced at the Fuel left after the
+orders queued ahead of it**, a Buy among them, as commit pays it; before, it was priced at the
+Stockpile as it stood, so a Refuel behind a purchase was refused and a later order could spend the
+Fuel it would take.
 
 **Measured** (`sweeps/after-421.txt` against `after-420.txt`; the candidates in
-`421-candidate-*.txt`): ground Colonies on the Moon at the end 222 to 229 (255 before §16); first
-Moon Colony in 69 to 71 of 80 games; Ships stranded at the end 34 to 41; collapses 46; wins 10 / 10 /
-0 / 14 to 8 / 7 / 2 / 17; the tree complete in 74 of 80. The off-Earth figures and the price reach a
+`421-candidate-*.txt`): ground Colonies on the Moon at the end 222 to 228 (255 before §16); first
+Moon Colony in 69 to 72 of 80 games; Refuel orders 472 to 520; Ships stranded at the end 34 to 43;
+collapses 46; wins 10 / 10 / 0 / 14 to 8 / 7 / 2 / 17; the tree complete in 73 of 80. The off-Earth figures and the price reach a
 human player more than the computer, which builds few Refineries off Earth.
 
 **What would show this wrong**: a Refinery on Earth making 3; a Module's 4.5 rounded to 4; Fuel at 4

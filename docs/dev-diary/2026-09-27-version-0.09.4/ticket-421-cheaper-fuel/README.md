@@ -28,3 +28,19 @@ The trading window on turn 1 (`shot: trade:1 panel:0 seed:7 cardshut:1`): Fuel 3
 1.5; the top bar's Fuel +4 from China's Refinery.
 
 ![The trading window](trading-window.png)
+
+## The review
+
+An agent that did not build it found the Buy-plus-Refuel could never be taken: a Refuel was priced at
+the Stockpile as it stood, so behind a purchase from an empty Stockpile it was refused, and a later
+order could spend the Fuel it would take (a queue that committed to -1 Fuel). And the test could not
+fail: it matched the log line of a refusal. Fixed: a Refuel is priced at what the queued orders leave,
+in the check and in `remaining`; the plain Refuel stays on offer beside the bought one; the test
+checks the pricing, a queue that would have gone below nought, and the computer buying then refuelling,
+each watched red with its half of the fix undone. The Body card prints a yield to as many places as it
+has, up to four, so Phobos reads x0.625:
+
+![Phobos](phobos-card.png)
+
+Swept again ([`after-421.txt`](../sweeps/after-421.txt)): Refuel orders 472 to 520; Moon ground
+Colonies 228; first Moon Colony in 72 of 80; stranded 43.

@@ -3279,7 +3279,11 @@ fn slot_yield_row(ui: &mut Ui, figures: [(&str, f64); 4], size: f32, tint: Color
                     ui.label(RichText::new(*key).size(size).color(tint));
                 }
             }
-            ui.label(RichText::new(format!("x{v:.2}")).size(size).color(tint));
+            // Ticket #421 (version 0.09.4): two places, or as many as the figure has up to four, so
+            // Phobos's Refinery reads x0.625 and not a rounded x0.62.
+            let two = format!("{v:.2}");
+            let exact = format!("{v:.4}").trim_end_matches('0').to_string();
+            ui.label(RichText::new(format!("x{}", if exact.len() > two.len() { exact } else { two })).size(size).color(tint));
         }
     });
 }

@@ -685,7 +685,13 @@ impl Game {
         let mut cost = Cost::default();
         let mut bought = 0;
         for o in pending {
-            cost.add(self.order_cost(seat, o));
+            // Ticket #421 (version 0.09.4): a Refuel takes what is left when it is paid, as commit
+            // pays it, not what the Stockpile held before the orders ahead of it.
+            let c = match o {
+                Order::Refuel { ship } => Cost { fuel: self.refuel_amount_from(*ship, self.seat(seat).stockpile.fuel - cost.fuel), ..Default::default() },
+                _ => self.order_cost(seat, o),
+            };
+            cost.add(c);
             if let Order::BuyInfluence { amount } = o {
                 bought += *amount;
             }
@@ -777,7 +783,11 @@ impl Game {
     /// Ticket #339 (version 0.09.0): is the order legal at all, price aside? The half of the check
     /// that names a RULE. Every arm returns the order's cost so the caller above can price it.
     fn check_order_rules(&self, seat: Seat, pending: &[Order], order: &Order) -> Result<Cost, OrderError> {
-        let cost = self.order_cost(seat, order);
+        // Ticket #421 (version 0.09.4): a Refuel is priced at the Fuel left after the pending orders.
+        let cost = match order {
+            Order::Refuel { ship } => Cost { fuel: self.refuel_amount_from(*ship, self.remaining(seat, pending).0.fuel), ..Default::default() },
+            _ => self.order_cost(seat, order),
+        };
         match order {
             Order::BuyInfluence { amount } => {
                 if *amount <= 0 {

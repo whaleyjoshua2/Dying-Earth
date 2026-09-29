@@ -2448,19 +2448,18 @@ impl Game {
                     Place::State(_) => body == BodyId::Earth && orbit.is_low(),
                     Place::Colony(c) => self.colony(*c).is_some_and(|c| c.body == body && self.colony_orbit(c) == orbit),
                 });
-            // Ticket #421 (version 0.09.4): short of the Fuel to fill it, the seat buys the rest.
+            // Ticket #421 (version 0.09.4): short of the Fuel to fill it, the seat buys the rest, in
+            // the same candidate. The plain Refuel from what is held stays on offer beside it, so a
+            // turn whose Ducats are held for something else still fills what it can.
             let top_up = self.ai_fuel_top_up(seat, self.tank_of(seat, s.kind) - s.fuel);
-            if s.fuel < self.tank_of(seat, s.kind) && self.refuelling_station(seat, body, orbit) && (self.seat(seat).stockpile.fuel > 0.0 || top_up.is_some()) && !ready_to_fire {
-                push(
-                    top_up.into_iter().chain([Order::Refuel { ship: s.id }]).collect(),
-                    Cat::Transit,
-                    self.base_weight(seat, Cat::Transit),
-                    gap_for(Cat::Transit, None),
-                    1.0,
-                    1.0,
-                    format!("refuel {} at {} ({} of {} in the tank)", ship_name, self.orbit_name(body, orbit), figure(s.fuel), figure(self.tank_of(seat, s.kind))),
-                    None,
-                );
+            if s.fuel < self.tank_of(seat, s.kind) && self.refuelling_station(seat, body, orbit) && !ready_to_fire {
+                let note = format!("refuel {} at {} ({} of {} in the tank)", ship_name, self.orbit_name(body, orbit), figure(s.fuel), figure(self.tank_of(seat, s.kind)));
+                if let Some(buy) = top_up {
+                    push(vec![buy, Order::Refuel { ship: s.id }], Cat::Transit, self.base_weight(seat, Cat::Transit), gap_for(Cat::Transit, None), 1.0, 1.0, format!("{note}, buying the rest"), None);
+                }
+                if self.seat(seat).stockpile.fuel > 0.0 {
+                    push(vec![Order::Refuel { ship: s.id }], Cat::Transit, self.base_weight(seat, Cat::Transit), gap_for(Cat::Transit, None), 1.0, 1.0, note, None);
+                }
             }
             // Ticket #335 (version 0.09.0): **it changes orbit rather than flying away when what it
             // wants is at the same Body** -- a station of its own to fill the tank at, a Colony with

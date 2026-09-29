@@ -2264,9 +2264,16 @@ impl Game {
     /// Ticket #87: what a Refuel order takes from the Stockpile: what the tank wants, as far as
     /// the Stockpile can pay.
     pub fn refuel_amount(&self, seat: Seat, ship: ShipId) -> f64 {
+        self.refuel_amount_from(ship, self.seat(seat).stockpile.fuel)
+    }
+
+    /// Ticket #421 (version 0.09.4): the same from a given amount of Fuel -- what is left after the
+    /// orders queued before it, a Buy among them -- so a Refuel queued behind a purchase is priced
+    /// at what it will take when it is paid, where it was priced at the Stockpile as it stood.
+    pub fn refuel_amount_from(&self, ship: ShipId, available: f64) -> f64 {
         let Some(s) = self.ship(ship) else { return 0.0 };
         let want = (self.tank_of(s.seat, s.kind) - s.fuel).max(0.0);
-        tenth(want.min(self.seat(seat).stockpile.fuel.max(0.0)))
+        tenth(want.min(available.max(0.0)))
     }
 
     /// Ticket #87: the cheapest leg a seat's Ship can fly from this Body today, in Fuel.

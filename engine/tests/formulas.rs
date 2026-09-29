@@ -2564,12 +2564,37 @@ fn the_ai_buys_fuel_for_a_colony_ship_or_a_refuel() {
     s.colonists = 0;
     s.fuel = 5.0;
     s.slot = Some(iss_slot);
-    // The Refuel is weighed with the 25 Fuel bought in it, 75 Ducats at 3 each, where with no Fuel
-    // held it was not weighed at all. (Whether it wins the Ducats is the scoring's business: here
-    // the seat spends them on Influence first.)
-    let _ = g.ai_orders(Seat(0));
-    let refuel: Vec<&String> = g.log.iter().filter(|l| l.contains("refuel Frigate")).collect();
-    assert!(refuel.iter().any(|l| l.contains("75 Ducats")), "the Refuel carries the purchase: {refuel:?}");
+    // The purchase and the Refuel pass the checks together from an empty Stockpile, the Refuel
+    // priced at the 25 the Buy leaves, and commit leaves nothing below nought.
+    let buy = Order::Buy { resource: Resource::Fuel, amount: 25 };
+    let refuel = Order::Refuel { ship };
+    assert_eq!(g.check_order(Seat(0), std::slice::from_ref(&buy), &refuel).map(|c| c.fuel), Ok(25.0), "the Refuel takes what the Buy brings");
+    // A later order cannot spend the Fuel the Refuel will take: 24 bought, 1 held, 25 into the tank.
+    g.seats[0].stockpile.fuel = 1.0;
+    let queued = vec![Order::Buy { resource: Resource::Fuel, amount: 24 }, refuel.clone(), Order::Buy { resource: Resource::Fuel, amount: 39 }];
+    assert_eq!(g.remaining(Seat(0), &queued).0.fuel, 39.0, "25 of the 64 went into the tank");
+    let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
+    g.colony_mut(iss).unwrap().modules.push(Module::new(ModuleKind::Shipyard));
+    assert!(g.check_order(Seat(0), &queued, &Order::BuildShip { site: Place::Colony(iss), kind: UnitKind::ColonyShip }).is_err(), "40 wanted, 39 left");
+    g.seats[0].stockpile.fuel = 0.0;
+    // And the computer takes it, where Influence cannot outbid it for the Ducats.
+    let mut t = Tables::load(&default_data_dir()).expect("tables load");
+    t.ducats.per_influence = 1_000_000;
+    let mut h = Game::new(Arc::new(t), NewGame { seed: 7, player: FactionKind::Custodians, player_is_ai: false, player_start: StateId::EastAsia });
+    calm(&mut h);
+    h.seats[0].stockpile.fuel = 0.0;
+    h.seats[0].stockpile.ducats = 500.0;
+    let (ship, _) = colony_ship_ready(&mut h, BodyId::Earth);
+    let s = h.ship_mut(ship).unwrap();
+    s.kind = UnitKind::Frigate;
+    s.colonists = 0;
+    s.fuel = 5.0;
+    s.slot = Some(iss_slot);
+    let orders = h.ai_orders(Seat(0));
+    let at = |o: &Order| orders.iter().position(|x| x == o);
+    assert!(at(&Order::Refuel { ship }).is_some() && at(&Order::Buy { resource: Resource::Fuel, amount: 25 }) < at(&Order::Refuel { ship }), "it buys the 25, then refuels: {orders:?}");
+    h.commit_orders(Seat(0), &orders);
+    assert!(h.seats[0].stockpile.fuel >= 0.0, "and the Stockpile holds no less than nought: {}", h.seats[0].stockpile.fuel);
 }
 
 #[test]
@@ -16262,7 +16287,7 @@ fn tenths_a_prospector_region_keeps_the_tenth_of_its_ducats() {
 /// Earth makes 4 now, so the tenth is shown on a Refinery Module's 4.5 at the Moon, 4.5 x 0.6875 =
 /// 3.09, to the tenth 3.1, and under Automated Refining 4.64, 4.6.
 #[test]
-fn tenths_a_refinery_under_automated_refining_yields_four_and_a_half() {
+fn tenths_a_refinery_module_at_the_moon_carries_its_tenth() {
     let mut g = game();
     g.state_mut(StateId::EastAsia).facilities = vec![facility(FacilityKind::Refinery)];
     assert_eq!(income_of(&mut g, Seat(0)).fuel, 4.0, "whole stays whole");
