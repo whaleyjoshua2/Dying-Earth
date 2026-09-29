@@ -272,8 +272,24 @@ pub struct SimResult {
     /// Ticket #324 (version 0.08.8): Batteries standing at the end, by the seat directing them.
     pub batteries: [u32; SEAT_COUNT],
     /// The turn the whole Tech Tree completed, if it did. A research agreement pays two seats a
-    /// tenth more, and the tree already finished with the game half run.
+    /// tenth more, and the tree already finished with the game half run. Ticket #416 (version
+    /// 0.09.4): the turn the LAST Tech completed, read inside the turn loop; it was the game's last
+    /// turn for a game whose tree was complete at the end, which the comment above did not say.
     pub tree_done_turn: Option<u32>,
+    /// Ticket #416 (version 0.09.4): the turn each Tech completed, in `TechId::ALL` order.
+    pub tech_done_turns: Vec<Option<u32>>,
+    /// Ticket #416: the world's Research over the game by source -- Research Labs, Observatories,
+    /// research agreements, neutral and occupied Labs, and the rest -- and the turns it was summed over.
+    pub research_by_source: [f64; 5],
+    pub research_turns: u32,
+    /// Ticket #416: the world's Research made each turn, all sources.
+    pub research_by_turn: Vec<f64>,
+    /// Ticket #416: summed each turn over every held Region, its `population_factor` times its
+    /// Education -- what a base of one Research per Region, scaled as a Lab is, would make, before
+    /// any Faction or Tech multiplier -- and the Regions held and Labs working, likewise summed.
+    pub region_base_units: f64,
+    pub regions_held_turns: u32,
+    pub labs_working_turns: u32,
     pub highest_rung: u32,
     pub victory_met: Option<(Seat, FactionKind)>,
     pub log: Vec<String>,
@@ -333,6 +349,13 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
     let mut first_under_sink_turn: Option<u32> = None;
     let mut unrest_turns = [[0u32; 3]; SEAT_COUNT];
     let mut start_lost_to_throw_off = false;
+    // Ticket #416 (version 0.09.4): the tree's finish and the world's Research by source.
+    let mut tech_done_turns: Vec<Option<u32>> = vec![None; TechId::ALL.len()];
+    let mut research_by_source = [0f64; 5];
+    let mut research_by_turn: Vec<f64> = Vec::new();
+    let (mut research_turns, mut regions_held_turns, mut labs_working_turns) = (0u32, 0u32, 0u32);
+    let mut region_base_units = 0f64;
+    let mut neutral_before = game.research.neutral_total;
     let window_turn = game.next_window_turn(1);
     let max_turns = tables.victory.turns;
     let mut guard = 0;
@@ -453,6 +476,45 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         }
         if first_under_sink_turn.is_none() && game.seat(Seat(0)).stabilization_run > 0 {
             first_under_sink_turn = Some(game.turn);
+        }
+        for (i, t) in TechId::ALL.into_iter().enumerate() {
+            if tech_done_turns[i].is_none() && game.research.done.contains(&t) {
+                tech_done_turns[i] = Some(game.turn);
+            }
+        }
+        {
+            let mut this_turn = 0.0;
+            for s in Seat::ALL {
+                for (name, r, v) in &game.seat(s).income_sources {
+                    if *r != crate::Resource::Research {
+                        continue;
+                    }
+                    let k = if name.starts_with("Research Lab") {
+                        0
+                    } else if name.starts_with("Observatory") {
+                        1
+                    } else if name.starts_with("Research agreement") {
+                        2
+                    } else {
+                        4
+                    };
+                    research_by_source[k] += v;
+                    this_turn += v;
+                }
+            }
+            let neutral = (game.research.neutral_total - neutral_before) as f64;
+            neutral_before = game.research.neutral_total;
+            research_by_source[3] += neutral;
+            this_turn += neutral;
+            research_by_turn.push(this_turn);
+            research_turns += 1;
+            for st in &game.states {
+                if st.control.controller().is_some() {
+                    regions_held_turns += 1;
+                    region_base_units += game.population_factor(st.id) * game.education_level(st.id);
+                }
+                labs_working_turns += st.facilities.iter().filter(|f| f.kind == FacilityKind::ResearchLab && f.working()).count() as u32;
+            }
         }
         if coastal_engineering_turn.is_none() && game.has_tech(crate::ids::TechId::CoastalEngineering) {
             coastal_engineering_turn = Some(game.turn);
@@ -615,7 +677,7 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
     let ranking = game.ranking();
     let final_score = Seat::ALL.map(|s| game.progress(s).score());
     let final_place = Seat::ALL.map(|s| ranking.iter().position(|(r, _)| *r == s).map(|i| i as u8 + 1).unwrap_or(4));
-    let tree_done_turn = if game.research.done.len() == game.tables.techs.len() { Some(game.turn) } else { None };
+    let tree_done_turn = if game.research.done.len() == game.tables.techs.len() { tech_done_turns.iter().copied().max().flatten() } else { None };
     let highest_rung = game.research.done.iter().map(|t| tables.tech(*t).rung).max().unwrap_or(0);
     // Ticket #56, read off the log as the #52 to #55 figures are.
     let sea_walls_built = game.log.iter().filter(|l| l.contains("completed Sea Wall at")).count() as u32;
@@ -779,6 +841,13 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         uniques,
         batteries,
         tree_done_turn,
+        tech_done_turns,
+        research_by_source,
+        research_turns,
+        research_by_turn,
+        region_base_units,
+        regions_held_turns,
+        labs_working_turns,
         highest_rung,
         victory_met,
         log: game.log,

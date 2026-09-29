@@ -19,7 +19,7 @@
 
 use dying_earth_engine::data::BreakEffect;
 use dying_earth_engine::data::{default_data_dir, Tables};
-use dying_earth_engine::ids::{BodyId, FactionKind, Seat, StateId};
+use dying_earth_engine::ids::{BodyId, FactionKind, Seat, StateId, TechId};
 use dying_earth_engine::state::{figure, tenth, Outcome};
 use std::sync::Arc;
 
@@ -96,6 +96,13 @@ fn main() {
     let mut all_gate_turns: [Vec<u32>; 4] = Default::default();
     // Ticket #405 (version 0.09.4): the turn the world was first under the Sink, every seating.
     let mut all_under_sink: Vec<u32> = Vec::new();
+    // Ticket #416 (version 0.09.4): the tree's finish, each Tech's, and the world's Research.
+    let mut all_tree_turns: Vec<u32> = Vec::new();
+    let mut all_tech_turns: Vec<Vec<u32>> = vec![Vec::new(); TechId::ALL.len()];
+    let mut all_research_by_source = [0f64; 5];
+    let (mut all_research_turns, mut all_regions_held_turns, mut all_labs_turns) = (0u32, 0u32, 0u32);
+    let mut all_region_base = 0f64;
+    let mut all_research_at: [Vec<f64>; 4] = Default::default();
     // Ticket #406 (version 0.09.4): each Faction's score at the end and its place in the ranking.
     let mut all_scores: [Vec<f64>; 4] = Default::default();
     let mut all_places = [[0u32; 4]; 4];
@@ -297,6 +304,24 @@ fn main() {
                             takes += r.influence_transfers;
                             if let Some(t) = r.tree_done_turn {
                                 tree_turns.push(t);
+                                all_tree_turns.push(t);
+                            }
+                            for (i, t) in r.tech_done_turns.iter().enumerate() {
+                                if let Some(t) = t {
+                                    all_tech_turns[i].push(*t);
+                                }
+                            }
+                            for k in 0..5 {
+                                all_research_by_source[k] += r.research_by_source[k];
+                            }
+                            all_research_turns += r.research_turns;
+                            all_regions_held_turns += r.regions_held_turns;
+                            all_labs_turns += r.labs_working_turns;
+                            all_region_base += r.region_base_units;
+                            for (j, at) in [5usize, 10, 20, 30].into_iter().enumerate() {
+                                if let Some(v) = r.research_by_turn.get(at - 1) {
+                                    all_research_at[j].push(*v);
+                                }
                             }
                             scrubbers += r.scrubbers;
                             leapfrogs += r.leapfrogs;
@@ -760,6 +785,28 @@ fn main() {
         for (i, k) in FactionKind::ALL.into_iter().enumerate() {
             println!("  {:>12}: Victory gate completed in {:2} of {all_games} games, median turn {}", k.name(), all_gate_turns[i].len(), median_u(&mut all_gate_turns[i]));
         }
+        // Ticket #416 (version 0.09.4): when the tree finishes, and where Research comes from.
+        println!("  The whole Tech Tree completed in {} of {all_games} games, median turn {} (the turn its last Tech completed)", all_tree_turns.len(), median_u(&mut all_tree_turns));
+        let mut order: Vec<usize> = (0..TechId::ALL.len()).collect();
+        let mut meds: Vec<String> = Vec::new();
+        for v in all_tech_turns.iter_mut() {
+            meds.push(median_u(v));
+        }
+        order.sort_by_key(|i| std::cmp::Reverse(all_tech_turns[*i].len()));
+        println!("  Each Tech: completed in N games, median turn");
+        for i in order {
+            println!("    {:>24}: {:2} of {all_games}, median turn {}", format!("{:?}", TechId::ALL[i]), all_tech_turns[i].len(), meds[i]);
+        }
+        let total: f64 = all_research_by_source.iter().sum();
+        let per = |v: f64| if all_research_turns > 0 { v / all_research_turns as f64 } else { 0.0 };
+        println!("  The world's Research a turn, mean over {all_research_turns} game-turns: {:.1} -- Research Labs {:.1}, Observatories {:.1}, research agreements {:.1}, neutral and occupied Labs {:.1}, the rest {:.1}", per(total), per(all_research_by_source[0]), per(all_research_by_source[1]), per(all_research_by_source[2]), per(all_research_by_source[3]), per(all_research_by_source[4]));
+        let med_f = |v: &mut Vec<f64>| {
+            v.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            v.get(v.len() / 2).map(|x| format!("{x:.0}")).unwrap_or("-".into())
+        };
+        let [a5, a10, a20, a30] = &mut all_research_at;
+        println!("  The world's Research at turn 5 / 10 / 20 / 30, median: {} / {} / {} / {} (games alive {} / {} / {} / {})", med_f(a5), med_f(a10), med_f(a20), med_f(a30), a5.len(), a10.len(), a20.len(), a30.len());
+        println!("  Regions held a turn, mean {:.1}; Research Labs working a turn, mean {:.1}; a base of 1 a Region, scaled by population and Education as a Lab is, before multipliers: {:.1} a turn", per(all_regions_held_turns as f64), per(all_labs_turns as f64), per(all_region_base));
         for (i, k) in FactionKind::ALL.into_iter().enumerate() {
             let mut v = all_scores[i].clone();
             v.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
