@@ -29,3 +29,10 @@ An agent that did not build it found the engine correct: every tank reader goes 
 the computer seats route only Colony Ships on its largest tank, saves load with the Tech appended.
 Fixed from it: the test doc comment put back on the tree-cost test; the `shot:` boards build their
 Colony Ships with a full tank of 40, not 30; two stale comments.
+
+## Renamed
+
+At the designer's word the Tech is **Cryogenic Tanks** (`cryogenic_tanks`, `TechId::CryogenicTanks`);
+the picture and the sweeps above were taken under its first name, Deep Tanks.
+
+![Renamed](renamed.png)

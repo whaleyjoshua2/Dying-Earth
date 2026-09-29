@@ -430,27 +430,29 @@ it (base 0.8, 59 of 80) were put and declined.
 adding nothing; a neutral Region's Research counting toward someone's Lead; a hover whose figures do
 not sum to the Output row's.
 
-## 16. Bigger tanks: Colony Ships at 40, and Deep Tanks
+## 16. Bigger tanks: Colony Ships at 40, and Cryogenic Tanks
+
+The Tech was built as *Deep Tanks* and renamed **Cryogenic Tanks** at the designer's word.
 
 The authority is [ticket #420](https://github.com/whaleyjoshua2/Dying-Earth/issues/420). The
 designer: *"colony ships now have 40 fuel military ships 30, add a level two tech in the propulsion
 line that adds 15 to tank capacity to all ships."*
 
 **The Colony Ship's tank is 40**; the Frigate's, Battleship's, Carrier's and Missile Carrier's stay
-30 (`units.toml`). **Deep Tanks**, Propulsion rung 2, cost 32, needing Clean Propellant and needed by
+30 (`units.toml`). **Cryogenic Tanks**, Propulsion rung 2, cost 32, needing Clean Propellant and needed by
 nothing, adds **15 Fuel to every Ship's tank** (`tank_fuel = 15.0`), on Clean Propellant's 5: a
 Colony Ship 40 / 45 / 60, a warship 30 / 35 / 50; +7 under Provisional Findings. **A Ship is built
 with its tank full**, so a Colony Ship's build pays 40 Fuel, 60 with both Techs; one flying when a
 Tech completes gains the room empty. Every tank reader goes through `tank_of`. **The computer
 seats** pick it in every Propulsion chain after Nuclear Rockets. The tree is 24 Techs, 789 Research.
 
-**Measured** (`sweeps/after-420.txt`, against `after-416-schools.txt`): Deep Tanks completed in
+**Measured** (`sweeps/after-420.txt`, against `after-416-schools.txt`): Cryogenic Tanks completed in
 80 of 80 games, median turn 15; wins 7 / 9 / 3 / 17 to 10 / 10 / 0 / 14; collapses 43 to 46; the
 tree still complete in 78 of 80, median turn 24; ground Colonies on the Moon at the end 255 to 222,
 Deimos 26 to 30; first Colony on the Moon in 74 to 69 of 80 games.
 
 **What would show this wrong**: a Colony Ship built with 30; a warship built with 40; a tank that
-does not grow when Deep Tanks completes; a seat whose pick list skips it.
+does not grow when Cryogenic Tanks completes; a seat whose pick list skips it.
 
 ## 17. Cheaper Fuel: Refineries, small bodies and the market
 

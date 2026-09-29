@@ -4507,8 +4507,8 @@ fn f_coastal_engineering_is_the_thirteenth_tech() {
     // Ticket #343 (version 0.09.1): twenty-one, with Missile Technology on Propulsion rung 3.
     // Ticket #393 (version 0.09.3): twenty-two, with Nuclear Rockets on Propulsion rung 2.
     // Ticket #413 (version 0.09.4): twenty-three, with Orbital Refuelling on Propulsion rung 1.
-    // Ticket #420 (version 0.09.4): twenty-four, with Deep Tanks on Propulsion rung 2.
-    assert_eq!(TechId::ALL.len(), 24, "thirteen Techs, the four gates, Civil Defense, #232's two, Missile Technology, Nuclear Rockets, Orbital Refuelling and Deep Tanks");
+    // Ticket #420 (version 0.09.4): twenty-four, with Cryogenic Tanks on Propulsion rung 2.
+    assert_eq!(TechId::ALL.len(), 24, "thirteen Techs, the four gates, Civil Defense, #232's two, Missile Technology, Nuclear Rockets, Orbital Refuelling and Cryogenic Tanks");
     assert_eq!(g.tables.techs.len(), 24, "and twenty-four rows in techs.toml");
     let c = g.tables.tech(TechId::CoastalEngineering);
     assert_eq!(c.name, "Coastal Engineering");
@@ -6636,7 +6636,7 @@ fn the_four_gates_stand_on_rung_three_at_one_price_with_their_prerequisites() {
         assert_eq!(card.needs, needs, "{t:?}");
         assert_eq!(g.tables.victory_gate(kind), Some(t));
     }
-    assert_eq!(TechId::ALL.len(), 24, "eighteen, Beneficiation and Relay Networks since ticket #232, Missile Technology since #343, Nuclear Rockets since #393, Orbital Refuelling since #413, Deep Tanks since #420");
+    assert_eq!(TechId::ALL.len(), 24, "eighteen, Beneficiation and Relay Networks since ticket #232, Missile Technology since #343, Nuclear Rockets since #393, Orbital Refuelling since #413, Cryogenic Tanks since #420");
     // Version 0.08.3 moved three of the four gates' prerequisites in three separate tickets, and
     // nothing watched how deep each gate ended up. Counted as Techs that must stand before the
     // gate is reachable, the gate excluded.
@@ -10097,22 +10097,22 @@ fn civil_defense_doubles_what_a_constabulary_is_worth_at_the_gate() {
     assert_eq!(g.tables.influence.constabulary_margin_defended, 10);
 }
 
-/// Ticket #420 (version 0.09.4): a Colony Ship's tank is 40, a warship's 30; Deep Tanks, on
+/// Ticket #420 (version 0.09.4): a Colony Ship's tank is 40, a warship's 30; Cryogenic Tanks, on
 /// Propulsion rung 2 at 32 behind Clean Propellant, adds 15 to every Ship's on Clean Propellant's
 /// 5, half under Provisional Findings; the build pays the whole tank; every seat picks it in its
 /// Propulsion chain after Nuclear Rockets.
 #[test]
-fn deep_tanks_adds_fifteen_to_every_tank_on_clean_propellants_five() {
+fn cryogenic_tanks_adds_fifteen_to_every_tank_on_clean_propellants_five() {
     let mut g = game();
-    let card = g.tables.tech(TechId::DeepTanks);
-    assert_eq!((card.name.as_str(), card.branch.as_str(), card.rung, card.cost), ("Deep Tanks", "Propulsion", 2, 32));
+    let card = g.tables.tech(TechId::CryogenicTanks);
+    assert_eq!((card.name.as_str(), card.branch.as_str(), card.rung, card.cost), ("Cryogenic Tanks", "Propulsion", 2, 32));
     assert_eq!(card.needs, vec![TechId::CleanPropellant]);
-    assert!(TechId::ALL.iter().all(|t| !g.tables.tech(*t).needs.contains(&TechId::DeepTanks)), "needed by nothing");
+    assert!(TechId::ALL.iter().all(|t| !g.tables.tech(*t).needs.contains(&TechId::CryogenicTanks)), "needed by nothing");
     let tanks = |g: &Game| (g.tank_of(Seat(0), UnitKind::ColonyShip), g.tank_of(Seat(0), UnitKind::Frigate), g.tank_of(Seat(0), UnitKind::MissileCarrier));
     assert_eq!(tanks(&g), (40.0, 30.0, 30.0));
     with_tech(&mut g, TechId::CleanPropellant);
     assert_eq!(tanks(&g), (45.0, 35.0, 35.0));
-    with_tech(&mut g, TechId::DeepTanks);
+    with_tech(&mut g, TechId::CryogenicTanks);
     assert_eq!(tanks(&g), (60.0, 50.0, 50.0));
     assert_eq!(g.tank_of(Seat(0), UnitKind::Army), 0.0, "an Army has no tank");
     let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
@@ -10120,14 +10120,14 @@ fn deep_tanks_adds_fifteen_to_every_tank_on_clean_propellants_five() {
     // Under Provisional Findings, the Archivists', half of 15, rounded down: 7.
     let mut g = game();
     let arc = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Archivists).unwrap();
-    g.research.current = Some(TechId::DeepTanks);
-    g.research.findings_tech = Some(TechId::DeepTanks);
+    g.research.current = Some(TechId::CryogenicTanks);
+    g.research.findings_tech = Some(TechId::CryogenicTanks);
     assert!(g.provisional_findings(arc));
     assert_eq!(g.tank_of(arc, UnitKind::ColonyShip), 47.0);
     for k in FactionKind::ALL {
         let order = &g.tables.ai.tech_picks[&k].order;
         let at = |t: TechId| order.iter().position(|x| *x == t);
-        assert!(at(TechId::DeepTanks).is_some() && at(TechId::DeepTanks) == at(TechId::NuclearRockets).map(|i| i + 1), "{k:?} picks it after Nuclear Rockets: {order:?}");
+        assert!(at(TechId::CryogenicTanks).is_some() && at(TechId::CryogenicTanks) == at(TechId::NuclearRockets).map(|i| i + 1), "{k:?} picks it after Nuclear Rockets: {order:?}");
     }
 }
 
@@ -10158,7 +10158,7 @@ fn the_tree_costs_eighteen_thirty_two_and_forty_eight_by_rung() {
     let total: i64 = TechId::ALL.into_iter().map(|t| g.tables.tech(t).cost).sum();
     assert_eq!(g.tables.tech(TechId::NuclearRockets).cost, 38, "priced above its rung");
     assert_eq!(g.tables.tech(TechId::OrbitalRefuelling).cost, 22, "priced above its rung");
-    assert_eq!(total, 789, "the whole tree since ticket #420's Deep Tanks (32 on rung 2); 757 from #413's Orbital Refuelling (22 on rung 1); 735 from #393, 697 from #343, 649 from #232, 585 from #231, 554 from #201, 507 before that");
+    assert_eq!(total, 789, "the whole tree since ticket #420's Cryogenic Tanks (32 on rung 2); 757 from #413's Orbital Refuelling (22 on rung 1); 735 from #393, 697 from #343, 649 from #232, 585 from #231, 554 from #201, 507 before that");
 }
 
 // ------------------------------------------------------- 0.08.1 ticket #208: the School's step
