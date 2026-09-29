@@ -51,3 +51,16 @@ Region's whole chain and rendered seven lines; it starts from the Region's figur
 Three mutations, each watched red and restored: a Lab's share floored on its own (three tests,
 *"the Lab's 0.9 counts"* among them); the neutral share ignored (the neutral test); Unrest 7 not
 halving a Region's own (the Region test).
+
+## The review
+
+An agent that did not build it found the arithmetic sound: a Region's own and a Lab's share each
+halved once at Unrest 7, the seat's figure settled whole once, the occupier taking the Region's own,
+the old Lab path gone from every reader. Fixed from it: Public Science and The Upload's text now say
+*Region and Lab Research*; the Directive's lines say *your Research*, not *your Labs*; a neutral Lab's
+box shows its own share for the world, not its Region's whole figure; tests for the Output hover's
+two lines, one neutral Lab's share, and a neutral Region at Unrest 7; stale comments. Put to the
+designer: a Drought, a Storm Surge, a card's Facility cut and a Strip Permit reach only a Lab's
+share now, not the Region's own; the computer seats still skip a School where no Lab stands.
+The sweep reads a Tech's turn after the turn's end, one past the turn it completed, as its other
+measures do. The closing sweep is [`after-416.txt`](../sweeps/after-416.txt).

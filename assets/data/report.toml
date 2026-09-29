@@ -337,11 +337,11 @@ upload = "uploaded {n} Colonists into the Archive at {colony}"
 # The other three name what their own Directive really buys, in the words the Report line for each
 # has used since #235: the Natural Sink, their coffers, propellant. `unfund_archive` is true of all
 # four alike, because nought sends the whole of it to the shared Tech whoever ordered it.
-fund_archive = "set its Labs to pay the Archive fund from the next Income"
+fund_archive = "set its Research to pay the Archive fund from the next Income"
 directive_sink_order = "directed its Research into the Natural Sink from the next Income"
 directive_ducats_order = "directed its Research into its coffers from the next Income"
 directive_fuel_order = "directed its Research into propellant from the next Income"
-unfund_archive = "set its Labs back to the shared Tech from the next Income"
+unfund_archive = "set its Research back to the shared Tech from the next Income"
 max_on = "set its whole Allotment to go to {place} every turn"
 max_off = "set its Influence to be placed by hand again"
 build_emigrants = "recruited {n} Pioneers in {state}"

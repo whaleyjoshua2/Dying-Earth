@@ -5690,6 +5690,8 @@ fn a_neutral_states_lab_pays_half_its_yield_into_the_tech_and_nobodys_lead() {
     // With a Lab, x1.5: 2.507, at half 1.253.
     g.state_mut(StateId::NorthAmerica).facilities.push(facility(FacilityKind::ResearchLab));
     assert!((g.world_research(StateId::NorthAmerica) - 1.25325).abs() < 1e-3, "{}", g.world_research(StateId::NorthAmerica));
+    // One Lab's share for the world, which its box shows: 1.671 x 0.5 x 0.5 = 0.418.
+    assert!((g.world_lab_share(StateId::NorthAmerica) - 0.41775).abs() < 1e-3, "{}", g.world_lab_share(StateId::NorthAmerica));
     let world: f64 = StateId::ALL.into_iter().map(|s| g.world_research(s)).sum();
     assert!(world > 1.25325, "every neutral Region pays, not only the one with a Lab: {world}");
     let before = g.research.progress;
@@ -5706,6 +5708,11 @@ fn a_neutral_states_lab_pays_half_its_yield_into_the_tech_and_nobodys_lead() {
     assert_eq!((y.amount, y.upkeep), (0.0, 3.0), "the occupier pays for a Lab that works for the world");
     assert!((g.world_research(StateId::NorthAmerica) - 0.41775).abs() < 1e-3, "{}", g.world_research(StateId::NorthAmerica));
     assert!((g.region_research(Seat(2), StateId::NorthAmerica) - 1.671).abs() < 1e-3, "the occupier's own: {}", g.region_research(Seat(2), StateId::NorthAmerica));
+    // Neutral again, at Unrest 7: halved, 1.253 to 0.627.
+    g.state_mut(StateId::NorthAmerica).control = Control::Neutral;
+    g.state_mut(StateId::NorthAmerica).unrest = 7.0;
+    assert!((g.world_research(StateId::NorthAmerica) - 0.626625).abs() < 1e-3, "{}", g.world_research(StateId::NorthAmerica));
+    g.state_mut(StateId::NorthAmerica).unrest = 0.0;
     // Held: the holder's own and its Lab's share, 0.836, to the tenth 0.8; nothing to the world.
     g.state_mut(StateId::NorthAmerica).control = Control::Controlled(Seat(2));
     assert_eq!(g.world_research(StateId::NorthAmerica), 0.0);
@@ -5739,6 +5746,10 @@ fn a_region_makes_research_without_a_lab_and_a_lab_makes_it_half_again() {
     assert_eq!(lab.does.as_deref(), Some("x1.5 this Region's Research"));
     g.income_phase();
     assert_eq!(g.seats[0].research_last_turn, (sum + 0.9).floor() as i64, "the Lab's 0.9 counts");
+    // The Output row's hover names both, to the tenth.
+    let sources = g.place_output_sources(Place::State(StateId::EastAsia)).unwrap();
+    assert!(sources.contains(&(Resource::Research, "population and Education".to_string(), 1.8)), "{sources:?}");
+    assert!(sources.contains(&(Resource::Research, "Research Lab".to_string(), 0.9)), "{sources:?}");
     // Unrest 7 halves the Region's own and the Lab's share.
     g.state_mut(StateId::EastAsia).unrest = 7.0;
     assert!((g.region_research(Seat(0), StateId::EastAsia) - own / 2.0).abs() < 1e-9);

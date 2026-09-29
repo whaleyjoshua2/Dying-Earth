@@ -806,7 +806,7 @@ fn main() {
         }
         let total: f64 = all_research_by_source.iter().sum();
         let per = |v: f64| if all_research_turns > 0 { v / all_research_turns as f64 } else { 0.0 };
-        println!("  The world's Research a turn, mean over {all_research_turns} game-turns: {:.1} -- Regions' own {:.1}, Research Labs {:.1}, Observatories {:.1}, research agreements {:.1}, neutral and occupied Labs {:.1}, the rest {:.1}", per(total), per(all_research_by_source[5]), per(all_research_by_source[0]), per(all_research_by_source[1]), per(all_research_by_source[2]), per(all_research_by_source[3]), per(all_research_by_source[4]));
+        println!("  The world's Research a turn, mean over {all_research_turns} game-turns: {:.1} -- Regions' own {:.1}, Research Labs {:.1}, Observatories {:.1}, research agreements {:.1}, neutral Regions and occupied Labs {:.1}, the rest {:.1}", per(total), per(all_research_by_source[5]), per(all_research_by_source[0]), per(all_research_by_source[1]), per(all_research_by_source[2]), per(all_research_by_source[3]), per(all_research_by_source[4]));
         let med_f = |v: &mut Vec<f64>| {
             v.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
             v.get(v.len() / 2).map(|x| format!("{x:.0}")).unwrap_or("-".into())

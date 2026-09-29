@@ -279,7 +279,7 @@ pub struct SimResult {
     /// Ticket #416 (version 0.09.4): the turn each Tech completed, in `TechId::ALL` order.
     pub tech_done_turns: Vec<Option<u32>>,
     /// Ticket #416: the world's Research over the game by source -- Research Labs, Observatories,
-    /// research agreements, neutral and occupied Labs, the rest, and the Regions' own (population and
+    /// research agreements, neutral Regions and occupied Labs, the rest, and the Regions' own (population and
     /// Education) -- and the turns it was summed over.
     pub research_by_source: [f64; 6],
     pub research_turns: u32,

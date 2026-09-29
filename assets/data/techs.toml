@@ -174,7 +174,7 @@ branch = "Society"
 rung = 1
 cost = 18
 needs = []
-effect = "Research Lab output x1.5; Breakthrough gives 25; stances hold through Comms Blackout; a Labour Dispute idles one Facility only"
+effect = "Region and Lab Research x1.5; Breakthrough gives 25; stances hold through Comms Blackout; a Labour Dispute idles one Facility only"
 value = 1.5
 
 [[tech]]
@@ -294,7 +294,7 @@ cost = 48
 # ORDER until this Tech stands, so the whole Archive chain moves back with it. The Archive already
 # completed in just 28 of 80 games at the 0.08.2 baseline. Expect later and fewer; the sweep says.
 needs = ["closed_loop_colonies"]
-effect = "Opens the Archivists' Victory Condition; Research Lab and Observatory output x1.25"
+effect = "Opens the Archivists' Victory Condition; Region, Lab and Observatory Research x1.25"
 value = 1.25
 gate_for = "archivists"
 

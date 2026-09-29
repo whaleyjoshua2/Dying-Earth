@@ -6360,9 +6360,10 @@ fn facility_figures(game: &Game, sid: StateId, f: &Facility, director: Option<Se
         return format!("{yield_text}; {}{}", sea_wall_keep(game, f), sea_wall_unkept(f));
     }
     match director {
-        Some(d) if world_lab => format!("{} (for the world: {} Research a turn)", game.facility_yield(d, sid, f.kind).text(), figure(tenth(game.world_research(sid)))),
+        // Ticket #416 (version 0.09.4): this Lab's own share, not the Region's whole figure.
+        Some(d) if world_lab => format!("{} (for the world: {} Research a turn)", game.facility_yield(d, sid, f.kind).text(), figure(tenth(game.world_lab_share(sid)))),
         Some(d) => game.facility_yield(d, sid, f.kind).text(),
-        None if world_lab => format!("in no one's hands: {} Research a turn for the world", figure(tenth(game.world_research(sid)))),
+        None if world_lab => format!("in no one's hands: {} Research a turn for the world", figure(tenth(game.world_lab_share(sid)))),
         None => "idle, nobody directs this state".to_string(),
     }
 }
@@ -6844,7 +6845,7 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     let live = game.education_level(sid);
     let schooled = live - card.education_level;
     // Ticket #352 (version 0.09.1): it counts TWICE in a Research Lab, which looks like a defect
-    // until it is said; the Lab's own hover says it too.
+    // until it is said. Ticket #416 (version 0.09.4): in every Region's own Research now.
     const EDU: &str = "It counts twice in this Region's Research: once weighting how many people it has, and once on its own. It also stiffens this Region against an outsider's Influence, and goes with any Colonist recruited here.";
     let hover = if schooled > 0.005 {
         format!("{:.2} on the card, and {:+.2} from a School.\n{EDU}", card.education_level, schooled)
@@ -7578,7 +7579,7 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
             let directive = game.seat(Seat(0)).research_directive;
             ui.label(
                 egui::RichText::new(if directive == 0 {
-                    "Your Labs pay the shared Tech. Set a Research Directive in the Tech Tree window to pay this fund instead.".to_string()
+                    "Your Research pays the shared Tech. Set a Research Directive in the Tech Tree window to pay this fund instead.".to_string()
                 } else {
                     format!("Your Research Directive sends {directive}% of your Research to this fund, from the next Income. It is set in the Tech Tree window.")
                 })
@@ -10560,7 +10561,7 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                     ),
                 );
                 if game.seat(Seat(0)).research_directive > 0 || session.pending.iter().any(|o| matches!(o, Order::SetResearchDirective { percent } if *percent > 0)) {
-                    ui.colored_label(Color32::YELLOW, "Your Labs pay the Archive fund: the turn after they next pay it, Provisional Findings is off.");
+                    ui.colored_label(Color32::YELLOW, "Your Research pays the Archive fund: the turn after it next pays it, Provisional Findings is off.");
                 }
             }
             // Ticket #173 (version 0.07.6): the tree keeps offering its Pick buttons while the

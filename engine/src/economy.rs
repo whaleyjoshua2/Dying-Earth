@@ -412,17 +412,31 @@ impl Game {
     /// Techs) with its Labs' multiplier, at `neutral_share`; occupied, only its Labs' share, at the
     /// same fraction, since the occupier takes the Region's own. Halved at Unrest 7.
     pub fn world_research(&self, sid: StateId) -> f64 {
-        let t = &self.tables;
-        let rr = &t.region_research;
         let labs = self.state(sid).facilities.iter().filter(|f| f.kind == FacilityKind::ResearchLab && f.working() && !f.offline_until_resolution).count() as f64;
-        let tech = |id: TechId| if self.has_tech(id) { t.tech(id).value } else { 1.0 };
-        let own = rr.base * self.population_factor(sid) * self.education_level(sid) * tech(TechId::PublicScience) * tech(TechId::TheUpload);
-        let v = match self.state(sid).control {
-            Control::Neutral => own * (1.0 + labs * (rr.lab_multiplier - 1.0)),
-            Control::Occupied { .. } => own * labs * (rr.lab_multiplier - 1.0),
+        match self.state(sid).control {
+            Control::Neutral => self.world_own(sid) * self.tables.region_research.neutral_share + labs * self.world_lab_share(sid),
+            Control::Occupied { .. } => labs * self.world_lab_share(sid),
             _ => 0.0,
-        } * rr.neutral_share;
+        }
+    }
+
+    /// Ticket #416: a Region's own Research as the world reads it -- base x population factor x
+    /// Education x the world's Techs, no Faction's -- halved at Unrest 7.
+    fn world_own(&self, sid: StateId) -> f64 {
+        let t = &self.tables;
+        let tech = |id: TechId| if self.has_tech(id) { t.tech(id).value } else { 1.0 };
+        let v = t.region_research.base * self.population_factor(sid) * self.education_level(sid) * tech(TechId::PublicScience) * tech(TechId::TheUpload);
         if self.facilities_at_half(sid) { v / 2.0 } else { v }
+    }
+
+    /// Ticket #416: what ONE working Lab in a Region nobody holds, or under Occupation, pays the
+    /// world a turn: its share of the Region's own, at `neutral_share`. Nothing in a held Region.
+    pub fn world_lab_share(&self, sid: StateId) -> f64 {
+        if !matches!(self.state(sid).control, Control::Neutral | Control::Occupied { .. }) {
+            return 0.0;
+        }
+        let rr = &self.tables.region_research;
+        self.world_own(sid) * (rr.lab_multiplier - 1.0) * rr.neutral_share
     }
 
     /// Ticket #416 (version 0.09.4): a Region's own Research for the seat directing it, before the
@@ -518,8 +532,8 @@ impl Game {
                     if !self.state(sid).control.is_occupied() {
                         // Ticket #185 (version 0.08.0): the LIVE Education Level, which a School moves.
                         // Ticket #352 (version 0.09.1): through the chain, in the rule's order.
-                        // From the Region's own figure, whose arithmetic the Education Level's hover
-                        // gives, so the Lab's hover stays within its six lines.
+                        // From the Region's own figure rather than its whole chain, so the Lab's
+                        // hover stays within its six lines.
                         let mut r = Chain::base(self.region_research_chain(seat, sid).value(), "this Region's Research");
                         r.times(t.region_research.lab_multiplier - 1.0, || "the Lab's share".to_string());
                         y.amount = r.tenth();
