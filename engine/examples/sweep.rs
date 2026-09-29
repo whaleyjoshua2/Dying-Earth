@@ -311,8 +311,8 @@ fn main() {
                                     all_tech_turns[i].push(*t);
                                 }
                             }
-                            for k in 0..5 {
-                                all_research_by_source[k] += r.research_by_source[k];
+                            for (a, v) in all_research_by_source.iter_mut().zip(r.research_by_source) {
+                                *a += v;
                             }
                             all_research_turns += r.research_turns;
                             all_regions_held_turns += r.regions_held_turns;
