@@ -5582,7 +5582,8 @@ fn output_row(ui: &mut Ui, game: &Game, place: Place) {
     let Some(o) = game.place_output(place) else { return };
     // Ticket #415 (version 0.09.4): each figure names what made it, the fixed sentence gone.
     let sources = game.place_output_sources(place).unwrap_or_default();
-    let widgets: Vec<(String, f64)> = widget_makers(game, place).into_iter().map(|(n, v)| (n, v as f64)).collect();
+    // The card's own Widget makers, bare-named and without a nought line, as the other figures read.
+    let widgets: Vec<(String, f64)> = widget_makers(game, place).into_iter().filter(|(_, v)| *v != 0).map(|(n, v)| (n.strip_prefix("the ").map(str::to_string).unwrap_or(n), v as f64)).collect();
     let mut parts: Vec<RowPart> = Vec::new();
     for (v, icon, r) in [(o.materials, "materials", Resource::Materials), (o.widgets, "widgets", Resource::Widgets), (o.fuel, "fuel", Resource::Fuel), (o.energy, "energy", Resource::Energy), (o.ducats, "ducats", Resource::Ducats), (o.research, "research", Resource::Research)] {
         if v.abs() > 1e-9 {

@@ -850,38 +850,20 @@ impl Game {
     /// one-Region seat with a lit Reactor reads a row lower than the top bar's Energy income by the
     /// relief. Nothing for a place nobody directs.
     pub fn place_output(&self, place: Place) -> Option<PlaceOutput> {
-        let director = match place {
-            Place::State(sid) => self.state(sid).control.director(),
-            Place::Colony(cid) => self.colony(cid)?.control.director(),
-        }?;
+        // Ticket #415 (version 0.09.4): summed from the very list its hovers show, so the row and
+        // its sources can never disagree.
         let mut out = PlaceOutput::default();
-        for p in self.producers_of(director) {
-            let (here, working) = match p.place {
-                ProducerPlace::Facility(sid, i) => (place == Place::State(sid), self.state(sid).facilities[i].working()),
-                ProducerPlace::Module(cid, i) => (place == Place::Colony(cid), self.colony(cid).map(|c| c.modules[i].working()).unwrap_or(false)),
-            };
-            if !here || !working || !p.online {
-                continue;
+        for (r, _, v) in self.place_output_sources(place)? {
+            match r {
+                Resource::Materials => out.materials += v,
+                Resource::Fuel => out.fuel += v,
+                Resource::Energy => out.energy += v,
+                Resource::Ducats => out.ducats += v,
+                Resource::Research => out.research += v,
+                // The Widgets are the place's own figure below: a Factory's are only part of
+                // them, the Industry Level or the Core Module making the rest.
+                Resource::Widgets => {}
             }
-            if let Some((r, v)) = p.output {
-                match r {
-                    Resource::Materials => out.materials += v,
-                    Resource::Fuel => out.fuel += v,
-                    Resource::Energy => out.energy += v,
-                    Resource::Ducats => out.ducats += v,
-                    Resource::Research => out.research += v,
-                    // The Widgets are the place's own figure below: a Factory's are only part of
-                    // them, the Industry Level or the Core Module making the rest.
-                    Resource::Widgets => {}
-                }
-            }
-            out.research += p.research as f64;
-            out.energy -= p.upkeep;
-        }
-        if let Place::State(sid) = place
-            && matches!(self.state(sid).control, Control::Controlled(_))
-        {
-            out.ducats += self.state_ducats(sid);
         }
         out.widgets = self.widgets_at(place) as f64;
         Some(PlaceOutput { materials: tenth(out.materials), fuel: tenth(out.fuel), energy: tenth(out.energy), ducats: tenth(out.ducats), widgets: out.widgets, research: out.research })
