@@ -117,7 +117,9 @@ pub const SAVE_VERSION: u32 = 7;
 /// Ticket #401 (version 0.09.3, the closing ticket): moved to 0.09.3. `SAVE_VERSION` moved once for
 /// the version, to 7, at the tenths (#387) and carries the Stadium (#389), the seventeenth Facility
 /// kind, besides: a 0.09.2 file knows neither.
-pub const GAME_VERSION: &str = "0.09.3";
+/// Ticket #417 (version 0.09.4, the closing ticket): moved to 0.09.4. `SAVE_VERSION` did not move
+/// this version: every field it added reads a default from an older file, so a 0.09.3 save loads.
+pub const GAME_VERSION: &str = "0.09.4";
 
 /// The game autosaves at the start of the Report phase of every third turn.
 pub const AUTOSAVE_EVERY: u32 = 3;

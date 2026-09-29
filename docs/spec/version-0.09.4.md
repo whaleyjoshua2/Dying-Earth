@@ -6,8 +6,34 @@ The map is [Map: version 0.09.4](https://github.com/whaleyjoshua2/Dying-Earth/is
 pictures and batches that decided it are in
 [`docs/dev-diary/2026-09-27-version-0.09.4/`](../dev-diary/2026-09-27-version-0.09.4/).
 
-**What the version is.** Version 0.09.3 with the designer's list. The summary and the win column
-are written when the version closes.
+**What the version is.** Version 0.09.3 with the designer's list. **The Custodians' line made to
+count**: the first turn under the Sink easing Unrest everywhere (§2), the gap in ppm on their
+Victory line with partial credit for the run (§3), Conquer-and-Mothball said with its price (§4),
+and a Nature Reserve that grows the Sink (§14). **The other Factions**: the Archivists paid for
+leading a Tech (§8), the Arkwrights' Unrest eased by every place they found off Earth (§12).
+**Research** comes from every Region's people and schooling, a Lab making it half again (§15).
+**Propulsion**: Orbital Refuelling and Clean Propellant's bigger tanks (§9), Colony Ships at 40 Fuel
+and Cryogenic Tanks (§16), and cheaper Fuel to pay for them (§17). **The computer** manages Unrest
+earlier and more cheaply (§7). **The window**: a Colony Ship unloads any count (§6), the Tech tree
+lit along a path on a hover (§10), the Victory bars in each Faction's colour (§11), the Output row
+naming its sources (§13), the language cut (§5) and the driver's defects (§1).
+
+**What it did to the win column** (80 games, per Faction, at the shipped climate cell):
+
+| | 0.09.3 | 0.09.4 |
+|---|---|---|
+| Custodians | 7 | 8 |
+| Prospectors | 5 | 7 |
+| Arkwrights | 1 | 2 |
+| Archivists | 7 | 17 |
+| collapses | 60 | 46 |
+
+The closing sweep is
+[`sweeps/final-0.09.4.txt`](../dev-diary/2026-09-27-version-0.09.4/sweeps/final-0.09.4.txt),
+line for line the sweep after §17. The largest single move came with Research (§15): the whole
+Tech tree completes in 73 of 80 games at a median turn 24, where it completed in 47 at turn 28, and
+every Victory gate is reached in 73 to 80 games. Collapses fell as research sped up. Every ticket's
+own sweep is filed beside the closing one.
 
 ## 1. The defects the headless driver shows
 
@@ -145,7 +171,7 @@ Climate Panel quoting different figures.
 
 The authority is [ticket #407](https://github.com/whaleyjoshua2/Dying-Earth/issues/407). No rule moves.
 
-**The price is the order's, not conquest's**: a Mothball in a Region costs +1 Unrest there and a
+**The price is the order's, not the Occupation's**: a Mothball in a Region costs +1 Unrest there and a
 Decommission +2, whoever holds it, and nothing damps either; in a Colony neither costs Unrest.
 
 - **The buttons say it, in as few words as carry it** (the designer: *"way way fewer words"*): the
@@ -461,7 +487,7 @@ Colony Ship's 40-Fuel tank (§16).
 
 **A Refinery on Earth makes 4 Fuel, a Refinery Module off Earth 4.5** (both 3 before); a building's
 output may carry a fraction now. **The three low-gravity worlds' Refinery yields are a quarter up**:
-the Moon 0.6875, Phobos 0.625, Deimos 0.3125. **The market's Fuel is 3 Ducats** (4 before), its band
+the Moon 0.6875, Phobos 0.625, Deimos 0.3125. **The Trading window's Fuel is 3 Ducats** (4 before), its band
 2 to 4; what it pays for Fuel sold is half, 1.5. **The computer seats buy Fuel** when short of what a
 Colony Ship's tank or a Refuel they weigh wants: the purchase rides in the same candidate, at its
 weight, beside the plain Refuel from what is held. **A Refuel is priced at the Fuel left after the

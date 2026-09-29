@@ -1,4 +1,4 @@
-DYING EARTH - playtest build, version 0.09.3
+DYING EARTH - playtest build, version 0.09.4
 ============================================
 
 Thanks for playing. This is an early build of a turn-based strategy game about colonizing
@@ -16,74 +16,58 @@ HOW TO RUN
 4. The very first launch shows a blank dark window for up to ten seconds while it
    compiles graphics. Later launches are quick.
 5. Needs Windows 10 or 11, 64-bit, and any graphics card from the last ten years.
-6. Saves from 0.09.2 and before will not load in this version: every stockpile figure is
-   kept to a tenth now and there is a new building, so an old file describes a board this
-   version cannot read. The Load screen says so.
+6. Saves from 0.09.3 load in this version and play by its rules. Saves from 0.09.2 and
+   before will not load; the Load screen says so.
 7. This version ships for Windows and for Linux. On Linux, read RUN-ON-LINUX.txt in the
    folder instead of steps 2 to 5.
 
-WHAT CHANGED SINCE 0.09.2
+WHAT CHANGED SINCE 0.09.3
 -------------------------
-Most of this version points off Earth: reasons to go far, and a way to fill a tank when
-you get there. Eight rules moved, and the computer plays every one.
+The Custodians' version: their climate game counts now. Research comes from every country,
+and fuel is cheaper to make and buy. The computer plays every rule below.
 
 THE RULES THAT MOVED
-- EVERY RESOURCE IS KEPT TO A TENTH. Materials, Fuel, Energy and Ducats show one decimal
-  where they have one (a Bank pays 6.8, not 6). A price or an upkeep that was whole stays
-  whole; nothing is rounded away any more.
-- NUCLEAR ROCKETS, a new rung-2 Tech (cost 38), cut every transit by a fifth. Hardened
-  Hulls now needs it as well as Efficient Transit.
-- THE FIRST COLONY ON EACH WORLD CALMS EVERYONE. The first ground colony ever founded on a
-  world takes half a point of Unrest off every country on Earth, whoever holds it.
-- THE STADIUM, a new building, halves what the climate adds to a country's Unrest (the
-  heat, the sea, a climate break or card). With a Constabulary as well, Unrest now moves
-  in quarters.
-- A COLONY WITH A WORKING REFINERY REFUELS SHIPS in its world's low orbit, from your
-  stockpile, as a station does in its own orbit. A blockade of that orbit shuts it, and a
-  ship that can reach one is no longer stranded.
-- TRADE POSTS PAY BY DISTANCE. Each world you hold pays a Trade Post anywhere by how far
-  it is from Earth: Earth 3 Ducats, the Moon 3.5, Venus 4, Mars 5, Phobos and Deimos 6.
-- SHIPS BUILT ON THE MOON, PHOBOS OR DEIMOS COST LESS with a working mine there: three
-  quarters of their materials with one mine, three fifths with two.
-- THE COMPUTER COVETS A BIG COLONY. The more people and output a colony has, the more a
-  computer side wants to take it, by influence or by landing an army.
-- A CHOICE CARD THAT REACHES NOBODY goes back to the bottom of the deck and the next card
-  is drawn; the report says why it passed each side by.
+- RESEARCH COMES FROM EVERY COUNTRY, by its people and its schooling. A Research Lab makes
+  that country's research half again (x1.5). Countries nobody holds add half theirs to the
+  shared Tech. The whole tree now finishes in most games.
+- THE FIRST TURN THE WORLD IS UNDER THE NATURAL SINK calms every country by half a point,
+  a whole point where the Custodians hold it. Once a game.
+- THE CUSTODIANS' VICTORY LINE says how far over the Sink the world is, in ppm, and a run
+  under it earns part credit before it reaches three turns.
+- A NATURE RESERVE, a new building for everyone (30 materials, 5 widgets), adds 1 to the
+  Natural Sink and softens climate unrest in its country.
+- THE ARCHIVISTS, leading a Tech to completion, win 5 Influence and half a point of Unrest
+  off every country they hold.
+- THE ARKWRIGHTS calm every country they hold by a point for each colony they found off
+  Earth, and half a point for each station.
+- ORBITAL REFUELLING, a new rung-1 Tech, cuts every crossing by a tenth.
+- COLONY SHIPS HOLD 40 FUEL; warships hold 30. CRYOGENIC TANKS, a new rung-2 Tech, adds
+  15 to every tank. A ship is built full, so the fuel is paid at the yard.
+- FUEL IS CHEAPER: a refinery makes 4 on Earth and 4.5 off it, the Moon, Phobos and Deimos
+  refine a quarter better, and the market sells fuel at 3 ducats.
+- MOTHBALLING says its price: +1 Unrest in that country, +2 to decommission.
 
-THE CARDS
-- A SHIP'S OWN CARD CAN ATTACK. A frigate's, a battleship's or a missile carrier's card
-  carries the stack's stance and its Attack button; the attack is still the whole stack's.
-  Clicking empty space on the solar map closes a ship's card and brings back the roster.
-- EVERY PLACE CARD SAYS ITS OUTPUT under its population, and a colony or station card its
-  founding date under its name.
-- THE COUNTRY CARD IS REARRANGED: Influence, Pioneers, Policies, the buildings, Armies,
-  then Orders. A finished sea wall or scrubber is one line; hover it for the rest.
-- THE BUILD HOVER USES GLYPHS for every figure, colonists included.
-- END TURN NAMES EVERYTHING STILL OWED at once, and the Unrest lines in the report are
-  quieter: one net line a country, with its causes named.
+THE WINDOW
+- A COLONY SHIP UNLOADS ANY NUMBER of colonists, with a slider, and founds with any number.
+- HOVER A TECH and the tree lights the path to it. The boxes are a tenth smaller.
+- EACH SIDE'S VICTORY BARS are in its own colour.
+- HOVER A FIGURE ON A PLACE'S OUTPUT ROW to see what made it.
+- FEWER WORDS in the report and on the cards.
 
 WHAT WE WANT TO KNOW
 --------------------
 Write down anything, however small. Especially:
 - The moment you were not sure what to do next.
 - Anything you clicked that did nothing, or did something you did not expect.
-- GOING FAR: did Nuclear Rockets, the distance pay or a refinery colony make Mars or the
-  small moons worth the trip?
-- THE TENTHS: were the decimals easy to read, or noise?
-- A BIG COLONY: if you built one place up, did the computer come for it? Did it feel fair?
-- THE STADIUM: did you build one, and could you tell it was working?
-- Anything that still says the same thing twice.
+- THE CUSTODIANS: could you tell how close you were to winning? Did a Nature Reserve feel
+  worth a slot?
+- RESEARCH: did it matter which countries you held, and did a School feel worth it?
+- FUEL: with the bigger colony ship, did you run short?
 - The turn the game got boring, if it did, and the turn you felt you had lost.
 - Crashes: what you were doing, and the "Seed" number shown on the title screen and
   the game-over screen. With the seed the game can be replayed exactly.
 
 Screenshots help. Print Screen, then paste into a message.
-
-PLAYING THE CUSTODIANS
-----------------------
-Your lever on Earth is switching industry off. Mothball a Factory, Mine, Power Plant or
-Refinery, at home or in a country you have taken, and it emits nothing. Each Mothball
-costs that country +1 Unrest.
 
 KNOWN ROUGH EDGES
 -----------------
@@ -92,25 +76,20 @@ first. These are known. You do not need to report them.
 
 WHAT THIS VERSION KNOWS ABOUT ITSELF
 
-- THE WIN COLUMN: Custodians 7, Prospectors 5, Arkwrights 1, Archivists 7, where last
-  version was 2 / 5 / 0 / 11. Most of the move came with the tenths.
-- THE WORLD COLLAPSES IN 60 GAMES OF 80, where it was 62.
-- THE COMPUTER ALMOST NEVER BUILDS A SHIPYARD ON THE MOON, PHOBOS OR DEIMOS, so the
-  cheaper ships there are yours alone for now.
-- THE COMPUTER'S APPETITE FOR A BIG COLONY is only visible when someone builds one; the
-  computer sides do not build big colonies themselves, so the eighty games cannot show it.
-- TWO STACKS THAT ATTACK IN ONE ORBIT IN ONE TURN FIGHT TWO BATTLES, one per attack.
-- A COMMS BLACKOUT CANNOT STOP AN ATTACK YOU FOUGHT BEFORE THE TURN ENDED.
-- AN ARKWRIGHTS PLAYER WHO OPENS IN MEXICO has six buildings in five slots and nothing free
-  to build until an Industry Level raise.
-- NOBODY CAN ACCEPT OR DECLINE AN ACCORD OFFERED TO THEM - INCLUDING YOU. The game still
-  answers on your behalf.
-- THE THREAT LINE ON A COUNTRY'S CARD STILL QUOTES THE FIRST EXCHANGE, while every other
-  odds figure is the whole battle's.
+- THE WIN COLUMN: Custodians 8, Prospectors 7, Arkwrights 2, Archivists 17, where last
+  version was 7 / 5 / 1 / 7. The Archivists gained most, with research.
+- THE WORLD COLLAPSES IN 46 GAMES OF 80, where it was 60.
+- THE WHOLE TECH TREE FINISHES IN 73 GAMES OF 80, around turn 24.
+- THE ARKWRIGHTS SCORE NOTHING at the end in 57 games of 80.
+- THE COMPUTER BUILDS FEW REFINERIES OFF EARTH, so the better refining on the small moons is
+  mostly yours.
 
 CARRIED OVER, STILL TRUE
 
-- FUEL AND ENERGY PRICES BARELY MOVE, because the computer sides never sell goods.
+- THE COMPUTER ALMOST NEVER BUILDS A SHIPYARD ON THE MOON, PHOBOS OR DEIMOS.
+- TWO STACKS THAT ATTACK IN ONE ORBIT IN ONE TURN FIGHT TWO BATTLES, one per attack.
+- NOBODY CAN ACCEPT OR DECLINE AN ACCORD OFFERED TO THEM - INCLUDING YOU. The game still
+  answers on your behalf.
 - WHERE EACH SIDE STARTS IS NOT RANDOM. The computer sides always take the same countries
   in the same order.
 - RENAMING SHIPS, COLONIES AND STATIONS is still cut.
