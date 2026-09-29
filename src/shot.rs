@@ -1234,6 +1234,13 @@ fn build_board(session: &mut Session) {
         // so all four Faction tints are in one picture. The AI seldom leaves four controllers alive.
         // `reserve:1` (a building aid, ticket #411, version 0.09.4): a working Nature Reserve in the
         // player's first Region, so its box and icon can be photographed on the card.
+        // `lab:1` (a building aid, ticket #416, version 0.09.4): a working Research Lab in the
+        // player's first Region, so its box and the Output row's Research hover can be photographed.
+        if std::env::args().any(|a| a == "lab:1")
+            && let Some(sid) = g.controlled_states(Seat(0)).first().copied()
+        {
+            g.state_mut(sid).facilities.push(dying_earth_engine::Facility { online: true, ..dying_earth_engine::Facility::new(FacilityKind::ResearchLab) });
+        }
         if std::env::args().any(|a| a == "reserve:1")
             && let Some(sid) = g.controlled_states(Seat(0)).first().copied()
         {

@@ -6360,9 +6360,9 @@ fn facility_figures(game: &Game, sid: StateId, f: &Facility, director: Option<Se
         return format!("{yield_text}; {}{}", sea_wall_keep(game, f), sea_wall_unkept(f));
     }
     match director {
-        Some(d) if world_lab => format!("{} (the Lab works for the world: {} Research a turn to the Tech under research)", game.facility_yield(d, sid, f.kind).text(), game.world_lab_yield(sid) / 2),
+        Some(d) if world_lab => format!("{} (for the world: {} Research a turn)", game.facility_yield(d, sid, f.kind).text(), figure(tenth(game.world_research(sid)))),
         Some(d) => game.facility_yield(d, sid, f.kind).text(),
-        None if world_lab => format!("in no one's hands: {} Research a turn to the Tech under research", game.world_lab_yield(sid) / 2),
+        None if world_lab => format!("in no one's hands: {} Research a turn for the world", figure(tenth(game.world_research(sid)))),
         None => "idle, nobody directs this state".to_string(),
     }
 }
@@ -6845,7 +6845,7 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     let schooled = live - card.education_level;
     // Ticket #352 (version 0.09.1): it counts TWICE in a Research Lab, which looks like a defect
     // until it is said; the Lab's own hover says it too.
-    const EDU: &str = "It counts twice in a Research Lab: once weighting how many people it has, and once on its own. It also stiffens this Region against an outsider's Influence, and goes with any Colonist recruited here.";
+    const EDU: &str = "It counts twice in this Region's Research: once weighting how many people it has, and once on its own. It also stiffens this Region against an outsider's Influence, and goes with any Colonist recruited here.";
     let hover = if schooled > 0.005 {
         format!("{:.2} on the card, and {:+.2} from a School.\n{EDU}", card.education_level, schooled)
     } else {

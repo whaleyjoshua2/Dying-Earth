@@ -457,7 +457,7 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("station_built_eased", &["faction", "station", "ease"]),
     ("antarctica_opens", &["n"]),
     ("archive_begun", &["faction", "colony"]),
-    ("neutral_research", &["states", "n"]),
+    ("neutral_research", &["n"]),
     ("emigrants_mustered", &["n", "state", "fell", "unrest"]),
     // Ticket #334 (version 0.09.0).
     ("army_ordered", &["place", "people"]),

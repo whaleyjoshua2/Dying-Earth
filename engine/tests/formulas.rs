@@ -1412,12 +1412,15 @@ fn tech_public_science_raises_research_lab_output() {
     g.research.current = Some(TechId::CleanPower);
     g.research.done.push(TechId::EfficientGrids);
     g.seats[0].stockpile.energy = 1000.0;
+    // Ticket #416 (version 0.09.4): the Lab's share of East Asia's own, 1 x 1.32 x 1.10 x 1.25 =
+    // 1.815, is a half: 0.91, to the tenth 0.9; with Public Science x1.5, 1.36, to the tenth 1.4.
+    assert_eq!(g.facility_yield(Seat(0), StateId::EastAsia, FacilityKind::ResearchLab).amount, 0.9);
     g.income_phase();
-    // Ticket #53, East Asia: 2 x (1 + 16.4/50) x 1.1 x 1.25 = 3.65 -> 3
-    assert_eq!(g.seats[0].research_last_turn, 3);
+    let before = g.seats[0].research_last_turn;
     with_tech(&mut g, TechId::PublicScience);
+    assert_eq!(g.facility_yield(Seat(0), StateId::EastAsia, FacilityKind::ResearchLab).amount, 1.4);
     g.income_phase();
-    assert_eq!(g.seats[0].research_last_turn, 5, "5.48 rounded down");
+    assert!(g.seats[0].research_last_turn > before, "and the seat's Research rises with it: {before} then {}", g.seats[0].research_last_turn);
 }
 
 #[test]
@@ -1523,7 +1526,9 @@ fn building_yields_on_the_card_equal_what_income_pays() {
     g.research.done.push(TechId::DeepMining);
     g.research.current = Some(TechId::CleanPower);
     let mut expect = Stockpile::default();
-    let mut research = 0;
+    // Ticket #416 (version 0.09.4): every directed Region's own Research and every Lab's share, to
+    // the tenth, settled whole once.
+    let mut research_f: f64 = g.directed_states(Seat(0)).into_iter().map(|sid| g.region_research(Seat(0), sid)).sum();
     for sid in [StateId::EastAsia, StateId::NorthAfrica] {
         for f in &g.state(sid).facilities {
             let y = g.facility_yield(Seat(0), sid, f.kind);
@@ -1531,12 +1536,13 @@ fn building_yields_on_the_card_equal_what_income_pays() {
                 Some(Resource::Materials) => expect.materials += y.amount,
                 Some(Resource::Fuel) => expect.fuel += y.amount,
                 Some(Resource::Energy) => expect.energy += y.amount,
+                Some(Resource::Research) => research_f += y.amount,
                 _ => {}
             }
-            research += y.research;
             expect.energy -= y.upkeep;
         }
     }
+    let research = research_f.floor() as i64;
     for m in &g.colony(c).unwrap().modules {
         let y = g.module_yield(Seat(0), c, m.kind);
         match y.resource {
@@ -2401,13 +2407,16 @@ fn provisional_findings_halves_the_tech_under_research_and_goes_off_the_turn_aft
     // already placed. A pick made during this turn is read from the next one; the test stands the
     // frozen Tech up by hand rather than running a turn, which would move everything else it reads.
     g.research.findings_tech = g.research.current;
+    // Ticket #416 (version 0.09.4): every Region makes Research now, and three Incomes would finish
+    // Public Science under the test; held far short of its cost so it stays the Tech under research.
+    g.research.progress = -1_000_000;
     // A multiplier of 1.5 reads 1.25; nobody else reads an unfinished Tech at all.
     assert!(g.provisional_findings(Seat(3)), "on at the start: nobody has funded yet");
     assert!((g.tech_multiplier(Seat(3), TechId::PublicScience) - 1.25).abs() < 1e-9);
     assert_eq!(g.tech_multiplier(Seat(0), TechId::PublicScience), 1.0);
     // An addition of +2 reads +1, and an immunity does not carry at all.
     assert_eq!(g.tech_addition(Seat(3), TechId::ExpandedHabitats), 0, "only the Tech under research");
-    let with = g.facility_yield(Seat(3), StateId::Europe, FacilityKind::ResearchLab).research;
+    let with = g.facility_yield(Seat(3), StateId::Europe, FacilityKind::ResearchLab).amount;
     // Version 0.07.0: the declaration is made in one turn and paid at the next Income, so it is
     // that Income which funds, and the Income after it that finds Provisional Findings gone.
     g.commit_orders(Seat(3), &[Order::SetResearchDirective { percent: 100 }]);
@@ -2419,7 +2428,7 @@ fn provisional_findings_halves_the_tech_under_research_and_goes_off_the_turn_aft
     g.income_phase();
     assert!(!g.provisional_findings(Seat(3)), "they funded last turn");
     assert_eq!(g.tech_multiplier(Seat(3), TechId::PublicScience), 1.0);
-    let without = g.facility_yield(Seat(3), StateId::Europe, FacilityKind::ResearchLab).research;
+    let without = g.facility_yield(Seat(3), StateId::Europe, FacilityKind::ResearchLab).amount;
     assert!(without < with, "the Lab made {with} with Provisional Findings and {without} without");
     // A turn of contributing switches it back on.
     g.income_phase();
@@ -5664,41 +5673,76 @@ fn north_america_and_south_east_asia_start_with_an_inland_research_lab() {
     assert_eq!(have, vec![FacilityKind::PowerPlant, FacilityKind::Factory, FacilityKind::Mine, FacilityKind::Refinery, FacilityKind::LaunchSite], "a held North America carries the package and no Lab");
 }
 
-/// Ticket #69 (b): a Lab in a state nobody holds runs itself, pays no Energy, and pays half its
-/// yield (rounded down) into the Tech under research, counting toward nobody's Research Lead; under
-/// Occupation the half still flows and the occupier pays the upkeep but draws no Research; held, the
-/// Lab is the holder's, whole.
+/// Ticket #69 (b), and ticket #416 (version 0.09.4): a Region nobody holds makes its own Research
+/// at half, its Labs multiplying it as a held Region's do, into the Tech under research and nobody's
+/// Research Lead; under Occupation the occupier takes the Region's own and the Lab's share still
+/// goes to the world at half, the occupier paying the Lab's upkeep; held, all of it is the holder's.
 #[test]
 fn a_neutral_states_lab_pays_half_its_yield_into_the_tech_and_nobodys_lead() {
     let mut g = game();
     g.pick_tech(Seat(0), TechId::PublicScience).unwrap();
-    // The only Lab in the world stands in a neutral North America.
     for st in &mut g.states {
         st.facilities.retain(|f| f.kind != FacilityKind::ResearchLab);
     }
     g.state_mut(StateId::NorthAmerica).control = Control::Neutral;
+    // North America's own: 1 x 1.114 x 1.5 = 1.671; nobody's, at half, 0.836.
+    assert!((g.world_research(StateId::NorthAmerica) - 0.8355).abs() < 1e-3, "{}", g.world_research(StateId::NorthAmerica));
+    // With a Lab, x1.5: 2.507, at half 1.253.
     g.state_mut(StateId::NorthAmerica).facilities.push(facility(FacilityKind::ResearchLab));
-    // A Faction's Lab there makes 3 (2 x 1.076 x 1.5, rounded down); the world gets half of that: 1.
-    assert_eq!(g.facility_yield(Seat(2), StateId::NorthAmerica, FacilityKind::ResearchLab).research, 3, "the Arkwrights, at Research x1.0");
+    assert!((g.world_research(StateId::NorthAmerica) - 1.25325).abs() < 1e-3, "{}", g.world_research(StateId::NorthAmerica));
+    let world: f64 = StateId::ALL.into_iter().map(|s| g.world_research(s)).sum();
+    assert!(world > 1.25325, "every neutral Region pays, not only the one with a Lab: {world}");
     let before = g.research.progress;
+    g.research.contributions = [0; 4];
     g.income_phase();
-    assert_eq!(g.research.progress - before, 1, "half of one Lab, rounded down");
-    assert_eq!(g.research.contributions, [0; 4], "and nobody's Lead");
-    assert!(g.report.lines.iter().any(|l| l.text.contains("The United States") && l.text.contains("Research")), "the Report says so: {:?}", g.report.lines);
-    // Occupied: the half still flows; the occupier pays the 3 Energy and draws nothing from it.
+    let seats: i64 = Seat::ALL.into_iter().map(|s| g.seat(s).research_last_turn).sum();
+    assert_eq!(g.research.progress - before, seats + world.floor() as i64, "the seats' Research and the world's share reach the Tech");
+    assert_eq!(g.research.contributions.iter().sum::<i64>(), seats, "and the world's share counts toward nobody's Lead");
+    assert!(g.report.lines.iter().any(|l| l.text == format!("Regions in no one's hands added {} Research.", world.floor() as i64)), "the Report says so: {:?}", g.report.lines);
+    // Occupied: the occupier takes the Region's own; the Lab's share, 1.671 x 0.5, goes to the
+    // world at half, 0.42; the occupier pays the 3 Energy and draws no Lab share.
     g.state_mut(StateId::NorthAmerica).control = Control::Occupied { occupier: Seat(2), previous: None, turns: 1, banked: 0 };
     let y = g.facility_yield(Seat(2), StateId::NorthAmerica, FacilityKind::ResearchLab);
-    assert_eq!((y.research, y.upkeep), (0, 3.0), "the occupier pays for a Lab that works for the world");
-    let before = g.research.progress;
-    g.income_phase();
-    assert_eq!(g.research.progress - before, 1);
-    assert_eq!(g.research.contributions[2], 0);
-    // Held: whole, and the holder's.
+    assert_eq!((y.amount, y.upkeep), (0.0, 3.0), "the occupier pays for a Lab that works for the world");
+    assert!((g.world_research(StateId::NorthAmerica) - 0.41775).abs() < 1e-3, "{}", g.world_research(StateId::NorthAmerica));
+    assert!((g.region_research(Seat(2), StateId::NorthAmerica) - 1.671).abs() < 1e-3, "the occupier's own: {}", g.region_research(Seat(2), StateId::NorthAmerica));
+    // Held: the holder's own and its Lab's share, 0.836, to the tenth 0.8; nothing to the world.
     g.state_mut(StateId::NorthAmerica).control = Control::Controlled(Seat(2));
-    let before = g.research.progress;
+    assert_eq!(g.world_research(StateId::NorthAmerica), 0.0);
+    assert_eq!(g.facility_yield(Seat(2), StateId::NorthAmerica, FacilityKind::ResearchLab).amount, 0.8);
+}
+
+/// Ticket #416 (version 0.09.4): a Region makes Research with no Lab in it, from its people and
+/// its schooling; a Lab makes it x1.5; Unrest 7 halves both; and the seat's Research is its
+/// Regions' own and its Labs' shares summed to the tenth and settled whole ONCE, so a Lab's 0.9 in a
+/// small Region is never rounded away.
+#[test]
+fn a_region_makes_research_without_a_lab_and_a_lab_makes_it_half_again() {
+    let mut g = game();
+    assert_eq!(g.kind(Seat(0)), FactionKind::Custodians);
+    for st in &mut g.states {
+        st.facilities.retain(|f| f.kind != FacilityKind::ResearchLab);
+    }
+    // East Asia, the Custodians': 1 x 1.32 x 1.10 x 1.25 = 1.815, with no Lab.
+    let own = g.region_research(Seat(0), StateId::EastAsia);
+    assert!((own - 1.815).abs() < 0.01, "{own}");
+    g.seats[0].stockpile.energy = 1000.0;
     g.income_phase();
-    assert_eq!(g.research.progress - before, 3);
-    assert_eq!(g.research.contributions[2], 3, "a held Lab counts toward the Lead as it always did");
+    let bare = g.seats[0].research_last_turn;
+    assert!(bare > 0, "a seat with no Lab makes Research");
+    let sum: f64 = g.directed_states(Seat(0)).into_iter().map(|s| g.region_research(Seat(0), s)).sum();
+    assert_eq!(bare, sum.floor() as i64, "its Regions' own, settled whole once");
+    // A Lab: half again of the Region's own, 0.9, added before the settling.
+    g.state_mut(StateId::EastAsia).facilities.push(facility(FacilityKind::ResearchLab));
+    let lab = g.facility_yield(Seat(0), StateId::EastAsia, FacilityKind::ResearchLab);
+    assert_eq!(lab.amount, 0.9);
+    assert_eq!(lab.does.as_deref(), Some("x1.5 this Region's Research"));
+    g.income_phase();
+    assert_eq!(g.seats[0].research_last_turn, (sum + 0.9).floor() as i64, "the Lab's 0.9 counts");
+    // Unrest 7 halves the Region's own and the Lab's share.
+    g.state_mut(StateId::EastAsia).unrest = 7.0;
+    assert!((g.region_research(Seat(0), StateId::EastAsia) - own / 2.0).abs() < 1e-9);
+    assert_eq!(g.facility_yield(Seat(0), StateId::EastAsia, FacilityKind::ResearchLab).amount, 0.5, "0.9 halved to the tenth");
 }
 
 /// Ticket #69 (c): Coastal Engineering on Industry rung 1, cheaper than the rung it stands on and
@@ -6578,10 +6622,10 @@ fn the_gates_general_bonuses_are_for_everyone() {
     with_tech(&mut g, TechId::ExtractionCharter);
     assert_eq!(g.module_yield(cus, moon, ModuleKind::Mine).amount, 8.3, "4 x 1.65 x 1.25 = 8.25, to the tenth");
     assert_eq!(g.module_yield(cus, moon, ModuleKind::Observatory).research, 2, "2 x 1.25 = 2.5");
-    let lab_before = g.facility_yield(cus, StateId::EastAsia, FacilityKind::ResearchLab).research;
+    let lab_before = g.facility_yield(cus, StateId::EastAsia, FacilityKind::ResearchLab).amount;
     with_tech(&mut g, TechId::TheUpload);
     assert_eq!(g.module_yield(cus, moon, ModuleKind::Observatory).research, 3, "2 x 1.25 x 1.25 = 3.125");
-    assert!(g.facility_yield(cus, StateId::EastAsia, FacilityKind::ResearchLab).research > lab_before, "a Lab makes more too");
+    assert!(g.facility_yield(cus, StateId::EastAsia, FacilityKind::ResearchLab).amount > lab_before, "a Lab makes more too");
     assert_eq!(g.colony_ship_capacity(cus), 4);
     with_tech(&mut g, TechId::GenerationShips);
     assert_eq!(g.colony_ship_capacity(cus), 6);
@@ -8792,12 +8836,12 @@ fn a_research_lab_reads_the_education_level_the_school_has_raised() {
     let mut g = game();
     let sid = g.directed_states(Seat(0))[0];
     g.state_mut(sid).facilities.push(Facility::new(FacilityKind::ResearchLab));
-    let before = g.facility_yield(Seat(0), sid, FacilityKind::ResearchLab).research;
+    let before = g.facility_yield(Seat(0), sid, FacilityKind::ResearchLab).amount;
     g.state_mut(sid).facilities.push(Facility::new(FacilityKind::School));
     for _ in 0..8 {
         g.run_schools();
     }
-    let after = g.facility_yield(Seat(0), sid, FacilityKind::ResearchLab).research;
+    let after = g.facility_yield(Seat(0), sid, FacilityKind::ResearchLab).amount;
     assert!(after > before, "a Lab should make more once the School has run: {before} then {after}");
 }
 
@@ -9084,10 +9128,11 @@ fn schooling_applies_twice_to_a_research_lab() {
 
     let taught = 2.0;
     g.state_mut(sid).schooling = taught - card;
-    let base = g.tables.facility(FacilityKind::ResearchLab).produces.as_ref().unwrap().amount as f64;
+    // Ticket #416 (version 0.09.4): the Region's own, base 1, and the Lab's share of it, a half.
     let mult = g.tables.faction(g.kind(Seat(0))).research_multiplier;
-    let want = (base * (1.0 + pop / 5000.0 * taught) * taught * mult).floor() as i64;
-    assert_eq!(g.facility_yield(Seat(0), sid, FacilityKind::ResearchLab).research, want, "the factor and the multiplier both carry the schooling");
+    let own = 1.0 * (1.0 + pop / 5000.0 * taught) * taught * mult;
+    assert!((g.region_research(Seat(0), sid) - own).abs() < 1e-9, "the factor and the multiplier both carry the schooling");
+    assert_eq!(g.facility_yield(Seat(0), sid, FacilityKind::ResearchLab).amount, tenth(own * 0.5), "and the Lab's share with them");
 }
 
 /// Ticket #188: the Observatory's per-Colonist bonus is moderated the same way, so the rule reads
@@ -10952,7 +10997,12 @@ fn a_research_directive_sends_a_share_of_the_turns_research_somewhere_else() {
         let mut g = game();
         let pro = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Prospectors).unwrap();
         g.state_mut(StateId::Europe).control = Control::Controlled(pro);
-        g.state_mut(StateId::Europe).facilities.push(facility(FacilityKind::ResearchLab));
+        // Ticket #416 (version 0.09.4): a Lab adds a half of the Region's own now, so four of them,
+        // paid for, make enough Research that half of it is a whole number of points to direct.
+        for _ in 0..4 {
+            g.state_mut(StateId::Europe).facilities.push(facility(FacilityKind::ResearchLab));
+        }
+        g.seats[pro.index()].stockpile.energy = 1000.0;
         g.pick_tech(Seat(0), TechId::PublicScience).ok();
         g.seats[pro.index()].research_directive = percent;
         g.income_phase();
@@ -10972,7 +11022,12 @@ fn a_research_directive_sends_a_share_of_the_turns_research_somewhere_else() {
         let mut g = game();
         let ark = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Arkwrights).unwrap();
         g.state_mut(StateId::Europe).control = Control::Controlled(ark);
-        g.state_mut(StateId::Europe).facilities.push(facility(FacilityKind::ResearchLab));
+        // Ticket #416 (version 0.09.4): a Lab adds a half of the Region's own now, so four of them,
+        // paid for, make enough Research that half of it is a whole number of points to direct.
+        for _ in 0..4 {
+            g.state_mut(StateId::Europe).facilities.push(facility(FacilityKind::ResearchLab));
+        }
+        g.seats[ark.index()].stockpile.energy = 1000.0;
         g.pick_tech(Seat(0), TechId::PublicScience).ok();
         g.seats[ark.index()].research_directive = percent;
         g.income_phase();
@@ -12743,21 +12798,20 @@ fn a_research_labs_hover_is_its_arithmetic() {
     let g = game();
     assert_eq!(g.kind(Seat(0)), FactionKind::Custodians);
     let y = g.facility_yield(Seat(0), StateId::EastAsia, FacilityKind::ResearchLab);
-    assert_eq!(y.research, 3);
+    // Ticket #416 (version 0.09.4): the Lab's hover starts from the Region's own Research (1 x 1.32
+    // x 1.10 x 1.25 = 1.815), whose arithmetic the Region's own chain carries (below), and takes
+    // the Lab's share of it, to the tenth -- three lines under a heading that wraps to two.
+    assert_eq!(y.amount, 0.9);
+    assert_eq!(y.chain.lines(6), vec!["1.8 this Region's Research".to_string(), "× 0.50 the Lab's share".to_string(), "= 0.91, rounded to 0.9".to_string()]);
     assert_eq!(
-        y.chain.lines(6),
+        g.region_research_chain(Seat(0), StateId::EastAsia).lines(6),
         vec![
-            "2 base".to_string(),
+            "1 base".to_string(),
             "× 1.32 for 1.44B people, weighted by Education".to_string(),
             "× 1.10 for Education 1.10".to_string(),
             "× 1.25 as the Custodians".to_string(),
-            "= 3.62, rounded down to 3".to_string(),
         ]
     );
-    // Past the ceiling the later factors share a line rather than any being dropped.
-    let short = y.chain.lines(4);
-    assert_eq!(short.len(), 4);
-    assert_eq!(short[2], "× 1.10 for Education 1.10, × 1.25 as the Custodians");
 }
 
 /// Ticket #352: the chain IS the figure. For every Facility kind in every Region, and every Module

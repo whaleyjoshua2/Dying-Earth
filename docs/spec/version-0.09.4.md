@@ -389,3 +389,41 @@ in 15 of 80 games before and after; the Unrest figures within a point or two.
 
 **What would show this wrong**: a Reserve adding nothing to the Sink or to its holder's removal; a
 second Reserve in one Region; a Plain or Agitate rise damped by it.
+
+## 15. Research from every Region's people and schooling
+
+The authority is [ticket #416](https://github.com/whaleyjoshua2/Dying-Earth/issues/416).
+
+**Every Region a seat directs makes Research**, with or without a Lab: `base` x its population
+factor (1 + population / 5000 x Education) x its Education Level x the Faction's Research multiplier
+x Public Science x The Upload, the Lab's old formula without the Lab. **A working Research Lab makes
+it x1.5**: each Lab adds its multiplier less one, a half, of the Region's own. **Unrest 7 halves
+both.** A seat's Research from its Regions and its Labs is summed to the tenth and **settled whole
+once**, so a Lab's 0.9 in a small Region is never rounded away. `[region_research]` in
+`facilities.toml`: **base 1.0, lab_multiplier 1.5, neutral_share 0.5**, set by the designer (*"q5
+1/1.5"*, then *"leave it"* once the rounding was corrected). The Lab's `produces` amount is no
+longer read.
+
+**An occupied Region's own goes to the occupier** (it directs the Region); its Labs' share goes to
+the world at half, the occupier paying their upkeep. **A Region nobody holds makes its own the same
+way at half**, its Labs multiplying it, into the Tech under research and nobody's Research Lead (the
+designer: *"let's apply the same rules to neutral but at .5"*), with the world's Techs' multipliers
+and no Faction's; one Report line, *"Regions in no one's hands added N Research."*
+
+**On the card**: the Output row's Research hover lists *population and Education* and *Research
+Lab*; the Lab's box reads *x1.5 this Region's Research*, its hover the Region's figure times the
+Lab's share; the Education Level's hover says it counts twice *in this Region's Research*. The
+computer seats' weights are unchanged (the designer, Q8).
+
+**Measured.** The sweep now records the turn the tree's LAST Tech completed (it recorded the game's
+last turn for a game whose tree was complete at the end), each Tech's turn, and the world's Research
+by source. Before: the tree complete in **47 of 80** games, median turn **28**; the world's Research
+35.4 a turn, Labs 20.7. After: **76 of 80, median turn 24**; 48.9 a turn, the Regions' own 26.7,
+Labs 6.7, Observatories 13.2, neutral Regions and occupied Labs 2.3; collapses **57 to 38**; wins
+7 / 6 / 0 / 10 to 13 / 13 / 1 / 15. The designer's ideal was 60 of 80; the figures that land nearer
+it (base 0.8, 59 of 80) were put and declined.
+
+**What would show this wrong**: a Region with no Lab making no Research; a Lab in a small Region
+adding nothing; a neutral Region's Research counting toward someone's Lead; a hover whose figures do
+not sum to the Output row's.
+

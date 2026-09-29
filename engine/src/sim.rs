@@ -279,8 +279,9 @@ pub struct SimResult {
     /// Ticket #416 (version 0.09.4): the turn each Tech completed, in `TechId::ALL` order.
     pub tech_done_turns: Vec<Option<u32>>,
     /// Ticket #416: the world's Research over the game by source -- Research Labs, Observatories,
-    /// research agreements, neutral and occupied Labs, and the rest -- and the turns it was summed over.
-    pub research_by_source: [f64; 5],
+    /// research agreements, neutral and occupied Labs, the rest, and the Regions' own (population and
+    /// Education) -- and the turns it was summed over.
+    pub research_by_source: [f64; 6],
     pub research_turns: u32,
     /// Ticket #416: the world's Research made each turn, all sources.
     pub research_by_turn: Vec<f64>,
@@ -351,7 +352,7 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
     let mut start_lost_to_throw_off = false;
     // Ticket #416 (version 0.09.4): the tree's finish and the world's Research by source.
     let mut tech_done_turns: Vec<Option<u32>> = vec![None; TechId::ALL.len()];
-    let mut research_by_source = [0f64; 5];
+    let mut research_by_source = [0f64; 6];
     let mut research_by_turn: Vec<f64> = Vec::new();
     let (mut research_turns, mut regions_held_turns, mut labs_working_turns) = (0u32, 0u32, 0u32);
     let mut region_base_units = 0f64;
@@ -495,6 +496,8 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
                         1
                     } else if name.starts_with("Research agreement") {
                         2
+                    } else if name.starts_with("Population and Education") {
+                        5
                     } else {
                         4
                     };

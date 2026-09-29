@@ -172,6 +172,15 @@ pub struct PopulationFactorCard {
     pub population_per_point: f64,
 }
 
+/// Ticket #416 (version 0.09.4): every Region's own Research, and a Lab's multiplier on it
+/// (`facilities.toml`).
+#[derive(Debug, Clone, Deserialize)]
+pub struct RegionResearchCard {
+    pub base: f64,
+    pub lab_multiplier: f64,
+    pub neutral_share: f64,
+}
+
 /// Ticket #257 (version 0.08.4): what each Sea Level rise a Sea Wall has held back adds to its
 /// keep, in Materials a turn (`facilities.toml`).
 #[derive(Debug, Clone, Deserialize)]
@@ -1461,6 +1470,7 @@ struct FacilitiesFile {
     widgets: WidgetsCard,
     scrubber: ScrubberCard,
     population_factor: PopulationFactorCard,
+    region_research: RegionResearchCard,
     sea_wall: SeaWallCard,
     mothball: MothballCard,
     school: SchoolCard,
@@ -1840,6 +1850,8 @@ pub struct Tables {
     pub scrubber: ScrubberCard,
     /// Ticket #333 (version 0.09.0): the Research Lab's population factor divisor (`facilities.toml`).
     pub population_factor: PopulationFactorCard,
+    /// Ticket #416 (version 0.09.4): Research from every Region, and the Lab's multiplier on it.
+    pub region_research: RegionResearchCard,
     pub mothball: MothballCard,
     /// Ticket #257: the Sea Wall's keep per rise held.
     pub sea_wall: SeaWallCard,
@@ -1977,6 +1989,7 @@ impl Tables {
             widgets: facilities.widgets,
             scrubber: facilities.scrubber,
             population_factor: facilities.population_factor,
+            region_research: facilities.region_research,
             mothball: facilities.mothball,
             sea_wall: facilities.sea_wall,
             school: facilities.school,

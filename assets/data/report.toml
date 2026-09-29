@@ -86,7 +86,8 @@ emigrants_lifted = "{n} Pioneers lifted from {state} to {station}{spaceport}."
 # partial-unload phrase above will not serve: that one is about people who arrived somewhere and
 # could not land, and these never left the ground.
 emigrants_stayed = "{n} more found no Habitat room at {station} and are still waiting in {state}."
-neutral_research = "The Labs of {states}, in no one's hands, added {n} Research to the Tech under research."
+# Ticket #416 (version 0.09.4): every Region nobody holds makes Research now, not only its Lab.
+neutral_research = "Regions in no one's hands added {n} Research."
 archive_built = "The {faction} raised the Archive at {place}; it wants {left} more Research."
 archive_complete = "The {faction} completed the Archive at {place}: it stands, and every point of its Research is paid."
 archive_destroyed = "The Archive at {place} was destroyed when the Colony passed out of the {faction}' hands; their Archive fund is kept."
