@@ -17683,3 +17683,19 @@ fn a_nature_reserve_grows_the_sink_and_calms_a_climate_rise() {
     let again = Order::BuildFacility { state: sid, kind: FacilityKind::NatureReserve };
     assert!(g.check_order(Seat(0), &[], &again).unwrap_err().0.contains("already has a Nature Reserve"), "one to a Region");
 }
+
+/// Ticket #411 (Q9, B): **a Nature Reserve in an occupied Region credits the occupier**, the seat
+/// that directs it; the Sink gains either way.
+#[test]
+fn a_nature_reserve_in_an_occupied_region_credits_the_occupier() {
+    let mut g = game();
+    let sid = StateId::NorthAfrica;
+    g.take_control(sid, Seat(1));
+    g.state_mut(sid).facilities.push(facility(FacilityKind::NatureReserve));
+    let held = g.scrubber_removal_by_seat();
+    assert_eq!((held[1], held[2]), (1.0, 0.0), "held: the holder's");
+    g.state_mut(sid).control = Control::Occupied { occupier: Seat(2), previous: Some(Seat(1)), turns: 1, banked: 0 };
+    let occupied = g.scrubber_removal_by_seat();
+    assert_eq!((occupied[1], occupied[2]), (0.0, 1.0), "occupied: the occupier's");
+    assert_eq!(held.iter().sum::<f64>(), occupied.iter().sum::<f64>(), "the Sink gains the same");
+}

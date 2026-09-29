@@ -4353,13 +4353,17 @@ impl Game {
     /// Scrubber belongs to whoever controls its state, and counts as removal for that seat's Blame.
     pub fn scrubber_removal_by_seat(&self) -> [f64; SEAT_COUNT] {
         let per = self.tables.facility(FacilityKind::Scrubber).sink_per_turn;
-        // Ticket #411 (version 0.09.4): and every working Nature Reserve's, credited to its holder.
+        // Ticket #411 (version 0.09.4): and every working Nature Reserve's, credited to the seat that
+        // directs its Region -- the occupier during an Occupation, at the designer's word (Q9, B).
         let reserve = self.tables.facility(FacilityKind::NatureReserve).sink_per_turn;
         let mut out = [0.0; SEAT_COUNT];
         for st in &self.states {
-            let Some(seat) = st.control.controller() else { continue };
-            out[seat.index()] += per * self.scrubbers_online(st.id) as f64;
-            out[seat.index()] += reserve * st.facilities.iter().filter(|f| f.kind == FacilityKind::NatureReserve && f.working()).count() as f64;
+            if let Some(seat) = st.control.controller() {
+                out[seat.index()] += per * self.scrubbers_online(st.id) as f64;
+            }
+            if let Some(seat) = st.control.director() {
+                out[seat.index()] += reserve * st.facilities.iter().filter(|f| f.kind == FacilityKind::NatureReserve && f.working()).count() as f64;
+            }
         }
         out
     }

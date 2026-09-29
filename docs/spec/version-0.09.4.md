@@ -373,7 +373,8 @@ The authority is [ticket #411](https://github.com/whaleyjoshua2/Dying-Earth/issu
 
 **The Nature Reserve**, a Region Facility every Faction may build: **30 Materials, 5 Widgets**, no
 Energy upkeep, no Emissions, **a slot, one to a Region**, no Tech. While it stands it adds **1 ppm a
-turn to the Natural Sink**, credited to its holder's Blame removal as a Scrubber's is, and takes **a
+turn to the Natural Sink**, credited as Blame removal to the seat that directs its Region (the
+occupier during an Occupation, at the designer's word), and takes **a
 sixth off what the climate adds to its Region's Unrest** (a third of the Stadium's half,
 `nature_reserve_factor` in `unrest.toml`), multiplying with a Stadium's where both stand. Its icon
 is a beech (game-icons.net, Lorc), chosen by the designer from a sheet of seven.
