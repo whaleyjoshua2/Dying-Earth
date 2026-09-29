@@ -6792,7 +6792,7 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
             game.tables.influence.first_settled_allotment
         ),
     );
-    ui.label(format!("GDP {}: its economy pays its controller {} Ducats a turn (GDP x Industry Level / 5, never below 1); a Bank here would add {}", card.gdp, game.state_ducats(sid), (game.tables.facility(FacilityKind::Bank).produces.as_ref().map(|p| p.amount).unwrap_or(0) * card.gdp) / 10));
+    ui.label(format!("GDP {}: its economy pays its controller {} Ducats a turn (GDP x Industry Level / 5, never below 1); a Bank here would add {}", card.gdp, game.state_ducats(sid), (game.tables.facility(FacilityKind::Bank).produces.as_ref().map(|p| p.amount).unwrap_or(0.0) * card.gdp as f64 / 10.0).floor() as i64));
     icon_word(ui, "emissions", format!("Emissions this turn: industry {:.1}, Facilities {:.1}, people {:.1}", industry_em, fac_em, game.population_coefficient(sid) * st.population * mult));
     // Ticket #54: the per-person line, its formula, and what Leapfrog has taken off it.
     {

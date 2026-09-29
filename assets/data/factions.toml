@@ -466,7 +466,8 @@ per_repair_point = 10
 # Energy +100%, on a currency that also buys Influence, Relief, Resettle and Leapfrogs, and the
 # AI's fixed lot of ten Materials now costs 30 Ducats where it cost 20.
 per_materials = 3
-per_fuel = 4
+# Ticket #421 (version 0.09.4): a quarter off, 4 to 3, its band 2 to 4.
+per_fuel = 3
 per_energy = 2
 price_band = 1
 price_step_units = 20

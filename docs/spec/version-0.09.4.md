@@ -452,3 +452,24 @@ Deimos 26 to 30; first Colony on the Moon in 74 to 69 of 80 games.
 **What would show this wrong**: a Colony Ship built with 30; a warship built with 40; a tank that
 does not grow when Deep Tanks completes; a seat whose pick list skips it.
 
+## 17. Cheaper Fuel: Refineries, small bodies and the market
+
+The authority is [ticket #421](https://github.com/whaleyjoshua2/Dying-Earth/issues/421), to pay for a
+Colony Ship's 40-Fuel tank (§16).
+
+**A Refinery on Earth makes 4 Fuel, a Refinery Module off Earth 4.5** (both 3 before); a building's
+output may carry a fraction now. **The three low-gravity worlds' Refinery yields are a quarter up**:
+the Moon 0.6875, Phobos 0.625, Deimos 0.3125. **The market's Fuel is 3 Ducats** (4 before), its band
+2 to 4; what it pays for Fuel sold is half, 1.5. **The computer seats buy Fuel** when short of what a
+Colony Ship's tank or a Refuel they weigh wants: the purchase rides in the same candidate, at its
+weight, and where their Ducats cannot pay for it the candidate is weighed as before.
+
+**Measured** (`sweeps/after-421.txt` against `after-420.txt`; the candidates in
+`421-candidate-*.txt`): ground Colonies on the Moon at the end 222 to 229 (255 before §16); first
+Moon Colony in 69 to 71 of 80 games; Ships stranded at the end 34 to 41; collapses 46; wins 10 / 10 /
+0 / 14 to 8 / 7 / 2 / 17; the tree complete in 74 of 80. The off-Earth figures and the price reach a
+human player more than the computer, which builds few Refineries off Earth.
+
+**What would show this wrong**: a Refinery on Earth making 3; a Module's 4.5 rounded to 4; Fuel at 4
+Ducats; a computer seat with Ducats and no Fuel never weighing a Refuel.
+

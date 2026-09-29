@@ -25,7 +25,8 @@ impl std::error::Error for DataError {}
 #[derive(Debug, Clone, Deserialize)]
 pub struct Produces {
     pub resource: Resource,
-    pub amount: i64,
+    /// Ticket #421 (version 0.09.4): a fraction allowed, for a Refinery Module's 4.5.
+    pub amount: f64,
 }
 
 /// A Colony Slot: a real place on its Body, at its approximate longitude and latitude (ticket #45).

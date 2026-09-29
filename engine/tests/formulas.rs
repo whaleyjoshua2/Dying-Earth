@@ -662,8 +662,8 @@ fn phobos_and_deimos_are_small_different_bodies_one_hop_past_mars() {
     assert_eq!(ph.name, "Phobos");
     assert_eq!(de.name, "Deimos");
     assert_eq!((ph.colony_slots(), de.colony_slots()), (2, 1));
-    assert_eq!((ph.mine_yield, ph.generator_yield, ph.refinery_yield, ph.research_yield), (1.75, 0.75, 0.5, 0.8));
-    assert_eq!((de.mine_yield, de.generator_yield, de.refinery_yield, de.research_yield), (1.0, 1.0, 0.25, 0.8));
+    assert_eq!((ph.mine_yield, ph.generator_yield, ph.refinery_yield, ph.research_yield), (1.75, 0.75, 0.625, 0.8), "Refinery a quarter up since ticket #421");
+    assert_eq!((de.mine_yield, de.generator_yield, de.refinery_yield, de.research_yield), (1.0, 1.0, 0.3125, 0.8));
     // Reach. Ticket #57 replaced the fixed card turns for a crossing between the Earth system and
     // the Mars system with the real flight: at the window it is the Hohmann 259 days, nine turns,
     // for the card's Fuel. The hops inside a system are untouched by it.
@@ -782,14 +782,14 @@ fn the_trading_window_sells_materials_fuel_and_energy_at_the_table_prices() {
     assert_eq!((left.materials, left.ducats), (20.0, 40.0));
     assert!(g.check_order(Seat(0), &pending, &factory).is_ok());
     let f = Order::Buy { resource: Resource::Fuel, amount: 2 };
-    assert_eq!(g.order_cost(Seat(0), &f).ducats, 8.0, "Fuel is 4 Ducats each since ticket #220");
+    assert_eq!(g.order_cost(Seat(0), &f).ducats, 6.0, "Fuel is 3 Ducats each since ticket #421, 4 from #220");
     let e = Order::Buy { resource: Resource::Energy, amount: 5 };
     assert_eq!(g.order_cost(Seat(0), &e).ducats, 10.0, "Energy is 2 Ducats each since ticket #220");
     assert!(g.check_order(Seat(0), &[], &Order::Buy { resource: Resource::Materials, amount: 0 }).is_err(), "a positive amount");
     assert!(g.check_order(Seat(0), &[], &Order::Buy { resource: Resource::Ducats, amount: 5 }).is_err(), "Ducats are not for sale");
     assert!(g.check_order(Seat(0), &[], &Order::Buy { resource: Resource::Materials, amount: 34 }).is_err(), "102 Ducats needed, 100 held");
     g.commit_orders(Seat(0), &[m, f, e]);
-    assert_eq!(g.seats[0].stockpile, Stockpile { materials: 10.0, fuel: 2.0, energy: 5.0, ducats: 52.0 });
+    assert_eq!(g.seats[0].stockpile, Stockpile { materials: 10.0, fuel: 2.0, energy: 5.0, ducats: 54.0 }, "Fuel at 3 since ticket #421");
 }
 
 #[test]
@@ -825,7 +825,7 @@ fn selling_materials_or_fuel_returns_half_the_buying_price() {
     let m = Order::Sell { resource: Resource::Materials, amount: 10 };
     assert_eq!(g.order_cost(Seat(0), &m).ducats, -15.0, "half of 3 Ducats each since ticket #220");
     let f = Order::Sell { resource: Resource::Fuel, amount: 2 };
-    assert_eq!(g.order_cost(Seat(0), &f).ducats, -4.0, "half of 4 Ducats each, rounded down over the lot");
+    assert_eq!(g.order_cost(Seat(0), &f).ducats, -3.0, "half of 3 Ducats each since ticket #421");
     assert!(g.check_order(Seat(0), &[], &Order::Sell { resource: Resource::Materials, amount: 11 }).is_err(), "10 held");
     assert!(g.check_order(Seat(0), &[], &Order::Sell { resource: Resource::Energy, amount: 5 }).is_err(), "Energy is not bought back");
     // The Ducats from a sale are spendable at once.
@@ -834,7 +834,7 @@ fn selling_materials_or_fuel_returns_half_the_buying_price() {
     assert_eq!((left.materials, left.ducats), (0.0, 15.0));
     assert!(g.check_order(Seat(0), &pending, &Order::BuyInfluence { amount: 5 }).is_ok());
     g.commit_orders(Seat(0), &[m, f]);
-    assert_eq!(g.seats[0].stockpile, Stockpile { materials: 0.0, fuel: 0.0, energy: 20.0, ducats: 19.0 });
+    assert_eq!(g.seats[0].stockpile, Stockpile { materials: 0.0, fuel: 0.0, energy: 20.0, ducats: 18.0 }, "15 and 3, Fuel at 3 since ticket #421");
 }
 
 // ---------------------------------------------------------------- #36 Embassies and Relays
@@ -1400,9 +1400,10 @@ fn tech_deep_mining_raises_mine_output_on_earth_and_off_it() {
 fn tech_automated_refining_raises_refinery_output() {
     let mut g = game();
     g.state_mut(StateId::EastAsia).facilities = vec![facility(FacilityKind::Refinery)];
-    assert_eq!(income_of(&mut g, Seat(0)).fuel, 3.0);
+    // Ticket #421 (version 0.09.4): a Refinery on Earth makes 4, where it made 3.
+    assert_eq!(income_of(&mut g, Seat(0)).fuel, 4.0);
     with_tech(&mut g, TechId::AutomatedRefining);
-    assert_eq!(income_of(&mut g, Seat(0)).fuel, 4.5, "4.5, to the tenth"); // Ticket #387: where 4 was floored
+    assert_eq!(income_of(&mut g, Seat(0)).fuel, 6.0, "4 x 1.5");
 }
 
 #[test]
@@ -2539,6 +2540,36 @@ fn the_ai_builds_a_school_where_no_lab_stands() {
         }
     }
     assert!(schools > 0, "no seat ordered a School in 48 seatings with no Lab on Earth");
+}
+
+/// Ticket #421 (version 0.09.4): a computer seat short of the Fuel a Colony Ship's tank or a
+/// Refuel wants buys the rest at the market, where before it bought only Materials.
+#[test]
+fn the_ai_buys_fuel_for_a_colony_ship_or_a_refuel() {
+    let mut g = game();
+    calm(&mut g);
+    g.seats[0].stockpile.fuel = 10.0;
+    g.seats[0].stockpile.ducats = 500.0;
+    assert!(matches!(g.ai_fuel_top_up(Seat(0), 40.0), Some(Order::Buy { resource: Resource::Fuel, amount: 30 })), "40 wanted, 10 held: 30 bought");
+    assert!(g.ai_fuel_top_up(Seat(0), 8.0).is_none(), "enough held");
+    g.seats[0].stockpile.ducats = 20.0;
+    assert!(g.ai_fuel_top_up(Seat(0), 40.0).is_none(), "90 Ducats wanted, 20 held");
+    // An empty Frigate at the ISS's ring with 5 in a tank of 30 and no Fuel in the Stockpile.
+    g.seats[0].stockpile.fuel = 0.0;
+    g.seats[0].stockpile.ducats = 500.0;
+    let (ship, _) = colony_ship_ready(&mut g, BodyId::Earth);
+    let iss_slot = g.colonies.iter().find(|c| c.in_orbit && c.body == BodyId::Earth && c.control.director() == Some(Seat(0))).map(|c| c.slot).expect("the ISS");
+    let s = g.ship_mut(ship).unwrap();
+    s.kind = UnitKind::Frigate;
+    s.colonists = 0;
+    s.fuel = 5.0;
+    s.slot = Some(iss_slot);
+    // The Refuel is weighed with the 25 Fuel bought in it, 75 Ducats at 3 each, where with no Fuel
+    // held it was not weighed at all. (Whether it wins the Ducats is the scoring's business: here
+    // the seat spends them on Influence first.)
+    let _ = g.ai_orders(Seat(0));
+    let refuel: Vec<&String> = g.log.iter().filter(|l| l.contains("refuel Frigate")).collect();
+    assert!(refuel.iter().any(|l| l.contains("75 Ducats")), "the Refuel carries the purchase: {refuel:?}");
 }
 
 #[test]
@@ -4824,7 +4855,7 @@ fn a_modules_output_uses_its_own_slots_yield() {
     let mut slots: Vec<u32> = (0..card.colony_slots()).collect();
     slots.sort_by(|a, b| g.slot_yields(BodyId::Mars, *a).mine.partial_cmp(&g.slot_yields(BodyId::Mars, *b).mine).unwrap());
     let (poor, rich) = (slots[0], *slots.last().unwrap());
-    let mine_amount = g.tables.module(ModuleKind::Mine).produces.as_ref().unwrap().amount as f64;
+    let mine_amount = g.tables.module(ModuleKind::Mine).produces.as_ref().unwrap().amount;
     for slot in [poor, rich] {
         let id = ColonyId(g.fresh_id());
         g.colonies.push(Colony {
@@ -4873,7 +4904,7 @@ fn a_modules_output_uses_its_own_slots_yield() {
     assert!((g.research_yield_at(g.colony(rich_id).unwrap()) - science).abs() < 1e-9, "an Observatory on the ground reads its slot's Research yield");
     assert!((g.research_yield_at(g.colony(iss).unwrap()) - g.tables.body(BodyId::Earth).research_yield).abs() < 1e-9, "a station's Observatory reads its Body's");
     g.colony_mut(rich_id).unwrap().modules.push(Module::new(ModuleKind::Observatory));
-    let base = g.tables.module(ModuleKind::Observatory).produces.as_ref().map(|p| p.amount).unwrap_or(0) as f64;
+    let base = g.tables.module(ModuleKind::Observatory).produces.as_ref().map(|p| p.amount).unwrap_or(0.0);
     let colonists = g.colony(rich_id).unwrap().colonists as f64;
     let per_colonist = g.tables.observatory.research_per_colonist;
     let want = (base * science * (1.0 + colonists * per_colonist) * g.tables.faction(g.kind(Seat(0))).research_multiplier_off_earth.unwrap_or(g.tables.faction(g.kind(Seat(0))).research_multiplier)).floor() as i64;
@@ -5905,12 +5936,13 @@ fn twenty_five_hundred_ducats_in_the_fund_is_the_prospectors_first_part() {
     assert!(matches!(g.outcome, Some(Outcome::Win { seat, .. }) if seat == pro), "{:?}", g.outcome);
 }
 
-/// Ticket #72 (d): the Moon's four yields up a tenth.
+/// Ticket #72 (d): the Moon's four yields up a tenth. Ticket #421 (version 0.09.4): its Refinery
+/// yield a quarter up again, 0.55 to 0.6875.
 #[test]
 fn the_moons_four_yields_are_up_a_tenth() {
     let g = game();
     let m = g.tables.body(BodyId::Moon);
-    assert!((m.mine_yield - 1.65).abs() < 1e-9 && (m.generator_yield - 1.375).abs() < 1e-9 && (m.refinery_yield - 0.55).abs() < 1e-9 && (m.research_yield - 1.0).abs() < 1e-9, "{:?}", (m.mine_yield, m.generator_yield, m.refinery_yield, m.research_yield));
+    assert!((m.mine_yield - 1.65).abs() < 1e-9 && (m.generator_yield - 1.375).abs() < 1e-9 && (m.refinery_yield - 0.6875).abs() < 1e-9 && (m.research_yield - 1.0).abs() < 1e-9, "{:?}", (m.mine_yield, m.generator_yield, m.refinery_yield, m.research_yield));
 }
 
 /// Ticket #72 (e): the Prospector AI plays the share as a strategy: nothing before the pace's first
@@ -6454,10 +6486,10 @@ fn the_custodian_pairs_and_nobody_elses() {
     d.sort();
     assert_eq!(d, vec![(moon, 0), (moon, 1), (moon, 2)]);
     with_tech(&mut g, TechId::EfficientGrids);
-    // Generator 5 x 1.375 x 1.5 = 10.3 to the tenth, doubled 20.6; Refinery 3 x 0.55 = 1.65, to the tenth 1.7, doubled 3.4 (ticket #387);
+    // Generator 5 x 1.375 x 1.5 = 10.3 to the tenth, doubled 20.6; Refinery 4.5 x 0.6875 = 3.09, to the tenth 3.1, doubled 6.2 (ticket #421);
     // Observatory 2 x 1.2 x 1.25 = 3, doubled 6.
     assert_eq!(g.module_yield_at(cus, moon, 0).amount, 20.6);
-    assert_eq!(g.module_yield_at(cus, moon, 1).amount, 3.4);
+    assert_eq!(g.module_yield_at(cus, moon, 1).amount, 6.2);
     assert_eq!(g.module_yield_at(cus, moon, 2).research, 6);
     let pro = Seat(1);
     let theirs = colony(&mut g, pro, BodyId::Moon, &[ModuleKind::Mine], 0);
@@ -6548,7 +6580,7 @@ fn the_prospectors_buy_at_fifteen_per_cent_off() {
     let buy = |r, n| Order::Buy { resource: r, amount: n };
     assert_eq!(g.order_cost(cus, &buy(Resource::Materials, 10)).ducats, 30.0);
     assert_eq!(g.order_cost(pro, &buy(Resource::Materials, 10)).ducats, 25.5, "30 x 0.85 = 25.5"); // Ticket #387: to the tenth, where 25 was floored
-    assert_eq!(g.order_cost(pro, &buy(Resource::Fuel, 5)).ducats, 17.0, "20 x 0.85 = 17.0");
+    assert_eq!(g.order_cost(pro, &buy(Resource::Fuel, 5)).ducats, 12.8, "15 x 0.85 = 12.75, to the tenth (Fuel at 3 since ticket #421)");
     assert_eq!(g.order_cost(pro, &buy(Resource::Energy, 10)).ducats, 17.0, "20 x 0.85 = 17.0");
     assert_eq!(g.order_cost(pro, &Order::BuyInfluence { amount: 5 }).ducats, 10.0, "Influence is not a commodity");
     assert_eq!(g.order_cost(pro, &Order::Sell { resource: Resource::Materials, amount: 10 }).ducats, -15.0, "selling is not discounted: half of 3 each, undiscounted");
@@ -9188,7 +9220,7 @@ fn schooling_moderates_the_observatorys_per_colonist_bonus() {
     let per = g.tables.observatory.research_per_colonist;
     let n = g.colony(id).unwrap().colonists as f64;
     let science = g.research_yield_at(g.colony(id).unwrap());
-    let base = g.tables.module(ModuleKind::Observatory).produces.as_ref().unwrap().amount as f64;
+    let base = g.tables.module(ModuleKind::Observatory).produces.as_ref().unwrap().amount;
     let mult = g.tables.faction(g.kind(Seat(0))).research_multiplier;
     for taught in [0.5, 2.0] {
         g.colony_mut(id).unwrap().education = taught;
@@ -10392,8 +10424,8 @@ fn the_yields_the_ai_weights_now_read_actually_move_with_their_techs() {
     assert!(mine_after > mine_before, "a Mine's yield moves with its Techs: {mine_before} -> {mine_after}");
     assert!(relay_after > relay_before, "and a Relay's: {relay_before} -> {relay_after}");
     // The Mine's weight is scaled by yield-over-card, so the card figure must stay reachable.
-    let card = g.tables.module(ModuleKind::Mine).produces.as_ref().map(|p| p.amount).unwrap_or(0);
-    assert_eq!(card, 4, "the Mine's card figure, which the AI weight divides by");
+    let card = g.tables.module(ModuleKind::Mine).produces.as_ref().map(|p| p.amount).unwrap_or(0.0);
+    assert_eq!(card, 4.0, "the Mine's card figure, which the AI weight divides by");
 }
 
 /// Ticket #244 (version 0.08.3): the Arkwrights' signature rule is COACH CLASS, and the word
@@ -12355,13 +12387,13 @@ fn four_makers_the_factory_makes_widgets_the_mine_makes_materials_and_the_start_
     let (f, m) = (t.facility(FacilityKind::Factory), t.facility(FacilityKind::Mine));
     // The Factory and the Mine each smoke 0.75, at the designer's word.
     assert_eq!((f.materials, f.widgets, f.energy_upkeep, f.emissions), (20, 4, 2, 0.75));
-    assert_eq!(f.produces.as_ref().map(|p| (p.resource, p.amount)), Some((Resource::Widgets, 4)));
+    assert_eq!(f.produces.as_ref().map(|p| (p.resource, p.amount)), Some((Resource::Widgets, 4.0)));
     assert_eq!((m.materials, m.widgets, m.energy_upkeep, m.emissions), (20, 4, 2, 0.75));
-    assert_eq!(m.produces.as_ref().map(|p| (p.resource, p.amount)), Some((Resource::Materials, 4)));
+    assert_eq!(m.produces.as_ref().map(|p| (p.resource, p.amount)), Some((Resource::Materials, 4.0)));
     let fm = t.module(ModuleKind::Factory);
     assert_eq!((fm.materials, fm.widgets, fm.energy_upkeep, fm.earth_emissions), (20, 4, 3, 1.0));
-    assert_eq!(fm.produces.as_ref().map(|p| (p.resource, p.amount)), Some((Resource::Widgets, 4)));
-    assert_eq!(t.module(ModuleKind::Core).produces.as_ref().map(|p| (p.resource, p.amount)), Some((Resource::Widgets, 4)));
+    assert_eq!(fm.produces.as_ref().map(|p| (p.resource, p.amount)), Some((Resource::Widgets, 4.0)));
+    assert_eq!(t.module(ModuleKind::Core).produces.as_ref().map(|p| (p.resource, p.amount)), Some((Resource::Widgets, 4.0)));
     // China leans Materials: a Mine there makes 6, not 4, and 9 with Deep Mining; a Factory there
     // makes no Materials at all.
     let sid = StateId::EastAsia;
@@ -16226,16 +16258,19 @@ fn tenths_a_prospector_region_keeps_the_tenth_of_its_ducats() {
     assert_eq!(g.seats[pro.index()].stockpile.ducats, g.tables.start.ducats as f64 + 14.4);
 }
 
-/// Ticket #387: a Refinery under Automated Refining yields 3 x 1.5 = 4.5 Fuel, not 4. The whole
-/// base stays whole; only the multiplied figure carries a tenth.
+/// Ticket #387: a multiplied yield carries a tenth. Ticket #421 (version 0.09.4): a Refinery on
+/// Earth makes 4 now, so the tenth is shown on a Refinery Module's 4.5 at the Moon, 4.5 x 0.6875 =
+/// 3.09, to the tenth 3.1, and under Automated Refining 4.64, 4.6.
 #[test]
 fn tenths_a_refinery_under_automated_refining_yields_four_and_a_half() {
     let mut g = game();
     g.state_mut(StateId::EastAsia).facilities = vec![facility(FacilityKind::Refinery)];
-    assert_eq!(income_of(&mut g, Seat(0)).fuel, 3.0, "whole stays whole");
+    assert_eq!(income_of(&mut g, Seat(0)).fuel, 4.0, "whole stays whole");
+    let moon = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Refinery], 0);
+    assert_eq!(g.module_yield(Seat(0), moon, ModuleKind::Refinery).amount, 3.1, "4.5 x 0.6875, to the tenth");
     with_tech(&mut g, TechId::AutomatedRefining);
-    assert_eq!(g.facility_yield(Seat(0), StateId::EastAsia, FacilityKind::Refinery).amount, 4.5, "3 x 1.5, to the tenth");
-    assert_eq!(income_of(&mut g, Seat(0)).fuel, 4.5, "and it is paid to the tenth");
+    assert_eq!(g.facility_yield(Seat(0), StateId::EastAsia, FacilityKind::Refinery).amount, 6.0, "4 x 1.5");
+    assert_eq!(g.module_yield(Seat(0), moon, ModuleKind::Refinery).amount, 4.6, "4.5 x 0.6875 x 1.5, to the tenth");
 }
 
 /// Ticket #387: the Venture Capital Fund banks its share to the tenth. Europe at Industry 5 pays

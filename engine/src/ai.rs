@@ -407,6 +407,17 @@ impl Game {
         }
     }
 
+    /// Ticket #421 (version 0.09.4): the market Buy that brings the seat's Fuel up to `need`, or
+    /// `None` where it holds enough already or its Ducats cannot pay for the shortfall.
+    pub fn ai_fuel_top_up(&self, seat: Seat, need: f64) -> Option<Order> {
+        let short = (need - self.seat(seat).stockpile.fuel).ceil() as i64;
+        if short <= 0 {
+            return None;
+        }
+        let buy = Order::Buy { resource: Resource::Fuel, amount: short };
+        (self.order_cost(seat, &buy).ducats <= self.seat(seat).stockpile.ducats).then_some(buy)
+    }
+
     /// Ticket #419 (version 0.09.4): how much more a Faction eased by its foundings (the
     /// Arkwrights) weighs founding a ground Colony or building a station, by its most restive
     /// Region: one at `founding_pull_from`, rising in a line to double at `founding_pull_double_at`.
@@ -1505,7 +1516,7 @@ impl Game {
                     // reaches 5 at a four-Colonist Colony and 12 at a rich one, which is how
                     // ticket #232's first attempt at the Mine put 329 Mines on the board.
                     ModuleKind::TradePost => {
-                        let bare = self.tables.module(ModuleKind::TradePost).produces.as_ref().map(|p| p.amount).unwrap_or(1).max(1) as f64;
+                        let bare = self.tables.module(ModuleKind::TradePost).produces.as_ref().map(|p| p.amount).unwrap_or(1.0).max(1.0);
                         let with = self.module_yield(seat, cid, ModuleKind::TradePost).amount;
                         (Cat::Producer, self.base_weight(seat, Cat::Producer) * (with / bare).clamp(0.25, 2.0))
                     }
@@ -1744,7 +1755,14 @@ impl Game {
                     Cat::MissileCarrier => m.threat,
                     _ => 1.0,
                 };
-                push(vec![Order::BuildShip { site: Place::Colony(cid), kind: uk }], cat, self.base_weight(seat, cat), gap_for(cat, None), lift, 1.0, format!("build {} at {}", uk.name(), self.place_name(Place::Colony(cid))), None);
+                // Ticket #421 (version 0.09.4): a Colony Ship short of the Fuel its tank takes buys
+                // the rest at the market in the same breath, at the Ship's weight.
+                let build = Order::BuildShip { site: Place::Colony(cid), kind: uk };
+                let orders = match self.ai_fuel_top_up(seat, if uk == UnitKind::ColonyShip { self.tank_of(seat, uk) } else { 0.0 }) {
+                    Some(buy) => vec![buy, build],
+                    None => vec![build],
+                };
+                push(orders, cat, self.base_weight(seat, cat), gap_for(cat, None), lift, 1.0, format!("build {} at {}", uk.name(), self.place_name(Place::Colony(cid))), None);
             }
         }
 
@@ -2430,9 +2448,11 @@ impl Game {
                     Place::State(_) => body == BodyId::Earth && orbit.is_low(),
                     Place::Colony(c) => self.colony(*c).is_some_and(|c| c.body == body && self.colony_orbit(c) == orbit),
                 });
-            if s.fuel < self.tank_of(seat, s.kind) && self.refuelling_station(seat, body, orbit) && self.seat(seat).stockpile.fuel > 0.0 && !ready_to_fire {
+            // Ticket #421 (version 0.09.4): short of the Fuel to fill it, the seat buys the rest.
+            let top_up = self.ai_fuel_top_up(seat, self.tank_of(seat, s.kind) - s.fuel);
+            if s.fuel < self.tank_of(seat, s.kind) && self.refuelling_station(seat, body, orbit) && (self.seat(seat).stockpile.fuel > 0.0 || top_up.is_some()) && !ready_to_fire {
                 push(
-                    vec![Order::Refuel { ship: s.id }],
+                    top_up.into_iter().chain([Order::Refuel { ship: s.id }]).collect(),
                     Cat::Transit,
                     self.base_weight(seat, Cat::Transit),
                     gap_for(Cat::Transit, None),

@@ -542,7 +542,7 @@ impl Game {
                 }
                 Resource::Ducats => {
                     // A Bank (ticket #35): its amount times the state's gdp / 10.
-                    let mut v = Chain::base(p.amount as f64, "base");
+                    let mut v = Chain::base(p.amount, "base");
                     v.times(card.gdp as f64, || "for GDP".to_string());
                     v.over(10.0, "");
                     v.times(fac.output_multiplier, || format!("as the {}", fac.name));
@@ -556,7 +556,7 @@ impl Game {
                 // Region leans Widgets and no Tech lifts them, so the lean and Deep Mining stay
                 // Materials rules and reach the Mine alone.
                 res => {
-                    let mut v = Chain::base(p.amount as f64, "base");
+                    let mut v = Chain::base(p.amount, "base");
                     if card.resource_lean == res {
                         v.times(1.5, || format!("as this Region leans {}", res.name()));
                     }
@@ -658,7 +658,7 @@ impl Game {
                 let here = self.colonists_at_body(seat, col.body) as i64;
                 let held: Vec<BodyId> = self.bodies_held(seat).into_iter().filter(|b| *b != col.body).collect();
                 let far: f64 = held.iter().map(|b| t.body(*b).trade_pays).sum();
-                let raw = p.amount as f64 * here as f64 + far;
+                let raw = p.amount * here as f64 + far;
                 let bodies = held.iter().map(|b| format!("{} {}", b.name().trim_start_matches("the "), figure(t.body(*b).trade_pays))).collect::<Vec<_>>().join(" + ");
                 let arithmetic = if held.is_empty() { format!("{} x {here} Colonists", p.amount) } else { format!("{} x {here} Colonists + {bodies}", p.amount) };
                 let mut v = Chain::base(raw, format!("from {here} Colonists here and {} other Bodies held", held.len()));
@@ -694,7 +694,7 @@ impl Game {
                 // Ticket #188 (version 0.08.0): and the per-Colonist bonus is moderated by the
                 // Colony's schooling too, exactly as a Region's population bonus is, so the rule
                 // reads the same in both halves of the game.
-                let mut r = Chain::base(p.amount as f64, "base");
+                let mut r = Chain::base(p.amount, "base");
                 r.times(science, || "for this site's science".to_string());
                 r.times(col.education, || format!("for Education {:.2}", col.education));
                 r.times(1.0 + col.colonists as f64 * per * col.education, || format!("for {} Colonists, weighted by Education", col.colonists));
@@ -718,7 +718,7 @@ impl Game {
                 } else {
                     self.colony_yields(col).of_module(job)
                 };
-                let mut v = Chain::base(p.amount as f64, "base");
+                let mut v = Chain::base(p.amount, "base");
                 v.times(yield_, || if mc.sun_scaled { "for the sunlight here".to_string() } else { "for this site's yield".to_string() });
                 v.times(fac.output_multiplier, || format!("as the {}", fac.name));
                 v.times(self.tech_output_multiplier_module(seat, job), || "for Techs".to_string());
