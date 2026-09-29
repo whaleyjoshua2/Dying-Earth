@@ -17672,7 +17672,9 @@ fn a_nature_reserve_grows_the_sink_and_calms_a_climate_rise() {
     assert!((g.emissions_now().scrubbers - g.scrubber_removal()).abs() < 1e-9, "and in the Climate phase's Sink");
     g.state_mut(sid).unrest = 3.0;
     let rose = g.raise_unrest(sid, 1.2, UnrestSource::Climate);
-    assert!((rose - 1.0).abs() < 1e-6, "a sixth off a climate rise of 1.2 lands 1.0: {rose}");
+    assert!((rose - 1.0).abs() < 1e-12, "a sixth off a climate rise of 1.2 lands 1.0: {rose}");
+    // Five sixths exactly, so a rise of 1.5 lands on the quarter and a threshold is not missed by a hair.
+    assert_eq!(1.5 * g.tables.unrest.nature_reserve_factor, 1.25, "exactly five sixths");
     assert_eq!(g.raise_unrest(sid, 1.0, UnrestSource::Plain), 1.0, "nothing off a plain rise");
     g.state_mut(sid).facilities.push(facility(FacilityKind::Stadium));
     let rose = g.raise_unrest(sid, 1.2, UnrestSource::Climate);

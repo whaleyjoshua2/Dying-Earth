@@ -105,7 +105,7 @@ impl Game {
         self.climate.temperature = temp.max(c.base_temperature);
         self.climate.last = breakdown.clone();
         self.log(format!(
-            "Climate: emissions {:.1} (industry {:.1}, factories {:.1}, power {:.1}, refineries {:.1}, launches {:.1}, population {:.1}, cards {:.1}, permafrost {:.1}, war {:.1}), sink {:.1} (Scrubbers {:.1}), net {:+.1}; CO2 {:.1} ppm; temperature {:+.2} heading to {:+.2}.",
+            "Climate: emissions {:.1} (industry {:.1}, factories {:.1}, power {:.1}, refineries {:.1}, launches {:.1}, population {:.1}, cards {:.1}, permafrost {:.1}, war {:.1}), sink {:.1} (Scrubbers and Reserves {:.1}), net {:+.1}; CO2 {:.1} ppm; temperature {:+.2} heading to {:+.2}.",
             breakdown.total(),
             breakdown.state_industry,
             breakdown.factories,

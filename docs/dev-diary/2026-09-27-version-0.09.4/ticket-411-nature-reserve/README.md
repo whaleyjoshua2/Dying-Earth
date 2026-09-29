@@ -34,3 +34,15 @@ figure at one.
 [`../sweeps/after-411.txt`](../sweeps/after-411.txt) against [`../sweeps/after-419.txt`](../sweeps/after-419.txt):
 97 Reserves built, wins 9 / 5 / 0 / 9 to 7 / 6 / 0 / 10, collapses 57, the world under the Sink in
 15 of 80 either way.
+
+## The review
+
+An agent that did not build it found nothing broken and reproduced the sweep. Fixed from it: **the
+Reserve's figure was typed 0.8333333, not five sixths**, so a rise of 1.5 landed 1.24999995 and a
+Region could read *7.00* while sitting under the threshold; it is five sixths to the last digit now,
+the test pinning *1.5 lands 1.25 exactly* (the rerun sweep keeps every figure §14 quotes). The
+Climate Panel, the Blame hovers and the Climate log say *Scrubbers and Reserves* where they said
+Scrubbers. **The icon on the card**, with a new building aid `reserve:1`: the beech in China's box,
+*Nature Reserve*.
+
+![The Reserve on the card](reserve-on-the-card.png)

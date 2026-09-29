@@ -104,7 +104,7 @@ constabulary_damping = 0.5
 stadium_factor = 0.5
 # Ticket #411 (version 0.09.4): a working Nature Reserve takes a third of the Stadium's effect off a
 # CLIMATE rise: the Stadium keeps a half, the Reserve five sixths; with both they multiply.
-nature_reserve_factor = 0.8333333
+nature_reserve_factor = 0.8333333333333334
 
 # ---- thresholds (rule 5 of #52)
 # At `army_threshold` the Standing Army stops replenishing; at `facility_threshold` every Facility

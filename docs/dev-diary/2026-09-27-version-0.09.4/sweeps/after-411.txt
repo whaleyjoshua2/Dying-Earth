@@ -294,7 +294,7 @@ ACROSS ALL FOUR SEATINGS, 80 games:
     Arkwrights: score at the end median 0.00, nought in 76; placed 1st / 2nd / 3rd / 4th in 1 / 12 / 14 / 53
     Archivists: score at the end median 0.33, nought in 21; placed 1st / 2nd / 3rd / 4th in 23 / 30 / 18 / 9
   Unrest, per Faction over the batch (Region-turns held; at 4 or more; at 7 or more; throw-offs; start state lost as seat 0, to a throw-off / to a taking):
-    Custodians: 14643 held; 4846 at 4+ (33%); 1627 at 7+ (11%); 58 throw-offs; start lost 1 / 2
+    Custodians: 14643 held; 4846 at 4+ (33%); 1628 at 7+ (11%); 58 throw-offs; start lost 1 / 2
    Prospectors: 3259 held; 1245 at 4+ (38%); 607 at 7+ (19%); 13 throw-offs; start lost 4 / 7
     Arkwrights: 4416 held; 1218 at 4+ (28%); 350 at 7+ (8%); 9 throw-offs; start lost 1 / 12
     Archivists: 3054 held; 1269 at 4+ (42%); 371 at 7+ (12%); 6 throw-offs; start lost 4 / 13
