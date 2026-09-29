@@ -347,7 +347,8 @@ station weigh more as their most restive Region's Unrest rises, one at 4 and dou
 them by Faction); ground Colonies unchanged to the Body; wins **9 / 5 / 0 / 9** and collapses
 **57**, unmoved. The ease fires seldom. **The pull on a ground Colony does nothing measurable**: it
 sits on the landing itself, which is offered only to a loaded Ship already in low orbit and was
-chosen anyway; the stations are what moved. The line states the rule's figure; a Region already
+chosen anyway; the stations are what moved. The designer left it so (Q6, A): stations answer Unrest,
+Colonies are founded as they were. The line states the rule's figure; a Region already
 nearly calm eases by less.
 
 **What would show this wrong**: a rival's founding easing the Arkwrights; an Antarctic founding or a
