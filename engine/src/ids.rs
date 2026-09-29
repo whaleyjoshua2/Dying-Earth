@@ -612,10 +612,13 @@ pub enum TechId {
     /// needed by nothing, priced at 22 above its rung. A crossing's days x0.9 before the rounding
     /// up, multiplied with Nuclear Rockets' x0.8 when both stand (0.72).
     OrbitalRefuelling,
+    /// Ticket #420 (version 0.09.4): Propulsion rung 2, needing Clean Propellant and needed by
+    /// nothing, at 32. Every Ship's tank +15 Fuel, on Clean Propellant's +5.
+    DeepTanks,
 }
 
 impl TechId {
-    pub const ALL: [TechId; 23] = [
+    pub const ALL: [TechId; 24] = [
         TechId::EfficientGrids,
         TechId::CleanPower,
         TechId::CleanManufacturing,
@@ -639,6 +642,7 @@ impl TechId {
         TechId::MissileTechnology,
         TechId::NuclearRockets,
         TechId::OrbitalRefuelling,
+        TechId::DeepTanks,
     ];
     pub fn index(self) -> usize {
         self as usize

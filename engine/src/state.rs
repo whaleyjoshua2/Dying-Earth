@@ -1986,7 +1986,9 @@ impl Game {
         if base <= 0.0 {
             return 0.0;
         }
+        // Ticket #420 (version 0.09.4): and Deep Tanks' Fuel on top.
         base + self.tech_addition_of(seat, TechId::CleanPropellant, self.tables.tech(TechId::CleanPropellant).tank_fuel) as f64
+            + self.tech_addition_of(seat, TechId::DeepTanks, self.tables.tech(TechId::DeepTanks).tank_fuel) as f64
     }
 
     /// An additive Tech read for one seat: its full value once done, half rounded down under

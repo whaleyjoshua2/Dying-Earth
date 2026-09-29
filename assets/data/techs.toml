@@ -392,3 +392,18 @@ cost = 22
 needs = []
 effect = "Transit times x0.9; stacks with Nuclear Rockets"
 value = 0.9
+
+# Ticket #420 (version 0.09.4): the twenty-fourth Tech, appended last with its enum variant.
+# Propulsion rung 2 beside Efficient Transit and Nuclear Rockets, needing Clean Propellant and
+# needed by nothing, at Efficient Transit's 32, at the designer's word. Every Ship's tank +15 Fuel,
+# on Clean Propellant's +5 where both stand; half under Provisional Findings, as every addition is.
+[[tech]]
+id = "deep_tanks"
+name = "Deep Tanks"
+branch = "Propulsion"
+rung = 2
+cost = 32
+needs = ["clean_propellant"]
+effect = "Every Ship's tank +15 Fuel"
+value = 1.0
+tank_fuel = 15.0

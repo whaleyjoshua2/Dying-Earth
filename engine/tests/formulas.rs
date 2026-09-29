@@ -2023,7 +2023,8 @@ fn a_colony_ship(g: &mut Game, seat: Seat, body: BodyId) -> ShipId {
         escaped: false,
         arrived_this_turn: false,
         built_turn: 1,
-        fuel: 30.0, slot: None,
+        // Ticket #420 (version 0.09.4): a Colony Ship's tank is 40, full.
+        fuel: 40.0, slot: None,
     });
     id
 }
@@ -4475,8 +4476,9 @@ fn f_coastal_engineering_is_the_thirteenth_tech() {
     // Ticket #343 (version 0.09.1): twenty-one, with Missile Technology on Propulsion rung 3.
     // Ticket #393 (version 0.09.3): twenty-two, with Nuclear Rockets on Propulsion rung 2.
     // Ticket #413 (version 0.09.4): twenty-three, with Orbital Refuelling on Propulsion rung 1.
-    assert_eq!(TechId::ALL.len(), 23, "thirteen Techs, the four gates, Civil Defense, #232's two, Missile Technology, Nuclear Rockets and Orbital Refuelling");
-    assert_eq!(g.tables.techs.len(), 23, "and twenty-three rows in techs.toml");
+    // Ticket #420 (version 0.09.4): twenty-four, with Deep Tanks on Propulsion rung 2.
+    assert_eq!(TechId::ALL.len(), 24, "thirteen Techs, the four gates, Civil Defense, #232's two, Missile Technology, Nuclear Rockets, Orbital Refuelling and Deep Tanks");
+    assert_eq!(g.tables.techs.len(), 24, "and twenty-four rows in techs.toml");
     let c = g.tables.tech(TechId::CoastalEngineering);
     assert_eq!(c.name, "Coastal Engineering");
     assert_eq!(c.branch, "Industry");
@@ -5051,7 +5053,8 @@ fn the_ai_banks_fuel_when_the_mars_window_is_within_two_turns() {
                 escaped: false,
                 arrived_this_turn: false,
                 built_turn: 1,
-                fuel: 30.0, slot: None,
+                // Ticket #420 (version 0.09.4): each tank full, a Colony Ship's 40.
+                fuel: if kind == UnitKind::ColonyShip { 40.0 } else { 30.0 }, slot: None,
             });
         }
         g
@@ -5139,7 +5142,8 @@ fn colony_ship_ready(g: &mut Game, body: BodyId) -> (ShipId, Order) {
         escaped: false,
         arrived_this_turn: false,
         built_turn: turn,
-        fuel: 30.0, slot: None,
+        // Ticket #420 (version 0.09.4): a Colony Ship's tank is 40, full.
+        fuel: 40.0, slot: None,
     });
     // Ticket #93: a Body with no Colony Slots (Venus) gets slot 0, an order the check will refuse.
     let slot = g.free_slots_on(body).first().copied().unwrap_or(0);
@@ -6600,7 +6604,7 @@ fn the_four_gates_stand_on_rung_three_at_one_price_with_their_prerequisites() {
         assert_eq!(card.needs, needs, "{t:?}");
         assert_eq!(g.tables.victory_gate(kind), Some(t));
     }
-    assert_eq!(TechId::ALL.len(), 23, "eighteen, Beneficiation and Relay Networks since ticket #232, Missile Technology since #343, Nuclear Rockets since #393, Orbital Refuelling since #413");
+    assert_eq!(TechId::ALL.len(), 24, "eighteen, Beneficiation and Relay Networks since ticket #232, Missile Technology since #343, Nuclear Rockets since #393, Orbital Refuelling since #413, Deep Tanks since #420");
     // Version 0.08.3 moved three of the four gates' prerequisites in three separate tickets, and
     // nothing watched how deep each gate ended up. Counted as Techs that must stand before the
     // gate is reachable, the gate excluded.
@@ -6843,8 +6847,9 @@ fn the_ai_lifts_a_crowded_load_only_when_behind_on_presence() {
 #[test]
 fn a_ship_is_built_with_a_full_tank_paid_from_the_stockpile() {
     let mut g = game();
+    // Ticket #420 (version 0.09.4): the Colony Ship's is 40, every warship's 30.
     for k in UnitKind::SHIPS {
-        assert_eq!(g.tables.unit(k).tank, 30, "{k:?}");
+        assert_eq!(g.tables.unit(k).tank, if k == UnitKind::ColonyShip { 40 } else { 30 }, "{k:?}");
     }
     assert_eq!(g.tables.unit(UnitKind::Army).tank, 0);
     let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
@@ -6933,7 +6938,7 @@ fn refuel_is_an_order_at_a_station_of_your_own_and_a_station_rescues_a_stranded_
     g.ship_mut(far).unwrap().slot = Some(0);
     assert!(g.check_order(Seat(0), &[], &Order::Refuel { ship: far }).is_ok());
     let (full, _) = colony_ship_ready(&mut g, BodyId::Earth);
-    g.ship_mut(full).unwrap().fuel = 30.0;
+    g.ship_mut(full).unwrap().fuel = 40.0;
     g.ship_mut(full).unwrap().slot = Some(iss_slot);
     assert!(g.check_order(Seat(0), &[], &Order::Refuel { ship: full }).unwrap_err().0.contains("full"));
 }
@@ -10066,6 +10071,40 @@ fn civil_defense_doubles_what_a_constabulary_is_worth_at_the_gate() {
 /// Ticket #231 (version 0.08.3): rungs 2 and 3 to 32 and 48, RUNG 1 LEFT AT 18. The total is the
 /// figure the ticket was decided on -- 554 to 585, a rise of 5.6%, about 1.8 turns of late-game
 /// Research -- so it is pinned here and not left to be re-derived.
+/// Ticket #420 (version 0.09.4): a Colony Ship's tank is 40, a warship's 30; Deep Tanks, on
+/// Propulsion rung 2 at 32 behind Clean Propellant, adds 15 to every Ship's on Clean Propellant's
+/// 5, half under Provisional Findings; the build pays the whole tank; every seat picks it in its
+/// Propulsion chain after Nuclear Rockets.
+#[test]
+fn deep_tanks_adds_fifteen_to_every_tank_on_clean_propellants_five() {
+    let mut g = game();
+    let card = g.tables.tech(TechId::DeepTanks);
+    assert_eq!((card.name.as_str(), card.branch.as_str(), card.rung, card.cost), ("Deep Tanks", "Propulsion", 2, 32));
+    assert_eq!(card.needs, vec![TechId::CleanPropellant]);
+    assert!(TechId::ALL.iter().all(|t| !g.tables.tech(*t).needs.contains(&TechId::DeepTanks)), "needed by nothing");
+    let tanks = |g: &Game| (g.tank_of(Seat(0), UnitKind::ColonyShip), g.tank_of(Seat(0), UnitKind::Frigate), g.tank_of(Seat(0), UnitKind::MissileCarrier));
+    assert_eq!(tanks(&g), (40.0, 30.0, 30.0));
+    with_tech(&mut g, TechId::CleanPropellant);
+    assert_eq!(tanks(&g), (45.0, 35.0, 35.0));
+    with_tech(&mut g, TechId::DeepTanks);
+    assert_eq!(tanks(&g), (60.0, 50.0, 50.0));
+    assert_eq!(g.tank_of(Seat(0), UnitKind::Army), 0.0, "an Army has no tank");
+    let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
+    assert_eq!(g.order_cost(Seat(0), &Order::BuildShip { site: Place::Colony(iss), kind: UnitKind::ColonyShip }).fuel, 60.0, "the build fills the whole tank");
+    // Under Provisional Findings, the Archivists', half of 15, rounded down: 7.
+    let mut g = game();
+    let arc = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Archivists).unwrap();
+    g.research.current = Some(TechId::DeepTanks);
+    g.research.findings_tech = Some(TechId::DeepTanks);
+    assert!(g.provisional_findings(arc));
+    assert_eq!(g.tank_of(arc, UnitKind::ColonyShip), 47.0);
+    for k in FactionKind::ALL {
+        let order = &g.tables.ai.tech_picks[&k].order;
+        let at = |t: TechId| order.iter().position(|x| *x == t);
+        assert!(at(TechId::DeepTanks).is_some() && at(TechId::DeepTanks) == at(TechId::NuclearRockets).map(|i| i + 1), "{k:?} picks it after Nuclear Rockets: {order:?}");
+    }
+}
+
 #[test]
 fn the_tree_costs_eighteen_thirty_two_and_forty_eight_by_rung() {
     let g = game();
@@ -10087,7 +10126,7 @@ fn the_tree_costs_eighteen_thirty_two_and_forty_eight_by_rung() {
     let total: i64 = TechId::ALL.into_iter().map(|t| g.tables.tech(t).cost).sum();
     assert_eq!(g.tables.tech(TechId::NuclearRockets).cost, 38, "priced above its rung");
     assert_eq!(g.tables.tech(TechId::OrbitalRefuelling).cost, 22, "priced above its rung");
-    assert_eq!(total, 757, "the whole tree since ticket #413's Orbital Refuelling (22 on rung 1); 735 from #393, 697 from #343, 649 from #232, 585 from #231, 554 from #201, 507 before that");
+    assert_eq!(total, 789, "the whole tree since ticket #420's Deep Tanks (32 on rung 2); 757 from #413's Orbital Refuelling (22 on rung 1); 735 from #393, 697 from #343, 649 from #232, 585 from #231, 554 from #201, 507 before that");
 }
 
 // ------------------------------------------------------- 0.08.1 ticket #208: the School's step
@@ -14635,7 +14674,7 @@ fn ticket_345_the_computer_sends_its_colony_ship_to_a_world_nobody_has_settled()
             let name = g.next_ship_name(UnitKind::ColonyShip);
             g.ships.push(Ship {
                 id, name, kind: UnitKind::ColonyShip, seat: Seat(1), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 4, warhead: false,
-                colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None,
+                colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 40.0, slot: None,
             });
             g.seats[1].stockpile.fuel = 200.0;
             g.seats[1].stockpile.energy = 400.0;
@@ -16811,10 +16850,11 @@ fn a_colony_with_a_working_refinery_refuels_its_low_orbit_and_rescues_a_stranded
     let depot = colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Refinery], 4);
     assert!(g.check_order(Seat(0), &[], &refuel).is_ok(), "a working Refinery below fuels low orbit: {:?}", g.check_order(Seat(0), &[], &refuel));
     assert!(!g.stranded(far), "the depot rescues it");
-    assert_eq!(g.order_cost(Seat(0), &refuel).fuel, 29.0, "30 - 1 wanted, 50 held");
+    // Ticket #420 (version 0.09.4): a Colony Ship's tank is 40.
+    assert_eq!(g.order_cost(Seat(0), &refuel).fuel, 39.0, "40 - 1 wanted, 50 held");
     g.commit_orders(Seat(0), std::slice::from_ref(&refuel));
-    assert_eq!(g.ship(far).unwrap().fuel, 30.0, "filled from the Stockpile");
-    assert_eq!(g.seats[0].stockpile.fuel, 21.0);
+    assert_eq!(g.ship(far).unwrap().fuel, 40.0, "filled from the Stockpile");
+    assert_eq!(g.seats[0].stockpile.fuel, 11.0);
     assert!(g.log.iter().any(|l| l.contains(" refuels ") && l.contains("at a Refinery Colony")), "the log says where: {:?}", g.log.last());
     // The Refinery mothballed: the depot is shut.
     g.ship_mut(far).unwrap().fuel = 1.0;

@@ -95,7 +95,7 @@ A Colony in orbit, built for Materials into an Orbital Slot with no crew, holdin
 _Avoid_: base, platform, orbital, outpost
 
 **Tank**:
-The Fuel a Ship carries, since version 0.06.0: a figure per Ship type (and since version 0.09.4 five more for everyone once Clean Propellant stands), filled at the Shipyard for Fuel paid at the build, spent by transits and, since version 0.09.0, one Fuel by a change of orbit at a Body, and refilled only by a Refuel. A Ship whose Tank cannot pay any leg from where it stands, with no Space Station of its Faction there (nor, since version 0.09.3, a Colony of its Faction's with a working Refinery below its low orbit), is stranded until one is built there; a Tank at nought with a station of its own in another orbit is stranded too, since the change of orbit that would reach it costs Fuel. Since version 0.09.1 a Battle in orbit also spends it: every hull named in one pays two Fuel, and the same two Fuel are the bar a warship must hold to hold Orbital Control, to contest an orbit, to blockade or to fight at its full strength, and the bar any Ship must hold to intercept.
+The Fuel a Ship carries, since version 0.06.0: a figure per Ship type (since version 0.09.4 a Colony Ship's 40 and every warship's 30; five more for everyone once Clean Propellant stands, and fifteen more on that once Deep Tanks stands), filled at the Shipyard for Fuel paid at the build, spent by transits and, since version 0.09.0, one Fuel by a change of orbit at a Body, and refilled only by a Refuel. A Ship whose Tank cannot pay any leg from where it stands, with no Space Station of its Faction there (nor, since version 0.09.3, a Colony of its Faction's with a working Refinery below its low orbit), is stranded until one is built there; a Tank at nought with a station of its own in another orbit is stranded too, since the change of orbit that would reach it costs Fuel. Since version 0.09.1 a Battle in orbit also spends it: every hull named in one pays two Fuel, and the same two Fuel are the bar a warship must hold to hold Orbital Control, to contest an orbit, to blockade or to fight at its full strength, and the bar any Ship must hold to intercept.
 _Avoid_: fuel tank, propellant, range, fuel level
 
 **Stranded**:
@@ -177,6 +177,10 @@ _Avoid_: nuclear drive, NTR, fast transit, engines
 **Orbital Refuelling**:
 The Tech, since version 0.09.4, that shortens a Transit by a tenth: Propulsion, rung 1, beside Clean Propellant, needing nothing and needed by nothing, priced at 22 Research where its rung is 18. It cuts a crossing's days before they are rounded up to turns, and with Nuclear Rockets the two cuts multiply. Despite its name it fills no tank; a Ship's tank is filled by a Refuel.
 _Avoid_: refuel (that is the order), fuel depot
+
+**Deep Tanks**:
+The Tech, since version 0.09.4, that adds fifteen Fuel to every Ship's Tank: Propulsion, rung 2, beside Efficient Transit and Nuclear Rockets, needing Clean Propellant and needed by nothing, at 32 Research. It stacks with Clean Propellant's five. A Ship is built with its Tank full, so a bigger Tank costs more Fuel at the yard; a Ship already flying when it completes gains the room empty.
+_Avoid_: fuel tanks, extended tanks
 
 **opens_on**:
 The Region a Faction's card names for the start screen's globe to face. It has one reader and one job: pointing the camera. It is not a starting position -- any Region may be chosen -- which is why it stopped being called `home` in version 0.08.0.
