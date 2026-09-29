@@ -618,7 +618,7 @@ impl Game {
         let turns_left = t.victory.turns.saturating_sub(self.turn).max(1) as f64;
         let flight = |b: BodyId| self.transit_cost_for(seat, BodyId::Earth, b).0 as f64;
         // The 0.06.0 AI sweep (ticket #94): a leg no tank could pay (Mars off its window can ask
-        // 47 Fuel of a 30 tank) is not a destination either; before this the AI named it as its
+        // 47 Fuel of a 30 tank, a Colony Ship's 40 since ticket #420) is not a destination either; before this the AI named it as its
         // one choice, the Transit was refused at the check, and the Ship sat at Earth.
         // Ticket #413 (version 0.09.4): the seat's own tanks, Clean Propellant's Fuel included.
         let tank = UnitKind::SHIPS.iter().map(|k| self.tank_of(seat, *k)).fold(0.0, f64::max);

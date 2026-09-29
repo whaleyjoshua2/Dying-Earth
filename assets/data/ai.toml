@@ -520,12 +520,11 @@ battle_fuel_weight = 0.2
 # propulsion chain, then to lowest". Every list is its own Victory gate chain (the antecedents,
 # cheapest first, as #348 laid them; the gate itself is taken by the gate rule in `research.rs`),
 # then the Propulsion chain in tree order (Orbital Refuelling since ticket #413, Clean Propellant, Efficient Transit, Nuclear Rockets,
-# Hardened Hulls, Missile Technology), and then NOTHING: the engine's fallback takes the cheapest
+# Deep Tanks since ticket #420, Hardened Hulls, Missile Technology), and then NOTHING: the engine's fallback takes the cheapest
 # Tech left. What that dropped: the Custodians' Coastal Engineering (#77), Efficient Grids, Clean
 # Power, Civil Defense (#201) and Clean Manufacturing; the Archivists' Public Science, Coastal
 # Engineering, Green Consensus and Civil Defense. Each is now reached only as the cheapest left.
 # Measured in the sweep after #393, in the 0.09.3 diary.
-# Ticket #420 (version 0.09.4): Deep Tanks joins every Propulsion chain after Nuclear Rockets.
 [tech_picks.prospectors]
 # Ticket #348: Beneficiation joins the list. Ticket #242 made it a prerequisite of the Extraction
 # Charter and nobody put it on the list it gates, so the Prospectors reached their own gate only by

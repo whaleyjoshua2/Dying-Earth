@@ -22,3 +22,10 @@ out of `tank_of` (*(45, 35, 35) against (60, 50, 50)*), green after.
 [`after-420.txt`](../sweeps/after-420.txt) against [`after-416-schools.txt`](../sweeps/after-416-schools.txt):
 Deep Tanks completed in 80 of 80 games, median turn 15; wins 7 / 9 / 3 / 17 to 10 / 10 / 0 / 14;
 collapses 43 to 46; ground Colonies on the Moon at the end 255 to 222.
+
+## The review
+
+An agent that did not build it found the engine correct: every tank reader goes through `tank_of`,
+the computer seats route only Colony Ships on its largest tank, saves load with the Tech appended.
+Fixed from it: the test doc comment put back on the tree-cost test; the `shot:` boards build their
+Colony Ships with a full tank of 40, not 30; two stale comments.

@@ -10065,12 +10065,6 @@ fn civil_defense_doubles_what_a_constabulary_is_worth_at_the_gate() {
     assert_eq!(g.tables.influence.constabulary_margin_defended, 10);
 }
 
-/// Ticket #201: the tree's costs, which this ticket set and whose header comment had been wrong
-/// since version 0.07.1 -- it claimed 16, 28, 44 while the data said 15, 30, 45.
-///
-/// Ticket #231 (version 0.08.3): rungs 2 and 3 to 32 and 48, RUNG 1 LEFT AT 18. The total is the
-/// figure the ticket was decided on -- 554 to 585, a rise of 5.6%, about 1.8 turns of late-game
-/// Research -- so it is pinned here and not left to be re-derived.
 /// Ticket #420 (version 0.09.4): a Colony Ship's tank is 40, a warship's 30; Deep Tanks, on
 /// Propulsion rung 2 at 32 behind Clean Propellant, adds 15 to every Ship's on Clean Propellant's
 /// 5, half under Provisional Findings; the build pays the whole tank; every seat picks it in its
@@ -10105,6 +10099,12 @@ fn deep_tanks_adds_fifteen_to_every_tank_on_clean_propellants_five() {
     }
 }
 
+/// Ticket #201: the tree's costs, which this ticket set and whose header comment had been wrong
+/// since version 0.07.1 -- it claimed 16, 28, 44 while the data said 15, 30, 45.
+///
+/// Ticket #231 (version 0.08.3): rungs 2 and 3 to 32 and 48, RUNG 1 LEFT AT 18. The total is the
+/// figure the ticket was decided on -- 554 to 585, a rise of 5.6%, about 1.8 turns of late-game
+/// Research -- so it is pinned here and not left to be re-derived.
 #[test]
 fn the_tree_costs_eighteen_thirty_two_and_forty_eight_by_rung() {
     let g = game();
