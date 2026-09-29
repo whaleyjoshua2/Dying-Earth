@@ -1964,6 +1964,23 @@ impl Game {
         }
     }
 
+    /// Ticket #419 (version 0.09.4): `ease` off the Unrest of every Region this seat holds, for a
+    /// place it has just founded; what was actually eased, so the line never claims what did not
+    /// happen.
+    fn founding_ease(&mut self, seat: Seat, ease: f64) -> f64 {
+        if ease <= 0.0 {
+            return 0.0;
+        }
+        let mut eased = 0.0;
+        for sid in self.controlled_states(seat) {
+            eased += self.lower_unrest(sid, ease);
+        }
+        if eased > 0.0 {
+            self.log(format!("The {} eased {} Unrest in the Regions they hold by founding.", self.seat_name(seat), crate::state::figure(eased)));
+        }
+        eased
+    }
+
     /// Ticket #54: every Mothball, Restart and Decommission whose turn has come. A decommission
     /// refunds half the building's Materials, rounded down, and frees its slot; in a Nation State a
     /// mothball and a decommission each add their Unrest, and in a Colony neither adds anything.
@@ -2581,7 +2598,13 @@ impl Game {
             self.colonies.push(Colony { id, body: *body, slot: *slot, control: Control::Controlled(*seat), modules: vec![Module::new(ModuleKind::Core)], colonists: 0, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: self.turn, in_orbit: true });
             let line = format!("{} built {}.", self.seat_name(*seat), self.place_name(Place::Colony(id)));
             self.log(line);
-            let text = self.say("station_built", &[("faction", self.seat_name(*seat)), ("station", self.place_name(Place::Colony(id)))]);
+            // Ticket #419 (version 0.09.4): and a station built, by half a point.
+            let ease = self.tables.faction(self.kind(*seat)).found_station_unrest_ease;
+            let eased = self.founding_ease(*seat, ease);
+            let text = self.say(
+                if eased > 0.0 { "station_built_eased" } else { "station_built" },
+                &[("faction", self.seat_name(*seat)), ("station", self.place_name(Place::Colony(id))), ("ease", crate::state::figure(ease))],
+            );
             self.report_line_of(*seat, LineKind::YourBuild, LineKind::BuildComplete, Some(ReportPlace::Colony(id)), text);
         }
         // Founding orders into the same Colony Slot from more than one seat are decided at the Body,
@@ -2743,13 +2766,18 @@ impl Game {
                             let slot_name = self.tables.body(b).slots[slot as usize].name.clone();
                             let line = format!("The {} founded a Colony at {} on {} with {} Colonists.", self.seat_name(seat), slot_name, self.tables.body(b).name, moved);
                             self.log(line);
+                            // Ticket #419 (version 0.09.4): a founding off Earth eases the founder's Regions
+                            // where its card says so (the Arkwrights'), said on this line.
+                            let ease = self.tables.faction(self.kind(seat)).found_colony_unrest_ease;
+                            let eased = if b != BodyId::Earth { self.founding_ease(seat, ease) } else { 0.0 };
                             let text = self.say(
-                                "colony_founded",
+                                if eased > 0.0 { "colony_founded_eased" } else { "colony_founded" },
                                 &[
                                     ("faction", self.seat_name(seat)),
                                     ("slot", slot_name),
                                     ("body", self.tables.body(b).name.clone()),
                                     ("n", moved.to_string()),
+                                    ("ease", crate::state::figure(ease)),
                                 ],
                             );
                             self.report_line(LineKind::ColonyFounded, Some(ReportPlace::Colony(id)), text);

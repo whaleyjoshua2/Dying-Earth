@@ -17549,3 +17549,86 @@ fn the_tech_trees_lit_path_is_everything_a_tech_needs() {
     assert_eq!(path.len(), 5);
     assert_eq!(t.tech_path(TechId::CleanPropellant), vec![TechId::CleanPropellant], "a rung-1 Tech lights itself alone");
 }
+
+/// Ticket #419 (version 0.09.4): **the Arkwrights' foundings ease every Region they hold**: a whole
+/// point for a ground Colony off Earth, half for a Space Station, said on the founding's line; a
+/// rival's founding eases nothing. Their computer seat reaches for a founding by its most restive
+/// Region, one at 4, double at 9. Seat 2 is the Arkwrights.
+#[test]
+fn the_arkwrights_foundings_ease_their_unrest() {
+    for (seat, eased) in [(Seat(2), 1.0), (Seat(1), 0.0)] {
+        let mut g = game();
+        let held = g.controlled_states(seat);
+        for sid in &held {
+            g.state_mut(*sid).unrest = 4.0;
+        }
+        let ship = ship_in(&mut g, seat, UnitKind::ColonyShip, BodyId::Moon, None, Stance::Hold);
+        g.ship_mut(ship).unwrap().colonists = 4;
+        let slot = g.free_slots_on(BodyId::Moon)[0];
+        g.report.lines.clear();
+        // The control makes the same turn without the founding, so the Resolution's other falls cancel;
+        // the Moon's first ground Colony eases every Region by its own half point as well (#395).
+        let first = if g.first_at(BodyId::Moon).is_none() { g.tables.unrest.first_colony_ease } else { 0.0 };
+        let mut control = g.clone();
+        g.commit_orders(seat, &[Order::Unload { ship, colonists: 4, army: false, into: UnloadTarget::Slot(BodyId::Moon, slot) }]);
+        g.resolution_phase();
+        control.resolution_phase();
+        for sid in &held {
+            assert_eq!(control.state(*sid).unrest - g.state(*sid).unrest, eased + first, "{seat:?}: {sid:?} after a founding");
+        }
+        let line = g.report.lines.iter().find(|l| l.kind == LineKind::ColonyFounded && l.text.contains("founded a Colony")).expect("the founding's line").text.clone();
+        assert_eq!(line.ends_with(": -1 Unrest."), eased > 0.0, "{line}");
+    }
+    // A founding in Antarctica, on Earth, eases nothing.
+    let mut g = game();
+    g.antarctica_open = true;
+    let held = g.controlled_states(Seat(2));
+    for sid in &held {
+        g.state_mut(*sid).unrest = 4.0;
+    }
+    let ship = ship_in(&mut g, Seat(2), UnitKind::ColonyShip, BodyId::Earth, None, Stance::Hold);
+    g.ship_mut(ship).unwrap().colonists = 4;
+    let ice = g.free_slots_on(BodyId::Earth)[0];
+    let mut control = g.clone();
+    g.commit_orders(Seat(2), &[Order::Unload { ship, colonists: 4, army: false, into: UnloadTarget::Slot(BodyId::Earth, ice) }]);
+    g.resolution_phase();
+    control.resolution_phase();
+    assert!(g.colonies.len() > control.colonies.len(), "the premise: a Colony founded in Antarctica");
+    for sid in &held {
+        assert_eq!(control.state(*sid).unrest, g.state(*sid).unrest, "Antarctica eases nothing: {sid:?}");
+    }
+    // A station built: half a point.
+    let mut g = game();
+    g.seats[2].stockpile.materials = 500.0;
+    let held = g.controlled_states(Seat(2));
+    for sid in &held {
+        g.state_mut(*sid).unrest = 4.0;
+    }
+    let slot = (0..g.tables.body(BodyId::Earth).orbital_slots).find(|s| g.colonies.iter().all(|c| !(c.body == BodyId::Earth && c.in_orbit && c.slot == *s))).expect("a free ring over Earth");
+    let build = Order::BuildStation { body: BodyId::Earth, slot };
+    assert!(g.check_order(Seat(2), &[], &build).is_ok(), "{:?}", g.check_order(Seat(2), &[], &build));
+    g.report.lines.clear();
+    let mut control = g.clone();
+    g.commit_orders(Seat(2), std::slice::from_ref(&build));
+    g.resolution_phase();
+    control.resolution_phase();
+    assert!(g.colonies.len() > control.colonies.len(), "the premise: the station stands");
+    for sid in &held {
+        assert_eq!(control.state(*sid).unrest - g.state(*sid).unrest, 0.5, "{sid:?} after a station");
+    }
+    assert!(g.report.lines.iter().any(|l| l.text.ends_with(": -0.5 Unrest.")), "the line says it: {:?}", g.report.lines);
+    let t = tables();
+    let a = t.faction(FactionKind::Arkwrights);
+    assert_eq!((a.found_colony_unrest_ease, a.found_station_unrest_ease), (1.0, 0.5), "the designer's figures");
+    // The computer's pull: one at 4 and under, double at 9, by the most restive Region held.
+    let mut g = game();
+    let held = g.controlled_states(Seat(2));
+    let pull = |g: &mut Game, u: f64| {
+        g.state_mut(held[0]).unrest = u;
+        g.ai_founding_pull(Seat(2))
+    };
+    assert_eq!(pull(&mut g, 3.0), 1.0);
+    assert_eq!(pull(&mut g, 6.5), 1.5);
+    assert_eq!(pull(&mut g, 10.0), 2.0);
+    assert_eq!(g.ai_founding_pull(Seat(1)), 1.0, "a Faction whose foundings ease nothing");
+}

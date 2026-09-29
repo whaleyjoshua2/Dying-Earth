@@ -393,6 +393,10 @@ relief_from = 5.0
 relief_double_at = 9.0
 mothball_restive_from = 5.0
 mothball_restive_factor = 0.25
+# Ticket #419 (version 0.09.4): the Arkwrights, eased by their foundings, weigh founding a ground
+# Colony and building a station by their most restive Region: one at 4, double at 9.
+founding_pull_from = 4.0
+founding_pull_double_at = 9.0
 # Ticket #345 (version 0.09.1): FIRST TO A BODY, on the computer's side. `first_windfall_worth`
 # is what one Influence of an unclaimed Body's windfall counts for when a seat picks where to
 # send a loaded Colony Ship, in the units a Colony Slot's yields are weighed in -- a slot is worth

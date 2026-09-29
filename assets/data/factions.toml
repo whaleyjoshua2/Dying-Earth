@@ -158,6 +158,11 @@ start_extra_facilities = ["power_plant"]
 # Ticket #407 (version 0.09.4): audited against the data: 16 with Generation Ships too, and a
 # Colony Ship at 25.5 since figures are carried to a tenth.
 signature = "Coach Class. A Colony Ship carries 8 Colonists, 12 with Expanded Habitats and 16 with Generation Ships too, and their Habitats hold half again as many, 6 and 12. They recruit 8 Pioneers a turn where others recruit 4, but every Pioneer takes twice the population. Every Ship costs them 15% less, a Colony Ship 25.5 Materials; a transit burns three quarters of the Fuel; and, starting with no station, a Space Station costs them 20 Materials and a Module three quarters."
+# Ticket #419 (version 0.09.4): Unrest off every Region they hold, a whole point for each ground
+# Colony they found off Earth (Antarctica excepted) and half a point for each Space Station they
+# build; a place taken counts for nothing.
+found_colony_unrest_ease = 1.0
+found_station_unrest_ease = 0.5
 # Ticket #203 (version 0.08.1). The building is ticket #183's.
 unique = "Spaceport -- replaces the Launch Site, and pays +1 Influence into next turn's Allotment for every Pioneer it lifts off Earth. Off Earth, the Chorus -- replaces the Relay, and adds +1 Influence to the Allotment for every 6 Colonists at its Colony."
 victory = "Diaspora: 30 Colonists living off Earth, on Colonies spread over at least three Bodies with at least 4 Colonists each (Antarctica and stations over Earth do not count)."

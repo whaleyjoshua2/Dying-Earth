@@ -325,3 +325,30 @@ map by the designer on 2026-09-28. No rule moves.
 **Each Faction's two Victory bars are filled in its own colour**, its heading's, where every bar was
 the theme's one blue (as the glossary's *Victory bar* entry had always said they were); **the
 Colonists-in-transit band is that colour darkened**, hatched as before.
+
+## 12. The Arkwrights' Unrest eased by every place they found off Earth
+
+The authority is [ticket #419](https://github.com/whaleyjoshua2/Dying-Earth/issues/419), added to the
+map by the designer on 2026-09-28.
+
+**Each ground Colony the Arkwrights found off Earth takes a point off the Unrest of every Region they
+hold, and each Space Station they build half a point** (`found_colony_unrest_ease`,
+`found_station_unrest_ease` on their card; nought for the other three). Antarctica, being on Earth,
+eases nothing; a place taken rather than founded counts for nothing. The founding's own line says it
+(*"… with 4 Colonists: -1 Unrest."*, *"… built Starlab: -0.5 Unrest."*), and only where something
+eased.
+
+**It is part of their computer seat's Unrest management**: founding a ground Colony and building a
+station weigh more as their most restive Region's Unrest rises, one at 4 and double at 9
+(`founding_pull_from`, `founding_pull_double_at` in `ai.toml`), as Relief does since §7.
+
+**Measured** (against the sweep after §9): the Arkwrights' held Region-turns at Unrest 7+ 360 to
+355, their throw-offs 7 and 7; stations on the Moon 15 to 20 (all seats; the sweep does not split
+them by Faction); ground Colonies unchanged to the Body; wins **9 / 5 / 0 / 9** and collapses
+**57**, unmoved. The ease fires seldom. **The pull on a ground Colony does nothing measurable**: it
+sits on the landing itself, which is offered only to a loaded Ship already in low orbit and was
+chosen anyway; the stations are what moved. The line states the rule's figure; a Region already
+nearly calm eases by less.
+
+**What would show this wrong**: a rival's founding easing the Arkwrights; an Antarctic founding or a
+taken place easing anything; the line claiming an ease that did not land.

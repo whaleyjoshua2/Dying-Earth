@@ -404,6 +404,24 @@ impl Game {
         }
     }
 
+    /// Ticket #419 (version 0.09.4): how much more a Faction eased by its foundings (the
+    /// Arkwrights) weighs founding a ground Colony or building a station, by its most restive
+    /// Region: one at `founding_pull_from`, rising in a line to double at `founding_pull_double_at`.
+    /// One for a Faction whose foundings ease nothing.
+    pub fn ai_founding_pull(&self, seat: Seat) -> f64 {
+        let card = self.tables.faction(self.kind(seat));
+        if card.found_colony_unrest_ease <= 0.0 && card.found_station_unrest_ease <= 0.0 {
+            return 1.0;
+        }
+        let th = &self.tables.ai.thresholds;
+        let worst = self.controlled_states(seat).iter().map(|s| self.state(*s).unrest).fold(0.0, f64::max);
+        let span = th.founding_pull_double_at - th.founding_pull_from;
+        if worst < th.founding_pull_from || span <= 0.0 {
+            return 1.0;
+        }
+        (1.0 + (worst - th.founding_pull_from) / span).min(2.0)
+    }
+
     /// Ticket #410 (version 0.09.4): Relief's weight at this Unrest: none under `relief_from`, one
     /// there, rising in a line to double at `relief_double_at` (the Facilities' 7 and the throw-off's
     /// 10 either side of it) and no higher.
@@ -1808,7 +1826,7 @@ impl Game {
             }
             if let Some(slot) = self.free_orbital_slots(body).first() {
                 let opp = if has_shipyard { 1.0 } else { m.opportunity };
-                push(vec![Order::BuildStation { body, slot: *slot }], Cat::LaunchSiteOrShipyard, self.base_weight(seat, Cat::LaunchSiteOrShipyard), 1.0, 1.0, opp, format!("build {} over {}", self.station_name(body, *slot), self.tables.body(body).name), None);
+                push(vec![Order::BuildStation { body, slot: *slot }], Cat::LaunchSiteOrShipyard, self.base_weight(seat, Cat::LaunchSiteOrShipyard) * self.ai_founding_pull(seat), 1.0, 1.0, opp, format!("build {} over {}", self.station_name(body, *slot), self.tables.body(body).name), None);
             }
         }
 
@@ -2529,7 +2547,7 @@ impl Game {
                         // Ticket #409 (version 0.09.4): it asks for what lands, the most the slot
                         // takes, as every other Unload does; the rest stay aboard as before.
                         let lift = if unclaimed { self.tables.ai.thresholds.first_found_weight } else { 1.0 };
-                        push(vec![Order::Unload { ship: s.id, colonists: self.unload_most(s.id, UnloadTarget::Slot(body, slot)), army: false, into: UnloadTarget::Slot(body, slot) }], Cat::FoundColony, self.base_weight(seat, Cat::FoundColony) * lift, gap_for(Cat::FoundColony, None), 1.0, opp, format!("found a Colony at {} on {}", self.tables.body(body).slots[slot as usize].name, self.tables.body(body).name), None);
+                        push(vec![Order::Unload { ship: s.id, colonists: self.unload_most(s.id, UnloadTarget::Slot(body, slot)), army: false, into: UnloadTarget::Slot(body, slot) }], Cat::FoundColony, self.base_weight(seat, Cat::FoundColony) * lift * self.ai_founding_pull(seat), gap_for(Cat::FoundColony, None), 1.0, opp, format!("found a Colony at {} on {}", self.tables.body(body).slots[slot as usize].name, self.tables.body(body).name), None);
                     }
                 }
                 // Ticket #44: Antarctica, Earth's slots. A foothold, not Presence: half weight and no gap,

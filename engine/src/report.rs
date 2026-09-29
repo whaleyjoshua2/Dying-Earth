@@ -441,6 +441,8 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("slot_taken", &["faction"]),
     ("landing_contested", &["faction", "body"]),
     ("colony_founded", &["faction", "slot", "body", "n"]),
+    // Ticket #419 (version 0.09.4).
+    ("colony_founded_eased", &["faction", "slot", "body", "n", "ease"]),
     // Ticket #353 (version 0.09.1): who the Habitat room had no place for, at all four clamp sites.
     ("no_habitat_room", &["n", "place"]),
     // Ticket #345 (version 0.09.1): a Body settled for the first time.
@@ -451,6 +453,8 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("under_the_sink_eases", &["ease", "custodians"]),
     ("disembarked", &["n", "colony"]),
     ("station_built", &["faction", "station"]),
+    // Ticket #419 (version 0.09.4).
+    ("station_built_eased", &["faction", "station", "ease"]),
     ("antarctica_opens", &["n"]),
     ("archive_begun", &["faction", "colony"]),
     ("neutral_research", &["states", "n"]),

@@ -614,6 +614,12 @@ pub struct FactionCard {
     pub lead_influence: i64,
     #[serde(default)]
     pub lead_unrest_ease: f64,
+    /// Ticket #419 (version 0.09.4): Unrest off every Region the Faction holds for each ground
+    /// Colony it founds off Earth and each Space Station it builds. Nought for all but the Arkwrights.
+    #[serde(default)]
+    pub found_colony_unrest_ease: f64,
+    #[serde(default)]
+    pub found_station_unrest_ease: f64,
     /// Ticket #203 (version 0.08.1): the Faction's Unique Facility in one sentence -- what it is,
     /// what it replaces, and what it does beyond the common building's job. It was on no card until
     /// the Faction window went in: the four Unique Facilities arrived in version 0.08.0 (tickets
@@ -1299,6 +1305,10 @@ pub struct AiThresholds {
     pub relief_double_at: f64,
     pub mothball_restive_from: f64,
     pub mothball_restive_factor: f64,
+    /// Ticket #419 (version 0.09.4): a Faction eased by its foundings weighs founding by its most
+    /// restive Region, one at `founding_pull_from`, double at `founding_pull_double_at`.
+    pub founding_pull_from: f64,
+    pub founding_pull_double_at: f64,
     /// Ticket #284 (version 0.08.5): the Relations score at or below which a seat has cause to
     /// attack a place a rival holds -- Cold or worse.
     pub war_cause: i64,

@@ -21,7 +21,7 @@ The Faction that maximizes resource extraction without regard for ecological cos
 _Avoid_: Extractors (the retired name), capitalists, industrialists, exploiters
 
 **Arkwrights**:
-The Faction that exists to get people off Earth and spread them as widely as it can. Their signature rule is Coach Class, and they win on Diaspora. Since version 0.08.6 they open with two Pioneers already waiting in their start Region -- a gift outside Coach Class that took no population, the mirror of the two Colonists the other three Factions have aboard the station the Arkwrights do not have -- who wait there for the first Ship. Since version 0.09.2 they hold a second Power Plant at home in place of the station's Solar Array the others start with.
+The Faction that exists to get people off Earth and spread them as widely as it can. Their signature rule is Coach Class, and they win on Diaspora. Since version 0.08.6 they open with two Pioneers already waiting in their start Region -- a gift outside Coach Class that took no population, the mirror of the two Colonists the other three Factions have aboard the station the Arkwrights do not have -- who wait there for the first Ship. Since version 0.09.2 they hold a second Power Plant at home in place of the station's Solar Array the others start with. Since version 0.09.4 each ground Colony they found off Earth takes a point off the Unrest of every Region they hold, and each Space Station they build half a point.
 _Avoid_: settlers, arks, exodus, nomads
 
 **Archivists**:
