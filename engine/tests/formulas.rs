@@ -17632,3 +17632,25 @@ fn the_arkwrights_foundings_ease_their_unrest() {
     assert_eq!(pull(&mut g, 10.0), 2.0);
     assert_eq!(g.ai_founding_pull(Seat(1)), 1.0, "a Faction whose foundings ease nothing");
 }
+
+/// Ticket #415 (version 0.09.4): **each Output figure's sources add up to the figure**: every working
+/// building's output under its name, the upkeep as one line below nought on Energy, a Region's
+/// economy in its Ducats.
+#[test]
+fn the_output_rows_sources_add_up_to_its_figures() {
+    let g = fresh();
+    for place in [Place::State(g.controlled_states(Seat(0))[0]), Place::Colony(station_of(&g, Seat(0), BodyId::Earth).expect("the ISS"))] {
+        let o = g.place_output(place).expect("a directed place");
+        let s = g.place_output_sources(place).expect("its sources");
+        let sum = |r: Resource| tenth(s.iter().filter(|(x, ..)| *x == r).map(|(.., v)| *v).sum());
+        assert!((sum(Resource::Materials) - o.materials).abs() < 1e-9, "{place:?} Materials: {} against {}", sum(Resource::Materials), o.materials);
+        assert!((sum(Resource::Fuel) - o.fuel).abs() < 1e-9, "{place:?} Fuel");
+        assert!((sum(Resource::Energy) - o.energy).abs() < 1e-9, "{place:?} Energy, net of the upkeep line: {} against {}", sum(Resource::Energy), o.energy);
+        assert!((sum(Resource::Ducats) - o.ducats).abs() < 1e-9, "{place:?} Ducats");
+        assert!((sum(Resource::Research) - o.research).abs() < 1e-9, "{place:?} Research");
+    }
+    let home = Place::State(g.controlled_states(Seat(0))[0]);
+    let s = g.place_output_sources(home).unwrap();
+    assert!(s.iter().any(|(r, n, v)| *r == Resource::Energy && n == "upkeep" && *v < 0.0), "the upkeep as one line below nought");
+    assert!(s.iter().any(|(r, n, _)| *r == Resource::Ducats && n == "the economy"), "a Region's economy");
+}

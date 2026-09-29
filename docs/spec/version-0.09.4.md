@@ -353,3 +353,16 @@ nearly calm eases by less.
 
 **What would show this wrong**: a rival's founding easing the Arkwrights; an Antarctic founding or a
 taken place easing anything; the line claiming an ease that did not land.
+
+## 13. The Output row names its sources on a hover
+
+The authority is [ticket #415](https://github.com/whaleyjoshua2/Dying-Earth/issues/415). No rule moves.
+
+**Each figure of the Output row, on every place card, names what made it on its own hover**: each
+working building under its name, like ones grouped (*Mine x2 12*), the five biggest a line each and
+the rest as *and 3 more: 1.5*. Energy carries the place's upkeep as one line below nought (*upkeep
+-9*), a Region's Ducats *the economy*, the Widgets the card's own Widget makers. The row's fixed
+sentence is gone.
+
+**What would show this wrong**: a figure whose listed sources do not add up to it; a hover past six
+lines.

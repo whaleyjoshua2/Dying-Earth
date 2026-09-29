@@ -887,6 +887,47 @@ impl Game {
         Some(PlaceOutput { materials: tenth(out.materials), fuel: tenth(out.fuel), energy: tenth(out.energy), ducats: tenth(out.ducats), widgets: out.widgets, research: out.research })
     }
 
+    /// Ticket #415 (version 0.09.4): what made each figure of `place_output`, source by source --
+    /// a working building's output under its own name, the Energy its buildings pay as one
+    /// `upkeep` line below nought, a controlled Region's economy in its Ducats -- for the Output
+    /// row's hovers. The Widgets are listed by the card's own Widgets breakdown, not here.
+    pub fn place_output_sources(&self, place: Place) -> Option<Vec<(Resource, String, f64)>> {
+        let director = match place {
+            Place::State(sid) => self.state(sid).control.director(),
+            Place::Colony(cid) => self.colony(cid)?.control.director(),
+        }?;
+        let mut out: Vec<(Resource, String, f64)> = Vec::new();
+        let mut upkeep = 0.0;
+        for p in self.producers_of(director) {
+            let (here, working) = match p.place {
+                ProducerPlace::Facility(sid, i) => (place == Place::State(sid), self.state(sid).facilities[i].working()),
+                ProducerPlace::Module(cid, i) => (place == Place::Colony(cid), self.colony(cid).map(|c| c.modules[i].working()).unwrap_or(false)),
+            };
+            if !here || !working || !p.online {
+                continue;
+            }
+            if let Some((r, v)) = p.output
+                && r != Resource::Widgets
+                && v.abs() > 1e-9
+            {
+                out.push((r, p.name.to_string(), v));
+            }
+            if p.research > 0 {
+                out.push((Resource::Research, p.name.to_string(), p.research as f64));
+            }
+            upkeep += p.upkeep;
+        }
+        if upkeep > 1e-9 {
+            out.push((Resource::Energy, "upkeep".to_string(), -upkeep));
+        }
+        if let Place::State(sid) = place
+            && matches!(self.state(sid).control, Control::Controlled(_))
+        {
+            out.push((Resource::Ducats, "the economy".to_string(), self.state_ducats(sid)));
+        }
+        Some(out)
+    }
+
     fn producers_of(&self, seat: Seat) -> Vec<Producer> {
         let mut out = Vec::new();
         for sid in self.directed_states(seat) {

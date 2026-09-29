@@ -5578,22 +5578,50 @@ fn queue_line(game: &Game, place: Place, b: &Build, turns: u32) -> String {
 /// place makes them, in the top bar's order, a figure only where the place makes any; Energy net of
 /// the place's own upkeep. Nothing on a place nobody directs.
 fn output_row(ui: &mut Ui, game: &Game, place: Place) {
+    use dying_earth_engine::Resource;
     let Some(o) = game.place_output(place) else { return };
-    let hover = "What this place made this turn, at this turn's multipliers: a building shut for Energy or mothballed made nothing. Energy is net of the place's own upkeep, before any Reactor's relief, which is the seat's; a Region's Ducats include its economy.".to_string();
+    // Ticket #415 (version 0.09.4): each figure names what made it, the fixed sentence gone.
+    let sources = game.place_output_sources(place).unwrap_or_default();
+    let widgets: Vec<(String, f64)> = widget_makers(game, place).into_iter().map(|(n, v)| (n, v as f64)).collect();
     let mut parts: Vec<RowPart> = Vec::new();
-    for (v, icon) in [(o.materials, "materials"), (o.widgets, "widgets"), (o.fuel, "fuel"), (o.energy, "energy"), (o.ducats, "ducats"), (o.research, "research")] {
+    for (v, icon, r) in [(o.materials, "materials", Resource::Materials), (o.widgets, "widgets", Resource::Widgets), (o.fuel, "fuel", Resource::Fuel), (o.energy, "energy", Resource::Energy), (o.ducats, "ducats", Resource::Ducats), (o.research, "research", Resource::Research)] {
         if v.abs() > 1e-9 {
-            parts.push(RowPart { before: figure(v), icon: Some(icon), after: String::new(), hover: Some(hover.clone()) });
+            let list: Vec<(String, f64)> = if r == Resource::Widgets { widgets.clone() } else { sources.iter().filter(|(x, ..)| *x == r).map(|(_, n, v)| (n.clone(), *v)).collect() };
+            parts.push(RowPart { before: figure(v), icon: Some(icon), after: String::new(), hover: Some(output_sources_hover(&list)) });
         }
     }
     ui.horizontal(|ui| {
-        rule_tip(ui.label(RichText::new("Output:").weak()), hover.clone());
+        ui.label(RichText::new("Output:").weak());
         if parts.is_empty() {
             ui.label(RichText::new("nothing this turn").weak());
         } else {
             glyph_row(ui, &parts, 15.0);
         }
     });
+}
+
+/// Ticket #415 (version 0.09.4): an Output figure's hover: its sources, like ones grouped
+/// (*Mine x2 12*), the five biggest a line each and the rest as *and 3 more: 1.5*, within the six
+/// lines a hover may run to.
+fn output_sources_hover(list: &[(String, f64)]) -> String {
+    let mut grouped: Vec<(String, u32, f64)> = Vec::new();
+    for (name, v) in list {
+        match grouped.iter_mut().find(|(n, ..)| n == name) {
+            Some(g) => {
+                g.1 += 1;
+                g.2 += v;
+            }
+            None => grouped.push((name.clone(), 1, *v)),
+        }
+    }
+    grouped.sort_by(|a, b| b.2.abs().total_cmp(&a.2.abs()));
+    let line = |(n, k, v): &(String, u32, f64)| if *k > 1 { format!("{n} x{k} {}", figure(*v)) } else { format!("{n} {}", figure(*v)) };
+    let mut lines: Vec<String> = grouped.iter().take(5).map(line).collect();
+    if grouped.len() > 5 {
+        let rest = &grouped[5..];
+        lines.push(format!("and {} more: {}", rest.len(), figure(rest.iter().map(|g| g.2).sum())));
+    }
+    lines.join("\n")
 }
 
 /// Ticket #332: **the Widgets block on a card**, Region, Colony and station alike, at the
