@@ -602,7 +602,8 @@ impl Game {
         }
         let pairs = &self.tables.faction(self.kind(seat)).mothball_pairs;
         let Some((fk, _)) = pairs.iter().find(|(_, m)| **m == mk) else { return 1.0 };
-        let facilities = self.directed_states(seat).iter().flat_map(|s| self.state(*s).facilities.iter()).filter(|f| f.kind == *fk).count();
+        // Ticket #426 (version 0.09.5): by the job, so a held Reactor counts as a Power Plant.
+        let facilities = self.directed_states(seat).iter().flat_map(|s| self.state(*s).facilities.iter()).filter(|f| f.kind.common().unwrap_or(f.kind) == *fk).count();
         let doubled = self.doubled_modules(seat).iter().filter(|(cid, i)| self.colony(*cid).and_then(|c| c.modules.get(*i)).map(|m| m.kind == mk).unwrap_or(false)).count();
         if facilities > doubled {
             2.0
@@ -2236,9 +2237,12 @@ impl Game {
             // and keeps a Facility idle while its doubling stands.
             let pairs = &self.tables.faction(kind).mothball_pairs;
             let doubled = self.doubled_modules(seat);
+            // Ticket #426 (version 0.09.5): a Facility is read by the job it does, so a held Reactor
+            // is idled, kept idle and counted as the Power Plant the rule treats it as.
+            let job = |k: FacilityKind| k.common().unwrap_or(k);
             let mut in_use: Vec<FacilityKind> = Vec::new();
             for (fk, mk) in pairs {
-                let idle = self.directed_states(seat).iter().flat_map(|s| self.state(*s).facilities.iter()).filter(|f| f.kind == *fk && f.mothballed).count();
+                let idle = self.directed_states(seat).iter().flat_map(|s| self.state(*s).facilities.iter()).filter(|f| job(f.kind) == *fk && f.mothballed).count();
                 let paired = doubled.iter().filter(|(cid, i)| self.colony(*cid).and_then(|c| c.modules.get(*i)).map(|m| m.kind == *mk).unwrap_or(false)).count();
                 if idle > 0 && paired >= idle {
                     in_use.push(*fk);
@@ -2260,7 +2264,7 @@ impl Game {
                 let Some(best) = best_undoubled else { continue };
                 for sid in self.directed_states(seat) {
                     for (i, f) in self.state(sid).facilities.iter().enumerate() {
-                        if f.kind != *fk || f.mothballed {
+                        if job(f.kind) != *fk || f.mothballed {
                             continue;
                         }
                         let y = self.facility_yield(seat, sid, f.kind);
@@ -2287,7 +2291,7 @@ impl Game {
             for (b, name, mothballed, _, _) in standing.iter().filter(|(_, _, moth, _, _)| *moth) {
                 // Ticket #82: not a Facility whose idleness is doubling a Module off Earth.
                 if let BuildingRef::Facility(sid, i) = b
-                    && self.state(*sid).facilities.get(*i).map(|f| in_use.contains(&f.kind)).unwrap_or(false)
+                    && self.state(*sid).facilities.get(*i).map(|f| in_use.contains(&job(f.kind))).unwrap_or(false)
                 {
                     continue;
                 }

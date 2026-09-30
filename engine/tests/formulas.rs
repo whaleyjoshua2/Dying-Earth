@@ -18033,7 +18033,9 @@ fn commodity_finance_lifts_the_ducats_of_every_bank_and_trade_post_by_fifteen_pe
     assert_eq!(before.0, before.1, "the Investment Bank pays a Bank's Ducats");
     with_tech(&mut g, TechId::CommodityFinance);
     let after = read(&g);
-    let near = |a: f64, b: f64| (a - b).abs() <= 0.051;
+    // Each side is rounded to the tenth, so the two may differ by a little over a tenth; a double
+    // application (x1.3225) is far outside it.
+    let near = |a: f64, b: f64| (a - b).abs() <= 0.12;
     let extra = g.tables.unique.exchange_ducats as f64;
     assert!(near(after.0, before.0 * 1.15), "a Bank x1.15: {before:?} -> {after:?}");
     assert!(near(after.1, before.1 * 1.15), "an Investment Bank x1.15");
@@ -18057,4 +18059,25 @@ fn a_captured_mothballed_reactor_doubles_a_custodian_generator_as_a_power_plant_
     let i = g.state(StateId::EastAsia).facilities.len() - 1;
     g.state_mut(StateId::EastAsia).facilities[i].mothballed = true;
     assert_eq!(g.doubled_modules(cus), vec![(moon, 0)], "a mothballed Reactor doubles the Generator, as a Power Plant would");
+}
+
+/// Ticket #426 (the review): **the Custodian computer keeps a held Reactor idle while it doubles a
+/// Generator**, as it keeps a Power Plant, even with Energy to spare. The rule counted the Reactor
+/// as a Power Plant; the computer read it by its kind, and would Restart it and throw the doubling away.
+#[test]
+fn the_custodian_ai_keeps_a_held_reactor_idle_while_it_doubles_a_generator() {
+    let mut g = game();
+    calm(&mut g);
+    let cus = Seat(0);
+    g.seats[0].stockpile.energy = 500.0;
+    colony(&mut g, cus, BodyId::Phobos, &[ModuleKind::Generator], 0);
+    g.state_mut(StateId::EastAsia).facilities.push(facility(FacilityKind::Reactor));
+    let i = g.state(StateId::EastAsia).facilities.len() - 1;
+    g.state_mut(StateId::EastAsia).facilities[i].mothballed = true;
+    assert_eq!(g.doubled_modules(cus).len(), 1, "the premise: the idle Reactor doubles the Generator");
+    let orders = g.ai_orders(cus);
+    assert!(
+        !orders.iter().any(|o| matches!(o, Order::Change { building: BuildingRef::Facility(StateId::EastAsia, j), what: BuildingChange::Restart } if *j == i)),
+        "the doubling stands, so no restart of the Reactor: {orders:?}"
+    );
 }

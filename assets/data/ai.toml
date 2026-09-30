@@ -511,7 +511,8 @@ battle_fuel_weight = 0.2
 # An antecedent a list already held is NOT repeated -- it keeps the place it had. The additions are
 # ordered by cost and not by the tree, because the list is read against what is AVAILABLE: an
 # antecedent whose own prerequisites are unmet is skipped over this turn and taken the turn they are
-# met, so Beneficiation can stand ahead of the Deep Mining it needs without ever being picked first.
+# met, so an antecedent can stand ahead of the Tech it needs without ever being picked first (the
+# example here was Beneficiation, off every road since ticket #426).
 
 # Ticket #355 (version 0.09.1): Hardened Hulls and Missile Technology close all four lists, AFTER
 # each Faction's Victory gate chain, which always comes first -- the designer's word.
