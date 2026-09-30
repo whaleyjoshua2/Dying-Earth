@@ -7220,7 +7220,12 @@ fn pioneers_block(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, act
     // Ticket #428 (version 0.09.5): ONE slider for every door below -- the sea, the lift, a Colony
     // Ship -- each door sending that many, or as many as its room takes. Drawn only where a door is.
     let lifts = st.facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working());
-    let send = if st.emigrants > 0 && (game.antarctica_open || lifts) { count_slider(ui, ("send", sid), st.emigrants, "Pioneers") } else { st.emigrants };
+    let sea_door = game.antarctica_open
+        && (!game.free_slots_on(BodyId::Earth).is_empty() || game.colonies.iter().any(|c| c.body == BodyId::Earth && !c.in_orbit && c.control.director() == Some(Seat(0)) && game.habitat_room(c) > c.colonists));
+    let lift_door = lifts
+        && (game.colonies.iter().any(|c| c.body == BodyId::Earth && c.in_orbit && c.control.director() == Some(Seat(0)) && game.habitat_room(c) > c.colonists)
+            || game.ships.iter().any(|s| s.seat == Seat(0) && s.kind == UnitKind::ColonyShip && s.at == ShipAt::Body(BodyId::Earth) && s.colonists < game.colony_ship_capacity(Seat(0))));
+    let send = if st.emigrants > 0 && (sea_door || lift_door) { count_slider(ui, ("send", sid), st.emigrants, "Pioneers") } else { st.emigrants };
     if game.antarctica_open && st.emigrants > 0 {
         let n = send;
         for slot in game.free_slots_on(BodyId::Earth) {
@@ -8286,14 +8291,18 @@ fn unload_count(ui: &mut Ui, ship: ShipId, key: &str, most: u32) -> u32 {
 /// them or moving them at all should be a slider interface like the transfer off ship we built".
 /// From 1 to `most` in steps of one, starting at the most, remembered under `key` while the card
 /// stays open; nothing drawn where only one is possible.
+///
+/// The count is remembered WITH the most it was chosen under, and a most that has moved starts the
+/// slider afresh at the new most (the review): kept alone, the count could only ever fall, so a
+/// Region with nobody waiting pinned the next turn's load at one.
 fn count_slider(ui: &mut Ui, key: impl std::hash::Hash + std::fmt::Debug, most: u32, word: &str) -> u32 {
     let most = most.max(1);
     let id = egui::Id::new(key);
-    let mut n: u32 = ui.data(|d| d.get_temp(id)).unwrap_or(most).clamp(1, most);
+    let mut n: u32 = ui.data(|d| d.get_temp::<(u32, u32)>(id)).filter(|(_, was)| *was == most).map_or(most, |(n, _)| n).clamp(1, most);
     if most > 1 {
         ui.add(egui::Slider::new(&mut n, 1..=most).text(word));
     }
-    ui.data_mut(|d| d.insert_temp(id, n));
+    ui.data_mut(|d| d.insert_temp(id, (n, most)));
     n
 }
 
@@ -11558,7 +11567,7 @@ mod tests {
         let mut frame = |most: u32, set: Option<u32>| {
             let _ = ctx.run_ui(egui::RawInput::default(), |ui| {
                 if let Some(v) = set {
-                    ui.data_mut(|d| d.insert_temp(egui::Id::new(("t", 1)), v));
+                    ui.data_mut(|d| d.insert_temp(egui::Id::new(("t", 1)), (v, most)));
                 }
                 got.push(count_slider(ui, ("t", 1), most, "Pioneers"));
             });
@@ -11568,7 +11577,10 @@ mod tests {
         frame(4, None);
         frame(1, None);
         frame(0, None);
-        assert_eq!(got, vec![4, 2, 2, 1, 1], "the most first, a choice kept, held under a shrinking most, never nought");
+        // The review: a most that grows again starts the slider at it, not at the smallest most
+        // ever seen -- a Region with nobody waiting must not pin the next turn's load at one.
+        frame(4, None);
+        assert_eq!(got, vec![4, 2, 2, 1, 1, 4], "the most first, a choice kept, held under a shrinking most, never nought, back to a growing most");
     }
 
     /// Ticket #425 (version 0.09.5): **two lines into one box never meet at its door.** The
