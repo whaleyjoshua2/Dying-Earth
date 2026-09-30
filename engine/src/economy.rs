@@ -707,6 +707,8 @@ impl Game {
                 r.times(self.tech_multiplier(seat, TechId::PublicScience), || t.tech(TechId::PublicScience).name.clone());
                 // Ticket #84: the Upload stacks on Public Science.
                 r.times(self.tech_multiplier(seat, TechId::TheUpload), || t.tech(TechId::TheUpload).name.clone());
+                // Ticket #433 (version 0.09.5): Orbital Data Centers, on the Observatory alone.
+                r.times(self.tech_multiplier(seat, TechId::OrbitalDataCenters), || t.tech(TechId::OrbitalDataCenters).name.clone());
                 y.research = r.floor() as i64;
                 y.chain = r;
             } else {

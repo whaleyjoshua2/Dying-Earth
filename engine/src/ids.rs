@@ -619,10 +619,14 @@ pub enum TechId {
     /// Charter needs it in place of Beneficiation. The Ducats of every Bank, Investment Bank, Trade
     /// Post and Exchange x1.15, the Exchange's extra Ducat flat on top.
     CommodityFinance,
+    /// Ticket #433 (version 0.09.5): Society rung 2, needing Large Language Models, at 32; The Upload
+    /// needs it beside Civil Defense. Observatory Research x1.5, on Large Language Models' and The
+    /// Upload's.
+    OrbitalDataCenters,
 }
 
 impl TechId {
-    pub const ALL: [TechId; 25] = [
+    pub const ALL: [TechId; 26] = [
         TechId::EfficientGrids,
         TechId::CleanPower,
         TechId::CleanManufacturing,
@@ -648,6 +652,7 @@ impl TechId {
         TechId::OrbitalRefuelling,
         TechId::CryogenicTanks,
         TechId::CommodityFinance,
+        TechId::OrbitalDataCenters,
     ];
     pub fn index(self) -> usize {
         self as usize

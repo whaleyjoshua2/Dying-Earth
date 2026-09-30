@@ -35,3 +35,11 @@ Taken headlessly with `shot: tech:1 panel:0 seed:7 cardshut:1 window:1500x1300`,
   Beneficiation is below it and leads nowhere.
 - [`lit-charter.png`](ticket-426-commodity-finance/lit-charter.png): the Prospectors' road lit, as
   Deep Mining, Automated Refining, Commodity Finance and the Extraction Charter.
+
+## Orbital Data Centers (ticket #433)
+
+- [`tree.png`](ticket-433-orbital-data-centers/tree.png): the tree with twenty-six Techs. Society's
+  rung 2 is Civil Defense over Orbital Data Centers; both lines enter The Upload, one from above
+  and one from below.
+- [`lit-upload.png`](ticket-433-orbital-data-centers/lit-upload.png): the Archivists' road lit, as
+  Large Language Models, Civil Defense, Orbital Data Centers and The Upload.

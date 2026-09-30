@@ -184,7 +184,7 @@ branch = "Society"
 rung = 1
 cost = 18
 needs = []
-effect = "Region and Lab Research x1.5; Breakthrough gives 25; stances hold through Comms Blackout; a Labour Dispute idles one Facility only"
+effect = "Region, Lab and Observatory Research x1.5; Breakthrough gives 25; stances hold through Comms Blackout; a Labour Dispute idles one Facility only"
 value = 1.5
 
 [[tech]]
@@ -321,7 +321,10 @@ cost = 48
 # -> The Upload, 98 Research with the gate, where it was 148 through Closed-Loop Colonies. It names
 # Civil Defense ALONE: a second line from Large Language Models would run straight behind the Civil
 # Defense box and read as passing through it, the fault #245 took out of this row.
-needs = ["civil_defense"]
+#
+# Ticket #433 (version 0.09.5): and Orbital Data Centers beside it, at the designer's word ("q3 B"),
+# so the road is Large Language Models, Civil Defense, Orbital Data Centers and The Upload: 130.
+needs = ["civil_defense", "orbital_data_centers"]
 effect = "Opens the Archivists' Victory Condition; Region, Lab and Observatory Research x1.25"
 value = 1.25
 gate_for = "archivists"
@@ -462,3 +465,18 @@ cost = 32
 needs = ["deep_mining"]
 effect = "Bank, Investment Bank, Trade Post and Exchange Ducats x1.15"
 value = 1.15
+
+# Ticket #433 (version 0.09.5): the twenty-sixth Tech, appended last with its enum variant, at the
+# designer's word -- "a second level 2 tech for society called orbital data centers that boosts
+# research". Needs Large Language Models, 32; The Upload needs it beside Civil Defense. `value`
+# multiplies an Observatory's Research, after Large Language Models' and The Upload's -- the first
+# Tech aimed at Research made off Earth alone. Drawn under Civil Defense in Society's rung-2 cell.
+[[tech]]
+id = "orbital_data_centers"
+name = "Orbital Data Centers"
+branch = "Society"
+rung = 2
+cost = 32
+needs = ["public_science"]
+effect = "Observatory Research x1.5"
+value = 1.5

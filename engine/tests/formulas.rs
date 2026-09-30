@@ -4534,8 +4534,9 @@ fn f_coastal_engineering_is_the_thirteenth_tech() {
     // Ticket #413 (version 0.09.4): twenty-three, with Orbital Refuelling on Propulsion rung 1.
     // Ticket #420 (version 0.09.4): twenty-four, with Cryogenic Tanks on Propulsion rung 2.
     // Ticket #426 (version 0.09.5): twenty-five, with Commodity Finance on Extraction rung 2.
-    assert_eq!(TechId::ALL.len(), 25, "thirteen Techs, the four gates, Civil Defense, #232's two, Missile Technology, Nuclear Rockets, Orbital Refuelling, Cryogenic Tanks and Commodity Finance");
-    assert_eq!(g.tables.techs.len(), 25, "and twenty-five rows in techs.toml");
+    // Ticket #433 (version 0.09.5): twenty-six, with Orbital Data Centers on Society rung 2.
+    assert_eq!(TechId::ALL.len(), 26, "thirteen Techs, the four gates, Civil Defense, #232's two, Missile Technology, Nuclear Rockets, Orbital Refuelling, Cryogenic Tanks, Commodity Finance and Orbital Data Centers");
+    assert_eq!(g.tables.techs.len(), 26, "and twenty-six rows in techs.toml");
     let c = g.tables.tech(TechId::CoastalEngineering);
     assert_eq!(c.name, "Coastal Engineering");
     assert_eq!(c.branch, "Stewardship", "Industry renamed on ticket #424");
@@ -6655,7 +6656,7 @@ fn the_four_gates_stand_on_rung_three_at_one_price_with_their_prerequisites() {
         // Tech that makes such a Colony liveable is what opens its door.
         // Ticket #424 (version 0.09.5): back into Society, through Civil Defense, which needs Large
         // Language Models (Public Science renamed).
-        (FactionKind::Archivists, TechId::TheUpload, vec![TechId::CivilDefense]),
+        (FactionKind::Archivists, TechId::TheUpload, vec![TechId::CivilDefense, TechId::OrbitalDataCenters]),
     ];
     // Ticket #117 (version 0.07.1): rung 3 went 40 to 44, a tenth rounded to the nearest. What the
     // ticket guards is that no Faction's gate is dearer than another's, so the figure is checked
@@ -6670,7 +6671,7 @@ fn the_four_gates_stand_on_rung_three_at_one_price_with_their_prerequisites() {
         assert_eq!(card.needs, needs, "{t:?}");
         assert_eq!(g.tables.victory_gate(kind), Some(t));
     }
-    assert_eq!(TechId::ALL.len(), 25, "eighteen, Beneficiation and Relay Networks since ticket #232, Missile Technology since #343, Nuclear Rockets since #393, Orbital Refuelling since #413, Cryogenic Tanks since #420, Commodity Finance since #426");
+    assert_eq!(TechId::ALL.len(), 26, "eighteen, Beneficiation and Relay Networks since ticket #232, Missile Technology since #343, Nuclear Rockets since #393, Orbital Refuelling since #413, Cryogenic Tanks since #420, Commodity Finance since #426, Orbital Data Centers since #433");
     // Version 0.08.3 moved three of the four gates' prerequisites in three separate tickets, and
     // nothing watched how deep each gate ended up. Counted as Techs that must stand before the
     // gate is reachable, the gate excluded.
@@ -6689,7 +6690,7 @@ fn the_four_gates_stand_on_rung_three_at_one_price_with_their_prerequisites() {
     // so the whole Archive chain sits behind those four.
     // Ticket #424 (version 0.09.5): the Archivists' two, all in Society; the Custodians' three,
     // all in Stewardship.
-    assert_eq!(depth(TechId::TheUpload), 2, "the Archivists' gate, two deep since ticket #424");
+    assert_eq!(depth(TechId::TheUpload), 3, "the Archivists' gate, two deep since ticket #424, three since #433");
     assert_eq!(depth(TechId::PlanetaryStewardship), 3, "the Custodians', three since ticket #424");
     // Ticket #425 (version 0.09.5): Clean Power off Closed-Loop Colonies, Efficient Grids off
     // Automated Refining -- no road leaves its own row now.
@@ -10196,7 +10197,7 @@ fn the_tree_costs_eighteen_thirty_two_and_forty_eight_by_rung() {
     let total: i64 = TechId::ALL.into_iter().map(|t| g.tables.tech(t).cost).sum();
     assert_eq!(g.tables.tech(TechId::NuclearRockets).cost, 38, "priced above its rung");
     assert_eq!(g.tables.tech(TechId::OrbitalRefuelling).cost, 22, "priced above its rung");
-    assert_eq!(total, 821, "the whole tree since ticket #426's Commodity Finance (32 on rung 2); 789 from #420's Cryogenic Tanks (32 on rung 2); 757 from #413's Orbital Refuelling (22 on rung 1); 735 from #393, 697 from #343, 649 from #232, 585 from #231, 554 from #201, 507 before that");
+    assert_eq!(total, 853, "the whole tree since ticket #433's Orbital Data Centers (32 on rung 2); 821 from #426's Commodity Finance (32 on rung 2); 789 from #420's Cryogenic Tanks (32 on rung 2); 757 from #413's Orbital Refuelling (22 on rung 1); 735 from #393, 697 from #343, 649 from #232, 585 from #231, 554 from #201, 507 before that");
 }
 
 // ------------------------------------------------------- 0.08.1 ticket #208: the School's step
@@ -17938,10 +17939,12 @@ fn each_victory_tech_ends_a_line_of_its_own() {
     assert_eq!(price(FactionKind::Custodians), 130, "18 + 32 + 32 + 48");
     // The Archivists: the whole road in Society.
     assert_eq!(line(TechId::TheUpload), "Society");
-    assert_eq!(t.tech(TechId::TheUpload).needs, vec![TechId::CivilDefense], "The Upload needs Civil Defense, which needs Large Language Models");
+    // Ticket #433 (version 0.09.5): and Orbital Data Centers beside Civil Defense, both needing
+    // Large Language Models.
+    assert_eq!(t.tech(TechId::TheUpload).needs, vec![TechId::CivilDefense, TechId::OrbitalDataCenters], "The Upload needs Civil Defense and Orbital Data Centers");
     assert!(t.gate_chain(FactionKind::Archivists).iter().all(|x| line(*x) == "Society"), "no Tech outside Society on the Archivists' road");
-    assert_eq!(names(t.gate_chain(FactionKind::Archivists)), vec!["Large Language Models", "Civil Defense"]);
-    assert_eq!(price(FactionKind::Archivists), 98, "18 + 32 + 48");
+    assert_eq!(names(t.gate_chain(FactionKind::Archivists)), vec!["Large Language Models", "Civil Defense", "Orbital Data Centers"]);
+    assert_eq!(price(FactionKind::Archivists), 130, "18 + 32 + 32 + 48, 98 before ticket #433");
     // Each list opens with its own chain: the first entries are the chain and nothing else.
     for k in FactionKind::ALL {
         let chain = t.gate_chain(k);
@@ -18007,7 +18010,7 @@ fn commodity_finance_stands_in_for_beneficiation_under_the_charter() {
     let chain = t.gate_chain(FactionKind::Prospectors);
     assert!(!chain.contains(&TechId::Beneficiation) && chain.contains(&TechId::CommodityFinance));
     assert_eq!(chain.iter().map(|x| t.tech(*x).cost).sum::<i64>() + t.tech(TechId::ExtractionCharter).cost, 130, "the road stays 130");
-    assert_eq!(TechId::ALL.len(), 25);
+    assert_eq!(TechId::ALL.len(), 26, "twenty-five with it, twenty-six since #433's Orbital Data Centers");
 }
 
 /// Ticket #426: **every Bank, Investment Bank, Trade Post and Exchange pays its Ducats x1.15** once
@@ -18080,4 +18083,30 @@ fn the_custodian_ai_keeps_a_held_reactor_idle_while_it_doubles_a_generator() {
         !orders.iter().any(|o| matches!(o, Order::Change { building: BuildingRef::Facility(StateId::EastAsia, j), what: BuildingChange::Restart } if *j == i)),
         "the doubling stands, so no restart of the Reactor: {orders:?}"
     );
+}
+
+// ---------------------------------------------------------------- Ticket #433 (version 0.09.5): Orbital Data Centers
+
+/// Ticket #433: **Orbital Data Centers**, Society rung 2 at 32 needing Large Language Models;
+/// The Upload needs it beside Civil Defense, so the Archivists' road is 130; and an Observatory's
+/// Research is x1.5 once it stands, on top of the Techs that already lift it.
+#[test]
+fn orbital_data_centers_lifts_the_observatory_and_opens_the_upload() {
+    let t = tables();
+    let c = t.tech(TechId::OrbitalDataCenters);
+    assert_eq!((c.name.as_str(), c.branch.as_str(), c.rung, c.cost, c.value), ("Orbital Data Centers", "Society", 2, 32, 1.5));
+    assert_eq!(c.needs, vec![TechId::PublicScience]);
+    assert_eq!(t.tech(TechId::TheUpload).needs, vec![TechId::CivilDefense, TechId::OrbitalDataCenters]);
+    let chain = t.gate_chain(FactionKind::Archivists);
+    assert_eq!(chain.iter().map(|x| t.tech(*x).cost).sum::<i64>() + t.tech(TechId::TheUpload).cost, 130);
+    let mut g = game();
+    let s = Seat(0);
+    let moon = colony(&mut g, s, BodyId::Moon, &[ModuleKind::Observatory], 4);
+    // Read on the unrounded figure, since the Research is floored after every multiplier.
+    let before = g.module_yield(s, moon, ModuleKind::Observatory).chain.value();
+    assert!(before > 0.0, "the premise: the Observatory makes Research");
+    with_tech(&mut g, TechId::OrbitalDataCenters);
+    let y = g.module_yield(s, moon, ModuleKind::Observatory);
+    assert!((y.chain.value() / before - 1.5).abs() < 1e-9, "x1.5: {before} -> {}", y.chain.value());
+    assert_eq!(y.research, y.chain.value().floor() as i64, "and floored once, at the end");
 }

@@ -588,4 +588,5 @@ order = ["expanded_habitats", "closed_loop_colonies", "orbital_refuelling", "cle
 [tech_picks.archivists]
 # Ticket #424 (version 0.09.5): The Upload's road is back in Society -- Large Language Models (the id is
 # still `public_science`) and Civil Defense. Closed-Loop Colonies and its three are off this list.
-order = ["public_science", "civil_defense", "orbital_refuelling", "clean_propellant", "efficient_transit", "nuclear_rockets", "cryogenic_tanks", "hardened_hulls", "missile_technology"]
+# Ticket #433 (version 0.09.5): and Orbital Data Centers, which The Upload now needs too.
+order = ["public_science", "civil_defense", "orbital_data_centers", "orbital_refuelling", "clean_propellant", "efficient_transit", "nuclear_rockets", "cryogenic_tanks", "hardened_hulls", "missile_technology"]

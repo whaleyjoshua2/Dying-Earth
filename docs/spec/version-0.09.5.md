@@ -131,3 +131,24 @@ Three stray Mass Driver figures on the Exchange's data row, which nothing read, 
 - an Exchange whose extra Ducat grows with it;
 - an Investment Bank's interest that moves;
 - a place where a Faction building does less than its base.
+
+## 4. Orbital Data Centers
+
+The authority is [ticket #433](https://github.com/whaleyjoshua2/Dying-Earth/issues/433). The
+designer added it on 2026-09-29, reopening ticket #424's "Society's rung 2 left as it is".
+
+**Orbital Data Centers** is the twenty-sixth Tech: Society rung 2 at **32 Research**, needing Large
+Language Models. The whole tree now costs **853**.
+
+- **Its effect:** it multiplies an **Observatory's Research by 1.5**. This comes on top of Large
+  Language Models' x1.5 and The Upload's x1.25, and the figure is rounded down once, at the end.
+  It is the first Tech aimed at Research made off Earth alone.
+- **The Upload needs Civil Defense and Orbital Data Centers**, at the designer's word ("q3 B"). The
+  Archivists' road is Large Language Models, Civil Defense, Orbital Data Centers and The Upload:
+  **130**, where it was 98. Their pick list opens with those three.
+- **Where it is drawn:** under Civil Defense in Society's rung-2 stack.
+- **Large Language Models' box text** now says what it has always done: *"Region, Lab and
+  Observatory Research x1.5"*.
+
+**What would show this wrong**: an Observatory that makes the same Research with it as without; a
+Lab or Region lifted by it; The Upload open without it.
