@@ -43,3 +43,16 @@ Taken headlessly with `shot: tech:1 panel:0 seed:7 cardshut:1 window:1500x1300`,
   and one from below.
 - [`lit-upload.png`](ticket-433-orbital-data-centers/lit-upload.png): the Archivists' road lit, as
   Large Language Models, Civil Defense, Orbital Data Centers and The Upload.
+
+## Pioneers moved by slider (ticket #428)
+
+Taken with the new `colonyship:1` aid (an empty Colony Ship of yours at Earth) beside `emigrants:5`,
+`room:1`, `antarctic:1` and `select:EastAsia`.
+
+- [`region.png`](ticket-428-sliders/region.png): China's card. A Recruit slider at 2, then one shared
+  slider at 5 above the doors: "Send 5 to ISS over Earth by lift" and "Send 4 to TSV Endeavour",
+  each capped at its room.
+- [`sea.png`](ticket-428-sliders/sea.png): the same card with the ice open. The sea doors take the
+  slider's 5; the lift is capped at the station's room of 2.
+- [`ship.png`](ticket-428-sliders/ship.png): the Colony Ship's card. The Region drop-down, a slider
+  under it, and "Load 4 Pioneers".

@@ -7202,7 +7202,8 @@ fn pioneers_block(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, act
     // twice the batch -- 16.0 people -- and Australia carries 10.1 to 12.6, so the button was dead
     // there with nothing on screen to say why. Where the state cannot pay for even one, it still
     // offers one, so the refusal a player reads is "not enough people there" rather than silence.
-    let per = game.emigrants_affordable(Seat(0), sid).max(1);
+    // Ticket #428 (version 0.09.5): how many, on a slider, up to what the state may recruit.
+    let per = count_slider(ui, ("recruit", sid), game.emigrants_affordable(Seat(0), sid).max(1), "Pioneers");
     cost_button_with_hover(
         ui,
         game,
@@ -7216,8 +7217,12 @@ fn pioneers_block(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, act
         )),
         actions,
     );
+    // Ticket #428 (version 0.09.5): ONE slider for every door below -- the sea, the lift, a Colony
+    // Ship -- each door sending that many, or as many as its room takes. Drawn only where a door is.
+    let lifts = st.facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working());
+    let send = if st.emigrants > 0 && (game.antarctica_open || lifts) { count_slider(ui, ("send", sid), st.emigrants, "Pioneers") } else { st.emigrants };
     if game.antarctica_open && st.emigrants > 0 {
-        let n = st.emigrants;
+        let n = send;
         for slot in game.free_slots_on(BodyId::Earth) {
             // Ticket #283 (version 0.08.5): the third founding door wears the same face as the
             // two Ship doors, the site's yields in glyphs, at the designer's word.
@@ -7243,10 +7248,10 @@ fn pioneers_block(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, act
     }
     // Ticket #141 (version 0.07.3): waiting Emigrants lift straight to a station of yours over
     // Earth, as many as it has room for, by the Launch Site here. A launch, no Ship.
-    if st.emigrants > 0 && st.facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working()) {
+    if st.emigrants > 0 && lifts {
         for c in game.colonies.iter().filter(|c| c.body == BodyId::Earth && c.in_orbit && c.control.director() == Some(Seat(0))) {
             let room = game.habitat_room(c).saturating_sub(c.colonists);
-            let n = st.emigrants.min(room);
+            let n = send.min(room);
             if n == 0 {
                 continue;
             }
@@ -7272,11 +7277,11 @@ fn pioneers_block(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, act
     // beyond its capacity, and each of those may die on arrival. A risk that drowns people wants
     // the sentence explaining it beside the button, and that sentence lives on the Ship's card --
     // so a player who means to crowd a ship goes there deliberately.
-    if st.emigrants > 0 && st.facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working()) {
+    if st.emigrants > 0 && lifts {
         let capacity = game.colony_ship_capacity(Seat(0));
         for s in game.ships.iter().filter(|s| s.seat == Seat(0) && s.kind == UnitKind::ColonyShip && s.at == ShipAt::Body(BodyId::Earth)) {
             let room = capacity.saturating_sub(s.colonists);
-            let n = st.emigrants.min(room);
+            let n = send.min(room);
             if n == 0 {
                 continue;
             }
@@ -8182,15 +8187,17 @@ fn ship_cargo_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut View
                                 }
                             }
                         });
-                        // Ticket #73: a Launch Site lifts the Emigrants waiting there, no more.
-                        let lift = n.min(game.state(chosen).emigrants).max(1);
-                        cost_button(ui, game, &session.pending, Order::Load { ship: s.id, colonists: lift, from: LoadSource::State(chosen), army: None }, &format!("Load {lift} Pioneers"), actions);
                     });
+                    // Ticket #73: a Launch Site lifts the Emigrants waiting there, no more. Ticket
+                    // #428 (version 0.09.5): how many, on a slider under the Region's drop-down.
+                    let lift = count_slider(ui, ("load", s.id, chosen), n.min(game.state(chosen).emigrants), "Pioneers");
+                    cost_button(ui, game, &session.pending, Order::Load { ship: s.id, colonists: lift, from: LoadSource::State(chosen), army: None }, &format!("Load {lift} Pioneers"), actions);
                 }
             }
             _ => {
                 for c in game.colonies.iter().filter(|c| c.body == body && c.control.director() == Some(Seat(0)) && c.colonists > 0) {
-                    let k = n.min(c.colonists);
+                    // Ticket #428 (version 0.09.5): how many, on a slider above the place's button.
+                    let k = count_slider(ui, ("load", s.id, c.id), n.min(c.colonists), "Colonists");
                     // Ticket #335 (version 0.09.0): by the place's OWN name, which names a station
                     // and a ground Colony alike.
                     cost_button(ui, game, &session.pending, Order::Load { ship: s.id, colonists: k, from: LoadSource::Colony(c.id), army: None }, &format!("Load {} Colonists from {}", k, game.place_name(Place::Colony(c.id))), actions);
@@ -8262,20 +8269,29 @@ fn ship_cargo_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut View
     }
 }
 
-/// Ticket #409 (version 0.09.4): how many Colonists to unload, on a slider from 1 to the most the
-/// place will take, remembered per Ship and place. The designer: *"up to max number the outpost will
-/// take"*. No slider where only one fits.
 /// Ticket #409 (version 0.09.4): "1 Colonist", "4 Colonists", now that one is a routine count.
 fn colonists_word(n: u32) -> String {
     if n == 1 { "1 Colonist".to_string() } else { format!("{n} Colonists") }
 }
 
+/// Ticket #409 (version 0.09.4): how many Colonists to unload, on a slider from 1 to the most the
+/// place will take, remembered per Ship and place. The designer: *"up to max number the outpost will
+/// take"*. No slider where only one fits.
 fn unload_count(ui: &mut Ui, ship: ShipId, key: &str, most: u32) -> u32 {
+    count_slider(ui, ("unload_count", ship, key), most, "Colonists")
+}
+
+/// Ticket #428 (version 0.09.5): **every count of people is a slider**, the Unload slider's
+/// behaviour made general at the designer's word -- "recruit pioneers, lifting pioneers, settling
+/// them or moving them at all should be a slider interface like the transfer off ship we built".
+/// From 1 to `most` in steps of one, starting at the most, remembered under `key` while the card
+/// stays open; nothing drawn where only one is possible.
+fn count_slider(ui: &mut Ui, key: impl std::hash::Hash + std::fmt::Debug, most: u32, word: &str) -> u32 {
     let most = most.max(1);
-    let id = egui::Id::new(("unload_count", ship, key));
+    let id = egui::Id::new(key);
     let mut n: u32 = ui.data(|d| d.get_temp(id)).unwrap_or(most).clamp(1, most);
     if most > 1 {
-        ui.add(egui::Slider::new(&mut n, 1..=most).text("Colonists"));
+        ui.add(egui::Slider::new(&mut n, 1..=most).text(word));
     }
     ui.data_mut(|d| d.insert_temp(id, n));
     n
@@ -11530,6 +11546,29 @@ mod tests {
         let further = tech_edge_path(from, to.left_center(), gap_x, ROW, &[blocker, below]);
         assert!(!crosses(&further, blocker) && !crosses(&further, below), "both boxes cleared");
         assert_eq!(further.last(), Some(&to.left_center()));
+    }
+
+    /// Ticket #428 (version 0.09.5): **the count slider** every Pioneer order shares. It starts at
+    /// the most; a count set lower is kept while the card stays open; when the most shrinks under
+    /// it (a station fills, fewer wait) it falls to the new most; and it never offers nought.
+    #[test]
+    fn the_count_slider_starts_at_the_most_keeps_a_choice_and_never_offers_nought() {
+        let ctx = egui::Context::default();
+        let mut got = Vec::new();
+        let mut frame = |most: u32, set: Option<u32>| {
+            let _ = ctx.run_ui(egui::RawInput::default(), |ui| {
+                if let Some(v) = set {
+                    ui.data_mut(|d| d.insert_temp(egui::Id::new(("t", 1)), v));
+                }
+                got.push(count_slider(ui, ("t", 1), most, "Pioneers"));
+            });
+        };
+        frame(4, None);
+        frame(4, Some(2));
+        frame(4, None);
+        frame(1, None);
+        frame(0, None);
+        assert_eq!(got, vec![4, 2, 2, 1, 1], "the most first, a choice kept, held under a shrinking most, never nought");
     }
 
     /// Ticket #425 (version 0.09.5): **two lines into one box never meet at its door.** The

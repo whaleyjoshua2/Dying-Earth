@@ -175,3 +175,21 @@ The authority is [ticket #427](https://github.com/whaleyjoshua2/Dying-Earth/issu
 
 **What would show this wrong**: three recruited in one state (five for the Arkwrights) without a
 Call; a second state refused while the first recruits; a computer seat recruiting past its plan.
+
+## 6. Pioneers moved by slider
+
+The authority is [ticket #428](https://github.com/whaleyjoshua2/Dying-Earth/issues/428). No rule
+moves.
+
+**Every count of people is a slider**, the 0.09.4 Unload slider made general. It runs from 1 to the
+most in steps of one, starts at the most, keeps a count you set while the card is open, falls to a
+new most that is smaller, and is hidden where only one is possible.
+- **Recruit** (Region card): up to what the state may recruit this turn.
+- **One shared slider above the Region card's doors**: the sea to Antarctica, the lift to your
+  station over Earth, and a Colony Ship at Earth. Each door sends that many, or as many as its room
+  takes.
+- **The Ship card at Earth**: the Region drop-down, with a slider under it.
+- **The Ship card off Earth**: a slider over each place's Load button.
+
+**What would show this wrong**: a door that sends more than the slider says or more than its room;
+a slider that offers nought; a slider shown where only one is possible.

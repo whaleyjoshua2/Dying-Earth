@@ -816,6 +816,15 @@ fn build_board(session: &mut Session) {
         {
             g.colony_mut(id).unwrap().modules.push(Module::new(ModuleKind::Habitat));
         }
+        // `colonyship:1` (a building aid, ticket #428, version 0.09.5): an empty Colony Ship of seat
+        // 0's at Earth, so the Region card's "Send N to" door and the Ship card's load slider can be
+        // photographed on turn 1.
+        if std::env::args().any(|a| a == "colonyship:1") {
+            let id = ShipId(g.fresh_id());
+            let built_turn = g.turn;
+            let name = g.next_ship_name(UnitKind::ColonyShip);
+            g.ships.push(Ship { id, name, kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: g.tank_of(Seat(0), UnitKind::ColonyShip), slot: None });
+        }
         // `shut:1` (a building aid, ticket #359, version 0.09.1), given with `barracks:1`: that Moon
         // Colony's Habitat and Barracks are mothballed and six live there, two more than the Core
         // alone holds -- so its card (`hab:ground`) shows the half line and the Build Army door
