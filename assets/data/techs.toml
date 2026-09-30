@@ -175,8 +175,9 @@ value = 1.5
 
 # Ticket #424 (version 0.09.5): renamed Large Language Models, at the designer's word -- "Rename
 # public science to something more archivist themed like LLM". The id stays `public_science` so a
-# saved game keeps the Tech it had; the effect is unchanged. It now heads the Archivists' road:
-# Large Language Models -> Civil Defense -> The Upload, all in Society.
+# saved game keeps the Tech it had; the effect is unchanged. It now heads the Archivists' road, all
+# in Society: Large Language Models -> Civil Defense and (since ticket #433) Orbital Data Centers ->
+# The Upload.
 [[tech]]
 id = "public_science"
 name = "Large Language Models"
@@ -318,8 +319,8 @@ cost = 48
 #
 # Ticket #424 (version 0.09.5): back into Society, at the designer's word -- "put the archivist at
 # the end of society". The road is Large Language Models (Public Science renamed) -> Civil Defense
-# -> The Upload, 98 Research with the gate, where it was 148 through Closed-Loop Colonies. It names
-# Civil Defense ALONE: a second line from Large Language Models would run straight behind the Civil
+# -> The Upload, 98 Research with the gate, where it was 148 through Closed-Loop Colonies. It named
+# Civil Defense alone (until #433 added Orbital Data Centers beside it, below), not Large Language Models: a second line from Large Language Models would run straight behind the Civil
 # Defense box and read as passing through it, the fault #245 took out of this row.
 #
 # Ticket #433 (version 0.09.5): and Orbital Data Centers beside it, at the designer's word ("q3 B"),

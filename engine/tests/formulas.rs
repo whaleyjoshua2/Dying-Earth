@@ -18102,11 +18102,14 @@ fn orbital_data_centers_lifts_the_observatory_and_opens_the_upload() {
     let mut g = game();
     let s = Seat(0);
     let moon = colony(&mut g, s, BodyId::Moon, &[ModuleKind::Observatory], 4);
+    g.state_mut(StateId::EastAsia).facilities.push(facility(FacilityKind::ResearchLab));
     // Read on the unrounded figure, since the Research is floored after every multiplier.
     let before = g.module_yield(s, moon, ModuleKind::Observatory).chain.value();
-    assert!(before > 0.0, "the premise: the Observatory makes Research");
+    let (region, lab) = (g.region_research_chain(s, StateId::EastAsia).value(), g.facility_yield(s, StateId::EastAsia, FacilityKind::ResearchLab).chain.value());
+    assert!(before > 0.0 && region > 0.0 && lab > 0.0, "the premise: each makes Research");
     with_tech(&mut g, TechId::OrbitalDataCenters);
     let y = g.module_yield(s, moon, ModuleKind::Observatory);
     assert!((y.chain.value() / before - 1.5).abs() < 1e-9, "x1.5: {before} -> {}", y.chain.value());
-    assert_eq!(y.research, y.chain.value().floor() as i64, "and floored once, at the end");
+    assert_eq!(g.region_research_chain(s, StateId::EastAsia).value(), region, "a Region's Research is untouched");
+    assert_eq!(g.facility_yield(s, StateId::EastAsia, FacilityKind::ResearchLab).chain.value(), lab, "a Lab's is untouched");
 }
