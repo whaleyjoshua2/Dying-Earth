@@ -5858,7 +5858,7 @@ fn coastal_engineering_sits_on_rung_one_below_its_rungs_cost_with_no_prerequisit
     // Ticket #424 (version 0.09.5): and back again, the other way -- Green Consensus moved to the
     // Stewardship line and needs Efficient Grids, and the gate needs all three.
     assert_eq!(g.tables.tech(TechId::GreenConsensus).needs, vec![TechId::EfficientGrids], "Efficient Grids since ticket #424");
-    assert_eq!(g.tables.tech(TechId::PlanetaryStewardship).needs, vec![TechId::EfficientGrids, TechId::CleanPower, TechId::GreenConsensus], "the designer's three");
+    assert_eq!(g.tables.tech(TechId::PlanetaryStewardship).needs, vec![TechId::CleanPower, TechId::GreenConsensus], "the designer's three, Efficient Grids through both");
     let w = g.tables.facility(FacilityKind::SeaWall);
     assert_eq!((w.materials, w.widgets), (20, 8), "20 Materials since ticket #77; 8 Widgets since ticket #332");
 }
@@ -6642,7 +6642,7 @@ fn the_four_gates_stand_on_rung_three_at_one_price_with_their_prerequisites() {
     let g = game();
     let gates = [
         // Ticket #424 (version 0.09.5): the designer's three, the whole road in Stewardship.
-        (FactionKind::Custodians, TechId::PlanetaryStewardship, vec![TechId::EfficientGrids, TechId::CleanPower, TechId::GreenConsensus]),
+        (FactionKind::Custodians, TechId::PlanetaryStewardship, vec![TechId::CleanPower, TechId::GreenConsensus]),
         // Ticket #242 (version 0.08.3): Beneficiation joined, so the new Tech sits in the
         // branch's spine rather than being a leaf nobody has to take.
         (FactionKind::Prospectors, TechId::ExtractionCharter, vec![TechId::AutomatedRefining, TechId::Beneficiation]),
@@ -17919,7 +17919,7 @@ fn each_victory_tech_ends_a_line_of_its_own() {
     assert_eq!(t.tech(TechId::GreenConsensus).needs, vec![TechId::EfficientGrids], "Green Consensus needs Efficient Grids");
     let mut ps = t.tech(TechId::PlanetaryStewardship).needs.clone();
     ps.sort_by_key(|x| x.index());
-    assert_eq!(ps, vec![TechId::EfficientGrids, TechId::CleanPower, TechId::GreenConsensus], "the designer's three");
+    assert_eq!(ps, vec![TechId::CleanPower, TechId::GreenConsensus], "the designer's three, Efficient Grids reached through both");
     assert_eq!(names(t.gate_chain(FactionKind::Custodians)), vec!["Efficient Grids", "Clean Power", "Green Consensus"]);
     assert_eq!(price(FactionKind::Custodians), 130, "18 + 32 + 32 + 48");
     // The Archivists: the whole road in Society.

@@ -28,8 +28,10 @@ Victory Tech ends a line of its own:
   Planetary Stewardship (rung 3), each pair stacked in its cell, **Planetary Stewardship in the lower
   box**.
 - **Green Consensus moves to Stewardship and needs Efficient Grids** (was Public Science).
-- **Planetary Stewardship moves to Stewardship and needs Efficient Grids, Green Consensus and Clean
-  Power** (was Green Consensus alone), in the designer's list's words.
+- **Planetary Stewardship moves to Stewardship; its road is Efficient Grids, Green Consensus and Clean
+  Power** (was Green Consensus alone), in the designer's list's words. It lists Clean Power and Green
+  Consensus only: both need Efficient Grids, so a line straight from Efficient Grids is not drawn, at
+  the designer's word.
 - **The Upload needs Civil Defense** (was Closed-Loop Colonies). Civil Defense needs Large Language
   Models, so the chain is the ticket's "Public Science and Civil Defense". The Upload names only Civil
   Defense because a second line from Large Language Models would run straight behind the Civil

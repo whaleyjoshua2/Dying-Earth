@@ -251,8 +251,10 @@ rung = 3
 cost = 48
 # Ticket #424 (version 0.09.5): at the end of the Stewardship line, needing the three the designer
 # named -- "instead requires efficient grids, green consensus, and clean power". Drawn stacked
-# under Clean Manufacturing in the line's rung-3 cell.
-needs = ["efficient_grids", "clean_power", "green_consensus"]
+# under Clean Manufacturing in the line's rung-3 cell. It LISTS only Clean Power and Green Consensus:
+# both need Efficient Grids, so the road is the designer's three, and a line straight from Efficient
+# Grids was only clutter -- "because it already flows though the other two it doesn't need a line".
+needs = ["clean_power", "green_consensus"]
 effect = "Opens the Custodians' Victory Condition; the Natural Sink grows by 1.0 ppm a turn for the world"
 value = 1.0
 gate_for = "custodians"
