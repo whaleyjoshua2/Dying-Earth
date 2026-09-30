@@ -1277,7 +1277,9 @@ fn orbit_rings_on_globe(
         let mut step = if station.is_some() { 1.0 } else { 0.0 };
         for seat in Seat::ALL {
             let here = ships_in_orbit(game, seat, body, orbit);
-            if here.is_empty() {
+            // Ticket #430 (version 0.09.5): a rival stack at a Body the player does not see sits in
+            // no orbit on the rings; the band counts it, whose and how many.
+            if here.is_empty() || (seat != Seat(0) && hidden_body(game, body)) {
                 continue;
             }
             let from = a + 0.5 * step;
@@ -1304,7 +1306,7 @@ fn orbit_rings_on_globe(
         // Ticket #317 (version 0.08.8) gave the Body one Battle mark. Ticket #335: a Battle is
         // fought and recorded in ONE ORBIT, so the mark belongs beside the orbit that fought, and
         // two fights at one Body -- one in low orbit, one at a station's ring -- put two marks up.
-        if let Some(i) = game.battle_last_turn_at(ReportPlace::Orbit(body, orbit))
+        if let Some(i) = game.battle_last_turn_at(ReportPlace::Orbit(body, orbit)).filter(|i| battle_seen(game, *i))
             && let Some(p) = seen(a - 0.78)
         {
             battle_mark(painter, p, battle_colour(session, game, i));
@@ -2880,6 +2882,53 @@ struct BandRow {
     battle: Option<usize>,
 }
 
+/// Ticket #430 (version 0.09.5): **fog of war, as the player sees it.** The player is seat 0; a
+/// spectator sees everything, as before the fog. The rules are the engine's (`visibility.rs`).
+fn hidden_body(game: &Game, body: BodyId) -> bool {
+    !game.spectator && !game.sees_body(Seat(0), body)
+}
+fn hidden_place(game: &Game, place: Place) -> bool {
+    !game.spectator && !game.sees_place(Seat(0), place)
+}
+fn hidden_ship(game: &Game, s: &Ship) -> bool {
+    !game.spectator && !game.sees_ship(Seat(0), s)
+}
+fn hidden_army(game: &Game, a: &Army) -> bool {
+    !game.spectator && !game.sees_army(Seat(0), a)
+}
+/// Ticket #430: the Armies at a place the player does not see, as "Arkwrights: 2 Armies" lines --
+/// whose and how many, never strength or damage.
+fn unseen_army_lines(ui: &mut Ui, game: &Game, unseen: &[&Army]) {
+    let mut seats: Vec<Option<Seat>> = unseen.iter().map(|a| game.army_seat(a)).collect();
+    seats.sort_by_key(|s| s.map(|s| s.index()));
+    seats.dedup();
+    for seat in seats {
+        let n = unseen.iter().filter(|a| game.army_seat(a) == seat).count();
+        let who = seat.map(|s| game.seat_name(s)).unwrap_or_else(|| "Neutral".into());
+        ui.label(format!("  {who}: {n} Arm{}", if n == 1 { "y" } else { "ies" }));
+    }
+}
+
+/// Ticket #430: a Battle the player sees -- one it fought in, or one somewhere it sees.
+fn battle_seen(game: &Game, i: usize) -> bool {
+    let Some(b) = game.report.battles.get(i) else { return false };
+    if game.spectator || b.parties.iter().any(|p| p.seat == Some(Seat(0))) {
+        return true;
+    }
+    match b.at {
+        Some(ReportPlace::State(s)) => !hidden_place(game, Place::State(s)),
+        Some(ReportPlace::Colony(c)) => !hidden_place(game, Place::Colony(c)),
+        Some(ReportPlace::Body(body)) | Some(ReportPlace::Orbit(body, _)) => !hidden_body(game, body),
+        None => false,
+    }
+}
+fn books_open(game: &Game, seat: Seat) -> bool {
+    game.spectator || game.sees_books(Seat(0), seat)
+}
+fn doings_open(game: &Game, seat: Seat) -> bool {
+    game.spectator || game.sees_doings(Seat(0), seat)
+}
+
 #[allow(clippy::too_many_arguments)]
 fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &ViewState, camera: &Camera, cam_gt: &GlobalTransform, globes: &Query<(&Globe, &GlobalTransform)>, hotspots: &mut Vec<Hotspot>) {
     let project = |p: Vec3| -> Option<Pos2> { camera.world_to_viewport(cam_gt, p).ok().map(|v| Pos2::new(v.x, v.y)) };
@@ -2994,7 +3043,7 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                     // Ticket #335 (version 0.09.0): a Battle is fought and recorded in one ORBIT,
                     // so the mark beside the Body's label reads the first of the Body's orbits to
                     // have one; a mark per orbit is the interface lane's.
-                    if let Some(i) = game.battle_last_turn_in_orbit(body) {
+                    if let Some(i) = game.battle_last_turn_in_orbit(body).filter(|i| battle_seen(game, *i)) {
                         let label_centre = p - egui::vec2(0.0, side * (22.0 + 7.5 * lines as f32));
                         let width = painter.layout_no_wrap(text.clone(), FontId::proportional(13.0), Color32::WHITE).size().x;
                         let at = label_centre - egui::vec2(width / 2.0 + 18.0, 0.0);
@@ -3031,14 +3080,21 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                     // Body is in low orbit or at one of the stations, and what it can reach from
                     // there -- the ground, a station, a Battle -- follows from that alone. A stack
                     // spread over several orbits says how many; the Surface Map's band names each.
-                    let text = format!("{} x{}  str {}, {}", game.seat_name(seat), ships.len(), fighting_stack_strength(game, seat, body), stack_orbit_phrase(game, seat, body));
                     let at = p - egui::vec2(0.0, 58.0 + row * 16.0);
+                    row += 1.0;
+                    // Ticket #430 (version 0.09.5): a rival stack at a Body the player does not see
+                    // is whose and how many, and no card opens on it.
+                    if seat != Seat(0) && hidden_body(game, body) {
+                        label_at(painter, at, &format!("{}: {} Ship{}", game.seat_name(seat), ships.len(), if ships.len() == 1 { "" } else { "s" }), seat_colour(session, seat), 12.0);
+                        continue;
+                    }
+                    let text = format!("{} x{}  str {}, {}", game.seat_name(seat), ships.len(), fighting_stack_strength(game, seat, body), stack_orbit_phrase(game, seat, body));
                     label_kind_at(painter, at, Some(Kind::of_ships(ships.iter().filter_map(|id| game.ship(*id)))), &text, seat_colour(session, seat), 12.0);
                     hotspots.push(Hotspot { pos: at, radius: 14.0, hit: Hit::Select(Selection::ShipStack(body, seat)) });
-                    row += 1.0;
                 }
             }
-            for s in &game.ships {
+            // Ticket #430 (version 0.09.5): a rival Ship in flight only with its books open.
+            for s in game.ships.iter().filter(|s| !hidden_ship(game, s)) {
                 if let ShipAt::Transit { from, to, turns_left } = s.at {
                     let a = geo::solar_place(game, from);
                     let b = geo::solar_place(game, to);
@@ -3110,7 +3166,7 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                         // Report. Ticket #317 (version 0.08.8): the ring became the Battle mark,
                         // above the label in the Unrest label's row, and a row higher when that
                         // label is showing.
-                        if let Some(i) = game.battle_last_turn_at(ReportPlace::State(sid)) {
+                        if let Some(i) = game.battle_last_turn_at(ReportPlace::State(sid)).filter(|i| battle_seen(game, *i)) {
                             let lift = if st.unrest >= game.tables.unrest.army_threshold { 56.0 } else { 38.0 };
                             let at = p - egui::vec2(0.0, lift);
                             battle_mark(painter, at, battle_colour(session, game, i));
@@ -3119,25 +3175,37 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                         // Army shields (ticket #31): one per Faction present, grey for a neutral Standing Army.
                         // Ticket #297 (version 0.08.6): a shield whose Army is dug in carries a
                         // trench line beneath it, in its own colour.
-                        let mut shields: Vec<(Option<Seat>, i64, bool, bool)> = Vec::new();
+                        // Ticket #430 (version 0.09.5): in a Region the player does not see, a
+                        // rival's shield carries HOW MANY Armies ("x2"), not their strength, and
+                        // says nothing of trenches or wounds.
+                        let fogged = hidden_place(game, Place::State(sid));
+                        let mut shields: Vec<(Option<Seat>, String, bool, bool)> = Vec::new();
                         for seat in Seat::ALL {
                             let s = game.army_stack_strength(seat, Place::State(sid));
                             let ids = game.armies_of_seat_at(seat, Place::State(sid));
                             if s > 0 || !ids.is_empty() {
+                                if fogged && seat != Seat(0) {
+                                    shields.push((Some(seat), format!("x{}", ids.len().max(1)), false, false));
+                                    continue;
+                                }
                                 let dug = ids.iter().filter_map(|id| game.army(*id)).any(|a| game.army_dug_in(a));
                                 let hurt = ids.iter().filter_map(|id| game.army(*id)).any(|a| a.damage > 0);
-                                shields.push((Some(seat), s, dug, hurt));
+                                shields.push((Some(seat), s.to_string(), dug, hurt));
                             }
                         }
                         let neutral_armies: Vec<&Army> = game.armies.iter().filter(|a| a.at == ArmyAt::Place(Place::State(sid)) && game.army_seat(a).is_none() && !game.army_stands_down(a)).collect();
                         let neutral: i64 = neutral_armies.iter().map(|a| game.army_strength(a)).sum();
                         if neutral > 0 {
-                            shields.push((None, neutral, neutral_armies.iter().any(|a| game.army_dug_in(a)), neutral_armies.iter().any(|a| a.damage > 0)));
+                            if fogged {
+                                shields.push((None, format!("x{}", neutral_armies.len()), false, false));
+                            } else {
+                                shields.push((None, neutral.to_string(), neutral_armies.iter().any(|a| game.army_dug_in(a)), neutral_armies.iter().any(|a| a.damage > 0)));
+                            }
                         }
                         for (i, (seat, strength, dug, hurt)) in shields.iter().enumerate() {
                             let centre = p + egui::vec2(-38.0 + 26.0 * i as f32, 36.0);
                             let fill = seat.map(|s| seat_colour(session, s)).unwrap_or(Color32::from_gray(150));
-                            shield(painter, centre, fill, &strength.to_string(), *hurt);
+                            shield(painter, centre, fill, strength, *hurt);
                             if *dug {
                                 painter.line_segment([centre + egui::vec2(-10.0, 15.0), centre + egui::vec2(10.0, 15.0)], egui::Stroke::new(3.0, fill));
                             }
@@ -3168,6 +3236,15 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                     // Battle row per orbit that fought.
                     let mut band: Vec<BandRow> = Vec::new();
                     for seat in Seat::ALL {
+                        // Ticket #430 (version 0.09.5): at a Body the player does not see, a rival's
+                        // Ships are one row, whose and how many, with no orbit, strength or card.
+                        if seat != Seat(0) && hidden_body(game, body) {
+                            let n = game.ships_at(seat, body).len();
+                            if n > 0 {
+                                band.push(BandRow { text: format!("{}: {} Ship{}", game.seat_name(seat), n, if n == 1 { "" } else { "s" }), colour: seat_colour(session, seat), kind: None, seat: None, battle: None });
+                            }
+                            continue;
+                        }
                         for orbit in game.orbits_of(body) {
                             let here = ships_in_orbit(game, seat, body, orbit);
                             if here.is_empty() {
@@ -3212,7 +3289,7 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                     // Ticket #335 (version 0.09.0): one row per ORBIT that fought, since two fights
                     // at one Body are two records and the map now marks each on its own ring.
                     for orbit in game.orbits_of(body) {
-                        let Some(i) = game.battle_last_turn_at(ReportPlace::Orbit(body, orbit)) else { continue };
+                        let Some(i) = game.battle_last_turn_at(ReportPlace::Orbit(body, orbit)).filter(|i| battle_seen(game, *i)) else { continue };
                         let who = game.report.battles[i].aggressor().map(|s| format!("the {} attacked", game.seat_name(s))).unwrap_or_else(|| "nobody attacked".to_string());
                         let text = format!("A Battle {} last turn: {who}", orbit_phrase(game, body, orbit));
                         band.push(BandRow { text, colour: battle_colour(session, game, i), kind: Some(Kind::Battle), seat: None, battle: Some(i) });
@@ -3375,7 +3452,7 @@ fn slot_labels(painter: &egui::Painter, session: &Session, game: &Game, body: Bo
                 // Ticket #311 (version 0.08.7): last turn's Battle at this Colony, as a Region's.
                 // Ticket #317 (version 0.08.8): the Battle mark above the slot's point.
                 if let Some(c) = game.colony_at(body, slot)
-                    && let Some(i) = game.battle_last_turn_at(ReportPlace::Colony(c.id))
+                    && let Some(i) = game.battle_last_turn_at(ReportPlace::Colony(c.id)).filter(|i| battle_seen(game, *i))
                 {
                     let at = p - egui::vec2(0.0, 18.0);
                     battle_mark(painter, at, battle_colour(session, game, i));
@@ -4398,9 +4475,10 @@ fn selection_card(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSt
             // page, one row per Battle in the aggressor's colour, each a way there; the Report is
             // reachable by no button once it has closed, and this is where a player who missed a
             // mark finds the fight.
-            if view.view == View::Solar && !game.report.battles.is_empty() {
+            if view.view == View::Solar && (0..game.report.battles.len()).any(|i| battle_seen(game, i)) {
                 ui.label(RichText::new("Battles last turn").strong());
-                for (i, b) in game.report.battles.iter().enumerate() {
+                // Ticket #430 (version 0.09.5): the Battles the player sees.
+                for (i, b) in game.report.battles.iter().enumerate().filter(|(i, _)| battle_seen(game, *i)) {
                     let who = b.aggressor().map(|s| format!("the {} attacked", game.seat_name(s))).unwrap_or_else(|| "nobody attacked".to_string());
                     let text = format!("{}: {who}; {}", b.place, b.result);
                     let colour = battle_colour(session, game, i);
@@ -5604,6 +5682,11 @@ fn queue_line(game: &Game, place: Place, b: &Build, turns: u32) -> String {
 /// the place's own upkeep. Nothing on a place nobody directs.
 fn output_row(ui: &mut Ui, game: &Game, place: Place) {
     use dying_earth_engine::Resource;
+    // Ticket #430 (version 0.09.5): a rival's earnings at a place the player does not see are hidden.
+    if game.place_control(place).director().is_some_and(|d| d != Seat(0)) && hidden_place(game, place) {
+        ui.label(RichText::new("Output: out of sight").weak());
+        return;
+    }
     let Some(o) = game.place_output(place) else { return };
     // Ticket #415 (version 0.09.4): each figure names what made it, the fixed sentence gone.
     let sources = game.place_output_sources(place).unwrap_or_default();
@@ -5655,6 +5738,10 @@ fn output_sources_hover(list: &[(String, f64)]) -> String {
 /// queue under it, each item `Habitat 3 of 8` with its estimate. The queue is drawn on the tiles
 /// too; here it is in order, which the tiles cannot say.
 fn widgets_block(ui: &mut Ui, game: &Game, place: Place) {
+    // Ticket #430 (version 0.09.5): nor what a rival builds there, nor at what rate.
+    if game.place_control(place).director().is_some_and(|d| d != Seat(0)) && hidden_place(game, place) {
+        return;
+    }
     let rate = game.widgets_at(place);
     let makers = widget_makers(game, place);
     let breakdown = if makers.is_empty() { "nothing here makes any".to_string() } else { makers.iter().map(|(name, n)| format!("{n} from {name}")).collect::<Vec<_>>().join(", ") };
@@ -6657,7 +6744,9 @@ fn slot_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
                 boxes.push((SlotBoxKind::Standing(i), coastal));
             }
         }
-        for (qi, b) in st.queue.iter().enumerate() {
+        // Ticket #430 (version 0.09.5): a rival's builds under way only where the player sees.
+        let unseen = director.is_some_and(|d| d != Seat(0)) && hidden_place(game, Place::State(sid));
+        for (qi, b) in st.queue.iter().enumerate().filter(|_| !unseen) {
             if let BuildItem::Facility(k) = b.item
                 && b.coastal == coastal
                 && game.takes_slot(k)
@@ -6997,12 +7086,14 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     // each of the player's raised Armies its march buttons and repairs, indented. The block that
     // stood at the foot of the card, below the fold at 1080 in the presentation review's picture,
     // is gone. The whole block is a tenth larger, at `ARMY_LIST_SCALE`.
-    let armies: Vec<&Army> = game.armies.iter().filter(|a| a.at == ArmyAt::Place(Place::State(sid))).collect();
+    // Ticket #430 (version 0.09.5): the Armies the player does not see are counted, not listed.
+    let (armies, unseen): (Vec<&Army>, Vec<&Army>) = game.armies.iter().filter(|a| a.at == ArmyAt::Place(Place::State(sid))).partition(|a| !hidden_army(game, a));
     ui.scope(|ui| {
         for font in ui.style_mut().text_styles.values_mut() {
             font.size *= ARMY_LIST_SCALE;
         }
         let heading = ui.label(RichText::new("Armies").strong());
+        unseen_army_lines(ui, game, &unseen);
         // Ticket #323 (version 0.08.8): a click on the shield brings the card to its Armies block.
         if view.armed_stack == Some(sid) && view.armed_scroll {
             heading.scroll_to_me(Some(egui::Align::Min));
@@ -7572,13 +7663,15 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     // stood here; since ticket #332 the queue is in full under the Widgets line above the tiles.
     // Ticket #312 (version 0.08.7): the Colony's Armies block, as the Region card's: a heading, the
     // stance row under it, the rows, and the repairs under the player's own; a tenth larger.
-    let armies: Vec<&Army> = game.armies.iter().filter(|a| a.at == ArmyAt::Place(Place::Colony(cid))).collect();
-    if !armies.is_empty() {
+    // Ticket #430 (version 0.09.5): the Armies the player does not see are counted, not listed.
+    let (armies, unseen): (Vec<&Army>, Vec<&Army>) = game.armies.iter().filter(|a| a.at == ArmyAt::Place(Place::Colony(cid))).partition(|a| !hidden_army(game, a));
+    if !armies.is_empty() || !unseen.is_empty() {
         ui.scope(|ui| {
             for font in ui.style_mut().text_styles.values_mut() {
                 font.size *= ARMY_LIST_SCALE;
             }
             ui.label(RichText::new("Armies").strong());
+            unseen_army_lines(ui, game, &unseen);
             let my_armies: Vec<&Army> = armies.iter().copied().filter(|a| !session.spectator && game.army_seat(a) == Some(Seat(0))).collect();
             if !my_armies.is_empty() {
                 stance_row(ui, game, &session.pending, my_armies[0].stance, |s| Order::ArmyStance { place: Place::Colony(cid), stance: s }, false, actions);
@@ -7796,6 +7889,13 @@ fn attack_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
 /// else went to `ship_panel`.
 fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, body: BodyId, seat: Seat, actions: &mut Vec<Action>) {
     let ships: Vec<&Ship> = game.ships.iter().filter(|s| s.seat == seat && s.at == ShipAt::Body(body)).collect();
+    // Ticket #430 (version 0.09.5): a rival stack at a Body the player does not see is whose and
+    // how many, however its card was reached.
+    if seat != Seat(0) && hidden_body(game, body) {
+        ui.label(RichText::new(format!("{}: {} Ships at {}", game.seat_name(seat), ships.len(), game.tables.body(body).name)).size(22.0).strong());
+        ui.label(RichText::new("Out of sight.").weak());
+        return;
+    }
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 8.0;
         // Ticket #216 (version 0.08.2): the Faction's symbol alone, as on a Colony card's heading.
@@ -8049,6 +8149,12 @@ fn ship_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
         view.selection = Selection::None;
         return;
     };
+    // Ticket #430 (version 0.09.5): a rival Ship the player does not see has no card.
+    if hidden_ship(game, s) {
+        ui.label(RichText::new(format!("A {} Ship", game.seat_name(s.seat))).size(22.0).strong());
+        ui.label(RichText::new("Out of sight.").weak());
+        return;
+    }
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 8.0;
         faction_glyph(ui, session, game, Some(s.seat), 22.0);
@@ -9367,7 +9473,9 @@ fn module_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     let standing: Vec<usize> = (0..col.modules.len()).filter(|i| col.modules[*i].kind != ModuleKind::Archive).collect();
     // Ticket #332 (version 0.09.0): a building tile is a queue index; its face reads the count
     // off the build and its hover the estimate at this place's Widgets behind everything ahead.
-    let building: Vec<usize> = col.queue.iter().enumerate().filter(|(_, b)| matches!(b.item, BuildItem::Module(k) if k != ModuleKind::Archive)).map(|(qi, _)| qi).collect();
+    // Ticket #430 (version 0.09.5): a rival's builds under way only where the player sees.
+    let unseen = director.is_some_and(|d| d != Seat(0)) && hidden_place(game, Place::Colony(cid));
+    let building: Vec<usize> = col.queue.iter().enumerate().filter(|(_, b)| !unseen && matches!(b.item, BuildItem::Module(k) if k != ModuleKind::Archive)).map(|(qi, _)| qi).collect();
     let estimates = game.queue_estimates(Place::Colony(cid));
     // Ticket #291 (version 0.08.6): the Modules ORDERED this turn and not yet committed, as the
     // Faction's own kind (#186), each with its index in the pending list for the right-click that
@@ -10313,6 +10421,11 @@ fn faction_window(ctx: &egui::Context, session: &Session, game: &Game, view: &mu
         // gathered from the sources. That is still a total, and gives nothing away.
         let research: f64 = s.income_sources.iter().filter(|(_, r, _)| *r == dying_earth_engine::Resource::Research).map(|(_, _, v)| v).sum();
         ui.label(RichText::new("Income last turn").strong());
+        // Ticket #430 (version 0.09.5): a rival's totals only while it is Cordial or better toward
+        // the player, or under an Accord.
+        if !books_open(game, seat) {
+            ui.label(RichText::new("Out of sight: they share their books at Cordial.").weak());
+        } else {
         glyph_row(
             ui,
             &[
@@ -10324,11 +10437,12 @@ fn faction_window(ctx: &egui::Context, session: &Session, game: &Game, view: &mu
             ],
             15.0,
         );
+        }
         // Ticket #203: a spectator has no side to keep secrets from, so they get no line at all.
         // Ticket #306 (version 0.08.7): the line that said where the breakdown is ("Hover a
         // figure...") is cut as a signpost, at the designer's word; the withholding line stays,
         // since it states a rule.
-        if !session.spectator && !breakdown {
+        if !session.spectator && !breakdown && books_open(game, seat) {
             ui.label(RichText::new("A rival's income is shown as totals only; the building-by-building breakdown is yours alone.").weak());
         }
         ui.add_space(6.0);
@@ -10448,9 +10562,9 @@ A rival that holds you at less than neutral defends its places against you a lit
 
         // 6. Ticket #263 (version 0.08.4): **Under way** -- what this Faction has begun and not yet
         // finished: builds with the turns until they land, Ships in transit with their names and
-        // their roads, soonest first. The list in full on every page, at the designer's word: a
-        // build stands hatched on its card and a transit is drawn on the Solar System Map for
-        // anyone to see, so the disclosure rule hides nothing here; it only saves the clicks.
+        // their roads, soonest first. Ticket #430 (version 0.09.5): under the fog a rival's list
+        // holds only the builds at places the player sees, and no transits unless its books are
+        // open; all of it while the rival is Friendly or under an Accord.
         ui.label(RichText::new("Under way").strong());
         let u = game.under_way(seat);
         // Ticket #332 (version 0.09.0): each build with its count and figure and the estimate,
@@ -10458,12 +10572,20 @@ A rival that holds you at less than neutral defends its places against you a lit
         // alone; soonest first as before, the name breaking a tie.
         let mut builds: Vec<(String, Place, u32, u32, u32)> = Vec::new();
         for place in StateId::ALL.iter().map(|s| Place::State(*s)).chain(game.colonies.iter().map(|c| Place::Colony(c.id))) {
+            // Ticket #430 (version 0.09.5): a rival's builds where the player sees the place, or all
+            // of them while it is Friendly or under an Accord.
+            if !doings_open(game, seat) && hidden_place(game, place) {
+                continue;
+            }
             for (b, t) in game.queue_at(place).iter().zip(game.queue_estimates(place)).filter(|(b, _)| b.seat == seat) {
                 builds.push((b.item.name(), place, b.done, b.widgets, t));
             }
         }
         builds.sort_by(|a, b| a.4.cmp(&b.4).then_with(|| a.0.cmp(&b.0)));
-        if builds.is_empty() && u.transits.is_empty() {
+        // Ticket #430 (version 0.09.5): its Ships in flight only with its books open.
+        let transits = if books_open(game, seat) { u.transits.clone() } else { Vec::new() };
+        let u_transits = &transits;
+        if builds.is_empty() && u_transits.is_empty() {
             ui.label(RichText::new("Nothing under way.").weak());
         } else {
             let turns = |n: u32| if n == 1 { "1 turn".to_string() } else { format!("{n} turns") };
@@ -10472,9 +10594,9 @@ A rival that holds you at less than neutral defends its places against you a lit
                 let items: Vec<String> = builds.iter().map(|(what, place, done, widgets, n)| format!("{} {} {} ({done} of {widgets}, {})", with_article(what), if matches!(place, Place::State(_)) { "in" } else { "at" }, game.place_name(*place), estimate_words(*n))).collect();
                 ui.label(format!("Building: {}", items.join(", ")));
             }
-            if !u.transits.is_empty() {
+            if !u_transits.is_empty() {
                 // "Earth to Mars" in words: the interface font has no arrow and drew a box for one.
-                let items: Vec<String> = u.transits.iter().map(|(name, from, to, n)| format!("{name}, {from} to {to}, {}", turns(*n))).collect();
+                let items: Vec<String> = u_transits.iter().map(|(name, from, to, n)| format!("{name}, {from} to {to}, {}", turns(*n))).collect();
                 ui.label(format!("In transit: {}", items.join("; ")));
             }
         }
@@ -11109,7 +11231,10 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
             // that stood in the Report's Battle Report block since ticket #50, then the round
             // picture and the replay of ticket #381. One window a Battle; Close hands on to the
             // next, or to the turn's head, through `advance_popup`.
-            if let Some(b) = game.report.battles.get(i) {
+            // Ticket #430 (version 0.09.5): a Battle the player does not see passes straight on.
+            if !battle_seen(game, i) {
+                advance_popup(view, view.moments_of(&session.tables, &game.report).len(), game.last_event.is_some(), card_owed(Some(game)));
+            } else if let Some(b) = game.report.battles.get(i) {
                 egui::Modal::new("battle".into()).show(ctx, |ui| {
                     ui.set_width(620.0);
                     ui.label(RichText::new(format!("Battle at {}", b.place)).size(20.0).strong());
