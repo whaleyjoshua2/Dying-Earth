@@ -167,7 +167,7 @@ The authority is [ticket #427](https://github.com/whaleyjoshua2/Dying-Earth/issu
   The plan is what their Colony Ships carry, plus Antarctica once the ice is open, plus the room in
   their places off Earth, less who already waits. States with a working Launch Site go first, the
   most populous first.
-- **Each recruitment still takes 0.5 Unrest off the state it comes from**, now in every state recruited from that turn, at the designer's word ("leave it half each").
+- **Each Pioneer recruited takes 0.125 Unrest off its state**, at the designer's word ("let's just set such that each pioneer is .125"): a batch of 2 takes 0.25 off, the Arkwrights' 4 take 0.5, and an Exodus Call's 8 take 1.0. Before, every batch took 0.5. The Recruit button's hover says the figure for the batch it offers.
 - **During an Exodus Call** the Recruit button and the computer offer the Call's figure at the ordinary price in people.
 - The Faction card, the tutorial and the glossary say the new figure.
 

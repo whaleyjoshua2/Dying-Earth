@@ -7212,7 +7212,7 @@ fn pioneers_block(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, act
         Some(format!(
             "{} people, on the card at End Turn, and {} off this state's Unrest. A working Launch Site lifts them onto a Ship or straight to a station of yours over Earth; once the ice is open the sea takes them to Antarctica.",
             game.tables.people_text(game.muster_population_in(Seat(0), sid, per)),
-            Game::unrest_figure(game.tables.emigrants.unrest_fall)
+            Game::unrest_figure(game.tables.emigrants.unrest_fall_each * per as f64)
         )),
         actions,
     );

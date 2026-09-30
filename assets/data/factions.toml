@@ -352,7 +352,9 @@ draw_return = 0.9
 # Ticket #73 (version 0.05.5): Pioneers. Colonists are built: a Faction recruits up to `per_turn` a
 # turn in one Nation State it directs, at `population_each` population apiece (times the Faction's
 # lift multiplier: Coach Class doubles it), landing on the state's card at End Turn; a batch takes
-# `unrest_fall` off the state's Unrest. Pioneers sent to Antarctica by sea arrive `antarctica_turns`
+# `unrest_fall` off the state's Unrest -- since ticket #427 (version 0.09.5) `unrest_fall_each` a
+# PIONEER, at the designer's word ("let's just set such that each pioneer is .125"), so a batch of
+# two takes 0.25 and the Arkwrights' four 0.5, where every batch took 0.5. Pioneers sent to Antarctica by sea arrive `antarctica_turns`
 # later, with no launch.
 # Ticket #237 (version 0.08.3): the Exodus Call. The Arkwrights only, on a state they control, once
 # per state EVER -- the shape the Strip Permit has had since ticket #54. While it runs it doubles
@@ -393,7 +395,7 @@ muster_multiplier = 2
 [emigrants]
 per_turn = 2
 population_each = 1.0
-unrest_fall = 0.5
+unrest_fall_each = 0.125
 antarctica_turns = 1
 
 [start]

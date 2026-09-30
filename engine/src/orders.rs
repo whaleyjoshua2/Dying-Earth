@@ -2549,7 +2549,7 @@ impl Game {
                     // NOW, so a batch mustered after a School has run knows more than one before it,
                     // and the two average together on the card.
                     self.muster_emigrants(*state, *n);
-                    let fell = self.lower_unrest(*state, self.tables.emigrants.unrest_fall);
+                    let fell = self.lower_unrest(*state, self.tables.emigrants.unrest_fall_each * *n as f64);
                     let line = format!("{} Pioneers recruited in {} for the {}; its Unrest fell by {} to {}.", n, self.tables.state(*state).name, self.seat_name(seat), Game::unrest_figure(fell), self.unrest_text(*state));
                     self.log(line);
                     let text = self.say(

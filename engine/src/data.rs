@@ -1772,7 +1772,8 @@ pub struct ExodusCallCard {
 pub struct EmigrantsCard {
     pub per_turn: u32,
     pub population_each: f64,
-    pub unrest_fall: f64,
+    /// Ticket #427 (version 0.09.5): Unrest off the state for each Pioneer recruited there.
+    pub unrest_fall_each: f64,
     pub antarctica_turns: u32,
 }
 

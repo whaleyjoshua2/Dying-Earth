@@ -6121,7 +6121,8 @@ fn emigrants_muster_four_a_turn_per_faction_in_one_state_at_one_unit_of_populati
     g.commit_orders(Seat(0), &[build]);
     assert_eq!(g.state(StateId::EastAsia).emigrants, 2, "on the card at End Turn");
     assert!((pop - g.state(StateId::EastAsia).population - 2.0).abs() < 1e-9, "one unit each: one million people since ticket #333, five million from ticket #143");
-    assert_eq!(g.state(StateId::EastAsia).unrest, 2.5, "the batch took 0.5 off");
+    // Ticket #427 (version 0.09.5): 0.125 a Pioneer, at the designer's word, where a batch took 0.5.
+    assert_eq!(g.state(StateId::EastAsia).unrest, 2.75, "two Pioneers took 0.25 off");
     assert!(g.log.to_vec().iter().any(|l| l.contains("Pioneers recruited in China")), "{:?}", g.log.to_vec());
     // Coach Class: four a state a turn (eight a turn before ticket #427) at twice the population.
     assert_eq!(g.emigrants_per_turn(Seat(0)), 2);
