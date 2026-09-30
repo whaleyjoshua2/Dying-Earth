@@ -4537,17 +4537,19 @@ fn f_coastal_engineering_is_the_thirteenth_tech() {
     assert_eq!(g.tables.techs.len(), 24, "and twenty-four rows in techs.toml");
     let c = g.tables.tech(TechId::CoastalEngineering);
     assert_eq!(c.name, "Coastal Engineering");
-    assert_eq!(c.branch, "Industry");
+    assert_eq!(c.branch, "Stewardship", "Industry renamed on ticket #424");
     // Ticket #69 (version 0.05.5): moved from rung 2 at 25 to rung 1 at 10 with no prerequisite.
     // Ticket #117 (version 0.07.1): 10 to 11, with every other cost, a tenth rounded to the nearest.
     assert_eq!(c.rung, 1, "rung 1, beside Efficient Grids");
     assert_eq!(c.cost, 15, "15 since ticket #231 (version 0.08.3); 14 from #201, 12 from #142, 11 from #117, 10 before");
     assert!(c.needs.is_empty(), "it needs nothing");
     assert!(c.effect.contains("Sea Wall"), "its effect names the Sea Wall: {}", c.effect);
-    // Two boxes on Industry rung 1, and Clean Power alone on rung 2.
-    let on_rung = |r: u32| -> Vec<&str> { TechId::ALL.into_iter().map(|t| g.tables.tech(t)).filter(|t| t.branch == "Industry" && t.rung == r).map(|t| t.name.as_str()).collect() };
-    assert_eq!(on_rung(1), vec!["Efficient Grids", "Coastal Engineering"], "two boxes on Industry rung 1");
-    assert_eq!(on_rung(2), vec!["Clean Power"]);
+    // Two boxes on Stewardship rung 1; ticket #424 (version 0.09.5) put Green Consensus beside Clean
+    // Power on rung 2, and Planetary Stewardship under Clean Manufacturing on rung 3.
+    let on_rung = |r: u32| -> Vec<&str> { TechId::ALL.into_iter().map(|t| g.tables.tech(t)).filter(|t| t.branch == "Stewardship" && t.rung == r).map(|t| t.name.as_str()).collect() };
+    assert_eq!(on_rung(1), vec!["Efficient Grids", "Coastal Engineering"], "two boxes on Stewardship rung 1");
+    assert_eq!(on_rung(2), vec!["Clean Power", "Green Consensus"]);
+    assert_eq!(on_rung(3), vec!["Clean Manufacturing", "Planetary Stewardship"], "Planetary Stewardship the lower box");
     // The Sea Wall's card names it as its unlock, and there are fifteen Facilities in version
     // 0.08.0: ten through version 0.07, the School on ticket #185, and the four Unique Facilities on
     // tickets #182 to #186 -- the Investment Bank, the Spaceport, the Reactor and the Academy.
@@ -5853,8 +5855,10 @@ fn coastal_engineering_sits_on_rung_one_below_its_rungs_cost_with_no_prerequisit
     // foot of the Industry branch, at the designer's word -- "Efficient grids is no longer
     // required for green consensus". Pinned because it moves the Custodians' Victory gate:
     // Planetary Stewardship now hangs off Society alone.
-    assert_eq!(g.tables.tech(TechId::GreenConsensus).needs, vec![TechId::PublicScience], "Society alone since ticket #242");
-    assert_eq!(g.tables.tech(TechId::PlanetaryStewardship).needs, vec![TechId::GreenConsensus], "and the gate above it is unchanged");
+    // Ticket #424 (version 0.09.5): and back again, the other way -- Green Consensus moved to the
+    // Stewardship line and needs Efficient Grids, and the gate needs all three.
+    assert_eq!(g.tables.tech(TechId::GreenConsensus).needs, vec![TechId::EfficientGrids], "Efficient Grids since ticket #424");
+    assert_eq!(g.tables.tech(TechId::PlanetaryStewardship).needs, vec![TechId::EfficientGrids, TechId::CleanPower, TechId::GreenConsensus], "the designer's three");
     let w = g.tables.facility(FacilityKind::SeaWall);
     assert_eq!((w.materials, w.widgets), (20, 8), "20 Materials since ticket #77; 8 Widgets since ticket #332");
 }
@@ -6637,7 +6641,8 @@ fn the_arkwrights_ships_cost_fifteen_per_cent_less() {
 fn the_four_gates_stand_on_rung_three_at_one_price_with_their_prerequisites() {
     let g = game();
     let gates = [
-        (FactionKind::Custodians, TechId::PlanetaryStewardship, vec![TechId::GreenConsensus]),
+        // Ticket #424 (version 0.09.5): the designer's three, the whole road in Stewardship.
+        (FactionKind::Custodians, TechId::PlanetaryStewardship, vec![TechId::EfficientGrids, TechId::CleanPower, TechId::GreenConsensus]),
         // Ticket #242 (version 0.08.3): Beneficiation joined, so the new Tech sits in the
         // branch's spine rather than being a leaf nobody has to take.
         (FactionKind::Prospectors, TechId::ExtractionCharter, vec![TechId::AutomatedRefining, TechId::Beneficiation]),
@@ -6646,7 +6651,9 @@ fn the_four_gates_stand_on_rung_three_at_one_price_with_their_prerequisites() {
         // on screen as an unrelated line into Generation Ships. Ticket #246: and Public Science
         // dropped too, for Closed-Loop Colonies -- the Archive stands at a Colony off Earth, so the
         // Tech that makes such a Colony liveable is what opens its door.
-        (FactionKind::Archivists, TechId::TheUpload, vec![TechId::ClosedLoopColonies]),
+        // Ticket #424 (version 0.09.5): back into Society, through Civil Defense, which needs Large
+        // Language Models (Public Science renamed).
+        (FactionKind::Archivists, TechId::TheUpload, vec![TechId::CivilDefense]),
     ];
     // Ticket #117 (version 0.07.1): rung 3 went 40 to 44, a tenth rounded to the nearest. What the
     // ticket guards is that no Faction's gate is dearer than another's, so the figure is checked
@@ -6678,8 +6685,10 @@ fn the_four_gates_stand_on_rung_three_at_one_price_with_their_prerequisites() {
     // Ticket #246: four, and the deepest tier -- Closed-Loop Colonies waits on Expanded Habitats
     // and Clean Power, and Clean Power on Efficient Grids. This gate also bars the Archive ORDER,
     // so the whole Archive chain sits behind those four.
-    assert_eq!(depth(TechId::TheUpload), 4, "the Archivists' gate, four deep since ticket #246");
-    assert_eq!(depth(TechId::PlanetaryStewardship), 2, "the Custodians', two since ticket #242 freed Green Consensus from Industry");
+    // Ticket #424 (version 0.09.5): the Archivists' two, all in Society; the Custodians' three,
+    // all in Stewardship.
+    assert_eq!(depth(TechId::TheUpload), 2, "the Archivists' gate, two deep since ticket #424");
+    assert_eq!(depth(TechId::PlanetaryStewardship), 3, "the Custodians', three since ticket #424");
     assert_eq!(depth(TechId::GenerationShips), 4, "the Arkwrights', through Closed-Loop Colonies, which itself pulls in Clean Power and Efficient Grids");
     assert_eq!(depth(TechId::ExtractionCharter), 4, "the Prospectors', deepest since Beneficiation joined on ticket #232");
 }
@@ -16410,7 +16419,9 @@ fn a_computer_seat_picks_its_gate_chain_then_propulsion_then_the_cheapest() {
     let mut g = game();
     let seat = Seat(0);
     assert_eq!(g.kind(seat), FactionKind::Custodians);
-    g.research.done.push(TechId::PublicScience);
+    // Ticket #424 (version 0.09.5): the Custodians' road is Efficient Grids, Clean Power and Green Consensus.
+    g.research.done.push(TechId::EfficientGrids);
+    g.research.done.push(TechId::CleanPower);
     g.research.done.push(TechId::GreenConsensus);
     g.research.shortlist.clear();
     assert!(g.available_techs().contains(&TechId::CoastalEngineering), "the cheapest Tech on the board is open");
@@ -17883,4 +17894,44 @@ fn a_nature_reserve_in_an_occupied_region_credits_the_occupier() {
     let occupied = g.scrubber_removal_by_seat();
     assert_eq!((occupied[1], occupied[2]), (0.0, 1.0), "occupied: the occupier's");
     assert_eq!(held.iter().sum::<f64>(), occupied.iter().sum::<f64>(), "the Sink gains the same");
+}
+
+// ---------------------------------------------------------------- Ticket #424 (version 0.09.5): each Victory Tech at the end of a line
+
+/// Ticket #424: **each Faction's Victory Tech ends a line of its own.** The Industry line is renamed
+/// Stewardship and takes Green Consensus and Planetary Stewardship; The Upload's road runs inside
+/// Society; Public Science is renamed Large Language Models. The chains are read off the tables, so
+/// this pins the designer's shape and the price of each road.
+#[test]
+fn each_victory_tech_ends_a_line_of_its_own() {
+    let t = tables();
+    let line = |x: TechId| t.tech(x).branch.clone();
+    let names = |v: Vec<TechId>| -> Vec<String> { v.into_iter().map(|x| t.tech(x).name.clone()).collect() };
+    let price = |k: FactionKind| -> i64 { t.gate_chain(k).iter().map(|x| t.tech(*x).cost).sum::<i64>() + t.tech(t.victory_gate(k).unwrap()).cost };
+    assert!(TechId::ALL.iter().all(|x| t.tech(*x).branch != "Industry"), "no Tech is left on a line called Industry");
+    assert_eq!(t.tech(TechId::PublicScience).name, "Large Language Models", "Public Science renamed, its id kept");
+    // The Custodians: the whole road in Stewardship.
+    assert_eq!(line(TechId::PlanetaryStewardship), "Stewardship");
+    assert_eq!(line(TechId::GreenConsensus), "Stewardship");
+    for x in [TechId::EfficientGrids, TechId::CleanPower, TechId::CleanManufacturing, TechId::CoastalEngineering] {
+        assert_eq!(line(x), "Stewardship", "{} moves with its line", t.tech(x).name);
+    }
+    assert_eq!(t.tech(TechId::GreenConsensus).needs, vec![TechId::EfficientGrids], "Green Consensus needs Efficient Grids");
+    let mut ps = t.tech(TechId::PlanetaryStewardship).needs.clone();
+    ps.sort_by_key(|x| x.index());
+    assert_eq!(ps, vec![TechId::EfficientGrids, TechId::CleanPower, TechId::GreenConsensus], "the designer's three");
+    assert_eq!(names(t.gate_chain(FactionKind::Custodians)), vec!["Efficient Grids", "Clean Power", "Green Consensus"]);
+    assert_eq!(price(FactionKind::Custodians), 130, "18 + 32 + 32 + 48");
+    // The Archivists: the whole road in Society.
+    assert_eq!(line(TechId::TheUpload), "Society");
+    assert_eq!(t.tech(TechId::TheUpload).needs, vec![TechId::CivilDefense], "The Upload needs Civil Defense, which needs Large Language Models");
+    assert!(t.gate_chain(FactionKind::Archivists).iter().all(|x| line(*x) == "Society"), "no Tech outside Society on the Archivists' road");
+    assert_eq!(names(t.gate_chain(FactionKind::Archivists)), vec!["Large Language Models", "Civil Defense"]);
+    assert_eq!(price(FactionKind::Archivists), 98, "18 + 32 + 48");
+    // Each list opens with its own chain: the first entries are the chain and nothing else.
+    for k in FactionKind::ALL {
+        let chain = t.gate_chain(k);
+        let order = &t.ai_tech_picks(k).order;
+        assert!(chain.iter().all(|x| order[..chain.len()].contains(x)), "the {k:?} list opens with its gate chain: {:?}", names(order.clone()));
+    }
 }

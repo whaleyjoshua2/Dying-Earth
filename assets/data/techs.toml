@@ -58,7 +58,7 @@ size = 3
 [[tech]]
 id = "efficient_grids"
 name = "Efficient Grids"
-branch = "Industry"
+branch = "Stewardship"
 rung = 1
 cost = 18
 needs = []
@@ -68,7 +68,7 @@ value = 1.5
 [[tech]]
 id = "clean_power"
 name = "Clean Power"
-branch = "Industry"
+branch = "Stewardship"
 rung = 2
 cost = 32
 needs = ["efficient_grids"]
@@ -78,7 +78,7 @@ value = 0.4
 [[tech]]
 id = "clean_manufacturing"
 name = "Clean Manufacturing"
-branch = "Industry"
+branch = "Stewardship"
 rung = 3
 cost = 48
 needs = ["clean_power"]
@@ -167,9 +167,13 @@ needs = ["deep_mining", "efficient_grids"]
 effect = "Refinery output x1.5; Ice Deposit gives x3"
 value = 1.5
 
+# Ticket #424 (version 0.09.5): renamed Large Language Models, at the designer's word -- "Rename
+# public science to something more archivist themed like LLM". The id stays `public_science` so a
+# saved game keeps the Tech it had; the effect is unchanged. It now heads the Archivists' road:
+# Large Language Models -> Civil Defense -> The Upload, all in Society.
 [[tech]]
 id = "public_science"
-name = "Public Science"
+name = "Large Language Models"
 branch = "Society"
 rung = 1
 cost = 18
@@ -180,7 +184,7 @@ value = 1.5
 [[tech]]
 id = "green_consensus"
 name = "Green Consensus"
-branch = "Society"
+branch = "Stewardship"
 rung = 2
 cost = 32
 # Ticket #242 (version 0.08.3): Clean Power is no longer a prerequisite, at the designer's word --
@@ -188,7 +192,12 @@ cost = 32
 # so requiring it required the whole foot of the Industry branch; dropping it frees the Society
 # line, and with it PLANETARY STEWARDSHIP, the Custodians' Victory gate, from Industry altogether.
 # That makes the Custodians' gate cheaper to reach, and they are the seat winning 37 of 80.
-needs = ["public_science"]
+#
+# Ticket #424 (version 0.09.5): moved to the Stewardship line (Industry renamed), and needing
+# EFFICIENT GRIDS in place of Public Science, at the designer's word, so the Custodians' whole
+# road sits in one row. It undoes #242's freeing in the other direction: the Custodians' road is
+# now Efficient Grids, Clean Power and Green Consensus, 130 Research with the gate, where it was 98.
+needs = ["efficient_grids"]
 effect = "Per-person Emissions x0.5; Influence thresholds x0.75; Heatwave loss halved"
 value = 0.5
 influence_threshold_multiplier = 0.75
@@ -200,7 +209,7 @@ influence_threshold_multiplier = 0.75
 [[tech]]
 id = "coastal_engineering"
 name = "Coastal Engineering"
-branch = "Industry"
+branch = "Stewardship"
 rung = 1
 cost = 15
 needs = []
@@ -237,10 +246,13 @@ value = 10.0
 [[tech]]
 id = "planetary_stewardship"
 name = "Planetary Stewardship"
-branch = "Society"
+branch = "Stewardship"
 rung = 3
 cost = 48
-needs = ["green_consensus"]
+# Ticket #424 (version 0.09.5): at the end of the Stewardship line, needing the three the designer
+# named -- "instead requires efficient grids, green consensus, and clean power". Drawn stacked
+# under Clean Manufacturing in the line's rung-3 cell.
+needs = ["efficient_grids", "clean_power", "green_consensus"]
 effect = "Opens the Custodians' Victory Condition; the Natural Sink grows by 1.0 ppm a turn for the world"
 value = 1.0
 gate_for = "custodians"
@@ -293,7 +305,13 @@ cost = 48
 # the Prospectors' gates. And it is not only a Victory gate -- `orders.rs` refuses the Archive
 # ORDER until this Tech stands, so the whole Archive chain moves back with it. The Archive already
 # completed in just 28 of 80 games at the 0.08.2 baseline. Expect later and fewer; the sweep says.
-needs = ["closed_loop_colonies"]
+#
+# Ticket #424 (version 0.09.5): back into Society, at the designer's word -- "put the archivist at
+# the end of society". The road is Large Language Models (Public Science renamed) -> Civil Defense
+# -> The Upload, 98 Research with the gate, where it was 148 through Closed-Loop Colonies. It names
+# Civil Defense ALONE: a second line from Large Language Models would run straight behind the Civil
+# Defense box and read as passing through it, the fault #245 took out of this row.
+needs = ["civil_defense"]
 effect = "Opens the Archivists' Victory Condition; Region, Lab and Observatory Research x1.25"
 value = 1.25
 gate_for = "archivists"

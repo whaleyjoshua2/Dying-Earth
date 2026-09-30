@@ -560,7 +560,9 @@ order = ["beneficiation", "deep_mining", "efficient_grids", "automated_refining"
 # by the cheapest-remaining fallback -- which is exactly how The Upload got chosen in the game that
 # opened ticket #201 -- and the Custodians are the seat that most wants to keep what it holds: they
 # lose their start Region in up to 12 seeds of 20.
-order = ["public_science", "green_consensus", "orbital_refuelling", "clean_propellant", "efficient_transit", "nuclear_rockets", "cryogenic_tanks", "hardened_hulls", "missile_technology"]
+# Ticket #424 (version 0.09.5): the Custodians' road moved to the Stewardship line -- Efficient Grids,
+# Clean Power and Green Consensus, cheapest first. Public Science is on nobody's road but the Archivists'.
+order = ["efficient_grids", "clean_power", "green_consensus", "orbital_refuelling", "clean_propellant", "efficient_transit", "nuclear_rockets", "cryogenic_tanks", "hardened_hulls", "missile_technology"]
 
 # Ticket #51: the Arkwrights want room, cheap upkeep and cheap transits.
 # Ticket #348: Efficient Grids and Clean Power open the list. Generation Ships waits on Closed-Loop
@@ -577,4 +579,6 @@ order = ["efficient_grids", "clean_power", "expanded_habitats", "closed_loop_col
 # and they held Efficient Grids alone of them. They won 0 of 80 and their Archive waits on this same
 # Tech, since `orders.rs` refuses the Archive order until The Upload stands.
 [tech_picks.archivists]
-order = ["expanded_habitats", "efficient_grids", "clean_power", "closed_loop_colonies", "orbital_refuelling", "clean_propellant", "efficient_transit", "nuclear_rockets", "cryogenic_tanks", "hardened_hulls", "missile_technology"]
+# Ticket #424 (version 0.09.5): The Upload's road is back in Society -- Large Language Models (the id is
+# still `public_science`) and Civil Defense. Closed-Loop Colonies and its three are off this list.
+order = ["public_science", "civil_defense", "orbital_refuelling", "clean_propellant", "efficient_transit", "nuclear_rockets", "cryogenic_tanks", "hardened_hulls", "missile_technology"]

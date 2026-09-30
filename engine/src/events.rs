@@ -758,7 +758,8 @@ impl Game {
             }
             EventId::LabourDispute => match self.pick_state_by_population() {
                 Some(s) => {
-                    let what = if self.has_tech(TechId::PublicScience) { "one of its Facilities makes nothing at the next Income (Public Science)" } else { "its Facilities make nothing at the next Income" };
+                    // Ticket #424 (version 0.09.5): the Tech named from its card, since Public Science was renamed.
+                    let what = if self.has_tech(TechId::PublicScience) { format!("one of its Facilities makes nothing at the next Income ({})", t.tech(TechId::PublicScience).name) } else { "its Facilities make nothing at the next Income".to_string() };
                     (EventTarget::State(s), format!("{} in {}: {what}.", card.name, t.state(s).name))
                 }
                 None => (EventTarget::None, format!("{}: nobody lives anywhere, so nothing happens.", card.name)),

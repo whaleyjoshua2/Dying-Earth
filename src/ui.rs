@@ -8699,7 +8699,11 @@ fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, ac
     //
     // A branch not named here keeps its first-appearance place, after the named ones, so a new
     // branch cannot vanish by being forgotten.
-    const BAND_ORDER: [&str; 5] = ["Society", "Off-world Living", "Extraction", "Industry", "Propulsion"];
+    //
+    // Ticket #424 (version 0.09.5): Industry renamed STEWARDSHIP and lifted to second, directly above
+    // Off-world Living, at the designer's word -- "bring that whole branch up above off world
+    // living". Each Faction's Victory Tech now ends a band of its own.
+    const BAND_ORDER: [&str; 5] = ["Society", "Stewardship", "Off-world Living", "Extraction", "Propulsion"];
     let mut branches: Vec<String> = Vec::new();
     for t in TechId::ALL {
         let b = &game.tables.tech(t).branch;
