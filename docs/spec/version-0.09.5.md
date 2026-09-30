@@ -244,6 +244,14 @@ Victory progress, the Victory window's "(+N in transit)" included; the Moments.
 **The computer seats see only what a human in their seat would.** `reveal_all` lifts the fog for
 testing only: the headless driver's flag and the `reveal:1` shot aid set it.
 
+**Measured** (20 seeds x four seatings at the shipped cell, `sweeps/fog-430.txt` against
+`sweeps/reveal-430.txt`, the same batch with `DYING_EARTH_REVEAL=1`): the fog costs the computer
+seats almost nothing. The win column is **10 / 10 / 1 / 17** (Custodians / Prospectors /
+Arkwrights / Archivists) with the fog and without it, collapses **42 of 80** both ways; one
+Arkwright Victory gate (73 against 74) and one placing differ. Accords are common: **148 to 174
+struck in a seating's 20 games**, and 24 to 26 still standing at the end. An Accord opens a rival's
+books and doings, so between pairs under one the fog is lifted.
+
 **What would show this wrong**: a rival Ship's kind or strength shown at a Body you do not see; a
 rival build under way shown at a place you do not see; a computer seat reacting to a Ship it could
 not see; a save that changes what is seen.
