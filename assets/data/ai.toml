@@ -535,8 +535,8 @@ order = ["beneficiation", "deep_mining", "automated_refining", "orbital_refuelli
 # not stating a private preference -- it is holding the whole table up. Clean Power is an antecedent
 # of BOTH the Arkwrights' and the Archivists' gates, so every turn a Prospector Lead pushed it to
 # the back it stalled two rivals' Victory Conditions without the Prospectors ever choosing to.
-# (Ticket #424, version 0.09.5: it is now the Arkwrights' and the CUSTODIANS', no longer the
-# Archivists'. The point stands.)
+# (Ticket #424, version 0.09.5: it is no longer the Archivists'; ticket #425 took it off the
+# Arkwrights' too, so it is on the CUSTODIANS' road alone. The point stands.)
 #
 # `never = "green_consensus"` IS GONE TOO, and for the same reason one layer down. It was kept at
 # first on a build specification that claimed Green Consensus was nobody else's antecedent. It is

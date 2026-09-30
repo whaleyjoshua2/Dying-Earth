@@ -376,6 +376,7 @@ value = 1.0
 # THE BRANCH AND THE PREREQUISITE ARE THE BUILD'S CHOICE, NOT THE DESIGNER'S -- the rung and the
 # cost are theirs. Propulsion is where the tree's only other combat Tech (Hardened Hulls) sits, and
 # Hardened Hulls is its rung-3 neighbour there, so the prerequisite keeps the branch in one line.
+# (That prerequisite held until ticket #425, below.)
 [[tech]]
 id = "missile_technology"
 name = "Missile Technology"
@@ -389,8 +390,8 @@ effect = "Unlocks the Missile Carrier: the first weapon Tech, and the whole tabl
 value = 0.0
 
 # Ticket #393 (version 0.09.3): the twenty-second Tech, appended last with its enum variant, as
-# every Tech since #232 has been. Propulsion rung 2 BESIDE Efficient Transit (both need Clean
-# Propellant; Hardened Hulls now needs both), and priced at 38 where the rung is 32, at the
+# every Tech since #232 has been. Propulsion rung 2 BESIDE Efficient Transit (both needed Clean
+# Propellant until ticket #425 gave Efficient Transit Orbital Refuelling; Hardened Hulls needs both), and priced at 38 where the rung is 32, at the
 # designer's word: "i want to be costlier". It is the one Tech that touches a transit's TURNS: the
 # crossing's days are multiplied by `value` before the rounding up to sixty-day turns, so Mars at
 # the window is four turns where it was five and Venus two where it was three, and a one-turn hop
@@ -407,7 +408,8 @@ effect = "Transit times x0.8 (a Mars crossing four turns at the window, Venus tw
 value = 0.8
 
 # Ticket #413 (version 0.09.4): the twenty-third Tech, appended last with its enum variant.
-# Propulsion rung 1 BESIDE Clean Propellant, needing nothing and needed by nothing, priced at 22
+# Propulsion rung 1 BESIDE Clean Propellant, needing nothing (and needed by nothing until ticket
+# #425 made it Efficient Transit's), priced at 22
 # where the rung is 18, at the designer's word. A crossing's days are multiplied by `value` before
 # the rounding up, and by Nuclear Rockets' as well where both stand (0.72): at the window Mars is
 # four turns where it was five with either or both, and the stacking gains off the window.

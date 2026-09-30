@@ -8674,12 +8674,12 @@ fn tech_edge_entry(from_box: egui::Rect, to_box: egui::Rect) -> Pos2 {
 /// Ticket #425 (version 0.09.5): **the x of the lane a line climbs in**, in the gap left of the
 /// needing box. From the column just before, it is on the SOURCE's side of the gap, so a line that
 /// forks to a box in another row forks out of the Tech that feeds it, not beside the door of the
-/// box level with that Tech. From further back it keeps the old lane, by the needing box. Three
-/// lanes, three and a half pixels apart, fit the gap; `lane` is the source's band.
+/// box level with that Tech. From further back it keeps the old lane, by the needing box. Two
+/// lanes, three pixels apart, both on the source's half of the gap; `lane` is the source's band.
 fn tech_edge_lane(from_box: egui::Rect, to_box: egui::Rect, lane: f32) -> f32 {
     let gap = to_box.min.x - from_box.max.x;
     if gap > 0.0 && gap < to_box.width() {
-        from_box.max.x + 4.0 + (lane % 3.0) * 3.5
+        from_box.max.x + 3.0 + (lane % 2.0) * 3.0
     } else {
         to_box.min.x - 4.0 - lane * 3.5
     }
@@ -8812,8 +8812,8 @@ fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, ac
     // Lines first, so the boxes sit on top of them. A line is green once the Tech it comes from is done.
     // Ticket #133: a line is ELBOWED -- it leaves the needed box, runs along the gap to the left of
     // the needing box's column, and enters the needing box's left edge. A Tech that needs one on
-    // its own rung (Closed-Loop Colonies needs Clean Power) is reached the same way: out of the
-    // needed box's LEFT edge, down that same gap, and in.
+    // its own rung (none does since ticket #425; Closed-Loop Colonies once needed Clean Power) is
+    // reached the same way: out of the needed box's LEFT edge, down that same gap, and in.
     //
     // Ticket #339 (version 0.09.0): where that elbow would run THROUGH a box, it is routed around
     // it instead (`tech_edge_path`). Every box in the tree is an obstacle to every line but the two
@@ -11553,9 +11553,12 @@ mod tests {
         let from_below = tech_edge_entry(stewardship, manufacturing);
         assert!(from_below.y > manufacturing.center().y + 10.0 && from_below.y < manufacturing.max.y, "from below: near the bottom: {from_below:?}");
         // The climb is nearer the source's column than the target's.
-        let gap_x = tech_edge_lane(clean_power, stewardship, 0.0);
-        assert!(gap_x > clean_power.max.x && gap_x < stewardship.min.x, "in the gap");
-        assert!(gap_x - clean_power.max.x < stewardship.min.x - gap_x, "on the source's side: {gap_x}");
+        // The climb is nearer the source's column than the target's, whatever band it comes from.
+        for lane in 0..5 {
+            let gap_x = tech_edge_lane(clean_power, stewardship, lane as f32);
+            assert!(gap_x > clean_power.max.x && gap_x < stewardship.min.x, "in the gap");
+            assert!(gap_x - clean_power.max.x < stewardship.min.x - gap_x, "on the source's side in band {lane}: {gap_x}");
+        }
     }
 }
 

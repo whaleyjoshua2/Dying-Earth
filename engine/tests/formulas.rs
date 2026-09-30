@@ -17975,3 +17975,14 @@ fn four_prerequisites_moved_at_the_designers_word() {
         assert!(chain.iter().all(|x| order[..chain.len()].contains(x)), "the {k:?} list opens with its gate chain and nothing else");
     }
 }
+
+/// Ticket #425: **Orbital Refuelling is drawn above Clean Propellant**, level with the Efficient
+/// Transit it feeds. The tree sorts a stacked cell by `stack`, ties in the tree's order, so this
+/// pins the one Tech that sits out of that order.
+#[test]
+fn orbital_refuelling_is_stacked_above_clean_propellant() {
+    let t = tables();
+    let key = |x: TechId| (t.tech(x).stack, x.index());
+    assert!(key(TechId::OrbitalRefuelling) < key(TechId::CleanPropellant), "Orbital Refuelling first in Propulsion's rung-1 cell");
+    assert!(TechId::ALL.iter().filter(|x| **x != TechId::OrbitalRefuelling).all(|x| t.tech(*x).stack == 0), "no other Tech sits out of the tree's order");
+}
