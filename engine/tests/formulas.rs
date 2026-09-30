@@ -17030,6 +17030,9 @@ fn a_computer_seat_wants_a_rivals_fat_colony_more_than_its_lean_one() {
     // board's top: its size reaches the floor.
     let lean = colony(&mut g, Seat(1), BodyId::Mars, &[], 2);
     let fat = colony(&mut g, Seat(1), BodyId::Mars, &[ModuleKind::Mine, ModuleKind::Generator, ModuleKind::Factory, ModuleKind::Refinery, ModuleKind::Habitat], 8);
+    // Ticket #430 (version 0.09.5): seat 0 has a Ship at Mars, so it SEES what the two earn; out of
+    // sight a Colony is sized by its Colonists alone (the next test).
+    a_colony_ship(&mut g, Seat(0), BodyId::Mars);
     let size = |g: &Game, c: ColonyId| g.ai_place_size(c);
     // The size is the Colonists and the Output row summed, Energy only where net positive.
     {
@@ -18264,4 +18267,46 @@ fn a_rivals_report_line_shows_only_where_the_player_sees_or_under_an_accord() {
     g.strike_accord(me, them, vec![Term::NonAggression]).expect("an Accord");
     let p = g.rival_paragraph(them).expect("a paragraph");
     assert!(p.contains("NEAR") && p.contains("FAR") && p.contains('7'), "an Accord shows all of it: {p}");
+}
+
+/// Ticket #430: **a computer seat sees only what a human in its seat would.** A rival Carrier in
+/// flight toward its station is hidden while the rival's books are shut, so it builds no Battery
+/// against it; with the books open (an Accord) the same Carrier presses the station.
+#[test]
+fn a_computer_seat_ignores_a_rival_carrier_in_flight_it_cannot_see() {
+    let mut g = game();
+    calm(&mut g);
+    let station = g.colonies.iter().find(|c| c.in_orbit && c.body == BodyId::Earth && c.control.director() == Some(Seat(0))).map(|c| c.id).expect("seat 0's station");
+    g.seats[0].stockpile.materials = 500.0;
+    g.seats[0].stockpile.energy = 500.0;
+    {
+        let col = g.colony_mut(station).unwrap();
+        col.modules.push(Module::new(ModuleKind::Habitat));
+        col.modules.push(Module::new(ModuleKind::TradePost));
+        col.colonists = 8;
+    }
+    let id = ShipId(g.fresh_id());
+    let name = g.next_ship_name(UnitKind::Carrier);
+    g.ships.push(Ship { id, name, kind: UnitKind::Carrier, seat: Seat(1), damage: 0, at: ShipAt::Transit { from: BodyId::Moon, to: BodyId::Earth, turns_left: 1 }, colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None });
+    let battery = |orders: &[Order]| orders.iter().any(|o| matches!(o, Order::BuildModule { colony, kind: ModuleKind::Battery } if *colony == station));
+    assert!(!g.sees_books(Seat(0), Seat(1)), "the premise: their books are shut");
+    assert!(!battery(&g.ai_orders(Seat(0))), "a Carrier in flight it cannot see presses nothing");
+    g.strike_accord(Seat(0), Seat(1), vec![Term::Passage]).expect("an Accord");
+    assert!(battery(&g.ai_orders(Seat(0))), "with the books open, the same Carrier presses the station");
+}
+
+/// Ticket #430: **out of sight, a rival Colony is sized by its Colonists alone** -- what it earns is
+/// hidden -- so a computer seat with nothing at Mars ranks a fat Colony there by its people, and
+/// ranks it by its earnings too once it has a Ship there to see them.
+#[test]
+fn a_computer_seat_sizes_a_rival_colony_out_of_sight_by_its_colonists_alone() {
+    let mut g = fresh();
+    let fat = colony(&mut g, Seat(1), BodyId::Mars, &[ModuleKind::Mine, ModuleKind::Generator, ModuleKind::Factory, ModuleKind::Refinery, ModuleKind::Habitat], 8);
+    g.ships.retain(|s| !(s.seat == Seat(0) && s.at == ShipAt::Body(BodyId::Mars)));
+    assert!(!g.sees_body(Seat(0), BodyId::Mars), "the premise: seat 0 has nothing at Mars");
+    let weight = |g: &Game| g.ai_influence_targets(Seat(0)).into_iter().find(|(p, _)| *p == Place::Colony(fat)).map(|(_, w)| w).expect("a target");
+    let blind = weight(&g);
+    a_colony_ship(&mut g, Seat(0), BodyId::Mars);
+    let seen = weight(&g);
+    assert!(seen > blind, "its earnings, once seen, raise the weight: {blind} blind, {seen} seen");
 }
