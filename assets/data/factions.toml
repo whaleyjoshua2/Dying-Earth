@@ -157,7 +157,7 @@ module_materials_multiplier = 0.75
 start_extra_facilities = ["power_plant"]
 # Ticket #407 (version 0.09.4): audited against the data: 16 with Generation Ships too, and a
 # Colony Ship at 25.5 since figures are carried to a tenth.
-signature = "Coach Class. A Colony Ship carries 8 Colonists, 12 with Expanded Habitats and 16 with Generation Ships too, and their Habitats hold half again as many, 6 and 12. They recruit 8 Pioneers a turn where others recruit 4, but every Pioneer takes twice the population. Every Ship costs them 15% less, a Colony Ship 25.5 Materials; a transit burns three quarters of the Fuel; and, starting with no station, a Space Station costs them 20 Materials and a Module three quarters."
+signature = "Coach Class. A Colony Ship carries 8 Colonists, 12 with Expanded Habitats and 16 with Generation Ships too, and their Habitats hold half again as many, 6 and 12. They recruit 4 Pioneers a turn in each state where others recruit 2, but every Pioneer takes twice the population. Every Ship costs them 15% less, a Colony Ship 25.5 Materials; a transit burns three quarters of the Fuel; and, starting with no station, a Space Station costs them 20 Materials and a Module three quarters."
 # Ticket #419 (version 0.09.4): Unrest off every Region they hold, a whole point for each ground
 # Colony they found off Earth (Antarctica excepted) and half a point for each Space Station they
 # build; a place taken counts for nothing.
@@ -386,8 +386,12 @@ min_turns_held = 3
 turns = 2
 muster_multiplier = 2
 
+# Ticket #427 (version 0.09.5): PER STATE, where it was per Faction -- "a max of two a time per
+# country per turn. Two countries recruiting their maximum a single turn will result in four
+# pioneers." Coach Class's `emigrants_multiplier` doubles it to four a state; an Exodus Call doubles
+# the figure again in its own state.
 [emigrants]
-per_turn = 4
+per_turn = 2
 population_each = 1.0
 unrest_fall = 0.5
 antarctica_turns = 1

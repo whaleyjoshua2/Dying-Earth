@@ -63,7 +63,7 @@ note = "A station builds one Module for every Colonist living on it. The two abo
 [[note]]
 turn = 3
 figure = "Recruit Pioneers"
-text = "The Region you started in has a Launch Site, so it can put people into orbit. Click it, and under Pioneers recruit four: they take people from the Region and appear on its card when the turn ends."
+text = "The Region you started in has a Launch Site, so it can put people into orbit. Click it, and under Pioneers recruit two: they take people from the Region and appear on its card when the turn ends."
 note = "Every figure on a card explains itself. Rest the pointer on a number and the rule behind it appears."
 
 [[note]]

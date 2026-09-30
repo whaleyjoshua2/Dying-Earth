@@ -6111,21 +6111,22 @@ fn emigrants_muster_four_a_turn_per_faction_in_one_state_at_one_unit_of_populati
     calm(&mut g);
     g.state_mut(StateId::EastAsia).unrest = 3.0;
     let pop = g.state(StateId::EastAsia).population;
-    let build = Order::BuildEmigrants { state: StateId::EastAsia, n: 4 };
+    // Ticket #427 (version 0.09.5): two a state a turn, where it was four in one state.
+    let build = Order::BuildEmigrants { state: StateId::EastAsia, n: 2 };
     assert!(g.check_order(Seat(0), &[], &build).is_ok());
-    assert!(g.check_order(Seat(0), &[], &Order::BuildEmigrants { state: StateId::EastAsia, n: 5 }).is_err(), "four a turn");
-    assert!(g.check_order(Seat(0), std::slice::from_ref(&build), &Order::BuildEmigrants { state: StateId::Europe, n: 1 }).is_err(), "one state a turn");
+    assert!(g.check_order(Seat(0), &[], &Order::BuildEmigrants { state: StateId::EastAsia, n: 3 }).is_err(), "two a state");
+    assert!(g.check_order(Seat(0), std::slice::from_ref(&build), &Order::BuildEmigrants { state: StateId::Europe, n: 1 }).is_err(), "not your state");
     assert!(g.check_order(Seat(1), &[], &Order::BuildEmigrants { state: StateId::EastAsia, n: 1 }).is_err(), "not your state");
     assert!(g.check_order(Seat(0), &[], &Order::Load { ship: ShipId(999), colonists: 1, from: LoadSource::State(StateId::EastAsia), army: None }).is_err(), "nothing waits yet");
     g.commit_orders(Seat(0), &[build]);
-    assert_eq!(g.state(StateId::EastAsia).emigrants, 4, "on the card at End Turn");
-    assert!((pop - g.state(StateId::EastAsia).population - 4.0).abs() < 1e-9, "one unit each: one million people since ticket #333, five million from ticket #143");
+    assert_eq!(g.state(StateId::EastAsia).emigrants, 2, "on the card at End Turn");
+    assert!((pop - g.state(StateId::EastAsia).population - 2.0).abs() < 1e-9, "one unit each: one million people since ticket #333, five million from ticket #143");
     assert_eq!(g.state(StateId::EastAsia).unrest, 2.5, "the batch took 0.5 off");
     assert!(g.log.to_vec().iter().any(|l| l.contains("Pioneers recruited in China")), "{:?}", g.log.to_vec());
-    // Coach Class: eight a turn at twice the population.
-    assert_eq!(g.emigrants_per_turn(Seat(0)), 4);
-    assert_eq!(g.emigrants_per_turn(Seat(2)), 8, "the Arkwrights recruit eight");
-    assert!((g.lift_population(Seat(2), 8) - 16.0).abs() < 1e-9, "at twice the population");
+    // Coach Class: four a state a turn (eight a turn before ticket #427) at twice the population.
+    assert_eq!(g.emigrants_per_turn(Seat(0)), 2);
+    assert_eq!(g.emigrants_per_turn(Seat(2)), 4, "the Arkwrights recruit four a state");
+    assert!((g.lift_population(Seat(2), 4) - 8.0).abs() < 1e-9, "at twice the population");
 }
 
 /// Ticket #73 (b): a Launch Site lifts only the Emigrants waiting in its state; the population was
@@ -11322,19 +11323,20 @@ fn an_exodus_call_doubles_the_muster_and_suspends_the_double_cost() {
     let ark = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Arkwrights).unwrap();
     let sid = g.controlled_states(ark)[0];
     let plain = g.emigrants_per_turn(ark);
-    assert_eq!(plain, 8, "Coach Class musters eight where others muster four");
+    // Ticket #427 (version 0.09.5): four a state, where it was eight in one state.
+    assert_eq!(plain, 4, "Coach Class musters four a state where others muster two");
     assert!((g.muster_population_in(ark, sid, plain) - g.lift_population(ark, plain)).abs() < 1e-9, "and pays double for them until the Call");
 
     g.seats[ark.index()].stockpile.ducats = 500.0;
     held_long_enough(&mut g, sid);
     g.commit_orders(ark, &[Order::ExodusCall { state: sid }]);
     assert!(g.exodus_call_running(sid), "it runs from the turn it is sounded");
-    assert_eq!(g.emigrants_per_turn_in(ark, sid), plain * 2, "sixteen, not eight");
+    assert_eq!(g.emigrants_per_turn_in(ark, sid), plain * 2, "eight, not four");
 
-    // The whole point: sixteen people cost what sixteen people cost anybody else.
+    // The whole point: eight people cost what eight people cost anybody else.
     let each = g.tables.emigrants.population_each;
-    assert!((g.muster_population_in(ark, sid, 16) - each * 16.0).abs() < 1e-9, "the ordinary price, not their double");
-    assert!(g.muster_population_in(ark, sid, 16) < g.lift_population(ark, 16), "which is strictly less than Coach Class charges");
+    assert!((g.muster_population_in(ark, sid, 8) - each * 8.0).abs() < 1e-9, "the ordinary price, not their double");
+    assert!(g.muster_population_in(ark, sid, 8) < g.lift_population(ark, 8), "which is strictly less than Coach Class charges");
 
     // Elsewhere they are unchanged: the Call is a Region's, not a Faction's.
     let other = g.controlled_states(ark).into_iter().find(|s| *s != sid);
@@ -18112,4 +18114,56 @@ fn orbital_data_centers_lifts_the_observatory_and_opens_the_upload() {
     assert!((y.chain.value() / before - 1.5).abs() < 1e-9, "x1.5: {before} -> {}", y.chain.value());
     assert_eq!(g.region_research_chain(s, StateId::EastAsia).value(), region, "a Region's Research is untouched");
     assert_eq!(g.facility_yield(s, StateId::EastAsia, FacilityKind::ResearchLab).chain.value(), lab, "a Lab's is untouched");
+}
+
+// ---------------------------------------------------------------- Ticket #427 (version 0.09.5): two Pioneers a state a turn
+
+/// Ticket #427: **up to two Pioneers a turn from each state a Faction directs, in as many states as
+/// it likes** -- the designer's "Two countries recruiting their maximum a single turn will result in
+/// four pioneers". One recruitment a state a turn; Coach Class keeps its double (four a state), and
+/// an Exodus Call doubles the figure in its state.
+#[test]
+fn pioneers_are_recruited_two_a_state_a_turn_in_every_state_a_faction_directs() {
+    let mut g = game();
+    calm(&mut g);
+    let s = Seat(0);
+    g.state_mut(StateId::NorthAfrica).control = Control::Controlled(s);
+    g.state_mut(StateId::NorthAfrica).population = 50.0;
+    let china = Order::BuildEmigrants { state: StateId::EastAsia, n: 2 };
+    let africa = Order::BuildEmigrants { state: StateId::NorthAfrica, n: 2 };
+    assert!(g.check_order(s, &[], &china).is_ok(), "two in one state");
+    assert!(g.check_order(s, &[], &Order::BuildEmigrants { state: StateId::EastAsia, n: 3 }).is_err(), "not three");
+    assert!(g.check_order(s, std::slice::from_ref(&china), &africa).is_ok(), "and two more in a second state the same turn");
+    assert!(g.check_order(s, std::slice::from_ref(&china), &Order::BuildEmigrants { state: StateId::EastAsia, n: 1 }).is_err(), "one recruitment a state a turn");
+    g.commit_orders(s, &[china, africa]);
+    assert_eq!((g.state(StateId::EastAsia).emigrants, g.state(StateId::NorthAfrica).emigrants), (2, 2), "four Pioneers from two states");
+    let ark = Seat::ALL.into_iter().find(|x| g.kind(*x) == FactionKind::Arkwrights).unwrap();
+    assert_eq!((g.emigrants_per_turn(s), g.emigrants_per_turn(ark)), (2, 4), "Coach Class keeps its double: four a state");
+}
+
+/// Ticket #427: **a computer seat recruits from as many states as its plan needs, and no further**
+/// -- the designer's "only to the extent that have plans to use them". The plan is what its Colony
+/// Ships carry and its places off Earth can house, less who already waits.
+#[test]
+fn a_computer_seat_recruits_from_several_states_only_as_far_as_its_plan() {
+    let mut g = game();
+    bare_stations(&mut g);
+    let s = Seat(0);
+    a_colony_ship(&mut g, s, BodyId::Earth);
+    g.seats[0].stockpile.energy = 200.0;
+    g.state_mut(StateId::NorthAfrica).control = Control::Controlled(s);
+    g.state_mut(StateId::NorthAfrica).population = 50.0;
+    g.state_mut(StateId::NorthAfrica).facilities.push(facility(FacilityKind::LaunchSite));
+    let room: u32 = g.colonies.iter().filter(|c| c.control.director() == Some(s)).map(|c| g.habitat_room(c).saturating_sub(c.colonists)).sum();
+    let want = g.colony_ship_capacity(s) * 2 + if g.antarctica_open { g.colony_ship_capacity(s) } else { 0 } + room;
+    let recruited = |g: &mut Game| -> Vec<(StateId, u32)> { g.ai_orders(s).iter().filter_map(|o| if let Order::BuildEmigrants { state, n } = o { Some((*state, *n)) } else { None }).collect() };
+    // The plan wants more than one state gives: both states recruit.
+    assert!(want >= 4, "the premise: the plan wants at least two states' worth: {want}");
+    let both = recruited(&mut g);
+    assert_eq!(both.len(), 2, "two states recruit: {both:?}");
+    assert!(both.iter().all(|(_, n)| *n == 2), "each its two: {both:?}");
+    // With all but one of the plan already waiting, one Pioneer, from one state.
+    g.state_mut(StateId::EastAsia).emigrants = want - 1;
+    let one = recruited(&mut g);
+    assert_eq!(one.iter().map(|(_, n)| n).sum::<u32>(), 1, "no further than the plan: {one:?}");
 }

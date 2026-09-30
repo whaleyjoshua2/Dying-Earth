@@ -152,3 +152,24 @@ Language Models. The whole tree now costs **853**.
 
 **What would show this wrong**: an Observatory that makes the same Research with it as without; a
 Lab or Region lifted by it; The Upload open without it.
+
+## 5. Two Pioneers a state a turn
+
+The authority is [ticket #427](https://github.com/whaleyjoshua2/Dying-Earth/issues/427).
+
+- **Up to 2 Pioneers a turn from each state a Faction directs**, in as many states as it likes, with
+  one recruitment in each state a turn. Before, it was 4 a turn per Faction, all from one state.
+  Two states at their cap make four.
+- **Coach Class keeps its double**: the Arkwrights recruit 4 a state, at twice the population each.
+- **An Exodus Call** doubles the figure in its state (4, or 8 for the Arkwrights) and waives the
+  double charge while it runs, as before.
+- **The computer seats** recruit only as far as their plan needs, from as many states as that takes.
+  The plan is what their Colony Ships carry, plus Antarctica once the ice is open, plus the room in
+  their places off Earth, less who already waits. States with a working Launch Site go first, the
+  most populous first.
+- The Faction card, the tutorial and the glossary say the new figure.
+
+**Measured, not yet**: how many Pioneers a game raises. The closing sweep reports it against 0.09.4.
+
+**What would show this wrong**: three recruited in one state (five for the Arkwrights) without a
+Call; a second state refused while the first recruits; a computer seat recruiting past its plan.

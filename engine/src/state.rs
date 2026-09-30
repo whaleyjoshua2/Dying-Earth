@@ -2154,6 +2154,7 @@ impl Game {
     // ---------------------------------------------------------------- Ticket #51: Coach Class and the rest
 
     /// Ticket #73: how many Emigrants this seat may muster in a turn (Coach Class doubles it).
+    /// Ticket #427 (version 0.09.5): in EACH state it directs.
     pub fn emigrants_per_turn(&self, seat: Seat) -> u32 {
         (self.tables.emigrants.per_turn as f64 * self.tables.faction(self.kind(seat)).emigrants_multiplier).floor() as u32
     }

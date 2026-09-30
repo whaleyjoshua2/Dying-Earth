@@ -2378,19 +2378,32 @@ impl Game {
                 .sum();
             let want = if has_ship_or_yard { capacity * 2 } else { 0 } + if self.antarctica_open { capacity } else { 0 } + room_off_earth;
             if per > 0 && waiting < want {
-                let by_population = |a: &StateId, b: &StateId| self.state(*a).population.partial_cmp(&self.state(*b).population).unwrap_or(std::cmp::Ordering::Equal);
-                let with_site = self
-                    .directed_states(seat)
-                    .into_iter()
-                    .filter(|s| self.state(*s).facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working()))
-                    .max_by(by_population);
-                let target = with_site.or_else(|| if self.antarctica_open { self.directed_states(seat).into_iter().max_by(by_population) } else { None });
-                // Ticket #196: as many as the state can pay for, not all or nothing. A Coach Class batch
-                // costs the Arkwrights 16.0 people and Australia carries 10.1 to 12.6.
-                if let Some(st) = target
-                    && let n = self.emigrants_affordable(seat, st)
-                    && n > 0
-                {
+                // Ticket #427 (version 0.09.5): the cap is per state now, so the seat recruits from as
+                // many states as it takes to fill the plan and NO further -- the designer's "only to
+                // the extent that have plans to use them". The states with a working Launch Site
+                // first (their Pioneers can lift), then, with the ice open, the rest; the most
+                // populous first within each.
+                let by_population = |a: &StateId, b: &StateId| self.state(*b).population.partial_cmp(&self.state(*a).population).unwrap_or(std::cmp::Ordering::Equal);
+                let has_site = |s: &StateId| self.state(*s).facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working());
+                let mut targets: Vec<StateId> = self.directed_states(seat).into_iter().filter(|s| has_site(s)).collect();
+                targets.sort_by(by_population);
+                if self.antarctica_open {
+                    let mut rest: Vec<StateId> = self.directed_states(seat).into_iter().filter(|s| !has_site(s)).collect();
+                    rest.sort_by(by_population);
+                    targets.extend(rest);
+                }
+                let mut short = want - waiting;
+                for st in targets {
+                    if short == 0 {
+                        break;
+                    }
+                    // Ticket #196: as many as the state can pay for, not all or nothing. A Coach
+                    // Class batch costs the Arkwrights twice the people.
+                    let n = self.emigrants_affordable(seat, st).min(short);
+                    if n == 0 {
+                        continue;
+                    }
+                    short -= n;
                     let opp = if presence_needed > 0 && waiting == 0 { m.opportunity } else { 1.0 };
                     push(vec![Order::BuildEmigrants { state: st, n }], Cat::LoadUnload, self.base_weight(seat, Cat::LoadUnload), gap_for(Cat::LoadUnload, None), 1.0, opp, format!("recruit {n} Pioneers in {}", self.tables.state(st).name), None);
                 }

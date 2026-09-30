@@ -1975,6 +1975,8 @@ impl Game {
             Order::Change { building, what } => self.check_change(seat, pending, *building, *what).map(|_| cost),
             // Ticket #54: Leapfrog, the Custodians only, on a state they control.
             // Ticket #73: Emigrants muster four a turn per Faction, in one state it directs.
+            // Ticket #427 (version 0.09.5): two a turn IN EACH state it directs, one recruitment a
+            // state a turn, in as many states as it likes.
             Order::BuildEmigrants { state, n } => {
                 if self.state(*state).control.director() != Some(seat) {
                     return fail("you do not direct that Nation State");
@@ -1983,8 +1985,8 @@ impl Game {
                 if *n == 0 || *n > cap {
                     return fail(format!("up to {cap} Pioneers a turn"));
                 }
-                if pending.iter().any(|o| matches!(o, Order::BuildEmigrants { .. })) {
-                    return fail("Pioneers are already recruiting this turn: one state a turn");
+                if pending.iter().any(|o| matches!(o, Order::BuildEmigrants { state: s, .. } if s == state)) {
+                    return fail("Pioneers are already recruiting here this turn");
                 }
                 if self.state(*state).population < self.lift_population(seat, *n) {
                     return fail("not enough people there");
