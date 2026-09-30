@@ -32,6 +32,8 @@ enum Cat {
     Constabulary,
     /// Ticket #389 (version 0.09.3): a Stadium, after a Constabulary.
     Stadium,
+    /// Ticket #411 (version 0.09.4): a Nature Reserve.
+    NatureReserve,
     Relief,
     Resettle,
     /// Ticket #267 (version 0.08.4): a Smear campaign against a rival.
@@ -324,6 +326,7 @@ impl Game {
             Cat::BuildInfluence => w.build_influence,
             Cat::Constabulary => w.build_constabulary,
             Cat::Stadium => w.build_stadium,
+            Cat::NatureReserve => w.build_nature_reserve,
             Cat::Relief => w.relief,
             Cat::Resettle => w.resettle,
             Cat::Smear => w.smear,
@@ -375,6 +378,74 @@ impl Game {
     /// The measure this seat's Victory Condition counts first (ticket #50).
     fn first_kind(&self, seat: Seat) -> VictoryFirstKind {
         self.tables.faction(self.kind(seat)).victory_first.kind
+    }
+
+    /// Ticket #410 (version 0.09.4): whether a computer seat offers a Constabulary or a Stadium in
+    /// this Region at all: a Constabulary from `constabulary_from`; a Stadium from `stadium_from`,
+    /// where a Constabulary stands, or where the Region has `stadium_alone_free_slots` slot left and
+    /// no Constabulary on order to take it.
+    pub fn ai_offers_calming(&self, sid: StateId, kind: FacilityKind) -> bool {
+        let th = &self.tables.ai.thresholds;
+        let unrest = self.state(sid).unrest;
+        match kind {
+            FacilityKind::Constabulary => unrest >= th.constabulary_from,
+            FacilityKind::Stadium => {
+                let queued = self.state(sid).queue.iter().any(|b| matches!(b.item, BuildItem::Facility(k) if k.does_the_job_of(FacilityKind::Constabulary)));
+                unrest >= th.stadium_from && (self.constabulary_online(sid) || (!queued && self.free_slots(sid) <= th.stadium_alone_free_slots))
+            }
+            _ => false,
+        }
+    }
+
+    /// Ticket #410 (version 0.09.4): a Mothball's weight in a restive Region, where the point of
+    /// Unrest it adds, which nothing damps, costs most. In a Colony, or a calm Region, no change.
+    pub fn ai_mothball_price(&self, b: BuildingRef) -> f64 {
+        let th = &self.tables.ai.thresholds;
+        match b {
+            BuildingRef::Facility(sid, _) if self.state(sid).unrest >= th.mothball_restive_from => th.mothball_restive_factor,
+            _ => 1.0,
+        }
+    }
+
+    /// Ticket #421 (version 0.09.4): the market Buy that brings the seat's Fuel up to `need`, or
+    /// `None` where it holds enough already or its Ducats cannot pay for the shortfall.
+    pub fn ai_fuel_top_up(&self, seat: Seat, need: f64) -> Option<Order> {
+        let short = (need - self.seat(seat).stockpile.fuel).ceil() as i64;
+        if short <= 0 {
+            return None;
+        }
+        let buy = Order::Buy { resource: Resource::Fuel, amount: short };
+        (self.order_cost(seat, &buy).ducats <= self.seat(seat).stockpile.ducats).then_some(buy)
+    }
+
+    /// Ticket #419 (version 0.09.4): how much more a Faction eased by its foundings (the
+    /// Arkwrights) weighs founding a ground Colony or building a station, by its most restive
+    /// Region: one at `founding_pull_from`, rising in a line to double at `founding_pull_double_at`.
+    /// One for a Faction whose foundings ease nothing.
+    pub fn ai_founding_pull(&self, seat: Seat) -> f64 {
+        let card = self.tables.faction(self.kind(seat));
+        if card.found_colony_unrest_ease <= 0.0 && card.found_station_unrest_ease <= 0.0 {
+            return 1.0;
+        }
+        let th = &self.tables.ai.thresholds;
+        let worst = self.controlled_states(seat).iter().map(|s| self.state(*s).unrest).fold(0.0, f64::max);
+        let span = th.founding_pull_double_at - th.founding_pull_from;
+        if worst < th.founding_pull_from || span <= 0.0 {
+            return 1.0;
+        }
+        (1.0 + (worst - th.founding_pull_from) / span).min(2.0)
+    }
+
+    /// Ticket #410 (version 0.09.4): Relief's weight at this Unrest: none under `relief_from`, one
+    /// there, rising in a line to double at `relief_double_at` (the Facilities' 7 and the throw-off's
+    /// 10 either side of it) and no higher.
+    pub fn ai_relief_weight(&self, unrest: f64) -> Option<f64> {
+        let th = &self.tables.ai.thresholds;
+        if unrest < th.relief_from {
+            return None;
+        }
+        let span = th.relief_double_at - th.relief_from;
+        Some(if span <= 0.0 { 2.0 } else { (1.0 + (unrest - th.relief_from) / span).min(2.0) })
     }
 
     /// Victory gap multiplier and the part it applies to.
@@ -558,10 +629,11 @@ impl Game {
         let turns_left = t.victory.turns.saturating_sub(self.turn).max(1) as f64;
         let flight = |b: BodyId| self.transit_cost_for(seat, BodyId::Earth, b).0 as f64;
         // The 0.06.0 AI sweep (ticket #94): a leg no tank could pay (Mars off its window can ask
-        // 47 Fuel of a 30 tank) is not a destination either; before this the AI named it as its
+        // 47 Fuel of a 30 tank, a Colony Ship's 40 since ticket #420) is not a destination either; before this the AI named it as its
         // one choice, the Transit was refused at the check, and the Ship sat at Earth.
-        let tank = t.units.iter().map(|u| u.tank).max().unwrap_or(0);
-        let payable = |b: BodyId| self.transit_cost_for(seat, BodyId::Earth, b).1 <= tank as f64;
+        // Ticket #413 (version 0.09.4): the seat's own tanks, Clean Propellant's Fuel included.
+        let tank = UnitKind::SHIPS.iter().map(|k| self.tank_of(seat, *k)).fold(0.0, f64::max);
+        let payable = |b: BodyId| self.transit_cost_for(seat, BodyId::Earth, b).1 <= tank;
         // Ticket #93: Venus, with no Colony Slots, is a destination when the seat holds a station
         // there with room, or when a slot is free in its orbit and the Stockpile could raise one.
         let venus_open = |b: BodyId| {
@@ -1040,7 +1112,7 @@ impl Game {
                         || cat == Cat::Observatory
                 }
                 // Ticket #54: a Scrubber is what a Custodian buys Stabilization with now.
-                VictoryFirstKind::StabilizationRun => cat == Cat::Scrubber || cat == Cat::Leapfrog || cat == Cat::ResearchLab || cat == Cat::Observatory,
+                VictoryFirstKind::StabilizationRun => cat == Cat::Scrubber || cat == Cat::Leapfrog || cat == Cat::ResearchLab || cat == Cat::Observatory || cat == Cat::NatureReserve,
                 // Version 0.07.0: the Research Lab and Observatory join the list for the same
                 // reason as the Venture Fund's: Generation Ships gates this win.
                 VictoryFirstKind::ColonistsOffEarth => {
@@ -1134,18 +1206,14 @@ impl Game {
                         FacilityKind::Factory | FacilityKind::Mine | FacilityKind::PowerPlant | FacilityKind::Refinery | FacilityKind::Bank => (Cat::Producer, self.base_weight(seat, Cat::Producer)),
                         FacilityKind::ResearchLab => (Cat::ResearchLab, self.base_weight(seat, Cat::ResearchLab)),
                         // Ticket #185 (version 0.08.0): the School is a Research building in all but
-                        // name -- it multiplies every Lab in its state -- so it is weighed as one. It
-                        // is worth nothing where no Lab stands, so it waits for one.
-                        FacilityKind::School => {
-                            if !self.state(sid).facilities.iter().any(|f| f.kind == FacilityKind::ResearchLab) {
-                                continue;
-                            }
-                            (Cat::ResearchLab, self.base_weight(seat, Cat::ResearchLab))
-                        }
+                        // name, so it is weighed as one. Ticket #416 (version 0.09.4): every Region
+                        // makes Research from its Education now, so it no longer waits for a Lab.
+                        FacilityKind::School => (Cat::ResearchLab, self.base_weight(seat, Cat::ResearchLab)),
                         FacilityKind::Embassy => (Cat::BuildInfluence, self.base_weight(seat, Cat::BuildInfluence)),
                         // Ticket #52: a Constabulary is worth raising only where Unrest has taken hold.
+                        // Ticket #410 (version 0.09.4): from where the Standing Army stops, not past it.
                         FacilityKind::Constabulary => {
-                            if self.state(sid).unrest < 5.0 {
+                            if !self.ai_offers_calming(sid, FacilityKind::Constabulary) {
                                 continue;
                             }
                             (Cat::Constabulary, self.base_weight(seat, Cat::Constabulary))
@@ -1153,11 +1221,21 @@ impl Game {
                         // Ticket #389 (version 0.09.3): the Stadium after the Constabulary, at the
                         // designer's word -- only where one already stands and Unrest is still 5 or
                         // more, the second answer to a Region that stays restive.
+                        // Ticket #410 (version 0.09.4): or alone, where the Region has one slot left
+                        // and the Constabulary cannot have it too.
                         FacilityKind::Stadium => {
-                            if self.state(sid).unrest < 5.0 || !self.constabulary_online(sid) {
+                            if !self.ai_offers_calming(sid, FacilityKind::Stadium) {
                                 continue;
                             }
                             (Cat::Stadium, self.base_weight(seat, Cat::Stadium))
+                        }
+                        // Ticket #411 (version 0.09.4): the Nature Reserve, a little for everyone and
+                        // on the Sink gap for the Custodians; part of every seat's Unrest management
+                        // at the designer's word, at the Stadium's weight from Unrest 4.
+                        FacilityKind::NatureReserve => {
+                            let base = self.base_weight(seat, Cat::NatureReserve);
+                            let restive = self.state(sid).unrest >= self.tables.ai.thresholds.constabulary_from;
+                            (Cat::NatureReserve, if restive { base.max(self.base_weight(seat, Cat::Stadium)) } else { base })
                         }
                         FacilityKind::LaunchSite => {
                             if has_launch {
@@ -1209,7 +1287,8 @@ impl Game {
                     // Ticket #389 (version 0.09.3): the Stadium takes the Constabulary's multipliers
                     // here and below, at the designer's word: its second answer to the same Region,
                     // which in a Region just Occupied is the same restive Region the Occupation made.
-                    let calms = matches!(fk, FacilityKind::Constabulary | FacilityKind::Stadium);
+                    let calms = matches!(fk, FacilityKind::Constabulary | FacilityKind::Stadium)
+                        || (fk == FacilityKind::NatureReserve && self.state(sid).unrest >= self.tables.ai.thresholds.constabulary_from);
                     let just_occupied = calms && self.state(sid).control.is_occupied();
                     let sway = if (first_embassy && self.standing_pressed(seat, Place::State(sid))) || just_occupied { m.threat } else { 1.0 };
                     // Ticket #56: a Facility that waits on a Tech is not offered until it is in.
@@ -1230,8 +1309,8 @@ impl Game {
                     let sway = if sea_close { m.threat } else { sway };
                     // Ticket #60: #52 and #53 measured no Constabulary in any AI game -- a building
                     // that fixes nothing economic never beat a producer under the victory-gap
-                    // multiplier, so it never won a build slot while the gap was wide. From Unrest 5
-                    // (the only Unrest at which the candidate is offered at all, above) it takes the
+                    // multiplier, so it never won a build slot while the gap was wide. From the Unrest
+                    // the candidate is offered at (`ai_offers_calming`, 4 since ticket #410) it takes the
                     // multiplier too, because a state at 7 halves every Facility's output and every
                     // Facility's Emissions: calming it advances whatever the seat is behind on.
                     // Ticket #70: and the victory-gap multiplier, as the Constabulary does at Unrest
@@ -1437,7 +1516,7 @@ impl Game {
                     // reaches 5 at a four-Colonist Colony and 12 at a rich one, which is how
                     // ticket #232's first attempt at the Mine put 329 Mines on the board.
                     ModuleKind::TradePost => {
-                        let bare = self.tables.module(ModuleKind::TradePost).produces.as_ref().map(|p| p.amount).unwrap_or(1).max(1) as f64;
+                        let bare = self.tables.module(ModuleKind::TradePost).produces.as_ref().map(|p| p.amount).unwrap_or(1.0).max(1.0);
                         let with = self.module_yield(seat, cid, ModuleKind::TradePost).amount;
                         (Cat::Producer, self.base_weight(seat, Cat::Producer) * (with / bare).clamp(0.25, 2.0))
                     }
@@ -1676,7 +1755,14 @@ impl Game {
                     Cat::MissileCarrier => m.threat,
                     _ => 1.0,
                 };
-                push(vec![Order::BuildShip { site: Place::Colony(cid), kind: uk }], cat, self.base_weight(seat, cat), gap_for(cat, None), lift, 1.0, format!("build {} at {}", uk.name(), self.place_name(Place::Colony(cid))), None);
+                // Ticket #421 (version 0.09.4): a Colony Ship short of the Fuel its tank takes buys
+                // the rest at the market in the same breath, at the Ship's weight.
+                let build = Order::BuildShip { site: Place::Colony(cid), kind: uk };
+                let orders = match self.ai_fuel_top_up(seat, if uk == UnitKind::ColonyShip { self.tank_of(seat, uk) } else { 0.0 }) {
+                    Some(buy) => vec![buy, build],
+                    None => vec![build],
+                };
+                push(orders, cat, self.base_weight(seat, cat), gap_for(cat, None), lift, 1.0, format!("build {} at {}", uk.name(), self.place_name(Place::Colony(cid))), None);
             }
         }
 
@@ -1765,7 +1851,7 @@ impl Game {
             }
             if let Some(slot) = self.free_orbital_slots(body).first() {
                 let opp = if has_shipyard { 1.0 } else { m.opportunity };
-                push(vec![Order::BuildStation { body, slot: *slot }], Cat::LaunchSiteOrShipyard, self.base_weight(seat, Cat::LaunchSiteOrShipyard), 1.0, 1.0, opp, format!("build {} over {}", self.station_name(body, *slot), self.tables.body(body).name), None);
+                push(vec![Order::BuildStation { body, slot: *slot }], Cat::LaunchSiteOrShipyard, self.base_weight(seat, Cat::LaunchSiteOrShipyard) * self.ai_founding_pull(seat), 1.0, 1.0, opp, format!("build {} over {}", self.station_name(body, *slot), self.tables.body(body).name), None);
             }
         }
 
@@ -1875,17 +1961,14 @@ impl Game {
         }
 
         // --- Ticket #52: Relief where Unrest has taken hold, and Resettle into a calm state of
-        // the seat's own. Relief is one point per 10 Ducats the seat can spare, from Unrest 6, at
-        // the opportunity multiplier from 9, where one more turn would throw the seat off.
+        // the seat's own. Relief is one point per 10 Ducats the seat can spare, its weight read by
+        // `ai_relief_weight` (ticket #410: from 5, double by 9).
         let u = self.tables.unrest.clone();
         let ducats = self.seat(seat).stockpile.ducats;
         for sid in self.directed_states(seat) {
             let n = self.state(sid).unrest;
-            if n < 6.0 {
-                continue;
-            }
+            let Some(opp) = self.ai_relief_weight(n) else { continue };
             let points = if u.relief_ducats > 0 { ((ducats / u.relief_ducats as f64).floor() as i64).min(n.ceil() as i64) } else { 0 };
-            let opp = if n >= 9.0 { m.opportunity } else { 1.0 };
             for _ in 0..points {
                 push(
                     vec![Order::Relief { state: sid }],
@@ -2114,7 +2197,7 @@ impl Game {
                 push(
                     vec![Order::Change { building: *b, what: BuildingChange::Mothball }],
                     Cat::Mothball,
-                    self.base_weight(seat, Cat::Mothball),
+                    self.base_weight(seat, Cat::Mothball) * self.ai_mothball_price(*b),
                     1.0,
                     1.0,
                     m.opportunity,
@@ -2133,7 +2216,7 @@ impl Game {
                     push(
                         vec![Order::Change { building: *b, what: BuildingChange::Mothball }],
                         Cat::Mothball,
-                        self.base_weight(seat, Cat::Mothball),
+                        self.base_weight(seat, Cat::Mothball) * self.ai_mothball_price(*b),
                         gap_for(Cat::Scrubber, None),
                         1.0,
                         1.0,
@@ -2182,7 +2265,7 @@ impl Game {
                             push(
                                 vec![Order::Change { building: BuildingRef::Facility(sid, i), what: BuildingChange::Mothball }],
                                 Cat::Mothball,
-                                self.base_weight(seat, Cat::Mothball),
+                                self.base_weight(seat, Cat::Mothball) * self.ai_mothball_price(BuildingRef::Facility(sid, i)),
                                 1.0,
                                 1.0,
                                 m.opportunity,
@@ -2365,17 +2448,18 @@ impl Game {
                     Place::State(_) => body == BodyId::Earth && orbit.is_low(),
                     Place::Colony(c) => self.colony(*c).is_some_and(|c| c.body == body && self.colony_orbit(c) == orbit),
                 });
-            if s.fuel < card.tank as f64 && self.refuelling_station(seat, body, orbit) && self.seat(seat).stockpile.fuel > 0.0 && !ready_to_fire {
-                push(
-                    vec![Order::Refuel { ship: s.id }],
-                    Cat::Transit,
-                    self.base_weight(seat, Cat::Transit),
-                    gap_for(Cat::Transit, None),
-                    1.0,
-                    1.0,
-                    format!("refuel {} at {} ({} of {} in the tank)", ship_name, self.orbit_name(body, orbit), figure(s.fuel), card.tank),
-                    None,
-                );
+            // Ticket #421 (version 0.09.4): short of the Fuel to fill it, the seat buys the rest, in
+            // the same candidate. The plain Refuel from what is held stays on offer beside it, so a
+            // turn whose Ducats are held for something else still fills what it can.
+            let top_up = self.ai_fuel_top_up(seat, self.tank_of(seat, s.kind) - s.fuel);
+            if s.fuel < self.tank_of(seat, s.kind) && self.refuelling_station(seat, body, orbit) && !ready_to_fire {
+                let note = format!("refuel {} at {} ({} of {} in the tank)", ship_name, self.orbit_name(body, orbit), figure(s.fuel), figure(self.tank_of(seat, s.kind)));
+                if let Some(buy) = top_up {
+                    push(vec![buy, Order::Refuel { ship: s.id }], Cat::Transit, self.base_weight(seat, Cat::Transit), gap_for(Cat::Transit, None), 1.0, 1.0, format!("{note}, buying the rest"), None);
+                }
+                if self.seat(seat).stockpile.fuel > 0.0 {
+                    push(vec![Order::Refuel { ship: s.id }], Cat::Transit, self.base_weight(seat, Cat::Transit), gap_for(Cat::Transit, None), 1.0, 1.0, note, None);
+                }
             }
             // Ticket #335 (version 0.09.0): **it changes orbit rather than flying away when what it
             // wants is at the same Body** -- a station of its own to fill the tank at, a Colony with
@@ -2395,7 +2479,7 @@ impl Game {
                 // very turn the carrier fired, and the Launch failed with the orbit given up.
                 let on_the_lane = s.kind.is_warship() && orbit.is_low() && self.ai_wants_the_ground(seat, body) && self.ai_low_orbit_garrison(seat, body).contains(&s.id);
                 let can_fight = s.fuel >= self.tables.melee.battle_fuel as f64;
-                if s.fuel < card.tank as f64 && self.seat(seat).stockpile.fuel > 0.0 && !self.refuelling_station(seat, body, orbit) && !(on_the_lane && can_fight) && !ready_to_fire {
+                if s.fuel < self.tank_of(seat, s.kind) && self.seat(seat).stockpile.fuel > 0.0 && !self.refuelling_station(seat, body, orbit) && !(on_the_lane && can_fight) && !ready_to_fire {
                     // Ticket #396 (version 0.09.3): a Refinery Colony's depot is its low orbit.
                     for c in self.colonies.iter().filter(|c| c.body == body && self.fuels_for(c, seat)) {
                         wants.push((self.colony_orbit(c), format!("to refuel at {}", self.place_name(Place::Colony(c.id))), Cat::Transit, self.base_weight(seat, Cat::Transit)));
@@ -2486,8 +2570,10 @@ impl Game {
                         // appetite is lifted while the Body's first is unclaimed and falls back to
                         // the plain weight the moment somebody has it.
                         let unclaimed = self.first_at(body).is_none() && self.tables.body(body).first_windfall > 0;
+                        // Ticket #409 (version 0.09.4): it asks for what lands, the most the slot
+                        // takes, as every other Unload does; the rest stay aboard as before.
                         let lift = if unclaimed { self.tables.ai.thresholds.first_found_weight } else { 1.0 };
-                        push(vec![Order::Unload { ship: s.id, colonists: s.colonists, army: false, into: UnloadTarget::Slot(body, slot) }], Cat::FoundColony, self.base_weight(seat, Cat::FoundColony) * lift, gap_for(Cat::FoundColony, None), 1.0, opp, format!("found a Colony at {} on {}", self.tables.body(body).slots[slot as usize].name, self.tables.body(body).name), None);
+                        push(vec![Order::Unload { ship: s.id, colonists: self.unload_most(s.id, UnloadTarget::Slot(body, slot)), army: false, into: UnloadTarget::Slot(body, slot) }], Cat::FoundColony, self.base_weight(seat, Cat::FoundColony) * lift * self.ai_founding_pull(seat), gap_for(Cat::FoundColony, None), 1.0, opp, format!("found a Colony at {} on {}", self.tables.body(body).slots[slot as usize].name, self.tables.body(body).name), None);
                     }
                 }
                 // Ticket #44: Antarctica, Earth's slots. A foothold, not Presence: half weight and no gap,
@@ -2495,7 +2581,7 @@ impl Game {
                 if s.colonists > 0 && body == BodyId::Earth && orbit.is_low() && !ferrying {
                     // Ticket #56: Antarctica is shut until the ice opens; a loaded Ship goes elsewhere.
                     if let Some(slot) = self.best_slot_for(seat, BodyId::Earth, behind).filter(|_| self.antarctica_open) {
-                        push(vec![Order::Unload { ship: s.id, colonists: s.colonists, army: false, into: UnloadTarget::Slot(body, slot) }], Cat::FoundColony, self.base_weight(seat, Cat::FoundColony) * 0.5, 1.0, 1.0, 1.0, format!("found a Colony at {}", self.tables.body(BodyId::Earth).slots[slot as usize].name), None);
+                        push(vec![Order::Unload { ship: s.id, colonists: self.unload_most(s.id, UnloadTarget::Slot(body, slot)), army: false, into: UnloadTarget::Slot(body, slot) }], Cat::FoundColony, self.base_weight(seat, Cat::FoundColony) * 0.5, 1.0, 1.0, 1.0, format!("found a Colony at {}", self.tables.body(BodyId::Earth).slots[slot as usize].name), None);
                     }
                 }
                 // The 0.06.0 AI sweep (ticket #94): a loaded Colony Ship disembarks into a Colony or

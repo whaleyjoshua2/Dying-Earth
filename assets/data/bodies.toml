@@ -79,7 +79,8 @@ trade_pays = 3.5
 # Ticket #72 (version 0.05.5): all four up a tenth (1.5, 1.25, 0.5, 1.0 before).
 mine_yield = 1.65
 generator_yield = 1.375
-refinery_yield = 0.55
+# Ticket #421 (version 0.09.4): the three low-gravity worlds' Refinery yield a quarter up.
+refinery_yield = 0.6875
 research_yield = 1.0
 orbital_slots = 2
 stations = ["Gateway", "Selene"]
@@ -128,7 +129,7 @@ transit_fuel = 24
 trade_pays = 6
 mine_yield = 1.75
 generator_yield = 0.75
-refinery_yield = 0.5
+refinery_yield = 0.625
 research_yield = 0.8
 orbital_slots = 1
 stations = ["Phobos Gateway"]
@@ -150,7 +151,7 @@ transit_fuel = 24
 trade_pays = 6
 mine_yield = 1.0
 generator_yield = 1.0
-refinery_yield = 0.25
+refinery_yield = 0.3125
 research_yield = 0.8
 orbital_slots = 1
 stations = ["Deimos Gateway"]

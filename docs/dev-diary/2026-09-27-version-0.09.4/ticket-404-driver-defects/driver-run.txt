@@ -1,0 +1,15 @@
+$ play check --orders (build army china / build facility china factory / build army nowhere)
+line 1: ok `build army china` costs 25 Materials, 4 Widgets and 1M people
+line 2: ok `build facility china factory` costs 20 Materials and 4 Widgets
+line 3: REFUSED `build army nowhere`: "nowhere" is not a Region; the board's are Nigeria, Egypt, China, India, Indonesia, Australia, The European Union, The United States, Mexico, Brazil, Russia, Iran, Japan, Saudi Arabia
+
+
+$ play turn --orders (the same, unforced)
+The turn did NOT end: 1 line(s) were refused. Fix them, or pass --force to end the turn with the rest.
+
+$ play show (excerpts)
+Market: Materials 3, Fuel 4, Energy 2 Ducats each; Influence 2 Ducats a point; Relief 10 Ducats
+army 1   seat - at Nigeria                    hp 5 | Hold (standing)
+army 2   seat - at Egypt                      hp 5 | Hold (standing)
+army 3   seat 0 at China                      hp 5 | Hold (standing)
+army 4   seat - at India                      hp 5 | Hold (standing)

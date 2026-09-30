@@ -302,10 +302,11 @@ fn temperature_history(ui: &mut Ui, game: &Game, size: egui::Vec2) {
 /// clipped to the bar and counts toward nothing; egui's own `ProgressBar`, which this replaces,
 /// cannot hold a second segment. `fraction` is the settled fill and `transit` the band's width
 /// beyond it, both of the whole bar.
-fn victory_bar(ui: &mut Ui, fraction: f32, transit: f32) {
+/// Ticket #418 (version 0.09.4): filled in the Faction's own colour, its heading's, where every bar
+/// was the theme's one blue; the in-transit band is that colour darkened.
+fn victory_bar(ui: &mut Ui, fraction: f32, transit: f32, fill: Color32) {
     let (rect, _) = ui.allocate_exact_size(egui::vec2(ui.available_width(), 16.0), egui::Sense::hover());
     let painter = ui.painter_at(rect);
-    let fill = ui.visuals().selection.bg_fill;
     painter.rect_filled(rect, 3.0, Color32::from_rgb(38, 38, 44));
     let at = |f: f32| rect.left() + f.clamp(0.0, 1.0) * rect.width();
     if transit > 0.0 {
@@ -2022,7 +2023,8 @@ fn faction_rulebook(ui: &mut Ui, session: &Session, kind: FactionKind) {
     ui.add_space(6.0);
     let ink = ui.visuals().text_color();
     ui.label(RichText::new("Signature rule").strong());
-    draw_with_icons(ui, &card.signature, 14.0, ink, &[]);
+    // Ticket #407 (version 0.09.4): with its figures read from the data.
+    draw_with_icons(ui, &session.tables.signature(kind), 14.0, ink, &[]);
     ui.add_space(6.0);
     ui.label(RichText::new("Victory Condition").strong());
     draw_with_icons(ui, &card.victory, 14.0, ink, &[]);
@@ -3277,7 +3279,11 @@ fn slot_yield_row(ui: &mut Ui, figures: [(&str, f64); 4], size: f32, tint: Color
                     ui.label(RichText::new(*key).size(size).color(tint));
                 }
             }
-            ui.label(RichText::new(format!("x{v:.2}")).size(size).color(tint));
+            // Ticket #421 (version 0.09.4): two places, or as many as the figure has up to four, so
+            // Phobos's Refinery reads x0.625 and not a rounded x0.62.
+            let two = format!("{v:.2}");
+            let exact = format!("{v:.4}").trim_end_matches('0').to_string();
+            ui.label(RichText::new(format!("x{}", if exact.len() > two.len() { exact } else { two })).size(size).color(tint));
         }
     });
 }
@@ -4323,7 +4329,8 @@ fn side_panel(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
             let mut cancel: Option<usize> = None;
             for (i, o) in session.pending.iter().enumerate() {
                 ui.horizontal(|ui| {
-                    ui.label(format!("{} ({})", order_text(game, o), game.order_cost(Seat(0), o).text()));
+                    // Ticket #404 (version 0.09.4): everything the order pays, as the driver's confirm says it.
+                    ui.label(format!("{} ({})", order_text(game, o), game.order_price_text(Seat(0), o, game.order_cost(Seat(0), o))));
                     if ui.small_button("cancel").clicked() {
                         cancel = Some(i);
                     }
@@ -4555,7 +4562,7 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, seat: Seat, marks: boo
             let ordered = pending.iter().any(|o| {
                 matches!(o, Order::Transit { ship, .. } | Order::Load { ship, .. } | Order::Unload { ship, .. } | Order::Repair { unit: UnitRef::Ship(ship), .. } if *ship == s.id)
             }) || pending.iter().any(|o| matches!(o, Order::ShipStance { body: b, .. } if *b == body));
-            let tank = game.tables.unit(s.kind).tank;
+            let tank = figure(game.tank_of(s.seat, s.kind));
             // The working figures stay ON the row: the Roster is where a player checks whether a
             // hull can move before ordering it, and the tank is the figure that says stranded.
             // Ticket #346 (version 0.09.1): the strength is the one the hull would FIGHT at, since
@@ -4800,8 +4807,9 @@ fn order_text(game: &Game, o: &Order) -> String {
         Order::MoveArmy { army, to } => format!("{} to {}", army, game.tables.state(*to).name),
         Order::Load { ship, colonists, army, .. } => format!("Load {} onto {}", if *colonists > 0 { format!("{colonists} Colonists") } else { format!("{}", army.unwrap_or(ArmyId(0))) }, ship),
         Order::Unload { ship, colonists, army, into } => match into {
-            UnloadTarget::Slot(b, s) => format!("Found a Colony at {} on {} from {}", game.tables.body(*b).slots[*s as usize].name, game.tables.body(*b).name, ship),
-            UnloadTarget::Colony(c) => format!("Unload {} from {} into {}", if *colonists > 0 { format!("{colonists} Colonists") } else if *army { "the Army".into() } else { "nothing".into() }, ship, game.place_name(Place::Colony(*c))),
+            // Ticket #409 (version 0.09.4): with the count the slider chose.
+            UnloadTarget::Slot(b, s) => format!("Found a Colony at {} on {} with {} from {}", game.tables.body(*b).slots[*s as usize].name, game.tables.body(*b).name, colonists_word(*colonists), ship),
+            UnloadTarget::Colony(c) => format!("Unload {} from {} into {}", if *colonists > 0 { colonists_word(*colonists) } else if *army { "the Army".into() } else { "nothing".into() }, ship, game.place_name(Place::Colony(*c))),
         },
         Order::Influence { target, amount } => format!("{} Influence on {}", amount, game.place_name(*target)),
         Order::BuyInfluence { amount } => format!("Buy {} Influence with Ducats", amount),
@@ -4882,7 +4890,8 @@ fn change_buttons(ui: &mut Ui, game: &Game, pending: &[Order], b: BuildingRef, m
         pair.reverse();
     }
     for what in pair {
-        cost_button(ui, game, pending, Order::Change { building: b, what }, what.name(), actions);
+        // Ticket #407 (version 0.09.4): the price in a Region, "+1 Unrest"; nothing in a Colony.
+        cost_button_with_hover(ui, game, pending, Order::Change { building: b, what }, what.name(), game.change_price_text(b, what), actions);
     }
 }
 
@@ -5573,22 +5582,51 @@ fn queue_line(game: &Game, place: Place, b: &Build, turns: u32) -> String {
 /// place makes them, in the top bar's order, a figure only where the place makes any; Energy net of
 /// the place's own upkeep. Nothing on a place nobody directs.
 fn output_row(ui: &mut Ui, game: &Game, place: Place) {
+    use dying_earth_engine::Resource;
     let Some(o) = game.place_output(place) else { return };
-    let hover = "What this place made this turn, at this turn's multipliers: a building shut for Energy or mothballed made nothing. Energy is net of the place's own upkeep, before any Reactor's relief, which is the seat's; a Region's Ducats include its economy.".to_string();
+    // Ticket #415 (version 0.09.4): each figure names what made it, the fixed sentence gone.
+    let sources = game.place_output_sources(place).unwrap_or_default();
+    // The card's own Widget makers, bare-named and without a nought line, as the other figures read.
+    let widgets: Vec<(String, f64)> = widget_makers(game, place).into_iter().filter(|(_, v)| *v != 0).map(|(n, v)| (n.strip_prefix("the ").map(str::to_string).unwrap_or(n), v as f64)).collect();
     let mut parts: Vec<RowPart> = Vec::new();
-    for (v, icon) in [(o.materials, "materials"), (o.widgets, "widgets"), (o.fuel, "fuel"), (o.energy, "energy"), (o.ducats, "ducats"), (o.research, "research")] {
+    for (v, icon, r) in [(o.materials, "materials", Resource::Materials), (o.widgets, "widgets", Resource::Widgets), (o.fuel, "fuel", Resource::Fuel), (o.energy, "energy", Resource::Energy), (o.ducats, "ducats", Resource::Ducats), (o.research, "research", Resource::Research)] {
         if v.abs() > 1e-9 {
-            parts.push(RowPart { before: figure(v), icon: Some(icon), after: String::new(), hover: Some(hover.clone()) });
+            let list: Vec<(String, f64)> = if r == Resource::Widgets { widgets.clone() } else { sources.iter().filter(|(x, ..)| *x == r).map(|(_, n, v)| (n.clone(), *v)).collect() };
+            parts.push(RowPart { before: figure(v), icon: Some(icon), after: String::new(), hover: Some(output_sources_hover(&list)) });
         }
     }
     ui.horizontal(|ui| {
-        rule_tip(ui.label(RichText::new("Output:").weak()), hover.clone());
+        ui.label(RichText::new("Output:").weak());
         if parts.is_empty() {
             ui.label(RichText::new("nothing this turn").weak());
         } else {
             glyph_row(ui, &parts, 15.0);
         }
     });
+}
+
+/// Ticket #415 (version 0.09.4): an Output figure's hover: its sources, like ones grouped
+/// (*Mine x2 12*), the five biggest a line each and the rest as *and 3 more: 1.5*, within the six
+/// lines a hover may run to.
+fn output_sources_hover(list: &[(String, f64)]) -> String {
+    let mut grouped: Vec<(String, u32, f64)> = Vec::new();
+    for (name, v) in list {
+        match grouped.iter_mut().find(|(n, ..)| n == name) {
+            Some(g) => {
+                g.1 += 1;
+                g.2 += v;
+            }
+            None => grouped.push((name.clone(), 1, *v)),
+        }
+    }
+    grouped.sort_by(|a, b| b.2.abs().total_cmp(&a.2.abs()));
+    let line = |(n, k, v): &(String, u32, f64)| if *k > 1 { format!("{n} x{k} {}", figure(*v)) } else { format!("{n} {}", figure(*v)) };
+    let mut lines: Vec<String> = grouped.iter().take(5).map(line).collect();
+    if grouped.len() > 5 {
+        let rest = &grouped[5..];
+        lines.push(format!("and {} more: {}", rest.len(), figure(rest.iter().map(|g| g.2).sum())));
+    }
+    lines.join("\n")
 }
 
 /// Ticket #332: **the Widgets block on a card**, Region, Colony and station alike, at the
@@ -6326,9 +6364,10 @@ fn facility_figures(game: &Game, sid: StateId, f: &Facility, director: Option<Se
         return format!("{yield_text}; {}{}", sea_wall_keep(game, f), sea_wall_unkept(f));
     }
     match director {
-        Some(d) if world_lab => format!("{} (the Lab works for the world: {} Research a turn to the Tech under research)", game.facility_yield(d, sid, f.kind).text(), game.world_lab_yield(sid) / 2),
+        // Ticket #416 (version 0.09.4): this Lab's own share, not the Region's whole figure.
+        Some(d) if world_lab => format!("{} (for the world: {} Research a turn)", game.facility_yield(d, sid, f.kind).text(), figure(tenth(game.world_lab_share(sid)))),
         Some(d) => game.facility_yield(d, sid, f.kind).text(),
-        None if world_lab => format!("in no one's hands: {} Research a turn to the Tech under research", game.world_lab_yield(sid) / 2),
+        None if world_lab => format!("in no one's hands: {} Research a turn for the world", figure(tenth(game.world_lab_share(sid)))),
         None => "idle, nobody directs this state".to_string(),
     }
 }
@@ -6757,7 +6796,7 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
             game.tables.influence.first_settled_allotment
         ),
     );
-    ui.label(format!("GDP {}: its economy pays its controller {} Ducats a turn (GDP x Industry Level / 5, never below 1); a Bank here would add {}", card.gdp, game.state_ducats(sid), (game.tables.facility(FacilityKind::Bank).produces.as_ref().map(|p| p.amount).unwrap_or(0) * card.gdp) / 10));
+    ui.label(format!("GDP {}: its economy pays its controller {} Ducats a turn (GDP x Industry Level / 5, never below 1); a Bank here would add {}", card.gdp, game.state_ducats(sid), (game.tables.facility(FacilityKind::Bank).produces.as_ref().map(|p| p.amount).unwrap_or(0.0) * card.gdp as f64 / 10.0).floor() as i64));
     icon_word(ui, "emissions", format!("Emissions this turn: industry {:.1}, Facilities {:.1}, people {:.1}", industry_em, fac_em, game.population_coefficient(sid) * st.population * mult));
     // Ticket #54: the per-person line, its formula, and what Leapfrog has taken off it.
     {
@@ -6810,8 +6849,8 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     let live = game.education_level(sid);
     let schooled = live - card.education_level;
     // Ticket #352 (version 0.09.1): it counts TWICE in a Research Lab, which looks like a defect
-    // until it is said; the Lab's own hover says it too.
-    const EDU: &str = "It counts twice in a Research Lab: once weighting how many people it has, and once on its own. It also stiffens this Region against an outsider's Influence, and goes with any Colonist recruited here.";
+    // until it is said. Ticket #416 (version 0.09.4): in every Region's own Research now.
+    const EDU: &str = "It counts twice in this Region's Research: once weighting how many people it has, and once on its own. It also stiffens this Region against an outsider's Influence, and goes with any Colonist recruited here.";
     let hover = if schooled > 0.005 {
         format!("{:.2} on the card, and {:+.2} from a School.\n{EDU}", card.education_level, schooled)
     } else {
@@ -6833,7 +6872,7 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         rule_tip(
             ui.colored_label(colour, format!("Unrest {}: {}", game.unrest_text(sid), game.unrest_note(sid))),
             format!(
-                "Unrest runs 0 to {:.0}, in halves, with three thresholds:\nat {:.0} the Standing Army stops replenishing,\nat {:.0} every Facility here runs at half,\nat {:.0} the state throws its controller off.\nIt falls {:.1} a turn on its own, except the turn the state changed hands.",
+                "Unrest runs 0 to {:.0}, in quarters, with three thresholds:\nat {:.0} the Standing Army stops replenishing,\nat {:.0} every Facility here runs at half,\nat {:.0} the state throws its controller off.\nIt falls {:.1} a turn on its own, except the turn the state changed hands.",
                 u.max, u.army_threshold, u.facility_threshold, u.max, u.natural_fall
             ),
         );
@@ -6884,13 +6923,8 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         );
         influence_row(ui, game, session, view, Place::State(sid), false, actions);
         ui.separator();
-        if game.constabulary_online(sid) {
-            ui.label(RichText::new("A Constabulary here takes 1 off every turn and damps what the climate and the refugees add.").weak());
-        }
-        // Ticket #389 (version 0.09.3): the Stadium damps the climate's rises, and stacks with the police.
-        if game.stadium_online(sid) {
-            ui.label(RichText::new(if game.constabulary_online(sid) { "A Stadium here halves what the Constabulary leaves of a climate rise: a heat rise of one lands as a quarter." } else { "A Stadium here halves what the climate adds to the Unrest." }).weak());
-        }
+        // Ticket #408 (version 0.09.4): the Constabulary's and the Stadium's sentences that stood here
+        // are dropped, at the designer's word; each building's own box says what it does.
         // Ticket #390 (version 0.09.3): the Scrubbers' note that stood here is gone; each
         // Scrubber's own row under the boxes says what it does.
     }
@@ -7549,7 +7583,7 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
             let directive = game.seat(Seat(0)).research_directive;
             ui.label(
                 egui::RichText::new(if directive == 0 {
-                    "Your Labs pay the shared Tech. Set a Research Directive in the Tech Tree window to pay this fund instead.".to_string()
+                    "Your Research pays the shared Tech. Set a Research Directive in the Tech Tree window to pay this fund instead.".to_string()
                 } else {
                     format!("Your Research Directive sends {directive}% of your Research to this fund, from the next Income. It is set in the Tech Tree window.")
                 })
@@ -7651,12 +7685,15 @@ fn slot_panel(ui: &mut Ui, session: &Session, game: &Game, body: BodyId, slot: u
         slot_yield_row(ui, slot_yield_figures(&y), 14.0, ink);
     });
     for s in game.ships.iter().filter(|s| !session.spectator && s.seat == Seat(0) && s.at == ShipAt::Body(body) && s.kind == UnitKind::ColonyShip && s.colonists > 0) {
-        let order = Order::Unload { ship: s.id, colonists: s.colonists, army: s.army.is_some(), into: UnloadTarget::Slot(body, slot) };
+        // Ticket #409 (version 0.09.4): how many land, on a slider up to what a new Colony takes.
+        let into = UnloadTarget::Slot(body, slot);
+        let k = unload_count(ui, s.id, "found", game.unload_most(s.id, into));
+        let order = Order::Unload { ship: s.id, colonists: k, army: s.army.is_some(), into };
         // Ticket #211 (version 0.08.1): what the site is worth, at the moment of choosing it. The
         // four yields are drawn under every slot on the Body view already, but the moment of the
         // DECISION said nothing about them. In glyphs, at the designer's word -- each figure's word
         // heads its multiplier, which is the form the one glyph rule reads (ticket #132).
-        if found_button(ui, &game.slot_yields(body, slot), &format!("Found a Colony here with the {} Colonists aboard {}", s.colonists, game.ship_name(s))).clicked() {
+        if found_button(ui, &game.slot_yields(body, slot), &format!("Found a Colony here with {} from {}", colonists_word(k), game.ship_name(s))).clicked() {
             actions.push(Action::Place(order));
         }
     }
@@ -7909,7 +7946,7 @@ fn change_orbit_lines(ui: &mut Ui, session: &Session, game: &Game, body: BodyId,
                     game,
                     &session.pending,
                     Order::ChangeOrbit { ship: s.id, slot: orbit.slot() },
-                    &format!("Move ({}/{} in the tank)", figure(s.fuel), game.tables.unit(s.kind).tank),
+                    &format!("Move ({}/{} in the tank)", figure(s.fuel), figure(game.tank_of(s.seat, s.kind))),
                     Some(format!("{} is {} now. {orbit_fuel} Fuel from its own tank, and it fights this turn's Battle in its new orbit.", game.ship_name(s), orbit_phrase(game, body, game.ship_orbit(s)))),
                     actions,
                 ),
@@ -7944,7 +7981,7 @@ fn transit_lines(ui: &mut Ui, session: &Session, game: &Game, body: BodyId, to: 
             match one {
                 Some(s) => {
                     // Ticket #87: the button reads the tank against the leg.
-                    cost_button(ui, game, &session.pending, Order::Transit { ship: s.id, to, slot: orbit.slot() }, &format!("Go ({}/{} in the tank)", figure(s.fuel), game.tables.unit(s.kind).tank), actions);
+                    cost_button(ui, game, &session.pending, Order::Transit { ship: s.id, to, slot: orbit.slot() }, &format!("Go ({}/{} in the tank)", figure(s.fuel), figure(game.tank_of(s.seat, s.kind))), actions);
                     // Ticket #375: a warning, never a refusal, where the leg would leave the hull
                     // stranded at the far end -- a one-way trip can be the plan.
                     if let Some(left) = game.arrival_leaves_stranded(Seat(0), s.id, to, orbit.slot()) {
@@ -7973,7 +8010,6 @@ fn ship_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
         view.selection = Selection::None;
         return;
     };
-    let card = game.tables.unit(s.kind);
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 8.0;
         faction_glyph(ui, session, game, Some(s.seat), 22.0);
@@ -8036,7 +8072,7 @@ fn ship_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
         tanks.scroll_to_me(Some(egui::Align::Min));
     }
     ui.horizontal_wrapped(|ui| {
-        let fuel = format!("{}/{} Fuel", figure(s.fuel), card.tank);
+        let fuel = format!("{}/{} Fuel", figure(s.fuel), figure(game.tank_of(s.seat, s.kind)));
         match s.at {
             ShipAt::Body(b) => {
                 // Ticket #335 (version 0.09.0): a station fuels only a Ship in its OWN orbit, so a
@@ -8182,10 +8218,12 @@ fn ship_cargo_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut View
         for c in game.colonies.iter().filter(|c| c.body == body) {
             let own = c.control.director() == Some(Seat(0));
             if s.colonists > 0 && own {
-                let room = game.habitat_room(c).saturating_sub(c.colonists);
-                let k = s.colonists.min(room);
-                if k > 0 {
-                    cost_button(ui, game, &session.pending, Order::Unload { ship: s.id, colonists: k, army: false, into: UnloadTarget::Colony(c.id) }, &format!("Unload {} Colonists into {}", k, game.tables.body(c.body).slots[c.slot as usize].name), actions);
+                // Ticket #409 (version 0.09.4): any count up to the room left, on a slider.
+                let into = UnloadTarget::Colony(c.id);
+                let most = game.unload_most(s.id, into);
+                if most > 0 {
+                    let k = unload_count(ui, s.id, &format!("into {:?}", c.id), most);
+                    cost_button(ui, game, &session.pending, Order::Unload { ship: s.id, colonists: k, army: false, into }, &format!("Unload {} into {}", colonists_word(k), game.tables.body(c.body).slots[c.slot as usize].name), actions);
                 }
             }
             if let Some(aid) = s.army {
@@ -8203,17 +8241,41 @@ fn ship_cargo_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut View
             }
         }
         if s.kind == UnitKind::ColonyShip && s.colonists > 0 && body != BodyId::Earth {
-            for slot in game.free_slots_on(body) {
+            // Ticket #409 (version 0.09.4): how many land, on ONE slider over the founding buttons,
+            // up to what a new Colony takes, which is the same on every slot.
+            let slots = game.free_slots_on(body);
+            let k = slots.first().map(|slot| unload_count(ui, s.id, "found", game.unload_most(s.id, UnloadTarget::Slot(body, *slot)))).unwrap_or(0);
+            for slot in slots {
                 // Both founding doors read the same, at the designer's word: the same decision
                 // reached two ways should not want learning twice.
-                let order = Order::Unload { ship: s.id, colonists: s.colonists, army: s.army.is_some(), into: UnloadTarget::Slot(body, slot) };
-                let label = format!("Found a Colony at {}", game.tables.body(body).slots[slot as usize].name);
+                let into = UnloadTarget::Slot(body, slot);
+                let order = Order::Unload { ship: s.id, colonists: k, army: s.army.is_some(), into };
+                let label = format!("Found a Colony at {} with {}", game.tables.body(body).slots[slot as usize].name, k);
                 if found_button(ui, &game.slot_yields(body, slot), &label).clicked() {
                     actions.push(Action::Place(order));
                 }
             }
         }
     }
+}
+
+/// Ticket #409 (version 0.09.4): how many Colonists to unload, on a slider from 1 to the most the
+/// place will take, remembered per Ship and place. The designer: *"up to max number the outpost will
+/// take"*. No slider where only one fits.
+/// Ticket #409 (version 0.09.4): "1 Colonist", "4 Colonists", now that one is a routine count.
+fn colonists_word(n: u32) -> String {
+    if n == 1 { "1 Colonist".to_string() } else { format!("{n} Colonists") }
+}
+
+fn unload_count(ui: &mut Ui, ship: ShipId, key: &str, most: u32) -> u32 {
+    let most = most.max(1);
+    let id = egui::Id::new(("unload_count", ship, key));
+    let mut n: u32 = ui.data(|d| d.get_temp(id)).unwrap_or(most).clamp(1, most);
+    if most > 1 {
+        ui.add(egui::Slider::new(&mut n, 1..=most).text("Colonists"));
+    }
+    ui.data_mut(|d| d.insert_temp(id, n));
+    n
 }
 
 /// Ticket #374: **Bombard, Launch and Rearm for one Ship**, moved from the stack card. Nothing is
@@ -8617,10 +8679,13 @@ fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, ac
     // inside a box with them. Box text is drawn centred and is NOT clipped, so a name that no
     // longer fits spills over the box edge rather than being cut -- "Closed-Loop Colonies" and
     // "The Extraction Charter" are the two that would have shown it.
-    const COL: f32 = 144.0;
-    const ROW: f32 = 86.0;
-    const BOX_W: f32 = 122.0;
-    const BOX_H: f32 = 58.0;
+    //
+    // Ticket #414 (version 0.09.4): a tenth smaller again, the whole tree, at the designer's word
+    // ("reduce box size by 10%"): 122 x 58 on 144 x 86 to 110 x 52 on 130 x 77.
+    const COL: f32 = 130.0;
+    const ROW: f32 = 77.0;
+    const BOX_W: f32 = 110.0;
+    const BOX_H: f32 = 52.0;
     /// The row-heading column on the left, wide enough for "Off-world Living".
     const HEAD_W: f32 = 128.0;
     // Ticket #250 (version 0.08.3): the order the BANDS are drawn in, settled over five turns of
@@ -8714,6 +8779,17 @@ fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, ac
     // it instead (`tech_edge_path`). Every box in the tree is an obstacle to every line but the two
     // the line joins.
     let boxes: Vec<(TechId, egui::Rect)> = TechId::ALL.into_iter().map(|t| (t, box_of(t))).collect();
+    // Ticket #414 (version 0.09.4): a hover lights the path BACK to the root -- the hovered Tech and
+    // every Tech it needs, all the way down -- and fades the rest to a third; a Tech done on the
+    // path keeps its green line, so the lit path shows what is left. `techhover:<tech id>` (a
+    // building aid) lights one in a headless picture, where no pointer ever enters the window.
+    let forced = std::env::args().find_map(|a| a.strip_prefix("techhover:").map(|s| s.replace('_', ""))).and_then(|id| TechId::ALL.into_iter().find(|t| format!("{t:?}").eq_ignore_ascii_case(&id)));
+    // Through this Ui's own layer and clip, so a box scrolled out of sight, or under another window,
+    // lights nothing while the pointer is elsewhere.
+    let hovered = forced.or_else(|| boxes.iter().find(|(_, r)| ui.rect_contains_pointer(*r)).map(|(t, _)| *t));
+    let path: Vec<TechId> = hovered.map(|h| game.tables.tech_path(h)).unwrap_or_default();
+    let faded = |t: TechId| !path.is_empty() && !path.contains(&t);
+    let fade = |c: Color32, t: TechId| if faded(t) { c.gamma_multiply(0.33) } else { c };
     for t in TechId::ALL {
         for n in &game.tables.tech(t).needs {
             let to_box = box_of(t);
@@ -8723,7 +8799,9 @@ fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, ac
             let lane = branches.iter().position(|x| *x == game.tables.tech(*n).branch).unwrap_or(0) as f32;
             let gap_x = to_box.min.x - 4.0 - lane * 3.5;
             let colour = if game.research.done.contains(n) { Color32::from_rgb(120, 200, 120) } else { Color32::from_gray(150) };
-            let stroke = egui::Stroke::new(2.0, colour);
+            // A line is on the lit path when the Tech it enters is.
+            let colour = fade(colour, t);
+            let stroke = egui::Stroke::new(if !path.is_empty() && !faded(t) { 3.0 } else { 2.0 }, colour);
             let obstacles: Vec<egui::Rect> = boxes.iter().filter(|(o, _)| *o != t && *o != *n).map(|(_, r)| *r).collect();
             let path = tech_edge_path(from_box, to_box, gap_x, ROW, &obstacles);
             for leg in path.windows(2) {
@@ -8754,14 +8832,30 @@ fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, ac
             Some(k) => egui::Stroke::new(3.0, rgb(game.tables.faction(k).colour)),
             None => egui::Stroke::new(1.0, Color32::from_gray(200)),
         };
-        painter.rect(r, 6.0, fill, stroke, egui::StrokeKind::Inside);
-        painter.text(r.center_top() + egui::vec2(0.0, 13.0), egui::Align2::CENTER_CENTER, &card.name, FontId::proportional(12.0), Color32::WHITE);
-        painter.text(r.center_top() + egui::vec2(0.0, 29.0), egui::Align2::CENTER_CENTER, format!("cost {} - {}", card.cost, status), FontId::proportional(10.0), Color32::from_gray(230));
+        // Ticket #414 (version 0.09.4): on the lit path a bright border, off it a third.
+        let lit = !path.is_empty() && !faded(t);
+        // A lit Victory gate keeps its Faction's colour, a little thicker (the designer, Q4).
+        let stroke = match (lit, card.gate_for.is_some()) {
+            (true, false) => egui::Stroke::new(2.5, Color32::WHITE),
+            (true, true) => egui::Stroke::new(4.5, stroke.color),
+            _ => egui::Stroke::new(stroke.width, fade(stroke.color, t)),
+        };
+        painter.rect(r, 6.0, fade(fill, t), stroke, egui::StrokeKind::Inside);
+        // Ticket #414 (version 0.09.4): the type stays 12 unless a name no longer fits the box, and
+        // then it comes down only as far as it must.
+        let name_size = {
+            let wide = painter.layout_no_wrap(card.name.clone(), FontId::proportional(12.0), Color32::WHITE).size().x;
+            if wide > BOX_W - 6.0 { (12.0 * (BOX_W - 6.0) / wide).max(9.0) } else { 12.0 }
+        };
+        painter.text(r.center_top() + egui::vec2(0.0, 12.0), egui::Align2::CENTER_CENTER, &card.name, FontId::proportional(name_size), fade(Color32::WHITE, t));
+        painter.text(r.center_top() + egui::vec2(0.0, 27.0), egui::Align2::CENTER_CENTER, format!("cost {} - {}", card.cost, status), FontId::proportional(10.0), fade(Color32::from_gray(230), t));
         let needs = if card.needs.is_empty() { "nothing".to_string() } else { card.needs.iter().map(|n| game.tables.tech(*n).name.clone()).collect::<Vec<_>>().join(" and ") };
         ui.interact(r, ui.id().with(format!("tech-{t:?}")), egui::Sense::hover()).on_hover_text(format!("{} (rung {}, cost {} Research)\n{}\nNeeds: {}", card.name, card.rung, card.cost, card.effect, needs));
         if must_pick && available.contains(&t) && game.research.current != Some(t) {
-            let b = egui::Rect::from_center_size(r.center_bottom() - egui::vec2(0.0, 10.0), egui::vec2(50.0, 16.0));
-            if ui.put(b, egui::Button::new(RichText::new("Pick").size(10.0))).clicked() {
+            let b = egui::Rect::from_center_size(r.center_bottom() - egui::vec2(0.0, 10.0), egui::vec2(50.0, 14.0));
+            // Ticket #414 (version 0.09.4): faded off the lit path with its box.
+            let pick = if faded(t) { egui::Button::new(RichText::new("Pick").size(10.0).color(Color32::from_gray(90))).fill(Color32::from_gray(35)) } else { egui::Button::new(RichText::new("Pick").size(10.0)) };
+            if ui.put(b, pick).clicked() {
                 actions.push(Action::PickTech(t));
             }
         }
@@ -10133,7 +10227,7 @@ fn faction_window(ctx: &egui::Context, session: &Session, game: &Game, view: &mu
         // its longer wording. Nothing is deleted.
         // Ticket #265 (version 0.08.4): the hover names what Blame is, what the credit is, and the
         // two rules that read it.
-        ui.label(RichText::new("Blame").strong()).on_hover_text("Blame is the CO2 this Faction is answerable for: everything the sources it controlled emitted, less everything it removed.\nWhat it removed -- its Scrubbers, and for the Custodians what their Research Directive adds to the Natural Sink -- is its Blame credit.\nTwo rules read Blame: a share above a fair quarter raises this Faction's Influence thresholds on every Region it does not hold, up to half again;\nand every rival thinks a point worse of it for each step its share stands above that quarter, each by its own measure.");
+        ui.label(RichText::new("Blame").strong()).on_hover_text("Blame is the CO2 this Faction is answerable for: everything the sources it controlled emitted, less everything it removed.\nWhat it removed -- its Scrubbers and Nature Reserves, and for the Custodians what their Research Directive adds to the Natural Sink -- is its Blame credit.\nTwo rules read Blame: a share above a fair quarter raises this Faction's Influence thresholds on every Region it does not hold, up to half again;\nand every rival thinks a point worse of it for each step its share stands above that quarter, each by its own measure.");
         let share = game.blame_share(seat);
         ui.horizontal(|ui| {
             ui.add(
@@ -10471,7 +10565,7 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                     ),
                 );
                 if game.seat(Seat(0)).research_directive > 0 || session.pending.iter().any(|o| matches!(o, Order::SetResearchDirective { percent } if *percent > 0)) {
-                    ui.colored_label(Color32::YELLOW, "Your Labs pay the Archive fund: the turn after they next pay it, Provisional Findings is off.");
+                    ui.colored_label(Color32::YELLOW, "Your Research pays the Archive fund: the turn after it next pays it, Provisional Findings is off.");
                 }
             }
             // Ticket #173 (version 0.07.6): the tree keeps offering its Pick buttons while the
@@ -10599,7 +10693,7 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                     .on_hover_text("The permafrost has thawed. This much CO2 comes out of the ground every turn now, whatever anybody does. It is nobody's Blame and it does not count against a Stabilization run.");
             }
             // Ticket #54: the Scrubbers stand beside the Natural Sink in the same line.
-            ui.label(format!("Natural Sink -{:.1}{}", e.sink, if e.scrubbers > 0.0 { format!(" and Scrubbers -{:.1}", e.scrubbers) } else { String::new() }));
+            ui.label(format!("Natural Sink -{:.1}{}", e.sink, if e.scrubbers > 0.0 { format!(" and Scrubbers and Reserves -{:.1}", e.scrubbers) } else { String::new() }));
             ui.label(RichText::new(format!("Net {:+.1} ppm", e.net())).strong());
             // Ticket #153 (version 0.07.4): the same history, at the panel's width.
             ui.add_space(4.0);
@@ -10657,10 +10751,11 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
             };
             ui.label(RichText::new(line).size(16.0).strong().color(Color32::from_rgb(255, 200, 120)));
             ui.separator();
-            ui.label(format!("Stabilization run: {} consecutive turn(s) under the Sink.", game.seat(Seat(0)).stabilization_run));
+            // Ticket #406 (version 0.09.4): the Victory window's own row, so the two never disagree.
+            ui.label(game.stabilization_text());
             // Ticket #53: Blame, Faction by Faction, in the panel that attributes the Emissions.
             ui.separator();
-            ui.label(RichText::new("Blame: the CO2 each Faction is answerable for").strong()).on_hover_text("Blame is the CO2 this Faction is answerable for: everything the sources it controlled emitted, less everything it removed.\nWhat it removed -- its Scrubbers, and for the Custodians what their Research Directive adds to the Natural Sink -- is its Blame credit.\nTwo rules read Blame: a share above a fair quarter raises this Faction's Influence thresholds on every Region it does not hold, up to half again;\nand every rival thinks a point worse of it for each step its share stands above that quarter, each by its own measure.");
+            ui.label(RichText::new("Blame: the CO2 each Faction is answerable for").strong()).on_hover_text("Blame is the CO2 this Faction is answerable for: everything the sources it controlled emitted, less everything it removed.\nWhat it removed -- its Scrubbers and Nature Reserves, and for the Custodians what their Research Directive adds to the Natural Sink -- is its Blame credit.\nTwo rules read Blame: a share above a fair quarter raises this Faction's Influence thresholds on every Region it does not hold, up to half again;\nand every rival thinks a point worse of it for each step its share stands above that quarter, each by its own measure.");
             for seat in Seat::ALL {
                 let s = game.seat(seat);
                 // Ticket #265 (version 0.08.4): one form for every seat -- answerable for, how it
@@ -10710,14 +10805,16 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 // Ticket #373 (version 0.09.2): "(+N in transit)" on a label whose bar counts
                 // Colonists, and the band on the bar for them.
                 let in_transit = |n: u32| if n > 0 { format!(" (+{n} in transit)") } else { String::new() };
+                // Ticket #406 (version 0.09.4): the Custodians' row says the gap in ppm beside the run.
+                let first = p.first_label.clone().unwrap_or_else(|| format!("{}: {:.0} of {:.0}{}", p.first_name, p.first_value, p.first_bar, in_transit(p.first_transit)));
                 ui.label(match &p.first_held_back {
-                    Some(why) => format!("{}: {:.0} of {:.0}{} - {}", p.first_name, p.first_value, p.first_bar, in_transit(p.first_transit), why),
-                    None => format!("{}: {:.0} of {:.0}{}", p.first_name, p.first_value, p.first_bar, in_transit(p.first_transit)),
+                    Some(why) => format!("{first} - {why}"),
+                    None => first,
                 });
-                victory_bar(ui, p.first_fraction() as f32, p.first_transit_fraction() as f32);
+                victory_bar(ui, p.first_fraction() as f32, p.first_transit_fraction() as f32, seat_colour(session, seat));
                 // Ticket #51: the second part in the words its own card uses.
                 ui.label(format!("{}: {}{}", p.second_name, p.second_text, in_transit(p.second_transit)));
-                victory_bar(ui, p.second_fraction() as f32, p.second_transit_fraction() as f32);
+                victory_bar(ui, p.second_fraction() as f32, p.second_transit_fraction() as f32, seat_colour(session, seat));
                 // Ticket #72: the Prospectors set their Venture Capital Fund's share here, and draw.
                 // Ticket #256 (version 0.08.4): a slider and a Withdraw field, in their own function.
                 if seat == Seat(0) && !session.spectator && game.kind(Seat(0)) == FactionKind::Prospectors {
@@ -11353,8 +11450,9 @@ mod tests {
     /// coming back because the routing had no idea what a box was: its one detour fired only for a
     /// box whose middle sat within a pixel of the needed box's middle.
     ///
-    /// The fixture is the tree's own grid, three columns 144 apart and rows 86 apart with 122x58
-    /// boxes in them, so the figures a reader checks are the figures `tech_tree` uses. The
+    /// The fixture is the tree's grid as it stood before ticket #414 made it a tenth smaller
+    /// (three columns 144 apart, rows 86 apart, 122x58 boxes); the routing reads `ROW` and the box
+    /// rects it is given, so the shape it checks holds at any size. The
     /// obstacle is put squarely on the straight elbow's path, which is the shape both #245 and #246
     /// drew: a line from rung 1 to rung 3 running through whatever stands on rung 2.
     #[test]

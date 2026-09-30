@@ -54,17 +54,23 @@ landing_contested = "{faction} could not land at {body}: the orbit is contested.
 # Ticket #353 (version 0.09.1): the slot is NAMED. "in slot 3 on the Moon" named a place no player
 # could find on the board; {slot} now carries the slot's own name, which is the Colony's name too.
 colony_founded = "The {faction} founded a Colony at {slot} on {body} with {n} Colonists."
+# Ticket #419 (version 0.09.4): the same, where the founding eased the founder's Unrest.
+colony_founded_eased = "The {faction} founded a Colony at {slot} on {body} with {n} Colonists: -{ease} Unrest."
 # Ticket #353 (version 0.09.1): who did not land, at every place the engine clamps an arrival to the
 # Habitat room it found -- a founding by sea, a founding by Colony Ship, a join and a disembarkation.
 # One phrase for all four, because it is one rule.
 no_habitat_room = "{n} more found no Habitat room at {place} and did not land."
 # Ticket #345 (version 0.09.1): the first Colony a world has ever carried, and what it pays.
-first_to_body = "The {faction} are the first Faction ever to settle {body}. {colony} claims a windfall of {n} Influence, and its Core will pay while they hold it."
+# Ticket #408 (version 0.09.4): cut to what it must say, as are the four lines below.
+first_to_body = "The {faction} are first to settle {body}: +{n} Influence."
 # Ticket #395 (version 0.09.3): the world eases at the news, half a point off every Region's Unrest,
 # said once for the whole Earth, filed under On Earth; the Moment carries it too.
 first_to_body_eases = "The first Colony on {body} eased Unrest by {ease} in every Region on Earth."
+# Ticket #405 (version 0.09.4): the world under the Natural Sink for the first time, once a game.
+under_the_sink_eases = "The world is under the Natural Sink for the first time: Unrest eased by {ease} in every Region on Earth, {custodians} in the Custodians'."
 disembarked = "{n} Colonists disembarked into {colony}."
 station_built = "{faction} built {station}."
+station_built_eased = "{faction} built {station}: -{ease} Unrest."
 antarctica_opens = "The Antarctic ice opens: {n} Colony Slots on Earth."
 archive_begun = "The {faction} began the Archive at {colony}."
 claim_lot = "{place} is claimed by {factions} at the same Standing; the lot falls to the {winner}."
@@ -80,7 +86,8 @@ emigrants_lifted = "{n} Pioneers lifted from {state} to {station}{spaceport}."
 # partial-unload phrase above will not serve: that one is about people who arrived somewhere and
 # could not land, and these never left the ground.
 emigrants_stayed = "{n} more found no Habitat room at {station} and are still waiting in {state}."
-neutral_research = "The Labs of {states}, in no one's hands, added {n} Research to the Tech under research."
+# Ticket #416 (version 0.09.4): every Region nobody holds makes Research now, not only its Lab.
+neutral_research = "Regions in no one's hands added {n} Research."
 archive_built = "The {faction} raised the Archive at {place}; it wants {left} more Research."
 archive_complete = "The {faction} completed the Archive at {place}: it stands, and every point of its Research is paid."
 archive_destroyed = "The Archive at {place} was destroyed when the Colony passed out of the {faction}' hands; their Archive fund is kept."
@@ -110,12 +117,14 @@ launch_miss = "The {faction} launched a Warhead from {ship} at {place}: nothing 
 occupation_begun = "The {faction} occupy {place}."
 occupation_ended = "Occupation of {place} by the {faction} ended."
 # Ticket #299 (version 0.08.6): a break costs. {holder} is the previous holder, or nobody.
-occupation_broken = "The {faction}' Occupation of {place} broke: it goes back to the {holder} at +{unrest} Unrest, an offence against them, and the {standing} Standing the Occupation had won is gone."
+occupation_broken = "The {faction}' Occupation of {place} broke: +{unrest} Unrest."
+# Ticket #408 (version 0.09.4): where nothing rose -- a Colony, or a Region already at the top.
+occupation_broken_quiet = "The {faction}' Occupation of {place} broke."
 control_changed = "{place} now belongs to the {faction} ({why})."
 # Ticket #366 (version 0.09.2): a transfer and a throw-off in one Resolution, said once.
 passed_and_threw_off = "{state} passed to the {faction} and threw them off at once; it stands neutral."
 claim_tied = "{place} is claimed by {factions} at the same Standing; it stays as it is."
-threw_off = "{state} threw off the {faction}: it is neutral again, its Armies are its own, and its Unrest settles at {unrest}."
+threw_off = "{state} threw off the {faction}."
 # Ticket #371 (version 0.09.2): ONE net line a Region about its Unrest, at the end of the Resolution,
 # at the designer's word ("quiet unrest spam"). It replaced six lines written in phase order -- a
 # Mothball's, a Climate card's, a Strip Permit's, an Agitate's, a Relief's and a threshold's -- and
@@ -206,7 +215,7 @@ break_baseline = "{state}: its Baseline Emissions rise by {rise} for good."
 # Ticket #257 (version 0.08.4): the wall stands, and each rise it holds makes it dearer to keep.
 # The designer's line: "The Sea Wall in China took the sea, rising sea levels have increased the
 # cost to maintain this Sea Wall".
-sea_wall = "The Sea Wall in {state} took the sea at {temperature} C; the risen water makes it dearer to keep, {keep} Materials a turn now."
+sea_wall = "{whose} Sea Wall held the sea; keep now {keep} Materials."
 storm_surge_wall = "Storm Surge in {state}: the Sea Wall held. Its coastal Facilities make {percent}% less at the next Income."
 sea_wall_unkept = "Materials ran short: the Sea Wall in {states} stands unkept this turn and holds nothing."
 sea_nothing_left = "Sea level at {temperature} C: {state} has no coastal slots left to lose."
@@ -222,7 +231,10 @@ scrubbers_destroyed = "{n} Scrubber(s) in {state} were destroyed when the state 
 leapfrog = "The {faction} Leapfrogged {state}: its people now emit {coefficient} per hundred million."
 
 # Your works
-tech_complete = "{tech} is complete; every Faction has it. The {faction} led ({shares}) and pick the next Tech."
+tech_complete = "{tech} is complete. The {faction} led and pick the next Tech."
+# Ticket #412 (version 0.09.4): the same, where leading pays the Lead (the Archivists).
+tech_complete_rewarded = "{tech} is complete. The {faction} led and pick the next Tech: +{influence} Influence, -{ease} Unrest."
+tech_complete_rewarded_influence = "{tech} is complete. The {faction} led and pick the next Tech: +{influence} Influence."
 build_complete = "{faction} completed {building} at {place}."
 # Ticket #332 (version 0.09.0): a build under way at a place that changed hands, cancelled by its
 # new holder: the Materials are the holder's prize, at the holder's own price.
@@ -325,11 +337,11 @@ upload = "uploaded {n} Colonists into the Archive at {colony}"
 # The other three name what their own Directive really buys, in the words the Report line for each
 # has used since #235: the Natural Sink, their coffers, propellant. `unfund_archive` is true of all
 # four alike, because nought sends the whole of it to the shared Tech whoever ordered it.
-fund_archive = "set its Labs to pay the Archive fund from the next Income"
+fund_archive = "set its Research to pay the Archive fund from the next Income"
 directive_sink_order = "directed its Research into the Natural Sink from the next Income"
 directive_ducats_order = "directed its Research into its coffers from the next Income"
 directive_fuel_order = "directed its Research into propellant from the next Income"
-unfund_archive = "set its Labs back to the shared Tech from the next Income"
+unfund_archive = "set its Research back to the shared Tech from the next Income"
 max_on = "set its whole Allotment to go to {place} every turn"
 max_off = "set its Influence to be placed by hand again"
 build_emigrants = "recruited {n} Pioneers in {state}"
@@ -393,6 +405,12 @@ figure = "{n} Influence"
 on = true
 text = "{place} changed hands."
 figure = "the {faction}"
+
+# Ticket #405 (version 0.09.4): the climate's first good news, in the designer's words.
+[moments.under_the_sink]
+on = true
+text = "For the first time, the world takes more carbon out of the air than it puts in. Unrest eases by {ease} in every Region, {custodians} in the Custodians'."
+figure = "Under the Sink"
 
 [moments.climate_threshold]
 on = true

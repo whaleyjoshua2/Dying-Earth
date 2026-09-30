@@ -117,7 +117,9 @@ pub const SAVE_VERSION: u32 = 7;
 /// Ticket #401 (version 0.09.3, the closing ticket): moved to 0.09.3. `SAVE_VERSION` moved once for
 /// the version, to 7, at the tenths (#387) and carries the Stadium (#389), the seventeenth Facility
 /// kind, besides: a 0.09.2 file knows neither.
-pub const GAME_VERSION: &str = "0.09.3";
+/// Ticket #417 (version 0.09.4, the closing ticket): moved to 0.09.4. `SAVE_VERSION` did not move
+/// this version: every field it added reads a default from an older file, so a 0.09.3 save loads.
+pub const GAME_VERSION: &str = "0.09.4";
 
 /// The game autosaves at the start of the Report phase of every third turn.
 pub const AUTOSAVE_EVERY: u32 = 3;
@@ -472,7 +474,14 @@ pub fn load_from(path: &Path, tables: Arc<Tables>) -> Result<Game, String> {
     }
     let (_, body) = split(&text)?;
     let saved: SavedGame = ron::from_str(body).map_err(|e| format!("This save is damaged and cannot be loaded ({e})."))?;
-    Ok(saved.into_game(tables))
+    let mut game = saved.into_game(tables);
+    // Ticket #405 (version 0.09.4): a save from before the latch, written while the world stood
+    // under the Sink, has had its first turn under it; it must not be announced again. A save
+    // written since carries the latch set whenever the run is above nought, so this changes nothing.
+    if game.seats.iter().any(|s| s.stabilization_run > 0) {
+        game.climate.under_sink_eased = true;
+    }
+    Ok(game)
 }
 
 /// Every save in the folder, newest first. A folder that is not there, and a file that is not a

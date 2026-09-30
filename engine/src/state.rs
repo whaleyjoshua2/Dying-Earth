@@ -695,6 +695,20 @@ pub struct Climate {
     pub natural_sink: f64,
     /// Ticket #55: ppm the Permafrost Thaw Break adds to the world's Emissions every Climate phase.
     pub permafrost: f64,
+    /// Ticket #405 (version 0.09.4): the world has been under the Natural Sink once, and every
+    /// Region's Unrest has eased for it; it eases once a game. A save from before carries false.
+    #[serde(default)]
+    pub under_sink_eased: bool,
+    /// Ticket #406 (version 0.09.4): the counted gap over the Sink at the game's first Climate
+    /// phase; the best share of it closed since, never falling back; and the longest Stabilization
+    /// run of the game. The Custodians' partial credit. A save from before opens its gap at the next
+    /// Climate phase.
+    #[serde(default)]
+    pub opening_gap: f64,
+    #[serde(default)]
+    pub best_gap_closed: f64,
+    #[serde(default)]
+    pub best_run: u32,
     /// Ticket #55: which Breaks have fired, by index into `climate.toml`'s list. Each fires once.
     pub breaks_fired: Vec<bool>,
 }
@@ -974,6 +988,10 @@ pub struct SeatState {
     /// landing, which is the first turn anything can be spent.
     #[serde(default)]
     pub first_windfall: i64,
+    /// Ticket #412 (version 0.09.4): Influence won by leading a Tech, paid into the next Allotment
+    /// as the first-to-a-Body windfall is; a Tech completed during the Income is paid that turn.
+    #[serde(default)]
+    pub lead_windfall: i64,
     /// Ticket #192 (version 0.08.0): Colonists uploaded into the Archive, all told. The Archivists'
     /// second Victory part counts this rather than who happens to be living beside the Module, and
     /// it only ever climbs: an uploaded Colonist cannot be lost to a raid, a crowding death or a
@@ -1424,6 +1442,10 @@ pub struct Market {
     pub card_price: [i64; 3],
     #[serde(default)]
     pub card_price_until: [u32; 3],
+    /// Ticket #404 (version 0.09.4): the card that set each override, so the Market line can name
+    /// it. A save from before names none.
+    #[serde(default)]
+    pub card_price_by: [Option<EventId>; 3],
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -1573,6 +1595,7 @@ impl Game {
             sold_units: 0,
             spaceport_influence: 0,
             first_windfall: 0,
+            lead_windfall: 0,
             uploaded: 0,
             stabilization_run: 0,
             influence: BTreeMap::new(),
@@ -1704,6 +1727,10 @@ impl Game {
                 war_nobody_total: 0.0,
                 natural_sink: tables.climate.natural_sink,
                 permafrost: 0.0,
+                under_sink_eased: false,
+                opening_gap: 0.0,
+                best_gap_closed: 0.0,
+                best_run: 0,
                 breaks_fired: vec![false; tables.climate.breaks.len()],
             },
             research: Research {
@@ -1949,6 +1976,19 @@ impl Game {
         } else {
             1.0
         }
+    }
+
+    /// Ticket #413 (version 0.09.4): what a Ship of this kind holds for this seat: the card's tank
+    /// and Clean Propellant's Fuel on top (at half under Provisional Findings, as every addition
+    /// is). An Army has no tank and gains none.
+    pub fn tank_of(&self, seat: Seat, kind: UnitKind) -> f64 {
+        let base = self.tables.unit(kind).tank as f64;
+        if base <= 0.0 {
+            return 0.0;
+        }
+        // Ticket #420 (version 0.09.4): and Cryogenic Tanks' Fuel on top.
+        base + self.tech_addition_of(seat, TechId::CleanPropellant, self.tables.tech(TechId::CleanPropellant).tank_fuel) as f64
+            + self.tech_addition_of(seat, TechId::CryogenicTanks, self.tables.tech(TechId::CryogenicTanks).tank_fuel) as f64
     }
 
     /// An additive Tech read for one seat: its full value once done, half rounded down under
@@ -2224,9 +2264,16 @@ impl Game {
     /// Ticket #87: what a Refuel order takes from the Stockpile: what the tank wants, as far as
     /// the Stockpile can pay.
     pub fn refuel_amount(&self, seat: Seat, ship: ShipId) -> f64 {
+        self.refuel_amount_from(ship, self.seat(seat).stockpile.fuel)
+    }
+
+    /// Ticket #421 (version 0.09.4): the same from a given amount of Fuel -- what is left after the
+    /// orders queued before it, a Buy among them -- so a Refuel queued behind a purchase is priced
+    /// at what it will take when it is paid, where it was priced at the Stockpile as it stood.
+    pub fn refuel_amount_from(&self, ship: ShipId, available: f64) -> f64 {
         let Some(s) = self.ship(ship) else { return 0.0 };
-        let want = (self.tables.unit(s.kind).tank as f64 - s.fuel).max(0.0);
-        tenth(want.min(self.seat(seat).stockpile.fuel.max(0.0)))
+        let want = (self.tank_of(s.seat, s.kind) - s.fuel).max(0.0);
+        tenth(want.min(available.max(0.0)))
     }
 
     /// Ticket #87: the cheapest leg a seat's Ship can fly from this Body today, in Fuel.
@@ -3577,7 +3624,7 @@ impl Game {
         // Ticket #358 (version 0.09.1): and the Chorus's per-Colonist point, outside the
         // multiplier on the Spaceport's argument, at the designer's word.
         let outside: i64 = self.module_allotments(seat).iter().map(|y| y.1).sum();
-        (base as f64 * m).floor() as i64 + outside + self.seat(seat).spaceport_influence + self.seat(seat).first_windfall + firsts * t.first_settled_allotment
+        (base as f64 * m).floor() as i64 + outside + self.seat(seat).spaceport_influence + self.seat(seat).first_windfall + self.seat(seat).lead_windfall + firsts * t.first_settled_allotment
     }
 
     /// Ticket #345 (version 0.09.1): which seat was first to a Body, and at which Colony.
@@ -4057,7 +4104,9 @@ impl Game {
     /// The same at any turn, for the window tooltip and the AI's planning.
     pub fn transit_cost_at(&self, from: BodyId, to: BodyId, turn: u32) -> (u32, f64) {
         let tech = if self.has_tech(TechId::EfficientTransit) { self.tables.tech(TechId::EfficientTransit).value } else { 1.0 };
-        let days_factor = if self.has_tech(TechId::NuclearRockets) { self.tables.tech(TechId::NuclearRockets).value } else { 1.0 };
+        // Ticket #413 (version 0.09.4): Orbital Refuelling's tenth multiplies Nuclear Rockets' fifth.
+        let days = |t: TechId| if self.has_tech(t) { self.tables.tech(t).value } else { 1.0 };
+        let days_factor = days(TechId::NuclearRockets) * days(TechId::OrbitalRefuelling);
         self.transit_cost_with(from, to, 1.0, tech, days_factor, turn)
     }
 
@@ -4071,7 +4120,7 @@ impl Game {
 
     pub fn transit_cost_for_at(&self, seat: Seat, from: BodyId, to: BodyId, turn: u32) -> (u32, f64) {
         let faction = self.tables.faction(self.kind(seat)).transit_fuel_multiplier;
-        let (turns, fuel) = self.transit_cost_with(from, to, faction, self.tech_multiplier(seat, TechId::EfficientTransit), self.tech_multiplier(seat, TechId::NuclearRockets), turn);
+        let (turns, fuel) = self.transit_cost_with(from, to, faction, self.tech_multiplier(seat, TechId::EfficientTransit), self.tech_multiplier(seat, TechId::NuclearRockets) * self.tech_multiplier(seat, TechId::OrbitalRefuelling), turn);
         // Ticket #92 (version 0.06.0): a working Mass Driver of the seat's at the Body it leaves
         // takes a flat figure off, after the multipliers, never below the minimum.
         if self.mass_driver_at(seat, from) {
@@ -4313,10 +4362,17 @@ impl Game {
     /// Scrubber belongs to whoever controls its state, and counts as removal for that seat's Blame.
     pub fn scrubber_removal_by_seat(&self) -> [f64; SEAT_COUNT] {
         let per = self.tables.facility(FacilityKind::Scrubber).sink_per_turn;
+        // Ticket #411 (version 0.09.4): and every working Nature Reserve's, credited to the seat that
+        // directs its Region -- the occupier during an Occupation, at the designer's word (Q9, B).
+        let reserve = self.tables.facility(FacilityKind::NatureReserve).sink_per_turn;
         let mut out = [0.0; SEAT_COUNT];
         for st in &self.states {
-            let Some(seat) = st.control.controller() else { continue };
-            out[seat.index()] += per * self.scrubbers_online(st.id) as f64;
+            if let Some(seat) = st.control.controller() {
+                out[seat.index()] += per * self.scrubbers_online(st.id) as f64;
+            }
+            if let Some(seat) = st.control.director() {
+                out[seat.index()] += reserve * st.facilities.iter().filter(|f| f.kind == FacilityKind::NatureReserve && f.working()).count() as f64;
+            }
         }
         out
     }
@@ -4417,6 +4473,11 @@ impl Game {
         self.state(s).facilities.iter().any(|f| f.kind == FacilityKind::Constabulary && f.working())
     }
 
+    /// Ticket #411 (version 0.09.4): a working Nature Reserve here.
+    pub fn nature_reserve_online(&self, s: StateId) -> bool {
+        self.state(s).facilities.iter().any(|f| f.kind == FacilityKind::NatureReserve && f.working())
+    }
+
     /// Ticket #389 (version 0.09.3): a working Stadium here, which halves what the climate adds.
     pub fn stadium_online(&self, s: StateId) -> bool {
         self.state(s).facilities.iter().any(|f| f.kind == FacilityKind::Stadium && f.working())
@@ -4456,6 +4517,11 @@ impl Game {
         // Constabulary beside it -- and touches no Agitate and no refugees.
         if source == UnrestSource::Climate && self.stadium_online(s) {
             damped *= self.tables.unrest.stadium_factor;
+        }
+        // Ticket #411 (version 0.09.4): and a working Nature Reserve takes a third of that effect,
+        // multiplying with the Stadium's where both stand.
+        if source == UnrestSource::Climate && self.nature_reserve_online(s) {
+            damped *= self.tables.unrest.nature_reserve_factor;
         }
         if damped <= 0.0 {
             return 0.0;
@@ -4562,7 +4628,18 @@ impl Game {
     /// Add one line to the dispatch, with the kind that places it in the severity order and under
     /// its heading, and the place it takes the player to when it is clicked.
     pub fn report_line(&mut self, kind: LineKind, place: Option<ReportPlace>, text: String) {
-        self.report.lines.push(ReportLine { kind, place, text });
+        self.report.lines.push(ReportLine { kind, place, text, mine: false });
+    }
+
+    /// Ticket #404 (version 0.09.4): mark the last line written as the player's news when `seats`
+    /// holds seat 0, so it is listed under Your works too. A spectator has no seat of their own.
+    pub fn mark_mine(&mut self, seats: &[Option<Seat>]) {
+        if !self.spectator
+            && seats.contains(&Some(Seat(0)))
+            && let Some(l) = self.report.lines.last_mut()
+        {
+            l.mine = true;
+        }
     }
 
     /// The same, for a line that belongs to the player when seat 0 did it and to the board
@@ -4767,7 +4844,8 @@ impl Game {
     /// report Accords struck, by term and by seat.
     pub fn accord_acceptable(&self, seat: Seat, from: Seat, terms: &[Term]) -> bool {
         // Never help somebody already at the door.
-        if self.progress(from).score() >= 0.95 {
+        // Ticket #406 (version 0.09.4): how near the door stands, not the Custodians' partial credit.
+        if self.progress(from).score_as_it_stands() >= 0.95 {
             return false;
         }
         let view = self.relations_score(seat, from);

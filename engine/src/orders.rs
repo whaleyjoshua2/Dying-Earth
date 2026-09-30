@@ -248,6 +248,12 @@ impl Cost {
         self.ducats += other.ducats;
     }
     pub fn text(&self) -> String {
+        let parts = self.parts();
+        if parts.is_empty() { "free".to_string() } else { parts.join(", ") }
+    }
+    /// Ticket #404 (version 0.09.4): each figure the Stockpile pays, in words, for a caller that
+    /// adds what the Stockpile does not pay.
+    pub fn parts(&self) -> Vec<String> {
         let mut parts = Vec::new();
         if self.materials > 0.0 {
             parts.push(format!("{} Materials", figure(self.materials)));
@@ -264,7 +270,7 @@ impl Cost {
         if self.ducats > 0.0 {
             parts.push(format!("{} Ducats", figure(self.ducats)));
         }
-        if parts.is_empty() { "free".to_string() } else { parts.join(", ") }
+        parts
     }
 }
 
@@ -369,6 +375,90 @@ impl Game {
         }
     }
 
+    /// Ticket #404 (version 0.09.4): **everything an order pays, in words**, where the confirm said
+    /// only the Stockpile's part: the `Cost`, then the Widgets a build takes from its place's rate,
+    /// the people an Army takes, and the Fuel a move draws from the Ship's tank. `free` only where
+    /// nothing at all is spent. An Army read `costs 25 Materials` and hid the million people.
+    pub fn order_price_text(&self, seat: Seat, order: &Order, cost: Cost) -> String {
+        let mut parts = cost.parts();
+        let own = self.kind(seat);
+        // A build bought outright in Ducats starts done, so its Widgets are not the place's to pay.
+        let item = match order {
+            Order::BuildFacility { kind, .. } => Some(BuildItem::Facility(kind.built_by(own))),
+            Order::RaiseIndustry { .. } => Some(BuildItem::IndustryLevel),
+            Order::BuildModule { kind, .. } => Some(BuildItem::Module(kind.built_by(own))),
+            Order::BuildArchive { .. } => Some(BuildItem::Module(ModuleKind::Archive)),
+            Order::BuildShip { kind, .. } => Some(BuildItem::Unit(*kind)),
+            Order::BuildArmy { .. } => Some(BuildItem::Unit(UnitKind::Army)),
+            Order::Rearm { ship } => Some(BuildItem::Warhead(*ship)),
+            _ => None,
+        };
+        // A Launch spends the Warhead and no Fuel.
+        if let Order::Launch { .. } = order {
+            parts.push("the Warhead".to_string());
+        }
+        if let Some(item) = item {
+            let n = self.build_widgets(seat, item);
+            parts.push(format!("{n} Widget{}", if n == 1 { "" } else { "s" }));
+        }
+        if let Order::BuildArmy { place } = order {
+            parts.push(self.army_people_text(*place));
+        }
+        // Ticket #407 (version 0.09.4): a Mothball's or a Decommission's Unrest in a Region.
+        if let Order::Change { building: BuildingRef::Facility(..), what: what @ (BuildingChange::Mothball | BuildingChange::Decommission) } = order {
+            let u = &self.tables.unrest;
+            parts.push(format!("+{} Unrest", figure(if *what == BuildingChange::Mothball { u.per_mothball } else { u.per_decommission })));
+        }
+        if let Order::BuildEmigrants { state, n } = order {
+            parts.push(format!("{} people", self.tables.people_text(self.muster_population_in(seat, *state, *n))));
+        }
+        let tank = match order {
+            Order::Transit { ship, to, .. } => self.ship(*ship).and_then(|s| match s.at {
+                ShipAt::Body(from) => Some(self.transit_cost_for(seat, from, *to).1),
+                _ => None,
+            }),
+            Order::ChangeOrbit { .. } => Some(self.tables.orbit_change_fuel as f64),
+            _ => None,
+        };
+        if let Some(fuel) = tank.filter(|f| *f > 0.0) {
+            parts.push(format!("{} Fuel from the tank", figure(fuel)));
+        }
+        match parts.split_last() {
+            None => "free".to_string(),
+            Some((last, [])) => last.clone(),
+            Some((last, rest)) => format!("{} and {last}", rest.join(", ")),
+        }
+    }
+
+    /// Ticket #407 (version 0.09.4): what a Mothball or a Decommission costs, in as few words as
+    /// carry it, for the button's hover and the driver's confirm: *"+1 Unrest"*, *"+2 Unrest, 10
+    /// Materials back"*. In a Colony neither costs Unrest, and nothing is said; a Restart's button
+    /// says its own price.
+    pub fn change_price_text(&self, building: BuildingRef, what: BuildingChange) -> Option<String> {
+        let BuildingRef::Facility(sid, i) = building else { return None };
+        let u = &self.tables.unrest;
+        match what {
+            BuildingChange::Mothball => Some(format!("+{} Unrest", figure(u.per_mothball))),
+            BuildingChange::Decommission => {
+                let kind = self.state(sid).facilities.get(i)?.kind;
+                Some(format!("+{} Unrest, {} Materials back", figure(u.per_decommission), figure(tenth(self.tables.facility(kind).materials as f64 / 2.0))))
+            }
+            BuildingChange::Restart => None,
+        }
+    }
+
+    /// Ticket #409 (version 0.09.4): the most Colonists this Ship can unload there, which the
+    /// window's slider runs up to: the Colonists aboard, or the room left in the Colony's Habitats,
+    /// whichever is fewer; onto a free slot, what a new Colony's Core holds.
+    pub fn unload_most(&self, ship: ShipId, into: UnloadTarget) -> u32 {
+        let Some(s) = self.ship(ship) else { return 0 };
+        let room = match into {
+            UnloadTarget::Colony(c) => self.colony(c).map(|col| self.habitat_room(col).saturating_sub(col.colonists)).unwrap_or(0),
+            UnloadTarget::Slot(..) => self.tables.module(ModuleKind::Core).holds_colonists,
+        };
+        s.colonists.min(room)
+    }
+
     /// The cost of one order for a seat, before legality.
     pub fn order_cost(&self, seat: Seat, order: &Order) -> Cost {
         let t = &self.tables;
@@ -381,7 +471,7 @@ impl Game {
             Order::BuildModule { colony, kind } => Cost { materials: self.module_materials_at(seat, *colony, *kind), ..Default::default() },
             // Ticket #87: a Ship is built with a full tank, its Fuel paid at the build.
             // Ticket #398 (version 0.09.3): at the yard's price, so a low-gravity yard with a Mine is cheaper.
-            Order::BuildShip { site, kind } => Cost { materials: self.ship_materials_at(seat, *site, *kind), fuel: t.unit(*kind).tank as f64, ..Default::default() },
+            Order::BuildShip { site, kind } => Cost { materials: self.ship_materials_at(seat, *site, *kind), fuel: self.tank_of(seat, *kind), ..Default::default() },
             Order::BuildArmy { .. } => Cost { materials: t.unit(UnitKind::Army).materials as f64, ..Default::default() },
             Order::Repair { points, .. } => {
                 Cost { materials: (t.repair.materials_per_point * *points as i64) as f64, ..Default::default() }
@@ -399,6 +489,11 @@ impl Game {
             // build's, paid by the yard's place over the turns it takes.
             Order::Launch { .. } => Cost::default(),
             Order::Rearm { .. } => Cost { materials: t.nuke.rearm_materials as f64, ..Default::default() },
+            // Ticket #404 (version 0.09.4): a tribute is paid from the Stockpile with the order's
+            // cost, so the confirm names it and the running total counts it; it was taken at the
+            // commit, outside the cost, and the driver said `costs free`.
+            Order::Tribute { materials: true, .. } => Cost { materials: t.relations.tribute_materials as f64, ..Default::default() },
+            Order::Tribute { materials: false, .. } => Cost { ducats: t.relations.tribute_ducats as f64, ..Default::default() },
             Order::Refuel { ship } => Cost { fuel: self.refuel_amount(seat, *ship), ..Default::default() },
             Order::Influence { amount, .. } => Cost { influence: *amount, ..Default::default() },
             Order::Smear { amount, .. } => Cost { influence: *amount, ..Default::default() },
@@ -492,6 +587,40 @@ impl Game {
         if p <= 0 { self.market_base(row) } else { p }
     }
 
+    /// Ticket #404 (version 0.09.4): the Market as the headless driver prints it every turn, at the
+    /// seat's own price, **a price a card has set named with the card and the turns it has left**.
+    /// A price moves a step a turn inside its band; a card is what swings it from 4 to 1.
+    pub fn market_line(&self, seat: Seat) -> String {
+        let price = |r: Resource, name: &str| {
+            let p = self.market_price(seat, self.trade_price(r).unwrap_or(0) as f64);
+            let note = Game::market_row(r).and_then(|row| self.market_card_note(row)).map(|n| format!(" ({n})")).unwrap_or_default();
+            format!("{name} {}{note}", figure(p))
+        };
+        format!(
+            "Market: {}, {}, {} Ducats each; Influence {} Ducats a point; Relief {} Ducats",
+            price(Resource::Materials, "Materials"),
+            price(Resource::Fuel, "Fuel"),
+            price(Resource::Energy, "Energy"),
+            self.tables.ducats.per_influence,
+            self.tables.unrest.relief_ducats
+        )
+    }
+
+    /// Ticket #404: the card standing over a row's price this turn and how long it has left, or
+    /// `None` where the band is the price. A save from before names no card.
+    pub fn market_card_note(&self, row: usize) -> Option<String> {
+        let m = &self.market;
+        if m.card_price[row] <= 0 || self.turn > m.card_price_until[row] {
+            return None;
+        }
+        let name = m.card_price_by[row].map(|id| self.tables.event(id).name.clone()).unwrap_or_else(|| "a card".to_string());
+        Some(match m.card_price_until[row] - self.turn {
+            0 => format!("{name}, its last turn"),
+            1 => format!("{name}, 1 more turn"),
+            n => format!("{name}, {n} more turns"),
+        })
+    }
+
     /// Ticket #220 (version 0.08.2): the turn's trading moves each price, once, at the settle.
     ///
     /// `price_step_units` net units bought moves it a step up, the same sold moves it a step down,
@@ -556,7 +685,13 @@ impl Game {
         let mut cost = Cost::default();
         let mut bought = 0;
         for o in pending {
-            cost.add(self.order_cost(seat, o));
+            // Ticket #421 (version 0.09.4): a Refuel takes what is left when it is paid, as commit
+            // pays it, not what the Stockpile held before the orders ahead of it.
+            let c = match o {
+                Order::Refuel { ship } => Cost { fuel: self.refuel_amount_from(*ship, self.seat(seat).stockpile.fuel - cost.fuel), ..Default::default() },
+                _ => self.order_cost(seat, o),
+            };
+            cost.add(c);
             if let Order::BuyInfluence { amount } = o {
                 bought += *amount;
             }
@@ -648,7 +783,11 @@ impl Game {
     /// Ticket #339 (version 0.09.0): is the order legal at all, price aside? The half of the check
     /// that names a RULE. Every arm returns the order's cost so the caller above can price it.
     fn check_order_rules(&self, seat: Seat, pending: &[Order], order: &Order) -> Result<Cost, OrderError> {
-        let cost = self.order_cost(seat, order);
+        // Ticket #421 (version 0.09.4): a Refuel is priced at the Fuel left after the pending orders.
+        let cost = match order {
+            Order::Refuel { ship } => Cost { fuel: self.refuel_amount_from(*ship, self.remaining(seat, pending).0.fuel), ..Default::default() },
+            _ => self.order_cost(seat, order),
+        };
         match order {
             Order::BuyInfluence { amount } => {
                 if *amount <= 0 {
@@ -985,8 +1124,9 @@ impl Game {
                     return fail("this Nation State already has a School");
                 }
                 // Ticket #52: at most one Constabulary per Nation State. Ticket #389 (version
-                // 0.09.3): and one Stadium, by the same door.
-                if matches!(kind, FacilityKind::Constabulary | FacilityKind::Stadium)
+                // 0.09.3): and one Stadium, by the same door; ticket #411 (version 0.09.4): and one
+                // Nature Reserve.
+                if matches!(kind, FacilityKind::Constabulary | FacilityKind::Stadium | FacilityKind::NatureReserve)
                     && (self.state(*state).facilities.iter().any(|f| f.kind == *kind)
                         || self.state(*state).queue.iter().any(|b| b.item == BuildItem::Facility(*kind))
                         || pending.iter().any(|o| matches!(o.build_state(), Some(s) if s == *state) && matches!(o, Order::BuildFacility { kind: k, .. } | Order::BuildFacilityWithDucats { kind: k, .. } if k == kind)))
@@ -1311,7 +1451,7 @@ impl Game {
                 // Ticket #87: the leg is paid from the tank.
                 let (_, fuel) = self.transit_cost_for(seat, from, *to);
                 if s.fuel < fuel {
-                    return fail(format!("the tank holds {} Fuel of {}; this leg needs {}", figure(s.fuel), self.tables.unit(s.kind).tank, figure(fuel)));
+                    return fail(format!("the tank holds {} Fuel of {}; this leg needs {}", figure(s.fuel), figure(self.tank_of(seat, s.kind)), figure(fuel)));
                 }
                 Ok(cost)
             }
@@ -1376,7 +1516,7 @@ impl Game {
                         None => format!("every station or Refinery Colony that fuels you over {} is blockaded", self.tables.body(body).name),
                     });
                 }
-                if s.fuel >= self.tables.unit(s.kind).tank as f64 {
+                if s.fuel >= self.tank_of(seat, s.kind) {
                     return fail("the tank is full");
                 }
                 if cost.fuel <= 0.0 {
@@ -2256,7 +2396,7 @@ impl Game {
                 // Ticket #87: the Fuel came out of the Stockpile with the order's cost; it goes into the tank.
                 Order::Refuel { ship } => {
                     let amount = cost.fuel;
-                    let tank = self.ship(*ship).map(|s| self.tables.unit(s.kind).tank as f64).unwrap_or(0.0);
+                    let tank = self.ship(*ship).map(|s| self.tank_of(seat, s.kind)).unwrap_or(0.0);
                     if let Some(s) = self.ship_mut(*ship) {
                         s.fuel = tenth((s.fuel + amount).min(tank));
                     }
@@ -2573,11 +2713,10 @@ impl Game {
                     // Ticket #223/#226: one of the two acts that raise Relations. The gain is the
                     // flat act_gain, not scaled by the gift, which is why the price is fixed.
                     let t = self.tables.relations.clone();
+                    // Ticket #404 (version 0.09.4): the payer's side left with the order's cost, above.
                     if *materials {
-                        self.seat_mut(seat).stockpile.materials = tenth(self.seat(seat).stockpile.materials - t.tribute_materials as f64);
                         self.seat_mut(*to).stockpile.materials = tenth(self.seat(*to).stockpile.materials + t.tribute_materials as f64);
                     } else {
-                        self.seat_mut(seat).stockpile.ducats = tenth(self.seat(seat).stockpile.ducats - t.tribute_ducats as f64);
                         self.seat_mut(*to).stockpile.ducats = tenth(self.seat(*to).stockpile.ducats + t.tribute_ducats as f64);
                     }
                     self.credit(seat, *to);

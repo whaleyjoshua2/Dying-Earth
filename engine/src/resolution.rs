@@ -1501,9 +1501,13 @@ impl Game {
                         };
                         self.set_place_control(place, back);
                         self.war.occupations_broken[occupier.index()] += 1;
+                        // Ticket #408 (version 0.09.4): what actually rose, so the cut line never claims
+                        // Unrest a Colony has not got.
+                        let mut rose = 0.0;
                         if let Place::State(sid) = place {
                             let n = self.tables.unrest.occupation_break;
-                            if self.raise_unrest(sid, n, UnrestSource::Plain) > 0.0 {
+                            rose = self.raise_unrest(sid, n, UnrestSource::Plain);
+                            if rose > 0.0 {
                                 // Ticket #371 (version 0.09.2): a cause for the Region's net line.
                                 let cause = self.phrase("cause_occupation_break", &[]);
                                 self.unrest_cause(sid, cause, false);
@@ -1522,16 +1526,19 @@ impl Game {
                         let line = format!("Occupation of {} by the {} broke: back to the {} at +{:.0} Unrest, an offence.", self.place_name(place), self.seat_name(occupier), holder, self.tables.unrest.occupation_break);
                         self.log(line);
                         let text = self.say(
-                            "occupation_broken",
+                            if rose > 0.0 { "occupation_broken" } else { "occupation_broken_quiet" },
                             &[
                                 ("place", self.place_name(place)),
                                 ("faction", self.seat_name(occupier)),
                                 ("holder", holder),
-                                ("unrest", Game::unrest_figure(self.tables.unrest.occupation_break)),
+                                ("unrest", Game::unrest_figure(rose)),
                                 ("standing", banked.to_string()),
                             ],
                         );
                         self.report_line(LineKind::Occupation, Some(place.into()), text);
+                        // Ticket #404 (version 0.09.4): who directs the place changed, so it is the
+                        // player's news when the player occupied it or holds it.
+                        self.mark_mine(&[Some(occupier), previous]);
                         continue;
                     }
                     if !self.defenders_at(place, occupier).is_empty() {
@@ -1579,6 +1586,8 @@ impl Game {
                         self.log(line);
                         let text = self.say("occupation_begun", &[("faction", self.seat_name(seat)), ("place", self.place_name(place))]);
                         self.report_line(LineKind::Occupation, Some(place.into()), text);
+                        // Ticket #404 (version 0.09.4): as a change of hands, the player's news.
+                        self.mark_mine(&[Some(seat), previous]);
                         let gain = self.occupation_gain(place, seat);
                         self.set_place_control(place, Control::Occupied { occupier: seat, previous, turns: 1, banked: gain });
                         let have = self.seat(seat).influence.get(&place).copied().unwrap_or(0);
@@ -1698,6 +1707,7 @@ impl Game {
             let text = self.say("archive_destroyed", &[("place", self.place_name(place)), ("faction", whose)]);
             self.report_line(LineKind::Archive, Some(place.into()), text);
         }
+        let (before, directed) = (self.place_control(place).controller(), self.place_control(place).director());
         self.set_place_control(place, Control::Controlled(seat));
         // Standings persist through a transfer (ticket #33): the old controller keeps its own and
         // can contest the place back.
@@ -1708,6 +1718,10 @@ impl Game {
             &[("place", self.place_name(place)), ("faction", self.seat_name(seat)), ("why", why.to_string())],
         );
         self.report_line(LineKind::ControlChanged, Some(place.into()), text);
+        // Ticket #404 (version 0.09.4): a place that became the player's, or stopped being theirs,
+        // is their news: listed under Your works as well as under its place.
+        // An occupier whose Occupation a third Faction's Influence ends loses the place too.
+        self.mark_mine(&[Some(seat), before, directed]);
         // Ticket #366 (version 0.09.2): where this line stands, so a throw-off in the same
         // Resolution can say both in its place.
         self.pending.transfer_lines.push((place, self.report.lines.len() - 1));
@@ -1948,6 +1962,23 @@ impl Game {
         for (place, b) in completed {
             self.complete_build(place, b);
         }
+    }
+
+    /// Ticket #419 (version 0.09.4): `ease` off the Unrest of every Region this seat holds, for a
+    /// place it has just founded; what was actually eased, so the line never claims what did not
+    /// happen.
+    fn founding_ease(&mut self, seat: Seat, ease: f64) -> f64 {
+        if ease <= 0.0 {
+            return 0.0;
+        }
+        let mut eased = 0.0;
+        for sid in self.controlled_states(seat) {
+            eased += self.lower_unrest(sid, ease);
+        }
+        if eased > 0.0 {
+            self.log(format!("The {} eased {} Unrest in the Regions they hold by founding.", self.seat_name(seat), crate::state::figure(eased)));
+        }
+        eased
     }
 
     /// Ticket #54: every Mothball, Restart and Decommission whose turn has come. A decommission
@@ -2350,8 +2381,9 @@ impl Game {
                     escaped: false,
                     arrived_this_turn: false,
                     built_turn: turn,
-                    // Ticket #87: built with a full tank, paid at the build.
-                    fuel: self.tables.unit(kind).tank as f64,
+                    // Ticket #87: built with a full tank, paid at the build. Ticket #413 (version
+                    // 0.09.4): the seat's tank, Clean Propellant's Fuel included.
+                    fuel: self.tank_of(b.seat, kind),
                 });
             }
             _ => {}
@@ -2566,7 +2598,13 @@ impl Game {
             self.colonies.push(Colony { id, body: *body, slot: *slot, control: Control::Controlled(*seat), modules: vec![Module::new(ModuleKind::Core)], colonists: 0, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: self.turn, in_orbit: true });
             let line = format!("{} built {}.", self.seat_name(*seat), self.place_name(Place::Colony(id)));
             self.log(line);
-            let text = self.say("station_built", &[("faction", self.seat_name(*seat)), ("station", self.place_name(Place::Colony(id)))]);
+            // Ticket #419 (version 0.09.4): and a station built, by half a point.
+            let ease = self.tables.faction(self.kind(*seat)).found_station_unrest_ease;
+            let eased = self.founding_ease(*seat, ease);
+            let text = self.say(
+                if eased > 0.0 { "station_built_eased" } else { "station_built" },
+                &[("faction", self.seat_name(*seat)), ("station", self.place_name(Place::Colony(id))), ("ease", crate::state::figure(ease))],
+            );
             self.report_line_of(*seat, LineKind::YourBuild, LineKind::BuildComplete, Some(ReportPlace::Colony(id)), text);
         }
         // Founding orders into the same Colony Slot from more than one seat are decided at the Body,
@@ -2728,13 +2766,18 @@ impl Game {
                             let slot_name = self.tables.body(b).slots[slot as usize].name.clone();
                             let line = format!("The {} founded a Colony at {} on {} with {} Colonists.", self.seat_name(seat), slot_name, self.tables.body(b).name, moved);
                             self.log(line);
+                            // Ticket #419 (version 0.09.4): a founding off Earth eases the founder's Regions
+                            // where its card says so (the Arkwrights'), said on this line.
+                            let ease = self.tables.faction(self.kind(seat)).found_colony_unrest_ease;
+                            let eased = if b != BodyId::Earth { self.founding_ease(seat, ease) } else { 0.0 };
                             let text = self.say(
-                                "colony_founded",
+                                if eased > 0.0 { "colony_founded_eased" } else { "colony_founded" },
                                 &[
                                     ("faction", self.seat_name(seat)),
                                     ("slot", slot_name),
                                     ("body", self.tables.body(b).name.clone()),
                                     ("n", moved.to_string()),
+                                    ("ease", crate::state::figure(ease)),
                                 ],
                             );
                             self.report_line(LineKind::ColonyFounded, Some(ReportPlace::Colony(id)), text);
@@ -3107,6 +3150,8 @@ impl Game {
             && let Some(earlier) = self.report.lines.get_mut(i)
         {
             earlier.text = folded;
+            // Ticket #404: the player thrown off is the player's news, whoever it passed from.
+            earlier.mine |= !self.spectator && seat == Seat(0);
         } else {
             let text = self.say(
                 "threw_off",
@@ -3117,6 +3162,7 @@ impl Game {
                 ],
             );
             self.report_line(LineKind::ControlChanged, Some(ReportPlace::State(sid)), text);
+            self.mark_mine(&[Some(seat)]);
         }
         self.moment(
             MomentKind::ControlChanged,

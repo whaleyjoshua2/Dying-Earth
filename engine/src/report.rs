@@ -167,6 +167,11 @@ pub struct ReportLine {
     pub kind: LineKind,
     pub place: Option<ReportPlace>,
     pub text: String,
+    /// Ticket #404 (version 0.09.4): a place that changed hands to or from the player. Such a line
+    /// is listed under Your works as well as under its place; the headline's rank is unchanged. A
+    /// save from before marks none.
+    #[serde(default)]
+    pub mine: bool,
 }
 
 impl ReportLine {
@@ -199,10 +204,13 @@ pub enum MomentKind {
     /// Ticket #345 (version 0.09.1): a Body settled for the first time, by anybody. It fires once
     /// per Body in a whole game, which is the rarest Moment on the list.
     FirstToABody,
+    /// Ticket #405 (version 0.09.4): the world under the Natural Sink for the first time, once a
+    /// game, and every Region's Unrest eased for it. The climate's first good news.
+    UnderTheSink,
 }
 
 impl MomentKind {
-    pub const ALL: [MomentKind; 11] = [
+    pub const ALL: [MomentKind; 12] = [
         MomentKind::ColonyFounded,
         MomentKind::ControlChanged,
         MomentKind::ClimateThreshold,
@@ -214,6 +222,7 @@ impl MomentKind {
         MomentKind::RivalProgress,
         MomentKind::PlaceTakenByForce,
         MomentKind::FirstToABody,
+        MomentKind::UnderTheSink,
     ];
 
     /// The key its table carries in `report.toml`.
@@ -230,6 +239,7 @@ impl MomentKind {
             MomentKind::RivalProgress => "rival_progress",
             MomentKind::PlaceTakenByForce => "taken_by_force",
             MomentKind::FirstToABody => "first_to_body",
+            MomentKind::UnderTheSink => "under_the_sink",
         }
     }
 
@@ -247,6 +257,7 @@ impl MomentKind {
             MomentKind::RivalProgress => "A rival closing on its Victory Condition",
             MomentKind::PlaceTakenByForce => "A place taken by force",
             MomentKind::FirstToABody => "A Body settled for the first time",
+            MomentKind::UnderTheSink => "The world under the Natural Sink",
         }
     }
 
@@ -261,7 +272,7 @@ impl MomentKind {
             // Ticket #86: lives lost read before a place changing hands.
             MomentKind::LostInTransit => 2,
             MomentKind::ControlChanged => 2,
-            MomentKind::ClimateThreshold | MomentKind::Antarctica => 3,
+            MomentKind::ClimateThreshold | MomentKind::Antarctica | MomentKind::UnderTheSink => 3,
             MomentKind::DecisiveBattle | MomentKind::PlaceTakenByForce => 4,
             // Ticket #261: a rival about to win reads before a Tech and after a lost unit.
             MomentKind::RivalProgress => 5,
@@ -331,14 +342,15 @@ impl Report {
             .map(|(_, i)| i)
     }
 
-    /// Every line that is not the headline, in the order the five headings are shown.
+    /// Every line that is not the headline, in the order the five headings are shown. Ticket #404
+    /// (version 0.09.4): a line marked the player's is under Your works too.
     pub fn sections(&self) -> Vec<(Section, Vec<&ReportLine>)> {
         let head = self.headline_index();
         Section::ALL
             .into_iter()
             .map(|s| {
                 let lines: Vec<&ReportLine> =
-                    self.lines.iter().enumerate().filter(|(i, l)| Some(*i) != head && l.section() == s).map(|(_, l)| l).collect();
+                    self.lines.iter().enumerate().filter(|(i, l)| Some(*i) != head && (l.section() == s || (l.mine && s == Section::YourWorks))).map(|(_, l)| l).collect();
                 (s, lines)
             })
             .filter(|(_, l)| !l.is_empty())
@@ -429,17 +441,23 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("slot_taken", &["faction"]),
     ("landing_contested", &["faction", "body"]),
     ("colony_founded", &["faction", "slot", "body", "n"]),
+    // Ticket #419 (version 0.09.4).
+    ("colony_founded_eased", &["faction", "slot", "body", "n", "ease"]),
     // Ticket #353 (version 0.09.1): who the Habitat room had no place for, at all four clamp sites.
     ("no_habitat_room", &["n", "place"]),
     // Ticket #345 (version 0.09.1): a Body settled for the first time.
     ("first_to_body", &["faction", "body", "colony", "n"]),
     // Ticket #395 (version 0.09.3): and the world eases at the news, one line for the whole Earth.
     ("first_to_body_eases", &["body", "ease"]),
+    // Ticket #405 (version 0.09.4): the world under the Sink for the first time.
+    ("under_the_sink_eases", &["ease", "custodians"]),
     ("disembarked", &["n", "colony"]),
     ("station_built", &["faction", "station"]),
+    // Ticket #419 (version 0.09.4).
+    ("station_built_eased", &["faction", "station", "ease"]),
     ("antarctica_opens", &["n"]),
     ("archive_begun", &["faction", "colony"]),
-    ("neutral_research", &["states", "n"]),
+    ("neutral_research", &["n"]),
     ("emigrants_mustered", &["n", "state", "fell", "unrest"]),
     // Ticket #334 (version 0.09.0).
     ("army_ordered", &["place", "people"]),
@@ -475,6 +493,8 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("occupation_ended", &["place", "faction"]),
     // Ticket #299 (version 0.08.6): a broken Occupation, at a cost.
     ("occupation_broken", &["place", "faction", "holder", "unrest", "standing"]),
+    // Ticket #408 (version 0.09.4): the same where nothing rose.
+    ("occupation_broken_quiet", &["place", "faction", "holder", "unrest", "standing"]),
     ("control_changed", &["place", "faction", "why"]),
     // Ticket #366 (version 0.09.2): a transfer and a throw-off in one Resolution, said once.
     ("passed_and_threw_off", &["state", "faction"]),
@@ -529,7 +549,7 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("break_coastal", &["states", "exposure", "percent", "unrest"]),
     ("break_baseline", &["state", "rise"]),
     // Ticket #257 (version 0.08.4): the wall stands and its keep rises; a surge it holds; a keep unpaid.
-    ("sea_wall", &["temperature", "state", "keep"]),
+    ("sea_wall", &["temperature", "state", "whose", "keep"]),
     // Ticket #259 (version 0.08.4): the off-Earth cards join the deck.
     ("deck_joined", &["n"]),
     // Ticket #261: the two steps a rival's Moment fires on.
@@ -558,6 +578,9 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("scrubbers_destroyed", &["n", "state", "why"]),
     ("leapfrog", &["faction", "state", "coefficient"]),
     ("tech_complete", &["tech", "faction", "shares"]),
+    // Ticket #412 (version 0.09.4): the same, with what leading paid.
+    ("tech_complete_rewarded", &["tech", "faction", "shares", "influence", "ease"]),
+    ("tech_complete_rewarded_influence", &["tech", "faction", "shares", "influence", "ease"]),
     ("build_complete", &["faction", "building", "place"]),
     ("energy_short", &["faction", "buildings", "sink"]),
     ("energy_zero", &["faction"]),
@@ -724,6 +747,8 @@ pub const MOMENT_ARGS: &[(&str, &[&str])] = &[
     // Ticket #345 (version 0.09.1): a Body settled for the first time; ticket #395 (version
     // 0.09.3): with the world's easing in the same breath.
     ("first_to_body", &["faction", "body", "colony", "n", "ease"]),
+    // Ticket #405 (version 0.09.4): the same, as a Moment.
+    ("under_the_sink", &["ease", "custodians"]),
 ];
 
 impl ReportTable {

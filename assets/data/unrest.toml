@@ -81,6 +81,12 @@ scrubber_fall = 1.0
 # designer's "very small reduction in unrest globally". Half a point. Antarctica is on Earth and
 # does not count; a station is no settling.
 first_colony_ease = 0.5
+# Ticket #405 (version 0.09.4): the first Climate phase the world is EVER under the Natural Sink (the
+# Stabilization test: counted Emissions against the Sink and the Scrubbers) takes this off every
+# Region's Unrest, held or nobody's, once a game, whatever the next turn does; a Region the
+# Custodians hold takes the second figure instead. The designer's ".5 / 1 for custodians".
+under_sink_ease = 0.5
+under_sink_ease_custodians = 1.0
 
 # ---- damping (rule 4 of #52, widened on #53)
 # While two of the four green Techs are complete every climate-source AND refugee rise is this much
@@ -96,6 +102,9 @@ constabulary_damping = 0.5
 # moves in quarters from here, at the designer's word, where it moved in halves. Refugees and an
 # Agitate are not the climate and are untouched.
 stadium_factor = 0.5
+# Ticket #411 (version 0.09.4): a working Nature Reserve takes a third of the Stadium's effect off a
+# CLIMATE rise: the Stadium keeps a half, the Reserve five sixths; with both they multiply.
+nature_reserve_factor = 0.8333333333333334
 
 # ---- thresholds (rule 5 of #52)
 # At `army_threshold` the Standing Army stops replenishing; at `facility_threshold` every Facility

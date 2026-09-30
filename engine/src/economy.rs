@@ -119,6 +119,10 @@ impl Chain {
         self.steps.push(Step::Plus(n, why.into()));
         self.v
     }
+    /// The figure as it stands.
+    pub fn value(&self) -> f64 {
+        self.v
+    }
     pub fn floor(&mut self) -> f64 {
         self.steps.push(Step::Floor);
         self.v = self.v.floor();
@@ -379,6 +383,8 @@ impl Game {
             // line and for the same reason. It is paid once; the accumulator begins again at nought
             // and stays there until the seat is first to another Body.
             s.first_windfall = 0;
+            // Ticket #412 (version 0.09.4): and so has what leading a Tech won.
+            s.lead_windfall = 0;
         }
     }
 
@@ -388,43 +394,72 @@ impl Game {
     /// does. The yield is a Faction-less one: the row's figure by the state's people and schooling,
     /// times Public Science once the world has it. A Lab idled by a Wildfire or mothballed pays nothing.
     fn neutral_research(&mut self) {
-        let mut total = 0i64;
-        let mut names: Vec<String> = Vec::new();
-        for sid in StateId::ALL {
-            if !matches!(self.state(sid).control, Control::Neutral | Control::Occupied { .. }) {
-                continue;
-            }
-            let labs = self.state(sid).facilities.iter().filter(|f| f.kind == FacilityKind::ResearchLab && f.working() && !f.offline_until_resolution).count() as i64;
-            if labs == 0 {
-                continue;
-            }
-            let paid = labs * (self.world_lab_yield(sid) / 2);
-            if paid > 0 {
-                total += paid;
-                names.push(self.tables.state(sid).name.clone());
-            }
-        }
-        if total == 0 {
+        // Ticket #416 (version 0.09.4): every Region nobody holds, and the Labs of every occupied
+        // one, summed and settled whole once.
+        let total = StateId::ALL.into_iter().map(|sid| self.world_research(sid)).sum::<f64>().floor() as i64;
+        if total <= 0 {
             return;
         }
         self.add_research_unattributed(total);
         self.research.neutral_total += total;
-        let states = names.join(" and ");
-        let line = format!("The Labs of {states}, in no one's hands, added {total} Research to the Tech under research.");
-        self.log(line);
-        let text = self.say("neutral_research", &[("states", states), ("n", total.to_string())]);
+        self.log(format!("Regions in no one's hands added {total} Research to the Tech under research."));
+        let text = self.say("neutral_research", &[("n", total.to_string())]);
         self.report_line(LineKind::Note, None, text);
     }
 
-    /// Ticket #69: what one Research Lab in this state makes for the world, with no Faction's
-    /// multiplier: the row's figure x the population factor x the Education Level, x Public Science
-    /// once every Faction has it, rounded down.
-    pub fn world_lab_yield(&self, sid: StateId) -> i64 {
+    /// Ticket #416 (version 0.09.4): what this Region makes for the world a turn, to the tenth: held,
+    /// nothing; nobody's, its own Research (base x population factor x Education x the world's
+    /// Techs) with its Labs' multiplier, at `neutral_share`; occupied, only its Labs' share, at the
+    /// same fraction, since the occupier takes the Region's own. Halved at Unrest 7.
+    pub fn world_research(&self, sid: StateId) -> f64 {
+        let labs = self.state(sid).facilities.iter().filter(|f| f.kind == FacilityKind::ResearchLab && f.working() && !f.offline_until_resolution).count() as f64;
+        match self.state(sid).control {
+            Control::Neutral => self.world_own(sid) * self.tables.region_research.neutral_share + labs * self.world_lab_share(sid),
+            Control::Occupied { .. } => labs * self.world_lab_share(sid),
+            _ => 0.0,
+        }
+    }
+
+    /// Ticket #416: a Region's own Research as the world reads it -- base x population factor x
+    /// Education x the world's Techs, no Faction's -- halved at Unrest 7.
+    fn world_own(&self, sid: StateId) -> f64 {
         let t = &self.tables;
-        let base = t.facility(FacilityKind::ResearchLab).produces.as_ref().map(|p| p.amount).unwrap_or(0) as f64;
-        let public = if self.has_tech(TechId::PublicScience) { t.tech(TechId::PublicScience).value } else { 1.0 };
-        // Ticket #185 (version 0.08.0): the LIVE Education Level, which a School moves.
-        (base * self.population_factor(sid) * self.education_level(sid) * public).floor() as i64
+        let tech = |id: TechId| if self.has_tech(id) { t.tech(id).value } else { 1.0 };
+        let v = t.region_research.base * self.population_factor(sid) * self.education_level(sid) * tech(TechId::PublicScience) * tech(TechId::TheUpload);
+        if self.facilities_at_half(sid) { v / 2.0 } else { v }
+    }
+
+    /// Ticket #416: what ONE working Lab in a Region nobody holds, or under Occupation, pays the
+    /// world a turn: its share of the Region's own, at `neutral_share`. Nothing in a held Region.
+    pub fn world_lab_share(&self, sid: StateId) -> f64 {
+        if !matches!(self.state(sid).control, Control::Neutral | Control::Occupied { .. }) {
+            return 0.0;
+        }
+        let rr = &self.tables.region_research;
+        self.world_own(sid) * (rr.lab_multiplier - 1.0) * rr.neutral_share
+    }
+
+    /// Ticket #416 (version 0.09.4): a Region's own Research for the seat directing it, before the
+    /// Lab: `base` x the population factor x the Education Level x the Faction's and the Techs'
+    /// multipliers, as a Lab's was. Not settled whole; the caller settles.
+    pub fn region_research_chain(&self, seat: Seat, sid: StateId) -> Chain {
+        let t = &self.tables;
+        let fac = t.faction(self.kind(seat));
+        let edu = self.education_level(sid);
+        let mut r = Chain::base(t.region_research.base, "base");
+        r.times(self.population_factor(sid), || format!("for {} people, weighted by Education", t.people_text(self.state(sid).population)));
+        r.times(edu, || format!("for Education {edu:.2}"));
+        r.times(fac.research_multiplier, || format!("as the {}", fac.name));
+        r.times(self.tech_multiplier(seat, TechId::PublicScience), || t.tech(TechId::PublicScience).name.clone());
+        // Ticket #84: the Upload stacks on Public Science.
+        r.times(self.tech_multiplier(seat, TechId::TheUpload), || t.tech(TechId::TheUpload).name.clone());
+        r
+    }
+
+    /// Ticket #416: the Region's own Research as it is paid: halved at Unrest 7, as a building's is.
+    pub fn region_research(&self, seat: Seat, sid: StateId) -> f64 {
+        let v = self.region_research_chain(seat, sid).value();
+        if self.facilities_at_half(sid) { v / 2.0 } else { v }
     }
 
     fn replenish_standing_armies(&mut self) {
@@ -486,26 +521,28 @@ impl Game {
                 Resource::Research => {
                     // Ticket #69: an Occupied state's Lab works for the world (`neutral_research`),
                     // not for the occupier, who pays its upkeep and draws nothing.
-                    if self.state(sid).control.is_occupied() {
-                        y.research = 0;
-                    } else {
+                    // Ticket #416 (version 0.09.4): the Lab makes the Region's own Research
+                    // `lab_multiplier` times over, and this is its share, the multiplier less one. It
+                    // is carried to the tenth as a resource figure, not settled whole here, and income
+                    // adds it to the Region's own before the seat's Research is settled whole once, so
+                    // a Lab in a small Region is never rounded away.
+                    let _ = p;
+                    y.resource = Some(Resource::Research);
+                    y.does = Some(format!("x{} this Region's Research", t.region_research.lab_multiplier));
+                    if !self.state(sid).control.is_occupied() {
                         // Ticket #185 (version 0.08.0): the LIVE Education Level, which a School moves.
                         // Ticket #352 (version 0.09.1): through the chain, in the rule's order.
-                        let edu = self.education_level(sid);
-                        let mut r = Chain::base(p.amount as f64, "base");
-                        r.times(self.population_factor(sid), || format!("for {} people, weighted by Education", t.people_text(self.state(sid).population)));
-                        r.times(edu, || format!("for Education {edu:.2}"));
-                        r.times(fac.research_multiplier, || format!("as the {}", fac.name));
-                        r.times(self.tech_multiplier(seat, TechId::PublicScience), || t.tech(TechId::PublicScience).name.clone());
-                        // Ticket #84: the Upload stacks on Public Science.
-                        r.times(self.tech_multiplier(seat, TechId::TheUpload), || t.tech(TechId::TheUpload).name.clone());
-                        y.research = r.floor() as i64;
+                        // From the Region's own figure rather than its whole chain, so the Lab's
+                        // hover stays within its six lines.
+                        let mut r = Chain::base(self.region_research_chain(seat, sid).value(), "this Region's Research");
+                        r.times(t.region_research.lab_multiplier - 1.0, || "the Lab's share".to_string());
+                        y.amount = r.tenth();
                         y.chain = r;
                     }
                 }
                 Resource::Ducats => {
                     // A Bank (ticket #35): its amount times the state's gdp / 10.
-                    let mut v = Chain::base(p.amount as f64, "base");
+                    let mut v = Chain::base(p.amount, "base");
                     v.times(card.gdp as f64, || "for GDP".to_string());
                     v.over(10.0, "");
                     v.times(fac.output_multiplier, || format!("as the {}", fac.name));
@@ -519,7 +556,7 @@ impl Game {
                 // Region leans Widgets and no Tech lifts them, so the lean and Deep Mining stay
                 // Materials rules and reach the Mine alone.
                 res => {
-                    let mut v = Chain::base(p.amount as f64, "base");
+                    let mut v = Chain::base(p.amount, "base");
                     if card.resource_lean == res {
                         v.times(1.5, || format!("as this Region leans {}", res.name()));
                     }
@@ -621,7 +658,7 @@ impl Game {
                 let here = self.colonists_at_body(seat, col.body) as i64;
                 let held: Vec<BodyId> = self.bodies_held(seat).into_iter().filter(|b| *b != col.body).collect();
                 let far: f64 = held.iter().map(|b| t.body(*b).trade_pays).sum();
-                let raw = p.amount as f64 * here as f64 + far;
+                let raw = p.amount * here as f64 + far;
                 let bodies = held.iter().map(|b| format!("{} {}", b.name().trim_start_matches("the "), figure(t.body(*b).trade_pays))).collect::<Vec<_>>().join(" + ");
                 let arithmetic = if held.is_empty() { format!("{} x {here} Colonists", p.amount) } else { format!("{} x {here} Colonists + {bodies}", p.amount) };
                 let mut v = Chain::base(raw, format!("from {here} Colonists here and {} other Bodies held", held.len()));
@@ -657,7 +694,7 @@ impl Game {
                 // Ticket #188 (version 0.08.0): and the per-Colonist bonus is moderated by the
                 // Colony's schooling too, exactly as a Region's population bonus is, so the rule
                 // reads the same in both halves of the game.
-                let mut r = Chain::base(p.amount as f64, "base");
+                let mut r = Chain::base(p.amount, "base");
                 r.times(science, || "for this site's science".to_string());
                 r.times(col.education, || format!("for Education {:.2}", col.education));
                 r.times(1.0 + col.colonists as f64 * per * col.education, || format!("for {} Colonists, weighted by Education", col.colonists));
@@ -681,7 +718,7 @@ impl Game {
                 } else {
                     self.colony_yields(col).of_module(job)
                 };
-                let mut v = Chain::base(p.amount as f64, "base");
+                let mut v = Chain::base(p.amount, "base");
                 v.times(yield_, || if mc.sun_scaled { "for the sunlight here".to_string() } else { "for this site's yield".to_string() });
                 v.times(fac.output_multiplier, || format!("as the {}", fac.name));
                 v.times(self.tech_output_multiplier_module(seat, job), || "for Techs".to_string());
@@ -848,11 +885,36 @@ impl Game {
     /// one-Region seat with a lit Reactor reads a row lower than the top bar's Energy income by the
     /// relief. Nothing for a place nobody directs.
     pub fn place_output(&self, place: Place) -> Option<PlaceOutput> {
+        // Ticket #415 (version 0.09.4): summed from the very list its hovers show, so the row and
+        // its sources can never disagree.
+        let mut out = PlaceOutput::default();
+        for (r, _, v) in self.place_output_sources(place)? {
+            match r {
+                Resource::Materials => out.materials += v,
+                Resource::Fuel => out.fuel += v,
+                Resource::Energy => out.energy += v,
+                Resource::Ducats => out.ducats += v,
+                Resource::Research => out.research += v,
+                // The Widgets are the place's own figure below: a Factory's are only part of
+                // them, the Industry Level or the Core Module making the rest.
+                Resource::Widgets => {}
+            }
+        }
+        out.widgets = self.widgets_at(place) as f64;
+        Some(PlaceOutput { materials: tenth(out.materials), fuel: tenth(out.fuel), energy: tenth(out.energy), ducats: tenth(out.ducats), widgets: out.widgets, research: out.research })
+    }
+
+    /// Ticket #415 (version 0.09.4): what made each figure of `place_output`, source by source --
+    /// a working building's output under its own name, the Energy its buildings pay as one
+    /// `upkeep` line below nought, a controlled Region's economy in its Ducats -- for the Output
+    /// row's hovers. The Widgets are listed by the card's own Widgets breakdown, not here.
+    pub fn place_output_sources(&self, place: Place) -> Option<Vec<(Resource, String, f64)>> {
         let director = match place {
             Place::State(sid) => self.state(sid).control.director(),
             Place::Colony(cid) => self.colony(cid)?.control.director(),
         }?;
-        let mut out = PlaceOutput::default();
+        let mut out: Vec<(Resource, String, f64)> = Vec::new();
+        let mut upkeep = 0.0;
         for p in self.producers_of(director) {
             let (here, working) = match p.place {
                 ProducerPlace::Facility(sid, i) => (place == Place::State(sid), self.state(sid).facilities[i].working()),
@@ -861,28 +923,33 @@ impl Game {
             if !here || !working || !p.online {
                 continue;
             }
-            if let Some((r, v)) = p.output {
-                match r {
-                    Resource::Materials => out.materials += v,
-                    Resource::Fuel => out.fuel += v,
-                    Resource::Energy => out.energy += v,
-                    Resource::Ducats => out.ducats += v,
-                    Resource::Research => out.research += v,
-                    // The Widgets are the place's own figure below: a Factory's are only part of
-                    // them, the Industry Level or the Core Module making the rest.
-                    Resource::Widgets => {}
-                }
+            if let Some((r, v)) = p.output
+                && r != Resource::Widgets
+                && v.abs() > 1e-9
+            {
+                out.push((r, p.name.to_string(), v));
             }
-            out.research += p.research as f64;
-            out.energy -= p.upkeep;
+            if p.research > 0 {
+                out.push((Resource::Research, p.name.to_string(), p.research as f64));
+            }
+            upkeep += p.upkeep;
+        }
+        if upkeep > 1e-9 {
+            out.push((Resource::Energy, "upkeep".to_string(), -upkeep));
         }
         if let Place::State(sid) = place
             && matches!(self.state(sid).control, Control::Controlled(_))
         {
-            out.ducats += self.state_ducats(sid);
+            out.push((Resource::Ducats, "the economy".to_string(), self.state_ducats(sid)));
         }
-        out.widgets = self.widgets_at(place) as f64;
-        Some(PlaceOutput { materials: tenth(out.materials), fuel: tenth(out.fuel), energy: tenth(out.energy), ducats: tenth(out.ducats), widgets: out.widgets, research: out.research })
+        // Ticket #416 (version 0.09.4): the Region's own Research, to the tenth.
+        if let Place::State(sid) = place {
+            let v = tenth(self.region_research(director, sid));
+            if v > 0.0 {
+                out.push((Resource::Research, "population and Education".to_string(), v));
+            }
+        }
+        Some(out)
     }
 
     fn producers_of(&self, seat: Seat) -> Vec<Producer> {
@@ -1293,6 +1360,8 @@ impl Game {
                 .count() as f64;
         let mut gained = Stockpile::default();
         let mut research = 0;
+        // Ticket #416 (version 0.09.4): the Labs' shares, to the tenth, settled with the Regions' own.
+        let mut labs_research = 0.0;
         let mut off_earth = 0;
         let mut doubled_turns = 0;
         let mut sources: Vec<(String, Resource, f64)> = Vec::new();
@@ -1339,7 +1408,8 @@ impl Game {
                     Resource::Fuel => gained.fuel += v,
                     Resource::Energy => gained.energy += v,
                     Resource::Ducats => gained.ducats += v,
-                    Resource::Research | Resource::Widgets => {}
+                    Resource::Research => labs_research += v,
+                    Resource::Widgets => {}
                 }
                 sources.push((format!("{} in {}", p.name, where_), res, v));
             }
@@ -1438,6 +1508,14 @@ impl Game {
         // income, so it stacks with Public Science and with Provisional Findings rather than
         // competing with them. It reaches the Tech Tree, which already completes with the game half
         // run, so the sweep must report the turn the tree finishes.
+        // Ticket #416 (version 0.09.4): every Region this seat directs makes Research from its
+        // people and Education; with the Labs' shares, summed and settled whole once, so a small
+        // Region's tenths count.
+        let own: f64 = self.directed_states(seat).into_iter().map(|sid| self.region_research(seat, sid)).sum();
+        if own > 0.0 {
+            sources.push(("Population and Education".to_string(), Resource::Research, tenth(own)));
+        }
+        research += (own + labs_research).floor() as i64;
         let agreement = self.research_agreement_multiplier(seat);
         if agreement > 1.0 && research > 0 {
             let lifted = (research as f64 * agreement).floor() as i64;

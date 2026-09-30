@@ -81,13 +81,31 @@ impl Game {
                 s.stabilization_run = 0;
             }
         }
+        // Ticket #406 (version 0.09.4): the Custodians' partial credit. The counted gap at the first
+        // Climate phase is the opening figure; the best share of it closed since, and the longest
+        // run, are kept and never fall back.
+        let gap = breakdown.counted() - breakdown.total_sink();
+        if self.climate.opening_gap <= 0.0 && gap > 0.0 {
+            self.climate.opening_gap = gap;
+        }
+        if self.climate.opening_gap > 0.0 {
+            let closed = ((self.climate.opening_gap - gap) / self.climate.opening_gap).clamp(0.0, 1.0);
+            self.climate.best_gap_closed = self.climate.best_gap_closed.max(closed);
+        }
+        self.climate.best_run = self.climate.best_run.max(self.seat(Seat(0)).stabilization_run);
+        // Ticket #405 (version 0.09.4): the first Climate phase the world is EVER under the Sink,
+        // by the same test, eases every Region's Unrest once a game, whatever the next turn does.
+        if stabilized && !self.climate.under_sink_eased {
+            self.climate.under_sink_eased = true;
+            self.ease_under_the_sink();
+        }
         // Temperature follows the stock with a lag.
         let target = self.target_temperature();
         let temp = self.climate.temperature + (target - self.climate.temperature) * c.temperature_lag_fraction;
         self.climate.temperature = temp.max(c.base_temperature);
         self.climate.last = breakdown.clone();
         self.log(format!(
-            "Climate: emissions {:.1} (industry {:.1}, factories {:.1}, power {:.1}, refineries {:.1}, launches {:.1}, population {:.1}, cards {:.1}, permafrost {:.1}, war {:.1}), sink {:.1} (Scrubbers {:.1}), net {:+.1}; CO2 {:.1} ppm; temperature {:+.2} heading to {:+.2}.",
+            "Climate: emissions {:.1} (industry {:.1}, factories {:.1}, power {:.1}, refineries {:.1}, launches {:.1}, population {:.1}, cards {:.1}, permafrost {:.1}, war {:.1}), sink {:.1} (Scrubbers and Reserves {:.1}), net {:+.1}; CO2 {:.1} ppm; temperature {:+.2} heading to {:+.2}.",
             breakdown.total(),
             breakdown.state_industry,
             breakdown.factories,
@@ -374,7 +392,9 @@ impl Game {
         let mut headline = if let Some(i) = wall {
             self.state_mut(sid).facilities[i].rises_held += 1;
             let keep = self.state(sid).facilities[i].rises_held as f64 * self.tables.sea_wall.upkeep_per_rise;
-            said = self.say("sea_wall", &[("temperature", temperature.clone()), ("state", name.clone()), ("keep", crate::state::figure(keep))]);
+            // Ticket #408 (version 0.09.4): "The United States' Sea Wall", not "…States's".
+            let whose = if name.ends_with('s') { format!("{name}'") } else { format!("{name}'s") };
+            said = self.say("sea_wall", &[("temperature", temperature.clone()), ("state", name.clone()), ("whose", whose), ("keep", crate::state::figure(keep))]);
             format!("Sea level at {thr:+.1} C: the Sea Wall in {name} took the sea and stands; it costs {} Materials a turn to keep now.", crate::state::figure(keep))
         } else {
             // Ticket #56: the sea takes COASTAL slots only, and nothing once they are gone.
@@ -858,5 +878,28 @@ impl Game {
             }
         }
         false
+    }
+
+    /// Ticket #405 (version 0.09.4): the world is under the Natural Sink for the first time. Every
+    /// Region's Unrest eases by `under_sink_ease`, held or nobody's, and a Region the Custodians
+    /// hold by `under_sink_ease_custodians` instead -- the designer's ".5 / 1 for custodians". One
+    /// line for the whole Earth, as the first Colony's ease is said, and a Moment of its own.
+    fn ease_under_the_sink(&mut self) {
+        let (ease, theirs) = (self.tables.unrest.under_sink_ease, self.tables.unrest.under_sink_ease_custodians);
+        for sid in StateId::ALL {
+            let custodians = self.state(sid).control.controller().map(|s| self.kind(s) == FactionKind::Custodians).unwrap_or(false);
+            self.lower_unrest(sid, if custodians { theirs } else { ease });
+        }
+        self.log(format!("The world is under the Natural Sink for the first time: Unrest eased by {} in every Region, {} in the Custodians'.", figure(ease), figure(theirs)));
+        // The designer's words, "a half" and "a whole point", where the figures are those.
+        let words = |n: f64| match n {
+            0.5 => "a half".to_string(),
+            1.0 => "a whole point".to_string(),
+            n => figure(n),
+        };
+        let args = [("ease", words(ease)), ("custodians", words(theirs))];
+        let text = self.say("under_the_sink_eases", &args);
+        self.report_line(LineKind::Unrest, None, text);
+        self.moment(MomentKind::UnderTheSink, &args, None);
     }
 }

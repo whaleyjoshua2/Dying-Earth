@@ -30,7 +30,9 @@ name = "Refinery"
 materials = 20
 widgets = 4
 energy_upkeep = 3
-produces = { resource = "fuel", amount = 3 }
+# Ticket #421 (version 0.09.4): 4.5 Fuel off Earth, where it was 3, to pay for a Colony Ship's
+# 40-Fuel tank, at the designer's word.
+produces = { resource = "fuel", amount = 4.5 }
 earth_emissions = 1.5
 
 [[module]]

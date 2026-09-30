@@ -662,8 +662,8 @@ fn phobos_and_deimos_are_small_different_bodies_one_hop_past_mars() {
     assert_eq!(ph.name, "Phobos");
     assert_eq!(de.name, "Deimos");
     assert_eq!((ph.colony_slots(), de.colony_slots()), (2, 1));
-    assert_eq!((ph.mine_yield, ph.generator_yield, ph.refinery_yield, ph.research_yield), (1.75, 0.75, 0.5, 0.8));
-    assert_eq!((de.mine_yield, de.generator_yield, de.refinery_yield, de.research_yield), (1.0, 1.0, 0.25, 0.8));
+    assert_eq!((ph.mine_yield, ph.generator_yield, ph.refinery_yield, ph.research_yield), (1.75, 0.75, 0.625, 0.8), "Refinery a quarter up since ticket #421");
+    assert_eq!((de.mine_yield, de.generator_yield, de.refinery_yield, de.research_yield), (1.0, 1.0, 0.3125, 0.8));
     // Reach. Ticket #57 replaced the fixed card turns for a crossing between the Earth system and
     // the Mars system with the real flight: at the window it is the Hohmann 259 days, nine turns,
     // for the card's Fuel. The hops inside a system are untouched by it.
@@ -782,14 +782,14 @@ fn the_trading_window_sells_materials_fuel_and_energy_at_the_table_prices() {
     assert_eq!((left.materials, left.ducats), (20.0, 40.0));
     assert!(g.check_order(Seat(0), &pending, &factory).is_ok());
     let f = Order::Buy { resource: Resource::Fuel, amount: 2 };
-    assert_eq!(g.order_cost(Seat(0), &f).ducats, 8.0, "Fuel is 4 Ducats each since ticket #220");
+    assert_eq!(g.order_cost(Seat(0), &f).ducats, 6.0, "Fuel is 3 Ducats each since ticket #421, 4 from #220");
     let e = Order::Buy { resource: Resource::Energy, amount: 5 };
     assert_eq!(g.order_cost(Seat(0), &e).ducats, 10.0, "Energy is 2 Ducats each since ticket #220");
     assert!(g.check_order(Seat(0), &[], &Order::Buy { resource: Resource::Materials, amount: 0 }).is_err(), "a positive amount");
     assert!(g.check_order(Seat(0), &[], &Order::Buy { resource: Resource::Ducats, amount: 5 }).is_err(), "Ducats are not for sale");
     assert!(g.check_order(Seat(0), &[], &Order::Buy { resource: Resource::Materials, amount: 34 }).is_err(), "102 Ducats needed, 100 held");
     g.commit_orders(Seat(0), &[m, f, e]);
-    assert_eq!(g.seats[0].stockpile, Stockpile { materials: 10.0, fuel: 2.0, energy: 5.0, ducats: 52.0 });
+    assert_eq!(g.seats[0].stockpile, Stockpile { materials: 10.0, fuel: 2.0, energy: 5.0, ducats: 54.0 }, "Fuel at 3 since ticket #421");
 }
 
 #[test]
@@ -825,7 +825,7 @@ fn selling_materials_or_fuel_returns_half_the_buying_price() {
     let m = Order::Sell { resource: Resource::Materials, amount: 10 };
     assert_eq!(g.order_cost(Seat(0), &m).ducats, -15.0, "half of 3 Ducats each since ticket #220");
     let f = Order::Sell { resource: Resource::Fuel, amount: 2 };
-    assert_eq!(g.order_cost(Seat(0), &f).ducats, -4.0, "half of 4 Ducats each, rounded down over the lot");
+    assert_eq!(g.order_cost(Seat(0), &f).ducats, -3.0, "half of 3 Ducats each since ticket #421");
     assert!(g.check_order(Seat(0), &[], &Order::Sell { resource: Resource::Materials, amount: 11 }).is_err(), "10 held");
     assert!(g.check_order(Seat(0), &[], &Order::Sell { resource: Resource::Energy, amount: 5 }).is_err(), "Energy is not bought back");
     // The Ducats from a sale are spendable at once.
@@ -834,7 +834,7 @@ fn selling_materials_or_fuel_returns_half_the_buying_price() {
     assert_eq!((left.materials, left.ducats), (0.0, 15.0));
     assert!(g.check_order(Seat(0), &pending, &Order::BuyInfluence { amount: 5 }).is_ok());
     g.commit_orders(Seat(0), &[m, f]);
-    assert_eq!(g.seats[0].stockpile, Stockpile { materials: 0.0, fuel: 0.0, energy: 20.0, ducats: 19.0 });
+    assert_eq!(g.seats[0].stockpile, Stockpile { materials: 0.0, fuel: 0.0, energy: 20.0, ducats: 18.0 }, "15 and 3, Fuel at 3 since ticket #421");
 }
 
 // ---------------------------------------------------------------- #36 Embassies and Relays
@@ -1400,9 +1400,10 @@ fn tech_deep_mining_raises_mine_output_on_earth_and_off_it() {
 fn tech_automated_refining_raises_refinery_output() {
     let mut g = game();
     g.state_mut(StateId::EastAsia).facilities = vec![facility(FacilityKind::Refinery)];
-    assert_eq!(income_of(&mut g, Seat(0)).fuel, 3.0);
+    // Ticket #421 (version 0.09.4): a Refinery on Earth makes 4, where it made 3.
+    assert_eq!(income_of(&mut g, Seat(0)).fuel, 4.0);
     with_tech(&mut g, TechId::AutomatedRefining);
-    assert_eq!(income_of(&mut g, Seat(0)).fuel, 4.5, "4.5, to the tenth"); // Ticket #387: where 4 was floored
+    assert_eq!(income_of(&mut g, Seat(0)).fuel, 6.0, "4 x 1.5");
 }
 
 #[test]
@@ -1412,12 +1413,15 @@ fn tech_public_science_raises_research_lab_output() {
     g.research.current = Some(TechId::CleanPower);
     g.research.done.push(TechId::EfficientGrids);
     g.seats[0].stockpile.energy = 1000.0;
+    // Ticket #416 (version 0.09.4): the Lab's share of East Asia's own, 1 x 1.32 x 1.10 x 1.25 =
+    // 1.815, is a half: 0.91, to the tenth 0.9; with Public Science x1.5, 1.36, to the tenth 1.4.
+    assert_eq!(g.facility_yield(Seat(0), StateId::EastAsia, FacilityKind::ResearchLab).amount, 0.9);
     g.income_phase();
-    // Ticket #53, East Asia: 2 x (1 + 16.4/50) x 1.1 x 1.25 = 3.65 -> 3
-    assert_eq!(g.seats[0].research_last_turn, 3);
+    let before = g.seats[0].research_last_turn;
     with_tech(&mut g, TechId::PublicScience);
+    assert_eq!(g.facility_yield(Seat(0), StateId::EastAsia, FacilityKind::ResearchLab).amount, 1.4);
     g.income_phase();
-    assert_eq!(g.seats[0].research_last_turn, 5, "5.48 rounded down");
+    assert!(g.seats[0].research_last_turn > before, "and the seat's Research rises with it: {before} then {}", g.seats[0].research_last_turn);
 }
 
 #[test]
@@ -1523,7 +1527,9 @@ fn building_yields_on_the_card_equal_what_income_pays() {
     g.research.done.push(TechId::DeepMining);
     g.research.current = Some(TechId::CleanPower);
     let mut expect = Stockpile::default();
-    let mut research = 0;
+    // Ticket #416 (version 0.09.4): every directed Region's own Research and every Lab's share, to
+    // the tenth, settled whole once.
+    let mut research_f: f64 = g.directed_states(Seat(0)).into_iter().map(|sid| g.region_research(Seat(0), sid)).sum();
     for sid in [StateId::EastAsia, StateId::NorthAfrica] {
         for f in &g.state(sid).facilities {
             let y = g.facility_yield(Seat(0), sid, f.kind);
@@ -1531,12 +1537,13 @@ fn building_yields_on_the_card_equal_what_income_pays() {
                 Some(Resource::Materials) => expect.materials += y.amount,
                 Some(Resource::Fuel) => expect.fuel += y.amount,
                 Some(Resource::Energy) => expect.energy += y.amount,
+                Some(Resource::Research) => research_f += y.amount,
                 _ => {}
             }
-            research += y.research;
             expect.energy -= y.upkeep;
         }
     }
+    let research = research_f.floor() as i64;
     for m in &g.colony(c).unwrap().modules {
         let y = g.module_yield(Seat(0), c, m.kind);
         match y.resource {
@@ -2017,7 +2024,8 @@ fn a_colony_ship(g: &mut Game, seat: Seat, body: BodyId) -> ShipId {
         escaped: false,
         arrived_this_turn: false,
         built_turn: 1,
-        fuel: 30.0, slot: None,
+        // Ticket #420 (version 0.09.4): a Colony Ship's tank is 40, full.
+        fuel: 40.0, slot: None,
     });
     id
 }
@@ -2401,13 +2409,16 @@ fn provisional_findings_halves_the_tech_under_research_and_goes_off_the_turn_aft
     // already placed. A pick made during this turn is read from the next one; the test stands the
     // frozen Tech up by hand rather than running a turn, which would move everything else it reads.
     g.research.findings_tech = g.research.current;
+    // Ticket #416 (version 0.09.4): every Region makes Research now, and three Incomes would finish
+    // Public Science under the test; held far short of its cost so it stays the Tech under research.
+    g.research.progress = -1_000_000;
     // A multiplier of 1.5 reads 1.25; nobody else reads an unfinished Tech at all.
     assert!(g.provisional_findings(Seat(3)), "on at the start: nobody has funded yet");
     assert!((g.tech_multiplier(Seat(3), TechId::PublicScience) - 1.25).abs() < 1e-9);
     assert_eq!(g.tech_multiplier(Seat(0), TechId::PublicScience), 1.0);
     // An addition of +2 reads +1, and an immunity does not carry at all.
     assert_eq!(g.tech_addition(Seat(3), TechId::ExpandedHabitats), 0, "only the Tech under research");
-    let with = g.facility_yield(Seat(3), StateId::Europe, FacilityKind::ResearchLab).research;
+    let with = g.facility_yield(Seat(3), StateId::Europe, FacilityKind::ResearchLab).amount;
     // Version 0.07.0: the declaration is made in one turn and paid at the next Income, so it is
     // that Income which funds, and the Income after it that finds Provisional Findings gone.
     g.commit_orders(Seat(3), &[Order::SetResearchDirective { percent: 100 }]);
@@ -2419,7 +2430,7 @@ fn provisional_findings_halves_the_tech_under_research_and_goes_off_the_turn_aft
     g.income_phase();
     assert!(!g.provisional_findings(Seat(3)), "they funded last turn");
     assert_eq!(g.tech_multiplier(Seat(3), TechId::PublicScience), 1.0);
-    let without = g.facility_yield(Seat(3), StateId::Europe, FacilityKind::ResearchLab).research;
+    let without = g.facility_yield(Seat(3), StateId::Europe, FacilityKind::ResearchLab).amount;
     assert!(without < with, "the Lab made {with} with Provisional Findings and {without} without");
     // A turn of contributing switches it back on.
     g.income_phase();
@@ -2509,6 +2520,81 @@ fn an_ai_with_no_station_over_earth_orders_one_from_its_launch_site() {
         orders.iter().any(|o| matches!(o, Order::BuildStation { body: BodyId::Earth, .. })),
         "the Arkwright AI never orders a station over Earth: {orders:?}"
     );
+}
+
+/// Ticket #416 (version 0.09.4): every Region makes Research from its Education now, so the
+/// computer seats weigh a School where no Lab stands; until this ticket they waited for a Lab.
+#[test]
+fn the_ai_builds_a_school_where_no_lab_stands() {
+    let mut schools = 0;
+    for seed in 1..=12u64 {
+        let mut g = Game::new(tables(), NewGame { seed, player: FactionKind::Custodians, player_is_ai: true, player_start: StateId::EastAsia });
+        for st in &mut g.states {
+            st.facilities.retain(|f| f.kind != FacilityKind::ResearchLab);
+        }
+        for s in Seat::ALL {
+            g.seats[s.index()].stockpile.materials = 500.0;
+            g.seats[s.index()].stockpile.energy = 500.0;
+            g.seats[s.index()].stockpile.ducats = 500.0;
+            schools += g.ai_orders(s).iter().filter(|o| matches!(o, Order::BuildFacility { kind: FacilityKind::School, .. } | Order::BuildFacilityWithDucats { kind: FacilityKind::School, .. })).count();
+        }
+    }
+    assert!(schools > 0, "no seat ordered a School in 48 seatings with no Lab on Earth");
+}
+
+/// Ticket #421 (version 0.09.4): a computer seat short of the Fuel a Colony Ship's tank or a
+/// Refuel wants buys the rest at the market, where before it bought only Materials.
+#[test]
+fn the_ai_buys_fuel_for_a_colony_ship_or_a_refuel() {
+    let mut g = game();
+    calm(&mut g);
+    g.seats[0].stockpile.fuel = 10.0;
+    g.seats[0].stockpile.ducats = 500.0;
+    assert!(matches!(g.ai_fuel_top_up(Seat(0), 40.0), Some(Order::Buy { resource: Resource::Fuel, amount: 30 })), "40 wanted, 10 held: 30 bought");
+    assert!(g.ai_fuel_top_up(Seat(0), 8.0).is_none(), "enough held");
+    g.seats[0].stockpile.ducats = 20.0;
+    assert!(g.ai_fuel_top_up(Seat(0), 40.0).is_none(), "90 Ducats wanted, 20 held");
+    // An empty Frigate at the ISS's ring with 5 in a tank of 30 and no Fuel in the Stockpile.
+    g.seats[0].stockpile.fuel = 0.0;
+    g.seats[0].stockpile.ducats = 500.0;
+    let (ship, _) = colony_ship_ready(&mut g, BodyId::Earth);
+    let iss_slot = g.colonies.iter().find(|c| c.in_orbit && c.body == BodyId::Earth && c.control.director() == Some(Seat(0))).map(|c| c.slot).expect("the ISS");
+    let s = g.ship_mut(ship).unwrap();
+    s.kind = UnitKind::Frigate;
+    s.colonists = 0;
+    s.fuel = 5.0;
+    s.slot = Some(iss_slot);
+    // The purchase and the Refuel pass the checks together from an empty Stockpile, the Refuel
+    // priced at the 25 the Buy leaves, and commit leaves nothing below nought.
+    let buy = Order::Buy { resource: Resource::Fuel, amount: 25 };
+    let refuel = Order::Refuel { ship };
+    assert_eq!(g.check_order(Seat(0), std::slice::from_ref(&buy), &refuel).map(|c| c.fuel), Ok(25.0), "the Refuel takes what the Buy brings");
+    // A later order cannot spend the Fuel the Refuel will take: 24 bought, 1 held, 25 into the tank.
+    g.seats[0].stockpile.fuel = 1.0;
+    let queued = vec![Order::Buy { resource: Resource::Fuel, amount: 24 }, refuel.clone(), Order::Buy { resource: Resource::Fuel, amount: 39 }];
+    assert_eq!(g.remaining(Seat(0), &queued).0.fuel, 39.0, "25 of the 64 went into the tank");
+    let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
+    g.colony_mut(iss).unwrap().modules.push(Module::new(ModuleKind::Shipyard));
+    assert!(g.check_order(Seat(0), &queued, &Order::BuildShip { site: Place::Colony(iss), kind: UnitKind::ColonyShip }).is_err(), "40 wanted, 39 left");
+    g.seats[0].stockpile.fuel = 0.0;
+    // And the computer takes it, where Influence cannot outbid it for the Ducats.
+    let mut t = Tables::load(&default_data_dir()).expect("tables load");
+    t.ducats.per_influence = 1_000_000;
+    let mut h = Game::new(Arc::new(t), NewGame { seed: 7, player: FactionKind::Custodians, player_is_ai: false, player_start: StateId::EastAsia });
+    calm(&mut h);
+    h.seats[0].stockpile.fuel = 0.0;
+    h.seats[0].stockpile.ducats = 500.0;
+    let (ship, _) = colony_ship_ready(&mut h, BodyId::Earth);
+    let s = h.ship_mut(ship).unwrap();
+    s.kind = UnitKind::Frigate;
+    s.colonists = 0;
+    s.fuel = 5.0;
+    s.slot = Some(iss_slot);
+    let orders = h.ai_orders(Seat(0));
+    let at = |o: &Order| orders.iter().position(|x| x == o);
+    assert!(at(&Order::Refuel { ship }).is_some() && at(&Order::Buy { resource: Resource::Fuel, amount: 25 }) < at(&Order::Refuel { ship }), "it buys the 25, then refuels: {orders:?}");
+    h.commit_orders(Seat(0), &orders);
+    assert!(h.seats[0].stockpile.fuel >= 0.0, "and the Stockpile holds no less than nought: {}", h.seats[0].stockpile.fuel);
 }
 
 #[test]
@@ -4334,7 +4420,7 @@ fn d2_every_rise_turns_one_inland_slot_coastal_wall_or_no_wall() {
     g.apply_sea_threshold(sid, 1);
     assert_eq!(g.state(sid).facilities.len(), before, "the wall held: nothing drowned");
     assert_eq!((g.coastal_slots(sid), g.inland_slots(sid)), (4, 1), "and one more inland slot turned coastal behind it");
-    assert!(g.report.lines.iter().any(|l| l.text.contains("took the sea") && l.text.contains("one slot further in")), "the held-rise line says both: {:?}", g.report.lines);
+    assert!(g.report.lines.iter().any(|l| l.text.contains("held the sea") && l.text.contains("one slot further in")), "the held-rise line says both: {:?}", g.report.lines);
 
     // No empty inland slot left: the oldest inland Facility turns with its slot.
     g.apply_sea_threshold(sid, 2);
@@ -4402,7 +4488,7 @@ fn e_the_sea_wall_needs_its_tech_takes_no_slot_and_takes_one_threshold() {
     assert_eq!(g.coastal_slots(sid), before + 1, "and one inland slot turned coastal behind it, wall or no wall");
     let wall = g.state(sid).facilities.iter().find(|f| f.kind == FacilityKind::SeaWall).expect("the wall stands");
     assert_eq!(wall.rises_held, 1, "and counts the rise it held");
-    assert!(g.report.lines.iter().any(|l| l.text.contains("Sea Wall") && l.text.contains("dearer to keep")), "the Report says so: {:?}", g.report.lines);
+    assert!(g.report.lines.iter().any(|l| l.text.contains("Sea Wall held the sea")), "the Report says so: {:?}", g.report.lines);
     // The next one is held too.
     g.apply_sea_threshold(sid, 1);
     assert_eq!(g.state(sid).lost_slots, 0, "the wall holds every threshold, not one");
@@ -4445,8 +4531,10 @@ fn f_coastal_engineering_is_the_thirteenth_tech() {
     // Ticket #201 (version 0.08.1): eighteen, with Civil Defense on Society rung 2.
     // Ticket #343 (version 0.09.1): twenty-one, with Missile Technology on Propulsion rung 3.
     // Ticket #393 (version 0.09.3): twenty-two, with Nuclear Rockets on Propulsion rung 2.
-    assert_eq!(TechId::ALL.len(), 22, "thirteen Techs, the four gates, Civil Defense, #232's two, Missile Technology and Nuclear Rockets");
-    assert_eq!(g.tables.techs.len(), 22, "and twenty-two rows in techs.toml");
+    // Ticket #413 (version 0.09.4): twenty-three, with Orbital Refuelling on Propulsion rung 1.
+    // Ticket #420 (version 0.09.4): twenty-four, with Cryogenic Tanks on Propulsion rung 2.
+    assert_eq!(TechId::ALL.len(), 24, "thirteen Techs, the four gates, Civil Defense, #232's two, Missile Technology, Nuclear Rockets, Orbital Refuelling and Cryogenic Tanks");
+    assert_eq!(g.tables.techs.len(), 24, "and twenty-four rows in techs.toml");
     let c = g.tables.tech(TechId::CoastalEngineering);
     assert_eq!(c.name, "Coastal Engineering");
     assert_eq!(c.branch, "Industry");
@@ -4465,8 +4553,8 @@ fn f_coastal_engineering_is_the_thirteenth_tech() {
     // tickets #182 to #186 -- the Investment Bank, the Spaceport, the Reactor and the Academy.
     assert_eq!(g.tables.facility(FacilityKind::SeaWall).needs_tech, Some(TechId::CoastalEngineering));
     // Ticket #332 (version 0.09.0): and the Mine, sixteen. Ticket #389 (version 0.09.3): and the
-    // Stadium, seventeen.
-    assert_eq!(FacilityKind::ALL.len(), 17, "seventeen Facilities");
+    // Stadium, seventeen. Ticket #411 (version 0.09.4): and the Nature Reserve, eighteen.
+    assert_eq!(FacilityKind::ALL.len(), 18, "eighteen Facilities");
 }
 
 /// (g) Antarctica opens the first Climate phase the Temperature stands at +1.6, stays open, and its
@@ -4792,7 +4880,7 @@ fn a_modules_output_uses_its_own_slots_yield() {
     let mut slots: Vec<u32> = (0..card.colony_slots()).collect();
     slots.sort_by(|a, b| g.slot_yields(BodyId::Mars, *a).mine.partial_cmp(&g.slot_yields(BodyId::Mars, *b).mine).unwrap());
     let (poor, rich) = (slots[0], *slots.last().unwrap());
-    let mine_amount = g.tables.module(ModuleKind::Mine).produces.as_ref().unwrap().amount as f64;
+    let mine_amount = g.tables.module(ModuleKind::Mine).produces.as_ref().unwrap().amount;
     for slot in [poor, rich] {
         let id = ColonyId(g.fresh_id());
         g.colonies.push(Colony {
@@ -4841,7 +4929,7 @@ fn a_modules_output_uses_its_own_slots_yield() {
     assert!((g.research_yield_at(g.colony(rich_id).unwrap()) - science).abs() < 1e-9, "an Observatory on the ground reads its slot's Research yield");
     assert!((g.research_yield_at(g.colony(iss).unwrap()) - g.tables.body(BodyId::Earth).research_yield).abs() < 1e-9, "a station's Observatory reads its Body's");
     g.colony_mut(rich_id).unwrap().modules.push(Module::new(ModuleKind::Observatory));
-    let base = g.tables.module(ModuleKind::Observatory).produces.as_ref().map(|p| p.amount).unwrap_or(0) as f64;
+    let base = g.tables.module(ModuleKind::Observatory).produces.as_ref().map(|p| p.amount).unwrap_or(0.0);
     let colonists = g.colony(rich_id).unwrap().colonists as f64;
     let per_colonist = g.tables.observatory.research_per_colonist;
     let want = (base * science * (1.0 + colonists * per_colonist) * g.tables.faction(g.kind(Seat(0))).research_multiplier_off_earth.unwrap_or(g.tables.faction(g.kind(Seat(0))).research_multiplier)).floor() as i64;
@@ -5021,7 +5109,8 @@ fn the_ai_banks_fuel_when_the_mars_window_is_within_two_turns() {
                 escaped: false,
                 arrived_this_turn: false,
                 built_turn: 1,
-                fuel: 30.0, slot: None,
+                // Ticket #420 (version 0.09.4): each tank full, a Colony Ship's 40.
+                fuel: if kind == UnitKind::ColonyShip { 40.0 } else { 30.0 }, slot: None,
             });
         }
         g
@@ -5109,7 +5198,8 @@ fn colony_ship_ready(g: &mut Game, body: BodyId) -> (ShipId, Order) {
         escaped: false,
         arrived_this_turn: false,
         built_turn: turn,
-        fuel: 30.0, slot: None,
+        // Ticket #420 (version 0.09.4): a Colony Ship's tank is 40, full.
+        fuel: 40.0, slot: None,
     });
     // Ticket #93: a Body with no Colony Slots (Venus) gets slot 0, an order the check will refuse.
     let slot = g.free_slots_on(body).first().copied().unwrap_or(0);
@@ -5200,7 +5290,9 @@ fn every_report_line_carries_its_kind_and_place_and_falls_under_the_right_headin
     assert_eq!(LineKind::BuildComplete.section(Some(ReportPlace::Body(BodyId::Mars))), Section::InSpace);
     assert_eq!(LineKind::Unrest.section(Some(ReportPlace::State(StateId::Europe))), Section::OnEarth);
 
-    // The headings partition the report: every line but the headline appears exactly once.
+    // The headings partition the report: every line but the headline appears exactly once. Ticket
+    // #404 (version 0.09.4): a place changing hands to or from the player is under Your works as
+    // well; this report has none, so the partition still holds.
     let grouped: usize = g.report.sections().iter().map(|(_, l)| l.len()).sum();
     assert_eq!(grouped, g.report.lines.len() - 1, "every line but the headline is under a heading");
     let names: Vec<&str> = g.report.sections().iter().map(|(s, _)| s.name()).collect();
@@ -5661,41 +5753,87 @@ fn north_america_and_south_east_asia_start_with_an_inland_research_lab() {
     assert_eq!(have, vec![FacilityKind::PowerPlant, FacilityKind::Factory, FacilityKind::Mine, FacilityKind::Refinery, FacilityKind::LaunchSite], "a held North America carries the package and no Lab");
 }
 
-/// Ticket #69 (b): a Lab in a state nobody holds runs itself, pays no Energy, and pays half its
-/// yield (rounded down) into the Tech under research, counting toward nobody's Research Lead; under
-/// Occupation the half still flows and the occupier pays the upkeep but draws no Research; held, the
-/// Lab is the holder's, whole.
+/// Ticket #69 (b), and ticket #416 (version 0.09.4): a Region nobody holds makes its own Research
+/// at half, its Labs multiplying it as a held Region's do, into the Tech under research and nobody's
+/// Research Lead; under Occupation the occupier takes the Region's own and the Lab's share still
+/// goes to the world at half, the occupier paying the Lab's upkeep; held, all of it is the holder's.
 #[test]
 fn a_neutral_states_lab_pays_half_its_yield_into_the_tech_and_nobodys_lead() {
     let mut g = game();
     g.pick_tech(Seat(0), TechId::PublicScience).unwrap();
-    // The only Lab in the world stands in a neutral North America.
     for st in &mut g.states {
         st.facilities.retain(|f| f.kind != FacilityKind::ResearchLab);
     }
     g.state_mut(StateId::NorthAmerica).control = Control::Neutral;
+    // North America's own: 1 x 1.114 x 1.5 = 1.671; nobody's, at half, 0.836.
+    assert!((g.world_research(StateId::NorthAmerica) - 0.8355).abs() < 1e-3, "{}", g.world_research(StateId::NorthAmerica));
+    // With a Lab, x1.5: 2.507, at half 1.253.
     g.state_mut(StateId::NorthAmerica).facilities.push(facility(FacilityKind::ResearchLab));
-    // A Faction's Lab there makes 3 (2 x 1.076 x 1.5, rounded down); the world gets half of that: 1.
-    assert_eq!(g.facility_yield(Seat(2), StateId::NorthAmerica, FacilityKind::ResearchLab).research, 3, "the Arkwrights, at Research x1.0");
+    assert!((g.world_research(StateId::NorthAmerica) - 1.25325).abs() < 1e-3, "{}", g.world_research(StateId::NorthAmerica));
+    // One Lab's share for the world, which its box shows: 1.671 x 0.5 x 0.5 = 0.418.
+    assert!((g.world_lab_share(StateId::NorthAmerica) - 0.41775).abs() < 1e-3, "{}", g.world_lab_share(StateId::NorthAmerica));
+    let world: f64 = StateId::ALL.into_iter().map(|s| g.world_research(s)).sum();
+    assert!(world > 1.25325, "every neutral Region pays, not only the one with a Lab: {world}");
     let before = g.research.progress;
+    g.research.contributions = [0; 4];
     g.income_phase();
-    assert_eq!(g.research.progress - before, 1, "half of one Lab, rounded down");
-    assert_eq!(g.research.contributions, [0; 4], "and nobody's Lead");
-    assert!(g.report.lines.iter().any(|l| l.text.contains("The United States") && l.text.contains("Research")), "the Report says so: {:?}", g.report.lines);
-    // Occupied: the half still flows; the occupier pays the 3 Energy and draws nothing from it.
+    let seats: i64 = Seat::ALL.into_iter().map(|s| g.seat(s).research_last_turn).sum();
+    assert_eq!(g.research.progress - before, seats + world.floor() as i64, "the seats' Research and the world's share reach the Tech");
+    assert_eq!(g.research.contributions.iter().sum::<i64>(), seats, "and the world's share counts toward nobody's Lead");
+    assert!(g.report.lines.iter().any(|l| l.text == format!("Regions in no one's hands added {} Research.", world.floor() as i64)), "the Report says so: {:?}", g.report.lines);
+    // Occupied: the occupier takes the Region's own; the Lab's share, 1.671 x 0.5, goes to the
+    // world at half, 0.42; the occupier pays the 3 Energy and draws no Lab share.
     g.state_mut(StateId::NorthAmerica).control = Control::Occupied { occupier: Seat(2), previous: None, turns: 1, banked: 0 };
     let y = g.facility_yield(Seat(2), StateId::NorthAmerica, FacilityKind::ResearchLab);
-    assert_eq!((y.research, y.upkeep), (0, 3.0), "the occupier pays for a Lab that works for the world");
-    let before = g.research.progress;
-    g.income_phase();
-    assert_eq!(g.research.progress - before, 1);
-    assert_eq!(g.research.contributions[2], 0);
-    // Held: whole, and the holder's.
+    assert_eq!((y.amount, y.upkeep), (0.0, 3.0), "the occupier pays for a Lab that works for the world");
+    assert!((g.world_research(StateId::NorthAmerica) - 0.41775).abs() < 1e-3, "{}", g.world_research(StateId::NorthAmerica));
+    assert!((g.region_research(Seat(2), StateId::NorthAmerica) - 1.671).abs() < 1e-3, "the occupier's own: {}", g.region_research(Seat(2), StateId::NorthAmerica));
+    // Neutral again, at Unrest 7: halved, 1.253 to 0.627.
+    g.state_mut(StateId::NorthAmerica).control = Control::Neutral;
+    g.state_mut(StateId::NorthAmerica).unrest = 7.0;
+    assert!((g.world_research(StateId::NorthAmerica) - 0.626625).abs() < 1e-3, "{}", g.world_research(StateId::NorthAmerica));
+    g.state_mut(StateId::NorthAmerica).unrest = 0.0;
+    // Held: the holder's own and its Lab's share, 0.836, to the tenth 0.8; nothing to the world.
     g.state_mut(StateId::NorthAmerica).control = Control::Controlled(Seat(2));
-    let before = g.research.progress;
+    assert_eq!(g.world_research(StateId::NorthAmerica), 0.0);
+    assert_eq!(g.facility_yield(Seat(2), StateId::NorthAmerica, FacilityKind::ResearchLab).amount, 0.8);
+}
+
+/// Ticket #416 (version 0.09.4): a Region makes Research with no Lab in it, from its people and
+/// its schooling; a Lab makes it x1.5; Unrest 7 halves both; and the seat's Research is its
+/// Regions' own and its Labs' shares summed to the tenth and settled whole ONCE, so a Lab's 0.9 in a
+/// small Region is never rounded away.
+#[test]
+fn a_region_makes_research_without_a_lab_and_a_lab_makes_it_half_again() {
+    let mut g = game();
+    assert_eq!(g.kind(Seat(0)), FactionKind::Custodians);
+    for st in &mut g.states {
+        st.facilities.retain(|f| f.kind != FacilityKind::ResearchLab);
+    }
+    // East Asia, the Custodians': 1 x 1.32 x 1.10 x 1.25 = 1.815, with no Lab.
+    let own = g.region_research(Seat(0), StateId::EastAsia);
+    assert!((own - 1.815).abs() < 0.01, "{own}");
+    g.seats[0].stockpile.energy = 1000.0;
     g.income_phase();
-    assert_eq!(g.research.progress - before, 3);
-    assert_eq!(g.research.contributions[2], 3, "a held Lab counts toward the Lead as it always did");
+    let bare = g.seats[0].research_last_turn;
+    assert!(bare > 0, "a seat with no Lab makes Research");
+    let sum: f64 = g.directed_states(Seat(0)).into_iter().map(|s| g.region_research(Seat(0), s)).sum();
+    assert_eq!(bare, sum.floor() as i64, "its Regions' own, settled whole once");
+    // A Lab: half again of the Region's own, 0.9, added before the settling.
+    g.state_mut(StateId::EastAsia).facilities.push(facility(FacilityKind::ResearchLab));
+    let lab = g.facility_yield(Seat(0), StateId::EastAsia, FacilityKind::ResearchLab);
+    assert_eq!(lab.amount, 0.9);
+    assert_eq!(lab.does.as_deref(), Some("x1.5 this Region's Research"));
+    g.income_phase();
+    assert_eq!(g.seats[0].research_last_turn, (sum + 0.9).floor() as i64, "the Lab's 0.9 counts");
+    // The Output row's hover names both, to the tenth.
+    let sources = g.place_output_sources(Place::State(StateId::EastAsia)).unwrap();
+    assert!(sources.contains(&(Resource::Research, "population and Education".to_string(), 1.8)), "{sources:?}");
+    assert!(sources.contains(&(Resource::Research, "Research Lab".to_string(), 0.9)), "{sources:?}");
+    // Unrest 7 halves the Region's own and the Lab's share.
+    g.state_mut(StateId::EastAsia).unrest = 7.0;
+    assert!((g.region_research(Seat(0), StateId::EastAsia) - own / 2.0).abs() < 1e-9);
+    assert_eq!(g.facility_yield(Seat(0), StateId::EastAsia, FacilityKind::ResearchLab).amount, 0.5, "0.9 halved to the tenth");
 }
 
 /// Ticket #69 (c): Coastal Engineering on Industry rung 1, cheaper than the rung it stands on and
@@ -5823,12 +5961,13 @@ fn twenty_five_hundred_ducats_in_the_fund_is_the_prospectors_first_part() {
     assert!(matches!(g.outcome, Some(Outcome::Win { seat, .. }) if seat == pro), "{:?}", g.outcome);
 }
 
-/// Ticket #72 (d): the Moon's four yields up a tenth.
+/// Ticket #72 (d): the Moon's four yields up a tenth. Ticket #421 (version 0.09.4): its Refinery
+/// yield a quarter up again, 0.55 to 0.6875.
 #[test]
 fn the_moons_four_yields_are_up_a_tenth() {
     let g = game();
     let m = g.tables.body(BodyId::Moon);
-    assert!((m.mine_yield - 1.65).abs() < 1e-9 && (m.generator_yield - 1.375).abs() < 1e-9 && (m.refinery_yield - 0.55).abs() < 1e-9 && (m.research_yield - 1.0).abs() < 1e-9, "{:?}", (m.mine_yield, m.generator_yield, m.refinery_yield, m.research_yield));
+    assert!((m.mine_yield - 1.65).abs() < 1e-9 && (m.generator_yield - 1.375).abs() < 1e-9 && (m.refinery_yield - 0.6875).abs() < 1e-9 && (m.research_yield - 1.0).abs() < 1e-9, "{:?}", (m.mine_yield, m.generator_yield, m.refinery_yield, m.research_yield));
 }
 
 /// Ticket #72 (e): the Prospector AI plays the share as a strategy: nothing before the pace's first
@@ -6372,10 +6511,10 @@ fn the_custodian_pairs_and_nobody_elses() {
     d.sort();
     assert_eq!(d, vec![(moon, 0), (moon, 1), (moon, 2)]);
     with_tech(&mut g, TechId::EfficientGrids);
-    // Generator 5 x 1.375 x 1.5 = 10.3 to the tenth, doubled 20.6; Refinery 3 x 0.55 = 1.65, to the tenth 1.7, doubled 3.4 (ticket #387);
+    // Generator 5 x 1.375 x 1.5 = 10.3 to the tenth, doubled 20.6; Refinery 4.5 x 0.6875 = 3.09, to the tenth 3.1, doubled 6.2 (ticket #421);
     // Observatory 2 x 1.2 x 1.25 = 3, doubled 6.
     assert_eq!(g.module_yield_at(cus, moon, 0).amount, 20.6);
-    assert_eq!(g.module_yield_at(cus, moon, 1).amount, 3.4);
+    assert_eq!(g.module_yield_at(cus, moon, 1).amount, 6.2);
     assert_eq!(g.module_yield_at(cus, moon, 2).research, 6);
     let pro = Seat(1);
     let theirs = colony(&mut g, pro, BodyId::Moon, &[ModuleKind::Mine], 0);
@@ -6466,7 +6605,7 @@ fn the_prospectors_buy_at_fifteen_per_cent_off() {
     let buy = |r, n| Order::Buy { resource: r, amount: n };
     assert_eq!(g.order_cost(cus, &buy(Resource::Materials, 10)).ducats, 30.0);
     assert_eq!(g.order_cost(pro, &buy(Resource::Materials, 10)).ducats, 25.5, "30 x 0.85 = 25.5"); // Ticket #387: to the tenth, where 25 was floored
-    assert_eq!(g.order_cost(pro, &buy(Resource::Fuel, 5)).ducats, 17.0, "20 x 0.85 = 17.0");
+    assert_eq!(g.order_cost(pro, &buy(Resource::Fuel, 5)).ducats, 12.8, "15 x 0.85 = 12.75, to the tenth (Fuel at 3 since ticket #421)");
     assert_eq!(g.order_cost(pro, &buy(Resource::Energy, 10)).ducats, 17.0, "20 x 0.85 = 17.0");
     assert_eq!(g.order_cost(pro, &Order::BuyInfluence { amount: 5 }).ducats, 10.0, "Influence is not a commodity");
     assert_eq!(g.order_cost(pro, &Order::Sell { resource: Resource::Materials, amount: 10 }).ducats, -15.0, "selling is not discounted: half of 3 each, undiscounted");
@@ -6522,7 +6661,7 @@ fn the_four_gates_stand_on_rung_three_at_one_price_with_their_prerequisites() {
         assert_eq!(card.needs, needs, "{t:?}");
         assert_eq!(g.tables.victory_gate(kind), Some(t));
     }
-    assert_eq!(TechId::ALL.len(), 22, "eighteen, Beneficiation and Relay Networks since ticket #232, Missile Technology since #343, Nuclear Rockets since #393");
+    assert_eq!(TechId::ALL.len(), 24, "eighteen, Beneficiation and Relay Networks since ticket #232, Missile Technology since #343, Nuclear Rockets since #393, Orbital Refuelling since #413, Cryogenic Tanks since #420");
     // Version 0.08.3 moved three of the four gates' prerequisites in three separate tickets, and
     // nothing watched how deep each gate ended up. Counted as Techs that must stand before the
     // gate is reachable, the gate excluded.
@@ -6575,10 +6714,10 @@ fn the_gates_general_bonuses_are_for_everyone() {
     with_tech(&mut g, TechId::ExtractionCharter);
     assert_eq!(g.module_yield(cus, moon, ModuleKind::Mine).amount, 8.3, "4 x 1.65 x 1.25 = 8.25, to the tenth");
     assert_eq!(g.module_yield(cus, moon, ModuleKind::Observatory).research, 2, "2 x 1.25 = 2.5");
-    let lab_before = g.facility_yield(cus, StateId::EastAsia, FacilityKind::ResearchLab).research;
+    let lab_before = g.facility_yield(cus, StateId::EastAsia, FacilityKind::ResearchLab).amount;
     with_tech(&mut g, TechId::TheUpload);
     assert_eq!(g.module_yield(cus, moon, ModuleKind::Observatory).research, 3, "2 x 1.25 x 1.25 = 3.125");
-    assert!(g.facility_yield(cus, StateId::EastAsia, FacilityKind::ResearchLab).research > lab_before, "a Lab makes more too");
+    assert!(g.facility_yield(cus, StateId::EastAsia, FacilityKind::ResearchLab).amount > lab_before, "a Lab makes more too");
     assert_eq!(g.colony_ship_capacity(cus), 4);
     with_tech(&mut g, TechId::GenerationShips);
     assert_eq!(g.colony_ship_capacity(cus), 6);
@@ -6765,8 +6904,9 @@ fn the_ai_lifts_a_crowded_load_only_when_behind_on_presence() {
 #[test]
 fn a_ship_is_built_with_a_full_tank_paid_from_the_stockpile() {
     let mut g = game();
+    // Ticket #420 (version 0.09.4): the Colony Ship's is 40, every warship's 30.
     for k in UnitKind::SHIPS {
-        assert_eq!(g.tables.unit(k).tank, 30, "{k:?}");
+        assert_eq!(g.tables.unit(k).tank, if k == UnitKind::ColonyShip { 40 } else { 30 }, "{k:?}");
     }
     assert_eq!(g.tables.unit(UnitKind::Army).tank, 0);
     let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
@@ -6855,7 +6995,7 @@ fn refuel_is_an_order_at_a_station_of_your_own_and_a_station_rescues_a_stranded_
     g.ship_mut(far).unwrap().slot = Some(0);
     assert!(g.check_order(Seat(0), &[], &Order::Refuel { ship: far }).is_ok());
     let (full, _) = colony_ship_ready(&mut g, BodyId::Earth);
-    g.ship_mut(full).unwrap().fuel = 30.0;
+    g.ship_mut(full).unwrap().fuel = 40.0;
     g.ship_mut(full).unwrap().slot = Some(iss_slot);
     assert!(g.check_order(Seat(0), &[], &Order::Refuel { ship: full }).unwrap_err().0.contains("full"));
 }
@@ -7451,7 +7591,8 @@ fn the_research_lead_picks_from_a_shortlist_of_three() {
     let mut g = game();
     // The opening is a free choice of the whole of rung 1: nothing is drawn for it.
     assert!(g.research.shortlist.is_empty(), "the first Tech of the game is not drawn for");
-    assert_eq!(g.pickable_techs().len(), 6, "all six of rung 1");
+    // Ticket #413 (version 0.09.4): seven, with Orbital Refuelling.
+    assert_eq!(g.pickable_techs().len(), 7, "all seven of rung 1");
     g.pick_tech(Seat(0), TechId::PublicScience).unwrap();
     // Seat 0 is the human here, and the only contributor, so it leads and is asked to pick.
     let cost = g.tables.tech(TechId::PublicScience).cost;
@@ -8788,12 +8929,12 @@ fn a_research_lab_reads_the_education_level_the_school_has_raised() {
     let mut g = game();
     let sid = g.directed_states(Seat(0))[0];
     g.state_mut(sid).facilities.push(Facility::new(FacilityKind::ResearchLab));
-    let before = g.facility_yield(Seat(0), sid, FacilityKind::ResearchLab).research;
+    let before = g.facility_yield(Seat(0), sid, FacilityKind::ResearchLab).amount;
     g.state_mut(sid).facilities.push(Facility::new(FacilityKind::School));
     for _ in 0..8 {
         g.run_schools();
     }
-    let after = g.facility_yield(Seat(0), sid, FacilityKind::ResearchLab).research;
+    let after = g.facility_yield(Seat(0), sid, FacilityKind::ResearchLab).amount;
     assert!(after > before, "a Lab should make more once the School has run: {before} then {after}");
 }
 
@@ -9080,10 +9221,11 @@ fn schooling_applies_twice_to_a_research_lab() {
 
     let taught = 2.0;
     g.state_mut(sid).schooling = taught - card;
-    let base = g.tables.facility(FacilityKind::ResearchLab).produces.as_ref().unwrap().amount as f64;
+    // Ticket #416 (version 0.09.4): the Region's own, base 1, and the Lab's share of it, a half.
     let mult = g.tables.faction(g.kind(Seat(0))).research_multiplier;
-    let want = (base * (1.0 + pop / 5000.0 * taught) * taught * mult).floor() as i64;
-    assert_eq!(g.facility_yield(Seat(0), sid, FacilityKind::ResearchLab).research, want, "the factor and the multiplier both carry the schooling");
+    let own = 1.0 * (1.0 + pop / 5000.0 * taught) * taught * mult;
+    assert!((g.region_research(Seat(0), sid) - own).abs() < 1e-9, "the factor and the multiplier both carry the schooling");
+    assert_eq!(g.facility_yield(Seat(0), sid, FacilityKind::ResearchLab).amount, tenth(own * 0.5), "and the Lab's share with them");
 }
 
 /// Ticket #188: the Observatory's per-Colonist bonus is moderated the same way, so the rule reads
@@ -9103,7 +9245,7 @@ fn schooling_moderates_the_observatorys_per_colonist_bonus() {
     let per = g.tables.observatory.research_per_colonist;
     let n = g.colony(id).unwrap().colonists as f64;
     let science = g.research_yield_at(g.colony(id).unwrap());
-    let base = g.tables.module(ModuleKind::Observatory).produces.as_ref().unwrap().amount as f64;
+    let base = g.tables.module(ModuleKind::Observatory).produces.as_ref().unwrap().amount;
     let mult = g.tables.faction(g.kind(Seat(0))).research_multiplier;
     for taught in [0.5, 2.0] {
         g.colony_mut(id).unwrap().education = taught;
@@ -9980,6 +10122,40 @@ fn civil_defense_doubles_what_a_constabulary_is_worth_at_the_gate() {
     assert_eq!(g.tables.influence.constabulary_margin_defended, 10);
 }
 
+/// Ticket #420 (version 0.09.4): a Colony Ship's tank is 40, a warship's 30; Cryogenic Tanks, on
+/// Propulsion rung 2 at 32 behind Clean Propellant, adds 15 to every Ship's on Clean Propellant's
+/// 5, half under Provisional Findings; the build pays the whole tank; every seat picks it in its
+/// Propulsion chain after Nuclear Rockets.
+#[test]
+fn cryogenic_tanks_adds_fifteen_to_every_tank_on_clean_propellants_five() {
+    let mut g = game();
+    let card = g.tables.tech(TechId::CryogenicTanks);
+    assert_eq!((card.name.as_str(), card.branch.as_str(), card.rung, card.cost), ("Cryogenic Tanks", "Propulsion", 2, 32));
+    assert_eq!(card.needs, vec![TechId::CleanPropellant]);
+    assert!(TechId::ALL.iter().all(|t| !g.tables.tech(*t).needs.contains(&TechId::CryogenicTanks)), "needed by nothing");
+    let tanks = |g: &Game| (g.tank_of(Seat(0), UnitKind::ColonyShip), g.tank_of(Seat(0), UnitKind::Frigate), g.tank_of(Seat(0), UnitKind::MissileCarrier));
+    assert_eq!(tanks(&g), (40.0, 30.0, 30.0));
+    with_tech(&mut g, TechId::CleanPropellant);
+    assert_eq!(tanks(&g), (45.0, 35.0, 35.0));
+    with_tech(&mut g, TechId::CryogenicTanks);
+    assert_eq!(tanks(&g), (60.0, 50.0, 50.0));
+    assert_eq!(g.tank_of(Seat(0), UnitKind::Army), 0.0, "an Army has no tank");
+    let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
+    assert_eq!(g.order_cost(Seat(0), &Order::BuildShip { site: Place::Colony(iss), kind: UnitKind::ColonyShip }).fuel, 60.0, "the build fills the whole tank");
+    // Under Provisional Findings, the Archivists', half of 15, rounded down: 7.
+    let mut g = game();
+    let arc = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Archivists).unwrap();
+    g.research.current = Some(TechId::CryogenicTanks);
+    g.research.findings_tech = Some(TechId::CryogenicTanks);
+    assert!(g.provisional_findings(arc));
+    assert_eq!(g.tank_of(arc, UnitKind::ColonyShip), 47.0);
+    for k in FactionKind::ALL {
+        let order = &g.tables.ai.tech_picks[&k].order;
+        let at = |t: TechId| order.iter().position(|x| *x == t);
+        assert!(at(TechId::CryogenicTanks).is_some() && at(TechId::CryogenicTanks) == at(TechId::NuclearRockets).map(|i| i + 1), "{k:?} picks it after Nuclear Rockets: {order:?}");
+    }
+}
+
 /// Ticket #201: the tree's costs, which this ticket set and whose header comment had been wrong
 /// since version 0.07.1 -- it claimed 16, 28, 44 while the data said 15, 30, 45.
 ///
@@ -9993,7 +10169,8 @@ fn the_tree_costs_eighteen_thirty_two_and_forty_eight_by_rung() {
         let card = g.tables.tech(t);
         // Ticket #393 (version 0.09.3): Nuclear Rockets is priced above its rung on purpose, 38 where
         // rung 2 is 32, at the designer's word; Coastal Engineering below it, at 15.
-        if t == TechId::CoastalEngineering || t == TechId::NuclearRockets {
+        // Ticket #413 (version 0.09.4): and Orbital Refuelling, 22 where its rung is 18.
+        if t == TechId::CoastalEngineering || t == TechId::NuclearRockets || t == TechId::OrbitalRefuelling {
             continue;
         }
         let want = match card.rung {
@@ -10005,7 +10182,8 @@ fn the_tree_costs_eighteen_thirty_two_and_forty_eight_by_rung() {
     }
     let total: i64 = TechId::ALL.into_iter().map(|t| g.tables.tech(t).cost).sum();
     assert_eq!(g.tables.tech(TechId::NuclearRockets).cost, 38, "priced above its rung");
-    assert_eq!(total, 735, "the whole tree since ticket #393's Nuclear Rockets (38 on rung 2); 697 from #343, 649 from #232, 585 from #231, 554 from #201, 507 before that");
+    assert_eq!(g.tables.tech(TechId::OrbitalRefuelling).cost, 22, "priced above its rung");
+    assert_eq!(total, 789, "the whole tree since ticket #420's Cryogenic Tanks (32 on rung 2); 757 from #413's Orbital Refuelling (22 on rung 1); 735 from #393, 697 from #343, 649 from #232, 585 from #231, 554 from #201, 507 before that");
 }
 
 // ------------------------------------------------------- 0.08.1 ticket #208: the School's step
@@ -10271,8 +10449,8 @@ fn the_yields_the_ai_weights_now_read_actually_move_with_their_techs() {
     assert!(mine_after > mine_before, "a Mine's yield moves with its Techs: {mine_before} -> {mine_after}");
     assert!(relay_after > relay_before, "and a Relay's: {relay_before} -> {relay_after}");
     // The Mine's weight is scaled by yield-over-card, so the card figure must stay reachable.
-    let card = g.tables.module(ModuleKind::Mine).produces.as_ref().map(|p| p.amount).unwrap_or(0);
-    assert_eq!(card, 4, "the Mine's card figure, which the AI weight divides by");
+    let card = g.tables.module(ModuleKind::Mine).produces.as_ref().map(|p| p.amount).unwrap_or(0.0);
+    assert_eq!(card, 4.0, "the Mine's card figure, which the AI weight divides by");
 }
 
 /// Ticket #244 (version 0.08.3): the Arkwrights' signature rule is COACH CLASS, and the word
@@ -10879,7 +11057,7 @@ fn a_rival_closing_on_its_victory_condition_interrupts_the_player_once_a_step() 
     g.end_phase();
     assert_eq!(fired(&g), 2, "rivals only: {:?}", g.report.moments);
     assert_eq!(MomentKind::RivalProgress.rank(), 5, "between a Battle (4) and a Tech (6)");
-    assert_eq!(MomentKind::ALL.len(), 11, "ticket #281 (version 0.08.5) added a place taken by force, and #345 (0.09.1) a Body settled first");
+    assert_eq!(MomentKind::ALL.len(), 12, "ticket #281 (version 0.08.5) added a place taken by force, #345 (0.09.1) a Body settled first, and #405 (0.09.4) the world under the Sink");
     assert!(g.tables.report.moment_on(MomentKind::RivalProgress), "on by default");
 }
 
@@ -10946,7 +11124,12 @@ fn a_research_directive_sends_a_share_of_the_turns_research_somewhere_else() {
         let mut g = game();
         let pro = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Prospectors).unwrap();
         g.state_mut(StateId::Europe).control = Control::Controlled(pro);
-        g.state_mut(StateId::Europe).facilities.push(facility(FacilityKind::ResearchLab));
+        // Ticket #416 (version 0.09.4): a Lab adds a half of the Region's own now, so four of them,
+        // paid for, make enough Research that half of it is a whole number of points to direct.
+        for _ in 0..4 {
+            g.state_mut(StateId::Europe).facilities.push(facility(FacilityKind::ResearchLab));
+        }
+        g.seats[pro.index()].stockpile.energy = 1000.0;
         g.pick_tech(Seat(0), TechId::PublicScience).ok();
         g.seats[pro.index()].research_directive = percent;
         g.income_phase();
@@ -10966,7 +11149,12 @@ fn a_research_directive_sends_a_share_of_the_turns_research_somewhere_else() {
         let mut g = game();
         let ark = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Arkwrights).unwrap();
         g.state_mut(StateId::Europe).control = Control::Controlled(ark);
-        g.state_mut(StateId::Europe).facilities.push(facility(FacilityKind::ResearchLab));
+        // Ticket #416 (version 0.09.4): a Lab adds a half of the Region's own now, so four of them,
+        // paid for, make enough Research that half of it is a whole number of points to direct.
+        for _ in 0..4 {
+            g.state_mut(StateId::Europe).facilities.push(facility(FacilityKind::ResearchLab));
+        }
+        g.seats[ark.index()].stockpile.energy = 1000.0;
         g.pick_tech(Seat(0), TechId::PublicScience).ok();
         g.seats[ark.index()].research_directive = percent;
         g.income_phase();
@@ -12212,9 +12400,11 @@ fn the_queue_is_served_in_order_and_a_launch_pad_fire_takes_the_turns_widgets() 
 fn four_makers_the_factory_makes_widgets_the_mine_makes_materials_and_the_start_board_has_both() {
     let mut g = game();
     calm(&mut g);
-    // Ticket #389 (version 0.09.3): the Stadium stands after the Mine now, appended last in its turn.
-    assert_eq!(FacilityKind::ALL[FacilityKind::ALL.len() - 2], FacilityKind::Mine, "appended after every kind before it");
-    assert_eq!(FacilityKind::ALL.last(), Some(&FacilityKind::Stadium), "appended last");
+    // Ticket #389 (version 0.09.3): the Stadium stands after the Mine now, appended last in its turn;
+    // ticket #411 (version 0.09.4): and the Nature Reserve after it.
+    assert_eq!(FacilityKind::ALL[FacilityKind::ALL.len() - 3], FacilityKind::Mine, "appended after every kind before it");
+    assert_eq!(FacilityKind::ALL[FacilityKind::ALL.len() - 2], FacilityKind::Stadium);
+    assert_eq!(FacilityKind::ALL.last(), Some(&FacilityKind::NatureReserve), "appended last");
     assert_eq!(ModuleKind::ALL.last(), Some(&ModuleKind::Factory), "appended last");
     assert!(ModuleKind::BUILDABLE.contains(&ModuleKind::Factory));
     assert_eq!((FacilityKind::Mine.name(), ModuleKind::Factory.name()), ("Mine", "Factory"), "one name in both lists");
@@ -12222,13 +12412,13 @@ fn four_makers_the_factory_makes_widgets_the_mine_makes_materials_and_the_start_
     let (f, m) = (t.facility(FacilityKind::Factory), t.facility(FacilityKind::Mine));
     // The Factory and the Mine each smoke 0.75, at the designer's word.
     assert_eq!((f.materials, f.widgets, f.energy_upkeep, f.emissions), (20, 4, 2, 0.75));
-    assert_eq!(f.produces.as_ref().map(|p| (p.resource, p.amount)), Some((Resource::Widgets, 4)));
+    assert_eq!(f.produces.as_ref().map(|p| (p.resource, p.amount)), Some((Resource::Widgets, 4.0)));
     assert_eq!((m.materials, m.widgets, m.energy_upkeep, m.emissions), (20, 4, 2, 0.75));
-    assert_eq!(m.produces.as_ref().map(|p| (p.resource, p.amount)), Some((Resource::Materials, 4)));
+    assert_eq!(m.produces.as_ref().map(|p| (p.resource, p.amount)), Some((Resource::Materials, 4.0)));
     let fm = t.module(ModuleKind::Factory);
     assert_eq!((fm.materials, fm.widgets, fm.energy_upkeep, fm.earth_emissions), (20, 4, 3, 1.0));
-    assert_eq!(fm.produces.as_ref().map(|p| (p.resource, p.amount)), Some((Resource::Widgets, 4)));
-    assert_eq!(t.module(ModuleKind::Core).produces.as_ref().map(|p| (p.resource, p.amount)), Some((Resource::Widgets, 4)));
+    assert_eq!(fm.produces.as_ref().map(|p| (p.resource, p.amount)), Some((Resource::Widgets, 4.0)));
+    assert_eq!(t.module(ModuleKind::Core).produces.as_ref().map(|p| (p.resource, p.amount)), Some((Resource::Widgets, 4.0)));
     // China leans Materials: a Mine there makes 6, not 4, and 9 with Deep Mining; a Factory there
     // makes no Materials at all.
     let sid = StateId::EastAsia;
@@ -12735,21 +12925,20 @@ fn a_research_labs_hover_is_its_arithmetic() {
     let g = game();
     assert_eq!(g.kind(Seat(0)), FactionKind::Custodians);
     let y = g.facility_yield(Seat(0), StateId::EastAsia, FacilityKind::ResearchLab);
-    assert_eq!(y.research, 3);
+    // Ticket #416 (version 0.09.4): the Lab's hover starts from the Region's own Research (1 x 1.32
+    // x 1.10 x 1.25 = 1.815), whose arithmetic the Region's own chain carries (below), and takes
+    // the Lab's share of it, to the tenth -- three lines under a heading that wraps to two.
+    assert_eq!(y.amount, 0.9);
+    assert_eq!(y.chain.lines(6), vec!["1.8 this Region's Research".to_string(), "× 0.50 the Lab's share".to_string(), "= 0.91, rounded to 0.9".to_string()]);
     assert_eq!(
-        y.chain.lines(6),
+        g.region_research_chain(Seat(0), StateId::EastAsia).lines(6),
         vec![
-            "2 base".to_string(),
+            "1 base".to_string(),
             "× 1.32 for 1.44B people, weighted by Education".to_string(),
             "× 1.10 for Education 1.10".to_string(),
             "× 1.25 as the Custodians".to_string(),
-            "= 3.62, rounded down to 3".to_string(),
         ]
     );
-    // Past the ceiling the later factors share a line rather than any being dropped.
-    let short = y.chain.lines(4);
-    assert_eq!(short.len(), 4);
-    assert_eq!(short[2], "× 1.10 for Education 1.10, × 1.25 as the Custodians");
 }
 
 /// Ticket #352: the chain IS the figure. For every Facility kind in every Region, and every Module
@@ -14542,7 +14731,7 @@ fn ticket_345_the_computer_sends_its_colony_ship_to_a_world_nobody_has_settled()
             let name = g.next_ship_name(UnitKind::ColonyShip);
             g.ships.push(Ship {
                 id, name, kind: UnitKind::ColonyShip, seat: Seat(1), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 4, warhead: false,
-                colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None,
+                colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 40.0, slot: None,
             });
             g.seats[1].stockpile.fuel = 200.0;
             g.seats[1].stockpile.energy = 400.0;
@@ -14609,7 +14798,9 @@ fn ticket_345_the_report_and_the_moment_name_the_faction_the_body_and_the_colony
     let texts: Vec<String> = g.report.lines.iter().map(|l| l.text.clone()).collect();
     let line = texts.iter().find(|t| t.contains(&body) && t.contains("first")).unwrap_or_else(|| panic!("a Report line says who was first: {texts:?}"));
     assert!(line.contains(&faction), "the line names the Faction: {line}");
-    assert!(line.contains(&place), "and the Colony: {line}");
+    // Ticket #408 (version 0.09.4): the line no longer names the Colony, at the designer's word;
+    // it points at it, and the Moment names it.
+    assert!(!line.contains(&place), "the cut line names no Colony: {line}");
     assert!(line.contains(&g.tables.body(BodyId::Deimos).first_windfall.to_string()), "and what it pays: {line}");
     let moment = g.report.moments.iter().find(|m| m.kind == MomentKind::FirstToABody).expect("a Moment stops the turn for it");
     assert!(moment.text.contains(&faction), "the Moment names the Faction: {}", moment.text);
@@ -16092,16 +16283,19 @@ fn tenths_a_prospector_region_keeps_the_tenth_of_its_ducats() {
     assert_eq!(g.seats[pro.index()].stockpile.ducats, g.tables.start.ducats as f64 + 14.4);
 }
 
-/// Ticket #387: a Refinery under Automated Refining yields 3 x 1.5 = 4.5 Fuel, not 4. The whole
-/// base stays whole; only the multiplied figure carries a tenth.
+/// Ticket #387: a multiplied yield carries a tenth. Ticket #421 (version 0.09.4): a Refinery on
+/// Earth makes 4 now, so the tenth is shown on a Refinery Module's 4.5 at the Moon, 4.5 x 0.6875 =
+/// 3.09, to the tenth 3.1, and under Automated Refining 4.64, 4.6.
 #[test]
-fn tenths_a_refinery_under_automated_refining_yields_four_and_a_half() {
+fn tenths_a_refinery_module_at_the_moon_carries_its_tenth() {
     let mut g = game();
     g.state_mut(StateId::EastAsia).facilities = vec![facility(FacilityKind::Refinery)];
-    assert_eq!(income_of(&mut g, Seat(0)).fuel, 3.0, "whole stays whole");
+    assert_eq!(income_of(&mut g, Seat(0)).fuel, 4.0, "whole stays whole");
+    let moon = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Refinery], 0);
+    assert_eq!(g.module_yield(Seat(0), moon, ModuleKind::Refinery).amount, 3.1, "4.5 x 0.6875, to the tenth");
     with_tech(&mut g, TechId::AutomatedRefining);
-    assert_eq!(g.facility_yield(Seat(0), StateId::EastAsia, FacilityKind::Refinery).amount, 4.5, "3 x 1.5, to the tenth");
-    assert_eq!(income_of(&mut g, Seat(0)).fuel, 4.5, "and it is paid to the tenth");
+    assert_eq!(g.facility_yield(Seat(0), StateId::EastAsia, FacilityKind::Refinery).amount, 6.0, "4 x 1.5");
+    assert_eq!(g.module_yield(Seat(0), moon, ModuleKind::Refinery).amount, 4.6, "4.5 x 0.6875 x 1.5, to the tenth");
 }
 
 /// Ticket #387: the Venture Capital Fund banks its share to the tenth. Europe at Industry 5 pays
@@ -16220,7 +16414,10 @@ fn a_computer_seat_picks_its_gate_chain_then_propulsion_then_the_cheapest() {
     g.research.done.push(TechId::GreenConsensus);
     g.research.shortlist.clear();
     assert!(g.available_techs().contains(&TechId::CoastalEngineering), "the cheapest Tech on the board is open");
-    assert_eq!(g.ai_tech_pick(seat), TechId::CleanPropellant, "Propulsion comes before the cheapest");
+    // Ticket #413 (version 0.09.4): Orbital Refuelling heads the Propulsion chain.
+    assert_eq!(g.ai_tech_pick(seat), TechId::OrbitalRefuelling, "Propulsion comes before the cheapest");
+    g.research.done.push(TechId::OrbitalRefuelling);
+    assert_eq!(g.ai_tech_pick(seat), TechId::CleanPropellant, "then Clean Propellant");
     g.research.done.push(TechId::CleanPropellant);
     assert_eq!(g.ai_tech_pick(seat), TechId::EfficientTransit, "then the rung-2 pair, Efficient Transit first");
     g.research.done.push(TechId::EfficientTransit);
@@ -16713,10 +16910,11 @@ fn a_colony_with_a_working_refinery_refuels_its_low_orbit_and_rescues_a_stranded
     let depot = colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Refinery], 4);
     assert!(g.check_order(Seat(0), &[], &refuel).is_ok(), "a working Refinery below fuels low orbit: {:?}", g.check_order(Seat(0), &[], &refuel));
     assert!(!g.stranded(far), "the depot rescues it");
-    assert_eq!(g.order_cost(Seat(0), &refuel).fuel, 29.0, "30 - 1 wanted, 50 held");
+    // Ticket #420 (version 0.09.4): a Colony Ship's tank is 40.
+    assert_eq!(g.order_cost(Seat(0), &refuel).fuel, 39.0, "40 - 1 wanted, 50 held");
     g.commit_orders(Seat(0), std::slice::from_ref(&refuel));
-    assert_eq!(g.ship(far).unwrap().fuel, 30.0, "filled from the Stockpile");
-    assert_eq!(g.seats[0].stockpile.fuel, 21.0);
+    assert_eq!(g.ship(far).unwrap().fuel, 40.0, "filled from the Stockpile");
+    assert_eq!(g.seats[0].stockpile.fuel, 11.0);
     assert!(g.log.iter().any(|l| l.contains(" refuels ") && l.contains("at a Refinery Colony")), "the log says where: {:?}", g.log.last());
     // The Refinery mothballed: the depot is shut.
     g.ship_mut(far).unwrap().fuel = 1.0;
@@ -16856,4 +17054,833 @@ fn an_attack_has_a_target_only_in_an_orbit_the_seat_shares_with_a_rival() {
     g.ship_mut(rival).unwrap().slot = None;
     assert!(g.attack_has_a_target(Seat(0), BodyId::Mars), "the same orbit: a target");
     assert!(g.check_order(Seat(0), &[], &attack).is_ok(), "and the order stands");
+}
+
+/// Ticket #404 (version 0.09.4) (1): **a confirm names everything the order pays.** An Army costs
+/// its Materials from the Stockpile, its Widgets from the place's rate and its people at the
+/// Resolution; the driver said `costs 25 Materials` and hid the other two, which are the version's
+/// headline rule. A Region pays a million people, a Colony one Colonist.
+#[test]
+fn a_confirm_names_everything_an_army_pays() {
+    use dying_earth_engine::state::figure;
+    let mut g = game();
+    g.seats[0].stockpile.materials = 2000.0;
+    let army = g.tables.unit(UnitKind::Army).clone();
+    let raise = Order::BuildArmy { place: Place::State(StateId::EastAsia) };
+    let cost = g.check_order(Seat(0), &[], &raise).expect("East Asia can raise an Army");
+    assert_eq!(g.order_price_text(Seat(0), &raise, cost), format!("{} Materials, {} Widgets and 1M people", figure(army.materials as f64), army.widgets));
+    let c = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Barracks], 3);
+    let raise = Order::BuildArmy { place: Place::Colony(c) };
+    let cost = g.check_order(Seat(0), &[], &raise).expect("a Colony with a Barracks and three Colonists can raise one");
+    assert_eq!(g.order_price_text(Seat(0), &raise, cost), format!("{} Materials, {} Widgets and one Colonist", figure(army.materials as f64), army.widgets));
+}
+
+/// Ticket #404 (5): **a move that spends the tank says so**, where the driver said `costs free`. A
+/// transit and an orbit change draw on the Ship's tank, not the Stockpile; a Launch and a Bombard
+/// spend nothing and stay free.
+#[test]
+fn a_move_that_spends_the_tank_says_so() {
+    use dying_earth_engine::state::figure;
+    let mut g = game();
+    let ship = ship_in(&mut g, Seat(0), UnitKind::Frigate, BodyId::Earth, None, Stance::Hold);
+    let leg = Order::Transit { ship, to: BodyId::Moon, slot: None };
+    let (_, fuel) = g.transit_cost_for(Seat(0), BodyId::Earth, BodyId::Moon);
+    assert!(fuel > 0.0, "the premise: the leg costs Fuel");
+    let cost = g.check_order(Seat(0), &[], &leg).expect("the Moon is in reach");
+    assert_eq!(cost.fuel, 0.0, "the Stockpile pays nothing");
+    assert_eq!(g.order_price_text(Seat(0), &leg, cost), format!("{} Fuel from the tank", figure(fuel)));
+    let iss = station_of(&g, Seat(0), BodyId::Earth).expect("the ISS");
+    let change = Order::ChangeOrbit { ship, slot: Some(g.colony(iss).unwrap().slot) };
+    let cost = g.check_order(Seat(0), &[], &change).expect("the ISS's ring is an orbit of Earth");
+    assert_eq!(g.order_price_text(Seat(0), &change, cost), format!("{} Fuel from the tank", figure(g.tables.orbit_change_fuel as f64)));
+    // An order that spends nothing at all is free.
+    assert_eq!(g.order_price_text(Seat(0), &Order::ShipStance { body: BodyId::Earth, stance: Stance::Hold }, Cost::default()), "free");
+}
+
+/// Ticket #404 (4): **the Market line names a price a card has set, and the turns it has left.**
+/// A price moves at most a step a turn inside its band, but the Cheap Ore Offer puts Materials at 1
+/// for two turns; the driver printed no price at all after the first turn.
+#[test]
+fn the_market_line_names_a_price_a_card_has_set() {
+    let mut g = game();
+    let line = g.market_line(Seat(0));
+    assert!(line.starts_with("Market: Materials "), "the line: {line}");
+    assert!(!line.contains('('), "no card over any price: {line}");
+    g.seats[0].stockpile.ducats = 100.0;
+    ask_the_card(&mut g, EventId::CheapOreOffer);
+    g.answer_card(Seat(0), false).expect("the offer can be refused");
+    g.apply_card_answers();
+    g.settle_market();
+    g.turn += 1;
+    let line = g.market_line(Seat(0));
+    assert!(line.contains("Materials 1 (Cheap Ore Offer, 1 more turn)"), "the first turn of two: {line}");
+    g.turn += 1;
+    let line = g.market_line(Seat(0));
+    assert!(line.contains("Materials 1 (Cheap Ore Offer, its last turn)"), "the second: {line}");
+    g.turn += 1;
+    assert!(!g.market_line(Seat(0)).contains("Cheap Ore Offer"), "and spent after");
+}
+
+/// Ticket #404 (6, Q7): **a place changing hands to or from the player is also listed under Your
+/// works**, as well as under its place; the headline's ranking is unchanged. A rival's change of
+/// hands is not the player's news.
+#[test]
+fn a_change_of_hands_to_or_from_the_player_is_also_under_your_works() {
+    let mut g = game();
+    g.report.lines.clear();
+    let works = |g: &Game| g.report.sections().into_iter().find(|(s, _)| *s == Section::YourWorks).map(|(_, l)| l.iter().map(|l| l.text.clone()).collect::<Vec<_>>()).unwrap_or_default();
+    let earth = |g: &Game| g.report.sections().into_iter().find(|(s, _)| *s == Section::OnEarth).map(|(_, l)| l.iter().map(|l| l.text.clone()).collect::<Vec<_>>()).unwrap_or_default();
+    // A founding outranks the change of hands, so the change of hands is not the headline and is
+    // listed in the sections.
+    g.report_line(LineKind::ColonyFounded, None, "A Colony was founded.".to_string());
+    g.transfer_control(Place::State(StateId::NorthAfrica), Seat(0), "Pacified");
+    let gained = g.report.lines.iter().find(|l| l.kind == LineKind::ControlChanged).expect("the change of hands").text.clone();
+    assert_eq!(g.report.headline().map(|h| h.kind), Some(LineKind::ColonyFounded), "the ranking is unchanged");
+    assert!(works(&g).contains(&gained), "a gain is under Your works: {:?}", works(&g));
+    assert!(earth(&g).contains(&gained), "and still under its place: {:?}", earth(&g));
+    // Lost to a rival: the player's news too.
+    g.report.lines.retain(|l| l.kind != LineKind::ControlChanged);
+    g.transfer_control(Place::State(StateId::NorthAfrica), Seat(1), "Influence");
+    let lost = g.report.lines.iter().find(|l| l.kind == LineKind::ControlChanged).expect("the change of hands").text.clone();
+    assert!(works(&g).contains(&lost), "a loss is under Your works: {:?}", works(&g));
+    // Between two rivals: not the player's.
+    g.report.lines.retain(|l| l.kind != LineKind::ControlChanged);
+    g.transfer_control(Place::State(StateId::NorthAfrica), Seat(2), "Influence");
+    let theirs = g.report.lines.iter().find(|l| l.kind == LineKind::ControlChanged).expect("the change of hands").text.clone();
+    assert!(!works(&g).contains(&theirs), "a rival's change of hands is not the player's: {:?}", works(&g));
+    assert!(earth(&g).contains(&theirs), "and is under its place");
+}
+
+/// Ticket #404 (after review): **the confirm's edges.** A build bought outright in Ducats starts
+/// done, so it names no Widgets; a Faction's own Module is priced in its own Widgets; a Launch
+/// spends no Fuel, and names its Warhead.
+#[test]
+fn a_confirm_names_no_widgets_for_a_ducat_buy_and_a_launch_names_its_warhead() {
+    let g = game();
+    let (with_widgets, with_ducats) = (Order::BuildFacility { state: StateId::EastAsia, kind: FacilityKind::Factory }, Order::BuildFacilityWithDucats { state: StateId::EastAsia, kind: FacilityKind::Factory });
+    let w = g.build_widgets(Seat(0), BuildItem::Facility(FacilityKind::Factory));
+    assert!(g.order_price_text(Seat(0), &with_widgets, g.order_cost(Seat(0), &with_widgets)).ends_with(&format!("and {w} Widgets")), "a queued build names its Widgets");
+    assert!(!g.order_price_text(Seat(0), &with_ducats, g.order_cost(Seat(0), &with_ducats)).contains("Widget"), "a Ducat buy starts done");
+    // The Custodians' Institute order raises an Academy, at the Academy's Widgets.
+    let institute = Order::BuildModule { colony: ColonyId(0), kind: ModuleKind::Institute };
+    let own = ModuleKind::Institute.built_by(FactionKind::Custodians);
+    let w = g.build_widgets(Seat(0), BuildItem::Module(own));
+    assert!(g.order_price_text(Seat(0), &institute, Cost::default()).contains(&format!("{w} Widget")), "the Faction's own Module's Widgets");
+    let launch = Order::Launch { ship: ShipId(0), target: Place::State(StateId::Europe) };
+    assert_eq!(g.order_price_text(Seat(0), &launch, g.order_cost(Seat(0), &launch)), "the Warhead", "a Launch draws nothing from the tank; it spends its Warhead (Q9)");
+    let bombard = Order::Bombard { ship: ShipId(0), colony: ColonyId(0) };
+    assert_eq!(g.order_price_text(Seat(0), &bombard, g.order_cost(Seat(0), &bombard)), "free", "a Bombard spends nothing");
+}
+
+/// Ticket #404 (after review): **a throw-off of the player is under Your works; a rival's is not,
+/// and a spectated game marks nothing.**
+#[test]
+fn a_throw_off_of_the_player_is_under_your_works() {
+    let works = |g: &Game| g.report.sections().into_iter().find(|(s, _)| *s == Section::YourWorks).map(|(_, l)| l.len()).unwrap_or(0);
+    for (seat, mine) in [(Seat(0), true), (Seat(1), false)] {
+        let mut g = game();
+        let sid = StateId::NorthAfrica;
+        g.take_control(sid, seat);
+        g.report.lines.clear();
+        g.report_line(LineKind::ColonyFounded, None, "A Colony was founded.".to_string());
+        g.state_mut(sid).unrest = g.tables.unrest.throw_off_threshold;
+        g.state_mut(sid).changed_hands = true;
+        g.resolve_unrest();
+        assert_eq!(g.state(sid).control, Control::Neutral, "the premise: it threw its holder off");
+        let line = g.report.lines.iter().find(|l| l.kind == LineKind::ControlChanged).expect("the throw-off's line");
+        assert_eq!(line.mine, mine, "seat {seat:?}: {}", line.text);
+        assert_eq!(works(&g) > 0, mine, "seat {seat:?}: under Your works only when it was the player's");
+    }
+    let mut g = Game::spectate(tables(), 7);
+    g.report.lines.clear();
+    g.transfer_control(Place::State(StateId::NorthAfrica), Seat(0), "Pacified");
+    assert!(g.report.lines.iter().all(|l| !l.mine), "a spectator has no seat of their own");
+}
+
+/// Ticket #404 (Q8): **an Occupation begun or broken, on the player's place or by the player, is
+/// under Your works too.** The controller does not change, but who directs the place does. One
+/// between two rivals is not the player's.
+#[test]
+fn an_occupation_begun_or_broken_by_the_player_is_under_your_works() {
+    let occupation = |g: &Game| g.report.lines.iter().find(|l| l.kind == LineKind::Occupation).map(|l| (l.mine, l.text.clone())).expect("an Occupation line");
+    for (home, mine) in [(StateId::EastAsia, true), (StateId::Australia, false)] {
+        let mut g = game();
+        g.armies.retain(|a| a.home != ArmyHome::State(StateId::Europe));
+        let army = occupier_in(&mut g, home, StateId::Europe);
+        g.report.lines.clear();
+        g.resolution_phase();
+        assert!(matches!(g.state(StateId::Europe).control, Control::Occupied { .. }), "the premise: it is occupied");
+        let (marked, text) = occupation(&g);
+        assert_eq!(marked, mine, "begun from {home:?}: {text}");
+        // The army goes, and the Occupation breaks.
+        g.armies.retain(|a| a.id != army);
+        g.report.lines.clear();
+        g.resolution_phase();
+        assert!(!matches!(g.state(StateId::Europe).control, Control::Occupied { .. }), "the premise: it broke");
+        let (marked, text) = occupation(&g);
+        assert_eq!(marked, mine, "broken from {home:?}: {text}");
+    }
+}
+
+/// Ticket #404 (Q9, Q10): **a Launch costs the Warhead; a tribute its Materials or Ducats, in the
+/// running total; emigrants their people.**
+#[test]
+fn a_launch_a_tribute_and_emigrants_name_what_they_take() {
+    use dying_earth_engine::state::figure;
+    let mut g = game();
+    g.seats[0].stockpile.materials = 500.0;
+    let launch = Order::Launch { ship: ShipId(0), target: Place::State(StateId::Europe) };
+    assert_eq!(g.order_price_text(Seat(0), &launch, g.order_cost(Seat(0), &launch)), "the Warhead");
+    let tribute = Order::Tribute { to: Seat(1), materials: true };
+    let m = g.tables.relations.tribute_materials as f64;
+    let cost = g.check_order(Seat(0), &[], &tribute).expect("a tribute can be paid");
+    assert_eq!(g.order_price_text(Seat(0), &tribute, cost), format!("{} Materials", figure(m)));
+    let (left, _) = g.remaining(Seat(0), std::slice::from_ref(&tribute));
+    assert!((left.materials - (500.0 - m)).abs() < 1e-9, "the running total counts it: {}", left.materials);
+    let (mine, theirs) = (g.seats[0].stockpile.materials, g.seats[1].stockpile.materials);
+    g.commit_orders(Seat(0), std::slice::from_ref(&tribute));
+    assert!((g.seats[0].stockpile.materials - (mine - m)).abs() < 1e-9, "paid once, not twice: {}", g.seats[0].stockpile.materials);
+    assert!((g.seats[1].stockpile.materials - (theirs + m)).abs() < 1e-9, "and received");
+    let muster = Order::BuildEmigrants { state: StateId::EastAsia, n: 4 };
+    let people = g.muster_population_in(Seat(0), StateId::EastAsia, 4);
+    let text = g.order_price_text(Seat(0), &muster, g.order_cost(Seat(0), &muster));
+    assert!(text.ends_with(&format!("{} people", g.tables.people_text(people))), "the people mustered: {text}");
+    // And the figure named is the figure taken.
+    let before = g.state(StateId::EastAsia).population;
+    g.commit_orders(Seat(0), std::slice::from_ref(&muster));
+    assert!((before - g.state(StateId::EastAsia).population - people).abs() < 1e-9, "the Region gave up what the confirm named");
+}
+
+/// Ticket #404 (Q8, after the second review): **the player's own place occupied by a rival, and
+/// an Occupation of the player's ended by a third Faction's Influence, are the player's news.**
+#[test]
+fn an_occupation_on_the_players_place_and_one_taken_from_them_are_under_your_works() {
+    let mut g = game();
+    let sid = StateId::NorthAfrica;
+    g.take_control(sid, Seat(0));
+    g.armies.retain(|a| a.home != ArmyHome::State(sid));
+    occupier_in(&mut g, StateId::Europe, sid);
+    g.report.lines.clear();
+    g.resolution_phase();
+    assert!(matches!(g.state(sid).control, Control::Occupied { occupier: Seat(1), previous: Some(Seat(0)), .. }), "the premise: the Prospectors occupy the player's Region");
+    let line = g.report.lines.iter().find(|l| l.kind == LineKind::Occupation).expect("the Occupation line");
+    assert!(line.mine, "the player's place, occupied: {}", line.text);
+    // The player occupies a rival's Region, and a third Faction takes it by Influence.
+    let mut g = game();
+    let sid = StateId::NorthAfrica;
+    g.take_control(sid, Seat(1));
+    g.state_mut(sid).control = Control::Occupied { occupier: Seat(0), previous: Some(Seat(1)), turns: 1, banked: 0 };
+    g.report.lines.clear();
+    g.transfer_control(Place::State(sid), Seat(2), "Influence");
+    let line = g.report.lines.iter().find(|l| l.kind == LineKind::ControlChanged).expect("the change of hands");
+    assert!(line.mine, "the player's Occupation, ended by a third Faction: {}", line.text);
+}
+
+/// Ticket #405 (version 0.09.4): **the first turn the world is under the Natural Sink eases every
+/// Region's Unrest, once a game**: by a half, by a whole point where the Custodians hold it. The
+/// test is the Stabilization test, and it fires on that turn whatever the next does. A copy of the
+/// game whose ease is already spent is the control, so whatever else the Climate phase does to
+/// Unrest cancels out.
+#[test]
+fn the_first_turn_under_the_sink_eases_every_region_once() {
+    let base = || {
+        let mut g = game();
+        for sid in StateId::ALL {
+            g.state_mut(sid).unrest = 4.0;
+        }
+        g.climate.natural_sink = 1000.0;
+        g
+    };
+    let (mut g, mut control) = (base(), base());
+    control.climate.under_sink_eased = true;
+    g.report.lines.clear();
+    g.climate_phase();
+    control.climate_phase();
+    assert_eq!(g.seat(Seat(0)).stabilization_run, 1, "the premise: the world is under the Sink");
+    let u = &g.tables.unrest;
+    let custodians = |g: &Game, sid: StateId| g.state(sid).control.controller().map(|s| g.kind(s) == FactionKind::Custodians).unwrap_or(false);
+    let (mut theirs, mut others) = (0, 0);
+    for sid in StateId::ALL {
+        let want = if custodians(&g, sid) { theirs += 1; u.under_sink_ease_custodians } else { others += 1; u.under_sink_ease };
+        let eased = control.state(sid).unrest - g.state(sid).unrest;
+        assert!((eased - want).abs() < 1e-9, "{sid:?} eased by {eased}, not {want}");
+    }
+    assert!(theirs > 0 && others > 0, "the premise: both kinds of Region on the board");
+    assert_eq!((u.under_sink_ease, u.under_sink_ease_custodians), (0.5, 1.0), "the designer's figures");
+    assert!(g.report.lines.iter().any(|l| l.kind == LineKind::Unrest && l.place.is_none()), "one line for the whole Earth: {:?}", g.report.lines);
+    assert!(g.report.moments.iter().any(|m| m.kind == MomentKind::UnderTheSink), "and its Moment");
+    // Once a game: a second turn under the Sink eases nothing more.
+    for sid in StateId::ALL {
+        g.state_mut(sid).unrest = 4.0;
+        control.state_mut(sid).unrest = 4.0;
+    }
+    g.climate_phase();
+    control.climate_phase();
+    assert_eq!(g.seat(Seat(0)).stabilization_run, 2);
+    for sid in StateId::ALL {
+        assert_eq!(g.state(sid).unrest, control.state(sid).unrest, "{sid:?}: nothing the second time");
+    }
+}
+
+/// Ticket #405 (after review): **"under the Sink" is the Stabilization test, not the Climate
+/// Panel's net**, and **once a game survives a broken run.** Counted Emissions under the Sink with
+/// the Permafrost pushing the full net over it still eases; a run that breaks and starts again does
+/// not ease a second time.
+#[test]
+fn the_sink_ease_reads_the_stabilization_test_and_survives_a_broken_run() {
+    let mut g = game();
+    for sid in StateId::ALL {
+        g.state_mut(sid).unrest = 4.0;
+    }
+    let counted = g.emissions_now().counted();
+    g.climate.natural_sink = counted + 1.0;
+    g.climate.permafrost = 100.0;
+    let mut control = g.clone();
+    control.climate.under_sink_eased = true;
+    g.climate_phase();
+    control.climate_phase();
+    assert!(g.climate.last.net() > 0.0, "the premise: the Climate Panel's net is over the Sink: {}", g.climate.last.net());
+    assert_eq!(g.seat(Seat(0)).stabilization_run, 1, "the premise: the Stabilization test is under");
+    assert!(g.state(StateId::SubSaharanAfrica).unrest < control.state(StateId::SubSaharanAfrica).unrest, "the ease reads the Stabilization test");
+    // Over the Sink, the run breaks; under again, the run starts again, and nothing more eases.
+    g.climate.natural_sink = 0.0;
+    control.climate.natural_sink = 0.0;
+    g.climate_phase();
+    control.climate_phase();
+    assert_eq!(g.seat(Seat(0)).stabilization_run, 0, "the premise: the run broke");
+    for sid in StateId::ALL {
+        g.state_mut(sid).unrest = 4.0;
+        control.state_mut(sid).unrest = 4.0;
+    }
+    g.climate.natural_sink = 1000.0;
+    control.climate.natural_sink = 1000.0;
+    g.climate_phase();
+    control.climate_phase();
+    assert_eq!(g.seat(Seat(0)).stabilization_run, 1, "the premise: a new run");
+    for sid in StateId::ALL {
+        assert_eq!(g.state(sid).unrest, control.state(sid).unrest, "{sid:?}: nothing on a second run");
+    }
+    assert_eq!(g.report.moments.iter().filter(|m| m.kind == MomentKind::UnderTheSink).count(), 1, "one Moment over the three phases");
+    let words = g.report.moments.iter().find(|m| m.kind == MomentKind::UnderTheSink).map(|m| m.text.clone()).expect("the Moment of the first turn");
+    assert!(words.contains("by a half in every Region, a whole point in the Custodians'"), "the designer's words: {words}");
+}
+
+/// Ticket #406 (version 0.09.4): **the Custodians' first part earns partial credit**: the greater
+/// of the best run of the game over its bar and three tenths of the best share of the counted gap
+/// closed since the game's opening figure. Neither falls back; the Condition is still three turns in
+/// a row. Seat 0 is the Custodians.
+#[test]
+fn the_custodians_run_earns_partial_credit_for_the_best_run_and_the_gap_closed() {
+    let mut g = game();
+    let cap = g.tables.victory.stabilization_gap_cap;
+    assert_eq!(cap, 0.3, "the designer's three tenths");
+    let gap = |g: &Game| g.climate.last.counted() - g.climate.last.total_sink();
+    // The opening Climate phase sets the figure every later gap is measured against.
+    g.climate_phase();
+    let open = gap(&g);
+    assert!(open > 0.0, "the premise: the world opens over the Sink: {open}");
+    assert_eq!(g.climate.opening_gap, open);
+    assert_eq!(g.progress(Seat(0)).first_fraction(), 0.0, "nothing closed yet");
+    // Raise the Sink by half the gap: half of it closed.
+    g.climate.natural_sink += open / 2.0;
+    g.climate_phase();
+    let closed = (open - gap(&g)) / open;
+    assert!(closed > 0.3 && closed < 0.7, "the premise: about half closed: {closed}");
+    assert!((g.progress(Seat(0)).first_fraction() - cap * closed).abs() < 1e-9, "three tenths of the share closed: {}", g.progress(Seat(0)).first_fraction());
+    // Worse again: the best stands.
+    g.climate.natural_sink = 0.0;
+    g.climate_phase();
+    assert!((g.progress(Seat(0)).first_fraction() - cap * closed).abs() < 1e-9, "the best never falls back");
+    // Two turns under, then over: the best run of two stands, over the gap's credit.
+    g.climate.natural_sink = 1000.0;
+    g.climate_phase();
+    g.climate_phase();
+    g.climate.natural_sink = 0.0;
+    g.climate_phase();
+    let p = g.progress(Seat(0));
+    assert_eq!(g.seat(Seat(0)).stabilization_run, 0, "the premise: the run broke");
+    assert!((p.first_fraction() - 2.0 / 3.0).abs() < 1e-9, "the best run of two: {}", p.first_fraction());
+    // Another Faction's first part is untouched.
+    assert_eq!(g.progress(Seat(1)).first_partial, 0.0);
+    // A run of three that breaks fills the first part and still meets nothing, the gate Tech standing
+    // so nothing but the broken run holds it back.
+    g.research.done.push(TechId::PlanetaryStewardship);
+    g.climate.natural_sink = 1000.0;
+    for _ in 0..3 {
+        g.climate_phase();
+    }
+    g.climate.natural_sink = 0.0;
+    g.climate_phase();
+    let p = g.progress(Seat(0));
+    assert_eq!(p.first_fraction(), 1.0, "the best run of three");
+    assert!(p.first_held_back.is_none(), "the premise: the gate stands");
+    assert!(!p.first_met() && !p.met(), "the Condition is still three in a row, as it stands");
+    assert_eq!(p.first_fraction_as_it_stands(), 0.0, "and the computer seats read the run as it stands");
+    // The credit is the score: at turn 36 with nobody met, the Custodians rank first and win on it.
+    assert!(p.second_fraction() > 0.0, "the premise: Colonists off Earth");
+    assert!(Seat::ALL.iter().skip(1).all(|s| g.progress(*s).score() < p.score()), "the premise: the rivals score less");
+    assert_eq!(g.ranking()[0].0, Seat(0), "first in the final ranking");
+    g.turn = g.tables.victory.turns;
+    g.end_phase();
+    assert!(matches!(g.outcome, Some(Outcome::Win { seat: Seat(0), .. })), "and the turn-36 winner: {:?}", g.outcome);
+}
+
+/// Ticket #406 (version 0.09.4): **the Custodians' Victory row says the gap in ppm beside the
+/// run**, by the Stabilization test, over or under; the other Factions' rows are their own.
+#[test]
+fn the_stabilization_row_says_the_gap_in_ppm_beside_the_run() {
+    let mut g = game();
+    g.climate_phase();
+    let (c, s) = (g.climate.last.counted(), g.climate.last.total_sink());
+    let over = g.progress(Seat(0)).first_label.expect("the Custodians' row");
+    assert_eq!(over, format!("Stabilization: {:.1} ppm over the Sink (counted {c:.1}, Sink {s:.1}), run 0 of 3", c - s));
+    g.climate.natural_sink = 1000.0;
+    g.climate_phase();
+    let under = g.progress(Seat(0)).first_label.expect("the Custodians' row");
+    assert!(under.contains("ppm under the Sink") && under.ends_with("run 1 of 3"), "{under}");
+    assert!(g.progress(Seat(1)).first_label.is_none(), "the Prospectors' row is their own");
+}
+
+/// Ticket #407 (version 0.09.4): **a Mothball and a Decommission say their price, in as few words
+/// as carry it**: *"+1 Unrest"*, *"+2 Unrest, 10 Materials back"* in a Region; nothing in a
+/// Colony, where neither costs Unrest. The driver's confirm says the Unrest.
+#[test]
+fn a_mothball_and_a_decommission_say_their_price() {
+    use dying_earth_engine::state::figure;
+    let mut g = game();
+    g.state_mut(StateId::EastAsia).facilities.push(Facility { online: true, ..Facility::new(FacilityKind::Factory) });
+    let i = g.state(StateId::EastAsia).facilities.len() - 1;
+    let b = BuildingRef::Facility(StateId::EastAsia, i);
+    let half = figure(g.tables.facility(FacilityKind::Factory).materials as f64 / 2.0);
+    let u = g.tables.unrest.clone();
+    assert_eq!(g.change_price_text(b, BuildingChange::Mothball), Some(format!("+{} Unrest", figure(u.per_mothball))));
+    assert_eq!(g.change_price_text(b, BuildingChange::Decommission), Some(format!("+{} Unrest, {half} Materials back", figure(u.per_decommission))));
+    assert_eq!(g.change_price_text(b, BuildingChange::Restart), None, "a Restart's button says its own price");
+    let mothball = Order::Change { building: b, what: BuildingChange::Mothball };
+    let cost = g.check_order(Seat(0), &[], &mothball).expect("a Factory of theirs can be mothballed");
+    assert_eq!(g.order_price_text(Seat(0), &mothball, cost), format!("+{} Unrest", figure(u.per_mothball)));
+    let decommission = Order::Change { building: b, what: BuildingChange::Decommission };
+    let cost = g.check_order(Seat(0), &[], &decommission).expect("and decommissioned");
+    assert_eq!(g.order_price_text(Seat(0), &decommission, cost), format!("+{} Unrest", figure(u.per_decommission)));
+    // The Materials back the hover names are what the Resolution pays.
+    let before = g.seats[0].stockpile.materials;
+    g.commit_orders(Seat(0), std::slice::from_ref(&decommission));
+    for _ in 0..g.tables.mothball.decommission_turns.max(1) {
+        g.resolution_phase();
+        g.turn += 1;
+    }
+    assert_eq!(figure(g.seats[0].stockpile.materials - before), half, "the refund the hover promised");
+    let c = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Mine], 2);
+    let m = BuildingRef::Module(c, g.colony(c).unwrap().modules.len() - 1);
+    assert_eq!(g.change_price_text(m, BuildingChange::Mothball), None, "no Unrest in a Colony, so nothing said");
+    assert_eq!(g.change_price_text(m, BuildingChange::Decommission), None);
+}
+
+/// Ticket #407 (version 0.09.4): **the Custodians' text reads its figures from the data** and says
+/// their lever and its price; no Faction's text is left with a brace unfilled.
+#[test]
+fn the_custodians_text_reads_its_figures_from_the_data_and_says_the_lever() {
+    use dying_earth_engine::state::figure;
+    let t = tables();
+    let s = t.facility(FacilityKind::Scrubber);
+    let text = t.signature(FactionKind::Custodians);
+    assert!(text.contains(&format!("{} Materials, {} Widgets, {} Energy upkeep", s.materials, s.widgets, s.energy_upkeep)), "{text}");
+    assert!(text.contains(&format!("each Mothball there costs +{} Unrest", figure(t.unrest.per_mothball))), "{text}");
+    assert!(t.signature(FactionKind::Archivists).contains(&format!("at least {}%", t.research_directive.provisional_min_contribution)));
+    for k in FactionKind::ALL {
+        let text = t.signature(k);
+        assert!(!text.contains('{') && !text.contains('}'), "{k:?}: {text}");
+    }
+}
+
+/// Ticket #408 (version 0.09.4): **five Report lines cut to what they must say**, in the designer's
+/// words: the Tech completed, an Occupation broken, the first to a Body, a throw-off, a Sea Wall.
+#[test]
+fn the_cut_report_lines_say_only_what_they_must() {
+    let g = game();
+    let say = |key: &str, args: &[(&str, &str)]| g.say(key, &args.iter().map(|(k, v)| (*k, v.to_string())).collect::<Vec<_>>());
+    assert_eq!(say("tech_complete", &[("tech", "Coastal Engineering"), ("faction", "Prospectors"), ("shares", "Prospectors 6")]), "Coastal Engineering is complete. The Prospectors led and pick the next Tech.");
+    assert_eq!(
+        say("occupation_broken", &[("faction", "Prospectors"), ("place", "Egypt"), ("holder", "Custodians"), ("unrest", "2"), ("standing", "6")]),
+        "The Prospectors' Occupation of Egypt broke: +2 Unrest."
+    );
+    assert_eq!(say("first_to_body", &[("faction", "Archivists"), ("body", "the Moon"), ("colony", "Tycho"), ("n", "5"), ("ease", "0.5")]), "The Archivists are first to settle the Moon: +5 Influence.");
+    assert_eq!(say("threw_off", &[("state", "Egypt"), ("faction", "Custodians"), ("unrest", "5")]), "Egypt threw off the Custodians.");
+    assert_eq!(say("sea_wall", &[("state", "China"), ("whose", "China's"), ("temperature", "1.8"), ("keep", "4")]), "China's Sea Wall held the sea; keep now 4 Materials.");
+    assert_eq!(say("occupation_broken_quiet", &[("faction", "Prospectors"), ("place", "Tycho on the Moon"), ("holder", "Custodians"), ("unrest", "0"), ("standing", "0")]), "The Prospectors' Occupation of Tycho on the Moon broke.");
+}
+
+/// Ticket #408 (after review): **an Occupation of a Colony that breaks claims no Unrest**, since a
+/// Colony has none; the line says the break alone.
+#[test]
+fn an_occupation_of_a_colony_that_breaks_claims_no_unrest() {
+    let mut g = game();
+    let c = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Mine], 3);
+    g.colony_mut(c).unwrap().control = Control::Occupied { occupier: Seat(1), previous: Some(Seat(0)), turns: 1, banked: 0 };
+    g.report.lines.clear();
+    g.resolution_phase();
+    assert!(!matches!(g.colony(c).unwrap().control, Control::Occupied { .. }), "the premise: with no Army there, it broke");
+    let line = g.report.lines.iter().find(|l| l.kind == LineKind::Occupation).map(|l| l.text.clone()).expect("the break's line");
+    assert!(line.ends_with("broke.") && !line.contains("Unrest"), "{line}");
+}
+
+/// Ticket #409 (version 0.09.4): **a Colony Ship unloads any whole number of Colonists, up to what
+/// the place will take**: into a Colony, the Colonists aboard or the room left in its Habitats; onto
+/// a free slot, what a new Colony's Core holds. The rest stay aboard. The computer seats unload as
+/// many as fit, so they never stick on a count.
+#[test]
+fn a_colony_ship_unloads_any_count_up_to_what_the_place_will_take() {
+    let mut g = game();
+    let ship = ship_in(&mut g, Seat(0), UnitKind::ColonyShip, BodyId::Moon, None, Stance::Hold);
+    g.ship_mut(ship).unwrap().colonists = 7;
+    let ground = g.free_slots_on(BodyId::Moon)[0];
+    let core = g.tables.module(ModuleKind::Core).holds_colonists;
+    assert_eq!(g.unload_most(ship, UnloadTarget::Slot(BodyId::Moon, ground)), core.min(7), "a new Colony takes what its Core holds");
+    // Found with two: two land, five stay aboard.
+    let found = Order::Unload { ship, colonists: 2, army: false, into: UnloadTarget::Slot(BodyId::Moon, ground) };
+    assert!(g.check_order(Seat(0), &[], &found).is_ok());
+    g.commit_orders(Seat(0), std::slice::from_ref(&found));
+    g.resolution_phase();
+    let c = g.colonies.iter().find(|c| c.body == BodyId::Moon && c.slot == ground).expect("founded").id;
+    assert_eq!(g.colony(c).unwrap().colonists, 2, "two founded it");
+    assert_eq!(g.ship(ship).unwrap().colonists, 5, "five stay aboard");
+    // Into that Colony: as many as the room left, one at a time if wished.
+    let room = g.habitat_room(g.colony(c).unwrap()) - 2;
+    assert_eq!(g.unload_most(ship, UnloadTarget::Colony(c)), room.min(5));
+    g.ship_mut(ship).unwrap().arrived_this_turn = false;
+    let one = Order::Unload { ship, colonists: 1, army: false, into: UnloadTarget::Colony(c) };
+    assert!(g.check_order(Seat(0), &[], &one).is_ok(), "one Colonist is an order");
+    // A computer seat never asks for more than fits, founding or disembarking, and every Unload it
+    // gives stands: it cannot stick on a count.
+    g.seats[0].ai = true;
+    let check = |g: &mut Game| {
+        let mut unloads = 0;
+        for o in g.ai_orders(Seat(0)) {
+            if let Order::Unload { ship: sid, colonists, into, .. } = o {
+                unloads += 1;
+                assert!(colonists <= g.unload_most(sid, into), "the computer asks for {colonists} into {into:?}, more than fits");
+                assert!(g.check_order(Seat(0), &[], &o).is_ok(), "and the order stands: {:?}", g.check_order(Seat(0), &[], &o));
+            }
+        }
+        unloads
+    };
+    assert!(check(&mut g) > 0, "the premise: the computer founds with what is aboard");
+    // With every other slot on the Moon taken, the only door is to disembark into its own Colony.
+    for _ in g.free_slots_on(BodyId::Moon) {
+        colony(&mut g, Seat(1), BodyId::Moon, &[], 1);
+    }
+    assert!(g.free_slots_on(BodyId::Moon).is_empty(), "the premise: no slot left");
+    assert!(check(&mut g) > 0, "the premise: the computer disembarks");
+}
+
+/// Ticket #410 (version 0.09.4): **a computer seat offers a Constabulary from Unrest 4**, where
+/// the Standing Army stops replenishing, not a point past it; and **a Stadium alone where the Region
+/// has one slot left**, which the Constabulary cannot have too.
+#[test]
+fn a_computer_seat_answers_unrest_from_four_and_raises_a_stadium_alone_where_slots_are_short() {
+    let mut g = game();
+    let sid = StateId::NorthAfrica;
+    g.take_control(sid, Seat(1));
+    let offers = |g: &mut Game, unrest: f64, kind: FacilityKind| {
+        g.state_mut(sid).unrest = unrest;
+        g.ai_offers_calming(sid, kind)
+    };
+    assert!(offers(&mut g, 4.0, FacilityKind::Constabulary), "a Constabulary at four");
+    assert!(!offers(&mut g, 3.75, FacilityKind::Constabulary), "none under four");
+    assert!(g.free_slots(sid) > 1, "the premise: slots to spare");
+    assert!(!offers(&mut g, 9.0, FacilityKind::Stadium), "no Stadium alone while slots are free");
+    while g.free_slots(sid) > 1 {
+        g.state_mut(sid).facilities.push(facility(FacilityKind::Mine));
+    }
+    assert!(offers(&mut g, 5.0, FacilityKind::Stadium), "one slot left: a Stadium alone");
+    assert!(!offers(&mut g, 4.75, FacilityKind::Stadium), "and never under five");
+    // A Constabulary on order already has that slot: no Stadium alone beside it.
+    let widgets = g.build_widgets(Seat(1), BuildItem::Facility(FacilityKind::Constabulary));
+    g.state_mut(sid).queue.push(Build { item: BuildItem::Facility(FacilityKind::Constabulary), seat: Seat(1), widgets, done: 0, coastal: false });
+    assert!(!offers(&mut g, 9.0, FacilityKind::Stadium), "a Constabulary on order takes the last slot");
+}
+
+/// Ticket #410 (version 0.09.4): **the Mothball is priced in a restive Region, and Relief rises
+/// with Unrest**: a Region Facility's Mothball weighs a quarter from Unrest 5, a Colony's is
+/// untouched; Relief is offered from 5 at one, rising in a line to double at 9 and no higher.
+#[test]
+fn a_computer_seat_prices_a_mothball_and_weighs_relief_by_unrest() {
+    let mut g = game();
+    let sid = StateId::NorthAfrica;
+    g.state_mut(sid).facilities.push(facility(FacilityKind::Mine));
+    let b = BuildingRef::Facility(sid, g.state(sid).facilities.len() - 1);
+    g.state_mut(sid).unrest = 4.75;
+    assert_eq!(g.ai_mothball_price(b), 1.0, "calm enough: no price");
+    g.state_mut(sid).unrest = 5.0;
+    assert_eq!(g.ai_mothball_price(b), 0.25, "restive: a quarter");
+    let c = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Mine], 2);
+    assert_eq!(g.ai_mothball_price(BuildingRef::Module(c, 0)), 1.0, "a Colony has no Unrest to raise");
+    assert_eq!(g.ai_relief_weight(4.75), None, "no Relief under five");
+    assert_eq!(g.ai_relief_weight(5.0), Some(1.0));
+    assert_eq!(g.ai_relief_weight(7.0), Some(1.5), "halfway to double at seven");
+    assert_eq!(g.ai_relief_weight(9.0), Some(2.0));
+    assert_eq!(g.ai_relief_weight(10.0), Some(2.0), "and no higher");
+}
+
+/// Ticket #412 (version 0.09.4): **the Archivists win 5 Influence and ease every Region they hold
+/// by a half each time they lead a Tech to completion**, said on the Tech's line; nobody else does.
+/// Seat 3 is the Archivists.
+#[test]
+fn the_archivists_are_paid_for_leading_a_tech() {
+    for (lead, paid) in [(Seat(3), true), (Seat(1), false)] {
+        let mut g = game();
+        let held = g.controlled_states(lead);
+        assert!(!held.is_empty(), "the premise: they hold a Region");
+        for sid in &held {
+            g.state_mut(*sid).unrest = 4.0;
+        }
+        let tech = *g.pickable_techs().first().expect("a Tech to research");
+        g.research.current = Some(tech);
+        g.report.lines.clear();
+        let before = g.influence_allotment(lead);
+        let cost = g.tables.tech(tech).cost;
+        g.accrue_research(lead, cost);
+        assert_eq!(g.research.last_lead, Some(lead), "the premise: {lead:?} led");
+        let f = g.tables.faction(g.kind(lead));
+        assert_eq!(g.influence_allotment(lead) - before, if paid { f.lead_influence } else { 0 }, "{lead:?}: the Influence");
+        for sid in &held {
+            assert_eq!(g.state(*sid).unrest, if paid { 4.0 - f.lead_unrest_ease } else { 4.0 }, "{lead:?}: {sid:?}'s Unrest");
+        }
+        let line = g.report.lines.iter().find(|l| l.kind == LineKind::TechComplete).expect("the Tech's line").text.clone();
+        assert_eq!(line.contains("+5 Influence, -0.5 Unrest"), paid, "{line}");
+    }
+    let t = tables();
+    assert_eq!((t.faction(FactionKind::Archivists).lead_influence, t.faction(FactionKind::Archivists).lead_unrest_ease), (5, 0.5), "the designer's figures");
+    // At once, and once: a lead outside the Income is spendable now, and the next Income does not
+    // pay it again.
+    let mut g = game();
+    let tech = *g.pickable_techs().first().unwrap();
+    g.research.current = Some(tech);
+    let before = g.seat(Seat(3)).allotment;
+    g.accrue_research(Seat(3), g.tables.tech(tech).cost);
+    assert_eq!(g.seat(Seat(3)).allotment - before, 5, "spendable at once");
+    pick_a_tech(&mut g);
+    answer_the_card(&mut g);
+    g.end_turn(std::array::from_fn(|_| Vec::new())).expect("the turn ends");
+    assert_eq!(g.seat(Seat(3)).lead_windfall, 0);
+    assert_eq!(g.seat(Seat(3)).allotment, g.influence_allotment(Seat(3)), "the next Allotment carries no second five");
+    // Holding no Region, the line claims no Unrest.
+    let mut g = game();
+    for sid in g.controlled_states(Seat(3)) {
+        g.state_mut(sid).control = Control::Neutral;
+    }
+    let tech = *g.pickable_techs().first().unwrap();
+    g.research.current = Some(tech);
+    g.report.lines.clear();
+    g.accrue_research(Seat(3), g.tables.tech(tech).cost);
+    let line = g.report.lines.iter().find(|l| l.kind == LineKind::TechComplete).unwrap().text.clone();
+    assert!(line.ends_with("+5 Influence."), "{line}");
+}
+
+/// Ticket #413 (version 0.09.4): **Orbital Refuelling**, Propulsion rung 1 at 22, needing nothing,
+/// cuts a crossing's days by a tenth before the rounding up and multiplies with Nuclear Rockets;
+/// **Clean Propellant adds 5 to every Ship's tank**, a new Ship built full.
+#[test]
+fn orbital_refuelling_stacks_with_nuclear_rockets_and_clean_propellant_widens_the_tank() {
+    let mut g = game();
+    let card = g.tables.tech(TechId::OrbitalRefuelling).clone();
+    assert_eq!((card.rung, card.cost, card.needs.len(), card.value), (1, 22, 0, 0.9));
+    assert!(g.tables.techs.iter().all(|t| !t.needs.contains(&TechId::OrbitalRefuelling)), "needed by nothing");
+    // The multipliers stack: 0.9 alone, 0.72 with Nuclear Rockets.
+    let turns = |g: &Game, turn: u32| g.transit_cost_for_at(Seat(0), BodyId::Earth, BodyId::Mars, turn).0;
+    let base: Vec<u32> = (1..=36).map(|t| turns(&g, t)).collect();
+    g.research.done.push(TechId::NuclearRockets);
+    let nuclear: Vec<u32> = (1..=36).map(|t| turns(&g, t)).collect();
+    g.research.done.push(TechId::OrbitalRefuelling);
+    let both: Vec<u32> = (1..=36).map(|t| turns(&g, t)).collect();
+    assert!(both.iter().zip(&nuclear).all(|(b, n)| b <= n), "the stack never slows a crossing");
+    assert!(both.iter().zip(&nuclear).any(|(b, n)| b < n), "and somewhere off the window it gains a turn: {nuclear:?} -> {both:?}");
+    g.research.done.retain(|t| *t != TechId::NuclearRockets);
+    let alone: Vec<u32> = (1..=36).map(|t| turns(&g, t)).collect();
+    assert!(alone.iter().zip(&base).any(|(a, b)| a < b), "Orbital Refuelling alone shortens a crossing");
+    // The spec's table: at the window, Mars 5 / 4 / 4 / 4 and Venus 3 / 3 / 2 / 2.
+    let window = |g: &Game, to: BodyId| (1..=36).map(|turn| g.transit_cost_at(BodyId::Earth, to, turn).0).min().unwrap();
+    let mut t = game();
+    let row = |t: &mut Game, techs: &[TechId]| {
+        t.research.done.retain(|x| *x != TechId::NuclearRockets && *x != TechId::OrbitalRefuelling);
+        t.research.done.extend_from_slice(techs);
+        (window(t, BodyId::Mars), window(t, BodyId::Venus))
+    };
+    assert_eq!(row(&mut t, &[]), (5, 3));
+    assert_eq!(row(&mut t, &[TechId::OrbitalRefuelling]), (4, 3));
+    assert_eq!(row(&mut t, &[TechId::NuclearRockets]), (4, 2));
+    assert_eq!(row(&mut t, &[TechId::NuclearRockets, TechId::OrbitalRefuelling]), (4, 2));
+    // The tank.
+    let tank = g.tables.unit(UnitKind::Frigate).tank as f64;
+    assert_eq!(g.tank_of(Seat(0), UnitKind::Frigate), tank);
+    g.research.done.push(TechId::CleanPropellant);
+    assert_eq!(g.tank_of(Seat(0), UnitKind::Frigate), tank + 5.0, "Clean Propellant: +5");
+    assert_eq!(g.tank_of(Seat(0), UnitKind::Army), 0.0, "an Army has no tank");
+    let yard = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Shipyard], 3);
+    build_now(&mut g, Place::Colony(yard), BuildItem::Unit(UnitKind::Frigate), Seat(0));
+    g.resolution_phase();
+    let s = g.ships.iter().rfind(|s| s.seat == Seat(0) && s.kind == UnitKind::Frigate).expect("built");
+    assert_eq!(s.fuel, tank + 5.0, "a new Ship is built full");
+}
+
+/// Ticket #414 (version 0.09.4): **the path a hover lights is the Tech and everything it needs, all
+/// the way down**; a Tech it does not need stays dark even beside it on the tree.
+#[test]
+fn the_tech_trees_lit_path_is_everything_a_tech_needs() {
+    let t = tables();
+    let path = t.tech_path(TechId::MissileTechnology);
+    for want in [TechId::MissileTechnology, TechId::HardenedHulls, TechId::EfficientTransit, TechId::NuclearRockets, TechId::CleanPropellant] {
+        assert!(path.contains(&want), "{want:?} is on Missile Technology's path: {path:?}");
+    }
+    assert!(!path.contains(&TechId::OrbitalRefuelling), "Orbital Refuelling, beside it, is not");
+    assert_eq!(path.len(), 5);
+    assert_eq!(t.tech_path(TechId::CleanPropellant), vec![TechId::CleanPropellant], "a rung-1 Tech lights itself alone");
+}
+
+/// Ticket #419 (version 0.09.4): **the Arkwrights' foundings ease every Region they hold**: a whole
+/// point for a ground Colony off Earth, half for a Space Station, said on the founding's line; a
+/// rival's founding eases nothing. Their computer seat reaches for a founding by its most restive
+/// Region, one at 4, double at 9. Seat 2 is the Arkwrights.
+#[test]
+fn the_arkwrights_foundings_ease_their_unrest() {
+    for (seat, eased) in [(Seat(2), 1.0), (Seat(1), 0.0)] {
+        let mut g = game();
+        let held = g.controlled_states(seat);
+        for sid in &held {
+            g.state_mut(*sid).unrest = 4.0;
+        }
+        let ship = ship_in(&mut g, seat, UnitKind::ColonyShip, BodyId::Moon, None, Stance::Hold);
+        g.ship_mut(ship).unwrap().colonists = 4;
+        let slot = g.free_slots_on(BodyId::Moon)[0];
+        g.report.lines.clear();
+        // The control makes the same turn without the founding, so the Resolution's other falls cancel;
+        // the Moon's first ground Colony eases every Region by its own half point as well (#395).
+        let first = if g.first_at(BodyId::Moon).is_none() { g.tables.unrest.first_colony_ease } else { 0.0 };
+        let mut control = g.clone();
+        g.commit_orders(seat, &[Order::Unload { ship, colonists: 4, army: false, into: UnloadTarget::Slot(BodyId::Moon, slot) }]);
+        g.resolution_phase();
+        control.resolution_phase();
+        for sid in &held {
+            assert_eq!(control.state(*sid).unrest - g.state(*sid).unrest, eased + first, "{seat:?}: {sid:?} after a founding");
+        }
+        let line = g.report.lines.iter().find(|l| l.kind == LineKind::ColonyFounded && l.text.contains("founded a Colony")).expect("the founding's line").text.clone();
+        assert_eq!(line.ends_with(": -1 Unrest."), eased > 0.0, "{line}");
+    }
+    // A founding in Antarctica, on Earth, eases nothing.
+    let mut g = game();
+    g.antarctica_open = true;
+    let held = g.controlled_states(Seat(2));
+    for sid in &held {
+        g.state_mut(*sid).unrest = 4.0;
+    }
+    let ship = ship_in(&mut g, Seat(2), UnitKind::ColonyShip, BodyId::Earth, None, Stance::Hold);
+    g.ship_mut(ship).unwrap().colonists = 4;
+    let ice = g.free_slots_on(BodyId::Earth)[0];
+    let mut control = g.clone();
+    g.commit_orders(Seat(2), &[Order::Unload { ship, colonists: 4, army: false, into: UnloadTarget::Slot(BodyId::Earth, ice) }]);
+    g.resolution_phase();
+    control.resolution_phase();
+    assert!(g.colonies.len() > control.colonies.len(), "the premise: a Colony founded in Antarctica");
+    for sid in &held {
+        assert_eq!(control.state(*sid).unrest, g.state(*sid).unrest, "Antarctica eases nothing: {sid:?}");
+    }
+    // A station built: half a point.
+    let mut g = game();
+    g.seats[2].stockpile.materials = 500.0;
+    let held = g.controlled_states(Seat(2));
+    for sid in &held {
+        g.state_mut(*sid).unrest = 4.0;
+    }
+    let slot = (0..g.tables.body(BodyId::Earth).orbital_slots).find(|s| g.colonies.iter().all(|c| !(c.body == BodyId::Earth && c.in_orbit && c.slot == *s))).expect("a free ring over Earth");
+    let build = Order::BuildStation { body: BodyId::Earth, slot };
+    assert!(g.check_order(Seat(2), &[], &build).is_ok(), "{:?}", g.check_order(Seat(2), &[], &build));
+    g.report.lines.clear();
+    let mut control = g.clone();
+    g.commit_orders(Seat(2), std::slice::from_ref(&build));
+    g.resolution_phase();
+    control.resolution_phase();
+    assert!(g.colonies.len() > control.colonies.len(), "the premise: the station stands");
+    for sid in &held {
+        assert_eq!(control.state(*sid).unrest - g.state(*sid).unrest, 0.5, "{sid:?} after a station");
+    }
+    assert!(g.report.lines.iter().any(|l| l.text.ends_with(": -0.5 Unrest.")), "the line says it: {:?}", g.report.lines);
+    let t = tables();
+    let a = t.faction(FactionKind::Arkwrights);
+    assert_eq!((a.found_colony_unrest_ease, a.found_station_unrest_ease), (1.0, 0.5), "the designer's figures");
+    // The computer's pull: one at 4 and under, double at 9, by the most restive Region held.
+    let mut g = game();
+    let held = g.controlled_states(Seat(2));
+    let pull = |g: &mut Game, u: f64| {
+        g.state_mut(held[0]).unrest = u;
+        g.ai_founding_pull(Seat(2))
+    };
+    assert_eq!(pull(&mut g, 3.0), 1.0);
+    assert_eq!(pull(&mut g, 6.5), 1.5);
+    assert_eq!(pull(&mut g, 10.0), 2.0);
+    assert_eq!(g.ai_founding_pull(Seat(1)), 1.0, "a Faction whose foundings ease nothing");
+}
+
+/// Ticket #415 (version 0.09.4): **each Output figure's sources add up to the figure**: every working
+/// building's output under its name, the upkeep as one line below nought on Energy, a Region's
+/// economy in its Ducats.
+#[test]
+fn the_output_rows_sources_add_up_to_its_figures() {
+    let g = fresh();
+    for place in [Place::State(g.controlled_states(Seat(0))[0]), Place::Colony(station_of(&g, Seat(0), BodyId::Earth).expect("the ISS"))] {
+        let o = g.place_output(place).expect("a directed place");
+        let s = g.place_output_sources(place).expect("its sources");
+        let sum = |r: Resource| tenth(s.iter().filter(|(x, ..)| *x == r).map(|(.., v)| *v).sum());
+        assert!((sum(Resource::Materials) - o.materials).abs() < 1e-9, "{place:?} Materials: {} against {}", sum(Resource::Materials), o.materials);
+        assert!((sum(Resource::Fuel) - o.fuel).abs() < 1e-9, "{place:?} Fuel");
+        assert!((sum(Resource::Energy) - o.energy).abs() < 1e-9, "{place:?} Energy, net of the upkeep line: {} against {}", sum(Resource::Energy), o.energy);
+        assert!((sum(Resource::Ducats) - o.ducats).abs() < 1e-9, "{place:?} Ducats");
+        assert!((sum(Resource::Research) - o.research).abs() < 1e-9, "{place:?} Research");
+    }
+    let home = Place::State(g.controlled_states(Seat(0))[0]);
+    let s = g.place_output_sources(home).unwrap();
+    assert!(s.iter().any(|(r, n, v)| *r == Resource::Energy && n == "upkeep" && *v < 0.0), "the upkeep as one line below nought");
+    assert!(s.iter().any(|(r, n, _)| *r == Resource::Ducats && n == "the economy"), "a Region's economy");
+}
+
+/// Ticket #411 (version 0.09.4): **the Nature Reserve** adds 1 to the Sink while it stands,
+/// credited to its holder, and takes a sixth off a climate rise to its Region's Unrest (a third of
+/// the Stadium's half), multiplying with a Stadium's; one to a Region; 30 Materials and 5 Widgets.
+#[test]
+fn a_nature_reserve_grows_the_sink_and_calms_a_climate_rise() {
+    let mut g = game();
+    let sid = StateId::EastAsia;
+    let card = g.tables.facility(FacilityKind::NatureReserve).clone();
+    assert_eq!((card.materials, card.widgets, card.energy_upkeep, card.sink_per_turn), (30, 5, 0, 1.0), "the designer's figures");
+    let before = g.scrubber_removal_by_seat()[0];
+    g.state_mut(sid).facilities.push(facility(FacilityKind::NatureReserve));
+    assert!((g.scrubber_removal_by_seat()[0] - before - 1.0).abs() < 1e-9, "+1 on the Sink, the holder's");
+    assert!((g.emissions_now().scrubbers - g.scrubber_removal()).abs() < 1e-9, "and in the Climate phase's Sink");
+    g.state_mut(sid).unrest = 3.0;
+    let rose = g.raise_unrest(sid, 1.2, UnrestSource::Climate);
+    assert!((rose - 1.0).abs() < 1e-12, "a sixth off a climate rise of 1.2 lands 1.0: {rose}");
+    // Five sixths exactly, so a rise of 1.5 lands on the quarter and a threshold is not missed by a hair.
+    assert_eq!(1.5 * g.tables.unrest.nature_reserve_factor, 1.25, "exactly five sixths");
+    assert_eq!(g.raise_unrest(sid, 1.0, UnrestSource::Plain), 1.0, "nothing off a plain rise");
+    g.state_mut(sid).facilities.push(facility(FacilityKind::Stadium));
+    let rose = g.raise_unrest(sid, 1.2, UnrestSource::Climate);
+    assert!((rose - 0.5).abs() < 1e-6, "with a Stadium the two multiply, 1.2 to 0.5: {rose}");
+    g.seats[0].stockpile.materials = 500.0;
+    let again = Order::BuildFacility { state: sid, kind: FacilityKind::NatureReserve };
+    assert!(g.check_order(Seat(0), &[], &again).unwrap_err().0.contains("already has a Nature Reserve"), "one to a Region");
+}
+
+/// Ticket #411 (Q9, B): **a Nature Reserve in an occupied Region credits the occupier**, the seat
+/// that directs it; the Sink gains either way.
+#[test]
+fn a_nature_reserve_in_an_occupied_region_credits_the_occupier() {
+    let mut g = game();
+    let sid = StateId::NorthAfrica;
+    g.take_control(sid, Seat(1));
+    g.state_mut(sid).facilities.push(facility(FacilityKind::NatureReserve));
+    let held = g.scrubber_removal_by_seat();
+    assert_eq!((held[1], held[2]), (1.0, 0.0), "held: the holder's");
+    g.state_mut(sid).control = Control::Occupied { occupier: Seat(2), previous: Some(Seat(1)), turns: 1, banked: 0 };
+    let occupied = g.scrubber_removal_by_seat();
+    assert_eq!((occupied[1], occupied[2]), (0.0, 1.0), "occupied: the occupier's");
+    assert_eq!(held.iter().sum::<f64>(), occupied.iter().sum::<f64>(), "the Sink gains the same");
 }

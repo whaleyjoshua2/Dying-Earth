@@ -5,6 +5,11 @@
 # Prospectors' Venture Capital Fund (2000 DUCATS on their card since ticket #240, version
 # 0.08.3; it was 1000 Materials from ticket #182, version 0.08.0).
 stabilization_turns = 3
+# Ticket #406 (version 0.09.4): the Custodians' first part is worth the greater of the best run of
+# the game over the bar and this share of the best the counted gap has closed since the game's
+# opening figure. Three tenths, under the third one turn of run is worth, so a real run always beats
+# any cut.
+stabilization_gap_cap = 0.3
 # Off-world Presence is the same bar for every Faction.
 off_world_presence = 12
 # Ticket #27 (version 0.02): twenty-four turns of one month. Ticket #67 (version 0.05.5): thirty-six

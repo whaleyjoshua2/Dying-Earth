@@ -141,6 +141,62 @@ fn a_save_from_another_version_and_a_damaged_file_are_both_refused_with_a_messag
     save::load_from(&good, tables()).expect("the undamaged save still loads");
 }
 
+/// Ticket #417 (version 0.09.4, the closing ticket): `SAVE_VERSION` did not move this version,
+/// so a save written by 0.09.3 must still load. Simulated by writing a save and cutting every field
+/// 0.09.4 added out of it, each of which must then read its default.
+#[test]
+fn a_save_without_this_versions_fields_still_loads() {
+    let dir = TempDir::new("older-fields");
+    let game = played_to(5, 4);
+    let text = save::to_text(&game, SaveKind::Manual).unwrap();
+    // Remove `name:value` wherever it stands, the value running to the next comma or closing
+    // bracket at its own depth.
+    let cut = |text: &str, name: &str| -> String {
+        let key = format!("{name}:");
+        let mut out = String::new();
+        let mut rest = text;
+        while let Some(i) = rest.find(&key) {
+            let before = &rest[..i];
+            if !before.trim_end().ends_with([',', '(', '{']) {
+                out.push_str(&rest[..i + key.len()]);
+                rest = &rest[i + key.len()..];
+                continue;
+            }
+            out.push_str(before);
+            let mut depth = 0i32;
+            let mut end = rest.len();
+            for (j, c) in rest[i + key.len()..].char_indices() {
+                match c {
+                    '(' | '[' | '{' => depth += 1,
+                    ')' | ']' | '}' if depth == 0 => {
+                        end = i + key.len() + j;
+                        break;
+                    }
+                    ')' | ']' | '}' => depth -= 1,
+                    ',' if depth == 0 => {
+                        end = i + key.len() + j + 1;
+                        break;
+                    }
+                    _ => {}
+                }
+            }
+            rest = &rest[end..];
+        }
+        out.push_str(rest);
+        out
+    };
+    let mut older = text.clone();
+    for name in ["under_sink_eased", "opening_gap", "best_gap_closed", "best_run", "lead_windfall", "card_price_by"] {
+        let before = older.len();
+        older = cut(&older, name);
+        assert!(older.len() < before, "{name} was in the save and is cut");
+    }
+    let path = dir.path().join("save-5-turn-4-older.ron");
+    std::fs::write(&path, &older).unwrap();
+    let loaded = save::load_from(&path, tables()).expect("a save without this version's fields loads");
+    assert_eq!(loaded.turn, game.turn);
+}
+
 /// (d) The autosave cadence and the rotation: turns 3, 6, 9 and 12 each write one, and only the
 /// last three of a game's autosaves are kept.
 #[test]

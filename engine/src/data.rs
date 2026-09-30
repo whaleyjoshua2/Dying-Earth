@@ -25,7 +25,8 @@ impl std::error::Error for DataError {}
 #[derive(Debug, Clone, Deserialize)]
 pub struct Produces {
     pub resource: Resource,
-    pub amount: i64,
+    /// Ticket #421 (version 0.09.4): a fraction allowed, for a Refinery Module's 4.5.
+    pub amount: f64,
 }
 
 /// A Colony Slot: a real place on its Body, at its approximate longitude and latitude (ticket #45).
@@ -170,6 +171,15 @@ pub struct ScrubberCard {
 #[derive(Debug, Clone, Deserialize)]
 pub struct PopulationFactorCard {
     pub population_per_point: f64,
+}
+
+/// Ticket #416 (version 0.09.4): every Region's own Research, and a Lab's multiplier on it
+/// (`facilities.toml`).
+#[derive(Debug, Clone, Deserialize)]
+pub struct RegionResearchCard {
+    pub base: f64,
+    pub lab_multiplier: f64,
+    pub neutral_share: f64,
 }
 
 /// Ticket #257 (version 0.08.4): what each Sea Level rise a Sea Wall has held back adds to its
@@ -346,6 +356,9 @@ pub struct TechCard {
     /// every other Tech in the tree.
     #[serde(default)]
     pub habitat_colonists: Option<f64>,
+    /// Ticket #413 (version 0.09.4): Fuel this Tech adds to every Ship's tank (Clean Propellant).
+    #[serde(default)]
+    pub tank_fuel: f64,
     #[serde(default)]
     pub influence_threshold_multiplier: Option<f64>,
     /// Ticket #84 (version 0.06.0): the Faction whose Victory Condition this Tech opens, if any.
@@ -605,6 +618,18 @@ pub struct FactionCard {
     #[serde(default)]
     pub mothball_pairs: std::collections::BTreeMap<FacilityKind, ModuleKind>,
     pub signature: String,
+    /// Ticket #412 (version 0.09.4): what the Faction wins each time it leads a Tech to completion,
+    /// in Influence and in Unrest off every Region it holds. Nought for all but the Archivists.
+    #[serde(default)]
+    pub lead_influence: i64,
+    #[serde(default)]
+    pub lead_unrest_ease: f64,
+    /// Ticket #419 (version 0.09.4): Unrest off every Region the Faction holds for each ground
+    /// Colony it founds off Earth and each Space Station it builds. Nought for all but the Arkwrights.
+    #[serde(default)]
+    pub found_colony_unrest_ease: f64,
+    #[serde(default)]
+    pub found_station_unrest_ease: f64,
     /// Ticket #203 (version 0.08.1): the Faction's Unique Facility in one sentence -- what it is,
     /// what it replaces, and what it does beyond the common building's job. It was on no card until
     /// the Faction window went in: the four Unique Facilities arrived in version 0.08.0 (tickets
@@ -1040,12 +1065,18 @@ pub struct UnrestTable {
     /// Ticket #395 (version 0.09.3): what the first ground Colony ever founded on a Body takes off
     /// every Region's Unrest at once, whoever holds it, once a Body.
     pub first_colony_ease: f64,
+    /// Ticket #405 (version 0.09.4): what the first Climate phase the world is ever under the
+    /// Natural Sink takes off every Region's Unrest, and off a Region the Custodians hold instead.
+    pub under_sink_ease: f64,
+    pub under_sink_ease_custodians: f64,
     pub green_techs_two: f64,
     pub green_techs_four: f64,
     pub constabulary_damping: f64,
     /// Ticket #389 (version 0.09.3): what a working Stadium multiplies a climate rise by, after the
     /// damping above; half, so a heat rise of one lands as a quarter where a Constabulary stands too.
     pub stadium_factor: f64,
+    /// Ticket #411 (version 0.09.4): what a working Nature Reserve multiplies a climate rise by.
+    pub nature_reserve_factor: f64,
     pub army_threshold: f64,
     pub facility_threshold: f64,
     pub throw_off_threshold: f64,
@@ -1064,6 +1095,9 @@ pub struct UnrestTable {
 #[derive(Debug, Clone, Deserialize)]
 pub struct VictoryTable {
     pub stabilization_turns: u32,
+    /// Ticket #406 (version 0.09.4): what closing the whole counted gap is worth to the
+    /// Custodians' first part, short of a run.
+    pub stabilization_gap_cap: f64,
     pub off_world_presence: u32,
     pub turns: u32,
     /// Ticket #57: the game begins on the first of this month. Ticket #67 (version 0.05.5): a Turn
@@ -1174,6 +1208,9 @@ pub struct AiWeights {
     /// Ticket #389 (version 0.09.3): the Stadium, raised only where a Constabulary already stands
     /// and Unrest is still 5 or more.
     pub build_stadium: f64,
+    /// Ticket #411 (version 0.09.4): the Nature Reserve, on the Sink gap for the Custodians and a
+    /// little for everyone; at the Stadium's weight where the Region's Unrest is 4 or more.
+    pub build_nature_reserve: f64,
     /// Ticket #267 (version 0.08.4): smear a rival the seat is Cold or Hostile toward whose Blame
     /// share stands above the fair quarter.
     pub smear: f64,
@@ -1275,6 +1312,18 @@ pub struct AiPace {
 #[derive(Debug, Clone, Deserialize)]
 pub struct AiThresholds {
     pub attack_odds: f64,
+    /// Ticket #410 (version 0.09.4): the Unrest the computer seats act on (see `ai.toml`).
+    pub constabulary_from: f64,
+    pub stadium_from: f64,
+    pub stadium_alone_free_slots: u32,
+    pub relief_from: f64,
+    pub relief_double_at: f64,
+    pub mothball_restive_from: f64,
+    pub mothball_restive_factor: f64,
+    /// Ticket #419 (version 0.09.4): a Faction eased by its foundings weighs founding by its most
+    /// restive Region, one at `founding_pull_from`, double at `founding_pull_double_at`.
+    pub founding_pull_from: f64,
+    pub founding_pull_double_at: f64,
     /// Ticket #284 (version 0.08.5): the Relations score at or below which a seat has cause to
     /// attack a place a rival holds -- Cold or worse.
     pub war_cause: i64,
@@ -1422,6 +1471,7 @@ struct FacilitiesFile {
     widgets: WidgetsCard,
     scrubber: ScrubberCard,
     population_factor: PopulationFactorCard,
+    region_research: RegionResearchCard,
     sea_wall: SeaWallCard,
     mothball: MothballCard,
     school: SchoolCard,
@@ -1801,6 +1851,8 @@ pub struct Tables {
     pub scrubber: ScrubberCard,
     /// Ticket #333 (version 0.09.0): the Research Lab's population factor divisor (`facilities.toml`).
     pub population_factor: PopulationFactorCard,
+    /// Ticket #416 (version 0.09.4): Research from every Region, and the Lab's multiplier on it.
+    pub region_research: RegionResearchCard,
     pub mothball: MothballCard,
     /// Ticket #257: the Sea Wall's keep per rise held.
     pub sea_wall: SeaWallCard,
@@ -1938,6 +1990,7 @@ impl Tables {
             widgets: facilities.widgets,
             scrubber: facilities.scrubber,
             population_factor: facilities.population_factor,
+            region_research: facilities.region_research,
             mothball: facilities.mothball,
             sea_wall: facilities.sea_wall,
             school: facilities.school,
@@ -2391,6 +2444,43 @@ impl Tables {
                 ("bodies", figure(f.victory_second.bodies as f64)),
             ],
         )
+    }
+    /// Ticket #407 (version 0.09.4): a Faction's signature rule with its figures read from the
+    /// data, so the text cannot go stale: the Scrubber's price, upkeep, Sink and cap, the Leapfrog's
+    /// price and a Mothball's Unrest. A text that names none of them reads as written.
+    pub fn signature(&self, kind: FactionKind) -> String {
+        let s = self.facility(FacilityKind::Scrubber);
+        crate::report::render(
+            &self.faction(kind).signature,
+            &[
+                ("scrubber_materials", crate::state::figure(s.materials as f64)),
+                ("scrubber_widgets", crate::state::figure(s.widgets as f64)),
+                ("scrubber_upkeep", crate::state::figure(s.energy_upkeep as f64)),
+                ("scrubber_sink", format!("{:.1}", s.sink_per_turn)),
+                ("scrubber_fall", crate::state::figure(self.unrest.scrubber_fall)),
+                ("scrubber_min", self.scrubber.min.to_string()),
+                ("scrubber_max", self.scrubber.max.to_string()),
+                ("leapfrog", self.ducats.per_leapfrog.to_string()),
+                ("mothball", crate::state::figure(self.unrest.per_mothball)),
+                ("scrubber_people", self.people_text(self.scrubber.per_population)),
+                ("provisional", self.research_directive.provisional_min_contribution.to_string()),
+            ],
+        )
+    }
+    /// Ticket #414 (version 0.09.4): a Tech and every Tech it needs, all the way down -- the path
+    /// the Tech tree lights on a hover.
+    pub fn tech_path(&self, t: TechId) -> Vec<TechId> {
+        let mut v = vec![t];
+        let mut i = 0;
+        while i < v.len() {
+            for n in &self.tech(v[i]).needs {
+                if !v.contains(n) {
+                    v.push(*n);
+                }
+            }
+            i += 1;
+        }
+        v
     }
     pub fn ai_weights(&self, kind: FactionKind) -> &AiWeights {
         &self.ai.weights[&kind]

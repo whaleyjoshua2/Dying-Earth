@@ -24,11 +24,17 @@ pub struct Progress {
     /// Ticket #51: the first part is at its bar but something else denies it (the Archive is
     /// complete and offline). Set with the reason.
     pub first_held_back: Option<String>,
+    /// Ticket #406 (version 0.09.4): the share of the first part earned short of its bar, where the
+    /// value alone says less -- the Custodians' best run and the gap closed. Nought for the others.
+    pub first_partial: f64,
+    /// Ticket #406 (version 0.09.4): the first part's row in words where the value alone is not
+    /// the figure a player acts on: the Custodians' gap in ppm beside their run. `None` for the rest.
+    pub first_label: Option<String>,
 }
 
 impl Progress {
     pub fn first_fraction(&self) -> f64 {
-        (self.first_value / self.first_bar).clamp(0.0, 1.0)
+        (self.first_value / self.first_bar).max(self.first_partial).clamp(0.0, 1.0)
     }
     pub fn second_fraction(&self) -> f64 {
         (self.second_value / self.second_bar).clamp(0.0, 1.0)
@@ -36,7 +42,17 @@ impl Progress {
     /// Ticket #373 (version 0.09.2): how much of the bar the Colonists in transit would fill beyond
     /// the settled fill, clipped at the bar's end. Nought where the part counts no Colonists.
     pub fn first_transit_fraction(&self) -> f64 {
-        ((self.first_value + self.first_transit as f64) / self.first_bar).clamp(0.0, 1.0) - self.first_fraction()
+        // Ticket #406 (version 0.09.4): never below nought where a partial credit fills more.
+        (((self.first_value + self.first_transit as f64) / self.first_bar).clamp(0.0, 1.0) - self.first_fraction()).max(0.0)
+    }
+    /// Ticket #406 (version 0.09.4): the first part as it stands this turn, without the Custodians'
+    /// partial credit: how near the Condition is, which the computer seats read where they read
+    /// nearness (the gate pick, the door no Accord is opened at), so their play does not change.
+    pub fn first_fraction_as_it_stands(&self) -> f64 {
+        (self.first_value / self.first_bar).clamp(0.0, 1.0)
+    }
+    pub fn score_as_it_stands(&self) -> f64 {
+        self.first_fraction_as_it_stands().min(self.second_fraction())
     }
     pub fn second_transit_fraction(&self) -> f64 {
         ((self.second_value + self.second_transit as f64) / self.second_bar).clamp(0.0, 1.0) - self.second_fraction()
@@ -116,6 +132,19 @@ impl Game {
         }
     }
 
+    /// Ticket #406 (version 0.09.4): the Stabilization row in ppm, off the last Climate phase, by
+    /// the test the run uses (counted Emissions against the Sink and the Scrubbers): *"Stabilization:
+    /// 21.3 ppm over the Sink (counted 27.6, Sink 6.3), run 0 of 3"*, the bar the Custodians' card
+    /// names. The Victory window, the Climate Panel and the headless driver all print it, so they
+    /// never disagree.
+    pub fn stabilization_text(&self) -> String {
+        let (counted, sink) = (self.climate.last.counted(), self.climate.last.total_sink());
+        let gap = counted - sink;
+        let side = if gap < 0.0 { "under" } else { "over" };
+        let bar = self.tables.faction(FactionKind::Custodians).victory_first.bar;
+        format!("Stabilization: {:.1} ppm {side} the Sink (counted {:.1}, Sink {:.1}), run {} of {:.0}", gap.abs(), counted, sink, self.seat(Seat(0)).stabilization_run, bar)
+    }
+
     pub fn progress(&self, seat: Seat) -> Progress {
         let s = self.seat(seat);
         // Ticket #50: the first part is whatever the Faction's card names, at the bar on the card.
@@ -188,6 +217,15 @@ impl Game {
             second_transit,
             second_text,
             first_held_back,
+            // Ticket #406 (version 0.09.4): the Custodians' run is worth the greater of the best run
+            // of the game over the bar and three tenths of the best share of the counted gap closed;
+            // neither falls back. `met` still reads the run as it stands.
+            first_partial: if card.kind == VictoryFirstKind::StabilizationRun {
+                (self.climate.best_run as f64 / card.bar).max(self.tables.victory.stabilization_gap_cap * self.climate.best_gap_closed)
+            } else {
+                0.0
+            },
+            first_label: (card.kind == VictoryFirstKind::StabilizationRun).then(|| self.stabilization_text()),
         }
     }
 

@@ -35,7 +35,10 @@ influence_multiplier = 1.2
 # Ticket #332 (version 0.09.0): the Factory pairs with the Factory Module and the Mine with the
 # Mine, now that each list has both; before, the Factory paired with the Mine.
 mothball_pairs = { factory = "factory", mine = "mine", power_plant = "generator", refinery = "refinery", research_lab = "observatory" }
-signature = "The Scrubber, Leapfrog and Production Moved. Only they build a Scrubber, in a Region they control, and it takes no build slot: 30 Materials, 2 turns, 4 Energy upkeep, no Emissions. Online it adds 3.0 ppm a turn to the Natural Sink and takes 1 off that Region's Unrest. A Region holds one per two hundred million people, between 2 and 10, and they are destroyed if it changes hands. A Leapfrog costs 50 Ducats in a Region they control and lowers its people's Emissions coefficient by 0.03 for good, never below 0.04. Production Moved: while a Factory, Mine, Power Plant, Refinery or Research Lab of theirs stands mothballed, one Factory, Mine, Generator, Refinery or Observatory of theirs off Earth makes double, one for one, the most productive first."
+# Ticket #407 (version 0.09.4): the figures in braces are read from the data where the text is
+# shown, so the text cannot go stale again (it said 4 Energy upkeep and 2 turns, where the Scrubber
+# costs 3 and is paid in Widgets); and the last sentence says their lever on Earth and its price.
+signature = "The Scrubber, Leapfrog and Production Moved. Only they build a Scrubber, in a Region they control, without a slot: {scrubber_materials} Materials, {scrubber_widgets} Widgets, {scrubber_upkeep} Energy upkeep. Online it adds {scrubber_sink} ppm a turn to the Natural Sink and takes {scrubber_fall} off the Region's Unrest; one per {scrubber_people} people, {scrubber_min} to {scrubber_max}, destroyed if the Region changes hands. A Leapfrog costs {leapfrog} Ducats and cuts a Region's Emissions for good. Production Moved: while a Factory, Mine, Power Plant, Refinery or Research Lab of theirs stands mothballed, a matching Module of theirs off Earth makes double, one for one. Their lever on Earth is switching industry off, at home or in a Region they have taken: each Mothball there costs +{mothball} Unrest."
 # Ticket #203 (version 0.08.1): the Unique Facility in one sentence, for the Faction card and the
 # Faction window. Ticket #186 built the Academy; nothing on any card named it until now.
 unique = "Academy -- replaces the School and the Institute, and pays +1 Ducat a turn while it is online."
@@ -152,7 +155,14 @@ module_materials_multiplier = 0.75
 # Ticket #377 (version 0.09.2): with no station to carry the Solar Array every other seat's
 # station starts with, a second Power Plant in the home Region.
 start_extra_facilities = ["power_plant"]
-signature = "Coach Class. A Colony Ship carries 8 Colonists, 12 with Expanded Habitats, and their Habitats hold half again as many, 6 and 12. They recruit 8 Pioneers a turn where others recruit 4, but every Pioneer takes twice the population. Every Ship costs them 15% less, a Colony Ship 25 Materials; a transit burns three quarters of the Fuel; and, starting with no station, a Space Station costs them 20 Materials and a Module three quarters."
+# Ticket #407 (version 0.09.4): audited against the data: 16 with Generation Ships too, and a
+# Colony Ship at 25.5 since figures are carried to a tenth.
+signature = "Coach Class. A Colony Ship carries 8 Colonists, 12 with Expanded Habitats and 16 with Generation Ships too, and their Habitats hold half again as many, 6 and 12. They recruit 8 Pioneers a turn where others recruit 4, but every Pioneer takes twice the population. Every Ship costs them 15% less, a Colony Ship 25.5 Materials; a transit burns three quarters of the Fuel; and, starting with no station, a Space Station costs them 20 Materials and a Module three quarters."
+# Ticket #419 (version 0.09.4): Unrest off every Region they hold, a whole point for each ground
+# Colony they found off Earth (Antarctica excepted) and half a point for each Space Station they
+# build; a place taken counts for nothing.
+found_colony_unrest_ease = 1.0
+found_station_unrest_ease = 0.5
 # Ticket #203 (version 0.08.1). The building is ticket #183's.
 unique = "Spaceport -- replaces the Launch Site, and pays +1 Influence into next turn's Allotment for every Pioneer it lifts off Earth. Off Earth, the Chorus -- replaces the Relay, and adds +1 Influence to the Allotment for every 6 Colonists at its Colony."
 victory = "Diaspora: 30 Colonists living off Earth, on Colonies spread over at least three Bodies with at least 4 Colonists each (Antarctica and stations over Earth do not count)."
@@ -189,9 +199,15 @@ emissions_multiplier = 0.9
 research_multiplier = 1.5
 research_multiplier_off_earth = 1.75
 influence_multiplier = 1.0
-signature = "Provisional Findings. While their Research went to the shared Tech last turn, they already have half the effect of the Tech under research: a multiplier x reads 1 + (x - 1) / 2, an addition reads half rounded down, and immunities do not carry. A turn of funding the Archive switches it off for the turn after. Their Research is x1.5 on Earth and x1.75 off it, an Observatory on a station over Earth counting as off."
+# Ticket #407 (version 0.09.4): audited against the data: the 75% contribution of ticket #235,
+# which the text had never said.
+signature = "Provisional Findings. While at least {provisional}% of their Research went to the shared Tech last turn, they already have half the effect of the Tech under research: a multiplier x reads 1 + (x - 1) / 2, an addition reads half rounded down, and immunities do not carry. Keeping back more switches it off for the turn after. Their Research is x1.5 on Earth and x1.75 off it, an Observatory on a station over Earth counting as off."
+# Ticket #412 (version 0.09.4): each time they lead a Tech to completion, 5 Influence at once and
+# half a point of Unrest off every Region they hold.
+lead_influence = 5
+lead_unrest_ease = 0.5
 # Ticket #203 (version 0.08.1). The building is ticket #184's.
-unique = "Reactor -- replaces the Power Plant, and takes 75% off the Energy upkeep of everything its holder owns, the Archive excepted. Off Earth, the Heliostat -- replaces the Solar Array, and makes 1 more Energy wherever it stands."
+unique = "Reactor -- replaces the Power Plant, and takes a quarter off the Energy upkeep of everything its holder owns, the Archive excepted. Off Earth, the Heliostat -- replaces the Solar Array, and makes 1 more Energy wherever it stands."
 # Ticket #68 (version 0.05.5): the first part is the Research paid into the Archive.
 # Ticket #347 (version 0.09.1): 125 of it, and the fund holds the whole figure from the first turn.
 # This bar IS `[archive] research` in modules.toml -- one figure written in two files, the Archive's
@@ -450,7 +466,8 @@ per_repair_point = 10
 # Energy +100%, on a currency that also buys Influence, Relief, Resettle and Leapfrogs, and the
 # AI's fixed lot of ten Materials now costs 30 Ducats where it cost 20.
 per_materials = 3
-per_fuel = 4
+# Ticket #421 (version 0.09.4): a quarter off, 4 to 3, its band 2 to 4.
+per_fuel = 3
 per_energy = 2
 price_band = 1
 price_step_units = 20

@@ -31,7 +31,7 @@ pub struct Credit {
 
 /// The icons in use, their authors, and the names they carry at game-icons.net. Anything added to
 /// `assets/icons/` belongs here too: the credit is the licence's price, not a courtesy.
-pub const CREDITS: [Credit; 43] = [
+pub const CREDITS: [Credit; 44] = [
     Credit { resource: "Materials", icon: "Mine Wagon", author: "Delapouite" },
     Credit { resource: "Fuel", icon: "Jerrycan", author: "Delapouite" },
     Credit { resource: "Energy", icon: "Electric", author: "Sbed" },
@@ -94,6 +94,7 @@ pub const CREDITS: [Credit; 43] = [
     Credit { resource: "Facility Constabulary", icon: "Handcuffs", author: "Lorc" },
     Credit { resource: "Facility Sea Wall", icon: "Dam", author: "Delapouite" },
     Credit { resource: "Facility Scrubber", icon: "Computer Fan", author: "Delapouite" },
+    Credit { resource: "Facility Nature Reserve", icon: "Beech", author: "Lorc" },
     // Tickets #181 to #186 (version 0.08.0): the four Unique Facilities. Every candidate was
     // rendered at 16 and 28 pixels on the game's own ground and looked at before any was adopted,
     // and two were killed by that: a TURBINE for the Reactor, which at 16 pixels is the Scrubber's
@@ -124,6 +125,8 @@ pub fn facility_icon(kind: dying_earth_engine::FacilityKind) -> &'static str {
         Constabulary => "facility_constabulary",
         // Ticket #389 (version 0.09.3): the Stadium, a bowl of tiers round a field.
         Stadium => "facility_stadium",
+        // Ticket #411 (version 0.09.4): the Nature Reserve, a beech, chosen by the designer.
+        NatureReserve => "facility_nature_reserve",
         SeaWall => "facility_sea_wall",
         Scrubber => "facility_scrubber",
         // Ticket #185 (version 0.08.0): the School.

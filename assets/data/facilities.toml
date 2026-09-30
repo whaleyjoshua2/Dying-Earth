@@ -34,7 +34,9 @@ name = "Refinery"
 materials = 20
 widgets = 4
 energy_upkeep = 3
-produces = { resource = "fuel", amount = 3 }
+# Ticket #421 (version 0.09.4): 4 Fuel on Earth, where it was 3, to pay for a Colony Ship's
+# 40-Fuel tank, at the designer's word.
+produces = { resource = "fuel", amount = 4 }
 emissions = 1.5
 
 [[facility]]
@@ -86,7 +88,9 @@ name = "Constabulary"
 materials = 25
 widgets = 4
 energy_upkeep = 2
-does = "takes 1 off this state's Unrest a turn, halves what the climate and an Agitate add to it, and adds 5 to what a rival must reach to take this state (10 with Civil Defense)"
+# Ticket #408 (version 0.09.4): said as the engine does it, a flat half point off each rise, refugees
+# included, now that the card's own sentence is gone.
+does = "takes 1 off this state's Unrest a turn and half a point off each rise from the climate, refugees or an Agitate; adds 5 to what a rival must reach to take this state (10 with Civil Defense)"
 emissions = 0.0
 
 # Ticket #54 (version 0.05): the Scrubber, the Custodians' signature Facility, which replaces
@@ -327,6 +331,18 @@ per_industry_level = 1
 [population_factor]
 population_per_point = 5000.0
 
+# Ticket #416 (version 0.09.4): every Region a seat directs makes Research from its people and its
+# schooling -- `base` x the population factor x the Education Level, the Lab's own formula without
+# the Lab -- and a working Research Lab multiplies it by `lab_multiplier`, each Lab adding its
+# multiplier less one. The Lab's `produces` above marks it as a Research building; its amount is no
+# longer read. A Region nobody holds makes its own the same way at `neutral_share`, into the Tech
+# under research and nobody's lead, and an occupied Region's Labs their share at the same fraction.
+# Set by the designer from the candidate sweeps: base 1.0, a Lab x1.5, the neutral share a half.
+[region_research]
+base = 1.0
+lab_multiplier = 1.5
+neutral_share = 0.5
+
 # Ticket #389 (version 0.09.3): the Stadium, the designer's "entertainment themed" building that
 # lowers Unrest. It DAMPS rather than drains: it halves what the climate adds to its state's Unrest
 # (the heat, the sea, a Break, a Climate card) and touches no Agitate, a rise quartered where a
@@ -340,5 +356,20 @@ name = "Stadium"
 materials = 20
 widgets = 4
 energy_upkeep = 1
-does = "halves what the climate adds to this state's Unrest, after a Constabulary takes its half point off (a heat rise of one lands as a quarter with both); an Agitate is untouched"
+does = "halves what the climate adds to this state's Unrest, after a Constabulary's half point (a heat rise of one lands as a quarter with both); an Agitate is untouched"
 emissions = 0.0
+
+# Ticket #411 (version 0.09.4): the Nature Reserve, the designer's "new building ... that increases
+# the natural sink - all factions can build". +1 ppm on the Natural Sink a turn while it stands,
+# credited to its holder's Blame removal as a Scrubber's is; and a third of the Stadium's effect on
+# Unrest (`nature_reserve_factor` in unrest.toml). A slot, one to a Region, every Faction's alike.
+# Appended last with its enum variant.
+[[facility]]
+id = "nature_reserve"
+name = "Nature Reserve"
+materials = 30
+widgets = 5
+energy_upkeep = 0
+does = "+1 ppm on the Natural Sink a turn; a sixth off what the climate adds to Unrest here"
+emissions = 0.0
+sink_per_turn = 1.0

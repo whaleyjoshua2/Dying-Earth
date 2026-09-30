@@ -188,10 +188,15 @@ pub enum FacilityKind {
     /// Agitate. Cheaper than the Constabulary, one to a
     /// Region, every Faction's alike. Appended last, as every kind since the Mine.
     Stadium,
+    /// Ticket #411 (version 0.09.4): the **Nature Reserve**, land given back: +1 on the Natural Sink
+    /// while it stands, credited to its holder's Blame removal, and a sixth off what the climate
+    /// adds to its Region's Unrest (a third of the Stadium's half). Every Faction's alike, one to a
+    /// Region, a slot. Appended last.
+    NatureReserve,
 }
 
 impl FacilityKind {
-    pub const ALL: [FacilityKind; 17] = [
+    pub const ALL: [FacilityKind; 18] = [
         FacilityKind::Factory,
         FacilityKind::PowerPlant,
         FacilityKind::Refinery,
@@ -209,6 +214,7 @@ impl FacilityKind {
         FacilityKind::Academy,
         FacilityKind::Mine,
         FacilityKind::Stadium,
+        FacilityKind::NatureReserve,
     ];
     pub fn name(self) -> &'static str {
         match self {
@@ -230,6 +236,7 @@ impl FacilityKind {
             // Ticket #332 (version 0.09.0): one name in both lists, by the Refinery precedent.
             FacilityKind::Mine => "Mine",
             FacilityKind::Stadium => "Stadium",
+            FacilityKind::NatureReserve => "Nature Reserve",
         }
     }
 
@@ -601,10 +608,17 @@ pub enum TechId {
     /// Venus two where it was three; a one-turn hop stays one; the Fuel is untouched. Hardened
     /// Hulls needs this AND Efficient Transit.
     NuclearRockets,
+    /// Ticket #413 (version 0.09.4): Propulsion rung 1 beside Clean Propellant, needing nothing and
+    /// needed by nothing, priced at 22 above its rung. A crossing's days x0.9 before the rounding
+    /// up, multiplied with Nuclear Rockets' x0.8 when both stand (0.72).
+    OrbitalRefuelling,
+    /// Ticket #420 (version 0.09.4): Propulsion rung 2, needing Clean Propellant and needed by
+    /// nothing, at 32. Every Ship's tank +15 Fuel, on Clean Propellant's +5.
+    CryogenicTanks,
 }
 
 impl TechId {
-    pub const ALL: [TechId; 22] = [
+    pub const ALL: [TechId; 24] = [
         TechId::EfficientGrids,
         TechId::CleanPower,
         TechId::CleanManufacturing,
@@ -627,6 +641,8 @@ impl TechId {
         TechId::RelayNetworks,
         TechId::MissileTechnology,
         TechId::NuclearRockets,
+        TechId::OrbitalRefuelling,
+        TechId::CryogenicTanks,
     ];
     pub fn index(self) -> usize {
         self as usize

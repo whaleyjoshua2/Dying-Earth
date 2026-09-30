@@ -19,7 +19,7 @@
 
 use dying_earth_engine::data::BreakEffect;
 use dying_earth_engine::data::{default_data_dir, Tables};
-use dying_earth_engine::ids::{BodyId, FactionKind, Seat, StateId};
+use dying_earth_engine::ids::{BodyId, FactionKind, Seat, StateId, TechId};
 use dying_earth_engine::state::{figure, tenth, Outcome};
 use std::sync::Arc;
 
@@ -94,6 +94,27 @@ fn main() {
     // different Faction in every seating, so the gate figure this ticket is judged by cannot be
     // read off it without adding four arrays up by hand.
     let mut all_gate_turns: [Vec<u32>; 4] = Default::default();
+    // Ticket #405 (version 0.09.4): the turn the world was first under the Sink, every seating.
+    let mut all_under_sink: Vec<u32> = Vec::new();
+    // Ticket #416 (version 0.09.4): the tree's finish, each Tech's, and the world's Research.
+    let mut all_tree_turns: Vec<u32> = Vec::new();
+    let mut all_tech_turns: Vec<Vec<u32>> = vec![Vec::new(); TechId::ALL.len()];
+    let mut all_research_by_source = [0f64; 6];
+    // Of the games still running at turn 28, the tree's median finish: how many had it complete.
+    let (mut all_reached_28, mut all_reached_28_done) = (0u32, 0u32);
+    let (mut all_research_turns, mut all_regions_held_turns, mut all_labs_turns) = (0u32, 0u32, 0u32);
+    let mut all_region_base = 0f64;
+    let mut all_research_at: [Vec<f64>; 4] = Default::default();
+    // Ticket #406 (version 0.09.4): each Faction's score at the end and its place in the ranking.
+    let mut all_scores: [Vec<f64>; 4] = Default::default();
+    let mut all_places = [[0u32; 4]; 4];
+    // Ticket #410 (version 0.09.4): Unrest per Faction: Region-turns held / at 4+ / at 7+, throw-offs,
+    // and seat 0's start state lost, to a throw-off or to a taking.
+    let mut all_unrest = [[0u32; 3]; 4];
+    let mut all_throw_offs = [0u32; 4];
+    // Ticket #412 (version 0.09.4): the Techs each Faction led, over the batch.
+    let mut all_leads = [0u32; 4];
+    let mut all_start_lost = [[0u32; 2]; 4];
     // Ticket #343 (version 0.09.1): the nuke's counters across every seating, so the closing
     // review has ONE total to quote rather than four blocks to add up by hand.
     let mut all_warc = dying_earth_engine::state::WarCounters::default();
@@ -141,6 +162,7 @@ fn main() {
                         let (mut draws, mut scrubbers, mut leapfrogs, mut constabularies, mut sea_walls) = (0u32, 0u32, 0u32, 0u32, 0u32);
                         // Ticket #389 (version 0.09.3): Stadiums, beside the Constabularies they follow.
                         let mut stadiums = 0u32;
+                        let mut nature_reserves = 0u32;
                         let (mut first_colony, mut off_earth, mut techs) = (Vec::new(), Vec::new(), Vec::new());
                         let mut breaks_fired = vec![0u32; tables.climate.breaks.len()];
                         let mut highest_rung = 0u32;
@@ -174,6 +196,13 @@ fn main() {
                         let mut warc = dying_earth_engine::state::WarCounters::default();
                         // Ticket #343 (version 0.09.1): the Natural Sink at the end of each game.
                         let mut sinks_end: Vec<f64> = Vec::new();
+                        let mut under_sink: Vec<u32> = Vec::new();
+                        let mut cell_scores: [Vec<f64>; 4] = Default::default();
+                        let mut cell_places = [[0u32; 4]; 4];
+                        let mut cell_unrest = [[0u32; 3]; 4];
+                        let mut cell_throw_offs = [0u32; 4];
+                        let mut cell_leads = [0u32; 4];
+                        let mut cell_start_lost = [0u32; 2];
                         let mut war_ppm: [Vec<f64>; 4] = Default::default();
                         let mut war_nobody: Vec<f64> = Vec::new();
                         let mut walls_standing = 0u32;
@@ -277,11 +306,34 @@ fn main() {
                             takes += r.influence_transfers;
                             if let Some(t) = r.tree_done_turn {
                                 tree_turns.push(t);
+                                all_tree_turns.push(t);
+                            }
+                            for (i, t) in r.tech_done_turns.iter().enumerate() {
+                                if let Some(t) = t {
+                                    all_tech_turns[i].push(*t);
+                                }
+                            }
+                            for (a, v) in all_research_by_source.iter_mut().zip(r.research_by_source) {
+                                *a += v;
+                            }
+                            all_research_turns += r.research_turns;
+                            if r.last_turn >= 28 {
+                                all_reached_28 += 1;
+                                all_reached_28_done += r.tree_done_turn.is_some() as u32;
+                            }
+                            all_regions_held_turns += r.regions_held_turns;
+                            all_labs_turns += r.labs_working_turns;
+                            all_region_base += r.region_base_units;
+                            for (j, at) in [5usize, 10, 20, 30].into_iter().enumerate() {
+                                if let Some(v) = r.research_by_turn.get(at - 1) {
+                                    all_research_at[j].push(*v);
+                                }
                             }
                             scrubbers += r.scrubbers;
                             leapfrogs += r.leapfrogs;
                             constabularies += r.constabularies;
                             stadiums += r.stadiums;
+                            nature_reserves += r.nature_reserves;
                             sea_walls += r.sea_walls_built;
                             if let Some(t) = r.first_colony_turn {
                                 first_colony.push(t);
@@ -380,6 +432,22 @@ fn main() {
                             neutral_holds += r.neutral_holds;
                             warc.add(&r.war);
                             sinks_end.push(r.natural_sink_end);
+                            if r.start_state_lost_turn.is_some() {
+                                cell_start_lost[if r.start_lost_to_throw_off { 0 } else { 1 }] += 1;
+                            }
+                            for s in Seat::ALL {
+                                for (c, n) in cell_unrest[s.index()].iter_mut().zip(r.unrest_turns[s.index()]) {
+                                    *c += n;
+                                }
+                                cell_throw_offs[s.index()] += r.throw_offs_by_seat[s.index()];
+                                cell_leads[s.index()] += r.leads_by_seat[s.index()];
+                                cell_scores[s.index()].push(r.final_score[s.index()]);
+                                cell_places[s.index()][(r.final_place[s.index()].clamp(1, 4) - 1) as usize] += 1;
+                            }
+                            if let Some(t) = r.first_under_sink_turn {
+                                under_sink.push(t);
+                                all_under_sink.push(t);
+                            }
                             all_warc.add(&r.war);
                             for (i, k) in r.seat_kinds().into_iter().enumerate() {
                                 let f = FactionKind::ALL.iter().position(|x| *x == k).unwrap();
@@ -436,6 +504,20 @@ fn main() {
                             for s in Seat::ALL {
                                 let at = FactionKind::ALL.into_iter().position(|k| k == order[s.index()]).unwrap_or(0);
                                 all_wins[at] += wins[s.index()];
+                                all_scores[at].extend(cell_scores[s.index()].iter().copied());
+                                for (a, n) in all_unrest[at].iter_mut().zip(cell_unrest[s.index()]) {
+                                    *a += n;
+                                }
+                                all_throw_offs[at] += cell_throw_offs[s.index()];
+                                all_leads[at] += cell_leads[s.index()];
+                                if s == Seat(0) {
+                                    for (a, n) in all_start_lost[at].iter_mut().zip(cell_start_lost) {
+                                        *a += n;
+                                    }
+                                }
+                                for p in 0..4 {
+                                    all_places[at][p] += cell_places[s.index()][p];
+                                }
                                 all_gate_turns[at].extend(gate_turns[s.index()].iter().copied());
                             }
                             all_games += seeds as u32;
@@ -453,7 +535,7 @@ fn main() {
                             println!("      draws {draws}, collapses {}/{seeds}, median collapse turn {median}", turns.len());
                             println!("      median turn of first Colony {}", median_u(&mut first_colony));
                             println!("      median Colonists off Earth at the end, all seats {}", median_u(&mut off_earth));
-                            println!("      Scrubbers {scrubbers}, Leapfrogs {leapfrogs}, Constabularies {constabularies}, Stadiums {stadiums}, Sea Walls {sea_walls}");
+                            println!("      Scrubbers {scrubbers}, Leapfrogs {leapfrogs}, Constabularies {constabularies}, Stadiums {stadiums}, Nature Reserves {nature_reserves}, Sea Walls {sea_walls}");
                             println!("      Techs: median {} completed, highest rung reached {highest_rung}", median_u(&mut techs));
                             println!(
                                 "      Observatories standing at the end, all seeds, by seat {observatories:?}; median Research made off Earth a game, by seat {:?}",
@@ -689,6 +771,7 @@ fn main() {
                                 warc.hulls_left_dry.iter().sum::<u32>()
                             );
                             println!("      Natural Sink at the end: median {sink_med:.2} over {} games", sinks_end.len());
+                            println!("      The world under the Natural Sink at least once in {}/{seeds} seeds (median first turn {})", under_sink.len(), median_u(&mut under_sink));
                             println!("      The whole Tech Tree completed in {}/{seeds} seeds (median turn {})", tree_turns.len(), median_u(&mut tree_turns));
                             println!("      Breaks fired: {}", fired.join(", "));
                         }
@@ -708,6 +791,48 @@ fn main() {
         for (i, k) in FactionKind::ALL.into_iter().enumerate() {
             println!("  {:>12}: Victory gate completed in {:2} of {all_games} games, median turn {}", k.name(), all_gate_turns[i].len(), median_u(&mut all_gate_turns[i]));
         }
+        // Ticket #416 (version 0.09.4): when the tree finishes, and where Research comes from.
+        println!("  The whole Tech Tree completed in {} of {all_games} games, median turn {} (the turn its last Tech completed)", all_tree_turns.len(), median_u(&mut all_tree_turns));
+        println!("  Games still running at turn 28: {all_reached_28} of {all_games}; the tree complete at the end in {all_reached_28_done} of them");
+        let mut order: Vec<usize> = (0..TechId::ALL.len()).collect();
+        let mut meds: Vec<String> = Vec::new();
+        for v in all_tech_turns.iter_mut() {
+            meds.push(median_u(v));
+        }
+        order.sort_by_key(|i| std::cmp::Reverse(all_tech_turns[*i].len()));
+        println!("  Each Tech: completed in N games, median turn");
+        for i in order {
+            println!("    {:>24}: {:2} of {all_games}, median turn {}", format!("{:?}", TechId::ALL[i]), all_tech_turns[i].len(), meds[i]);
+        }
+        let total: f64 = all_research_by_source.iter().sum();
+        let per = |v: f64| if all_research_turns > 0 { v / all_research_turns as f64 } else { 0.0 };
+        println!("  The world's Research a turn, mean over {all_research_turns} game-turns: {:.1} -- Regions' own {:.1}, Research Labs {:.1}, Observatories {:.1}, research agreements {:.1}, neutral Regions and occupied Labs {:.1}, the rest {:.1}", per(total), per(all_research_by_source[5]), per(all_research_by_source[0]), per(all_research_by_source[1]), per(all_research_by_source[2]), per(all_research_by_source[3]), per(all_research_by_source[4]));
+        let med_f = |v: &mut Vec<f64>| {
+            v.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            v.get(v.len() / 2).map(|x| format!("{x:.0}")).unwrap_or("-".into())
+        };
+        let [a5, a10, a20, a30] = &mut all_research_at;
+        println!("  The world's Research at turn 5 / 10 / 20 / 30, median: {} / {} / {} / {} (games alive {} / {} / {} / {})", med_f(a5), med_f(a10), med_f(a20), med_f(a30), a5.len(), a10.len(), a20.len(), a30.len());
+        println!("  Regions held a turn, mean {:.1}; Research Labs working a turn, mean {:.1}; a base of 1 a Region, scaled by population and Education as a Lab is, before multipliers: {:.1} a turn", per(all_regions_held_turns as f64), per(all_labs_turns as f64), per(all_region_base));
+        for (i, k) in FactionKind::ALL.into_iter().enumerate() {
+            let mut v = all_scores[i].clone();
+            v.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            let med = v.get(v.len() / 2).copied().unwrap_or(0.0);
+            let nought = v.iter().filter(|s| **s <= 0.0).count();
+            let p = all_places[i];
+            println!("  {:>12}: score at the end median {med:.2}, nought in {nought}; placed 1st / 2nd / 3rd / 4th in {} / {} / {} / {}", k.name(), p[0], p[1], p[2], p[3]);
+        }
+        println!("  Unrest, per Faction over the batch (Region-turns held; at 4 or more; at 7 or more; throw-offs; start state lost as seat 0, to a throw-off / to a taking):");
+        for (i, k) in FactionKind::ALL.into_iter().enumerate() {
+            let u = all_unrest[i];
+            let pct = |n: u32| if u[0] == 0 { 0.0 } else { 100.0 * n as f64 / u[0] as f64 };
+            println!("  {:>12}: {} held; {} at 4+ ({:.0}%); {} at 7+ ({:.0}%); {} throw-offs; start lost {} / {}", k.name(), u[0], u[1], pct(u[1]), u[2], pct(u[2]), all_throw_offs[i], all_start_lost[i][0], all_start_lost[i][1]);
+        }
+        println!(
+            "  Techs led over the batch, per Faction: {}",
+            FactionKind::ALL.into_iter().enumerate().map(|(i, k)| format!("{} {}", k.name(), all_leads[i])).collect::<Vec<_>>().join(", ")
+        );
+        println!("  the world under the Natural Sink at least once in {} of {all_games} games (median first turn {})", all_under_sink.len(), median_u(&mut all_under_sink));
         // Version 0.09.3: the worlds settled, over every seating.
         println!("  {}", off_earth_line(&base, &all_ground_by_body, &all_stations_by_body, &mut all_first_by_body, &mut all_ground_off_earth_per_game, all_games as u64));
         // Ticket #343 (version 0.09.1): summed over every seat of every seating -- a TOTAL, never
