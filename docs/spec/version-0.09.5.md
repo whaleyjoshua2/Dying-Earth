@@ -34,7 +34,8 @@ Victory Tech ends a line of its own:
   Models, so the chain is the ticket's "Public Science and Civil Defense". The Upload names only Civil
   Defense because a second line from Large Language Models would run straight behind the Civil
   Defense box and read as passing through it, the fault ticket #245 took out of this same row. The
-  Archive order still waits on The Upload; the Archive still stands at a Colony off Earth.
+  Archive still stands at a Colony off Earth; The Upload gates the Archivists' win, not the Archive
+  order (ticket #361).
 - **Public Science is renamed Large Language Models.** Its effect is unchanged. Its id stays
   `public_science`, so a saved game loads with the Tech it had.
 - **Society's rung 2 is Civil Defense alone.** The designer judges it on the shot.

@@ -17933,5 +17933,8 @@ fn each_victory_tech_ends_a_line_of_its_own() {
         let chain = t.gate_chain(k);
         let order = &t.ai_tech_picks(k).order;
         assert!(chain.iter().all(|x| order[..chain.len()].contains(x)), "the {k:?} list opens with its gate chain: {:?}", names(order.clone()));
+        // And the Propulsion chain follows at once, whatever of it the gate chain has not already taken.
+        let rest: Vec<TechId> = order[chain.len()..].iter().copied().take_while(|x| line(*x) == "Propulsion").collect();
+        assert_eq!(rest.len(), order.len() - chain.len(), "the {k:?} list runs gate chain, then Propulsion, then nothing: {:?}", names(order.clone()));
     }
 }

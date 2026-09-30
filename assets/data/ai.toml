@@ -534,11 +534,13 @@ order = ["beneficiation", "deep_mining", "efficient_grids", "automated_refining"
 # not stating a private preference -- it is holding the whole table up. Clean Power is an antecedent
 # of BOTH the Arkwrights' and the Archivists' gates, so every turn a Prospector Lead pushed it to
 # the back it stalled two rivals' Victory Conditions without the Prospectors ever choosing to.
+# (Ticket #424, version 0.09.5: it is now the Arkwrights' and the CUSTODIANS', no longer the
+# Archivists'. The point stands.)
 #
 # `never = "green_consensus"` IS GONE TOO, and for the same reason one layer down. It was kept at
 # first on a build specification that claimed Green Consensus was nobody else's antecedent. It is
 # the CUSTODIANS' ONLY rung-2 antecedent -- Planetary Stewardship needs it and nothing else in the
-# tree does -- so the Prospectors were refusing to fund the one chain the weakest Faction on the
+# tree does (ticket #424 made Clean Power a second) -- so the Prospectors were refusing to fund the one chain the weakest Faction on the
 # board has, in a game where they win 30 of 80 and the Custodians 3.
 #
 # `never` is the gentler of the two levers and it is worth saying what it did, since the difference
@@ -576,8 +578,8 @@ order = ["efficient_grids", "clean_power", "expanded_habitats", "closed_loop_col
 # Ticket #348: Expanded Habitats, Clean Power and Closed-Loop Colonies open the list. Ticket #246
 # moved The Upload on to Closed-Loop Colonies and warned in `techs.toml` that the gate had gone from
 # one antecedent to four; nothing then put those four on the list of the Faction whose gate it is,
-# and they held Efficient Grids alone of them. They won 0 of 80 and their Archive waits on this same
-# Tech, since `orders.rs` refuses the Archive order until The Upload stands.
+# and they held Efficient Grids alone of them. They won 0 of 80. (The Archive order waited on The
+# Upload then; ticket #361 undid that, and ticket #424 took the road off Closed-Loop Colonies.)
 [tech_picks.archivists]
 # Ticket #424 (version 0.09.5): The Upload's road is back in Society -- Large Language Models (the id is
 # still `public_science`) and Civil Defense. Closed-Loop Colonies and its three are off this list.
