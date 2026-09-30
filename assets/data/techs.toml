@@ -104,7 +104,9 @@ name = "Efficient Transit"
 branch = "Propulsion"
 rung = 2
 cost = 32
-needs = ["clean_propellant"]
+# Ticket #425 (version 0.09.5): Orbital Refuelling in place of Clean Propellant, at the designer's word
+# ("orbital refueling needed for efficient transit"), so the row runs in two lanes.
+needs = ["orbital_refuelling"]
 effect = "Transit Fuel x0.6; transits advance through Solar Storm"
 value = 0.6
 
@@ -143,7 +145,9 @@ name = "Closed-Loop Colonies"
 branch = "Off-world Living"
 rung = 2
 cost = 32
-needs = ["expanded_habitats", "clean_power"]
+# Ticket #425 (version 0.09.5): Clean Power dropped, at the designer's word ("Clean power no longer
+# needed for either upload or generation ship"). This was Generation Ships' one link to Stewardship.
+needs = ["expanded_habitats"]
 effect = "Module Energy upkeep x0.5; immune to Grid Failure"
 value = 0.5
 
@@ -163,7 +167,9 @@ name = "Automated Refining"
 branch = "Extraction"
 rung = 2
 cost = 32
-needs = ["deep_mining", "efficient_grids"]
+# Ticket #425 (version 0.09.5): Efficient Grids dropped, at the designer's word ("efficient grids no
+# longer needed for extraction charter"). This was the Charter's one link to Stewardship.
+needs = ["deep_mining"]
 effect = "Refinery output x1.5; Ice Deposit gives x3"
 value = 1.5
 
@@ -376,7 +382,9 @@ name = "Missile Technology"
 branch = "Propulsion"
 rung = 3
 cost = 48
-needs = ["hardened_hulls"]
+# Ticket #425 (version 0.09.5): Nuclear Rockets in place of Hardened Hulls, at the designer's word
+# ("Missile tech no longer requires hardened hulls"), so the first weapon is one step of Propulsion.
+needs = ["nuclear_rockets"]
 effect = "Unlocks the Missile Carrier: the first weapon Tech, and the whole table sees it"
 value = 0.0
 
@@ -405,6 +413,9 @@ value = 0.8
 # four turns where it was five with either or both, and the stacking gains off the window.
 [[tech]]
 id = "orbital_refuelling"
+# Ticket #425 (version 0.09.5): drawn ABOVE Clean Propellant in its cell, level with the Efficient
+# Transit it now leads to, so the row reads as two lanes and no line shares a trunk with another.
+stack = -1
 name = "Orbital Refuelling"
 branch = "Propulsion"
 rung = 1

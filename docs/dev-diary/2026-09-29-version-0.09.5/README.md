@@ -18,3 +18,12 @@ Taken headlessly with `shot: tech:1 panel:0 seed:7 cardshut:1 window:1500x1300`,
 - [`lit-upload.png`](ticket-424-victory-ends/lit-upload.png): the Archivists' road lit, as Large
   Language Models, Civil Defense and The Upload, all in Society. "Large Language Models" fits its
   box.
+
+## Four prerequisites moved, and the lines redrawn (ticket #425)
+
+- [`tree.png`](ticket-425-prerequisites/tree.png): the whole tree. No line leaves its row. The
+  Propulsion row is two lanes, with Orbital Refuelling on top. Clean Power's line into Planetary
+  Stewardship forks out beside Clean Power and enters near the top of the box. Nuclear Rockets' line
+  enters Hardened Hulls near the bottom.
+- [`lit-hardened-hulls.png`](ticket-425-prerequisites/lit-hardened-hulls.png): Hardened Hulls' path
+  lit, as Orbital Refuelling, Efficient Transit, Clean Propellant and Nuclear Rockets.

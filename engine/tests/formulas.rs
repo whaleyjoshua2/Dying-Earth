@@ -6689,8 +6689,10 @@ fn the_four_gates_stand_on_rung_three_at_one_price_with_their_prerequisites() {
     // all in Stewardship.
     assert_eq!(depth(TechId::TheUpload), 2, "the Archivists' gate, two deep since ticket #424");
     assert_eq!(depth(TechId::PlanetaryStewardship), 3, "the Custodians', three since ticket #424");
-    assert_eq!(depth(TechId::GenerationShips), 4, "the Arkwrights', through Closed-Loop Colonies, which itself pulls in Clean Power and Efficient Grids");
-    assert_eq!(depth(TechId::ExtractionCharter), 4, "the Prospectors', deepest since Beneficiation joined on ticket #232");
+    // Ticket #425 (version 0.09.5): Clean Power off Closed-Loop Colonies, Efficient Grids off
+    // Automated Refining -- no road leaves its own row now.
+    assert_eq!(depth(TechId::GenerationShips), 2, "the Arkwrights', Expanded Habitats and Closed-Loop Colonies");
+    assert_eq!(depth(TechId::ExtractionCharter), 3, "the Prospectors', Deep Mining, Automated Refining and Beneficiation");
 }
 
 /// Ticket #84: with both parts at their bars the Custodians still do not win until Planetary
@@ -14184,7 +14186,8 @@ fn a_missile_carrier_waits_for_missile_technology() {
     let t = g.tables.tech(TechId::MissileTechnology);
     assert_eq!((t.rung, t.cost), (3, 48), "rung 3, cost 48");
     assert_eq!(t.branch, "Propulsion");
-    assert_eq!(t.needs, vec![TechId::HardenedHulls]);
+    // Ticket #425 (version 0.09.5): Nuclear Rockets in place of Hardened Hulls, at the designer's word.
+    assert_eq!(t.needs, vec![TechId::NuclearRockets]);
 }
 
 /// Ticket #343 (R3): the Launch gate. Its shape is a Bombard's -- your Ship, the right kind, not in
@@ -16398,12 +16401,16 @@ fn nuclear_rockets_takes_a_turn_off_a_crossing_and_none_off_a_hop() {
 }
 
 /// Ticket #393: **Hardened Hulls needs Efficient Transit AND Nuclear Rockets**, the two rung-2
-/// Propulsion Techs side by side, each needing Clean Propellant alone.
+/// Propulsion Techs side by side. Ticket #425 (version 0.09.5): they open off two roots now,
+/// Efficient Transit off Orbital Refuelling and Nuclear Rockets off Clean Propellant.
 #[test]
 fn hardened_hulls_needs_both_rung_two_propulsion_techs() {
     let mut g = game();
     g.research.done.push(TechId::CleanPropellant);
-    assert!(g.available_techs().contains(&TechId::EfficientTransit) && g.available_techs().contains(&TechId::NuclearRockets), "both open off Clean Propellant");
+    assert!(g.available_techs().contains(&TechId::NuclearRockets), "Nuclear Rockets opens off Clean Propellant");
+    assert!(!g.available_techs().contains(&TechId::EfficientTransit), "Efficient Transit does not");
+    g.research.done.push(TechId::OrbitalRefuelling);
+    assert!(g.available_techs().contains(&TechId::EfficientTransit), "it opens off Orbital Refuelling");
     g.research.done.push(TechId::EfficientTransit);
     assert!(!g.available_techs().contains(&TechId::HardenedHulls), "Efficient Transit alone does not open Hardened Hulls");
     g.research.done.push(TechId::NuclearRockets);
@@ -17696,7 +17703,9 @@ fn orbital_refuelling_stacks_with_nuclear_rockets_and_clean_propellant_widens_th
     let mut g = game();
     let card = g.tables.tech(TechId::OrbitalRefuelling).clone();
     assert_eq!((card.rung, card.cost, card.needs.len(), card.value), (1, 22, 0, 0.9));
-    assert!(g.tables.techs.iter().all(|t| !t.needs.contains(&TechId::OrbitalRefuelling)), "needed by nothing");
+    // Ticket #425 (version 0.09.5): Efficient Transit needs it, and nothing else does.
+    let needing: Vec<TechId> = g.tables.techs.iter().filter(|t| t.needs.contains(&TechId::OrbitalRefuelling)).map(|t| t.id).collect();
+    assert_eq!(needing, vec![TechId::EfficientTransit], "needed by Efficient Transit alone");
     // The multipliers stack: 0.9 alone, 0.72 with Nuclear Rockets.
     let turns = |g: &Game, turn: u32| g.transit_cost_for_at(Seat(0), BodyId::Earth, BodyId::Mars, turn).0;
     let base: Vec<u32> = (1..=36).map(|t| turns(&g, t)).collect();
@@ -17739,12 +17748,15 @@ fn orbital_refuelling_stacks_with_nuclear_rockets_and_clean_propellant_widens_th
 #[test]
 fn the_tech_trees_lit_path_is_everything_a_tech_needs() {
     let t = tables();
-    let path = t.tech_path(TechId::MissileTechnology);
-    for want in [TechId::MissileTechnology, TechId::HardenedHulls, TechId::EfficientTransit, TechId::NuclearRockets, TechId::CleanPropellant] {
-        assert!(path.contains(&want), "{want:?} is on Missile Technology's path: {path:?}");
+    // Ticket #425 (version 0.09.5): Missile Technology needs Nuclear Rockets alone, so Hardened
+    // Hulls is now the longer path.
+    let path = t.tech_path(TechId::HardenedHulls);
+    for want in [TechId::HardenedHulls, TechId::EfficientTransit, TechId::OrbitalRefuelling, TechId::NuclearRockets, TechId::CleanPropellant] {
+        assert!(path.contains(&want), "{want:?} is on Hardened Hulls' path: {path:?}");
     }
-    assert!(!path.contains(&TechId::OrbitalRefuelling), "Orbital Refuelling, beside it, is not");
+    assert!(!path.contains(&TechId::CryogenicTanks), "Cryogenic Tanks, beside it, is not");
     assert_eq!(path.len(), 5);
+    assert_eq!(t.tech_path(TechId::MissileTechnology), vec![TechId::MissileTechnology, TechId::NuclearRockets, TechId::CleanPropellant]);
     assert_eq!(t.tech_path(TechId::CleanPropellant), vec![TechId::CleanPropellant], "a rung-1 Tech lights itself alone");
 }
 
@@ -17936,5 +17948,30 @@ fn each_victory_tech_ends_a_line_of_its_own() {
         // And the Propulsion chain follows at once, whatever of it the gate chain has not already taken.
         let rest: Vec<TechId> = order[chain.len()..].iter().copied().take_while(|x| line(*x) == "Propulsion").collect();
         assert_eq!(rest.len(), order.len() - chain.len(), "the {k:?} list runs gate chain, then Propulsion, then nothing: {:?}", names(order.clone()));
+    }
+}
+
+// ---------------------------------------------------------------- Ticket #425 (version 0.09.5): four prerequisites moved
+
+/// Ticket #425: **Missile Technology needs Nuclear Rockets, Automated Refining needs Deep Mining,
+/// Closed-Loop Colonies needs Expanded Habitats, and Efficient Transit needs Orbital Refuelling** --
+/// each alone. So the Charter no longer reaches Efficient Grids, Generation Ships no longer reaches
+/// Clean Power, and Orbital Refuelling leads somewhere.
+#[test]
+fn four_prerequisites_moved_at_the_designers_word() {
+    let t = tables();
+    let price = |k: FactionKind| -> i64 { t.gate_chain(k).iter().map(|x| t.tech(*x).cost).sum::<i64>() + t.tech(t.victory_gate(k).unwrap()).cost };
+    assert_eq!(t.tech(TechId::MissileTechnology).needs, vec![TechId::NuclearRockets], "no longer Hardened Hulls");
+    assert_eq!(t.tech(TechId::AutomatedRefining).needs, vec![TechId::DeepMining], "no longer Efficient Grids");
+    assert_eq!(t.tech(TechId::ClosedLoopColonies).needs, vec![TechId::ExpandedHabitats], "no longer Clean Power");
+    assert_eq!(t.tech(TechId::EfficientTransit).needs, vec![TechId::OrbitalRefuelling], "Orbital Refuelling in place of Clean Propellant");
+    assert!(!t.gate_chain(FactionKind::Prospectors).contains(&TechId::EfficientGrids), "the Charter no longer reaches Efficient Grids");
+    assert!(!t.gate_chain(FactionKind::Arkwrights).contains(&TechId::CleanPower), "Generation Ships no longer reaches Clean Power");
+    assert_eq!(price(FactionKind::Prospectors), 130, "Deep Mining, Automated Refining, Beneficiation and the Charter, 148 before");
+    assert_eq!(price(FactionKind::Arkwrights), 98, "Expanded Habitats, Closed-Loop Colonies and Generation Ships");
+    for k in FactionKind::ALL {
+        let chain = t.gate_chain(k);
+        let order = &t.ai_tech_picks(k).order;
+        assert!(chain.iter().all(|x| order[..chain.len()].contains(x)), "the {k:?} list opens with its gate chain and nothing else");
     }
 }

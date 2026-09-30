@@ -529,7 +529,8 @@ battle_fuel_weight = 0.2
 # Ticket #348: Beneficiation joins the list. Ticket #242 made it a prerequisite of the Extraction
 # Charter and nobody put it on the list it gates, so the Prospectors reached their own gate only by
 # taking Beneficiation as the cheapest thing left.
-order = ["beneficiation", "deep_mining", "efficient_grids", "automated_refining", "orbital_refuelling", "clean_propellant", "efficient_transit", "nuclear_rockets", "cryogenic_tanks", "hardened_hulls", "missile_technology"]
+# Ticket #425 (version 0.09.5): Efficient Grids off -- Automated Refining needs Deep Mining alone.
+order = ["beneficiation", "deep_mining", "automated_refining", "orbital_refuelling", "clean_propellant", "efficient_transit", "nuclear_rockets", "cryogenic_tanks", "hardened_hulls", "missile_technology"]
 # Ticket #348: `last = "clean_power"` is GONE. The tree is SHARED, so a Faction deferring a Tech is
 # not stating a private preference -- it is holding the whole table up. Clean Power is an antecedent
 # of BOTH the Arkwrights' and the Archivists' gates, so every turn a Prospector Lead pushed it to
@@ -572,7 +573,9 @@ order = ["efficient_grids", "clean_power", "green_consensus", "orbital_refuellin
 # the Arkwrights had the top and the bottom of that chain on their list and neither of its middle
 # two rungs. They won 1 of 80.
 [tech_picks.arkwrights]
-order = ["efficient_grids", "clean_power", "expanded_habitats", "closed_loop_colonies", "orbital_refuelling", "clean_propellant", "efficient_transit", "nuclear_rockets", "cryogenic_tanks", "hardened_hulls", "missile_technology"]
+# Ticket #425 (version 0.09.5): Efficient Grids and Clean Power off -- Closed-Loop Colonies needs
+# Expanded Habitats alone, so the road is all Off-world Living.
+order = ["expanded_habitats", "closed_loop_colonies", "orbital_refuelling", "clean_propellant", "efficient_transit", "nuclear_rockets", "cryogenic_tanks", "hardened_hulls", "missile_technology"]
 
 # Ticket #51: the Archivists want Research and a quiet world.
 # Ticket #348: Expanded Habitats, Clean Power and Closed-Loop Colonies open the list. Ticket #246

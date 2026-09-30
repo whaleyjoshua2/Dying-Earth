@@ -53,3 +53,35 @@ Colonies are no longer on it). The version's closing sweep reports the win colum
 **What would show this wrong**: a Tech reaching Planetary Stewardship through Large Language Models; a
 Tech outside Society on The Upload's chain; a pick list that does not open with its gate chain; a
 saved game losing its Public Science; the Stewardship row drawn anywhere but second.
+
+## 2. Four prerequisites moved, and the lines redrawn
+
+The authority is [ticket #425](https://github.com/whaleyjoshua2/Dying-Earth/issues/425).
+
+| Tech | Needs, before | Needs, after |
+|---|---|---|
+| Missile Technology | Hardened Hulls | **Nuclear Rockets** |
+| Automated Refining | Deep Mining, Efficient Grids | **Deep Mining** |
+| Closed-Loop Colonies | Expanded Habitats, Clean Power | **Expanded Habitats** |
+| Efficient Transit | Clean Propellant | **Orbital Refuelling** |
+
+So **no Victory road leaves its own row**: the Prospectors' is Deep Mining, Automated Refining,
+Beneficiation and the Charter, **130** (was 148); the Arkwrights' is Expanded Habitats, Closed-Loop
+Colonies and Generation Ships, **98** (was 148). Their pick lists drop the Techs that left their
+roads (Efficient Grids; Efficient Grids and Clean Power). No cost or effect moves.
+
+**The lines, redrawn** at the designer's word ("adjust that branch to look better"; and on the
+Stewardship row, "what with the vertical line between clean manufacturing and plantary stwardship"):
+
+- **Orbital Refuelling is drawn above Clean Propellant**, level with the Efficient Transit it feeds,
+  so Propulsion reads as two lanes: Orbital Refuelling -> Efficient Transit -> Hardened Hulls, and
+  Clean Propellant -> Nuclear Rockets and Cryogenic Tanks, Nuclear Rockets -> Hardened Hulls and
+  Missile Technology. A Tech's place in a stacked cell is `stack` in `techs.toml`, lower first;
+  absent is the tree's order.
+- **A line from another row enters its box a quarter from the edge it comes from**, not at the
+  middle, so two lines into one box never meet at its door.
+- **A line that changes rows climbs on the source's side of the gap**, so a fork reads as leaving the
+  Tech that feeds it, not as a line between the two boxes on the right.
+
+**What would show this wrong**: a road that reaches another row; two lines meeting at one door; a
+vertical beside the door of a box the line does not enter.

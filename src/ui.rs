@@ -8619,8 +8619,7 @@ fn credits_request_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut
 ///
 /// The air between rows is `row - from_box.height()`, so the function needs no copy of the tree's
 /// box height; the lane sits a quarter of a row-gap clear of the box edge, as the old detour did.
-fn tech_edge_path(from_box: egui::Rect, to_box: egui::Rect, gap_x: f32, row: f32, obstacles: &[egui::Rect]) -> Vec<Pos2> {
-    let to = to_box.left_center();
+fn tech_edge_path(from_box: egui::Rect, to: Pos2, gap_x: f32, row: f32, obstacles: &[egui::Rect]) -> Vec<Pos2> {
     let clear = (row - from_box.height()).max(8.0) / 4.0;
     // A run at `y`: out of the box (by a side if `y` is level with it, otherwise by the nearer of
     // top and bottom and down the column into the lane), along to the gap, up or down the gap, in.
@@ -8653,6 +8652,37 @@ fn tech_edge_path(from_box: egui::Rect, to_box: egui::Rect, gap_x: f32, row: f32
         }
     }
     path_at(from_box.center().y)
+}
+
+/// Ticket #425 (version 0.09.5): **where a line enters the box of the Tech that needs it.** A line
+/// from a box level with it goes in at the middle of the left edge; one from a box wholly above
+/// goes in a quarter down, one from below a quarter up. So two lines into one box -- Clean Power's
+/// from above and Green Consensus's level, into Planetary Stewardship -- never meet at the door and
+/// read as one line running between the boxes on the right.
+fn tech_edge_entry(from_box: egui::Rect, to_box: egui::Rect) -> Pos2 {
+    let quarter = to_box.height() / 4.0;
+    let y = if from_box.center().y < to_box.min.y {
+        to_box.min.y + quarter
+    } else if from_box.center().y > to_box.max.y {
+        to_box.max.y - quarter
+    } else {
+        to_box.center().y
+    };
+    Pos2::new(to_box.min.x, y)
+}
+
+/// Ticket #425 (version 0.09.5): **the x of the lane a line climbs in**, in the gap left of the
+/// needing box. From the column just before, it is on the SOURCE's side of the gap, so a line that
+/// forks to a box in another row forks out of the Tech that feeds it, not beside the door of the
+/// box level with that Tech. From further back it keeps the old lane, by the needing box. Three
+/// lanes, three and a half pixels apart, fit the gap; `lane` is the source's band.
+fn tech_edge_lane(from_box: egui::Rect, to_box: egui::Rect, lane: f32) -> f32 {
+    let gap = to_box.min.x - from_box.max.x;
+    if gap > 0.0 && gap < to_box.width() {
+        from_box.max.x + 4.0 + (lane % 3.0) * 3.5
+    } else {
+        to_box.min.x - 4.0 - lane * 3.5
+    }
 }
 
 /// Does an axis-aligned segment pass through a box? Written as a rectangle overlap, since a
@@ -8729,7 +8759,13 @@ fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, ac
                     let card = game.tables.tech(*t);
                     branches.iter().position(|x| *x == card.branch) == Some(b) && card.rung.max(1) as usize - 1 == r
                 })
-                .collect()
+                .collect::<Vec<TechId>>()
+        })
+        // Ticket #425 (version 0.09.5): a stack in the order its cards' `stack` gives, ties in the
+        // tree's own, so a box can sit level with the Tech it feeds.
+        .map(|mut v: Vec<TechId>| {
+            v.sort_by_key(|t| (game.tables.tech(*t).stack, t.index()));
+            v
         })
         .collect();
     // Ticket #250 (version 0.08.3): EVERY rung stacks, the last one included. It did not before --
@@ -8801,17 +8837,17 @@ fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, ac
             // Each source row takes its own lane in the gap, or every line into a column merges
             // into one trunk and nobody can tell which Tech feeds which (the first picture).
             let lane = branches.iter().position(|x| *x == game.tables.tech(*n).branch).unwrap_or(0) as f32;
-            let gap_x = to_box.min.x - 4.0 - lane * 3.5;
+            let gap_x = tech_edge_lane(from_box, to_box, lane);
             let colour = if game.research.done.contains(n) { Color32::from_rgb(120, 200, 120) } else { Color32::from_gray(150) };
             // A line is on the lit path when the Tech it enters is.
             let colour = fade(colour, t);
             let stroke = egui::Stroke::new(if !path.is_empty() && !faded(t) { 3.0 } else { 2.0 }, colour);
             let obstacles: Vec<egui::Rect> = boxes.iter().filter(|(o, _)| *o != t && *o != *n).map(|(_, r)| *r).collect();
-            let path = tech_edge_path(from_box, to_box, gap_x, ROW, &obstacles);
+            let path = tech_edge_path(from_box, tech_edge_entry(from_box, to_box), gap_x, ROW, &obstacles);
             for leg in path.windows(2) {
                 painter.line_segment([leg[0], leg[1]], stroke);
             }
-            painter.circle_filled(to_box.left_center(), 3.5, colour);
+            painter.circle_filled(tech_edge_entry(from_box, to_box), 3.5, colour);
         }
     }
     for t in TechId::ALL {
@@ -11470,7 +11506,7 @@ mod tests {
         // legs, leaving the needed box by its right edge at its own middle.
         let (from, to) = (at(0.0, 0.0), at(2.0, 0.0));
         let gap_x = to.min.x - 4.0;
-        let clear = tech_edge_path(from, to, gap_x, ROW, &[at(1.0, 1.0), at(1.0, 2.0)]);
+        let clear = tech_edge_path(from, to.left_center(), gap_x, ROW, &[at(1.0, 1.0), at(1.0, 2.0)]);
         assert_eq!(clear.first(), Some(&from.right_center()), "nothing in the way: out of the right edge, as it always was");
         assert_eq!(clear.last(), Some(&to.left_center()), "and in at the needing box's left edge");
         assert_eq!(clear.len(), 4, "three legs");
@@ -11478,7 +11514,7 @@ mod tests {
         // The same edge with a box standing on rung 2 of that row, which the straight elbow would
         // run through. The detour must clear it, and must still arrive at the same place.
         let blocker = at(1.0, 0.0);
-        let routed = tech_edge_path(from, to, gap_x, ROW, &[blocker, at(1.0, 2.0)]);
+        let routed = tech_edge_path(from, to.left_center(), gap_x, ROW, &[blocker, at(1.0, 2.0)]);
         assert!(crosses(&clear, blocker), "the control: the straight elbow really does cross that box");
         assert!(!crosses(&routed, blocker), "the routed edge clears it");
         assert_eq!(routed.last(), Some(&to.left_center()), "and still arrives at the needing box's left edge");
@@ -11488,9 +11524,38 @@ mod tests {
         // has to be taken. Both are cleared, which is what "around the boxes" means when there is
         // more than one.
         let below = at(1.0, 1.0);
-        let further = tech_edge_path(from, to, gap_x, ROW, &[blocker, below]);
+        let further = tech_edge_path(from, to.left_center(), gap_x, ROW, &[blocker, below]);
         assert!(!crosses(&further, blocker) && !crosses(&further, below), "both boxes cleared");
         assert_eq!(further.last(), Some(&to.left_center()));
+    }
+
+    /// Ticket #425 (version 0.09.5): **two lines into one box never meet at its door.** The
+    /// designer, on the Stewardship row: *"what with the vertical line between clean manufacturing
+    /// and plantary stwardship"* -- Clean Power's line down into Planetary Stewardship ran up the
+    /// gap beside Clean Manufacturing's door and merged with Green Consensus's line at Planetary
+    /// Stewardship's middle, so it read as a line between the two rung-3 boxes. A line from a box
+    /// level with its target enters at the middle; one from above enters near the top, one from
+    /// below near the bottom; and its climb runs on the SOURCE's side of the gap, so a fork reads as
+    /// leaving the Tech that feeds it.
+    #[test]
+    fn a_line_from_another_row_enters_its_box_apart_from_the_level_one() {
+        const COL: f32 = 130.0;
+        const ROW: f32 = 77.0;
+        let at = |col: f32, row: f32| egui::Rect::from_min_size(Pos2::new(col * COL + 10.0, row * ROW + 12.0), egui::vec2(110.0, 52.0));
+        // Clean Power on top, Green Consensus below it; Clean Manufacturing and Planetary
+        // Stewardship to their right.
+        let (clean_power, green_consensus, manufacturing, stewardship) = (at(0.0, 0.0), at(0.0, 1.0), at(1.0, 0.0), at(1.0, 1.0));
+        assert_eq!(tech_edge_entry(clean_power, manufacturing), manufacturing.left_center(), "level: straight in at the middle");
+        assert_eq!(tech_edge_entry(green_consensus, stewardship), stewardship.left_center(), "level: straight in at the middle");
+        let from_above = tech_edge_entry(clean_power, stewardship);
+        assert_eq!(from_above.x, stewardship.min.x, "on the left edge");
+        assert!(from_above.y < stewardship.center().y - 10.0 && from_above.y > stewardship.min.y, "from above: near the top, apart from the level line's door: {from_above:?}");
+        let from_below = tech_edge_entry(stewardship, manufacturing);
+        assert!(from_below.y > manufacturing.center().y + 10.0 && from_below.y < manufacturing.max.y, "from below: near the bottom: {from_below:?}");
+        // The climb is nearer the source's column than the target's.
+        let gap_x = tech_edge_lane(clean_power, stewardship, 0.0);
+        assert!(gap_x > clean_power.max.x && gap_x < stewardship.min.x, "in the gap");
+        assert!(gap_x - clean_power.max.x < stewardship.min.x - gap_x, "on the source's side: {gap_x}");
     }
 }
 
