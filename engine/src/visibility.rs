@@ -88,4 +88,57 @@ impl Game {
             ArmyAt::Aboard(s) => self.ship(s).is_some_and(|s| self.sees_ship(viewer, s)),
         }
     }
+
+    /// Is `viewer` looking at a Report's place? A Region or Colony as `sees_place`, a Body or one of
+    /// its orbits as `sees_body`.
+    pub fn sees_report_place(&self, viewer: Seat, p: crate::report::ReportPlace) -> bool {
+        use crate::report::ReportPlace;
+        match p {
+            ReportPlace::State(s) => self.sees_state(viewer, s),
+            ReportPlace::Colony(c) => self.sees_place(viewer, Place::Colony(c)),
+            ReportPlace::Body(b) | ReportPlace::Orbit(b, _) => self.sees_body(viewer, b),
+        }
+    }
+
+    /// Where an order was given, for the fog's reading of a rival's Report line: the Region or
+    /// Colony it names, or the Body a Ship was at when it was ordered. `None` for an order with no
+    /// place on the board (Influence bought, a trade, a Smear, a directive, an Accord), which a
+    /// player reads only while the rival is Friendly or under an Accord.
+    pub fn order_place(&self, o: &crate::orders::Order) -> Option<crate::report::ReportPlace> {
+        use crate::orders::{BuildingRef, LoadSource, Order, UnloadTarget};
+        use crate::report::ReportPlace;
+        let at_ship = |id: ShipId| match self.ship(id)?.at {
+            ShipAt::Body(b) => Some(ReportPlace::Body(b)),
+            ShipAt::Transit { .. } => None,
+        };
+        match o {
+            Order::BuildFacility { state, .. } | Order::BuildFacilityWithDucats { state, .. } | Order::RaiseIndustry { state } => Some(ReportPlace::State(*state)),
+            Order::BuildEmigrants { state, .. } | Order::SendToAntarctica { state, .. } | Order::LiftToStation { state, .. } => Some(ReportPlace::State(*state)),
+            Order::Relief { state } | Order::Agitate { state } | Order::Resettle { state } | Order::Leapfrog { state } | Order::StripPermit { state } | Order::ExodusCall { state } => Some(ReportPlace::State(*state)),
+            Order::MoveArmy { to, .. } => Some(ReportPlace::State(*to)),
+            Order::BuildModule { colony, .. } | Order::BuildModuleWithDucats { colony, .. } | Order::BuildArchive { colony } | Order::Upload { colony, .. } => Some(ReportPlace::Colony(*colony)),
+            Order::BuildShip { site, .. } => Some(ReportPlace::of(*site)),
+            Order::BuildArmy { place } | Order::ArmyStance { place, .. } | Order::CancelBuild { place, .. } => Some(ReportPlace::of(*place)),
+            Order::Influence { target, .. } => Some(ReportPlace::of(*target)),
+            Order::Launch { target, .. } => Some(ReportPlace::of(*target)),
+            Order::Bombard { colony, .. } => Some(ReportPlace::Colony(*colony)),
+            Order::BuildStation { body, .. } | Order::ShipStance { body, .. } => Some(ReportPlace::Body(*body)),
+            Order::Transit { ship, .. } | Order::ChangeOrbit { ship, .. } | Order::Refuel { ship } | Order::Rearm { ship } => at_ship(*ship),
+            Order::Load { ship, from, .. } => match from {
+                LoadSource::State(s) => Some(ReportPlace::State(*s)),
+                LoadSource::Colony(c) => Some(ReportPlace::Colony(*c)),
+            }
+            .or_else(|| at_ship(*ship)),
+            Order::Unload { ship, into, .. } => match into {
+                UnloadTarget::Colony(c) => Some(ReportPlace::Colony(*c)),
+                UnloadTarget::Slot(b, _) => Some(ReportPlace::Body(*b)),
+            }
+            .or_else(|| at_ship(*ship)),
+            Order::Change { building, .. } => Some(match building {
+                BuildingRef::Facility(s, _) => ReportPlace::State(*s),
+                BuildingRef::Module(c, _) => ReportPlace::Colony(*c),
+            }),
+            _ => None,
+        }
+    }
 }

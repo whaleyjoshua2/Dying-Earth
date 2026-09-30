@@ -270,7 +270,7 @@ impl Game {
                 &[("faction", self.seat_name(*seat)), ("ship", kind.clone()), ("body", self.tables.body(*body).name.clone())],
             );
             self.report_line(LineKind::Ship, Some(ReportPlace::Body(*body)), text);
-            self.ai_deed(*seat, "arrived", &[("unit", kind), ("body", self.tables.body(*body).name.clone())]);
+            self.ai_deed_at(*seat, "arrived", &[("unit", kind), ("body", self.tables.body(*body).name.clone())], Some(crate::report::ReportPlace::Body(*body)));
             self.log(line);
         }
         // Intercept battles (ticket #50): one melee per intercepting stack, against every arriving
@@ -2392,7 +2392,7 @@ impl Game {
         self.log(line);
         let text = self.say("build_complete", &[("faction", self.seat_name(b.seat)), ("building", name.clone()), ("place", self.place_name(place))]);
         self.report_line_of(b.seat, LineKind::YourBuild, LineKind::BuildComplete, Some(place.into()), text);
-        self.ai_deed(b.seat, "completed", &[("building", name.clone()), ("place", self.place_name(place))]);
+        self.ai_deed_at(b.seat, "completed", &[("building", name.clone()), ("place", self.place_name(place))], Some(crate::report::ReportPlace::of(place)));
     }
 
     // ------------------------------------------------------------------ (f)
@@ -2527,7 +2527,7 @@ impl Game {
             &[("faction", self.seat_name(seat)), ("colony", self.place_name(Place::Colony(id))), ("note", note), ("n", moved.to_string())],
             Some(ReportPlace::Colony(id)),
         );
-        self.ai_deed(seat, "founded", &[("colony", self.place_name(Place::Colony(id)))]);
+        self.ai_deed_at(seat, "founded", &[("colony", self.place_name(Place::Colony(id)))], Some(crate::report::ReportPlace::Colony(id)));
     }
 
     /// Ticket #73: Emigrants join the seat's own Antarctic Colony while it has room; the rest go home.
@@ -2802,7 +2802,7 @@ impl Game {
                                 ],
                                 Some(ReportPlace::Colony(id)),
                             );
-                            self.ai_deed(seat, "founded", &[("colony", self.place_name(Place::Colony(id)))]);
+                            self.ai_deed_at(seat, "founded", &[("colony", self.place_name(Place::Colony(id)))], Some(crate::report::ReportPlace::Colony(id)));
                             // Ticket #345 (version 0.09.1): a candidate for its Body's first.
                             ground_founded.push((seat, b, id));
                         }
@@ -3056,7 +3056,7 @@ impl Game {
                 self.phrase("cause_agitate_damped", &[("faction", who)])
             };
             self.unrest_cause(sid, cause, seat == Seat(0));
-            self.ai_deed(seat, "agitate", &[("state", name)]);
+            self.ai_deed_at(seat, "agitate", &[("state", name)], Some(crate::report::ReportPlace::State(sid)));
         }
         // Relief (rule 3): one point per order, paid for in Ducats at the Orders phase.
         let mut relieved: Vec<(Seat, StateId, f64)> = Vec::new();

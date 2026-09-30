@@ -18242,3 +18242,26 @@ fn a_rivals_books_and_doings_open_with_an_accord_and_its_ships_in_flight_with_it
     g.reveal_all = true;
     assert!(g.sees_books(me, them) && g.sees_ship(me, g.ship(ship).unwrap()), "reveal_all lifts the fog");
 }
+
+/// Ticket #430: **a rival's Report line shows if it happened where the player sees**, or the rival
+/// is Friendly toward it or under an Accord; a line with no place only then.
+#[test]
+fn a_rivals_report_line_shows_only_where_the_player_sees_or_under_an_accord() {
+    let mut g = game();
+    let (me, them) = (Seat(0), Seat(1));
+    g.seats[them.index()].ai = true;
+    let mine = g.directed_states(me);
+    let near = mine[0];
+    let far = StateId::ALL.into_iter().find(|x| !mine.contains(x) && !g.tables.state(*x).neighbours.iter().any(|n| mine.contains(n))).unwrap();
+    g.report.ai_lines.push(dying_earth_engine::report::AiReport { seat: them, deeds: Vec::new(), places: Vec::new() });
+    g.ai_deed_at(them, "agitate", &[("state", "NEAR".to_string())], Some(dying_earth_engine::report::ReportPlace::State(near)));
+    g.ai_deed_at(them, "agitate", &[("state", "FAR".to_string())], Some(dying_earth_engine::report::ReportPlace::State(far)));
+    g.ai_deed_at(them, "greenwash", &[("n", "7".to_string())], None);
+    let p = g.rival_paragraph(them).expect("a paragraph");
+    assert!(p.contains("NEAR"), "a deed where the player sees: {p}");
+    assert!(!p.contains("FAR"), "not one out of sight: {p}");
+    assert!(!p.contains('7'), "nor one with no place: {p}");
+    g.strike_accord(me, them, vec![Term::NonAggression]).expect("an Accord");
+    let p = g.rival_paragraph(them).expect("a paragraph");
+    assert!(p.contains("NEAR") && p.contains("FAR") && p.contains('7'), "an Accord shows all of it: {p}");
+}

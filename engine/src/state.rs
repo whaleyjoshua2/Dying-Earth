@@ -5005,22 +5005,40 @@ impl Game {
 
     /// A sentence about what one AI seat's turn came to, appended to that Faction's paragraph.
     pub fn ai_deed(&mut self, seat: Seat, key: &str, args: &[(&str, String)]) {
+        self.ai_deed_at(seat, key, args, None);
+    }
+
+    /// Ticket #430 (version 0.09.5): the same, with the place it happened, for the fog.
+    pub fn ai_deed_at(&mut self, seat: Seat, key: &str, args: &[(&str, String)], place: Option<crate::report::ReportPlace>) {
         if !self.seat(seat).ai {
             return;
         }
         let text = self.tables.report.rival(key, args);
         if let Some(entry) = self.report.ai_lines.iter_mut().find(|e| e.seat == seat) {
+            entry.places.resize(entry.deeds.len(), None);
             entry.deeds.push(text);
+            entry.places.push(place);
         }
     }
 
     /// What one rival Faction did this turn, as one paragraph.
     pub fn rival_paragraph(&self, seat: Seat) -> Option<String> {
         let entry = self.report.ai_lines.iter().find(|e| e.seat == seat)?;
-        if entry.deeds.is_empty() {
+        // Ticket #430 (version 0.09.5): under the fog, the deeds at places the player sees, or all
+        // of them while the rival is Friendly toward it or under an Accord. A spectator reads all.
+        let viewer = Seat(0);
+        let open = self.spectator || self.sees_doings(viewer, seat);
+        let kept: Vec<String> = entry
+            .deeds
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| open || entry.places.get(*i).copied().flatten().is_some_and(|p| self.sees_report_place(viewer, p)))
+            .map(|(_, d)| d.clone())
+            .collect();
+        if kept.is_empty() {
             return None;
         }
-        let deeds = Game::and_list(&entry.deeds);
+        let deeds = Game::and_list(&kept);
         Some(self.tables.report.rival("paragraph", &[("faction", self.seat_name(seat)), ("deeds", deeds)]))
     }
 

@@ -236,8 +236,9 @@ impl Game {
             // log and nowhere else.
             if self.seat(seat).ai {
                 let told = crate::orders::merged_for_report(&kept);
-                let deeds: Vec<String> = told.iter().filter_map(|o| self.rival_deed(seat, o)).collect();
-                self.report.ai_lines.push(AiReport { seat, deeds });
+                // Ticket #430 (version 0.09.5): each deed with its place, for the fog.
+                let (deeds, places): (Vec<String>, Vec<Option<crate::report::ReportPlace>>) = told.iter().filter_map(|o| self.rival_deed(seat, o).map(|d| (d, self.order_place(o)))).unzip();
+                self.report.ai_lines.push(AiReport { seat, deeds, places });
             }
             self.commit_orders(seat, &kept);
             self.log(format!("{} gave {} order(s).", self.seat_name(seat), all[seat.index()].len()));
