@@ -1917,6 +1917,12 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
             view.selection = Selection::State(s);
             view.show_climate = false;
         }
+        // `emptymove:1` (a building aid, ticket #429, version 0.09.5): the right-click's confirm for
+        // an empty Colony Ship stands open, since no pointer ever right-clicks in a headless picture.
+        if std::env::args().any(|a| a == "emptymove:1") {
+            view.empty_move_text = "Empty Colony Ship. Send?".to_string();
+            view.popup = Popup::ConfirmEmptyMove;
+        }
         // `site:<body id>,<slot>` (a building aid, ticket #258): that Body's picture opens the empty
         // Colony Slot's panel, the one place the yields were still in words. `settler:<body id>`
         // (the same ticket): that Body's picture selects seat 0's Ship stack there.

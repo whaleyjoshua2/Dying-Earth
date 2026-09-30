@@ -82,6 +82,9 @@ pub enum Popup {
     /// Attack is fought, and at the head of the next turn for every Battle the Resolution fought,
     /// before the Event and the Moments. The Report no longer carries the Battle Report block.
     Battle(usize),
+    /// Ticket #429 (version 0.09.5): a right-click would move an empty Colony Ship or Carrier; ask
+    /// once. The orders wait in `ViewState::empty_move`, the question in `empty_move_text`.
+    ConfirmEmptyMove,
 }
 
 #[derive(Resource)]
@@ -422,6 +425,10 @@ pub struct ViewState {
     pub credits_amount: i64,
     pub credits_offer: i64,
     pub attack_preview: bool,
+    /// Ticket #429 (version 0.09.5): the right-click's move orders held while `Popup::ConfirmEmptyMove`
+    /// asks, and the question it asks.
+    pub empty_move: Vec<dying_earth_engine::Order>,
+    pub empty_move_text: String,
     /// Ticket #323 (version 0.08.8): the Region whose stack of the player's Armies is ARMED for a
     /// right-click march, set by a click on its shield; cleared by any other click, Escape, End
     /// Turn or a change of view. `armed_scroll` asks the card to scroll to its Armies block once.
@@ -500,7 +507,7 @@ impl Default for ViewState {
             greenwash_amount: 5,
             credits_amount: 10,
             credits_offer: 0,
-            attack_preview: false, armed_stack: None, armed_scroll: false, stack_scroll: None,
+            attack_preview: false, empty_move: Vec::new(), empty_move_text: String::new(), armed_stack: None, armed_scroll: false, stack_scroll: None,
             battle_end: 0, battles_then_head: false, battles_then_note: false,
             moments_on: None,
             force_hover: None,

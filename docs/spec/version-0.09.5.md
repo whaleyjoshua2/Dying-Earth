@@ -193,3 +193,20 @@ new most that is smaller, and is hidden where only one is possible.
 
 **What would show this wrong**: a door that sends more than the slider says or more than its room;
 a slider that offers nought; a slider shown where only one is possible.
+
+## 7. A warning on moving an empty Colony Ship or Carrier
+
+The authority is [ticket #429](https://github.com/whaleyjoshua2/Dying-Earth/issues/429). No rule
+moves.
+
+- **Empty** means a Colony Ship with no Colonists, or a Carrier with no Army. A warship is never
+  empty.
+- **The card** says **"Empty."** in amber over its moves, for one hull, or **"2 empty"** for a stack
+  holding two empty hulls. It costs no click.
+- **A right-click move** skips the card, so it asks once before sending an empty hull: **"Empty Colony
+  Ship. Send?"** (or "Empty Carrier. Send?"; "2 empty Colony Ships. Send?"; "3 empty. Send?"), with
+  **Send** and **Back**. This covers a transit on the System Map and a change of orbit on a Body.
+  Back places nothing.
+
+**What would show this wrong**: a loaded hull or a warship named empty; a right-click that sends an
+empty hull without asking; a Back that places the move anyway.

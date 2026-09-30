@@ -56,3 +56,10 @@ Taken with the new `colonyship:1` aid (an empty Colony Ship of yours at Earth) b
   slider's 5; the lift is capped at the station's room of 2.
 - [`ship.png`](ticket-428-sliders/ship.png): the Colony Ship's card. The Region drop-down, a slider
   under it, and "Load 4 Pioneers".
+
+## A warning on moving an empty Colony Ship or Carrier (ticket #429)
+
+- [`card.png`](ticket-429-empty-ship/card.png): an empty Colony Ship's card at Earth (`colonyship:1
+  stack:earth ship:1`). "Empty." in amber under Transit, above the moves.
+- [`confirm.png`](ticket-429-empty-ship/confirm.png): the right-click's confirm, raised by the new
+  `emptymove:1` aid: "Empty Colony Ship. Send?" with Send and Back.

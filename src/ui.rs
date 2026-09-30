@@ -431,6 +431,9 @@ enum Action {
     /// point of no return is one button that says so.
     Attack(BodyId),
     PreviewAttack,
+    /// Ticket #429 (version 0.09.5): a right-click's moves that would send an empty Colony Ship or
+    /// Carrier, held for the confirm, with its question.
+    ConfirmEmptyMove(Vec<Order>, String),
     Cancel(usize),
     /// Ticket #323 (version 0.08.8): a sentence for the panel's notice line, where a refusal shows.
     Notice(String),
@@ -1409,6 +1412,11 @@ pub fn draw(
                 session.place(o);
             }
             Action::PreviewAttack => view.attack_preview = true,
+            Action::ConfirmEmptyMove(orders, text) => {
+                view.empty_move = orders;
+                view.empty_move_text = text;
+                view.popup = Popup::ConfirmEmptyMove;
+            }
             Action::Attack(body) => {
                 // Ticket #383 (version 0.09.2): fought now, and its window is the news.
                 if let Some(fought) = session.attack(body) {
@@ -3648,8 +3656,14 @@ fn right_click(pos: Pos2, session: &Session, game: &Game, view: &ViewState, came
                 actions.push(Action::Cancel(i));
             }
         } else {
-            for o in orders {
-                if game.check_order(Seat(0), &session.pending, &o).is_ok() {
+            let placeable: Vec<Order> = orders.into_iter().filter(|o| game.check_order(Seat(0), &session.pending, o).is_ok()).collect();
+            // Ticket #429 (version 0.09.5): a right-click skips the card and its "Empty." note, so a
+            // move that sends an empty Colony Ship or Carrier asks once first.
+            let moving: Vec<&Ship> = placeable.iter().filter_map(|o| match o { Order::Transit { ship, .. } | Order::ChangeOrbit { ship, .. } => game.ship(*ship), _ => None }).collect();
+            if let Some(question) = empty_move_question(&moving) {
+                actions.push(Action::ConfirmEmptyMove(placeable, question));
+            } else {
+                for o in placeable {
                     actions.push(Action::Place(o));
                 }
             }
@@ -7897,6 +7911,11 @@ fn ship_line(game: &Game, s: &Ship) -> String {
 /// picture asked for, which only the Ship's card answers.
 #[allow(clippy::too_many_arguments)]
 fn move_dropdowns(ui: &mut Ui, session: &Session, game: &Game, body: BodyId, ships: &[&Ship], one: Option<&Ship>, scroll: Option<StackBlock>, salt: &str, actions: &mut Vec<Action>) {
+    // Ticket #429 (version 0.09.5): an empty Colony Ship or Carrier says so over its moves, in amber,
+    // at no cost of a click.
+    if let Some(note) = empty_note(ships) {
+        ui.colored_label(Color32::from_rgb(230, 170, 90), note);
+    }
     // The planets in the sky's order, the one whose group the Ships are in pulled to the front. A
     // stable sort, so the rest keep their order.
     let mut planets: Vec<BodyId> = BodyId::ALL.into_iter().filter(|b| b.primary() == *b).collect();
@@ -8710,6 +8729,35 @@ fn tech_edge_lane(from_box: egui::Rect, to_box: egui::Rect, lane: f32) -> f32 {
         from_box.max.x + 3.0 + (lane % 2.0) * 3.0
     } else {
         to_box.min.x - 4.0 - lane * 3.5
+    }
+}
+
+/// Ticket #429 (version 0.09.5): **a hull that carries nothing it was built to carry** -- a Colony
+/// Ship with no Colonists, a Carrier with no Army. A warship is never empty.
+fn empty_hull(s: &Ship) -> bool {
+    (s.kind == UnitKind::ColonyShip && s.colonists == 0) || (s.kind == UnitKind::Carrier && s.army.is_none())
+}
+
+/// Ticket #429: the card's note over the moves: "Empty." for one hull, "2 empty" for a stack.
+fn empty_note(ships: &[&Ship]) -> Option<String> {
+    let n = ships.iter().filter(|s| empty_hull(s)).count();
+    match (n, ships.len()) {
+        (0, _) => None,
+        (_, 1) => Some("Empty.".to_string()),
+        (n, _) => Some(format!("{n} empty")),
+    }
+}
+
+/// Ticket #429: the right-click's question, in the designer's words: "Empty Colony Ship. Send?",
+/// "Empty Carrier. Send?", or for more than one "2 empty Colony Ships. Send?" / "3 empty. Send?".
+fn empty_move_question(ships: &[&Ship]) -> Option<String> {
+    let empty: Vec<&&Ship> = ships.iter().filter(|s| empty_hull(s)).collect();
+    let kind = |k: UnitKind| if k == UnitKind::Carrier { "Carrier" } else { "Colony Ship" };
+    match empty.as_slice() {
+        [] => None,
+        [one] => Some(format!("Empty {}. Send?", kind(one.kind))),
+        many if many.iter().all(|s| s.kind == many[0].kind) => Some(format!("{} empty {}s. Send?", many.len(), kind(many[0].kind))),
+        many => Some(format!("{} empty. Send?", many.len())),
     }
 }
 
@@ -11030,6 +11078,25 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 });
             });
         }
+        Popup::ConfirmEmptyMove => {
+            // Ticket #429 (version 0.09.5): the designer's words, Send / Back.
+            egui::Modal::new("confirm_empty_move".into()).show(ctx, |ui| {
+                ui.set_width(320.0);
+                ui.label(RichText::new(view.empty_move_text.clone()).size(18.0).strong());
+                ui.horizontal(|ui| {
+                    if ui.button("Send").clicked() {
+                        for o in std::mem::take(&mut view.empty_move) {
+                            actions.push(Action::Place(o));
+                        }
+                        view.popup = Popup::None;
+                    }
+                    if ui.button("Back").clicked() {
+                        view.empty_move.clear();
+                        view.popup = Popup::None;
+                    }
+                });
+            });
+        }
         Popup::Battle(i) => {
             // Ticket #383 (version 0.09.2): **a Battle in a window of its own**: the party lines
             // that stood in the Report's Battle Report block since ticket #50, then the round
@@ -11555,6 +11622,30 @@ mod tests {
         let further = tech_edge_path(from, to.left_center(), gap_x, ROW, &[blocker, below]);
         assert!(!crosses(&further, blocker) && !crosses(&further, below), "both boxes cleared");
         assert_eq!(further.last(), Some(&to.left_center()));
+    }
+
+    /// Ticket #429 (version 0.09.5): **an empty Colony Ship or Carrier says so**: "Empty." on one
+    /// hull's card, "2 empty" on a stack's, and the right-click's question in the designer's words.
+    /// A loaded hull and a warship never do.
+    #[test]
+    fn an_empty_colony_ship_or_carrier_is_named_and_a_loaded_one_or_a_warship_is_not() {
+        let hull = |kind: UnitKind, colonists: u32, army: Option<ArmyId>| Ship {
+            id: ShipId(1), name: String::new(), kind, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists, warhead: false, colonists_education: 1.0, army,
+            stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None,
+        };
+        let (empty_cs, full_cs) = (hull(UnitKind::ColonyShip, 0, None), hull(UnitKind::ColonyShip, 4, None));
+        let (empty_car, full_car) = (hull(UnitKind::Carrier, 0, None), hull(UnitKind::Carrier, 0, Some(ArmyId(7))));
+        let frigate = hull(UnitKind::Frigate, 0, None);
+        assert_eq!(empty_note(&[&full_cs]), None, "a loaded Colony Ship");
+        assert_eq!(empty_note(&[&full_car]), None, "a Carrier with its Army");
+        assert_eq!(empty_note(&[&frigate]), None, "a warship is never empty");
+        assert_eq!(empty_note(&[&empty_cs]).as_deref(), Some("Empty."));
+        assert_eq!(empty_note(&[&empty_cs, &empty_car, &full_cs, &frigate]).as_deref(), Some("2 empty"));
+        assert_eq!(empty_move_question(&[&full_cs, &frigate]), None);
+        assert_eq!(empty_move_question(&[&empty_cs]).as_deref(), Some("Empty Colony Ship. Send?"));
+        assert_eq!(empty_move_question(&[&empty_car, &frigate]).as_deref(), Some("Empty Carrier. Send?"));
+        assert_eq!(empty_move_question(&[&empty_cs, &empty_cs]).as_deref(), Some("2 empty Colony Ships. Send?"));
+        assert_eq!(empty_move_question(&[&empty_cs, &empty_car]).as_deref(), Some("2 empty. Send?"));
     }
 
     /// Ticket #428 (version 0.09.5): **the count slider** every Pioneer order shares. It starts at
