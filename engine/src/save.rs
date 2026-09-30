@@ -297,6 +297,7 @@ impl SavedGame {
             accords,
             events_no_target,
             body_firsts,
+            reveal_all: _,
         } = g;
         SavedGame {
             seed: *seed,
@@ -382,6 +383,7 @@ impl SavedGame {
             events_no_target: self.events_no_target,
             body_firsts: self.body_firsts,
             log: self.log,
+            reveal_all: false,
         }
     }
 }

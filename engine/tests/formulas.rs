@@ -18187,3 +18187,58 @@ fn an_exodus_call_raises_what_the_recruit_offers_in_its_state() {
     g.state_mut(sid).population = 5.0;
     assert_eq!(g.emigrants_affordable(ark, sid), 5, "five people pay for five at the ordinary price, where the double charge bought two");
 }
+
+// ---------------------------------------------------------------- Ticket #430 (version 0.09.5): fog of war
+
+/// Ticket #430: **on Earth a seat sees its own Regions and their neighbours**, and a working Embassy
+/// of its own shows the whole of Earth.
+#[test]
+fn a_seat_sees_its_regions_and_their_neighbours_and_an_embassy_shows_all_earth() {
+    let mut g = game();
+    let s = Seat(0);
+    let mine = g.directed_states(s);
+    let home = mine[0];
+    let next = g.tables.state(home).neighbours[0];
+    let far = StateId::ALL.into_iter().find(|x| !mine.contains(x) && !g.tables.state(*x).neighbours.iter().any(|n| mine.contains(n))).expect("a Region out of sight");
+    assert!(g.sees_state(s, home) && g.sees_state(s, next), "its own and the next");
+    assert!(!g.sees_state(s, far), "not {:?}, out of sight", far);
+    g.state_mut(home).facilities.push(facility(FacilityKind::Embassy));
+    assert!(g.sees_state(s, far), "an Embassy shows all of Earth");
+}
+
+/// Ticket #430: **a Body off Earth is seen with a Ship or a place of your own there**, or a working
+/// Relay; not otherwise.
+#[test]
+fn a_seat_sees_a_body_where_it_has_a_ship_or_a_place() {
+    let mut g = game();
+    let s = Seat(0);
+    let empty = BodyId::ALL
+        .into_iter()
+        .find(|b| *b != BodyId::Earth && !g.ships.iter().any(|x| x.seat == s && x.at == ShipAt::Body(*b)) && !g.colonies.iter().any(|c| c.body == *b && c.control.director() == Some(s)))
+        .expect("a Body with nothing of seat 0's");
+    assert!(!g.sees_body(s, empty), "{empty:?} unseen");
+    let ship = a_colony_ship(&mut g, s, empty);
+    assert!(g.sees_body(s, empty), "a Ship there sees it");
+    g.ships.retain(|x| x.id != ship);
+    colony(&mut g, s, empty, &[ModuleKind::Habitat], 1);
+    assert!(g.sees_body(s, empty), "a place there sees it");
+}
+
+/// Ticket #430: **a rival's books open at Cordial toward you or an Accord; its doings at Friendly or
+/// an Accord**; a rival Ship in flight is seen only with its books; `reveal_all` lifts everything.
+#[test]
+fn a_rivals_books_and_doings_open_with_an_accord_and_its_ships_in_flight_with_its_books() {
+    let mut g = game();
+    let (me, them) = (Seat(0), Seat(1));
+    assert!(!matches!(g.relations_level(them, me), "Cordial" | "Friendly"), "the premise: not Cordial at the start");
+    assert!(!g.sees_books(me, them) && !g.sees_doings(me, them), "a stranger's books and doings are shut");
+    let ship = a_colony_ship(&mut g, them, BodyId::Earth);
+    g.ship_mut(ship).unwrap().at = ShipAt::Transit { from: BodyId::Earth, to: BodyId::Mars, turns_left: 3 };
+    assert!(!g.sees_ship(me, g.ship(ship).unwrap()), "their Ship in flight is unseen");
+    g.strike_accord(me, them, vec![Term::NonAggression]).expect("an Accord");
+    assert!(g.sees_books(me, them) && g.sees_doings(me, them), "an Accord opens both");
+    assert!(g.sees_ship(me, g.ship(ship).unwrap()), "and their Ship in flight");
+    g.accords.clear();
+    g.reveal_all = true;
+    assert!(g.sees_books(me, them) && g.sees_ship(me, g.ship(ship).unwrap()), "reveal_all lifts the fog");
+}

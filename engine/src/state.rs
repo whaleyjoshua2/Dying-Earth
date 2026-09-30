@@ -1556,6 +1556,10 @@ pub struct Game {
     /// Ticket #345 (version 0.09.1): who was first to each Body, one row per Body at most,
     /// appended when a first is claimed and never rewritten. In the save.
     pub body_firsts: Vec<BodyFirst>,
+    /// Ticket #430 (version 0.09.5): **fog of war lifted**, for testing only -- the headless
+    /// driver's flag, the shot aid and the sweep's instruments set it. Every seat, the computer's
+    /// included, then sees the whole board as before the fog. Never saved; a loaded game is fogged.
+    pub reveal_all: bool,
 }
 
 /// Ticket #50: every game seats all four Factions. The player picks one Faction and a start
@@ -1777,6 +1781,7 @@ impl Game {
             market: Market::default(),
             accords: Vec::new(),
             body_firsts: Vec::new(),
+            reveal_all: false,
             tables,
         };
         // Ticket #57: every Colony Slot on every Body draws its own four yields, in Body order then

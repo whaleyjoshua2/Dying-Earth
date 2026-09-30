@@ -210,3 +210,40 @@ moves.
 
 **What would show this wrong**: a loaded hull or a warship named empty; a right-click that sends an
 empty hull without asking; a Back that places the move anyway.
+
+## 8. Fog of war
+
+The authority is [ticket #430](https://github.com/whaleyjoshua2/Dying-Earth/issues/430) and its two
+resolution comments. **Nothing about the fog is saved**: what a seat sees is worked out from the
+board each time it is asked (`engine/src/visibility.rs`).
+
+**What a seat sees**:
+- **A Body off Earth**, and Earth's orbits and Antarctica, when it has a Colony or station there, a
+  Ship there, or a working Relay (or a Chorus) at a Colony it directs there.
+- **On Earth**, the Regions it directs and their neighbours. A working Embassy in a Region it directs
+  shows the whole of Earth.
+- **A rival's books** (stockpiles, income totals, Ships in flight) when that rival is **Cordial or
+  better toward it**, or the two stand under an Accord.
+- **A rival's doings** (its Under way list and its Report lines) when that rival is **Friendly toward
+  it**, or under an Accord.
+
+**Always open**: who holds a place, and what stands there (buildings, Colonists); Research and
+Victory progress, the Victory window's "(+N in transit)" included; the Moments.
+
+**What the fog hides**:
+- **Rival Ships at a Body you do not see** are shown only as whose and how many ("Prospectors: 3
+  Ships"). The same goes for **rival Armies in a Region you do not see** ("Arkwrights: 2 Armies").
+- **Rival Ships in flight** are shown only with their books; a Ship is seen again when it arrives
+  somewhere you see.
+- **A rival's build under way** is shown only where you see its place.
+- **A rival's income at a place** is shown only where you see the place.
+- **A rival's Report line** is shown if it happened somewhere you see, or the rival is Friendly
+  toward you or under an Accord.
+- **A Battle** is shown if it was somewhere you see, or you fought in it.
+
+**The computer seats see only what a human in their seat would.** `reveal_all` lifts the fog for
+testing only: the headless driver's flag and the `reveal:1` shot aid set it.
+
+**What would show this wrong**: a rival Ship's kind or strength shown at a Body you do not see; a
+rival build under way shown at a place you do not see; a computer seat reacting to a Ship it could
+not see; a save that changes what is seen.
