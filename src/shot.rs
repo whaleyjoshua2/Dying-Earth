@@ -816,6 +816,15 @@ fn build_board(session: &mut Session) {
         {
             g.colony_mut(id).unwrap().modules.push(Module::new(ModuleKind::Habitat));
         }
+        // `accords:0` (a building aid, ticket #430, version 0.09.5): every Accord struck, so a picture
+        // after driven turns shows the fog as a seat with no Accord sees it.
+        if std::env::args().any(|a| a == "accords:0") {
+            g.accords.clear();
+        }
+        // `reveal:1` (a building aid, ticket #430, version 0.09.5): the fog of war lifted.
+        if std::env::args().any(|a| a == "reveal:1") {
+            g.reveal_all = true;
+        }
         // `colonyship:1` (a building aid, ticket #428, version 0.09.5): an empty Colony Ship of seat
         // 0's at Earth, so the Region card's "Send N to" door and the Ship card's load slider can be
         // photographed on turn 1.

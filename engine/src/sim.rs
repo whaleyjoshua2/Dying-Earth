@@ -313,6 +313,9 @@ pub fn run(tables: Arc<Tables>, seed: u64, player: FactionKind) -> SimResult {
 /// As `run`, with seat 0 starting in `start` (the sweep uses this to try other seats at the table).
 pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: StateId) -> SimResult {
     let mut game = Game::new(tables.clone(), NewGame { seed, player, player_is_ai: true, player_start: start });
+    // Ticket #430 (version 0.09.5): the sweep's `--reveal` lifts the fog for every seat, so a batch
+    // can be read against the computer playing with the whole board in view.
+    game.reveal_all = std::env::var_os("DYING_EARTH_REVEAL").is_some();
     game.start();
     let mut first_colony_turn = None;
     let mut projected_collapse: Option<u32> = None;

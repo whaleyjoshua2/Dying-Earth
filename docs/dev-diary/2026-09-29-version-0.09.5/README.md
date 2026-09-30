@@ -63,3 +63,19 @@ Taken with the new `colonyship:1` aid (an empty Colony Ship of yours at Earth) b
   stack:earth ship:1`). "Empty." in amber under Transit, above the moves.
 - [`confirm.png`](ticket-429-empty-ship/confirm.png): the right-click's confirm, raised by the new
   `emptymove:1` aid: "Empty Colony Ship. Send?" with Send and Back.
+
+## Fog of war (ticket #430)
+
+Taken ten turns in (`turns:10`, seed 7), with the new `accords:0` aid. By turn 10 the computer
+playing seat 0 had struck an Accord with all three rivals, and an Accord opens a rival's books, so
+without the aid the fog lifts entirely. The `reveal:1` aid gives the same board with no fog.
+
+- [`compare-solar.png`](ticket-430-fog/compare-solar.png): the Solar System Map, fogged on the left
+  and revealed on the right. The Archivists' Colony Ship in flight to Deimos, its line and its label,
+  are gone under the fog. Mars keeps its full detail, because seat 0 has a frigate there.
+- [`compare-nigeria.png`](ticket-430-fog/compare-nigeria.png): Nigeria's Army shield, a Region out of
+  seat 0's sight. Fogged it reads "x1" with no trench line; revealed it reads its strength, 5, dug
+  in.
+- [`fog-solar.png`](ticket-430-fog/fog-solar.png), [`revealed-solar.png`](ticket-430-fog/revealed-solar.png),
+  [`fog-earth.png`](ticket-430-fog/fog-earth.png), [`revealed-earth.png`](ticket-430-fog/revealed-earth.png):
+  the whole windows.

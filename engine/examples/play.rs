@@ -1240,6 +1240,14 @@ fn print_board(g: &Game) {
         println!("none anywhere");
     }
     for sh in &g.ships {
+        // Ticket #430 (version 0.09.5): under the fog a rival Ship out of sight is whose and where,
+        // and one in flight is not listed at all unless its books are open (`--reveal` lifts it).
+        if !g.sees_ship(me, sh) {
+            if let ShipAt::Body(b) = sh.at {
+                println!("ship ?   seat {} at {} (out of sight)", sh.seat.0, b.name());
+            }
+            continue;
+        }
         // Ticket #335 (version 0.09.0): the ORBIT, not the bare Body and a slot number, so a Ship at
         // a station's ring can be told from one in low orbit without doing the arithmetic.
         println!(
@@ -1270,6 +1278,13 @@ fn print_board(g: &Game) {
         }
     }
     for a in &g.armies {
+        // Ticket #430 (version 0.09.5): an Army out of sight is whose and where.
+        if !g.sees_army(me, a) {
+            if let ArmyAt::Place(p) = a.at {
+                println!("army ?   seat {} at {} (out of sight)", g.army_seat(a).map(|s| s.0.to_string()).unwrap_or_else(|| "-".to_string()), g.place_name(p));
+            }
+            continue;
+        }
         let at = match a.at {
             ArmyAt::Place(p) => g.place_name(p),
             ArmyAt::Aboard(s) => format!("aboard ship {}", s.0),
@@ -1327,7 +1342,11 @@ fn flag(args: &[String], name: &str) -> Option<String> {
 
 fn load(tables: Arc<Tables>, path: &Path) -> Game {
     match save::load_from(path, tables) {
-        Ok(g) => g,
+        // Ticket #430 (version 0.09.5): `--reveal` lifts the fog of war, for testing only.
+        Ok(mut g) => {
+            g.reveal_all = std::env::args().any(|a| a == "--reveal");
+            g
+        }
         Err(e) => {
             eprintln!("{e}");
             std::process::exit(2);
