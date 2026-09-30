@@ -530,7 +530,8 @@ battle_fuel_weight = 0.2
 # Charter and nobody put it on the list it gates, so the Prospectors reached their own gate only by
 # taking Beneficiation as the cheapest thing left.
 # Ticket #425 (version 0.09.5): Efficient Grids off -- Automated Refining needs Deep Mining alone.
-order = ["beneficiation", "deep_mining", "automated_refining", "orbital_refuelling", "clean_propellant", "efficient_transit", "nuclear_rockets", "cryogenic_tanks", "hardened_hulls", "missile_technology"]
+# Ticket #426 (version 0.09.5): Commodity Finance in place of Beneficiation, which left the road.
+order = ["deep_mining", "automated_refining", "commodity_finance", "orbital_refuelling", "clean_propellant", "efficient_transit", "nuclear_rockets", "cryogenic_tanks", "hardened_hulls", "missile_technology"]
 # Ticket #348: `last = "clean_power"` is GONE. The tree is SHARED, so a Faction deferring a Tech is
 # not stating a private preference -- it is holding the whole table up. Clean Power is an antecedent
 # of BOTH the Arkwrights' and the Archivists' gates, so every turn a Prospector Lead pushed it to

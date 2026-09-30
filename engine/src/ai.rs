@@ -1133,7 +1133,9 @@ impl Game {
         let gap_for = |cat: Cat, item: Option<&str>| -> f64 {
             // Nothing advances without Energy: while it is the scarcest resource, an Energy producer
             // counts as advancing whichever part the Faction is behind on.
-            let energy_producer = cat == Cat::Producer && matches!(item, Some("Power Plant") | Some("Generator"));
+            // Ticket #426 (version 0.09.5): and the Archivists' Reactor, which is a Power Plant
+            // everywhere -- a Faction building carries its base building's reasons to be built.
+            let energy_producer = cat == Cat::Producer && matches!(item, Some("Power Plant") | Some("Reactor") | Some("Generator"));
             if energy_producer && needs.contains(&Resource::Energy) {
                 return gap;
             }
@@ -1516,8 +1518,10 @@ impl Game {
                     // reaches 5 at a four-Colonist Colony and 12 at a rich one, which is how
                     // ticket #232's first attempt at the Mine put 329 Mines on the board.
                     ModuleKind::TradePost => {
+                        // Ticket #426 (version 0.09.5): read for the kind this seat builds, so the
+                        // Prospectors' Exchange is weighed with its extra Ducat.
                         let bare = self.tables.module(ModuleKind::TradePost).produces.as_ref().map(|p| p.amount).unwrap_or(1.0).max(1.0);
-                        let with = self.module_yield(seat, cid, ModuleKind::TradePost).amount;
+                        let with = self.module_yield(seat, cid, mk).amount;
                         (Cat::Producer, self.base_weight(seat, Cat::Producer) * (with / bare).clamp(0.25, 2.0))
                     }
                     // Ticket #92: a Mass Driver at a low-gravity ground Colony with a Mine, once the
@@ -1671,11 +1675,13 @@ impl Game {
                 // Ticket #41: the first Relay at a Colony is a threat answer while the rival's standing
                 // presses on the seat's own there, once the Colony has a producer Module (a Relay before
                 // the first Mine starved the Colony). A second Relay is worth its base weight.
-                let has_producer = col.modules.iter().any(|m| matches!(m.kind, ModuleKind::Mine | ModuleKind::Generator | ModuleKind::Refinery | ModuleKind::TradePost));
-                let first_relay = mk == ModuleKind::Relay
+                // Ticket #426 (version 0.09.5): by the job, so an Exchange is a producer and a Chorus
+                // is the first Relay, as the base buildings are.
+                let has_producer = col.modules.iter().any(|m| [ModuleKind::Mine, ModuleKind::Generator, ModuleKind::Refinery, ModuleKind::TradePost].iter().any(|k| m.kind.does_the_job_of(*k)));
+                let first_relay = mk.does_the_job_of(ModuleKind::Relay)
                     && has_producer
-                    && !col.modules.iter().any(|m| m.kind == ModuleKind::Relay)
-                    && !col.queue.iter().any(|b| b.item == BuildItem::Module(ModuleKind::Relay));
+                    && !col.modules.iter().any(|m| m.kind.does_the_job_of(ModuleKind::Relay))
+                    && !col.queue.iter().any(|b| matches!(b.item, BuildItem::Module(k) if k.does_the_job_of(ModuleKind::Relay)));
                 let t = if matches!(cat, Cat::ArmyOrBarracks) {
                     threat
                 } else if first_relay && self.standing_pressed(seat, Place::Colony(cid)) {

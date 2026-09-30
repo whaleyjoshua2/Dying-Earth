@@ -6796,7 +6796,10 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
             game.tables.influence.first_settled_allotment
         ),
     );
-    ui.label(format!("GDP {}: its economy pays its controller {} Ducats a turn (GDP x Industry Level / 5, never below 1); a Bank here would add {}", card.gdp, game.state_ducats(sid), (game.tables.facility(FacilityKind::Bank).produces.as_ref().map(|p| p.amount).unwrap_or(0.0) * card.gdp as f64 / 10.0).floor() as i64));
+    // Ticket #426 (version 0.09.5): the player's own Bank by name (the Prospectors' Investment Bank),
+    // at its real figure, the Faction's output multiplier and Commodity Finance included.
+    let bank = FacilityKind::Bank.built_by(game.kind(Seat(0)));
+    ui.label(format!("GDP {}: its economy pays its controller {} Ducats a turn (GDP x Industry Level / 5, never below 1); a{} {} here would add {}", card.gdp, game.state_ducats(sid), if bank == FacilityKind::InvestmentBank { "n" } else { "" }, bank.name(), game.facility_yield(Seat(0), sid, bank).amount));
     icon_word(ui, "emissions", format!("Emissions this turn: industry {:.1}, Facilities {:.1}, people {:.1}", industry_em, fac_em, game.population_coefficient(sid) * st.population * mult));
     // Ticket #54: the per-person line, its formula, and what Leapfrog has taken off it.
     {

@@ -85,3 +85,49 @@ Stewardship row, "what with the vertical line between clean manufacturing and pl
 
 **What would show this wrong**: a road that reaches another row; two lines meeting at one door; a
 vertical beside the door of a box the line does not enter.
+
+## 3. Commodity Finance, and every Faction building carries its base building
+
+The authority is [ticket #426](https://github.com/whaleyjoshua2/Dying-Earth/issues/426).
+
+**Commodity Finance** is the twenty-fifth Tech: Extraction rung 2 at **32 Research**, needing Deep
+Mining. The whole tree now costs **821**, where it cost 789.
+- **Its effect:** it multiplies by **1.15** the Ducats of every **Bank, Investment Bank, Trade Post
+  and Exchange**, after the Faction's output multiplier. The Trade Post is in at the designer's
+  word.
+  - The Exchange's extra Ducat stays flat on top.
+  - The Investment Bank's 1% interest into the Venture Capital Fund does not change.
+- **Who gets it:** everyone, once it completes, as with every Tech.
+- **The Extraction Charter** needs Automated Refining and Commodity Finance, where it needed
+  Beneficiation. **Beneficiation** stays in the tree and leads nowhere.
+  - The Prospectors' road stays **130**: Deep Mining, Automated Refining, Commodity Finance, the
+    Charter.
+  - Their pick list opens with those three.
+- **Where it is drawn:** in the middle of Extraction's rung-2 stack, level with the Charter.
+  Automated Refining sits above it and Beneficiation below.
+
+**A Faction building carries everything its base building does**, at the designer's word:
+*"please make sure all faction specific buildings also carry the base yeilds"*. This was already
+true of every building's yield, Tech bonus, event card and job. The Investment Bank pays a full
+Bank's Ducats and adds its interest on top. Seven places matched a building by name or kind and
+now match it by the job it does:
+- **The Custodians' mothball bonus:** a mothballed Reactor they hold doubles a Generator, as a
+  Power Plant does.
+- **The computer seats, four places:**
+  - a Reactor answers an Energy shortage;
+  - a Chorus is a Colony's first Relay;
+  - an Exchange counts as a producing building;
+  - an Exchange is weighed with its extra Ducat.
+- **The sweep:** it counts Investment Banks, Exchanges, Choruses and Heliostats with their base
+  buildings.
+- **The Region card:** it names the player's own Bank ("an Investment Bank here would add") at its
+  real figure.
+
+Three stray Mass Driver figures on the Exchange's data row, which nothing read, are removed.
+
+**What would show this wrong**:
+- a Bank, Trade Post, Investment Bank or Exchange that pays the same with Commodity Finance as
+  without;
+- an Exchange whose extra Ducat grows with it;
+- an Investment Bank's interest that moves;
+- a place where a Faction building does less than its base.

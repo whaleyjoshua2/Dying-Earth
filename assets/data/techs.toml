@@ -274,7 +274,9 @@ cost = 48
 # Ticket #242 (version 0.08.3): Beneficiation joins Automated Refining as a prerequisite, at the
 # designer's word -- "beneficiation is now required for extraction charter". It gives the new Tech
 # a place in the branch's spine rather than leaving it a leaf nobody has to take.
-needs = ["automated_refining", "beneficiation"]
+# Ticket #426 (version 0.09.5): Commodity Finance in place of Beneficiation, at the designer's word --
+# "Extraction Charter will require that tech rather than beneficiation; beneficiation stays in the tree".
+needs = ["automated_refining", "commodity_finance"]
 effect = "Opens the Prospectors' Victory Condition; Mine output x1.25"
 value = 1.25
 gate_for = "prospectors"
@@ -341,6 +343,9 @@ gate_for = "archivists"
 # chain, so the whole product is floored once and a tenth is never lost to rounding.
 [[tech]]
 id = "beneficiation"
+# Ticket #426 (version 0.09.5): drawn at the FOOT of Extraction's rung-2 stack, under Commodity
+# Finance, since it now leads nowhere and Commodity Finance sits level with the Charter it feeds.
+stack = 1
 name = "Beneficiation"
 branch = "Extraction"
 rung = 2
@@ -440,3 +445,20 @@ needs = ["clean_propellant"]
 effect = "Every Ship's tank +15 Fuel"
 value = 1.0
 tank_fuel = 15.0
+
+# Ticket #426 (version 0.09.5): the twenty-fifth Tech, appended last with its enum variant, at the
+# designer's word -- "2nd level tech in extraction that adds 15% to the output of banks, exchanges,
+# and investment banks". Needs Deep Mining, 32, and the Charter needs it. `value` multiplies the
+# Ducats of every Bank and Investment Bank (a Bank's 4 x GDP / 10) and every Trade Post and Exchange
+# (the network figure), after the Faction's output multiplier; the Exchange's extra Ducat stays flat
+# on top, and the Investment Bank's interest into the Fund is untouched ("q3a no"). The Trade Post
+# is in at the designer's word ("q3b yes"). World-wide, as every Tech.
+[[tech]]
+id = "commodity_finance"
+name = "Commodity Finance"
+branch = "Extraction"
+rung = 2
+cost = 32
+needs = ["deep_mining"]
+effect = "Bank, Investment Bank, Trade Post and Exchange Ducats x1.15"
+value = 1.15

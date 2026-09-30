@@ -615,10 +615,14 @@ pub enum TechId {
     /// Ticket #420 (version 0.09.4): Propulsion rung 2, needing Clean Propellant and needed by
     /// nothing, at 32. Every Ship's tank +15 Fuel, on Clean Propellant's +5.
     CryogenicTanks,
+    /// Ticket #426 (version 0.09.5): Extraction rung 2, needing Deep Mining, at 32; the Extraction
+    /// Charter needs it in place of Beneficiation. The Ducats of every Bank, Investment Bank, Trade
+    /// Post and Exchange x1.15, the Exchange's extra Ducat flat on top.
+    CommodityFinance,
 }
 
 impl TechId {
-    pub const ALL: [TechId; 24] = [
+    pub const ALL: [TechId; 25] = [
         TechId::EfficientGrids,
         TechId::CleanPower,
         TechId::CleanManufacturing,
@@ -643,6 +647,7 @@ impl TechId {
         TechId::NuclearRockets,
         TechId::OrbitalRefuelling,
         TechId::CryogenicTanks,
+        TechId::CommodityFinance,
     ];
     pub fn index(self) -> usize {
         self as usize

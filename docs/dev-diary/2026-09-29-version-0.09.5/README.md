@@ -27,3 +27,11 @@ Taken headlessly with `shot: tech:1 panel:0 seed:7 cardshut:1 window:1500x1300`,
   enters Hardened Hulls near the bottom.
 - [`lit-hardened-hulls.png`](ticket-425-prerequisites/lit-hardened-hulls.png): Hardened Hulls' path
   lit, as Orbital Refuelling, Efficient Transit, Clean Propellant and Nuclear Rockets.
+
+## Commodity Finance (ticket #426)
+
+- [`tree.png`](ticket-426-commodity-finance/tree.png): the tree with twenty-five Techs. Commodity
+  Finance is in the middle of Extraction's rung-2 stack, level with the Extraction Charter;
+  Beneficiation is below it and leads nowhere.
+- [`lit-charter.png`](ticket-426-commodity-finance/lit-charter.png): the Prospectors' road lit, as
+  Deep Mining, Automated Refining, Commodity Finance and the Extraction Charter.

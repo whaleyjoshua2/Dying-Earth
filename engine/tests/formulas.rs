@@ -4533,8 +4533,9 @@ fn f_coastal_engineering_is_the_thirteenth_tech() {
     // Ticket #393 (version 0.09.3): twenty-two, with Nuclear Rockets on Propulsion rung 2.
     // Ticket #413 (version 0.09.4): twenty-three, with Orbital Refuelling on Propulsion rung 1.
     // Ticket #420 (version 0.09.4): twenty-four, with Cryogenic Tanks on Propulsion rung 2.
-    assert_eq!(TechId::ALL.len(), 24, "thirteen Techs, the four gates, Civil Defense, #232's two, Missile Technology, Nuclear Rockets, Orbital Refuelling and Cryogenic Tanks");
-    assert_eq!(g.tables.techs.len(), 24, "and twenty-four rows in techs.toml");
+    // Ticket #426 (version 0.09.5): twenty-five, with Commodity Finance on Extraction rung 2.
+    assert_eq!(TechId::ALL.len(), 25, "thirteen Techs, the four gates, Civil Defense, #232's two, Missile Technology, Nuclear Rockets, Orbital Refuelling, Cryogenic Tanks and Commodity Finance");
+    assert_eq!(g.tables.techs.len(), 25, "and twenty-five rows in techs.toml");
     let c = g.tables.tech(TechId::CoastalEngineering);
     assert_eq!(c.name, "Coastal Engineering");
     assert_eq!(c.branch, "Stewardship", "Industry renamed on ticket #424");
@@ -6645,7 +6646,8 @@ fn the_four_gates_stand_on_rung_three_at_one_price_with_their_prerequisites() {
         (FactionKind::Custodians, TechId::PlanetaryStewardship, vec![TechId::CleanPower, TechId::GreenConsensus]),
         // Ticket #242 (version 0.08.3): Beneficiation joined, so the new Tech sits in the
         // branch's spine rather than being a leaf nobody has to take.
-        (FactionKind::Prospectors, TechId::ExtractionCharter, vec![TechId::AutomatedRefining, TechId::Beneficiation]),
+        // Ticket #426 (version 0.09.5): Commodity Finance in its place, at the designer's word.
+        (FactionKind::Prospectors, TechId::ExtractionCharter, vec![TechId::AutomatedRefining, TechId::CommodityFinance]),
         (FactionKind::Arkwrights, TechId::GenerationShips, vec![TechId::ClosedLoopColonies]),
         // Ticket #245 (version 0.08.3): Expanded Habitats dropped, and with it the edge that read
         // on screen as an unrelated line into Generation Ships. Ticket #246: and Public Science
@@ -6668,7 +6670,7 @@ fn the_four_gates_stand_on_rung_three_at_one_price_with_their_prerequisites() {
         assert_eq!(card.needs, needs, "{t:?}");
         assert_eq!(g.tables.victory_gate(kind), Some(t));
     }
-    assert_eq!(TechId::ALL.len(), 24, "eighteen, Beneficiation and Relay Networks since ticket #232, Missile Technology since #343, Nuclear Rockets since #393, Orbital Refuelling since #413, Cryogenic Tanks since #420");
+    assert_eq!(TechId::ALL.len(), 25, "eighteen, Beneficiation and Relay Networks since ticket #232, Missile Technology since #343, Nuclear Rockets since #393, Orbital Refuelling since #413, Cryogenic Tanks since #420, Commodity Finance since #426");
     // Version 0.08.3 moved three of the four gates' prerequisites in three separate tickets, and
     // nothing watched how deep each gate ended up. Counted as Techs that must stand before the
     // gate is reachable, the gate excluded.
@@ -6692,7 +6694,7 @@ fn the_four_gates_stand_on_rung_three_at_one_price_with_their_prerequisites() {
     // Ticket #425 (version 0.09.5): Clean Power off Closed-Loop Colonies, Efficient Grids off
     // Automated Refining -- no road leaves its own row now.
     assert_eq!(depth(TechId::GenerationShips), 2, "the Arkwrights', Expanded Habitats and Closed-Loop Colonies");
-    assert_eq!(depth(TechId::ExtractionCharter), 3, "the Prospectors', Deep Mining, Automated Refining and Beneficiation");
+    assert_eq!(depth(TechId::ExtractionCharter), 3, "the Prospectors', Deep Mining, Automated Refining and Commodity Finance");
 }
 
 /// Ticket #84: with both parts at their bars the Custodians still do not win until Planetary
@@ -10194,7 +10196,7 @@ fn the_tree_costs_eighteen_thirty_two_and_forty_eight_by_rung() {
     let total: i64 = TechId::ALL.into_iter().map(|t| g.tables.tech(t).cost).sum();
     assert_eq!(g.tables.tech(TechId::NuclearRockets).cost, 38, "priced above its rung");
     assert_eq!(g.tables.tech(TechId::OrbitalRefuelling).cost, 22, "priced above its rung");
-    assert_eq!(total, 789, "the whole tree since ticket #420's Cryogenic Tanks (32 on rung 2); 757 from #413's Orbital Refuelling (22 on rung 1); 735 from #393, 697 from #343, 649 from #232, 585 from #231, 554 from #201, 507 before that");
+    assert_eq!(total, 821, "the whole tree since ticket #426's Commodity Finance (32 on rung 2); 789 from #420's Cryogenic Tanks (32 on rung 2); 757 from #413's Orbital Refuelling (22 on rung 1); 735 from #393, 697 from #343, 649 from #232, 585 from #231, 554 from #201, 507 before that");
 }
 
 // ------------------------------------------------------- 0.08.1 ticket #208: the School's step
@@ -17984,5 +17986,75 @@ fn orbital_refuelling_is_stacked_above_clean_propellant() {
     let t = tables();
     let key = |x: TechId| (t.tech(x).stack, x.index());
     assert!(key(TechId::OrbitalRefuelling) < key(TechId::CleanPropellant), "Orbital Refuelling first in Propulsion's rung-1 cell");
-    assert!(TechId::ALL.iter().filter(|x| **x != TechId::OrbitalRefuelling).all(|x| t.tech(*x).stack == 0), "no other Tech sits out of the tree's order");
+    // Ticket #426 (version 0.09.5): and Beneficiation at the foot of Extraction's rung 2, under
+    // Commodity Finance, which sits level with the Charter it feeds.
+    assert!(key(TechId::CommodityFinance) < key(TechId::Beneficiation) && key(TechId::AutomatedRefining) < key(TechId::CommodityFinance), "Automated Refining, Commodity Finance, Beneficiation");
+    assert!(TechId::ALL.iter().filter(|x| ![TechId::OrbitalRefuelling, TechId::Beneficiation].contains(*x)).all(|x| t.tech(*x).stack == 0), "no other Tech sits out of the tree's order");
+}
+
+// ---------------------------------------------------------------- Ticket #426 (version 0.09.5): Commodity Finance
+
+/// Ticket #426: **Commodity Finance**, Extraction rung 2 at 32, needing Deep Mining; the Extraction
+/// Charter needs it in place of Beneficiation, which stays in the tree and leads nowhere.
+#[test]
+fn commodity_finance_stands_in_for_beneficiation_under_the_charter() {
+    let t = tables();
+    let c = t.tech(TechId::CommodityFinance);
+    assert_eq!((c.name.as_str(), c.branch.as_str(), c.rung, c.cost), ("Commodity Finance", "Extraction", 2, 32));
+    assert_eq!(c.needs, vec![TechId::DeepMining]);
+    assert_eq!(t.tech(TechId::ExtractionCharter).needs, vec![TechId::AutomatedRefining, TechId::CommodityFinance]);
+    assert!(t.techs.iter().all(|x| !x.needs.contains(&TechId::Beneficiation)), "Beneficiation leads nowhere");
+    let chain = t.gate_chain(FactionKind::Prospectors);
+    assert!(!chain.contains(&TechId::Beneficiation) && chain.contains(&TechId::CommodityFinance));
+    assert_eq!(chain.iter().map(|x| t.tech(*x).cost).sum::<i64>() + t.tech(TechId::ExtractionCharter).cost, 130, "the road stays 130");
+    assert_eq!(TechId::ALL.len(), 25);
+}
+
+/// Ticket #426: **every Bank, Investment Bank, Trade Post and Exchange pays its Ducats x1.15** once
+/// Commodity Finance stands; the Exchange's extra Ducat stays flat on top.
+#[test]
+fn commodity_finance_lifts_the_ducats_of_every_bank_and_trade_post_by_fifteen_percent() {
+    let mut g = game();
+    let s = Seat(0);
+    g.state_mut(StateId::EastAsia).facilities.push(facility(FacilityKind::Bank));
+    g.state_mut(StateId::EastAsia).facilities.push(facility(FacilityKind::InvestmentBank));
+    let moon = colony(&mut g, s, BodyId::Moon, &[ModuleKind::TradePost], 0);
+    let mars = colony(&mut g, s, BodyId::Mars, &[ModuleKind::Exchange], 0);
+    let read = |g: &Game| {
+        (
+            g.facility_yield(s, StateId::EastAsia, FacilityKind::Bank).amount,
+            g.facility_yield(s, StateId::EastAsia, FacilityKind::InvestmentBank).amount,
+            g.module_yield(s, moon, ModuleKind::TradePost).amount,
+            g.module_yield(s, mars, ModuleKind::Exchange).amount,
+        )
+    };
+    let before = read(&g);
+    assert!(before.0 > 0.0 && before.2 > 0.0, "the premise: each pays something: {before:?}");
+    assert_eq!(before.0, before.1, "the Investment Bank pays a Bank's Ducats");
+    with_tech(&mut g, TechId::CommodityFinance);
+    let after = read(&g);
+    let near = |a: f64, b: f64| (a - b).abs() <= 0.051;
+    let extra = g.tables.unique.exchange_ducats as f64;
+    assert!(near(after.0, before.0 * 1.15), "a Bank x1.15: {before:?} -> {after:?}");
+    assert!(near(after.1, before.1 * 1.15), "an Investment Bank x1.15");
+    assert!(near(after.2, before.2 * 1.15), "a Trade Post x1.15");
+    assert!(near(after.3 - extra, (before.3 - extra) * 1.15), "an Exchange x1.15, its extra Ducat flat: {before:?} -> {after:?}");
+}
+
+/// Ticket #426: **a Faction building carries everything its base building does** -- the designer's
+/// "please make sure all faction specific buildings also carry the base yeilds". The one rule that
+/// did not: a Custodian's mothballed Power Plant doubles their best Generator off Earth, and a
+/// mothballed Reactor they have taken from the Archivists did not, though it is a Power Plant
+/// everywhere else.
+#[test]
+fn a_captured_mothballed_reactor_doubles_a_custodian_generator_as_a_power_plant_would() {
+    let mut g = game();
+    let cus = Seat(0);
+    assert_eq!(g.kind(cus), FactionKind::Custodians);
+    let moon = colony(&mut g, cus, BodyId::Moon, &[ModuleKind::Generator], 0);
+    g.state_mut(StateId::EastAsia).facilities.push(facility(FacilityKind::Reactor));
+    assert!(g.doubled_modules(cus).is_empty(), "a Reactor at work doubles nothing");
+    let i = g.state(StateId::EastAsia).facilities.len() - 1;
+    g.state_mut(StateId::EastAsia).facilities[i].mothballed = true;
+    assert_eq!(g.doubled_modules(cus), vec![(moon, 0)], "a mothballed Reactor doubles the Generator, as a Power Plant would");
 }
