@@ -1412,10 +1412,14 @@ pub fn draw(
                 session.place(o);
             }
             Action::PreviewAttack => view.attack_preview = true,
+            // Ticket #429 (the review): only onto a clear screen, so a turn ended earlier in the same
+            // frame keeps its Report or Battle window, and the stale move is dropped.
             Action::ConfirmEmptyMove(orders, text) => {
-                view.empty_move = orders;
-                view.empty_move_text = text;
-                view.popup = Popup::ConfirmEmptyMove;
+                if view.popup == Popup::None {
+                    view.empty_move = orders;
+                    view.empty_move_text = text;
+                    view.popup = Popup::ConfirmEmptyMove;
+                }
             }
             Action::Attack(body) => {
                 // Ticket #383 (version 0.09.2): fought now, and its window is the news.
@@ -3624,6 +3628,9 @@ fn apply_hit(hit: Hit, view: &mut ViewState) {
     }
 }
 
+/// Ticket #429 (version 0.09.5): a move that would send an empty Colony Ship or Carrier asks first
+/// (`Popup::ConfirmEmptyMove`), since a right-click skips the card's "Empty." note.
+///
 /// Ticket #323 (version 0.08.8): **a right-click on the map moves the armed stack.** On Earth, with
 /// a Region's stack armed by a click on its shield, a right-click on a neighbouring Region places
 /// the stack's march there, the same orders the card's *attack X* button places; a second
