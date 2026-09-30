@@ -276,3 +276,20 @@ fn a_manual_save_is_refused_while_orders_are_pending() {
     assert!(!save::can_save_now(0, true), "a Battle fought this turn refuses a save");
     assert!(save::SAVE_PENDING_HOVER.contains("beginning of a turn"), "the hover says why");
 }
+
+/// Ticket #430 (version 0.09.5): **a save changes nothing the fog shows.** A rival's Report deeds
+/// keep their places through the round trip, and `reveal_all` -- a testing switch -- is never saved:
+/// a loaded game is fogged.
+#[test]
+fn a_save_keeps_the_rival_deeds_places_and_never_the_reveal_switch() {
+    let mut original = played_to(11, 5);
+    original.reveal_all = true;
+    let places: Vec<Vec<Option<dying_earth_engine::report::ReportPlace>>> = original.report.ai_lines.iter().map(|a| a.places.clone()).collect();
+    assert!(places.iter().flatten().any(|p| p.is_some()), "the premise: some rival deed has a place");
+    let dir = TempDir::new("fog");
+    let path = save::save_to(dir.path(), &original, SaveKind::Manual).expect("the save is written");
+    let loaded = save::load_from(&path, tables()).expect("the save is read back");
+    assert!(!loaded.reveal_all, "a loaded game is fogged");
+    let back: Vec<Vec<Option<dying_earth_engine::report::ReportPlace>>> = loaded.report.ai_lines.iter().map(|a| a.places.clone()).collect();
+    assert_eq!(back, places, "each deed keeps its place");
+}

@@ -18310,3 +18310,22 @@ fn a_computer_seat_sizes_a_rival_colony_out_of_sight_by_its_colonists_alone() {
     let seen = weight(&g);
     assert!(seen > blind, "its earnings, once seen, raise the weight: {blind} blind, {seen} seen");
 }
+
+/// Ticket #430 (the review): **the Report is fogged before its headline is chosen.** A Battle line
+/// at a place the player does not see is dropped, so it never headlines; a line the fog leaves
+/// open (who holds a place) stays wherever it happened.
+#[test]
+fn the_report_drops_a_battle_out_of_sight_and_keeps_a_change_of_hands() {
+    use dying_earth_engine::report::{LineKind, ReportLine, ReportPlace};
+    let mut g = game();
+    let mine = g.directed_states(Seat(0));
+    let far = StateId::ALL.into_iter().find(|x| !mine.contains(x) && !g.tables.state(*x).neighbours.iter().any(|n| mine.contains(n))).unwrap();
+    g.report.lines.clear();
+    g.report.lines.push(ReportLine { kind: LineKind::DecisiveBattle, place: Some(ReportPlace::State(far)), text: "HIDDEN FIGHT".into(), mine: false });
+    g.report.lines.push(ReportLine { kind: LineKind::ControlChanged, place: Some(ReportPlace::State(far)), text: "OPEN CHANGE".into(), mine: false });
+    let seen = g.report_seen_by(Seat(0));
+    assert!(seen.lines.iter().all(|l| l.text != "HIDDEN FIGHT"), "a Battle out of sight is dropped");
+    assert_eq!(seen.headline().map(|l| l.text.as_str()), Some("OPEN CHANGE"), "and does not headline; who holds a place stays open");
+    g.reveal_all = true;
+    assert_eq!(g.report_seen_by(Seat(0)).lines.len(), 2, "reveal_all keeps both");
+}

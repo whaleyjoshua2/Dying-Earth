@@ -240,6 +240,13 @@ Victory progress, the Victory window's "(+N in transit)" included; the Moments.
 - **A rival's Report line** is shown if it happened somewhere you see, or the rival is Friendly
   toward you or under an Accord.
 - **A Battle** is shown if it was somewhere you see, or you fought in it.
+- **The Report's own lines** about a Battle, a Ship, an Army or a rival's completed build are dropped
+  where you do not see their place, before the headline is chosen. Lines about who holds a place,
+  the climate, the Techs, the Events and the card stay open. A rival's transit is read at where it
+  is bound.
+- **Orbital Control** at a Body you do not see is not shown, since it would say whose warships hold
+  low orbit. Nor is what a rival's building earns on its tile's hover, or what a rival's Region pays
+  it, at a place you do not see.
 
 **The computer seats see only what a human in their seat would.** `reveal_all` lifts the fog for
 testing only: the headless driver's flag and the `reveal:1` shot aid set it.

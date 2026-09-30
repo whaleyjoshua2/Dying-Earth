@@ -765,6 +765,10 @@ fn standing_note(g: &Game, seat: Seat, target: Target) -> String {
 /// names), its item, and the Widgets done of the Widgets it wants. A build begun by another seat --
 /// what a conquest leaves behind -- is the only kind that may be cancelled, so it says whose it is.
 fn queue_text(g: &Game, place: Place) -> Vec<String> {
+    // Ticket #430 (version 0.09.5): a rival's builds under way at a place seat 0 does not see.
+    if g.place_control(place).director().is_some_and(|d| d != Seat(0)) && !g.sees_place(Seat(0), place) {
+        return vec!["(out of sight)".to_string()];
+    }
     g.queue_at(place)
         .iter()
         .enumerate()
@@ -935,7 +939,9 @@ fn print_costs(g: &Game) {
 
 fn print_report(g: &Game) {
     println!("\n=== REPORT, turn {} ===", g.report.turn);
-    if let Some(h) = g.report.headline() {
+    // Ticket #430 (version 0.09.5): the Report as seat 0 sees it under the fog (`--reveal` lifts it).
+    let report = g.report_seen_by(Seat(0));
+    if let Some(h) = report.headline() {
         println!("HEADLINE: {}", h.text);
     }
     if let Some(e) = &g.report.event {
@@ -943,13 +949,13 @@ fn print_report(g: &Game) {
     }
     // Ticket #404 (version 0.09.4): under the window's headings, so a place that changed hands to
     // or from you reads under Your works as well as under its place.
-    for (section, lines) in g.report.sections() {
+    for (section, lines) in report.sections() {
         println!("  -- {} --", section.name_for(g.spectator));
         for l in lines {
             println!("  [{:?}] {}", l.kind, l.text);
         }
     }
-    for b in &g.report.battles {
+    for b in g.report.battles.iter().filter(|b| g.battle_seen_by(Seat(0), b)) {
         println!("  [Battle] {}", b.text(&|s| g.seat_name(s), "a neutral force"));
     }
     for (seat, para) in g.faction_paragraphs() {

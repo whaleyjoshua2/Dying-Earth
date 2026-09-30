@@ -89,6 +89,28 @@ impl Game {
         }
     }
 
+    /// Ticket #430 (the review): **the Report as `viewer` reads it.** A line about a Battle, a Ship, an
+    /// Army or a rival's build at a place it does not see is dropped, before the headline is chosen,
+    /// so a hidden fight never headlines. What stays open under the fog -- who holds a place, the
+    /// climate, the Techs, the Events, the card -- keeps every line. The player's own lines stay.
+    pub fn report_seen_by(&self, viewer: Seat) -> crate::report::Report {
+        use crate::report::LineKind;
+        let mut r = self.report.clone();
+        if self.reveal_all || self.spectator {
+            return r;
+        }
+        r.lines.retain(|l| {
+            let fogged = matches!(l.kind, LineKind::DecisiveBattle | LineKind::Battle | LineKind::Ship | LineKind::BuildComplete | LineKind::Army);
+            l.mine || !fogged || l.place.is_none_or(|p| self.sees_report_place(viewer, p))
+        });
+        r
+    }
+
+    /// Ticket #430: does `viewer` see this Battle? One it fought in, or one at a place it sees.
+    pub fn battle_seen_by(&self, viewer: Seat, b: &BattleLine) -> bool {
+        self.reveal_all || self.spectator || b.parties.iter().any(|p| p.seat == Some(viewer)) || b.at.is_some_and(|p| self.sees_report_place(viewer, p))
+    }
+
     /// Is `viewer` looking at a Report's place? A Region or Colony as `sees_place`, a Body or one of
     /// its orbits as `sees_body`.
     pub fn sees_report_place(&self, viewer: Seat, p: crate::report::ReportPlace) -> bool {
@@ -123,7 +145,10 @@ impl Game {
             Order::Launch { target, .. } => Some(ReportPlace::of(*target)),
             Order::Bombard { colony, .. } => Some(ReportPlace::Colony(*colony)),
             Order::BuildStation { body, .. } | Order::ShipStance { body, .. } => Some(ReportPlace::Body(*body)),
-            Order::Transit { ship, .. } | Order::ChangeOrbit { ship, .. } | Order::Refuel { ship } | Order::Rearm { ship } => at_ship(*ship),
+            // A transit is read at where it is BOUND (the review): its deed names the destination, and
+            // a Ship in flight is hidden, so only a seat that sees the far end reads where it went.
+            Order::Transit { to, .. } => Some(ReportPlace::Body(*to)),
+            Order::ChangeOrbit { ship, .. } | Order::Refuel { ship } | Order::Rearm { ship } => at_ship(*ship),
             Order::Load { ship, from, .. } => match from {
                 LoadSource::State(s) => Some(ReportPlace::State(*s)),
                 LoadSource::Colony(c) => Some(ReportPlace::Colony(*c)),

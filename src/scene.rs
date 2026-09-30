@@ -272,7 +272,8 @@ pub fn sync_scene(
     }
     for (r, mut t, mut vis, mut mat) in &mut rings {
         t.translation = place(r.0);
-        match game.orbital_control(r.0) {
+        // Ticket #430 (version 0.09.5): no Control ring at a Body out of sight.
+        match game.orbital_control(r.0).filter(|_| game.spectator || game.sees_body(Seat(0), r.0)) {
             Some(s) => {
                 *vis = Visibility::Inherited;
                 // Ticket #255: by Faction, as the slot markers above.

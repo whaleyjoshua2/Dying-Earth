@@ -2911,16 +2911,12 @@ fn unseen_army_lines(ui: &mut Ui, game: &Game, unseen: &[&Army]) {
 
 /// Ticket #430: a Battle the player sees -- one it fought in, or one somewhere it sees.
 fn battle_seen(game: &Game, i: usize) -> bool {
-    let Some(b) = game.report.battles.get(i) else { return false };
-    if game.spectator || b.parties.iter().any(|p| p.seat == Some(Seat(0))) {
-        return true;
-    }
-    match b.at {
-        Some(ReportPlace::State(s)) => !hidden_place(game, Place::State(s)),
-        Some(ReportPlace::Colony(c)) => !hidden_place(game, Place::Colony(c)),
-        Some(ReportPlace::Body(body)) | Some(ReportPlace::Orbit(body, _)) => !hidden_body(game, body),
-        None => false,
-    }
+    game.report.battles.get(i).is_some_and(|b| game.battle_seen_by(Seat(0), b))
+}
+/// Ticket #430 (the review): what a building earns is seen where its director is the player, nobody,
+/// or a rival at a place the player sees.
+fn earnings_seen(game: &Game, place: Place, director: Option<Seat>) -> bool {
+    director.is_none_or(|d| d == Seat(0)) || !hidden_place(game, place)
 }
 fn books_open(game: &Game, seat: Seat) -> bool {
     game.spectator || game.sees_books(Seat(0), seat)
@@ -3062,7 +3058,9 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                     // The Orbital Control flag in the holder's Faction colour. Ticket #335 (version
                     // 0.09.0): Control is of LOW ORBIT, and the flag says so, since a warship at a
                     // station's ring holds nothing by sitting there.
-                    if let Some(s) = game.orbital_control(body) {
+                    // Ticket #430 (the review): not at a Body out of sight, where it would say whose
+                    // warships hold low orbit.
+                    if let Some(s) = game.orbital_control(body).filter(|_| !hidden_body(game, body)) {
                         label_at(painter, p - egui::vec2(0.0, side * 40.0), &format!("Orbital Control of low orbit: {}", game.seat_name(s)), seat_colour(session, s), 12.0);
                     }
                 }
@@ -3278,7 +3276,7 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                     // Ticket #335: Orbital Control is of LOW ORBIT, and the line says so, since a
                     // warship at a station's ring holds nothing by sitting there.
                     let any_battery = Seat::ALL.iter().any(|s| !game.batteries_at(*s, body, Orbit::Low).is_empty());
-                    band.push(match game.orbital_control(body) {
+                    band.push(match game.orbital_control(body).filter(|_| !hidden_body(game, body)) {
                         Some(s) => BandRow { text: format!("Orbital Control of low orbit: {}", game.seat_name(s)), colour: seat_colour(session, s), kind: None, seat: None, battle: None },
                         None if any_battery => BandRow { text: "Orbital Control of low orbit: nobody, a Battery stands".to_string(), colour: Color32::LIGHT_GRAY, kind: None, seat: None, battle: None },
                         None => BandRow { text: "Orbital Control of low orbit: nobody".to_string(), colour: Color32::LIGHT_GRAY, kind: None, seat: None, battle: None },
@@ -6466,6 +6464,10 @@ fn facility_figures(game: &Game, sid: StateId, f: &Facility, director: Option<Se
     // Ticket #69: a Lab in a state nobody holds, or under Occupation, works for the world.
     let world_lab = f.kind == FacilityKind::ResearchLab && f.working() && !f.offline_until_resolution && matches!(game.state(sid).control, Control::Neutral | Control::Occupied { .. });
     // Ticket #257 (version 0.08.4): a Sea Wall says what it has held back and what that costs.
+    // Ticket #430 (the review): a rival's earnings at a place out of sight are hidden on the tile too.
+    if !earnings_seen(game, Place::State(sid), director) {
+        return "out of sight".to_string();
+    }
     if f.kind == FacilityKind::SeaWall {
         let yield_text = director.map(|d| game.facility_yield(d, sid, f.kind).text()).unwrap_or_else(|| "idle, nobody directs this state".to_string());
         // Ticket #390 (version 0.09.3): the keep clause the short row reads too, written once.
@@ -6539,7 +6541,7 @@ fn facility_row(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, i: us
         // Ticket #390 (version 0.09.3): a short row's hover is its whole sentence and nothing else,
         // so the Sea Wall's, the longest in the data, stays within the six-line ceiling.
         let rules = if short.is_some() { full.clone() } else { facility_rules(f.kind.name(), f.coastal) };
-        let tip = match director.filter(|_| !f.mothballed).map(|d| game.facility_yield(d, sid, f.kind).chain).filter(|c| c.multiplied()) {
+        let tip = match director.filter(|_| !f.mothballed && earnings_seen(game, Place::State(sid), director)).map(|d| game.facility_yield(d, sid, f.kind).chain).filter(|c| c.multiplied()) {
             Some(chain) => chain_tip(&rules, &chain),
             None => rules,
         };
@@ -6790,7 +6792,7 @@ fn slot_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
                 let heading = format!("{} ({side}): {}{}", f.kind.name(), facility_figures(game, sid, f, director), facility_offline_words(f));
                 let tip = facility_rules(&heading, f.coastal);
                 // Ticket #352 (version 0.09.1): with its arithmetic, where the figure is multiplied.
-                let tip = match director.filter(|_| !f.mothballed).map(|d| game.facility_yield(d, sid, f.kind).chain).filter(|c| c.multiplied()) {
+                let tip = match director.filter(|_| !f.mothballed && earnings_seen(game, Place::State(sid), director)).map(|d| game.facility_yield(d, sid, f.kind).chain).filter(|c| c.multiplied()) {
                     Some(chain) => chain_tip(&tip, &chain),
                     None => tip,
                 };
@@ -6909,7 +6911,9 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     // Ticket #426 (version 0.09.5): the player's own Bank by name (the Prospectors' Investment Bank),
     // at its real figure, the Faction's output multiplier and Commodity Finance included.
     let bank = FacilityKind::Bank.built_by(game.kind(Seat(0)));
-    ui.label(format!("GDP {}: its economy pays its controller {} Ducats a turn (GDP x Industry Level / 5, never below 1); a{} {} here would add {}", card.gdp, game.state_ducats(sid), if bank == FacilityKind::InvestmentBank { "n" } else { "" }, bank.name(), game.facility_yield(Seat(0), sid, bank).amount));
+    // Ticket #430 (the review): what a rival's Region pays it is hidden where the player does not see.
+    let pays = if earnings_seen(game, Place::State(sid), game.state(sid).control.director()) { game.state_ducats(sid).to_string() } else { "an unseen number of".to_string() };
+    ui.label(format!("GDP {}: its economy pays its controller {} Ducats a turn (GDP x Industry Level / 5, never below 1); a{} {} here would add {}", card.gdp, pays, if bank == FacilityKind::InvestmentBank { "n" } else { "" }, bank.name(), game.facility_yield(Seat(0), sid, bank).amount));
     icon_word(ui, "emissions", format!("Emissions this turn: industry {:.1}, Facilities {:.1}, people {:.1}", industry_em, fac_em, game.population_coefficient(sid) * st.population * mult));
     // Ticket #54: the per-person line, its formula, and what Leapfrog has taken off it.
     {
@@ -9347,6 +9351,7 @@ fn module_line(game: &Game, col: &Colony, cid: ColonyId, mi: usize, director: Op
         format!("strength {}, {} of {} hit points, {} Energy upkeep", card.strength, card.hit_points.saturating_sub(m.damage), card.hit_points, card.energy_upkeep)
     } else {
         match director {
+            _ if !earnings_seen(game, Place::Colony(cid), director) => "out of sight".to_string(),
             Some(d) => game.module_yield_at(d, cid, mi).text(),
             None => "idle".to_string(),
         }
@@ -9506,7 +9511,7 @@ fn module_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
         // the Module rules, which the old rows never had.
         let mut tip = module_rules(m.kind, &format!("{}{}", module_line(game, col, cid, mi, director), module_offline_words(col, m)));
         // Ticket #352 (version 0.09.1): with its arithmetic, where the figure is multiplied.
-        if let Some(chain) = director.filter(|_| !m.mothballed).map(|d| game.module_yield_at(d, cid, mi).chain).filter(|c| c.multiplied()) {
+        if let Some(chain) = director.filter(|_| !m.mothballed && earnings_seen(game, Place::Colony(cid), director)).map(|d| game.module_yield_at(d, cid, mi).chain).filter(|c| c.multiplied()) {
             tip = chain_tip(&tip, &chain);
         }
         // Ticket #324 (version 0.08.8): a Battery's hover carries its rules; a damaged one wears its
@@ -9590,7 +9595,7 @@ fn module_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
             let colour = if m.mothballed { Color32::from_rgb(170, 170, 190) } else { ui.visuals().text_color() };
             let line = figures_with_icons(ui, &module_line(game, col, cid, mi, director), 14.0, colour, &[]);
             // Ticket #352 (version 0.09.1): the strip's line carries the arithmetic too.
-            if let Some(chain) = director.filter(|_| !m.mothballed).map(|d| game.module_yield_at(d, cid, mi).chain).filter(|c| c.multiplied()) {
+            if let Some(chain) = director.filter(|_| !m.mothballed && earnings_seen(game, Place::Colony(cid), director)).map(|d| game.module_yield_at(d, cid, mi).chain).filter(|c| c.multiplied()) {
                 rule_tip(line, chain_tip(&module_rules(m.kind, &module_line(game, col, cid, mi, director)), &chain));
             }
             if mine && m.kind != ModuleKind::Archive {
@@ -11258,7 +11263,8 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                         battle_log_view(ui, session, game, b);
                     });
                     ui.add_space(6.0);
-                    let more = i + 1 < view.battle_end;
+                    // Ticket #430 (the review): "Next" only if a Battle the player sees is still to come.
+                    let more = (i + 1..view.battle_end).any(|j| battle_seen(game, j));
                     if ui.button(if more { "Next Battle" } else { "Close" }).clicked() {
                         advance_popup(view, view.moments_of(&session.tables, &game.report).len(), game.last_event.is_some(), card_owed(Some(game)));
                     }
@@ -11305,7 +11311,9 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 // which has no headline rank, so `headline()` never offers one and falls through of
                 // its own accord. If a headline is wanted here that is not wanted there, the kind is
                 // the place to say so; a filter at the point of drawing loses the fallback.
-                if let Some(head) = game.report.headline() {
+                // Ticket #430 (the review): the Report as the player sees it, fogged before the headline.
+                let seen_report = game.report_seen_by(Seat(0));
+                if let Some(head) = seen_report.headline() {
                     ui.add_space(4.0);
                     let label = ui.label(RichText::new(&head.text).size(17.0).strong().color(Color32::from_rgb(255, 220, 150)));
                     if let Some(place) = head.place
@@ -11317,7 +11325,7 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 ui.separator();
                 egui::ScrollArea::vertical().max_height(520.0).show(ui, |ui| {
                     // The five headings, empty ones left out; every line with a place is a way there.
-                    for (section, lines) in game.report.sections() {
+                    for (section, lines) in seen_report.sections() {
                         // Ticket #337 (version 0.09.0): a seat's ANSWER to the turn's Choice Card is
                         // lifted out of the heading it landed under -- the player's own under Your
                         // works, a rival's under The climate -- and drawn with the other three
