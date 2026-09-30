@@ -167,6 +167,8 @@ The authority is [ticket #427](https://github.com/whaleyjoshua2/Dying-Earth/issu
   The plan is what their Colony Ships carry, plus Antarctica once the ice is open, plus the room in
   their places off Earth, less who already waits. States with a working Launch Site go first, the
   most populous first.
+- **Each recruitment still takes 0.5 Unrest off the state it comes from**, now in every state recruited from that turn, at the designer's word ("leave it half each").
+- **During an Exodus Call** the Recruit button and the computer offer the Call's figure at the ordinary price in people.
 - The Faction card, the tutorial and the glossary say the new figure.
 
 **Measured, not yet**: how many Pioneers a game raises. The closing sweep reports it against 0.09.4.
