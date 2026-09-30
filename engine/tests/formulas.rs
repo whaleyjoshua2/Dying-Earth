@@ -18167,3 +18167,22 @@ fn a_computer_seat_recruits_from_several_states_only_as_far_as_its_plan() {
     let one = recruited(&mut g);
     assert_eq!(one.iter().map(|(_, n)| n).sum::<u32>(), 1, "no further than the plan: {one:?}");
 }
+
+/// Ticket #427 (the review): **during an Exodus Call the Recruit figure is the Call's**. The
+/// Arkwrights' Call doubles their four to eight in its state at the ordinary price in people; the
+/// figure the button offers and the computer recruits read the state, so they offer eight, where
+/// they offered the Faction-wide four at the double charge.
+#[test]
+fn an_exodus_call_raises_what_the_recruit_offers_in_its_state() {
+    let mut g = game();
+    let ark = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Arkwrights).unwrap();
+    let sid = g.controlled_states(ark)[0];
+    g.state_mut(sid).population = 100.0;
+    assert_eq!(g.emigrants_affordable(ark, sid), 4, "four a state, plainly");
+    g.seats[ark.index()].stockpile.ducats = 500.0;
+    held_long_enough(&mut g, sid);
+    g.commit_orders(ark, &[Order::ExodusCall { state: sid }]);
+    assert_eq!(g.emigrants_affordable(ark, sid), 8, "eight under the Call");
+    g.state_mut(sid).population = 5.0;
+    assert_eq!(g.emigrants_affordable(ark, sid), 5, "five people pay for five at the ordinary price, where the double charge bought two");
+}

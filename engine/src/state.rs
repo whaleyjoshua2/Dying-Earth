@@ -2534,8 +2534,10 @@ impl Game {
     /// on all 243 turns it tried and mustered nothing in twenty games. A muster takes what the
     /// Region can pay for.
     pub fn emigrants_affordable(&self, seat: Seat, s: StateId) -> u32 {
-        let per = self.emigrants_per_turn(seat);
-        let each = self.lift_population(seat, 1);
+        // Ticket #427 (the review): what THIS state may recruit and at what it charges, so an Exodus
+        // Call's doubled figure and waived double charge reach the Recruit button and the computer.
+        let per = self.emigrants_per_turn_in(seat, s);
+        let each = self.muster_population_in(seat, s, 1);
         if each <= 0.0 {
             return per;
         }

@@ -42,8 +42,9 @@
 #   - A Habitat is **25 Materials** of the **80** the game starts with, takes one turn, and holds 4
 #     -- so a Habitat ordered on turn 2 stands on turn 3, and the ISS then holds **8**: the Core
 #     Module's 4 and the Habitat's 4, with two already aboard.
-#   - A recruit is **4** for the Custodians, and the Pioneers are on the Region's card at End Turn --
-#     so recruiting on turn 3 means they are waiting on turn 4, and four fit with two berths to spare.
+#   - A recruit is **2** for the Custodians (a state a turn, since ticket #427; it was 4), and the
+#     Pioneers are on the Region's card at End Turn -- so recruiting on turn 3 means they are waiting
+#     on turn 4, and both fit with four berths to spare.
 #
 # The Reactor is NOT what a Custodian builds: it is the Archivists' Unique Facility since ticket
 # #184. Nothing here asks for one.
@@ -69,7 +70,7 @@ note = "Every figure on a card explains itself. Rest the pointer on a number and
 [[note]]
 turn = 4
 figure = "Send them to the ISS"
-text = "The ISS holds eight now, two of them already there, so all four fit. Send them up from the Region's own card, or ask for them from the ISS's."
+text = "The ISS holds eight now, two of them already there, so both fit. Send them up from the Region's own card, or ask for them from the ISS's."
 note = "That is the last of these notes that asks you for anything. Twelve people living off Earth is half your Victory Condition."
 
 [[note]]

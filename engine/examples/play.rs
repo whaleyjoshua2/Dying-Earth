@@ -1308,7 +1308,7 @@ fn print_board(g: &Game) {
         println!("{}", g.window_text(b));
     }
     println!(
-        "Colony Ship capacity: {} safe, {} crowded; lifting one Colonist costs {:.2} population; Pioneers a turn: {}",
+        "Colony Ship capacity: {} safe, {} crowded; lifting one Colonist costs {:.2} population; Pioneers a turn in each state: {}",
         g.colony_ship_capacity(me),
         g.colony_ship_crowded_capacity(me),
         g.lift_population(me, 1),

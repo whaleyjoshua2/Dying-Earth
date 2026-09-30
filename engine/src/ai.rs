@@ -2329,8 +2329,8 @@ impl Game {
         }
 
         // --- Ticket #73: Emigrants. Colonists are built now, so before a Colony Ship can be loaded
-        // or Antarctica settled a batch must muster in a state the seat directs: the one with a
-        // working Launch Site, or, with the ice open, the most populous. It musters while fewer
+        // or Antarctica settled a batch must muster in a state the seat directs: those with a
+        // working Launch Site, or, with the ice open, any (several since ticket #427, below). It musters while fewer
         // wait than two Ship loads (and one more while the ice is open), and never for nothing.
         let presence_needed = self.tables.victory.off_world_presence.saturating_sub(self.off_world_colonists(seat));
         // Ticket #237 (version 0.08.3): the Exodus Call. Sounded where the Arkwrights hold their
