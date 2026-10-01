@@ -87,7 +87,8 @@ impl Game {
     }
 
     /// Ticket #370 (version 0.09.2): **the player's Colonists still aboard a Ship off Earth are
-    /// reported every turn they wait**, one line a Body, under Ships, at the designer's word --
+    /// reported while they wait** -- since ticket #431 (version 0.09.5) only on a turn the line
+    /// changes -- one line a Body, under Ships, at the designer's word --
     /// *"colonists wait aboard in low orbit of Mars"*, and *"blocked by rivals' control of the
     /// orbit"* when a rival's Orbital Control shuts the ground or a blockade shuts the station they
     /// are docked at. Any orbit off Earth counts; a Ship in transit does not, since nothing can be
@@ -2293,7 +2294,8 @@ impl Game {
                     let line = format!("{} at {} had no slot left and was lost.", name, self.place_name(place));
                     self.log(line);
                     let text = self.say("build_lost", &[("building", name.clone()), ("place", self.place_name(place))]);
-                    self.report_line(LineKind::Note, Some(place.into()), text);
+                    // Ticket #431 (the review): the builder's loss, under the fog.
+                    self.report_line_by(b.seat, LineKind::Note, Some(place.into()), text);
                     return;
                 };
                 self.state_mut(s).facilities.push(if coastal { Facility::in_coastal_slot(k) } else { Facility::new(k) });
@@ -2977,7 +2979,9 @@ impl Game {
             let (who, whom) = (self.seat_name(buyer), self.seat_name(seller));
             self.log(format!("The {who} bought {take} ppm of carbon credit from the {whom} for {} Ducats.", figure(kept)));
             let text = self.say("credits_bought", &[("faction", who), ("n", take.to_string()), ("seller", whom), ("ducats", figure(kept))]);
-            self.report_line(LineKind::Note, None, text);
+            // Ticket #431 (the review): the buyer's act, and the player's news when it sold.
+            self.report_line_by(buyer, LineKind::Note, None, text);
+            self.mark_mine(&[Some(seller)]);
             self.ai_deed(buyer, "buy_credits", &[("n", take.to_string())]);
         }
     }

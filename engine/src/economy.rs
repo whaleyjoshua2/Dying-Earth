@@ -341,7 +341,8 @@ impl Game {
                     Place::State(s) => ReportPlace::State(s),
                     Place::Colony(c) => ReportPlace::Colony(c),
                 };
-                self.report_line(LineKind::Note, Some(at), text);
+                // Ticket #431 (the review): the seat's own order; a rival's is its doings, under the fog.
+                self.report_line_by(seat, LineKind::Note, Some(at), text);
             }
         }
         for s in &mut self.ships {

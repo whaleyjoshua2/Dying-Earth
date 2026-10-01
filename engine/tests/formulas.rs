@@ -16024,7 +16024,7 @@ fn the_report_says_one_net_unrest_line_a_region_with_its_causes() {
 /// turn they wait**, one line a Body, under Ships; a rival's are not; and the line says when a
 /// rival's Orbital Control stops the landing.
 #[test]
-fn colonists_waiting_aboard_off_earth_are_reported_every_turn_under_ships() {
+fn colonists_waiting_aboard_off_earth_are_reported_under_ships_when_the_line_changes() {
     let mut g = fresh();
     g.start();
     let waiting = |g: &Game| g.report.lines.iter().filter(|l| l.text.contains("wait aboard")).cloned().collect::<Vec<_>>();
@@ -18359,4 +18359,25 @@ fn a_rivals_notes_are_its_doings_a_smear_on_you_shows_and_repeats_merge() {
     g.strike_accord(me, them, vec![Term::NonAggression]).expect("an Accord");
     let t = texts(&g);
     assert!(t.contains(&"FAR DECOMMISSION".to_string()) && t.contains(&"DIRECTED RESEARCH".to_string()), "an Accord shows its doings: {t:?}");
+}
+
+/// Ticket #431 (the review): **through the real Smear**, a rival's Smear on the player reaches its
+/// Report, and a rival's Smear on another rival does not, under the fog.
+#[test]
+fn a_rivals_smear_on_the_player_shows_and_one_on_another_rival_does_not() {
+    let mut g = game();
+    calm(&mut g);
+    for s in Seat::ALL {
+        g.seats[s.index()].allotment = 20;
+    }
+    let on_me = Order::Smear { target: Seat(0), amount: 5 };
+    let on_them = Order::Smear { target: Seat(3), amount: 5 };
+    assert!(g.check_order(Seat(1), &[], &on_me).is_ok() && g.check_order(Seat(2), &[], &on_them).is_ok(), "the premise: both may smear");
+    g.commit_orders(Seat(1), &[on_me]);
+    g.commit_orders(Seat(2), &[on_them]);
+    g.resolution_phase();
+    assert_eq!(g.report.lines.iter().filter(|l| l.text.contains("smeared")).count(), 2, "the premise: two Smears written");
+    let seen: Vec<String> = g.report_seen_by(Seat(0)).lines.into_iter().filter(|l| l.text.contains("smeared")).map(|l| l.text).collect();
+    assert_eq!(seen.len(), 1, "only the one on the player: {seen:?}");
+    assert!(seen[0].contains(&g.seat_name(Seat(1))), "the Smear by seat 1: {seen:?}");
 }

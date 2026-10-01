@@ -2689,7 +2689,8 @@ impl Game {
                         "strip_permit",
                         &[("faction", self.seat_name(seat)), ("state", self.tables.state(*state).name.clone()), ("turns", turns.to_string())],
                     );
-                    self.report_line(LineKind::Note, Some(ReportPlace::State(*state)), text);
+                    // Ticket #431 (the review): the Faction's own act, under the fog.
+                    self.report_line_by(seat, LineKind::Note, Some(ReportPlace::State(*state)), text);
                 }
                 Order::BuyInfluence { amount } => {
                     self.seat_mut(seat).allotment += amount;

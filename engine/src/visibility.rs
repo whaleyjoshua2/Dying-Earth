@@ -116,7 +116,11 @@ impl Game {
         let mut counts: Vec<usize> = Vec::new();
         for l in r.lines {
             match merged.iter().position(|m| m.text == l.text && m.kind == l.kind) {
-                Some(i) => counts[i] += 1,
+                // The review: a merged line is the player's if any of its copies was.
+                Some(i) => {
+                    counts[i] += 1;
+                    merged[i].mine |= l.mine;
+                }
                 None => {
                     merged.push(l);
                     counts.push(1);

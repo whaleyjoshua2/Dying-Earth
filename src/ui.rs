@@ -2944,7 +2944,8 @@ fn report_lines(ui: &mut Ui, game: &Game, session: &Session, lines: &[&dying_ear
     let fold_key = |l: &ReportLine| -> Option<(LineKind, Option<Seat>)> {
         match l.kind {
             LineKind::SeaLevel => Some((l.kind, None)),
-            LineKind::Refugees | LineKind::Unrest if !own(l) => Some((l.kind, None)),
+            // The review: only a line at a Region folds; a world-wide Unrest line stands alone.
+            LineKind::Refugees | LineKind::Unrest if !own(l) && l.place.is_some() => Some((l.kind, None)),
             LineKind::BuildComplete => Some((l.kind, l.by)),
             _ => None,
         }
