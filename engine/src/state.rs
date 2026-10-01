@@ -1556,6 +1556,9 @@ pub struct Game {
     /// Ticket #345 (version 0.09.1): who was first to each Body, one row per Body at most,
     /// appended when a first is claimed and never rewritten. In the save.
     pub body_firsts: Vec<BodyFirst>,
+    /// Ticket #431 (version 0.09.5): last turn's "Colonists wait aboard" lines, so one that has not
+    /// changed is not written again. Not saved: after a load each shows once.
+    pub waiting_last: Vec<String>,
     /// Ticket #430 (version 0.09.5): **fog of war lifted**, for testing only -- the headless
     /// driver's flag, the shot aid and the sweep's instruments set it. Every seat, the computer's
     /// included, then sees the whole board as before the fog. Never saved; a loaded game is fogged.
@@ -1781,6 +1784,7 @@ impl Game {
             market: Market::default(),
             accords: Vec::new(),
             body_firsts: Vec::new(),
+            waiting_last: Vec::new(),
             reveal_all: false,
             tables,
         };
@@ -4636,7 +4640,12 @@ impl Game {
     /// Add one line to the dispatch, with the kind that places it in the severity order and under
     /// its heading, and the place it takes the player to when it is clicked.
     pub fn report_line(&mut self, kind: LineKind, place: Option<ReportPlace>, text: String) {
-        self.report.lines.push(ReportLine { kind, place, text, mine: false });
+        self.report.lines.push(ReportLine { kind, place, text, mine: false, by: None });
+    }
+
+    /// Ticket #431 (version 0.09.5): a line that reports what `seat` did.
+    pub fn report_line_by(&mut self, seat: Seat, kind: LineKind, place: Option<ReportPlace>, text: String) {
+        self.report.lines.push(ReportLine { kind, place, text, mine: false, by: Some(seat) });
     }
 
     /// Ticket #404 (version 0.09.4): mark the last line written as the player's news when `seats`
@@ -4992,7 +5001,7 @@ impl Game {
 
     pub fn report_line_of(&mut self, seat: Seat, mine: LineKind, theirs: LineKind, place: Option<ReportPlace>, text: String) {
         let kind = crate::report::line_kind_of(seat, mine, theirs, self.spectator);
-        self.report_line(kind, place, text);
+        self.report_line_by(seat, kind, place, text);
     }
 
     /// Add a Moment the turn may stop for. The cap of two and the switches are applied when the

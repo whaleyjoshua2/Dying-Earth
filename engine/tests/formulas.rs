@@ -5784,7 +5784,8 @@ fn a_neutral_states_lab_pays_half_its_yield_into_the_tech_and_nobodys_lead() {
     let seats: i64 = Seat::ALL.into_iter().map(|s| g.seat(s).research_last_turn).sum();
     assert_eq!(g.research.progress - before, seats + world.floor() as i64, "the seats' Research and the world's share reach the Tech");
     assert_eq!(g.research.contributions.iter().sum::<i64>(), seats, "and the world's share counts toward nobody's Lead");
-    assert!(g.report.lines.iter().any(|l| l.text == format!("Regions in no one's hands added {} Research.", world.floor() as i64)), "the Report says so: {:?}", g.report.lines);
+    // Ticket #431 (version 0.09.5): the Report no longer says so -- cut at the designer's word.
+    assert!(!g.report.lines.iter().any(|l| l.text.contains("Regions in no one's hands")), "no line for it: {:?}", g.report.lines);
     // Occupied: the occupier takes the Region's own; the Lab's share, 1.671 x 0.5, goes to the
     // world at half, 0.42; the occupier pays the 3 Energy and draws no Lab share.
     g.state_mut(StateId::NorthAmerica).control = Control::Occupied { occupier: Seat(2), previous: None, turns: 1, banked: 0 };
@@ -16045,9 +16046,10 @@ fn colonists_waiting_aboard_off_earth_are_reported_every_turn_under_ships() {
     assert_eq!(lines[0].place, Some(ReportPlace::Body(BodyId::Moon)), "the line points at the Body");
     assert_eq!(lines[0].section(), Section::Ships, "under Ships");
     assert_eq!(lines[0].kind.headline_rank(), None, "never the headline");
-    // Every turn they wait, not only the first.
+    // Ticket #431 (version 0.09.5): NOT every turn they wait -- only when the line changes.
     quiet_turn(&mut g);
-    assert_eq!(waiting(&g).len(), 1, "said again the next turn");
+    assert_eq!(waiting(&g).len(), 0, "not said again while nothing changed");
+    // The blocked landing below changes the line, so it is said again there.
     // A rival warship takes Orbital Control of the Moon, and the line says the landing is blocked.
     // The Resolution is run by hand, since the computer plays seat 1 and would order the frigate
     // elsewhere in a whole turn; the Report is cleared first, as a new turn clears it.
@@ -18321,11 +18323,40 @@ fn the_report_drops_a_battle_out_of_sight_and_keeps_a_change_of_hands() {
     let mine = g.directed_states(Seat(0));
     let far = StateId::ALL.into_iter().find(|x| !mine.contains(x) && !g.tables.state(*x).neighbours.iter().any(|n| mine.contains(n))).unwrap();
     g.report.lines.clear();
-    g.report.lines.push(ReportLine { kind: LineKind::DecisiveBattle, place: Some(ReportPlace::State(far)), text: "HIDDEN FIGHT".into(), mine: false });
-    g.report.lines.push(ReportLine { kind: LineKind::ControlChanged, place: Some(ReportPlace::State(far)), text: "OPEN CHANGE".into(), mine: false });
+    g.report.lines.push(ReportLine { kind: LineKind::DecisiveBattle, place: Some(ReportPlace::State(far)), text: "HIDDEN FIGHT".into(), mine: false, by: None });
+    g.report.lines.push(ReportLine { kind: LineKind::ControlChanged, place: Some(ReportPlace::State(far)), text: "OPEN CHANGE".into(), mine: false, by: None });
     let seen = g.report_seen_by(Seat(0));
     assert!(seen.lines.iter().all(|l| l.text != "HIDDEN FIGHT"), "a Battle out of sight is dropped");
     assert_eq!(seen.headline().map(|l| l.text.as_str()), Some("OPEN CHANGE"), "and does not headline; who holds a place stays open");
     g.reveal_all = true;
     assert_eq!(g.report_seen_by(Seat(0)).lines.len(), 2, "reveal_all keeps both");
+}
+
+// ---------------------------------------------------------------- Ticket #431 (version 0.09.5): the Report trimmed
+
+/// Ticket #431: **a rival's own act is its doings** -- shown where the player sees the place, or
+/// while it is Friendly or under an Accord -- and a Smear aimed at the player always shows; a line
+/// repeated word for word is written once with a count.
+#[test]
+fn a_rivals_notes_are_its_doings_a_smear_on_you_shows_and_repeats_merge() {
+    use dying_earth_engine::report::{LineKind, ReportPlace};
+    let mut g = game();
+    let (me, them) = (Seat(0), Seat(1));
+    let mine = g.directed_states(me);
+    let far = StateId::ALL.into_iter().find(|x| !mine.contains(x) && !g.tables.state(*x).neighbours.iter().any(|n| mine.contains(n))).unwrap();
+    g.report.lines.clear();
+    g.report_line_by(them, LineKind::Note, Some(ReportPlace::State(far)), "FAR DECOMMISSION".into());
+    g.report_line_by(them, LineKind::Note, None, "DIRECTED RESEARCH".into());
+    g.report_line_by(them, LineKind::Note, None, "SMEARED YOU".into());
+    g.mark_mine(&[Some(me)]);
+    g.report_line_by(me, LineKind::YourWorks, None, "RESTARTED.".into());
+    g.report_line_by(me, LineKind::YourWorks, None, "RESTARTED.".into());
+    let texts = |g: &Game| g.report_seen_by(me).lines.into_iter().map(|l| l.text).collect::<Vec<_>>();
+    let t = texts(&g);
+    assert!(!t.contains(&"FAR DECOMMISSION".to_string()) && !t.contains(&"DIRECTED RESEARCH".to_string()), "a rival's doings out of sight: {t:?}");
+    assert!(t.contains(&"SMEARED YOU".to_string()), "a Smear on the player always shows: {t:?}");
+    assert_eq!(t.iter().filter(|x| x.starts_with("RESTARTED")).collect::<Vec<_>>(), vec!["RESTARTED (x2)"], "a repeat merges with its count");
+    g.strike_accord(me, them, vec![Term::NonAggression]).expect("an Accord");
+    let t = texts(&g);
+    assert!(t.contains(&"FAR DECOMMISSION".to_string()) && t.contains(&"DIRECTED RESEARCH".to_string()), "an Accord shows its doings: {t:?}");
 }

@@ -262,3 +262,28 @@ books and doings, so between pairs under one the fog is lifted.
 **What would show this wrong**: a rival Ship's kind or strength shown at a Body you do not see; a
 rival build under way shown at a place you do not see; a computer seat reacting to a Ship it could
 not see; a save that changes what is seen.
+
+## 9. The Report organized and trimmed
+
+The authority is [ticket #431](https://github.com/whaleyjoshua2/Dying-Earth/issues/431). Measured
+first (10 games, fogged, as seat 0 reads them): about **30 lines a turn, 56 on the busiest**, plus
+about 17 rival clauses.
+
+- **What happened to you first**: the headline, then **Your works**, open.
+- **Every other heading is collapsed** with its count ("The climate (18)"). The rival paragraphs go
+  under **Rivals (N)**, collapsed.
+- **Folded into one line each, opening to the full list:**
+  - the sea at every Region ("The sea at 13 Regions");
+  - the Refugees and the Unrest of Regions not the player's;
+  - each rival's completed builds ("Arkwrights: 2 buildings completed").
+  The player's own Regions keep their Unrest and Refugee lines.
+- **A rival's own act is its doings** under the fog (§8): a decommission, a Smear, Research directed,
+  an Exodus Call. Each Report line now records whose act it is. A Smear aimed at the player always
+  shows. A Greenwash stays public, as ticket #277 made it.
+- **Cut**: a line repeated word for word is written once with a count ("... (x2)"); "Regions in no
+  one's hands added N Research" is gone; "Colonists wait aboard" is written only when it changes.
+- An Exodus Call was filed under Your works whoever sounded it; it is the player's only when the
+  player's.
+
+**What would show this wrong**: a busy turn opening at more than a screen; a rival's Note out of
+sight; a repeated line written twice; the waiting line written on a turn it did not change.

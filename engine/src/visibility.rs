@@ -96,13 +96,39 @@ impl Game {
     pub fn report_seen_by(&self, viewer: Seat) -> crate::report::Report {
         use crate::report::LineKind;
         let mut r = self.report.clone();
-        if self.reveal_all || self.spectator {
-            return r;
+        if !(self.reveal_all || self.spectator) {
+            r.lines.retain(|l| {
+                let seen = |p: Option<crate::report::ReportPlace>| p.is_some_and(|p| self.sees_report_place(viewer, p));
+                match l.by {
+                    _ if l.mine => true,
+                    // Ticket #431 (version 0.09.5): a rival's own act -- a decommission, a Smear, Research
+                    // directed -- is its doings: where the place is seen, or while Friendly or under an Accord.
+                    Some(rival) if rival != viewer => self.sees_doings(viewer, rival) || seen(l.place),
+                    _ => {
+                        let fogged = matches!(l.kind, LineKind::DecisiveBattle | LineKind::Battle | LineKind::Ship | LineKind::BuildComplete | LineKind::Army);
+                        !fogged || l.place.is_none() || seen(l.place)
+                    }
+                }
+            });
         }
-        r.lines.retain(|l| {
-            let fogged = matches!(l.kind, LineKind::DecisiveBattle | LineKind::Battle | LineKind::Ship | LineKind::BuildComplete | LineKind::Army);
-            l.mine || !fogged || l.place.is_none_or(|p| self.sees_report_place(viewer, p))
-        });
+        // Ticket #431 (version 0.09.5): a line repeated word for word is written once, with a count.
+        let mut merged: Vec<crate::report::ReportLine> = Vec::new();
+        let mut counts: Vec<usize> = Vec::new();
+        for l in r.lines {
+            match merged.iter().position(|m| m.text == l.text && m.kind == l.kind) {
+                Some(i) => counts[i] += 1,
+                None => {
+                    merged.push(l);
+                    counts.push(1);
+                }
+            }
+        }
+        for (l, n) in merged.iter_mut().zip(counts) {
+            if n > 1 {
+                l.text = format!("{} (x{n})", l.text.trim_end_matches('.'));
+            }
+        }
+        r.lines = merged;
         r
     }
 

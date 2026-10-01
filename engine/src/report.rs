@@ -182,6 +182,11 @@ pub struct ReportLine {
     /// save from before marks none.
     #[serde(default)]
     pub mine: bool,
+    /// Ticket #431 (version 0.09.5): the Faction whose act the line reports, where one did it, so the
+    /// fog can treat a rival's Notes as its doings and the Report can fold its builds by Faction.
+    /// None for the board's own news and on a save from before this version.
+    #[serde(default)]
+    pub by: Option<Seat>,
 }
 
 impl ReportLine {

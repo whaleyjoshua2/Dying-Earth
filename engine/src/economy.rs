@@ -403,8 +403,7 @@ impl Game {
         self.add_research_unattributed(total);
         self.research.neutral_total += total;
         self.log(format!("Regions in no one's hands added {total} Research to the Tech under research."));
-        let text = self.say("neutral_research", &[("n", total.to_string())]);
-        self.report_line(LineKind::Note, None, text);
+        // Ticket #431 (version 0.09.5): no Report line -- the designer cut it as telling nothing.
     }
 
     /// Ticket #416 (version 0.09.4): what this Region makes for the world a turn, to the tenth: held,

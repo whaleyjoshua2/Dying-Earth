@@ -79,3 +79,14 @@ without the aid the fog lifts entirely. The `reveal:1` aid gives the same board 
 - [`fog-solar.png`](ticket-430-fog/fog-solar.png), [`revealed-solar.png`](ticket-430-fog/revealed-solar.png),
   [`fog-earth.png`](ticket-430-fog/fog-earth.png), [`revealed-earth.png`](ticket-430-fog/revealed-earth.png):
   the whole windows.
+
+## The Report organized and trimmed (ticket #431)
+
+Seed 7, fourteen turns in, `accords:0`, the Report from `menus:1`.
+
+- [`report.png`](ticket-431-report/report.png): as it opens. The headline, Your works open, and the
+  other headings collapsed with their counts: In space (7), On Earth (10), The climate (18), Ships
+  (1), Rivals (3). Eight lines to read where there were about forty-five.
+- [`report-open.png`](ticket-431-report/report-open.png): with the headings open (the new
+  `reportopen:1` aid). Inside In space, "Arkwrights: 2 buildings completed" folds two lines into one;
+  your own Regions' Unrest stands line by line under On Earth.

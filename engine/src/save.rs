@@ -298,6 +298,7 @@ impl SavedGame {
             events_no_target,
             body_firsts,
             reveal_all: _,
+            waiting_last: _,
         } = g;
         SavedGame {
             seed: *seed,
@@ -384,6 +385,7 @@ impl SavedGame {
             body_firsts: self.body_firsts,
             log: self.log,
             reveal_all: false,
+            waiting_last: Vec::new(),
         }
     }
 }

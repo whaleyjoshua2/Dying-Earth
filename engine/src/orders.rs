@@ -2667,7 +2667,9 @@ impl Game {
                     );
                     self.log(line);
                     let text = self.say("exodus_call", &[("faction", self.seat_name(seat)), ("state", self.tables.state(*state).name.clone()), ("n", per.to_string()), ("turns", turns.to_string())]);
-                    self.report_line(LineKind::YourWorks, Some(ReportPlace::State(*state)), text);
+                    // Ticket #431 (version 0.09.5): Your works only when it is the player's Call; a
+                    // rival's is its doing, under the fog, where it was filed as the player's.
+                    self.report_line_of(seat, LineKind::YourWorks, LineKind::Note, Some(ReportPlace::State(*state)), text);
                 }
                 Order::StripPermit { state } => {
                     let turns = self.tables.strip_permit.turns;

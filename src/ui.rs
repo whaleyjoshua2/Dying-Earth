@@ -2909,6 +2909,78 @@ fn unseen_army_lines(ui: &mut Ui, game: &Game, unseen: &[&Army]) {
     }
 }
 
+/// Ticket #431 (version 0.09.5): one Report line, a way to its place where it has one.
+fn report_line_ui(ui: &mut Ui, game: &Game, l: &dying_earth_engine::report::ReportLine, actions: &mut Vec<Action>) {
+    match l.place {
+        Some(place) => {
+            // Ticket #127 (version 0.07.2): a line that points somewhere wears the glyph of what it
+            // points to. A Body, and an orbit, are no one kind of thing.
+            let kind = match place {
+                ReportPlace::State(_) => Some(Kind::Region),
+                ReportPlace::Colony(c) => game.colony(c).map(Kind::of_colony),
+                ReportPlace::Body(_) | ReportPlace::Orbit(_, _) => None,
+            };
+            let button = match kind.and_then(|k| k.image(ui.ctx(), 14.0)) {
+                Some(image) => egui::Button::image_and_text(image, &l.text),
+                None => egui::Button::new(&l.text),
+            };
+            if ui.add(button.frame(false)).on_hover_text("Go there").clicked() {
+                actions.push(Action::GoTo(place));
+            }
+        }
+        None => {
+            ui.label(&l.text);
+        }
+    }
+}
+
+/// Ticket #431 (version 0.09.5): **a heading's lines with their repeats folded**, at the designer's
+/// word: the sea at every Region, the Refugees and the Unrest of Regions not the player's, and each
+/// rival's completed builds become one line apiece that opens to the full list. The player's own
+/// Regions keep their Unrest and Refugee lines.
+fn report_lines(ui: &mut Ui, game: &Game, session: &Session, lines: &[&dying_earth_engine::report::ReportLine], actions: &mut Vec<Action>) {
+    use dying_earth_engine::report::{LineKind, ReportLine};
+    let own = |l: &ReportLine| l.mine || matches!(l.place, Some(ReportPlace::State(s)) if game.state(s).control.director() == Some(Seat(0)));
+    let fold_key = |l: &ReportLine| -> Option<(LineKind, Option<Seat>)> {
+        match l.kind {
+            LineKind::SeaLevel => Some((l.kind, None)),
+            LineKind::Refugees | LineKind::Unrest if !own(l) => Some((l.kind, None)),
+            LineKind::BuildComplete => Some((l.kind, l.by)),
+            _ => None,
+        }
+    };
+    let mut done: Vec<(LineKind, Option<Seat>)> = Vec::new();
+    for l in lines {
+        let Some(key) = fold_key(l) else {
+            report_line_ui(ui, game, l, actions);
+            continue;
+        };
+        if done.contains(&key) {
+            continue;
+        }
+        let group: Vec<&ReportLine> = lines.iter().copied().filter(|m| fold_key(m) == Some(key)).collect();
+        if group.len() < 2 {
+            report_line_ui(ui, game, l, actions);
+            continue;
+        }
+        done.push(key);
+        let n = group.len();
+        let title = match key {
+            (LineKind::SeaLevel, _) => format!("The sea at {n} Regions"),
+            (LineKind::Refugees, _) => format!("Refugees in {n} other Regions"),
+            (LineKind::Unrest, _) => format!("Unrest moved in {n} other Regions"),
+            (_, Some(seat)) => format!("{}: {n} buildings completed", game.seat_name(seat)),
+            _ => format!("{n} more"),
+        };
+        let colour = key.1.map(|s| seat_colour(session, s)).unwrap_or(Color32::LIGHT_GRAY);
+        egui::CollapsingHeader::new(RichText::new(title).color(colour)).id_salt(("fold", format!("{key:?}"))).default_open(false).show(ui, |ui| {
+            for m in &group {
+                report_line_ui(ui, game, m, actions);
+            }
+        });
+    }
+}
+
 /// Ticket #430: a Battle the player sees -- one it fought in, or one somewhere it sees.
 fn battle_seen(game: &Game, i: usize) -> bool {
     game.report.battles.get(i).is_some_and(|b| game.battle_seen_by(Seat(0), b))
@@ -11325,7 +11397,12 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 ui.separator();
                 egui::ScrollArea::vertical().max_height(520.0).show(ui, |ui| {
                     // The five headings, empty ones left out; every line with a place is a way there.
-                    for (section, lines) in seen_report.sections() {
+                    // Ticket #431 (version 0.09.5): **what happened to you first**, open; then every
+                    // other heading collapsed with its count, at the designer's word ("q1 c"), so a
+                    // busy turn opens at a dozen lines rather than fifty.
+                    let mut sections = seen_report.sections();
+                    sections.sort_by_key(|(section, _)| *section != dying_earth_engine::report::Section::YourWorks);
+                    for (section, lines) in sections {
                         // Ticket #337 (version 0.09.0): a seat's ANSWER to the turn's Choice Card is
                         // lifted out of the heading it landed under -- the player's own under Your
                         // works, a rival's under The climate -- and drawn with the other three
@@ -11336,32 +11413,16 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                         if lines.is_empty() {
                             continue;
                         }
-                        ui.label(RichText::new(section.name_for(session.spectator)).strong());
-                        for l in lines {
-                            match l.place {
-                                Some(place) => {
-                                    // Ticket #127 (version 0.07.2): a line that points somewhere wears
-                                    // the glyph of what it points to. A Body is no one kind of thing.
-                                    let kind = match place {
-                                        dying_earth_engine::report::ReportPlace::State(_) => Some(Kind::Region),
-                                        dying_earth_engine::report::ReportPlace::Colony(c) => game.colony(c).map(Kind::of_colony),
-                                        dying_earth_engine::report::ReportPlace::Body(_) => None,
-                                        // Ticket #335 (version 0.09.0): an orbit is no one kind of
-                                        // thing either.
-                                        dying_earth_engine::report::ReportPlace::Orbit(_, _) => None,
-                                    };
-                                    let button = match kind.and_then(|k| k.image(ui.ctx(), 14.0)) {
-                                        Some(image) => egui::Button::image_and_text(image, &l.text),
-                                        None => egui::Button::new(&l.text),
-                                    };
-                                    if ui.add(button.frame(false)).on_hover_text("Go there").clicked() {
-                                        actions.push(Action::GoTo(place));
-                                    }
-                                }
-                                None => {
-                                    ui.label(&l.text);
-                                }
-                            }
+                        let name = section.name_for(session.spectator);
+                        if section == dying_earth_engine::report::Section::YourWorks {
+                            ui.label(RichText::new(name).strong());
+                            report_lines(ui, game, session, &lines, actions);
+                        } else {
+                            // `reportopen:1` (a building aid): the headings open in a headless picture.
+                            let open = std::env::args().any(|a| a == "reportopen:1");
+                            egui::CollapsingHeader::new(RichText::new(format!("{name} ({})", lines.len())).strong()).id_salt(("report", name)).default_open(open).show(ui, |ui| {
+                                report_lines(ui, game, session, &lines, actions);
+                            });
                         }
                         ui.add_space(4.0);
                     }
@@ -11385,12 +11446,15 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                     }
                     // Ticket #58: what each rival Faction did, one paragraph each, in seat order.
                     // Ticket #64: a spectator has no rivals, so all four Factions are told.
+                    // Ticket #431 (version 0.09.5): collapsed under "Rivals" with a count.
                     let paragraphs = game.faction_paragraphs();
                     if !paragraphs.is_empty() {
-                        ui.label(RichText::new(if session.spectator { "What the Factions did" } else { "What the rival Factions did" }).strong());
-                        for (seat, text) in paragraphs {
-                            ui.label(RichText::new(text).color(seat_colour(session, seat)));
-                        }
+                        let title = if session.spectator { "What the Factions did" } else { "Rivals" };
+                        egui::CollapsingHeader::new(RichText::new(format!("{title} ({})", paragraphs.len())).strong()).id_salt("report_rivals").default_open(false).show(ui, |ui| {
+                            for (seat, text) in paragraphs {
+                                ui.label(RichText::new(text).color(seat_colour(session, seat)));
+                            }
+                        });
                     }
                 });
                 ui.separator();

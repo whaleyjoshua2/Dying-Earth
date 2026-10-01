@@ -101,6 +101,8 @@ impl Game {
         if self.spectator {
             return;
         }
+        // Ticket #431 (version 0.09.5): only a line that changed since last turn is written.
+        let last = std::mem::take(&mut self.waiting_last);
         let me = Seat(0);
         for body in BodyId::ALL {
             if body == BodyId::Earth {
@@ -142,7 +144,10 @@ impl Game {
                 })
                 .unwrap_or_default();
             let text = self.say("colonists_waiting", &[("n", n.to_string()), ("where", where_), ("blocked", blocked)]);
-            self.report_line(LineKind::Ship, Some(ReportPlace::Body(body)), text);
+            self.waiting_last.push(text.clone());
+            if !last.contains(&text) {
+                self.report_line(LineKind::Ship, Some(ReportPlace::Body(body)), text);
+            }
         }
     }
 
@@ -3024,7 +3029,9 @@ impl Game {
             let (who, whom) = (self.seat_name(seat), self.seat_name(target));
             self.log(format!("The {who} smeared the {whom}: {ppm:.0} ppm laid on their Blame."));
             let text = self.say("smear", &[("faction", who), ("target", whom.clone()), ("ppm", format!("{ppm:.0}"))]);
-            self.report_line(LineKind::Note, None, text);
+            // Ticket #431 (version 0.09.5): a rival's doing, and the player's news when aimed at it.
+            self.report_line_by(seat, LineKind::Note, None, text);
+            self.mark_mine(&[Some(target)]);
             self.ai_deed(seat, "smear", &[("n", amount.to_string()), ("faction", whom)]);
         }
         // Ticket #277 (version 0.08.5): Greenwash campaigns land -- ppm off the seat's own ledger for
