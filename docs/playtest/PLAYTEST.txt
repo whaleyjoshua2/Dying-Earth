@@ -1,4 +1,4 @@
-DYING EARTH - playtest build, version 0.09.4
+DYING EARTH - playtest build, version 0.09.5
 ============================================
 
 Thanks for playing. This is an early build of a turn-based strategy game about colonizing
@@ -16,53 +16,54 @@ HOW TO RUN
 4. The very first launch shows a blank dark window for up to ten seconds while it
    compiles graphics. Later launches are quick.
 5. Needs Windows 10 or 11, 64-bit, and any graphics card from the last ten years.
-6. Saves from 0.09.3 load in this version and play by its rules. Saves from 0.09.2 and
-   before will not load; the Load screen says so.
+6. Saves from 0.09.3 and 0.09.4 load in this version and play by its rules. Saves from
+   0.09.2 and before will not load; the Load screen says so.
 7. This version ships for Windows and for Linux. On Linux, read RUN-ON-LINUX.txt in the
    folder instead of steps 2 to 5.
 
-WHAT CHANGED SINCE 0.09.3
+WHAT CHANGED SINCE 0.09.4
 -------------------------
-The Custodians' version: their climate game counts now. Research comes from every country,
-and fuel is cheaper to make and buy. The computer plays every rule below.
+The fog version: you no longer see everything your rivals do. The Tech tree is redrawn so
+each side's winning Tech ends a line of its own. The computer plays every rule below.
 
 THE RULES THAT MOVED
-- RESEARCH COMES FROM EVERY COUNTRY, by its people and its schooling. A Research Lab makes
-  that country's research half again (x1.5). Countries nobody holds add half theirs to the
-  shared Tech. The whole tree now finishes in most games.
-- THE FIRST TURN THE WORLD IS UNDER THE NATURAL SINK calms every country by half a point,
-  a whole point where the Custodians hold it. Once a game.
-- THE CUSTODIANS' VICTORY LINE says how far over the Sink the world is, in ppm, and a run
-  under it earns part credit before it reaches three turns.
-- A NATURE RESERVE, a new building for everyone (30 materials, 5 widgets), adds 1 to the
-  Natural Sink and softens climate unrest in its country.
-- THE ARCHIVISTS, leading a Tech to completion, win 5 Influence and half a point of Unrest
-  off every country they hold.
-- THE ARKWRIGHTS calm every country they hold by a point for each colony they found off
-  Earth, and half a point for each station.
-- ORBITAL REFUELLING, a new rung-1 Tech, cuts every crossing by a tenth.
-- COLONY SHIPS HOLD 40 FUEL; warships hold 30. CRYOGENIC TANKS, a new rung-2 Tech, adds
-  15 to every tank. A ship is built full, so the fuel is paid at the yard.
-- FUEL IS CHEAPER: a refinery makes 4 on Earth and 4.5 off it, the Moon, Phobos and Deimos
-  refine a quarter better, and the market sells fuel at 3 ducats.
-- MOTHBALLING says its price: +1 Unrest in that country, +2 to decommission.
+- FOG OF WAR. Off Earth you see a world where you have a colony, a station, a ship or a
+  working Relay. On Earth you see the countries you hold and their neighbours; a working
+  Embassy shows all of Earth. Out of sight, rival ships and armies are only counted, and
+  their builds, earnings and report lines are hidden.
+- GOOD RELATIONS LIFT THE FOG. A rival Cordial to you shows its stockpiles and income; a
+  Friendly one shows what it is doing. An Accord shows both. The computer sees only what
+  you would in its place.
+- THE TECH TREE IS REDRAWN. Each side's winning Tech ends a line: Prospectors Extraction,
+  Arkwrights Off-world Living, Archivists Society, Custodians Stewardship (Industry
+  renamed). Public Science is now LARGE LANGUAGE MODELS.
+- FOUR PREREQUISITES MOVED: Missile Technology needs Nuclear Rockets, not Hardened Hulls;
+  Automated Refining needs only Deep Mining; Closed-Loop Colonies needs only Expanded
+  Habitats; Efficient Transit needs Orbital Refuelling.
+- COMMODITY FINANCE, a new Extraction Tech (32), makes Banks, Investment Banks, Trade Posts
+  and Exchanges pay 15% more. The Extraction Charter needs it instead of Beneficiation.
+- ORBITAL DATA CENTERS, a new Society Tech (32), makes Observatories half again. The Upload
+  needs it.
+- PIONEERS: up to two a turn from EACH country you hold (Arkwrights four), where it was
+  four a turn from one country. Each one calms its country by an eighth of a point.
 
 THE WINDOW
-- A COLONY SHIP UNLOADS ANY NUMBER of colonists, with a slider, and founds with any number.
-- HOVER A TECH and the tree lights the path to it. The boxes are a tenth smaller.
-- EACH SIDE'S VICTORY BARS are in its own colour.
-- HOVER A FIGURE ON A PLACE'S OUTPUT ROW to see what made it.
-- FEWER WORDS in the report and on the cards.
+- EVERY PIONEER ORDER IS A SLIDER: recruit, the sea, the lift and loading a colony ship.
+- MOVING AN EMPTY COLONY SHIP OR CARRIER WARNS YOU: "Empty." on its card, and a right-click
+  move asks before it goes.
+- THE REPORT IS SHORTER. Your own news comes first; the other headings are folded shut
+  with a count. Click one to open it.
 
 WHAT WE WANT TO KNOW
 --------------------
 Write down anything, however small. Especially:
 - The moment you were not sure what to do next.
 - Anything you clicked that did nothing, or did something you did not expect.
-- THE CUSTODIANS: could you tell how close you were to winning? Did a Nature Reserve feel
-  worth a slot?
-- RESEARCH: did it matter which countries you held, and did a School feel worth it?
-- FUEL: with the bigger colony ship, did you run short?
+- THE FOG: did you miss knowing what a rival was up to? Did you build an Embassy or a Relay
+  to see, or court a rival's friendship for it?
+- THE REPORT: did you open the folded headings, or was your own news enough?
+- THE TREE: could you see your own road to victory at a glance?
+- PIONEERS: was the slider quicker than the old buttons?
 - The turn the game got boring, if it did, and the turn you felt you had lost.
 - Crashes: what you were doing, and the "Seed" number shown on the title screen and
   the game-over screen. With the seed the game can be replayed exactly.
@@ -76,16 +77,18 @@ first. These are known. You do not need to report them.
 
 WHAT THIS VERSION KNOWS ABOUT ITSELF
 
-- THE WIN COLUMN: Custodians 8, Prospectors 7, Arkwrights 2, Archivists 17, where last
-  version was 7 / 5 / 1 / 7. The Archivists gained most, with research.
-- THE WORLD COLLAPSES IN 46 GAMES OF 80, where it was 60.
-- THE WHOLE TECH TREE FINISHES IN 73 GAMES OF 80, around turn 24.
-- THE ARKWRIGHTS SCORE NOTHING at the end in 57 games of 80.
-- THE COMPUTER BUILDS FEW REFINERIES OFF EARTH, so the better refining on the small moons is
-  mostly yours.
+- THE WIN COLUMN: Custodians 10, Prospectors 10, Arkwrights 1, Archivists 17, where last
+  version was 8 / 7 / 2 / 17.
+- THE WORLD COLLAPSES IN 42 GAMES OF 80, where it was 46.
+- THE WHOLE TECH TREE FINISHES IN 65 GAMES OF 80, around turn 25, where it was 73.
+- THE ARKWRIGHTS SCORE NOTHING at the end in 58 games of 80.
+- THE FOG DOES NOT HURT THE COMPUTER: with the fog lifted the same eighty games end the
+  same way.
 
 CARRIED OVER, STILL TRUE
 
+- THE COMPUTER BUILDS FEW REFINERIES OFF EARTH, so the better refining on the small moons is
+  mostly yours.
 - THE COMPUTER ALMOST NEVER BUILDS A SHIPYARD ON THE MOON, PHOBOS OR DEIMOS.
 - TWO STACKS THAT ATTACK IN ONE ORBIT IN ONE TURN FIGHT TWO BATTLES, one per attack.
 - NOBODY CAN ACCEPT OR DECLINE AN ACCORD OFFERED TO THEM - INCLUDING YOU. The game still

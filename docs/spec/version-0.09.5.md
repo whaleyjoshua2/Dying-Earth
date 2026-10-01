@@ -6,6 +6,35 @@ The map is [Map: version 0.09.5](https://github.com/whaleyjoshua2/Dying-Earth/is
 pictures and batches that decided it are in
 [`docs/dev-diary/2026-09-29-version-0.09.5/`](../dev-diary/2026-09-29-version-0.09.5/).
 
+**What the version is.** Version 0.09.4 with the designer's list. **The Tech tree reworked** so each
+Faction's Victory Tech ends a line of its own, Industry renamed Stewardship and Public Science renamed
+Large Language Models (§1), four prerequisites moved and the lines redrawn (§2), and two new rung-2
+Techs: Commodity Finance for the Banks (§3) and Orbital Data Centers for the Observatories (§4).
+**Pioneers**: two a state a turn (§5), every count moved by slider (§6). **An empty Colony Ship or
+Carrier warns** before it moves (§7). **Fog of war**: a Faction sees the others only where a place,
+a Ship, a Relay, an Embassy or good Relations lets it, and the computer seats see as a human would
+(§8). **The Report** opens on the player's own news, its other headings collapsed (§9).
+
+**What it did to the win column** (80 games, per Faction, at the shipped climate cell):
+
+| | 0.09.4 | 0.09.5 |
+|---|---|---|
+| Custodians | 8 | 10 |
+| Prospectors | 7 | 10 |
+| Arkwrights | 2 | 1 |
+| Archivists | 17 | 17 |
+| collapses | 46 | 42 |
+
+The closing sweep is
+[`sweeps/final-0.09.5.txt`](../dev-diary/2026-09-29-version-0.09.5/sweeps/final-0.09.5.txt), byte
+for byte the fog sweep after §8 (`sweeps/fog-430.txt`): the Report's trimming (§9) moves no rule.
+**The tree**, every Victory chain having changed price: the whole Tech tree completes in 65 of 80
+games at a median turn 25, where it completed in 73 at turn 24. Each Victory gate is reached in 70
+to 77 games (Custodians 77, Arkwrights 73, Archivists 71, Prospectors 70), where it was 73 to 80.
+The fog costs the computer seats nothing measurable: the same batch with the fog lifted reads the
+same win column and collapses, and one Arkwrights gate more (74),
+[`sweeps/reveal-430.txt`](../dev-diary/2026-09-29-version-0.09.5/sweeps/reveal-430.txt).
+
 ## 1. Each Victory Tech at the end of a line
 
 The authority is [ticket #424](https://github.com/whaleyjoshua2/Dying-Earth/issues/424).

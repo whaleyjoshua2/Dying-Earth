@@ -3,6 +3,12 @@
 The map is [Map: version 0.09.5](https://github.com/whaleyjoshua2/Dying-Earth/issues/423), and the
 spec is [`docs/spec/version-0.09.5.md`](../../spec/version-0.09.5.md).
 
+**The closing sweep** ([`sweeps/final-0.09.5.txt`](sweeps/final-0.09.5.txt), 20 seeds x four
+seatings): wins Custodians 10, Prospectors 10, Arkwrights 1, Archivists 17, where 0.09.4 closed at
+8 / 7 / 2 / 17; collapses 42 of 80, where it was 46. The whole Tech tree completes in 65 of 80 games,
+median turn 25, where it was 73 at turn 24. The file is byte for byte [`sweeps/fog-430.txt`](sweeps/fog-430.txt):
+the Report's trimming (ticket #431) moves no rule.
+
 ## Each Victory Tech at the end of a line (ticket #424)
 
 Taken headlessly with `shot: tech:1 panel:0 seed:7 cardshut:1 window:1500x1300`, adding

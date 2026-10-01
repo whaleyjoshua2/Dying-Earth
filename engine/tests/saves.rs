@@ -144,6 +144,8 @@ fn a_save_from_another_version_and_a_damaged_file_are_both_refused_with_a_messag
 /// Ticket #417 (version 0.09.4, the closing ticket): `SAVE_VERSION` did not move this version,
 /// so a save written by 0.09.3 must still load. Simulated by writing a save and cutting every field
 /// 0.09.4 added out of it, each of which must then read its default.
+/// Ticket #432 (version 0.09.5, the closing ticket): `SAVE_VERSION` did not move again. The fog's
+/// two Report fields, a line's `by` and a rival deed's `places` (#430), are cut beside 0.09.4's.
 #[test]
 fn a_save_without_this_versions_fields_still_loads() {
     let dir = TempDir::new("older-fields");
@@ -186,7 +188,7 @@ fn a_save_without_this_versions_fields_still_loads() {
         out
     };
     let mut older = text.clone();
-    for name in ["under_sink_eased", "opening_gap", "best_gap_closed", "best_run", "lead_windfall", "card_price_by"] {
+    for name in ["under_sink_eased", "opening_gap", "best_gap_closed", "best_run", "lead_windfall", "card_price_by", "by", "places"] {
         let before = older.len();
         older = cut(&older, name);
         assert!(older.len() < before, "{name} was in the save and is cut");
