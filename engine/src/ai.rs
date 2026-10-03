@@ -1860,7 +1860,19 @@ impl Game {
             push(vec![Order::BuyInfluence { amount: step }], Cat::Influence, self.base_weight(seat, Cat::Influence) * 0.9, 1.0, 1.0, 1.0, format!("buy {} Influence for {} Ducats", step, per * step), None);
         }
         // Ticket #42: the trading window. While Materials are the scarcest resource (or the bootstrap
-        // need), Ducats buy them in lots of 10 at a producer's weight; the AI does not sell.
+        // need), Ducats buy them in lots of 10 at a producer's weight; it sells, since ticket
+        // #448 (version 0.09.6), at the end of its turn.
+        // Ticket #448 (version 0.09.6): **Energy**, where the seat would be short at Income -- the
+        // shortfall that shuts its buildings -- bought ahead of the spending, at a producer's weight
+        // and the opportunity multiplier, since a building switched off pays for nothing.
+        {
+            let s = self.seat(seat);
+            let short = s.stockpile.energy + s.income_last_turn.energy;
+            if short < 0.0 {
+                let n = (-short).ceil() as i64;
+                push(vec![Order::Buy { resource: Resource::Energy, amount: n }], Cat::Producer, self.base_weight(seat, Cat::Producer), 1.0, 1.0, m.opportunity, format!("buy {n} Energy, short at Income otherwise"), None);
+            }
+        }
         let per_materials = self.tables.ducats.per_materials;
         if (scarce == Resource::Materials || needs.contains(&Resource::Materials)) && per_materials > 0 {
             let lots = (self.seat(seat).stockpile.ducats / (per_materials * 10) as f64).floor() as i64;
@@ -3355,6 +3367,47 @@ impl Game {
         // reaches the bar by the pace's last turn at the current output, and the most it may when
         // nothing less will. (A first cut zeroed the share whenever Materials were being held for
         // a build, which is nearly every turn, so nothing was ever banked.)
+        // Ticket #448 (version 0.09.6): **the market**, after everything else is chosen, so what is
+        // sold is what the turn's own orders leave. Energy is bought where the seat would be short at
+        // Income -- the shortfall that shuts buildings. Materials beyond three turns of this turn's
+        // own spending plus a reserve are sold, and Fuel beyond what its Ships' tanks take plus a
+        // reserve, each only at or above the midpoint price. (A queued build was paid at its order,
+        // so "what the queue needs" is the spending the seat keeps up, not the queue itself.)
+        {
+            let th = self.tables.ai.thresholds.clone();
+            let before = self.seat(seat).stockpile;
+            let left = self.remaining(seat, &chosen).0;
+            let spent = (before.materials - left.materials).max(0.0);
+            // Three turns of the larger of its income and its own spending, at the designer's word: a
+            // first cut kept three turns of the spending alone, and sold the stock a seat builds up
+            // between big builds.
+            let income = self.seat(seat).income_last_turn.materials.max(0.0);
+            let keep = th.market_materials_reserve + th.market_materials_turns * spent.max(income);
+            let surplus = (left.materials - keep).floor() as i64;
+            // Never while Materials are held for a dearer build, nor in a turn it bought them: a sale
+            // at half the price of a purchase is money burned, and the held Materials are the build.
+            let bought_m = chosen.iter().any(|o| matches!(o, Order::Buy { resource: Resource::Materials, .. }));
+            let bought_f = chosen.iter().any(|o| matches!(o, Order::Buy { resource: Resource::Fuel, .. }));
+            if surplus > 0 && self.market_price_at(0) >= self.market_base(0) && reserve.is_none() && !bought_m {
+                let sell = Order::Sell { resource: Resource::Materials, amount: surplus };
+                if self.check_order(seat, &chosen, &sell).is_ok() {
+                    lines.push(format!("  take          sell {surplus} Materials, beyond {keep:.0} kept"));
+                    chosen.push(sell);
+                }
+            }
+            let tanks: f64 = self.ships.iter().filter(|s| s.seat == seat).map(|s| (self.tank_of(seat, s.kind) - s.fuel).max(0.0)).sum();
+            let keep = tanks + th.market_fuel_reserve;
+            let left = self.remaining(seat, &chosen).0;
+            let surplus = (left.fuel - keep).floor() as i64;
+            // Not while Fuel is held for the Mars window (ticket #57): a sale is a spend.
+            if surplus > 0 && self.market_price_at(1) >= self.market_base(1) && !self.window_within(2) && !bought_f {
+                let sell = Order::Sell { resource: Resource::Fuel, amount: surplus };
+                if self.check_order(seat, &chosen, &sell).is_ok() {
+                    lines.push(format!("  take          sell {surplus} Fuel, beyond {keep:.0} kept"));
+                    chosen.push(sell);
+                }
+            }
+        }
         if first_kind == VictoryFirstKind::VentureFund {
             let v = self.tables.venture.clone();
             let bar = self.tables.faction(kind).victory_first.bar;

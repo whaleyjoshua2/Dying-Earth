@@ -1343,6 +1343,10 @@ pub struct AiThresholds {
     pub emitter_k: f64,
     pub emitter_cap: f64,
     pub emitter_cause: i64,
+    /// Ticket #448 (version 0.09.6): what a seat keeps back from the market.
+    pub market_materials_reserve: f64,
+    pub market_materials_turns: f64,
+    pub market_fuel_reserve: f64,
     pub evade_damage_fraction: f64,
     pub influence_step: i64,
     /// Ticket #75: a held state's worth on the Influence target list, as a share of a neutral one's.

@@ -432,6 +432,13 @@ war_cause = -5
 emitter_k = 2.0
 emitter_cap = 2.0
 emitter_cause = -3
+# Ticket #448 (version 0.09.6): the market. A seat keeps this many Materials, plus this many turns of
+# the larger of its Materials income and what the turn's own orders spend, and sells the rest; and
+# keeps its Ships' empty tank room plus this much Fuel, selling the rest -- each only at or above the
+# midpoint price, and never in a turn it bought that good or held Materials for a dearer build.
+market_materials_reserve = 20.0
+market_materials_turns = 3.0
+market_fuel_reserve = 10.0
 evade_damage_fraction = 0.6667
 influence_step = 5
 # Ticket #75 (version 0.05.5): what a state another Faction holds is worth on the AI's Influence

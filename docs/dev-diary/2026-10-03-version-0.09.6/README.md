@@ -263,3 +263,27 @@ the rival's whole-game Blame above the quarter, so it does not move.
   "Colonists 6 of 8 room. Growing: +0.1 a turn, next Colonist in 9 turns."
 - [`half-plain.png`](ticket-450-colonists-line/half-plain.png), taken with `hab:1 seed:7`. The ISS,
   "2/4" in plain text.
+
+## The computer seats use the market (ticket #448)
+
+Three sweeps, all filed:
+
+| run | Cust | Pros | Ark | Arch | collapses |
+|---|---|---|---|---|---|
+| before (after #446) | 10 | 8 | 8 | 8 | 46 |
+| [`after-448-first-build.txt`](sweeps/after-448-first-build.txt): sells beyond 20 + 3 turns of spending | 6 | 13 | 3 | 7 | 51 |
+| [`after-448-no-churn.txt`](sweeps/after-448-no-churn.txt): no sale in a turn it bought, nor while saving | 6 | 8 | 2 | 18 | 45 |
+| [`after-448.txt`](sweeps/after-448.txt): keeps 3 turns of income too, at the designer's word | 9 | 6 | 4 | 19 | 42 |
+
+- **The first build churned.** Every seat bought and sold thousands of units, one seating buying
+  3,651 and selling 3,586: Materials bought, then sold back at half the price.
+- **Stopping same-turn and saving-turn sales** did not stop selling between big builds.
+- **The designer chose A**, a reserve of income turns, at three. Measured, it moved little: one
+  seating's trade figures were unchanged.
+- **Offered C** (Fuel only) **or D** (no selling), **the designer chose E**: keep it as built, with
+  these figures.
+
+**Witnessed red:** the new test `the_ai_sells_its_surplus_and_buys_the_energy_it_lacks`, run against
+the previous `ai.rs`, sold no Materials. An older test (#57, Fuel banked for the Mars window)
+failed on the first cut, which sold 130 Fuel two turns from the window. Fuel sales now wait for the
+window.

@@ -18852,3 +18852,32 @@ fn the_custodians_aggression_follows_a_rivals_emissions() {
     assert!(!g.has_cause(cus, light), "not against a light one");
     assert!(!g.has_cause(light, heavy), "and no other seat at −3");
 }
+
+/// Ticket #448 (version 0.09.6): **the computer uses the market.** It sells Materials beyond a
+/// reserve and three turns of its own spending, and Fuel beyond its tanks' room and a reserve, each
+/// at or above the midpoint price and never below; and buys Energy where it would be short at Income.
+#[test]
+fn the_ai_sells_its_surplus_and_buys_the_energy_it_lacks() {
+    let mut g = game();
+    calm(&mut g);
+    let cust = Seat(0);
+    g.seats[0].stockpile.materials = 2000.0;
+    g.seats[0].stockpile.fuel = 500.0;
+    g.seats[0].stockpile.ducats = 0.0;
+    let orders = g.ai_orders(cust);
+    assert!(orders.iter().any(|o| matches!(o, Order::Sell { resource: Resource::Materials, amount } if *amount > 0)), "Materials sold: {orders:?}");
+    assert!(orders.iter().any(|o| matches!(o, Order::Sell { resource: Resource::Fuel, amount } if *amount > 0)), "Fuel sold");
+    // Under the midpoint, nothing is sold.
+    g.market.price[0] = g.market_base(0) - 1;
+    g.market.price[1] = g.market_base(1) - 1;
+    let orders = g.ai_orders(cust);
+    assert!(!orders.iter().any(|o| matches!(o, Order::Sell { .. })), "not into a slump: {orders:?}");
+    // Short of Energy at Income: it buys the shortfall.
+    let mut g = game();
+    calm(&mut g);
+    g.seats[0].stockpile.ducats = 500.0;
+    g.seats[0].stockpile.energy = 0.0;
+    g.seats[0].income_last_turn.energy = -10.0;
+    let orders = g.ai_orders(cust);
+    assert!(orders.iter().any(|o| matches!(o, Order::Buy { resource: Resource::Energy, .. })), "Energy bought: {orders:?}");
+}

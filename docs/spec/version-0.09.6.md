@@ -340,3 +340,28 @@ The authority is [ticket #450](https://github.com/whaleyjoshua2/Dying-Earth/issu
   - **amber** from three quarters;
   - **red** when full, since a full place takes no more Colonists and grows no further.
 - **Where:** the Colony and station card only. Map labels and roster lines keep their words.
+
+## 15. The computer seats use the market
+
+The authority is [ticket #448](https://github.com/whaleyjoshua2/Dying-Earth/issues/448). Computer seats
+only; no rule moves.
+
+- **Energy bought where the seat would be short at Income**, the shortfall that switches buildings
+  off. It is weighed ahead of the turn's other spending, at a producer's weight and the opportunity
+  multiplier.
+- **Selling, at the end of the turn, after everything else is chosen:**
+  - **Materials** beyond 20, plus three turns of the larger of the seat's Materials income and what
+    this turn's own orders spend (the designer's word on the measured miss: "a but make 3x");
+  - **Fuel** beyond its Ships' empty tank room, plus 10.
+  - Each is sold only at or above the midpoint price.
+  - Never in a turn the seat bought that good.
+  - No Materials while they are held for a dearer build.
+  - No Fuel while Fuel is held for the Mars window (ticket #57).
+- **The Prospectors** get no special rule: their Fund banks the Ducats from sales as from any income.
+- **Energy** stays unsellable.
+- **Measured,** and accepted by the designer as built (option E):
+
+| | Cust | Pros | Ark | Arch | collapses |
+|---|---|---|---|---|---|
+| before | 10 | 8 | 8 | 8 | 46 |
+| as shipped | 9 | 6 | 4 | 19 | 42 |
