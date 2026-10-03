@@ -34,3 +34,15 @@ The pictures:
 **The Education blend:** witnessed red in
 `colonists_unloaded_onto_a_station_blend_their_education`, which failed with "four at 1.0 and four
 at 2.0 make 1.5, not 1". It passes after the fix.
+
+## Generation Ships needs Relay Networks (ticket #438)
+
+- [`lit-generation-ships.png`](ticket-438-relay-networks/lit-generation-ships.png), taken with
+  `tech:1 panel:0 seed:7 cardshut:1 window:1500x1300 techhover:generation_ships`. The Arkwrights'
+  road is lit: Expanded Habitats, then Closed-Loop Colonies and Relay Networks stacked at rung 2,
+  then Generation Ships. Each rung-2 box's line enters Generation Ships at its own quarter. No
+  re-layout was needed.
+- **Witnessed red:** the new test `generation_ships_needs_relay_networks_and_every_road_costs_130`
+  failed with `left: [ClosedLoopColonies]`, `right: [ClosedLoopColonies, RelayNetworks]`. Two older
+  tests pinned the old road (its 98 Research and its depth of 2). They were moved to 130 and 3, each
+  with the ticket named.

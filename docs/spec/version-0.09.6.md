@@ -57,3 +57,21 @@ The authority is [ticket #437](https://github.com/whaleyjoshua2/Dying-Earth/issu
 - a station over Earth with Colonists that a Colony Ship in its ring cannot load from;
 - a greyed Unload button with no orbit named;
 - four Colonists at Education 2.0 unloaded onto four at 1.0 leaving anything but 1.5.
+
+## 3. Generation Ships needs Relay Networks
+
+The authority is [ticket #438](https://github.com/whaleyjoshua2/Dying-Earth/issues/438).
+
+- **Generation Ships needs Closed-Loop Colonies and Relay Networks**, where it needed Closed-Loop
+  Colonies alone. Both lines are drawn: one into the box's upper quarter, one into its lower.
+- **Relay Networks stays at 32.** The Arkwrights' road is Expanded Habitats 18, Closed-Loop
+  Colonies 32, Relay Networks 32 and Generation Ships 48: **130**, where it was 98. **All four
+  Victory roads now cost 130.**
+- **The computer Arkwrights** research Relay Networks straight after Closed-Loop Colonies, before
+  the Propulsion line.
+
+**What would show this wrong:**
+
+- Generation Ships available with Relay Networks unresearched;
+- a Victory road at any price but 130;
+- the Arkwrights' pick list reaching Propulsion before Relay Networks.

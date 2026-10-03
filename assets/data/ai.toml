@@ -577,7 +577,8 @@ order = ["efficient_grids", "clean_power", "green_consensus", "orbital_refuellin
 [tech_picks.arkwrights]
 # Ticket #425 (version 0.09.5): Efficient Grids and Clean Power off -- Closed-Loop Colonies needs
 # Expanded Habitats alone, so the road is all Off-world Living.
-order = ["expanded_habitats", "closed_loop_colonies", "orbital_refuelling", "clean_propellant", "efficient_transit", "nuclear_rockets", "cryogenic_tanks", "hardened_hulls", "missile_technology"]
+# Ticket #438 (version 0.09.6): Relay Networks joins the road, straight after Closed-Loop Colonies.
+order = ["expanded_habitats", "closed_loop_colonies", "relay_networks", "orbital_refuelling", "clean_propellant", "efficient_transit", "nuclear_rockets", "cryogenic_tanks", "hardened_hulls", "missile_technology"]
 
 # Ticket #51: the Archivists want Research and a quiet world.
 # Ticket #348: Expanded Habitats, Clean Power and Closed-Loop Colonies open the list. Ticket #246

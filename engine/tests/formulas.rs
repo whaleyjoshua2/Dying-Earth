@@ -6652,7 +6652,8 @@ fn the_four_gates_stand_on_rung_three_at_one_price_with_their_prerequisites() {
         // branch's spine rather than being a leaf nobody has to take.
         // Ticket #426 (version 0.09.5): Commodity Finance in its place, at the designer's word.
         (FactionKind::Prospectors, TechId::ExtractionCharter, vec![TechId::AutomatedRefining, TechId::CommodityFinance]),
-        (FactionKind::Arkwrights, TechId::GenerationShips, vec![TechId::ClosedLoopColonies]),
+        // Ticket #438 (version 0.09.6): and Relay Networks, at the designer's word.
+        (FactionKind::Arkwrights, TechId::GenerationShips, vec![TechId::ClosedLoopColonies, TechId::RelayNetworks]),
         // Ticket #245 (version 0.08.3): Expanded Habitats dropped, and with it the edge that read
         // on screen as an unrelated line into Generation Ships. Ticket #246: and Public Science
         // dropped too, for Closed-Loop Colonies -- the Archive stands at a Colony off Earth, so the
@@ -6697,7 +6698,7 @@ fn the_four_gates_stand_on_rung_three_at_one_price_with_their_prerequisites() {
     assert_eq!(depth(TechId::PlanetaryStewardship), 3, "the Custodians', three since ticket #424");
     // Ticket #425 (version 0.09.5): Clean Power off Closed-Loop Colonies, Efficient Grids off
     // Automated Refining -- no road leaves its own row now.
-    assert_eq!(depth(TechId::GenerationShips), 2, "the Arkwrights', Expanded Habitats and Closed-Loop Colonies");
+    assert_eq!(depth(TechId::GenerationShips), 3, "the Arkwrights', Expanded Habitats, Closed-Loop Colonies and, since ticket #438, Relay Networks");
     assert_eq!(depth(TechId::ExtractionCharter), 3, "the Prospectors', Deep Mining, Automated Refining and Commodity Finance");
 }
 
@@ -17981,7 +17982,8 @@ fn four_prerequisites_moved_at_the_designers_word() {
     assert!(!t.gate_chain(FactionKind::Prospectors).contains(&TechId::EfficientGrids), "the Charter no longer reaches Efficient Grids");
     assert!(!t.gate_chain(FactionKind::Arkwrights).contains(&TechId::CleanPower), "Generation Ships no longer reaches Clean Power");
     assert_eq!(price(FactionKind::Prospectors), 130, "Deep Mining, Automated Refining, Beneficiation and the Charter, 148 before");
-    assert_eq!(price(FactionKind::Arkwrights), 98, "Expanded Habitats, Closed-Loop Colonies and Generation Ships");
+    // Ticket #438 (version 0.09.6): 130 since Generation Ships needs Relay Networks as well.
+    assert_eq!(price(FactionKind::Arkwrights), 130, "Expanded Habitats, Closed-Loop Colonies, Relay Networks and Generation Ships, 98 before");
     for k in FactionKind::ALL {
         let chain = t.gate_chain(k);
         let order = &t.ai_tech_picks(k).order;
@@ -18410,4 +18412,20 @@ fn colonists_unloaded_onto_a_station_blend_their_education() {
     let col = g.colony(station).unwrap();
     assert_eq!(col.colonists, 8);
     assert!((col.education - 1.5).abs() < 1e-9, "four at 1.0 and four at 2.0 make 1.5, not {}", col.education);
+}
+
+/// Ticket #438 (version 0.09.6): **Generation Ships needs Closed-Loop Colonies and Relay Networks**,
+/// Relay Networks staying at 32, so the Arkwrights' road is 130 like every other Faction's; and the
+/// computer Arkwrights research Relay Networks straight after Closed-Loop Colonies.
+#[test]
+fn generation_ships_needs_relay_networks_and_every_road_costs_130() {
+    let t = tables();
+    let price = |k: FactionKind| -> i64 { t.gate_chain(k).iter().map(|x| t.tech(*x).cost).sum::<i64>() + t.tech(t.victory_gate(k).unwrap()).cost };
+    assert_eq!(t.tech(TechId::GenerationShips).needs, vec![TechId::ClosedLoopColonies, TechId::RelayNetworks]);
+    assert_eq!(t.tech(TechId::RelayNetworks).cost, 32);
+    for k in FactionKind::ALL {
+        assert_eq!(price(k), 130, "the {k:?} road");
+    }
+    let order = &t.ai_tech_picks(FactionKind::Arkwrights).order;
+    assert_eq!(order[..3], [TechId::ExpandedHabitats, TechId::ClosedLoopColonies, TechId::RelayNetworks], "the Arkwrights' list opens with its road");
 }
