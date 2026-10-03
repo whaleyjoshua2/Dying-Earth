@@ -633,8 +633,9 @@ fn ships_are_built_only_at_shipyards_and_lifts_need_a_launch_site() {
     g.seats[0].stockpile.fuel = 50.0;
     assert!(g.check_order(Seat(0), &[], &frigate(Place::Colony(iss))).is_ok());
     // Lifts: a Ship at Earth loads Colonists only from a state with a Launch Site, and each lift is a launch.
+    // Ticket #443 (version 0.09.6): in a station's ring, since low orbit needs no Launch Site now.
     let ship = ShipId(g.fresh_id());
-    g.ships.push(Ship { name: String::new(), id: ship, kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None });
+    g.ships.push(Ship { name: String::new(), id: ship, kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: Some(0) });
     g.state_mut(StateId::NorthAfrica).control = Control::Controlled(Seat(0));
     g.state_mut(StateId::NorthAfrica).facilities.retain(|f| f.kind != FacilityKind::LaunchSite);
     // Ticket #73: a lift takes Emigrants already mustered, so both states hold some.
@@ -3633,6 +3634,8 @@ fn a_a_mothballed_facility_makes_nothing_costs_nothing_and_keeps_its_slot() {
     // A mothballed Launch Site lifts nobody.
     g.state_mut(sid).emigrants = 1;
     let ship = a_colony_ship(&mut g, Seat(0), BodyId::Earth);
+    // Ticket #443 (version 0.09.6): in a station's ring, since low orbit needs no Launch Site now.
+    g.ship_mut(ship).unwrap().slot = Some(0);
     let lift = Order::Load { ship, colonists: 1, from: LoadSource::State(sid), army: None };
     assert!(g.check_order(Seat(0), &[], &lift).is_ok(), "a working Launch Site lifts");
     let ls = facility_at(&g, sid, FacilityKind::LaunchSite);
@@ -18614,4 +18617,80 @@ fn a_thrown_off_regions_scrubber_runs_at_a_quarter_for_nobody() {
     assert_eq!(g.scrubber_removal_by_seat().iter().sum::<f64>(), before - 6.0, "credited to no seat");
     assert_eq!(g.scrubber_removal(), before - 6.0 + 1.5, "two quarters, 0.75 each, still on the Sink");
     assert_eq!(g.calming_fall(sid), g.tables.unrest.scrubber_fall * 0.25);
+}
+
+/// Ticket #443 (version 0.09.6): **a Colony Ship takes Pioneers from several countries.** In one turn
+/// a Colony Ship at Earth may take one Load from each Region its seat directs with a working Launch
+/// Site, all of them together held to its room; never two from one Region, never beside a move.
+#[test]
+fn a_colony_ship_loads_pioneers_from_several_regions_in_one_turn() {
+    let mut g = game();
+    let (ship, _) = colony_ship_ready(&mut g, BodyId::Earth);
+    g.ship_mut(ship).unwrap().colonists = 0;
+    let room = g.colony_ship_crowded_capacity(Seat(0));
+    assert!(room >= 4, "the premise: room for two and two, {room}");
+    let (a, b) = (StateId::EastAsia, StateId::Japan);
+    g.take_control(b, Seat(0));
+    for sid in [a, b] {
+        if !g.state(sid).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite) {
+            g.state_mut(sid).facilities.push(facility(FacilityKind::LaunchSite));
+        }
+        g.state_mut(sid).emigrants = room;
+    }
+    let from_a = Order::Load { ship, colonists: 2, from: LoadSource::State(a), army: None };
+    let from_b = Order::Load { ship, colonists: 2, from: LoadSource::State(b), army: None };
+    assert!(g.check_order(Seat(0), &[], &from_a).is_ok());
+    assert!(g.check_order(Seat(0), std::slice::from_ref(&from_a), &from_b).is_ok(), "a second Region beside the first: {:?}", g.check_order(Seat(0), std::slice::from_ref(&from_a), &from_b));
+    // Never two from one Region, and never past the room counted over both.
+    let again_a = Order::Load { ship, colonists: 1, from: LoadSource::State(a), army: None };
+    assert!(g.check_order(Seat(0), std::slice::from_ref(&from_a), &again_a).is_err(), "one Load a Region");
+    let too_many = Order::Load { ship, colonists: room - 1, from: LoadSource::State(b), army: None };
+    assert!(g.check_order(Seat(0), std::slice::from_ref(&from_a), &too_many).unwrap_err().0.contains("at most"), "the room is the Ship's, over every Region");
+    // Never beside a move.
+    let go = Order::ChangeOrbit { ship, slot: Some(0) };
+    assert!(g.check_order(Seat(0), std::slice::from_ref(&from_a), &go).is_err());
+    let both = vec![from_a.clone(), from_b.clone()];
+    g.commit_orders(Seat(0), &both);
+    g.resolution_phase();
+    assert_eq!(g.ship(ship).unwrap().colonists, 4, "two from each");
+}
+
+/// Ticket #443 (version 0.09.6), Q5: **a Colony Ship in low orbit over Earth takes Pioneers from a
+/// Region with no Launch Site**, at the designer's word; in a station's ring it still needs one.
+#[test]
+fn a_ship_in_low_orbit_loads_from_a_region_without_a_launch_site() {
+    let mut g = game();
+    let (ship, _) = colony_ship_ready(&mut g, BodyId::Earth);
+    g.ship_mut(ship).unwrap().colonists = 0;
+    let sid = StateId::Japan;
+    g.take_control(sid, Seat(0));
+    g.state_mut(sid).facilities.retain(|f| !f.kind.does_the_job_of(FacilityKind::LaunchSite));
+    g.state_mut(sid).emigrants = 2;
+    let load = Order::Load { ship, colonists: 2, from: LoadSource::State(sid), army: None };
+    assert_eq!(g.ship(ship).unwrap().slot, None, "the premise: in low orbit");
+    assert!(g.check_order(Seat(0), &[], &load).is_ok(), "low orbit needs no Launch Site: {:?}", g.check_order(Seat(0), &[], &load));
+    g.ship_mut(ship).unwrap().slot = Some(0);
+    assert!(g.check_order(Seat(0), &[], &load).unwrap_err().0.contains("Launch Site"), "a station's ring still does");
+}
+
+/// Ticket #443 (version 0.09.6): **the computer fills a Colony Ship from several Regions**, most
+/// Pioneers waiting first, in low orbit from a Region with no Launch Site too.
+#[test]
+fn the_ai_loads_a_colony_ship_from_several_regions() {
+    let mut g = game();
+    calm(&mut g);
+    let (ship, _) = colony_ship_ready(&mut g, BodyId::Earth);
+    g.ship_mut(ship).unwrap().colonists = 0;
+    let room = g.colony_ship_capacity(Seat(0));
+    let (a, b) = (StateId::EastAsia, StateId::Japan);
+    g.take_control(b, Seat(0));
+    g.state_mut(b).facilities.retain(|f| !f.kind.does_the_job_of(FacilityKind::LaunchSite));
+    g.state_mut(a).emigrants = room / 2;
+    g.state_mut(b).emigrants = room - room / 2;
+    let orders = g.ai_orders(Seat(0));
+    let loads: Vec<StateId> = orders.iter().filter_map(|o| match o {
+        Order::Load { ship: s, from: LoadSource::State(st), .. } if *s == ship => Some(*st),
+        _ => None,
+    }).collect();
+    assert!(loads.contains(&a) && loads.contains(&b), "a Load from each Region, the one with no Launch Site included: {loads:?}");
 }

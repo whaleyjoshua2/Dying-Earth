@@ -7424,10 +7424,12 @@ fn pioneers_block(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, act
     let lifts = st.facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working());
     let sea_door = game.antarctica_open
         && (!game.free_slots_on(BodyId::Earth).is_empty() || game.colonies.iter().any(|c| c.body == BodyId::Earth && !c.in_orbit && c.control.director() == Some(Seat(0)) && game.habitat_room(c) > c.colonists));
-    let lift_door = lifts
-        && (game.colonies.iter().any(|c| c.body == BodyId::Earth && c.in_orbit && c.control.director() == Some(Seat(0)) && game.habitat_room(c) > c.colonists)
-            || game.ships.iter().any(|s| s.seat == Seat(0) && s.kind == UnitKind::ColonyShip && s.at == ShipAt::Body(BodyId::Earth) && s.colonists < game.colony_ship_capacity(Seat(0))));
-    let send = if st.emigrants > 0 && (sea_door || lift_door) { count_slider(ui, ("send", sid), st.emigrants, "Pioneers") } else { st.emigrants };
+    let lift_door = lifts && game.colonies.iter().any(|c| c.body == BodyId::Earth && c.in_orbit && c.control.director() == Some(Seat(0)) && game.habitat_room(c) > c.colonists);
+    // Ticket #443 (version 0.09.6): a Colony Ship in LOW orbit takes Pioneers from a Region with no
+    // Launch Site; one at a station's ring still needs it.
+    let ship_reached = |s: &Ship| s.seat == Seat(0) && s.kind == UnitKind::ColonyShip && s.at == ShipAt::Body(BodyId::Earth) && (lifts || s.slot.is_none());
+    let ship_door = game.ships.iter().any(|s| ship_reached(s) && s.colonists < game.colony_ship_capacity(Seat(0)));
+    let send = if st.emigrants > 0 && (sea_door || lift_door || ship_door) { count_slider(ui, ("send", sid), st.emigrants, "Pioneers") } else { st.emigrants };
     if game.antarctica_open && st.emigrants > 0 {
         let n = send;
         for slot in game.free_slots_on(BodyId::Earth) {
@@ -7484,9 +7486,9 @@ fn pioneers_block(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, act
     // beyond its capacity, and each of those may die on arrival. A risk that drowns people wants
     // the sentence explaining it beside the button, and that sentence lives on the Ship's card --
     // so a player who means to crowd a ship goes there deliberately.
-    if st.emigrants > 0 && lifts {
+    if st.emigrants > 0 && ship_door {
         let capacity = game.colony_ship_capacity(Seat(0));
-        for s in game.ships.iter().filter(|s| s.seat == Seat(0) && s.kind == UnitKind::ColonyShip && s.at == ShipAt::Body(BodyId::Earth)) {
+        for s in game.ships.iter().filter(|s| ship_reached(s)) {
             let room = capacity.saturating_sub(s.colonists);
             let n = send.min(room);
             if n == 0 {
@@ -7508,7 +7510,7 @@ fn pioneers_block(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, act
         RichText::new(if st.facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working()) {
             "Launch Site: Colonists and Armies lift to any orbit of Earth from here. Ships are built at a Shipyard on a station or Colony."
         } else {
-            "No working Launch Site: nothing lifts to orbit from here."
+            "No working Launch Site: only a Colony Ship in low orbit takes Pioneers from here."
         })
         .weak(),
     );
@@ -8348,7 +8350,7 @@ fn ship_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
         transits.scroll_to_me(Some(egui::Align::Min));
     }
     move_dropdowns(ui, session, game, body, &[s], Some(s), view.stack_scroll, &format!("ship{}", s.id.0), actions);
-    ship_cargo_block(ui, session, game, view, s, body, actions);
+    ship_cargo_block(ui, session, game, s, body, actions);
     if s.damage > 0 {
         ui.label(RichText::new("Repair").strong());
         cost_button(ui, game, &session.pending, Order::Repair { unit: UnitRef::Ship(s.id), points: s.damage }, "Repair fully", actions);
@@ -8378,7 +8380,7 @@ fn capitalised(text: &str) -> String {
 
 /// Ticket #374: **Load and unload, for one Ship**, moved from the stack card where it stood once
 /// per hull. The block is left out for a hull that carries nothing and can carry nothing.
-fn ship_cargo_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, s: &Ship, body: BodyId, actions: &mut Vec<Action>) {
+fn ship_cargo_block(ui: &mut Ui, session: &Session, game: &Game, s: &Ship, body: BodyId, actions: &mut Vec<Action>) {
     let card = game.tables.unit(s.kind);
     // Ticket #86: at Earth a warming world crowds a Colony Ship beyond its safe capacity.
     let safe = if s.kind == UnitKind::ColonyShip { game.colony_ship_capacity(Seat(0)) } else { card.carries_colonists };
@@ -8398,26 +8400,25 @@ fn ship_cargo_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut View
     if capacity > s.colonists {
         let n = capacity - s.colonists;
         if body == BodyId::Earth {
-            let states = game.directed_states(Seat(0));
-            // Ticket #204 (version 0.08.1): opens on a Region that can actually lift, where it
-            // opened on the most populous one whether or not it had a Launch Site or anybody
-            // waiting. The `Some` also stands in for the emptiness check this replaced: with no
-            // directed Region there is nothing to draw from and nothing to draw.
-            if let Some(chosen) = view.load_state.filter(|x| states.contains(x)).or_else(|| default_emigrant_source(game, &states, true)) {
-                ui.horizontal(|ui| {
-                    ui.label("from");
-                    egui::ComboBox::from_id_salt(("load", s.id.0)).selected_text(game.tables.state(chosen).name.clone()).show_ui(ui, |ui| {
-                        for st in &states {
-                            if ui.selectable_label(*st == chosen, game.tables.state(*st).name.clone()).clicked() {
-                                view.load_state = Some(*st);
-                            }
-                        }
-                    });
-                });
-                // Ticket #73: a Launch Site lifts the Emigrants waiting there, no more. Ticket
-                // #428 (version 0.09.5): how many, on a slider under the Region's drop-down.
-                let lift = count_slider(ui, ("load", s.id, chosen), n.min(game.state(chosen).emigrants), "Pioneers");
-                cost_button(ui, game, &session.pending, Order::Load { ship: s.id, colonists: lift, from: LoadSource::State(chosen), army: None }, &format!("Load {lift} Pioneers"), actions);
+            // Ticket #443 (version 0.09.6): a row for EACH Region of yours with Pioneers waiting, where
+            // one drop-down chose a single Region: a Colony Ship takes a Load from every one of them
+            // in a turn. Each row's slider runs to what the Ship has room for after the Loads already
+            // placed this turn, so the rows together never pass its room. A Region with a Load
+            // placed is greyed by the rule itself, which names why.
+            let placed: u32 = session.pending.iter().filter_map(|o| match o {
+                Order::Load { ship, colonists, from: LoadSource::State(_), army: None } if *ship == s.id => Some(*colonists),
+                _ => None,
+            }).sum();
+            let left = n.saturating_sub(placed);
+            for st in game.directed_states(Seat(0)).into_iter().filter(|st| game.state(*st).emigrants > 0) {
+                let most = left.min(game.state(st).emigrants);
+                if most == 0 {
+                    continue;
+                }
+                // Ticket #73: the Pioneers waiting there, no more. Ticket #428 (version 0.09.5): how
+                // many, on a slider.
+                let lift = count_slider(ui, ("load", s.id, st), most, "Pioneers");
+                cost_button(ui, game, &session.pending, Order::Load { ship: s.id, colonists: lift, from: LoadSource::State(st), army: None }, &format!("Load {lift} Pioneers from {}", game.tables.state(st).name), actions);
             }
         }
         // Ticket #437 (version 0.09.6): over Earth too, from each station of yours with Colonists

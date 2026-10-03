@@ -2591,16 +2591,31 @@ impl Game {
                 // Earth, where ticket #335 held it to low orbit.
                 if body == BodyId::Earth && s.colonists < capacity {
                     // Load from the directed state with the most Emigrants waiting (ticket #73).
-                    // Ticket #46: only a state with a working Launch Site lifts them.
-                    let from = self
+                    // Ticket #46: only a state with a working Launch Site lifts them. Ticket #443
+                    // (version 0.09.6): to a station's ring; in LOW orbit any Region of the seat's
+                    // will do. And from EACH such Region in turn, most waiting first, until the Ship
+                    // is full -- one Load a Region, all in the one bundle.
+                    let in_low = s.slot.is_none();
+                    let mut from: Vec<StateId> = self
                         .directed_states(seat)
                         .into_iter()
-                        .filter(|s| self.state(*s).emigrants > 0 && self.state(*s).facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working()))
-                        .max_by_key(|s| self.state(*s).emigrants);
-                    if let Some(st) = from {
-                        let n = (capacity - s.colonists).min(self.state(st).emigrants);
+                        .filter(|s| self.state(*s).emigrants > 0 && (in_low || self.state(*s).facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working())))
+                        .collect();
+                    from.sort_by_key(|s| std::cmp::Reverse(self.state(*s).emigrants));
+                    let mut room = capacity - s.colonists;
+                    let mut loads = Vec::new();
+                    for st in from {
+                        if room == 0 {
+                            break;
+                        }
+                        let n = room.min(self.state(st).emigrants);
+                        loads.push(Order::Load { ship: s.id, colonists: n, from: LoadSource::State(st), army: None });
+                        room -= n;
+                    }
+                    let n = capacity - s.colonists - room;
+                    if n > 0 {
                         let opp = if presence_needed <= n { m.opportunity } else { 1.0 };
-                        push(vec![Order::Load { ship: s.id, colonists: n, from: LoadSource::State(st), army: None }], Cat::LoadUnload, self.base_weight(seat, Cat::LoadUnload), gap_for(Cat::LoadUnload, None), 1.0, opp, format!("load {} Colonists onto {}", n, ship_name), None);
+                        push(loads, Cat::LoadUnload, self.base_weight(seat, Cat::LoadUnload), gap_for(Cat::LoadUnload, None), 1.0, opp, format!("load {} Colonists onto {}", n, ship_name), None);
                     }
                 }
                 // Ticket #335 (version 0.09.0): a Colony is founded from low orbit, which is what

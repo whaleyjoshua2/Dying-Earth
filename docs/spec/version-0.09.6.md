@@ -184,3 +184,32 @@ the Region (`facilities.toml` `[scrubber]`):
 **What would show this wrong:** a Scrubber destroyed by a change of hands (other than by the
 destruction roll); a Prospector-held Scrubber crediting 3.0 ppm or none; a neutral one charging
 upkeep or crediting a seat.
+
+## 9. A Colony Ship takes Pioneers from several countries
+
+The authority is [ticket #443](https://github.com/whaleyjoshua2/Dying-Earth/issues/443).
+
+- **Several Regions in one turn.** A Colony Ship at Earth may take one Load from **each** Region its
+  seat directs, in one turn.
+  - The Loads count together against the Ship's room, crowding included.
+  - Two Loads never come from one Region ("this Ship already loads from that Region this turn").
+  - Loads stand beside one another and nothing else: no Transit, Unload or change of orbit that turn.
+- **Low orbit needs no Launch Site** (Q5, asked mid-build). A Colony Ship in **low orbit** over
+  Earth takes Pioneers from any Region its seat directs, Launch Site or none. A station's ring still
+  needs a working Launch Site in the Region, and so does a lift straight onto a station. Before,
+  every load from a Region needed one, in any orbit (ticket #46).
+- **The Ship card** at Earth lists one row per Region with Pioneers waiting, each with its own slider
+  and a "Load N Pioneers from <Region>" button, where a drop-down chose one Region. Each slider runs
+  to the room left after the Loads already placed.
+- **The Region card's "Send N to <Ship>" door** opens for a Colony Ship in low orbit even without a
+  Launch Site. A Region without one says "only a Colony Ship in low orbit takes Pioneers from here".
+- **The computer seats** fill a Ship from their Regions, most Pioneers waiting first, until full. In
+  low orbit that includes Regions with no Launch Site.
+
+**What would show this wrong:**
+
+- a Ship refused a second Region's Load in the same turn;
+- two Loads from one Region accepted;
+- the Loads together passing the room;
+- a low-orbit Load refused for want of a Launch Site;
+- a station-ring Load accepted without one.

@@ -402,9 +402,9 @@ pub struct ViewState {
     /// Ticket #146 (version 0.07.3): the slot box clicked on the selected Region's card.
     pub slot_box: Option<SlotBox>,
     pub trade_amounts: [i64; 4],
-    pub load_state: Option<StateId>,
-    /// Ticket #204 (version 0.08.1): the Region a Colony's own loader draws from, kept apart from
-    /// `load_state` so that choosing a Region on a Ship's card does not move it on a station's.
+    /// Ticket #204 (version 0.08.1): the Region a Colony's own loader draws from, kept apart from the
+    /// Ship card's choice so the two never moved together; since ticket #443 (version 0.09.6) the Ship
+    /// card lists every Region and chooses none.
     pub lift_state: Option<StateId>,
     /// Ticket #343 (version 0.09.1): the place a Launch is aimed at, chosen on the Ship stack's
     /// card. A Launch carries a `Place` -- a Region, a ground Colony or a station -- and over Earth
@@ -498,7 +498,6 @@ impl Default for ViewState {
             hab_tile: None,
             slot_box: None,
             trade_amounts: [5, 10, 10, 10],
-            load_state: None,
             lift_state: None,
             launch_target: None,
             influence_amount: 5,

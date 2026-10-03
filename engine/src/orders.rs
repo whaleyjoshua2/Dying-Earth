@@ -1746,10 +1746,28 @@ impl Game {
                 if *colonists == 0 && army.is_none() {
                     return fail("nothing to load");
                 }
-                if s.colonists + *colonists > capacity {
+                // Ticket #443 (version 0.09.6): at Earth a Colony Ship takes one Load from EACH Region
+                // its seat directs, in the same turn: Pioneers from several countries. Those Loads
+                // stand beside one another and nothing else, two never come from one Region, and the
+                // room is the Ship's, counted over all of them -- crowding included.
+                let from_region = |o: &Order| match o {
+                    Order::Load { ship: x, from: LoadSource::State(st), army: None, .. } if x == ship => Some(*st),
+                    _ => None,
+                };
+                let loading: u32 = pending.iter().filter(|o| from_region(o).is_some()).map(|o| if let Order::Load { colonists, .. } = o { *colonists } else { 0 }).sum();
+                if s.colonists + loading + *colonists > capacity {
                     return fail(format!("this Ship carries at most {capacity} Colonists"));
                 }
-                if pending.iter().any(|o| matches!(o, Order::Transit { ship: x, .. } | Order::Load { ship: x, .. } | Order::Unload { ship: x, .. } | Order::ChangeOrbit { ship: x, .. } if x == ship)) {
+                let mine = from_region(order);
+                let other = |o: &&Order| matches!(o, Order::Transit { ship: x, .. } | Order::Load { ship: x, .. } | Order::Unload { ship: x, .. } | Order::ChangeOrbit { ship: x, .. } if x == ship);
+                let blocks = |o: &&Order| match (mine, from_region(o)) {
+                    (Some(a), Some(b)) => a == b,
+                    _ => true,
+                };
+                if pending.iter().filter(other).any(|o| blocks(&o)) {
+                    if mine.is_some() && pending.iter().filter(other).all(|o| from_region(o).is_some()) {
+                        return fail("this Ship already loads from that Region this turn");
+                    }
                     return fail("this Ship already has an order");
                 }
                 if *colonists > 0 {
@@ -1761,9 +1779,12 @@ impl Game {
                             if self.state(*st).control.director() != Some(seat) {
                                 return fail("you do not direct that Nation State");
                             }
-                            // Ticket #46: a lift to orbit needs a Launch Site there.
-                            if !self.state(*st).facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working()) {
-                                return fail("a lift to orbit needs a working Launch Site there");
+                            // Ticket #46: a lift to orbit needs a Launch Site there. Ticket #443 (version
+                            // 0.09.6), at the designer's word: not to LOW orbit -- a Colony Ship there
+                            // takes Pioneers from any Region its seat directs. A station's ring is
+                            // still reached by a Launch Site alone.
+                            if s.slot.is_some() && !self.state(*st).facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working()) {
+                                return fail("a lift to a station's orbit needs a working Launch Site there; low orbit needs none");
                             }
                             // Ticket #73: a Launch Site lifts only the Emigrants waiting there; the
                             // population was paid when they mustered.

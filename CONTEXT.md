@@ -343,7 +343,7 @@ The order that lands a Colony Ship's Colonists at a Colony of its Faction's. Sin
 _Avoid_: disembark, drop off
 
 **Colony Ship**:
-The Ship type that carries Colonists, and nothing else since version 0.04. It cannot attack and is weak if caught. Since version 0.06.0 a warming Earth crowds it: lifting at Earth it may take Colonists beyond its capacity, one for every fifth of a degree the Temperature stands above +1.8, at most four, and each of those crowded aboard may die when it arrives. Since version 0.09.5 an empty one says **Empty.** on its card, and a right-click move asks before sending it.
+The Ship type that carries Colonists, and nothing else since version 0.04. It cannot attack and is weak if caught. Since version 0.06.0 a warming Earth crowds it: lifting at Earth it may take Colonists beyond its capacity, one for every fifth of a degree the Temperature stands above +1.8, at most four, and each of those crowded aboard may die when it arrives. Since version 0.09.5 an empty one says **Empty.** on its card, and a right-click move asks before sending it. Since version 0.09.6 it may take Pioneers from several Regions in one turn at Earth, one Load each, together within its room.
 _Avoid_: transport, colony (that is the settlement), settler ship
 
 **Crowding**:
@@ -429,7 +429,7 @@ A building placed in a Region. Eighteen kinds since version 0.09.4, which added 
 _Avoid_: item, building, module (that is the Colony word), structure
 
 **Launch Site**:
-The Facility that puts people and Armies into orbit from a Region: since version 0.04 it builds no Ship, and it lifts the Region's waiting Pioneers and its raised Armies onto a Ship, or straight onto a Space Station of its Faction's over Earth; a station over Earth is built from it too. It must be working. Since version 0.09.1 a lift from a Launch Site reaches any orbit of Earth -- low orbit or any station's -- where until then it reached low orbit alone; a place without one, a Colony on the ground, is still reached from low orbit only, and no Colony builds one. A lift that asks more than a station has room for fills what there is, the rest waiting in the Region.
+The Facility that puts people and Armies into orbit from a Region: since version 0.04 it builds no Ship, and it lifts the Region's waiting Pioneers and its raised Armies onto a Ship, or straight onto a Space Station of its Faction's over Earth; a station over Earth is built from it too. It must be working. Since version 0.09.1 a lift from a Launch Site reaches any orbit of Earth -- low orbit or any station's -- where until then it reached low orbit alone; a place without one, a Colony on the ground, is still reached from low orbit only, and no Colony builds one. A lift that asks more than a station has room for fills what there is, the rest waiting in the Region. Since version 0.09.6 a Colony Ship in low orbit over Earth takes Pioneers from any Region of its Faction's without one; a station's ring, and a lift straight onto a station, still need it.
 _Avoid_: spaceport (that is the Arkwrights' Unique Facility), launch pad, launch (a Launch fires a Warhead)
 
 **Research Lab**:

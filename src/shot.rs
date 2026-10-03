@@ -808,6 +808,13 @@ fn build_board(session: &mut Session) {
                 g.state_mut(sid).emigrants = n;
             }
         }
+        // `emigrantsall:<n>` (a building aid, ticket #443, version 0.09.6): n Pioneers wait in EVERY
+        // Region seat 0 holds, so a Colony Ship's card shows a row for each (with `pressedat:1`).
+        if let Some(n) = std::env::args().find_map(|a| a.strip_prefix("emigrantsall:").and_then(|v| v.parse::<u32>().ok())) {
+            for sid in g.controlled_states(Seat(0)) {
+                g.state_mut(sid).emigrants = n;
+            }
+        }
         // `room:1` (a building aid, ticket #141): seat 0's station over Earth has a Habitat, so the
         // lift button can be photographed on turn 1, when the station is still a bare core.
         if std::env::args().any(|a| a == "room:1")

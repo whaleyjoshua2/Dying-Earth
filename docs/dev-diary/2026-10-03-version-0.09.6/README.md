@@ -142,3 +142,20 @@ A new aid, `scrubber:<Region>` (or `scrubber:own`), stands one Scrubber in a Reg
   - Both now allow for the transfer's destruction roll, which can take one building of any kind.
 - **Older tests:** the 0.05 test that pinned destruction now pins half. The ticket #351 test (a
   Region occupied from neutral adds nothing) holds unchanged, by keeping that case at nought.
+
+## A Colony Ship takes Pioneers from several countries (ticket #443)
+
+A new aid, `emigrantsall:<n>`, puts n Pioneers in every Region seat 0 holds.
+
+- [`ship-card.png`](ticket-443-several-regions/ship-card.png), taken with
+  `pressedat:1 emigrantsall:3 colonyship:1 stack:earth ship:1 panel:0 seed:7`. An empty Colony Ship
+  in low orbit over Earth, with two rows: "Load 3 Pioneers from Nigeria" and "Load 3 Pioneers from
+  China". Nigeria has no Launch Site, and its row is open because the Ship is in low orbit. Under
+  them, "Load 2 Colonists from ISS over Earth" is greyed, since the ISS is reached from its own ring.
+  The tank reads 35/35 (ticket #455).
+- **Witnessed red, three new tests:**
+  - **the rule:** a second Region's Load was refused, "this Ship already has an order";
+  - **low orbit:** refused for want of a Launch Site;
+  - **the computer:** run against the previous `ai.rs`, it loaded from China alone (`[EastAsia]`).
+- **Older tests:** two checked a Launch Site refusal with the Ship in low orbit. They now check it from
+  a station's ring.
