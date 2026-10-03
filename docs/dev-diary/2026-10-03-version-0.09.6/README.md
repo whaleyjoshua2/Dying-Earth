@@ -253,3 +253,13 @@ the rival's whole-game Blame above the quarter, so it does not move.
 - [`slots.png`](ticket-452-two-texts/slots.png), taken with
   `select:eastasia panel:0 seed:7 "tip:Slots: Size"`. China's slots hover: "Size 3 + 3 + starting
   Industry 3, +1 inland per raise", then 4 coastal, then the line about mothballed and building.
+
+## The Colonists line (ticket #450)
+
+- [`full-red.png`](ticket-450-colonists-line/full-red.png), taken with `first:1 hab:ground seed:7`.
+  The Moon Colony, 4 of 4: "4/4" in red.
+- [`three-quarters-amber.png`](ticket-450-colonists-line/three-quarters-amber.png), taken with
+  `marsstation:1 selectstation:mars seed:7 "tip:Colonists 6 of"`. "6/8" in amber, with the hover
+  "Colonists 6 of 8 room. Growing: +0.1 a turn, next Colonist in 9 turns."
+- [`half-plain.png`](ticket-450-colonists-line/half-plain.png), taken with `hab:1 seed:7`. The ISS,
+  "2/4" in plain text.

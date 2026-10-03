@@ -327,3 +327,16 @@ The authority is [ticket #452](https://github.com/whaleyjoshua2/Dying-Earth/issu
   > coastal. A Sea Wall stops the taking, not the turning.
   > Mothballed and building each keep a slot.
 - Every rule the old texts stated is kept.
+
+## 14. The Colonists line: 8/12, a glyph, coloured by fullness
+
+The authority is [ticket #450](https://github.com/whaleyjoshua2/Dying-Earth/issues/450). No rule moves.
+
+- **The form:** the Colony and station card's Colonists line reads `[people glyph] 8/12`, where it
+  read "Colonists 8 of 12 room". The words move to its hover: "Colonists 8 of 12 room.", then the
+  growth line (§11).
+- **The colours:**
+  - plain under three quarters full;
+  - **amber** from three quarters;
+  - **red** when full, since a full place takes no more Colonists and grows no further.
+- **Where:** the Colony and station card only. Map labels and roster lines keep their words.

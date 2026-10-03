@@ -7717,8 +7717,21 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     // each, so the line no longer names Habitats alone.
     // Ticket #444 (version 0.09.6): the hover says whether the place is growing, and when the next
     // Colonist comes, or why it is shrinking.
-    let line = ui.label(format!("Colonists {} of {} room", col.colonists, game.habitat_room(col)));
-    rule_tip(line, colony_growth_words(game, col));
+    // Ticket #450 (version 0.09.6): the glyph and `8/12`, the words gone to the hover; amber from
+    // three quarters full, red when full, since a full place takes nobody and grows no further.
+    let room = game.habitat_room(col);
+    let fill = if room == 0 { 1.0 } else { col.colonists as f64 / room as f64 };
+    let ink = if fill >= 1.0 { Color32::from_rgb(230, 90, 80) } else if fill >= 0.75 { Color32::from_rgb(230, 170, 90) } else { ui.visuals().text_color() };
+    let line = ui
+        .horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 4.0;
+            if let Some(image) = Icons::from_ctx(ui.ctx(), "population", 15.0) {
+                ui.add(image);
+            }
+            ui.label(RichText::new(format!("{}/{}", col.colonists, room)).color(ink));
+        })
+        .response;
+    rule_tip(line, format!("Colonists {} of {} room.\n{}", col.colonists, room, colony_growth_words(game, col)));
     // Ticket #391 (version 0.09.3): what the Colony made this turn, under its people.
     output_row(ui, game, Place::Colony(cid));
     // Ticket #204 (version 0.08.1): the receiver's door, against the figure it changes.
