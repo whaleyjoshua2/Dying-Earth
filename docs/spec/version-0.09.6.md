@@ -282,3 +282,31 @@ The authority is [ticket #444](https://github.com/whaleyjoshua2/Dying-Earth/issu
 - a Colony past its room;
 - a blockaded or dark Colony growing;
 - an Earth Region's growth not matching its hover.
+
+## 12. The Custodians' aggression follows a rival's CO2
+
+The authority is [ticket #446](https://github.com/whaleyjoshua2/Dying-Earth/issues/446). Computer
+seats only; no rule moves for a human Custodian.
+
+- **The measure** is a rival's share of **this turn's emissions**, every seat's sources counted
+  (`emissions_share`).
+- **The lift:** against a rival above a fair quarter, the computer Custodians weigh every hostile act
+  by `1 + emitter_k × (share − 0.25)`, at most `emitter_cap` (`ai.toml`: 2.0 and 2.0). A rival at
+  40% is ×1.3; one at 75% or more is ×2. The acts:
+  - Smear and Agitate;
+  - Influence spent on that rival's Regions and Colonies;
+  - an Army's attack and a march on that rival's Region;
+  - a warship's Attack at a Body where that rival has Ships, and a Blockade of that rival's station.
+- **Cause:** against such a rival the Custodians have cause at Relations **−3** (`emitter_cause`),
+  where every computer seat needs −5 (`war_cause`). Every hostile act's gate reads one test,
+  `has_cause`.
+- **Wording:** the code's comments called −5 "Cold"; the game's scale calls it **Wary**, and the
+  comments now say so.
+- A Smear still needs the rival's Blame share above a fair quarter, as since ticket #267.
+
+**What would show this wrong:**
+
+- a computer Custodian Smearing or marching on a rival at −4 whose emissions share is at or under a
+  quarter;
+- any other computer seat acting at −3;
+- a lift above ×2.

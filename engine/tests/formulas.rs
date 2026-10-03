@@ -18814,3 +18814,41 @@ fn a_colony_grows_by_two_percent_a_turn_and_declines_when_starved_or_dark() {
     g.colony_growth_step();
     assert_eq!(g.colony(c).unwrap().colonists, room - 1, "the lights out, one gone");
 }
+
+/// Ticket #446 (version 0.09.6): **the computer Custodians' aggression follows a rival's CO2.**
+/// Against a rival above a fair quarter of this turn's emissions every hostile act is weighed
+/// `1 + 2 × (share − 0.25)`, at most ×2, and they have cause at Relations −3 where every seat needs
+/// −5. No other seat is touched, nor a rival at or under the quarter.
+#[test]
+fn the_custodians_aggression_follows_a_rivals_emissions() {
+    let mut g = game();
+    let cus = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Custodians).unwrap();
+    let mut others = Seat::ALL.into_iter().filter(|s| *s != cus);
+    let (heavy, light, third) = (others.next().unwrap(), others.next().unwrap(), others.next().unwrap());
+    let mut by = [0.0; 4];
+    by[heavy.index()] = 40.0;
+    by[light.index()] = 20.0;
+    by[cus.index()] = 20.0;
+    by[third.index()] = 20.0;
+    g.climate.last.by_seat = by;
+    assert!((g.emissions_share(heavy) - 0.4).abs() < 1e-9);
+    assert!((g.emitter_lift(cus, heavy) - 1.3).abs() < 1e-9, "1 + 2 x 0.15");
+    assert_eq!(g.emitter_lift(cus, light), 1.0, "at or under the quarter, nothing");
+    assert_eq!(g.emitter_lift(heavy, cus), 1.0, "only the Custodians");
+    g.climate.last.by_seat = [0.0, 0.0, 0.0, 0.0];
+    g.climate.last.by_seat[heavy.index()] = 100.0;
+    assert_eq!(g.emitter_lift(cus, heavy), 2.0, "at most x2");
+    // Cause at −3 against the heavy emitter; −5 still for everyone else.
+    for s in Seat::ALL {
+        for r in Seat::ALL {
+            g.relations.score[s.index()][r.index()] = 0;
+        }
+    }
+    g.relations.score[cus.index()][heavy.index()] = -3 - g.relations_score(cus, heavy);
+    g.relations.score[cus.index()][light.index()] = -3 - g.relations_score(cus, light);
+    g.relations.score[light.index()][heavy.index()] = -3 - g.relations_score(light, heavy);
+    assert_eq!(g.relations_score(cus, heavy), -3, "the premise");
+    assert!(g.has_cause(cus, heavy), "the Custodians act at −3 against a heavy emitter");
+    assert!(!g.has_cause(cus, light), "not against a light one");
+    assert!(!g.has_cause(light, heavy), "and no other seat at −3");
+}

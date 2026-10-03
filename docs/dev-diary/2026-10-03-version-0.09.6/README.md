@@ -223,3 +223,24 @@ station, people sent down). How often the computer took them is not measured her
 Colonists off Earth at the end, seating by seating, were 92 / 109 / 150 / 133, against
 92 / 105 / 143 / 139. Growth stops at a Colony's room, and most computer Colonies stand full, so it
 adds little as the computer plays today.
+
+## The Custodians' aggression follows a rival's CO2 (ticket #446)
+
+**Witnessed red:** the new test `the_custodians_aggression_follows_a_rivals_emissions` checks
+×1.3 at a 40% share, ×2 at the cap, nothing at or under a quarter or for any other seat, and cause
+at −3. Run with `emitter_cause` set back to −5, it failed on "the Custodians act at −3 against a
+heavy emitter". No picture: nothing on screen changes.
+
+**The sweep after this ticket** ([`sweeps/after-446.txt`](sweeps/after-446.txt)): 10 / 8 / 8 / 8 with
+46 collapses, where it was 10 / 7 / 8 / 10 with 45. The move is inside the noise. In the seating with
+the Custodians as seat 0, against the sweep after #444:
+
+| Seat 0 (the Custodians) | after #444 | after #446 |
+|---|---|---|
+| Agitates landed | 135 | **382** |
+| Battles opened | 15 | 17 |
+| places taken by force | 11 | 6 |
+| Smear laid on the Prospectors | 71 | 70 |
+
+The new aggression shows almost entirely as Agitate, nearly three times as much. A Smear still needs
+the rival's whole-game Blame above the quarter, so it does not move.
