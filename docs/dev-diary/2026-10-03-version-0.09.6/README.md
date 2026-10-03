@@ -55,3 +55,13 @@ at 2.0 make 1.5, not 1". It passes after the fix.
 - **Witnessed red:** the new test `the_archive_costs_150_and_the_computer_paces_to_it` failed with
   `left: 125, right: 150`. Two older tests pinned the 125 (#347's figure, and the turn-one line's
   words). They read 150 now; the turn-one line itself already followed the data.
+
+## The Custodians' Influence at ×1.15 (ticket #440)
+
+- [`card.png`](ticket-440-custodians-influence/card.png), taken with
+  `factions:custodians rulebook:1 panel:0 seed:7 "tip:Influence Allotment x"`. The forced hover
+  reads "Influence Allotment x1.15". The top bar and the Greenwash line both read 14 Influence this
+  turn, where 0.09.5's pictures read 15.
+- **Witnessed red:** the new test `the_custodians_influence_multiplier_is_one_point_one_five`
+  failed before the data moved. Two Allotment tests moved their figures (15 to 14, 20 to 19, 21 to
+  20; 16 holds). The 0.06.0 test that pinned 1.2 is gone, superseded.

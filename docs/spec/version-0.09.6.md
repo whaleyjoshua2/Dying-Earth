@@ -91,3 +91,17 @@ The authority is [ticket #439](https://github.com/whaleyjoshua2/Dying-Earth/issu
 
 **What would show this wrong:** an Archive that completes, or a first Victory part that fills, at
 any figure but 150; or a computer Archivist pace that ends anywhere else.
+
+## 5. The Custodians' Influence at ×1.15
+
+The authority is [ticket #440](https://github.com/whaleyjoshua2/Dying-Earth/issues/440).
+
+- **The Custodians' Influence multiplier is 1.15**, where it was 1.2. The card shows "x1.15" and
+  its hover "Influence Allotment x1.15", both read from the data.
+- **Rounding is unchanged:** the Allotment is multiplied, then rounded down to a whole point, as
+  every Faction's is. From China at the start, (10 + 3) × 1.15 = 14.95 gives **14** a turn, where
+  ×1.2 gave 15.
+- **The computer Custodians** read the Allotment, not the figure, so nothing of theirs moves.
+
+**What would show this wrong:** a Custodian Allotment of 15 from China alone on turn 1, or a card
+that reads x1.2.

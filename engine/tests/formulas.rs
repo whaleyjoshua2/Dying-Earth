@@ -466,15 +466,16 @@ fn the_allotment_is_the_base_plus_each_controlled_states_value_times_the_faction
     // 1.2. They hold East Asia -- China since ticket #122 -- whose value went 4 to 3 when ticket
     // #125 (version 0.07.2) cut Japan and Korea out of it: (10 + 3) x 1.2 = 15.6 -> 15. Europe
     // is still 5, and the Prospectors are still x1.0.
-    assert_eq!(g.tables.faction(FactionKind::Custodians).influence_multiplier, 1.2);
-    assert_eq!(g.influence_allotment(Seat(0)), 15);
+    // Ticket #440 (version 0.09.6): 1.15, rounded down: (10 + 3) x 1.15 = 14.95 -> 14.
+    assert_eq!(g.tables.faction(FactionKind::Custodians).influence_multiplier, 1.15);
+    assert_eq!(g.influence_allotment(Seat(0)), 14);
     assert_eq!(g.influence_allotment(Seat(1)), 15);
     g.state_mut(StateId::NorthAmerica).control = Control::Controlled(Seat(1));
     assert_eq!(g.influence_allotment(Seat(1)), 22, "North America adds 7");
     // Raising East Asia's Industry Level adds one to its value.
     g.state_mut(StateId::EastAsia).industry_level += 1;
     assert_eq!(g.state_influence_value(StateId::EastAsia), 4);
-    assert_eq!(g.influence_allotment(Seat(0)), 16, "(10 + 4) x 1.2 = 16.8");
+    assert_eq!(g.influence_allotment(Seat(0)), 16, "(10 + 4) x 1.15 = 16.1");
     // Ticket #53: twelve states share out the eight states' figures exactly, so the total stands.
     let total: i64 = StateId::ALL.iter().map(|s| g.tables.state(*s).influence).sum();
     assert_eq!(total, 34, "7 + 5 + 4 + 4 + 4 + 2 + 2 + 2 + 1 + 1 + 1 + 1, as the eight totalled 34");
@@ -844,15 +845,15 @@ fn embassies_and_relays_add_to_the_allotment_and_raise_their_places_standing_eac
     let mut g = game();
     // Ticket #54: the Custodians' multiplier is 1.25; ticket #82 (version 0.06.0): 1.2. In East
     // Asia, value 3 since ticket #125: (10 + 3) x 1.2 = 15. Two Embassies (they stack) add 4:
-    // (10 + 3 + 4) x 1.2 = 20.4 -> 20.
-    assert_eq!(g.influence_allotment(Seat(0)), 15);
+    // (10 + 3 + 4) x 1.2 = 20.4 -> 20. Ticket #440 (version 0.09.6): x1.15, so 14, 19 and 20.
+    assert_eq!(g.influence_allotment(Seat(0)), 14);
     g.state_mut(StateId::EastAsia).facilities.push(facility(FacilityKind::Embassy));
     g.state_mut(StateId::EastAsia).facilities.push(facility(FacilityKind::Embassy));
     assert_eq!(g.building_allotment(Seat(0)), 4);
-    assert_eq!(g.influence_allotment(Seat(0)), 20);
+    assert_eq!(g.influence_allotment(Seat(0)), 19);
     // A Relay in a Colony adds 1 more.
     let c = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Relay], 4);
-    assert_eq!(g.influence_allotment(Seat(0)), 21, "(10 + 3 + 5) x 1.2 = 21.6");
+    assert_eq!(g.influence_allotment(Seat(0)), 20, "(10 + 3 + 5) x 1.15 = 20.7");
     // Each Resolution the standing rises by the buildings' figures and does not decay. Ticket #75:
     // the start state begins at its threshold, so the rises are counted from there.
     let claim = g.seats[0].influence[&Place::State(StateId::EastAsia)];
@@ -6550,13 +6551,6 @@ fn the_income_pays_the_doubled_mine() {
     let name = g.place_name(Place::Colony(moon));
     assert!(g.seat(cus).income_sources.iter().any(|(src, r, n)| src.starts_with(&format!("Mine in {name}")) && src.contains("doubled") && *r == Resource::Materials && *n == 13.2), "{:?}", g.seat(cus).income_sources);
     assert_eq!(g.seat(cus).doubled_module_turns, 1);
-}
-
-/// Ticket #82: the Custodians' Influence multiplier is 1.2 (1.25 before).
-#[test]
-fn the_custodians_influence_multiplier_is_one_point_two() {
-    let g = game();
-    assert!((g.tables.faction(FactionKind::Custodians).influence_multiplier - 1.2).abs() < 1e-9);
 }
 
 /// Ticket #82: the Custodian AI idles a Mine on Earth once an undoubled Mine off Earth outproduces
@@ -18439,4 +18433,12 @@ fn the_archive_costs_150_and_the_computer_paces_to_it() {
     assert_eq!(t.archive.research, 150);
     assert_eq!(t.faction(FactionKind::Archivists).victory_first.bar, 150.0);
     assert_eq!(t.ai_pace(FactionKind::Archivists).first, vec![[10, 38], [18, 75], [26, 113], [32, 150]]);
+}
+
+/// Ticket #440 (version 0.09.6): **the Custodians' Influence multiplier is 1.15**, at the
+/// designer's word, the Allotment still rounded down after it.
+#[test]
+fn the_custodians_influence_multiplier_is_one_point_one_five() {
+    let t = tables();
+    assert!((t.faction(FactionKind::Custodians).influence_multiplier - 1.15).abs() < 1e-9);
 }

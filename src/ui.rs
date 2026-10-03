@@ -5194,7 +5194,7 @@ struct RowPart {
 }
 
 /// Ticket #132 (version 0.07.3): a row of parts separated by a middle dot, each hugging its own
-/// glyph and carrying its own hover: `Output x1 · [chimney] x0.75 · [flask] x1.25 · [horn] x1.2`
+/// glyph and carrying its own hover: `Output x1 · [chimney] x0.75 · [flask] x1.25 · [horn] x1.15`
 /// on a Faction card, `leans [cart]` on the start globe's Region panel. This is the one place the
 /// glyph rule bends: here the glyph HEADS a multiplier instead of following a number (see
 /// `draw_with_icons`), because four cards side by side are read by comparison, glyph under glyph,
