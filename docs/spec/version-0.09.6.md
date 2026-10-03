@@ -394,3 +394,33 @@ behind it, the seat weighs what advances that Victory more heavily.
 | after | 8 | 3 | 6 | 22 | 41 |
 
 The Arkwrights end at nought in 23 games, where it was 49.
+
+## 17. The computer seats break Blockades
+
+The authority is [ticket #447](https://github.com/whaleyjoshua2/Dying-Earth/issues/447). Computer seats
+only; no rule moves.
+
+- **A Blockade is cause.** A seat with a place starved by a rival's Blockade has cause against that
+  rival at once (`has_cause`), where it waited for Relations to fall to −5 at one a turn.
+- **The Battery comes first.**
+  - At a place under Blockade the computer weighs no Materials build: the place makes no Widgets, so
+    none would finish.
+  - The Battery bought with Ducats takes the opportunity multiplier beside the threat.
+  - The purchase still goes ahead with a Battery on order there, since that one cannot finish. The
+    ticket had called this a bug; it is not.
+- **A standing fleet.** A seat with a Shipyard keeps 2 warships, 4 while any place of its own is
+  blockaded (`ai.toml` `warships_wanted`, `warships_wanted_blockaded`), counting those on order.
+  Below the figure a warship takes the threat's lift, and the opportunity multiplier while blockaded.
+- **A backup yard.** A seat with exactly one Shipyard, and no station still waiting for one, wants a
+  second station over Earth, where two of its own may now stand; with the threat's lift while
+  blockaded. Elsewhere the one-station-a-Body loop offers its stations as before.
+- **Measured,** against the sweep before this ticket:
+
+| Over 80 games | before | after |
+|---|---|---|
+| games with an orbital Battle | 7 | 14 |
+| games with a Blockade | 5 | 7 |
+| warships built | 77 | 103 |
+| Batteries standing at the end | 28 | 42 |
+| wins (Cust / Pros / Ark / Arch) | 8 / 3 / 6 / 22 | 15 / 10 / 10 / 5 |
+| collapses | 41 | 40 |

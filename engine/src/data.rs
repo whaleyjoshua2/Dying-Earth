@@ -1355,6 +1355,9 @@ pub struct AiThresholds {
     pub market_materials_reserve: f64,
     pub market_materials_turns: f64,
     pub market_fuel_reserve: f64,
+    /// Ticket #447 (version 0.09.6): the standing fleet, and the fleet while blockaded.
+    pub warships_wanted: u32,
+    pub warships_wanted_blockaded: u32,
     pub evade_damage_fraction: f64,
     pub influence_step: i64,
     /// Ticket #75: a held state's worth on the Influence target list, as a share of a neutral one's.

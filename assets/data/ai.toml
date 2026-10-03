@@ -447,6 +447,10 @@ emitter_cause = -3
 market_materials_reserve = 20.0
 market_materials_turns = 3.0
 market_fuel_reserve = 10.0
+# Ticket #447 (version 0.09.6): the warships a seat with a Shipyard keeps as a standing fleet, and
+# while any place of its own is under Blockade. Below the figure a warship takes the threat's lift.
+warships_wanted = 2
+warships_wanted_blockaded = 4
 evade_damage_fraction = 0.6667
 influence_step = 5
 # Ticket #75 (version 0.05.5): what a state another Faction holds is worth on the AI's Influence

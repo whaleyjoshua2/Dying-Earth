@@ -18970,3 +18970,82 @@ fn the_archivists_computer_is_paced_in_uploads() {
     let head = g.log.iter().find(|l| l.starts_with("AI ") && l.contains("scored")).cloned().unwrap();
     assert!(head.contains("gap x1.00"), "no Archive, no Uploads pace: {head}");
 }
+
+/// A rival Frigate on Blockade in the ring of seat 0's station over Earth (ticket #447's board).
+fn blockade_the_iss(g: &mut Game, by: Seat) -> ColonyId {
+    let iss = station_of(g, Seat(0), BodyId::Earth).unwrap();
+    let slot = g.colony(iss).unwrap().slot;
+    let id = ShipId(g.fresh_id());
+    g.ships.push(Ship { name: String::new(), id, kind: UnitKind::Frigate, seat: by, damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Blockade, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: Some(slot) });
+    assert_eq!(g.starved_by(iss), Some(by), "the premise: the station is blockaded");
+    iss
+}
+
+/// Ticket #447 (version 0.09.6): **a Blockade is cause, and the Battery comes first.** A blockaded
+/// computer seat has cause against the blockader at once, Relations untouched; at the blockaded place
+/// it weighs no Materials build (nothing finishes there, the place making no Widgets) and the Battery
+/// bought with Ducats takes the opportunity multiplier beside the threat.
+#[test]
+fn a_blockaded_seat_has_cause_and_buys_the_battery_first() {
+    let mut g = game();
+    calm(&mut g);
+    let by = Seat(1);
+    assert!(!g.has_cause(Seat(0), by), "the premise: no cause while Neutral");
+    let iss = blockade_the_iss(&mut g, by);
+    assert!(g.has_cause(Seat(0), by), "a Blockade is cause against the blockader");
+    assert!(!g.has_cause(Seat(0), Seat(2)), "and against nobody else");
+    g.seats[0].stockpile.materials = 300.0;
+    g.seats[0].stockpile.ducats = 300.0;
+    g.colony_mut(iss).unwrap().colonists = 4;
+    let orders = g.ai_orders(Seat(0));
+    assert!(orders.iter().any(|o| matches!(o, Order::BuildModuleWithDucats { colony, kind: ModuleKind::Battery } if *colony == iss)), "the Battery is bought: {orders:?}");
+    assert!(!orders.iter().any(|o| matches!(o, Order::BuildModule { colony, .. } if *colony == iss)), "and no Materials build at the blockaded place: {orders:?}");
+}
+
+/// Ticket #447 (version 0.09.6): **a standing want of two warships**, four while blockaded. Below it a
+/// warship is weighed at the threat's lift; at it, at its plain weight.
+#[test]
+fn a_seat_with_a_yard_wants_two_warships() {
+    let board = |warships: usize| {
+        let mut g = game();
+        calm(&mut g);
+        g.ships.retain(|s| s.seat != Seat(0));
+        let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
+        g.colony_mut(iss).unwrap().modules.push(Module::new(ModuleKind::Shipyard));
+        g.seats[0].stockpile.materials = 300.0;
+        g.seats[0].stockpile.fuel = 300.0;
+        for _ in 0..warships {
+            let id = ShipId(g.fresh_id());
+            g.ships.push(Ship { name: String::new(), id, kind: UnitKind::Frigate, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None });
+        }
+        g.ai_orders(Seat(0));
+        scored(&g, "build Frigate at")
+    };
+    let (none, two) = (board(0), board(2));
+    assert!(two > 0.0, "a Frigate is still weighed with two: {two}");
+    assert!(none >= two * 2.0 - 1e-9, "below the standing want it takes the threat's lift: {none} against {two}");
+    assert_eq!(game().tables.ai.thresholds.warships_wanted, 2);
+    assert_eq!(game().tables.ai.thresholds.warships_wanted_blockaded, 4);
+}
+
+/// Ticket #447 (version 0.09.6): **a second station as a backup yard.** A seat with exactly one
+/// Shipyard wants a second station, over Earth first -- where two of its own may stand -- and wants no
+/// third while the second has no yard yet.
+#[test]
+fn a_seat_with_one_yard_wants_a_second_station_over_earth() {
+    let mut g = game();
+    calm(&mut g);
+    let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
+    g.colony_mut(iss).unwrap().modules.push(Module::new(ModuleKind::Shipyard));
+    g.seats[0].stockpile.materials = 300.0;
+    let orders = g.ai_orders(Seat(0));
+    assert!(scored(&g, "as a backup yard") > 0.0, "a second station over Earth is weighed: {:#?}", g.log.iter().filter(|l| l.contains("over Earth")).collect::<Vec<_>>());
+    assert!(orders.iter().any(|o| matches!(o, Order::BuildStation { body: BodyId::Earth, .. })) || scored(&g, "as a backup yard") > 0.0);
+    // A second station standing with no yard yet: no third.
+    let slot = g.free_orbital_slots(BodyId::Earth)[0];
+    let id = ColonyId(g.fresh_id());
+    g.colonies.push(Colony { id, body: BodyId::Earth, slot, control: Control::Controlled(Seat(0)), modules: vec![Module::new(ModuleKind::Core)], colonists: 0, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
+    g.log.clear();
+    g.ai_orders(Seat(0));
+    assert_eq!(scored(&g, "as a backup yard"), 0.0, "no third while the second has no yard");
+}

@@ -314,3 +314,32 @@ Three sweeps, all filed:
 - the Arkwrights' test, against the previous `ai.rs`: thirty over Earth and no Body read "gap x1.00";
 - the Archivists' test, twice: nobody Uploaded at turn 30 read on pace before the pace existed, and
   with no Archive the first cut read "gap x3.00 on Presence".
+
+## The computer seats break Blockades (ticket #447)
+
+**Found at the start (measured):** Blockades had nearly vanished this version. Games with a Blockade
+went 18 (0.09.5) to 5, orbital Battles 21 to 7 and warships built 199 to 77, the falls coming with
+the market (#448) and pace (#449) tickets.
+
+**The sweep after this ticket** ([`sweeps/after-447.txt`](sweeps/after-447.txt)):
+
+| Over 80 games | before | after |
+|---|---|---|
+| games with an orbital Battle | 7 | 14 |
+| games with a Blockade | 5 | 7 |
+| warships built | 77 | 103 |
+| Batteries standing at the end | 28 | 42 |
+| Blockade-turns suffered | 0 | 5 |
+| wins (Cust / Pros / Ark / Arch) | 8 / 3 / 6 / 22 | **15 / 10 / 10 / 5** |
+| collapses | 41 | 40 |
+
+- **The win column moved more than anything else.** The Archivists fell from 22 to 5 and end at
+  nought in 51 games, where it was 34. The Custodians, Prospectors and Arkwrights each rose. Why the
+  Archivists fell was not traced.
+- **The sweep does not count stations over Earth**, so how often the backup yard was built is not
+  measured.
+
+**Witnessed red, three new tests:**
+- a blockaded seat had no cause against the blockader;
+- a Frigate scored 3 with no fleet and 3 with two warships;
+- no second station over Earth was weighed.

@@ -145,7 +145,20 @@ impl Game {
     pub fn has_cause(&self, seat: Seat, rival: Seat) -> bool {
         let th = &self.tables.ai.thresholds;
         let bar = if self.emitter_lift(seat, rival) > 1.0 { th.emitter_cause } else { th.war_cause };
-        rival != seat && self.relations_score(seat, rival) <= bar
+        // Ticket #447 (version 0.09.6): a Blockade is cause, at once. Relations fall one a turn of
+        // it, so a blockaded seat's warships sat on Hold through the turns that mattered.
+        rival != seat && (self.relations_score(seat, rival) <= bar || self.blockaded_by(seat, rival))
+    }
+
+    /// Ticket #447 (version 0.09.6): whether a place of this seat's is starved by that rival's
+    /// Blockade.
+    pub fn blockaded_by(&self, seat: Seat, rival: Seat) -> bool {
+        self.colonies.iter().any(|c| c.control.director() == Some(seat) && self.starved_by(c.id) == Some(rival))
+    }
+
+    /// Ticket #447 (version 0.09.6): whether any place of this seat's is under Blockade.
+    pub fn blockaded(&self, seat: Seat) -> bool {
+        self.colonies.iter().any(|c| c.control.director() == Some(seat) && self.starved_by(c.id).is_some())
     }
 
     pub fn war_cause_at(&self, seat: Seat, place: Place) -> bool {
@@ -1491,7 +1504,14 @@ impl Game {
             if self.free_module_slots(&col) == 0 {
                 continue;
             }
+            // Ticket #447 (version 0.09.6): a place under Blockade makes no Widgets, so nothing built
+            // for Materials there ever finishes. It weighs none; the Battery bought with Ducats, below,
+            // is the one build that lands, and it comes first.
+            let starved_here = self.starved_by(cid).is_some();
             for mk in ModuleKind::BUILDABLE {
+                if starved_here {
+                    break;
+                }
                 // Ticket #186 (version 0.08.0): as on Earth -- the Custodians build their Academy in
                 // place of the Institute, nobody else builds an Academy, and what is left is weighed
                 // by the job it does.
@@ -1778,7 +1798,7 @@ impl Game {
             // present and a fight to take or leave. Measured before: the seat blockaded for 35
             // turns built no warship and answered nothing.
             if self.starved_by(cid).is_some() && !col.modules.iter().any(|m| m.kind == ModuleKind::Battery) {
-                push(vec![Order::BuildModuleWithDucats { colony: cid, kind: ModuleKind::Battery }], Cat::ArmyOrBarracks, self.base_weight(seat, Cat::ArmyOrBarracks), 1.0, m.threat, 1.0, format!("buy a Battery for {} against the Blockade", self.place_name(Place::Colony(cid))), None);
+                push(vec![Order::BuildModuleWithDucats { colony: cid, kind: ModuleKind::Battery }], Cat::ArmyOrBarracks, self.base_weight(seat, Cat::ArmyOrBarracks), 1.0, m.threat, m.opportunity, format!("buy a Battery for {} against the Blockade", self.place_name(Place::Colony(cid))), None);
             }
             // Ticket #359 (version 0.09.1): a WORKING Barracks, which is what the raise's door reads.
             if col.modules.iter().any(|m| m.kind == ModuleKind::Barracks && m.working()) && !self.armies.iter().any(|a| a.home == ArmyHome::Colony(cid)) {
@@ -1811,6 +1831,17 @@ impl Game {
             // seats had cause in 710 of 2,456 seat-turns and a warship in 70.
             let cause_target = seat.others().iter().any(|o| self.has_cause(seat, *o) && self.colonies.iter().any(|c| c.control.director() == Some(*o)));
             let war_threat = if cause_target { m.threat.max(threat) } else { threat };
+            // Ticket #447 (version 0.09.6): a STANDING fleet. A seat with a yard keeps
+            // `warships_wanted` warships, `warships_wanted_blockaded` while a place of its own is
+            // blockaded, counting those on order; below it a warship takes the threat's lift, and
+            // the opportunity multiplier while blockaded. Measured before: 77 warships built in 80
+            // games, and an orbital Battle in 7.
+            let fleet = self.ships.iter().filter(|s| s.seat == seat && s.kind.is_warship()).count()
+                + self.colonies.iter().filter(|c| c.control.director() == Some(seat)).flat_map(|c| c.queue.iter()).filter(|b| matches!(b.item, BuildItem::Unit(k) if k.is_warship())).count();
+            let under_blockade = self.blockaded(seat);
+            let fleet_short = (fleet as u32) < if under_blockade { th.warships_wanted_blockaded } else { th.warships_wanted };
+            let war_threat = if fleet_short { m.threat.max(war_threat) } else { war_threat };
+            let fleet_opp = if fleet_short && under_blockade { m.opportunity } else { 1.0 };
             for uk in UnitKind::SHIPS {
                 let cat = match uk {
                     UnitKind::ColonyShip => Cat::ColonyShip,
@@ -1849,7 +1880,7 @@ impl Game {
                     Some(buy) => vec![buy, build],
                     None => vec![build],
                 };
-                push(orders, cat, self.base_weight(seat, cat), gap_for(cat, None), lift, 1.0, format!("build {} at {}", uk.name(), self.place_name(Place::Colony(cid))), None);
+                push(orders, cat, self.base_weight(seat, cat), gap_for(cat, None), lift, if cat == Cat::Warship { fleet_opp } else { 1.0 }, format!("build {} at {}", uk.name(), self.place_name(Place::Colony(cid))), None);
             }
         }
 
@@ -1952,6 +1983,25 @@ impl Game {
             if let Some(slot) = self.free_orbital_slots(body).first() {
                 let opp = if has_shipyard { 1.0 } else { m.opportunity };
                 push(vec![Order::BuildStation { body, slot: *slot }], Cat::LaunchSiteOrShipyard, self.base_weight(seat, Cat::LaunchSiteOrShipyard) * self.ai_founding_pull(seat), 1.0, 1.0, opp, format!("build {} over {}", self.station_name(body, *slot), self.tables.body(body).name), None);
+            }
+        }
+        // Ticket #447 (version 0.09.6): **a backup yard.** A seat with exactly one Shipyard, and no
+        // station of its own still waiting for one, wants a second station: over Earth first, where
+        // two of its own may stand, then wherever the loop above offers one (the Moon first of them).
+        // While a place of its own is blockaded the want takes the threat's lift. A seat whose one
+        // yard is shut builds no Ship at all, which is how a Blockade held: measured, a seat
+        // blockaded for 35 turns built no warship.
+        {
+            let has_yard = |c: &Colony| c.modules.iter().any(|m| m.kind == ModuleKind::Shipyard) || c.queue.iter().any(|b| b.item == BuildItem::Module(ModuleKind::Shipyard));
+            let mine: Vec<&Colony> = self.colonies.iter().filter(|c| c.control.director() == Some(seat)).collect();
+            let yards = mine.iter().filter(|c| has_yard(c)).count();
+            let spare_station = mine.iter().any(|c| c.in_orbit && !has_yard(c));
+            let over_earth = mine.iter().filter(|c| c.in_orbit && c.body == BodyId::Earth).count();
+            if yards == 1 && !spare_station && over_earth == 1
+                && let Some(slot) = self.free_orbital_slots(BodyId::Earth).first().copied()
+            {
+                let lift = if self.blockaded(seat) { m.threat } else { 1.0 };
+                push(vec![Order::BuildStation { body: BodyId::Earth, slot }], Cat::LaunchSiteOrShipyard, self.base_weight(seat, Cat::LaunchSiteOrShipyard), 1.0, lift, 1.0, format!("build {} over Earth as a backup yard", self.station_name(BodyId::Earth, slot)), None);
             }
         }
         // Ticket #442 (version 0.09.6): the mirror -- a ground Colony BUILT from a working station of
