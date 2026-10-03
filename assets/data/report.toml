@@ -227,7 +227,8 @@ sea_took_destroying = "The sea took {n} coastal {slots} from {state} at {tempera
 heat_board = "The heat raised Unrest in {n} Regions and took people from {m}."
 development = "{state} raised its Industry Level to {level}."
 development_woke = "{state} raised its Industry Level to {level} and brought a {building} online."
-scrubbers_destroyed = "{n} Scrubber(s) in {state} were destroyed when the state {why}."
+# Ticket #445 (version 0.09.6): no longer destroyed; they run at a share in other hands.
+scrubbers_changed_hands = "{n} Scrubber(s) in {state} now run at {share}."
 leapfrog = "The {faction} Leapfrogged {state}: its people now emit {coefficient} per hundred million."
 
 # Your works

@@ -150,3 +150,37 @@ designer after charting.
 - a Ship holding more Fuel than its order paid;
 - a cancel that leaves the Stockpile short of the tank;
 - a computer warship build refused for Fuel it never planned to buy.
+
+## 8. A captured Scrubber runs at half
+
+The authority is [ticket #445](https://github.com/whaleyjoshua2/Dying-Earth/issues/445).
+
+**Before:** every Scrubber in a Region was destroyed when the Region changed hands (by Influence,
+Occupation, Pacification or a throw-off). **After:** it stands, and runs at a share set by who holds
+the Region (`facilities.toml` `[scrubber]`):
+
+| Held by | Sink | Unrest relief | Blame credit | Energy upkeep |
+|---|---|---|---|---|
+| the Custodians | 3.0 ppm | 1 a turn | the holder's | 3 |
+| any other Faction | 1.5 ppm | 0.5 a turn | the holder's | 3 |
+| nobody (neutral, after a throw-off) | 0.75 ppm | 0.25 a turn | nobody's | none |
+
+- **Taken back by the Custodians**, a Scrubber runs whole again.
+- **A Scrubber still on order** is cancelled when its Region changes hands, as before; only the
+  Custodians may build one.
+- **A neutral Scrubber shut for want of Energy** runs again at the throw-off, since a neutral Region
+  pays no upkeep. A mothballed one stays mothballed.
+- **A Region occupied from neutral** has no controller, and its Scrubber still adds nothing, as since
+  ticket #351. The quarter is a *neutral* Region's. This case was not put to the designer; it keeps
+  the rule it had.
+- **The Report** says "N Scrubber(s) in <Region> now run at half" (or "a quarter", or "full
+  strength"), where it said they were destroyed.
+- **The Region card's Scrubber line** gives the shared figures, e.g. "+1.5 ppm Sink, 0.5 off Unrest a
+  turn, 3 Energy upkeep (x0.5)". The Energy-shortfall line's "the Natural Sink loses N ppm" counts
+  each shut Scrubber at its share.
+- **The transfer's destruction roll** (spec 8.3) still applies to a Scrubber as to any building.
+- **The computer seats:** no new want.
+
+**What would show this wrong:** a Scrubber destroyed by a change of hands (other than by the
+destruction roll); a Prospector-held Scrubber crediting 3.0 ppm or none; a neutral one charging
+upkeep or crediting a seat.

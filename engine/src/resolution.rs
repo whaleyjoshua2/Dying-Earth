@@ -1646,24 +1646,34 @@ impl Game {
         }
     }
 
-    /// Ticket #54: every Scrubber in a Nation State is destroyed when the state changes hands, by
-    /// Influence, by Occupation or by being thrown off. They are the Custodians' own works, and they
-    /// do not pass to whoever takes the place.
-    pub fn destroy_scrubbers(&mut self, sid: StateId, why: &str) {
+    /// Ticket #54: every Scrubber in a Nation State was destroyed when the state changed hands, by
+    /// Influence, by Occupation or by being thrown off. Ticket #445 (version 0.09.6): it STANDS, and
+    /// runs at the share its new holder runs it at (`scrubber_share`): whole under the Custodians,
+    /// half under anyone else, a quarter with nobody. Only a Scrubber still on order is lost, since
+    /// only the Custodians may build one. Called after the control has moved, so the share is the
+    /// new holder's.
+    pub fn scrubbers_change_hands(&mut self, sid: StateId, why: &str) {
+        self.state_mut(sid).queue.retain(|b| b.item != BuildItem::Facility(FacilityKind::Scrubber));
         let n = self.state(sid).facilities.iter().filter(|f| f.kind == FacilityKind::Scrubber).count();
         if n == 0 {
             return;
         }
-        self.state_mut(sid).facilities.retain(|f| f.kind != FacilityKind::Scrubber);
-        self.state_mut(sid).queue.retain(|b| b.item != BuildItem::Facility(FacilityKind::Scrubber));
-        let line = format!(
-            "{} Scrubber(s) in {} were destroyed when the state {}.",
-            n,
-            self.tables.state(sid).name,
-            why
-        );
+        // A neutral Region pays no upkeep, so a Scrubber it inherits shut for want of Energy runs
+        // again; a mothballed one stays mothballed.
+        if self.state(sid).control == Control::Neutral {
+            for f in self.state_mut(sid).facilities.iter_mut().filter(|f| f.kind == FacilityKind::Scrubber) {
+                f.online = true;
+            }
+        }
+        let share = match self.scrubber_share(sid) {
+            s if s >= 1.0 => "full strength".to_string(),
+            s if (s - 0.5).abs() < 1e-9 => "half".to_string(),
+            s if (s - 0.25).abs() < 1e-9 => "a quarter".to_string(),
+            s => format!("x{s}"),
+        };
+        let line = format!("{} Scrubber(s) in {} run at {} now that the state {}.", n, self.tables.state(sid).name, share, why);
         self.log(line);
-        let text = self.say("scrubbers_destroyed", &[("n", n.to_string()), ("state", self.tables.state(sid).name.clone()), ("why", why.to_string())]);
+        let text = self.say("scrubbers_changed_hands", &[("n", n.to_string()), ("state", self.tables.state(sid).name.clone()), ("share", share)]);
         self.report_line(LineKind::Climate, Some(ReportPlace::State(sid)), text);
     }
 
@@ -1691,12 +1701,10 @@ impl Game {
         if let Place::State(sid) = place {
             self.armies.retain(|a| !(a.levy && a.home == ArmyHome::State(sid)));
         }
-        // Ticket #54: the Scrubbers go first, before the place has a new owner to hold them.
-        if let Place::State(sid) = place
-            && self.place_control(place).controller() != Some(seat)
-        {
-            self.destroy_scrubbers(sid, "changed hands");
-        }
+        // Ticket #54: the Scrubbers went first, before the place had a new owner to hold them. Ticket
+        // #445 (version 0.09.6): they stand, so this only notes whether they change hands; the share
+        // is read once the new owner holds them, below.
+        let scrubbers_move = matches!(place, Place::State(_)) && self.place_control(place).controller() != Some(seat);
         // Ticket #51: an Archive is destroyed when its Colony changes hands, whether by Occupation
         // or by Influence. The Archive fund is kept, so the Archivists can start again.
         if let Place::Colony(c) = place
@@ -1715,6 +1723,11 @@ impl Game {
         }
         let (before, directed) = (self.place_control(place).controller(), self.place_control(place).director());
         self.set_place_control(place, Control::Controlled(seat));
+        if let Place::State(sid) = place
+            && scrubbers_move
+        {
+            self.scrubbers_change_hands(sid, "changed hands");
+        }
         // Standings persist through a transfer (ticket #33): the old controller keeps its own and
         // can contest the place back.
         let line = format!("{} now belongs to the {} ({}).", self.place_name(place), self.seat_name(seat), why);
@@ -3135,8 +3148,9 @@ impl Game {
     fn throw_off(&mut self, sid: StateId, seat: Seat) {
         let u = &self.tables.unrest;
         let back = u.throw_off_reset;
-        self.destroy_scrubbers(sid, "threw off its controller");
         self.state_mut(sid).control = Control::Neutral;
+        // Ticket #445 (version 0.09.6): the Scrubbers stand, at the quarter a Region with nobody runs them at.
+        self.scrubbers_change_hands(sid, "threw off its controller");
         self.state_mut(sid).unrest = back;
         // Ticket #53: a state that is thrown off counts six fresh turns of neutrality.
         self.restart_neutrality_clock(sid);

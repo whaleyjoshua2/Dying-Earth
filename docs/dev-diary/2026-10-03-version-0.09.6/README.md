@@ -124,3 +124,21 @@ The 35 tank moved every Faction by 3 wins or less, which is inside the noise. Ov
 seatings, Refuel orders came to 330, against 306 after #441. Ships stranded at the end came to 37,
 against 38. The four Factions now sit within 4 wins of one another. Collapses, at 46, are the
 figure farthest from the ideal.
+
+## A captured Scrubber runs at half (ticket #445)
+
+A new aid, `scrubber:<Region>` (or `scrubber:own`), stands one Scrubber in a Region.
+
+- [`held-by-prospectors.png`](ticket-445-captured-scrubbers/held-by-prospectors.png), taken with
+  `player:prospectors scrubber:own select:eastasia panel:0 seed:7 window:1280x1600`. China, held by
+  the Prospectors: "Scrubber: +1.5 ppm Sink, 0.5 off Unrest a turn, 3 [Energy] upkeep (x0.5)".
+- [`neutral.png`](ticket-445-captured-scrubbers/neutral.png), taken with
+  `scrubber:middleeast select:middleeast panel:0 seed:7`. Neutral Iran: "Scrubber: +0.75 ppm Sink,
+  0.25 off Unrest a turn (x0.25)", with no upkeep.
+- **Witnessed red, two new tests:**
+  - **the captured case:** read 0 Scrubbers standing after a transfer, where 2 were wanted;
+  - **the throw-off case:** read 0 standing after a throw-off. Its setup first failed because the
+    Scrubbers' own calm held the Region below the throw-off; they are switched off for that step.
+  - Both now allow for the transfer's destruction roll, which can take one building of any kind.
+- **Older tests:** the 0.05 test that pinned destruction now pins half. The ticket #351 test (a
+  Region occupied from neutral adds nothing) holds unchanged, by keeping that case at nought.

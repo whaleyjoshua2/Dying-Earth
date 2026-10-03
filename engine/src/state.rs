@@ -4385,7 +4385,8 @@ impl Game {
         let mut out = [0.0; SEAT_COUNT];
         for st in &self.states {
             if let Some(seat) = st.control.controller() {
-                out[seat.index()] += per * self.scrubbers_online(st.id) as f64;
+                // Ticket #445 (version 0.09.6): at the share its holder runs it at.
+                out[seat.index()] += per * self.scrubber_share(st.id) * self.scrubbers_online(st.id) as f64;
             }
             if let Some(seat) = st.control.director() {
                 out[seat.index()] += reserve * st.facilities.iter().filter(|f| f.kind == FacilityKind::NatureReserve && f.working()).count() as f64;
@@ -4394,9 +4395,32 @@ impl Game {
         out
     }
 
-    /// What the whole table takes back this Climate phase.
+    /// What the whole table takes back this Climate phase. Ticket #445 (version 0.09.6): with the
+    /// neutral Regions' Scrubbers at their quarter, which no seat is credited with.
     pub fn scrubber_removal(&self) -> f64 {
-        self.scrubber_removal_by_seat().iter().sum()
+        self.scrubber_removal_by_seat().iter().sum::<f64>() + self.scrubber_removal_neutral()
+    }
+
+    /// Ticket #445 (version 0.09.6): what a Scrubber runs at in this Region -- whole under the
+    /// Custodians, `captured_share` under any other Faction, `neutral_share` with no controller.
+    pub fn scrubber_share(&self, s: StateId) -> f64 {
+        let c = &self.tables.scrubber;
+        match self.state(s).control.controller() {
+            Some(seat) if self.kind(seat) == FactionKind::Custodians => 1.0,
+            Some(_) => c.captured_share,
+            // A Region occupied from neutral has no controller either, and its Scrubber never added
+            // to the Sink (ticket #351's review); the quarter is a NEUTRAL Region's, at the designer's
+            // word on a throw-off, so that case stays at nought.
+            None if self.state(s).control == Control::Neutral => c.neutral_share,
+            None => 0.0,
+        }
+    }
+
+    /// Ticket #445 (version 0.09.6): the ppm the Scrubbers of Regions with no controller take back,
+    /// to nobody's Blame.
+    pub fn scrubber_removal_neutral(&self) -> f64 {
+        let per = self.tables.facility(FacilityKind::Scrubber).sink_per_turn;
+        self.states.iter().filter(|st| st.control.controller().is_none()).map(|st| per * self.scrubber_share(st.id) * self.scrubbers_online(st.id) as f64).sum()
     }
 
     // ---------------------------------------------------------------- Ticket #54: the two coefficients
@@ -4583,7 +4607,8 @@ impl Game {
             n += u.constabulary_fall;
         }
         if self.scrubbers_online(s) > 0 {
-            n += u.scrubber_fall;
+            // Ticket #445 (version 0.09.6): at the share its holder runs it at.
+            n += u.scrubber_fall * self.scrubber_share(s);
         }
         n
     }

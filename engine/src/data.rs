@@ -163,6 +163,10 @@ pub struct ScrubberCard {
     pub per_population: f64,
     pub min: u32,
     pub max: u32,
+    /// Ticket #445 (version 0.09.6): what a Scrubber runs at in a Faction's hands other than the
+    /// Custodians', and in a neutral Region.
+    pub captured_share: f64,
+    pub neutral_share: f64,
 }
 
 /// Ticket #333 (version 0.09.0): what a Region's people are worth to a Research Lab, one point of

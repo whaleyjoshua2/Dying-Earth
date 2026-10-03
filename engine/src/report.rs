@@ -595,7 +595,7 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("heat_board", &["n", "m"]),
     ("development", &["state", "level"]),
     ("development_woke", &["state", "level", "building"]),
-    ("scrubbers_destroyed", &["n", "state", "why"]),
+    ("scrubbers_changed_hands", &["n", "state", "share"]),
     ("leapfrog", &["faction", "state", "coefficient"]),
     ("tech_complete", &["tech", "faction", "shares"]),
     // Ticket #412 (version 0.09.4): the same, with what leading paid.

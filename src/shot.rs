@@ -851,6 +851,15 @@ fn build_board(session: &mut Session) {
             let name = g.next_ship_name(UnitKind::ColonyShip);
             g.ships.push(Ship { id, name, kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Venus), colonists: 4, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: g.tank_of(Seat(0), UnitKind::ColonyShip), slot: (v != "low").then_some(1) });
         }
+        // `scrubber:<Region>` (a building aid, ticket #445, version 0.09.6): one Scrubber stands in the
+        // named Region (the `select:` spelling), or in seat 0's first Region with `scrubber:own`, so
+        // its line on the Region card can be photographed in another Faction's hands or nobody's.
+        if let Some(v) = std::env::args().find_map(|a| a.strip_prefix("scrubber:").map(str::to_owned)) {
+            let sid = if v == "own" { g.directed_states(Seat(0)).first().copied() } else { StateId::ALL.into_iter().find(|s| format!("{s:?}").eq_ignore_ascii_case(&v)) };
+            if let Some(sid) = sid {
+                g.state_mut(sid).facilities.push(Facility::new(FacilityKind::Scrubber));
+            }
+        }
         // `issload:1` (a building aid, ticket #437, version 0.09.6): seat 0's first station over
         // Earth holds four Colonists, and an empty Colony Ship of theirs sits in its ring, so the
         // Ship card at Earth (`stack:earth ship:1`) shows "Load N Colonists from" that station.

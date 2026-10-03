@@ -3759,7 +3759,7 @@ fn d_leapfrog_is_custodian_only_and_never_goes_below_the_base() {
 /// its state's population, is destroyed when the state changes hands, counts as removal for its
 /// controller's Blame, and takes 1 off its state's Unrest a turn.
 #[test]
-fn e_a_scrubber_enlarges_the_sink_and_is_capped_destroyed_and_calming() {
+fn e_a_scrubber_enlarges_the_sink_and_is_capped_captured_at_half_and_calming() {
     let mut g = game();
     calm(&mut g);
     let sid = StateId::EastAsia;
@@ -3839,10 +3839,12 @@ fn e_a_scrubber_enlarges_the_sink_and_is_capped_destroyed_and_calming() {
     assert!((g.seats[0].blame_removed - before - removed).abs() < 1e-9, "the Climate phase credits it as removal");
     assert!((g.calming_fall(sid) - g.tables.unrest.scrubber_fall).abs() < 1e-9, "a Scrubber calms its state by 1 a turn");
 
-    // Destroyed when the state changes hands.
+    // Destroyed when the state changed hands. Ticket #445 (version 0.09.6): it stands, at half for a
+    // holder who is not the Custodians, less anything the transfer's destruction roll takes.
     g.transfer_control(Place::State(sid), Seat(1), "Influence");
-    assert_eq!(g.scrubbers_online(sid), 0, "the Scrubbers do not pass to whoever takes the state");
-    assert!(g.report.lines.iter().any(|l| l.text.contains("Scrubber(s) in China were destroyed")), "and the Report says so");
+    assert!(g.scrubbers_online(sid) >= 1, "the Scrubbers stand under whoever takes the state");
+    assert_eq!(g.scrubber_removal_by_seat()[1], 1.5 * g.scrubbers_online(sid) as f64, "at half, to the new holder");
+    assert!(g.report.lines.iter().any(|l| l.text.contains("in China now run at half")), "and the Report says so: {:?}", g.report.lines);
 }
 
 /// (f) A Strip Permit doubles a state's Facility output for three turns, then raises its Baseline
@@ -18555,4 +18557,61 @@ fn the_ai_buys_the_fuel_for_a_warships_tank() {
     // figure: a Frigate costs none, so Ducats are wanted only for the Fuel bought beside it. Without
     // the purchase the line was "skip ... (needs 25 Materials, 0 left)", the bundle the build alone.
     assert!(lines.iter().any(|l| l.starts_with("  take") || l.contains("Ducats")), "the Frigate is weighed with its tank bought: {lines:#?}");
+}
+
+/// Ticket #445 (version 0.09.6): **a captured Scrubber runs at half, where it was destroyed.** Taken
+/// by another Faction it adds half its ppm to the Sink, credited to the new holder, and half its calm;
+/// taken back by the Custodians it runs whole; a Scrubber still on order is cancelled as before.
+#[test]
+fn a_captured_scrubber_runs_at_half_and_whole_again_when_retaken() {
+    let mut g = game();
+    let cust = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Custodians).unwrap();
+    let rival = Seat::ALL.into_iter().find(|s| *s != cust).unwrap();
+    let sid = StateId::Australia;
+    g.take_control(sid, cust);
+    g.state_mut(sid).facilities.push(facility(FacilityKind::Scrubber));
+    g.state_mut(sid).facilities.push(facility(FacilityKind::Scrubber));
+    g.state_mut(sid).queue.push(Build { item: BuildItem::Facility(FacilityKind::Scrubber), seat: cust, widgets: 8, done: 0, coastal: false, fuel: 0.0 });
+    let fall = g.tables.unrest.scrubber_fall;
+    assert_eq!(g.scrubber_removal_by_seat()[cust.index()], 6.0, "two whole Scrubbers, 3.0 each");
+    assert_eq!(g.calming_fall(sid), fall);
+    g.transfer_control(Place::State(sid), rival, "test");
+    // The transfer's destruction roll (spec 8.3) may take a building; what stands is not destroyed
+    // for being a Scrubber.
+    let n = g.scrubbers_online(sid) as f64;
+    assert!(n >= 1.0, "they stand, less any the roll took");
+    assert_eq!(g.state(sid).queue.iter().filter(|b| b.item == BuildItem::Facility(FacilityKind::Scrubber)).count(), 0, "the one on order is cancelled");
+    assert_eq!(g.scrubber_removal_by_seat()[rival.index()], 1.5 * n, "half, to the new holder");
+    assert_eq!(g.scrubber_removal_by_seat()[cust.index()], 0.0);
+    assert_eq!(g.calming_fall(sid), fall * 0.5);
+    g.transfer_control(Place::State(sid), cust, "test");
+    assert_eq!(g.scrubber_removal_by_seat()[cust.index()], 3.0 * g.scrubbers_online(sid) as f64, "whole again");
+}
+
+/// Ticket #445 (version 0.09.6): **a Scrubber in a neutral Region runs at a quarter**, to nobody's
+/// Blame: a throw-off no longer destroys it, and the Sink still takes its quarter.
+#[test]
+fn a_thrown_off_regions_scrubber_runs_at_a_quarter_for_nobody() {
+    let mut g = game();
+    let cust = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Custodians).unwrap();
+    let sid = StateId::Australia;
+    g.take_control(sid, cust);
+    g.state_mut(sid).facilities.push(facility(FacilityKind::Scrubber));
+    g.state_mut(sid).facilities.push(facility(FacilityKind::Scrubber));
+    let before = g.scrubber_removal();
+    // Off for the throw-off itself, so their calm cannot hold it back; on again after.
+    for f in g.state_mut(sid).facilities.iter_mut().filter(|f| f.kind == FacilityKind::Scrubber) {
+        f.online = false;
+    }
+    g.state_mut(sid).unrest = g.tables.unrest.throw_off_threshold;
+    g.state_mut(sid).changed_hands = true;
+    g.resolve_unrest();
+    assert_eq!(g.state(sid).control, Control::Neutral, "the premise: thrown off");
+    for f in g.state_mut(sid).facilities.iter_mut().filter(|f| f.kind == FacilityKind::Scrubber) {
+        f.online = true;
+    }
+    assert_eq!(g.scrubbers_online(sid), 2, "not destroyed");
+    assert_eq!(g.scrubber_removal_by_seat().iter().sum::<f64>(), before - 6.0, "credited to no seat");
+    assert_eq!(g.scrubber_removal(), before - 6.0 + 1.5, "two quarters, 0.75 each, still on the Sink");
+    assert_eq!(g.calming_fall(sid), g.tables.unrest.scrubber_fall * 0.25);
 }

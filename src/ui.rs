@@ -6501,11 +6501,19 @@ fn standings_row(ui: &mut Ui, game: &Game, session: &Session, target: Place, thr
 /// *Scrubber: +3.0 ppm Sink, 1 off Unrest a turn, 3 Energy upkeep*; *Sea Wall: holds the sea off; 3
 /// rises held, 1.5 Materials a turn to keep* (or *nothing held yet*, and *unkept this turn* when it
 /// is) -- the figures the data holds, glyph-rendered by the row, in the resolution's words.
-fn no_slot_figures(game: &Game, f: &Facility) -> String {
+fn no_slot_figures(game: &Game, sid: StateId, f: &Facility) -> String {
     let card = game.tables.facility(f.kind);
     match f.kind {
         FacilityKind::SeaWall => format!("holds the sea off; {}{}", sea_wall_keep(game, f), sea_wall_unkept(f)),
-        _ => format!("+{:.1} ppm Sink, {} off Unrest a turn, {} Energy upkeep", card.sink_per_turn, Game::unrest_figure(game.tables.unrest.scrubber_fall), card.energy_upkeep),
+        // Ticket #445 (version 0.09.6): at the share its holder runs it at, and no upkeep with nobody.
+        _ => {
+            let share = game.scrubber_share(sid);
+            let upkeep = if game.state(sid).control.controller().is_some() { format!(", {} Energy upkeep", card.energy_upkeep) } else { String::new() };
+            let at = if share < 1.0 { format!(" (x{share})") } else { String::new() };
+            let sink = card.sink_per_turn * share;
+            let sink = if (sink * 10.0).fract().abs() < 1e-9 { format!("{sink:.1}") } else { format!("{sink:.2}") };
+            format!("+{sink} ppm Sink, {} off Unrest a turn{upkeep}{at}", Game::unrest_figure(game.tables.unrest.scrubber_fall * share))
+        }
     }
 }
 
@@ -6593,7 +6601,7 @@ fn facility_row(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, i: us
     let full = facility_figures(game, sid, f, director);
     // Ticket #390 (version 0.09.3): a Scrubber or Sea Wall row is one short line, at the designer's
     // word ("reduce verbiage for sea wall and scrubber"); its whole sentence is the row's hover.
-    let short = if game.takes_slot(f.kind) || f.mothballed { None } else { Some(no_slot_figures(game, f)) };
+    let short = if game.takes_slot(f.kind) || f.mothballed { None } else { Some(no_slot_figures(game, sid, f)) };
     let figures = short.clone().unwrap_or_else(|| full.clone());
     let colour = if f.mothballed { Color32::from_rgb(170, 170, 190) } else { ui.visuals().text_color() };
     // Ticket #112 (version 0.07.1): the glyphs come down into the Facility list, where the
