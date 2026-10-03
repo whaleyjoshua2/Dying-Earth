@@ -76,3 +76,19 @@ Colony a Shipyard and room for several Modules. Before the fix:
   all.
 
 After the fix it scores nothing, whether the first Factory is standing or on order.
+
+**The sweep after four of the five figure tickets** ([`sweeps/after-441.txt`](sweeps/after-441.txt),
+20 seeds x four seatings, the shipped cell): Relay Networks (#438), the Archive at 150 (#439), the
+Custodians at ×1.15 (#440) and this cap. Colony Ships at 35 Fuel (#455) is not yet in.
+
+| | Custodians | Prospectors | Arkwrights | Archivists | collapses |
+|---|---|---|---|---|---|
+| 0.09.5 | 10 | 10 | 1 | 17 | 42 |
+| after #441 | 12 | 9 | 8 | 7 | 44 |
+| designer's ideal | 15 | 15 | 15 | 15 | 20 |
+
+- **The Arkwrights** win 8 and score nought in 37 games, where they won 1 and scored nought in 58.
+- **The Archivists** fall from 17 to 7.
+- **Collapses** are 44. The agent's trial of the cap alone gave 32. The difference is the other
+  three figures: none of the four tickets was measured alone on this branch.
+- The whole Tech tree completes in 61 of 80 games, median turn 25.
