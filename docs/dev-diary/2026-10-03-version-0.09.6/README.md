@@ -244,3 +244,12 @@ the Custodians as seat 0, against the sweep after #444:
 
 The new aggression shows almost entirely as Agitate, nearly three times as much. A Smear still needs
 the rival's whole-game Blame above the quarter, so it does not move.
+
+## Two texts made shorter (ticket #452)
+
+- [`blame.png`](ticket-452-two-texts/blame.png), taken with
+  `factions:custodians panel:0 seed:7 "tip:Above a quarter"`. The Blame hover in six wrapped lines,
+  where it ran to eleven. It is drawn through `rule_tip` now, so the `tip:` aid can open it.
+- [`slots.png`](ticket-452-two-texts/slots.png), taken with
+  `select:eastasia panel:0 seed:7 "tip:Slots: Size"`. China's slots hover: "Size 3 + 3 + starting
+  Industry 3, +1 inland per raise", then 4 coastal, then the line about mothballed and building.

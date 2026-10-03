@@ -5081,6 +5081,10 @@ fn change_buttons(ui: &mut Ui, game: &Game, pending: &[Order], b: BuildingRef, m
 /// panel degrades to the old shape rather than to clipped buttons.
 const CHANGE_BUTTONS_WIDTH: f32 = 196.0;
 
+/// Ticket #452 (version 0.09.6): the Blame hover, cut at the designer's word and written once, where
+/// the Faction window and the Climate Panel each carried four long lines of it, word for word.
+const BLAME_HOVER: &str = "Blame: CO2 this Faction's places emitted, less what it removed (Scrubbers, Nature Reserves, the Custodians' Sink Directive).\nAbove a quarter share: Influence thresholds rise up to +50% where it doesn't hold, and every rival likes it a point less per step.";
+
 /// Ticket #116 (version 0.07.1): the rule for what gets a tooltip, so the next person has a test
 /// to apply rather than a list to extend. The designer: *"increase the use of mouse over tooltips."*
 ///
@@ -7172,7 +7176,8 @@ This turn {:+.2}%: {:+.1} million.", c.population_growth * 100.0, c.population_l
     rule_tip(
         ui.label(RichText::new(format!("Facilities ({free_now} of {} slots free{})", game.build_slots(sid), if ordered_slots > 0 { format!(", {ordered_slots} ordered this turn") } else { String::new() })).strong()),
         format!(
-            "Slots: Size {} plus {} plus the Industry Level {} it started at, and one more for every raise since, always inland.\n{} are coastal: the sea takes those at a threshold, oldest Facility with them, and turns one inland slot coastal every time, wall or no wall. A Sea Wall holds the taking off, not the turning.\nMothballed and building each keep a slot.",
+            // Ticket #452 (version 0.09.6): cut, at the designer's word, every rule kept.
+            "Slots: Size {} + {} + starting Industry {}, +1 inland per raise.\n{} coastal: each sea threshold takes one (with its oldest Facility) and turns an inland slot coastal. A Sea Wall stops the taking, not the turning.\nMothballed and building each keep a slot.",
             game.tables.state(sid).size,
             game.tables.base_slots,
             game.tables.state(sid).industry_level,
@@ -10603,7 +10608,7 @@ fn faction_window(ctx: &egui::Context, session: &Session, game: &Game, view: &mu
         // its longer wording. Nothing is deleted.
         // Ticket #265 (version 0.08.4): the hover names what Blame is, what the credit is, and the
         // two rules that read it.
-        ui.label(RichText::new("Blame").strong()).on_hover_text("Blame is the CO2 this Faction is answerable for: everything the sources it controlled emitted, less everything it removed.\nWhat it removed -- its Scrubbers and Nature Reserves, and for the Custodians what their Research Directive adds to the Natural Sink -- is its Blame credit.\nTwo rules read Blame: a share above a fair quarter raises this Faction's Influence thresholds on every Region it does not hold, up to half again;\nand every rival thinks a point worse of it for each step its share stands above that quarter, each by its own measure.");
+        rule_tip(ui.label(RichText::new("Blame").strong()), BLAME_HOVER.to_string());
         let share = game.blame_share(seat);
         ui.horizontal(|ui| {
             ui.add(
@@ -11139,7 +11144,7 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
             ui.label(game.stabilization_text());
             // Ticket #53: Blame, Faction by Faction, in the panel that attributes the Emissions.
             ui.separator();
-            ui.label(RichText::new("Blame: the CO2 each Faction is answerable for").strong()).on_hover_text("Blame is the CO2 this Faction is answerable for: everything the sources it controlled emitted, less everything it removed.\nWhat it removed -- its Scrubbers and Nature Reserves, and for the Custodians what their Research Directive adds to the Natural Sink -- is its Blame credit.\nTwo rules read Blame: a share above a fair quarter raises this Faction's Influence thresholds on every Region it does not hold, up to half again;\nand every rival thinks a point worse of it for each step its share stands above that quarter, each by its own measure.");
+            rule_tip(ui.label(RichText::new("Blame: the CO2 each Faction is answerable for").strong()), BLAME_HOVER.to_string());
             for seat in Seat::ALL {
                 let s = game.seat(seat);
                 // Ticket #265 (version 0.08.4): one form for every seat -- answerable for, how it

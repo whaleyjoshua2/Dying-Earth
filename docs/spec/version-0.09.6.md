@@ -310,3 +310,20 @@ seats only; no rule moves for a human Custodian.
   quarter;
 - any other computer seat acting at −3;
 - a lift above ×2.
+
+## 13. Two texts made shorter
+
+The authority is [ticket #452](https://github.com/whaleyjoshua2/Dying-Earth/issues/452). No rule moves.
+
+- **The Blame hover**, in the Faction window and the Climate Panel, is one shared text where each
+  carried four long lines, word for word:
+  > Blame: CO2 this Faction's places emitted, less what it removed (Scrubbers, Nature Reserves, the
+  > Custodians' Sink Directive).
+  > Above a quarter share: Influence thresholds rise up to +50% where it doesn't hold, and every
+  > rival likes it a point less per step.
+- **The Region's slots hover:**
+  > Slots: Size 3 + 3 + starting Industry 3, +1 inland per raise.
+  > 4 coastal: each sea threshold takes one (with its oldest Facility) and turns an inland slot
+  > coastal. A Sea Wall stops the taking, not the turning.
+  > Mothballed and building each keep a slot.
+- Every rule the old texts stated is kept.
