@@ -2821,9 +2821,10 @@ impl Game {
                             if colonists > 0 && col.control.director() == Some(seat) {
                                 let room = self.habitat_room(col).saturating_sub(col.colonists);
                                 let n = colonists.min(room).min(self.ship(ship).map(|s| s.colonists).unwrap_or(0));
-                                if let Some(c) = self.colony_mut(cid) {
-                                    c.colonists += n;
-                                }
+                                // Ticket #437 (version 0.09.6): through `settle_people`, so they bring
+                                // their schooling, where they were added to the count alone.
+                                let taught = self.ship(ship).map(|s| s.colonists_education).unwrap_or(1.0);
+                                self.settle_people(cid, n, taught);
                                 if let Some(s) = self.ship_mut(ship) {
                                     s.colonists -= n;
                                 }

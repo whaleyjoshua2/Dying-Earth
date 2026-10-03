@@ -18381,3 +18381,33 @@ fn a_rivals_smear_on_the_player_shows_and_one_on_another_rival_does_not() {
     assert_eq!(seen.len(), 1, "only the one on the player: {seen:?}");
     assert!(seen[0].contains(&g.seat_name(Seat(1))), "the Smear by seat 1: {seen:?}");
 }
+
+/// Ticket #437 (version 0.09.6): Colonists unloaded onto a place that already stands bring their
+/// schooling with them, blended as every other arrival is, where they were added to the count alone.
+#[test]
+fn colonists_unloaded_onto_a_station_blend_their_education() {
+    let mut g = game();
+    g.seats[0].stockpile.materials = 300.0;
+    let (ship, _) = colony_ship_ready(&mut g, BodyId::Venus);
+    let build = Order::BuildStation { body: BodyId::Venus, slot: 0 };
+    g.commit_orders(Seat(0), std::slice::from_ref(&build));
+    g.resolution_phase();
+    bare_stations(&mut g);
+    let station = g.colonies.iter().find(|c| c.body == BodyId::Venus && c.in_orbit).expect("Ishtar stands").id;
+    let col = g.colony_mut(station).unwrap();
+    col.modules.push(Module::new(ModuleKind::Habitat));
+    col.colonists = 4;
+    col.education = 1.0;
+    col.settler_education = 1.0;
+    let s = g.ship_mut(ship).unwrap();
+    s.slot = Some(0);
+    s.colonists = 4;
+    s.colonists_education = 2.0;
+    let land = Order::Unload { ship, colonists: 4, army: false, into: UnloadTarget::Colony(station) };
+    assert!(g.check_order(Seat(0), &[], &land).is_ok());
+    g.commit_orders(Seat(0), std::slice::from_ref(&land));
+    g.resolution_phase();
+    let col = g.colony(station).unwrap();
+    assert_eq!(col.colonists, 8);
+    assert!((col.education - 1.5).abs() < 1e-9, "four at 1.0 and four at 2.0 make 1.5, not {}", col.education);
+}

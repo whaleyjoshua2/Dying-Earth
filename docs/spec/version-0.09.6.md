@@ -28,3 +28,32 @@ names a ground slot.
 
 **What would show this wrong:** a Ship card that panics at any station, or a button that names a
 ground site for a station.
+
+## 2. Moving Colonists from a Colony Ship onto a station
+
+The authority is [ticket #437](https://github.com/whaleyjoshua2/Dying-Earth/issues/437).
+
+**Unchanged rules, now seen working:**
+
+- **Onto a station.** A Colony Ship unloads into one of your stations from that station's own
+  orbit, and changing orbit still costs a turn and 1 Fuel. In any other orbit the Unload button is
+  greyed, and its hover says where to move: "Move this Ship to Venus, at Aphrodite, then unload next
+  turn". The crash (§1) had hidden this.
+- **Back off a station.** Colonists may go back from any place of yours, station or ground, onto a
+  Colony Ship in that place's orbit.
+
+**Changed:**
+
+- **Over Earth, the Ship card lists your stations too.** Under the Pioneers drop-down, each station
+  of yours over Earth with Colonists aboard offers "Load N Colonists from <station>" on a slider.
+  Until now the card at Earth offered only the Regions' Pioneers, so a Colonist lifted to the ISS
+  could not leave it. Antarctic Colonies are not listed, as decided: stations only.
+- **Unloading brings Education.** Colonists unloaded onto a place that already stands blend their
+  Education into the place's, as every other arrival does. Before, they were added to the count
+  alone.
+
+**What would show this wrong:**
+
+- a station over Earth with Colonists that a Colony Ship in its ring cannot load from;
+- a greyed Unload button with no orbit named;
+- four Colonists at Education 2.0 unloaded onto four at 1.0 leaving anything but 1.5.

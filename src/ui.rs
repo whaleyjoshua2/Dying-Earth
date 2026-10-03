@@ -8384,39 +8384,38 @@ fn ship_cargo_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut View
     }
     if capacity > s.colonists {
         let n = capacity - s.colonists;
-        match body {
-            BodyId::Earth => {
-                let states = game.directed_states(Seat(0));
-                // Ticket #204 (version 0.08.1): opens on a Region that can actually lift, where it
-                // opened on the most populous one whether or not it had a Launch Site or anybody
-                // waiting. The `Some` also stands in for the emptiness check this replaced: with no
-                // directed Region there is nothing to draw from and nothing to draw.
-                if let Some(chosen) = view.load_state.filter(|x| states.contains(x)).or_else(|| default_emigrant_source(game, &states, true)) {
-                    ui.horizontal(|ui| {
-                        ui.label("from");
-                        egui::ComboBox::from_id_salt(("load", s.id.0)).selected_text(game.tables.state(chosen).name.clone()).show_ui(ui, |ui| {
-                            for st in &states {
-                                if ui.selectable_label(*st == chosen, game.tables.state(*st).name.clone()).clicked() {
-                                    view.load_state = Some(*st);
-                                }
+        if body == BodyId::Earth {
+            let states = game.directed_states(Seat(0));
+            // Ticket #204 (version 0.08.1): opens on a Region that can actually lift, where it
+            // opened on the most populous one whether or not it had a Launch Site or anybody
+            // waiting. The `Some` also stands in for the emptiness check this replaced: with no
+            // directed Region there is nothing to draw from and nothing to draw.
+            if let Some(chosen) = view.load_state.filter(|x| states.contains(x)).or_else(|| default_emigrant_source(game, &states, true)) {
+                ui.horizontal(|ui| {
+                    ui.label("from");
+                    egui::ComboBox::from_id_salt(("load", s.id.0)).selected_text(game.tables.state(chosen).name.clone()).show_ui(ui, |ui| {
+                        for st in &states {
+                            if ui.selectable_label(*st == chosen, game.tables.state(*st).name.clone()).clicked() {
+                                view.load_state = Some(*st);
                             }
-                        });
+                        }
                     });
-                    // Ticket #73: a Launch Site lifts the Emigrants waiting there, no more. Ticket
-                    // #428 (version 0.09.5): how many, on a slider under the Region's drop-down.
-                    let lift = count_slider(ui, ("load", s.id, chosen), n.min(game.state(chosen).emigrants), "Pioneers");
-                    cost_button(ui, game, &session.pending, Order::Load { ship: s.id, colonists: lift, from: LoadSource::State(chosen), army: None }, &format!("Load {lift} Pioneers"), actions);
-                }
+                });
+                // Ticket #73: a Launch Site lifts the Emigrants waiting there, no more. Ticket
+                // #428 (version 0.09.5): how many, on a slider under the Region's drop-down.
+                let lift = count_slider(ui, ("load", s.id, chosen), n.min(game.state(chosen).emigrants), "Pioneers");
+                cost_button(ui, game, &session.pending, Order::Load { ship: s.id, colonists: lift, from: LoadSource::State(chosen), army: None }, &format!("Load {lift} Pioneers"), actions);
             }
-            _ => {
-                for c in game.colonies.iter().filter(|c| c.body == body && c.control.director() == Some(Seat(0)) && c.colonists > 0) {
-                    // Ticket #428 (version 0.09.5): how many, on a slider above the place's button.
-                    let k = count_slider(ui, ("load", s.id, c.id), n.min(c.colonists), "Colonists");
-                    // Ticket #335 (version 0.09.0): by the place's OWN name, which names a station
-                    // and a ground Colony alike.
-                    cost_button(ui, game, &session.pending, Order::Load { ship: s.id, colonists: k, from: LoadSource::Colony(c.id), army: None }, &format!("Load {} Colonists from {}", k, game.place_name(Place::Colony(c.id))), actions);
-                }
-            }
+        }
+        // Ticket #437 (version 0.09.6): over Earth too, from each station of yours with Colonists
+        // aboard, under the Pioneers -- the rule always allowed it, the card offered only the
+        // Regions, so a Colonist lifted to the ISS could not leave it. Elsewhere every place of yours.
+        for c in game.colonies.iter().filter(|c| c.body == body && (body != BodyId::Earth || c.in_orbit) && c.control.director() == Some(Seat(0)) && c.colonists > 0) {
+            // Ticket #428 (version 0.09.5): how many, on a slider above the place's button.
+            let k = count_slider(ui, ("load", s.id, c.id), n.min(c.colonists), "Colonists");
+            // Ticket #335 (version 0.09.0): by the place's OWN name, which names a station
+            // and a ground Colony alike.
+            cost_button(ui, game, &session.pending, Order::Load { ship: s.id, colonists: k, from: LoadSource::Colony(c.id), army: None }, &format!("Load {} Colonists from {}", k, game.place_name(Place::Colony(c.id))), actions);
         }
     }
     if card.carries_army && s.army.is_none() {

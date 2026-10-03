@@ -14,3 +14,23 @@ and a Colony Ship of theirs with four Colonists in its ring. The command was
   the panic the designer's save gives.
 - [`card.png`](ticket-436-venus-crash/card.png), **after the fix:** TSV Endeavour's card at
   Aphrodite. Under Load and unload, a slider at 4 and "Unload 4 Colonists into Aphrodite".
+
+## Moving Colonists from a Colony Ship onto a station (ticket #437)
+
+Two new aids:
+- `venusstation:low`: `venusstation:1`'s Ship in low orbit instead of Aphrodite's ring;
+- `issload:1`: seat 0's first station over Earth holding four Colonists, with an empty Colony Ship
+  in its ring.
+
+The pictures:
+- [`wrong-orbit.png`](ticket-437-onto-a-station/wrong-orbit.png), taken with
+  `venusstation:low stack:venus ship:1 "tip:unload next turn"`. The Ship is in low orbit, so
+  "Unload 4 Colonists into Aphrodite" is greyed, with the hover "Move this Ship to Venus, at
+  Aphrodite, then unload next turn: Aphrodite over Venus is reached from there alone."
+- [`load-from-iss.png`](ticket-437-onto-a-station/load-from-iss.png), taken with
+  `issload:1 stack:earth ship:1`. The Ship card at Earth shows the Pioneers drop-down, then a slider
+  at 4 and "Load 4 Colonists from ISS over Earth".
+
+**The Education blend:** witnessed red in
+`colonists_unloaded_onto_a_station_blend_their_education`, which failed with "four at 1.0 and four
+at 2.0 make 1.5, not 1". It passes after the fix.
