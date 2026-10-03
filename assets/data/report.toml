@@ -229,6 +229,9 @@ development = "{state} raised its Industry Level to {level}."
 development_woke = "{state} raised its Industry Level to {level} and brought a {building} online."
 # Ticket #445 (version 0.09.6): no longer destroyed; they run at a share in other hands.
 scrubbers_changed_hands = "{n} Scrubber(s) in {state} now run at {share}."
+# Ticket #442 (version 0.09.6).
+colony_built = "{faction} built {colony}."
+sent_down = "{n} Colonists went down from {from} to {to}."
 leapfrog = "The {faction} Leapfrogged {state}: its people now emit {coefficient} per hundred million."
 
 # Your works
@@ -330,6 +333,8 @@ build_ship = "began a {unit} at {place}"
 build_army = "began an Army at {place}, {people} under arms"
 cancel_build = "cancelled the {building} under way at {place}"
 build_station = "began a Space Station over {body}"
+build_colony = "began a Colony on {body}"
+send_down = "sent {n} Colonists down to {place}"
 build_archive = "began the Archive at {colony}"
 # Ticket #192 (version 0.08.0): the Upload, in the rival-deeds paragraph.
 upload = "uploaded {n} Colonists into the Archive at {colony}"

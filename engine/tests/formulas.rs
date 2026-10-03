@@ -2026,7 +2026,8 @@ fn a_colony_ship(g: &mut Game, seat: Seat, body: BodyId) -> ShipId {
         escaped: false,
         arrived_this_turn: false,
         built_turn: 1,
-        // Ticket #420 (version 0.09.4): a Colony Ship's tank is 40, full.
+        // Ticket #420 (version 0.09.4): a Colony Ship's tank is 40, full. Ticket #442 (version 0.09.6):
+        // at a Body with no low orbit, the arrival ring.
         fuel: 40.0, slot: None,
     });
     id
@@ -5195,6 +5196,7 @@ fn a_loaded_colony_ship_goes_to_the_moon_when_mars_is_a_year_away() {
 fn colony_ship_ready(g: &mut Game, body: BodyId) -> (ShipId, Order) {
     let id = ShipId(g.fresh_id());
     let turn = g.turn;
+    let arrival = g.arrival_slot(Seat(0), body);
     g.ships.push(Ship {
         id,
         name: String::new(),
@@ -5208,8 +5210,9 @@ fn colony_ship_ready(g: &mut Game, body: BodyId) -> (ShipId, Order) {
         escaped: false,
         arrived_this_turn: false,
         built_turn: turn,
-        // Ticket #420 (version 0.09.4): a Colony Ship's tank is 40, full.
-        fuel: 40.0, slot: None,
+        // Ticket #420 (version 0.09.4): a Colony Ship's tank is 40, full. Ticket #442 (version 0.09.6):
+        // at a Body with no low orbit, the arrival ring.
+        fuel: 40.0, slot: arrival,
     });
     // Ticket #93: a Body with no Colony Slots (Venus) gets slot 0, an order the check will refuse.
     let slot = g.free_slots_on(body).first().copied().unwrap_or(0);
@@ -7323,51 +7326,50 @@ fn venus_is_a_body_of_orbits_only_with_its_own_window() {
     assert!(!Game::leg_allowed(BodyId::Venus, BodyId::Phobos));
 }
 
-/// Ticket #93: a station at Venus is built from a Ship of the seat's in orbit there; a Colony Ship
-/// lands only into it; its Colonists count for Off-world Presence and it is Venus for Diaspora;
-/// no leg to Mars is accepted.
+/// Ticket #93: a station at Venus was built from a Ship of the seat's in orbit there. Ticket #442
+/// (version 0.09.6), at the designer's word: it is **founded** -- a Colony Ship in an empty ring of
+/// Venus unloads, the station opens with a Core and the Colonists aboard, for no Materials; no Ship
+/// is a foothold for a Materials build there any more. Its Colonists count off Earth and Venus for
+/// Diaspora; no leg to Mars is accepted.
 #[test]
-fn a_venus_station_is_built_from_a_ship_in_orbit_and_its_colonists_are_off_earth() {
+fn a_venus_station_is_founded_by_a_colony_ship_in_its_ring_and_its_colonists_are_off_earth() {
     let mut g = game();
     g.seats[0].stockpile.materials = 300.0;
-    let build = Order::BuildStation { body: BodyId::Venus, slot: 0 };
-    assert!(g.check_order(Seat(0), &[], &build).unwrap_err().0.contains("Ship"), "nothing of ours at Venus");
+    let build = Order::BuildStation { body: BodyId::Venus, slot: 1 };
     let (ship, found) = colony_ship_ready(&mut g, BodyId::Venus);
     assert!(g.check_order(Seat(0), &[], &found).is_err(), "no ground to found on");
-    assert!(g.check_order(Seat(0), &[], &build).is_ok(), "a Ship in orbit is the foothold");
-    g.commit_orders(Seat(0), std::slice::from_ref(&build));
-    g.resolution_phase();
-    bare_stations(&mut g);
-    let station = g.colonies.iter().find(|c| c.body == BodyId::Venus && c.in_orbit).expect("Ishtar stands").id;
-    g.colony_mut(station).unwrap().modules.push(Module::new(ModuleKind::Habitat));
-    let land = Order::Unload { ship, colonists: 4, army: false, into: UnloadTarget::Colony(station) };
-    // Ticket #335 (version 0.09.0): a station is unloaded into from its own orbit; the Ship that
-    // built it from low orbit changes orbit to its ring first.
-    assert!(g.check_order(Seat(0), &[], &land).unwrap_err().0.contains("reached from"), "not from low orbit");
-    let change = Order::ChangeOrbit { ship, slot: Some(0) };
-    assert!(g.check_order(Seat(0), &[], &change).is_ok());
-    g.commit_orders(Seat(0), std::slice::from_ref(&change));
-    g.resolution_phase();
-    assert_eq!(g.ship(ship).unwrap().slot, Some(0), "it rode up to Ishtar's ring");
-    assert!(g.check_order(Seat(0), &[], &land).is_ok());
+    assert!(g.check_order(Seat(0), &[], &build).unwrap_err().0.contains("Colony Ship"), "a Ship is no foothold for a Materials build");
+    assert_eq!(g.ship(ship).unwrap().slot, Some(0), "it sits in the first ring, Venus having no low orbit");
+    // From another ring, the move comes first.
+    let into_aphrodite = Order::Unload { ship, colonists: 4, army: false, into: UnloadTarget::Ring(BodyId::Venus, 1) };
+    assert!(g.check_order(Seat(0), &[], &into_aphrodite).unwrap_err().0.contains("Move this Ship"));
+    let land = Order::Unload { ship, colonists: 4, army: false, into: UnloadTarget::Ring(BodyId::Venus, 0) };
+    assert!(g.check_order(Seat(0), &[], &land).is_ok(), "{:?}", g.check_order(Seat(0), &[], &land));
+    let materials = g.seats[0].stockpile.materials;
     g.commit_orders(Seat(0), std::slice::from_ref(&land));
     g.resolution_phase();
-    assert_eq!(g.colony(station).unwrap().colonists, 4);
+    let station = g.colonies.iter().find(|c| c.body == BodyId::Venus && c.in_orbit && c.slot == 0).expect("Ishtar founded");
+    assert_eq!(station.colonists, 4);
+    assert_eq!(station.control, Control::Controlled(Seat(0)));
+    assert_eq!(g.seats[0].stockpile.materials, materials, "no Materials paid");
+    bare_stations(&mut g);
     assert_eq!(g.off_world_colonists(Seat(0)), 4, "Venus is off Earth");
     assert_eq!(g.bodies_settled(Seat(0), 4), 1, "and a Body for Diaspora");
     assert!(g.check_order(Seat(0), &[], &Order::Transit { ship, to: BodyId::Mars, slot: None }).unwrap_err().0.contains("Venus"));
 }
 
-/// Ticket #93: the AI raises a station at Venus when a Ship of its own stands there.
+/// Ticket #93: the AI raises a station at Venus when a Ship of its own stands there. Ticket #442
+/// (version 0.09.6): by FOUNDING it -- its loaded Colony Ship, in a free ring, unloads into it.
 #[test]
-fn the_ai_raises_a_station_at_venus_when_it_has_a_ship_there() {
+fn the_ai_founds_a_station_at_venus_from_its_colony_ship() {
     let mut g = game();
     calm(&mut g);
     g.seats[0].stockpile.materials = 300.0;
     g.seats[0].stockpile.energy = 300.0;
     let _ = colony_ship_ready(&mut g, BodyId::Venus);
     let orders = g.ai_orders(Seat(0));
-    assert!(orders.iter().any(|o| matches!(o, Order::BuildStation { body: BodyId::Venus, .. })), "no station at Venus: {orders:?}");
+    assert!(orders.iter().any(|o| matches!(o, Order::Unload { into: UnloadTarget::Ring(BodyId::Venus, _), .. })), "no station founded at Venus: {orders:?}");
+    assert!(!orders.iter().any(|o| matches!(o, Order::BuildStation { body: BodyId::Venus, .. })), "and none built for Materials");
 }
 
 // ---------------------------------------------------------------- 0.06.0 ticket #94: the AI sweep
@@ -13069,7 +13071,8 @@ fn build_now(g: &mut Game, place: Place, item: BuildItem, seat: Seat) {
 fn a_new_ship_starts_in_the_orbit_of_the_yard_that_built_it() {
     let mut g = game();
     let total: usize = BodyId::ALL.iter().map(|b| g.orbits_of(*b).len()).sum();
-    assert_eq!(total, 21, "low orbit plus one per Orbital Slot, over six Bodies");
+    // Ticket #442 (version 0.09.6): Venus has no low orbit, so 20 where it was 21.
+    assert_eq!(total, 20, "low orbit where there is ground, plus one per Orbital Slot, over six Bodies");
     assert_eq!(g.orbits_of(BodyId::Mars)[0], Orbit::Low, "low orbit is the first of them");
     assert_eq!(g.orbit_name(BodyId::Mars, Orbit::Low), "Mars, low orbit");
     let iss = station_of(&g, Seat(0), BodyId::Earth).expect("the ISS");
@@ -18693,4 +18696,91 @@ fn the_ai_loads_a_colony_ship_from_several_regions() {
         _ => None,
     }).collect();
     assert!(loads.contains(&a) && loads.contains(&b), "a Load from each Region, the one with no Launch Site included: {loads:?}");
+}
+
+/// Ticket #442 (version 0.09.6): **Venus has no low orbit**, at the designer's word -- it has no
+/// ground, so the orbit that reaches the ground has no purpose. A Ship goes to one of its station
+/// orbits; a move that names low orbit there is refused, and the default arrival is the seat's own
+/// station's ring, else the first.
+#[test]
+fn venus_has_no_low_orbit() {
+    let mut g = game();
+    assert!(!g.has_low_orbit(BodyId::Venus));
+    assert!(g.has_low_orbit(BodyId::Earth) && g.has_low_orbit(BodyId::Mars));
+    assert!(!g.orbits_of(BodyId::Venus).contains(&Orbit::Low));
+    assert_eq!(g.orbits_of(BodyId::Venus).len(), 3);
+    assert_eq!(g.arrival_slot(Seat(0), BodyId::Venus), Some(0), "the first ring, with no station of ours");
+    assert_eq!(g.arrival_slot(Seat(0), BodyId::Mars), None, "low orbit where there is one");
+    at_window(&mut g);
+    let (ship, _) = colony_ship_ready(&mut g, BodyId::Earth);
+    let low = Order::Transit { ship, to: BodyId::Venus, slot: None };
+    assert!(g.check_order(Seat(0), &[], &low).unwrap_err().0.contains("no low orbit"), "{:?}", g.check_order(Seat(0), &[], &low));
+    assert!(g.check_order(Seat(0), &[], &Order::Transit { ship, to: BodyId::Venus, slot: Some(1) }).is_ok());
+}
+
+/// Ticket #442 (version 0.09.6): **a ground Colony built from a station.** With a working station of
+/// the seat's over a Body and a free ground slot, the seat builds a ground Colony there for the
+/// station's Materials price; it opens with a Core and nobody. Never on Earth, never without a station.
+#[test]
+fn a_ground_colony_is_built_from_a_station() {
+    let mut g = game();
+    g.seats[0].stockpile.materials = 300.0;
+    let slot = g.free_slots_on(BodyId::Mars)[0];
+    let build = Order::BuildColony { body: BodyId::Mars, slot };
+    assert!(g.check_order(Seat(0), &[], &build).unwrap_err().0.contains("station"), "no station of ours over Mars");
+    let id = ColonyId(g.fresh_id());
+    g.colonies.push(Colony { id, body: BodyId::Mars, slot: 0, control: Control::Controlled(Seat(0)), modules: vec![Module::new(ModuleKind::Core)], colonists: 2, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
+    assert!(g.check_order(Seat(0), &[], &build).is_ok(), "{:?}", g.check_order(Seat(0), &[], &build));
+    assert_eq!(g.order_cost(Seat(0), &build).materials, g.station_materials(Seat(0)), "the station's price");
+    assert!(g.check_order(Seat(0), &[], &Order::BuildColony { body: BodyId::Earth, slot: 0 }).is_err(), "never on Earth");
+    g.commit_orders(Seat(0), std::slice::from_ref(&build));
+    g.resolution_phase();
+    let col = g.colonies.iter().find(|c| c.body == BodyId::Mars && !c.in_orbit && c.slot == slot).expect("built");
+    assert_eq!((col.colonists, col.control), (0, Control::Controlled(Seat(0))));
+    assert!(col.modules.iter().any(|m| m.kind == ModuleKind::Core));
+}
+
+/// Ticket #442 (version 0.09.6): **Colonists sent down** from a station of the seat's to its ground
+/// Colony on the same Body: free, within the Colony's room, with what they know; one order a station
+/// a turn; not while the station is blockaded; never up.
+#[test]
+fn colonists_are_sent_down_from_a_station_to_a_ground_colony() {
+    let mut g = game();
+    let up = ColonyId(g.fresh_id());
+    g.colonies.push(Colony { id: up, body: BodyId::Mars, slot: 0, control: Control::Controlled(Seat(0)), modules: vec![Module::new(ModuleKind::Core), Module::new(ModuleKind::Habitat)], colonists: 6, education: 2.0, settler_education: 2.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
+    let down = colony(&mut g, Seat(0), BodyId::Mars, &[], 0);
+    g.colony_mut(down).unwrap().education = 1.0;
+    let room = g.habitat_room(g.colony(down).unwrap());
+    let send = Order::SendDown { from: up, to: down, colonists: 4 };
+    assert!(room >= 4, "the premise: room for four, {room}");
+    assert_eq!(g.order_cost(Seat(0), &send), Cost::default(), "free");
+    assert!(g.check_order(Seat(0), &[], &send).is_ok(), "{:?}", g.check_order(Seat(0), &[], &send));
+    assert!(g.check_order(Seat(0), std::slice::from_ref(&send), &Order::SendDown { from: up, to: down, colonists: 1 }).is_err(), "one a station a turn");
+    assert!(g.check_order(Seat(0), &[], &Order::SendDown { from: down, to: up, colonists: 1 }).is_err(), "down only");
+    assert!(g.check_order(Seat(0), &[], &Order::SendDown { from: up, to: down, colonists: room + 1 }).is_err(), "within the room");
+    g.commit_orders(Seat(0), std::slice::from_ref(&send));
+    g.resolution_phase();
+    assert_eq!(g.colony(up).unwrap().colonists, 2);
+    assert_eq!(g.colony(down).unwrap().colonists, 4);
+    assert!((g.colony(down).unwrap().education - 2.0).abs() < 1e-9, "they bring what they know");
+}
+
+/// Ticket #442 (version 0.09.6): **the computer builds a ground Colony from its station, and sends
+/// its people down.** A station over Mars and nothing on the ground: a Colony built there is weighed.
+/// A ground Colony with room beside it: the station's people are weighed going down.
+#[test]
+fn the_ai_builds_a_colony_from_its_station_and_sends_people_down() {
+    let mut g = game();
+    calm(&mut g);
+    g.seats[0].stockpile.materials = 300.0;
+    g.seats[0].stockpile.energy = 300.0;
+    let up = ColonyId(g.fresh_id());
+    g.colonies.push(Colony { id: up, body: BodyId::Mars, slot: 0, control: Control::Controlled(Seat(0)), modules: vec![Module::new(ModuleKind::Core), Module::new(ModuleKind::Habitat)], colonists: 6, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
+    g.ai_orders(Seat(0));
+    assert!(scored(&g, "build a Colony at") > 0.0, "a Colony built from the station is weighed");
+    let down = colony(&mut g, Seat(0), BodyId::Mars, &[], 0);
+    g.log.clear();
+    g.ai_orders(Seat(0));
+    let room = g.habitat_room(g.colony(down).unwrap()).min(6);
+    assert!(scored(&g, &format!("send {room} down to")) > 0.0, "its people are weighed going down");
 }

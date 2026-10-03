@@ -3133,7 +3133,8 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                     // station's ring holds nothing by sitting there.
                     // Ticket #430 (the review): not at a Body out of sight, where it would say whose
                     // warships hold low orbit.
-                    if let Some(s) = game.orbital_control(body).filter(|_| !hidden_body(game, body)) {
+                    // Ticket #442 (version 0.09.6): and not at a Body with no low orbit.
+                    if let Some(s) = game.orbital_control(body).filter(|_| !hidden_body(game, body) && game.has_low_orbit(body)) {
                         label_at(painter, p - egui::vec2(0.0, side * 40.0), &format!("Orbital Control of low orbit: {}", game.seat_name(s)), seat_colour(session, s), 12.0);
                     }
                 }
@@ -3349,11 +3350,14 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                     // Ticket #335: Orbital Control is of LOW ORBIT, and the line says so, since a
                     // warship at a station's ring holds nothing by sitting there.
                     let any_battery = Seat::ALL.iter().any(|s| !game.batteries_at(*s, body, Orbit::Low).is_empty());
-                    band.push(match game.orbital_control(body).filter(|_| !hidden_body(game, body)) {
-                        Some(s) => BandRow { text: format!("Orbital Control of low orbit: {}", game.seat_name(s)), colour: seat_colour(session, s), kind: None, seat: None, battle: None },
-                        None if any_battery => BandRow { text: "Orbital Control of low orbit: nobody, a Battery stands".to_string(), colour: Color32::LIGHT_GRAY, kind: None, seat: None, battle: None },
-                        None => BandRow { text: "Orbital Control of low orbit: nobody".to_string(), colour: Color32::LIGHT_GRAY, kind: None, seat: None, battle: None },
-                    });
+                    // Ticket #442 (version 0.09.6): not at a Body with no low orbit (Venus).
+                    if game.has_low_orbit(body) {
+                        band.push(match game.orbital_control(body).filter(|_| !hidden_body(game, body)) {
+                            Some(s) => BandRow { text: format!("Orbital Control of low orbit: {}", game.seat_name(s)), colour: seat_colour(session, s), kind: None, seat: None, battle: None },
+                            None if any_battery => BandRow { text: "Orbital Control of low orbit: nobody, a Battery stands".to_string(), colour: Color32::LIGHT_GRAY, kind: None, seat: None, battle: None },
+                            None => BandRow { text: "Orbital Control of low orbit: nobody".to_string(), colour: Color32::LIGHT_GRAY, kind: None, seat: None, battle: None },
+                        });
+                    }
                     // Ticket #317 (version 0.08.8): a Battle in orbit last turn is a row of the
                     // band, with the Battle mark's glyph, in the aggressor's colour; its hotspot
                     // reads the record and opens the Report as the mark's does.
@@ -3842,9 +3846,11 @@ fn right_click(pos: Pos2, session: &Session, game: &Game, view: &ViewState, came
             // LOW ORBIT -- `slot: None` -- which is the orbit the ground is reached from and the
             // one a player almost always means from this map. A station's own orbit is chosen from
             // the stack card's Transits row, or by a right-click on its glyph once there.
-            let orders: Vec<Order> = ids.into_iter().map(|id| Order::Transit { ship: id, to, slot: None }).filter(|o| game.check_order(Seat(0), &session.pending, o).is_ok() || session.pending.contains(o)).collect();
+            // Ticket #442 (version 0.09.6): at a Body with no low orbit, the arrival ring.
+            let slot = game.arrival_slot(Seat(0), to);
+            let orders: Vec<Order> = ids.into_iter().map(|id| Order::Transit { ship: id, to, slot }).filter(|o| game.check_order(Seat(0), &session.pending, o).is_ok() || session.pending.contains(o)).collect();
             if orders.is_empty() {
-                actions.push(Action::Notice(format!("No selected Ship can pay the leg to {}.", game.orbit_name(to, Orbit::Low))));
+                actions.push(Action::Notice(format!("No selected Ship can pay the leg to {}.", game.orbit_name(to, Orbit::of(slot)))));
             }
             place_or_cancel(orders, actions);
         }
@@ -4980,6 +4986,7 @@ fn order_text(game: &Game, o: &Order) -> String {
             // Ticket #409 (version 0.09.4): with the count the slider chose.
             UnloadTarget::Slot(b, s) => format!("Found a Colony at {} on {} with {} from {}", game.tables.body(*b).slots[*s as usize].name, game.tables.body(*b).name, colonists_word(*colonists), ship),
             UnloadTarget::Colony(c) => format!("Unload {} from {} into {}", if *colonists > 0 { colonists_word(*colonists) } else if *army { "the Army".into() } else { "nothing".into() }, ship, game.place_name(Place::Colony(*c))),
+            UnloadTarget::Ring(b, s) => format!("Found {} over {} with {} from {}", game.station_name(*b, *s), game.tables.body(*b).name, colonists_word(*colonists), ship),
         },
         Order::Influence { target, amount } => format!("{} Influence on {}", amount, game.place_name(*target)),
         Order::BuyInfluence { amount } => format!("Buy {} Influence with Ducats", amount),
@@ -4989,6 +4996,9 @@ fn order_text(game: &Game, o: &Order) -> String {
         Order::BuildFacilityWithDucats { state, kind } => format!("Build {} in {} for Ducats", kind.name(), game.tables.state(*state).name),
         Order::BuildModuleWithDucats { colony, kind } => format!("Build {} at {} for Ducats", kind.name(), game.place_name(Place::Colony(*colony))),
         Order::BuildStation { body, slot } => format!("Build {} over {}", game.station_name(*body, *slot), game.tables.body(*body).name),
+        // Ticket #442 (version 0.09.6).
+        Order::BuildColony { body, slot } => format!("Build a Colony at {} on {}", game.tables.body(*body).slots[*slot as usize].name, game.tables.body(*body).name),
+        Order::SendDown { from, to, colonists } => format!("Send {} down from {} to {}", colonists_word(*colonists), game.place_name(Place::Colony(*from)), game.place_name(Place::Colony(*to))),
         Order::BuildArchive { colony } => format!("Build the Archive at {}", game.place_name(Place::Colony(*colony))),
         Order::SetMaxStanding { target: Some(p) } => format!("Spend your whole Allotment on {}, every turn", game.place_name(*p)),
         Order::SetMaxStanding { target: None } => "Place your Influence by hand again".to_string(),
@@ -5003,6 +5013,7 @@ fn order_text(game: &Game, o: &Order) -> String {
             match into {
                 UnloadTarget::Slot(_, slot) => game.tables.body(BodyId::Earth).slots[*slot as usize].name.clone(),
                 UnloadTarget::Colony(c) => game.place_name(Place::Colony(*c)),
+                UnloadTarget::Ring(..) => String::new(),
             }
         ),
         // Ticket #72.
@@ -7699,6 +7710,18 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     output_row(ui, game, Place::Colony(cid));
     // Ticket #204 (version 0.08.1): the receiver's door, against the figure it changes.
     emigrant_loader(ui, session, game, view, col, actions);
+    // Ticket #442 (version 0.09.6): a station of yours sends its people DOWN to a ground Colony of
+    // yours on the same Body, free, within that Colony's room, one order a turn.
+    if col.in_orbit && col.colonists > 0 && col.control.director() == Some(Seat(0)) && !session.spectator {
+        for down in game.colonies.iter().filter(|c| !c.in_orbit && c.body == col.body && c.control.director() == Some(Seat(0))) {
+            let most = col.colonists.min(game.habitat_room(down).saturating_sub(down.colonists));
+            if most == 0 {
+                continue;
+            }
+            let k = count_slider(ui, ("down", cid, down.id), most, "Colonists");
+            cost_button(ui, game, &session.pending, Order::SendDown { from: cid, to: down.id, colonists: k }, &format!("Send {} down to {}", colonists_word(k), game.place_name(Place::Colony(down.id))), actions);
+        }
+    }
     // Ticket #97 (version 0.07.0): the Module cap, shown beside the Colonists that buy it, so a
     // player meets it on the card rather than as a refusal.
     let (used, cap) = (game.module_slots_used(col), game.module_slots(col));
@@ -7915,6 +7938,11 @@ fn slot_panel(ui: &mut Ui, session: &Session, game: &Game, body: BodyId, slot: u
         if found_button(ui, &game.slot_yields(body, slot), &format!("Found a Colony here with {} from {}", colonists_word(k), game.ship_name(s))).clicked() {
             actions.push(Action::Place(order));
         }
+    }
+    // Ticket #442 (version 0.09.6): built from a station of yours over this Body, for the station's
+    // Materials, opening with nobody; greyed with the reason where there is no such station.
+    if !session.spectator && body != BodyId::Earth && game.colonies.iter().any(|c| c.in_orbit && c.body == body && c.control.director() == Some(Seat(0))) {
+        cost_button(ui, game, &session.pending, Order::BuildColony { body, slot }, "Build a Colony here from your station", actions);
     }
 }
 
@@ -8496,6 +8524,13 @@ fn ship_cargo_block(ui: &mut Ui, session: &Session, game: &Game, s: &Ship, body:
                 if found_button(ui, &game.slot_yields(body, slot), &label).clicked() {
                     actions.push(Action::Place(order));
                 }
+            }
+            // Ticket #442 (version 0.09.6): a station FOUNDED from the empty ring the Ship sits in --
+            // at Venus the one way to a station -- for the Colonists aboard, no Materials.
+            if let Some(n) = s.slot.filter(|n| game.free_orbital_slots(body).contains(n)) {
+                let into = UnloadTarget::Ring(body, n);
+                let k = unload_count(ui, s.id, "found ring", game.unload_most(s.id, into));
+                cost_button(ui, game, &session.pending, Order::Unload { ship: s.id, colonists: k, army: false, into }, &format!("Found {} with {}", game.station_name(body, n), colonists_word(k)), actions);
             }
         }
     }

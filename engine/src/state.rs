@@ -3837,14 +3837,33 @@ impl Game {
     /// Ticket #335: the orbits of a Body -- LOW ORBIT, then one per Orbital Slot. Every Ship at the
     /// Body sits in exactly one of them, and a Battle is fought within one of them.
     pub fn orbits_of(&self, body: BodyId) -> Vec<Orbit> {
-        std::iter::once(Orbit::Low).chain((0..self.tables.body(body).orbital_slots).map(Orbit::Slot)).collect()
+        let low = self.has_low_orbit(body).then_some(Orbit::Low);
+        low.into_iter().chain((0..self.tables.body(body).orbital_slots).map(Orbit::Slot)).collect()
+    }
+
+    /// Ticket #442 (version 0.09.6), at the designer's word: a Body with no ground has no LOW orbit,
+    /// the orbit the ground is reached from -- Venus, today. Its Ships sit in its station orbits.
+    pub fn has_low_orbit(&self, body: BodyId) -> bool {
+        self.tables.body(body).colony_slots() > 0
+    }
+
+    /// Ticket #442 (version 0.09.6): where a Ship sent to a Body arrives when nothing names an
+    /// orbit -- low orbit, or at a Body with none, the ring of the seat's own station there, else the
+    /// first free ring, else the first.
+    pub fn arrival_slot(&self, seat: Seat, body: BodyId) -> Option<u32> {
+        if self.has_low_orbit(body) {
+            return None;
+        }
+        let own = self.colonies.iter().find(|c| c.in_orbit && c.body == body && c.control.director() == Some(seat)).map(|c| c.slot);
+        Some(own.or_else(|| self.free_orbital_slots(body).first().copied()).unwrap_or(0))
     }
 
     /// Ticket #335: whether this orbit exists at this Body. Low orbit always does; a slot's does
-    /// where the Body has that many Orbital Slots.
+    /// where the Body has that many Orbital Slots. Ticket #442 (version 0.09.6): low orbit only where
+    /// the Body has ground.
     pub fn orbit_exists(&self, body: BodyId, orbit: Orbit) -> bool {
         match orbit {
-            Orbit::Low => true,
+            Orbit::Low => self.has_low_orbit(body),
             Orbit::Slot(n) => n < self.tables.body(body).orbital_slots,
         }
     }

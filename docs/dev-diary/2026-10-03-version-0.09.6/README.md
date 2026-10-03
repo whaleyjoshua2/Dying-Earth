@@ -159,3 +159,49 @@ A new aid, `emigrantsall:<n>`, puts n Pioneers in every Region seat 0 holds.
   - **the computer:** run against the previous `ai.rs`, it loaded from China alone (`[EastAsia]`).
 - **Older tests:** two checked a Launch Site refusal with the Ship in low orbit. They now check it from
   a station's ring.
+
+## Founding a station from a ground Colony, and a ground Colony from a station (ticket #442)
+
+New aids:
+- `venusring:1`: a loaded Colony Ship in Ishtar's empty ring;
+- `marsstation:1` and `marsstation:down`: a station of seat 0's over Mars, and with `down` an empty
+  ground Colony below it;
+- `selectstation:<body>`: opens seat 0's station card at that Body.
+
+The pictures:
+- [`found-at-venus.png`](ticket-442-founding/found-at-venus.png), taken with
+  `venusring:1 stack:venus ship:1 seed:7`.
+  - The Colony Ship at Ishtar, with "Found Ishtar with 4 Colonists" under a slider at 4.
+  - The orbit moves offer Aphrodite and Lada, and no low orbit.
+  - The map's "Orbital Control of low orbit" line is gone from Venus. It was there in the first take
+    of this picture and was fixed before it was filed.
+- [`build-from-station.png`](ticket-442-founding/build-from-station.png), taken with
+  `marsstation:1 site:mars,1 seed:7`. Valles Marineris, empty, with "Build a Colony here from your
+  station 40 [Materials]".
+- [`send-down.png`](ticket-442-founding/send-down.png), taken with
+  `marsstation:down selectstation:mars seed:7`. Mars Base Camp, six aboard, with a slider at 4 and
+  "Send 4 Colonists down to Olympus Mons on Mars".
+
+**Witnessed red:**
+- **The 0.06.0 Venus test** (a station built from any Ship there) failed under the new rule: the
+  Materials build it now refuses was still accepted. It is rewritten as founding by Colony Ship.
+- **The Venus low-orbit test** could not compile before `has_low_orbit` existed. The Transit refusal
+  was added after.
+- **The save migration**, switched off, loaded the Ship with `left: None, right: Some(0)`.
+- **The computer's station-and-colony test**, run against the previous `ai.rs`, weighed no Colony
+  built from the station.
+- **The orbit count** across six Bodies moved from 21 to 20.
+
+**The sweep after this ticket** ([`sweeps/after-442.txt`](sweeps/after-442.txt)):
+
+| | Cust | Pros | Ark | Arch | collapses |
+|---|---|---|---|---|---|
+| before (after #443) | 9 | 10 | 6 | 9 | 46 |
+| after #442 | 10 | 10 | 7 | 9 | 44 |
+
+The move is inside the noise. Settlement at the end barely moved:
+- ground Colonies on the Moon 131, where it was 125;
+- Venus stations 4, as before.
+
+The sweep counts no use of the new routes (a station founded by Colony Ship, a Colony built from a
+station, people sent down). How often the computer took them is not measured here.

@@ -295,3 +295,17 @@ fn a_save_keeps_the_rival_deeds_places_and_never_the_reveal_switch() {
     let back: Vec<Vec<Option<dying_earth_engine::report::ReportPlace>>> = loaded.report.ai_lines.iter().map(|a| a.places.clone()).collect();
     assert_eq!(back, places, "each deed keeps its place");
 }
+
+/// Ticket #442 (version 0.09.6): **Venus has no low orbit**, so a Ship an older save left there --
+/// or flying there to arrive in it -- loads into the first station orbit.
+#[test]
+fn a_ship_saved_in_venus_low_orbit_loads_into_its_first_ring() {
+    let mut game = played_to(3, 2);
+    let id = ShipId(game.fresh_id());
+    let fuel = game.tank_of(Seat(0), UnitKind::ColonyShip);
+    game.ships.push(Ship { id, name: String::new(), kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Venus), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel, slot: None });
+    let dir = TempDir::new("venus-low");
+    let path = save::save_to(dir.path(), &game, SaveKind::Manual).expect("the save is written");
+    let loaded = save::load_from(&path, tables()).expect("the save is read back");
+    assert_eq!(loaded.ships.iter().find(|s| s.id == id).unwrap().slot, Some(0), "into Ishtar's ring");
+}

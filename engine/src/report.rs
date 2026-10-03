@@ -596,6 +596,8 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("development", &["state", "level"]),
     ("development_woke", &["state", "level", "building"]),
     ("scrubbers_changed_hands", &["n", "state", "share"]),
+    ("colony_built", &["faction", "colony"]),
+    ("sent_down", &["n", "from", "to"]),
     ("leapfrog", &["faction", "state", "coefficient"]),
     ("tech_complete", &["tech", "faction", "shares"]),
     // Ticket #412 (version 0.09.4): the same, with what leading paid.
@@ -697,6 +699,8 @@ pub const RIVAL_ARGS: &[(&str, &[&str])] = &[
     // Ticket #332 (version 0.09.0).
     ("cancel_build", &["building", "place"]),
     ("build_station", &["body"]),
+    ("build_colony", &["body"]),
+    ("send_down", &["n", "place"]),
     ("build_archive", &["colony"]),
     // Ticket #192 (version 0.08.0): the Upload.
     ("upload", &["n", "colony"]),

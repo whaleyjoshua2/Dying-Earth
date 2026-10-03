@@ -213,3 +213,40 @@ The authority is [ticket #443](https://github.com/whaleyjoshua2/Dying-Earth/issu
 - the Loads together passing the room;
 - a low-orbit Load refused for want of a Launch Site;
 - a station-ring Load accepted without one.
+
+## 10. Founding a station from a ground Colony, and a ground Colony from a station
+
+The authority is [ticket #442](https://github.com/whaleyjoshua2/Dying-Earth/issues/442).
+
+| To found | Before | After |
+|---|---|---|
+| a station, off Earth | built for Materials, with a ground Colony of yours on that Body; at Venus, with any Ship of yours there | still built that way with a ground Colony; **or founded** by a Colony Ship in that station's own ring, a Core and the Colonists aboard, no Materials. At Venus only founded |
+| a ground Colony | a Colony Ship in low orbit unloads | still; **or built** from a working station of yours over that Body, for the station's Materials price, opening with a Core and nobody |
+| over Earth | a station from a Launch Site; Antarctica by Colony Ship or by sea | unchanged |
+
+- **Sending people down.** A station of yours sends Colonists down to a ground Colony of yours on the
+  same Body.
+  - Free, any number within the Colony's room, on a slider.
+  - It lands at the Resolution, with their Education blended.
+  - One order a station a turn, and not while the station is under Blockade.
+  - Down only.
+  - A Colony Ship can still unload into a ground Colony, as before.
+- **Venus has no low orbit.** It has no ground, so the orbit that reaches the ground has no purpose.
+  - Its Ships sit in its three station orbits. A move to Venus names one; the default is the seat's
+    own station's orbit, else the first free one.
+  - A Ship an older save left in Venus low orbit loads into the first station orbit.
+  - Venus low-orbit Control and Blockades are gone, and the map no longer labels them.
+- **The computer seats:**
+  - they found a station from a loaded Colony Ship's ring where they have none at that Body;
+  - they no longer build one at Venus for Materials;
+  - they build a ground Colony from a station where they have none on the ground;
+  - they send a station's people down to a ground Colony with room.
+- **Two foundings in one ring** in one Resolution: the first takes it, and the second stays aboard.
+
+**What would show this wrong:**
+
+- a station built at Venus for Materials;
+- a station founded over Earth;
+- a ground Colony built with no station of yours above it;
+- a Ship in Venus low orbit;
+- Colonists sent up, or past the Colony's room, or from a blockaded station.

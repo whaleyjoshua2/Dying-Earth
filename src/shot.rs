@@ -858,6 +858,30 @@ fn build_board(session: &mut Session) {
             let name = g.next_ship_name(UnitKind::ColonyShip);
             g.ships.push(Ship { id, name, kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Venus), colonists: 4, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: g.tank_of(Seat(0), UnitKind::ColonyShip), slot: (v != "low").then_some(1) });
         }
+        // `venusring:1` (a building aid, ticket #442, version 0.09.6): a Colony Ship of seat 0's with
+        // four Colonists in Ishtar's empty ring over Venus, so its card's "Found Ishtar" door shows.
+        if std::env::args().any(|a| a == "venusring:1") {
+            let id = ShipId(g.fresh_id());
+            let built_turn = g.turn;
+            let name = g.next_ship_name(UnitKind::ColonyShip);
+            g.ships.push(Ship { id, name, kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Venus), colonists: 4, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: g.tank_of(Seat(0), UnitKind::ColonyShip), slot: Some(0) });
+        }
+        // `marsstation:1` (a building aid, ticket #442, version 0.09.6): a station of seat 0's over
+        // Mars with six aboard and a Habitat, so a ground slot's card offers "Build a Colony here
+        // from your station" (`site:mars,1`); `marsstation:down` adds an empty ground Colony of
+        // theirs below, so the station's card (`selectstation:mars`) offers to send people down.
+        if let Some(v) = std::env::args().find_map(|a| a.strip_prefix("marsstation:").map(str::to_owned)) {
+            if g.station_at(BodyId::Mars, 0).is_none() {
+                let id = ColonyId(g.fresh_id());
+                g.colonies.push(Colony { id, body: BodyId::Mars, slot: 0, control: Control::Controlled(Seat(0)), modules: vec![Module::new(ModuleKind::Core), Module::new(ModuleKind::Habitat)], colonists: 6, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
+            }
+            if v == "down"
+                && let Some(slot) = g.free_slots_on(BodyId::Mars).first().copied()
+            {
+                let id = ColonyId(g.fresh_id());
+                g.colonies.push(Colony { id, body: BodyId::Mars, slot, control: Control::Controlled(Seat(0)), modules: vec![Module::new(ModuleKind::Core)], colonists: 0, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: false });
+            }
+        }
         // `scrubber:<Region>` (a building aid, ticket #445, version 0.09.6): one Scrubber stands in the
         // named Region (the `select:` spelling), or in seat 0's first Region with `scrubber:own`, so
         // its line on the Region card can be photographed in another Faction's hands or nobody's.
@@ -1994,6 +2018,13 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
                 && b == body
             {
                 view.selection = Selection::Slot(body, slot);
+            }
+            // `selectstation:<body>` (a building aid, ticket #442, version 0.09.6): seat 0's station
+            // over that Body is selected, so its card is in the picture.
+            if std::env::args().any(|a| a.strip_prefix("selectstation:").and_then(body_from_id) == Some(body))
+                && let Some(c) = session.game.as_ref().and_then(|g| g.colonies.iter().find(|c| c.in_orbit && c.body == body && c.control.director() == Some(Seat(0))).map(|c| c.id))
+            {
+                view.selection = Selection::Colony(c);
             }
         }
         plan.next_at = t + 2.5;

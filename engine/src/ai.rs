@@ -270,7 +270,13 @@ impl Game {
     /// ring where the Ship is going there to unload, to refuel or to sit. Until this ticket a
     /// warship's leg always named the richest rival station's slot and every other leg named
     /// nothing at all, so no computer seat ever chose an orbit for a reason.
+    /// Ticket #442 (version 0.09.6): what the choice below names, or where it names nothing at a Body
+    /// with no low orbit (Venus), the seat's own station's ring, else the first.
     pub fn ai_destination_orbit(&self, seat: Seat, ship: &Ship, to: BodyId) -> Option<u32> {
+        self.ai_destination_orbit_chosen(seat, ship, to).or_else(|| self.arrival_slot(seat, to))
+    }
+
+    fn ai_destination_orbit_chosen(&self, seat: Seat, ship: &Ship, to: BodyId) -> Option<u32> {
         // The unload: people aboard go to a station of this seat's with room for them, and a
         // station is touched from its own ring alone.
         if ship.colonists > 0
@@ -1874,7 +1880,8 @@ impl Game {
                 BodyId::Earth => self.directed_states(seat).iter().any(|s| self.state(*s).facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working())),
                 // Ticket #93: at Venus, a Body of orbits only, a Ship of the seat's there is the
                 // foothold, and the station is what its Colonists land in.
-                b if self.tables.body(b).colony_slots() == 0 => self.ships.iter().any(|s| s.seat == seat && s.at == ShipAt::Body(b) && !s.arrived_this_turn),
+                // Ticket #442 (version 0.09.6): no longer; a Colony Ship founds it, below.
+                b if self.tables.body(b).colony_slots() == 0 => false,
                 _ => self.colonies.iter().any(|c| !c.in_orbit && c.body == body && c.control.director() == Some(seat) && c.modules.iter().any(|m| matches!(m.kind, ModuleKind::Mine | ModuleKind::Generator | ModuleKind::Refinery))),
             };
             if has_station || !foothold {
@@ -1883,6 +1890,29 @@ impl Game {
             if let Some(slot) = self.free_orbital_slots(body).first() {
                 let opp = if has_shipyard { 1.0 } else { m.opportunity };
                 push(vec![Order::BuildStation { body, slot: *slot }], Cat::LaunchSiteOrShipyard, self.base_weight(seat, Cat::LaunchSiteOrShipyard) * self.ai_founding_pull(seat), 1.0, 1.0, opp, format!("build {} over {}", self.station_name(body, *slot), self.tables.body(body).name), None);
+            }
+        }
+        // Ticket #442 (version 0.09.6): the mirror -- a ground Colony BUILT from a working station of
+        // the seat's at a Body where it has none on the ground, into the slot that best serves it,
+        // at the station's weight; and the people it holds SENT DOWN to a ground Colony of the seat's
+        // with room on the same Body, as many as fit.
+        for body in BodyId::ALL.into_iter().filter(|b| *b != BodyId::Earth) {
+            let station = self.colonies.iter().find(|c| c.in_orbit && c.body == body && c.control.director() == Some(seat) && self.starved_by(c.id).is_none()).map(|c| c.id);
+            let Some(station) = station else { continue };
+            let ground = self.colonies.iter().find(|c| !c.in_orbit && c.body == body && c.control.director() == Some(seat)).map(|c| c.id);
+            match ground {
+                None => {
+                    if let Some(slot) = self.best_slot_for(seat, body, behind) {
+                        push(vec![Order::BuildColony { body, slot }], Cat::LaunchSiteOrShipyard, self.base_weight(seat, Cat::LaunchSiteOrShipyard) * self.ai_founding_pull(seat), 1.0, 1.0, 1.0, format!("build a Colony at {} on {}", self.tables.body(body).slots[slot as usize].name, self.tables.body(body).name), None);
+                    }
+                }
+                Some(down) => {
+                    let room = self.colony(down).map(|c| self.habitat_room(c).saturating_sub(c.colonists)).unwrap_or(0);
+                    let n = room.min(self.colony(station).map(|c| c.colonists).unwrap_or(0));
+                    if n > 0 {
+                        push(vec![Order::SendDown { from: station, to: down, colonists: n }], Cat::LoadUnload, self.base_weight(seat, Cat::LoadUnload), gap_for(Cat::LoadUnload, None), 1.0, 1.0, format!("send {} down to {}", n, self.place_name(Place::Colony(down))), None);
+                    }
+                }
             }
         }
 
@@ -2637,6 +2667,17 @@ impl Game {
                         let lift = if unclaimed { self.tables.ai.thresholds.first_found_weight } else { 1.0 };
                         push(vec![Order::Unload { ship: s.id, colonists: self.unload_most(s.id, UnloadTarget::Slot(body, slot)), army: false, into: UnloadTarget::Slot(body, slot) }], Cat::FoundColony, self.base_weight(seat, Cat::FoundColony) * lift * self.ai_founding_pull(seat), gap_for(Cat::FoundColony, None), 1.0, opp, format!("found a Colony at {} on {}", self.tables.body(body).slots[slot as usize].name, self.tables.body(body).name), None);
                     }
+                }
+                // Ticket #442 (version 0.09.6): a station FOUNDED from the ring a loaded Colony Ship
+                // sits in, off Earth, where the seat has no station at that Body -- the one way to a
+                // station at Venus, which has no ground and no low orbit. As founding a Colony.
+                if s.colonists > 0 && body != BodyId::Earth
+                    && let Some(n) = orbit.slot()
+                    && self.free_orbital_slots(body).contains(&n)
+                    && !self.colonies.iter().any(|c| c.in_orbit && c.body == body && c.control.director() == Some(seat))
+                {
+                    let into = UnloadTarget::Ring(body, n);
+                    push(vec![Order::Unload { ship: s.id, colonists: self.unload_most(s.id, into), army: false, into }], Cat::FoundColony, self.base_weight(seat, Cat::FoundColony) * self.ai_founding_pull(seat), gap_for(Cat::FoundColony, None), 1.0, 1.0, format!("found {} over {}", self.station_name(body, n), self.tables.body(body).name), None);
                 }
                 // Ticket #44: Antarctica, Earth's slots. A foothold, not Presence: half weight and no gap,
                 // so it is taken when the Ship cannot go anywhere better.

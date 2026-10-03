@@ -487,6 +487,20 @@ pub fn load_from(path: &Path, tables: Arc<Tables>) -> Result<Game, String> {
     if game.seats.iter().any(|s| s.stabilization_run > 0) {
         game.climate.under_sink_eased = true;
     }
+    // Ticket #442 (version 0.09.6): a Body with no ground has no low orbit, so a Ship a save left
+    // there -- or flying there to arrive in it -- goes to the first station orbit.
+    let lowless: Vec<(usize, BodyId)> = game
+        .ships
+        .iter()
+        .enumerate()
+        .filter_map(|(i, s)| match s.at {
+            ShipAt::Body(b) | ShipAt::Transit { to: b, .. } if s.slot.is_none() && !game.has_low_orbit(b) => Some((i, b)),
+            _ => None,
+        })
+        .collect();
+    for (i, _) in lowless {
+        game.ships[i].slot = Some(0);
+    }
     Ok(game)
 }
 

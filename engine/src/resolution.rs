@@ -2462,6 +2462,8 @@ impl Game {
                     true
                 }
                 UnloadTarget::Colony(c) => self.join_antarctic_colony(s.seat, c, s.n, s.from, s.education),
+                // Ticket #442 (version 0.09.6): the sea never reaches an orbit; the check refuses it.
+                UnloadTarget::Ring(..) => false,
                 UnloadTarget::Slot(..) => {
                     let own = self
                         .colonies
@@ -2630,6 +2632,36 @@ impl Game {
             );
             self.report_line_of(*seat, LineKind::YourBuild, LineKind::BuildComplete, Some(ReportPlace::Colony(id)), text);
         }
+        // Ticket #442 (version 0.09.6): ground Colonies built from a station, opening with a Core and
+        // nobody, as a built station does; the first order for a slot takes it.
+        for (seat, body, slot) in std::mem::take(&mut self.pending.colony_builds) {
+            if !self.free_slots_on(body).contains(&slot) {
+                continue;
+            }
+            let id = ColonyId(self.fresh_id());
+            self.colonies.push(Colony { id, body, slot, control: Control::Controlled(seat), modules: vec![Module::new(ModuleKind::Core)], colonists: 0, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: self.turn, in_orbit: false });
+            let line = format!("{} built {}.", self.seat_name(seat), self.place_name(Place::Colony(id)));
+            self.log(line);
+            let text = self.say("colony_built", &[("faction", self.seat_name(seat)), ("colony", self.place_name(Place::Colony(id)))]);
+            self.report_line_of(seat, LineKind::YourBuild, LineKind::BuildComplete, Some(ReportPlace::Colony(id)), text);
+        }
+        // Ticket #442 (version 0.09.6): Colonists sent down from a station, with what they know,
+        // within the room the ground Colony has when they land.
+        for (seat, from, to, n) in std::mem::take(&mut self.pending.send_downs) {
+            let ok = self.colony(from).is_some_and(|c| c.control.director() == Some(seat) && c.in_orbit) && self.colony(to).is_some_and(|c| c.control.director() == Some(seat) && !c.in_orbit) && self.starved_by(from).is_none();
+            if !ok {
+                continue;
+            }
+            let room = self.colony(to).map(|c| self.habitat_room(c).saturating_sub(c.colonists)).unwrap_or(0);
+            let n = n.min(room).min(self.colony(from).map(|c| c.colonists).unwrap_or(0));
+            if n == 0 {
+                continue;
+            }
+            let taught = self.take_colonists(from, n);
+            self.settle_people(to, n, taught);
+            let text = self.say("sent_down", &[("n", n.to_string()), ("from", self.place_name(Place::Colony(from))), ("to", self.place_name(Place::Colony(to)))]);
+            self.report_line_of(seat, LineKind::YourWorks, LineKind::Ship, Some(ReportPlace::Colony(to)), text);
+        }
         // Founding orders into the same Colony Slot from more than one seat are decided at the Body,
         // ties drawn at random (ticket #50).
         let mut founding: Vec<(Seat, ShipId, BodyId, u32)> = Vec::new();
@@ -2741,6 +2773,8 @@ impl Game {
                     let barred = match into {
                         UnloadTarget::Colony(cid) => !self.may_unload_into(seat, cid) || !self.colony(cid).map(|c| self.ship_may_touch(s, c)).unwrap_or(false),
                         UnloadTarget::Slot(_, _) => !self.may_land(seat, body) || !self.ship_in_orbit(s, body, Orbit::Low),
+                        // Ticket #442 (version 0.09.6): a station founded from its own ring.
+                        UnloadTarget::Ring(_, n) => !self.ship_in_orbit(s, body, Orbit::Slot(n)) || self.slot_blockaded_against(seat, body, n),
                     };
                     if barred {
                         let line = format!("{} could not land at {}: the orbit is contested.", self.seat_name(seat), self.tables.body(body).name);
@@ -2828,6 +2862,33 @@ impl Game {
                             self.ai_deed_at(seat, "founded", &[("colony", self.place_name(Place::Colony(id)))], Some(crate::report::ReportPlace::Colony(id)));
                             // Ticket #345 (version 0.09.1): a candidate for its Body's first.
                             ground_founded.push((seat, b, id));
+                        }
+                        // Ticket #442 (version 0.09.6): **a Colony Ship founds a station** in the ring it
+                        // sits in: a Core and the Colonists aboard, no Materials. A slot two seats found
+                        // into in one Resolution goes to the first; the second stays aboard.
+                        UnloadTarget::Ring(b, slot) => {
+                            if b != body || b == BodyId::Earth || self.station_at(b, slot).is_some() || colonists == 0 {
+                                continue;
+                            }
+                            let n = colonists.min(self.ship(ship).map(|s| s.colonists).unwrap_or(0));
+                            let id = ColonyId(self.fresh_id());
+                            self.colonies.push(Colony { id, body: b, slot, control: Control::Controlled(seat), modules: vec![Module::new(ModuleKind::Core)], colonists: 0, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: self.turn, in_orbit: true });
+                            let room = self.habitat_room(self.colony(id).unwrap());
+                            let moved = n.min(room);
+                            let taught = self.unload_people(ship, moved);
+                            self.settle_people(id, moved, taught);
+                            let line = format!("The {} founded {} with {} Colonists.", self.seat_name(seat), self.place_name(Place::Colony(id)), moved);
+                            self.log(line);
+                            // Ticket #419 (version 0.09.4): a station eases where the card says so.
+                            let ease = self.tables.faction(self.kind(seat)).found_station_unrest_ease;
+                            let eased = self.founding_ease(seat, ease);
+                            let text = self.say(
+                                if eased > 0.0 { "station_built_eased" } else { "station_built" },
+                                &[("faction", self.seat_name(seat)), ("station", self.place_name(Place::Colony(id))), ("ease", crate::state::figure(ease))],
+                            );
+                            self.report_line_of(seat, LineKind::YourBuild, LineKind::BuildComplete, Some(ReportPlace::Colony(id)), text);
+                            self.no_habitat_room(id, n.saturating_sub(moved));
+                            self.ai_deed_at(seat, "founded", &[("colony", self.place_name(Place::Colony(id)))], Some(crate::report::ReportPlace::Colony(id)));
                         }
                         UnloadTarget::Colony(cid) => {
                             let Some(col) = self.colony(cid) else { continue };
