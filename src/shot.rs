@@ -834,6 +834,20 @@ fn build_board(session: &mut Session) {
             let name = g.next_ship_name(UnitKind::ColonyShip);
             g.ships.push(Ship { id, name, kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: g.tank_of(Seat(0), UnitKind::ColonyShip), slot: None });
         }
+        // `venusstation:1` (a building aid, ticket #436, version 0.09.6): the designer's crash save in
+        // little. Seat 0 holds Aphrodite, station slot 1 over Venus, with room for four, and a Colony
+        // Ship of theirs with four Colonists sits in its ring. Venus has no ground slots, so a Ship
+        // card that names the station by its ground slot (`stack:venus ship:1`) reads past the end.
+        if std::env::args().any(|a| a == "venusstation:1") {
+            if g.station_at(BodyId::Venus, 1).is_none() {
+                let id = ColonyId(g.fresh_id());
+                g.colonies.push(Colony { id, body: BodyId::Venus, slot: 1, control: Control::Controlled(Seat(0)), modules: vec![Module::new(ModuleKind::Core)], colonists: 0, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
+            }
+            let id = ShipId(g.fresh_id());
+            let built_turn = g.turn;
+            let name = g.next_ship_name(UnitKind::ColonyShip);
+            g.ships.push(Ship { id, name, kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Venus), colonists: 4, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: g.tank_of(Seat(0), UnitKind::ColonyShip), slot: Some(1) });
+        }
         // `shut:1` (a building aid, ticket #359, version 0.09.1), given with `barracks:1`: that Moon
         // Colony's Habitat and Barracks are mothballed and six live there, two more than the Core
         // alone holds -- so its card (`hab:ground`) shows the half line and the Build Army door

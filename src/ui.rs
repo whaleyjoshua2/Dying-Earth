@@ -8441,13 +8441,18 @@ fn ship_cargo_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut View
     if s.colonists > 0 || s.army.is_some() {
         for c in game.colonies.iter().filter(|c| c.body == body) {
             let own = c.control.director() == Some(Seat(0));
+            // Ticket #436 (version 0.09.6): a station is named for its station slot, a ground Colony
+            // for its ground slot. Both were read off the ground slots, so a station whose slot number
+            // ran past them -- any over Venus, which has none -- panicked the card, and the rest were
+            // named for the wrong place.
+            let place = if c.in_orbit { game.station_name(c.body, c.slot) } else { game.tables.body(c.body).slots[c.slot as usize].name.clone() };
             if s.colonists > 0 && own {
                 // Ticket #409 (version 0.09.4): any count up to the room left, on a slider.
                 let into = UnloadTarget::Colony(c.id);
                 let most = game.unload_most(s.id, into);
                 if most > 0 {
                     let k = unload_count(ui, s.id, &format!("into {:?}", c.id), most);
-                    cost_button(ui, game, &session.pending, Order::Unload { ship: s.id, colonists: k, army: false, into }, &format!("Unload {} into {}", colonists_word(k), game.tables.body(c.body).slots[c.slot as usize].name), actions);
+                    cost_button(ui, game, &session.pending, Order::Unload { ship: s.id, colonists: k, army: false, into }, &format!("Unload {} into {}", colonists_word(k), place), actions);
                 }
             }
             if let Some(aid) = s.army {
@@ -8455,7 +8460,7 @@ fn ship_cargo_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut View
                 // carries the same odds the march buttons do. Ticket #309 (version 0.08.7): on a
                 // hover that names the defender, not on the face. Ticket #339 (version 0.09.0): and
                 // those odds are the whole Battle's.
-                let slot_name = &game.tables.body(c.body).slots[c.slot as usize].name;
+                let slot_name = &place;
                 let (label, hover) = if own {
                     (format!("Land the Army at {slot_name}"), format!("{slot_name}: held by you. Landing costs nothing; the Army lands on Hold."))
                 } else {
