@@ -313,6 +313,9 @@ pub fn run(tables: Arc<Tables>, seed: u64, player: FactionKind) -> SimResult {
 /// As `run`, with seat 0 starting in `start` (the sweep uses this to try other seats at the table).
 pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: StateId) -> SimResult {
     let mut game = Game::new(tables.clone(), NewGame { seed, player, player_is_ai: true, player_start: start });
+    // Ticket #430 (version 0.09.5): the sweep's `--reveal` lifts the fog for every seat, so a batch
+    // can be read against the computer playing with the whole board in view.
+    game.reveal_all = std::env::var_os("DYING_EARTH_REVEAL").is_some();
     game.start();
     let mut first_colony_turn = None;
     let mut projected_collapse: Option<u32> = None;
@@ -588,7 +591,9 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         .filter(|l| l.contains(" population left "))
         .filter_map(|l| l.trim_start().split(' ').next().and_then(|n| n.parse::<f64>().ok()))
         .sum();
-    let new_buildings = ["Bank", "Trade Post", "Embassy", "Relay"].map(|b| game.log.iter().filter(|l| l.contains(&format!("completed {b} at"))).count() as u32);
+    // Ticket #426 (version 0.09.5): each counts the Faction building that does its job too.
+    let new_buildings = [&["Bank", "Investment Bank"][..], &["Trade Post", "Exchange"], &["Embassy"], &["Relay", "Chorus"]]
+        .map(|names| game.log.iter().filter(|l| names.iter().any(|b| l.contains(&format!("completed {b} at")))).count() as u32);
     // Ticket #53: Blame as it stands at the end, and the neutral states that developed themselves.
     let blame = Seat::ALL.map(|s| game.blame(s));
     let blame_share = Seat::ALL.map(|s| game.blame_share(s));
@@ -798,8 +803,9 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         deep_colonies: game.colonies.iter().filter(|c| !c.in_orbit && game.working_mines(c) >= 2).count() as u32,
         ground_modules: game.colonies.iter().filter(|c| !c.in_orbit).map(|c| c.modules.len() as u32).sum(),
         ground_colonies: game.colonies.iter().filter(|c| !c.in_orbit).count() as u32,
-        solar_arrays: game.colonies.iter().map(|c| c.modules.iter().filter(|m| m.kind == ModuleKind::SolarArray).count() as u32).sum(),
-        trade_posts: game.colonies.iter().map(|c| c.modules.iter().filter(|m| m.kind == ModuleKind::TradePost).count() as u32).sum(),
+        // Ticket #426 (version 0.09.5): the Heliostat and the Exchange counted with their base kinds.
+        solar_arrays: game.colonies.iter().map(|c| c.modules.iter().filter(|m| m.kind.does_the_job_of(ModuleKind::SolarArray)).count() as u32).sum(),
+        trade_posts: game.colonies.iter().map(|c| c.modules.iter().filter(|m| m.kind.does_the_job_of(ModuleKind::TradePost)).count() as u32).sum(),
         mass_drivers: game.colonies.iter().map(|c| c.modules.iter().filter(|m| m.kind == ModuleKind::MassDriver).count() as u32).sum(),
         martian_moon_colonies: game.colonies.iter().filter(|c| !c.in_orbit && matches!(c.body, BodyId::Phobos | BodyId::Deimos)).count() as u32,
         venus_stations: game.colonies.iter().filter(|c| c.body == BodyId::Venus).count() as u32,

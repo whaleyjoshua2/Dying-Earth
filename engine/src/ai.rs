@@ -506,8 +506,10 @@ impl Game {
         scheduled.chain(breaks).any(|t| t - now <= 0.2)
     }
 
+    /// Ticket #430 (version 0.09.5): under the fog a rival Ship AT a Body is always counted there
+    /// (whose and how many is open), but one in flight toward it only while its books are open.
     fn enemy_present_or_inbound(&self, seat: Seat, body: BodyId) -> bool {
-        self.ships.iter().any(|s| s.seat != seat && (s.at == ShipAt::Body(body) || matches!(s.at, ShipAt::Transit { to, .. } if to == body)))
+        self.ships.iter().any(|s| s.seat != seat && (s.at == ShipAt::Body(body) || (matches!(s.at, ShipAt::Transit { to, .. } if to == body) && self.sees_ship(seat, s))))
     }
 
     /// Ticket #50: an Army of ANY other seat, not only one rival's.
@@ -523,7 +525,8 @@ impl Game {
             Place::Colony(c) => {
                 let body = self.colony(c).map(|c| c.body);
                 self.armies.iter().any(|a| theirs(a) && a.at == ArmyAt::Place(place))
-                    || body.map(|b| self.ships.iter().any(|s| s.seat != seat && s.army.is_some() && (s.at == ShipAt::Body(b) || matches!(s.at, ShipAt::Transit { to, .. } if to == b)))).unwrap_or(false)
+                    // Ticket #430 (version 0.09.5): an Army aboard is cargo, seen only on a Ship the seat sees.
+                    || body.map(|b| self.ships.iter().any(|s| s.seat != seat && s.army.is_some() && self.sees_ship(seat, s) && (s.at == ShipAt::Body(b) || matches!(s.at, ShipAt::Transit { to, .. } if to == b)))).unwrap_or(false)
             }
         }
     }
@@ -602,7 +605,8 @@ impl Game {
         }
         let pairs = &self.tables.faction(self.kind(seat)).mothball_pairs;
         let Some((fk, _)) = pairs.iter().find(|(_, m)| **m == mk) else { return 1.0 };
-        let facilities = self.directed_states(seat).iter().flat_map(|s| self.state(*s).facilities.iter()).filter(|f| f.kind == *fk).count();
+        // Ticket #426 (version 0.09.5): by the job, so a held Reactor counts as a Power Plant.
+        let facilities = self.directed_states(seat).iter().flat_map(|s| self.state(*s).facilities.iter()).filter(|f| f.kind.common().unwrap_or(f.kind) == *fk).count();
         let doubled = self.doubled_modules(seat).iter().filter(|(cid, i)| self.colony(*cid).and_then(|c| c.modules.get(*i)).map(|m| m.kind == mk).unwrap_or(false)).count();
         if facilities > doubled {
             2.0
@@ -881,15 +885,26 @@ impl Game {
     /// Ticket #394 (version 0.09.3): **the size of a place**, its Colonists plus what it makes a
     /// turn -- the Output row's figures summed, Energy only where it makes more than it eats.
     pub fn ai_place_size(&self, cid: ColonyId) -> f64 {
+        self.ai_place_size_for(None, cid)
+    }
+
+    /// Ticket #430 (version 0.09.5): the same, as `viewer` sees it: what a place earns is hidden
+    /// where it does not see, so there it is sized by its Colonists alone. `None` reads the board.
+    fn ai_place_size_for(&self, viewer: Option<Seat>, cid: ColonyId) -> f64 {
         let Some(col) = self.colony(cid) else { return 0.0 };
-        col.colonists as f64 + self.place_output(Place::Colony(cid)).map(|o| o.made()).unwrap_or(0.0)
+        let earns = viewer.is_none_or(|v| col.control.director() == Some(v) || self.sees_place(v, Place::Colony(cid)));
+        col.colonists as f64 + if earns { self.place_output(Place::Colony(cid)).map(|o| o.made()).unwrap_or(0.0) } else { 0.0 }
     }
 
     /// Ticket #394 (version 0.09.3): the largest size any directed Colony or station on the board
     /// has, computed once a plan (the review's fix-up: computing it inside every bounty walked every
     /// place's yields once per rival Colony, R x D x Y a plan).
     pub fn ai_board_largest_size(&self) -> f64 {
-        self.colonies.iter().filter(|c| c.control.director().is_some()).map(|c| self.ai_place_size(c.id)).fold(0.0, f64::max)
+        self.ai_board_largest_size_for(None)
+    }
+
+    fn ai_board_largest_size_for(&self, viewer: Option<Seat>) -> f64 {
+        self.colonies.iter().filter(|c| c.control.director().is_some()).map(|c| self.ai_place_size_for(viewer, c.id)).fold(0.0, f64::max)
     }
 
     /// Ticket #394 (version 0.09.3): **the bounty a rival's Colony or station is**, rescaled to the
@@ -903,17 +918,17 @@ impl Game {
     /// that grows 20 a Colonist) fell faster than the bounty rose, and a Colony of eight people and
     /// three Modules still ranked below one of two people and nothing built.
     pub fn ai_bounty(&self, cid: ColonyId) -> f64 {
-        self.ai_bounty_against(cid, self.ai_board_largest_size())
+        self.ai_bounty_against(None, cid, self.ai_board_largest_size())
     }
 
     /// The bounty with the board's largest size already in hand, for the planner's loops.
-    fn ai_bounty_against(&self, cid: ColonyId, largest: f64) -> f64 {
+    fn ai_bounty_against(&self, viewer: Option<Seat>, cid: ColonyId, largest: f64) -> f64 {
         let m = &self.tables.ai.multipliers;
         let Some(col) = self.colony(cid) else { return 1.0 };
         if col.control.director().is_none() {
             return 1.0;
         }
-        (m.bounty_top * self.ai_place_size(cid) / largest.max(m.bounty_floor)).max(m.bounty_least)
+        (m.bounty_top * self.ai_place_size_for(viewer, cid) / largest.max(m.bounty_floor)).max(m.bounty_least)
     }
 
     /// Ticket #394 (version 0.09.3): the places a computer seat weighs spending Influence on, best
@@ -952,11 +967,12 @@ impl Game {
         // Region's 5 to 10 still and above a held Region's 1.5 to 3 now. Measured with the bounty
         // alone and no price: the seats spent on places they could not afford, and collapses went
         // from 60 to 69 of 80.
-        let largest = self.ai_board_largest_size();
+        // Ticket #430 (version 0.09.5): sized as this seat sees them.
+        let largest = self.ai_board_largest_size_for(Some(seat));
         for c in &self.colonies {
             if c.control.controller().map(|o| o != seat).unwrap_or(false) {
                 let price = self.influence_needed_for(seat, Place::Colony(c.id)).max(1) as f64;
-                targets.push((Place::Colony(c.id), (th.colony_price_pivot / price).min(3.0) * self.ai_bounty_against(c.id, largest)));
+                targets.push((Place::Colony(c.id), (th.colony_price_pivot / price).min(3.0) * self.ai_bounty_against(Some(seat), c.id, largest)));
             }
         }
         targets.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
@@ -1001,7 +1017,7 @@ impl Game {
         let kind = self.kind(seat);
         let m = self.tables.ai.multipliers.clone();
         // Ticket #394 (version 0.09.3): the board's largest place, once a plan, for the bounties.
-        let largest_on_board = self.ai_board_largest_size();
+        let largest_on_board = self.ai_board_largest_size_for(Some(seat));
         let th = self.tables.ai.thresholds.clone();
         let first_kind = self.first_kind(seat);
         let scarce = self.scarcest(seat);
@@ -1133,7 +1149,9 @@ impl Game {
         let gap_for = |cat: Cat, item: Option<&str>| -> f64 {
             // Nothing advances without Energy: while it is the scarcest resource, an Energy producer
             // counts as advancing whichever part the Faction is behind on.
-            let energy_producer = cat == Cat::Producer && matches!(item, Some("Power Plant") | Some("Generator"));
+            // Ticket #426 (version 0.09.5): and the Archivists' Reactor, which is a Power Plant
+            // everywhere -- a Faction building carries its base building's reasons to be built.
+            let energy_producer = cat == Cat::Producer && matches!(item, Some("Power Plant") | Some("Reactor") | Some("Generator"));
             if energy_producer && needs.contains(&Resource::Energy) {
                 return gap;
             }
@@ -1516,8 +1534,10 @@ impl Game {
                     // reaches 5 at a four-Colonist Colony and 12 at a rich one, which is how
                     // ticket #232's first attempt at the Mine put 329 Mines on the board.
                     ModuleKind::TradePost => {
+                        // Ticket #426 (version 0.09.5): read for the kind this seat builds, so the
+                        // Prospectors' Exchange is weighed with its extra Ducat.
                         let bare = self.tables.module(ModuleKind::TradePost).produces.as_ref().map(|p| p.amount).unwrap_or(1.0).max(1.0);
-                        let with = self.module_yield(seat, cid, ModuleKind::TradePost).amount;
+                        let with = self.module_yield(seat, cid, mk).amount;
                         (Cat::Producer, self.base_weight(seat, Cat::Producer) * (with / bare).clamp(0.25, 2.0))
                     }
                     // Ticket #92: a Mass Driver at a low-gravity ground Colony with a Mine, once the
@@ -1611,7 +1631,7 @@ impl Game {
                         let pressed = self.ships.iter().any(|s| {
                             s.seat != seat
                                 && ((s.at == ShipAt::Body(col.body) && s.kind.is_warship() && !s.escaped)
-                                    || (s.kind == UnitKind::Carrier && matches!(s.at, ShipAt::Transit { to, .. } if to == col.body)))
+                                    || (s.kind == UnitKind::Carrier && matches!(s.at, ShipAt::Transit { to, .. } if to == col.body) && self.sees_ship(seat, s)))
                         });
                         if !pressed || col.modules.iter().any(|m| m.kind == ModuleKind::Battery) || col.queue.iter().any(|b| b.item == BuildItem::Module(ModuleKind::Battery)) {
                             continue;
@@ -1671,11 +1691,13 @@ impl Game {
                 // Ticket #41: the first Relay at a Colony is a threat answer while the rival's standing
                 // presses on the seat's own there, once the Colony has a producer Module (a Relay before
                 // the first Mine starved the Colony). A second Relay is worth its base weight.
-                let has_producer = col.modules.iter().any(|m| matches!(m.kind, ModuleKind::Mine | ModuleKind::Generator | ModuleKind::Refinery | ModuleKind::TradePost));
-                let first_relay = mk == ModuleKind::Relay
+                // Ticket #426 (version 0.09.5): by the job, so an Exchange is a producer and a Chorus
+                // is the first Relay, as the base buildings are.
+                let has_producer = col.modules.iter().any(|m| [ModuleKind::Mine, ModuleKind::Generator, ModuleKind::Refinery, ModuleKind::TradePost].iter().any(|k| m.kind.does_the_job_of(*k)));
+                let first_relay = mk.does_the_job_of(ModuleKind::Relay)
                     && has_producer
-                    && !col.modules.iter().any(|m| m.kind == ModuleKind::Relay)
-                    && !col.queue.iter().any(|b| b.item == BuildItem::Module(ModuleKind::Relay));
+                    && !col.modules.iter().any(|m| m.kind.does_the_job_of(ModuleKind::Relay))
+                    && !col.queue.iter().any(|b| matches!(b.item, BuildItem::Module(k) if k.does_the_job_of(ModuleKind::Relay)));
                 let t = if matches!(cat, Cat::ArmyOrBarracks) {
                     threat
                 } else if first_relay && self.standing_pressed(seat, Place::Colony(cid)) {
@@ -2230,9 +2252,12 @@ impl Game {
             // and keeps a Facility idle while its doubling stands.
             let pairs = &self.tables.faction(kind).mothball_pairs;
             let doubled = self.doubled_modules(seat);
+            // Ticket #426 (version 0.09.5): a Facility is read by the job it does, so a held Reactor
+            // is idled, kept idle and counted as the Power Plant the rule treats it as.
+            let job = |k: FacilityKind| k.common().unwrap_or(k);
             let mut in_use: Vec<FacilityKind> = Vec::new();
             for (fk, mk) in pairs {
-                let idle = self.directed_states(seat).iter().flat_map(|s| self.state(*s).facilities.iter()).filter(|f| f.kind == *fk && f.mothballed).count();
+                let idle = self.directed_states(seat).iter().flat_map(|s| self.state(*s).facilities.iter()).filter(|f| job(f.kind) == *fk && f.mothballed).count();
                 let paired = doubled.iter().filter(|(cid, i)| self.colony(*cid).and_then(|c| c.modules.get(*i)).map(|m| m.kind == *mk).unwrap_or(false)).count();
                 if idle > 0 && paired >= idle {
                     in_use.push(*fk);
@@ -2254,7 +2279,7 @@ impl Game {
                 let Some(best) = best_undoubled else { continue };
                 for sid in self.directed_states(seat) {
                     for (i, f) in self.state(sid).facilities.iter().enumerate() {
-                        if f.kind != *fk || f.mothballed {
+                        if job(f.kind) != *fk || f.mothballed {
                             continue;
                         }
                         let y = self.facility_yield(seat, sid, f.kind);
@@ -2281,7 +2306,7 @@ impl Game {
             for (b, name, mothballed, _, _) in standing.iter().filter(|(_, _, moth, _, _)| *moth) {
                 // Ticket #82: not a Facility whose idleness is doubling a Module off Earth.
                 if let BuildingRef::Facility(sid, i) = b
-                    && self.state(*sid).facilities.get(*i).map(|f| in_use.contains(&f.kind)).unwrap_or(false)
+                    && self.state(*sid).facilities.get(*i).map(|f| in_use.contains(&job(f.kind))).unwrap_or(false)
                 {
                     continue;
                 }
@@ -2319,8 +2344,8 @@ impl Game {
         }
 
         // --- Ticket #73: Emigrants. Colonists are built now, so before a Colony Ship can be loaded
-        // or Antarctica settled a batch must muster in a state the seat directs: the one with a
-        // working Launch Site, or, with the ice open, the most populous. It musters while fewer
+        // or Antarctica settled a batch must muster in a state the seat directs: those with a
+        // working Launch Site, or, with the ice open, any (several since ticket #427, below). It musters while fewer
         // wait than two Ship loads (and one more while the ice is open), and never for nothing.
         let presence_needed = self.tables.victory.off_world_presence.saturating_sub(self.off_world_colonists(seat));
         // Ticket #237 (version 0.08.3): the Exodus Call. Sounded where the Arkwrights hold their
@@ -2368,19 +2393,32 @@ impl Game {
                 .sum();
             let want = if has_ship_or_yard { capacity * 2 } else { 0 } + if self.antarctica_open { capacity } else { 0 } + room_off_earth;
             if per > 0 && waiting < want {
-                let by_population = |a: &StateId, b: &StateId| self.state(*a).population.partial_cmp(&self.state(*b).population).unwrap_or(std::cmp::Ordering::Equal);
-                let with_site = self
-                    .directed_states(seat)
-                    .into_iter()
-                    .filter(|s| self.state(*s).facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working()))
-                    .max_by(by_population);
-                let target = with_site.or_else(|| if self.antarctica_open { self.directed_states(seat).into_iter().max_by(by_population) } else { None });
-                // Ticket #196: as many as the state can pay for, not all or nothing. A Coach Class batch
-                // costs the Arkwrights 16.0 people and Australia carries 10.1 to 12.6.
-                if let Some(st) = target
-                    && let n = self.emigrants_affordable(seat, st)
-                    && n > 0
-                {
+                // Ticket #427 (version 0.09.5): the cap is per state now, so the seat recruits from as
+                // many states as it takes to fill the plan and NO further -- the designer's "only to
+                // the extent that have plans to use them". The states with a working Launch Site
+                // first (their Pioneers can lift), then, with the ice open, the rest; the most
+                // populous first within each.
+                let by_population = |a: &StateId, b: &StateId| self.state(*b).population.partial_cmp(&self.state(*a).population).unwrap_or(std::cmp::Ordering::Equal);
+                let has_site = |s: &StateId| self.state(*s).facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working());
+                let mut targets: Vec<StateId> = self.directed_states(seat).into_iter().filter(|s| has_site(s)).collect();
+                targets.sort_by(by_population);
+                if self.antarctica_open {
+                    let mut rest: Vec<StateId> = self.directed_states(seat).into_iter().filter(|s| !has_site(s)).collect();
+                    rest.sort_by(by_population);
+                    targets.extend(rest);
+                }
+                let mut short = want - waiting;
+                for st in targets {
+                    if short == 0 {
+                        break;
+                    }
+                    // Ticket #196: as many as the state can pay for, not all or nothing. A Coach
+                    // Class batch costs the Arkwrights twice the people.
+                    let n = self.emigrants_affordable(seat, st).min(short);
+                    if n == 0 {
+                        continue;
+                    }
+                    short -= n;
                     let opp = if presence_needed > 0 && waiting == 0 { m.opportunity } else { 1.0 };
                     push(vec![Order::BuildEmigrants { state: st, n }], Cat::LoadUnload, self.base_weight(seat, Cat::LoadUnload), gap_for(Cat::LoadUnload, None), 1.0, opp, format!("recruit {n} Pioneers in {}", self.tables.state(st).name), None);
                 }
@@ -2688,7 +2726,7 @@ impl Game {
                                 }
                                 // Ticket #394 (version 0.09.3): a rival's Colony at its bounty, so a
                                 // seat with cause and an Army goes for the fat one it can beat.
-                                let base = self.base_weight(seat, Cat::LoadUnload) * if enemy { self.ai_bounty_against(c.id, largest_on_board) } else { 1.0 };
+                                let base = self.base_weight(seat, Cat::LoadUnload) * if enemy { self.ai_bounty_against(Some(seat), c.id, largest_on_board) } else { 1.0 };
                                 push(vec![Order::Unload { ship: s.id, colonists: 0, army: true, into: UnloadTarget::Colony(c.id) }], Cat::LoadUnload, base, 1.0, if mine { m.threat } else { 1.0 }, 1.0, format!("land an Army at {}", self.place_name(Place::Colony(c.id))), None);
                             }
                         }
@@ -2724,6 +2762,7 @@ impl Game {
                 s.seat != seat
                     && matches!(s.kind, UnitKind::ColonyShip | UnitKind::Carrier)
                     && matches!(s.at, ShipAt::Transit { to, .. } if to == body)
+                    && self.sees_ship(seat, s)
                     && stack.iter().any(|p| p.kind.is_warship() && !p.escaped && self.ship_orbit(p) == self.ship_orbit(s))
             });
             let threat = if self.enemy_present_or_inbound(seat, body) { m.threat } else { 1.0 };

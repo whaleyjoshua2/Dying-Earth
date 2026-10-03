@@ -431,6 +431,9 @@ enum Action {
     /// point of no return is one button that says so.
     Attack(BodyId),
     PreviewAttack,
+    /// Ticket #429 (version 0.09.5): a right-click's moves that would send an empty Colony Ship or
+    /// Carrier, held for the confirm, with its question.
+    ConfirmEmptyMove(Vec<Order>, String),
     Cancel(usize),
     /// Ticket #323 (version 0.08.8): a sentence for the panel's notice line, where a refusal shows.
     Notice(String),
@@ -1274,7 +1277,9 @@ fn orbit_rings_on_globe(
         let mut step = if station.is_some() { 1.0 } else { 0.0 };
         for seat in Seat::ALL {
             let here = ships_in_orbit(game, seat, body, orbit);
-            if here.is_empty() {
+            // Ticket #430 (version 0.09.5): a rival stack at a Body the player does not see sits in
+            // no orbit on the rings; the band counts it, whose and how many.
+            if here.is_empty() || (seat != Seat(0) && hidden_body(game, body)) {
                 continue;
             }
             let from = a + 0.5 * step;
@@ -1301,7 +1306,7 @@ fn orbit_rings_on_globe(
         // Ticket #317 (version 0.08.8) gave the Body one Battle mark. Ticket #335: a Battle is
         // fought and recorded in ONE ORBIT, so the mark belongs beside the orbit that fought, and
         // two fights at one Body -- one in low orbit, one at a station's ring -- put two marks up.
-        if let Some(i) = game.battle_last_turn_at(ReportPlace::Orbit(body, orbit))
+        if let Some(i) = game.battle_last_turn_at(ReportPlace::Orbit(body, orbit)).filter(|i| battle_seen(game, *i))
             && let Some(p) = seen(a - 0.78)
         {
             battle_mark(painter, p, battle_colour(session, game, i));
@@ -1409,6 +1414,15 @@ pub fn draw(
                 session.place(o);
             }
             Action::PreviewAttack => view.attack_preview = true,
+            // Ticket #429 (the review): only onto a clear screen, so a turn ended earlier in the same
+            // frame keeps its Report or Battle window, and the stale move is dropped.
+            Action::ConfirmEmptyMove(orders, text) => {
+                if view.popup == Popup::None {
+                    view.empty_move = orders;
+                    view.empty_move_text = text;
+                    view.popup = Popup::ConfirmEmptyMove;
+                }
+            }
             Action::Attack(body) => {
                 // Ticket #383 (version 0.09.2): fought now, and its window is the news.
                 if let Some(fought) = session.attack(body) {
@@ -2868,6 +2882,122 @@ struct BandRow {
     battle: Option<usize>,
 }
 
+/// Ticket #430 (version 0.09.5): **fog of war, as the player sees it.** The player is seat 0; a
+/// spectator sees everything, as before the fog. The rules are the engine's (`visibility.rs`).
+fn hidden_body(game: &Game, body: BodyId) -> bool {
+    !game.spectator && !game.sees_body(Seat(0), body)
+}
+fn hidden_place(game: &Game, place: Place) -> bool {
+    !game.spectator && !game.sees_place(Seat(0), place)
+}
+fn hidden_ship(game: &Game, s: &Ship) -> bool {
+    !game.spectator && !game.sees_ship(Seat(0), s)
+}
+fn hidden_army(game: &Game, a: &Army) -> bool {
+    !game.spectator && !game.sees_army(Seat(0), a)
+}
+/// Ticket #430: the Armies at a place the player does not see, as "Arkwrights: 2 Armies" lines --
+/// whose and how many, never strength or damage.
+fn unseen_army_lines(ui: &mut Ui, game: &Game, unseen: &[&Army]) {
+    let mut seats: Vec<Option<Seat>> = unseen.iter().map(|a| game.army_seat(a)).collect();
+    seats.sort_by_key(|s| s.map(|s| s.index()));
+    seats.dedup();
+    for seat in seats {
+        let n = unseen.iter().filter(|a| game.army_seat(a) == seat).count();
+        let who = seat.map(|s| game.seat_name(s)).unwrap_or_else(|| "Neutral".into());
+        ui.label(format!("  {who}: {n} Arm{}", if n == 1 { "y" } else { "ies" }));
+    }
+}
+
+/// Ticket #431 (version 0.09.5): one Report line, a way to its place where it has one.
+fn report_line_ui(ui: &mut Ui, game: &Game, l: &dying_earth_engine::report::ReportLine, actions: &mut Vec<Action>) {
+    match l.place {
+        Some(place) => {
+            // Ticket #127 (version 0.07.2): a line that points somewhere wears the glyph of what it
+            // points to. A Body, and an orbit, are no one kind of thing.
+            let kind = match place {
+                ReportPlace::State(_) => Some(Kind::Region),
+                ReportPlace::Colony(c) => game.colony(c).map(Kind::of_colony),
+                ReportPlace::Body(_) | ReportPlace::Orbit(_, _) => None,
+            };
+            let button = match kind.and_then(|k| k.image(ui.ctx(), 14.0)) {
+                Some(image) => egui::Button::image_and_text(image, &l.text),
+                None => egui::Button::new(&l.text),
+            };
+            if ui.add(button.frame(false)).on_hover_text("Go there").clicked() {
+                actions.push(Action::GoTo(place));
+            }
+        }
+        None => {
+            ui.label(&l.text);
+        }
+    }
+}
+
+/// Ticket #431 (version 0.09.5): **a heading's lines with their repeats folded**, at the designer's
+/// word: the sea at every Region, the Refugees and the Unrest of Regions not the player's, and each
+/// rival's completed builds become one line apiece that opens to the full list. The player's own
+/// Regions keep their Unrest and Refugee lines.
+fn report_lines(ui: &mut Ui, game: &Game, session: &Session, lines: &[&dying_earth_engine::report::ReportLine], actions: &mut Vec<Action>) {
+    use dying_earth_engine::report::{LineKind, ReportLine};
+    let own = |l: &ReportLine| l.mine || matches!(l.place, Some(ReportPlace::State(s)) if game.state(s).control.director() == Some(Seat(0)));
+    let fold_key = |l: &ReportLine| -> Option<(LineKind, Option<Seat>)> {
+        match l.kind {
+            LineKind::SeaLevel => Some((l.kind, None)),
+            // The review: only a line at a Region folds; a world-wide Unrest line stands alone.
+            LineKind::Refugees | LineKind::Unrest if !own(l) && l.place.is_some() => Some((l.kind, None)),
+            LineKind::BuildComplete => Some((l.kind, l.by)),
+            _ => None,
+        }
+    };
+    let mut done: Vec<(LineKind, Option<Seat>)> = Vec::new();
+    for l in lines {
+        let Some(key) = fold_key(l) else {
+            report_line_ui(ui, game, l, actions);
+            continue;
+        };
+        if done.contains(&key) {
+            continue;
+        }
+        let group: Vec<&ReportLine> = lines.iter().copied().filter(|m| fold_key(m) == Some(key)).collect();
+        if group.len() < 2 {
+            report_line_ui(ui, game, l, actions);
+            continue;
+        }
+        done.push(key);
+        let n = group.len();
+        let title = match key {
+            (LineKind::SeaLevel, _) => format!("The sea at {n} Regions"),
+            (LineKind::Refugees, _) => format!("Refugees in {n} other Regions"),
+            (LineKind::Unrest, _) => format!("Unrest moved in {n} other Regions"),
+            (_, Some(seat)) => format!("{}: {n} buildings completed", game.seat_name(seat)),
+            _ => format!("{n} more"),
+        };
+        let colour = key.1.map(|s| seat_colour(session, s)).unwrap_or(Color32::LIGHT_GRAY);
+        egui::CollapsingHeader::new(RichText::new(title).color(colour)).id_salt(("fold", format!("{key:?}"))).default_open(false).show(ui, |ui| {
+            for m in &group {
+                report_line_ui(ui, game, m, actions);
+            }
+        });
+    }
+}
+
+/// Ticket #430: a Battle the player sees -- one it fought in, or one somewhere it sees.
+fn battle_seen(game: &Game, i: usize) -> bool {
+    game.report.battles.get(i).is_some_and(|b| game.battle_seen_by(Seat(0), b))
+}
+/// Ticket #430 (the review): what a building earns is seen where its director is the player, nobody,
+/// or a rival at a place the player sees.
+fn earnings_seen(game: &Game, place: Place, director: Option<Seat>) -> bool {
+    director.is_none_or(|d| d == Seat(0)) || !hidden_place(game, place)
+}
+fn books_open(game: &Game, seat: Seat) -> bool {
+    game.spectator || game.sees_books(Seat(0), seat)
+}
+fn doings_open(game: &Game, seat: Seat) -> bool {
+    game.spectator || game.sees_doings(Seat(0), seat)
+}
+
 #[allow(clippy::too_many_arguments)]
 fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &ViewState, camera: &Camera, cam_gt: &GlobalTransform, globes: &Query<(&Globe, &GlobalTransform)>, hotspots: &mut Vec<Hotspot>) {
     let project = |p: Vec3| -> Option<Pos2> { camera.world_to_viewport(cam_gt, p).ok().map(|v| Pos2::new(v.x, v.y)) };
@@ -2982,7 +3112,7 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                     // Ticket #335 (version 0.09.0): a Battle is fought and recorded in one ORBIT,
                     // so the mark beside the Body's label reads the first of the Body's orbits to
                     // have one; a mark per orbit is the interface lane's.
-                    if let Some(i) = game.battle_last_turn_in_orbit(body) {
+                    if let Some(i) = game.battle_last_turn_in_orbit(body).filter(|i| battle_seen(game, *i)) {
                         let label_centre = p - egui::vec2(0.0, side * (22.0 + 7.5 * lines as f32));
                         let width = painter.layout_no_wrap(text.clone(), FontId::proportional(13.0), Color32::WHITE).size().x;
                         let at = label_centre - egui::vec2(width / 2.0 + 18.0, 0.0);
@@ -3001,7 +3131,9 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                     // The Orbital Control flag in the holder's Faction colour. Ticket #335 (version
                     // 0.09.0): Control is of LOW ORBIT, and the flag says so, since a warship at a
                     // station's ring holds nothing by sitting there.
-                    if let Some(s) = game.orbital_control(body) {
+                    // Ticket #430 (the review): not at a Body out of sight, where it would say whose
+                    // warships hold low orbit.
+                    if let Some(s) = game.orbital_control(body).filter(|_| !hidden_body(game, body)) {
                         label_at(painter, p - egui::vec2(0.0, side * 40.0), &format!("Orbital Control of low orbit: {}", game.seat_name(s)), seat_colour(session, s), 12.0);
                     }
                 }
@@ -3019,14 +3151,21 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                     // Body is in low orbit or at one of the stations, and what it can reach from
                     // there -- the ground, a station, a Battle -- follows from that alone. A stack
                     // spread over several orbits says how many; the Surface Map's band names each.
-                    let text = format!("{} x{}  str {}, {}", game.seat_name(seat), ships.len(), fighting_stack_strength(game, seat, body), stack_orbit_phrase(game, seat, body));
                     let at = p - egui::vec2(0.0, 58.0 + row * 16.0);
+                    row += 1.0;
+                    // Ticket #430 (version 0.09.5): a rival stack at a Body the player does not see
+                    // is whose and how many, and no card opens on it.
+                    if seat != Seat(0) && hidden_body(game, body) {
+                        label_at(painter, at, &format!("{}: {} Ship{}", game.seat_name(seat), ships.len(), if ships.len() == 1 { "" } else { "s" }), seat_colour(session, seat), 12.0);
+                        continue;
+                    }
+                    let text = format!("{} x{}  str {}, {}", game.seat_name(seat), ships.len(), fighting_stack_strength(game, seat, body), stack_orbit_phrase(game, seat, body));
                     label_kind_at(painter, at, Some(Kind::of_ships(ships.iter().filter_map(|id| game.ship(*id)))), &text, seat_colour(session, seat), 12.0);
                     hotspots.push(Hotspot { pos: at, radius: 14.0, hit: Hit::Select(Selection::ShipStack(body, seat)) });
-                    row += 1.0;
                 }
             }
-            for s in &game.ships {
+            // Ticket #430 (version 0.09.5): a rival Ship in flight only with its books open.
+            for s in game.ships.iter().filter(|s| !hidden_ship(game, s)) {
                 if let ShipAt::Transit { from, to, turns_left } = s.at {
                     let a = geo::solar_place(game, from);
                     let b = geo::solar_place(game, to);
@@ -3098,7 +3237,7 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                         // Report. Ticket #317 (version 0.08.8): the ring became the Battle mark,
                         // above the label in the Unrest label's row, and a row higher when that
                         // label is showing.
-                        if let Some(i) = game.battle_last_turn_at(ReportPlace::State(sid)) {
+                        if let Some(i) = game.battle_last_turn_at(ReportPlace::State(sid)).filter(|i| battle_seen(game, *i)) {
                             let lift = if st.unrest >= game.tables.unrest.army_threshold { 56.0 } else { 38.0 };
                             let at = p - egui::vec2(0.0, lift);
                             battle_mark(painter, at, battle_colour(session, game, i));
@@ -3107,25 +3246,37 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                         // Army shields (ticket #31): one per Faction present, grey for a neutral Standing Army.
                         // Ticket #297 (version 0.08.6): a shield whose Army is dug in carries a
                         // trench line beneath it, in its own colour.
-                        let mut shields: Vec<(Option<Seat>, i64, bool, bool)> = Vec::new();
+                        // Ticket #430 (version 0.09.5): in a Region the player does not see, a
+                        // rival's shield carries HOW MANY Armies ("x2"), not their strength, and
+                        // says nothing of trenches or wounds.
+                        let fogged = hidden_place(game, Place::State(sid));
+                        let mut shields: Vec<(Option<Seat>, String, bool, bool)> = Vec::new();
                         for seat in Seat::ALL {
                             let s = game.army_stack_strength(seat, Place::State(sid));
                             let ids = game.armies_of_seat_at(seat, Place::State(sid));
                             if s > 0 || !ids.is_empty() {
+                                if fogged && seat != Seat(0) {
+                                    shields.push((Some(seat), format!("x{}", ids.len().max(1)), false, false));
+                                    continue;
+                                }
                                 let dug = ids.iter().filter_map(|id| game.army(*id)).any(|a| game.army_dug_in(a));
                                 let hurt = ids.iter().filter_map(|id| game.army(*id)).any(|a| a.damage > 0);
-                                shields.push((Some(seat), s, dug, hurt));
+                                shields.push((Some(seat), s.to_string(), dug, hurt));
                             }
                         }
                         let neutral_armies: Vec<&Army> = game.armies.iter().filter(|a| a.at == ArmyAt::Place(Place::State(sid)) && game.army_seat(a).is_none() && !game.army_stands_down(a)).collect();
                         let neutral: i64 = neutral_armies.iter().map(|a| game.army_strength(a)).sum();
                         if neutral > 0 {
-                            shields.push((None, neutral, neutral_armies.iter().any(|a| game.army_dug_in(a)), neutral_armies.iter().any(|a| a.damage > 0)));
+                            if fogged {
+                                shields.push((None, format!("x{}", neutral_armies.len()), false, false));
+                            } else {
+                                shields.push((None, neutral.to_string(), neutral_armies.iter().any(|a| game.army_dug_in(a)), neutral_armies.iter().any(|a| a.damage > 0)));
+                            }
                         }
                         for (i, (seat, strength, dug, hurt)) in shields.iter().enumerate() {
                             let centre = p + egui::vec2(-38.0 + 26.0 * i as f32, 36.0);
                             let fill = seat.map(|s| seat_colour(session, s)).unwrap_or(Color32::from_gray(150));
-                            shield(painter, centre, fill, &strength.to_string(), *hurt);
+                            shield(painter, centre, fill, strength, *hurt);
                             if *dug {
                                 painter.line_segment([centre + egui::vec2(-10.0, 15.0), centre + egui::vec2(10.0, 15.0)], egui::Stroke::new(3.0, fill));
                             }
@@ -3156,6 +3307,15 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                     // Battle row per orbit that fought.
                     let mut band: Vec<BandRow> = Vec::new();
                     for seat in Seat::ALL {
+                        // Ticket #430 (version 0.09.5): at a Body the player does not see, a rival's
+                        // Ships are one row, whose and how many, with no orbit, strength or card.
+                        if seat != Seat(0) && hidden_body(game, body) {
+                            let n = game.ships_at(seat, body).len();
+                            if n > 0 {
+                                band.push(BandRow { text: format!("{}: {} Ship{}", game.seat_name(seat), n, if n == 1 { "" } else { "s" }), colour: seat_colour(session, seat), kind: None, seat: None, battle: None });
+                            }
+                            continue;
+                        }
                         for orbit in game.orbits_of(body) {
                             let here = ships_in_orbit(game, seat, body, orbit);
                             if here.is_empty() {
@@ -3189,7 +3349,7 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                     // Ticket #335: Orbital Control is of LOW ORBIT, and the line says so, since a
                     // warship at a station's ring holds nothing by sitting there.
                     let any_battery = Seat::ALL.iter().any(|s| !game.batteries_at(*s, body, Orbit::Low).is_empty());
-                    band.push(match game.orbital_control(body) {
+                    band.push(match game.orbital_control(body).filter(|_| !hidden_body(game, body)) {
                         Some(s) => BandRow { text: format!("Orbital Control of low orbit: {}", game.seat_name(s)), colour: seat_colour(session, s), kind: None, seat: None, battle: None },
                         None if any_battery => BandRow { text: "Orbital Control of low orbit: nobody, a Battery stands".to_string(), colour: Color32::LIGHT_GRAY, kind: None, seat: None, battle: None },
                         None => BandRow { text: "Orbital Control of low orbit: nobody".to_string(), colour: Color32::LIGHT_GRAY, kind: None, seat: None, battle: None },
@@ -3200,7 +3360,7 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                     // Ticket #335 (version 0.09.0): one row per ORBIT that fought, since two fights
                     // at one Body are two records and the map now marks each on its own ring.
                     for orbit in game.orbits_of(body) {
-                        let Some(i) = game.battle_last_turn_at(ReportPlace::Orbit(body, orbit)) else { continue };
+                        let Some(i) = game.battle_last_turn_at(ReportPlace::Orbit(body, orbit)).filter(|i| battle_seen(game, *i)) else { continue };
                         let who = game.report.battles[i].aggressor().map(|s| format!("the {} attacked", game.seat_name(s))).unwrap_or_else(|| "nobody attacked".to_string());
                         let text = format!("A Battle {} last turn: {who}", orbit_phrase(game, body, orbit));
                         band.push(BandRow { text, colour: battle_colour(session, game, i), kind: Some(Kind::Battle), seat: None, battle: Some(i) });
@@ -3363,7 +3523,7 @@ fn slot_labels(painter: &egui::Painter, session: &Session, game: &Game, body: Bo
                 // Ticket #311 (version 0.08.7): last turn's Battle at this Colony, as a Region's.
                 // Ticket #317 (version 0.08.8): the Battle mark above the slot's point.
                 if let Some(c) = game.colony_at(body, slot)
-                    && let Some(i) = game.battle_last_turn_at(ReportPlace::Colony(c.id))
+                    && let Some(i) = game.battle_last_turn_at(ReportPlace::Colony(c.id)).filter(|i| battle_seen(game, *i))
                 {
                     let at = p - egui::vec2(0.0, 18.0);
                     battle_mark(painter, at, battle_colour(session, game, i));
@@ -3616,6 +3776,9 @@ fn apply_hit(hit: Hit, view: &mut ViewState) {
     }
 }
 
+/// Ticket #429 (version 0.09.5): a move that would send an empty Colony Ship or Carrier asks first
+/// (`Popup::ConfirmEmptyMove`), since a right-click skips the card's "Empty." note.
+///
 /// Ticket #323 (version 0.08.8): **a right-click on the map moves the armed stack.** On Earth, with
 /// a Region's stack armed by a click on its shield, a right-click on a neighbouring Region places
 /// the stack's march there, the same orders the card's *attack X* button places; a second
@@ -3648,8 +3811,14 @@ fn right_click(pos: Pos2, session: &Session, game: &Game, view: &ViewState, came
                 actions.push(Action::Cancel(i));
             }
         } else {
-            for o in orders {
-                if game.check_order(Seat(0), &session.pending, &o).is_ok() {
+            let placeable: Vec<Order> = orders.into_iter().filter(|o| game.check_order(Seat(0), &session.pending, o).is_ok()).collect();
+            // Ticket #429 (version 0.09.5): a right-click skips the card and its "Empty." note, so a
+            // move that sends an empty Colony Ship or Carrier asks once first.
+            let moving: Vec<&Ship> = placeable.iter().filter_map(|o| match o { Order::Transit { ship, .. } | Order::ChangeOrbit { ship, .. } => game.ship(*ship), _ => None }).collect();
+            if let Some(question) = empty_move_question(&moving) {
+                actions.push(Action::ConfirmEmptyMove(placeable, question));
+            } else {
+                for o in placeable {
                     actions.push(Action::Place(o));
                 }
             }
@@ -4377,9 +4546,10 @@ fn selection_card(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSt
             // page, one row per Battle in the aggressor's colour, each a way there; the Report is
             // reachable by no button once it has closed, and this is where a player who missed a
             // mark finds the fight.
-            if view.view == View::Solar && !game.report.battles.is_empty() {
+            if view.view == View::Solar && (0..game.report.battles.len()).any(|i| battle_seen(game, i)) {
                 ui.label(RichText::new("Battles last turn").strong());
-                for (i, b) in game.report.battles.iter().enumerate() {
+                // Ticket #430 (version 0.09.5): the Battles the player sees.
+                for (i, b) in game.report.battles.iter().enumerate().filter(|(i, _)| battle_seen(game, *i)) {
                     let who = b.aggressor().map(|s| format!("the {} attacked", game.seat_name(s))).unwrap_or_else(|| "nobody attacked".to_string());
                     let text = format!("{}: {who}; {}", b.place, b.result);
                     let colour = battle_colour(session, game, i);
@@ -5583,6 +5753,11 @@ fn queue_line(game: &Game, place: Place, b: &Build, turns: u32) -> String {
 /// the place's own upkeep. Nothing on a place nobody directs.
 fn output_row(ui: &mut Ui, game: &Game, place: Place) {
     use dying_earth_engine::Resource;
+    // Ticket #430 (version 0.09.5): a rival's earnings at a place the player does not see are hidden.
+    if game.place_control(place).director().is_some_and(|d| d != Seat(0)) && hidden_place(game, place) {
+        ui.label(RichText::new("Output: out of sight").weak());
+        return;
+    }
     let Some(o) = game.place_output(place) else { return };
     // Ticket #415 (version 0.09.4): each figure names what made it, the fixed sentence gone.
     let sources = game.place_output_sources(place).unwrap_or_default();
@@ -5634,6 +5809,10 @@ fn output_sources_hover(list: &[(String, f64)]) -> String {
 /// queue under it, each item `Habitat 3 of 8` with its estimate. The queue is drawn on the tiles
 /// too; here it is in order, which the tiles cannot say.
 fn widgets_block(ui: &mut Ui, game: &Game, place: Place) {
+    // Ticket #430 (version 0.09.5): nor what a rival builds there, nor at what rate.
+    if game.place_control(place).director().is_some_and(|d| d != Seat(0)) && hidden_place(game, place) {
+        return;
+    }
     let rate = game.widgets_at(place);
     let makers = widget_makers(game, place);
     let breakdown = if makers.is_empty() { "nothing here makes any".to_string() } else { makers.iter().map(|(name, n)| format!("{n} from {name}")).collect::<Vec<_>>().join(", ") };
@@ -6358,6 +6537,10 @@ fn facility_figures(game: &Game, sid: StateId, f: &Facility, director: Option<Se
     // Ticket #69: a Lab in a state nobody holds, or under Occupation, works for the world.
     let world_lab = f.kind == FacilityKind::ResearchLab && f.working() && !f.offline_until_resolution && matches!(game.state(sid).control, Control::Neutral | Control::Occupied { .. });
     // Ticket #257 (version 0.08.4): a Sea Wall says what it has held back and what that costs.
+    // Ticket #430 (the review): a rival's earnings at a place out of sight are hidden on the tile too.
+    if !earnings_seen(game, Place::State(sid), director) {
+        return "out of sight".to_string();
+    }
     if f.kind == FacilityKind::SeaWall {
         let yield_text = director.map(|d| game.facility_yield(d, sid, f.kind).text()).unwrap_or_else(|| "idle, nobody directs this state".to_string());
         // Ticket #390 (version 0.09.3): the keep clause the short row reads too, written once.
@@ -6431,7 +6614,7 @@ fn facility_row(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, i: us
         // Ticket #390 (version 0.09.3): a short row's hover is its whole sentence and nothing else,
         // so the Sea Wall's, the longest in the data, stays within the six-line ceiling.
         let rules = if short.is_some() { full.clone() } else { facility_rules(f.kind.name(), f.coastal) };
-        let tip = match director.filter(|_| !f.mothballed).map(|d| game.facility_yield(d, sid, f.kind).chain).filter(|c| c.multiplied()) {
+        let tip = match director.filter(|_| !f.mothballed && earnings_seen(game, Place::State(sid), director)).map(|d| game.facility_yield(d, sid, f.kind).chain).filter(|c| c.multiplied()) {
             Some(chain) => chain_tip(&rules, &chain),
             None => rules,
         };
@@ -6636,7 +6819,9 @@ fn slot_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
                 boxes.push((SlotBoxKind::Standing(i), coastal));
             }
         }
-        for (qi, b) in st.queue.iter().enumerate() {
+        // Ticket #430 (version 0.09.5): a rival's builds under way only where the player sees.
+        let unseen = director.is_some_and(|d| d != Seat(0)) && hidden_place(game, Place::State(sid));
+        for (qi, b) in st.queue.iter().enumerate().filter(|_| !unseen) {
             if let BuildItem::Facility(k) = b.item
                 && b.coastal == coastal
                 && game.takes_slot(k)
@@ -6680,7 +6865,7 @@ fn slot_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
                 let heading = format!("{} ({side}): {}{}", f.kind.name(), facility_figures(game, sid, f, director), facility_offline_words(f));
                 let tip = facility_rules(&heading, f.coastal);
                 // Ticket #352 (version 0.09.1): with its arithmetic, where the figure is multiplied.
-                let tip = match director.filter(|_| !f.mothballed).map(|d| game.facility_yield(d, sid, f.kind).chain).filter(|c| c.multiplied()) {
+                let tip = match director.filter(|_| !f.mothballed && earnings_seen(game, Place::State(sid), director)).map(|d| game.facility_yield(d, sid, f.kind).chain).filter(|c| c.multiplied()) {
                     Some(chain) => chain_tip(&tip, &chain),
                     None => tip,
                 };
@@ -6796,7 +6981,12 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
             game.tables.influence.first_settled_allotment
         ),
     );
-    ui.label(format!("GDP {}: its economy pays its controller {} Ducats a turn (GDP x Industry Level / 5, never below 1); a Bank here would add {}", card.gdp, game.state_ducats(sid), (game.tables.facility(FacilityKind::Bank).produces.as_ref().map(|p| p.amount).unwrap_or(0.0) * card.gdp as f64 / 10.0).floor() as i64));
+    // Ticket #426 (version 0.09.5): the player's own Bank by name (the Prospectors' Investment Bank),
+    // at its real figure, the Faction's output multiplier and Commodity Finance included.
+    let bank = FacilityKind::Bank.built_by(game.kind(Seat(0)));
+    // Ticket #430 (the review): what a rival's Region pays it is hidden where the player does not see.
+    let pays = if earnings_seen(game, Place::State(sid), game.state(sid).control.director()) { game.state_ducats(sid).to_string() } else { "an unseen number of".to_string() };
+    ui.label(format!("GDP {}: its economy pays its controller {} Ducats a turn (GDP x Industry Level / 5, never below 1); a{} {} here would add {}", card.gdp, pays, if bank == FacilityKind::InvestmentBank { "n" } else { "" }, bank.name(), game.facility_yield(Seat(0), sid, bank).amount));
     icon_word(ui, "emissions", format!("Emissions this turn: industry {:.1}, Facilities {:.1}, people {:.1}", industry_em, fac_em, game.population_coefficient(sid) * st.population * mult));
     // Ticket #54: the per-person line, its formula, and what Leapfrog has taken off it.
     {
@@ -6973,12 +7163,14 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     // each of the player's raised Armies its march buttons and repairs, indented. The block that
     // stood at the foot of the card, below the fold at 1080 in the presentation review's picture,
     // is gone. The whole block is a tenth larger, at `ARMY_LIST_SCALE`.
-    let armies: Vec<&Army> = game.armies.iter().filter(|a| a.at == ArmyAt::Place(Place::State(sid))).collect();
+    // Ticket #430 (version 0.09.5): the Armies the player does not see are counted, not listed.
+    let (armies, unseen): (Vec<&Army>, Vec<&Army>) = game.armies.iter().filter(|a| a.at == ArmyAt::Place(Place::State(sid))).partition(|a| !hidden_army(game, a));
     ui.scope(|ui| {
         for font in ui.style_mut().text_styles.values_mut() {
             font.size *= ARMY_LIST_SCALE;
         }
         let heading = ui.label(RichText::new("Armies").strong());
+        unseen_army_lines(ui, game, &unseen);
         // Ticket #323 (version 0.08.8): a click on the shield brings the card to its Armies block.
         if view.armed_stack == Some(sid) && view.armed_scroll {
             heading.scroll_to_me(Some(egui::Align::Min));
@@ -7199,7 +7391,8 @@ fn pioneers_block(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, act
     // twice the batch -- 16.0 people -- and Australia carries 10.1 to 12.6, so the button was dead
     // there with nothing on screen to say why. Where the state cannot pay for even one, it still
     // offers one, so the refusal a player reads is "not enough people there" rather than silence.
-    let per = game.emigrants_affordable(Seat(0), sid).max(1);
+    // Ticket #428 (version 0.09.5): how many, on a slider, up to what the state may recruit.
+    let per = count_slider(ui, ("recruit", sid), game.emigrants_affordable(Seat(0), sid).max(1), "Pioneers");
     cost_button_with_hover(
         ui,
         game,
@@ -7208,13 +7401,22 @@ fn pioneers_block(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, act
         &format!("Recruit {per} Pioneers"),
         Some(format!(
             "{} people, on the card at End Turn, and {} off this state's Unrest. A working Launch Site lifts them onto a Ship or straight to a station of yours over Earth; once the ice is open the sea takes them to Antarctica.",
-            game.tables.people_text(game.lift_population(Seat(0), per)),
-            Game::unrest_figure(game.tables.emigrants.unrest_fall)
+            game.tables.people_text(game.muster_population_in(Seat(0), sid, per)),
+            Game::unrest_figure(game.tables.emigrants.unrest_fall_each * per as f64)
         )),
         actions,
     );
+    // Ticket #428 (version 0.09.5): ONE slider for every door below -- the sea, the lift, a Colony
+    // Ship -- each door sending that many, or as many as its room takes. Drawn only where a door is.
+    let lifts = st.facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working());
+    let sea_door = game.antarctica_open
+        && (!game.free_slots_on(BodyId::Earth).is_empty() || game.colonies.iter().any(|c| c.body == BodyId::Earth && !c.in_orbit && c.control.director() == Some(Seat(0)) && game.habitat_room(c) > c.colonists));
+    let lift_door = lifts
+        && (game.colonies.iter().any(|c| c.body == BodyId::Earth && c.in_orbit && c.control.director() == Some(Seat(0)) && game.habitat_room(c) > c.colonists)
+            || game.ships.iter().any(|s| s.seat == Seat(0) && s.kind == UnitKind::ColonyShip && s.at == ShipAt::Body(BodyId::Earth) && s.colonists < game.colony_ship_capacity(Seat(0))));
+    let send = if st.emigrants > 0 && (sea_door || lift_door) { count_slider(ui, ("send", sid), st.emigrants, "Pioneers") } else { st.emigrants };
     if game.antarctica_open && st.emigrants > 0 {
-        let n = st.emigrants;
+        let n = send;
         for slot in game.free_slots_on(BodyId::Earth) {
             // Ticket #283 (version 0.08.5): the third founding door wears the same face as the
             // two Ship doors, the site's yields in glyphs, at the designer's word.
@@ -7240,10 +7442,10 @@ fn pioneers_block(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, act
     }
     // Ticket #141 (version 0.07.3): waiting Emigrants lift straight to a station of yours over
     // Earth, as many as it has room for, by the Launch Site here. A launch, no Ship.
-    if st.emigrants > 0 && st.facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working()) {
+    if st.emigrants > 0 && lifts {
         for c in game.colonies.iter().filter(|c| c.body == BodyId::Earth && c.in_orbit && c.control.director() == Some(Seat(0))) {
             let room = game.habitat_room(c).saturating_sub(c.colonists);
-            let n = st.emigrants.min(room);
+            let n = send.min(room);
             if n == 0 {
                 continue;
             }
@@ -7269,11 +7471,11 @@ fn pioneers_block(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, act
     // beyond its capacity, and each of those may die on arrival. A risk that drowns people wants
     // the sentence explaining it beside the button, and that sentence lives on the Ship's card --
     // so a player who means to crowd a ship goes there deliberately.
-    if st.emigrants > 0 && st.facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working()) {
+    if st.emigrants > 0 && lifts {
         let capacity = game.colony_ship_capacity(Seat(0));
         for s in game.ships.iter().filter(|s| s.seat == Seat(0) && s.kind == UnitKind::ColonyShip && s.at == ShipAt::Body(BodyId::Earth)) {
             let room = capacity.saturating_sub(s.colonists);
-            let n = st.emigrants.min(room);
+            let n = send.min(room);
             if n == 0 {
                 continue;
             }
@@ -7538,13 +7740,15 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     // stood here; since ticket #332 the queue is in full under the Widgets line above the tiles.
     // Ticket #312 (version 0.08.7): the Colony's Armies block, as the Region card's: a heading, the
     // stance row under it, the rows, and the repairs under the player's own; a tenth larger.
-    let armies: Vec<&Army> = game.armies.iter().filter(|a| a.at == ArmyAt::Place(Place::Colony(cid))).collect();
-    if !armies.is_empty() {
+    // Ticket #430 (version 0.09.5): the Armies the player does not see are counted, not listed.
+    let (armies, unseen): (Vec<&Army>, Vec<&Army>) = game.armies.iter().filter(|a| a.at == ArmyAt::Place(Place::Colony(cid))).partition(|a| !hidden_army(game, a));
+    if !armies.is_empty() || !unseen.is_empty() {
         ui.scope(|ui| {
             for font in ui.style_mut().text_styles.values_mut() {
                 font.size *= ARMY_LIST_SCALE;
             }
             ui.label(RichText::new("Armies").strong());
+            unseen_army_lines(ui, game, &unseen);
             let my_armies: Vec<&Army> = armies.iter().copied().filter(|a| !session.spectator && game.army_seat(a) == Some(Seat(0))).collect();
             if !my_armies.is_empty() {
                 stance_row(ui, game, &session.pending, my_armies[0].stance, |s| Order::ArmyStance { place: Place::Colony(cid), stance: s }, false, actions);
@@ -7762,6 +7966,13 @@ fn attack_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
 /// else went to `ship_panel`.
 fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, body: BodyId, seat: Seat, actions: &mut Vec<Action>) {
     let ships: Vec<&Ship> = game.ships.iter().filter(|s| s.seat == seat && s.at == ShipAt::Body(body)).collect();
+    // Ticket #430 (version 0.09.5): a rival stack at a Body the player does not see is whose and
+    // how many, however its card was reached.
+    if seat != Seat(0) && hidden_body(game, body) {
+        ui.label(RichText::new(format!("{}: {} Ships at {}", game.seat_name(seat), ships.len(), game.tables.body(body).name)).size(22.0).strong());
+        ui.label(RichText::new("Out of sight.").weak());
+        return;
+    }
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 8.0;
         // Ticket #216 (version 0.08.2): the Faction's symbol alone, as on a Colony card's heading.
@@ -7884,6 +8095,11 @@ fn ship_line(game: &Game, s: &Ship) -> String {
 /// picture asked for, which only the Ship's card answers.
 #[allow(clippy::too_many_arguments)]
 fn move_dropdowns(ui: &mut Ui, session: &Session, game: &Game, body: BodyId, ships: &[&Ship], one: Option<&Ship>, scroll: Option<StackBlock>, salt: &str, actions: &mut Vec<Action>) {
+    // Ticket #429 (version 0.09.5): an empty Colony Ship or Carrier says so over its moves, in amber,
+    // at no cost of a click.
+    if let Some(note) = empty_note(ships) {
+        ui.colored_label(Color32::from_rgb(230, 170, 90), note);
+    }
     // The planets in the sky's order, the one whose group the Ships are in pulled to the front. A
     // stable sort, so the rest keep their order.
     let mut planets: Vec<BodyId> = BodyId::ALL.into_iter().filter(|b| b.primary() == *b).collect();
@@ -8010,6 +8226,12 @@ fn ship_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
         view.selection = Selection::None;
         return;
     };
+    // Ticket #430 (version 0.09.5): a rival Ship the player does not see has no card.
+    if hidden_ship(game, s) {
+        ui.label(RichText::new(format!("A {} Ship", game.seat_name(s.seat))).size(22.0).strong());
+        ui.label(RichText::new("Out of sight.").weak());
+        return;
+    }
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 8.0;
         faction_glyph(ui, session, game, Some(s.seat), 22.0);
@@ -8179,15 +8401,17 @@ fn ship_cargo_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut View
                                 }
                             }
                         });
-                        // Ticket #73: a Launch Site lifts the Emigrants waiting there, no more.
-                        let lift = n.min(game.state(chosen).emigrants).max(1);
-                        cost_button(ui, game, &session.pending, Order::Load { ship: s.id, colonists: lift, from: LoadSource::State(chosen), army: None }, &format!("Load {lift} Pioneers"), actions);
                     });
+                    // Ticket #73: a Launch Site lifts the Emigrants waiting there, no more. Ticket
+                    // #428 (version 0.09.5): how many, on a slider under the Region's drop-down.
+                    let lift = count_slider(ui, ("load", s.id, chosen), n.min(game.state(chosen).emigrants), "Pioneers");
+                    cost_button(ui, game, &session.pending, Order::Load { ship: s.id, colonists: lift, from: LoadSource::State(chosen), army: None }, &format!("Load {lift} Pioneers"), actions);
                 }
             }
             _ => {
                 for c in game.colonies.iter().filter(|c| c.body == body && c.control.director() == Some(Seat(0)) && c.colonists > 0) {
-                    let k = n.min(c.colonists);
+                    // Ticket #428 (version 0.09.5): how many, on a slider above the place's button.
+                    let k = count_slider(ui, ("load", s.id, c.id), n.min(c.colonists), "Colonists");
                     // Ticket #335 (version 0.09.0): by the place's OWN name, which names a station
                     // and a ground Colony alike.
                     cost_button(ui, game, &session.pending, Order::Load { ship: s.id, colonists: k, from: LoadSource::Colony(c.id), army: None }, &format!("Load {} Colonists from {}", k, game.place_name(Place::Colony(c.id))), actions);
@@ -8259,22 +8483,35 @@ fn ship_cargo_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut View
     }
 }
 
-/// Ticket #409 (version 0.09.4): how many Colonists to unload, on a slider from 1 to the most the
-/// place will take, remembered per Ship and place. The designer: *"up to max number the outpost will
-/// take"*. No slider where only one fits.
 /// Ticket #409 (version 0.09.4): "1 Colonist", "4 Colonists", now that one is a routine count.
 fn colonists_word(n: u32) -> String {
     if n == 1 { "1 Colonist".to_string() } else { format!("{n} Colonists") }
 }
 
+/// Ticket #409 (version 0.09.4): how many Colonists to unload, on a slider from 1 to the most the
+/// place will take, remembered per Ship and place. The designer: *"up to max number the outpost will
+/// take"*. No slider where only one fits.
 fn unload_count(ui: &mut Ui, ship: ShipId, key: &str, most: u32) -> u32 {
+    count_slider(ui, ("unload_count", ship, key), most, "Colonists")
+}
+
+/// Ticket #428 (version 0.09.5): **every count of people is a slider**, the Unload slider's
+/// behaviour made general at the designer's word -- "recruit pioneers, lifting pioneers, settling
+/// them or moving them at all should be a slider interface like the transfer off ship we built".
+/// From 1 to `most` in steps of one, starting at the most, remembered under `key` while the card
+/// stays open; nothing drawn where only one is possible.
+///
+/// The count is remembered WITH the most it was chosen under, and a most that has moved starts the
+/// slider afresh at the new most (the review): kept alone, the count could only ever fall, so a
+/// Region with nobody waiting pinned the next turn's load at one.
+fn count_slider(ui: &mut Ui, key: impl std::hash::Hash + std::fmt::Debug, most: u32, word: &str) -> u32 {
     let most = most.max(1);
-    let id = egui::Id::new(("unload_count", ship, key));
-    let mut n: u32 = ui.data(|d| d.get_temp(id)).unwrap_or(most).clamp(1, most);
+    let id = egui::Id::new(key);
+    let mut n: u32 = ui.data(|d| d.get_temp::<(u32, u32)>(id)).filter(|(_, was)| *was == most).map_or(most, |(n, _)| n).clamp(1, most);
     if most > 1 {
-        ui.add(egui::Slider::new(&mut n, 1..=most).text("Colonists"));
+        ui.add(egui::Slider::new(&mut n, 1..=most).text(word));
     }
-    ui.data_mut(|d| d.insert_temp(id, n));
+    ui.data_mut(|d| d.insert_temp(id, (n, most)));
     n
 }
 
@@ -8619,8 +8856,7 @@ fn credits_request_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut
 ///
 /// The air between rows is `row - from_box.height()`, so the function needs no copy of the tree's
 /// box height; the lane sits a quarter of a row-gap clear of the box edge, as the old detour did.
-fn tech_edge_path(from_box: egui::Rect, to_box: egui::Rect, gap_x: f32, row: f32, obstacles: &[egui::Rect]) -> Vec<Pos2> {
-    let to = to_box.left_center();
+fn tech_edge_path(from_box: egui::Rect, to: Pos2, gap_x: f32, row: f32, obstacles: &[egui::Rect]) -> Vec<Pos2> {
     let clear = (row - from_box.height()).max(8.0) / 4.0;
     // A run at `y`: out of the box (by a side if `y` is level with it, otherwise by the nearer of
     // top and bottom and down the column into the lane), along to the gap, up or down the gap, in.
@@ -8653,6 +8889,66 @@ fn tech_edge_path(from_box: egui::Rect, to_box: egui::Rect, gap_x: f32, row: f32
         }
     }
     path_at(from_box.center().y)
+}
+
+/// Ticket #425 (version 0.09.5): **where a line enters the box of the Tech that needs it.** A line
+/// from a box level with it goes in at the middle of the left edge; one from a box wholly above
+/// goes in a quarter down, one from below a quarter up. So two lines into one box -- Clean Power's
+/// from above and Green Consensus's level, into Planetary Stewardship -- never meet at the door and
+/// read as one line running between the boxes on the right.
+fn tech_edge_entry(from_box: egui::Rect, to_box: egui::Rect) -> Pos2 {
+    let quarter = to_box.height() / 4.0;
+    let y = if from_box.center().y < to_box.min.y {
+        to_box.min.y + quarter
+    } else if from_box.center().y > to_box.max.y {
+        to_box.max.y - quarter
+    } else {
+        to_box.center().y
+    };
+    Pos2::new(to_box.min.x, y)
+}
+
+/// Ticket #425 (version 0.09.5): **the x of the lane a line climbs in**, in the gap left of the
+/// needing box. From the column just before, it is on the SOURCE's side of the gap, so a line that
+/// forks to a box in another row forks out of the Tech that feeds it, not beside the door of the
+/// box level with that Tech. From further back it keeps the old lane, by the needing box. Two
+/// lanes, three pixels apart, both on the source's half of the gap; `lane` is the source's band.
+fn tech_edge_lane(from_box: egui::Rect, to_box: egui::Rect, lane: f32) -> f32 {
+    let gap = to_box.min.x - from_box.max.x;
+    if gap > 0.0 && gap < to_box.width() {
+        from_box.max.x + 3.0 + (lane % 2.0) * 3.0
+    } else {
+        to_box.min.x - 4.0 - lane * 3.5
+    }
+}
+
+/// Ticket #429 (version 0.09.5): **a hull that carries nothing it was built to carry** -- a Colony
+/// Ship with no Colonists, a Carrier with no Army. A warship is never empty.
+fn empty_hull(s: &Ship) -> bool {
+    (s.kind == UnitKind::ColonyShip && s.colonists == 0) || (s.kind == UnitKind::Carrier && s.army.is_none())
+}
+
+/// Ticket #429: the card's note over the moves: "Empty." for one hull, "2 empty" for a stack.
+fn empty_note(ships: &[&Ship]) -> Option<String> {
+    let n = ships.iter().filter(|s| empty_hull(s)).count();
+    match (n, ships.len()) {
+        (0, _) => None,
+        (_, 1) => Some("Empty.".to_string()),
+        (n, _) => Some(format!("{n} empty")),
+    }
+}
+
+/// Ticket #429: the right-click's question, in the designer's words: "Empty Colony Ship. Send?",
+/// "Empty Carrier. Send?", or for more than one "2 empty Colony Ships. Send?" / "3 empty. Send?".
+fn empty_move_question(ships: &[&Ship]) -> Option<String> {
+    let empty: Vec<&&Ship> = ships.iter().filter(|s| empty_hull(s)).collect();
+    let kind = |k: UnitKind| if k == UnitKind::Carrier { "Carrier" } else { "Colony Ship" };
+    match empty.as_slice() {
+        [] => None,
+        [one] => Some(format!("Empty {}. Send?", kind(one.kind))),
+        many if many.iter().all(|s| s.kind == many[0].kind) => Some(format!("{} empty {}s. Send?", many.len(), kind(many[0].kind))),
+        many => Some(format!("{} empty. Send?", many.len())),
+    }
 }
 
 /// Does an axis-aligned segment pass through a box? Written as a rectangle overlap, since a
@@ -8699,7 +8995,11 @@ fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, ac
     //
     // A branch not named here keeps its first-appearance place, after the named ones, so a new
     // branch cannot vanish by being forgotten.
-    const BAND_ORDER: [&str; 5] = ["Society", "Off-world Living", "Extraction", "Industry", "Propulsion"];
+    //
+    // Ticket #424 (version 0.09.5): Industry renamed STEWARDSHIP and lifted to second, directly above
+    // Off-world Living, at the designer's word -- "bring that whole branch up above off world
+    // living". Each Faction's Victory Tech now ends a band of its own.
+    const BAND_ORDER: [&str; 5] = ["Society", "Stewardship", "Off-world Living", "Extraction", "Propulsion"];
     let mut branches: Vec<String> = Vec::new();
     for t in TechId::ALL {
         let b = &game.tables.tech(t).branch;
@@ -8725,7 +9025,13 @@ fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, ac
                     let card = game.tables.tech(*t);
                     branches.iter().position(|x| *x == card.branch) == Some(b) && card.rung.max(1) as usize - 1 == r
                 })
-                .collect()
+                .collect::<Vec<TechId>>()
+        })
+        // Ticket #425 (version 0.09.5): a stack in the order its cards' `stack` gives, ties in the
+        // tree's own, so a box can sit level with the Tech it feeds.
+        .map(|mut v: Vec<TechId>| {
+            v.sort_by_key(|t| (game.tables.tech(*t).stack, t.index()));
+            v
         })
         .collect();
     // Ticket #250 (version 0.08.3): EVERY rung stacks, the last one included. It did not before --
@@ -8772,8 +9078,8 @@ fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, ac
     // Lines first, so the boxes sit on top of them. A line is green once the Tech it comes from is done.
     // Ticket #133: a line is ELBOWED -- it leaves the needed box, runs along the gap to the left of
     // the needing box's column, and enters the needing box's left edge. A Tech that needs one on
-    // its own rung (Closed-Loop Colonies needs Clean Power) is reached the same way: out of the
-    // needed box's LEFT edge, down that same gap, and in.
+    // its own rung (none does since ticket #425; Closed-Loop Colonies once needed Clean Power) is
+    // reached the same way: out of the needed box's LEFT edge, down that same gap, and in.
     //
     // Ticket #339 (version 0.09.0): where that elbow would run THROUGH a box, it is routed around
     // it instead (`tech_edge_path`). Every box in the tree is an obstacle to every line but the two
@@ -8797,17 +9103,17 @@ fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, ac
             // Each source row takes its own lane in the gap, or every line into a column merges
             // into one trunk and nobody can tell which Tech feeds which (the first picture).
             let lane = branches.iter().position(|x| *x == game.tables.tech(*n).branch).unwrap_or(0) as f32;
-            let gap_x = to_box.min.x - 4.0 - lane * 3.5;
+            let gap_x = tech_edge_lane(from_box, to_box, lane);
             let colour = if game.research.done.contains(n) { Color32::from_rgb(120, 200, 120) } else { Color32::from_gray(150) };
             // A line is on the lit path when the Tech it enters is.
             let colour = fade(colour, t);
             let stroke = egui::Stroke::new(if !path.is_empty() && !faded(t) { 3.0 } else { 2.0 }, colour);
             let obstacles: Vec<egui::Rect> = boxes.iter().filter(|(o, _)| *o != t && *o != *n).map(|(_, r)| *r).collect();
-            let path = tech_edge_path(from_box, to_box, gap_x, ROW, &obstacles);
+            let path = tech_edge_path(from_box, tech_edge_entry(from_box, to_box), gap_x, ROW, &obstacles);
             for leg in path.windows(2) {
                 painter.line_segment([leg[0], leg[1]], stroke);
             }
-            painter.circle_filled(to_box.left_center(), 3.5, colour);
+            painter.circle_filled(tech_edge_entry(from_box, to_box), 3.5, colour);
         }
     }
     for t in TechId::ALL {
@@ -9118,6 +9424,7 @@ fn module_line(game: &Game, col: &Colony, cid: ColonyId, mi: usize, director: Op
         format!("strength {}, {} of {} hit points, {} Energy upkeep", card.strength, card.hit_points.saturating_sub(m.damage), card.hit_points, card.energy_upkeep)
     } else {
         match director {
+            _ if !earnings_seen(game, Place::Colony(cid), director) => "out of sight".to_string(),
             Some(d) => game.module_yield_at(d, cid, mi).text(),
             None => "idle".to_string(),
         }
@@ -9244,7 +9551,9 @@ fn module_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     let standing: Vec<usize> = (0..col.modules.len()).filter(|i| col.modules[*i].kind != ModuleKind::Archive).collect();
     // Ticket #332 (version 0.09.0): a building tile is a queue index; its face reads the count
     // off the build and its hover the estimate at this place's Widgets behind everything ahead.
-    let building: Vec<usize> = col.queue.iter().enumerate().filter(|(_, b)| matches!(b.item, BuildItem::Module(k) if k != ModuleKind::Archive)).map(|(qi, _)| qi).collect();
+    // Ticket #430 (version 0.09.5): a rival's builds under way only where the player sees.
+    let unseen = director.is_some_and(|d| d != Seat(0)) && hidden_place(game, Place::Colony(cid));
+    let building: Vec<usize> = col.queue.iter().enumerate().filter(|(_, b)| !unseen && matches!(b.item, BuildItem::Module(k) if k != ModuleKind::Archive)).map(|(qi, _)| qi).collect();
     let estimates = game.queue_estimates(Place::Colony(cid));
     // Ticket #291 (version 0.08.6): the Modules ORDERED this turn and not yet committed, as the
     // Faction's own kind (#186), each with its index in the pending list for the right-click that
@@ -9275,7 +9584,7 @@ fn module_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
         // the Module rules, which the old rows never had.
         let mut tip = module_rules(m.kind, &format!("{}{}", module_line(game, col, cid, mi, director), module_offline_words(col, m)));
         // Ticket #352 (version 0.09.1): with its arithmetic, where the figure is multiplied.
-        if let Some(chain) = director.filter(|_| !m.mothballed).map(|d| game.module_yield_at(d, cid, mi).chain).filter(|c| c.multiplied()) {
+        if let Some(chain) = director.filter(|_| !m.mothballed && earnings_seen(game, Place::Colony(cid), director)).map(|d| game.module_yield_at(d, cid, mi).chain).filter(|c| c.multiplied()) {
             tip = chain_tip(&tip, &chain);
         }
         // Ticket #324 (version 0.08.8): a Battery's hover carries its rules; a damaged one wears its
@@ -9359,7 +9668,7 @@ fn module_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
             let colour = if m.mothballed { Color32::from_rgb(170, 170, 190) } else { ui.visuals().text_color() };
             let line = figures_with_icons(ui, &module_line(game, col, cid, mi, director), 14.0, colour, &[]);
             // Ticket #352 (version 0.09.1): the strip's line carries the arithmetic too.
-            if let Some(chain) = director.filter(|_| !m.mothballed).map(|d| game.module_yield_at(d, cid, mi).chain).filter(|c| c.multiplied()) {
+            if let Some(chain) = director.filter(|_| !m.mothballed && earnings_seen(game, Place::Colony(cid), director)).map(|d| game.module_yield_at(d, cid, mi).chain).filter(|c| c.multiplied()) {
                 rule_tip(line, chain_tip(&module_rules(m.kind, &module_line(game, col, cid, mi, director)), &chain));
             }
             if mine && m.kind != ModuleKind::Archive {
@@ -10190,6 +10499,11 @@ fn faction_window(ctx: &egui::Context, session: &Session, game: &Game, view: &mu
         // gathered from the sources. That is still a total, and gives nothing away.
         let research: f64 = s.income_sources.iter().filter(|(_, r, _)| *r == dying_earth_engine::Resource::Research).map(|(_, _, v)| v).sum();
         ui.label(RichText::new("Income last turn").strong());
+        // Ticket #430 (version 0.09.5): a rival's totals only while it is Cordial or better toward
+        // the player, or under an Accord.
+        if !books_open(game, seat) {
+            ui.label(RichText::new("Out of sight: they share their books at Cordial.").weak());
+        } else {
         glyph_row(
             ui,
             &[
@@ -10201,11 +10515,12 @@ fn faction_window(ctx: &egui::Context, session: &Session, game: &Game, view: &mu
             ],
             15.0,
         );
+        }
         // Ticket #203: a spectator has no side to keep secrets from, so they get no line at all.
         // Ticket #306 (version 0.08.7): the line that said where the breakdown is ("Hover a
         // figure...") is cut as a signpost, at the designer's word; the withholding line stays,
         // since it states a rule.
-        if !session.spectator && !breakdown {
+        if !session.spectator && !breakdown && books_open(game, seat) {
             ui.label(RichText::new("A rival's income is shown as totals only; the building-by-building breakdown is yours alone.").weak());
         }
         ui.add_space(6.0);
@@ -10325,9 +10640,9 @@ A rival that holds you at less than neutral defends its places against you a lit
 
         // 6. Ticket #263 (version 0.08.4): **Under way** -- what this Faction has begun and not yet
         // finished: builds with the turns until they land, Ships in transit with their names and
-        // their roads, soonest first. The list in full on every page, at the designer's word: a
-        // build stands hatched on its card and a transit is drawn on the Solar System Map for
-        // anyone to see, so the disclosure rule hides nothing here; it only saves the clicks.
+        // their roads, soonest first. Ticket #430 (version 0.09.5): under the fog a rival's list
+        // holds only the builds at places the player sees, and no transits unless its books are
+        // open; all of it while the rival is Friendly or under an Accord.
         ui.label(RichText::new("Under way").strong());
         let u = game.under_way(seat);
         // Ticket #332 (version 0.09.0): each build with its count and figure and the estimate,
@@ -10335,12 +10650,20 @@ A rival that holds you at less than neutral defends its places against you a lit
         // alone; soonest first as before, the name breaking a tie.
         let mut builds: Vec<(String, Place, u32, u32, u32)> = Vec::new();
         for place in StateId::ALL.iter().map(|s| Place::State(*s)).chain(game.colonies.iter().map(|c| Place::Colony(c.id))) {
+            // Ticket #430 (version 0.09.5): a rival's builds where the player sees the place, or all
+            // of them while it is Friendly or under an Accord.
+            if !doings_open(game, seat) && hidden_place(game, place) {
+                continue;
+            }
             for (b, t) in game.queue_at(place).iter().zip(game.queue_estimates(place)).filter(|(b, _)| b.seat == seat) {
                 builds.push((b.item.name(), place, b.done, b.widgets, t));
             }
         }
         builds.sort_by(|a, b| a.4.cmp(&b.4).then_with(|| a.0.cmp(&b.0)));
-        if builds.is_empty() && u.transits.is_empty() {
+        // Ticket #430 (version 0.09.5): its Ships in flight only with its books open.
+        let transits = if books_open(game, seat) { u.transits.clone() } else { Vec::new() };
+        let u_transits = &transits;
+        if builds.is_empty() && u_transits.is_empty() {
             ui.label(RichText::new("Nothing under way.").weak());
         } else {
             let turns = |n: u32| if n == 1 { "1 turn".to_string() } else { format!("{n} turns") };
@@ -10349,9 +10672,9 @@ A rival that holds you at less than neutral defends its places against you a lit
                 let items: Vec<String> = builds.iter().map(|(what, place, done, widgets, n)| format!("{} {} {} ({done} of {widgets}, {})", with_article(what), if matches!(place, Place::State(_)) { "in" } else { "at" }, game.place_name(*place), estimate_words(*n))).collect();
                 ui.label(format!("Building: {}", items.join(", ")));
             }
-            if !u.transits.is_empty() {
+            if !u_transits.is_empty() {
                 // "Earth to Mars" in words: the interface font has no arrow and drew a box for one.
-                let items: Vec<String> = u.transits.iter().map(|(name, from, to, n)| format!("{name}, {from} to {to}, {}", turns(*n))).collect();
+                let items: Vec<String> = u_transits.iter().map(|(name, from, to, n)| format!("{name}, {from} to {to}, {}", turns(*n))).collect();
                 ui.label(format!("In transit: {}", items.join("; ")));
             }
         }
@@ -10962,12 +11285,34 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 });
             });
         }
+        Popup::ConfirmEmptyMove => {
+            // Ticket #429 (version 0.09.5): the designer's words, Send / Back.
+            egui::Modal::new("confirm_empty_move".into()).show(ctx, |ui| {
+                ui.set_width(320.0);
+                ui.label(RichText::new(view.empty_move_text.clone()).size(18.0).strong());
+                ui.horizontal(|ui| {
+                    if ui.button("Send").clicked() {
+                        for o in std::mem::take(&mut view.empty_move) {
+                            actions.push(Action::Place(o));
+                        }
+                        view.popup = Popup::None;
+                    }
+                    if ui.button("Back").clicked() {
+                        view.empty_move.clear();
+                        view.popup = Popup::None;
+                    }
+                });
+            });
+        }
         Popup::Battle(i) => {
             // Ticket #383 (version 0.09.2): **a Battle in a window of its own**: the party lines
             // that stood in the Report's Battle Report block since ticket #50, then the round
             // picture and the replay of ticket #381. One window a Battle; Close hands on to the
             // next, or to the turn's head, through `advance_popup`.
-            if let Some(b) = game.report.battles.get(i) {
+            // Ticket #430 (version 0.09.5): a Battle the player does not see passes straight on.
+            if !battle_seen(game, i) {
+                advance_popup(view, view.moments_of(&session.tables, &game.report).len(), game.last_event.is_some(), card_owed(Some(game)));
+            } else if let Some(b) = game.report.battles.get(i) {
                 egui::Modal::new("battle".into()).show(ctx, |ui| {
                     ui.set_width(620.0);
                     ui.label(RichText::new(format!("Battle at {}", b.place)).size(20.0).strong());
@@ -10991,7 +11336,8 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                         battle_log_view(ui, session, game, b);
                     });
                     ui.add_space(6.0);
-                    let more = i + 1 < view.battle_end;
+                    // Ticket #430 (the review): "Next" only if a Battle the player sees is still to come.
+                    let more = (i + 1..view.battle_end).any(|j| battle_seen(game, j));
                     if ui.button(if more { "Next Battle" } else { "Close" }).clicked() {
                         advance_popup(view, view.moments_of(&session.tables, &game.report).len(), game.last_event.is_some(), card_owed(Some(game)));
                     }
@@ -11038,7 +11384,9 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 // which has no headline rank, so `headline()` never offers one and falls through of
                 // its own accord. If a headline is wanted here that is not wanted there, the kind is
                 // the place to say so; a filter at the point of drawing loses the fallback.
-                if let Some(head) = game.report.headline() {
+                // Ticket #430 (the review): the Report as the player sees it, fogged before the headline.
+                let seen_report = game.report_seen_by(Seat(0));
+                if let Some(head) = seen_report.headline() {
                     ui.add_space(4.0);
                     let label = ui.label(RichText::new(&head.text).size(17.0).strong().color(Color32::from_rgb(255, 220, 150)));
                     if let Some(place) = head.place
@@ -11050,7 +11398,12 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 ui.separator();
                 egui::ScrollArea::vertical().max_height(520.0).show(ui, |ui| {
                     // The five headings, empty ones left out; every line with a place is a way there.
-                    for (section, lines) in game.report.sections() {
+                    // Ticket #431 (version 0.09.5): **what happened to you first**, open; then every
+                    // other heading collapsed with its count, at the designer's word ("q1 c"), so a
+                    // busy turn opens at a dozen lines rather than fifty.
+                    let mut sections = seen_report.sections();
+                    sections.sort_by_key(|(section, _)| *section != dying_earth_engine::report::Section::YourWorks);
+                    for (section, lines) in sections {
                         // Ticket #337 (version 0.09.0): a seat's ANSWER to the turn's Choice Card is
                         // lifted out of the heading it landed under -- the player's own under Your
                         // works, a rival's under The climate -- and drawn with the other three
@@ -11061,32 +11414,16 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                         if lines.is_empty() {
                             continue;
                         }
-                        ui.label(RichText::new(section.name_for(session.spectator)).strong());
-                        for l in lines {
-                            match l.place {
-                                Some(place) => {
-                                    // Ticket #127 (version 0.07.2): a line that points somewhere wears
-                                    // the glyph of what it points to. A Body is no one kind of thing.
-                                    let kind = match place {
-                                        dying_earth_engine::report::ReportPlace::State(_) => Some(Kind::Region),
-                                        dying_earth_engine::report::ReportPlace::Colony(c) => game.colony(c).map(Kind::of_colony),
-                                        dying_earth_engine::report::ReportPlace::Body(_) => None,
-                                        // Ticket #335 (version 0.09.0): an orbit is no one kind of
-                                        // thing either.
-                                        dying_earth_engine::report::ReportPlace::Orbit(_, _) => None,
-                                    };
-                                    let button = match kind.and_then(|k| k.image(ui.ctx(), 14.0)) {
-                                        Some(image) => egui::Button::image_and_text(image, &l.text),
-                                        None => egui::Button::new(&l.text),
-                                    };
-                                    if ui.add(button.frame(false)).on_hover_text("Go there").clicked() {
-                                        actions.push(Action::GoTo(place));
-                                    }
-                                }
-                                None => {
-                                    ui.label(&l.text);
-                                }
-                            }
+                        let name = section.name_for(session.spectator);
+                        if section == dying_earth_engine::report::Section::YourWorks {
+                            ui.label(RichText::new(name).strong());
+                            report_lines(ui, game, session, &lines, actions);
+                        } else {
+                            // `reportopen:1` (a building aid): the headings open in a headless picture.
+                            let open = std::env::args().any(|a| a == "reportopen:1");
+                            egui::CollapsingHeader::new(RichText::new(format!("{name} ({})", lines.len())).strong()).id_salt(("report", name)).default_open(open).show(ui, |ui| {
+                                report_lines(ui, game, session, &lines, actions);
+                            });
                         }
                         ui.add_space(4.0);
                     }
@@ -11110,12 +11447,15 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                     }
                     // Ticket #58: what each rival Faction did, one paragraph each, in seat order.
                     // Ticket #64: a spectator has no rivals, so all four Factions are told.
+                    // Ticket #431 (version 0.09.5): collapsed under "Rivals" with a count.
                     let paragraphs = game.faction_paragraphs();
                     if !paragraphs.is_empty() {
-                        ui.label(RichText::new(if session.spectator { "What the Factions did" } else { "What the rival Factions did" }).strong());
-                        for (seat, text) in paragraphs {
-                            ui.label(RichText::new(text).color(seat_colour(session, seat)));
-                        }
+                        let title = if session.spectator { "What the Factions did" } else { "Rivals" };
+                        egui::CollapsingHeader::new(RichText::new(format!("{title} ({})", paragraphs.len())).strong()).id_salt("report_rivals").default_open(false).show(ui, |ui| {
+                            for (seat, text) in paragraphs {
+                                ui.label(RichText::new(text).color(seat_colour(session, seat)));
+                            }
+                        });
                     }
                 });
                 ui.separator();
@@ -11466,7 +11806,7 @@ mod tests {
         // legs, leaving the needed box by its right edge at its own middle.
         let (from, to) = (at(0.0, 0.0), at(2.0, 0.0));
         let gap_x = to.min.x - 4.0;
-        let clear = tech_edge_path(from, to, gap_x, ROW, &[at(1.0, 1.0), at(1.0, 2.0)]);
+        let clear = tech_edge_path(from, to.left_center(), gap_x, ROW, &[at(1.0, 1.0), at(1.0, 2.0)]);
         assert_eq!(clear.first(), Some(&from.right_center()), "nothing in the way: out of the right edge, as it always was");
         assert_eq!(clear.last(), Some(&to.left_center()), "and in at the needing box's left edge");
         assert_eq!(clear.len(), 4, "three legs");
@@ -11474,7 +11814,7 @@ mod tests {
         // The same edge with a box standing on rung 2 of that row, which the straight elbow would
         // run through. The detour must clear it, and must still arrive at the same place.
         let blocker = at(1.0, 0.0);
-        let routed = tech_edge_path(from, to, gap_x, ROW, &[blocker, at(1.0, 2.0)]);
+        let routed = tech_edge_path(from, to.left_center(), gap_x, ROW, &[blocker, at(1.0, 2.0)]);
         assert!(crosses(&clear, blocker), "the control: the straight elbow really does cross that box");
         assert!(!crosses(&routed, blocker), "the routed edge clears it");
         assert_eq!(routed.last(), Some(&to.left_center()), "and still arrives at the needing box's left edge");
@@ -11484,9 +11824,91 @@ mod tests {
         // has to be taken. Both are cleared, which is what "around the boxes" means when there is
         // more than one.
         let below = at(1.0, 1.0);
-        let further = tech_edge_path(from, to, gap_x, ROW, &[blocker, below]);
+        let further = tech_edge_path(from, to.left_center(), gap_x, ROW, &[blocker, below]);
         assert!(!crosses(&further, blocker) && !crosses(&further, below), "both boxes cleared");
         assert_eq!(further.last(), Some(&to.left_center()));
+    }
+
+    /// Ticket #429 (version 0.09.5): **an empty Colony Ship or Carrier says so**: "Empty." on one
+    /// hull's card, "2 empty" on a stack's, and the right-click's question in the designer's words.
+    /// A loaded hull and a warship never do.
+    #[test]
+    fn an_empty_colony_ship_or_carrier_is_named_and_a_loaded_one_or_a_warship_is_not() {
+        let hull = |kind: UnitKind, colonists: u32, army: Option<ArmyId>| Ship {
+            id: ShipId(1), name: String::new(), kind, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists, warhead: false, colonists_education: 1.0, army,
+            stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None,
+        };
+        let (empty_cs, full_cs) = (hull(UnitKind::ColonyShip, 0, None), hull(UnitKind::ColonyShip, 4, None));
+        let (empty_car, full_car) = (hull(UnitKind::Carrier, 0, None), hull(UnitKind::Carrier, 0, Some(ArmyId(7))));
+        let frigate = hull(UnitKind::Frigate, 0, None);
+        assert_eq!(empty_note(&[&full_cs]), None, "a loaded Colony Ship");
+        assert_eq!(empty_note(&[&full_car]), None, "a Carrier with its Army");
+        assert_eq!(empty_note(&[&frigate]), None, "a warship is never empty");
+        assert_eq!(empty_note(&[&empty_cs]).as_deref(), Some("Empty."));
+        assert_eq!(empty_note(&[&empty_cs, &empty_car, &full_cs, &frigate]).as_deref(), Some("2 empty"));
+        assert_eq!(empty_move_question(&[&full_cs, &frigate]), None);
+        assert_eq!(empty_move_question(&[&empty_cs]).as_deref(), Some("Empty Colony Ship. Send?"));
+        assert_eq!(empty_move_question(&[&empty_car, &frigate]).as_deref(), Some("Empty Carrier. Send?"));
+        assert_eq!(empty_move_question(&[&empty_cs, &empty_cs]).as_deref(), Some("2 empty Colony Ships. Send?"));
+        assert_eq!(empty_move_question(&[&empty_cs, &empty_car]).as_deref(), Some("2 empty. Send?"));
+    }
+
+    /// Ticket #428 (version 0.09.5): **the count slider** every Pioneer order shares. It starts at
+    /// the most; a count set lower is kept while the card stays open; when the most shrinks under
+    /// it (a station fills, fewer wait) it falls to the new most; and it never offers nought.
+    #[test]
+    fn the_count_slider_starts_at_the_most_keeps_a_choice_and_never_offers_nought() {
+        let ctx = egui::Context::default();
+        let mut got = Vec::new();
+        let mut frame = |most: u32, set: Option<u32>| {
+            let _ = ctx.run_ui(egui::RawInput::default(), |ui| {
+                if let Some(v) = set {
+                    ui.data_mut(|d| d.insert_temp(egui::Id::new(("t", 1)), (v, most)));
+                }
+                got.push(count_slider(ui, ("t", 1), most, "Pioneers"));
+            });
+        };
+        frame(4, None);
+        frame(4, Some(2));
+        frame(4, None);
+        frame(1, None);
+        frame(0, None);
+        // The review: a most that grows again starts the slider at it, not at the smallest most
+        // ever seen -- a Region with nobody waiting must not pin the next turn's load at one.
+        frame(4, None);
+        assert_eq!(got, vec![4, 2, 2, 1, 1, 4], "the most first, a choice kept, held under a shrinking most, never nought, back to a growing most");
+    }
+
+    /// Ticket #425 (version 0.09.5): **two lines into one box never meet at its door.** The
+    /// designer, on the Stewardship row: *"what with the vertical line between clean manufacturing
+    /// and plantary stwardship"* -- Clean Power's line down into Planetary Stewardship ran up the
+    /// gap beside Clean Manufacturing's door and merged with Green Consensus's line at Planetary
+    /// Stewardship's middle, so it read as a line between the two rung-3 boxes. A line from a box
+    /// level with its target enters at the middle; one from above enters near the top, one from
+    /// below near the bottom; and its climb runs on the SOURCE's side of the gap, so a fork reads as
+    /// leaving the Tech that feeds it.
+    #[test]
+    fn a_line_from_another_row_enters_its_box_apart_from_the_level_one() {
+        const COL: f32 = 130.0;
+        const ROW: f32 = 77.0;
+        let at = |col: f32, row: f32| egui::Rect::from_min_size(Pos2::new(col * COL + 10.0, row * ROW + 12.0), egui::vec2(110.0, 52.0));
+        // Clean Power on top, Green Consensus below it; Clean Manufacturing and Planetary
+        // Stewardship to their right.
+        let (clean_power, green_consensus, manufacturing, stewardship) = (at(0.0, 0.0), at(0.0, 1.0), at(1.0, 0.0), at(1.0, 1.0));
+        assert_eq!(tech_edge_entry(clean_power, manufacturing), manufacturing.left_center(), "level: straight in at the middle");
+        assert_eq!(tech_edge_entry(green_consensus, stewardship), stewardship.left_center(), "level: straight in at the middle");
+        let from_above = tech_edge_entry(clean_power, stewardship);
+        assert_eq!(from_above.x, stewardship.min.x, "on the left edge");
+        assert!(from_above.y < stewardship.center().y - 10.0 && from_above.y > stewardship.min.y, "from above: near the top, apart from the level line's door: {from_above:?}");
+        let from_below = tech_edge_entry(stewardship, manufacturing);
+        assert!(from_below.y > manufacturing.center().y + 10.0 && from_below.y < manufacturing.max.y, "from below: near the bottom: {from_below:?}");
+        // The climb is nearer the source's column than the target's.
+        // The climb is nearer the source's column than the target's, whatever band it comes from.
+        for lane in 0..5 {
+            let gap_x = tech_edge_lane(clean_power, stewardship, lane as f32);
+            assert!(gap_x > clean_power.max.x && gap_x < stewardship.min.x, "in the gap");
+            assert!(gap_x - clean_power.max.x < stewardship.min.x - gap_x, "on the source's side in band {lane}: {gap_x}");
+        }
     }
 }
 

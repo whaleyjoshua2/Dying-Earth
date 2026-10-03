@@ -765,6 +765,10 @@ fn standing_note(g: &Game, seat: Seat, target: Target) -> String {
 /// names), its item, and the Widgets done of the Widgets it wants. A build begun by another seat --
 /// what a conquest leaves behind -- is the only kind that may be cancelled, so it says whose it is.
 fn queue_text(g: &Game, place: Place) -> Vec<String> {
+    // Ticket #430 (version 0.09.5): a rival's builds under way at a place seat 0 does not see.
+    if g.place_control(place).director().is_some_and(|d| d != Seat(0)) && !g.sees_place(Seat(0), place) {
+        return vec!["(out of sight)".to_string()];
+    }
     g.queue_at(place)
         .iter()
         .enumerate()
@@ -935,7 +939,9 @@ fn print_costs(g: &Game) {
 
 fn print_report(g: &Game) {
     println!("\n=== REPORT, turn {} ===", g.report.turn);
-    if let Some(h) = g.report.headline() {
+    // Ticket #430 (version 0.09.5): the Report as seat 0 sees it under the fog (`--reveal` lifts it).
+    let report = g.report_seen_by(Seat(0));
+    if let Some(h) = report.headline() {
         println!("HEADLINE: {}", h.text);
     }
     if let Some(e) = &g.report.event {
@@ -943,13 +949,13 @@ fn print_report(g: &Game) {
     }
     // Ticket #404 (version 0.09.4): under the window's headings, so a place that changed hands to
     // or from you reads under Your works as well as under its place.
-    for (section, lines) in g.report.sections() {
+    for (section, lines) in report.sections() {
         println!("  -- {} --", section.name_for(g.spectator));
         for l in lines {
             println!("  [{:?}] {}", l.kind, l.text);
         }
     }
-    for b in &g.report.battles {
+    for b in g.report.battles.iter().filter(|b| g.battle_seen_by(Seat(0), b)) {
         println!("  [Battle] {}", b.text(&|s| g.seat_name(s), "a neutral force"));
     }
     for (seat, para) in g.faction_paragraphs() {
@@ -1240,6 +1246,14 @@ fn print_board(g: &Game) {
         println!("none anywhere");
     }
     for sh in &g.ships {
+        // Ticket #430 (version 0.09.5): under the fog a rival Ship out of sight is whose and where,
+        // and one in flight is not listed at all unless its books are open (`--reveal` lifts it).
+        if !g.sees_ship(me, sh) {
+            if let ShipAt::Body(b) = sh.at {
+                println!("ship ?   seat {} at {} (out of sight)", sh.seat.0, b.name());
+            }
+            continue;
+        }
         // Ticket #335 (version 0.09.0): the ORBIT, not the bare Body and a slot number, so a Ship at
         // a station's ring can be told from one in low orbit without doing the arithmetic.
         println!(
@@ -1270,6 +1284,13 @@ fn print_board(g: &Game) {
         }
     }
     for a in &g.armies {
+        // Ticket #430 (version 0.09.5): an Army out of sight is whose and where.
+        if !g.sees_army(me, a) {
+            if let ArmyAt::Place(p) = a.at {
+                println!("army ?   seat {} at {} (out of sight)", g.army_seat(a).map(|s| s.0.to_string()).unwrap_or_else(|| "-".to_string()), g.place_name(p));
+            }
+            continue;
+        }
         let at = match a.at {
             ArmyAt::Place(p) => g.place_name(p),
             ArmyAt::Aboard(s) => format!("aboard ship {}", s.0),
@@ -1308,7 +1329,7 @@ fn print_board(g: &Game) {
         println!("{}", g.window_text(b));
     }
     println!(
-        "Colony Ship capacity: {} safe, {} crowded; lifting one Colonist costs {:.2} population; Pioneers a turn: {}",
+        "Colony Ship capacity: {} safe, {} crowded; lifting one Colonist costs {:.2} population; Pioneers a turn in each state: {}",
         g.colony_ship_capacity(me),
         g.colony_ship_crowded_capacity(me),
         g.lift_population(me, 1),
@@ -1327,7 +1348,11 @@ fn flag(args: &[String], name: &str) -> Option<String> {
 
 fn load(tables: Arc<Tables>, path: &Path) -> Game {
     match save::load_from(path, tables) {
-        Ok(g) => g,
+        // Ticket #430 (version 0.09.5): `--reveal` lifts the fog of war, for testing only.
+        Ok(mut g) => {
+            g.reveal_all = std::env::args().any(|a| a == "--reveal");
+            g
+        }
         Err(e) => {
             eprintln!("{e}");
             std::process::exit(2);

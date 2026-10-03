@@ -816,6 +816,24 @@ fn build_board(session: &mut Session) {
         {
             g.colony_mut(id).unwrap().modules.push(Module::new(ModuleKind::Habitat));
         }
+        // `accords:0` (a building aid, ticket #430, version 0.09.5): every Accord struck, so a picture
+        // after driven turns shows the fog as a seat with no Accord sees it.
+        if std::env::args().any(|a| a == "accords:0") {
+            g.accords.clear();
+        }
+        // `reveal:1` (a building aid, ticket #430, version 0.09.5): the fog of war lifted.
+        if std::env::args().any(|a| a == "reveal:1") {
+            g.reveal_all = true;
+        }
+        // `colonyship:1` (a building aid, ticket #428, version 0.09.5): an empty Colony Ship of seat
+        // 0's at Earth, so the Region card's "Send N to" door and the Ship card's load slider can be
+        // photographed on turn 1.
+        if std::env::args().any(|a| a == "colonyship:1") {
+            let id = ShipId(g.fresh_id());
+            let built_turn = g.turn;
+            let name = g.next_ship_name(UnitKind::ColonyShip);
+            g.ships.push(Ship { id, name, kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: g.tank_of(Seat(0), UnitKind::ColonyShip), slot: None });
+        }
         // `shut:1` (a building aid, ticket #359, version 0.09.1), given with `barracks:1`: that Moon
         // Colony's Habitat and Barracks are mothballed and six live there, two more than the Core
         // alone holds -- so its card (`hab:ground`) shows the half line and the Build Army door
@@ -1907,6 +1925,12 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
         if let Some(s) = wanted {
             view.selection = Selection::State(s);
             view.show_climate = false;
+        }
+        // `emptymove:1` (a building aid, ticket #429, version 0.09.5): the right-click's confirm for
+        // an empty Colony Ship stands open, since no pointer ever right-clicks in a headless picture.
+        if std::env::args().any(|a| a == "emptymove:1") {
+            view.empty_move_text = "Empty Colony Ship. Send?".to_string();
+            view.popup = Popup::ConfirmEmptyMove;
         }
         // `site:<body id>,<slot>` (a building aid, ticket #258): that Body's picture opens the empty
         // Colony Slot's panel, the one place the yields were still in words. `settler:<body id>`

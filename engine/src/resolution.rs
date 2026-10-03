@@ -87,7 +87,8 @@ impl Game {
     }
 
     /// Ticket #370 (version 0.09.2): **the player's Colonists still aboard a Ship off Earth are
-    /// reported every turn they wait**, one line a Body, under Ships, at the designer's word --
+    /// reported while they wait** -- since ticket #431 (version 0.09.5) only on a turn the line
+    /// changes -- one line a Body, under Ships, at the designer's word --
     /// *"colonists wait aboard in low orbit of Mars"*, and *"blocked by rivals' control of the
     /// orbit"* when a rival's Orbital Control shuts the ground or a blockade shuts the station they
     /// are docked at. Any orbit off Earth counts; a Ship in transit does not, since nothing can be
@@ -101,6 +102,8 @@ impl Game {
         if self.spectator {
             return;
         }
+        // Ticket #431 (version 0.09.5): only a line that changed since last turn is written.
+        let last = std::mem::take(&mut self.waiting_last);
         let me = Seat(0);
         for body in BodyId::ALL {
             if body == BodyId::Earth {
@@ -142,7 +145,10 @@ impl Game {
                 })
                 .unwrap_or_default();
             let text = self.say("colonists_waiting", &[("n", n.to_string()), ("where", where_), ("blocked", blocked)]);
-            self.report_line(LineKind::Ship, Some(ReportPlace::Body(body)), text);
+            self.waiting_last.push(text.clone());
+            if !last.contains(&text) {
+                self.report_line(LineKind::Ship, Some(ReportPlace::Body(body)), text);
+            }
         }
     }
 
@@ -270,7 +276,7 @@ impl Game {
                 &[("faction", self.seat_name(*seat)), ("ship", kind.clone()), ("body", self.tables.body(*body).name.clone())],
             );
             self.report_line(LineKind::Ship, Some(ReportPlace::Body(*body)), text);
-            self.ai_deed(*seat, "arrived", &[("unit", kind), ("body", self.tables.body(*body).name.clone())]);
+            self.ai_deed_at(*seat, "arrived", &[("unit", kind), ("body", self.tables.body(*body).name.clone())], Some(crate::report::ReportPlace::Body(*body)));
             self.log(line);
         }
         // Intercept battles (ticket #50): one melee per intercepting stack, against every arriving
@@ -2288,7 +2294,8 @@ impl Game {
                     let line = format!("{} at {} had no slot left and was lost.", name, self.place_name(place));
                     self.log(line);
                     let text = self.say("build_lost", &[("building", name.clone()), ("place", self.place_name(place))]);
-                    self.report_line(LineKind::Note, Some(place.into()), text);
+                    // Ticket #431 (the review): the builder's loss, under the fog.
+                    self.report_line_by(b.seat, LineKind::Note, Some(place.into()), text);
                     return;
                 };
                 self.state_mut(s).facilities.push(if coastal { Facility::in_coastal_slot(k) } else { Facility::new(k) });
@@ -2392,7 +2399,7 @@ impl Game {
         self.log(line);
         let text = self.say("build_complete", &[("faction", self.seat_name(b.seat)), ("building", name.clone()), ("place", self.place_name(place))]);
         self.report_line_of(b.seat, LineKind::YourBuild, LineKind::BuildComplete, Some(place.into()), text);
-        self.ai_deed(b.seat, "completed", &[("building", name.clone()), ("place", self.place_name(place))]);
+        self.ai_deed_at(b.seat, "completed", &[("building", name.clone()), ("place", self.place_name(place))], Some(crate::report::ReportPlace::of(place)));
     }
 
     // ------------------------------------------------------------------ (f)
@@ -2527,7 +2534,7 @@ impl Game {
             &[("faction", self.seat_name(seat)), ("colony", self.place_name(Place::Colony(id))), ("note", note), ("n", moved.to_string())],
             Some(ReportPlace::Colony(id)),
         );
-        self.ai_deed(seat, "founded", &[("colony", self.place_name(Place::Colony(id)))]);
+        self.ai_deed_at(seat, "founded", &[("colony", self.place_name(Place::Colony(id)))], Some(crate::report::ReportPlace::Colony(id)));
     }
 
     /// Ticket #73: Emigrants join the seat's own Antarctic Colony while it has room; the rest go home.
@@ -2802,7 +2809,7 @@ impl Game {
                                 ],
                                 Some(ReportPlace::Colony(id)),
                             );
-                            self.ai_deed(seat, "founded", &[("colony", self.place_name(Place::Colony(id)))]);
+                            self.ai_deed_at(seat, "founded", &[("colony", self.place_name(Place::Colony(id)))], Some(crate::report::ReportPlace::Colony(id)));
                             // Ticket #345 (version 0.09.1): a candidate for its Body's first.
                             ground_founded.push((seat, b, id));
                         }
@@ -2972,7 +2979,9 @@ impl Game {
             let (who, whom) = (self.seat_name(buyer), self.seat_name(seller));
             self.log(format!("The {who} bought {take} ppm of carbon credit from the {whom} for {} Ducats.", figure(kept)));
             let text = self.say("credits_bought", &[("faction", who), ("n", take.to_string()), ("seller", whom), ("ducats", figure(kept))]);
-            self.report_line(LineKind::Note, None, text);
+            // Ticket #431 (the review): the buyer's act, and the player's news when it sold.
+            self.report_line_by(buyer, LineKind::Note, None, text);
+            self.mark_mine(&[Some(seller)]);
             self.ai_deed(buyer, "buy_credits", &[("n", take.to_string())]);
         }
     }
@@ -3024,7 +3033,9 @@ impl Game {
             let (who, whom) = (self.seat_name(seat), self.seat_name(target));
             self.log(format!("The {who} smeared the {whom}: {ppm:.0} ppm laid on their Blame."));
             let text = self.say("smear", &[("faction", who), ("target", whom.clone()), ("ppm", format!("{ppm:.0}"))]);
-            self.report_line(LineKind::Note, None, text);
+            // Ticket #431 (version 0.09.5): a rival's doing, and the player's news when aimed at it.
+            self.report_line_by(seat, LineKind::Note, None, text);
+            self.mark_mine(&[Some(target)]);
             self.ai_deed(seat, "smear", &[("n", amount.to_string()), ("faction", whom)]);
         }
         // Ticket #277 (version 0.08.5): Greenwash campaigns land -- ppm off the seat's own ledger for
@@ -3056,7 +3067,7 @@ impl Game {
                 self.phrase("cause_agitate_damped", &[("faction", who)])
             };
             self.unrest_cause(sid, cause, seat == Seat(0));
-            self.ai_deed(seat, "agitate", &[("state", name)]);
+            self.ai_deed_at(seat, "agitate", &[("state", name)], Some(crate::report::ReportPlace::State(sid)));
         }
         // Relief (rule 3): one point per order, paid for in Ducats at the Orders phase.
         let mut relieved: Vec<(Seat, StateId, f64)> = Vec::new();

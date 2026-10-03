@@ -364,6 +364,11 @@ pub struct TechCard {
     /// Ticket #84 (version 0.06.0): the Faction whose Victory Condition this Tech opens, if any.
     #[serde(default)]
     pub gate_for: Option<FactionKind>,
+    /// Ticket #425 (version 0.09.5): where this Tech's box sits in a stacked cell of the tree, lower
+    /// first. Absent is 0, and ties keep the tree's order, so only a Tech that must sit out of that
+    /// order says so. Drawing only; no rule reads it.
+    #[serde(default)]
+    pub stack: i32,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -1767,7 +1772,8 @@ pub struct ExodusCallCard {
 pub struct EmigrantsCard {
     pub per_turn: u32,
     pub population_each: f64,
-    pub unrest_fall: f64,
+    /// Ticket #427 (version 0.09.5): Unrest off the state for each Pioneer recruited there.
+    pub unrest_fall_each: f64,
     pub antarctica_turns: u32,
 }
 

@@ -8,6 +8,9 @@
 //!   [--start=<state>] [--sinks=6,8] [--steps=150,180] [--permafrost=4.0,2.5]
 //!   [--sink-cut=2.0,1.0] [--balance]`
 //!
+//! Ticket #430 (version 0.09.5): with `DYING_EARTH_REVEAL=1` in the environment the fog of war is
+//! lifted for every seat, so a batch can be read against the computer seeing the whole board.
+//!
 //! THE TARGET this sweep is read against, as ticket #60 restated it from #46 and #53: every seating
 //! stays hot to the end -- a median end Temperature of +2.5 to +2.9 C where it does not collapse --
 //! and Collapse is a real threat but not a certainty, roughly half to three quarters of seeds

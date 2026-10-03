@@ -341,7 +341,8 @@ impl Game {
                     Place::State(s) => ReportPlace::State(s),
                     Place::Colony(c) => ReportPlace::Colony(c),
                 };
-                self.report_line(LineKind::Note, Some(at), text);
+                // Ticket #431 (the review): the seat's own order; a rival's is its doings, under the fog.
+                self.report_line_by(seat, LineKind::Note, Some(at), text);
             }
         }
         for s in &mut self.ships {
@@ -403,8 +404,7 @@ impl Game {
         self.add_research_unattributed(total);
         self.research.neutral_total += total;
         self.log(format!("Regions in no one's hands added {total} Research to the Tech under research."));
-        let text = self.say("neutral_research", &[("n", total.to_string())]);
-        self.report_line(LineKind::Note, None, text);
+        // Ticket #431 (version 0.09.5): no Report line -- the designer cut it as telling nothing.
     }
 
     /// Ticket #416 (version 0.09.4): what this Region makes for the world a turn, to the tenth: held,
@@ -546,6 +546,8 @@ impl Game {
                     v.times(card.gdp as f64, || "for GDP".to_string());
                     v.over(10.0, "");
                     v.times(fac.output_multiplier, || format!("as the {}", fac.name));
+                    // Ticket #426 (version 0.09.5): Commodity Finance, on a Bank and an Investment Bank alike.
+                    v.times(self.tech_multiplier(seat, TechId::CommodityFinance), || "for Commodity Finance".to_string());
                     y.resource = Some(Resource::Ducats);
                     // Ticket #387 (version 0.09.3): to the tenth, where it was floored.
                     y.amount = v.tenth();
@@ -663,6 +665,9 @@ impl Game {
                 let arithmetic = if held.is_empty() { format!("{} x {here} Colonists", p.amount) } else { format!("{} x {here} Colonists + {bodies}", p.amount) };
                 let mut v = Chain::base(raw, format!("from {here} Colonists here and {} other Bodies held", held.len()));
                 v.times(fac.output_multiplier, || format!("as the {}", fac.name));
+                // Ticket #426 (version 0.09.5): Commodity Finance, on a Trade Post and an Exchange
+                // alike, before the Exchange's flat Ducat.
+                v.times(self.tech_multiplier(seat, TechId::CommodityFinance), || "for Commodity Finance".to_string());
                 y.resource = Some(Resource::Ducats);
                 // Ticket #387 (version 0.09.3): to the tenth, where it was floored.
                 y.amount = v.tenth();
@@ -702,6 +707,8 @@ impl Game {
                 r.times(self.tech_multiplier(seat, TechId::PublicScience), || t.tech(TechId::PublicScience).name.clone());
                 // Ticket #84: the Upload stacks on Public Science.
                 r.times(self.tech_multiplier(seat, TechId::TheUpload), || t.tech(TechId::TheUpload).name.clone());
+                // Ticket #433 (version 0.09.5): Orbital Data Centers, on the Observatory alone.
+                r.times(self.tech_multiplier(seat, TechId::OrbitalDataCenters), || t.tech(TechId::OrbitalDataCenters).name.clone());
                 y.research = r.floor() as i64;
                 y.chain = r;
             } else {
@@ -777,7 +784,9 @@ impl Game {
             // Ticket #82: one idle Facility of the kind doubles one Module of its pair, the most
             // productive undoubled one off Earth first (a station over Earth is off Earth;
             // Antarctica is not); with no idle Facility there is no bonus.
-            let idle = self.directed_states(seat).iter().flat_map(|s| self.state(*s).facilities.iter()).filter(|f| f.kind == *fk && f.mothballed).count();
+            // Ticket #426 (version 0.09.5): by the job, so a captured Reactor counts as the Power
+            // Plant it is everywhere else, and a Faction's Module as its base.
+            let idle = self.directed_states(seat).iter().flat_map(|s| self.state(*s).facilities.iter()).filter(|f| f.kind.common().unwrap_or(f.kind) == *fk && f.mothballed).count();
             if idle == 0 {
                 continue;
             }
@@ -788,8 +797,8 @@ impl Game {
                     continue;
                 }
                 for (i, m) in col.modules.iter().enumerate() {
-                    if m.kind == *mk && !m.mothballed {
-                        let y = self.module_yield(seat, cid, *mk);
+                    if m.kind.does_the_job_of(*mk) && !m.mothballed {
+                        let y = self.module_yield(seat, cid, m.kind);
                         candidates.push(((cid, i), y.amount.max(y.research as f64)));
                     }
                 }

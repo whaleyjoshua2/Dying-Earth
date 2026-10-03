@@ -23,6 +23,16 @@ pub enum ReportPlace {
     Orbit(BodyId, Orbit),
 }
 
+impl ReportPlace {
+    /// Ticket #430 (version 0.09.5): a Region or a Colony as a Report's place.
+    pub fn of(place: Place) -> ReportPlace {
+        match place {
+            Place::State(s) => ReportPlace::State(s),
+            Place::Colony(c) => ReportPlace::Colony(c),
+        }
+    }
+}
+
 impl From<Place> for ReportPlace {
     fn from(p: Place) -> ReportPlace {
         match p {
@@ -172,6 +182,11 @@ pub struct ReportLine {
     /// save from before marks none.
     #[serde(default)]
     pub mine: bool,
+    /// Ticket #431 (version 0.09.5): the Faction whose act the line reports, where one did it, so the
+    /// fog can treat a rival's Notes as its doings and the Report can fold its builds by Faction.
+    /// None for the board's own news and on a save from before this version.
+    #[serde(default)]
+    pub by: Option<Seat>,
 }
 
 impl ReportLine {
@@ -311,6 +326,11 @@ pub const MOMENTS_PER_TURN: usize = 2;
 pub struct AiReport {
     pub seat: Seat,
     pub deeds: Vec<String>,
+    /// Ticket #430 (version 0.09.5): where each deed happened, beside it, so the fog can keep a
+    /// deed from a player who does not see its place. Empty on a save from before this version,
+    /// when every deed reads as placeless.
+    #[serde(default)]
+    pub places: Vec<Option<ReportPlace>>,
 }
 
 /// Everything the Report popup shows at the start of a turn (spec 17.5, ticket #58).

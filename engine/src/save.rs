@@ -119,7 +119,9 @@ pub const SAVE_VERSION: u32 = 7;
 /// kind, besides: a 0.09.2 file knows neither.
 /// Ticket #417 (version 0.09.4, the closing ticket): moved to 0.09.4. `SAVE_VERSION` did not move
 /// this version: every field it added reads a default from an older file, so a 0.09.3 save loads.
-pub const GAME_VERSION: &str = "0.09.4";
+/// Ticket #432 (version 0.09.5, the closing ticket): moved to 0.09.5. `SAVE_VERSION` did not move:
+/// the fog's Report fields read a default, and the two new Techs are appended, so a 0.09.4 save loads.
+pub const GAME_VERSION: &str = "0.09.5";
 
 /// The game autosaves at the start of the Report phase of every third turn.
 pub const AUTOSAVE_EVERY: u32 = 3;
@@ -297,6 +299,8 @@ impl SavedGame {
             accords,
             events_no_target,
             body_firsts,
+            reveal_all: _,
+            waiting_last: _,
         } = g;
         SavedGame {
             seed: *seed,
@@ -382,6 +386,8 @@ impl SavedGame {
             events_no_target: self.events_no_target,
             body_firsts: self.body_firsts,
             log: self.log,
+            reveal_all: false,
+            waiting_last: Vec::new(),
         }
     }
 }

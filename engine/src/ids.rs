@@ -608,17 +608,25 @@ pub enum TechId {
     /// Venus two where it was three; a one-turn hop stays one; the Fuel is untouched. Hardened
     /// Hulls needs this AND Efficient Transit.
     NuclearRockets,
-    /// Ticket #413 (version 0.09.4): Propulsion rung 1 beside Clean Propellant, needing nothing and
-    /// needed by nothing, priced at 22 above its rung. A crossing's days x0.9 before the rounding
+    /// Ticket #413 (version 0.09.4): Propulsion rung 1 beside Clean Propellant, needing nothing,
+    /// priced at 22 above its rung; since ticket #425 (version 0.09.5) Efficient Transit needs it. A crossing's days x0.9 before the rounding
     /// up, multiplied with Nuclear Rockets' x0.8 when both stand (0.72).
     OrbitalRefuelling,
     /// Ticket #420 (version 0.09.4): Propulsion rung 2, needing Clean Propellant and needed by
     /// nothing, at 32. Every Ship's tank +15 Fuel, on Clean Propellant's +5.
     CryogenicTanks,
+    /// Ticket #426 (version 0.09.5): Extraction rung 2, needing Deep Mining, at 32; the Extraction
+    /// Charter needs it in place of Beneficiation. The Ducats of every Bank, Investment Bank, Trade
+    /// Post and Exchange x1.15, the Exchange's extra Ducat flat on top.
+    CommodityFinance,
+    /// Ticket #433 (version 0.09.5): Society rung 2, needing Large Language Models, at 32; The Upload
+    /// needs it beside Civil Defense. Observatory Research x1.5, on Large Language Models' and The
+    /// Upload's.
+    OrbitalDataCenters,
 }
 
 impl TechId {
-    pub const ALL: [TechId; 24] = [
+    pub const ALL: [TechId; 26] = [
         TechId::EfficientGrids,
         TechId::CleanPower,
         TechId::CleanManufacturing,
@@ -643,6 +651,8 @@ impl TechId {
         TechId::NuclearRockets,
         TechId::OrbitalRefuelling,
         TechId::CryogenicTanks,
+        TechId::CommodityFinance,
+        TechId::OrbitalDataCenters,
     ];
     pub fn index(self) -> usize {
         self as usize

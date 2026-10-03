@@ -1975,6 +1975,8 @@ impl Game {
             Order::Change { building, what } => self.check_change(seat, pending, *building, *what).map(|_| cost),
             // Ticket #54: Leapfrog, the Custodians only, on a state they control.
             // Ticket #73: Emigrants muster four a turn per Faction, in one state it directs.
+            // Ticket #427 (version 0.09.5): two a turn IN EACH state it directs, one recruitment a
+            // state a turn, in as many states as it likes.
             Order::BuildEmigrants { state, n } => {
                 if self.state(*state).control.director() != Some(seat) {
                     return fail("you do not direct that Nation State");
@@ -1983,8 +1985,8 @@ impl Game {
                 if *n == 0 || *n > cap {
                     return fail(format!("up to {cap} Pioneers a turn"));
                 }
-                if pending.iter().any(|o| matches!(o, Order::BuildEmigrants { .. })) {
-                    return fail("Pioneers are already recruiting this turn: one state a turn");
+                if pending.iter().any(|o| matches!(o, Order::BuildEmigrants { state: s, .. } if s == state)) {
+                    return fail("Pioneers are already recruiting here this turn");
                 }
                 if self.state(*state).population < self.lift_population(seat, *n) {
                     return fail("not enough people there");
@@ -2547,7 +2549,7 @@ impl Game {
                     // NOW, so a batch mustered after a School has run knows more than one before it,
                     // and the two average together on the card.
                     self.muster_emigrants(*state, *n);
-                    let fell = self.lower_unrest(*state, self.tables.emigrants.unrest_fall);
+                    let fell = self.lower_unrest(*state, self.tables.emigrants.unrest_fall_each * *n as f64);
                     let line = format!("{} Pioneers recruited in {} for the {}; its Unrest fell by {} to {}.", n, self.tables.state(*state).name, self.seat_name(seat), Game::unrest_figure(fell), self.unrest_text(*state));
                     self.log(line);
                     let text = self.say(
@@ -2665,7 +2667,9 @@ impl Game {
                     );
                     self.log(line);
                     let text = self.say("exodus_call", &[("faction", self.seat_name(seat)), ("state", self.tables.state(*state).name.clone()), ("n", per.to_string()), ("turns", turns.to_string())]);
-                    self.report_line(LineKind::YourWorks, Some(ReportPlace::State(*state)), text);
+                    // Ticket #431 (version 0.09.5): Your works only when it is the player's Call; a
+                    // rival's is its doing, under the fog, where it was filed as the player's.
+                    self.report_line_of(seat, LineKind::YourWorks, LineKind::Note, Some(ReportPlace::State(*state)), text);
                 }
                 Order::StripPermit { state } => {
                     let turns = self.tables.strip_permit.turns;
@@ -2685,7 +2689,8 @@ impl Game {
                         "strip_permit",
                         &[("faction", self.seat_name(seat)), ("state", self.tables.state(*state).name.clone()), ("turns", turns.to_string())],
                     );
-                    self.report_line(LineKind::Note, Some(ReportPlace::State(*state)), text);
+                    // Ticket #431 (the review): the Faction's own act, under the fog.
+                    self.report_line_by(seat, LineKind::Note, Some(ReportPlace::State(*state)), text);
                 }
                 Order::BuyInfluence { amount } => {
                     self.seat_mut(seat).allotment += amount;

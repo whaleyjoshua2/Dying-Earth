@@ -20,6 +20,7 @@ pub mod sim;
 pub mod state;
 pub mod turn;
 pub mod victory;
+pub mod visibility;
 
 pub use climate::{LastTurn, Projection};
 pub use data::{DataError, Tables, TutorialNote};

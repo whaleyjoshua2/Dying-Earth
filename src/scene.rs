@@ -272,7 +272,8 @@ pub fn sync_scene(
     }
     for (r, mut t, mut vis, mut mat) in &mut rings {
         t.translation = place(r.0);
-        match game.orbital_control(r.0) {
+        // Ticket #430 (version 0.09.5): no Control ring at a Body out of sight.
+        match game.orbital_control(r.0).filter(|_| game.spectator || game.sees_body(Seat(0), r.0)) {
             Some(s) => {
                 *vis = Visibility::Inherited;
                 // Ticket #255: by Faction, as the slot markers above.
@@ -286,7 +287,8 @@ pub fn sync_scene(
     }
     // Transits as lines with a marker at the current fraction.
     if current == View::Solar && showing_3d {
-        for s in &game.ships {
+        // Ticket #430 (version 0.09.5): a rival Ship in flight is drawn only with its books open.
+        for s in game.ships.iter().filter(|s| game.spectator || game.sees_ship(Seat(0), s)) {
             if let ShipAt::Transit { from, to, turns_left } = s.at {
                 let a = place(from);
                 let b = place(to);

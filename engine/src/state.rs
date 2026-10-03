@@ -1556,6 +1556,13 @@ pub struct Game {
     /// Ticket #345 (version 0.09.1): who was first to each Body, one row per Body at most,
     /// appended when a first is claimed and never rewritten. In the save.
     pub body_firsts: Vec<BodyFirst>,
+    /// Ticket #431 (version 0.09.5): last turn's "Colonists wait aboard" lines, so one that has not
+    /// changed is not written again. Not saved: after a load each shows once.
+    pub waiting_last: Vec<String>,
+    /// Ticket #430 (version 0.09.5): **fog of war lifted**, for testing only -- the headless
+    /// driver's flag, the shot aid and the sweep's instruments set it. Every seat, the computer's
+    /// included, then sees the whole board as before the fog. Never saved; a loaded game is fogged.
+    pub reveal_all: bool,
 }
 
 /// Ticket #50: every game seats all four Factions. The player picks one Faction and a start
@@ -1777,6 +1784,8 @@ impl Game {
             market: Market::default(),
             accords: Vec::new(),
             body_firsts: Vec::new(),
+            waiting_last: Vec::new(),
+            reveal_all: false,
             tables,
         };
         // Ticket #57: every Colony Slot on every Body draws its own four yields, in Body order then
@@ -2154,6 +2163,7 @@ impl Game {
     // ---------------------------------------------------------------- Ticket #51: Coach Class and the rest
 
     /// Ticket #73: how many Emigrants this seat may muster in a turn (Coach Class doubles it).
+    /// Ticket #427 (version 0.09.5): in EACH state it directs.
     pub fn emigrants_per_turn(&self, seat: Seat) -> u32 {
         (self.tables.emigrants.per_turn as f64 * self.tables.faction(self.kind(seat)).emigrants_multiplier).floor() as u32
     }
@@ -2533,8 +2543,10 @@ impl Game {
     /// on all 243 turns it tried and mustered nothing in twenty games. A muster takes what the
     /// Region can pay for.
     pub fn emigrants_affordable(&self, seat: Seat, s: StateId) -> u32 {
-        let per = self.emigrants_per_turn(seat);
-        let each = self.lift_population(seat, 1);
+        // Ticket #427 (the review): what THIS state may recruit and at what it charges, so an Exodus
+        // Call's doubled figure and waived double charge reach the Recruit button and the computer.
+        let per = self.emigrants_per_turn_in(seat, s);
+        let each = self.muster_population_in(seat, s, 1);
         if each <= 0.0 {
             return per;
         }
@@ -4628,7 +4640,12 @@ impl Game {
     /// Add one line to the dispatch, with the kind that places it in the severity order and under
     /// its heading, and the place it takes the player to when it is clicked.
     pub fn report_line(&mut self, kind: LineKind, place: Option<ReportPlace>, text: String) {
-        self.report.lines.push(ReportLine { kind, place, text, mine: false });
+        self.report.lines.push(ReportLine { kind, place, text, mine: false, by: None });
+    }
+
+    /// Ticket #431 (version 0.09.5): a line that reports what `seat` did.
+    pub fn report_line_by(&mut self, seat: Seat, kind: LineKind, place: Option<ReportPlace>, text: String) {
+        self.report.lines.push(ReportLine { kind, place, text, mine: false, by: Some(seat) });
     }
 
     /// Ticket #404 (version 0.09.4): mark the last line written as the player's news when `seats`
@@ -4984,7 +5001,7 @@ impl Game {
 
     pub fn report_line_of(&mut self, seat: Seat, mine: LineKind, theirs: LineKind, place: Option<ReportPlace>, text: String) {
         let kind = crate::report::line_kind_of(seat, mine, theirs, self.spectator);
-        self.report_line(kind, place, text);
+        self.report_line_by(seat, kind, place, text);
     }
 
     /// Add a Moment the turn may stop for. The cap of two and the switches are applied when the
@@ -4997,22 +5014,40 @@ impl Game {
 
     /// A sentence about what one AI seat's turn came to, appended to that Faction's paragraph.
     pub fn ai_deed(&mut self, seat: Seat, key: &str, args: &[(&str, String)]) {
+        self.ai_deed_at(seat, key, args, None);
+    }
+
+    /// Ticket #430 (version 0.09.5): the same, with the place it happened, for the fog.
+    pub fn ai_deed_at(&mut self, seat: Seat, key: &str, args: &[(&str, String)], place: Option<crate::report::ReportPlace>) {
         if !self.seat(seat).ai {
             return;
         }
         let text = self.tables.report.rival(key, args);
         if let Some(entry) = self.report.ai_lines.iter_mut().find(|e| e.seat == seat) {
+            entry.places.resize(entry.deeds.len(), None);
             entry.deeds.push(text);
+            entry.places.push(place);
         }
     }
 
     /// What one rival Faction did this turn, as one paragraph.
     pub fn rival_paragraph(&self, seat: Seat) -> Option<String> {
         let entry = self.report.ai_lines.iter().find(|e| e.seat == seat)?;
-        if entry.deeds.is_empty() {
+        // Ticket #430 (version 0.09.5): under the fog, the deeds at places the player sees, or all
+        // of them while the rival is Friendly toward it or under an Accord. A spectator reads all.
+        let viewer = Seat(0);
+        let open = self.spectator || self.sees_doings(viewer, seat);
+        let kept: Vec<String> = entry
+            .deeds
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| open || entry.places.get(*i).copied().flatten().is_some_and(|p| self.sees_report_place(viewer, p)))
+            .map(|(_, d)| d.clone())
+            .collect();
+        if kept.is_empty() {
             return None;
         }
-        let deeds = Game::and_list(&entry.deeds);
+        let deeds = Game::and_list(&kept);
         Some(self.tables.report.rival("paragraph", &[("faction", self.seat_name(seat)), ("deeds", deeds)]))
     }
 
