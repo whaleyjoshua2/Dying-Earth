@@ -931,6 +931,9 @@ pub struct ClimateTable {
     pub collapse_line: f64,
     pub temperature_lag_fraction: f64,
     pub population_growth: f64,
+    /// Ticket #444 (version 0.09.6): a Colony's growth share a turn, and its loss a turn when starved.
+    pub colony_growth: f64,
+    pub colony_decline: u32,
     /// Ticket #333 (version 0.09.0): the population figure's unit, in people. A Region's figure, a
     /// Colonist and a Pioneer are all counted in it, so `Region population 380.0` is 380 million
     /// people and one Colonist is one million. A code constant of five million from ticket #143

@@ -6983,7 +6983,12 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     // read it as the Nation's. The designer: *"Population 12.2 (hundreds of millions) should say
     // something like Population 12.2 (339M)."* Ticket #333 (version 0.09.0): units of one million,
     // read off the tables, the same shape: `Region population 1454.5 (1.45B)`.
-    icon_word(ui, "population", format!("Region population {}, Industry Level {}, leans {:?}", game.tables.population_text(st.population), st.industry_level, card.resource_lean));
+    // Ticket #444 (version 0.09.6): the natural growth the rule already ran, shown: the base, the
+    // heat's cut, and this turn's figure.
+    let pop = icon_word(ui, "population", format!("Region population {}, Industry Level {}, leans {:?}", game.tables.population_text(st.population), st.industry_level, card.resource_lean));
+    let (c, rate) = (&game.tables.climate, game.population_growth_rate());
+    rule_tip(pop, format!("Growth {:+.2}% a turn, less {:.2}% per tenth of a degree above {:+.1} C.
+This turn {:+.2}%: {:+.1} million.", c.population_growth * 100.0, c.population_loss_per_tenth_degree * 100.0, c.base_temperature, rate * 100.0, st.population * rate));
     // Ticket #391 (version 0.09.3): what the Region made this turn, under its population.
     output_row(ui, game, Place::State(sid));
     // Ticket #161 (version 0.07.5): what an Allotment is, which this line names and never explains.
@@ -7705,7 +7710,10 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     }
     // Ticket #164 (version 0.07.5): the room is the Core Module's four and the Habitats' eight
     // each, so the line no longer names Habitats alone.
-    ui.label(format!("Colonists {} of {} room", col.colonists, game.habitat_room(col)));
+    // Ticket #444 (version 0.09.6): the hover says whether the place is growing, and when the next
+    // Colonist comes, or why it is shrinking.
+    let line = ui.label(format!("Colonists {} of {} room", col.colonists, game.habitat_room(col)));
+    rule_tip(line, colony_growth_words(game, col));
     // Ticket #391 (version 0.09.3): what the Colony made this turn, under its people.
     output_row(ui, game, Place::Colony(cid));
     // Ticket #204 (version 0.08.1): the receiver's door, against the figure it changes.
@@ -11994,4 +12002,27 @@ mod glyph_words {
         assert_eq!(glyph_for(true, "ppm", &[("ppm", "emissions")]), Some("emissions"), "the Blame block's extra word");
         assert_eq!(glyph_for(true, "ppm", &[]), None, "and ppm nowhere else");
     }
+}
+
+/// Ticket #444 (version 0.09.6): a Colony's natural growth in words, for its Colonists line: growing
+/// and when the next Colonist comes, full, or shrinking and why.
+fn colony_growth_words(game: &Game, col: &dying_earth_engine::Colony) -> String {
+    let c = &game.tables.climate;
+    let dark = !col.modules.iter().any(|m| m.kind == ModuleKind::Core && m.working());
+    if game.starved_by(col.id).is_some() {
+        return format!("Shrinking: {} a turn, under Blockade.", c.colony_decline);
+    }
+    if dark {
+        return format!("Shrinking: {} a turn, its Core offline.", c.colony_decline);
+    }
+    if col.colonists == 0 {
+        return "Nobody here to grow.".to_string();
+    }
+    if col.colonists >= game.habitat_room(col) {
+        return "Full: no room to grow. A Habitat makes room.".to_string();
+    }
+    let per = col.colonists as f64 * c.colony_growth;
+    let banked = game.colony_growth.get(&col.id).copied().unwrap_or(0.0);
+    let turns = ((1.0 - banked) / per).ceil().max(1.0) as u32;
+    format!("Growing: {:+.1} a turn, next Colonist in {} turn{}.", per, turns, if turns == 1 { "" } else { "s" })
 }

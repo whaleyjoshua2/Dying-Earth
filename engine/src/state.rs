@@ -1561,6 +1561,9 @@ pub struct Game {
     /// Ticket #345 (version 0.09.1): who was first to each Body, one row per Body at most,
     /// appended when a first is claimed and never rewritten. In the save.
     pub body_firsts: Vec<BodyFirst>,
+    /// Ticket #444 (version 0.09.6): each Colony's growth toward its next Colonist, a fraction
+    /// below one; a Colony with none has nothing banked.
+    pub colony_growth: BTreeMap<ColonyId, f64>,
     /// Ticket #431 (version 0.09.5): last turn's "Colonists wait aboard" lines, so one that has not
     /// changed is not written again. Not saved: after a load each shows once.
     pub waiting_last: Vec<String>,
@@ -1790,6 +1793,7 @@ impl Game {
             accords: Vec::new(),
             body_firsts: Vec::new(),
             waiting_last: Vec::new(),
+            colony_growth: BTreeMap::new(),
             reveal_all: false,
             tables,
         };

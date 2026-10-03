@@ -250,3 +250,35 @@ The authority is [ticket #442](https://github.com/whaleyjoshua2/Dying-Earth/issu
 - a ground Colony built with no station of yours above it;
 - a Ship in Venus low orbit;
 - Colonists sent up, or past the Colony's room, or from a blockaded station.
+
+## 11. Natural population growth and decline, in Colonies and on Earth
+
+The authority is [ticket #444](https://github.com/whaleyjoshua2/Dying-Earth/issues/444).
+
+- **Earth's rule is kept:** every Region grows 1% a turn, less 0.15% for each tenth of a degree above
+  +1.2 C; a fall raises Unrest and sends Refugees. It is now **shown**: the Region card's population
+  line has a hover giving the rule and this turn's figure ("This turn +1.00%: +14.5 million").
+- **Colonies and stations grow.** Each grows by **2%** of its Colonists a turn (`climate.toml`
+  `colony_growth`).
+  - The fraction is kept on the place and lands as a whole Colonist when it reaches one: a Colony of
+    ten gains one every five turns.
+  - It stops at the room its Habitats give. A full Colony banks nothing.
+  - It grows only while it is not under Blockade and its Core works.
+- **And decline.** Under Blockade, or with its Core offline, a Colony loses **1** Colonist a turn
+  (`colony_decline`) and banks nothing. Nothing else shrinks a Colony.
+- **Born Colonists** know what the place knows, so Education does not move. They count for every
+  Victory figure.
+- **The Report:** one line a seat under Your works, "Colonies grew by N: <place +1, …>" (or "lost N",
+  or both).
+- **The card:** the Colonists line has a hover:
+  - "Growing: +0.1 a turn, next Colonist in 9 turns";
+  - or "Full: no room to grow";
+  - or "Shrinking: 1 a turn, under Blockade" / "its Core offline".
+- **The save** carries each Colony's fraction (defaulted, so an older save loads).
+
+**What would show this wrong:**
+
+- a Colony of ten with room not gaining one in five turns;
+- a Colony past its room;
+- a blockaded or dark Colony growing;
+- an Earth Region's growth not matching its hover.

@@ -253,6 +253,9 @@ pub struct SavedGame {
     /// Ticket #345 (version 0.09.1): who was first to each Body.
     #[serde(default)]
     pub body_firsts: Vec<BodyFirst>,
+    /// Ticket #444 (version 0.09.6): each Colony's growth toward its next Colonist.
+    #[serde(default)]
+    pub colony_growth: BTreeMap<ColonyId, f64>,
 }
 
 impl SavedGame {
@@ -299,6 +302,7 @@ impl SavedGame {
             accords,
             events_no_target,
             body_firsts,
+            colony_growth,
             reveal_all: _,
             waiting_last: _,
         } = g;
@@ -341,6 +345,7 @@ impl SavedGame {
             fought: fought.clone(),
             widgets: widgets.clone(),
             body_firsts: body_firsts.clone(),
+            colony_growth: colony_growth.clone(),
         }
     }
 
@@ -385,6 +390,7 @@ impl SavedGame {
             accords: self.accords,
             events_no_target: self.events_no_target,
             body_firsts: self.body_firsts,
+            colony_growth: self.colony_growth,
             log: self.log,
             reveal_all: false,
             waiting_last: Vec::new(),

@@ -231,6 +231,10 @@ development_woke = "{state} raised its Industry Level to {level} and brought a {
 scrubbers_changed_hands = "{n} Scrubber(s) in {state} now run at {share}."
 # Ticket #442 (version 0.09.6).
 colony_built = "{faction} built {colony}."
+# Ticket #444 (version 0.09.6): a Colony's natural growth and decline, one line a seat.
+colonies_grew = "Colonies grew by {up}: {places}."
+colonies_shrank = "Colonies lost {down}: {places}."
+colonies_grew_and_shrank = "Colonies grew by {up} and lost {down}: {places}."
 sent_down = "{n} Colonists went down from {from} to {to}."
 leapfrog = "The {faction} Leapfrogged {state}: its people now emit {coefficient} per hundred million."
 

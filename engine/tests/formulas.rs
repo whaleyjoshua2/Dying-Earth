@@ -18784,3 +18784,33 @@ fn the_ai_builds_a_colony_from_its_station_and_sends_people_down() {
     let room = g.habitat_room(g.colony(down).unwrap()).min(6);
     assert!(scored(&g, &format!("send {room} down to")) > 0.0, "its people are weighed going down");
 }
+
+/// Ticket #444 (version 0.09.6): **a Colony grows by 2% of its Colonists a turn**, the fraction kept
+/// on the place, up to its Habitats' room; and **loses one a turn** under Blockade or with its Core
+/// offline. A Colony of ten: a Colonist after five turns.
+#[test]
+fn a_colony_grows_by_two_percent_a_turn_and_declines_when_starved_or_dark() {
+    let mut g = game();
+    assert!((g.tables.climate.colony_growth - 0.02).abs() < 1e-9);
+    let c = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Habitat], 10);
+    assert!(g.habitat_room(g.colony(c).unwrap()) >= 12, "the premise: room to grow");
+    for _ in 0..4 {
+        g.colony_growth_step();
+    }
+    assert_eq!(g.colony(c).unwrap().colonists, 10, "0.8 of a Colonist after four turns");
+    g.colony_growth_step();
+    assert_eq!(g.colony(c).unwrap().colonists, 11, "one after five");
+    // Full: no growth, and nothing banked toward the next.
+    let room = g.habitat_room(g.colony(c).unwrap());
+    g.colony_mut(c).unwrap().colonists = room;
+    for _ in 0..10 {
+        g.colony_growth_step();
+    }
+    assert_eq!(g.colony(c).unwrap().colonists, room, "never past the room");
+    // The Core offline: one a turn lost.
+    for m in g.colony_mut(c).unwrap().modules.iter_mut().filter(|m| m.kind == ModuleKind::Core) {
+        m.online = false;
+    }
+    g.colony_growth_step();
+    assert_eq!(g.colony(c).unwrap().colonists, room - 1, "the lights out, one gone");
+}

@@ -205,3 +205,21 @@ The move is inside the noise. Settlement at the end barely moved:
 
 The sweep counts no use of the new routes (a station founded by Colony Ship, a Colony built from a
 station, people sent down). How often the computer took them is not measured here.
+
+## Natural population growth and decline (ticket #444)
+
+- [`colony-growing.png`](ticket-444-growth/colony-growing.png), taken with
+  `marsstation:1 selectstation:mars seed:7 "tip:Growing"`. Mars Base Camp, 6 of 8: "Growing: +0.1 a
+  turn, next Colonist in 9 turns."
+- [`region-growth.png`](ticket-444-growth/region-growth.png), taken with
+  `select:eastasia panel:0 seed:7 "tip:Growth +"`. China's population hover: "Growth +1.00% a turn,
+  less 0.15% per tenth of a degree above +1.2 C. This turn +1.00%: +14.5 million."
+- **Witnessed red:** the new test `a_colony_grows_by_two_percent_a_turn_and_declines_when_starved_or_dark`
+  could not compile before the figure and the step existed.
+- **The save test** now also cuts `colony_growth`, so an older save without it still loads.
+
+**The sweep after this ticket** ([`sweeps/after-444.txt`](sweeps/after-444.txt)): 10 / 7 / 8 / 10 with
+45 collapses, where it was 10 / 10 / 7 / 9 with 44. The move is inside the noise. The median
+Colonists off Earth at the end, seating by seating, were 92 / 109 / 150 / 133, against
+92 / 105 / 143 / 139. Growth stops at a Colony's room, and most computer Colonies stand full, so it
+adds little as the computer plays today.
