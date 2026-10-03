@@ -110,3 +110,17 @@ Custodians at ×1.15 (#440) and this cap. Colony Ships at 35 Fuel (#455) is not 
 - **Older tests moved to 35:** four pinned 40 (the 0.06.0 tank test, Cryogenic Tanks' sums 40 / 45
   / 60 and its Provisional Findings 47, the Refinery depot's refuel of 39, and the market test's
   "40 wanted").
+
+**The sweep after all five figure tickets** ([`sweeps/after-455.txt`](sweeps/after-455.txt)):
+
+| | Custodians | Prospectors | Arkwrights | Archivists | collapses |
+|---|---|---|---|---|---|
+| 0.09.5 | 10 | 10 | 1 | 17 | 42 |
+| after #441 (four tickets) | 12 | 9 | 8 | 7 | 44 |
+| after #455 (all five) | 9 | 10 | 6 | 9 | 46 |
+| designer's ideal | 15 | 15 | 15 | 15 | 20 |
+
+The 35 tank moved every Faction by 3 wins or less, which is inside the noise. Over the four
+seatings, Refuel orders came to 330, against 306 after #441. Ships stranded at the end came to 37,
+against 38. The four Factions now sit within 4 wins of one another. Collapses, at 46, are the
+figure farthest from the ideal.
