@@ -18442,3 +18442,37 @@ fn the_custodians_influence_multiplier_is_one_point_one_five() {
     let t = tables();
     assert!((t.faction(FactionKind::Custodians).influence_multiplier - 1.15).abs() < 1e-9);
 }
+
+/// Ticket #441 (version 0.09.6): **a Shipyard wants one Factory, not one every turn.** A Colony
+/// with a yard and nothing under way wants a Factory Module "because a Ship is wanted" -- until one
+/// stands or is on order there, after which it wants no more on that account. Room for many Modules,
+/// so a missing want is the cap and not a full Colony.
+#[test]
+fn a_shipyard_wants_one_factory_module_and_no_more() {
+    let mut g = game();
+    calm(&mut g);
+    let cust = Seat(0);
+    g.turn = 5;
+    g.seats[0].stockpile.materials = 300.0;
+    g.seats[0].stockpile.energy = 500.0;
+    g.seats[0].income_last_turn.materials = 6.0;
+    g.seats[0].income_last_turn.energy = 20.0;
+    let iss = station_of(&g, cust, BodyId::Earth).unwrap();
+    g.colony_mut(iss).unwrap().colonists = 0;
+    let moon = colony(&mut g, cust, BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Shipyard], 20);
+    let free = { let c = g.colony(moon).unwrap(); g.module_slots(c) - g.module_slots_used(c) };
+    assert!(free >= 2, "the premise: room for a Factory and more, {free} free");
+    g.ai_orders(cust);
+    assert!(scored(&g, "build Factory at Mare") > 0.0, "the first Factory at a yard is wanted");
+    // One standing: no second on the yard's account.
+    g.colony_mut(moon).unwrap().modules.push(Module::new(ModuleKind::Factory));
+    g.log.clear();
+    g.ai_orders(cust);
+    assert_eq!(scored(&g, "build Factory at Mare"), 0.0, "a second Factory beside a standing one is not wanted");
+    // One on order instead: the same.
+    g.colony_mut(moon).unwrap().modules.retain(|m| m.kind != ModuleKind::Factory);
+    g.colony_mut(moon).unwrap().queue.push(Build { item: BuildItem::Module(ModuleKind::Factory), seat: cust, widgets: 4, done: 0, coastal: false });
+    g.log.clear();
+    g.ai_orders(cust);
+    assert_eq!(scored(&g, "build Factory at Mare"), 0.0, "nor beside one on order");
+}

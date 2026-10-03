@@ -105,3 +105,22 @@ The authority is [ticket #440](https://github.com/whaleyjoshua2/Dying-Earth/issu
 
 **What would show this wrong:** a Custodian Allotment of 15 from China alone on turn 1, or a card
 that reads x1.2.
+
+## 6. A Shipyard wants one Factory, not one every turn
+
+The authority is [ticket #441](https://github.com/whaleyjoshua2/Dying-Earth/issues/441). No rule
+moves; this is how the computer seats spend.
+
+- **Before:** once a Colony had a Shipyard, every computer seat wanted another Factory Module there
+  each turn "because a Ship is wanted". Nothing counted the Factories already standing, and the want
+  carried the full victory-gap boost. A yard Colony filled its free slots with Factories. The
+  Arkwrights' one station over Earth spent its Materials on them and never launched a Colony Ship.
+- **After:** a yard Colony wants **one** Factory on the yard's account, counting those standing and
+  on order. A Colony whose build queue is deep still wants one on its own account, as before.
+- **All four computer seats.**
+- **The designer's ideal**, given on this ticket: about **15 / 15 / 15 / 15 wins and 20 collapses**
+  over the 80-game sweep. The trial (balance suggestions, Ar1) moved collapses from 42 to 32, toward
+  it.
+
+**What would show this wrong:** a computer yard Colony with two Factory Modules and a short queue,
+or one with none while it builds Ships.

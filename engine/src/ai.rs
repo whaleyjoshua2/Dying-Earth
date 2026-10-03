@@ -1481,6 +1481,13 @@ impl Game {
                     // (6 against 9, measured), which is every turn of every game.
                     ModuleKind::Factory => {
                         let ship_wanted = col.modules.iter().any(|m| m.kind == ModuleKind::Shipyard) || col.queue.iter().any(|b| b.item == BuildItem::Module(ModuleKind::Shipyard));
+                        // Ticket #441 (version 0.09.6): a yard wants ONE Factory. Nothing counted the
+                        // Factories already there, so a yard Colony filled every free slot with them
+                        // at the full victory gap, and the Arkwrights' one station over Earth spent its
+                        // Materials on Factories and never launched. One standing or on order ends the
+                        // yard's claim; a queue deep enough still wants one on its own account, below.
+                        let has_factory = col.modules.iter().any(|m| m.kind == ModuleKind::Factory) || col.queue.iter().any(|b| b.item == BuildItem::Module(ModuleKind::Factory));
+                        let ship_wanted = ship_wanted && !has_factory;
                         if col.queue.len() < th.factory_module_queue_depth && !ship_wanted {
                             continue;
                         }

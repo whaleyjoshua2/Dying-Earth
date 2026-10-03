@@ -65,3 +65,14 @@ at 2.0 make 1.5, not 1". It passes after the fix.
 - **Witnessed red:** the new test `the_custodians_influence_multiplier_is_one_point_one_five`
   failed before the data moved. Two Allotment tests moved their figures (15 to 14, 20 to 19, 21 to
   20; 16 holds). The 0.06.0 test that pinned 1.2 is gone, superseded.
+
+## A Shipyard wants one Factory, not one every turn (ticket #441)
+
+**Witnessed red:** the new test `a_shipyard_wants_one_factory_module_and_no_more` gives a Moon
+Colony a Shipyard and room for several Modules. Before the fix:
+
+- the first Factory was wanted, as it should be;
+- with one Factory already standing, a second still scored 12, where it should be wanted not at
+  all.
+
+After the fix it scores nothing, whether the first Factory is standing or on order.
