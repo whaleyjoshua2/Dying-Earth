@@ -2572,11 +2572,11 @@ fn the_ai_buys_fuel_for_a_colony_ship_or_a_refuel() {
     assert_eq!(g.check_order(Seat(0), std::slice::from_ref(&buy), &refuel).map(|c| c.fuel), Ok(25.0), "the Refuel takes what the Buy brings");
     // A later order cannot spend the Fuel the Refuel will take: 24 bought, 1 held, 25 into the tank.
     g.seats[0].stockpile.fuel = 1.0;
-    let queued = vec![Order::Buy { resource: Resource::Fuel, amount: 24 }, refuel.clone(), Order::Buy { resource: Resource::Fuel, amount: 39 }];
-    assert_eq!(g.remaining(Seat(0), &queued).0.fuel, 39.0, "25 of the 64 went into the tank");
+    let queued = vec![Order::Buy { resource: Resource::Fuel, amount: 24 }, refuel.clone(), Order::Buy { resource: Resource::Fuel, amount: 34 }];
+    assert_eq!(g.remaining(Seat(0), &queued).0.fuel, 34.0, "25 of the 59 went into the tank");
     let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
     g.colony_mut(iss).unwrap().modules.push(Module::new(ModuleKind::Shipyard));
-    assert!(g.check_order(Seat(0), &queued, &Order::BuildShip { site: Place::Colony(iss), kind: UnitKind::ColonyShip }).is_err(), "40 wanted, 39 left");
+    assert!(g.check_order(Seat(0), &queued, &Order::BuildShip { site: Place::Colony(iss), kind: UnitKind::ColonyShip }).is_err(), "35 wanted since ticket #455, 34 left");
     g.seats[0].stockpile.fuel = 0.0;
     // And the computer takes it, where Influence cannot outbid it for the Ducats.
     let mut t = Tables::load(&default_data_dir()).expect("tables load");
@@ -2985,7 +2985,7 @@ fn e_four_stops_replenishment_seven_halves_output_ten_throws_the_controller_off(
     g.take_control(StateId::Europe, Seat(0));
     g.seats[0].influence.insert(Place::State(StateId::NorthAfrica), 42);
     g.seats[1].influence.insert(Place::State(StateId::NorthAfrica), 17);
-    g.state_mut(StateId::NorthAfrica).queue.push(Build { item: BuildItem::Facility(FacilityKind::Bank), seat: Seat(0), coastal: false, widgets: 99, done: 0 });
+    g.state_mut(StateId::NorthAfrica).queue.push(Build { item: BuildItem::Facility(FacilityKind::Bank), seat: Seat(0), coastal: false, fuel: 0.0, widgets: 99, done: 0 });
     let id = ArmyId(g.fresh_id());
     g.armies.push(Army { name: String::new(), id, home: ArmyHome::State(StateId::Europe), at: ArmyAt::Place(Place::State(StateId::NorthAfrica)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None, levy: false, raised_strength: 0 });
     g.raise_unrest(StateId::NorthAfrica, 10.0, UnrestSource::Plain);
@@ -5264,6 +5264,7 @@ fn every_report_line_carries_its_kind_and_place_and_falls_under_the_right_headin
         widgets: 4,
         done: 4,
         coastal: false,
+        fuel: 0.0,
     });
     let (_, found) = colony_ship_ready(&mut g, BodyId::Moon);
     hold_temperature(&mut g, 1.7);
@@ -6918,7 +6919,7 @@ fn a_ship_is_built_with_a_full_tank_paid_from_the_stockpile() {
     let mut g = game();
     // Ticket #420 (version 0.09.4): the Colony Ship's is 40, every warship's 30.
     for k in UnitKind::SHIPS {
-        assert_eq!(g.tables.unit(k).tank, if k == UnitKind::ColonyShip { 40 } else { 30 }, "{k:?}");
+        assert_eq!(g.tables.unit(k).tank, if k == UnitKind::ColonyShip { 35 } else { 30 }, "{k:?}");
     }
     assert_eq!(g.tables.unit(UnitKind::Army).tank, 0);
     let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
@@ -7521,7 +7522,7 @@ fn a_colony_holds_one_module_for_each_colonist_and_none_without() {
     assert!(g.check_order(Seat(0), &[], &order).is_ok(), "mothballing frees Energy, never room");
     assert_eq!(g.module_slots_used(g.colony(c).unwrap()), 2);
     // One under construction reserves its slot.
-    g.colony_mut(c).unwrap().queue.push(Build { item: BuildItem::Module(ModuleKind::Mine), seat: Seat(0), widgets: 4, done: 0, coastal: false });
+    g.colony_mut(c).unwrap().queue.push(Build { item: BuildItem::Module(ModuleKind::Mine), seat: Seat(0), widgets: 4, done: 0, coastal: false, fuel: 0.0 });
     assert_eq!(g.module_slots_used(g.colony(c).unwrap()), 3);
     assert!(g.check_order(Seat(0), &[], &order).is_err(), "the one building holds the last slot");
     // The Archive is exempt, and counted on neither side of the sum.
@@ -10146,21 +10147,21 @@ fn cryogenic_tanks_adds_fifteen_to_every_tank_on_clean_propellants_five() {
     assert_eq!(card.needs, vec![TechId::CleanPropellant]);
     assert!(TechId::ALL.iter().all(|t| !g.tables.tech(*t).needs.contains(&TechId::CryogenicTanks)), "needed by nothing");
     let tanks = |g: &Game| (g.tank_of(Seat(0), UnitKind::ColonyShip), g.tank_of(Seat(0), UnitKind::Frigate), g.tank_of(Seat(0), UnitKind::MissileCarrier));
-    assert_eq!(tanks(&g), (40.0, 30.0, 30.0));
+    assert_eq!(tanks(&g), (35.0, 30.0, 30.0));
     with_tech(&mut g, TechId::CleanPropellant);
-    assert_eq!(tanks(&g), (45.0, 35.0, 35.0));
+    assert_eq!(tanks(&g), (40.0, 35.0, 35.0));
     with_tech(&mut g, TechId::CryogenicTanks);
-    assert_eq!(tanks(&g), (60.0, 50.0, 50.0));
+    assert_eq!(tanks(&g), (55.0, 50.0, 50.0));
     assert_eq!(g.tank_of(Seat(0), UnitKind::Army), 0.0, "an Army has no tank");
     let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
-    assert_eq!(g.order_cost(Seat(0), &Order::BuildShip { site: Place::Colony(iss), kind: UnitKind::ColonyShip }).fuel, 60.0, "the build fills the whole tank");
+    assert_eq!(g.order_cost(Seat(0), &Order::BuildShip { site: Place::Colony(iss), kind: UnitKind::ColonyShip }).fuel, 55.0, "the build fills the whole tank: 35 since ticket #455");
     // Under Provisional Findings, the Archivists', half of 15, rounded down: 7.
     let mut g = game();
     let arc = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Archivists).unwrap();
     g.research.current = Some(TechId::CryogenicTanks);
     g.research.findings_tech = Some(TechId::CryogenicTanks);
     assert!(g.provisional_findings(arc));
-    assert_eq!(g.tank_of(arc, UnitKind::ColonyShip), 47.0);
+    assert_eq!(g.tank_of(arc, UnitKind::ColonyShip), 42.0, "35 + 7, ticket #455");
     for k in FactionKind::ALL {
         let order = &g.tables.ai.tech_picks[&k].order;
         let at = |t: TechId| order.iter().position(|x| *x == t);
@@ -10954,12 +10955,12 @@ fn what_a_faction_has_under_way_lists_its_builds_and_transits_soonest_first() {
     // Plant of 8 is two Resolutions off; the Moon Colony makes its Core Module's 4, so a Mine with
     // one Widget left lands next turn.
     assert_eq!(g.widgets_at(Place::State(sid)), 7, "a flat 4 and Europe's Industry Level");
-    g.state_mut(sid).queue.push(Build { item: BuildItem::Facility(FacilityKind::PowerPlant), seat: Seat(0), widgets: 8, done: 0, coastal: false });
+    g.state_mut(sid).queue.push(Build { item: BuildItem::Facility(FacilityKind::PowerPlant), seat: Seat(0), widgets: 8, done: 0, coastal: false, fuel: 0.0 });
     let cid = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Habitat], 4);
     assert_eq!(g.widgets_at(Place::Colony(cid)), 4, "the Core Module's four");
-    g.colony_mut(cid).unwrap().queue.push(Build { item: BuildItem::Module(ModuleKind::Mine), seat: Seat(0), widgets: 4, done: 3, coastal: false });
+    g.colony_mut(cid).unwrap().queue.push(Build { item: BuildItem::Module(ModuleKind::Mine), seat: Seat(0), widgets: 4, done: 3, coastal: false, fuel: 0.0 });
     // A rival's build in a Region the player directs is the rival's, not the player's.
-    g.state_mut(sid).queue.push(Build { item: BuildItem::Facility(FacilityKind::Bank), seat: Seat(1), widgets: 4, done: 0, coastal: false });
+    g.state_mut(sid).queue.push(Build { item: BuildItem::Facility(FacilityKind::Bank), seat: Seat(1), widgets: 4, done: 0, coastal: false, fuel: 0.0 });
     // Two Ships: one on the road to Mars with three turns left, one arriving next turn, and one at rest.
     let put = |g: &mut Game, kind: UnitKind| -> ShipId {
         let id = ShipId(g.fresh_id());
@@ -12610,7 +12611,7 @@ fn turns_to_build_estimates_at_the_places_rate_behind_its_queue() {
     assert_eq!(g.widgets_at(place), 7, "a flat 4 and Industry Level 3");
     assert_eq!(g.turns_to_build(Seat(0), place, bank), 1, "4 Widgets at 7 a turn");
     assert_eq!(g.turns_to_build(Seat(0), place, BuildItem::IndustryLevel), 1);
-    g.state_mut(sid).queue.push(Build { item: BuildItem::Facility(FacilityKind::PowerPlant), seat: Seat(0), widgets: 8, done: 0, coastal: false });
+    g.state_mut(sid).queue.push(Build { item: BuildItem::Facility(FacilityKind::PowerPlant), seat: Seat(0), widgets: 8, done: 0, coastal: false, fuel: 0.0 });
     assert_eq!(g.turns_to_build(Seat(0), place, bank), 2, "8 owed ahead and 4 more: 12 at 7 a turn, rounded up");
     assert_eq!(g.queue_estimates(place), vec![2], "the Power Plant itself: 8 at 7, rounded up");
     g.state_mut(sid).facilities.push(facility(FacilityKind::Factory));
@@ -12699,7 +12700,7 @@ fn the_ai_wants_a_factory_module_where_a_colonys_queue_is_two_deep() {
     g.colony_mut(iss).unwrap().colonists = 0;
     let moon = colony(&mut g, cust, BodyId::Moon, &[], 4);
     for _ in 0..2 {
-        g.colony_mut(moon).unwrap().queue.push(Build { item: BuildItem::Module(ModuleKind::Habitat), seat: cust, widgets: 4, done: 0, coastal: false });
+        g.colony_mut(moon).unwrap().queue.push(Build { item: BuildItem::Module(ModuleKind::Habitat), seat: cust, widgets: 4, done: 0, coastal: false, fuel: 0.0 });
     }
     let orders = g.ai_orders(cust);
     let (factory, mine) = (scored(&g, "build Factory at Mare"), scored(&g, "build Mine at Mare"));
@@ -13048,7 +13049,7 @@ fn ship_in(g: &mut Game, seat: Seat, kind: UnitKind, body: BodyId, slot: Option<
 /// Shipyard's queue is the one door a Ship comes into a real game through, and ticket #335 makes
 /// the orbit it comes into the yard's own.
 fn build_now(g: &mut Game, place: Place, item: BuildItem, seat: Seat) {
-    let b = Build { item, seat, widgets: 0, done: 0, coastal: false };
+    let b = Build { item, seat, widgets: 0, done: 0, coastal: false, fuel: 0.0 };
     match place {
         Place::State(s) => g.state_mut(s).queue.push(b),
         Place::Colony(c) => g.colony_mut(c).unwrap().queue.push(b),
@@ -15202,7 +15203,7 @@ fn a_shipyard_refusal_says_whether_it_is_absent_shut_or_still_building() {
     let why = g.check_order(Seat(0), &[], &order).unwrap_err().0;
     assert_eq!(why, "no Shipyard here", "with no Shipyard the refusal names the absence");
     // One in the queue. It is not absent, it is not finished, and the refusal says which.
-    g.colony_mut(cid).unwrap().queue.push(Build { item: BuildItem::Module(ModuleKind::Shipyard), seat: Seat(0), widgets: 6, done: 0, coastal: false });
+    g.colony_mut(cid).unwrap().queue.push(Build { item: BuildItem::Module(ModuleKind::Shipyard), seat: Seat(0), widgets: 6, done: 0, coastal: false, fuel: 0.0 });
     let why = g.check_order(Seat(0), &[], &order).unwrap_err().0;
     assert!(why.contains("still building"), "a Shipyard under way is not an absent one: {why}");
     assert!(!why.contains("no Shipyard"), "and the refusal never denies what the player can see in the queue: {why}");
@@ -16931,11 +16932,11 @@ fn a_colony_with_a_working_refinery_refuels_its_low_orbit_and_rescues_a_stranded
     let depot = colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Refinery], 4);
     assert!(g.check_order(Seat(0), &[], &refuel).is_ok(), "a working Refinery below fuels low orbit: {:?}", g.check_order(Seat(0), &[], &refuel));
     assert!(!g.stranded(far), "the depot rescues it");
-    // Ticket #420 (version 0.09.4): a Colony Ship's tank is 40.
-    assert_eq!(g.order_cost(Seat(0), &refuel).fuel, 39.0, "40 - 1 wanted, 50 held");
+    // Ticket #420 (version 0.09.4): a Colony Ship's tank is 40; 35 since ticket #455 (version 0.09.6).
+    assert_eq!(g.order_cost(Seat(0), &refuel).fuel, 34.0, "35 - 1 wanted, 50 held");
     g.commit_orders(Seat(0), std::slice::from_ref(&refuel));
-    assert_eq!(g.ship(far).unwrap().fuel, 40.0, "filled from the Stockpile");
-    assert_eq!(g.seats[0].stockpile.fuel, 11.0);
+    assert_eq!(g.ship(far).unwrap().fuel, 35.0, "filled from the Stockpile");
+    assert_eq!(g.seats[0].stockpile.fuel, 16.0);
     assert!(g.log.iter().any(|l| l.contains(" refuels ") && l.contains("at a Refinery Colony")), "the log says where: {:?}", g.log.last());
     // The Refinery mothballed: the depot is shut.
     g.ship_mut(far).unwrap().fuel = 1.0;
@@ -17620,7 +17621,7 @@ fn a_computer_seat_answers_unrest_from_four_and_raises_a_stadium_alone_where_slo
     assert!(!offers(&mut g, 4.75, FacilityKind::Stadium), "and never under five");
     // A Constabulary on order already has that slot: no Stadium alone beside it.
     let widgets = g.build_widgets(Seat(1), BuildItem::Facility(FacilityKind::Constabulary));
-    g.state_mut(sid).queue.push(Build { item: BuildItem::Facility(FacilityKind::Constabulary), seat: Seat(1), widgets, done: 0, coastal: false });
+    g.state_mut(sid).queue.push(Build { item: BuildItem::Facility(FacilityKind::Constabulary), seat: Seat(1), widgets, done: 0, coastal: false, fuel: 0.0 });
     assert!(!offers(&mut g, 9.0, FacilityKind::Stadium), "a Constabulary on order takes the last slot");
 }
 
@@ -18471,8 +18472,87 @@ fn a_shipyard_wants_one_factory_module_and_no_more() {
     assert_eq!(scored(&g, "build Factory at Mare"), 0.0, "a second Factory beside a standing one is not wanted");
     // One on order instead: the same.
     g.colony_mut(moon).unwrap().modules.retain(|m| m.kind != ModuleKind::Factory);
-    g.colony_mut(moon).unwrap().queue.push(Build { item: BuildItem::Module(ModuleKind::Factory), seat: cust, widgets: 4, done: 0, coastal: false });
+    g.colony_mut(moon).unwrap().queue.push(Build { item: BuildItem::Module(ModuleKind::Factory), seat: cust, widgets: 4, done: 0, coastal: false, fuel: 0.0 });
     g.log.clear();
     g.ai_orders(cust);
     assert_eq!(scored(&g, "build Factory at Mare"), 0.0, "nor beside one on order");
+}
+
+/// Ticket #455 (version 0.09.6): **a Colony Ship's tank is 35**, at the designer's word.
+#[test]
+fn a_colony_ships_tank_is_35() {
+    let t = tables();
+    assert_eq!(t.unit(UnitKind::ColonyShip).tank, 35);
+}
+
+/// Ticket #455 (version 0.09.6): **a Ship is built with the tank it was paid for.** The Fuel is
+/// paid at the order; a tank Tech that completes while the Ship is building adds room that comes
+/// empty, as it does to a Ship already flying, where the Ship used to come out filled to the new
+/// tank for nothing.
+#[test]
+fn a_ship_is_built_with_the_tank_it_was_paid_for() {
+    let mut g = game();
+    let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
+    g.colony_mut(iss).unwrap().modules.push(Module::new(ModuleKind::Shipyard));
+    g.colony_mut(iss).unwrap().modules.push(Module::new(ModuleKind::Factory));
+    g.seats[0].stockpile.materials = 100.0;
+    g.seats[0].stockpile.energy = 200.0;
+    g.seats[0].stockpile.fuel = 50.0;
+    let build = Order::BuildShip { site: Place::Colony(iss), kind: UnitKind::Frigate };
+    g.commit_orders(Seat(0), std::slice::from_ref(&build));
+    assert_eq!(g.seats[0].stockpile.fuel, 20.0, "30 paid at the order");
+    // Cryogenic Tanks completes before the yard finishes: the tank is now 45.
+    g.research.done.push(TechId::CryogenicTanks);
+    assert_eq!(g.tank_of(Seat(0), UnitKind::Frigate), 45.0);
+    for _ in 0..3 {
+        g.resolution_phase();
+        if g.ships.iter().any(|s| s.kind == UnitKind::Frigate && s.seat == Seat(0)) {
+            break;
+        }
+        g.turn += 1;
+    }
+    let ship = g.ships.iter().find(|s| s.kind == UnitKind::Frigate && s.seat == Seat(0)).expect("built");
+    assert_eq!(ship.fuel, 30.0, "built with the 30 paid for; the 15 more of room comes empty");
+}
+
+/// Ticket #455 (version 0.09.6): **cancelling a Ship build refunds the Fuel paid for its tank**,
+/// beside the Materials.
+#[test]
+fn cancelling_a_ship_build_refunds_its_tanks_fuel() {
+    let mut g = game();
+    let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
+    g.colony_mut(iss).unwrap().modules.push(Module::new(ModuleKind::Shipyard));
+    g.seats[0].stockpile.materials = 100.0;
+    g.seats[0].stockpile.energy = 200.0;
+    g.seats[0].stockpile.fuel = 50.0;
+    let build = Order::BuildShip { site: Place::Colony(iss), kind: UnitKind::Frigate };
+    g.commit_orders(Seat(0), std::slice::from_ref(&build));
+    assert_eq!(g.seats[0].stockpile.fuel, 20.0);
+    let index = g.colony(iss).unwrap().queue.len() - 1;
+    let cancel = Order::CancelBuild { place: Place::Colony(iss), index };
+    assert_eq!(g.order_cost(Seat(0), &cancel).fuel, -30.0, "the tank's Fuel comes back");
+    g.commit_orders(Seat(0), std::slice::from_ref(&cancel));
+    assert_eq!(g.seats[0].stockpile.fuel, 50.0);
+}
+
+/// Ticket #455 (version 0.09.6): **the computer buys the Fuel for a warship's tank** as it does a
+/// Colony Ship's: a seat with no Fuel weighs a Frigate at its yard with the Buy for its tank in
+/// the same bundle, where it weighed the build alone and could never have fuelled it.
+#[test]
+fn the_ai_buys_the_fuel_for_a_warships_tank() {
+    let mut g = game();
+    calm(&mut g);
+    let cust = Seat(0);
+    let iss = station_of(&g, cust, BodyId::Earth).unwrap();
+    g.colony_mut(iss).unwrap().modules.push(Module::new(ModuleKind::Shipyard));
+    g.seats[0].stockpile.materials = 300.0;
+    g.seats[0].stockpile.energy = 500.0;
+    g.seats[0].stockpile.ducats = 5000.0;
+    g.seats[0].stockpile.fuel = 0.0;
+    g.ai_orders(cust);
+    let lines: Vec<&String> = g.log.iter().filter(|l| l.contains("build Frigate at")).collect();
+    // It may lose out to other wants this turn. What shows the tank is in the bundle is a Ducat
+    // figure: a Frigate costs none, so Ducats are wanted only for the Fuel bought beside it. Without
+    // the purchase the line was "skip ... (needs 25 Materials, 0 left)", the bundle the build alone.
+    assert!(lines.iter().any(|l| l.starts_with("  take") || l.contains("Ducats")), "the Frigate is weighed with its tank bought: {lines:#?}");
 }

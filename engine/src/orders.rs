@@ -529,7 +529,7 @@ impl Game {
             Order::BuildFacilityWithDucats { kind, .. } => Cost { ducats: self.market_price(seat, self.facility_materials(seat, *kind) * t.ducats.per_building_material as f64), ..Default::default() },
             // Ticket #332 (version 0.09.0): the refund is a negative cost, as a purchase is, so
             // `remaining` and `commit_orders` credit it without a special case.
-            Order::CancelBuild { place, index } => Cost { materials: -self.cancel_refund(seat, *place, *index), ..Default::default() },
+            Order::CancelBuild { place, index } => Cost { materials: -self.cancel_refund(seat, *place, *index), fuel: -self.cancel_fuel_refund(*place, *index), ..Default::default() },
             Order::BuildStation { .. } => Cost { materials: self.station_materials(seat), ..Default::default() },
             Order::BuildModuleWithDucats { colony, kind } => Cost { ducats: self.market_price(seat, self.module_materials_at(seat, *colony, *kind) * t.ducats.per_building_material as f64), ..Default::default() },
             // Ticket #68: the Archive Module costs its row's Materials; the Research comes after.
@@ -2240,6 +2240,12 @@ impl Game {
     /// Ticket #332 (version 0.09.0): what a `CancelBuild` at this place and index would pay the
     /// canceller: the item's Materials at the canceller's own price, or nought if there is no
     /// such build. The check refuses the order in that case; this only prices it.
+    /// Ticket #455 (version 0.09.6): the Fuel a cancelled build gives back -- a Ship's tank, paid at
+    /// the order. Nought for anything else.
+    pub fn cancel_fuel_refund(&self, place: Place, index: usize) -> f64 {
+        self.queue_at(place).get(index).map(|b| b.fuel).unwrap_or(0.0)
+    }
+
     pub fn cancel_refund(&self, seat: Seat, place: Place, index: usize) -> f64 {
         self.queue_at(place).get(index).map(|b| self.item_materials(seat, place, b.item)).unwrap_or(0.0)
     }
@@ -2269,11 +2275,11 @@ impl Game {
                     let done = if matches!(order, Order::BuildFacilityWithDucats { .. }) { widgets } else { 0 };
                     // Ticket #56: the build reserves the slot it will stand in, coastal or inland.
                     let coastal = self.next_slot_is_coastal(*state, kind, 0, 0).unwrap_or(false);
-                    self.state_mut(*state).queue.push(Build { item: BuildItem::Facility(kind), seat, widgets, done, coastal });
+                    self.state_mut(*state).queue.push(Build { item: BuildItem::Facility(kind), seat, widgets, done, coastal, fuel: 0.0 });
                 }
                 Order::RaiseIndustry { state } => {
                     let widgets = self.build_widgets(seat, BuildItem::IndustryLevel);
-                    self.state_mut(*state).queue.push(Build { item: BuildItem::IndustryLevel, seat, widgets, done: 0, coastal: false });
+                    self.state_mut(*state).queue.push(Build { item: BuildItem::IndustryLevel, seat, widgets, done: 0, coastal: false, fuel: 0.0 });
                 }
                 Order::BuildModule { colony, kind } | Order::BuildModuleWithDucats { colony, kind } => {
                     // Ticket #186: as on Earth -- the Custodians' Institute order raises an Academy.
@@ -2282,12 +2288,13 @@ impl Game {
                     let widgets = self.build_widgets(seat, BuildItem::Module(kind));
                     let done = if matches!(order, Order::BuildModuleWithDucats { .. }) { widgets } else { 0 };
                     if let Some(c) = self.colony_mut(*colony) {
-                        c.queue.push(Build { item: BuildItem::Module(kind), seat, widgets, done, coastal: false });
+                        c.queue.push(Build { item: BuildItem::Module(kind), seat, widgets, done, coastal: false, fuel: 0.0 });
                     }
                 }
                 Order::BuildShip { site, kind } => {
                     let widgets = self.build_widgets(seat, BuildItem::Unit(*kind));
-                    let b = Build { item: BuildItem::Unit(*kind), seat, widgets, done: 0, coastal: false };
+                    // Ticket #455 (version 0.09.6): the tank's Fuel paid just above rides with the build.
+                    let b = Build { item: BuildItem::Unit(*kind), seat, widgets, done: 0, coastal: false, fuel: cost.fuel };
                     match site {
                         Place::State(s) => self.state_mut(*s).queue.push(b),
                         Place::Colony(c) => {
@@ -2299,7 +2306,7 @@ impl Game {
                 }
                 Order::BuildArmy { place } => {
                     let widgets = self.build_widgets(seat, BuildItem::Unit(UnitKind::Army));
-                    let b = Build { item: BuildItem::Unit(UnitKind::Army), seat, widgets, done: 0, coastal: false };
+                    let b = Build { item: BuildItem::Unit(UnitKind::Army), seat, widgets, done: 0, coastal: false, fuel: 0.0 };
                     // Ticket #334 (version 0.09.0): the people go under arms at the order, as a
                     // Pioneer's population is paid at the recruit: a Region's unit of population, a
                     // Colony's Colonist. Nobody returns when the Army dies or marches.
@@ -2352,7 +2359,7 @@ impl Game {
                     if let RearmSite::Yard(c) = self.rearm_site(seat, *ship) {
                         let widgets = self.build_widgets(seat, BuildItem::Warhead(*ship));
                         if let Some(col) = self.colony_mut(c) {
-                            col.queue.push(Build { item: BuildItem::Warhead(*ship), seat, widgets, done: 0, coastal: false });
+                            col.queue.push(Build { item: BuildItem::Warhead(*ship), seat, widgets, done: 0, coastal: false, fuel: 0.0 });
                         }
                     }
                 }
@@ -2475,7 +2482,7 @@ impl Game {
                     // Research is paid into the fund once it stands.
                     let widgets = self.build_widgets(seat, BuildItem::Module(ModuleKind::Archive));
                     if let Some(c) = self.colony_mut(*colony) {
-                        c.queue.push(Build { item: BuildItem::Module(ModuleKind::Archive), seat, widgets, done: 0, coastal: false });
+                        c.queue.push(Build { item: BuildItem::Module(ModuleKind::Archive), seat, widgets, done: 0, coastal: false, fuel: 0.0 });
                     }
                     let line = format!("The {} began the Archive at {}.", self.seat_name(seat), self.place_name(Place::Colony(*colony)));
                     self.log(line);

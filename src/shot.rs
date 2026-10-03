@@ -383,7 +383,7 @@ fn build_board(session: &mut Session) {
             let mut modules = vec![Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Generator), Module::new(ModuleKind::Mine)];
             let mut queue = Vec::new();
             if point == 0 {
-                queue.push(Build { item: BuildItem::Module(ModuleKind::Archive), seat: Seat(0), widgets: 12, done: 4, coastal: false });
+                queue.push(Build { item: BuildItem::Module(ModuleKind::Archive), seat: Seat(0), widgets: 12, done: 4, coastal: false, fuel: 0.0 });
             } else {
                 modules.push(Module::new(ModuleKind::Archive));
             }
@@ -988,11 +988,11 @@ fn build_board(session: &mut Session) {
         if std::env::args().any(|a| a == "underway:1") {
             let turn = g.turn;
             if let Some(sid) = g.directed_states(Seat(0)).first().copied() {
-                g.state_mut(sid).queue.push(Build { item: BuildItem::Facility(FacilityKind::Factory), seat: Seat(0), widgets: 4, done: 0, coastal: false });
+                g.state_mut(sid).queue.push(Build { item: BuildItem::Facility(FacilityKind::Factory), seat: Seat(0), widgets: 4, done: 0, coastal: false, fuel: 0.0 });
             }
             let slot = g.free_slots_on(BodyId::Moon).first().copied().unwrap_or(0);
             let id = ColonyId(g.fresh_id());
-            let queue = vec![Build { item: BuildItem::Module(ModuleKind::Mine), seat: Seat(0), widgets: 4, done: 3, coastal: false }];
+            let queue = vec![Build { item: BuildItem::Module(ModuleKind::Mine), seat: Seat(0), widgets: 4, done: 3, coastal: false, fuel: 0.0 }];
             g.colonies.push(Colony { id, body: BodyId::Moon, slot, control: Control::Controlled(Seat(0)), modules: vec![Module::new(ModuleKind::Habitat)], colonists: 4, education: 1.0, settler_education: 1.0, queue, grid_failed: false, founded_turn: 1, in_orbit: false });
             let sid = ShipId(g.fresh_id());
             let name = g.next_ship_name(UnitKind::Frigate);
@@ -1027,16 +1027,16 @@ fn build_board(session: &mut Session) {
             if let Some(sid) = g.directed_states(Seat(0)).first().copied() {
                 for (kind, seat, widgets, done) in [(FacilityKind::PowerPlant, Seat(0), 8, 3), (FacilityKind::ResearchLab, Seat(0), 4, 0), (FacilityKind::Bank, Seat(1), 8, 2)] {
                     let coastal = g.next_slot_is_coastal(sid, kind, 0, 0).unwrap_or(false);
-                    g.state_mut(sid).queue.push(Build { item: BuildItem::Facility(kind), seat, widgets, done, coastal });
+                    g.state_mut(sid).queue.push(Build { item: BuildItem::Facility(kind), seat, widgets, done, coastal, fuel: 0.0 });
                 }
             }
             let slot = g.free_slots_on(BodyId::Moon).first().copied().unwrap_or(0);
             let id = ColonyId(g.fresh_id());
             let modules = vec![Module::new(ModuleKind::Core), Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Generator), Module::new(ModuleKind::Factory)];
             let queue = vec![
-                Build { item: BuildItem::Module(ModuleKind::Habitat), seat: Seat(0), widgets: 4, done: 2, coastal: false },
-                Build { item: BuildItem::Module(ModuleKind::Mine), seat: Seat(0), widgets: 4, done: 0, coastal: false },
-                Build { item: BuildItem::Module(ModuleKind::Refinery), seat: Seat(1), widgets: 8, done: 1, coastal: false },
+                Build { item: BuildItem::Module(ModuleKind::Habitat), seat: Seat(0), widgets: 4, done: 2, coastal: false, fuel: 0.0 },
+                Build { item: BuildItem::Module(ModuleKind::Mine), seat: Seat(0), widgets: 4, done: 0, coastal: false, fuel: 0.0 },
+                Build { item: BuildItem::Module(ModuleKind::Refinery), seat: Seat(1), widgets: 8, done: 1, coastal: false, fuel: 0.0 },
             ];
             g.colonies.push(Colony { id, body: BodyId::Moon, slot, control: Control::Controlled(Seat(0)), modules, colonists: 8, education: 1.0, settler_education: 1.0, queue, grid_failed: false, founded_turn: 1, in_orbit: false });
             g.seats[0].stockpile.materials = 200.0;

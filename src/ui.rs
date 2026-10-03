@@ -5680,6 +5680,11 @@ fn build_words(game: &Game, order: &Order) -> Option<String> {
         Order::BuildArmy { place } => format!(", and {}", game.army_people_text(*place)),
         _ => String::new(),
     };
+    // Ticket #455 (version 0.09.6): a Ship's price carries its tank, so the hover says so. The
+    // caller ends the text with the full stop.
+    if matches!(order, Order::BuildShip { .. }) && cost.fuel > 0.0 {
+        return Some(format!("{} Materials, {widgets} Widgets, {when}.\nBuilt full: {} Fuel", cost.materials, cost.fuel));
+    }
     Some(format!("{} Materials, {widgets} Widgets{people}, {when}", cost.materials))
 }
 

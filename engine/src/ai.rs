@@ -1787,7 +1787,9 @@ impl Game {
                 // Ticket #421 (version 0.09.4): a Colony Ship short of the Fuel its tank takes buys
                 // the rest at the market in the same breath, at the Ship's weight.
                 let build = Order::BuildShip { site: Place::Colony(cid), kind: uk };
-                let orders = match self.ai_fuel_top_up(seat, if uk == UnitKind::ColonyShip { self.tank_of(seat, uk) } else { 0.0 }) {
+                // Ticket #455 (version 0.09.6): every Ship, a warship included, where the Colony Ship alone
+                // was planned for and a warship short of its tank was refused for want of Fuel.
+                let orders = match self.ai_fuel_top_up(seat, self.tank_of(seat, uk)) {
                     Some(buy) => vec![buy, build],
                     None => vec![build],
                 };

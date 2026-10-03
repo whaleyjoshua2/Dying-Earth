@@ -2389,8 +2389,11 @@ impl Game {
                     arrived_this_turn: false,
                     built_turn: turn,
                     // Ticket #87: built with a full tank, paid at the build. Ticket #413 (version
-                    // 0.09.4): the seat's tank, Clean Propellant's Fuel included.
-                    fuel: self.tank_of(b.seat, kind),
+                    // 0.09.4): the seat's tank, Clean Propellant's Fuel included. Ticket #455
+                    // (version 0.09.6): the tank PAID FOR at the order; room a tank Tech added since
+                    // comes empty, as it does to a Ship already flying. A build older than the
+                    // record carries nought and fills as it always did.
+                    fuel: if b.fuel > 0.0 { b.fuel.min(self.tank_of(b.seat, kind)) } else { self.tank_of(b.seat, kind) },
                 });
             }
             _ => {}

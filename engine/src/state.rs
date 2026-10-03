@@ -234,7 +234,7 @@ impl BuildItem {
 /// count in place of a due turn. The place's Widgets fill `done` each Resolution in queue order,
 /// and the build completes at the Resolution `done` reaches `widgets`; a build never completes
 /// short of its figure, and nothing here is a turn count.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Build {
     pub item: BuildItem,
     pub seat: Seat,
@@ -247,6 +247,11 @@ pub struct Build {
     /// Ticket #56: the slot a Facility build in a Nation State reserved, coastal or inland. False
     /// for everything else, which has no slot of this kind to reserve.
     pub coastal: bool,
+    /// Ticket #455 (version 0.09.6): the Fuel paid at the order for a Ship's tank, which the Ship
+    /// is built holding and a cancel refunds. Nought for everything else, and in a save older than
+    /// the field, where the Ship is filled to its tank as it always was.
+    #[serde(default)]
+    pub fuel: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

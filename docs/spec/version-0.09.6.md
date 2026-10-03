@@ -124,3 +124,29 @@ moves; this is how the computer seats spend.
 
 **What would show this wrong:** a computer yard Colony with two Factory Modules and a short queue,
 or one with none while it builds Ships.
+
+## 7. Colony Ships hold 35 Fuel, and the build price matches the tank
+
+The authority is [ticket #455](https://github.com/whaleyjoshua2/Dying-Earth/issues/455), added by the
+designer after charting.
+
+- **The Colony Ship's base tank is 35**, where it was 40. Clean Propellant's +5 and Cryogenic
+  Tanks' +15 are unchanged: 40 with the first, 55 with both. Warships stay at 30.
+- **A Ship is built with the tank it was paid for.** The Fuel is paid at the order, as before, and
+  the build now records it.
+  - The Ship comes out holding exactly that.
+  - Room a tank Tech added while it was building comes empty, as it does for a Ship already flying.
+  - Before, the Ship was filled to the tank on the turn it finished, so a Tech completing mid-build
+    gave up to 15 Fuel nobody paid for.
+  - A build in a save older than the record fills as it always did.
+- **Cancelling a Ship build refunds its tank's Fuel** with the Materials. Before, the Fuel was lost.
+- **The build button's hover** ends "Built full: N Fuel."
+- **The computer seats buy the Fuel ahead of every Ship build**, warships included, as they did for
+  a Colony Ship alone. Where they cannot pay this turn, the build waits like any other want.
+
+**What would show this wrong:**
+
+- a new Colony Ship holding anything but 35 before Clean Propellant;
+- a Ship holding more Fuel than its order paid;
+- a cancel that leaves the Stockpile short of the tank;
+- a computer warship build refused for Fuel it never planned to buy.

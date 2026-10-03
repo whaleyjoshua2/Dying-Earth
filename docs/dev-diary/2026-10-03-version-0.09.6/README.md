@@ -92,3 +92,21 @@ Custodians at ×1.15 (#440) and this cap. Colony Ships at 35 Fuel (#455) is not 
 - **Collapses** are 44. The agent's trial of the cap alone gave 32. The difference is the other
   three figures: none of the four tickets was measured alone on this branch.
 - The whole Tech tree completes in 61 of 80 games, median turn 25.
+
+## Colony Ships hold 35 Fuel, and the build price matches the tank (ticket #455)
+
+- [`build-hover.png`](ticket-455-colony-ship-tank/build-hover.png), taken with
+  `first:1 hab:ground yard:1 seed:7 "tip:Built full"`. A Moon Colony with a Shipyard on turn 2.
+  The Colony Ship's button reads 22.5 Materials, 35 Fuel and 4 Widgets. It is greyed for the Fuel
+  (28 held), and the hover ends "Built full: 35 [Fuel]."
+- **Witnessed red, four new tests:**
+  - **the tank:** read `left: 40, right: 35`;
+  - **a Frigate ordered before Cryogenic Tanks completed:** came out holding 45 having paid for 30;
+  - **a cancel:** refunded no Fuel (`left: 0.0, right: -30.0`);
+  - **the computer's warship:** weighed alone, with no Buy for its tank. With the old line the
+    Frigate's skip read "needs 25 Materials, 0 left"; with the fix it reads "needs 90 Ducats", the
+    tank's purchase in the bundle. A first version of this test passed both ways and was rewritten
+    until it told them apart.
+- **Older tests moved to 35:** four pinned 40 (the 0.06.0 tank test, Cryogenic Tanks' sums 40 / 45
+  / 60 and its Provisional Findings 47, the Refinery depot's refuel of 39, and the market test's
+  "40 wanted").
