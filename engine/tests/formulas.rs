@@ -18881,3 +18881,92 @@ fn the_ai_sells_its_surplus_and_buys_the_energy_it_lacks() {
     let orders = g.ai_orders(cust);
     assert!(orders.iter().any(|o| matches!(o, Order::Buy { resource: Resource::Energy, .. })), "Energy bought: {orders:?}");
 }
+
+/// Ticket #449 (version 0.09.6): **a pace table ends at its bar.** Three versions running a Victory
+/// figure moved and the computer's schedule did not (the Fund at 1000 against 2500, the Archive at 80
+/// against 125). Every `first` schedule's last figure is its Faction's first Victory bar.
+#[test]
+fn every_pace_table_ends_at_its_victory_bar() {
+    let t = tables();
+    for k in FactionKind::ALL {
+        let pace = t.ai_pace(k);
+        if let Some(last) = pace.first.last() {
+            assert_eq!(last[1] as f64, t.faction(k).victory_first.bar, "the {k:?} pace ends at its bar");
+        }
+        // And a Bodies schedule ends at the Bodies its second part asks for.
+        if let Some(last) = pace.bodies.last() {
+            assert_eq!(last[1] as u32, t.faction(k).victory_second.bodies, "the {k:?} Bodies pace ends at its Bodies");
+        }
+        if let Some(last) = pace.uploads.last() {
+            assert_eq!(last[1] as f64, t.faction(k).victory_second.bar, "the {k:?} Uploads pace ends at its bar");
+        }
+    }
+}
+
+/// Ticket #449 (version 0.09.6): **the computer Arkwrights are paced in Bodies.** With thirty living
+/// off Earth and no Body settled, the seat reads itself as behind (it read itself on pace); and
+/// while Bodies are short a lift onto its station over Earth is a foothold at half weight with no
+/// boost, where it took the full weight and the gap.
+#[test]
+fn the_arkwrights_computer_is_paced_in_bodies() {
+    let mut g = game();
+    calm(&mut g);
+    let ark = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Arkwrights).unwrap();
+    assert_eq!(g.tables.ai_pace(FactionKind::Arkwrights).bodies, vec![[18, 1], [24, 2], [30, 3]]);
+    g.turn = 24;
+    let home = g.directed_states(ark)[0];
+    if !g.state(home).facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite)) {
+        g.state_mut(home).facilities.push(facility(FacilityKind::LaunchSite));
+    }
+    g.state_mut(home).emigrants = 4;
+    let slot = g.free_orbital_slots(BodyId::Earth)[0];
+    let id = ColonyId(g.fresh_id());
+    let modules: Vec<Module> = std::iter::once(ModuleKind::Core).chain(std::iter::repeat_n(ModuleKind::Habitat, 5)).map(Module::new).collect();
+    g.colonies.push(Colony { id, body: BodyId::Earth, slot, control: Control::Controlled(ark), modules, colonists: 30, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
+    assert!(g.off_world_colonists(ark) >= 30 && g.bodies_settled(ark, 4) == 0, "the premise: thirty in orbit, no Body");
+    g.ai_orders(ark);
+    let head = g.log.iter().find(|l| l.starts_with("AI ") && l.contains("scored")).cloned().unwrap();
+    assert!(!head.contains("gap x1.00"), "thirty over Earth and no Body is behind: {head}");
+    let short = scored(&g, "lift ");
+    assert!(short > 0.0, "the lift is still weighed: {:#?}", g.log.iter().filter(|l| l.contains("lift")).collect::<Vec<_>>());
+    // Three Bodies settled: the lift takes its full weight again.
+    for body in [BodyId::Moon, BodyId::Mars, BodyId::Phobos] {
+        let c = colony(&mut g, ark, body, &[], 4);
+        assert_eq!(g.colony(c).unwrap().colonists, 4);
+    }
+    assert_eq!(g.bodies_settled(ark, 4), 3);
+    g.state_mut(home).emigrants = 4;
+    g.log.clear();
+    g.ai_orders(ark);
+    let full = scored(&g, "lift ");
+    assert!(full >= short * 2.0 - 1e-9, "half weight while Bodies are short: {short} against {full}");
+}
+
+/// Ticket #449 (version 0.09.6): **the computer Archivists are paced in Uploads**, at the designer's
+/// word ("the computer pushes when behind"). The fund paid and twelve living off Earth, nobody
+/// Uploaded at turn 30: the seat reads itself as behind, where it read itself on pace.
+#[test]
+fn the_archivists_computer_is_paced_in_uploads() {
+    let mut g = game();
+    calm(&mut g);
+    let arc = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Archivists).unwrap();
+    g.turn = 30;
+    g.seats[arc.index()].archive_fund = g.tables.archive.research;
+    let slot = g.free_orbital_slots(BodyId::Earth)[0];
+    let id = ColonyId(g.fresh_id());
+    let modules: Vec<Module> = [ModuleKind::Core, ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Archive].into_iter().map(Module::new).collect();
+    g.colonies.push(Colony { id, body: BodyId::Earth, slot, control: Control::Controlled(arc), modules, colonists: 12, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
+    assert!(g.off_world_colonists(arc) >= 12 && g.seats[arc.index()].uploaded == 0, "the premise");
+    g.ai_orders(arc);
+    let head = g.log.iter().find(|l| l.starts_with("AI ") && l.contains("scored")).cloned().unwrap();
+    assert!(!head.contains("gap x1.00"), "nobody Uploaded at turn 30 is behind: {head}");
+    // Before the Archive stands complete there is nothing to Upload into, so the Uploads pace is
+    // not read: the same seat with no Archive is on pace. (A first cut read it from turn 1, and the
+    // computer chased Colonists and built the Archive in 3 games of 80.)
+    g.colony_mut(id).unwrap().modules.retain(|m| m.kind != ModuleKind::Archive);
+    assert!(!g.archive_complete(arc));
+    g.log.clear();
+    g.ai_orders(arc);
+    let head = g.log.iter().find(|l| l.starts_with("AI ") && l.contains("scored")).cloned().unwrap();
+    assert!(head.contains("gap x1.00"), "no Archive, no Uploads pace: {head}");
+}

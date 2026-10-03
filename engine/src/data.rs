@@ -1319,6 +1319,14 @@ pub struct AiPace {
     #[serde(default)]
     pub under_sink_by_turn: u32,
     pub colonists: Vec<[i64; 2]>,
+    /// Ticket #449 (version 0.09.6): Bodies settled by turn, for a Faction whose second Victory part
+    /// counts them (the Arkwrights). Empty for the rest.
+    #[serde(default)]
+    pub bodies: Vec<[i64; 2]>,
+    /// Ticket #449 (version 0.09.6): Colonists Uploaded by turn, for a Faction whose second Victory
+    /// part counts them (the Archivists). Empty for the rest.
+    #[serde(default)]
+    pub uploads: Vec<[i64; 2]>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

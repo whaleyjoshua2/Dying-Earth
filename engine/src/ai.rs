@@ -1,7 +1,7 @@
 //! The AI faction (spec 16): enumerate every legal action, score it, spend greedily.
 
 use crate::combat::first_round_odds;
-use crate::data::VictoryFirstKind;
+use crate::data::{VictoryFirstKind, VictorySecondKind};
 use crate::ids::*;
 use crate::orders::*;
 use crate::state::*;
@@ -489,7 +489,24 @@ impl Game {
         let m = &self.tables.ai.multipliers;
         let turn = self.turn;
         let ratio_of = |actual: f64, expected: f64| if expected <= 0.0 { 1.0 } else { (actual / expected).min(1.0) };
-        let presence_ratio = ratio_of(self.off_world_colonists(seat) as f64, Self::expected(&pace.colonists, turn));
+        let mut presence_ratio = ratio_of(self.off_world_colonists(seat) as f64, Self::expected(&pace.colonists, turn));
+        // Ticket #449 (version 0.09.6): a second part that counts BODIES is paced in Bodies. Nothing
+        // read them: the Arkwrights' computer judged itself by Colonists off Earth alone, filled one
+        // station over Earth, and scored nought with no Body settled.
+        let second = self.tables.faction(self.kind(seat)).victory_second;
+        if second.kind == VictorySecondKind::ColoniesOnBodies && !pace.bodies.is_empty() {
+            let bodies = ratio_of(self.bodies_settled(seat, second.colonists_each) as f64, Self::expected(&pace.bodies, turn));
+            presence_ratio = presence_ratio.min(bodies);
+        }
+        // And one that counts UPLOADS is paced in Uploads, at the designer's word: the Archivists'
+        // computer judged itself by Colonists living off Earth, which an Upload takes away.
+        // Only once the Archive stands complete: before that there is nothing to Upload into, and a
+        // seat read as behind on Uploads from turn 1 chased Colonists and never built the Archive
+        // (measured: 3 Archives in 80 games, no Archivist win).
+        if second.kind == VictorySecondKind::ColonistsUploaded && !pace.uploads.is_empty() && self.archive_complete(seat) {
+            let uploads = ratio_of(self.seat(seat).uploaded as f64, Self::expected(&pace.uploads, turn));
+            presence_ratio = presence_ratio.min(uploads);
+        }
         let first_ratio = match self.first_kind(seat) {
             // A Stabilization run has no useful interpolation: the pace is in ppm off the Sink.
             VictoryFirstKind::StabilizationRun => {
@@ -1181,7 +1198,10 @@ impl Game {
                 }
             }
         };
-        let advances_presence = |cat: Cat| matches!(cat, Cat::Habitat | Cat::ColonyShip | Cat::FoundColony | Cat::LoadUnload | Cat::Transit);
+        // Ticket #449 (version 0.09.6): a Bodies part is advanced by going, not by housing, so a
+        // Habitat takes no "behind" boost from it.
+        let counts_bodies = self.tables.faction(kind).victory_second.kind == VictorySecondKind::ColoniesOnBodies;
+        let advances_presence = |cat: Cat| matches!(cat, Cat::ColonyShip | Cat::FoundColony | Cat::LoadUnload | Cat::Transit) || (cat == Cat::Habitat && !counts_bodies);
         let gap_for = |cat: Cat, item: Option<&str>| -> f64 {
             // Nothing advances without Energy: while it is the scarcest resource, an Energy producer
             // counts as advancing whichever part the Faction is behind on.
@@ -2520,7 +2540,12 @@ impl Game {
                 if let Some(c) = station {
                     let k = n.min(self.habitat_room(c) - c.colonists);
                     let opp = if presence_needed > 0 { m.opportunity } else { 1.0 };
-                    push(vec![Order::LiftToStation { state: sid, n: k, colony: c.id }], Cat::LoadUnload, self.base_weight(seat, Cat::LoadUnload), gap_for(Cat::LoadUnload, None), 1.0, opp, format!("lift {} Pioneers from {} to {}", k, self.tables.state(sid).name, self.place_name(Place::Colony(c.id))), None);
+                    // Ticket #449 (version 0.09.6): while a Bodies part is short, a lift over Earth is
+                    // a foothold, as a Ship's disembark there is (ticket #94): half weight, no gap.
+                    let sec = self.tables.faction(kind).victory_second;
+                    let bodies_short = sec.kind == VictorySecondKind::ColoniesOnBodies && self.bodies_settled(seat, sec.colonists_each) < sec.bodies;
+                    let (w, g, opp) = if bodies_short { (self.base_weight(seat, Cat::LoadUnload) * 0.5, 1.0, 1.0) } else { (self.base_weight(seat, Cat::LoadUnload), gap_for(Cat::LoadUnload, None), opp) };
+                    push(vec![Order::LiftToStation { state: sid, n: k, colony: c.id }], Cat::LoadUnload, w, g, 1.0, opp, format!("lift {} Pioneers from {} to {}", k, self.tables.state(sid).name, self.place_name(Place::Colony(c.id))), None);
                 }
             }
             // With the ice open, waiting Emigrants go to Antarctica by sea: a free slot first, else

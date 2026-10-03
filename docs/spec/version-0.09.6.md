@@ -365,3 +365,32 @@ only; no rule moves.
 |---|---|---|---|---|---|
 | before | 10 | 8 | 8 | 8 | 46 |
 | as shipped | 9 | 6 | 4 | 19 | 42 |
+
+## 16. The computer pace tables checked and brought up to date
+
+The authority is [ticket #449](https://github.com/whaleyjoshua2/Dying-Earth/issues/449). Computer seats
+only; no rule moves. A pace table says how far along its Victory a computer seat should be by a turn;
+behind it, the seat weighs what advances that Victory more heavily.
+
+- **The Prospectors' pace** runs to the real bar: 333 by turn 9, 833 by 18, 1500 by 27, 2500 by 34.
+  It had stood at 1000.
+- **The Arkwrights are paced in Bodies**, which nothing read:
+  - a Bodies schedule, 1 by turn 18, 2 by 24, 3 by 30, read as every schedule is, so a seat with no
+    Body is behind from the start;
+  - while Bodies are short, a lift onto the station over Earth is a foothold at half weight with no
+    "behind" boost, as ticket #94 had it for a Ship's disembark there;
+  - a Habitat is not progress on a Bodies part.
+- **The Archivists are paced in Uploads**, at the designer's word: 4 by turn 26, 8 by 30, 12 by 34.
+  The pace is read **only once the Archive stands complete**, since there is nothing to Upload into
+  before.
+- **The Custodians' pace** is left as it is. It is never met, so they push on the climate all game.
+- **A guard test** holds every pace table's last figure to its bar: the first part, the Bodies and
+  the Uploads.
+- **Measured,** against the sweep before this ticket:
+
+| | Cust | Pros | Ark | Arch | collapses |
+|---|---|---|---|---|---|
+| before | 9 | 6 | 4 | 19 | 42 |
+| after | 8 | 3 | 6 | 22 | 41 |
+
+The Arkwrights end at nought in 23 games, where it was 49.

@@ -287,3 +287,30 @@ Three sweeps, all filed:
 the previous `ai.rs`, sold no Materials. An older test (#57, Fuel banked for the Mars window)
 failed on the first cut, which sold 130 Fuel two turns from the window. Fuel sales now wait for the
 window.
+
+## The computer pace tables (ticket #449)
+
+Three sweeps, all filed:
+
+| run | Cust | Pros | Ark | Arch | collapses |
+|---|---|---|---|---|---|
+| before (after #448) | 9 | 6 | 4 | 19 | 42 |
+| [`after-449-before-uploads.txt`](sweeps/after-449-before-uploads.txt): Prospectors rescaled, Arkwrights in Bodies | 7 | 3 | 6 | 22 | 41 |
+| [`after-449-uploads-fault.txt`](sweeps/after-449-uploads-fault.txt): the Uploads pace read from turn 1 | 9 | 11 | 10 | **0** | 49 |
+| [`after-449.txt`](sweeps/after-449.txt): the Uploads pace read once the Archive is complete | 8 | 3 | 6 | 22 | 41 |
+
+- **The Arkwrights settle Bodies now.** They end at nought in 23 games, where it was 49; their median
+  score is 0.33, where it was 0. Ground Colonies on Mars, Phobos and Deimos came to 79 over the
+  batch, against 37. Their wins moved 4 to 6, inside the noise.
+- **The Prospectors** fell 6 to 3, their Fund medians about the same.
+- **The Uploads pace had a fault in its first cut.** Read from turn 1, the computer was "behind on
+  Uploads" before any Archive could stand, chased Colonists, and built the Archive in 3 games of 80:
+  no Archivist win. Read only once the Archive is complete, it changes almost nothing: the Archivists
+  already Upload whenever they can.
+- **Against the ideal** (15 / 15 / 15 / 15 and 20) the column is no closer than before the ticket.
+
+**Witnessed red:**
+- the guard test, on the Prospectors' 1000 against 2500;
+- the Arkwrights' test, against the previous `ai.rs`: thirty over Earth and no Body read "gap x1.00";
+- the Archivists' test, twice: nobody Uploaded at turn 30 read on pace before the pace existed, and
+  with no Archive the first cut read "gap x3.00 on Presence".

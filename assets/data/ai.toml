@@ -364,8 +364,10 @@ bounty_least = 1.0
 # 1000/750 rather than given a new last number -- it is what makes the computer set its banking share
 # every turn, and leaving the early marks where they were would have it bank too little until turn 27
 # and then find the last stretch impossible.
+# Ticket #449 (version 0.09.6): rescaled to the real bar, 2500; it had stood at 1000 since the bar was
+# 1000. A test now holds every `first` schedule to its bar.
 [pace.prospectors]
-first = [[9, 133], [18, 333], [27, 600], [34, 1000]]
+first = [[9, 333], [18, 833], [27, 1500], [34, 2500]]
 colonists = [[12, 4], [22, 12]]
 
 [pace.custodians]
@@ -377,6 +379,9 @@ colonists = [[12, 4], [22, 12]]
 # Ticket #51: Diaspora is 30 Colonists off Earth, so the pace runs to 30.
 [pace.arkwrights]
 first = [[6, 4], [12, 12], [18, 22], [24, 30]]
+# Ticket #449 (version 0.09.6): the Bodies their second part asks for, which nothing paced: one by
+# turn 18, two by 24, three by 30, read as every schedule is (a seat with none is behind at once).
+bodies = [[18, 1], [24, 2], [30, 3]]
 colonists = [[12, 4], [22, 12]]
 
 # Ticket #51: the pace is in the Archive's first Victory part. Ticket #68 (version 0.05.5): that is
@@ -384,6 +389,9 @@ colonists = [[12, 4], [22, 12]]
 # 150, the Archive's cost since that ticket, on the same turns -- it had stayed at 80 through 125.
 [pace.archivists]
 first = [[10, 38], [18, 75], [26, 113], [32, 150]]
+# Ticket #449 (version 0.09.6): the Uploads their second part asks for, which nothing paced: four by
+# turn 26, eight by 30, twelve by 34. Added at the designer's word, so the computer pushes when behind.
+uploads = [[26, 4], [30, 8], [34, 12]]
 colonists = [[12, 4], [22, 12]]
 
 [thresholds]
