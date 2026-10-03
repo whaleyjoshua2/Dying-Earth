@@ -75,3 +75,19 @@ The authority is [ticket #438](https://github.com/whaleyjoshua2/Dying-Earth/issu
 - Generation Ships available with Relay Networks unresearched;
 - a Victory road at any price but 130;
 - the Arkwrights' pick list reaching Propulsion before Relay Networks.
+
+## 4. The Archive fund at 150
+
+The authority is [ticket #439](https://github.com/whaleyjoshua2/Dying-Earth/issues/439).
+
+- **The Archive costs 150 Research**, where it cost 125. That figure is also the Archivists'
+  first Victory part. Both stored figures moved (`modules.toml`, `factions.toml`), along with the
+  Archivists' card text and the glossary. The turn-one line and the Victory window read the figure,
+  so they follow it.
+- **The computer Archivists' pace** runs to 150 on the same turns: 38 by turn 10, 75 by turn 18,
+  113 by turn 26, 150 by turn 32. It had stayed at 80 since version 0.05.5.
+- **Measured before** (balance suggestions, Archive at 150 alone): 12 / 9 / 1 / 15 with 42
+  collapses, against 0.09.5's 10 / 10 / 1 / 17. The version's sweep reads it with the other figures.
+
+**What would show this wrong:** an Archive that completes, or a first Victory part that fills, at
+any figure but 150; or a computer Archivist pace that ends anywhere else.

@@ -212,9 +212,9 @@ unique = "Reactor -- replaces the Power Plant, and takes a quarter off the Energ
 # Ticket #347 (version 0.09.1): 125 of it, and the fund holds the whole figure from the first turn.
 # This bar IS `[archive] research` in modules.toml -- one figure written in two files, the Archive's
 # cost and the Archivists' bar, and a test asserts the two are equal so they cannot drift.
-victory = "Build the Archive at a Colony off Earth (50 Materials, three turns, and four Colonists must live there to begin it), pay 125 Research into it and keep it running, then upload 12 Colonists into it from the people living where it stands."
+victory = "Build the Archive at a Colony off Earth (50 Materials, three turns, and four Colonists must live there to begin it), pay 150 Research into it and keep it running, then upload 12 Colonists into it from the people living where it stands."
 victory_short = "build the Archive off Earth, pay {first} Research into it, and upload {second} Colonists,"
-victory_first = { kind = "archive_research", bar = 125 }
+victory_first = { kind = "archive_research", bar = 150 }
 # Ticket #192 (version 0.08.0): twelve Colonists UPLOADED, not twelve living beside the Archive.
 victory_second = { kind = "colonists_uploaded", bar = 12 }
 colour = [0.871, 0.322, 0.439]

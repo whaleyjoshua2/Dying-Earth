@@ -2236,7 +2236,7 @@ fn funding_the_archive_banks_this_turns_research_and_contributes_nothing_to_the_
 #[test]
 fn the_archives_research_and_the_archivists_victory_bar_are_one_figure() {
     let g = game();
-    assert_eq!(g.tables.archive.research, 125, "the designer's figure for ticket #347");
+    assert_eq!(g.tables.archive.research, 150, "the designer's figure: 125 for ticket #347, 150 since ticket #439 (version 0.09.6)");
     let bar = g.tables.faction(FactionKind::Archivists).victory_first.bar;
     assert_eq!(
         bar, g.tables.archive.research as f64,
@@ -15475,7 +15475,7 @@ fn ticket_350_the_turn_one_line_names_each_factions_own_condition() {
         ),
         (FactionKind::Prospectors, "Build, spread Influence, and put 2,500 Ducats in the Venture Capital Fund with 12 Colonists living off Earth, before the Temperature reaches +3.0 C."),
         (FactionKind::Arkwrights, "Build, spread Influence, and get 30 Colonists living off Earth, spread over three Bodies, before the Temperature reaches +3.0 C."),
-        (FactionKind::Archivists, "Build, spread Influence, and build the Archive off Earth, pay 125 Research into it, and upload 12 Colonists, before the Temperature reaches +3.0 C."),
+        (FactionKind::Archivists, "Build, spread Influence, and build the Archive off Earth, pay 150 Research into it, and upload 12 Colonists, before the Temperature reaches +3.0 C."),
     ] {
         let line = turn_one_line(kind);
         assert!(line.ends_with(words), "{kind:?}: {line}");
@@ -18428,4 +18428,15 @@ fn generation_ships_needs_relay_networks_and_every_road_costs_130() {
     }
     let order = &t.ai_tech_picks(FactionKind::Arkwrights).order;
     assert_eq!(order[..3], [TechId::ExpandedHabitats, TechId::ClosedLoopColonies, TechId::RelayNetworks], "the Arkwrights' list opens with its road");
+}
+
+/// Ticket #439 (version 0.09.6): **the Archive costs 150**, at the designer's word, its Research and
+/// the Archivists' Victory bar one figure still; and the computer Archivists' pace runs to 150 on
+/// the same turns, where it ran to 80 and was never moved for 125.
+#[test]
+fn the_archive_costs_150_and_the_computer_paces_to_it() {
+    let t = tables();
+    assert_eq!(t.archive.research, 150);
+    assert_eq!(t.faction(FactionKind::Archivists).victory_first.bar, 150.0);
+    assert_eq!(t.ai_pace(FactionKind::Archivists).first, vec![[10, 38], [18, 75], [26, 113], [32, 150]]);
 }

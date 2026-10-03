@@ -380,9 +380,10 @@ first = [[6, 4], [12, 12], [18, 22], [24, 30]]
 colonists = [[12, 4], [22, 12]]
 
 # Ticket #51: the pace is in the Archive's first Victory part. Ticket #68 (version 0.05.5): that is
-# Research paid into the Archive, 80 in all, over a thirty-six-turn game.
+# Research paid into the Archive, 80 in all, over a thirty-six-turn game. Ticket #439 (version 0.09.6):
+# 150, the Archive's cost since that ticket, on the same turns -- it had stayed at 80 through 125.
 [pace.archivists]
-first = [[10, 20], [18, 40], [26, 60], [32, 80]]
+first = [[10, 38], [18, 75], [26, 113], [32, 150]]
 colonists = [[12, 4], [22, 12]]
 
 [thresholds]

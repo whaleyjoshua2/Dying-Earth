@@ -46,3 +46,12 @@ at 2.0 make 1.5, not 1". It passes after the fix.
   failed with `left: [ClosedLoopColonies]`, `right: [ClosedLoopColonies, RelayNetworks]`. Two older
   tests pinned the old road (its 98 Research and its depth of 2). They were moved to 130 and 3, each
   with the ticket named.
+
+## The Archive fund at 150 (ticket #439)
+
+- [`victory.png`](ticket-439-archive-150/victory.png), taken with
+  `victory:1 panel:0 seed:7 player:archivists`. The Victory window's first line reads "The Archive:
+  0 of 150 - needs The Upload, not yet researched".
+- **Witnessed red:** the new test `the_archive_costs_150_and_the_computer_paces_to_it` failed with
+  `left: 125, right: 150`. Two older tests pinned the 125 (#347's figure, and the turn-one line's
+  words). They read 150 now; the turn-one line itself already followed the data.
