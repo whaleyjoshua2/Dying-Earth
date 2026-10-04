@@ -479,7 +479,9 @@ fn the_allotment_is_the_base_plus_each_controlled_states_value_times_the_faction
     assert_eq!(g.influence_allotment(Seat(0)), 16, "(10 + 4) x 1.15 = 16.1");
     // Ticket #53: twelve states share out the eight states' figures exactly, so the total stands.
     let total: i64 = StateId::ALL.iter().map(|s| g.tables.state(*s).influence).sum();
-    assert_eq!(total, 34, "7 + 5 + 4 + 4 + 4 + 2 + 2 + 2 + 1 + 1 + 1 + 1, as the eight totalled 34");
+    // Ticket #482 (version 0.09.8): 35. South Africa's 1 was added, at the designer's word, where
+    // every split before it shared its parent's; Nigeria's card had only the 1 to give.
+    assert_eq!(total, 35, "the eight totalled 34, shared out exactly until South Africa added 1");
 }
 
 // ---------------------------------------------------------------- #35 Ducats
@@ -731,7 +733,7 @@ fn antarctica_is_three_colony_slots_on_earth_whose_colonists_stay_on_earth_and_w
     // Ticket #56 re-cut them: abundant ore and Fuel under the ice.
     assert_eq!((earth.mine_yield, earth.generator_yield, earth.refinery_yield, earth.research_yield), (1.75, 0.75, 2.0, 1.0));
     assert_eq!(g.free_slots_on(BodyId::Earth).len(), 3);
-    assert_eq!(StateId::ALL.len(), 16, "sixteen Regions since ticket #453, and Antarctica is none of them");
+    assert_eq!(StateId::ALL.len(), 18, "eighteen Regions since ticket #482, and Antarctica is none of them");
     let m = g.tables.faction(FactionKind::Custodians).emissions_multiplier;
     let before = g.emissions_now();
     bare_stations(&mut g);
@@ -1599,7 +1601,7 @@ fn every_neutral_state_starts_with_its_start_facilities() {
         // Ticket #332 (version 0.09.0): and a Mine beside every start Factory, on top of the count.
         let mines = card.start_facilities.iter().filter(|k| **k == FacilityKind::Mine).count() as u32;
         // Ticket #453 (version 0.09.6): Pakistan's Mine stands alone, at the designer's word.
-        let lone = u32::from(sid == StateId::Pakistan);
+        let lone = u32::from(sid == StateId::Kazakhstan);
         assert_eq!(card.start_facilities.iter().filter(|k| **k == FacilityKind::Factory).count() as u32 + lone, mines, "{}: a Mine beside every Factory", card.name);
         assert_eq!(card.start_facilities.len() as u32 - labs - mines, card.industry_level, "{}: as many as the Industry Level, plus a start Lab and the Mines", card.name);
     }
@@ -1859,11 +1861,13 @@ fn the_ai_seats_take_start_states_not_adjacent_to_any_taken_one() {
     // untouched Regions stand at Industry 2, Australia and -- since ticket #125 (version 0.07.2)
     // -- the Arabian Peninsula, and the tie goes to the more populous: the peninsula at 1.0
     // against Australia at 0.5.
-    assert_eq!(held(Seat(2)), vec![StateId::ArabianPeninsula]);
+    // Ticket #482 (version 0.09.8): a third stands at Industry 2 now, South Africa, with more
+    // people than either, and takes the pick.
+    assert_eq!(held(Seat(2)), vec![StateId::SouthAfrica]);
     // Then the untouched states are all at Industry 1, so the tie goes to the most populous:
     // Sub-Saharan Africa at 11.4.
     // The peninsula's neighbours join the adjacent set; Australia is the last at Industry 2.
-    assert_eq!(held(Seat(3)), vec![StateId::Australia]);
+    assert_eq!(held(Seat(3)), vec![StateId::ArabianPeninsula]);
     // The fallback, when every free state touches a taken one: the highest Industry Level free
     // state, ties by population. With everything above taken, North America at 3 wins.
     let taken = [StateId::Europe, StateId::EastAsia, StateId::Australia, StateId::SubSaharanAfrica, StateId::SouthAmerica, StateId::CentralAmerica];
@@ -2789,8 +2793,10 @@ fn b_a_sea_level_threshold_raises_two_a_slot_and_displaces_five_percent_an_expos
     g.state_mut(StateId::SouthEastAsia).industry_level = 0;
     // Ticket #125 (version 0.07.2): Japan and Korea border East Asia too, and take none here.
     g.state_mut(StateId::Japan).industry_level = 0;
-    // Ticket #453 (version 0.09.6): and so does Pakistan.
-    g.state_mut(StateId::Pakistan).industry_level = 0;
+    // Ticket #453 (version 0.09.6): and so does Pakistan. Ticket #482 (version 0.09.8): Kazakhstan
+    // by that card now, and Iran's Region, which Pakistan and Afghanistan joined.
+    g.state_mut(StateId::Kazakhstan).industry_level = 0;
+    g.state_mut(StateId::MiddleEast).industry_level = 0;
     g.apply_sea_threshold(StateId::EastAsia, 0);
     assert_eq!(g.unrest(StateId::EastAsia), 2.0, "one per build slot, and Asia is exposed 2");
     let displaced = pop * 0.05 * 2.0;
@@ -2829,8 +2835,10 @@ fn c_heat_refugees_arrive_at_the_neighbours_and_raise_unrest_per_two_and_a_half_
     g.state_mut(StateId::SouthEastAsia).industry_level = 0;
     // Ticket #125 (version 0.07.2): Japan and Korea border East Asia too, and take none here.
     g.state_mut(StateId::Japan).industry_level = 0;
-    // Ticket #453 (version 0.09.6): and so does Pakistan.
-    g.state_mut(StateId::Pakistan).industry_level = 0;
+    // Ticket #453 (version 0.09.6): and so does Pakistan. Ticket #482 (version 0.09.8): Kazakhstan
+    // by that card now, and Iran's Region, which Pakistan and Afghanistan joined.
+    g.state_mut(StateId::Kazakhstan).industry_level = 0;
+    g.state_mut(StateId::MiddleEast).industry_level = 0;
     hold_temperature(&mut g, 3.0);
     assert!(g.population_growth_rate() < 0.0);
     g.climate_phase();
@@ -3248,17 +3256,20 @@ fn the_ai_pays_relief_and_raises_a_constabulary_where_unrest_has_taken_hold() {
 fn twelve_nation_states_share_out_the_eight_they_came_from() {
     let g = game();
     let t = &g.tables;
-    assert_eq!(StateId::ALL.len(), 16);
+    assert_eq!(StateId::ALL.len(), 18);
     let card = |s: StateId| t.state(s);
     // Asia's 30 GDP and 7 Influence go to East Asia, South Asia and South-East Asia -- and since
     // ticket #125 (version 0.07.2) to Japan and Korea, cut out of East Asia with 6 and 1 of them.
-    let asia = [StateId::EastAsia, StateId::SouthAsia, StateId::SouthEastAsia, StateId::Japan, StateId::Pakistan];
-    assert_eq!(asia.iter().map(|s| card(*s).gdp).sum::<i64>(), 30, "Asia's GDP share");
-    assert_eq!(asia.iter().map(|s| card(*s).influence).sum::<i64>(), 7, "Asia's Influence value");
-    // Africa's 3 and 2 split at the Sahara.
-    let africa = [StateId::SubSaharanAfrica, StateId::NorthAfrica];
+    // Ticket #482 (version 0.09.8): Pakistan and Afghanistan crossed from Asia's share into Iran's
+    // Region, so the two pools are counted as one: Asia's 30 and 7 with the Middle East's 5 and 4.
+    let asia = [StateId::EastAsia, StateId::SouthAsia, StateId::SouthEastAsia, StateId::Japan, StateId::Kazakhstan, StateId::MiddleEast, StateId::ArabianPeninsula, StateId::Turkey];
+    assert_eq!(asia.iter().map(|s| card(*s).gdp).sum::<i64>(), 30 + 5, "Asia's GDP share, and the Middle East's");
+    assert_eq!(asia.iter().map(|s| card(*s).influence).sum::<i64>(), 7 + 4, "Asia's Influence value, and the Middle East's");
+    // Africa's 3 and 2 split at the Sahara; ticket #482 cut South Africa out of the south, and its
+    // Influence of 1 is the one figure in the world that was added and not shared.
+    let africa = [StateId::SubSaharanAfrica, StateId::NorthAfrica, StateId::SouthAfrica];
     assert_eq!(africa.iter().map(|s| card(*s).gdp).sum::<i64>(), 3);
-    assert_eq!(africa.iter().map(|s| card(*s).influence).sum::<i64>(), 2);
+    assert_eq!(africa.iter().map(|s| card(*s).influence).sum::<i64>(), 2 + 1);
     // North America's 25 and 8 split with Central America and the Caribbean.
     let america = [StateId::NorthAmerica, StateId::CentralAmerica];
     assert_eq!(america.iter().map(|s| card(*s).gdp).sum::<i64>(), 25);
@@ -4304,7 +4315,9 @@ fn b_coastal_slots_are_two_an_exposure_capped_and_a_raise_is_inland() {
     // Ticket #125 (version 0.07.2): Japan and Korea (Exposure 2, four slots) and the Arabian
     // Peninsula (Exposure 1, two) bring six to the 34 of before.
     // Ticket #453 (version 0.09.6): Pakistan (Exposure 1, two) and the United Kingdom (Exposure 2, four).
-    assert_eq!(world, 46, "46 coastal slots in the world: 34, six on ticket #125's Regions and six on ticket #453's");
+    // Ticket #482 (version 0.09.8): Kazakhstan has no coast (two fewer than Pakistan's card had),
+    // Turkey is Exposure 1 (two) and South Africa Exposure 2 (four).
+    assert_eq!(world, 50, "50 coastal slots in the world: 46, less Kazakhstan's two, and six on ticket #482's Regions");
     // Ticket #70: Europe's Refinery and North America's Factory, third on their cards with an
     // Exposure of 1, now stand inland from the first turn. Ticket #377 (version 0.09.2): Europe is
     // the Prospectors' home and stands with the package (Power Plant, Factory, Mine, Refinery,
@@ -5585,7 +5598,9 @@ fn a_spectated_game_seats_four_computers_and_deals_seat_zero_by_the_spreading_ru
     }
     // Ticket #125 (version 0.07.2): the Arabian Peninsula, untouched at Industry 2 and more populous
     // than Australia, is the third pick now; Australia is the fourth.
-    assert_eq!(taken, vec![StateId::EastAsia, StateId::Europe, StateId::ArabianPeninsula, StateId::Australia]);
+    // Ticket #482 (version 0.09.8): South Africa, at Industry 2 with more people than either, is
+    // the third; the peninsula the fourth; Australia no seat's.
+    assert_eq!(taken, vec![StateId::EastAsia, StateId::Europe, StateId::SouthAfrica, StateId::ArabianPeninsula]);
     for seat in Seat::ALL {
         assert_eq!(g.controlled_states(seat), vec![taken[seat.index()]], "{seat:?} starts where the rule put it");
     }
@@ -8392,7 +8407,10 @@ fn a_cold_seat_marches_on_a_rivals_region_a_cordial_one_does_not_and_an_occupier
     for a in g.armies.iter_mut().filter(|a| a.standing && a.home == ArmyHome::State(neutral)) {
         a.damage = 3;
     }
-    assert!(g.ai_orders(Seat(0)).iter().any(|o| matches!(o, Order::MoveArmy { to, .. } if *to == neutral)), "a weak neutral next door is marched on with no cause: {:?}", g.ai_orders(Seat(0)));
+    // Ticket #482 (version 0.09.8): China borders Iran's Region too now, and the seat may take
+    // that neutral neighbour for the weak one; either way it marches on a neutral with no cause.
+    let orders = g.ai_orders(Seat(0));
+    assert!(orders.iter().any(|o| matches!(o, Order::MoveArmy { to, .. } if g.state(*to).control == Control::Neutral)), "a weak neutral next door is marched on with no cause: {orders:?}");
 
     // An occupier stays: an Army at a place this seat occupies is offered no march.
     let mut g = game();
@@ -12808,7 +12826,7 @@ fn four_makers_the_factory_makes_widgets_the_mine_makes_materials_and_the_start_
         let card = fresh.tables.state(sid);
         let factories = card.start_facilities.iter().filter(|k| **k == FacilityKind::Factory).count();
         let mines = card.start_facilities.iter().filter(|k| **k == FacilityKind::Mine).count();
-        assert_eq!(factories + usize::from(sid == StateId::Pakistan), mines, "{}: a Mine beside every Factory", card.name);
+        assert_eq!(factories + usize::from(sid == StateId::Kazakhstan), mines, "{}: a Mine beside every Factory", card.name);
         let standing_mines = fresh.state(sid).facilities.iter().filter(|f| f.kind == FacilityKind::Mine).count();
         let standing_factories = fresh.state(sid).facilities.iter().filter(|f| f.kind == FacilityKind::Factory).count();
         if fresh.state(sid).control.controller().is_none() {
@@ -17571,7 +17589,7 @@ fn a_throw_off_of_the_player_is_under_your_works() {
 #[test]
 fn an_occupation_begun_or_broken_by_the_player_is_under_your_works() {
     let occupation = |g: &Game| g.report.lines.iter().find(|l| l.kind == LineKind::Occupation).map(|l| (l.mine, l.text.clone())).expect("an Occupation line");
-    for (home, mine) in [(StateId::EastAsia, true), (StateId::Australia, false)] {
+    for (home, mine) in [(StateId::EastAsia, true), (StateId::ArabianPeninsula, false)] {
         let mut g = game();
         g.armies.retain(|a| a.home != ArmyHome::State(StateId::Europe));
         let army = occupier_in(&mut g, home, StateId::Europe);
@@ -19416,31 +19434,54 @@ fn an_offline_building_records_why() {
     assert!(!shut.is_empty() && shut.iter().all(|f| f.offline_cause == Some(OfflineCause::Energy)), "Energy: {shut:?}");
 }
 
-/// Ticket #453 (version 0.09.6): two Regions join the board. Pakistan is cut out of India's and
-/// China's, the United Kingdom out of the European Union's, and each split shares out its parents'
-/// people, GDP and Influence rather than inventing more.
+/// Ticket #453 (version 0.09.6): two Regions join the board, and each split shares out its parents'
+/// people, GDP and Influence rather than inventing more. The United Kingdom is cut out of the
+/// European Union's. Pakistan was cut out of India's and China's.
+/// Ticket #482 (version 0.09.8): **the Regions redrawn around Iran, to eighteen.** Iran's Region is
+/// Iran, Pakistan and Afghanistan; Turkey's is Turkey, the Levant, Iraq and the Caucasus; the card
+/// that was Pakistan's is Kazakhstan's, the five republics alone and landlocked; and South Africa
+/// is cut out of Nigeria's. People and GDP are shared exactly; one Influence is added.
 #[test]
-fn pakistan_and_the_united_kingdom_share_out_their_parents() {
+fn the_regions_are_redrawn_around_iran_to_eighteen() {
     let g = game();
     let t = &g.tables;
-    assert_eq!(StateId::ALL.len(), 16);
+    assert_eq!(StateId::ALL.len(), 18);
     let card = |s: StateId| t.state(s);
-    let (pk, uk) = (card(StateId::Pakistan), card(StateId::UnitedKingdom));
-    assert_eq!((pk.name.as_str(), uk.name.as_str()), ("Pakistan", "The United Kingdom"));
-    let three = [StateId::SouthAsia, StateId::EastAsia, StateId::Pakistan];
-    assert_eq!(three.iter().map(|s| card(*s).population).sum::<f64>(), 1940.0 + 1440.0, "India's and China's people, shared three ways");
-    assert_eq!(three.iter().map(|s| card(*s).gdp).sum::<i64>(), 4 + 17);
-    assert_eq!(three.iter().map(|s| card(*s).influence).sum::<i64>(), 2 + 3);
-    assert_eq!((pk.population, pk.gdp, pk.influence, pk.industry_level, pk.size), (350.0, 2, 1, 1, 2));
+    let (ir, tr, kz, za, ng, uk) = (card(StateId::MiddleEast), card(StateId::Turkey), card(StateId::Kazakhstan), card(StateId::SouthAfrica), card(StateId::SubSaharanAfrica), card(StateId::UnitedKingdom));
+    assert_eq!([ir.name.as_str(), tr.name.as_str(), kz.name.as_str(), za.name.as_str(), ng.name.as_str(), uk.name.as_str()], ["Iran", "Turkey", "Kazakhstan", "South Africa", "Nigeria", "The United Kingdom"]);
+    // The two old cards' 600 people, 5 GDP and 3 Influence, shared three ways.
+    let three = [StateId::MiddleEast, StateId::Turkey, StateId::Kazakhstan];
+    assert_eq!(three.iter().map(|s| card(*s).population).sum::<f64>(), 250.0 + 350.0);
+    assert_eq!(three.iter().map(|s| card(*s).gdp).sum::<i64>(), 3 + 2);
+    assert_eq!(three.iter().map(|s| card(*s).influence).sum::<i64>(), 2 + 1);
+    assert_eq!((ir.population, ir.gdp, ir.influence, ir.industry_level, ir.size, ir.coastal_exposure), (345.0, 1, 1, 2, 2, 1));
+    assert_eq!((tr.population, tr.gdp, tr.influence, tr.industry_level, tr.size, tr.coastal_exposure), (185.0, 3, 1, 2, 2, 1));
+    assert_eq!((kz.population, kz.gdp, kz.influence, kz.industry_level, kz.size, kz.coastal_exposure), (70.0, 1, 1, 1, 2, 0));
+    // Nigeria's 1,140 people and 2 GDP, shared two ways; its 1 Influence kept, and 1 added.
+    assert_eq!(ng.population + za.population, 1140.0);
+    assert_eq!((ng.gdp + za.gdp, ng.influence, za.influence), (2, 1, 1));
+    assert_eq!((za.population, za.gdp, za.industry_level, za.size, za.coastal_exposure), (210.0, 1, 2, 2, 2));
+    // The United Kingdom's share of the European Union's, as ticket #453 left it.
     let two = [StateId::Europe, StateId::UnitedKingdom];
     assert_eq!(two.iter().map(|s| card(*s).population).sum::<f64>(), 600.0);
     assert_eq!(two.iter().map(|s| card(*s).gdp).sum::<i64>(), 20);
     assert_eq!(two.iter().map(|s| card(*s).influence).sum::<i64>(), 5);
     assert_eq!((uk.population, uk.gdp, uk.influence, uk.industry_level, uk.size), (75.0, 3, 1, 3, 1));
     assert_eq!(StateId::ALL.iter().map(|s| card(*s).population).sum::<f64>(), 7860.0, "nobody was invented");
-    // Pakistan lies between India and Iran, so those two no longer touch; every edge is on both cards.
-    assert!(!card(StateId::SouthAsia).neighbours.contains(&StateId::MiddleEast));
-    assert_eq!(pk.neighbours, vec![StateId::SouthAsia, StateId::EastAsia, StateId::MiddleEast, StateId::Russia]);
+    // Leans and starts, as the designer set them.
+    use dying_earth_engine::Resource;
+    assert_eq!([ir.resource_lean, tr.resource_lean, kz.resource_lean, za.resource_lean], [Resource::Fuel, Resource::Materials, Resource::Fuel, Resource::Materials]);
+    assert_eq!(tr.start_facilities, vec![FacilityKind::Factory, FacilityKind::Mine, FacilityKind::PowerPlant], "a Mine beside its Factory, as every start Factory has");
+    assert_eq!(za.start_facilities, vec![FacilityKind::Mine, FacilityKind::PowerPlant, FacilityKind::Factory]);
+    // Kazakhstan is the one landlocked Region: no coastal slot, and nothing for the sea to take.
+    assert_eq!((g.coastal_slots(StateId::Kazakhstan), g.inland_slots(StateId::Kazakhstan)), (0, g.build_slots(StateId::Kazakhstan)));
+    assert!(StateId::ALL.iter().filter(|s| **s != StateId::Kazakhstan).all(|s| g.coastal_slots(*s) > 0), "every other Region has a coast");
+    // Pakistan is Iran's now, so India and Iran touch again; Iran no longer touches Europe or Africa.
+    assert!(card(StateId::SouthAsia).neighbours.contains(&StateId::MiddleEast));
+    assert_eq!(ir.neighbours, vec![StateId::Turkey, StateId::Kazakhstan, StateId::EastAsia, StateId::SouthAsia, StateId::ArabianPeninsula]);
+    assert_eq!(tr.neighbours, vec![StateId::Europe, StateId::Russia, StateId::NorthAfrica, StateId::ArabianPeninsula, StateId::MiddleEast]);
+    assert_eq!(kz.neighbours, vec![StateId::Russia, StateId::EastAsia, StateId::MiddleEast]);
+    assert_eq!(za.neighbours, vec![StateId::SubSaharanAfrica]);
     assert_eq!(uk.neighbours, vec![StateId::Europe, StateId::NorthAmerica]);
     for a in StateId::ALL {
         for b in &card(a).neighbours {

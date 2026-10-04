@@ -359,3 +359,57 @@ The authority is [ticket #481](https://github.com/whaleyjoshua2/Dying-Earth/issu
   and 32 collapses.
 
 **Pictures:** [`ticket-481/`](../dev-diary/2026-10-04-version-0.09.8/ticket-481/).
+
+## 11. The Regions redrawn around Iran, to eighteen
+
+The authority is [ticket #482](https://github.com/whaleyjoshua2/Dying-Earth/issues/482).
+
+- **Eighteen Regions**, where there were sixteen.
+  - **Iran** is Iran, Pakistan and Afghanistan. It keeps its name, its flag and its place.
+  - **Turkey**, new: Turkey, Iraq, Syria, Lebanon, Israel and Palestine, Jordan, Armenia,
+    Azerbaijan and Georgia, out of Iran's Region.
+  - **Kazakhstan**: the five Central Asian republics, alone on the card that was Pakistan's.
+  - **South Africa**, new: South Africa, Namibia, Botswana, Lesotho, Eswatini, Angola, Zambia,
+    Zimbabwe, Malawi, Mozambique and Madagascar, out of Nigeria's Region.
+- **The cards.** People and GDP are shared out of the parents exactly; the world still holds 7,860.
+
+  | Region | People | GDP | Influence | Industry Level | Leans | Size | Coast | Baseline emissions | Starts with |
+  |---|---|---|---|---|---|---|---|---|---|
+  | Iran | 345 | 1 | 1 | 2 | Fuel | 2 | 1 | 0.5 | Refinery, Power Plant |
+  | Turkey | 185 | 3 | 1 | 2 | Materials | 2 | 1 | 0.4 | Factory, Mine, Power Plant |
+  | Kazakhstan | 70 | 1 | 1 | 1 | Fuel | 2 | 0 | 0.4 | Power Plant, Mine |
+  | South Africa | 210 | 1 | 1 | 2 | Materials | 2 | 2 | 0.4 | Mine, Power Plant, Factory |
+  | Nigeria | 930 | 1 | 1 | 1 | Materials | 3 | 1 | 0.3 | Factory, Mine |
+
+- **Turkey starts with a Mine** beside its Factory, which the designer's table did not list: every
+  start Factory has had one since version 0.09.0, and a test holds it.
+- **The world's Influence is 35**, where it was 34: each of the five has 1, at the designer's word.
+- **Kazakhstan is landlocked**: no coastal slot, and the sea takes nothing from it. It is the first
+  such Region; nothing in the engine needed changing for it.
+- **Who touches whom.** Iran: Turkey, Kazakhstan, China, India, Saudi Arabia. Turkey: the European
+  Union, Russia, Egypt, Saudi Arabia, Iran. Kazakhstan: Russia, China, Iran. South Africa: Nigeria.
+  India and Iran touch again; Iran no longer touches the European Union or Egypt.
+- **Where the computer seats start.** The spreading rule's four picks are China, the European
+  Union, South Africa and Saudi Arabia, where the last two were Saudi Arabia and Australia: South
+  Africa stands at Industry Level 2 with more people than either.
+- **The map** is repainted from Natural Earth's countries. Compared pixel by pixel with the map
+  before, it differs in the three moves and nowhere else.
+- **Saves:** `SAVE_VERSION` is 9. A save of sixteen Regions is refused with the usual message.
+- **Emissions were set by hand**, as in 0.09.6, and are the CO2 sweep ticket's to square: the
+  industry line rises by about 1.6 a turn.
+
+**Measured** (80 games, the standing cell,
+[`after-482.txt`](../dev-diary/2026-10-04-version-0.09.8/sweeps/after-482.txt)):
+
+| | before this | after this |
+|---|---|---|
+| Custodians | 7 | 4 |
+| Prospectors | 21 | 20 |
+| Arkwrights | 16 | 11 |
+| Archivists | 4 | 6 |
+| collapses | 32 | 39 |
+
+Collapses rise by seven and the Arkwrights lose five wins, both past noise. Not traced; the CO2
+sweep is run on this board next.
+
+**Pictures:** [`ticket-482/`](../dev-diary/2026-10-04-version-0.09.8/ticket-482/).

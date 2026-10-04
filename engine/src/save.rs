@@ -24,7 +24,11 @@ use std::sync::Arc;
 ///
 /// Ticket #453 (version 0.09.6): moved to **8**. Two Regions joined the board (Pakistan, the United
 /// Kingdom), so a save of fourteen has no card for two of the sixteen and three parents' figures moved.
-pub const SAVE_VERSION: u32 = 8;
+///
+/// Ticket #482 (version 0.09.8): moved to **9**. Two more Regions joined the board (Turkey, South
+/// Africa), the Region called Pakistan became Kazakhstan, and three cards' figures moved, so a save
+/// of sixteen has no card for two of the eighteen.
+pub const SAVE_VERSION: u32 = 9;
 
 /// The rules version this executable plays, named beside the file's own in a refusal.
 ///

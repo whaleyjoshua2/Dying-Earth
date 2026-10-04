@@ -95,12 +95,16 @@ pub fn state_lonlat(state: StateId) -> (f32, f32) {
         StateId::Russia => (90.0, 62.0),
         // Ticket #125 (version 0.07.2): the Middle East lost the peninsula, so its label moves up
         // to the Iranian plateau; the two new Regions sit on Honshu and on the Nejd.
-        StateId::MiddleEast => (50.0, 33.0),
+        StateId::MiddleEast => (58.0, 31.0),
         StateId::Japan => (138.0, 37.0),
         StateId::ArabianPeninsula => (45.0, 23.0),
         // Ticket #453 (version 0.09.6): on the Indus plain and on the Scottish Lowlands, clear of the Union's label.
-        StateId::Pakistan => (68.0, 33.0),
+        // Ticket #482 (version 0.09.8): Kazakhstan's on the steppe; Iran's own moves east to stand
+        // between Iran and Pakistan, above; Turkey's on Anatolia; South Africa's on the Highveld.
+        StateId::Kazakhstan => (67.0, 47.0),
         StateId::UnitedKingdom => (-3.0, 56.5),
+        StateId::Turkey => (36.0, 38.0),
+        StateId::SouthAfrica => (25.0, -27.0),
     }
 }
 

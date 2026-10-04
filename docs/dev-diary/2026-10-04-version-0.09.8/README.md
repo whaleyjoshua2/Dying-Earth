@@ -276,3 +276,40 @@ one of them.
 7 / 21 / 16 / 4 and 32 collapses. The race is shown, not played differently.
 
 Not pictured: the Report's "sent a Colony Ship to the Moon" line, which the test reads.
+
+## The Regions redrawn around Iran, to eighteen (#482)
+
+The designer: *"split Pakistan and Afghanistan from existing state and merge with Iran, then split
+Iran making Turkey, Iraq, Jordan, Israel/Palestine, and Syria its own state. if that makes our state
+count 17 lets add one more"*. Decided on the ticket: Central Asia stays a Region, named Kazakhstan;
+Lebanon and the Caucasus go with Turkey; the eighteenth is South Africa with its neighbours; the
+cards as tabled; each of the five keeps 1 Influence, so the world's rises to 35.
+
+**The ground**, repainted from Natural Earth (fetched for the run, not kept in the repo) by
+`cargo run --release --example prep_assets -- --mask-only --borders <geojson> <preview>`. Compared
+with the old map pixel by pixel, it differs in three moves and no others: 18,846 pixels from
+Nigeria's Region to South Africa's, 5,881 from Iran's to Turkey's, 4,717 from Pakistan's to Iran's.
+
+![the redrawn ground from Africa to Central Asia](ticket-482/redrawn-ground.png)
+
+**The four cards** on turn 1 (`select:<Region> turns:0 seed:7`): Iran and Turkey above, Kazakhstan
+and South Africa below. Kazakhstan's boxes carry no coastal edge. South Africa is the Arkwrights'
+start on this seed.
+
+![the four cards](ticket-482/four-cards.png)
+
+**Witnessed red:** thirteen tests went red on the redraw. Ten were counts and shares to re-base.
+Three were findings:
+
+- **Turkey's start broke a standing rule**: the designer's table gave it a Factory and a Power
+  Plant, and every start Factory has a Mine beside it. A Mine was added.
+- **A computer seat's start moved**: the spreading rule's third pick is South Africa now, and
+  Australia is no seat's start.
+- **A computer seat marched elsewhere**: China borders Iran's Region now, and the seat took that
+  neutral neighbour where the test expected India.
+
+The flags are from the flag-icons set the others came from (`tr`, `kz`, `za`); `pk` is removed.
+
+**The sweep** ([`after-482.txt`](sweeps/after-482.txt)): 4 / 20 / 11 / 6 and 39 collapses, from
+7 / 21 / 16 / 4 and 32. Collapses up seven and the Arkwrights down five, both past noise; not
+traced. The last time two Regions were added collapses rose by six.

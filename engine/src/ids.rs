@@ -172,12 +172,19 @@ pub enum StateId {
     // Version 0.09.6 (ticket #453): Pakistan cut out of South Asia (Pakistan, Afghanistan) and East
     // Asia (the five Central Asian republics), the United Kingdom (with Ireland and Iceland) out of
     // Europe. Appended, as every split has been, so no older index moves.
-    Pakistan,
+    // Version 0.09.8 (ticket #482): this is KAZAKHSTAN now, the five Central Asian republics alone;
+    // Pakistan and Afghanistan went to the Region called Iran (`MiddleEast`). It keeps its place.
+    Kazakhstan,
     UnitedKingdom,
+    // Version 0.09.8 (ticket #482): Turkey, the Levant, Iraq and the Caucasus cut out of the Region
+    // called Iran; South Africa and its neighbours cut out of Nigeria's. Appended, as every split
+    // has been, so no older index moves.
+    Turkey,
+    SouthAfrica,
 }
 
 impl StateId {
-    pub const ALL: [StateId; 16] = [
+    pub const ALL: [StateId; 18] = [
         StateId::SubSaharanAfrica,
         StateId::NorthAfrica,
         StateId::EastAsia,
@@ -192,8 +199,10 @@ impl StateId {
         StateId::MiddleEast,
         StateId::Japan,
         StateId::ArabianPeninsula,
-        StateId::Pakistan,
+        StateId::Kazakhstan,
         StateId::UnitedKingdom,
+        StateId::Turkey,
+        StateId::SouthAfrica,
     ];
     pub fn index(self) -> usize {
         self as usize
