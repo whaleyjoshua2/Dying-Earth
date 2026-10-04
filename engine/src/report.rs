@@ -571,7 +571,6 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     // Ticket #257 (version 0.08.4): the wall stands and its keep rises; a surge it holds; a keep unpaid.
     ("sea_wall", &["temperature", "state", "whose", "keep"]),
     // Ticket #259 (version 0.08.4): the off-Earth cards join the deck.
-    ("deck_joined", &["n"]),
     // Ticket #261: the two steps a rival's Moment fires on.
     ("rival_three_quarters", &["faction", "part", "value", "bar"]),
     ("rival_one_part_met", &["faction", "met", "part", "value", "bar"]),

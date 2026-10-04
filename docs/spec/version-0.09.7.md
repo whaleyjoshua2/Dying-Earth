@@ -135,3 +135,25 @@ seats only; no rule moves.
 
 Within noise on wins. The games do not stall: the tree completes as often and as early. The
 Custodians reach their gate in five fewer games.
+
+## 6. The Report coloured by Faction, with 15% fewer words
+
+The authority is [ticket #463](https://github.com/whaleyjoshua2/Dying-Earth/issues/463). No rule
+moves.
+
+- **A Faction's name is drawn in that Faction's colour** wherever a Report line says it, the
+  player's own included. A line that names two shows both. The rest of the line is as it was; the
+  gold headline is not coloured.
+- **"The" is gone before a Faction's name**, at the head of a line and inside it: "Prospectors
+  issued a Strip Permit in Iran", "Iran is blockaded by Prospectors". The turn-1 lines list rivals
+  the same way.
+- **The words.** The Report's templates held 2,031 words and hold 1,725, 15.1 per cent fewer. A
+  test holds the ceiling at 1,727. Every changed line is in
+  [`ticket-463/cuts.md`](../dev-diary/2026-10-03-version-0.09.7/ticket-463/cuts.md), approved by the
+  designer before it was written. No figure or rule was dropped from a line. What a rival's list of
+  deeds no longer says: "from the next Income" on a Research directive, and "under way" on a
+  cancelled build.
+- **Not announced any more:** the off-Earth Events joining the deck on turn 12. They still join.
+- **The designer's own sentence is kept:** the Moment for the first turn under the Sink.
+- **A carbon credit the player bought or sold is listed once**, under Your works; it stood under On
+  Earth as well. A change of hands to or from the player is still listed under both (version 0.09.4).

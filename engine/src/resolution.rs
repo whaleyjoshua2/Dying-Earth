@@ -3068,8 +3068,10 @@ impl Game {
             self.log(format!("The {who} bought {take} ppm of carbon credit from the {whom} for {} Ducats.", figure(kept)));
             let text = self.say("credits_bought", &[("faction", who), ("n", take.to_string()), ("seller", whom), ("ducats", figure(kept))]);
             // Ticket #431 (the review): the buyer's act, and the player's news when it sold.
-            self.report_line_by(buyer, LineKind::Note, None, text);
-            self.mark_mine(&[Some(seller)]);
+            // Ticket #463 (version 0.09.7): listed ONCE -- under Your works when the player bought
+            // or sold, otherwise under its own heading -- where a sale by the player stood under both.
+            let players = !self.spectator && (buyer == Seat(0) || seller == Seat(0));
+            self.report_line_by(buyer, if players { LineKind::YourWorks } else { LineKind::Note }, None, text);
             self.ai_deed(buyer, "buy_credits", &[("n", take.to_string())]);
         }
     }

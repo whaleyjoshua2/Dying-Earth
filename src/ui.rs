@@ -2909,8 +2909,38 @@ fn unseen_army_lines(ui: &mut Ui, game: &Game, unseen: &[&Army]) {
     }
 }
 
+/// Ticket #463 (version 0.09.7): a Report line cut wherever it names a Faction, so each name can be
+/// drawn in its Faction's colour and a line that names two shows both.
+fn split_faction_names<'a>(text: &'a str, names: &[(String, Seat)]) -> Vec<(&'a str, Option<Seat>)> {
+    let mut out = Vec::new();
+    let mut rest = text;
+    while let Some((i, len, seat)) = names.iter().filter_map(|(n, s)| rest.find(n.as_str()).map(|i| (i, n.len(), *s))).min_by_key(|(i, _, _)| *i) {
+        if i > 0 {
+            out.push((&rest[..i], None));
+        }
+        out.push((&rest[i..i + len], Some(seat)));
+        rest = &rest[i + len..];
+    }
+    if !rest.is_empty() {
+        out.push((rest, None));
+    }
+    out
+}
+
+/// Ticket #463: the line as laid-out text, the names coloured and the rest left to the widget.
+fn faction_coloured(ui: &Ui, game: &Game, session: &Session, text: &str, style: egui::TextStyle) -> egui::text::LayoutJob {
+    let names: Vec<(String, Seat)> = Seat::ALL.into_iter().map(|s| (game.seat_name(s), s)).collect();
+    let font = style.resolve(ui.style());
+    let mut job = egui::text::LayoutJob::default();
+    for (part, seat) in split_faction_names(text, &names) {
+        let color = seat.map(|s| seat_colour(session, s)).unwrap_or(Color32::PLACEHOLDER);
+        job.append(part, 0.0, egui::TextFormat { font_id: font.clone(), color, ..Default::default() });
+    }
+    job
+}
+
 /// Ticket #431 (version 0.09.5): one Report line, a way to its place where it has one.
-fn report_line_ui(ui: &mut Ui, game: &Game, l: &dying_earth_engine::report::ReportLine, actions: &mut Vec<Action>) {
+fn report_line_ui(ui: &mut Ui, game: &Game, session: &Session, l: &dying_earth_engine::report::ReportLine, actions: &mut Vec<Action>) {
     match l.place {
         Some(place) => {
             // Ticket #127 (version 0.07.2): a line that points somewhere wears the glyph of what it
@@ -2920,16 +2950,17 @@ fn report_line_ui(ui: &mut Ui, game: &Game, l: &dying_earth_engine::report::Repo
                 ReportPlace::Colony(c) => game.colony(c).map(Kind::of_colony),
                 ReportPlace::Body(_) | ReportPlace::Orbit(_, _) => None,
             };
+            let text = faction_coloured(ui, game, session, &l.text, egui::TextStyle::Button);
             let button = match kind.and_then(|k| k.image(ui.ctx(), 14.0)) {
-                Some(image) => egui::Button::image_and_text(image, &l.text),
-                None => egui::Button::new(&l.text),
+                Some(image) => egui::Button::image_and_text(image, text),
+                None => egui::Button::new(text),
             };
             if ui.add(button.frame(false)).on_hover_text("Go there").clicked() {
                 actions.push(Action::GoTo(place));
             }
         }
         None => {
-            ui.label(&l.text);
+            ui.label(faction_coloured(ui, game, session, &l.text, egui::TextStyle::Body));
         }
     }
 }
@@ -2953,7 +2984,7 @@ fn report_lines(ui: &mut Ui, game: &Game, session: &Session, lines: &[&dying_ear
     let mut done: Vec<(LineKind, Option<Seat>)> = Vec::new();
     for l in lines {
         let Some(key) = fold_key(l) else {
-            report_line_ui(ui, game, l, actions);
+            report_line_ui(ui, game, session, l, actions);
             continue;
         };
         if done.contains(&key) {
@@ -2961,7 +2992,7 @@ fn report_lines(ui: &mut Ui, game: &Game, session: &Session, lines: &[&dying_ear
         }
         let group: Vec<&ReportLine> = lines.iter().copied().filter(|m| fold_key(m) == Some(key)).collect();
         if group.len() < 2 {
-            report_line_ui(ui, game, l, actions);
+            report_line_ui(ui, game, session, l, actions);
             continue;
         }
         done.push(key);
@@ -2976,7 +3007,7 @@ fn report_lines(ui: &mut Ui, game: &Game, session: &Session, lines: &[&dying_ear
         let colour = key.1.map(|s| seat_colour(session, s)).unwrap_or(Color32::LIGHT_GRAY);
         egui::CollapsingHeader::new(RichText::new(title).color(colour)).id_salt(("fold", format!("{key:?}"))).default_open(false).show(ui, |ui| {
             for m in &group {
-                report_line_ui(ui, game, m, actions);
+                report_line_ui(ui, game, session, m, actions);
             }
         });
     }
@@ -11853,6 +11884,19 @@ fn chronicle_screen(root: &mut Ui, session: &Session, actions: &mut Vec<Action>)
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Ticket #463 (version 0.09.7): a Report line is cut at every Faction's name, so a line that
+    /// names two colours both, and a line that names none is left whole.
+    #[test]
+    fn a_report_line_is_cut_at_each_factions_name() {
+        let names = vec![("Custodians".to_string(), Seat(0)), ("Prospectors".to_string(), Seat(1))];
+        assert_eq!(
+            split_faction_names("Prospectors bought 3 ppm of carbon credit from Custodians for 3 Ducats.", &names),
+            vec![("Prospectors", Some(Seat(1))), (" bought 3 ppm of carbon credit from ", None), ("Custodians", Some(Seat(0))), (" for 3 Ducats.", None)]
+        );
+        assert_eq!(split_faction_names("The sea took 2 coastal slots from Australia.", &names), vec![("The sea took 2 coastal slots from Australia.", None)]);
+        assert_eq!(split_faction_names("Egypt threw off Custodians", &names), vec![("Egypt threw off ", None), ("Custodians", Some(Seat(0)))]);
+    }
 
     /// Ticket #205 (version 0.08.1): a tutorial note must hand on to the turn's Event when there is
     /// one. It did so when the note was dismissed by its button, because `Action::TutorialNoteRead`

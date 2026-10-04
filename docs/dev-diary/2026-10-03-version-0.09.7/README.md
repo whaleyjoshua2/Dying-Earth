@@ -63,3 +63,19 @@ could not compile while `last` held one Tech. The 0.09.1 guard test
 **The sweep** ([`after-462.txt`](sweeps/after-462.txt)): 10 / 7 / 10 / 14 and 39 collapses, from
 9 / 5 / 12 / 13 and 41. The tree completes in 51 games at turn 24, unchanged. The Archivists keep
 back 65 to 82 per cent of their Research on average, from 100.
+
+## The Report coloured by Faction, with 15% fewer words (ticket #463)
+
+- [`before-report.png`](ticket-463/before-report.png) and
+  [`after-report.png`](ticket-463/after-report.png): the same Report, January 2032, seed 7. After:
+  each Faction's name in its colour, the carbon-credit sales once instead of twice, and two more
+  headings fit in the window.
+- [`cuts.md`](ticket-463/cuts.md): every template that changed, before and after, with word counts.
+
+**Witnessed red:** three new tests failed before the build (the ceiling at 2,031 words; the credit
+line listed twice; the deck line still said). Twenty older tests quoted old wording and were moved.
+Two of them caught real faults in the first draft: the Sink Moment is the designer's own sentence,
+whose "{ease}" is in words ("a half") and needs its "by"; and a change of hands is listed under two
+headings on purpose (ticket #404), so the single listing was narrowed to carbon credits.
+
+No sweep: nothing a computer seat reads was changed.

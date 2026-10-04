@@ -1065,7 +1065,8 @@ fn the_deck_is_twenty_six_cards_as_the_table_deals_them_and_no_calm() {
     g.question_phase();
     assert!(g.deck.off_earth_joined);
     assert_eq!(dealt(&g), 40, "turn 12: the seven join, and the deck is forty");
-    assert!(g.report.lines.iter().any(|l| l.text.contains("join the deck")), "the Report says so: {:?}", g.report.lines);
+    // Ticket #463 (version 0.09.7): and it is not announced, at the designer's word.
+    assert!(!g.report.lines.iter().any(|l| l.text.contains("join the deck")), "the Report is silent on it: {:?}", g.report.lines);
     g.question_phase();
     assert_eq!(dealt(&g), 40, "and they join once");
     // The rest of this test reads the deck as dealt, so a fresh one -- with the off-Earth cards
@@ -2921,7 +2922,7 @@ fn the_report_says_one_net_migration_line_per_region_and_only_when_it_is_worth_s
     g.resolve_unrest();
     let lines = refugee_lines(&g);
     assert_eq!(lines.len(), 1, "one line for the Region, not one per flow: {lines:?}");
-    assert!(lines[0].contains("took in 3.0 people of 7.0 arriving"), "the net and the gross: {lines:?}");
+    assert!(lines[0].contains("took in 3.0 of 7.0 arriving"), "the net and the gross: {lines:?}");
     // Ticket #371 (version 0.09.2): the Unrest clause is the Region's own net line's now.
     assert!(!lines[0].contains("Unrest"), "the migration line says only the migration: {lines:?}");
 
@@ -2932,14 +2933,14 @@ fn the_report_says_one_net_migration_line_per_region_and_only_when_it_is_worth_s
     g.resolve_unrest();
     let lines = refugee_lines(&g);
     assert_eq!(lines.len(), 1, "one line, two causes: {lines:?}");
-    assert_eq!(lines[0], "Russia lost 7.0 people to its neighbours: mostly the heat.", "the largest cause, and only it");
+    assert_eq!(lines[0], "Russia lost 7.0 people to neighbours: mostly the heat.", "the largest cause, and only it");
 
     // A net loss to one cause says it plainly, without `mostly`.
     let mut g = game();
     calm(&mut g);
     g.state_mut(StateId::Russia).refugees_out = vec![("the reefs".to_string(), 3.0)];
     g.resolve_unrest();
-    assert_eq!(refugee_lines(&g)[0], "Russia lost 3.0 people to its neighbours: the reefs.");
+    assert_eq!(refugee_lines(&g)[0], "Russia lost 3.0 people to neighbours: the reefs.");
 }
 
 /// (d) Occupation: +3 when it begins and +1 a turn after; the figure carries over when control
@@ -4446,7 +4447,7 @@ fn d2_every_rise_turns_one_inland_slot_coastal_wall_or_no_wall() {
     assert_eq!(standing(&g, sid, true), vec![FacilityKind::Refinery, FacilityKind::PowerPlant], "the Factory drowned, oldest first, as before");
     assert_eq!(standing(&g, sid, false), vec![FacilityKind::ResearchLab], "the empty slot turned, not the Research Lab's");
     assert_eq!(g.free_coastal(sid), 1, "the turned slot is coastal and empty, waiting for the next rise");
-    assert!(g.report.lines.iter().any(|l| l.text.contains("The coast now reaches one slot further in.")), "the Report says the coast moved: {:?}", g.report.lines);
+    assert!(g.report.lines.iter().any(|l| l.text.contains("The coast moved one slot inland.")), "the Report says the coast moved: {:?}", g.report.lines);
 
     // A wall: the rise takes nothing, and STILL turns one inland slot -- the last empty one.
     g.state_mut(sid).facilities.push(Facility::new(FacilityKind::SeaWall));
@@ -4454,14 +4455,14 @@ fn d2_every_rise_turns_one_inland_slot_coastal_wall_or_no_wall() {
     g.apply_sea_threshold(sid, 1);
     assert_eq!(g.state(sid).facilities.len(), before, "the wall held: nothing drowned");
     assert_eq!((g.coastal_slots(sid), g.inland_slots(sid)), (4, 1), "and one more inland slot turned coastal behind it");
-    assert!(g.report.lines.iter().any(|l| l.text.contains("held the sea") && l.text.contains("one slot further in")), "the held-rise line says both: {:?}", g.report.lines);
+    assert!(g.report.lines.iter().any(|l| l.text.contains("held the sea") && l.text.contains("one slot inland")), "the held-rise line says both: {:?}", g.report.lines);
 
     // No empty inland slot left: the oldest inland Facility turns with its slot.
     g.apply_sea_threshold(sid, 2);
     assert_eq!((g.coastal_slots(sid), g.inland_slots(sid)), (5, 0), "the last inland slot turned");
     assert_eq!(standing(&g, sid, false), vec![FacilityKind::SeaWall], "nothing but the wall, which takes no slot, stands inland any more");
     assert!(standing(&g, sid, true).contains(&FacilityKind::ResearchLab), "the Research Lab stands on the coast now");
-    assert!(g.report.lines.iter().any(|l| l.text.contains("a Research Lab stands on it now")), "the Report names what turned: {:?}", g.report.lines);
+    assert!(g.report.lines.iter().any(|l| l.text.contains("inland, onto a Research Lab")), "the Report names what turned: {:?}", g.report.lines);
 
     // Nothing inland left to turn: a further rise turns nothing.
     g.apply_sea_loss(sid, 2.9);
@@ -5550,7 +5551,7 @@ fn the_first_reports_headline_is_the_seating_explanation() {
     assert_eq!(head.kind, LineKind::Seating);
     assert_eq!(
         head.text,
-        "January 2030. You play the Custodians from China; the computer plays the Prospectors, the Arkwrights and the Archivists."
+        "January 2030. You play Custodians from China; the computer plays Prospectors, Arkwrights and Archivists."
     );
     // It headlines over everything else the first turn wrote down.
     assert!(g.report.lines.len() > 1, "and there are other lines under it");
@@ -8207,7 +8208,7 @@ fn a_battle_is_a_report_line_at_its_place_by_name_with_odds_and_a_moment_when_a_
     let lost: Vec<&String> = line.parties.iter().flat_map(|p| p.destroyed.iter()).collect();
     let report = g.report.lines.iter().find(|l| l.text.starts_with("Battle at Egypt")).expect("a Report line for the Battle");
     assert_eq!(report.place, Some(ReportPlace::State(target)), "the line jumps to the place");
-    assert!(report.text.contains(&format!("{:.0}% odds of holding the field", odds * 100.0)), "and says the odds, labelled: {}", report.text);
+    assert!(report.text.contains(&format!("{:.0}% to hold the field", odds * 100.0)), "and says the odds, labelled: {}", report.text);
     let moments = g.report.moments.iter().filter(|m| m.kind == MomentKind::DecisiveBattle).count();
     if lost.is_empty() {
         assert_eq!(report.kind, LineKind::Battle, "a bloodless Battle is unranked");
@@ -8366,7 +8367,7 @@ fn a_blockade_is_ordered_and_starves_the_station_in_its_slot_upkeep_still_paid()
     assert!(blockaded.relations.offended[0][1], "each Income under a Blockade is an offence against the holder");
     assert!(!held.relations.offended[0][1], "and a Frigate on Hold offends nobody");
     assert_eq!((blockaded.seats[0].blockade_turns_suffered, blockaded.seats[1].blockade_turns_imposed), (1, 1), "counted for the sweep");
-    assert!(blockaded.report.lines.iter().any(|l| l.text.contains("is blockaded by the") && l.text.contains("made nothing")), "the Report says so: {:?}", blockaded.report.lines);
+    assert!(blockaded.report.lines.iter().any(|l| l.text.contains("is blockaded by") && l.text.contains("nothing made")), "the Report says so: {:?}", blockaded.report.lines);
     // Nothing died and nothing burned.
     assert_eq!(blockaded.colony(station).unwrap().modules.len(), g.colony(station).unwrap().modules.len());
 }
@@ -8842,7 +8843,7 @@ fn decommissioning_a_habitat_still_loses_the_people_it_held_and_says_so() {
     assert_eq!(g.colony(id).unwrap().colonists, room, "the people the decommissioned Habitat held are lost with it");
     let lost = full - room;
     assert!(
-        g.report.lines.iter().any(|l| l.text.contains(&format!("{lost} Colonists")) && l.text.contains("nowhere to live")),
+        g.report.lines.iter().any(|l| l.text.contains(&format!("{lost} Colonists")) && l.text.contains("had no room")),
         "the Report should say the {lost} Colonists were lost; it said: {:?}",
         g.report.lines.iter().map(|l| l.text.clone()).collect::<Vec<_>>()
     );
@@ -10606,7 +10607,7 @@ fn agitate_raises_a_rivals_regions_unrest_for_ducats_and_influence_once_a_turn()
     // (version 0.09.3): the line is written after the Climate phase, so a turn run as its
     // Resolution alone writes it here.
     g.report_unrest_net();
-    assert!(g.report.lines.iter().any(|l| l.kind == LineKind::Unrest && l.text.contains("agitation by the Custodians")), "the Report names who paid: {:?}", g.report.lines);
+    assert!(g.report.lines.iter().any(|l| l.kind == LineKind::Unrest && l.text.contains("agitation by Custodians")), "the Report names who paid: {:?}", g.report.lines);
     // A working Constabulary halves it -- and calms a point a turn besides: 3 + 0.5 - 1.0 - 1.5.
     g.state_mut(sid).facilities.push(facility(FacilityKind::Constabulary));
     g.state_mut(sid).unrest = 3.0;
@@ -10712,7 +10713,7 @@ fn overselling_carbon_credits_puts_the_excess_on_the_custodians_ledger_and_a_sho
     assert!((g.blame(b) - 98.0).abs() < 1e-9, "the second buyer got the two left: {}", g.blame(b));
     assert!((g.blame(cus) - 102.0).abs() < 1e-9, "twelve sold against five held: seven oversold are Blame taken, 100 - 5 + 7: {}", g.blame(cus));
     assert_eq!(g.seats[b.index()].stockpile.ducats, 98.0, "paid ten, eight back for the eight it did not get");
-    assert!(g.report.lines.iter().any(|l| l.text.contains("came back")), "{:?}", g.report.lines);
+    assert!(g.report.lines.iter().any(|l| l.text.contains("Ducats returned")), "{:?}", g.report.lines);
 }
 
 /// Ticket #268 (version 0.08.4): the computer Custodians offer their credit while their own share
@@ -15387,7 +15388,7 @@ fn a_lift_to_a_station_fills_as_far_as_the_habitat_room_goes() {
     // got this line in the same ticket; a partial lift is the same silence one step earlier.
     let said: Vec<String> = g.report.lines.iter().map(|l| l.text.clone()).collect();
     assert!(
-        said.iter().any(|t| t.contains("still waiting in") && t.starts_with("3 more")),
+        said.iter().any(|t| t.contains("and wait in") && t.starts_with("3 more")),
         "a line names the Pioneers a clamped lift left behind: {said:?}"
     );
     // Room for nobody is not an order: it is refused, and the refusal names the room.
@@ -15497,7 +15498,7 @@ fn turn_one_line(player: FactionKind) -> String {
     g.report
         .lines
         .iter()
-        .find(|l| l.text.starts_with("Your rivals are"))
+        .find(|l| l.text.starts_with("Your rivals:"))
         .map(|l| l.text.clone())
         .unwrap_or_else(|| panic!("no turn-1 rivals line: {:?}", g.report.lines))
 }
@@ -15507,11 +15508,11 @@ fn ticket_350_the_turn_one_line_names_each_factions_own_condition() {
     for (kind, words) in [
         (
             FactionKind::Custodians,
-            "Build, spread Influence, and reach Stabilization, three Climate phases running with Emissions under the Natural Sink, with 12 Colonists living off Earth, before the Temperature reaches +3.0 C.",
+            "Build, spread Influence and reach Stabilization, three Climate phases running with Emissions under the Natural Sink, with 12 Colonists living off Earth, before +3.0 C.",
         ),
-        (FactionKind::Prospectors, "Build, spread Influence, and put 2,500 Ducats in the Venture Capital Fund with 12 Colonists living off Earth, before the Temperature reaches +3.0 C."),
-        (FactionKind::Arkwrights, "Build, spread Influence, and get 30 Colonists living off Earth, spread over three Bodies, before the Temperature reaches +3.0 C."),
-        (FactionKind::Archivists, "Build, spread Influence, and build the Archive off Earth, pay 150 Research into it, and upload 12 Colonists, before the Temperature reaches +3.0 C."),
+        (FactionKind::Prospectors, "Build, spread Influence and put 2,500 Ducats in the Venture Capital Fund with 12 Colonists living off Earth, before +3.0 C."),
+        (FactionKind::Arkwrights, "Build, spread Influence and get 30 Colonists living off Earth, spread over three Bodies, before +3.0 C."),
+        (FactionKind::Archivists, "Build, spread Influence and build the Archive off Earth, pay 150 Research into it, and upload 12 Colonists, before +3.0 C."),
     ] {
         let line = turn_one_line(kind);
         assert!(line.ends_with(words), "{kind:?}: {line}");
@@ -15956,7 +15957,7 @@ fn a_transfer_thrown_off_in_the_same_resolution_is_one_line() {
     assert_eq!(g.state(europe).control, Control::Neutral, "thrown off");
     let lines: Vec<String> = g.report.lines.iter().filter(|l| l.kind == LineKind::ControlChanged && l.place == Some(ReportPlace::State(europe))).map(|l| l.text.clone()).collect();
     assert_eq!(lines.len(), 1, "one line, not a transfer and a throw-off: {lines:?}");
-    assert!(lines[0].contains("passed to the Custodians and threw them off at once; it stands neutral"), "{lines:?}");
+    assert!(lines[0].contains("passed to Custodians and threw them off at once: neutral"), "{lines:?}");
 }
 
 /// Ticket #366, defect 4: **a rival's founding names the slot**, where it said "slot 1" of slot 0.
@@ -16000,7 +16001,7 @@ fn the_lift_line_says_what_the_spaceport_will_pay() {
     assert!(g.check_order(Seat(0), &[], &lift).is_ok(), "{:?}", g.check_order(Seat(0), &[], &lift));
     g.commit_orders(Seat(0), &[lift]);
     let line = g.report.lines.iter().find(|l| l.text.contains("Pioneers lifted")).map(|l| l.text.clone()).expect("the lift line");
-    assert!(line.ends_with("(+2 Influence next turn from the Spaceport)."), "{line}");
+    assert!(line.ends_with("(Spaceport: +2 Influence next turn)."), "{line}");
     // A shut Spaceport pays nothing, and the line says nothing of it.
     g.state_mut(home).facilities.iter_mut().find(|f| f.kind == FacilityKind::Spaceport).unwrap().mothballed = true;
     assert_eq!(g.pay_spaceport(Seat(0), home, 3), 0);
@@ -16029,7 +16030,7 @@ fn the_report_says_one_net_unrest_line_a_region_with_its_causes() {
     // its Resolution alone writes them here.
     g.report_unrest_net();
     let lines = unrest_lines(&g);
-    assert_eq!(lines, vec!["China: Unrest from 3 to 1.5 (agitation by the Prospectors, Relief by the Custodians).".to_string()], "{lines:?}");
+    assert_eq!(lines, vec!["China: Unrest from 3 to 1.5 (agitation by Prospectors, Relief by Custodians).".to_string()], "{lines:?}");
     // A rise past the first threshold ends the line with what the threshold means. A Heatwave card
     // and refugees arriving are causes too, in the order they landed; the fall is skipped, as it is
     // in a turn the Region changed hands, so the figures read plainly.
@@ -16045,7 +16046,7 @@ fn the_report_says_one_net_unrest_line_a_region_with_its_causes() {
     assert_eq!(lines.len(), 1, "{lines:?}");
     assert!(lines[0].starts_with("China: Unrest from 3.5 to "), "{lines:?}");
     assert!(lines[0].contains("5.0 people arriving"), "the refugees are a cause, not a line of their own: {lines:?}");
-    assert!(lines[0].contains("agitation by the Prospectors"), "{lines:?}");
+    assert!(lines[0].contains("agitation by Prospectors"), "{lines:?}");
     assert!(lines[0].contains(", past the first threshold: the Standing Army no longer replenishes."), "{lines:?}");
     assert!(!g.report.lines.iter().any(|l| l.kind == LineKind::Refugees && l.text.contains("Unrest")), "no second line about the same Unrest: {:?}", g.report.lines);
     // A turn in which nothing but the fall moved it says nothing: the fall alone is not news.
@@ -16096,7 +16097,7 @@ fn colonists_waiting_aboard_off_earth_are_reported_under_ships_when_the_line_cha
     g.resolution_phase();
     let lines = waiting(&g);
     assert_eq!(lines.len(), 1, "{lines:?}");
-    assert_eq!(lines[0].text, "4 Colonists wait aboard in low orbit of the Moon, blocked by rivals' control of the orbit.");
+    assert_eq!(lines[0].text, "4 Colonists wait aboard in low orbit of the Moon, blocked: rivals control the orbit.");
 }
 
 /// Ticket #370: **every Ship line reads under Ships**, a heading of its own above Your works, where
@@ -16588,7 +16589,7 @@ fn a_card_that_reaches_nobody_goes_to_the_bottom_and_the_next_is_drawn() {
     assert_eq!(g.draw, CardDraw::Choice(EventId::SalvageRights), "the card under it is the draw");
     assert_eq!(g.deck.cards, vec![Card::Event(EventId::OrbitalDebris)], "and Orbital Debris waits at the bottom, unspent");
     assert_eq!(g.deck.drawn, vec![Card::Event(EventId::SalvageRights)], "only the card drawn counts as drawn");
-    assert!(g.report.lines.iter().any(|l| l.text.contains("Orbital Debris") && l.text.contains("bottom of the deck")), "{:?}", g.report.lines);
+    assert!(g.report.lines.iter().any(|l| l.text.contains("Orbital Debris") && l.text.contains("went under the deck")), "{:?}", g.report.lines);
 }
 
 /// Ticket #388: **a seat the card cannot reach is told why it passed them by, and that neither side
@@ -16634,7 +16635,7 @@ fn a_card_is_put_back_once_a_turn_and_a_deck_of_one_gives_it_back() {
     }
     assert_eq!(g.draw, CardDraw::Choice(EventId::OrbitalDebris), "the second unreachable card is drawn all the same");
     assert_eq!(g.deck.cards, vec![Card::Event(EventId::DeepSurvey)], "the Survey went to the bottom, once");
-    assert_eq!(g.report.lines.iter().filter(|l| l.text.contains("bottom of the deck")).count(), 1, "one put-back line: {:?}", g.report.lines);
+    assert_eq!(g.report.lines.iter().filter(|l| l.text.contains("went under the deck")).count(), 1, "one put-back line: {:?}", g.report.lines);
     let q = g.pending_question().expect("the Debris is the question");
     assert!(Seat::ALL.into_iter().all(|s| q.answer_of(s) == Some(CardAnswer::NothingToDecide)), "and passes everyone by");
     // A deck of one.
@@ -16692,7 +16693,7 @@ fn a_cause_from_the_resolution_survives_to_the_net_line_after_the_climate_phase(
     let name = g.tables.state(home).name.clone();
     let net: Vec<&String> = g.report.lines.iter().map(|l| &l.text).filter(|t| t.starts_with(&format!("{name}: Unrest from"))).collect();
     assert_eq!(net.len(), 1, "one net line for home: {:?}", g.report.lines);
-    assert!(net[0].contains("agitation by the Prospectors"), "and the Agitate is a cause on it: {}", net[0]);
+    assert!(net[0].contains("agitation by Prospectors"), "and the Agitate is a cause on it: {}", net[0]);
 }
 
 /// Ticket #400 (the review's finding): **a coral Break's rise is a cause on the net line**, since the
@@ -17565,15 +17566,15 @@ fn the_custodians_text_reads_its_figures_from_the_data_and_says_the_lever() {
 fn the_cut_report_lines_say_only_what_they_must() {
     let g = game();
     let say = |key: &str, args: &[(&str, &str)]| g.say(key, &args.iter().map(|(k, v)| (*k, v.to_string())).collect::<Vec<_>>());
-    assert_eq!(say("tech_complete", &[("tech", "Coastal Engineering"), ("faction", "Prospectors"), ("shares", "Prospectors 6")]), "Coastal Engineering is complete. The Prospectors led and pick the next Tech.");
+    assert_eq!(say("tech_complete", &[("tech", "Coastal Engineering"), ("faction", "Prospectors"), ("shares", "Prospectors 6")]), "Coastal Engineering is complete; Prospectors led and pick next.");
     assert_eq!(
         say("occupation_broken", &[("faction", "Prospectors"), ("place", "Egypt"), ("holder", "Custodians"), ("unrest", "2"), ("standing", "6")]),
-        "The Prospectors' Occupation of Egypt broke: +2 Unrest."
+        "Prospectors' Occupation of Egypt broke: +2 Unrest."
     );
-    assert_eq!(say("first_to_body", &[("faction", "Archivists"), ("body", "the Moon"), ("colony", "Tycho"), ("n", "5"), ("ease", "0.5")]), "The Archivists are first to settle the Moon: +5 Influence.");
-    assert_eq!(say("threw_off", &[("state", "Egypt"), ("faction", "Custodians"), ("unrest", "5")]), "Egypt threw off the Custodians.");
+    assert_eq!(say("first_to_body", &[("faction", "Archivists"), ("body", "the Moon"), ("colony", "Tycho"), ("n", "5"), ("ease", "0.5")]), "Archivists are first to settle the Moon: +5 Influence.");
+    assert_eq!(say("threw_off", &[("state", "Egypt"), ("faction", "Custodians"), ("unrest", "5")]), "Egypt threw off Custodians.");
     assert_eq!(say("sea_wall", &[("state", "China"), ("whose", "China's"), ("temperature", "1.8"), ("keep", "4")]), "China's Sea Wall held the sea; keep now 4 Materials.");
-    assert_eq!(say("occupation_broken_quiet", &[("faction", "Prospectors"), ("place", "Tycho on the Moon"), ("holder", "Custodians"), ("unrest", "0"), ("standing", "0")]), "The Prospectors' Occupation of Tycho on the Moon broke.");
+    assert_eq!(say("occupation_broken_quiet", &[("faction", "Prospectors"), ("place", "Tycho on the Moon"), ("holder", "Custodians"), ("unrest", "0"), ("standing", "0")]), "Prospectors' Occupation of Tycho on the Moon broke.");
 }
 
 /// Ticket #408 (after review): **an Occupation of a Colony that breaks claims no Unrest**, since a
@@ -19280,4 +19281,42 @@ fn the_computer_leaves_its_rivals_gates_until_last_and_starves_them() {
     g.seats[3].archive_fund = 0;
     let orders = g.ai_orders(arch);
     assert!(orders.contains(&Order::SetResearchDirective { percent: 100 }), "the fund lost, they pay into it again: {orders:?}");
+}
+
+/// Ticket #463 (version 0.09.7): **the Report's words are held to a ceiling.** The designer asked
+/// for 15 per cent off the 2,031 words its templates held; this counts every quoted template in
+/// `report.toml` the way the ticket did, so a later version cannot creep back.
+#[test]
+fn the_reports_templates_stay_under_their_word_ceiling() {
+    let text = std::fs::read_to_string(default_data_dir().join("report.toml")).expect("report.toml");
+    let words: usize = text
+        .lines()
+        .filter(|l| !l.trim_start().starts_with('#'))
+        .filter_map(|l| l.split_once(" = \""))
+        .map(|(_, v)| v.trim_end().trim_end_matches('"').split_whitespace().count())
+        .sum();
+    assert!(words <= 1727, "the Report's templates hold {words} words; the ceiling is 1,727 (15% off 2,031)");
+    // "The" is gone before a Faction's name, which is drawn in its colour instead.
+    assert!(!text.contains("he {faction}"), "a template still says \"the {{faction}}\"");
+}
+
+/// Ticket #463: a carbon credit the player SOLD is listed once, under Your works, where it used to
+/// stand under On Earth as well. (A change of hands is still listed under both, by ticket #404.)
+#[test]
+fn a_carbon_credit_the_player_sold_is_listed_once() {
+    let mut g = game();
+    calm(&mut g);
+    let cus = g.credit_seller().unwrap();
+    assert_eq!(cus, Seat(0), "the premise: the player is the Custodians, the seller");
+    for s in Seat::ALL {
+        g.seats[s.index()].blame_emitted = 100.0;
+        g.seats[s.index()].stockpile.ducats = 100.0;
+    }
+    g.seats[0].credits_offered = 12;
+    g.commit_orders(Seat(1), &[Order::BuyCredits { ppm: 3 }]);
+    g.resolution_phase();
+    let sections = g.report.sections();
+    let listed: usize = sections.iter().map(|(_, lines)| lines.iter().filter(|l| l.text.contains("carbon credit")).count()).sum();
+    assert_eq!(listed, 1, "once: {:?}", sections.iter().map(|(s, l)| (*s, l.len())).collect::<Vec<_>>());
+    assert!(sections.iter().any(|(s, lines)| *s == Section::YourWorks && lines.iter().any(|l| l.text.contains("carbon credit"))), "and under Your works");
 }
