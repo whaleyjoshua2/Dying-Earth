@@ -1578,6 +1578,17 @@ impl Game {
         gained.materials -= keep_due;
         // Ticket #387 (version 0.09.3): every figure written is settled to the tenth.
         gained = gained.settled();
+        // Ticket #467 (version 0.09.7): the gross of it, every gain and no cost, onto the seat's
+        // whole-game total for the final report.
+        let made = |r: Resource| -> f64 { sources.iter().filter(|(_, res, n)| *res == r && *n > 0.0).map(|(_, _, n)| n).sum() };
+        let (materials, fuel, energy, ducats) = (made(Resource::Materials), made(Resource::Fuel), made(Resource::Energy), made(Resource::Ducats));
+        {
+            let total = &mut self.seat_mut(seat).produced_total;
+            total.materials = tenth(total.materials + materials);
+            total.fuel = tenth(total.fuel + fuel);
+            total.energy = tenth(total.energy + energy);
+            total.ducats = tenth(total.ducats + ducats);
+        }
         self.seat_mut(seat).income_sources = sources;
         let before = self.seat(seat).stockpile;
         let clamped = balance.max(0.0);

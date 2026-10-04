@@ -1046,6 +1046,11 @@ pub struct SeatState {
     pub research_last_turn: i64,
     /// Ticket #50: all the Research this seat's own Labs have produced, counted at production.
     pub research_total: i64,
+    /// Ticket #467 (version 0.09.7): everything this seat has made at Income over the whole game,
+    /// GROSS -- before upkeep and every other cost -- for the final report. Purchases and sales are
+    /// not production and never enter it.
+    #[serde(default)]
+    pub produced_total: Stockpile,
     /// Ticket #80 (version 0.06.0): the part of it made by Observatories at Colonies and stations
     /// not at Earth (Antarctica and a station over Earth are on Earth), for the measurement.
     #[serde(default)]
@@ -1657,6 +1662,7 @@ impl Game {
             allotment: 0,
             research_last_turn: 0,
             research_total: 0,
+            produced_total: Stockpile::default(),
             research_off_earth_total: 0,
             doubled_module_turns: 0,
             lost_in_transit: 0,

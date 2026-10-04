@@ -19355,3 +19355,25 @@ fn the_tutorials_seventh_note_teaches_greenwash_and_smear() {
     assert_eq!(last.note.as_deref(), Some("That is the last of these notes; the game carries on from here. Planetary Stewardship is required for victory."));
     assert!(notes[5].note.is_none(), "turn 6 no longer says it is the last");
 }
+
+/// Ticket #467 (version 0.09.7): **what a seat has produced over the whole game**, for the final
+/// report -- gross, everything made at Income before upkeep and other costs -- kept as a running
+/// total beside the Research total that was always kept.
+#[test]
+fn a_seat_keeps_a_gross_total_of_what_it_has_produced() {
+    let mut g = fresh();
+    calm(&mut g);
+    assert_eq!(g.seats[0].produced_total, Stockpile::default(), "nothing made before the first Income");
+    g.income_phase();
+    let gross = |g: &Game, r: Resource| -> f64 { g.seats[0].income_sources.iter().filter(|(_, res, n)| *res == r && *n > 0.0).map(|(_, _, n)| n).sum() };
+    let first = Stockpile { materials: gross(&g, Resource::Materials), fuel: gross(&g, Resource::Fuel), energy: gross(&g, Resource::Energy), ducats: gross(&g, Resource::Ducats) };
+    assert!(first.materials > 0.0 && first.energy > 0.0 && first.ducats > 0.0, "the premise: the start Region makes things: {first:?} {:?}", g.seats[0].income_sources);
+    assert!(g.seats[0].income_sources.iter().any(|(_, _, n)| *n < 0.0), "the premise: and something is paid out of it");
+    let total = g.seats[0].produced_total;
+    for (have, want) in [(total.materials, first.materials), (total.fuel, first.fuel), (total.energy, first.energy), (total.ducats, first.ducats)] {
+        assert!((have - want).abs() < 1e-9, "gross, upkeep not taken off: {total:?} against {first:?}");
+    }
+    assert!(total.energy > g.seats[0].income_last_turn.energy, "more than the net the Stockpile gained");
+    g.income_phase();
+    assert!((g.seats[0].produced_total.materials - first.materials - gross(&g, Resource::Materials)).abs() < 1e-9, "and it runs on, Income after Income");
+}

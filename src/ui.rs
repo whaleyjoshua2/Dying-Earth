@@ -2929,6 +2929,26 @@ fn unseen_army_lines(ui: &mut Ui, game: &Game, unseen: &[&Army]) {
     }
 }
 
+/// Ticket #467 (version 0.09.7): a whole figure with its thousands marked, "1,240".
+fn grouped(n: f64) -> String {
+    let whole = n.round() as i64;
+    let digits = whole.abs().to_string();
+    let mut out = String::new();
+    for (i, c) in digits.chars().enumerate() {
+        if i > 0 && (digits.len() - i).is_multiple_of(3) {
+            out.push(',');
+        }
+        out.push(c);
+    }
+    if whole < 0 { format!("-{out}") } else { out }
+}
+
+/// Ticket #467: a final-report cell at the designer's word -- the whole game's total, then the
+/// Stockpile at the end in brackets: "1,240 (38)".
+fn made_and_held(made: f64, held: f64) -> String {
+    format!("{} ({})", grouped(made), grouped(held))
+}
+
 /// Ticket #463 (version 0.09.7): a Report line cut wherever it names a Faction, so each name can be
 /// drawn in its Faction's colour and a line that names two shows both.
 fn split_faction_names<'a>(text: &'a str, names: &[(String, Seat)]) -> Vec<(&'a str, Option<Seat>)> {
@@ -11938,17 +11958,19 @@ fn chronicle_screen(root: &mut Ui, session: &Session, actions: &mut Vec<Action>)
 
             // 3. The table: nine figures a row, every one of them the engine's. The Stockpile alone
             // says least about a Faction that spent well, which is why the other five are here.
-            ui.label(RichText::new("What each Faction ended the game holding").size(20.0).strong());
+            ui.label(RichText::new("What each Faction made and held").size(20.0).strong());
             ui.add_space(4.0);
             egui::Grid::new("chronicle_table").num_columns(10).spacing((18.0, 6.0)).striped(true).show(ui, |ui| {
                 let head = |ui: &mut Ui, text: &str, hover: &str| {
                     ui.label(RichText::new(text).strong()).on_hover_text(hover);
                 };
                 ui.label(RichText::new("Faction").strong());
-                head(ui, "Materials", "The Materials in the Faction's Stockpile at the end.");
-                head(ui, "Fuel", "The Fuel in the Faction's Stockpile at the end.");
-                head(ui, "Energy", "The Energy in the Faction's Stockpile at the end.");
-                head(ui, "Ducats", "The Ducats in the Faction's Stockpile at the end.");
+                // Ticket #467 (version 0.09.7): the whole game's production, gross, with the Stockpile
+                // at the end in brackets, where the Stockpile stood alone.
+                head(ui, "Materials", "Materials made over the whole game, before upkeep. In brackets: the Stockpile at the end.");
+                head(ui, "Fuel", "Fuel made over the whole game. In brackets: the Stockpile at the end.");
+                head(ui, "Energy", "Energy made over the whole game, before upkeep. In brackets: the Stockpile at the end.");
+                head(ui, "Ducats", "Ducats made over the whole game, sales apart. In brackets: the Stockpile at the end.");
                 head(ui, "Off Earth", "Colonists living off Earth: in Colonies away from Earth and on stations over it. Antarctica is on Earth.");
                 head(ui, "Regions", "Nation States the Faction directed at the end: those it controlled, and those it occupied.");
                 head(ui, "Colonies", "Colonies and stations the Faction directed at the end, the two counted together.");
@@ -11958,14 +11980,14 @@ fn chronicle_screen(root: &mut Ui, session: &Session, actions: &mut Vec<Action>)
                 for (seat, _) in &ranking {
                     let s = game.seat(*seat);
                     ui.label(RichText::new(game.seat_name(*seat)).strong().color(seat_colour(session, *seat)));
-                    ui.label(figure(s.stockpile.materials));
-                    ui.label(figure(s.stockpile.fuel));
-                    ui.label(figure(s.stockpile.energy));
-                    ui.label(figure(s.stockpile.ducats));
+                    ui.label(made_and_held(s.produced_total.materials, s.stockpile.materials));
+                    ui.label(made_and_held(s.produced_total.fuel, s.stockpile.fuel));
+                    ui.label(made_and_held(s.produced_total.energy, s.stockpile.energy));
+                    ui.label(made_and_held(s.produced_total.ducats, s.stockpile.ducats));
                     ui.label(format!("{}", game.off_world_colonists(*seat)));
                     ui.label(format!("{}", game.directed_states(*seat).len()));
                     ui.label(format!("{}", game.directed_colonies(*seat).len()));
-                    ui.label(format!("{}", s.research_total));
+                    ui.label(grouped(s.research_total as f64));
                     ui.label(format!("{:.0} ppm ({:.0}%)", game.blame(*seat), game.blame_share(*seat) * 100.0));
                     ui.end_row();
                 }
@@ -11996,6 +12018,15 @@ fn chronicle_screen(root: &mut Ui, session: &Session, actions: &mut Vec<Action>)
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Ticket #467 (version 0.09.7): the final report's cell is the total and then the Stockpile.
+    #[test]
+    fn a_final_report_cell_reads_total_then_stockpile() {
+        assert_eq!(made_and_held(1240.4, 38.2), "1,240 (38)");
+        assert_eq!(made_and_held(999.6, 0.0), "1,000 (0)");
+        assert_eq!(grouped(1_234_567.0), "1,234,567");
+        assert_eq!(grouped(12.0), "12");
+    }
 
     /// Ticket #464 (version 0.09.7): the ring around the sun runs over the top from eight o'clock to
     /// four, so a point on it there is the ring's, and the open foot, the disc and the space

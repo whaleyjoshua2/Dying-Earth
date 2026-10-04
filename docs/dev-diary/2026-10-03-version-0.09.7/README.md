@@ -120,3 +120,13 @@ not enough, and the rails are half what they were.
 **Witnessed red:** the test `the_clock_reads_twelve_hours_and_the_sitting_reads_hours_and_minutes`
 could not compile before the two functions existed. The Linux local-time code cannot be built on
 this Windows host; the GitHub kit build is its first compile.
+
+## The final report's totals (ticket #467)
+
+- [`final-chronicle.png`](ticket-467/final-chronicle.png): the Chronicle of seed 7, the table under
+  its new heading. The Prospectors made 1,549 Ducats and ended with 2; the Custodians' Fuel reads
+  "8 (10)", the Stockpile above the total, since they began with Fuel they did not make.
+
+**Witnessed red:** the test `a_seat_keeps_a_gross_total_of_what_it_has_produced` could not compile
+before the counter existed, and then failed on its own premise: the tests' usual board strips every
+building, so nothing was made. It uses the full starting board.

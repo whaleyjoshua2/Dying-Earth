@@ -217,3 +217,21 @@ moves.
 - **If the row is ever full, the clock is left out** rather than wrapped to a third line.
 - **Local time on Linux too.** The clock, and the Load screen's times with it, read the machine's
   own time zone there, where the Load screen read UTC.
+
+## 10. The final report's totals: Total (Stockpile at the end)
+
+The authority is [ticket #467](https://github.com/whaleyjoshua2/Dying-Earth/issues/467). No rule
+moves.
+
+- **The Chronicle's table** is headed "What each Faction made and held". Its Materials, Fuel, Energy
+  and Ducats columns read the whole game's production and then the Stockpile at the end in brackets:
+  "1,240 (38)". They read the Stockpile alone before.
+- **Produced is gross:** everything made at Income, before upkeep and every other cost. A Ducat
+  banked to the Venture Fund was still made. Market purchases, sales and carbon credits are not
+  production.
+- **Research** stays a whole-game total with no bracket: there is no Stockpile of it.
+- A bracket can exceed its total: a seat starts the game with a Stockpile it did not make, and may
+  buy more.
+- Figures of a thousand and over carry a comma.
+- **Older saves:** nothing is built for them, at the designer's word. A save from before this
+  section still loads, and its totals count from the load.
