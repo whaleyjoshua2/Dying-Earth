@@ -51,3 +51,21 @@ The authority is [ticket #459](https://github.com/whaleyjoshua2/Dying-Earth/issu
 | collapses | 46 | 40 |
 | the world under the Sink at least once | 10 games | 17 games |
 | the Sink at the end, median by seating | 4.0 / 4.5 / 4.8 / 5.2 | 4.0 / 7.1 / 7.2 / 9.9 |
+
+## 3. The Strip Permit's lasting Unrest at +2
+
+The authority is [ticket #460](https://github.com/whaleyjoshua2/Dying-Earth/issues/460).
+
+- **When a Strip Permit's three turns end, the Region's Unrest rises by 2 for good**, where it rose
+  by 3. The Prospectors' card text says so. Its other prices are unchanged: Baseline Emissions +0.2,
+  once per Region, ever.
+- The computer Prospectors take a Permit without weighing its Unrest, so nothing was taught.
+
+**Measured** (80 games):
+
+| | after §2 | Strip Permit at +2 |
+|---|---|---|
+| wins (Cust / Pros / Ark / Arch) | 10 / 3 / 13 / 13 | 10 / 5 / 11 / 12 |
+| collapses | 40 | 41 |
+
+Within noise. The Prospectors place first on score in 36 games, from 32.

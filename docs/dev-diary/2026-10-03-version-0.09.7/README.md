@@ -27,3 +27,13 @@ from cause. The rule became three steps.
 
 **The sweep** ([`after-459.txt`](sweeps/after-459.txt)): 10 / 3 / 13 / 13 and 40 collapses, from
 6 / 2 / 11 / 15 and 46. The world goes under the Sink at least once in 17 games of 80, from 10.
+
+## The Strip Permit's lasting Unrest at +2 (ticket #460)
+
+No picture: a figure in data and one sentence of the Prospectors' card.
+
+**Witnessed red:** the test `f_a_strip_permit_doubles_output_for_three_turns_then_charges_its_price`,
+moved to 2 before the data, read `left: (3, 2.0, 0.2, 3.0), right: (3, 2.0, 0.2, 2.0)`.
+
+**The sweep** ([`after-460.txt`](sweeps/after-460.txt)): 10 / 5 / 11 / 12 and 41 collapses, from
+10 / 3 / 13 / 13 and 40. Within noise.

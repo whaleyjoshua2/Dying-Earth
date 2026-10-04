@@ -3870,7 +3870,7 @@ fn e_a_scrubber_enlarges_the_sink_and_is_capped_captured_at_half_and_calming() {
 }
 
 /// (f) A Strip Permit doubles a state's Facility output for three turns, then raises its Baseline
-/// Emissions by 0.2 and its Unrest by 3, for good. Once per state, ever, and the Prospectors only.
+/// Emissions by 0.2 and its Unrest by 2 (ticket #460, version 0.09.7; 3 before), for good. Once per state, ever, and the Prospectors only.
 #[test]
 fn f_a_strip_permit_doubles_output_for_three_turns_then_charges_its_price() {
     let mut g = game();
@@ -3879,7 +3879,7 @@ fn f_a_strip_permit_doubles_output_for_three_turns_then_charges_its_price() {
     g.take_control(sid, Seat(1));
     g.state_mut(sid).facilities.push(facility(FacilityKind::Factory));
     let t = g.tables.strip_permit.clone();
-    assert_eq!((t.turns, t.multiplier, t.baseline_rise, t.unrest), (3, 2.0, 0.2, 3.0));
+    assert_eq!((t.turns, t.multiplier, t.baseline_rise, t.unrest), (3, 2.0, 0.2, 2.0));
     // The Custodians have no Strip Permit.
     assert!(g.check_order(Seat(0), &[], &Order::StripPermit { state: StateId::EastAsia }).is_err(), "only the Prospectors issue one");
     let o = Order::StripPermit { state: sid };
@@ -3905,8 +3905,8 @@ fn f_a_strip_permit_doubles_output_for_three_turns_then_charges_its_price() {
     }
     assert_eq!(g.facility_yield(Seat(1), sid, FacilityKind::Factory).amount, normal, "and back to normal afterwards");
     assert!((g.baseline_emissions(sid) - (baseline + 0.2)).abs() < 1e-9, "its Baseline Emissions rose 0.2 for good");
-    // The rise is 3; the turn's own fall of 1.5 comes off it in the same Resolution.
-    let expected = 2.0 + 3.0 - g.tables.unrest.natural_fall;
+    // The rise is 2; the turn's own fall of 1.5 comes off it in the same Resolution.
+    let expected = 2.0 + 2.0 - g.tables.unrest.natural_fall;
     assert!((g.unrest(sid) - expected).abs() < 1e-9, "Unrest {} where {expected} was wanted", g.unrest(sid));
 }
 

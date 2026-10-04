@@ -74,7 +74,8 @@ coastal_per_exposure = 2
 turns = 3
 multiplier = 2.0
 baseline_rise = 0.2
-unrest = 3.0
+# Ticket #460 (version 0.09.7): 2, where it was 3.
+unrest = 2.0
 
 [development]
 turns = 9
