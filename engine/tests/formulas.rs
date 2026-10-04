@@ -7625,6 +7625,68 @@ fn the_ai_founds_at_a_far_orbit_once_the_ordinary_slots_are_taken() {
     }
 }
 
+/// Ticket #481 (version 0.09.8): **the race to the Moon is everyone's to watch.** Each Faction's
+/// furthest step toward a landing is read off the board, the leader first; a loaded Colony Ship
+/// sent there before the first landing is the world's news; and the landing's Moment names the
+/// winner and how far each rival had got. Once somebody has landed the race is over.
+#[test]
+fn the_race_to_the_moon_is_everyones_to_watch() {
+    let mut g = game();
+    calm(&mut g);
+    let (cus, ark) = (Seat(0), Seat(2));
+    // The bare board: three stations with no Shipyard, and the Arkwrights with no station at all.
+    assert!(Seat::ALL.iter().all(|s| g.moon_step(*s) == MoonStep::NoShipyard));
+    assert_eq!(g.moon_race().unwrap().iter().map(|(s, _)| *s).collect::<Vec<_>>(), Seat::ALL.to_vec(), "all level: seat order");
+    // The steps, one at a time.
+    let iss = station_of(&g, cus, BodyId::Earth).unwrap();
+    g.colony_mut(iss).unwrap().modules.push(Module::new(ModuleKind::Shipyard));
+    assert_eq!(g.moon_step(cus), MoonStep::Shipyard);
+    let (ship, _) = colony_ship_ready(&mut g, BodyId::Earth);
+    g.ship_mut(ship).unwrap().colonists = 0;
+    assert_eq!(g.moon_step(cus), MoonStep::ColonyShip);
+    // An empty Colony Ship sent to the Moon is no news, and no step further.
+    let to_moon = Order::Transit { ship, to: BodyId::Moon, slot: None };
+    let sent = |g: &Game| g.report.lines.iter().filter(|l| l.text.contains("sent a Colony Ship to the Moon")).count();
+    g.ship_mut(ship).unwrap().colonists = 4;
+    assert_eq!(g.moon_step(cus), MoonStep::Aboard);
+    // The Arkwrights catch up as far as a Shipyard, and stand second.
+    let theirs = colony(&mut g, ark, BodyId::Mars, &[ModuleKind::Shipyard], 0);
+    let _ = theirs;
+    assert_eq!(g.moon_race().unwrap()[..2], [(cus, MoonStep::Aboard), (ark, MoonStep::Shipyard)], "the leader first");
+    // Loaded and sent: the world reads it, with no place and no seat for the fog to hide it by.
+    g.commit_orders(cus, std::slice::from_ref(&to_moon));
+    assert_eq!(sent(&g), 1);
+    let line = g.report.lines.iter().find(|l| l.text.contains("sent a Colony Ship")).unwrap();
+    assert_eq!((line.text.as_str(), line.place, line.by), ("Custodians sent a Colony Ship to the Moon.", None, None));
+    assert_eq!(g.moon_step(cus), MoonStep::Bound);
+    g.resolution_phase();
+    assert_eq!(g.moon_step(cus), MoonStep::InOrbit);
+    // The landing: the race is over, and its Moment says who won and where each rival stood.
+    g.ships.iter_mut().for_each(|s| s.arrived_this_turn = false);
+    let slot = g.free_slots_on(BodyId::Moon)[0];
+    g.commit_orders(cus, &[Order::Unload { ship, colonists: 4, army: false, into: UnloadTarget::Slot(BodyId::Moon, slot) }]);
+    g.resolution_phase();
+    assert_eq!(g.moon_step(cus), MoonStep::Landed);
+    assert_eq!(g.first_at(BodyId::Moon).map(|(s, _)| s), Some(cus));
+    assert!(g.moon_race().is_none(), "over once somebody has landed");
+    let moment = g.report.moments.iter().find(|m| m.kind == MomentKind::FirstToABody).expect("the landing's Moment");
+    assert!(moment.text.starts_with("Custodians win the race to the Moon. "), "{}", moment.text);
+    assert!(moment.text.contains("Arkwrights had a Shipyard") && moment.text.contains("Prospectors had no Shipyard") && moment.text.contains("Archivists had no Shipyard"), "{}", moment.text);
+    assert!(moment.text.contains("is theirs; Unrest eased by"), "{}", moment.text);
+    assert_eq!(g.report.moments.iter().filter(|m| m.kind == MomentKind::FirstToABody).count(), 1, "one Moment, not the old and the new");
+    // After the landing a Colony Ship sent to the Moon is no longer the world's news.
+    let before = sent(&g);
+    let (second, _) = colony_ship_ready(&mut g, BodyId::Earth);
+    g.commit_orders(cus, &[Order::Transit { ship: second, to: BodyId::Moon, slot: None }]);
+    assert_eq!(sent(&g), before);
+    // Another Body's first landing keeps the words it had.
+    let (third, _) = colony_ship_ready(&mut g, BodyId::Mars);
+    let site = g.free_slots_on(BodyId::Mars)[0];
+    g.commit_orders(cus, &[Order::Unload { ship: third, colonists: 4, army: false, into: UnloadTarget::Slot(BodyId::Mars, site) }]);
+    g.resolution_phase();
+    assert!(g.report.moments.iter().any(|m| m.text.contains("are first to settle Mars")), "{:?}", g.report.moments.iter().map(|m| m.text.clone()).collect::<Vec<_>>());
+}
+
 /// Ticket #93: the AI raises a station at Venus when a Ship of its own stands there. Ticket #442
 /// (version 0.09.6): by FOUNDING it -- its loaded Colony Ship, in a free ring, unloads into it.
 #[test]
@@ -19534,7 +19596,9 @@ fn the_reports_templates_stay_under_their_word_ceiling() {
         .filter_map(|l| l.split_once(" = \""))
         .map(|(_, v)| v.trim_end().trim_end_matches('"').split_whitespace().count())
         .sum();
-    assert!(words <= 1727, "the Report's templates hold {words} words; the ceiling is 1,727 (15% off 2,031)");
+    // Ticket #481 (version 0.09.8): the ceiling rises by the 54 words of the race to the Moon, a
+    // new thing the Report says; the 15% cut of what it said before stands.
+    assert!(words <= 1781, "the Report's templates hold {words} words; the ceiling is 1,781 (15% off 2,031, and 54 for the race to the Moon)");
     // "The" is gone before a Faction's name, which is drawn in its colour instead.
     assert!(!text.contains("he {faction}"), "a template still says \"the {{faction}}\"");
 }

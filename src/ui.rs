@@ -3717,6 +3717,32 @@ fn first_to_body_line(ui: &mut Ui, session: &Session, game: &Game, body: BodyId)
     );
 }
 
+/// Ticket #481 (version 0.09.8): **the race to the Moon**, on the Moon's card until somebody lands:
+/// each Faction's furthest step toward a landing, the leader first, in its own colour. It is read
+/// through the fog, at the designer's word: a contest nobody can see is not one.
+fn moon_race_block(ui: &mut Ui, session: &Session, game: &Game, body: BodyId) {
+    if body != BodyId::Moon {
+        return;
+    }
+    let Some(race) = game.moon_race() else { return };
+    rule_tip(
+        ui.label(RichText::new("The race to the Moon").strong()),
+        "How far each Faction has got toward landing here, the leader first. Everyone sees it, until somebody lands.".to_string(),
+    );
+    for (seat, step) in race {
+        let words = match step {
+            MoonStep::NoShipyard => "no Shipyard",
+            MoonStep::Shipyard => "has a Shipyard",
+            MoonStep::ColonyShip => "has a Colony Ship",
+            MoonStep::Aboard => "Colonists aboard",
+            MoonStep::Bound => "on the way",
+            MoonStep::InOrbit => "in the Moon's orbit",
+            MoonStep::Landed => "landed",
+        };
+        ui.label(RichText::new(format!("{}: {words}", game.seat_name(seat))).color(seat_colour(session, seat)));
+    }
+}
+
 /// Ticket #46: the stations over the Body on screen, and the orbital slots still free.
 /// Ticket #283 (version 0.08.5): the planet card's Colonies block. The Body's own four figures
 /// first, weak, then one row per Colony on the ground and per open site, in slot order, with the
@@ -3731,6 +3757,8 @@ fn colonies_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSt
         slot_yield_row(ui, [("materials", card.mine_yield), ("energy", card.generator_yield), ("fuel", card.refinery_yield), ("research", card.research_yield)], 14.0, weak);
     });
     first_to_body_line(ui, session, game, body);
+    // Ticket #481 (version 0.09.8): the race to the Moon, under the line that says nobody has landed.
+    moon_race_block(ui, session, game, body);
     let rows: Vec<u32> = (0..card.colony_slots()).filter(|s| body != BodyId::Earth || game.colony_at(body, *s).is_some()).collect();
     if rows.is_empty() {
         return;

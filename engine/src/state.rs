@@ -3712,6 +3712,44 @@ impl Game {
         self.body_firsts.iter().find(|f| f.body == body).map(|f| (f.seat, f.colony))
     }
 
+    /// Ticket #481 (version 0.09.8): **how far a Faction has got toward landing on the Moon**: the
+    /// furthest step it stands on. Read off the board, and the same for every seat.
+    pub fn moon_step(&self, seat: Seat) -> MoonStep {
+        let mine = |c: &&Colony| c.control.director() == Some(seat);
+        if self.colonies.iter().filter(mine).any(|c| c.body == BodyId::Moon && !c.in_orbit) {
+            return MoonStep::Landed;
+        }
+        let loaded: Vec<&Ship> = self.ships.iter().filter(|s| s.seat == seat && s.kind == UnitKind::ColonyShip && s.colonists > 0).collect();
+        if loaded.iter().any(|s| s.at == ShipAt::Body(BodyId::Moon)) {
+            return MoonStep::InOrbit;
+        }
+        if loaded.iter().any(|s| matches!(s.at, ShipAt::Transit { to: BodyId::Moon, .. })) {
+            return MoonStep::Bound;
+        }
+        if !loaded.is_empty() {
+            return MoonStep::Aboard;
+        }
+        if self.ships.iter().any(|s| s.seat == seat && s.kind == UnitKind::ColonyShip) {
+            return MoonStep::ColonyShip;
+        }
+        if self.colonies.iter().filter(mine).any(|c| c.modules.iter().any(|m| m.kind == ModuleKind::Shipyard)) {
+            return MoonStep::Shipyard;
+        }
+        MoonStep::NoShipyard
+    }
+
+    /// Ticket #481: **the race to the Moon**, every seat's step, the leader first and ties in seat
+    /// order. It is everyone's to see, through the fog. `None` once somebody has landed: the race
+    /// is over and the Moon's card says who won it.
+    pub fn moon_race(&self) -> Option<Vec<(Seat, MoonStep)>> {
+        if self.first_at(BodyId::Moon).is_some() {
+            return None;
+        }
+        let mut race: Vec<(Seat, MoonStep)> = Seat::ALL.into_iter().map(|s| (s, self.moon_step(s))).collect();
+        race.sort_by_key(|r| std::cmp::Reverse(r.1));
+        Some(race)
+    }
+
     /// Ticket #345: every Body this seat was first to, in the order it claimed them.
     pub fn firsts_of(&self, seat: Seat) -> Vec<BodyFirst> {
         self.body_firsts.iter().copied().filter(|f| f.seat == seat).collect()
@@ -3751,6 +3789,12 @@ impl Game {
         if self.colonies.iter().any(|c| c.body == body && !c.in_orbit && c.id != colony && c.founded_turn < self.turn) {
             return false;
         }
+        // Ticket #481 (version 0.09.8): where each rival stood in the race to the Moon, read before
+        // the landing is written down, for the Moment that ends it.
+        let rivals: Vec<String> = match (body, self.moon_race()) {
+            (BodyId::Moon, Some(race)) => race.into_iter().filter(|(s, _)| *s != seat).map(|(s, step)| self.phrase(step.key(), &[("faction", self.seat_name(s))])).collect(),
+            _ => Vec::new(),
+        };
         self.body_firsts.push(BodyFirst { body, seat, colony });
         let windfall = self.tables.body(body).first_windfall;
         self.seats[seat.index()].first_windfall += windfall;
@@ -3771,7 +3815,15 @@ impl Game {
         self.report_line(LineKind::ColonyFounded, Some(ReportPlace::Colony(colony)), text);
         let eased = self.say("first_to_body_eases", &[("body", body_name), ("ease", figure(ease))]);
         self.report_line(LineKind::Unrest, None, eased);
-        self.moment(MomentKind::FirstToABody, &args, Some(ReportPlace::Colony(colony)));
+        // Ticket #481: the Moon's first landing is the end of a race everyone watched, and its
+        // Moment says so in words of its own, with the figure every first landing carries.
+        if rivals.is_empty() {
+            self.moment(MomentKind::FirstToABody, &args, Some(ReportPlace::Colony(colony)));
+        } else if let Some(card) = self.tables.report.moment(MomentKind::FirstToABody) {
+            let figure = crate::report::render(&card.figure, &args);
+            let text = self.say("moon_race_won", &[("faction", args[0].1.clone()), ("rivals", rivals.join("; ")), ("colony", args[2].1.clone()), ("ease", args[4].1.clone())]);
+            self.report.moments.push(Moment { kind: MomentKind::FirstToABody, text, figure, place: Some(ReportPlace::Colony(colony)), tech: None, note: None, seat: None });
+        }
         true
     }
 

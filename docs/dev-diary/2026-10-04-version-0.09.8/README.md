@@ -250,3 +250,29 @@ not give (1.0, 5.0, 1.0).
 7 / 20 / 17 / 4 and 32. Within noise. Ships stranded at the end: 3 over the 80 games, from 15. The
 Mass Driver's change left it the same to the line: the computer seats build none (0 standing at the
 end of all 80 games).
+
+## A Moon race everyone can watch (#481)
+
+The designer asked for a Report line, a countdown on the Moon's card, and *"a proper moment when
+someone lands"*. Charting found the Moment already existed (0.09.1) and that the Moon is one turn
+away, so a countdown of turns would always read "next turn". Decided on the ticket: the card counts
+steps toward a landing; the race is seen through the fog, for the Moon only, until it is won; the
+landing's Moment gets words of its own naming where each rival stood.
+
+**Witnessed red:** `the_race_to_the_moon_is_everyones_to_watch` passed on its first run, so the
+news line was broken on purpose (sent to Mars in place of the Moon) and the test failed
+(`left: 0, right: 1`), then restored. The Report's word ceiling went red too, as expected: 1,780
+words against 1,727. It was raised by the 54 words added.
+
+A new aid, `moonrace:1`, stages four Factions on four different steps; `moonrace:won` then lands
+one of them.
+
+- **The Moon's card mid-race** (`moonrace:1`):
+  ![the race on the Moon's card](ticket-481/moon-card-race.png)
+- **The Moment that ends it** (`menus:1 moonrace:won moment:first`):
+  ![the Moment](ticket-481/race-won-moment.png)
+
+**The sweep** ([`after-481.txt`](sweeps/after-481.txt)) is the same to the line as `after-486.txt`:
+7 / 21 / 16 / 4 and 32 collapses. The race is shown, not played differently.
+
+Not pictured: the Report's "sent a Colony Ship to the Moon" line, which the test reads.

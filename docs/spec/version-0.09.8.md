@@ -331,3 +331,31 @@ table of section 8 and the fares of section 7.
 | Ships stranded at the end | 15 | 3 |
 
 The win column is within noise. Stranding is back to where it stood before section 8.
+
+## 10. A Moon race everyone can watch
+
+The authority is [ticket #481](https://github.com/whaleyjoshua2/Dying-Earth/issues/481).
+
+- **Until somebody lands on the Moon, the race to it is everyone's to see**, through the fog. It
+  changes no rule: the first landing's prize is what it was (5 Influence, +1 a turn, Unrest eased).
+- **Each Faction stands on the furthest of six steps**, read off the board:
+  no Shipyard; a Shipyard; a Colony Ship; Colonists aboard a Colony Ship; a loaded Colony Ship on
+  the way to the Moon; a loaded Colony Ship in the Moon's orbit.
+- **The Moon's card lists the race**, under the line that says nobody has landed: a heading, "The
+  race to the Moon", and one line a Faction in its colour, the leader first and ties in seat order:
+  "Prospectors: in the Moon's orbit". It leaves the card at the first landing.
+- **The Report says when a loaded Colony Ship is sent to the Moon**, before the first landing, by
+  any Faction, the player's own included: "Arkwrights sent a Colony Ship to the Moon." It carries no
+  place and no seat, so every seat reads it. An empty Colony Ship and a warship write nothing.
+- **The first landing's Moment has words of its own**: "Prospectors win the race to the Moon.
+  Arkwrights were on the way; Archivists had built a Colony Ship; Custodians had no Shipyard. Mare
+  Tranquillitatis on the Moon is theirs; Unrest eased by 0.5 in every Region." Its figure is the
+  Influence, as for any first landing. Every other Body's first landing reads as before.
+- **Only the Moon.** No other Body has a race card.
+- **The Report's word ceiling rises from 1,727 to 1,781**: the 54 words these lines add. The 15% cut
+  of version 0.09.7 stands on what the Report said before.
+- **The computer seats** play as they did. The sweep is the same to the line as the one before it
+  ([`after-481.txt`](../dev-diary/2026-10-04-version-0.09.8/sweeps/after-481.txt)): 7 / 21 / 16 / 4
+  and 32 collapses.
+
+**Pictures:** [`ticket-481/`](../dev-diary/2026-10-04-version-0.09.8/ticket-481/).

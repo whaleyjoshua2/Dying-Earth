@@ -467,6 +467,9 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("no_habitat_room", &["n", "place"]),
     // Ticket #345 (version 0.09.1): a Body settled for the first time.
     ("first_to_body", &["faction", "body", "colony", "n"]),
+    // Ticket #481 (version 0.09.8): the race to the Moon.
+    ("moon_race_sent", &["faction"]),
+    ("moon_race_won", &["faction", "rivals", "colony", "ease"]),
     ("opening_met", &["reward"]),
     ("opening_launch_site", &["state"]),
     // Ticket #395 (version 0.09.3): and the world eases at the news, one line for the whole Earth.
@@ -631,6 +634,13 @@ pub fn ordinal(n: usize) -> String {
 
 /// The same for `[phrase]`.
 pub const PHRASE_ARGS: &[(&str, &[&str])] = &[
+    // Ticket #481 (version 0.09.8): a rival's step in the race to the Moon.
+    ("moon_no_shipyard", &["faction"]),
+    ("moon_shipyard", &["faction"]),
+    ("moon_colony_ship", &["faction"]),
+    ("moon_aboard", &["faction"]),
+    ("moon_bound", &["faction"]),
+    ("moon_in_orbit", &["faction"]),
     ("attacks", &[]),
     // Ticket #370 (version 0.09.2): where the player's Colonists wait aboard, and what blocks them.
     ("waiting_low", &["body"]),

@@ -64,6 +64,34 @@ pub enum Orbit {
     Slot(u32),
 }
 
+/// Ticket #481 (version 0.09.8): **a step toward landing on the Moon**, in order, the race the
+/// Moon's card shows for every Faction until somebody lands.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum MoonStep {
+    NoShipyard,
+    Shipyard,
+    ColonyShip,
+    Aboard,
+    Bound,
+    InOrbit,
+    Landed,
+}
+
+impl MoonStep {
+    /// The `[phrase]` in `report.toml` that says a rival stood here when the race was won.
+    pub fn key(self) -> &'static str {
+        match self {
+            MoonStep::NoShipyard => "moon_no_shipyard",
+            MoonStep::Shipyard => "moon_shipyard",
+            MoonStep::ColonyShip => "moon_colony_ship",
+            MoonStep::Aboard => "moon_aboard",
+            MoonStep::Bound => "moon_bound",
+            // A rival that has landed cannot be a rival of the first to land.
+            MoonStep::InOrbit | MoonStep::Landed => "moon_in_orbit",
+        }
+    }
+}
+
 /// Ticket #486 (version 0.09.8): **an end of a journey** -- a Body, or one of its far orbits,
 /// which for travel is a place of its own: Earth L4 is not left by way of Earth.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

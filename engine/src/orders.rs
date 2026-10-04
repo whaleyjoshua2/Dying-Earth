@@ -2516,6 +2516,13 @@ impl Game {
                         s.slot = *slot;
                     }
                     self.log(format!("{} launches {} toward {} ({} turns, {} Fuel from the tank).", self.seat_name(seat), ship, name, turns, figure(fuel)));
+                    // Ticket #481 (version 0.09.8): a loaded Colony Ship sent to the Moon before
+                    // anybody has landed there is the world's news, whoever sent it and whatever
+                    // the fog hides: it carries no place and no seat, so every seat reads it.
+                    if *to == BodyId::Moon && self.first_at(BodyId::Moon).is_none() && self.ship(*ship).is_some_and(|s| s.kind == UnitKind::ColonyShip && s.colonists > 0) {
+                        let text = self.say("moon_race_sent", &[("faction", self.seat_name(seat))]);
+                        self.report_line(LineKind::Ship, None, text);
+                    }
                 }
                 // Ticket #335 (version 0.09.0): the Fuel leaves the tank now, as a transit's does,
                 // and the Ship moves at the Resolution WITH the transits, before the Battles, so a

@@ -63,6 +63,11 @@ no_habitat_room = "{n} more found no Habitat room at {place}."
 # Ticket #345 (version 0.09.1): the first Colony a world has ever carried, and what it pays.
 # Ticket #408 (version 0.09.4): cut to what it must say, as are the four lines below.
 first_to_body = "{faction} are first to settle {body}: +{n} Influence."
+# Ticket #481 (version 0.09.8): the race to the Moon, which everyone watches. A loaded Colony Ship
+# sent there before the first landing is the world's news, whoever sent it; and the landing's
+# Moment names the winner and says how far each rival had got.
+moon_race_sent = "{faction} sent a Colony Ship to the Moon."
+moon_race_won = "{faction} win the race to the Moon. {rivals}. {colony} is theirs; Unrest eased by {ease} in every Region."
 # Ticket #471 (version 0.09.7): the player's own Opening Objective, met; a rival's is not reported.
 opening_met = "Objective met: {reward}."
 opening_launch_site = "Free Launch Site in {state}."
@@ -260,6 +265,13 @@ energy_zero = "{faction}: Energy at zero with every producer off."
 # ---------------------------------------------------------------- fragments other sentences use
 [phrase]
 attacks = " and attacks"
+# Ticket #481 (version 0.09.8): how far a rival had got in the race to the Moon when it was won.
+moon_no_shipyard = "{faction} had no Shipyard"
+moon_shipyard = "{faction} had a Shipyard"
+moon_colony_ship = "{faction} had built a Colony Ship"
+moon_aboard = "{faction} had Colonists aboard"
+moon_bound = "{faction} were on the way"
+moon_in_orbit = "{faction} were in its orbit"
 # Ticket #370 (version 0.09.2): where the player's Colonists wait aboard, and what blocks them. One
 # orbit reads "in low orbit of Mars" or "at Ares over Mars"; more than one, "at Mars: 2 in low
 # orbit, 2 at Ares". A rival's Orbital Control of low orbit shuts the ground, in the designer's

@@ -1573,6 +1573,28 @@ fn build_board(session: &mut Session) {
     // A card whose offer costs more than a seat holds greys its take button, and that is the state
     // a third of the table is in when a card is drawn; a fresh board is never poor enough to show
     // it.
+    // `moonrace:1` or `moonrace:won` (a building aid, ticket #481, version 0.09.8): the race to the
+    // Moon staged at four different steps -- the Prospectors' loaded Colony Ship in the Moon's orbit,
+    // the Arkwrights' on the way, the Archivists' built and empty -- so the Moon's card can be
+    // photographed mid-race; with `won`, the Prospectors then land, for the Moment that ends it.
+    if let Some(mode) = std::env::args().find_map(|a| a.strip_prefix("moonrace:").map(str::to_owned))
+        && let Some(g) = session.game.as_mut()
+    {
+        let turn = g.turn;
+        for (seat, at, colonists) in [(Seat(1), ShipAt::Body(BodyId::Moon), 4), (Seat(2), ShipAt::Transit { from: BodyId::Earth, to: BodyId::Moon, turns_left: 1 }, 4), (Seat(3), ShipAt::Body(BodyId::Earth), 0)] {
+            let id = ShipId(g.fresh_id());
+            let name = g.next_ship_name(UnitKind::ColonyShip);
+            g.ships.push(Ship { id, name, kind: UnitKind::ColonyShip, seat, damage: 0, at, colonists, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: turn, fuel: 20.0, slot: None });
+        }
+        if mode == "won"
+            && let Some(slot) = g.free_slots_on(BodyId::Moon).first().copied()
+        {
+            let id = ColonyId(g.fresh_id());
+            g.colonies.push(Colony { id, body: BodyId::Moon, slot, control: Control::Controlled(Seat(1)), modules: vec![Module::new(ModuleKind::Core)], colonists: 4, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: turn, in_orbit: false });
+            g.ships.retain(|s| !(s.seat == Seat(1) && s.at == ShipAt::Body(BodyId::Moon) && s.kind == UnitKind::ColonyShip));
+            g.claim_first(Seat(1), BodyId::Moon, id);
+        }
+    }
     // `farstation:1` or `farstation:2` (a building aid, ticket #480, version 0.09.8): seat 0 holds a station at
     // Earth L4 (or, for 2, Earth L5) with four aboard, and a Frigate of theirs sits in that orbit, so the far orbit can
     // be photographed held. With `hab:1` its card is the one opened.
