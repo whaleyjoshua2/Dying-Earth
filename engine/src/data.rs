@@ -39,8 +39,17 @@ pub struct SlotCard {
 
 /// Ticket #485 (version 0.09.8): a leg's Fuel -- its delta-v in km/s times the scale, to a tenth,
 /// a half rounding up.
-fn leg_fuel(delta_v: f64, per: f64) -> f64 {
+pub fn leg_fuel(delta_v: f64, per: f64) -> f64 {
     (delta_v * per * 10.0 + 1e-6).round() / 10.0
+}
+
+/// Ticket #486 (version 0.09.8): the delta-v of the gulf between two systems, named by
+/// `System::key`: "earth", "venus", "mars" and "far", a far orbit; `["far", "far"]` is the gulf
+/// between one far orbit and the other.
+#[derive(Debug, Clone, Deserialize)]
+pub struct GulfCard {
+    pub between: [String; 2],
+    pub delta_v: f64,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -64,17 +73,21 @@ pub struct BodyCard {
     #[serde(default)]
     pub local_turns: u32,
     /// Ticket #485 (version 0.09.8): a leg's Fuel is its real delta-v, in km/s, times the one
-    /// scale `fuel_per_delta_v`. The two delta-v figures are the data; the two Fuel figures are
-    /// worked out from them when the tables load, to a tenth.
+    /// scale `fuel_per_delta_v`.
+    /// Ticket #486 (version 0.09.8): every journey is priced the same way. A Body carries what it
+    /// costs to LEAVE its orbit for another system and what it costs to ARRIVE in it from one, the
+    /// second lower where there is air to brake on; a journey between two systems is the leaving
+    /// of one, the gulf between the two, and the arriving at the other. A satellite carries the
+    /// hop out to it from its parent and the hop back, which are their own figures.
+    #[serde(default)]
+    pub leave_delta_v: f64,
+    #[serde(default)]
+    pub arrive_delta_v: f64,
     #[serde(default)]
     pub local_delta_v: f64,
-    #[serde(skip)]
-    pub local_fuel: f64,
-    pub transit_turns: u32,
     #[serde(default)]
-    pub transit_delta_v: f64,
-    #[serde(skip)]
-    pub transit_fuel: f64,
+    pub local_return_delta_v: f64,
+    pub transit_turns: u32,
     /// Ticket #92 (version 0.06.0): a small world, where a Mass Driver may stand.
     #[serde(default)]
     pub low_gravity: bool,
@@ -1246,6 +1259,8 @@ struct EphemerisFile {
     transit: TransitTable,
     /// Ticket #93 (version 0.06.0): the Earth-Venus transfer, the same shape.
     transit_venus: TransitTable,
+    /// Ticket #486 (version 0.09.8): and Venus to Mars, the phase angle Mars's longitude less Venus's.
+    transit_venus_mars: TransitTable,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -1502,12 +1517,13 @@ struct BodiesFile {
     /// are not a Body's own: between two satellites of one parent, and to or from a far orbit.
     fuel_per_delta_v: f64,
     sibling_delta_v: f64,
+    /// Ticket #486 (version 0.09.8): the gulf between each two systems, in km/s.
+    #[serde(default)]
+    gulf: Vec<GulfCard>,
     /// Ticket #335 (version 0.09.0): what an orbit change costs from the Ship's own tank.
     #[serde(default = "one_i64")]
     orbit_change_fuel: i64,
     /// Ticket #480 (version 0.09.8): what a move to or from a far orbit costs from the tank.
-    #[serde(default)]
-    far_orbit_delta_v: f64,
     #[serde(default = "forty")]
     station_materials: i64,
     /// Ticket #57: how far a Colony Slot's own yields may fall either side of its Body's.
@@ -1930,11 +1946,12 @@ pub struct TutorialTable {
 pub struct Tables {
     pub bodies: Vec<BodyCard>,
     /// Ticket #45: the hop between two satellites of the same Body.
-    pub sibling_transit: (u32, f64),
+    pub sibling_turns: u32,
+    pub sibling_delta_v: f64,
     pub fuel_per_delta_v: f64,
+    pub gulfs: Vec<GulfCard>,
     /// Ticket #335 (version 0.09.0): the Fuel an orbit change takes from a Ship's own tank.
     pub orbit_change_fuel: i64,
-    pub far_orbit_fuel: f64,
     /// Ticket #46: what a station costs.
     pub station_materials: i64,
     /// Ticket #57: how far a Colony Slot's own four yields may fall either side of its Body's.
@@ -1944,6 +1961,7 @@ pub struct Tables {
     pub transit: TransitTable,
     /// Ticket #93 (version 0.06.0): the Earth-Venus transfer.
     pub transit_venus: TransitTable,
+    pub transit_venus_mars: TransitTable,
     pub states: Vec<StateCard>,
     /// Ticket #53: how a neutral Nation State develops itself (`nation_states.toml`).
     pub development: DevelopmentTable,
@@ -2061,14 +2079,19 @@ fn err(file: &str, message: impl Into<String>) -> DataError {
 }
 
 impl Tables {
+    /// Ticket #486 (version 0.09.8): the gulf between two systems, in km/s, read either way round.
+    /// Nought between a system and itself.
+    pub fn gulf(&self, a: crate::ids::System, b: crate::ids::System) -> f64 {
+        if a == b {
+            return 0.0;
+        }
+        let (x, y) = (a.key(), b.key());
+        self.gulfs.iter().find(|g| (g.between[0] == x && g.between[1] == y) || (g.between[0] == y && g.between[1] == x)).map(|g| g.delta_v).unwrap_or(0.0)
+    }
+
     /// Load every table from a directory (normally `assets/data`).
     pub fn load(dir: &Path) -> Result<Tables, DataError> {
-        let mut bodies: BodiesFile = read(dir, "bodies.toml")?;
-        // Ticket #485 (version 0.09.8): each leg's Fuel from its delta-v and the one scale.
-        for b in &mut bodies.body {
-            b.transit_fuel = leg_fuel(b.transit_delta_v, bodies.fuel_per_delta_v);
-            b.local_fuel = leg_fuel(b.local_delta_v, bodies.fuel_per_delta_v);
-        }
+        let bodies: BodiesFile = read(dir, "bodies.toml")?;
         let states: StatesFile = read(dir, "nation_states.toml")?;
         let facilities: FacilitiesFile = read(dir, "facilities.toml")?;
         let modules: ModulesFile = read(dir, "modules.toml")?;
@@ -2087,15 +2110,17 @@ impl Tables {
         let ship_names: ShipNames = read(dir, "ship_names.toml")?;
         let tables = Tables {
             ship_names,
-            sibling_transit: (bodies.sibling_turns, leg_fuel(bodies.sibling_delta_v, bodies.fuel_per_delta_v)),
+            sibling_turns: bodies.sibling_turns,
+            sibling_delta_v: bodies.sibling_delta_v,
             fuel_per_delta_v: bodies.fuel_per_delta_v,
+            gulfs: bodies.gulf,
             orbit_change_fuel: bodies.orbit_change_fuel,
-            far_orbit_fuel: leg_fuel(bodies.far_orbit_delta_v, bodies.fuel_per_delta_v),
             station_materials: bodies.station_materials,
             slot_yield_spread: bodies.slot_yield_spread,
             planets: ephemeris.planet,
             transit: ephemeris.transit,
             transit_venus: ephemeris.transit_venus,
+            transit_venus_mars: ephemeris.transit_venus_mars,
             bodies: bodies.body,
             states: states.state,
             development: states.development,

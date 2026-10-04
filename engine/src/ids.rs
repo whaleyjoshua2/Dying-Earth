@@ -64,6 +64,36 @@ pub enum Orbit {
     Slot(u32),
 }
 
+/// Ticket #486 (version 0.09.8): **an end of a journey** -- a Body, or one of its far orbits,
+/// which for travel is a place of its own: Earth L4 is not left by way of Earth.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Port {
+    Body(BodyId),
+    /// A far orbit, by its Body and its Orbital Slot.
+    Far(BodyId, u32),
+}
+
+/// Ticket #486: the systems a journey runs within or between. Each far orbit is one of its own.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum System {
+    Earth,
+    Venus,
+    Mars,
+    Far(u32),
+}
+
+impl System {
+    /// The name `bodies.toml` writes a gulf's two ends in.
+    pub fn key(self) -> &'static str {
+        match self {
+            System::Earth => "earth",
+            System::Venus => "venus",
+            System::Mars => "mars",
+            System::Far(_) => "far",
+        }
+    }
+}
+
 impl Orbit {
     /// The orbit a Ship's `slot` names: low orbit where it names none.
     pub fn of(slot: Option<u32>) -> Orbit {

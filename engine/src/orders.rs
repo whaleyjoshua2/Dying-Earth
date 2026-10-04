@@ -441,7 +441,7 @@ impl Game {
             }),
             // Ticket #480 (version 0.09.8): a far orbit at either end costs the far figure.
             Order::ChangeOrbit { ship, slot } => Some(self.ship(*ship).and_then(|s| match s.at {
-                ShipAt::Body(b) => Some(self.orbit_change_cost(b, self.ship_orbit(s), Orbit::of(*slot))),
+                ShipAt::Body(b) => Some(self.orbit_change_cost(seat, b, self.ship_orbit(s), Orbit::of(*slot))),
                 _ => None,
             }).unwrap_or(self.tables.orbit_change_fuel as f64)),
             _ => None,
@@ -1513,10 +1513,6 @@ impl Game {
                 if from == *to {
                     return fail("already there");
                 }
-                // Ticket #93: no leg between Venus and the Mars system this version.
-                if !Self::leg_allowed(from, *to) {
-                    return fail("no leg runs between Venus and the Mars system; fly by Earth");
-                }
                 if s.arrived_this_turn {
                     return fail("arrived this turn; it may act next turn");
                 }
@@ -1564,7 +1560,7 @@ impl Game {
                 if s.arrived_this_turn {
                     return fail("arrived this turn; it may act next turn");
                 }
-                let fuel = self.orbit_change_cost(body, self.ship_orbit(s), want);
+                let fuel = self.orbit_change_cost(seat, body, self.ship_orbit(s), want);
                 if s.fuel < fuel {
                     return fail(format!("the tank holds {} Fuel; an orbit change needs {}", figure(s.fuel), figure(fuel)));
                 }
@@ -2508,9 +2504,8 @@ impl Game {
                     // Ticket #393 (version 0.09.3): and the turns as the seat was quoted them, since Nuclear
                     // Rockets read at half under Provisional Findings shortens the quote; the table-wide
                     // cost flew a turn longer than the card said.
-                    let (turns, _) = self.transit_cost_for(seat, from, *to);
-                    // Ticket #480 (version 0.09.8): with the far figure for a far orbit at either end.
-                    let fuel = self.ship(*ship).map(|s| self.transit_fuel(seat, s, from, *to, *slot)).unwrap_or(0.0);
+                    // Ticket #486 (version 0.09.8): the leg from the orbit it sits in to the orbit named.
+                    let (turns, fuel) = self.ship(*ship).map(|s| self.transit_leg(seat, s, from, *to, *slot)).unwrap_or_else(|| self.transit_cost_for(seat, from, *to));
                     let name = self.tables.body(*to).name.clone();
                     if let Some(s) = self.ship_mut(*ship) {
                         s.at = ShipAt::Transit { from, to: *to, turns_left: turns };
@@ -2531,7 +2526,7 @@ impl Game {
                         _ => None,
                     });
                     let fuel = match (body, self.ship(*ship)) {
-                        (Some(b), Some(s)) => self.orbit_change_cost(b, self.ship_orbit(s), Orbit::of(*slot)),
+                        (Some(b), Some(s)) => self.orbit_change_cost(seat, b, self.ship_orbit(s), Orbit::of(*slot)),
                         _ => self.tables.orbit_change_fuel as f64,
                     };
                     if let Some(s) = self.ship_mut(*ship) {

@@ -582,9 +582,233 @@ between missions comes from spacecraft design (how much heating the solar panels
 far more than from the orbit, so the game may fairly pick a single number. For Venus, two
 turns, from the study alone.
 
+### 3.9 Every journey between the eight places, each direction on its own
+
+Added 2026-10-04 (third pass). The game will price every pair of places, and each
+direction separately. Everything in this section is **computed** in this session with the
+constants and formulas of section 2 unless marked otherwise; nothing here was found as a
+published pairwise table.
+
+#### 3.9.1 Rules used for every cell
+
+- Minimum-energy (Hohmann) transfer between circular coplanar orbits, at a good window.
+- **Leaving** a planet's system is always propulsive. A ship leaving a moon first drops to
+  a low pass over its planet and burns there (the Oberth saving); from the Moon that is a
+  0.82 burn to fall to a 300 km perigee, then the escape burn at perigee; from Phobos or
+  Deimos it is the three-burn route of section 3.8.5 run backwards.
+- **Arriving where there is air** is "aerobraking as flown":
+  - Mars: capture burn at 300 km into a 35-hour ellipse, drag, 0.08 trim (section 3.8.2).
+  - Venus: capture burn at 300 km into a 24-hour ellipse, drag, 0.09 trim (section 3.8.4).
+  - **Earth (new assumption, mirrors Venus): capture burn at 300 km perigee into a 24-hour
+    ellipse (apogee altitude 71,400 km), drag down to 300 km, then 0.10 trim** (from a
+    110 x 450 km orbit: raise perigee 0.05, lower apogee 0.05). A ship coming from the
+    Moon is already on a bound ellipse, so it needs no capture burn at all: only the trim.
+  - Phobos: aerobraked route of section 3.8.5. Deimos: no aerobraking (it does not help).
+- Arriving at the Moon, L4 or L5: propulsive, no air.
+- L4 and L5 are on Earth's orbit, outside any gravity well. Legs between them and Earth's
+  system are phasing orbits (section 3.6), two laps. Legs from them to Venus or Mars are
+  the same Hohmann transfers Earth uses.
+
+**Aerobraking into low Earth orbit has not been flown by any mission found in this
+research.** The drag required is 2.76 km/s from the 24-hour ellipse and 3.11 km/s on a
+return from the Moon, against a flown maximum of about 1.2 km/s. The Earth-arrival figures
+are a consistent application of the designer's rule, not a record of practice. One
+secondary cross-check exists: Wikipedia's "Delta-v budget" table gives low lunar orbit ->
+LEO as **0.90**, stating that "the return to LEO figures assume that a heat shield and
+aerobraking/aerocapture are used"; the figure here is 0.92.
+
+#### 3.9.2 The 8 x 8 table (km/s; row = from, column = to)
+
+| From \ To | LEO | Moon | Venus | Mars | Phobos | Deimos | L4 | L5 |
+|---|---|---|---|---|---|---|---|---|
+| **LEO** | - | 3.93 | 4.34 | 4.52 | 4.93 | 4.97 | 4.14 | 3.99 |
+| **Moon** (low lunar orbit) | 0.92 | - | 2.06 | 2.24 | 2.65 | 2.69 | 1.86 | 1.71 |
+| **Venus** (low orbit) | 4.14 | 4.52 | - | 6.70 | 7.11 | 7.14 | 5.81 | 5.81 |
+| **Mars** (low orbit) | 3.02 | 3.40 | 5.40 | - | 1.20 | 1.72 | 5.04 | 5.04 |
+| **Phobos** | 2.55 | 2.93 | 4.93 | 0.61 | - | 0.75 | 4.57 | 4.57 |
+| **Deimos** | 2.31 | 2.69 | 4.69 | 0.71 | 0.75 | - | 4.33 | 4.33 |
+| **L4** | 1.33 | 1.71 | 3.36 | 3.88 | 4.29 | 4.33 | - | 2.84 |
+| **L5** | 1.48 | 1.86 | 3.36 | 3.88 | 4.29 | 4.33 | 2.48 | - |
+
+The LEO row reproduces the legs already in the game (4.0, 4.4, 4.6 with corridor burns,
+4.9, 5.0, 4.0) before rounding.
+
+Status of each cell:
+
+| Cells | Status |
+|---|---|
+| LEO -> Moon | Computed; **sourced** cross-check Apollo 11 3.99 (section 3.1) |
+| Moon -> LEO | Computed 0.92; secondary cross-check Wikipedia 0.90. **Unflown** as aerobraking |
+| LEO -> Venus, Mars, Phobos, Deimos | Computed; sections 3.8.2 - 3.8.5. Mars capture burn checked against MRO's flown 1,015 m/s |
+| Mars <-> Phobos <-> Deimos | Computed; reproduces Foster (NASA Ames) to 1 m/s. Down-legs by aerobraking are **unflown** |
+| Everything arriving at LEO from Venus, Mars, Phobos, Deimos, L4, L5 | Computed under the Earth assumption above; **unflown** |
+| Venus <-> Mars, Venus <-> Phobos / Deimos | Computed; **no source found**; see 3.9.3 |
+| All L4 / L5 cells | Computed; the stop burn at two laps is corroborated by EASCO and LISAmax (section 3.6). L4 <-> L5 is computed alone, **no source** |
+| All Moon <-> interplanetary cells | Computed; assume a burn at a 300 km Earth perigee on the way out or in. **No source** |
+
+How each return to LEO is made up:
+
+```
+Moon   -> LEO: 0.823 leave lunar orbit + 0 capture + 0.098 trim                  = 0.92
+Mars   -> LEO: 2.091 leave low Mars orbit (v_inf 2.649)
+               + [sqrt(2.945^2 + 10.926^2) - 10.485] = 0.831 capture + 0.098     = 3.02
+Venus  -> LEO: 3.318 leave low Venus orbit (v_inf 2.707)
+               + [sqrt(2.495^2 + 10.926^2) - 10.485] = 0.722 capture + 0.098     = 4.14
+L4     -> LEO: 0.764 leave L4 + 0.467 capture + 0.098                            = 1.33
+L5     -> LEO: 0.903 leave L5 + 0.478 capture + 0.098                            = 1.48
+Phobos -> LEO: 0.844 + 0.777 (three-burn, backwards) + 0.831 + 0.098             = 2.55
+Deimos -> LEO: 0.604 + 0.777 + 0.831 + 0.098                                     = 2.31
+```
+
+(10.926 is escape speed at 300 km; 10.485 is perigee speed of the 24-hour ellipse.)
+
+The asymmetry the designer asked for is large: LEO -> Mars 4.52 but Mars -> LEO 3.02;
+LEO -> Moon 3.93 but Moon -> LEO 0.92. The cheap direction costs months (3.9.5).
+
+#### 3.9.3 Venus <-> Mars, and Venus <-> Phobos / Deimos
+
+Hohmann between 0.72333566 and 1.52371034 au: **217.5 days**; v_inf leaving or reaching
+Venus **5.763 km/s**, at Mars **4.768 km/s**. These are about twice the Earth-Mars and
+Earth-Venus figures, because the two orbits are far apart.
+
+```
+Venus -> Mars:   leave low Venus orbit sqrt(5.763^2 + 10.114^2) - 7.151 = 4.490
+                 capture at Mars to 35 h ellipse sqrt(4.768^2 + 4.814^2) - 4.639 = 2.136
+                 trim 0.078                                        total = 6.70
+Mars -> Venus:   leave low Mars orbit sqrt(4.768^2 + 4.814^2) - 3.404 = 3.372
+                 capture at Venus to 24 h ellipse sqrt(5.763^2 + 10.114^2) - 9.698 = 1.943
+                 trim 0.089                                        total = 5.40
+Venus -> Phobos 7.11, -> Deimos 7.14;  Phobos -> Venus 4.93, Deimos -> Venus 4.69
+```
+
+**How practical is it? Physically sound, never flown as a journey, and dearer than either
+Earth leg - but cheaper than going by way of Earth.** Venus -> LEO -> Mars with a stop is
+4.14 + 4.52 = 8.66 against 6.70 direct; Mars -> LEO -> Venus is 3.02 + 4.34 = 7.36 against
+5.40. The window recurs every **333.9 days**, more often than either Earth window. No
+published Venus-to-Mars orbit-to-orbit budget was found; the only related source read is
+Foster's short-stay Mars mission, which uses a Venus **flyby** on the way (section 3.4
+reference), showing the geometry is used in real mission design. The arrival speeds are
+the weak point: 4.77 km/s at Mars and 5.76 km/s at Venus are faster than the arrivals of
+the missions in section 3.8 (MRO 2.96, Venus Express about 5.0), so capture burns are
+large (2.1 and 1.9) and real windows will vary more than Earth's do. Trust +/- 0.5.
+
+#### 3.9.4 From L4 or L5 outward
+
+A ship at L4 or L5 has already paid Earth's 3.20 km/s escape. But it has also lost the
+Oberth saving: its departure burn is made in open space, so the full heliocentric speed
+change is paid at face value.
+
+| Leg | From L4 / L5 | From LEO | Saving | Why |
+|---|---|---|---|---|
+| -> Mars (low orbit) | 2.945 + 0.934 = **3.88** | 4.52 | 0.64 | LEO pays 3.59 to get v_inf 2.945; L4 pays 2.945 |
+| -> Venus (low orbit) | 2.495 + 0.861 = **3.36** | 4.34 | 0.98 | LEO pays 3.48; L4 pays 2.495 |
+| -> Moon | **1.71** (L4), **1.86** (L5) | 3.93 | - | Phasing back to Earth, perigee burn 0.12 - 0.13, lunar insertion 0.82 |
+| L4 -> L5 | **2.84**, 2.33 years | - | - | Drop back 120 deg in two laps (v_inf 1.421 twice) |
+| L5 -> L4 | **2.48**, 2.67 years | - | - | Advance 120 deg in three laps (v_inf 1.243 twice) |
+
+So being "outside the well" is worth only 0.6 - 1.0 km/s toward a planet, not 3.2.
+Coming back is worse: Mars -> L4 is **5.04** against Mars -> LEO 3.02, because L4 has no
+air and no well to brake against.
+
+L4 <-> L5 is a pure time trade, like section 3.6:
+
+| Laps | L4 -> L5 | L5 -> L4 |
+|---|---|---|
+| 1 | 4.99 in 1.33 yr | 10.10 in 0.67 yr |
+| 2 | **2.84 in 2.33 yr** | 3.98 in 1.67 yr |
+| 3 | 1.99 in 3.33 yr | **2.48 in 2.67 yr** |
+| 4 | 1.53 in 4.33 yr | 1.81 in 3.67 yr |
+
+#### 3.9.5 Flight times and windows (60-day turns)
+
+| Pair | Coast, days | Turns | Window recurs | Notes |
+|---|---|---|---|---|
+| Earth system <-> Moon | 5 | under 1 | none needed | |
+| Earth system <-> Mars system | 259 | 4.3 | 779.9 days (13 turns) | Outbound: Mars 44.3 deg ahead. Return: Earth 75.1 deg behind Mars. Different dates |
+| Earth system <-> Venus | 146 | 2.4 | 583.9 days (9.7 turns) | Outbound: Venus 54.0 deg behind Earth. Return: Earth 36.0 deg ahead of Venus |
+| Venus <-> Mars system | 217 | 3.6 | **333.9 days (5.6 turns)** | Outbound: Mars 66.0 deg ahead of Venus. Return: Venus 168.4 deg behind Mars |
+| L4 or L5 <-> Mars system | 259 | 4.3 | 779.9 days | Same period as Earth's, but about **130 days earlier for L4, 130 days later for L5** (60 deg at 0.4616 deg/day) |
+| L4 or L5 <-> Venus | 146 | 2.4 | 583.9 days | About **97 days later for L4, 97 days earlier for L5** (60 deg at 0.6165 deg/day) |
+| LEO or Moon -> L5; L4 -> LEO or Moon | 791 | 13.2 | **no window** | Two-lap phasing; any date |
+| LEO or Moon -> L4; L5 -> LEO or Moon | 670 | 11.2 | **no window** | Two-lap phasing; any date |
+| L4 -> L5 | 852 | 14.2 | **no window** | |
+| L5 -> L4 | 974 | 16.2 | **no window** | |
+| Within Mars system | under 1 | 0 | none needed | Hours |
+
+Moon legs to the planets add 5 days and must catch the Moon on the right side of its
+27-day orbit, which a 60-day turn swallows.
+
+**Aerobraking then adds to the arrival** (section 3.8.6): Mars 3 - 6 months (2 - 3 turns),
+flown; Venus about 4 months (2 turns), one study; **Earth about 4 - 6 months (2 - 3
+turns), an estimate** scaled from the Venus study (2.0 km/s in 122 days) to Earth's
+2.8 - 3.1 km/s, with no source. That estimate matters most on the Moon run: Moon -> LEO is
+0.92 with months of aerobraking, or 3.93 in five days without it.
+
+#### 3.9.6 The simplest honest pricing structure
+
+**The candidate works. Recommended.** journey = leave(from) + gulf(system, system) +
+arrive(to), with journeys inside one system keeping their own figure.
+
+It works for a physical reason: every place in a system makes its escape or capture burn
+at the same low pass over its planet, so "leave" and "arrive" can be measured to the edge
+of the well (v_inf = 0) and the gulf is whatever remains, and that remainder is nearly the
+same for every pair of places in the two systems.
+
+| Place | Leave | Arrive | |
+|---|---|---|---|
+| LEO | 3.20 | 0.54 | arrive = capture to 24 h ellipse from escape speed, + trim |
+| Moon | 0.92 | 0.92 | no air |
+| Venus | 2.96 | 0.50 | |
+| Mars | 1.41 | 0.25 | |
+| Phobos | 0.94 | 0.66 | arrive uses aerobraking |
+| Deimos | 0.70 | 0.70 | aerobraking does not help |
+| L4, L5 | 0 | 0 | |
+
+| Gulf (same both ways) | km/s |
+|---|---|
+| Earth - Venus | 0.64 |
+| Earth - Mars | 1.07 |
+| Earth - L4, Earth - L5 | 0.87 |
+| Venus - Mars | 3.48 |
+| Venus - L4, Venus - L5 | 2.85 |
+| Mars - L4, Mars - L5 | 3.62 |
+| L4 - L5 | 2.66 |
+
+Local figures kept as they are (8): LEO -> Moon 3.93, Moon -> LEO 0.92, Mars -> Phobos
+1.20, Mars -> Deimos 1.72, Phobos -> Mars 0.61, Deimos -> Mars 0.71, Phobos <-> Deimos
+0.75 each way.
+
+**Error against the full table, all 48 between-system cells:**
+
+- Worst error **0.18 km/s**, on L4 <-> L5 (the true figures are 2.84 and 2.48; one gulf
+  gives 2.66 both ways).
+- Next worst **0.08**, on the Earth - L4 / L5 legs (L4 and L5 differ slightly by direction).
+- **Every other cell is within 0.01 km/s.**
+
+Example: LEO -> Mars = 3.20 + 1.07 + 0.25 = 4.52. Mars -> LEO = 1.41 + 1.07 + 0.54 = 3.02.
+Venus -> Deimos = 2.96 + 3.48 + 0.70 = 7.14.
+
+That is 16 leave/arrive figures (four of them zero), 10 gulfs (7 distinct values) and 8
+local figures, in place of 56 cells. If the L4 / L5 asymmetry matters, make four gulfs
+directional (LEO-side -> L4 0.94, -> L5 0.79, L4 -> Earth 0.79, L5 -> Earth 0.94, L4 -> L5
+2.84, L5 -> L4 2.48) and the worst error falls to 0.01.
+
+A cruder structure with **no gulf at all** (a best-fit leave and arrive per place) was also
+tested: worst error 0.59, on L5 -> L4. Not recommended.
+
+A least-squares fit of the candidate (free leave, arrive and gulf) gives the same worst
+error, 0.17, so the hand-built edge-of-the-well figures above are as good as any.
+
 ---
 
 ## 4. What is uncertain
+
+00. **The pairwise table (added 2026-10-04, third pass).** Least trusted, in order:
+   (a) **every arrival at LEO by aerobraking** - unflown, the drag is 2.8 - 3.1 km/s, and
+   the 4 - 6 month duration is an unsourced estimate; (b) **Venus <-> Mars** - no source,
+   fast arrivals, trust +/- 0.5; (c) **L4 <-> L5** - computed alone; (d) the Moon <->
+   planet legs assume a perigee burn at 300 km with ideal timing. The window offsets for
+   L4 and L5 (130 and 97 days) are simple circular-orbit arithmetic.
 
 0. **Venus "aerobraking as flown" (added 2026-10-04; now the least trusted figure with
    L4/L5).** It has not been flown. The 4.4 depends on choosing a 24-hour capture ellipse

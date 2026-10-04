@@ -2764,8 +2764,9 @@ impl Game {
                 // Ticket #480 (version 0.09.8): with every buildable station slot here taken, a
                 // loaded Colony Ship goes out to a free far orbit to found there, at the founding's
                 // own half weight. It pays the far figure, so the tank must hold it.
-                if s.kind == UnitKind::ColonyShip && s.colonists > 0 && !self.far_orbit(body, orbit) && self.buildable_orbital_slots(body).is_empty() && s.fuel >= self.tables.far_orbit_fuel
+                if s.kind == UnitKind::ColonyShip && s.colonists > 0 && !self.far_orbit(body, orbit) && self.buildable_orbital_slots(body).is_empty()
                     && let Some(n) = self.free_orbital_slots(body).into_iter().find(|n| self.far_slot(body, *n))
+                    && s.fuel >= self.orbit_change_cost(seat, body, orbit, Orbit::Slot(n))
                 {
                     wants.push((Orbit::Slot(n), format!("to found {}", self.station_name(body, n)), Cat::FoundColony, self.base_weight(seat, Cat::FoundColony) * 0.5));
                 }

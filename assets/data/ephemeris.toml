@@ -99,3 +99,18 @@ fuel_per_degree = 0.00833333
 days_per_turn = 60.0
 max_turns = 9
 synodic_days = 583.92
+
+# Ticket #486 (version 0.09.8): the same for a transit between Venus and the Mars system, which no
+# leg flew until now. The phase angle is Mars's heliocentric longitude less Venus's. The Hohmann
+# flight between the two orbits is 217.5 days, four turns of sixty: in that time Mars moves 113.7
+# degrees, so the flight out wants Mars 66.3 degrees ahead of Venus; Venus moves 347.7, so the
+# flight back wants Mars 167.7 degrees ahead. The two come round every 333.9 days.
+[transit_venus_mars]
+days_at_window = 217.5
+hohmann_angle = 66.3
+return_hohmann_angle = 167.7
+days_per_degree = 1.5
+fuel_per_degree = 0.00833333
+days_per_turn = 60.0
+max_turns = 9
+synodic_days = 333.92

@@ -207,3 +207,38 @@ rounded to the tenth now.
 **The sweep** ([`after-485.txt`](sweeps/after-485.txt)), at 4.0: 7 / 20 / 17 / 4 and 32 collapses, from
 8 / 19 / 17 / 3 and 33. Within noise. At 4.5 it read 8 / 21 / 17 / 1 and 33. Ships stranded at the
 end of a game: 15 over the 80 at 4.0, 13 at 4.5, 3 before.
+
+## Every leg of every journey priced the same way (#486)
+
+Added by the designer on closing #485: *"add a ticket to make the legs of all journeys calculated
+the same way (earth has aero breaking). That way we can go from L5 to venus etc."*
+
+**The research** is section 3.9 of [`docs/research/delta-v.md`](../../research/delta-v.md): a table
+of every pair of the eight places, each direction, all computed. The agent then tested whether a
+few figures a place reproduce it: a leave and an arrive figure each, and a gulf for each pair of
+systems. They do, to 0.18 km/s at worst (one far orbit to the other) and 0.01 nearly everywhere, so
+that is the model.
+
+**Decided on the ticket:** the far orbits are places of their own for travel; every pair is flown;
+Earth's air brakes the way home, as flown (unflown at Earth, as at Venus, and the designer kept
+it); a trip to a far orbit still takes one turn where two years is real; every crossing has a
+window the same way.
+
+**Witnessed red:** the change turned nine older tests red; eight quoted a price and were re-based,
+and one was a computer seat choosing a different order (below). The new test
+`every_journey_is_priced_the_same_way_each_direction_for_itself` was run with Earth's arriving figure
+set to its leaving one and failed on Venus to Earth (`left: 27.2, right: 16.6`).
+
+**A computer seat changed its mind.** `the_computer_bombards_with_cause_and_the_orbit_held` failed:
+its Battleship at Mars, full tank, now flies home to blockade the rival's station, the homeward leg
+being 12.1 where it was past the tank off its window. The test now gives the hull 10 Fuel, short of
+the leg, and it bombards as before.
+
+**A Ship's doors**, turn 4: a Colony Ship in low Earth orbit on the left, a Frigate at Earth L5 on
+the right (`farstation:2 stack:earth ship:1`). From L5 the Moon is 7.2 where from Earth it is 15.7,
+and Venus is five turns at 24.3 where from Earth it is seven at 40.3, its window being nearer.
+
+![a Ship's doors from Earth and from Earth L5](ticket-486/ship-cards.png)
+
+**The sweep** ([`after-486.txt`](sweeps/after-486.txt)): 7 / 21 / 16 / 4 and 32 collapses, from
+7 / 20 / 17 / 4 and 32. Within noise. Ships stranded at the end: 3 over the 80 games, from 15.

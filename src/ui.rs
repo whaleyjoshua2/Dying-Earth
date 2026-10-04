@@ -3803,7 +3803,7 @@ A Warship on Blockade shuts the one orbit it sits in and no other: a station's r
         for slot in game.free_orbital_slots(body) {
             // Ticket #480 (version 0.09.8): a far orbit is founded by a Colony Ship, not built.
             if game.far_slot(body, slot) {
-                ui.label(RichText::new(format!("{}: free. Founded by a Colony Ship in that orbit; {} Fuel to reach.", game.station_name(body, slot), figure(game.tables.far_orbit_fuel))).weak());
+                ui.label(RichText::new(format!("{}: free. Founded by a Colony Ship in that orbit; {} Fuel to reach.", game.station_name(body, slot), figure(game.orbit_change_cost(Seat(0), body, Orbit::Low, Orbit::Slot(slot))))).weak());
                 continue;
             }
             cost_button(ui, game, &session.pending, Order::BuildStation { body, slot }, &format!("Build {} here", game.station_name(body, slot)), actions);
@@ -4014,7 +4014,7 @@ fn right_click(pos: Pos2, session: &Session, game: &Game, view: &ViewState, came
                         "No selected Ship moves to {}: {} there already, has another order, or holds fewer than {} Fuel.",
                         game.orbit_name(body, orbit),
                         if alone { "it is" } else { "each is" },
-                        figure(if game.far_orbit(body, orbit) { game.tables.far_orbit_fuel } else { game.tables.orbit_change_fuel as f64 })
+                        figure(game.orbit_change_cost(Seat(0), body, Orbit::Low, orbit))
                     )));
                 }
                 place_or_cancel(orders, actions);
@@ -8532,8 +8532,9 @@ fn body_dropdown(ui: &mut Ui, session: &Session, game: &Game, body: BodyId, to: 
     // Ticket #92: the player's own figure, with the Faction's and the Tech's multipliers and a Mass
     // Driver's cut on it; read once, for the header and the drift line inside.
     let (turns, fuel) = game.transit_cost_for(Seat(0), body, to);
-    // Ticket #480 (version 0.09.8): one Ship's own figure, a far orbit it leaves counted.
-    let fuel = one.filter(|_| !here).map(|s| game.transit_fuel(Seat(0), s, body, to, None)).unwrap_or(fuel);
+    // Ticket #486 (version 0.09.8): one Ship's own leg, from the orbit it sits in: a far orbit is
+    // an end of its own, with its own price and its own window.
+    let (turns, fuel) = one.filter(|_| !here).map(|s| game.transit_leg(Seat(0), s, body, to, game.arrival_slot(Seat(0), to))).unwrap_or((turns, fuel));
     let header = if here {
         format!("{} (here): change orbit, {} Fuel", game.tables.body(to).name, game.tables.orbit_change_fuel)
     } else {
@@ -8561,7 +8562,7 @@ fn body_dropdown(ui: &mut Ui, session: &Session, game: &Game, body: BodyId, to: 
 fn change_orbit_lines(ui: &mut Ui, session: &Session, game: &Game, body: BodyId, ships: &[&Ship], one: Option<&Ship>, actions: &mut Vec<Action>) {
     let orbit_fuel = game.tables.orbit_change_fuel;
     // Ticket #480 (version 0.09.8): a far orbit at either end costs the far figure, and the line says so.
-    let far_words = if game.tables.body(body).far_slots > 0 { format!(", {} to or from a far orbit", figure(game.tables.far_orbit_fuel)) } else { String::new() };
+    let far_words = if game.tables.body(body).far_slots > 0 { ", a far orbit its own fare" } else { "" };
     ui.label(RichText::new(format!("Moving between two orbits of {} costs {orbit_fuel} Fuel from the Ship's own tank{far_words}, and lands with the transits, before the Battles.", game.tables.body(body).name)).weak());
     for orbit in game.orbits_of(body) {
         // Every Ship already sitting there is no candidate; a line nobody can take is not drawn.
@@ -8569,7 +8570,7 @@ fn change_orbit_lines(ui: &mut Ui, session: &Session, game: &Game, body: BodyId,
         if movers.is_empty() {
             continue;
         }
-        let orbit_fuel = figure(if game.far_orbit(body, orbit) || movers.iter().any(|s| game.far_orbit(body, game.ship_orbit(s))) { game.tables.far_orbit_fuel } else { orbit_fuel as f64 });
+        let orbit_fuel = figure(one.or(movers.first().copied()).map(|s| game.orbit_change_cost(Seat(0), body, game.ship_orbit(s), orbit)).unwrap_or(orbit_fuel as f64));
         ui.horizontal_wrapped(|ui| {
             ui.label(format!("   To {}", orbit_short(game, body, orbit)));
             match one {

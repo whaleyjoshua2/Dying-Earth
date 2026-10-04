@@ -260,3 +260,69 @@ and their sources are in [`docs/research/delta-v.md`](../research/delta-v.md).
 
 The win column is within noise at both scales. The Moon is first settled in about as many games and
 at the same median turn. More Ships end the game stranded.
+
+## 9. Every leg of every journey priced the same way
+
+The authority is [ticket #486](https://github.com/whaleyjoshua2/Dying-Earth/issues/486). The figures
+are section 3.9 of [`docs/research/delta-v.md`](../research/delta-v.md). This section supersedes the
+table of section 8 and the fares of section 7.
+
+- **Every journey between any two places is priced one way, each direction for itself**, at section
+  8's scale of 4 Fuel a km/s.
+  - **Inside a system** a hop has its own figure, out and back: Earth and the Moon; Mars, Phobos
+    and Deimos.
+  - **Between two systems** a journey is the **leaving** of one end, the **gulf** between the two
+    systems, and the **arriving** at the other. Arriving is lower where there is air to brake on.
+  - The figures are in `bodies.toml`: `leave_delta_v` and `arrive_delta_v` on each Body, a
+    satellite's `local_delta_v` and `local_return_delta_v`, and a `[[gulf]]` for each pair of
+    systems. They reproduce the research note's table of every pair to 0.18 km/s at worst.
+- **Earth's air brakes the way home**, as flown: a capture burn into a loose orbit, then the air. A
+  leg no longer costs the same both ways.
+- **The Moon is no longer priced as Earth.** A journey from the Moon to another system is the
+  Moon's own, and about half Earth's.
+- **Earth L4 and Earth L5 are places of their own for travel.** A leg from one is priced from
+  there, not by way of Earth, and costs nothing to leave or arrive in, being outside every gravity
+  well. They remain Earth's stations in every other way (section 7).
+- **Every pair is flown.** The refusal of a leg between Venus and the Mars system is gone.
+
+  Fuel at the window, from the row to the column:
+
+  | | Earth | Moon | Venus | Mars | Phobos | Deimos | L4, L5 |
+  |---|---|---|---|---|---|---|---|
+  | **Earth** | | 15.7 | 17.4 | 18.1 | 19.7 | 19.9 | 16.3 |
+  | **Moon** | 3.7 | | 8.2 | 9.0 | 10.6 | 10.8 | 7.2 |
+  | **Venus** | 16.6 | 18.1 | | 26.8 | 28.4 | 28.6 | 23.2 |
+  | **Mars** | 12.1 | 13.6 | 21.6 | | 4.8 | 6.9 | 20.1 |
+  | **Phobos** | 10.2 | 11.7 | 19.7 | 2.4 | | 3.0 | 18.2 |
+  | **Deimos** | 9.2 | 10.8 | 18.7 | 2.8 | 3.0 | | 17.3 |
+  | **L4, L5** | 5.6 | 7.2 | 13.4 | 15.5 | 17.1 | 17.3 | 10.6 |
+
+- **Every journey between two systems has a window the same way**: cheapest and shortest when its
+  two ends line up, dearer and longer the further off.
+  - **Venus and Mars** have a table of their own: 217.5 days at the window, four turns, coming
+    round every 334 days.
+  - **A far orbit reads Earth's sky sixty degrees round**, L4 ahead and L5 behind, so its windows
+    to Mars and Venus are Earth's shifted, and its flights as long as Earth's.
+  - **No window** inside the Earth system, the far orbits among it, nor inside the Mars system: a
+    move takes a turn.
+- **A move between Earth's orbits** is still 1 Fuel, and to or from a far orbit is that journey:
+  16.3 out, 5.6 home, 10.6 across. The seat's own Fuel multipliers apply to it as to any journey.
+- **Unchanged:** the tanks; the scale; the Faction's, Efficient Transit's and a Mass Driver's cuts.
+  A Mass Driver on the Moon now takes the 3.7 home to its floor of 1.
+- **The computer seats** read every leg's price from the engine. One test of theirs moved: a
+  Battleship holding Mars's orbit with cause and a full tank now flies home to blockade its rival's
+  station, the leg being cheap, where it bombarded; short of that leg's Fuel it bombards as before.
+
+**Measured** (80 games, the standing cell,
+[`after-486.txt`](../dev-diary/2026-10-04-version-0.09.8/sweeps/after-486.txt)):
+
+| | before this | after this |
+|---|---|---|
+| Custodians | 7 | 7 |
+| Prospectors | 20 | 21 |
+| Arkwrights | 17 | 16 |
+| Archivists | 4 | 4 |
+| collapses | 32 | 32 |
+| Ships stranded at the end | 15 | 3 |
+
+The win column is within noise. Stranding is back to where it stood before section 8.
