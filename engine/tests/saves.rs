@@ -149,6 +149,9 @@ fn a_save_from_another_version_and_a_damaged_file_are_both_refused_with_a_messag
 /// Ticket #469 (version 0.09.7, the closing ticket): `SAVE_VERSION` stays at 8, so a 0.09.6 save
 /// must load. The five fields this version added to a seat are cut too: what it has produced
 /// (#467), its Opening Objective's turn and the Launch Site owed (#471), and the Archives lost (#461).
+/// Ticket #484 (version 0.09.8, the closing ticket): `SAVE_VERSION` is 9 since the Regions were
+/// redrawn (#482), so no older save loads; this still shows a file missing a later field reads its
+/// default, the Opening Objective's count of turns running (#478) among them.
 #[test]
 fn a_save_without_this_versions_fields_still_loads() {
     let dir = TempDir::new("older-fields");

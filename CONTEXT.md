@@ -689,7 +689,7 @@ The phase in which a Faction commits everything it will do that turn: building, 
 _Avoid_: commands, moves, actions, player phase
 
 **Policies**:
-The block on a Region's card, since version 0.09.3, holding what the player may set for the Region rather than build in it: the Custodians' Leapfrog, the Arkwrights' Exodus Call, the Prospectors' Strip Permit, Raise Industry Level, Relief and Resettle. It stands between the Pioneers and the Facilities. The card's Orders block, at its foot, holds Build Army alone; a Colony's Orders block holds Build Army and Ships, since every Army and Ship build lives in an Orders block on both cards.
+The block on a Region's card, since version 0.09.3, holding what the player may set for the Region rather than build in it: the Custodians' Leapfrog, the Arkwrights' Exodus Call, the Prospectors' Strip Permit, Relief and Resettle. Raise Industry Level stood here until version 0.09.8, which made it the last tile among the Facility boxes. It stands between the Pioneers and the Facilities. The card's Orders block, at its foot, holds Build Army alone; a Colony's Orders block holds Build Army and Ships, since every Army and Ship build lives in an Orders block on both cards.
 _Avoid_: orders (for these), decrees, edicts
 
 **Refusal**:

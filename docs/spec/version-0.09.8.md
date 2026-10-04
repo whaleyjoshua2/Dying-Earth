@@ -6,8 +6,47 @@ The map is [Map: version 0.09.8](https://github.com/whaleyjoshua2/Dying-Earth/is
 pictures and batches that decided it are in
 [`docs/dev-diary/2026-10-04-version-0.09.8/`](../dev-diary/2026-10-04-version-0.09.8/).
 
-**What the version is.** Version 0.09.7 with the designer's list. The summary and the win column
-are written when the version closes.
+**What the version is.** Version 0.09.7 with the designer's list, and two items the designer
+added on the way. **The cards**: sub-headers larger, white and led by a glyph (§1), the population
+and GDP lines recut (§2), Raise Industry Level as a tile (§3), the tutorial 14 per cent shorter
+(§4). **Rule figures**: the Prospectors' Opening Objective pays 50 Ducats and wants three turns
+running (§5); Raise Industry Level costs more each time (§6). **The sky**: two far orbits, Earth L4
+and L5, reached only by Ship (§7); every journey's Fuel is its real delta-v, priced the same way
+between any two places and each direction for itself, with a Mass Driver taking a quarter off (§8,
+§9, the two added on the way; §9 supersedes §8's table and §7's fares); a race to the Moon that
+everyone watches (§10). **The board**: eighteen Regions, redrawn around Iran (§11), and the
+climate retuned for them (§12).
+
+**What it did to the win column** (80 games, per Faction):
+
+| | 0.09.7 | before the Regions were redrawn | after | 0.09.8, the climate retuned | the ideal |
+|---|---|---|---|---|---|
+| Custodians | 8 | 7 | 4 | 9 | 15 |
+| Prospectors | 21 | 21 | 20 | 27 | 15 |
+| Arkwrights | 18 | 16 | 11 | 18 | 15 |
+| Archivists | 5 | 4 | 6 | 7 | 15 |
+| collapses | 28 | 32 | 39 | 17 | 20 |
+
+Until the Regions were redrawn no ticket moved the column past noise. The redraw raised collapses
+to 39; the climate's retune brought them to 17 and gave most of the games it saved to the
+Prospectors. Neither move is traced further.
+
+The closing sweep is
+[`sweeps/final-0.09.8.txt`](../dev-diary/2026-10-04-version-0.09.8/sweeps/final-0.09.8.txt), the
+same to the line as the sweep after §12: nothing a computer seat reads changed after it. It is run
+at the cell `climate.toml` holds, Sink 8 and step 330, where every sweep before §12 was run at Sink
+6 and step 300. Over its 80 games:
+
+- **Collapses fall in one seating.** With the Prospectors in seat 0, starting in China, 14 of 20
+  games collapse; in the other three seatings 1, 2 and 0.
+- **The tree** completes in 49 games at a median turn 25. Victory gates are reached in
+  58 / 77 / 55 / 50 games (Custodians / Prospectors / Arkwrights / Archivists).
+- **Opening Objectives met:** Custodians 80, Prospectors 73, Arkwrights 29, Archivists 76.
+- **The Archivists score nothing** at the end in 53 games, and place last in 54.
+- **The Moon** is first settled in 65 games.
+- **Ships stranded** at the end: 4.
+- **Never used by a computer seat:** no station founded at Earth L4 or L5, and no Mass Driver built.
+- **Saves:** `SAVE_VERSION` is 9; a 0.09.7 save is refused, the board having two more Regions.
 
 ## 1. Card sub-headers: larger, white, a glyph leading each
 

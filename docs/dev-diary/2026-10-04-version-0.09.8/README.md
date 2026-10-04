@@ -328,3 +328,18 @@ first with 7.0 counted Emissions where it used 5.0, to stand between the weakene
 
 **The sweep** ([`after-483.txt`](sweeps/after-483.txt)), run by the tool's new default cell, is the
 same to the line as the grid's cell: 9 / 27 / 18 / 7 and 17 collapses, from 4 / 20 / 11 / 6 and 39.
+
+## Closing the version (#484)
+
+`GAME_VERSION` is 0.09.8. `SAVE_VERSION` moved once, to 9, on the Regions ticket. The spec has its
+summary and win column; the playtest note is rewritten; the glossary's Policies entry no longer
+lists Raise Industry Level.
+
+**The closing sweep** ([`final-0.09.8.txt`](sweeps/final-0.09.8.txt)) is the same to the line as
+`after-483.txt`: 9 / 27 / 18 / 7 and 17 collapses, at Sink 8 and step 330. 0.09.7 closed at
+8 / 21 / 18 / 5 and 28, at Sink 6 and step 300.
+
+What the version leaves open, reported and not pursued: the Prospectors at 27 wins; 14 of the 17
+collapses in the seating where the Prospectors start in China; the computer seats never founding at
+a far orbit nor building a Mass Driver; a computer Battleship that flies home to blockade where it
+bombarded.
