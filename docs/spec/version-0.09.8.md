@@ -44,3 +44,22 @@ The authority is [ticket #474](https://github.com/whaleyjoshua2/Dying-Earth/issu
 - No rule moves, and nothing a computer seat reads.
 
 **Pictures:** [`ticket-474/`](../dev-diary/2026-10-04-version-0.09.8/ticket-474/).
+
+## 2. The population and GDP lines on the cards
+
+The authority is [ticket #475](https://github.com/whaleyjoshua2/Dying-Earth/issues/475).
+
+- **The Region card's population line** reads "Region population 385.6 (386M)" behind the people
+  glyph, and no more. Its hover, the growth rule, is unchanged.
+- **The Region card's GDP line** reads "GDP 23: Industry Level 3, leans Fuel".
+- **What the GDP line said before is its hover**, three lines: what the Region pays its controller
+  in Ducats a turn; the rule, GDP x Industry Level / 5, never below 1; and what the player's Bank
+  would add there. A rival's pay the player cannot see stays hidden.
+- **The Colony card's people line** reads "14/16 (14.2M)" behind the people glyph: Colonists over
+  room, then the people as a real number to a tenth of a million.
+  - The bracket counts the part-grown next Colonist, so it moves each turn the place grows.
+  - The figure before the slash stays whole; it is what room and Module slots count.
+  - "14/16" keeps its amber at three-quarters full and its red when full; the bracket is plain.
+- No rule moves, and nothing a computer seat reads.
+
+**Pictures:** [`ticket-475/`](../dev-diary/2026-10-04-version-0.09.8/ticket-475/).

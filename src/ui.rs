@@ -7213,7 +7213,9 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     // read off the tables, the same shape: `Region population 1454.5 (1.45B)`.
     // Ticket #444 (version 0.09.6): the natural growth the rule already ran, shown: the base, the
     // heat's cut, and this turn's figure.
-    let pop = icon_word(ui, "population", format!("Region population {}, Industry Level {}, leans {:?}", game.tables.population_text(st.population), st.industry_level, card.resource_lean));
+    // Ticket #475 (version 0.09.8): the people alone; the Industry Level and the lean that rode on
+    // this line are on the GDP line below, at the designer's word.
+    let pop = icon_word(ui, "population", format!("Region population {}", game.tables.population_text(st.population)));
     let (c, rate) = (&game.tables.climate, game.population_growth_rate());
     rule_tip(pop, format!("Growth {:+.2}% a turn, less {:.2}% per tenth of a degree above {:+.1} C.
 This turn {:+.2}%: {:+.1} million.", c.population_growth * 100.0, c.population_loss_per_tenth_degree * 100.0, c.base_temperature, rate * 100.0, st.population * rate));
@@ -7243,7 +7245,12 @@ This turn {:+.2}%: {:+.1} million.", c.population_growth * 100.0, c.population_l
     let bank = FacilityKind::Bank.built_by(game.kind(Seat(0)));
     // Ticket #430 (the review): what a rival's Region pays it is hidden where the player does not see.
     let pays = if earnings_seen(game, Place::State(sid), game.state(sid).control.director()) { game.state_ducats(sid).to_string() } else { "an unseen number of".to_string() };
-    ui.label(format!("GDP {}: its economy pays its controller {} Ducats a turn (GDP x Industry Level / 5, never below 1); a{} {} here would add {}", card.gdp, pays, if bank == FacilityKind::InvestmentBank { "n" } else { "" }, bank.name(), game.facility_yield(Seat(0), sid, bank).amount));
+    // Ticket #475 (version 0.09.8): the line cut to the designer's words -- *"GDP 23: Industry Level
+    // 3, leans Fuel"* -- and what it said before is its hover: the pay, the rule, the Bank.
+    rule_tip(
+        ui.label(format!("GDP {}: Industry Level {}, leans {:?}", card.gdp, st.industry_level, card.resource_lean)),
+        format!("Pays its controller {} Ducats a turn.\nGDP x Industry Level / 5, never below 1.\nA{} {} here would add {}.", pays, if bank == FacilityKind::InvestmentBank { "n" } else { "" }, bank.name(), game.facility_yield(Seat(0), sid, bank).amount),
+    );
     icon_word(ui, "emissions", format!("Emissions this turn: industry {:.1}, Facilities {:.1}, people {:.1}", industry_em, fac_em, game.population_coefficient(sid) * st.population * mult));
     // Ticket #54: the per-person line, its formula, and what Leapfrog has taken off it.
     {
@@ -7958,6 +7965,10 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
                 ui.add(image);
             }
             ui.label(RichText::new(format!("{}/{}", col.colonists, room)).color(ink));
+            // Ticket #475 (version 0.09.8): the people as a real number, the part-grown next
+            // Colonist counted, so the bracket moves each turn the place grows.
+            let people = (col.colonists as f64 + game.colony_growth.get(&col.id).copied().unwrap_or(0.0)) * game.tables.climate.people_per_unit / 1_000_000.0;
+            ui.label(format!("({people:.1}M)"));
         })
         .response;
     rule_tip(line, format!("Colonists {} of {} room.\n{}", col.colonists, room, colony_growth_words(game, col)));

@@ -41,3 +41,20 @@ Seen in the pictures and left alone:
 
 Not pictured: the Ships heading (no Shipyard on these boards), the Colony card's Armies heading, and
 the full-place warning under Modules.
+
+## The population and GDP lines on the cards (#475)
+
+The designer gave both lines word for word. Decided on the ticket: the figures cut from the GDP line
+go onto its hover; the Colony card's bracket counts the part-grown next Colonist; the amber and red
+stay on the count.
+
+The left of each pair is the build after the sub-headers ticket, the right this build, seed 7, turn 4.
+
+- **The Region card** (`select:EastAsia turns:3 seed:7`):
+  ![the Region card's lines, before and after](ticket-475/region-before-after.png)
+- **The GDP line's hover** (`tip:Pays`):
+  ![the GDP hover](ticket-475/gdp-hover.png)
+- **The Colony card**, the ISS (`hab:1`): six Colonists and three tenths of a seventh.
+  ![the Colony card's people line, before and after](ticket-475/outpost-before-after.png)
+
+Not pictured: the hover on a rival's Region the player cannot see.
