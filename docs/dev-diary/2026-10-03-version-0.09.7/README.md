@@ -151,3 +151,20 @@ inland behind it (ticket #276), which the test had not allowed for.
 **The sweep** ([`after-470.txt`](sweeps/after-470.txt)): 9 / 6 / 11 / 13 and 41 collapses, from
 10 / 7 / 10 / 14 and 39: within noise. Coastal slots lost fall from a median 47 to 62 a game to 34 to
 51; thresholds held by a wall rise from about 360 a seating to about 565.
+
+## An Opening Objective for each Faction (ticket #471)
+
+- [`journal-met-earth.png`](ticket-471/journal-met-earth.png): the Victory window on its Journal tab
+  in May 2032, the Custodians' objective "Met, March 2030."
+
+**Witnessed red:** the objectives' test could not compile before the seat kept the turn it met its
+objective. The Report's word-ceiling test then failed at 1,737 words against 1,727, which is what
+it is for; the two new lines were shortened and four old ones trimmed. The first test of the
+computer's lean compared a Custodian Scrubber before and after and read 16 against 16: the
+Custodians already give their first Scrubber the same multiplier, so the test moved to the
+Prospectors' Investment Bank.
+
+**The sweep** ([`after-471.txt`](sweeps/after-471.txt)): 8 / 21 / 18 / 5 and 28 collapses, from
+9 / 6 / 11 / 13 and 41. It now prints how often and when each Faction meets its objective:
+Custodians in all 80 games on turn 2; Archivists in all 80 around turns 7 to 11; Prospectors in 58,
+around turns 9 to 16; Arkwrights in 47, around turns 15 to 29.

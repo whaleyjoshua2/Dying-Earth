@@ -467,6 +467,8 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("no_habitat_room", &["n", "place"]),
     // Ticket #345 (version 0.09.1): a Body settled for the first time.
     ("first_to_body", &["faction", "body", "colony", "n"]),
+    ("opening_met", &["reward"]),
+    ("opening_launch_site", &["state"]),
     // Ticket #395 (version 0.09.3): and the world eases at the news, one line for the whole Earth.
     ("first_to_body_eases", &["body", "ease"]),
     // Ticket #405 (version 0.09.4): the world under the Sink for the first time.

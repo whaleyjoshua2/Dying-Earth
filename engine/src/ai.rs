@@ -1196,12 +1196,26 @@ impl Game {
             None
         };
 
+        let opening_unmet = self.seat(seat).opening_met_turn.is_none();
+        let opening_kind = self.tables.faction(kind).opening.kind;
+        let opening_lift = self.tables.ai.multipliers.opportunity;
         let mut push = |orders: Vec<Order>, cat: Cat, base: f64, gap: f64, threat: f64, opportunity: f64, note: String, stack: Option<String>| {
             let base = if (homeless_archive || ferry_lift) && matches!(cat, Cat::ColonyShip | Cat::Transit | Cat::FoundColony | Cat::LoadUnload | Cat::LaunchSiteOrShipyard) {
                 base * homeless_bonus
             } else {
                 base
             };
+            // Ticket #471 (version 0.09.7): the seat's Opening Objective, until it is met. What
+            // advances it takes the opportunity multiplier -- there is no deadline, so it is a
+            // lean, not a rush.
+            let opens = opening_unmet
+                && match opening_kind {
+                    crate::data::OpeningKind::ScrubberWorking => cat == Cat::Scrubber,
+                    crate::data::OpeningKind::InvestmentBanks => note.starts_with("build Investment Bank in"),
+                    crate::data::OpeningKind::MoonColony => matches!(cat, Cat::FoundColony | Cat::Transit) && note.contains("the Moon"),
+                    crate::data::OpeningKind::ResearchPair => matches!(cat, Cat::Observatory | Cat::ResearchLab),
+                };
+            let opportunity = if opens { opportunity.max(opening_lift) } else { opportunity };
             cands.push(Candidate { orders, cat, base, gap, threat, opportunity, note, stack, pace: 1.0 });
         };
 

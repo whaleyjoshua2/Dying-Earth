@@ -26,7 +26,7 @@ start_rivals = "Your rivals: {rivals}. Build, spread Influence and {condition} b
 solar_storm = "Solar Storm: no transit advanced this turn."
 ship_arrived = "{faction} {ship} arrived at {body}."
 # Ticket #375 (version 0.09.2): the Ship a Distress Call turned aside, named, where nothing named it.
-ship_held = "{faction} {ship} held at {body} this turn, answering the call."
+ship_held = "{faction} {ship} held at {body}, answering the call."
 # Ticket #370 (version 0.09.2): the player's own Colonists still aboard a Ship off Earth, every turn
 # they wait, one line a Body, in the designer's words -- "colonists wait aboard in low orbit of
 # Mars", with "blocked by rivals' control of the orbit" when a rival's Orbital Control shuts the
@@ -50,7 +50,7 @@ battle = "Battle at {place}: {faction} attacked at {odds}% to hold the field; {o
 event_damaged_ships = "{event} damaged {n} Ship(s)."
 loaded = "{faction} loaded {cargo} at {body}{spaceport}."
 slot_taken = "{faction}: that Colony Slot was taken first."
-landing_contested = "{faction} could not land at {body}: the orbit is contested."
+landing_contested = "{faction} could not land at {body}: orbit contested."
 # Ticket #353 (version 0.09.1): the slot is NAMED. "in slot 3 on the Moon" named a place no player
 # could find on the board; {slot} now carries the slot's own name, which is the Colony's name too.
 colony_founded = "{faction} founded a Colony at {slot} on {body} with {n} Colonists."
@@ -63,6 +63,9 @@ no_habitat_room = "{n} more found no Habitat room at {place}."
 # Ticket #345 (version 0.09.1): the first Colony a world has ever carried, and what it pays.
 # Ticket #408 (version 0.09.4): cut to what it must say, as are the four lines below.
 first_to_body = "{faction} are first to settle {body}: +{n} Influence."
+# Ticket #471 (version 0.09.7): the player's own Opening Objective, met; a rival's is not reported.
+opening_met = "Objective met: {reward}."
+opening_launch_site = "Free Launch Site in {state}."
 # Ticket #395 (version 0.09.3): the world eases at the news, half a point off every Region's Unrest,
 # said once for the whole Earth, filed under On Earth; the Moment carries it too.
 first_to_body_eases = "The first Colony on {body} eased Unrest by {ease} in every Region."
@@ -164,7 +167,7 @@ relations_they = "The {first} are now {level} toward you{more}."
 relations_you = "You are now {list}."
 # Ticket #332 (version 0.09.0): the fire takes the turn's Widgets from its Region, so nothing there
 # moves; before, it pushed a due Ship back a turn.
-launch_pad_fire = "Launch Pad Fire: {place} applies no Widgets this turn; {widgets} lost."
+launch_pad_fire = "Launch Pad Fire: {place} applies no Widgets; {widgets} lost."
 game_over_win = "Game over, turn {turn}: {faction} win ({note})."
 game_over_draw = "Game over, turn {turn}: a draw ({note})."
 game_over_collapse = "Game over, turn {turn}: Collapse at {temperature} C. Nobody wins."
@@ -252,7 +255,7 @@ build_cancelled = "{faction} cancelled the {building} at {place}: {refund} Mater
 # Ticket #351 (version 0.09.1): {sink} is `energy_short_sink` below when Scrubbers were shut, and
 # empty otherwise -- a Custodian lost three Scrubbers this way in the playtest with nothing said.
 energy_short = "{faction}: Energy ran short; shut down {buildings}{sink}."
-energy_zero = "{faction}: Energy fell to zero even with every producer off."
+energy_zero = "{faction}: Energy at zero with every producer off."
 
 # ---------------------------------------------------------------- fragments other sentences use
 [phrase]

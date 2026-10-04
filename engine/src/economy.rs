@@ -387,6 +387,8 @@ impl Game {
             // Ticket #412 (version 0.09.4): and so has what leading a Tech won.
             s.lead_windfall = 0;
         }
+        // Ticket #471 (version 0.09.7): the Opening Objectives, read once every seat has its Income.
+        self.opening_objectives();
     }
 
     /// Ticket #69 (version 0.05.5): a Research Lab in a Nation State nobody holds, or one under

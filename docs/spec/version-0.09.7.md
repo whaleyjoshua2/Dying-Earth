@@ -299,3 +299,47 @@ The authority is [ticket #470](https://github.com/whaleyjoshua2/Dying-Earth/issu
 | thresholds held by a wall, by seating | 363 / 363 / 333 / 384 | 606 / 527 / 509 / 620 |
 
 The win column is within noise. The sea takes about a quarter fewer coastal slots.
+
+## 13. An Opening Objective for each Faction, and the Journal
+
+The authority is [ticket #471](https://github.com/whaleyjoshua2/Dying-Earth/issues/471).
+
+- **Each Faction has one Opening Objective.** It has no deadline, so it is never missed. It is met
+  at the first Income at which it is true, once, and its reward is paid then.
+
+| Faction | Objective | Reward |
+|---|---|---|
+| Custodians | a Scrubber of theirs working | +0.5 ppm on the Natural Sink, for good |
+| Prospectors | a working Investment Bank in each of three different Regions | 75 Ducats into the Venture Capital Fund |
+| Arkwrights | a Colony of theirs on the Moon, on the ground or in orbit | a free Launch Site |
+| Archivists | two working at once from Research Labs and Observatories, at least one an Observatory | 10 Research into the Archive fund |
+
+- **The Arkwrights' Launch Site** stands, free and working, in a Region they hold that has none and
+  has a free slot, the most populous of several. With no such Region it stays owed, and lands on the
+  first one they hold.
+- **Two Investment Banks in one Region count once.** An Investment Bank is an Earth building, so
+  "three different places" is three Regions.
+- **The Archivists' reward** stops at the fund's cap.
+- **The Journal.** The Victory window has two tabs, Victory and Journal. The Journal lists the
+  player's Opening Objective, its reward, and "Met, March 2030." or "Not yet met. No deadline."
+  Later versions' objectives go here too.
+- **Rivals' objectives are not shown** and their meeting one is not reported. The player's own is
+  one line under Your works: "Objective met: 75 Ducats into the Venture Capital Fund." The
+  Arkwrights' Launch Site says "Free Launch Site in India."
+- **The computer seats lean toward theirs** until it is met: a move that advances it takes the
+  opportunity multiplier (×2). The computer Custodians already gave their first Scrubber that.
+- **Four Report lines lost two words each** to keep the Report under its ceiling with the new lines:
+  the Launch Pad Fire, Energy at zero, a Ship held, and a contested landing.
+- Every figure and every sentence is in `factions.toml` (`opening = { ... }`).
+
+**Measured** (80 games):
+
+| | after §12 | with the Opening Objectives |
+|---|---|---|
+| wins (Cust / Pros / Ark / Arch) | 9 / 6 / 11 / 13 | 8 / 21 / 18 / 5 |
+| collapses | 41 | 28 |
+| objective met, games of 80 | | 80 / 58 / 47 / 80 |
+| median turn met, by seating | | Custodians 2; Prospectors 9 to 16; Arkwrights 15 to 29; Archivists 7 to 11 |
+
+The largest move of the version, and not traced: the Prospectors and Arkwrights up by 15 and 7
+wins, the Archivists down by 8, thirteen fewer collapses.

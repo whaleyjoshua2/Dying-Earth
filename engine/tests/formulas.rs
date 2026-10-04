@@ -19421,3 +19421,85 @@ fn a_neutral_coastal_region_builds_a_sea_wall_when_the_sea_is_close() {
     g.take_control(egypt, Seat(1));
     assert!(walled(&g, egypt), "and it comes with the Region");
 }
+
+/// Ticket #471 (version 0.09.7): **each Faction has an opening objective**, with no deadline, met
+/// at the first Income it is true and rewarded once, toward its own Victory.
+#[test]
+fn each_faction_has_an_opening_objective_met_once_and_rewarded() {
+    let mut g = game();
+    calm(&mut g);
+    let (cus, pro, ark, arc) = (Seat(0), Seat(1), Seat(2), Seat(3));
+    assert_eq!([g.kind(cus), g.kind(pro), g.kind(ark), g.kind(arc)], [FactionKind::Custodians, FactionKind::Prospectors, FactionKind::Arkwrights, FactionKind::Archivists]);
+    for s in Seat::ALL {
+        g.seats[s.index()].stockpile.energy = 500.0;
+        assert_eq!(g.seat(s).opening_met_turn, None, "nothing met on the bare board");
+    }
+    g.income_phase();
+    assert!(Seat::ALL.iter().all(|s| g.seat(*s).opening_met_turn.is_none()), "nor after an Income of nothing");
+    // The Custodians: a Scrubber working. +0.5 ppm on the Natural Sink, for good.
+    let sink = g.climate.natural_sink;
+    g.state_mut(StateId::EastAsia).facilities.push(facility(FacilityKind::Scrubber));
+    // The Prospectors: a working Investment Bank in each of THREE different places. Two in one do not count twice.
+    let fund = g.seats[1].venture_fund;
+    g.take_control(StateId::Russia, pro);
+    for sid in [StateId::Europe, StateId::Europe, StateId::Russia] {
+        g.state_mut(sid).facilities.push(facility(FacilityKind::InvestmentBank));
+    }
+    // The Arkwrights: a Colony on the Moon. A free Launch Site in a Region of theirs that has none.
+    let home = g.controlled_states(ark)[0];
+    g.take_control(StateId::SouthAsia, ark);
+    assert!(!g.state(StateId::SouthAsia).facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite)), "the premise: India has no Launch Site");
+    colony(&mut g, ark, BodyId::Moon, &[ModuleKind::Habitat], 2);
+    // The Archivists: two of Research Lab and Observatory working, one of them off Earth. Two Labs are not enough.
+    let archive = g.seats[3].archive_fund;
+    let theirs = g.controlled_states(arc)[0];
+    g.state_mut(theirs).facilities.push(facility(FacilityKind::ResearchLab));
+    g.state_mut(theirs).facilities.push(facility(FacilityKind::ResearchLab));
+    g.income_phase();
+    let turn = g.turn;
+    assert_eq!(g.seat(cus).opening_met_turn, Some(turn), "the Custodians' Scrubber");
+    assert!((g.climate.natural_sink - sink - 0.5).abs() < 1e-9, "+0.5 on the Sink: {} from {sink}", g.climate.natural_sink);
+    assert_eq!(g.seat(pro).opening_met_turn, None, "two places are not three");
+    assert_eq!(g.seat(ark).opening_met_turn, Some(turn), "the Arkwrights' Moon Colony");
+    assert!(g.state(StateId::SouthAsia).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite && f.working()), "a free Launch Site where they had none");
+    assert_eq!(g.state(home).facilities.iter().filter(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite)).count(), 1, "and no second one at home");
+    assert_eq!(g.seat(arc).opening_met_turn, None, "two Labs on Earth: one must be off it");
+    // The third place, and an Observatory in orbit.
+    g.take_control(StateId::MiddleEast, pro);
+    g.state_mut(StateId::MiddleEast).facilities.push(facility(FacilityKind::InvestmentBank));
+    colony(&mut g, arc, BodyId::Moon, &[ModuleKind::Observatory], 1);
+    g.income_phase();
+    assert_eq!(g.seat(pro).opening_met_turn, Some(g.turn));
+    assert!(g.seats[1].venture_fund >= fund + 75.0, "75 Ducats into the Fund: {} from {fund}", g.seats[1].venture_fund);
+    assert_eq!(g.seat(arc).opening_met_turn, Some(g.turn));
+    assert_eq!(g.seats[3].archive_fund, archive + 10, "10 Research into the Archive fund");
+    // Once only.
+    let (sink, fund, archive) = (g.climate.natural_sink, g.seats[1].venture_fund, g.seats[3].archive_fund);
+    g.seats[1].venture_share = 0.0;
+    g.income_phase();
+    assert_eq!(g.climate.natural_sink, sink);
+    assert_eq!(g.seats[3].archive_fund, archive);
+    assert!(g.seats[1].venture_fund < fund + 75.0, "not paid twice: {}", g.seats[1].venture_fund);
+    // The player's own is reported under Your works; a rival's is not reported at all.
+    assert!(g.report.lines.iter().all(|l| !l.text.contains("Opening objective")) || g.report.lines.iter().filter(|l| l.text.contains("Opening objective")).all(|l| l.kind == LineKind::YourWorks));
+}
+
+/// Ticket #471: a computer seat leans toward its Opening Objective until it is met -- what
+/// advances it takes the opportunity multiplier -- and not after.
+#[test]
+fn the_computer_leans_toward_its_opening_objective_until_it_is_met() {
+    let mut g = game();
+    calm(&mut g);
+    let pro = Seat(1);
+    g.turn = 3;
+    g.seats[1].stockpile.materials = 200.0;
+    g.seats[1].stockpile.energy = 200.0;
+    g.ai_orders(pro);
+    let before = scored(&g, "build Investment Bank in");
+    assert!(before > 0.0, "the premise: an Investment Bank is a candidate: {:?}", g.log.iter().filter(|l| l.contains("Bank")).collect::<Vec<_>>());
+    g.seats[1].opening_met_turn = Some(2);
+    g.log.clear();
+    g.ai_orders(pro);
+    let after = scored(&g, "build Investment Bank in");
+    assert!((before - after * g.tables.ai.multipliers.opportunity).abs() < 1e-6, "the lean, and only while unmet: {before} against {after}");
+}

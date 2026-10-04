@@ -2929,6 +2929,34 @@ fn unseen_army_lines(ui: &mut Ui, game: &Game, unseen: &[&Army]) {
     }
 }
 
+/// Ticket #471 (version 0.09.7): the Victory window's Journal tab -- the player's own objectives,
+/// each with its reward and whether it is met. A rival's are not shown, at the designer's word;
+/// with no player at the table, every Faction's is.
+fn journal_tab(ui: &mut Ui, session: &Session, game: &Game) {
+    let seats: Vec<Seat> = if session.spectator { Seat::ALL.to_vec() } else { vec![Seat(0)] };
+    for seat in seats {
+        let card = &game.tables.faction(game.kind(seat)).opening;
+        if session.spectator {
+            ui.label(RichText::new(game.seat_name(seat)).strong().color(seat_colour(session, seat)));
+        }
+        ui.label(RichText::new("Opening Objective").strong());
+        ui.label(format!("{}.", card.text));
+        ui.label(format!("Reward: {}.", card.reward_text));
+        match game.seat(seat).opening_met_turn {
+            Some(turn) => {
+                ui.label(RichText::new(format!("Met, {}.", game.date(turn).text())).color(Color32::from_rgb(140, 220, 140)));
+                if game.seat(seat).launch_site_owed {
+                    ui.label(RichText::new("The Launch Site waits for a Region of yours with none and a free slot.").weak());
+                }
+            }
+            None => {
+                ui.label(RichText::new("Not yet met. No deadline.").weak());
+            }
+        }
+        ui.add_space(8.0);
+    }
+}
+
 /// Ticket #467 (version 0.09.7): a whole figure with its thousands marked, "1,240".
 fn grouped(n: f64) -> String {
     let whole = n.round() as i64;
@@ -11386,6 +11414,21 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
         // Ticket #292 (version 0.08.6): the same home as Trading, for the same reason.
         let home = view.beside_faction_window();
         egui::Window::new("Victory").open(&mut open).default_width(470.0).default_pos(home).show(ctx, |ui| {
+            // Ticket #471 (version 0.09.7): two tabs. The Journal keeps the player's objectives --
+            // the Opening Objective now, and whatever later versions add.
+            ui.horizontal(|ui| {
+                if ui.selectable_label(!view.victory_journal, "Victory").clicked() {
+                    view.victory_journal = false;
+                }
+                if ui.selectable_label(view.victory_journal, "Journal").clicked() {
+                    view.victory_journal = true;
+                }
+            });
+            ui.separator();
+            if view.victory_journal {
+                journal_tab(ui, session, game);
+                return;
+            }
             // Ticket #50: a row per seat, in seat order, each headed by its Faction in its colour.
             for seat in Seat::ALL {
                 let p = game.progress(seat);

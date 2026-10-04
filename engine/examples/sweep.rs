@@ -197,6 +197,7 @@ fn main() {
                         let (mut blockade_suffered, mut blockade_imposed) = ([0u32; 4], [0u32; 4]);
                         let (mut colonists_grown, mut colonists_declined) = ([0u32; 4], [0u32; 4]);
                         let (mut archives_lost, mut archive_fund_lost) = (0u32, 0i64);
+                        let mut opening_met: [Vec<u32>; 4] = Default::default();
                         let (mut levies, mut neutral_holds) = (0u32, 0u32);
                         let mut warc = dying_earth_engine::state::WarCounters::default();
                         // Ticket #343 (version 0.09.1): the Natural Sink at the end of each game.
@@ -418,6 +419,11 @@ fn main() {
                             }
                             archive_funds.push(r.archive_fund_at_end.max(0) as u32);
                             archives_lost += r.archives_lost;
+                            for (i, t) in r.opening_met.iter().enumerate() {
+                                if let Some(t) = t {
+                                    opening_met[i].push(*t);
+                                }
+                            }
                             archive_fund_lost += r.archive_fund_lost;
                             neutral_research.push(r.neutral_research.max(0) as u32);
                             slots_lost.push(r.coastal_slots_lost);
@@ -604,6 +610,7 @@ fn main() {
                                 median_u(&mut archive_funds)
                             );
                             println!("      Archives lost with their Colony over the batch: {archives_lost}, the fund lost with them {archive_fund_lost}");
+                            println!("      Opening Objectives met, Custodians / Prospectors / Arkwrights / Archivists: {} / {} / {} / {} of {seeds}, median turn {} / {} / {} / {}", opening_met[0].len(), opening_met[1].len(), opening_met[2].len(), opening_met[3].len(), median_u(&mut opening_met[0]), median_u(&mut opening_met[1]), median_u(&mut opening_met[2]), median_u(&mut opening_met[3]));
                             println!(
                                 "      Neutral Labs paid a median {} Research a game; Coastal Engineering complete in {}/{seeds} seeds (median turn {})",
                                 median_u(&mut neutral_research),

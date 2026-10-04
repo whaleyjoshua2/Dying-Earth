@@ -1005,6 +1005,12 @@ pub struct SeatState {
     pub colonists_grown: u32,
     #[serde(default)]
     pub colonists_declined: u32,
+    /// Ticket #471 (version 0.09.7): the turn this seat met its Opening Objective, and whether the
+    /// Arkwrights' free Launch Site is still owed for want of a Region to stand it in.
+    #[serde(default)]
+    pub opening_met_turn: Option<u32>,
+    #[serde(default)]
+    pub launch_site_owed: bool,
     /// Ticket #461 (version 0.09.7): Archives this seat has lost with their Colonies, and the fund
     /// lost with them, over the game, for the sweep.
     #[serde(default)]
@@ -1648,6 +1654,8 @@ impl Game {
             blockade_turns_imposed: 0,
             colonists_grown: 0,
             colonists_declined: 0,
+            opening_met_turn: None,
+            launch_site_owed: false,
             archives_lost: 0,
             archive_fund_lost: 0,
             bought_units: 0,

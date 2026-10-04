@@ -384,6 +384,8 @@ pub struct ViewState {
     /// top bar is first drawn; the view is made afresh when a game is started or loaded.
     pub played_since: Option<std::time::Instant>,
     pub show_victory: bool,
+    /// Ticket #471 (version 0.09.7): the Victory window's second tab, the Journal, is the one shown.
+    pub victory_journal: bool,
     /// Ticket #203 (version 0.08.1): the Faction window, and which SEAT's page it is open on. The
     /// dropdown in its top right names the four Factions, but every live figure on the page is a
     /// seat's, so the seat is what is remembered. It opens on seat 0 -- the player's own Faction,
@@ -495,6 +497,7 @@ impl Default for ViewState {
             top_bar_bottom: 0.0,
             played_since: None,
             show_victory: false,
+            victory_journal: false,
             show_factions: false,
             faction_seat: Seat(0),
             faction_rulebook_open: false,

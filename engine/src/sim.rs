@@ -100,6 +100,9 @@ pub struct SimResult {
     pub colonists_declined: [u32; SEAT_COUNT],
     /// Ticket #461 (version 0.09.7): Archives lost with their Colonies, and the fund lost with them.
     pub archives_lost: u32,
+    /// Ticket #471 (version 0.09.7): the turn each FACTION met its Opening Objective, in
+    /// `FactionKind::ALL` order, whatever seat it sat in.
+    pub opening_met: [Option<u32>; SEAT_COUNT],
     pub archive_fund_lost: i64,
     /// Ticket #282 (version 0.08.5): Levies raised by neutral Regions, and neutral Regions that held.
     pub levies_raised: u32,
@@ -703,6 +706,7 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
     let colonists_grown = Seat::ALL.map(|s| game.seat(s).colonists_grown);
     let colonists_declined = Seat::ALL.map(|s| game.seat(s).colonists_declined);
     let archives_lost = Seat::ALL.iter().map(|s| game.seat(*s).archives_lost).sum();
+    let opening_met = FactionKind::ALL.map(|k| Seat::ALL.into_iter().find(|s| game.kind(*s) == k).and_then(|s| game.seat(s).opening_met_turn));
     let archive_fund_lost = Seat::ALL.iter().map(|s| game.seat(*s).archive_fund_lost).sum();
     let events_no_target = game.events_no_target;
     let (choice_taken, choice_refused, choice_not_asked) = (game.choice_taken, game.choice_refused, game.choice_not_asked);
@@ -767,6 +771,7 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         colonists_grown,
         colonists_declined,
         archives_lost,
+        opening_met,
         archive_fund_lost,
         levies_raised: game.levies_raised,
         neutral_holds: game.neutral_holds,

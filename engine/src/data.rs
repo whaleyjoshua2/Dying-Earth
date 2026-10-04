@@ -656,6 +656,8 @@ pub struct FactionCard {
     pub victory_first: VictoryFirstCard,
     /// Ticket #51: the second part, generalised the way #50 generalised the first.
     pub victory_second: VictorySecondCard,
+    /// Ticket #471 (version 0.09.7): the Faction's Opening Objective.
+    pub opening: OpeningCard,
     pub colour: [f32; 3],
     /// Ticket #100 (version 0.07.0), renamed on ticket #195 (version 0.08.0): the Region the start
     /// screen opens its globe on. It has ONE reader, and its only job is pointing the start globe's
@@ -786,6 +788,39 @@ impl VictorySecondKind {
             VictorySecondKind::ColonistsUploaded => "Colonists uploaded",
         }
     }
+}
+
+/// Ticket #471 (version 0.09.7): a Faction's **Opening Objective** -- one early thing to do, with
+/// no deadline, rewarded once toward its own Victory. Every figure and every word the player reads
+/// is here in `factions.toml`.
+#[derive(Debug, Clone, Deserialize)]
+pub struct OpeningCard {
+    pub kind: OpeningKind,
+    /// How many the objective wants: three places with an Investment Bank, two research buildings.
+    #[serde(default = "one")]
+    pub count: u32,
+    /// The reward's size, in the unit its kind pays: ppm, Ducats or Research. The Arkwrights' is a
+    /// Launch Site and reads nought.
+    #[serde(default)]
+    pub reward: f64,
+    pub text: String,
+    pub reward_text: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OpeningKind {
+    /// The Custodians: a Scrubber of theirs working. The Natural Sink grows, for good.
+    ScrubberWorking,
+    /// The Prospectors: a working Investment Bank in each of `count` different places. Ducats
+    /// into the Venture Capital Fund.
+    InvestmentBanks,
+    /// The Arkwrights: a Colony on the Moon, ground or station. A free Launch Site in a Region of
+    /// theirs that has none.
+    MoonColony,
+    /// The Archivists: `count` working at once from Research Labs and Observatories, one of them
+    /// off Earth. Research into the Archive fund.
+    ResearchPair,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize)]

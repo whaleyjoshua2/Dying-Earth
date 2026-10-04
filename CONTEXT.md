@@ -788,6 +788,14 @@ _Avoid_: subdued, loyal, converted
 
 ### Winning
 
+**Opening Objective**:
+One early thing a Faction is asked to do, since version 0.09.7, rewarded once toward its own Victory Condition. It has no deadline, so it is never missed: it is met at the first Income it is true. The Custodians' is a working Scrubber (the Natural Sink grows for good); the Prospectors', a working Investment Bank in each of three different places (Ducats into the Venture Capital Fund); the Arkwrights', a Colony on the Moon, ground or orbit (a free Launch Site in a Region of theirs that has none); the Archivists', two Research Labs or Observatories working, one of them off Earth (Research into the Archive fund). A player sees their own in the **Journal**; a rival's is not shown.
+_Avoid_: quest, mission, starting goal
+
+**Journal**:
+The second tab of the Victory window, since version 0.09.7, listing the player's objectives with each one's reward and whether it is met. It holds the Opening Objective now and is where later objectives will go.
+_Avoid_: quest log, objectives window
+
 **Victory Condition**:
 What one Faction must achieve to win. Since version 0.08.0 the Archivists' second part counts Colonists UPLOADED into the Archive rather than Colonists living beside it, which makes that half monotonic: an uploaded Colonist cannot be lost to a raid, a crowding death or a handover. Each Faction has its own, and meeting it in an End phase wins the game at once; since version 0.06.0 it is not met until the Faction's Victory gate, a Tech of its own on the Tech Tree, stands, though every part of it accrues before that; if more than one seat meets it in the same phase, the larger margin over its own bar wins and an exact tie is a draw. If no Faction has met its condition by the end of the last turn, the seats are ranked by score -- the smaller of their two parts' fractions -- then by Colonists off Earth, then by Colonies held, and the first ranked wins. Since version 0.09.4 the Custodians' percentage carries the Stabilization run's partial credit, so a Custodian that has never met its first part can still rank, and win, on it.
 _Avoid_: win condition, goal, objective, victory points
