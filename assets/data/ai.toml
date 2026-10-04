@@ -565,6 +565,9 @@ battle_fuel_weight = 0.2
 # Ticket #425 (version 0.09.5): Efficient Grids off -- Automated Refining needs Deep Mining alone.
 # Ticket #426 (version 0.09.5): Commodity Finance in place of Beneficiation, which left the road.
 order = ["deep_mining", "automated_refining", "commodity_finance", "orbital_refuelling", "clean_propellant", "efficient_transit", "nuclear_rockets", "cryogenic_tanks", "hardened_hulls", "missile_technology"]
+# Ticket #462 (version 0.09.7): the three rivals' gates, picked only when nothing else is left, and
+# starved of this seat's Research (its whole cap kept back) while one is under research.
+last = ["planetary_stewardship", "generation_ships", "the_upload"]
 # Ticket #348: `last = "clean_power"` is GONE. The tree is SHARED, so a Faction deferring a Tech is
 # not stating a private preference -- it is holding the whole table up. Clean Power is an antecedent
 # of BOTH the Arkwrights' and the Archivists' gates, so every turn a Prospector Lead pushed it to
@@ -600,6 +603,9 @@ order = ["deep_mining", "automated_refining", "commodity_finance", "orbital_refu
 # Ticket #424 (version 0.09.5): the Custodians' road moved to the Stewardship line -- Efficient Grids,
 # Clean Power and Green Consensus, cheapest first. Public Science is on nobody's road but the Archivists'.
 order = ["efficient_grids", "clean_power", "green_consensus", "orbital_refuelling", "clean_propellant", "efficient_transit", "nuclear_rockets", "cryogenic_tanks", "hardened_hulls", "missile_technology"]
+# Ticket #462 (version 0.09.7): the three rivals' gates, picked only when nothing else is left, and
+# starved of this seat's Research (its whole cap kept back) while one is under research.
+last = ["extraction_charter", "generation_ships", "the_upload"]
 
 # Ticket #51: the Arkwrights want room, cheap upkeep and cheap transits.
 # Ticket #348: Efficient Grids and Clean Power open the list. Generation Ships waits on Closed-Loop
@@ -611,6 +617,9 @@ order = ["efficient_grids", "clean_power", "green_consensus", "orbital_refuellin
 # Expanded Habitats alone, so the road is all Off-world Living.
 # Ticket #438 (version 0.09.6): Relay Networks joins the road, straight after Closed-Loop Colonies.
 order = ["expanded_habitats", "closed_loop_colonies", "relay_networks", "orbital_refuelling", "clean_propellant", "efficient_transit", "nuclear_rockets", "cryogenic_tanks", "hardened_hulls", "missile_technology"]
+# Ticket #462 (version 0.09.7): the three rivals' gates, picked only when nothing else is left, and
+# starved of this seat's Research (its whole cap kept back) while one is under research.
+last = ["planetary_stewardship", "extraction_charter", "the_upload"]
 
 # Ticket #51: the Archivists want Research and a quiet world.
 # Ticket #348: Expanded Habitats, Clean Power and Closed-Loop Colonies open the list. Ticket #246
@@ -623,3 +632,6 @@ order = ["expanded_habitats", "closed_loop_colonies", "relay_networks", "orbital
 # still `public_science`) and Civil Defense. Closed-Loop Colonies and its three are off this list.
 # Ticket #433 (version 0.09.5): and Orbital Data Centers, which The Upload now needs too.
 order = ["public_science", "civil_defense", "orbital_data_centers", "orbital_refuelling", "clean_propellant", "efficient_transit", "nuclear_rockets", "cryogenic_tanks", "hardened_hulls", "missile_technology"]
+# Ticket #462 (version 0.09.7): the three rivals' gates, picked only when nothing else is left, and
+# starved of this seat's Research (its whole cap kept back) while one is under research.
+last = ["planetary_stewardship", "extraction_charter", "generation_ships"]

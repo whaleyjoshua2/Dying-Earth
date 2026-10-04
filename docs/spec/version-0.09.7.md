@@ -105,3 +105,33 @@ The authority is [ticket #461](https://github.com/whaleyjoshua2/Dying-Earth/issu
 The win column is within noise. **20 Archives were lost with their Colony** over the 80 games, and
 2,952 Research of fund with them (nearly always a full 150). How many were lost before this ticket
 was not counted, so there is no before figure for that.
+
+## 5. The computer seats research their rivals' gates last; the Archivists stop diverting at a full fund
+
+The authority is [ticket #462](https://github.com/whaleyjoshua2/Dying-Earth/issues/462). Computer
+seats only; no rule moves.
+
+- **`last` is a list** (`[tech_picks.*]` in `ai.toml`), and each Faction's is the three gates that
+  are not its own. A computer Research Lead picks a rival's gate only when nothing else is left,
+  and then the cheapest of them. Its own gate it still picks first, by the rule of version 0.06.0.
+- **A rival's gate is starved.** A computer seat keeps back its whole cap of Research (50 per cent)
+  while a gate that is not its own is under research, at the usual price of a point of Relations
+  with every rival. Its own gate it funds in full. The designer: the seat that needs the gate is
+  the one still paying for it, so it is likelier to hold the Lead.
+- **The road is still protected.** No Faction leaves or refuses a Tech a rival must pass through to
+  reach its gate; the test from version 0.09.1 holds that, with the gate itself now excepted.
+- **The computer Archivists set their directive to 0 once the fund is full**, where they left it at
+  100 all game, and back to 100 when the fund has room again (§4: it can be lost).
+
+**Measured** (80 games):
+
+| | after §4 | with §5 |
+|---|---|---|
+| wins (Cust / Pros / Ark / Arch) | 9 / 5 / 12 / 13 | 10 / 7 / 10 / 14 |
+| collapses | 41 | 39 |
+| the whole tree complete | 51 games, median turn 24 | 51 games, median turn 24 |
+| gates reached (Cust / Pros / Ark / Arch) | 67 / 75 / 59 / 61 | 62 / 74 / 57 / 63 |
+| Research the Archivists keep back, mean by seating | 100% in all four | 82 / 78 / 70 / 65% |
+
+Within noise on wins. The games do not stall: the tree completes as often and as early. The
+Custodians reach their gate in five fewer games.

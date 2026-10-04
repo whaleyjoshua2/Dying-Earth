@@ -51,3 +51,15 @@ new `{fund}` field was declared.
 **The sweep** ([`after-461.txt`](sweeps/after-461.txt)): 9 / 5 / 12 / 13 and 41 collapses, within
 noise. The sweep now counts Archives lost: 20 over the 80 games (1, 7, 2 and 10 by seating), with
 2,952 of fund.
+
+## Rivals' gates researched last; the Archivists stop diverting at a full fund (ticket #462)
+
+No picture: computer-seat behaviour.
+
+**Witnessed red:** the new test `the_computer_leaves_its_rivals_gates_until_last_and_starves_them`
+could not compile while `last` held one Tech. The 0.09.1 guard test
+(`no_faction_defers_a_tech_another_factions_gate_needs`) was amended to allow the gate itself.
+
+**The sweep** ([`after-462.txt`](sweeps/after-462.txt)): 10 / 7 / 10 / 14 and 39 collapses, from
+9 / 5 / 12 / 13 and 41. The tree completes in 51 games at turn 24, unchanged. The Archivists keep
+back 65 to 82 per cent of their Research on average, from 100.

@@ -2087,7 +2087,9 @@ impl Game {
                     let mine = self.tables.victory_gate(kind) == Some(t);
                     if mine || picks.order.contains(&t) {
                         th.directive_when_wanted
-                    } else if picks.never == Some(t) || picks.last == Some(t) {
+                    // Ticket #462 (version 0.09.7): `last` is the rivals' gates, so a seat keeps
+                    // back its whole cap while a gate that is not its own is under research.
+                    } else if picks.never == Some(t) || picks.last.contains(&t) {
                         cap
                     } else {
                         th.directive_when_indifferent
@@ -2132,6 +2134,12 @@ impl Game {
             if fund < cap && self.seat(seat).research_last_turn > 0 && self.seat(seat).research_directive == 0 {
                 let opp = if fund + self.seat(seat).research_last_turn >= cap { m.opportunity } else { 1.0 };
                 push(vec![Order::SetResearchDirective { percent: self.research_directive_cap(seat) }], Cat::FundArchive, self.base_weight(seat, Cat::FundArchive), gap_for(Cat::FundArchive, None), 1.0, opp, format!("pay the Labs into the Archive fund from the next Income, {} Research a turn", self.seat(seat).research_last_turn), None);
+            }
+            // Ticket #462 (version 0.09.7): a full fund takes nothing, and a directive left standing
+            // still costs them Provisional Findings and a point with every rival, so it comes off;
+            // the branch above puts it back the turn the fund has room again (#461: it can be lost).
+            if fund >= cap && self.seat(seat).research_directive > 0 {
+                push(vec![Order::SetResearchDirective { percent: 0 }], Cat::FundArchive, self.base_weight(seat, Cat::FundArchive), gap_for(Cat::FundArchive, None), 1.0, m.opportunity, "the fund is full: give all their Research to the shared Tech again".to_string(), None);
             }
             // Ticket #199 (version 0.08.0): the Archive also waits on the gate Tech, and the computer
             // is deliberately NOT taught that here. Every candidate goes through `check_order` before

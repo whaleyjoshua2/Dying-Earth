@@ -1409,11 +1409,12 @@ pub struct AiThresholds {
 
 /// Ticket #50: one pick list per Faction. `order` is tried first, then the cheapest available
 /// Tech that is not `never`, and `last` only when nothing else is left.
+/// Ticket #462 (version 0.09.7): `last` is a list -- each Faction's is its three rivals' gates.
 #[derive(Debug, Clone, Deserialize)]
 pub struct AiTechPicks {
     pub order: Vec<TechId>,
     #[serde(default)]
-    pub last: Option<TechId>,
+    pub last: Vec<TechId>,
     #[serde(default)]
     pub never: Option<TechId>,
 }

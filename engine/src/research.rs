@@ -347,12 +347,13 @@ impl Game {
             }
         }
         let mut rest: Vec<TechId> = available.clone();
-        rest.retain(|t| Some(*t) != picks.never && Some(*t) != picks.last);
+        rest.retain(|t| Some(*t) != picks.never && !picks.last.contains(t));
         rest.sort_by_key(|t| self.tables.tech(*t).cost);
         if let Some(t) = rest.first() {
             return (*t, "pick_cheapest");
         }
-        if let Some(last) = picks.last.filter(|t| available.contains(t)) {
+        // Ticket #462 (version 0.09.7): a list now; the cheapest of what it was leaving.
+        if let Some(last) = picks.last.iter().copied().filter(|t| available.contains(t)).min_by_key(|t| self.tables.tech(*t).cost) {
             return (last, "pick_last");
         }
         (available[0], "pick_cheapest")

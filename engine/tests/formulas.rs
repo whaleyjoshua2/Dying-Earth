@@ -7896,12 +7896,16 @@ fn no_faction_defers_a_tech_another_factions_gate_needs() {
         // Green Consensus was nobody else's antecedent. It is the Custodians' ONLY rung-2
         // antecedent, on the one chain they have, and they are the weakest Faction on the board.
         // The designer, told that: drop it.
-        for (lever, tech) in [("leave", picks.last), ("refuse to fund", picks.never)] {
-            let Some(tech) = tech else { continue };
+        //
+        // Ticket #462 (version 0.09.7): `last` is a list, and the designer put the rivals' GATES
+        // on it, knowingly -- the seat that needs a gate is the one still paying for it. The rule
+        // this test keeps is about the road: no Tech a rival must pass THROUGH is left or refused.
+        let levers = picks.last.iter().map(|t| ("leave", *t)).chain(picks.never.iter().map(|t| ("refuse to fund", *t)));
+        for (lever, tech) in levers {
             for other in FactionKind::ALL.into_iter().filter(|k| *k != kind) {
                 let gate = t.victory_gate(other).expect("every Faction has a Victory gate");
                 assert!(
-                    !t.gate_chain(other).contains(&tech),
+                    tech == gate || !t.gate_chain(other).contains(&tech),
                     "the {:?} {} {}, and the {:?} cannot reach {} without it",
                     kind,
                     lever,
@@ -19224,4 +19228,56 @@ fn the_computer_goes_after_a_half_full_archive_and_the_archivists_defend_it() {
     g.ai_orders(arch);
     let pressed = scored(&g, "build Barracks at");
     assert!((pressed - calm_score * g.tables.ai.multipliers.threat).abs() < 1e-6, "a rival with cause and a half-full fund: the threat's lift, {pressed} against {calm_score}");
+}
+
+/// Ticket #462 (version 0.09.7): **each computer Faction leaves its rivals' gates until last** --
+/// `last` is a list, the three gates that are not its own -- and holds back its whole cap of
+/// Research while one of them is under research. **The computer Archivists stop diverting once
+/// the fund is full.**
+#[test]
+fn the_computer_leaves_its_rivals_gates_until_last_and_starves_them() {
+    let mut g = game();
+    calm(&mut g);
+    let t = g.tables.clone();
+    for kind in FactionKind::ALL {
+        let mut rivals: Vec<TechId> = FactionKind::ALL.into_iter().filter(|k| *k != kind).map(|k| t.victory_gate(k).unwrap()).collect();
+        let mut last = t.ai_tech_picks(kind).last.clone();
+        rivals.sort();
+        last.sort();
+        assert_eq!(last, rivals, "{kind:?} leaves the three gates that are not its own");
+    }
+    // A Prospector Lead offered a rival's gate and a dearer Tech off its list takes the dearer one.
+    let pro = Seat(1);
+    assert_eq!(g.kind(pro), FactionKind::Prospectors);
+    g.research.shortlist = vec![TechId::TheUpload, TechId::CleanManufacturing];
+    assert!(!t.ai_tech_picks(FactionKind::Prospectors).order.contains(&TechId::CleanManufacturing));
+    assert_eq!(g.ai_tech_pick_with_reason(pro), (TechId::CleanManufacturing, "pick_cheapest"));
+    // Nothing else left: the cheapest of the gates it was leaving.
+    g.research.shortlist = vec![TechId::TheUpload, TechId::GenerationShips];
+    assert_eq!(g.ai_tech_pick_with_reason(pro).1, "pick_last");
+    // While a rival's gate is under research it keeps back its whole cap.
+    g.turn = 20;
+    g.seats[1].research_last_turn = 6;
+    g.research.current = Some(TechId::TheUpload);
+    g.ai_orders(pro);
+    assert!(scored(&g, "direct 50 per cent") > 0.0, "the cap, against a rival's gate: {:?}", g.log.iter().filter(|l| l.contains("per cent")).collect::<Vec<_>>());
+    // Its own gate it funds in full.
+    g.seats[1].research_directive = 50;
+    g.research.current = Some(TechId::ExtractionCharter);
+    g.log.clear();
+    g.ai_orders(pro);
+    assert!(scored(&g, "direct 0 per cent") > 0.0, "nothing kept back from its own gate");
+    // The Archivists: a full fund, and the directive comes off; room again, and it goes back on.
+    let arch = Seat(3);
+    assert_eq!(g.kind(arch), FactionKind::Archivists);
+    g.seats[3].research_last_turn = 6;
+    g.seats[3].research_directive = 100;
+    g.seats[3].archive_fund = g.archive_fund_cap(arch);
+    g.log.clear();
+    let orders = g.ai_orders(arch);
+    assert!(orders.contains(&Order::SetResearchDirective { percent: 0 }), "a full fund takes nothing, so they give it all to the shared Tech: {orders:?}");
+    g.seats[3].research_directive = 0;
+    g.seats[3].archive_fund = 0;
+    let orders = g.ai_orders(arch);
+    assert!(orders.contains(&Order::SetResearchDirective { percent: 100 }), "the fund lost, they pay into it again: {orders:?}");
 }
