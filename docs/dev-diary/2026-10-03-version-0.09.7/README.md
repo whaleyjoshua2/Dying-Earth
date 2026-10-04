@@ -79,4 +79,7 @@ Two of them caught real faults in the first draft: the Sink Moment is the design
 whose "{ease}" is in words ("a half") and needs its "by"; and a change of hands is listed under two
 headings on purpose (ticket #404), so the single listing was narrowed to carbon credits.
 
+The picture was retaken twice for the designer's two additions: held Regions in their owner's colour,
+and each Faction's recruiting as one line (witnessed red: two lines where one was wanted).
+
 No sweep: nothing a computer seat reads was changed.

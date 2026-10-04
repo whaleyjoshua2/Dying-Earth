@@ -478,7 +478,7 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("antarctica_opens", &["n"]),
     ("archive_begun", &["faction", "colony"]),
     ("neutral_research", &["n"]),
-    ("emigrants_mustered", &["n", "state", "fell", "unrest"]),
+    ("emigrants_mustered", &["faction", "n", "where"]),
     // Ticket #334 (version 0.09.0).
     ("army_ordered", &["place", "people"]),
     ("emigrants_arrived", &["n", "state", "colony"]),
@@ -634,6 +634,7 @@ pub const PHRASE_ARGS: &[(&str, &[&str])] = &[
     ("waiting_station", &["station", "body"]),
     ("waiting_many", &["body", "parts"]),
     ("waiting_part_low", &["n"]),
+    ("recruited_part", &["n", "state"]),
     ("waiting_part_station", &["n", "station"]),
     ("waiting_blocked", &[]),
     ("waiting_blockaded", &["station"]),

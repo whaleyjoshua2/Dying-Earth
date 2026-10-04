@@ -19320,3 +19320,22 @@ fn a_carbon_credit_the_player_sold_is_listed_once() {
     assert_eq!(listed, 1, "once: {:?}", sections.iter().map(|(s, l)| (*s, l.len())).collect::<Vec<_>>());
     assert!(sections.iter().any(|(s, lines)| *s == Section::YourWorks && lines.iter().any(|l| l.text.contains("carbon credit"))), "and under Your works");
 }
+
+/// Ticket #463 (version 0.09.7), the designer's last word on it: **a Faction's recruiting is one
+/// Report line**, the total and then each Region -- "[Faction recruited total pioneers] [n at
+/// state a] [n at state b]" -- where every Region had a line of its own.
+#[test]
+fn a_factions_recruiting_is_one_report_line() {
+    let mut g = game();
+    calm(&mut g);
+    g.take_control(StateId::SouthAsia, Seat(0));
+    g.report.lines.clear();
+    g.commit_orders(Seat(0), &[Order::BuildEmigrants { state: StateId::EastAsia, n: 2 }, Order::BuildEmigrants { state: StateId::SouthAsia, n: 1 }]);
+    let said: Vec<&str> = g.report.lines.iter().map(|l| l.text.as_str()).filter(|t| t.contains("Pioneers")).collect();
+    assert_eq!(said, vec!["Custodians recruited 3 Pioneers: 2 in China, 1 in India."]);
+    // One Region is the same line, shorter.
+    g.report.lines.clear();
+    g.commit_orders(Seat(1), &[Order::BuildEmigrants { state: StateId::Europe, n: 2 }]);
+    let said: Vec<&str> = g.report.lines.iter().map(|l| l.text.as_str()).filter(|t| t.contains("Pioneers")).collect();
+    assert_eq!(said, vec!["Prospectors recruited 2 Pioneers: 2 in The European Union."]);
+}

@@ -161,3 +161,8 @@ moves.
   "color country names the color of their owner too". The owner is whoever controls the Region as
   the Report is read; a Region nobody holds keeps the line's own colour. A name is matched as a
   whole word, so "Iran" is not coloured inside "Iranian".
+- **A Faction's recruiting is one line**, the designer's last addition: the total, then each Region
+  -- "Archivists recruited 4 Pioneers: 2 in The United States, 2 in Australia." Every Region had a
+  line of its own, which also quoted the Unrest it calmed; that clause is gone from the line, and
+  the Region's own Unrest line still carries the change. A line about one Region still goes there
+  when clicked; a line about several points nowhere.
