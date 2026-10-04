@@ -1351,6 +1351,11 @@ pub struct AiThresholds {
     pub emitter_k: f64,
     pub emitter_cap: f64,
     pub emitter_cause: i64,
+    /// Ticket #461 (version 0.09.7): a rival's Colony holding the Archive is worth this much more to
+    /// a seat with cause, once the fund is at least this share of its cap; the Archivists defend
+    /// it under the same test.
+    pub archive_target_lift: f64,
+    pub archive_target_fund: f64,
     /// Ticket #448 (version 0.09.6): what a seat keeps back from the market.
     pub market_materials_reserve: f64,
     pub market_materials_turns: f64,

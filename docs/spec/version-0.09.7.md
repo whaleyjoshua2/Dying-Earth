@@ -69,3 +69,39 @@ The authority is [ticket #460](https://github.com/whaleyjoshua2/Dying-Earth/issu
 | collapses | 40 | 41 |
 
 Within noise. The Prospectors place first on score in 36 games, from 32.
+
+## 4. The Archive fund is lost when its Colony changes hands
+
+The authority is [ticket #461](https://github.com/whaleyjoshua2/Dying-Earth/issues/461).
+
+- **When a Colony holding the Archive changes hands, the Archivists' fund goes to nought**, where
+  it was kept. A change of hands is an Influence takeover or a completed Occupation, as before; the
+  Module is destroyed, as before. A Colony that is only occupied has not changed hands.
+- **Only the Archive's Colony carries the fund.** Losing another Colony costs nothing from it, and
+  a fund with no Archive built cannot be taken.
+- **Uploads are kept**, as since version 0.08.0.
+- **The texts:** the Report line reads "The Archive at <place> was destroyed when the Colony left
+  the Archivists' hands; their fund of <n> is lost." The Archive's hover ends "Destroyed if this
+  Colony changes hands, and the fund is lost with it."
+
+**The computer seats** (figures in `ai.toml`):
+
+- **Going after it.** A rival's Colony holding the Archive is weighed at ×2 (`archive_target_lift`)
+  by a seat that has cause against its holder, once the fund is at least half its cap
+  (`archive_target_fund = 0.5`). It applies to spending Influence on the Colony and to landing an
+  Army there. Without cause, or under half, nothing changes.
+- **Defending it.** While any rival has cause against them and the fund is at least half, the
+  computer Archivists weigh a Barracks and an Army at the Archive's Colony at the threat's lift,
+  and hold the Colony with Influence once a rival's Standing comes within four steps of theirs,
+  where two is the rule for every other place.
+
+**Measured** (80 games):
+
+| | after §3 | with the fund lost |
+|---|---|---|
+| wins (Cust / Pros / Ark / Arch) | 10 / 5 / 11 / 12 | 9 / 5 / 12 / 13 |
+| collapses | 41 | 41 |
+
+The win column is within noise. **20 Archives were lost with their Colony** over the 80 games, and
+2,952 Research of fund with them (nearly always a full 150). How many were lost before this ticket
+was not counted, so there is no before figure for that.

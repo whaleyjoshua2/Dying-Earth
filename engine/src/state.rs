@@ -1005,6 +1005,12 @@ pub struct SeatState {
     pub colonists_grown: u32,
     #[serde(default)]
     pub colonists_declined: u32,
+    /// Ticket #461 (version 0.09.7): Archives this seat has lost with their Colonies, and the fund
+    /// lost with them, over the game, for the sweep.
+    #[serde(default)]
+    pub archives_lost: u32,
+    #[serde(default)]
+    pub archive_fund_lost: i64,
     /// Ticket #227 (version 0.08.2): units this seat has bought and sold through the Trading window
     /// over the whole game. Kept because floating prices are only fair if more than one hand is on
     /// them, and the sweep had no way to say whose were.
@@ -1637,6 +1643,8 @@ impl Game {
             blockade_turns_imposed: 0,
             colonists_grown: 0,
             colonists_declined: 0,
+            archives_lost: 0,
+            archive_fund_lost: 0,
             bought_units: 0,
             sold_units: 0,
             spaceport_influence: 0,

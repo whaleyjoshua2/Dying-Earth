@@ -196,6 +196,7 @@ fn main() {
                         let mut agitates = [0u32; 4];
                         let (mut blockade_suffered, mut blockade_imposed) = ([0u32; 4], [0u32; 4]);
                         let (mut colonists_grown, mut colonists_declined) = ([0u32; 4], [0u32; 4]);
+                        let (mut archives_lost, mut archive_fund_lost) = (0u32, 0i64);
                         let (mut levies, mut neutral_holds) = (0u32, 0u32);
                         let mut warc = dying_earth_engine::state::WarCounters::default();
                         // Ticket #343 (version 0.09.1): the Natural Sink at the end of each game.
@@ -416,6 +417,8 @@ fn main() {
                                 archive_complete.push(t);
                             }
                             archive_funds.push(r.archive_fund_at_end.max(0) as u32);
+                            archives_lost += r.archives_lost;
+                            archive_fund_lost += r.archive_fund_lost;
                             neutral_research.push(r.neutral_research.max(0) as u32);
                             slots_lost.push(r.coastal_slots_lost);
                             drowned.push(r.facilities_drowned);
@@ -600,6 +603,7 @@ fn main() {
                                 median_u(&mut archive_complete),
                                 median_u(&mut archive_funds)
                             );
+                            println!("      Archives lost with their Colony over the batch: {archives_lost}, the fund lost with them {archive_fund_lost}");
                             println!(
                                 "      Neutral Labs paid a median {} Research a game; Coastal Engineering complete in {}/{seeds} seeds (median turn {})",
                                 median_u(&mut neutral_research),

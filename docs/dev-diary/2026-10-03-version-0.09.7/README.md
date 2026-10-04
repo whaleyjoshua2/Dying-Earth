@@ -37,3 +37,17 @@ moved to 2 before the data, read `left: (3, 2.0, 0.2, 3.0), right: (3, 2.0, 0.2,
 
 **The sweep** ([`after-460.txt`](sweeps/after-460.txt)): 10 / 5 / 11 / 12 and 41 collapses, from
 10 / 3 / 13 / 13 and 40. Within noise.
+
+## The Archive fund is lost when its Colony changes hands (ticket #461)
+
+No picture: the headless shot of the Archive's card does not draw its hover, which is where the one
+changed sentence shows.
+
+**Witnessed red:** the existing Archive test, renamed and asked for a fund of nought, and the new
+test `the_computer_goes_after_a_half_full_archive_and_the_archivists_defend_it`, could not compile
+before the two `ai.toml` figures existed; the root crate's tests then failed until the Report line's
+new `{fund}` field was declared.
+
+**The sweep** ([`after-461.txt`](sweeps/after-461.txt)): 9 / 5 / 12 / 13 and 41 collapses, within
+noise. The sweep now counts Archives lost: 20 over the 80 games (1, 7, 2 and 10 by seating), with
+2,952 of fund.

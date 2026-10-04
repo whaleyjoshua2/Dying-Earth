@@ -90,7 +90,7 @@ emigrants_stayed = "{n} more found no Habitat room at {station} and are still wa
 neutral_research = "Regions in no one's hands added {n} Research."
 archive_built = "The {faction} raised the Archive at {place}; it wants {left} more Research."
 archive_complete = "The {faction} completed the Archive at {place}: it stands, and every point of its Research is paid."
-archive_destroyed = "The Archive at {place} was destroyed when the Colony passed out of the {faction}' hands; their Archive fund is kept."
+archive_destroyed = "The Archive at {place} was destroyed when the Colony left the {faction}' hands; their fund of {fund} is lost."
 archive_funded = "The {faction} are funding the Archive: {banked} Research banked, {fund} of {cap} in the fund."
 # Ticket #235 (version 0.08.3): the other three Research Directives. Each says what was given up as
 # well as what was got, because the whole of the decision is the trade.

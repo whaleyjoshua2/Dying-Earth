@@ -1709,7 +1709,9 @@ impl Game {
         // is read once the new owner holds them, below.
         let scrubbers_move = matches!(place, Place::State(_)) && self.place_control(place).controller() != Some(seat);
         // Ticket #51: an Archive is destroyed when its Colony changes hands, whether by Occupation
-        // or by Influence. The Archive fund is kept, so the Archivists can start again.
+        // or by Influence. Ticket #461 (version 0.09.7): and the fund is LOST with it, where it was
+        // kept -- the designer's counterplay. Uploads are kept (#192): they only ever climb. A
+        // Colony without the Archive carries no fund, so losing one costs nothing here.
         if let Place::Colony(c) = place
             && self.place_control(place).controller() != Some(seat)
             && self.colony(c).map(|col| col.modules.iter().any(|m| m.kind == ModuleKind::Archive)).unwrap_or(false)
@@ -1719,9 +1721,14 @@ impl Game {
                 col.modules.retain(|m| m.kind != ModuleKind::Archive);
             }
             let whose = owner.map(|o| self.seat_name(o)).unwrap_or_else(|| "nobody".to_string());
-            let line = format!("The Archive at {} was destroyed when the Colony passed out of the {}' hands; their Archive fund is kept.", self.place_name(place), whose);
+            let fund = owner.map(|o| std::mem::take(&mut self.seat_mut(o).archive_fund)).unwrap_or(0);
+            if let Some(o) = owner {
+                self.seat_mut(o).archives_lost += 1;
+                self.seat_mut(o).archive_fund_lost += fund;
+            }
+            let line = format!("The Archive at {} was destroyed when the Colony passed out of the {}' hands; their Archive fund of {} is lost.", self.place_name(place), whose, fund);
             self.log(line);
-            let text = self.say("archive_destroyed", &[("place", self.place_name(place)), ("faction", whose)]);
+            let text = self.say("archive_destroyed", &[("place", self.place_name(place)), ("faction", whose), ("fund", fund.to_string())]);
             self.report_line(LineKind::Archive, Some(place.into()), text);
         }
         let (before, directed) = (self.place_control(place).controller(), self.place_control(place).director());

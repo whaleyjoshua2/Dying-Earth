@@ -991,7 +991,34 @@ impl Game {
         if col.control.director().is_none() {
             return 1.0;
         }
-        (m.bounty_top * self.ai_place_size_for(viewer, cid) / largest.max(m.bounty_floor)).max(m.bounty_least)
+        let archive = viewer.map(|v| self.archive_threat_lift(v, cid)).unwrap_or(1.0);
+        (m.bounty_top * self.ai_place_size_for(viewer, cid) / largest.max(m.bounty_floor)).max(m.bounty_least) * archive
+    }
+
+    /// Ticket #461 (version 0.09.7): the Archive fund is lost with the Archive's Colony, so the
+    /// Colony is worth `archive_target_lift` more to a seat with cause against its holder once the
+    /// fund is at least `archive_target_fund` of its cap. Under that it is no threat yet.
+    fn archive_threat_lift(&self, seat: Seat, cid: ColonyId) -> f64 {
+        let th = &self.tables.ai.thresholds;
+        let Some(col) = self.colony(cid) else { return 1.0 };
+        match col.control.controller() {
+            Some(owner) if owner != seat && self.archive_at_risk(owner, cid) && self.has_cause(seat, owner) => th.archive_target_lift,
+            _ => 1.0,
+        }
+    }
+
+    /// Ticket #461: this Colony holds its holder's Archive and the fund is worth taking.
+    fn archive_at_risk(&self, owner: Seat, cid: ColonyId) -> bool {
+        let th = &self.tables.ai.thresholds;
+        self.colony(cid).is_some_and(|c| c.modules.iter().any(|m| m.kind == ModuleKind::Archive))
+            && self.seat(owner).archive_fund as f64 >= th.archive_target_fund * self.archive_fund_cap(owner) as f64
+    }
+
+    /// Ticket #461: the Archivists' side of it -- a rival with cause against them while the Archive
+    /// at this Colony is worth taking. The designer: "they need to be able to respond to heightened
+    /// threat".
+    fn archive_threatened(&self, seat: Seat, cid: ColonyId) -> bool {
+        self.archive_at_risk(seat, cid) && seat.others().iter().any(|r| self.has_cause(*r, seat))
     }
 
     /// Ticket #394 (version 0.09.3): the places a computer seat weighs spending Influence on, best
@@ -1498,7 +1525,9 @@ impl Game {
             let col = self.colony(cid).unwrap().clone();
             // Ticket #278 (version 0.08.5): a starved Colony is the threat made good; the seat
             // learns to want a warship where it is blockaded.
-            let threat = if self.enemy_present_or_inbound(seat, col.body) || self.enemy_army_near(seat, Place::Colony(cid)) || self.starved_by(cid).is_some() { m.threat } else { 1.0 };
+            // Ticket #461 (version 0.09.7): and at the Archive's Colony while a rival has cause and the
+            // fund is worth taking, so the Archivists raise a Barracks and an Army there.
+            let threat = if self.enemy_present_or_inbound(seat, col.body) || self.enemy_army_near(seat, Place::Colony(cid)) || self.starved_by(cid).is_some() || self.archive_threatened(seat, cid) { m.threat } else { 1.0 };
             // Ticket #97 (version 0.07.0): no room, nothing to enumerate. Without this the AI scores
             // Modules it cannot build, spends its list on them and has them dropped at commit.
             if self.free_module_slots(&col) == 0 {
@@ -1949,7 +1978,9 @@ impl Game {
         for place in owned {
             let rival = self.rival_standing(seat, place);
             let mine = self.seat(seat).influence.get(&place).copied().unwrap_or(0);
-            if rival > 0 && rival + 2 * step >= mine {
+            // Ticket #461 (version 0.09.7): the Archive's Colony under threat is held from twice as far off.
+            let reach = if matches!(place, Place::Colony(c) if self.archive_threatened(seat, c)) { 4 } else { 2 };
+            if rival > 0 && rival + reach * step >= mine {
                 let margin = self.challenge_margin_at(place);
                 let need = (rival + margin + 2 * step - mine).max(step);
                 let can = ((allotment + bought_steps) / step).max(1);

@@ -98,6 +98,9 @@ pub struct SimResult {
     /// Ticket #454 (version 0.09.6): Colonists gained by natural growth and lost to decline, by seat.
     pub colonists_grown: [u32; SEAT_COUNT],
     pub colonists_declined: [u32; SEAT_COUNT],
+    /// Ticket #461 (version 0.09.7): Archives lost with their Colonies, and the fund lost with them.
+    pub archives_lost: u32,
+    pub archive_fund_lost: i64,
     /// Ticket #282 (version 0.08.5): Levies raised by neutral Regions, and neutral Regions that held.
     pub levies_raised: u32,
     pub neutral_holds: u32,
@@ -699,6 +702,8 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
     let blockade_imposed = Seat::ALL.map(|s| game.seat(s).blockade_turns_imposed);
     let colonists_grown = Seat::ALL.map(|s| game.seat(s).colonists_grown);
     let colonists_declined = Seat::ALL.map(|s| game.seat(s).colonists_declined);
+    let archives_lost = Seat::ALL.iter().map(|s| game.seat(*s).archives_lost).sum();
+    let archive_fund_lost = Seat::ALL.iter().map(|s| game.seat(*s).archive_fund_lost).sum();
     let events_no_target = game.events_no_target;
     let (choice_taken, choice_refused, choice_not_asked) = (game.choice_taken, game.choice_refused, game.choice_not_asked);
     // Ticket #276 (version 0.08.5): the three sea figures are counters on the state, not scraped
@@ -761,6 +766,8 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         blockade_imposed,
         colonists_grown,
         colonists_declined,
+        archives_lost,
+        archive_fund_lost,
         levies_raised: game.levies_raised,
         neutral_holds: game.neutral_holds,
         war: game.war.clone(),

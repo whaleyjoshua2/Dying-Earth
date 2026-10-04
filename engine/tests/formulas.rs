@@ -2472,14 +2472,22 @@ fn a_complete_archive_goes_offline_when_energy_runs_short_and_wins_nothing_that_
 }
 
 #[test]
-fn the_archive_is_destroyed_when_its_colony_changes_hands_and_the_fund_is_kept() {
+/// Ticket #461 (version 0.09.7): and the fund is LOST with it, where it was kept; Uploads are kept.
+fn the_archive_is_destroyed_when_its_colony_changes_hands_and_the_fund_is_lost() {
     let mut g = game();
     let cid = archive_at(&mut g, Seat(3), BodyId::Mars, 40, 6);
+    // A Colony without the Archive costs the fund nothing.
+    let other = colony(&mut g, Seat(3), BodyId::Moon, &[ModuleKind::Habitat], 2);
+    g.transfer_control(Place::Colony(other), Seat(1), "Influence");
+    assert_eq!(g.seats[3].archive_fund, 40, "only the Archive's Colony carries the fund");
+    g.seats[3].uploaded = 5;
     assert_eq!(g.archive_colony(Seat(3)), Some(cid));
     g.transfer_control(Place::Colony(cid), Seat(1), "Influence");
     assert_eq!(g.archive_colony(Seat(3)), None, "the Archive went with the Colony");
     assert!(!g.colony(cid).unwrap().modules.iter().any(|m| m.kind == ModuleKind::Archive));
-    assert_eq!(g.seats[3].archive_fund, 40, "the fund is kept");
+    assert_eq!(g.seats[3].archive_fund, 0, "the fund is lost with it");
+    assert_eq!((g.seats[3].archives_lost, g.seats[3].archive_fund_lost), (1, 40), "counted, for the sweep");
+    assert_eq!(g.seats[3].uploaded, 5, "Uploads are kept: they only ever climb");
     assert!(g.report.lines.iter().any(|l| l.text.contains("Archive at") && l.text.contains("destroyed")), "{:?}", g.report.lines);
     // An Occupied Colony's Archive is dark while the Occupation lasts.
     let research = g.tables.archive.research;
@@ -19177,4 +19185,43 @@ fn the_computer_custodians_divert_at_the_cap_once_their_gate_stands() {
     g.log.clear();
     g.ai_orders(cust);
     assert!(scored(&g, "direct 50 per cent") > 0.0, "already at cause, the point changes nothing");
+}
+
+/// Ticket #461 (version 0.09.7): **the computer seats go after the Archive**, and **the computer
+/// Archivists defend it**. A rival's Colony holding the Archive is worth double to a seat with cause
+/// once the fund is at least half full; and under that same threat the Archivists' Barracks and
+/// Army there take the threat's lift.
+#[test]
+fn the_computer_goes_after_a_half_full_archive_and_the_archivists_defend_it() {
+    let mut g = game();
+    calm(&mut g);
+    let (rival, arch) = (Seat(1), Seat(3));
+    assert_eq!(g.kind(arch), FactionKind::Archivists);
+    let cap = g.archive_fund_cap(arch);
+    let cid = archive_at(&mut g, arch, BodyId::Mars, cap / 2 - 1, 4);
+    let value = |g: &Game| g.ai_influence_targets(rival).into_iter().find(|(p, _)| *p == Place::Colony(cid)).map(|(_, v)| v).unwrap();
+    let lift = g.tables.ai.thresholds.archive_target_lift;
+    assert_eq!(lift, 2.0);
+    let plain = value(&g);
+    // Cause alone is not enough: the fund is under half.
+    g.relations.score[rival.index()][arch.index()] = g.tables.relations.worst;
+    assert!(g.has_cause(rival, arch));
+    assert_eq!(value(&g), plain, "under half full it is no threat yet");
+    g.seats[arch.index()].archive_fund = cap / 2;
+    assert!((value(&g) - plain * lift).abs() < 1e-9, "half full and with cause: double, {} against {plain}", value(&g));
+    // Without cause, nothing.
+    g.relations.score[rival.index()][arch.index()] = 0;
+    assert_eq!(value(&g), plain, "no cause, no lift");
+    // The Archivists' side: the same threat lifts their Barracks at the Archive's Colony.
+    g.seats[arch.index()].stockpile.materials = 200.0;
+    g.seats[arch.index()].stockpile.energy = 200.0;
+    g.turn = 12;
+    g.ai_orders(arch);
+    let calm_score = scored(&g, "build Barracks at");
+    assert!(calm_score > 0.0, "the premise: a Barracks is a candidate there: {:?}", g.log.iter().filter(|l| l.contains("Barracks")).collect::<Vec<_>>());
+    g.relations.score[rival.index()][arch.index()] = g.tables.relations.worst;
+    g.log.clear();
+    g.ai_orders(arch);
+    let pressed = scored(&g, "build Barracks at");
+    assert!((pressed - calm_score * g.tables.ai.multipliers.threat).abs() < 1e-6, "a rival with cause and a half-full fund: the threat's lift, {pressed} against {calm_score}");
 }
