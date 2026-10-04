@@ -216,6 +216,8 @@ break_baseline = "{state}: its Baseline Emissions rise by {rise} for good."
 # The designer's line: "The Sea Wall in China took the sea, rising sea levels have increased the
 # cost to maintain this Sea Wall".
 sea_wall = "{whose} Sea Wall held the sea; keep now {keep} Materials."
+# Ticket #470 (version 0.09.7): a Region nobody holds raises its own.
+neutral_sea_wall = "{state} built a Sea Wall."
 storm_surge_wall = "Storm Surge in {state}: the Sea Wall held. Coastal Facilities make {percent}% less next Income."
 sea_wall_unkept = "Materials ran short: the Sea Wall in {states} is unkept and holds nothing."
 sea_nothing_left = "Sea level at {temperature} C: {state} has no coastal slots left."

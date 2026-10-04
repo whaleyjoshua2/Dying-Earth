@@ -166,9 +166,35 @@ impl Game {
             self.seat_mut(seat).victory_history.push(VictoryRecord { turn: record_turn, score, blame_share, gate_done, archive_complete, antarctica_open });
         }
         self.neutral_development();
+        // Ticket #470 (version 0.09.7): after this phase's thresholds have had their turn, so a wall
+        // decided now stands from the next.
+        self.neutral_sea_walls();
         // Ticket #52: a Resettle order steers only the flows of the Climate phase that follows it.
         for seat in Seat::ALL {
             self.seat_mut(seat).resettle_to = None;
+        }
+    }
+
+    /// Ticket #470 (version 0.09.7): **a neutral Region builds a Sea Wall.** Once Coastal
+    /// Engineering is complete, a Region nobody holds, with a Coastal Slot left and no wall, raises
+    /// one when the sea is close -- the next Sea Level threshold within 0.2 C, the computer
+    /// Factions' own test. It costs the Region nothing to build or to keep while neutral (the keep
+    /// is charged to whoever directs a Region, and nobody directs this one), it stands from the
+    /// next turn, and it passes with the Region to whoever takes it. Its development clock is
+    /// untouched.
+    pub fn neutral_sea_walls(&mut self) {
+        if !self.has_tech(TechId::CoastalEngineering) {
+            return;
+        }
+        for sid in StateId::ALL {
+            if self.state(sid).control != Control::Neutral || self.state(sid).facilities.iter().any(|f| f.kind == FacilityKind::SeaWall) || !self.sea_is_close(sid) {
+                continue;
+            }
+            self.state_mut(sid).facilities.push(Facility::new(FacilityKind::SeaWall));
+            let name = self.tables.state(sid).name.clone();
+            self.log(format!("{name} built a Sea Wall of its own."));
+            let text = self.say("neutral_sea_wall", &[("state", name)]);
+            self.report_line(LineKind::SeaLevel, Some(ReportPlace::State(sid)), text);
         }
     }
 

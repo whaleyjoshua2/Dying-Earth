@@ -270,3 +270,32 @@ count against a Stabilization run (2); that one Relay covers the whole Body, tha
 that a mothballed one shows nothing, and whose multipliers the figures carry (3); how the odds are
 measured (4); and that the rival holding low orbit must also have a stack on Blockade there (5).
 The rules themselves are unchanged.
+
+## 12. Neutral Regions build Sea Walls
+
+The authority is [ticket #470](https://github.com/whaleyjoshua2/Dying-Earth/issues/470).
+
+- **A neutral Region builds a Sea Wall** once Coastal Engineering is complete, when the next Sea
+  Level threshold of any kind is within 0.2 C of the Temperature. That is the test the computer
+  Factions use for their own.
+- **Which Regions:** any Region nobody holds, with a Coastal Slot left and no wall standing.
+- **What it costs:** nothing to build and nothing to keep while the Region is neutral. It is decided
+  at the end of the Climate phase and stands from the next turn.
+- **When the Region is taken** the wall comes with it, and its new holder pays the keep, as for any
+  wall.
+- A wall holds a threshold as it always has: no slot is lost, and the coast still moves one slot
+  inland behind it.
+- The Region's development clock is untouched.
+- **The Report:** "Egypt built a Sea Wall.", under the sea's lines and folded with them.
+
+**Measured** (80 games):
+
+| | after §5 | with neutral Sea Walls |
+|---|---|---|
+| wins (Cust / Pros / Ark / Arch) | 10 / 7 / 10 / 14 | 9 / 6 / 11 / 13 |
+| collapses | 39 | 41 |
+| coastal slots lost a game, median by seating | 62 / 60 / 62 / 47 | 37 / 49 / 51 / 34 |
+| buildings drowned a game, median by seating | 34 / 32 / 33 / 21 | 25 / 29 / 28 / 19 |
+| thresholds held by a wall, by seating | 363 / 363 / 333 / 384 | 606 / 527 / 509 / 620 |
+
+The win column is within noise. The sea takes about a quarter fewer coastal slots.

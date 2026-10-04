@@ -19377,3 +19377,47 @@ fn a_seat_keeps_a_gross_total_of_what_it_has_produced() {
     g.income_phase();
     assert!((g.seats[0].produced_total.materials - first.materials - gross(&g, Resource::Materials)).abs() < 1e-9, "and it runs on, Income after Income");
 }
+
+/// Ticket #470 (version 0.09.7): **a neutral Region builds a Sea Wall** once Coastal Engineering
+/// is complete and the next Sea Level threshold is within 0.2 C -- free to build, free to keep while
+/// neutral, standing the turn after -- and the wall then holds the threshold, and comes with the
+/// Region when it is taken.
+#[test]
+fn a_neutral_coastal_region_builds_a_sea_wall_when_the_sea_is_close() {
+    let mut g = game();
+    calm(&mut g);
+    // `calm` marks every Sea Level threshold passed; this test is about one still ahead.
+    for s in &mut g.states {
+        s.thresholds_fired = vec![false; 3];
+    }
+    let egypt = StateId::NorthAfrica;
+    assert_eq!(g.state(egypt).control, Control::Neutral);
+    assert!(g.coastal_slots(egypt) > 0, "the premise: a coast to lose");
+    let walled = |g: &Game, s: StateId| g.state(s).facilities.iter().any(|f| f.kind == FacilityKind::SeaWall && f.working());
+    let first = g.tables.climate.sea_level_thresholds[0];
+    // The sea close and no Tech: nothing.
+    g.climate.temperature = first - 0.15;
+    g.neutral_sea_walls();
+    assert!(!walled(&g, egypt), "not before Coastal Engineering");
+    // The Tech and the sea far off: nothing.
+    with_tech(&mut g, TechId::CoastalEngineering);
+    g.climate.temperature = first - 0.5;
+    g.neutral_sea_walls();
+    assert!(!walled(&g, egypt), "not while the sea is far off");
+    // Both: every neutral Region with a coast builds one, and no held Region does.
+    g.climate.temperature = first - 0.15;
+    g.report.lines.clear();
+    g.neutral_sea_walls();
+    assert!(walled(&g, egypt), "the wall stands");
+    assert!(!walled(&g, StateId::EastAsia), "a held Region builds its own");
+    assert!(g.report.lines.iter().any(|l| l.text == "Egypt built a Sea Wall."), "{:?}", g.report.lines.iter().map(|l| &l.text).collect::<Vec<_>>());
+    g.neutral_sea_walls();
+    assert_eq!(g.state(egypt).facilities.iter().filter(|f| f.kind == FacilityKind::SeaWall).count(), 1, "one to a Region");
+    // It holds the threshold, and passes to whoever takes the Region.
+    let coast = g.coastal_slots(egypt);
+    g.apply_sea_threshold(egypt, 0);
+    assert_eq!(g.state(egypt).lost_slots, 0, "held: no slot lost to the sea");
+    assert_eq!(g.coastal_slots(egypt), coast + 1, "though the coast still moves one slot inland behind the wall (#276)");
+    g.take_control(egypt, Seat(1));
+    assert!(walled(&g, egypt), "and it comes with the Region");
+}

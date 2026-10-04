@@ -547,7 +547,7 @@ impl Game {
 
     /// Ticket #56: a Sea Level threshold of any kind -- one still scheduled for this state, or the
     /// Ice Sheets Break -- standing within 0.2 C of the Temperature, with a coast still to lose.
-    fn sea_is_close(&self, sid: StateId) -> bool {
+    pub(crate) fn sea_is_close(&self, sid: StateId) -> bool {
         if self.coastal_slots(sid) == 0 {
             return false;
         }

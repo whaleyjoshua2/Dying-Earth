@@ -138,3 +138,16 @@ building, so nothing was made. It uses the full starting board.
 
 The other five hovers were not pictured: the Army's row sat below the card's fold in the headless
 shot, and the rest need a Battle, a Blockade or a Relay on the board.
+
+## Neutral Regions build Sea Walls (ticket #470)
+
+No picture: a rule in the Climate phase and one Report line.
+
+**Witnessed red:** the new test could not compile before the rule existed. It then failed twice on
+its own premises, not the rule: the tests' `calm` helper marks every Sea Level threshold as already
+passed, so the sea was never close; and a wall holds the slots but the coast still moves one slot
+inland behind it (ticket #276), which the test had not allowed for.
+
+**The sweep** ([`after-470.txt`](sweeps/after-470.txt)): 9 / 6 / 11 / 13 and 41 collapses, from
+10 / 7 / 10 / 14 and 39: within noise. Coastal slots lost fall from a median 47 to 62 a game to 34 to
+51; thresholds held by a wall rise from about 360 a seating to about 565.
