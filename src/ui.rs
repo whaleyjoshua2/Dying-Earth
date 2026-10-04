@@ -7248,7 +7248,7 @@ This turn {:+.2}%: {:+.1} million.", c.population_growth * 100.0, c.population_l
     // Ticket #475 (version 0.09.8): the line cut to the designer's words -- *"GDP 23: Industry Level
     // 3, leans Fuel"* -- and what it said before is its hover: the pay, the rule, the Bank.
     rule_tip(
-        ui.label(format!("GDP {}: Industry Level {}, leans {:?}", card.gdp, st.industry_level, card.resource_lean)),
+        icon_word(ui, "ducats", format!("GDP {}: Industry Level {}, leans {:?}", card.gdp, st.industry_level, card.resource_lean)),
         format!("Pays its controller {} Ducats a turn.\nGDP x Industry Level / 5, never below 1.\nA{} {} here would add {}.", pays, if bank == FacilityKind::InvestmentBank { "n" } else { "" }, bank.name(), game.facility_yield(Seat(0), sid, bank).amount),
     );
     icon_word(ui, "emissions", format!("Emissions this turn: industry {:.1}, Facilities {:.1}, people {:.1}", industry_em, fac_em, game.population_coefficient(sid) * st.population * mult));

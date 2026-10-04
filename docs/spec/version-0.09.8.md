@@ -51,7 +51,7 @@ The authority is [ticket #475](https://github.com/whaleyjoshua2/Dying-Earth/issu
 
 - **The Region card's population line** reads "Region population 385.6 (386M)" behind the people
   glyph, and no more. Its hover, the growth rule, is unchanged.
-- **The Region card's GDP line** reads "GDP 23: Industry Level 3, leans Fuel".
+- **The Region card's GDP line** reads "GDP 23: Industry Level 3, leans Fuel", behind the Ducats glyph.
 - **What the GDP line said before is its hover**, three lines: what the Region pays its controller
   in Ducats a turn; the rule, GDP x Industry Level / 5, never below 1; and what the player's Bank
   would add there. A rival's pay the player cannot see stays hidden.
