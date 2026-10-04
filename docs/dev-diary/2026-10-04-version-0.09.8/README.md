@@ -58,3 +58,27 @@ The left of each pair is the build after the sub-headers ticket, the right this 
   ![the Colony card's people line, before and after](ticket-475/outpost-before-after.png)
 
 Not pictured: the hover on a rival's Region the player cannot see.
+
+## Raise Industry Level as a tile (#476)
+
+The designer: *"get rid of the raise industry level button, instead add an empty tile that says
+raise industry level; when clicked it changes to click to build and procs another such box at the
+end."* Decided on the ticket: the rule stands, so the tile is drawn *"just like any building being
+built"* until the raise completes; last of the tiles; one click orders it.
+
+China, seed 7, turn 4 (`select:EastAsia turns:3 seed:7`). A new aid, `raise:1`, gives the seat
+Materials and places the order.
+
+- **Free, and refused**: the seat holds 21 Materials of the 30, so the tile is greyed and the
+  refusal leads its hover (`"tip:Adds an inland"`):
+  ![the Raise tile and its hover](ticket-476/hover.png)
+- **Ordered** (`raise:1`):
+  ![the tile ordered](ticket-476/ordered.png)
+- **Its hover while ordered** (`raise:1 "tip:ordered this turn"`):
+  ![the ordered tile's hover](ticket-476/ordhover.png)
+- **After End Turn** (`raise:1 commit:1`): a fourth free box, and a new Raise tile after it. A card
+  of the new turn overlaps the left of the picture.
+  ![the tile after the raise completes](ticket-476/done.png)
+
+Not pictured: the tile live and affordable (ungreyed); the raise under way across a turn ("building,
+2 of 4"), which needs a Region making fewer than 4 Widgets a turn.

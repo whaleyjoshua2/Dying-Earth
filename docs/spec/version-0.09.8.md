@@ -63,3 +63,24 @@ The authority is [ticket #475](https://github.com/whaleyjoshua2/Dying-Earth/issu
 - No rule moves, and nothing a computer seat reads.
 
 **Pictures:** [`ticket-475/`](../dev-diary/2026-10-04-version-0.09.8/ticket-475/).
+
+## 3. Raise Industry Level as a tile
+
+The authority is [ticket #476](https://github.com/whaleyjoshua2/Dying-Earth/issues/476).
+
+- **Raise Industry Level is a tile among the Facility boxes**, last of all, after the final inland
+  box: dashed like a free slot and reading "Raise Industry Level". The button in the Policies block
+  and the note under it are gone.
+- **One click orders the raise.** The rule is unchanged: it is paid at End Turn, built through the
+  Region's Widgets queue, and one may be under way in a Region at a time.
+- **While it is ordered or under way the tile is drawn like any building being built**: hatched,
+  "ordered" and "0 of 4" before End Turn, "building" and the Widgets done after, with "Industry
+  Level" beneath it. A right-click takes back an order placed this turn.
+- **When it completes** the Region has one more inland slot, drawn as a free "Click to Build" box,
+  and a new Raise tile stands after it.
+- **Its hover** gives the price, when it is ready, and "Adds an inland slot." Where the order would
+  be refused the tile is greyed and the reason leads the same hover.
+- **Only on a Region the player directs.** A rival's or a neutral Region shows no Raise tile.
+- The Widgets queue line for a raise stays. No rule moves, and nothing a computer seat reads.
+
+**Pictures:** [`ticket-476/`](../dev-diary/2026-10-04-version-0.09.8/ticket-476/).

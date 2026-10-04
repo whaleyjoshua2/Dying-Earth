@@ -1411,6 +1411,21 @@ fn build_board(session: &mut Session) {
         eprintln!("order:{name} was refused");
         std::process::exit(3);
     }
+    // `raise:1` (a building aid, ticket #476, version 0.09.8): Raise Industry Level is ordered in
+    // seat 0's start state and left pending, so its tile can be photographed ordered. The seat is
+    // given the Materials first: three turns in it cannot afford one.
+    if std::env::args().any(|a| a == "raise:1")
+        && let Some(g) = session.game.as_mut()
+    {
+        g.seats[0].stockpile.materials = 60.0;
+    }
+    if std::env::args().any(|a| a == "raise:1")
+        && let Some(sid) = session.game.as_ref().and_then(|g| g.directed_states(Seat(0)).first().copied())
+        && !session.place(Order::RaiseIndustry { state: sid })
+    {
+        eprintln!("raise:1 was refused");
+        std::process::exit(3);
+    }
     if let Some(name) = std::env::args().find_map(|a| a.strip_prefix("morder:").map(str::to_owned))
         && let Some(kind) = ModuleKind::ALL.into_iter().find(|k| format!("{k:?}").eq_ignore_ascii_case(&name))
         && let Some(cid) = session.game.as_ref().and_then(|g| g.colonies.iter().find(|c| c.in_orbit && c.body == BodyId::Earth && c.control.director() == Some(Seat(0))).map(|c| c.id))

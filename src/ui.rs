@@ -7002,6 +7002,15 @@ enum SlotBoxKind {
     Ordered(FacilityKind, usize),
     Free,
     Flooded(Option<FacilityKind>),
+    /// Ticket #476 (version 0.09.8): **the Raise Industry Level tile**, last of all the boxes on a
+    /// Region the player directs, in place of the button the Policies block held. A click orders
+    /// the raise.
+    Raise,
+    /// The raise ordered this turn, by its index in the pending list; a right-click takes it back.
+    RaiseOrdered(usize),
+    /// The raise under way, by its index in the Region's queue. When it completes the Region has
+    /// one more inland slot, drawn as a free box, and a new `Raise` tile after it.
+    RaiseBuilding(usize),
 }
 /// Ticket #390 (version 0.09.3): the strip under the boxes, drawn after the completed slotless rows
 /// so the card reads boxes, then what stands without a slot, then what may be built.
@@ -7095,6 +7104,17 @@ fn slot_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
             }
         }
     }
+    // Ticket #476 (version 0.09.8): the Raise Industry Level tile, after the last inland box.
+    if mine {
+        let raise = if let Some(i) = session.pending.iter().position(|o| matches!(o, Order::RaiseIndustry { state } if *state == sid)) {
+            SlotBoxKind::RaiseOrdered(i)
+        } else if let Some(qi) = st.queue.iter().position(|b| matches!(b.item, BuildItem::IndustryLevel)) {
+            SlotBoxKind::RaiseBuilding(qi)
+        } else {
+            SlotBoxKind::Raise
+        };
+        boxes.push((raise, false));
+    }
     let rows = boxes.len().div_ceil(SLOT_COLS).max(1);
     let grid_size = egui::vec2(SLOT_COLS as f32 * HAB_TILE + (SLOT_COLS as f32 - 1.0) * HAB_GAP, rows as f32 * (HAB_TILE + HAB_LABEL + HAB_GAP));
     let (grid, _) = ui.allocate_exact_size(grid_size, egui::Sense::hover());
@@ -7164,6 +7184,38 @@ fn slot_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
                     k.map(|k| format!("{}, ", k.name())).unwrap_or_else(|| "A slot ".to_string())
                 );
                 hab_tile(ui, rect, id, k.map(crate::icons::facility_icon), k.map(|k| k.name()).unwrap_or(""), TileState::Flooded, false, edge, tip);
+            }
+            SlotBoxKind::Raise => {
+                // Ticket #476: one click orders it. Greyed, the refusal leads the same hover.
+                let order = Order::RaiseIndustry { state: sid };
+                let check = game.check_order(Seat(0), &session.pending, &order);
+                let words = format!("Raise Industry Level: {}. Adds an inland slot.", build_words(game, &order).unwrap_or_default().trim_end_matches(" here"));
+                let tip = match &check {
+                    Ok(_) => words,
+                    Err(e) => refusal_hover(&e.0, Some(&words)),
+                };
+                if hab_tile(ui, rect, id, None, "", TileState::Raise(check.is_ok()), false, edge, tip).clicked() && check.is_ok() {
+                    actions.push(Action::Place(order));
+                }
+            }
+            SlotBoxKind::RaiseOrdered(i) => {
+                let widgets = game.build_widgets(Seat(0), BuildItem::IndustryLevel);
+                let turns = game.turns_to_build(Seat(0), Place::State(sid), BuildItem::IndustryLevel);
+                let tip = format!("Industry Level: ordered this turn, {widgets} Widgets, {} once the turn ends. Adds an inland slot.\nRight-click to cancel the order.", estimate_words(turns));
+                if hab_tile(ui, rect, id, None, "Industry Level", TileState::Building { ordered: true, done: 0, widgets }, false, edge, tip).secondary_clicked() {
+                    actions.push(Action::Cancel(*i));
+                }
+            }
+            SlotBoxKind::RaiseBuilding(qi) => {
+                let b = &st.queue[*qi];
+                let turns = estimates.get(*qi).copied().unwrap_or(u32::MAX);
+                let (tip, cancel) = building_tip(game, session, Place::State(sid), *qi, b, turns, mine, "Industry Level", " Adds an inland slot.");
+                let resp = hab_tile(ui, rect, id, None, "Industry Level", TileState::Building { ordered: false, done: b.done, widgets: b.widgets }, false, edge, tip);
+                if let Some(order) = cancel
+                    && resp.secondary_clicked()
+                {
+                    actions.push(Action::Place(order));
+                }
             }
         }
     }
@@ -7621,8 +7673,8 @@ fn policies_block(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, act
             ui.label(RichText::new(format!("{} turns of double output here, then +{:.1} Baseline Emissions and +{} Unrest, for good", t.turns, t.baseline_rise, Game::unrest_figure(t.unrest))).weak());
         });
     }
-    cost_button(ui, game, &session.pending, Order::RaiseIndustry { state: sid }, "Raise Industry Level", actions);
-    ui.label(RichText::new("Raising the Industry Level adds an inland slot.").weak());
+    // Ticket #476 (version 0.09.8): Raise Industry Level is a tile among the Facility boxes now;
+    // the button and its note that stood here are gone.
     // Ticket #52: Relief and Resettle, with their prices on the buttons.
     ui.horizontal(|ui| {
         cost_button(ui, game, &session.pending, Order::Relief { state: sid }, "Relief: Unrest -1", actions);
@@ -9609,6 +9661,10 @@ enum TileState {
     /// one they cannot keeps the old word, because telling somebody to click a thing that will do
     /// nothing is worse than the word it replaced.
     Free(bool),
+    /// Ticket #476 (version 0.09.8): the Raise Industry Level tile, dashed like a free slot and
+    /// saying what a click does; the flag is whether the order would be taken, and it is greyed
+    /// where it would not.
+    Raise(bool),
     /// Ticket #146: a coastal slot the sea has taken, drawn under water.
     Flooded,
 }
@@ -9631,7 +9687,7 @@ fn hab_tile(ui: &mut Ui, rect: egui::Rect, id: egui::Id, key: Option<&str>, name
         edge.unwrap_or(Color32::from_gray(120))
     };
     match state {
-        TileState::Free(yours) => {
+        TileState::Free(_) | TileState::Raise(_) => {
             // A dashed border, four sides of short strokes, and the word in the middle.
             let dash = 5.0;
             let step = 9.0;
@@ -9653,7 +9709,7 @@ fn hab_tile(ui: &mut Ui, rect: egui::Rect, id: egui::Id, key: Option<&str>, name
             // Ticket #218 (version 0.08.2): a tile the player can build in says so. Two lines: the
             // tile is 84 square and `Click to Build` is about 78 wide at 12pt, so one line would
             // leave three pixels of air and break if the font ever moved.
-            let (word, ink) = if yours { ("Click to
+            let (word, ink) = if let TileState::Raise(ok) = state { ("Raise\nIndustry\nLevel", Color32::from_gray(if ok { 165 } else { 105 })) } else if state == TileState::Free(true) { ("Click to
 Build", Color32::from_gray(165)) } else { ("free", Color32::from_gray(130)) };
             painter.text(rect.center(), egui::Align2::CENTER_CENTER, word, FontId::proportional(12.0), ink);
         }
