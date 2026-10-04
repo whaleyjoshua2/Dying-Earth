@@ -83,3 +83,18 @@ The picture was retaken twice for the designer's two additions: held Regions in 
 and each Faction's recruiting as one line (witnessed red: two lines where one was wanted).
 
 No sweep: nothing a computer seat reads was changed.
+
+## A compact Temperature gauge around the End Turn sun (ticket #464)
+
+A rough ring was built first and shown to the designer (orange, open at the foot, running from
+seven o'clock round to five); the designer asked for it redder and from eight to four.
+
+- [`early-zoom.png`](ticket-464/early-zoom.png): turn 2, the ring an empty track with five dim
+  notches.
+- [`late-zoom.png`](ticket-464/late-zoom.png): the Temperature forced to +2.6 heading to +2.9. Red
+  to the white tick near four o'clock, the fired Breaks bright, and the ring's hover above it.
+- [`late-earth.png`](ticket-464/late-earth.png): the whole window at the same moment, the Climate
+  Panel open: its bar in the same red.
+
+**Witnessed red:** the test `the_temperature_ring_runs_from_eight_to_four_over_the_top` failed at
+exactly four o'clock on a rounding edge, and the hit test was given a pixel of tolerance.

@@ -370,10 +370,10 @@ fn temperature_bar(ui: &mut Ui, game: &Game) {
         painter.rect_filled(
             egui::Rect::from_min_max(egui::pos2(at(now), bar.top()), egui::pos2(at(committed), bar.bottom())),
             0.0,
-            Color32::from_rgb(104, 62, 40),
+            TEMPERATURE_COMMITTED,
         );
     }
-    painter.rect_filled(egui::Rect::from_min_max(bar.min, egui::pos2(at(now), bar.bottom())), 3.0, Color32::from_rgb(206, 112, 54));
+    painter.rect_filled(egui::Rect::from_min_max(bar.min, egui::pos2(at(now), bar.bottom())), 3.0, TEMPERATURE_FILL);
     for n in &notches {
         let x = at(n.at);
         let (top, bottom) = if n.foot { (bar.top() + 15.0, bar.bottom()) } else { (bar.top(), bar.bottom()) };
@@ -4376,6 +4376,20 @@ fn command_cluster(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewS
             // Tech. The `tip:<word>` aid can force it: nothing hovers in a headless capture.
             let refusal = game.end_turn_refusal().unwrap_or_else(|| "The turn cannot end yet.".to_string());
             let resp = sun_button(ui, can_end_turn(game, view), sun_d, "End Turn");
+            // Ticket #464 (version 0.09.7): the Temperature gauge, compact, around the sun.
+            let sun_centre = egui::pos2(resp.rect.center().x, resp.rect.min.y + 4.0 + sun_d / 2.0);
+            temperature_ring(ui.painter(), game, sun_centre, sun_d / 2.0);
+            // The ring has a hover and a click of its own: it says the Temperature and opens the
+            // Climate Panel, and a press on it does not end the turn.
+            let ring_tip = temperature_ring_tip(game);
+            let on_ring = ui.input(|i| i.pointer.hover_pos()).is_some_and(|at| on_temperature_ring(at, sun_centre, sun_d / 2.0));
+            if on_ring || forced_tip(&ring_tip) {
+                resp.clone().show_tooltip_text(ring_tip);
+                if on_ring && ui.input(|i| i.pointer.primary_clicked()) {
+                    toggle_climate(view);
+                }
+                return;
+            }
             if forced_tip(&refusal) {
                 resp.clone().show_tooltip_text(refusal.clone());
             }
@@ -4395,6 +4409,76 @@ fn command_cluster(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewS
         });
     });
     ui.add_space(4.0);
+}
+
+/// Ticket #464 (version 0.09.7): the Temperature gauge's two warm colours, shared by the Climate
+/// Panel's bar and the ring around the sun -- the designer's "make it more red", and "match color
+/// maybe at least". The fill is the warming that has arrived; the band, what the Stock commits to.
+const TEMPERATURE_FILL: Color32 = Color32::from_rgb(214, 70, 46);
+const TEMPERATURE_COMMITTED: Color32 = Color32::from_rgb(112, 44, 36);
+const TEMPERATURE_BREAK: Color32 = Color32::from_rgb(236, 88, 76);
+/// The ring's own measures: how far outside the sun's limb it runs, and how thick.
+const RING_GAP: f32 = 5.5;
+const RING_WIDTH: f32 = 5.0;
+
+/// Ticket #464 (version 0.09.7): **the Temperature gauge wrapped around the sun** -- the Climate
+/// Panel's bar bent into a ring that runs over the top from eight o'clock to four o'clock, the
+/// base Temperature at eight and Collapse at four, at the designer's word. The dark track, the band
+/// the Stock already commits the world to, the red fill to the Temperature now with a white tick at
+/// its head, and a notch at each Break, bright once it has fired. No labels and no foot notches:
+/// they do not fit at this size, and the panel has them.
+fn temperature_ring(p: &egui::Painter, game: &Game, centre: Pos2, sun_r: f32) {
+    let c = &game.tables.climate;
+    let (lo, hi) = (c.base_temperature, c.collapse_line);
+    let frac = |t: f64| ((t - lo) / (hi - lo)).clamp(0.0, 1.0) as f32;
+    let (now, committed) = (frac(game.climate.temperature), frac(game.target_temperature()));
+    // Screen angles run clockwise from three o'clock, so eight o'clock is 150 degrees and the
+    // ring sweeps 240 from there to four.
+    let (start, sweep) = (150f32.to_radians(), 240f32.to_radians());
+    let (width, radius) = (RING_WIDTH, sun_r + RING_GAP);
+    let at = |f: f32, r: f32| centre + egui::vec2((start + f * sweep).cos(), (start + f * sweep).sin()) * r;
+    let arc = |from: f32, to: f32, colour: Color32| {
+        if to <= from {
+            return;
+        }
+        let steps = (((to - from) * 60.0).ceil() as usize).max(1);
+        let points: Vec<Pos2> = (0..=steps).map(|i| at(from + (to - from) * i as f32 / steps as f32, radius)).collect();
+        p.add(egui::Shape::line(points, egui::Stroke::new(width, colour)));
+    };
+    arc(0.0, 1.0, Color32::from_rgb(38, 38, 44));
+    arc(now, committed, TEMPERATURE_COMMITTED);
+    arc(0.0, now, TEMPERATURE_FILL);
+    for (i, b) in c.breaks.iter().enumerate() {
+        let f = frac(b.temperature);
+        let (inner, outer) = (radius - width / 2.0, radius + width / 2.0);
+        if game.climate.breaks_fired[i] {
+            // On a dark backing, as on the bar, so a fired Break reads against the red fill.
+            p.line_segment([at(f, inner - 1.0), at(f, outer + 1.0)], egui::Stroke::new(3.4, Color32::from_rgb(18, 18, 22)));
+            p.line_segment([at(f, inner - 1.0), at(f, outer + 1.0)], egui::Stroke::new(1.6, TEMPERATURE_BREAK));
+        } else {
+            p.line_segment([at(f, inner), at(f, outer)], egui::Stroke::new(1.2, TEMPERATURE_BREAK.gamma_multiply(0.75)));
+        }
+    }
+    p.line_segment([at(now, radius - width / 2.0 - 1.5), at(now, radius + width / 2.0 + 1.5)], egui::Stroke::new(1.8, Color32::WHITE));
+}
+
+/// Ticket #464: whether a point is on the ring -- within its thickness and between eight o'clock
+/// and four over the top -- so the ring can take its own hover and click.
+fn on_temperature_ring(at: Pos2, centre: Pos2, sun_r: f32) -> bool {
+    let d = at - centre;
+    let (near, far) = (sun_r + RING_GAP - RING_WIDTH / 2.0 - 1.5, sun_r + RING_GAP + RING_WIDTH / 2.0 + 2.5);
+    // Below the line through eight and four o'clock (30 degrees under the horizontal) is the open foot.
+    (near..=far).contains(&d.length()) && d.y <= d.length() * 0.5 + 1.0
+}
+
+/// Ticket #464: the ring's hover, three lines.
+fn temperature_ring_tip(game: &Game) -> String {
+    let c = &game.tables.climate;
+    let next = match game.next_break() {
+        Some(b) => format!("next: {} at {:+.1}", b.name, b.temperature),
+        None => "every Break is behind us".to_string(),
+    };
+    format!("Temperature {:+.1} C, heading to {:+.1}\n{next}\nCollapse at {:+.1}. Click for the Climate Panel.", game.climate.temperature, game.target_temperature(), c.collapse_line)
 }
 
 /// Ticket #294 (version 0.08.6): **End Turn as a sun** -- a shaded disc with sunspots and a
@@ -11890,6 +11974,25 @@ fn chronicle_screen(root: &mut Ui, session: &Session, actions: &mut Vec<Action>)
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Ticket #464 (version 0.09.7): the ring around the sun runs over the top from eight o'clock to
+    /// four, so a point on it there is the ring's, and the open foot, the disc and the space
+    /// outside are not.
+    #[test]
+    fn the_temperature_ring_runs_from_eight_to_four_over_the_top() {
+        let (c, r) = (egui::pos2(100.0, 100.0), 30.0);
+        let ring = r + RING_GAP;
+        let clock = |hour: f32| c + egui::vec2((hour * 30.0 - 90.0).to_radians().cos(), (hour * 30.0 - 90.0).to_radians().sin()) * ring;
+        for hour in [8.0, 9.0, 10.5, 12.0, 2.0, 3.0, 4.0] {
+            assert!(on_temperature_ring(clock(hour), c, r), "{hour} o'clock is on the ring");
+        }
+        for hour in [5.0, 6.0, 7.0] {
+            assert!(!on_temperature_ring(clock(hour), c, r), "{hour} o'clock is the open foot");
+        }
+        assert!(!on_temperature_ring(c, c, r), "the disc is End Turn's");
+        assert!(!on_temperature_ring(c + egui::vec2(0.0, -r + 4.0), c, r), "and so is its limb");
+        assert!(!on_temperature_ring(c + egui::vec2(0.0, -ring - 12.0), c, r), "outside is nothing");
+    }
 
     /// Ticket #463 (version 0.09.7): a Report line is cut at every Faction's name, so a line that
     /// names two colours both, and a line that names none is left whole.

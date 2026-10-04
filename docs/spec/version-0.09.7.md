@@ -166,3 +166,21 @@ moves.
   line of its own, which also quoted the Unrest it calmed; that clause is gone from the line, and
   the Region's own Unrest line still carries the change. A line about one Region still goes there
   when clicked; a line about several points nowhere.
+
+## 7. A compact Temperature gauge around the End Turn sun
+
+The authority is [ticket #464](https://github.com/whaleyjoshua2/Dying-Earth/issues/464). No rule
+moves.
+
+- **A ring around the sun** is the Climate Panel's Temperature bar at a glance. It runs over the
+  top from eight o'clock (the base Temperature) to four o'clock (Collapse).
+- **What it carries:** a dark track; a red fill to the Temperature now, with a white tick at its
+  head; a darker band on to the Temperature the CO2 Stock already commits the world to; and a notch
+  at each Break, dim until it fires and bright on a dark backing after. No labels, and no Sea Level
+  or Antarctica notches: the panel has those.
+- **Its hover,** three lines: "Temperature +2.6 C, heading to +2.9", "next: Amazon Dieback at
+  +2.6", "Collapse at +3.0. Click for the Climate Panel."
+- **A click on the ring opens or closes the Climate Panel**, and does not end the turn. The disc
+  and the words "End Turn" are End Turn's, as before.
+- **The Climate Panel's bar takes the ring's red** for its fill and its committed band, so the two
+  read as one gauge. Nothing else on the panel moves.
