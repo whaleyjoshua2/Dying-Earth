@@ -16,6 +16,7 @@ impl Game {
                 if f.offline_until_resolution {
                     f.offline_until_resolution = false;
                     f.online = !f.mothballed;
+                    f.offline_cause = None;
                 }
             }
         }
@@ -24,11 +25,13 @@ impl Game {
                 c.grid_failed = false;
                 for m in &mut c.modules {
                     m.online = !m.mothballed;
+                    m.offline_cause = None;
                 }
             }
             for m in c.modules.iter_mut().filter(|m| m.offline_until_resolution) {
                 m.offline_until_resolution = false;
                 m.online = !m.mothballed;
+                m.offline_cause = None;
             }
         }
         // Ticket #371 (version 0.09.2): where every Region's Unrest stands as the Resolution opens,

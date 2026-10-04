@@ -424,3 +424,28 @@ only; no rule moves.
 | Batteries standing at the end | 28 | 42 |
 | wins (Cust / Pros / Ark / Arch) | 8 / 3 / 6 / 22 | 15 / 10 / 10 / 5 |
 | collapses | 41 | 40 |
+
+## 18. An offline building's hover says why
+
+The authority is [ticket #451](https://github.com/whaleyjoshua2/Dying-Earth/issues/451). No rule moves.
+
+- **The cause is recorded.** Each Facility and Module carries why it is offline (`OfflineCause`), set
+  where it is switched off and cleared when it comes back. The hover reports it, where it used to
+  work the cause out by elimination and call every other case "short of Energy". An older save loads;
+  a building already offline in one falls back to what its flags say.
+- **The line,** under the building's figures:
+  - "Offline: short of Energy."
+  - "Offline until next turn: struck by <card>." (the card named)
+  - "Offline: grid down."
+  - "Offline: Colony occupied."
+  - "Offline: upkeep unpaid." (a Sea Wall)
+- **Making nothing while online** is said too:
+  - "Blockaded: makes nothing." on every Module of a place under Blockade;
+  - "At half: Unrest." on a Region's Facilities at the Facility threshold;
+  - "At half: shut Habitat." on a Colony's Modules, its Energy makers apart.
+- **A Scrubber or Sea Wall** has no box, only a row; its row's hover now carries the line, which it
+  never did. The Sea Wall's row says "unkept this turn" only when that is the cause.
+- **A mothballed building** says so in its figures already ("mothballed: making nothing, …"), and
+  keeps that sentence.
+- **Beside the arithmetic:** where a figure is multiplied the hover shows its sums; the cause line
+  stays above them and the sums give up a line, so the hover keeps to six.

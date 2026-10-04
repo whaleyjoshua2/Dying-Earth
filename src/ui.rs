@@ -6546,7 +6546,9 @@ fn sea_wall_keep(game: &Game, f: &Facility) -> String {
 
 /// Ticket #390: the clause a Sea Wall left unkept this turn adds, and nothing otherwise.
 fn sea_wall_unkept(f: &Facility) -> &'static str {
-    if !f.online && !f.mothballed { "; unkept this turn" } else { "" }
+    // Ticket #451 (version 0.09.6): by the recorded cause, where any offline wall read as unkept.
+    let other_cause = matches!(f.offline_cause, Some(OfflineCause::Energy) | Some(OfflineCause::Card(_)));
+    if !f.online && !f.mothballed && !other_cause { "; unkept this turn" } else { "" }
 }
 
 /// Ticket #146 (version 0.07.3): one Facility's line -- its figures with their glyphs, the hover
@@ -6591,7 +6593,11 @@ fn facility_figures(game: &Game, sid: StateId, f: &Facility, director: Option<Se
 /// a tooltip is allowed. They stay on every hover without a chain.
 fn chain_tip(with_rules: &str, chain: &Chain) -> String {
     let mut lines: Vec<String> = with_rules.lines().next().map(str::to_string).into_iter().collect();
-    lines.extend(chain.lines(5));
+    // Ticket #451 (version 0.09.6): the cause line stays -- offline, blockaded or at half -- and the
+    // chain gives up a line for it, so the hover keeps to six.
+    lines.extend(with_rules.lines().skip(1).filter(|l| l.starts_with("Offline") || l.starts_with("At half") || l.starts_with("Blockaded")).map(str::to_string));
+    let room = 6usize.saturating_sub(lines.len());
+    lines.extend(chain.lines(room));
     lines.join("\n")
 }
 
@@ -6641,7 +6647,9 @@ fn facility_row(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, i: us
         // Ticket #352 (version 0.09.1): with its arithmetic, where the figure is multiplied.
         // Ticket #390 (version 0.09.3): a short row's hover is its whole sentence and nothing else,
         // so the Sea Wall's, the longest in the data, stays within the six-line ceiling.
-        let rules = if short.is_some() { full.clone() } else { facility_rules(f.kind.name(), f.coastal) };
+        // Ticket #451 (version 0.09.6): and why it is offline, which this row never said -- a Scrubber
+        // or Sea Wall has no box, and the box's hover was the only place the cause stood.
+        let rules = if short.is_some() { format!("{}{}", full, facility_offline_words(game, sid, f)) } else { facility_rules(f.kind.name(), f.coastal) };
         let tip = match director.filter(|_| !f.mothballed && earnings_seen(game, Place::State(sid), director)).map(|d| game.facility_yield(d, sid, f.kind).chain).filter(|c| c.multiplied()) {
             Some(chain) => chain_tip(&rules, &chain),
             None => rules,
@@ -6890,7 +6898,7 @@ fn slot_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
             SlotBoxKind::Standing(i) => {
                 let f = &st.facilities[*i];
                 let state = if f.mothballed { TileState::Mothballed } else if !f.online { TileState::Offline } else { TileState::Standing };
-                let heading = format!("{} ({side}): {}{}", f.kind.name(), facility_figures(game, sid, f, director), facility_offline_words(f));
+                let heading = format!("{} ({side}): {}{}", f.kind.name(), facility_figures(game, sid, f, director), facility_offline_words(game, sid, f));
                 let tip = facility_rules(&heading, f.coastal);
                 // Ticket #352 (version 0.09.1): with its arithmetic, where the figure is multiplied.
                 let tip = match director.filter(|_| !f.mothballed && earnings_seen(game, Place::State(sid), director)).map(|d| game.facility_yield(d, sid, f.kind).chain).filter(|c| c.multiplied()) {
@@ -9570,29 +9578,51 @@ fn battery_rules(game: &Game, col: &Colony) -> String {
 /// not carry them, since the row and the hover are about the same building. Ticket #307: they
 /// name the cause. A Facility goes offline two ways: struck by a card until the next Resolution,
 /// or shut at Income for want of Energy.
-fn facility_offline_words(f: &Facility) -> &'static str {
-    if f.online || f.mothballed {
-        ""
-    } else if f.offline_until_resolution {
-        " (offline until the next Resolution, struck by a card; making nothing)"
-    } else {
-        " (offline, short of Energy; making nothing)"
+/// Ticket #451 (version 0.09.6): **the recorded cause, in a line of its own.** The engine records why
+/// a building went offline (`OfflineCause`), so the hover says it and never guesses -- a Sea Wall
+/// shut for its keep said "short of Energy". A building offline in a save older than the record has
+/// none, and falls back to what the flags say.
+fn offline_cause_words(cause: Option<&OfflineCause>, until_resolution: bool, grid: bool, occupied_archive: bool) -> String {
+    match cause {
+        Some(OfflineCause::Card(name)) => format!("\nOffline until next turn: struck by {name}."),
+        Some(OfflineCause::Energy) => "\nOffline: short of Energy.".to_string(),
+        Some(OfflineCause::Grid) => "\nOffline: grid down.".to_string(),
+        Some(OfflineCause::Occupied) => "\nOffline: Colony occupied.".to_string(),
+        Some(OfflineCause::Unkept) => "\nOffline: upkeep unpaid.".to_string(),
+        None if until_resolution => "\nOffline until next turn: struck by a card.".to_string(),
+        None if grid => "\nOffline: grid down.".to_string(),
+        None if occupied_archive => "\nOffline: Colony occupied.".to_string(),
+        None => "\nOffline: short of Energy.".to_string(),
     }
 }
 
-/// A Module's offline words, the counterpart of `facility_offline_words`: a card, the Colony's
-/// grid down, an Occupied Colony's Archive, or want of Energy.
-fn module_offline_words(col: &Colony, m: &Module) -> &'static str {
-    if m.online || m.mothballed {
-        ""
-    } else if m.offline_until_resolution {
-        " (offline until the next Resolution, struck by a card; making nothing)"
-    } else if col.grid_failed {
-        " (offline, the grid is down; making nothing)"
-    } else if m.kind == ModuleKind::Archive && col.control.is_occupied() {
-        " (offline while the Colony is Occupied)"
+/// A Facility's line under its figures: why it is offline, or that its Region's Unrest has it at
+/// half. Nothing for a mothballed one, whose figures say so already.
+fn facility_offline_words(game: &Game, sid: StateId, f: &Facility) -> String {
+    if f.mothballed {
+        String::new()
+    } else if !f.online {
+        offline_cause_words(f.offline_cause.as_ref(), f.offline_until_resolution, false, false)
+    } else if game.facilities_at_half(sid) {
+        "\nAt half: Unrest.".to_string()
     } else {
-        " (offline, short of Energy; making nothing)"
+        String::new()
+    }
+}
+
+/// A Module's line, the counterpart of `facility_offline_words`: why it is offline, that the place
+/// is blockaded and makes nothing, or that a shut Habitat has everything but Energy at half.
+fn module_offline_words(game: &Game, col: &Colony, m: &Module) -> String {
+    if m.mothballed {
+        String::new()
+    } else if !m.online {
+        offline_cause_words(m.offline_cause.as_ref(), m.offline_until_resolution, col.grid_failed, m.kind == ModuleKind::Archive && col.control.is_occupied())
+    } else if game.starved_by(col.id).is_some() {
+        "\nBlockaded: makes nothing.".to_string()
+    } else if game.habitat_halves(col.id) && !matches!(m.kind, ModuleKind::Generator | ModuleKind::SolarArray) {
+        "\nAt half: shut Habitat.".to_string()
+    } else {
+        String::new()
     }
 }
 
@@ -9661,7 +9691,7 @@ fn module_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
         let selected = view.hab_tile == Some(HabTile::Module(mi));
         // Ticket #150 (version 0.07.4): the tile's hover -- the figures its strip line carries and
         // the Module rules, which the old rows never had.
-        let mut tip = module_rules(m.kind, &format!("{}{}", module_line(game, col, cid, mi, director), module_offline_words(col, m)));
+        let mut tip = module_rules(m.kind, &format!("{}{}", module_line(game, col, cid, mi, director), module_offline_words(game, col, m)));
         // Ticket #352 (version 0.09.1): with its arithmetic, where the figure is multiplied.
         if let Some(chain) = director.filter(|_| !m.mothballed && earnings_seen(game, Place::Colony(cid), director)).map(|d| game.module_yield_at(d, cid, mi).chain).filter(|c| c.multiplied()) {
             tip = chain_tip(&tip, &chain);
@@ -9672,7 +9702,7 @@ fn module_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
         if m.kind == ModuleKind::Battery {
             // Ticket #363 (version 0.09.1): the heading and the Battery's own rules alone. With the
             // generic Energy and Mothball sentences it ran to thirteen rendered lines against six.
-            tip = format!("{}{}{}", module_line(game, col, cid, mi, director), module_offline_words(col, m), battery_rules(game, col));
+            tip = format!("{}{}{}", module_line(game, col, cid, mi, director), module_offline_words(game, col, m), battery_rules(game, col));
             if m.damage > 0 {
                 let hp = game.tables.module(ModuleKind::Battery).hit_points;
                 label = format!("Battery {}/{}", hp.saturating_sub(m.damage), hp);
@@ -9734,7 +9764,7 @@ fn module_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
         // The Archive stands apart: a row of its own, outside the count.
         let rect = egui::Rect::from_min_size(grid.min + egui::vec2(0.0, rows as f32 * (HAB_TILE + HAB_LABEL + HAB_GAP)), egui::vec2(HAB_TILE, HAB_TILE));
         let state = if col.modules[ai].mothballed { TileState::Mothballed } else if !col.modules[ai].online { TileState::Offline } else { TileState::Standing };
-        let tip = format!("{}{}\nOutside the Module count. Its Research is paid into the Archive fund at any pace; complete, it takes a great deal of Energy to keep running. Destroyed outright if this Colony changes hands; the fund is kept.", module_line(game, col, cid, ai, director), module_offline_words(col, &col.modules[ai]));
+        let tip = format!("{}{}\nOutside the Module count. Its Research is paid into the Archive fund at any pace; complete, it takes a great deal of Energy to keep running. Destroyed outright if this Colony changes hands; the fund is kept.", module_line(game, col, cid, ai, director), module_offline_words(game, col, &col.modules[ai]));
         if hab_tile(ui, rect, ui.id().with("hab-archive"), Some(crate::icons::module_icon(ModuleKind::Archive)), "The Archive", state, view.hab_tile == Some(HabTile::Module(ai)), None, tip).clicked() {
             view.hab_tile = Some(HabTile::Module(ai));
         }

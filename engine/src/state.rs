@@ -140,6 +140,23 @@ pub struct PendingChange {
     pub seat: Seat,
 }
 
+/// Ticket #451 (version 0.09.6): **why a building is offline**, recorded where it is switched off, so
+/// its hover says the cause and never guesses. Absent while it is online, or mothballed, or in a save
+/// older than the field.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum OfflineCause {
+    /// Shut by the Energy shortfall at Income.
+    Energy,
+    /// Struck by this card until the next Resolution.
+    Card(String),
+    /// Its Colony's grid is down.
+    Grid,
+    /// An Archive at an Occupied Colony.
+    Occupied,
+    /// A Sea Wall whose keep went unpaid.
+    Unkept,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Facility {
     pub kind: FacilityKind,
@@ -158,6 +175,9 @@ pub struct Facility {
     /// Ticket #56: whether this Facility stands in one of its state's coastal slots. The sea takes
     /// coastal slots only, so a coastal Facility is the one it can destroy.
     pub coastal: bool,
+    /// Ticket #451 (version 0.09.6): why it is offline.
+    #[serde(default)]
+    pub offline_cause: Option<OfflineCause>,
     /// Ticket #257 (version 0.08.4): a Sea Wall's count of the Sea Level thresholds it has held
     /// back. The wall is not destroyed absorbing one any more; each rise it holds adds
     /// `sea_wall_upkeep_per_rise` Materials a turn to its keep. Zero on every other kind.
@@ -167,7 +187,7 @@ pub struct Facility {
 
 impl Facility {
     pub fn new(kind: FacilityKind) -> Facility {
-        Facility { kind, online: true, offline_until_resolution: false, self_run: false, mothballed: false, change: None, coastal: false, rises_held: 0 }
+        Facility { kind, online: true, offline_until_resolution: false, self_run: false, mothballed: false, change: None, coastal: false, rises_held: 0, offline_cause: None }
     }
     /// Ticket #56: a Facility standing in a coastal slot.
     pub fn in_coastal_slot(kind: FacilityKind) -> Facility {
@@ -189,6 +209,9 @@ pub struct Module {
     /// Ticket #54: mothballed, exactly as a Facility is.
     pub mothballed: bool,
     pub change: Option<PendingChange>,
+    /// Ticket #451 (version 0.09.6): why it is offline.
+    #[serde(default)]
+    pub offline_cause: Option<OfflineCause>,
     /// Ticket #324 (version 0.08.8): hits taken in a Battle, nought for every Module but a Battery;
     /// repaired with Materials as a Ship's are. At the card's hit points the Battery is gone.
     #[serde(default)]
@@ -197,7 +220,7 @@ pub struct Module {
 
 impl Module {
     pub fn new(kind: ModuleKind) -> Module {
-        Module { kind, online: true, offline_until_resolution: false, mothballed: false, change: None, damage: 0 }
+        Module { kind, online: true, offline_until_resolution: false, mothballed: false, change: None, damage: 0, offline_cause: None }
     }
     /// Ticket #54: standing, running and not mothballed.
     pub fn working(&self) -> bool {

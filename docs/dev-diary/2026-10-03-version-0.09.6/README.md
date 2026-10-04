@@ -343,3 +343,25 @@ the market (#448) and pace (#449) tickets.
 - a blockaded seat had no cause against the blockader;
 - a Frigate scored 3 with no fleet and 3 with two warships;
 - no second station over Earth was weighed.
+
+## An offline building's hover says why (ticket #451)
+
+A new aid, `offline:<case>` (`card`, `unkept`, `half`, `blockade`), sets up one way a building makes
+nothing.
+
+- [`struck-by-a-card.png`](ticket-451-offline-reasons/struck-by-a-card.png): China's Power Plant,
+  dimmed, "Offline until next turn: struck by Labour Dispute."
+- [`sea-wall-unkept.png`](ticket-451-offline-reasons/sea-wall-unkept.png): the Sea Wall's row,
+  "unkept this turn", and its hover ending "Offline: upkeep unpaid." It said nothing about being
+  offline before.
+- [`at-half.png`](ticket-451-offline-reasons/at-half.png): China at Unrest 7. The Power Plant reads
+  "At half: Unrest." above its sums, which end "halved at Unrest 7: 3". The first take lost the line:
+  a hover with sums kept only its first line. Fixed, and the same fix keeps an offline line there.
+- [`blockaded.png`](ticket-451-offline-reasons/blockaded.png): the ISS under a Prospector Blockade;
+  its Core Module reads "Blockaded: makes nothing."
+
+**Witnessed red:**
+- the new test `an_offline_building_records_why` could not compile before the record existed;
+- the Sea Wall test's new assertion, with the Unkept line taken out, read `left: None, right:
+  Some(Unkept)`.
+- The older-save test now cuts `offline_cause` too.

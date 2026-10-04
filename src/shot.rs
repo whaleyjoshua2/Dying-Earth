@@ -858,6 +858,38 @@ fn build_board(session: &mut Session) {
             let name = g.next_ship_name(UnitKind::ColonyShip);
             g.ships.push(Ship { id, name, kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Venus), colonists: 4, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: g.tank_of(Seat(0), UnitKind::ColonyShip), slot: (v != "low").then_some(1) });
         }
+        // `offline:<case>` (a building aid, ticket #451, version 0.09.6): one way a building of seat
+        // 0's makes nothing, so its hover's cause line can be photographed. `card`: the home Region's
+        // first Facility struck by a Labour Dispute. `unkept`: a Sea Wall there shut for its keep.
+        // `half`: the home Region's Unrest at the Facility threshold. `blockade`: a rival Frigate on
+        // Blockade in the ring of seat 0's station over Earth.
+        if let Some(v) = std::env::args().find_map(|a| a.strip_prefix("offline:").map(str::to_owned)) {
+            let home = g.controlled_states(Seat(0)).first().copied();
+            match (v.as_str(), home) {
+                ("card", Some(sid)) => {
+                    if let Some(f) = g.state_mut(sid).facilities.first_mut() {
+                        f.online = false;
+                        f.offline_until_resolution = true;
+                        f.offline_cause = Some(OfflineCause::Card("Labour Dispute".to_string()));
+                    }
+                }
+                ("unkept", Some(sid)) => {
+                    let mut wall = Facility::new(FacilityKind::SeaWall);
+                    wall.online = false;
+                    wall.offline_cause = Some(OfflineCause::Unkept);
+                    g.state_mut(sid).facilities.push(wall);
+                }
+                ("half", Some(sid)) => g.state_mut(sid).unrest = g.tables.unrest.facility_threshold,
+                ("blockade", _) => {
+                    if let Some(slot) = g.colonies.iter().find(|c| c.in_orbit && c.body == BodyId::Earth && c.control.director() == Some(Seat(0))).map(|c| c.slot) {
+                        let id = ShipId(g.fresh_id());
+                        let name = g.next_ship_name(UnitKind::Frigate);
+                        g.ships.push(Ship { id, name, kind: UnitKind::Frigate, seat: Seat(1), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Blockade, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: Some(slot) });
+                    }
+                }
+                _ => {}
+            }
+        }
         // `venusring:1` (a building aid, ticket #442, version 0.09.6): a Colony Ship of seat 0's with
         // four Colonists in Ishtar's empty ring over Venus, so its card's "Found Ishtar" door shows.
         if std::env::args().any(|a| a == "venusring:1") {

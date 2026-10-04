@@ -4654,6 +4654,8 @@ fn a_sea_wall_costs_half_a_material_a_turn_for_every_rise_it_has_held() {
     assert_eq!(income_of(&mut g, Seat(0)).materials, 0.0, "nothing to pay with, nothing paid");
     assert_eq!(g.seat(Seat(0)).stockpile.materials, 0.0, "never below nothing");
     assert!(!g.state(sid).facilities[0].working(), "unkept: it holds nothing this turn");
+    // Ticket #451 (version 0.09.6): and it says so, where its hover said "short of Energy".
+    assert_eq!(g.state(sid).facilities[0].offline_cause, Some(OfflineCause::Unkept));
     assert!(g.report.lines.iter().any(|l| l.text.contains("Sea Wall") && l.text.contains("unkept")), "the Report says so: {:?}", g.report.lines);
 }
 
@@ -19048,4 +19050,33 @@ fn a_seat_with_one_yard_wants_a_second_station_over_earth() {
     g.log.clear();
     g.ai_orders(Seat(0));
     assert_eq!(scored(&g, "as a backup yard"), 0.0, "no third while the second has no yard");
+}
+
+/// Ticket #451 (version 0.09.6): **an offline building records why.** A card names itself, a grid
+/// failure is the grid, an Energy shortfall is Energy, and the cause clears when the building comes
+/// back, where the hover guessed and called every other case "short of Energy".
+#[test]
+fn an_offline_building_records_why() {
+    // A card.
+    let mut g = game();
+    let sid = StateId::EastAsia;
+    g.last_event = Some(DrawnEvent { card: Card::Event(EventId::Wildfire), target: EventTarget::State(sid), scale: 1.0, text: String::new() });
+    g.apply_event_now();
+    let name = g.tables.event(EventId::Wildfire).name.clone();
+    let i = g.state(sid).facilities.iter().position(|f| f.offline_until_resolution).expect("one struck");
+    assert_eq!(g.state(sid).facilities[i].offline_cause, Some(OfflineCause::Card(name)));
+    g.last_event = None;
+    g.resolution_phase();
+    let back = &g.state(sid).facilities[i];
+    assert!(back.online && back.offline_cause.is_none(), "back, and the cause cleared: {back:?}");
+    // The grid.
+    let c = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Habitat], 2);
+    g.last_event = Some(DrawnEvent { card: Card::Event(EventId::GridFailure), target: EventTarget::Colony(c), scale: 1.0, text: String::new() });
+    g.apply_event_now();
+    assert!(g.colony(c).unwrap().modules.iter().all(|m| m.offline_cause == Some(OfflineCause::Grid)), "the grid: {:?}", g.colony(c).unwrap().modules);
+    // An Energy shortfall.
+    let mut g = short_board(0.0);
+    g.income_phase();
+    let shut: Vec<&Facility> = g.state(StateId::EastAsia).facilities.iter().filter(|f| !f.online).collect();
+    assert!(!shut.is_empty() && shut.iter().all(|f| f.offline_cause == Some(OfflineCause::Energy)), "Energy: {shut:?}");
 }

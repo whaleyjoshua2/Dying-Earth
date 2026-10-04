@@ -985,6 +985,7 @@ impl Game {
                     col.grid_failed = true;
                     for m in &mut col.modules {
                         m.online = false;
+                        m.offline_cause = Some(OfflineCause::Grid);
                     }
                 }
             }
@@ -995,6 +996,7 @@ impl Game {
                         for m in col.modules.iter_mut().filter(|m| m.kind == ModuleKind::Generator) {
                             m.online = false;
                             m.offline_until_resolution = true;
+                            m.offline_cause = Some(OfflineCause::Card(t.event(id).name.clone()));
                         }
                     }
                     if let Some(h) = holder {
@@ -1009,6 +1011,7 @@ impl Game {
                         col.grid_failed = true;
                         for m in &mut col.modules {
                             m.online = false;
+                            m.offline_cause = Some(OfflineCause::Grid);
                         }
                     }
                 }
@@ -1054,6 +1057,7 @@ impl Game {
                 for f in st.facilities.iter_mut().filter(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite)) {
                     f.offline_until_resolution = true;
                     f.online = false;
+                    f.offline_cause = Some(OfflineCause::Card(t.event(id).name.clone()));
                 }
             }
             (EventId::LabourDispute, EventTarget::State(s)) => {
@@ -1066,10 +1070,12 @@ impl Game {
                     let st = self.state_mut(s);
                     st.facilities[i].offline_until_resolution = true;
                     st.facilities[i].online = false;
+                    st.facilities[i].offline_cause = Some(OfflineCause::Card(t.event(id).name.clone()));
                 } else {
                     for f in &mut self.state_mut(s).facilities {
                         f.offline_until_resolution = true;
                         f.online = false;
+                        f.offline_cause = Some(OfflineCause::Card(t.event(id).name.clone()));
                     }
                 }
             }
@@ -1080,6 +1086,7 @@ impl Game {
                     let st = self.state_mut(s);
                     st.facilities[i].offline_until_resolution = true;
                     st.facilities[i].online = false;
+                    st.facilities[i].offline_cause = Some(OfflineCause::Card(t.event(id).name.clone()));
                 }
                 if !self.has_tech(TechId::CleanManufacturing) {
                     self.state_mut(s).wildfire_emissions_next += t.events.wildfire_emissions * ev.scale;

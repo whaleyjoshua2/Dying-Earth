@@ -1382,12 +1382,29 @@ impl Game {
         for p in &producers {
             let where_ = match p.place {
                 ProducerPlace::Facility(sid, i) => {
-                    self.state_mut(sid).facilities[i].online = p.online;
+                    // Ticket #451 (version 0.09.6): and why. A card's strike keeps its card; anything
+                    // else the shortfall shut is short of Energy; back online, no cause.
+                    let f = &mut self.state_mut(sid).facilities[i];
+                    f.online = p.online;
+                    f.offline_cause = if p.online { None } else if f.offline_until_resolution { f.offline_cause.take() } else { Some(OfflineCause::Energy) };
                     self.tables.state(sid).name.clone()
                 }
                 ProducerPlace::Module(cid, i) => {
                     if let Some(c) = self.colony_mut(cid) {
-                        c.modules[i].online = p.online;
+                        let (grid, occupied) = (c.grid_failed, c.control.is_occupied());
+                        let m = &mut c.modules[i];
+                        m.online = p.online;
+                        m.offline_cause = if p.online {
+                            None
+                        } else if m.offline_until_resolution {
+                            m.offline_cause.take()
+                        } else if grid {
+                            Some(OfflineCause::Grid)
+                        } else if m.kind == ModuleKind::Archive && occupied {
+                            Some(OfflineCause::Occupied)
+                        } else {
+                            Some(OfflineCause::Energy)
+                        };
                     }
                     self.place_name(Place::Colony(cid))
                 }
@@ -1593,6 +1610,7 @@ impl Game {
                 for f in self.state_mut(sid).facilities.iter_mut() {
                     if f.kind == FacilityKind::SeaWall && f.working() {
                         f.online = false;
+                        f.offline_cause = Some(OfflineCause::Unkept);
                         any = true;
                     }
                 }
