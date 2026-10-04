@@ -4063,32 +4063,34 @@ fn c_the_permafrost_break_adds_four_ppm_a_turn_on_its_own_line_outside_blame_and
     assert_eq!(g.seat(Seat(0)).stabilization_run, run_before + 1, "exempt from Stabilization: the run goes on");
 }
 
-/// (d) The Sink Weakens: the Natural Sink falls to 4.0 for good, and Stabilization is measured
-/// against 4.0 from then on.
+/// (d) The Sink Weakens: the Natural Sink falls by 2.0 for good, and Stabilization is measured
+/// against the weakened Sink from then on. Ticket #483 (version 0.09.8): from 8.0 to 6.0, where it
+/// fell from 6.0 to 4.0.
 #[test]
 fn d_the_sink_weakens_lowers_the_sink_and_the_stabilization_bar_with_it() {
     let mut g = game();
     calm(&mut g);
     breaks_ahead(&mut g);
     bare_world(&mut g);
-    assert_eq!(g.climate.natural_sink, 6.0, "it opens at the table's figure");
+    // Ticket #483 (version 0.09.8): 8, where it was 6.
+    assert_eq!(g.climate.natural_sink, 8.0, "it opens at the table's figure");
     hold_temperature(&mut g, 2.1);
     g.climate_phase();
-    assert_eq!(g.climate.natural_sink, 4.0, "the Sink Weakens took it to 4.0");
-    assert_eq!(g.emissions_now().sink, 4.0, "and the panel's Sink line with it");
+    assert_eq!(g.climate.natural_sink, 6.0, "the Sink Weakens took it to 6.0");
+    assert_eq!(g.emissions_now().sink, 6.0, "and the panel's Sink line with it");
     assert!(g.seat(Seat(0)).stabilization_run > 0, "0 counted was under the Sink");
 
-    // 5.0 counted Emissions: under the old Sink of 6.0, over the new one of 4.0. A neutral state,
+    // 7.0 counted Emissions: under the old Sink of 8.0, over the new one of 6.0. A neutral state,
     // so no Faction's Emissions multiplier stands between the card and the sum.
     g.state_mut(StateId::MiddleEast).control = Control::Neutral;
-    g.state_mut(StateId::MiddleEast).industry_level = 10; // Baseline 0.5 x 10
+    g.state_mut(StateId::MiddleEast).industry_level = 14; // Baseline 0.5 x 14
     let e = g.emissions_now();
-    assert!((e.counted() - 5.0).abs() < 1e-9, "5.0 counted: {}", e.counted());
+    assert!((e.counted() - 7.0).abs() < 1e-9, "7.0 counted: {}", e.counted());
     g.climate_phase();
-    assert_eq!(g.seat(Seat(0)).stabilization_run, 0, "5.0 breaks a run against a Sink of 4.0, where it would have held against 6.0");
+    assert_eq!(g.seat(Seat(0)).stabilization_run, 0, "7.0 breaks a run against a Sink of 6.0, where it would have held against 8.0");
     // The Custodian AI steers by this same figure (`victory_gap` reads `climate.last.total_sink()`),
     // so a weakened Sink moves its pace with it.
-    assert_eq!(g.climate.last.total_sink(), 4.0, "the Sink the AI reads is the weakened one");
+    assert_eq!(g.climate.last.total_sink(), 6.0, "the Sink the AI reads is the weakened one");
 }
 
 /// (e) Ice Sheets Committed fires a Sea Level threshold out of sequence, and the scheduled ones
@@ -4136,18 +4138,19 @@ fn f_amazon_dieback_pulses_twenty_ppm_once_and_leaves_south_america_dirtier_for_
     hold_temperature(&mut g, 2.7);
     let co2_before = g.climate.co2;
     g.climate_phase();
-    // Nothing counted, no Permafrost yet in the sum, a Sink of 6.0, then the 20 ppm pulse.
-    assert!((g.climate.co2 - (co2_before - 6.0 + 20.0)).abs() < 1e-9, "a 20 ppm pulse: {}", g.climate.co2);
+    // Nothing counted, no Permafrost yet in the sum, a Sink of 8.0 (ticket #483), then the 20 ppm pulse.
+    assert!((g.climate.co2 - (co2_before - 8.0 + 20.0)).abs() < 1e-9, "a 20 ppm pulse: {}", g.climate.co2);
     assert!((g.baseline_emissions(StateId::SouthAmerica) - (base + 1.0)).abs() < 1e-9, "Baseline Emissions up by 1.0");
     // And it bites: the state's industry emits at the raised figure.
     g.state_mut(StateId::SouthAmerica).industry_level = 2;
     assert!((g.emissions_now().state_industry - (base + 1.0) * 2.0).abs() < 1e-9, "{}", g.emissions_now().state_industry);
     g.state_mut(StateId::SouthAmerica).industry_level = 0;
 
-    // A second phase: Permafrost 4.0 against the weakened Sink of 4.0, and no second pulse.
+    // A second phase: Permafrost 4.0 against the weakened Sink of 6.0 (ticket #483; 4.0 against 4.0
+    // before), so the Stock falls by 2.0, and no second pulse.
     let co2_again = g.climate.co2;
     g.climate_phase();
-    assert!((g.climate.co2 - co2_again).abs() < 1e-9, "the pulse does not come twice: {}", g.climate.co2);
+    assert!((g.climate.co2 - (co2_again - 2.0)).abs() < 1e-9, "the pulse does not come twice: {}", g.climate.co2);
     assert!((g.baseline_emissions(StateId::SouthAmerica) - (base + 1.0)).abs() < 1e-9, "and the rise does not come twice either");
 }
 

@@ -313,3 +313,18 @@ The flags are from the flag-icons set the others came from (`tr`, `kz`, `za`); `
 **The sweep** ([`after-482.txt`](sweeps/after-482.txt)): 4 / 20 / 11 / 6 and 39 collapses, from
 7 / 21 / 16 / 4 and 32. Collapses up seven and the Arkwrights down five, both past noise; not
 traced. The last time two Regions were added collapses rose by six.
+
+## A CO2 sweep for the new countries (#483)
+
+The designer: *"run a co2 sweep to account for the new countries since 0.09.5"*. Measured first, then
+chosen: the Regions alone emit 21.3 a turn at the start where 0.09.5's emitted 18.3, and fifteen
+cells of Sink and step were swept at 80 games each, with one run of the alternative (every Region's
+baseline scaled back). The table and what it shows are in [`sweeps/co2-grid.md`](sweeps/co2-grid.md).
+The designer took Sink 8 and step 330: 17 collapses.
+
+**Witnessed red:** two tests quoted the old Sink and went red on the change
+(`d_the_sink_weakens...`: `left: 8.0, right: 6.0`; `f_amazon_dieback...`); both were re-based, the
+first with 7.0 counted Emissions where it used 5.0, to stand between the weakened Sink and the whole.
+
+**The sweep** ([`after-483.txt`](sweeps/after-483.txt)), run by the tool's new default cell, is the
+same to the line as the grid's cell: 9 / 27 / 18 / 7 and 17 collapses, from 4 / 20 / 11 / 6 and 39.

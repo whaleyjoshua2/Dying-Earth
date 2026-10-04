@@ -857,7 +857,7 @@ Since version 0.08.4, the record each Faction keeps of every Climate phase -- ho
 _Avoid_: progress graph, score chart, victory log
 
 **Natural Sink**:
-The amount of CO2 the oceans and forests remove from the CO2 Stock every turn. Net emissions below it stabilize the stock. Every Scrubber standing and online enlarges it while it stands, and since version 0.09.4 every Nature Reserve by 1 ppm; the Custodians' Research Directive can add to it for good; and since version 0.09.1 a Launch on or over Earth raises it by a quarter of a ppm for good, the soot of a nuke at home dimming the sky. Since version 0.05 a Break can weaken it for good, and since version 0.09.1 that Break **takes 2 ppm off** it, never below nothing, rather than setting it to 4, so a Sink somebody has raised keeps what it was given.
+The amount of CO2 the oceans and forests remove from the CO2 Stock every turn. It opens at 8 ppm since version 0.09.8, when the board had grown to eighteen Regions; 6 before. Net emissions below it stabilize the stock. Every Scrubber standing and online enlarges it while it stands, and since version 0.09.4 every Nature Reserve by 1 ppm; the Custodians' Research Directive can add to it for good; and since version 0.09.1 a Launch on or over Earth raises it by a quarter of a ppm for good, the soot of a nuke at home dimming the sky. Since version 0.05 a Break can weaken it for good, and since version 0.09.1 that Break **takes 2 ppm off** it, never below nothing, rather than setting it to 4, so a Sink somebody has raised keeps what it was given.
 _Avoid_: absorption, offset, carbon capture
 
 **Nature Reserve**:

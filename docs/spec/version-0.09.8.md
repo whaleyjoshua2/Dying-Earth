@@ -413,3 +413,34 @@ Collapses rise by seven and the Arkwrights lose five wins, both past noise. Not 
 sweep is run on this board next.
 
 **Pictures:** [`ticket-482/`](../dev-diary/2026-10-04-version-0.09.8/ticket-482/).
+
+## 12. The climate retuned for eighteen Regions
+
+The authority is [ticket #483](https://github.com/whaleyjoshua2/Dying-Earth/issues/483). The grid is
+[`sweeps/co2-grid.md`](../dev-diary/2026-10-04-version-0.09.8/sweeps/co2-grid.md).
+
+- **The Natural Sink opens at 8 ppm a turn**, where it opened at 6.
+- **Half a degree takes 330 ppm**, where it took 300 (`ppm_step`).
+- Nothing else in `climate.toml` moves. The Sink Weakens still takes 2 off, so it leaves 6 where it
+  left 4.
+- **Why.** Four Regions joined the board between 0.09.5 and this version, each with industry of its
+  own and no parent reduced to match: the Regions alone emit 21.3 a turn at the start where they
+  emitted 18.3. At the old cell 39 of 80 games collapsed.
+- **The sweep tool** reads its default cell from `climate.toml`, so the standing command is
+  `cargo run --release -p dying-earth-engine --example sweep -- 20 --seatings --balance`, and its
+  header states the designer's ideal as its target.
+- **The computer seats** read the Sink off the climate as it stands; no figure of theirs quotes it.
+
+**Measured** (80 games, [`after-483.txt`](../dev-diary/2026-10-04-version-0.09.8/sweeps/after-483.txt)):
+
+| | Sink 6, step 300 | Sink 8, step 330 | the ideal |
+|---|---|---|---|
+| Custodians | 4 | 9 | 15 |
+| Prospectors | 20 | 27 | 15 |
+| Arkwrights | 11 | 18 | 15 |
+| Archivists | 6 | 7 | 15 |
+| collapses | 39 | 17 | 20 |
+
+The collapses are at the target. The win column is not: the Prospectors take most of the games the
+kinder climate saves, and no cell of the fifteen swept gave them fewer than 19. Fourteen of the 17
+collapses fall in the one seating where the Prospectors sit in seat 0 and start in China.
