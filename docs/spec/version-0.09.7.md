@@ -235,3 +235,38 @@ moves.
 - Figures of a thousand and over carry a comma.
 - **Older saves:** nothing is built for them, at the designer's word. A save from before this
   section still loads, and its totals count from the load.
+
+## 11. Six more texts tightened
+
+The authority is [ticket #468](https://github.com/whaleyjoshua2/Dying-Earth/issues/468). No rule
+moves; these are hovers, in the designer's own cuts.
+
+1. **A Region's own Army:** "A Region's own Army: strength and hit points Industry Level + 1 [and
+   +N armed]. Defending at home: +1 Constabulary, +1 calm [, +1 dug in].\
+   Heals 1 a turn while Unrest is under 5. Destroyed at its strength in damage; back at 1 two
+   Incomes later.\
+   Neutral, it arms for good: +2 at a threat next door, +1 per attack held."
+2. **War emissions** (Climate Panel): "Last turn's Battles on Earth and in its orbit: N ppm per hit,
+   Blame to whoever landed it; N per building burned when a three-turn Occupation takes a place,
+   Blame to the taker.\
+   A Battle itself burns nothing; a Pacified place is taken whole; a neutral Army's hits are
+   nobody's."
+3. **What a Relay or Embassy shows:** "A working Relay at your Colony off Earth, or Embassy in your
+   Region on Earth, shows every rival's income at that Body, building by building; the Faction
+   window gives totals only."
+4. **Battle odds in an orbit:** "The chance you are victorious: 62.5%."
+5. **Blockade:** "A warship stack on Blockade in a station's orbit starves it. A ground Colony
+   starves while one rival alone holds Orbital Control of low orbit.\
+   Starved, every Module makes nothing and still pays upkeep; nobody dies, nothing is destroyed.
+   Each turn is an offence against you."
+6. **Widgets,** one definition under each place's own first line, where two were written: "A Widget
+   is one unit of work; a build completes at the Resolution its Widgets are filled. A place's
+   Widgets go that turn to its own builds, earliest order first. Unapplied, they are lost: never
+   banked, traded or carried."
+
+What the texts no longer say, by the designer's cuts: that a Standing Army away from home is an
+Army like any other, and that a neutral Region's arming has no ceiling (1); that war's emissions
+count against a Stabilization run (2); that one Relay covers the whole Body, that a Unique counts,
+that a mothballed one shows nothing, and whose multipliers the figures carry (3); how the odds are
+measured (4); and that the rival holding low orbit must also have a stack on Blockade there (5).
+The rules themselves are unchanged.

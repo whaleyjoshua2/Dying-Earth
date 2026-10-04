@@ -130,3 +130,11 @@ this Windows host; the GitHub kit build is its first compile.
 **Witnessed red:** the test `a_seat_keeps_a_gross_total_of_what_it_has_produced` could not compile
 before the counter existed, and then failed on its own premise: the tests' usual board strips every
 building, so nothing was made. It uses the full starting board.
+
+## Six more texts tightened (ticket #468)
+
+- [`widgets-earth.png`](ticket-468/widgets-earth.png): the top bar's Widgets hover with the shared
+  definition under its first line.
+
+The other five hovers were not pictured: the Army's row sat below the card's fold in the headless
+shot, and the rest need a Battle, a Blockade or a Relay on the board.

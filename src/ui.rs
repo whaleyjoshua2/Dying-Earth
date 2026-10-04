@@ -5246,6 +5246,10 @@ const CHANGE_BUTTONS_WIDTH: f32 = 196.0;
 /// the Faction window and the Climate Panel each carried four long lines of it, word for word.
 const BLAME_HOVER: &str = "Blame: CO2 this Faction's places emitted, less what it removed (Scrubbers, Nature Reserves, the Custodians' Sink Directive).\nAbove a quarter share: Influence thresholds rise up to +50% where it doesn't hold, and every rival likes it a point less per step.";
 
+/// Ticket #468 (version 0.09.7): what a Widget is, said once -- the place card's hover and the top
+/// bar's each said it in words of their own, both over the six-line ceiling.
+const WIDGET_HOVER: &str = "A Widget is one unit of work; a build completes at the Resolution its Widgets are filled. A place's Widgets go that turn to its own builds, earliest order first. Unapplied, they are lost: never banked, traded or carried.";
+
 /// Ticket #116 (version 0.07.1): the rule for what gets a tooltip, so the next person has a test
 /// to apply rather than a list to extend. The designer: *"increase the use of mouse over tooltips."*
 ///
@@ -5672,7 +5676,7 @@ fn orbit_odds_lines(ui: &mut Ui, game: &Game, body: BodyId) {
         // long as it needs to, and the hover paid back the line it had borrowed.
         rule_tip(
             ui.label(format!("Attacking {}: {:.0}% is your chance of holding the orbit when the Battle is over (your strength {mine} against {theirs}).", orbit_phrase(game, body, orbit), odds * 100.0)),
-            "The chance that nothing of any rival's is left standing in this orbit when the Battle ends and something of yours is -- what an Occupation tests, not a share of the strength.\nIt is measured: the Battle is fought a thousand times over on a copy of the board, from a seed of its own, so the figure never moves and asking for it never moves the game.".to_string(),
+            format!("The chance you are victorious: {:.1}%.", odds * 100.0),
         );
     }
     if !any {
@@ -5998,7 +6002,7 @@ fn widgets_block(ui: &mut Ui, game: &Game, place: Place) {
     let makers = widget_makers(game, place);
     let breakdown = if makers.is_empty() { "nothing here makes any".to_string() } else { makers.iter().map(|(name, n)| format!("{n} from {name}")).collect::<Vec<_>>().join(", ") };
     let hover = format!(
-        "Widgets {rate} a turn here: {breakdown}.\nA Widget is one unit of work. Every build carries a Widget figure and completes at the Resolution its count reaches it; each turn this place's Widgets fill the earliest order under way here first and flow on to the next. What is not applied is lost: Widgets are never banked, traded or carried."
+        "Widgets {rate} a turn here: {breakdown}.\n{WIDGET_HOVER}"
     );
     rule_tip(icon_word(ui, "widgets", format!("Widgets {rate} a turn")), hover);
     for (b, turns) in game.queue_at(place).iter().zip(game.queue_estimates(place)) {
@@ -6029,9 +6033,7 @@ fn eye_block(ui: &mut Ui, session: &Session, game: &Game, place: Place) {
     let Some(holder) = game.place_control(place).director().map(|d| game.seat_name(d)) else { return };
     rule_tip(
         ui.label(RichText::new(format!("{} reads what the {holder} draw here, building by building:", eye_source(game, Seat(0), body))).strong()),
-        format!(
-            "A working Relay at a Colony of yours off Earth, or a working Embassy in a Region of yours on Earth, reads every rival's income at that Body building by building. The Faction window gives a rival's totals alone.\nOne is enough for the whole Body, and a Unique that does the job counts; mothballed or offline it reads nothing.\nThe figures are the {holder}' own, their Faction's multipliers and Techs in them."
-        ),
+        "A working Relay at your Colony off Earth, or Embassy in your Region on Earth, shows every rival's income at that Body, building by building; the Faction window gives totals only.".to_string(),
     );
     if read.is_empty() {
         ui.label(RichText::new("  Nothing stands here yet, so there is nothing to read.").weak());
@@ -6073,7 +6075,7 @@ fn eye_source(game: &Game, seat: Seat, body: BodyId) -> String {
 /// the player directs with its rate, its makers and its queue.
 fn widgets_bar_hover(game: &Game, made: i64, applied: i64) -> String {
     let mut lines = vec![format!(
-        "Widgets: {made} made a turn across the places you direct, {applied} applied at the last Resolution.\nA Widget is one unit of work, the second half of every build's price. Each place's Widgets go that same turn to the builds under way at that place, earliest order first, and what is not applied is lost: never banked, never traded."
+        "Widgets: {made} made a turn across the places you direct, {applied} applied at the last Resolution.\n{WIDGET_HOVER}"
     )];
     for place in directed_places(game, Seat(0)) {
         let rate = game.widgets_at(place);
@@ -7453,10 +7455,10 @@ This turn {:+.2}%: {:+.1} million.", c.population_growth * 100.0, c.population_l
             let t = &game.tables.standing_army;
             let tip = if a.standing {
                 let armed = game.state(sid).armed;
-                let police = if game.constabulary_online(sid) { format!(" +{} for the working Constabulary", t.constabulary) } else { format!(" +{} if a Constabulary were working here", t.constabulary) };
-                let calm = if game.army_replenishes(sid) { format!(", +{} while Unrest is under {:.0}", t.calm, game.tables.unrest.army_threshold) } else { format!(", +{} lost to Unrest at {:.0} or more", t.calm, game.tables.unrest.army_threshold) };
+                let police = if game.constabulary_online(sid) { format!(" +{} Constabulary", t.constabulary) } else { format!(" +{} if it had a Constabulary", t.constabulary) };
+                let calm = if game.army_replenishes(sid) { format!(", +{} calm", t.calm) } else { format!(", +{} lost to Unrest {:.0}+", t.calm, game.tables.unrest.army_threshold) };
                 format!(
-                    "A Region's own Army. Its strength and hit points are Industry Level + 1{}; it may march, and away from home it is an Army like any other. Defending at home, it fights at that{police}{calm}{}. It heals 1 a turn while Unrest is under {:.0}; at its strength in damage it is destroyed, and returns at strength 1 two Incomes later. A neutral Region arms for good, +{} when a threat appears next door and +{} for every attack it holds against, with no ceiling.",
+                    "A Region's own Army: strength and hit points Industry Level + 1{}. Defending at home:{police}{calm}{}.\nHeals 1 a turn while Unrest is under {:.0}. Destroyed at its strength in damage; back at 1 two Incomes later.\nNeutral, it arms for good: +{} at a threat next door, +{} per attack held.",
                     if armed > 0 { format!(" and +{armed} armed") } else { String::new() },
                     if game.army_dug_in(a) { format!(", +{} dug in", game.tables.dig_in.defence) } else { String::new() },
                     game.tables.unrest.army_threshold,
@@ -7871,7 +7873,7 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
             // Ticket #335 (version 0.09.0): a Blockade shuts the ORBIT it is given in, so a station
             // starves under a Blockade of its own ring and the ground starves under one in low
             // orbit; a stack blockading elsewhere at the Body starves nothing.
-            "A warship stack ordered to Blockade a station's own orbit starves that station; a Colony on the ground starves while one rival holds Orbital Control of low orbit outright and has a stack on Blockade in low orbit. Every Module makes nothing and pays its upkeep; nobody dies and nothing is destroyed. Each turn of it is an offence against you.",
+            "A warship stack on Blockade in a station's orbit starves it. A ground Colony starves while one rival alone holds Orbital Control of low orbit.\nStarved, every Module makes nothing and still pays upkeep; nobody dies, nothing is destroyed. Each turn is an offence against you.",
         );
     }
     // Ticket #359 (version 0.09.1): an occupied Habitat standing shut halves the Colony, and the
@@ -11277,7 +11279,7 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
             // Ticket #279 (version 0.08.5): war's own line, when there was one.
             if e.war > 0.0 {
                 ui.label(format!("War {:.1}", e.war)).on_hover_text(format!(
-                    "Last turn's Battles on Earth and in Earth orbit: {} ppm for every hit landed, worn as Blame by whoever landed it, and {} for every building burned when a place is taken by an Occupation that ran its three turns, worn by the taker. A Battle itself burns nothing, and a place Pacified is taken whole. A neutral Region's Army's hits are nobody's. It counts against a Stabilization run: a war a Faction chose is not the weather.",
+                    "Last turn's Battles on Earth and in its orbit: {} ppm per hit, Blame to whoever landed it; {} per building burned when a three-turn Occupation takes a place, Blame to the taker.\nA Battle itself burns nothing; a Pacified place is taken whole; a neutral Army's hits are nobody's.",
                     game.tables.climate.war_ppm_per_hit, game.tables.climate.war_ppm_per_building
                 ));
             }
