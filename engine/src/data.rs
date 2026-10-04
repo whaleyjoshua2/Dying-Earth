@@ -37,6 +37,12 @@ pub struct SlotCard {
     pub lat: f32,
 }
 
+/// Ticket #485 (version 0.09.8): a leg's Fuel -- its delta-v in km/s times the scale, to a tenth,
+/// a half rounding up.
+fn leg_fuel(delta_v: f64, per: f64) -> f64 {
+    (delta_v * per * 10.0 + 1e-6).round() / 10.0
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct BodyCard {
     pub id: BodyId,
@@ -57,10 +63,18 @@ pub struct BodyCard {
     pub parent: Option<BodyId>,
     #[serde(default)]
     pub local_turns: u32,
+    /// Ticket #485 (version 0.09.8): a leg's Fuel is its real delta-v, in km/s, times the one
+    /// scale `fuel_per_delta_v`. The two delta-v figures are the data; the two Fuel figures are
+    /// worked out from them when the tables load, to a tenth.
     #[serde(default)]
-    pub local_fuel: i64,
+    pub local_delta_v: f64,
+    #[serde(skip)]
+    pub local_fuel: f64,
     pub transit_turns: u32,
-    pub transit_fuel: i64,
+    #[serde(default)]
+    pub transit_delta_v: f64,
+    #[serde(skip)]
+    pub transit_fuel: f64,
     /// Ticket #92 (version 0.06.0): a small world, where a Mass Driver may stand.
     #[serde(default)]
     pub low_gravity: bool,
@@ -1484,14 +1498,16 @@ struct BodiesFile {
     body: Vec<BodyCard>,
     #[serde(default = "one_u32")]
     sibling_turns: u32,
-    #[serde(default = "one_i64")]
-    sibling_fuel: i64,
+    /// Ticket #485 (version 0.09.8): the Fuel a km/s of delta-v costs, and the three legs that
+    /// are not a Body's own: between two satellites of one parent, and to or from a far orbit.
+    fuel_per_delta_v: f64,
+    sibling_delta_v: f64,
     /// Ticket #335 (version 0.09.0): what an orbit change costs from the Ship's own tank.
     #[serde(default = "one_i64")]
     orbit_change_fuel: i64,
     /// Ticket #480 (version 0.09.8): what a move to or from a far orbit costs from the tank.
     #[serde(default)]
-    far_orbit_fuel: i64,
+    far_orbit_delta_v: f64,
     #[serde(default = "forty")]
     station_materials: i64,
     /// Ticket #57: how far a Colony Slot's own yields may fall either side of its Body's.
@@ -1914,10 +1930,11 @@ pub struct TutorialTable {
 pub struct Tables {
     pub bodies: Vec<BodyCard>,
     /// Ticket #45: the hop between two satellites of the same Body.
-    pub sibling_transit: (u32, i64),
+    pub sibling_transit: (u32, f64),
+    pub fuel_per_delta_v: f64,
     /// Ticket #335 (version 0.09.0): the Fuel an orbit change takes from a Ship's own tank.
     pub orbit_change_fuel: i64,
-    pub far_orbit_fuel: i64,
+    pub far_orbit_fuel: f64,
     /// Ticket #46: what a station costs.
     pub station_materials: i64,
     /// Ticket #57: how far a Colony Slot's own four yields may fall either side of its Body's.
@@ -2046,7 +2063,12 @@ fn err(file: &str, message: impl Into<String>) -> DataError {
 impl Tables {
     /// Load every table from a directory (normally `assets/data`).
     pub fn load(dir: &Path) -> Result<Tables, DataError> {
-        let bodies: BodiesFile = read(dir, "bodies.toml")?;
+        let mut bodies: BodiesFile = read(dir, "bodies.toml")?;
+        // Ticket #485 (version 0.09.8): each leg's Fuel from its delta-v and the one scale.
+        for b in &mut bodies.body {
+            b.transit_fuel = leg_fuel(b.transit_delta_v, bodies.fuel_per_delta_v);
+            b.local_fuel = leg_fuel(b.local_delta_v, bodies.fuel_per_delta_v);
+        }
         let states: StatesFile = read(dir, "nation_states.toml")?;
         let facilities: FacilitiesFile = read(dir, "facilities.toml")?;
         let modules: ModulesFile = read(dir, "modules.toml")?;
@@ -2065,9 +2087,10 @@ impl Tables {
         let ship_names: ShipNames = read(dir, "ship_names.toml")?;
         let tables = Tables {
             ship_names,
-            sibling_transit: (bodies.sibling_turns, bodies.sibling_fuel),
+            sibling_transit: (bodies.sibling_turns, leg_fuel(bodies.sibling_delta_v, bodies.fuel_per_delta_v)),
+            fuel_per_delta_v: bodies.fuel_per_delta_v,
             orbit_change_fuel: bodies.orbit_change_fuel,
-            far_orbit_fuel: bodies.far_orbit_fuel,
+            far_orbit_fuel: leg_fuel(bodies.far_orbit_delta_v, bodies.fuel_per_delta_v),
             station_materials: bodies.station_materials,
             slot_yield_spread: bodies.slot_yield_spread,
             planets: ephemeris.planet,

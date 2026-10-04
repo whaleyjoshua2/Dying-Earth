@@ -677,16 +677,16 @@ fn phobos_and_deimos_are_small_different_bodies_one_hop_past_mars() {
     let mut g = g;
     at_window(&mut g);
     // Ticket #67 (version 0.05.5): the Hohmann flight is five turns of sixty days.
-    assert_eq!(g.transit_cost(BodyId::Earth, BodyId::Phobos), (5, 24.0));
-    assert_eq!(g.transit_cost(BodyId::Moon, BodyId::Deimos), (5, 24.0));
-    assert_eq!(g.transit_cost(BodyId::Mars, BodyId::Phobos), (1, 2.0));
-    assert_eq!(g.transit_cost(BodyId::Deimos, BodyId::Mars), (1, 2.0));
-    assert_eq!(g.transit_cost(BodyId::Phobos, BodyId::Deimos), (1, 1.0));
-    assert_eq!(g.transit_cost(BodyId::Earth, BodyId::Mars), (5, 20.0));
-    assert_eq!(g.transit_cost(BodyId::Moon, BodyId::Mars), (5, 20.0));
-    assert_eq!(g.transit_cost(BodyId::Earth, BodyId::Moon), (1, 6.0));
+    assert_eq!(g.transit_cost(BodyId::Earth, BodyId::Phobos), (5, 22.1));
+    assert_eq!(g.transit_cost(BodyId::Moon, BodyId::Deimos), (5, 22.5));
+    assert_eq!(g.transit_cost(BodyId::Mars, BodyId::Phobos), (1, 5.4));
+    assert_eq!(g.transit_cost(BodyId::Deimos, BodyId::Mars), (1, 7.7));
+    assert_eq!(g.transit_cost(BodyId::Phobos, BodyId::Deimos), (1, 3.4));
+    assert_eq!(g.transit_cost(BodyId::Earth, BodyId::Mars), (5, 20.7));
+    assert_eq!(g.transit_cost(BodyId::Moon, BodyId::Mars), (5, 20.7));
+    assert_eq!(g.transit_cost(BodyId::Earth, BodyId::Moon), (1, 18.0));
     // The flight home reads the same cards, at its own window, which is not the same turn: the
-    // moons' 24 against Mars's 20, both stretched by however far off that window the best turn in
+    // moons' 22.1 and 22.5 against Mars's 20.7, both stretched by however far off that window the best turn in
     // the game's span falls. The window arithmetic itself is pinned by the ticket #57 tests.
     at_return_window(&mut g);
     let (moon_turns, from_deimos) = g.transit_cost(BodyId::Deimos, BodyId::Earth);
@@ -1342,10 +1342,10 @@ fn tech_efficient_transit_cuts_fuel() {
     let mut g = game();
     // Ticket #57: on the window a crossing pays the card's Fuel, and Efficient Transit comes after.
     at_window(&mut g);
-    assert_eq!(g.transit_cost(BodyId::Earth, BodyId::Mars).1, 20.0);
+    assert_eq!(g.transit_cost(BodyId::Earth, BodyId::Mars).1, 20.7);
     with_tech(&mut g, TechId::EfficientTransit);
-    assert_eq!(g.transit_cost(BodyId::Earth, BodyId::Mars).1, 12.0);
-    assert_eq!(g.transit_cost(BodyId::Moon, BodyId::Earth).1, 3.6, "6 x 0.6, to the tenth"); // Ticket #387: where 3 was floored
+    assert_eq!(g.transit_cost(BodyId::Earth, BodyId::Mars).1, 12.4);
+    assert_eq!(g.transit_cost(BodyId::Moon, BodyId::Earth).1, 10.8, "18 x 0.6, to the tenth"); // Ticket #387: where 3 was floored
 }
 
 #[test]
@@ -2139,10 +2139,10 @@ fn an_arkwright_pays_half_for_a_station_and_three_quarters_for_a_module() {
     // Transit Fuel too: three quarters, then Efficient Transit on top of that. Ticket #57: on the
     // window the crossing pays the card's Fuel, and both multipliers apply after the window factor.
     at_window(&mut g);
-    assert_eq!(g.transit_cost_for(Seat(0), BodyId::Earth, BodyId::Mars).1, 20.0);
-    assert_eq!(g.transit_cost_for(Seat(2), BodyId::Earth, BodyId::Mars).1, 15.0);
+    assert_eq!(g.transit_cost_for(Seat(0), BodyId::Earth, BodyId::Mars).1, 20.7);
+    assert_eq!(g.transit_cost_for(Seat(2), BodyId::Earth, BodyId::Mars).1, 15.5);
     g.research.done.push(TechId::EfficientTransit);
-    assert_eq!(g.transit_cost_for(Seat(2), BodyId::Earth, BodyId::Mars).1, 9.0, "20 x 0.75 x 0.6");
+    assert_eq!(g.transit_cost_for(Seat(2), BodyId::Earth, BodyId::Mars).1, 9.3, "20.7 x 0.75 x 0.6, to the tenth");
 }
 
 #[test]
@@ -5059,7 +5059,7 @@ fn the_first_mars_window_falls_where_the_real_one_of_early_2031_does() {
 fn a_crossing_costs_the_hohmann_flight_at_the_window_and_more_away_from_it() {
     let mut g = game();
     let tr = g.tables.transit.clone();
-    let card_fuel = g.tables.body(BodyId::Mars).transit_fuel as f64;
+    let card_fuel = g.tables.body(BodyId::Mars).transit_fuel;
     let window = g.next_window_turn(1);
     let hohmann = (tr.days_at_window / tr.days_per_turn).ceil() as u32;
     // Ticket #67 (version 0.05.5): a turn is sixty days, so the same flight is five turns, and the
@@ -5101,12 +5101,12 @@ fn earth_moon_and_mars_system_hops_are_untouched_by_the_window() {
     let mut g = game();
     let cycle = (g.tables.transit.synodic_days / g.tables.transit.days_per_turn).ceil() as u32 + 1;
     let hops = [
-        ((BodyId::Earth, BodyId::Moon), (1u32, 6.0)),
-        ((BodyId::Moon, BodyId::Earth), (1, 6.0)),
-        ((BodyId::Mars, BodyId::Phobos), (1, 2.0)),
-        ((BodyId::Phobos, BodyId::Mars), (1, 2.0)),
-        ((BodyId::Phobos, BodyId::Deimos), (1, 1.0)),
-        ((BodyId::Deimos, BodyId::Phobos), (1, 1.0)),
+        ((BodyId::Earth, BodyId::Moon), (1u32, 18.0)),
+        ((BodyId::Moon, BodyId::Earth), (1, 18.0)),
+        ((BodyId::Mars, BodyId::Phobos), (1, 5.4)),
+        ((BodyId::Phobos, BodyId::Mars), (1, 5.4)),
+        ((BodyId::Phobos, BodyId::Deimos), (1, 3.4)),
+        ((BodyId::Deimos, BodyId::Phobos), (1, 3.4)),
     ];
     for t in 1..=cycle {
         g.turn = t;
@@ -5927,6 +5927,33 @@ fn the_prospectors_pay_fifteen_percent_less_for_facilities_and_modules_and_nothi
     assert_eq!(g.order_cost(pro, &Order::BuildModuleWithDucats { colony: moon, kind: ModuleKind::Habitat }).ducats, 36.2, "21.3 x 2 = 42.6, x 0.85 = 36.21"); // Ticket #387: where 35 was floored
     assert_eq!(g.order_cost(pro, &Order::BuildStation { body: BodyId::Moon, slot: 0 }).materials, 40.0, "a Space Station is not a building of theirs to discount");
     assert_eq!(g.order_cost(pro, &Order::RaiseIndustry { state: StateId::Europe }).materials, 15.0, "Cheap Industry is its own clause");
+}
+
+/// Ticket #485 (version 0.09.8): **a leg's Fuel is its real delta-v times one scale.** Each leg
+/// carries its delta-v in km/s, aerobraking as flown where there is air, and costs 4.5 Fuel a km/s,
+/// to a tenth, the same both ways. The tanks are unchanged, and every leg from Earth fits one.
+#[test]
+fn a_legs_fuel_is_its_real_delta_v_times_the_scale() {
+    let mut g = game();
+    at_window(&mut g);
+    assert_eq!(g.tables.fuel_per_delta_v, 4.5);
+    for (body, delta_v, fuel) in [(BodyId::Moon, 4.0, 18.0), (BodyId::Venus, 4.4, 19.8), (BodyId::Mars, 4.6, 20.7), (BodyId::Phobos, 4.9, 22.1), (BodyId::Deimos, 5.0, 22.5)] {
+        let card = g.tables.body(body);
+        assert_eq!((card.transit_delta_v, card.transit_fuel), (delta_v, fuel), "{body:?} from Earth");
+        assert!(fuel <= g.tank_of(Seat(0), UnitKind::Frigate), "{body:?} is within a tank of {}", g.tank_of(Seat(0), UnitKind::Frigate));
+    }
+    assert_eq!((g.tables.body(BodyId::Phobos).local_delta_v, g.tables.body(BodyId::Deimos).local_delta_v), (1.2, 1.7));
+    assert_eq!((g.tables.sibling_transit.1, g.tables.far_orbit_fuel), (3.4, 18.0), "Phobos to Deimos at 0.75 km/s; a far orbit at the Moon's 4.0");
+    // The same both ways.
+    for (a, b, fuel) in [(BodyId::Earth, BodyId::Moon, 18.0), (BodyId::Earth, BodyId::Mars, 20.7), (BodyId::Mars, BodyId::Phobos, 5.4), (BodyId::Mars, BodyId::Deimos, 7.7), (BodyId::Phobos, BodyId::Deimos, 3.4)] {
+        assert_eq!(g.transit_cost(a, b).1, fuel, "{a:?} to {b:?}");
+        if a != BodyId::Earth || b == BodyId::Moon {
+            assert_eq!(g.transit_cost(b, a).1, fuel, "{b:?} to {a:?}");
+        }
+    }
+    let window = g.next_venus_window_turn(1);
+    assert_eq!(g.transit_cost_at(BodyId::Earth, BodyId::Venus, window).1, 19.8);
+    assert_eq!((g.tank_of(Seat(0), UnitKind::ColonyShip), g.tank_of(Seat(0), UnitKind::Frigate)), (35.0, 30.0), "the tanks are as they were");
 }
 
 /// Ticket #479 (version 0.09.8): **Raise Industry Level costs more each time.** 30 Materials and 4
@@ -7025,9 +7052,9 @@ fn a_transit_spends_the_tank_and_is_refused_when_the_tank_cannot_pay() {
     g.seats[0].stockpile.fuel = 0.0;
     let to_mars = Order::Transit { ship, to: BodyId::Mars, slot: None };
     assert_eq!(g.order_cost(Seat(0), &to_mars).fuel, 0.0, "the Stockpile pays nothing");
-    assert!(g.check_order(Seat(0), &[], &to_mars).is_ok(), "20 of the 30 in the tank");
+    assert!(g.check_order(Seat(0), &[], &to_mars).is_ok(), "20.7 of the 30 in the tank");
     g.commit_orders(Seat(0), std::slice::from_ref(&to_mars));
-    assert_eq!(g.ship(ship).unwrap().fuel, 10.0, "30 - 20");
+    assert_eq!(g.ship(ship).unwrap().fuel, 9.3, "30 - 20.7");
     assert_eq!(g.seats[0].stockpile.fuel, 0.0);
     let (poor, _) = colony_ship_ready(&mut g, BodyId::Earth);
     g.ship_mut(poor).unwrap().fuel = 5.0;
@@ -7313,16 +7340,16 @@ fn a_mass_driver_cuts_the_owners_departures_by_four_and_gives_its_mines_one_more
     at_window(&mut g);
     let cus = Seat(0);
     let moon = colony(&mut g, cus, BodyId::Moon, &[ModuleKind::Mine, ModuleKind::MassDriver], 0);
-    assert_eq!(g.transit_cost_for(cus, BodyId::Moon, BodyId::Earth).1, 2.0, "6 - 4");
-    assert_eq!(g.transit_cost_for(cus, BodyId::Moon, BodyId::Mars).1, 16.0, "20 - 4");
-    assert_eq!(g.transit_cost_for(cus, BodyId::Earth, BodyId::Moon).1, 6.0, "arriving is not departing");
-    assert_eq!(g.transit_cost_for(Seat(1), BodyId::Moon, BodyId::Earth).1, 6.0, "a rival pays the leg");
+    assert_eq!(g.transit_cost_for(cus, BodyId::Moon, BodyId::Earth).1, 14.0, "18 - 4");
+    assert_eq!(g.transit_cost_for(cus, BodyId::Moon, BodyId::Mars).1, 16.7, "20.7 - 4");
+    assert_eq!(g.transit_cost_for(cus, BodyId::Earth, BodyId::Moon).1, 18.0, "arriving is not departing");
+    assert_eq!(g.transit_cost_for(Seat(1), BodyId::Moon, BodyId::Earth).1, 18.0, "a rival pays the leg");
     let ark = Seat(2);
     colony(&mut g, ark, BodyId::Moon, &[ModuleKind::MassDriver], 0);
-    assert_eq!(g.transit_cost_for(ark, BodyId::Moon, BodyId::Earth).1, 1.0, "6 x 0.75 = 4.0, - 4, minimum 1");
+    assert_eq!(g.transit_cost_for(ark, BodyId::Moon, BodyId::Earth).1, 9.5, "18 x 0.75 = 13.5, - 4");
     assert_eq!(g.module_yield(cus, moon, ModuleKind::Mine).amount, 7.6, "4 x 1.65 = 6.6, +1"); // Ticket #387: to the tenth, where 6 was floored
     g.colony_mut(moon).unwrap().modules[1].mothballed = true;
-    assert_eq!(g.transit_cost_for(cus, BodyId::Moon, BodyId::Earth).1, 6.0, "mothballed, it throws nothing");
+    assert_eq!(g.transit_cost_for(cus, BodyId::Moon, BodyId::Earth).1, 18.0, "mothballed, it throws nothing");
     assert_eq!(g.module_yield(cus, moon, ModuleKind::Mine).amount, 6.6); // Ticket #387
 }
 
@@ -7374,9 +7401,9 @@ fn venus_is_a_body_of_orbits_only_with_its_own_window() {
     let w2 = g.next_venus_window_turn(w1 + 1);
     let w3 = g.next_venus_window_turn(w2 + 1);
     assert_eq!((w1, w2, w3), (9, 18, 28), "the research note's windows");
-    assert_eq!(g.transit_cost_at(BodyId::Earth, BodyId::Venus, w1), (3, 16.0), "three turns and the card's Fuel on the window");
+    assert_eq!(g.transit_cost_at(BodyId::Earth, BodyId::Venus, w1), (3, 19.8), "three turns and the card's Fuel on the window");
     let (turns_off, fuel_off) = g.transit_cost_at(BodyId::Earth, BodyId::Venus, w1 + 4);
-    assert!(turns_off > 3 && fuel_off > 16.0, "off the window both rise: {turns_off} turns, {fuel_off} Fuel");
+    assert!(turns_off > 3 && fuel_off > 19.8, "off the window both rise: {turns_off} turns, {fuel_off} Fuel");
     assert!(g.crossing_offset(BodyId::Earth, BodyId::Venus, w1).is_some());
     assert!(g.crossing_offset(BodyId::Venus, BodyId::Earth, w1).is_some());
     assert!(g.crossing_offset(BodyId::Earth, BodyId::Mars, w1).is_some(), "Mars's window is untouched");
@@ -7427,7 +7454,7 @@ fn earth_l4_and_l5_are_far_orbits_reached_only_by_ship() {
     let mut g = game();
     g.seats[0].stockpile.materials = 300.0;
     let earth = g.tables.body(BodyId::Earth);
-    assert_eq!((earth.orbital_slots, earth.far_slots, g.tables.far_orbit_fuel), (7, 2, 8));
+    assert_eq!((earth.orbital_slots, earth.far_slots, g.tables.far_orbit_fuel), (7, 2, 18.0));
     assert_eq!([g.station_name(BodyId::Earth, 5), g.station_name(BodyId::Earth, 6)], ["Earth L4", "Earth L5"]);
     assert!(g.far_slot(BodyId::Earth, 5) && g.far_slot(BodyId::Earth, 6) && !g.far_slot(BodyId::Earth, 4) && !g.far_slot(BodyId::Earth, 7));
     assert!(BodyId::ALL.iter().filter(|b| **b != BodyId::Earth).all(|b| g.tables.body(*b).far_slots == 0), "Earth alone has far orbits");
@@ -7438,9 +7465,9 @@ fn earth_l4_and_l5_are_far_orbits_reached_only_by_ship() {
     assert!(err.contains("only by Ship"), "{err}");
     // The fares: 1 between ordinary orbits, 8 wherever a far orbit is an end.
     assert_eq!(g.orbit_change_cost(BodyId::Earth, Orbit::Low, Orbit::Slot(0)), 1.0);
-    assert_eq!(g.orbit_change_cost(BodyId::Earth, Orbit::Low, Orbit::Slot(5)), 8.0);
-    assert_eq!(g.orbit_change_cost(BodyId::Earth, Orbit::Slot(5), Orbit::Slot(6)), 8.0);
-    assert_eq!(g.orbit_change_cost(BodyId::Earth, Orbit::Slot(6), Orbit::Slot(0)), 8.0);
+    assert_eq!(g.orbit_change_cost(BodyId::Earth, Orbit::Low, Orbit::Slot(5)), 18.0);
+    assert_eq!(g.orbit_change_cost(BodyId::Earth, Orbit::Slot(5), Orbit::Slot(6)), 18.0);
+    assert_eq!(g.orbit_change_cost(BodyId::Earth, Orbit::Slot(6), Orbit::Slot(0)), 18.0);
     // A Colony Ship in low orbit: an ordinary slot is not founded into, and a far one wants the move first.
     let (ship, _) = colony_ship_ready(&mut g, BodyId::Earth);
     let into = |n: u32| Order::Unload { ship, colonists: 4, army: false, into: UnloadTarget::Ring(BodyId::Earth, n) };
@@ -7449,17 +7476,17 @@ fn earth_l4_and_l5_are_far_orbits_reached_only_by_ship() {
     let crossing = g.transit_cost_for(Seat(0), BodyId::Earth, BodyId::Moon).1;
     assert_eq!(g.transit_fuel(Seat(0), g.ship(ship).unwrap(), BodyId::Earth, BodyId::Moon, None), crossing, "from low orbit, the crossing alone");
     g.commit_orders(Seat(0), &[Order::ChangeOrbit { ship, slot: Some(5) }]);
-    assert_eq!(g.ship(ship).unwrap().fuel, 32.0, "8 Fuel from the tank of 40");
+    assert_eq!(g.ship(ship).unwrap().fuel, 22.0, "18 Fuel from the tank of 40");
     g.resolution_phase();
     assert_eq!(g.ship(ship).unwrap().slot, Some(5));
     g.ships.iter_mut().for_each(|s| s.arrived_this_turn = false);
     // Leaving a far orbit for another Body pays the far figure on top; so does naming one to arrive in.
-    assert_eq!(g.transit_fuel(Seat(0), g.ship(ship).unwrap(), BodyId::Earth, BodyId::Moon, None), crossing + 8.0);
+    assert_eq!(g.transit_fuel(Seat(0), g.ship(ship).unwrap(), BodyId::Earth, BodyId::Moon, None), crossing + 18.0);
     let back = g.transit_cost_for(Seat(0), BodyId::Moon, BodyId::Earth).1;
     let mut away = g.ship(ship).unwrap().clone();
     away.at = ShipAt::Body(BodyId::Moon);
     away.slot = None;
-    assert_eq!(g.transit_fuel(Seat(0), &away, BodyId::Moon, BodyId::Earth, Some(6)), back + 8.0);
+    assert_eq!(g.transit_fuel(Seat(0), &away, BodyId::Moon, BodyId::Earth, Some(6)), back + 18.0);
     assert_eq!(g.transit_fuel(Seat(0), &away, BodyId::Moon, BodyId::Earth, Some(0)), back);
     // Founded from its own orbit: a Core and the Colonists aboard, no Materials.
     let materials = g.seats[0].stockpile.materials;
@@ -7515,10 +7542,10 @@ fn the_ai_founds_at_a_far_orbit_once_the_ordinary_slots_are_taken() {
     let orders = board(true, Some(5), 3.0).ai_orders(Seat(0));
     assert!(orders.iter().any(|o| matches!(o, Order::Unload { into: UnloadTarget::Ring(BodyId::Earth, 5), .. })), "no station founded at Earth L4: {orders:?}");
     // In low orbit with the tank to reach it and no other Body in reach: it goes out to found.
-    let orders = board(true, None, 8.0).ai_orders(Seat(0));
+    let orders = board(true, None, 18.0).ai_orders(Seat(0));
     assert!(orders.iter().any(|o| matches!(o, Order::ChangeOrbit { slot: Some(5), .. })), "it does not go out to Earth L4: {orders:?}");
     // While an ordinary slot stands free, neither.
-    for (slot, fuel) in [(Some(5), 3.0), (None, 8.0)] {
+    for (slot, fuel) in [(Some(5), 3.0), (None, 18.0)] {
         let orders = board(false, slot, fuel).ai_orders(Seat(0));
         assert!(!orders.iter().any(far), "a far orbit is for when the five are taken: {orders:?}");
     }
@@ -8647,7 +8674,7 @@ fn an_order_after_a_launch_rearm_or_bombard_is_refused() {
     let iss = g.colonies.iter().find(|c| c.in_orbit && c.body == BodyId::Earth && c.control.director() == Some(Seat(0))).map(|c| c.slot).expect("the ISS");
     let ship = carrier_in(&mut g, Seat(0), BodyId::Earth, Some(iss), true);
     g.seats[0].stockpile.fuel = 100.0;
-    g.ship_mut(ship).unwrap().fuel = 10.0;
+    g.ship_mut(ship).unwrap().fuel = 20.0;
     // Each of the three is lawful on its own, so a refusal can only be the one-order rule.
     for t in [Order::ChangeOrbit { ship, slot: None }, Order::Transit { ship, to: BodyId::Moon, slot: None }, Order::Refuel { ship }] {
         assert!(g.check_order(Seat(0), &[], &t).is_ok(), "{t:?} alone is lawful");

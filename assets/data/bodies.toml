@@ -1,23 +1,31 @@
 # Spec section 4.1. Yields multiply what a Module produces, never what it costs.
-# transit_turns and transit_fuel are from Earth (the Moon counts as Earth for reach). A Body with a
-# parent is that parent's satellite: local_turns and local_fuel are the hop between them, and two
-# satellites of the same parent are sibling_turns and sibling_fuel apart (ticket #45).
+# transit_turns and transit_delta_v are from Earth (the Moon counts as Earth for reach). A Body with a
+# parent is that parent's satellite: local_turns and local_delta_v are the hop between them, and two
+# satellites of the same parent are sibling_turns and sibling_delta_v apart (ticket #45).
 # Every Colony Slot is a real place on its Body, at its approximate longitude and latitude (east
 # positive), and a Colony there takes its name (ticket #45).
 
 sibling_turns = 1
-sibling_fuel = 1
+# Ticket #485 (version 0.09.8): **a leg's Fuel is its real delta-v times one scale.** Every leg below
+# carries its delta-v in km/s, orbit to orbit, from `docs/research/delta-v.md`: a Ship brakes on air
+# where there is air, as missions have flown it -- a burn into a loose orbit, then months of passes
+# through the upper air (Mars, Venus, and a little at Phobos; none at the Moon or Deimos). A leg costs
+# the same both ways. The scale is the designer's: Mars at about 20, rounded up to 4.5 Fuel a km/s.
+# Phobos to Deimos is 0.75 km/s.
+fuel_per_delta_v = 4.5
+sibling_delta_v = 0.75
 # Ticket #335 (version 0.09.0): moving a Ship between two orbits of one Body -- low orbit and the
 # Orbital Slots -- is an order costing this much Fuel from the Ship's own tank, the sibling hop's
 # figure at the designer's word. Refused below it.
 orbit_change_fuel = 1
 # Ticket #480 (version 0.09.8): a FAR ORBIT -- Earth's L4 and L5 -- is farther out. A move to or from
-# one costs this much Fuel from the tank and a turn, from any other orbit of its Body; a leg between
+# one costs its delta-v in Fuel from the tank and a turn, from any other orbit of its Body; a leg between
 # Bodies pays it on top of the crossing for a far orbit it leaves and for one it names to arrive in.
 # A far orbit is reached only by Ship: its station is founded by a Colony Ship in it, as at Venus,
 # never built from a Launch Site, and no lift reaches it. A Body's `far_slots` are the LAST that many
 # of its Orbital Slots.
-far_orbit_fuel = 8
+# Ticket #485: 4.0 km/s, the Moon's figure, where a flat 8 Fuel stood.
+far_orbit_delta_v = 4.0
 # Version 0.04 (ticket #46): a Space Station is built for this many Materials into a free orbital
 # slot, from a Nation State with a Launch Site (over Earth) or a Colony (elsewhere); no crew needed.
 # It holds only a Shipyard and Habitats. Ships are built only at Shipyards. Each Body names its
@@ -52,7 +60,7 @@ first_windfall = 0
 # Earth with no transit. Cold and Fuel-leaning: good for Refineries, poor for Habitats and Generators.
 # Its Colonists live on Earth (no Off-world Presence) and its Modules emit like Facilities.
 transit_turns = 0
-transit_fuel = 0
+transit_delta_v = 0.0
 # Ticket #397 (version 0.09.3): what a Trade Post anywhere is paid a turn for the Faction holding
 # this Body (a Colony, a station or, on Earth, a Region), by its distance from Earth: the designer's
 # Earth 3, the Moon 3.5, Venus 4, Mars 5, Phobos 6, Deimos 6, where a flat 3 stood for every Body.
@@ -80,9 +88,9 @@ low_gravity = true
 name = "the Moon"
 parent = "earth"
 local_turns = 1
-local_fuel = 6
+local_delta_v = 4.0
 transit_turns = 1
-transit_fuel = 6
+transit_delta_v = 4.0
 trade_pays = 3.5
 # Ticket #72 (version 0.05.5): all four up a tenth (1.5, 1.25, 0.5, 1.0 before).
 mine_yield = 1.65
@@ -104,7 +112,7 @@ id = "mars"
 name = "Mars"
 first_windfall = 15
 transit_turns = 4
-transit_fuel = 20
+transit_delta_v = 4.6
 trade_pays = 5
 mine_yield = 1.25
 generator_yield = 0.75
@@ -131,9 +139,9 @@ low_gravity = true
 name = "Phobos"
 parent = "mars"
 local_turns = 1
-local_fuel = 2
+local_delta_v = 1.2
 transit_turns = 5
-transit_fuel = 24
+transit_delta_v = 4.9
 trade_pays = 6
 mine_yield = 1.75
 generator_yield = 0.75
@@ -153,9 +161,9 @@ low_gravity = true
 name = "Deimos"
 parent = "mars"
 local_turns = 1
-local_fuel = 2
+local_delta_v = 1.7
 transit_turns = 5
-transit_fuel = 24
+transit_delta_v = 5.0
 trade_pays = 6
 mine_yield = 1.0
 generator_yield = 1.0
@@ -179,7 +187,7 @@ name = "Venus"
 # Venus is given ground.
 first_windfall = 0
 transit_turns = 3
-transit_fuel = 16
+transit_delta_v = 4.4
 trade_pays = 4
 mine_yield = 1.0
 generator_yield = 1.0

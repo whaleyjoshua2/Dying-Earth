@@ -3917,13 +3917,13 @@ impl Game {
     /// Ticket #480: what a move between two orbits of one Body costs from the tank: the far
     /// figure where either end is a far orbit, else the plain orbit change.
     pub fn orbit_change_cost(&self, body: BodyId, from: Orbit, to: Orbit) -> f64 {
-        if self.far_orbit(body, from) || self.far_orbit(body, to) { self.tables.far_orbit_fuel as f64 } else { self.tables.orbit_change_fuel as f64 }
+        if self.far_orbit(body, from) || self.far_orbit(body, to) { self.tables.far_orbit_fuel } else { self.tables.orbit_change_fuel as f64 }
     }
 
     /// Ticket #480: what a leg between Bodies costs this Ship: the crossing, and the far figure
     /// again for a far orbit it leaves and for a far orbit it names to arrive in.
     pub fn transit_fuel(&self, seat: Seat, s: &Ship, from: BodyId, to: BodyId, slot: Option<u32>) -> f64 {
-        let far = self.tables.far_orbit_fuel as f64;
+        let far = self.tables.far_orbit_fuel;
         let leaving = if self.far_orbit(from, self.ship_orbit(s)) { far } else { 0.0 };
         let arriving = if self.far_orbit(to, Orbit::of(slot)) { far } else { 0.0 };
         self.transit_cost_for(seat, from, to).1 + leaving + arriving
@@ -4305,11 +4305,11 @@ impl Game {
         // angle stands from it; the Faction multiplier and Efficient Transit apply after.
         // Ticket #93: the crossing names its own transfer table, Mars's or Venus's.
         let (turns, fuel) = match self.crossing(from, to, turn) {
-            None => (turns, fuel as f64),
+            None => (turns, fuel),
             Some((offset, tr)) => {
                 let days = (tr.days_at_window + tr.days_per_degree * offset.abs()) * days_factor;
                 let turns = ((days / tr.days_per_turn).ceil() as u32).clamp(1, tr.max_turns);
-                (turns, fuel as f64 * (1.0 + tr.fuel_per_degree * offset.abs()))
+                (turns, fuel * (1.0 + tr.fuel_per_degree * offset.abs()))
             }
         };
         // Ticket #387 (version 0.09.3): to the tenth, where it was rounded down.

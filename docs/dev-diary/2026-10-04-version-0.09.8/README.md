@@ -174,3 +174,32 @@ then *"they don't even have to be plain markers"*. They are not on that map at a
 Colony Ship at Earth has nothing better to do, which is rare.
 
 Not pictured: the Ship card's "To Earth L4" door and its 8 Fuel; the greyed lift.
+
+## Fuel scaled to real delta-v (#485)
+
+Added by the designer during the L4 ticket: *"add a ticket to scale fuel requirements with real life
+delta v requirements"*.
+
+**The research** is [`docs/research/delta-v.md`](../../research/delta-v.md), done by an agent in two
+passes. The first found that with full aerocapture the real cost from Earth orbit is nearly the same
+everywhere, Mars and Venus cheaper than the Moon. The designer: *"seems an over estimate if erases
+any delta-v differences from the moon"*. It was the optimistic end: aerocapture has never been
+flown. The second pass priced **aerobraking as flown**, checked against mission records (Mars
+Reconnaissance Orbiter's capture burn 1,015 m/s, Venus Express's 1,251 m/s), and that is what the
+game uses. My remembered Venus figure of 4.8 was wrong; like for like it is 4.4.
+
+**The scale.** Three candidates were swept with whole-number Fuel before the designer chose (the
+Moon kept at 6, Mars kept at 20, and between); all three were within noise of the standing win
+column. The designer took Mars at 20, rounded up to 4.5 Fuel a km/s.
+
+**Witnessed red:** the change itself turned ten older tests red, each quoting an old price; they
+were re-based one figure at a time. The new test `a_legs_fuel_is_its_real_delta_v_times_the_scale`
+was run with the scale at 4.0 and failed (`left: 4.0, right: 4.5`).
+
+**A Colony Ship's card at Earth**, turn 4 (`stack:earth ship:1`): the Moon at 18, the far orbits at
+18, and Mars and Venus off their windows past a full tank.
+
+![a Colony Ship's doors at the new prices](ticket-485/ship-card.png)
+
+**The sweep** ([`after-485.txt`](sweeps/after-485.txt)): 8 / 21 / 17 / 1 and 33 collapses, from
+8 / 19 / 17 / 3 and 33. Within noise. Ships stranded at the end of a game: 13 over the 80, from 3.
