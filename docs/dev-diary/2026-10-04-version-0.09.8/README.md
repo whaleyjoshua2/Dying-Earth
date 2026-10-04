@@ -91,3 +91,13 @@ took the red. The tile's words and dashes wear it, dimmed where the order would 
 
 Not pictured: the raise under way across a turn ("building,
 2 of 4"), which needs a Region making fewer than 4 Widgets a turn.
+
+## The tutorial, 10% fewer words (#477)
+
+462 words to 398. The designer approved the seven cuts as a before-and-after table on the ticket,
+and declined a tested ceiling: *"nah we need some flexibility here"*.
+
+The four notes that changed, as the game draws them (`menus:1 tutorial:<turn> seed:7`): turns 1 and
+2 above, 3 and 5 below.
+
+![the four changed tutorial notes](ticket-477/notes.png)

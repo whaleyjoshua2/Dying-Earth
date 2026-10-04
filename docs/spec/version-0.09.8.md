@@ -86,3 +86,18 @@ The authority is [ticket #476](https://github.com/whaleyjoshua2/Dying-Earth/issu
 - The Widgets queue line for a raise stays. No rule moves, and nothing a computer seat reads.
 
 **Pictures:** [`ticket-476/`](../dev-diary/2026-10-04-version-0.09.8/ticket-476/).
+
+## 4. The tutorial, 14% fewer words
+
+The authority is [ticket #477](https://github.com/whaleyjoshua2/Dying-Earth/issues/477).
+
+- **The tutorial's seven notes hold 398 words, where they held 462**, counted as the words of each
+  note's heading, text and quieter line. The designer asked for 10% off, which is 415.
+- **Seven passages were cut**, on turns 1, 2, 3 and 5; the ticket holds each before and after.
+  Turns 4, 6 and 7 are as they were, the designer's closing sentence on turn 7 among them.
+- No step the player is asked to take was dropped. Two statements went with the words: that
+  recruiting takes people from the Region (turn 3), and that the Scrubber is the only thing that
+  visibly moves the climate (turn 5). Turn 5 says "Region" where it said "state".
+- **No test holds a ceiling**, at the designer's word: the notes are to stay free to rewrite.
+
+**Pictures:** [`ticket-477/`](../dev-diary/2026-10-04-version-0.09.8/ticket-477/).
