@@ -142,6 +142,14 @@ pub fn solar_ring(body: BodyId) -> f32 {
     }
 }
 
+/// Ticket #480 (version 0.09.8): where a Body's far orbits stand on the Solar System Map -- on the
+/// Body's own ring, a sixth of the way round from it: the first (L4) ahead of it, the second (L5)
+/// behind. The Sun's pair, at the designer's word, so they stand well clear of the Body's disc.
+pub fn solar_far_point(game: &dying_earth_engine::Game, body: BodyId, k: u32) -> Vec3 {
+    let lead = if k.is_multiple_of(2) { 60.0 } else { -60.0 };
+    solar_position(body, game.turn, game.heliocentric_longitude(body, game.turn) as f32 + lead)
+}
+
 /// The same, reading the turn and the longitude off a game in play.
 pub fn solar_place(game: &dying_earth_engine::Game, body: BodyId) -> Vec3 {
     solar_position(body, game.turn, game.heliocentric_longitude(body, game.turn) as f32)

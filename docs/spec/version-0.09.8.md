@@ -166,3 +166,42 @@ The authority is [ticket #479](https://github.com/whaleyjoshua2/Dying-Earth/issu
 | raises the Factions completed | 1,895 | 1,627 |
 
 The win column is within noise. The computer seats raise about a seventh less often.
+
+## 7. Earth L4 and Earth L5, two far orbits
+
+The authority is [ticket #480](https://github.com/whaleyjoshua2/Dying-Earth/issues/480).
+
+- **Earth has seven Orbital Slots**, where it had five. The sixth and seventh are **far orbits**,
+  named **Earth L4** and **Earth L5**. Both begin empty.
+- **A far orbit is reached only by Ship.**
+  - A move to or from one costs **8 Fuel** from the tank and a turn, from any other orbit of Earth,
+    the other far orbit included. Between Earth's other orbits a move is still 1 Fuel.
+  - A leg between Bodies pays the 8 on top of its crossing for a far orbit it leaves, and again for
+    a far orbit it names to arrive in.
+- **A station there is founded, not built**, as at Venus: a Colony Ship with Colonists, sitting in
+  that orbit, unloads into it; the station opens with a Core and those Colonists, for no Materials.
+  A Launch Site builds none, and the refusal says so.
+- **No lift reaches it.** A Region's Launch Site offers no lift to a far station, and the station's
+  card says "No lift reaches here: its people come by Colony Ship." Its people arrive by Colony
+  Ship unloading in its orbit; the Ship may be loaded from a Region or another station as before.
+- **Its name stands alone:** "Earth L4", where another station reads "ISS over Earth". Its card
+  reads "Founded", not "Built".
+- **Where it is drawn.** Not on Earth's Surface Map at all, at the designer's word: no ring and no
+  marker. On the Solar System Map each stands at its own point on Earth's path round the Sun, a
+  sixth of the way ahead of Earth (L4) and behind (L5), named; an open circle while empty, its
+  station's glyph in the holder's colour once founded, which is clicked to open its card.
+- **Earth's planet card** lists each free far orbit as "Earth L4: free. Founded by a Colony Ship in
+  that orbit; 8 Fuel to reach." in place of a Build button.
+- **The computer seats** build stations only in the five. Once every one of those is taken, a
+  loaded Colony Ship of theirs at Earth with 8 Fuel goes out to a free far orbit and founds there,
+  at half the weight of founding a Colony, as Antarctica is weighed.
+- **Saves:** slots are kept by number and the two are added at the end; `SAVE_VERSION` stays.
+- Not changed: whether a stranded Ship counts a depot in a far orbit as in reach still reads the
+  1 Fuel figure.
+
+**Measured** (80 games, the standing cell,
+[`after-480.txt`](../dev-diary/2026-10-04-version-0.09.8/sweeps/after-480.txt)): 8 / 19 / 17 / 3
+and 33 collapses, from 8 / 19 / 17 / 5 and 31. Within noise. **The computer seats founded one far
+station in the 80 games.**
+
+**Pictures:** [`ticket-480/`](../dev-diary/2026-10-04-version-0.09.8/ticket-480/).

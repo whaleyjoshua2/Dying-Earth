@@ -575,7 +575,8 @@ fn a_station_is_built_for_materials_in_an_orbital_slot_and_holds_only_a_shipyard
     let mut g = game();
     let slots: Vec<u32> = BodyId::ALL.iter().map(|b| g.tables.body(*b).orbital_slots).collect();
     // Ticket #93 (version 0.06.0): and three over Venus.
-    assert_eq!(slots, vec![5, 2, 3, 1, 1, 3], "ticket #50: five orbital slots over Earth");
+    // Ticket #480 (version 0.09.8): seven, the last two the far orbits Earth L4 and Earth L5.
+    assert_eq!(slots, vec![7, 2, 3, 1, 1, 3], "ticket #50: five orbital slots over Earth, and two far");
     // The start (ticket #50): the Custodians' ISS, the Prospectors' Tiangong and the Archivists'
     // Axiom over Earth (bare until ticket #290, version 0.08.6, put two aboard); the Arkwrights
     // start with no station, so two slots stand free.
@@ -592,7 +593,8 @@ fn a_station_is_built_for_materials_in_an_orbital_slot_and_holds_only_a_shipyard
     assert_eq!(g.colony(iss).unwrap().modules.len(), 1, "its Core Module, and no Shipyard at the start");
     assert_eq!(g.colony(iss).unwrap().modules[0].kind, ModuleKind::Core);
     assert!(g.colony(iss).unwrap().in_orbit);
-    assert_eq!(g.free_orbital_slots(BodyId::Earth), vec![3, 4]);
+    assert_eq!(g.free_orbital_slots(BodyId::Earth), vec![3, 4, 5, 6]);
+    assert_eq!(g.buildable_orbital_slots(BodyId::Earth), vec![3, 4], "the far two are founded, not built");
     assert_eq!(g.free_slots_on(BodyId::Earth).len(), 3, "stations take no surface slot");
     // Built for 40 Materials from a state with a Launch Site (Earth) or a Colony (elsewhere); no crew.
     let build = Order::BuildStation { body: BodyId::Earth, slot: 3 };
@@ -7415,6 +7417,113 @@ fn a_venus_station_is_founded_by_a_colony_ship_in_its_ring_and_its_colonists_are
     assert!(g.check_order(Seat(0), &[], &Order::Transit { ship, to: BodyId::Mars, slot: None }).unwrap_err().0.contains("Venus"));
 }
 
+/// Ticket #480 (version 0.09.8): **Earth L4 and Earth L5 are far orbits, reached only by Ship.**
+/// Two more Orbital Slots over Earth, farther out: a move to or from one costs 8 Fuel from the tank,
+/// and a leg between Bodies pays that on top of its crossing. A station there is founded by a Colony
+/// Ship in that orbit, as at Venus, for no Materials; it is never built from a Launch Site and no
+/// lift reaches it. It is named for itself alone.
+#[test]
+fn earth_l4_and_l5_are_far_orbits_reached_only_by_ship() {
+    let mut g = game();
+    g.seats[0].stockpile.materials = 300.0;
+    let earth = g.tables.body(BodyId::Earth);
+    assert_eq!((earth.orbital_slots, earth.far_slots, g.tables.far_orbit_fuel), (7, 2, 8));
+    assert_eq!([g.station_name(BodyId::Earth, 5), g.station_name(BodyId::Earth, 6)], ["Earth L4", "Earth L5"]);
+    assert!(g.far_slot(BodyId::Earth, 5) && g.far_slot(BodyId::Earth, 6) && !g.far_slot(BodyId::Earth, 4) && !g.far_slot(BodyId::Earth, 7));
+    assert!(BodyId::ALL.iter().filter(|b| **b != BodyId::Earth).all(|b| g.tables.body(*b).far_slots == 0), "Earth alone has far orbits");
+    assert_eq!(g.orbit_name(BodyId::Earth, Orbit::Slot(5)), "Earth L4");
+    // Never built from a Launch Site, though the same seat may build in an ordinary slot.
+    assert!(g.check_order(Seat(0), &[], &Order::BuildStation { body: BodyId::Earth, slot: 3 }).is_ok());
+    let err = g.check_order(Seat(0), &[], &Order::BuildStation { body: BodyId::Earth, slot: 5 }).unwrap_err().0;
+    assert!(err.contains("only by Ship"), "{err}");
+    // The fares: 1 between ordinary orbits, 8 wherever a far orbit is an end.
+    assert_eq!(g.orbit_change_cost(BodyId::Earth, Orbit::Low, Orbit::Slot(0)), 1.0);
+    assert_eq!(g.orbit_change_cost(BodyId::Earth, Orbit::Low, Orbit::Slot(5)), 8.0);
+    assert_eq!(g.orbit_change_cost(BodyId::Earth, Orbit::Slot(5), Orbit::Slot(6)), 8.0);
+    assert_eq!(g.orbit_change_cost(BodyId::Earth, Orbit::Slot(6), Orbit::Slot(0)), 8.0);
+    // A Colony Ship in low orbit: an ordinary slot is not founded into, and a far one wants the move first.
+    let (ship, _) = colony_ship_ready(&mut g, BodyId::Earth);
+    let into = |n: u32| Order::Unload { ship, colonists: 4, army: false, into: UnloadTarget::Ring(BodyId::Earth, n) };
+    assert!(g.check_order(Seat(0), &[], &into(3)).unwrap_err().0.contains("Launch Site"));
+    assert!(g.check_order(Seat(0), &[], &into(5)).unwrap_err().0.contains("Move this Ship"));
+    let crossing = g.transit_cost_for(Seat(0), BodyId::Earth, BodyId::Moon).1;
+    assert_eq!(g.transit_fuel(Seat(0), g.ship(ship).unwrap(), BodyId::Earth, BodyId::Moon, None), crossing, "from low orbit, the crossing alone");
+    g.commit_orders(Seat(0), &[Order::ChangeOrbit { ship, slot: Some(5) }]);
+    assert_eq!(g.ship(ship).unwrap().fuel, 32.0, "8 Fuel from the tank of 40");
+    g.resolution_phase();
+    assert_eq!(g.ship(ship).unwrap().slot, Some(5));
+    g.ships.iter_mut().for_each(|s| s.arrived_this_turn = false);
+    // Leaving a far orbit for another Body pays the far figure on top; so does naming one to arrive in.
+    assert_eq!(g.transit_fuel(Seat(0), g.ship(ship).unwrap(), BodyId::Earth, BodyId::Moon, None), crossing + 8.0);
+    let back = g.transit_cost_for(Seat(0), BodyId::Moon, BodyId::Earth).1;
+    let mut away = g.ship(ship).unwrap().clone();
+    away.at = ShipAt::Body(BodyId::Moon);
+    away.slot = None;
+    assert_eq!(g.transit_fuel(Seat(0), &away, BodyId::Moon, BodyId::Earth, Some(6)), back + 8.0);
+    assert_eq!(g.transit_fuel(Seat(0), &away, BodyId::Moon, BodyId::Earth, Some(0)), back);
+    // Founded from its own orbit: a Core and the Colonists aboard, no Materials.
+    let materials = g.seats[0].stockpile.materials;
+    assert!(g.check_order(Seat(0), &[], &into(5)).is_ok(), "{:?}", g.check_order(Seat(0), &[], &into(5)));
+    g.commit_orders(Seat(0), &[into(5)]);
+    g.resolution_phase();
+    let l4 = g.station_at(BodyId::Earth, 5).expect("Earth L4 founded").id;
+    assert_eq!(g.colony(l4).unwrap().colonists, 4);
+    assert_eq!(g.colony(l4).unwrap().control, Control::Controlled(Seat(0)));
+    assert_eq!(g.seats[0].stockpile.materials, materials, "no Materials paid");
+    assert_eq!(g.place_name(Place::Colony(l4)), "Earth L4", "named for itself alone");
+    // No lift reaches it.
+    let home = g.directed_states(Seat(0))[0];
+    g.state_mut(home).emigrants = 2;
+    let err = g.check_order(Seat(0), &[], &Order::LiftToStation { state: home, n: 1, colony: l4 }).unwrap_err().0;
+    assert!(err.contains("no lift reaches Earth L4"), "{err}");
+}
+
+/// Ticket #480 (version 0.09.8): the computer seats found at a far orbit from a loaded Colony Ship
+/// once every station slot over Earth that can be built in is taken, and not before.
+#[test]
+fn the_ai_founds_at_a_far_orbit_once_the_ordinary_slots_are_taken() {
+    let station = |g: &mut Game, seat: Seat, slot: u32| {
+        let id = ColonyId(g.fresh_id());
+        g.colonies.push(Colony { id, body: BodyId::Earth, slot, control: Control::Controlled(seat), modules: vec![Module::new(ModuleKind::Core)], colonists: 0, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
+    };
+    let board = |fill: bool, slot: Option<u32>, fuel: f64| {
+        let mut g = game();
+        calm(&mut g);
+        g.seats[0].stockpile.energy = 300.0;
+        if fill {
+            station(&mut g, Seat(2), 3);
+            station(&mut g, Seat(1), 4);
+        }
+        // The seat's own station is full, so its people have nowhere else over Earth to go.
+        let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
+        let room = g.habitat_room(g.colony(iss).unwrap());
+        g.colonies.iter_mut().find(|c| c.id == iss).unwrap().colonists = room;
+        let (ship, _) = colony_ship_ready(&mut g, BodyId::Earth);
+        let s = g.ships.iter_mut().find(|s| s.id == ship).unwrap();
+        s.slot = slot;
+        s.fuel = fuel;
+        // Nothing to top the tank up from, and no ground free on the Moon, the one Body in reach:
+        // what is left for the Ship is the far orbit or nothing.
+        g.seats[0].stockpile.fuel = 0.0;
+        while !g.free_slots_on(BodyId::Moon).is_empty() {
+            colony(&mut g, Seat(1), BodyId::Moon, &[], 0);
+        }
+        g
+    };
+    let far = |o: &Order| matches!(o, Order::ChangeOrbit { slot: Some(5 | 6), .. } | Order::Unload { into: UnloadTarget::Ring(BodyId::Earth, _), .. });
+    // In the far orbit, the five taken: it founds.
+    let orders = board(true, Some(5), 3.0).ai_orders(Seat(0));
+    assert!(orders.iter().any(|o| matches!(o, Order::Unload { into: UnloadTarget::Ring(BodyId::Earth, 5), .. })), "no station founded at Earth L4: {orders:?}");
+    // In low orbit with the tank to reach it and no other Body in reach: it goes out to found.
+    let orders = board(true, None, 8.0).ai_orders(Seat(0));
+    assert!(orders.iter().any(|o| matches!(o, Order::ChangeOrbit { slot: Some(5), .. })), "it does not go out to Earth L4: {orders:?}");
+    // While an ordinary slot stands free, neither.
+    for (slot, fuel) in [(Some(5), 3.0), (None, 8.0)] {
+        let orders = board(false, slot, fuel).ai_orders(Seat(0));
+        assert!(!orders.iter().any(far), "a far orbit is for when the five are taken: {orders:?}");
+    }
+}
+
 /// Ticket #93: the AI raises a station at Venus when a Ship of its own stands there. Ticket #442
 /// (version 0.09.6): by FOUNDING it -- its loaded Colony Ship, in a free ring, unloads into it.
 #[test]
@@ -13133,7 +13242,7 @@ fn a_new_ship_starts_in_the_orbit_of_the_yard_that_built_it() {
     let mut g = game();
     let total: usize = BodyId::ALL.iter().map(|b| g.orbits_of(*b).len()).sum();
     // Ticket #442 (version 0.09.6): Venus has no low orbit, so 20 where it was 21.
-    assert_eq!(total, 20, "low orbit where there is ground, plus one per Orbital Slot, over six Bodies");
+    assert_eq!(total, 22, "low orbit where there is ground, plus one per Orbital Slot, over six Bodies");
     assert_eq!(g.orbits_of(BodyId::Mars)[0], Orbit::Low, "low orbit is the first of them");
     assert_eq!(g.orbit_name(BodyId::Mars, Orbit::Low), "Mars, low orbit");
     let iss = station_of(&g, Seat(0), BodyId::Earth).expect("the ISS");

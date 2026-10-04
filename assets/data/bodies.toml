@@ -11,6 +11,13 @@ sibling_fuel = 1
 # Orbital Slots -- is an order costing this much Fuel from the Ship's own tank, the sibling hop's
 # figure at the designer's word. Refused below it.
 orbit_change_fuel = 1
+# Ticket #480 (version 0.09.8): a FAR ORBIT -- Earth's L4 and L5 -- is farther out. A move to or from
+# one costs this much Fuel from the tank and a turn, from any other orbit of its Body; a leg between
+# Bodies pays it on top of the crossing for a far orbit it leaves and for one it names to arrive in.
+# A far orbit is reached only by Ship: its station is founded by a Colony Ship in it, as at Venus,
+# never built from a Launch Site, and no lift reaches it. A Body's `far_slots` are the LAST that many
+# of its Orbital Slots.
+far_orbit_fuel = 8
 # Version 0.04 (ticket #46): a Space Station is built for this many Materials into a free orbital
 # slot, from a Nation State with a Launch Site (over Earth) or a Colony (elsewhere); no crew needed.
 # It holds only a Shipyard and Habitats. Ships are built only at Shipyards. Each Body names its
@@ -56,8 +63,9 @@ mine_yield = 1.75
 generator_yield = 0.75
 refinery_yield = 2.0
 research_yield = 1.0
-orbital_slots = 5
-stations = ["ISS", "Tiangong", "Axiom", "Orbital Reef", "Starlab"]
+orbital_slots = 7
+stations = ["ISS", "Tiangong", "Axiom", "Orbital Reef", "Starlab", "Earth L4", "Earth L5"]
+far_slots = 2
 slots = [
     { name = "Antarctic Peninsula", lon = -63.0, lat = -69.0 },
     { name = "Lake Vostok", lon = 105.0, lat = -77.5 },

@@ -1573,6 +1573,21 @@ fn build_board(session: &mut Session) {
     // A card whose offer costs more than a seat holds greys its take button, and that is the state
     // a third of the table is in when a card is drawn; a fresh board is never poor enough to show
     // it.
+    // `farstation:1` or `farstation:2` (a building aid, ticket #480, version 0.09.8): seat 0 holds a station at
+    // Earth L4 (or, for 2, Earth L5) with four aboard, and a Frigate of theirs sits in that orbit, so the far orbit can
+    // be photographed held. With `hab:1` its card is the one opened.
+    if let Some(k) = std::env::args().find_map(|a| a.strip_prefix("farstation:").and_then(|v| v.parse::<u32>().ok()))
+        && let Some(g) = session.game.as_mut()
+    {
+        let slot = g.tables.body(BodyId::Earth).orbital_slots.saturating_sub(g.tables.body(BodyId::Earth).far_slots) + k.saturating_sub(1);
+        let id = ColonyId(g.fresh_id());
+        let turn = g.turn;
+        g.colonies.insert(0, Colony { id, body: BodyId::Earth, slot, control: Control::Controlled(Seat(0)), modules: vec![Module::new(ModuleKind::Core)], colonists: 4, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: turn, in_orbit: true });
+        if let Some(s) = g.ships.iter_mut().find(|s| s.seat == Seat(0)) {
+            s.at = ShipAt::Body(BodyId::Earth);
+            s.slot = Some(slot);
+        }
+    }
     // `openingrun:<n>` (a building aid, ticket #478, version 0.09.8): seat 0's Opening Objective
     // has been true n Incomes running, so the Journal's count can be photographed.
     if let Some(n) = std::env::args().find_map(|a| a.strip_prefix("openingrun:").and_then(|v| v.parse::<u32>().ok()))

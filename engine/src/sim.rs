@@ -89,6 +89,8 @@ pub struct SimResult {
     pub sea_walls_built: u32,
     /// Ticket #479 (version 0.09.8): Industry Level raises a Faction completed, read off the log.
     pub industry_raises: u32,
+    /// Ticket #480 (version 0.09.8): stations founded in a far orbit, Earth L4 or L5, off the log.
+    pub far_foundings: u32,
     /// Since ticket #257 (version 0.08.4) a wall is not destroyed; this counts the thresholds walls held.
     pub sea_walls_spent: u32,
     /// Ticket #272 (version 0.08.4): walls standing and working at the end.
@@ -700,6 +702,7 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
     let highest_rung = game.research.done.iter().map(|t| tables.tech(*t).rung).max().unwrap_or(0);
     // Ticket #56, read off the log as the #52 to #55 figures are.
     let sea_walls_built = game.log.iter().filter(|l| l.contains("completed Sea Wall at")).count() as u32;
+    let far_foundings = game.log.iter().filter(|l| l.contains(" founded Earth L")).count() as u32;
     let industry_raises = game.log.iter().filter(|l| l.contains("completed Industry Level at")).count() as u32;
     let sea_walls_spent = game.log.iter().filter(|l| l.contains("the Sea Wall in") && l.contains("took the sea")).count() as u32;
     let sea_walls_standing = game.states.iter().flat_map(|s| s.facilities.iter()).filter(|f| f.kind == FacilityKind::SeaWall && f.working()).count() as u32;
@@ -768,6 +771,7 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         last_turn_at_twelve,
         sea_walls_built,
         industry_raises,
+        far_foundings,
         sea_walls_standing,
         agitates,
         blockade_suffered,

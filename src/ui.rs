@@ -1206,6 +1206,12 @@ fn orbit_rings_on_globe(
     // keep the radii, planes and periods ticket #151 gave them, to the pixel.
     for orbit in game.orbits_of(body) {
         let slot = orbit.slot();
+        // Ticket #480 (version 0.09.8): a far orbit -- Earth L4, Earth L5 -- is not on this map at
+        // all, at the designer's word: no ring and no marker. It stands on the Solar System Map,
+        // its station is chosen there or from the planet card, and a Ship is sent from its card.
+        if slot.is_some_and(|n| game.far_slot(body, n)) {
+            continue;
+        }
         // A step tighter to the globe than the first try, at the designer's word ("just slightly
         // tighter"), so the outer rings stay nearer the window at the default zoom.
         let radius = GLOBE_RADIUS
@@ -3203,8 +3209,31 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                         let samples = 64;
                         let points: Vec<Option<Pos2>> = (0..samples).map(|i| project(at(i as f32 / samples as f32 * std::f32::consts::TAU))).collect();
                         orbit_polyline(painter, &points, stations == 0, Color32::from_gray(140), 1.2);
-                        for slot in 0..orbital {
-                            let Some(q) = project(at(slot as f32 / orbital as f32 * std::f32::consts::TAU + 0.3)) else { continue };
+                        // Ticket #480 (version 0.09.8): the far orbits are not on this ring. Each
+                        // stands at its own point on the Body's path round the Sun, a sixth of the
+                        // way ahead of it and behind, with its name.
+                        let near = orbital.saturating_sub(game.tables.body(body).far_slots);
+                        for slot in near..orbital {
+                            let Some(q) = project(geo::solar_far_point(game, body, slot - near)) else { continue };
+                            let station = game.colonies.iter().find(|c| c.in_orbit && c.body == body && c.slot == slot);
+                            let colour = station.and_then(|c| c.control.director()).map(|s| seat_colour(session, s)).unwrap_or(Color32::from_gray(150));
+                            match station {
+                                Some(c) => {
+                                    glyph_at(painter, Kind::Station, q, 14.0, colour);
+                                    hotspots.push(Hotspot { pos: q, radius: 14.0, hit: Hit::Select(Selection::Colony(c.id)) });
+                                }
+                                None => {
+                                    painter.circle_filled(q, 7.0, Color32::from_black_alpha(170));
+                                    painter.circle_stroke(q, 5.0, egui::Stroke::new(1.5, on_map(colour)));
+                                }
+                            }
+                            label_at(painter, q + egui::vec2(0.0, 15.0), &game.station_name(body, slot), colour, 11.0);
+                            if let Some(s) = warship_in_slot(game, body, slot) {
+                                glyph_at(painter, Kind::Warship, q + egui::vec2(12.0, 0.0), 12.0, seat_colour(session, s.seat));
+                            }
+                        }
+                        for slot in 0..near {
+                            let Some(q) = project(at(slot as f32 / near as f32 * std::f32::consts::TAU + 0.3)) else { continue };
                             if let Some(c) = game.colonies.iter().find(|c| c.in_orbit && c.body == body && c.slot == slot) {
                                 let colour = c.control.director().map(|s| seat_colour(session, s)).unwrap_or(Color32::LIGHT_GRAY);
                                 glyph_at(painter, Kind::Station, q, 14.0, colour);
@@ -3772,6 +3801,11 @@ A Warship on Blockade shuts the one orbit it sits in and no other: a station's r
     }
     if !session.spectator {
         for slot in game.free_orbital_slots(body) {
+            // Ticket #480 (version 0.09.8): a far orbit is founded by a Colony Ship, not built.
+            if game.far_slot(body, slot) {
+                ui.label(RichText::new(format!("{}: free. Founded by a Colony Ship in that orbit; {} Fuel to reach.", game.station_name(body, slot), game.tables.far_orbit_fuel)).weak());
+                continue;
+            }
             cost_button(ui, game, &session.pending, Order::BuildStation { body, slot }, &format!("Build {} here", game.station_name(body, slot)), actions);
         }
     }
@@ -3980,7 +4014,7 @@ fn right_click(pos: Pos2, session: &Session, game: &Game, view: &ViewState, came
                         "No selected Ship moves to {}: {} there already, has another order, or holds fewer than {} Fuel.",
                         game.orbit_name(body, orbit),
                         if alone { "it is" } else { "each is" },
-                        game.tables.orbit_change_fuel
+                        if game.far_orbit(body, orbit) { game.tables.far_orbit_fuel } else { game.tables.orbit_change_fuel }
                     )));
                 }
                 place_or_cancel(orders, actions);
@@ -5179,7 +5213,7 @@ fn order_text(game: &Game, o: &Order) -> String {
             // Ticket #409 (version 0.09.4): with the count the slider chose.
             UnloadTarget::Slot(b, s) => format!("Found a Colony at {} on {} with {} from {}", game.tables.body(*b).slots[*s as usize].name, game.tables.body(*b).name, colonists_word(*colonists), ship),
             UnloadTarget::Colony(c) => format!("Unload {} from {} into {}", if *colonists > 0 { colonists_word(*colonists) } else if *army { "the Army".into() } else { "nothing".into() }, ship, game.place_name(Place::Colony(*c))),
-            UnloadTarget::Ring(b, s) => format!("Found {} over {} with {} from {}", game.station_name(*b, *s), game.tables.body(*b).name, colonists_word(*colonists), ship),
+            UnloadTarget::Ring(b, s) => format!("Found {} with {} from {}", game.slot_place_name(*b, *s), colonists_word(*colonists), ship),
         },
         Order::Influence { target, amount } => format!("{} Influence on {}", amount, game.place_name(*target)),
         Order::BuyInfluence { amount } => format!("Buy {} Influence with Ducats", amount),
@@ -5188,7 +5222,7 @@ fn order_text(game: &Game, o: &Order) -> String {
         Order::Sell { resource, amount } => format!("Sell {} {} for {} Ducats", amount, resource.name(), -game.order_cost(Seat(0), o).ducats),
         Order::BuildFacilityWithDucats { state, kind } => format!("Build {} in {} for Ducats", kind.name(), game.tables.state(*state).name),
         Order::BuildModuleWithDucats { colony, kind } => format!("Build {} at {} for Ducats", kind.name(), game.place_name(Place::Colony(*colony))),
-        Order::BuildStation { body, slot } => format!("Build {} over {}", game.station_name(*body, *slot), game.tables.body(*body).name),
+        Order::BuildStation { body, slot } => format!("Build {}", game.slot_place_name(*body, *slot)),
         // Ticket #442 (version 0.09.6).
         Order::BuildColony { body, slot } => format!("Build a Colony at {} on {}", game.tables.body(*body).slots[*slot as usize].name, game.tables.body(*body).name),
         Order::SendDown { from, to, colonists } => format!("Send {} down from {} to {}", colonists_word(*colonists), game.place_name(Place::Colony(*from)), game.place_name(Place::Colony(*to))),
@@ -7771,7 +7805,8 @@ fn pioneers_block(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, act
     // Ticket #141 (version 0.07.3): waiting Emigrants lift straight to a station of yours over
     // Earth, as many as it has room for, by the Launch Site here. A launch, no Ship.
     if st.emigrants > 0 && lifts {
-        for c in game.colonies.iter().filter(|c| c.body == BodyId::Earth && c.in_orbit && c.control.director() == Some(Seat(0))) {
+        // Ticket #480 (version 0.09.8): no lift reaches a far orbit, so none is offered to one.
+        for c in game.colonies.iter().filter(|c| c.body == BodyId::Earth && c.in_orbit && !game.far_slot(c.body, c.slot) && c.control.director() == Some(Seat(0))) {
             let room = game.habitat_room(c).saturating_sub(c.colonists);
             let n = send.min(room);
             if n == 0 {
@@ -7876,6 +7911,11 @@ fn emigrant_loader(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewS
     if by_sea && !game.antarctica_open {
         return;
     }
+    // Ticket #480 (version 0.09.8): no lift reaches a far orbit; the card says how its people come.
+    if col.in_orbit && game.far_slot(col.body, col.slot) {
+        ui.label(RichText::new("No lift reaches here: its people come by Colony Ship.").weak());
+        return;
+    }
     let states = game.directed_states(Seat(0));
     let Some(chosen) = view.lift_state.filter(|x| states.contains(x)).or_else(|| default_emigrant_source(game, &states, !by_sea)) else {
         return;
@@ -7943,7 +7983,7 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     // -- *"each colony/station card has the date it was founded under its name in the header"*. A
     // station is built and a Colony founded, as the glossary has them; a starting station reads
     // the game's first date.
-    ui.label(RichText::new(format!("{} {}", if col.in_orbit { "Built" } else { "Founded" }, game.date(col.founded_turn).text())).weak().small());
+    ui.label(RichText::new(format!("{} {}", if col.in_orbit && !game.far_slot(col.body, col.slot) { "Built" } else { "Founded" }, game.date(col.founded_turn).text())).weak().small());
     // Ticket #283 (version 0.08.5): what the ground is worth, under the heading, in glyphs. A
     // station reads the Body's figures, which the planet card shows, so it carries no row.
     if !col.in_orbit {
@@ -8492,6 +8532,8 @@ fn body_dropdown(ui: &mut Ui, session: &Session, game: &Game, body: BodyId, to: 
     // Ticket #92: the player's own figure, with the Faction's and the Tech's multipliers and a Mass
     // Driver's cut on it; read once, for the header and the drift line inside.
     let (turns, fuel) = game.transit_cost_for(Seat(0), body, to);
+    // Ticket #480 (version 0.09.8): one Ship's own figure, a far orbit it leaves counted.
+    let fuel = one.filter(|_| !here).map(|s| game.transit_fuel(Seat(0), s, body, to, None)).unwrap_or(fuel);
     let header = if here {
         format!("{} (here): change orbit, {} Fuel", game.tables.body(to).name, game.tables.orbit_change_fuel)
     } else {
@@ -8518,13 +8560,16 @@ fn body_dropdown(ui: &mut Ui, session: &Session, game: &Game, body: BodyId, to: 
 /// there.
 fn change_orbit_lines(ui: &mut Ui, session: &Session, game: &Game, body: BodyId, ships: &[&Ship], one: Option<&Ship>, actions: &mut Vec<Action>) {
     let orbit_fuel = game.tables.orbit_change_fuel;
-    ui.label(RichText::new(format!("Moving between two orbits of {} costs {orbit_fuel} Fuel from the Ship's own tank, and lands with the transits, before the Battles.", game.tables.body(body).name)).weak());
+    // Ticket #480 (version 0.09.8): a far orbit at either end costs the far figure, and the line says so.
+    let far_words = if game.tables.body(body).far_slots > 0 { format!(", {} to or from a far orbit", game.tables.far_orbit_fuel) } else { String::new() };
+    ui.label(RichText::new(format!("Moving between two orbits of {} costs {orbit_fuel} Fuel from the Ship's own tank{far_words}, and lands with the transits, before the Battles.", game.tables.body(body).name)).weak());
     for orbit in game.orbits_of(body) {
         // Every Ship already sitting there is no candidate; a line nobody can take is not drawn.
         let movers: Vec<&Ship> = ships.iter().copied().filter(|s| game.ship_orbit(s) != orbit).collect();
         if movers.is_empty() {
             continue;
         }
+        let orbit_fuel = if game.far_orbit(body, orbit) || movers.iter().any(|s| game.far_orbit(body, game.ship_orbit(s))) { game.tables.far_orbit_fuel } else { orbit_fuel };
         ui.horizontal_wrapped(|ui| {
             ui.label(format!("   To {}", orbit_short(game, body, orbit)));
             match one {

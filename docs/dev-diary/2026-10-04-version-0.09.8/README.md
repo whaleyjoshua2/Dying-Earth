@@ -144,3 +144,33 @@ above its card:
 the Factions completed: 1,627 over the 80 games, against 1,895 at the flat price (by seating 157 /
 733 / 302 / 435 from 188 / 920 / 332 / 455). The flat-price run, with the steps at nought, matched
 `after-478.txt` line for line apart from the new line, so the count itself moves nothing.
+
+## Earth L4 and Earth L5 (#480)
+
+The designer's answers turned two extra slots into a new kind of place: farther out (8 Fuel),
+reached only by Ship, founded by a Colony Ship as a Venus station is, the Sun's pair of points
+rather than the Moon's, and taught to the computer seats.
+
+**Witnessed red:** `earth_l4_and_l5_are_far_orbits_reached_only_by_ship` and
+`the_ai_founds_at_a_far_orbit_once_the_ordinary_slots_are_taken` were run with `far_slots` at nought
+in the data and both failed; they pass with it at 2. Two older tests that count Earth's slots and
+orbits were re-based (5 to 7, 20 to 22).
+
+**Drawn, then undrawn.** The first build put the two on Earth's Surface Map as clickable points off
+the globe. The designer, mid-build: *"these don't need to be clickable points on Earth's map btw"*,
+then *"they don't even have to be plain markers"*. They are not on that map at all now.
+
+- **The Solar System Map**, empty on the left and Earth L5 held on the right (`farstation:2`, a new
+  aid that plants a station and a Frigate there):
+  ![the Solar System Map with the far orbits](ticket-480/solar-empty-and-held.png)
+- **Earth's map and planet card**: no marker for either, and the card's two lines for them:
+  ![Earth's map and card](ticket-480/earth-map-and-card.png)
+- **A far station's card** (`farstation:1 hab:1`):
+  ![the Earth L4 card](ticket-480/earth-l4-card.png)
+
+**The sweep** ([`after-480.txt`](sweeps/after-480.txt)): 8 / 19 / 17 / 3 and 33 collapses, from
+8 / 19 / 17 / 5 and 31. Within noise. The sweep gained a line, stations founded at Earth L4 or L5:
+**one in the 80 games**. The computer seats go there only when the five are taken and a loaded
+Colony Ship at Earth has nothing better to do, which is rare.
+
+Not pictured: the Ship card's "To Earth L4" door and its 8 Fuel; the greyed lift.

@@ -48,6 +48,10 @@ pub struct BodyCard {
     pub orbital_slots: u32,
     #[serde(default)]
     pub stations: Vec<String>,
+    /// Ticket #480 (version 0.09.8): how many of the Orbital Slots, counted from the LAST, are far
+    /// orbits -- Earth's L4 and L5. A far orbit is reached only by Ship, for `far_orbit_fuel`.
+    #[serde(default)]
+    pub far_slots: u32,
     /// Ticket #45: the Body this one orbits, and the hop between them.
     #[serde(default)]
     pub parent: Option<BodyId>,
@@ -1485,6 +1489,9 @@ struct BodiesFile {
     /// Ticket #335 (version 0.09.0): what an orbit change costs from the Ship's own tank.
     #[serde(default = "one_i64")]
     orbit_change_fuel: i64,
+    /// Ticket #480 (version 0.09.8): what a move to or from a far orbit costs from the tank.
+    #[serde(default)]
+    far_orbit_fuel: i64,
     #[serde(default = "forty")]
     station_materials: i64,
     /// Ticket #57: how far a Colony Slot's own yields may fall either side of its Body's.
@@ -1910,6 +1917,7 @@ pub struct Tables {
     pub sibling_transit: (u32, i64),
     /// Ticket #335 (version 0.09.0): the Fuel an orbit change takes from a Ship's own tank.
     pub orbit_change_fuel: i64,
+    pub far_orbit_fuel: i64,
     /// Ticket #46: what a station costs.
     pub station_materials: i64,
     /// Ticket #57: how far a Colony Slot's own four yields may fall either side of its Body's.
@@ -2059,6 +2067,7 @@ impl Tables {
             ship_names,
             sibling_transit: (bodies.sibling_turns, bodies.sibling_fuel),
             orbit_change_fuel: bodies.orbit_change_fuel,
+            far_orbit_fuel: bodies.far_orbit_fuel,
             station_materials: bodies.station_materials,
             slot_yield_spread: bodies.slot_yield_spread,
             planets: ephemeris.planet,

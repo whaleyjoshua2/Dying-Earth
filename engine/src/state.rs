@@ -2011,7 +2011,8 @@ impl Game {
             Place::State(s) => self.tables.state(s).name.clone(),
             Place::Colony(c) => match self.colony(c) {
                 // Ticket #46: a station is named for its orbital slot.
-                Some(col) if col.in_orbit => format!("{} over {}", self.station_name(col.body, col.slot), self.tables.body(col.body).name),
+                // Ticket #480 (version 0.09.8): a far orbit's station by its own name alone.
+                Some(col) if col.in_orbit => self.slot_place_name(col.body, col.slot),
                 // Ticket #45: a Colony is named for its slot, a real place on its Body.
                 Some(col) => format!("{} on {}", self.tables.body(col.body).slots[col.slot as usize].name, self.tables.body(col.body).name),
                 None => format!("{c}"),
@@ -3894,6 +3895,46 @@ impl Game {
         self.tables.body(body).stations.get(slot as usize).cloned().unwrap_or_else(|| format!("Station {}", slot + 1))
     }
 
+    // ------------------------------------------- Ticket #480 (version 0.09.8): far orbits
+
+    /// Ticket #480: whether this Orbital Slot is a **far orbit** -- Earth's L4 and L5, the last
+    /// `far_slots` of the Body's slots. A far orbit is reached only by Ship: its station is founded
+    /// by a Colony Ship in it, never built from the ground, and no lift reaches it.
+    pub fn far_slot(&self, body: BodyId, slot: u32) -> bool {
+        let b = self.tables.body(body);
+        slot < b.orbital_slots && slot >= b.orbital_slots.saturating_sub(b.far_slots)
+    }
+
+    pub fn far_orbit(&self, body: BodyId, orbit: Orbit) -> bool {
+        orbit.slot().is_some_and(|n| self.far_slot(body, n))
+    }
+
+    /// Ticket #480: the free Orbital Slots a station may be BUILT in -- every free one but the far.
+    pub fn buildable_orbital_slots(&self, body: BodyId) -> Vec<u32> {
+        self.free_orbital_slots(body).into_iter().filter(|n| !self.far_slot(body, *n)).collect()
+    }
+
+    /// Ticket #480: what a move between two orbits of one Body costs from the tank: the far
+    /// figure where either end is a far orbit, else the plain orbit change.
+    pub fn orbit_change_cost(&self, body: BodyId, from: Orbit, to: Orbit) -> f64 {
+        if self.far_orbit(body, from) || self.far_orbit(body, to) { self.tables.far_orbit_fuel as f64 } else { self.tables.orbit_change_fuel as f64 }
+    }
+
+    /// Ticket #480: what a leg between Bodies costs this Ship: the crossing, and the far figure
+    /// again for a far orbit it leaves and for a far orbit it names to arrive in.
+    pub fn transit_fuel(&self, seat: Seat, s: &Ship, from: BodyId, to: BodyId, slot: Option<u32>) -> f64 {
+        let far = self.tables.far_orbit_fuel as f64;
+        let leaving = if self.far_orbit(from, self.ship_orbit(s)) { far } else { 0.0 };
+        let arriving = if self.far_orbit(to, Orbit::of(slot)) { far } else { 0.0 };
+        self.transit_cost_for(seat, from, to).1 + leaving + arriving
+    }
+
+    /// Ticket #480: a station's place by name -- "ISS over Earth", and a far orbit's alone,
+    /// "Earth L4", which names its Body already.
+    pub fn slot_place_name(&self, body: BodyId, slot: u32) -> String {
+        if self.far_slot(body, slot) { self.station_name(body, slot) } else { format!("{} over {}", self.station_name(body, slot), self.tables.body(body).name) }
+    }
+
     // ------------------------------------------- Ticket #335 (version 0.09.0): a Body's orbits
 
     /// Ticket #335: the orbits of a Body -- LOW ORBIT, then one per Orbital Slot. Every Ship at the
@@ -3954,6 +3995,7 @@ impl Game {
     pub fn orbit_name(&self, body: BodyId, orbit: Orbit) -> String {
         match orbit {
             Orbit::Low => format!("{}, low orbit", self.tables.body(body).name),
+            Orbit::Slot(n) if self.far_slot(body, n) => self.station_name(body, n),
             Orbit::Slot(n) => format!("{}, at {}", self.tables.body(body).name, self.station_name(body, n)),
         }
     }
