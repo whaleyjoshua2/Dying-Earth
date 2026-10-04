@@ -6,6 +6,45 @@ The map is [Map: version 0.09.7](https://github.com/whaleyjoshua2/Dying-Earth/is
 pictures and batches that decided it are in
 [`docs/dev-diary/2026-10-03-version-0.09.7/`](../dev-diary/2026-10-03-version-0.09.7/).
 
+**What the version is.** Version 0.09.6 with the designer's list. **Figures moved**: Planetary
+Stewardship adds 1.5 ppm to the Sink (§1), the Custodians' Research Directive 0.02 ppm a point (§2),
+the Strip Permit's lasting Unrest is +2 (§3). **The Archive**: its fund is lost with its Colony, and
+the computer seats go after it and defend it (§4). **The computer seats** leave their rivals' gates
+until last and starve them, and the Archivists stop diverting at a full fund (§5). **The window**:
+the Report coloured by Faction and Region with 15 per cent fewer words (§6), the Temperature as a
+ring around the End Turn sun (§7), a seventh tutorial note for Blame (§8), a clock (§9), the final
+report's totals (§10), six hovers tightened (§11). **Two rules added after charting**: neutral
+Regions build Sea Walls (§12), and each Faction has an Opening Objective, kept in a new Journal
+(§13). The three Arkwright computer-seat changes on the designer's list were already built in 0.09.6.
+
+**What it did to the win column** (80 games, per Faction, at the shipped climate cell):
+
+| | 0.09.6 | 0.09.7 before the Opening Objectives | 0.09.7 |
+|---|---|---|---|
+| Custodians | 5 | 9 | 8 |
+| Prospectors | 3 | 6 | 21 |
+| Arkwrights | 11 | 11 | 18 |
+| Archivists | 15 | 13 | 5 |
+| collapses | 46 | 41 | 28 |
+
+The designer's ideal is about 15 / 15 / 15 / 15 and 20. The Opening Objectives (§13) are the
+largest move of the version and are not traced; the designer closed them as built.
+
+The closing sweep is
+[`sweeps/final-0.09.7.txt`](../dev-diary/2026-10-03-version-0.09.7/sweeps/final-0.09.7.txt), byte
+for byte the sweep after §13: nothing a computer seat reads changed after it. Over its 80 games:
+
+- **The tree** completes in 54 games at a median turn 25, where it completed in 55 at turn 24.
+  Victory gates are reached in 59 / 80 / 58 / 58 games (Custodians / Prospectors / Arkwrights /
+  Archivists), where it was 66 / 74 / 58 / 68.
+- **The world goes under the Sink** at least once in 11 games.
+- **Opening Objectives met:** Custodians 80, Prospectors 58, Arkwrights 47, Archivists 80.
+- **Archives lost with their Colony:** 21, and 3,099 Research of fund with them.
+- **The Archivists score nothing** at the end in 51 games, and place last in 50.
+- **A Blockade** stood in 5 games, an orbital Battle in 3.
+- **Saves:** `SAVE_VERSION` stays at 8; a 0.09.6 save loads, and a test cuts this version's five new
+  fields from a save to show it.
+
 ## 1. Planetary Stewardship at 1.5
 
 The authority is [ticket #458](https://github.com/whaleyjoshua2/Dying-Earth/issues/458).

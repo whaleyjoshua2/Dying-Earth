@@ -2650,7 +2650,8 @@ impl Game {
             }
             // Ticket #141 (version 0.07.3): waiting Emigrants lift straight to the seat's own station
             // over Earth while it has room, from a state with a working Launch Site. Presence, not a
-            // foothold: a station over Earth is off Earth, so it takes the unload's full weight.
+            // foothold. Ticket #449 (version 0.09.6): at half weight, and no boost, while the Faction's
+            // Bodies part is short -- a station over Earth is off Earth but settles no Body.
             for sid in self.directed_states(seat) {
                 let n = self.state(sid).emigrants;
                 if n == 0 || !self.state(sid).facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working()) {

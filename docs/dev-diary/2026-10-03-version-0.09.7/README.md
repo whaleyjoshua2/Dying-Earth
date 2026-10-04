@@ -168,3 +168,12 @@ Prospectors' Investment Bank.
 9 / 6 / 11 / 13 and 41. It now prints how often and when each Faction meets its objective:
 Custodians in all 80 games on turn 2; Archivists in all 80 around turns 7 to 11; Prospectors in 58,
 around turns 9 to 16; Arkwrights in 47, around turns 15 to 29.
+
+## Closing the version (ticket #469)
+
+[`sweeps/final-0.09.7.txt`](sweeps/final-0.09.7.txt): the closing sweep, byte for byte the sweep
+after ticket #471. 8 / 21 / 18 / 5 wins and 28 collapses, against 0.09.6's 5 / 3 / 11 / 15 and 46.
+
+**Witnessed red:** the older-save test, given this version's five new seat fields to cut, failed
+with "Unexpected missing field named `produced_total`" once that field's default was taken away,
+and passes with it back.
