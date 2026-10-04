@@ -19339,3 +19339,19 @@ fn a_factions_recruiting_is_one_report_line() {
     let said: Vec<&str> = g.report.lines.iter().map(|l| l.text.as_str()).filter(|t| t.contains("Pioneers")).collect();
     assert_eq!(said, vec!["Prospectors recruited 2 Pioneers: 2 in The European Union."]);
 }
+
+/// Ticket #465 (version 0.09.7): **the tutorial teaches Blame on a seventh turn** -- the Greenwash
+/// and the Smear in one note -- and closes in the designer's sentence. The note quotes the rules'
+/// figures, so it is held to them.
+#[test]
+fn the_tutorials_seventh_note_teaches_greenwash_and_smear() {
+    let t = tables();
+    let notes = &t.tutorial.note;
+    assert_eq!(notes.iter().map(|n| n.turn).collect::<Vec<_>>(), vec![1, 2, 3, 4, 5, 6, 7]);
+    let last = notes.last().unwrap();
+    assert!(last.text.contains("Greenwash") && last.text.contains("Smear") && last.text.contains("Blame"), "{}", last.text);
+    assert_eq!((t.influence.smear.ppm_per_influence, t.influence.greenwash.ppm_per_influence, t.influence.greenwash.ducats_per_influence), (2.0, 2.0, 1));
+    assert_eq!(last.text.matches("2 ppm").count(), 2, "both rates, as the data has them: {}", last.text);
+    assert_eq!(last.note.as_deref(), Some("That is the last of these notes; the game carries on from here. Planetary Stewardship is required for victory."));
+    assert!(notes[5].note.is_none(), "turn 6 no longer says it is the last");
+}

@@ -184,3 +184,19 @@ moves.
   and the words "End Turn" are End Turn's, as before.
 - **The Climate Panel's bar takes the ring's red** for its fill and its committed band, so the two
   read as one gauge. Nothing else on the panel moves.
+
+## 8. Smear and Greenwash in the tutorial
+
+The authority is [ticket #465](https://github.com/whaleyjoshua2/Dying-Earth/issues/465). No rule
+moves.
+
+- **The tutorial has a seventh note**, on turn 7, for Blame: the Greenwash and the Smear together.
+  - Headline: "Blame: Greenwash and Smear"
+  - Text: "Blame is the carbon you answer for; a large share makes places dearer to take. In
+    Factions (F): Greenwash, on your page, cuts yours 2 ppm per Influence and Ducat. Smear, on a
+    rival's, adds 2 ppm per Influence; they resent it."
+  - Quieter line, the designer's sentence: "That is the last of these notes; the game carries on
+    from here. Planetary Stewardship is required for victory."
+- **Turn 6's quieter line is gone.** It said the same two things at length.
+- A test holds the note's two rates to `[smear]` and `[greenwash]` in `influence.toml`.
+- As with every tutorial note, nothing is forced and nothing is checked.

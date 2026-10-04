@@ -21,7 +21,7 @@
 # five notes spent TWO of them asking for nothing -- "You are the Custodians" and "Read the board"
 # -- so the first instruction landed on turn 3 and getting off Earth, the thing the designer wanted
 # taught, on turn 5. Now **each of the first turns asks for one thing, and they are one chain**.
-# The last two notes keep their place but ask for NOTHING, at the designer's word: they point at the
+# Notes five and six keep their place but ask for NOTHING, at the designer's word: they point at the
 # climate and at the Research race, which are the two things that have started happening to the
 # player by then.
 #
@@ -83,4 +83,13 @@ note = "The Scrubber is yours alone. It takes no build slot, it pulls carbon bac
 turn = 6
 figure = "The Research race"
 text = "The bar beside the Research figure is the race: each Faction's share of the Tech under research, in its own colour. Whoever gave the most picks the next one. Click the bar for the Tech Tree."
-note = "Planetary Stewardship is your gate: with both parts of your Victory Condition at their bars, you still do not win until it stands. That is the last of these notes; the game carries on from here."
+
+# Ticket #465 (version 0.09.7): a seventh note, for Blame -- the Greenwash and the Smear in one, at
+# the designer's word, and as few words as will carry it. Its quieter line closes the tutorial in
+# the designer's own sentence; turn 6's, which said the same at length, is gone. The two rates are
+# `[smear]` and `[greenwash]` in influence.toml, and a test holds this note to them.
+[[note]]
+turn = 7
+figure = "Blame: Greenwash and Smear"
+text = "Blame is the carbon you answer for; a large share makes places dearer to take. In Factions (F): Greenwash, on your page, cuts yours 2 ppm per Influence and Ducat. Smear, on a rival's, adds 2 ppm per Influence; they resent it."
+note = "That is the last of these notes; the game carries on from here. Planetary Stewardship is required for victory."

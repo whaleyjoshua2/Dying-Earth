@@ -98,3 +98,11 @@ seven o'clock round to five); the designer asked for it redder and from eight to
 
 **Witnessed red:** the test `the_temperature_ring_runs_from_eight_to_four_over_the_top` failed at
 exactly four o'clock on a rounding edge, and the hit test was given a pixel of tolerance.
+
+## Smear and Greenwash in the tutorial (ticket #465)
+
+- [`note-report.png`](ticket-465/note-report.png): the seventh note as the player sees it, with
+  "Play on" under it since it is the last.
+
+**Witnessed red:** the test `the_tutorials_seventh_note_teaches_greenwash_and_smear` read
+`left: [1, 2, 3, 4, 5, 6]` before the note was written.
