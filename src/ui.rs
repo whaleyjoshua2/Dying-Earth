@@ -2949,6 +2949,10 @@ fn journal_tab(ui: &mut Ui, session: &Session, game: &Game) {
                     ui.label(RichText::new("The Launch Site waits for a Region of yours with none and a free slot.").weak());
                 }
             }
+            // Ticket #478 (version 0.09.8): an objective that wants turns running shows its count.
+            None if card.turns > 1 && game.seat(seat).opening_run > 0 => {
+                ui.label(RichText::new(format!("Not yet met: {} of {} turns.", game.seat(seat).opening_run, card.turns)).weak());
+            }
             None => {
                 ui.label(RichText::new("Not yet met. No deadline.").weak());
             }

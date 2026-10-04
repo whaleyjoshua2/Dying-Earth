@@ -799,6 +799,10 @@ pub struct OpeningCard {
     /// How many the objective wants: three places with an Investment Bank, two research buildings.
     #[serde(default = "one")]
     pub count: u32,
+    /// Ticket #478 (version 0.09.8): how many Incomes running the objective must be true before
+    /// it is met. One for every Faction but the Prospectors, whose Banks must stand three.
+    #[serde(default = "one")]
+    pub turns: u32,
     /// The reward's size, in the unit its kind pays: ppm, Ducats or Research. The Arkwrights' is a
     /// Launch Site and reads nought.
     #[serde(default)]

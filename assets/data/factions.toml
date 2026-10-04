@@ -106,7 +106,8 @@ victory_short = "put {first} Ducats in the Venture Capital Fund with {second} Co
 victory_first = { kind = "venture_fund", bar = 2500 }
 victory_second = { kind = "off_world_presence", bar = 12 }
 # Ticket #471 (version 0.09.7): the Opening Objective -- no deadline, met once, rewarded once.
-opening = { kind = "investment_banks", count = 3, reward = 75.0, text = "Have a working Investment Bank in three different places", reward_text = "75 Ducats into the Venture Capital Fund" }
+# Ticket #478 (version 0.09.8): 75 Ducats to 50, and the three Banks must work three Incomes running.
+opening = { kind = "investment_banks", count = 3, turns = 3, reward = 50.0, text = "Keep a working Investment Bank in three places for three turns", reward_text = "50 Ducats into the Venture Capital Fund" }
 colour = [0.85, 0.5, 0.2]
 
 # Ticket #50 seated two more Factions; ticket #51 gave them their cards.

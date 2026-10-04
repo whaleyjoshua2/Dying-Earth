@@ -1009,6 +1009,10 @@ pub struct SeatState {
     /// Arkwrights' free Launch Site is still owed for want of a Region to stand it in.
     #[serde(default)]
     pub opening_met_turn: Option<u32>,
+    /// Ticket #478 (version 0.09.8): the Incomes in a row this seat's Opening Objective has been
+    /// true and not yet met; an Income where it is false starts the count again.
+    #[serde(default)]
+    pub opening_run: u32,
     #[serde(default)]
     pub launch_site_owed: bool,
     /// Ticket #461 (version 0.09.7): Archives this seat has lost with their Colonies, and the fund
@@ -1655,6 +1659,7 @@ impl Game {
             colonists_grown: 0,
             colonists_declined: 0,
             opening_met_turn: None,
+            opening_run: 0,
             launch_site_owed: false,
             archives_lost: 0,
             archive_fund_lost: 0,

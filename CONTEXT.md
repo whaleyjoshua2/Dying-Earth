@@ -789,7 +789,7 @@ _Avoid_: subdued, loyal, converted
 ### Winning
 
 **Opening Objective**:
-One early thing a Faction is asked to do, since version 0.09.7, rewarded once toward its own Victory Condition. It has no deadline, so it is never missed: it is met at the first Income it is true. The Custodians' is a working Scrubber (the Natural Sink grows for good); the Prospectors', a working Investment Bank in each of three different places (Ducats into the Venture Capital Fund); the Arkwrights', a Colony on the Moon, ground or orbit (a free Launch Site in a Region of theirs that has none); the Archivists', two Research Labs or Observatories working, one of them off Earth (Research into the Archive fund). A player sees their own in the **Journal**; a rival's is not shown.
+One early thing a Faction is asked to do, since version 0.09.7, rewarded once toward its own Victory Condition. It has no deadline, so it is never missed: it is met at the first Income it is true, or, where it asks for turns running, at the last of them, an Income where it is false starting the count again. The Custodians' is a working Scrubber (the Natural Sink grows for good); the Prospectors', since version 0.09.8, a working Investment Bank in each of three different places for three turns running (Ducats into the Venture Capital Fund); the Arkwrights', a Colony on the Moon, ground or orbit (a free Launch Site in a Region of theirs that has none); the Archivists', two Research Labs or Observatories working, one of them off Earth (Research into the Archive fund). A player sees their own in the **Journal**; a rival's is not shown.
 _Avoid_: quest, mission, starting goal
 
 **Journal**:

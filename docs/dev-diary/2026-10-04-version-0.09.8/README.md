@@ -101,3 +101,26 @@ The four notes that changed, as the game draws them (`menus:1 tutorial:<turn> se
 2 above, 3 and 5 below.
 
 ![the four changed tutorial notes](ticket-477/notes.png)
+
+## The Prospectors' Opening Objective: 50 Ducats, three turns running (#478)
+
+Decided on the ticket: three Incomes in a row, a turn with one Bank not working starts the count
+again; still three different Regions; the Journal shows the count.
+
+**Witnessed red:** the new test `the_prospectors_opening_objective_wants_three_turns_running` and
+the amended `each_faction_has_an_opening_objective_met_once_and_rewarded`, written before the rule,
+both failed with the objective met at the first Income (`left: (Some(1), 0)`). The first build then
+failed the new test on its own premise: the Fund grows a little each Income by itself, so the test
+now measures the 50 on top of that growth.
+
+**The Journal's count** (`player:prospectors victory:1 journal:1 openingrun:2`; `openingrun:` is a
+new aid that sets the count):
+
+![the Journal reading 2 of 3 turns](ticket-478/journal-count.png)
+
+**The sweep** ([`after-478.txt`](sweeps/after-478.txt)): 8 / 19 / 20 / 4 and 29 collapses, from
+8 / 21 / 18 / 5 and 28. Within noise. The Prospectors meet their objective in 51 of 80 games, from
+58, by seating 20 / 20 / 6 / 5 from 20 / 20 / 9 / 9, at a median turn one or two later.
+
+**The sweep's command and time, for the record:** `cargo run --release -p dying-earth-engine
+--example sweep -- 20 --seatings --steps=300 --balance`; the 80 games took 11 seconds, measured.

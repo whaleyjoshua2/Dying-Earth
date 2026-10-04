@@ -19422,6 +19422,51 @@ fn a_neutral_coastal_region_builds_a_sea_wall_when_the_sea_is_close() {
     assert!(walled(&g, egypt), "and it comes with the Region");
 }
 
+/// Ticket #478 (version 0.09.8): **the Prospectors' Opening Objective wants three Incomes running**
+/// with a working Investment Bank in three places, and pays 50 Ducats; an Income with one of the
+/// three not working starts the count again.
+#[test]
+fn the_prospectors_opening_objective_wants_three_turns_running() {
+    let mut g = game();
+    calm(&mut g);
+    let pro = Seat(1);
+    assert_eq!(g.kind(pro), FactionKind::Prospectors);
+    let card = g.tables.faction(FactionKind::Prospectors).opening.clone();
+    assert_eq!((card.count, card.turns, card.reward), (3, 3, 50.0));
+    assert_eq!(card.text, "Keep a working Investment Bank in three places for three turns");
+    assert_eq!(card.reward_text, "50 Ducats into the Venture Capital Fund");
+    for kind in [FactionKind::Custodians, FactionKind::Arkwrights, FactionKind::Archivists] {
+        assert_eq!(g.tables.faction(kind).opening.turns, 1, "{kind:?} is met the Income it is true");
+    }
+    g.seats[1].stockpile.energy = 500.0;
+    g.seats[1].venture_share = 0.0;
+    g.take_control(StateId::Russia, pro);
+    g.take_control(StateId::MiddleEast, pro);
+    for sid in [StateId::Europe, StateId::Russia, StateId::MiddleEast] {
+        g.state_mut(sid).facilities.push(facility(FacilityKind::InvestmentBank));
+    }
+    let fund = g.seats[1].venture_fund;
+    g.income_phase();
+    g.income_phase();
+    assert_eq!((g.seat(pro).opening_met_turn, g.seat(pro).opening_run), (None, 2), "two turns of three");
+    // One of the three stops working: the count starts again.
+    let bank = |g: &mut Game, on: bool| g.state_mut(StateId::MiddleEast).facilities.iter_mut().filter(|f| f.kind == FacilityKind::InvestmentBank).for_each(|f| f.mothballed = !on);
+    bank(&mut g, false);
+    g.income_phase();
+    assert_eq!((g.seat(pro).opening_met_turn, g.seat(pro).opening_run), (None, 0), "a turn with one not working starts the count again");
+    bank(&mut g, true);
+    g.income_phase();
+    let first = g.seats[1].venture_fund;
+    g.income_phase();
+    assert_eq!((g.seat(pro).opening_met_turn, g.seat(pro).opening_run), (None, 2));
+    // The Fund grows a little each Income of its own accord; the reward is 50 on top of that.
+    let (second, grows) = (g.seats[1].venture_fund, g.seats[1].venture_fund - first);
+    assert!(second - fund < 50.0, "nothing paid before the third: {second} from {fund}");
+    g.income_phase();
+    assert_eq!(g.seat(pro).opening_met_turn, Some(g.turn), "the third Income running");
+    assert!((g.seats[1].venture_fund - (second + grows + 50.0)).abs() < 1e-9, "50 Ducats into the Fund: {} from {second}, which grows {grows} a turn", g.seats[1].venture_fund);
+}
+
 /// Ticket #471 (version 0.09.7): **each Faction has an opening objective**, with no deadline, met
 /// at the first Income it is true and rewarded once, toward its own Victory.
 #[test]
@@ -19469,17 +19514,21 @@ fn each_faction_has_an_opening_objective_met_once_and_rewarded() {
     g.state_mut(StateId::MiddleEast).facilities.push(facility(FacilityKind::InvestmentBank));
     colony(&mut g, arc, BodyId::Moon, &[ModuleKind::Observatory], 1);
     g.income_phase();
-    assert_eq!(g.seat(pro).opening_met_turn, Some(g.turn));
-    assert!(g.seats[1].venture_fund >= fund + 75.0, "75 Ducats into the Fund: {} from {fund}", g.seats[1].venture_fund);
     assert_eq!(g.seat(arc).opening_met_turn, Some(g.turn));
     assert_eq!(g.seats[3].archive_fund, archive + 10, "10 Research into the Archive fund");
+    // Ticket #478 (version 0.09.8): the Prospectors' wants three Incomes running; one is one of three.
+    assert_eq!((g.seat(pro).opening_met_turn, g.seat(pro).opening_run), (None, 1), "one turn of three");
+    g.income_phase();
+    g.income_phase();
+    assert_eq!(g.seat(pro).opening_met_turn, Some(g.turn));
+    assert!(g.seats[1].venture_fund >= fund + 50.0, "50 Ducats into the Fund: {} from {fund}", g.seats[1].venture_fund);
     // Once only.
     let (sink, fund, archive) = (g.climate.natural_sink, g.seats[1].venture_fund, g.seats[3].archive_fund);
     g.seats[1].venture_share = 0.0;
     g.income_phase();
     assert_eq!(g.climate.natural_sink, sink);
     assert_eq!(g.seats[3].archive_fund, archive);
-    assert!(g.seats[1].venture_fund < fund + 75.0, "not paid twice: {}", g.seats[1].venture_fund);
+    assert!(g.seats[1].venture_fund < fund + 50.0, "not paid twice: {}", g.seats[1].venture_fund);
     // The player's own is reported under Your works; a rival's is not reported at all.
     assert!(g.report.lines.iter().all(|l| !l.text.contains("Opening objective")) || g.report.lines.iter().filter(|l| l.text.contains("Opening objective")).all(|l| l.kind == LineKind::YourWorks));
 }

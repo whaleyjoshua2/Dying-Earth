@@ -101,3 +101,36 @@ The authority is [ticket #477](https://github.com/whaleyjoshua2/Dying-Earth/issu
 - **No test holds a ceiling**, at the designer's word: the notes are to stay free to rewrite.
 
 **Pictures:** [`ticket-477/`](../dev-diary/2026-10-04-version-0.09.8/ticket-477/).
+
+## 5. The Prospectors' Opening Objective: 50 Ducats, three turns running
+
+The authority is [ticket #478](https://github.com/whaleyjoshua2/Dying-Earth/issues/478).
+
+- **The reward is 50 Ducats** into the Venture Capital Fund, where it was 75.
+- **The objective wants three Incomes running** with a working Investment Bank in each of three
+  different Regions the Prospectors control. Working is online and not mothballed, as before; two
+  Banks in one Region count once, as before. It need not be the same three Regions each turn.
+- **An Income where fewer than three Regions have a working Bank starts the count again.**
+- It is still met once, paid once, and has no deadline.
+- **Its words:** "Keep a working Investment Bank in three places for three turns" and "50 Ducats
+  into the Venture Capital Fund".
+- **The Journal shows the count** once it has started: "Not yet met: 2 of 3 turns."
+- The other three Factions' objectives are unchanged: each is met the Income it is true.
+- **The computer Prospectors** are taught nothing new: they lean toward building Banks until the
+  objective is met, as before.
+- **Saves:** the count is a new field that reads nought from an older save; `SAVE_VERSION` stays.
+
+**Measured** (80 games, the standing cell,
+[`after-478.txt`](../dev-diary/2026-10-04-version-0.09.8/sweeps/after-478.txt)):
+
+| | 0.09.7 | after this |
+|---|---|---|
+| Custodians | 8 | 8 |
+| Prospectors | 21 | 19 |
+| Arkwrights | 18 | 20 |
+| Archivists | 5 | 4 |
+| collapses | 28 | 29 |
+| Prospectors meet their objective | 58 of 80 | 51 of 80 |
+
+Every move in the win column is within noise. The Prospectors meet the objective in seven fewer
+games and a turn or two later.

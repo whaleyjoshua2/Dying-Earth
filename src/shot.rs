@@ -1573,6 +1573,13 @@ fn build_board(session: &mut Session) {
     // A card whose offer costs more than a seat holds greys its take button, and that is the state
     // a third of the table is in when a card is drawn; a fresh board is never poor enough to show
     // it.
+    // `openingrun:<n>` (a building aid, ticket #478, version 0.09.8): seat 0's Opening Objective
+    // has been true n Incomes running, so the Journal's count can be photographed.
+    if let Some(n) = std::env::args().find_map(|a| a.strip_prefix("openingrun:").and_then(|v| v.parse::<u32>().ok()))
+        && let Some(g) = session.game.as_mut()
+    {
+        g.seats[0].opening_run = n;
+    }
     if let Some(n) = std::env::args().find_map(|a| a.strip_prefix("ducats:").and_then(|v| v.parse::<i64>().ok()))
         && let Some(g) = session.game.as_mut()
     {

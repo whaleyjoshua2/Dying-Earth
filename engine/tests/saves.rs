@@ -191,7 +191,7 @@ fn a_save_without_this_versions_fields_still_loads() {
         out
     };
     let mut older = text.clone();
-    for name in ["under_sink_eased", "opening_gap", "best_gap_closed", "best_run", "lead_windfall", "card_price_by", "by", "places", "colony_growth", "offline_cause", "produced_total", "opening_met_turn", "launch_site_owed", "archives_lost", "archive_fund_lost"] {
+    for name in ["under_sink_eased", "opening_gap", "best_gap_closed", "best_run", "lead_windfall", "card_price_by", "by", "places", "colony_growth", "offline_cause", "produced_total", "opening_met_turn", "opening_run", "launch_site_owed", "archives_lost", "archive_fund_lost"] {
         let before = older.len();
         older = cut(&older, name);
         assert!(older.len() < before, "{name} was in the save and is cut");
