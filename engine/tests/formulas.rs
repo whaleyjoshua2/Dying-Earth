@@ -6745,7 +6745,7 @@ fn a_victory_condition_waits_on_its_gate() {
 /// Ticket #84: each gate is a Tech for everyone. The Charter: Mine x1.25 (4 x 1.65 x 1.25 = 8.25);
 /// the Upload: Observatory and Lab x1.25 (2 x 1.25 x 1.25 = 3.125 for a Custodian Observatory);
 /// Generation Ships: a Colony Ship carries 2 more (12 for the Arkwrights); Stewardship: the Sink
-/// grows by 1.0.
+/// grows by 1.5 (ticket #458, version 0.09.7; 1.0 before).
 #[test]
 fn the_gates_general_bonuses_are_for_everyone() {
     let mut g = game();
@@ -6766,7 +6766,7 @@ fn the_gates_general_bonuses_are_for_everyone() {
     assert_eq!(g.colony_ship_capacity(Seat(2)), 12, "(4 + 2) x 2 for the Arkwrights");
     let sink = g.emissions_now().sink;
     with_tech(&mut g, TechId::PlanetaryStewardship);
-    assert!((g.emissions_now().sink - sink - 1.0).abs() < 1e-9, "the Sink grows by 1.0: {} then {}", sink, g.emissions_now().sink);
+    assert!((g.emissions_now().sink - sink - 1.5).abs() < 1e-9, "the Sink grows by 1.5: {} then {}", sink, g.emissions_now().sink);
 }
 
 /// Ticket #84: the Custodian AI, as Research Lead with the road to its gate open, picks Planetary
