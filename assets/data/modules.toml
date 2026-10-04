@@ -141,7 +141,8 @@ base = 0
 per_colonist = 1
 
 [archive]
-research = 125
+# Ticket #439 (version 0.09.6): 150, at the designer's word; with the bar in `factions.toml`.
+research = 150
 # Ticket #192 (version 0.08.0): how many Colonists must live at the place before the Archive may be
 # ORDERED. Checked once, at the order; neither the three-turn build nor the standing Module cares
 # afterwards, and the Victory Condition does its own checking at the end.

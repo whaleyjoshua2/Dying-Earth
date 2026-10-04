@@ -140,6 +140,23 @@ pub struct PendingChange {
     pub seat: Seat,
 }
 
+/// Ticket #451 (version 0.09.6): **why a building is offline**, recorded where it is switched off, so
+/// its hover says the cause and never guesses. Absent while it is online, or mothballed, or in a save
+/// older than the field.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum OfflineCause {
+    /// Shut by the Energy shortfall at Income.
+    Energy,
+    /// Struck by this card until the next Resolution.
+    Card(String),
+    /// Its Colony's grid is down.
+    Grid,
+    /// An Archive at an Occupied Colony.
+    Occupied,
+    /// A Sea Wall whose keep went unpaid.
+    Unkept,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Facility {
     pub kind: FacilityKind,
@@ -158,6 +175,9 @@ pub struct Facility {
     /// Ticket #56: whether this Facility stands in one of its state's coastal slots. The sea takes
     /// coastal slots only, so a coastal Facility is the one it can destroy.
     pub coastal: bool,
+    /// Ticket #451 (version 0.09.6): why it is offline.
+    #[serde(default)]
+    pub offline_cause: Option<OfflineCause>,
     /// Ticket #257 (version 0.08.4): a Sea Wall's count of the Sea Level thresholds it has held
     /// back. The wall is not destroyed absorbing one any more; each rise it holds adds
     /// `sea_wall_upkeep_per_rise` Materials a turn to its keep. Zero on every other kind.
@@ -167,7 +187,7 @@ pub struct Facility {
 
 impl Facility {
     pub fn new(kind: FacilityKind) -> Facility {
-        Facility { kind, online: true, offline_until_resolution: false, self_run: false, mothballed: false, change: None, coastal: false, rises_held: 0 }
+        Facility { kind, online: true, offline_until_resolution: false, self_run: false, mothballed: false, change: None, coastal: false, rises_held: 0, offline_cause: None }
     }
     /// Ticket #56: a Facility standing in a coastal slot.
     pub fn in_coastal_slot(kind: FacilityKind) -> Facility {
@@ -189,6 +209,9 @@ pub struct Module {
     /// Ticket #54: mothballed, exactly as a Facility is.
     pub mothballed: bool,
     pub change: Option<PendingChange>,
+    /// Ticket #451 (version 0.09.6): why it is offline.
+    #[serde(default)]
+    pub offline_cause: Option<OfflineCause>,
     /// Ticket #324 (version 0.08.8): hits taken in a Battle, nought for every Module but a Battery;
     /// repaired with Materials as a Ship's are. At the card's hit points the Battery is gone.
     #[serde(default)]
@@ -197,7 +220,7 @@ pub struct Module {
 
 impl Module {
     pub fn new(kind: ModuleKind) -> Module {
-        Module { kind, online: true, offline_until_resolution: false, mothballed: false, change: None, damage: 0 }
+        Module { kind, online: true, offline_until_resolution: false, mothballed: false, change: None, damage: 0, offline_cause: None }
     }
     /// Ticket #54: standing, running and not mothballed.
     pub fn working(&self) -> bool {
@@ -234,7 +257,7 @@ impl BuildItem {
 /// count in place of a due turn. The place's Widgets fill `done` each Resolution in queue order,
 /// and the build completes at the Resolution `done` reaches `widgets`; a build never completes
 /// short of its figure, and nothing here is a turn count.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Build {
     pub item: BuildItem,
     pub seat: Seat,
@@ -247,6 +270,11 @@ pub struct Build {
     /// Ticket #56: the slot a Facility build in a Nation State reserved, coastal or inland. False
     /// for everything else, which has no slot of this kind to reserve.
     pub coastal: bool,
+    /// Ticket #455 (version 0.09.6): the Fuel paid at the order for a Ship's tank, which the Ship
+    /// is built holding and a cancel refunds. Nought for everything else, and in a save older than
+    /// the field, where the Ship is filled to its tank as it always was.
+    #[serde(default)]
+    pub fuel: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -971,6 +999,12 @@ pub struct SeatState {
     pub blockade_turns_suffered: u32,
     #[serde(default)]
     pub blockade_turns_imposed: u32,
+    /// Ticket #454 (version 0.09.6): Colonists this seat's Colonies have gained by natural growth and
+    /// lost to natural decline over the game, for the sweep.
+    #[serde(default)]
+    pub colonists_grown: u32,
+    #[serde(default)]
+    pub colonists_declined: u32,
     /// Ticket #227 (version 0.08.2): units this seat has bought and sold through the Trading window
     /// over the whole game. Kept because floating prices are only fair if more than one hand is on
     /// them, and the sweep had no way to say whose were.
@@ -1556,6 +1590,9 @@ pub struct Game {
     /// Ticket #345 (version 0.09.1): who was first to each Body, one row per Body at most,
     /// appended when a first is claimed and never rewritten. In the save.
     pub body_firsts: Vec<BodyFirst>,
+    /// Ticket #444 (version 0.09.6): each Colony's growth toward its next Colonist, a fraction
+    /// below one; a Colony with none has nothing banked.
+    pub colony_growth: BTreeMap<ColonyId, f64>,
     /// Ticket #431 (version 0.09.5): last turn's "Colonists wait aboard" lines, so one that has not
     /// changed is not written again. Not saved: after a load each shows once.
     pub waiting_last: Vec<String>,
@@ -1598,6 +1635,8 @@ impl Game {
             agitates_issued: 0,
             blockade_turns_suffered: 0,
             blockade_turns_imposed: 0,
+            colonists_grown: 0,
+            colonists_declined: 0,
             bought_units: 0,
             sold_units: 0,
             spaceport_influence: 0,
@@ -1785,6 +1824,7 @@ impl Game {
             accords: Vec::new(),
             body_firsts: Vec::new(),
             waiting_last: Vec::new(),
+            colony_growth: BTreeMap::new(),
             reveal_all: false,
             tables,
         };
@@ -3832,14 +3872,33 @@ impl Game {
     /// Ticket #335: the orbits of a Body -- LOW ORBIT, then one per Orbital Slot. Every Ship at the
     /// Body sits in exactly one of them, and a Battle is fought within one of them.
     pub fn orbits_of(&self, body: BodyId) -> Vec<Orbit> {
-        std::iter::once(Orbit::Low).chain((0..self.tables.body(body).orbital_slots).map(Orbit::Slot)).collect()
+        let low = self.has_low_orbit(body).then_some(Orbit::Low);
+        low.into_iter().chain((0..self.tables.body(body).orbital_slots).map(Orbit::Slot)).collect()
+    }
+
+    /// Ticket #442 (version 0.09.6), at the designer's word: a Body with no ground has no LOW orbit,
+    /// the orbit the ground is reached from -- Venus, today. Its Ships sit in its station orbits.
+    pub fn has_low_orbit(&self, body: BodyId) -> bool {
+        self.tables.body(body).colony_slots() > 0
+    }
+
+    /// Ticket #442 (version 0.09.6): where a Ship sent to a Body arrives when nothing names an
+    /// orbit -- low orbit, or at a Body with none, the ring of the seat's own station there, else the
+    /// first free ring, else the first.
+    pub fn arrival_slot(&self, seat: Seat, body: BodyId) -> Option<u32> {
+        if self.has_low_orbit(body) {
+            return None;
+        }
+        let own = self.colonies.iter().find(|c| c.in_orbit && c.body == body && c.control.director() == Some(seat)).map(|c| c.slot);
+        Some(own.or_else(|| self.free_orbital_slots(body).first().copied()).unwrap_or(0))
     }
 
     /// Ticket #335: whether this orbit exists at this Body. Low orbit always does; a slot's does
-    /// where the Body has that many Orbital Slots.
+    /// where the Body has that many Orbital Slots. Ticket #442 (version 0.09.6): low orbit only where
+    /// the Body has ground.
     pub fn orbit_exists(&self, body: BodyId, orbit: Orbit) -> bool {
         match orbit {
-            Orbit::Low => true,
+            Orbit::Low => self.has_low_orbit(body),
             Orbit::Slot(n) => n < self.tables.body(body).orbital_slots,
         }
     }
@@ -4380,7 +4439,8 @@ impl Game {
         let mut out = [0.0; SEAT_COUNT];
         for st in &self.states {
             if let Some(seat) = st.control.controller() {
-                out[seat.index()] += per * self.scrubbers_online(st.id) as f64;
+                // Ticket #445 (version 0.09.6): at the share its holder runs it at.
+                out[seat.index()] += per * self.scrubber_share(st.id) * self.scrubbers_online(st.id) as f64;
             }
             if let Some(seat) = st.control.director() {
                 out[seat.index()] += reserve * st.facilities.iter().filter(|f| f.kind == FacilityKind::NatureReserve && f.working()).count() as f64;
@@ -4389,9 +4449,32 @@ impl Game {
         out
     }
 
-    /// What the whole table takes back this Climate phase.
+    /// What the whole table takes back this Climate phase. Ticket #445 (version 0.09.6): with the
+    /// neutral Regions' Scrubbers at their quarter, which no seat is credited with.
     pub fn scrubber_removal(&self) -> f64 {
-        self.scrubber_removal_by_seat().iter().sum()
+        self.scrubber_removal_by_seat().iter().sum::<f64>() + self.scrubber_removal_neutral()
+    }
+
+    /// Ticket #445 (version 0.09.6): what a Scrubber runs at in this Region -- whole under the
+    /// Custodians, `captured_share` under any other Faction, `neutral_share` with no controller.
+    pub fn scrubber_share(&self, s: StateId) -> f64 {
+        let c = &self.tables.scrubber;
+        match self.state(s).control.controller() {
+            Some(seat) if self.kind(seat) == FactionKind::Custodians => 1.0,
+            Some(_) => c.captured_share,
+            // A Region occupied from neutral has no controller either, and its Scrubber never added
+            // to the Sink (ticket #351's review); the quarter is a NEUTRAL Region's, at the designer's
+            // word on a throw-off, so that case stays at nought.
+            None if self.state(s).control == Control::Neutral => c.neutral_share,
+            None => 0.0,
+        }
+    }
+
+    /// Ticket #445 (version 0.09.6): the ppm the Scrubbers of Regions with no controller take back,
+    /// to nobody's Blame.
+    pub fn scrubber_removal_neutral(&self) -> f64 {
+        let per = self.tables.facility(FacilityKind::Scrubber).sink_per_turn;
+        self.states.iter().filter(|st| st.control.controller().is_none()).map(|st| per * self.scrubber_share(st.id) * self.scrubbers_online(st.id) as f64).sum()
     }
 
     // ---------------------------------------------------------------- Ticket #54: the two coefficients
@@ -4578,7 +4661,8 @@ impl Game {
             n += u.constabulary_fall;
         }
         if self.scrubbers_online(s) > 0 {
-            n += u.scrubber_fall;
+            // Ticket #445 (version 0.09.6): at the share its holder runs it at.
+            n += u.scrubber_fall * self.scrubber_share(s);
         }
         n
     }

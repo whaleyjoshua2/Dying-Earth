@@ -20,7 +20,8 @@ carries_army = false
 # Ticket #87 (version 0.06.0): every Ship carries its own Fuel in a tank of this size, filled at
 # the yard and refilled only by a Refuel order at a Body with a station of its own. Ticket #420
 # (version 0.09.4): the Colony Ship's is 40, every warship's 30, at the designer's word.
-tank = 40
+# Ticket #455 (version 0.09.6): 35, at the designer's word; the Techs' +5 and +15 unchanged.
+tank = 35
 
 [[unit]]
 id = "frigate"

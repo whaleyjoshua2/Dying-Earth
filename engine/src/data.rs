@@ -163,6 +163,10 @@ pub struct ScrubberCard {
     pub per_population: f64,
     pub min: u32,
     pub max: u32,
+    /// Ticket #445 (version 0.09.6): what a Scrubber runs at in a Faction's hands other than the
+    /// Custodians', and in a neutral Region.
+    pub captured_share: f64,
+    pub neutral_share: f64,
 }
 
 /// Ticket #333 (version 0.09.0): what a Region's people are worth to a Research Lab, one point of
@@ -656,7 +660,7 @@ pub struct FactionCard {
     /// Ticket #100 (version 0.07.0), renamed on ticket #195 (version 0.08.0): the Region the start
     /// screen opens its globe on. It has ONE reader, and its only job is pointing the start globe's
     /// camera, which the old name `home` did not say -- it read as a starting position, which it has
-    /// never been: any of the fourteen may still be chosen.
+    /// never been: any of the sixteen may still be chosen.
     pub opens_on: StateId,
     /// Ticket #46: the station over Earth the Faction starts with, by name in bodies.toml.
     /// Ticket #50: the Arkwrights start with none, so this is optional.
@@ -927,6 +931,9 @@ pub struct ClimateTable {
     pub collapse_line: f64,
     pub temperature_lag_fraction: f64,
     pub population_growth: f64,
+    /// Ticket #444 (version 0.09.6): a Colony's growth share a turn, and its loss a turn when starved.
+    pub colony_growth: f64,
+    pub colony_decline: u32,
     /// Ticket #333 (version 0.09.0): the population figure's unit, in people. A Region's figure, a
     /// Colonist and a Pioneer are all counted in it, so `Region population 380.0` is 380 million
     /// people and one Colonist is one million. A code constant of five million from ticket #143
@@ -1312,6 +1319,14 @@ pub struct AiPace {
     #[serde(default)]
     pub under_sink_by_turn: u32,
     pub colonists: Vec<[i64; 2]>,
+    /// Ticket #449 (version 0.09.6): Bodies settled by turn, for a Faction whose second Victory part
+    /// counts them (the Arkwrights). Empty for the rest.
+    #[serde(default)]
+    pub bodies: Vec<[i64; 2]>,
+    /// Ticket #449 (version 0.09.6): Colonists Uploaded by turn, for a Faction whose second Victory
+    /// part counts them (the Archivists). Empty for the rest.
+    #[serde(default)]
+    pub uploads: Vec<[i64; 2]>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -1332,6 +1347,17 @@ pub struct AiThresholds {
     /// Ticket #284 (version 0.08.5): the Relations score at or below which a seat has cause to
     /// attack a place a rival holds -- Cold or worse.
     pub war_cause: i64,
+    /// Ticket #446 (version 0.09.6): the computer Custodians' lift against a heavy emitter.
+    pub emitter_k: f64,
+    pub emitter_cap: f64,
+    pub emitter_cause: i64,
+    /// Ticket #448 (version 0.09.6): what a seat keeps back from the market.
+    pub market_materials_reserve: f64,
+    pub market_materials_turns: f64,
+    pub market_fuel_reserve: f64,
+    /// Ticket #447 (version 0.09.6): the standing fleet, and the fleet while blockaded.
+    pub warships_wanted: u32,
+    pub warships_wanted_blockaded: u32,
     pub evade_damage_fraction: f64,
     pub influence_step: i64,
     /// Ticket #75: a held state's worth on the Influence target list, as a share of a neutral one's.

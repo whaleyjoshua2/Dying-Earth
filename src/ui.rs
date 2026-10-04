@@ -2686,7 +2686,7 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
                 .filter(|(n, _)| *n > 0)
                 .collect();
             bodies.sort_by_key(|(n, _)| std::cmp::Reverse(*n));
-            // Ticket #166 (version 0.07.5): the four largest and a count of the rest. All fourteen
+            // Ticket #166 (version 0.07.5): the four largest and a count of the rest. All sixteen
             // were listed, which buried the chart the player hovered for under a list they could
             // read off the map.
             const NAMED: usize = 4;
@@ -3133,7 +3133,8 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                     // station's ring holds nothing by sitting there.
                     // Ticket #430 (the review): not at a Body out of sight, where it would say whose
                     // warships hold low orbit.
-                    if let Some(s) = game.orbital_control(body).filter(|_| !hidden_body(game, body)) {
+                    // Ticket #442 (version 0.09.6): and not at a Body with no low orbit.
+                    if let Some(s) = game.orbital_control(body).filter(|_| !hidden_body(game, body) && game.has_low_orbit(body)) {
                         label_at(painter, p - egui::vec2(0.0, side * 40.0), &format!("Orbital Control of low orbit: {}", game.seat_name(s)), seat_colour(session, s), 12.0);
                     }
                 }
@@ -3349,11 +3350,14 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                     // Ticket #335: Orbital Control is of LOW ORBIT, and the line says so, since a
                     // warship at a station's ring holds nothing by sitting there.
                     let any_battery = Seat::ALL.iter().any(|s| !game.batteries_at(*s, body, Orbit::Low).is_empty());
-                    band.push(match game.orbital_control(body).filter(|_| !hidden_body(game, body)) {
-                        Some(s) => BandRow { text: format!("Orbital Control of low orbit: {}", game.seat_name(s)), colour: seat_colour(session, s), kind: None, seat: None, battle: None },
-                        None if any_battery => BandRow { text: "Orbital Control of low orbit: nobody, a Battery stands".to_string(), colour: Color32::LIGHT_GRAY, kind: None, seat: None, battle: None },
-                        None => BandRow { text: "Orbital Control of low orbit: nobody".to_string(), colour: Color32::LIGHT_GRAY, kind: None, seat: None, battle: None },
-                    });
+                    // Ticket #442 (version 0.09.6): not at a Body with no low orbit (Venus).
+                    if game.has_low_orbit(body) {
+                        band.push(match game.orbital_control(body).filter(|_| !hidden_body(game, body)) {
+                            Some(s) => BandRow { text: format!("Orbital Control of low orbit: {}", game.seat_name(s)), colour: seat_colour(session, s), kind: None, seat: None, battle: None },
+                            None if any_battery => BandRow { text: "Orbital Control of low orbit: nobody, a Battery stands".to_string(), colour: Color32::LIGHT_GRAY, kind: None, seat: None, battle: None },
+                            None => BandRow { text: "Orbital Control of low orbit: nobody".to_string(), colour: Color32::LIGHT_GRAY, kind: None, seat: None, battle: None },
+                        });
+                    }
                     // Ticket #317 (version 0.08.8): a Battle in orbit last turn is a row of the
                     // band, with the Battle mark's glyph, in the aggressor's colour; its hotspot
                     // reads the record and opens the Report as the mark's does.
@@ -3842,9 +3846,11 @@ fn right_click(pos: Pos2, session: &Session, game: &Game, view: &ViewState, came
             // LOW ORBIT -- `slot: None` -- which is the orbit the ground is reached from and the
             // one a player almost always means from this map. A station's own orbit is chosen from
             // the stack card's Transits row, or by a right-click on its glyph once there.
-            let orders: Vec<Order> = ids.into_iter().map(|id| Order::Transit { ship: id, to, slot: None }).filter(|o| game.check_order(Seat(0), &session.pending, o).is_ok() || session.pending.contains(o)).collect();
+            // Ticket #442 (version 0.09.6): at a Body with no low orbit, the arrival ring.
+            let slot = game.arrival_slot(Seat(0), to);
+            let orders: Vec<Order> = ids.into_iter().map(|id| Order::Transit { ship: id, to, slot }).filter(|o| game.check_order(Seat(0), &session.pending, o).is_ok() || session.pending.contains(o)).collect();
             if orders.is_empty() {
-                actions.push(Action::Notice(format!("No selected Ship can pay the leg to {}.", game.orbit_name(to, Orbit::Low))));
+                actions.push(Action::Notice(format!("No selected Ship can pay the leg to {}.", game.orbit_name(to, Orbit::of(slot)))));
             }
             place_or_cancel(orders, actions);
         }
@@ -4980,6 +4986,7 @@ fn order_text(game: &Game, o: &Order) -> String {
             // Ticket #409 (version 0.09.4): with the count the slider chose.
             UnloadTarget::Slot(b, s) => format!("Found a Colony at {} on {} with {} from {}", game.tables.body(*b).slots[*s as usize].name, game.tables.body(*b).name, colonists_word(*colonists), ship),
             UnloadTarget::Colony(c) => format!("Unload {} from {} into {}", if *colonists > 0 { colonists_word(*colonists) } else if *army { "the Army".into() } else { "nothing".into() }, ship, game.place_name(Place::Colony(*c))),
+            UnloadTarget::Ring(b, s) => format!("Found {} over {} with {} from {}", game.station_name(*b, *s), game.tables.body(*b).name, colonists_word(*colonists), ship),
         },
         Order::Influence { target, amount } => format!("{} Influence on {}", amount, game.place_name(*target)),
         Order::BuyInfluence { amount } => format!("Buy {} Influence with Ducats", amount),
@@ -4989,6 +4996,9 @@ fn order_text(game: &Game, o: &Order) -> String {
         Order::BuildFacilityWithDucats { state, kind } => format!("Build {} in {} for Ducats", kind.name(), game.tables.state(*state).name),
         Order::BuildModuleWithDucats { colony, kind } => format!("Build {} at {} for Ducats", kind.name(), game.place_name(Place::Colony(*colony))),
         Order::BuildStation { body, slot } => format!("Build {} over {}", game.station_name(*body, *slot), game.tables.body(*body).name),
+        // Ticket #442 (version 0.09.6).
+        Order::BuildColony { body, slot } => format!("Build a Colony at {} on {}", game.tables.body(*body).slots[*slot as usize].name, game.tables.body(*body).name),
+        Order::SendDown { from, to, colonists } => format!("Send {} down from {} to {}", colonists_word(*colonists), game.place_name(Place::Colony(*from)), game.place_name(Place::Colony(*to))),
         Order::BuildArchive { colony } => format!("Build the Archive at {}", game.place_name(Place::Colony(*colony))),
         Order::SetMaxStanding { target: Some(p) } => format!("Spend your whole Allotment on {}, every turn", game.place_name(*p)),
         Order::SetMaxStanding { target: None } => "Place your Influence by hand again".to_string(),
@@ -5003,6 +5013,7 @@ fn order_text(game: &Game, o: &Order) -> String {
             match into {
                 UnloadTarget::Slot(_, slot) => game.tables.body(BodyId::Earth).slots[*slot as usize].name.clone(),
                 UnloadTarget::Colony(c) => game.place_name(Place::Colony(*c)),
+                UnloadTarget::Ring(..) => String::new(),
             }
         ),
         // Ticket #72.
@@ -5069,6 +5080,10 @@ fn change_buttons(ui: &mut Ui, game: &Game, pending: &[Order], b: BuildingRef, m
 /// buttons. With less than this the buttons go beneath the line as they did before, so a narrowed
 /// panel degrades to the old shape rather than to clipped buttons.
 const CHANGE_BUTTONS_WIDTH: f32 = 196.0;
+
+/// Ticket #452 (version 0.09.6): the Blame hover, cut at the designer's word and written once, where
+/// the Faction window and the Climate Panel each carried four long lines of it, word for word.
+const BLAME_HOVER: &str = "Blame: CO2 this Faction's places emitted, less what it removed (Scrubbers, Nature Reserves, the Custodians' Sink Directive).\nAbove a quarter share: Influence thresholds rise up to +50% where it doesn't hold, and every rival likes it a point less per step.";
 
 /// Ticket #116 (version 0.07.1): the rule for what gets a tooltip, so the next person has a test
 /// to apply rather than a list to extend. The designer: *"increase the use of mouse over tooltips."*
@@ -5194,7 +5209,7 @@ struct RowPart {
 }
 
 /// Ticket #132 (version 0.07.3): a row of parts separated by a middle dot, each hugging its own
-/// glyph and carrying its own hover: `Output x1 · [chimney] x0.75 · [flask] x1.25 · [horn] x1.2`
+/// glyph and carrying its own hover: `Output x1 · [chimney] x0.75 · [flask] x1.25 · [horn] x1.15`
 /// on a Faction card, `leans [cart]` on the start globe's Region panel. This is the one place the
 /// glyph rule bends: here the glyph HEADS a multiplier instead of following a number (see
 /// `draw_with_icons`), because four cards side by side are read by comparison, glyph under glyph,
@@ -5680,6 +5695,11 @@ fn build_words(game: &Game, order: &Order) -> Option<String> {
         Order::BuildArmy { place } => format!(", and {}", game.army_people_text(*place)),
         _ => String::new(),
     };
+    // Ticket #455 (version 0.09.6): a Ship's price carries its tank, so the hover says so. The
+    // caller ends the text with the full stop.
+    if matches!(order, Order::BuildShip { .. }) && cost.fuel > 0.0 {
+        return Some(format!("{} Materials, {widgets} Widgets, {when}.\nBuilt full: {} Fuel", cost.materials, cost.fuel));
+    }
     Some(format!("{} Materials, {widgets} Widgets{people}, {when}", cost.materials))
 }
 
@@ -6496,11 +6516,19 @@ fn standings_row(ui: &mut Ui, game: &Game, session: &Session, target: Place, thr
 /// *Scrubber: +3.0 ppm Sink, 1 off Unrest a turn, 3 Energy upkeep*; *Sea Wall: holds the sea off; 3
 /// rises held, 1.5 Materials a turn to keep* (or *nothing held yet*, and *unkept this turn* when it
 /// is) -- the figures the data holds, glyph-rendered by the row, in the resolution's words.
-fn no_slot_figures(game: &Game, f: &Facility) -> String {
+fn no_slot_figures(game: &Game, sid: StateId, f: &Facility) -> String {
     let card = game.tables.facility(f.kind);
     match f.kind {
         FacilityKind::SeaWall => format!("holds the sea off; {}{}", sea_wall_keep(game, f), sea_wall_unkept(f)),
-        _ => format!("+{:.1} ppm Sink, {} off Unrest a turn, {} Energy upkeep", card.sink_per_turn, Game::unrest_figure(game.tables.unrest.scrubber_fall), card.energy_upkeep),
+        // Ticket #445 (version 0.09.6): at the share its holder runs it at, and no upkeep with nobody.
+        _ => {
+            let share = game.scrubber_share(sid);
+            let upkeep = if game.state(sid).control.controller().is_some() { format!(", {} Energy upkeep", card.energy_upkeep) } else { String::new() };
+            let at = if share < 1.0 { format!(" (x{share})") } else { String::new() };
+            let sink = card.sink_per_turn * share;
+            let sink = if (sink * 10.0).fract().abs() < 1e-9 { format!("{sink:.1}") } else { format!("{sink:.2}") };
+            format!("+{sink} ppm Sink, {} off Unrest a turn{upkeep}{at}", Game::unrest_figure(game.tables.unrest.scrubber_fall * share))
+        }
     }
 }
 
@@ -6518,7 +6546,9 @@ fn sea_wall_keep(game: &Game, f: &Facility) -> String {
 
 /// Ticket #390: the clause a Sea Wall left unkept this turn adds, and nothing otherwise.
 fn sea_wall_unkept(f: &Facility) -> &'static str {
-    if !f.online && !f.mothballed { "; unkept this turn" } else { "" }
+    // Ticket #451 (version 0.09.6): by the recorded cause, where any offline wall read as unkept.
+    let other_cause = matches!(f.offline_cause, Some(OfflineCause::Energy) | Some(OfflineCause::Card(_)));
+    if !f.online && !f.mothballed && !other_cause { "; unkept this turn" } else { "" }
 }
 
 /// Ticket #146 (version 0.07.3): one Facility's line -- its figures with their glyphs, the hover
@@ -6563,7 +6593,11 @@ fn facility_figures(game: &Game, sid: StateId, f: &Facility, director: Option<Se
 /// a tooltip is allowed. They stay on every hover without a chain.
 fn chain_tip(with_rules: &str, chain: &Chain) -> String {
     let mut lines: Vec<String> = with_rules.lines().next().map(str::to_string).into_iter().collect();
-    lines.extend(chain.lines(5));
+    // Ticket #451 (version 0.09.6): the cause line stays -- offline, blockaded or at half -- and the
+    // chain gives up a line for it, so the hover keeps to six.
+    lines.extend(with_rules.lines().skip(1).filter(|l| l.starts_with("Offline") || l.starts_with("At half") || l.starts_with("Blockaded")).map(str::to_string));
+    let room = 6usize.saturating_sub(lines.len());
+    lines.extend(chain.lines(room));
     lines.join("\n")
 }
 
@@ -6588,7 +6622,7 @@ fn facility_row(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, i: us
     let full = facility_figures(game, sid, f, director);
     // Ticket #390 (version 0.09.3): a Scrubber or Sea Wall row is one short line, at the designer's
     // word ("reduce verbiage for sea wall and scrubber"); its whole sentence is the row's hover.
-    let short = if game.takes_slot(f.kind) || f.mothballed { None } else { Some(no_slot_figures(game, f)) };
+    let short = if game.takes_slot(f.kind) || f.mothballed { None } else { Some(no_slot_figures(game, sid, f)) };
     let figures = short.clone().unwrap_or_else(|| full.clone());
     let colour = if f.mothballed { Color32::from_rgb(170, 170, 190) } else { ui.visuals().text_color() };
     // Ticket #112 (version 0.07.1): the glyphs come down into the Facility list, where the
@@ -6613,7 +6647,9 @@ fn facility_row(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, i: us
         // Ticket #352 (version 0.09.1): with its arithmetic, where the figure is multiplied.
         // Ticket #390 (version 0.09.3): a short row's hover is its whole sentence and nothing else,
         // so the Sea Wall's, the longest in the data, stays within the six-line ceiling.
-        let rules = if short.is_some() { full.clone() } else { facility_rules(f.kind.name(), f.coastal) };
+        // Ticket #451 (version 0.09.6): and why it is offline, which this row never said -- a Scrubber
+        // or Sea Wall has no box, and the box's hover was the only place the cause stood.
+        let rules = if short.is_some() { format!("{}{}", full, facility_offline_words(game, sid, f)) } else { facility_rules(f.kind.name(), f.coastal) };
         let tip = match director.filter(|_| !f.mothballed && earnings_seen(game, Place::State(sid), director)).map(|d| game.facility_yield(d, sid, f.kind).chain).filter(|c| c.multiplied()) {
             Some(chain) => chain_tip(&rules, &chain),
             None => rules,
@@ -6862,7 +6898,7 @@ fn slot_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
             SlotBoxKind::Standing(i) => {
                 let f = &st.facilities[*i];
                 let state = if f.mothballed { TileState::Mothballed } else if !f.online { TileState::Offline } else { TileState::Standing };
-                let heading = format!("{} ({side}): {}{}", f.kind.name(), facility_figures(game, sid, f, director), facility_offline_words(f));
+                let heading = format!("{} ({side}): {}{}", f.kind.name(), facility_figures(game, sid, f, director), facility_offline_words(game, sid, f));
                 let tip = facility_rules(&heading, f.coastal);
                 // Ticket #352 (version 0.09.1): with its arithmetic, where the figure is multiplied.
                 let tip = match director.filter(|_| !f.mothballed && earnings_seen(game, Place::State(sid), director)).map(|d| game.facility_yield(d, sid, f.kind).chain).filter(|c| c.multiplied()) {
@@ -6959,7 +6995,12 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     // read it as the Nation's. The designer: *"Population 12.2 (hundreds of millions) should say
     // something like Population 12.2 (339M)."* Ticket #333 (version 0.09.0): units of one million,
     // read off the tables, the same shape: `Region population 1454.5 (1.45B)`.
-    icon_word(ui, "population", format!("Region population {}, Industry Level {}, leans {:?}", game.tables.population_text(st.population), st.industry_level, card.resource_lean));
+    // Ticket #444 (version 0.09.6): the natural growth the rule already ran, shown: the base, the
+    // heat's cut, and this turn's figure.
+    let pop = icon_word(ui, "population", format!("Region population {}, Industry Level {}, leans {:?}", game.tables.population_text(st.population), st.industry_level, card.resource_lean));
+    let (c, rate) = (&game.tables.climate, game.population_growth_rate());
+    rule_tip(pop, format!("Growth {:+.2}% a turn, less {:.2}% per tenth of a degree above {:+.1} C.
+This turn {:+.2}%: {:+.1} million.", c.population_growth * 100.0, c.population_loss_per_tenth_degree * 100.0, c.base_temperature, rate * 100.0, st.population * rate));
     // Ticket #391 (version 0.09.3): what the Region made this turn, under its population.
     output_row(ui, game, Place::State(sid));
     // Ticket #161 (version 0.07.5): what an Allotment is, which this line names and never explains.
@@ -7143,7 +7184,8 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     rule_tip(
         ui.label(RichText::new(format!("Facilities ({free_now} of {} slots free{})", game.build_slots(sid), if ordered_slots > 0 { format!(", {ordered_slots} ordered this turn") } else { String::new() })).strong()),
         format!(
-            "Slots: Size {} plus {} plus the Industry Level {} it started at, and one more for every raise since, always inland.\n{} are coastal: the sea takes those at a threshold, oldest Facility with them, and turns one inland slot coastal every time, wall or no wall. A Sea Wall holds the taking off, not the turning.\nMothballed and building each keep a slot.",
+            // Ticket #452 (version 0.09.6): cut, at the designer's word, every rule kept.
+            "Slots: Size {} + {} + starting Industry {}, +1 inland per raise.\n{} coastal: each sea threshold takes one (with its oldest Facility) and turns an inland slot coastal. A Sea Wall stops the taking, not the turning.\nMothballed and building each keep a slot.",
             game.tables.state(sid).size,
             game.tables.base_slots,
             game.tables.state(sid).industry_level,
@@ -7411,10 +7453,12 @@ fn pioneers_block(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, act
     let lifts = st.facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working());
     let sea_door = game.antarctica_open
         && (!game.free_slots_on(BodyId::Earth).is_empty() || game.colonies.iter().any(|c| c.body == BodyId::Earth && !c.in_orbit && c.control.director() == Some(Seat(0)) && game.habitat_room(c) > c.colonists));
-    let lift_door = lifts
-        && (game.colonies.iter().any(|c| c.body == BodyId::Earth && c.in_orbit && c.control.director() == Some(Seat(0)) && game.habitat_room(c) > c.colonists)
-            || game.ships.iter().any(|s| s.seat == Seat(0) && s.kind == UnitKind::ColonyShip && s.at == ShipAt::Body(BodyId::Earth) && s.colonists < game.colony_ship_capacity(Seat(0))));
-    let send = if st.emigrants > 0 && (sea_door || lift_door) { count_slider(ui, ("send", sid), st.emigrants, "Pioneers") } else { st.emigrants };
+    let lift_door = lifts && game.colonies.iter().any(|c| c.body == BodyId::Earth && c.in_orbit && c.control.director() == Some(Seat(0)) && game.habitat_room(c) > c.colonists);
+    // Ticket #443 (version 0.09.6): a Colony Ship in LOW orbit takes Pioneers from a Region with no
+    // Launch Site; one at a station's ring still needs it.
+    let ship_reached = |s: &Ship| s.seat == Seat(0) && s.kind == UnitKind::ColonyShip && s.at == ShipAt::Body(BodyId::Earth) && (lifts || s.slot.is_none());
+    let ship_door = game.ships.iter().any(|s| ship_reached(s) && s.colonists < game.colony_ship_capacity(Seat(0)));
+    let send = if st.emigrants > 0 && (sea_door || lift_door || ship_door) { count_slider(ui, ("send", sid), st.emigrants, "Pioneers") } else { st.emigrants };
     if game.antarctica_open && st.emigrants > 0 {
         let n = send;
         for slot in game.free_slots_on(BodyId::Earth) {
@@ -7471,9 +7515,9 @@ fn pioneers_block(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, act
     // beyond its capacity, and each of those may die on arrival. A risk that drowns people wants
     // the sentence explaining it beside the button, and that sentence lives on the Ship's card --
     // so a player who means to crowd a ship goes there deliberately.
-    if st.emigrants > 0 && lifts {
+    if st.emigrants > 0 && ship_door {
         let capacity = game.colony_ship_capacity(Seat(0));
-        for s in game.ships.iter().filter(|s| s.seat == Seat(0) && s.kind == UnitKind::ColonyShip && s.at == ShipAt::Body(BodyId::Earth)) {
+        for s in game.ships.iter().filter(|s| ship_reached(s)) {
             let room = capacity.saturating_sub(s.colonists);
             let n = send.min(room);
             if n == 0 {
@@ -7495,7 +7539,7 @@ fn pioneers_block(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, act
         RichText::new(if st.facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working()) {
             "Launch Site: Colonists and Armies lift to any orbit of Earth from here. Ships are built at a Shipyard on a station or Colony."
         } else {
-            "No working Launch Site: nothing lifts to orbit from here."
+            "No working Launch Site: only a Colony Ship in low orbit takes Pioneers from here."
         })
         .weak(),
     );
@@ -7679,11 +7723,39 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     }
     // Ticket #164 (version 0.07.5): the room is the Core Module's four and the Habitats' eight
     // each, so the line no longer names Habitats alone.
-    ui.label(format!("Colonists {} of {} room", col.colonists, game.habitat_room(col)));
+    // Ticket #444 (version 0.09.6): the hover says whether the place is growing, and when the next
+    // Colonist comes, or why it is shrinking.
+    // Ticket #450 (version 0.09.6): the glyph and `8/12`, the words gone to the hover; amber from
+    // three quarters full, red when full, since a full place takes nobody and grows no further.
+    let room = game.habitat_room(col);
+    let fill = if room == 0 { 1.0 } else { col.colonists as f64 / room as f64 };
+    let ink = if fill >= 1.0 { Color32::from_rgb(230, 90, 80) } else if fill >= 0.75 { Color32::from_rgb(230, 170, 90) } else { ui.visuals().text_color() };
+    let line = ui
+        .horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 4.0;
+            if let Some(image) = Icons::from_ctx(ui.ctx(), "population", 15.0) {
+                ui.add(image);
+            }
+            ui.label(RichText::new(format!("{}/{}", col.colonists, room)).color(ink));
+        })
+        .response;
+    rule_tip(line, format!("Colonists {} of {} room.\n{}", col.colonists, room, colony_growth_words(game, col)));
     // Ticket #391 (version 0.09.3): what the Colony made this turn, under its people.
     output_row(ui, game, Place::Colony(cid));
     // Ticket #204 (version 0.08.1): the receiver's door, against the figure it changes.
     emigrant_loader(ui, session, game, view, col, actions);
+    // Ticket #442 (version 0.09.6): a station of yours sends its people DOWN to a ground Colony of
+    // yours on the same Body, free, within that Colony's room, one order a turn.
+    if col.in_orbit && col.colonists > 0 && col.control.director() == Some(Seat(0)) && !session.spectator {
+        for down in game.colonies.iter().filter(|c| !c.in_orbit && c.body == col.body && c.control.director() == Some(Seat(0))) {
+            let most = col.colonists.min(game.habitat_room(down).saturating_sub(down.colonists));
+            if most == 0 {
+                continue;
+            }
+            let k = count_slider(ui, ("down", cid, down.id), most, "Colonists");
+            cost_button(ui, game, &session.pending, Order::SendDown { from: cid, to: down.id, colonists: k }, &format!("Send {} down to {}", colonists_word(k), game.place_name(Place::Colony(down.id))), actions);
+        }
+    }
     // Ticket #97 (version 0.07.0): the Module cap, shown beside the Colonists that buy it, so a
     // player meets it on the card rather than as a refusal.
     let (used, cap) = (game.module_slots_used(col), game.module_slots(col));
@@ -7900,6 +7972,11 @@ fn slot_panel(ui: &mut Ui, session: &Session, game: &Game, body: BodyId, slot: u
         if found_button(ui, &game.slot_yields(body, slot), &format!("Found a Colony here with {} from {}", colonists_word(k), game.ship_name(s))).clicked() {
             actions.push(Action::Place(order));
         }
+    }
+    // Ticket #442 (version 0.09.6): built from a station of yours over this Body, for the station's
+    // Materials, opening with nobody; greyed with the reason where there is no such station.
+    if !session.spectator && body != BodyId::Earth && game.colonies.iter().any(|c| c.in_orbit && c.body == body && c.control.director() == Some(Seat(0))) {
+        cost_button(ui, game, &session.pending, Order::BuildColony { body, slot }, "Build a Colony here from your station", actions);
     }
 }
 
@@ -8335,7 +8412,7 @@ fn ship_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
         transits.scroll_to_me(Some(egui::Align::Min));
     }
     move_dropdowns(ui, session, game, body, &[s], Some(s), view.stack_scroll, &format!("ship{}", s.id.0), actions);
-    ship_cargo_block(ui, session, game, view, s, body, actions);
+    ship_cargo_block(ui, session, game, s, body, actions);
     if s.damage > 0 {
         ui.label(RichText::new("Repair").strong());
         cost_button(ui, game, &session.pending, Order::Repair { unit: UnitRef::Ship(s.id), points: s.damage }, "Repair fully", actions);
@@ -8365,7 +8442,7 @@ fn capitalised(text: &str) -> String {
 
 /// Ticket #374: **Load and unload, for one Ship**, moved from the stack card where it stood once
 /// per hull. The block is left out for a hull that carries nothing and can carry nothing.
-fn ship_cargo_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, s: &Ship, body: BodyId, actions: &mut Vec<Action>) {
+fn ship_cargo_block(ui: &mut Ui, session: &Session, game: &Game, s: &Ship, body: BodyId, actions: &mut Vec<Action>) {
     let card = game.tables.unit(s.kind);
     // Ticket #86: at Earth a warming world crowds a Colony Ship beyond its safe capacity.
     let safe = if s.kind == UnitKind::ColonyShip { game.colony_ship_capacity(Seat(0)) } else { card.carries_colonists };
@@ -8384,39 +8461,37 @@ fn ship_cargo_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut View
     }
     if capacity > s.colonists {
         let n = capacity - s.colonists;
-        match body {
-            BodyId::Earth => {
-                let states = game.directed_states(Seat(0));
-                // Ticket #204 (version 0.08.1): opens on a Region that can actually lift, where it
-                // opened on the most populous one whether or not it had a Launch Site or anybody
-                // waiting. The `Some` also stands in for the emptiness check this replaced: with no
-                // directed Region there is nothing to draw from and nothing to draw.
-                if let Some(chosen) = view.load_state.filter(|x| states.contains(x)).or_else(|| default_emigrant_source(game, &states, true)) {
-                    ui.horizontal(|ui| {
-                        ui.label("from");
-                        egui::ComboBox::from_id_salt(("load", s.id.0)).selected_text(game.tables.state(chosen).name.clone()).show_ui(ui, |ui| {
-                            for st in &states {
-                                if ui.selectable_label(*st == chosen, game.tables.state(*st).name.clone()).clicked() {
-                                    view.load_state = Some(*st);
-                                }
-                            }
-                        });
-                    });
-                    // Ticket #73: a Launch Site lifts the Emigrants waiting there, no more. Ticket
-                    // #428 (version 0.09.5): how many, on a slider under the Region's drop-down.
-                    let lift = count_slider(ui, ("load", s.id, chosen), n.min(game.state(chosen).emigrants), "Pioneers");
-                    cost_button(ui, game, &session.pending, Order::Load { ship: s.id, colonists: lift, from: LoadSource::State(chosen), army: None }, &format!("Load {lift} Pioneers"), actions);
+        if body == BodyId::Earth {
+            // Ticket #443 (version 0.09.6): a row for EACH Region of yours with Pioneers waiting, where
+            // one drop-down chose a single Region: a Colony Ship takes a Load from every one of them
+            // in a turn. Each row's slider runs to what the Ship has room for after the Loads already
+            // placed this turn, so the rows together never pass its room. A Region with a Load
+            // placed is greyed by the rule itself, which names why.
+            let placed: u32 = session.pending.iter().filter_map(|o| match o {
+                Order::Load { ship, colonists, from: LoadSource::State(_), army: None } if *ship == s.id => Some(*colonists),
+                _ => None,
+            }).sum();
+            let left = n.saturating_sub(placed);
+            for st in game.directed_states(Seat(0)).into_iter().filter(|st| game.state(*st).emigrants > 0) {
+                let most = left.min(game.state(st).emigrants);
+                if most == 0 {
+                    continue;
                 }
+                // Ticket #73: the Pioneers waiting there, no more. Ticket #428 (version 0.09.5): how
+                // many, on a slider.
+                let lift = count_slider(ui, ("load", s.id, st), most, "Pioneers");
+                cost_button(ui, game, &session.pending, Order::Load { ship: s.id, colonists: lift, from: LoadSource::State(st), army: None }, &format!("Load {lift} Pioneers from {}", game.tables.state(st).name), actions);
             }
-            _ => {
-                for c in game.colonies.iter().filter(|c| c.body == body && c.control.director() == Some(Seat(0)) && c.colonists > 0) {
-                    // Ticket #428 (version 0.09.5): how many, on a slider above the place's button.
-                    let k = count_slider(ui, ("load", s.id, c.id), n.min(c.colonists), "Colonists");
-                    // Ticket #335 (version 0.09.0): by the place's OWN name, which names a station
-                    // and a ground Colony alike.
-                    cost_button(ui, game, &session.pending, Order::Load { ship: s.id, colonists: k, from: LoadSource::Colony(c.id), army: None }, &format!("Load {} Colonists from {}", k, game.place_name(Place::Colony(c.id))), actions);
-                }
-            }
+        }
+        // Ticket #437 (version 0.09.6): over Earth too, from each station of yours with Colonists
+        // aboard, under the Pioneers -- the rule always allowed it, the card offered only the
+        // Regions, so a Colonist lifted to the ISS could not leave it. Elsewhere every place of yours.
+        for c in game.colonies.iter().filter(|c| c.body == body && (body != BodyId::Earth || c.in_orbit) && c.control.director() == Some(Seat(0)) && c.colonists > 0) {
+            // Ticket #428 (version 0.09.5): how many, on a slider above the place's button.
+            let k = count_slider(ui, ("load", s.id, c.id), n.min(c.colonists), "Colonists");
+            // Ticket #335 (version 0.09.0): by the place's OWN name, which names a station
+            // and a ground Colony alike.
+            cost_button(ui, game, &session.pending, Order::Load { ship: s.id, colonists: k, from: LoadSource::Colony(c.id), army: None }, &format!("Load {} Colonists from {}", k, game.place_name(Place::Colony(c.id))), actions);
         }
     }
     if card.carries_army && s.army.is_none() {
@@ -8441,13 +8516,18 @@ fn ship_cargo_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut View
     if s.colonists > 0 || s.army.is_some() {
         for c in game.colonies.iter().filter(|c| c.body == body) {
             let own = c.control.director() == Some(Seat(0));
+            // Ticket #436 (version 0.09.6): a station is named for its station slot, a ground Colony
+            // for its ground slot. Both were read off the ground slots, so a station whose slot number
+            // ran past them -- any over Venus, which has none -- panicked the card, and the rest were
+            // named for the wrong place.
+            let place = if c.in_orbit { game.station_name(c.body, c.slot) } else { game.tables.body(c.body).slots[c.slot as usize].name.clone() };
             if s.colonists > 0 && own {
                 // Ticket #409 (version 0.09.4): any count up to the room left, on a slider.
                 let into = UnloadTarget::Colony(c.id);
                 let most = game.unload_most(s.id, into);
                 if most > 0 {
                     let k = unload_count(ui, s.id, &format!("into {:?}", c.id), most);
-                    cost_button(ui, game, &session.pending, Order::Unload { ship: s.id, colonists: k, army: false, into }, &format!("Unload {} into {}", colonists_word(k), game.tables.body(c.body).slots[c.slot as usize].name), actions);
+                    cost_button(ui, game, &session.pending, Order::Unload { ship: s.id, colonists: k, army: false, into }, &format!("Unload {} into {}", colonists_word(k), place), actions);
                 }
             }
             if let Some(aid) = s.army {
@@ -8455,7 +8535,7 @@ fn ship_cargo_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut View
                 // carries the same odds the march buttons do. Ticket #309 (version 0.08.7): on a
                 // hover that names the defender, not on the face. Ticket #339 (version 0.09.0): and
                 // those odds are the whole Battle's.
-                let slot_name = &game.tables.body(c.body).slots[c.slot as usize].name;
+                let slot_name = &place;
                 let (label, hover) = if own {
                     (format!("Land the Army at {slot_name}"), format!("{slot_name}: held by you. Landing costs nothing; the Army lands on Hold."))
                 } else {
@@ -8478,6 +8558,13 @@ fn ship_cargo_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut View
                 if found_button(ui, &game.slot_yields(body, slot), &label).clicked() {
                     actions.push(Action::Place(order));
                 }
+            }
+            // Ticket #442 (version 0.09.6): a station FOUNDED from the empty ring the Ship sits in --
+            // at Venus the one way to a station -- for the Colonists aboard, no Materials.
+            if let Some(n) = s.slot.filter(|n| game.free_orbital_slots(body).contains(n)) {
+                let into = UnloadTarget::Ring(body, n);
+                let k = unload_count(ui, s.id, "found ring", game.unload_most(s.id, into));
+                cost_button(ui, game, &session.pending, Order::Unload { ship: s.id, colonists: k, army: false, into }, &format!("Found {} with {}", game.station_name(body, n), colonists_word(k)), actions);
             }
         }
     }
@@ -9491,29 +9578,51 @@ fn battery_rules(game: &Game, col: &Colony) -> String {
 /// not carry them, since the row and the hover are about the same building. Ticket #307: they
 /// name the cause. A Facility goes offline two ways: struck by a card until the next Resolution,
 /// or shut at Income for want of Energy.
-fn facility_offline_words(f: &Facility) -> &'static str {
-    if f.online || f.mothballed {
-        ""
-    } else if f.offline_until_resolution {
-        " (offline until the next Resolution, struck by a card; making nothing)"
-    } else {
-        " (offline, short of Energy; making nothing)"
+/// Ticket #451 (version 0.09.6): **the recorded cause, in a line of its own.** The engine records why
+/// a building went offline (`OfflineCause`), so the hover says it and never guesses -- a Sea Wall
+/// shut for its keep said "short of Energy". A building offline in a save older than the record has
+/// none, and falls back to what the flags say.
+fn offline_cause_words(cause: Option<&OfflineCause>, until_resolution: bool, grid: bool, occupied_archive: bool) -> String {
+    match cause {
+        Some(OfflineCause::Card(name)) => format!("\nOffline until next turn: struck by {name}."),
+        Some(OfflineCause::Energy) => "\nOffline: short of Energy.".to_string(),
+        Some(OfflineCause::Grid) => "\nOffline: grid down.".to_string(),
+        Some(OfflineCause::Occupied) => "\nOffline: Colony occupied.".to_string(),
+        Some(OfflineCause::Unkept) => "\nOffline: upkeep unpaid.".to_string(),
+        None if until_resolution => "\nOffline until next turn: struck by a card.".to_string(),
+        None if grid => "\nOffline: grid down.".to_string(),
+        None if occupied_archive => "\nOffline: Colony occupied.".to_string(),
+        None => "\nOffline: short of Energy.".to_string(),
     }
 }
 
-/// A Module's offline words, the counterpart of `facility_offline_words`: a card, the Colony's
-/// grid down, an Occupied Colony's Archive, or want of Energy.
-fn module_offline_words(col: &Colony, m: &Module) -> &'static str {
-    if m.online || m.mothballed {
-        ""
-    } else if m.offline_until_resolution {
-        " (offline until the next Resolution, struck by a card; making nothing)"
-    } else if col.grid_failed {
-        " (offline, the grid is down; making nothing)"
-    } else if m.kind == ModuleKind::Archive && col.control.is_occupied() {
-        " (offline while the Colony is Occupied)"
+/// A Facility's line under its figures: why it is offline, or that its Region's Unrest has it at
+/// half. Nothing for a mothballed one, whose figures say so already.
+fn facility_offline_words(game: &Game, sid: StateId, f: &Facility) -> String {
+    if f.mothballed {
+        String::new()
+    } else if !f.online {
+        offline_cause_words(f.offline_cause.as_ref(), f.offline_until_resolution, false, false)
+    } else if game.facilities_at_half(sid) {
+        "\nAt half: Unrest.".to_string()
     } else {
-        " (offline, short of Energy; making nothing)"
+        String::new()
+    }
+}
+
+/// A Module's line, the counterpart of `facility_offline_words`: why it is offline, that the place
+/// is blockaded and makes nothing, or that a shut Habitat has everything but Energy at half.
+fn module_offline_words(game: &Game, col: &Colony, m: &Module) -> String {
+    if m.mothballed {
+        String::new()
+    } else if !m.online {
+        offline_cause_words(m.offline_cause.as_ref(), m.offline_until_resolution, col.grid_failed, m.kind == ModuleKind::Archive && col.control.is_occupied())
+    } else if game.starved_by(col.id).is_some() {
+        "\nBlockaded: makes nothing.".to_string()
+    } else if game.habitat_halves(col.id) && !matches!(m.kind, ModuleKind::Generator | ModuleKind::SolarArray) {
+        "\nAt half: shut Habitat.".to_string()
+    } else {
+        String::new()
     }
 }
 
@@ -9582,7 +9691,7 @@ fn module_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
         let selected = view.hab_tile == Some(HabTile::Module(mi));
         // Ticket #150 (version 0.07.4): the tile's hover -- the figures its strip line carries and
         // the Module rules, which the old rows never had.
-        let mut tip = module_rules(m.kind, &format!("{}{}", module_line(game, col, cid, mi, director), module_offline_words(col, m)));
+        let mut tip = module_rules(m.kind, &format!("{}{}", module_line(game, col, cid, mi, director), module_offline_words(game, col, m)));
         // Ticket #352 (version 0.09.1): with its arithmetic, where the figure is multiplied.
         if let Some(chain) = director.filter(|_| !m.mothballed && earnings_seen(game, Place::Colony(cid), director)).map(|d| game.module_yield_at(d, cid, mi).chain).filter(|c| c.multiplied()) {
             tip = chain_tip(&tip, &chain);
@@ -9593,7 +9702,7 @@ fn module_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
         if m.kind == ModuleKind::Battery {
             // Ticket #363 (version 0.09.1): the heading and the Battery's own rules alone. With the
             // generic Energy and Mothball sentences it ran to thirteen rendered lines against six.
-            tip = format!("{}{}{}", module_line(game, col, cid, mi, director), module_offline_words(col, m), battery_rules(game, col));
+            tip = format!("{}{}{}", module_line(game, col, cid, mi, director), module_offline_words(game, col, m), battery_rules(game, col));
             if m.damage > 0 {
                 let hp = game.tables.module(ModuleKind::Battery).hit_points;
                 label = format!("Battery {}/{}", hp.saturating_sub(m.damage), hp);
@@ -9655,7 +9764,7 @@ fn module_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
         // The Archive stands apart: a row of its own, outside the count.
         let rect = egui::Rect::from_min_size(grid.min + egui::vec2(0.0, rows as f32 * (HAB_TILE + HAB_LABEL + HAB_GAP)), egui::vec2(HAB_TILE, HAB_TILE));
         let state = if col.modules[ai].mothballed { TileState::Mothballed } else if !col.modules[ai].online { TileState::Offline } else { TileState::Standing };
-        let tip = format!("{}{}\nOutside the Module count. Its Research is paid into the Archive fund at any pace; complete, it takes a great deal of Energy to keep running. Destroyed outright if this Colony changes hands; the fund is kept.", module_line(game, col, cid, ai, director), module_offline_words(col, &col.modules[ai]));
+        let tip = format!("{}{}\nOutside the Module count. Its Research is paid into the Archive fund at any pace; complete, it takes a great deal of Energy to keep running. Destroyed outright if this Colony changes hands; the fund is kept.", module_line(game, col, cid, ai, director), module_offline_words(game, col, &col.modules[ai]));
         if hab_tile(ui, rect, ui.id().with("hab-archive"), Some(crate::icons::module_icon(ModuleKind::Archive)), "The Archive", state, view.hab_tile == Some(HabTile::Module(ai)), None, tip).clicked() {
             view.hab_tile = Some(HabTile::Module(ai));
         }
@@ -9990,7 +10099,7 @@ fn condensed_rail<T: egui::emath::Numeric>(ui: &mut Ui, value: &mut T, width: f3
 }
 
 /// Ticket #382: **the fill bar**, the fund against its bar in the Faction's colour, `width` by
-/// fourteen with the figures beside it -- the shape of `research_race_bar`, figures and all. Not
+/// sixteen with the figures beside it -- the shape of `research_race_bar`, figures and all. Not
 /// written on the fill: no text reads on both Factions' fills, and the race bar sets the precedent.
 fn fund_bar(ui: &mut Ui, colour: Color32, fund: f64, bar: f64, width: f32, what: &str) {
     let (rect, resp) = ui.allocate_exact_size(egui::vec2(width, 14.0), egui::Sense::hover());
@@ -10542,7 +10651,7 @@ fn faction_window(ctx: &egui::Context, session: &Session, game: &Game, view: &mu
         // its longer wording. Nothing is deleted.
         // Ticket #265 (version 0.08.4): the hover names what Blame is, what the credit is, and the
         // two rules that read it.
-        ui.label(RichText::new("Blame").strong()).on_hover_text("Blame is the CO2 this Faction is answerable for: everything the sources it controlled emitted, less everything it removed.\nWhat it removed -- its Scrubbers and Nature Reserves, and for the Custodians what their Research Directive adds to the Natural Sink -- is its Blame credit.\nTwo rules read Blame: a share above a fair quarter raises this Faction's Influence thresholds on every Region it does not hold, up to half again;\nand every rival thinks a point worse of it for each step its share stands above that quarter, each by its own measure.");
+        rule_tip(ui.label(RichText::new("Blame").strong()), BLAME_HOVER.to_string());
         let share = game.blame_share(seat);
         ui.horizontal(|ui| {
             ui.add(
@@ -11078,7 +11187,7 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
             ui.label(game.stabilization_text());
             // Ticket #53: Blame, Faction by Faction, in the panel that attributes the Emissions.
             ui.separator();
-            ui.label(RichText::new("Blame: the CO2 each Faction is answerable for").strong()).on_hover_text("Blame is the CO2 this Faction is answerable for: everything the sources it controlled emitted, less everything it removed.\nWhat it removed -- its Scrubbers and Nature Reserves, and for the Custodians what their Research Directive adds to the Natural Sink -- is its Blame credit.\nTwo rules read Blame: a share above a fair quarter raises this Faction's Influence thresholds on every Region it does not hold, up to half again;\nand every rival thinks a point worse of it for each step its share stands above that quarter, each by its own measure.");
+            rule_tip(ui.label(RichText::new("Blame: the CO2 each Faction is answerable for").strong()), BLAME_HOVER.to_string());
             for seat in Seat::ALL {
                 let s = game.seat(seat);
                 // Ticket #265 (version 0.08.4): one form for every seat -- answerable for, how it
@@ -11941,4 +12050,27 @@ mod glyph_words {
         assert_eq!(glyph_for(true, "ppm", &[("ppm", "emissions")]), Some("emissions"), "the Blame block's extra word");
         assert_eq!(glyph_for(true, "ppm", &[]), None, "and ppm nowhere else");
     }
+}
+
+/// Ticket #444 (version 0.09.6): a Colony's natural growth in words, for its Colonists line: growing
+/// and when the next Colonist comes, full, or shrinking and why.
+fn colony_growth_words(game: &Game, col: &dying_earth_engine::Colony) -> String {
+    let c = &game.tables.climate;
+    let dark = !col.modules.iter().any(|m| m.kind == ModuleKind::Core && m.working());
+    if game.starved_by(col.id).is_some() {
+        return format!("Shrinking: {} a turn, under Blockade.", c.colony_decline);
+    }
+    if dark {
+        return format!("Shrinking: {} a turn, its Core offline.", c.colony_decline);
+    }
+    if col.colonists == 0 {
+        return "Nobody here to grow.".to_string();
+    }
+    if col.colonists >= game.habitat_room(col) {
+        return "Full: no room to grow. A Habitat makes room.".to_string();
+    }
+    let per = col.colonists as f64 * c.colony_growth;
+    let banked = game.colony_growth.get(&col.id).copied().unwrap_or(0.0);
+    let turns = ((1.0 - banked) / per).ceil().max(1.0) as u32;
+    format!("Growing: {:+.1} a turn, next Colonist in {} turn{}.", per, turns, if turns == 1 { "" } else { "s" })
 }

@@ -16,6 +16,7 @@ impl Game {
                 if f.offline_until_resolution {
                     f.offline_until_resolution = false;
                     f.online = !f.mothballed;
+                    f.offline_cause = None;
                 }
             }
         }
@@ -24,11 +25,13 @@ impl Game {
                 c.grid_failed = false;
                 for m in &mut c.modules {
                     m.online = !m.mothballed;
+                    m.offline_cause = None;
                 }
             }
             for m in c.modules.iter_mut().filter(|m| m.offline_until_resolution) {
                 m.offline_until_resolution = false;
                 m.online = !m.mothballed;
+                m.offline_cause = None;
             }
         }
         // Ticket #371 (version 0.09.2): where every Region's Unrest stands as the Resolution opens,
@@ -1646,24 +1649,34 @@ impl Game {
         }
     }
 
-    /// Ticket #54: every Scrubber in a Nation State is destroyed when the state changes hands, by
-    /// Influence, by Occupation or by being thrown off. They are the Custodians' own works, and they
-    /// do not pass to whoever takes the place.
-    pub fn destroy_scrubbers(&mut self, sid: StateId, why: &str) {
+    /// Ticket #54: every Scrubber in a Nation State was destroyed when the state changed hands, by
+    /// Influence, by Occupation or by being thrown off. Ticket #445 (version 0.09.6): it STANDS, and
+    /// runs at the share its new holder runs it at (`scrubber_share`): whole under the Custodians,
+    /// half under anyone else, a quarter with nobody. Only a Scrubber still on order is lost, since
+    /// only the Custodians may build one. Called after the control has moved, so the share is the
+    /// new holder's.
+    pub fn scrubbers_change_hands(&mut self, sid: StateId, why: &str) {
+        self.state_mut(sid).queue.retain(|b| b.item != BuildItem::Facility(FacilityKind::Scrubber));
         let n = self.state(sid).facilities.iter().filter(|f| f.kind == FacilityKind::Scrubber).count();
         if n == 0 {
             return;
         }
-        self.state_mut(sid).facilities.retain(|f| f.kind != FacilityKind::Scrubber);
-        self.state_mut(sid).queue.retain(|b| b.item != BuildItem::Facility(FacilityKind::Scrubber));
-        let line = format!(
-            "{} Scrubber(s) in {} were destroyed when the state {}.",
-            n,
-            self.tables.state(sid).name,
-            why
-        );
+        // A neutral Region pays no upkeep, so a Scrubber it inherits shut for want of Energy runs
+        // again; a mothballed one stays mothballed.
+        if self.state(sid).control == Control::Neutral {
+            for f in self.state_mut(sid).facilities.iter_mut().filter(|f| f.kind == FacilityKind::Scrubber) {
+                f.online = true;
+            }
+        }
+        let share = match self.scrubber_share(sid) {
+            s if s >= 1.0 => "full strength".to_string(),
+            s if (s - 0.5).abs() < 1e-9 => "half".to_string(),
+            s if (s - 0.25).abs() < 1e-9 => "a quarter".to_string(),
+            s => format!("x{s}"),
+        };
+        let line = format!("{} Scrubber(s) in {} run at {} now that the state {}.", n, self.tables.state(sid).name, share, why);
         self.log(line);
-        let text = self.say("scrubbers_destroyed", &[("n", n.to_string()), ("state", self.tables.state(sid).name.clone()), ("why", why.to_string())]);
+        let text = self.say("scrubbers_changed_hands", &[("n", n.to_string()), ("state", self.tables.state(sid).name.clone()), ("share", share)]);
         self.report_line(LineKind::Climate, Some(ReportPlace::State(sid)), text);
     }
 
@@ -1691,12 +1704,10 @@ impl Game {
         if let Place::State(sid) = place {
             self.armies.retain(|a| !(a.levy && a.home == ArmyHome::State(sid)));
         }
-        // Ticket #54: the Scrubbers go first, before the place has a new owner to hold them.
-        if let Place::State(sid) = place
-            && self.place_control(place).controller() != Some(seat)
-        {
-            self.destroy_scrubbers(sid, "changed hands");
-        }
+        // Ticket #54: the Scrubbers went first, before the place had a new owner to hold them. Ticket
+        // #445 (version 0.09.6): they stand, so this only notes whether they change hands; the share
+        // is read once the new owner holds them, below.
+        let scrubbers_move = matches!(place, Place::State(_)) && self.place_control(place).controller() != Some(seat);
         // Ticket #51: an Archive is destroyed when its Colony changes hands, whether by Occupation
         // or by Influence. The Archive fund is kept, so the Archivists can start again.
         if let Place::Colony(c) = place
@@ -1715,6 +1726,11 @@ impl Game {
         }
         let (before, directed) = (self.place_control(place).controller(), self.place_control(place).director());
         self.set_place_control(place, Control::Controlled(seat));
+        if let Place::State(sid) = place
+            && scrubbers_move
+        {
+            self.scrubbers_change_hands(sid, "changed hands");
+        }
         // Standings persist through a transfer (ticket #33): the old controller keeps its own and
         // can contest the place back.
         let line = format!("{} now belongs to the {} ({}).", self.place_name(place), self.seat_name(seat), why);
@@ -2389,8 +2405,11 @@ impl Game {
                     arrived_this_turn: false,
                     built_turn: turn,
                     // Ticket #87: built with a full tank, paid at the build. Ticket #413 (version
-                    // 0.09.4): the seat's tank, Clean Propellant's Fuel included.
-                    fuel: self.tank_of(b.seat, kind),
+                    // 0.09.4): the seat's tank, Clean Propellant's Fuel included. Ticket #455
+                    // (version 0.09.6): the tank PAID FOR at the order; room a tank Tech added since
+                    // comes empty, as it does to a Ship already flying. A build older than the
+                    // record carries nought and fills as it always did.
+                    fuel: if b.fuel > 0.0 { b.fuel.min(self.tank_of(b.seat, kind)) } else { self.tank_of(b.seat, kind) },
                 });
             }
             _ => {}
@@ -2446,6 +2465,8 @@ impl Game {
                     true
                 }
                 UnloadTarget::Colony(c) => self.join_antarctic_colony(s.seat, c, s.n, s.from, s.education),
+                // Ticket #442 (version 0.09.6): the sea never reaches an orbit; the check refuses it.
+                UnloadTarget::Ring(..) => false,
                 UnloadTarget::Slot(..) => {
                     let own = self
                         .colonies
@@ -2614,6 +2635,36 @@ impl Game {
             );
             self.report_line_of(*seat, LineKind::YourBuild, LineKind::BuildComplete, Some(ReportPlace::Colony(id)), text);
         }
+        // Ticket #442 (version 0.09.6): ground Colonies built from a station, opening with a Core and
+        // nobody, as a built station does; the first order for a slot takes it.
+        for (seat, body, slot) in std::mem::take(&mut self.pending.colony_builds) {
+            if !self.free_slots_on(body).contains(&slot) {
+                continue;
+            }
+            let id = ColonyId(self.fresh_id());
+            self.colonies.push(Colony { id, body, slot, control: Control::Controlled(seat), modules: vec![Module::new(ModuleKind::Core)], colonists: 0, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: self.turn, in_orbit: false });
+            let line = format!("{} built {}.", self.seat_name(seat), self.place_name(Place::Colony(id)));
+            self.log(line);
+            let text = self.say("colony_built", &[("faction", self.seat_name(seat)), ("colony", self.place_name(Place::Colony(id)))]);
+            self.report_line_of(seat, LineKind::YourBuild, LineKind::BuildComplete, Some(ReportPlace::Colony(id)), text);
+        }
+        // Ticket #442 (version 0.09.6): Colonists sent down from a station, with what they know,
+        // within the room the ground Colony has when they land.
+        for (seat, from, to, n) in std::mem::take(&mut self.pending.send_downs) {
+            let ok = self.colony(from).is_some_and(|c| c.control.director() == Some(seat) && c.in_orbit) && self.colony(to).is_some_and(|c| c.control.director() == Some(seat) && !c.in_orbit) && self.starved_by(from).is_none();
+            if !ok {
+                continue;
+            }
+            let room = self.colony(to).map(|c| self.habitat_room(c).saturating_sub(c.colonists)).unwrap_or(0);
+            let n = n.min(room).min(self.colony(from).map(|c| c.colonists).unwrap_or(0));
+            if n == 0 {
+                continue;
+            }
+            let taught = self.take_colonists(from, n);
+            self.settle_people(to, n, taught);
+            let text = self.say("sent_down", &[("n", n.to_string()), ("from", self.place_name(Place::Colony(from))), ("to", self.place_name(Place::Colony(to)))]);
+            self.report_line_of(seat, LineKind::YourWorks, LineKind::Ship, Some(ReportPlace::Colony(to)), text);
+        }
         // Founding orders into the same Colony Slot from more than one seat are decided at the Body,
         // ties drawn at random (ticket #50).
         let mut founding: Vec<(Seat, ShipId, BodyId, u32)> = Vec::new();
@@ -2725,6 +2776,8 @@ impl Game {
                     let barred = match into {
                         UnloadTarget::Colony(cid) => !self.may_unload_into(seat, cid) || !self.colony(cid).map(|c| self.ship_may_touch(s, c)).unwrap_or(false),
                         UnloadTarget::Slot(_, _) => !self.may_land(seat, body) || !self.ship_in_orbit(s, body, Orbit::Low),
+                        // Ticket #442 (version 0.09.6): a station founded from its own ring.
+                        UnloadTarget::Ring(_, n) => !self.ship_in_orbit(s, body, Orbit::Slot(n)) || self.slot_blockaded_against(seat, body, n),
                     };
                     if barred {
                         let line = format!("{} could not land at {}: the orbit is contested.", self.seat_name(seat), self.tables.body(body).name);
@@ -2813,6 +2866,33 @@ impl Game {
                             // Ticket #345 (version 0.09.1): a candidate for its Body's first.
                             ground_founded.push((seat, b, id));
                         }
+                        // Ticket #442 (version 0.09.6): **a Colony Ship founds a station** in the ring it
+                        // sits in: a Core and the Colonists aboard, no Materials. A slot two seats found
+                        // into in one Resolution goes to the first; the second stays aboard.
+                        UnloadTarget::Ring(b, slot) => {
+                            if b != body || b == BodyId::Earth || self.station_at(b, slot).is_some() || colonists == 0 {
+                                continue;
+                            }
+                            let n = colonists.min(self.ship(ship).map(|s| s.colonists).unwrap_or(0));
+                            let id = ColonyId(self.fresh_id());
+                            self.colonies.push(Colony { id, body: b, slot, control: Control::Controlled(seat), modules: vec![Module::new(ModuleKind::Core)], colonists: 0, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: self.turn, in_orbit: true });
+                            let room = self.habitat_room(self.colony(id).unwrap());
+                            let moved = n.min(room);
+                            let taught = self.unload_people(ship, moved);
+                            self.settle_people(id, moved, taught);
+                            let line = format!("The {} founded {} with {} Colonists.", self.seat_name(seat), self.place_name(Place::Colony(id)), moved);
+                            self.log(line);
+                            // Ticket #419 (version 0.09.4): a station eases where the card says so.
+                            let ease = self.tables.faction(self.kind(seat)).found_station_unrest_ease;
+                            let eased = self.founding_ease(seat, ease);
+                            let text = self.say(
+                                if eased > 0.0 { "station_built_eased" } else { "station_built" },
+                                &[("faction", self.seat_name(seat)), ("station", self.place_name(Place::Colony(id))), ("ease", crate::state::figure(ease))],
+                            );
+                            self.report_line_of(seat, LineKind::YourBuild, LineKind::BuildComplete, Some(ReportPlace::Colony(id)), text);
+                            self.no_habitat_room(id, n.saturating_sub(moved));
+                            self.ai_deed_at(seat, "founded", &[("colony", self.place_name(Place::Colony(id)))], Some(crate::report::ReportPlace::Colony(id)));
+                        }
                         UnloadTarget::Colony(cid) => {
                             let Some(col) = self.colony(cid) else { continue };
                             if col.body != body {
@@ -2821,9 +2901,10 @@ impl Game {
                             if colonists > 0 && col.control.director() == Some(seat) {
                                 let room = self.habitat_room(col).saturating_sub(col.colonists);
                                 let n = colonists.min(room).min(self.ship(ship).map(|s| s.colonists).unwrap_or(0));
-                                if let Some(c) = self.colony_mut(cid) {
-                                    c.colonists += n;
-                                }
+                                // Ticket #437 (version 0.09.6): through `settle_people`, so they bring
+                                // their schooling, where they were added to the count alone.
+                                let taught = self.ship(ship).map(|s| s.colonists_education).unwrap_or(1.0);
+                                self.settle_people(cid, n, taught);
                                 if let Some(s) = self.ship_mut(ship) {
                                     s.colonists -= n;
                                 }
@@ -3131,8 +3212,9 @@ impl Game {
     fn throw_off(&mut self, sid: StateId, seat: Seat) {
         let u = &self.tables.unrest;
         let back = u.throw_off_reset;
-        self.destroy_scrubbers(sid, "threw off its controller");
         self.state_mut(sid).control = Control::Neutral;
+        // Ticket #445 (version 0.09.6): the Scrubbers stand, at the quarter a Region with nobody runs them at.
+        self.scrubbers_change_hands(sid, "threw off its controller");
         self.state_mut(sid).unrest = back;
         // Ticket #53: a state that is thrown off counts six fresh turns of neutrality.
         self.restart_neutrality_clock(sid);

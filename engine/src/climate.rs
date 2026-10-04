@@ -3,6 +3,7 @@
 use crate::data::{BreakCard, BreakEffect};
 use crate::ids::*;
 use crate::state::*;
+use std::collections::BTreeMap;
 
 /// Ticket #55: what the Climate Panel says about the last turn on which cutting net Emissions to
 /// zero still avoids Collapse.
@@ -136,6 +137,8 @@ impl Game {
         self.antarctica_check();
         self.sea_level_check();
         self.population_change();
+        // Ticket #444 (version 0.09.6): the Colonies' own growth, beside the Regions'.
+        self.colony_growth_step();
         // Ticket #166 (version 0.07.5): the record is written HERE, after the heat has taken its
         // people and the Refugees have moved, so the population it carries is the turn's settled
         // figure and not the one the turn began with. Nothing else on the record moves in between:
@@ -554,6 +557,64 @@ impl Game {
         let c = &self.tables.climate;
         let tenths = ((self.climate.temperature - c.base_temperature) / 0.1 + 1e-9).floor().max(0.0);
         c.population_growth - c.population_loss_per_tenth_degree * tenths
+    }
+
+    /// Ticket #444 (version 0.09.6): **a Colony's natural growth and decline**, at the designer's
+    /// word. Each Colony and station grows by `colony_growth` of its Colonists a turn, the fraction
+    /// kept on the place (`colony_growth`) and landing as a whole Colonist at one, up to its
+    /// Habitats' room, while it is not under Blockade and its Core works. Under Blockade or with its
+    /// Core offline it loses `colony_decline` a turn instead, and banks nothing. A full Colony banks
+    /// nothing either. Born Colonists know what the place knows, so Education does not move.
+    pub fn colony_growth_step(&mut self) {
+        let (rate, decline) = (self.tables.climate.colony_growth, self.tables.climate.colony_decline);
+        let mut grew: BTreeMap<Seat, Vec<(ColonyId, i64)>> = BTreeMap::new();
+        let ids: Vec<ColonyId> = self.colonies.iter().filter(|c| c.colonists > 0).map(|c| c.id).collect();
+        for id in ids {
+            let Some(col) = self.colony(id) else { continue };
+            let dark = !col.modules.iter().any(|m| m.kind == ModuleKind::Core && m.working());
+            let starved = self.starved_by(id).is_some();
+            let room = self.habitat_room(col).saturating_sub(col.colonists);
+            let (seat, now) = (col.control.director(), col.colonists);
+            let change: i64 = if dark || starved {
+                self.colony_growth.remove(&id);
+                let lost = decline.min(now);
+                if let Some(c) = self.colony_mut(id) {
+                    c.colonists -= lost;
+                }
+                -(lost as i64)
+            } else if room == 0 {
+                self.colony_growth.remove(&id);
+                0
+            } else {
+                let banked = self.colony_growth.get(&id).copied().unwrap_or(0.0) + now as f64 * rate;
+                let born = (banked.floor() as u32).min(room);
+                let left = if born == room { 0.0 } else { banked - born as f64 };
+                self.colony_growth.insert(id, left);
+                if let Some(c) = self.colony_mut(id) {
+                    c.colonists += born;
+                }
+                born as i64
+            };
+            if change != 0
+                && let Some(seat) = seat
+            {
+                grew.entry(seat).or_default().push((id, change));
+            }
+        }
+        // One line a seat under its works: what grew and what was lost, with the places.
+        for (seat, places) in grew {
+            let (up, down): (i64, i64) = (places.iter().filter(|p| p.1 > 0).map(|p| p.1).sum(), -places.iter().filter(|p| p.1 < 0).map(|p| p.1).sum::<i64>());
+            self.seat_mut(seat).colonists_grown += up as u32;
+            self.seat_mut(seat).colonists_declined += down as u32;
+            let named: Vec<String> = places.iter().map(|(c, n)| format!("{} {:+}", self.place_name(Place::Colony(*c)), n)).collect();
+            let key = match (up > 0, down > 0) {
+                (true, false) => "colonies_grew",
+                (false, true) => "colonies_shrank",
+                _ => "colonies_grew_and_shrank",
+            };
+            let text = self.say(key, &[("up", up.to_string()), ("down", down.to_string()), ("places", named.join(", "))]);
+            self.report_line_of(seat, LineKind::YourWorks, LineKind::Note, None, text);
+        }
     }
 
     fn population_change(&mut self) {

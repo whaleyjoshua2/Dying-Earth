@@ -186,7 +186,7 @@ impl Game {
             .or_else(|| at_ship(*ship)),
             Order::Unload { ship, into, .. } => match into {
                 UnloadTarget::Colony(c) => Some(ReportPlace::Colony(*c)),
-                UnloadTarget::Slot(b, _) => Some(ReportPlace::Body(*b)),
+                UnloadTarget::Slot(b, _) | UnloadTarget::Ring(b, _) => Some(ReportPlace::Body(*b)),
             }
             .or_else(|| at_ship(*ship)),
             Order::Change { building, .. } => Some(match building {

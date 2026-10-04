@@ -21,7 +21,10 @@ use std::sync::Arc;
 
 /// The stamp at the head of every save. A file whose stamp is not this one is refused with a plain
 /// message; a save is never migrated between versions.
-pub const SAVE_VERSION: u32 = 7;
+///
+/// Ticket #453 (version 0.09.6): moved to **8**. Two Regions joined the board (Pakistan, the United
+/// Kingdom), so a save of fourteen has no card for two of the sixteen and three parents' figures moved.
+pub const SAVE_VERSION: u32 = 8;
 
 /// The rules version this executable plays, named beside the file's own in a refusal.
 ///
@@ -121,7 +124,9 @@ pub const SAVE_VERSION: u32 = 7;
 /// this version: every field it added reads a default from an older file, so a 0.09.3 save loads.
 /// Ticket #432 (version 0.09.5, the closing ticket): moved to 0.09.5. `SAVE_VERSION` did not move:
 /// the fog's Report fields read a default, and the two new Techs are appended, so a 0.09.4 save loads.
-pub const GAME_VERSION: &str = "0.09.5";
+/// Ticket #454 (version 0.09.6, the closing ticket): moved to 0.09.6. `SAVE_VERSION` moved once for
+/// the version, to 8, when two Regions joined the board (#453): a 0.09.5 save is refused.
+pub const GAME_VERSION: &str = "0.09.6";
 
 /// The game autosaves at the start of the Report phase of every third turn.
 pub const AUTOSAVE_EVERY: u32 = 3;
@@ -253,6 +258,9 @@ pub struct SavedGame {
     /// Ticket #345 (version 0.09.1): who was first to each Body.
     #[serde(default)]
     pub body_firsts: Vec<BodyFirst>,
+    /// Ticket #444 (version 0.09.6): each Colony's growth toward its next Colonist.
+    #[serde(default)]
+    pub colony_growth: BTreeMap<ColonyId, f64>,
 }
 
 impl SavedGame {
@@ -299,6 +307,7 @@ impl SavedGame {
             accords,
             events_no_target,
             body_firsts,
+            colony_growth,
             reveal_all: _,
             waiting_last: _,
         } = g;
@@ -341,6 +350,7 @@ impl SavedGame {
             fought: fought.clone(),
             widgets: widgets.clone(),
             body_firsts: body_firsts.clone(),
+            colony_growth: colony_growth.clone(),
         }
     }
 
@@ -385,6 +395,7 @@ impl SavedGame {
             accords: self.accords,
             events_no_target: self.events_no_target,
             body_firsts: self.body_firsts,
+            colony_growth: self.colony_growth,
             log: self.log,
             reveal_all: false,
             waiting_last: Vec::new(),
@@ -486,6 +497,20 @@ pub fn load_from(path: &Path, tables: Arc<Tables>) -> Result<Game, String> {
     // written since carries the latch set whenever the run is above nought, so this changes nothing.
     if game.seats.iter().any(|s| s.stabilization_run > 0) {
         game.climate.under_sink_eased = true;
+    }
+    // Ticket #442 (version 0.09.6): a Body with no ground has no low orbit, so a Ship a save left
+    // there -- or flying there to arrive in it -- goes to the first station orbit.
+    let lowless: Vec<(usize, BodyId)> = game
+        .ships
+        .iter()
+        .enumerate()
+        .filter_map(|(i, s)| match s.at {
+            ShipAt::Body(b) | ShipAt::Transit { to: b, .. } if s.slot.is_none() && !game.has_low_orbit(b) => Some((i, b)),
+            _ => None,
+        })
+        .collect();
+    for (i, _) in lowless {
+        game.ships[i].slot = Some(0);
     }
     Ok(game)
 }

@@ -25,6 +25,10 @@ pub enum UnloadTarget {
     Slot(BodyId, u32),
     /// Disembark into an existing Colony on this Body (own: into Habitats; enemy: an Army lands to attack).
     Colony(ColonyId),
+    /// Ticket #442 (version 0.09.6): **found a Space Station** in this station slot, from a Colony
+    /// Ship in that slot's own ring -- a Core and the Colonists aboard, no Materials, as a ground
+    /// Colony is founded from low orbit.
+    Ring(BodyId, u32),
 }
 
 /// Ticket #54 (version 0.05): one standing building, by its place and its position in that place's
@@ -125,6 +129,14 @@ pub enum Order {
     /// Version 0.04 (ticket #46): a Space Station in an orbital slot, built for Materials from a
     /// Nation State with a Launch Site (over Earth) or a Colony of the seat's (elsewhere).
     BuildStation { body: BodyId, slot: u32 },
+    /// Ticket #442 (version 0.09.6): a **ground Colony built from a station** of the seat's at that
+    /// Body, into a free ground slot, for the station's Materials price; it opens with a Core and
+    /// nobody, as a built station does.
+    BuildColony { body: BodyId, slot: u32 },
+    /// Ticket #442 (version 0.09.6): Colonists **sent down** from a station of the seat's to its
+    /// ground Colony on the same Body, free, within the Colony's room; not while the station is
+    /// blockaded; one a station a turn; down only.
+    SendDown { from: ColonyId, to: ColonyId, colonists: u32 },
     /// Version 0.05 (ticket #51): the Archive, at a Colony off Earth. Version 0.05.5 (ticket #68):
     /// one Module, paid in Materials from the Stockpile; its Research is paid into the fund after.
     BuildArchive { colony: ColonyId },
@@ -308,6 +320,12 @@ pub struct Pending {
     pub cargo: Vec<(Seat, Order)>,
     /// Ticket #46: stations ordered this turn.
     pub stations: Vec<(Seat, BodyId, u32)>,
+    /// Ticket #442 (version 0.09.6): ground Colonies built from a station this turn, and Colonists
+    /// sent down.
+    #[serde(default)]
+    pub colony_builds: Vec<(Seat, BodyId, u32)>,
+    #[serde(default)]
+    pub send_downs: Vec<(Seat, ColonyId, ColonyId, u32)>,
     /// Ticket #52: Relief orders paid this turn, one entry per point.
     pub relief: Vec<(Seat, StateId)>,
     /// Ticket #269 (version 0.08.4): Agitate orders paid this turn -- who, where.
@@ -454,7 +472,7 @@ impl Game {
         let Some(s) = self.ship(ship) else { return 0 };
         let room = match into {
             UnloadTarget::Colony(c) => self.colony(c).map(|col| self.habitat_room(col).saturating_sub(col.colonists)).unwrap_or(0),
-            UnloadTarget::Slot(..) => self.tables.module(ModuleKind::Core).holds_colonists,
+            UnloadTarget::Slot(..) | UnloadTarget::Ring(..) => self.tables.module(ModuleKind::Core).holds_colonists,
         };
         s.colonists.min(room)
     }
@@ -529,8 +547,10 @@ impl Game {
             Order::BuildFacilityWithDucats { kind, .. } => Cost { ducats: self.market_price(seat, self.facility_materials(seat, *kind) * t.ducats.per_building_material as f64), ..Default::default() },
             // Ticket #332 (version 0.09.0): the refund is a negative cost, as a purchase is, so
             // `remaining` and `commit_orders` credit it without a special case.
-            Order::CancelBuild { place, index } => Cost { materials: -self.cancel_refund(seat, *place, *index), ..Default::default() },
+            Order::CancelBuild { place, index } => Cost { materials: -self.cancel_refund(seat, *place, *index), fuel: -self.cancel_fuel_refund(*place, *index), ..Default::default() },
             Order::BuildStation { .. } => Cost { materials: self.station_materials(seat), ..Default::default() },
+            // Ticket #442 (version 0.09.6): a ground Colony from a station, at the station's price.
+            Order::BuildColony { .. } => Cost { materials: self.station_materials(seat), ..Default::default() },
             Order::BuildModuleWithDucats { colony, kind } => Cost { ducats: self.market_price(seat, self.module_materials_at(seat, *colony, *kind) * t.ducats.per_building_material as f64), ..Default::default() },
             // Ticket #68: the Archive Module costs its row's Materials; the Research comes after.
             // Ticket #88: the Archive is a Module, so its Colony's working Mines take off too.
@@ -1023,9 +1043,10 @@ impl Game {
                 }
                 let foothold = match body {
                     BodyId::Earth => self.directed_states(seat).iter().any(|s| self.state(*s).facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working())),
-                    // Ticket #93: at a Body with no Colony Slots (Venus) a station is built from a
-                    // Ship of the seat's in orbit there, since there is no ground to build from.
-                    b if self.tables.body(*b).colony_slots() == 0 => self.ships.iter().any(|s| s.seat == seat && s.at == ShipAt::Body(*b)),
+                    // Ticket #93: at a Body with no Colony Slots (Venus) a station was built from a
+                    // Ship of the seat's in orbit there. Ticket #442 (version 0.09.6), at the
+                    // designer's word: no longer -- it is FOUNDED by a Colony Ship in its ring.
+                    b if self.tables.body(*b).colony_slots() == 0 => false,
                     b => self.colonies.iter().any(|c| !c.in_orbit && c.body == *b && c.control.director() == Some(seat)),
                 };
                 if !foothold {
@@ -1035,8 +1056,8 @@ impl Game {
                         // mothballed is told to get a Launch Site it already has.
                         "needs a Nation State of yours with a working Launch Site"
                     } else if self.tables.body(*body).colony_slots() == 0 {
-                        // Ticket #93: Venus.
-                        "needs a Ship of yours in orbit here; there is no ground to build from"
+                        // Ticket #93: Venus. Ticket #442 (version 0.09.6): founded, not built.
+                        "there is no ground to build from: a Colony Ship in this orbit founds it"
                     } else {
                         "needs a Colony of yours on this Body"
                     });
@@ -1044,6 +1065,55 @@ impl Game {
                 // Ticket #99 (version 0.07.0): a rival warship sitting in the slot denies it.
                 if self.slot_blockaded_against(seat, *body, *slot) {
                     return fail(format!("a rival warship holds Orbital Slot {slot} over {}", self.tables.body(*body).name));
+                }
+                Ok(cost)
+            }
+            // Ticket #442 (version 0.09.6): a ground Colony built from a working station of the seat's
+            // at that Body, into a free ground slot. Not on Earth, whose ground is Antarctica, reached by
+            // Colony Ship or by sea.
+            Order::BuildColony { body, slot } => {
+                if *body == BodyId::Earth {
+                    return fail("Antarctica is reached by Colony Ship or by sea");
+                }
+                if !self.free_slots_on(*body).contains(slot) {
+                    return fail("that ground slot is taken, or there is no such slot");
+                }
+                if pending.iter().any(|o| matches!(o, Order::BuildColony { body: b, slot: s } if b == body && s == slot)) {
+                    return fail("a Colony is already ordered there");
+                }
+                let station = self.colonies.iter().any(|c| c.in_orbit && c.body == *body && c.control.director() == Some(seat) && self.starved_by(c.id).is_none());
+                if !station {
+                    return fail("needs a station of yours over this Body, not under Blockade");
+                }
+                Ok(cost)
+            }
+            // Ticket #442 (version 0.09.6): Colonists down from a station of the seat's to its ground
+            // Colony on the same Body. Free, within the Colony's room, one a station a turn, not while
+            // the station is under Blockade, down only.
+            Order::SendDown { from, to, colonists } => {
+                let (Some(up), Some(down)) = (self.colony(*from), self.colony(*to)) else { return fail("no such place") };
+                if up.control.director() != Some(seat) || down.control.director() != Some(seat) {
+                    return fail("both places must be yours");
+                }
+                if !up.in_orbit || down.in_orbit || up.body != down.body {
+                    return fail("down from a station to a ground Colony on the same Body");
+                }
+                if *colonists == 0 {
+                    return fail("nobody to send");
+                }
+                if up.colonists < *colonists {
+                    return fail(format!("only {} Colonists aboard", up.colonists));
+                }
+                if self.starved_by(*from).is_some() {
+                    return fail("the station is under Blockade");
+                }
+                if pending.iter().any(|o| matches!(o, Order::SendDown { from: f, .. } if f == from)) {
+                    return fail("this station already sends people down this turn");
+                }
+                let queued: u32 = pending.iter().filter_map(|o| match o { Order::SendDown { to: t, colonists: n, .. } if t == to => Some(*n), _ => None }).sum();
+                let room = self.habitat_room(down).saturating_sub(down.colonists + queued);
+                if *colonists > room {
+                    return fail(format!("{} has room for {room}", self.place_name(Place::Colony(*to))));
                 }
                 Ok(cost)
             }
@@ -1448,6 +1518,10 @@ impl Game {
                         return fail(format!("{} has {} Orbital Slots, numbered 0 to {}", self.tables.body(*to).name, slots, slots.saturating_sub(1)));
                     }
                 }
+                // Ticket #442 (version 0.09.6): a Body with no ground has no low orbit to arrive in.
+                if slot.is_none() && !self.has_low_orbit(*to) {
+                    return fail(format!("{} has no low orbit: name one of its station orbits", self.tables.body(*to).name));
+                }
                 // Ticket #87: the leg is paid from the tank.
                 let (_, fuel) = self.transit_cost_for(seat, from, *to);
                 if s.fuel < fuel {
@@ -1746,10 +1820,28 @@ impl Game {
                 if *colonists == 0 && army.is_none() {
                     return fail("nothing to load");
                 }
-                if s.colonists + *colonists > capacity {
+                // Ticket #443 (version 0.09.6): at Earth a Colony Ship takes one Load from EACH Region
+                // its seat directs, in the same turn: Pioneers from several countries. Those Loads
+                // stand beside one another and nothing else, two never come from one Region, and the
+                // room is the Ship's, counted over all of them -- crowding included.
+                let from_region = |o: &Order| match o {
+                    Order::Load { ship: x, from: LoadSource::State(st), army: None, .. } if x == ship => Some(*st),
+                    _ => None,
+                };
+                let loading: u32 = pending.iter().filter(|o| from_region(o).is_some()).map(|o| if let Order::Load { colonists, .. } = o { *colonists } else { 0 }).sum();
+                if s.colonists + loading + *colonists > capacity {
                     return fail(format!("this Ship carries at most {capacity} Colonists"));
                 }
-                if pending.iter().any(|o| matches!(o, Order::Transit { ship: x, .. } | Order::Load { ship: x, .. } | Order::Unload { ship: x, .. } | Order::ChangeOrbit { ship: x, .. } if x == ship)) {
+                let mine = from_region(order);
+                let other = |o: &&Order| matches!(o, Order::Transit { ship: x, .. } | Order::Load { ship: x, .. } | Order::Unload { ship: x, .. } | Order::ChangeOrbit { ship: x, .. } if x == ship);
+                let blocks = |o: &&Order| match (mine, from_region(o)) {
+                    (Some(a), Some(b)) => a == b,
+                    _ => true,
+                };
+                if pending.iter().filter(other).any(|o| blocks(&o)) {
+                    if mine.is_some() && pending.iter().filter(other).all(|o| from_region(o).is_some()) {
+                        return fail("this Ship already loads from that Region this turn");
+                    }
                     return fail("this Ship already has an order");
                 }
                 if *colonists > 0 {
@@ -1761,9 +1853,12 @@ impl Game {
                             if self.state(*st).control.director() != Some(seat) {
                                 return fail("you do not direct that Nation State");
                             }
-                            // Ticket #46: a lift to orbit needs a Launch Site there.
-                            if !self.state(*st).facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working()) {
-                                return fail("a lift to orbit needs a working Launch Site there");
+                            // Ticket #46: a lift to orbit needs a Launch Site there. Ticket #443 (version
+                            // 0.09.6), at the designer's word: not to LOW orbit -- a Colony Ship there
+                            // takes Pioneers from any Region its seat directs. A station's ring is
+                            // still reached by a Launch Site alone.
+                            if s.slot.is_some() && !self.state(*st).facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working()) {
+                                return fail("a lift to a station's orbit needs a working Launch Site there; low orbit needs none");
                             }
                             // Ticket #73: a Launch Site lifts only the Emigrants waiting there; the
                             // population was paid when they mustered.
@@ -1872,6 +1967,28 @@ impl Game {
                         // Ticket #56: Antarctica is shut under the ice until the world is warm enough.
                         if *b == BodyId::Earth && !self.antarctica_open {
                             return fail(format!("the Antarctic ice has not opened: it opens at {:+.1} C", self.tables.climate.antarctica_opens_at));
+                        }
+                    }
+                    // Ticket #442 (version 0.09.6): a station founded from its own ring, by a Colony
+                    // Ship, off Earth -- over Earth a station comes from a Launch Site.
+                    UnloadTarget::Ring(b, slot) => {
+                        if *b != body {
+                            return fail("that orbit is not at this Body");
+                        }
+                        if body == BodyId::Earth {
+                            return fail("over Earth a station is built from a Launch Site");
+                        }
+                        if s.kind != UnitKind::ColonyShip || *colonists == 0 {
+                            return fail("only a Colony Ship with Colonists founds a station");
+                        }
+                        if !self.free_orbital_slots(body).contains(slot) {
+                            return fail("that station slot is taken");
+                        }
+                        if !self.ship_in_orbit(s, body, Orbit::Slot(*slot)) {
+                            return fail(self.move_first(body, Orbit::Slot(*slot), "found the station", "a station is founded from its own orbit."));
+                        }
+                        if self.slot_blockaded_against(seat, body, *slot) {
+                            return fail(format!("a rival warship holds Orbital Slot {slot} over {}", self.tables.body(body).name));
                         }
                     }
                     UnloadTarget::Colony(c) => {
@@ -2007,6 +2124,7 @@ impl Game {
                     return fail(format!("{waiting} Pioneers are waiting there"));
                 }
                 match into {
+                    UnloadTarget::Ring(..) => return fail("the sea reaches the ground, not an orbit"),
                     UnloadTarget::Slot(b, slot) => {
                         if *b != BodyId::Earth || !self.free_slots_on(BodyId::Earth).contains(slot) {
                             return fail("that Antarctic slot is not free");
@@ -2240,6 +2358,12 @@ impl Game {
     /// Ticket #332 (version 0.09.0): what a `CancelBuild` at this place and index would pay the
     /// canceller: the item's Materials at the canceller's own price, or nought if there is no
     /// such build. The check refuses the order in that case; this only prices it.
+    /// Ticket #455 (version 0.09.6): the Fuel a cancelled build gives back -- a Ship's tank, paid at
+    /// the order. Nought for anything else.
+    pub fn cancel_fuel_refund(&self, place: Place, index: usize) -> f64 {
+        self.queue_at(place).get(index).map(|b| b.fuel).unwrap_or(0.0)
+    }
+
     pub fn cancel_refund(&self, seat: Seat, place: Place, index: usize) -> f64 {
         self.queue_at(place).get(index).map(|b| self.item_materials(seat, place, b.item)).unwrap_or(0.0)
     }
@@ -2269,11 +2393,11 @@ impl Game {
                     let done = if matches!(order, Order::BuildFacilityWithDucats { .. }) { widgets } else { 0 };
                     // Ticket #56: the build reserves the slot it will stand in, coastal or inland.
                     let coastal = self.next_slot_is_coastal(*state, kind, 0, 0).unwrap_or(false);
-                    self.state_mut(*state).queue.push(Build { item: BuildItem::Facility(kind), seat, widgets, done, coastal });
+                    self.state_mut(*state).queue.push(Build { item: BuildItem::Facility(kind), seat, widgets, done, coastal, fuel: 0.0 });
                 }
                 Order::RaiseIndustry { state } => {
                     let widgets = self.build_widgets(seat, BuildItem::IndustryLevel);
-                    self.state_mut(*state).queue.push(Build { item: BuildItem::IndustryLevel, seat, widgets, done: 0, coastal: false });
+                    self.state_mut(*state).queue.push(Build { item: BuildItem::IndustryLevel, seat, widgets, done: 0, coastal: false, fuel: 0.0 });
                 }
                 Order::BuildModule { colony, kind } | Order::BuildModuleWithDucats { colony, kind } => {
                     // Ticket #186: as on Earth -- the Custodians' Institute order raises an Academy.
@@ -2282,12 +2406,13 @@ impl Game {
                     let widgets = self.build_widgets(seat, BuildItem::Module(kind));
                     let done = if matches!(order, Order::BuildModuleWithDucats { .. }) { widgets } else { 0 };
                     if let Some(c) = self.colony_mut(*colony) {
-                        c.queue.push(Build { item: BuildItem::Module(kind), seat, widgets, done, coastal: false });
+                        c.queue.push(Build { item: BuildItem::Module(kind), seat, widgets, done, coastal: false, fuel: 0.0 });
                     }
                 }
                 Order::BuildShip { site, kind } => {
                     let widgets = self.build_widgets(seat, BuildItem::Unit(*kind));
-                    let b = Build { item: BuildItem::Unit(*kind), seat, widgets, done: 0, coastal: false };
+                    // Ticket #455 (version 0.09.6): the tank's Fuel paid just above rides with the build.
+                    let b = Build { item: BuildItem::Unit(*kind), seat, widgets, done: 0, coastal: false, fuel: cost.fuel };
                     match site {
                         Place::State(s) => self.state_mut(*s).queue.push(b),
                         Place::Colony(c) => {
@@ -2299,7 +2424,7 @@ impl Game {
                 }
                 Order::BuildArmy { place } => {
                     let widgets = self.build_widgets(seat, BuildItem::Unit(UnitKind::Army));
-                    let b = Build { item: BuildItem::Unit(UnitKind::Army), seat, widgets, done: 0, coastal: false };
+                    let b = Build { item: BuildItem::Unit(UnitKind::Army), seat, widgets, done: 0, coastal: false, fuel: 0.0 };
                     // Ticket #334 (version 0.09.0): the people go under arms at the order, as a
                     // Pioneer's population is paid at the recruit: a Region's unit of population, a
                     // Colony's Colonist. Nobody returns when the Army dies or marches.
@@ -2352,7 +2477,7 @@ impl Game {
                     if let RearmSite::Yard(c) = self.rearm_site(seat, *ship) {
                         let widgets = self.build_widgets(seat, BuildItem::Warhead(*ship));
                         if let Some(col) = self.colony_mut(c) {
-                            col.queue.push(Build { item: BuildItem::Warhead(*ship), seat, widgets, done: 0, coastal: false });
+                            col.queue.push(Build { item: BuildItem::Warhead(*ship), seat, widgets, done: 0, coastal: false, fuel: 0.0 });
                         }
                     }
                 }
@@ -2469,13 +2594,16 @@ impl Game {
                     }
                 }
                 Order::BuildStation { body, slot } => self.pending.stations.push((seat, *body, *slot)),
+                // Ticket #442 (version 0.09.6).
+                Order::BuildColony { body, slot } => self.pending.colony_builds.push((seat, *body, *slot)),
+                Order::SendDown { from, to, colonists } => self.pending.send_downs.push((seat, *from, *to, *colonists)),
                 Order::BuildArchive { colony } => {
                     // Ticket #68: the Module rises in the Colony's queue like any other build, from
                     // its own row (ticket #332: twelve Widgets, its three turns times four); the
                     // Research is paid into the fund once it stands.
                     let widgets = self.build_widgets(seat, BuildItem::Module(ModuleKind::Archive));
                     if let Some(c) = self.colony_mut(*colony) {
-                        c.queue.push(Build { item: BuildItem::Module(ModuleKind::Archive), seat, widgets, done: 0, coastal: false });
+                        c.queue.push(Build { item: BuildItem::Module(ModuleKind::Archive), seat, widgets, done: 0, coastal: false, fuel: 0.0 });
                     }
                     let line = format!("The {} began the Archive at {}.", self.seat_name(seat), self.place_name(Place::Colony(*colony)));
                     self.log(line);
@@ -2909,6 +3037,9 @@ impl Game {
                 r("cancel_build", &[("building", building), ("place", place(*p))])
             }
             Order::BuildStation { body, .. } => r("build_station", &[("body", self.tables.body(*body).name.clone())]),
+            // Ticket #442 (version 0.09.6).
+            Order::BuildColony { body, .. } => r("build_colony", &[("body", self.tables.body(*body).name.clone())]),
+            Order::SendDown { to, colonists, .. } => r("send_down", &[("n", colonists.to_string()), ("place", place(Place::Colony(*to)))]),
             // Ticket #87.
             Order::Refuel { ship } => {
                 let body = self.ship(*ship).and_then(|s| match s.at {
@@ -2993,6 +3124,7 @@ impl Game {
                         None => format!("{} slot {i}", self.tables.body(*b).name),
                     },
                     UnloadTarget::Colony(c) => place(Place::Colony(*c)),
+                    UnloadTarget::Ring(b, i) => format!("{} over {}", self.station_name(*b, *i), self.tables.body(*b).name),
                 };
                 r("unload", &[("place", where_)])
             }

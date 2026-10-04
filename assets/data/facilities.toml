@@ -97,15 +97,16 @@ emissions = 0.0
 # Restoration. Only they build it, only in a Nation State they control, and it takes NO build slot
 # (`no_slot`). While it stands and is online it enlarges the Natural Sink by `sink_per_turn` ppm in
 # that Climate phase, which counts as removal for its controller's Blame, and it takes 1 off its
-# state's Unrest every turn (`unrest.toml`, `scrubber_fall`). It is destroyed outright if the state
-# changes hands. How many one state may hold is `[scrubber]` below.
+# state's Unrest every turn (`unrest.toml`, `scrubber_fall`). It was destroyed outright if the state
+# changed hands; since ticket #445 (version 0.09.6) it stands at a share, `[scrubber]` below, which
+# also says how many one state may hold.
 [[facility]]
 id = "scrubber"
 name = "Scrubber"
 materials = 30
 widgets = 8
 energy_upkeep = 3
-does = "+3.0 ppm on the Natural Sink and 1 off this state's Unrest a turn, counted as its holder's removal; no build slot; destroyed if this state changes hands"
+does = "+3.0 ppm on the Natural Sink and 1 off this state's Unrest a turn, counted as its holder's removal; no build slot; half in another Faction's hands, a quarter in nobody's"
 emissions = 0.0
 sink_per_turn = 3.0
 no_slot = true
@@ -221,6 +222,11 @@ emissions = 0.75
 # clamp(round(population / per_population), min, max). Russia at 150 gets the floor of 2; India at
 # 1940 gets the ceiling of 10.
 [scrubber]
+# Ticket #445 (version 0.09.6): a Scrubber runs whole under the Custodians, at `captured_share` in any
+# other Faction's hands (its Sink and its calm, credited to the holder, the upkeep whole), and at
+# `neutral_share` in a neutral Region (to nobody's Blame, no upkeep). It is no longer destroyed.
+captured_share = 0.5
+neutral_share = 0.25
 per_population = 200.0
 min = 2
 max = 10

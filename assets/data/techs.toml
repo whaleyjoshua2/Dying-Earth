@@ -288,7 +288,9 @@ name = "Generation Ships"
 branch = "Off-world Living"
 rung = 3
 cost = 48
-needs = ["closed_loop_colonies"]
+# Ticket #438 (version 0.09.6): and Relay Networks, at the designer's word ("relay networks needed for
+# generation ship"), so the Arkwrights' road is 130 like every other Faction's.
+needs = ["closed_loop_colonies", "relay_networks"]
 effect = "Opens the Arkwrights' Victory Condition; a Colony Ship carries +2 Colonists"
 value = 2.0
 gate_for = "arkwrights"
