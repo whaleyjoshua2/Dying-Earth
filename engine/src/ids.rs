@@ -111,10 +111,15 @@ pub enum StateId {
     // the ground it covers, the card carries the name -- so these read `japan` and `arabian_peninsula`.
     Japan,
     ArabianPeninsula,
+    // Version 0.09.6 (ticket #453): Pakistan cut out of South Asia (Pakistan, Afghanistan) and East
+    // Asia (the five Central Asian republics), the United Kingdom (with Ireland and Iceland) out of
+    // Europe. Appended, as every split has been, so no older index moves.
+    Pakistan,
+    UnitedKingdom,
 }
 
 impl StateId {
-    pub const ALL: [StateId; 14] = [
+    pub const ALL: [StateId; 16] = [
         StateId::SubSaharanAfrica,
         StateId::NorthAfrica,
         StateId::EastAsia,
@@ -129,6 +134,8 @@ impl StateId {
         StateId::MiddleEast,
         StateId::Japan,
         StateId::ArabianPeninsula,
+        StateId::Pakistan,
+        StateId::UnitedKingdom,
     ];
     pub fn index(self) -> usize {
         self as usize

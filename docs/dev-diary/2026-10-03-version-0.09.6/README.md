@@ -365,3 +365,21 @@ nothing.
 - the Sea Wall test's new assertion, with the Unkept line taken out, read `left: None, right:
   Some(Unkept)`.
 - The older-save test now cuts `offline_cause` too.
+
+## Two Regions added: Pakistan and the United Kingdom (ticket #453)
+
+- [`mask-preview.png`](ticket-453/mask-preview.png): the redrawn mask. Pakistan in dark green from
+  the Arabian Sea to the Kazakh steppe; the United Kingdom, Ireland and Iceland in slate.
+- [`pakistan-earth.png`](ticket-453/pakistan-earth.png): Pakistan's card on turn 1, with its flag, a
+  Power Plant and a Mine, and its label between Iran, India and China.
+- [`uk-earth.png`](ticket-453/uk-earth.png): the United Kingdom's card, with its four buildings. The
+  first take had its label under the European Union's; it was moved north to Scotland.
+- [`start-earth.png`](ticket-453/start-earth.png): the board on turn 1 with nothing selected.
+
+**Witnessed red:** the new test `pakistan_and_the_united_kingdom_share_out_their_parents` could not
+compile before the two Regions existed. Seventeen older tests then failed on the parents' old figures
+and were brought up to the new ones; two enforced the start-building rule, which the first tables
+broke and the designer settled (the rule kept, Pakistan's lone Mine the exception).
+
+**The sweep** ([`after-453.txt`](sweeps/after-453.txt)): 5 / 3 / 11 / 15 wins and 46 collapses,
+where fourteen Regions gave 15 / 10 / 10 / 5 and 40. Not traced.

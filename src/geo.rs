@@ -98,6 +98,9 @@ pub fn state_lonlat(state: StateId) -> (f32, f32) {
         StateId::MiddleEast => (50.0, 33.0),
         StateId::Japan => (138.0, 37.0),
         StateId::ArabianPeninsula => (45.0, 23.0),
+        // Ticket #453 (version 0.09.6): on the Indus plain and on the Scottish Lowlands, clear of the Union's label.
+        StateId::Pakistan => (68.0, 33.0),
+        StateId::UnitedKingdom => (-3.0, 56.5),
     }
 }
 

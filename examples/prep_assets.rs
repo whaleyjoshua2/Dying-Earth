@@ -7,13 +7,15 @@
 //! the mask, from the `earth.png` already in `assets/textures`, so the borders can be redrawn
 //! without the source JPEGs.
 //!
-//! Mask layout (`assets/textures/earth_states.png`, grey 8-bit): 0 = water, 1..15 = a Region.
+//! Mask layout (`assets/textures/earth_states.png`, grey 8-bit): 0 = water, 1..17 = a Region.
 //! Values 1 to 9 are the order the mask was first painted (Sub-Saharan Africa, Antarctica, East
 //! Asia, Australia and Oceania, Europe, North America, South America, Russia, the Middle East);
 //! since ticket #44 Antarctica is no Region and the window maps its value (2) to none. Ticket #53
 //! split the map into twelve and APPENDED its four new Regions (10 North Africa, 11 South Asia, 12
 //! South-East Asia, 13 Central America and the Caribbean) rather than renumbering; ticket #125
 //! (version 0.07.2) appended two more (14 Japan and Korea, 15 the Arabian Peninsula) the same way,
+//! and ticket #453 (version 0.09.6) two more again (16 Pakistan with Afghanistan and the five
+//! Central Asian republics, 17 the United Kingdom with Ireland and Iceland),
 //! so every old value still means what it meant. The Regions have been named for their Nations
 //! since ticket #122 -- value 3 is the Region called China -- but the mask's names are the
 //! geographic ones it was painted under, since that is what the value covers.
@@ -59,7 +61,9 @@ const SOUTH_EAST_ASIA: u8 = 12;
 const CENTRAL_AMERICA: u8 = 13;
 const JAPAN_KOREA: u8 = 14;
 const ARABIAN_PENINSULA: u8 = 15;
-const VALUES: usize = 16;
+const PAKISTAN: u8 = 16;
+const UNITED_KINGDOM: u8 = 17;
+const VALUES: usize = 18;
 
 /// The Region a country belongs to, by Natural Earth's `ADM0_A3`, then by its `SUBREGION`, then by
 /// its `CONTINENT`. Every case the research flagged is decided here by name, so the table can be
@@ -76,10 +80,14 @@ fn region_for(adm0: &str, subregion: &str, continent: &str) -> u8 {
         // Greenland stays with the United States' Region, as it always was.
         "GRL" | "USA" | "CAN" | "BMU" | "SPM" => return NORTH_AMERICA,
         "MEX" => return CENTRAL_AMERICA,
-        // Kazakhstan goes whole to China's Region with the rest of Central Asia, ending the one
-        // place the old lines split a country.
-        "KAZ" | "UZB" | "TKM" | "KGZ" | "TJK" | "CHN" | "MNG" | "TWN" | "HKG" | "MAC" => return EAST_ASIA,
-        "AFG" | "IND" | "PAK" | "BGD" | "LKA" | "NPL" | "BTN" | "MDV" => return SOUTH_ASIA,
+        // Ticket #453 (version 0.09.6): Pakistan and Afghanistan leave India's Region and the five
+        // Central Asian republics leave China's, for the Region called Pakistan; the United Kingdom,
+        // Ireland and Iceland leave the European Union's, and the Isle of Man and the Channel
+        // Islands go with the Crown they belong to.
+        "PAK" | "AFG" | "KAZ" | "UZB" | "TKM" | "KGZ" | "TJK" => return PAKISTAN,
+        "GBR" | "IRL" | "ISL" | "IMN" | "JEY" | "GGY" => return UNITED_KINGDOM,
+        "CHN" | "MNG" | "TWN" | "HKG" | "MAC" => return EAST_ASIA,
+        "IND" | "BGD" | "LKA" | "NPL" | "BTN" | "MDV" => return SOUTH_ASIA,
         // North Africa: Morocco to Egypt and down through Sudan, as the table has always said.
         "EGY" | "LBY" | "TUN" | "DZA" | "MAR" | "ESH" | "SDN" => return NORTH_AFRICA,
         "RUS" => return RUSSIA,
@@ -322,7 +330,7 @@ fn main() {
     mask.save(out.join("earth_states.png")).expect("save mask");
     let unassigned: Vec<&(String, u8)> = table.iter().filter(|(_, v)| *v == 0).collect();
     println!("wrote earth_states.png from {} countries; {} land pixels took the nearest Region by flood", table.len(), filled);
-    println!("pixel counts water/SSA/AN/EA/AU/EU/NA/SA/RU/ME/NAF/SAS/SEA/CAC/JK/ARB = {counts:?}");
+    println!("pixel counts water/SSA/AN/EA/AU/EU/NA/SA/RU/ME/NAF/SAS/SEA/CAC/JK/ARB/PAK/UK ={counts:?}");
     if !unassigned.is_empty() {
         println!("left to the flood, having no Region of their own: {}", unassigned.iter().map(|(n, _)| n.as_str()).collect::<Vec<_>>().join(", "));
     }
@@ -348,6 +356,8 @@ fn main() {
             Some(StateId::CentralAmerica),
             Some(StateId::Japan),
             Some(StateId::ArabianPeninsula),
+            Some(StateId::Pakistan),
+            Some(StateId::UnitedKingdom),
         ];
         let colours: Vec<[u8; 3]> = MASK_IDS
             .iter()

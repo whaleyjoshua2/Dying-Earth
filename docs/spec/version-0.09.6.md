@@ -449,3 +449,46 @@ The authority is [ticket #451](https://github.com/whaleyjoshua2/Dying-Earth/issu
   keeps that sentence.
 - **Beside the arithmetic:** where a figure is multiplied the hover shows its sums; the cause line
   stays above them and the sums give up a line, so the hover keeps to six.
+
+## 19. Two Regions added: Pakistan and the United Kingdom
+
+The authority is [ticket #453](https://github.com/whaleyjoshua2/Dying-Earth/issues/453). The board
+has sixteen Regions, where it had fourteen.
+
+- **Pakistan:** Pakistan and Afghanistan out of India's Region; Kazakhstan, Uzbekistan,
+  Turkmenistan, Kyrgyzstan and Tajikistan out of China's.
+- **The United Kingdom:** the UK, Ireland and Iceland out of the European Union's Region.
+- **People and Influence are shared out, never invented.** The world is still 7,860 million people
+  and 34 Influence.
+
+| | India | China | Pakistan | EU | United Kingdom |
+|---|---|---|---|---|---|
+| People | 1940 → 1660 | 1440 → 1370 | 350 | 600 → 525 | 75 |
+| GDP | 4 → 3 | 17 → 16 | 2 | 20 → 17 | 3 |
+| Influence | 2 → 1 | 3 | 1 | 5 → 4 | 1 |
+| Industry Level | 2 | 3 | 1 | 3 | 3 |
+| Size | 2 | 3 | 2 | 2 | 1 |
+| Coast | 2 | 2 | 1 | 1 | 2 |
+| Education | 0.75 | 1.1 | 0.8 | 1.45 | 1.5 |
+| Emissions | 0.4 | 0.5 | 0.4 | 0.3 | 0.3 |
+| Lean | Materials | Materials | Fuel | Energy | Fuel |
+| Starts with | unchanged | unchanged | Power Plant, Mine | unchanged | Refinery, Power Plant, Factory, Mine |
+
+- **Neighbours.** Pakistan: India, China, Iran, Russia. India no longer borders Iran. The United
+  Kingdom: the EU and the United States.
+- **Start buildings keep the rule** (as many as the Industry Level, a Mine beside each Factory), with
+  one exception at the designer's word: Pakistan's Mine stands with no Factory.
+- **What follows from the figures.** A home Region's income moves with its card: China pays 9.6
+  Ducats a turn where it paid 10.2, the EU 10.2 (12.2 to the Prospectors) where it paid 12 (14.4),
+  and the EU adds 4 to an Allotment where it added 5. India's Scrubber cap is 8 where it was the
+  ceiling of 10. Sixteen Regions make a little more Research between them than fourteen did.
+- **The map.** The Region mask is redrawn from Natural Earth's country borders with two values
+  appended (16, 17). Flags from flag-icons (MIT), as the others are.
+- **Saves.** `SAVE_VERSION` moves to 8: a save from before this ticket is refused.
+
+**Measured** (20 seeds × four seatings, 80 games, the same cell as every sweep this version):
+
+| | fourteen Regions | sixteen Regions |
+|---|---|---|
+| wins (Cust / Pros / Ark / Arch) | 15 / 10 / 10 / 5 | 5 / 3 / 11 / 15 |
+| collapses | 40 | 46 |

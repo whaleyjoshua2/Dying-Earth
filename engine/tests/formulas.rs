@@ -469,9 +469,10 @@ fn the_allotment_is_the_base_plus_each_controlled_states_value_times_the_faction
     // Ticket #440 (version 0.09.6): 1.15, rounded down: (10 + 3) x 1.15 = 14.95 -> 14.
     assert_eq!(g.tables.faction(FactionKind::Custodians).influence_multiplier, 1.15);
     assert_eq!(g.influence_allotment(Seat(0)), 14);
-    assert_eq!(g.influence_allotment(Seat(1)), 15);
+    // Ticket #453 (version 0.09.6): Europe is 4 since the United Kingdom took one: 10 + 4 = 14.
+    assert_eq!(g.influence_allotment(Seat(1)), 14);
     g.state_mut(StateId::NorthAmerica).control = Control::Controlled(Seat(1));
-    assert_eq!(g.influence_allotment(Seat(1)), 22, "North America adds 7");
+    assert_eq!(g.influence_allotment(Seat(1)), 21, "North America adds 7");
     // Raising East Asia's Industry Level adds one to its value.
     g.state_mut(StateId::EastAsia).industry_level += 1;
     assert_eq!(g.state_influence_value(StateId::EastAsia), 4);
@@ -491,19 +492,21 @@ fn a_controlled_state_pays_ducats_from_gdp_times_industry_and_a_bank_adds_more()
     // divisor is 5 and nothing pays under 1, so 17 x 3 / 5 = 10; Europe 20 x 3 / 5 = 12, and ticket
     // #83 (version 0.06.0): x1.2 for the Prospectors who hold it, 14. North Africa, gdp 1 at
     // Industry 1, would have paid nothing under the old rule and pays the floor of 1.
-    assert_eq!(g.state_ducats(StateId::EastAsia), 10.2); // Ticket #387: 17 x 3 / 5 to the tenth, where 10 was floored
-    assert_eq!(g.state_ducats(StateId::Europe), 14.4); // Ticket #387: 12 x 1.2 to the tenth, where 14 was floored
+    // Ticket #453 (version 0.09.6): China's gdp is 16 and Europe's 17 since Pakistan and the United
+    // Kingdom were cut out: 16 x 3 / 5 = 9.6, and 17 x 3 / 5 x 1.2 = 12.24.
+    assert_eq!(g.state_ducats(StateId::EastAsia), 9.6);
+    assert_eq!(g.state_ducats(StateId::Europe), 12.2);
     assert_eq!(g.tables.base_ducats(StateId::NorthAfrica, 1), 1.0, "the floor: no Region pays nothing");
     assert_eq!(g.tables.base_ducats(StateId::ArabianPeninsula, 2), 1.0, "Saudi Arabia, 2 x 2 / 5, pays the floor");
     let paid = income_of(&mut g, Seat(0));
-    assert_eq!(paid.ducats, 10.2); // Ticket #387
+    assert_eq!(paid.ducats, 9.6); // Ticket #387; 16 x 3 / 5 since ticket #453
     // A Bank in East Asia adds 4 x 17 / 10 = 6 (it was 4 x 23 / 10 = 9 before ticket #125 took 6 of
     // the gdp to Japan and Korea); in North Africa (gdp 1) it would add nothing. A Bank's own
     // figure did not move on ticket #139.
     g.state_mut(StateId::EastAsia).facilities.push(facility(FacilityKind::Bank));
-    assert_eq!(g.facility_yield(Seat(0), StateId::EastAsia, FacilityKind::Bank).amount, 6.8); // Ticket #387: 4 x 17 / 10 to the tenth, where 6 was floored
+    assert_eq!(g.facility_yield(Seat(0), StateId::EastAsia, FacilityKind::Bank).amount, 6.4); // Ticket #453: 4 x 16 / 10, to the tenth
     assert_eq!(g.facility_yield(Seat(0), StateId::NorthAfrica, FacilityKind::Bank).amount, 0.4); // Ticket #387: 4 x 1 / 10 to the tenth, where it floored to nothing
-    assert_eq!(income_of(&mut g, Seat(0)).ducats, 17.0); // Ticket #387: 10.2 + 6.8
+    assert_eq!(income_of(&mut g, Seat(0)).ducats, 16.0); // Ticket #453: 9.6 + 6.4
     // A Trade Post followed the Habitat yield; ticket #90 (version 0.06.0): it pays 2 per Colonist
     // at its Body plus a figure per other Body held. Empty Colonies on the Moon and Mars, with Earth
     // held: each sees two other Bodies. Ticket #397 (version 0.09.3): by distance from Earth, so the
@@ -726,7 +729,7 @@ fn antarctica_is_three_colony_slots_on_earth_whose_colonists_stay_on_earth_and_w
     // Ticket #56 re-cut them: abundant ore and Fuel under the ice.
     assert_eq!((earth.mine_yield, earth.generator_yield, earth.refinery_yield, earth.research_yield), (1.75, 0.75, 2.0, 1.0));
     assert_eq!(g.free_slots_on(BodyId::Earth).len(), 3);
-    assert_eq!(StateId::ALL.len(), 14, "fourteen Regions since ticket #125, and Antarctica is none of them");
+    assert_eq!(StateId::ALL.len(), 16, "sixteen Regions since ticket #453, and Antarctica is none of them");
     let m = g.tables.faction(FactionKind::Custodians).emissions_multiplier;
     let before = g.emissions_now();
     bare_stations(&mut g);
@@ -1417,11 +1420,12 @@ fn tech_public_science_raises_research_lab_output() {
     g.seats[0].stockpile.energy = 1000.0;
     // Ticket #416 (version 0.09.4): the Lab's share of East Asia's own, 1 x 1.32 x 1.10 x 1.25 =
     // 1.815, is a half: 0.91, to the tenth 0.9; with Public Science x1.5, 1.36, to the tenth 1.4.
+    // Ticket #453 (version 0.09.6): 1.30 for 1.37B people, so 1.789, 0.89 and 1.34: 0.9 and 1.3.
     assert_eq!(g.facility_yield(Seat(0), StateId::EastAsia, FacilityKind::ResearchLab).amount, 0.9);
     g.income_phase();
     let before = g.seats[0].research_last_turn;
     with_tech(&mut g, TechId::PublicScience);
-    assert_eq!(g.facility_yield(Seat(0), StateId::EastAsia, FacilityKind::ResearchLab).amount, 1.4);
+    assert_eq!(g.facility_yield(Seat(0), StateId::EastAsia, FacilityKind::ResearchLab).amount, 1.3);
     g.income_phase();
     assert!(g.seats[0].research_last_turn > before, "and the seat's Research rises with it: {before} then {}", g.seats[0].research_last_turn);
 }
@@ -1591,7 +1595,9 @@ fn every_neutral_state_starts_with_its_start_facilities() {
         let labs = card.start_facilities.iter().filter(|k| **k == FacilityKind::ResearchLab).count() as u32;
         // Ticket #332 (version 0.09.0): and a Mine beside every start Factory, on top of the count.
         let mines = card.start_facilities.iter().filter(|k| **k == FacilityKind::Mine).count() as u32;
-        assert_eq!(card.start_facilities.iter().filter(|k| **k == FacilityKind::Factory).count() as u32, mines, "{}: a Mine beside every Factory", card.name);
+        // Ticket #453 (version 0.09.6): Pakistan's Mine stands alone, at the designer's word.
+        let lone = u32::from(sid == StateId::Pakistan);
+        assert_eq!(card.start_facilities.iter().filter(|k| **k == FacilityKind::Factory).count() as u32 + lone, mines, "{}: a Mine beside every Factory", card.name);
         assert_eq!(card.start_facilities.len() as u32 - labs - mines, card.industry_level, "{}: as many as the Industry Level, plus a start Lab and the Mines", card.name);
     }
     assert_eq!(g.seats[0].stockpile, Stockpile { materials: 80.0, fuel: 20.0, energy: 20.0, ducats: 0.0 });
@@ -2208,6 +2214,9 @@ fn funding_the_archive_banks_this_turns_research_and_contributes_nothing_to_the_
     assert_eq!(g.archive_fund_cap(Seat(3)), research, "the whole figure, with no Archive standing");
     g.seats[3].archive_fund = research - 3;
     g.research.contributions = [0; 4];
+    // Ticket #453 (version 0.09.6): sixteen Regions make a little more Research between them, so
+    // Public Science would complete on this Income and clear the contributions; start it again.
+    g.research.progress = 0;
     g.income_phase();
     let made = g.seats[3].research_last_turn;
     assert!(made > 3, "the Lab makes more than the three the fund still has room for: {made}");
@@ -2769,6 +2778,8 @@ fn b_a_sea_level_threshold_raises_two_a_slot_and_displaces_five_percent_an_expos
     g.state_mut(StateId::SouthEastAsia).industry_level = 0;
     // Ticket #125 (version 0.07.2): Japan and Korea border East Asia too, and take none here.
     g.state_mut(StateId::Japan).industry_level = 0;
+    // Ticket #453 (version 0.09.6): and so does Pakistan.
+    g.state_mut(StateId::Pakistan).industry_level = 0;
     g.apply_sea_threshold(StateId::EastAsia, 0);
     assert_eq!(g.unrest(StateId::EastAsia), 2.0, "one per build slot, and Asia is exposed 2");
     let displaced = pop * 0.05 * 2.0;
@@ -2807,6 +2818,8 @@ fn c_heat_refugees_arrive_at_the_neighbours_and_raise_unrest_per_two_and_a_half_
     g.state_mut(StateId::SouthEastAsia).industry_level = 0;
     // Ticket #125 (version 0.07.2): Japan and Korea border East Asia too, and take none here.
     g.state_mut(StateId::Japan).industry_level = 0;
+    // Ticket #453 (version 0.09.6): and so does Pakistan.
+    g.state_mut(StateId::Pakistan).industry_level = 0;
     hold_temperature(&mut g, 3.0);
     assert!(g.population_growth_rate() < 0.0);
     g.climate_phase();
@@ -3224,11 +3237,11 @@ fn the_ai_pays_relief_and_raises_a_constabulary_where_unrest_has_taken_hold() {
 fn twelve_nation_states_share_out_the_eight_they_came_from() {
     let g = game();
     let t = &g.tables;
-    assert_eq!(StateId::ALL.len(), 14);
+    assert_eq!(StateId::ALL.len(), 16);
     let card = |s: StateId| t.state(s);
     // Asia's 30 GDP and 7 Influence go to East Asia, South Asia and South-East Asia -- and since
     // ticket #125 (version 0.07.2) to Japan and Korea, cut out of East Asia with 6 and 1 of them.
-    let asia = [StateId::EastAsia, StateId::SouthAsia, StateId::SouthEastAsia, StateId::Japan];
+    let asia = [StateId::EastAsia, StateId::SouthAsia, StateId::SouthEastAsia, StateId::Japan, StateId::Pakistan];
     assert_eq!(asia.iter().map(|s| card(*s).gdp).sum::<i64>(), 30, "Asia's GDP share");
     assert_eq!(asia.iter().map(|s| card(*s).influence).sum::<i64>(), 7, "Asia's Influence value");
     // Africa's 3 and 2 split at the Sahara.
@@ -3715,7 +3728,8 @@ fn c_population_emissions_follow_the_industry_level() {
     // Ticket #143: 288 units of five million, the 14.4 hundred-million of before; the same 0.432.
     // Ticket #333: 1,440 units of one million, the same 0.432 again.
     let per_level = g.tables.climate.population_emissions_per_level;
-    assert!((rise - per_level * 1440.0 * mult).abs() < 1e-9, "the population line rose {rise:.3}");
+    // Ticket #453 (version 0.09.6): 1,370 since Central Asia left for Pakistan.
+    assert!((rise - per_level * 1370.0 * mult).abs() < 1e-9, "the population line rose {rise:.3}");
 }
 
 /// (d) Leapfrog is the Custodians' alone, costs 50 Ducats, takes one level's worth off the state's
@@ -3776,7 +3790,11 @@ fn e_a_scrubber_enlarges_the_sink_and_is_capped_captured_at_half_and_calming() {
     // million; 40 units of five million before), between 2 and 10.
     assert_eq!(g.tables.scrubber.per_population, 200.0, "two hundred million people a Scrubber");
     assert_eq!(g.scrubber_cap(StateId::Russia), 2, "Russia at 150 takes the floor");
-    assert_eq!(g.scrubber_cap(StateId::SouthAsia), 10, "India at 1940 takes the ceiling");
+    // Ticket #453 (version 0.09.6): India at 1,660 no longer reaches the ceiling; nobody does at the start.
+    assert_eq!(g.scrubber_cap(StateId::SouthAsia), 8, "India at 1660: eight");
+    g.state_mut(StateId::SouthAsia).population = 2400.0;
+    assert_eq!(g.scrubber_cap(StateId::SouthAsia), 10, "the ceiling");
+    g.state_mut(StateId::SouthAsia).population = 1660.0;
     // Only the Custodians, and only on a state they control. Every seat that is not the Custodians
     // is refused, on its own state and on anyone else's, by BOTH build paths: the Materials one and
     // the Ducat one of ticket #42, which a Faction with money could otherwise walk in through.
@@ -4274,7 +4292,8 @@ fn b_coastal_slots_are_two_an_exposure_capped_and_a_raise_is_inland() {
     }
     // Ticket #125 (version 0.07.2): Japan and Korea (Exposure 2, four slots) and the Arabian
     // Peninsula (Exposure 1, two) bring six to the 34 of before.
-    assert_eq!(world, 40, "40 coastal slots in the world: the 34 of version 0.05.5 and six on the two new Regions");
+    // Ticket #453 (version 0.09.6): Pakistan (Exposure 1, two) and the United Kingdom (Exposure 2, four).
+    assert_eq!(world, 46, "46 coastal slots in the world: 34, six on ticket #125's Regions and six on ticket #453's");
     // Ticket #70: Europe's Refinery and North America's Factory, third on their cards with an
     // Exposure of 1, now stand inland from the first turn. Ticket #377 (version 0.09.2): Europe is
     // the Prospectors' home and stands with the package (Power Plant, Factory, Mine, Refinery,
@@ -5827,9 +5846,9 @@ fn a_region_makes_research_without_a_lab_and_a_lab_makes_it_half_again() {
     for st in &mut g.states {
         st.facilities.retain(|f| f.kind != FacilityKind::ResearchLab);
     }
-    // East Asia, the Custodians': 1 x 1.32 x 1.10 x 1.25 = 1.815, with no Lab.
+    // East Asia, the Custodians': 1 x 1.30 x 1.10 x 1.25 = 1.789 since ticket #453, with no Lab.
     let own = g.region_research(Seat(0), StateId::EastAsia);
-    assert!((own - 1.815).abs() < 0.01, "{own}");
+    assert!((own - 1.789).abs() < 0.01, "{own}");
     g.seats[0].stockpile.energy = 1000.0;
     g.income_phase();
     let bare = g.seats[0].research_last_turn;
@@ -5919,7 +5938,7 @@ fn the_venture_capital_fund_banks_a_share_of_ducat_income_and_a_draw_returns_nin
     // Europe's economy pays 14 Ducats a turn to this seat. Materials output is 13 and is now
     // beside the point: an Earth Mine at 4 x 1.25 = 5 and a Moon Mine at 4 x 1.65 x 1.25 = 8.3 (ticket #387: to the tenth).
     let inc = income_of(&mut g, pro);
-    assert_eq!((inc.ducats, inc.materials), (14.4, 13.3), "at 0% nothing is banked and every Ducat lands"); // Ticket #387: 12 x 1.2 = 14.4, where 14 was floored
+    assert_eq!((inc.ducats, inc.materials), (12.2, 13.3), "at 0% nothing is banked and every Ducat lands"); // Ticket #453: 10.2 x 1.2 = 12.24
     assert_eq!(g.seats[pro.index()].venture_fund, 0.0);
     // The share is an order, refused off the steps and to anyone else.
     assert_eq!(g.check_order(Seat(0), &[], &Order::SetVentureShare { share: 50 }).unwrap_err().0, "only the Prospectors have a Venture Capital Fund");
@@ -5931,11 +5950,11 @@ fn the_venture_capital_fund_banks_a_share_of_ducat_income_and_a_draw_returns_nin
     assert!(g.check_order(pro, &[], &Order::SetVentureShare { share: 80 }).is_ok());
     g.commit_orders(pro, &[Order::SetVentureShare { share: 50 }]);
     assert!((g.seats[pro.index()].venture_share - 0.5).abs() < 1e-9);
-    // Half of 14.4 is 7.2 to the Fund and 7.2 to the Stockpile (ticket #387). Materials are untouched by the share now.
+    // Half of 12.2 is 6.1 to the Fund and 6.1 to the Stockpile (ticket #387). Materials are untouched by the share now.
     let inc = income_of(&mut g, pro);
-    assert_eq!((inc.ducats, inc.materials), (7.2, 13.3));
-    assert_eq!(g.seats[pro.index()].venture_fund, 7.2);
-    assert!(g.seat(pro).income_sources.iter().any(|(name, r, n)| name.contains("Venture Capital Fund") && *r == Resource::Ducats && *n == -7.2), "{:?}", g.seat(pro).income_sources);
+    assert_eq!((inc.ducats, inc.materials), (6.1, 13.3));
+    assert_eq!(g.seats[pro.index()].venture_fund, 6.1);
+    assert!(g.seat(pro).income_sources.iter().any(|(name, r, n)| name.contains("Venture Capital Fund") && *r == Resource::Ducats && *n == -6.1), "{:?}", g.seat(pro).income_sources);
     // Ducats taken by SELLING are not income, so the Fund never sees them. This is the clause that
     // kept a Materials fund honest -- bought Materials were not output -- pointed at the new
     // resource: a hoard you can fill by trading is not a hoard.
@@ -5943,16 +5962,16 @@ fn the_venture_capital_fund_banks_a_share_of_ducat_income_and_a_draw_returns_nin
     g.seats[pro.index()].stockpile.materials = 100.0;
     g.commit_orders(pro, &[Order::Sell { resource: Resource::Materials, amount: 10 }]);
     assert_eq!(g.seats[pro.index()].venture_fund, fund, "a sale banks nothing");
-    // 80% of 14.4 is 11.5 to the tenth: 2.9 lands, 11.5 banks, taking the Fund to 18.7 (ticket #387).
+    // 80% of 12.2 is 9.8 to the tenth: 2.4 lands, 9.8 banks, taking the Fund to 15.9 (ticket #387).
     g.commit_orders(pro, &[Order::SetVentureShare { share: 80 }]);
     let inc = income_of(&mut g, pro);
-    assert_eq!(inc.ducats, 2.9);
-    assert_eq!(g.seats[pro.index()].venture_fund, 18.7);
+    assert_eq!(inc.ducats, 2.4);
+    assert_eq!(g.seats[pro.index()].venture_fund, 15.9);
     // A draw: 10 out, 9 back IN DUCATS; never more than the Fund holds.
     let before = g.seats[pro.index()].stockpile.ducats;
-    assert!(g.check_order(pro, &[], &Order::DrawVenture { amount: 19 }).is_err(), "the Fund holds 18.7");
+    assert!(g.check_order(pro, &[], &Order::DrawVenture { amount: 16 }).is_err(), "the Fund holds 15.9");
     g.commit_orders(pro, &[Order::DrawVenture { amount: 10 }]);
-    assert_eq!(g.seats[pro.index()].venture_fund, 8.7);
+    assert_eq!(g.seats[pro.index()].venture_fund, 5.9);
     assert_eq!(g.seats[pro.index()].stockpile.ducats, before + 9.0, "nine tenths come back, in Ducats");
     assert_eq!(g.check_order(Seat(0), &[], &Order::DrawVenture { amount: 1 }).unwrap_err().0, "only the Prospectors have a Venture Capital Fund");
 }
@@ -12475,7 +12494,7 @@ fn four_makers_the_factory_makes_widgets_the_mine_makes_materials_and_the_start_
         let card = fresh.tables.state(sid);
         let factories = card.start_facilities.iter().filter(|k| **k == FacilityKind::Factory).count();
         let mines = card.start_facilities.iter().filter(|k| **k == FacilityKind::Mine).count();
-        assert_eq!(factories, mines, "{}: a Mine beside every Factory", card.name);
+        assert_eq!(factories + usize::from(sid == StateId::Pakistan), mines, "{}: a Mine beside every Factory", card.name);
         let standing_mines = fresh.state(sid).facilities.iter().filter(|f| f.kind == FacilityKind::Mine).count();
         let standing_factories = fresh.state(sid).facilities.iter().filter(|f| f.kind == FacilityKind::Factory).count();
         if fresh.state(sid).control.controller().is_none() {
@@ -12770,11 +12789,11 @@ fn one_unit_of_population_is_one_million_people_and_a_pioneer_takes_exactly_one(
     calm(&mut g);
     let people_per_unit = g.tables.climate.people_per_unit;
     assert_eq!(people_per_unit, 1_000_000.0, "one unit is one million people");
-    // The world opens at 7,860 units, 7.86 billion people; China at 1,440, 1.44 billion.
+    // The world opens at 7,860 units, 7.86 billion people; China at 1,370 since ticket #453.
     let world: f64 = g.tables.states.iter().map(|s| s.population).sum();
     assert_eq!(world, 7860.0);
     assert_eq!(g.tables.people_text(world), "7.86B");
-    assert_eq!(g.tables.state(StateId::EastAsia).population, 1440.0);
+    assert_eq!(g.tables.state(StateId::EastAsia).population, 1370.0);
     // A Pioneer takes one unit, one million people, from its Region, at the recruit.
     let before = g.state(StateId::EastAsia).population;
     g.commit_orders(Seat(0), &[Order::BuildEmigrants { state: StateId::EastAsia, n: 1 }]);
@@ -12952,12 +12971,12 @@ fn a_research_labs_hover_is_its_arithmetic() {
     // x 1.10 x 1.25 = 1.815), whose arithmetic the Region's own chain carries (below), and takes
     // the Lab's share of it, to the tenth -- three lines under a heading that wraps to two.
     assert_eq!(y.amount, 0.9);
-    assert_eq!(y.chain.lines(6), vec!["1.8 this Region's Research".to_string(), "× 0.50 the Lab's share".to_string(), "= 0.91, rounded to 0.9".to_string()]);
+    assert_eq!(y.chain.lines(6), vec!["1.8 this Region's Research".to_string(), "× 0.50 the Lab's share".to_string(), "= 0.89, rounded to 0.9".to_string()]);
     assert_eq!(
         g.region_research_chain(Seat(0), StateId::EastAsia).lines(6),
         vec![
             "1 base".to_string(),
-            "× 1.32 for 1.44B people, weighted by Education".to_string(),
+            "× 1.30 for 1.37B people, weighted by Education".to_string(),
             "× 1.10 for Education 1.10".to_string(),
             "× 1.25 as the Custodians".to_string(),
         ]
@@ -16301,12 +16320,12 @@ fn tenths_a_prospector_region_keeps_the_tenth_of_its_ducats() {
     let pro = Seat(1);
     assert_eq!(g.kind(pro), FactionKind::Prospectors);
     assert_eq!(g.state(StateId::Europe).control, Control::Controlled(pro), "Europe is theirs at the start");
-    assert_eq!(g.tables.base_ducats(StateId::Europe, 3), 12.0, "the whole base: 20 x 3 / 5");
-    assert_eq!(g.state_ducats(StateId::Europe), 14.4, "12 x 1.2, to the tenth");
+    assert_eq!(g.tables.base_ducats(StateId::Europe, 3), 10.2, "the base: 17 x 3 / 5 since ticket #453");
+    assert_eq!(g.state_ducats(StateId::Europe), 12.2, "10.2 x 1.2 = 12.24, to the tenth");
     g.state_mut(StateId::Europe).facilities.clear();
     let inc = income_of(&mut g, pro);
-    assert_eq!(inc.ducats, 14.4, "and the Stockpile takes the tenth");
-    assert_eq!(g.seats[pro.index()].stockpile.ducats, g.tables.start.ducats as f64 + 14.4);
+    assert_eq!(inc.ducats, 12.2, "and the Stockpile takes the tenth");
+    assert_eq!(g.seats[pro.index()].stockpile.ducats, g.tables.start.ducats as f64 + 12.2);
 }
 
 /// Ticket #387: a multiplied yield carries a tenth. Ticket #421 (version 0.09.4): a Refinery on
@@ -16325,21 +16344,21 @@ fn tenths_a_refinery_module_at_the_moon_carries_its_tenth() {
 }
 
 /// Ticket #387: the Venture Capital Fund banks its share to the tenth. Europe at Industry 5 pays
-/// the Prospectors 20 x 5 / 5 x 1.2 = 24 Ducats; a 30% share banks 7.2 and leaves 16.8, where the
-/// floor banked 7 and left 17.
+/// the Prospectors 17 x 5 / 5 x 1.2 = 20.4 Ducats since ticket #453; a 30% share banks 6.1 and leaves 14.3, where the
+/// floor banked 6 and left 14.
 #[test]
 fn tenths_the_fund_banks_its_share_to_the_tenth() {
     let mut g = game();
     let pro = Seat(1);
     g.state_mut(StateId::Europe).facilities.clear();
     g.state_mut(StateId::Europe).industry_level = 5;
-    assert_eq!(income_of(&mut g, pro).ducats, 24.0, "the premise: a whole income");
+    assert_eq!(income_of(&mut g, pro).ducats, 20.4, "the premise: 17 x 5 / 5 x 1.2 since ticket #453");
     g.commit_orders(pro, &[Order::SetVentureShare { share: 30 }]);
     let inc = income_of(&mut g, pro);
-    assert_eq!(g.seats[pro.index()].venture_fund, 7.2, "30% of 24, to the tenth");
-    assert_eq!(g.seats[pro.index()].venture_banked_last_turn, 7.2);
-    assert_eq!(inc.ducats, 16.8, "and the rest lands, to the tenth");
-    assert!(g.seat(pro).income_sources.iter().any(|(name, r, n)| name.contains("Venture Capital Fund") && *r == Resource::Ducats && *n == -7.2), "{:?}", g.seat(pro).income_sources);
+    assert_eq!(g.seats[pro.index()].venture_fund, 6.1, "30% of 20.4 is 6.12, to the tenth");
+    assert_eq!(g.seats[pro.index()].venture_banked_last_turn, 6.1);
+    assert_eq!(inc.ducats, 14.3, "and the rest lands, to the tenth");
+    assert!(g.seat(pro).income_sources.iter().any(|(name, r, n)| name.contains("Venture Capital Fund") && *r == Resource::Ducats && *n == -6.1), "{:?}", g.seat(pro).income_sources);
 }
 
 /// Ticket #387: a Facility price under the Prospectors' 15% off comes out to a tenth: a 25-Materials
@@ -19079,4 +19098,37 @@ fn an_offline_building_records_why() {
     g.income_phase();
     let shut: Vec<&Facility> = g.state(StateId::EastAsia).facilities.iter().filter(|f| !f.online).collect();
     assert!(!shut.is_empty() && shut.iter().all(|f| f.offline_cause == Some(OfflineCause::Energy)), "Energy: {shut:?}");
+}
+
+/// Ticket #453 (version 0.09.6): two Regions join the board. Pakistan is cut out of India's and
+/// China's, the United Kingdom out of the European Union's, and each split shares out its parents'
+/// people, GDP and Influence rather than inventing more.
+#[test]
+fn pakistan_and_the_united_kingdom_share_out_their_parents() {
+    let g = game();
+    let t = &g.tables;
+    assert_eq!(StateId::ALL.len(), 16);
+    let card = |s: StateId| t.state(s);
+    let (pk, uk) = (card(StateId::Pakistan), card(StateId::UnitedKingdom));
+    assert_eq!((pk.name.as_str(), uk.name.as_str()), ("Pakistan", "The United Kingdom"));
+    let three = [StateId::SouthAsia, StateId::EastAsia, StateId::Pakistan];
+    assert_eq!(three.iter().map(|s| card(*s).population).sum::<f64>(), 1940.0 + 1440.0, "India's and China's people, shared three ways");
+    assert_eq!(three.iter().map(|s| card(*s).gdp).sum::<i64>(), 4 + 17);
+    assert_eq!(three.iter().map(|s| card(*s).influence).sum::<i64>(), 2 + 3);
+    assert_eq!((pk.population, pk.gdp, pk.influence, pk.industry_level, pk.size), (350.0, 2, 1, 1, 2));
+    let two = [StateId::Europe, StateId::UnitedKingdom];
+    assert_eq!(two.iter().map(|s| card(*s).population).sum::<f64>(), 600.0);
+    assert_eq!(two.iter().map(|s| card(*s).gdp).sum::<i64>(), 20);
+    assert_eq!(two.iter().map(|s| card(*s).influence).sum::<i64>(), 5);
+    assert_eq!((uk.population, uk.gdp, uk.influence, uk.industry_level, uk.size), (75.0, 3, 1, 3, 1));
+    assert_eq!(StateId::ALL.iter().map(|s| card(*s).population).sum::<f64>(), 7860.0, "nobody was invented");
+    // Pakistan lies between India and Iran, so those two no longer touch; every edge is on both cards.
+    assert!(!card(StateId::SouthAsia).neighbours.contains(&StateId::MiddleEast));
+    assert_eq!(pk.neighbours, vec![StateId::SouthAsia, StateId::EastAsia, StateId::MiddleEast, StateId::Russia]);
+    assert_eq!(uk.neighbours, vec![StateId::Europe, StateId::NorthAmerica]);
+    for a in StateId::ALL {
+        for b in &card(a).neighbours {
+            assert!(card(*b).neighbours.contains(&a), "{a:?} lists {b:?}, and {b:?} must list it back");
+        }
+    }
 }

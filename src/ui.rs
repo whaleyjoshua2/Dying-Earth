@@ -2686,7 +2686,7 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
                 .filter(|(n, _)| *n > 0)
                 .collect();
             bodies.sort_by_key(|(n, _)| std::cmp::Reverse(*n));
-            // Ticket #166 (version 0.07.5): the four largest and a count of the rest. All fourteen
+            // Ticket #166 (version 0.07.5): the four largest and a count of the rest. All sixteen
             // were listed, which buried the chart the player hovered for under a list they could
             // read off the map.
             const NAMED: usize = 4;
@@ -10099,7 +10099,7 @@ fn condensed_rail<T: egui::emath::Numeric>(ui: &mut Ui, value: &mut T, width: f3
 }
 
 /// Ticket #382: **the fill bar**, the fund against its bar in the Faction's colour, `width` by
-/// fourteen with the figures beside it -- the shape of `research_race_bar`, figures and all. Not
+/// sixteen with the figures beside it -- the shape of `research_race_bar`, figures and all. Not
 /// written on the fill: no text reads on both Factions' fills, and the race bar sets the precedent.
 fn fund_bar(ui: &mut Ui, colour: Color32, fund: f64, bar: f64, width: f32, what: &str) {
     let (rect, resp) = ui.allocate_exact_size(egui::vec2(width, 14.0), egui::Sense::hover());

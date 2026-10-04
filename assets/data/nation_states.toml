@@ -124,7 +124,7 @@ influence = 1
 gdp = 1
 unrest = 0.0
 
-# East Asia: China, Mongolia, Taiwan and Central Asia (Kazakhstan whole, since version 0.07.2). The
+# East Asia: China, Mongolia and Taiwan (Central Asia left for Pakistan on ticket #453). The
 # workshop of the world, the dirtiest industry per unit on the map alongside the Middle East, and
 # vast coastal cities. Ticket #125 cut Japan and Korea out of it and shared the figures by the rule
 # ticket #53 set -- a split hands out its parent's figure exactly -- so 16.4, 23 and 4 became
@@ -135,20 +135,20 @@ demonym = "Chinese"
 name = "China"
 flag = "cn"
 colour = [0.71, 0.24, 0.16]
-population = 1440.0
+population = 1370.0
 industry_level = 3
 resource_lean = "materials"
 baseline_emissions = 0.5
 education_level = 1.1
 size = 3
 coastal_exposure = 2
-neighbours = ["russia", "south_asia", "south_east_asia", "japan"]
+neighbours = ["russia", "pakistan", "south_asia", "south_east_asia", "japan"]
 start_facilities = ["factory", "mine", "power_plant", "refinery"]
 influence = 3
-gdp = 17
+gdp = 16
 unrest = 0.0
 
-# South Asia: India, Pakistan, Bangladesh, Nepal, Sri Lanka and Afghanistan. The most people of any
+# South Asia: India, Bangladesh, Nepal and Sri Lanka (Pakistan and Afghanistan left on ticket #453). The most people of any
 # state on the map, the least schooling outside Africa, and deltas the sea will take first.
 [[state]]
 id = "south_asia"
@@ -156,17 +156,17 @@ demonym = "Indian"
 name = "India"
 flag = "in"
 colour = [0.47, 0.86, 0.47]
-population = 1940.0
+population = 1660.0
 industry_level = 2
 resource_lean = "materials"
 baseline_emissions = 0.4
 education_level = 0.75
 size = 2
 coastal_exposure = 2
-neighbours = ["east_asia", "south_east_asia", "middle_east"]
+neighbours = ["east_asia", "south_east_asia", "pakistan"]
 start_facilities = ["factory", "mine", "power_plant"]
-influence = 2
-gdp = 4
+influence = 1
+gdp = 3
 unrest = 0.0
 
 # South-East Asia: Myanmar to the Philippines and most of Indonesia, about 680 million people, oil
@@ -217,17 +217,17 @@ demonym = "European"
 name = "The European Union"
 flag = "eu"
 colour = [0.27, 0.51, 0.86]
-population = 600.0
+population = 525.0
 industry_level = 3
 resource_lean = "energy"
 baseline_emissions = 0.3
 education_level = 1.45
 size = 2
 coastal_exposure = 1
-neighbours = ["north_america", "north_africa", "russia", "middle_east"]
+neighbours = ["north_america", "north_africa", "russia", "middle_east", "united_kingdom"]
 start_facilities = ["power_plant", "factory", "mine", "refinery"]
-influence = 5
-gdp = 20
+influence = 4
+gdp = 17
 unrest = 0.0
 
 # North America: the United States and Canada, about 375 million people.
@@ -244,7 +244,7 @@ baseline_emissions = 0.4
 education_level = 1.5
 size = 3
 coastal_exposure = 1
-neighbours = ["europe", "russia", "central_america"]
+neighbours = ["europe", "russia", "central_america", "united_kingdom"]
 # Ticket #69 (version 0.05.5): a Research Lab added to the start Facilities (as in South-East Asia),
 # standing inland; while the state is neutral it pays half its yield into the shared Tech.
 start_facilities = ["refinery", "power_plant", "factory", "mine", "research_lab"]
@@ -307,7 +307,7 @@ baseline_emissions = 0.4
 education_level = 1.35
 size = 3
 coastal_exposure = 1
-neighbours = ["europe", "east_asia", "north_america", "japan"]
+neighbours = ["europe", "east_asia", "north_america", "japan", "pakistan"]
 start_facilities = ["refinery", "power_plant"]
 influence = 4
 gdp = 3
@@ -331,7 +331,7 @@ baseline_emissions = 0.5
 education_level = 1.0
 size = 2
 coastal_exposure = 1
-neighbours = ["europe", "north_africa", "south_asia", "arabian_peninsula"]
+neighbours = ["europe", "north_africa", "pakistan", "arabian_peninsula"]
 start_facilities = ["refinery", "power_plant"]
 influence = 2
 gdp = 3
@@ -389,4 +389,53 @@ neighbours = ["middle_east", "north_africa", "sub_saharan_africa"]
 start_facilities = ["refinery", "power_plant"]
 influence = 2
 gdp = 2
+unrest = 0.0
+
+# Ticket #453 (version 0.09.6). Pakistan: Pakistan and Afghanistan out of India's Region and the five
+# Central Asian republics (Kazakhstan, Uzbekistan, Turkmenistan, Kyrgyzstan, Tajikistan) out of
+# China's, about 350 million people -- 280 from India's card and 70 from China's. One GDP from each
+# parent and one of India's two Influence. The rest of the card is the designer's, approved on the
+# ticket: gas and oil, so it leans Fuel; it starts with a Power Plant and a Mine -- the one start Mine
+# with no Factory beside it, at the designer's word; landlocked but for the
+# Makran coast. It lies between India and Iran, so those two no longer touch.
+[[state]]
+id = "pakistan"
+demonym = "Pakistani"
+name = "Pakistan"
+flag = "pk"
+colour = [0.13, 0.40, 0.22]
+population = 350.0
+industry_level = 1
+resource_lean = "fuel"
+baseline_emissions = 0.4
+education_level = 0.8
+size = 2
+coastal_exposure = 1
+neighbours = ["south_asia", "east_asia", "middle_east", "russia"]
+start_facilities = ["power_plant", "mine"]
+influence = 1
+gdp = 2
+unrest = 0.0
+
+# Ticket #453 (version 0.09.6). The United Kingdom, with Ireland and Iceland: about 75 million people,
+# 3 GDP and 1 Influence out of the European Union's card. It starts with a Refinery (North Sea
+# oil), a Power Plant, a Factory and its Mine. A small, rich, well-schooled island Region with an exposed coast. It borders the Union across
+# the Channel and the United States across the Atlantic by way of Iceland.
+[[state]]
+id = "united_kingdom"
+demonym = "British"
+name = "The United Kingdom"
+flag = "gb"
+colour = [0.35, 0.40, 0.50]
+population = 75.0
+industry_level = 3
+resource_lean = "fuel"
+baseline_emissions = 0.3
+education_level = 1.5
+size = 1
+coastal_exposure = 2
+neighbours = ["europe", "north_america"]
+start_facilities = ["refinery", "power_plant", "factory", "mine"]
+influence = 1
+gdp = 3
 unrest = 0.0
