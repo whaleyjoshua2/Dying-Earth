@@ -442,7 +442,8 @@ provisional_min_contribution = 75
 # about +0.5 ppm over a game if they divert half throughout -- half a Planetary Stewardship, earned
 # over thirty turns of not researching. Per-turn instead of permanent was measured at 0.09 ppm a
 # turn, which is one and a half per cent of the Sink: invisible, and the reason permanent won.
-custodians_ppm_per_point = 0.01
+# Ticket #459 (version 0.09.7): 0.02, about +1 ppm over a game at half diverted throughout.
+custodians_ppm_per_point = 0.02
 # The Prospectors: Ducats per point. "10-1" was ambiguous by a factor of a hundred -- ten points to
 # a Ducat is 22 Ducats over a game, less than half a Leapfrog, and one point to ten Ducats is 2,200,
 # larger than their whole economy. The designer chose 0.8, about 5 Ducats a turn and 178 over a

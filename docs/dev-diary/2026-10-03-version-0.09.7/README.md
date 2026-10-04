@@ -14,3 +14,16 @@ data, failed with "the Sink grows by 1.5: 6 then 7".
 
 **The sweep** ([`after-458.txt`](sweeps/after-458.txt)): 6 / 2 / 11 / 15, 46 collapses. Within noise
 of the baseline.
+
+## The Custodians' Research Directive at 0.02 (ticket #459)
+
+No picture: a figure in data and a computer-seat behaviour.
+
+**Witnessed red:** the new test `the_computer_custodians_divert_at_the_cap_once_their_gate_stands`
+failed first on the figure (`left: 0.01, right: 0.02`), then, the figure set, on the behaviour (the
+log showed only "direct 10 per cent"). The first build then failed the test's Relations case: it
+missed that giving everything earns a point, so 15 per cent is not free against a rival one point
+from cause. The rule became three steps.
+
+**The sweep** ([`after-459.txt`](sweeps/after-459.txt)): 10 / 3 / 13 / 13 and 40 collapses, from
+6 / 2 / 11 / 15 and 46. The world goes under the Sink at least once in 17 games of 80, from 10.

@@ -19134,3 +19134,47 @@ fn pakistan_and_the_united_kingdom_share_out_their_parents() {
         }
     }
 }
+
+/// Ticket #459 (version 0.09.7): the Custodians' Research Directive adds 0.02 ppm to the Sink a
+/// point, and **the computer Custodians divert their whole cap once Planetary Stewardship stands**,
+/// their Victory road being done. Diverting past 15 per cent costs a point of Relations with every
+/// rival, so where that point would carry a rival to cause they divert 15 and no more.
+#[test]
+fn the_computer_custodians_divert_at_the_cap_once_their_gate_stands() {
+    let mut g = game();
+    calm(&mut g);
+    let cust = Seat(0);
+    assert_eq!(g.kind(cust), FactionKind::Custodians);
+    assert_eq!(g.tables.research_directive.custodians_ppm_per_point, 0.02);
+    g.turn = 20;
+    g.seats[0].research_last_turn = 6;
+    g.research.current = Some(TechId::CivilDefense);
+    g.ai_orders(cust);
+    assert_eq!(scored(&g, "direct 50 per cent"), 0.0, "before the gate they keep back only a little");
+    with_tech(&mut g, TechId::PlanetaryStewardship);
+    g.log.clear();
+    g.ai_orders(cust);
+    assert!(scored(&g, "direct 50 per cent") > 0.0, "the gate standing, the whole cap goes to the Sink: {:?}", g.log.iter().filter(|l| l.contains("per cent")).collect::<Vec<_>>());
+    // A rival one point from cause: the point is not spent, and 15 per cent costs nothing.
+    let war = g.tables.ai.thresholds.war_cause;
+    let blame = g.relations_score(Seat(1), cust) - g.relations_deeds(Seat(1), cust);
+    // (Giving everything earns a point, so the score reads one higher while nothing is diverted.)
+    g.relations.score[1][0] = war + 2 - blame;
+    assert_eq!(g.relations_score(Seat(1), cust), war + 2, "the premise: one point from cause once the free share is taken");
+    g.log.clear();
+    g.ai_orders(cust);
+    assert_eq!(scored(&g, "direct 50 per cent"), 0.0, "not at the price of a war");
+    assert!(scored(&g, "direct 15 per cent") > 0.0, "the most that costs no Relations");
+    // A rival whom only giving everything keeps from cause: nothing is diverted at all.
+    g.relations.score[1][0] = war + 1 - blame;
+    g.seats[0].research_directive = 15;
+    g.log.clear();
+    g.ai_orders(cust);
+    assert!(scored(&g, "direct 0 per cent") > 0.0, "back to giving everything");
+    g.seats[0].research_directive = 0;
+    // A rival already at cause loses nothing more by it.
+    g.relations.score[1][0] = war - 1 - blame;
+    g.log.clear();
+    g.ai_orders(cust);
+    assert!(scored(&g, "direct 50 per cent") > 0.0, "already at cause, the point changes nothing");
+}

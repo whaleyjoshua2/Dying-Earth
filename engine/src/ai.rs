@@ -2063,6 +2063,27 @@ impl Game {
                     }
                 }
             };
+            // Ticket #459 (version 0.09.7): the Custodians' Victory road done -- their gate stands,
+            // and it needs every Tech before it -- Research only helps their rivals, so the whole
+            // cap goes to the Sink. Past the free share it costs a point of Relations with every
+            // rival; where that point would carry one to cause, they take the free share and no more.
+            let want = if kind == FactionKind::Custodians && self.tables.victory_gate(kind).is_some_and(|g| self.has_tech(g)) {
+                let rel = &self.tables.relations;
+                let term_now = self.directive_relations_term(seat);
+                // Giving everything earns a point, the free share earns none, more than that costs
+                // one: the most diverted that puts no rival at cause who would not be there anyway.
+                let at_cause = |term: i64| Seat::ALL.into_iter().filter(|r| *r != seat && self.relations_score(*r, seat) - term_now + term <= th.war_cause).count();
+                let anyway = at_cause(rel.directive_step);
+                if at_cause(-rel.directive_step) == anyway {
+                    cap
+                } else if at_cause(0) == anyway {
+                    100 - rel.directive_min_contribution
+                } else {
+                    0
+                }
+            } else {
+                want
+            };
             let want = want.min(cap);
             if want != self.seat(seat).research_directive {
                 let what = match kind {
