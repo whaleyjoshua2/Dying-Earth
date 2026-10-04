@@ -10,9 +10,9 @@ sibling_turns = 1
 # carries its delta-v in km/s, orbit to orbit, from `docs/research/delta-v.md`: a Ship brakes on air
 # where there is air, as missions have flown it -- a burn into a loose orbit, then months of passes
 # through the upper air (Mars, Venus, and a little at Phobos; none at the Moon or Deimos). A leg costs
-# the same both ways. The scale is the designer's: Mars at about 20, rounded up to 4.5 Fuel a km/s.
+# the same both ways. The scale is the designer's: 4 Fuel a km/s, after 4.5 was swept and found no different.
 # Phobos to Deimos is 0.75 km/s.
-fuel_per_delta_v = 4.5
+fuel_per_delta_v = 4.0
 sibling_delta_v = 0.75
 # Ticket #335 (version 0.09.0): moving a Ship between two orbits of one Body -- low orbit and the
 # Orbital Slots -- is an order costing this much Fuel from the Ship's own tank, the sibling hop's

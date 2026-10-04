@@ -4265,7 +4265,8 @@ impl Game {
         // takes a flat figure off, after the multipliers, never below the minimum.
         if self.mass_driver_at(seat, from) {
             let md = &self.tables.mass_driver;
-            return (turns, (fuel - md.fuel_off as f64).max(md.fuel_min as f64));
+            // Ticket #485 (version 0.09.8): to the tenth again, now that a leg may carry a decimal.
+            return (turns, tenth((fuel - md.fuel_off as f64).max(md.fuel_min as f64)));
         }
         (turns, fuel)
     }

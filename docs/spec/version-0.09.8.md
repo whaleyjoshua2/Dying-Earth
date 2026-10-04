@@ -174,7 +174,7 @@ The authority is [ticket #480](https://github.com/whaleyjoshua2/Dying-Earth/issu
 - **Earth has seven Orbital Slots**, where it had five. The sixth and seventh are **far orbits**,
   named **Earth L4** and **Earth L5**. Both begin empty.
 - **A far orbit is reached only by Ship.**
-  - A move to or from one costs **8 Fuel** (18 since section 8) from the tank and a turn, from any other orbit of Earth,
+  - A move to or from one costs **8 Fuel** (16 since section 8) from the tank and a turn, from any other orbit of Earth,
     the other far orbit included. Between Earth's other orbits a move is still 1 Fuel.
   - A leg between Bodies pays the 8 on top of its crossing for a far orbit it leaves, and again for
     a far orbit it names to arrive in.
@@ -211,24 +211,24 @@ station in the 80 games.**
 The authority is [ticket #485](https://github.com/whaleyjoshua2/Dying-Earth/issues/485). The figures
 and their sources are in [`docs/research/delta-v.md`](../research/delta-v.md).
 
-- **A leg's Fuel is its real delta-v, in km/s, times one scale: 4.5 Fuel a km/s**, to a tenth. The
-  scale was chosen to keep Mars at about 20 and rounded up from 4.35, at the designer's word. Both
-  figures are in `bodies.toml`: each leg's delta-v, and `fuel_per_delta_v`.
+- **A leg's Fuel is its real delta-v, in km/s, times one scale: 4 Fuel a km/s**, to a tenth. Both
+  figures are in `bodies.toml`: each leg's delta-v, and `fuel_per_delta_v`. The designer first took
+  4.5 (Mars at about 20), had 4.0 swept beside it, and chose 4.0.
 - **Ships brake on air where there is air, as missions have flown it**: a burn into a loose orbit,
   then months of passes through the upper air. That is Mars, Venus and, a little, Phobos. The
   Moon, Deimos and the far orbits have none.
 
   | Leg | Delta-v (km/s) | Fuel | Before |
   |---|---|---|---|
-  | Earth to the Moon | 4.0 | 18.0 | 6 |
-  | Earth to Venus | 4.4 | 19.8 | 16 |
-  | Earth to Mars | 4.6 | 20.7 | 20 |
-  | Earth to Phobos | 4.9 | 22.1 | 24 |
-  | Earth to Deimos | 5.0 | 22.5 | 24 |
-  | to or from Earth L4 or L5 | 4.0 | 18.0 | 8 |
-  | Mars to Phobos | 1.2 | 5.4 | 2 |
-  | Mars to Deimos | 1.7 | 7.7 | 2 |
-  | Phobos to Deimos | 0.75 | 3.4 | 1 |
+  | Earth to the Moon | 4.0 | 16.0 | 6 |
+  | Earth to Venus | 4.4 | 17.6 | 16 |
+  | Earth to Mars | 4.6 | 18.4 | 20 |
+  | Earth to Phobos | 4.9 | 19.6 | 24 |
+  | Earth to Deimos | 5.0 | 20.0 | 24 |
+  | to or from Earth L4 or L5 | 4.0 | 16.0 | 8 |
+  | Mars to Phobos | 1.2 | 4.8 | 2 |
+  | Mars to Deimos | 1.7 | 6.8 | 2 |
+  | Phobos to Deimos | 0.75 | 3.0 | 1 |
 
 - **A leg costs the same both ways.** Earth's air would make the way home cheaper; that is not
   priced.
@@ -237,26 +237,26 @@ and their sources are in [`docs/research/delta-v.md`](../research/delta-v.md).
 - **Unchanged:** the launch windows, which still raise a crossing's price the further it is from
   its window, on the new figures; the turns a leg takes; the tanks, 35 for a Colony Ship and 30 for
   the rest; the Faction's, Efficient Transit's and a Mass Driver's cuts, which apply after as before.
+  A Mass Driver's result is rounded to the tenth, now that a leg may carry a decimal.
 - **What follows from it:**
   - A full tank reaches any one Body from Earth at its window and does not come home without
     refuelling. The Moon is no longer the cheap first hop.
-  - A Mass Driver's flat 4 Fuel is worth less against the new prices: 14 from the Moon to Earth
+  - A Mass Driver's flat 4 Fuel is worth less against the new prices: 12 from the Moon to Earth
     where it left 2.
-  - Off its window a crossing can pass a full tank: Mars reads 36.3 on turn 4.
+  - Off its window a crossing can pass a full tank: Mars reads 32.3 on turn 4, Venus 40.7.
 - **The computer seats** read every leg's price from the engine and were taught nothing.
 
 **Measured** (80 games, the standing cell,
 [`after-485.txt`](../dev-diary/2026-10-04-version-0.09.8/sweeps/after-485.txt)):
 
-| | before this | after this |
-|---|---|---|
-| Custodians | 8 | 8 |
-| Prospectors | 19 | 21 |
-| Arkwrights | 17 | 17 |
-| Archivists | 3 | 1 |
-| collapses | 33 | 33 |
-| Ships stranded at the end | 3 | 13 |
-| Refuel orders | 271 | 290 |
+| | before this | at 4.5 | at 4.0, as built |
+|---|---|---|---|
+| Custodians | 8 | 8 | 7 |
+| Prospectors | 19 | 21 | 20 |
+| Arkwrights | 17 | 17 | 17 |
+| Archivists | 3 | 1 | 4 |
+| collapses | 33 | 33 | 32 |
+| Ships stranded at the end | 3 | 13 | 15 |
 
-The win column is within noise. The Moon is first settled in about as many games and at the same
-median turn. More Ships end the game stranded.
+The win column is within noise at both scales. The Moon is first settled in about as many games and
+at the same median turn. More Ships end the game stranded.

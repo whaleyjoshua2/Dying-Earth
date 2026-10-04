@@ -190,16 +190,20 @@ game uses. My remembered Venus figure of 4.8 was wrong; like for like it is 4.4.
 
 **The scale.** Three candidates were swept with whole-number Fuel before the designer chose (the
 Moon kept at 6, Mars kept at 20, and between); all three were within noise of the standing win
-column. The designer took Mars at 20, rounded up to 4.5 Fuel a km/s.
+column. The designer took Mars at 20, rounded up to 4.5 Fuel a km/s; then, the build in hand, asked
+for 4.0 swept beside it (*"can you drop the conversion rate to 4 and rerun"*), and chose 4.0.
 
 **Witnessed red:** the change itself turned ten older tests red, each quoting an old price; they
 were re-based one figure at a time. The new test `a_legs_fuel_is_its_real_delta_v_times_the_scale`
-was run with the scale at 4.0 and failed (`left: 4.0, right: 4.5`).
+was run against the wrong scale and failed (`left: 4.0, right: 4.5`). Re-basing to 4.0 then caught a
+real fault: a Mass Driver's cut left `14.399999999999999` where 14.4 was meant, so its result is
+rounded to the tenth now.
 
-**A Colony Ship's card at Earth**, turn 4 (`stack:earth ship:1`): the Moon at 18, the far orbits at
-18, and Mars and Venus off their windows past a full tank.
+**A Colony Ship's card at Earth**, turn 4 (`stack:earth ship:1`): the Moon at 16, the far orbits at
+16, and Mars (32.3) and Venus (40.7) off their windows.
 
 ![a Colony Ship's doors at the new prices](ticket-485/ship-card.png)
 
-**The sweep** ([`after-485.txt`](sweeps/after-485.txt)): 8 / 21 / 17 / 1 and 33 collapses, from
-8 / 19 / 17 / 3 and 33. Within noise. Ships stranded at the end of a game: 13 over the 80, from 3.
+**The sweep** ([`after-485.txt`](sweeps/after-485.txt)), at 4.0: 7 / 20 / 17 / 4 and 32 collapses, from
+8 / 19 / 17 / 3 and 33. Within noise. At 4.5 it read 8 / 21 / 17 / 1 and 33. Ships stranded at the
+end of a game: 15 over the 80 at 4.0, 13 at 4.5, 3 before.
