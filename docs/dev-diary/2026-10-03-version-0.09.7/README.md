@@ -68,7 +68,8 @@ back 65 to 82 per cent of their Research on average, from 100.
 
 - [`before-report.png`](ticket-463/before-report.png) and
   [`after-report.png`](ticket-463/after-report.png): the same Report, January 2032, seed 7. After:
-  each Faction's name in its colour, the carbon-credit sales once instead of twice, and two more
+  each Faction's name in its colour and each held Region's in its owner's, the carbon-credit sales
+  once instead of twice, and two more
   headings fit in the window.
 - [`cuts.md`](ticket-463/cuts.md): every template that changed, before and after, with word counts.
 

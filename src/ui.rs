@@ -2914,7 +2914,10 @@ fn unseen_army_lines(ui: &mut Ui, game: &Game, unseen: &[&Army]) {
 fn split_faction_names<'a>(text: &'a str, names: &[(String, Seat)]) -> Vec<(&'a str, Option<Seat>)> {
     let mut out = Vec::new();
     let mut rest = text;
-    while let Some((i, len, seat)) = names.iter().filter_map(|(n, s)| rest.find(n.as_str()).map(|i| (i, n.len(), *s))).min_by_key(|(i, _, _)| *i) {
+    // A name counts only as a whole word -- "Iran" is not found in "Iranian" -- and the longer name
+    // wins where two start together.
+    let whole = |hay: &str, n: &str| hay.match_indices(n).map(|(i, _)| i).find(|i| !hay[i + n.len()..].starts_with(|c: char| c.is_alphanumeric()) && !hay[..*i].ends_with(|c: char| c.is_alphanumeric()));
+    while let Some((i, len, seat)) = names.iter().filter_map(|(n, s)| whole(rest, n).map(|i| (i, n.len(), *s))).min_by_key(|(i, len, _)| (*i, std::cmp::Reverse(*len))) {
         if i > 0 {
             out.push((&rest[..i], None));
         }
@@ -2929,7 +2932,10 @@ fn split_faction_names<'a>(text: &'a str, names: &[(String, Seat)]) -> Vec<(&'a 
 
 /// Ticket #463: the line as laid-out text, the names coloured and the rest left to the widget.
 fn faction_coloured(ui: &Ui, game: &Game, session: &Session, text: &str, style: egui::TextStyle) -> egui::text::LayoutJob {
-    let names: Vec<(String, Seat)> = Seat::ALL.into_iter().map(|s| (game.seat_name(s), s)).collect();
+    let mut names: Vec<(String, Seat)> = Seat::ALL.into_iter().map(|s| (game.seat_name(s), s)).collect();
+    // The designer, the same day: "color country names the color of their owner too". A Region
+    // nobody holds keeps the line's own colour.
+    names.extend(StateId::ALL.into_iter().filter_map(|sid| game.state(sid).control.controller().map(|owner| (game.tables.state(sid).name.clone(), owner))));
     let font = style.resolve(ui.style());
     let mut job = egui::text::LayoutJob::default();
     for (part, seat) in split_faction_names(text, &names) {
@@ -11896,6 +11902,12 @@ mod tests {
         );
         assert_eq!(split_faction_names("The sea took 2 coastal slots from Australia.", &names), vec![("The sea took 2 coastal slots from Australia.", None)]);
         assert_eq!(split_faction_names("Egypt threw off Custodians", &names), vec![("Egypt threw off ", None), ("Custodians", Some(Seat(0)))]);
+        // A held Region's name takes its owner's colour by the same cut, as a whole word only.
+        let names = vec![("Prospectors".to_string(), Seat(1)), ("Iran".to_string(), Seat(1)), ("China".to_string(), Seat(0))];
+        assert_eq!(
+            split_faction_names("Prospectors issued a Strip Permit in Iran: the 1st Iranian Army left for China.", &names),
+            vec![("Prospectors", Some(Seat(1))), (" issued a Strip Permit in ", None), ("Iran", Some(Seat(1))), (": the 1st Iranian Army left for ", None), ("China", Some(Seat(0))), (".", None)]
+        );
     }
 
     /// Ticket #205 (version 0.08.1): a tutorial note must hand on to the turn's Event when there is

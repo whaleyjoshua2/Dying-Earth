@@ -157,3 +157,7 @@ moves.
 - **The designer's own sentence is kept:** the Moment for the first turn under the Sink.
 - **A carbon credit the player bought or sold is listed once**, under Your works; it stood under On
   Earth as well. A change of hands to or from the player is still listed under both (version 0.09.4).
+- **A held Region's name is drawn in its owner's colour too**, added by the designer after the build:
+  "color country names the color of their owner too". The owner is whoever controls the Region as
+  the Report is read; a Region nobody holds keeps the line's own colour. A name is matched as a
+  whole word, so "Iran" is not coloured inside "Iranian".
