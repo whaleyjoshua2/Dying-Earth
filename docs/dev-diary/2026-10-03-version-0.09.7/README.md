@@ -106,3 +106,17 @@ exactly four o'clock on a rounding edge, and the hit test was given a pixel of t
 
 **Witnessed red:** the test `the_tutorials_seventh_note_teaches_greenwash_and_smear` read
 `left: [1, 2, 3, 4, 5, 6]` before the note was written.
+
+## A real-time clock in the window (ticket #466)
+
+- [`bars.png`](ticket-466/bars.png): the top bar for the Custodians, the Prospectors and the
+  Archivists at 1280 wide, the clock at the right end of the second row in all three.
+
+Three takes before it stood. Flowed into the row as a label, the clock wrapped to a third line of
+its own; it is painted at the row's right edge instead. Then the two Factions with a fund on that
+row had no room for it at 1280 wide, and the designer chose to shorten the fund; a quarter off was
+not enough, and the rails are half what they were.
+
+**Witnessed red:** the test `the_clock_reads_twelve_hours_and_the_sitting_reads_hours_and_minutes`
+could not compile before the two functions existed. The Linux local-time code cannot be built on
+this Windows host; the GitHub kit build is its first compile.

@@ -200,3 +200,20 @@ moves.
 - **Turn 6's quieter line is gone.** It said the same two things at length.
 - A test holds the note's two rates to `[smear]` and `[greenwash]` in `influence.toml`.
 - As with every tutorial note, nothing is forced and nothing is checked.
+
+## 9. A real-time clock in the window
+
+The authority is [ticket #466](https://github.com/whaleyjoshua2/Dying-Earth/issues/466). No rule
+moves.
+
+- **The time of day on this machine** stands at the right end of the top bar's second row, in grey:
+  twelve-hour, hours and minutes, "9:47 PM". No seconds and no date. It is kept on the second row,
+  away from the in-game date on the first.
+- **Its hover says how long this sitting has run:** "Playing for 1 h 20 min", counted from when the
+  game was started or loaded.
+- **The fund on that row is half as long.** The Prospectors' Venture Fund and the Archivists'
+  Archive fund each show a slider and a fill bar there; both are 60 pixels where they were 120, so
+  the fund and the clock fit together at 1280 wide. The full control elsewhere is unchanged.
+- **If the row is ever full, the clock is left out** rather than wrapped to a third line.
+- **Local time on Linux too.** The clock, and the Load screen's times with it, read the machine's
+  own time zone there, where the Load screen read UTC.

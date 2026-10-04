@@ -2787,6 +2787,26 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
             }
             // Ticket #382 (version 0.09.2): the fund at a glance, to the right of the buttons.
             condensed_fund(ui, session, game, actions);
+            // Ticket #466 (version 0.09.7): the time of day on this machine, at the row's right
+            // end, well clear of the in-game date on the row above. Its hover says how long this
+            // sitting has run.
+            let since = *view.played_since.get_or_insert_with(std::time::Instant::now);
+            let clock = crate::saves::clock_text(std::time::SystemTime::now());
+            let wide = ui.painter().layout_no_wrap(clock.clone(), egui::TextStyle::Body.resolve(ui.style()), Color32::GRAY).size().x;
+            // Painted at the row's right edge rather than flowed: a wrapping row sends a widget it
+            // cannot fit to a line of its own, and the clock is not worth a third line of the bar.
+            // Where the row is full -- a Faction with a fund on the bar, in a narrow window -- it
+            // is left out.
+            let cursor = ui.cursor();
+            let centre_y = if cursor.height().is_finite() && cursor.height() > 0.0 { cursor.center().y } else { cursor.min.y + 13.0 };
+            let right = ui.max_rect().right() - 8.0;
+            let rect = egui::Rect::from_min_max(egui::pos2(right - wide, centre_y - 9.0), egui::pos2(right, centre_y + 9.0));
+            if rect.left() >= cursor.min.x + 8.0 {
+                ui.painter().text(rect.right_center(), egui::Align2::RIGHT_CENTER, clock, egui::TextStyle::Body.resolve(ui.style()), Color32::GRAY);
+                ui.interact(rect, ui.id().with("clock"), egui::Sense::hover()).on_hover_text(crate::saves::playing_text(since.elapsed()));
+                // The minute turns over whether or not the player touches anything.
+                ui.ctx().request_repaint_after(std::time::Duration::from_secs(5));
+            }
         });
     });
     // Ticket #292 (version 0.08.6): the bar's foot, measured, for every window that opens under it.
@@ -10142,7 +10162,9 @@ fn condensed_fund(ui: &mut Ui, session: &Session, game: &Game, actions: &mut Vec
         return;
     }
     let me = Seat(0);
-    const RAIL: f32 = 120.0;
+    // Ticket #466 (version 0.09.7): 120 until the clock took the row's right end; at half that, the
+    // fund and the clock both fit at 1280 wide. The full control, with its Withdraw, is unchanged.
+    const RAIL: f32 = 60.0;
     let colour = seat_colour(session, me);
     match game.kind(me) {
         FactionKind::Archivists => {
