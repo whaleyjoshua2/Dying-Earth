@@ -5392,6 +5392,30 @@ fn icon_word(ui: &mut Ui, key: &str, text: impl Into<String>) -> egui::Response 
     }
 }
 
+/// Ticket #474 (version 0.09.8): **a card's sub-header**, drawn one way on the Region card and the
+/// outpost card -- its glyph, then its words in white at `CARD_HEADING_SIZE`. Before this each
+/// heading was drawn where it stood: bold at the body size, and Influence alone with a glyph and in
+/// the body's grey. The glyph keeps its own fill.
+fn card_heading(ui: &mut Ui, key: &str, text: impl Into<String>) -> egui::Response {
+    let words = RichText::new(text).size(CARD_HEADING_SIZE).strong();
+    match Icons::from_ctx(ui.ctx(), key, CARD_HEADING_GLYPH) {
+        Some(image) => {
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = 5.0;
+                ui.add(image);
+                ui.label(words);
+            })
+            .response
+        }
+        None => ui.label(words),
+    }
+}
+
+/// Ticket #474: 15% over the body's 12.5 points is 14.4; the designer took 14.5. The glyph grows
+/// from `icon_word`'s 15 pixels by the same share.
+const CARD_HEADING_SIZE: f32 = 14.5;
+const CARD_HEADING_GLYPH: f32 = 17.0;
+
 /// Ticket #132 (version 0.07.3): one part of a `glyph_row` -- words before the glyph, the glyph,
 /// words after it, and the phrase the glyph replaced on hover.
 struct RowPart {
@@ -6327,14 +6351,15 @@ fn influence_row(ui: &mut Ui, game: &Game, session: &Session, view: &mut ViewSta
         // Ticket #161 (version 0.07.5): the Colony's card follows the Nation card, and its three
         // controls -- which the Nation card no longer has -- get hovers of their own.
         ui.horizontal(|ui| {
+            // Ticket #474 (version 0.09.8): the "Influence:" label that stood here is gone -- the
+            // heading above the row says it -- and its hover is on the figure.
             rule_tip(
-                ui.label("Influence:"),
+                ui.add(egui::DragValue::new(&mut view.influence_amount).range(1..=100)),
                 format!(
                     "How much of this turn's Allotment to put here. It becomes your Standing and stays, whoever holds the place after.\nUnspent Allotment is lost at End Turn. A Standing decays {} a turn for the holder, {} for everyone else.",
                     game.tables.influence.decay_controlled, game.tables.influence.decay
                 ),
             );
-            ui.add(egui::DragValue::new(&mut view.influence_amount).range(1..=100));
             let order = Order::Influence { target, amount: view.influence_amount };
             let ok = game.check_order(Seat(0), &session.pending, &order);
             let spend = ui.add_enabled(ok.is_ok(), egui::Button::new("Spend"));
@@ -7334,7 +7359,7 @@ This turn {:+.2}%: {:+.1} million.", c.population_growth * 100.0, c.population_l
         // which nothing on the card says today. The designer: *"influence mouse over on all words in
         // the influence portion of the nation card."*
         rule_tip(
-            icon_word(ui, "influence", "Influence"),
+            card_heading(ui, "influence", "Influence"),
             // Ticket #372 (version 0.09.2): the margin as the rule reads it here, not the flat base.
             format!(
                 "Your claim here: spend from the corner's Allotment and it becomes your Standing, which survives any change of hands.\nHighest Standing at the threshold takes a free place; a held one wants the holder's plus {}.\nDecays {} a turn for the holder, {} for everyone else.",
@@ -7359,6 +7384,9 @@ This turn {:+.2}%: {:+.1} million.", c.population_growth * 100.0, c.population_l
     if mine {
         pioneers_block(ui, session, game, sid, actions);
         policies_block(ui, session, game, sid, actions);
+        // Ticket #474 (version 0.09.8): a rule below the Policies, so the Widgets line and its queue
+        // read with the Facilities they build.
+        ui.separator();
     }
     // Ticket #332 (version 0.09.0): what this Region makes in Widgets a turn, and its queue.
     widgets_block(ui, game, Place::State(sid));
@@ -7373,7 +7401,7 @@ This turn {:+.2}%: {:+.1} million.", c.population_growth * 100.0, c.population_l
     let ordered_slots = session.pending.iter().filter(|o| o.build_state() == Some(sid) && o.build_facility().is_some_and(|k| game.takes_slot(k.built_by(game.kind(Seat(0)))))).count() as u32;
     let free_now = game.free_slots(sid).saturating_sub(ordered_slots);
     rule_tip(
-        ui.label(RichText::new(format!("Facilities ({free_now} of {} slots free{})", game.build_slots(sid), if ordered_slots > 0 { format!(", {ordered_slots} ordered this turn") } else { String::new() })).strong()),
+        card_heading(ui, "facility_factory", format!("Facilities ({free_now} of {} slots free{})", game.build_slots(sid), if ordered_slots > 0 { format!(", {ordered_slots} ordered this turn") } else { String::new() })),
         format!(
             // Ticket #452 (version 0.09.6): cut, at the designer's word, every rule kept.
             "Slots: Size {} + {} + starting Industry {}, +1 inland per raise.\n{} coastal: each sea threshold takes one (with its oldest Facility) and turns an inland slot coastal. A Sea Wall stops the taking, not the turning.\nMothballed and building each keep a slot.",
@@ -7402,7 +7430,7 @@ This turn {:+.2}%: {:+.1} million.", c.population_growth * 100.0, c.population_l
         for font in ui.style_mut().text_styles.values_mut() {
             font.size *= ARMY_LIST_SCALE;
         }
-        let heading = ui.label(RichText::new("Armies").strong());
+        let heading = card_heading(ui, "battle", "Armies");
         unseen_army_lines(ui, game, &unseen);
         // Ticket #323 (version 0.08.8): a click on the shield brings the card to its Armies block.
         if view.armed_stack == Some(sid) && view.armed_scroll {
@@ -7539,7 +7567,7 @@ This turn {:+.2}%: {:+.1} million.", c.population_growth * 100.0, c.population_l
         // built by clicking a free box. Ticket #390 (version 0.09.3): and the policies are their own
         // block above the Facilities now; what is left here is the Army, at the designer's word --
         // *"all army/ship builds should be in orders sections for both"* cards.
-        ui.label(RichText::new("Orders").strong());
+        card_heading(ui, "orders", "Orders");
         cost_button(ui, game, &session.pending, Order::BuildArmy { place: Place::State(sid) }, "Build Army", actions);
     }
 }
@@ -7552,7 +7580,7 @@ This turn {:+.2}%: {:+.1} million.", c.population_growth * 100.0, c.population_l
 fn policies_block(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, actions: &mut Vec<Action>) {
     let st = game.state(sid);
     ui.separator();
-    ui.label(RichText::new("Policies").strong());
+    card_heading(ui, "policies", "Policies");
     // Ticket #54: the Custodians' Leapfrog, and the Prospectors' Strip Permit.
     if game.kind(Seat(0)) == FactionKind::Custodians {
         ui.horizontal(|ui| {
@@ -7610,7 +7638,7 @@ fn pioneers_block(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, act
     let st = game.state(sid);
     ui.separator();
     // Ticket #73: muster Emigrants here, and send them to Antarctica by sea once the ice is open.
-    ui.label(RichText::new("Pioneers").strong());
+    card_heading(ui, "colony_ship", "Pioneers");
     // Ticket #211 (version 0.08.1): the figure stands at the HEAD of this block, above the
     // button that changes it, and is shown at every value including nought. It existed before
     // -- in the Influence block, some way up the card, and only while it was above zero -- so a
@@ -7957,11 +7985,12 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     } else {
         format!("Modules {used} of {cap} ({} free, one for each Colonist)", game.tables.slots.base)
     };
-    let resp = if used >= cap {
-        ui.colored_label(Color32::YELLOW, format!("{line} - no room for another until more Colonists live here"))
-    } else {
-        ui.label(line)
-    };
+    // Ticket #474 (version 0.09.8): the Modules line is a heading like the Region card's Facilities;
+    // the warning that rode on it when the place is full stands under it.
+    let resp = card_heading(ui, "colony", line);
+    if used >= cap {
+        ui.colored_label(Color32::YELLOW, "No room for another until more Colonists live here");
+    }
     // Ticket #116 (version 0.07.1): the rule behind the cap, which ticket #97 put in the engine and
     // nowhere on the card.
     rule_tip(
@@ -8010,7 +8039,7 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
             for font in ui.style_mut().text_styles.values_mut() {
                 font.size *= ARMY_LIST_SCALE;
             }
-            ui.label(RichText::new("Armies").strong());
+            card_heading(ui, "battle", "Armies");
             unseen_army_lines(ui, game, &unseen);
             let my_armies: Vec<&Army> = armies.iter().copied().filter(|a| !session.spectator && game.army_seat(a) == Some(Seat(0))).collect();
             if !my_armies.is_empty() {
@@ -8041,7 +8070,7 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
             let fund = game.seat(Seat(0)).archive_fund;
             let built = game.archive_built(Seat(0));
             ui.separator();
-            ui.label(RichText::new("The Archive").strong());
+            card_heading(ui, "module_archive", "The Archive");
             ui.label(format!("Archive fund {fund} of {research}"));
             // Ticket #235 (version 0.08.3): the switch that stood here is a SLIDER now, and it
             // lives in the Tech Tree window with the other three Factions' -- at the designer's
@@ -8106,12 +8135,12 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
         // Ticket #162 (version 0.07.5): the header matches the Nation card's, which ticket #154
         // renamed when its own build list folded into the boxes. A Module is ordered from a free
         // tile; what is left here is orders.
-        ui.label(RichText::new("Orders").strong());
+        card_heading(ui, "orders", "Orders");
         if !col.in_orbit {
             cost_button(ui, game, &session.pending, Order::BuildArmy { place: Place::Colony(cid) }, "Build Army (Barracks)", actions);
         }
         if col.modules.iter().any(|m| m.kind == ModuleKind::Shipyard) {
-            ui.label(RichText::new("Ships (Shipyard)").strong());
+            card_heading(ui, "warship", "Ships (Shipyard)");
             for uk in UnitKind::SHIPS {
                 cost_button(ui, game, &session.pending, Order::BuildShip { site: Place::Colony(cid), kind: uk }, uk.name(), actions);
             }
@@ -8119,6 +8148,9 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     }
     // Ticket #312 (version 0.08.7): the stance row and the repairs that stood here are in the
     // Armies block above.
+    // Ticket #474 (version 0.09.8): Influence under a heading of its own, as on the Region card.
+    ui.separator();
+    card_heading(ui, "influence", "Influence");
     influence_row(ui, game, session, view, Place::Colony(cid), true, actions);
 }
 
