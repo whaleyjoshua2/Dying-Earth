@@ -2370,6 +2370,7 @@ impl Game {
 
     /// Pay for and record every order of a seat at End Turn (spec 7.3: costs are paid at once).
     pub fn commit_orders(&mut self, seat: Seat, orders: &[Order]) {
+        let mut recruited: Vec<(StateId, u32)> = Vec::new();
         for order in orders {
             let cost = self.order_cost(seat, order);
             {
@@ -2680,11 +2681,9 @@ impl Game {
                     let fell = self.lower_unrest(*state, self.tables.emigrants.unrest_fall_each * *n as f64);
                     let line = format!("{} Pioneers recruited in {} for the {}; its Unrest fell by {} to {}.", n, self.tables.state(*state).name, self.seat_name(seat), Game::unrest_figure(fell), self.unrest_text(*state));
                     self.log(line);
-                    let text = self.say(
-                        "emigrants_mustered",
-                        &[("n", n.to_string()), ("state", self.tables.state(*state).name.clone()), ("fell", Game::unrest_figure(fell).to_string()), ("unrest", self.unrest_text(*state))],
-                    );
-                    self.report_line_of(seat, LineKind::YourWorks, LineKind::Note, Some(ReportPlace::State(*state)), text);
+                    // Ticket #463 (version 0.09.7): one Report line a Faction, written after the
+                    // orders -- the total, then each Region -- where each Region had its own.
+                    recruited.push((*state, *n));
                 }
                 // Ticket #73: Emigrants leave for Antarctica by sea, and land a turn later.
                 Order::SendToAntarctica { state, n, into } => {
@@ -2874,6 +2873,14 @@ impl Game {
                     self.log(format!("{} sold {} {} for {} Ducats.", self.seat_name(seat), amount, resource.name(), -cost.ducats));
                 }
             }
+        }
+        if !recruited.is_empty() {
+            let total: u32 = recruited.iter().map(|(_, n)| n).sum();
+            let parts: Vec<String> = recruited.iter().map(|(s, n)| self.phrase("recruited_part", &[("n", n.to_string()), ("state", self.tables.state(*s).name.clone())])).collect();
+            let text = self.say("emigrants_mustered", &[("faction", self.seat_name(seat)), ("n", total.to_string()), ("where", parts.join(", "))]);
+            // One Region is still a line that goes there; several point nowhere in particular.
+            let place = if let [(only, _)] = recruited[..] { Some(ReportPlace::State(only)) } else { None };
+            self.report_line_of(seat, LineKind::YourWorks, LineKind::Note, place, text);
         }
     }
 }

@@ -136,6 +136,10 @@ fn apply_aids(plan: &mut ShotPlan, view: &mut ViewState) {
     if plan.trade {
         view.show_trade = true;
     }
+    // `journal:1` (a building aid, ticket #471): the Victory window opens on its Journal tab.
+    if std::env::args().any(|a| a == "journal:1") {
+        view.victory_journal = true;
+    }
     if plan.victory {
         view.show_victory = true;
     }

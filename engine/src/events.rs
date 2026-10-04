@@ -56,9 +56,8 @@ impl Game {
         self.deck.cards.shuffle(&mut self.rng);
         self.deck.off_earth_joined = true;
         let line = format!("The {n} Events that can only land off Earth join the deck, shuffled in among the {} left.", self.deck.cards.len() - n);
-        self.log(line.clone());
-        let text = self.say("deck_joined", &[("n", n.to_string())]);
-        self.report_line(LineKind::Event, None, text);
+        // Ticket #463 (version 0.09.7): logged, and no longer announced in the Report.
+        self.log(line);
     }
 
     /// Ticket #337 (version 0.09.0): **the Question, at the head of the turn and before orders.**
@@ -512,7 +511,7 @@ impl Game {
                 // card's name and takes the "{card}: " off the front of each.
                 // The player's own line is second person, by the same test `line_kind_of` files it under
                 // Your works by: seat 0, and nobody's when the computer plays all four.
-                let (who, them) = if seat == Seat(0) && !self.spectator { ("You".to_string(), "you".to_string()) } else { (format!("The {}", self.seat_name(seat)), "them".to_string()) };
+                let (who, them) = if seat == Seat(0) && !self.spectator { ("You".to_string(), "you".to_string()) } else { (self.seat_name(seat), "them".to_string()) };
                 let text = self.say("card_passed_by", &[("card", name.clone()), ("who", who), ("lack", lack), ("them", them)]);
                 self.report_line_of(seat, LineKind::YourWorks, LineKind::Card, None, text);
             }

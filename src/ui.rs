@@ -370,10 +370,10 @@ fn temperature_bar(ui: &mut Ui, game: &Game) {
         painter.rect_filled(
             egui::Rect::from_min_max(egui::pos2(at(now), bar.top()), egui::pos2(at(committed), bar.bottom())),
             0.0,
-            Color32::from_rgb(104, 62, 40),
+            TEMPERATURE_COMMITTED,
         );
     }
-    painter.rect_filled(egui::Rect::from_min_max(bar.min, egui::pos2(at(now), bar.bottom())), 3.0, Color32::from_rgb(206, 112, 54));
+    painter.rect_filled(egui::Rect::from_min_max(bar.min, egui::pos2(at(now), bar.bottom())), 3.0, TEMPERATURE_FILL);
     for n in &notches {
         let x = at(n.at);
         let (top, bottom) = if n.foot { (bar.top() + 15.0, bar.bottom()) } else { (bar.top(), bar.bottom()) };
@@ -2787,6 +2787,26 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
             }
             // Ticket #382 (version 0.09.2): the fund at a glance, to the right of the buttons.
             condensed_fund(ui, session, game, actions);
+            // Ticket #466 (version 0.09.7): the time of day on this machine, at the row's right
+            // end, well clear of the in-game date on the row above. Its hover says how long this
+            // sitting has run.
+            let since = *view.played_since.get_or_insert_with(std::time::Instant::now);
+            let clock = crate::saves::clock_text(std::time::SystemTime::now());
+            let wide = ui.painter().layout_no_wrap(clock.clone(), egui::TextStyle::Body.resolve(ui.style()), Color32::GRAY).size().x;
+            // Painted at the row's right edge rather than flowed: a wrapping row sends a widget it
+            // cannot fit to a line of its own, and the clock is not worth a third line of the bar.
+            // Where the row is full -- a Faction with a fund on the bar, in a narrow window -- it
+            // is left out.
+            let cursor = ui.cursor();
+            let centre_y = if cursor.height().is_finite() && cursor.height() > 0.0 { cursor.center().y } else { cursor.min.y + 13.0 };
+            let right = ui.max_rect().right() - 8.0;
+            let rect = egui::Rect::from_min_max(egui::pos2(right - wide, centre_y - 9.0), egui::pos2(right, centre_y + 9.0));
+            if rect.left() >= cursor.min.x + 8.0 {
+                ui.painter().text(rect.right_center(), egui::Align2::RIGHT_CENTER, clock, egui::TextStyle::Body.resolve(ui.style()), Color32::GRAY);
+                ui.interact(rect, ui.id().with("clock"), egui::Sense::hover()).on_hover_text(crate::saves::playing_text(since.elapsed()));
+                // The minute turns over whether or not the player touches anything.
+                ui.ctx().request_repaint_after(std::time::Duration::from_secs(5));
+            }
         });
     });
     // Ticket #292 (version 0.08.6): the bar's foot, measured, for every window that opens under it.
@@ -2909,8 +2929,92 @@ fn unseen_army_lines(ui: &mut Ui, game: &Game, unseen: &[&Army]) {
     }
 }
 
+/// Ticket #471 (version 0.09.7): the Victory window's Journal tab -- the player's own objectives,
+/// each with its reward and whether it is met. A rival's are not shown, at the designer's word;
+/// with no player at the table, every Faction's is.
+fn journal_tab(ui: &mut Ui, session: &Session, game: &Game) {
+    let seats: Vec<Seat> = if session.spectator { Seat::ALL.to_vec() } else { vec![Seat(0)] };
+    for seat in seats {
+        let card = &game.tables.faction(game.kind(seat)).opening;
+        if session.spectator {
+            ui.label(RichText::new(game.seat_name(seat)).strong().color(seat_colour(session, seat)));
+        }
+        ui.label(RichText::new("Opening Objective").strong());
+        ui.label(format!("{}.", card.text));
+        ui.label(format!("Reward: {}.", card.reward_text));
+        match game.seat(seat).opening_met_turn {
+            Some(turn) => {
+                ui.label(RichText::new(format!("Met, {}.", game.date(turn).text())).color(Color32::from_rgb(140, 220, 140)));
+                if game.seat(seat).launch_site_owed {
+                    ui.label(RichText::new("The Launch Site waits for a Region of yours with none and a free slot.").weak());
+                }
+            }
+            None => {
+                ui.label(RichText::new("Not yet met. No deadline.").weak());
+            }
+        }
+        ui.add_space(8.0);
+    }
+}
+
+/// Ticket #467 (version 0.09.7): a whole figure with its thousands marked, "1,240".
+fn grouped(n: f64) -> String {
+    let whole = n.round() as i64;
+    let digits = whole.abs().to_string();
+    let mut out = String::new();
+    for (i, c) in digits.chars().enumerate() {
+        if i > 0 && (digits.len() - i).is_multiple_of(3) {
+            out.push(',');
+        }
+        out.push(c);
+    }
+    if whole < 0 { format!("-{out}") } else { out }
+}
+
+/// Ticket #467: a final-report cell at the designer's word -- the whole game's total, then the
+/// Stockpile at the end in brackets: "1,240 (38)".
+fn made_and_held(made: f64, held: f64) -> String {
+    format!("{} ({})", grouped(made), grouped(held))
+}
+
+/// Ticket #463 (version 0.09.7): a Report line cut wherever it names a Faction, so each name can be
+/// drawn in its Faction's colour and a line that names two shows both.
+fn split_faction_names<'a>(text: &'a str, names: &[(String, Seat)]) -> Vec<(&'a str, Option<Seat>)> {
+    let mut out = Vec::new();
+    let mut rest = text;
+    // A name counts only as a whole word -- "Iran" is not found in "Iranian" -- and the longer name
+    // wins where two start together.
+    let whole = |hay: &str, n: &str| hay.match_indices(n).map(|(i, _)| i).find(|i| !hay[i + n.len()..].starts_with(|c: char| c.is_alphanumeric()) && !hay[..*i].ends_with(|c: char| c.is_alphanumeric()));
+    while let Some((i, len, seat)) = names.iter().filter_map(|(n, s)| whole(rest, n).map(|i| (i, n.len(), *s))).min_by_key(|(i, len, _)| (*i, std::cmp::Reverse(*len))) {
+        if i > 0 {
+            out.push((&rest[..i], None));
+        }
+        out.push((&rest[i..i + len], Some(seat)));
+        rest = &rest[i + len..];
+    }
+    if !rest.is_empty() {
+        out.push((rest, None));
+    }
+    out
+}
+
+/// Ticket #463: the line as laid-out text, the names coloured and the rest left to the widget.
+fn faction_coloured(ui: &Ui, game: &Game, session: &Session, text: &str, style: egui::TextStyle) -> egui::text::LayoutJob {
+    let mut names: Vec<(String, Seat)> = Seat::ALL.into_iter().map(|s| (game.seat_name(s), s)).collect();
+    // The designer, the same day: "color country names the color of their owner too". A Region
+    // nobody holds keeps the line's own colour.
+    names.extend(StateId::ALL.into_iter().filter_map(|sid| game.state(sid).control.controller().map(|owner| (game.tables.state(sid).name.clone(), owner))));
+    let font = style.resolve(ui.style());
+    let mut job = egui::text::LayoutJob::default();
+    for (part, seat) in split_faction_names(text, &names) {
+        let color = seat.map(|s| seat_colour(session, s)).unwrap_or(Color32::PLACEHOLDER);
+        job.append(part, 0.0, egui::TextFormat { font_id: font.clone(), color, ..Default::default() });
+    }
+    job
+}
+
 /// Ticket #431 (version 0.09.5): one Report line, a way to its place where it has one.
-fn report_line_ui(ui: &mut Ui, game: &Game, l: &dying_earth_engine::report::ReportLine, actions: &mut Vec<Action>) {
+fn report_line_ui(ui: &mut Ui, game: &Game, session: &Session, l: &dying_earth_engine::report::ReportLine, actions: &mut Vec<Action>) {
     match l.place {
         Some(place) => {
             // Ticket #127 (version 0.07.2): a line that points somewhere wears the glyph of what it
@@ -2920,16 +3024,17 @@ fn report_line_ui(ui: &mut Ui, game: &Game, l: &dying_earth_engine::report::Repo
                 ReportPlace::Colony(c) => game.colony(c).map(Kind::of_colony),
                 ReportPlace::Body(_) | ReportPlace::Orbit(_, _) => None,
             };
+            let text = faction_coloured(ui, game, session, &l.text, egui::TextStyle::Button);
             let button = match kind.and_then(|k| k.image(ui.ctx(), 14.0)) {
-                Some(image) => egui::Button::image_and_text(image, &l.text),
-                None => egui::Button::new(&l.text),
+                Some(image) => egui::Button::image_and_text(image, text),
+                None => egui::Button::new(text),
             };
             if ui.add(button.frame(false)).on_hover_text("Go there").clicked() {
                 actions.push(Action::GoTo(place));
             }
         }
         None => {
-            ui.label(&l.text);
+            ui.label(faction_coloured(ui, game, session, &l.text, egui::TextStyle::Body));
         }
     }
 }
@@ -2953,7 +3058,7 @@ fn report_lines(ui: &mut Ui, game: &Game, session: &Session, lines: &[&dying_ear
     let mut done: Vec<(LineKind, Option<Seat>)> = Vec::new();
     for l in lines {
         let Some(key) = fold_key(l) else {
-            report_line_ui(ui, game, l, actions);
+            report_line_ui(ui, game, session, l, actions);
             continue;
         };
         if done.contains(&key) {
@@ -2961,7 +3066,7 @@ fn report_lines(ui: &mut Ui, game: &Game, session: &Session, lines: &[&dying_ear
         }
         let group: Vec<&ReportLine> = lines.iter().copied().filter(|m| fold_key(m) == Some(key)).collect();
         if group.len() < 2 {
-            report_line_ui(ui, game, l, actions);
+            report_line_ui(ui, game, session, l, actions);
             continue;
         }
         done.push(key);
@@ -2976,7 +3081,7 @@ fn report_lines(ui: &mut Ui, game: &Game, session: &Session, lines: &[&dying_ear
         let colour = key.1.map(|s| seat_colour(session, s)).unwrap_or(Color32::LIGHT_GRAY);
         egui::CollapsingHeader::new(RichText::new(title).color(colour)).id_salt(("fold", format!("{key:?}"))).default_open(false).show(ui, |ui| {
             for m in &group {
-                report_line_ui(ui, game, m, actions);
+                report_line_ui(ui, game, session, m, actions);
             }
         });
     }
@@ -4339,6 +4444,20 @@ fn command_cluster(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewS
             // Tech. The `tip:<word>` aid can force it: nothing hovers in a headless capture.
             let refusal = game.end_turn_refusal().unwrap_or_else(|| "The turn cannot end yet.".to_string());
             let resp = sun_button(ui, can_end_turn(game, view), sun_d, "End Turn");
+            // Ticket #464 (version 0.09.7): the Temperature gauge, compact, around the sun.
+            let sun_centre = egui::pos2(resp.rect.center().x, resp.rect.min.y + 4.0 + sun_d / 2.0);
+            temperature_ring(ui.painter(), game, sun_centre, sun_d / 2.0);
+            // The ring has a hover and a click of its own: it says the Temperature and opens the
+            // Climate Panel, and a press on it does not end the turn.
+            let ring_tip = temperature_ring_tip(game);
+            let on_ring = ui.input(|i| i.pointer.hover_pos()).is_some_and(|at| on_temperature_ring(at, sun_centre, sun_d / 2.0));
+            if on_ring || forced_tip(&ring_tip) {
+                resp.clone().show_tooltip_text(ring_tip);
+                if on_ring && ui.input(|i| i.pointer.primary_clicked()) {
+                    toggle_climate(view);
+                }
+                return;
+            }
             if forced_tip(&refusal) {
                 resp.clone().show_tooltip_text(refusal.clone());
             }
@@ -4358,6 +4477,76 @@ fn command_cluster(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewS
         });
     });
     ui.add_space(4.0);
+}
+
+/// Ticket #464 (version 0.09.7): the Temperature gauge's two warm colours, shared by the Climate
+/// Panel's bar and the ring around the sun -- the designer's "make it more red", and "match color
+/// maybe at least". The fill is the warming that has arrived; the band, what the Stock commits to.
+const TEMPERATURE_FILL: Color32 = Color32::from_rgb(214, 70, 46);
+const TEMPERATURE_COMMITTED: Color32 = Color32::from_rgb(112, 44, 36);
+const TEMPERATURE_BREAK: Color32 = Color32::from_rgb(236, 88, 76);
+/// The ring's own measures: how far outside the sun's limb it runs, and how thick.
+const RING_GAP: f32 = 5.5;
+const RING_WIDTH: f32 = 5.0;
+
+/// Ticket #464 (version 0.09.7): **the Temperature gauge wrapped around the sun** -- the Climate
+/// Panel's bar bent into a ring that runs over the top from eight o'clock to four o'clock, the
+/// base Temperature at eight and Collapse at four, at the designer's word. The dark track, the band
+/// the Stock already commits the world to, the red fill to the Temperature now with a white tick at
+/// its head, and a notch at each Break, bright once it has fired. No labels and no foot notches:
+/// they do not fit at this size, and the panel has them.
+fn temperature_ring(p: &egui::Painter, game: &Game, centre: Pos2, sun_r: f32) {
+    let c = &game.tables.climate;
+    let (lo, hi) = (c.base_temperature, c.collapse_line);
+    let frac = |t: f64| ((t - lo) / (hi - lo)).clamp(0.0, 1.0) as f32;
+    let (now, committed) = (frac(game.climate.temperature), frac(game.target_temperature()));
+    // Screen angles run clockwise from three o'clock, so eight o'clock is 150 degrees and the
+    // ring sweeps 240 from there to four.
+    let (start, sweep) = (150f32.to_radians(), 240f32.to_radians());
+    let (width, radius) = (RING_WIDTH, sun_r + RING_GAP);
+    let at = |f: f32, r: f32| centre + egui::vec2((start + f * sweep).cos(), (start + f * sweep).sin()) * r;
+    let arc = |from: f32, to: f32, colour: Color32| {
+        if to <= from {
+            return;
+        }
+        let steps = (((to - from) * 60.0).ceil() as usize).max(1);
+        let points: Vec<Pos2> = (0..=steps).map(|i| at(from + (to - from) * i as f32 / steps as f32, radius)).collect();
+        p.add(egui::Shape::line(points, egui::Stroke::new(width, colour)));
+    };
+    arc(0.0, 1.0, Color32::from_rgb(38, 38, 44));
+    arc(now, committed, TEMPERATURE_COMMITTED);
+    arc(0.0, now, TEMPERATURE_FILL);
+    for (i, b) in c.breaks.iter().enumerate() {
+        let f = frac(b.temperature);
+        let (inner, outer) = (radius - width / 2.0, radius + width / 2.0);
+        if game.climate.breaks_fired[i] {
+            // On a dark backing, as on the bar, so a fired Break reads against the red fill.
+            p.line_segment([at(f, inner - 1.0), at(f, outer + 1.0)], egui::Stroke::new(3.4, Color32::from_rgb(18, 18, 22)));
+            p.line_segment([at(f, inner - 1.0), at(f, outer + 1.0)], egui::Stroke::new(1.6, TEMPERATURE_BREAK));
+        } else {
+            p.line_segment([at(f, inner), at(f, outer)], egui::Stroke::new(1.2, TEMPERATURE_BREAK.gamma_multiply(0.75)));
+        }
+    }
+    p.line_segment([at(now, radius - width / 2.0 - 1.5), at(now, radius + width / 2.0 + 1.5)], egui::Stroke::new(1.8, Color32::WHITE));
+}
+
+/// Ticket #464: whether a point is on the ring -- within its thickness and between eight o'clock
+/// and four over the top -- so the ring can take its own hover and click.
+fn on_temperature_ring(at: Pos2, centre: Pos2, sun_r: f32) -> bool {
+    let d = at - centre;
+    let (near, far) = (sun_r + RING_GAP - RING_WIDTH / 2.0 - 1.5, sun_r + RING_GAP + RING_WIDTH / 2.0 + 2.5);
+    // Below the line through eight and four o'clock (30 degrees under the horizontal) is the open foot.
+    (near..=far).contains(&d.length()) && d.y <= d.length() * 0.5 + 1.0
+}
+
+/// Ticket #464: the ring's hover, three lines.
+fn temperature_ring_tip(game: &Game) -> String {
+    let c = &game.tables.climate;
+    let next = match game.next_break() {
+        Some(b) => format!("next: {} at {:+.1}", b.name, b.temperature),
+        None => "every Break is behind us".to_string(),
+    };
+    format!("Temperature {:+.1} C, heading to {:+.1}\n{next}\nCollapse at {:+.1}. Click for the Climate Panel.", game.climate.temperature, game.target_temperature(), c.collapse_line)
 }
 
 /// Ticket #294 (version 0.08.6): **End Turn as a sun** -- a shaded disc with sunspots and a
@@ -5085,6 +5274,10 @@ const CHANGE_BUTTONS_WIDTH: f32 = 196.0;
 /// the Faction window and the Climate Panel each carried four long lines of it, word for word.
 const BLAME_HOVER: &str = "Blame: CO2 this Faction's places emitted, less what it removed (Scrubbers, Nature Reserves, the Custodians' Sink Directive).\nAbove a quarter share: Influence thresholds rise up to +50% where it doesn't hold, and every rival likes it a point less per step.";
 
+/// Ticket #468 (version 0.09.7): what a Widget is, said once -- the place card's hover and the top
+/// bar's each said it in words of their own, both over the six-line ceiling.
+const WIDGET_HOVER: &str = "A Widget is one unit of work; a build completes at the Resolution its Widgets are filled. A place's Widgets go that turn to its own builds, earliest order first. Unapplied, they are lost: never banked, traded or carried.";
+
 /// Ticket #116 (version 0.07.1): the rule for what gets a tooltip, so the next person has a test
 /// to apply rather than a list to extend. The designer: *"increase the use of mouse over tooltips."*
 ///
@@ -5511,7 +5704,7 @@ fn orbit_odds_lines(ui: &mut Ui, game: &Game, body: BodyId) {
         // long as it needs to, and the hover paid back the line it had borrowed.
         rule_tip(
             ui.label(format!("Attacking {}: {:.0}% is your chance of holding the orbit when the Battle is over (your strength {mine} against {theirs}).", orbit_phrase(game, body, orbit), odds * 100.0)),
-            "The chance that nothing of any rival's is left standing in this orbit when the Battle ends and something of yours is -- what an Occupation tests, not a share of the strength.\nIt is measured: the Battle is fought a thousand times over on a copy of the board, from a seed of its own, so the figure never moves and asking for it never moves the game.".to_string(),
+            format!("The chance you are victorious: {:.1}%.", odds * 100.0),
         );
     }
     if !any {
@@ -5837,7 +6030,7 @@ fn widgets_block(ui: &mut Ui, game: &Game, place: Place) {
     let makers = widget_makers(game, place);
     let breakdown = if makers.is_empty() { "nothing here makes any".to_string() } else { makers.iter().map(|(name, n)| format!("{n} from {name}")).collect::<Vec<_>>().join(", ") };
     let hover = format!(
-        "Widgets {rate} a turn here: {breakdown}.\nA Widget is one unit of work. Every build carries a Widget figure and completes at the Resolution its count reaches it; each turn this place's Widgets fill the earliest order under way here first and flow on to the next. What is not applied is lost: Widgets are never banked, traded or carried."
+        "Widgets {rate} a turn here: {breakdown}.\n{WIDGET_HOVER}"
     );
     rule_tip(icon_word(ui, "widgets", format!("Widgets {rate} a turn")), hover);
     for (b, turns) in game.queue_at(place).iter().zip(game.queue_estimates(place)) {
@@ -5868,9 +6061,7 @@ fn eye_block(ui: &mut Ui, session: &Session, game: &Game, place: Place) {
     let Some(holder) = game.place_control(place).director().map(|d| game.seat_name(d)) else { return };
     rule_tip(
         ui.label(RichText::new(format!("{} reads what the {holder} draw here, building by building:", eye_source(game, Seat(0), body))).strong()),
-        format!(
-            "A working Relay at a Colony of yours off Earth, or a working Embassy in a Region of yours on Earth, reads every rival's income at that Body building by building. The Faction window gives a rival's totals alone.\nOne is enough for the whole Body, and a Unique that does the job counts; mothballed or offline it reads nothing.\nThe figures are the {holder}' own, their Faction's multipliers and Techs in them."
-        ),
+        "A working Relay at your Colony off Earth, or Embassy in your Region on Earth, shows every rival's income at that Body, building by building; the Faction window gives totals only.".to_string(),
     );
     if read.is_empty() {
         ui.label(RichText::new("  Nothing stands here yet, so there is nothing to read.").weak());
@@ -5912,7 +6103,7 @@ fn eye_source(game: &Game, seat: Seat, body: BodyId) -> String {
 /// the player directs with its rate, its makers and its queue.
 fn widgets_bar_hover(game: &Game, made: i64, applied: i64) -> String {
     let mut lines = vec![format!(
-        "Widgets: {made} made a turn across the places you direct, {applied} applied at the last Resolution.\nA Widget is one unit of work, the second half of every build's price. Each place's Widgets go that same turn to the builds under way at that place, earliest order first, and what is not applied is lost: never banked, never traded."
+        "Widgets: {made} made a turn across the places you direct, {applied} applied at the last Resolution.\n{WIDGET_HOVER}"
     )];
     for place in directed_places(game, Seat(0)) {
         let rate = game.widgets_at(place);
@@ -7292,10 +7483,10 @@ This turn {:+.2}%: {:+.1} million.", c.population_growth * 100.0, c.population_l
             let t = &game.tables.standing_army;
             let tip = if a.standing {
                 let armed = game.state(sid).armed;
-                let police = if game.constabulary_online(sid) { format!(" +{} for the working Constabulary", t.constabulary) } else { format!(" +{} if a Constabulary were working here", t.constabulary) };
-                let calm = if game.army_replenishes(sid) { format!(", +{} while Unrest is under {:.0}", t.calm, game.tables.unrest.army_threshold) } else { format!(", +{} lost to Unrest at {:.0} or more", t.calm, game.tables.unrest.army_threshold) };
+                let police = if game.constabulary_online(sid) { format!(" +{} Constabulary", t.constabulary) } else { format!(" +{} if it had a Constabulary", t.constabulary) };
+                let calm = if game.army_replenishes(sid) { format!(", +{} calm", t.calm) } else { format!(", +{} lost to Unrest {:.0}+", t.calm, game.tables.unrest.army_threshold) };
                 format!(
-                    "A Region's own Army. Its strength and hit points are Industry Level + 1{}; it may march, and away from home it is an Army like any other. Defending at home, it fights at that{police}{calm}{}. It heals 1 a turn while Unrest is under {:.0}; at its strength in damage it is destroyed, and returns at strength 1 two Incomes later. A neutral Region arms for good, +{} when a threat appears next door and +{} for every attack it holds against, with no ceiling.",
+                    "A Region's own Army: strength and hit points Industry Level + 1{}. Defending at home:{police}{calm}{}.\nHeals 1 a turn while Unrest is under {:.0}. Destroyed at its strength in damage; back at 1 two Incomes later.\nNeutral, it arms for good: +{} at a threat next door, +{} per attack held.",
                     if armed > 0 { format!(" and +{armed} armed") } else { String::new() },
                     if game.army_dug_in(a) { format!(", +{} dug in", game.tables.dig_in.defence) } else { String::new() },
                     game.tables.unrest.army_threshold,
@@ -7710,7 +7901,7 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
             // Ticket #335 (version 0.09.0): a Blockade shuts the ORBIT it is given in, so a station
             // starves under a Blockade of its own ring and the ground starves under one in low
             // orbit; a stack blockading elsewhere at the Body starves nothing.
-            "A warship stack ordered to Blockade a station's own orbit starves that station; a Colony on the ground starves while one rival holds Orbital Control of low orbit outright and has a stack on Blockade in low orbit. Every Module makes nothing and pays its upkeep; nobody dies and nothing is destroyed. Each turn of it is an offence against you.",
+            "A warship stack on Blockade in a station's orbit starves it. A ground Colony starves while one rival alone holds Orbital Control of low orbit.\nStarved, every Module makes nothing and still pays upkeep; nobody dies, nothing is destroyed. Each turn is an offence against you.",
         );
     }
     // Ticket #359 (version 0.09.1): an occupied Habitat standing shut halves the Colony, and the
@@ -9764,7 +9955,7 @@ fn module_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
         // The Archive stands apart: a row of its own, outside the count.
         let rect = egui::Rect::from_min_size(grid.min + egui::vec2(0.0, rows as f32 * (HAB_TILE + HAB_LABEL + HAB_GAP)), egui::vec2(HAB_TILE, HAB_TILE));
         let state = if col.modules[ai].mothballed { TileState::Mothballed } else if !col.modules[ai].online { TileState::Offline } else { TileState::Standing };
-        let tip = format!("{}{}\nOutside the Module count. Its Research is paid into the Archive fund at any pace; complete, it takes a great deal of Energy to keep running. Destroyed outright if this Colony changes hands; the fund is kept.", module_line(game, col, cid, ai, director), module_offline_words(game, col, &col.modules[ai]));
+        let tip = format!("{}{}\nOutside the Module count. Its Research is paid into the Archive fund at any pace; complete, it takes a great deal of Energy to keep running. Destroyed if this Colony changes hands, and the fund is lost with it.", module_line(game, col, cid, ai, director), module_offline_words(game, col, &col.modules[ai]));
         if hab_tile(ui, rect, ui.id().with("hab-archive"), Some(crate::icons::module_icon(ModuleKind::Archive)), "The Archive", state, view.hab_tile == Some(HabTile::Module(ai)), None, tip).clicked() {
             view.hab_tile = Some(HabTile::Module(ai));
         }
@@ -10021,7 +10212,9 @@ fn condensed_fund(ui: &mut Ui, session: &Session, game: &Game, actions: &mut Vec
         return;
     }
     let me = Seat(0);
-    const RAIL: f32 = 120.0;
+    // Ticket #466 (version 0.09.7): 120 until the clock took the row's right end; at half that, the
+    // fund and the clock both fit at 1280 wide. The full control, with its Withdraw, is unchanged.
+    const RAIL: f32 = 60.0;
     let colour = seat_colour(session, me);
     match game.kind(me) {
         FactionKind::Archivists => {
@@ -11114,7 +11307,7 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
             // Ticket #279 (version 0.08.5): war's own line, when there was one.
             if e.war > 0.0 {
                 ui.label(format!("War {:.1}", e.war)).on_hover_text(format!(
-                    "Last turn's Battles on Earth and in Earth orbit: {} ppm for every hit landed, worn as Blame by whoever landed it, and {} for every building burned when a place is taken by an Occupation that ran its three turns, worn by the taker. A Battle itself burns nothing, and a place Pacified is taken whole. A neutral Region's Army's hits are nobody's. It counts against a Stabilization run: a war a Faction chose is not the weather.",
+                    "Last turn's Battles on Earth and in its orbit: {} ppm per hit, Blame to whoever landed it; {} per building burned when a three-turn Occupation takes a place, Blame to the taker.\nA Battle itself burns nothing; a Pacified place is taken whole; a neutral Army's hits are nobody's.",
                     game.tables.climate.war_ppm_per_hit, game.tables.climate.war_ppm_per_building
                 ));
             }
@@ -11221,6 +11414,21 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
         // Ticket #292 (version 0.08.6): the same home as Trading, for the same reason.
         let home = view.beside_faction_window();
         egui::Window::new("Victory").open(&mut open).default_width(470.0).default_pos(home).show(ctx, |ui| {
+            // Ticket #471 (version 0.09.7): two tabs. The Journal keeps the player's objectives --
+            // the Opening Objective now, and whatever later versions add.
+            ui.horizontal(|ui| {
+                if ui.selectable_label(!view.victory_journal, "Victory").clicked() {
+                    view.victory_journal = false;
+                }
+                if ui.selectable_label(view.victory_journal, "Journal").clicked() {
+                    view.victory_journal = true;
+                }
+            });
+            ui.separator();
+            if view.victory_journal {
+                journal_tab(ui, session, game);
+                return;
+            }
             // Ticket #50: a row per seat, in seat order, each headed by its Faction in its colour.
             for seat in Seat::ALL {
                 let p = game.progress(seat);
@@ -11795,17 +12003,19 @@ fn chronicle_screen(root: &mut Ui, session: &Session, actions: &mut Vec<Action>)
 
             // 3. The table: nine figures a row, every one of them the engine's. The Stockpile alone
             // says least about a Faction that spent well, which is why the other five are here.
-            ui.label(RichText::new("What each Faction ended the game holding").size(20.0).strong());
+            ui.label(RichText::new("What each Faction made and held").size(20.0).strong());
             ui.add_space(4.0);
             egui::Grid::new("chronicle_table").num_columns(10).spacing((18.0, 6.0)).striped(true).show(ui, |ui| {
                 let head = |ui: &mut Ui, text: &str, hover: &str| {
                     ui.label(RichText::new(text).strong()).on_hover_text(hover);
                 };
                 ui.label(RichText::new("Faction").strong());
-                head(ui, "Materials", "The Materials in the Faction's Stockpile at the end.");
-                head(ui, "Fuel", "The Fuel in the Faction's Stockpile at the end.");
-                head(ui, "Energy", "The Energy in the Faction's Stockpile at the end.");
-                head(ui, "Ducats", "The Ducats in the Faction's Stockpile at the end.");
+                // Ticket #467 (version 0.09.7): the whole game's production, gross, with the Stockpile
+                // at the end in brackets, where the Stockpile stood alone.
+                head(ui, "Materials", "Materials made over the whole game, before upkeep. In brackets: the Stockpile at the end.");
+                head(ui, "Fuel", "Fuel made over the whole game. In brackets: the Stockpile at the end.");
+                head(ui, "Energy", "Energy made over the whole game, before upkeep. In brackets: the Stockpile at the end.");
+                head(ui, "Ducats", "Ducats made over the whole game, sales apart. In brackets: the Stockpile at the end.");
                 head(ui, "Off Earth", "Colonists living off Earth: in Colonies away from Earth and on stations over it. Antarctica is on Earth.");
                 head(ui, "Regions", "Nation States the Faction directed at the end: those it controlled, and those it occupied.");
                 head(ui, "Colonies", "Colonies and stations the Faction directed at the end, the two counted together.");
@@ -11815,14 +12025,14 @@ fn chronicle_screen(root: &mut Ui, session: &Session, actions: &mut Vec<Action>)
                 for (seat, _) in &ranking {
                     let s = game.seat(*seat);
                     ui.label(RichText::new(game.seat_name(*seat)).strong().color(seat_colour(session, *seat)));
-                    ui.label(figure(s.stockpile.materials));
-                    ui.label(figure(s.stockpile.fuel));
-                    ui.label(figure(s.stockpile.energy));
-                    ui.label(figure(s.stockpile.ducats));
+                    ui.label(made_and_held(s.produced_total.materials, s.stockpile.materials));
+                    ui.label(made_and_held(s.produced_total.fuel, s.stockpile.fuel));
+                    ui.label(made_and_held(s.produced_total.energy, s.stockpile.energy));
+                    ui.label(made_and_held(s.produced_total.ducats, s.stockpile.ducats));
                     ui.label(format!("{}", game.off_world_colonists(*seat)));
                     ui.label(format!("{}", game.directed_states(*seat).len()));
                     ui.label(format!("{}", game.directed_colonies(*seat).len()));
-                    ui.label(format!("{}", s.research_total));
+                    ui.label(grouped(s.research_total as f64));
                     ui.label(format!("{:.0} ppm ({:.0}%)", game.blame(*seat), game.blame_share(*seat) * 100.0));
                     ui.end_row();
                 }
@@ -11853,6 +12063,53 @@ fn chronicle_screen(root: &mut Ui, session: &Session, actions: &mut Vec<Action>)
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Ticket #467 (version 0.09.7): the final report's cell is the total and then the Stockpile.
+    #[test]
+    fn a_final_report_cell_reads_total_then_stockpile() {
+        assert_eq!(made_and_held(1240.4, 38.2), "1,240 (38)");
+        assert_eq!(made_and_held(999.6, 0.0), "1,000 (0)");
+        assert_eq!(grouped(1_234_567.0), "1,234,567");
+        assert_eq!(grouped(12.0), "12");
+    }
+
+    /// Ticket #464 (version 0.09.7): the ring around the sun runs over the top from eight o'clock to
+    /// four, so a point on it there is the ring's, and the open foot, the disc and the space
+    /// outside are not.
+    #[test]
+    fn the_temperature_ring_runs_from_eight_to_four_over_the_top() {
+        let (c, r) = (egui::pos2(100.0, 100.0), 30.0);
+        let ring = r + RING_GAP;
+        let clock = |hour: f32| c + egui::vec2((hour * 30.0 - 90.0).to_radians().cos(), (hour * 30.0 - 90.0).to_radians().sin()) * ring;
+        for hour in [8.0, 9.0, 10.5, 12.0, 2.0, 3.0, 4.0] {
+            assert!(on_temperature_ring(clock(hour), c, r), "{hour} o'clock is on the ring");
+        }
+        for hour in [5.0, 6.0, 7.0] {
+            assert!(!on_temperature_ring(clock(hour), c, r), "{hour} o'clock is the open foot");
+        }
+        assert!(!on_temperature_ring(c, c, r), "the disc is End Turn's");
+        assert!(!on_temperature_ring(c + egui::vec2(0.0, -r + 4.0), c, r), "and so is its limb");
+        assert!(!on_temperature_ring(c + egui::vec2(0.0, -ring - 12.0), c, r), "outside is nothing");
+    }
+
+    /// Ticket #463 (version 0.09.7): a Report line is cut at every Faction's name, so a line that
+    /// names two colours both, and a line that names none is left whole.
+    #[test]
+    fn a_report_line_is_cut_at_each_factions_name() {
+        let names = vec![("Custodians".to_string(), Seat(0)), ("Prospectors".to_string(), Seat(1))];
+        assert_eq!(
+            split_faction_names("Prospectors bought 3 ppm of carbon credit from Custodians for 3 Ducats.", &names),
+            vec![("Prospectors", Some(Seat(1))), (" bought 3 ppm of carbon credit from ", None), ("Custodians", Some(Seat(0))), (" for 3 Ducats.", None)]
+        );
+        assert_eq!(split_faction_names("The sea took 2 coastal slots from Australia.", &names), vec![("The sea took 2 coastal slots from Australia.", None)]);
+        assert_eq!(split_faction_names("Egypt threw off Custodians", &names), vec![("Egypt threw off ", None), ("Custodians", Some(Seat(0)))]);
+        // A held Region's name takes its owner's colour by the same cut, as a whole word only.
+        let names = vec![("Prospectors".to_string(), Seat(1)), ("Iran".to_string(), Seat(1)), ("China".to_string(), Seat(0))];
+        assert_eq!(
+            split_faction_names("Prospectors issued a Strip Permit in Iran: the 1st Iranian Army left for China.", &names),
+            vec![("Prospectors", Some(Seat(1))), (" issued a Strip Permit in ", None), ("Iran", Some(Seat(1))), (": the 1st Iranian Army left for ", None), ("China", Some(Seat(0))), (".", None)]
+        );
+    }
 
     /// Ticket #205 (version 0.08.1): a tutorial note must hand on to the turn's Event when there is
     /// one. It did so when the note was dismissed by its button, because `Action::TutorialNoteRead`

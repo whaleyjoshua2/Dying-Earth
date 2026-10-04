@@ -1,4 +1,4 @@
-DYING EARTH - playtest build, version 0.09.6
+DYING EARTH - playtest build, version 0.09.7
 ============================================
 
 Thanks for playing. This is an early build of a turn-based strategy game about colonizing
@@ -16,60 +16,63 @@ HOW TO RUN
 4. The very first launch shows a blank dark window for up to ten seconds while it
    compiles graphics. Later launches are quick.
 5. Needs Windows 10 or 11, 64-bit, and any graphics card from the last ten years.
-6. SAVES FROM 0.09.5 AND BEFORE WILL NOT LOAD: the map has two new countries. The Load
-   screen says so.
+6. Saves from 0.09.6 load in this version and play by its rules. Saves from 0.09.5 and
+   before will not load; the Load screen says so.
 7. This version ships for Windows and for Linux. On Linux, read RUN-ON-LINUX.txt in the
    folder instead of steps 2 to 5.
 
-WHAT CHANGED SINCE 0.09.5
+WHAT CHANGED SINCE 0.09.6
 -------------------------
-The growth version: colonies grow on their own, there are more ways to move people and
-found places, and the map has sixteen countries. The computer plays every rule below.
+The tightening version: every side has an opening objective, the report is shorter and
+in colour, and several figures moved. The computer plays every rule below.
 
 THE RULES THAT MOVED
-- TWO NEW COUNTRIES. PAKISTAN (with Afghanistan and Central Asia) is cut out of India and
-  China; THE UNITED KINGDOM (with Ireland and Iceland) out of the European Union. India no
-  longer borders Iran.
-- COLONIES GROW: 2% of their Colonists a turn, up to their Habitats' room. A colony under
-  Blockade, or with its Core dark, loses one a turn.
-- A COLONY SHIP LOADS PIONEERS FROM SEVERAL COUNTRIES in one turn.
-- A COLONY SHIP UNLOADS ONTO A STATION of yours, from the ring it sits in.
-- FOUND WITHOUT A COLONY SHIP: a ground colony builds a station over its world, and a
-  station builds a ground colony below it and sends Colonists down. Otherwise a Colony
-  Ship founds as before.
-- VENUS HAS NO LOW ORBIT any more. Ships there sit at a station ring.
-- COLONY SHIPS HOLD 35 FUEL, down from 40. A ship is built with the Fuel you paid for,
-  and cancelling the build gives it back.
-- GENERATION SHIPS needs Relay Networks as well as Closed-Loop Colonies.
-- THE ARCHIVE costs 150 Research to fund.
-- THE CUSTODIANS' INFLUENCE BONUS is 15%, down from 20%.
-- A CAPTURED SCRUBBER RUNS AT HALF instead of being destroyed; a quarter for a neutral
-  country that takes one back.
+- AN OPENING OBJECTIVE FOR EACH SIDE, with no deadline and a reward toward winning:
+    Custodians - have a Scrubber working: +0.5 ppm on the Natural Sink, for good.
+    Prospectors - a working Investment Bank in three different countries: 75 Ducats
+      into the Venture Capital Fund.
+    Arkwrights - found a Colony on the Moon, ground or orbit: a free Launch Site in a
+      country of yours that has none.
+    Archivists - two Research Labs or Observatories working, one off Earth: 10 Research
+      into the Archive fund.
+  Yours is on the new JOURNAL tab of the Victory window. Rivals' are not shown.
+- NEUTRAL COUNTRIES BUILD SEA WALLS once Coastal Engineering is researched and the sea is
+  close. The wall comes with the country when you take it, and you pay its keep.
+- THE ARCHIVE FUND IS LOST if the colony holding the Archive changes hands. Uploads are
+  kept.
+- PLANETARY STEWARDSHIP adds 1.5 ppm to the Sink, up from 1.0.
+- THE CUSTODIANS' RESEARCH DIRECTIVE adds 0.02 ppm to the Sink a point, up from 0.01.
+- A STRIP PERMIT leaves +2 Unrest behind, down from +3.
 
 THE COMPUTER
-- IT USES THE MARKET: buys Energy when short, sells spare Materials and Fuel.
-- IT BREAKS BLOCKADES: a Battery first, a standing fleet, and a second shipyard over Earth.
-- THE CUSTODIANS PICK ON THE BIGGEST POLLUTER.
-- A computer Shipyard builds one Factory, not one every turn.
+- IT LEAVES RIVALS' WINNING TECHS UNTIL LAST, and holds back half its Research while one
+  is being researched.
+- IT GOES AFTER THE ARCHIVE once the fund is half full, if it has cause; the Archivists
+  defend it.
+- THE CUSTODIANS pour Research into the Sink once Planetary Stewardship stands.
 
 THE WINDOW
-- THE COLONISTS LINE reads 8/12 with a people glyph: amber from three quarters full, red
-  when full.
-- AN OFFLINE BUILDING SAYS WHY on hover: short of Energy, the card that struck it, the
-  grid, occupation, or upkeep unpaid. Blockaded and at-half are said too.
-- FIXED: the crash on selecting a Colony Ship at a Venus station.
+- THE REPORT IS IN COLOUR AND SHORTER. Each side's name, and each held country's, is in
+  its owner's colour. A side's recruiting is one line.
+- THE TEMPERATURE IS A RING AROUND END TURN: red from 8 o'clock toward 4 as the world
+  warms, a notch at each Break. Hover it for the figures; click it for the Climate Panel.
+- A CLOCK at the right of the top bar shows the real time; hover it to see how long you
+  have been playing.
+- THE TUTORIAL HAS A SEVENTH NOTE, on Blame, Greenwash and Smear.
+- THE FINAL REPORT'S TABLE shows what each side made over the whole game, with what it
+  had left in brackets.
+- SIX HOVERS ARE SHORTER: a country's own Army, war emissions, what a Relay shows, battle
+  odds, the Blockade, and Widgets.
 
 WHAT WE WANT TO KNOW
 --------------------
 Write down anything, however small. Especially:
 - The moment you were not sure what to do next.
 - Anything you clicked that did nothing, or did something you did not expect.
-- GROWTH: did you notice colonies growing? Did you build Habitats ahead of it?
-- FOUNDING: did you found a station from the ground, or a colony from a station? Was it
-  clear you could?
-- THE NEW COUNTRIES: did you take Pakistan or the United Kingdom? Were they worth it?
-- OFFLINE BUILDINGS: when one went dark, did the hover tell you what to fix?
-- THE COMPUTER: did a rival blockade you, or break yours?
+- THE OPENING OBJECTIVE: did you notice it? Did you go for it? Was the reward worth it?
+- THE RING: did you read the temperature off it, or still open the Climate Panel?
+- THE REPORT: is it easier to see who did what? Is anything now too short to understand?
+- THE ARCHIVE: as the Archivists, did you guard it? As a rival, did you go for it?
 - The turn the game got boring, if it did, and the turn you felt you had lost.
 - Crashes: what you were doing, and the "Seed" number shown on the title screen and
   the game-over screen. With the seed the game can be replayed exactly.
@@ -83,13 +86,16 @@ first. These are known. You do not need to report them.
 
 WHAT THIS VERSION KNOWS ABOUT ITSELF
 
-- THE WIN COLUMN: Custodians 5, Prospectors 3, Arkwrights 11, Archivists 15, where last
-  version was 10 / 10 / 1 / 17. Before the two new countries went in, this version read
-  15 / 10 / 10 / 5; why they moved it so far is not yet known.
-- THE WORLD COLLAPSES IN 46 GAMES OF 80, where it was 42.
-- THE WHOLE TECH TREE FINISHES IN 55 GAMES OF 80, around turn 24, where it was 65.
-- BLOCKADES ARE RARE between computers: one stood in 4 games of 80.
-- COLONIES GROW SLOWLY in computer hands: 379 Colonists over the eighty games.
+- THE WIN COLUMN: Custodians 8, Prospectors 21, Arkwrights 18, Archivists 5, where last
+  version was 5 / 3 / 11 / 15. The opening objectives moved it most; why they moved it
+  so far is not yet known.
+- THE WORLD COLLAPSES IN 28 GAMES OF 80, where it was 46.
+- THE ARCHIVISTS SCORE NOTHING at the end in 51 games of 80.
+- THE COMPUTER ARKWRIGHTS reach the Moon late: they meet their objective in 47 games of
+  80, around turns 15 to 29.
+- THE ARCHIVE IS TAKEN in about one game in four between computers.
+- THE SLIDER FOR THE VENTURE FUND AND THE RESEARCH DIRECTIVE ON THE TOP BAR IS SHORT, so
+  fine settings are easier in the Victory window and the Tech Tree.
 
 CARRIED OVER, STILL TRUE
 

@@ -547,7 +547,7 @@ impl Game {
 
     /// Ticket #56: a Sea Level threshold of any kind -- one still scheduled for this state, or the
     /// Ice Sheets Break -- standing within 0.2 C of the Temperature, with a coast still to lose.
-    fn sea_is_close(&self, sid: StateId) -> bool {
+    pub(crate) fn sea_is_close(&self, sid: StateId) -> bool {
         if self.coastal_slots(sid) == 0 {
             return false;
         }
@@ -991,7 +991,34 @@ impl Game {
         if col.control.director().is_none() {
             return 1.0;
         }
-        (m.bounty_top * self.ai_place_size_for(viewer, cid) / largest.max(m.bounty_floor)).max(m.bounty_least)
+        let archive = viewer.map(|v| self.archive_threat_lift(v, cid)).unwrap_or(1.0);
+        (m.bounty_top * self.ai_place_size_for(viewer, cid) / largest.max(m.bounty_floor)).max(m.bounty_least) * archive
+    }
+
+    /// Ticket #461 (version 0.09.7): the Archive fund is lost with the Archive's Colony, so the
+    /// Colony is worth `archive_target_lift` more to a seat with cause against its holder once the
+    /// fund is at least `archive_target_fund` of its cap. Under that it is no threat yet.
+    fn archive_threat_lift(&self, seat: Seat, cid: ColonyId) -> f64 {
+        let th = &self.tables.ai.thresholds;
+        let Some(col) = self.colony(cid) else { return 1.0 };
+        match col.control.controller() {
+            Some(owner) if owner != seat && self.archive_at_risk(owner, cid) && self.has_cause(seat, owner) => th.archive_target_lift,
+            _ => 1.0,
+        }
+    }
+
+    /// Ticket #461: this Colony holds its holder's Archive and the fund is worth taking.
+    fn archive_at_risk(&self, owner: Seat, cid: ColonyId) -> bool {
+        let th = &self.tables.ai.thresholds;
+        self.colony(cid).is_some_and(|c| c.modules.iter().any(|m| m.kind == ModuleKind::Archive))
+            && self.seat(owner).archive_fund as f64 >= th.archive_target_fund * self.archive_fund_cap(owner) as f64
+    }
+
+    /// Ticket #461: the Archivists' side of it -- a rival with cause against them while the Archive
+    /// at this Colony is worth taking. The designer: "they need to be able to respond to heightened
+    /// threat".
+    fn archive_threatened(&self, seat: Seat, cid: ColonyId) -> bool {
+        self.archive_at_risk(seat, cid) && seat.others().iter().any(|r| self.has_cause(*r, seat))
     }
 
     /// Ticket #394 (version 0.09.3): the places a computer seat weighs spending Influence on, best
@@ -1169,12 +1196,26 @@ impl Game {
             None
         };
 
+        let opening_unmet = self.seat(seat).opening_met_turn.is_none();
+        let opening_kind = self.tables.faction(kind).opening.kind;
+        let opening_lift = self.tables.ai.multipliers.opportunity;
         let mut push = |orders: Vec<Order>, cat: Cat, base: f64, gap: f64, threat: f64, opportunity: f64, note: String, stack: Option<String>| {
             let base = if (homeless_archive || ferry_lift) && matches!(cat, Cat::ColonyShip | Cat::Transit | Cat::FoundColony | Cat::LoadUnload | Cat::LaunchSiteOrShipyard) {
                 base * homeless_bonus
             } else {
                 base
             };
+            // Ticket #471 (version 0.09.7): the seat's Opening Objective, until it is met. What
+            // advances it takes the opportunity multiplier -- there is no deadline, so it is a
+            // lean, not a rush.
+            let opens = opening_unmet
+                && match opening_kind {
+                    crate::data::OpeningKind::ScrubberWorking => cat == Cat::Scrubber,
+                    crate::data::OpeningKind::InvestmentBanks => note.starts_with("build Investment Bank in"),
+                    crate::data::OpeningKind::MoonColony => matches!(cat, Cat::FoundColony | Cat::Transit) && note.contains("the Moon"),
+                    crate::data::OpeningKind::ResearchPair => matches!(cat, Cat::Observatory | Cat::ResearchLab),
+                };
+            let opportunity = if opens { opportunity.max(opening_lift) } else { opportunity };
             cands.push(Candidate { orders, cat, base, gap, threat, opportunity, note, stack, pace: 1.0 });
         };
 
@@ -1498,7 +1539,9 @@ impl Game {
             let col = self.colony(cid).unwrap().clone();
             // Ticket #278 (version 0.08.5): a starved Colony is the threat made good; the seat
             // learns to want a warship where it is blockaded.
-            let threat = if self.enemy_present_or_inbound(seat, col.body) || self.enemy_army_near(seat, Place::Colony(cid)) || self.starved_by(cid).is_some() { m.threat } else { 1.0 };
+            // Ticket #461 (version 0.09.7): and at the Archive's Colony while a rival has cause and the
+            // fund is worth taking, so the Archivists raise a Barracks and an Army there.
+            let threat = if self.enemy_present_or_inbound(seat, col.body) || self.enemy_army_near(seat, Place::Colony(cid)) || self.starved_by(cid).is_some() || self.archive_threatened(seat, cid) { m.threat } else { 1.0 };
             // Ticket #97 (version 0.07.0): no room, nothing to enumerate. Without this the AI scores
             // Modules it cannot build, spends its list on them and has them dropped at commit.
             if self.free_module_slots(&col) == 0 {
@@ -1949,7 +1992,9 @@ impl Game {
         for place in owned {
             let rival = self.rival_standing(seat, place);
             let mine = self.seat(seat).influence.get(&place).copied().unwrap_or(0);
-            if rival > 0 && rival + 2 * step >= mine {
+            // Ticket #461 (version 0.09.7): the Archive's Colony under threat is held from twice as far off.
+            let reach = if matches!(place, Place::Colony(c) if self.archive_threatened(seat, c)) { 4 } else { 2 };
+            if rival > 0 && rival + reach * step >= mine {
                 let margin = self.challenge_margin_at(place);
                 let need = (rival + margin + 2 * step - mine).max(step);
                 let can = ((allotment + bought_steps) / step).max(1);
@@ -2056,12 +2101,35 @@ impl Game {
                     let mine = self.tables.victory_gate(kind) == Some(t);
                     if mine || picks.order.contains(&t) {
                         th.directive_when_wanted
-                    } else if picks.never == Some(t) || picks.last == Some(t) {
+                    // Ticket #462 (version 0.09.7): `last` is the rivals' gates, so a seat keeps
+                    // back its whole cap while a gate that is not its own is under research.
+                    } else if picks.never == Some(t) || picks.last.contains(&t) {
                         cap
                     } else {
                         th.directive_when_indifferent
                     }
                 }
+            };
+            // Ticket #459 (version 0.09.7): the Custodians' Victory road done -- their gate stands,
+            // and it needs every Tech before it -- Research only helps their rivals, so the whole
+            // cap goes to the Sink. Past the free share it costs a point of Relations with every
+            // rival; where that point would carry one to cause, they take the free share and no more.
+            let want = if kind == FactionKind::Custodians && self.tables.victory_gate(kind).is_some_and(|g| self.has_tech(g)) {
+                let rel = &self.tables.relations;
+                let term_now = self.directive_relations_term(seat);
+                // Giving everything earns a point, the free share earns none, more than that costs
+                // one: the most diverted that puts no rival at cause who would not be there anyway.
+                let at_cause = |term: i64| Seat::ALL.into_iter().filter(|r| *r != seat && self.relations_score(*r, seat) - term_now + term <= th.war_cause).count();
+                let anyway = at_cause(rel.directive_step);
+                if at_cause(-rel.directive_step) == anyway {
+                    cap
+                } else if at_cause(0) == anyway {
+                    100 - rel.directive_min_contribution
+                } else {
+                    0
+                }
+            } else {
+                want
             };
             let want = want.min(cap);
             if want != self.seat(seat).research_directive {
@@ -2080,6 +2148,12 @@ impl Game {
             if fund < cap && self.seat(seat).research_last_turn > 0 && self.seat(seat).research_directive == 0 {
                 let opp = if fund + self.seat(seat).research_last_turn >= cap { m.opportunity } else { 1.0 };
                 push(vec![Order::SetResearchDirective { percent: self.research_directive_cap(seat) }], Cat::FundArchive, self.base_weight(seat, Cat::FundArchive), gap_for(Cat::FundArchive, None), 1.0, opp, format!("pay the Labs into the Archive fund from the next Income, {} Research a turn", self.seat(seat).research_last_turn), None);
+            }
+            // Ticket #462 (version 0.09.7): a full fund takes nothing, and a directive left standing
+            // still costs them Provisional Findings and a point with every rival, so it comes off;
+            // the branch above puts it back the turn the fund has room again (#461: it can be lost).
+            if fund >= cap && self.seat(seat).research_directive > 0 {
+                push(vec![Order::SetResearchDirective { percent: 0 }], Cat::FundArchive, self.base_weight(seat, Cat::FundArchive), gap_for(Cat::FundArchive, None), 1.0, m.opportunity, "the fund is full: give all their Research to the shared Tech again".to_string(), None);
             }
             // Ticket #199 (version 0.08.0): the Archive also waits on the gate Tech, and the computer
             // is deliberately NOT taught that here. Every candidate goes through `check_order` before
@@ -2576,7 +2650,8 @@ impl Game {
             }
             // Ticket #141 (version 0.07.3): waiting Emigrants lift straight to the seat's own station
             // over Earth while it has room, from a state with a working Launch Site. Presence, not a
-            // foothold: a station over Earth is off Earth, so it takes the unload's full weight.
+            // foothold. Ticket #449 (version 0.09.6): at half weight, and no boost, while the Faction's
+            // Bodies part is short -- a station over Earth is off Earth but settles no Body.
             for sid in self.directed_states(seat) {
                 let n = self.state(sid).emigrants;
                 if n == 0 || !self.state(sid).facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working()) {

@@ -146,6 +146,9 @@ fn a_save_from_another_version_and_a_damaged_file_are_both_refused_with_a_messag
 /// 0.09.4 added out of it, each of which must then read its default.
 /// Ticket #432 (version 0.09.5, the closing ticket): `SAVE_VERSION` did not move again. The fog's
 /// two Report fields, a line's `by` and a rival deed's `places` (#430), are cut beside 0.09.4's.
+/// Ticket #469 (version 0.09.7, the closing ticket): `SAVE_VERSION` stays at 8, so a 0.09.6 save
+/// must load. The five fields this version added to a seat are cut too: what it has produced
+/// (#467), its Opening Objective's turn and the Launch Site owed (#471), and the Archives lost (#461).
 #[test]
 fn a_save_without_this_versions_fields_still_loads() {
     let dir = TempDir::new("older-fields");
@@ -188,7 +191,7 @@ fn a_save_without_this_versions_fields_still_loads() {
         out
     };
     let mut older = text.clone();
-    for name in ["under_sink_eased", "opening_gap", "best_gap_closed", "best_run", "lead_windfall", "card_price_by", "by", "places", "colony_growth", "offline_cause"] {
+    for name in ["under_sink_eased", "opening_gap", "best_gap_closed", "best_run", "lead_windfall", "card_price_by", "by", "places", "colony_growth", "offline_cause", "produced_total", "opening_met_turn", "launch_site_owed", "archives_lost", "archive_fund_lost"] {
         let before = older.len();
         older = cut(&older, name);
         assert!(older.len() < before, "{name} was in the save and is cut");

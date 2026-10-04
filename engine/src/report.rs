@@ -467,6 +467,8 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("no_habitat_room", &["n", "place"]),
     // Ticket #345 (version 0.09.1): a Body settled for the first time.
     ("first_to_body", &["faction", "body", "colony", "n"]),
+    ("opening_met", &["reward"]),
+    ("opening_launch_site", &["state"]),
     // Ticket #395 (version 0.09.3): and the world eases at the news, one line for the whole Earth.
     ("first_to_body_eases", &["body", "ease"]),
     // Ticket #405 (version 0.09.4): the world under the Sink for the first time.
@@ -478,7 +480,7 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("antarctica_opens", &["n"]),
     ("archive_begun", &["faction", "colony"]),
     ("neutral_research", &["n"]),
-    ("emigrants_mustered", &["n", "state", "fell", "unrest"]),
+    ("emigrants_mustered", &["faction", "n", "where"]),
     // Ticket #334 (version 0.09.0).
     ("army_ordered", &["place", "people"]),
     ("emigrants_arrived", &["n", "state", "colony"]),
@@ -489,7 +491,7 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("claim_lot", &["place", "factions", "winner"]),
     ("archive_built", &["faction", "place", "left"]),
     ("archive_complete", &["faction", "place"]),
-    ("archive_destroyed", &["place", "faction"]),
+    ("archive_destroyed", &["place", "faction", "fund"]),
     ("archive_funded", &["faction", "banked", "fund", "cap"]),
     // Ticket #235 (version 0.08.3): the three Research Directives that are not the Archive's.
     ("directive_sink", &["faction", "research", "ppm", "sink"]),
@@ -570,8 +572,8 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("break_baseline", &["state", "rise"]),
     // Ticket #257 (version 0.08.4): the wall stands and its keep rises; a surge it holds; a keep unpaid.
     ("sea_wall", &["temperature", "state", "whose", "keep"]),
+    ("neutral_sea_wall", &["state"]),
     // Ticket #259 (version 0.08.4): the off-Earth cards join the deck.
-    ("deck_joined", &["n"]),
     // Ticket #261: the two steps a rival's Moment fires on.
     ("rival_three_quarters", &["faction", "part", "value", "bar"]),
     ("rival_one_part_met", &["faction", "met", "part", "value", "bar"]),
@@ -635,6 +637,7 @@ pub const PHRASE_ARGS: &[(&str, &[&str])] = &[
     ("waiting_station", &["station", "body"]),
     ("waiting_many", &["body", "parts"]),
     ("waiting_part_low", &["n"]),
+    ("recruited_part", &["n", "state"]),
     ("waiting_part_station", &["n", "station"]),
     ("waiting_blocked", &[]),
     ("waiting_blockaded", &["station"]),

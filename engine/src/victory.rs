@@ -300,3 +300,92 @@ impl Game {
         }
     }
 }
+
+// ---------------------------------------------------------------- Ticket #471: Opening Objectives
+
+impl Game {
+    /// Ticket #471 (version 0.09.7): whether this seat's **Opening Objective** is true right now.
+    /// Each is one early thing its Faction wants anyway (`[faction] opening` in `factions.toml`).
+    pub fn opening_true(&self, seat: Seat) -> bool {
+        use crate::data::OpeningKind;
+        let card = &self.tables.faction(self.kind(seat)).opening;
+        let regions = self.controlled_states(seat);
+        let working = |sid: &StateId, kind: FacilityKind| self.state(*sid).facilities.iter().filter(|f| f.kind == kind && f.working()).count();
+        match card.kind {
+            OpeningKind::ScrubberWorking => regions.iter().any(|sid| working(sid, FacilityKind::Scrubber) > 0),
+            // A place counts once, however many Banks stand in it.
+            OpeningKind::InvestmentBanks => regions.iter().filter(|sid| working(sid, FacilityKind::InvestmentBank) > 0).count() as u32 >= card.count,
+            OpeningKind::MoonColony => self.colonies.iter().any(|c| c.body == BodyId::Moon && c.control.controller() == Some(seat)),
+            OpeningKind::ResearchPair => {
+                let labs: usize = regions.iter().map(|sid| working(sid, FacilityKind::ResearchLab)).sum();
+                // An Observatory stands only off Earth or on a station, so it is the one off Earth.
+                let observatories = self
+                    .colonies
+                    .iter()
+                    .filter(|c| c.control.controller() == Some(seat))
+                    .flat_map(|c| c.modules.iter())
+                    .filter(|m| m.kind.does_the_job_of(ModuleKind::Observatory) && m.working())
+                    .count();
+                observatories >= 1 && (labs + observatories) as u32 >= card.count
+            }
+        }
+    }
+
+    /// Ticket #471: read at the end of every Income. An objective is met at the first Income it is
+    /// true, once, and its reward is paid then; there is no deadline, so none is ever missed. The
+    /// player's own is reported under Your works. A rival's is logged and not reported: the
+    /// designer keeps rivals' objectives quiet.
+    pub fn opening_objectives(&mut self) {
+        use crate::data::OpeningKind;
+        for seat in Seat::ALL {
+            if self.seat(seat).opening_met_turn.is_none() && self.opening_true(seat) {
+                let card = self.tables.faction(self.kind(seat)).opening.clone();
+                self.seat_mut(seat).opening_met_turn = Some(self.turn);
+                match card.kind {
+                    OpeningKind::ScrubberWorking => self.climate.natural_sink += card.reward,
+                    OpeningKind::InvestmentBanks => {
+                        let s = self.seat_mut(seat);
+                        s.venture_fund = tenth(s.venture_fund + card.reward);
+                    }
+                    OpeningKind::MoonColony => self.seat_mut(seat).launch_site_owed = true,
+                    OpeningKind::ResearchPair => {
+                        let cap = self.archive_fund_cap(seat);
+                        let s = self.seat_mut(seat);
+                        s.archive_fund = (s.archive_fund + card.reward as i64).min(cap);
+                    }
+                }
+                self.log(format!("The {} met their Opening Objective ({}): {}.", self.seat_name(seat), card.text, card.reward_text));
+                if seat == Seat(0) && !self.spectator {
+                    let text = self.say("opening_met", &[("reward", card.reward_text.clone())]);
+                    self.report_line(LineKind::YourWorks, None, text);
+                }
+            }
+            self.grant_owed_launch_site(seat);
+        }
+    }
+
+    /// Ticket #471: the Arkwrights' reward -- a Launch Site, free and working, in a Region of theirs
+    /// that has none and has a slot for it, the most populous of several. With no such Region it
+    /// stays owed, and lands on the first one they hold.
+    fn grant_owed_launch_site(&mut self, seat: Seat) {
+        if !self.seat(seat).launch_site_owed {
+            return;
+        }
+        let Some(sid) = self
+            .controlled_states(seat)
+            .into_iter()
+            .filter(|sid| self.free_slots(*sid) > 0 && !self.state(*sid).facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite)))
+            .max_by(|a, b| self.state(*a).population.total_cmp(&self.state(*b).population))
+        else {
+            return;
+        };
+        self.add_start_facility(sid, FacilityKind::LaunchSite);
+        self.seat_mut(seat).launch_site_owed = false;
+        let name = self.tables.state(sid).name.clone();
+        self.log(format!("The {} were given a Launch Site in {name}, their Opening Objective's reward.", self.seat_name(seat)));
+        if seat == Seat(0) && !self.spectator {
+            let text = self.say("opening_launch_site", &[("state", name)]);
+            self.report_line(LineKind::YourWorks, Some(ReportPlace::State(sid)), text);
+        }
+    }
+}

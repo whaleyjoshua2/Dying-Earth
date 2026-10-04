@@ -2,7 +2,7 @@
 //! folder is opened. The engine knows how to write and read a save; it never knows where.
 
 use std::path::{Path, PathBuf};
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 
 /// The folder every save goes in: `%LOCALAPPDATA%\DyingEarth\data\saves`, found through the
 /// `directories` crate, which is where Microsoft's guidance for game developers puts a file the
@@ -36,6 +36,28 @@ pub fn when_text(t: SystemTime) -> String {
     civil_text(local_seconds(t))
 }
 
+/// Ticket #466 (version 0.09.7): the time of day on this machine, twelve-hour, for the top bar's
+/// clock: "9:47 PM". No seconds and no date, at the designer's word.
+pub fn clock_text(t: SystemTime) -> String {
+    clock_of(local_seconds(t))
+}
+
+fn clock_of(local: i64) -> String {
+    let rest = local.rem_euclid(86_400);
+    let (hour, minute) = (rest / 3_600, (rest % 3_600) / 60);
+    format!("{}:{minute:02} {}", if hour % 12 == 0 { 12 } else { hour % 12 }, if hour < 12 { "AM" } else { "PM" })
+}
+
+/// Ticket #466: how long this sitting has run, for the clock's hover.
+pub fn playing_text(d: Duration) -> String {
+    let minutes = d.as_secs() / 60;
+    match (minutes / 60, minutes % 60) {
+        (0, 0) => "Playing for under a minute".to_string(),
+        (0, m) => format!("Playing for {m} min"),
+        (h, m) => format!("Playing for {h} h {m} min"),
+    }
+}
+
 /// Seconds since the epoch, shifted into local time so the civil conversion below reads local.
 fn local_seconds(t: SystemTime) -> i64 {
     let utc = match t.duration_since(SystemTime::UNIX_EPOCH) {
@@ -57,7 +79,45 @@ fn local_seconds(t: SystemTime) -> i64 {
             return (ticks / 10_000_000) as i64 - EPOCH_OFFSET;
         }
     }
+    // Ticket #466 (version 0.09.7): local time on Linux too, where this read UTC. The C library
+    // breaks the instant down in this machine's zone and says how far that zone stands from UTC.
+    #[cfg(unix)]
+    {
+        let mut out = std::mem::MaybeUninit::<nix::Tm>::zeroed();
+        // Safety: `utc` is a valid time_t and `out` is a zeroed, correctly laid-out `struct tm`
+        // that `localtime_r` fills; it is read only when the call says it succeeded.
+        let done = unsafe { nix::localtime_r(&utc, out.as_mut_ptr()) };
+        if !done.is_null() {
+            return utc + unsafe { out.assume_init() }.gmtoff as i64;
+        }
+    }
     utc
+}
+
+/// The C library's `struct tm` as glibc and the BSDs lay it out on 64-bit machines, for the one
+/// field this file reads: the zone's offset from UTC in seconds.
+#[cfg(unix)]
+mod nix {
+    use std::os::raw::{c_char, c_int, c_long};
+
+    #[repr(C)]
+    pub struct Tm {
+        pub sec: c_int,
+        pub min: c_int,
+        pub hour: c_int,
+        pub mday: c_int,
+        pub mon: c_int,
+        pub year: c_int,
+        pub wday: c_int,
+        pub yday: c_int,
+        pub isdst: c_int,
+        pub gmtoff: c_long,
+        pub zone: *const c_char,
+    }
+
+    unsafe extern "C" {
+        pub fn localtime_r(time: *const i64, out: *mut Tm) -> *mut Tm;
+    }
 }
 
 /// Seconds since the epoch as a date and a time, by Howard Hinnant's civil-from-days.
@@ -105,5 +165,18 @@ mod tests {
         assert_eq!(civil_text(1_789_050_720), "10 September 2026, 14:32", "a real instant");
         // A leap day, which a naive month table gets wrong.
         assert_eq!(civil_text(1_709_208_000), "29 February 2024, 12:00", "the leap day");
+    }
+
+    /// Ticket #466 (version 0.09.7): the top bar's clock, twelve-hour, and how long a sitting has run.
+    #[test]
+    fn the_clock_reads_twelve_hours_and_the_sitting_reads_hours_and_minutes() {
+        let at = |h: i64, m: i64| clock_of(1_789_050_720 / 86_400 * 86_400 + h * 3_600 + m * 60 + 59);
+        assert_eq!(at(21, 47), "9:47 PM");
+        assert_eq!(at(0, 5), "12:05 AM", "midnight is twelve");
+        assert_eq!(at(12, 0), "12:00 PM", "and so is noon");
+        assert_eq!(at(9, 3), "9:03 AM");
+        assert_eq!(playing_text(Duration::from_secs(59)), "Playing for under a minute");
+        assert_eq!(playing_text(Duration::from_secs(12 * 60 + 30)), "Playing for 12 min");
+        assert_eq!(playing_text(Duration::from_secs(80 * 60)), "Playing for 1 h 20 min");
     }
 }

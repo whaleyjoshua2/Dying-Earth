@@ -39,7 +39,7 @@ impl Game {
         self.report = Report { turn: self.turn, ..Default::default() };
         // Ticket #58: the first Report keeps its explanation as the headline.
         let home = self.tables.state(self.controlled_states(Seat(0))[0]).name.clone();
-        let names: Vec<String> = Seat::ALL.into_iter().skip(1).map(|s| format!("the {}", self.seat_name(s))).collect();
+        let names: Vec<String> = Seat::ALL.into_iter().skip(1).map(|s| self.seat_name(s)).collect();
         let seating = self.say(
             "seating",
             &[
@@ -64,7 +64,7 @@ impl Game {
         let rivals: Vec<String> = Seat::ALL
             .into_iter()
             .skip(1)
-            .map(|s| format!("the {} in {}", self.seat_name(s), self.tables.state(self.controlled_states(s)[0]).name))
+            .map(|s| format!("{} in {}", self.seat_name(s), self.tables.state(self.controlled_states(s)[0]).name))
             .collect();
         let text = self.say(
             "start_rivals",

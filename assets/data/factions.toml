@@ -50,6 +50,8 @@ victory = "Stabilization (3 consecutive Climate phases with net Emissions below 
 victory_short = "reach Stabilization, {first} Climate phases running with Emissions under the Natural Sink, with {second} Colonists living off Earth,"
 victory_first = { kind = "stabilization_run", bar = 3 }
 victory_second = { kind = "off_world_presence", bar = 12 }
+# Ticket #471 (version 0.09.7): the Opening Objective -- no deadline, met once, rewarded once.
+opening = { kind = "scrubber_working", reward = 0.5, text = "Have a Scrubber working", reward_text = "+0.5 ppm on the Natural Sink, for good" }
 colour = [0.15, 0.65, 0.6]
 
 [[faction]]
@@ -86,7 +88,7 @@ ducats_multiplier = 1.2
 market_multiplier = 0.85
 # Ticket #221: zero. They do not mind another Faction's Blame at all, which is a statement about them.
 resentment = 0.0
-signature = "Cheap Industry and the Strip Permit. Raising Industry Level costs them 15 Materials rather than 30, every Facility and Module 15% less; their Regions pay a fifth more Ducats and the Trading window sells to them at 15% off. A Strip Permit is free and may be taken once in a Region's whole life: for three turns every Facility there produces double, and when it ends that Region's Baseline Emissions rise by 0.2 for good and its Unrest by 3. The Venture Capital Fund: each turn they set what share of their Ducat income is banked in it, 0% to 80% in whole percents; a withdrawal returns nine tenths."
+signature = "Cheap Industry and the Strip Permit. Raising Industry Level costs them 15 Materials rather than 30, every Facility and Module 15% less; their Regions pay a fifth more Ducats and the Trading window sells to them at 15% off. A Strip Permit is free and may be taken once in a Region's whole life: for three turns every Facility there produces double, and when it ends that Region's Baseline Emissions rise by 0.2 for good and its Unrest by 2. The Venture Capital Fund: each turn they set what share of their Ducat income is banked in it, 0% to 80% in whole percents; a withdrawal returns nine tenths."
 # Ticket #203 (version 0.08.1). The building is ticket #182's.
 unique = "Investment Bank -- replaces the Bank, and banks 1% interest a turn on the Venture Capital Fund's balance, one building per Region paying, never less than 1 Ducat in all. Off Earth, the Exchange -- replaces the Trade Post, and pays 1 more Ducat a turn."
 # Ticket #72: the Extraction Total is retired; the first part is Ducats banked in the Fund.
@@ -103,6 +105,8 @@ victory_short = "put {first} Ducats in the Venture Capital Fund with {second} Co
 # ends short; "other things will bolster their output". The AI reads this figure, not a copy of it.
 victory_first = { kind = "venture_fund", bar = 2500 }
 victory_second = { kind = "off_world_presence", bar = 12 }
+# Ticket #471 (version 0.09.7): the Opening Objective -- no deadline, met once, rewarded once.
+opening = { kind = "investment_banks", count = 3, reward = 75.0, text = "Have a working Investment Bank in three different places", reward_text = "75 Ducats into the Venture Capital Fund" }
 colour = [0.85, 0.5, 0.2]
 
 # Ticket #50 seated two more Factions; ticket #51 gave them their cards.
@@ -170,6 +174,8 @@ victory = "Diaspora: 30 Colonists living off Earth, on Colonies spread over at l
 victory_short = "get {first} Colonists living off Earth, spread over {bodies} Bodies,"
 victory_first = { kind = "colonists_off_earth", bar = 30 }
 victory_second = { kind = "colonies_on_bodies", bodies = 3, colonists_each = 4 }
+# Ticket #471 (version 0.09.7): the Opening Objective -- no deadline, met once, rewarded once.
+opening = { kind = "moon_colony", text = "Found a Colony on the Moon, on the ground or in orbit", reward_text = "a free Launch Site in a Region of yours that has none" }
 colour = [0.44, 0.275, 0.66]
 
 [[faction]]
@@ -218,6 +224,8 @@ victory_short = "build the Archive off Earth, pay {first} Research into it, and 
 victory_first = { kind = "archive_research", bar = 150 }
 # Ticket #192 (version 0.08.0): twelve Colonists UPLOADED, not twelve living beside the Archive.
 victory_second = { kind = "colonists_uploaded", bar = 12 }
+# Ticket #471 (version 0.09.7): the Opening Objective -- no deadline, met once, rewarded once.
+opening = { kind = "research_pair", count = 2, reward = 10.0, text = "Have two Research Labs or Observatories working, one of them off Earth", reward_text = "10 Research into the Archive fund" }
 colour = [0.871, 0.322, 0.439]
 
 # Ticket #54 (version 0.05): the [restoration] table is retired with the order; the Custodians'
@@ -442,7 +450,8 @@ provisional_min_contribution = 75
 # about +0.5 ppm over a game if they divert half throughout -- half a Planetary Stewardship, earned
 # over thirty turns of not researching. Per-turn instead of permanent was measured at 0.09 ppm a
 # turn, which is one and a half per cent of the Sink: invisible, and the reason permanent won.
-custodians_ppm_per_point = 0.01
+# Ticket #459 (version 0.09.7): 0.02, about +1 ppm over a game at half diverted throughout.
+custodians_ppm_per_point = 0.02
 # The Prospectors: Ducats per point. "10-1" was ambiguous by a factor of a hundred -- ten points to
 # a Ducat is 22 Ducats over a game, less than half a Leapfrog, and one point to ten Ducats is 2,200,
 # larger than their whole economy. The designer chose 0.8, about 5 Ducats a turn and 178 over a

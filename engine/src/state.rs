@@ -1005,6 +1005,18 @@ pub struct SeatState {
     pub colonists_grown: u32,
     #[serde(default)]
     pub colonists_declined: u32,
+    /// Ticket #471 (version 0.09.7): the turn this seat met its Opening Objective, and whether the
+    /// Arkwrights' free Launch Site is still owed for want of a Region to stand it in.
+    #[serde(default)]
+    pub opening_met_turn: Option<u32>,
+    #[serde(default)]
+    pub launch_site_owed: bool,
+    /// Ticket #461 (version 0.09.7): Archives this seat has lost with their Colonies, and the fund
+    /// lost with them, over the game, for the sweep.
+    #[serde(default)]
+    pub archives_lost: u32,
+    #[serde(default)]
+    pub archive_fund_lost: i64,
     /// Ticket #227 (version 0.08.2): units this seat has bought and sold through the Trading window
     /// over the whole game. Kept because floating prices are only fair if more than one hand is on
     /// them, and the sweep had no way to say whose were.
@@ -1040,6 +1052,11 @@ pub struct SeatState {
     pub research_last_turn: i64,
     /// Ticket #50: all the Research this seat's own Labs have produced, counted at production.
     pub research_total: i64,
+    /// Ticket #467 (version 0.09.7): everything this seat has made at Income over the whole game,
+    /// GROSS -- before upkeep and every other cost -- for the final report. Purchases and sales are
+    /// not production and never enter it.
+    #[serde(default)]
+    pub produced_total: Stockpile,
     /// Ticket #80 (version 0.06.0): the part of it made by Observatories at Colonies and stations
     /// not at Earth (Antarctica and a station over Earth are on Earth), for the measurement.
     #[serde(default)]
@@ -1637,6 +1654,10 @@ impl Game {
             blockade_turns_imposed: 0,
             colonists_grown: 0,
             colonists_declined: 0,
+            opening_met_turn: None,
+            launch_site_owed: false,
+            archives_lost: 0,
+            archive_fund_lost: 0,
             bought_units: 0,
             sold_units: 0,
             spaceport_influence: 0,
@@ -1649,6 +1670,7 @@ impl Game {
             allotment: 0,
             research_last_turn: 0,
             research_total: 0,
+            produced_total: Stockpile::default(),
             research_off_earth_total: 0,
             doubled_module_turns: 0,
             lost_in_transit: 0,
