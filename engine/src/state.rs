@@ -999,6 +999,12 @@ pub struct SeatState {
     pub blockade_turns_suffered: u32,
     #[serde(default)]
     pub blockade_turns_imposed: u32,
+    /// Ticket #454 (version 0.09.6): Colonists this seat's Colonies have gained by natural growth and
+    /// lost to natural decline over the game, for the sweep.
+    #[serde(default)]
+    pub colonists_grown: u32,
+    #[serde(default)]
+    pub colonists_declined: u32,
     /// Ticket #227 (version 0.08.2): units this seat has bought and sold through the Trading window
     /// over the whole game. Kept because floating prices are only fair if more than one hand is on
     /// them, and the sweep had no way to say whose were.
@@ -1629,6 +1635,8 @@ impl Game {
             agitates_issued: 0,
             blockade_turns_suffered: 0,
             blockade_turns_imposed: 0,
+            colonists_grown: 0,
+            colonists_declined: 0,
             bought_units: 0,
             sold_units: 0,
             spaceport_influence: 0,

@@ -6,6 +6,43 @@ The map is [Map: version 0.09.6](https://github.com/whaleyjoshua2/Dying-Earth/is
 pictures and batches that decided it are in
 [`docs/dev-diary/2026-10-03-version-0.09.6/`](../dev-diary/2026-10-03-version-0.09.6/).
 
+**What the version is.** Version 0.09.5 with the designer's list. **People**: a Colony grows by 2% a
+turn and shrinks when starved or dark (§11); a Colony Ship takes Pioneers from several countries (§9)
+and unloads onto a station (§2); a station is founded from a ground Colony and a ground Colony from a
+station (§10); the Colonists line reads `8/12` (§14). **Rules moved**: Generation Ships needs Relay
+Networks (§3), the Archive fund is 150 (§4), the Custodians' Influence is ×1.15 (§5), Colony Ships
+hold 35 Fuel (§7), a captured Scrubber runs at half (§8). **The computer seats**: one Factory per
+Shipyard (§6), the Custodians' aggression follows a rival's CO2 (§12), the market used (§15), the
+pace tables (§16), Blockades broken (§17). **The window**: two texts cut (§13), an offline building
+says why (§18), and the Venus crash fixed (§1). **The board**: sixteen Regions, Pakistan and the
+United Kingdom added (§19).
+
+**What it did to the win column** (80 games, per Faction, at the shipped climate cell):
+
+| | 0.09.5 | 0.09.6 on fourteen Regions | 0.09.6 |
+|---|---|---|---|
+| Custodians | 10 | 15 | 5 |
+| Prospectors | 10 | 10 | 3 |
+| Arkwrights | 1 | 10 | 11 |
+| Archivists | 17 | 5 | 15 |
+| collapses | 42 | 40 | 46 |
+
+The two new Regions (§19) restart the baseline: the middle column is the version before them
+(`sweeps/after-447.txt`), the last the version as shipped. The move between them is not traced. The
+designer's ideal is about 15 / 15 / 15 / 15 and 20.
+
+The closing sweep is
+[`sweeps/final-0.09.6.txt`](../dev-diary/2026-10-03-version-0.09.6/sweeps/final-0.09.6.txt), the
+sweep after §19 with one line added. Over its 80 games:
+
+- **Colonists grown** by natural growth: 379; lost to decline: 9.
+- **Units sold on the market**: 55,942 (bought: 57,295), all four seats.
+- **Blockade-turns**: 3. A Blockade stood in 4 games, an orbital Battle in 11.
+- **The tree** completes in 55 of 80 games at a median turn 24, where it completed in 65 at turn 25.
+  Victory gates are reached in 58 to 74 games (Prospectors 74, Archivists 68, Custodians 66,
+  Arkwrights 58), where it was 70 to 77.
+- **Saves**: `SAVE_VERSION` is 8; a 0.09.5 save is refused and the Load screen says so.
+
 ## 1. The crash on a Colony Ship at a Venus station
 
 The authority is [ticket #436](https://github.com/whaleyjoshua2/Dying-Earth/issues/436). No rule

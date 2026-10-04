@@ -18821,6 +18821,7 @@ fn a_colony_grows_by_two_percent_a_turn_and_declines_when_starved_or_dark() {
     assert_eq!(g.colony(c).unwrap().colonists, 10, "0.8 of a Colonist after four turns");
     g.colony_growth_step();
     assert_eq!(g.colony(c).unwrap().colonists, 11, "one after five");
+    assert_eq!(g.seats[0].colonists_grown, 1, "and the seat counts it, for the sweep (ticket #454)");
     // Full: no growth, and nothing banked toward the next.
     let room = g.habitat_room(g.colony(c).unwrap());
     g.colony_mut(c).unwrap().colonists = room;
@@ -18834,6 +18835,7 @@ fn a_colony_grows_by_two_percent_a_turn_and_declines_when_starved_or_dark() {
     }
     g.colony_growth_step();
     assert_eq!(g.colony(c).unwrap().colonists, room - 1, "the lights out, one gone");
+    assert_eq!(g.seats[0].colonists_declined, 1);
 }
 
 /// Ticket #446 (version 0.09.6): **the computer Custodians' aggression follows a rival's CO2.**

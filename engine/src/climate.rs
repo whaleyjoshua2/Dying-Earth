@@ -604,6 +604,8 @@ impl Game {
         // One line a seat under its works: what grew and what was lost, with the places.
         for (seat, places) in grew {
             let (up, down): (i64, i64) = (places.iter().filter(|p| p.1 > 0).map(|p| p.1).sum(), -places.iter().filter(|p| p.1 < 0).map(|p| p.1).sum::<i64>());
+            self.seat_mut(seat).colonists_grown += up as u32;
+            self.seat_mut(seat).colonists_declined += down as u32;
             let named: Vec<String> = places.iter().map(|(c, n)| format!("{} {:+}", self.place_name(Place::Colony(*c)), n)).collect();
             let key = match (up > 0, down > 0) {
                 (true, false) => "colonies_grew",

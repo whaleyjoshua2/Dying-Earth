@@ -195,6 +195,7 @@ fn main() {
                         let mut credits_sold = [0.0f64; 4];
                         let mut agitates = [0u32; 4];
                         let (mut blockade_suffered, mut blockade_imposed) = ([0u32; 4], [0u32; 4]);
+                        let (mut colonists_grown, mut colonists_declined) = ([0u32; 4], [0u32; 4]);
                         let (mut levies, mut neutral_holds) = (0u32, 0u32);
                         let mut warc = dying_earth_engine::state::WarCounters::default();
                         // Ticket #343 (version 0.09.1): the Natural Sink at the end of each game.
@@ -296,6 +297,8 @@ fn main() {
                                 agitates[i] += r.agitates[i];
                                 blockade_suffered[i] += r.blockade_suffered[i];
                                 blockade_imposed[i] += r.blockade_imposed[i];
+                                colonists_grown[i] += r.colonists_grown[i];
+                                colonists_declined[i] += r.colonists_declined[i];
                                 war_ppm[i].push(r.war_ppm[i]);
                                 bought[i] += r.bought[i];
                                 sold[i] += r.sold[i];
@@ -675,6 +678,7 @@ fn main() {
                             );
                             // Ticket #278 (version 0.08.5): Colony-turns starved under a Blockade, suffered and imposed.
                             println!("      Blockade-turns over the batch: suffered by seat {blockade_suffered:?}, imposed by seat {blockade_imposed:?}");
+                            println!("      Natural growth over the batch: Colonists grown by seat {colonists_grown:?}, lost to decline by seat {colonists_declined:?}");
                             // Ticket #279 (version 0.08.5): what war put in the air, by seat and nobody's.
                             let war: Vec<String> = (0..4).map(|i| med0(&mut war_ppm[i])).collect();
                             println!("      War in ppm a game, by seat (median): [{}]; nobody's (median) {}", war.join(", "), med0(&mut war_nobody));

@@ -383,3 +383,9 @@ broke and the designer settled (the rule kept, Pakistan's lone Mine the exceptio
 
 **The sweep** ([`after-453.txt`](sweeps/after-453.txt)): 5 / 3 / 11 / 15 wins and 46 collapses,
 where fourteen Regions gave 15 / 10 / 10 / 5 and 40. Not traced.
+
+## Closing the version (ticket #454)
+
+[`sweeps/final-0.09.6.txt`](sweeps/final-0.09.6.txt): the closing sweep, the sweep after ticket #453
+with one line a seating added (natural growth). 5 / 3 / 11 / 15 wins, 46 collapses. Colonists grown
+379, lost to decline 9; 55,942 units sold on the market; 3 Blockade-turns.

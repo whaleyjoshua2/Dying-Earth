@@ -124,7 +124,9 @@ pub const SAVE_VERSION: u32 = 8;
 /// this version: every field it added reads a default from an older file, so a 0.09.3 save loads.
 /// Ticket #432 (version 0.09.5, the closing ticket): moved to 0.09.5. `SAVE_VERSION` did not move:
 /// the fog's Report fields read a default, and the two new Techs are appended, so a 0.09.4 save loads.
-pub const GAME_VERSION: &str = "0.09.5";
+/// Ticket #454 (version 0.09.6, the closing ticket): moved to 0.09.6. `SAVE_VERSION` moved once for
+/// the version, to 8, when two Regions joined the board (#453): a 0.09.5 save is refused.
+pub const GAME_VERSION: &str = "0.09.6";
 
 /// The game autosaves at the start of the Report phase of every third turn.
 pub const AUTOSAVE_EVERY: u32 = 3;
