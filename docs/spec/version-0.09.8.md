@@ -307,8 +307,13 @@ table of section 8 and the fares of section 7.
     move takes a turn.
 - **A move between Earth's orbits** is still 1 Fuel, and to or from a far orbit is that journey:
   16.3 out, 5.6 home, 10.6 across. The seat's own Fuel multipliers apply to it as to any journey.
-- **Unchanged:** the tanks; the scale; the Faction's, Efficient Transit's and a Mass Driver's cuts.
-  A Mass Driver on the Moon now takes the 3.7 home to its floor of 1.
+- **Unchanged:** the tanks; the scale; the Faction's and Efficient Transit's cuts.
+- **A Mass Driver takes a quarter off** every leg its owner's Ships fly from its Body, after the
+  multipliers and to the tenth, at the designer's word, where it took a flat 4 Fuel with a floor of
+  1. Against legs priced by delta-v the flat figure erased the Moon's 3.7 home and barely touched
+  the way out; a quarter leaves 2.8 home and 6.8 to Mars. Its card says "departures from here 25%
+  less Fuel". The computer seats built no Mass Driver in the 80 games of the sweep, before or
+  after, so the sweep is the same to the line.
 - **The computer seats** read every leg's price from the engine. One test of theirs moved: a
   Battleship holding Mars's orbit with cause and a full tank now flies home to blockade its rival's
   station, the leg being cheap, where it bombarded; short of that leg's Fuel it bombards as before.

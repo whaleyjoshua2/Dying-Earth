@@ -240,5 +240,13 @@ and Venus is five turns at 24.3 where from Earth it is seven at 40.3, its window
 
 ![a Ship's doors from Earth and from Earth L5](ticket-486/ship-cards.png)
 
+**The Mass Driver at a quarter.** Shown that a flat 4 Fuel now took the Moon's way home to its
+floor, the designer asked: *"can mass drivers be a flat 25% off fuel requirements"*. Built. The
+test was changed first and could not compile until the rule's figure existed, so its red is a
+compile error and not a failing assertion; its figures (2.8, 6.8, 2.1) are ones the old rule did
+not give (1.0, 5.0, 1.0).
+
 **The sweep** ([`after-486.txt`](sweeps/after-486.txt)): 7 / 21 / 16 / 4 and 32 collapses, from
-7 / 20 / 17 / 4 and 32. Within noise. Ships stranded at the end: 3 over the 80 games, from 15.
+7 / 20 / 17 / 4 and 32. Within noise. Ships stranded at the end: 3 over the 80 games, from 15. The
+Mass Driver's change left it the same to the line: the computer seats build none (0 standing at the
+end of all 80 games).

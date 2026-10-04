@@ -761,7 +761,7 @@ impl Game {
         // Ticket #92: a Mass Driver makes nothing itself; the card says what it does.
         if kind == ModuleKind::MassDriver {
             let md = &t.mass_driver;
-            y.detail = Some(format!("departures from here {} Fuel cheaper, never under {}; each Mine here +{} Materials", md.fuel_off, md.fuel_min, md.mine_bonus));
+            y.detail = Some(format!("departures from here {:.0}% less Fuel; each Mine here +{} Materials", md.fuel_cut * 100.0, md.mine_bonus));
         }
         // Ticket #51: the Archive draws its Energy only once it is complete; ticket #68: that is
         // standing with its Research paid in full. Until then it costs nothing to run.

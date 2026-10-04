@@ -345,11 +345,11 @@ pub struct ModuleCard {
 }
 
 /// Ticket #92 (version 0.06.0): the Mass Driver's figures: the Fuel it takes off the owner's
-/// departures (never below the minimum) and what each Mine at its Colony makes more.
+/// departures and what each Mine at its Colony makes more. Ticket #486 (version 0.09.8): the Fuel
+/// is a share of the leg, a quarter, where it was a flat 4 with a floor of 1.
 #[derive(Debug, Clone, Deserialize)]
 pub struct MassDriverCard {
-    pub fuel_off: i64,
-    pub fuel_min: i64,
+    pub fuel_cut: f64,
     pub mine_bonus: i64,
 }
 

@@ -7398,22 +7398,25 @@ fn the_mass_driver_stands_on_a_low_gravity_colony_behind_efficient_transit_one_p
     assert!(g.check_order(Seat(0), &[], &build(moon)).unwrap_err().0.contains("Mass Driver"), "one per Colony");
 }
 
-/// Ticket #92: a working Mass Driver takes a flat 4 Fuel off every leg the owner's Ships fly from
-/// its Body, after the multipliers, to a minimum of 1; a rival pays the full leg; a mothballed one
-/// does nothing; and each Mine at its Colony makes +1 Materials.
+/// Ticket #92: a working Mass Driver took a flat 4 Fuel off every leg the owner's Ships fly from
+/// its Body, after the multipliers, to a minimum of 1. Ticket #486 (version 0.09.8), at the
+/// designer's word: **a quarter off**, after the multipliers, to the tenth, with no floor. A rival
+/// pays the full leg; a mothballed one does nothing; and each Mine at its Colony makes +1 Materials.
 #[test]
-fn a_mass_driver_cuts_the_owners_departures_by_four_and_gives_its_mines_one_more() {
+fn a_mass_driver_cuts_the_owners_departures_by_a_quarter_and_gives_its_mines_one_more() {
     let mut g = game();
     at_window(&mut g);
     let cus = Seat(0);
     let moon = colony(&mut g, cus, BodyId::Moon, &[ModuleKind::Mine, ModuleKind::MassDriver], 0);
-    assert_eq!(g.transit_cost_for(cus, BodyId::Moon, BodyId::Earth).1, 1.0, "3.7 home - 4, minimum 1");
-    assert_eq!(g.transit_cost_for(cus, BodyId::Moon, BodyId::Mars).1, 5.0, "9.0 - 4");
+    assert_eq!(g.tables.mass_driver.fuel_cut, 0.25);
+    assert_eq!(g.transit_cost_for(cus, BodyId::Moon, BodyId::Earth).1, 2.8, "3.7 home x 0.75");
+    assert_eq!(g.transit_cost_for(cus, BodyId::Moon, BodyId::Mars).1, 6.8, "9.0 x 0.75");
+    assert!(g.transit_cost_for(cus, BodyId::Moon, BodyId::Venus).1 < g.transit_cost_for(Seat(1), BodyId::Moon, BodyId::Venus).1, "every leg it leaves by");
     assert_eq!(g.transit_cost_for(cus, BodyId::Earth, BodyId::Moon).1, 15.7, "arriving is not departing");
     assert_eq!(g.transit_cost_for(Seat(1), BodyId::Moon, BodyId::Earth).1, 3.7, "a rival pays the leg");
     let ark = Seat(2);
     colony(&mut g, ark, BodyId::Moon, &[ModuleKind::MassDriver], 0);
-    assert_eq!(g.transit_cost_for(ark, BodyId::Moon, BodyId::Earth).1, 1.0, "3.7 x 0.75 = 2.8, - 4, minimum 1");
+    assert_eq!(g.transit_cost_for(ark, BodyId::Moon, BodyId::Earth).1, 2.1, "3.7 x 0.75 = 2.8 for the Arkwrights, x 0.75 again");
     assert_eq!(g.module_yield(cus, moon, ModuleKind::Mine).amount, 7.6, "4 x 1.65 = 6.6, +1"); // Ticket #387: to the tenth, where 6 was floored
     g.colony_mut(moon).unwrap().modules[1].mothballed = true;
     assert_eq!(g.transit_cost_for(cus, BodyId::Moon, BodyId::Earth).1, 3.7, "mothballed, it throws nothing");

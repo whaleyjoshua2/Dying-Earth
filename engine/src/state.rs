@@ -4356,13 +4356,12 @@ impl Game {
         let faction = self.tables.faction(self.kind(seat)).transit_fuel_multiplier;
         let (turns, fuel) = self.journey_with(from, to, faction, self.tech_multiplier(seat, TechId::EfficientTransit), self.tech_multiplier(seat, TechId::NuclearRockets) * self.tech_multiplier(seat, TechId::OrbitalRefuelling), turn);
         // Ticket #92 (version 0.06.0): a working Mass Driver of the seat's at the Body it leaves
-        // takes a flat figure off, after the multipliers, never below the minimum.
+        // takes Fuel off the leg, after the multipliers. Ticket #486 (version 0.09.8), at the
+        // designer's word: a quarter of it, to the tenth, where it was a flat 4 with a floor of 1.
         if let Port::Body(b) = from
             && self.mass_driver_at(seat, b)
         {
-            let md = &self.tables.mass_driver;
-            // Ticket #485 (version 0.09.8): to the tenth again, now that a leg may carry a decimal.
-            return (turns, tenth((fuel - md.fuel_off as f64).max(md.fuel_min as f64)));
+            return (turns, tenth(fuel * (1.0 - self.tables.mass_driver.fuel_cut)));
         }
         (turns, fuel)
     }

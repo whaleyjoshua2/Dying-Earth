@@ -303,7 +303,7 @@ The Module only a Space Station holds, since version 0.06.0. It makes Energy tha
 _Avoid_: solar panel, power satellite, collector
 
 **Mass Driver**:
-The Module only a ground Colony on a small world (the Moon, Phobos, Deimos) holds, since version 0.06.0, one to a Colony, behind Efficient Transit. While it works, every transit its owner's Ships fly from that Body spends four Fuel less, after every multiplier and never below one, and each Mine at its Colony makes one Materials more.
+The Module only a ground Colony on a small world (the Moon, Phobos, Deimos) holds, since version 0.06.0, one to a Colony, behind Efficient Transit. While it works, every transit its owner's Ships fly from that Body spends a quarter less Fuel, after every multiplier (four Fuel less and never below one, until version 0.09.8), and each Mine at its Colony makes one Materials more.
 _Avoid_: catapult, launcher, railgun, launch loop
 
 **Core Module**:
