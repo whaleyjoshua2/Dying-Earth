@@ -80,5 +80,14 @@ Materials and places the order.
   of the new turn overlaps the left of the picture.
   ![the tile after the raise completes](ticket-476/done.png)
 
-Not pictured: the tile live and affordable (ungreyed); the raise under way across a turn ("building,
+**After the designer looked:** *"can we shift the color maybe something closer to the mothballed blue
+shade or a red version of the same tone"*. Both were built and shot, live and greyed; the designer
+took the red. The tile's words and dashes wear it, dimmed where the order would be refused.
+
+![the two colours, affordable and not](ticket-476/colours.png)
+
+- **Live, in the red** (`raise:afford`):
+  ![the tile live](ticket-476/live.png)
+
+Not pictured: the raise under way across a turn ("building,
 2 of 4"), which needs a Region making fewer than 4 Widgets a turn.

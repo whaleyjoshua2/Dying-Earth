@@ -1413,8 +1413,8 @@ fn build_board(session: &mut Session) {
     }
     // `raise:1` (a building aid, ticket #476, version 0.09.8): Raise Industry Level is ordered in
     // seat 0's start state and left pending, so its tile can be photographed ordered. The seat is
-    // given the Materials first: three turns in it cannot afford one.
-    if std::env::args().any(|a| a == "raise:1")
+    // given the Materials first: three turns in it cannot afford one. `raise:afford` gives them and orders nothing.
+    if std::env::args().any(|a| a == "raise:1" || a == "raise:afford")
         && let Some(g) = session.game.as_mut()
     {
         g.seats[0].stockpile.materials = 60.0;

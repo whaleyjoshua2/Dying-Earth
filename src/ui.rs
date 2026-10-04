@@ -9632,6 +9632,8 @@ fn moments_corner(ui: &mut Ui, session: &Session, view: &mut ViewState) {
 const TUTORIAL_TICK: f32 = 14.0 * 1.2;
 
 const HAB_TILE: f32 = 84.0;
+/// Ticket #476 (version 0.09.8): the Raise Industry Level tile's words and dashes.
+const RAISE_INK: Color32 = Color32::from_rgb(215, 165, 160);
 const HAB_GAP: f32 = 10.0;
 /// Room under a tile for its name.
 const HAB_LABEL: f32 = 18.0;
@@ -9691,6 +9693,12 @@ fn hab_tile(ui: &mut Ui, rect: egui::Rect, id: egui::Id, key: Option<&str>, name
             // A dashed border, four sides of short strokes, and the word in the middle.
             let dash = 5.0;
             let step = 9.0;
+            // Ticket #476: the Raise tile's dashes wear its own colour, so it is told from a free
+            // slot at a glance; the hover's brightening still wins.
+            let outline = match state {
+                TileState::Raise(ok) if !resp.hovered() => if ok { RAISE_INK } else { RAISE_INK.gamma_multiply(0.55) },
+                _ => outline,
+            };
             let stroke = egui::Stroke::new(1.0, outline);
             let mut x = rect.min.x;
             while x < rect.max.x {
@@ -9709,7 +9717,7 @@ fn hab_tile(ui: &mut Ui, rect: egui::Rect, id: egui::Id, key: Option<&str>, name
             // Ticket #218 (version 0.08.2): a tile the player can build in says so. Two lines: the
             // tile is 84 square and `Click to Build` is about 78 wide at 12pt, so one line would
             // leave three pixels of air and break if the font ever moved.
-            let (word, ink) = if let TileState::Raise(ok) = state { ("Raise\nIndustry\nLevel", Color32::from_gray(if ok { 165 } else { 105 })) } else if state == TileState::Free(true) { ("Click to
+            let (word, ink) = if let TileState::Raise(ok) = state { ("Raise\nIndustry\nLevel", if ok { RAISE_INK } else { RAISE_INK.gamma_multiply(0.55) }) } else if state == TileState::Free(true) { ("Click to
 Build", Color32::from_gray(165)) } else { ("free", Color32::from_gray(130)) };
             painter.text(rect.center(), egui::Align2::CENTER_CENTER, word, FontId::proportional(12.0), ink);
         }

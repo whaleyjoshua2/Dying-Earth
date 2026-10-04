@@ -80,6 +80,8 @@ The authority is [ticket #476](https://github.com/whaleyjoshua2/Dying-Earth/issu
   and a new Raise tile stands after it.
 - **Its hover** gives the price, when it is ready, and "Adds an inland slot." Where the order would
   be refused the tile is greyed and the reason leads the same hover.
+- **Its words and dashes are a muted red**, so it is told from a free slot at a glance; dimmed
+  where the order would be refused.
 - **Only on a Region the player directs.** A rival's or a neutral Region shows no Raise tile.
 - The Widgets queue line for a raise stays. No rule moves, and nothing a computer seat reads.
 
