@@ -134,3 +134,35 @@ The authority is [ticket #478](https://github.com/whaleyjoshua2/Dying-Earth/issu
 
 Every move in the win column is within noise. The Prospectors meet the objective in seven fewer
 games and a turn or two later.
+
+## 6. Raise Industry Level at a rising price
+
+The authority is [ticket #479](https://github.com/whaleyjoshua2/Dying-Earth/issues/479).
+
+- **Each raise costs more than the last**: 30 Materials and 4 Widgets, then 40 and 5, then 50 and
+  6, +10 Materials and +1 Widget every time, with no ceiling. The figures are in
+  `facilities.toml` (`materials_step`, `materials_cheap_step`, `widgets_step`).
+- **What is counted is the Region**: how far it stands above the Industry Level on its card,
+  whoever raised it. Neutral Development's raises count. A level lost to a nuke comes off the price
+  again. A Region at or below its card's level pays the first price.
+- **The Prospectors pay half the Materials at every step**: 15, 20, 25. Their 15% off Widgets
+  applies to the risen figure, rounded down: 3, 4, 5.
+- **Nothing is added to the card's words.** The Raise tile's hover reads the Region's next price.
+- A cancelled raise refunds at the price the Region charges at that moment, which is the price
+  paid, since the level has not yet risen.
+- **The computer seats** are taught nothing: they sum what an order costs from the engine's own
+  price before weighing it, so they read the risen figure.
+
+**Measured** (80 games, the standing cell,
+[`after-479.txt`](../dev-diary/2026-10-04-version-0.09.8/sweeps/after-479.txt)):
+
+| | before this | after this |
+|---|---|---|
+| Custodians | 8 | 8 |
+| Prospectors | 19 | 19 |
+| Arkwrights | 20 | 17 |
+| Archivists | 4 | 5 |
+| collapses | 29 | 31 |
+| raises the Factions completed | 1,895 | 1,627 |
+
+The win column is within noise. The computer seats raise about a seventh less often.

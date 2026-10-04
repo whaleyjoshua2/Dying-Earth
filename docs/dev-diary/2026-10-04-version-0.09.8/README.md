@@ -124,3 +124,23 @@ new aid that sets the count):
 
 **The sweep's command and time, for the record:** `cargo run --release -p dying-earth-engine
 --example sweep -- 20 --seatings --steps=300 --balance`; the 80 games took 11 seconds, measured.
+
+## Raise Industry Level at a rising price (#479)
+
+Decided on the ticket: counted by the Region's levels above its card; the Prospectors pay half the
+Materials at every step; no new words.
+
+**Witnessed red:** the new test `raising_industry_costs_more_with_every_raise_standing_in_the_region`
+was run with the three steps at nought in the data and failed at the second price
+(`left: (30.0, 4)`, `right: (40.0, 5)`); it passed when the steps were set.
+
+**The tile's hover at the second price** (`raise:1 commit:1 "tip:Adds an inland"`), China one raise
+above its card:
+
+![the Raise tile's hover reading 40 and 5](ticket-479/second-price.png)
+
+**The sweep** ([`after-479.txt`](sweeps/after-479.txt)): 8 / 19 / 17 / 5 and 31 collapses, from
+8 / 19 / 20 / 4 and 29. Within noise. The sweep gained a line this ticket, the Industry Level raises
+the Factions completed: 1,627 over the 80 games, against 1,895 at the flat price (by seating 157 /
+733 / 302 / 435 from 188 / 920 / 332 / 455). The flat-price run, with the steps at nought, matched
+`after-478.txt` line for line apart from the new line, so the count itself moves nothing.

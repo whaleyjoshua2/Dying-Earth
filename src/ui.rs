@@ -5904,7 +5904,7 @@ fn build_words(game: &Game, order: &Order) -> Option<String> {
     if ducats {
         return Some(format!("{} Ducats, ready at the next Resolution ahead of the queue", cost.ducats));
     }
-    let widgets = game.build_widgets(Seat(0), item);
+    let widgets = game.build_widgets_at(Seat(0), place, item);
     let when = match game.turns_to_build(Seat(0), place, item) {
         u32::MAX => "nothing here makes Widgets, so it would never finish".to_string(),
         1 => "ready next turn here".to_string(),
@@ -6233,7 +6233,7 @@ fn cost_button_with_hover(ui: &mut Ui, game: &Game, pending: &[Order], order: Or
     let check = game.check_order(Seat(0), pending, &order);
     // Ticket #332 (version 0.09.0): the Widget figure on the face after the price, and the hover's
     // first line the Materials, the Widgets and the estimate at this place's rate behind its queue.
-    let widgets = build_item_of(game, &order).filter(|(_, _, ducats)| !ducats).map(|(_, item, _)| game.build_widgets(Seat(0), item)).unwrap_or(0);
+    let widgets = build_item_of(game, &order).filter(|(_, _, ducats)| !ducats).map(|(place, item, _)| game.build_widgets_at(Seat(0), place, item)).unwrap_or(0);
     let mut resp = priced_button(ui, check.is_ok(), label, &cost, widgets);
     let ready = build_words(game, &order);
     let whole = match (&ready, &hover) {
@@ -7203,7 +7203,7 @@ fn slot_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
                 }
             }
             SlotBoxKind::RaiseOrdered(i) => {
-                let widgets = game.build_widgets(Seat(0), BuildItem::IndustryLevel);
+                let widgets = game.industry_widgets(Seat(0), sid);
                 let turns = game.turns_to_build(Seat(0), Place::State(sid), BuildItem::IndustryLevel);
                 let tip = format!("Industry Level: ordered this turn, {widgets} Widgets, {} once the turn ends. Adds an inland slot.\nRight-click to cancel the order.", estimate_words(turns));
                 if hab_tile(ui, rect, id, None, "Industry Level", TileState::Building { ordered: true, done: 0, widgets }, false, edge, tip).secondary_clicked() {

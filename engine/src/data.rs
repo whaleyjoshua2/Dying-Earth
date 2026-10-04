@@ -251,6 +251,14 @@ pub struct IndustryLevelCard {
     pub materials_cheap_industry: i64,
     /// Ticket #332 (version 0.09.0): the Widgets a raise needs, in place of its flat turn.
     pub widgets: u32,
+    /// Ticket #479 (version 0.09.8): what each raise already standing in the Region adds to the
+    /// next one's price -- to the Materials, to the Prospectors' Materials, and to the Widgets.
+    #[serde(default)]
+    pub materials_step: i64,
+    #[serde(default)]
+    pub materials_cheap_step: i64,
+    #[serde(default)]
+    pub widgets_step: u32,
 }
 
 /// Ticket #332 (version 0.09.0): the Widgets a Region makes a turn with no Factory at all: a flat

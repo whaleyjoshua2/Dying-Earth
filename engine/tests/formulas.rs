@@ -5927,6 +5927,33 @@ fn the_prospectors_pay_fifteen_percent_less_for_facilities_and_modules_and_nothi
     assert_eq!(g.order_cost(pro, &Order::RaiseIndustry { state: StateId::Europe }).materials, 15.0, "Cheap Industry is its own clause");
 }
 
+/// Ticket #479 (version 0.09.8): **Raise Industry Level costs more each time.** 30 Materials and 4
+/// Widgets, then 40 and 5, then 50 and 6, counted by the raises standing in the Region above its
+/// card's level, whoever made them. The Prospectors pay half the Materials at every step and take
+/// their 15% off the Widgets.
+#[test]
+fn raising_industry_costs_more_with_every_raise_standing_in_the_region() {
+    let mut g = game();
+    let pro = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Prospectors).unwrap();
+    let cus = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Custodians).unwrap();
+    g.take_control(StateId::Europe, pro);
+    let price = |g: &Game, seat: Seat, sid: StateId| (g.order_cost(seat, &Order::RaiseIndustry { state: sid }).materials, g.industry_widgets(seat, sid));
+    let card = g.tables.state(StateId::EastAsia).industry_level;
+    for (n, (everyone, prospectors)) in [((30.0, 4), (15.0, 3)), ((40.0, 5), (20.0, 4)), ((50.0, 6), (25.0, 5)), ((60.0, 7), (30.0, 5))].into_iter().enumerate() {
+        g.state_mut(StateId::EastAsia).industry_level = card + n as u32;
+        g.state_mut(StateId::Europe).industry_level = g.tables.state(StateId::Europe).industry_level + n as u32;
+        assert_eq!(g.raises_standing(StateId::EastAsia), n as u32);
+        assert_eq!(price(&g, cus, StateId::EastAsia), everyone, "with {n} standing");
+        assert_eq!(price(&g, pro, StateId::Europe), prospectors, "the Prospectors, with {n} standing");
+        assert_eq!(g.build_widgets_at(cus, Place::State(StateId::EastAsia), BuildItem::IndustryLevel), everyone.1);
+    }
+    // A level lost comes off the price again; a Region below its card's level pays the first price.
+    g.state_mut(StateId::EastAsia).industry_level = card + 1;
+    assert_eq!(price(&g, cus, StateId::EastAsia), (40.0, 5));
+    g.state_mut(StateId::EastAsia).industry_level = card.saturating_sub(1);
+    assert_eq!(price(&g, cus, StateId::EastAsia), (30.0, 4));
+}
+
 /// Ticket #72 (b), rewritten on ticket #240 (version 0.08.3): the Venture Capital Fund banks a
 /// share of the Prospectors' **Ducat income**, set on any turn in steps of 10% from 0 to 80; a draw
 /// returns nine tenths of it in Ducats, rounded down; nobody else has one.

@@ -4548,10 +4548,34 @@ impl Game {
     }
 
     /// Cheap Industry, the Prospectors' signature rule (spec 14.2).
-    pub fn industry_cost(&self, seat: Seat) -> f64 {
+    /// Ticket #479 (version 0.09.8): the price RISES with every raise standing in the Region.
+    pub fn industry_cost(&self, seat: Seat, sid: StateId) -> f64 {
+        let (card, n) = (&self.tables.industry_level, self.raises_standing(sid) as i64);
         match self.kind(seat) {
-            FactionKind::Prospectors => self.tables.industry_level.materials_cheap_industry as f64,
-            _ => self.tables.industry_level.materials as f64,
+            FactionKind::Prospectors => (card.materials_cheap_industry + card.materials_cheap_step * n) as f64,
+            _ => (card.materials + card.materials_step * n) as f64,
+        }
+    }
+
+    /// Ticket #479: how far a Region stands above its card's Industry Level -- the raises standing
+    /// there, whoever made them, Neutral Development's among them. A nuke takes one back off.
+    pub fn raises_standing(&self, sid: StateId) -> u32 {
+        self.state(sid).industry_level.saturating_sub(self.tables.state(sid).industry_level)
+    }
+
+    /// Ticket #479: the Widgets the next raise in a Region needs: the row, a step for every raise
+    /// standing, and the Faction's own multiplier on the whole, as `build_widgets` takes it.
+    pub fn industry_widgets(&self, seat: Seat, sid: StateId) -> u32 {
+        let card = &self.tables.industry_level;
+        let row = card.widgets + card.widgets_step * self.raises_standing(sid);
+        ((row as f64 * self.tables.faction(self.kind(seat)).facility_materials_multiplier).floor() as u32).max(1)
+    }
+
+    /// Ticket #479: `build_widgets` where the place is known, which a raise's price needs.
+    pub fn build_widgets_at(&self, seat: Seat, place: Place, item: BuildItem) -> u32 {
+        match (item, place) {
+            (BuildItem::IndustryLevel, Place::State(sid)) => self.industry_widgets(seat, sid),
+            _ => self.build_widgets(seat, item),
         }
     }
 

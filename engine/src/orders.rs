@@ -416,7 +416,11 @@ impl Game {
             parts.push("the Warhead".to_string());
         }
         if let Some(item) = item {
-            let n = self.build_widgets(seat, item);
+            // Ticket #479 (version 0.09.8): a raise's Widgets are its Region's, which rise.
+            let n = match order {
+                Order::RaiseIndustry { state } => self.industry_widgets(seat, *state),
+                _ => self.build_widgets(seat, item),
+            };
             parts.push(format!("{n} Widget{}", if n == 1 { "" } else { "s" }));
         }
         if let Order::BuildArmy { place } = order {
@@ -483,7 +487,7 @@ impl Game {
         match order {
             // Ticket #72: the Faction's own Facility price (the Prospectors' 15% off).
             Order::BuildFacility { kind, .. } => Cost { materials: self.facility_materials(seat, *kind), ..Default::default() },
-            Order::RaiseIndustry { .. } => Cost { materials: self.industry_cost(seat), ..Default::default() },
+            Order::RaiseIndustry { state } => Cost { materials: self.industry_cost(seat, *state), ..Default::default() },
             // Ticket #51: a Faction's card may make its Modules and its Colony Ships cost less.
             // Ticket #88: and the Colony's working Mines take more off.
             Order::BuildModule { colony, kind } => Cost { materials: self.module_materials_at(seat, *colony, *kind), ..Default::default() },
@@ -2397,7 +2401,7 @@ impl Game {
                     self.state_mut(*state).queue.push(Build { item: BuildItem::Facility(kind), seat, widgets, done, coastal, fuel: 0.0 });
                 }
                 Order::RaiseIndustry { state } => {
-                    let widgets = self.build_widgets(seat, BuildItem::IndustryLevel);
+                    let widgets = self.industry_widgets(seat, *state);
                     self.state_mut(*state).queue.push(Build { item: BuildItem::IndustryLevel, seat, widgets, done: 0, coastal: false, fuel: 0.0 });
                 }
                 Order::BuildModule { colony, kind } | Order::BuildModuleWithDucats { colony, kind } => {

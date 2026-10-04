@@ -500,7 +500,7 @@ The Orders-phase order that takes a Facility or a Module down for good: a turn l
 _Avoid_: demolish, scrap, sell, destroy
 
 **Industry Level**:
-How built-up a Region is. Together with the state's size it sets how many Facilities fit, and every slot it adds is an Inland Slot. It scales the state's emissions. Since version 0.09.0 it adds one Widget a turn per level to the flat four every Region makes with no Factory, so a built-up Region builds a little faster on its own. Raising it is a build action.
+How built-up a Region is. Together with the state's size it sets how many Facilities fit, and every slot it adds is an Inland Slot. It scales the state's emissions. Since version 0.09.0 it adds one Widget a turn per level to the flat four every Region makes with no Factory, so a built-up Region builds a little faster on its own. Raising it is a build action. Since version 0.09.8 each raise costs more than the last, counted by how far the Region stands above the level on its card, whoever raised it.
 _Avoid_: development, tier, infrastructure
 
 **Neutral Development**:

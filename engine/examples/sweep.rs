@@ -162,6 +162,7 @@ fn main() {
                         let mut temps = Vec::new();
                         let mut wins = [0u32; 4];
                         // Ticket #60: the balance counters, for the one-cell runs of the balance report.
+                        let mut industry_raises = 0u32;
                         let (mut draws, mut scrubbers, mut leapfrogs, mut constabularies, mut sea_walls) = (0u32, 0u32, 0u32, 0u32, 0u32);
                         // Ticket #389 (version 0.09.3): Stadiums, beside the Constabularies they follow.
                         let mut stadiums = 0u32;
@@ -343,6 +344,7 @@ fn main() {
                             stadiums += r.stadiums;
                             nature_reserves += r.nature_reserves;
                             sea_walls += r.sea_walls_built;
+                            industry_raises += r.industry_raises;
                             if let Some(t) = r.first_colony_turn {
                                 first_colony.push(t);
                             }
@@ -695,6 +697,7 @@ fn main() {
                             println!("      War in ppm a game, by seat (median): [{}]; nobody's (median) {}", war.join(", "), med0(&mut war_nobody));
                             // Ticket #282 (version 0.08.5): neutral states arming.
                             println!("      Neutral states: {levies} threat episodes armed for over the batch, {neutral_holds} attacks held against");
+                            println!("      Industry Level raises completed by the Factions over the batch: {industry_raises}");
                             println!("      Sea Walls: {sea_walls} built over the batch, {walls_standing} standing at the end, {walls_held} thresholds held");
                             println!("      Events drawn with nowhere to land over the batch: {no_target}; the Fund at or past its bar in {fund_met}/{seeds} seeds");
                             // Ticket #337 (version 0.09.0): what the eighteen cards that ask a
