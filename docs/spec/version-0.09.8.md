@@ -26,13 +26,14 @@ The authority is [ticket #474](https://github.com/whaleyjoshua2/Dying-Earth/issu
 - **The Armies heading takes the shared size.** Its list keeps the tenth it has had since 0.08.7.
 - **A rule is drawn below the Policies block**, so the Widgets line and its queue read with the
   Facilities they build.
+- **A rule is drawn above the Armies block** on both cards.
 - **The glyphs:**
 
   | Heading | Glyph |
   |---|---|
   | Influence | Influence |
   | Pioneers | the Colony Ship |
-  | Policies | a scroll, drawn for the game |
+  | Policies | a gavel on its block, drawn for the game |
   | Facilities | the Factory's |
   | Modules | the Habitat's |
   | Armies | the Battle mark |

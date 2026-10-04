@@ -22,13 +22,20 @@ at `window:1280x1500` so the whole card shows.
   ![the Colony card, before and after](ticket-474/outpost-before-after.png)
 - **The Archivists' Colony card**, for The Archive's heading (`hab:1 player:archivists archive:1`):
   ![the Archivists' Colony card](ticket-474/archivists-colony-card.png)
-- **The headings at four times their size**, to judge the glyphs. Policies' scroll and Orders' list
+- **The headings at four times their size**, to judge the glyphs. Policies' gavel and Orders' list
   are new drawings (`assets/icons/policies.svg`, `orders.svg`):
   ![the headings magnified](ticket-474/headings-magnified.png)
 
+**After the designer looked:** *"policies looks a bit wonky at its size - replace, also we need a line
+before the armies section"*. Policies was a scroll first. Four replacements were drawn and previewed
+at 17 pixels (a preview drawn by script, not by the game's own renderer); the gavel went into the
+build. A rule now stands above the Armies block on both cards.
+
+![four candidates for the Policies glyph](ticket-474/policies-candidates/sheet.png)
+
 Seen in the pictures and left alone:
 
-- The Region card is 23 pixels taller for the larger headings.
+- The Region card is about 30 pixels taller for the larger headings and the new rule.
 - On a station with no Shipyard the Orders heading has nothing under it. It was so before; the
   larger heading makes it plainer.
 

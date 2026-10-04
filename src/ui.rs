@@ -7426,6 +7426,8 @@ This turn {:+.2}%: {:+.1} million.", c.population_growth * 100.0, c.population_l
     // is gone. The whole block is a tenth larger, at `ARMY_LIST_SCALE`.
     // Ticket #430 (version 0.09.5): the Armies the player does not see are counted, not listed.
     let (armies, unseen): (Vec<&Army>, Vec<&Army>) = game.armies.iter().filter(|a| a.at == ArmyAt::Place(Place::State(sid))).partition(|a| !hidden_army(game, a));
+    // Ticket #474 (version 0.09.8): a rule above the Armies, at the designer's word.
+    ui.separator();
     ui.scope(|ui| {
         for font in ui.style_mut().text_styles.values_mut() {
             font.size *= ARMY_LIST_SCALE;
@@ -8035,6 +8037,8 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     // Ticket #430 (version 0.09.5): the Armies the player does not see are counted, not listed.
     let (armies, unseen): (Vec<&Army>, Vec<&Army>) = game.armies.iter().filter(|a| a.at == ArmyAt::Place(Place::Colony(cid))).partition(|a| !hidden_army(game, a));
     if !armies.is_empty() || !unseen.is_empty() {
+        // Ticket #474 (version 0.09.8): a rule above the Armies, as on the Region card.
+        ui.separator();
         ui.scope(|ui| {
             for font in ui.style_mut().text_styles.values_mut() {
                 font.size *= ARMY_LIST_SCALE;

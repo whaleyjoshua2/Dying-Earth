@@ -229,7 +229,7 @@ pub fn faction_symbol(kind: dying_earth_engine::FactionKind) -> &'static str {
 /// the Colony Ship already wears Lorc's upright Rocket, and a second upright rocket at sixteen
 /// pixels is the same silhouette twice. The DIAGONAL is what tells the two apart across a roster.
 /// Ticket #474 (version 0.09.8): two heading glyphs for the cards, drawn by hand: **policies**, a
-/// scroll with its lines, and **orders**, a list of three ticked-off rows. Neither is a figure or
+/// gavel on its block, and **orders**, a list of three ticked-off rows. Neither is a figure or
 /// a kind, so both wear the neutral fill.
 pub const DRAWN: [&str; 9] = ["station", "facility_school", "battle", "module_battery", "widgets", "missile_carrier", "facility_stadium", "policies", "orders"];
 
