@@ -226,7 +226,8 @@ impl Game {
         let bound_here = |s: &Ship| s.seat == seat && (s.at == ShipAt::Body(body) || matches!(s.at, ShipAt::Transit { to, .. } if to == body));
         // A hull of its own carrying people to a free slot, or an Army to land: a founding and a
         // landing both wait on low orbit.
-        let settling = !self.free_slots_on(body).is_empty() && self.ships.iter().any(|s| bound_here(s) && s.colonists > 0);
+        // Ticket #489 (version 0.09.9): with four aboard, the least that founds.
+        let settling = !self.free_slots_on(body).is_empty() && self.ships.iter().any(|s| bound_here(s) && s.colonists >= self.tables.emigrants.found_with);
         let landing = self.ships.iter().any(|s| bound_here(s) && s.army.is_some());
         // Ticket #363 (version 0.09.1): an armed Missile Carrier of its own here with a target on the
         // ground -- a Region, over Earth, or a ground Colony -- fires from low orbit held outright, so
@@ -2026,9 +2027,12 @@ impl Game {
                 continue;
             }
             // Ticket #480 (version 0.09.8): a far orbit is founded by a Ship, not built.
-            if let Some(slot) = self.buildable_orbital_slots(body).first() {
+            // Ticket #489 (version 0.09.9): and only with four to send up.
+            if let Some(slot) = self.buildable_orbital_slots(body).first()
+                && let Some(from) = self.station_founders(seat, body, &[])
+            {
                 let opp = if has_shipyard { 1.0 } else { m.opportunity };
-                push(vec![Order::BuildStation { body, slot: *slot }], Cat::LaunchSiteOrShipyard, self.base_weight(seat, Cat::LaunchSiteOrShipyard) * self.ai_founding_pull(seat), 1.0, 1.0, opp, format!("build {} over {}", self.station_name(body, *slot), self.tables.body(body).name), None);
+                push(vec![Order::BuildStation { body, slot: *slot, from }], Cat::LaunchSiteOrShipyard, self.base_weight(seat, Cat::LaunchSiteOrShipyard) * self.ai_founding_pull(seat), 1.0, 1.0, opp, format!("build {} over {}", self.station_name(body, *slot), self.tables.body(body).name), None);
             }
         }
         // Ticket #447 (version 0.09.6): **a backup yard.** A seat with exactly one Shipyard, and no
@@ -2045,9 +2049,10 @@ impl Game {
             let over_earth = mine.iter().filter(|c| c.in_orbit && c.body == BodyId::Earth).count();
             if yards == 1 && !spare_station && over_earth == 1
                 && let Some(slot) = self.buildable_orbital_slots(BodyId::Earth).first().copied()
+                && let Some(from) = self.station_founders(seat, BodyId::Earth, &[])
             {
                 let lift = if self.blockaded(seat) { m.threat } else { 1.0 };
-                push(vec![Order::BuildStation { body: BodyId::Earth, slot }], Cat::LaunchSiteOrShipyard, self.base_weight(seat, Cat::LaunchSiteOrShipyard), 1.0, lift, 1.0, format!("build {} over Earth as a backup yard", self.station_name(BodyId::Earth, slot)), None);
+                push(vec![Order::BuildStation { body: BodyId::Earth, slot, from }], Cat::LaunchSiteOrShipyard, self.base_weight(seat, Cat::LaunchSiteOrShipyard), 1.0, lift, 1.0, format!("build {} over Earth as a backup yard", self.station_name(BodyId::Earth, slot)), None);
             }
         }
         // Ticket #442 (version 0.09.6): the mirror -- a ground Colony BUILT from a working station of
@@ -2060,8 +2065,11 @@ impl Game {
             let ground = self.colonies.iter().find(|c| !c.in_orbit && c.body == body && c.control.director() == Some(seat)).map(|c| c.id);
             match ground {
                 None => {
-                    if let Some(slot) = self.best_slot_for(seat, body, behind) {
-                        push(vec![Order::BuildColony { body, slot }], Cat::LaunchSiteOrShipyard, self.base_weight(seat, Cat::LaunchSiteOrShipyard) * self.ai_founding_pull(seat), 1.0, 1.0, 1.0, format!("build a Colony at {} on {}", self.tables.body(body).slots[slot as usize].name, self.tables.body(body).name), None);
+                    // Ticket #489 (version 0.09.9): only from a station with four to spare.
+                    if let Some(slot) = self.best_slot_for(seat, body, behind)
+                        && let Some(from) = self.colony_founders(seat, body, &[])
+                    {
+                        push(vec![Order::BuildColony { body, slot, from }], Cat::LaunchSiteOrShipyard, self.base_weight(seat, Cat::LaunchSiteOrShipyard) * self.ai_founding_pull(seat), 1.0, 1.0, 1.0, format!("build a Colony at {} on {}", self.tables.body(body).slots[slot as usize].name, self.tables.body(body).name), None);
                     }
                 }
                 Some(down) => {
@@ -2617,7 +2625,13 @@ impl Game {
                 .filter(|c| c.control.director() == Some(seat))
                 .map(|c| self.habitat_room(c).saturating_sub(c.colonists))
                 .sum();
-            let want = if has_ship_or_yard { capacity * 2 } else { 0 } + if self.antarctica_open { capacity } else { 0 } + room_off_earth;
+            // Ticket #489 (version 0.09.9): a station over Earth is built with four Pioneers now, so a
+            // seat with none to stand on recruits the four. Without this a seat with no station had
+            // no room anywhere, recruited nobody, and so could never build the station that is the
+            // room: measured, the Arkwrights starting with two waiting won 1 game in 80.
+            let station_over_earth = self.colonies.iter().any(|c| c.in_orbit && c.body == BodyId::Earth && c.control.director() == Some(seat));
+            let to_build = if !station_over_earth && !self.buildable_orbital_slots(BodyId::Earth).is_empty() { self.tables.emigrants.found_with } else { 0 };
+            let want = if has_ship_or_yard { capacity * 2 } else { 0 } + if self.antarctica_open { capacity } else { 0 } + room_off_earth + to_build;
             if per > 0 && waiting < want {
                 // Ticket #427 (version 0.09.5): the cap is per state now, so the seat recruits from as
                 // many states as it takes to fill the plan and NO further -- the designer's "only to
@@ -2684,7 +2698,8 @@ impl Game {
                     if n == 0 {
                         continue;
                     }
-                    if let Some(slot) = self.best_slot_for(seat, BodyId::Earth, behind) {
+                    // Ticket #489 (version 0.09.9): a free slot wants four.
+                    if let Some(slot) = self.best_slot_for(seat, BodyId::Earth, behind).filter(|_| n >= self.tables.emigrants.found_with) {
                         push(vec![Order::SendToAntarctica { state: sid, n, into: UnloadTarget::Slot(BodyId::Earth, slot) }], Cat::FoundColony, self.base_weight(seat, Cat::FoundColony) * 0.5, 1.0, 1.0, 1.0, format!("send {} Pioneers from {} to {} by sea", n, self.tables.state(sid).name, self.tables.body(BodyId::Earth).slots[slot as usize].name), None);
                     } else if let Some(c) = self.colonies.iter().find(|c| c.body == BodyId::Earth && !c.in_orbit && c.control.director() == Some(seat) && self.habitat_room(c) > c.colonists) {
                         let k = n.min(self.habitat_room(c) - c.colonists);
@@ -2764,7 +2779,7 @@ impl Game {
                 // Ticket #480 (version 0.09.8): with every buildable station slot here taken, a
                 // loaded Colony Ship goes out to a free far orbit to found there, at the founding's
                 // own half weight. It pays the far figure, so the tank must hold it.
-                if s.kind == UnitKind::ColonyShip && s.colonists > 0 && !self.far_orbit(body, orbit) && self.buildable_orbital_slots(body).is_empty()
+                if s.kind == UnitKind::ColonyShip && s.colonists >= self.tables.emigrants.found_with && !self.far_orbit(body, orbit) && self.buildable_orbital_slots(body).is_empty()
                     && let Some(n) = self.free_orbital_slots(body).into_iter().find(|n| self.far_slot(body, *n))
                     && s.fuel >= self.orbit_change_cost(seat, body, orbit, Orbit::Slot(n))
                 {
@@ -2772,7 +2787,7 @@ impl Game {
                 }
                 // Ticket #357 (version 0.09.1): an empty Colony Ship at Earth no longer comes down
                 // to low orbit to be loaded, since a Launch Site now lifts into any orbit of Earth.
-                let wants_the_ground = (s.colonists > 0 && !self.free_slots_on(body).is_empty()) || s.army.is_some();
+                let wants_the_ground = (s.colonists >= self.tables.emigrants.found_with && !self.free_slots_on(body).is_empty()) || s.army.is_some();
                 if wants_the_ground {
                     wants.push((Orbit::Low, "to reach the ground".to_string(), Cat::LoadUnload, self.base_weight(seat, Cat::LoadUnload)));
                 }
@@ -2852,7 +2867,8 @@ impl Game {
                 }
                 // Ticket #335 (version 0.09.0): a Colony is founded from low orbit, which is what
                 // touches the ground; from a station's ring the order is refused.
-                if s.colonists > 0 && body != BodyId::Earth && orbit.is_low() {
+                // Ticket #489 (version 0.09.9): every founding below wants four aboard.
+                if s.colonists >= self.tables.emigrants.found_with && body != BodyId::Earth && orbit.is_low() {
                     let free = self.free_slots_on(body);
                     // Ticket #57: every slot has its own four yields, so the AI picks the free slot
                     // whose figures best serve the part it is furthest behind on, not the first one.
@@ -2873,7 +2889,7 @@ impl Game {
                 // Ticket #442 (version 0.09.6): a station FOUNDED from the ring a loaded Colony Ship
                 // sits in, off Earth, where the seat has no station at that Body -- the one way to a
                 // station at Venus, which has no ground and no low orbit. As founding a Colony.
-                if s.colonists > 0 && body != BodyId::Earth
+                if s.colonists >= self.tables.emigrants.found_with && body != BodyId::Earth
                     && let Some(n) = orbit.slot()
                     && self.free_orbital_slots(body).contains(&n)
                     && !self.colonies.iter().any(|c| c.in_orbit && c.body == body && c.control.director() == Some(seat))
@@ -2884,7 +2900,7 @@ impl Game {
                 // Ticket #480 (version 0.09.8): **a far orbit**, Earth's L4 or L5, founded from the
                 // loaded Colony Ship sitting in it, once every station slot that can be built in is
                 // taken. A foothold over Earth, as Antarctica is: half weight and no gap.
-                if s.colonists > 0 && s.kind == UnitKind::ColonyShip
+                if s.colonists >= self.tables.emigrants.found_with && s.kind == UnitKind::ColonyShip
                     && let Some(n) = orbit.slot()
                     && self.far_slot(body, n)
                     && self.free_orbital_slots(body).contains(&n)
@@ -2895,7 +2911,7 @@ impl Game {
                 }
                 // Ticket #44: Antarctica, Earth's slots. A foothold, not Presence: half weight and no gap,
                 // so it is taken when the Ship cannot go anywhere better.
-                if s.colonists > 0 && body == BodyId::Earth && orbit.is_low() && !ferrying {
+                if s.colonists >= self.tables.emigrants.found_with && body == BodyId::Earth && orbit.is_low() && !ferrying {
                     // Ticket #56: Antarctica is shut until the ice opens; a loaded Ship goes elsewhere.
                     if let Some(slot) = self.best_slot_for(seat, BodyId::Earth, behind).filter(|_| self.antarctica_open) {
                         push(vec![Order::Unload { ship: s.id, colonists: self.unload_most(s.id, UnloadTarget::Slot(body, slot)), army: false, into: UnloadTarget::Slot(body, slot) }], Cat::FoundColony, self.base_weight(seat, Cat::FoundColony) * 0.5, 1.0, 1.0, 1.0, format!("found a Colony at {}", self.tables.body(BodyId::Earth).slots[slot as usize].name), None);
@@ -2929,7 +2945,9 @@ impl Game {
                     // Ticket #361: a ferrying Archivist crosses to its Archive's Body first.
                     let dest = if ferrying { archive_body.unwrap_or_else(|| self.best_body_for(seat, behind)) } else { self.best_body_for(seat, behind) };
                     let own_room = self.colonies.iter().any(|c| c.control.director() == Some(seat) && self.habitat_room(c) > c.colonists);
-                    let mut dests = vec![dest];
+                    // Ticket #489 (version 0.09.9): with fewer than four aboard it founds nowhere, so
+                    // it sails only to a place of its own with room; with none it stays to load.
+                    let mut dests = if s.colonists >= self.tables.emigrants.found_with { vec![dest] } else { Vec::new() };
                     if own_room {
                         // The 0.06.0 AI sweep (ticket #94): not the Body the Ship is at.
                         for c in &self.colonies {

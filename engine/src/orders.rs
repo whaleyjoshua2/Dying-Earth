@@ -128,11 +128,13 @@ pub enum Order {
     CancelBuild { place: Place, index: usize },
     /// Version 0.04 (ticket #46): a Space Station in an orbital slot, built for Materials from a
     /// Nation State with a Launch Site (over Earth) or a Colony of the seat's (elsewhere).
-    BuildStation { body: BodyId, slot: u32 },
+    /// Ticket #489 (version 0.09.9): `from` gives its four: Pioneers waiting in a Region with a
+    /// working Launch Site (over Earth), or Colonists of a ground Colony of the seat's there.
+    BuildStation { body: BodyId, slot: u32, from: LoadSource },
     /// Ticket #442 (version 0.09.6): a **ground Colony built from a station** of the seat's at that
-    /// Body, into a free ground slot, for the station's Materials price; it opens with a Core and
-    /// nobody, as a built station does.
-    BuildColony { body: BodyId, slot: u32 },
+    /// Body, into a free ground slot, for the station's Materials price; it opens with a Core.
+    /// Ticket #489 (version 0.09.9): `from` is that station, which gives it four.
+    BuildColony { body: BodyId, slot: u32, from: ColonyId },
     /// Ticket #442 (version 0.09.6): Colonists **sent down** from a station of the seat's to its
     /// ground Colony on the same Body, free, within the Colony's room; not while the station is
     /// blockaded; one a station a turn; down only.
@@ -318,12 +320,13 @@ pub struct Pending {
     #[serde(default)]
     pub orbit_changes: Vec<(Seat, ShipId, Option<u32>)>,
     pub cargo: Vec<(Seat, Order)>,
-    /// Ticket #46: stations ordered this turn.
-    pub stations: Vec<(Seat, BodyId, u32)>,
+    /// Ticket #46: stations ordered this turn. Ticket #489 (version 0.09.9): with where their four
+    /// came from and what they know, to go home if the station is not built.
+    pub stations: Vec<(Seat, BodyId, u32, LoadSource, f64)>,
     /// Ticket #442 (version 0.09.6): ground Colonies built from a station this turn, and Colonists
     /// sent down.
     #[serde(default)]
-    pub colony_builds: Vec<(Seat, BodyId, u32)>,
+    pub colony_builds: Vec<(Seat, BodyId, u32, ColonyId, f64)>,
     #[serde(default)]
     pub send_downs: Vec<(Seat, ColonyId, ColonyId, u32)>,
     /// Ticket #52: Relief orders paid this turn, one entry per point.
@@ -483,6 +486,20 @@ impl Game {
             UnloadTarget::Slot(..) | UnloadTarget::Ring(..) => self.tables.module(ModuleKind::Core).holds_colonists,
         };
         s.colonists.min(room)
+    }
+
+    /// Ticket #489 (version 0.09.9): refused where a place cannot give its four, saying what is
+    /// short -- a Region's waiting Pioneers, or what a Colony or station has to spare once it keeps
+    /// enough for its Modules.
+    fn founders_short(&self, from: LoadSource, pending: &[Order]) -> Result<(), OrderError> {
+        let found = self.tables.emigrants.found_with;
+        if self.founders_spare(from, pending) >= found {
+            return Ok(());
+        }
+        Err(OrderError(match from {
+            LoadSource::State(_) => format!("needs {found} Colonists"),
+            LoadSource::Colony(_) => format!("needs {found} Colonists to spare"),
+        }))
     }
 
     /// The cost of one order for a seat, before legality.
@@ -1042,11 +1059,11 @@ impl Game {
                 }
                 Ok(cost)
             }
-            Order::BuildStation { body, slot } => {
+            Order::BuildStation { body, slot, from } => {
                 if !self.free_orbital_slots(*body).contains(slot) {
                     return fail("that orbital slot is taken, or there is no such slot");
                 }
-                if pending.iter().any(|o| matches!(o, Order::BuildStation { body: b, slot: s } if b == body && s == slot)) {
+                if pending.iter().any(|o| matches!(o, Order::BuildStation { body: b, slot: s, .. } if b == body && s == slot)) {
                     return fail("a station is already ordered there");
                 }
                 // Ticket #480 (version 0.09.8): a far orbit is reached only by Ship.
@@ -1078,25 +1095,35 @@ impl Game {
                 if self.slot_blockaded_against(seat, *body, *slot) {
                     return fail(format!("a rival warship holds Orbital Slot {slot} over {}", self.tables.body(*body).name));
                 }
+                // Ticket #489 (version 0.09.9): and four to send up, from a place that may send them.
+                if !self.station_sources(seat, *body).contains(from) {
+                    return fail("its Colonists must come from a Region of yours with a working Launch Site, or a Colony of yours below");
+                }
+                self.founders_short(*from, pending)?;
                 Ok(cost)
             }
             // Ticket #442 (version 0.09.6): a ground Colony built from a working station of the seat's
             // at that Body, into a free ground slot. Not on Earth, whose ground is Antarctica, reached by
             // Colony Ship or by sea.
-            Order::BuildColony { body, slot } => {
+            Order::BuildColony { body, slot, from } => {
                 if *body == BodyId::Earth {
                     return fail("Antarctica is reached by Colony Ship or by sea");
                 }
                 if !self.free_slots_on(*body).contains(slot) {
                     return fail("that ground slot is taken, or there is no such slot");
                 }
-                if pending.iter().any(|o| matches!(o, Order::BuildColony { body: b, slot: s } if b == body && s == slot)) {
+                if pending.iter().any(|o| matches!(o, Order::BuildColony { body: b, slot: s, .. } if b == body && s == slot)) {
                     return fail("a Colony is already ordered there");
                 }
                 let station = self.colonies.iter().any(|c| c.in_orbit && c.body == *body && c.control.director() == Some(seat) && self.starved_by(c.id).is_none());
                 if !station {
                     return fail("needs a station of yours over this Body, not under Blockade");
                 }
+                // Ticket #489 (version 0.09.9): that station gives the new Colony its four.
+                if !self.colony(*from).is_some_and(|c| c.in_orbit && c.body == *body && c.control.director() == Some(seat) && self.starved_by(c.id).is_none()) {
+                    return fail("its Colonists must come from your station over this Body");
+                }
+                self.founders_short(LoadSource::Colony(*from), pending)?;
                 Ok(cost)
             }
             // Ticket #442 (version 0.09.6): Colonists down from a station of the seat's to its ground
@@ -1969,6 +1996,10 @@ impl Game {
                         if s.kind != UnitKind::ColonyShip || *colonists == 0 {
                             return fail("only a Colony Ship with Colonists founds a Colony");
                         }
+                        // Ticket #489 (version 0.09.9): a Colony is founded with four.
+                        if *colonists < self.tables.emigrants.found_with {
+                            return fail(format!("needs {} Colonists", self.tables.emigrants.found_with));
+                        }
                         if !self.free_slots_on(body).contains(slot) {
                             return fail("that Colony Slot is taken");
                         }
@@ -1989,6 +2020,10 @@ impl Game {
                         }
                         if s.kind != UnitKind::ColonyShip || *colonists == 0 {
                             return fail("only a Colony Ship with Colonists founds a station");
+                        }
+                        // Ticket #489 (version 0.09.9): and a station with four.
+                        if *colonists < self.tables.emigrants.found_with {
+                            return fail(format!("needs {} Colonists", self.tables.emigrants.found_with));
                         }
                         if !self.free_orbital_slots(body).contains(slot) {
                             return fail("that station slot is taken");
@@ -2137,6 +2172,10 @@ impl Game {
                     UnloadTarget::Slot(b, slot) => {
                         if *b != BodyId::Earth || !self.free_slots_on(BodyId::Earth).contains(slot) {
                             return fail("that Antarctic slot is not free");
+                        }
+                        // Ticket #489 (version 0.09.9): a Colony is founded with four.
+                        if *n < self.tables.emigrants.found_with {
+                            return fail(format!("needs {} Colonists", self.tables.emigrants.found_with));
                         }
                         if pending.iter().any(|o| matches!(o, Order::SendToAntarctica { into: UnloadTarget::Slot(_, s), .. } if s == slot)) {
                             return fail("Pioneers are already bound for that slot this turn");
@@ -2618,9 +2657,21 @@ impl Game {
                         self.report_line_of(seat, LineKind::Archive, LineKind::Archive, Some(ReportPlace::Colony(*colony)), text);
                     }
                 }
-                Order::BuildStation { body, slot } => self.pending.stations.push((seat, *body, *slot)),
-                // Ticket #442 (version 0.09.6).
-                Order::BuildColony { body, slot } => self.pending.colony_builds.push((seat, *body, *slot)),
+                // Ticket #489 (version 0.09.9): the four leave their source now, as Pioneers sent by
+                // sea do, and arrive when the station is built at the Resolution.
+                Order::BuildStation { body, slot, from } => {
+                    let n = self.tables.emigrants.found_with;
+                    let taught = match from {
+                        LoadSource::State(s) => self.take_emigrants(*s, n),
+                        LoadSource::Colony(c) => self.take_colonists(*c, n),
+                    };
+                    self.pending.stations.push((seat, *body, *slot, *from, taught));
+                }
+                // Ticket #442 (version 0.09.6). Ticket #489: and its four leave the station.
+                Order::BuildColony { body, slot, from } => {
+                    let taught = self.take_colonists(*from, self.tables.emigrants.found_with);
+                    self.pending.colony_builds.push((seat, *body, *slot, *from, taught));
+                }
                 Order::SendDown { from, to, colonists } => self.pending.send_downs.push((seat, *from, *to, *colonists)),
                 Order::BuildArchive { colony } => {
                     // Ticket #68: the Module rises in the Colony's queue like any other build, from

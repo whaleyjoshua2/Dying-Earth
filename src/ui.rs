@@ -845,6 +845,21 @@ const YIELD_ROW_W: f32 = 220.0;
 /// "1 [ducats] each; sells for 0.5 [ducats] (x0.85 for you, over the lot)", read off the picture.
 const TRADE_PRICE_W: f32 = 340.0;
 
+/// Ticket #489 (version 0.09.9): a founding door, greyed with the refusal on its hover where the
+/// order would be refused -- fewer than four chosen to found with.
+#[allow(clippy::too_many_arguments)]
+fn found_door(ui: &mut Ui, game: &Game, pending: &[Order], order: Order, body: BodyId, slot: u32, label: &str, actions: &mut Vec<Action>) {
+    let check = game.check_order(Seat(0), pending, &order);
+    let resp = ui.add_enabled_ui(check.is_ok(), |ui| found_button(ui, &game.slot_yields(body, slot), label)).inner;
+    let resp = match &check {
+        Err(e) => rule_tip(resp, refusal_hover(&e.0, None)),
+        Ok(_) => resp,
+    };
+    if resp.clicked() {
+        actions.push(Action::Place(order));
+    }
+}
+
 fn found_button(ui: &mut Ui, yields: &dying_earth_engine::SlotYields, label: &str) -> egui::Response {
     ui.scope_builder(egui::UiBuilder::new().sense(egui::Sense::click()), |ui| {
         let resp = ui.response();
@@ -3834,7 +3849,8 @@ A Warship on Blockade shuts the one orbit it sits in and no other: a station's r
                 ui.label(RichText::new(format!("{}: free. Founded by a Colony Ship in that orbit; {} Fuel to reach.", game.station_name(body, slot), figure(game.orbit_change_cost(Seat(0), body, Orbit::Low, Orbit::Slot(slot))))).weak());
                 continue;
             }
-            cost_button(ui, game, &session.pending, Order::BuildStation { body, slot }, &format!("Build {} here", game.station_name(body, slot)), actions);
+            // Ticket #489 (version 0.09.9): its four from the source with the most to spare.
+            cost_button(ui, game, &session.pending, game.station_order(Seat(0), body, slot, &session.pending), &format!("Build {} here", game.station_name(body, slot)), actions);
         }
     }
     ui.label(RichText::new("A station holds a Shipyard, Habitats, Observatories, Solar Arrays and a Trade Post. Ships are built only at a Shipyard.").weak());
@@ -5250,9 +5266,9 @@ fn order_text(game: &Game, o: &Order) -> String {
         Order::Sell { resource, amount } => format!("Sell {} {} for {} Ducats", amount, resource.name(), -game.order_cost(Seat(0), o).ducats),
         Order::BuildFacilityWithDucats { state, kind } => format!("Build {} in {} for Ducats", kind.name(), game.tables.state(*state).name),
         Order::BuildModuleWithDucats { colony, kind } => format!("Build {} at {} for Ducats", kind.name(), game.place_name(Place::Colony(*colony))),
-        Order::BuildStation { body, slot } => format!("Build {}", game.slot_place_name(*body, *slot)),
+        Order::BuildStation { body, slot, .. } => format!("Build {}", game.slot_place_name(*body, *slot)),
         // Ticket #442 (version 0.09.6).
-        Order::BuildColony { body, slot } => format!("Build a Colony at {} on {}", game.tables.body(*body).slots[*slot as usize].name, game.tables.body(*body).name),
+        Order::BuildColony { body, slot, .. } => format!("Build a Colony at {} on {}", game.tables.body(*body).slots[*slot as usize].name, game.tables.body(*body).name),
         Order::SendDown { from, to, colonists } => format!("Send {} down from {} to {}", colonists_word(*colonists), game.place_name(Place::Colony(*from)), game.place_name(Place::Colony(*to))),
         Order::BuildArchive { colony } => format!("Build the Archive at {}", game.place_name(Place::Colony(*colony))),
         Order::SetMaxStanding { target: Some(p) } => format!("Spend your whole Allotment on {}, every turn", game.place_name(*p)),
@@ -5886,8 +5902,10 @@ fn attack_hover(ctx: &egui::Context, game: &Game, place: Place, name: &str, atta
 /// Ticket #332 (version 0.09.0): `widgets` is the build's Widget figure, drawn after the price as
 /// `8 [cog]` -- the second half of what a build costs, on the face beside the first -- and nought
 /// for an order that builds nothing.
-fn priced_button(ui: &mut Ui, enabled: bool, label: &str, cost: &dying_earth_engine::Cost, widgets: u32) -> egui::Response {
-    let parts: Vec<(&str, f64)> = [("materials", cost.materials), ("fuel", cost.fuel), ("energy", cost.energy), ("influence", cost.influence as f64), ("ducats", cost.ducats), ("widgets", widgets as f64)]
+/// Ticket #489 (version 0.09.9): `colonists` are the people a founding takes, drawn last in the
+/// price behind the population glyph.
+fn priced_button(ui: &mut Ui, enabled: bool, label: &str, cost: &dying_earth_engine::Cost, widgets: u32, colonists: u32) -> egui::Response {
+    let parts: Vec<(&str, f64)> = [("materials", cost.materials), ("fuel", cost.fuel), ("energy", cost.energy), ("influence", cost.influence as f64), ("ducats", cost.ducats), ("widgets", widgets as f64), ("population", colonists as f64)]
         .into_iter()
         .filter(|(_, n)| *n > 0.0)
         .collect();
@@ -6278,7 +6296,7 @@ fn orders_button(ui: &mut Ui, game: &Game, pending: &[Order], orders: Vec<Order>
         }
     }
     let ok = !able.is_empty();
-    let mut resp = priced_button(ui, ok, label, &cost, 0);
+    let mut resp = priced_button(ui, ok, label, &cost, 0, 0);
     let text = if ok { hover } else { Some(refusal_hover(refusal.as_deref().unwrap_or("Nothing here can take the order."), hover.as_deref())) };
     if let Some(text) = text {
         resp = rule_tip(resp, text);
@@ -6296,7 +6314,9 @@ fn cost_button_with_hover(ui: &mut Ui, game: &Game, pending: &[Order], order: Or
     // Ticket #332 (version 0.09.0): the Widget figure on the face after the price, and the hover's
     // first line the Materials, the Widgets and the estimate at this place's rate behind its queue.
     let widgets = build_item_of(game, &order).filter(|(_, _, ducats)| !ducats).map(|(place, item, _)| game.build_widgets_at(Seat(0), place, item)).unwrap_or(0);
-    let mut resp = priced_button(ui, check.is_ok(), label, &cost, widgets);
+    // Ticket #489 (version 0.09.9): a station or a station-built Colony takes four people too.
+    let founders = if matches!(order, Order::BuildStation { .. } | Order::BuildColony { .. }) { game.tables.emigrants.found_with } else { 0 };
+    let mut resp = priced_button(ui, check.is_ok(), label, &cost, widgets, founders);
     let ready = build_words(game, &order);
     let whole = match (&ready, &hover) {
         (Some(r), Some(h)) => Some(format!("{r}.\nOnce it stands: {h}")),
@@ -7812,9 +7832,7 @@ fn pioneers_block(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, act
             // two Ship doors, the site's yields in glyphs, at the designer's word.
             let order = Order::SendToAntarctica { state: sid, n, into: UnloadTarget::Slot(BodyId::Earth, slot) };
             let label = format!("Send {n} to {} by sea", game.tables.body(BodyId::Earth).slots[slot as usize].name);
-            if found_button(ui, &game.slot_yields(BodyId::Earth, slot), &label).clicked() {
-                actions.push(Action::Place(order));
-            }
+            found_door(ui, game, &session.pending, order, BodyId::Earth, slot, &label, actions);
         }
         // Ticket #204 (version 0.08.1): capped at the room there. A sea crossing checks no room
         // at the order -- it lands `min(n, room)` a turn later and sends the surplus home with a
@@ -8331,14 +8349,14 @@ fn slot_panel(ui: &mut Ui, session: &Session, game: &Game, body: BodyId, slot: u
         // four yields are drawn under every slot on the Body view already, but the moment of the
         // DECISION said nothing about them. In glyphs, at the designer's word -- each figure's word
         // heads its multiplier, which is the form the one glyph rule reads (ticket #132).
-        if found_button(ui, &game.slot_yields(body, slot), &format!("Found a Colony here with {} from {}", colonists_word(k), game.ship_name(s))).clicked() {
-            actions.push(Action::Place(order));
-        }
+        found_door(ui, game, &session.pending, order, body, slot, &format!("Found a Colony here with {} from {}", colonists_word(k), game.ship_name(s)), actions);
     }
     // Ticket #442 (version 0.09.6): built from a station of yours over this Body, for the station's
-    // Materials, opening with nobody; greyed with the reason where there is no such station.
-    if !session.spectator && body != BodyId::Earth && game.colonies.iter().any(|c| c.in_orbit && c.body == body && c.control.director() == Some(Seat(0))) {
-        cost_button(ui, game, &session.pending, Order::BuildColony { body, slot }, "Build a Colony here from your station", actions);
+    // Materials; greyed with the reason where the station cannot spare its four (ticket #489).
+    if !session.spectator && body != BodyId::Earth
+        && let Some(order) = game.colony_order(Seat(0), body, slot, &session.pending)
+    {
+        cost_button(ui, game, &session.pending, order, "Build a Colony here from your station", actions);
     }
 }
 
@@ -8923,9 +8941,7 @@ fn ship_cargo_block(ui: &mut Ui, session: &Session, game: &Game, s: &Ship, body:
                 let into = UnloadTarget::Slot(body, slot);
                 let order = Order::Unload { ship: s.id, colonists: k, army: s.army.is_some(), into };
                 let label = format!("Found a Colony at {} with {}", game.tables.body(body).slots[slot as usize].name, k);
-                if found_button(ui, &game.slot_yields(body, slot), &label).clicked() {
-                    actions.push(Action::Place(order));
-                }
+                found_door(ui, game, &session.pending, order, body, slot, &label, actions);
             }
             // Ticket #442 (version 0.09.6): a station FOUNDED from the empty ring the Ship sits in --
             // at Venus the one way to a station -- for the Colonists aboard, no Materials.
@@ -9123,7 +9139,7 @@ fn ship_weapons_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut Vi
 fn ducat_button(ui: &mut Ui, game: &Game, session: &Session, verb: &str, ducats: f64, order: &Order) -> egui::Response {
     let ok = game.check_order(Seat(0), &session.pending, order);
     let mut resp = if ducats > 0.0 {
-        priced_button(ui, ok.is_ok(), verb, &dying_earth_engine::Cost { ducats, ..Default::default() }, 0)
+        priced_button(ui, ok.is_ok(), verb, &dying_earth_engine::Cost { ducats, ..Default::default() }, 0, 0)
     } else {
         ui.add_enabled(ok.is_ok(), egui::Button::new(format!("{verb} 0 Ducats")))
     };

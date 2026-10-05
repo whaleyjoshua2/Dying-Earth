@@ -2430,16 +2430,98 @@ impl Game {
     }
 
     /// Ticket #141 (version 0.07.3): how many of a Nation State's waiting Emigrants the pending
-    /// orders already send away, by sea or by lift, so the same people are never ordered twice.
+    /// orders already send away, by sea or by lift, so the same people are never ordered twice;
+    /// since ticket #489 (version 0.09.9), or to a station built over Earth.
     pub fn emigrants_leaving(&self, pending: &[crate::orders::Order], state: StateId) -> u32 {
         use crate::orders::Order;
         pending
             .iter()
             .map(|o| match o {
                 Order::SendToAntarctica { state: s, n, .. } | Order::LiftToStation { state: s, n, .. } if *s == state => *n,
+                // Ticket #489 (version 0.09.9): a station over Earth takes its four from here.
+                Order::BuildStation { from: crate::orders::LoadSource::State(s), .. } if *s == state => self.tables.emigrants.found_with,
                 _ => 0,
             })
             .sum()
+    }
+
+    /// Ticket #489 (version 0.09.9): where a station the seat builds over `body` would take its four
+    /// from, given the turn's other orders: the source with the most to spare, or None.
+    pub fn station_founders(&self, seat: Seat, body: BodyId, pending: &[crate::orders::Order]) -> Option<crate::orders::LoadSource> {
+        self.station_sources(seat, body).into_iter().map(|f| (self.founders_spare(f, pending), f)).filter(|(n, _)| *n >= self.tables.emigrants.found_with).max_by_key(|(n, _)| *n).map(|(_, f)| f)
+    }
+
+    /// Ticket #489: the station a ground Colony built at `body` would take its four from, or None.
+    pub fn colony_founders(&self, seat: Seat, body: BodyId, pending: &[crate::orders::Order]) -> Option<ColonyId> {
+        use crate::orders::LoadSource;
+        self.colonies
+            .iter()
+            .filter(|c| c.in_orbit && c.body == body && c.control.director() == Some(seat) && self.starved_by(c.id).is_none())
+            .map(|c| (self.founders_spare(LoadSource::Colony(c.id), pending), c.id))
+            .filter(|(n, _)| *n >= self.tables.emigrants.found_with)
+            .max_by_key(|(n, _)| *n)
+            .map(|(_, c)| c)
+    }
+
+    /// Ticket #489: every place that may give a station over `body` its four, enough or not: over
+    /// Earth a Region the seat directs with a working Launch Site, elsewhere a ground Colony of the
+    /// seat's there.
+    pub fn station_sources(&self, seat: Seat, body: BodyId) -> Vec<crate::orders::LoadSource> {
+        use crate::orders::LoadSource;
+        if body == BodyId::Earth {
+            self.directed_states(seat).into_iter().filter(|s| self.state(*s).facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working())).map(LoadSource::State).collect()
+        } else {
+            self.colonies.iter().filter(|c| !c.in_orbit && c.body == body && c.control.director() == Some(seat)).map(|c| LoadSource::Colony(c.id)).collect()
+        }
+    }
+
+    /// Ticket #489: the order to build a station over `body` in `slot`, its four from the best
+    /// source. Where no source has four the order names the one with the most, so the check says
+    /// what is short; where there is none at all it names any Region, and the check refuses it for
+    /// the missing Launch Site or Colony before it reaches the source.
+    pub fn station_order(&self, seat: Seat, body: BodyId, slot: u32, pending: &[crate::orders::Order]) -> crate::orders::Order {
+        use crate::orders::LoadSource;
+        let from = self
+            .station_founders(seat, body, pending)
+            .or_else(|| self.station_sources(seat, body).into_iter().max_by_key(|f| self.founders_spare(*f, pending)))
+            .unwrap_or(LoadSource::State(StateId::ALL[0]));
+        crate::orders::Order::BuildStation { body, slot, from }
+    }
+
+    /// Ticket #489: the order to build a ground Colony at `body` in `slot` from a station of the
+    /// seat's over it, chosen as `station_order` chooses; None where the seat has no station there.
+    pub fn colony_order(&self, seat: Seat, body: BodyId, slot: u32, pending: &[crate::orders::Order]) -> Option<crate::orders::Order> {
+        use crate::orders::LoadSource;
+        let from = self.colony_founders(seat, body, pending).or_else(|| {
+            self.colonies.iter().filter(|c| c.in_orbit && c.body == body && c.control.director() == Some(seat)).max_by_key(|c| self.founders_spare(LoadSource::Colony(c.id), pending)).map(|c| c.id)
+        })?;
+        Some(crate::orders::Order::BuildColony { body, slot, from })
+    }
+
+    /// Ticket #489: how many a place could give to found, after what the turn's other orders already
+    /// take from it. A Region gives its waiting Pioneers. A Colony or station keeps as many as its
+    /// Modules in slots, never fewer than `found_with`, and gives the rest.
+    pub fn founders_spare(&self, from: crate::orders::LoadSource, pending: &[crate::orders::Order]) -> u32 {
+        use crate::orders::{LoadSource, Order};
+        let found = self.tables.emigrants.found_with;
+        let taken: u32 = pending
+            .iter()
+            .map(|o| match o {
+                Order::Load { colonists, from: f, .. } if *f == from => *colonists,
+                Order::BuildStation { from: f @ LoadSource::Colony(_), .. } if *f == from => found,
+                Order::BuildColony { from: c, .. } if LoadSource::Colony(*c) == from => found,
+                Order::SendDown { from: c, colonists, .. } if LoadSource::Colony(*c) == from => *colonists,
+                _ => 0,
+            })
+            .sum();
+        match from {
+            LoadSource::State(s) => self.state(s).emigrants.saturating_sub(taken + self.emigrants_leaving(pending, s)),
+            LoadSource::Colony(c) => {
+                let Some(col) = self.colony(c) else { return 0 };
+                let keep = self.module_slots_used(col).max(found);
+                col.colonists.saturating_sub(taken + keep)
+            }
+        }
     }
 
     /// The population a lift from a Launch Site takes for this many Colonists (Coach Class doubles it).

@@ -1893,6 +1893,9 @@ pub struct EmigrantsCard {
     /// Ticket #427 (version 0.09.5): Unrest off the state for each Pioneer recruited there.
     pub unrest_fall_each: f64,
     pub antarctica_turns: u32,
+    /// Ticket #489 (version 0.09.9): the Colonists every new Colony or station opens with, however
+    /// it is made, and the least a founding Unload or send by sea may carry.
+    pub found_with: u32,
 }
 
 /// Ticket #72 (version 0.05.5): the Prospectors' Venture Capital Fund: the largest share of their

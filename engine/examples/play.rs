@@ -446,7 +446,7 @@ fn parse_line(g: &Game, line: &str) -> Result<Line, String> {
                 "module-ducats" => Order::BuildModuleWithDucats { colony: colony_id(at(2)?)?, kind: pick(&ModuleKind::BUILDABLE, at(3)?)? },
                 "ship" => Order::BuildShip { site: place(at(2)?)?, kind: pick(&UnitKind::SHIPS, at(3)?)? },
                 "army" => Order::BuildArmy { place: place(at(2)?)? },
-                "station" => Order::BuildStation { body: pick(&BodyId::ALL, at(2)?)?, slot: count(at(3)?)? },
+                "station" => g.station_order(Seat(0), pick(&BodyId::ALL, at(2)?)?, count(at(3)?)?, &[]),
                 "archive" => Order::BuildArchive { colony: colony_id(at(2)?)? },
                 _ => return Err(format!("`build {what}` is not one of facility, module, ship, army, station, archive")),
             }
