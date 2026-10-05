@@ -33,7 +33,9 @@ The authority is [ticket #489](https://github.com/whaleyjoshua2/Dying-Earth/issu
 - **Which source.** A station order and a station-built Colony name the place their four come from.
   The game chooses for the player: the qualifying Region or Colony with the most to spare.
 - **People ordered once are ordered once.** A source's spare counts what the turn's other
-  orders already take from it: Loads, lifts, sends by sea or down, and other builds.
+  orders already take from it: Loads, lifts, sends by sea or down, and other builds; and a Load or
+  a Send Down counts the four a build has claimed. A founding settles the people who really left,
+  never more.
 - **When they leave.** Builders leave their source when the turn is ended and arrive as the
   place is built at Resolution, as Pioneers sent by sea do. If the place is not built (another
   Faction took the slot), they go back where they came from.

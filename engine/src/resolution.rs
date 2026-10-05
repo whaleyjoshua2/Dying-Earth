@@ -2611,8 +2611,8 @@ impl Game {
     /// Ticket #489 (version 0.09.9): the four who left to found a place that was not built go back
     /// where they came from, knowing what they knew: to the Region's waiting Pioneers, or to the
     /// Colony or station, while it is still the seat's.
-    fn send_founders_home(&mut self, seat: Seat, from: LoadSource, taught: f64) {
-        let n = self.tables.emigrants.found_with;
+    fn send_founders_home(&mut self, seat: Seat, founders: Founders) {
+        let Founders { from, n, taught } = founders;
         match from {
             LoadSource::State(s) => {
                 let blended = Game::blend(self.state(s).emigrants, self.state(s).emigrants_education, n, taught);
@@ -2636,19 +2636,19 @@ impl Game {
         let mut slots_done: Vec<(BodyId, u32)> = Vec::new();
         // Ticket #489 (version 0.09.9): which entries were built, so the rest send their four home.
         let mut built: Vec<usize> = Vec::new();
-        for (seat, body, slot, _, _) in stations.iter() {
+        for (seat, body, slot, _) in stations.iter() {
             if self.station_at(*body, *slot).is_some() || slots_done.contains(&(*body, *slot)) {
                 continue;
             }
             slots_done.push((*body, *slot));
             let mut contenders: Vec<Seat> = Vec::new();
-            for (s2, b2, sl2, _, _) in stations.iter() {
+            for (s2, b2, sl2, _) in stations.iter() {
                 if b2 == body && sl2 == slot && !contenders.contains(s2) {
                     contenders.push(*s2);
                 }
             }
             let seat = &if contenders.len() > 1 { self.tiebreak_at_body(*body, &contenders) } else { *seat };
-            let Some(entry) = stations.iter().position(|(s2, b2, sl2, _, _)| s2 == seat && b2 == body && sl2 == slot) else { continue };
+            let Some(entry) = stations.iter().position(|(s2, b2, sl2, _)| s2 == seat && b2 == body && sl2 == slot) else { continue };
             built.push(entry);
             let id = ColonyId(self.fresh_id());
             // Ticket #164 (version 0.07.5): a station is founded with its Core Module, so it can take
@@ -2656,7 +2656,7 @@ impl Game {
             // built out of an allowance it no longer has.
             self.colonies.push(Colony { id, body: *body, slot: *slot, control: Control::Controlled(*seat), modules: vec![Module::new(ModuleKind::Core)], colonists: 0, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: self.turn, in_orbit: true });
             // Ticket #489 (version 0.09.9): and its four, who left their source at End Turn.
-            self.settle_people(id, self.tables.emigrants.found_with, stations[entry].4);
+            self.settle_people(id, stations[entry].3.n, stations[entry].3.taught);
             let line = format!("{} built {}.", self.seat_name(*seat), self.place_name(Place::Colony(id)));
             self.log(line);
             // Ticket #419 (version 0.09.4): and a station built, by half a point.
@@ -2668,22 +2668,22 @@ impl Game {
             );
             self.report_line_of(*seat, LineKind::YourBuild, LineKind::BuildComplete, Some(ReportPlace::Colony(id)), text);
         }
-        for (i, (seat, _, _, from, taught)) in stations.iter().enumerate() {
+        for (i, (seat, _, _, founders)) in stations.iter().enumerate() {
             if !built.contains(&i) {
-                self.send_founders_home(*seat, *from, *taught);
+                self.send_founders_home(*seat, *founders);
             }
         }
         // Ticket #442 (version 0.09.6): ground Colonies built from a station, opening with a Core;
         // the first order for a slot takes it. Ticket #489 (version 0.09.9): with the station's
         // four, who go back up if the slot was taken first.
-        for (seat, body, slot, from, taught) in std::mem::take(&mut self.pending.colony_builds) {
+        for (seat, body, slot, founders) in std::mem::take(&mut self.pending.colony_builds) {
             if !self.free_slots_on(body).contains(&slot) {
-                self.send_founders_home(seat, LoadSource::Colony(from), taught);
+                self.send_founders_home(seat, founders);
                 continue;
             }
             let id = ColonyId(self.fresh_id());
             self.colonies.push(Colony { id, body, slot, control: Control::Controlled(seat), modules: vec![Module::new(ModuleKind::Core)], colonists: 0, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: self.turn, in_orbit: false });
-            self.settle_people(id, self.tables.emigrants.found_with, taught);
+            self.settle_people(id, founders.n, founders.taught);
             let line = format!("{} built {}.", self.seat_name(seat), self.place_name(Place::Colony(id)));
             self.log(line);
             let text = self.say("colony_built", &[("faction", self.seat_name(seat)), ("colony", self.place_name(Place::Colony(id)))]);
@@ -2837,6 +2837,8 @@ impl Game {
                             let n = colonists.min(self.ship(ship).map(|s| s.colonists).unwrap_or(0));
                             // Ticket #489 (version 0.09.9): four, or no founding.
                             if n < self.tables.emigrants.found_with {
+                                let line = format!("{} could not found at {}: {} Colonists aboard, {} wanted.", self.seat_name(seat), self.tables.body(b).name, n, self.tables.emigrants.found_with);
+                                self.log(line);
                                 continue;
                             }
                             let id = ColonyId(self.fresh_id());
@@ -2922,6 +2924,8 @@ impl Game {
                             let n = colonists.min(self.ship(ship).map(|s| s.colonists).unwrap_or(0));
                             // Ticket #489 (version 0.09.9): four, or no founding.
                             if n < self.tables.emigrants.found_with {
+                                let line = format!("{} could not found at {}: {} Colonists aboard, {} wanted.", self.seat_name(seat), self.tables.body(b).name, n, self.tables.emigrants.found_with);
+                                self.log(line);
                                 continue;
                             }
                             let id = ColonyId(self.fresh_id());

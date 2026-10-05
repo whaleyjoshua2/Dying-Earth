@@ -6315,7 +6315,7 @@ fn cost_button_with_hover(ui: &mut Ui, game: &Game, pending: &[Order], order: Or
     // first line the Materials, the Widgets and the estimate at this place's rate behind its queue.
     let widgets = build_item_of(game, &order).filter(|(_, _, ducats)| !ducats).map(|(place, item, _)| game.build_widgets_at(Seat(0), place, item)).unwrap_or(0);
     // Ticket #489 (version 0.09.9): a station or a station-built Colony takes four people too.
-    let founders = if matches!(order, Order::BuildStation { .. } | Order::BuildColony { .. }) { game.tables.emigrants.found_with } else { 0 };
+    let founders = game.order_founders(&order);
     let mut resp = priced_button(ui, check.is_ok(), label, &cost, widgets, founders);
     let ready = build_words(game, &order);
     let whole = match (&ready, &hover) {

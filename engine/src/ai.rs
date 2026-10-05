@@ -2630,7 +2630,7 @@ impl Game {
             // no room anywhere, recruited nobody, and so could never build the station that is the
             // room: measured, the Arkwrights starting with two waiting won 1 game in 80.
             let station_over_earth = self.colonies.iter().any(|c| c.in_orbit && c.body == BodyId::Earth && c.control.director() == Some(seat));
-            let to_build = if !station_over_earth && !self.buildable_orbital_slots(BodyId::Earth).is_empty() { self.tables.emigrants.found_with } else { 0 };
+            let to_build = if !station_over_earth && !self.buildable_orbital_slots(BodyId::Earth).is_empty() && !self.station_sources(seat, BodyId::Earth).is_empty() { self.tables.emigrants.found_with } else { 0 };
             let want = if has_ship_or_yard { capacity * 2 } else { 0 } + if self.antarctica_open { capacity } else { 0 } + room_off_earth + to_build;
             if per > 0 && waiting < want {
                 // Ticket #427 (version 0.09.5): the cap is per state now, so the seat recruits from as

@@ -20106,3 +20106,43 @@ fn the_ai_with_no_station_recruits_the_four_a_station_takes() {
     let orders = g.ai_orders(ark);
     assert!(orders.iter().any(|o| matches!(o, Order::BuildEmigrants { .. })), "it recruits: {orders:?}");
 }
+
+/// Ticket #489 (the review): people a build has claimed this turn are not loaded or sent down again.
+#[test]
+fn people_a_build_claims_are_not_ordered_twice() {
+    let mut g = game();
+    g.seats[0].stockpile.materials = 300.0;
+    let sid = StateId::EastAsia;
+    g.state_mut(sid).emigrants = 4;
+    let build = Order::BuildStation { body: BodyId::Earth, slot: 3, from: LoadSource::State(sid) };
+    assert!(g.check_order(Seat(0), &[], &build).is_ok());
+    let ship = ship_in(&mut g, Seat(0), UnitKind::ColonyShip, BodyId::Earth, None, Stance::Hold);
+    let load = Order::Load { ship, colonists: 4, from: LoadSource::State(sid), army: None };
+    assert!(g.check_order(Seat(0), &[], &load).is_ok(), "the premise: four to load alone");
+    assert!(g.check_order(Seat(0), std::slice::from_ref(&build), &load).is_err(), "the station has them");
+    // From a station: a Colony built from it claims four, so a Send Down of the rest is short.
+    let up = colony(&mut g, Seat(0), BodyId::Moon, &[], 8);
+    g.colony_mut(up).unwrap().in_orbit = true;
+    g.colony_mut(up).unwrap().slot = 0;
+    let down = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Habitat], 0);
+    let slot = g.free_slots_on(BodyId::Moon)[0];
+    let found = Order::BuildColony { body: BodyId::Moon, slot, from: up };
+    let send = Order::SendDown { from: up, to: down, colonists: 5 };
+    assert!(g.check_order(Seat(0), &[], &send).is_ok(), "the premise: five to send alone");
+    assert!(g.check_order(Seat(0), std::slice::from_ref(&found), &send).is_err(), "four of the eight are claimed");
+}
+
+/// Ticket #489 (the review): a founding settles the people who really left, never more. A build
+/// committed with two waiting (the check would refuse it; nothing here asks it) makes nobody.
+#[test]
+fn a_founding_settles_only_the_people_who_left() {
+    let mut g = game();
+    g.seats[0].stockpile.materials = 300.0;
+    let sid = StateId::EastAsia;
+    g.state_mut(sid).emigrants = 2;
+    let before: u32 = g.colonies.iter().map(|c| c.colonists).sum::<u32>() + g.state(sid).emigrants;
+    g.commit_orders(Seat(0), &[Order::BuildStation { body: BodyId::Earth, slot: 3, from: LoadSource::State(sid) }]);
+    g.resolution_phase();
+    let after: u32 = g.colonies.iter().map(|c| c.colonists).sum::<u32>() + g.state(sid).emigrants;
+    assert!(after <= before, "people made from nothing: {before} before, {after} after");
+}

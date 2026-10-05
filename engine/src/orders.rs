@@ -301,6 +301,16 @@ fn fail<T>(msg: impl Into<String>) -> Result<T, OrderError> {
     Err(OrderError(msg.into()))
 }
 
+/// Ticket #489 (version 0.09.9): the people who left a place at End Turn to found a station or a
+/// Colony -- where from, how many really left, and what they know -- so the founding settles that
+/// many and a founding that fails sends that many home.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct Founders {
+    pub from: LoadSource,
+    pub n: u32,
+    pub taught: f64,
+}
+
 /// Things committed at End Turn that act later in Resolution.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Pending {
@@ -322,11 +332,11 @@ pub struct Pending {
     pub cargo: Vec<(Seat, Order)>,
     /// Ticket #46: stations ordered this turn. Ticket #489 (version 0.09.9): with where their four
     /// came from and what they know, to go home if the station is not built.
-    pub stations: Vec<(Seat, BodyId, u32, LoadSource, f64)>,
+    pub stations: Vec<(Seat, BodyId, u32, Founders)>,
     /// Ticket #442 (version 0.09.6): ground Colonies built from a station this turn, and Colonists
     /// sent down.
     #[serde(default)]
-    pub colony_builds: Vec<(Seat, BodyId, u32, ColonyId, f64)>,
+    pub colony_builds: Vec<(Seat, BodyId, u32, Founders)>,
     #[serde(default)]
     pub send_downs: Vec<(Seat, ColonyId, ColonyId, u32)>,
     /// Ticket #52: Relief orders paid this turn, one entry per point.
@@ -486,6 +496,22 @@ impl Game {
             UnloadTarget::Slot(..) | UnloadTarget::Ring(..) => self.tables.module(ModuleKind::Core).holds_colonists,
         };
         s.colonists.min(room)
+    }
+
+    /// Ticket #489 (version 0.09.9): the four leave their place at End Turn, as many as are there.
+    fn send_founders(&mut self, from: LoadSource) -> Founders {
+        let want = self.tables.emigrants.found_with;
+        let (n, taught) = match from {
+            LoadSource::State(s) => {
+                let n = want.min(self.state(s).emigrants);
+                (n, self.take_emigrants(s, n))
+            }
+            LoadSource::Colony(c) => {
+                let n = want.min(self.colony(c).map(|col| col.colonists).unwrap_or(0));
+                (n, self.take_colonists(c, n))
+            }
+        };
+        Founders { from, n, taught }
     }
 
     /// Ticket #489 (version 0.09.9): refused where a place cannot give its four, saying what is
@@ -1097,7 +1123,7 @@ impl Game {
                 }
                 // Ticket #489 (version 0.09.9): and four to send up, from a place that may send them.
                 if !self.station_sources(seat, *body).contains(from) {
-                    return fail("its Colonists must come from a Region of yours with a working Launch Site, or a Colony of yours below");
+                    return fail("its four come from a Launch Site Region or a Colony below");
                 }
                 self.founders_short(*from, pending)?;
                 Ok(cost)
@@ -1140,8 +1166,10 @@ impl Game {
                 if *colonists == 0 {
                     return fail("nobody to send");
                 }
-                if up.colonists < *colonists {
-                    return fail(format!("only {} Colonists aboard", up.colonists));
+                // Ticket #489 (version 0.09.9): less any a Colony built from it this turn takes.
+                let aboard = up.colonists.saturating_sub(self.founders_claimed(pending, LoadSource::Colony(*from)));
+                if aboard < *colonists {
+                    return fail(format!("only {aboard} Colonists aboard"));
                 }
                 if self.starved_by(*from).is_some() {
                     return fail("the station is under Blockade");
@@ -1897,8 +1925,10 @@ impl Game {
                             }
                             // Ticket #73: a Launch Site lifts only the Emigrants waiting there; the
                             // population was paid when they mustered.
-                            if self.state(*st).emigrants < *colonists {
-                                return fail(format!("only {} Pioneers are waiting there", self.state(*st).emigrants));
+                            // Ticket #489 (version 0.09.9): less any a station built this turn takes.
+                            let waiting = self.state(*st).emigrants.saturating_sub(self.founders_claimed(pending, *from));
+                            if waiting < *colonists {
+                                return fail(format!("only {waiting} Pioneers are waiting there"));
                             }
                             // Ticket #357 (version 0.09.1): a lift from a Launch Site reaches ANY
                             // orbit of Earth, at the designer's word, where ticket #335 held it to
@@ -1915,7 +1945,8 @@ impl Game {
                             if !self.ship_may_touch(s, col) {
                                 return fail(self.move_first(body, self.colony_orbit(col), "load", &format!("{} is reached from there alone.", self.place_name(Place::Colony(*c)))));
                             }
-                            if col.colonists < *colonists {
+                            // Ticket #489 (version 0.09.9): less any a build this turn takes.
+                            if col.colonists.saturating_sub(self.founders_claimed(pending, *from)) < *colonists {
                                 return fail("not enough Colonists there");
                             }
                         }
@@ -2660,17 +2691,13 @@ impl Game {
                 // Ticket #489 (version 0.09.9): the four leave their source now, as Pioneers sent by
                 // sea do, and arrive when the station is built at the Resolution.
                 Order::BuildStation { body, slot, from } => {
-                    let n = self.tables.emigrants.found_with;
-                    let taught = match from {
-                        LoadSource::State(s) => self.take_emigrants(*s, n),
-                        LoadSource::Colony(c) => self.take_colonists(*c, n),
-                    };
-                    self.pending.stations.push((seat, *body, *slot, *from, taught));
+                    let founders = self.send_founders(*from);
+                    self.pending.stations.push((seat, *body, *slot, founders));
                 }
                 // Ticket #442 (version 0.09.6). Ticket #489: and its four leave the station.
                 Order::BuildColony { body, slot, from } => {
-                    let taught = self.take_colonists(*from, self.tables.emigrants.found_with);
-                    self.pending.colony_builds.push((seat, *body, *slot, *from, taught));
+                    let founders = self.send_founders(LoadSource::Colony(*from));
+                    self.pending.colony_builds.push((seat, *body, *slot, founders));
                 }
                 Order::SendDown { from, to, colonists } => self.pending.send_downs.push((seat, *from, *to, *colonists)),
                 Order::BuildArchive { colony } => {

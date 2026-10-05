@@ -2463,6 +2463,13 @@ impl Game {
             .map(|(_, c)| c)
     }
 
+    /// Ticket #489 (the review): the people an order takes to found a place, shown in its price:
+    /// four for a station or a station-built Colony, nought for every other order.
+    pub fn order_founders(&self, order: &crate::orders::Order) -> u32 {
+        use crate::orders::Order;
+        if matches!(order, Order::BuildStation { .. } | Order::BuildColony { .. }) { self.tables.emigrants.found_with } else { 0 }
+    }
+
     /// Ticket #489: every place that may give a station over `body` its four, enough or not: over
     /// Earth a Region the seat directs with a working Launch Site, elsewhere a ground Colony of the
     /// seat's there.
@@ -2498,6 +2505,14 @@ impl Game {
         Some(crate::orders::Order::BuildColony { body, slot, from })
     }
 
+    /// Ticket #489 (the review): the people the turn's builds already take from a place, four for
+    /// each station or Colony it founds, so a Load or a Send Down never orders them a second time.
+    pub fn founders_claimed(&self, pending: &[crate::orders::Order], from: crate::orders::LoadSource) -> u32 {
+        use crate::orders::{LoadSource, Order};
+        let builds = pending.iter().filter(|o| matches!(o, Order::BuildStation { from: f, .. } if *f == from) || matches!(o, Order::BuildColony { from: c, .. } if LoadSource::Colony(*c) == from)).count() as u32;
+        builds * self.tables.emigrants.found_with
+    }
+
     /// Ticket #489: how many a place could give to found, after what the turn's other orders already
     /// take from it. A Region gives its waiting Pioneers. A Colony or station keeps as many as its
     /// Modules in slots, never fewer than `found_with`, and gives the rest.
@@ -2508,12 +2523,11 @@ impl Game {
             .iter()
             .map(|o| match o {
                 Order::Load { colonists, from: f, .. } if *f == from => *colonists,
-                Order::BuildStation { from: f @ LoadSource::Colony(_), .. } if *f == from => found,
-                Order::BuildColony { from: c, .. } if LoadSource::Colony(*c) == from => found,
                 Order::SendDown { from: c, colonists, .. } if LoadSource::Colony(*c) == from => *colonists,
                 _ => 0,
             })
-            .sum();
+            .sum::<u32>()
+            + if matches!(from, LoadSource::Colony(_)) { self.founders_claimed(pending, from) } else { 0 };
         match from {
             LoadSource::State(s) => self.state(s).emigrants.saturating_sub(taken + self.emigrants_leaving(pending, s)),
             LoadSource::Colony(c) => {

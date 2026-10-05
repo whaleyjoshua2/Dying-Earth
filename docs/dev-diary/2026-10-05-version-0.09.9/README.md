@@ -40,5 +40,13 @@ takes and never built one. The computer now counts the station it could build as
 At two Pioneers with the fix: 5 / 23 / 24 / 5 and 23 collapses. At four, as shipped, the fix changes
 no game: 0 / 24 / 33 / 6 and 16.
 
+**The review** (two agents, standards and spec, neither of which built it) found: a Load or Send
+Down could order people a build had already claimed, and fail quietly at the Resolution; a founding
+settled four whatever had left; the UI decided which orders take people; a long refusal; the
+computer recruiting four for a station with no Launch Site to build it from; a short founding
+skipped with no line. All six fixed, the first two with tests watched failing first. Kept: four
+from a Colony that changed hands in the turn are lost, not handed to its captor. The sweep after
+the fixes is the same to the line.
+
 **The sweep's command:** `cargo run --release -p dying-earth-engine --example sweep -- 20 --seatings
 --balance`.
