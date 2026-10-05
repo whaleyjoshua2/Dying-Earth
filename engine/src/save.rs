@@ -24,7 +24,11 @@ use std::sync::Arc;
 ///
 /// Ticket #453 (version 0.09.6): moved to **8**. Two Regions joined the board (Pakistan, the United
 /// Kingdom), so a save of fourteen has no card for two of the sixteen and three parents' figures moved.
-pub const SAVE_VERSION: u32 = 8;
+///
+/// Ticket #482 (version 0.09.8): moved to **9**. Two more Regions joined the board (Turkey, South
+/// Africa), the Region called Pakistan became Kazakhstan, and three cards' figures moved, so a save
+/// of sixteen has no card for two of the eighteen.
+pub const SAVE_VERSION: u32 = 9;
 
 /// The rules version this executable plays, named beside the file's own in a refusal.
 ///
@@ -128,7 +132,9 @@ pub const SAVE_VERSION: u32 = 8;
 /// the version, to 8, when two Regions joined the board (#453): a 0.09.5 save is refused.
 /// Ticket #469 (version 0.09.7, the closing ticket): moved to 0.09.7. `SAVE_VERSION` did not move:
 /// every field the version added reads a default from an older file, so a 0.09.6 save loads.
-pub const GAME_VERSION: &str = "0.09.7";
+/// Ticket #484 (version 0.09.8, the closing ticket): moved to 0.09.8. `SAVE_VERSION` moved once for
+/// the version, to 9, when the Regions were redrawn to eighteen (#482): a 0.09.7 save is refused.
+pub const GAME_VERSION: &str = "0.09.8";
 
 /// The game autosaves at the start of the Report phase of every third turn.
 pub const AUTOSAVE_EVERY: u32 = 3;

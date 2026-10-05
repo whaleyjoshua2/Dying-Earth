@@ -761,7 +761,7 @@ impl Game {
         // Ticket #92: a Mass Driver makes nothing itself; the card says what it does.
         if kind == ModuleKind::MassDriver {
             let md = &t.mass_driver;
-            y.detail = Some(format!("departures from here {} Fuel cheaper, never under {}; each Mine here +{} Materials", md.fuel_off, md.fuel_min, md.mine_bonus));
+            y.detail = Some(format!("departures from here {:.0}% less Fuel; each Mine here +{} Materials", md.fuel_cut * 100.0, md.mine_bonus));
         }
         // Ticket #51: the Archive draws its Energy only once it is complete; ticket #68: that is
         // standing with its Research paid in full. Until then it costs nothing to run.
@@ -1195,7 +1195,7 @@ impl Game {
     /// this place's Widgets a turn behind everything already in its queue; at least 1, and
     /// `u32::MAX` if the place makes nothing. The build buttons' "8 Widgets, 2 turns here".
     pub fn turns_to_build(&self, seat: Seat, place: Place, item: BuildItem) -> u32 {
-        let owed = self.widgets_owed(place) + self.build_widgets(seat, item) as i64;
+        let owed = self.widgets_owed(place) + self.build_widgets_at(seat, place, item) as i64;
         Self::resolutions_for(owed, self.widgets_at(place))
     }
 
@@ -1205,7 +1205,8 @@ impl Game {
     pub fn item_materials(&self, seat: Seat, place: Place, item: BuildItem) -> f64 {
         match (item, place) {
             (BuildItem::Facility(k), _) => self.facility_materials(seat, k),
-            (BuildItem::IndustryLevel, _) => self.industry_cost(seat),
+            (BuildItem::IndustryLevel, Place::State(sid)) => self.industry_cost(seat, sid),
+            (BuildItem::IndustryLevel, _) => self.tables.industry_level.materials as f64,
             (BuildItem::Module(k), Place::Colony(c)) => self.module_materials_at(seat, c, k),
             (BuildItem::Module(k), Place::State(_)) => self.module_materials(seat, k),
             (BuildItem::Unit(UnitKind::Army), _) => self.tables.unit(UnitKind::Army).materials as f64,

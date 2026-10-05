@@ -416,7 +416,11 @@ impl Game {
             parts.push("the Warhead".to_string());
         }
         if let Some(item) = item {
-            let n = self.build_widgets(seat, item);
+            // Ticket #479 (version 0.09.8): a raise's Widgets are its Region's, which rise.
+            let n = match order {
+                Order::RaiseIndustry { state } => self.industry_widgets(seat, *state),
+                _ => self.build_widgets(seat, item),
+            };
             parts.push(format!("{n} Widget{}", if n == 1 { "" } else { "s" }));
         }
         if let Order::BuildArmy { place } = order {
@@ -431,11 +435,15 @@ impl Game {
             parts.push(format!("{} people", self.tables.people_text(self.muster_population_in(seat, *state, *n))));
         }
         let tank = match order {
-            Order::Transit { ship, to, .. } => self.ship(*ship).and_then(|s| match s.at {
-                ShipAt::Body(from) => Some(self.transit_cost_for(seat, from, *to).1),
+            Order::Transit { ship, to, slot } => self.ship(*ship).and_then(|s| match s.at {
+                ShipAt::Body(from) => Some(self.transit_fuel(seat, s, from, *to, *slot)),
                 _ => None,
             }),
-            Order::ChangeOrbit { .. } => Some(self.tables.orbit_change_fuel as f64),
+            // Ticket #480 (version 0.09.8): a far orbit at either end costs the far figure.
+            Order::ChangeOrbit { ship, slot } => Some(self.ship(*ship).and_then(|s| match s.at {
+                ShipAt::Body(b) => Some(self.orbit_change_cost(seat, b, self.ship_orbit(s), Orbit::of(*slot))),
+                _ => None,
+            }).unwrap_or(self.tables.orbit_change_fuel as f64)),
             _ => None,
         };
         if let Some(fuel) = tank.filter(|f| *f > 0.0) {
@@ -483,7 +491,7 @@ impl Game {
         match order {
             // Ticket #72: the Faction's own Facility price (the Prospectors' 15% off).
             Order::BuildFacility { kind, .. } => Cost { materials: self.facility_materials(seat, *kind), ..Default::default() },
-            Order::RaiseIndustry { .. } => Cost { materials: self.industry_cost(seat), ..Default::default() },
+            Order::RaiseIndustry { state } => Cost { materials: self.industry_cost(seat, *state), ..Default::default() },
             // Ticket #51: a Faction's card may make its Modules and its Colony Ships cost less.
             // Ticket #88: and the Colony's working Mines take more off.
             Order::BuildModule { colony, kind } => Cost { materials: self.module_materials_at(seat, *colony, *kind), ..Default::default() },
@@ -1041,6 +1049,10 @@ impl Game {
                 if pending.iter().any(|o| matches!(o, Order::BuildStation { body: b, slot: s } if b == body && s == slot)) {
                     return fail("a station is already ordered there");
                 }
+                // Ticket #480 (version 0.09.8): a far orbit is reached only by Ship.
+                if self.far_slot(*body, *slot) {
+                    return fail(format!("{} is reached only by Ship: a Colony Ship in that orbit founds it", self.station_name(*body, *slot)));
+                }
                 let foothold = match body {
                     BodyId::Earth => self.directed_states(seat).iter().any(|s| self.state(*s).facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working())),
                     // Ticket #93: at a Body with no Colony Slots (Venus) a station was built from a
@@ -1501,10 +1513,6 @@ impl Game {
                 if from == *to {
                     return fail("already there");
                 }
-                // Ticket #93: no leg between Venus and the Mars system this version.
-                if !Self::leg_allowed(from, *to) {
-                    return fail("no leg runs between Venus and the Mars system; fly by Earth");
-                }
                 if s.arrived_this_turn {
                     return fail("arrived this turn; it may act next turn");
                 }
@@ -1523,7 +1531,7 @@ impl Game {
                     return fail(format!("{} has no low orbit: name one of its station orbits", self.tables.body(*to).name));
                 }
                 // Ticket #87: the leg is paid from the tank.
-                let (_, fuel) = self.transit_cost_for(seat, from, *to);
+                let fuel = self.transit_fuel(seat, s, from, *to, *slot);
                 if s.fuel < fuel {
                     return fail(format!("the tank holds {} Fuel of {}; this leg needs {}", figure(s.fuel), figure(self.tank_of(seat, s.kind)), figure(fuel)));
                 }
@@ -1552,7 +1560,7 @@ impl Game {
                 if s.arrived_this_turn {
                     return fail("arrived this turn; it may act next turn");
                 }
-                let fuel = self.tables.orbit_change_fuel as f64;
+                let fuel = self.orbit_change_cost(seat, body, self.ship_orbit(s), want);
                 if s.fuel < fuel {
                     return fail(format!("the tank holds {} Fuel; an orbit change needs {}", figure(s.fuel), figure(fuel)));
                 }
@@ -1975,7 +1983,8 @@ impl Game {
                         if *b != body {
                             return fail("that orbit is not at this Body");
                         }
-                        if body == BodyId::Earth {
+                        // Ticket #480 (version 0.09.8): save at a far orbit, which only a Ship reaches.
+                        if body == BodyId::Earth && !self.far_slot(body, *slot) {
                             return fail("over Earth a station is built from a Launch Site");
                         }
                         if s.kind != UnitKind::ColonyShip || *colonists == 0 {
@@ -2159,6 +2168,10 @@ impl Game {
                 let Some(col) = self.colony(*colony) else { return fail("no such station") };
                 if col.body != BodyId::Earth || !col.in_orbit || col.control.director() != Some(seat) {
                     return fail("that is not your station over Earth");
+                }
+                // Ticket #480 (version 0.09.8): no lift reaches a far orbit.
+                if self.far_slot(col.body, col.slot) {
+                    return fail(format!("no lift reaches {}: its people come by Colony Ship", self.station_name(col.body, col.slot)));
                 }
                 if self.slot_blockaded_against(seat, BodyId::Earth, col.slot) {
                     return fail("a rival warship blockades that station's slot");
@@ -2397,7 +2410,7 @@ impl Game {
                     self.state_mut(*state).queue.push(Build { item: BuildItem::Facility(kind), seat, widgets, done, coastal, fuel: 0.0 });
                 }
                 Order::RaiseIndustry { state } => {
-                    let widgets = self.build_widgets(seat, BuildItem::IndustryLevel);
+                    let widgets = self.industry_widgets(seat, *state);
                     self.state_mut(*state).queue.push(Build { item: BuildItem::IndustryLevel, seat, widgets, done: 0, coastal: false, fuel: 0.0 });
                 }
                 Order::BuildModule { colony, kind } | Order::BuildModuleWithDucats { colony, kind } => {
@@ -2491,7 +2504,8 @@ impl Game {
                     // Ticket #393 (version 0.09.3): and the turns as the seat was quoted them, since Nuclear
                     // Rockets read at half under Provisional Findings shortens the quote; the table-wide
                     // cost flew a turn longer than the card said.
-                    let (turns, fuel) = self.transit_cost_for(seat, from, *to);
+                    // Ticket #486 (version 0.09.8): the leg from the orbit it sits in to the orbit named.
+                    let (turns, fuel) = self.ship(*ship).map(|s| self.transit_leg(seat, s, from, *to, *slot)).unwrap_or_else(|| self.transit_cost_for(seat, from, *to));
                     let name = self.tables.body(*to).name.clone();
                     if let Some(s) = self.ship_mut(*ship) {
                         s.at = ShipAt::Transit { from, to: *to, turns_left: turns };
@@ -2502,16 +2516,26 @@ impl Game {
                         s.slot = *slot;
                     }
                     self.log(format!("{} launches {} toward {} ({} turns, {} Fuel from the tank).", self.seat_name(seat), ship, name, turns, figure(fuel)));
+                    // Ticket #481 (version 0.09.8): a loaded Colony Ship sent to the Moon before
+                    // anybody has landed there is the world's news, whoever sent it and whatever
+                    // the fog hides: it carries no place and no seat, so every seat reads it.
+                    if *to == BodyId::Moon && self.first_at(BodyId::Moon).is_none() && self.ship(*ship).is_some_and(|s| s.kind == UnitKind::ColonyShip && s.colonists > 0) {
+                        let text = self.say("moon_race_sent", &[("faction", self.seat_name(seat))]);
+                        self.report_line(LineKind::Ship, None, text);
+                    }
                 }
                 // Ticket #335 (version 0.09.0): the Fuel leaves the tank now, as a transit's does,
                 // and the Ship moves at the Resolution WITH the transits, before the Battles, so a
                 // Ship that changes orbit fights in its new one.
                 Order::ChangeOrbit { ship, slot } => {
-                    let fuel = self.tables.orbit_change_fuel as f64;
                     let body = self.ship(*ship).and_then(|s| match s.at {
                         ShipAt::Body(b) => Some(b),
                         _ => None,
                     });
+                    let fuel = match (body, self.ship(*ship)) {
+                        (Some(b), Some(s)) => self.orbit_change_cost(seat, b, self.ship_orbit(s), Orbit::of(*slot)),
+                        _ => self.tables.orbit_change_fuel as f64,
+                    };
                     if let Some(s) = self.ship_mut(*ship) {
                         s.fuel = tenth((s.fuel - fuel).max(0.0));
                     }
@@ -3131,7 +3155,7 @@ impl Game {
                         None => format!("{} slot {i}", self.tables.body(*b).name),
                     },
                     UnloadTarget::Colony(c) => place(Place::Colony(*c)),
-                    UnloadTarget::Ring(b, i) => format!("{} over {}", self.station_name(*b, *i), self.tables.body(*b).name),
+                    UnloadTarget::Ring(b, i) => self.slot_place_name(*b, *i),
                 };
                 r("unload", &[("place", where_)])
             }

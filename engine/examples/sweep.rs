@@ -11,7 +11,14 @@
 //! Ticket #430 (version 0.09.5): with `DYING_EARTH_REVEAL=1` in the environment the fog of war is
 //! lifted for every seat, so a batch can be read against the computer seeing the whole board.
 //!
-//! THE TARGET this sweep is read against, as ticket #60 restated it from #46 and #53: every seating
+//! **THE TARGET this sweep is read against, since ticket #483 (version 0.09.8), is the designer's
+//! ideal: over 80 games (twenty seeds by four seatings) about 15 wins for each Faction and about
+//! 20 collapses.** The standing cell is whatever `climate.toml` holds, which `--sinks` and
+//! `--steps` default to, so the standing command is
+//! `cargo run --release -p dying-earth-engine --example sweep -- 20 --seatings --balance`.
+//! What follows is the older target, kept as the record of how the knobs were first set.
+//!
+//! THE TARGET this sweep was first read against, as ticket #60 restated it from #46 and #53: every seating
 //! stays hot to the end -- a median end Temperature of +2.5 to +2.9 C where it does not collapse --
 //! and Collapse is a real threat but not a certainty, roughly half to three quarters of seeds
 //! collapsing with a median Collapse turn of 19 or later. The five seatings it is measured over are
@@ -75,14 +82,16 @@ fn main() {
         .find_map(|a| a.strip_prefix("--start=").map(|s| s.to_string()))
         .and_then(|s| StateId::ALL.into_iter().find(|k| format!("{k:?}").to_lowercase().starts_with(&s)))
         .unwrap_or(StateId::EastAsia);
-    let sinks = list("--sinks=", &[6.0]);
-    let steps = list("--steps=", &[90.0, 100.0, 110.0, 120.0, 130.0, 140.0]);
     // Ticket #60: the Breaks' own two figures. Every other Break figure is left where `climate.toml`
     // has it -- the Coral Die-off, Ice Sheets and the Amazon pulse are not swept here.
     let permafrosts = list("--permafrost=", &[f64::NAN]);
     let sink_cuts = list("--sink-cut=", &[f64::NAN]);
     let balance = std::env::args().any(|a| a == "--balance");
     let base = Tables::load(&default_data_dir()).expect("tables");
+    // Ticket #483 (version 0.09.8): the cell swept by default is the one the game ships, read off
+    // `climate.toml`, where a Sink of 6 and six steps of version 0.02's stood written here.
+    let sinks = list("--sinks=", &[base.climate.natural_sink]);
+    let steps = list("--steps=", &[base.climate.ppm_step]);
     // Ticket #241 (version 0.08.3): `--seatings` runs all four Factions as seat 0 in one
     // process and prints ONE win column of `4 x seeds` at the end. Version 0.08.2 ended by
     // naming this as missing: its figures were per seating, and a win column of 80 had to be
@@ -162,6 +171,8 @@ fn main() {
                         let mut temps = Vec::new();
                         let mut wins = [0u32; 4];
                         // Ticket #60: the balance counters, for the one-cell runs of the balance report.
+                        let mut industry_raises = 0u32;
+                        let (mut far_foundings, mut far_games) = (0u32, 0u32);
                         let (mut draws, mut scrubbers, mut leapfrogs, mut constabularies, mut sea_walls) = (0u32, 0u32, 0u32, 0u32, 0u32);
                         // Ticket #389 (version 0.09.3): Stadiums, beside the Constabularies they follow.
                         let mut stadiums = 0u32;
@@ -343,6 +354,9 @@ fn main() {
                             stadiums += r.stadiums;
                             nature_reserves += r.nature_reserves;
                             sea_walls += r.sea_walls_built;
+                            industry_raises += r.industry_raises;
+                            far_foundings += r.far_foundings;
+                            far_games += (r.far_foundings > 0) as u32;
                             if let Some(t) = r.first_colony_turn {
                                 first_colony.push(t);
                             }
@@ -695,6 +709,8 @@ fn main() {
                             println!("      War in ppm a game, by seat (median): [{}]; nobody's (median) {}", war.join(", "), med0(&mut war_nobody));
                             // Ticket #282 (version 0.08.5): neutral states arming.
                             println!("      Neutral states: {levies} threat episodes armed for over the batch, {neutral_holds} attacks held against");
+                            println!("      Industry Level raises completed by the Factions over the batch: {industry_raises}");
+                            println!("      Stations founded at Earth L4 or L5 over the batch: {far_foundings}, in {far_games}/{seeds} seeds");
                             println!("      Sea Walls: {sea_walls} built over the batch, {walls_standing} standing at the end, {walls_held} thresholds held");
                             println!("      Events drawn with nowhere to land over the batch: {no_target}; the Fund at or past its bar in {fund_met}/{seeds} seeds");
                             // Ticket #337 (version 0.09.0): what the eighteen cards that ask a

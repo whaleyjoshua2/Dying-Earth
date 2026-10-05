@@ -60,8 +60,17 @@ degrees_per_ppm_step = 0.5
 # they did at every step tried (13 of 20 at 330). At 270 three seatings collapse at a median turn
 # 18 to 22, cutting the game's second half; at 330 two boards finish comfortable at +2.4. No cell
 # fits every seating. THE DESIGNER MAY MOVE THIS: 270 for a hotter world, 330 for a kinder one.
-ppm_step = 300.0
-natural_sink = 6.0
+#
+# Ticket #483 (version 0.09.8): **moved, to step 330 and a Sink of 8**, at the designer's word. Four
+# Regions joined the board between 0.09.5 and 0.09.8, each with industry of its own and no parent
+# reduced to match, so the Regions alone emit 21.3 a turn at the start where they emitted 18.3, and
+# 39 of 80 games collapsed at the old cell. Fifteen cells were swept on the eighteen-Region board,
+# 80 games each (`docs/dev-diary/2026-10-04-version-0.09.8/sweeps/co2-grid.md`), against the
+# designer's ideal of about 15 wins a Faction and 20 collapses: this cell reads 17 collapses and is
+# the nearest. The dials set the collapses and not the win column: the games saved go mostly to
+# the Prospectors.
+ppm_step = 330.0
+natural_sink = 8.0
 collapse_line = 3.0
 temperature_lag_fraction = 0.5
 population_growth = 0.01

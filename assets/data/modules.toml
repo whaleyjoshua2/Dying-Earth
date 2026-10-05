@@ -84,8 +84,10 @@ produces = { resource = "ducats", amount = 2 }
 # Ticket #92 (version 0.06.0): the Mass Driver's figures; its row is the last in the file, in the
 # engine's order.
 [mass_driver]
-fuel_off = 4
-fuel_min = 1
+# Ticket #486 (version 0.09.8): a quarter off the leg, at the designer's word, where a flat 4 Fuel
+# with a floor of 1 stood: against legs priced by delta-v the flat figure erased the Moon's way home
+# and barely touched the way out.
+fuel_cut = 0.25
 mine_bonus = 1
 
 # Ticket #36 (version 0.03). Adds to its holder's Allotment and raises its Colony's standing each turn.
@@ -192,8 +194,8 @@ sun_scaled = true
 # Ticket #92 (version 0.06.0): the Mass Driver, a Module only a ground Colony on a low-gravity
 # Body (bodies.toml `low_gravity`: the Moon, Phobos, Deimos) holds, one per Colony, behind
 # `needs_tech`. While it is working, every transit the owner's Ships fly from that Body spends
-# `[mass_driver] fuel_off` less, after the Faction's and the Tech's multipliers, never below
-# `fuel_min`; and each Mine at its Colony makes `mine_bonus` more Materials, after everything.
+# `[mass_driver] fuel_cut` of its Fuel less, after the Faction's and the Tech's multipliers; and
+# each Mine at its Colony makes `mine_bonus` more Materials, after everything.
 [[module]]
 id = "mass_driver"
 name = "Mass Driver"

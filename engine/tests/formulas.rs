@@ -479,7 +479,9 @@ fn the_allotment_is_the_base_plus_each_controlled_states_value_times_the_faction
     assert_eq!(g.influence_allotment(Seat(0)), 16, "(10 + 4) x 1.15 = 16.1");
     // Ticket #53: twelve states share out the eight states' figures exactly, so the total stands.
     let total: i64 = StateId::ALL.iter().map(|s| g.tables.state(*s).influence).sum();
-    assert_eq!(total, 34, "7 + 5 + 4 + 4 + 4 + 2 + 2 + 2 + 1 + 1 + 1 + 1, as the eight totalled 34");
+    // Ticket #482 (version 0.09.8): 35. South Africa's 1 was added, at the designer's word, where
+    // every split before it shared its parent's; Nigeria's card had only the 1 to give.
+    assert_eq!(total, 35, "the eight totalled 34, shared out exactly until South Africa added 1");
 }
 
 // ---------------------------------------------------------------- #35 Ducats
@@ -575,7 +577,8 @@ fn a_station_is_built_for_materials_in_an_orbital_slot_and_holds_only_a_shipyard
     let mut g = game();
     let slots: Vec<u32> = BodyId::ALL.iter().map(|b| g.tables.body(*b).orbital_slots).collect();
     // Ticket #93 (version 0.06.0): and three over Venus.
-    assert_eq!(slots, vec![5, 2, 3, 1, 1, 3], "ticket #50: five orbital slots over Earth");
+    // Ticket #480 (version 0.09.8): seven, the last two the far orbits Earth L4 and Earth L5.
+    assert_eq!(slots, vec![7, 2, 3, 1, 1, 3], "ticket #50: five orbital slots over Earth, and two far");
     // The start (ticket #50): the Custodians' ISS, the Prospectors' Tiangong and the Archivists'
     // Axiom over Earth (bare until ticket #290, version 0.08.6, put two aboard); the Arkwrights
     // start with no station, so two slots stand free.
@@ -592,7 +595,8 @@ fn a_station_is_built_for_materials_in_an_orbital_slot_and_holds_only_a_shipyard
     assert_eq!(g.colony(iss).unwrap().modules.len(), 1, "its Core Module, and no Shipyard at the start");
     assert_eq!(g.colony(iss).unwrap().modules[0].kind, ModuleKind::Core);
     assert!(g.colony(iss).unwrap().in_orbit);
-    assert_eq!(g.free_orbital_slots(BodyId::Earth), vec![3, 4]);
+    assert_eq!(g.free_orbital_slots(BodyId::Earth), vec![3, 4, 5, 6]);
+    assert_eq!(g.buildable_orbital_slots(BodyId::Earth), vec![3, 4], "the far two are founded, not built");
     assert_eq!(g.free_slots_on(BodyId::Earth).len(), 3, "stations take no surface slot");
     // Built for 40 Materials from a state with a Launch Site (Earth) or a Colony (elsewhere); no crew.
     let build = Order::BuildStation { body: BodyId::Earth, slot: 3 };
@@ -675,22 +679,22 @@ fn phobos_and_deimos_are_small_different_bodies_one_hop_past_mars() {
     let mut g = g;
     at_window(&mut g);
     // Ticket #67 (version 0.05.5): the Hohmann flight is five turns of sixty days.
-    assert_eq!(g.transit_cost(BodyId::Earth, BodyId::Phobos), (5, 24.0));
-    assert_eq!(g.transit_cost(BodyId::Moon, BodyId::Deimos), (5, 24.0));
-    assert_eq!(g.transit_cost(BodyId::Mars, BodyId::Phobos), (1, 2.0));
-    assert_eq!(g.transit_cost(BodyId::Deimos, BodyId::Mars), (1, 2.0));
-    assert_eq!(g.transit_cost(BodyId::Phobos, BodyId::Deimos), (1, 1.0));
-    assert_eq!(g.transit_cost(BodyId::Earth, BodyId::Mars), (5, 20.0));
-    assert_eq!(g.transit_cost(BodyId::Moon, BodyId::Mars), (5, 20.0));
-    assert_eq!(g.transit_cost(BodyId::Earth, BodyId::Moon), (1, 6.0));
-    // The flight home reads the same cards, at its own window, which is not the same turn: the
-    // moons' 24 against Mars's 20, both stretched by however far off that window the best turn in
-    // the game's span falls. The window arithmetic itself is pinned by the ticket #57 tests.
+    assert_eq!(g.transit_cost(BodyId::Earth, BodyId::Phobos), (5, 19.7));
+    assert_eq!(g.transit_cost(BodyId::Moon, BodyId::Deimos), (5, 10.8));
+    assert_eq!(g.transit_cost(BodyId::Mars, BodyId::Phobos), (1, 4.8));
+    assert_eq!(g.transit_cost(BodyId::Deimos, BodyId::Mars), (1, 2.8));
+    assert_eq!(g.transit_cost(BodyId::Phobos, BodyId::Deimos), (1, 3.0));
+    assert_eq!(g.transit_cost(BodyId::Earth, BodyId::Mars), (5, 18.1));
+    assert_eq!(g.transit_cost(BodyId::Moon, BodyId::Mars), (5, 9.0));
+    assert_eq!(g.transit_cost(BodyId::Earth, BodyId::Moon), (1, 15.7));
+    // The flight home is priced for itself (ticket #486, version 0.09.8), at its own window, which
+    // is not the same turn: Earth's air brakes the arrival, and Deimos, high in Mars's well, is
+    // cheaper to leave than Mars. The window arithmetic itself is pinned by the ticket #57 tests.
     at_return_window(&mut g);
     let (moon_turns, from_deimos) = g.transit_cost(BodyId::Deimos, BodyId::Earth);
     let (mars_turns, from_mars) = g.transit_cost(BodyId::Mars, BodyId::Moon);
     assert_eq!(moon_turns, mars_turns, "one flight home, whichever rock it leaves from");
-    assert!(from_deimos > from_mars, "Deimos reads the dearer card: {from_deimos} Fuel against {from_mars}");
+    assert!(from_deimos < from_mars, "Deimos is the cheaper to leave: {from_deimos} Fuel against {from_mars}");
     // Their Colonists are off Earth.
     bare_stations(&mut g);
     colony(&mut g, Seat(0), BodyId::Phobos, &[ModuleKind::Habitat], 4);
@@ -729,7 +733,7 @@ fn antarctica_is_three_colony_slots_on_earth_whose_colonists_stay_on_earth_and_w
     // Ticket #56 re-cut them: abundant ore and Fuel under the ice.
     assert_eq!((earth.mine_yield, earth.generator_yield, earth.refinery_yield, earth.research_yield), (1.75, 0.75, 2.0, 1.0));
     assert_eq!(g.free_slots_on(BodyId::Earth).len(), 3);
-    assert_eq!(StateId::ALL.len(), 16, "sixteen Regions since ticket #453, and Antarctica is none of them");
+    assert_eq!(StateId::ALL.len(), 18, "eighteen Regions since ticket #482, and Antarctica is none of them");
     let m = g.tables.faction(FactionKind::Custodians).emissions_multiplier;
     let before = g.emissions_now();
     bare_stations(&mut g);
@@ -1340,10 +1344,10 @@ fn tech_efficient_transit_cuts_fuel() {
     let mut g = game();
     // Ticket #57: on the window a crossing pays the card's Fuel, and Efficient Transit comes after.
     at_window(&mut g);
-    assert_eq!(g.transit_cost(BodyId::Earth, BodyId::Mars).1, 20.0);
+    assert_eq!(g.transit_cost(BodyId::Earth, BodyId::Mars).1, 18.1);
     with_tech(&mut g, TechId::EfficientTransit);
-    assert_eq!(g.transit_cost(BodyId::Earth, BodyId::Mars).1, 12.0);
-    assert_eq!(g.transit_cost(BodyId::Moon, BodyId::Earth).1, 3.6, "6 x 0.6, to the tenth"); // Ticket #387: where 3 was floored
+    assert_eq!(g.transit_cost(BodyId::Earth, BodyId::Mars).1, 10.9);
+    assert_eq!(g.transit_cost(BodyId::Moon, BodyId::Earth).1, 2.2, "3.7 home x 0.6, to the tenth"); // Ticket #387: where 3 was floored
 }
 
 #[test]
@@ -1597,7 +1601,7 @@ fn every_neutral_state_starts_with_its_start_facilities() {
         // Ticket #332 (version 0.09.0): and a Mine beside every start Factory, on top of the count.
         let mines = card.start_facilities.iter().filter(|k| **k == FacilityKind::Mine).count() as u32;
         // Ticket #453 (version 0.09.6): Pakistan's Mine stands alone, at the designer's word.
-        let lone = u32::from(sid == StateId::Pakistan);
+        let lone = u32::from(sid == StateId::Kazakhstan);
         assert_eq!(card.start_facilities.iter().filter(|k| **k == FacilityKind::Factory).count() as u32 + lone, mines, "{}: a Mine beside every Factory", card.name);
         assert_eq!(card.start_facilities.len() as u32 - labs - mines, card.industry_level, "{}: as many as the Industry Level, plus a start Lab and the Mines", card.name);
     }
@@ -1857,11 +1861,13 @@ fn the_ai_seats_take_start_states_not_adjacent_to_any_taken_one() {
     // untouched Regions stand at Industry 2, Australia and -- since ticket #125 (version 0.07.2)
     // -- the Arabian Peninsula, and the tie goes to the more populous: the peninsula at 1.0
     // against Australia at 0.5.
-    assert_eq!(held(Seat(2)), vec![StateId::ArabianPeninsula]);
+    // Ticket #482 (version 0.09.8): a third stands at Industry 2 now, South Africa, with more
+    // people than either, and takes the pick.
+    assert_eq!(held(Seat(2)), vec![StateId::SouthAfrica]);
     // Then the untouched states are all at Industry 1, so the tie goes to the most populous:
     // Sub-Saharan Africa at 11.4.
     // The peninsula's neighbours join the adjacent set; Australia is the last at Industry 2.
-    assert_eq!(held(Seat(3)), vec![StateId::Australia]);
+    assert_eq!(held(Seat(3)), vec![StateId::ArabianPeninsula]);
     // The fallback, when every free state touches a taken one: the highest Industry Level free
     // state, ties by population. With everything above taken, North America at 3 wins.
     let taken = [StateId::Europe, StateId::EastAsia, StateId::Australia, StateId::SubSaharanAfrica, StateId::SouthAmerica, StateId::CentralAmerica];
@@ -2137,10 +2143,10 @@ fn an_arkwright_pays_half_for_a_station_and_three_quarters_for_a_module() {
     // Transit Fuel too: three quarters, then Efficient Transit on top of that. Ticket #57: on the
     // window the crossing pays the card's Fuel, and both multipliers apply after the window factor.
     at_window(&mut g);
-    assert_eq!(g.transit_cost_for(Seat(0), BodyId::Earth, BodyId::Mars).1, 20.0);
-    assert_eq!(g.transit_cost_for(Seat(2), BodyId::Earth, BodyId::Mars).1, 15.0);
+    assert_eq!(g.transit_cost_for(Seat(0), BodyId::Earth, BodyId::Mars).1, 18.1);
+    assert_eq!(g.transit_cost_for(Seat(2), BodyId::Earth, BodyId::Mars).1, 13.6);
     g.research.done.push(TechId::EfficientTransit);
-    assert_eq!(g.transit_cost_for(Seat(2), BodyId::Earth, BodyId::Mars).1, 9.0, "20 x 0.75 x 0.6");
+    assert_eq!(g.transit_cost_for(Seat(2), BodyId::Earth, BodyId::Mars).1, 8.1, "18.1 x 0.75 x 0.6, to the tenth");
 }
 
 #[test]
@@ -2787,8 +2793,10 @@ fn b_a_sea_level_threshold_raises_two_a_slot_and_displaces_five_percent_an_expos
     g.state_mut(StateId::SouthEastAsia).industry_level = 0;
     // Ticket #125 (version 0.07.2): Japan and Korea border East Asia too, and take none here.
     g.state_mut(StateId::Japan).industry_level = 0;
-    // Ticket #453 (version 0.09.6): and so does Pakistan.
-    g.state_mut(StateId::Pakistan).industry_level = 0;
+    // Ticket #453 (version 0.09.6): and so does Pakistan. Ticket #482 (version 0.09.8): Kazakhstan
+    // by that card now, and Iran's Region, which Pakistan and Afghanistan joined.
+    g.state_mut(StateId::Kazakhstan).industry_level = 0;
+    g.state_mut(StateId::MiddleEast).industry_level = 0;
     g.apply_sea_threshold(StateId::EastAsia, 0);
     assert_eq!(g.unrest(StateId::EastAsia), 2.0, "one per build slot, and Asia is exposed 2");
     let displaced = pop * 0.05 * 2.0;
@@ -2827,8 +2835,10 @@ fn c_heat_refugees_arrive_at_the_neighbours_and_raise_unrest_per_two_and_a_half_
     g.state_mut(StateId::SouthEastAsia).industry_level = 0;
     // Ticket #125 (version 0.07.2): Japan and Korea border East Asia too, and take none here.
     g.state_mut(StateId::Japan).industry_level = 0;
-    // Ticket #453 (version 0.09.6): and so does Pakistan.
-    g.state_mut(StateId::Pakistan).industry_level = 0;
+    // Ticket #453 (version 0.09.6): and so does Pakistan. Ticket #482 (version 0.09.8): Kazakhstan
+    // by that card now, and Iran's Region, which Pakistan and Afghanistan joined.
+    g.state_mut(StateId::Kazakhstan).industry_level = 0;
+    g.state_mut(StateId::MiddleEast).industry_level = 0;
     hold_temperature(&mut g, 3.0);
     assert!(g.population_growth_rate() < 0.0);
     g.climate_phase();
@@ -3246,17 +3256,20 @@ fn the_ai_pays_relief_and_raises_a_constabulary_where_unrest_has_taken_hold() {
 fn twelve_nation_states_share_out_the_eight_they_came_from() {
     let g = game();
     let t = &g.tables;
-    assert_eq!(StateId::ALL.len(), 16);
+    assert_eq!(StateId::ALL.len(), 18);
     let card = |s: StateId| t.state(s);
     // Asia's 30 GDP and 7 Influence go to East Asia, South Asia and South-East Asia -- and since
     // ticket #125 (version 0.07.2) to Japan and Korea, cut out of East Asia with 6 and 1 of them.
-    let asia = [StateId::EastAsia, StateId::SouthAsia, StateId::SouthEastAsia, StateId::Japan, StateId::Pakistan];
-    assert_eq!(asia.iter().map(|s| card(*s).gdp).sum::<i64>(), 30, "Asia's GDP share");
-    assert_eq!(asia.iter().map(|s| card(*s).influence).sum::<i64>(), 7, "Asia's Influence value");
-    // Africa's 3 and 2 split at the Sahara.
-    let africa = [StateId::SubSaharanAfrica, StateId::NorthAfrica];
+    // Ticket #482 (version 0.09.8): Pakistan and Afghanistan crossed from Asia's share into Iran's
+    // Region, so the two pools are counted as one: Asia's 30 and 7 with the Middle East's 5 and 4.
+    let asia = [StateId::EastAsia, StateId::SouthAsia, StateId::SouthEastAsia, StateId::Japan, StateId::Kazakhstan, StateId::MiddleEast, StateId::ArabianPeninsula, StateId::Turkey];
+    assert_eq!(asia.iter().map(|s| card(*s).gdp).sum::<i64>(), 30 + 5, "Asia's GDP share, and the Middle East's");
+    assert_eq!(asia.iter().map(|s| card(*s).influence).sum::<i64>(), 7 + 4, "Asia's Influence value, and the Middle East's");
+    // Africa's 3 and 2 split at the Sahara; ticket #482 cut South Africa out of the south, and its
+    // Influence of 1 is the one figure in the world that was added and not shared.
+    let africa = [StateId::SubSaharanAfrica, StateId::NorthAfrica, StateId::SouthAfrica];
     assert_eq!(africa.iter().map(|s| card(*s).gdp).sum::<i64>(), 3);
-    assert_eq!(africa.iter().map(|s| card(*s).influence).sum::<i64>(), 2);
+    assert_eq!(africa.iter().map(|s| card(*s).influence).sum::<i64>(), 2 + 1);
     // North America's 25 and 8 split with Central America and the Caribbean.
     let america = [StateId::NorthAmerica, StateId::CentralAmerica];
     assert_eq!(america.iter().map(|s| card(*s).gdp).sum::<i64>(), 25);
@@ -4050,32 +4063,34 @@ fn c_the_permafrost_break_adds_four_ppm_a_turn_on_its_own_line_outside_blame_and
     assert_eq!(g.seat(Seat(0)).stabilization_run, run_before + 1, "exempt from Stabilization: the run goes on");
 }
 
-/// (d) The Sink Weakens: the Natural Sink falls to 4.0 for good, and Stabilization is measured
-/// against 4.0 from then on.
+/// (d) The Sink Weakens: the Natural Sink falls by 2.0 for good, and Stabilization is measured
+/// against the weakened Sink from then on. Ticket #483 (version 0.09.8): from 8.0 to 6.0, where it
+/// fell from 6.0 to 4.0.
 #[test]
 fn d_the_sink_weakens_lowers_the_sink_and_the_stabilization_bar_with_it() {
     let mut g = game();
     calm(&mut g);
     breaks_ahead(&mut g);
     bare_world(&mut g);
-    assert_eq!(g.climate.natural_sink, 6.0, "it opens at the table's figure");
+    // Ticket #483 (version 0.09.8): 8, where it was 6.
+    assert_eq!(g.climate.natural_sink, 8.0, "it opens at the table's figure");
     hold_temperature(&mut g, 2.1);
     g.climate_phase();
-    assert_eq!(g.climate.natural_sink, 4.0, "the Sink Weakens took it to 4.0");
-    assert_eq!(g.emissions_now().sink, 4.0, "and the panel's Sink line with it");
+    assert_eq!(g.climate.natural_sink, 6.0, "the Sink Weakens took it to 6.0");
+    assert_eq!(g.emissions_now().sink, 6.0, "and the panel's Sink line with it");
     assert!(g.seat(Seat(0)).stabilization_run > 0, "0 counted was under the Sink");
 
-    // 5.0 counted Emissions: under the old Sink of 6.0, over the new one of 4.0. A neutral state,
+    // 7.0 counted Emissions: under the old Sink of 8.0, over the new one of 6.0. A neutral state,
     // so no Faction's Emissions multiplier stands between the card and the sum.
     g.state_mut(StateId::MiddleEast).control = Control::Neutral;
-    g.state_mut(StateId::MiddleEast).industry_level = 10; // Baseline 0.5 x 10
+    g.state_mut(StateId::MiddleEast).industry_level = 14; // Baseline 0.5 x 14
     let e = g.emissions_now();
-    assert!((e.counted() - 5.0).abs() < 1e-9, "5.0 counted: {}", e.counted());
+    assert!((e.counted() - 7.0).abs() < 1e-9, "7.0 counted: {}", e.counted());
     g.climate_phase();
-    assert_eq!(g.seat(Seat(0)).stabilization_run, 0, "5.0 breaks a run against a Sink of 4.0, where it would have held against 6.0");
+    assert_eq!(g.seat(Seat(0)).stabilization_run, 0, "7.0 breaks a run against a Sink of 6.0, where it would have held against 8.0");
     // The Custodian AI steers by this same figure (`victory_gap` reads `climate.last.total_sink()`),
     // so a weakened Sink moves its pace with it.
-    assert_eq!(g.climate.last.total_sink(), 4.0, "the Sink the AI reads is the weakened one");
+    assert_eq!(g.climate.last.total_sink(), 6.0, "the Sink the AI reads is the weakened one");
 }
 
 /// (e) Ice Sheets Committed fires a Sea Level threshold out of sequence, and the scheduled ones
@@ -4123,18 +4138,19 @@ fn f_amazon_dieback_pulses_twenty_ppm_once_and_leaves_south_america_dirtier_for_
     hold_temperature(&mut g, 2.7);
     let co2_before = g.climate.co2;
     g.climate_phase();
-    // Nothing counted, no Permafrost yet in the sum, a Sink of 6.0, then the 20 ppm pulse.
-    assert!((g.climate.co2 - (co2_before - 6.0 + 20.0)).abs() < 1e-9, "a 20 ppm pulse: {}", g.climate.co2);
+    // Nothing counted, no Permafrost yet in the sum, a Sink of 8.0 (ticket #483), then the 20 ppm pulse.
+    assert!((g.climate.co2 - (co2_before - 8.0 + 20.0)).abs() < 1e-9, "a 20 ppm pulse: {}", g.climate.co2);
     assert!((g.baseline_emissions(StateId::SouthAmerica) - (base + 1.0)).abs() < 1e-9, "Baseline Emissions up by 1.0");
     // And it bites: the state's industry emits at the raised figure.
     g.state_mut(StateId::SouthAmerica).industry_level = 2;
     assert!((g.emissions_now().state_industry - (base + 1.0) * 2.0).abs() < 1e-9, "{}", g.emissions_now().state_industry);
     g.state_mut(StateId::SouthAmerica).industry_level = 0;
 
-    // A second phase: Permafrost 4.0 against the weakened Sink of 4.0, and no second pulse.
+    // A second phase: Permafrost 4.0 against the weakened Sink of 6.0 (ticket #483; 4.0 against 4.0
+    // before), so the Stock falls by 2.0, and no second pulse.
     let co2_again = g.climate.co2;
     g.climate_phase();
-    assert!((g.climate.co2 - co2_again).abs() < 1e-9, "the pulse does not come twice: {}", g.climate.co2);
+    assert!((g.climate.co2 - (co2_again - 2.0)).abs() < 1e-9, "the pulse does not come twice: {}", g.climate.co2);
     assert!((g.baseline_emissions(StateId::SouthAmerica) - (base + 1.0)).abs() < 1e-9, "and the rise does not come twice either");
 }
 
@@ -4302,7 +4318,9 @@ fn b_coastal_slots_are_two_an_exposure_capped_and_a_raise_is_inland() {
     // Ticket #125 (version 0.07.2): Japan and Korea (Exposure 2, four slots) and the Arabian
     // Peninsula (Exposure 1, two) bring six to the 34 of before.
     // Ticket #453 (version 0.09.6): Pakistan (Exposure 1, two) and the United Kingdom (Exposure 2, four).
-    assert_eq!(world, 46, "46 coastal slots in the world: 34, six on ticket #125's Regions and six on ticket #453's");
+    // Ticket #482 (version 0.09.8): Kazakhstan has no coast (two fewer than Pakistan's card had),
+    // Turkey is Exposure 1 (two) and South Africa Exposure 2 (four).
+    assert_eq!(world, 50, "50 coastal slots in the world: 46, less Kazakhstan's two, and six on ticket #482's Regions");
     // Ticket #70: Europe's Refinery and North America's Factory, third on their cards with an
     // Exposure of 1, now stand inland from the first turn. Ticket #377 (version 0.09.2): Europe is
     // the Prospectors' home and stands with the package (Power Plant, Factory, Mine, Refinery,
@@ -5057,7 +5075,8 @@ fn the_first_mars_window_falls_where_the_real_one_of_early_2031_does() {
 fn a_crossing_costs_the_hohmann_flight_at_the_window_and_more_away_from_it() {
     let mut g = game();
     let tr = g.tables.transit.clone();
-    let card_fuel = g.tables.body(BodyId::Mars).transit_fuel as f64;
+    // Ticket #486 (version 0.09.8): the "card's Fuel" is the journey's delta-v at the scale.
+    let card_fuel = dying_earth_engine::data::leg_fuel(g.journey_delta_v(Port::Body(BodyId::Earth), Port::Body(BodyId::Mars)).1, g.tables.fuel_per_delta_v);
     let window = g.next_window_turn(1);
     let hohmann = (tr.days_at_window / tr.days_per_turn).ceil() as u32;
     // Ticket #67 (version 0.05.5): a turn is sixty days, so the same flight is five turns, and the
@@ -5099,12 +5118,12 @@ fn earth_moon_and_mars_system_hops_are_untouched_by_the_window() {
     let mut g = game();
     let cycle = (g.tables.transit.synodic_days / g.tables.transit.days_per_turn).ceil() as u32 + 1;
     let hops = [
-        ((BodyId::Earth, BodyId::Moon), (1u32, 6.0)),
-        ((BodyId::Moon, BodyId::Earth), (1, 6.0)),
-        ((BodyId::Mars, BodyId::Phobos), (1, 2.0)),
-        ((BodyId::Phobos, BodyId::Mars), (1, 2.0)),
-        ((BodyId::Phobos, BodyId::Deimos), (1, 1.0)),
-        ((BodyId::Deimos, BodyId::Phobos), (1, 1.0)),
+        ((BodyId::Earth, BodyId::Moon), (1u32, 15.7)),
+        ((BodyId::Moon, BodyId::Earth), (1, 3.7)),
+        ((BodyId::Mars, BodyId::Phobos), (1, 4.8)),
+        ((BodyId::Phobos, BodyId::Mars), (1, 2.4)),
+        ((BodyId::Phobos, BodyId::Deimos), (1, 3.0)),
+        ((BodyId::Deimos, BodyId::Phobos), (1, 3.0)),
     ];
     for t in 1..=cycle {
         g.turn = t;
@@ -5582,7 +5601,9 @@ fn a_spectated_game_seats_four_computers_and_deals_seat_zero_by_the_spreading_ru
     }
     // Ticket #125 (version 0.07.2): the Arabian Peninsula, untouched at Industry 2 and more populous
     // than Australia, is the third pick now; Australia is the fourth.
-    assert_eq!(taken, vec![StateId::EastAsia, StateId::Europe, StateId::ArabianPeninsula, StateId::Australia]);
+    // Ticket #482 (version 0.09.8): South Africa, at Industry 2 with more people than either, is
+    // the third; the peninsula the fourth; Australia no seat's.
+    assert_eq!(taken, vec![StateId::EastAsia, StateId::Europe, StateId::SouthAfrica, StateId::ArabianPeninsula]);
     for seat in Seat::ALL {
         assert_eq!(g.controlled_states(seat), vec![taken[seat.index()]], "{seat:?} starts where the rule put it");
     }
@@ -5925,6 +5946,126 @@ fn the_prospectors_pay_fifteen_percent_less_for_facilities_and_modules_and_nothi
     assert_eq!(g.order_cost(pro, &Order::BuildModuleWithDucats { colony: moon, kind: ModuleKind::Habitat }).ducats, 36.2, "21.3 x 2 = 42.6, x 0.85 = 36.21"); // Ticket #387: where 35 was floored
     assert_eq!(g.order_cost(pro, &Order::BuildStation { body: BodyId::Moon, slot: 0 }).materials, 40.0, "a Space Station is not a building of theirs to discount");
     assert_eq!(g.order_cost(pro, &Order::RaiseIndustry { state: StateId::Europe }).materials, 15.0, "Cheap Industry is its own clause");
+}
+
+/// Ticket #485 (version 0.09.8): **a leg's Fuel is its real delta-v times one scale**, 4 Fuel a
+/// km/s, to a tenth, aerobraking as flown where there is air.
+/// Ticket #486 (version 0.09.8): **every journey is priced the same way, each direction for
+/// itself.** Inside a system a hop has its own figure out and back; between two systems a journey
+/// is the leaving of one end, the gulf between the systems, and the arriving at the other, lower
+/// where there is air. A far orbit is an end of its own. The tanks are unchanged.
+#[test]
+fn every_journey_is_priced_the_same_way_each_direction_for_itself() {
+    let g = game();
+    assert_eq!(g.tables.fuel_per_delta_v, 4.0);
+    let (earth, moon, venus, mars, phobos, deimos) = (Port::Body(BodyId::Earth), Port::Body(BodyId::Moon), Port::Body(BodyId::Venus), Port::Body(BodyId::Mars), Port::Body(BodyId::Phobos), Port::Body(BodyId::Deimos));
+    let (l4, l5) = (Port::Far(BodyId::Earth, 5), Port::Far(BodyId::Earth, 6));
+    assert_eq!((g.port(BodyId::Earth, Orbit::Slot(5)), g.port(BodyId::Earth, Orbit::Slot(4)), g.port(BodyId::Earth, Orbit::Low)), (l4, earth, earth), "a far orbit is its own end; any other orbit is its Body");
+    // Every journey, out and back, in Fuel at the window.
+    let fares = [
+        // inside a system: its own figure each way
+        (earth, moon, 15.7), (moon, earth, 3.7),
+        (mars, phobos, 4.8), (phobos, mars, 2.4),
+        (mars, deimos, 6.9), (deimos, mars, 2.8),
+        (phobos, deimos, 3.0), (deimos, phobos, 3.0),
+        // out from Earth, and home, where Earth's air brakes the arrival
+        (earth, venus, 17.4), (venus, earth, 16.6),
+        (earth, mars, 18.1), (mars, earth, 12.1),
+        (earth, phobos, 19.7), (phobos, earth, 10.2),
+        (earth, deimos, 19.9), (deimos, earth, 9.2),
+        // the Moon is not Earth: it is cheap to leave
+        (moon, venus, 8.2), (moon, mars, 9.0), (moon, phobos, 10.6), (moon, deimos, 10.8),
+        (venus, moon, 18.1), (mars, moon, 13.6),
+        // Venus and the Mars system, which no leg flew before
+        (venus, mars, 26.8), (mars, venus, 21.6), (venus, deimos, 28.6), (phobos, venus, 19.7),
+        // the far orbits, ends of their own
+        (earth, l4, 16.3), (earth, l5, 16.3), (l4, earth, 5.6), (l5, earth, 5.6),
+        (moon, l4, 7.2), (l5, moon, 7.2),
+        (l5, venus, 13.4), (venus, l5, 23.2), (l4, mars, 15.5), (mars, l4, 20.1), (l4, phobos, 17.1), (l4, deimos, 17.3),
+        (l4, l5, 10.6), (l5, l4, 10.6),
+    ];
+    for (from, to, fuel) in fares {
+        let got = dying_earth_engine::data::leg_fuel(g.journey_delta_v(from, to).1, g.tables.fuel_per_delta_v);
+        assert_eq!(got, fuel, "{from:?} to {to:?}");
+    }
+    // The figures #485 priced from Earth are reproduced to within a tenth of a km/s.
+    for (to, delta_v) in [(moon, 4.0), (venus, 4.4), (mars, 4.6), (phobos, 4.9), (deimos, 5.0), (l4, 4.0)] {
+        assert!((g.journey_delta_v(earth, to).1 - delta_v).abs() <= 0.1, "{to:?}: {} against {delta_v}", g.journey_delta_v(earth, to).1);
+    }
+    // Every pair of systems has its gulf in the data.
+    for (a, b) in [(System::Earth, System::Venus), (System::Earth, System::Mars), (System::Earth, System::Far(5)), (System::Venus, System::Mars), (System::Venus, System::Far(6)), (System::Mars, System::Far(5)), (System::Far(5), System::Far(6))] {
+        assert!(g.tables.gulf(a, b) > 0.0 && g.tables.gulf(a, b) == g.tables.gulf(b, a), "{a:?} and {b:?}");
+    }
+    assert_eq!((g.tank_of(Seat(0), UnitKind::ColonyShip), g.tank_of(Seat(0), UnitKind::Frigate)), (35.0, 30.0), "the tanks are as they were");
+}
+
+/// Ticket #486 (version 0.09.8): **every journey between two systems has a window the same way.**
+/// Venus to Mars is flown, four turns at its window; a far orbit reads Earth's sky a sixth of the
+/// way round, so its windows are Earth's shifted; inside the Earth system, far orbits included,
+/// there is no window and a move takes a turn.
+#[test]
+fn every_crossing_has_a_window_and_venus_flies_to_mars() {
+    let mut g = game();
+    let (earth, venus, mars) = (Port::Body(BodyId::Earth), Port::Body(BodyId::Venus), Port::Body(BodyId::Mars));
+    let (l4, l5) = (Port::Far(BodyId::Earth, 5), Port::Far(BodyId::Earth, 6));
+    // No window inside the Earth system, the far orbits among it, nor inside the Mars system.
+    for (a, b) in [(earth, l4), (l5, earth), (l4, l5), (Port::Body(BodyId::Moon), l4), (mars, Port::Body(BodyId::Phobos))] {
+        assert!(g.crossing_ports(a, b, 1).is_none(), "{a:?} to {b:?} crosses nothing");
+        assert_eq!(g.journey_cost_for_at(Seat(0), a, b, 1).0, 1, "{a:?} to {b:?} takes a turn");
+    }
+    // Venus to Mars: a window somewhere in its cycle, four turns of sixty at it, and back likewise.
+    let tr = g.tables.transit_venus_mars.clone();
+    assert_eq!((tr.days_at_window / tr.days_per_turn).ceil() as u32, 4);
+    let cycle = (tr.synodic_days / tr.days_per_turn).ceil() as u32 + 1;
+    for (a, b, fuel) in [(venus, mars, 26.8), (mars, venus, 21.6)] {
+        let window = (1..=cycle).find(|t| g.crossing_ports(a, b, *t).is_some_and(|(off, _)| off == 0.0)).unwrap_or_else(|| panic!("{a:?} to {b:?} has no window in {cycle} turns"));
+        assert_eq!(g.journey_cost_for_at(Seat(0), a, b, window), (4, fuel), "{a:?} to {b:?} at its window, turn {window}");
+        let worst = (1..=cycle).map(|t| g.journey_cost_for_at(Seat(0), a, b, t).1).fold(0.0, f64::max);
+        assert!(worst > fuel, "off the window it is dearer: {worst}");
+    }
+    // The order itself is lawful now: no "fly by Earth".
+    let (ship, _) = colony_ship_ready(&mut g, BodyId::Venus);
+    g.ship_mut(ship).unwrap().fuel = 100.0;
+    assert!(g.check_order(Seat(0), &[], &Order::Transit { ship, to: BodyId::Mars, slot: None }).is_ok(), "{:?}", g.check_order(Seat(0), &[], &Order::Transit { ship, to: BodyId::Mars, slot: None }));
+    // A far orbit's sky is Earth's, sixty degrees round: L4 ahead, L5 behind.
+    let lon = g.heliocentric_longitude(BodyId::Earth, 3);
+    assert_eq!((g.port_longitude(l4, 3), g.port_longitude(l5, 3)), (lon + 60.0, lon - 60.0));
+    // So its window to Mars is not Earth's: on Earth's window turn a far orbit stands off it.
+    let window = g.next_window_turn(1);
+    assert_eq!(g.crossing_ports(earth, mars, window).unwrap().0, 0.0);
+    assert!(g.crossing_ports(l4, mars, window).unwrap().0 != 0.0 && g.crossing_ports(l5, mars, window).unwrap().0 != 0.0);
+    let cycle = (g.tables.transit.synodic_days / g.tables.transit.days_per_turn).ceil() as u32 + 1;
+    for far in [l4, l5] {
+        let w = (1..=cycle).find(|t| g.crossing_ports(far, mars, *t).unwrap().0 == 0.0).unwrap_or_else(|| panic!("{far:?} has no Mars window"));
+        assert_eq!(g.journey_cost_for_at(Seat(0), far, mars, w), (5, 15.5), "{far:?} to Mars at its own window, turn {w}");
+    }
+}
+
+/// Ticket #479 (version 0.09.8): **Raise Industry Level costs more each time.** 30 Materials and 4
+/// Widgets, then 40 and 5, then 50 and 6, counted by the raises standing in the Region above its
+/// card's level, whoever made them. The Prospectors pay half the Materials at every step and take
+/// their 15% off the Widgets.
+#[test]
+fn raising_industry_costs_more_with_every_raise_standing_in_the_region() {
+    let mut g = game();
+    let pro = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Prospectors).unwrap();
+    let cus = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Custodians).unwrap();
+    g.take_control(StateId::Europe, pro);
+    let price = |g: &Game, seat: Seat, sid: StateId| (g.order_cost(seat, &Order::RaiseIndustry { state: sid }).materials, g.industry_widgets(seat, sid));
+    let card = g.tables.state(StateId::EastAsia).industry_level;
+    for (n, (everyone, prospectors)) in [((30.0, 4), (15.0, 3)), ((40.0, 5), (20.0, 4)), ((50.0, 6), (25.0, 5)), ((60.0, 7), (30.0, 5))].into_iter().enumerate() {
+        g.state_mut(StateId::EastAsia).industry_level = card + n as u32;
+        g.state_mut(StateId::Europe).industry_level = g.tables.state(StateId::Europe).industry_level + n as u32;
+        assert_eq!(g.raises_standing(StateId::EastAsia), n as u32);
+        assert_eq!(price(&g, cus, StateId::EastAsia), everyone, "with {n} standing");
+        assert_eq!(price(&g, pro, StateId::Europe), prospectors, "the Prospectors, with {n} standing");
+        assert_eq!(g.build_widgets_at(cus, Place::State(StateId::EastAsia), BuildItem::IndustryLevel), everyone.1);
+    }
+    // A level lost comes off the price again; a Region below its card's level pays the first price.
+    g.state_mut(StateId::EastAsia).industry_level = card + 1;
+    assert_eq!(price(&g, cus, StateId::EastAsia), (40.0, 5));
+    g.state_mut(StateId::EastAsia).industry_level = card.saturating_sub(1);
+    assert_eq!(price(&g, cus, StateId::EastAsia), (30.0, 4));
 }
 
 /// Ticket #72 (b), rewritten on ticket #240 (version 0.08.3): the Venture Capital Fund banks a
@@ -6996,9 +7137,9 @@ fn a_transit_spends_the_tank_and_is_refused_when_the_tank_cannot_pay() {
     g.seats[0].stockpile.fuel = 0.0;
     let to_mars = Order::Transit { ship, to: BodyId::Mars, slot: None };
     assert_eq!(g.order_cost(Seat(0), &to_mars).fuel, 0.0, "the Stockpile pays nothing");
-    assert!(g.check_order(Seat(0), &[], &to_mars).is_ok(), "20 of the 30 in the tank");
+    assert!(g.check_order(Seat(0), &[], &to_mars).is_ok(), "18.1 of the 30 in the tank");
     g.commit_orders(Seat(0), std::slice::from_ref(&to_mars));
-    assert_eq!(g.ship(ship).unwrap().fuel, 10.0, "30 - 20");
+    assert_eq!(g.ship(ship).unwrap().fuel, 11.9, "30 - 18.1");
     assert_eq!(g.seats[0].stockpile.fuel, 0.0);
     let (poor, _) = colony_ship_ready(&mut g, BodyId::Earth);
     g.ship_mut(poor).unwrap().fuel = 5.0;
@@ -7275,25 +7416,28 @@ fn the_mass_driver_stands_on_a_low_gravity_colony_behind_efficient_transit_one_p
     assert!(g.check_order(Seat(0), &[], &build(moon)).unwrap_err().0.contains("Mass Driver"), "one per Colony");
 }
 
-/// Ticket #92: a working Mass Driver takes a flat 4 Fuel off every leg the owner's Ships fly from
-/// its Body, after the multipliers, to a minimum of 1; a rival pays the full leg; a mothballed one
-/// does nothing; and each Mine at its Colony makes +1 Materials.
+/// Ticket #92: a working Mass Driver took a flat 4 Fuel off every leg the owner's Ships fly from
+/// its Body, after the multipliers, to a minimum of 1. Ticket #486 (version 0.09.8), at the
+/// designer's word: **a quarter off**, after the multipliers, to the tenth, with no floor. A rival
+/// pays the full leg; a mothballed one does nothing; and each Mine at its Colony makes +1 Materials.
 #[test]
-fn a_mass_driver_cuts_the_owners_departures_by_four_and_gives_its_mines_one_more() {
+fn a_mass_driver_cuts_the_owners_departures_by_a_quarter_and_gives_its_mines_one_more() {
     let mut g = game();
     at_window(&mut g);
     let cus = Seat(0);
     let moon = colony(&mut g, cus, BodyId::Moon, &[ModuleKind::Mine, ModuleKind::MassDriver], 0);
-    assert_eq!(g.transit_cost_for(cus, BodyId::Moon, BodyId::Earth).1, 2.0, "6 - 4");
-    assert_eq!(g.transit_cost_for(cus, BodyId::Moon, BodyId::Mars).1, 16.0, "20 - 4");
-    assert_eq!(g.transit_cost_for(cus, BodyId::Earth, BodyId::Moon).1, 6.0, "arriving is not departing");
-    assert_eq!(g.transit_cost_for(Seat(1), BodyId::Moon, BodyId::Earth).1, 6.0, "a rival pays the leg");
+    assert_eq!(g.tables.mass_driver.fuel_cut, 0.25);
+    assert_eq!(g.transit_cost_for(cus, BodyId::Moon, BodyId::Earth).1, 2.8, "3.7 home x 0.75");
+    assert_eq!(g.transit_cost_for(cus, BodyId::Moon, BodyId::Mars).1, 6.8, "9.0 x 0.75");
+    assert!(g.transit_cost_for(cus, BodyId::Moon, BodyId::Venus).1 < g.transit_cost_for(Seat(1), BodyId::Moon, BodyId::Venus).1, "every leg it leaves by");
+    assert_eq!(g.transit_cost_for(cus, BodyId::Earth, BodyId::Moon).1, 15.7, "arriving is not departing");
+    assert_eq!(g.transit_cost_for(Seat(1), BodyId::Moon, BodyId::Earth).1, 3.7, "a rival pays the leg");
     let ark = Seat(2);
     colony(&mut g, ark, BodyId::Moon, &[ModuleKind::MassDriver], 0);
-    assert_eq!(g.transit_cost_for(ark, BodyId::Moon, BodyId::Earth).1, 1.0, "6 x 0.75 = 4.0, - 4, minimum 1");
+    assert_eq!(g.transit_cost_for(ark, BodyId::Moon, BodyId::Earth).1, 2.1, "3.7 x 0.75 = 2.8 for the Arkwrights, x 0.75 again");
     assert_eq!(g.module_yield(cus, moon, ModuleKind::Mine).amount, 7.6, "4 x 1.65 = 6.6, +1"); // Ticket #387: to the tenth, where 6 was floored
     g.colony_mut(moon).unwrap().modules[1].mothballed = true;
-    assert_eq!(g.transit_cost_for(cus, BodyId::Moon, BodyId::Earth).1, 6.0, "mothballed, it throws nothing");
+    assert_eq!(g.transit_cost_for(cus, BodyId::Moon, BodyId::Earth).1, 3.7, "mothballed, it throws nothing");
     assert_eq!(g.module_yield(cus, moon, ModuleKind::Mine).amount, 6.6); // Ticket #387
 }
 
@@ -7345,15 +7489,16 @@ fn venus_is_a_body_of_orbits_only_with_its_own_window() {
     let w2 = g.next_venus_window_turn(w1 + 1);
     let w3 = g.next_venus_window_turn(w2 + 1);
     assert_eq!((w1, w2, w3), (9, 18, 28), "the research note's windows");
-    assert_eq!(g.transit_cost_at(BodyId::Earth, BodyId::Venus, w1), (3, 16.0), "three turns and the card's Fuel on the window");
+    assert_eq!(g.transit_cost_at(BodyId::Earth, BodyId::Venus, w1), (3, 17.4), "three turns and the card's Fuel on the window");
     let (turns_off, fuel_off) = g.transit_cost_at(BodyId::Earth, BodyId::Venus, w1 + 4);
-    assert!(turns_off > 3 && fuel_off > 16.0, "off the window both rise: {turns_off} turns, {fuel_off} Fuel");
+    assert!(turns_off > 3 && fuel_off > 17.4, "off the window both rise: {turns_off} turns, {fuel_off} Fuel");
     assert!(g.crossing_offset(BodyId::Earth, BodyId::Venus, w1).is_some());
     assert!(g.crossing_offset(BodyId::Venus, BodyId::Earth, w1).is_some());
     assert!(g.crossing_offset(BodyId::Earth, BodyId::Mars, w1).is_some(), "Mars's window is untouched");
     assert!(Game::leg_allowed(BodyId::Earth, BodyId::Venus));
-    assert!(!Game::leg_allowed(BodyId::Mars, BodyId::Venus));
-    assert!(!Game::leg_allowed(BodyId::Venus, BodyId::Phobos));
+    // Ticket #486 (version 0.09.8): and so does every other, Venus to the Mars system among them.
+    assert!(Game::leg_allowed(BodyId::Mars, BodyId::Venus));
+    assert!(Game::leg_allowed(BodyId::Venus, BodyId::Phobos));
 }
 
 /// Ticket #93: a station at Venus was built from a Ship of the seat's in orbit there. Ticket #442
@@ -7385,7 +7530,179 @@ fn a_venus_station_is_founded_by_a_colony_ship_in_its_ring_and_its_colonists_are
     bare_stations(&mut g);
     assert_eq!(g.off_world_colonists(Seat(0)), 4, "Venus is off Earth");
     assert_eq!(g.bodies_settled(Seat(0), 4), 1, "and a Body for Diaspora");
-    assert!(g.check_order(Seat(0), &[], &Order::Transit { ship, to: BodyId::Mars, slot: None }).unwrap_err().0.contains("Venus"));
+    // Ticket #486 (version 0.09.8): the leg to Mars is flown now; its own test has it.
+    let _ = ship;
+}
+
+/// Ticket #480 (version 0.09.8): **Earth L4 and Earth L5 are far orbits, reached only by Ship.**
+/// Two more Orbital Slots over Earth, farther out: a move to or from one costs 8 Fuel from the tank,
+/// and a leg between Bodies pays that on top of its crossing. A station there is founded by a Colony
+/// Ship in that orbit, as at Venus, for no Materials; it is never built from a Launch Site and no
+/// lift reaches it. It is named for itself alone.
+#[test]
+fn earth_l4_and_l5_are_far_orbits_reached_only_by_ship() {
+    let mut g = game();
+    g.seats[0].stockpile.materials = 300.0;
+    let earth = g.tables.body(BodyId::Earth);
+    assert_eq!((earth.orbital_slots, earth.far_slots), (7, 2));
+    assert_eq!([g.station_name(BodyId::Earth, 5), g.station_name(BodyId::Earth, 6)], ["Earth L4", "Earth L5"]);
+    assert!(g.far_slot(BodyId::Earth, 5) && g.far_slot(BodyId::Earth, 6) && !g.far_slot(BodyId::Earth, 4) && !g.far_slot(BodyId::Earth, 7));
+    assert!(BodyId::ALL.iter().filter(|b| **b != BodyId::Earth).all(|b| g.tables.body(*b).far_slots == 0), "Earth alone has far orbits");
+    assert_eq!(g.orbit_name(BodyId::Earth, Orbit::Slot(5)), "Earth L4");
+    // Never built from a Launch Site, though the same seat may build in an ordinary slot.
+    assert!(g.check_order(Seat(0), &[], &Order::BuildStation { body: BodyId::Earth, slot: 3 }).is_ok());
+    let err = g.check_order(Seat(0), &[], &Order::BuildStation { body: BodyId::Earth, slot: 5 }).unwrap_err().0;
+    assert!(err.contains("only by Ship"), "{err}");
+    // The fares: 1 between ordinary orbits. Ticket #486 (version 0.09.8): a far orbit is an end of
+    // its own, priced as any journey is: 16.3 out to it, 5.6 home on Earth's air, 10.6 across.
+    assert_eq!(g.orbit_change_cost(Seat(0), BodyId::Earth, Orbit::Low, Orbit::Slot(0)), 1.0);
+    assert_eq!(g.orbit_change_cost(Seat(0), BodyId::Earth, Orbit::Low, Orbit::Slot(5)), 16.3);
+    assert_eq!(g.orbit_change_cost(Seat(0), BodyId::Earth, Orbit::Slot(5), Orbit::Slot(6)), 10.6);
+    assert_eq!(g.orbit_change_cost(Seat(0), BodyId::Earth, Orbit::Slot(6), Orbit::Slot(0)), 5.6);
+    // A Colony Ship in low orbit: an ordinary slot is not founded into, and a far one wants the move first.
+    let (ship, _) = colony_ship_ready(&mut g, BodyId::Earth);
+    let into = |n: u32| Order::Unload { ship, colonists: 4, army: false, into: UnloadTarget::Ring(BodyId::Earth, n) };
+    assert!(g.check_order(Seat(0), &[], &into(3)).unwrap_err().0.contains("Launch Site"));
+    assert!(g.check_order(Seat(0), &[], &into(5)).unwrap_err().0.contains("Move this Ship"));
+    let crossing = g.transit_cost_for(Seat(0), BodyId::Earth, BodyId::Moon).1;
+    assert_eq!(g.transit_fuel(Seat(0), g.ship(ship).unwrap(), BodyId::Earth, BodyId::Moon, None), crossing, "from low orbit, the crossing alone");
+    g.commit_orders(Seat(0), &[Order::ChangeOrbit { ship, slot: Some(5) }]);
+    assert_eq!(g.ship(ship).unwrap().fuel, 23.7, "16.3 Fuel from the tank of 40");
+    g.resolution_phase();
+    assert_eq!(g.ship(ship).unwrap().slot, Some(5));
+    g.ships.iter_mut().for_each(|s| s.arrived_this_turn = false);
+    // Ticket #486: from the far orbit a leg is priced from THERE, not by way of Earth; and a leg
+    // that names a far orbit to arrive in is priced to it.
+    assert_eq!(g.transit_fuel(Seat(0), g.ship(ship).unwrap(), BodyId::Earth, BodyId::Moon, None), 7.2, "Earth L4 to the Moon, where low orbit pays {crossing}");
+    let back = g.transit_cost_for(Seat(0), BodyId::Moon, BodyId::Earth).1;
+    let mut away = g.ship(ship).unwrap().clone();
+    away.at = ShipAt::Body(BodyId::Moon);
+    away.slot = None;
+    assert_eq!(g.transit_fuel(Seat(0), &away, BodyId::Moon, BodyId::Earth, Some(6)), 7.2, "the Moon to Earth L5");
+    assert_eq!((g.transit_fuel(Seat(0), &away, BodyId::Moon, BodyId::Earth, Some(0)), back), (3.7, 3.7), "the Moon home to an ordinary orbit");
+    // Founded from its own orbit: a Core and the Colonists aboard, no Materials.
+    let materials = g.seats[0].stockpile.materials;
+    assert!(g.check_order(Seat(0), &[], &into(5)).is_ok(), "{:?}", g.check_order(Seat(0), &[], &into(5)));
+    g.commit_orders(Seat(0), &[into(5)]);
+    g.resolution_phase();
+    let l4 = g.station_at(BodyId::Earth, 5).expect("Earth L4 founded").id;
+    assert_eq!(g.colony(l4).unwrap().colonists, 4);
+    assert_eq!(g.colony(l4).unwrap().control, Control::Controlled(Seat(0)));
+    assert_eq!(g.seats[0].stockpile.materials, materials, "no Materials paid");
+    assert_eq!(g.place_name(Place::Colony(l4)), "Earth L4", "named for itself alone");
+    // No lift reaches it.
+    let home = g.directed_states(Seat(0))[0];
+    g.state_mut(home).emigrants = 2;
+    let err = g.check_order(Seat(0), &[], &Order::LiftToStation { state: home, n: 1, colony: l4 }).unwrap_err().0;
+    assert!(err.contains("no lift reaches Earth L4"), "{err}");
+}
+
+/// Ticket #480 (version 0.09.8): the computer seats found at a far orbit from a loaded Colony Ship
+/// once every station slot over Earth that can be built in is taken, and not before.
+#[test]
+fn the_ai_founds_at_a_far_orbit_once_the_ordinary_slots_are_taken() {
+    let station = |g: &mut Game, seat: Seat, slot: u32| {
+        let id = ColonyId(g.fresh_id());
+        g.colonies.push(Colony { id, body: BodyId::Earth, slot, control: Control::Controlled(seat), modules: vec![Module::new(ModuleKind::Core)], colonists: 0, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
+    };
+    let board = |fill: bool, slot: Option<u32>, fuel: f64| {
+        let mut g = game();
+        calm(&mut g);
+        g.seats[0].stockpile.energy = 300.0;
+        if fill {
+            station(&mut g, Seat(2), 3);
+            station(&mut g, Seat(1), 4);
+        }
+        // The seat's own station is full, so its people have nowhere else over Earth to go.
+        let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
+        let room = g.habitat_room(g.colony(iss).unwrap());
+        g.colonies.iter_mut().find(|c| c.id == iss).unwrap().colonists = room;
+        let (ship, _) = colony_ship_ready(&mut g, BodyId::Earth);
+        let s = g.ships.iter_mut().find(|s| s.id == ship).unwrap();
+        s.slot = slot;
+        s.fuel = fuel;
+        // Nothing to top the tank up from, and no ground free on the Moon, the one Body in reach:
+        // what is left for the Ship is the far orbit or nothing.
+        g.seats[0].stockpile.fuel = 0.0;
+        while !g.free_slots_on(BodyId::Moon).is_empty() {
+            colony(&mut g, Seat(1), BodyId::Moon, &[], 0);
+        }
+        g
+    };
+    let far = |o: &Order| matches!(o, Order::ChangeOrbit { slot: Some(5 | 6), .. } | Order::Unload { into: UnloadTarget::Ring(BodyId::Earth, _), .. });
+    // In the far orbit, the five taken: it founds.
+    let orders = board(true, Some(5), 3.0).ai_orders(Seat(0));
+    assert!(orders.iter().any(|o| matches!(o, Order::Unload { into: UnloadTarget::Ring(BodyId::Earth, 5), .. })), "no station founded at Earth L4: {orders:?}");
+    // In low orbit with the tank to reach it and no other Body in reach: it goes out to found.
+    let orders = board(true, None, 17.0).ai_orders(Seat(0));
+    assert!(orders.iter().any(|o| matches!(o, Order::ChangeOrbit { slot: Some(5), .. })), "it does not go out to Earth L4: {orders:?}");
+    // While an ordinary slot stands free, neither.
+    for (slot, fuel) in [(Some(5), 3.0), (None, 17.0)] {
+        let orders = board(false, slot, fuel).ai_orders(Seat(0));
+        assert!(!orders.iter().any(far), "a far orbit is for when the five are taken: {orders:?}");
+    }
+}
+
+/// Ticket #481 (version 0.09.8): **the race to the Moon is everyone's to watch.** Each Faction's
+/// furthest step toward a landing is read off the board, the leader first; a loaded Colony Ship
+/// sent there before the first landing is the world's news; and the landing's Moment names the
+/// winner and how far each rival had got. Once somebody has landed the race is over.
+#[test]
+fn the_race_to_the_moon_is_everyones_to_watch() {
+    let mut g = game();
+    calm(&mut g);
+    let (cus, ark) = (Seat(0), Seat(2));
+    // The bare board: three stations with no Shipyard, and the Arkwrights with no station at all.
+    assert!(Seat::ALL.iter().all(|s| g.moon_step(*s) == MoonStep::NoShipyard));
+    assert_eq!(g.moon_race().unwrap().iter().map(|(s, _)| *s).collect::<Vec<_>>(), Seat::ALL.to_vec(), "all level: seat order");
+    // The steps, one at a time.
+    let iss = station_of(&g, cus, BodyId::Earth).unwrap();
+    g.colony_mut(iss).unwrap().modules.push(Module::new(ModuleKind::Shipyard));
+    assert_eq!(g.moon_step(cus), MoonStep::Shipyard);
+    let (ship, _) = colony_ship_ready(&mut g, BodyId::Earth);
+    g.ship_mut(ship).unwrap().colonists = 0;
+    assert_eq!(g.moon_step(cus), MoonStep::ColonyShip);
+    // An empty Colony Ship sent to the Moon is no news, and no step further.
+    let to_moon = Order::Transit { ship, to: BodyId::Moon, slot: None };
+    let sent = |g: &Game| g.report.lines.iter().filter(|l| l.text.contains("sent a Colony Ship to the Moon")).count();
+    g.ship_mut(ship).unwrap().colonists = 4;
+    assert_eq!(g.moon_step(cus), MoonStep::Aboard);
+    // The Arkwrights catch up as far as a Shipyard, and stand second.
+    let theirs = colony(&mut g, ark, BodyId::Mars, &[ModuleKind::Shipyard], 0);
+    let _ = theirs;
+    assert_eq!(g.moon_race().unwrap()[..2], [(cus, MoonStep::Aboard), (ark, MoonStep::Shipyard)], "the leader first");
+    // Loaded and sent: the world reads it, with no place and no seat for the fog to hide it by.
+    g.commit_orders(cus, std::slice::from_ref(&to_moon));
+    assert_eq!(sent(&g), 1);
+    let line = g.report.lines.iter().find(|l| l.text.contains("sent a Colony Ship")).unwrap();
+    assert_eq!((line.text.as_str(), line.place, line.by), ("Custodians sent a Colony Ship to the Moon.", None, None));
+    assert_eq!(g.moon_step(cus), MoonStep::Bound);
+    g.resolution_phase();
+    assert_eq!(g.moon_step(cus), MoonStep::InOrbit);
+    // The landing: the race is over, and its Moment says who won and where each rival stood.
+    g.ships.iter_mut().for_each(|s| s.arrived_this_turn = false);
+    let slot = g.free_slots_on(BodyId::Moon)[0];
+    g.commit_orders(cus, &[Order::Unload { ship, colonists: 4, army: false, into: UnloadTarget::Slot(BodyId::Moon, slot) }]);
+    g.resolution_phase();
+    assert_eq!(g.moon_step(cus), MoonStep::Landed);
+    assert_eq!(g.first_at(BodyId::Moon).map(|(s, _)| s), Some(cus));
+    assert!(g.moon_race().is_none(), "over once somebody has landed");
+    let moment = g.report.moments.iter().find(|m| m.kind == MomentKind::FirstToABody).expect("the landing's Moment");
+    assert!(moment.text.starts_with("Custodians win the race to the Moon. "), "{}", moment.text);
+    assert!(moment.text.contains("Arkwrights had a Shipyard") && moment.text.contains("Prospectors had no Shipyard") && moment.text.contains("Archivists had no Shipyard"), "{}", moment.text);
+    assert!(moment.text.contains("is theirs; Unrest eased by"), "{}", moment.text);
+    assert_eq!(g.report.moments.iter().filter(|m| m.kind == MomentKind::FirstToABody).count(), 1, "one Moment, not the old and the new");
+    // After the landing a Colony Ship sent to the Moon is no longer the world's news.
+    let before = sent(&g);
+    let (second, _) = colony_ship_ready(&mut g, BodyId::Earth);
+    g.commit_orders(cus, &[Order::Transit { ship: second, to: BodyId::Moon, slot: None }]);
+    assert_eq!(sent(&g), before);
+    // Another Body's first landing keeps the words it had.
+    let (third, _) = colony_ship_ready(&mut g, BodyId::Mars);
+    let site = g.free_slots_on(BodyId::Mars)[0];
+    g.commit_orders(cus, &[Order::Unload { ship: third, colonists: 4, army: false, into: UnloadTarget::Slot(BodyId::Mars, site) }]);
+    g.resolution_phase();
+    assert!(g.report.moments.iter().any(|m| m.text.contains("are first to settle Mars")), "{:?}", g.report.moments.iter().map(|m| m.text.clone()).collect::<Vec<_>>());
 }
 
 /// Ticket #93: the AI raises a station at Venus when a Ship of its own stands there. Ticket #442
@@ -8093,7 +8410,10 @@ fn a_cold_seat_marches_on_a_rivals_region_a_cordial_one_does_not_and_an_occupier
     for a in g.armies.iter_mut().filter(|a| a.standing && a.home == ArmyHome::State(neutral)) {
         a.damage = 3;
     }
-    assert!(g.ai_orders(Seat(0)).iter().any(|o| matches!(o, Order::MoveArmy { to, .. } if *to == neutral)), "a weak neutral next door is marched on with no cause: {:?}", g.ai_orders(Seat(0)));
+    // Ticket #482 (version 0.09.8): China borders Iran's Region too now, and the seat may take
+    // that neutral neighbour for the weak one; either way it marches on a neutral with no cause.
+    let orders = g.ai_orders(Seat(0));
+    assert!(orders.iter().any(|o| matches!(o, Order::MoveArmy { to, .. } if g.state(*to).control == Control::Neutral)), "a weak neutral next door is marched on with no cause: {orders:?}");
 
     // An occupier stays: an Army at a place this seat occupies is offered no march.
     let mut g = game();
@@ -8511,7 +8831,7 @@ fn an_order_after_a_launch_rearm_or_bombard_is_refused() {
     let iss = g.colonies.iter().find(|c| c.in_orbit && c.body == BodyId::Earth && c.control.director() == Some(Seat(0))).map(|c| c.slot).expect("the ISS");
     let ship = carrier_in(&mut g, Seat(0), BodyId::Earth, Some(iss), true);
     g.seats[0].stockpile.fuel = 100.0;
-    g.ship_mut(ship).unwrap().fuel = 10.0;
+    g.ship_mut(ship).unwrap().fuel = 20.0;
     // Each of the three is lawful on its own, so a refusal can only be the one-order rule.
     for t in [Order::ChangeOrbit { ship, slot: None }, Order::Transit { ship, to: BodyId::Moon, slot: None }, Order::Refuel { ship }] {
         assert!(g.check_order(Seat(0), &[], &t).is_ok(), "{t:?} alone is lawful");
@@ -12278,7 +12598,9 @@ fn the_computer_bombards_with_cause_and_the_orbit_held() {
     g.ships.retain(|s| s.at != ShipAt::Body(BodyId::Mars));
     let ship = ShipId(g.fresh_id());
     let name = g.next_ship_name(UnitKind::Battleship);
-    g.ships.push(Ship { id: ship, name, kind: UnitKind::Battleship, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None });
+    g.ships.push(Ship { id: ship, name, kind: UnitKind::Battleship, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 10.0, slot: None });
+    // Ticket #486 (version 0.09.8): the hull holds 10 Fuel, short of the leg home. With a full tank
+    // it now flies to blockade the rival's station over Earth instead, the homeward leg being cheap.
     let calm_orders: Vec<Order> = g.ai_orders(Seat(0));
     assert!(!calm_orders.iter().any(|o| matches!(o, Order::Bombard { .. })), "no cause, no Bombard: {calm_orders:?}");
     g.relations.score[0][1] = -8;
@@ -12507,7 +12829,7 @@ fn four_makers_the_factory_makes_widgets_the_mine_makes_materials_and_the_start_
         let card = fresh.tables.state(sid);
         let factories = card.start_facilities.iter().filter(|k| **k == FacilityKind::Factory).count();
         let mines = card.start_facilities.iter().filter(|k| **k == FacilityKind::Mine).count();
-        assert_eq!(factories + usize::from(sid == StateId::Pakistan), mines, "{}: a Mine beside every Factory", card.name);
+        assert_eq!(factories + usize::from(sid == StateId::Kazakhstan), mines, "{}: a Mine beside every Factory", card.name);
         let standing_mines = fresh.state(sid).facilities.iter().filter(|f| f.kind == FacilityKind::Mine).count();
         let standing_factories = fresh.state(sid).facilities.iter().filter(|f| f.kind == FacilityKind::Factory).count();
         if fresh.state(sid).control.controller().is_none() {
@@ -13106,7 +13428,7 @@ fn a_new_ship_starts_in_the_orbit_of_the_yard_that_built_it() {
     let mut g = game();
     let total: usize = BodyId::ALL.iter().map(|b| g.orbits_of(*b).len()).sum();
     // Ticket #442 (version 0.09.6): Venus has no low orbit, so 20 where it was 21.
-    assert_eq!(total, 20, "low orbit where there is ground, plus one per Orbital Slot, over six Bodies");
+    assert_eq!(total, 22, "low orbit where there is ground, plus one per Orbital Slot, over six Bodies");
     assert_eq!(g.orbits_of(BodyId::Mars)[0], Orbit::Low, "low orbit is the first of them");
     assert_eq!(g.orbit_name(BodyId::Mars, Orbit::Low), "Mars, low orbit");
     let iss = station_of(&g, Seat(0), BodyId::Earth).expect("the ISS");
@@ -17270,7 +17592,7 @@ fn a_throw_off_of_the_player_is_under_your_works() {
 #[test]
 fn an_occupation_begun_or_broken_by_the_player_is_under_your_works() {
     let occupation = |g: &Game| g.report.lines.iter().find(|l| l.kind == LineKind::Occupation).map(|l| (l.mine, l.text.clone())).expect("an Occupation line");
-    for (home, mine) in [(StateId::EastAsia, true), (StateId::Australia, false)] {
+    for (home, mine) in [(StateId::EastAsia, true), (StateId::ArabianPeninsula, false)] {
         let mut g = game();
         g.armies.retain(|a| a.home != ArmyHome::State(StateId::Europe));
         let army = occupier_in(&mut g, home, StateId::Europe);
@@ -19115,31 +19437,54 @@ fn an_offline_building_records_why() {
     assert!(!shut.is_empty() && shut.iter().all(|f| f.offline_cause == Some(OfflineCause::Energy)), "Energy: {shut:?}");
 }
 
-/// Ticket #453 (version 0.09.6): two Regions join the board. Pakistan is cut out of India's and
-/// China's, the United Kingdom out of the European Union's, and each split shares out its parents'
-/// people, GDP and Influence rather than inventing more.
+/// Ticket #453 (version 0.09.6): two Regions join the board, and each split shares out its parents'
+/// people, GDP and Influence rather than inventing more. The United Kingdom is cut out of the
+/// European Union's. Pakistan was cut out of India's and China's.
+/// Ticket #482 (version 0.09.8): **the Regions redrawn around Iran, to eighteen.** Iran's Region is
+/// Iran, Pakistan and Afghanistan; Turkey's is Turkey, the Levant, Iraq and the Caucasus; the card
+/// that was Pakistan's is Kazakhstan's, the five republics alone and landlocked; and South Africa
+/// is cut out of Nigeria's. People and GDP are shared exactly; one Influence is added.
 #[test]
-fn pakistan_and_the_united_kingdom_share_out_their_parents() {
+fn the_regions_are_redrawn_around_iran_to_eighteen() {
     let g = game();
     let t = &g.tables;
-    assert_eq!(StateId::ALL.len(), 16);
+    assert_eq!(StateId::ALL.len(), 18);
     let card = |s: StateId| t.state(s);
-    let (pk, uk) = (card(StateId::Pakistan), card(StateId::UnitedKingdom));
-    assert_eq!((pk.name.as_str(), uk.name.as_str()), ("Pakistan", "The United Kingdom"));
-    let three = [StateId::SouthAsia, StateId::EastAsia, StateId::Pakistan];
-    assert_eq!(three.iter().map(|s| card(*s).population).sum::<f64>(), 1940.0 + 1440.0, "India's and China's people, shared three ways");
-    assert_eq!(three.iter().map(|s| card(*s).gdp).sum::<i64>(), 4 + 17);
-    assert_eq!(three.iter().map(|s| card(*s).influence).sum::<i64>(), 2 + 3);
-    assert_eq!((pk.population, pk.gdp, pk.influence, pk.industry_level, pk.size), (350.0, 2, 1, 1, 2));
+    let (ir, tr, kz, za, ng, uk) = (card(StateId::MiddleEast), card(StateId::Turkey), card(StateId::Kazakhstan), card(StateId::SouthAfrica), card(StateId::SubSaharanAfrica), card(StateId::UnitedKingdom));
+    assert_eq!([ir.name.as_str(), tr.name.as_str(), kz.name.as_str(), za.name.as_str(), ng.name.as_str(), uk.name.as_str()], ["Iran", "Turkey", "Kazakhstan", "South Africa", "Nigeria", "The United Kingdom"]);
+    // The two old cards' 600 people, 5 GDP and 3 Influence, shared three ways.
+    let three = [StateId::MiddleEast, StateId::Turkey, StateId::Kazakhstan];
+    assert_eq!(three.iter().map(|s| card(*s).population).sum::<f64>(), 250.0 + 350.0);
+    assert_eq!(three.iter().map(|s| card(*s).gdp).sum::<i64>(), 3 + 2);
+    assert_eq!(three.iter().map(|s| card(*s).influence).sum::<i64>(), 2 + 1);
+    assert_eq!((ir.population, ir.gdp, ir.influence, ir.industry_level, ir.size, ir.coastal_exposure), (345.0, 1, 1, 2, 2, 1));
+    assert_eq!((tr.population, tr.gdp, tr.influence, tr.industry_level, tr.size, tr.coastal_exposure), (185.0, 3, 1, 2, 2, 1));
+    assert_eq!((kz.population, kz.gdp, kz.influence, kz.industry_level, kz.size, kz.coastal_exposure), (70.0, 1, 1, 1, 2, 0));
+    // Nigeria's 1,140 people and 2 GDP, shared two ways; its 1 Influence kept, and 1 added.
+    assert_eq!(ng.population + za.population, 1140.0);
+    assert_eq!((ng.gdp + za.gdp, ng.influence, za.influence), (2, 1, 1));
+    assert_eq!((za.population, za.gdp, za.industry_level, za.size, za.coastal_exposure), (210.0, 1, 2, 2, 2));
+    // The United Kingdom's share of the European Union's, as ticket #453 left it.
     let two = [StateId::Europe, StateId::UnitedKingdom];
     assert_eq!(two.iter().map(|s| card(*s).population).sum::<f64>(), 600.0);
     assert_eq!(two.iter().map(|s| card(*s).gdp).sum::<i64>(), 20);
     assert_eq!(two.iter().map(|s| card(*s).influence).sum::<i64>(), 5);
     assert_eq!((uk.population, uk.gdp, uk.influence, uk.industry_level, uk.size), (75.0, 3, 1, 3, 1));
     assert_eq!(StateId::ALL.iter().map(|s| card(*s).population).sum::<f64>(), 7860.0, "nobody was invented");
-    // Pakistan lies between India and Iran, so those two no longer touch; every edge is on both cards.
-    assert!(!card(StateId::SouthAsia).neighbours.contains(&StateId::MiddleEast));
-    assert_eq!(pk.neighbours, vec![StateId::SouthAsia, StateId::EastAsia, StateId::MiddleEast, StateId::Russia]);
+    // Leans and starts, as the designer set them.
+    use dying_earth_engine::Resource;
+    assert_eq!([ir.resource_lean, tr.resource_lean, kz.resource_lean, za.resource_lean], [Resource::Fuel, Resource::Materials, Resource::Fuel, Resource::Materials]);
+    assert_eq!(tr.start_facilities, vec![FacilityKind::Factory, FacilityKind::Mine, FacilityKind::PowerPlant], "a Mine beside its Factory, as every start Factory has");
+    assert_eq!(za.start_facilities, vec![FacilityKind::Mine, FacilityKind::PowerPlant, FacilityKind::Factory]);
+    // Kazakhstan is the one landlocked Region: no coastal slot, and nothing for the sea to take.
+    assert_eq!((g.coastal_slots(StateId::Kazakhstan), g.inland_slots(StateId::Kazakhstan)), (0, g.build_slots(StateId::Kazakhstan)));
+    assert!(StateId::ALL.iter().filter(|s| **s != StateId::Kazakhstan).all(|s| g.coastal_slots(*s) > 0), "every other Region has a coast");
+    // Pakistan is Iran's now, so India and Iran touch again; Iran no longer touches Europe or Africa.
+    assert!(card(StateId::SouthAsia).neighbours.contains(&StateId::MiddleEast));
+    assert_eq!(ir.neighbours, vec![StateId::Turkey, StateId::Kazakhstan, StateId::EastAsia, StateId::SouthAsia, StateId::ArabianPeninsula]);
+    assert_eq!(tr.neighbours, vec![StateId::Europe, StateId::Russia, StateId::NorthAfrica, StateId::ArabianPeninsula, StateId::MiddleEast]);
+    assert_eq!(kz.neighbours, vec![StateId::Russia, StateId::EastAsia, StateId::MiddleEast]);
+    assert_eq!(za.neighbours, vec![StateId::SubSaharanAfrica]);
     assert_eq!(uk.neighbours, vec![StateId::Europe, StateId::NorthAmerica]);
     for a in StateId::ALL {
         for b in &card(a).neighbours {
@@ -19295,7 +19640,9 @@ fn the_reports_templates_stay_under_their_word_ceiling() {
         .filter_map(|l| l.split_once(" = \""))
         .map(|(_, v)| v.trim_end().trim_end_matches('"').split_whitespace().count())
         .sum();
-    assert!(words <= 1727, "the Report's templates hold {words} words; the ceiling is 1,727 (15% off 2,031)");
+    // Ticket #481 (version 0.09.8): the ceiling rises by the 54 words of the race to the Moon, a
+    // new thing the Report says; the 15% cut of what it said before stands.
+    assert!(words <= 1781, "the Report's templates hold {words} words; the ceiling is 1,781 (15% off 2,031, and 54 for the race to the Moon)");
     // "The" is gone before a Faction's name, which is drawn in its colour instead.
     assert!(!text.contains("he {faction}"), "a template still says \"the {{faction}}\"");
 }
@@ -19422,6 +19769,51 @@ fn a_neutral_coastal_region_builds_a_sea_wall_when_the_sea_is_close() {
     assert!(walled(&g, egypt), "and it comes with the Region");
 }
 
+/// Ticket #478 (version 0.09.8): **the Prospectors' Opening Objective wants three Incomes running**
+/// with a working Investment Bank in three places, and pays 50 Ducats; an Income with one of the
+/// three not working starts the count again.
+#[test]
+fn the_prospectors_opening_objective_wants_three_turns_running() {
+    let mut g = game();
+    calm(&mut g);
+    let pro = Seat(1);
+    assert_eq!(g.kind(pro), FactionKind::Prospectors);
+    let card = g.tables.faction(FactionKind::Prospectors).opening.clone();
+    assert_eq!((card.count, card.turns, card.reward), (3, 3, 50.0));
+    assert_eq!(card.text, "Keep a working Investment Bank in three places for three turns");
+    assert_eq!(card.reward_text, "50 Ducats into the Venture Capital Fund");
+    for kind in [FactionKind::Custodians, FactionKind::Arkwrights, FactionKind::Archivists] {
+        assert_eq!(g.tables.faction(kind).opening.turns, 1, "{kind:?} is met the Income it is true");
+    }
+    g.seats[1].stockpile.energy = 500.0;
+    g.seats[1].venture_share = 0.0;
+    g.take_control(StateId::Russia, pro);
+    g.take_control(StateId::MiddleEast, pro);
+    for sid in [StateId::Europe, StateId::Russia, StateId::MiddleEast] {
+        g.state_mut(sid).facilities.push(facility(FacilityKind::InvestmentBank));
+    }
+    let fund = g.seats[1].venture_fund;
+    g.income_phase();
+    g.income_phase();
+    assert_eq!((g.seat(pro).opening_met_turn, g.seat(pro).opening_run), (None, 2), "two turns of three");
+    // One of the three stops working: the count starts again.
+    let bank = |g: &mut Game, on: bool| g.state_mut(StateId::MiddleEast).facilities.iter_mut().filter(|f| f.kind == FacilityKind::InvestmentBank).for_each(|f| f.mothballed = !on);
+    bank(&mut g, false);
+    g.income_phase();
+    assert_eq!((g.seat(pro).opening_met_turn, g.seat(pro).opening_run), (None, 0), "a turn with one not working starts the count again");
+    bank(&mut g, true);
+    g.income_phase();
+    let first = g.seats[1].venture_fund;
+    g.income_phase();
+    assert_eq!((g.seat(pro).opening_met_turn, g.seat(pro).opening_run), (None, 2));
+    // The Fund grows a little each Income of its own accord; the reward is 50 on top of that.
+    let (second, grows) = (g.seats[1].venture_fund, g.seats[1].venture_fund - first);
+    assert!(second - fund < 50.0, "nothing paid before the third: {second} from {fund}");
+    g.income_phase();
+    assert_eq!(g.seat(pro).opening_met_turn, Some(g.turn), "the third Income running");
+    assert!((g.seats[1].venture_fund - (second + grows + 50.0)).abs() < 1e-9, "50 Ducats into the Fund: {} from {second}, which grows {grows} a turn", g.seats[1].venture_fund);
+}
+
 /// Ticket #471 (version 0.09.7): **each Faction has an opening objective**, with no deadline, met
 /// at the first Income it is true and rewarded once, toward its own Victory.
 #[test]
@@ -19469,17 +19861,21 @@ fn each_faction_has_an_opening_objective_met_once_and_rewarded() {
     g.state_mut(StateId::MiddleEast).facilities.push(facility(FacilityKind::InvestmentBank));
     colony(&mut g, arc, BodyId::Moon, &[ModuleKind::Observatory], 1);
     g.income_phase();
-    assert_eq!(g.seat(pro).opening_met_turn, Some(g.turn));
-    assert!(g.seats[1].venture_fund >= fund + 75.0, "75 Ducats into the Fund: {} from {fund}", g.seats[1].venture_fund);
     assert_eq!(g.seat(arc).opening_met_turn, Some(g.turn));
     assert_eq!(g.seats[3].archive_fund, archive + 10, "10 Research into the Archive fund");
+    // Ticket #478 (version 0.09.8): the Prospectors' wants three Incomes running; one is one of three.
+    assert_eq!((g.seat(pro).opening_met_turn, g.seat(pro).opening_run), (None, 1), "one turn of three");
+    g.income_phase();
+    g.income_phase();
+    assert_eq!(g.seat(pro).opening_met_turn, Some(g.turn));
+    assert!(g.seats[1].venture_fund >= fund + 50.0, "50 Ducats into the Fund: {} from {fund}", g.seats[1].venture_fund);
     // Once only.
     let (sink, fund, archive) = (g.climate.natural_sink, g.seats[1].venture_fund, g.seats[3].archive_fund);
     g.seats[1].venture_share = 0.0;
     g.income_phase();
     assert_eq!(g.climate.natural_sink, sink);
     assert_eq!(g.seats[3].archive_fund, archive);
-    assert!(g.seats[1].venture_fund < fund + 75.0, "not paid twice: {}", g.seats[1].venture_fund);
+    assert!(g.seats[1].venture_fund < fund + 50.0, "not paid twice: {}", g.seats[1].venture_fund);
     // The player's own is reported under Your works; a rival's is not reported at all.
     assert!(g.report.lines.iter().all(|l| !l.text.contains("Opening objective")) || g.report.lines.iter().filter(|l| l.text.contains("Opening objective")).all(|l| l.kind == LineKind::YourWorks));
 }

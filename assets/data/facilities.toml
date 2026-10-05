@@ -314,10 +314,16 @@ exchange_ducats = 1
 chorus_colonists = 6
 
 # Ticket #332 (version 0.09.0): a raise is a build like any other, four Widgets for its one turn.
+# Ticket #479 (version 0.09.8): the price rises with every raise standing in the Region above its
+# card's level, whoever made it: 30 and 4, then 40 and 5, then 50 and 6. The Prospectors pay half
+# the Materials at every step: 15, 20, 25.
 [industry_level]
 materials = 30
 materials_cheap_industry = 15
 widgets = 4
+materials_step = 10
+materials_cheap_step = 5
+widgets_step = 1
 
 # Ticket #332 (version 0.09.0): what a Region makes in Widgets a turn with no Factory at all: a flat
 # `region_base` plus `per_industry_level` per point of Industry Level (1 to 3), at the designer's

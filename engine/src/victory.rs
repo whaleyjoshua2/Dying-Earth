@@ -332,13 +332,19 @@ impl Game {
     }
 
     /// Ticket #471: read at the end of every Income. An objective is met at the first Income it is
-    /// true, once, and its reward is paid then; there is no deadline, so none is ever missed. The
+    /// true, once, and its reward is paid then; there is no deadline, so none is ever missed.
+    /// Ticket #478 (version 0.09.8): or at the last of `turns` Incomes running, where its card asks
+    /// for more than one; an Income where it is false starts that count again. The
     /// player's own is reported under Your works. A rival's is logged and not reported: the
     /// designer keeps rivals' objectives quiet.
     pub fn opening_objectives(&mut self) {
         use crate::data::OpeningKind;
         for seat in Seat::ALL {
-            if self.seat(seat).opening_met_turn.is_none() && self.opening_true(seat) {
+            if self.seat(seat).opening_met_turn.is_none() {
+                let run = if self.opening_true(seat) { self.seat(seat).opening_run + 1 } else { 0 };
+                self.seat_mut(seat).opening_run = run;
+            }
+            if self.seat(seat).opening_met_turn.is_none() && self.seat(seat).opening_run >= self.tables.faction(self.kind(seat)).opening.turns {
                 let card = self.tables.faction(self.kind(seat)).opening.clone();
                 self.seat_mut(seat).opening_met_turn = Some(self.turn);
                 match card.kind {

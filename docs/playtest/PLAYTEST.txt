@@ -1,4 +1,4 @@
-DYING EARTH - playtest build, version 0.09.7
+DYING EARTH - playtest build, version 0.09.8
 ============================================
 
 Thanks for playing. This is an early build of a turn-based strategy game about colonizing
@@ -16,63 +16,73 @@ HOW TO RUN
 4. The very first launch shows a blank dark window for up to ten seconds while it
    compiles graphics. Later launches are quick.
 5. Needs Windows 10 or 11, 64-bit, and any graphics card from the last ten years.
-6. Saves from 0.09.6 load in this version and play by its rules. Saves from 0.09.5 and
-   before will not load; the Load screen says so.
+6. Saves from 0.09.7 and before will not load: the map has two more countries. The Load
+   screen says so.
 7. This version ships for Windows and for Linux. On Linux, read RUN-ON-LINUX.txt in the
    folder instead of steps 2 to 5.
 
-WHAT CHANGED SINCE 0.09.6
+WHAT CHANGED SINCE 0.09.7
 -------------------------
-The tightening version: every side has an opening objective, the report is shorter and
-in colour, and several figures moved. The computer plays every rule below.
+The Moon race version: the first landing on the Moon is a contest you can watch, fuel
+follows real spaceflight, and the map has eighteen countries. The computer plays every
+rule below.
+
+THE SKY
+- THE RACE TO THE MOON. Until somebody lands, the Moon's card lists how far each side has
+  got: a Shipyard, a Colony Ship, people aboard, on the way, in orbit. You see it whether
+  or not you can see their ships. The Report says when anyone sends a loaded Colony Ship
+  there, and the landing gets a pop-up naming the winner and where everyone else stood.
+- FUEL FOLLOWS REAL SPACEFLIGHT. Every trip costs what it would really cost, and the way
+  out and the way back are priced separately:
+    From Earth: the Moon 15.7, Venus 17.4, Mars 18.1, Phobos 19.7, Deimos 19.9.
+    Home to Earth is cheap, because Earth's air does the braking: 3.7 from the Moon,
+      12.1 from Mars.
+    From the Moon everything is about half Earth's price: Mars is 9.0.
+  A full tank (30, or 35 for a Colony Ship) reaches one place from Earth; plan to refuel.
+- VENUS TO MARS is a trip you can make now, four turns at its own launch window.
+- EARTH L4 AND EARTH L5: two new places for a station, far from Earth on its path round
+  the Sun. You cannot build there from the ground or lift people to them. Fly a loaded
+  Colony Ship there (16.3 Fuel) and found the station from the ship. They are on the
+  Solar System map, not Earth's.
+- A MASS DRIVER takes a quarter off the Fuel of every trip leaving its world, where it
+  took a flat 4.
+
+THE MAP
+- EIGHTEEN COUNTRIES, up from sixteen. Iran now includes Pakistan and Afghanistan. Turkey
+  is new, with Iraq, Syria, Israel, Jordan, Lebanon and the Caucasus. Kazakhstan is
+  Central Asia on its own and has no coast, so the sea takes nothing from it. South
+  Africa is new, split from Nigeria, with its neighbours up to Angola and Mozambique.
+- THE CLIMATE IS KINDER, to make up for the extra countries' industry: the world absorbs
+  8 ppm a turn, up from 6, and each half degree takes 330 ppm, up from 300.
 
 THE RULES THAT MOVED
-- AN OPENING OBJECTIVE FOR EACH SIDE, with no deadline and a reward toward winning:
-    Custodians - have a Scrubber working: +0.5 ppm on the Natural Sink, for good.
-    Prospectors - a working Investment Bank in three different countries: 75 Ducats
-      into the Venture Capital Fund.
-    Arkwrights - found a Colony on the Moon, ground or orbit: a free Launch Site in a
-      country of yours that has none.
-    Archivists - two Research Labs or Observatories working, one off Earth: 10 Research
-      into the Archive fund.
-  Yours is on the new JOURNAL tab of the Victory window. Rivals' are not shown.
-- NEUTRAL COUNTRIES BUILD SEA WALLS once Coastal Engineering is researched and the sea is
-  close. The wall comes with the country when you take it, and you pay its keep.
-- THE ARCHIVE FUND IS LOST if the colony holding the Archive changes hands. Uploads are
-  kept.
-- PLANETARY STEWARDSHIP adds 1.5 ppm to the Sink, up from 1.0.
-- THE CUSTODIANS' RESEARCH DIRECTIVE adds 0.02 ppm to the Sink a point, up from 0.01.
-- A STRIP PERMIT leaves +2 Unrest behind, down from +3.
-
-THE COMPUTER
-- IT LEAVES RIVALS' WINNING TECHS UNTIL LAST, and holds back half its Research while one
-  is being researched.
-- IT GOES AFTER THE ARCHIVE once the fund is half full, if it has cause; the Archivists
-  defend it.
-- THE CUSTODIANS pour Research into the Sink once Planetary Stewardship stands.
+- RAISING A COUNTRY'S INDUSTRY LEVEL COSTS MORE EACH TIME: 30 Materials and 4 Widgets,
+  then 40 and 5, then 50 and 6. The Prospectors pay half the Materials.
+- THE PROSPECTORS' OPENING OBJECTIVE pays 50 Ducats, down from 75, and wants a working
+  Investment Bank in three countries for three turns in a row. The Journal shows the
+  count.
 
 THE WINDOW
-- THE REPORT IS IN COLOUR AND SHORTER. Each side's name, and each held country's, is in
-  its owner's colour. A side's recruiting is one line.
-- THE TEMPERATURE IS A RING AROUND END TURN: red from 8 o'clock toward 4 as the world
-  warms, a notch at each Break. Hover it for the figures; click it for the Climate Panel.
-- A CLOCK at the right of the top bar shows the real time; hover it to see how long you
-  have been playing.
-- THE TUTORIAL HAS A SEVENTH NOTE, on Blame, Greenwash and Smear.
-- THE FINAL REPORT'S TABLE shows what each side made over the whole game, with what it
-  had left in brackets.
-- SIX HOVERS ARE SHORTER: a country's own Army, war emissions, what a Relay shows, battle
-  odds, the Blockade, and Widgets.
+- RAISE INDUSTRY LEVEL IS A TILE, the last one among a country's building boxes, in red.
+  Click it to order the raise; right-click to take it back. The button is gone.
+- CARD HEADINGS ARE BIGGER, each with a small picture: Influence, Pioneers, Policies,
+  Facilities, Armies, Orders.
+- A COUNTRY'S CARD is shorter: "Region population 385.6 (386M)" and "GDP 23: Industry
+  Level 3, leans Fuel". Hover the GDP line for what it pays.
+- A COLONY'S CARD shows its people as a real number: "14/16 (14.2M)".
+- THE TUTORIAL is about a seventh shorter.
 
 WHAT WE WANT TO KNOW
 --------------------
 Write down anything, however small. Especially:
 - The moment you were not sure what to do next.
 - Anything you clicked that did nothing, or did something you did not expect.
-- THE OPENING OBJECTIVE: did you notice it? Did you go for it? Was the reward worth it?
-- THE RING: did you read the temperature off it, or still open the Climate Panel?
-- THE REPORT: is it easier to see who did what? Is anything now too short to understand?
-- THE ARCHIVE: as the Archivists, did you guard it? As a rival, did you go for it?
+- THE MOON RACE: did you watch it? Did it change what you did?
+- FUEL: did you run a ship dry? Did you use the Moon as a stepping stone? Is the cheap
+  trip home obvious?
+- EARTH L4 AND L5: did you find them? Did you found a station there, and why?
+- THE RAISE TILE: did you find it without the button?
+- THE NEW COUNTRIES: is it clear who borders whom around Iran and Turkey?
 - The turn the game got boring, if it did, and the turn you felt you had lost.
 - Crashes: what you were doing, and the "Seed" number shown on the title screen and
   the game-over screen. With the seed the game can be replayed exactly.
@@ -86,14 +96,16 @@ first. These are known. You do not need to report them.
 
 WHAT THIS VERSION KNOWS ABOUT ITSELF
 
-- THE WIN COLUMN: Custodians 8, Prospectors 21, Arkwrights 18, Archivists 5, where last
-  version was 5 / 3 / 11 / 15. The opening objectives moved it most; why they moved it
-  so far is not yet known.
-- THE WORLD COLLAPSES IN 28 GAMES OF 80, where it was 46.
-- THE ARCHIVISTS SCORE NOTHING at the end in 51 games of 80.
-- THE COMPUTER ARKWRIGHTS reach the Moon late: they meet their objective in 47 games of
-  80, around turns 15 to 29.
-- THE ARCHIVE IS TAKEN in about one game in four between computers.
+- THE WIN COLUMN: Custodians 9, Prospectors 27, Arkwrights 18, Archivists 7, where last
+  version was 8 / 21 / 18 / 5. The Prospectors win too often; the kinder climate gave
+  them most of the games it saved.
+- THE WORLD COLLAPSES IN 17 GAMES OF 80, where it was 28. Fourteen of the 17 are games
+  where the Prospectors go first and start in China.
+- THE ARCHIVISTS SCORE NOTHING at the end in 53 games of 80.
+- THE COMPUTER NEVER USES EARTH L4 OR L5, AND NEVER BUILDS A MASS DRIVER. Both are yours.
+- THE COMPUTER ARKWRIGHTS reach the Moon late: they meet their objective in 29 games of
+  80.
+- A COMPUTER SIDE NOW STARTS IN SOUTH AFRICA, where one used to start in Australia.
 - THE SLIDER FOR THE VENTURE FUND AND THE RESEARCH DIRECTIVE ON THE TOP BAR IS SHORT, so
   fine settings are easier in the Victory window and the Tech Tree.
 

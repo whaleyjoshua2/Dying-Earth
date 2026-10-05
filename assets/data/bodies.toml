@@ -1,16 +1,29 @@
 # Spec section 4.1. Yields multiply what a Module produces, never what it costs.
-# transit_turns and transit_fuel are from Earth (the Moon counts as Earth for reach). A Body with a
-# parent is that parent's satellite: local_turns and local_fuel are the hop between them, and two
-# satellites of the same parent are sibling_turns and sibling_fuel apart (ticket #45).
+# transit_turns and transit_delta_v are from Earth (the Moon counts as Earth for reach). A Body with a
+# parent is that parent's satellite: local_turns and local_delta_v are the hop between them, and two
+# satellites of the same parent are sibling_turns and sibling_delta_v apart (ticket #45).
 # Every Colony Slot is a real place on its Body, at its approximate longitude and latitude (east
 # positive), and a Colony there takes its name (ticket #45).
 
 sibling_turns = 1
-sibling_fuel = 1
+# Ticket #485 (version 0.09.8): **a leg's Fuel is its real delta-v times one scale.** Every leg below
+# carries its delta-v in km/s, orbit to orbit, from `docs/research/delta-v.md`: a Ship brakes on air
+# where there is air, as missions have flown it -- a burn into a loose orbit, then months of passes
+# through the upper air (Mars, Venus, and a little at Phobos; none at the Moon or Deimos). The scale is the designer's: 4 Fuel a km/s, after 4.5 was swept and found no different.
+# Phobos to Deimos is 0.75 km/s. Ticket #486 prices every other journey: see the foot of this file.
+fuel_per_delta_v = 4.0
+sibling_delta_v = 0.75
+
 # Ticket #335 (version 0.09.0): moving a Ship between two orbits of one Body -- low orbit and the
 # Orbital Slots -- is an order costing this much Fuel from the Ship's own tank, the sibling hop's
 # figure at the designer's word. Refused below it.
 orbit_change_fuel = 1
+# Ticket #480 (version 0.09.8): a FAR ORBIT -- Earth's L4 and L5 -- is farther out. A move to or from
+# one costs its delta-v in Fuel from the tank and a turn, from any other orbit of its Body; a leg between
+# Bodies pays it on top of the crossing for a far orbit it leaves and for one it names to arrive in.
+# A far orbit is reached only by Ship: its station is founded by a Colony Ship in it, as at Venus,
+# never built from a Launch Site, and no lift reaches it. A Body's `far_slots` are the LAST that many
+# of its Orbital Slots.
 # Version 0.04 (ticket #46): a Space Station is built for this many Materials into a free orbital
 # slot, from a Nation State with a Launch Site (over Earth) or a Colony (elsewhere); no crew needed.
 # It holds only a Shipyard and Habitats. Ships are built only at Shipyards. Each Body names its
@@ -45,7 +58,8 @@ first_windfall = 0
 # Earth with no transit. Cold and Fuel-leaning: good for Refineries, poor for Habitats and Generators.
 # Its Colonists live on Earth (no Off-world Presence) and its Modules emit like Facilities.
 transit_turns = 0
-transit_fuel = 0
+leave_delta_v = 3.2
+arrive_delta_v = 0.54
 # Ticket #397 (version 0.09.3): what a Trade Post anywhere is paid a turn for the Faction holding
 # this Body (a Colony, a station or, on Earth, a Region), by its distance from Earth: the designer's
 # Earth 3, the Moon 3.5, Venus 4, Mars 5, Phobos 6, Deimos 6, where a flat 3 stood for every Body.
@@ -56,8 +70,9 @@ mine_yield = 1.75
 generator_yield = 0.75
 refinery_yield = 2.0
 research_yield = 1.0
-orbital_slots = 5
-stations = ["ISS", "Tiangong", "Axiom", "Orbital Reef", "Starlab"]
+orbital_slots = 7
+stations = ["ISS", "Tiangong", "Axiom", "Orbital Reef", "Starlab", "Earth L4", "Earth L5"]
+far_slots = 2
 slots = [
     { name = "Antarctic Peninsula", lon = -63.0, lat = -69.0 },
     { name = "Lake Vostok", lon = 105.0, lat = -77.5 },
@@ -72,9 +87,11 @@ low_gravity = true
 name = "the Moon"
 parent = "earth"
 local_turns = 1
-local_fuel = 6
+local_delta_v = 3.93
+local_return_delta_v = 0.92
 transit_turns = 1
-transit_fuel = 6
+leave_delta_v = 0.92
+arrive_delta_v = 0.92
 trade_pays = 3.5
 # Ticket #72 (version 0.05.5): all four up a tenth (1.5, 1.25, 0.5, 1.0 before).
 mine_yield = 1.65
@@ -96,7 +113,8 @@ id = "mars"
 name = "Mars"
 first_windfall = 15
 transit_turns = 4
-transit_fuel = 20
+leave_delta_v = 1.41
+arrive_delta_v = 0.25
 trade_pays = 5
 mine_yield = 1.25
 generator_yield = 0.75
@@ -123,9 +141,11 @@ low_gravity = true
 name = "Phobos"
 parent = "mars"
 local_turns = 1
-local_fuel = 2
+local_delta_v = 1.2
+local_return_delta_v = 0.61
 transit_turns = 5
-transit_fuel = 24
+leave_delta_v = 0.94
+arrive_delta_v = 0.66
 trade_pays = 6
 mine_yield = 1.75
 generator_yield = 0.75
@@ -145,9 +165,11 @@ low_gravity = true
 name = "Deimos"
 parent = "mars"
 local_turns = 1
-local_fuel = 2
+local_delta_v = 1.72
+local_return_delta_v = 0.71
 transit_turns = 5
-transit_fuel = 24
+leave_delta_v = 0.7
+arrive_delta_v = 0.7
 trade_pays = 6
 mine_yield = 1.0
 generator_yield = 1.0
@@ -171,7 +193,8 @@ name = "Venus"
 # Venus is given ground.
 first_windfall = 0
 transit_turns = 3
-transit_fuel = 16
+leave_delta_v = 2.96
+arrive_delta_v = 0.5
 trade_pays = 4
 mine_yield = 1.0
 generator_yield = 1.0
@@ -180,3 +203,34 @@ research_yield = 1.3
 orbital_slots = 3
 stations = ["Ishtar", "Aphrodite", "Lada"]
 slots = []
+
+# Ticket #486 (version 0.09.8): **every journey is priced the same way**, each direction for itself.
+# Inside a system a hop has its own figure: a satellite's `local_delta_v` out to it from its parent
+# and `local_return_delta_v` back, and `sibling_delta_v` between two satellites of one parent.
+# Between two systems a journey is the LEAVING of one end (`leave_delta_v`), the GULF between the
+# two systems below, and the ARRIVING at the other (`arrive_delta_v`), which is lower where there
+# is air to brake on: Earth, Venus, Mars and a little at Phobos. A far orbit, Earth L4 or L5, is a
+# system of its own for travel and costs nothing to leave or to arrive in, being outside every
+# gravity well. The figures are section 3.9 of `docs/research/delta-v.md`; they reproduce its
+# table of every pair to 0.18 km/s at worst (one far orbit to the other) and 0.01 nearly everywhere.
+[[gulf]]
+between = ["earth", "venus"]
+delta_v = 0.64
+[[gulf]]
+between = ["earth", "mars"]
+delta_v = 1.07
+[[gulf]]
+between = ["earth", "far"]
+delta_v = 0.87
+[[gulf]]
+between = ["venus", "mars"]
+delta_v = 3.48
+[[gulf]]
+between = ["venus", "far"]
+delta_v = 2.85
+[[gulf]]
+between = ["mars", "far"]
+delta_v = 3.62
+[[gulf]]
+between = ["far", "far"]
+delta_v = 2.66

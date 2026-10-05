@@ -927,12 +927,12 @@ fn print_costs(g: &Game) {
     // Ticket #404 (version 0.09.4): the Army's Widgets and people beside its Materials, as a Ship's
     // Widgets are.
     println!(
-        "Army {}M/{}w and {} people (a Colony's, one Colonist) | Space Station {}M | Industry Level {}M",
+        "Army {}M/{}w and {} people (a Colony's, one Colonist) | Space Station {}M | Industry Level from {}M, rising with each raise",
         g.tables.unit(UnitKind::Army).materials,
         g.build_widgets(me, BuildItem::Unit(UnitKind::Army)),
         g.tables.people_text(g.tables.army.population_each),
         g.station_materials(me),
-        g.industry_cost(me)
+        if g.kind(me) == FactionKind::Prospectors { g.tables.industry_level.materials_cheap_industry } else { g.tables.industry_level.materials }
     );
     // Ticket #404 (version 0.09.4): the Market line is on the board every turn, so not here too.
 }

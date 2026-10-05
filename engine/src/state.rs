@@ -1009,6 +1009,10 @@ pub struct SeatState {
     /// Arkwrights' free Launch Site is still owed for want of a Region to stand it in.
     #[serde(default)]
     pub opening_met_turn: Option<u32>,
+    /// Ticket #478 (version 0.09.8): the Incomes in a row this seat's Opening Objective has been
+    /// true and not yet met; an Income where it is false starts the count again.
+    #[serde(default)]
+    pub opening_run: u32,
     #[serde(default)]
     pub launch_site_owed: bool,
     /// Ticket #461 (version 0.09.7): Archives this seat has lost with their Colonies, and the fund
@@ -1655,6 +1659,7 @@ impl Game {
             colonists_grown: 0,
             colonists_declined: 0,
             opening_met_turn: None,
+            opening_run: 0,
             launch_site_owed: false,
             archives_lost: 0,
             archive_fund_lost: 0,
@@ -2006,7 +2011,8 @@ impl Game {
             Place::State(s) => self.tables.state(s).name.clone(),
             Place::Colony(c) => match self.colony(c) {
                 // Ticket #46: a station is named for its orbital slot.
-                Some(col) if col.in_orbit => format!("{} over {}", self.station_name(col.body, col.slot), self.tables.body(col.body).name),
+                // Ticket #480 (version 0.09.8): a far orbit's station by its own name alone.
+                Some(col) if col.in_orbit => self.slot_place_name(col.body, col.slot),
                 // Ticket #45: a Colony is named for its slot, a real place on its Body.
                 Some(col) => format!("{} on {}", self.tables.body(col.body).slots[col.slot as usize].name, self.tables.body(col.body).name),
                 None => format!("{c}"),
@@ -3706,6 +3712,44 @@ impl Game {
         self.body_firsts.iter().find(|f| f.body == body).map(|f| (f.seat, f.colony))
     }
 
+    /// Ticket #481 (version 0.09.8): **how far a Faction has got toward landing on the Moon**: the
+    /// furthest step it stands on. Read off the board, and the same for every seat.
+    pub fn moon_step(&self, seat: Seat) -> MoonStep {
+        let mine = |c: &&Colony| c.control.director() == Some(seat);
+        if self.colonies.iter().filter(mine).any(|c| c.body == BodyId::Moon && !c.in_orbit) {
+            return MoonStep::Landed;
+        }
+        let loaded: Vec<&Ship> = self.ships.iter().filter(|s| s.seat == seat && s.kind == UnitKind::ColonyShip && s.colonists > 0).collect();
+        if loaded.iter().any(|s| s.at == ShipAt::Body(BodyId::Moon)) {
+            return MoonStep::InOrbit;
+        }
+        if loaded.iter().any(|s| matches!(s.at, ShipAt::Transit { to: BodyId::Moon, .. })) {
+            return MoonStep::Bound;
+        }
+        if !loaded.is_empty() {
+            return MoonStep::Aboard;
+        }
+        if self.ships.iter().any(|s| s.seat == seat && s.kind == UnitKind::ColonyShip) {
+            return MoonStep::ColonyShip;
+        }
+        if self.colonies.iter().filter(mine).any(|c| c.modules.iter().any(|m| m.kind == ModuleKind::Shipyard)) {
+            return MoonStep::Shipyard;
+        }
+        MoonStep::NoShipyard
+    }
+
+    /// Ticket #481: **the race to the Moon**, every seat's step, the leader first and ties in seat
+    /// order. It is everyone's to see, through the fog. `None` once somebody has landed: the race
+    /// is over and the Moon's card says who won it.
+    pub fn moon_race(&self) -> Option<Vec<(Seat, MoonStep)>> {
+        if self.first_at(BodyId::Moon).is_some() {
+            return None;
+        }
+        let mut race: Vec<(Seat, MoonStep)> = Seat::ALL.into_iter().map(|s| (s, self.moon_step(s))).collect();
+        race.sort_by_key(|r| std::cmp::Reverse(r.1));
+        Some(race)
+    }
+
     /// Ticket #345: every Body this seat was first to, in the order it claimed them.
     pub fn firsts_of(&self, seat: Seat) -> Vec<BodyFirst> {
         self.body_firsts.iter().copied().filter(|f| f.seat == seat).collect()
@@ -3745,6 +3789,12 @@ impl Game {
         if self.colonies.iter().any(|c| c.body == body && !c.in_orbit && c.id != colony && c.founded_turn < self.turn) {
             return false;
         }
+        // Ticket #481 (version 0.09.8): where each rival stood in the race to the Moon, read before
+        // the landing is written down, for the Moment that ends it.
+        let rivals: Vec<String> = match (body, self.moon_race()) {
+            (BodyId::Moon, Some(race)) => race.into_iter().filter(|(s, _)| *s != seat).map(|(s, step)| self.phrase(step.key(), &[("faction", self.seat_name(s))])).collect(),
+            _ => Vec::new(),
+        };
         self.body_firsts.push(BodyFirst { body, seat, colony });
         let windfall = self.tables.body(body).first_windfall;
         self.seats[seat.index()].first_windfall += windfall;
@@ -3765,7 +3815,15 @@ impl Game {
         self.report_line(LineKind::ColonyFounded, Some(ReportPlace::Colony(colony)), text);
         let eased = self.say("first_to_body_eases", &[("body", body_name), ("ease", figure(ease))]);
         self.report_line(LineKind::Unrest, None, eased);
-        self.moment(MomentKind::FirstToABody, &args, Some(ReportPlace::Colony(colony)));
+        // Ticket #481: the Moon's first landing is the end of a race everyone watched, and its
+        // Moment says so in words of its own, with the figure every first landing carries.
+        if rivals.is_empty() {
+            self.moment(MomentKind::FirstToABody, &args, Some(ReportPlace::Colony(colony)));
+        } else if let Some(card) = self.tables.report.moment(MomentKind::FirstToABody) {
+            let figure = crate::report::render(&card.figure, &args);
+            let text = self.say("moon_race_won", &[("faction", args[0].1.clone()), ("rivals", rivals.join("; ")), ("colony", args[2].1.clone()), ("ease", args[4].1.clone())]);
+            self.report.moments.push(Moment { kind: MomentKind::FirstToABody, text, figure, place: Some(ReportPlace::Colony(colony)), tech: None, note: None, seat: None });
+        }
         true
     }
 
@@ -3889,6 +3947,52 @@ impl Game {
         self.tables.body(body).stations.get(slot as usize).cloned().unwrap_or_else(|| format!("Station {}", slot + 1))
     }
 
+    // ------------------------------------------- Ticket #480 (version 0.09.8): far orbits
+
+    /// Ticket #480: whether this Orbital Slot is a **far orbit** -- Earth's L4 and L5, the last
+    /// `far_slots` of the Body's slots. A far orbit is reached only by Ship: its station is founded
+    /// by a Colony Ship in it, never built from the ground, and no lift reaches it.
+    pub fn far_slot(&self, body: BodyId, slot: u32) -> bool {
+        let b = self.tables.body(body);
+        slot < b.orbital_slots && slot >= b.orbital_slots.saturating_sub(b.far_slots)
+    }
+
+    pub fn far_orbit(&self, body: BodyId, orbit: Orbit) -> bool {
+        orbit.slot().is_some_and(|n| self.far_slot(body, n))
+    }
+
+    /// Ticket #480: the free Orbital Slots a station may be BUILT in -- every free one but the far.
+    pub fn buildable_orbital_slots(&self, body: BodyId) -> Vec<u32> {
+        self.free_orbital_slots(body).into_iter().filter(|n| !self.far_slot(body, *n)).collect()
+    }
+
+    /// Ticket #480: what a move between two orbits of one Body costs from the tank: the plain
+    /// orbit change, or where either end is a far orbit, a journey.
+    /// Ticket #486 (version 0.09.8): that journey priced as any other is, out and back each for
+    /// itself, with the seat's own multipliers.
+    pub fn orbit_change_cost(&self, seat: Seat, body: BodyId, from: Orbit, to: Orbit) -> f64 {
+        if self.far_orbit(body, from) || self.far_orbit(body, to) { self.journey_cost_for_at(seat, self.port(body, from), self.port(body, to), self.turn).1 } else { self.tables.orbit_change_fuel as f64 }
+    }
+
+    /// Ticket #480: what a leg between Bodies costs this Ship: the crossing, and the far figure
+    /// again for a far orbit it leaves and for a far orbit it names to arrive in.
+    pub fn transit_fuel(&self, seat: Seat, s: &Ship, from: BodyId, to: BodyId, slot: Option<u32>) -> f64 {
+        self.transit_leg(seat, s, from, to, slot).1
+    }
+
+    /// Ticket #486 (version 0.09.8): the turns and the Fuel of the leg this Ship would fly from
+    /// the orbit it sits in to the orbit named: a far orbit at either end is that end, a place of
+    /// its own, and not its Body.
+    pub fn transit_leg(&self, seat: Seat, s: &Ship, from: BodyId, to: BodyId, slot: Option<u32>) -> (u32, f64) {
+        self.journey_cost_for_at(seat, self.port(from, self.ship_orbit(s)), self.port(to, Orbit::of(slot)), self.turn)
+    }
+
+    /// Ticket #480: a station's place by name -- "ISS over Earth", and a far orbit's alone,
+    /// "Earth L4", which names its Body already.
+    pub fn slot_place_name(&self, body: BodyId, slot: u32) -> String {
+        if self.far_slot(body, slot) { self.station_name(body, slot) } else { format!("{} over {}", self.station_name(body, slot), self.tables.body(body).name) }
+    }
+
     // ------------------------------------------- Ticket #335 (version 0.09.0): a Body's orbits
 
     /// Ticket #335: the orbits of a Body -- LOW ORBIT, then one per Orbital Slot. Every Ship at the
@@ -3949,6 +4053,7 @@ impl Game {
     pub fn orbit_name(&self, body: BodyId, orbit: Orbit) -> String {
         match orbit {
             Orbit::Low => format!("{}, low orbit", self.tables.body(body).name),
+            Orbit::Slot(n) if self.far_slot(body, n) => self.station_name(body, n),
             Orbit::Slot(n) => format!("{}, at {}", self.tables.body(body).name, self.station_name(body, n)),
         }
     }
@@ -4212,15 +4317,7 @@ impl Game {
     }
 
     pub fn transit_cost_for_at(&self, seat: Seat, from: BodyId, to: BodyId, turn: u32) -> (u32, f64) {
-        let faction = self.tables.faction(self.kind(seat)).transit_fuel_multiplier;
-        let (turns, fuel) = self.transit_cost_with(from, to, faction, self.tech_multiplier(seat, TechId::EfficientTransit), self.tech_multiplier(seat, TechId::NuclearRockets) * self.tech_multiplier(seat, TechId::OrbitalRefuelling), turn);
-        // Ticket #92 (version 0.06.0): a working Mass Driver of the seat's at the Body it leaves
-        // takes a flat figure off, after the multipliers, never below the minimum.
-        if self.mass_driver_at(seat, from) {
-            let md = &self.tables.mass_driver;
-            return (turns, (fuel - md.fuel_off as f64).max(md.fuel_min as f64));
-        }
-        (turns, fuel)
+        self.journey_cost_for_at(seat, Port::Body(from), Port::Body(to), turn)
     }
 
     /// Ticket #92: whether the seat has a working Mass Driver at a ground Colony on this Body.
@@ -4236,38 +4333,89 @@ impl Game {
     /// a turn and a one-turn hop never does. It is the one thing that touches a transit's turns;
     /// `faction` and `tech` (Efficient Transit) touch the Fuel alone.
     fn transit_cost_with(&self, from: BodyId, to: BodyId, faction: f64, tech: f64, days_factor: f64, turn: u32) -> (u32, f64) {
-        let t = &self.tables;
-        let parent = |b: BodyId| t.body(b).parent;
-        let near_earth = |b: BodyId| b == BodyId::Earth || parent(b) == Some(BodyId::Earth);
-        let far = |b: BodyId| (t.body(b).transit_turns, t.body(b).transit_fuel);
-        let (turns, fuel) = if parent(from) == Some(to) {
-            (t.body(from).local_turns, t.body(from).local_fuel)
-        } else if parent(to) == Some(from) {
-            (t.body(to).local_turns, t.body(to).local_fuel)
-        } else if parent(from).is_some() && parent(from) == parent(to) && !near_earth(from) {
-            t.sibling_transit
-        } else if near_earth(from) {
-            far(to)
-        } else if near_earth(to) || far(from).0 >= far(to).0 {
-            far(from)
-        } else {
-            far(to)
-        };
-        // Ticket #57: a crossing between the two systems is not a fixed card any more. It costs the
-        // Hohmann flight and the card's Fuel at the window, and more of both the further the phase
-        // angle stands from it; the Faction multiplier and Efficient Transit apply after.
-        // Ticket #93: the crossing names its own transfer table, Mars's or Venus's.
-        let (turns, fuel) = match self.crossing(from, to, turn) {
-            None => (turns, fuel as f64),
+        self.journey_with(Port::Body(from), Port::Body(to), faction, tech, days_factor, turn)
+    }
+
+    /// Ticket #486 (version 0.09.8): **every journey priced the same way**, between any two ends,
+    /// each direction for itself. Its delta-v becomes Fuel at the one scale; where it crosses
+    /// between two systems that have a sky to line up in, it costs the window's flight and that
+    /// Fuel at the window and more of both the further the phase angle stands from it (ticket
+    /// #57); the Faction multiplier and Efficient Transit apply after.
+    fn journey_with(&self, from: Port, to: Port, faction: f64, tech: f64, days_factor: f64, turn: u32) -> (u32, f64) {
+        let (turns, delta_v) = self.journey_delta_v(from, to);
+        let fuel = crate::data::leg_fuel(delta_v, self.tables.fuel_per_delta_v);
+        let (turns, fuel) = match self.crossing_ports(from, to, turn) {
+            None => (turns, fuel),
             Some((offset, tr)) => {
                 let days = (tr.days_at_window + tr.days_per_degree * offset.abs()) * days_factor;
                 let turns = ((days / tr.days_per_turn).ceil() as u32).clamp(1, tr.max_turns);
-                (turns, fuel as f64 * (1.0 + tr.fuel_per_degree * offset.abs()))
+                (turns, fuel * (1.0 + tr.fuel_per_degree * offset.abs()))
             }
         };
         // Ticket #387 (version 0.09.3): to the tenth, where it was rounded down.
         let fuel = tenth(fuel * faction * tech);
         (turns.max(1), fuel)
+    }
+
+    /// Ticket #486: a journey's real delta-v in km/s, and the turns it takes where no sky sets
+    /// them. Inside a system a hop has its own figure, out and back each for itself. Between two
+    /// systems it is the leaving of one end, the gulf between the systems, and the arriving at the
+    /// other, the arriving lower where there is air to brake on.
+    pub fn journey_delta_v(&self, from: Port, to: Port) -> (u32, f64) {
+        let t = &self.tables;
+        if let (Port::Body(a), Port::Body(b)) = (from, to) {
+            let parent = |x: BodyId| t.body(x).parent;
+            if parent(a) == Some(b) {
+                return (t.body(a).local_turns, t.body(a).local_return_delta_v);
+            }
+            if parent(b) == Some(a) {
+                return (t.body(b).local_turns, t.body(b).local_delta_v);
+            }
+            if parent(a).is_some() && parent(a) == parent(b) {
+                return (t.sibling_turns, t.sibling_delta_v);
+            }
+        }
+        let ends = |p: Port| match p {
+            Port::Body(b) => (t.body(b).leave_delta_v, t.body(b).arrive_delta_v),
+            // A far orbit is already out of every gravity well: nothing to leave, nothing to stop in.
+            Port::Far(..) => (0.0, 0.0),
+        };
+        (1, ends(from).0 + t.gulf(self.system_of_port(from), self.system_of_port(to)) + ends(to).1)
+    }
+
+    /// Ticket #486: the end of a journey an orbit of a Body is: the Body, or the far orbit itself.
+    pub fn port(&self, body: BodyId, orbit: Orbit) -> Port {
+        match orbit {
+            Orbit::Slot(n) if self.far_slot(body, n) => Port::Far(body, n),
+            _ => Port::Body(body),
+        }
+    }
+
+    /// Ticket #486: the system an end of a journey is in.
+    pub fn system_of_port(&self, p: Port) -> System {
+        match p {
+            Port::Far(_, n) => System::Far(n),
+            Port::Body(BodyId::Earth | BodyId::Moon) => System::Earth,
+            Port::Body(BodyId::Mars | BodyId::Phobos | BodyId::Deimos) => System::Mars,
+            Port::Body(BodyId::Venus) => System::Venus,
+        }
+    }
+
+    /// Ticket #486: a journey as one seat pays it, between any two ends: the Faction's Fuel
+    /// multiplier, Efficient Transit, the turns as the seat reads Nuclear Rockets, and a Mass
+    /// Driver of the seat's at the Body it leaves.
+    pub fn journey_cost_for_at(&self, seat: Seat, from: Port, to: Port, turn: u32) -> (u32, f64) {
+        let faction = self.tables.faction(self.kind(seat)).transit_fuel_multiplier;
+        let (turns, fuel) = self.journey_with(from, to, faction, self.tech_multiplier(seat, TechId::EfficientTransit), self.tech_multiplier(seat, TechId::NuclearRockets) * self.tech_multiplier(seat, TechId::OrbitalRefuelling), turn);
+        // Ticket #92 (version 0.06.0): a working Mass Driver of the seat's at the Body it leaves
+        // takes Fuel off the leg, after the multipliers. Ticket #486 (version 0.09.8), at the
+        // designer's word: a quarter of it, to the tenth, where it was a flat 4 with a floor of 1.
+        if let Port::Body(b) = from
+            && self.mass_driver_at(seat, b)
+        {
+            return (turns, tenth(fuel * (1.0 - self.tables.mass_driver.fuel_cut)));
+        }
+        (turns, fuel)
     }
 
     // ---------------------------------------------- Ticket #57: the calendar and the real sky
@@ -4362,24 +4510,67 @@ impl Game {
         }
     }
 
-    /// Ticket #93: whether a leg runs between two Bodies at all. Every leg runs but the one
-    /// between Venus and the Mars system, which this version does not offer: fly by Earth.
-    pub fn leg_allowed(from: BodyId, to: BodyId) -> bool {
-        let (a, b) = (Self::system_of(from), Self::system_of(to));
-        !matches!((a, b), (1, 2) | (2, 1))
+    /// Ticket #93: whether a leg runs between two Bodies at all. Ticket #486 (version 0.09.8):
+    /// every one does; the leg between Venus and the Mars system, refused until now, is flown.
+    pub fn leg_allowed(_from: BodyId, _to: BodyId) -> bool {
+        true
     }
 
     /// Ticket #93: the crossing a transit makes, with its offset from the window and the transfer
-    /// table that prices it: Earth to Mars or back on the Mars sky, Earth to Venus or back on
-    /// Venus's. `None` for a hop inside a system.
+    /// table that prices it. `None` for a hop inside a system.
     pub fn crossing(&self, from: BodyId, to: BodyId, turn: u32) -> Option<(f64, &crate::data::TransitTable)> {
+        self.crossing_ports(Port::Body(from), Port::Body(to), turn)
+    }
+
+    /// Ticket #486 (version 0.09.8): **every journey between two systems has a window the same
+    /// way**: cheapest when its two ends line up for the minimum-energy flight, dearer the further
+    /// off. Earth's side of the Mars and Venus tables may be a far orbit, which reads Earth's sky a
+    /// sixth of the way round; Venus to Mars has a table of its own. `None` for a hop inside a
+    /// system, and between Earth, the Moon and the far orbits, which have no window.
+    pub fn crossing_ports(&self, from: Port, to: Port, turn: u32) -> Option<(f64, &crate::data::TransitTable)> {
         let t = &self.tables;
-        match (Self::system_of(from), Self::system_of(to)) {
-            (0, 1) => Some((self.window_offset(turn), &t.transit)),
-            (1, 0) => Some((self.return_window_offset(turn), &t.transit)),
-            (0, 2) => Some((self.span_offset_of(BodyId::Venus, turn, t.transit_venus.hohmann_angle), &t.transit_venus)),
-            (2, 0) => Some((self.span_offset_of(BodyId::Venus, turn, t.transit_venus.return_hohmann_angle), &t.transit_venus)),
-            _ => None,
+        let near = |s: System| matches!(s, System::Earth | System::Far(_));
+        // `home` and `away` are the table's two sides; the phase angle is away's longitude less
+        // home's, and the flight out wants one angle and the flight back the other.
+        let (table, out) = match (self.system_of_port(from), self.system_of_port(to)) {
+            (a, System::Mars) if near(a) => (&t.transit, true),
+            (System::Mars, b) if near(b) => (&t.transit, false),
+            (a, System::Venus) if near(a) => (&t.transit_venus, true),
+            (System::Venus, b) if near(b) => (&t.transit_venus, false),
+            (System::Venus, System::Mars) => (&t.transit_venus_mars, true),
+            (System::Mars, System::Venus) => (&t.transit_venus_mars, false),
+            _ => return None,
+        };
+        let (home, away, angle) = if out { (from, to, table.hohmann_angle) } else { (to, from, table.return_hohmann_angle) };
+        Some((self.span_offset_ports(home, away, turn, angle), table))
+    }
+
+    /// Ticket #486: where an end of a journey stands in the sky: its Body's heliocentric longitude
+    /// (a satellite reads its planet's), and a far orbit its Body's sixty degrees ahead (the first,
+    /// L4) or behind (the second, L5).
+    pub fn port_longitude(&self, p: Port, turn: u32) -> f64 {
+        match p {
+            Port::Body(b) => self.heliocentric_longitude(b, turn),
+            Port::Far(b, n) => {
+                let card = self.tables.body(b);
+                let k = n.saturating_sub(card.orbital_slots.saturating_sub(card.far_slots));
+                self.heliocentric_longitude(b, turn) + if k.is_multiple_of(2) { 60.0 } else { -60.0 }
+            }
+        }
+    }
+
+    /// Ticket #486: `span_offset_of` between any two ends: the nearest the phase angle, away's
+    /// longitude less home's, comes to `angle` anywhere in the turn.
+    fn span_offset_ports(&self, home: Port, away: Port, turn: u32, angle: f64) -> f64 {
+        let phase = |t: u32| crate::ephemeris::wrap_180(self.port_longitude(away, t) - self.port_longitude(home, t));
+        let start = crate::ephemeris::wrap_180(phase(turn) - angle);
+        let end = crate::ephemeris::wrap_180(phase(turn + 1) - angle);
+        if start.signum() != end.signum() && (start - end).abs() < 90.0 {
+            0.0
+        } else if start.abs() <= end.abs() {
+            start
+        } else {
+            end
         }
     }
 
@@ -4543,10 +4734,34 @@ impl Game {
     }
 
     /// Cheap Industry, the Prospectors' signature rule (spec 14.2).
-    pub fn industry_cost(&self, seat: Seat) -> f64 {
+    /// Ticket #479 (version 0.09.8): the price RISES with every raise standing in the Region.
+    pub fn industry_cost(&self, seat: Seat, sid: StateId) -> f64 {
+        let (card, n) = (&self.tables.industry_level, self.raises_standing(sid) as i64);
         match self.kind(seat) {
-            FactionKind::Prospectors => self.tables.industry_level.materials_cheap_industry as f64,
-            _ => self.tables.industry_level.materials as f64,
+            FactionKind::Prospectors => (card.materials_cheap_industry + card.materials_cheap_step * n) as f64,
+            _ => (card.materials + card.materials_step * n) as f64,
+        }
+    }
+
+    /// Ticket #479: how far a Region stands above its card's Industry Level -- the raises standing
+    /// there, whoever made them, Neutral Development's among them. A nuke takes one back off.
+    pub fn raises_standing(&self, sid: StateId) -> u32 {
+        self.state(sid).industry_level.saturating_sub(self.tables.state(sid).industry_level)
+    }
+
+    /// Ticket #479: the Widgets the next raise in a Region needs: the row, a step for every raise
+    /// standing, and the Faction's own multiplier on the whole, as `build_widgets` takes it.
+    pub fn industry_widgets(&self, seat: Seat, sid: StateId) -> u32 {
+        let card = &self.tables.industry_level;
+        let row = card.widgets + card.widgets_step * self.raises_standing(sid);
+        ((row as f64 * self.tables.faction(self.kind(seat)).facility_materials_multiplier).floor() as u32).max(1)
+    }
+
+    /// Ticket #479: `build_widgets` where the place is known, which a raise's price needs.
+    pub fn build_widgets_at(&self, seat: Seat, place: Place, item: BuildItem) -> u32 {
+        match (item, place) {
+            (BuildItem::IndustryLevel, Place::State(sid)) => self.industry_widgets(seat, sid),
+            _ => self.build_widgets(seat, item),
         }
     }
 

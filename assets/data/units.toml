@@ -145,7 +145,7 @@ odds_seed = 339
 # side it is on and whether or not it opened the fight. A Battery pays nothing, having no tank, and
 # an Army is untouched: a ground melee is not a space Battle.
 #
-# 2, which is a third of the cheapest leg in the game (the Moon's 6) and a fifteenth of a tank.
+# 2, which is a third of the cheapest leg in the game (the Moon's 6 until ticket #485; 16 since, so an eighth) and a fifteenth of a tank.
 # Two is also the bar a warship must hold to hold an orbit at all (see below), so a hull holds an
 # orbit exactly as long as it could still fight for it.
 battle_fuel = 2

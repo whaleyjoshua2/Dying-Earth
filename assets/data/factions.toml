@@ -4,7 +4,7 @@
 id = "custodians"
 # Ticket #100 (version 0.07.0), renamed on ticket #195 (version 0.08.0): the Region the start
 # screen opens the globe on for this Faction. It changes nothing else -- no starting position, and
-# any of the sixteen may still be chosen -- which is what the old name `home` did not say.
+# any of the eighteen may still be chosen -- which is what the old name `home` did not say.
 # Energy-lean for the Scrubbers, education 1.45 for the Research their Stabilization run leans on.
 opens_on = "europe"
 name = "Custodians"
@@ -58,7 +58,7 @@ colour = [0.15, 0.65, 0.6]
 id = "prospectors"
 # Ticket #100 (version 0.07.0), renamed on ticket #195 (version 0.08.0): the Region the start
 # screen opens the globe on for this Faction. It changes nothing else -- no starting position, and
-# any of the sixteen may still be chosen -- which is what the old name `home` did not say.
+# any of the eighteen may still be chosen -- which is what the old name `home` did not say.
 # Materials-lean at Industry 3 and GDP 23: the extraction engine their whole game is.
 opens_on = "east_asia"
 name = "Prospectors"
@@ -106,7 +106,8 @@ victory_short = "put {first} Ducats in the Venture Capital Fund with {second} Co
 victory_first = { kind = "venture_fund", bar = 2500 }
 victory_second = { kind = "off_world_presence", bar = 12 }
 # Ticket #471 (version 0.09.7): the Opening Objective -- no deadline, met once, rewarded once.
-opening = { kind = "investment_banks", count = 3, reward = 75.0, text = "Have a working Investment Bank in three different places", reward_text = "75 Ducats into the Venture Capital Fund" }
+# Ticket #478 (version 0.09.8): 75 Ducats to 50, and the three Banks must work three Incomes running.
+opening = { kind = "investment_banks", count = 3, turns = 3, reward = 50.0, text = "Keep a working Investment Bank in three places for three turns", reward_text = "50 Ducats into the Venture Capital Fund" }
 colour = [0.85, 0.5, 0.2]
 
 # Ticket #50 seated two more Factions; ticket #51 gave them their cards.
@@ -115,7 +116,7 @@ colour = [0.85, 0.5, 0.2]
 id = "arkwrights"
 # Ticket #100 (version 0.07.0), renamed on ticket #195 (version 0.08.0): the Region the start
 # screen opens the globe on for this Faction. It changes nothing else -- no starting position, and
-# any of the sixteen may still be chosen -- which is what the old name `home` did not say.
+# any of the eighteen may still be chosen -- which is what the old name `home` did not say.
 # Population 1940, the largest on Earth -- 388 in the units of five million used from ticket #143
 # (version 0.07.3) until ticket #333 (version 0.09.0) put population in units of one million people,
 # and 19.4 in the hundreds of millions before that -- and Coach Class recruits eight a turn at
@@ -182,7 +183,7 @@ colour = [0.44, 0.275, 0.66]
 id = "archivists"
 # Ticket #100 (version 0.07.0), renamed on ticket #195 (version 0.08.0): the Region the start
 # screen opens the globe on for this Faction. It changes nothing else -- no starting position, and
-# any of the sixteen may still be chosen -- which is what the old name `home` did not say.
+# any of the eighteen may still be chosen -- which is what the old name `home` did not say.
 # Education 1.5, the highest there is, and GDP 23 to pay for the Archive.
 opens_on = "north_america"
 name = "Archivists"

@@ -91,17 +91,17 @@ demonym = "Nigerian"
 name = "Nigeria"
 flag = "ng"
 colour = [0.90, 0.71, 0.24]
-population = 1140.0
+population = 930.0
 industry_level = 1
 resource_lean = "materials"
 baseline_emissions = 0.3
 education_level = 0.7
 size = 3
 coastal_exposure = 1
-neighbours = ["north_africa", "arabian_peninsula"]
+neighbours = ["north_africa", "arabian_peninsula", "south_africa"]
 start_facilities = ["factory", "mine"]
 influence = 1
-gdp = 2
+gdp = 1
 unrest = 0.0
 
 # North Africa: Morocco to Egypt and down through Sudan, about 260 million people, oil and gas along
@@ -119,7 +119,7 @@ baseline_emissions = 0.4
 education_level = 0.85
 size = 2
 coastal_exposure = 1
-neighbours = ["sub_saharan_africa", "europe", "middle_east", "arabian_peninsula"]
+neighbours = ["sub_saharan_africa", "europe", "turkey", "arabian_peninsula"]
 start_facilities = ["refinery"]
 influence = 1
 gdp = 1
@@ -143,7 +143,7 @@ baseline_emissions = 0.5
 education_level = 1.1
 size = 3
 coastal_exposure = 2
-neighbours = ["russia", "pakistan", "south_asia", "south_east_asia", "japan"]
+neighbours = ["russia", "kazakhstan", "middle_east", "south_asia", "south_east_asia", "japan"]
 start_facilities = ["factory", "mine", "power_plant", "refinery"]
 influence = 3
 gdp = 16
@@ -164,7 +164,7 @@ baseline_emissions = 0.4
 education_level = 0.75
 size = 2
 coastal_exposure = 2
-neighbours = ["east_asia", "south_east_asia", "pakistan"]
+neighbours = ["east_asia", "south_east_asia", "middle_east"]
 start_facilities = ["factory", "mine", "power_plant"]
 influence = 1
 gdp = 3
@@ -225,7 +225,7 @@ baseline_emissions = 0.3
 education_level = 1.45
 size = 2
 coastal_exposure = 1
-neighbours = ["north_america", "north_africa", "russia", "middle_east", "united_kingdom"]
+neighbours = ["north_america", "north_africa", "russia", "turkey", "united_kingdom"]
 start_facilities = ["power_plant", "factory", "mine", "refinery"]
 influence = 4
 gdp = 17
@@ -308,7 +308,7 @@ baseline_emissions = 0.4
 education_level = 1.35
 size = 3
 coastal_exposure = 1
-neighbours = ["europe", "east_asia", "north_america", "japan", "pakistan"]
+neighbours = ["europe", "east_asia", "north_america", "japan", "kazakhstan", "turkey"]
 start_facilities = ["refinery", "power_plant"]
 influence = 4
 gdp = 3
@@ -317,25 +317,31 @@ unrest = 0.0
 # The Middle East: Turkey to Iran, the Levant, Iraq and the Caucasus, about 250 million people
 # since ticket #125 cut the Arabian Peninsula out of it and shared the figures by ticket #53's rule
 # -- 3.5, 5 and 4 became 2.5 + 1.0, 3 + 2 and 2 + 2. Still among the highest Emissions per unit of
-# industry on the map. It borders Africa only through the Sinai now; the strait to the Horn went
-# with the peninsula.
+# industry on the map.
+# Ticket #482 (version 0.09.8): redrawn at the designer's word. It is **Iran, Pakistan and
+# Afghanistan** now, about 345 million people: Turkey, the Levant, Iraq and the Caucasus left for
+# the Region called Turkey, and Pakistan and Afghanistan came in from the Region that was called
+# Pakistan. The two old cards' 600 people, 5 GDP and 3 Influence were shared among this one,
+# Turkey and Kazakhstan by the real countries: 345 / 185 / 70 people and 1 / 3 / 1 GDP. It is poor
+# for its people now, the old Region's wealth having been Turkey's, Israel's and Iraq's. It no
+# longer touches Europe or Africa; it lies between Turkey and India, under Kazakhstan and China.
 [[state]]
 id = "middle_east"
 demonym = "Iranian"
 name = "Iran"
 flag = "ir"
 colour = [0.92, 0.88, 0.71]
-population = 250.0
+population = 345.0
 industry_level = 2
 resource_lean = "fuel"
 baseline_emissions = 0.5
 education_level = 1.0
 size = 2
 coastal_exposure = 1
-neighbours = ["europe", "north_africa", "pakistan", "arabian_peninsula"]
+neighbours = ["turkey", "kazakhstan", "east_asia", "south_asia", "arabian_peninsula"]
 start_facilities = ["refinery", "power_plant"]
-influence = 2
-gdp = 3
+influence = 1
+gdp = 1
 unrest = 0.0
 
 # Japan and Korea: Japan, South Korea and North Korea, about 200 million people, the second rich
@@ -386,7 +392,7 @@ baseline_emissions = 0.5
 education_level = 1.0
 size = 2
 coastal_exposure = 1
-neighbours = ["middle_east", "north_africa", "sub_saharan_africa"]
+neighbours = ["middle_east", "turkey", "north_africa", "sub_saharan_africa"]
 start_facilities = ["refinery", "power_plant"]
 influence = 2
 gdp = 2
@@ -399,23 +405,27 @@ unrest = 0.0
 # ticket: gas and oil, so it leans Fuel; it starts with a Power Plant and a Mine -- the one start Mine
 # with no Factory beside it, at the designer's word; landlocked but for the
 # Makran coast. It lies between India and Iran, so those two no longer touch.
+# Ticket #482 (version 0.09.8): **this card is Kazakhstan now**, the five Central Asian republics
+# alone, about 70 million people: Pakistan and Afghanistan went to Iran's Region. It keeps its
+# place in the engine's order, its lean, its start and its schooling. It is the one landlocked
+# Region on the map: no coast, so no coastal slots and nothing for the sea to take.
 [[state]]
-id = "pakistan"
-demonym = "Pakistani"
-name = "Pakistan"
-flag = "pk"
-colour = [0.13, 0.40, 0.22]
-population = 350.0
+id = "kazakhstan"
+demonym = "Kazakh"
+name = "Kazakhstan"
+flag = "kz"
+colour = [0.20, 0.62, 0.72]
+population = 70.0
 industry_level = 1
 resource_lean = "fuel"
 baseline_emissions = 0.4
 education_level = 0.8
 size = 2
-coastal_exposure = 1
-neighbours = ["south_asia", "east_asia", "middle_east", "russia"]
+coastal_exposure = 0
+neighbours = ["russia", "east_asia", "middle_east"]
 start_facilities = ["power_plant", "mine"]
 influence = 1
-gdp = 2
+gdp = 1
 unrest = 0.0
 
 # Ticket #453 (version 0.09.6). The United Kingdom, with Ireland and Iceland: about 75 million people,
@@ -439,4 +449,55 @@ neighbours = ["europe", "north_america"]
 start_facilities = ["refinery", "power_plant", "factory", "mine"]
 influence = 1
 gdp = 3
+unrest = 0.0
+
+# Ticket #482 (version 0.09.8). Turkey: Turkey, Iraq, Syria, Lebanon, Israel and Palestine, Jordan,
+# and Armenia, Azerbaijan and Georgia, out of the Region called Iran, about 185 million people and
+# 3 of the two old cards' 5 GDP. The rest of the card is the designer's, approved on the ticket: it
+# leans Materials and starts with a Factory, the Mine every start Factory has beside it, and a
+# Power Plant. It borders the European Union across
+# the Bosphorus, Russia across the Caucasus, Egypt across the Sinai, Saudi Arabia and Iran.
+[[state]]
+id = "turkey"
+demonym = "Turkish"
+name = "Turkey"
+flag = "tr"
+colour = [0.78, 0.33, 0.30]
+population = 185.0
+industry_level = 2
+resource_lean = "materials"
+baseline_emissions = 0.4
+education_level = 1.0
+size = 2
+coastal_exposure = 1
+neighbours = ["europe", "russia", "north_africa", "arabian_peninsula", "middle_east"]
+start_facilities = ["factory", "mine", "power_plant"]
+influence = 1
+gdp = 3
+unrest = 0.0
+
+# Ticket #482 (version 0.09.8). South Africa: South Africa, Namibia, Botswana, Lesotho, Eswatini,
+# Angola, Zambia, Zimbabwe, Malawi, Mozambique and Madagascar, out of Nigeria's Region, about 210
+# million people and 1 of its 2 GDP. The eighteenth Region, added at the designer's word so the
+# count is even. Its Influence is 1 and Nigeria keeps its own 1, so the world's Influence is 35
+# where it was 34, by decision: a Region worth no Influence is a dead card. The rest is the
+# designer's, approved on the ticket: mines and coal, so it leans Materials and starts with a Mine,
+# a Power Plant and a Factory; an exposed coast on two oceans.
+[[state]]
+id = "south_africa"
+demonym = "South African"
+name = "South Africa"
+flag = "za"
+colour = [0.24, 0.52, 0.36]
+population = 210.0
+industry_level = 2
+resource_lean = "materials"
+baseline_emissions = 0.4
+education_level = 0.7
+size = 2
+coastal_exposure = 2
+neighbours = ["sub_saharan_africa"]
+start_facilities = ["mine", "power_plant", "factory"]
+influence = 1
+gdp = 1
 unrest = 0.0

@@ -95,12 +95,16 @@ pub fn state_lonlat(state: StateId) -> (f32, f32) {
         StateId::Russia => (90.0, 62.0),
         // Ticket #125 (version 0.07.2): the Middle East lost the peninsula, so its label moves up
         // to the Iranian plateau; the two new Regions sit on Honshu and on the Nejd.
-        StateId::MiddleEast => (50.0, 33.0),
+        StateId::MiddleEast => (58.0, 31.0),
         StateId::Japan => (138.0, 37.0),
         StateId::ArabianPeninsula => (45.0, 23.0),
         // Ticket #453 (version 0.09.6): on the Indus plain and on the Scottish Lowlands, clear of the Union's label.
-        StateId::Pakistan => (68.0, 33.0),
+        // Ticket #482 (version 0.09.8): Kazakhstan's on the steppe; Iran's own moves east to stand
+        // between Iran and Pakistan, above; Turkey's on Anatolia; South Africa's on the Highveld.
+        StateId::Kazakhstan => (67.0, 47.0),
         StateId::UnitedKingdom => (-3.0, 56.5),
+        StateId::Turkey => (36.0, 38.0),
+        StateId::SouthAfrica => (25.0, -27.0),
     }
 }
 
@@ -140,6 +144,14 @@ pub fn solar_ring(body: BodyId) -> f32 {
         BodyId::Moon => solar_ring(BodyId::Earth),
         BodyId::Phobos | BodyId::Deimos => solar_ring(BodyId::Mars),
     }
+}
+
+/// Ticket #480 (version 0.09.8): where a Body's far orbits stand on the Solar System Map -- on the
+/// Body's own ring, a sixth of the way round from it: the first (L4) ahead of it, the second (L5)
+/// behind. The Sun's pair, at the designer's word, so they stand well clear of the Body's disc.
+pub fn solar_far_point(game: &dying_earth_engine::Game, body: BodyId, k: u32) -> Vec3 {
+    let lead = if k.is_multiple_of(2) { 60.0 } else { -60.0 };
+    solar_position(body, game.turn, game.heliocentric_longitude(body, game.turn) as f32 + lead)
 }
 
 /// The same, reading the turn and the longitude off a game in play.

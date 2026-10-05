@@ -2025,7 +2025,8 @@ impl Game {
             if has_station || !foothold {
                 continue;
             }
-            if let Some(slot) = self.free_orbital_slots(body).first() {
+            // Ticket #480 (version 0.09.8): a far orbit is founded by a Ship, not built.
+            if let Some(slot) = self.buildable_orbital_slots(body).first() {
                 let opp = if has_shipyard { 1.0 } else { m.opportunity };
                 push(vec![Order::BuildStation { body, slot: *slot }], Cat::LaunchSiteOrShipyard, self.base_weight(seat, Cat::LaunchSiteOrShipyard) * self.ai_founding_pull(seat), 1.0, 1.0, opp, format!("build {} over {}", self.station_name(body, *slot), self.tables.body(body).name), None);
             }
@@ -2043,7 +2044,7 @@ impl Game {
             let spare_station = mine.iter().any(|c| c.in_orbit && !has_yard(c));
             let over_earth = mine.iter().filter(|c| c.in_orbit && c.body == BodyId::Earth).count();
             if yards == 1 && !spare_station && over_earth == 1
-                && let Some(slot) = self.free_orbital_slots(BodyId::Earth).first().copied()
+                && let Some(slot) = self.buildable_orbital_slots(BodyId::Earth).first().copied()
             {
                 let lift = if self.blockaded(seat) { m.threat } else { 1.0 };
                 push(vec![Order::BuildStation { body: BodyId::Earth, slot }], Cat::LaunchSiteOrShipyard, self.base_weight(seat, Cat::LaunchSiteOrShipyard), 1.0, lift, 1.0, format!("build {} over Earth as a backup yard", self.station_name(BodyId::Earth, slot)), None);
@@ -2760,6 +2761,15 @@ impl Game {
                         wants.push((self.colony_orbit(c), format!("to disembark into {}", self.place_name(Place::Colony(c.id))), Cat::LoadUnload, weight));
                     }
                 }
+                // Ticket #480 (version 0.09.8): with every buildable station slot here taken, a
+                // loaded Colony Ship goes out to a free far orbit to found there, at the founding's
+                // own half weight. It pays the far figure, so the tank must hold it.
+                if s.kind == UnitKind::ColonyShip && s.colonists > 0 && !self.far_orbit(body, orbit) && self.buildable_orbital_slots(body).is_empty()
+                    && let Some(n) = self.free_orbital_slots(body).into_iter().find(|n| self.far_slot(body, *n))
+                    && s.fuel >= self.orbit_change_cost(seat, body, orbit, Orbit::Slot(n))
+                {
+                    wants.push((Orbit::Slot(n), format!("to found {}", self.station_name(body, n)), Cat::FoundColony, self.base_weight(seat, Cat::FoundColony) * 0.5));
+                }
                 // Ticket #357 (version 0.09.1): an empty Colony Ship at Earth no longer comes down
                 // to low orbit to be loaded, since a Launch Site now lifts into any orbit of Earth.
                 let wants_the_ground = (s.colonists > 0 && !self.free_slots_on(body).is_empty()) || s.army.is_some();
@@ -2870,6 +2880,18 @@ impl Game {
                 {
                     let into = UnloadTarget::Ring(body, n);
                     push(vec![Order::Unload { ship: s.id, colonists: self.unload_most(s.id, into), army: false, into }], Cat::FoundColony, self.base_weight(seat, Cat::FoundColony) * self.ai_founding_pull(seat), gap_for(Cat::FoundColony, None), 1.0, 1.0, format!("found {} over {}", self.station_name(body, n), self.tables.body(body).name), None);
+                }
+                // Ticket #480 (version 0.09.8): **a far orbit**, Earth's L4 or L5, founded from the
+                // loaded Colony Ship sitting in it, once every station slot that can be built in is
+                // taken. A foothold over Earth, as Antarctica is: half weight and no gap.
+                if s.colonists > 0 && s.kind == UnitKind::ColonyShip
+                    && let Some(n) = orbit.slot()
+                    && self.far_slot(body, n)
+                    && self.free_orbital_slots(body).contains(&n)
+                    && self.buildable_orbital_slots(body).is_empty()
+                {
+                    let into = UnloadTarget::Ring(body, n);
+                    push(vec![Order::Unload { ship: s.id, colonists: self.unload_most(s.id, into), army: false, into }], Cat::FoundColony, self.base_weight(seat, Cat::FoundColony) * 0.5, 1.0, 1.0, 1.0, format!("found {}", self.station_name(body, n)), None);
                 }
                 // Ticket #44: Antarctica, Earth's slots. A foothold, not Presence: half weight and no gap,
                 // so it is taken when the Ship cannot go anywhere better.

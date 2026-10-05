@@ -64,6 +64,64 @@ pub enum Orbit {
     Slot(u32),
 }
 
+/// Ticket #481 (version 0.09.8): **a step toward landing on the Moon**, in order, the race the
+/// Moon's card shows for every Faction until somebody lands.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum MoonStep {
+    NoShipyard,
+    Shipyard,
+    ColonyShip,
+    Aboard,
+    Bound,
+    InOrbit,
+    Landed,
+}
+
+impl MoonStep {
+    /// The `[phrase]` in `report.toml` that says a rival stood here when the race was won.
+    pub fn key(self) -> &'static str {
+        match self {
+            MoonStep::NoShipyard => "moon_no_shipyard",
+            MoonStep::Shipyard => "moon_shipyard",
+            MoonStep::ColonyShip => "moon_colony_ship",
+            MoonStep::Aboard => "moon_aboard",
+            MoonStep::Bound => "moon_bound",
+            // A rival that has landed cannot be a rival of the first to land.
+            MoonStep::InOrbit | MoonStep::Landed => "moon_in_orbit",
+        }
+    }
+}
+
+/// Ticket #486 (version 0.09.8): **an end of a journey** -- a Body, or one of its far orbits,
+/// which for travel is a place of its own: Earth L4 is not left by way of Earth.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Port {
+    Body(BodyId),
+    /// A far orbit, by its Body and its Orbital Slot.
+    Far(BodyId, u32),
+}
+
+/// Ticket #486: the systems a journey runs within or between. Each far orbit is one of its own.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum System {
+    Earth,
+    Venus,
+    Mars,
+    Far(u32),
+}
+
+impl System {
+    /// The name `bodies.toml` writes a gulf's two ends in.
+    pub fn key(self) -> &'static str {
+        match self {
+            System::Earth => "earth",
+            System::Venus => "venus",
+            System::Mars => "mars",
+            System::Far(_) => "far",
+        }
+    }
+}
+
 impl Orbit {
     /// The orbit a Ship's `slot` names: low orbit where it names none.
     pub fn of(slot: Option<u32>) -> Orbit {
@@ -114,12 +172,19 @@ pub enum StateId {
     // Version 0.09.6 (ticket #453): Pakistan cut out of South Asia (Pakistan, Afghanistan) and East
     // Asia (the five Central Asian republics), the United Kingdom (with Ireland and Iceland) out of
     // Europe. Appended, as every split has been, so no older index moves.
-    Pakistan,
+    // Version 0.09.8 (ticket #482): this is KAZAKHSTAN now, the five Central Asian republics alone;
+    // Pakistan and Afghanistan went to the Region called Iran (`MiddleEast`). It keeps its place.
+    Kazakhstan,
     UnitedKingdom,
+    // Version 0.09.8 (ticket #482): Turkey, the Levant, Iraq and the Caucasus cut out of the Region
+    // called Iran; South Africa and its neighbours cut out of Nigeria's. Appended, as every split
+    // has been, so no older index moves.
+    Turkey,
+    SouthAfrica,
 }
 
 impl StateId {
-    pub const ALL: [StateId; 16] = [
+    pub const ALL: [StateId; 18] = [
         StateId::SubSaharanAfrica,
         StateId::NorthAfrica,
         StateId::EastAsia,
@@ -134,8 +199,10 @@ impl StateId {
         StateId::MiddleEast,
         StateId::Japan,
         StateId::ArabianPeninsula,
-        StateId::Pakistan,
+        StateId::Kazakhstan,
         StateId::UnitedKingdom,
+        StateId::Turkey,
+        StateId::SouthAfrica,
     ];
     pub fn index(self) -> usize {
         self as usize

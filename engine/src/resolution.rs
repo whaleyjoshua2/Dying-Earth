@@ -2877,7 +2877,8 @@ impl Game {
                         // sits in: a Core and the Colonists aboard, no Materials. A slot two seats found
                         // into in one Resolution goes to the first; the second stays aboard.
                         UnloadTarget::Ring(b, slot) => {
-                            if b != body || b == BodyId::Earth || self.station_at(b, slot).is_some() || colonists == 0 {
+                            // Ticket #480 (version 0.09.8): over Earth, only into a far orbit.
+                            if b != body || (b == BodyId::Earth && !self.far_slot(b, slot)) || self.station_at(b, slot).is_some() || colonists == 0 {
                                 continue;
                             }
                             let n = colonists.min(self.ship(ship).map(|s| s.colonists).unwrap_or(0));

@@ -49,22 +49,25 @@
 # The Reactor is NOT what a Custodian builds: it is the Archivists' Unique Facility since ticket
 # #184. Nothing here asks for one.
 
+# Ticket #477 (version 0.09.8): 462 words to 398, at the designer's word -- "word count for tutorial
+# sequence reduced by 10%" -- by seven cuts on turns 1, 2, 3 and 5, each approved as a before and
+# after. No ceiling is tested: the designer wants room to rewrite these.
 [[note]]
 turn = 1
 figure = "Spend your Influence"
-text = "Influence is your claim on a place. Click a Region on the globe, then spend from the corner in the lower right; Max spends everything left. What you do not spend by the end of the turn is lost."
-note = "You are the Custodians: colonise the solar system without wrecking Earth doing it. You need three turns running where the world puts out less carbon than it takes back, and twelve Colonists living off Earth."
+text = "Influence is your claim on a place. Click a Region on the globe, then spend from the lower right corner; Max spends it all. Unspent Influence is lost at End Turn."
+note = "You are the Custodians: colonise the solar system without wrecking Earth. You need three turns running where the world emits less carbon than it takes back, and twelve Colonists living off Earth."
 
 [[note]]
 turn = 2
 figure = "Build a Habitat on the ISS"
-text = "The ISS is yours, in orbit over Earth, with two people already aboard and room to build. Click it on the globe, click a free tile on its card, and order a Habitat: 25 Materials, ready next turn, and it holds four more."
-note = "A station builds one Module for every Colonist living on it. The two aboard are what let you build at all; the people you send up next will let you build more."
+text = "The ISS is yours, in orbit over Earth, with two people aboard. Click it on the globe, click a free tile on its card, and order a Habitat: 25 Materials, ready next turn, room for four more."
+note = "A station builds one Module for each Colonist living on it. Send more people up to build more."
 
 [[note]]
 turn = 3
 figure = "Recruit Pioneers"
-text = "The Region you started in has a Launch Site, so it can put people into orbit. Click it, and under Pioneers recruit two: they take people from the Region and appear on its card when the turn ends."
+text = "Your starting Region has a Launch Site, so it can put people into orbit. Click it, and under Pioneers recruit two: they appear on its card when the turn ends."
 note = "Every figure on a card explains itself. Rest the pointer on a number and the rule behind it appears."
 
 [[note]]
@@ -76,8 +79,8 @@ note = "That is the last of these notes that asks you for anything. Twelve peopl
 [[note]]
 turn = 5
 figure = "Watch the temperature"
-text = "The bar along the top carries the world's figures: rest the pointer on the ppm and the temperature for their histories. The Climate Panel (C) holds the whole picture, and says what the air is already committed to whatever anybody does now."
-note = "The Scrubber is yours alone. It takes no build slot, it pulls carbon back out of the air and it calms the state it stands in -- and it is the only thing in the game that visibly moves the climate."
+text = "The top bar carries the world's figures: rest the pointer on the ppm and the temperature for their histories. The Climate Panel (C) holds the whole picture, and what the air is already committed to."
+note = "The Scrubber is yours alone. It takes no build slot, pulls carbon out of the air and calms the Region it stands in."
 
 [[note]]
 turn = 6
