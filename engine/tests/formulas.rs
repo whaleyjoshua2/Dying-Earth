@@ -1871,10 +1871,13 @@ fn the_ai_seats_take_start_states_not_adjacent_to_any_taken_one() {
     // Then the untouched states are all at Industry 1, so the tie goes to the most populous:
     // Sub-Saharan Africa at 11.4.
     // The peninsula's neighbours join the adjacent set; Australia is the last at Industry 2.
-    assert_eq!(held(Seat(3)), vec![StateId::ArabianPeninsula]);
+    // Ticket #492 (version 0.09.9): the peninsula touches South Africa now, across the Red Sea from
+    // the Horn, so it is taken off the table with it, and Australia is the pick.
+    assert_eq!(held(Seat(3)), vec![StateId::Australia]);
     // The fallback, when every free state touches a taken one: the highest Industry Level free
     // state, ties by population. With everything above taken, North America at 3 wins.
-    let taken = [StateId::Europe, StateId::EastAsia, StateId::Australia, StateId::SubSaharanAfrica, StateId::SouthAmerica, StateId::CentralAmerica];
+    // Ticket #492 (version 0.09.9): with South Africa, since the peninsula touches it and no longer Nigeria.
+    let taken = [StateId::Europe, StateId::EastAsia, StateId::Australia, StateId::SubSaharanAfrica, StateId::SouthAfrica, StateId::SouthAmerica, StateId::CentralAmerica];
     assert_eq!(g.ai_start_state(&taken), StateId::NorthAmerica, "the fallback picks the best free state");
     // Every seat's start carries a Launch Site.
     for seat in Seat::ALL {
@@ -5609,7 +5612,8 @@ fn a_spectated_game_seats_four_computers_and_deals_seat_zero_by_the_spreading_ru
     // than Australia, is the third pick now; Australia is the fourth.
     // Ticket #482 (version 0.09.8): South Africa, at Industry 2 with more people than either, is
     // the third; the peninsula the fourth; Australia no seat's.
-    assert_eq!(taken, vec![StateId::EastAsia, StateId::Europe, StateId::SouthAfrica, StateId::ArabianPeninsula]);
+    // Ticket #492 (version 0.09.9): the peninsula touches South Africa now; Australia is the fourth.
+    assert_eq!(taken, vec![StateId::EastAsia, StateId::Europe, StateId::SouthAfrica, StateId::Australia]);
     for seat in Seat::ALL {
         assert_eq!(g.controlled_states(seat), vec![taken[seat.index()]], "{seat:?} starts where the rule put it");
     }
@@ -17606,7 +17610,8 @@ fn a_throw_off_of_the_player_is_under_your_works() {
 #[test]
 fn an_occupation_begun_or_broken_by_the_player_is_under_your_works() {
     let occupation = |g: &Game| g.report.lines.iter().find(|l| l.kind == LineKind::Occupation).map(|l| (l.mine, l.text.clone())).expect("an Occupation line");
-    for (home, mine) in [(StateId::EastAsia, true), (StateId::ArabianPeninsula, false)] {
+    // Ticket #492 (version 0.09.9): the fourth seat starts in Australia now, not the peninsula.
+    for (home, mine) in [(StateId::EastAsia, true), (StateId::Australia, false)] {
         let mut g = game();
         g.armies.retain(|a| a.home != ArmyHome::State(StateId::Europe));
         let army = occupier_in(&mut g, home, StateId::Europe);
@@ -19482,11 +19487,12 @@ fn the_regions_are_redrawn_around_iran_to_eighteen() {
     assert_eq!((tr.population, tr.gdp, tr.influence, tr.industry_level, tr.size, tr.coastal_exposure), (185.0, 3, 1, 2, 2, 1));
     assert_eq!((kz.population, kz.gdp, kz.influence, kz.industry_level, kz.size, kz.coastal_exposure), (70.0, 1, 1, 1, 2, 0));
     // Nigeria's 1,140 people and 2 GDP, shared two ways; its 1 Influence kept, and 1 added.
-    assert_eq!(ng.population + za.population, 1140.0);
+    assert_eq!(ng.population + za.population + card(StateId::NorthAfrica).population, 1140.0 + 260.0);
     assert_eq!((ng.gdp + za.gdp, ng.influence, za.influence), (2, 1, 1));
-    // Ticket #492 (version 0.09.9): East Africa's 198 move to South Africa, 408 from 210; the rest stands.
-    assert_eq!((za.population, za.gdp, za.industry_level, za.size, za.coastal_exposure), (408.0, 1, 2, 2, 2));
-    assert_eq!(ng.population, 732.0);
+    // Ticket #492 (version 0.09.9): East Africa and the Horn to South Africa, Angola back, Eritrea
+    // to Egypt: 517, 619 and 264; the rest stands.
+    assert_eq!((za.population, za.gdp, za.industry_level, za.size, za.coastal_exposure), (517.0, 1, 2, 2, 2));
+    assert_eq!((ng.population, card(StateId::NorthAfrica).population), (619.0, 264.0));
     // The United Kingdom's share of the European Union's, as ticket #453 left it.
     let two = [StateId::Europe, StateId::UnitedKingdom];
     assert_eq!(two.iter().map(|s| card(*s).population).sum::<f64>(), 600.0);
@@ -19507,7 +19513,8 @@ fn the_regions_are_redrawn_around_iran_to_eighteen() {
     assert_eq!(ir.neighbours, vec![StateId::Turkey, StateId::Kazakhstan, StateId::EastAsia, StateId::SouthAsia, StateId::ArabianPeninsula]);
     assert_eq!(tr.neighbours, vec![StateId::Europe, StateId::Russia, StateId::NorthAfrica, StateId::ArabianPeninsula, StateId::MiddleEast]);
     assert_eq!(kz.neighbours, vec![StateId::Russia, StateId::EastAsia, StateId::MiddleEast]);
-    assert_eq!(za.neighbours, vec![StateId::SubSaharanAfrica]);
+    // Ticket #492 (version 0.09.9): the Horn's, Egypt's Region and Arabia across the Red Sea.
+    assert_eq!(za.neighbours, vec![StateId::SubSaharanAfrica, StateId::NorthAfrica, StateId::ArabianPeninsula]);
     assert_eq!(uk.neighbours, vec![StateId::Europe, StateId::NorthAmerica]);
     for a in StateId::ALL {
         for b in &card(a).neighbours {

@@ -99,17 +99,24 @@ ceiling at seven, as it was before: its four lines of arithmetic are what overfl
 Re-swept: the win column the same; Exchanges at the end in one seating 22 from 20, the computer
 building one Trade Post a Body.
 
-## East Africa to the South Africa Region (#492)
+## East Africa and the Horn to the South Africa Region (#492)
 
-Kenya, Tanzania, Uganda, Rwanda and Burundi to South Africa's Region (the designer chose all of East
-Africa; Zambia was there already): South Africa 408 people, Nigeria 732. Spec section 4.
+First built as East Africa alone (Kenya, Tanzania, Uganda, Rwanda, Burundi), then amended by the
+designer: *"swap angola and give south africa ethiopia and somalia too; eritrea to egypt"*; Djibouti
+goes with the Horn. South Africa 517 people, Nigeria 619, Egypt 264. Spec section 4.
 
 **The ground**, repainted from Natural Earth by `cargo run --release --example prep_assets --
 --mask-only --borders <geojson> <preview>`. The file was fetched for the run, not kept; a repaint
-before the change matched the committed map to the pixel, so it is the 0.09.8 file. After it,
-4,742 pixels move from Nigeria's Region to South Africa's and none elsewhere.
+before the change matched the committed map to the pixel, so it is the 0.09.8 file. Against the
+0.09.8 map: 9,630 pixels from Nigeria's Region to South Africa's, 3,421 back (Angola), 392 to
+Egypt's (Eritrea), none elsewhere.
 
 ![Africa before and after](ticket-492/africa-before-after.png)
 
-**The sweep** ([`after-492.txt`](sweeps/after-492.txt)): 3 / 27 / 23 / 3 and 21 collapses, from
-3 / 25 / 26 / 4 and 21, within noise.
+**Neighbours.** South Africa now touches Egypt, and faces Saudi Arabia across the Red Sea in
+Nigeria's place. A consequence: the spreading rule's fourth computer start is Australia, where it
+was Saudi Arabia, since Saudi Arabia now touches South Africa, the third. Four tests that pinned
+the old board were moved to it.
+
+**The sweep** ([`after-492.txt`](sweeps/after-492.txt)): 2 / 26 / 28 / 2 and 20 collapses, from
+3 / 25 / 26 / 4 and 21, within noise. The East-Africa-only build had read 3 / 27 / 23 / 3 and 21.
