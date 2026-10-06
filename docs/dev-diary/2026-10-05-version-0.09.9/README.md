@@ -120,3 +120,14 @@ the old board were moved to it.
 
 **The sweep** ([`after-492.txt`](sweeps/after-492.txt)): 2 / 26 / 28 / 2 and 20 collapses, from
 3 / 25 / 26 / 4 and 21, within noise. The East-Africa-only build had read 3 / 27 / 23 / 3 and 21.
+
+## Stations drawn short in a Body's In orbit list (#493)
+
+Every Body's In orbit list: the station glyph, the name in the holder's colour, the people; red
+"blockaded" under a Blockade; the modules on the hover. Spec section 5. No rule moves, so no sweep.
+
+- [`ticket-493/in-orbit-rows.png`](ticket-493/in-orbit-rows.png): Earth's list on turn 1, with a
+  rival Frigate on Blockade in the ISS's ring (the new `blockadeiss:1` shot aid): ISS in the
+  Custodians' teal, "blockaded" in red; Tiangong in the Prospectors' orange; Axiom in the
+  Archivists' red.
+- [`ticket-493/in-orbit-hover.png`](ticket-493/in-orbit-hover.png): the ISS row's hover, "Solar Array".

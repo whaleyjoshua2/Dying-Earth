@@ -1541,6 +1541,18 @@ fn build_board(session: &mut Session) {
             g.ships.push(Ship { id, name, kind: UnitKind::Frigate, seat, damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: 30.0, slot });
         }
     }
+    // Ticket #493 (version 0.09.9): `blockadeiss:1` (a building aid): a Frigate of seat 1's on
+    // Blockade in the ring of seat 0's first station over Earth, so the In orbit list's red
+    // "blockaded" can be photographed.
+    if std::env::args().any(|a| a == "blockadeiss:1")
+        && let Some(g) = session.game.as_mut()
+        && let Some(slot) = g.colonies.iter().find(|c| c.in_orbit && c.body == BodyId::Earth && c.control.director() == Some(Seat(0))).map(|c| c.slot)
+    {
+        let id = ShipId(g.fresh_id());
+        let name = g.next_ship_name(UnitKind::Frigate);
+        let built_turn = g.turn;
+        g.ships.push(Ship { id, name, kind: UnitKind::Frigate, seat: Seat(1), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Blockade, escaped: false, arrived_this_turn: false, built_turn, fuel: 30.0, slot: Some(slot) });
+    }
     // Ticket #398 (version 0.09.3): `yard:1` (a building aid): seat 0's first ground Colony gains a
     // working Mine and a Shipyard, so the Build Where You Dig note and the Ship buttons at a
     // low-gravity yard's price can be photographed; with `first:1 hab:ground` that is the Moon. The

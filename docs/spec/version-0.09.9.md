@@ -185,3 +185,16 @@ and the amendment the designer made after the first build.
 [`after-492.txt`](../dev-diary/2026-10-05-version-0.09.9/sweeps/after-492.txt)): 2 / 26 / 28 / 2 and 20
 collapses, from 3 / 25 / 26 / 4 and 21: within noise. (The first build, East Africa alone, read
 3 / 27 / 23 / 3 and 21.)
+
+## 5. Stations drawn short in a Body's In orbit list
+
+The authority is [ticket #493](https://github.com/whaleyjoshua2/Dying-Earth/issues/493).
+
+- **On every Body's card**, each station in the In orbit list is one row: the station glyph
+  (off-white), its name in its holder's colour, and its Colonists with the people glyph, as
+  `[station] ISS 2 [people]`. A click selects it, as before.
+- **Nobody's** station has its name in grey; an **occupied** one in the occupier's colour.
+- **A station under Blockade** adds "blockaded" in red.
+- **The owner's name and the modules leave the row.** The modules are its hover: "Shipyard, Solar
+  Array", or "bare" for a Core alone.
+- No rule moves.

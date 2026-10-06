@@ -3822,25 +3822,37 @@ A Warship on Blockade shuts the one orbit it sits in and no other: a station's r
             card.name, card.orbital_slots
         ),
     );
+    // Ticket #493 (version 0.09.9): a station's row, on every Body's card, is its glyph, its name in
+    // its holder's colour -- grey for nobody's, the occupier's for an occupied one -- and its people;
+    // "blockaded" in red where a Blockade starves it. The owner's name and the modules are gone from
+    // the row, the modules to its hover.
+    const BLOCKADED: Color32 = Color32::from_rgb(236, 88, 76);
     for c in game.colonies.iter().filter(|c| c.in_orbit && c.body == body) {
-        let owner = match c.control {
-            Control::Neutral => "nobody's".to_string(),
-            Control::Controlled(s) => game.seat_name(s),
-            Control::Occupied { occupier, .. } => format!("occupied by the {}", game.seat_name(occupier)),
+        let colour = match c.control {
+            Control::Neutral => Color32::from_gray(150),
+            Control::Controlled(s) | Control::Occupied { occupier: s, .. } => seat_colour(session, s),
         };
-        // Ticket #165 (version 0.07.5): the Core Module is left out of the list. Every Colony and
-        // every station has one, so naming it says nothing about this one; and a station that holds
-        // only its Core Module is exactly what the words below have always called a bare core module.
+        // Ticket #165 (version 0.07.5): the Core Module is left out of the list; one alone is "bare".
         let mods: Vec<&str> = c.modules.iter().filter(|m| m.kind != ModuleKind::Core).map(|m| m.kind.name()).collect();
-        // Ticket #278 (version 0.08.5): a station under a Blockade says so, and by whom.
-        let starved = match game.starved_by(c.id) {
-            Some(by) => format!("; blockaded by the {}: producing nothing", game.seat_name(by)),
-            None => String::new(),
-        };
-        let text = format!("{}: {}, {} Colonists, {}{starved}", game.station_name(body, c.slot), owner, c.colonists, if mods.is_empty() { "a bare core module".to_string() } else { mods.join(", ") });
-        if ui.button(text).clicked() {
-            view.selection = Selection::Colony(c.id);
-        }
+        let tip = if mods.is_empty() { "bare".to_string() } else { mods.join(", ") };
+        ui.horizontal(|ui| {
+            let name = RichText::new(game.station_name(body, c.slot)).color(colour);
+            let button = match Kind::Station.image(ui.ctx(), KIND_GLYPH) {
+                Some(image) => egui::Button::image_and_text(image, name),
+                None => egui::Button::new(name),
+            };
+            if rule_tip(ui.add(button), tip).clicked() {
+                view.selection = Selection::Colony(c.id);
+            }
+            ui.label(c.colonists.to_string());
+            if let Some(image) = Icons::from_ctx(ui.ctx(), "population", 14.0) {
+                ui.add(image);
+            }
+            // Ticket #278 (version 0.08.5): a station under a Blockade says so.
+            if game.starved_by(c.id).is_some() {
+                ui.colored_label(BLOCKADED, "blockaded");
+            }
+        });
     }
     if !session.spectator {
         for slot in game.free_orbital_slots(body) {
