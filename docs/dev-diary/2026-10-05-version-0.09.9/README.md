@@ -70,3 +70,10 @@ traced. The sweep gained a line, places at the end by tier: 929 Outposts, 81 Set
 Colonies of 1,032.
 
 The Report's word ceiling rose by two, to 1,783, for a rival's "upgraded {colony}".
+
+**The review** (two agents, standards and spec): a Module refused at the tier's cap still blamed the
+people ("one for each of its 14 Colonists"); it now says "full: upgrade to a Settlement for more",
+test watched failing first. Also fixed: the free tile's hover stated the old rule; the Modules
+hover wrote "one a Colonist" where the data holds the figure; the tiers check sat under another
+ticket's comment; the queue test written three times. Kept: a tier build under way when the place
+changes hands completes for the new holder, as a Module does. The sweep is the same to the line.

@@ -107,6 +107,8 @@ The authority is [ticket #490](https://github.com/whaleyjoshua2/Dying-Earth/issu
   cut to "Modules 3 of 6"; full, it says "Full until more Colonists live here", or at the cap
   "Full: upgrade for more room", or at the top "Full". Its hover: "One a Colonist, at most 6 as an
   Outpost. Mothballed keeps a slot, building reserves one; the Core and the Archive take none."
+- **A Module refused for want of room** says why: "full until more Colonists live here" below the
+  tier's cap, "full: upgrade to a Settlement for more" at it, "full: a Colony holds 18" at the top.
 - **The computer seats** order the upgrade for a place whose slots are all taken at its tier's cap
   and whose people are enough for the next tier, at a Producer's weight (`raise_tier` in
   `ai.toml`).

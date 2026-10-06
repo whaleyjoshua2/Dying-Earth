@@ -79,7 +79,7 @@ A permanent settlement a Faction holds on a Body, founded when a Colony Ship unl
 _Avoid_: base
 
 **Tier**:
-How far a Colony or Space Station has grown, since version 0.09.9: an **Outpost**, a **Settlement** or a **Colony**, every place starting an Outpost. Its Module slots are the lower of its Colonists and its tier's cap -- six, twelve, eighteen -- and the next tier is bought with Materials and Widgets once enough people live there, twelve for a Settlement and eighteen for a Colony. A place never falls back a tier. The word Colony names both the place, whatever its tier, and the top tier; the card's title says which tier it stands at.
+How far a Colony or Space Station has grown, since version 0.09.9: an **Outpost**, a **Settlement** or a **Colony**, every place starting an Outpost. Its Module slots are the lower of its Colonists and its tier's cap -- six, twelve, eighteen -- and the next tier is bought with Materials and Widgets once enough people live there, twelve for a Settlement and eighteen for a Colony. A place never falls back a tier. The word Colony names both the place, whatever its tier, and the top tier.
 _Avoid_: level, rank, size (Size is a Region's)
 
 **Colony Slot**:

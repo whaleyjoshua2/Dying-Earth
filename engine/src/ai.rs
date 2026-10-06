@@ -2045,7 +2045,7 @@ impl Game {
                 && c.colonists >= next.colonists
                 && self.module_slots(c) >= self.tier_of(c).cap
                 && self.free_module_slots(c) == 0
-                && !c.queue.iter().any(|b| matches!(b.item, BuildItem::Tier(_)))
+                && self.tier_under_way(c).is_none()
             {
                 push(vec![Order::RaiseTier { colony: c.id }], Cat::RaiseTier, self.base_weight(seat, Cat::RaiseTier), gap_for(Cat::RaiseTier, None), 1.0, 1.0, format!("upgrade {} to a {}", self.place_name(Place::Colony(c.id)), next.name), None);
             }

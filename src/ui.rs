@@ -8146,7 +8146,9 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
         ui.colored_label(Color32::YELLOW, why);
     }
     // Ticket #116 (version 0.07.1): the rule behind the cap. Ticket #490: with the tier's ceiling.
-    rule_tip(resp, format!("One a Colonist, at most {} as a {}.\nMothballed keeps a slot, building reserves one; the Core and the Archive take none.", tier.cap, tier.name));
+    let per = match game.tables.slots.per_colonist { 1 => "One a Colonist".to_string(), n => format!("One for every {n} Colonists") };
+    let free = match game.tables.slots.base { 0 => String::new(), n => format!(", {n} free") };
+    rule_tip(resp, format!("{per}{free}, at most {} as a {}.\nMothballed keeps a slot, building reserves one; the Core and the Archive take none.", tier.cap, tier.name));
     // Ticket #332 (version 0.09.0): what this place makes in Widgets a turn, and its queue in
     // order -- the Archive and a Ship on it too, which have no tile.
     widgets_block(ui, game, Place::Colony(cid));
@@ -10068,7 +10070,7 @@ fn module_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     // above it: ordered this turn, under way, or offered.
     let upgrade = game.next_tier(col).filter(|_| mine).map(|next| {
         let pending = session.pending.iter().position(|o| matches!(o, Order::RaiseTier { colony } if *colony == cid));
-        let queued = col.queue.iter().position(|b| matches!(b.item, BuildItem::Tier(_)));
+        let queued = game.tier_under_way(col);
         (next, pending, queued)
     });
     let total = standing.len() + building.len() + ordered.len() + free + usize::from(upgrade.is_some());
@@ -10151,7 +10153,8 @@ fn module_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     for fi in 0..free {
         // One free place is as good as another, so the first stands for the click.
         let selected = fi == 0 && view.hab_tile == Some(HabTile::Free);
-        let tip = format!("Room for another Module: click it to build here.\n{} places are free from the start and one more for every {} Colonist.", game.tables.slots.base, game.tables.slots.per_colonist);
+        // Ticket #490 (version 0.09.9): the rule is on the Modules heading's hover.
+        let tip = "Room for another Module: click it to build here.".to_string();
         if hab_tile(ui, tile_rect(i), ui.id().with(("hab-free", fi)), None, "", TileState::Free(mine), selected, None, tip).clicked() {
             view.hab_tile = Some(HabTile::Free);
         }

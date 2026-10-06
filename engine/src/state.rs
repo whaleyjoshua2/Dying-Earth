@@ -3288,7 +3288,12 @@ impl Game {
         &tiers[(c.tier as usize).min(tiers.len() - 1)]
     }
 
-    /// Ticket #490: the tier above it, or None at the top.
+    /// Ticket #490 (version 0.09.9): the upgrade in its queue, by index, if one is under way.
+    pub fn tier_under_way(&self, c: &Colony) -> Option<usize> {
+        c.queue.iter().position(|b| matches!(b.item, BuildItem::Tier(_)))
+    }
+
+    /// Ticket #490 (version 0.09.9): the tier above it, or None at the top.
     pub fn next_tier(&self, c: &Colony) -> Option<&crate::data::TierCard> {
         self.tables.tiers.get(c.tier as usize + 1)
     }

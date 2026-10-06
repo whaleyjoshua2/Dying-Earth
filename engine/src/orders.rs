@@ -1331,7 +1331,7 @@ impl Game {
                     return fail("not yours");
                 }
                 let Some(next) = self.next_tier(col) else { return fail(format!("already a {}", self.tier_of(col).name)) };
-                if pending.iter().any(|o| matches!(o, Order::RaiseTier { colony: c } if c == colony)) || col.queue.iter().any(|b| matches!(b.item, BuildItem::Tier(_))) {
+                if pending.iter().any(|o| matches!(o, Order::RaiseTier { colony: c } if c == colony)) || self.tier_under_way(col).is_some() {
                     return fail("already being upgraded");
                 }
                 if col.colonists < next.colonists {
@@ -1418,13 +1418,15 @@ impl Game {
                     .filter(|o| matches!(o.build_module(), Some((c, k)) if c == *colony && k != ModuleKind::Archive))
                     .count() as u32;
                 if self.module_slots_used(col) + ordered >= self.module_slots(col) {
-                    return fail(format!(
-                        "{} holds {} Modules already, all it has room for: {} free and one for each of its {} Colonists",
-                        self.place_name(Place::Colony(*colony)),
-                        self.module_slots_used(col) + ordered,
-                        self.tables.slots.base,
-                        col.colonists
-                    ));
+                    // Ticket #490 (version 0.09.9): full at its tier's cap, it wants the upgrade, not people.
+                    let tier = self.tier_of(col);
+                    return fail(if self.module_slots(col) < tier.cap {
+                        "full until more Colonists live here".to_string()
+                    } else if let Some(next) = self.next_tier(col) {
+                        format!("full: upgrade to a {} for more", next.name)
+                    } else {
+                        format!("full: a {} holds {}", tier.name, tier.cap)
+                    });
                 }
                 Ok(cost)
             }

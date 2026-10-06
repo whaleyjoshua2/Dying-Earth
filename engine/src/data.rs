@@ -2200,6 +2200,13 @@ impl Tables {
     }
 
     fn validate(&self) -> Result<(), DataError> {
+        // Ticket #490 (version 0.09.9): a first tier to start at, and every tier above it rising.
+        if self.tiers.is_empty() {
+            return Err(err("modules.toml", "no tiers".to_string()));
+        }
+        if self.tiers.windows(2).any(|w| w[1].cap <= w[0].cap || w[1].colonists < w[0].colonists) {
+            return Err(err("modules.toml", "each tier must allow more slots, and want no fewer Colonists, than the one before".to_string()));
+        }
         // Ticket #58: every sentence the Report says, with every placeholder the engine supplies.
         self.report.check().map_err(|m| err("report.toml", m))?;
         // Every fixed id must have exactly one row, in the engine's order.
@@ -2243,13 +2250,6 @@ impl Tables {
             }
         }
         // Ticket #50: a Faction's start station, when it has one, must name an orbital slot over Earth.
-        // Ticket #490 (version 0.09.9): a first tier to start at, and every tier above it rising.
-        if self.tiers.is_empty() {
-            return Err(err("modules.toml", "no tiers".to_string()));
-        }
-        if self.tiers.windows(2).any(|w| w[1].cap <= w[0].cap || w[1].colonists < w[0].colonists) {
-            return Err(err("modules.toml", "each tier must allow more slots than the one before".to_string()));
-        }
         for f in &self.factions {
             if let Some(name) = &f.start_station
                 && !self.body(BodyId::Earth).stations.contains(name)

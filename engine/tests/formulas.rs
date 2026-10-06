@@ -20236,3 +20236,25 @@ fn the_ai_upgrades_a_full_place_with_the_people_for_it() {
     }
     assert!(raises(&mut g), "six of six, twelve people");
 }
+
+/// Ticket #490 (the review): a Module refused at the tier's cap says to upgrade, not to wait for
+/// people; one refused for want of people says so; at the top tier it says full.
+#[test]
+fn a_module_refused_at_the_tiers_cap_says_to_upgrade() {
+    let mut g = game();
+    g.seats[0].stockpile.materials = 300.0;
+    let c = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Habitat; 6], 14);
+    let build = Order::BuildModule { colony: c, kind: ModuleKind::Habitat };
+    let err = g.check_order(Seat(0), &[], &build).unwrap_err().0;
+    assert!(err.contains("upgrade to a Settlement"), "{err}");
+    g.colony_mut(c).unwrap().colonists = 5;
+    let err = g.check_order(Seat(0), &[], &build).unwrap_err().0;
+    assert!(err.contains("more Colonists"), "{err}");
+    g.colony_mut(c).unwrap().tier = 2;
+    g.colony_mut(c).unwrap().colonists = 30;
+    for _ in 0..12 {
+        g.colony_mut(c).unwrap().modules.push(Module::new(ModuleKind::Habitat));
+    }
+    let err = g.check_order(Seat(0), &[], &build).unwrap_err().0;
+    assert!(err.contains("full"), "{err}");
+}
