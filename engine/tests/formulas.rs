@@ -20258,3 +20258,50 @@ fn a_module_refused_at_the_tiers_cap_says_to_upgrade() {
     let err = g.check_order(Seat(0), &[], &build).unwrap_err().0;
     assert!(err.contains("full"), "{err}");
 }
+
+// ---------------------------------------------------------------- #491 the Exchange's interest (version 0.09.9)
+
+/// Ticket #491 (version 0.09.9): a working Exchange on a Colony or station pays an Investment
+/// Bank's interest into the Fund, one share a place as a Region's Bank does; two in one place pay
+/// once; a mothballed one pays nothing.
+#[test]
+fn an_exchange_pays_a_banks_interest_one_share_a_place() {
+    let mut g = game();
+    let pro = seat_of(&g, FactionKind::Prospectors);
+    g.seats[pro.index()].stockpile.energy = 500.0;
+    let c = colony(&mut g, pro, BodyId::Moon, &[ModuleKind::Exchange, ModuleKind::Exchange], 4);
+    g.seats[pro.index()].venture_fund = 500.0;
+    g.income_phase();
+    assert_eq!(g.seats[pro.index()].venture_fund, 505.0, "1% of 500, once for the place");
+    // With a Region's Bank as well: two shares.
+    let a = g.controlled_states(pro)[0];
+    g.state_mut(a).facilities.push(Facility::new(FacilityKind::InvestmentBank));
+    g.seats[pro.index()].venture_fund = 500.0;
+    g.income_phase();
+    assert_eq!(g.seats[pro.index()].venture_fund, 510.0, "the Region and the place");
+    // Mothballed, the place pays nothing.
+    for m in &mut g.colony_mut(c).unwrap().modules {
+        if m.kind == ModuleKind::Exchange {
+            m.mothballed = true;
+        }
+    }
+    g.seats[pro.index()].venture_fund = 500.0;
+    g.income_phase();
+    assert_eq!(g.seats[pro.index()].venture_fund, 505.0, "the Region alone");
+}
+
+/// Ticket #491: a captured Exchange pays its captor a share of its Ducat income, as a captured
+/// Investment Bank does: here at least the floor of one beside the Exchange's own extra Ducat.
+#[test]
+fn a_captured_exchange_pays_its_captor_interest() {
+    let mut g = game();
+    let cus = seat_of(&g, FactionKind::Custodians);
+    g.seats[cus.index()].stockpile.energy = 500.0;
+    let c = colony(&mut g, cus, BodyId::Moon, &[ModuleKind::Exchange], 4);
+    let mut control = g.clone();
+    control.colony_mut(c).unwrap().modules[0] = Module::new(ModuleKind::TradePost);
+    g.income_phase();
+    control.income_phase();
+    let more = g.seats[cus.index()].income_last_turn.ducats - control.seats[cus.index()].income_last_turn.ducats;
+    assert!(more >= 2.0, "the Exchange's extra Ducat and at least one of interest: {more}");
+}

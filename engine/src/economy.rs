@@ -1500,11 +1500,22 @@ impl Game {
                 paying_regions.insert(sid);
             }
         }
+        // Ticket #491 (version 0.09.9): and a Colony or station with a working Exchange, one share a
+        // place, as a Region with a Bank: the Prospectors' Bank off Earth.
+        let mut paying_places: std::collections::BTreeSet<ColonyId> = std::collections::BTreeSet::new();
+        for p in producers.iter().filter(|p| p.online && p.name == ModuleKind::Exchange.name()) {
+            if let ProducerPlace::Module(cid, _) = p.place
+                && self.colony(cid).is_some_and(|c| c.control == Control::Controlled(seat))
+            {
+                paying_places.insert(cid);
+            }
+        }
         let u_interest = self.tables.unique.investment_bank_interest;
         let u_floor = self.tables.unique.investment_bank_floor;
         let mut interest_to_fund = 0.0;
-        if !paying_regions.is_empty() {
-            let n = paying_regions.len() as i64;
+        if !paying_regions.is_empty() || !paying_places.is_empty() {
+            let n = (paying_regions.len() + paying_places.len()) as i64;
+            let payers = if paying_places.is_empty() { "Investment Bank" } else if paying_regions.is_empty() { "Exchange" } else { "Investment Bank or Exchange" };
             if self.tables.faction(self.kind(seat)).victory_first.kind == VictoryFirstKind::VentureFund {
                 // Ticket #240 (version 0.08.3): the Fund holds Ducats, so this interest is paid
                 // in Ducats. The rate and the floor were fitted against a Materials fund and are
@@ -1513,12 +1524,12 @@ impl Game {
                 // Ticket #387 (version 0.09.3): to the tenth, where it was floored.
                 let per = tenth(self.seat(seat).venture_fund * u_interest);
                 interest_to_fund = tenth(n as f64 * per).max(u_floor as f64);
-                sources.push((format!("{n} Investment Bank (interest banked)"), Resource::Ducats, interest_to_fund));
+                sources.push((format!("{n} {payers} (interest banked)"), Resource::Ducats, interest_to_fund));
             } else {
                 let per = tenth(gained.ducats * u_interest).max(u_floor as f64);
                 let paid = tenth(n as f64 * per);
                 gained.ducats += paid;
-                sources.push((format!("{n} Investment Bank (interest)"), Resource::Ducats, paid));
+                sources.push((format!("{n} {payers} (interest)"), Resource::Ducats, paid));
             }
         }
         // Ticket #72 (version 0.05.5): the Venture Capital Fund took its share of the Materials the

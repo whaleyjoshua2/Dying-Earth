@@ -77,3 +77,17 @@ test watched failing first. Also fixed: the free tile's hover stated the old rul
 hover wrote "one a Colonist" where the data holds the figure; the tiers check sat under another
 ticket's comment; the queue test written three times. Kept: a tier build under way when the place
 changes hands completes for the new holder, as a Module does. The sweep is the same to the line.
+
+## The Prospectors' Bank paying interest off Earth (#491)
+
+The Exchange pays an Investment Bank's interest, one share for each Colony or station with a working
+one, as a Region with a Bank counts; captured, it pays its captor as a captured Bank does. Spec
+section 3.
+
+**The picture.** [`ticket-491/exchange-hover.png`](ticket-491/exchange-hover.png): Tiangong's build
+list, the Exchange's hover "+1 Ducat over a Trade Post, and a Bank's interest". It wraps to seven
+lines, as the old wording did.
+
+**The sweep** ([`after-491.txt`](sweeps/after-491.txt)): 3 / 25 / 26 / 4 and 21 collapses, from
+3 / 26 / 26 / 4 and 20, within noise. The Prospectors' median Fund at the end rises in every
+seating, by 21 to 308 Ducats.

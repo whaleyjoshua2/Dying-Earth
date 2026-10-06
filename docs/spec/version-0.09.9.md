@@ -129,3 +129,23 @@ The authority is [ticket #490](https://github.com/whaleyjoshua2/Dying-Earth/issu
 
 At the end of the 80 games 1,032 Colonies and stations stand: 929 Outposts, 81 Settlements, 22
 Colonies (the sweep's new line). The Arkwrights' fall of seven is past noise and **not traced**.
+
+## 3. The Prospectors' Bank paying interest off Earth
+
+The authority is [ticket #491](https://github.com/whaleyjoshua2/Dying-Earth/issues/491).
+
+- **The Exchange**, the Prospectors' own Module in the Trade Post's place, pays an Investment Bank's
+  interest on top of its Ducats: 1% of the Venture Capital Fund into the Fund, to the tenth.
+- **One share a place**: each Colony or station with a working Exchange counts once, as each Region
+  with a working Investment Bank does, however many stand there. The floor of 1 is still one floor
+  for the whole Faction.
+- **A captured Exchange** pays its captor 1% of that turn's Ducat income, at least 1, as a captured
+  Investment Bank does.
+- **The Opening Objective** is unchanged: its three Investment Banks are Regions' alone.
+- **Its hover:** "+1 Ducat over a Trade Post, and a Bank's interest". The income line names the
+  payers: "2 Investment Bank or Exchange (interest banked)".
+
+**Measured** (80 games,
+[`after-491.txt`](../dev-diary/2026-10-05-version-0.09.9/sweeps/after-491.txt)): 3 / 25 / 26 / 4 and 21
+collapses, from 3 / 26 / 26 / 4 and 20: within noise. The Prospectors' median Fund at the end rises
+in every seating: 2,616 to 2,637, 2,782 to 3,090, 1,357 to 1,545, 1,550 to 1,661.

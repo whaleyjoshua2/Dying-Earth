@@ -301,7 +301,8 @@ name = "Exchange"
 materials = 25
 widgets = 4
 energy_upkeep = 2
-does = "pays 1 Ducat more a turn than a Trade Post"
+# Ticket #491 (version 0.09.9): and an Investment Bank's interest, one share a place.
+does = "+1 Ducat over a Trade Post, and a Bank's interest"
 produces = { resource = "ducats", amount = 2 }
 
 # Ticket #239 (version 0.08.3): the Chorus, the Arkwrights' Unique Module, replacing the Relay at
