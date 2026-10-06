@@ -19486,7 +19486,8 @@ fn the_regions_are_redrawn_around_iran_to_eighteen() {
     assert_eq!((ir.population, ir.gdp, ir.influence, ir.industry_level, ir.size, ir.coastal_exposure), (345.0, 1, 1, 2, 2, 1));
     assert_eq!((tr.population, tr.gdp, tr.influence, tr.industry_level, tr.size, tr.coastal_exposure), (185.0, 3, 1, 2, 2, 1));
     assert_eq!((kz.population, kz.gdp, kz.influence, kz.industry_level, kz.size, kz.coastal_exposure), (70.0, 1, 1, 1, 2, 0));
-    // Nigeria's 1,140 people and 2 GDP, shared two ways; its 1 Influence kept, and 1 added.
+    // Nigeria's 1,140 people and 2 GDP, shared two ways; its 1 Influence kept, and 1 added. Ticket
+    // #492 (version 0.09.9): the people three ways, Eritrea's to Egypt's 260.
     assert_eq!(ng.population + za.population + card(StateId::NorthAfrica).population, 1140.0 + 260.0);
     assert_eq!((ng.gdp + za.gdp, ng.influence, za.influence), (2, 1, 1));
     // Ticket #492 (version 0.09.9): East Africa and the Horn to South Africa, Angola back, Eritrea
