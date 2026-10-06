@@ -232,6 +232,8 @@ impl Module {
 pub enum BuildItem {
     Facility(FacilityKind),
     IndustryLevel,
+    /// Ticket #490 (version 0.09.9): a Colony or station raised to the tier at this index.
+    Tier(u32),
     Module(ModuleKind),
     Unit(UnitKind),
     /// Ticket #343 (version 0.09.1): a **Warhead** for a Missile Carrier that has fired, loaded at
@@ -246,6 +248,7 @@ impl BuildItem {
         match self {
             BuildItem::Facility(k) => k.name().to_string(),
             BuildItem::IndustryLevel => "Industry Level".to_string(),
+            BuildItem::Tier(_) => "Upgrade".to_string(),
             BuildItem::Module(k) => k.name().to_string(),
             BuildItem::Unit(k) => k.name().to_string(),
             BuildItem::Warhead(_) => "Warhead".to_string(),
@@ -494,6 +497,10 @@ pub struct Colony {
     /// Grid Failure: Modules offline until the next Resolution.
     pub grid_failed: bool,
     pub founded_turn: u32,
+    /// Ticket #490 (version 0.09.9): its tier, an index into the tiers table -- 0 an Outpost, 1 a
+    /// Settlement, 2 a Colony. It caps the Module slots and rises only by a paid build.
+    #[serde(default)]
+    pub tier: u32,
     /// Version 0.04 (ticket #46): a Space Station in an orbital slot rather than a Colony on the ground.
     pub in_orbit: bool,
 }
@@ -1876,7 +1883,7 @@ impl Game {
             // Solar Array -- in the Faction's own versions.
             let mut modules = vec![Module::new(ModuleKind::Core)];
             modules.extend(game.tables.start.station_modules.iter().map(|k| Module::new(k.built_by(game.kind(seat)))));
-            game.colonies.push(Colony { id, body: BodyId::Earth, slot: slot as u32, control: Control::Controlled(seat), modules, colonists: aboard, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
+            game.colonies.push(Colony { id, body: BodyId::Earth, slot: slot as u32, control: Control::Controlled(seat), modules, colonists: aboard, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, tier: 0, in_orbit: true });
         }
         // Starting positions (spec 14.3, ticket #50): the player's pick, then each AI seat in turn.
         let mut taken = vec![setup.player_start];
@@ -3271,7 +3278,19 @@ impl Game {
     /// only as its people arrive.
     pub fn module_slots(&self, c: &Colony) -> u32 {
         let s = &self.tables.slots;
-        s.base + c.colonists / s.per_colonist.max(1)
+        // Ticket #490 (version 0.09.9): never more than its tier allows.
+        (s.base + c.colonists / s.per_colonist.max(1)).min(self.tier_of(c).cap)
+    }
+
+    /// Ticket #490 (version 0.09.9): the tier a Colony or station stands at.
+    pub fn tier_of(&self, c: &Colony) -> &crate::data::TierCard {
+        let tiers = &self.tables.tiers;
+        &tiers[(c.tier as usize).min(tiers.len() - 1)]
+    }
+
+    /// Ticket #490: the tier above it, or None at the top.
+    pub fn next_tier(&self, c: &Colony) -> Option<&crate::data::TierCard> {
+        self.tables.tiers.get(c.tier as usize + 1)
     }
 
     /// Ticket #97: the Modules standing or building here that count against the cap. A mothballed

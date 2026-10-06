@@ -307,7 +307,7 @@ fn build_board(session: &mut Session) {
                 if g.station_at(BodyId::Mars, slot).is_none() {
                     let id = ColonyId(g.fresh_id());
                     let modules = vec![Module::new(ModuleKind::Core), Module::new(ModuleKind::Habitat)];
-                    g.colonies.push(Colony { id, body: BodyId::Mars, slot, control: Control::Controlled(seat), modules, colonists: 2, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
+                    g.colonies.push(Colony { id, body: BodyId::Mars, slot, control: Control::Controlled(seat), modules, colonists: 2, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, tier: 0, in_orbit: true });
                 }
             }
             for (seat, kind, slot, stance) in [(Seat(0), UnitKind::ColonyShip, Some(0u32), Stance::Hold), (Seat(1), UnitKind::Frigate, Some(0), Stance::Blockade)] {
@@ -391,7 +391,7 @@ fn build_board(session: &mut Session) {
             } else {
                 modules.push(Module::new(ModuleKind::Archive));
             }
-            g.colonies.push(Colony { id, body: BodyId::Mars, slot, control: Control::Controlled(Seat(0)), modules, colonists: 8, education: 1.0, settler_education: 1.0, queue, grid_failed: false, founded_turn: 1, in_orbit: false });
+            g.colonies.push(Colony { id, body: BodyId::Mars, slot, control: Control::Controlled(Seat(0)), modules, colonists: 8, education: 1.0, settler_education: 1.0, queue, grid_failed: false, founded_turn: 1, tier: 0, in_orbit: false });
             g.seats[0].archive_fund = match point {
                 0 => research / 4,
                 1 => research / 2,
@@ -411,7 +411,7 @@ fn build_board(session: &mut Session) {
             let mut battery = Module::new(ModuleKind::Battery);
             battery.damage = 2;
             let modules = vec![Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Generator), Module::new(ModuleKind::Mine), battery];
-            g.colonies.push(Colony { id, body: BodyId::Mars, slot, control: Control::Controlled(Seat(0)), modules, colonists: 4, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: false });
+            g.colonies.push(Colony { id, body: BodyId::Mars, slot, control: Control::Controlled(Seat(0)), modules, colonists: 4, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, tier: 0, in_orbit: false });
             let sid = ShipId(g.fresh_id());
             let name = g.next_ship_name(UnitKind::Frigate);
             let built_turn = g.turn;
@@ -427,7 +427,7 @@ fn build_board(session: &mut Session) {
             let slot = g.free_slots_on(BodyId::Moon).first().copied().unwrap_or(0);
             let id = ColonyId(g.fresh_id());
             let modules = vec![Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Generator), Module::new(ModuleKind::Mine), Module::new(ModuleKind::Barracks), Module::new(ModuleKind::Core)];
-            g.colonies.push(Colony { id, body: BodyId::Moon, slot, control: Control::Controlled(Seat(0)), modules, colonists: 4, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: false });
+            g.colonies.push(Colony { id, body: BodyId::Moon, slot, control: Control::Controlled(Seat(0)), modules, colonists: 4, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, tier: 0, in_orbit: false });
             g.seats[0].stockpile.materials = 120.0;
             g.seats[0].stockpile.energy = 60.0;
         }
@@ -438,7 +438,7 @@ fn build_board(session: &mut Session) {
         if std::env::args().any(|a| a == "refuel:1") {
             let id = ColonyId(g.fresh_id());
             let modules = vec![Module::new(ModuleKind::Habitat)];
-            g.colonies.push(Colony { id, body: BodyId::Mars, slot: 0, control: Control::Controlled(Seat(1)), modules, colonists: 2, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
+            g.colonies.push(Colony { id, body: BodyId::Mars, slot: 0, control: Control::Controlled(Seat(1)), modules, colonists: 2, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, tier: 0, in_orbit: true });
             let sid = ShipId(g.fresh_id());
             let name = g.next_ship_name(UnitKind::Frigate);
             let built_turn = g.turn;
@@ -454,7 +454,7 @@ fn build_board(session: &mut Session) {
             let slot = g.free_slots_on(BodyId::Mars).first().copied().unwrap_or(0);
             let id = ColonyId(g.fresh_id());
             let modules = vec![Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Mine), Module::new(ModuleKind::Generator)];
-            g.colonies.push(Colony { id, body: BodyId::Mars, slot, control: Control::Controlled(Seat(1)), modules, colonists: 8, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: false });
+            g.colonies.push(Colony { id, body: BodyId::Mars, slot, control: Control::Controlled(Seat(1)), modules, colonists: 8, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, tier: 0, in_orbit: false });
             g.ships.retain(|s| !(s.at == ShipAt::Body(BodyId::Mars) && s.kind.is_warship() && s.seat != Seat(0)));
             let sid = ShipId(g.fresh_id());
             let name = g.next_ship_name(UnitKind::Battleship);
@@ -604,12 +604,12 @@ fn build_board(session: &mut Session) {
             if let Some(slot) = slots.next() {
                 let id = ColonyId(g.fresh_id());
                 let modules = vec![Module::new(ModuleKind::Core), Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Mine), Module::new(ModuleKind::Generator)];
-                g.colonies.push(Colony { id, body: BodyId::Moon, slot, control: Control::Controlled(Seat(1)), modules, colonists: 4, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: false });
+                g.colonies.push(Colony { id, body: BodyId::Moon, slot, control: Control::Controlled(Seat(1)), modules, colonists: 4, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, tier: 0, in_orbit: false });
             }
             if watching && let Some(slot) = slots.next() {
                 let id = ColonyId(g.fresh_id());
                 let modules = vec![Module::new(ModuleKind::Core), Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Relay)];
-                g.colonies.push(Colony { id, body: BodyId::Moon, slot, control: Control::Controlled(Seat(0)), modules, colonists: 4, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: false });
+                g.colonies.push(Colony { id, body: BodyId::Moon, slot, control: Control::Controlled(Seat(0)), modules, colonists: 4, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, tier: 0, in_orbit: false });
             }
         }
         // `rival:1` (a building aid, ticket #261, version 0.08.4): seat 1 stands three quarters of
@@ -621,7 +621,7 @@ fn build_board(session: &mut Session) {
             let slot = g.free_slots_on(BodyId::Moon).first().copied().unwrap_or(0);
             let id = ColonyId(g.fresh_id());
             let modules = vec![Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Habitat)];
-            g.colonies.push(Colony { id, body: BodyId::Moon, slot, control: Control::Controlled(rival), modules, colonists: 9, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: false });
+            g.colonies.push(Colony { id, body: BodyId::Moon, slot, control: Control::Controlled(rival), modules, colonists: 9, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, tier: 0, in_orbit: false });
             g.seats[1].venture_fund = 2000.0;
             g.seats[1].stabilization_run = 3;
             run_one_quiet_turn(g);
@@ -644,7 +644,7 @@ fn build_board(session: &mut Session) {
             if std::env::args().any(|a| a == "post:1") {
                 modules.push(Module::new(ModuleKind::TradePost));
             }
-            g.colonies.push(Colony { id, body: BodyId::Mars, slot, control: Control::Controlled(Seat(0)), modules, colonists: n, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: false });
+            g.colonies.push(Colony { id, body: BodyId::Mars, slot, control: Control::Controlled(Seat(0)), modules, colonists: n, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, tier: 0, in_orbit: false });
             g.seats[0].stockpile.materials = 120.0;
             g.seats[0].stockpile.energy = 60.0;
             ARCHIVE_COLONY.with(|c| c.set(Some(id)));
@@ -757,7 +757,7 @@ fn build_board(session: &mut Session) {
             let slot = g.free_slots_on(BodyId::Moon).first().copied().unwrap_or(0);
             let id = ColonyId(g.fresh_id());
             let modules = vec![Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Generator), Module::new(ModuleKind::Mine), Module::new(ModuleKind::MassDriver)];
-            g.colonies.push(Colony { id, body: BodyId::Moon, slot, control: Control::Controlled(Seat(0)), modules, colonists: 4, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: false });
+            g.colonies.push(Colony { id, body: BodyId::Moon, slot, control: Control::Controlled(Seat(0)), modules, colonists: 4, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, tier: 0, in_orbit: false });
             g.seats[0].stockpile.materials = 120.0;
             g.seats[0].stockpile.energy = 60.0;
             ARCHIVE_COLONY.with(|c| c.set(Some(id)));
@@ -855,7 +855,7 @@ fn build_board(session: &mut Session) {
         if let Some(v) = venus {
             if g.station_at(BodyId::Venus, 1).is_none() {
                 let id = ColonyId(g.fresh_id());
-                g.colonies.push(Colony { id, body: BodyId::Venus, slot: 1, control: Control::Controlled(Seat(0)), modules: vec![Module::new(ModuleKind::Core)], colonists: 0, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
+                g.colonies.push(Colony { id, body: BodyId::Venus, slot: 1, control: Control::Controlled(Seat(0)), modules: vec![Module::new(ModuleKind::Core)], colonists: 0, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, tier: 0, in_orbit: true });
             }
             let id = ShipId(g.fresh_id());
             let built_turn = g.turn;
@@ -909,13 +909,13 @@ fn build_board(session: &mut Session) {
         if let Some(v) = std::env::args().find_map(|a| a.strip_prefix("marsstation:").map(str::to_owned)) {
             if g.station_at(BodyId::Mars, 0).is_none() {
                 let id = ColonyId(g.fresh_id());
-                g.colonies.push(Colony { id, body: BodyId::Mars, slot: 0, control: Control::Controlled(Seat(0)), modules: vec![Module::new(ModuleKind::Core), Module::new(ModuleKind::Habitat)], colonists: 6, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
+                g.colonies.push(Colony { id, body: BodyId::Mars, slot: 0, control: Control::Controlled(Seat(0)), modules: vec![Module::new(ModuleKind::Core), Module::new(ModuleKind::Habitat)], colonists: 6, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, tier: 0, in_orbit: true });
             }
             if v == "down"
                 && let Some(slot) = g.free_slots_on(BodyId::Mars).first().copied()
             {
                 let id = ColonyId(g.fresh_id());
-                g.colonies.push(Colony { id, body: BodyId::Mars, slot, control: Control::Controlled(Seat(0)), modules: vec![Module::new(ModuleKind::Core)], colonists: 0, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: false });
+                g.colonies.push(Colony { id, body: BodyId::Mars, slot, control: Control::Controlled(Seat(0)), modules: vec![Module::new(ModuleKind::Core)], colonists: 0, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, tier: 0, in_orbit: false });
             }
         }
         // `scrubber:<Region>` (a building aid, ticket #445, version 0.09.6): one Scrubber stands in the
@@ -1069,7 +1069,7 @@ fn build_board(session: &mut Session) {
             let slot = g.free_slots_on(BodyId::Moon).first().copied().unwrap_or(0);
             let id = ColonyId(g.fresh_id());
             let queue = vec![Build { item: BuildItem::Module(ModuleKind::Mine), seat: Seat(0), widgets: 4, done: 3, coastal: false, fuel: 0.0 }];
-            g.colonies.push(Colony { id, body: BodyId::Moon, slot, control: Control::Controlled(Seat(0)), modules: vec![Module::new(ModuleKind::Habitat)], colonists: 4, education: 1.0, settler_education: 1.0, queue, grid_failed: false, founded_turn: 1, in_orbit: false });
+            g.colonies.push(Colony { id, body: BodyId::Moon, slot, control: Control::Controlled(Seat(0)), modules: vec![Module::new(ModuleKind::Habitat)], colonists: 4, education: 1.0, settler_education: 1.0, queue, grid_failed: false, founded_turn: 1, tier: 0, in_orbit: false });
             let sid = ShipId(g.fresh_id());
             let name = g.next_ship_name(UnitKind::Frigate);
             g.ships.push(Ship {
@@ -1114,7 +1114,7 @@ fn build_board(session: &mut Session) {
                 Build { item: BuildItem::Module(ModuleKind::Mine), seat: Seat(0), widgets: 4, done: 0, coastal: false, fuel: 0.0 },
                 Build { item: BuildItem::Module(ModuleKind::Refinery), seat: Seat(1), widgets: 8, done: 1, coastal: false, fuel: 0.0 },
             ];
-            g.colonies.push(Colony { id, body: BodyId::Moon, slot, control: Control::Controlled(Seat(0)), modules, colonists: 8, education: 1.0, settler_education: 1.0, queue, grid_failed: false, founded_turn: 1, in_orbit: false });
+            g.colonies.push(Colony { id, body: BodyId::Moon, slot, control: Control::Controlled(Seat(0)), modules, colonists: 8, education: 1.0, settler_education: 1.0, queue, grid_failed: false, founded_turn: 1, tier: 0, in_orbit: false });
             g.seats[0].stockpile.materials = 200.0;
             g.seats[0].stockpile.energy = 80.0;
         }
@@ -1590,7 +1590,7 @@ fn build_board(session: &mut Session) {
             && let Some(slot) = g.free_slots_on(BodyId::Moon).first().copied()
         {
             let id = ColonyId(g.fresh_id());
-            g.colonies.push(Colony { id, body: BodyId::Moon, slot, control: Control::Controlled(Seat(1)), modules: vec![Module::new(ModuleKind::Core)], colonists: 4, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: turn, in_orbit: false });
+            g.colonies.push(Colony { id, body: BodyId::Moon, slot, control: Control::Controlled(Seat(1)), modules: vec![Module::new(ModuleKind::Core)], colonists: 4, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: turn, tier: 0, in_orbit: false });
             g.ships.retain(|s| !(s.seat == Seat(1) && s.at == ShipAt::Body(BodyId::Moon) && s.kind == UnitKind::ColonyShip));
             g.claim_first(Seat(1), BodyId::Moon, id);
         }
@@ -1604,7 +1604,7 @@ fn build_board(session: &mut Session) {
         let slot = g.tables.body(BodyId::Earth).orbital_slots.saturating_sub(g.tables.body(BodyId::Earth).far_slots) + k.saturating_sub(1);
         let id = ColonyId(g.fresh_id());
         let turn = g.turn;
-        g.colonies.insert(0, Colony { id, body: BodyId::Earth, slot, control: Control::Controlled(Seat(0)), modules: vec![Module::new(ModuleKind::Core)], colonists: 4, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: turn, in_orbit: true });
+        g.colonies.insert(0, Colony { id, body: BodyId::Earth, slot, control: Control::Controlled(Seat(0)), modules: vec![Module::new(ModuleKind::Core)], colonists: 4, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: turn, tier: 0, in_orbit: true });
         if let Some(s) = g.ships.iter_mut().find(|s| s.seat == Seat(0)) {
             s.at = ShipAt::Body(BodyId::Earth);
             s.slot = Some(slot);

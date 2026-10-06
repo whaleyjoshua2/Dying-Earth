@@ -133,6 +133,8 @@ fn main() {
     // Version 0.09.3: off Earth at the end, by Body, over every seating.
     let mut all_ground_by_body = [0u32; 6];
     let mut all_stations_by_body = [0u32; 6];
+    // Ticket #490 (version 0.09.9): places at the end by tier, over every seating.
+    let mut all_by_tier: Vec<u32> = Vec::new();
     let mut all_first_by_body: [Vec<u32>; 6] = Default::default();
     let mut all_ground_off_earth_per_game: Vec<u32> = Vec::new();
     // Ticket #355 (version 0.09.1): the orbital war PER FACTION across every seating, and the games
@@ -408,6 +410,10 @@ fn main() {
                             martian_moon_colonies += r.martian_moon_colonies;
                             venus_stations += r.venus_stations;
                             venus_colonists += r.venus_colonists;
+                            all_by_tier.resize(all_by_tier.len().max(r.places_by_tier.len()), 0);
+                            for (t, n) in r.places_by_tier.iter().enumerate() {
+                                all_by_tier[t] += n;
+                            }
                             for b in 0..6 {
                                 ground_by_body[b] += r.ground_colonies_by_body[b];
                                 stations_by_body[b] += r.stations_by_body[b];
@@ -869,6 +875,8 @@ fn main() {
         println!("  the world under the Natural Sink at least once in {} of {all_games} games (median first turn {})", all_under_sink.len(), median_u(&mut all_under_sink));
         // Version 0.09.3: the worlds settled, over every seating.
         println!("  {}", off_earth_line(&base, &all_ground_by_body, &all_stations_by_body, &mut all_first_by_body, &mut all_ground_off_earth_per_game, all_games as u64));
+        let tiers: Vec<String> = base.tiers.iter().zip(&all_by_tier).map(|(t, n)| format!("{} {n}", t.name)).collect();
+        println!("  Colonies and stations at the end over the batch, by tier: {}", tiers.join(", "));
         // Ticket #343 (version 0.09.1): summed over every seat of every seating -- a TOTAL, never
         // a per-Faction figure, since seat 0 is a different Faction in each seating.
         println!(

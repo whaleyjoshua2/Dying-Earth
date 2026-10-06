@@ -1269,6 +1269,8 @@ pub struct AiWeights {
     /// Ticket #56: raise a Sea Wall in a coastal slot before the sea takes it.
     pub build_sea_wall: f64,
     pub raise_industry: f64,
+    /// Ticket #490 (version 0.09.9): raise a Colony or station to its next tier.
+    pub raise_tier: f64,
     pub build_research_lab: f64,
     /// Ticket #80 (version 0.06.0): an Observatory is offered, at the Research Lab weight, at a
     /// Colony or station holding this many Colonists.
@@ -1614,6 +1616,19 @@ pub struct SlotsCard {
     pub per_colonist: u32,
 }
 
+/// Ticket #490 (version 0.09.9): one tier of a Colony or station -- Outpost, Settlement, Colony --
+/// with the most Module slots it allows, the Colonists it needs before it can be reached, and its
+/// price in Materials and Widgets.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TierCard {
+    pub name: String,
+    pub cap: u32,
+    pub colonists: u32,
+    pub materials: u32,
+    pub widgets: u32,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ArchiveCard {
@@ -1642,6 +1657,7 @@ pub struct InSituCard {
 struct ModulesFile {
     module: Vec<ModuleCard>,
     slots: SlotsCard,
+    tiers: Vec<TierCard>,
     archive: ArchiveCard,
     observatory: ObservatoryCard,
     in_situ: InSituCard,
@@ -1994,6 +2010,8 @@ pub struct Tables {
     pub modules: Vec<ModuleCard>,
     /// Ticket #97: how many Modules a Colony or a Space Station may hold.
     pub slots: SlotsCard,
+    /// Ticket #490 (version 0.09.9): the tiers that cap them, in order, the first where every place starts.
+    pub tiers: Vec<TierCard>,
     /// Ticket #98: how many Techs the Research Lead chooses between.
     pub shortlist: ShortlistCard,
     /// Ticket #51: the Archive's stages and their Research price.
@@ -2141,6 +2159,7 @@ impl Tables {
             school: facilities.school,
             unique: facilities.unique,
             slots: modules.slots,
+            tiers: modules.tiers,
             archive: modules.archive,
             observatory: modules.observatory,
             in_situ: modules.in_situ,
@@ -2224,6 +2243,13 @@ impl Tables {
             }
         }
         // Ticket #50: a Faction's start station, when it has one, must name an orbital slot over Earth.
+        // Ticket #490 (version 0.09.9): a first tier to start at, and every tier above it rising.
+        if self.tiers.is_empty() {
+            return Err(err("modules.toml", "no tiers".to_string()));
+        }
+        if self.tiers.windows(2).any(|w| w[1].cap <= w[0].cap || w[1].colonists < w[0].colonists) {
+            return Err(err("modules.toml", "each tier must allow more slots than the one before".to_string()));
+        }
         for f in &self.factions {
             if let Some(name) = &f.start_station
                 && !self.body(BodyId::Earth).stations.contains(name)

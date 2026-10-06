@@ -50,3 +50,23 @@ the fixes is the same to the line.
 
 **The sweep's command:** `cargo run --release -p dying-earth-engine --example sweep -- 20 --seatings
 --balance`.
+
+## Colony tiers: Outpost, Settlement, Colony (#490)
+
+Every Colony and station stands at a tier, an Outpost to start; its Module slots are the lower of
+its Colonists and the tier's cap, 6, 12 or 18; the next tier is a build through its Widgets queue,
+30 Materials and 4 Widgets at 12 Colonists, 50 and 6 at 18. Spec section 2.
+
+**The pictures.**
+
+- [`ticket-490/outpost-card.png`](ticket-490/outpost-card.png): the ISS on turn 1, "ISS over Earth
+  Outpost", Modules 1 of 2, and after the free box the dashed red Upgrade tile, "Settlement" under it.
+- [`ticket-490/upgrade-needs-twelve.png`](ticket-490/upgrade-needs-twelve.png): its hover, greyed:
+  "needs 12 [people]", then "Upgrade to a Settlement: 30 [Materials] and 4 [Widgets]. Up to 12 Modules."
+
+**The sweep** ([`after-490.txt`](sweeps/after-490.txt)): 3 / 26 / 26 / 4 and 20 collapses, from
+0 / 24 / 33 / 6 and 16 after the founding rule. The Arkwrights' fall of seven is past noise, not
+traced. The sweep gained a line, places at the end by tier: 929 Outposts, 81 Settlements, 22
+Colonies of 1,032.
+
+The Report's word ceiling rose by two, to 1,783, for a rival's "upgraded {colony}".

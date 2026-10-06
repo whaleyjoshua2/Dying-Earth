@@ -48,6 +48,9 @@ build_archive = 0
 upload = 0
 build_producer = 5
 raise_industry = 5
+# Ticket #490 (version 0.09.9): raise a Colony or station to its next tier once its slots are full
+# at its cap and enough people live there; weighed as a Producer is, since it opens slots for one.
+raise_tier = 5
 build_research_lab = 8
 # Ticket #81 (version 0.06.0): the Observatory has its own weight, the Archivists' set high so
 # their AI chases its 1.75 off Earth.
@@ -109,6 +112,7 @@ build_archive = 0
 upload = 0
 build_producer = 6
 raise_industry = 3
+raise_tier = 6
 build_research_lab = 8
 build_observatory = 8
 observatory_colonists = 8
@@ -167,6 +171,7 @@ build_archive = 0
 upload = 0
 build_producer = 6
 raise_industry = 3
+raise_tier = 6
 build_research_lab = 6
 build_observatory = 6
 observatory_colonists = 8
@@ -228,6 +233,7 @@ build_archive = 9
 upload = 10
 build_producer = 6
 raise_industry = 3
+raise_tier = 6
 build_research_lab = 9
 build_observatory = 12
 # Ticket #80: the Archivist AI raises its Observatory a load earlier than the others.

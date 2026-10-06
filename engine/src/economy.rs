@@ -1144,6 +1144,8 @@ impl Game {
         let (row, m) = match item {
             BuildItem::Facility(k) => (t.facility(k).widgets, fac.facility_materials_multiplier),
             BuildItem::IndustryLevel => (t.industry_level.widgets, fac.facility_materials_multiplier),
+            // Ticket #490 (version 0.09.9): a tier is priced flat, no Faction's discount.
+            BuildItem::Tier(n) => (t.tiers.get(n as usize).map_or(1, |r| r.widgets), 1.0),
             BuildItem::Module(k) => (t.module(k).widgets, fac.module_materials_multiplier),
             BuildItem::Unit(UnitKind::Army) => (t.unit(UnitKind::Army).widgets, 1.0),
             BuildItem::Unit(k) => (t.unit(k).widgets, fac.ship_materials_multiplier),
@@ -1207,6 +1209,7 @@ impl Game {
             (BuildItem::Facility(k), _) => self.facility_materials(seat, k),
             (BuildItem::IndustryLevel, Place::State(sid)) => self.industry_cost(seat, sid),
             (BuildItem::IndustryLevel, _) => self.tables.industry_level.materials as f64,
+            (BuildItem::Tier(n), _) => self.tables.tiers.get(n as usize).map_or(0.0, |r| r.materials as f64),
             (BuildItem::Module(k), Place::Colony(c)) => self.module_materials_at(seat, c, k),
             (BuildItem::Module(k), Place::State(_)) => self.module_materials(seat, k),
             (BuildItem::Unit(UnitKind::Army), _) => self.tables.unit(UnitKind::Army).materials as f64,

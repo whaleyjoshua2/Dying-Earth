@@ -10,6 +10,8 @@ use crate::state::*;
 enum Cat {
     Producer,
     RaiseIndustry,
+    /// Ticket #490 (version 0.09.9): a Colony or station to its next tier.
+    RaiseTier,
     ResearchLab,
     /// Ticket #81 (version 0.06.0): the Observatory, weighted apart from the Lab.
     Observatory,
@@ -363,6 +365,7 @@ impl Game {
         match cat {
             Cat::Producer => w.build_producer,
             Cat::RaiseIndustry => w.raise_industry,
+            Cat::RaiseTier => w.raise_tier,
             Cat::ResearchLab => w.build_research_lab,
             Cat::Observatory => w.build_observatory,
             Cat::Habitat => w.build_habitat,
@@ -2033,6 +2036,18 @@ impl Game {
             {
                 let opp = if has_shipyard { 1.0 } else { m.opportunity };
                 push(vec![Order::BuildStation { body, slot: *slot, from }], Cat::LaunchSiteOrShipyard, self.base_weight(seat, Cat::LaunchSiteOrShipyard) * self.ai_founding_pull(seat), 1.0, 1.0, opp, format!("build {} over {}", self.station_name(body, *slot), self.tables.body(body).name), None);
+            }
+        }
+        // Ticket #490 (version 0.09.9): a place of the seat's whose slots are all taken at its tier's
+        // cap, with the people the next tier wants, is raised to it.
+        for c in self.colonies.iter().filter(|c| c.control.director() == Some(seat)) {
+            if let Some(next) = self.next_tier(c)
+                && c.colonists >= next.colonists
+                && self.module_slots(c) >= self.tier_of(c).cap
+                && self.free_module_slots(c) == 0
+                && !c.queue.iter().any(|b| matches!(b.item, BuildItem::Tier(_)))
+            {
+                push(vec![Order::RaiseTier { colony: c.id }], Cat::RaiseTier, self.base_weight(seat, Cat::RaiseTier), gap_for(Cat::RaiseTier, None), 1.0, 1.0, format!("upgrade {} to a {}", self.place_name(Place::Colony(c.id)), next.name), None);
             }
         }
         // Ticket #447 (version 0.09.6): **a backup yard.** A seat with exactly one Shipyard, and no

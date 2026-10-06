@@ -52,6 +52,9 @@ impl BuildingRef {
 pub enum Order {
     BuildFacility { state: StateId, kind: FacilityKind },
     RaiseIndustry { state: StateId },
+    /// Ticket #490 (version 0.09.9): raise a Colony or station to its next tier, a build through
+    /// its Widgets queue, once enough people live there.
+    RaiseTier { colony: ColonyId },
     BuildModule { colony: ColonyId, kind: ModuleKind },
     BuildShip { site: Place, kind: UnitKind },
     BuildArmy { place: Place },
@@ -417,6 +420,7 @@ impl Game {
         let item = match order {
             Order::BuildFacility { kind, .. } => Some(BuildItem::Facility(kind.built_by(own))),
             Order::RaiseIndustry { .. } => Some(BuildItem::IndustryLevel),
+            Order::RaiseTier { colony } => self.tier_build(*colony),
             Order::BuildModule { kind, .. } => Some(BuildItem::Module(kind.built_by(own))),
             Order::BuildArchive { .. } => Some(BuildItem::Module(ModuleKind::Archive)),
             Order::BuildShip { kind, .. } => Some(BuildItem::Unit(*kind)),
@@ -498,6 +502,12 @@ impl Game {
         s.colonists.min(room)
     }
 
+    /// Ticket #490 (version 0.09.9): the build that raises a Colony or station to its next tier.
+    pub fn tier_build(&self, colony: ColonyId) -> Option<BuildItem> {
+        let c = self.colony(colony)?;
+        self.next_tier(c).map(|_| BuildItem::Tier(c.tier + 1))
+    }
+
     /// Ticket #489 (version 0.09.9): the four leave their place at End Turn, as many as are there.
     fn send_founders(&mut self, from: LoadSource) -> Founders {
         let want = self.tables.emigrants.found_with;
@@ -535,6 +545,8 @@ impl Game {
             // Ticket #72: the Faction's own Facility price (the Prospectors' 15% off).
             Order::BuildFacility { kind, .. } => Cost { materials: self.facility_materials(seat, *kind), ..Default::default() },
             Order::RaiseIndustry { state } => Cost { materials: self.industry_cost(seat, *state), ..Default::default() },
+            // Ticket #490 (version 0.09.9): the next tier's price, the same for every Faction.
+            Order::RaiseTier { colony } => Cost { materials: self.colony(*colony).and_then(|c| self.next_tier(c)).map_or(0.0, |t| t.materials as f64), ..Default::default() },
             // Ticket #51: a Faction's card may make its Modules and its Colony Ships cost less.
             // Ticket #88: and the Colony's working Mines take more off.
             Order::BuildModule { colony, kind } => Cost { materials: self.module_materials_at(seat, *colony, *kind), ..Default::default() },
@@ -1309,6 +1321,21 @@ impl Game {
                     || self.state(*state).queue.iter().any(|b| b.item == BuildItem::IndustryLevel)
                 {
                     return fail("Industry Level is already being raised here");
+                }
+                Ok(cost)
+            }
+            // Ticket #490 (version 0.09.9): the next tier, once its people live here, one at a time.
+            Order::RaiseTier { colony } => {
+                let Some(col) = self.colony(*colony) else { return fail("no such Colony") };
+                if col.control.director() != Some(seat) {
+                    return fail("not yours");
+                }
+                let Some(next) = self.next_tier(col) else { return fail(format!("already a {}", self.tier_of(col).name)) };
+                if pending.iter().any(|o| matches!(o, Order::RaiseTier { colony: c } if c == colony)) || col.queue.iter().any(|b| matches!(b.item, BuildItem::Tier(_))) {
+                    return fail("already being upgraded");
+                }
+                if col.colonists < next.colonists {
+                    return fail(format!("needs {} Colonists", next.colonists));
                 }
                 Ok(cost)
             }
@@ -2483,6 +2510,15 @@ impl Game {
                     let widgets = self.industry_widgets(seat, *state);
                     self.state_mut(*state).queue.push(Build { item: BuildItem::IndustryLevel, seat, widgets, done: 0, coastal: false, fuel: 0.0 });
                 }
+                // Ticket #490 (version 0.09.9): the upgrade joins the place's queue like a Module.
+                Order::RaiseTier { colony } => {
+                    if let Some(item) = self.tier_build(*colony) {
+                        let widgets = self.build_widgets(seat, item);
+                        if let Some(c) = self.colony_mut(*colony) {
+                            c.queue.push(Build { item, seat, widgets, done: 0, coastal: false, fuel: 0.0 });
+                        }
+                    }
+                }
                 Order::BuildModule { colony, kind } | Order::BuildModuleWithDucats { colony, kind } => {
                     // Ticket #186: as on Earth -- the Custodians' Institute order raises an Academy.
                     let kind = kind.built_by(self.kind(seat));
@@ -3130,6 +3166,7 @@ impl Game {
                 r("build_facility_ducats", &[("building", kind.name().to_string()), ("state", self.tables.state(*state).name.clone())])
             }
             Order::RaiseIndustry { state } => r("raise_industry", &[("state", self.tables.state(*state).name.clone())]),
+            Order::RaiseTier { colony } => r("raise_tier", &[("colony", place(Place::Colony(*colony)))]),
             Order::BuildModule { colony, kind } => {
                 r("build_module", &[("building", kind.name().to_string()), ("colony", place(Place::Colony(*colony)))])
             }

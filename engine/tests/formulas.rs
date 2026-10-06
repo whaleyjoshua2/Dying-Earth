@@ -129,6 +129,7 @@ fn colony(g: &mut Game, seat: Seat, body: BodyId, modules: &[ModuleKind], coloni
         queue: Vec::new(),
         grid_failed: false,
         founded_turn: 1,
+        tier: 0,
         in_orbit: false,
     });
     id
@@ -2180,6 +2181,7 @@ fn diaspora_wants_three_bodies_with_four_colonists_each_and_counts_no_antarctic_
         queue: Vec::new(),
         grid_failed: false,
         founded_turn: 1,
+        tier: 0,
         in_orbit: true,
     });
     assert_eq!(g.progress(Seat(2)).second_value, 4.0);
@@ -4955,6 +4957,7 @@ fn a_modules_output_uses_its_own_slots_yield() {
             queue: Vec::new(),
             grid_failed: false,
             founded_turn: 1,
+            tier: 0,
             in_orbit: false,
         });
         let want = tenth(mine_amount * g.slot_yields(BodyId::Mars, slot).mine); // Ticket #387
@@ -7180,7 +7183,7 @@ fn refuel_is_an_order_at_a_station_of_your_own_and_a_station_rescues_a_stranded_
     assert!(g.stranded(far), "1 in the tank, the cheapest leg (Phobos, 2) beyond it, no station of ours");
     assert!(!g.stranded(ship), "14 in the tank at Earth flies to the Moon");
     let id = ColonyId(g.fresh_id());
-    g.colonies.push(Colony { id, body: BodyId::Mars, slot: 0, control: Control::Controlled(Seat(0)), modules: Vec::new(), colonists: 0, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
+    g.colonies.push(Colony { id, body: BodyId::Mars, slot: 0, control: Control::Controlled(Seat(0)), modules: Vec::new(), colonists: 0, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, tier: 0, in_orbit: true });
     // Ticket #335 (version 0.09.0): the station rescues it because the 1 in the tank still pays the
     // orbit change that reaches the ring it stands on; a dry tank in the wrong orbit does not.
     assert!(!g.stranded(far), "a station of ours in orbit rescues it");
@@ -7258,7 +7261,7 @@ fn modules_cost_less_at_a_colony_with_working_mines() {
 /// A station of seat 0's over `body`, bare, for the tests that need one.
 fn station_at(g: &mut Game, seat: Seat, body: BodyId) -> ColonyId {
     let id = ColonyId(g.fresh_id());
-    g.colonies.push(Colony { id, body, slot: 0, control: Control::Controlled(seat), modules: Vec::new(), colonists: 0, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
+    g.colonies.push(Colony { id, body, slot: 0, control: Control::Controlled(seat), modules: Vec::new(), colonists: 0, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, tier: 0, in_orbit: true });
     id
 }
 
@@ -7607,7 +7610,7 @@ fn earth_l4_and_l5_are_far_orbits_reached_only_by_ship() {
 fn the_ai_founds_at_a_far_orbit_once_the_ordinary_slots_are_taken() {
     let station = |g: &mut Game, seat: Seat, slot: u32| {
         let id = ColonyId(g.fresh_id());
-        g.colonies.push(Colony { id, body: BodyId::Earth, slot, control: Control::Controlled(seat), modules: vec![Module::new(ModuleKind::Core)], colonists: 0, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
+        g.colonies.push(Colony { id, body: BodyId::Earth, slot, control: Control::Controlled(seat), modules: vec![Module::new(ModuleKind::Core)], colonists: 0, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, tier: 0, in_orbit: true });
     };
     let board = |fill: bool, slot: Option<u32>, fuel: f64| {
         let mut g = game();
@@ -7938,6 +7941,7 @@ fn a_filled_habitat_always_hands_back_at_least_two_slots() {
                 queue: Vec::new(),
                 grid_failed: false,
                 founded_turn: 1,
+                tier: 0,
                 in_orbit: false,
             };
             let holds = g.habitat_room(&c);
@@ -12212,12 +12216,12 @@ fn a_carrier_has_somewhere_to_go_only_with_cause_against_a_colony_off_earth() {
     assert!(!g.carrier_target_exists(Seat(0)), "a fresh board: no rival Colony off Earth");
     // A rival's station over Earth is not off Earth.
     let over_earth = ColonyId(g.fresh_id());
-    g.colonies.push(Colony { id: over_earth, body: BodyId::Earth, slot: 3, control: Control::Controlled(Seat(2)), modules: Vec::new(), colonists: 0, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
+    g.colonies.push(Colony { id: over_earth, body: BodyId::Earth, slot: 3, control: Control::Controlled(Seat(2)), modules: Vec::new(), colonists: 0, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, tier: 0, in_orbit: true });
     g.relations.score[0][2] = -8;
     assert!(!g.carrier_target_exists(Seat(0)), "a station over Earth is no Carrier's target");
     // A rival's Colony on Mars, the rival Neutral: no cause.
     let mars = ColonyId(g.fresh_id());
-    g.colonies.push(Colony { id: mars, body: BodyId::Mars, slot: 0, control: Control::Controlled(Seat(1)), modules: Vec::new(), colonists: 4, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: false });
+    g.colonies.push(Colony { id: mars, body: BodyId::Mars, slot: 0, control: Control::Controlled(Seat(1)), modules: Vec::new(), colonists: 4, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, tier: 0, in_orbit: false });
     assert!(!g.carrier_target_exists(Seat(0)), "Neutral toward its holder: no cause, no target");
     // Cold toward its holder: cause.
     g.relations.score[0][1] = -8;
@@ -12458,7 +12462,7 @@ fn a_refuel_accord_opens_a_partners_station() {
     let mut g = game();
     calm(&mut g);
     let station = ColonyId(g.fresh_id());
-    g.colonies.push(Colony { id: station, body: BodyId::Mars, slot: 0, control: Control::Controlled(Seat(1)), modules: Vec::new(), colonists: 2, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
+    g.colonies.push(Colony { id: station, body: BodyId::Mars, slot: 0, control: Control::Controlled(Seat(1)), modules: Vec::new(), colonists: 2, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, tier: 0, in_orbit: true });
     let id = ShipId(g.fresh_id());
     let name = g.next_ship_name(UnitKind::Frigate);
     // Ticket #335 (version 0.09.0): the Frigate stands at the partner station's own ring, which is
@@ -12555,7 +12559,7 @@ fn a_battleship_bombards_a_rival_colony_from_an_orbit_it_holds() {
     let mut g = game();
     calm(&mut g);
     let colony = ColonyId(g.fresh_id());
-    g.colonies.push(Colony { id: colony, body: BodyId::Mars, slot: 0, control: Control::Controlled(Seat(1)), modules: vec![Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Core)], colonists: 12, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: false });
+    g.colonies.push(Colony { id: colony, body: BodyId::Mars, slot: 0, control: Control::Controlled(Seat(1)), modules: vec![Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Core)], colonists: 12, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, tier: 0, in_orbit: false });
     g.ships.retain(|s| s.at != ShipAt::Body(BodyId::Mars));
     let ship = ShipId(g.fresh_id());
     let name = g.next_ship_name(UnitKind::Battleship);
@@ -12602,7 +12606,7 @@ fn the_computer_bombards_with_cause_and_the_orbit_held() {
     let mut g = game();
     calm(&mut g);
     let colony = ColonyId(g.fresh_id());
-    g.colonies.push(Colony { id: colony, body: BodyId::Mars, slot: 0, control: Control::Controlled(Seat(1)), modules: vec![Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Mine)], colonists: 4, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: false });
+    g.colonies.push(Colony { id: colony, body: BodyId::Mars, slot: 0, control: Control::Controlled(Seat(1)), modules: vec![Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Mine)], colonists: 4, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, tier: 0, in_orbit: false });
     g.ships.retain(|s| s.at != ShipAt::Body(BodyId::Mars));
     let ship = ShipId(g.fresh_id());
     let name = g.next_ship_name(UnitKind::Battleship);
@@ -16208,7 +16212,7 @@ fn a_leg_that_would_strand_the_ship_at_the_far_end_is_named() {
     assert_eq!(g.arrival_leaves_stranded(Seat(0), ship, BodyId::Mars, None), Some(0.0), "arrives with nought and no way out");
     // A station of ours at Mars rescues it.
     let id = ColonyId(g.fresh_id());
-    g.colonies.push(Colony { id, body: BodyId::Mars, slot: 0, control: Control::Controlled(Seat(0)), modules: vec![Module::new(ModuleKind::Core)], colonists: 0, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
+    g.colonies.push(Colony { id, body: BodyId::Mars, slot: 0, control: Control::Controlled(Seat(0)), modules: vec![Module::new(ModuleKind::Core)], colonists: 0, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, tier: 0, in_orbit: true });
     // Into that station's own orbit it refuels on arrival; into low orbit with nought in the tank
     // it cannot pay the orbit change to reach it, so it is stranded in sight of a station, as
     // `stranded` has it.
@@ -16890,7 +16894,7 @@ fn the_first_colony_on_each_body_eases_unrest_everywhere_by_a_half() {
     assert_eq!(g.state(StateId::Europe).unrest, 3.0, "eases the world again");
     // A station over an unclaimed Body is no settling, and Antarctica is on Earth.
     let station = ColonyId(g.fresh_id());
-    g.colonies.push(Colony { id: station, body: BodyId::Phobos, slot: 0, control: Control::Controlled(Seat(3)), modules: vec![Module::new(ModuleKind::Core)], colonists: 4, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
+    g.colonies.push(Colony { id: station, body: BodyId::Phobos, slot: 0, control: Control::Controlled(Seat(3)), modules: vec![Module::new(ModuleKind::Core)], colonists: 4, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, tier: 0, in_orbit: true });
     assert!(!g.claim_first(Seat(3), BodyId::Phobos, station), "a station claims nothing");
     let antarctic = colony(&mut g, Seat(3), BodyId::Earth, &[], 4);
     assert!(!g.claim_first(Seat(3), BodyId::Earth, antarctic), "Antarctica is on Earth");
@@ -19098,7 +19102,7 @@ fn a_ground_colony_is_built_from_a_station() {
     let slot = g.free_slots_on(BodyId::Mars)[0];
     assert!(g.colony_order(Seat(0), BodyId::Mars, slot, &[]).is_none(), "no station of ours over Mars");
     let id = ColonyId(g.fresh_id());
-    g.colonies.push(Colony { id, body: BodyId::Mars, slot: 0, control: Control::Controlled(Seat(0)), modules: vec![Module::new(ModuleKind::Core)], colonists: 8, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
+    g.colonies.push(Colony { id, body: BodyId::Mars, slot: 0, control: Control::Controlled(Seat(0)), modules: vec![Module::new(ModuleKind::Core)], colonists: 8, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, tier: 0, in_orbit: true });
     let build = g.colony_order(Seat(0), BodyId::Mars, slot, &[]).expect("a station there");
     assert!(g.check_order(Seat(0), &[], &build).is_ok(), "{:?}", g.check_order(Seat(0), &[], &build));
     assert_eq!(g.order_cost(Seat(0), &build).materials, g.station_materials(Seat(0)), "the station's price");
@@ -19117,7 +19121,7 @@ fn a_ground_colony_is_built_from_a_station() {
 fn colonists_are_sent_down_from_a_station_to_a_ground_colony() {
     let mut g = game();
     let up = ColonyId(g.fresh_id());
-    g.colonies.push(Colony { id: up, body: BodyId::Mars, slot: 0, control: Control::Controlled(Seat(0)), modules: vec![Module::new(ModuleKind::Core), Module::new(ModuleKind::Habitat)], colonists: 6, education: 2.0, settler_education: 2.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
+    g.colonies.push(Colony { id: up, body: BodyId::Mars, slot: 0, control: Control::Controlled(Seat(0)), modules: vec![Module::new(ModuleKind::Core), Module::new(ModuleKind::Habitat)], colonists: 6, education: 2.0, settler_education: 2.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, tier: 0, in_orbit: true });
     let down = colony(&mut g, Seat(0), BodyId::Mars, &[], 0);
     g.colony_mut(down).unwrap().education = 1.0;
     let room = g.habitat_room(g.colony(down).unwrap());
@@ -19146,7 +19150,7 @@ fn the_ai_builds_a_colony_from_its_station_and_sends_people_down() {
     g.seats[0].stockpile.energy = 300.0;
     let up = ColonyId(g.fresh_id());
     // Ticket #489 (version 0.09.9): eight aboard, so it keeps four and has four to found with.
-    g.colonies.push(Colony { id: up, body: BodyId::Mars, slot: 0, control: Control::Controlled(Seat(0)), modules: vec![Module::new(ModuleKind::Core), Module::new(ModuleKind::Habitat)], colonists: 8, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
+    g.colonies.push(Colony { id: up, body: BodyId::Mars, slot: 0, control: Control::Controlled(Seat(0)), modules: vec![Module::new(ModuleKind::Core), Module::new(ModuleKind::Habitat)], colonists: 8, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, tier: 0, in_orbit: true });
     g.ai_orders(Seat(0));
     assert!(scored(&g, "build a Colony at") > 0.0, "a Colony built from the station is weighed");
     let down = colony(&mut g, Seat(0), BodyId::Mars, &[], 0);
@@ -19295,7 +19299,7 @@ fn the_arkwrights_computer_is_paced_in_bodies() {
     let slot = g.free_orbital_slots(BodyId::Earth)[0];
     let id = ColonyId(g.fresh_id());
     let modules: Vec<Module> = std::iter::once(ModuleKind::Core).chain(std::iter::repeat_n(ModuleKind::Habitat, 5)).map(Module::new).collect();
-    g.colonies.push(Colony { id, body: BodyId::Earth, slot, control: Control::Controlled(ark), modules, colonists: 30, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
+    g.colonies.push(Colony { id, body: BodyId::Earth, slot, control: Control::Controlled(ark), modules, colonists: 30, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, tier: 0, in_orbit: true });
     assert!(g.off_world_colonists(ark) >= 30 && g.bodies_settled(ark, 4) == 0, "the premise: thirty in orbit, no Body");
     g.ai_orders(ark);
     let head = g.log.iter().find(|l| l.starts_with("AI ") && l.contains("scored")).cloned().unwrap();
@@ -19328,7 +19332,7 @@ fn the_archivists_computer_is_paced_in_uploads() {
     let slot = g.free_orbital_slots(BodyId::Earth)[0];
     let id = ColonyId(g.fresh_id());
     let modules: Vec<Module> = [ModuleKind::Core, ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Archive].into_iter().map(Module::new).collect();
-    g.colonies.push(Colony { id, body: BodyId::Earth, slot, control: Control::Controlled(arc), modules, colonists: 12, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
+    g.colonies.push(Colony { id, body: BodyId::Earth, slot, control: Control::Controlled(arc), modules, colonists: 12, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, tier: 0, in_orbit: true });
     assert!(g.off_world_colonists(arc) >= 12 && g.seats[arc.index()].uploaded == 0, "the premise");
     g.ai_orders(arc);
     let head = g.log.iter().find(|l| l.starts_with("AI ") && l.contains("scored")).cloned().unwrap();
@@ -19419,7 +19423,7 @@ fn a_seat_with_one_yard_wants_a_second_station_over_earth() {
     // A second station standing with no yard yet: no third.
     let slot = g.free_orbital_slots(BodyId::Earth)[0];
     let id = ColonyId(g.fresh_id());
-    g.colonies.push(Colony { id, body: BodyId::Earth, slot, control: Control::Controlled(Seat(0)), modules: vec![Module::new(ModuleKind::Core)], colonists: 0, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
+    g.colonies.push(Colony { id, body: BodyId::Earth, slot, control: Control::Controlled(Seat(0)), modules: vec![Module::new(ModuleKind::Core)], colonists: 0, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, tier: 0, in_orbit: true });
     g.log.clear();
     g.ai_orders(Seat(0));
     assert_eq!(scored(&g, "as a backup yard"), 0.0, "no third while the second has no yard");
@@ -19658,8 +19662,9 @@ fn the_reports_templates_stay_under_their_word_ceiling() {
         .map(|(_, v)| v.trim_end().trim_end_matches('"').split_whitespace().count())
         .sum();
     // Ticket #481 (version 0.09.8): the ceiling rises by the 54 words of the race to the Moon, a
-    // new thing the Report says; the 15% cut of what it said before stands.
-    assert!(words <= 1781, "the Report's templates hold {words} words; the ceiling is 1,781 (15% off 2,031, and 54 for the race to the Moon)");
+    // new thing the Report says; the 15% cut of what it said before stands. Ticket #490 (version
+    // 0.09.9): and by the 2 of a rival's upgrade, "upgraded {colony}".
+    assert!(words <= 1783, "the Report's templates hold {words} words; the ceiling is 1,783 (15% off 2,031, 54 for the race to the Moon, 2 for a rival's upgrade)");
     // "The" is gone before a Faction's name, which is drawn in its colour instead.
     assert!(!text.contains("he {faction}"), "a template still says \"the {{faction}}\"");
 }
@@ -20145,4 +20150,89 @@ fn a_founding_settles_only_the_people_who_left() {
     g.resolution_phase();
     let after: u32 = g.colonies.iter().map(|c| c.colonists).sum::<u32>() + g.state(sid).emigrants;
     assert!(after <= before, "people made from nothing: {before} before, {after} after");
+}
+
+// ---------------------------------------------------------------- #490 Colony tiers (version 0.09.9)
+
+/// Ticket #490 (version 0.09.9): a place's Module slots are the lower of its Colonists and its
+/// tier's cap: an Outpost 6, a Settlement 12, a Colony 18.
+#[test]
+fn module_slots_are_the_lower_of_colonists_and_the_tiers_cap() {
+    let mut g = game();
+    let names: Vec<&str> = g.tables.tiers.iter().map(|t| t.name.as_str()).collect();
+    assert_eq!(names, ["Outpost", "Settlement", "Colony"]);
+    let c = colony(&mut g, Seat(0), BodyId::Moon, &[], 4);
+    assert_eq!(g.colony(c).unwrap().tier, 0, "every place starts an Outpost");
+    assert_eq!(g.module_slots(g.colony(c).unwrap()), 4, "four people, four slots");
+    g.colony_mut(c).unwrap().colonists = 10;
+    assert_eq!(g.module_slots(g.colony(c).unwrap()), 6, "an Outpost holds six");
+    g.colony_mut(c).unwrap().tier = 1;
+    assert_eq!(g.module_slots(g.colony(c).unwrap()), 10, "a Settlement, ten people");
+    g.colony_mut(c).unwrap().colonists = 20;
+    assert_eq!(g.module_slots(g.colony(c).unwrap()), 12, "a Settlement holds twelve");
+    g.colony_mut(c).unwrap().tier = 2;
+    assert_eq!(g.module_slots(g.colony(c).unwrap()), 18, "a Colony eighteen");
+}
+
+/// Ticket #490: the next tier is ordered once its people live there, for its price, through the
+/// place's Widgets queue, one at a time; it lands when the build completes; the top refuses.
+#[test]
+fn a_tier_is_raised_through_the_queue_once_its_people_live_there() {
+    let mut g = game();
+    g.seats[0].stockpile.materials = 300.0;
+    let c = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Factory], 11);
+    let raise = Order::RaiseTier { colony: c };
+    let err = g.check_order(Seat(0), &[], &raise).unwrap_err().0;
+    assert!(err.contains("needs 12 Colonists"), "{err}");
+    g.colony_mut(c).unwrap().colonists = 12;
+    assert!(g.check_order(Seat(0), &[], &raise).is_ok(), "{:?}", g.check_order(Seat(0), &[], &raise));
+    assert_eq!(g.order_cost(Seat(0), &raise).materials, 30.0);
+    assert!(g.check_order(Seat(0), std::slice::from_ref(&raise), &raise).is_err(), "one at a time");
+    assert!(g.check_order(Seat(1), &[], &raise).is_err(), "not theirs");
+    g.commit_orders(Seat(0), std::slice::from_ref(&raise));
+    assert_eq!(g.seats[0].stockpile.materials, 270.0);
+    let b = g.colony(c).unwrap().queue.last().cloned().expect("queued");
+    assert_eq!((b.item, b.widgets), (BuildItem::Tier(1), 4));
+    assert!(g.check_order(Seat(0), &[], &raise).unwrap_err().0.contains("already being upgraded"));
+    for _ in 0..30 {
+        g.resolution_phase();
+        if g.colony(c).unwrap().tier == 1 {
+            break;
+        }
+    }
+    assert_eq!(g.colony(c).unwrap().tier, 1, "a Settlement once its Widgets are made");
+    // People lost keep the tier.
+    g.colony_mut(c).unwrap().colonists = 5;
+    g.resolution_phase();
+    assert_eq!(g.colony(c).unwrap().tier, 1);
+    // The top refuses.
+    g.colony_mut(c).unwrap().tier = 2;
+    g.colony_mut(c).unwrap().colonists = 30;
+    assert!(g.check_order(Seat(0), &[], &raise).unwrap_err().0.contains("already a Colony"));
+}
+
+/// Ticket #490: a station climbs the same tiers.
+#[test]
+fn a_station_climbs_the_same_tiers() {
+    let mut g = game();
+    let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
+    g.colony_mut(iss).unwrap().colonists = 12;
+    assert_eq!(g.module_slots(g.colony(iss).unwrap()), 6);
+    assert!(g.check_order(Seat(0), &[], &Order::RaiseTier { colony: iss }).is_ok());
+}
+
+/// Ticket #490: the computer upgrades a place whose slots are full at its cap and whose people are
+/// enough for the next tier, and not one with room left.
+#[test]
+fn the_ai_upgrades_a_full_place_with_the_people_for_it() {
+    let mut g = game();
+    calm(&mut g);
+    g.seats[1].stockpile.materials = 300.0;
+    let c = colony(&mut g, Seat(1), BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 12);
+    let raises = |g: &mut Game| g.ai_orders(Seat(1)).iter().any(|o| matches!(o, Order::RaiseTier { colony } if *colony == c));
+    assert!(!raises(&mut g), "three of six slots used: room left");
+    for _ in 0..3 {
+        g.colony_mut(c).unwrap().modules.push(Module::new(ModuleKind::Habitat));
+    }
+    assert!(raises(&mut g), "six of six, twelve people");
 }

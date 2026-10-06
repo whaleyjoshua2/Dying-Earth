@@ -708,6 +708,7 @@ pub const RIVAL_ARGS: &[(&str, &[&str])] = &[
     ("build_facility", &["building", "state"]),
     ("build_facility_ducats", &["building", "state"]),
     ("raise_industry", &["state"]),
+    ("raise_tier", &["colony"]),
     ("build_module", &["building", "colony"]),
     ("build_module_ducats", &["building", "colony"]),
     ("build_ship", &["unit", "place"]),

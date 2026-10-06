@@ -2326,6 +2326,12 @@ impl Game {
             (Place::State(s), BuildItem::IndustryLevel) => {
                 self.state_mut(s).industry_level += 1;
             }
+            // Ticket #490 (version 0.09.9): the place stands at its new tier.
+            (Place::Colony(c), BuildItem::Tier(t)) => {
+                if let Some(col) = self.colony_mut(c) {
+                    col.tier = col.tier.max(t);
+                }
+            }
             // Ticket #68 (version 0.05.5): the Archive Module stands. If its Research is already paid
             // (a fund kept from a destroyed Archive) it is complete at once; otherwise it says what
             // it still wants.
@@ -2519,6 +2525,7 @@ impl Game {
             queue: Vec::new(),
             grid_failed: false,
             founded_turn: self.turn,
+            tier: 0,
             in_orbit: false,
         });
         let room = self.habitat_room(self.colony(id).unwrap());
@@ -2654,7 +2661,7 @@ impl Game {
             // Ticket #164 (version 0.07.5): a station is founded with its Core Module, so it can take
             // four people the turn it stands, where a bare one could hold nobody until a Habitat was
             // built out of an allowance it no longer has.
-            self.colonies.push(Colony { id, body: *body, slot: *slot, control: Control::Controlled(*seat), modules: vec![Module::new(ModuleKind::Core)], colonists: 0, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: self.turn, in_orbit: true });
+            self.colonies.push(Colony { id, body: *body, slot: *slot, control: Control::Controlled(*seat), modules: vec![Module::new(ModuleKind::Core)], colonists: 0, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: self.turn, tier: 0, in_orbit: true });
             // Ticket #489 (version 0.09.9): and its four, who left their source at End Turn.
             self.settle_people(id, stations[entry].3.n, stations[entry].3.taught);
             let line = format!("{} built {}.", self.seat_name(*seat), self.place_name(Place::Colony(id)));
@@ -2682,7 +2689,7 @@ impl Game {
                 continue;
             }
             let id = ColonyId(self.fresh_id());
-            self.colonies.push(Colony { id, body, slot, control: Control::Controlled(seat), modules: vec![Module::new(ModuleKind::Core)], colonists: 0, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: self.turn, in_orbit: false });
+            self.colonies.push(Colony { id, body, slot, control: Control::Controlled(seat), modules: vec![Module::new(ModuleKind::Core)], colonists: 0, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: self.turn, tier: 0, in_orbit: false });
             self.settle_people(id, founders.n, founders.taught);
             let line = format!("{} built {}.", self.seat_name(seat), self.place_name(Place::Colony(id)));
             self.log(line);
@@ -2857,6 +2864,7 @@ impl Game {
                                 queue: Vec::new(),
                                 grid_failed: false,
                                 founded_turn: self.turn,
+                                tier: 0,
                                 in_orbit: false,
                             });
                             let room = self.habitat_room(self.colony(id).unwrap());
@@ -2929,7 +2937,7 @@ impl Game {
                                 continue;
                             }
                             let id = ColonyId(self.fresh_id());
-                            self.colonies.push(Colony { id, body: b, slot, control: Control::Controlled(seat), modules: vec![Module::new(ModuleKind::Core)], colonists: 0, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: self.turn, in_orbit: true });
+                            self.colonies.push(Colony { id, body: b, slot, control: Control::Controlled(seat), modules: vec![Module::new(ModuleKind::Core)], colonists: 0, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: self.turn, tier: 0, in_orbit: true });
                             let room = self.habitat_room(self.colony(id).unwrap());
                             let moved = n.min(room);
                             let taught = self.unload_people(ship, moved);

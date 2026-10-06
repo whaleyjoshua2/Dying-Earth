@@ -5227,6 +5227,8 @@ fn order_text(game: &Game, o: &Order) -> String {
         Order::Tribute { to, materials } => format!("Pay the {} a tribute in {}", game.seat_name(*to), if *materials { "Materials" } else { "Ducats" }),
         Order::BuildFacility { state, kind } => format!("Build {} in {}", kind.name(), game.tables.state(*state).name),
         Order::RaiseIndustry { state } => format!("Raise Industry Level in {}", game.tables.state(*state).name),
+        // Ticket #490 (version 0.09.9).
+        Order::RaiseTier { colony } => format!("Upgrade {}{}", game.place_name(Place::Colony(*colony)), game.colony(*colony).and_then(|c| game.next_tier(c)).map(|t| format!(" to a {}", t.name)).unwrap_or_default()),
         Order::BuildModule { colony, kind } => format!("Build {} at {}", kind.name(), game.place_name(Place::Colony(*colony))),
         Order::BuildShip { site, kind } => format!("Build {} at {}", kind.name(), game.place_name(*site)),
         Order::BuildArmy { place } => format!("Build Army at {}", game.place_name(*place)),
@@ -8024,6 +8026,8 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
         // standing rule that a colour says whose and nobody's place says nothing.
         faction_glyph(ui, session, game, col.control.controller(), 22.0);
         ui.label(RichText::new(game.place_name(Place::Colony(cid))).size(22.0).strong());
+        // Ticket #490 (version 0.09.9): its tier, beside the name.
+        ui.label(RichText::new(&game.tier_of(col).name).size(22.0).weak());
     });
     // Ticket #391 (version 0.09.3): the date it was founded, under its name, at the designer's word
     // -- *"each colony/station card has the date it was founded under its name in the header"*. A
@@ -8133,29 +8137,16 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     // Ticket #97 (version 0.07.0): the Module cap, shown beside the Colonists that buy it, so a
     // player meets it on the card rather than as a refusal.
     let (used, cap) = (game.module_slots_used(col), game.module_slots(col));
-    // Ticket #164 (version 0.07.5): with the base allowance at nothing, the cap is exactly the
-    // number of people living here, so the line says that rather than naming a base of zero.
-    let line = if game.tables.slots.base == 0 {
-        format!("Modules {used} of {cap} (one for each Colonist)")
-    } else {
-        format!("Modules {used} of {cap} ({} free, one for each Colonist)", game.tables.slots.base)
-    };
-    // Ticket #474 (version 0.09.8): the Modules line is a heading like the Region card's Facilities;
-    // the warning that rode on it when the place is full stands under it.
-    let resp = card_heading(ui, "colony", line);
+    // Ticket #490 (version 0.09.9): the rule is in the hover; the heading says the figures alone.
+    let tier = game.tier_of(col);
+    let resp = card_heading(ui, "colony", format!("Modules {used} of {cap}"));
     if used >= cap {
-        ui.colored_label(Color32::YELLOW, "No room for another until more Colonists live here");
+        // Ticket #474 (version 0.09.8): the warning under the heading when the place is full.
+        let why = if cap < tier.cap { "Full until more Colonists live here" } else if game.next_tier(col).is_some() { "Full: upgrade for more room" } else { "Full" };
+        ui.colored_label(Color32::YELLOW, why);
     }
-    // Ticket #116 (version 0.07.1): the rule behind the cap, which ticket #97 put in the engine and
-    // nowhere on the card.
-    rule_tip(
-        resp,
-        format!(
-            "One slot for every {} Colonist living here, and none before: the Core Module a founding gives is the whole of what a founding gives, so a place grows only as its people arrive.\nIts Core Module holds {}, which is how the first of them get here. Mothballed keeps a slot and building reserves one; the Core Module and the Archive count on neither side.",
-            game.tables.slots.per_colonist,
-            game.tables.module(ModuleKind::Core).holds_colonists
-        ),
-    );
+    // Ticket #116 (version 0.07.1): the rule behind the cap. Ticket #490: with the tier's ceiling.
+    rule_tip(resp, format!("One a Colonist, at most {} as a {}.\nMothballed keeps a slot, building reserves one; the Core and the Archive take none.", tier.cap, tier.name));
     // Ticket #332 (version 0.09.0): what this place makes in Widgets a turn, and its queue in
     // order -- the Archive and a Ship on it too, which have no tile.
     widgets_block(ui, game, Place::Colony(cid));
@@ -9752,6 +9743,9 @@ enum TileState {
     /// in place of the turns, at the designer's word; an ordered one reads `0 of 8`. The estimate
     /// in turns is on the hover.
     Building { ordered: bool, done: u32, widgets: u32 },
+    /// Ticket #490 (version 0.09.9): **the Upgrade tile**, last of a Colony's or station's boxes,
+    /// drawn as the Raise Industry Level tile is; the flag says whether the order would stand.
+    Upgrade(bool),
     /// Ticket #218 (version 0.08.2): the flag says whether the PLAYER could actually build here --
     /// their own place, and not a slot the sea has taken. A tile they can use invites the click;
     /// one they cannot keeps the old word, because telling somebody to click a thing that will do
@@ -9783,14 +9777,14 @@ fn hab_tile(ui: &mut Ui, rect: egui::Rect, id: egui::Id, key: Option<&str>, name
         edge.unwrap_or(Color32::from_gray(120))
     };
     match state {
-        TileState::Free(_) | TileState::Raise(_) => {
+        TileState::Free(_) | TileState::Raise(_) | TileState::Upgrade(_) => {
             // A dashed border, four sides of short strokes, and the word in the middle.
             let dash = 5.0;
             let step = 9.0;
             // Ticket #476: the Raise tile's dashes wear its own colour, so it is told from a free
             // slot at a glance; the hover's brightening still wins.
             let outline = match state {
-                TileState::Raise(ok) if !resp.hovered() => if ok { RAISE_INK } else { RAISE_INK.gamma_multiply(0.55) },
+                TileState::Raise(ok) | TileState::Upgrade(ok) if !resp.hovered() => if ok { RAISE_INK } else { RAISE_INK.gamma_multiply(0.55) },
                 _ => outline,
             };
             let stroke = egui::Stroke::new(1.0, outline);
@@ -9811,7 +9805,7 @@ fn hab_tile(ui: &mut Ui, rect: egui::Rect, id: egui::Id, key: Option<&str>, name
             // Ticket #218 (version 0.08.2): a tile the player can build in says so. Two lines: the
             // tile is 84 square and `Click to Build` is about 78 wide at 12pt, so one line would
             // leave three pixels of air and break if the font ever moved.
-            let (word, ink) = if let TileState::Raise(ok) = state { ("Raise\nIndustry\nLevel", if ok { RAISE_INK } else { RAISE_INK.gamma_multiply(0.55) }) } else if state == TileState::Free(true) { ("Click to
+            let (word, ink) = if let TileState::Raise(ok) = state { ("Raise\nIndustry\nLevel", if ok { RAISE_INK } else { RAISE_INK.gamma_multiply(0.55) }) } else if let TileState::Upgrade(ok) = state { ("Upgrade", if ok { RAISE_INK } else { RAISE_INK.gamma_multiply(0.55) }) } else if state == TileState::Free(true) { ("Click to
 Build", Color32::from_gray(165)) } else { ("free", Color32::from_gray(130)) };
             painter.text(rect.center(), egui::Align2::CENTER_CENTER, word, FontId::proportional(12.0), ink);
         }
@@ -10070,7 +10064,14 @@ fn module_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
         Vec::new()
     };
     let free = (cap.saturating_sub(used) as usize).saturating_sub(ordered.len());
-    let total = standing.len() + building.len() + ordered.len() + free;
+    // Ticket #490 (version 0.09.9): the Upgrade tile, last, on a place of the player's with a tier
+    // above it: ordered this turn, under way, or offered.
+    let upgrade = game.next_tier(col).filter(|_| mine).map(|next| {
+        let pending = session.pending.iter().position(|o| matches!(o, Order::RaiseTier { colony } if *colony == cid));
+        let queued = col.queue.iter().position(|b| matches!(b.item, BuildItem::Tier(_)));
+        (next, pending, queued)
+    });
+    let total = standing.len() + building.len() + ordered.len() + free + usize::from(upgrade.is_some());
     let rows = total.div_ceil(MODULE_COLS).max(1);
     let archive = col.modules.iter().position(|m| m.kind == ModuleKind::Archive);
     let archive_rows = if archive.is_some() { 1 } else { 0 };
@@ -10155,6 +10156,46 @@ fn module_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
             view.hab_tile = Some(HabTile::Free);
         }
         i += 1;
+    }
+    if let Some((next, pending, queued)) = upgrade {
+        let rect = tile_rect(i);
+        let id = ui.id().with("hab-upgrade");
+        let name = next.name.as_str();
+        match (pending, queued) {
+            (Some(pi), _) => {
+                let item = BuildItem::Tier(col.tier + 1);
+                let widgets = game.build_widgets(Seat(0), item);
+                let turns = game.turns_to_build(Seat(0), Place::Colony(cid), item);
+                let tip = format!("{name}: ordered this turn, {widgets} Widgets, {} once the turn ends.\nRight-click to cancel the order.", estimate_words(turns));
+                if hab_tile(ui, rect, id, None, name, TileState::Building { ordered: true, done: 0, widgets }, false, None, tip).secondary_clicked() {
+                    actions.push(Action::Cancel(pi));
+                }
+            }
+            (None, Some(qi)) => {
+                let b = &col.queue[qi];
+                let turns = estimates.get(qi).copied().unwrap_or(u32::MAX);
+                let (tip, cancel) = building_tip(game, session, Place::Colony(cid), qi, b, turns, mine, name, "");
+                let resp = hab_tile(ui, rect, id, None, name, TileState::Building { ordered: false, done: b.done, widgets: b.widgets }, false, None, tip);
+                if let Some(order) = cancel
+                    && resp.secondary_clicked()
+                {
+                    actions.push(Action::Place(order));
+                }
+            }
+            (None, None) => {
+                // One click orders it; greyed, the refusal leads the hover.
+                let order = Order::RaiseTier { colony: cid };
+                let check = game.check_order(Seat(0), &session.pending, &order);
+                let words = format!("Upgrade to a {name}: {}. Up to {} Modules.", game.order_price_text(Seat(0), &order, game.order_cost(Seat(0), &order)), next.cap);
+                let tip = match &check {
+                    Ok(_) => words,
+                    Err(e) => refusal_hover(&e.0, Some(&words)),
+                };
+                if hab_tile(ui, rect, id, None, name, TileState::Upgrade(check.is_ok()), false, None, tip).clicked() && check.is_ok() {
+                    actions.push(Action::Place(order));
+                }
+            }
+        }
     }
     if let Some(ai) = archive {
         // The Archive stands apart: a row of its own, outside the count.

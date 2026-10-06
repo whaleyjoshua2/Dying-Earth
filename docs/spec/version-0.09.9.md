@@ -78,3 +78,52 @@ The dev diary's README has the trace.
 
 With the Arkwrights starting at two Pioneers and the computer's recruiting fixed, the column read
 5 / 23 / 24 / 5 and 23 collapses; at two before the fix, 8 / 45 / 1 / 2 and 24.
+
+## 2. Colony tiers: Outpost, Settlement, Colony
+
+The authority is [ticket #490](https://github.com/whaleyjoshua2/Dying-Earth/issues/490).
+
+- **Every Colony and station stands at a tier**, and starts at the first. The tiers are a list in
+  `modules.toml` (`[[tiers]]`), so a fourth is one more entry:
+
+| Tier | Module slots at most | Colonists to reach it | Price |
+|---|---|---|---|
+| Outpost | 6 | (every place starts here) | |
+| Settlement | 12 | 12 | 30 Materials, 4 Widgets |
+| Colony | 18 | 18 | 50 Materials, 6 Widgets |
+
+- **Module slots are the lower of the place's Colonists and its tier's cap.** The Core and the
+  Archive take none, as before.
+- **The place stays a Colony** in every rule and text, the Diaspora's included; Colony is also the
+  top tier's name. The card's title carries the tier beside the name: "ISS over Earth Outpost".
+- **Stations** climb the same tiers.
+- **The upgrade** is a tile after the Module boxes, dashed in the Raise Industry Level tile's red,
+  reading "Upgrade" with the next tier's name under it. A click orders it; it is built through the
+  place's Widgets queue like a Module, one at a time, and lands when the build completes. The
+  same price for every Faction. Greyed, its hover leads with what is short: "needs 12 Colonists".
+  Its hover otherwise: "Upgrade to a Settlement: 30 Materials and 4 Widgets. Up to 12 Modules."
+- **A place never falls back a tier.** Losing people already costs it slots.
+- **A place past its cap** loses nothing; it builds no more until upgraded. The Modules heading is
+  cut to "Modules 3 of 6"; full, it says "Full until more Colonists live here", or at the cap
+  "Full: upgrade for more room", or at the top "Full". Its hover: "One a Colonist, at most 6 as an
+  Outpost. Mothballed keeps a slot, building reserves one; the Core and the Archive take none."
+- **The computer seats** order the upgrade for a place whose slots are all taken at its tier's cap
+  and whose people are enough for the next tier, at a Producer's weight (`raise_tier` in
+  `ai.toml`).
+- **A rival's upgrade** reaches the Report where the fog allows: "upgraded Tycho on the Moon". The
+  Report's word ceiling rises by its two words, to 1,783.
+- **Saves:** a place with no tier recorded reads as an Outpost; `SAVE_VERSION` stays at 9.
+
+**Measured** (80 games, the standing cell,
+[`after-490.txt`](../dev-diary/2026-10-05-version-0.09.9/sweeps/after-490.txt)):
+
+| | after §1 | after this | the ideal |
+|---|---|---|---|
+| Custodians | 0 | 3 | 15 |
+| Prospectors | 24 | 26 | 15 |
+| Arkwrights | 33 | 26 | 15 |
+| Archivists | 6 | 4 | 15 |
+| collapses | 16 | 20 | 20 |
+
+At the end of the 80 games 1,032 Colonies and stations stand: 929 Outposts, 81 Settlements, 22
+Colonies (the sweep's new line). The Arkwrights' fall of seven is past noise and **not traced**.

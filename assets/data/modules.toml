@@ -142,6 +142,31 @@ energy_upkeep = 12
 base = 0
 per_colonist = 1
 
+# Ticket #490 (version 0.09.9): the tiers a Colony or station climbs, in order. Its Module slots are
+# the lower of its Colonists and its tier's `cap`; the next tier is a paid build through the Widgets
+# queue, open once `colonists` live there, and a place never falls back a tier. Every place starts
+# at the first. A fourth tier is one more entry.
+[[tiers]]
+name = "Outpost"
+cap = 6
+colonists = 0
+materials = 0
+widgets = 0
+
+[[tiers]]
+name = "Settlement"
+cap = 12
+colonists = 12
+materials = 30
+widgets = 4
+
+[[tiers]]
+name = "Colony"
+cap = 18
+colonists = 18
+materials = 50
+widgets = 6
+
 [archive]
 # Ticket #439 (version 0.09.6): 150, at the designer's word; with the bar in `factions.toml`.
 research = 150
