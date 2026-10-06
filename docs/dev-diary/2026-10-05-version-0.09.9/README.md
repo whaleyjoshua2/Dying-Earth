@@ -91,3 +91,10 @@ lines, as the old wording did.
 **The sweep** ([`after-491.txt`](sweeps/after-491.txt)): 3 / 25 / 26 / 4 and 21 collapses, from
 3 / 26 / 26 / 4 and 20, within noise. The Prospectors' median Fund at the end rises in every
 seating, by 21 to 308 Ducats.
+
+**The review** (one agent, both axes): the computer Prospectors did not value the Exchange's interest
+(at a Fund of 2,000 they wanted it less, 11.5 against 34.5 empty; now 57.5); a blockaded place's
+Exchange still paid; both fixed with tests watched failing first. The hover is over the six-line
+ceiling at seven, as it was before: its four lines of arithmetic are what overflow; not cut here.
+Re-swept: the win column the same; Exchanges at the end in one seating 22 from 20, the computer
+building one Trade Post a Body.

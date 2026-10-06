@@ -1668,7 +1668,13 @@ impl Game {
                         // Prospectors' Exchange is weighed with its extra Ducat.
                         let bare = self.tables.module(ModuleKind::TradePost).produces.as_ref().map(|p| p.amount).unwrap_or(1.0).max(1.0);
                         let with = self.module_yield(seat, cid, mk).amount;
-                        (Cat::Producer, self.base_weight(seat, Cat::Producer) * (with / bare).clamp(0.25, 2.0))
+                        // Ticket #491 (version 0.09.9): an Exchange pays the Investment Bank's interest,
+                        // a share of the Fund, so its appetite tracks the balance as the Bank's does.
+                        // One a Body (ticket #90), so never a second share at one place.
+                        let shares = mk.built_by(self.kind(seat)) == ModuleKind::Exchange
+                            && self.tables.faction(self.kind(seat)).victory_first.kind == crate::data::VictoryFirstKind::VentureFund;
+                        let interest = if shares { 1.0 + self.seat(seat).venture_fund * m.investment_bank_per_fund } else { 1.0 };
+                        (Cat::Producer, self.base_weight(seat, Cat::Producer) * (with / bare).clamp(0.25, 2.0) * interest)
                     }
                     // Ticket #92: a Mass Driver at a low-gravity ground Colony with a Mine, once the
                     // Tech stands, one per Colony; and a Mine beside one weighs what the driver adds.

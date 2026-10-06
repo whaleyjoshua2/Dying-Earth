@@ -141,9 +141,14 @@ The authority is [ticket #491](https://github.com/whaleyjoshua2/Dying-Earth/issu
   for the whole Faction.
 - **A captured Exchange** pays its captor 1% of that turn's Ducat income, at least 1, as a captured
   Investment Bank does.
+- **A place under Blockade** makes nothing, so its Exchange pays no interest.
+- **The computer Prospectors** weigh an Exchange by the Fund, as they weigh an Investment Bank: the
+  fuller the Fund, the more it is wanted.
 - **The Opening Objective** is unchanged: its three Investment Banks are Regions' alone.
 - **Its hover:** "+1 Ducat over a Trade Post, and a Bank's interest". The income line names the
-  payers: "2 Investment Bank or Exchange (interest banked)".
+  payers: "2 Investment Bank or Exchange (interest banked)". The build hover runs to **seven** lines,
+  as it did before this ticket: the four lines of arithmetic under it are what overflow, and cutting
+  them is left to the designer.
 
 **Measured** (80 games,
 [`after-491.txt`](../dev-diary/2026-10-05-version-0.09.9/sweeps/after-491.txt)): 3 / 25 / 26 / 4 and 21

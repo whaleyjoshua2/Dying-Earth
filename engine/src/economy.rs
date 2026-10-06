@@ -1501,11 +1501,13 @@ impl Game {
             }
         }
         // Ticket #491 (version 0.09.9): and a Colony or station with a working Exchange, one share a
-        // place, as a Region with a Bank: the Prospectors' Bank off Earth.
+        // place, as a Region with a Bank: the Prospectors' Bank off Earth. A place under Blockade
+        // makes nothing (#278), so pays no interest either.
         let mut paying_places: std::collections::BTreeSet<ColonyId> = std::collections::BTreeSet::new();
         for p in producers.iter().filter(|p| p.online && p.name == ModuleKind::Exchange.name()) {
             if let ProducerPlace::Module(cid, _) = p.place
-                && self.colony(cid).is_some_and(|c| c.control == Control::Controlled(seat))
+                && self.controls_producer(seat, p.place)
+                && self.starved_by(cid).is_none()
             {
                 paying_places.insert(cid);
             }

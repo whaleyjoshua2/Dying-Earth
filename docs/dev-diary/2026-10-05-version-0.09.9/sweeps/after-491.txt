@@ -93,13 +93,13 @@ sink  step  perm  after | collapses/20 | collapse turns (median, min..max) | tem
       Tanks: Ships stranded at the end over the batch, by seat [0, 0, 0, 0]; 117 Refuel orders (0 at a partner's, 9 at a Refinery Colony); 5 stations standing off Earth at the end
       The opening: Modules beyond the Core on a starting station at the end of turn 3 over the batch, by seat [40, 60, 21, 40]
       Build it where you dig: 40 ground Colonies with two or more working Mines at the end over the batch; 3.9 Modules per ground Colony
-      Solar Arrays standing at the end over the batch: 217; Trade Posts 78; Mass Drivers 0; Colonies on Phobos or Deimos 27
+      Solar Arrays standing at the end over the batch: 217; Trade Posts 80; Mass Drivers 0; Colonies on Phobos or Deimos 27
       Ducats over a game (median), by seat -- made [1472, 1244, 1842, 37], spent [1860, 1270, 1859, 158]
       Materials income over a game (median), by seat [1320, 261, 1425, 154]; Mines completed over the batch 444, Factories 194
       Research Directive: mean % KEPT BACK from the shared pot, by seat [10, 13, 7, 86]; turns under an 85% contribution over the batch [53, 103, 51, 479]
       Accords STRUCK over the batch: 153 (against 32 standing at the end)
       Exodus Calls sounded over the batch: 125, worth 1024 Pioneers
-      Unique Modules standing at the end over the batch: Academy 0, Heliostat 22, Exchange 20, Chorus 55
+      Unique Modules standing at the end over the batch: Academy 0, Heliostat 22, Exchange 22, Chorus 55
       Batteries standing at the end over the batch, by seat [0, 0, 2, 0]
       Venus: 4 stations at the end over the batch, 16 Colonists living there
       Off Earth at the end over the batch: ground Colonies the Moon 61, Mars 0, Phobos 8, Deimos 19, Venus 0 (median 5 a game); stations the Moon 0, Mars 0, Phobos 0, Deimos 1, Venus 4; first ground Colony founded: the Moon in 19/20 (median turn 15); Mars in 0/20 (median turn -); Phobos in 5/20 (median turn 28); Deimos in 19/20 (median turn 21); Venus in 0/20 (median turn -)

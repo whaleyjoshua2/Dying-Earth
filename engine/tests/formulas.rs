@@ -20305,3 +20305,41 @@ fn a_captured_exchange_pays_its_captor_interest() {
     let more = g.seats[cus.index()].income_last_turn.ducats - control.seats[cus.index()].income_last_turn.ducats;
     assert!(more >= 2.0, "the Exchange's extra Ducat and at least one of interest: {more}");
 }
+
+/// Ticket #491 (the review): the computer Prospectors weigh an Exchange by the Fund, as they weigh an
+/// Investment Bank, since its interest is a share of it.
+#[test]
+fn the_computer_prospectors_weigh_an_exchange_by_the_fund() {
+    let mut g = game();
+    calm(&mut g);
+    let pro = seat_of(&g, FactionKind::Prospectors);
+    g.seats[pro.index()].stockpile.materials = 300.0;
+    g.seats[pro.index()].stockpile.energy = 300.0;
+    let c = colony(&mut g, pro, BodyId::Moon, &[], 4);
+    let at = g.place_name(Place::Colony(c));
+    let weigh = |g: &mut Game| {
+        g.log.clear();
+        g.ai_orders(pro);
+        scored(g, &format!("build Trade Post at {at}")).max(scored(g, &format!("build Exchange at {at}")))
+    };
+    let empty = weigh(&mut g);
+    assert!(empty > 0.0, "the premise: an Exchange is weighed at all");
+    g.seats[pro.index()].venture_fund = 2000.0;
+    let rich = weigh(&mut g);
+    assert!(rich > empty * 1.5, "a full Fund lifts it: {empty} against {rich}");
+}
+
+/// Ticket #491 (the review): a place under Blockade makes nothing, so its Exchange pays no interest.
+#[test]
+fn a_blockaded_exchange_pays_no_interest() {
+    let mut g = game();
+    let pro = seat_of(&g, FactionKind::Prospectors);
+    g.seats[pro.index()].stockpile.energy = 500.0;
+    let c = colony(&mut g, pro, BodyId::Moon, &[ModuleKind::Exchange], 4);
+    let ship = ship_in(&mut g, Seat(0), UnitKind::Frigate, BodyId::Moon, None, Stance::Blockade);
+    let _ = ship;
+    assert!(g.starved_by(c).is_some(), "the premise: blockaded");
+    g.seats[pro.index()].venture_fund = 500.0;
+    g.income_phase();
+    assert_eq!(g.seats[pro.index()].venture_fund, 500.0, "nothing from a blockaded place");
+}
