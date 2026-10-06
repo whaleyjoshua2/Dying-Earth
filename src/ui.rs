@@ -3832,7 +3832,8 @@ A Warship on Blockade shuts the one orbit it sits in and no other: a station's r
             Control::Neutral => Color32::from_gray(150),
             Control::Controlled(s) | Control::Occupied { occupier: s, .. } => seat_colour(session, s),
         };
-        // Ticket #165 (version 0.07.5): the Core Module is left out of the list; one alone is "bare".
+        // Ticket #165 (version 0.07.5): the Core Module is left out of the list, every place having
+        // one, so naming it says nothing; one alone is "bare".
         let mods: Vec<&str> = c.modules.iter().filter(|m| m.kind != ModuleKind::Core).map(|m| m.kind.name()).collect();
         let tip = if mods.is_empty() { "bare".to_string() } else { mods.join(", ") };
         ui.horizontal(|ui| {
