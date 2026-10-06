@@ -98,3 +98,18 @@ Exchange still paid; both fixed with tests watched failing first. The hover is o
 ceiling at seven, as it was before: its four lines of arithmetic are what overflow; not cut here.
 Re-swept: the win column the same; Exchanges at the end in one seating 22 from 20, the computer
 building one Trade Post a Body.
+
+## East Africa to the South Africa Region (#492)
+
+Kenya, Tanzania, Uganda, Rwanda and Burundi to South Africa's Region (the designer chose all of East
+Africa; Zambia was there already): South Africa 408 people, Nigeria 732. Spec section 4.
+
+**The ground**, repainted from Natural Earth by `cargo run --release --example prep_assets --
+--mask-only --borders <geojson> <preview>`. The file was fetched for the run, not kept; a repaint
+before the change matched the committed map to the pixel, so it is the 0.09.8 file. After it,
+4,742 pixels move from Nigeria's Region to South Africa's and none elsewhere.
+
+![Africa before and after](ticket-492/africa-before-after.png)
+
+**The sweep** ([`after-492.txt`](sweeps/after-492.txt)): 3 / 27 / 23 / 3 and 21 collapses, from
+3 / 25 / 26 / 4 and 21, within noise.

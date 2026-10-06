@@ -82,8 +82,10 @@ fn region_for(adm0: &str, subregion: &str, continent: &str) -> u8 {
         // called Turkey; Iran keeps its Region and takes Pakistan and Afghanistan into it.
         "TUR" | "IRQ" | "SYR" | "LBN" | "ISR" | "PSX" | "PSE" | "JOR" | "ARM" | "AZE" | "GEO" => return TURKEY,
         "IRN" | "PAK" | "AFG" => return MIDDLE_EAST,
-        // Ticket #482: South Africa and its neighbours leave Nigeria's Region.
+        // Ticket #482: South Africa and its neighbours leave Nigeria's Region. Ticket #492 (version
+        // 0.09.9): and East Africa with them -- Kenya, Tanzania, Uganda, Rwanda and Burundi.
         "ZAF" | "NAM" | "BWA" | "LSO" | "SWZ" | "AGO" | "ZMB" | "ZWE" | "MWI" | "MOZ" | "MDG" => return SOUTH_AFRICA,
+        "KEN" | "TZA" | "UGA" | "RWA" | "BDI" => return SOUTH_AFRICA,
         // Cyprus is in the European Union: the designer's one exception to the subregion rule.
         "CYP" => return EUROPE,
         // Greenland stays with the United States' Region, as it always was.

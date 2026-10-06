@@ -154,3 +154,24 @@ The authority is [ticket #491](https://github.com/whaleyjoshua2/Dying-Earth/issu
 [`after-491.txt`](../dev-diary/2026-10-05-version-0.09.9/sweeps/after-491.txt)): 3 / 25 / 26 / 4 and 21
 collapses, from 3 / 26 / 26 / 4 and 20: within noise. The Prospectors' median Fund at the end rises
 in every seating: 2,616 to 2,637, 2,782 to 3,090, 1,357 to 1,545, 1,550 to 1,661.
+
+## 4. East Africa to the South Africa Region
+
+The authority is [ticket #492](https://github.com/whaleyjoshua2/Dying-Earth/issues/492).
+
+- **Kenya, Tanzania, Uganda, Rwanda and Burundi** leave Nigeria's Region for South Africa's. Zambia
+  was South Africa's already, since version 0.09.8.
+- **People** move exactly, at 2023 figures (UN): Kenya 55.1, Tanzania 67.4, Uganda 48.6, Rwanda
+  14.1, Burundi 13.2 million, 198 in all. South Africa 408, from 210; Nigeria 732, from 930. The
+  world holds 7,860 still.
+- **Nothing else on either card moves**: GDP 1 and 1 (Nigeria's was already the floor), Influence,
+  emissions, Size, coast, Industry Level, Lean and start buildings.
+- **Neighbours unchanged**: no Region but Nigeria's touches the five.
+- **The map** is repainted from Natural Earth's countries, the same file as version 0.09.8 (a repaint
+  before the change matched the old map to the pixel). It differs in one move only: 4,742 pixels
+  from Nigeria's Region to South Africa's.
+- **Saves:** `SAVE_VERSION` stays at 9.
+
+**Measured** (80 games,
+[`after-492.txt`](../dev-diary/2026-10-05-version-0.09.9/sweeps/after-492.txt)): 3 / 27 / 23 / 3 and 21
+collapses, from 3 / 25 / 26 / 4 and 21: within noise.

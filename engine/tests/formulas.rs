@@ -19484,7 +19484,9 @@ fn the_regions_are_redrawn_around_iran_to_eighteen() {
     // Nigeria's 1,140 people and 2 GDP, shared two ways; its 1 Influence kept, and 1 added.
     assert_eq!(ng.population + za.population, 1140.0);
     assert_eq!((ng.gdp + za.gdp, ng.influence, za.influence), (2, 1, 1));
-    assert_eq!((za.population, za.gdp, za.industry_level, za.size, za.coastal_exposure), (210.0, 1, 2, 2, 2));
+    // Ticket #492 (version 0.09.9): East Africa's 198 move to South Africa, 408 from 210; the rest stands.
+    assert_eq!((za.population, za.gdp, za.industry_level, za.size, za.coastal_exposure), (408.0, 1, 2, 2, 2));
+    assert_eq!(ng.population, 732.0);
     // The United Kingdom's share of the European Union's, as ticket #453 left it.
     let two = [StateId::Europe, StateId::UnitedKingdom];
     assert_eq!(two.iter().map(|s| card(*s).population).sum::<f64>(), 600.0);

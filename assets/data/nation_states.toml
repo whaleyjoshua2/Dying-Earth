@@ -91,7 +91,8 @@ demonym = "Nigerian"
 name = "Nigeria"
 flag = "ng"
 colour = [0.90, 0.71, 0.24]
-population = 930.0
+# Ticket #492 (version 0.09.9): 732, from 930, East Africa's 198 gone to South Africa.
+population = 732.0
 industry_level = 1
 resource_lean = "materials"
 baseline_emissions = 0.3
@@ -483,13 +484,16 @@ unrest = 0.0
 # where it was 34, by decision: a Region worth no Influence is a dead card. The rest is the
 # designer's, approved on the ticket: mines and coal, so it leans Materials and starts with a Mine,
 # a Power Plant and a Factory; an exposed coast on two oceans.
+# Ticket #492 (version 0.09.9): and East Africa out of Nigeria's Region -- Kenya 55.1, Tanzania 67.4,
+# Uganda 48.6, Rwanda 14.1 and Burundi 13.2 million (UN, 2023), 198 in all, so 408. Its GDP stays 1,
+# Nigeria's 1 being the floor; nothing else on either card moves.
 [[state]]
 id = "south_africa"
 demonym = "South African"
 name = "South Africa"
 flag = "za"
 colour = [0.24, 0.52, 0.36]
-population = 210.0
+population = 408.0
 industry_level = 2
 resource_lean = "materials"
 baseline_emissions = 0.4
