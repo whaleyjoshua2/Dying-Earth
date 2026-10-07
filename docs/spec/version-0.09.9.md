@@ -198,3 +198,11 @@ The authority is [ticket #493](https://github.com/whaleyjoshua2/Dying-Earth/issu
 - **The owner's name and the modules leave the row.** The modules are its hover: "Shipyard, Solar
   Array", or "bare" for a Core alone.
 - No rule moves.
+
+## 6. A divider on the Colony card above the Modules
+
+The authority is [ticket #494](https://github.com/whaleyjoshua2/Dying-Earth/issues/494).
+
+- **One thin rule** between a Colony's or station's first section (the date, the holder, its people,
+  its Output, the Lift and Send-down controls) and its Modules heading: the same rule the Region
+  card has drawn since version 0.09.8. No rule moves.

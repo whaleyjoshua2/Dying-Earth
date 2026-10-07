@@ -8152,6 +8152,9 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     let (used, cap) = (game.module_slots_used(col), game.module_slots(col));
     // Ticket #490 (version 0.09.9): the rule is in the hover; the heading says the figures alone.
     let tier = game.tier_of(col);
+    // Ticket #494 (version 0.09.9): a rule between the place's first section and its Modules, as
+    // the Region card's rules stand since ticket #474.
+    ui.separator();
     let resp = card_heading(ui, "colony", format!("Modules {used} of {cap}"));
     if used >= cap {
         // Ticket #474 (version 0.09.8): the warning under the heading when the place is full.

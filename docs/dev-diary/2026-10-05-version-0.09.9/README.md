@@ -131,3 +131,11 @@ Every Body's In orbit list: the station glyph, the name in the holder's colour, 
   Custodians' teal, "blockaded" in red; Tiangong in the Prospectors' orange; Axiom in the
   Archivists' red.
 - [`ticket-493/in-orbit-hover.png`](ticket-493/in-orbit-hover.png): the ISS row's hover, "Solar Array".
+
+## A divider on the Colony card above the Modules (#494)
+
+One rule above the Modules heading, as the Region card's. Spec section 6. No rule moves, so no sweep.
+
+- [`ticket-494/colony-card-divider.png`](ticket-494/colony-card-divider.png): the ISS's card; the
+  rule under "Lift Pioneers", above "Modules 1 of 2".
+- [`ticket-494/divider-zoomed.png`](ticket-494/divider-zoomed.png): the same, three times as large.
