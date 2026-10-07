@@ -134,7 +134,9 @@ pub const SAVE_VERSION: u32 = 9;
 /// every field the version added reads a default from an older file, so a 0.09.6 save loads.
 /// Ticket #484 (version 0.09.8, the closing ticket): moved to 0.09.8. `SAVE_VERSION` moved once for
 /// the version, to 9, when the Regions were redrawn to eighteen (#482): a 0.09.7 save is refused.
-pub const GAME_VERSION: &str = "0.09.8";
+/// Ticket #498 (version 0.09.9, the closing ticket): moved to 0.09.9. `SAVE_VERSION` did not move:
+/// every field the version added reads a default from an older file, so a 0.09.8 save loads.
+pub const GAME_VERSION: &str = "0.09.9";
 
 /// The game autosaves at the start of the Report phase of every third turn.
 pub const AUTOSAVE_EVERY: u32 = 3;

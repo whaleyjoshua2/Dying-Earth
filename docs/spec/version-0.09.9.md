@@ -6,8 +6,36 @@ The map is [Map: version 0.09.9](https://github.com/whaleyjoshua2/Dying-Earth/is
 pictures and batches that decided it are in
 [`docs/dev-diary/2026-10-05-version-0.09.9/`](../dev-diary/2026-10-05-version-0.09.9/).
 
-**What the version is.** Version 0.09.8 with the designer's list. *(Summary and win column written
-when the version closes.)*
+**What the version is.** Version 0.09.8 with the designer's list. **Settling**: every new Colony
+or station opens with four Colonists (§1); Colonies and stations climb tiers you pay for, Outpost,
+Settlement, Colony, their Module slots capped by the tier (§2); the Prospectors' Exchange pays the
+Investment Bank's interest off Earth (§3). **The board**: East Africa and the Horn to South Africa,
+Angola back to Nigeria, Eritrea to Egypt (§4). **Bargains**: an offer waits for its answer and can
+be refused (§7), and the Factions trade, one thing for one thing (§8). **The cards**: stations
+drawn short in the In orbit list (§5), a divider above a Colony's Modules (§6), four texts cut (§9).
+
+**What it did to the win column** (80 games, per Faction):
+
+| | 0.09.8 | four to found (§1) | tiers (§2) | the Exchange (§3) | the map (§4) | refusing (§7) | 0.09.9, trading (§8) | the ideal |
+|---|---|---|---|---|---|---|---|---|
+| Custodians | 9 | 0 | 3 | 3 | 2 | 2 | 2 | 15 |
+| Prospectors | 27 | 24 | 26 | 25 | 26 | 27 | 23 | 15 |
+| Arkwrights | 18 | 33 | 26 | 26 | 28 | 26 | 30 | 15 |
+| Archivists | 7 | 6 | 4 | 4 | 2 | 2 | 2 | 15 |
+| collapses | 17 | 16 | 20 | 21 | 20 | 21 | 20 | 20 |
+
+Four to found moved the column far past noise and nothing after it moved it back: stations off
+Earth became rare, the Arkwrights reached the Moon first far more often, and the Custodians stopped
+winning, which is **not traced**. Collapses sit at the ideal's 20. The closing sweep is
+[`sweeps/final-0.09.9.txt`](../dev-diary/2026-10-05-version-0.09.9/sweeps/final-0.09.9.txt), the
+same to the line as the sweep after §8. Over its 80 games:
+
+- **Tiers:** 884 Outposts, 87 Settlements, 41 Colonies stand at the end.
+- **Opening Objectives met:** Custodians 80, Prospectors 80, Arkwrights 59, Archivists 78.
+- **The Archivists score nothing** at the end in 50 games.
+- **Never used by a computer seat:** Earth L4 or L5, a Mass Driver, a Colony traded.
+- **Saves:** `SAVE_VERSION` stays at 9; a 0.09.8 save loads, every field the version added
+  reading a default.
 
 ## 1. Four Colonists to found
 

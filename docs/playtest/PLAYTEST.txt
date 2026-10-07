@@ -1,4 +1,4 @@
-DYING EARTH - playtest build, version 0.09.8
+DYING EARTH - playtest build, version 0.09.9
 ============================================
 
 Thanks for playing. This is an early build of a turn-based strategy game about colonizing
@@ -16,73 +16,62 @@ HOW TO RUN
 4. The very first launch shows a blank dark window for up to ten seconds while it
    compiles graphics. Later launches are quick.
 5. Needs Windows 10 or 11, 64-bit, and any graphics card from the last ten years.
-6. Saves from 0.09.7 and before will not load: the map has two more countries. The Load
-   screen says so.
+6. Saves from 0.09.8 load. Saves from 0.09.7 and before do not: the Load screen says so.
 7. This version ships for Windows and for Linux. On Linux, read RUN-ON-LINUX.txt in the
    folder instead of steps 2 to 5.
 
-WHAT CHANGED SINCE 0.09.7
+WHAT CHANGED SINCE 0.09.8
 -------------------------
-The Moon race version: the first landing on the Moon is a contest you can watch, fuel
-follows real spaceflight, and the map has eighteen countries. The computer plays every
-rule below.
+The settlement version: colonies grow through tiers you pay for, you can refuse what
+other sides offer you, and the sides can trade. The computer plays every rule below.
 
-THE SKY
-- THE RACE TO THE MOON. Until somebody lands, the Moon's card lists how far each side has
-  got: a Shipyard, a Colony Ship, people aboard, on the way, in orbit. You see it whether
-  or not you can see their ships. The Report says when anyone sends a loaded Colony Ship
-  there, and the landing gets a pop-up naming the winner and where everyone else stood.
-- FUEL FOLLOWS REAL SPACEFLIGHT. Every trip costs what it would really cost, and the way
-  out and the way back are priced separately:
-    From Earth: the Moon 15.7, Venus 17.4, Mars 18.1, Phobos 19.7, Deimos 19.9.
-    Home to Earth is cheap, because Earth's air does the braking: 3.7 from the Moon,
-      12.1 from Mars.
-    From the Moon everything is about half Earth's price: Mars is 9.0.
-  A full tank (30, or 35 for a Colony Ship) reaches one place from Earth; plan to refuel.
-- VENUS TO MARS is a trip you can make now, four turns at its own launch window.
-- EARTH L4 AND EARTH L5: two new places for a station, far from Earth on its path round
-  the Sun. You cannot build there from the ground or lift people to them. Fly a loaded
-  Colony Ship there (16.3 Fuel) and found the station from the ship. They are on the
-  Solar System map, not Earth's.
-- A MASS DRIVER takes a quarter off the Fuel of every trip leaving its world, where it
-  took a flat 4.
+SETTLING
+- EVERY NEW COLONY OR STATION OPENS WITH FOUR PEOPLE, however it is made. A Colony Ship
+  must set down four. Building a station from a country's Launch Site takes four Pioneers
+  waiting there; building one from a Colony, or a Colony from a station, takes four of its
+  people, and it must keep at least as many as its Modules. The Arkwrights start with four
+  Pioneers waiting, so their first station can still go up on turn 1.
+- COLONIES HAVE TIERS: Outpost, Settlement, Colony. Every place starts an Outpost. Its
+  Module slots are its people, up to 6 for an Outpost, 12 for a Settlement, 18 for a
+  Colony. The red "Upgrade" tile after the Module boxes buys the next tier: 30 Materials
+  and 4 Widgets at 12 people, 50 and 6 at 18. The card's title says the tier.
+- THE PROSPECTORS' EXCHANGE, their Trade Post off Earth, now also pays the Investment
+  Bank's interest into their Fund.
+
+BARGAINS
+- YOU CAN REFUSE. An Accord another side offers you waits for your answer: a box at the
+  start of your turn, Accept or Refuse, and the turn will not end until you answer. The
+  computer sides answer theirs at the start of their next turn too, and a side you refuse
+  waits three turns before asking again. Your own offers are answered the same way, and
+  the Report tells you how it went.
+- TRADES. On a rival's page of the Faction window, under Accords: give one thing for one
+  thing, Ducats, Materials, Fuel, Energy, or one of your Colonies or stations. They answer
+  next turn, and the goods move only if both of you still have them. A Colony traded
+  changes hands peacefully, people and all. Not with a side that is Hostile. A trade
+  counts as a kindness both ways.
 
 THE MAP
-- EIGHTEEN COUNTRIES, up from sixteen. Iran now includes Pakistan and Afghanistan. Turkey
-  is new, with Iraq, Syria, Israel, Jordan, Lebanon and the Caucasus. Kazakhstan is
-  Central Asia on its own and has no coast, so the sea takes nothing from it. South
-  Africa is new, split from Nigeria, with its neighbours up to Angola and Mozambique.
-- THE CLIMATE IS KINDER, to make up for the extra countries' industry: the world absorbs
-  8 ppm a turn, up from 6, and each half degree takes 330 ppm, up from 300.
-
-THE RULES THAT MOVED
-- RAISING A COUNTRY'S INDUSTRY LEVEL COSTS MORE EACH TIME: 30 Materials and 4 Widgets,
-  then 40 and 5, then 50 and 6. The Prospectors pay half the Materials.
-- THE PROSPECTORS' OPENING OBJECTIVE pays 50 Ducats, down from 75, and wants a working
-  Investment Bank in three countries for three turns in a row. The Journal shows the
-  count.
+- SOUTH AFRICA NOW RUNS UP THE EAST OF THE CONTINENT: Kenya, Tanzania, Uganda, Rwanda,
+  Burundi, Ethiopia, Somalia and Djibouti joined it from Nigeria. Angola went back to
+  Nigeria; Eritrea went to Egypt. South Africa now borders Egypt and faces Saudi Arabia
+  across the Red Sea.
 
 THE WINDOW
-- RAISE INDUSTRY LEVEL IS A TILE, the last one among a country's building boxes, in red.
-  Click it to order the raise; right-click to take it back. The button is gone.
-- CARD HEADINGS ARE BIGGER, each with a small picture: Influence, Pioneers, Policies,
-  Facilities, Armies, Orders.
-- A COUNTRY'S CARD is shorter: "Region population 385.6 (386M)" and "GDP 23: Industry
-  Level 3, leans Fuel". Hover the GDP line for what it pays.
-- A COLONY'S CARD shows its people as a real number: "14/16 (14.2M)".
-- THE TUTORIAL is about a seventh shorter.
+- STATIONS IN ORBIT are short rows: the station's name in its owner's colour, how many
+  live there, and "blockaded" in red if one is. Hover a row for its Modules.
+- A LINE now divides a Colony's card above its Modules.
+- FOUR HOVERS ARE SHORTER: a world's In orbit heading, Greenwash, a Ship in your roster,
+  and the Modules heading.
 
 WHAT WE WANT TO KNOW
 --------------------
 Write down anything, however small. Especially:
 - The moment you were not sure what to do next.
 - Anything you clicked that did nothing, or did something you did not expect.
-- THE MOON RACE: did you watch it? Did it change what you did?
-- FUEL: did you run a ship dry? Did you use the Moon as a stepping stone? Is the cheap
-  trip home obvious?
-- EARTH L4 AND L5: did you find them? Did you found a station there, and why?
-- THE RAISE TILE: did you find it without the button?
-- THE NEW COUNTRIES: is it clear who borders whom around Iran and Turkey?
+- TIERS: did you find the Upgrade tile? Did the six-Module cap of an Outpost stop you?
+- OFFERS: did the Accept / Refuse box come at a sensible moment? Did you refuse anything?
+- TRADES: did you trade? With whom, and what? Did you ever trade a Colony?
+- FOUR TO FOUND: did needing four people slow your first Colony?
 - The turn the game got boring, if it did, and the turn you felt you had lost.
 - Crashes: what you were doing, and the "Seed" number shown on the title screen and
   the game-over screen. With the seed the game can be replayed exactly.
@@ -96,18 +85,21 @@ first. These are known. You do not need to report them.
 
 WHAT THIS VERSION KNOWS ABOUT ITSELF
 
-- THE WIN COLUMN: Custodians 9, Prospectors 27, Arkwrights 18, Archivists 7, where last
-  version was 8 / 21 / 18 / 5. The Prospectors win too often; the kinder climate gave
-  them most of the games it saved.
-- THE WORLD COLLAPSES IN 17 GAMES OF 80, where it was 28. Fourteen of the 17 are games
-  where the Prospectors go first and start in China.
-- THE ARCHIVISTS SCORE NOTHING at the end in 53 games of 80.
+- THE WIN COLUMN: Custodians 2, Prospectors 23, Arkwrights 30, Archivists 2, where last
+  version was 9 / 27 / 18 / 7. Four people to found a Colony moved it most: stations off
+  Earth are much rarer, and the Arkwrights, whose ships carry eight, reach the Moon first
+  far more often. Why the Custodians stopped winning is not yet traced.
+- THE WORLD COLLAPSES IN 20 GAMES OF 80, where it was 17.
+- THE ARCHIVISTS SCORE NOTHING at the end in 50 games of 80.
+- FEW PLACES CLIMB A TIER: at the end of the eighty games, 884 Outposts, 87 Settlements
+  and 41 Colonies.
+- THE COMPUTER OFFERS MANY TRADES AND FEW ARE STRUCK: about 20 a game, one in seven
+  accepted, mostly because the side asked is short of the same thing.
+- THE COMPUTER NEVER TRADES A COLONY, and never offers one.
 - THE COMPUTER NEVER USES EARTH L4 OR L5, AND NEVER BUILDS A MASS DRIVER. Both are yours.
-- THE COMPUTER ARKWRIGHTS reach the Moon late: they meet their objective in 29 games of
-  80.
-- A COMPUTER SIDE NOW STARTS IN SOUTH AFRICA, where one used to start in Australia.
-- THE SLIDER FOR THE VENTURE FUND AND THE RESEARCH DIRECTIVE ON THE TOP BAR IS SHORT, so
-  fine settings are easier in the Victory window and the Tech Tree.
+- A COMPUTER SIDE STARTS IN AUSTRALIA AGAIN, where one started in Saudi Arabia: Saudi
+  Arabia now borders South Africa, which another computer side takes.
+- THE EXCHANGE'S BUILD HOVER RUNS TO SEVEN LINES, one over the limit.
 
 CARRIED OVER, STILL TRUE
 
@@ -115,8 +107,6 @@ CARRIED OVER, STILL TRUE
   mostly yours.
 - THE COMPUTER ALMOST NEVER BUILDS A SHIPYARD ON THE MOON, PHOBOS OR DEIMOS.
 - TWO STACKS THAT ATTACK IN ONE ORBIT IN ONE TURN FIGHT TWO BATTLES, one per attack.
-- NOBODY CAN ACCEPT OR DECLINE AN ACCORD OFFERED TO THEM - INCLUDING YOU. The game still
-  answers on your behalf.
 - WHERE EACH SIDE STARTS IS NOT RANDOM. The computer sides always take the same countries
   in the same order.
 - RENAMING SHIPS, COLONIES AND STATIONS is still cut.

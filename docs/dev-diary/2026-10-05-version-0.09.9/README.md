@@ -203,3 +203,21 @@ rule moves, so no sweep.
 - [`ticket-497/greenwash-hover.png`](ticket-497/greenwash-hover.png): four lines, from about 64.
 - [`ticket-497/ship-hover.png`](ticket-497/ship-hover.png): five lines with its stance, from about 54
   after the stance line.
+
+## Closing the version (#498)
+
+`GAME_VERSION` is 0.09.9. `SAVE_VERSION` stays at 9: every field the version added -- a place's
+tier, the offers waiting, the refusals remembered -- reads a default from an older file, so a
+0.09.8 save loads (the saves test cuts them, watched failing with the tier's default taken off).
+The spec has its summary and win column; the playtest note is rewritten, and its line that nobody
+can accept or decline an Accord is gone; the glossary's Exchange and Region entries carry the
+version.
+
+**The closing sweep** ([`final-0.09.9.txt`](sweeps/final-0.09.9.txt)) is the same to the line as
+`after-496.txt`: 2 / 23 / 30 / 2 and 20 collapses. 0.09.8 closed at 9 / 27 / 18 / 7 and 17.
+
+What the version leaves open, reported and not pursued: the Custodians at 2 wins and the Arkwrights
+at 30, the column moved by four to found and not traced; few places climbing a tier (87
+Settlements and 41 Colonies of 1,012 places); the computer's Trades mostly declined; the computer
+seats never founding at a far orbit, building a Mass Driver or trading a Colony; the Exchange's
+build hover at seven lines.
