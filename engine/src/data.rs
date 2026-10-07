@@ -1269,6 +1269,8 @@ pub struct AiWeights {
     /// Ticket #56: raise a Sea Wall in a coastal slot before the sea takes it.
     pub build_sea_wall: f64,
     pub raise_industry: f64,
+    /// Ticket #490 (version 0.09.9): raise a Colony or station to its next tier.
+    pub raise_tier: f64,
     pub build_research_lab: f64,
     /// Ticket #80 (version 0.06.0): an Observatory is offered, at the Research Lab weight, at a
     /// Colony or station holding this many Colonists.
@@ -1320,6 +1322,8 @@ pub struct AiWeights {
     /// every turn would bury the player in yes-or-no questions.
     #[serde(default = "accord_weight_default")]
     pub accord: f64,
+    /// Ticket #496 (version 0.09.9): how readily this seat offers a Trade.
+    pub trade: f64,
     pub influence: f64,
     pub transit: f64,
     pub load_unload: f64,
@@ -1412,6 +1416,11 @@ pub struct AiPace {
 #[derive(Debug, Clone, Deserialize)]
 pub struct AiThresholds {
     pub attack_odds: f64,
+    /// Ticket #496 (version 0.09.9): a good short under this, a good long over this many Ducats'
+    /// worth, and how much of the short one a Trade asks for.
+    pub trade_short: f64,
+    pub trade_long: f64,
+    pub trade_ask: u32,
     /// Ticket #410 (version 0.09.4): the Unrest the computer seats act on (see `ai.toml`).
     pub constabulary_from: f64,
     pub stadium_from: f64,
@@ -1614,6 +1623,19 @@ pub struct SlotsCard {
     pub per_colonist: u32,
 }
 
+/// Ticket #490 (version 0.09.9): one tier of a Colony or station -- Outpost, Settlement, Colony --
+/// with the most Module slots it allows, the Colonists it needs before it can be reached, and its
+/// price in Materials and Widgets.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TierCard {
+    pub name: String,
+    pub cap: u32,
+    pub colonists: u32,
+    pub materials: u32,
+    pub widgets: u32,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ArchiveCard {
@@ -1642,6 +1664,7 @@ pub struct InSituCard {
 struct ModulesFile {
     module: Vec<ModuleCard>,
     slots: SlotsCard,
+    tiers: Vec<TierCard>,
     archive: ArchiveCard,
     observatory: ObservatoryCard,
     in_situ: InSituCard,
@@ -1845,6 +1868,9 @@ pub struct RelationsCard {
     /// a scarred pair's floor.
     #[serde(default = "accord_kept_default")]
     pub accord_kept_turns: u32,
+    /// Ticket #495 (version 0.09.9): the turns a refused Faction waits before offering the one who
+    /// refused an Accord again.
+    pub offer_refused_turns: u32,
 }
 
 fn turn_cap_default() -> i64 {
@@ -1893,6 +1919,9 @@ pub struct EmigrantsCard {
     /// Ticket #427 (version 0.09.5): Unrest off the state for each Pioneer recruited there.
     pub unrest_fall_each: f64,
     pub antarctica_turns: u32,
+    /// Ticket #489 (version 0.09.9): the Colonists every new Colony or station opens with, however
+    /// it is made, and the least a founding Unload or send by sea may carry.
+    pub found_with: u32,
 }
 
 /// Ticket #72 (version 0.05.5): the Prospectors' Venture Capital Fund: the largest share of their
@@ -1991,6 +2020,8 @@ pub struct Tables {
     pub modules: Vec<ModuleCard>,
     /// Ticket #97: how many Modules a Colony or a Space Station may hold.
     pub slots: SlotsCard,
+    /// Ticket #490 (version 0.09.9): the tiers that cap them, in order, the first where every place starts.
+    pub tiers: Vec<TierCard>,
     /// Ticket #98: how many Techs the Research Lead chooses between.
     pub shortlist: ShortlistCard,
     /// Ticket #51: the Archive's stages and their Research price.
@@ -2138,6 +2169,7 @@ impl Tables {
             school: facilities.school,
             unique: facilities.unique,
             slots: modules.slots,
+            tiers: modules.tiers,
             archive: modules.archive,
             observatory: modules.observatory,
             in_situ: modules.in_situ,
@@ -2178,6 +2210,13 @@ impl Tables {
     }
 
     fn validate(&self) -> Result<(), DataError> {
+        // Ticket #490 (version 0.09.9): a first tier to start at, and every tier above it rising.
+        if self.tiers.is_empty() {
+            return Err(err("modules.toml", "no tiers".to_string()));
+        }
+        if self.tiers.windows(2).any(|w| w[1].cap <= w[0].cap || w[1].colonists < w[0].colonists) {
+            return Err(err("modules.toml", "each tier must allow more slots, and want no fewer Colonists, than the one before".to_string()));
+        }
         // Ticket #58: every sentence the Report says, with every placeholder the engine supplies.
         self.report.check().map_err(|m| err("report.toml", m))?;
         // Every fixed id must have exactly one row, in the engine's order.

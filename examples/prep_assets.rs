@@ -82,8 +82,11 @@ fn region_for(adm0: &str, subregion: &str, continent: &str) -> u8 {
         // called Turkey; Iran keeps its Region and takes Pakistan and Afghanistan into it.
         "TUR" | "IRQ" | "SYR" | "LBN" | "ISR" | "PSX" | "PSE" | "JOR" | "ARM" | "AZE" | "GEO" => return TURKEY,
         "IRN" | "PAK" | "AFG" => return MIDDLE_EAST,
-        // Ticket #482: South Africa and its neighbours leave Nigeria's Region.
-        "ZAF" | "NAM" | "BWA" | "LSO" | "SWZ" | "AGO" | "ZMB" | "ZWE" | "MWI" | "MOZ" | "MDG" => return SOUTH_AFRICA,
+        // Ticket #482: South Africa and its neighbours leave Nigeria's Region. Ticket #492 (version
+        // 0.09.9): and East Africa and the Horn with them -- Kenya, Tanzania, Uganda, Rwanda, Burundi,
+        // Ethiopia, Somalia with Somaliland, and Djibouti -- while Angola goes back to Nigeria's.
+        "ZAF" | "NAM" | "BWA" | "LSO" | "SWZ" | "ZMB" | "ZWE" | "MWI" | "MOZ" | "MDG" => return SOUTH_AFRICA,
+        "KEN" | "TZA" | "UGA" | "RWA" | "BDI" | "ETH" | "SOM" | "SOL" | "DJI" => return SOUTH_AFRICA,
         // Cyprus is in the European Union: the designer's one exception to the subregion rule.
         "CYP" => return EUROPE,
         // Greenland stays with the United States' Region, as it always was.
@@ -99,7 +102,8 @@ fn region_for(adm0: &str, subregion: &str, continent: &str) -> u8 {
         "CHN" | "MNG" | "TWN" | "HKG" | "MAC" => return EAST_ASIA,
         "IND" | "BGD" | "LKA" | "NPL" | "BTN" | "MDV" => return SOUTH_ASIA,
         // North Africa: Morocco to Egypt and down through Sudan, as the table has always said.
-        "EGY" | "LBY" | "TUN" | "DZA" | "MAR" | "ESH" | "SDN" => return NORTH_AFRICA,
+        // Ticket #492 (version 0.09.9): and Eritrea.
+        "EGY" | "LBY" | "TUN" | "DZA" | "MAR" | "ESH" | "SDN" | "ERI" => return NORTH_AFRICA,
         "RUS" => return RUSSIA,
         "ATA" => return ANTARCTICA,
         _ => {}

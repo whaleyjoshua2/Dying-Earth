@@ -168,7 +168,7 @@ impl Game {
             Order::BuildEmigrants { state, .. } | Order::SendToAntarctica { state, .. } | Order::LiftToStation { state, .. } => Some(ReportPlace::State(*state)),
             Order::Relief { state } | Order::Agitate { state } | Order::Resettle { state } | Order::Leapfrog { state } | Order::StripPermit { state } | Order::ExodusCall { state } => Some(ReportPlace::State(*state)),
             Order::MoveArmy { to, .. } => Some(ReportPlace::State(*to)),
-            Order::BuildModule { colony, .. } | Order::BuildModuleWithDucats { colony, .. } | Order::BuildArchive { colony } | Order::Upload { colony, .. } => Some(ReportPlace::Colony(*colony)),
+            Order::BuildModule { colony, .. } | Order::BuildModuleWithDucats { colony, .. } | Order::BuildArchive { colony } | Order::Upload { colony, .. } | Order::RaiseTier { colony } => Some(ReportPlace::Colony(*colony)),
             Order::BuildShip { site, .. } => Some(ReportPlace::of(*site)),
             Order::BuildArmy { place } | Order::ArmyStance { place, .. } | Order::CancelBuild { place, .. } => Some(ReportPlace::of(*place)),
             Order::Influence { target, .. } => Some(ReportPlace::of(*target)),

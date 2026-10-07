@@ -129,7 +129,9 @@ resentment = 0.5
 # Ticket #290 (version 0.08.6): so two Pioneers wait in their start Region on turn one instead, a gift
 # outside Coach Class that takes no population -- the mirror of the two Colonists aboard everybody
 # else's station. They wait for the first Ship.
-start_emigrants = 2
+# Ticket #489 (version 0.09.9): four, from two, the four a station built over Earth now takes, so
+# their first can still be ordered on turn one.
+start_emigrants = 4
 blurb = "Leave Earth: the diaspora is the point."
 motto = "Nothing left behind but the Earth."
 # Ticket #210 (version 0.08.1): the prefix every Ship of theirs wears in front of its name --
@@ -332,6 +334,9 @@ scar_floor = -3
 tribute_ducats = 25
 tribute_materials = 15
 accord_kept_turns = 4
+# Ticket #495 (version 0.09.9): a Faction refused an Accord offers the one who refused none again for
+# this many turns, so a refusal is not answered by the same offer every turn.
+offer_refused_turns = 3
 
 # Ticket #268 (version 0.08.4): carbon credits. The Custodians -- and only they -- may offer ppm of
 # carbon credit a turn, standing until changed; any other Faction may buy up to `cap_per_turn` ppm
@@ -407,6 +412,10 @@ per_turn = 2
 population_each = 1.0
 unrest_fall_each = 0.125
 antarctica_turns = 1
+# Ticket #489 (version 0.09.9): every new Colony or station opens with this many Colonists, however it
+# is made -- a Colony Ship's Unload, Pioneers by sea, or a build from a Launch Site, a Colony or a
+# station, which gives them up.
+found_with = 4
 
 [start]
 # Raised from 60 on ticket #24, since income now flows from turn one.

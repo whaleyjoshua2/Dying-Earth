@@ -91,14 +91,17 @@ demonym = "Nigerian"
 name = "Nigeria"
 flag = "ng"
 colour = [0.90, 0.71, 0.24]
-population = 930.0
+# Ticket #492 (version 0.09.9): 619, from 930: East Africa's 198 and the Horn's 145.7 gone to South
+# Africa, Eritrea's 3.7 to Egypt, Angola's 36.7 back from South Africa.
+population = 619.0
 industry_level = 1
 resource_lean = "materials"
 baseline_emissions = 0.3
 education_level = 0.7
 size = 3
 coastal_exposure = 1
-neighbours = ["north_africa", "arabian_peninsula", "south_africa"]
+# Ticket #492 (version 0.09.9): the Horn gone, it no longer faces Arabia across the Red Sea.
+neighbours = ["north_africa", "south_africa"]
 start_facilities = ["factory", "mine"]
 influence = 1
 gdp = 1
@@ -112,14 +115,15 @@ demonym = "Egyptian"
 name = "Egypt"
 flag = "eg"
 colour = [0.94, 0.71, 0.78]
-population = 260.0
+population = 264.0
 industry_level = 1
 resource_lean = "fuel"
 baseline_emissions = 0.4
 education_level = 0.85
 size = 2
 coastal_exposure = 1
-neighbours = ["sub_saharan_africa", "europe", "turkey", "arabian_peninsula"]
+# Ticket #492 (version 0.09.9): Eritrea's 3.7 million join it, so 264; and it touches South Africa's.
+neighbours = ["sub_saharan_africa", "europe", "turkey", "arabian_peninsula", "south_africa"]
 start_facilities = ["refinery"]
 influence = 1
 gdp = 1
@@ -392,7 +396,8 @@ baseline_emissions = 0.5
 education_level = 1.0
 size = 2
 coastal_exposure = 1
-neighbours = ["middle_east", "turkey", "north_africa", "sub_saharan_africa"]
+# Ticket #492 (version 0.09.9): across the Red Sea from the Horn, now South Africa's.
+neighbours = ["middle_east", "turkey", "north_africa", "south_africa"]
 start_facilities = ["refinery", "power_plant"]
 influence = 2
 gdp = 2
@@ -483,20 +488,25 @@ unrest = 0.0
 # where it was 34, by decision: a Region worth no Influence is a dead card. The rest is the
 # designer's, approved on the ticket: mines and coal, so it leans Materials and starts with a Mine,
 # a Power Plant and a Factory; an exposed coast on two oceans.
+# Ticket #492 (version 0.09.9): and East Africa and the Horn out of Nigeria's Region -- Kenya 55.1,
+# Tanzania 67.4, Uganda 48.6, Rwanda 14.1, Burundi 13.2, Ethiopia 126.5, Somalia 18.1 and Djibouti
+# 1.1 million (UN, 2023) -- while Angola's 36.7 go back to Nigeria's: 517. Its GDP stays 1, Nigeria's
+# 1 being the floor; nothing else on either card moves. It touches Egypt's Region now, and faces
+# Arabia across the Red Sea where Nigeria's did.
 [[state]]
 id = "south_africa"
 demonym = "South African"
 name = "South Africa"
 flag = "za"
 colour = [0.24, 0.52, 0.36]
-population = 210.0
+population = 517.0
 industry_level = 2
 resource_lean = "materials"
 baseline_emissions = 0.4
 education_level = 0.7
 size = 2
 coastal_exposure = 2
-neighbours = ["sub_saharan_africa"]
+neighbours = ["sub_saharan_africa", "north_africa", "arabian_peninsula"]
 start_facilities = ["mine", "power_plant", "factory"]
 influence = 1
 gdp = 1

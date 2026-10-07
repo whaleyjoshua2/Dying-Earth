@@ -1,0 +1,316 @@
+# Dying Earth — version 0.09.9, the settlement version
+
+Amendments to the specification, one section per decision. Each section names the ticket whose
+resolution comment is the authority; where this document and a ticket disagree, the ticket is right.
+The map is [Map: version 0.09.9](https://github.com/whaleyjoshua2/Dying-Earth/issues/488), and the
+pictures and batches that decided it are in
+[`docs/dev-diary/2026-10-05-version-0.09.9/`](../dev-diary/2026-10-05-version-0.09.9/).
+
+**What the version is.** Version 0.09.8 with the designer's list. **Settling**: every new Colony
+or station opens with four Colonists (§1); Colonies and stations climb tiers you pay for, Outpost,
+Settlement, Colony, their Module slots capped by the tier (§2); the Prospectors' Exchange pays the
+Investment Bank's interest off Earth (§3). **The board**: East Africa and the Horn to South Africa,
+Angola back to Nigeria, Eritrea to Egypt (§4). **Bargains**: an offer waits for its answer and can
+be refused (§7), and the Factions trade, one thing for one thing (§8). **The cards**: stations
+drawn short in the In orbit list (§5), a divider above a Colony's Modules (§6), four texts cut (§9).
+
+**What it did to the win column** (80 games, per Faction):
+
+| | 0.09.8 | four to found (§1) | tiers (§2) | the Exchange (§3) | the map (§4) | refusing (§7) | 0.09.9, trading (§8) | the ideal |
+|---|---|---|---|---|---|---|---|---|
+| Custodians | 9 | 0 | 3 | 3 | 2 | 2 | 2 | 15 |
+| Prospectors | 27 | 24 | 26 | 25 | 26 | 27 | 23 | 15 |
+| Arkwrights | 18 | 33 | 26 | 26 | 28 | 26 | 30 | 15 |
+| Archivists | 7 | 6 | 4 | 4 | 2 | 2 | 2 | 15 |
+| collapses | 17 | 16 | 20 | 21 | 20 | 21 | 20 | 20 |
+
+Four to found moved the column far past noise and nothing after it moved it back: stations off
+Earth became rare, the Arkwrights reached the Moon first far more often, and the Custodians stopped
+winning, which is **not traced**. Collapses sit at the ideal's 20. The closing sweep is
+[`sweeps/final-0.09.9.txt`](../dev-diary/2026-10-05-version-0.09.9/sweeps/final-0.09.9.txt), the
+same to the line as the sweep after §8. Over its 80 games:
+
+- **Tiers:** 884 Outposts, 87 Settlements, 41 Colonies stand at the end.
+- **Opening Objectives met:** Custodians 80, Prospectors 80, Arkwrights 59, Archivists 78.
+- **The Archivists score nothing** at the end in 50 games.
+- **Never used by a computer seat:** Earth L4 or L5, a Mass Driver, a Colony traded.
+- **Saves:** `SAVE_VERSION` stays at 9; a 0.09.8 save loads, every field the version added
+  reading a default.
+
+## 1. Four Colonists to found
+
+The authority is [ticket #489](https://github.com/whaleyjoshua2/Dying-Earth/issues/489).
+
+**Every new Colony or station opens with four Colonists**, however it is made. The figure is
+`found_with = 4` under `[emigrants]` in `factions.toml`. Materials prices are unchanged.
+
+| How it is made | Where the four come from | Before |
+|---|---|---|
+| A Colony Ship unloads onto a free ground slot, or into a free ring off Earth or at Earth L4 or L5 | the Ship: the Unload must put down at least 4 | at least 1 |
+| Pioneers sent to Antarctica by sea, into a free slot | the Region they sail from: at least 4 sent | at least 1 |
+| A station over Earth, built from a Launch Site | 4 Pioneers waiting in a Region of the builder's with a working Launch Site | nobody |
+| A station over another Body, built from a ground Colony there | 4 Colonists from that Colony | nobody |
+| A ground Colony built from a station over that Body | 4 Colonists from that station | nobody |
+
+- **A Colony Ship lands exactly four**, as it already could not land more: a new Colony's Core
+  holds four and the rest stay aboard.
+- **A Colony or station that builds one keeps enough people.** After the four leave it must
+  still hold at least as many Colonists as its Modules in slots (Core and Archive not counted,
+  a Module mothballed or building counted, as on the card's "Modules {used}"), and never fewer
+  than four. So a source needs that number plus four.
+- **Which source.** A station order and a station-built Colony name the place their four come from.
+  The game chooses for the player: the qualifying Region or Colony with the most to spare.
+- **People ordered once are ordered once.** A source's spare counts what the turn's other
+  orders already take from it: Loads, lifts, sends by sea or down, and other builds; and a Load or
+  a Send Down counts the four a build has claimed. A founding settles the people who really left,
+  never more.
+- **When they leave.** Builders leave their source when the turn is ended and arrive as the
+  place is built at Resolution, as Pioneers sent by sea do. If the place is not built (another
+  Faction took the slot), they go back where they came from.
+- **A lift from a Launch Site** carrying the four is the station build itself: no second launch,
+  no second emission.
+- **The hover.** Every founding button's price reads "4 Colonists" beside the Materials. A
+  refusal says what is short: "needs 4 Colonists", or "needs 4 Colonists to spare".
+- **The computer seats** found only with four ready, by the same rule: a Colony Ship sets down
+  four or does not found, and a Colony or station builds only with four to spare. A Colony Ship
+  of theirs holding fewer than four sails only to a place of their own with room, or stays to
+  load. **A seat with no station over Earth recruits the four a station takes**: their recruiting
+  wanted room to put people, and with no station there was none, so a seat without one never
+  recruited and never built one.
+- **The Arkwrights start with 4 Pioneers waiting** in their start Region, where it was 2, so their
+  first station can still be ordered on turn 1. The gift takes no population, as before.
+- **Not changed:** unloading or sending into a Colony that already stands, the Arkwrights' Colony
+  Ship carrying 8, and the stations every other Faction starts with.
+- **Saves:** the source rides on the order and on the pending build; `SAVE_VERSION` stays at 9.
+
+**Measured** (80 games, the standing cell,
+[`after-489.txt`](../dev-diary/2026-10-05-version-0.09.9/sweeps/after-489.txt)):
+
+| | 0.09.8 | after this | the ideal |
+|---|---|---|---|
+| Custodians | 9 | 0 | 15 |
+| Prospectors | 27 | 24 | 15 |
+| Arkwrights | 18 | 33 | 15 |
+| Archivists | 7 | 6 | 15 |
+| collapses | 17 | 16 | 20 |
+| Arkwrights meet their Opening Objective | 29 of 80 | 55 of 80 | |
+| stations off Earth at the end | 94 | 36 | |
+
+The column moves far past noise. Stations off Earth fall to a third: a Colony or station must
+hold eight before it builds one. The Arkwrights, whose Colony Ship carries eight and who start
+with their four, reach the Moon first far more often, and their Opening Objective, a Colony on the
+Moon, is met in 55 games where it was 29. The Custodians win none: traced on one game they still
+had their twelve off Earth by turn 8, but never held Stabilization; the game diverged through Tech
+picks and cards, not through any one rule, so their loss is **not traced** past that.
+The dev diary's README has the trace.
+
+With the Arkwrights starting at two Pioneers and the computer's recruiting fixed, the column read
+5 / 23 / 24 / 5 and 23 collapses; at two before the fix, 8 / 45 / 1 / 2 and 24.
+
+## 2. Colony tiers: Outpost, Settlement, Colony
+
+The authority is [ticket #490](https://github.com/whaleyjoshua2/Dying-Earth/issues/490).
+
+- **Every Colony and station stands at a tier**, and starts at the first. The tiers are a list in
+  `modules.toml` (`[[tiers]]`), so a fourth is one more entry:
+
+| Tier | Module slots at most | Colonists to reach it | Price |
+|---|---|---|---|
+| Outpost | 6 | (every place starts here) | |
+| Settlement | 12 | 12 | 30 Materials, 4 Widgets |
+| Colony | 18 | 18 | 50 Materials, 6 Widgets |
+
+- **Module slots are the lower of the place's Colonists and its tier's cap.** The Core and the
+  Archive take none, as before.
+- **The place stays a Colony** in every rule and text, the Diaspora's included; Colony is also the
+  top tier's name. The card's title carries the tier beside the name: "ISS over Earth Outpost".
+- **Stations** climb the same tiers.
+- **The upgrade** is a tile after the Module boxes, dashed in the Raise Industry Level tile's red,
+  reading "Upgrade" with the next tier's name under it. A click orders it; it is built through the
+  place's Widgets queue like a Module, one at a time, and lands when the build completes. The
+  same price for every Faction. Greyed, its hover leads with what is short: "needs 12 Colonists".
+  Its hover otherwise: "Upgrade to a Settlement: 30 Materials and 4 Widgets. Up to 12 Modules."
+- **A place never falls back a tier.** Losing people already costs it slots.
+- **A place past its cap** loses nothing; it builds no more until upgraded. The Modules heading is
+  cut to "Modules 3 of 6"; full, it says "Full until more Colonists live here", or at the cap
+  "Full: upgrade for more room", or at the top "Full". Its hover: "One a Colonist, at most 6 as an
+  Outpost. Mothballed keeps a slot, building reserves one; the Core and the Archive take none."
+- **A Module refused for want of room** says why: "full until more Colonists live here" below the
+  tier's cap, "full: upgrade to a Settlement for more" at it, "full: a Colony holds 18" at the top.
+- **The computer seats** order the upgrade for a place whose slots are all taken at its tier's cap
+  and whose people are enough for the next tier, at a Producer's weight (`raise_tier` in
+  `ai.toml`).
+- **A rival's upgrade** reaches the Report where the fog allows: "upgraded Tycho on the Moon". The
+  Report's word ceiling rises by its two words, to 1,783.
+- **Saves:** a place with no tier recorded reads as an Outpost; `SAVE_VERSION` stays at 9.
+
+**Measured** (80 games, the standing cell,
+[`after-490.txt`](../dev-diary/2026-10-05-version-0.09.9/sweeps/after-490.txt)):
+
+| | after §1 | after this | the ideal |
+|---|---|---|---|
+| Custodians | 0 | 3 | 15 |
+| Prospectors | 24 | 26 | 15 |
+| Arkwrights | 33 | 26 | 15 |
+| Archivists | 6 | 4 | 15 |
+| collapses | 16 | 20 | 20 |
+
+At the end of the 80 games 1,032 Colonies and stations stand: 929 Outposts, 81 Settlements, 22
+Colonies (the sweep's new line). The Arkwrights' fall of seven is past noise and **not traced**.
+
+## 3. The Prospectors' Bank paying interest off Earth
+
+The authority is [ticket #491](https://github.com/whaleyjoshua2/Dying-Earth/issues/491).
+
+- **The Exchange**, the Prospectors' own Module in the Trade Post's place, pays an Investment Bank's
+  interest on top of its Ducats: 1% of the Venture Capital Fund into the Fund, to the tenth.
+- **One share a place**: each Colony or station with a working Exchange counts once, as each Region
+  with a working Investment Bank does, however many stand there. The floor of 1 is still one floor
+  for the whole Faction.
+- **A captured Exchange** pays its captor 1% of that turn's Ducat income, at least 1, as a captured
+  Investment Bank does.
+- **A place under Blockade** makes nothing, so its Exchange pays no interest.
+- **The computer Prospectors** weigh an Exchange by the Fund, as they weigh an Investment Bank: the
+  fuller the Fund, the more it is wanted.
+- **The Opening Objective** is unchanged: its three Investment Banks are Regions' alone.
+- **Its hover:** "+1 Ducat over a Trade Post, and a Bank's interest". The income line names the
+  payers: "2 Investment Bank or Exchange (interest banked)". The build hover runs to **seven** lines,
+  as it did before this ticket: the four lines of arithmetic under it are what overflow, and cutting
+  them is left to the designer.
+
+**Measured** (80 games,
+[`after-491.txt`](../dev-diary/2026-10-05-version-0.09.9/sweeps/after-491.txt)): 3 / 25 / 26 / 4 and 21
+collapses, from 3 / 26 / 26 / 4 and 20: within noise. The Prospectors' median Fund at the end rises
+in every seating: 2,616 to 2,637, 2,782 to 3,090, 1,357 to 1,545, 1,550 to 1,661.
+
+## 4. East Africa and the Horn to the South Africa Region
+
+The authority is [ticket #492](https://github.com/whaleyjoshua2/Dying-Earth/issues/492), its decision
+and the amendment the designer made after the first build.
+
+- **To South Africa's Region from Nigeria's:** Kenya, Tanzania, Uganda, Rwanda, Burundi, Ethiopia,
+  Somalia (Somaliland with it) and Djibouti. Zambia was South Africa's already, since version 0.09.8.
+- **To Nigeria's Region from South Africa's:** Angola.
+- **To Egypt's Region from Nigeria's:** Eritrea.
+- **People** move exactly, at 2023 figures (UN): Kenya 55.1, Tanzania 67.4, Uganda 48.6, Rwanda 14.1,
+  Burundi 13.2, Ethiopia 126.5, Somalia 18.1, Djibouti 1.1, Angola 36.7, Eritrea 3.7 million.
+  South Africa 517, from 210; Nigeria 619, from 930; Egypt 264, from 260. The world holds 7,860 still.
+- **Nothing else on the cards moves**: GDP (Nigeria's and South Africa's 1 already the floor),
+  Influence, emissions, Size, coast, Industry Level, Lean and start buildings.
+- **Who touches whom.** South Africa: Nigeria, Egypt, and Saudi Arabia across the Red Sea. Egypt
+  gains South Africa. Nigeria loses Saudi Arabia, the Horn being gone; Saudi Arabia faces South
+  Africa instead.
+- **Where the computer seats start.** The spreading rule takes no Region touching one already taken,
+  and Saudi Arabia now touches South Africa, the third pick: **the fourth computer start is
+  Australia**, where it was Saudi Arabia.
+- **The map** is repainted from Natural Earth's countries, the same file as version 0.09.8 (a repaint
+  before the change matched the old map to the pixel). It differs in these moves only: 9,630
+  pixels from Nigeria's Region to South Africa's, 3,421 from South Africa's to Nigeria's, 392 from
+  Nigeria's to Egypt's.
+- **Saves:** `SAVE_VERSION` stays at 9.
+
+**Measured** (80 games,
+[`after-492.txt`](../dev-diary/2026-10-05-version-0.09.9/sweeps/after-492.txt)): 2 / 26 / 28 / 2 and 20
+collapses, from 3 / 25 / 26 / 4 and 21: within noise. (The first build, East Africa alone, read
+3 / 27 / 23 / 3 and 21.)
+
+## 5. Stations drawn short in a Body's In orbit list
+
+The authority is [ticket #493](https://github.com/whaleyjoshua2/Dying-Earth/issues/493).
+
+- **On every Body's card**, each station in the In orbit list is one row: the station glyph
+  (off-white), its name in its holder's colour, and its Colonists with the people glyph, as
+  `[station] ISS 2 [people]`. A click selects it, as before.
+- **Nobody's** station has its name in grey; an **occupied** one in the occupier's colour.
+- **A station under Blockade** adds "blockaded" in red.
+- **The owner's name and the modules leave the row.** The modules are its hover: "Shipyard, Solar
+  Array", or "bare" for a Core alone.
+- No rule moves.
+
+## 6. A divider on the Colony card above the Modules
+
+The authority is [ticket #494](https://github.com/whaleyjoshua2/Dying-Earth/issues/494).
+
+- **One thin rule** between a Colony's or station's first section (the date, the holder, its people,
+  its Output, the Lift and Send-down controls) and its Modules heading: the same rule the Region
+  card has drawn since version 0.09.8. No rule moves.
+
+## 7. Accords and deals you can refuse
+
+The authority is [ticket #495](https://github.com/whaleyjoshua2/Dying-Earth/issues/495).
+
+- **An Accord offered waits for its answer** until the head of the receiver's next turn. Nobody answers
+  for the player any more.
+- **The player answers in a prompt** raised once the turn's Report and Moments are done: "Accords
+  offered", a row each -- "Prospectors offer an Accord: non-aggression, passage." with **Accept** and
+  **Refuse**. The turn does not end while one waits: End Turn says "Prospectors offer the Custodians
+  an Accord. Accept it or refuse it." **Accept** strikes it at once, if it still can be (no Accord
+  already standing, a research agreement still Friendly); otherwise it lapses.
+- **A computer seat** answers an offer made it at the head of its next turn, by its own reckoning as
+  before, so every seat answers on the same clock.
+- **A refusal is remembered**: a computer seat refused does not offer the same Faction an Accord again
+  for `offer_refused_turns` turns (3, in `factions.toml`'s `[relations]`), nor while its last offer
+  waits. A Faction's second offer to another while its first waits is refused: "your offer is
+  waiting on their answer".
+- **What the player learns**, in their own section of the Report: "Accord struck with Prospectors."
+  or "Prospectors refused your Accord." The Report's word ceiling rises by these 8 words, less a
+  word of slack it held, to 1,790. A Faction's name is drawn in its colour with no "The", by the
+  Report's standing rule.
+- **The offer button's hover:** "They answer next turn. A refusal costs you nothing: it is not an
+  offence."
+- **Tribute** stays a gift, not an offer. A trade, if the trade ticket allows one, is answered the same
+  way.
+- **Saves:** offers waiting and refusals remembered are saved; an older save reads none.
+
+**Measured** (80 games,
+[`after-495.txt`](../dev-diary/2026-10-05-version-0.09.9/sweeps/after-495.txt)): 2 / 27 / 26 / 2 and 21
+collapses, from 2 / 26 / 28 / 2 and 20: within noise. Accords struck over the batch 599, from 610.
+
+## 8. Trades between Factions
+
+The authority is [ticket #496](https://github.com/whaleyjoshua2/Dying-Earth/issues/496).
+
+- **A Trade is one thing for one thing**, offered with `Order::ProposeTrade`: an amount of Ducats,
+  Materials, Fuel or Energy, or a Colony or station held outright -- never an Archive's Colony nor a
+  place under Blockade. Widgets are not traded: a place's rate, not a stock.
+- **It is answered as an Accord is**, at the head of the receiver's next turn: the player in the
+  offers prompt ("Prospectors offer 30 Materials for 60 Ducats."), a computer seat by its rule.
+  Nothing is held at the offer; **the goods move when it is accepted**, and only if both sides still
+  hold them -- otherwise it fails and each human side reads "Trade with X failed: why".
+- **A place traded changes hands in peace**: its people, Modules, builds and own Army go with it; no
+  building is lost, no Moment of a taking, not counted as a taking.
+- **No Trade where either holds the other Hostile.** One Trade a turn to a Faction, none while an
+  offer to it waits.
+- **An accepted Trade is an act of friendship each way**, once a turn per pair, as Tribute is.
+- **The computer seats** offer a Trade, at most one a turn, when a Stockpile good is under
+  `trade_short` (15) and another is worth over `trade_long` (150 Ducats): they ask `trade_ask` (20)
+  of the short good of the Faction they stand best with, giving as much of the long one at the
+  Trading window's prices. They never offer a place. They accept a Trade at least even at those
+  prices, or a place for no more than its build price (its Core's 40 Materials and each Module's
+  Materials price); never giving a place, never what they cannot pay. A refusal is remembered three
+  turns, as an Accord's is. The figures are in `ai.toml`, with a `trade` weight for each Faction.
+- **Where:** a Trade block on a rival's page of the Faction window, under the Accords: "Give
+  [Ducats] 10 / For [Materials] 10", "Offer Prospectors a Trade", greyed with the reason on the hover.
+  The headless driver: `trade <faction> <give> for <ask>` and `trade accept|refuse <faction>`.
+- **The Report** gains "offered X a Trade" (a rival's deed), "Trade struck with X.", "X refused your
+  Trade." and "Trade with X failed: why."; its word ceiling rises by these 17 words, to 1,807.
+
+**Measured** (80 games,
+[`after-496.txt`](../dev-diary/2026-10-05-version-0.09.9/sweeps/after-496.txt)): 2 / 23 / 30 / 2 and 20
+collapses, from 2 / 27 / 26 / 2 and 21: the Prospectors and Arkwrights each move four, at the edge of
+noise. Counted over the same 80 games: 1,576 Trades offered by the computer seats, 238 struck,
+1,250 declined, 27 failed for goods gone.
+
+## 9. Four more texts tightened
+
+The authority is [ticket #497](https://github.com/whaleyjoshua2/Dying-Earth/issues/497).
+
+| Where | Before (words) | Now |
+|---|---|---|
+| A Body's In orbit hover | about 79 | "Room for {n} stations, one to a ring. A station is reached only from its own ring; a Warship on Blockade there starves it." |
+| Greenwash | about 64 | "Each point: {per} Ducat(s), {rate} ppm off your Blame for good. Nothing leaves the air. One a turn; public, no offence; a rival may answer with a Smear." |
+| A Ship's roster hover, after its stance line | about 54 | "Tank {} of {}. Fills at your station in its ring, over your Colony with a Refinery, or a Refuel partner's. STRANDED: no leg it can pay, nowhere to fill." |
+| What a station holds | a refusal of 25, a footer of 20 that named five of the eight kinds | the refusal "not on a station"; the footer "Ships are built only at a Shipyard." |
+
+The Greenwash hover is now drawn through `rule_tip`, like every other hover. A fifth, the Modules
+heading's hover, was cut with the tiers (section 2). No rule moves.

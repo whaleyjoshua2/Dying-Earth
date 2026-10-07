@@ -145,6 +145,14 @@ impl Game {
                 }
             }
         }
+        // Ticket #495 (version 0.09.9): an Accord offered to a human seat is answered first.
+        for o in &self.offers {
+            if !self.seat(o.to).ai {
+                // Ticket #496 (version 0.09.9): or a Trade.
+                let what = if o.trade.is_some() { "a Trade" } else { "an Accord" };
+                owed.push(format!("{} offer {} {what}. Accept it or refuse it.", self.seat_name(o.from), self.seat_name(o.to)));
+            }
+        }
         if let Some(lead) = self.tech_owed_by() {
             owed.push(format!(
                 "The {} hold the Research Lead and owe the table a Tech. Choose what the world researches next.",
@@ -263,6 +271,8 @@ impl Game {
         }
         self.turn += 1;
         self.log(format!("--- Turn {} ---", self.turn));
+        // Ticket #495 (version 0.09.9): the computer seats answer the Accords offered them last turn.
+        self.answer_computer_offers();
         // Ticket #173 (version 0.07.6): the Archivists read the Tech under research for the whole of
         // the turn to come, frozen here. Their Provisional Findings gives them half its effect while
         // the turn is still being ordered, and a Lead that may change its pick would otherwise

@@ -323,15 +323,19 @@ DIPLOMACY (ticket #226; `show` prints Relations both ways and every Accord stand
                                          refuel          either may Refuel at the other's stations
                                          research        both parties' Research rises a tenth; it
                                                          wants Friendly on BOTH sides to strike
-                                       One offer a turn to a Faction, and none where an Accord
-                                       already stands. THE ANSWER IS NOBODY'S TO WRITE: every seat,
-                                       this one included, answers an offer made to it at the
-                                       Resolution by its own weights, so there is no order to accept
-                                       or decline one. A refusal is not an offence. An Accord kept
-                                       {kept} turns pays both sides.
+                                       One offer a turn to a Faction, none where an Accord already
+                                       stands, and none while your last to them waits. It is
+                                       answered at the head of their next turn. A refusal is not an
+                                       offence. An Accord kept {kept} turns pays both sides.
+  accord accept|refuse <faction>       answer an Accord a Faction offered you; the turn does not
+                                       end until every one is answered.
   accord end <faction>                 declare a standing Accord over: free, and it lapses at the
                                        next turn's start -- which gives the board a turn's warning
                                        that something is coming.
+  trade <faction> <give> for <ask>     one thing for one thing: `<n> ducats|materials|fuel|energy`
+                                       or a colony id; answered at the head of their next turn, the
+                                       goods moving only if both still hold them.
+  trade accept|refuse <faction>        answer a Trade a Faction offered you.
   tribute <faction> ducats             a fixed gift, one per Faction per turn, paying Relations:
   tribute <faction> materials          {tributeducats} Ducats, or {tributematerials} Materials.
 
@@ -417,6 +421,9 @@ enum Line {
     Tech(TechId),
     /// Ticket #337: this seat's answer to the turn's Choice Card -- taken, or refused.
     Answer(bool),
+    /// Ticket #495 (version 0.09.9): this seat's answer to the Accord a Faction offered it; ticket
+    /// #496, or the Trade (`true` in the last field).
+    Offer(Seat, bool, bool),
 }
 
 /// The game is read here as well as written: a Faction is named by its own name, and which seat
@@ -446,7 +453,7 @@ fn parse_line(g: &Game, line: &str) -> Result<Line, String> {
                 "module-ducats" => Order::BuildModuleWithDucats { colony: colony_id(at(2)?)?, kind: pick(&ModuleKind::BUILDABLE, at(3)?)? },
                 "ship" => Order::BuildShip { site: place(at(2)?)?, kind: pick(&UnitKind::SHIPS, at(3)?)? },
                 "army" => Order::BuildArmy { place: place(at(2)?)? },
-                "station" => Order::BuildStation { body: pick(&BodyId::ALL, at(2)?)?, slot: count(at(3)?)? },
+                "station" => g.station_order(Seat(0), pick(&BodyId::ALL, at(2)?)?, count(at(3)?)?, &[]),
                 "archive" => Order::BuildArchive { colony: colony_id(at(2)?)? },
                 _ => return Err(format!("`build {what}` is not one of facility, module, ship, army, station, archive")),
             }
@@ -539,14 +546,33 @@ fn parse_line(g: &Game, line: &str) -> Result<Line, String> {
                     Order::ProposeAccord { to, terms }
                 }
                 "end" => Order::EndAccord { with: seat_of(g, at(2)?)? },
-                "accept" | "decline" | "refuse" => {
-                    return Err(
-                        "an offer made to you is answered at the Resolution by your own seat's weights: no order accepts or declines one. `accord end <faction>` ends an Accord that stands."
-                            .into(),
-                    );
-                }
-                _ => return Err(format!("`accord {what}` is not one of offer, end")),
+                // Ticket #495 (version 0.09.9): an offer made to you waits for your answer.
+                "accept" => return Ok(Line::Offer(seat_of(g, at(2)?)?, true, false)),
+                "decline" | "refuse" => return Ok(Line::Offer(seat_of(g, at(2)?)?, false, false)),
+                _ => return Err(format!("`accord {what}` is not one of offer, end, accept, refuse")),
             }
+        }
+        // Ticket #496 (version 0.09.9): `trade <faction> <n> <good>|<colony id> for <n> <good>|<colony id>`,
+        // and `trade accept|refuse <faction>` to answer one offered.
+        "trade" => {
+            let first = at(1)?.to_ascii_lowercase();
+            if first == "accept" || first == "refuse" || first == "decline" {
+                return Ok(Line::Offer(seat_of(g, at(2)?)?, first == "accept", true));
+            }
+            let to = seat_of(g, at(1)?)?;
+            let rest: Vec<&str> = w[2..].to_vec();
+            let split = rest.iter().position(|x| x.eq_ignore_ascii_case("for")).ok_or("a Trade reads `trade <faction> <what you give> for <what you ask>`")?;
+            let good = |words: &[&str]| -> Result<dying_earth_engine::TradeGood, String> {
+                match words {
+                    [n, r] => {
+                        let r = pick(&[Resource::Ducats, Resource::Materials, Resource::Fuel, Resource::Energy], r)?;
+                        Ok(dying_earth_engine::TradeGood::Goods(r, count(n)?))
+                    }
+                    [c] => Ok(dying_earth_engine::TradeGood::Place(colony_id(c)?)),
+                    _ => Err("each side is `<n> <ducats|materials|fuel|energy>` or a colony id".into()),
+                }
+            };
+            Order::ProposeTrade { to, give: good(&rest[..split])?, get: good(&rest[split + 1..])? }
         }
         "tribute" => {
             let to = seat_of(g, at(1)?)?;
@@ -722,6 +748,11 @@ fn print_question(g: &Game) {
 /// card and the line that answers it, since a line is the only door the driver has. `Game::end_turn`
 /// refuses in its own words; a player reading only those would not know what to write.
 fn owed_answer(g: &Game) -> Option<String> {
+    // Ticket #495 (version 0.09.9): an Accord offered is answered by name.
+    if let Some((_, o)) = g.offers_to(Seat(0)).first() {
+        let what = if o.trade.is_some() { "trade" } else { "accord" };
+        return Some(format!("Put `{what} accept {0}` or `{what} refuse {0}` in the order list.", g.seat_name(o.from).to_lowercase()));
+    }
     let q = g.pending_question()?;
     if q.answer_of(Seat(0)).is_some() {
         return None;
@@ -1462,6 +1493,18 @@ fn main() {
                             bad += 1;
                         }
                     },
+                    // Ticket #495 (version 0.09.9): an Accord offered, answered as the card is.
+                    Ok(Line::Offer(from, accept, trade)) => {
+                        let what = if trade { "Trade" } else { "Accord" };
+                        let index = game.offers_to(Seat(0)).into_iter().find(|(_, o)| o.from == from && o.trade.is_some() == trade).map(|(i, _)| i);
+                        match index.ok_or_else(|| format!("{} have offered you no {what}", game.seat_name(from))).and_then(|i| game.answer_offer(Seat(0), i, accept)) {
+                            Ok(()) => println!("line {}: answered: you {} the {} {what}", n + 1, if accept { "accept" } else { "refuse" }, game.seat_name(from)),
+                            Err(e) => {
+                                println!("line {}: REFUSED `{line}`: {e}", n + 1);
+                                bad += 1;
+                            }
+                        }
+                    }
                     Ok(Line::Tech(t)) => match game.pick_tech(Seat(0), t) {
                         Ok(()) => println!("line {}: picked {}", n + 1, game.tables.tech(t).name),
                         Err(e) => {

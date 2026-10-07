@@ -442,6 +442,8 @@ enum Action {
     /// Ticket #337 (version 0.09.0): seat 0 answered this turn's choice card. A PLACEHOLDER, so
     /// the card can be answered at all while the interface for it is built in its own lane.
     AnswerCard(bool),
+    /// Ticket #495 (version 0.09.9): an Accord offered to the player, by its index, accepted or not.
+    AnswerOffer(usize, bool),
     /// Ticket #58: a Report line was clicked; go where it points.
     GoTo(ReportPlace),
     ChooseFaction(FactionKind),
@@ -844,6 +846,21 @@ const YIELD_ROW_W: f32 = 220.0;
 /// line wrapped one word to a line). Sized to the longest line the cell ever holds, the Prospectors'
 /// "1 [ducats] each; sells for 0.5 [ducats] (x0.85 for you, over the lot)", read off the picture.
 const TRADE_PRICE_W: f32 = 340.0;
+
+/// Ticket #489 (version 0.09.9): a founding door, greyed with the refusal on its hover where the
+/// order would be refused -- fewer than four chosen to found with.
+#[allow(clippy::too_many_arguments)]
+fn found_door(ui: &mut Ui, game: &Game, pending: &[Order], order: Order, body: BodyId, slot: u32, label: &str, actions: &mut Vec<Action>) {
+    let check = game.check_order(Seat(0), pending, &order);
+    let resp = ui.add_enabled_ui(check.is_ok(), |ui| found_button(ui, &game.slot_yields(body, slot), label)).inner;
+    let resp = match &check {
+        Err(e) => rule_tip(resp, refusal_hover(&e.0, None)),
+        Ok(_) => resp,
+    };
+    if resp.clicked() {
+        actions.push(Action::Place(order));
+    }
+}
 
 fn found_button(ui: &mut Ui, yields: &dying_earth_engine::SlotYields, label: &str) -> egui::Response {
     ui.scope_builder(egui::UiBuilder::new().sense(egui::Sense::click()), |ui| {
@@ -1515,6 +1532,12 @@ pub fn draw(
             // hands on to the turn's Moments and its Report as it goes (`Popup::Card`).
             Action::AnswerCard(taken) => {
                 let result = session.game.as_mut().map(|g| g.answer_card(Seat(0), taken));
+                if let Some(Err(e)) = result {
+                    session.last_error = Some(e);
+                }
+            }
+            Action::AnswerOffer(index, accept) => {
+                let result = session.game.as_mut().map(|g| g.answer_offer(Seat(0), index, accept));
                 if let Some(Err(e)) = result {
                     session.last_error = Some(e);
                 }
@@ -3801,31 +3824,43 @@ fn stations_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSt
     rule_tip(
         ui.label(RichText::new(format!("In orbit: {} of {} station slots", count, card.orbital_slots)).strong()),
         format!(
-            "{} has room for {} stations in orbit, and a station taken is a station gone: nobody else builds there.
-A station is touched -- unloaded into, refuelled at, blockaded, attacked -- only from its own orbit, and this Body's orbits are low orbit and one per slot.
-A Warship on Blockade shuts the one orbit it sits in and no other: a station's ring starves that station, and low orbit starves the ground under a rival's Orbital Control.",
-            card.name, card.orbital_slots
+            // Ticket #497 (version 0.09.9): cut from about 79 words.
+            "Room for {} stations, one to a ring. A station is reached only from its own ring; a Warship on Blockade there starves it.",
+            card.orbital_slots
         ),
     );
+    // Ticket #493 (version 0.09.9): a station's row, on every Body's card, is its glyph, its name in
+    // its holder's colour -- grey for nobody's, the occupier's for an occupied one -- and its people;
+    // "blockaded" in red where a Blockade starves it. The owner's name and the modules are gone from
+    // the row, the modules to its hover.
+    const BLOCKADED: Color32 = Color32::from_rgb(236, 88, 76);
     for c in game.colonies.iter().filter(|c| c.in_orbit && c.body == body) {
-        let owner = match c.control {
-            Control::Neutral => "nobody's".to_string(),
-            Control::Controlled(s) => game.seat_name(s),
-            Control::Occupied { occupier, .. } => format!("occupied by the {}", game.seat_name(occupier)),
+        let colour = match c.control {
+            Control::Neutral => Color32::from_gray(150),
+            Control::Controlled(s) | Control::Occupied { occupier: s, .. } => seat_colour(session, s),
         };
-        // Ticket #165 (version 0.07.5): the Core Module is left out of the list. Every Colony and
-        // every station has one, so naming it says nothing about this one; and a station that holds
-        // only its Core Module is exactly what the words below have always called a bare core module.
+        // Ticket #165 (version 0.07.5): the Core Module is left out of the list, every place having
+        // one, so naming it says nothing; one alone is "bare".
         let mods: Vec<&str> = c.modules.iter().filter(|m| m.kind != ModuleKind::Core).map(|m| m.kind.name()).collect();
-        // Ticket #278 (version 0.08.5): a station under a Blockade says so, and by whom.
-        let starved = match game.starved_by(c.id) {
-            Some(by) => format!("; blockaded by the {}: producing nothing", game.seat_name(by)),
-            None => String::new(),
-        };
-        let text = format!("{}: {}, {} Colonists, {}{starved}", game.station_name(body, c.slot), owner, c.colonists, if mods.is_empty() { "a bare core module".to_string() } else { mods.join(", ") });
-        if ui.button(text).clicked() {
-            view.selection = Selection::Colony(c.id);
-        }
+        let tip = if mods.is_empty() { "bare".to_string() } else { mods.join(", ") };
+        ui.horizontal(|ui| {
+            let name = RichText::new(game.station_name(body, c.slot)).color(colour);
+            let button = match Kind::Station.image(ui.ctx(), KIND_GLYPH) {
+                Some(image) => egui::Button::image_and_text(image, name),
+                None => egui::Button::new(name),
+            };
+            if rule_tip(ui.add(button), tip).clicked() {
+                view.selection = Selection::Colony(c.id);
+            }
+            ui.label(c.colonists.to_string());
+            if let Some(image) = Icons::from_ctx(ui.ctx(), "population", 14.0) {
+                ui.add(image);
+            }
+            // Ticket #278 (version 0.08.5): a station under a Blockade says so.
+            if game.starved_by(c.id).is_some() {
+                ui.colored_label(BLOCKADED, "blockaded");
+            }
+        });
     }
     if !session.spectator {
         for slot in game.free_orbital_slots(body) {
@@ -3834,10 +3869,13 @@ A Warship on Blockade shuts the one orbit it sits in and no other: a station's r
                 ui.label(RichText::new(format!("{}: free. Founded by a Colony Ship in that orbit; {} Fuel to reach.", game.station_name(body, slot), figure(game.orbit_change_cost(Seat(0), body, Orbit::Low, Orbit::Slot(slot))))).weak());
                 continue;
             }
-            cost_button(ui, game, &session.pending, Order::BuildStation { body, slot }, &format!("Build {} here", game.station_name(body, slot)), actions);
+            // Ticket #489 (version 0.09.9): its four from the source with the most to spare.
+            cost_button(ui, game, &session.pending, game.station_order(Seat(0), body, slot, &session.pending), &format!("Build {} here", game.station_name(body, slot)), actions);
         }
     }
-    ui.label(RichText::new("A station holds a Shipyard, Habitats, Observatories, Solar Arrays and a Trade Post. Ships are built only at a Shipyard.").weak());
+    // Ticket #497 (version 0.09.9): the list it gave was short of three kinds; a station's build list
+    // shows what it holds.
+    ui.label(RichText::new("Ships are built only at a Shipyard.").weak());
 }
 
 /// The Colony Slot within fourteen degrees of a point on a Body, nearest first.
@@ -5052,7 +5090,8 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, seat: Seat, marks: boo
             // orbit clause is also more accurate than what it replaces: since ticket #335 a station
             // fuels only a Ship in its OWN orbit, which "where the Ship sits" did not say.
             let tip = format!(
-                "{}: {} {}\nTank {} of {}. Fuel goes on transits, cheapest at a launch window.\nIt fills at a station of yours in that station's orbit, or in low orbit over a Colony of yours with a working Refinery; a Refuel partner's serve too. STRANDED: no leg it can pay, and nowhere to fill up.",
+                // Ticket #497 (version 0.09.9): cut from about 54 words after the stance line.
+                "{}: {} {}\nTank {} of {}. Fills at your station in its ring, over your Colony with a Refinery, or a Refuel partner's.\nSTRANDED: no leg it can pay, nowhere to fill.",
                 s.stance.name(),
                 s.stance.one_liner(true),
                 Stance::PERSISTS,
@@ -5186,23 +5225,44 @@ fn roster_order_touches_state(o: &Order, sid: StateId) -> bool {
     }
 }
 
+/// Ticket #496 (version 0.09.9): one side of a Trade as the player reads it: "40 Ducats", or a place.
+fn trade_good_text(game: &Game, g: TradeGood) -> String {
+    match g {
+        TradeGood::Goods(r, n) => format!("{n} {}", r.name()),
+        TradeGood::Place(c) => game.place_name(Place::Colony(c)),
+    }
+}
+
+/// Ticket #496: an offer's words after its Faction's name in the prompt: what an Accord holds, or
+/// what a Trade gives for what it asks.
+fn offer_words(game: &Game, o: &dying_earth_engine::state::Offer) -> String {
+    match o.trade {
+        Some((give, get)) => format!("offer {} for {}.", trade_good_text(game, give), trade_good_text(game, get)),
+        None => format!("offer an Accord: {}.", o.terms.iter().map(|t| term_name(*t)).collect::<Vec<_>>().join(", ")),
+    }
+}
+
+/// An Accord's Term as the order list and the offers prompt name it.
+fn term_name(t: Term) -> &'static str {
+    match t {
+        Term::NonAggression => "non-aggression",
+        Term::Passage => "passage",
+        Term::Refuel => "refuel",
+        Term::ResearchAgreement => "a research agreement",
+    }
+}
+
 fn order_text(game: &Game, o: &Order) -> String {
     match o {
         // Ticket #226 (version 0.08.2): the Accord orders, so a pending one reads in the order list
         // like any other and can be cancelled like any other.
         Order::ProposeAccord { to, terms } => {
-            let names: Vec<&str> = terms
-                .iter()
-                .map(|t| match t {
-                    Term::NonAggression => "non-aggression",
-                    Term::Passage => "passage",
-                    Term::Refuel => "refuel",
-                    Term::ResearchAgreement => "a research agreement",
-                })
-                .collect();
+            let names: Vec<&str> = terms.iter().map(|t| term_name(*t)).collect();
             format!("Offer the {} an Accord: {}", game.seat_name(*to), names.join(", "))
         }
         Order::EndAccord { with } => format!("Declare your Accord with the {} over", game.seat_name(*with)),
+        // Ticket #496 (version 0.09.9).
+        Order::ProposeTrade { to, give, get } => format!("Offer {} {} for {}", game.seat_name(*to), trade_good_text(game, *give), trade_good_text(game, *get)),
         // Ticket #332 (version 0.09.0): a rival's build cancelled at a place that changed hands.
         Order::CancelBuild { place, index } => {
             let building = game.queue_at(*place).get(*index).map(|b| b.item.name()).unwrap_or_else(|| "build".to_string());
@@ -5211,6 +5271,8 @@ fn order_text(game: &Game, o: &Order) -> String {
         Order::Tribute { to, materials } => format!("Pay the {} a tribute in {}", game.seat_name(*to), if *materials { "Materials" } else { "Ducats" }),
         Order::BuildFacility { state, kind } => format!("Build {} in {}", kind.name(), game.tables.state(*state).name),
         Order::RaiseIndustry { state } => format!("Raise Industry Level in {}", game.tables.state(*state).name),
+        // Ticket #490 (version 0.09.9).
+        Order::RaiseTier { colony } => format!("Upgrade {}{}", game.place_name(Place::Colony(*colony)), game.colony(*colony).and_then(|c| game.next_tier(c)).map(|t| format!(" to a {}", t.name)).unwrap_or_default()),
         Order::BuildModule { colony, kind } => format!("Build {} at {}", kind.name(), game.place_name(Place::Colony(*colony))),
         Order::BuildShip { site, kind } => format!("Build {} at {}", kind.name(), game.place_name(*site)),
         Order::BuildArmy { place } => format!("Build Army at {}", game.place_name(*place)),
@@ -5250,9 +5312,9 @@ fn order_text(game: &Game, o: &Order) -> String {
         Order::Sell { resource, amount } => format!("Sell {} {} for {} Ducats", amount, resource.name(), -game.order_cost(Seat(0), o).ducats),
         Order::BuildFacilityWithDucats { state, kind } => format!("Build {} in {} for Ducats", kind.name(), game.tables.state(*state).name),
         Order::BuildModuleWithDucats { colony, kind } => format!("Build {} at {} for Ducats", kind.name(), game.place_name(Place::Colony(*colony))),
-        Order::BuildStation { body, slot } => format!("Build {}", game.slot_place_name(*body, *slot)),
+        Order::BuildStation { body, slot, .. } => format!("Build {}", game.slot_place_name(*body, *slot)),
         // Ticket #442 (version 0.09.6).
-        Order::BuildColony { body, slot } => format!("Build a Colony at {} on {}", game.tables.body(*body).slots[*slot as usize].name, game.tables.body(*body).name),
+        Order::BuildColony { body, slot, .. } => format!("Build a Colony at {} on {}", game.tables.body(*body).slots[*slot as usize].name, game.tables.body(*body).name),
         Order::SendDown { from, to, colonists } => format!("Send {} down from {} to {}", colonists_word(*colonists), game.place_name(Place::Colony(*from)), game.place_name(Place::Colony(*to))),
         Order::BuildArchive { colony } => format!("Build the Archive at {}", game.place_name(Place::Colony(*colony))),
         Order::SetMaxStanding { target: Some(p) } => format!("Spend your whole Allotment on {}, every turn", game.place_name(*p)),
@@ -5886,8 +5948,10 @@ fn attack_hover(ctx: &egui::Context, game: &Game, place: Place, name: &str, atta
 /// Ticket #332 (version 0.09.0): `widgets` is the build's Widget figure, drawn after the price as
 /// `8 [cog]` -- the second half of what a build costs, on the face beside the first -- and nought
 /// for an order that builds nothing.
-fn priced_button(ui: &mut Ui, enabled: bool, label: &str, cost: &dying_earth_engine::Cost, widgets: u32) -> egui::Response {
-    let parts: Vec<(&str, f64)> = [("materials", cost.materials), ("fuel", cost.fuel), ("energy", cost.energy), ("influence", cost.influence as f64), ("ducats", cost.ducats), ("widgets", widgets as f64)]
+/// Ticket #489 (version 0.09.9): `colonists` are the people a founding takes, drawn last in the
+/// price behind the population glyph.
+fn priced_button(ui: &mut Ui, enabled: bool, label: &str, cost: &dying_earth_engine::Cost, widgets: u32, colonists: u32) -> egui::Response {
+    let parts: Vec<(&str, f64)> = [("materials", cost.materials), ("fuel", cost.fuel), ("energy", cost.energy), ("influence", cost.influence as f64), ("ducats", cost.ducats), ("widgets", widgets as f64), ("population", colonists as f64)]
         .into_iter()
         .filter(|(_, n)| *n > 0.0)
         .collect();
@@ -6278,7 +6342,7 @@ fn orders_button(ui: &mut Ui, game: &Game, pending: &[Order], orders: Vec<Order>
         }
     }
     let ok = !able.is_empty();
-    let mut resp = priced_button(ui, ok, label, &cost, 0);
+    let mut resp = priced_button(ui, ok, label, &cost, 0, 0);
     let text = if ok { hover } else { Some(refusal_hover(refusal.as_deref().unwrap_or("Nothing here can take the order."), hover.as_deref())) };
     if let Some(text) = text {
         resp = rule_tip(resp, text);
@@ -6296,7 +6360,9 @@ fn cost_button_with_hover(ui: &mut Ui, game: &Game, pending: &[Order], order: Or
     // Ticket #332 (version 0.09.0): the Widget figure on the face after the price, and the hover's
     // first line the Materials, the Widgets and the estimate at this place's rate behind its queue.
     let widgets = build_item_of(game, &order).filter(|(_, _, ducats)| !ducats).map(|(place, item, _)| game.build_widgets_at(Seat(0), place, item)).unwrap_or(0);
-    let mut resp = priced_button(ui, check.is_ok(), label, &cost, widgets);
+    // Ticket #489 (version 0.09.9): a station or a station-built Colony takes four people too.
+    let founders = game.order_founders(&order);
+    let mut resp = priced_button(ui, check.is_ok(), label, &cost, widgets, founders);
     let ready = build_words(game, &order);
     let whole = match (&ready, &hover) {
         (Some(r), Some(h)) => Some(format!("{r}.\nOnce it stands: {h}")),
@@ -7812,9 +7878,7 @@ fn pioneers_block(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, act
             // two Ship doors, the site's yields in glyphs, at the designer's word.
             let order = Order::SendToAntarctica { state: sid, n, into: UnloadTarget::Slot(BodyId::Earth, slot) };
             let label = format!("Send {n} to {} by sea", game.tables.body(BodyId::Earth).slots[slot as usize].name);
-            if found_button(ui, &game.slot_yields(BodyId::Earth, slot), &label).clicked() {
-                actions.push(Action::Place(order));
-            }
+            found_door(ui, game, &session.pending, order, BodyId::Earth, slot, &label, actions);
         }
         // Ticket #204 (version 0.08.1): capped at the room there. A sea crossing checks no room
         // at the order -- it lands `min(n, room)` a turn later and sends the surplus home with a
@@ -8006,6 +8070,8 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
         // standing rule that a colour says whose and nobody's place says nothing.
         faction_glyph(ui, session, game, col.control.controller(), 22.0);
         ui.label(RichText::new(game.place_name(Place::Colony(cid))).size(22.0).strong());
+        // Ticket #490 (version 0.09.9): its tier, beside the name.
+        ui.label(RichText::new(&game.tier_of(col).name).size(22.0).weak());
     });
     // Ticket #391 (version 0.09.3): the date it was founded, under its name, at the designer's word
     // -- *"each colony/station card has the date it was founded under its name in the header"*. A
@@ -8115,29 +8181,21 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     // Ticket #97 (version 0.07.0): the Module cap, shown beside the Colonists that buy it, so a
     // player meets it on the card rather than as a refusal.
     let (used, cap) = (game.module_slots_used(col), game.module_slots(col));
-    // Ticket #164 (version 0.07.5): with the base allowance at nothing, the cap is exactly the
-    // number of people living here, so the line says that rather than naming a base of zero.
-    let line = if game.tables.slots.base == 0 {
-        format!("Modules {used} of {cap} (one for each Colonist)")
-    } else {
-        format!("Modules {used} of {cap} ({} free, one for each Colonist)", game.tables.slots.base)
-    };
-    // Ticket #474 (version 0.09.8): the Modules line is a heading like the Region card's Facilities;
-    // the warning that rode on it when the place is full stands under it.
-    let resp = card_heading(ui, "colony", line);
+    // Ticket #490 (version 0.09.9): the rule is in the hover; the heading says the figures alone.
+    let tier = game.tier_of(col);
+    // Ticket #494 (version 0.09.9): a rule between the place's first section and its Modules, as
+    // the Region card's rules stand since ticket #474.
+    ui.separator();
+    let resp = card_heading(ui, "colony", format!("Modules {used} of {cap}"));
     if used >= cap {
-        ui.colored_label(Color32::YELLOW, "No room for another until more Colonists live here");
+        // Ticket #474 (version 0.09.8): the warning under the heading when the place is full.
+        let why = if cap < tier.cap { "Full until more Colonists live here" } else if game.next_tier(col).is_some() { "Full: upgrade for more room" } else { "Full" };
+        ui.colored_label(Color32::YELLOW, why);
     }
-    // Ticket #116 (version 0.07.1): the rule behind the cap, which ticket #97 put in the engine and
-    // nowhere on the card.
-    rule_tip(
-        resp,
-        format!(
-            "One slot for every {} Colonist living here, and none before: the Core Module a founding gives is the whole of what a founding gives, so a place grows only as its people arrive.\nIts Core Module holds {}, which is how the first of them get here. Mothballed keeps a slot and building reserves one; the Core Module and the Archive count on neither side.",
-            game.tables.slots.per_colonist,
-            game.tables.module(ModuleKind::Core).holds_colonists
-        ),
-    );
+    // Ticket #116 (version 0.07.1): the rule behind the cap. Ticket #490: with the tier's ceiling.
+    let per = match game.tables.slots.per_colonist { 1 => "One a Colonist".to_string(), n => format!("One for every {n} Colonists") };
+    let free = match game.tables.slots.base { 0 => String::new(), n => format!(", {n} free") };
+    rule_tip(resp, format!("{per}{free}, at most {} as a {}.\nMothballed keeps a slot, building reserves one; the Core and the Archive take none.", tier.cap, tier.name));
     // Ticket #332 (version 0.09.0): what this place makes in Widgets a turn, and its queue in
     // order -- the Archive and a Ship on it too, which have no tile.
     widgets_block(ui, game, Place::Colony(cid));
@@ -8331,14 +8389,14 @@ fn slot_panel(ui: &mut Ui, session: &Session, game: &Game, body: BodyId, slot: u
         // four yields are drawn under every slot on the Body view already, but the moment of the
         // DECISION said nothing about them. In glyphs, at the designer's word -- each figure's word
         // heads its multiplier, which is the form the one glyph rule reads (ticket #132).
-        if found_button(ui, &game.slot_yields(body, slot), &format!("Found a Colony here with {} from {}", colonists_word(k), game.ship_name(s))).clicked() {
-            actions.push(Action::Place(order));
-        }
+        found_door(ui, game, &session.pending, order, body, slot, &format!("Found a Colony here with {} from {}", colonists_word(k), game.ship_name(s)), actions);
     }
     // Ticket #442 (version 0.09.6): built from a station of yours over this Body, for the station's
-    // Materials, opening with nobody; greyed with the reason where there is no such station.
-    if !session.spectator && body != BodyId::Earth && game.colonies.iter().any(|c| c.in_orbit && c.body == body && c.control.director() == Some(Seat(0))) {
-        cost_button(ui, game, &session.pending, Order::BuildColony { body, slot }, "Build a Colony here from your station", actions);
+    // Materials; greyed with the reason where the station cannot spare its four (ticket #489).
+    if !session.spectator && body != BodyId::Earth
+        && let Some(order) = game.colony_order(Seat(0), body, slot, &session.pending)
+    {
+        cost_button(ui, game, &session.pending, order, "Build a Colony here from your station", actions);
     }
 }
 
@@ -8923,9 +8981,7 @@ fn ship_cargo_block(ui: &mut Ui, session: &Session, game: &Game, s: &Ship, body:
                 let into = UnloadTarget::Slot(body, slot);
                 let order = Order::Unload { ship: s.id, colonists: k, army: s.army.is_some(), into };
                 let label = format!("Found a Colony at {} with {}", game.tables.body(body).slots[slot as usize].name, k);
-                if found_button(ui, &game.slot_yields(body, slot), &label).clicked() {
-                    actions.push(Action::Place(order));
-                }
+                found_door(ui, game, &session.pending, order, body, slot, &label, actions);
             }
             // Ticket #442 (version 0.09.6): a station FOUNDED from the empty ring the Ship sits in --
             // at Venus the one way to a station -- for the Colonists aboard, no Materials.
@@ -9123,7 +9179,7 @@ fn ship_weapons_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut Vi
 fn ducat_button(ui: &mut Ui, game: &Game, session: &Session, verb: &str, ducats: f64, order: &Order) -> egui::Response {
     let ok = game.check_order(Seat(0), &session.pending, order);
     let mut resp = if ducats > 0.0 {
-        priced_button(ui, ok.is_ok(), verb, &dying_earth_engine::Cost { ducats, ..Default::default() }, 0)
+        priced_button(ui, ok.is_ok(), verb, &dying_earth_engine::Cost { ducats, ..Default::default() }, 0, 0)
     } else {
         ui.add_enabled(ok.is_ok(), egui::Button::new(format!("{verb} 0 Ducats")))
     };
@@ -9736,6 +9792,9 @@ enum TileState {
     /// in place of the turns, at the designer's word; an ordered one reads `0 of 8`. The estimate
     /// in turns is on the hover.
     Building { ordered: bool, done: u32, widgets: u32 },
+    /// Ticket #490 (version 0.09.9): **the Upgrade tile**, last of a Colony's or station's boxes,
+    /// drawn as the Raise Industry Level tile is; the flag says whether the order would stand.
+    Upgrade(bool),
     /// Ticket #218 (version 0.08.2): the flag says whether the PLAYER could actually build here --
     /// their own place, and not a slot the sea has taken. A tile they can use invites the click;
     /// one they cannot keeps the old word, because telling somebody to click a thing that will do
@@ -9767,14 +9826,14 @@ fn hab_tile(ui: &mut Ui, rect: egui::Rect, id: egui::Id, key: Option<&str>, name
         edge.unwrap_or(Color32::from_gray(120))
     };
     match state {
-        TileState::Free(_) | TileState::Raise(_) => {
+        TileState::Free(_) | TileState::Raise(_) | TileState::Upgrade(_) => {
             // A dashed border, four sides of short strokes, and the word in the middle.
             let dash = 5.0;
             let step = 9.0;
             // Ticket #476: the Raise tile's dashes wear its own colour, so it is told from a free
             // slot at a glance; the hover's brightening still wins.
             let outline = match state {
-                TileState::Raise(ok) if !resp.hovered() => if ok { RAISE_INK } else { RAISE_INK.gamma_multiply(0.55) },
+                TileState::Raise(ok) | TileState::Upgrade(ok) if !resp.hovered() => if ok { RAISE_INK } else { RAISE_INK.gamma_multiply(0.55) },
                 _ => outline,
             };
             let stroke = egui::Stroke::new(1.0, outline);
@@ -9795,7 +9854,7 @@ fn hab_tile(ui: &mut Ui, rect: egui::Rect, id: egui::Id, key: Option<&str>, name
             // Ticket #218 (version 0.08.2): a tile the player can build in says so. Two lines: the
             // tile is 84 square and `Click to Build` is about 78 wide at 12pt, so one line would
             // leave three pixels of air and break if the font ever moved.
-            let (word, ink) = if let TileState::Raise(ok) = state { ("Raise\nIndustry\nLevel", if ok { RAISE_INK } else { RAISE_INK.gamma_multiply(0.55) }) } else if state == TileState::Free(true) { ("Click to
+            let (word, ink) = if let TileState::Raise(ok) = state { ("Raise\nIndustry\nLevel", if ok { RAISE_INK } else { RAISE_INK.gamma_multiply(0.55) }) } else if let TileState::Upgrade(ok) = state { ("Upgrade", if ok { RAISE_INK } else { RAISE_INK.gamma_multiply(0.55) }) } else if state == TileState::Free(true) { ("Click to
 Build", Color32::from_gray(165)) } else { ("free", Color32::from_gray(130)) };
             painter.text(rect.center(), egui::Align2::CENTER_CENTER, word, FontId::proportional(12.0), ink);
         }
@@ -10054,7 +10113,14 @@ fn module_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
         Vec::new()
     };
     let free = (cap.saturating_sub(used) as usize).saturating_sub(ordered.len());
-    let total = standing.len() + building.len() + ordered.len() + free;
+    // Ticket #490 (version 0.09.9): the Upgrade tile, last, on a place of the player's with a tier
+    // above it: ordered this turn, under way, or offered.
+    let upgrade = game.next_tier(col).filter(|_| mine).map(|next| {
+        let pending = session.pending.iter().position(|o| matches!(o, Order::RaiseTier { colony } if *colony == cid));
+        let queued = game.tier_under_way(col);
+        (next, pending, queued)
+    });
+    let total = standing.len() + building.len() + ordered.len() + free + usize::from(upgrade.is_some());
     let rows = total.div_ceil(MODULE_COLS).max(1);
     let archive = col.modules.iter().position(|m| m.kind == ModuleKind::Archive);
     let archive_rows = if archive.is_some() { 1 } else { 0 };
@@ -10134,11 +10200,52 @@ fn module_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     for fi in 0..free {
         // One free place is as good as another, so the first stands for the click.
         let selected = fi == 0 && view.hab_tile == Some(HabTile::Free);
-        let tip = format!("Room for another Module: click it to build here.\n{} places are free from the start and one more for every {} Colonist.", game.tables.slots.base, game.tables.slots.per_colonist);
+        // Ticket #490 (version 0.09.9): the rule is on the Modules heading's hover.
+        let tip = "Room for another Module: click it to build here.".to_string();
         if hab_tile(ui, tile_rect(i), ui.id().with(("hab-free", fi)), None, "", TileState::Free(mine), selected, None, tip).clicked() {
             view.hab_tile = Some(HabTile::Free);
         }
         i += 1;
+    }
+    if let Some((next, pending, queued)) = upgrade {
+        let rect = tile_rect(i);
+        let id = ui.id().with("hab-upgrade");
+        let name = next.name.as_str();
+        match (pending, queued) {
+            (Some(pi), _) => {
+                let item = BuildItem::Tier(col.tier + 1);
+                let widgets = game.build_widgets(Seat(0), item);
+                let turns = game.turns_to_build(Seat(0), Place::Colony(cid), item);
+                let tip = format!("{name}: ordered this turn, {widgets} Widgets, {} once the turn ends.\nRight-click to cancel the order.", estimate_words(turns));
+                if hab_tile(ui, rect, id, None, name, TileState::Building { ordered: true, done: 0, widgets }, false, None, tip).secondary_clicked() {
+                    actions.push(Action::Cancel(pi));
+                }
+            }
+            (None, Some(qi)) => {
+                let b = &col.queue[qi];
+                let turns = estimates.get(qi).copied().unwrap_or(u32::MAX);
+                let (tip, cancel) = building_tip(game, session, Place::Colony(cid), qi, b, turns, mine, name, "");
+                let resp = hab_tile(ui, rect, id, None, name, TileState::Building { ordered: false, done: b.done, widgets: b.widgets }, false, None, tip);
+                if let Some(order) = cancel
+                    && resp.secondary_clicked()
+                {
+                    actions.push(Action::Place(order));
+                }
+            }
+            (None, None) => {
+                // One click orders it; greyed, the refusal leads the hover.
+                let order = Order::RaiseTier { colony: cid };
+                let check = game.check_order(Seat(0), &session.pending, &order);
+                let words = format!("Upgrade to a {name}: {}. Up to {} Modules.", game.order_price_text(Seat(0), &order, game.order_cost(Seat(0), &order)), next.cap);
+                let tip = match &check {
+                    Ok(_) => words,
+                    Err(e) => refusal_hover(&e.0, Some(&words)),
+                };
+                if hab_tile(ui, rect, id, None, name, TileState::Upgrade(check.is_ok()), false, None, tip).clicked() && check.is_ok() {
+                    actions.push(Action::Place(order));
+                }
+            }
+        }
     }
     if let Some(ai) = archive {
         // The Archive stands apart: a row of its own, outside the count.
@@ -10789,10 +10896,11 @@ fn greenwash_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewS
     let me = Seat(0);
     let g = &game.tables.influence.greenwash;
     let (rate, per) = (g.ppm_per_influence, g.ducats_per_influence);
-    ui.label(RichText::new("Greenwash campaign").strong()).on_hover_text(format!(
-        "Influence spent on your own name, with {per} Ducat{} beside every point: every point takes {rate} ppm off your Blame for good, and the share every rule reads moves with it. Nothing leaves the air.\nOne campaign a turn, from this turn's Allotment and your Ducats. It is public and no offence: the Report says you greenwashed, and a rival can answer with a Smear.",
-        if per == 1 { "" } else { "s" }
-    ));
+    // Ticket #497 (version 0.09.9): cut from about 64 words, and through `rule_tip` like every hover.
+    rule_tip(
+        ui.label(RichText::new("Greenwash campaign").strong()),
+        format!("Each point: {per} Ducat{}, {rate} ppm off your Blame for good. Nothing leaves the air.\nOne a turn; public, no offence; a rival may answer with a Smear.", if per == 1 { "" } else { "s" }),
+    );
     let cleaned = game.seat(me).blame_cleaned;
     if cleaned > 0.0 {
         ui.label(RichText::new(format!("{cleaned:.0} ppm of your Blame has been greenwashed away.")).weak());
@@ -10816,6 +10924,65 @@ fn greenwash_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewS
         rule_tip(resp.clone(), e.0.clone());
     }
     if resp.on_hover_text(format!("{:.0} ppm off your Blame at End Turn.", amount as f64 * rate)).clicked() {
+        actions.push(Action::Place(order));
+    }
+}
+
+/// Ticket #496 (version 0.09.9): **a Trade**, one thing for one thing, on a rival's page beside the
+/// Accord offer: what you give -- an amount of a Stockpile good, or a place of yours -- and what you
+/// ask of them, the same way. The choice lives in egui's memory under the pair, as the Accord's
+/// ticks do; it is a scratch choice, not game state.
+fn trade_block(ui: &mut Ui, session: &Session, game: &Game, other: Seat, actions: &mut Vec<Action>) {
+    const GOODS: [ResourceKind; 4] = [ResourceKind::Ducats, ResourceKind::Materials, ResourceKind::Fuel, ResourceKind::Energy];
+    ui.label(RichText::new("Trade").strong());
+    let side = |ui: &mut Ui, key: &str, owner: Seat| -> TradeGood {
+        let id = egui::Id::new(("trade", key, other.index()));
+        // Ducats given and Materials asked, to begin with, so the first choice reads as a trade.
+        let start = if key == "give" { 0 } else { 1 };
+        let (mut kind, mut n, mut place): (usize, u32, Option<ColonyId>) = ui.ctx().memory(|m| m.data.get_temp(id).unwrap_or((start, 10, None)));
+        let places: Vec<ColonyId> = game.colonies.iter().filter(|c| c.control == Control::Controlled(owner)).map(|c| c.id).collect();
+        ui.horizontal(|ui| {
+            ui.label(if key == "give" { "Give" } else { "For" });
+            let label = |k: usize| if k < GOODS.len() { GOODS[k].name().to_string() } else { "a place".to_string() };
+            egui::ComboBox::from_id_salt(("trade-kind", key, other.index())).selected_text(label(kind)).show_ui(ui, |ui| {
+                for k in 0..=GOODS.len() {
+                    ui.selectable_value(&mut kind, k, label(k));
+                }
+            });
+            if kind < GOODS.len() {
+                ui.add(egui::DragValue::new(&mut n).range(1..=9999));
+            } else {
+                let shown = place.filter(|p| places.contains(p)).or(places.first().copied());
+                place = shown;
+                egui::ComboBox::from_id_salt(("trade-place", key, other.index())).selected_text(shown.map(|c| game.place_name(Place::Colony(c))).unwrap_or_else(|| "none".to_string())).show_ui(ui, |ui| {
+                    for c in &places {
+                        ui.selectable_value(&mut place, Some(*c), game.place_name(Place::Colony(*c)));
+                    }
+                });
+            }
+        });
+        ui.ctx().memory_mut(|m| m.data.insert_temp(id, (kind, n, place)));
+        match (kind < GOODS.len(), place) {
+            (true, _) => TradeGood::Goods(GOODS[kind], n),
+            (false, Some(c)) => TradeGood::Place(c),
+            (false, None) => TradeGood::Place(ColonyId(u32::MAX)),
+        }
+    };
+    let give = side(ui, "give", Seat(0));
+    let get = side(ui, "get", other);
+    let order = Order::ProposeTrade { to: other, give, get };
+    if session.pending.iter().any(|o| matches!(o, Order::ProposeTrade { to, .. } if *to == other)) {
+        ui.label(RichText::new("Your Trade goes to them this turn.").weak());
+        return;
+    }
+    let ok = game.check_order(Seat(0), &session.pending, &order);
+    let resp = ui.add_enabled(ok.is_ok(), egui::Button::new(format!("Offer {} a Trade", game.seat_name(other))));
+    let words = "They answer next turn; the goods move only if both still hold them.";
+    let resp = match &ok {
+        Ok(_) => rule_tip(resp, words.to_string()),
+        Err(e) => rule_tip(resp, refusal_hover(&e.0, Some(words))),
+    };
+    if resp.clicked() {
         actions.push(Action::Place(order));
     }
 }
@@ -10885,7 +11052,8 @@ fn accords_block(ui: &mut Ui, session: &Session, game: &Game, other: Seat, actio
         } else {
             let ok = game.check_order(me, &session.pending, &order);
             let resp = ui.add_enabled(ok.is_ok(), egui::Button::new(format!("Offer the {} an Accord", game.seat_name(other))));
-            let words = "They answer this turn, by their own reckoning. A refusal costs you nothing: it is not an offence.";
+            // Ticket #495 (version 0.09.9): the answer waits a turn now.
+            let words = "They answer next turn. A refusal costs you nothing: it is not an offence.";
             // Ticket #380 (version 0.09.2): greyed, the refusal first and these words after it.
             let resp = match &ok {
                 Ok(_) => rule_tip(resp, words.to_string()),
@@ -11090,6 +11258,8 @@ A rival that holds you at less than neutral defends its places against you a lit
         // player's seat and somebody else. Your own page has nobody to strike one with.
         if !session.spectator && seat != Seat(0) {
             accords_block(ui, session, game, seat, actions);
+            ui.add_space(6.0);
+            trade_block(ui, session, game, seat, actions);
             ui.add_space(6.0);
             smear_block(ui, session, game, view, seat, actions);
             ui.add_space(6.0);
@@ -11304,6 +11474,11 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
     // `card_aside` is a building aid and nothing in play sets it (`cardshut:1`).
     if view.popup == Popup::None && !view.card_aside && card_owed(Some(game)) {
         view.popup = Popup::Card;
+    }
+    // Ticket #495 (version 0.09.9): an Accord offered to the player is raised the same way, once
+    // nothing else is up, so the turn's Report and Moments come first.
+    if view.popup == Popup::None && !game.seat(Seat(0)).ai && !game.offers_to(Seat(0)).is_empty() {
+        view.popup = Popup::Offers;
     }
     if view.show_trade && !session.spectator {
         let mut open = true;
@@ -11753,6 +11928,35 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                         }
                     }
                 });
+            });
+        }
+        // Ticket #495 (version 0.09.9): the Accords offered to the player, one row each, Accept or
+        // Refuse. Like the card, an answer is the only way out: no Continue, and Escape holds it.
+        Popup::Offers => {
+            let offers: Vec<(usize, Seat, String)> = game.offers_to(Seat(0)).into_iter().map(|(i, o)| (i, o.from, offer_words(game, o))).collect();
+            if offers.is_empty() {
+                view.popup = Popup::None;
+                return;
+            }
+            egui::Modal::new("offers".into()).show(ctx, |ui| {
+                ui.set_width(520.0);
+                ui.label(RichText::new(if offers.len() == 1 { "An offer" } else { "Offers" }).size(20.0).strong());
+                ui.add_space(6.0);
+                for (i, from, words) in &offers {
+                    ui.horizontal(|ui| {
+                        ui.label(RichText::new(game.seat_name(*from)).color(seat_colour(session, *from)).size(16.0));
+                        ui.label(RichText::new(words).size(16.0));
+                    });
+                    ui.horizontal(|ui| {
+                        if ui.button(RichText::new("Accept").size(15.0)).clicked() {
+                            actions.push(Action::AnswerOffer(*i, true));
+                        }
+                        if ui.button(RichText::new("Refuse").size(15.0)).clicked() {
+                            actions.push(Action::AnswerOffer(*i, false));
+                        }
+                    });
+                    ui.add_space(6.0);
+                }
             });
         }
         Popup::Event => {

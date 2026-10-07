@@ -23,6 +23,23 @@ pub struct Stockpile {
 }
 
 impl Stockpile {
+    /// Ticket #496 (version 0.09.9): the figure held of a Stockpile good, for a Trade; None for one
+    /// the Stockpile does not hold (Research, Widgets).
+    pub fn of_mut(&mut self, r: Resource) -> Option<&mut f64> {
+        match r {
+            Resource::Ducats => Some(&mut self.ducats),
+            Resource::Materials => Some(&mut self.materials),
+            Resource::Fuel => Some(&mut self.fuel),
+            Resource::Energy => Some(&mut self.energy),
+            _ => None,
+        }
+    }
+
+    /// Ticket #496: the same, read.
+    pub fn of(mut self, r: Resource) -> f64 {
+        self.of_mut(r).map(|v| *v).unwrap_or(0.0)
+    }
+
     /// Ticket #387 (version 0.09.3): every figure settled to a tenth, the one shape a stockpile is
     /// ever stored in. A pay, a refund and an income all come through here.
     pub fn settled(self) -> Stockpile {
@@ -232,6 +249,8 @@ impl Module {
 pub enum BuildItem {
     Facility(FacilityKind),
     IndustryLevel,
+    /// Ticket #490 (version 0.09.9): a Colony or station raised to the tier at this index.
+    Tier(u32),
     Module(ModuleKind),
     Unit(UnitKind),
     /// Ticket #343 (version 0.09.1): a **Warhead** for a Missile Carrier that has fired, loaded at
@@ -246,6 +265,7 @@ impl BuildItem {
         match self {
             BuildItem::Facility(k) => k.name().to_string(),
             BuildItem::IndustryLevel => "Industry Level".to_string(),
+            BuildItem::Tier(_) => "Upgrade".to_string(),
             BuildItem::Module(k) => k.name().to_string(),
             BuildItem::Unit(k) => k.name().to_string(),
             BuildItem::Warhead(_) => "Warhead".to_string(),
@@ -494,6 +514,10 @@ pub struct Colony {
     /// Grid Failure: Modules offline until the next Resolution.
     pub grid_failed: bool,
     pub founded_turn: u32,
+    /// Ticket #490 (version 0.09.9): its tier, an index into the tiers table -- 0 an Outpost, 1 a
+    /// Settlement, 2 a Colony. It caps the Module slots and rises only by a paid build.
+    #[serde(default)]
+    pub tier: u32,
     /// Version 0.04 (ticket #46): a Space Station in an orbital slot rather than a Colony on the ground.
     pub in_orbit: bool,
 }
@@ -1441,6 +1465,30 @@ pub enum Term {
     ResearchAgreement,
 }
 
+/// Ticket #495 (version 0.09.9): **an Accord offered and not yet answered.** It is answered at the
+/// head of the receiver's next turn: by a human seat in a prompt before its orders, the turn not
+/// ending until it has; by a computer seat by its own rule, as the turn begins.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Offer {
+    pub from: Seat,
+    pub to: Seat,
+    pub terms: Vec<Term>,
+    /// Ticket #496 (version 0.09.9): a Trade in place of an Accord: what `from` gives, and what it
+    /// asks of `to`.
+    #[serde(default)]
+    pub trade: Option<(crate::orders::TradeGood, crate::orders::TradeGood)>,
+    /// The turn it was made in.
+    pub turn: u32,
+}
+
+/// Ticket #495: a refusal remembered -- `from` offers `to` no Accord again before `until`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Refusal {
+    pub from: Seat,
+    pub to: Seat,
+    pub until: u32,
+}
+
 /// Ticket #226 (version 0.08.2): an Accord between two Factions, holding one or more Terms.
 ///
 /// `diplomacy` is on Relations' own `_Avoid_` list in the glossary, so the system has a word of its
@@ -1608,6 +1656,10 @@ pub struct Game {
     pub market: Market,
     /// Ticket #226 (version 0.08.2): the Accords standing between pairs of Factions.
     pub accords: Vec<Accord>,
+    /// Ticket #495 (version 0.09.9): the Accords offered and not yet answered.
+    pub offers: Vec<Offer>,
+    /// Ticket #495: refusals remembered, so a refused Faction does not offer again at once.
+    pub refusals: Vec<Refusal>,
     /// Ticket #345 (version 0.09.1): who was first to each Body, one row per Body at most,
     /// appended when a first is claimed and never rewritten. In the save.
     pub body_firsts: Vec<BodyFirst>,
@@ -1849,6 +1901,8 @@ impl Game {
             relations: Relations::default(),
             market: Market::default(),
             accords: Vec::new(),
+            offers: Vec::new(),
+            refusals: Vec::new(),
             body_firsts: Vec::new(),
             waiting_last: Vec::new(),
             colony_growth: BTreeMap::new(),
@@ -1876,7 +1930,7 @@ impl Game {
             // Solar Array -- in the Faction's own versions.
             let mut modules = vec![Module::new(ModuleKind::Core)];
             modules.extend(game.tables.start.station_modules.iter().map(|k| Module::new(k.built_by(game.kind(seat)))));
-            game.colonies.push(Colony { id, body: BodyId::Earth, slot: slot as u32, control: Control::Controlled(seat), modules, colonists: aboard, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
+            game.colonies.push(Colony { id, body: BodyId::Earth, slot: slot as u32, control: Control::Controlled(seat), modules, colonists: aboard, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, tier: 0, in_orbit: true });
         }
         // Starting positions (spec 14.3, ticket #50): the player's pick, then each AI seat in turn.
         let mut taken = vec![setup.player_start];
@@ -2430,16 +2484,112 @@ impl Game {
     }
 
     /// Ticket #141 (version 0.07.3): how many of a Nation State's waiting Emigrants the pending
-    /// orders already send away, by sea or by lift, so the same people are never ordered twice.
+    /// orders already send away, by sea or by lift, so the same people are never ordered twice;
+    /// since ticket #489 (version 0.09.9), or to a station built over Earth.
     pub fn emigrants_leaving(&self, pending: &[crate::orders::Order], state: StateId) -> u32 {
         use crate::orders::Order;
         pending
             .iter()
             .map(|o| match o {
                 Order::SendToAntarctica { state: s, n, .. } | Order::LiftToStation { state: s, n, .. } if *s == state => *n,
+                // Ticket #489 (version 0.09.9): a station over Earth takes its four from here.
+                Order::BuildStation { from: crate::orders::LoadSource::State(s), .. } if *s == state => self.tables.emigrants.found_with,
                 _ => 0,
             })
             .sum()
+    }
+
+    /// Ticket #489 (version 0.09.9): where a station the seat builds over `body` would take its four
+    /// from, given the turn's other orders: the source with the most to spare, or None.
+    pub fn station_founders(&self, seat: Seat, body: BodyId, pending: &[crate::orders::Order]) -> Option<crate::orders::LoadSource> {
+        self.station_sources(seat, body).into_iter().map(|f| (self.founders_spare(f, pending), f)).filter(|(n, _)| *n >= self.tables.emigrants.found_with).max_by_key(|(n, _)| *n).map(|(_, f)| f)
+    }
+
+    /// Ticket #489: the station a ground Colony built at `body` would take its four from, or None.
+    pub fn colony_founders(&self, seat: Seat, body: BodyId, pending: &[crate::orders::Order]) -> Option<ColonyId> {
+        use crate::orders::LoadSource;
+        self.colonies
+            .iter()
+            .filter(|c| c.in_orbit && c.body == body && c.control.director() == Some(seat) && self.starved_by(c.id).is_none())
+            .map(|c| (self.founders_spare(LoadSource::Colony(c.id), pending), c.id))
+            .filter(|(n, _)| *n >= self.tables.emigrants.found_with)
+            .max_by_key(|(n, _)| *n)
+            .map(|(_, c)| c)
+    }
+
+    /// Ticket #489 (the review): the people an order takes to found a place, shown in its price:
+    /// four for a station or a station-built Colony, nought for every other order.
+    pub fn order_founders(&self, order: &crate::orders::Order) -> u32 {
+        use crate::orders::Order;
+        if matches!(order, Order::BuildStation { .. } | Order::BuildColony { .. }) { self.tables.emigrants.found_with } else { 0 }
+    }
+
+    /// Ticket #489: every place that may give a station over `body` its four, enough or not: over
+    /// Earth a Region the seat directs with a working Launch Site, elsewhere a ground Colony of the
+    /// seat's there.
+    pub fn station_sources(&self, seat: Seat, body: BodyId) -> Vec<crate::orders::LoadSource> {
+        use crate::orders::LoadSource;
+        if body == BodyId::Earth {
+            self.directed_states(seat).into_iter().filter(|s| self.state(*s).facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working())).map(LoadSource::State).collect()
+        } else {
+            self.colonies.iter().filter(|c| !c.in_orbit && c.body == body && c.control.director() == Some(seat)).map(|c| LoadSource::Colony(c.id)).collect()
+        }
+    }
+
+    /// Ticket #489: the order to build a station over `body` in `slot`, its four from the best
+    /// source. Where no source has four the order names the one with the most, so the check says
+    /// what is short; where there is none at all it names any Region, and the check refuses it for
+    /// the missing Launch Site or Colony before it reaches the source.
+    pub fn station_order(&self, seat: Seat, body: BodyId, slot: u32, pending: &[crate::orders::Order]) -> crate::orders::Order {
+        use crate::orders::LoadSource;
+        let from = self
+            .station_founders(seat, body, pending)
+            .or_else(|| self.station_sources(seat, body).into_iter().max_by_key(|f| self.founders_spare(*f, pending)))
+            .unwrap_or(LoadSource::State(StateId::ALL[0]));
+        crate::orders::Order::BuildStation { body, slot, from }
+    }
+
+    /// Ticket #489: the order to build a ground Colony at `body` in `slot` from a station of the
+    /// seat's over it, chosen as `station_order` chooses; None where the seat has no station there.
+    pub fn colony_order(&self, seat: Seat, body: BodyId, slot: u32, pending: &[crate::orders::Order]) -> Option<crate::orders::Order> {
+        use crate::orders::LoadSource;
+        let from = self.colony_founders(seat, body, pending).or_else(|| {
+            self.colonies.iter().filter(|c| c.in_orbit && c.body == body && c.control.director() == Some(seat)).max_by_key(|c| self.founders_spare(LoadSource::Colony(c.id), pending)).map(|c| c.id)
+        })?;
+        Some(crate::orders::Order::BuildColony { body, slot, from })
+    }
+
+    /// Ticket #489 (the review): the people the turn's builds already take from a place, four for
+    /// each station or Colony it founds, so a Load or a Send Down never orders them a second time.
+    pub fn founders_claimed(&self, pending: &[crate::orders::Order], from: crate::orders::LoadSource) -> u32 {
+        use crate::orders::{LoadSource, Order};
+        let builds = pending.iter().filter(|o| matches!(o, Order::BuildStation { from: f, .. } if *f == from) || matches!(o, Order::BuildColony { from: c, .. } if LoadSource::Colony(*c) == from)).count() as u32;
+        builds * self.tables.emigrants.found_with
+    }
+
+    /// Ticket #489: how many a place could give to found, after what the turn's other orders already
+    /// take from it. A Region gives its waiting Pioneers. A Colony or station keeps as many as its
+    /// Modules in slots, never fewer than `found_with`, and gives the rest.
+    pub fn founders_spare(&self, from: crate::orders::LoadSource, pending: &[crate::orders::Order]) -> u32 {
+        use crate::orders::{LoadSource, Order};
+        let found = self.tables.emigrants.found_with;
+        let taken: u32 = pending
+            .iter()
+            .map(|o| match o {
+                Order::Load { colonists, from: f, .. } if *f == from => *colonists,
+                Order::SendDown { from: c, colonists, .. } if LoadSource::Colony(*c) == from => *colonists,
+                _ => 0,
+            })
+            .sum::<u32>()
+            + if matches!(from, LoadSource::Colony(_)) { self.founders_claimed(pending, from) } else { 0 };
+        match from {
+            LoadSource::State(s) => self.state(s).emigrants.saturating_sub(taken + self.emigrants_leaving(pending, s)),
+            LoadSource::Colony(c) => {
+                let Some(col) = self.colony(c) else { return 0 };
+                let keep = self.module_slots_used(col).max(found);
+                col.colonists.saturating_sub(taken + keep)
+            }
+        }
     }
 
     /// The population a lift from a Launch Site takes for this many Colonists (Coach Class doubles it).
@@ -3175,7 +3325,24 @@ impl Game {
     /// only as its people arrive.
     pub fn module_slots(&self, c: &Colony) -> u32 {
         let s = &self.tables.slots;
-        s.base + c.colonists / s.per_colonist.max(1)
+        // Ticket #490 (version 0.09.9): never more than its tier allows.
+        (s.base + c.colonists / s.per_colonist.max(1)).min(self.tier_of(c).cap)
+    }
+
+    /// Ticket #490 (version 0.09.9): the tier a Colony or station stands at.
+    pub fn tier_of(&self, c: &Colony) -> &crate::data::TierCard {
+        let tiers = &self.tables.tiers;
+        &tiers[(c.tier as usize).min(tiers.len() - 1)]
+    }
+
+    /// Ticket #490 (version 0.09.9): the upgrade in its queue, by index, if one is under way.
+    pub fn tier_under_way(&self, c: &Colony) -> Option<usize> {
+        c.queue.iter().position(|b| matches!(b.item, BuildItem::Tier(_)))
+    }
+
+    /// Ticket #490 (version 0.09.9): the tier above it, or None at the top.
+    pub fn next_tier(&self, c: &Colony) -> Option<&crate::data::TierCard> {
+        self.tables.tiers.get(c.tier as usize + 1)
     }
 
     /// Ticket #97: the Modules standing or building here that count against the cap. A mothballed
@@ -5113,6 +5280,229 @@ impl Game {
         let turn = self.turn;
         self.accords.push(Accord { a, b, terms, struck: turn, paid: turn, ending: false });
         Ok(())
+    }
+
+    /// Ticket #495 (version 0.09.9): the offers waiting on `seat`'s answer, with their index.
+    pub fn offers_to(&self, seat: Seat) -> Vec<(usize, &Offer)> {
+        self.offers.iter().enumerate().filter(|(_, o)| o.to == seat).collect()
+    }
+
+    /// Ticket #496 (version 0.09.9): a Trade answered. A yes moves both sides' goods, if both still
+    /// hold them, and is an act of friendship each way; a no is remembered as an Accord's is.
+    fn settle_trade(&mut self, from: Seat, to: Seat, give: crate::orders::TradeGood, get: crate::orders::TradeGood, yes: bool) {
+        use crate::orders::TradeGood;
+        let line = |g: &mut Game, me: Seat, key: &str, other: Seat, why: &str| {
+            if !g.seat(me).ai {
+                let text = g.say(key, &[("faction", g.seat_name(other)), ("why", why.to_string())]);
+                g.report_line_of(me, LineKind::YourWorks, LineKind::Note, None, text);
+            }
+        };
+        if !yes {
+            let until = self.turn + self.tables.relations.offer_refused_turns;
+            self.refusals.retain(|r| !(r.from == from && r.to == to));
+            self.refusals.push(Refusal { from, to, until });
+            self.log(format!("{} declined a Trade from {}.", self.seat_name(to), self.seat_name(from)));
+            line(self, from, "trade_refused", to, "");
+            return;
+        }
+        let short = if self.hostile(from, to) { Err("they are Hostile".to_string()) } else { self.holds_good(from, give).and_then(|_| self.holds_good(to, get)) };
+        if let Err(why) = short {
+            self.log(format!("A Trade between {} and {} failed: {why}.", self.seat_name(from), self.seat_name(to)));
+            line(self, from, "trade_failed", to, &why);
+            line(self, to, "trade_failed", from, &why);
+            return;
+        }
+        for (g, giver, taker) in [(give, from, to), (get, to, from)] {
+            match g {
+                TradeGood::Goods(r, n) => {
+                    for (seat, by) in [(giver, -(n as f64)), (taker, n as f64)] {
+                        if let Some(v) = self.seat_mut(seat).stockpile.of_mut(r) {
+                            *v = tenth(*v + by);
+                        }
+                    }
+                }
+                TradeGood::Place(c) => {
+                    self.transfer_control(Place::Colony(c), taker, "Trade");
+                    // Ticket #496 (the review): the giver's standing goes with the place, so it
+                    // cannot be won straight back with Influence; and its builds under way.
+                    let place = Place::Colony(c);
+                    let standing = self.seat_mut(giver).influence.remove(&place).unwrap_or(0);
+                    let theirs = self.seat(taker).influence.get(&place).copied().unwrap_or(0);
+                    self.seat_mut(taker).influence.insert(place, theirs.max(standing));
+                    if let Some(col) = self.colony_mut(c) {
+                        for b in &mut col.queue {
+                            b.seat = taker;
+                        }
+                    }
+                }
+            }
+        }
+        self.credit(from, to);
+        self.credit(to, from);
+        self.log(format!("{} and {} struck a Trade.", self.seat_name(from), self.seat_name(to)));
+        line(self, from, "trade_struck", to, "");
+        line(self, to, "trade_struck", from, "");
+    }
+
+    /// Ticket #496: whether either of a pair holds the other Hostile.
+    pub fn hostile(&self, a: Seat, b: Seat) -> bool {
+        self.relations_level(a, b) == "Hostile" || self.relations_level(b, a) == "Hostile"
+    }
+
+    /// Ticket #496: whether `seat` can give `g` now: enough of the good, or the place held outright,
+    /// not an Archive's Colony, not under Blockade.
+    pub fn holds_good(&self, seat: Seat, g: crate::orders::TradeGood) -> Result<(), String> {
+        use crate::orders::TradeGood;
+        match g {
+            TradeGood::Goods(r, n) => {
+                let held = self.seat(seat).stockpile.of(r);
+                if held + 1e-9 < n as f64 {
+                    return Err(format!("{} hold {} {}", self.seat_name(seat), figure(held), r.name()));
+                }
+                Ok(())
+            }
+            TradeGood::Place(c) => {
+                let Some(col) = self.colony(c) else { return Err("there is no such place to trade".into()) };
+                if col.control != Control::Controlled(seat) {
+                    return Err(format!("{} no longer hold {}", self.seat_name(seat), self.place_name(Place::Colony(c))));
+                }
+                if col.modules.iter().any(|m| m.kind == ModuleKind::Archive) {
+                    return Err("an Archive's Colony is never traded".into());
+                }
+                if self.starved_by(c).is_some() {
+                    return Err(format!("{} is under Blockade", self.place_name(Place::Colony(c))));
+                }
+                // Ticket #496 (the review): another Army of the seat's standing there would be left
+                // inside somebody else's place; the place's own goes with it.
+                if self.armies.iter().any(|a| a.at == ArmyAt::Place(Place::Colony(c)) && a.home != ArmyHome::Colony(c) && self.army_seat(a) == Some(seat)) {
+                    return Err(format!("{} have an Army there", self.seat_name(seat)));
+                }
+                Ok(())
+            }
+        }
+    }
+
+    /// Ticket #496: what a side of a Trade is worth in Ducats: a good at the Trading window's price,
+    /// a place at its build price -- its Core's station price and each Module's Materials -- in Materials.
+    pub fn trade_value(&self, g: crate::orders::TradeGood) -> f64 {
+        use crate::orders::TradeGood;
+        let materials = self.trade_price(Resource::Materials).unwrap_or(1) as f64;
+        match g {
+            TradeGood::Goods(Resource::Ducats, n) => n as f64,
+            TradeGood::Goods(r, n) => n as f64 * self.trade_price(r).unwrap_or(1) as f64,
+            TradeGood::Place(c) => {
+                let modules: f64 = self.colony(c).map(|col| col.modules.iter().filter(|m| m.kind != ModuleKind::Core).map(|m| self.tables.module(m.kind).materials as f64).sum()).unwrap_or(0.0);
+                (self.tables.station_materials as f64 + modules) * materials
+            }
+        }
+    }
+
+    /// Ticket #496: a computer seat's answer to a Trade offered it -- never giving a place, never
+    /// what it cannot pay, never to a Faction it is Hostile with or that is at the door, and only
+    /// where what it gets is worth at least what it gives.
+    pub fn trade_acceptable(&self, seat: Seat, from: Seat, give: crate::orders::TradeGood, get: crate::orders::TradeGood) -> bool {
+        if matches!(get, crate::orders::TradeGood::Place(_)) || self.hostile(seat, from) || self.holds_good(seat, get).is_err() {
+            return false;
+        }
+        if self.progress(from).score_as_it_stands() >= 0.95 {
+            return false;
+        }
+        self.trade_value(give) + 1e-9 >= self.trade_value(get)
+    }
+
+    /// Ticket #495: whether an offer from `from` to `to` is waiting on its answer.
+    pub fn offer_waits(&self, from: Seat, to: Seat) -> bool {
+        self.offers.iter().any(|o| o.from == from && o.to == to)
+    }
+
+    /// Ticket #495: whether `from` was refused by `to` recently enough not to offer again.
+    pub fn refused_recently(&self, from: Seat, to: Seat) -> bool {
+        self.refusals.iter().any(|r| r.from == from && r.to == to && self.turn < r.until)
+    }
+
+    /// Ticket #495: a human seat answers an offer made to it. Accept strikes the Accord at once,
+    /// if it still can be; Refuse declines it and is remembered.
+    pub fn answer_offer(&mut self, seat: Seat, index: usize, accept: bool) -> Result<(), String> {
+        if self.offers.get(index).is_none_or(|o| o.to != seat) {
+            return Err("there is no such offer to answer".into());
+        }
+        let offer = self.offers.remove(index);
+        // Ticket #496 (version 0.09.9): a Trade's yes is checked where the goods move; one that
+        // cannot go through fails, and says why at once (the review).
+        if let Some((give, get)) = offer.trade {
+            let short = if accept { self.holds_good(offer.from, give).and_then(|_| self.holds_good(offer.to, get)).err() } else { None };
+            self.settle_offer(offer, accept);
+            return match short {
+                Some(why) => Err(format!("the Trade failed: {why}")),
+                None => Ok(()),
+            };
+        }
+        // Ticket #495 (the review): a yes that can no longer be struck says why.
+        if accept && self.accords.iter().any(|a| a.holds(offer.from, offer.to)) {
+            return Err(format!("you already hold an Accord with {}", self.seat_name(offer.from)));
+        }
+        if accept && offer.terms.contains(&Term::ResearchAgreement) && (self.relations_score(offer.from, offer.to) < 7 || self.relations_score(offer.to, offer.from) < 7) {
+            return Err("a research agreement wants Friendly on both sides, and that has gone".into());
+        }
+        self.settle_offer(offer, accept);
+        Ok(())
+    }
+
+    /// Ticket #495: the head of the turn. Every offer made to a computer seat is answered by its
+    /// rule, as the turn begins, so every seat answers on the same clock; refusals past their time
+    /// are forgotten. Offers to a human seat wait for its answer.
+    pub fn answer_computer_offers(&mut self) {
+        let turn = self.turn;
+        self.refusals.retain(|r| turn < r.until);
+        let mut waiting = Vec::new();
+        for offer in std::mem::take(&mut self.offers) {
+            if self.seat(offer.to).ai && offer.turn < turn {
+                let yes = match offer.trade {
+                    Some((give, get)) => self.trade_acceptable(offer.to, offer.from, give, get),
+                    None => self.accord_acceptable(offer.to, offer.from, &offer.terms),
+                };
+                self.settle_offer(offer, yes);
+            } else {
+                waiting.push(offer);
+            }
+        }
+        self.offers = waiting;
+    }
+
+    /// Ticket #495: an answer given. A yes strikes the Accord, or lapses if it no longer can be (one
+    /// already stands, or a research agreement has lost its Friendly); a no is remembered. Each human
+    /// seat in it reads a line of its own.
+    fn settle_offer(&mut self, offer: Offer, yes: bool) {
+        let (from, to) = (offer.from, offer.to);
+        if let Some((give, get)) = offer.trade {
+            self.settle_trade(from, to, give, get, yes);
+            return;
+        }
+        if yes {
+            match self.strike_accord(from, to, offer.terms) {
+                Ok(()) => {
+                    self.log(format!("{} and {} struck an Accord.", self.seat_name(from), self.seat_name(to)));
+                    // Ticket #495 (the review): one Accord a pair, so any other offer between them is moot.
+                    self.offers.retain(|o| !((o.from == from && o.to == to) || (o.from == to && o.to == from)));
+                    for (me, other) in [(from, to), (to, from)] {
+                        if !self.seat(me).ai {
+                            let text = self.say("accord_struck", &[("faction", self.seat_name(other))]);
+                            self.report_line_of(me, LineKind::YourWorks, LineKind::Note, None, text);
+                        }
+                    }
+                }
+                Err(why) => self.log(format!("The Accord between {} and {} lapsed: {why}.", self.seat_name(from), self.seat_name(to))),
+            }
+        } else {
+            let until = self.turn + self.tables.relations.offer_refused_turns;
+            self.refusals.retain(|r| !(r.from == from && r.to == to));
+            self.refusals.push(Refusal { from, to, until });
+            self.log(format!("{} declined an Accord from {}.", self.seat_name(to), self.seat_name(from)));
+            if !self.seat(from).ai {
+                let text = self.say("accord_refused", &[("faction", self.seat_name(to))]);
+                self.report_line_of(from, LineKind::YourWorks, LineKind::Note, None, text);
+            }
+        }
     }
 
     /// Ticket #226: declare it over. Free, and it lapses at the next turn's start.

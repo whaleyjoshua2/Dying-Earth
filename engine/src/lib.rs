@@ -27,7 +27,7 @@ pub use data::{DataError, Tables, TutorialNote};
 pub use economy::{Chain, GoesDark, ShortfallForecast, Step, Yield};
 pub use ephemeris::Position;
 pub use ids::*;
-pub use orders::{BuildingRef, Cost, LoadSource, Order, OrderError, RearmSite, UnitRef, UnloadTarget};
+pub use orders::{BuildingRef, Cost, LoadSource, Order, OrderError, RearmSite, TradeGood, UnitRef, UnloadTarget};
 pub use save::{SaveEntry, SaveHeader, SaveKind};
 pub use state::*;
 pub use turn::Phase;

@@ -13,6 +13,14 @@ pub enum UnitRef {
     Battery { colony: ColonyId, index: usize },
 }
 
+/// Ticket #496 (version 0.09.9): one side of a Trade -- so many of a Stockpile good (Ducats,
+/// Materials, Fuel or Energy), or a Colony or station.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TradeGood {
+    Goods(Resource, u32),
+    Place(ColonyId),
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum LoadSource {
     State(StateId),
@@ -52,6 +60,9 @@ impl BuildingRef {
 pub enum Order {
     BuildFacility { state: StateId, kind: FacilityKind },
     RaiseIndustry { state: StateId },
+    /// Ticket #490 (version 0.09.9): raise a Colony or station to its next tier, a build through
+    /// its Widgets queue, once enough people live there.
+    RaiseTier { colony: ColonyId },
     BuildModule { colony: ColonyId, kind: ModuleKind },
     BuildShip { site: Place, kind: UnitKind },
     BuildArmy { place: Place },
@@ -128,11 +139,13 @@ pub enum Order {
     CancelBuild { place: Place, index: usize },
     /// Version 0.04 (ticket #46): a Space Station in an orbital slot, built for Materials from a
     /// Nation State with a Launch Site (over Earth) or a Colony of the seat's (elsewhere).
-    BuildStation { body: BodyId, slot: u32 },
+    /// Ticket #489 (version 0.09.9): `from` gives its four: Pioneers waiting in a Region with a
+    /// working Launch Site (over Earth), or Colonists of a ground Colony of the seat's there.
+    BuildStation { body: BodyId, slot: u32, from: LoadSource },
     /// Ticket #442 (version 0.09.6): a **ground Colony built from a station** of the seat's at that
-    /// Body, into a free ground slot, for the station's Materials price; it opens with a Core and
-    /// nobody, as a built station does.
-    BuildColony { body: BodyId, slot: u32 },
+    /// Body, into a free ground slot, for the station's Materials price; it opens with a Core.
+    /// Ticket #489 (version 0.09.9): `from` is that station, which gives it four.
+    BuildColony { body: BodyId, slot: u32, from: ColonyId },
     /// Ticket #442 (version 0.09.6): Colonists **sent down** from a station of the seat's to its
     /// ground Colony on the same Body, free, within the Colony's room; not while the station is
     /// blockaded; one a station a turn; down only.
@@ -160,6 +173,9 @@ pub enum Order {
     /// the Resolution by its own weights; a refused offer is NOT an offence, since punishing a
     /// refusal would make every offer a threat.
     ProposeAccord { to: Seat, terms: Vec<Term> },
+    /// Ticket #496 (version 0.09.9): offer `to` a Trade, `give` for `get`, answered at the head of
+    /// their next turn as an Accord is; the goods change hands when it is accepted.
+    ProposeTrade { to: Seat, give: TradeGood, get: TradeGood },
     /// Ticket #226: declare a standing Accord over. Free, and it lapses at the next turn's start.
     EndAccord { with: Seat },
     /// Ticket #226: a fixed gift, one per pair per turn, paying +1 Relations. Fixed rather than a
@@ -299,6 +315,16 @@ fn fail<T>(msg: impl Into<String>) -> Result<T, OrderError> {
     Err(OrderError(msg.into()))
 }
 
+/// Ticket #489 (version 0.09.9): the people who left a place at End Turn to found a station or a
+/// Colony -- where from, how many really left, and what they know -- so the founding settles that
+/// many and a founding that fails sends that many home.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct Founders {
+    pub from: LoadSource,
+    pub n: u32,
+    pub taught: f64,
+}
+
 /// Things committed at End Turn that act later in Resolution.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Pending {
@@ -318,12 +344,13 @@ pub struct Pending {
     #[serde(default)]
     pub orbit_changes: Vec<(Seat, ShipId, Option<u32>)>,
     pub cargo: Vec<(Seat, Order)>,
-    /// Ticket #46: stations ordered this turn.
-    pub stations: Vec<(Seat, BodyId, u32)>,
+    /// Ticket #46: stations ordered this turn. Ticket #489 (version 0.09.9): with where their four
+    /// came from and what they know, to go home if the station is not built.
+    pub stations: Vec<(Seat, BodyId, u32, Founders)>,
     /// Ticket #442 (version 0.09.6): ground Colonies built from a station this turn, and Colonists
     /// sent down.
     #[serde(default)]
-    pub colony_builds: Vec<(Seat, BodyId, u32)>,
+    pub colony_builds: Vec<(Seat, BodyId, u32, Founders)>,
     #[serde(default)]
     pub send_downs: Vec<(Seat, ColonyId, ColonyId, u32)>,
     /// Ticket #52: Relief orders paid this turn, one entry per point.
@@ -404,6 +431,7 @@ impl Game {
         let item = match order {
             Order::BuildFacility { kind, .. } => Some(BuildItem::Facility(kind.built_by(own))),
             Order::RaiseIndustry { .. } => Some(BuildItem::IndustryLevel),
+            Order::RaiseTier { colony } => self.tier_build(*colony),
             Order::BuildModule { kind, .. } => Some(BuildItem::Module(kind.built_by(own))),
             Order::BuildArchive { .. } => Some(BuildItem::Module(ModuleKind::Archive)),
             Order::BuildShip { kind, .. } => Some(BuildItem::Unit(*kind)),
@@ -485,6 +513,52 @@ impl Game {
         s.colonists.min(room)
     }
 
+    /// Ticket #490 (version 0.09.9): the build that raises a Colony or station to its next tier.
+    pub fn tier_build(&self, colony: ColonyId) -> Option<BuildItem> {
+        let c = self.colony(colony)?;
+        self.next_tier(c).map(|_| BuildItem::Tier(c.tier + 1))
+    }
+
+    /// Ticket #489 (version 0.09.9): the four leave their place at End Turn, as many as are there.
+    fn send_founders(&mut self, from: LoadSource) -> Founders {
+        let want = self.tables.emigrants.found_with;
+        let (n, taught) = match from {
+            LoadSource::State(s) => {
+                let n = want.min(self.state(s).emigrants);
+                (n, self.take_emigrants(s, n))
+            }
+            LoadSource::Colony(c) => {
+                let n = want.min(self.colony(c).map(|col| col.colonists).unwrap_or(0));
+                (n, self.take_colonists(c, n))
+            }
+        };
+        Founders { from, n, taught }
+    }
+
+    /// Ticket #496 (version 0.09.9): a side of a Trade the game allows -- a Stockpile good in a
+    /// positive amount, or a place.
+    fn tradeable(&self, g: TradeGood) -> Result<(), OrderError> {
+        match g {
+            TradeGood::Goods(r, n) if n > 0 && Stockpile::default().of_mut(r).is_some() => Ok(()),
+            TradeGood::Goods(..) => Err(OrderError("a Trade is in Ducats, Materials, Fuel, Energy or a place".into())),
+            TradeGood::Place(_) => Ok(()),
+        }
+    }
+
+    /// Ticket #489 (version 0.09.9): refused where a place cannot give its four, saying what is
+    /// short -- a Region's waiting Pioneers, or what a Colony or station has to spare once it keeps
+    /// enough for its Modules.
+    fn founders_short(&self, from: LoadSource, pending: &[Order]) -> Result<(), OrderError> {
+        let found = self.tables.emigrants.found_with;
+        if self.founders_spare(from, pending) >= found {
+            return Ok(());
+        }
+        Err(OrderError(match from {
+            LoadSource::State(_) => format!("needs {found} Colonists"),
+            LoadSource::Colony(_) => format!("needs {found} Colonists to spare"),
+        }))
+    }
+
     /// The cost of one order for a seat, before legality.
     pub fn order_cost(&self, seat: Seat, order: &Order) -> Cost {
         let t = &self.tables;
@@ -492,6 +566,8 @@ impl Game {
             // Ticket #72: the Faction's own Facility price (the Prospectors' 15% off).
             Order::BuildFacility { kind, .. } => Cost { materials: self.facility_materials(seat, *kind), ..Default::default() },
             Order::RaiseIndustry { state } => Cost { materials: self.industry_cost(seat, *state), ..Default::default() },
+            // Ticket #490 (version 0.09.9): the next tier's price, the same for every Faction.
+            Order::RaiseTier { colony } => Cost { materials: self.colony(*colony).and_then(|c| self.next_tier(c)).map_or(0.0, |t| t.materials as f64), ..Default::default() },
             // Ticket #51: a Faction's card may make its Modules and its Colony Ships cost less.
             // Ticket #88: and the Colony's working Mines take more off.
             Order::BuildModule { colony, kind } => Cost { materials: self.module_materials_at(seat, *colony, *kind), ..Default::default() },
@@ -846,6 +922,30 @@ impl Game {
                 if pending.iter().any(|o| matches!(o, Order::ProposeAccord { to: t, .. } if t == to)) {
                     return fail("one offer a turn to a Faction");
                 }
+                // Ticket #495 (version 0.09.9): an offer waits a turn for its answer.
+                if self.offer_waits(seat, *to) {
+                    return fail("your offer is waiting on their answer");
+                }
+                Ok(cost)
+            }
+            // Ticket #496 (version 0.09.9): one thing for one thing, between a pair not Hostile.
+            Order::ProposeTrade { to, give, get } => {
+                if *to == seat {
+                    return fail("a Trade is made with another Faction");
+                }
+                if self.hostile(seat, *to) {
+                    return fail("no Trade while Hostile");
+                }
+                self.tradeable(*give)?;
+                self.tradeable(*get)?;
+                self.holds_good(seat, *give).map_err(OrderError)?;
+                // Ticket #496 (the review): the place asked for, checked whole at the offer.
+                if let TradeGood::Place(_) = get {
+                    self.holds_good(*to, *get).map_err(OrderError)?;
+                }
+                if self.offer_waits(seat, *to) {
+                    return fail("your offer is waiting on their answer");
+                }
                 Ok(cost)
             }
             Order::EndAccord { with } => {
@@ -1042,11 +1142,11 @@ impl Game {
                 }
                 Ok(cost)
             }
-            Order::BuildStation { body, slot } => {
+            Order::BuildStation { body, slot, from } => {
                 if !self.free_orbital_slots(*body).contains(slot) {
                     return fail("that orbital slot is taken, or there is no such slot");
                 }
-                if pending.iter().any(|o| matches!(o, Order::BuildStation { body: b, slot: s } if b == body && s == slot)) {
+                if pending.iter().any(|o| matches!(o, Order::BuildStation { body: b, slot: s, .. } if b == body && s == slot)) {
                     return fail("a station is already ordered there");
                 }
                 // Ticket #480 (version 0.09.8): a far orbit is reached only by Ship.
@@ -1078,25 +1178,35 @@ impl Game {
                 if self.slot_blockaded_against(seat, *body, *slot) {
                     return fail(format!("a rival warship holds Orbital Slot {slot} over {}", self.tables.body(*body).name));
                 }
+                // Ticket #489 (version 0.09.9): and four to send up, from a place that may send them.
+                if !self.station_sources(seat, *body).contains(from) {
+                    return fail("its four come from a Launch Site Region or a Colony below");
+                }
+                self.founders_short(*from, pending)?;
                 Ok(cost)
             }
             // Ticket #442 (version 0.09.6): a ground Colony built from a working station of the seat's
             // at that Body, into a free ground slot. Not on Earth, whose ground is Antarctica, reached by
             // Colony Ship or by sea.
-            Order::BuildColony { body, slot } => {
+            Order::BuildColony { body, slot, from } => {
                 if *body == BodyId::Earth {
                     return fail("Antarctica is reached by Colony Ship or by sea");
                 }
                 if !self.free_slots_on(*body).contains(slot) {
                     return fail("that ground slot is taken, or there is no such slot");
                 }
-                if pending.iter().any(|o| matches!(o, Order::BuildColony { body: b, slot: s } if b == body && s == slot)) {
+                if pending.iter().any(|o| matches!(o, Order::BuildColony { body: b, slot: s, .. } if b == body && s == slot)) {
                     return fail("a Colony is already ordered there");
                 }
                 let station = self.colonies.iter().any(|c| c.in_orbit && c.body == *body && c.control.director() == Some(seat) && self.starved_by(c.id).is_none());
                 if !station {
                     return fail("needs a station of yours over this Body, not under Blockade");
                 }
+                // Ticket #489 (version 0.09.9): that station gives the new Colony its four.
+                if !self.colony(*from).is_some_and(|c| c.in_orbit && c.body == *body && c.control.director() == Some(seat) && self.starved_by(c.id).is_none()) {
+                    return fail("its Colonists must come from your station over this Body");
+                }
+                self.founders_short(LoadSource::Colony(*from), pending)?;
                 Ok(cost)
             }
             // Ticket #442 (version 0.09.6): Colonists down from a station of the seat's to its ground
@@ -1113,8 +1223,10 @@ impl Game {
                 if *colonists == 0 {
                     return fail("nobody to send");
                 }
-                if up.colonists < *colonists {
-                    return fail(format!("only {} Colonists aboard", up.colonists));
+                // Ticket #489 (version 0.09.9): less any a Colony built from it this turn takes.
+                let aboard = up.colonists.saturating_sub(self.founders_claimed(pending, LoadSource::Colony(*from)));
+                if aboard < *colonists {
+                    return fail(format!("only {aboard} Colonists aboard"));
                 }
                 if self.starved_by(*from).is_some() {
                     return fail("the station is under Blockade");
@@ -1257,6 +1369,21 @@ impl Game {
                 }
                 Ok(cost)
             }
+            // Ticket #490 (version 0.09.9): the next tier, once its people live here, one at a time.
+            Order::RaiseTier { colony } => {
+                let Some(col) = self.colony(*colony) else { return fail("no such Colony") };
+                if col.control.director() != Some(seat) {
+                    return fail("not yours");
+                }
+                let Some(next) = self.next_tier(col) else { return fail(format!("already a {}", self.tier_of(col).name)) };
+                if pending.iter().any(|o| matches!(o, Order::RaiseTier { colony: c } if c == colony)) || self.tier_under_way(col).is_some() {
+                    return fail("already being upgraded");
+                }
+                if col.colonists < next.colonists {
+                    return fail(format!("needs {} Colonists", next.colonists));
+                }
+                Ok(cost)
+            }
             Order::BuildModule { colony, kind } => {
                 let Some(col) = self.colony(*colony) else { return fail("no such Colony") };
                 if col.control.director() != Some(seat) {
@@ -1281,7 +1408,8 @@ impl Game {
                 // was refused on Tiangong while the build button offered it, and the Heliostat,
                 // station-only, could be built nowhere at all.
                 if col.in_orbit && !kind.stands_on_a_station() {
-                    return fail("a station holds only a Shipyard, Habitats, Observatories, Solar Arrays, a Trade Post, an Institute, Batteries and Factories, or a Faction's own kind of one");
+                    // Ticket #497 (version 0.09.9): the build list shows what a station holds.
+                    return fail("not on a station");
                 }
                 // Ticket #186 (version 0.08.0): nobody but the Custodians builds an Academy off
                 // Earth either, captured ones included.
@@ -1336,13 +1464,15 @@ impl Game {
                     .filter(|o| matches!(o.build_module(), Some((c, k)) if c == *colony && k != ModuleKind::Archive))
                     .count() as u32;
                 if self.module_slots_used(col) + ordered >= self.module_slots(col) {
-                    return fail(format!(
-                        "{} holds {} Modules already, all it has room for: {} free and one for each of its {} Colonists",
-                        self.place_name(Place::Colony(*colony)),
-                        self.module_slots_used(col) + ordered,
-                        self.tables.slots.base,
-                        col.colonists
-                    ));
+                    // Ticket #490 (version 0.09.9): full at its tier's cap, it wants the upgrade, not people.
+                    let tier = self.tier_of(col);
+                    return fail(if self.module_slots(col) < tier.cap {
+                        "full until more Colonists live here".to_string()
+                    } else if let Some(next) = self.next_tier(col) {
+                        format!("full: upgrade to a {} for more", next.name)
+                    } else {
+                        format!("full: a {} holds {}", tier.name, tier.cap)
+                    });
                 }
                 Ok(cost)
             }
@@ -1870,8 +2000,10 @@ impl Game {
                             }
                             // Ticket #73: a Launch Site lifts only the Emigrants waiting there; the
                             // population was paid when they mustered.
-                            if self.state(*st).emigrants < *colonists {
-                                return fail(format!("only {} Pioneers are waiting there", self.state(*st).emigrants));
+                            // Ticket #489 (version 0.09.9): less any a station built this turn takes.
+                            let waiting = self.state(*st).emigrants.saturating_sub(self.founders_claimed(pending, *from));
+                            if waiting < *colonists {
+                                return fail(format!("only {waiting} Pioneers are waiting there"));
                             }
                             // Ticket #357 (version 0.09.1): a lift from a Launch Site reaches ANY
                             // orbit of Earth, at the designer's word, where ticket #335 held it to
@@ -1888,7 +2020,8 @@ impl Game {
                             if !self.ship_may_touch(s, col) {
                                 return fail(self.move_first(body, self.colony_orbit(col), "load", &format!("{} is reached from there alone.", self.place_name(Place::Colony(*c)))));
                             }
-                            if col.colonists < *colonists {
+                            // Ticket #489 (version 0.09.9): less any a build this turn takes.
+                            if col.colonists.saturating_sub(self.founders_claimed(pending, *from)) < *colonists {
                                 return fail("not enough Colonists there");
                             }
                         }
@@ -1969,6 +2102,10 @@ impl Game {
                         if s.kind != UnitKind::ColonyShip || *colonists == 0 {
                             return fail("only a Colony Ship with Colonists founds a Colony");
                         }
+                        // Ticket #489 (version 0.09.9): a Colony is founded with four.
+                        if *colonists < self.tables.emigrants.found_with {
+                            return fail(format!("needs {} Colonists", self.tables.emigrants.found_with));
+                        }
                         if !self.free_slots_on(body).contains(slot) {
                             return fail("that Colony Slot is taken");
                         }
@@ -1989,6 +2126,10 @@ impl Game {
                         }
                         if s.kind != UnitKind::ColonyShip || *colonists == 0 {
                             return fail("only a Colony Ship with Colonists founds a station");
+                        }
+                        // Ticket #489 (version 0.09.9): and a station with four.
+                        if *colonists < self.tables.emigrants.found_with {
+                            return fail(format!("needs {} Colonists", self.tables.emigrants.found_with));
                         }
                         if !self.free_orbital_slots(body).contains(slot) {
                             return fail("that station slot is taken");
@@ -2137,6 +2278,10 @@ impl Game {
                     UnloadTarget::Slot(b, slot) => {
                         if *b != BodyId::Earth || !self.free_slots_on(BodyId::Earth).contains(slot) {
                             return fail("that Antarctic slot is not free");
+                        }
+                        // Ticket #489 (version 0.09.9): a Colony is founded with four.
+                        if *n < self.tables.emigrants.found_with {
+                            return fail(format!("needs {} Colonists", self.tables.emigrants.found_with));
                         }
                         if pending.iter().any(|o| matches!(o, Order::SendToAntarctica { into: UnloadTarget::Slot(_, s), .. } if s == slot)) {
                             return fail("Pioneers are already bound for that slot this turn");
@@ -2413,6 +2558,15 @@ impl Game {
                     let widgets = self.industry_widgets(seat, *state);
                     self.state_mut(*state).queue.push(Build { item: BuildItem::IndustryLevel, seat, widgets, done: 0, coastal: false, fuel: 0.0 });
                 }
+                // Ticket #490 (version 0.09.9): the upgrade joins the place's queue like a Module.
+                Order::RaiseTier { colony } => {
+                    if let Some(item) = self.tier_build(*colony) {
+                        let widgets = self.build_widgets(seat, item);
+                        if let Some(c) = self.colony_mut(*colony) {
+                            c.queue.push(Build { item, seat, widgets, done: 0, coastal: false, fuel: 0.0 });
+                        }
+                    }
+                }
                 Order::BuildModule { colony, kind } | Order::BuildModuleWithDucats { colony, kind } => {
                     // Ticket #186: as on Earth -- the Custodians' Institute order raises an Academy.
                     let kind = kind.built_by(self.kind(seat));
@@ -2618,9 +2772,17 @@ impl Game {
                         self.report_line_of(seat, LineKind::Archive, LineKind::Archive, Some(ReportPlace::Colony(*colony)), text);
                     }
                 }
-                Order::BuildStation { body, slot } => self.pending.stations.push((seat, *body, *slot)),
-                // Ticket #442 (version 0.09.6).
-                Order::BuildColony { body, slot } => self.pending.colony_builds.push((seat, *body, *slot)),
+                // Ticket #489 (version 0.09.9): the four leave their source now, as Pioneers sent by
+                // sea do, and arrive when the station is built at the Resolution.
+                Order::BuildStation { body, slot, from } => {
+                    let founders = self.send_founders(*from);
+                    self.pending.stations.push((seat, *body, *slot, founders));
+                }
+                // Ticket #442 (version 0.09.6). Ticket #489: and its four leave the station.
+                Order::BuildColony { body, slot, from } => {
+                    let founders = self.send_founders(LoadSource::Colony(*from));
+                    self.pending.colony_builds.push((seat, *body, *slot, founders));
+                }
                 Order::SendDown { from, to, colonists } => self.pending.send_downs.push((seat, *from, *to, *colonists)),
                 Order::BuildArchive { colony } => {
                     // Ticket #68: the Module rises in the Colony's queue like any other build, from
@@ -2852,14 +3014,15 @@ impl Game {
                     // Ticket #226 (version 0.08.2): a computer seat answers by its own weights, and
                     // never accepts a term that would lose it the game. A refused offer is not an
                     // offence: punishing a refusal would make every offer a threat.
-                    let yes = self.accord_acceptable(*to, seat, terms);
-                    if yes {
-                        let _ = self.strike_accord(seat, *to, terms.clone());
-                        let text = format!("{} and {} struck an Accord.", self.seat_name(seat), self.seat_name(*to));
-                        self.log(text);
-                    } else {
-                        self.log(format!("{} declined an Accord from {}.", self.seat_name(*to), self.seat_name(seat)));
-                    }
+                    // Ticket #495 (version 0.09.9): answered at the head of the receiver's next
+                    // turn, by a human seat in a prompt, by a computer seat by that rule.
+                    self.offers.push(crate::state::Offer { from: seat, to: *to, terms: terms.clone(), trade: None, turn: self.turn });
+                    self.log(format!("{} offered {} an Accord.", self.seat_name(seat), self.seat_name(*to)));
+                }
+                // Ticket #496 (version 0.09.9): nothing is held at the offer.
+                Order::ProposeTrade { to, give, get } => {
+                    self.offers.push(crate::state::Offer { from: seat, to: *to, terms: Vec::new(), trade: Some((*give, *get)), turn: self.turn });
+                    self.log(format!("{} offered {} a Trade.", self.seat_name(seat), self.seat_name(*to)));
                 }
                 Order::EndAccord { with } => {
                     self.end_accord(seat, *with);
@@ -3052,6 +3215,7 @@ impl Game {
                 r("build_facility_ducats", &[("building", kind.name().to_string()), ("state", self.tables.state(*state).name.clone())])
             }
             Order::RaiseIndustry { state } => r("raise_industry", &[("state", self.tables.state(*state).name.clone())]),
+            Order::RaiseTier { colony } => r("raise_tier", &[("colony", place(Place::Colony(*colony)))]),
             Order::BuildModule { colony, kind } => {
                 r("build_module", &[("building", kind.name().to_string()), ("colony", place(Place::Colony(*colony)))])
             }
@@ -3166,6 +3330,7 @@ impl Game {
             Order::BuyCredits { ppm } => r("buy_credits", &[("n", ppm.to_string())]),
             Order::BuyInfluence { amount } => r("buy_influence", &[("n", amount.to_string())]),
             Order::ProposeAccord { to, .. } => r("propose_accord", &[("faction", self.seat_name(*to))]),
+            Order::ProposeTrade { to, .. } => r("propose_trade", &[("faction", self.seat_name(*to))]),
             Order::EndAccord { with } => r("end_accord", &[("faction", self.seat_name(*with))]),
             Order::Tribute { to, .. } => r("tribute", &[("faction", self.seat_name(*to))]),
             Order::Buy { resource, amount } => r("buy", &[("n", amount.to_string()), ("resource", resource.name().to_string())]),
