@@ -183,3 +183,13 @@ tradeable (a rate, not a stock); the designer swapped in Energy.
 2 / 27 / 26 / 2 and 21, at the edge of noise. A throwaway count over the same 80 games: 1,576 Trades
 offered, 238 struck, 1,250 declined, 27 failed. Most are declined because the Faction asked is short
 of the same good; not traced further.
+
+**The review** (two agents). Fixed, each with a test watched failing first: a place traded kept the
+giver's Influence standing, so the giver could win it straight back by Influence the next turn and
+keep the price -- the standing now goes to the new holder; builds under way at a place traded stayed
+the giver's -- they go with it, as decided; a place with another of the giver's Armies in it is not
+traded; a place asked for is checked whole at the offer; two Trades to one Faction in a turn are two
+offers, as decided; an Accept that cannot be paid says why at once. Also: the driver answers a Trade
+and an Accord apart; the Stockpile goods read through one helper. Kept, and said: a refusal of either
+kind holds back both kinds for three turns; the 0.95 "at the door" figure is the Accord's, in the
+engine; a place's price is the base 40 Materials, as decided. The win column is the same after.

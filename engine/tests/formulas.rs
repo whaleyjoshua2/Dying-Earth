@@ -20545,7 +20545,8 @@ fn a_trade_whose_goods_are_gone_fails() {
     g.seats[0].stockpile.ducats = 500.0;
     g.seats[1].stockpile.materials = 10.0;
     g.report.lines.clear();
-    g.answer_offer(Seat(0), 0, true).unwrap();
+    // Ticket #496 (the review): the answer says why at once, as well as the Report.
+    assert!(g.answer_offer(Seat(0), 0, true).unwrap_err().contains("Materials"));
     assert_eq!(g.seats[0].stockpile.ducats, 500.0, "nothing moved");
     assert!(g.report.lines.iter().any(|l| l.text.contains("failed")), "{:?}", g.report.lines);
 }
@@ -20581,4 +20582,49 @@ fn the_computer_offers_a_trade_when_short_and_long() {
     let (give, get) = trade.expect("a Trade offered");
     assert!(matches!(get, TradeGood::Goods(Resource::Materials, _)), "it asks for what it lacks: {get:?}");
     assert!(matches!(give, TradeGood::Goods(Resource::Ducats, _)), "and gives what it has: {give:?}");
+}
+
+/// Ticket #496 (the review): a place traded takes the giver's Influence standing to its new holder,
+/// so the giver cannot win it straight back with Influence; and its builds under way go with it.
+#[test]
+fn a_traded_place_takes_its_standing_and_builds_to_the_new_holder() {
+    let mut g = game();
+    calm(&mut g);
+    let c = colony(&mut g, Seat(0), BodyId::Moon, &[], 6);
+    g.seats[0].influence.insert(Place::Colony(c), 30);
+    g.colony_mut(c).unwrap().queue.push(Build { item: BuildItem::Module(ModuleKind::Habitat), seat: Seat(0), widgets: 4, done: 1, coastal: false, fuel: 0.0 });
+    g.seats[1].stockpile.ducats = 10_000.0;
+    g.offers.push(Offer { from: Seat(1), to: Seat(0), terms: Vec::new(), trade: Some((TradeGood::Goods(Resource::Ducats, 1), TradeGood::Place(c))), turn: g.turn });
+    g.answer_offer(Seat(0), 0, true).unwrap();
+    assert_eq!(g.colony(c).unwrap().control, Control::Controlled(Seat(1)));
+    assert_eq!(g.seats[1].influence.get(&Place::Colony(c)).copied().unwrap_or(0), 30, "the standing went with it");
+    assert_eq!(g.seats[0].influence.get(&Place::Colony(c)).copied().unwrap_or(0), 0, "and left the giver");
+    assert!(g.colony(c).unwrap().queue.iter().all(|b| b.seat == Seat(1)), "its builds are the new holder's");
+}
+
+/// Ticket #496 (the review): what the offer checks now -- the place asked for whole, a place with
+/// another Army of the giver's in it refused, two Trades to one Faction in a turn allowed -- and a
+/// yes the player cannot pay says why at once.
+#[test]
+fn a_trade_offer_checks_the_place_asked_and_a_failed_yes_says_why() {
+    let mut g = game();
+    calm(&mut g);
+    g.seats[0].stockpile.ducats = 100.0;
+    let d = |n| TradeGood::Goods(Resource::Ducats, n);
+    let archive = colony(&mut g, Seat(1), BodyId::Moon, &[ModuleKind::Archive], 6);
+    assert!(g.check_order(Seat(0), &[], &Order::ProposeTrade { to: Seat(1), give: d(10), get: TradeGood::Place(archive) }).unwrap_err().0.contains("Archive"), "asked for, refused at the offer");
+    let first = Order::ProposeTrade { to: Seat(1), give: d(10), get: TradeGood::Goods(Resource::Materials, 5) };
+    let second = Order::ProposeTrade { to: Seat(1), give: d(20), get: TradeGood::Goods(Resource::Fuel, 5) };
+    assert!(g.check_order(Seat(0), std::slice::from_ref(&first), &second).is_ok(), "two Trades are two offers");
+    // A place of the player's with one of their Regions' Armies standing in it is not traded.
+    let mine = colony(&mut g, Seat(0), BodyId::Mars, &[], 6);
+    let army = g.armies.iter().find(|a| g.army_seat(a) == Some(Seat(0))).map(|a| a.id).unwrap();
+    g.armies.iter_mut().find(|a| a.id == army).unwrap().at = ArmyAt::Place(Place::Colony(mine));
+    assert!(g.check_order(Seat(0), &[], &Order::ProposeTrade { to: Seat(1), give: TradeGood::Place(mine), get: d(1) }).unwrap_err().0.contains("Arm"));
+    // A yes the player cannot pay.
+    g.seats[1].stockpile.ducats = 10.0;
+    g.offers.push(Offer { from: Seat(1), to: Seat(0), terms: Vec::new(), trade: Some((d(1), TradeGood::Goods(Resource::Materials, 9999))), turn: g.turn });
+    let i = g.offers.len() - 1;
+    let err = g.answer_offer(Seat(0), i, true).unwrap_err();
+    assert!(err.contains("Materials"), "{err}");
 }

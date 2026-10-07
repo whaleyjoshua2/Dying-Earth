@@ -10962,7 +10962,7 @@ fn trade_block(ui: &mut Ui, session: &Session, game: &Game, other: Seat, actions
         match (kind < GOODS.len(), place) {
             (true, _) => TradeGood::Goods(GOODS[kind], n),
             (false, Some(c)) => TradeGood::Place(c),
-            (false, None) => TradeGood::Goods(GOODS[0], 0),
+            (false, None) => TradeGood::Place(ColonyId(u32::MAX)),
         }
     };
     let give = side(ui, "give", Seat(0));

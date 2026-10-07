@@ -332,9 +332,9 @@ DIPLOMACY (ticket #226; `show` prints Relations both ways and every Accord stand
   accord end <faction>                 declare a standing Accord over: free, and it lapses at the
                                        next turn's start -- which gives the board a turn's warning
                                        that something is coming.
-  trade <faction> <give> for <ask>     one thing for one thing: `40 ducats`, `20 materials`, `fuel`,
-                                       `energy`, or a colony id; answered at the head of their next
-                                       turn, the goods moving only if both still hold them.
+  trade <faction> <give> for <ask>     one thing for one thing: `<n> ducats|materials|fuel|energy`
+                                       or a colony id; answered at the head of their next turn, the
+                                       goods moving only if both still hold them.
   trade accept|refuse <faction>        answer a Trade a Faction offered you.
   tribute <faction> ducats             a fixed gift, one per Faction per turn, paying Relations:
   tribute <faction> materials          {tributeducats} Ducats, or {tributematerials} Materials.
@@ -421,8 +421,9 @@ enum Line {
     Tech(TechId),
     /// Ticket #337: this seat's answer to the turn's Choice Card -- taken, or refused.
     Answer(bool),
-    /// Ticket #495 (version 0.09.9): this seat's answer to the Accord a Faction offered it.
-    Offer(Seat, bool),
+    /// Ticket #495 (version 0.09.9): this seat's answer to the Accord a Faction offered it; ticket
+    /// #496, or the Trade (`true` in the last field).
+    Offer(Seat, bool, bool),
 }
 
 /// The game is read here as well as written: a Faction is named by its own name, and which seat
@@ -546,8 +547,8 @@ fn parse_line(g: &Game, line: &str) -> Result<Line, String> {
                 }
                 "end" => Order::EndAccord { with: seat_of(g, at(2)?)? },
                 // Ticket #495 (version 0.09.9): an offer made to you waits for your answer.
-                "accept" => return Ok(Line::Offer(seat_of(g, at(2)?)?, true)),
-                "decline" | "refuse" => return Ok(Line::Offer(seat_of(g, at(2)?)?, false)),
+                "accept" => return Ok(Line::Offer(seat_of(g, at(2)?)?, true, false)),
+                "decline" | "refuse" => return Ok(Line::Offer(seat_of(g, at(2)?)?, false, false)),
                 _ => return Err(format!("`accord {what}` is not one of offer, end, accept, refuse")),
             }
         }
@@ -556,7 +557,7 @@ fn parse_line(g: &Game, line: &str) -> Result<Line, String> {
         "trade" => {
             let first = at(1)?.to_ascii_lowercase();
             if first == "accept" || first == "refuse" || first == "decline" {
-                return Ok(Line::Offer(seat_of(g, at(2)?)?, first == "accept"));
+                return Ok(Line::Offer(seat_of(g, at(2)?)?, first == "accept", true));
             }
             let to = seat_of(g, at(1)?)?;
             let rest: Vec<&str> = w[2..].to_vec();
@@ -749,7 +750,8 @@ fn print_question(g: &Game) {
 fn owed_answer(g: &Game) -> Option<String> {
     // Ticket #495 (version 0.09.9): an Accord offered is answered by name.
     if let Some((_, o)) = g.offers_to(Seat(0)).first() {
-        return Some(format!("Put `accord accept {0}` or `accord refuse {0}` in the order list.", g.seat_name(o.from).to_lowercase()));
+        let what = if o.trade.is_some() { "trade" } else { "accord" };
+        return Some(format!("Put `{what} accept {0}` or `{what} refuse {0}` in the order list.", g.seat_name(o.from).to_lowercase()));
     }
     let q = g.pending_question()?;
     if q.answer_of(Seat(0)).is_some() {
@@ -1492,10 +1494,11 @@ fn main() {
                         }
                     },
                     // Ticket #495 (version 0.09.9): an Accord offered, answered as the card is.
-                    Ok(Line::Offer(from, accept)) => {
-                        let index = game.offers_to(Seat(0)).into_iter().find(|(_, o)| o.from == from).map(|(i, _)| i);
-                        match index.ok_or_else(|| format!("{} have offered you no Accord", game.seat_name(from))).and_then(|i| game.answer_offer(Seat(0), i, accept)) {
-                            Ok(()) => println!("line {}: answered: you {} the {} Accord", n + 1, if accept { "accept" } else { "refuse" }, game.seat_name(from)),
+                    Ok(Line::Offer(from, accept, trade)) => {
+                        let what = if trade { "Trade" } else { "Accord" };
+                        let index = game.offers_to(Seat(0)).into_iter().find(|(_, o)| o.from == from && o.trade.is_some() == trade).map(|(i, _)| i);
+                        match index.ok_or_else(|| format!("{} have offered you no {what}", game.seat_name(from))).and_then(|i| game.answer_offer(Seat(0), i, accept)) {
+                            Ok(()) => println!("line {}: answered: you {} the {} {what}", n + 1, if accept { "accept" } else { "refuse" }, game.seat_name(from)),
                             Err(e) => {
                                 println!("line {}: REFUSED `{line}`: {e}", n + 1);
                                 bad += 1;

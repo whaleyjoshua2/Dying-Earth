@@ -23,6 +23,23 @@ pub struct Stockpile {
 }
 
 impl Stockpile {
+    /// Ticket #496 (version 0.09.9): the figure held of a Stockpile good, for a Trade; None for one
+    /// the Stockpile does not hold (Research, Widgets).
+    pub fn of_mut(&mut self, r: Resource) -> Option<&mut f64> {
+        match r {
+            Resource::Ducats => Some(&mut self.ducats),
+            Resource::Materials => Some(&mut self.materials),
+            Resource::Fuel => Some(&mut self.fuel),
+            Resource::Energy => Some(&mut self.energy),
+            _ => None,
+        }
+    }
+
+    /// Ticket #496: the same, read.
+    pub fn of(mut self, r: Resource) -> f64 {
+        self.of_mut(r).map(|v| *v).unwrap_or(0.0)
+    }
+
     /// Ticket #387 (version 0.09.3): every figure settled to a tenth, the one shape a stockpile is
     /// ever stored in. A pay, a refund and an income all come through here.
     pub fn settled(self) -> Stockpile {
@@ -5298,23 +5315,26 @@ impl Game {
         for (g, giver, taker) in [(give, from, to), (get, to, from)] {
             match g {
                 TradeGood::Goods(r, n) => {
-                    let n = n as f64;
-                    let a = self.seat_mut(giver);
-                    match r {
-                        Resource::Ducats => a.stockpile.ducats = tenth(a.stockpile.ducats - n),
-                        Resource::Materials => a.stockpile.materials = tenth(a.stockpile.materials - n),
-                        Resource::Fuel => a.stockpile.fuel = tenth(a.stockpile.fuel - n),
-                        _ => a.stockpile.energy = tenth(a.stockpile.energy - n),
-                    }
-                    let t = self.seat_mut(taker);
-                    match r {
-                        Resource::Ducats => t.stockpile.ducats = tenth(t.stockpile.ducats + n),
-                        Resource::Materials => t.stockpile.materials = tenth(t.stockpile.materials + n),
-                        Resource::Fuel => t.stockpile.fuel = tenth(t.stockpile.fuel + n),
-                        _ => t.stockpile.energy = tenth(t.stockpile.energy + n),
+                    for (seat, by) in [(giver, -(n as f64)), (taker, n as f64)] {
+                        if let Some(v) = self.seat_mut(seat).stockpile.of_mut(r) {
+                            *v = tenth(*v + by);
+                        }
                     }
                 }
-                TradeGood::Place(c) => self.transfer_control(Place::Colony(c), taker, "Trade"),
+                TradeGood::Place(c) => {
+                    self.transfer_control(Place::Colony(c), taker, "Trade");
+                    // Ticket #496 (the review): the giver's standing goes with the place, so it
+                    // cannot be won straight back with Influence; and its builds under way.
+                    let place = Place::Colony(c);
+                    let standing = self.seat_mut(giver).influence.remove(&place).unwrap_or(0);
+                    let theirs = self.seat(taker).influence.get(&place).copied().unwrap_or(0);
+                    self.seat_mut(taker).influence.insert(place, theirs.max(standing));
+                    if let Some(col) = self.colony_mut(c) {
+                        for b in &mut col.queue {
+                            b.seat = taker;
+                        }
+                    }
+                }
             }
         }
         self.credit(from, to);
@@ -5335,20 +5355,14 @@ impl Game {
         use crate::orders::TradeGood;
         match g {
             TradeGood::Goods(r, n) => {
-                let s = self.seat(seat).stockpile;
-                let held = match r {
-                    Resource::Ducats => s.ducats,
-                    Resource::Materials => s.materials,
-                    Resource::Fuel => s.fuel,
-                    _ => s.energy,
-                };
+                let held = self.seat(seat).stockpile.of(r);
                 if held + 1e-9 < n as f64 {
                     return Err(format!("{} hold {} {}", self.seat_name(seat), figure(held), r.name()));
                 }
                 Ok(())
             }
             TradeGood::Place(c) => {
-                let Some(col) = self.colony(c) else { return Err("that place is gone".into()) };
+                let Some(col) = self.colony(c) else { return Err("there is no such place to trade".into()) };
                 if col.control != Control::Controlled(seat) {
                     return Err(format!("{} no longer hold {}", self.seat_name(seat), self.place_name(Place::Colony(c))));
                 }
@@ -5357,6 +5371,11 @@ impl Game {
                 }
                 if self.starved_by(c).is_some() {
                     return Err(format!("{} is under Blockade", self.place_name(Place::Colony(c))));
+                }
+                // Ticket #496 (the review): another Army of the seat's standing there would be left
+                // inside somebody else's place; the place's own goes with it.
+                if self.armies.iter().any(|a| a.at == ArmyAt::Place(Place::Colony(c)) && a.home != ArmyHome::Colony(c) && self.army_seat(a) == Some(seat)) {
+                    return Err(format!("{} have an Army there", self.seat_name(seat)));
                 }
                 Ok(())
             }
@@ -5408,10 +5427,15 @@ impl Game {
             return Err("there is no such offer to answer".into());
         }
         let offer = self.offers.remove(index);
-        // Ticket #496 (version 0.09.9): a Trade's yes is checked where the goods move.
-        if offer.trade.is_some() {
+        // Ticket #496 (version 0.09.9): a Trade's yes is checked where the goods move; one that
+        // cannot go through fails, and says why at once (the review).
+        if let Some((give, get)) = offer.trade {
+            let short = if accept { self.holds_good(offer.from, give).and_then(|_| self.holds_good(offer.to, get)).err() } else { None };
             self.settle_offer(offer, accept);
-            return Ok(());
+            return match short {
+                Some(why) => Err(format!("the Trade failed: {why}")),
+                None => Ok(()),
+            };
         }
         // Ticket #495 (the review): a yes that can no longer be struck says why.
         if accept && self.accords.iter().any(|a| a.holds(offer.from, offer.to)) {

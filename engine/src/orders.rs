@@ -539,7 +539,7 @@ impl Game {
     /// positive amount, or a place.
     fn tradeable(&self, g: TradeGood) -> Result<(), OrderError> {
         match g {
-            TradeGood::Goods(r, n) if n > 0 && matches!(r, Resource::Ducats | Resource::Materials | Resource::Fuel | Resource::Energy) => Ok(()),
+            TradeGood::Goods(r, n) if n > 0 && Stockpile::default().of_mut(r).is_some() => Ok(()),
             TradeGood::Goods(..) => Err(OrderError("a Trade is in Ducats, Materials, Fuel, Energy or a place".into())),
             TradeGood::Place(_) => Ok(()),
         }
@@ -939,13 +939,9 @@ impl Game {
                 self.tradeable(*give)?;
                 self.tradeable(*get)?;
                 self.holds_good(seat, *give).map_err(OrderError)?;
-                if let TradeGood::Place(c) = get
-                    && self.colony(*c).is_none_or(|col| col.control != Control::Controlled(*to))
-                {
-                    return fail("that place is not theirs to trade");
-                }
-                if pending.iter().any(|o| matches!(o, Order::ProposeTrade { to: t, .. } if t == to)) {
-                    return fail("one Trade a turn to a Faction");
+                // Ticket #496 (the review): the place asked for, checked whole at the offer.
+                if let TradeGood::Place(_) = get {
+                    self.holds_good(*to, *get).map_err(OrderError)?;
                 }
                 if self.offer_waits(seat, *to) {
                     return fail("your offer is waiting on their answer");
