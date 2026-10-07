@@ -50,10 +50,11 @@ pub fn leg_fuel(delta_v: f64, per: f64) -> f64 {
 pub struct GulfCard {
     pub between: [String; 2],
     pub delta_v: f64,
-    /// Ticket #502 (version 0.1.0.0): the turns a crossing of this gulf takes where no window
-    /// prices it -- one, unless the row says more (Ceres to Vesta is nine).
-    #[serde(default = "one")]
-    pub turns: u32,
+    /// Ticket #502 (version 0.1.0.0): the days a crossing of this gulf takes where no window
+    /// prices it, made turns as a window's flight is, Nuclear Rockets and all; a row without it is
+    /// crossed in one turn (Earth to a far orbit).
+    #[serde(default)]
+    pub days: Option<f64>,
 }
 
 /// Ticket #502 (version 0.1.0.0): a crossing with a window of its own between two systems named
@@ -1277,6 +1278,8 @@ struct EphemerisFile {
     /// Ticket #502 (version 0.1.0.0): every other crossing that has a window.
     #[serde(default)]
     crossing: Vec<CrossingTable>,
+    /// Ticket #502: how far the phase angle may move between two readings of one turn.
+    window_sample_degrees: f64,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -2009,6 +2012,8 @@ pub struct Tables {
     pub transit_venus_mars: TransitTable,
     /// Ticket #502 (version 0.1.0.0): the crossings to and from the three new worlds.
     pub crossings: Vec<CrossingTable>,
+    /// Ticket #502: how far the phase angle may move between two readings of one turn.
+    pub window_sample_degrees: f64,
     pub states: Vec<StateCard>,
     /// Ticket #53: how a neutral Nation State develops itself (`nation_states.toml`).
     pub development: DevelopmentTable,
@@ -2190,6 +2195,7 @@ impl Tables {
             transit_venus: ephemeris.transit_venus,
             transit_venus_mars: ephemeris.transit_venus_mars,
             crossings: ephemeris.crossing,
+            window_sample_degrees: ephemeris.window_sample_degrees,
             bodies: bodies.body,
             states: states.state,
             development: states.development,
@@ -2545,16 +2551,19 @@ impl Tables {
                 return Err(err("ephemeris.toml", format!("no [[planet]] row for {}: every planet needs its elements", id.name())));
             }
         }
-        // Ticket #502: a gulf missing between two systems would price the crossing at nothing.
+        // Ticket #502 (version 0.1.0.0): a gulf missing between two systems would price the crossing at nothing.
         {
             use crate::ids::System;
-            let systems = [System::Earth, System::Venus, System::Mars, System::Mercury, System::Ceres, System::Vesta, System::Far(0)];
+            let systems = System::ALL;
             for (i, a) in systems.iter().enumerate() {
                 for b in &systems[i..] {
                     if (a != b || *a == System::Far(0)) && self.gulf_card(*a, *b).is_none() {
                         return Err(err("bodies.toml", format!("no [[gulf]] between {} and {}", a.key(), b.key())));
                     }
                 }
+            }
+            if self.window_sample_degrees <= 0.0 {
+                return Err(err("ephemeris.toml", "window_sample_degrees must be above zero"));
             }
             for c in &self.crossings {
                 let tr = &c.table;

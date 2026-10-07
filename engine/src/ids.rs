@@ -115,7 +115,7 @@ pub enum System {
     Earth,
     Venus,
     Mars,
-    /// Ticket #502: the three new worlds' systems.
+    /// Ticket #502 (version 0.1.0.0): the three new worlds' systems.
     Mercury,
     Ceres,
     Vesta,
@@ -123,6 +123,8 @@ pub enum System {
 }
 
 impl System {
+    /// Ticket #502 (version 0.1.0.0): every system, a far orbit standing for both.
+    pub const ALL: [System; 7] = [System::Earth, System::Venus, System::Mars, System::Mercury, System::Ceres, System::Vesta, System::Far(0)];
     /// The name `bodies.toml` writes a gulf's two ends in.
     pub fn key(self) -> &'static str {
         match self {

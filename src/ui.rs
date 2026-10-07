@@ -1726,72 +1726,72 @@ fn credits_screen(root: &mut Ui, session: &mut Session, icons: &Icons) {
         // Ticket #502 (version 0.1.0.0): the list had already run past an 800-pixel window's foot
         // before the maps were credited, taking the flags and Back with it, so the page scrolls.
         egui::ScrollArea::vertical().show(ui, |ui| {
-        ui.vertical_centered(|ui| {
-            ui.add_space(60.0);
-            ui.label(RichText::new("Credits").size(40.0).strong());
-            ui.add_space(24.0);
-            ui.label(RichText::new("Icons").size(20.0).strong());
-            ui.label(RichText::new("From game-icons.net, used under Creative Commons BY 3.0.").size(15.0));
-            ui.add_space(10.0);
-            // Ticket #146 (version 0.07.3): thirty-two credits and a drawing no longer fit one column
-            // in an 800-pixel window -- the first picture of this screen ran off its bottom -- so
-            // the list is two columns, the figures and kinds on the left and the buildings on the
-            // right, each row an icon at 22 pixels beside its line.
-            let mut rows: Vec<(String, String)> = crate::icons::CREDITS.iter().map(|c| (c.key(), format!("{}: \"{}\" by {}", c.resource, c.icon, c.author))).collect();
-            // Ticket #135 (version 0.07.3): the game's own drawings, named so the list is complete.
-            for d in crate::icons::DRAWN {
-                rows.push((d.to_string(), format!("{}: drawn for Dying Earth, no credit owed", capitalised(d))));
-            }
-            let half = rows.len().div_ceil(2);
-            ui.horizontal_top(|ui| {
-                ui.add_space(ui.available_width() / 2.0 - 400.0);
-                for column in [&rows[..half], &rows[half..]] {
-                    ui.vertical(|ui| {
-                        ui.set_width(390.0);
-                        for (key, line) in column {
-                            ui.horizontal(|ui| {
-                                ui.spacing_mut().item_spacing.x = 8.0;
-                                if let Some(image) = icons.image(key, 20.0) {
-                                    ui.add(image);
-                                }
-                                ui.label(RichText::new(line).size(13.0));
-                            });
-                        }
-                    });
+            ui.vertical_centered(|ui| {
+                ui.add_space(60.0);
+                ui.label(RichText::new("Credits").size(40.0).strong());
+                ui.add_space(24.0);
+                ui.label(RichText::new("Icons").size(20.0).strong());
+                ui.label(RichText::new("From game-icons.net, used under Creative Commons BY 3.0.").size(15.0));
+                ui.add_space(10.0);
+                // Ticket #146 (version 0.07.3): thirty-two credits and a drawing no longer fit one column
+                // in an 800-pixel window -- the first picture of this screen ran off its bottom -- so
+                // the list is two columns, the figures and kinds on the left and the buildings on the
+                // right, each row an icon at 22 pixels beside its line.
+                let mut rows: Vec<(String, String)> = crate::icons::CREDITS.iter().map(|c| (c.key(), format!("{}: \"{}\" by {}", c.resource, c.icon, c.author))).collect();
+                // Ticket #135 (version 0.07.3): the game's own drawings, named so the list is complete.
+                for d in crate::icons::DRAWN {
+                    rows.push((d.to_string(), format!("{}: drawn for Dying Earth, no credit owed", capitalised(d))));
                 }
-            });
-            ui.add_space(12.0);
-            ui.label(RichText::new("https://game-icons.net").size(14.0).weak());
-            // Ticket #122 (version 0.07.2): the Nations' flags. MIT asks nothing on screen; they are
-            // named here anyway, since a player who wonders where the art came from should not
-            // have to open a folder to find out, and the provenance caveat the research raised is
-            // worth a line.
-            ui.add_space(18.0);
-            ui.label(RichText::new("Flags").size(20.0).strong());
-            ui.label(RichText::new("From flag-icons (github.com/lipis/flag-icons), under the MIT licence.").size(15.0));
-            ui.label(RichText::new("Its licence text ships beside the flags, in assets/flags.").size(14.0).weak());
-            ui.add_space(8.0);
-            ui.horizontal(|ui| {
-                ui.add_space(ui.available_width() / 2.0 - 6.0 * 40.0);
-                ui.spacing_mut().item_spacing.x = 10.0;
-                for sid in StateId::ALL {
-                    let card = session.tables.state(sid);
-                    if let Some(flag) = Icons::flag_from_ctx(ui.ctx(), &card.flag, 24.0) {
-                        ui.add(flag).on_hover_text(&card.name);
+                let half = rows.len().div_ceil(2);
+                ui.horizontal_top(|ui| {
+                    ui.add_space(ui.available_width() / 2.0 - 400.0);
+                    for column in [&rows[..half], &rows[half..]] {
+                        ui.vertical(|ui| {
+                            ui.set_width(390.0);
+                            for (key, line) in column {
+                                ui.horizontal(|ui| {
+                                    ui.spacing_mut().item_spacing.x = 8.0;
+                                    if let Some(image) = icons.image(key, 20.0) {
+                                        ui.add(image);
+                                    }
+                                    ui.label(RichText::new(line).size(13.0));
+                                });
+                            }
+                        });
                     }
+                });
+                ui.add_space(12.0);
+                ui.label(RichText::new("https://game-icons.net").size(14.0).weak());
+                // Ticket #122 (version 0.07.2): the Nations' flags. MIT asks nothing on screen; they are
+                // named here anyway, since a player who wonders where the art came from should not
+                // have to open a folder to find out, and the provenance caveat the research raised is
+                // worth a line.
+                ui.add_space(18.0);
+                ui.label(RichText::new("Flags").size(20.0).strong());
+                ui.label(RichText::new("From flag-icons (github.com/lipis/flag-icons), under the MIT licence.").size(15.0));
+                ui.label(RichText::new("Its licence text ships beside the flags, in assets/flags.").size(14.0).weak());
+                ui.add_space(8.0);
+                ui.horizontal(|ui| {
+                    ui.add_space(ui.available_width() / 2.0 - 6.0 * 40.0);
+                    ui.spacing_mut().item_spacing.x = 10.0;
+                    for sid in StateId::ALL {
+                        let card = session.tables.state(sid);
+                        if let Some(flag) = Icons::flag_from_ctx(ui.ctx(), &card.flag, 24.0) {
+                            ui.add(flag).on_hover_text(&card.name);
+                        }
+                    }
+                });
+                // Ticket #502 (version 0.1.0.0): the new worlds' maps, credited as their makers ask.
+                ui.add_space(18.0);
+                ui.label(RichText::new("Maps").size(20.0).strong());
+                ui.label(RichText::new("Ceres and Vesta: NASA/JPL-Caltech/UCLA/MPS/DLR/IDA.").size(14.0));
+                ui.label(RichText::new("Mercury: NASA/Johns Hopkins University Applied Physics Laboratory/Carnegie Institution of Washington.").size(14.0));
+                ui.add_space(30.0);
+                if ui.add(egui::Button::new(RichText::new("Back").size(20.0)).min_size(egui::vec2(180.0, 38.0))).clicked() {
+                    session.screen = Screen::Title;
                 }
+                ui.add_space(30.0);
             });
-            // Ticket #502 (version 0.1.0.0): the new worlds' maps, credited as their makers ask.
-            ui.add_space(18.0);
-            ui.label(RichText::new("Maps").size(20.0).strong());
-            ui.label(RichText::new("Ceres and Vesta: NASA/JPL-Caltech/UCLA/MPS/DLR/IDA.").size(14.0));
-            ui.label(RichText::new("Mercury: NASA/Johns Hopkins University Applied Physics Laboratory/Carnegie Institution of Washington.").size(14.0));
-            ui.add_space(30.0);
-            if ui.add(egui::Button::new(RichText::new("Back").size(20.0)).min_size(egui::vec2(180.0, 38.0))).clicked() {
-                session.screen = Screen::Title;
-            }
-            ui.add_space(30.0);
-        });
         });
     });
 }

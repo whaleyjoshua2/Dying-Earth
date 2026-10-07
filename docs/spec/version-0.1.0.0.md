@@ -81,18 +81,22 @@ Hohmann flight in turns of sixty days, rounded up, and the delta-v's Fuel; off i
 | Venus–Mercury | 75.6 | 2 | 144.6 | 9 |
 | Mars–Mercury | 170.5 | 3 | 100.9 | 9 |
 
-- **The cap** is the window's turns and four more, or nine where that is less, the cap Mars and
-  Venus keep.
+- **The cap** is the window's turns and four more, and never under nine, the cap Mars and Venus
+  keep.
 - **Mars–Vesta is 9 turns, not the 8 the decision's summary gave**: 494.5 days is 8.2 turns of
   sixty, and every flight in the game rounds up.
 - **A turn is read at a point every thirty degrees the phase angle moves in it**, so a window
   passed inside the turn is found. Mercury laps Earth in under two turns, its phase angle sweeping
   more than half the circle in one; read at its two ends alone, its window would never be found.
-  The Mars and Venus crossings, which move under thirty-eight degrees a turn, read as before.
+  The step is `window_sample_degrees`, 30, in `ephemeris.toml`. Mars's crossing is read at its two
+  ends as before; Venus's at three points and Venus–Mars at four, which on an angle moving steadily
+  through the turn gives the answer the two ends gave.
 
-**Window-free crossings** take the same flight whenever flown, the gulf's own `turns`:
-**Ceres–Vesta 9** (the designer's figure; its real window comes once in seventeen years),
-Mercury–Ceres 7, Mercury–Vesta 5, Venus–Ceres 8, Venus–Vesta 6 (Hohmann, rounded up).
+**Window-free crossings** take the same flight whenever flown, the gulf's own `days` made turns as
+a window's flight is, so Nuclear Rockets shortens them too: **Ceres–Vesta 9 turns** (540 days, the
+designer's figure; its real window comes once in seventeen years, 8 with Nuclear Rockets),
+Mercury–Ceres 7 (361.7 days), Mercury–Vesta 5 (294), Venus–Ceres 8 (421), Venus–Vesta 6 (349.9),
+Hohmann flights rounded up.
 
 **The table refuses a missing gulf.** Every pair of systems must have its row, or a crossing would
 be priced at nothing; the refusal names the pair. Every planet a Body is listed under must have its

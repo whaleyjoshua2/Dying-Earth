@@ -7505,9 +7505,9 @@ fn venus_is_a_body_of_orbits_only_with_its_own_window() {
     assert!(!card.low_gravity);
     assert!((g.tables.planet(BodyId::Venus).a - 0.7233).abs() < 1e-3);
     assert!((g.sun_factor(BodyId::Venus) - 1.911).abs() < 1e-2);
-    let w1 = g.next_venus_window_turn(1);
-    let w2 = g.next_venus_window_turn(w1 + 1);
-    let w3 = g.next_venus_window_turn(w2 + 1);
+    let w1 = g.next_window_turn_to(BodyId::Venus, 1);
+    let w2 = g.next_window_turn_to(BodyId::Venus, w1 + 1);
+    let w3 = g.next_window_turn_to(BodyId::Venus, w2 + 1);
     assert_eq!((w1, w2, w3), (9, 18, 28), "the research note's windows");
     assert_eq!(g.transit_cost_at(BodyId::Earth, BodyId::Venus, w1), (3, 17.4), "three turns and the card's Fuel on the window");
     let (turns_off, fuel_off) = g.transit_cost_at(BodyId::Earth, BodyId::Venus, w1 + 4);
@@ -7788,7 +7788,7 @@ fn the_ai_disembarks_into_its_own_station_with_room_at_venus_and_over_earth() {
 fn the_ai_offers_a_loaded_colony_ship_the_flight_to_a_venus_station_with_room() {
     let mut g = game();
     calm(&mut g);
-    g.turn = g.next_venus_window_turn(1);
+    g.turn = g.next_window_turn_to(BodyId::Venus, 1);
     g.seats[0].stockpile.materials = 300.0;
     g.seats[0].stockpile.energy = 300.0;
     g.seats[0].stockpile.fuel = 100.0;
@@ -20715,6 +20715,11 @@ fn the_new_worlds_are_reached_on_their_real_windows() {
         assert_eq!(g.transit_cost_at(BodyId::Ceres, BodyId::Vesta, turn), (9, 4.6), "turn {turn}");
         assert_eq!(g.transit_cost_at(BodyId::Vesta, BodyId::Ceres, turn), (9, 4.6), "turn {turn}");
     }
+    // Nuclear Rockets shortens a window-free crossing as it shortens a window's: 540 days to 432,
+    // eight turns.
+    let mut fast = game();
+    fast.research.done.push(TechId::NuclearRockets);
+    assert_eq!(fast.transit_cost_at(BodyId::Ceres, BodyId::Vesta, 1).0, 8, "Ceres to Vesta under Nuclear Rockets");
     // Mercury laps Earth in under two turns: its window is open more turns than not.
     let open = (1..=36).filter(|t| g.crossing_offset(BodyId::Earth, BodyId::Mercury, *t) == Some(0.0)).count();
     assert!(open >= 18, "Earth to Mercury is on its window {open} turns of 36");
@@ -20742,7 +20747,7 @@ fn ticket_502_a_missing_gulf_refuses_the_table() {
     }
     assert!(Tables::load(&dir).is_ok(), "the copy loads before anything is taken out of it");
     let bodies = std::fs::read_to_string(dir.join("bodies.toml")).expect("bodies.toml");
-    let row = "[[gulf]]\nbetween = [\"ceres\", \"vesta\"]\ndelta_v = 0.96\nturns = 9\n";
+    let row = "[[gulf]]\nbetween = [\"ceres\", \"vesta\"]\ndelta_v = 0.96\ndays = 540.0\n";
     let bodies = bodies.replace("\r\n", "\n");
     assert!(bodies.contains(row), "Ceres to Vesta has its row");
     std::fs::write(dir.join("bodies.toml"), bodies.replace(row, "")).expect("write");

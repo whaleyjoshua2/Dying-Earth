@@ -315,8 +315,10 @@ delta_v = 2.66
 
 # Ticket #502 (version 0.1.0.0): the new worlds' gulfs, section 1.1 of docs/research/new-worlds.md,
 # the same coplanar method. A crossing with a window (ephemeris.toml) takes the window's turns; one
-# without takes the row's `turns`, its Hohmann flight in turns of sixty, rounded up -- Ceres to
-# Vesta nine at the designer's word, its real window coming once in seventeen years.
+# without takes the row's `days`, its Hohmann flight, made turns as a window's flight is (Nuclear
+# Rockets shortening it): Mercury to Ceres 7, to Vesta 5, Venus to Ceres 8, to Vesta 6. Ceres to
+# Vesta is nine turns at the designer's word, 540 days, its real window coming once in seventeen
+# years.
 [[gulf]]
 between = ["earth", "mercury"]
 delta_v = 8.75
@@ -350,20 +352,20 @@ delta_v = 9.69
 [[gulf]]
 between = ["ceres", "vesta"]
 delta_v = 0.96
-turns = 9
+days = 540.0
 [[gulf]]
 between = ["venus", "ceres"]
 delta_v = 9.48
-turns = 8
+days = 421.0
 [[gulf]]
 between = ["venus", "vesta"]
 delta_v = 8.82
-turns = 6
+days = 349.9
 [[gulf]]
 between = ["mercury", "ceres"]
 delta_v = 20.70
-turns = 7
+days = 361.7
 [[gulf]]
 between = ["mercury", "vesta"]
 delta_v = 20.23
-turns = 5
+days = 294.0

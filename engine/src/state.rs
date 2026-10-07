@@ -4512,7 +4512,7 @@ impl Game {
         let (turns, delta_v) = self.journey_delta_v(from, to);
         let fuel = crate::data::leg_fuel(delta_v, self.tables.fuel_per_delta_v);
         let (turns, fuel) = match self.crossing_ports(from, to, turn) {
-            None => (turns, fuel),
+            None => (self.gulf_turns(from, to, days_factor).unwrap_or(turns), fuel),
             Some((offset, tr)) => {
                 let days = (tr.days_at_window + tr.days_per_degree * offset.abs()) * days_factor;
                 let turns = ((days / tr.days_per_turn).ceil() as u32).clamp(1, tr.max_turns);
@@ -4547,10 +4547,21 @@ impl Game {
             // A far orbit is already out of every gravity well: nothing to leave, nothing to stop in.
             Port::Far(..) => (0.0, 0.0),
         };
-        // Ticket #502 (version 0.1.0.0): a gulf with no window is crossed in its own row's turns.
         let (a, b) = (self.system_of_port(from), self.system_of_port(to));
-        let turns = if a == b { 1 } else { t.gulf_card(a, b).map(|g| g.turns).unwrap_or(1) };
-        (turns, ends(from).0 + t.gulf(a, b) + ends(to).1)
+        (self.gulf_turns(from, to, 1.0).unwrap_or(1), ends(from).0 + t.gulf(a, b) + ends(to).1)
+    }
+
+    /// Ticket #502 (version 0.1.0.0): the turns a crossing between two systems takes by its gulf's
+    /// own `days`, where it has no window: the days times Nuclear Rockets' factor, made turns of
+    /// sixty and rounded up, as a window's flight is. `None` inside a system or for a gulf crossed
+    /// in a turn.
+    fn gulf_turns(&self, from: Port, to: Port, days_factor: f64) -> Option<u32> {
+        let (a, b) = (self.system_of_port(from), self.system_of_port(to));
+        if a == b {
+            return None;
+        }
+        let days = self.tables.gulf_card(a, b)?.days?;
+        Some(((days * days_factor / self.tables.transit.days_per_turn).ceil() as u32).max(1))
     }
 
     /// Ticket #486: the end of a journey an orbit of a Body is: the Body, or the far orbit itself.
@@ -4711,9 +4722,9 @@ impl Game {
             }
         };
         let (home, away, angle) = if out { (from, to, table.hohmann_angle) } else { (to, from, table.return_hohmann_angle) };
-        // Ticket #502: a point every thirty degrees the phase angle moves in a turn.
+        // Ticket #502 (version 0.1.0.0): a point every `window_sample_degrees` the phase angle moves in a turn.
         let sweep = 360.0 * table.days_per_turn / table.synodic_days;
-        let steps = ((sweep / 30.0).ceil() as u32).max(1);
+        let steps = ((sweep / t.window_sample_degrees).ceil() as u32).max(1);
         Some((self.span_offset_ports(home, away, turn, angle, steps), table))
     }
 
@@ -4724,7 +4735,7 @@ impl Game {
         self.port_longitude_at(p, self.julian_day(turn))
     }
 
-    /// The same at any instant (ticket #502).
+    /// Ticket #502 (version 0.1.0.0): the same at any instant.
     fn port_longitude_at(&self, p: Port, jd: f64) -> f64 {
         let lon = |b: BodyId| crate::ephemeris::position(self.tables.planet(b), jd).longitude;
         match p {
@@ -4741,7 +4752,7 @@ impl Game {
     /// longitude less home's, comes to `angle` anywhere in the turn.
     ///
     /// Ticket #502 (version 0.1.0.0): Mercury laps Earth in under two turns, so its phase angle
-    /// sweeps more than half the circle inside one; the turn is read at `span_steps` points along
+    /// sweeps more than half the circle inside one; the turn is read at `steps` points along
     /// it, each pair of neighbours as the two ends were, so a window passed between them is found.
     /// A slow crossing reads its two ends alone, as before.
     fn span_offset_ports(&self, home: Port, away: Port, turn: u32, angle: f64, steps: u32) -> f64 {
@@ -4765,25 +4776,11 @@ impl Game {
         best
     }
 
-    /// Ticket #93: the turn Venus's window falls on, looked for from `from` forward over one of its
-    /// synodic cycles.
-    pub fn next_venus_window_turn(&self, from: u32) -> u32 {
-        let tr = &self.tables.transit_venus;
-        let cycle = (tr.synodic_days / tr.days_per_turn).ceil() as u32;
-        let from = from.max(1);
-        let off = |t: u32| self.span_offset_of(BodyId::Venus, t, tr.hohmann_angle).abs();
-        (from..=from + cycle).min_by(|a, b| off(*a).partial_cmp(&off(*b)).unwrap_or(std::cmp::Ordering::Equal)).unwrap_or(from)
-    }
-
     /// The turn the Mars window falls on, looked for from `from` forward over one synodic cycle:
-    /// the turn whose window offset is smallest in magnitude.
+    /// the turn whose window offset is smallest in magnitude. Ticket #502 (version 0.1.0.0): the
+    /// one search every Body's window uses, `next_window_turn_to`, which also replaced Venus's own.
     pub fn next_window_turn(&self, from: u32) -> u32 {
-        let tr = &self.tables.transit;
-        let cycle = (tr.synodic_days / tr.days_per_turn).ceil() as u32;
-        let from = from.max(1);
-        (from..=from + cycle)
-            .min_by(|a, b| self.window_offset(*a).abs().partial_cmp(&self.window_offset(*b).abs()).unwrap_or(std::cmp::Ordering::Equal))
-            .unwrap_or(from)
+        self.next_window_turn_to(BodyId::Mars, from)
     }
 
     /// Ticket #502 (version 0.1.0.0): the turn the window from Earth to any Body falls on, looked

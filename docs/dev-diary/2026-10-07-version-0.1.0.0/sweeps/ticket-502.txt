@@ -1,5 +1,5 @@
    Compiling dying-earth-engine v0.1.0 (C:\Users\Josh\games\Dying-Earth\engine)
-    Finished `release` profile [optimized] target(s) in 3.27s
+    Finished `release` profile [optimized] target(s) in 39.82s
      Running `target\release\examples\sweep.exe 20 --seatings --balance`
 seat 0: Custodians starting in EastAsia
 sink  step  perm  after | collapses/20 | collapse turns (median, min..max) | temp at end (median) | wins by seat

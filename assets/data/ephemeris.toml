@@ -11,6 +11,13 @@
 # The Moon reads Earth's row and Phobos and Deimos read Mars's: at this scale a satellite stands
 # where its parent stands.
 
+# Ticket #502 (version 0.1.0.0): a turn is read at a point every this many degrees the phase angle
+# moves in it, so a window passed inside the turn is found. Mercury laps Earth in under two turns,
+# sweeping more than half the circle in one. Mars's crossing is read at the turn's two ends, as it
+# always was; Venus's at three points and Venus to Mars at four, which on an angle moving steadily
+# through the turn gives the answer the two ends gave.
+window_sample_degrees = 30.0
+
 [[planet]]
 id = "earth"
 a = 1.00000261
@@ -166,8 +173,8 @@ synodic_days = 333.92
 # Ticket #502 (version 0.1.0.0): the new worlds' crossings that have a window, each the same shape,
 # from docs/research/new-worlds.md section 1.2. The phase angle is the second-named's longitude less
 # the first-named's, for the flight out and the flight back alike; a far orbit reads Earth's rows.
-# However far from the window, a crossing is never longer than its window's turns and four more, or
-# nine where that is less (the cap the Mars and Venus crossings keep).
+# However far from the window, a crossing is never longer than its window's turns and four more,
+# and never capped under nine turns (the cap the Mars and Venus crossings keep).
 [[crossing]]
 between = ["earth", "mercury"]
 days_at_window = 105.5
