@@ -1861,6 +1861,9 @@ pub struct RelationsCard {
     /// a scarred pair's floor.
     #[serde(default = "accord_kept_default")]
     pub accord_kept_turns: u32,
+    /// Ticket #495 (version 0.09.9): the turns a refused Faction waits before offering the one who
+    /// refused an Accord again.
+    pub offer_refused_turns: u32,
 }
 
 fn turn_cap_default() -> i64 {

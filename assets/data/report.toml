@@ -78,6 +78,9 @@ first_to_body_eases = "The first Colony on {body} eased Unrest by {ease} in ever
 under_the_sink_eases = "First turn under the Natural Sink: Unrest eased by {ease} in every Region, {custodians} in the Custodians'."
 disembarked = "{n} Colonists disembarked into {colony}."
 station_built = "{faction} built {station}."
+# Ticket #495 (version 0.09.9): an Accord answered, in the player's own section.
+accord_struck = "Accord struck with {faction}."
+accord_refused = "{faction} refused your Accord."
 station_built_eased = "{faction} built {station}: -{ease} Unrest."
 antarctica_opens = "The Antarctic ice opens: {n} Colony Slots on Earth."
 archive_begun = "{faction} began the Archive at {colony}."

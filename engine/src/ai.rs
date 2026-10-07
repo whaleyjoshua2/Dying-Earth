@@ -2398,6 +2398,11 @@ impl Game {
             if other == seat || self.accords.iter().any(|a| a.holds(seat, other)) {
                 continue;
             }
+            // Ticket #495 (version 0.09.9): not while its last offer waits on an answer, nor to a
+            // Faction that refused it within the last few turns.
+            if self.offers.iter().any(|o| o.from == seat && o.to == other) || self.refused_recently(seat, other) {
+                continue;
+            }
             let mut terms = vec![Term::NonAggression];
             // Ticket #320 (version 0.08.8): and Passage in the same offer, to a Faction this seat
             // is Cordial or better with when it holds a Region next door to one that Faction holds, so the

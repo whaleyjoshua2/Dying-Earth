@@ -66,6 +66,10 @@ pub enum Popup {
     /// raised at the head of the turn, where the Event would be, and hands on to the Moments and
     /// the Report once it has been answered.
     Card,
+    /// Ticket #495 (version 0.09.9): **the Accords offered to the player**, each to accept or refuse.
+    /// Raised whenever nothing else is up while one waits, as the card is; the turn will not end
+    /// until each is answered.
+    Offers,
     /// Ticket #169 (version 0.07.5): a tutorial game's note for this turn, shown before everything
     /// else, since it says what the turn is for.
     Tutorial,

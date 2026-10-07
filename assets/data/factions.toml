@@ -334,6 +334,9 @@ scar_floor = -3
 tribute_ducats = 25
 tribute_materials = 15
 accord_kept_turns = 4
+# Ticket #495 (version 0.09.9): a Faction refused an Accord offers the one who refused none again for
+# this many turns, so a refusal is not answered by the same offer every turn.
+offer_refused_turns = 3
 
 # Ticket #268 (version 0.08.4): carbon credits. The Custodians -- and only they -- may offer ppm of
 # carbon credit a turn, standing until changed; any other Faction may buy up to `cap_per_turn` ppm

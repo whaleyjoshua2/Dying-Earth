@@ -1541,6 +1541,16 @@ fn build_board(session: &mut Session) {
             g.ships.push(Ship { id, name, kind: UnitKind::Frigate, seat, damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: 30.0, slot });
         }
     }
+    // Ticket #495 (version 0.09.9): `offer:<n>` (a building aid): the first n computer seats each
+    // offer the player an Accord -- Non-aggression and Passage -- so the prompt can be photographed.
+    if let Some(n) = std::env::args().find_map(|a| a.strip_prefix("offer:").and_then(|v| v.parse::<usize>().ok()))
+        && let Some(g) = session.game.as_mut()
+    {
+        let turn = g.turn;
+        for from in [Seat(1), Seat(2), Seat(3)].into_iter().take(n) {
+            g.offers.push(dying_earth_engine::state::Offer { from, to: Seat(0), terms: vec![Term::NonAggression, Term::Passage], turn });
+        }
+    }
     // Ticket #493 (version 0.09.9): `blockadeiss:1` (a building aid): a Frigate of seat 1's on
     // Blockade in the ring of seat 0's first station over Earth, so the In orbit list's red
     // "blockaded" can be photographed.

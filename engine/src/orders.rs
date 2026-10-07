@@ -901,6 +901,10 @@ impl Game {
                 if pending.iter().any(|o| matches!(o, Order::ProposeAccord { to: t, .. } if t == to)) {
                     return fail("one offer a turn to a Faction");
                 }
+                // Ticket #495 (version 0.09.9): an offer waits a turn for its answer.
+                if self.offers.iter().any(|o| o.from == seat && o.to == *to) {
+                    return fail("your offer is waiting on their answer");
+                }
                 Ok(cost)
             }
             Order::EndAccord { with } => {
@@ -2968,14 +2972,10 @@ impl Game {
                     // Ticket #226 (version 0.08.2): a computer seat answers by its own weights, and
                     // never accepts a term that would lose it the game. A refused offer is not an
                     // offence: punishing a refusal would make every offer a threat.
-                    let yes = self.accord_acceptable(*to, seat, terms);
-                    if yes {
-                        let _ = self.strike_accord(seat, *to, terms.clone());
-                        let text = format!("{} and {} struck an Accord.", self.seat_name(seat), self.seat_name(*to));
-                        self.log(text);
-                    } else {
-                        self.log(format!("{} declined an Accord from {}.", self.seat_name(*to), self.seat_name(seat)));
-                    }
+                    // Ticket #495 (version 0.09.9): answered at the head of the receiver's next
+                    // turn, by a human seat in a prompt, by a computer seat by that rule.
+                    self.offers.push(crate::state::Offer { from: seat, to: *to, terms: terms.clone(), turn: self.turn });
+                    self.log(format!("{} offered {} an Accord.", self.seat_name(seat), self.seat_name(*to)));
                 }
                 Order::EndAccord { with } => {
                     self.end_accord(seat, *with);

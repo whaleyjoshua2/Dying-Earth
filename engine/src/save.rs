@@ -231,6 +231,11 @@ pub struct SavedGame {
     /// Ticket #226 (version 0.08.2): the Accords travel with the game.
     #[serde(default)]
     pub accords: Vec<Accord>,
+    /// Ticket #495 (version 0.09.9): the offers waiting on an answer, and refusals remembered.
+    #[serde(default)]
+    pub offers: Vec<crate::state::Offer>,
+    #[serde(default)]
+    pub refusals: Vec<crate::state::Refusal>,
     /// Ticket #272 (version 0.08.4): the sweep's count of Events drawn with nowhere to land.
     #[serde(default)]
     pub events_no_target: u32,
@@ -313,6 +318,8 @@ impl SavedGame {
             relations,
             market,
             accords,
+            offers,
+            refusals,
             events_no_target,
             body_firsts,
             colony_growth,
@@ -351,6 +358,8 @@ impl SavedGame {
             relations: relations.clone(),
             market: market.clone(),
             accords: accords.clone(),
+            offers: offers.clone(),
+            refusals: refusals.clone(),
             events_no_target: *events_no_target,
             levies_raised: *levies_raised,
             neutral_holds: *neutral_holds,
@@ -401,6 +410,8 @@ impl SavedGame {
             relations: self.relations,
             market: self.market,
             accords: self.accords,
+            offers: self.offers,
+            refusals: self.refusals,
             events_no_target: self.events_no_target,
             body_firsts: self.body_firsts,
             colony_growth: self.colony_growth,

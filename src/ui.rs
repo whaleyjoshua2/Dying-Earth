@@ -442,6 +442,8 @@ enum Action {
     /// Ticket #337 (version 0.09.0): seat 0 answered this turn's choice card. A PLACEHOLDER, so
     /// the card can be answered at all while the interface for it is built in its own lane.
     AnswerCard(bool),
+    /// Ticket #495 (version 0.09.9): an Accord offered to the player, by its index, accepted or not.
+    AnswerOffer(usize, bool),
     /// Ticket #58: a Report line was clicked; go where it points.
     GoTo(ReportPlace),
     ChooseFaction(FactionKind),
@@ -1530,6 +1532,12 @@ pub fn draw(
             // hands on to the turn's Moments and its Report as it goes (`Popup::Card`).
             Action::AnswerCard(taken) => {
                 let result = session.game.as_mut().map(|g| g.answer_card(Seat(0), taken));
+                if let Some(Err(e)) = result {
+                    session.last_error = Some(e);
+                }
+            }
+            Action::AnswerOffer(index, accept) => {
+                let result = session.game.as_mut().map(|g| g.answer_offer(Seat(0), index, accept));
                 if let Some(Err(e)) = result {
                     session.last_error = Some(e);
                 }
@@ -5215,20 +5223,22 @@ fn roster_order_touches_state(o: &Order, sid: StateId) -> bool {
     }
 }
 
+/// An Accord's Term as the order list and the offers prompt name it.
+fn term_name(t: Term) -> &'static str {
+    match t {
+        Term::NonAggression => "non-aggression",
+        Term::Passage => "passage",
+        Term::Refuel => "refuel",
+        Term::ResearchAgreement => "a research agreement",
+    }
+}
+
 fn order_text(game: &Game, o: &Order) -> String {
     match o {
         // Ticket #226 (version 0.08.2): the Accord orders, so a pending one reads in the order list
         // like any other and can be cancelled like any other.
         Order::ProposeAccord { to, terms } => {
-            let names: Vec<&str> = terms
-                .iter()
-                .map(|t| match t {
-                    Term::NonAggression => "non-aggression",
-                    Term::Passage => "passage",
-                    Term::Refuel => "refuel",
-                    Term::ResearchAgreement => "a research agreement",
-                })
-                .collect();
+            let names: Vec<&str> = terms.iter().map(|t| term_name(*t)).collect();
             format!("Offer the {} an Accord: {}", game.seat_name(*to), names.join(", "))
         }
         Order::EndAccord { with } => format!("Declare your Accord with the {} over", game.seat_name(*with)),
@@ -10961,7 +10971,8 @@ fn accords_block(ui: &mut Ui, session: &Session, game: &Game, other: Seat, actio
         } else {
             let ok = game.check_order(me, &session.pending, &order);
             let resp = ui.add_enabled(ok.is_ok(), egui::Button::new(format!("Offer the {} an Accord", game.seat_name(other))));
-            let words = "They answer this turn, by their own reckoning. A refusal costs you nothing: it is not an offence.";
+            // Ticket #495 (version 0.09.9): the answer waits a turn now.
+            let words = "They answer next turn. A refusal costs you nothing: it is not an offence.";
             // Ticket #380 (version 0.09.2): greyed, the refusal first and these words after it.
             let resp = match &ok {
                 Ok(_) => rule_tip(resp, words.to_string()),
@@ -11380,6 +11391,11 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
     // `card_aside` is a building aid and nothing in play sets it (`cardshut:1`).
     if view.popup == Popup::None && !view.card_aside && card_owed(Some(game)) {
         view.popup = Popup::Card;
+    }
+    // Ticket #495 (version 0.09.9): an Accord offered to the player is raised the same way, once
+    // nothing else is up, so the turn's Report and Moments come first.
+    if view.popup == Popup::None && !game.seat(Seat(0)).ai && !game.offers_to(Seat(0)).is_empty() {
+        view.popup = Popup::Offers;
     }
     if view.show_trade && !session.spectator {
         let mut open = true;
@@ -11829,6 +11845,36 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                         }
                     }
                 });
+            });
+        }
+        // Ticket #495 (version 0.09.9): the Accords offered to the player, one row each, Accept or
+        // Refuse. Like the card, an answer is the only way out: no Continue, and Escape holds it.
+        Popup::Offers => {
+            let offers: Vec<(usize, Seat, Vec<Term>)> = game.offers_to(Seat(0)).into_iter().map(|(i, o)| (i, o.from, o.terms.clone())).collect();
+            if offers.is_empty() {
+                view.popup = Popup::None;
+                return;
+            }
+            egui::Modal::new("offers".into()).show(ctx, |ui| {
+                ui.set_width(520.0);
+                ui.label(RichText::new(if offers.len() == 1 { "An Accord offered" } else { "Accords offered" }).size(20.0).strong());
+                ui.add_space(6.0);
+                for (i, from, terms) in &offers {
+                    let names: Vec<&str> = terms.iter().map(|t| term_name(*t)).collect();
+                    ui.horizontal(|ui| {
+                        ui.label(RichText::new(game.seat_name(*from)).color(seat_colour(session, *from)).size(16.0));
+                        ui.label(RichText::new(format!("offer an Accord: {}.", names.join(", "))).size(16.0));
+                    });
+                    ui.horizontal(|ui| {
+                        if ui.button(RichText::new("Accept").size(15.0)).clicked() {
+                            actions.push(Action::AnswerOffer(*i, true));
+                        }
+                        if ui.button(RichText::new("Refuse").size(15.0)).clicked() {
+                            actions.push(Action::AnswerOffer(*i, false));
+                        }
+                    });
+                    ui.add_space(6.0);
+                }
             });
         }
         Popup::Event => {

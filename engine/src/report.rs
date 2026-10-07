@@ -478,6 +478,8 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("under_the_sink_eases", &["ease", "custodians"]),
     ("disembarked", &["n", "colony"]),
     ("station_built", &["faction", "station"]),
+    ("accord_struck", &["faction"]),
+    ("accord_refused", &["faction"]),
     // Ticket #419 (version 0.09.4).
     ("station_built_eased", &["faction", "station", "ease"]),
     ("antarctica_opens", &["n"]),

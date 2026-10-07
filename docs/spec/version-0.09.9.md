@@ -206,3 +206,32 @@ The authority is [ticket #494](https://github.com/whaleyjoshua2/Dying-Earth/issu
 - **One thin rule** between a Colony's or station's first section (the date, the holder, its people,
   its Output, the Lift and Send-down controls) and its Modules heading: the same rule the Region
   card has drawn since version 0.09.8. No rule moves.
+
+## 7. Accords and deals you can refuse
+
+The authority is [ticket #495](https://github.com/whaleyjoshua2/Dying-Earth/issues/495).
+
+- **An Accord offered waits for its answer** until the head of the receiver's next turn. Nobody answers
+  for the player any more.
+- **The player answers in a prompt** raised once the turn's Report and Moments are done: "Accords
+  offered", a row each -- "Prospectors offer an Accord: non-aggression, passage." with **Accept** and
+  **Refuse**. The turn does not end while one waits: End Turn says "Prospectors offer the Custodians
+  an Accord. Accept it or refuse it." **Accept** strikes it at once, if it still can be (no Accord
+  already standing, a research agreement still Friendly); otherwise it lapses.
+- **A computer seat** answers an offer made it at the head of its next turn, by its own reckoning as
+  before, so every seat answers on the same clock.
+- **A refusal is remembered**: a computer seat refused does not offer the same Faction an Accord again
+  for `offer_refused_turns` turns (3, in `factions.toml`'s `[relations]`), nor while its last offer
+  waits. A Faction's second offer to another while its first waits is refused: "your offer is
+  waiting on their answer".
+- **What the player learns**, in their own section of the Report: "Accord struck with Prospectors."
+  or "Prospectors refused your Accord." The Report's word ceiling rises by these 7 words, to 1,790.
+- **The offer button's hover:** "They answer next turn. A refusal costs you nothing: it is not an
+  offence."
+- **Tribute** stays a gift, not an offer. A trade, if the trade ticket allows one, is answered the same
+  way.
+- **Saves:** offers waiting and refusals remembered are saved; an older save reads none.
+
+**Measured** (80 games,
+[`after-495.txt`](../dev-diary/2026-10-05-version-0.09.9/sweeps/after-495.txt)): 2 / 27 / 26 / 2 and 21
+collapses, from 2 / 26 / 28 / 2 and 20: within noise. Accords struck over the batch 599, from 610.

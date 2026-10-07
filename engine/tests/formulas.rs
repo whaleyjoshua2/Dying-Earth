@@ -57,6 +57,11 @@ fn answer_the_card(g: &mut Game) {
         if owed && !g.seat(seat).ai {
             g.answer_card(seat, false).ok();
         }
+        // Ticket #495 (version 0.09.9): and refuses every Accord offered it, the answer that binds
+        // nothing, since the turn will not end while one waits either.
+        while let Some((i, _)) = g.offers_to(seat).first().copied().filter(|_| !g.seat(seat).ai) {
+            g.answer_offer(seat, i, false).ok();
+        }
     }
 }
 
@@ -5445,7 +5450,11 @@ fn a_rivals_paragraph_names_its_visible_orders_and_none_of_its_scores() {
     assert!(g.rival_deed(seat, &Order::ArmyStance { place: Place::State(StateId::EastAsia), stance: Stance::Hold }).is_none());
 
     // And a real AI turn's paragraph says what it did, with none of the scored list in it.
+    // Ticket #495 (version 0.09.9): with the fog lifted. The test leaned on an Accord the computer
+    // struck for the player on turn one, which opened the fog between them; an offer waits for its
+    // answer now, so a deed in a place the player cannot see is rightly left out of the paragraph.
     let mut g = game();
+    g.reveal_all = true;
     pick_a_tech(&mut g);
     answer_the_card(&mut g);
     g.end_turn(std::array::from_fn(|_| Vec::new())).expect("the turn should end");
@@ -19673,8 +19682,9 @@ fn the_reports_templates_stay_under_their_word_ceiling() {
         .sum();
     // Ticket #481 (version 0.09.8): the ceiling rises by the 54 words of the race to the Moon, a
     // new thing the Report says; the 15% cut of what it said before stands. Ticket #490 (version
-    // 0.09.9): and by the 2 of a rival's upgrade, "upgraded {colony}".
-    assert!(words <= 1783, "the Report's templates hold {words} words; the ceiling is 1,783 (15% off 2,031, 54 for the race to the Moon, 2 for a rival's upgrade)");
+    // 0.09.9): and by the 2 of a rival's upgrade, "upgraded {colony}". Ticket #495 (version 0.09.9):
+    // and by the 7 of an Accord answered, struck or refused.
+    assert!(words <= 1790, "the Report's templates hold {words} words; the ceiling is 1,790 (15% off 2,031, 54 for the race to the Moon, 2 for a rival's upgrade, 7 for an Accord answered)");
     // "The" is gone before a Faction's name, which is drawn in its colour instead.
     assert!(!text.contains("he {faction}"), "a template still says \"the {{faction}}\"");
 }
@@ -20352,4 +20362,78 @@ fn a_blockaded_exchange_pays_no_interest() {
     g.seats[pro.index()].venture_fund = 500.0;
     g.income_phase();
     assert_eq!(g.seats[pro.index()].venture_fund, 500.0, "nothing from a blockaded place");
+}
+
+// ---------------------------------------------------------------- #495 Accords you can refuse (version 0.09.9)
+
+/// Ticket #495 (version 0.09.9): an Accord offered to the player waits for an answer; the turn will
+/// not end until it is given; Accept strikes it and says so in the player's own section.
+#[test]
+fn an_accord_offered_to_the_player_waits_for_their_answer() {
+    let mut g = game();
+    calm(&mut g);
+    g.commit_orders(Seat(1), &[Order::ProposeAccord { to: Seat(0), terms: vec![Term::NonAggression] }]);
+    assert!(!g.accords.iter().any(|a| a.holds(Seat(0), Seat(1))), "nobody answered for the player");
+    assert_eq!(g.offers_to(Seat(0)).len(), 1);
+    let why = g.end_turn_refusal().expect("the turn waits on the answer");
+    assert!(why.contains("Accept it or refuse it"), "{why}");
+    g.report.lines.clear();
+    g.answer_offer(Seat(0), 0, true).unwrap();
+    assert!(g.accords.iter().any(|a| a.holds(Seat(0), Seat(1))), "struck");
+    assert!(g.offers.is_empty());
+    assert!(g.report.lines.iter().any(|l| l.kind == LineKind::YourWorks && l.text.contains("Accord struck with")), "{:?}", g.report.lines);
+    assert!(g.answer_offer(Seat(0), 0, true).is_err(), "nothing left to answer");
+}
+
+/// Ticket #495: a refusal is remembered: the refused Faction offers the player nothing again for
+/// `offer_refused_turns`, and then may.
+#[test]
+fn a_refused_offer_is_not_made_again_for_a_few_turns() {
+    let mut g = game();
+    calm(&mut g);
+    let wait = g.tables.relations.offer_refused_turns;
+    assert_eq!(wait, 3);
+    let offers_to_player = |g: &mut Game| g.ai_orders(Seat(1)).iter().any(|o| matches!(o, Order::ProposeAccord { to: Seat(0), .. }));
+    assert!(offers_to_player(&mut g), "the premise: the computer would offer");
+    g.commit_orders(Seat(1), &[Order::ProposeAccord { to: Seat(0), terms: vec![Term::NonAggression] }]);
+    assert!(!offers_to_player(&mut g), "not while its offer waits");
+    g.answer_offer(Seat(0), 0, false).unwrap();
+    assert!(!g.accords.iter().any(|a| a.holds(Seat(0), Seat(1))));
+    assert!(g.refused_recently(Seat(1), Seat(0)));
+    assert!(!offers_to_player(&mut g), "refused this turn");
+    g.turn += wait;
+    assert!(!g.refused_recently(Seat(1), Seat(0)));
+    assert!(offers_to_player(&mut g), "and may offer again");
+}
+
+/// Ticket #495: an offer between two computer seats waits, as the player's does, and is answered
+/// at the head of the receiver's next turn.
+#[test]
+fn an_offer_between_computer_seats_is_answered_the_next_turn() {
+    let mut g = game();
+    calm(&mut g);
+    g.commit_orders(Seat(1), &[Order::ProposeAccord { to: Seat(2), terms: vec![Term::NonAggression] }]);
+    assert!(!g.accords.iter().any(|a| a.holds(Seat(1), Seat(2))), "not this turn");
+    g.answer_computer_offers();
+    assert_eq!(g.offers.len(), 1, "not before the turn turns");
+    g.turn += 1;
+    g.answer_computer_offers();
+    assert!(g.offers.is_empty());
+    assert!(g.accords.iter().any(|a| a.holds(Seat(1), Seat(2))) || g.refused_recently(Seat(1), Seat(2)), "answered one way or the other");
+}
+
+/// Ticket #495: the player's own offer is answered at the head of the next turn, and the Report
+/// says which way.
+#[test]
+fn the_players_offer_is_answered_next_turn_with_a_line() {
+    let mut g = game();
+    calm(&mut g);
+    let offer = Order::ProposeAccord { to: Seat(1), terms: vec![Term::NonAggression] };
+    assert!(g.check_order(Seat(0), &[], &offer).is_ok());
+    g.commit_orders(Seat(0), std::slice::from_ref(&offer));
+    assert!(g.check_order(Seat(0), &[], &offer).unwrap_err().0.contains("waiting on their answer"));
+    g.report.lines.clear();
+    g.turn += 1;
+    g.answer_computer_offers();
+    assert!(g.report.lines.iter().any(|l| l.kind == LineKind::YourWorks && (l.text.contains("Accord struck with") || l.text.contains("refused your Accord"))), "{:?}", g.report.lines);
 }

@@ -139,3 +139,21 @@ One rule above the Modules heading, as the Region card's. Spec section 6. No rul
 - [`ticket-494/colony-card-divider.png`](ticket-494/colony-card-divider.png): the ISS's card; the
   rule under "Lift Pioneers", above "Modules 1 of 2".
 - [`ticket-494/divider-zoomed.png`](ticket-494/divider-zoomed.png): the same, three times as large.
+
+## Accords and deals you can refuse (#495)
+
+An Accord offered waits until the head of the receiver's next turn: the player answers in a prompt,
+a computer seat by its rule; a refusal keeps the refused from offering again for three turns. Spec
+section 7.
+
+- [`ticket-495/offers-prompt.png`](ticket-495/offers-prompt.png): two offers waiting (the new
+  `offer:<n>` shot aid), each row its Faction in colour and its own Accept and Refuse;
+  [`offers-prompt-full.png`](ticket-495/offers-prompt-full.png), the whole screen, End Turn dimmed.
+
+**Tests that leaned on the old rule.** Tests that drive turns as the player now refuse every offer
+before ending one, as they already refused the Choice Card. One test of a rival's Report paragraph
+had relied on an Accord struck for the player on turn 1, which lifted the fog between them; it now
+lifts the fog itself.
+
+**The sweep** ([`after-495.txt`](sweeps/after-495.txt)): 2 / 27 / 26 / 2 and 21 collapses, from
+2 / 26 / 28 / 2 and 20, within noise. Accords struck over the batch 599, from 610.

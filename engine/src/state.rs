@@ -1454,6 +1454,26 @@ pub enum Term {
 /// own. Ending one takes a turn's notice and is free; VIOLATING a term while it stands costs +3 and
 /// ends the whole Accord -- without which a Faction could violate non-aggression every turn, pay 3
 /// each time, and keep drawing a permanent tenth of extra Research from a partner it was attacking.
+/// Ticket #495 (version 0.09.9): **an Accord offered and not yet answered.** It is answered at the
+/// head of the receiver's next turn: by a human seat in a prompt before its orders, the turn not
+/// ending until it has; by a computer seat by its own rule, as the turn begins.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Offer {
+    pub from: Seat,
+    pub to: Seat,
+    pub terms: Vec<Term>,
+    /// The turn it was made in.
+    pub turn: u32,
+}
+
+/// Ticket #495: a refusal remembered -- `from` offers `to` no Accord again before `until`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Refusal {
+    pub from: Seat,
+    pub to: Seat,
+    pub until: u32,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Accord {
     pub a: Seat,
@@ -1615,6 +1635,10 @@ pub struct Game {
     pub market: Market,
     /// Ticket #226 (version 0.08.2): the Accords standing between pairs of Factions.
     pub accords: Vec<Accord>,
+    /// Ticket #495 (version 0.09.9): the Accords offered and not yet answered.
+    pub offers: Vec<Offer>,
+    /// Ticket #495: refusals remembered, so a refused Faction does not offer again at once.
+    pub refusals: Vec<Refusal>,
     /// Ticket #345 (version 0.09.1): who was first to each Body, one row per Body at most,
     /// appended when a first is claimed and never rewritten. In the save.
     pub body_firsts: Vec<BodyFirst>,
@@ -1856,6 +1880,8 @@ impl Game {
             relations: Relations::default(),
             market: Market::default(),
             accords: Vec::new(),
+            offers: Vec::new(),
+            refusals: Vec::new(),
             body_firsts: Vec::new(),
             waiting_last: Vec::new(),
             colony_growth: BTreeMap::new(),
@@ -5233,6 +5259,75 @@ impl Game {
         let turn = self.turn;
         self.accords.push(Accord { a, b, terms, struck: turn, paid: turn, ending: false });
         Ok(())
+    }
+
+    /// Ticket #495 (version 0.09.9): the offers waiting on `seat`'s answer, with their index.
+    pub fn offers_to(&self, seat: Seat) -> Vec<(usize, &Offer)> {
+        self.offers.iter().enumerate().filter(|(_, o)| o.to == seat).collect()
+    }
+
+    /// Ticket #495: whether `from` was refused by `to` recently enough not to offer again.
+    pub fn refused_recently(&self, from: Seat, to: Seat) -> bool {
+        self.refusals.iter().any(|r| r.from == from && r.to == to && self.turn < r.until)
+    }
+
+    /// Ticket #495: a human seat answers an offer made to it. Accept strikes the Accord at once,
+    /// if it still can be; Refuse declines it and is remembered.
+    pub fn answer_offer(&mut self, seat: Seat, index: usize, accept: bool) -> Result<(), String> {
+        if self.offers.get(index).is_none_or(|o| o.to != seat) {
+            return Err("there is no such offer to answer".into());
+        }
+        let offer = self.offers.remove(index);
+        self.settle_offer(offer, accept);
+        Ok(())
+    }
+
+    /// Ticket #495: the head of the turn. Every offer made to a computer seat is answered by its
+    /// rule, as the turn begins, so every seat answers on the same clock; refusals past their time
+    /// are forgotten. Offers to a human seat wait for its answer.
+    pub fn answer_computer_offers(&mut self) {
+        let turn = self.turn;
+        self.refusals.retain(|r| turn < r.until);
+        let mut waiting = Vec::new();
+        for offer in std::mem::take(&mut self.offers) {
+            if self.seat(offer.to).ai && offer.turn < turn {
+                let yes = self.accord_acceptable(offer.to, offer.from, &offer.terms);
+                self.settle_offer(offer, yes);
+            } else {
+                waiting.push(offer);
+            }
+        }
+        self.offers = waiting;
+    }
+
+    /// Ticket #495: an answer given. A yes strikes the Accord, or lapses if it no longer can be (one
+    /// already stands, or a research agreement has lost its Friendly); a no is remembered. Each human
+    /// seat in it reads a line of its own.
+    fn settle_offer(&mut self, offer: Offer, yes: bool) {
+        let (from, to) = (offer.from, offer.to);
+        if yes {
+            match self.strike_accord(from, to, offer.terms) {
+                Ok(()) => {
+                    self.log(format!("{} and {} struck an Accord.", self.seat_name(from), self.seat_name(to)));
+                    for (me, other) in [(from, to), (to, from)] {
+                        if !self.seat(me).ai {
+                            let text = self.say("accord_struck", &[("faction", self.seat_name(other))]);
+                            self.report_line_of(me, LineKind::YourWorks, LineKind::Note, None, text);
+                        }
+                    }
+                }
+                Err(why) => self.log(format!("The Accord between {} and {} lapsed: {why}.", self.seat_name(from), self.seat_name(to))),
+            }
+        } else {
+            let until = self.turn + self.tables.relations.offer_refused_turns;
+            self.refusals.retain(|r| !(r.from == from && r.to == to));
+            self.refusals.push(Refusal { from, to, until });
+            self.log(format!("{} declined an Accord from {}.", self.seat_name(to), self.seat_name(from)));
+            if !self.seat(from).ai {
+                let text = self.say("accord_refused", &[("faction", self.seat_name(to))]);
+                self.report_line_of(from, LineKind::YourWorks, LineKind::Note, None, text);
+            }
+        }
     }
 
     /// Ticket #226: declare it over. Free, and it lapses at the next turn's start.
