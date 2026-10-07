@@ -157,3 +157,13 @@ lifts the fog itself.
 
 **The sweep** ([`after-495.txt`](sweeps/after-495.txt)): 2 / 27 / 26 / 2 and 21 collapses, from
 2 / 26 / 28 / 2 and 20, within noise. Accords struck over the batch 599, from 610.
+
+**The review** (two agents, standards and spec). Fixed: the headless driver had no way to answer an
+offer and so could end no turn once one came (`accord accept|refuse <faction>` now, and the owed
+banner says so; checked by driving a game until three offers came and answering them); the
+screenshot harness's turn-ender refuses offers as the tests' does; two offers crossing between one
+pair -- the first struck clears the other, and an Accept that can no longer be struck says why
+(test watched failing first); the Accord's doc comment back on the Accord; the word count is 8,
+not 7. Kept, and said: the prompt comes once the Report and Moments are done, before any order,
+where the Choice Card comes ahead of them; and a Faction's name takes no "The", by the Report's
+standing rule, where the ticket wrote "The Prospectors".

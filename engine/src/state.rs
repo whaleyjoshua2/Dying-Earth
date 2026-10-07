@@ -1448,12 +1448,6 @@ pub enum Term {
     ResearchAgreement,
 }
 
-/// Ticket #226 (version 0.08.2): an Accord between two Factions, holding one or more Terms.
-///
-/// `diplomacy` is on Relations' own `_Avoid_` list in the glossary, so the system has a word of its
-/// own. Ending one takes a turn's notice and is free; VIOLATING a term while it stands costs +3 and
-/// ends the whole Accord -- without which a Faction could violate non-aggression every turn, pay 3
-/// each time, and keep drawing a permanent tenth of extra Research from a partner it was attacking.
 /// Ticket #495 (version 0.09.9): **an Accord offered and not yet answered.** It is answered at the
 /// head of the receiver's next turn: by a human seat in a prompt before its orders, the turn not
 /// ending until it has; by a computer seat by its own rule, as the turn begins.
@@ -1474,6 +1468,12 @@ pub struct Refusal {
     pub until: u32,
 }
 
+/// Ticket #226 (version 0.08.2): an Accord between two Factions, holding one or more Terms.
+///
+/// `diplomacy` is on Relations' own `_Avoid_` list in the glossary, so the system has a word of its
+/// own. Ending one takes a turn's notice and is free; VIOLATING a term while it stands costs +3 and
+/// ends the whole Accord -- without which a Faction could violate non-aggression every turn, pay 3
+/// each time, and keep drawing a permanent tenth of extra Research from a partner it was attacking.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Accord {
     pub a: Seat,
@@ -5266,6 +5266,11 @@ impl Game {
         self.offers.iter().enumerate().filter(|(_, o)| o.to == seat).collect()
     }
 
+    /// Ticket #495: whether an offer from `from` to `to` is waiting on its answer.
+    pub fn offer_waits(&self, from: Seat, to: Seat) -> bool {
+        self.offers.iter().any(|o| o.from == from && o.to == to)
+    }
+
     /// Ticket #495: whether `from` was refused by `to` recently enough not to offer again.
     pub fn refused_recently(&self, from: Seat, to: Seat) -> bool {
         self.refusals.iter().any(|r| r.from == from && r.to == to && self.turn < r.until)
@@ -5278,6 +5283,13 @@ impl Game {
             return Err("there is no such offer to answer".into());
         }
         let offer = self.offers.remove(index);
+        // Ticket #495 (the review): a yes that can no longer be struck says why.
+        if accept && self.accords.iter().any(|a| a.holds(offer.from, offer.to)) {
+            return Err(format!("you already hold an Accord with {}", self.seat_name(offer.from)));
+        }
+        if accept && offer.terms.contains(&Term::ResearchAgreement) && (self.relations_score(offer.from, offer.to) < 7 || self.relations_score(offer.to, offer.from) < 7) {
+            return Err("a research agreement wants Friendly on both sides, and that has gone".into());
+        }
         self.settle_offer(offer, accept);
         Ok(())
     }
@@ -5309,6 +5321,8 @@ impl Game {
             match self.strike_accord(from, to, offer.terms) {
                 Ok(()) => {
                     self.log(format!("{} and {} struck an Accord.", self.seat_name(from), self.seat_name(to)));
+                    // Ticket #495 (the review): one Accord a pair, so any other offer between them is moot.
+                    self.offers.retain(|o| !((o.from == from && o.to == to) || (o.from == to && o.to == from)));
                     for (me, other) in [(from, to), (to, from)] {
                         if !self.seat(me).ai {
                             let text = self.say("accord_struck", &[("faction", self.seat_name(other))]);

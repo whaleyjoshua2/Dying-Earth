@@ -902,7 +902,7 @@ impl Game {
                     return fail("one offer a turn to a Faction");
                 }
                 // Ticket #495 (version 0.09.9): an offer waits a turn for its answer.
-                if self.offers.iter().any(|o| o.from == seat && o.to == *to) {
+                if self.offer_waits(seat, *to) {
                     return fail("your offer is waiting on their answer");
                 }
                 Ok(cost)

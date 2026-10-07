@@ -2400,7 +2400,7 @@ impl Game {
             }
             // Ticket #495 (version 0.09.9): not while its last offer waits on an answer, nor to a
             // Faction that refused it within the last few turns.
-            if self.offers.iter().any(|o| o.from == seat && o.to == other) || self.refused_recently(seat, other) {
+            if self.offer_waits(seat, other) || self.refused_recently(seat, other) {
                 continue;
             }
             let mut terms = vec![Term::NonAggression];

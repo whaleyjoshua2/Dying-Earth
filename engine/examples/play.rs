@@ -323,12 +323,12 @@ DIPLOMACY (ticket #226; `show` prints Relations both ways and every Accord stand
                                          refuel          either may Refuel at the other's stations
                                          research        both parties' Research rises a tenth; it
                                                          wants Friendly on BOTH sides to strike
-                                       One offer a turn to a Faction, and none where an Accord
-                                       already stands. THE ANSWER IS NOBODY'S TO WRITE: every seat,
-                                       this one included, answers an offer made to it at the
-                                       Resolution by its own weights, so there is no order to accept
-                                       or decline one. A refusal is not an offence. An Accord kept
-                                       {kept} turns pays both sides.
+                                       One offer a turn to a Faction, none where an Accord already
+                                       stands, and none while your last to them waits. It is
+                                       answered at the head of their next turn. A refusal is not an
+                                       offence. An Accord kept {kept} turns pays both sides.
+  accord accept|refuse <faction>       answer an Accord a Faction offered you; the turn does not
+                                       end until every one is answered.
   accord end <faction>                 declare a standing Accord over: free, and it lapses at the
                                        next turn's start -- which gives the board a turn's warning
                                        that something is coming.
@@ -417,6 +417,8 @@ enum Line {
     Tech(TechId),
     /// Ticket #337: this seat's answer to the turn's Choice Card -- taken, or refused.
     Answer(bool),
+    /// Ticket #495 (version 0.09.9): this seat's answer to the Accord a Faction offered it.
+    Offer(Seat, bool),
 }
 
 /// The game is read here as well as written: a Faction is named by its own name, and which seat
@@ -539,13 +541,10 @@ fn parse_line(g: &Game, line: &str) -> Result<Line, String> {
                     Order::ProposeAccord { to, terms }
                 }
                 "end" => Order::EndAccord { with: seat_of(g, at(2)?)? },
-                "accept" | "decline" | "refuse" => {
-                    return Err(
-                        "an offer made to you is answered at the Resolution by your own seat's weights: no order accepts or declines one. `accord end <faction>` ends an Accord that stands."
-                            .into(),
-                    );
-                }
-                _ => return Err(format!("`accord {what}` is not one of offer, end")),
+                // Ticket #495 (version 0.09.9): an offer made to you waits for your answer.
+                "accept" => return Ok(Line::Offer(seat_of(g, at(2)?)?, true)),
+                "decline" | "refuse" => return Ok(Line::Offer(seat_of(g, at(2)?)?, false)),
+                _ => return Err(format!("`accord {what}` is not one of offer, end, accept, refuse")),
             }
         }
         "tribute" => {
@@ -722,6 +721,10 @@ fn print_question(g: &Game) {
 /// card and the line that answers it, since a line is the only door the driver has. `Game::end_turn`
 /// refuses in its own words; a player reading only those would not know what to write.
 fn owed_answer(g: &Game) -> Option<String> {
+    // Ticket #495 (version 0.09.9): an Accord offered is answered by name.
+    if let Some((_, o)) = g.offers_to(Seat(0)).first() {
+        return Some(format!("Put `accord accept {0}` or `accord refuse {0}` in the order list.", g.seat_name(o.from).to_lowercase()));
+    }
     let q = g.pending_question()?;
     if q.answer_of(Seat(0)).is_some() {
         return None;
@@ -1462,6 +1465,17 @@ fn main() {
                             bad += 1;
                         }
                     },
+                    // Ticket #495 (version 0.09.9): an Accord offered, answered as the card is.
+                    Ok(Line::Offer(from, accept)) => {
+                        let index = game.offers_to(Seat(0)).into_iter().find(|(_, o)| o.from == from).map(|(i, _)| i);
+                        match index.ok_or_else(|| format!("{} have offered you no Accord", game.seat_name(from))).and_then(|i| game.answer_offer(Seat(0), i, accept)) {
+                            Ok(()) => println!("line {}: answered: you {} the {} Accord", n + 1, if accept { "accept" } else { "refuse" }, game.seat_name(from)),
+                            Err(e) => {
+                                println!("line {}: REFUSED `{line}`: {e}", n + 1);
+                                bad += 1;
+                            }
+                        }
+                    }
                     Ok(Line::Tech(t)) => match game.pick_tech(Seat(0), t) {
                         Ok(()) => println!("line {}: picked {}", n + 1, game.tables.tech(t).name),
                         Err(e) => {

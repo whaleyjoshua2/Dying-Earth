@@ -19683,8 +19683,8 @@ fn the_reports_templates_stay_under_their_word_ceiling() {
     // Ticket #481 (version 0.09.8): the ceiling rises by the 54 words of the race to the Moon, a
     // new thing the Report says; the 15% cut of what it said before stands. Ticket #490 (version
     // 0.09.9): and by the 2 of a rival's upgrade, "upgraded {colony}". Ticket #495 (version 0.09.9):
-    // and by the 7 of an Accord answered, struck or refused.
-    assert!(words <= 1790, "the Report's templates hold {words} words; the ceiling is 1,790 (15% off 2,031, 54 for the race to the Moon, 2 for a rival's upgrade, 7 for an Accord answered)");
+    // and by the 8 of an Accord answered, struck or refused, less a word of slack the ceiling held.
+    assert!(words <= 1790, "the Report's templates hold {words} words; the ceiling is 1,790 (15% off 2,031, 54 for the race to the Moon, 2 for a rival's upgrade, 8 for an Accord answered, less a word of slack)");
     // "The" is gone before a Faction's name, which is drawn in its colour instead.
     assert!(!text.contains("he {faction}"), "a template still says \"the {{faction}}\"");
 }
@@ -20436,4 +20436,27 @@ fn the_players_offer_is_answered_next_turn_with_a_line() {
     g.turn += 1;
     g.answer_computer_offers();
     assert!(g.report.lines.iter().any(|l| l.kind == LineKind::YourWorks && (l.text.contains("Accord struck with") || l.text.contains("refused your Accord"))), "{:?}", g.report.lines);
+}
+
+/// Ticket #495 (the review): two offers crossing between one pair. The first struck clears the
+/// other, so the player is never asked to accept an Accord that already stands; and a yes that can
+/// no longer be struck says why.
+#[test]
+fn crossing_offers_strike_once_and_a_lapsed_yes_says_why() {
+    let mut g = game();
+    calm(&mut g);
+    g.commit_orders(Seat(1), &[Order::ProposeAccord { to: Seat(0), terms: vec![Term::NonAggression] }]);
+    g.commit_orders(Seat(2), &[Order::ProposeAccord { to: Seat(0), terms: vec![Term::NonAggression] }]);
+    g.offers.push(Offer { from: Seat(0), to: Seat(1), terms: vec![Term::NonAggression], turn: g.turn });
+    let i = g.offers_to(Seat(0)).iter().find(|(_, o)| o.from == Seat(1)).map(|(i, _)| *i).unwrap();
+    g.answer_offer(Seat(0), i, true).unwrap();
+    assert!(g.accords.iter().any(|a| a.holds(Seat(0), Seat(1))));
+    assert!(!g.offers.iter().any(|o| (o.from == Seat(0) && o.to == Seat(1)) || (o.from == Seat(1) && o.to == Seat(0))), "the pair's other offer is moot");
+    assert_eq!(g.offers_to(Seat(0)).len(), 1, "the Arkwrights' still waits");
+    // An Accord with the Arkwrights struck some other way: their offer can no longer be accepted.
+    g.strike_accord(Seat(0), Seat(2), vec![Term::Passage]).unwrap();
+    let (i, _) = g.offers_to(Seat(0))[0];
+    let err = g.answer_offer(Seat(0), i, true).unwrap_err();
+    assert!(err.contains("already hold an Accord"), "{err}");
+    assert!(g.offers.is_empty(), "and it is gone");
 }

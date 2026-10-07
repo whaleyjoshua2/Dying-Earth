@@ -1777,6 +1777,10 @@ fn refuse_any_card(g: &mut Game) {
         if !g.seat(seat).ai && g.pending_question().map(|q| q.answer_of(seat).is_none()).unwrap_or(false) {
             g.answer_card(seat, false).ok();
         }
+        // Ticket #495 (version 0.09.9): and any Accord offered, which holds the turn as the card does.
+        while let Some((i, _)) = g.offers_to(seat).first().copied().filter(|_| !g.seat(seat).ai) {
+            g.answer_offer(seat, i, false).ok();
+        }
     }
 }
 

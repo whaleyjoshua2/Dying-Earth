@@ -225,7 +225,9 @@ The authority is [ticket #495](https://github.com/whaleyjoshua2/Dying-Earth/issu
   waits. A Faction's second offer to another while its first waits is refused: "your offer is
   waiting on their answer".
 - **What the player learns**, in their own section of the Report: "Accord struck with Prospectors."
-  or "Prospectors refused your Accord." The Report's word ceiling rises by these 7 words, to 1,790.
+  or "Prospectors refused your Accord." The Report's word ceiling rises by these 8 words, less a
+  word of slack it held, to 1,790. A Faction's name is drawn in its colour with no "The", by the
+  Report's standing rule.
 - **The offer button's hover:** "They answer next turn. A refusal costs you nothing: it is not an
   offence."
 - **Tribute** stays a gift, not an offer. A trade, if the trade ticket allows one, is answered the same
