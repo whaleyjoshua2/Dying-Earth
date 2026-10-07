@@ -16,10 +16,15 @@ pub enum BodyId {
     /// Version 0.06.0 (ticket #93): Venus, a Body of orbits only: no Colony Slots, three Orbital
     /// Slots, its own Launch Window on the real sky.
     Venus,
+    /// Version 0.1.0.0 (ticket #502): three more worlds, each a system of its own -- Mercury in
+    /// the Sun's glare, Ceres and 4 Vesta out in the belt.
+    Mercury,
+    Ceres,
+    Vesta,
 }
 
 impl BodyId {
-    pub const ALL: [BodyId; 6] = [BodyId::Earth, BodyId::Moon, BodyId::Mars, BodyId::Phobos, BodyId::Deimos, BodyId::Venus];
+    pub const ALL: [BodyId; 9] = [BodyId::Earth, BodyId::Moon, BodyId::Mars, BodyId::Phobos, BodyId::Deimos, BodyId::Venus, BodyId::Mercury, BodyId::Ceres, BodyId::Vesta];
     pub fn index(self) -> usize {
         self as usize
     }
@@ -48,6 +53,9 @@ impl BodyId {
             BodyId::Phobos => "Phobos",
             BodyId::Deimos => "Deimos",
             BodyId::Venus => "Venus",
+            BodyId::Mercury => "Mercury",
+            BodyId::Ceres => "Ceres",
+            BodyId::Vesta => "Vesta",
         }
     }
 }
@@ -107,6 +115,10 @@ pub enum System {
     Earth,
     Venus,
     Mars,
+    /// Ticket #502: the three new worlds' systems.
+    Mercury,
+    Ceres,
+    Vesta,
     Far(u32),
 }
 
@@ -117,6 +129,9 @@ impl System {
             System::Earth => "earth",
             System::Venus => "venus",
             System::Mars => "mars",
+            System::Mercury => "mercury",
+            System::Ceres => "ceres",
+            System::Vesta => "vesta",
             System::Far(_) => "far",
         }
     }

@@ -584,7 +584,8 @@ fn a_station_is_built_for_materials_in_an_orbital_slot_and_holds_only_a_shipyard
     let slots: Vec<u32> = BodyId::ALL.iter().map(|b| g.tables.body(*b).orbital_slots).collect();
     // Ticket #93 (version 0.06.0): and three over Venus.
     // Ticket #480 (version 0.09.8): seven, the last two the far orbits Earth L4 and Earth L5.
-    assert_eq!(slots, vec![7, 2, 3, 1, 1, 3], "ticket #50: five orbital slots over Earth, and two far");
+    // Ticket #502 (version 0.1.0.0): two over each of Mercury, Ceres and Vesta.
+    assert_eq!(slots, vec![7, 2, 3, 1, 1, 3, 2, 2, 2], "ticket #50: five orbital slots over Earth, and two far");
     // The start (ticket #50): the Custodians' ISS, the Prospectors' Tiangong and the Archivists'
     // Axiom over Earth (bare until ticket #290, version 0.08.6, put two aboard); the Arkwrights
     // start with no station, so two slots stand free.
@@ -673,8 +674,8 @@ fn ships_are_built_only_at_shipyards_and_lifts_need_a_launch_site() {
 #[test]
 fn phobos_and_deimos_are_small_different_bodies_one_hop_past_mars() {
     let g = game();
-    // Ticket #93 (version 0.06.0): Venus is the sixth.
-    assert_eq!(BodyId::ALL.len(), 6);
+    // Ticket #93 (version 0.06.0): Venus is the sixth. Ticket #502 (version 0.1.0.0): nine.
+    assert_eq!(BodyId::ALL.len(), 9);
     let ph = g.tables.body(BodyId::Phobos).clone();
     let de = g.tables.body(BodyId::Deimos).clone();
     assert_eq!(ph.name, "Phobos");
@@ -7415,7 +7416,8 @@ fn the_ai_offers_a_trade_post_at_each_body_it_holds() {
 fn the_mass_driver_stands_on_a_low_gravity_colony_behind_efficient_transit_one_per_colony() {
     let mut g = game();
     for b in BodyId::ALL {
-        assert_eq!(g.tables.body(b).low_gravity, matches!(b, BodyId::Moon | BodyId::Phobos | BodyId::Deimos), "{b:?}");
+        // Ticket #502 (version 0.1.0.0): and Ceres and Vesta; Mercury pulls as Mars does.
+        assert_eq!(g.tables.body(b).low_gravity, matches!(b, BodyId::Moon | BodyId::Phobos | BodyId::Deimos | BodyId::Ceres | BodyId::Vesta), "{b:?}");
     }
     let card = g.tables.module(ModuleKind::MassDriver);
     assert_eq!((card.materials, card.widgets, card.energy_upkeep), (35, 8, 4), "ticket #332: 8 Widgets for its two turns");
@@ -7496,7 +7498,6 @@ fn the_ai_offers_a_mass_driver_and_weighs_a_mine_higher_beside_one() {
 #[test]
 fn venus_is_a_body_of_orbits_only_with_its_own_window() {
     let g = game();
-    assert_eq!(BodyId::ALL.len(), 6);
     let card = g.tables.body(BodyId::Venus);
     assert_eq!(card.colony_slots(), 0);
     assert_eq!(card.orbital_slots, 3);
@@ -12274,6 +12275,10 @@ fn passage_lets_an_army_march_into_a_partners_region_on_hold() {
         let (home, target) = (StateId::EastAsia, StateId::Russia);
         assert!(g.tables.state(home).neighbours.contains(&target));
         g.take_control(target, Seat(1));
+        // Ticket #502 (version 0.1.0.0): Russia's own Army stood down, so the march without
+        // Passage is not decided by dice -- three more Bodies' slots drew their yields from the
+        // game's stream and moved every roll after them, and the 2nd Chinese Army fell.
+        g.armies.retain(|a| a.home != ArmyHome::State(target));
         if passage {
             g.strike_accord(Seat(0), Seat(1), vec![Term::Passage]).expect("Passage struck");
             assert!(g.accord_has(Seat(0), Seat(1), Term::Passage));
@@ -12313,6 +12318,9 @@ fn a_regions_own_army_marches_again_and_defends_only_at_home() {
     let mut g = game();
     let (home, target) = (StateId::EastAsia, StateId::Russia);
     g.take_control(target, Seat(1));
+    // Ticket #502 (version 0.1.0.0): Russia's own Army stood down, so the march is not decided by
+    // dice the three new Bodies' slot yields moved.
+    g.armies.retain(|a| a.home != ArmyHome::State(target));
     let standing = g.armies.iter().find(|a| a.standing && a.home == ArmyHome::State(home)).map(|a| a.id).expect("China's own Army");
     let a = g.army(standing).unwrap().clone();
     assert!(g.army_at_home(&a));
@@ -13455,7 +13463,8 @@ fn a_new_ship_starts_in_the_orbit_of_the_yard_that_built_it() {
     let mut g = game();
     let total: usize = BodyId::ALL.iter().map(|b| g.orbits_of(*b).len()).sum();
     // Ticket #442 (version 0.09.6): Venus has no low orbit, so 20 where it was 21.
-    assert_eq!(total, 22, "low orbit where there is ground, plus one per Orbital Slot, over six Bodies");
+    // Ticket #502 (version 0.1.0.0): Mercury, Ceres and Vesta, three orbits each.
+    assert_eq!(total, 31, "low orbit where there is ground, plus one per Orbital Slot, over nine Bodies");
     assert_eq!(g.orbits_of(BodyId::Mars)[0], Orbit::Low, "low orbit is the first of them");
     assert_eq!(g.orbit_name(BodyId::Mars, Orbit::Low), "Mars, low orbit");
     let iss = station_of(&g, Seat(0), BodyId::Earth).expect("the ISS");
@@ -20627,4 +20636,117 @@ fn a_trade_offer_checks_the_place_asked_and_a_failed_yes_says_why() {
     let i = g.offers.len() - 1;
     let err = g.answer_offer(Seat(0), i, true).unwrap_err();
     assert!(err.contains("Materials"), "{err}");
+}
+
+// ---------------------------------------------------------------- Ticket #502: three more worlds
+
+/// Ticket #502 (version 0.1.0.0): **Mercury, Ceres and Vesta join the board**, each with six Colony
+/// Slots and two Orbital Slots; Ceres and Vesta are low gravity, Mercury is not; the yields are the
+/// research's raised by 0.15, Trade Posts too; the first to each is paid 20, 25 and 25; and the
+/// sunlight is the inverse square of the distance, with no ceiling or floor.
+#[test]
+fn ceres_vesta_and_mercury_join_the_board() {
+    let g = game();
+    assert_eq!(BodyId::ALL.len(), 9);
+    let close = |a: f64, b: f64| (a - b).abs() < 1e-9;
+    let rows = [
+        (BodyId::Mercury, "Mercury", false, 20, [1.725, 0.575, 2.3, 1.38, 6.9], "Caloris Planitia", 6.673),
+        (BodyId::Ceres, "Ceres", true, 25, [0.8625, 2.0125, 0.575, 1.265, 8.05], "Occator", 0.1306),
+        (BodyId::Vesta, "Vesta", true, 25, [2.0125, 0.575, 0.575, 1.15, 8.05], "Rheasilvia", 0.1793),
+    ];
+    for (b, name, low, windfall, [mine, refinery, generator, research, trade], first_slot, sun) in rows {
+        let card = g.tables.body(b);
+        assert_eq!(card.name, name);
+        assert_eq!(card.colony_slots(), 6, "{name}: six Colony Slots");
+        assert_eq!(card.orbital_slots, 2, "{name}: two Orbital Slots");
+        assert_eq!(card.stations.len(), 2);
+        assert_eq!(card.low_gravity, low, "{name}");
+        assert_eq!(card.first_windfall, windfall, "{name}");
+        assert_eq!(card.parent, None, "{name} is a planet of its own on the board");
+        assert!(close(card.mine_yield, mine) && close(card.refinery_yield, refinery) && close(card.generator_yield, generator) && close(card.research_yield, research) && close(card.trade_pays, trade), "{name}: the yields x1.15");
+        assert_eq!(card.slots[0].name, first_slot);
+        assert!((g.sun_factor(b) - sun).abs() < 1e-3, "{name}: sunlight {} against {sun}", g.sun_factor(b));
+        assert_eq!(g.orbits_of(b).len(), 3, "{name}: low orbit and two rings");
+    }
+    assert!(g.sun_factor(BodyId::Mercury) > 6.0, "no ceiling on the sunlight");
+    assert!(g.sun_factor(BodyId::Ceres) < 0.15, "and no floor");
+}
+
+/// Ticket #502 (version 0.1.0.0): **the new worlds are reached on their real windows.** At the
+/// window a crossing costs its Hohmann flight in turns of sixty, rounded up, and its delta-v at 4
+/// Fuel a km/s: Earth to Mercury 2 turns and 52.5 Fuel (3.2 + 8.75 + 1.17 km/s), to Ceres 8 and
+/// 38 (3.2 + 6.19 + 0.11), to Vesta 7 and 35 (3.2 + 5.48 + 0.08); Mars to Ceres 10 and 20 (1.41 +
+/// 3.47 + 0.11), Mars to Vesta 9 and 16.2 (1.41 + 2.56 + 0.08). Off the window both rise. Ceres
+/// to Vesta has no window: 9 turns and 4.6 Fuel whenever it is flown.
+#[test]
+fn the_new_worlds_are_reached_on_their_real_windows() {
+    let g = game();
+    let at_window = |from: BodyId, to: BodyId| {
+        // Look from a turn where the window is not the start, over a whole cycle.
+        let mut best = None;
+        for turn in 1..=60 {
+            if g.crossing_offset(from, to, turn) == Some(0.0) {
+                best = Some(turn);
+                break;
+            }
+        }
+        let turn = best.unwrap_or_else(|| panic!("{from:?} to {to:?}: a window within sixty turns"));
+        (turn, g.transit_cost_at(from, to, turn))
+    };
+    for (from, to, want) in [
+        (BodyId::Earth, BodyId::Mercury, (2, 52.5)),
+        (BodyId::Earth, BodyId::Ceres, (8, 38.0)),
+        (BodyId::Earth, BodyId::Vesta, (7, 35.0)),
+        (BodyId::Mars, BodyId::Ceres, (10, 20.0)),
+        (BodyId::Mars, BodyId::Vesta, (9, 16.2)),
+    ] {
+        let (turn, cost) = at_window(from, to);
+        assert_eq!(cost, want, "{from:?} to {to:?} on its window, turn {turn}");
+        // Somewhere in the cycle the same crossing is dearer.
+        let worst = (1..=60).map(|t| g.transit_cost_at(from, to, t)).fold((0, 0.0), |a, b| (a.0.max(b.0), f64::max(a.1, b.1)));
+        assert!(worst.0 > want.0 && worst.1 > want.1, "{from:?} to {to:?} off its window: {worst:?}");
+    }
+    // The way back reads the same row from the other end.
+    let (turn, (turns, fuel)) = at_window(BodyId::Ceres, BodyId::Earth);
+    assert_eq!((turns, fuel), (8, 27.4), "Ceres home on its window, turn {turn}: 0.11 + 6.19 + 0.54 km/s");
+    // Ceres to Vesta has no window: the same every turn.
+    for turn in [1, 7, 19, 40] {
+        assert_eq!(g.crossing_offset(BodyId::Ceres, BodyId::Vesta, turn), None);
+        assert_eq!(g.transit_cost_at(BodyId::Ceres, BodyId::Vesta, turn), (9, 4.6), "turn {turn}");
+        assert_eq!(g.transit_cost_at(BodyId::Vesta, BodyId::Ceres, turn), (9, 4.6), "turn {turn}");
+    }
+    // Mercury laps Earth in under two turns: its window is open more turns than not.
+    let open = (1..=36).filter(|t| g.crossing_offset(BodyId::Earth, BodyId::Mercury, *t) == Some(0.0)).count();
+    assert!(open >= 18, "Earth to Mercury is on its window {open} turns of 36");
+    // The window the map's hover names is a turn the crossing is cheapest.
+    for b in [BodyId::Mercury, BodyId::Ceres, BodyId::Vesta, BodyId::Mars, BodyId::Venus] {
+        let w = g.next_window_turn_to(b, 1);
+        assert_eq!(g.crossing_offset(BodyId::Earth, b, w), Some(0.0), "{b:?}'s named window, turn {w}");
+    }
+    assert!(g.window_text(BodyId::Ceres).starts_with("Ceres window: "));
+}
+
+/// Ticket #502 (version 0.1.0.0): a gulf missing between two systems would price the crossing at
+/// nothing, so the whole table is refused and the refusal names the pair.
+#[test]
+fn ticket_502_a_missing_gulf_refuses_the_table() {
+    let src = default_data_dir();
+    let dir = std::env::temp_dir().join(format!("dying-earth-502-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).expect("a temporary data folder");
+    for entry in std::fs::read_dir(&src).expect("the data folder") {
+        let entry = entry.expect("a data file");
+        if entry.path().is_file() {
+            std::fs::copy(entry.path(), dir.join(entry.file_name())).expect("copy");
+        }
+    }
+    assert!(Tables::load(&dir).is_ok(), "the copy loads before anything is taken out of it");
+    let bodies = std::fs::read_to_string(dir.join("bodies.toml")).expect("bodies.toml");
+    let row = "[[gulf]]\nbetween = [\"ceres\", \"vesta\"]\ndelta_v = 0.96\nturns = 9\n";
+    let bodies = bodies.replace("\r\n", "\n");
+    assert!(bodies.contains(row), "Ceres to Vesta has its row");
+    std::fs::write(dir.join("bodies.toml"), bodies.replace(row, "")).expect("write");
+    let err = Tables::load(&dir).expect_err("a missing gulf is refused");
+    assert!(format!("{err:?}").contains("ceres and vesta"), "and the refusal names the pair: {err:?}");
+    let _ = std::fs::remove_dir_all(&dir);
 }

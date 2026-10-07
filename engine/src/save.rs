@@ -28,7 +28,11 @@ use std::sync::Arc;
 /// Ticket #482 (version 0.09.8): moved to **9**. Two more Regions joined the board (Turkey, South
 /// Africa), the Region called Pakistan became Kazakhstan, and three cards' figures moved, so a save
 /// of sixteen has no card for two of the eighteen.
-pub const SAVE_VERSION: u32 = 9;
+///
+/// Ticket #502 (version 0.1.0.0): moved to **10**. Three Bodies joined the board (Mercury, Ceres,
+/// Vesta), so a save of six has no card for three of the nine, and the Solar System it was played
+/// in had nowhere further to go.
+pub const SAVE_VERSION: u32 = 10;
 
 /// The rules version this executable plays, named beside the file's own in a refusal.
 ///

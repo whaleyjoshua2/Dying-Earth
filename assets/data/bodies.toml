@@ -204,6 +204,84 @@ orbital_slots = 3
 stations = ["Ishtar", "Aphrodite", "Lada"]
 slots = []
 
+# Version 0.1.0.0 (ticket #502): three more worlds, each a system of its own, from
+# docs/research/new-worlds.md. None has air, so arriving costs what leaving does (section 1.1); the
+# yields are the research's reading of what each holds (section 8), raised a sixth (x1.15) at the
+# designer's word, Trade Posts too. Sunlight is the inverse square of the distance with no ceiling
+# (Mercury x6.67, Vesta x0.18, Ceres x0.13), left natural for the day fusion arrives. Six Colony
+# Slots each, the six best known of the research's eight (section 6), and two Orbital Slots.
+[[body]]
+id = "mercury"
+name = "Mercury"
+first_windfall = 20
+transit_turns = 2
+leave_delta_v = 1.17
+arrive_delta_v = 1.17
+trade_pays = 6.9
+mine_yield = 1.725
+generator_yield = 2.3
+refinery_yield = 0.575
+research_yield = 1.38
+orbital_slots = 2
+stations = ["Messenger", "Mariner"]
+slots = [
+    { name = "Caloris Planitia", lon = 161.98, lat = 31.65 },
+    { name = "Borealis Planitia", lon = 32.6, lat = 67.3 },
+    { name = "Prokofiev", lon = 62.92, lat = 85.77 },
+    { name = "Rachmaninoff", lon = 57.37, lat = 27.66 },
+    { name = "Raditladi", lon = 119.06, lat = 27.15 },
+    { name = "Rembrandt", lon = 87.87, lat = -32.89 },
+]
+
+[[body]]
+id = "ceres"
+name = "Ceres"
+first_windfall = 25
+low_gravity = true
+transit_turns = 8
+leave_delta_v = 0.11
+arrive_delta_v = 0.11
+trade_pays = 8.05
+mine_yield = 0.8625
+generator_yield = 0.575
+refinery_yield = 2.0125
+research_yield = 1.265
+orbital_slots = 2
+stations = ["Piazzi", "Dawn"]
+slots = [
+    { name = "Occator", lon = -120.67, lat = 19.82 },
+    { name = "Ahuna Mons", lon = -43.8, lat = -10.48 },
+    { name = "Ernutet", lon = 45.52, lat = 52.93 },
+    { name = "Oxo", lon = -0.4, lat = 42.21 },
+    { name = "Kerwan", lon = 123.99, lat = -10.77 },
+    { name = "Yalode", lon = -67.52, lat = -42.58 },
+]
+
+# Vesta's longitudes are the IAU Claudia Double-Prime system, the one its map is drawn in.
+[[body]]
+id = "vesta"
+name = "Vesta"
+first_windfall = 25
+low_gravity = true
+transit_turns = 7
+leave_delta_v = 0.08
+arrive_delta_v = 0.08
+trade_pays = 8.05
+mine_yield = 2.0125
+generator_yield = 0.575
+refinery_yield = 0.575
+research_yield = 1.15
+orbital_slots = 2
+stations = ["Olbers", "Vestalia"]
+slots = [
+    { name = "Rheasilvia", lon = 86.3, lat = -71.95 },
+    { name = "Veneneia", lon = -54.32, lat = -47.93 },
+    { name = "Divalia Fossae", lon = -163.77, lat = -9.05 },
+    { name = "Marcia", lon = -20.45, lat = 8.98 },
+    { name = "Arruntia", lon = -138.41, lat = 39.44 },
+    { name = "Bellicia", lon = -162.24, lat = 37.73 },
+]
+
 # Ticket #486 (version 0.09.8): **every journey is priced the same way**, each direction for itself.
 # Inside a system a hop has its own figure: a satellite's `local_delta_v` out to it from its parent
 # and `local_return_delta_v` back, and `sibling_delta_v` between two satellites of one parent.
@@ -234,3 +312,58 @@ delta_v = 3.62
 [[gulf]]
 between = ["far", "far"]
 delta_v = 2.66
+
+# Ticket #502 (version 0.1.0.0): the new worlds' gulfs, section 1.1 of docs/research/new-worlds.md,
+# the same coplanar method. A crossing with a window (ephemeris.toml) takes the window's turns; one
+# without takes the row's `turns`, its Hohmann flight in turns of sixty, rounded up -- Ceres to
+# Vesta nine at the designer's word, its real window coming once in seventeen years.
+[[gulf]]
+between = ["earth", "mercury"]
+delta_v = 8.75
+[[gulf]]
+between = ["earth", "ceres"]
+delta_v = 6.19
+[[gulf]]
+between = ["earth", "vesta"]
+delta_v = 5.48
+[[gulf]]
+between = ["mars", "ceres"]
+delta_v = 3.47
+[[gulf]]
+between = ["mars", "vesta"]
+delta_v = 2.56
+[[gulf]]
+between = ["mars", "mercury"]
+delta_v = 14.39
+[[gulf]]
+between = ["venus", "mercury"]
+delta_v = 5.39
+[[gulf]]
+between = ["far", "mercury"]
+delta_v = 13.94
+[[gulf]]
+between = ["far", "ceres"]
+delta_v = 10.81
+[[gulf]]
+between = ["far", "vesta"]
+delta_v = 9.69
+[[gulf]]
+between = ["ceres", "vesta"]
+delta_v = 0.96
+turns = 9
+[[gulf]]
+between = ["venus", "ceres"]
+delta_v = 9.48
+turns = 8
+[[gulf]]
+between = ["venus", "vesta"]
+delta_v = 8.82
+turns = 6
+[[gulf]]
+between = ["mercury", "ceres"]
+delta_v = 20.70
+turns = 7
+[[gulf]]
+between = ["mercury", "vesta"]
+delta_v = 20.23
+turns = 5

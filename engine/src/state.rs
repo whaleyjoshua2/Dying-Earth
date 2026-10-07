@@ -4547,7 +4547,10 @@ impl Game {
             // A far orbit is already out of every gravity well: nothing to leave, nothing to stop in.
             Port::Far(..) => (0.0, 0.0),
         };
-        (1, ends(from).0 + t.gulf(self.system_of_port(from), self.system_of_port(to)) + ends(to).1)
+        // Ticket #502 (version 0.1.0.0): a gulf with no window is crossed in its own row's turns.
+        let (a, b) = (self.system_of_port(from), self.system_of_port(to));
+        let turns = if a == b { 1 } else { t.gulf_card(a, b).map(|g| g.turns).unwrap_or(1) };
+        (turns, ends(from).0 + t.gulf(a, b) + ends(to).1)
     }
 
     /// Ticket #486: the end of a journey an orbit of a Body is: the Body, or the far orbit itself.
@@ -4565,6 +4568,9 @@ impl Game {
             Port::Body(BodyId::Earth | BodyId::Moon) => System::Earth,
             Port::Body(BodyId::Mars | BodyId::Phobos | BodyId::Deimos) => System::Mars,
             Port::Body(BodyId::Venus) => System::Venus,
+            Port::Body(BodyId::Mercury) => System::Mercury,
+            Port::Body(BodyId::Ceres) => System::Ceres,
+            Port::Body(BodyId::Vesta) => System::Vesta,
         }
     }
 
@@ -4668,15 +4674,6 @@ impl Game {
         self.crossing(from, to, turn).map(|(offset, _)| offset)
     }
 
-    /// Which system a Body belongs to: 0 the Earth system, 1 the Mars system, 2 Venus (ticket #93).
-    pub fn system_of(body: BodyId) -> u8 {
-        match body {
-            BodyId::Earth | BodyId::Moon => 0,
-            BodyId::Mars | BodyId::Phobos | BodyId::Deimos => 1,
-            BodyId::Venus => 2,
-        }
-    }
-
     /// Ticket #93: whether a leg runs between two Bodies at all. Ticket #486 (version 0.09.8):
     /// every one does; the leg between Venus and the Mars system, refused until now, is flown.
     pub fn leg_allowed(_from: BodyId, _to: BodyId) -> bool {
@@ -4706,39 +4703,66 @@ impl Game {
             (System::Venus, b) if near(b) => (&t.transit_venus, false),
             (System::Venus, System::Mars) => (&t.transit_venus_mars, true),
             (System::Mars, System::Venus) => (&t.transit_venus_mars, false),
-            _ => return None,
+            // Ticket #502 (version 0.1.0.0): the new worlds' crossings are rows of their own, a far
+            // orbit reading Earth's; a pair with no row has no window.
+            (a, b) => {
+                let key = |s: System| if near(s) { "earth" } else { s.key() };
+                t.crossing_table(key(a), key(b))?
+            }
         };
         let (home, away, angle) = if out { (from, to, table.hohmann_angle) } else { (to, from, table.return_hohmann_angle) };
-        Some((self.span_offset_ports(home, away, turn, angle), table))
+        // Ticket #502: a point every thirty degrees the phase angle moves in a turn.
+        let sweep = 360.0 * table.days_per_turn / table.synodic_days;
+        let steps = ((sweep / 30.0).ceil() as u32).max(1);
+        Some((self.span_offset_ports(home, away, turn, angle, steps), table))
     }
 
     /// Ticket #486: where an end of a journey stands in the sky: its Body's heliocentric longitude
     /// (a satellite reads its planet's), and a far orbit its Body's sixty degrees ahead (the first,
     /// L4) or behind (the second, L5).
     pub fn port_longitude(&self, p: Port, turn: u32) -> f64 {
+        self.port_longitude_at(p, self.julian_day(turn))
+    }
+
+    /// The same at any instant (ticket #502).
+    fn port_longitude_at(&self, p: Port, jd: f64) -> f64 {
+        let lon = |b: BodyId| crate::ephemeris::position(self.tables.planet(b), jd).longitude;
         match p {
-            Port::Body(b) => self.heliocentric_longitude(b, turn),
+            Port::Body(b) => lon(b),
             Port::Far(b, n) => {
                 let card = self.tables.body(b);
                 let k = n.saturating_sub(card.orbital_slots.saturating_sub(card.far_slots));
-                self.heliocentric_longitude(b, turn) + if k.is_multiple_of(2) { 60.0 } else { -60.0 }
+                lon(b) + if k.is_multiple_of(2) { 60.0 } else { -60.0 }
             }
         }
     }
 
     /// Ticket #486: `span_offset_of` between any two ends: the nearest the phase angle, away's
     /// longitude less home's, comes to `angle` anywhere in the turn.
-    fn span_offset_ports(&self, home: Port, away: Port, turn: u32, angle: f64) -> f64 {
-        let phase = |t: u32| crate::ephemeris::wrap_180(self.port_longitude(away, t) - self.port_longitude(home, t));
-        let start = crate::ephemeris::wrap_180(phase(turn) - angle);
-        let end = crate::ephemeris::wrap_180(phase(turn + 1) - angle);
-        if start.signum() != end.signum() && (start - end).abs() < 90.0 {
-            0.0
-        } else if start.abs() <= end.abs() {
-            start
-        } else {
-            end
+    ///
+    /// Ticket #502 (version 0.1.0.0): Mercury laps Earth in under two turns, so its phase angle
+    /// sweeps more than half the circle inside one; the turn is read at `span_steps` points along
+    /// it, each pair of neighbours as the two ends were, so a window passed between them is found.
+    /// A slow crossing reads its two ends alone, as before.
+    fn span_offset_ports(&self, home: Port, away: Port, turn: u32, angle: f64, steps: u32) -> f64 {
+        let (j0, j1) = (self.julian_day(turn), self.julian_day(turn + 1));
+        let off = |k: u32| {
+            let jd = j0 + (j1 - j0) * k as f64 / steps as f64;
+            crate::ephemeris::wrap_180(self.port_longitude_at(away, jd) - self.port_longitude_at(home, jd) - angle)
+        };
+        let mut best = off(0);
+        let mut prev = best;
+        for k in 1..=steps {
+            let next = off(k);
+            if prev.signum() != next.signum() && (prev - next).abs() < 90.0 {
+                return 0.0;
+            }
+            if next.abs() < best.abs() {
+                best = next;
+            }
+            prev = next;
         }
+        best
     }
 
     /// Ticket #93: the turn Venus's window falls on, looked for from `from` forward over one of its
@@ -4762,11 +4786,21 @@ impl Game {
             .unwrap_or(from)
     }
 
-    /// The tooltip the Solar System Map shows over Mars, Phobos or Deimos (ticket #57).
+    /// Ticket #502 (version 0.1.0.0): the turn the window from Earth to any Body falls on, looked
+    /// for from `from` forward over one cycle of its crossing; `from` itself for a Body with none.
+    pub fn next_window_turn_to(&self, body: BodyId, from: u32) -> u32 {
+        let from = from.max(1);
+        let Some((_, tr)) = self.crossing(BodyId::Earth, body, from) else { return from };
+        let cycle = (tr.synodic_days / tr.days_per_turn).ceil() as u32;
+        let off = |t: u32| self.crossing_offset(BodyId::Earth, body, t).unwrap_or(0.0).abs();
+        (from..=from + cycle).min_by(|a, b| off(*a).partial_cmp(&off(*b)).unwrap_or(std::cmp::Ordering::Equal)).unwrap_or(from)
+    }
+
+    /// The tooltip the Solar System Map shows over a Body across a gulf (ticket #57).
     pub fn window_text(&self, body: BodyId) -> String {
         let name = self.tables.body(body).name.clone();
-        // Ticket #93: Venus has a window of its own.
-        let window = if body == BodyId::Venus { self.next_venus_window_turn(self.turn) } else { self.next_window_turn(self.turn) };
+        // Ticket #93: Venus has a window of its own; ticket #502, every Body its own.
+        let window = self.next_window_turn_to(body, self.turn);
         let (now_turns, now_fuel) = self.transit_cost_at(BodyId::Earth, body, self.turn);
         let (win_turns, win_fuel) = self.transit_cost_at(BodyId::Earth, body, window);
         let when = match window.saturating_sub(self.turn) {

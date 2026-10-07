@@ -210,7 +210,7 @@ fn apply_aids(plan: &mut ShotPlan, view: &mut ViewState) {
     }
 }
 
-const VIEWS: [(&str, View); 7] = [
+const VIEWS: [(&str, View); 10] = [
     ("solar", View::Solar),
     ("earth", View::Surface(BodyId::Earth)),
     ("moon", View::Surface(BodyId::Moon)),
@@ -218,6 +218,10 @@ const VIEWS: [(&str, View); 7] = [
     ("phobos", View::Surface(BodyId::Phobos)),
     ("deimos", View::Surface(BodyId::Deimos)),
     ("venus", View::Surface(BodyId::Venus)),
+    // Ticket #502 (version 0.1.0.0).
+    ("mercury", View::Surface(BodyId::Mercury)),
+    ("ceres", View::Surface(BodyId::Ceres)),
+    ("vesta", View::Surface(BodyId::Vesta)),
 ];
 
 // Ticket #109: the credits picture sits between the Faction cards and the start screen, so the

@@ -126,6 +126,9 @@ pub fn solar_position(body: BodyId, turn: u32, lon: f32) -> Vec3 {
         BodyId::Phobos => solar_position(BodyId::Mars, turn, lon) + Vec3::new(0.7 * (t * 1.3).cos(), 0.0, 0.7 * (t * 1.3).sin()),
         BodyId::Deimos => solar_position(BodyId::Mars, turn, lon) + Vec3::new(1.05 * (t * 0.7 + 2.0).cos(), 0.0, 1.05 * (t * 0.7 + 2.0).sin()),
         BodyId::Venus => on_ring(solar_ring(BodyId::Venus)),
+        BodyId::Mercury => on_ring(solar_ring(BodyId::Mercury)),
+        BodyId::Ceres => on_ring(solar_ring(BodyId::Ceres)),
+        BodyId::Vesta => on_ring(solar_ring(BodyId::Vesta)),
     }
 }
 
@@ -135,16 +138,29 @@ pub fn solar_position(body: BodyId, turn: u32, lon: f32) -> Vec3 {
 /// gap between them squashed to less than the two discs' radii together, and the two overlapped
 /// at every conjunction, about four times a game. The designer: *"adjust/rescale solar system view
 /// to keep Venus and earth from overlapping."* Venus is in and Earth out; Mars stays.
+///
+/// Ticket #502 (version 0.1.0.0): Mercury inside Venus, so the Sun is drawn smaller and Venus a
+/// little further out, to keep the same clearance between neighbours at a conjunction; Vesta and
+/// Ceres beyond Mars's moons, in the belt (`SOLAR_BELT`).
 pub fn solar_ring(body: BodyId) -> f32 {
     match body {
-        BodyId::Venus => 1.7,
+        BodyId::Mercury => 1.25,
+        BodyId::Venus => 2.2,
         BodyId::Earth => 3.8,
         BodyId::Mars => 6.0,
+        BodyId::Vesta => 7.3,
+        BodyId::Ceres => 7.9,
         // The satellites have no ring of their own; they ride their planet's.
         BodyId::Moon => solar_ring(BodyId::Earth),
         BodyId::Phobos | BodyId::Deimos => solar_ring(BodyId::Mars),
     }
 }
+
+/// Ticket #502 (version 0.1.0.0): the asteroid belt, a faint band Vesta and Ceres ride in.
+pub const SOLAR_BELT: (f32, f32) = (7.1, 8.1);
+
+/// Ticket #502: the Sun's radius on the Solar System Map.
+pub const SOLAR_SUN: f32 = 0.55;
 
 /// Ticket #480 (version 0.09.8): where a Body's far orbits stand on the Solar System Map -- on the
 /// Body's own ring, a sixth of the way round from it: the first (L4) ahead of it, the second (L5)
@@ -167,5 +183,8 @@ pub fn solar_radius(body: BodyId) -> f32 {
         BodyId::Phobos => 0.1,
         BodyId::Deimos => 0.08,
         BodyId::Venus => 0.40,
+        BodyId::Mercury => 0.16,
+        BodyId::Ceres => 0.14,
+        BodyId::Vesta => 0.12,
     }
 }

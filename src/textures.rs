@@ -42,6 +42,11 @@ pub struct Textures {
     pub deimos: Rgba,
     /// Ticket #93 (version 0.06.0): Venus's clouds, made by `examples/prep_assets.rs --venus`.
     pub venus: Rgba,
+    /// Ticket #502 (version 0.1.0.0): Mercury (MESSENGER), Ceres and Vesta (Dawn), made by
+    /// `examples/prep_worlds.rs`.
+    pub mercury: Rgba,
+    pub ceres: Rgba,
+    pub vesta: Rgba,
     /// 0 = water, 1..19 = the mask value of a Nation State (see `examples/prep_assets.rs`).
     pub mask: Vec<u8>,
 }
@@ -86,7 +91,10 @@ impl Textures {
         let phobos = Rgba::load(&dir.join("phobos.png"))?;
         let deimos = Rgba::load(&dir.join("deimos.png"))?;
         let venus = Rgba::load(&dir.join("venus.png"))?;
-        Ok(Textures { earth, moon, mars, phobos, deimos, venus, mask: mask_img.into_raw() })
+        let mercury = Rgba::load(&dir.join("mercury.png"))?;
+        let ceres = Rgba::load(&dir.join("ceres.png"))?;
+        let vesta = Rgba::load(&dir.join("vesta.png"))?;
+        Ok(Textures { earth, moon, mars, phobos, deimos, venus, mercury, ceres, vesta, mask: mask_img.into_raw() })
     }
 
     /// Ticket #126 (version 0.07.2): the Region under a point on the globe, by the mask -- which is

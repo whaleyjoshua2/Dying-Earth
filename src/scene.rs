@@ -64,6 +64,10 @@ pub fn setup_scene(
     let deimos_material = textured(&mut images, &mut materials, &textures.deimos);
     // Ticket #93: Venus's clouds.
     let venus_material = textured(&mut images, &mut materials, &textures.venus);
+    // Ticket #502 (version 0.1.0.0): the three new worlds.
+    let mercury_material = textured(&mut images, &mut materials, &textures.mercury);
+    let ceres_material = textured(&mut images, &mut materials, &textures.ceres);
+    let vesta_material = textured(&mut images, &mut materials, &textures.vesta);
     let colours = session.colours();
     let mut flat = |c: [f32; 3], unlit: bool| {
         materials.add(StandardMaterial { base_color: Color::srgb(c[0], c[1], c[2]), unlit, double_sided: true, cull_mode: None, ..default() })
@@ -77,6 +81,8 @@ pub fn setup_scene(
     let grey = flat([0.45, 0.45, 0.5], true);
     let sun = flat([1.0, 0.85, 0.3], true);
     let orbit = flat([0.3, 0.3, 0.38], true);
+    // Ticket #502: the belt, fainter than an orbit.
+    let belt = flat([0.07, 0.07, 0.085], true);
     let rings: Vec<Handle<StandardMaterial>> = colours.iter().map(|c| flat(*c, true)).collect();
 
     // --- Solar System Map
@@ -87,10 +93,16 @@ pub fn setup_scene(
     let orbit_mars = annulus(BodyId::Mars);
     // Ticket #93: Venus's ring, inside Earth's.
     let orbit_venus = annulus(BodyId::Venus);
+    // Ticket #502 (version 0.1.0.0): Mercury's ring, and the belt Ceres and Vesta ride in.
+    let orbit_mercury = annulus(BodyId::Mercury);
+    let belt_band = meshes.add(Annulus::new(geo::SOLAR_BELT.0, geo::SOLAR_BELT.1));
     commands
         .spawn((Transform::default(), Visibility::Hidden, SolarRoot))
         .with_children(|p| {
-            p.spawn((Mesh3d(sphere.clone()), MeshMaterial3d(sun.clone()), Transform::from_scale(Vec3::splat(0.8))));
+            p.spawn((Mesh3d(sphere.clone()), MeshMaterial3d(sun.clone()), Transform::from_scale(Vec3::splat(geo::SOLAR_SUN))));
+            // Below the orbits, so a ring drawn across it still shows.
+            p.spawn((Mesh3d(belt_band), MeshMaterial3d(belt), flat_ring.with_translation(Vec3::Y * -0.01)));
+            p.spawn((Mesh3d(orbit_mercury), MeshMaterial3d(orbit.clone()), flat_ring));
             p.spawn((Mesh3d(orbit_earth), MeshMaterial3d(orbit.clone()), flat_ring));
             p.spawn((Mesh3d(orbit_mars), MeshMaterial3d(orbit.clone()), flat_ring));
             p.spawn((Mesh3d(orbit_venus), MeshMaterial3d(orbit.clone()), flat_ring));
@@ -102,6 +114,9 @@ pub fn setup_scene(
                     BodyId::Phobos => phobos_material.clone(),
                     BodyId::Deimos => deimos_material.clone(),
                     BodyId::Venus => venus_material.clone(),
+                    BodyId::Mercury => mercury_material.clone(),
+                    BodyId::Ceres => ceres_material.clone(),
+                    BodyId::Vesta => vesta_material.clone(),
                 };
                 p.spawn((
                     Mesh3d(sphere.clone()),
@@ -133,6 +148,9 @@ pub fn setup_scene(
             BodyId::Phobos => phobos_material.clone(),
             BodyId::Deimos => deimos_material.clone(),
             BodyId::Venus => venus_material.clone(),
+            BodyId::Mercury => mercury_material.clone(),
+            BodyId::Ceres => ceres_material.clone(),
+            BodyId::Vesta => vesta_material.clone(),
         };
         commands
             .spawn((Transform::default(), Visibility::Hidden, SurfaceRoot(body)))
@@ -307,8 +325,9 @@ pub fn sync_scene(
         *t = match current {
             View::Solar => {
                 // The side panel covers the right of the window, so the system sits a little left.
-                let target = Vec3::new(1.6, 0.0, 0.0);
-                let eye = target + Quat::from_rotation_y(view.solar_yaw) * Vec3::new(0.0, 9.5 * view.zoom, 11.5 * view.zoom);
+                // Ticket #502 (version 0.1.0.0): drawn back a quarter and to the right, so the belt is in the picture.
+                let target = Vec3::new(3.3, 0.0, 0.0);
+                let eye = target + Quat::from_rotation_y(view.solar_yaw) * Vec3::new(0.0, 12.0 * view.zoom, 14.5 * view.zoom);
                 Transform::from_translation(eye).looking_at(target, Vec3::Y)
             }
             View::Surface(_) => {

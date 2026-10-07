@@ -1723,6 +1723,9 @@ fn title_screen(root: &mut Ui, session: &mut Session, actions: &mut Vec<Action>)
 /// where anything else the game owes a credit to goes as it grows.
 fn credits_screen(root: &mut Ui, session: &mut Session, icons: &Icons) {
     egui::CentralPanel::default().show(root, |ui| {
+        // Ticket #502 (version 0.1.0.0): the list had already run past an 800-pixel window's foot
+        // before the maps were credited, taking the flags and Back with it, so the page scrolls.
+        egui::ScrollArea::vertical().show(ui, |ui| {
         ui.vertical_centered(|ui| {
             ui.add_space(60.0);
             ui.label(RichText::new("Credits").size(40.0).strong());
@@ -1778,10 +1781,17 @@ fn credits_screen(root: &mut Ui, session: &mut Session, icons: &Icons) {
                     }
                 }
             });
+            // Ticket #502 (version 0.1.0.0): the new worlds' maps, credited as their makers ask.
+            ui.add_space(18.0);
+            ui.label(RichText::new("Maps").size(20.0).strong());
+            ui.label(RichText::new("Ceres and Vesta: NASA/JPL-Caltech/UCLA/MPS/DLR/IDA.").size(14.0));
+            ui.label(RichText::new("Mercury: NASA/Johns Hopkins University Applied Physics Laboratory/Carnegie Institution of Washington.").size(14.0));
             ui.add_space(30.0);
             if ui.add(egui::Button::new(RichText::new("Back").size(20.0)).min_size(egui::vec2(180.0, 38.0))).clicked() {
                 session.screen = Screen::Title;
             }
+            ui.add_space(30.0);
+        });
         });
     });
 }
@@ -3150,12 +3160,16 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
             // so which of them sits higher is not fixed and no constant stagger can answer it.
             // `label_at` has handed back the block it filled since ticket #335 for exactly this.
             let mut placed: Vec<egui::Rect> = Vec::new();
+            // Ticket #502 (version 0.1.0.0): the window line is drawn after every Body's label, so a
+            // world later in the list (Vesta under Ceres) cannot write over it.
+            let mut window_line: Option<(Pos2, String)> = None;
             for body in BodyId::ALL {
                 let pos = geo::solar_place(game, body);
                 // Ticket #155 (version 0.07.4): a label by Body -- Venus's and the satellites' hang
                 // BELOW their discs where a planet's stands above -- so the words of the two inner
                 // planets never meet at a conjunction, and a moon's never lie over its planet's.
-                let below = matches!(body, BodyId::Venus | BodyId::Moon | BodyId::Phobos | BodyId::Deimos);
+                // Ticket #502 (version 0.1.0.0): and Vesta's, so the two in the belt split the same way.
+                let below = matches!(body, BodyId::Venus | BodyId::Moon | BodyId::Phobos | BodyId::Deimos | BodyId::Vesta);
                 let side = if below { -1.0 } else { 1.0 };
                 let head = project(pos + Vec3::Y * side * (geo::solar_radius(body) + 0.05));
                 if let Some(p) = head {
@@ -3287,7 +3301,7 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                     // how this is presented has to be settled again.
                     let far = game.crossing_offset(BodyId::Earth, body, game.turn).is_some();
                     if far && hovering {
-                        label_on_screen(painter, p + egui::vec2(0.0, 96.0), &game.window_text(body), Color32::from_rgb(255, 220, 140), 13.0);
+                        window_line = Some((p + egui::vec2(0.0, 96.0), game.window_text(body)));
                     }
                     // The Orbital Control flag in the holder's Faction colour. Ticket #335 (version
                     // 0.09.0): Control is of LOW ORBIT, and the flag says so, since a warship at a
@@ -3325,6 +3339,9 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                     label_kind_at(painter, at, Some(Kind::of_ships(ships.iter().filter_map(|id| game.ship(*id)))), &text, seat_colour(session, seat), 12.0);
                     hotspots.push(Hotspot { pos: at, radius: 14.0, hit: Hit::Select(Selection::ShipStack(body, seat)) });
                 }
+            }
+            if let Some((at, text)) = window_line {
+                label_on_screen(painter, at, &text, Color32::from_rgb(255, 220, 140), 13.0);
             }
             // Ticket #430 (version 0.09.5): a rival Ship in flight only with its books open.
             for s in game.ships.iter().filter(|s| !hidden_ship(game, s)) {

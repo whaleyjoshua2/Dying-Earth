@@ -50,6 +50,19 @@ pub fn leg_fuel(delta_v: f64, per: f64) -> f64 {
 pub struct GulfCard {
     pub between: [String; 2],
     pub delta_v: f64,
+    /// Ticket #502 (version 0.1.0.0): the turns a crossing of this gulf takes where no window
+    /// prices it -- one, unless the row says more (Ceres to Vesta is nine).
+    #[serde(default = "one")]
+    pub turns: u32,
+}
+
+/// Ticket #502 (version 0.1.0.0): a crossing with a window of its own between two systems named
+/// by `System::key`, the phase angle read as the second's longitude less the first's.
+#[derive(Debug, Clone, Deserialize)]
+pub struct CrossingTable {
+    pub between: [String; 2],
+    #[serde(flatten)]
+    pub table: TransitTable,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -1261,6 +1274,9 @@ struct EphemerisFile {
     transit_venus: TransitTable,
     /// Ticket #486 (version 0.09.8): and Venus to Mars, the phase angle Mars's longitude less Venus's.
     transit_venus_mars: TransitTable,
+    /// Ticket #502 (version 0.1.0.0): every other crossing that has a window.
+    #[serde(default)]
+    crossing: Vec<CrossingTable>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -1991,6 +2007,8 @@ pub struct Tables {
     /// Ticket #93 (version 0.06.0): the Earth-Venus transfer.
     pub transit_venus: TransitTable,
     pub transit_venus_mars: TransitTable,
+    /// Ticket #502 (version 0.1.0.0): the crossings to and from the three new worlds.
+    pub crossings: Vec<CrossingTable>,
     pub states: Vec<StateCard>,
     /// Ticket #53: how a neutral Nation State develops itself (`nation_states.toml`).
     pub development: DevelopmentTable,
@@ -2116,8 +2134,27 @@ impl Tables {
         if a == b {
             return 0.0;
         }
+        self.gulf_card(a, b).map(|g| g.delta_v).unwrap_or(0.0)
+    }
+
+    /// Ticket #502 (version 0.1.0.0): the row of the gulf between two systems, read either way round.
+    pub fn gulf_card(&self, a: crate::ids::System, b: crate::ids::System) -> Option<&GulfCard> {
         let (x, y) = (a.key(), b.key());
-        self.gulfs.iter().find(|g| (g.between[0] == x && g.between[1] == y) || (g.between[0] == y && g.between[1] == x)).map(|g| g.delta_v).unwrap_or(0.0)
+        self.gulfs.iter().find(|g| (g.between[0] == x && g.between[1] == y) || (g.between[0] == y && g.between[1] == x))
+    }
+
+    /// Ticket #502: the crossing table between two systems' keys, and whether it is read the way
+    /// round it is written (`from` the first-named).
+    pub fn crossing_table(&self, from: &str, to: &str) -> Option<(&TransitTable, bool)> {
+        self.crossings.iter().find_map(|c| {
+            if c.between[0] == from && c.between[1] == to {
+                Some((&c.table, true))
+            } else if c.between[0] == to && c.between[1] == from {
+                Some((&c.table, false))
+            } else {
+                None
+            }
+        })
     }
 
     /// Load every table from a directory (normally `assets/data`).
@@ -2152,6 +2189,7 @@ impl Tables {
             transit: ephemeris.transit,
             transit_venus: ephemeris.transit_venus,
             transit_venus_mars: ephemeris.transit_venus_mars,
+            crossings: ephemeris.crossing,
             bodies: bodies.body,
             states: states.state,
             development: states.development,
@@ -2501,9 +2539,31 @@ impl Tables {
         if !(0.0..1.0).contains(&self.slot_yield_spread) {
             return Err(err("bodies.toml", format!("slot_yield_spread {} must be at least 0 and under 1", self.slot_yield_spread)));
         }
-        for id in [BodyId::Earth, BodyId::Mars, BodyId::Venus] {
+        // Ticket #502 (version 0.1.0.0): every planet a Body is listed under has its row.
+        for id in BodyId::ALL.into_iter().filter(|b| b.primary() == *b) {
             if !self.planets.iter().any(|p| p.id == id) {
-                return Err(err("ephemeris.toml", format!("no [[planet]] row for {}: the sky needs Earth's elements, Mars's and Venus's", id.name())));
+                return Err(err("ephemeris.toml", format!("no [[planet]] row for {}: every planet needs its elements", id.name())));
+            }
+        }
+        // Ticket #502: a gulf missing between two systems would price the crossing at nothing.
+        {
+            use crate::ids::System;
+            let systems = [System::Earth, System::Venus, System::Mars, System::Mercury, System::Ceres, System::Vesta, System::Far(0)];
+            for (i, a) in systems.iter().enumerate() {
+                for b in &systems[i..] {
+                    if (a != b || *a == System::Far(0)) && self.gulf_card(*a, *b).is_none() {
+                        return Err(err("bodies.toml", format!("no [[gulf]] between {} and {}", a.key(), b.key())));
+                    }
+                }
+            }
+            for c in &self.crossings {
+                let tr = &c.table;
+                if !c.between.iter().all(|k| systems.iter().any(|s| s.key() == k)) || c.between[0] == c.between[1] {
+                    return Err(err("ephemeris.toml", format!("[[crossing]] {:?}: two different systems by name", c.between)));
+                }
+                if tr.days_at_window <= 0.0 || tr.days_per_turn <= 0.0 || tr.max_turns == 0 || tr.synodic_days <= 0.0 {
+                    return Err(err("ephemeris.toml", format!("[[crossing]] {:?} needs days_at_window, days_per_turn, max_turns and synodic_days above zero", c.between)));
+                }
             }
         }
         for p in &self.planets {

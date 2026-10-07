@@ -197,10 +197,10 @@ pub struct SimResult {
     /// on Earth), and **the turn the first ground Colony standing on each Body was founded**, so a
     /// sweep can say how many worlds a game settles and when, which "first Colony" (Antarctica,
     /// turn 9, every game) and the Mars-system line alone could not.
-    pub ground_colonies_by_body: [u32; 6],
-    pub first_ground_colony_turn_by_body: [Option<u32>; 6],
+    pub ground_colonies_by_body: [u32; BodyId::ALL.len()],
+    pub first_ground_colony_turn_by_body: [Option<u32>; BodyId::ALL.len()],
     /// The same for stations, by Body, Earth's slot nought.
-    pub stations_by_body: [u32; 6],
+    pub stations_by_body: [u32; BodyId::ALL.len()],
     /// Ticket #490 (version 0.09.9): Colonies and stations standing at the end, by tier.
     pub places_by_tier: Vec<u32>,
     /// Ticket #72: the Prospectors' Venture Capital Fund at the end.

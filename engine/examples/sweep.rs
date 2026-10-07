@@ -43,7 +43,7 @@ fn list(flag: &str, default: &[f64]) -> Vec<f64> {
 /// Colonies and stations by Body over the batch, the median ground Colonies off Earth a game, and
 /// for each Body the games whose first ground Colony there stood at the end with the median turn it
 /// was founded -- the pace of settlement, which "first Colony" (Antarctica, by sea) never gave.
-fn off_earth_line(tables: &Tables, ground: &[u32; 6], stations: &[u32; 6], first: &mut [Vec<u32>; 6], per_game: &mut [u32], games: u64) -> String {
+fn off_earth_line(tables: &Tables, ground: &[u32; BodyId::ALL.len()], stations: &[u32; BodyId::ALL.len()], first: &mut [Vec<u32>; BodyId::ALL.len()], per_game: &mut [u32], games: u64) -> String {
     let name = |b: BodyId| tables.body(b).name.clone();
     let bodies: Vec<BodyId> = BodyId::ALL.into_iter().filter(|b| *b != BodyId::Earth).collect();
     let ground_s: Vec<String> = bodies.iter().map(|b| format!("{} {}", name(*b), ground[b.index()])).collect();
@@ -131,11 +131,11 @@ fn main() {
     // review has ONE total to quote rather than four blocks to add up by hand.
     let mut all_warc = dying_earth_engine::state::WarCounters::default();
     // Version 0.09.3: off Earth at the end, by Body, over every seating.
-    let mut all_ground_by_body = [0u32; 6];
-    let mut all_stations_by_body = [0u32; 6];
+    let mut all_ground_by_body = [0u32; BodyId::ALL.len()];
+    let mut all_stations_by_body = [0u32; BodyId::ALL.len()];
     // Ticket #490 (version 0.09.9): places at the end by tier, over every seating.
     let mut all_by_tier: Vec<u32> = Vec::new();
-    let mut all_first_by_body: [Vec<u32>; 6] = Default::default();
+    let mut all_first_by_body: [Vec<u32>; BodyId::ALL.len()] = Default::default();
     let mut all_ground_off_earth_per_game: Vec<u32> = Vec::new();
     // Ticket #355 (version 0.09.1): the orbital war PER FACTION across every seating, and the games
     // each act happened in at all, which is the bar that ticket is judged by. Per Faction, not per
@@ -286,9 +286,9 @@ fn main() {
                         let (mut venus_stations, mut venus_colonists) = (0u32, 0u32);
                         // Version 0.09.3: off Earth at the end, by Body -- ground Colonies, stations,
                         // and the turn each Body's first ground Colony was founded, over the batch.
-                        let mut ground_by_body = [0u32; 6];
-                        let mut stations_by_body = [0u32; 6];
-                        let mut first_by_body: [Vec<u32>; 6] = Default::default();
+                        let mut ground_by_body = [0u32; BodyId::ALL.len()];
+                        let mut stations_by_body = [0u32; BodyId::ALL.len()];
+                        let mut first_by_body: [Vec<u32>; BodyId::ALL.len()] = Default::default();
                         let mut ground_off_earth_per_game: Vec<u32> = Vec::new();
                         // Ticket #75: seat 0's start state.
                         let mut home_lost = Vec::new();
@@ -414,7 +414,7 @@ fn main() {
                             for (t, n) in r.places_by_tier.iter().enumerate() {
                                 all_by_tier[t] += n;
                             }
-                            for b in 0..6 {
+                            for b in 0..BodyId::ALL.len() {
                                 ground_by_body[b] += r.ground_colonies_by_body[b];
                                 stations_by_body[b] += r.stations_by_body[b];
                                 all_ground_by_body[b] += r.ground_colonies_by_body[b];

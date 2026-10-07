@@ -58,6 +58,54 @@ perihelion_longitude_rate = 0.00268329
 node_longitude = 76.67984255
 node_longitude_rate = -0.27769418
 
+# Ticket #502 (version 0.1.0.0): Mercury from the same JPL table; Ceres and Vesta, which that table
+# does not carry, fitted to JPL Horizons the same way (docs/research/new-worlds.md section 4.2,
+# within half a degree of Horizons from 2000 to 2100).
+[[planet]]
+id = "mercury"
+a = 0.38709927
+a_rate = 0.00000037
+e = 0.20563593
+e_rate = 0.00001906
+inclination = 7.00497902
+inclination_rate = -0.00594749
+mean_longitude = 252.25032350
+mean_longitude_rate = 149472.67411175
+perihelion_longitude = 77.45779628
+perihelion_longitude_rate = 0.16047689
+node_longitude = 48.33076593
+node_longitude_rate = -0.12534081
+
+[[planet]]
+id = "ceres"
+a = 2.76716476
+a_rate = -0.00016363
+e = 0.07762174
+e_rate = -0.00005100
+inclination = 10.59640602
+inclination_rate = -0.02066984
+mean_longitude = 160.78432733
+mean_longitude_rate = 7819.40767576
+perihelion_longitude = 153.11732409
+perihelion_longitude_rate = 1.75978337
+node_longitude = 80.55522405
+node_longitude_rate = -1.50565775
+
+[[planet]]
+id = "vesta"
+a = 2.36150737
+a_rate = 0.00000427
+e = 0.08934118
+e_rate = 0.00032909
+inclination = 7.13714420
+inclination_rate = 0.00564144
+mean_longitude = 234.43394156
+mean_longitude_rate = 9918.85851311
+perihelion_longitude = 254.24732846
+perihelion_longitude_rate = 1.25007430
+node_longitude = 103.96163686
+node_longitude_rate = -0.90018449
+
 # What a transit between the Earth system and the Mars system costs. The window offset is the
 # signed difference, in degrees, between the phase angle now (Mars's heliocentric longitude less
 # Earth's) and the Hohmann departure angle. At the window a transit costs the Hohmann flight and
@@ -114,3 +162,85 @@ fuel_per_degree = 0.00833333
 days_per_turn = 60.0
 max_turns = 9
 synodic_days = 333.92
+
+# Ticket #502 (version 0.1.0.0): the new worlds' crossings that have a window, each the same shape,
+# from docs/research/new-worlds.md section 1.2. The phase angle is the second-named's longitude less
+# the first-named's, for the flight out and the flight back alike; a far orbit reads Earth's rows.
+# However far from the window, a crossing is never longer than its window's turns and four more, or
+# nine where that is less (the cap the Mars and Venus crossings keep).
+[[crossing]]
+between = ["earth", "mercury"]
+days_at_window = 105.5
+hohmann_angle = 108.3
+return_hohmann_angle = -76.0
+days_per_degree = 1.5
+fuel_per_degree = 0.00833333
+days_per_turn = 60.0
+max_turns = 9
+synodic_days = 115.9
+
+[[crossing]]
+between = ["earth", "ceres"]
+days_at_window = 472.1
+hohmann_angle = 78.9
+return_hohmann_angle = -74.7
+days_per_degree = 1.5
+fuel_per_degree = 0.00833333
+days_per_turn = 60.0
+max_turns = 12
+synodic_days = 466.6
+
+[[crossing]]
+between = ["earth", "vesta"]
+days_at_window = 397.9
+hohmann_angle = 71.9
+return_hohmann_angle = -147.8
+days_per_degree = 1.5
+fuel_per_degree = 0.00833333
+days_per_turn = 60.0
+max_turns = 11
+synodic_days = 504.2
+
+[[crossing]]
+between = ["mars", "ceres"]
+days_at_window = 573.9
+hohmann_angle = 57.1
+return_hohmann_angle = 120.7
+days_per_degree = 1.5
+fuel_per_degree = 0.00833333
+days_per_turn = 60.0
+max_turns = 14
+synodic_days = 1161.5
+
+[[crossing]]
+between = ["mars", "vesta"]
+days_at_window = 494.5
+hohmann_angle = 45.7
+return_hohmann_angle = 79.1
+days_per_degree = 1.5
+fuel_per_degree = 0.00833333
+days_per_turn = 60.0
+max_turns = 13
+synodic_days = 1425.9
+
+[[crossing]]
+between = ["venus", "mercury"]
+days_at_window = 75.6
+hohmann_angle = -129.2
+return_hohmann_angle = -59.0
+days_per_degree = 1.5
+fuel_per_degree = 0.00833333
+days_per_turn = 60.0
+max_turns = 9
+synodic_days = 144.6
+
+[[crossing]]
+between = ["mars", "mercury"]
+days_at_window = 170.5
+hohmann_angle = -157.9
+return_hohmann_angle = -90.6
+days_per_degree = 1.5
+fuel_per_degree = 0.00833333
+days_per_turn = 60.0
+max_turns = 9
+synodic_days = 100.9
