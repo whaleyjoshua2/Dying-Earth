@@ -480,6 +480,9 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("station_built", &["faction", "station"]),
     ("accord_struck", &["faction"]),
     ("accord_refused", &["faction"]),
+    ("trade_struck", &["faction"]),
+    ("trade_refused", &["faction"]),
+    ("trade_failed", &["faction", "why"]),
     // Ticket #419 (version 0.09.4).
     ("station_built_eased", &["faction", "station", "ease"]),
     ("antarctica_opens", &["n"]),
@@ -705,6 +708,7 @@ pub const RIVAL_ARGS: &[(&str, &[&str])] = &[
     ("nothing", &["faction"]),
     // Ticket #226 (version 0.08.2): the Accords, told as the board could see them.
     ("propose_accord", &["faction"]),
+    ("propose_trade", &["faction"]),
     ("end_accord", &["faction"]),
     ("tribute", &["faction"]),
     ("build_facility", &["building", "state"]),

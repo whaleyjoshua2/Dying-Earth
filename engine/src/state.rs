@@ -1456,6 +1456,10 @@ pub struct Offer {
     pub from: Seat,
     pub to: Seat,
     pub terms: Vec<Term>,
+    /// Ticket #496 (version 0.09.9): a Trade in place of an Accord: what `from` gives, and what it
+    /// asks of `to`.
+    #[serde(default)]
+    pub trade: Option<(crate::orders::TradeGood, crate::orders::TradeGood)>,
     /// The turn it was made in.
     pub turn: u32,
 }
@@ -5266,6 +5270,127 @@ impl Game {
         self.offers.iter().enumerate().filter(|(_, o)| o.to == seat).collect()
     }
 
+    /// Ticket #496 (version 0.09.9): a Trade answered. A yes moves both sides' goods, if both still
+    /// hold them, and is an act of friendship each way; a no is remembered as an Accord's is.
+    fn settle_trade(&mut self, from: Seat, to: Seat, give: crate::orders::TradeGood, get: crate::orders::TradeGood, yes: bool) {
+        use crate::orders::TradeGood;
+        let line = |g: &mut Game, me: Seat, key: &str, other: Seat, why: &str| {
+            if !g.seat(me).ai {
+                let text = g.say(key, &[("faction", g.seat_name(other)), ("why", why.to_string())]);
+                g.report_line_of(me, LineKind::YourWorks, LineKind::Note, None, text);
+            }
+        };
+        if !yes {
+            let until = self.turn + self.tables.relations.offer_refused_turns;
+            self.refusals.retain(|r| !(r.from == from && r.to == to));
+            self.refusals.push(Refusal { from, to, until });
+            self.log(format!("{} declined a Trade from {}.", self.seat_name(to), self.seat_name(from)));
+            line(self, from, "trade_refused", to, "");
+            return;
+        }
+        let short = if self.hostile(from, to) { Err("they are Hostile".to_string()) } else { self.holds_good(from, give).and_then(|_| self.holds_good(to, get)) };
+        if let Err(why) = short {
+            self.log(format!("A Trade between {} and {} failed: {why}.", self.seat_name(from), self.seat_name(to)));
+            line(self, from, "trade_failed", to, &why);
+            line(self, to, "trade_failed", from, &why);
+            return;
+        }
+        for (g, giver, taker) in [(give, from, to), (get, to, from)] {
+            match g {
+                TradeGood::Goods(r, n) => {
+                    let n = n as f64;
+                    let a = self.seat_mut(giver);
+                    match r {
+                        Resource::Ducats => a.stockpile.ducats = tenth(a.stockpile.ducats - n),
+                        Resource::Materials => a.stockpile.materials = tenth(a.stockpile.materials - n),
+                        Resource::Fuel => a.stockpile.fuel = tenth(a.stockpile.fuel - n),
+                        _ => a.stockpile.energy = tenth(a.stockpile.energy - n),
+                    }
+                    let t = self.seat_mut(taker);
+                    match r {
+                        Resource::Ducats => t.stockpile.ducats = tenth(t.stockpile.ducats + n),
+                        Resource::Materials => t.stockpile.materials = tenth(t.stockpile.materials + n),
+                        Resource::Fuel => t.stockpile.fuel = tenth(t.stockpile.fuel + n),
+                        _ => t.stockpile.energy = tenth(t.stockpile.energy + n),
+                    }
+                }
+                TradeGood::Place(c) => self.transfer_control(Place::Colony(c), taker, "Trade"),
+            }
+        }
+        self.credit(from, to);
+        self.credit(to, from);
+        self.log(format!("{} and {} struck a Trade.", self.seat_name(from), self.seat_name(to)));
+        line(self, from, "trade_struck", to, "");
+        line(self, to, "trade_struck", from, "");
+    }
+
+    /// Ticket #496: whether either of a pair holds the other Hostile.
+    pub fn hostile(&self, a: Seat, b: Seat) -> bool {
+        self.relations_level(a, b) == "Hostile" || self.relations_level(b, a) == "Hostile"
+    }
+
+    /// Ticket #496: whether `seat` can give `g` now: enough of the good, or the place held outright,
+    /// not an Archive's Colony, not under Blockade.
+    pub fn holds_good(&self, seat: Seat, g: crate::orders::TradeGood) -> Result<(), String> {
+        use crate::orders::TradeGood;
+        match g {
+            TradeGood::Goods(r, n) => {
+                let s = self.seat(seat).stockpile;
+                let held = match r {
+                    Resource::Ducats => s.ducats,
+                    Resource::Materials => s.materials,
+                    Resource::Fuel => s.fuel,
+                    _ => s.energy,
+                };
+                if held + 1e-9 < n as f64 {
+                    return Err(format!("{} hold {} {}", self.seat_name(seat), figure(held), r.name()));
+                }
+                Ok(())
+            }
+            TradeGood::Place(c) => {
+                let Some(col) = self.colony(c) else { return Err("that place is gone".into()) };
+                if col.control != Control::Controlled(seat) {
+                    return Err(format!("{} no longer hold {}", self.seat_name(seat), self.place_name(Place::Colony(c))));
+                }
+                if col.modules.iter().any(|m| m.kind == ModuleKind::Archive) {
+                    return Err("an Archive's Colony is never traded".into());
+                }
+                if self.starved_by(c).is_some() {
+                    return Err(format!("{} is under Blockade", self.place_name(Place::Colony(c))));
+                }
+                Ok(())
+            }
+        }
+    }
+
+    /// Ticket #496: what a side of a Trade is worth in Ducats: a good at the Trading window's price,
+    /// a place at its build price -- its Core's station price and each Module's Materials -- in Materials.
+    pub fn trade_value(&self, g: crate::orders::TradeGood) -> f64 {
+        use crate::orders::TradeGood;
+        let materials = self.trade_price(Resource::Materials).unwrap_or(1) as f64;
+        match g {
+            TradeGood::Goods(Resource::Ducats, n) => n as f64,
+            TradeGood::Goods(r, n) => n as f64 * self.trade_price(r).unwrap_or(1) as f64,
+            TradeGood::Place(c) => {
+                let modules: f64 = self.colony(c).map(|col| col.modules.iter().filter(|m| m.kind != ModuleKind::Core).map(|m| self.tables.module(m.kind).materials as f64).sum()).unwrap_or(0.0);
+                (self.tables.station_materials as f64 + modules) * materials
+            }
+        }
+    }
+
+    /// Ticket #496: a computer seat's answer to a Trade offered it -- never giving a place, never
+    /// what it cannot pay, never to a Faction it is Hostile with or that is at the door, and only
+    /// where what it gets is worth at least what it gives.
+    pub fn trade_acceptable(&self, seat: Seat, from: Seat, give: crate::orders::TradeGood, get: crate::orders::TradeGood) -> bool {
+        if matches!(get, crate::orders::TradeGood::Place(_)) || self.hostile(seat, from) || self.holds_good(seat, get).is_err() {
+            return false;
+        }
+        if self.progress(from).score_as_it_stands() >= 0.95 {
+            return false;
+        }
+        self.trade_value(give) + 1e-9 >= self.trade_value(get)
+    }
+
     /// Ticket #495: whether an offer from `from` to `to` is waiting on its answer.
     pub fn offer_waits(&self, from: Seat, to: Seat) -> bool {
         self.offers.iter().any(|o| o.from == from && o.to == to)
@@ -5283,6 +5408,11 @@ impl Game {
             return Err("there is no such offer to answer".into());
         }
         let offer = self.offers.remove(index);
+        // Ticket #496 (version 0.09.9): a Trade's yes is checked where the goods move.
+        if offer.trade.is_some() {
+            self.settle_offer(offer, accept);
+            return Ok(());
+        }
         // Ticket #495 (the review): a yes that can no longer be struck says why.
         if accept && self.accords.iter().any(|a| a.holds(offer.from, offer.to)) {
             return Err(format!("you already hold an Accord with {}", self.seat_name(offer.from)));
@@ -5303,7 +5433,10 @@ impl Game {
         let mut waiting = Vec::new();
         for offer in std::mem::take(&mut self.offers) {
             if self.seat(offer.to).ai && offer.turn < turn {
-                let yes = self.accord_acceptable(offer.to, offer.from, &offer.terms);
+                let yes = match offer.trade {
+                    Some((give, get)) => self.trade_acceptable(offer.to, offer.from, give, get),
+                    None => self.accord_acceptable(offer.to, offer.from, &offer.terms),
+                };
                 self.settle_offer(offer, yes);
             } else {
                 waiting.push(offer);
@@ -5317,6 +5450,10 @@ impl Game {
     /// seat in it reads a line of its own.
     fn settle_offer(&mut self, offer: Offer, yes: bool) {
         let (from, to) = (offer.from, offer.to);
+        if let Some((give, get)) = offer.trade {
+            self.settle_trade(from, to, give, get, yes);
+            return;
+        }
         if yes {
             match self.strike_accord(from, to, offer.terms) {
                 Ok(()) => {

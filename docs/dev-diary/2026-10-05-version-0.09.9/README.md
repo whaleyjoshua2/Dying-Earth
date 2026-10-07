@@ -167,3 +167,19 @@ pair -- the first struck clears the other, and an Accept that can no longer be s
 not 7. Kept, and said: the prompt comes once the Report and Moments are done, before any order,
 where the Choice Card comes ahead of them; and a Faction's name takes no "The", by the Report's
 standing rule, where the ticket wrote "The Prospectors".
+
+## Trades between Factions (#496)
+
+One thing for one thing -- Ducats, Materials, Fuel, Energy or a place -- offered and answered as an
+Accord is, the goods moving on the answer. Spec section 8. Widgets were on the first list and are not
+tradeable (a rate, not a stock); the designer swapped in Energy.
+
+- [`ticket-496/trade-block.png`](ticket-496/trade-block.png): the Prospectors' page of the Faction
+  window, the Trade block under the Accords, greyed: "Custodians hold 9.6 [Ducats]".
+- [`ticket-496/trade-offer-prompt.png`](ticket-496/trade-offer-prompt.png): the prompt with a Trade
+  and an Accord in it (the new `offer:trade` shot aid).
+
+**The sweep** ([`after-496.txt`](sweeps/after-496.txt)): 2 / 23 / 30 / 2 and 20 collapses, from
+2 / 27 / 26 / 2 and 21, at the edge of noise. A throwaway count over the same 80 games: 1,576 Trades
+offered, 238 struck, 1,250 declined, 27 failed. Most are declined because the Faction asked is short
+of the same good; not traced further.

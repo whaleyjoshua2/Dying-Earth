@@ -1322,6 +1322,8 @@ pub struct AiWeights {
     /// every turn would bury the player in yes-or-no questions.
     #[serde(default = "accord_weight_default")]
     pub accord: f64,
+    /// Ticket #496 (version 0.09.9): how readily this seat offers a Trade.
+    pub trade: f64,
     pub influence: f64,
     pub transit: f64,
     pub load_unload: f64,
@@ -1414,6 +1416,11 @@ pub struct AiPace {
 #[derive(Debug, Clone, Deserialize)]
 pub struct AiThresholds {
     pub attack_odds: f64,
+    /// Ticket #496 (version 0.09.9): a good short under this, a good long over this many Ducats'
+    /// worth, and how much of the short one a Trade asks for.
+    pub trade_short: f64,
+    pub trade_long: f64,
+    pub trade_ask: u32,
     /// Ticket #410 (version 0.09.4): the Unrest the computer seats act on (see `ai.toml`).
     pub constabulary_from: f64,
     pub stadium_from: f64,

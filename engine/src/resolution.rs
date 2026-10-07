@@ -1687,7 +1687,8 @@ impl Game {
         // the sweep used to count them all together by scraping the log for lines ending
         // `(Influence).` -- a counter that could not say whether the doubling off Earth had moved
         // anything, since a Region and a Colony read the same.
-        if self.place_control(place).controller() != Some(seat) {
+        // Ticket #496 (version 0.09.9): a place traded changes hands in peace, counted as neither.
+        if self.place_control(place).controller() != Some(seat) && why != "Trade" {
             if why != "Influence" {
                 self.war.takes_by_force[seat.index()] += 1;
             } else {
@@ -1764,8 +1765,8 @@ impl Game {
         // one that the three-turn clock transfers -- a place that transfers by PACIFIED is taken
         // whole, at the designer's word, so "beat the Army, then win the people" keeps what it wins.
         // The Moment for a place taken by force fires on every take by force, burned or not: the
-        // taking is the news, not the fire.
-        if why != "Influence" {
+        // taking is the news, not the fire. Ticket #496 (version 0.09.9): and a Trade is no taking.
+        if why != "Influence" && why != "Trade" {
             // Ticket #343 (version 0.09.1): the Occupation's own figures, named where it reads
             // them, since the roll takes them as parameters now: the table's 0.25 and nothing
             // exempt, exactly what the function read for itself until this ticket.

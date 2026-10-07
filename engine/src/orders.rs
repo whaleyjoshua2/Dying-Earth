@@ -13,6 +13,14 @@ pub enum UnitRef {
     Battery { colony: ColonyId, index: usize },
 }
 
+/// Ticket #496 (version 0.09.9): one side of a Trade -- so many of a Stockpile good (Ducats,
+/// Materials, Fuel or Energy), or a Colony or station.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TradeGood {
+    Goods(Resource, u32),
+    Place(ColonyId),
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum LoadSource {
     State(StateId),
@@ -165,6 +173,9 @@ pub enum Order {
     /// the Resolution by its own weights; a refused offer is NOT an offence, since punishing a
     /// refusal would make every offer a threat.
     ProposeAccord { to: Seat, terms: Vec<Term> },
+    /// Ticket #496 (version 0.09.9): offer `to` a Trade, `give` for `get`, answered at the head of
+    /// their next turn as an Accord is; the goods change hands when it is accepted.
+    ProposeTrade { to: Seat, give: TradeGood, get: TradeGood },
     /// Ticket #226: declare a standing Accord over. Free, and it lapses at the next turn's start.
     EndAccord { with: Seat },
     /// Ticket #226: a fixed gift, one per pair per turn, paying +1 Relations. Fixed rather than a
@@ -522,6 +533,16 @@ impl Game {
             }
         };
         Founders { from, n, taught }
+    }
+
+    /// Ticket #496 (version 0.09.9): a side of a Trade the game allows -- a Stockpile good in a
+    /// positive amount, or a place.
+    fn tradeable(&self, g: TradeGood) -> Result<(), OrderError> {
+        match g {
+            TradeGood::Goods(r, n) if n > 0 && matches!(r, Resource::Ducats | Resource::Materials | Resource::Fuel | Resource::Energy) => Ok(()),
+            TradeGood::Goods(..) => Err(OrderError("a Trade is in Ducats, Materials, Fuel, Energy or a place".into())),
+            TradeGood::Place(_) => Ok(()),
+        }
     }
 
     /// Ticket #489 (version 0.09.9): refused where a place cannot give its four, saying what is
@@ -902,6 +923,30 @@ impl Game {
                     return fail("one offer a turn to a Faction");
                 }
                 // Ticket #495 (version 0.09.9): an offer waits a turn for its answer.
+                if self.offer_waits(seat, *to) {
+                    return fail("your offer is waiting on their answer");
+                }
+                Ok(cost)
+            }
+            // Ticket #496 (version 0.09.9): one thing for one thing, between a pair not Hostile.
+            Order::ProposeTrade { to, give, get } => {
+                if *to == seat {
+                    return fail("a Trade is made with another Faction");
+                }
+                if self.hostile(seat, *to) {
+                    return fail("no Trade while Hostile");
+                }
+                self.tradeable(*give)?;
+                self.tradeable(*get)?;
+                self.holds_good(seat, *give).map_err(OrderError)?;
+                if let TradeGood::Place(c) = get
+                    && self.colony(*c).is_none_or(|col| col.control != Control::Controlled(*to))
+                {
+                    return fail("that place is not theirs to trade");
+                }
+                if pending.iter().any(|o| matches!(o, Order::ProposeTrade { to: t, .. } if t == to)) {
+                    return fail("one Trade a turn to a Faction");
+                }
                 if self.offer_waits(seat, *to) {
                     return fail("your offer is waiting on their answer");
                 }
@@ -2974,8 +3019,13 @@ impl Game {
                     // offence: punishing a refusal would make every offer a threat.
                     // Ticket #495 (version 0.09.9): answered at the head of the receiver's next
                     // turn, by a human seat in a prompt, by a computer seat by that rule.
-                    self.offers.push(crate::state::Offer { from: seat, to: *to, terms: terms.clone(), turn: self.turn });
+                    self.offers.push(crate::state::Offer { from: seat, to: *to, terms: terms.clone(), trade: None, turn: self.turn });
                     self.log(format!("{} offered {} an Accord.", self.seat_name(seat), self.seat_name(*to)));
+                }
+                // Ticket #496 (version 0.09.9): nothing is held at the offer.
+                Order::ProposeTrade { to, give, get } => {
+                    self.offers.push(crate::state::Offer { from: seat, to: *to, terms: Vec::new(), trade: Some((*give, *get)), turn: self.turn });
+                    self.log(format!("{} offered {} a Trade.", self.seat_name(seat), self.seat_name(*to)));
                 }
                 Order::EndAccord { with } => {
                     self.end_accord(seat, *with);
@@ -3283,6 +3333,7 @@ impl Game {
             Order::BuyCredits { ppm } => r("buy_credits", &[("n", ppm.to_string())]),
             Order::BuyInfluence { amount } => r("buy_influence", &[("n", amount.to_string())]),
             Order::ProposeAccord { to, .. } => r("propose_accord", &[("faction", self.seat_name(*to))]),
+            Order::ProposeTrade { to, .. } => r("propose_trade", &[("faction", self.seat_name(*to))]),
             Order::EndAccord { with } => r("end_accord", &[("faction", self.seat_name(*with))]),
             Order::Tribute { to, .. } => r("tribute", &[("faction", self.seat_name(*to))]),
             Order::Buy { resource, amount } => r("buy", &[("n", amount.to_string()), ("resource", resource.name().to_string())]),

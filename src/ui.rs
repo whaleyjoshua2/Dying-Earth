@@ -5223,6 +5223,23 @@ fn roster_order_touches_state(o: &Order, sid: StateId) -> bool {
     }
 }
 
+/// Ticket #496 (version 0.09.9): one side of a Trade as the player reads it: "40 Ducats", or a place.
+fn trade_good_text(game: &Game, g: TradeGood) -> String {
+    match g {
+        TradeGood::Goods(r, n) => format!("{n} {}", r.name()),
+        TradeGood::Place(c) => game.place_name(Place::Colony(c)),
+    }
+}
+
+/// Ticket #496: an offer's words after its Faction's name in the prompt: what an Accord holds, or
+/// what a Trade gives for what it asks.
+fn offer_words(game: &Game, o: &dying_earth_engine::state::Offer) -> String {
+    match o.trade {
+        Some((give, get)) => format!("offer {} for {}.", trade_good_text(game, give), trade_good_text(game, get)),
+        None => format!("offer an Accord: {}.", o.terms.iter().map(|t| term_name(*t)).collect::<Vec<_>>().join(", ")),
+    }
+}
+
 /// An Accord's Term as the order list and the offers prompt name it.
 fn term_name(t: Term) -> &'static str {
     match t {
@@ -5242,6 +5259,8 @@ fn order_text(game: &Game, o: &Order) -> String {
             format!("Offer the {} an Accord: {}", game.seat_name(*to), names.join(", "))
         }
         Order::EndAccord { with } => format!("Declare your Accord with the {} over", game.seat_name(*with)),
+        // Ticket #496 (version 0.09.9).
+        Order::ProposeTrade { to, give, get } => format!("Offer {} {} for {}", game.seat_name(*to), trade_good_text(game, *give), trade_good_text(game, *get)),
         // Ticket #332 (version 0.09.0): a rival's build cancelled at a place that changed hands.
         Order::CancelBuild { place, index } => {
             let building = game.queue_at(*place).get(*index).map(|b| b.item.name()).unwrap_or_else(|| "build".to_string());
@@ -10906,6 +10925,65 @@ fn greenwash_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewS
     }
 }
 
+/// Ticket #496 (version 0.09.9): **a Trade**, one thing for one thing, on a rival's page beside the
+/// Accord offer: what you give -- an amount of a Stockpile good, or a place of yours -- and what you
+/// ask of them, the same way. The choice lives in egui's memory under the pair, as the Accord's
+/// ticks do; it is a scratch choice, not game state.
+fn trade_block(ui: &mut Ui, session: &Session, game: &Game, other: Seat, actions: &mut Vec<Action>) {
+    const GOODS: [ResourceKind; 4] = [ResourceKind::Ducats, ResourceKind::Materials, ResourceKind::Fuel, ResourceKind::Energy];
+    ui.label(RichText::new("Trade").strong());
+    let side = |ui: &mut Ui, key: &str, owner: Seat| -> TradeGood {
+        let id = egui::Id::new(("trade", key, other.index()));
+        // Ducats given and Materials asked, to begin with, so the first choice reads as a trade.
+        let start = if key == "give" { 0 } else { 1 };
+        let (mut kind, mut n, mut place): (usize, u32, Option<ColonyId>) = ui.ctx().memory(|m| m.data.get_temp(id).unwrap_or((start, 10, None)));
+        let places: Vec<ColonyId> = game.colonies.iter().filter(|c| c.control == Control::Controlled(owner)).map(|c| c.id).collect();
+        ui.horizontal(|ui| {
+            ui.label(if key == "give" { "Give" } else { "For" });
+            let label = |k: usize| if k < GOODS.len() { GOODS[k].name().to_string() } else { "a place".to_string() };
+            egui::ComboBox::from_id_salt(("trade-kind", key, other.index())).selected_text(label(kind)).show_ui(ui, |ui| {
+                for k in 0..=GOODS.len() {
+                    ui.selectable_value(&mut kind, k, label(k));
+                }
+            });
+            if kind < GOODS.len() {
+                ui.add(egui::DragValue::new(&mut n).range(1..=9999));
+            } else {
+                let shown = place.filter(|p| places.contains(p)).or(places.first().copied());
+                place = shown;
+                egui::ComboBox::from_id_salt(("trade-place", key, other.index())).selected_text(shown.map(|c| game.place_name(Place::Colony(c))).unwrap_or_else(|| "none".to_string())).show_ui(ui, |ui| {
+                    for c in &places {
+                        ui.selectable_value(&mut place, Some(*c), game.place_name(Place::Colony(*c)));
+                    }
+                });
+            }
+        });
+        ui.ctx().memory_mut(|m| m.data.insert_temp(id, (kind, n, place)));
+        match (kind < GOODS.len(), place) {
+            (true, _) => TradeGood::Goods(GOODS[kind], n),
+            (false, Some(c)) => TradeGood::Place(c),
+            (false, None) => TradeGood::Goods(GOODS[0], 0),
+        }
+    };
+    let give = side(ui, "give", Seat(0));
+    let get = side(ui, "get", other);
+    let order = Order::ProposeTrade { to: other, give, get };
+    if session.pending.iter().any(|o| matches!(o, Order::ProposeTrade { to, .. } if *to == other)) {
+        ui.label(RichText::new("Your Trade goes to them this turn.").weak());
+        return;
+    }
+    let ok = game.check_order(Seat(0), &session.pending, &order);
+    let resp = ui.add_enabled(ok.is_ok(), egui::Button::new(format!("Offer {} a Trade", game.seat_name(other))));
+    let words = "They answer next turn; the goods move only if both still hold them.";
+    let resp = match &ok {
+        Ok(_) => rule_tip(resp, words.to_string()),
+        Err(e) => rule_tip(resp, refusal_hover(&e.0, Some(words))),
+    };
+    if resp.clicked() {
+        actions.push(Action::Place(order));
+    }
+}
+
 fn accords_block(ui: &mut Ui, session: &Session, game: &Game, other: Seat, actions: &mut Vec<Action>) {
     let me = Seat(0);
     let r = &game.tables.relations;
@@ -11177,6 +11255,8 @@ A rival that holds you at less than neutral defends its places against you a lit
         // player's seat and somebody else. Your own page has nobody to strike one with.
         if !session.spectator && seat != Seat(0) {
             accords_block(ui, session, game, seat, actions);
+            ui.add_space(6.0);
+            trade_block(ui, session, game, seat, actions);
             ui.add_space(6.0);
             smear_block(ui, session, game, view, seat, actions);
             ui.add_space(6.0);
@@ -11850,20 +11930,19 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
         // Ticket #495 (version 0.09.9): the Accords offered to the player, one row each, Accept or
         // Refuse. Like the card, an answer is the only way out: no Continue, and Escape holds it.
         Popup::Offers => {
-            let offers: Vec<(usize, Seat, Vec<Term>)> = game.offers_to(Seat(0)).into_iter().map(|(i, o)| (i, o.from, o.terms.clone())).collect();
+            let offers: Vec<(usize, Seat, String)> = game.offers_to(Seat(0)).into_iter().map(|(i, o)| (i, o.from, offer_words(game, o))).collect();
             if offers.is_empty() {
                 view.popup = Popup::None;
                 return;
             }
             egui::Modal::new("offers".into()).show(ctx, |ui| {
                 ui.set_width(520.0);
-                ui.label(RichText::new(if offers.len() == 1 { "An Accord offered" } else { "Accords offered" }).size(20.0).strong());
+                ui.label(RichText::new(if offers.len() == 1 { "An offer" } else { "Offers" }).size(20.0).strong());
                 ui.add_space(6.0);
-                for (i, from, terms) in &offers {
-                    let names: Vec<&str> = terms.iter().map(|t| term_name(*t)).collect();
+                for (i, from, words) in &offers {
                     ui.horizontal(|ui| {
                         ui.label(RichText::new(game.seat_name(*from)).color(seat_colour(session, *from)).size(16.0));
-                        ui.label(RichText::new(format!("offer an Accord: {}.", names.join(", "))).size(16.0));
+                        ui.label(RichText::new(words).size(16.0));
                     });
                     ui.horizontal(|ui| {
                         if ui.button(RichText::new("Accept").size(15.0)).clicked() {

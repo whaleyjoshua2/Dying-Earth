@@ -237,3 +237,38 @@ The authority is [ticket #495](https://github.com/whaleyjoshua2/Dying-Earth/issu
 **Measured** (80 games,
 [`after-495.txt`](../dev-diary/2026-10-05-version-0.09.9/sweeps/after-495.txt)): 2 / 27 / 26 / 2 and 21
 collapses, from 2 / 26 / 28 / 2 and 20: within noise. Accords struck over the batch 599, from 610.
+
+## 8. Trades between Factions
+
+The authority is [ticket #496](https://github.com/whaleyjoshua2/Dying-Earth/issues/496).
+
+- **A Trade is one thing for one thing**, offered with `Order::ProposeTrade`: an amount of Ducats,
+  Materials, Fuel or Energy, or a Colony or station held outright -- never an Archive's Colony nor a
+  place under Blockade. Widgets are not traded: a place's rate, not a stock.
+- **It is answered as an Accord is**, at the head of the receiver's next turn: the player in the
+  offers prompt ("Prospectors offer 30 Materials for 60 Ducats."), a computer seat by its rule.
+  Nothing is held at the offer; **the goods move when it is accepted**, and only if both sides still
+  hold them -- otherwise it fails and each human side reads "Trade with X failed: why".
+- **A place traded changes hands in peace**: its people, Modules, builds and own Army go with it; no
+  building is lost, no Moment of a taking, not counted as a taking.
+- **No Trade where either holds the other Hostile.** One Trade a turn to a Faction, none while an
+  offer to it waits.
+- **An accepted Trade is an act of friendship each way**, once a turn per pair, as Tribute is.
+- **The computer seats** offer a Trade, at most one a turn, when a Stockpile good is under
+  `trade_short` (15) and another is worth over `trade_long` (150 Ducats): they ask `trade_ask` (20)
+  of the short good of the Faction they stand best with, giving as much of the long one at the
+  Trading window's prices. They never offer a place. They accept a Trade at least even at those
+  prices, or a place for no more than its build price (its Core's 40 Materials and each Module's
+  Materials price); never giving a place, never what they cannot pay. A refusal is remembered three
+  turns, as an Accord's is. The figures are in `ai.toml`, with a `trade` weight for each Faction.
+- **Where:** a Trade block on a rival's page of the Faction window, under the Accords: "Give
+  [Ducats] 10 / For [Materials] 10", "Offer Prospectors a Trade", greyed with the reason on the hover.
+  The headless driver: `trade <faction> <give> for <ask>` and `trade accept|refuse <faction>`.
+- **The Report** gains "offered X a Trade" (a rival's deed), "Trade struck with X.", "X refused your
+  Trade." and "Trade with X failed: why."; its word ceiling rises by these 17 words, to 1,807.
+
+**Measured** (80 games,
+[`after-496.txt`](../dev-diary/2026-10-05-version-0.09.9/sweeps/after-496.txt)): 2 / 23 / 30 / 2 and 20
+collapses, from 2 / 27 / 26 / 2 and 21: the Prospectors and Arkwrights each move four, at the edge of
+noise. Counted over the same 80 games: 1,576 Trades offered by the computer seats, 238 struck,
+1,250 declined, 27 failed for goods gone.

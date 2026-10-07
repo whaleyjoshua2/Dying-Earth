@@ -36,6 +36,8 @@ build_stadium = 5
 # Ticket #411 (version 0.09.4): the Nature Reserve.
 build_nature_reserve = 2
 resettle = 2
+# Ticket #496 (version 0.09.9): how readily this seat offers a Trade, one a turn at most.
+trade = 3
 # Ticket #267 (version 0.08.4): smear a rival the seat is Cold or Hostile toward, above a fair share.
 smear = 4
 # Ticket #268 (version 0.08.4): buy carbon credits from the Custodians while above a fair share.
@@ -100,6 +102,8 @@ build_stadium = 6
 # Ticket #411 (version 0.09.4): the Nature Reserve.
 build_nature_reserve = 5
 resettle = 2
+# Ticket #496 (version 0.09.9): how readily this seat offers a Trade, one a turn at most.
+trade = 3
 # Ticket #267 (version 0.08.4): smear a rival the seat is Cold or Hostile toward, above a fair share.
 smear = 4
 # Ticket #268 (version 0.08.4): buy carbon credits from the Custodians while above a fair share.
@@ -159,6 +163,8 @@ build_stadium = 4
 # Ticket #411 (version 0.09.4): the Nature Reserve.
 build_nature_reserve = 2
 resettle = 2
+# Ticket #496 (version 0.09.9): how readily this seat offers a Trade, one a turn at most.
+trade = 3
 # Ticket #267 (version 0.08.4): smear a rival the seat is Cold or Hostile toward, above a fair share.
 smear = 4
 # Ticket #268 (version 0.08.4): buy carbon credits from the Custodians while above a fair share.
@@ -218,6 +224,8 @@ build_stadium = 5
 # Ticket #411 (version 0.09.4): the Nature Reserve.
 build_nature_reserve = 2
 resettle = 2
+# Ticket #496 (version 0.09.9): how readily this seat offers a Trade, one a turn at most.
+trade = 3
 # Ticket #267 (version 0.08.4): smear a rival the seat is Cold or Hostile toward, above a fair share.
 smear = 4
 # Ticket #268 (version 0.08.4): buy carbon credits from the Custodians while above a fair share.
@@ -401,6 +409,12 @@ uploads = [[26, 4], [30, 8], [34, 12]]
 colonists = [[12, 4], [22, 12]]
 
 [thresholds]
+# Ticket #496 (version 0.09.9): a computer seat offers a Trade when a Stockpile good is under
+# `trade_short` and another is worth over `trade_long` Ducats at the Trading window's prices; it asks
+# `trade_ask` of the short good and gives what is worth as much of the long one.
+trade_short = 15.0
+trade_long = 150.0
+trade_ask = 20
 # Ticket #410 (version 0.09.4): how the computer seats manage Unrest, after a sweep found a third of
 # every Faction's held Region-turns at 4 or more and one in seven at 7 or more. The Constabulary is
 # offered from `constabulary_from` (where the Standing Army stops replenishing, not a point past

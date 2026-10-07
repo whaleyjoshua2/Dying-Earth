@@ -30,6 +30,8 @@ enum Cat {
     /// the first sweep after the Accords were built showed exactly: zero standing at the end of 20
     /// games. The Accords ticket recorded that as its own largest risk; this is the answer to it.
     Accord,
+    /// Ticket #496 (version 0.09.9): a Trade, one thing for one thing.
+    Trade,
     /// Ticket #52: a Constabulary, Relief and Resettle.
     Constabulary,
     /// Ticket #389 (version 0.09.3): a Stadium, after a Constabulary.
@@ -386,6 +388,7 @@ impl Game {
             Cat::BuyCredits => w.buy_credits,
             Cat::Agitate => w.agitate,
             Cat::Accord => w.accord,
+            Cat::Trade => w.trade,
             Cat::FundArchive => w.fund_archive,
             Cat::BuildArchive => w.build_archive,
             Cat::Upload => w.upload,
@@ -2431,6 +2434,38 @@ impl Game {
                 format!("offer the {} an Accord", self.seat_name(other)),
                 None,
             );
+        }
+        // Ticket #496 (version 0.09.9): **a Trade**, at most one a turn: where a Stockpile good is
+        // short and another long, ask the short one of the Faction this seat stands best with, giving
+        // as much of the long one as it is worth at the Trading window's prices. Never a place.
+        {
+            let th = &self.tables.ai.thresholds;
+            let s = self.seat(seat).stockpile;
+            let goods = [(Resource::Materials, s.materials), (Resource::Fuel, s.fuel), (Resource::Energy, s.energy), (Resource::Ducats, s.ducats)];
+            let price = |r: Resource| if r == Resource::Ducats { 1.0 } else { self.trade_price(r).unwrap_or(1) as f64 };
+            let short = goods.iter().filter(|(r, n)| *r != Resource::Ducats && *n < th.trade_short).min_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal)).map(|(r, _)| *r);
+            let long = goods.iter().filter(|(r, n)| Some(*r) != short && n * price(*r) > th.trade_long).max_by(|a, b| (a.1 * price(a.0)).partial_cmp(&(b.1 * price(b.0))).unwrap_or(std::cmp::Ordering::Equal)).map(|(r, _)| *r);
+            let partner = Seat::ALL
+                .into_iter()
+                .filter(|o| *o != seat && !self.hostile(seat, *o) && !self.offer_waits(seat, *o) && !self.refused_recently(seat, *o))
+                .max_by_key(|o| self.relations_score(seat, *o));
+            if let (Some(short), Some(long), Some(other)) = (short, long, partner) {
+                let ask = th.trade_ask;
+                let give = ((ask as f64 * price(short)) / price(long)).ceil() as u32;
+                let (give, get) = (crate::orders::TradeGood::Goods(long, give.max(1)), crate::orders::TradeGood::Goods(short, ask));
+                if self.holds_good(seat, give).is_ok() {
+                    push(
+                        vec![Order::ProposeTrade { to: other, give, get }],
+                        Cat::Trade,
+                        self.base_weight(seat, Cat::Trade),
+                        1.0,
+                        1.0,
+                        1.0,
+                        format!("offer the {} a Trade", self.seat_name(other)),
+                        None,
+                    );
+                }
+            }
         }
         // --- Ticket #54: Mothball, Restart and Decommission.
         // A mothball answers an Energy shortfall a turn ahead: the highest-upkeep building that

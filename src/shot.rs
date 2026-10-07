@@ -1541,6 +1541,17 @@ fn build_board(session: &mut Session) {
             g.ships.push(Ship { id, name, kind: UnitKind::Frigate, seat, damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: 30.0, slot });
         }
     }
+    // Ticket #496 (version 0.09.9): `offer:trade` (a building aid): the Prospectors offer the player
+    // a Trade, 30 Materials for 60 Ducats, beside an Accord from the Arkwrights, so the prompt can be
+    // photographed with both kinds of offer in it.
+    if std::env::args().any(|a| a == "offer:trade")
+        && let Some(g) = session.game.as_mut()
+    {
+        let turn = g.turn;
+        let trade = Some((TradeGood::Goods(dying_earth_engine::ids::Resource::Materials, 30), TradeGood::Goods(dying_earth_engine::ids::Resource::Ducats, 60)));
+        g.offers.push(dying_earth_engine::state::Offer { from: Seat(1), to: Seat(0), terms: Vec::new(), trade, turn });
+        g.offers.push(dying_earth_engine::state::Offer { from: Seat(2), to: Seat(0), terms: vec![Term::NonAggression], trade: None, turn });
+    }
     // Ticket #495 (version 0.09.9): `offer:<n>` (a building aid): the first n computer seats each
     // offer the player an Accord -- Non-aggression and Passage -- so the prompt can be photographed.
     if let Some(n) = std::env::args().find_map(|a| a.strip_prefix("offer:").and_then(|v| v.parse::<usize>().ok()))
@@ -1548,7 +1559,7 @@ fn build_board(session: &mut Session) {
     {
         let turn = g.turn;
         for from in [Seat(1), Seat(2), Seat(3)].into_iter().take(n) {
-            g.offers.push(dying_earth_engine::state::Offer { from, to: Seat(0), terms: vec![Term::NonAggression, Term::Passage], turn });
+            g.offers.push(dying_earth_engine::state::Offer { from, to: Seat(0), terms: vec![Term::NonAggression, Term::Passage], trade: None, turn });
         }
     }
     // Ticket #493 (version 0.09.9): `blockadeiss:1` (a building aid): a Frigate of seat 1's on

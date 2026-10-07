@@ -19684,7 +19684,8 @@ fn the_reports_templates_stay_under_their_word_ceiling() {
     // new thing the Report says; the 15% cut of what it said before stands. Ticket #490 (version
     // 0.09.9): and by the 2 of a rival's upgrade, "upgraded {colony}". Ticket #495 (version 0.09.9):
     // and by the 8 of an Accord answered, struck or refused, less a word of slack the ceiling held.
-    assert!(words <= 1790, "the Report's templates hold {words} words; the ceiling is 1,790 (15% off 2,031, 54 for the race to the Moon, 2 for a rival's upgrade, 8 for an Accord answered, less a word of slack)");
+    // Ticket #496 (version 0.09.9): and by the 17 of a Trade offered, struck, refused or failed.
+    assert!(words <= 1807, "the Report's templates hold {words} words; the ceiling is 1,807 (15% off 2,031, 54 for the race to the Moon, 2 for a rival's upgrade, 8 for an Accord answered, less a word of slack, 17 for a Trade)");
     // "The" is gone before a Faction's name, which is drawn in its colour instead.
     assert!(!text.contains("he {faction}"), "a template still says \"the {{faction}}\"");
 }
@@ -20447,7 +20448,7 @@ fn crossing_offers_strike_once_and_a_lapsed_yes_says_why() {
     calm(&mut g);
     g.commit_orders(Seat(1), &[Order::ProposeAccord { to: Seat(0), terms: vec![Term::NonAggression] }]);
     g.commit_orders(Seat(2), &[Order::ProposeAccord { to: Seat(0), terms: vec![Term::NonAggression] }]);
-    g.offers.push(Offer { from: Seat(0), to: Seat(1), terms: vec![Term::NonAggression], turn: g.turn });
+    g.offers.push(Offer { from: Seat(0), to: Seat(1), terms: vec![Term::NonAggression], trade: None, turn: g.turn });
     let i = g.offers_to(Seat(0)).iter().find(|(_, o)| o.from == Seat(1)).map(|(i, _)| *i).unwrap();
     g.answer_offer(Seat(0), i, true).unwrap();
     assert!(g.accords.iter().any(|a| a.holds(Seat(0), Seat(1))));
@@ -20459,4 +20460,125 @@ fn crossing_offers_strike_once_and_a_lapsed_yes_says_why() {
     let err = g.answer_offer(Seat(0), i, true).unwrap_err();
     assert!(err.contains("already hold an Accord"), "{err}");
     assert!(g.offers.is_empty(), "and it is gone");
+}
+
+// ---------------------------------------------------------------- #496 Trades (version 0.09.9)
+
+/// Ticket #496 (version 0.09.9): a fair Trade offered to a computer seat is struck at the head of
+/// the next turn: the goods change hands, both sides credit the other, and the player reads it.
+#[test]
+fn a_fair_trade_is_struck_the_next_turn() {
+    let mut g = game();
+    calm(&mut g);
+    let price = g.trade_price(Resource::Materials).unwrap() as u32;
+    g.seats[0].stockpile.ducats = 500.0;
+    g.seats[1].stockpile.materials = 100.0;
+    let (d0, m0, d1, m1) = (g.seats[0].stockpile.ducats, g.seats[0].stockpile.materials, g.seats[1].stockpile.ducats, g.seats[1].stockpile.materials);
+    let give = TradeGood::Goods(Resource::Ducats, 10 * price);
+    let get = TradeGood::Goods(Resource::Materials, 10);
+    let offer = Order::ProposeTrade { to: Seat(1), give, get };
+    assert!(g.check_order(Seat(0), &[], &offer).is_ok(), "{:?}", g.check_order(Seat(0), &[], &offer));
+    g.commit_orders(Seat(0), std::slice::from_ref(&offer));
+    assert_eq!(g.seats[0].stockpile.ducats, d0, "nothing is held at the offer");
+    g.report.lines.clear();
+    g.turn += 1;
+    g.answer_computer_offers();
+    assert_eq!(g.seats[0].stockpile.ducats, d0 - (10 * price) as f64);
+    assert_eq!(g.seats[0].stockpile.materials, m0 + 10.0);
+    assert_eq!(g.seats[1].stockpile.ducats, d1 + (10 * price) as f64);
+    assert_eq!(g.seats[1].stockpile.materials, m1 - 10.0);
+    assert!(g.relations.credited[1][0] && g.relations.credited[0][1], "an act of friendship each way");
+    assert!(g.report.lines.iter().any(|l| l.text.contains("Trade struck with")), "{:?}", g.report.lines);
+}
+
+/// Ticket #496: an uneven Trade is refused by a computer seat and remembered.
+#[test]
+fn an_uneven_trade_is_refused_and_remembered() {
+    let mut g = game();
+    calm(&mut g);
+    g.seats[0].stockpile.ducats = 500.0;
+    g.seats[1].stockpile.materials = 100.0;
+    g.commit_orders(Seat(0), &[Order::ProposeTrade { to: Seat(1), give: TradeGood::Goods(Resource::Ducats, 1), get: TradeGood::Goods(Resource::Materials, 50) }]);
+    g.report.lines.clear();
+    g.turn += 1;
+    g.answer_computer_offers();
+    assert_eq!(g.seats[1].stockpile.materials, 100.0, "nothing moved");
+    assert!(g.refused_recently(Seat(0), Seat(1)));
+    assert!(g.report.lines.iter().any(|l| l.text.contains("refused your Trade")), "{:?}", g.report.lines);
+}
+
+/// Ticket #496: a place traded changes hands in peace -- no taking by force, no buildings lost --
+/// and a computer seat takes one for no more than its build price, but never gives one.
+#[test]
+fn a_place_is_traded_in_peace_for_no_more_than_its_build_price() {
+    let mut g = game();
+    calm(&mut g);
+    let c = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Mine], 6);
+    let value = g.trade_value(TradeGood::Place(c));
+    let materials = g.trade_price(Resource::Materials).unwrap() as f64;
+    let core = g.tables.station_materials as f64;
+    let modules = (g.tables.module(ModuleKind::Habitat).materials + g.tables.module(ModuleKind::Mine).materials) as f64;
+    assert_eq!(value, (core + modules) * materials);
+    g.seats[1].stockpile.ducats = 10_000.0;
+    let fair = TradeGood::Goods(Resource::Ducats, value as u32);
+    assert!(g.trade_acceptable(Seat(1), Seat(0), TradeGood::Place(c), fair));
+    assert!(!g.trade_acceptable(Seat(1), Seat(0), TradeGood::Place(c), TradeGood::Goods(Resource::Ducats, value as u32 + 1)), "not for more");
+    let theirs = colony(&mut g, Seat(1), BodyId::Mars, &[], 4);
+    assert!(!g.trade_acceptable(Seat(1), Seat(0), TradeGood::Goods(Resource::Ducats, 1), TradeGood::Place(theirs)), "never gives a place");
+    let force = g.war.takes_by_force;
+    let modules_before = g.colony(c).unwrap().modules.len();
+    g.commit_orders(Seat(0), &[Order::ProposeTrade { to: Seat(1), give: TradeGood::Place(c), get: fair }]);
+    g.turn += 1;
+    g.answer_computer_offers();
+    assert_eq!(g.colony(c).unwrap().control, Control::Controlled(Seat(1)), "theirs now");
+    assert_eq!(g.colony(c).unwrap().modules.len(), modules_before, "nothing destroyed");
+    assert_eq!(g.war.takes_by_force, force, "not a taking");
+}
+
+/// Ticket #496: goods gone by the answer: the Trade fails, nothing moves, both are told.
+#[test]
+fn a_trade_whose_goods_are_gone_fails() {
+    let mut g = game();
+    calm(&mut g);
+    g.seats[1].stockpile.materials = 100.0;
+    g.offers.push(Offer { from: Seat(1), to: Seat(0), terms: Vec::new(), trade: Some((TradeGood::Goods(Resource::Materials, 50), TradeGood::Goods(Resource::Ducats, 5))), turn: g.turn });
+    g.seats[0].stockpile.ducats = 500.0;
+    g.seats[1].stockpile.materials = 10.0;
+    g.report.lines.clear();
+    g.answer_offer(Seat(0), 0, true).unwrap();
+    assert_eq!(g.seats[0].stockpile.ducats, 500.0, "nothing moved");
+    assert!(g.report.lines.iter().any(|l| l.text.contains("failed")), "{:?}", g.report.lines);
+}
+
+/// Ticket #496: what an offer may not be: with a Hostile Faction, in a good the Stockpile does not
+/// hold, more than you have, an Archive's Colony.
+#[test]
+fn a_trade_offer_is_refused_where_the_rules_shut_it() {
+    let mut g = game();
+    calm(&mut g);
+    g.seats[0].stockpile.ducats = 50.0;
+    let ok = |g: &Game, give, get| g.check_order(Seat(0), &[], &Order::ProposeTrade { to: Seat(1), give, get });
+    let d = |n| TradeGood::Goods(Resource::Ducats, n);
+    assert!(ok(&g, d(10), TradeGood::Goods(Resource::Materials, 5)).is_ok());
+    assert!(ok(&g, d(10), TradeGood::Goods(Resource::Research, 5)).is_err(), "Research is no Trade good");
+    assert!(ok(&g, d(10), TradeGood::Goods(Resource::Widgets, 5)).is_err(), "nor Widgets");
+    assert!(ok(&g, d(60), TradeGood::Goods(Resource::Materials, 5)).is_err(), "more than you hold");
+    let c = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Archive], 6);
+    assert!(ok(&g, TradeGood::Place(c), d(1)).unwrap_err().0.contains("Archive"));
+    g.relations.score[0][1] = -10;
+    assert!(ok(&g, d(10), TradeGood::Goods(Resource::Materials, 5)).unwrap_err().0.contains("Hostile"));
+}
+
+/// Ticket #496: a computer seat short of one good and long in another offers a Trade.
+#[test]
+fn the_computer_offers_a_trade_when_short_and_long() {
+    let mut g = game();
+    calm(&mut g);
+    g.seats[1].stockpile.materials = 2.0;
+    g.seats[1].stockpile.ducats = 2000.0;
+    let orders = g.ai_orders(Seat(1));
+    let trade = orders.iter().find_map(|o| if let Order::ProposeTrade { give, get, .. } = o { Some((*give, *get)) } else { None });
+    let (give, get) = trade.expect("a Trade offered");
+    assert!(matches!(get, TradeGood::Goods(Resource::Materials, _)), "it asks for what it lacks: {get:?}");
+    assert!(matches!(give, TradeGood::Goods(Resource::Ducats, _)), "and gives what it has: {give:?}");
 }

@@ -148,7 +148,9 @@ impl Game {
         // Ticket #495 (version 0.09.9): an Accord offered to a human seat is answered first.
         for o in &self.offers {
             if !self.seat(o.to).ai {
-                owed.push(format!("{} offer {} an Accord. Accept it or refuse it.", self.seat_name(o.from), self.seat_name(o.to)));
+                // Ticket #496 (version 0.09.9): or a Trade.
+                let what = if o.trade.is_some() { "a Trade" } else { "an Accord" };
+                owed.push(format!("{} offer {} {what}. Accept it or refuse it.", self.seat_name(o.from), self.seat_name(o.to)));
             }
         }
         if let Some(lead) = self.tech_owed_by() {

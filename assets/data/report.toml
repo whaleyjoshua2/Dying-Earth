@@ -81,6 +81,10 @@ station_built = "{faction} built {station}."
 # Ticket #495 (version 0.09.9): an Accord answered, in the player's own section.
 accord_struck = "Accord struck with {faction}."
 accord_refused = "{faction} refused your Accord."
+# Ticket #496 (version 0.09.9): a Trade answered, or failed for goods gone by the answer.
+trade_struck = "Trade struck with {faction}."
+trade_refused = "{faction} refused your Trade."
+trade_failed = "Trade with {faction} failed: {why}."
 station_built_eased = "{faction} built {station}: -{ease} Unrest."
 antarctica_opens = "The Antarctic ice opens: {n} Colony Slots on Earth."
 archive_begun = "{faction} began the Archive at {colony}."
@@ -348,6 +352,7 @@ paragraph = "{faction} {deeds}."
 nothing = "{faction} gave no orders."
 # Ticket #226 (version 0.08.2): the Accords, told as the board could see them.
 propose_accord = "offered {faction} an Accord"
+propose_trade = "offered {faction} a Trade"
 end_accord = "ended their Accord with {faction}"
 tribute = "paid {faction} a tribute"
 build_facility = "began a {building} in {state}"

@@ -332,6 +332,10 @@ DIPLOMACY (ticket #226; `show` prints Relations both ways and every Accord stand
   accord end <faction>                 declare a standing Accord over: free, and it lapses at the
                                        next turn's start -- which gives the board a turn's warning
                                        that something is coming.
+  trade <faction> <give> for <ask>     one thing for one thing: `40 ducats`, `20 materials`, `fuel`,
+                                       `energy`, or a colony id; answered at the head of their next
+                                       turn, the goods moving only if both still hold them.
+  trade accept|refuse <faction>        answer a Trade a Faction offered you.
   tribute <faction> ducats             a fixed gift, one per Faction per turn, paying Relations:
   tribute <faction> materials          {tributeducats} Ducats, or {tributematerials} Materials.
 
@@ -546,6 +550,28 @@ fn parse_line(g: &Game, line: &str) -> Result<Line, String> {
                 "decline" | "refuse" => return Ok(Line::Offer(seat_of(g, at(2)?)?, false)),
                 _ => return Err(format!("`accord {what}` is not one of offer, end, accept, refuse")),
             }
+        }
+        // Ticket #496 (version 0.09.9): `trade <faction> <n> <good>|<colony id> for <n> <good>|<colony id>`,
+        // and `trade accept|refuse <faction>` to answer one offered.
+        "trade" => {
+            let first = at(1)?.to_ascii_lowercase();
+            if first == "accept" || first == "refuse" || first == "decline" {
+                return Ok(Line::Offer(seat_of(g, at(2)?)?, first == "accept"));
+            }
+            let to = seat_of(g, at(1)?)?;
+            let rest: Vec<&str> = w[2..].to_vec();
+            let split = rest.iter().position(|x| x.eq_ignore_ascii_case("for")).ok_or("a Trade reads `trade <faction> <what you give> for <what you ask>`")?;
+            let good = |words: &[&str]| -> Result<dying_earth_engine::TradeGood, String> {
+                match words {
+                    [n, r] => {
+                        let r = pick(&[Resource::Ducats, Resource::Materials, Resource::Fuel, Resource::Energy], r)?;
+                        Ok(dying_earth_engine::TradeGood::Goods(r, count(n)?))
+                    }
+                    [c] => Ok(dying_earth_engine::TradeGood::Place(colony_id(c)?)),
+                    _ => Err("each side is `<n> <ducats|materials|fuel|energy>` or a colony id".into()),
+                }
+            };
+            Order::ProposeTrade { to, give: good(&rest[..split])?, get: good(&rest[split + 1..])? }
         }
         "tribute" => {
             let to = seat_of(g, at(1)?)?;
