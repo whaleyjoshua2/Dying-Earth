@@ -1408,7 +1408,8 @@ impl Game {
                 // was refused on Tiangong while the build button offered it, and the Heliostat,
                 // station-only, could be built nowhere at all.
                 if col.in_orbit && !kind.stands_on_a_station() {
-                    return fail("a station holds only a Shipyard, Habitats, Observatories, Solar Arrays, a Trade Post, an Institute, Batteries and Factories, or a Faction's own kind of one");
+                    // Ticket #497 (version 0.09.9): the build list shows what a station holds.
+                    return fail("not on a station");
                 }
                 // Ticket #186 (version 0.08.0): nobody but the Custodians builds an Academy off
                 // Earth either, captured ones included.

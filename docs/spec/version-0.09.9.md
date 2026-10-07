@@ -272,3 +272,17 @@ The authority is [ticket #496](https://github.com/whaleyjoshua2/Dying-Earth/issu
 collapses, from 2 / 27 / 26 / 2 and 21: the Prospectors and Arkwrights each move four, at the edge of
 noise. Counted over the same 80 games: 1,576 Trades offered by the computer seats, 238 struck,
 1,250 declined, 27 failed for goods gone.
+
+## 9. Four more texts tightened
+
+The authority is [ticket #497](https://github.com/whaleyjoshua2/Dying-Earth/issues/497).
+
+| Where | Before (words) | Now |
+|---|---|---|
+| A Body's In orbit hover | about 79 | "Room for {n} stations, one to a ring. A station is reached only from its own ring; a Warship on Blockade there starves it." |
+| Greenwash | about 64 | "Each point: {per} Ducat(s), {rate} ppm off your Blame for good. Nothing leaves the air. One a turn; public, no offence; a rival may answer with a Smear." |
+| A Ship's roster hover, after its stance line | about 54 | "Tank {} of {}. Fills at your station in its ring, over your Colony with a Refinery, or a Refuel partner's. STRANDED: no leg it can pay, nowhere to fill." |
+| What a station holds | a refusal of 25, a footer of 20 that named five of the eight kinds | the refusal "not on a station"; the footer "Ships are built only at a Shipyard." |
+
+The Greenwash hover is now drawn through `rule_tip`, like every other hover. A fifth, the Modules
+heading's hover, was cut with the tiers (section 2). No rule moves.

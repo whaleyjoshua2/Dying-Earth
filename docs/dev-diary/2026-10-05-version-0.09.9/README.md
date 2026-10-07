@@ -193,3 +193,13 @@ offers, as decided; an Accept that cannot be paid says why at once. Also: the dr
 and an Accord apart; the Stockpile goods read through one helper. Kept, and said: a refusal of either
 kind holds back both kinds for three turns; the 0.95 "at the door" figure is the Accord's, in the
 engine; a place's price is the base 40 Materials, as decided. The win column is the same after.
+
+## Four more texts tightened (#497)
+
+The In orbit hover, Greenwash, a Ship's roster hover, and what a station holds. Spec section 9. No
+rule moves, so no sweep.
+
+- [`ticket-497/in-orbit-hover.png`](ticket-497/in-orbit-hover.png): two lines, from about 79 words.
+- [`ticket-497/greenwash-hover.png`](ticket-497/greenwash-hover.png): four lines, from about 64.
+- [`ticket-497/ship-hover.png`](ticket-497/ship-hover.png): five lines with its stance, from about 54
+  after the stance line.

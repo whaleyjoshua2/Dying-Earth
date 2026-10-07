@@ -3824,10 +3824,9 @@ fn stations_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSt
     rule_tip(
         ui.label(RichText::new(format!("In orbit: {} of {} station slots", count, card.orbital_slots)).strong()),
         format!(
-            "{} has room for {} stations in orbit, and a station taken is a station gone: nobody else builds there.
-A station is touched -- unloaded into, refuelled at, blockaded, attacked -- only from its own orbit, and this Body's orbits are low orbit and one per slot.
-A Warship on Blockade shuts the one orbit it sits in and no other: a station's ring starves that station, and low orbit starves the ground under a rival's Orbital Control.",
-            card.name, card.orbital_slots
+            // Ticket #497 (version 0.09.9): cut from about 79 words.
+            "Room for {} stations, one to a ring. A station is reached only from its own ring; a Warship on Blockade there starves it.",
+            card.orbital_slots
         ),
     );
     // Ticket #493 (version 0.09.9): a station's row, on every Body's card, is its glyph, its name in
@@ -3874,7 +3873,9 @@ A Warship on Blockade shuts the one orbit it sits in and no other: a station's r
             cost_button(ui, game, &session.pending, game.station_order(Seat(0), body, slot, &session.pending), &format!("Build {} here", game.station_name(body, slot)), actions);
         }
     }
-    ui.label(RichText::new("A station holds a Shipyard, Habitats, Observatories, Solar Arrays and a Trade Post. Ships are built only at a Shipyard.").weak());
+    // Ticket #497 (version 0.09.9): the list it gave was short of three kinds; a station's build list
+    // shows what it holds.
+    ui.label(RichText::new("Ships are built only at a Shipyard.").weak());
 }
 
 /// The Colony Slot within fourteen degrees of a point on a Body, nearest first.
@@ -5089,7 +5090,8 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, seat: Seat, marks: boo
             // orbit clause is also more accurate than what it replaces: since ticket #335 a station
             // fuels only a Ship in its OWN orbit, which "where the Ship sits" did not say.
             let tip = format!(
-                "{}: {} {}\nTank {} of {}. Fuel goes on transits, cheapest at a launch window.\nIt fills at a station of yours in that station's orbit, or in low orbit over a Colony of yours with a working Refinery; a Refuel partner's serve too. STRANDED: no leg it can pay, and nowhere to fill up.",
+                // Ticket #497 (version 0.09.9): cut from about 54 words after the stance line.
+                "{}: {} {}\nTank {} of {}. Fills at your station in its ring, over your Colony with a Refinery, or a Refuel partner's.\nSTRANDED: no leg it can pay, nowhere to fill.",
                 s.stance.name(),
                 s.stance.one_liner(true),
                 Stance::PERSISTS,
@@ -10894,10 +10896,11 @@ fn greenwash_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewS
     let me = Seat(0);
     let g = &game.tables.influence.greenwash;
     let (rate, per) = (g.ppm_per_influence, g.ducats_per_influence);
-    ui.label(RichText::new("Greenwash campaign").strong()).on_hover_text(format!(
-        "Influence spent on your own name, with {per} Ducat{} beside every point: every point takes {rate} ppm off your Blame for good, and the share every rule reads moves with it. Nothing leaves the air.\nOne campaign a turn, from this turn's Allotment and your Ducats. It is public and no offence: the Report says you greenwashed, and a rival can answer with a Smear.",
-        if per == 1 { "" } else { "s" }
-    ));
+    // Ticket #497 (version 0.09.9): cut from about 64 words, and through `rule_tip` like every hover.
+    rule_tip(
+        ui.label(RichText::new("Greenwash campaign").strong()),
+        format!("Each point: {per} Ducat{}, {rate} ppm off your Blame for good. Nothing leaves the air.\nOne a turn; public, no offence; a rival may answer with a Smear.", if per == 1 { "" } else { "s" }),
+    );
     let cleaned = game.seat(me).blame_cleaned;
     if cleaned > 0.0 {
         ui.label(RichText::new(format!("{cleaned:.0} ppm of your Blame has been greenwashed away.")).weak());
