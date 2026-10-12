@@ -2526,7 +2526,7 @@ fn the_archive_is_destroyed_when_its_colony_changes_hands_and_the_fund_is_lost()
     let research = g.tables.archive.research;
     let again = archive_at(&mut g, Seat(3), BodyId::Moon, research, 12);
     // Ticket #164 (version 0.07.5): every Colony now draws 1 Energy for its Core Module, and an
-    // Archive is 12 on its own; this test is about Occupation, not about the Energy bill.
+    // Archive is 20 on its own (12 until ticket #511); this test is about Occupation, not about the Energy bill.
     g.seats[3].stockpile.energy = 400.0;
     g.income_phase();
     assert!(g.archive_online(Seat(3)));
