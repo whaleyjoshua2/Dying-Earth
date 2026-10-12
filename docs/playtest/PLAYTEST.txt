@@ -66,6 +66,17 @@ THE MAP
 - THE SOLAR SYSTEM MAP IS IN THREE DIMENSIONS: each world's ring lies in its real orbital
   plane. Drag up and down to tilt the view, sideways to turn it.
 
+FIXED SINCE THE FIRST 0.1.0.0 PLAYTEST
+--------------------------------------
+- A Colony Ship in a Venus station ring founds a station there.
+- The computer keeps the non-aggression Accords it gives; a broken Accord is reported.
+- An order that would break an Accord says so beside its price.
+- Agitate, and the Unrest a card asks you to accept, stand for a turn instead of
+  vanishing into that turn's natural fall.
+- A Region that changes hands puts its Armies on Hold, and you are told of any abroad.
+- Hover "of N left" under your Influence to see where this turn's Influence came from.
+- A win is declared the turn it is met, and heads the Report.
+
 WHAT WE WANT TO KNOW
 --------------------
 Write down anything, however small. Especially:

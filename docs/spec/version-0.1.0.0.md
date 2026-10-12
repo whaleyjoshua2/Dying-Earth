@@ -15,23 +15,29 @@ climate and the Victory bars scaled, three new Choice Cards (§8). **The Archive
 Closed-Loop Colonies at a quarter off (§9). **Coach Class at half again** (§10). **The Arkwrights'
 win waits on a Colonial Capital**, the computer chasing and gathering at one and every computer seat
 keeping slots for Habitats, the climate re-swept to a step of 620 (§11). **The Solar System Map in
-three dimensions**, each Body in its orbital plane (§12).
+three dimensions**, each Body in its orbital plane (§12). **The Tech tree reshaped** after the
+playtest, every rung-3 Tech at 48 and Propulsion in two lanes (§13), and **the playtest's fixes**
+(§14).
 
 **What it did to the win column** (80 games, per Faction, after each ticket in build order):
 
-| | 0.09.9 | §1 worlds | §2 Capital | §4 Accords | §5 Second | §6 tree | §7 Regions | §8 fifty turns | §9 Archive | §10 Coach Class | §11 closing | the ideal |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| Custodians | 2 | 1 | 1 | 1 | 1 | 3 | 3 | 6 | 6 | 3 | **7** | 15 |
-| Prospectors | 23 | 15 | 15 | 16 | 18 | 25 | 20 | 8 | 10 | 11 | **27** | 15 |
-| Arkwrights | 30 | 52 | 52 | 49 | 49 | 31 | 39 | 35 | 32 | 30 | **17** | 15 |
-| Archivists | 2 | 2 | 2 | 2 | 1 | 1 | 7 | 9 | 6 | 7 | **7** | 15 |
-| collapses | 20 | 8 | 8 | 10 | 10 | 18 | 8 | 22 | 26 | 29 | **22** | 20 |
+| | 0.09.9 | §1 worlds | §2 Capital | §4 Accords | §5 Second | §6 tree | §7 Regions | §8 fifty turns | §9 Archive | §10 Coach Class | §11 first close | §14 playtest fixes | §13 tree | §14 the win at the head: closing | the ideal |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Custodians | 2 | 1 | 1 | 1 | 1 | 3 | 3 | 6 | 6 | 3 | 7 | 1 | 2 | **2** | 15 |
+| Prospectors | 23 | 15 | 15 | 16 | 18 | 25 | 20 | 8 | 10 | 11 | 27 | 29 | 24 | **24** | 15 |
+| Arkwrights | 30 | 52 | 52 | 49 | 49 | 31 | 39 | 35 | 32 | 30 | 17 | 12 | 16 | **15** | 15 |
+| Archivists | 2 | 2 | 2 | 2 | 1 | 1 | 7 | 9 | 6 | 7 | 7 | 19 | 18 | **17** | 15 |
+| collapses | 20 | 8 | 8 | 10 | 10 | 18 | 8 | 22 | 26 | 29 | 22 | 19 | 20 | **22** | 20 |
 
-**The closing board** ([`sweeps/final-0.1.0.0.txt`](../dev-diary/2026-10-07-version-0.1.0.0/sweeps/final-0.1.0.0.txt)):
-**7 / 27 / 17 / 7 and 22 collapses.** The collapses meet the ideal; the Prospectors are the one
-Faction over the line, the Custodians and Archivists under 10 in every climate cell of the version.
-The Arkwrights' 17 are 6 outright with a Capital and 11 by the last turn's ranking. Balance work is
-the next version's, at the designer's word. `SAVE_VERSION` is 12: a 0.09.9 save is refused.
+**The closing board** ([`sweeps/final-0.1.0.0-after-playtest.txt`](../dev-diary/2026-10-07-version-0.1.0.0/sweeps/final-0.1.0.0-after-playtest.txt)):
+**2 / 24 / 15 / 17 and 22 collapses.** The first close read 7 / 27 / 17 / 7 and 22
+([`sweeps/final-0.1.0.0.txt`](../dev-diary/2026-10-07-version-0.1.0.0/sweeps/final-0.1.0.0.txt)).
+The one move past noise is the playtest's Accord fix (§14): the computer keeps the non-aggression
+it gives, and the Archivists rose from 7 to 18 while the Custodians fell to nought, where they have
+stayed. The collapses meet the ideal; the Prospectors are over the line and the Custodians far
+under it. Balance work is the next version's, at the designer's word. `SAVE_VERSION` is 12: a
+0.09.9 save is refused; the fields the playtest's fixes added load empty from an earlier 0.1.0.0
+save.
 
 The new worlds moved the column far past noise, away from the ideal. The control, the same build
 with the computer forbidden to choose the three as destinations, is within noise of 0.09.9, so the
@@ -532,3 +538,28 @@ Ticket #527, at the designer's word after the 0.1.0.0 playtest:
 - **Swept** ([`sweeps/ticket-527.txt`](../dev-diary/2026-10-07-version-0.1.0.0/sweeps/ticket-527.txt)):
   2 / 24 / 16 / 18 and 20 collapses, from 1 / 29 / 12 / 19 and 19 -- the Prospectors five down and
   the Arkwrights four up, at the edge of noise.
+
+## 14. The playtest's fixes
+
+Four agent players played the first 25 turns of each Faction through the text tool
+([`../dev-diary/2026-10-12-playtest-0.1.0.0/README.md`](../dev-diary/2026-10-12-playtest-0.1.0.0/README.md),
+all four 6/10). The bugs they found were fixed on their own tickets, each at the designer's word:
+
+- **Venus** (#516): the tool takes the ring founding the window always offered, and the refusals
+  say so.
+- **Accords** (#517): the computer drops any order that would break a non-aggression Accord it holds;
+  a broken Accord is reported to both sides. Swept 0 / 30 / 13 / 18 and 19, the one move past noise.
+- **Phantom offers** (#518): striking an Accord sweeps only Accord offers; a moot offer is dropped;
+  the tool counts a failed yes as an answer.
+- **Inherited Armies** (#519): a Region's Armies stand on Hold when it changes hands, the new holder
+  is told, and one in a rival's Region has a turn's grace.
+- **Agitate** (#520): its point lands after the natural fall, so it stands a turn; an order that
+  breaks an Accord says so beside its price.
+- **Choice cards** (#521): the Unrest a card's side raises lands after the natural fall (the Carbon
+  Levy, the Hard Winter, the Conscription Notice).
+- **The Allotment** (#522): its parts are kept and shown (the window's hover, the tool's `from:`).
+- **Ownership** (#523): a place handed over twice in a turn is one line; the player's lines are
+  under Your works alone.
+- **The win** (#524): Victory and Collapse are checked at the head of the turn too, after the Income
+  and the Climate, and the game's end heads its Report.
+- **The text tool** (#525, #526): Techs and Regions by their shown names; `upgrade` raises a tier.

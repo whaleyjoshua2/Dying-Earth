@@ -106,3 +106,10 @@ against Earth's.
 and 20 and the ideal of 15 each and 20. The spec's head carries the column after every ticket.
 `GAME_VERSION` 0.1.0.0; `SAVE_VERSION` 12. The kits are `dist/dying-earth-0.1.0.0-windows` (built
 here) and the Linux kit from the release-kits run.
+
+## After the playtest
+
+The 2026-10-12 playtest's bugs and the designer's last tree ticket were fixed before the merge
+(spec §13 and §14). **The closing board** ([`sweeps/final-0.1.0.0-after-playtest.txt`](sweeps/final-0.1.0.0-after-playtest.txt)):
+**2 / 24 / 15 / 17 and 22 collapses**, from the first close's 7 / 27 / 17 / 7 and 22. The Windows kit
+was rebuilt from the closing commit, the Linux kit from a new release-kits run.
