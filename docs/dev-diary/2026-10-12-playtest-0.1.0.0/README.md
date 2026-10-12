@@ -113,6 +113,9 @@ belong to the tool are kept apart below.
 
 - **No order to raise a tier** (Settlement, Colony, Colonial Capital). All four hit it; it made the
   Arkwrights' Capital requirement **untestable** in this playtest.
+  **Fixed (2026-10-12, ticket #526):** `upgrade <colony>` raises a Colony or station to its next
+  tier, and `show` prints each place's tier and what the next costs. Checked on tester 1's
+  Arkwrights save: South Pole-Aitken (25 people) takes `upgrade 27` for 30 Materials and 4 Widgets.
 - No view of an offer's terms; no `--check` dry run; `help` doesn't list Region ids or costs and
   carries developer ticket notes; Region display names ("usa", "the united states") not accepted in
   orders (`united` resolves to the UK); ships addressed by slot number, not station name; Energy can't

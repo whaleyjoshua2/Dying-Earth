@@ -232,6 +232,10 @@ const GRAMMAR: &str = r#"ORDER LINES (one per line; `#` starts a comment; blank 
                                        gates the Archivists' WIN, not this order (ticket #361,
                                        version 0.09.1, undoing ticket #199).
   industry <state>                     raise the Industry Level
+  upgrade <colony>                     raise a Colony or station to its next tier: Settlement,
+                                       Colony, and on the ground the Colonial Capital (one to a
+                                       Body). `show` prints each place's tier and what the next costs;
+                                       a tier wants every Module slot built and its people living there.
   cancel-build <place> <index>         cancel a build ANOTHER seat began at a place you now direct,
                                        which is what a conquest leaves behind: its Materials come
                                        back at your own price and the Widgets done are lost. One a
@@ -471,6 +475,9 @@ fn parse_line(g: &Game, line: &str) -> Result<Line, String> {
             }
         }
         "industry" => Order::RaiseIndustry { state: pick_state(at(1)?)? },
+        // Ticket #526 (version 0.1.0.0): the window's Upgrade tile -- a Colony or station to its next
+        // tier (Settlement, Colony, and on the ground the Colonial Capital).
+        "upgrade" => Order::RaiseTier { colony: colony_id(at(1)?)? },
         // Ticket #332 (version 0.09.0): a build another seat began at a place that has changed hands.
         "cancel-build" => Order::CancelBuild { place: place(at(1)?)?, index: count(at(2)?)? as usize },
         "transit" => Order::Transit {
@@ -1258,6 +1265,13 @@ fn print_board(g: &Game) {
             format!("on the ground at {}, reached from {}", c.body.name(), g.orbit_name(c.body, Orbit::Low))
         };
         println!("    at {reached} | modules: {}", if mods.is_empty() { "none".into() } else { mods.join(", ") });
+        // Ticket #526 (version 0.1.0.0): the tier, and what `upgrade` would buy next.
+        let next = match g.open_tier(c) {
+            Some(t) => format!("next `upgrade {}`: {} ({} Modules) at {} Colonists, {} Materials and {} Widgets", c.id.0, t.name, t.cap, t.colonists, t.materials, t.widgets),
+            None if g.next_tier(c).is_some() => "the next tier is not open here (the Body's Colonial Capital is another's)".to_string(),
+            None => "the last tier".to_string(),
+        };
+        println!("    tier: {} | {next}", g.tier_of(c).name);
         println!("    {}", widgets_text(g, Place::Colony(c.id), &q));
     }
 
