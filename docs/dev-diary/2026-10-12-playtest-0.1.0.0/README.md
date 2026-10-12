@@ -98,6 +98,11 @@ belong to the tool are kept apart below.
    (`../2026-10-07-version-0.1.0.0/sweeps/ticket-524.txt`): **2 / 24 / 15 / 17, 22 collapses**,
    within noise.
 10. **Tech id mismatch** (all four): "Large Language Models" can only be ordered as `publicscience`.
+    **Fixed (2026-10-12, ticket #525).** A text-tool gap: it matched ids alone, and the Tech kept its
+    id when it was renamed. The tool now takes a Tech or a Region by its shown name or its id, case,
+    spaces and a leading "The" ignored, and by any unique prefix: `tech large language models`,
+    `tech the upload`, `influence unitedstates`. A word that fits two asks which ("united": The United
+    States or The United Kingdom) where it went silently to the UK. "usa" is still not a name.
 
 ## 2. Design and balance (the big ones)
 

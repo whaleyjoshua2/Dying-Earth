@@ -52,6 +52,35 @@ fn pick<T: Copy + std::fmt::Debug>(list: &[T], word: &str) -> Result<T, String> 
     }
 }
 
+/// Ticket #525 (version 0.1.0.0): a thing by its shown name or by its id -- case, spaces and a
+/// leading "The" ignored, then any unique prefix of either. The ids alone were matched, so a Tech
+/// renamed on the board (Large Language Models, still `public_science`) could not be typed by the
+/// name the list printed, and `united` went silently to the one Region whose id began so.
+fn pick_named<T: Copy + std::fmt::Debug>(list: &[T], word: &str, name: impl Fn(T) -> String, what: &str) -> Result<T, String> {
+    let w = norm(word);
+    if w.is_empty() {
+        return Err("expected a name here".into());
+    }
+    let forms = |t: T| -> Vec<String> {
+        let shown = name(t);
+        let mut f = vec![norm(&format!("{t:?}")), norm(&shown)];
+        if let Some(bare) = shown.strip_prefix("The ") {
+            f.push(norm(bare));
+        }
+        f
+    };
+    if let Some(t) = list.iter().copied().find(|t| forms(*t).contains(&w)) {
+        return Ok(t);
+    }
+    let hits: Vec<T> = list.iter().copied().filter(|t| forms(*t).iter().any(|f| f.starts_with(&w))).collect();
+    let names = |ts: &[T]| ts.iter().map(|t| name(*t)).collect::<Vec<_>>().join(", ");
+    match hits.as_slice() {
+        [t] => Ok(*t),
+        [] => Err(format!("{word:?} is not {what}; they are {}", names(list))),
+        _ => Err(format!("{word:?} could be more than one: {}", names(&hits))),
+    }
+}
+
 const RESOURCES: [Resource; 5] = [Resource::Materials, Resource::Fuel, Resource::Energy, Resource::Research, Resource::Ducats];
 // Ticket #278 (version 0.08.5) and ticket #297 (version 0.08.6): a Blockade is a STANCE a Ship
 // stack is given, and Dig In is an Army's. The driver offered neither, so seat 0 could not give a
@@ -105,19 +134,13 @@ fn seat_of(g: &Game, word: &str) -> Result<Seat, String> {
 static STATE_NAMES: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::new();
 
 /// A Region by its name on the board or by its id, case and separators ignored: `india`,
-/// `"the united states"`, `southasia` and `SouthAsia` are all one Region.
+/// `"the united states"`, `southasia` and `SouthAsia` are all one Region. Ticket #525 (version
+/// 0.1.0.0): and by a unique prefix of its name, "The" or not -- `unitedstates`, `united` asks which.
 fn pick_state(word: &str) -> Result<StateId, String> {
-    let w = norm(word);
-    let names = STATE_NAMES.get();
-    if let Some(names) = names
-        && let Some(i) = names.iter().position(|n| norm(n) == w)
-    {
-        return Ok(StateId::ALL[i]);
+    match STATE_NAMES.get() {
+        Some(names) => pick_named(&StateId::ALL, word, |s| names[s.index()].clone(), "a Region"),
+        None => pick(&StateId::ALL, word),
     }
-    pick(&StateId::ALL, word).map_err(|e| match names {
-        Some(names) => format!("{word:?} is not a Region; the board's are {}", names.join(", ")),
-        None => e,
-    })
 }
 
 /// `europe`, `state:europe`, `colony:3`, `c:3` or a bare colony number.
@@ -211,7 +234,7 @@ const GRAMMAR: &str = r#"ORDER LINES (one per line; `#` starts a comment; blank 
                                        and what each side does; a seat that cannot pay the offer may
                                        only refuse.
 
-  tech <tech>                          pick the next shared Tech (when the board says one is awaited)
+  tech <tech>                          pick the next shared Tech (when the board says one is awaited), by its name
 
   build facility <state> <facility>    e.g. build facility europe factory
   build facility-ducats <state> <facility>
@@ -449,7 +472,11 @@ fn parse_line(g: &Game, line: &str) -> Result<Line, String> {
     let at = |i: usize| -> Result<&str, String> { w.get(i).copied().ok_or_else(|| format!("`{}` wants more words", w[0])) };
     let verb = w[0].to_ascii_lowercase();
     let o = match verb.as_str() {
-        "tech" => return Ok(Line::Tech(pick(&TechId::ALL, at(1)?)?)),
+        // Ticket #525 (version 0.1.0.0): by the name the list prints, every word of it, or the id.
+        "tech" => {
+            at(1)?;
+            return Ok(Line::Tech(pick_named(&TechId::ALL, &w[1..].concat(), |t| g.tables.tech(t).name.clone(), "a Tech")?));
+        }
         // Ticket #337 (version 0.09.0): the only door the driver has onto the turn's question. It
         // is not an Order -- it is answered the moment the line is read, as a `tech` pick is.
         "answer" => {
