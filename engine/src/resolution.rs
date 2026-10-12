@@ -3354,6 +3354,7 @@ impl Game {
             self.unrest_cause(sid, cause, seat == Seat(0));
             self.ai_deed_at(seat, "agitate", &[("state", name)], Some(crate::report::ReportPlace::State(sid)));
         }
+        self.land_card_unrest();
         // The throw-off (rule 5), after the falls: a Faction can still buy a state back from the brink.
         for sid in StateId::ALL {
             if self.state(sid).unrest < u.throw_off_threshold {

@@ -671,11 +671,34 @@ impl Game {
     /// Ticket #337: a card's move on a Region's Unrest, up through the damping or down flat.
     /// Ticket #371 (version 0.09.2): and a cause, by the card's name, for the Region's net line. The
     /// card is the turn's own Choice Card, which `draw` holds while its answers are applied.
+    /// Ticket #521 (version 0.1.0.0): a rise waits for `land_card_unrest`, after the natural fall,
+    /// which ate the Carbon Levy's half point whole; a fall lands now, as it always did.
     fn card_unrest(&mut self, sid: StateId, amount: f64) {
+        let card = match self.draw {
+            CardDraw::Choice(card) => Some(card),
+            _ => None,
+        };
+        if amount > 0.0
+            && let Some(card) = card
+        {
+            self.pending.card_unrest.push((sid, amount, card));
+            return;
+        }
         let moved = if amount >= 0.0 { self.raise_unrest(sid, amount, UnrestSource::Plain) } else { self.lower_unrest(sid, -amount) };
-        if moved > 0.0 && let CardDraw::Choice(card) = self.draw {
+        if moved > 0.0 && let Some(card) = card {
             let cause = self.phrase("cause_choice_card", &[("card", self.tables.event(card).name.clone())]);
             self.unrest_cause(sid, cause, false);
+        }
+    }
+
+    /// Ticket #521 (version 0.1.0.0): the choice card's Unrest rises, after the turn's falls, so the
+    /// price on the card stands for a turn, as Agitate's point does (#520).
+    pub fn land_card_unrest(&mut self) {
+        for (sid, amount, card) in std::mem::take(&mut self.pending.card_unrest) {
+            if self.raise_unrest(sid, amount, UnrestSource::Plain) > 0.0 {
+                let cause = self.phrase("cause_choice_card", &[("card", self.tables.event(card).name.clone())]);
+                self.unrest_cause(sid, cause, false);
+            }
         }
     }
 

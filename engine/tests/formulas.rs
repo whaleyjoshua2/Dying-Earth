@@ -14266,6 +14266,9 @@ fn the_two_sides_of_a_card_are_composed_in_data_and_make_different_boards() {
     refused.answer_card(Seat(0), false).unwrap();
     taken.apply_card_answers();
     refused.apply_card_answers();
+    // Ticket #521 (version 0.1.0.0): the rise lands after the turn's falls, as Resolution does it.
+    taken.land_card_unrest();
+    refused.land_card_unrest();
     assert_eq!(taken.seat(Seat(0)).stockpile.ducats, purse + relief as f64, "taking it pays out the relief the card names");
     assert_eq!(refused.seat(Seat(0)).stockpile.ducats, purse, "refusing it pays nothing");
     for (i, sid) in held.iter().enumerate() {
@@ -21570,6 +21573,8 @@ fn the_three_cards_of_the_fifty_turn_game_land_as_the_ticket_says() {
     assert!(g.may_take_card(s));
     g.answer_card(s, true).expect("levied");
     g.apply_card_answers();
+    // Ticket #521: the rise lands after the turn's falls, as Resolution does it.
+    g.land_card_unrest();
     assert_eq!(g.seat(s).stockpile.ducats, ducats + 20.0, "+20 Ducats");
     assert_eq!(g.climate.card_emissions_next, -1.0, "a ppm less next turn");
     assert_eq!(g.unrest(home), unrest + 0.5, "+0.5 Unrest in the Region held");
@@ -22028,4 +22033,30 @@ fn an_inherited_army_abroad_in_a_rivals_region_has_a_turns_grace() {
     g.turn += 1;
     g.resolution_phase();
     assert!(g.army(army).is_none_or(|a| a.stance == Stance::Attack), "and then the old rule: on Attack in a rival's Region");
+}
+
+/// Ticket #521 (version 0.1.0.0): the Carbon Levy's half point landed before the turn's natural
+/// fall, which ate it -- "Unrest from 0.5 to 0 (the Carbon Levy card)". At the designer's word
+/// (Q1 A, Q2) a choice card's Unrest lands after the fall, as Agitate's does (#520), so it stands
+/// for a turn: the Levy taken, the Hard Winter or the Conscription Notice refused.
+#[test]
+fn a_choice_cards_unrest_lands_after_the_natural_fall() {
+    for (card, take, figure) in [(EventId::CarbonLevy, true, 0.5), (EventId::TheHardWinter, false, 2.0), (EventId::ConscriptionNotice, false, 1.0)] {
+        let mut g = game();
+        calm(&mut g);
+        let me = Seat(0);
+        let held = g.controlled_states(me);
+        for s in &held {
+            g.state_mut(*s).unrest = 0.5;
+            g.state_mut(*s).facilities.retain(|f| f.kind != FacilityKind::Constabulary);
+        }
+        g.seat_mut(me).stockpile.ducats = 200.0;
+        ask_the_card(&mut g, card);
+        g.answer_card(me, take).unwrap();
+        g.resolution_phase();
+        g.report_unrest_net();
+        assert!(held.iter().any(|s| g.state(*s).unrest == figure), "{card:?}: {:?}", held.iter().map(|s| g.state(*s).unrest).collect::<Vec<_>>());
+        let name = g.tables.event(card).name.clone();
+        assert!(g.report.lines.iter().any(|l| l.kind == LineKind::Unrest && l.text.contains(&name) && l.text.contains(&format!("to {}", Game::unrest_figure(figure)))), "{card:?}: {:?}", g.report.lines.iter().filter(|l| l.kind == LineKind::Unrest).map(|l| &l.text).collect::<Vec<_>>());
+    }
 }

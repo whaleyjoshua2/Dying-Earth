@@ -361,6 +361,9 @@ pub struct Pending {
     /// Ticket #269 (version 0.08.4): Agitate orders paid this turn -- who, where.
     #[serde(default)]
     pub agitates: Vec<(Seat, StateId)>,
+    /// Ticket #521 (version 0.1.0.0): a choice card's Unrest rises, to land after the natural fall.
+    #[serde(default)]
+    pub card_unrest: Vec<(StateId, f64, EventId)>,
     /// Ticket #52: Resettle orders paid this turn, one per Faction at most.
     pub resettle: Vec<(Seat, StateId)>,
     pub influence: Vec<(Seat, Target, i64)>,

@@ -68,6 +68,12 @@ belong to the tool are kept apart below.
    Swept with the #519 grace (`../2026-10-07-version-0.1.0.0/sweeps/ticket-520.txt`): **1 / 30 / 11 /
    19, 19 collapses**, from 0 / 33 / 11 / 18 and 18, within noise.
 6. **Carbon Levy** (tester 3): the card says +0.5 Unrest; the Report showed Unrest falling. New card.
+   **Fixed (2026-10-12, ticket #521).** The half point did land, but before the turn's natural fall,
+   which took it back: from 0.5 the line read "from 0.5 to 0 (the Carbon Levy card)". A choice card's
+   Unrest rise now lands after the fall, as Agitate's does, so it stands for a turn -- the Levy taken,
+   the Hard Winter and the Conscription Notice refused. The climate cards are as they were.
+   Swept (`../2026-10-07-version-0.1.0.0/sweeps/ticket-521.txt`): **1 / 29 / 12 / 19, 19 collapses**,
+   within noise.
 7. **Influence bonuses not visible** (tester 4): the Spaceport's "+N Influence next turn" and first-to-
    settle bonuses never showed in "Influence allotment this turn".
 8. **Contradictory ownership headlines** (testers 1, 2): "X now belongs to the Prospectors
