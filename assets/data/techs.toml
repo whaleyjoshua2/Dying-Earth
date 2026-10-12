@@ -93,7 +93,8 @@ name = "Clean Manufacturing"
 branch = "Stewardship"
 # Ticket #505 (version 0.1.0.0): 58 where it was 48, the step before Planetary Stewardship.
 rung = 3
-cost = 58
+# Ticket #527 (version 0.1.0.0): 48, with every rung-3 Tech, at the designer's word.
+cost = 48
 needs = ["clean_power"]
 effect = "Factory and Refinery Emissions x0.4; Wildfire adds no Emissions"
 value = 0.4
@@ -118,10 +119,12 @@ branch = "Propulsion"
 rung = 2
 cost = 32
 # Ticket #425 (version 0.09.5): Orbital Refuelling in place of Clean Propellant, at the designer's word
-# ("orbital refueling needed for efficient transit"), so the row runs in two lanes.
-needs = ["orbital_refuelling"]
-effect = "Transit Fuel x0.6; transits advance through Solar Storm"
-value = 0.6
+# ("orbital refueling needed for efficient transit"), so the row runs in two lanes. Ticket #527
+# (version 0.1.0.0): Clean Propellant again, the lanes swapped, and the Fuel x0.75 from x0.6 -- "clean
+# propellant is the only requirement for efficient transit".
+needs = ["clean_propellant"]
+effect = "Transit Fuel x0.75; transits advance through Solar Storm"
+value = 0.75
 
 [[tech]]
 id = "hardened_hulls"
@@ -129,8 +132,10 @@ name = "Hardened Hulls"
 branch = "Propulsion"
 rung = 3
 cost = 48
-# Ticket #393 (version 0.09.3): needs BOTH rung-2 Propulsion Techs, at the designer's word.
-needs = ["efficient_transit", "nuclear_rockets"]
+# Ticket #393 (version 0.09.3): needed BOTH rung-2 Propulsion Techs. Ticket #527 (version 0.1.0.0):
+# Efficient Transit alone, Nuclear Rockets having moved up beside it -- "hardened hulls stays level
+# three but only needs efficient transit".
+needs = ["efficient_transit"]
 effect = "Every Ship +2 strength; immune to Radiation Surge"
 value = 2.0
 
@@ -416,11 +421,13 @@ value = 1.0
 id = "missile_technology"
 name = "Missile Technology"
 branch = "Propulsion"
-rung = 3
-cost = 48
+# Ticket #527 (version 0.1.0.0): rung 4 at 58, needing both rung-3 Propulsion Techs, at the
+# designer's word -- "Missile tech becomes level 4 (cost 58) and needs both level 3s".
+rung = 4
+cost = 58
 # Ticket #425 (version 0.09.5): Nuclear Rockets in place of Hardened Hulls, at the designer's word
 # ("Missile tech no longer requires hardened hulls"), so the first weapon is one step of Propulsion.
-needs = ["nuclear_rockets"]
+needs = ["nuclear_rockets", "hardened_hulls"]
 effect = "Unlocks the Missile Carrier: the first weapon Tech, and the whole table sees it"
 value = 0.0
 
@@ -436,9 +443,13 @@ value = 0.0
 id = "nuclear_rockets"
 name = "Nuclear Rockets"
 branch = "Propulsion"
-rung = 2
-cost = 38
-needs = ["clean_propellant"]
+# Ticket #527 (version 0.1.0.0): rung 3 at 48, after Cryogenic Tanks, at the designer's word --
+# "nuclear rockets becomes level 3 needing cryo tanks". Drawn above Hardened Hulls, in the lane of
+# Orbital Refuelling and Cryogenic Tanks.
+stack = -1
+rung = 3
+cost = 48
+needs = ["cryogenic_tanks"]
 effect = "Transit times x0.8 (a Mars crossing four turns at the window, Venus two); Fuel unchanged"
 value = 0.8
 
@@ -469,9 +480,12 @@ value = 0.9
 id = "cryogenic_tanks"
 name = "Cryogenic Tanks"
 branch = "Propulsion"
+# Ticket #527 (version 0.1.0.0): Orbital Refuelling alone, at the designer's word -- "cryogenics
+# tanks only need orbital refueling" -- and drawn above Efficient Transit, level with it.
+stack = -1
 rung = 2
 cost = 32
-needs = ["clean_propellant"]
+needs = ["orbital_refuelling"]
 effect = "Every Ship's tank +15 Fuel"
 value = 1.0
 tank_fuel = 15.0
@@ -487,6 +501,9 @@ tank_fuel = 15.0
 id = "commodity_finance"
 name = "Commodity Finance"
 branch = "Extraction"
+# Ticket #527 (version 0.1.0.0): drawn above Automated Refining, so Rail Gun Freight, a lone box
+# at its band's middle, stands level with the Tech it needs, at the designer's word.
+stack = -1
 rung = 2
 cost = 32
 needs = ["deep_mining"]
@@ -523,7 +540,8 @@ id = "regolith_printing"
 name = "Regolith Printing"
 branch = "Off-world Living"
 rung = 3
-cost = 58
+# Ticket #527 (version 0.1.0.0): 48, with every rung-3 Tech, at the designer's word.
+cost = 48
 needs = ["closed_loop_colonies"]
 effect = "Modules off Earth cost x0.75 Materials and x0.85 Widgets"
 value = 0.75
@@ -538,7 +556,8 @@ id = "rail_gun_freight"
 name = "Rail Gun Freight"
 branch = "Extraction"
 rung = 3
-cost = 58
+# Ticket #527 (version 0.1.0.0): 48, with every rung-3 Tech, at the designer's word.
+cost = 48
 needs = ["automated_refining"]
 effect = "Each working Mass Driver pays 3 Ducats a turn"
 value = 3
@@ -552,7 +571,8 @@ id = "superconductors"
 name = "Superconductors"
 branch = "Society"
 rung = 3
-cost = 58
+# Ticket #527 (version 0.1.0.0): 48, with every rung-3 Tech, at the designer's word.
+cost = 48
 needs = ["orbital_data_centers"]
 effect = "Energy output x1.25"
 value = 1.25

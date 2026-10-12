@@ -603,7 +603,7 @@ battle_fuel_weight = 0.2
 # Ticket #425 (version 0.09.5): Efficient Grids off -- Automated Refining needs Deep Mining alone.
 # Ticket #426 (version 0.09.5): Commodity Finance in place of Beneficiation, which left the road.
 # Ticket #505 (version 0.1.0.0): Rail Gun Freight, the 58-Research step before the Charter.
-order = ["deep_mining", "automated_refining", "commodity_finance", "rail_gun_freight", "orbital_refuelling", "clean_propellant", "efficient_transit", "nuclear_rockets", "cryogenic_tanks", "hardened_hulls", "missile_technology"]
+order = ["deep_mining", "automated_refining", "commodity_finance", "rail_gun_freight", "orbital_refuelling", "clean_propellant", "efficient_transit", "cryogenic_tanks", "nuclear_rockets", "hardened_hulls", "missile_technology"]
 # Ticket #462 (version 0.09.7): the three rivals' gates, picked only when nothing else is left, and
 # starved of this seat's Research (its whole cap kept back) while one is under research.
 last = ["planetary_stewardship", "generation_ships", "the_upload"]
@@ -642,7 +642,7 @@ last = ["planetary_stewardship", "generation_ships", "the_upload"]
 # Ticket #424 (version 0.09.5): the Custodians' road moved to the Stewardship line -- Efficient Grids,
 # Clean Power and Green Consensus, cheapest first. Public Science is on nobody's road but the Archivists'.
 # Ticket #505 (version 0.1.0.0): Clean Manufacturing, the 58-Research step before Planetary Stewardship.
-order = ["efficient_grids", "clean_power", "green_consensus", "clean_manufacturing", "orbital_refuelling", "clean_propellant", "efficient_transit", "nuclear_rockets", "cryogenic_tanks", "hardened_hulls", "missile_technology"]
+order = ["efficient_grids", "clean_power", "green_consensus", "clean_manufacturing", "orbital_refuelling", "clean_propellant", "efficient_transit", "cryogenic_tanks", "nuclear_rockets", "hardened_hulls", "missile_technology"]
 # Ticket #462 (version 0.09.7): the three rivals' gates, picked only when nothing else is left, and
 # starved of this seat's Research (its whole cap kept back) while one is under research.
 last = ["extraction_charter", "generation_ships", "the_upload"]
@@ -657,7 +657,7 @@ last = ["extraction_charter", "generation_ships", "the_upload"]
 # Expanded Habitats alone, so the road is all Off-world Living.
 # Ticket #438 (version 0.09.6): Relay Networks joins the road, straight after Closed-Loop Colonies.
 # Ticket #505 (version 0.1.0.0): Regolith Printing, the 58-Research step before Generation Ships.
-order = ["expanded_habitats", "closed_loop_colonies", "relay_networks", "regolith_printing", "orbital_refuelling", "clean_propellant", "efficient_transit", "nuclear_rockets", "cryogenic_tanks", "hardened_hulls", "missile_technology"]
+order = ["expanded_habitats", "closed_loop_colonies", "relay_networks", "regolith_printing", "orbital_refuelling", "clean_propellant", "efficient_transit", "cryogenic_tanks", "nuclear_rockets", "hardened_hulls", "missile_technology"]
 # Ticket #462 (version 0.09.7): the three rivals' gates, picked only when nothing else is left, and
 # starved of this seat's Research (its whole cap kept back) while one is under research.
 last = ["planetary_stewardship", "extraction_charter", "the_upload"]
@@ -673,7 +673,7 @@ last = ["planetary_stewardship", "extraction_charter", "the_upload"]
 # still `public_science`) and Civil Defense. Closed-Loop Colonies and its three are off this list.
 # Ticket #433 (version 0.09.5): and Orbital Data Centers, which The Upload now needs too.
 # Ticket #505 (version 0.1.0.0): Superconductors, the 58-Research step before The Upload.
-order = ["public_science", "civil_defense", "orbital_data_centers", "superconductors", "orbital_refuelling", "clean_propellant", "efficient_transit", "nuclear_rockets", "cryogenic_tanks", "hardened_hulls", "missile_technology"]
+order = ["public_science", "civil_defense", "orbital_data_centers", "superconductors", "orbital_refuelling", "clean_propellant", "efficient_transit", "cryogenic_tanks", "nuclear_rockets", "hardened_hulls", "missile_technology"]
 # Ticket #462 (version 0.09.7): the three rivals' gates, picked only when nothing else is left, and
 # starved of this seat's Research (its whole cap kept back) while one is under research.
 last = ["planetary_stewardship", "extraction_charter", "generation_ships"]

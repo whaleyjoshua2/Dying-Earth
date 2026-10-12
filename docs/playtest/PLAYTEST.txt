@@ -43,10 +43,13 @@ A LONGER GAME
 - THREE NEW CARDS with a choice: the Carbon Levy, the Deep Core Survey, the Trade Pact.
 
 THE TECH TREE
-- THE VICTORY GATES moved to a fourth rung at 62 Research, each behind a new 58-Research
-  Tech of its own branch: Clean Manufacturing (raised), Regolith Printing (cheaper
-  Modules off Earth), Rail Gun Freight (a Mass Driver pays 3 Ducats a turn) and
-  Superconductors (Energy x1.25). Every road to a gate is 202 Research.
+- THE VICTORY GATES moved to a fourth rung at 62 Research, each behind a 48-Research
+  Tech of its own branch: Clean Manufacturing, Regolith Printing (cheaper Modules off
+  Earth), Rail Gun Freight (a Mass Driver pays 3 Ducats a turn) and Superconductors
+  (Energy x1.25). Every road to a gate is 192 Research.
+- PROPULSION runs in two lanes: Orbital Refuelling, Cryogenic Tanks, Nuclear Rockets;
+  Clean Propellant, Efficient Transit (now Fuel x0.75), Hardened Hulls. Missile
+  Technology needs both ends, on the fourth rung at 58.
 
 THE JOURNAL AND THE FACTIONS
 - A SECOND OBJECTIVE for each Faction opens once the first is met: three Leapfrogs, a

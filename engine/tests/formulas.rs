@@ -1360,8 +1360,9 @@ fn tech_efficient_transit_cuts_fuel() {
     at_window(&mut g);
     assert_eq!(g.transit_cost(BodyId::Earth, BodyId::Mars).1, 18.1);
     with_tech(&mut g, TechId::EfficientTransit);
-    assert_eq!(g.transit_cost(BodyId::Earth, BodyId::Mars).1, 10.9);
-    assert_eq!(g.transit_cost(BodyId::Moon, BodyId::Earth).1, 2.2, "3.7 home x 0.6, to the tenth"); // Ticket #387: where 3 was floored
+    // Ticket #527 (version 0.1.0.0): x0.75, from x0.6.
+    assert_eq!(g.transit_cost(BodyId::Earth, BodyId::Mars).1, 13.6);
+    assert_eq!(g.transit_cost(BodyId::Moon, BodyId::Earth).1, 2.8, "3.7 home x 0.75, to the tenth"); // Ticket #387: where 3 was floored
 }
 
 #[test]
@@ -2172,7 +2173,8 @@ fn an_arkwright_pays_half_for_a_station_and_three_quarters_for_a_module() {
     assert_eq!(g.transit_cost_for(Seat(0), BodyId::Earth, BodyId::Mars).1, 18.1);
     assert_eq!(g.transit_cost_for(Seat(2), BodyId::Earth, BodyId::Mars).1, 13.6);
     g.research.done.push(TechId::EfficientTransit);
-    assert_eq!(g.transit_cost_for(Seat(2), BodyId::Earth, BodyId::Mars).1, 8.1, "18.1 x 0.75 x 0.6, to the tenth");
+    // Ticket #527 (version 0.1.0.0): Efficient Transit x0.75, from x0.6.
+    assert_eq!(g.transit_cost_for(Seat(2), BodyId::Earth, BodyId::Mars).1, 10.2, "18.1 x 0.75 x 0.75, to the tenth");
 }
 
 #[test]
@@ -10577,8 +10579,9 @@ fn cryogenic_tanks_adds_fifteen_to_every_tank_on_clean_propellants_five() {
     let mut g = game();
     let card = g.tables.tech(TechId::CryogenicTanks);
     assert_eq!((card.name.as_str(), card.branch.as_str(), card.rung, card.cost), ("Cryogenic Tanks", "Propulsion", 2, 32));
-    assert_eq!(card.needs, vec![TechId::CleanPropellant]);
-    assert!(TechId::ALL.iter().all(|t| !g.tables.tech(*t).needs.contains(&TechId::CryogenicTanks)), "needed by nothing");
+    // Ticket #527 (version 0.1.0.0): Orbital Refuelling in place of Clean Propellant, and Nuclear Rockets needs it.
+    assert_eq!(card.needs, vec![TechId::OrbitalRefuelling]);
+    assert!(TechId::ALL.iter().filter(|t| g.tables.tech(**t).needs.contains(&TechId::CryogenicTanks)).eq([TechId::NuclearRockets].iter()), "needed by Nuclear Rockets alone");
     let tanks = |g: &Game| (g.tank_of(Seat(0), UnitKind::ColonyShip), g.tank_of(Seat(0), UnitKind::Frigate), g.tank_of(Seat(0), UnitKind::MissileCarrier));
     assert_eq!(tanks(&g), (35.0, 30.0, 30.0));
     with_tech(&mut g, TechId::CleanPropellant);
@@ -10598,7 +10601,8 @@ fn cryogenic_tanks_adds_fifteen_to_every_tank_on_clean_propellants_five() {
     for k in FactionKind::ALL {
         let order = &g.tables.ai.tech_picks[&k].order;
         let at = |t: TechId| order.iter().position(|x| *x == t);
-        assert!(at(TechId::CryogenicTanks).is_some() && at(TechId::CryogenicTanks) == at(TechId::NuclearRockets).map(|i| i + 1), "{k:?} picks it after Nuclear Rockets: {order:?}");
+        // Ticket #527 (version 0.1.0.0): just before Nuclear Rockets, which needs it.
+        assert!(at(TechId::CryogenicTanks).is_some() && at(TechId::CryogenicTanks).map(|i| i + 1) == at(TechId::NuclearRockets), "{k:?} picks it before Nuclear Rockets: {order:?}");
     }
 }
 
@@ -10616,25 +10620,24 @@ fn the_tree_costs_eighteen_thirty_two_and_forty_eight_by_rung() {
         // Ticket #393 (version 0.09.3): Nuclear Rockets is priced above its rung on purpose, 38 where
         // rung 2 is 32, at the designer's word; Coastal Engineering below it, at 15.
         // Ticket #413 (version 0.09.4): and Orbital Refuelling, 22 where its rung is 18.
-        if t == TechId::CoastalEngineering || t == TechId::NuclearRockets || t == TechId::OrbitalRefuelling {
+        // Ticket #527 (version 0.1.0.0): Nuclear Rockets on rung 3 at its 48, no longer above its rung.
+        if t == TechId::CoastalEngineering || t == TechId::OrbitalRefuelling {
             continue;
         }
-        // Ticket #505 (version 0.1.0.0): rung 3 holds four Techs at 58 beside its 48s -- a rung is a
-        // column, the price each Tech's own -- and the gates' rung 4 costs 62.
-        let fifty_eight = [TechId::CleanManufacturing, TechId::RegolithPrinting, TechId::RailGunFreight, TechId::Superconductors];
+        // Ticket #505 (version 0.1.0.0): the gates' rung 4 costs 62. Ticket #527 (version 0.1.0.0): every rung-3 Tech
+        // 48 again, and Missile Technology on rung 4 at 58.
         let want = match card.rung {
             1 => 18,
             2 => 32,
-            3 if fifty_eight.contains(&t) => 58,
             3 => 48,
+            _ if t == TechId::MissileTechnology => 58,
             _ => 62,
         };
         assert_eq!(card.cost, want, "rung {} costs {want}: {t:?}", card.rung);
     }
     let total: i64 = TechId::ALL.into_iter().map(|t| g.tables.tech(t).cost).sum();
-    assert_eq!(g.tables.tech(TechId::NuclearRockets).cost, 38, "priced above its rung");
     assert_eq!(g.tables.tech(TechId::OrbitalRefuelling).cost, 22, "priced above its rung");
-    assert_eq!(total, 1093, "the whole tree since ticket #505's fourth rung (the gates 48 to 62, Clean Manufacturing 48 to 58, three new at 58); 853 since ticket #433's Orbital Data Centers (32 on rung 2); 821 from #426's Commodity Finance (32 on rung 2); 789 from #420's Cryogenic Tanks (32 on rung 2); 757 from #413's Orbital Refuelling (22 on rung 1); 735 from #393, 697 from #343, 649 from #232, 585 from #231, 554 from #201, 507 before that");
+    assert_eq!(total, 1073, "the whole tree since ticket #527 (the four 58s to 48, Nuclear Rockets 38 to 48, Missile Technology 48 to 58); 1,093 since ticket #505's fourth rung (the gates 48 to 62, Clean Manufacturing 48 to 58, three new at 58); 853 since ticket #433's Orbital Data Centers (32 on rung 2); 821 from #426's Commodity Finance (32 on rung 2); 789 from #420's Cryogenic Tanks (32 on rung 2); 757 from #413's Orbital Refuelling (22 on rung 1); 735 from #393, 697 from #343, 649 from #232, 585 from #231, 554 from #201, 507 before that");
 }
 
 // ------------------------------------------------------- 0.08.1 ticket #208: the School's step
@@ -14644,10 +14647,12 @@ fn a_missile_carrier_waits_for_missile_technology() {
     // The Tech's own row: the rung and the cost are the designer's; the branch and the
     // prerequisite are the build's choice, named in the ticket for correction.
     let t = g.tables.tech(TechId::MissileTechnology);
-    assert_eq!((t.rung, t.cost), (3, 48), "rung 3, cost 48");
+    // Ticket #527 (version 0.1.0.0): rung 4 at 58, from rung 3 at 48.
+    assert_eq!((t.rung, t.cost), (4, 58), "rung 4, cost 58");
     assert_eq!(t.branch, "Propulsion");
-    // Ticket #425 (version 0.09.5): Nuclear Rockets in place of Hardened Hulls, at the designer's word.
-    assert_eq!(t.needs, vec![TechId::NuclearRockets]);
+    // Ticket #425 (version 0.09.5): Nuclear Rockets in place of Hardened Hulls, at the designer's word;
+    // Ticket #527 (version 0.1.0.0): and Hardened Hulls again beside it, both rung-3 Propulsion Techs.
+    assert_eq!(t.needs, vec![TechId::NuclearRockets, TechId::HardenedHulls]);
 }
 
 /// Ticket #343 (R3): the Launch gate. Its shape is a Bombard's -- your Ship, the right kind, not in
@@ -16872,19 +16877,26 @@ fn nuclear_rockets_takes_a_turn_off_a_crossing_and_none_off_a_hop() {
 /// Ticket #393: **Hardened Hulls needs Efficient Transit AND Nuclear Rockets**, the two rung-2
 /// Propulsion Techs side by side. Ticket #425 (version 0.09.5): they open off two roots now,
 /// Efficient Transit off Orbital Refuelling and Nuclear Rockets off Clean Propellant.
+///
+/// Ticket #527 (version 0.1.0.0): two lanes again, the other way about: Clean Propellant, Efficient Transit, Hardened
+/// Hulls; Orbital Refuelling, Cryogenic Tanks, Nuclear Rockets; Missile Technology needs both ends.
 #[test]
 fn hardened_hulls_needs_both_rung_two_propulsion_techs() {
     let mut g = game();
     g.research.done.push(TechId::CleanPropellant);
-    assert!(g.available_techs().contains(&TechId::NuclearRockets), "Nuclear Rockets opens off Clean Propellant");
-    assert!(!g.available_techs().contains(&TechId::EfficientTransit), "Efficient Transit does not");
-    g.research.done.push(TechId::OrbitalRefuelling);
-    assert!(g.available_techs().contains(&TechId::EfficientTransit), "it opens off Orbital Refuelling");
+    assert!(g.available_techs().contains(&TechId::EfficientTransit), "Efficient Transit opens off Clean Propellant");
+    assert!(!g.available_techs().contains(&TechId::CryogenicTanks), "Cryogenic Tanks does not");
     g.research.done.push(TechId::EfficientTransit);
-    assert!(!g.available_techs().contains(&TechId::HardenedHulls), "Efficient Transit alone does not open Hardened Hulls");
+    assert!(g.available_techs().contains(&TechId::HardenedHulls), "Efficient Transit alone opens Hardened Hulls");
+    g.research.done.push(TechId::OrbitalRefuelling);
+    assert!(g.available_techs().contains(&TechId::CryogenicTanks), "Cryogenic Tanks opens off Orbital Refuelling");
+    assert!(!g.available_techs().contains(&TechId::NuclearRockets), "Nuclear Rockets waits on Cryogenic Tanks");
+    g.research.done.push(TechId::CryogenicTanks);
+    assert!(g.available_techs().contains(&TechId::NuclearRockets));
+    g.research.done.push(TechId::HardenedHulls);
+    assert!(!g.available_techs().contains(&TechId::MissileTechnology), "Missile Technology wants both");
     g.research.done.push(TechId::NuclearRockets);
-    assert!(g.available_techs().contains(&TechId::HardenedHulls), "both do");
-    assert_eq!(g.tables.tech(TechId::NuclearRockets).cost, 38, "priced above its rung on purpose");
+    assert!(g.available_techs().contains(&TechId::MissileTechnology), "both do");
 }
 
 /// Ticket #393: **a computer seat picks its Victory gate chain, then the Propulsion chain, then the
@@ -16910,6 +16922,9 @@ fn a_computer_seat_picks_its_gate_chain_then_propulsion_then_the_cheapest() {
     g.research.done.push(TechId::CleanPropellant);
     assert_eq!(g.ai_tech_pick(seat), TechId::EfficientTransit, "then the rung-2 pair, Efficient Transit first");
     g.research.done.push(TechId::EfficientTransit);
+    // Ticket #527 (version 0.1.0.0): Cryogenic Tanks before Nuclear Rockets, which needs it now.
+    assert_eq!(g.ai_tech_pick(seat), TechId::CryogenicTanks);
+    g.research.done.push(TechId::CryogenicTanks);
     assert_eq!(g.ai_tech_pick(seat), TechId::NuclearRockets);
 }
 
@@ -18182,9 +18197,9 @@ fn orbital_refuelling_stacks_with_nuclear_rockets_and_clean_propellant_widens_th
     let mut g = game();
     let card = g.tables.tech(TechId::OrbitalRefuelling).clone();
     assert_eq!((card.rung, card.cost, card.needs.len(), card.value), (1, 22, 0, 0.9));
-    // Ticket #425 (version 0.09.5): Efficient Transit needs it, and nothing else does.
+    // Ticket #425 (version 0.09.5): Efficient Transit needed it; Ticket #527 (version 0.1.0.0): Cryogenic Tanks does instead.
     let needing: Vec<TechId> = g.tables.techs.iter().filter(|t| t.needs.contains(&TechId::OrbitalRefuelling)).map(|t| t.id).collect();
-    assert_eq!(needing, vec![TechId::EfficientTransit], "needed by Efficient Transit alone");
+    assert_eq!(needing, vec![TechId::CryogenicTanks], "needed by Cryogenic Tanks alone");
     // The multipliers stack: 0.9 alone, 0.72 with Nuclear Rockets.
     let turns = |g: &Game, turn: u32| g.transit_cost_for_at(Seat(0), BodyId::Earth, BodyId::Mars, turn).0;
     let base: Vec<u32> = (1..=36).map(|t| turns(&g, t)).collect();
@@ -18229,13 +18244,18 @@ fn the_tech_trees_lit_path_is_everything_a_tech_needs() {
     let t = tables();
     // Ticket #425 (version 0.09.5): Missile Technology needs Nuclear Rockets alone, so Hardened
     // Hulls is now the longer path.
+    // Ticket #527 (version 0.1.0.0): Hardened Hulls is one lane, Missile Technology both.
     let path = t.tech_path(TechId::HardenedHulls);
-    for want in [TechId::HardenedHulls, TechId::EfficientTransit, TechId::OrbitalRefuelling, TechId::NuclearRockets, TechId::CleanPropellant] {
+    for want in [TechId::HardenedHulls, TechId::EfficientTransit, TechId::CleanPropellant] {
         assert!(path.contains(&want), "{want:?} is on Hardened Hulls' path: {path:?}");
     }
-    assert!(!path.contains(&TechId::CryogenicTanks), "Cryogenic Tanks, beside it, is not");
-    assert_eq!(path.len(), 5);
-    assert_eq!(t.tech_path(TechId::MissileTechnology), vec![TechId::MissileTechnology, TechId::NuclearRockets, TechId::CleanPropellant]);
+    assert!(!path.contains(&TechId::NuclearRockets), "Nuclear Rockets, beside it, is not");
+    assert_eq!(path.len(), 3);
+    let mut missile = t.tech_path(TechId::MissileTechnology);
+    missile.sort_by_key(|x| x.index());
+    let mut all = vec![TechId::MissileTechnology, TechId::NuclearRockets, TechId::CryogenicTanks, TechId::OrbitalRefuelling, TechId::HardenedHulls, TechId::EfficientTransit, TechId::CleanPropellant];
+    all.sort_by_key(|x| x.index());
+    assert_eq!(missile, all, "the whole of Propulsion");
     assert_eq!(t.tech_path(TechId::CleanPropellant), vec![TechId::CleanPropellant], "a rung-1 Tech lights itself alone");
 }
 
@@ -18413,7 +18433,7 @@ fn each_victory_tech_ends_a_line_of_its_own() {
     // Ticket #505 (version 0.1.0.0): Clean Manufacturing in place of Clean Power, which is reached through it.
     assert_eq!(ps, vec![TechId::CleanManufacturing, TechId::GreenConsensus], "the designer's three and Clean Manufacturing, Efficient Grids reached through both");
     assert_eq!(names(t.gate_chain(FactionKind::Custodians)), vec!["Efficient Grids", "Clean Power", "Green Consensus", "Clean Manufacturing"]);
-    assert_eq!(price(FactionKind::Custodians), 202, "18 + 32 + 32 + 58 + 62 since ticket #505; 130 before");
+    assert_eq!(price(FactionKind::Custodians), 192, "18 + 32 + 32 + 48 + 62 since Ticket #527 (version 0.1.0.0); 202 since ticket #505; 130 before");
     // The Archivists: the whole road in Society.
     assert_eq!(line(TechId::TheUpload), "Society");
     // Ticket #433 (version 0.09.5): and Orbital Data Centers beside Civil Defense, both needing
@@ -18422,7 +18442,7 @@ fn each_victory_tech_ends_a_line_of_its_own() {
     assert_eq!(t.tech(TechId::TheUpload).needs, vec![TechId::CivilDefense, TechId::Superconductors], "The Upload needs Civil Defense and Superconductors");
     assert!(t.gate_chain(FactionKind::Archivists).iter().all(|x| line(*x) == "Society"), "no Tech outside Society on the Archivists' road");
     assert_eq!(names(t.gate_chain(FactionKind::Archivists)), vec!["Large Language Models", "Civil Defense", "Orbital Data Centers", "Superconductors"]);
-    assert_eq!(price(FactionKind::Archivists), 202, "18 + 32 + 32 + 58 + 62 since ticket #505; 130 before, 98 before ticket #433");
+    assert_eq!(price(FactionKind::Archivists), 192, "18 + 32 + 32 + 48 + 62 since Ticket #527 (version 0.1.0.0); 202 since ticket #505; 130 before, 98 before ticket #433");
     // Each list opens with its own chain: the first entries are the chain and nothing else.
     for k in FactionKind::ALL {
         let chain = t.gate_chain(k);
@@ -18444,16 +18464,18 @@ fn each_victory_tech_ends_a_line_of_its_own() {
 fn four_prerequisites_moved_at_the_designers_word() {
     let t = tables();
     let price = |k: FactionKind| -> i64 { t.gate_chain(k).iter().map(|x| t.tech(*x).cost).sum::<i64>() + t.tech(t.victory_gate(k).unwrap()).cost };
-    assert_eq!(t.tech(TechId::MissileTechnology).needs, vec![TechId::NuclearRockets], "no longer Hardened Hulls");
+    // Ticket #527 (version 0.1.0.0): Hardened Hulls again, beside Nuclear Rockets.
+    assert_eq!(t.tech(TechId::MissileTechnology).needs, vec![TechId::NuclearRockets, TechId::HardenedHulls], "both rung-3 Propulsion Techs");
     assert_eq!(t.tech(TechId::AutomatedRefining).needs, vec![TechId::DeepMining], "no longer Efficient Grids");
     assert_eq!(t.tech(TechId::ClosedLoopColonies).needs, vec![TechId::ExpandedHabitats], "no longer Clean Power");
-    assert_eq!(t.tech(TechId::EfficientTransit).needs, vec![TechId::OrbitalRefuelling], "Orbital Refuelling in place of Clean Propellant");
+    // Ticket #527 (version 0.1.0.0): Clean Propellant again.
+    assert_eq!(t.tech(TechId::EfficientTransit).needs, vec![TechId::CleanPropellant], "Clean Propellant, as before #425");
     assert!(!t.gate_chain(FactionKind::Prospectors).contains(&TechId::EfficientGrids), "the Charter no longer reaches Efficient Grids");
     assert!(!t.gate_chain(FactionKind::Arkwrights).contains(&TechId::CleanPower), "Generation Ships no longer reaches Clean Power");
     // Ticket #505 (version 0.1.0.0): 202 each, the 58-Research Tech and the gate at 62 on every road.
-    assert_eq!(price(FactionKind::Prospectors), 202, "Deep Mining, Automated Refining, Commodity Finance, Rail Gun Freight and the Charter; 130 before #505, 148 before #425");
+    assert_eq!(price(FactionKind::Prospectors), 192, "192 since #527; Deep Mining, Automated Refining, Commodity Finance, Rail Gun Freight and the Charter; 130 before #505, 148 before #425");
     // Ticket #438 (version 0.09.6): 130 since Generation Ships needs Relay Networks as well.
-    assert_eq!(price(FactionKind::Arkwrights), 202, "Expanded Habitats, Closed-Loop Colonies, Relay Networks, Regolith Printing and Generation Ships; 130 before #505, 98 before #438");
+    assert_eq!(price(FactionKind::Arkwrights), 192, "192 since #527; Expanded Habitats, Closed-Loop Colonies, Relay Networks, Regolith Printing and Generation Ships; 130 before #505, 98 before #438");
     for k in FactionKind::ALL {
         let chain = t.gate_chain(k);
         let order = &t.ai_tech_picks(k).order;
@@ -18471,8 +18493,12 @@ fn orbital_refuelling_is_stacked_above_clean_propellant() {
     assert!(key(TechId::OrbitalRefuelling) < key(TechId::CleanPropellant), "Orbital Refuelling first in Propulsion's rung-1 cell");
     // Ticket #426 (version 0.09.5): and Beneficiation at the foot of Extraction's rung 2, under
     // Commodity Finance, which sits level with the Charter it feeds.
-    assert!(key(TechId::CommodityFinance) < key(TechId::Beneficiation) && key(TechId::AutomatedRefining) < key(TechId::CommodityFinance), "Automated Refining, Commodity Finance, Beneficiation");
-    assert!(TechId::ALL.iter().filter(|x| ![TechId::OrbitalRefuelling, TechId::Beneficiation].contains(*x)).all(|x| t.tech(*x).stack == 0), "no other Tech sits out of the tree's order");
+    // Ticket #527 (version 0.1.0.0): Commodity Finance above Automated Refining, which sits level with Rail Gun Freight;
+    // Cryogenic Tanks above Efficient Transit and Nuclear Rockets above Hardened Hulls, one lane each.
+    assert!(key(TechId::CommodityFinance) < key(TechId::AutomatedRefining) && key(TechId::AutomatedRefining) < key(TechId::Beneficiation), "Commodity Finance, Automated Refining, Beneficiation");
+    assert!(key(TechId::CryogenicTanks) < key(TechId::EfficientTransit) && key(TechId::NuclearRockets) < key(TechId::HardenedHulls));
+    let out = [TechId::OrbitalRefuelling, TechId::Beneficiation, TechId::CommodityFinance, TechId::CryogenicTanks, TechId::NuclearRockets];
+    assert!(TechId::ALL.iter().filter(|x| !out.contains(*x)).all(|x| t.tech(*x).stack == 0), "no other Tech sits out of the tree's order");
 }
 
 // ---------------------------------------------------------------- Ticket #426 (version 0.09.5): Commodity Finance
@@ -18490,7 +18516,7 @@ fn commodity_finance_stands_in_for_beneficiation_under_the_charter() {
     assert!(t.techs.iter().all(|x| !x.needs.contains(&TechId::Beneficiation)), "Beneficiation leads nowhere");
     let chain = t.gate_chain(FactionKind::Prospectors);
     assert!(!chain.contains(&TechId::Beneficiation) && chain.contains(&TechId::CommodityFinance));
-    assert_eq!(chain.iter().map(|x| t.tech(*x).cost).sum::<i64>() + t.tech(TechId::ExtractionCharter).cost, 202, "the road, 130 until ticket #505's rung-4 Tech and rung-5 gate");
+    assert_eq!(chain.iter().map(|x| t.tech(*x).cost).sum::<i64>() + t.tech(TechId::ExtractionCharter).cost, 192, "the road: 192 since ticket #527, 202 since #505, 130 before");
     assert_eq!(TechId::ALL.len(), 29, "twenty-five with it, twenty-six since #433's Orbital Data Centers, twenty-nine since #505");
 }
 
@@ -18581,7 +18607,7 @@ fn orbital_data_centers_lifts_the_observatory_and_opens_the_upload() {
     assert_eq!(t.tech(TechId::TheUpload).needs, vec![TechId::CivilDefense, TechId::Superconductors]);
     assert_eq!(t.tech(TechId::Superconductors).needs, vec![TechId::OrbitalDataCenters]);
     let chain = t.gate_chain(FactionKind::Archivists);
-    assert_eq!(chain.iter().map(|x| t.tech(*x).cost).sum::<i64>() + t.tech(TechId::TheUpload).cost, 202, "130 until ticket #505");
+    assert_eq!(chain.iter().map(|x| t.tech(*x).cost).sum::<i64>() + t.tech(TechId::TheUpload).cost, 192, "192 since ticket #527, 202 since #505, 130 before");
     let mut g = game();
     let s = Seat(0);
     let moon = colony(&mut g, s, BodyId::Moon, &[ModuleKind::Observatory], 4);
@@ -18898,7 +18924,7 @@ fn generation_ships_needs_relay_networks_and_every_road_costs_130() {
     assert_eq!(t.tech(TechId::GenerationShips).needs, vec![TechId::RegolithPrinting, TechId::RelayNetworks]);
     assert_eq!(t.tech(TechId::RelayNetworks).cost, 32);
     for k in FactionKind::ALL {
-        assert_eq!(price(k), 202, "the {k:?} road, 130 until ticket #505");
+        assert_eq!(price(k), 192, "the {k:?} road: 192 since ticket #527, 202 since #505, 130 before");
     }
     let order = &t.ai_tech_picks(FactionKind::Arkwrights).order;
     assert_eq!(order[..3], [TechId::ExpandedHabitats, TechId::ClosedLoopColonies, TechId::RelayNetworks], "the Arkwrights' list opens with its road");
@@ -21421,9 +21447,10 @@ fn the_gates_stand_on_rung_four_behind_a_fifty_eight_research_tech_of_their_own_
     let t = tables();
     assert_eq!(TechId::ALL.len(), 29);
     let on_rung = |r: u32| -> Vec<TechId> { TechId::ALL.into_iter().filter(|x| t.tech(*x).rung == r).collect() };
-    assert_eq!(on_rung(3), vec![TechId::CleanManufacturing, TechId::HardenedHulls, TechId::MissileTechnology, TechId::RegolithPrinting, TechId::RailGunFreight, TechId::Superconductors]);
-    assert_eq!(on_rung(3).iter().map(|x| t.tech(*x).cost).collect::<Vec<i64>>(), vec![58, 48, 48, 58, 58, 58], "rung 3: Propulsion's two at 48, the four steps to a gate at 58");
-    assert_eq!(on_rung(4), vec![TechId::PlanetaryStewardship, TechId::ExtractionCharter, TechId::GenerationShips, TechId::TheUpload]);
+    // Ticket #527 (version 0.1.0.0): Nuclear Rockets up to rung 3 and Missile Technology to rung 4; every rung-3 Tech 48.
+    assert_eq!(on_rung(3), vec![TechId::CleanManufacturing, TechId::HardenedHulls, TechId::NuclearRockets, TechId::RegolithPrinting, TechId::RailGunFreight, TechId::Superconductors]);
+    assert!(on_rung(3).iter().all(|x| t.tech(*x).cost == 48), "rung 3 at 48");
+    assert_eq!(on_rung(4), vec![TechId::PlanetaryStewardship, TechId::ExtractionCharter, TechId::GenerationShips, TechId::TheUpload, TechId::MissileTechnology]);
     assert_eq!(TechId::ALL.iter().map(|x| t.tech(*x).rung).max(), Some(4), "four rungs and no fifth");
     let fourth = [(FactionKind::Custodians, TechId::CleanManufacturing, TechId::CleanPower), (FactionKind::Prospectors, TechId::RailGunFreight, TechId::AutomatedRefining), (FactionKind::Arkwrights, TechId::RegolithPrinting, TechId::ClosedLoopColonies), (FactionKind::Archivists, TechId::Superconductors, TechId::OrbitalDataCenters)];
     for (k, step, under) in fourth {
@@ -21434,7 +21461,7 @@ fn the_gates_stand_on_rung_four_behind_a_fifty_eight_research_tech_of_their_own_
         assert!(t.tech(gate).needs.contains(&step) && !t.tech(gate).needs.contains(&under), "the gate lists {step:?} and not {under:?}, reached through it");
         let chain = t.gate_chain(k);
         assert_eq!(chain.len(), 4, "{k:?}");
-        assert_eq!(chain.iter().map(|x| t.tech(*x).cost).sum::<i64>() + t.tech(gate).cost, 202, "the {k:?} road is 18 + 32 + 32 + 58 + 62");
+        assert_eq!(chain.iter().map(|x| t.tech(*x).cost).sum::<i64>() + t.tech(gate).cost, 192, "the {k:?} road is 18 + 32 + 32 + 48 + 62 since ticket #527 (58 before)");
         let order = &t.ai_tech_picks(k).order;
         assert_eq!(order[3], step, "the {k:?} list takes {step:?} fourth, straight after its rung-2 pair");
         for other in FactionKind::ALL.into_iter().filter(|o| *o != k) {
@@ -21442,7 +21469,7 @@ fn the_gates_stand_on_rung_four_behind_a_fifty_eight_research_tech_of_their_own_
         }
     }
     let total: i64 = TechId::ALL.into_iter().map(|x| t.tech(x).cost).sum();
-    assert_eq!(total, 1093, "the whole tree");
+    assert_eq!(total, 1073, "the whole tree: 1,073 since ticket #527, 1,093 before");
 }
 
 /// Ticket #505: **Regolith Printing** -- a Module built off Earth costs x0.75 Materials and x0.85
@@ -22084,4 +22111,39 @@ fn the_allotment_keeps_its_parts_and_they_sum_to_it() {
     // A turn without them names none.
     g.income_phase();
     assert!(!g.seat(me).allotment_parts.iter().any(|p| p.0.starts_with("Spaceport") || p.0.starts_with("First")), "{:?}", g.seat(me).allotment_parts);
+}
+
+/// Ticket #527 (version 0.1.0.0): the tree at the designer's word -- every rung-3 Tech at 48;
+/// Propulsion in two lanes, Orbital Refuelling to Cryogenic Tanks to Nuclear Rockets and Clean
+/// Propellant to Efficient Transit to Hardened Hulls, joined at Missile Technology on rung 4 at 58;
+/// Efficient Transit's Fuel x0.75. Every road to a gate 192 Research (18, 32, 32, 48, 62), from 202.
+#[test]
+fn the_tech_tree_of_ticket_527() {
+    let g = game();
+    let t = |id: TechId| g.tables.tech(id);
+    use TechId::*;
+    for id in TechId::ALL.into_iter().filter(|id| t(*id).rung == 3) {
+        assert_eq!(t(id).cost, 48, "{id:?}");
+    }
+    assert_eq!(t(EfficientTransit).needs, vec![CleanPropellant]);
+    assert_eq!(t(CryogenicTanks).needs, vec![OrbitalRefuelling]);
+    assert_eq!((t(NuclearRockets).rung, t(NuclearRockets).cost, t(NuclearRockets).needs.clone()), (3, 48, vec![CryogenicTanks]));
+    assert_eq!((t(HardenedHulls).rung, t(HardenedHulls).needs.clone()), (3, vec![EfficientTransit]));
+    let mut missile = t(MissileTechnology).needs.clone();
+    missile.sort_by_key(|x| x.index());
+    let mut both = vec![NuclearRockets, HardenedHulls];
+    both.sort_by_key(|x| x.index());
+    assert_eq!((t(MissileTechnology).rung, t(MissileTechnology).cost, missile), (4, 58, both));
+    assert_eq!(t(EfficientTransit).value, 0.75);
+    for gate in TechId::ALL.into_iter().filter(|id| t(*id).gate_for.is_some()) {
+        let mut road = vec![gate];
+        let mut i = 0;
+        while i < road.len() {
+            for n in t(road[i]).needs.clone() {
+                if !road.contains(&n) { road.push(n); }
+            }
+            i += 1;
+        }
+        assert_eq!(road.iter().map(|x| t(*x).cost).sum::<i64>(), 192, "{gate:?}: {road:?}");
+    }
 }

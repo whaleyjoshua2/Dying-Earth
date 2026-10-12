@@ -511,3 +511,24 @@ astroid belt"*.
   flight's arc read the tilted places. The rings' radii are untouched, and the title screen's
   system, with no sky to read, is flat as before.
 - No rule moves; no sweep.
+
+## 13. The Tech tree reshaped
+
+Ticket #527, at the designer's word after the 0.1.0.0 playtest:
+
+- **Every rung-3 Tech costs 48.** Clean Manufacturing, Regolith Printing, Rail Gun Freight and
+  Superconductors drop from 58 (§6). Every road to a gate is 18 + 32 + 32 + 48 + 62 = **192**, from
+  202; the tree is 29 Techs and **1,073** Research, from 1,093.
+- **Rail Gun Freight is drawn beside Automated Refining**, the Tech it needs: Commodity Finance takes
+  the top of Extraction's rung-2 stack.
+- **Propulsion in two lanes.** Orbital Refuelling, then Cryogenic Tanks (needing it alone), then
+  Nuclear Rockets (rung 3 at 48, from rung 2 at 38). Clean Propellant, then Efficient Transit
+  (needing it alone, as before #425), then Hardened Hulls (needing Efficient Transit alone). The two
+  meet at **Missile Technology, rung 4 at 58**, which needs both rung-3 Propulsion Techs.
+- **Efficient Transit's Fuel is x0.75**, from x0.6.
+- **The computer**'s pick lists take Cryogenic Tanks before Nuclear Rockets, which needs it now; the
+  order is otherwise as it was (gate chain, then Propulsion).
+- **The picture:** [`ticket-527/tree.png`](../dev-diary/2026-10-07-version-0.1.0.0/ticket-527/tree.png).
+- **Swept** ([`sweeps/ticket-527.txt`](../dev-diary/2026-10-07-version-0.1.0.0/sweeps/ticket-527.txt)):
+  2 / 24 / 16 / 18 and 20 collapses, from 1 / 29 / 12 / 19 and 19 -- the Prospectors five down and
+  the Arkwrights four up, at the edge of noise.
