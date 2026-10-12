@@ -21825,3 +21825,26 @@ fn the_computer_keeps_slots_at_a_ground_colony_for_the_habitats_its_next_tier_ne
     g.colony_mut(big).unwrap().tier = capital - 1;
     assert_eq!(g.habitats_to_reserve(g.colony(big).unwrap()), 1, "room 20 of the Capital's 24: one Habitat kept, a second Capital never precluded");
 }
+
+// ---------------------------------------------------------------- the 0.1.0.0 playtest: the Venus soft-lock
+
+/// The 0.1.0.0 playtest (2026-10-12): four players stranded Colony Ships at Venus in five games. The
+/// engine founds a station there from a Colony Ship in a ring (ticket #442), but every refusal a
+/// player met pointed somewhere else: a slot founding said "move to low orbit", a change of orbit to
+/// low listed "Venus has low orbit and 3 Orbital Slots". Venus has no low orbit, so each refusal now
+/// says so and names the founding that works.
+#[test]
+fn every_refusal_at_venus_points_at_founding_from_the_ring() {
+    let mut g = game();
+    let (ship, _) = colony_ship_ready(&mut g, BodyId::Venus);
+    assert_eq!(g.ship(ship).unwrap().slot, Some(0), "at Ishtar, Venus's first ring");
+    let into_ground = Order::Unload { ship, colonists: 4, army: false, into: UnloadTarget::Slot(BodyId::Venus, 0) };
+    let why = g.check_order(Seat(0), &[], &into_ground).unwrap_err().0;
+    assert!(!why.contains("low orbit") && why.contains("no ground") && why.contains("station") && why.contains("ring"), "{why}");
+    let to_low = Order::ChangeOrbit { ship, slot: None };
+    let why = g.check_order(Seat(0), &[], &to_low).unwrap_err().0;
+    assert!(why.contains("no low orbit") && !why.contains("has low orbit"), "{why}");
+    // And the founding that works, works.
+    let found = Order::Unload { ship, colonists: 4, army: false, into: UnloadTarget::Ring(BodyId::Venus, 0) };
+    assert!(g.check_order(Seat(0), &[], &found).is_ok());
+}

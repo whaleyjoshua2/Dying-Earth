@@ -1732,7 +1732,9 @@ impl Game {
                 let want = Orbit::of(*slot);
                 if !self.orbit_exists(body, want) {
                     let slots = self.tables.body(body).orbital_slots;
-                    return fail(format!("{} has low orbit and {} Orbital Slots, numbered 0 to {}", self.tables.body(body).name, slots, slots.saturating_sub(1)));
+                    // The 0.1.0.0 playtest: at a Body with no ground the refusal said "has low orbit".
+                    let low = if self.has_low_orbit(body) { "low orbit and " } else { "no low orbit, only " };
+                    return fail(format!("{} has {low}{} Orbital Slots, numbered 0 to {}", self.tables.body(body).name, slots, slots.saturating_sub(1)));
                 }
                 if self.ship_orbit(s) == want {
                     return fail(format!("already in {}", self.orbit_name(body, want)));
@@ -2143,6 +2145,11 @@ impl Game {
                     UnloadTarget::Slot(b, slot) => {
                         if *b != body {
                             return fail("that slot is not at this Body");
+                        }
+                        // The 0.1.0.0 playtest: a Body with no ground (Venus) has no low orbit to
+                        // move to, and four players stranded Ships following "move to low orbit".
+                        if !self.has_low_orbit(body) {
+                            return fail(format!("{} has no ground to found a Colony on: a Colony Ship founds a Space Station from the station slot's ring it stands in", self.tables.body(body).name));
                         }
                         // Ticket #335 (version 0.09.0): founding a Colony is touching the ground,
                         // and low orbit is what touches the ground.

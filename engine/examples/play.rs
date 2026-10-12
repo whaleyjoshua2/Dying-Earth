@@ -188,7 +188,15 @@ fn unload_target(words: &[&str]) -> Result<UnloadTarget, String> {
             Ok(UnloadTarget::Slot(body, n))
         }
         Some("colony") => Ok(UnloadTarget::Colony(colony_id(words.get(1).ok_or("colony needs a number")?)?)),
-        _ => Err("expected `slot <body> <n>` or `colony <n>`".into()),
+        // The 0.1.0.0 playtest: a Space Station founded by a Colony Ship in a station slot's ring
+        // (ticket #442), which the window offers on the Ship card and this tool could not say --
+        // four players stranded Ships at Venus for want of it.
+        Some("ring") => {
+            let body = pick(&BodyId::ALL, words.get(1).ok_or("ring needs a Body")?)?;
+            let n = count(words.get(2).ok_or("ring needs a station slot number")?)?;
+            Ok(UnloadTarget::Ring(body, n))
+        }
+        _ => Err("expected `slot <body> <n>`, `colony <n>` or `ring <body> <n>`".into()),
     }
 }
 
@@ -251,6 +259,10 @@ const GRAMMAR: &str = r#"ORDER LINES (one per line; `#` starts a comment; blank 
   load <ship> <n> from <place> [army <army>]
   unload <ship> <n> [army] into slot <body> <slot>
   unload <ship> <n> [army] into colony <n>
+  unload <ship> <n> into ring <body> <slot>
+                                       found a SPACE STATION with a Colony Ship's Colonists, from
+                                       the station slot's ring the Ship sits in (no Materials). The
+                                       one way to settle Venus, which has no ground.
   move-army <army> <state>
   ship-stance <body> <stance>          stance = attack|hold|intercept|evade|blockade
   army-stance <place> <stance>         stance = attack|evade|digin (hold does nothing to an Army)

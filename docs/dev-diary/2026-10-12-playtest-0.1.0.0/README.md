@@ -26,6 +26,13 @@ belong to the tool are kept apart below.
    `change-orbit <ship> low` is refused; `transit … venus low` says "already there"; `build station
    venus N` says "a Colony Ship in this orbit founds it". `show` lists no low orbit at Venus. Ships
    stranded with 4–9 Colonists. Repro: tester 4, seed 401, ship 41, turn 22; seed 402, ship 44.
+   **Fixed (2026-10-12).** The engine always could: a Colony Ship founds a station from the ring it
+   sits in (ticket #442), and the window offers it as "Found …" on the Ship card. The text tool had no
+   way to say it, and the refusals pointed at a low orbit Venus does not have. The tool now takes
+   `unload <ship> <n> into ring <body> <slot>`; a slot founding at Venus says "Venus has no ground to
+   found a Colony on: a Colony Ship founds a Space Station from the station slot's ring it stands in";
+   a change to low orbit says "Venus has no low orbit, only 3 Orbital Slots". Tested (watched red on
+   the old message), and replayed on tester 2's stranded save: Ishtar founded with 4, 5 aboard.
 2. **Accord accepted but not struck** (testers 2, 3). `accord accept X` echoes "you accept", yet no
    Accord stands and X offers again; in tester 2's case X marched Armies in the same Resolution. Both
    cases were renewal-type offers — suspect the legacy Renew path left in place by ticket #509.
