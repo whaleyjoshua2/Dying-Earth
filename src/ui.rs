@@ -5255,7 +5255,21 @@ fn trade_good_text(game: &Game, g: TradeGood) -> String {
 fn offer_words(game: &Game, o: &dying_earth_engine::state::Offer) -> String {
     match o.trade {
         Some((give, get)) => format!("offer {} for {}.", trade_good_text(game, give), trade_good_text(game, get)),
-        None => format!("offer an Accord: {}.", o.terms.iter().map(|t| term_name(*t)).collect::<Vec<_>>().join(", ")),
+        None => {
+            let names = o.terms.iter().map(|t| term_name(*t)).collect::<Vec<_>>().join(", ");
+            match o.ask {
+                AccordAsk::New => format!("offer an Accord: {names}."),
+                // Ticket #509 (version 0.1.0.0): Terms added to the Accord that stands.
+                AccordAsk::Add => format!("offer to add to your Accord: {names}."),
+                // Ticket #509: the renewal, whole, with no Faction's name before it; and a research
+                // agreement dropped from it said so.
+                AccordAsk::Renew => {
+                    let held = game.accords.iter().find(|a| a.holds(o.from, o.to)).map(|a| a.terms.clone()).unwrap_or_default();
+                    let dropped = if held.contains(&Term::ResearchAgreement) && !o.terms.contains(&Term::ResearchAgreement) { " The research agreement drops: you are no longer both Friendly." } else { "" };
+                    format!("Your Accord with the {} ({names}) lapses next turn. Renew it for five turns?{dropped}", game.seat_name(o.from))
+                }
+            }
+        }
     }
 }
 
@@ -5280,6 +5294,14 @@ fn term_line(t: Term) -> &'static str {
     }
 }
 
+/// Ticket #509 (version 0.1.0.0): "3 turns left", "1 turn left": an Accord's turns, this one counted.
+fn turns_left_text(game: &Game, acc: &dying_earth_engine::state::Accord) -> String {
+    match game.accord_turns_left(acc) {
+        1 => "1 turn left".to_string(),
+        n => format!("{n} turns left"),
+    }
+}
+
 /// Ticket #508 (version 0.1.0.0): the hover on a held Accord, one line for each Term it holds and
 /// the price of breaking one.
 fn accord_terms_hover(terms: &[Term]) -> String {
@@ -5292,7 +5314,12 @@ fn order_text(game: &Game, o: &Order) -> String {
         // like any other and can be cancelled like any other.
         Order::ProposeAccord { to, terms } => {
             let names: Vec<&str> = terms.iter().map(|t| term_name(*t)).collect();
-            format!("Offer the {} an Accord: {}", game.seat_name(*to), names.join(", "))
+            // Ticket #509 (version 0.1.0.0): to a Faction the player holds an Accord with, Terms added.
+            if game.accords.iter().any(|a| a.holds(Seat(0), *to)) {
+                format!("Offer to add to your Accord with the {}: {}", game.seat_name(*to), names.join(", "))
+            } else {
+                format!("Offer the {} an Accord: {}", game.seat_name(*to), names.join(", "))
+            }
         }
         Order::EndAccord { with } => format!("Declare your Accord with the {} over", game.seat_name(*with)),
         // Ticket #496 (version 0.09.9).
@@ -10445,8 +10472,9 @@ Scarred: this pair can never recover above {floor:+}."));
                     tip.push_str(&format!("
 An Accord between them is over: it lapses at the next turn ({}).", terms.join(", ")));
                 } else {
+                    // Ticket #509 (version 0.1.0.0): and the turns it has left.
                     tip.push_str(&format!("
-An Accord stands: {}.", terms.join(", ")));
+An Accord stands: {}; {}.", terms.join(", "), turns_left_text(game, acc)));
                 }
             }
             ui.label(RichText::new(game.relations_level(viewer, subject)).color(colour)).on_hover_text(tip);
@@ -11051,7 +11079,8 @@ fn accords_block(ui: &mut Ui, session: &Session, game: &Game, other: Seat, actio
             rule_tip(over, accord_terms_hover(&acc.terms));
         } else {
             // Ticket #508 (version 0.1.0.0): what each Term it holds means, on the line.
-            let held = ui.label(format!("You hold an Accord with the {}: {}.", game.seat_name(other), names.join(", ")));
+            // Ticket #509 (version 0.1.0.0): and the turns it has left.
+            let held = ui.label(format!("You hold an Accord with the {}: {}; {}.", game.seat_name(other), names.join(", "), turns_left_text(game, acc)));
             rule_tip(held, accord_terms_hover(&acc.terms));
             let order = Order::EndAccord { with: other };
             let placed = session.pending.contains(&order);
@@ -11065,14 +11094,23 @@ fn accords_block(ui: &mut Ui, session: &Session, game: &Game, other: Seat, actio
                 actions.push(Action::Place(order));
             }
         }
-    } else {
-        // No Accord: the terms to offer. `view` is not threaded in here, so the ticks live in egui's
-        // own memory under this pair's id -- they are a scratch choice, not game state.
+    }
+    // Ticket #509 (version 0.1.0.0): the Terms to offer -- all four with no Accord, and beside one that
+    // stands the Terms it lacks, offered to add. Nothing beside one declared over or holding all four.
+    let have: Vec<Term> = standing.map(|a| a.terms.clone()).unwrap_or_default();
+    let adding = standing.is_some();
+    if standing.is_none_or(|a| !a.ending && a.terms.len() < 4) {
+        // The terms to offer. `view` is not threaded in here, so the ticks live in egui's own memory
+        // under this pair's id -- they are a scratch choice, not game state.
         let id = egui::Id::new(("accord-terms", other.index()));
         let mut picked: Vec<Term> = ui.ctx().memory(|m| m.data.get_temp(id).unwrap_or_default());
+        picked.retain(|t| !have.contains(t));
         let friendly = game.relations_score(me, other) >= 7 && game.relations_score(other, me) >= 7;
         // Ticket #508 (version 0.1.0.0): each says what it means in the line the held Accord's hover uses.
         for (term, label) in [(Term::NonAggression, "Non-aggression"), (Term::Passage, "Passage"), (Term::Refuel, "Refuel"), (Term::ResearchAgreement, "Research agreement")] {
+            if have.contains(&term) {
+                continue;
+            }
             let tip = term_line(term);
             let mut on = picked.contains(&term);
             let enabled = term != Term::ResearchAgreement || friendly;
@@ -11093,7 +11131,8 @@ fn accords_block(ui: &mut Ui, session: &Session, game: &Game, other: Seat, actio
             ui.label(RichText::new("Your offer goes to them this turn.").weak());
         } else {
             let ok = game.check_order(me, &session.pending, &order);
-            let resp = ui.add_enabled(ok.is_ok(), egui::Button::new(format!("Offer the {} an Accord", game.seat_name(other))));
+            let label = if adding { "Offer to add".to_string() } else { format!("Offer the {} an Accord", game.seat_name(other)) };
+            let resp = ui.add_enabled(ok.is_ok(), egui::Button::new(label));
             // Ticket #495 (version 0.09.9): the answer waits a turn now.
             let words = "They answer next turn. A refusal costs you nothing: it is not an offence.";
             // Ticket #380 (version 0.09.2): greyed, the refusal first and these words after it.
@@ -11975,7 +12014,7 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
         // Ticket #495 (version 0.09.9): the Accords offered to the player, one row each, Accept or
         // Refuse. Like the card, an answer is the only way out: no Continue, and Escape holds it.
         Popup::Offers => {
-            let offers: Vec<(usize, Seat, String)> = game.offers_to(Seat(0)).into_iter().map(|(i, o)| (i, o.from, offer_words(game, o))).collect();
+            let offers: Vec<(usize, Seat, String, bool)> = game.offers_to(Seat(0)).into_iter().map(|(i, o)| (i, o.from, offer_words(game, o), o.ask == AccordAsk::Renew)).collect();
             if offers.is_empty() {
                 view.popup = Popup::None;
                 return;
@@ -11984,16 +12023,22 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 ui.set_width(520.0);
                 ui.label(RichText::new(if offers.len() == 1 { "An offer" } else { "Offers" }).size(20.0).strong());
                 ui.add_space(6.0);
-                for (i, from, words) in &offers {
-                    ui.horizontal(|ui| {
-                        ui.label(RichText::new(game.seat_name(*from)).color(seat_colour(session, *from)).size(16.0));
+                for (i, from, words, renewal) in &offers {
+                    // Ticket #509 (version 0.1.0.0): a renewal names the Faction in its own words.
+                    if *renewal {
                         ui.label(RichText::new(words).size(16.0));
-                    });
+                    } else {
+                        ui.horizontal(|ui| {
+                            ui.label(RichText::new(game.seat_name(*from)).color(seat_colour(session, *from)).size(16.0));
+                            ui.label(RichText::new(words).size(16.0));
+                        });
+                    }
+                    let (yes, no) = if *renewal { ("Renew", "Let it lapse") } else { ("Accept", "Refuse") };
                     ui.horizontal(|ui| {
-                        if ui.button(RichText::new("Accept").size(15.0)).clicked() {
+                        if ui.button(RichText::new(yes).size(15.0)).clicked() {
                             actions.push(Action::AnswerOffer(*i, true));
                         }
-                        if ui.button(RichText::new("Refuse").size(15.0)).clicked() {
+                        if ui.button(RichText::new(no).size(15.0)).clicked() {
                             actions.push(Action::AnswerOffer(*i, false));
                         }
                     });
@@ -12511,6 +12556,25 @@ mod tests {
         );
         assert!(hover_lines_estimate(&all) <= HOVER_LINE_CEILING, "{} lines", hover_lines_estimate(&all));
         assert!(all.lines().all(|l| l.chars().count() <= HOVER_CHARS_PER_LINE), "each term on one rendered line");
+    }
+
+    /// Ticket #509 (version 0.1.0.0): the renewal prompt says the Accord, its Terms and the five
+    /// turns, and a research agreement it drops; the held line's turns left count this one.
+    #[test]
+    fn a_renewal_reads_whole_and_says_a_dropped_research_agreement() {
+        let tables = std::sync::Arc::new(dying_earth_engine::data::Tables::load(&dying_earth_engine::data::default_data_dir()).unwrap());
+        let mut g = Game::new(tables, NewGame { seed: 7, player: FactionKind::Custodians, player_is_ai: false, player_start: StateId::EastAsia });
+        g.relations.score[0][1] = 7;
+        g.relations.score[1][0] = 7;
+        g.strike_accord(Seat(0), Seat(1), vec![Term::NonAggression, Term::ResearchAgreement]).unwrap();
+        assert_eq!(turns_left_text(&g, &g.accords[0]), "5 turns left");
+        g.turn += 4;
+        assert_eq!(turns_left_text(&g, &g.accords[0]), "1 turn left");
+        let renew = dying_earth_engine::state::Offer { from: Seat(1), to: Seat(0), terms: vec![Term::NonAggression], trade: None, turn: g.turn, ask: AccordAsk::Renew };
+        let words = offer_words(&g, &renew);
+        assert_eq!(words, format!("Your Accord with the {} (non-aggression) lapses next turn. Renew it for five turns? The research agreement drops: you are no longer both Friendly.", g.seat_name(Seat(1))));
+        let whole = dying_earth_engine::state::Offer { terms: vec![Term::NonAggression, Term::ResearchAgreement], ..renew };
+        assert!(!offer_words(&g, &whole).contains("drops"), "nothing dropped, nothing said");
     }
 
     /// Ticket #467 (version 0.09.7): the final report's cell is the total and then the Stockpile.

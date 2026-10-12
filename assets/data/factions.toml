@@ -333,7 +333,10 @@ scar_floor = -3
 # that lifts a scarred pair's floor.
 tribute_ducats = 25
 tribute_materials = 15
-accord_kept_turns = 4
+# Ticket #509 (version 0.1.0.0): five, matching an Accord's five turns, so a full run pays once.
+accord_kept_turns = 5
+# Ticket #509 (version 0.1.0.0): an Accord runs this many turns and lapses unless renewed in its last.
+accord_turns = 5
 # Ticket #495 (version 0.09.9): a Faction refused an Accord offers the one who refused none again for
 # this many turns, so a refusal is not answered by the same offer every turn.
 offer_refused_turns = 3

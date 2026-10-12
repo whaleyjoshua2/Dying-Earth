@@ -853,7 +853,13 @@ fn build_board(session: &mut Session) {
         // Terms with seat 1, for the hover on its line in the Factions window.
         if std::env::args().any(|a| a == "accord:all") {
             let turn = g.turn;
-            g.accords.push(Accord { a: Seat(0), b: Seat(1), terms: vec![Term::NonAggression, Term::Passage, Term::Refuel, Term::ResearchAgreement], struck: turn, paid: turn, ending: false });
+            g.accords.push(Accord { a: Seat(0), b: Seat(1), terms: vec![Term::NonAggression, Term::Passage, Term::Refuel, Term::ResearchAgreement], struck: turn, paid: turn, ending: false, since: turn });
+        }
+        // `accord:some` (a building aid, ticket #509, version 0.1.0.0): seat 0 holds non-aggression alone
+        // with seat 1, so the card shows its turns left and the Terms it lacks, to add.
+        if std::env::args().any(|a| a == "accord:some") {
+            let turn = g.turn;
+            g.accords.push(Accord { a: Seat(0), b: Seat(1), terms: vec![Term::NonAggression], struck: turn, paid: turn, ending: false, since: turn });
         }
         // `accords:0` (a building aid, ticket #430, version 0.09.5): every Accord struck, so a picture
         // after driven turns shows the fog as a seat with no Accord sees it.
@@ -1577,8 +1583,21 @@ fn build_board(session: &mut Session) {
     {
         let turn = g.turn;
         let trade = Some((TradeGood::Goods(dying_earth_engine::ids::Resource::Materials, 30), TradeGood::Goods(dying_earth_engine::ids::Resource::Ducats, 60)));
-        g.offers.push(dying_earth_engine::state::Offer { from: Seat(1), to: Seat(0), terms: Vec::new(), trade, turn });
-        g.offers.push(dying_earth_engine::state::Offer { from: Seat(2), to: Seat(0), terms: vec![Term::NonAggression], trade: None, turn });
+        g.offers.push(dying_earth_engine::state::Offer { from: Seat(1), to: Seat(0), terms: Vec::new(), trade, turn, ask: Default::default() });
+        g.offers.push(dying_earth_engine::state::Offer { from: Seat(2), to: Seat(0), terms: vec![Term::NonAggression], trade: None, turn, ask: Default::default() });
+    }
+    // Ticket #509 (version 0.1.0.0): `offer:renew` (a building aid): the player's Accord with the
+    // Prospectors in its last turn, asked to renew, beside the Arkwrights offering Passage added to
+    // theirs, so the prompt can be photographed with both.
+    if std::env::args().any(|a| a == "offer:renew")
+        && let Some(g) = session.game.as_mut()
+    {
+        let turn = g.turn;
+        for (with, terms) in [(Seat(1), vec![Term::NonAggression, Term::Passage]), (Seat(2), vec![Term::NonAggression])] {
+            g.accords.push(Accord { a: Seat(0), b: with, terms, struck: turn, paid: turn, ending: false, since: turn });
+        }
+        g.offers.push(dying_earth_engine::state::Offer { from: Seat(1), to: Seat(0), terms: vec![Term::NonAggression, Term::Passage], trade: None, turn, ask: AccordAsk::Renew });
+        g.offers.push(dying_earth_engine::state::Offer { from: Seat(2), to: Seat(0), terms: vec![Term::Passage], trade: None, turn, ask: AccordAsk::Add });
     }
     // Ticket #495 (version 0.09.9): `offer:<n>` (a building aid): the first n computer seats each
     // offer the player an Accord -- Non-aggression and Passage -- so the prompt can be photographed.
@@ -1587,7 +1606,7 @@ fn build_board(session: &mut Session) {
     {
         let turn = g.turn;
         for from in [Seat(1), Seat(2), Seat(3)].into_iter().take(n) {
-            g.offers.push(dying_earth_engine::state::Offer { from, to: Seat(0), terms: vec![Term::NonAggression, Term::Passage], trade: None, turn });
+            g.offers.push(dying_earth_engine::state::Offer { from, to: Seat(0), terms: vec![Term::NonAggression, Term::Passage], trade: None, turn, ask: Default::default() });
         }
     }
     // Ticket #493 (version 0.09.9): `blockadeiss:1` (a building aid): a Frigate of seat 1's on

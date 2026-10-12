@@ -2400,7 +2400,7 @@ impl Game {
         // offer costs nothing and a refusal is not an offence, so the guard is on frequency rather
         // than on risk: a table where every seat proposed every turn would bury the player.
         for other in Seat::ALL {
-            if other == seat || self.accords.iter().any(|a| a.holds(seat, other)) {
+            if other == seat {
                 continue;
             }
             // Ticket #495 (version 0.09.9): not while its last offer waits on an answer, nor to a
@@ -2423,7 +2423,19 @@ impl Game {
             if self.refuel_worth_offering(seat, other) {
                 terms.push(Term::Refuel);
             }
-            if !self.accord_acceptable(seat, other, &terms) {
+            // Ticket #509 (version 0.1.0.0): a research agreement between Friends; and to a Faction it
+            // holds an Accord with, the Terms that Accord lacks, or nothing.
+            if self.relations_score(seat, other) >= 7 && self.relations_score(other, seat) >= 7 {
+                terms.push(Term::ResearchAgreement);
+            }
+            if let Some(acc) = self.accords.iter().find(|a| a.holds(seat, other)) {
+                // The review: nothing to one in its last turn, which lapses before the answer.
+                if self.accord_turns_left(acc) <= 1 {
+                    continue;
+                }
+                terms.retain(|t| !acc.terms.contains(t));
+            }
+            if terms.is_empty() || !self.accord_acceptable(seat, other, &terms) {
                 continue;
             }
             push(

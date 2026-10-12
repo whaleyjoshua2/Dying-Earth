@@ -7,17 +7,17 @@ pictures and batches that decided it are in
 [`docs/dev-diary/2026-10-07-version-0.1.0.0/`](../dev-diary/2026-10-07-version-0.1.0.0/).
 
 **What the version is.** Version 0.09.9 with the designer's list. **More room**: Mercury, Ceres and
-Vesta join the board (§1). **A fourth tier**, the Colonial Capital, one to a Body (§2). **An Accord's Terms** on its hover in the Factions window (§3).
+Vesta join the board (§1). **A fourth tier**, the Colonial Capital, one to a Body (§2). **An Accord's Terms** on its hover in the Factions window (§3). **Accords of five turns**, renewed or widened (§4).
 
 **What it did to the win column** (80 games, per Faction):
 
-| | 0.09.9 | the new worlds (§1) | §1, the computer kept off them (a control) | the Colonial Capital (§2) | the ideal |
-|---|---|---|---|---|---|
-| Custodians | 2 | 1 | 3 | 1 | 15 |
-| Prospectors | 23 | 15 | 22 | 15 | 15 |
-| Arkwrights | 30 | 52 | 32 | 52 | 15 |
-| Archivists | 2 | 2 | 4 | 2 | 15 |
-| collapses | 20 | 8 | 18 | 8 | 20 |
+| | 0.09.9 | the new worlds (§1) | §1, the computer kept off them (a control) | the Colonial Capital (§2) | Accords of five turns (§4) | the ideal |
+|---|---|---|---|---|---|---|
+| Custodians | 2 | 1 | 3 | 1 | 1 | 15 |
+| Prospectors | 23 | 15 | 22 | 15 | 16 | 15 |
+| Arkwrights | 30 | 52 | 32 | 52 | 49 | 15 |
+| Archivists | 2 | 2 | 4 | 2 | 2 | 15 |
+| collapses | 20 | 8 | 18 | 8 | 10 | 20 |
 
 The new worlds moved the column far past noise, away from the ideal. The control, the same build
 with the computer forbidden to choose the three as destinations, is within noise of 0.09.9, so the
@@ -168,3 +168,42 @@ breaking one:
 - The **Relations grid** still names the Terms a pair holds without explaining them.
 
 No rule moved, so no sweep.
+
+## 4. Accords of five turns
+
+The authority is [ticket #509](https://github.com/whaleyjoshua2/Dying-Earth/issues/509). The
+designer's *"offered at five turn intervals"* means an Accord **runs five turns and may be renewed**.
+
+- **Five turns**, the turn struck counted (`[relations] accord_turns = 5`). It lapses at the end of
+  its fifth unless renewed.
+- **Renewal.** At the head of its last turn both sides are asked. A computer seat renews where it
+  would accept the same Terms as a fresh offer. If both say yes, it runs five more turns from the end
+  of this run. Otherwise it lapses quietly, with no offence and no refusal remembered. The player is
+  asked in the offers prompt, which the turn waits on:
+  *"Your Accord with the Prospectors (non-aggression, passage) lapses next turn. Renew it for five
+  turns?"* **Renew** · **Let it lapse**. A computer seat that will not renew asks nothing, and the
+  Report says *"Prospectors let your Accord lapse."*
+- **A research agreement** renews only while both are Friendly; below that, the rest renews
+  without it, and the prompt says *"The research agreement drops: you are no longer both
+  Friendly."*
+- **Offers** carry a research agreement between Friends, from the computer too.
+- **Widening.** An Accord that stands may be offered the Terms it lacks: by the computer, or by
+  the player with the checkboxes under the held Accord and **Offer to add**. Once accepted, they join
+  it and the whole Accord starts five turns afresh. Offering a Term it already holds is refused:
+  *"your Accord already holds non-aggression"*.
+- **Kept** five turns, it raises Relations (`accord_kept_turns` 4 → 5), paid at the end of the
+  fifth, counted from the strike through renewals.
+- **Shown:** *"You hold an Accord with the Prospectors: non-aggression; 3 turns left."*, and the
+  same turns in the Relations hover.
+- **Unchanged:** Declare it over, breaking a Term, offer pacing, the 3-turn wait after a refusal.
+- **In its last turn** nobody may offer it Terms, since it would lapse before the answer
+  (*"your Accord lapses this turn: renew it first"*). Terms added and a renewal answered in the same
+  turn keep every Term, and neither shortens the other's run. Terms offered to an Accord since gone
+  are dropped unasked. The Report says *"Terms added to your Accord with the Prospectors."*
+- **Saves.** `SAVE_VERSION` moves to **11**: a save of 10 has no Accord clock.
+
+**Measured** over the 80 games
+([`sweeps/ticket-509.txt`](../dev-diary/2026-10-07-version-0.1.0.0/sweeps/ticket-509.txt)): wins
+1 / 16 / 49 / 2 and 10 collapses, within noise of §2's. Accords struck rose from 601 to 644, and those
+standing at the end fell from 87 to 76. Every one standing at the end is non-aggression alone:
+Relations sit at a median of −4 to −7, so pairs are seldom Friendly.

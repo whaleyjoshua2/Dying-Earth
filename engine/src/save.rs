@@ -32,7 +32,10 @@ use std::sync::Arc;
 /// Ticket #502 (version 0.1.0.0): moved to **10**. Three Bodies joined the board (Mercury, Ceres,
 /// Vesta), so a save of six has no card for three of the nine, and the Solar System it was played
 /// in had nowhere further to go.
-pub const SAVE_VERSION: u32 = 10;
+///
+/// Ticket #509 (version 0.1.0.0): moved to **11**. An Accord now runs five turns from its `since`,
+/// which a save of 10 lacks: read as nought, every Accord in it would lapse unasked.
+pub const SAVE_VERSION: u32 = 11;
 
 /// The rules version this executable plays, named beside the file's own in a refusal.
 ///

@@ -81,6 +81,10 @@ station_built = "{faction} built {station}."
 # Ticket #495 (version 0.09.9): an Accord answered, in the player's own section.
 accord_struck = "Accord struck with {faction}."
 accord_refused = "{faction} refused your Accord."
+# Ticket #509 (version 0.1.0.0): an Accord in its last turn the other side would not renew.
+accord_let_lapse = "{faction} let your Accord lapse."
+# Ticket #509: Terms added to an Accord that stands.
+accord_added = "Terms added to your Accord with {faction}."
 # Ticket #496 (version 0.09.9): a Trade answered, or failed for goods gone by the answer.
 trade_struck = "Trade struck with {faction}."
 trade_refused = "{faction} refused your Trade."

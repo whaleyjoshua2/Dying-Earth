@@ -19695,7 +19695,9 @@ fn the_reports_templates_stay_under_their_word_ceiling() {
     // and by the 8 of an Accord answered, struck or refused, less a word of slack the ceiling held.
     // Ticket #496 (version 0.09.9): and by the 17 of a Trade offered, struck, refused or failed.
     // Ticket #503 (version 0.1.0.0): and by the 9 of an upgrade to a Colonial Capital refunded.
-    assert!(words <= 1816, "the Report's templates hold {words} words; the ceiling is 1,816 (15% off 2,031, 54 for the race to the Moon, 2 for a rival's upgrade, 8 for an Accord answered, less a word of slack, 17 for a Trade, 9 for a Capital refunded)");
+    // Ticket #509 (version 0.1.0.0): and by the 5 of an Accord the other side let lapse, and the 7 of
+    // Terms added to one.
+    assert!(words <= 1828, "the Report's templates hold {words} words; the ceiling is 1,828 (15% off 2,031, 54 for the race to the Moon, 2 for a rival's upgrade, 8 for an Accord answered, less a word of slack, 17 for a Trade, 9 for a Capital refunded, 5 for an Accord let lapse, 7 for Terms added)");
     // "The" is gone before a Faction's name, which is drawn in its colour instead.
     assert!(!text.contains("he {faction}"), "a template still says \"the {{faction}}\"");
 }
@@ -20661,7 +20663,7 @@ fn crossing_offers_strike_once_and_a_lapsed_yes_says_why() {
     calm(&mut g);
     g.commit_orders(Seat(1), &[Order::ProposeAccord { to: Seat(0), terms: vec![Term::NonAggression] }]);
     g.commit_orders(Seat(2), &[Order::ProposeAccord { to: Seat(0), terms: vec![Term::NonAggression] }]);
-    g.offers.push(Offer { from: Seat(0), to: Seat(1), terms: vec![Term::NonAggression], trade: None, turn: g.turn });
+    g.offers.push(Offer { from: Seat(0), to: Seat(1), terms: vec![Term::NonAggression], trade: None, turn: g.turn, ask: AccordAsk::New });
     let i = g.offers_to(Seat(0)).iter().find(|(_, o)| o.from == Seat(1)).map(|(i, _)| *i).unwrap();
     g.answer_offer(Seat(0), i, true).unwrap();
     assert!(g.accords.iter().any(|a| a.holds(Seat(0), Seat(1))));
@@ -20673,6 +20675,225 @@ fn crossing_offers_strike_once_and_a_lapsed_yes_says_why() {
     let err = g.answer_offer(Seat(0), i, true).unwrap_err();
     assert!(err.contains("already hold an Accord"), "{err}");
     assert!(g.offers.is_empty(), "and it is gone");
+}
+
+// ---------------------------------------------------------------- #509 Accords of five turns (version 0.1.0.0)
+
+/// Ticket #509: the turn's end and the next turn's head, as `play_turn` runs them for an Accord:
+/// the settle, the turn turning, the renewals asked.
+fn accord_turn(g: &mut Game) {
+    g.settle_accords();
+    g.turn += 1;
+    g.answer_computer_offers();
+    g.ask_renewals();
+}
+
+/// Ticket #509 (version 0.1.0.0): an Accord runs five turns, the turn struck counted, and lapses at
+/// the end of the fifth unless both sides renew it in that last turn. Two computer seats renew when
+/// each would accept it afresh: one that has soured lets it go.
+#[test]
+fn an_accord_runs_five_turns_and_lapses_unless_both_renew() {
+    let mut g = game();
+    calm(&mut g);
+    let (a, b) = (Seat(1), Seat(2));
+    assert_eq!(g.tables.relations.accord_turns, 5);
+    g.strike_accord(a, b, vec![Term::NonAggression]).unwrap();
+    let left = |g: &Game| g.accords.iter().find(|x| x.holds(a, b)).map(|x| g.accord_turns_left(x));
+    assert_eq!(left(&g), Some(5), "five on the turn it is struck");
+    // The second soured: below Neutral it accepts no non-aggression, so it will not renew.
+    g.relations.score[b.index()][a.index()] = -5;
+    for _ in 0..4 {
+        accord_turn(&mut g);
+    }
+    assert_eq!(left(&g), Some(1), "its last turn");
+    g.settle_accords();
+    assert_eq!(left(&g), None, "lapsed at the end of its fifth turn");
+    // Both willing: renewed for another five, from the turn after its last.
+    g.relations.score[b.index()][a.index()] = 0;
+    g.strike_accord(a, b, vec![Term::NonAggression]).unwrap();
+    for _ in 0..4 {
+        accord_turn(&mut g);
+    }
+    accord_turn(&mut g);
+    assert_eq!(left(&g), Some(5), "renewed: the first turn of its next five");
+}
+
+/// Ticket #509: the player is asked to renew in the Accord's last turn, a prompt the turn waits on.
+/// Renew runs it five more turns; Let it lapse lets it lapse, and is no refusal remembered. A
+/// computer seat that will not renew asks nothing, and the Report says it let the Accord lapse.
+#[test]
+fn the_player_is_asked_to_renew_and_a_rival_that_will_not_says_so() {
+    let mut g = game();
+    calm(&mut g);
+    g.strike_accord(Seat(0), Seat(1), vec![Term::NonAggression, Term::Passage]).unwrap();
+    let struck = g.turn;
+    for _ in 0..4 {
+        accord_turn(&mut g);
+    }
+    let asks = g.offers_to(Seat(0));
+    assert_eq!(asks.len(), 1, "asked in its last turn");
+    assert_eq!((asks[0].1.ask, asks[0].1.terms.clone()), (AccordAsk::Renew, vec![Term::NonAggression, Term::Passage]));
+    assert!(g.end_turn_refusal().is_some(), "the turn waits on the answer");
+    g.answer_offer(Seat(0), 0, true).unwrap();
+    assert_eq!(g.accords[0].since, struck + 5);
+    accord_turn(&mut g);
+    assert!(g.accords.iter().any(|x| x.holds(Seat(0), Seat(1))), "renewed past its fifth turn");
+    // Let it lapse: nothing remembered against anybody, and it goes at its end.
+    for _ in 0..4 {
+        accord_turn(&mut g);
+    }
+    let (i, o) = g.offers_to(Seat(0))[0];
+    assert_eq!(o.ask, AccordAsk::Renew);
+    g.answer_offer(Seat(0), i, false).unwrap();
+    assert!(!g.refused_recently(Seat(1), Seat(0)), "letting it lapse is no refusal");
+    g.settle_accords();
+    assert!(g.accords.is_empty(), "lapsed");
+    // A rival that has soured asks nothing and says it let the Accord lapse.
+    g.strike_accord(Seat(0), Seat(2), vec![Term::NonAggression]).unwrap();
+    g.relations.score[2][0] = -5;
+    for _ in 0..3 {
+        accord_turn(&mut g);
+    }
+    g.report.lines.clear();
+    accord_turn(&mut g);
+    assert!(g.offers_to(Seat(0)).is_empty(), "no prompt");
+    assert!(g.report.lines.iter().any(|l| l.kind == LineKind::YourWorks && l.text.contains("let your Accord lapse")), "{:?}", g.report.lines);
+}
+
+/// Ticket #509: a research agreement renews only while both are still Friendly; below it, the rest
+/// renews without it.
+#[test]
+fn a_research_agreement_renews_only_between_friends() {
+    let mut g = game();
+    calm(&mut g);
+    let (a, b) = (Seat(1), Seat(2));
+    g.relations.score[a.index()][b.index()] = 7;
+    g.relations.score[b.index()][a.index()] = 7;
+    g.strike_accord(a, b, vec![Term::NonAggression, Term::ResearchAgreement]).unwrap();
+    g.relations.score[a.index()][b.index()] = 0;
+    for _ in 0..5 {
+        accord_turn(&mut g);
+    }
+    let acc = g.accords.iter().find(|x| x.holds(a, b)).expect("renewed");
+    assert_eq!(acc.terms, vec![Term::NonAggression], "without the research agreement");
+}
+
+/// Ticket #509: Terms may be added to an Accord that stands, by an offer of the Terms it lacks;
+/// accepted, they join it and the whole Accord starts five turns afresh.
+#[test]
+fn an_accord_is_widened_by_the_terms_it_lacks_and_starts_afresh() {
+    let mut g = game();
+    calm(&mut g);
+    g.strike_accord(Seat(0), Seat(1), vec![Term::NonAggression]).unwrap();
+    g.turn += 2;
+    let again = Order::ProposeAccord { to: Seat(1), terms: vec![Term::NonAggression, Term::Passage] };
+    assert!(g.check_order(Seat(0), &[], &again).unwrap_err().0.contains("already holds non-aggression"));
+    let add = Order::ProposeAccord { to: Seat(1), terms: vec![Term::Passage] };
+    assert!(g.check_order(Seat(0), &[], &add).is_ok(), "{:?}", g.check_order(Seat(0), &[], &add));
+    g.commit_orders(Seat(0), std::slice::from_ref(&add));
+    assert_eq!(g.offers[0].ask, AccordAsk::Add);
+    g.turn += 1;
+    g.answer_computer_offers();
+    let acc = g.accords.iter().find(|x| x.holds(Seat(0), Seat(1))).unwrap();
+    assert_eq!(acc.terms, vec![Term::NonAggression, Term::Passage]);
+    assert_eq!(g.accord_turns_left(acc), 5, "five turns afresh");
+}
+
+/// Ticket #509: the computer offers a research agreement between Friends, and offers an Accord that
+/// stands the Terms it lacks rather than nothing.
+#[test]
+fn the_computer_offers_research_between_friends_and_widens_what_stands() {
+    let mut g = game();
+    calm(&mut g);
+    let (a, b) = (Seat(1), Seat(2));
+    g.relations.score[a.index()][b.index()] = 7;
+    g.relations.score[b.index()][a.index()] = 7;
+    let offer = |g: &mut Game| g.ai_orders(a).into_iter().find_map(|o| match o {
+        Order::ProposeAccord { to, terms } if to == b => Some(terms),
+        _ => None,
+    });
+    let first = offer(&mut g).expect("an offer between Friends");
+    assert!(first.contains(&Term::NonAggression) && first.contains(&Term::ResearchAgreement), "{first:?}");
+    g.strike_accord(a, b, vec![Term::NonAggression]).unwrap();
+    let more = offer(&mut g).expect("the Terms it lacks");
+    assert!(!more.contains(&Term::NonAggression) && more.contains(&Term::ResearchAgreement), "{more:?}");
+}
+
+/// Ticket #509: an Accord kept pays its act at the end of its fifth turn, where it paid every four;
+/// and the count runs on through a renewal.
+#[test]
+fn a_kept_accord_pays_at_the_end_of_its_fifth_turn() {
+    let mut g = game();
+    calm(&mut g);
+    assert_eq!(g.tables.relations.accord_kept_turns, 5);
+    g.strike_accord(Seat(1), Seat(2), vec![Term::NonAggression]).unwrap();
+    let held = |g: &Game| g.log.iter().filter(|l| l.contains("has held")).count();
+    for _ in 0..4 {
+        accord_turn(&mut g);
+    }
+    assert_eq!(held(&g), 0, "four turns kept: not yet");
+    accord_turn(&mut g);
+    assert_eq!(held(&g), 1, "paid at the end of its fifth, and renewed");
+    for _ in 0..5 {
+        accord_turn(&mut g);
+    }
+    assert_eq!(held(&g), 2, "and again at the end of the tenth");
+}
+
+/// Ticket #509 (the review): Terms added and a renewal answered in the same last turn, in either
+/// order: the Accord keeps every Term, and neither shortens what the other gave.
+#[test]
+fn an_addition_and_a_renewal_in_one_turn_keep_every_term_and_the_longer_run() {
+    for add_first in [true, false] {
+        let mut g = game();
+        calm(&mut g);
+        g.strike_accord(Seat(0), Seat(1), vec![Term::NonAggression]).unwrap();
+        let struck = g.turn;
+        g.turn += 3;
+        g.offers.push(Offer { from: Seat(1), to: Seat(0), terms: vec![Term::Passage], trade: None, turn: g.turn, ask: AccordAsk::Add });
+        g.turn += 1;
+        g.ask_renewals();
+        let find = |g: &Game, ask: AccordAsk| g.offers_to(Seat(0)).iter().find(|(_, o)| o.ask == ask).map(|(i, _)| *i).unwrap();
+        for ask in if add_first { [AccordAsk::Add, AccordAsk::Renew] } else { [AccordAsk::Renew, AccordAsk::Add] } {
+            let i = find(&g, ask);
+            g.answer_offer(Seat(0), i, true).unwrap();
+        }
+        let acc = &g.accords[0];
+        assert_eq!(acc.terms, vec![Term::NonAggression, Term::Passage], "add first: {add_first}");
+        let left = g.accord_turns_left(acc);
+        if add_first {
+            assert_eq!(left, 5, "restarted by the addition; the renewal adds nothing to it");
+        } else {
+            assert_eq!(acc.since, struck + 5, "renewed from the end of its run, and the addition does not cut it");
+        }
+    }
+}
+
+/// Ticket #509 (the review): nobody offers Terms to an Accord in its last turn -- it lapses before
+/// the answer -- and an addition offered to an Accord since gone never reaches the player.
+#[test]
+fn no_terms_are_offered_to_an_accord_in_its_last_turn() {
+    let mut g = game();
+    calm(&mut g);
+    let (a, b) = (Seat(1), Seat(2));
+    g.relations.score[a.index()][b.index()] = 7;
+    g.relations.score[b.index()][a.index()] = 7;
+    g.strike_accord(a, b, vec![Term::NonAggression]).unwrap();
+    let adds = |g: &mut Game| g.ai_orders(a).iter().any(|o| matches!(o, Order::ProposeAccord { to, .. } if *to == b));
+    g.turn += 2;
+    assert!(adds(&mut g), "the premise: mid-run it offers the research agreement");
+    g.turn += 2;
+    assert!(!adds(&mut g), "not in its last turn");
+    g.strike_accord(Seat(0), Seat(3), vec![Term::NonAggression]).unwrap();
+    g.turn += 4;
+    let err = g.check_order(Seat(0), &[], &Order::ProposeAccord { to: Seat(3), terms: vec![Term::Passage] }).unwrap_err().0;
+    assert!(err.contains("lapses"), "{err}");
+    // An addition whose Accord has gone is dropped at the head of the turn.
+    g.offers.push(Offer { from: Seat(3), to: Seat(0), terms: vec![Term::Passage], trade: None, turn: g.turn, ask: AccordAsk::Add });
+    g.accords.clear();
+    g.turn += 1;
+    g.answer_computer_offers();
+    assert!(g.offers_to(Seat(0)).is_empty(), "no dead prompt");
 }
 
 // ---------------------------------------------------------------- #496 Trades (version 0.09.9)
@@ -20754,7 +20975,7 @@ fn a_trade_whose_goods_are_gone_fails() {
     let mut g = game();
     calm(&mut g);
     g.seats[1].stockpile.materials = 100.0;
-    g.offers.push(Offer { from: Seat(1), to: Seat(0), terms: Vec::new(), trade: Some((TradeGood::Goods(Resource::Materials, 50), TradeGood::Goods(Resource::Ducats, 5))), turn: g.turn });
+    g.offers.push(Offer { from: Seat(1), to: Seat(0), terms: Vec::new(), trade: Some((TradeGood::Goods(Resource::Materials, 50), TradeGood::Goods(Resource::Ducats, 5))), turn: g.turn, ask: AccordAsk::New });
     g.seats[0].stockpile.ducats = 500.0;
     g.seats[1].stockpile.materials = 10.0;
     g.report.lines.clear();
@@ -20807,7 +21028,7 @@ fn a_traded_place_takes_its_standing_and_builds_to_the_new_holder() {
     g.seats[0].influence.insert(Place::Colony(c), 30);
     g.colony_mut(c).unwrap().queue.push(Build { item: BuildItem::Module(ModuleKind::Habitat), seat: Seat(0), widgets: 4, done: 1, coastal: false, fuel: 0.0 });
     g.seats[1].stockpile.ducats = 10_000.0;
-    g.offers.push(Offer { from: Seat(1), to: Seat(0), terms: Vec::new(), trade: Some((TradeGood::Goods(Resource::Ducats, 1), TradeGood::Place(c))), turn: g.turn });
+    g.offers.push(Offer { from: Seat(1), to: Seat(0), terms: Vec::new(), trade: Some((TradeGood::Goods(Resource::Ducats, 1), TradeGood::Place(c))), turn: g.turn, ask: AccordAsk::New });
     g.answer_offer(Seat(0), 0, true).unwrap();
     assert_eq!(g.colony(c).unwrap().control, Control::Controlled(Seat(1)));
     assert_eq!(g.seats[1].influence.get(&Place::Colony(c)).copied().unwrap_or(0), 30, "the standing went with it");
@@ -20836,7 +21057,7 @@ fn a_trade_offer_checks_the_place_asked_and_a_failed_yes_says_why() {
     assert!(g.check_order(Seat(0), &[], &Order::ProposeTrade { to: Seat(1), give: TradeGood::Place(mine), get: d(1) }).unwrap_err().0.contains("Arm"));
     // A yes the player cannot pay.
     g.seats[1].stockpile.ducats = 10.0;
-    g.offers.push(Offer { from: Seat(1), to: Seat(0), terms: Vec::new(), trade: Some((d(1), TradeGood::Goods(Resource::Materials, 9999))), turn: g.turn });
+    g.offers.push(Offer { from: Seat(1), to: Seat(0), terms: Vec::new(), trade: Some((d(1), TradeGood::Goods(Resource::Materials, 9999))), turn: g.turn, ask: AccordAsk::New });
     let i = g.offers.len() - 1;
     let err = g.answer_offer(Seat(0), i, true).unwrap_err();
     assert!(err.contains("Materials"), "{err}");

@@ -1900,6 +1900,9 @@ pub struct RelationsCard {
     /// Ticket #495 (version 0.09.9): the turns a refused Faction waits before offering the one who
     /// refused an Accord again.
     pub offer_refused_turns: u32,
+    /// Ticket #509 (version 0.1.0.0): the turns an Accord runs before it lapses, unless both sides
+    /// renew it in its last.
+    pub accord_turns: u32,
 }
 
 fn turn_cap_default() -> i64 {

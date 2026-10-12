@@ -1465,6 +1465,16 @@ pub enum Term {
     ResearchAgreement,
 }
 
+/// Ticket #509 (version 0.1.0.0): what an Accord offer asks: a new Accord, Terms added to one that
+/// stands, or one in its last turn renewed for another run.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum AccordAsk {
+    #[default]
+    New,
+    Add,
+    Renew,
+}
+
 /// Ticket #495 (version 0.09.9): **an Accord offered and not yet answered.** It is answered at the
 /// head of the receiver's next turn: by a human seat in a prompt before its orders, the turn not
 /// ending until it has; by a computer seat by its own rule, as the turn begins.
@@ -1479,6 +1489,9 @@ pub struct Offer {
     pub trade: Option<(crate::orders::TradeGood, crate::orders::TradeGood)>,
     /// The turn it was made in.
     pub turn: u32,
+    /// Ticket #509 (version 0.1.0.0): new, added to the Accord that stands, or its renewal.
+    #[serde(default)]
+    pub ask: AccordAsk,
 }
 
 /// Ticket #495: a refusal remembered -- `from` offers `to` no Accord again before `until`.
@@ -1508,6 +1521,11 @@ pub struct Accord {
     /// nothing. That also gives the board a visible tell -- an Accord announced as ending is a turn
     /// of warning that something is coming.
     pub ending: bool,
+    /// Ticket #509 (version 0.1.0.0): the first turn of its current run of `accord_turns`: the turn
+    /// struck, the turn Terms were added, or the turn after its last run when renewed. A save from
+    /// before reads nought, and the turn struck stands in for it.
+    #[serde(default)]
+    pub since: u32,
 }
 
 impl Accord {
@@ -5338,8 +5356,59 @@ impl Game {
             return Err("a research agreement wants Friendly on both sides".into());
         }
         let turn = self.turn;
-        self.accords.push(Accord { a, b, terms, struck: turn, paid: turn, ending: false });
+        self.accords.push(Accord { a, b, terms, struck: turn, paid: turn, ending: false, since: turn });
         Ok(())
+    }
+
+    /// Ticket #509 (version 0.1.0.0): the turns an Accord has left, this one counted: five on the turn
+    /// it is struck, one in its last.
+    pub fn accord_turns_left(&self, acc: &Accord) -> u32 {
+        (acc.since.max(acc.struck) + self.tables.relations.accord_turns).saturating_sub(self.turn)
+    }
+
+    /// Ticket #509: the Terms a renewal carries: all of them, but a research agreement only while
+    /// both sides are still Friendly, a renewal being a fresh agreement.
+    pub fn renewal_terms(&self, acc: &Accord) -> Vec<Term> {
+        let friendly = self.relations_score(acc.a, acc.b) >= 7 && self.relations_score(acc.b, acc.a) >= 7;
+        acc.terms.iter().copied().filter(|t| *t != Term::ResearchAgreement || friendly).collect()
+    }
+
+    /// Ticket #509 (version 0.1.0.0): the head of an Accord's last turn, when both sides are asked to
+    /// renew it. A computer seat renews where it would accept the same Terms afresh; one that will
+    /// not lets it lapse, and a human seat with it reads so in the Report. Two computer seats both
+    /// willing renew it at once; a human seat is asked in a prompt the turn waits on.
+    pub fn ask_renewals(&mut self) {
+        let (turn, run) = (self.turn, self.tables.relations.accord_turns);
+        let last: Vec<(Seat, Seat)> = self.accords.iter().filter(|acc| !acc.ending && self.accord_turns_left(acc) == 1).map(|acc| (acc.a, acc.b)).collect();
+        for (a, b) in last {
+            let Some(acc) = self.accords.iter().find(|acc| acc.holds(a, b)) else { continue };
+            let terms = self.renewal_terms(acc);
+            let willing = |g: &Game, me: Seat, other: Seat| !g.seat(me).ai || (!terms.is_empty() && g.accord_acceptable(me, other, &terms));
+            let (yes_a, yes_b) = (willing(self, a, b), willing(self, b, a));
+            if !(yes_a && yes_b) {
+                self.log(format!("{} let the Accord with {} lapse.", self.seat_name(if yes_a { b } else { a }), self.seat_name(if yes_a { a } else { b })));
+                for (me, other, theirs) in [(a, b, yes_b), (b, a, yes_a)] {
+                    if !self.seat(me).ai && !theirs {
+                        let text = self.say("accord_let_lapse", &[("faction", self.seat_name(other))]);
+                        self.report_line_of(me, LineKind::YourWorks, LineKind::Note, None, text);
+                    }
+                }
+                continue;
+            }
+            match [a, b].into_iter().find(|s| !self.seat(*s).ai) {
+                Some(human) => {
+                    let from = if human == a { b } else { a };
+                    self.offers.push(Offer { from, to: human, terms, trade: None, turn, ask: AccordAsk::Renew });
+                }
+                None => {
+                    if let Some(acc) = self.accords.iter_mut().find(|acc| acc.holds(a, b)) {
+                        acc.terms = terms;
+                        acc.since = acc.since.max(acc.struck) + run;
+                    }
+                    self.log(format!("{} and {} renewed their Accord.", self.seat_name(a), self.seat_name(b)));
+                }
+            }
+        }
     }
 
     /// Ticket #495 (version 0.09.9): the offers waiting on `seat`'s answer, with their index.
@@ -5497,8 +5566,12 @@ impl Game {
                 None => Ok(()),
             };
         }
+        // Ticket #509 (version 0.1.0.0): a renewal or an addition wants the Accord still standing.
+        if accept && offer.ask != AccordAsk::New && !self.accords.iter().any(|a| a.holds(offer.from, offer.to)) {
+            return Err(format!("your Accord with {} is over", self.seat_name(offer.from)));
+        }
         // Ticket #495 (the review): a yes that can no longer be struck says why.
-        if accept && self.accords.iter().any(|a| a.holds(offer.from, offer.to)) {
+        if accept && offer.ask == AccordAsk::New && self.accords.iter().any(|a| a.holds(offer.from, offer.to)) {
             return Err(format!("you already hold an Accord with {}", self.seat_name(offer.from)));
         }
         if accept && offer.terms.contains(&Term::ResearchAgreement) && (self.relations_score(offer.from, offer.to) < 7 || self.relations_score(offer.to, offer.from) < 7) {
@@ -5514,6 +5587,9 @@ impl Game {
     pub fn answer_computer_offers(&mut self) {
         let turn = self.turn;
         self.refusals.retain(|r| turn < r.until);
+        // Ticket #509 (the review): Terms offered to an Accord that has since lapsed are moot.
+        let accords = &self.accords;
+        self.offers.retain(|o| o.ask != AccordAsk::Add || accords.iter().any(|a| a.holds(o.from, o.to)));
         let mut waiting = Vec::new();
         for offer in std::mem::take(&mut self.offers) {
             if self.seat(offer.to).ai && offer.turn < turn {
@@ -5536,6 +5612,52 @@ impl Game {
         let (from, to) = (offer.from, offer.to);
         if let Some((give, get)) = offer.trade {
             self.settle_trade(from, to, give, get, yes);
+            return;
+        }
+        // Ticket #509 (version 0.1.0.0): a renewal runs the Accord another five turns from the end of
+        // this run; letting it lapse is no refusal and is not remembered.
+        // The review: it renews the Terms the Accord holds when answered, so Terms added the same turn
+        // are kept; and one an addition has already restarted needs no renewal.
+        if offer.ask == AccordAsk::Renew {
+            let run = self.tables.relations.accord_turns;
+            let renew = self.accords.iter().find(|acc| acc.holds(from, to)).filter(|_| yes).map(|acc| (self.renewal_terms(acc), self.accord_turns_left(acc) == 1));
+            match renew {
+                Some((terms, last)) => {
+                    if let Some(acc) = self.accords.iter_mut().find(|acc| acc.holds(from, to))
+                        && last
+                    {
+                        acc.terms = terms;
+                        acc.since = acc.since.max(acc.struck) + run;
+                    }
+                    self.log(format!("{} and {} renewed their Accord.", self.seat_name(from), self.seat_name(to)));
+                }
+                None => self.log(format!("{} let the Accord with {} lapse.", self.seat_name(to), self.seat_name(from))),
+            }
+            return;
+        }
+        // Ticket #509: Terms added to the Accord that stands, which starts five turns afresh. A no is
+        // remembered as an offer's is.
+        if offer.ask == AccordAsk::Add && yes {
+            let friendly = self.relations_score(from, to) >= 7 && self.relations_score(to, from) >= 7;
+            let turn = self.turn;
+            let Some(acc) = self.accords.iter_mut().find(|acc| acc.holds(from, to)) else {
+                self.log(format!("Terms offered to the Accord between {} and {} lapsed: it is over.", self.seat_name(from), self.seat_name(to)));
+                return;
+            };
+            for t in offer.terms {
+                if !acc.terms.contains(&t) && (t != Term::ResearchAgreement || friendly) {
+                    acc.terms.push(t);
+                }
+            }
+            // The review: five turns from now, or the renewal already given if that runs longer.
+            acc.since = acc.since.max(acc.struck).max(turn);
+            self.log(format!("{} and {} added to their Accord.", self.seat_name(from), self.seat_name(to)));
+            for (me, other) in [(from, to), (to, from)] {
+                if !self.seat(me).ai {
+                    let text = self.say("accord_added", &[("faction", self.seat_name(other))]);
+                    self.report_line_of(me, LineKind::YourWorks, LineKind::Note, None, text);
+                }
+            }
             return;
         }
         if yes {
@@ -5599,10 +5721,13 @@ impl Game {
             self.log(format!("The Accord between {} and {} has lapsed.", self.seat_name(a), self.seat_name(b)));
         }
         self.accords.retain(|a| !a.ending);
+        // Ticket #509 (version 0.1.0.0): kept for `period` turns, the turn struck counted, it pays at
+        // the end of the last of them -- an Accord's five turns paying once -- before a run's end
+        // lapses it.
         let mut paid: Vec<(Seat, Seat)> = Vec::new();
         for acc in self.accords.iter_mut() {
-            if period > 0 && turn.saturating_sub(acc.paid) >= period {
-                acc.paid = turn;
+            if period > 0 && (turn + 1).saturating_sub(acc.paid) >= period {
+                acc.paid = turn + 1;
                 paid.push((acc.a, acc.b));
             }
         }
@@ -5618,6 +5743,13 @@ impl Game {
             }
             self.log(format!("The Accord between {} and {} has held.", self.seat_name(a), self.seat_name(b)));
         }
+        // Ticket #509: the end of an Accord's last turn, not renewed.
+        let ended: Vec<(Seat, Seat)> = self.accords.iter().filter(|acc| self.accord_turns_left(acc) <= 1).map(|acc| (acc.a, acc.b)).collect();
+        for (a, b) in ended {
+            self.log(format!("The Accord between {} and {} has run its course.", self.seat_name(a), self.seat_name(b)));
+        }
+        let run = self.tables.relations.accord_turns;
+        self.accords.retain(|acc| (acc.since.max(acc.struck) + run).saturating_sub(turn) > 1);
     }
 
     /// Ticket #226 (version 0.08.2): would `seat` accept this offer from `from`?

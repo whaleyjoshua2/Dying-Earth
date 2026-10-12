@@ -480,6 +480,9 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("station_built", &["faction", "station"]),
     ("accord_struck", &["faction"]),
     ("accord_refused", &["faction"]),
+    // Ticket #509 (version 0.1.0.0): an Accord the other side would not renew.
+    ("accord_let_lapse", &["faction"]),
+    ("accord_added", &["faction"]),
     ("trade_struck", &["faction"]),
     ("trade_refused", &["faction"]),
     ("trade_failed", &["faction", "why"]),

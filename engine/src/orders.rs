@@ -911,8 +911,23 @@ impl Game {
                 if terms.is_empty() {
                     return fail("an Accord wants at least one Term");
                 }
-                if self.accords.iter().any(|a| a.holds(seat, *to)) {
-                    return fail("you already hold an Accord with them");
+                // Ticket #509 (the review): not in its last turn -- it lapses before the answer.
+                if let Some(acc) = self.accords.iter().find(|a| a.holds(seat, *to))
+                    && self.accord_turns_left(acc) <= 1
+                {
+                    return fail("your Accord lapses this turn: renew it first");
+                }
+                // Ticket #509 (version 0.1.0.0): an Accord that stands is offered only the Terms it lacks.
+                if let Some(acc) = self.accords.iter().find(|a| a.holds(seat, *to))
+                    && let Some(t) = terms.iter().find(|t| acc.terms.contains(t))
+                {
+                    let name = match t {
+                        Term::NonAggression => "non-aggression",
+                        Term::Passage => "passage",
+                        Term::Refuel => "refuel",
+                        Term::ResearchAgreement => "a research agreement",
+                    };
+                    return fail(format!("your Accord already holds {name}"));
                 }
                 // The Friendly gate is checked at the OFFER as well as at the strike, so a player is
                 // told now rather than after a computer seat has said yes.
@@ -3024,12 +3039,14 @@ impl Game {
                     // offence: punishing a refusal would make every offer a threat.
                     // Ticket #495 (version 0.09.9): answered at the head of the receiver's next
                     // turn, by a human seat in a prompt, by a computer seat by that rule.
-                    self.offers.push(crate::state::Offer { from: seat, to: *to, terms: terms.clone(), trade: None, turn: self.turn });
+                    // Ticket #509 (version 0.1.0.0): to a Faction it holds an Accord with, Terms added.
+                    let ask = if self.accords.iter().any(|a| a.holds(seat, *to)) { crate::state::AccordAsk::Add } else { crate::state::AccordAsk::New };
+                    self.offers.push(crate::state::Offer { from: seat, to: *to, terms: terms.clone(), trade: None, turn: self.turn, ask });
                     self.log(format!("{} offered {} an Accord.", self.seat_name(seat), self.seat_name(*to)));
                 }
                 // Ticket #496 (version 0.09.9): nothing is held at the offer.
                 Order::ProposeTrade { to, give, get } => {
-                    self.offers.push(crate::state::Offer { from: seat, to: *to, terms: Vec::new(), trade: Some((*give, *get)), turn: self.turn });
+                    self.offers.push(crate::state::Offer { from: seat, to: *to, terms: Vec::new(), trade: Some((*give, *get)), turn: self.turn, ask: crate::state::AccordAsk::New });
                     self.log(format!("{} offered {} a Trade.", self.seat_name(seat), self.seat_name(*to)));
                 }
                 Order::EndAccord { with } => {
