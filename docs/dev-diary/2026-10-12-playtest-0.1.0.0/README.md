@@ -91,6 +91,12 @@ belong to the tool are kept apart below.
    works; they are under Your works alone now.
 9. **A win announced late and quietly** (tester 1): "score 1.00 MET" with "the game is still on"; the
    win came a turn later as a buried [Note] while the headline was another country.
+   **Fixed (2026-10-12, ticket #524).** Victory was checked only at the End phase, but the Custodians'
+   run ticks in the Climate phase and the Fund's interest lands at the Income, both at the head of
+   the next turn. It is checked there too now, so the Report that first shows a bar met announces
+   the win, and the game's end (a win, a draw or a Collapse) heads its Report. Swept
+   (`../2026-10-07-version-0.1.0.0/sweeps/ticket-524.txt`): **2 / 24 / 15 / 17, 22 collapses**,
+   within noise.
 10. **Tech id mismatch** (all four): "Large Language Models" can only be ordered as `publicscience`.
 
 ## 2. Design and balance (the big ones)

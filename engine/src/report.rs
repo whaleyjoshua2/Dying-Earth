@@ -87,6 +87,10 @@ pub enum LineKind {
     /// dispatch with nothing at all; filing the line under a kind that never headlines lets the next
     /// line by rank fall through on its own. Added LAST so a save written before it still loads.
     Card,
+    /// Ticket #524 (version 0.1.0.0): **the game's end** -- a win, a draw or a Collapse. It outranks
+    /// every other line, so the end heads the Report it happens in, where as a Note it never
+    /// headlined and a tester's win sat under "China now belongs to Prospectors". Added last.
+    GameOver,
 }
 
 /// The five headings the dispatch groups its lines under, in the order they are shown (four until
@@ -137,6 +141,7 @@ impl LineKind {
     /// Event, and last a build completed. A kind with no rank never headlines.
     pub fn headline_rank(self) -> Option<u8> {
         Some(match self {
+            LineKind::GameOver => 0,
             LineKind::Seating => 0,
             LineKind::ColonyFounded => 1,
             LineKind::ControlChanged => 2,
@@ -166,7 +171,7 @@ impl LineKind {
             // line has always read; only its headline rank is gone.
             LineKind::Break | LineKind::SeaLevel | LineKind::Event | LineKind::Development | LineKind::Climate | LineKind::Card => Section::TheClimate,
             LineKind::TechComplete | LineKind::YourBuild | LineKind::YourWorks => Section::YourWorks,
-            LineKind::ControlChanged | LineKind::DecisiveBattle | LineKind::Battle | LineKind::BuildComplete | LineKind::Note | LineKind::Seating => by_place(),
+            LineKind::ControlChanged | LineKind::DecisiveBattle | LineKind::Battle | LineKind::BuildComplete | LineKind::Note | LineKind::Seating | LineKind::GameOver => by_place(),
         }
     }
 }

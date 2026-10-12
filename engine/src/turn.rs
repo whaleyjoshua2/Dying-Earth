@@ -297,8 +297,14 @@ impl Game {
         // Ticket #400 (version 0.09.3): the net Unrest lines are written here, after the Climate
         // phase, so the heat and the sea are causes on them; they stood at the Resolution's end.
         self.report_unrest_net();
+        // Ticket #524 (version 0.1.0.0): a bar the Income or the Climate met wins now, not after a
+        // turn of orders.
+        self.victory_at_head();
         self.log("Phase 3: Report");
         self.report_phase();
+        if self.is_over() {
+            return Ok(());
+        }
         // Ticket #337 (version 0.09.0): the next turn's card, drawn before its orders are given.
         self.log("The Question");
         self.question_phase();

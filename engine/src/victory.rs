@@ -241,21 +241,7 @@ impl Game {
     pub fn end_phase(&mut self) {
         let progress: Vec<Progress> = Seat::ALL.into_iter().map(|s| self.progress(s)).collect();
         self.rival_moments(&progress);
-        let met: Vec<Seat> = Seat::ALL.into_iter().filter(|s| progress[s.index()].met()).collect();
-        if met.len() == 1 {
-            self.outcome = Some(Outcome::Win { seat: met[0], margin_note: "met its Victory Condition".into() });
-        } else if met.len() > 1 {
-            let best = met.iter().map(|s| progress[s.index()].margin()).fold(f64::MIN, f64::max);
-            let leaders: Vec<Seat> = met.iter().copied().filter(|s| progress[s.index()].margin() >= best).collect();
-            self.outcome = Some(if leaders.len() == 1 {
-                Outcome::Win { seat: leaders[0], margin_note: "more than one met its Victory Condition; the larger margin".into() }
-            } else {
-                Outcome::Draw { note: "more than one met its Victory Condition by the same margin".into() }
-            });
-        }
-        if self.outcome.is_none() && self.climate.temperature >= self.tables.climate.collapse_line {
-            self.outcome = Some(Outcome::Collapse);
-        }
+        self.settle_met(&progress);
         if self.outcome.is_none() && self.turn >= self.tables.victory.turns {
             // Rank every seat by score, then Colonists off Earth, then Colonies held, then a draw.
             let leaders = |key: &dyn Fn(Seat) -> f64, from: &[Seat]| -> Vec<Seat> {
@@ -279,6 +265,44 @@ impl Game {
                 Outcome::Draw { note: "equal at the last turn".into() }
             });
         }
+        self.announce_outcome();
+    }
+
+    /// Ticket #524 (version 0.1.0.0): **Victory checked at the head of the turn**, after the Income
+    /// and the Climate phase, where the Fund's interest and the Custodians' run move. Checked only at
+    /// the End, a bar met there waited a whole turn of orders to win: the Report showed "score 1.00
+    /// MET" and the game went on. A Collapse the Climate phase crossed ends the game here as well.
+    /// The last turn's ranking stays the End's.
+    pub fn victory_at_head(&mut self) {
+        if self.outcome.is_some() {
+            return;
+        }
+        let progress: Vec<Progress> = Seat::ALL.into_iter().map(|s| self.progress(s)).collect();
+        self.settle_met(&progress);
+        self.announce_outcome();
+    }
+
+    /// A Victory Condition met, by one or more seats, and else the Collapse.
+    fn settle_met(&mut self, progress: &[Progress]) {
+        let met: Vec<Seat> = Seat::ALL.into_iter().filter(|s| progress[s.index()].met()).collect();
+        if met.len() == 1 {
+            self.outcome = Some(Outcome::Win { seat: met[0], margin_note: "met its Victory Condition".into() });
+        } else if met.len() > 1 {
+            let best = met.iter().map(|s| progress[s.index()].margin()).fold(f64::MIN, f64::max);
+            let leaders: Vec<Seat> = met.iter().copied().filter(|s| progress[s.index()].margin() >= best).collect();
+            self.outcome = Some(if leaders.len() == 1 {
+                Outcome::Win { seat: leaders[0], margin_note: "more than one met its Victory Condition; the larger margin".into() }
+            } else {
+                Outcome::Draw { note: "more than one met its Victory Condition by the same margin".into() }
+            });
+        }
+        if self.outcome.is_none() && self.climate.temperature >= self.tables.climate.collapse_line {
+            self.outcome = Some(Outcome::Collapse);
+        }
+    }
+
+    /// The game's end, in the log and as the Report's headline (ticket #524: `LineKind::GameOver`).
+    fn announce_outcome(&mut self) {
         if let Some(o) = self.outcome.clone() {
             let line = match &o {
                 Outcome::Win { seat, margin_note } => format!("Game over on turn {}: the {} win ({}).", self.turn, self.seat_name(*seat), margin_note),
@@ -295,7 +319,7 @@ impl Game {
                     self.say("game_over_collapse", &[("turn", self.turn.to_string()), ("temperature", format!("{:+.1}", self.climate.temperature))])
                 }
             };
-            self.report_line(LineKind::Note, None, text);
+            self.report_line(LineKind::GameOver, None, text);
         }
     }
 

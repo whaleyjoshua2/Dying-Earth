@@ -22177,3 +22177,28 @@ fn a_place_that_changes_hands_twice_in_a_turn_says_so_in_one_line() {
     assert_eq!(listed + head_mine, mine, "each of the player's lines once");
     assert!(g.report.sections().iter().filter(|(s, _)| *s != Section::YourWorks).all(|(_, ls)| ls.iter().all(|l| !l.mine)));
 }
+
+/// Ticket #524 (version 0.1.0.0): the Custodians' run ticks in the Climate phase at the head of a
+/// turn, but Victory was checked only at the End: a Report showed "score 1.00 MET" and the win came
+/// a whole turn later, as a Note under another headline. At the designer's word (Q1 A) Victory is
+/// checked at the head of the turn too, after the Income and the Climate; (Q2) the game-over line
+/// heads the Report.
+#[test]
+fn a_bar_met_at_the_head_of_a_turn_wins_then_and_heads_the_report() {
+    let mut g = game();
+    assert_eq!(g.kind(Seat(0)), FactionKind::Custodians);
+    colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 18);
+    open_gates(&mut g);
+    g.seats[0].stabilization_run = 3;
+    // The world under the Sink, so the coming Climate phase makes the run four.
+    g.climate.natural_sink = 1000.0;
+    pick_a_tech(&mut g);
+    assert!(!g.progress(Seat(0)).met(), "not met when the turn is ended");
+    let turn = g.turn;
+    g.end_turn(std::array::from_fn(|_| Vec::new())).expect("the turn ends");
+    assert_eq!(g.seat(Seat(0)).stabilization_run, 4);
+    assert!(matches!(g.outcome, Some(Outcome::Win { seat: Seat(0), .. })), "won at the head of turn {}: {:?}", turn + 1, g.outcome);
+    let head = g.report.headline().expect("a headline");
+    assert_eq!(head.kind, LineKind::GameOver, "{}", head.text);
+    assert!(head.text.contains("Custodians"), "{}", head.text);
+}
