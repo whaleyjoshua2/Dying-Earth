@@ -468,3 +468,8 @@ against §10's 3 / 11 / 30 / 7 and 29 collapses:
   **4 / 13 / 8 / 9 and 46 collapses**; the Arkwrights held a Capital off Earth at the end of **8 of
   80** games (none before), 13 Capitals on the board (7 before). The first rule that reaches the
   requirement; the Arkwrights stand at 8 wins against the 30 the requirement took away.
+- **The climate re-swept** at the designer's word, the collapses having climbed to 46 with the games
+  nobody ends: `ppm_step` **620**, from 440, the Sink still 8
+  ([`sweeps/co2-grid.md`](../dev-diary/2026-10-07-version-0.1.0.0/sweeps/co2-grid.md), the second
+  grid). At 620 the grid read 7 / 27 / 17 / 7 and 22 collapses; the closing sweep is
+  [`sweeps/ticket-514-closing.txt`](../dev-diary/2026-10-07-version-0.1.0.0/sweeps/ticket-514-closing.txt).

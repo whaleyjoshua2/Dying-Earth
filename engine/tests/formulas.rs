@@ -14856,9 +14856,11 @@ fn the_sink_weakens_subtracts_and_the_projection_keeps_the_scrubbers_once() {
         // A Stock that leaves the Temperature still rising, so the phase's own update does not
         // carry it back under the Break's 2.0 before the Break is checked.
         g.climate.temperature = 2.0;
-        // Ticket #506 (version 0.1.0.0): 1,400 ppm, which reads +2.3 at the step of 440; 1,000 read
-        // +2.1 at 330 and reads +1.9 now, under the Break.
-        g.climate.co2 = 1_400.0;
+        // Ticket #506 (version 0.1.0.0): 1,400 ppm read +2.3 at the step of 440; 1,000 read +2.1 at
+        // 330. Ticket #514: 2,000 reads +2.5 at the step of 620, where 1,400 reads +1.99, under the
+        // Break. The figure is read off the step so the next move of it is not a move here.
+        let step = g.tables.climate.ppm_step;
+        g.climate.co2 = 420.0 + 2.6 * step;
         g.climate_phase();
         assert!(g.climate.breaks_fired[break_at(&g, "sink_weakens")], "the Break fired");
         g.climate.natural_sink
