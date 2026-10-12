@@ -459,7 +459,11 @@ against §10's 3 / 11 / 30 / 7 and 29 collapses:
   reserve spots for habitats"*): every computer seat's ground Colony off Earth keeps as many Module
   slots free as the Habitats its next tier's people still need (`habitats_to_reserve`), less any on
   order; no other Module takes one of them. A station, Antarctica and a place at its last tier
-  reserve nothing. **Measured**
+  reserve nothing, so nobody keeps room for the Moon's Capital once the Moon has one; and once the
+  seat holds a Capital its places keep room only where the next step is a Capital on a Body without
+  one, never for the lower tiers (the designer: *"once a colonial capital is raised the rest of the
+  colonies are not still reserving spaces ... so long as it does not preclude them raising a second
+  capital on another body"*). **Measured**
   ([`sweeps/ticket-514-reserve.txt`](../dev-diary/2026-10-07-version-0.1.0.0/sweeps/ticket-514-reserve.txt)):
   **4 / 13 / 8 / 9 and 46 collapses**; the Arkwrights held a Capital off Earth at the end of **8 of
   80** games (none before), 13 Capitals on the board (7 before). The first rule that reaches the

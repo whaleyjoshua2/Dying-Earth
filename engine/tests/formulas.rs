@@ -21788,7 +21788,11 @@ fn the_computer_keeps_slots_at_a_ground_colony_for_the_habitats_its_next_tier_ne
     g.log.clear();
     g.ai_orders(s);
     assert_eq!(scored(&g, &format!("build Mine at {name}")), 0.0, "the two free slots are the Habitats': {:?}", g.log.iter().filter(|l| l.contains(&name)).collect::<Vec<_>>());
-    // One on order counts; two Habitats standing reserve nothing, and the Mine is back.
+    // One on order counts against the reserve.
+    g.colony_mut(moon).unwrap().queue.push(Build { item: BuildItem::Module(ModuleKind::Habitat), seat: s, widgets: 4, done: 0, coastal: false, fuel: 0.0 });
+    assert_eq!(g.habitats_to_reserve(g.colony(moon).unwrap()), 1, "one still wanted beyond the one on order");
+    g.colony_mut(moon).unwrap().queue.clear();
+    // Two Habitats standing reserve nothing, and the Mine is back.
     g.colony_mut(moon).unwrap().modules.push(Module::new(ModuleKind::Habitat));
     g.colony_mut(moon).unwrap().modules.push(Module::new(ModuleKind::Habitat));
     g.colony_mut(moon).unwrap().colonists = 6;
@@ -21797,7 +21801,25 @@ fn the_computer_keeps_slots_at_a_ground_colony_for_the_habitats_its_next_tier_ne
     g.log.clear();
     g.ai_orders(s);
     assert!(scored(&g, &format!("build Mine at {name}")) > 0.0, "the Mine is offered again: {:?}", g.log.iter().filter(|l| l.contains(&name)).collect::<Vec<_>>());
-    // A station over Earth reserves nothing.
+    // A station over Earth reserves nothing; nor does a Colony-tier place on a Body whose Capital is
+    // another's, which can rise no further.
     let iss = station_of(&g, s, BodyId::Earth).unwrap();
     assert_eq!(g.habitats_to_reserve(g.colony(iss).unwrap()), 0);
+    let capital = g.tables.tiers.iter().position(|t| t.one_per_body).unwrap() as u32;
+    let theirs = colony(&mut g, Seat(1), BodyId::Moon, &[ModuleKind::Habitat], 4);
+    g.colony_mut(theirs).unwrap().tier = capital;
+    g.colony_mut(moon).unwrap().tier = capital - 1;
+    assert_eq!(g.habitats_to_reserve(g.colony(moon).unwrap()), 0, "the Moon's Capital is another's: nothing to reserve for");
+    // And once the seat holds a Capital, its places keep room only where the next step is a Capital
+    // on a Body without one: a bare Outpost no longer reserves for its Settlement, a Colony-tier
+    // place on Mars still keeps room for Mars's Capital.
+    let mars = colony(&mut g, s, BodyId::Mars, &[], 4);
+    assert_eq!(g.habitats_to_reserve(g.colony(mars).unwrap()), 2, "a bare Outpost of theirs reserves two");
+    let own = colony(&mut g, s, BodyId::Phobos, &[ModuleKind::Habitat], 4);
+    g.colony_mut(own).unwrap().tier = capital;
+    assert!(g.capital_held(s));
+    assert_eq!(g.habitats_to_reserve(g.colony(mars).unwrap()), 0, "a Capital held: the Outpost reserves nothing for its Settlement");
+    let big = colony(&mut g, s, BodyId::Mars, &[ModuleKind::Habitat; 4], 20);
+    g.colony_mut(big).unwrap().tier = capital - 1;
+    assert_eq!(g.habitats_to_reserve(g.colony(big).unwrap()), 1, "room 20 of the Capital's 24: one Habitat kept, a second Capital never precluded");
 }

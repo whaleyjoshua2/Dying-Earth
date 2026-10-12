@@ -1870,7 +1870,9 @@ impl Game {
                 // Ticket #514 (version 0.1.0.0): a ground Colony off Earth keeps slots for the Habitats
                 // its next tier's people need (`habitats_to_reserve`): no other Module takes one of
                 // them. Measured without it: every Capital candidate's slots filled with Mines,
-                // Choruses and Trade Posts while it held four, and could never grow.
+                // Choruses and Trade Posts while it held four, and could never grow. The reserve is
+                // the computer's own habit, judged against the board as committed: a Ducat buy, a
+                // card's free Module and the player are not bound by it.
                 if mk != ModuleKind::Habitat && self.free_module_slots(&col) <= self.habitats_to_reserve(&col) {
                     continue;
                 }

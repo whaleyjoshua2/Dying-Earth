@@ -3416,12 +3416,21 @@ impl Game {
     /// still wanted to house the people its next tier asks for, less any already on order -- so a
     /// place does not fill every slot with producers while it holds four and can never grow. The
     /// designer: "give the ais an understanding of the necessity to reserve spots for habitats".
-    /// Nothing for a station, for Antarctica, or for a place at its last tier.
+    /// Nothing for a station, for Antarctica, or for a place at its last tier -- a Colony whose Body
+    /// already has another's Capital among them (`open_tier`), since it can rise no further -- so
+    /// nobody keeps room for the Moon's Capital once the Moon has one. And once the seat holds a
+    /// Capital, its places keep room only where the next step IS a Capital, on a Body without one
+    /// (a second Capital is never precluded), and not for the lower tiers; the designer: "once a
+    /// colonial capital is raised the rest of the colonies are not still reserving spaces ... so
+    /// long as it does not preclude them raising a second capital on another body".
     pub fn habitats_to_reserve(&self, c: &Colony) -> u32 {
         if c.in_orbit || c.body == BodyId::Earth {
             return 0;
         }
-        let Some(next) = self.next_tier(c) else { return 0 };
+        let Some(next) = self.open_tier(c) else { return 0 };
+        if !next.one_per_body && c.control.controller().is_some_and(|s| self.capital_held(s)) {
+            return 0;
+        }
         let wanted = next.colonists.saturating_sub(self.habitat_room(c));
         let holds = self.habitat_holds(c).max(1);
         let needed = wanted.div_ceil(holds);
