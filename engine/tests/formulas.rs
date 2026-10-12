@@ -19774,7 +19774,8 @@ fn the_reports_templates_stay_under_their_word_ceiling() {
     // Ticket #503 (version 0.1.0.0): and by the 9 of an upgrade to a Colonial Capital refunded.
     // Ticket #509 (version 0.1.0.0): and by the 5 of an Accord the other side let lapse, and the 7 of
     // Terms added to one, and the 5 of a rival's renewal.
-    assert!(words <= 1833, "the Report's templates hold {words} words; the ceiling is 1,833 (15% off 2,031, 54 for the race to the Moon, 2 for a rival's upgrade, 8 for an Accord answered, less a word of slack, 17 for a Trade, 9 for a Capital refunded, 5 for an Accord let lapse, 7 for Terms added, 5 for a renewal)");
+    // Ticket #517 (version 0.1.0.0): and by the 12 of an Accord broken, told to each side.
+    assert!(words <= 1845, "the Report's templates hold {words} words; the ceiling is 1,845 (12 for an Accord broken, 15% off 2,031, 54 for the race to the Moon, 2 for a rival's upgrade, 8 for an Accord answered, less a word of slack, 17 for a Trade, 9 for a Capital refunded, 5 for an Accord let lapse, 7 for Terms added, 5 for a renewal)");
     // "The" is gone before a Faction's name, which is drawn in its colour instead.
     assert!(!text.contains("he {faction}"), "a template still says \"the {{faction}}\"");
 }
@@ -21847,4 +21848,52 @@ fn every_refusal_at_venus_points_at_founding_from_the_ring() {
     // And the founding that works, works.
     let found = Order::Unload { ship, colonists: 4, army: false, into: UnloadTarget::Ring(BodyId::Venus, 0) };
     assert!(g.check_order(Seat(0), &[], &found).is_ok());
+}
+
+// ---------------------------------------------------------------- the 0.1.0.0 playtest: Accords the computer broke at once
+
+/// The 0.1.0.0 playtest (ticket #517): players accepted Accords that were "never struck". They were
+/// struck -- and broken the same turn by the computer partner, whose orders spent Influence on the
+/// player's Regions (non-aggression is "no Influence or Battle on each other", and an act against it
+/// breaks the Accord), with nothing in the player's Report. Now the computer keeps the word it gives:
+/// no Influence, Agitate or Smear on a non-aggression partner; and a broken Accord reports to the
+/// player in it.
+#[test]
+fn the_computer_keeps_its_non_aggression_and_a_broken_accord_is_reported() {
+    let mut g = game();
+    calm(&mut g);
+    let (me, them) = (Seat(0), Seat(1));
+    g.seats[them.index()].stockpile.ducats = 2000.0;
+    g.seats[them.index()].allotment = 200;
+    // Every Region not theirs is mine, so all its targets are my places.
+    let theirs = g.controlled_states(them);
+    for sid in StateId::ALL {
+        if !theirs.contains(&sid) {
+            g.state_mut(sid).control = Control::Controlled(me);
+        }
+    }
+    // Without an Accord the partner-to-be spends on my Region (the premise).
+    let offends = |g: &Game, orders: &[Order]| orders.iter().any(|o| match o {
+        Order::Influence { target, .. } => g.place_control(*target).director() == Some(me),
+        Order::Agitate { state } => g.place_control(Place::State(*state)).director() == Some(me),
+        Order::Smear { target, .. } => *target == me,
+        _ => false,
+    });
+    let mut any = false;
+    for _ in 0..3 {
+        let o = g.ai_orders(them);
+        any |= offends(&g, &o);
+    }
+    assert!(any, "the premise: unbound, it spends on my Region");
+    // With non-aggression struck, none of its orders crosses me.
+    g.strike_accord(me, them, vec![Term::NonAggression]).unwrap();
+    for _ in 0..3 {
+        let o = g.ai_orders(them);
+        assert!(!offends(&g, &o), "the computer crossed its non-aggression partner: {o:?}");
+    }
+    // A break reports to the player in it.
+    g.report.lines.clear();
+    g.break_accord(them, me);
+    assert!(g.report.lines.iter().any(|l| l.text.contains("broke") && l.text.contains("Accord")), "{:?}", g.report.lines);
+    let _ = any;
 }

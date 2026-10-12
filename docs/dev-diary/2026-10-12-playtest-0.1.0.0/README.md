@@ -36,6 +36,13 @@ belong to the tool are kept apart below.
 2. **Accord accepted but not struck** (testers 2, 3). `accord accept X` echoes "you accept", yet no
    Accord stands and X offers again; in tester 2's case X marched Armies in the same Resolution. Both
    cases were renewal-type offers — suspect the legacy Renew path left in place by ticket #509.
+   **Fixed (2026-10-12, ticket #517).** Not the Renew path: the Accords were struck, then broken the
+   same turn by the computer partner spending Influence on the player's Regions (non-aggression is
+   "no Influence or Battle on each other"), and the break went only to the log. The computer now
+   drops any order that would cross a non-aggression partner (Influence, Agitate, Smear, an Army
+   into, a Bombard or Launch at its places), and a broken Accord is told to each player in it. Swept
+   (`../2026-10-07-version-0.1.0.0/sweeps/ticket-517.txt`): **0 / 30 / 13 / 18, 19 collapses**, from
+   7 / 27 / 17 / 7 and 22 -- the Archivists up past noise, the Custodians to nought.
 3. **Phantom offers** (tester 2). "STILL OWED" lists a Trade from the Custodians and the Archivists,
    but `trade accept|refuse` answers "they have offered you no Trade"; and Accord offers for an Accord
    struck earlier the same turn block the turn (accept: "you already hold an Accord").

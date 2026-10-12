@@ -3789,8 +3789,27 @@ impl Game {
         for l in &lines {
             self.log(l.clone());
         }
+        // The 0.1.0.0 playtest (ticket #517): the computer keeps the non-aggression it gives. An order
+        // that would cross a partner -- Influence on, Agitate in, a Smear of, an Army into, a Bombard
+        // or a Launch at a place that partner directs -- is dropped. Measured before: computer seats
+        // struck Accords and broke them the same turn by spending Influence on the partner's Regions,
+        // which players read as an Accord accepted and never struck.
+        chosen.retain(|o| !self.ai_crosses_partner(seat, o));
         // Ticket #58: the scored list is the AI's own head, so it stays in the log. What the Report
         // shows is built from the orders this seat actually commits, in `end_turn`.
         chosen
+    }
+
+    /// Ticket #517 (version 0.1.0.0): whether this order would act against a Faction this seat holds
+    /// non-aggression with -- the acts that break it.
+    pub fn ai_crosses_partner(&self, seat: Seat, order: &Order) -> bool {
+        let partner = |who: Option<Seat>| who.is_some_and(|w| w != seat && self.accord_has(seat, w, Term::NonAggression));
+        match order {
+            Order::Influence { target, .. } | Order::Launch { target, .. } => partner(self.place_control(*target).director()),
+            Order::Agitate { state } | Order::MoveArmy { to: state, .. } => partner(self.place_control(Place::State(*state)).director()),
+            Order::Smear { target, .. } => partner(Some(*target)),
+            Order::Bombard { colony, .. } => partner(self.place_control(Place::Colony(*colony)).director()),
+            _ => false,
+        }
     }
 }

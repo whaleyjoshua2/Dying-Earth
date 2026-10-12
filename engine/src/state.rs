@@ -5815,6 +5815,14 @@ impl Game {
         self.offend_by(breaker, other, 3);
         let text = format!("{} broke their Accord with {}.", self.seat_name(breaker), self.seat_name(other));
         self.log(text);
+        // Ticket #517 (version 0.1.0.0): and each player in it is told, where the break was only in
+        // the log and read as an Accord that was never struck.
+        for (me, them, key) in [(breaker, other, "accord_you_broke"), (other, breaker, "accord_broken")] {
+            if !self.seat(me).ai {
+                let text = self.say(key, &[("faction", self.seat_name(them))]);
+                self.report_line_of(me, LineKind::YourWorks, LineKind::Note, None, text);
+            }
+        }
     }
 
     /// Ticket #226 (version 0.08.2): run once a turn, beside the Relations settle.
