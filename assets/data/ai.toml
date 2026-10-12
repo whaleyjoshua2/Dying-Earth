@@ -471,6 +471,11 @@ emitter_cause = -3
 # that same test the Archivists' Barracks, Army and holding Influence there take the threat's lift.
 archive_target_lift = 2.0
 archive_target_fund = 0.5
+# Ticket #514 (version 0.1.0.0): a seat whose win waits on a Colonial Capital (the Arkwrights) and
+# holds none multiplies by this the upgrade of its CAPITAL CANDIDATE -- its most peopled ground
+# Colony on a Body with no Capital -- and a disembark into it, so the people gather where the
+# Capital can rise. Measured before it: 5 Capitals stood at the end of 80 games (ticket #513).
+capital_chase = 3.0
 # Ticket #448 (version 0.09.6): the market. A seat keeps this many Materials, plus this many turns of
 # the larger of its Materials income and what the turn's own orders spend, and sells the rest; and
 # keeps its Ships' empty tank room plus this much Fuel, selling the rest -- each only at or above the

@@ -414,3 +414,36 @@ against §9's:
   by the same margin.
 - Not traced here. The Arkwrights' edge, measured over the version, survives the climate dial, the
   Archive's price and now their load; what it rests on is a question for the balance work.
+
+## 11. A Colonial Capital held
+
+The authority is [ticket #514](https://github.com/whaleyjoshua2/Dying-Earth/issues/514). The
+designer, with the Arkwrights at 30 of 80 after Coach Class: *"let's add a requirement to control at
+least one colonial capital"*; theirs alone (Q1 A), as a gate on the win (Q3 A).
+
+- **The Arkwrights' Victory Condition** reads *42 Colonists off Earth over four Bodies at 4 each,
+  one of them holding a Colonial Capital of yours*. `factions.toml victory_capital = true` on their
+  card; no other card asks it.
+- **Held** when a Colonial Capital stands at a Colony the Arkwrights control (not Occupied: an
+  Occupied Capital counts for neither side), on any Body but Earth. Lost with the Colony.
+- **A gate on the win**, like the gate Tech: both parts accrue and score as before; `met` is false
+  and the Victory window's held-back note reads *needs a Colonial Capital of yours, at a Colony you
+  hold off Earth*. The gate Tech's note comes first when both hold.
+- **The computer Arkwrights chase it** (`ai.toml capital_chase = 3.0`): holding none, their
+  **Capital candidate** is their most peopled ground Colony off Earth on a Body with no Capital; its
+  every upgrade and a disembark into it weigh three times. Measured before the chase: 5 Capitals
+  stood at the end of 80 games.
+- **The sweep** reports who held a Capital at the end, by Faction.
+
+**Measured** over the 80 games
+([`sweeps/ticket-514.txt`](../dev-diary/2026-10-07-version-0.1.0.0/sweeps/ticket-514.txt)),
+against §10's 3 / 11 / 30 / 7 and 29 collapses:
+- Wins **4 / 12 / 1 / 7** with **56 collapses**. The Arkwrights fall from 30 wins to one, and the
+  games they would have ended run on until the world collapses.
+- **No Faction held a Capital at the end of any game.** Seven Capitals stood over the batch, every
+  one in Antarctica, which is on Earth and counts for nothing. Off Earth no computer seat gathered
+  24 Colonists at one ground Colony in 80 games, with the chase or without it (5 Capitals, all
+  Antarctic, before the chase).
+- **The build misses its bar.** The rule is as decided and the chase is in, but the computer cannot
+  meet the requirement, so in computer hands the Arkwrights cannot win. Reported to the designer on
+  the ticket; what moves next is the designer's call.

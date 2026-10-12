@@ -213,6 +213,7 @@ fn main() {
                         let (mut archives_lost, mut archive_fund_lost) = (0u32, 0i64);
                         let mut opening_met: [Vec<u32>; 4] = Default::default();
                         let mut second_met: [Vec<u32>; 4] = Default::default();
+                        let mut capitals_held = [0u32; 4];
                         let (mut levies, mut neutral_holds) = (0u32, 0u32);
                         let mut warc = dying_earth_engine::state::WarCounters::default();
                         // Ticket #343 (version 0.09.1): the Natural Sink at the end of each game.
@@ -446,6 +447,9 @@ fn main() {
                                     second_met[i].push(*t);
                                 }
                             }
+                            for (i, h) in r.capital_held.iter().enumerate() {
+                                capitals_held[i] += *h as u32;
+                            }
                             for (i, t) in r.opening_met.iter().enumerate() {
                                 if let Some(t) = t {
                                     opening_met[i].push(*t);
@@ -640,6 +644,8 @@ fn main() {
                             println!("      Opening Objectives met, Custodians / Prospectors / Arkwrights / Archivists: {} / {} / {} / {} of {seeds}, median turn {} / {} / {} / {}", opening_met[0].len(), opening_met[1].len(), opening_met[2].len(), opening_met[3].len(), median_u(&mut opening_met[0]), median_u(&mut opening_met[1]), median_u(&mut opening_met[2]), median_u(&mut opening_met[3]));
                             // Ticket #504 (version 0.1.0.0): the Second Objectives, the same way.
                             println!("      Second Objectives met, Custodians / Prospectors / Arkwrights / Archivists: {} / {} / {} / {} of {seeds}, median turn {} / {} / {} / {}", second_met[0].len(), second_met[1].len(), second_met[2].len(), second_met[3].len(), median_u(&mut second_met[0]), median_u(&mut second_met[1]), median_u(&mut second_met[2]), median_u(&mut second_met[3]));
+                            // Ticket #514 (version 0.1.0.0): who held a Colonial Capital at the end.
+                            println!("      A Colonial Capital held at the end, Custodians / Prospectors / Arkwrights / Archivists: {} / {} / {} / {} of {seeds}", capitals_held[0], capitals_held[1], capitals_held[2], capitals_held[3]);
                             println!(
                                 "      Neutral Labs paid a median {} Research a game; Coastal Engineering complete in {}/{seeds} seeds (median turn {})",
                                 median_u(&mut neutral_research),

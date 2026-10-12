@@ -109,6 +109,9 @@ pub struct SimResult {
     pub opening_met: [Option<u32>; SEAT_COUNT],
     /// Ticket #504 (version 0.1.0.0): and its Second Objective, in the same order.
     pub second_met: [Option<u32>; SEAT_COUNT],
+    /// Ticket #514 (version 0.1.0.0): whether each Faction held a Colonial Capital at the end, in
+    /// the same order.
+    pub capital_held: [bool; SEAT_COUNT],
     pub archive_fund_lost: i64,
     /// Ticket #282 (version 0.08.5): Levies raised by neutral Regions, and neutral Regions that held.
     pub levies_raised: u32,
@@ -718,6 +721,7 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
     let archives_lost = Seat::ALL.iter().map(|s| game.seat(*s).archives_lost).sum();
     let opening_met = FactionKind::ALL.map(|k| Seat::ALL.into_iter().find(|s| game.kind(*s) == k).and_then(|s| game.seat(s).opening_met_turn));
     let second_met = FactionKind::ALL.map(|k| Seat::ALL.into_iter().find(|s| game.kind(*s) == k).and_then(|s| game.seat(s).second_met_turn));
+    let capital_held = FactionKind::ALL.map(|k| Seat::ALL.into_iter().find(|s| game.kind(*s) == k).is_some_and(|s| game.capital_held(s)));
     let archive_fund_lost = Seat::ALL.iter().map(|s| game.seat(*s).archive_fund_lost).sum();
     let events_no_target = game.events_no_target;
     let (choice_taken, choice_refused, choice_not_asked) = (game.choice_taken, game.choice_refused, game.choice_not_asked);
@@ -786,6 +790,7 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         archives_lost,
         opening_met,
         second_met,
+        capital_held,
         archive_fund_lost,
         levies_raised: game.levies_raised,
         neutral_holds: game.neutral_holds,

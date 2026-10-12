@@ -713,6 +713,10 @@ pub struct FactionCard {
     pub victory_first: VictoryFirstCard,
     /// Ticket #51: the second part, generalised the way #50 generalised the first.
     pub victory_second: VictorySecondCard,
+    /// Ticket #514 (version 0.1.0.0): the win waits on a Colonial Capital the Faction holds at a
+    /// Colony it directs off Earth (the Arkwrights'). Absent, false.
+    #[serde(default)]
+    pub victory_capital: bool,
     /// Ticket #471 (version 0.09.7): the Faction's Opening Objective.
     pub opening: OpeningCard,
     /// Ticket #504 (version 0.1.0.0): its Second Objective, open once the Opening Objective is met.
@@ -1483,6 +1487,9 @@ pub struct AiThresholds {
     /// it under the same test.
     pub archive_target_lift: f64,
     pub archive_target_fund: f64,
+    /// Ticket #514 (version 0.1.0.0): what a seat whose win waits on a Colonial Capital, holding
+    /// none, multiplies the upgrade of its Capital candidate and a landing there by.
+    pub capital_chase: f64,
     /// Ticket #448 (version 0.09.6): what a seat keeps back from the market.
     pub market_materials_reserve: f64,
     pub market_materials_turns: f64,

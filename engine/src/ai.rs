@@ -2080,6 +2080,9 @@ impl Game {
         // cap, with the people the next tier wants, is raised to it.
         // Ticket #503 (version 0.1.0.0): the Colonial Capital too, where the Body has none (`open_tier`);
         // a station never sees it.
+        // Ticket #514 (version 0.1.0.0): a seat whose win waits on a Colonial Capital and holds none
+        // chases it: every upgrade at its Capital candidate weighs `capital_chase` times more.
+        let capital_candidate = if self.tables.faction(kind).victory_capital { self.capital_candidate(seat) } else { None };
         for c in self.colonies.iter().filter(|c| c.control.director() == Some(seat)) {
             if let Some(next) = self.open_tier(c)
                 && c.colonists >= next.colonists
@@ -2087,7 +2090,8 @@ impl Game {
                 && self.free_module_slots(c) == 0
                 && self.tier_under_way(c).is_none()
             {
-                push(vec![Order::RaiseTier { colony: c.id }], Cat::RaiseTier, self.base_weight(seat, Cat::RaiseTier), gap_for(Cat::RaiseTier, None), 1.0, 1.0, format!("upgrade {} to a {}", self.place_name(Place::Colony(c.id)), next.name), None);
+                let chase = if capital_candidate == Some(c.id) { self.tables.ai.thresholds.capital_chase } else { 1.0 };
+                push(vec![Order::RaiseTier { colony: c.id }], Cat::RaiseTier, self.base_weight(seat, Cat::RaiseTier) * chase, gap_for(Cat::RaiseTier, None), 1.0, 1.0, format!("upgrade {} to a {}", self.place_name(Place::Colony(c.id)), next.name), None);
             }
         }
         // Ticket #447 (version 0.09.6): **a backup yard.** A seat with exactly one Shipyard, and no
@@ -3041,6 +3045,8 @@ impl Game {
                             let over_earth = body == BodyId::Earth;
                             let opp = if presence_needed <= n && !over_earth { m.opportunity } else { 1.0 };
                             let (weight, gap) = if over_earth { (self.base_weight(seat, Cat::LoadUnload) * 0.5, 1.0) } else { (self.base_weight(seat, Cat::LoadUnload), gap_for(Cat::LoadUnload, None)) };
+                            // Ticket #514 (version 0.1.0.0): the people gather at the Capital candidate.
+                            let weight = if capital_candidate == Some(c.id) { weight * self.tables.ai.thresholds.capital_chase } else { weight };
                             push(vec![Order::Unload { ship: s.id, colonists: n, army: false, into: UnloadTarget::Colony(c.id) }], Cat::LoadUnload, weight, gap, 1.0, opp, format!("disembark {} Colonists into {}", n, self.place_name(Place::Colony(c.id))), None);
                         }
                     }

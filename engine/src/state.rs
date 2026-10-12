@@ -3403,6 +3403,27 @@ impl Game {
         self.next_tier(c).filter(|t| !(t.one_per_body && self.capital_of(c.body).is_some_and(|h| h != c.id)))
     }
 
+    /// Ticket #514 (version 0.1.0.0): whether this seat holds a Colonial Capital: one standing at a
+    /// Colony it CONTROLS (an Occupied one counts for neither side), off Earth. What the Arkwrights'
+    /// win waits on.
+    pub fn capital_held(&self, seat: Seat) -> bool {
+        self.colonies.iter().any(|c| c.control == Control::Controlled(seat) && !c.in_orbit && c.body != BodyId::Earth && self.tier_of(c).one_per_body)
+    }
+
+    /// Ticket #514: the Colony a seat chasing a Capital should raise -- its most peopled ground
+    /// Colony off Earth on a Body that has no Capital yet, ties to the lower id. None while it
+    /// holds a Capital already, or has no such Colony.
+    pub fn capital_candidate(&self, seat: Seat) -> Option<ColonyId> {
+        if self.capital_held(seat) {
+            return None;
+        }
+        self.colonies
+            .iter()
+            .filter(|c| c.control.director() == Some(seat) && !c.in_orbit && c.body != BodyId::Earth && self.capital_of(c.body).is_none())
+            .max_by_key(|c| (c.colonists, std::cmp::Reverse(c.id.0)))
+            .map(|c| c.id)
+    }
+
     /// Ticket #503 (version 0.1.0.0): the Colony that is this Body's Colonial Capital, if one has
     /// been raised. A Colony is never removed from the board, so once raised it is there for good.
     pub fn capital_of(&self, body: BodyId) -> Option<ColonyId> {

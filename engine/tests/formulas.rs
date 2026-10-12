@@ -2213,6 +2213,12 @@ fn diaspora_wants_three_bodies_with_four_colonists_each_and_counts_no_antarctic_
     g.colony_mut(ph).unwrap().colonists = 30;
     assert_eq!(g.progress(Seat(2)).first_value, 42.0);
     open_gates(&mut g);
+    // Ticket #514 (version 0.1.0.0): and a Colonial Capital of theirs must stand, at a Colony they hold.
+    let p = g.progress(Seat(2));
+    assert!(!p.met() && p.first_held_back.as_deref().unwrap_or("").contains("Colonial Capital"), "{:?}", p.first_held_back);
+    let capital = g.tables.tiers.iter().position(|t| t.one_per_body).expect("the Capital tier") as u32;
+    g.colony_mut(ph).unwrap().tier = capital;
+    assert!(g.capital_held(Seat(2)));
     assert!(g.progress(Seat(2)).met());
 }
 
@@ -15918,7 +15924,8 @@ fn ticket_350_the_turn_one_line_names_each_factions_own_condition() {
         ),
         // Ticket #506 (version 0.1.0.0): the fifty-turn bars.
         (FactionKind::Prospectors, "Build, spread Influence and put 3,500 Ducats in the Venture Capital Fund with 18 Colonists living off Earth, before +3.0 C."),
-        (FactionKind::Arkwrights, "Build, spread Influence and get 42 Colonists living off Earth, spread over four Bodies, before +3.0 C."),
+        // Ticket #514 (version 0.1.0.0): and a Colonial Capital.
+        (FactionKind::Arkwrights, "Build, spread Influence and get 42 Colonists living off Earth, spread over four Bodies, one holding a Colonial Capital, before +3.0 C."),
         (FactionKind::Archivists, "Build, spread Influence and build the Archive off Earth, pay 225 Research into it, and upload 18 Colonists, before +3.0 C."),
     ] {
         let line = turn_one_line(kind);
@@ -21612,4 +21619,90 @@ fn the_three_cards_of_the_fifty_turn_game_land_as_the_ticket_says() {
     for id in [EventId::CarbonLevy, EventId::DeepCoreSurvey, EventId::TradePact] {
         assert_eq!(t.event.iter().find(|e| e.id == id).map(|e| e.copies), Some(1), "{id:?}");
     }
+}
+
+// ---------------------------------------------------------------- Ticket #514 (version 0.1.0.0): a Colonial Capital held
+
+/// Ticket #514: **the Arkwrights' win waits on a Colonial Capital of theirs**, standing at a Colony
+/// they control off Earth -- a gate on the win like the Tech: both parts accrue and score as before,
+/// `met` is false and the held-back note names it. An Occupied Capital counts for neither side; a
+/// Capital over Earth's ground (Antarctica) counts for nobody; no other Faction's card asks it.
+#[test]
+fn the_arkwrights_win_waits_on_a_colonial_capital_they_hold() {
+    let mut g = game();
+    let ark = Seat(2);
+    assert!(g.tables.faction(FactionKind::Arkwrights).victory_capital);
+    assert!(FactionKind::ALL.iter().filter(|k| **k != FactionKind::Arkwrights).all(|k| !g.tables.faction(*k).victory_capital), "the Arkwrights alone");
+    let capital = g.tables.tiers.iter().position(|t| t.one_per_body).expect("the Capital tier") as u32;
+    // The two parts met: 42 off Earth over four Bodies.
+    let mars = colony(&mut g, ark, BodyId::Mars, &[ModuleKind::Habitat], 30);
+    for body in [BodyId::Moon, BodyId::Phobos, BodyId::Deimos] {
+        colony(&mut g, ark, body, &[ModuleKind::Habitat], 4);
+    }
+    open_gates(&mut g);
+    let p = g.progress(ark);
+    assert!(p.first_value >= p.first_bar && p.second_value >= p.second_bar, "both parts stand: {p:?}");
+    assert!(!p.met(), "no Capital: held back");
+    assert_eq!(p.first_held_back.as_deref(), Some("needs a Colonial Capital of yours, at a Colony you hold off Earth"));
+    assert!((p.score() - 1.0).abs() < 1e-9, "the score is untouched by the hold");
+    // The rival's Moment does not call this "half met, only Colonists off Earth remains at 42 of 42".
+    g.end_phase();
+    assert!(!g.report.moments.iter().any(|m| m.text.contains("met half")), "{:?}", g.report.moments);
+    assert!(g.outcome.is_none(), "the hold stops the win");
+    // A Capital on Antarctica is on Earth: nothing.
+    let ice = colony(&mut g, ark, BodyId::Earth, &[ModuleKind::Habitat], 4);
+    g.colony_mut(ice).unwrap().tier = capital;
+    assert!(!g.capital_held(ark) && !g.progress(ark).met(), "Antarctica's Capital is on Earth");
+    // Mars's Capital, theirs: met.
+    g.colony_mut(mars).unwrap().tier = capital;
+    assert!(g.capital_held(ark));
+    assert!(g.progress(ark).met() && g.progress(ark).first_held_back.is_none());
+    // Occupied by a rival: neither holds it.
+    g.colony_mut(mars).unwrap().control = Control::Occupied { occupier: Seat(1), previous: Some(ark), turns: 1, banked: 0 };
+    assert!(!g.capital_held(ark) && !g.capital_held(Seat(1)));
+    assert!(!g.progress(ark).met(), "lost with the Colony");
+    // The gate Tech's note comes first when both hold the win back.
+    g.research.done.retain(|t| *t != TechId::GenerationShips);
+    assert!(g.progress(ark).first_held_back.as_deref().unwrap_or("").contains("Generation Ships"));
+}
+
+/// Ticket #514: **the computer Arkwrights chase a Capital.** Holding none, their most peopled ground
+/// Colony on a Body without one is the candidate: its upgrade weighs `capital_chase` times another
+/// seat's identical upgrade, and a disembark there the same; with a Capital held, nothing is lifted.
+#[test]
+fn the_arkwright_computer_lifts_the_upgrade_and_the_landing_at_its_capital_candidate() {
+    let mut g = game();
+    calm(&mut g);
+    let (ark, cus) = (Seat(2), Seat(0));
+    let chase = g.tables.ai.thresholds.capital_chase;
+    assert_eq!(chase, 3.0);
+    // Two identical places at the Colony tier, full to its cap, with the Capital's 24 people: one the
+    // Arkwrights', one the Custodians'.
+    let colony_tier = g.tables.tiers.iter().position(|t| t.cap == 18).expect("the Colony tier") as u32;
+    let place = |g: &mut Game, seat: Seat, body: BodyId| {
+        let c = colony(g, seat, body, &[ModuleKind::Habitat; 18], 24);
+        g.colony_mut(c).unwrap().tier = colony_tier;
+        g.seats[seat.index()].stockpile.materials = 500.0;
+        g.seats[seat.index()].stockpile.energy = 500.0;
+        c
+    };
+    let theirs = place(&mut g, ark, BodyId::Mars);
+    let others = place(&mut g, cus, BodyId::Moon);
+    assert_eq!(g.capital_candidate(ark), Some(theirs));
+    assert_eq!(g.capital_candidate(cus), Some(others), "a candidate by the same rule, but no card of theirs asks a Capital, so the computer never reads it");
+    g.log.clear();
+    g.ai_orders(ark);
+    let lifted = scored(&g, "upgrade ");
+    g.log.clear();
+    g.ai_orders(cus);
+    let plain = scored(&g, "upgrade ");
+    assert!(plain > 0.0 && (lifted - plain * chase).abs() < 1e-6, "the candidate's upgrade at {chase}x: {lifted} against {plain}");
+    // With a Capital of theirs standing, the candidate is nobody and the lift is gone.
+    let capital = g.tables.tiers.iter().position(|t| t.one_per_body).unwrap() as u32;
+    let moon = colony(&mut g, ark, BodyId::Moon, &[ModuleKind::Habitat], 4);
+    g.colony_mut(moon).unwrap().tier = capital;
+    assert_eq!(g.capital_candidate(ark), None);
+    g.log.clear();
+    g.ai_orders(ark);
+    assert!((scored(&g, "upgrade ") - plain).abs() < 1e-6, "held: the plain weight");
 }

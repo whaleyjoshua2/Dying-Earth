@@ -184,11 +184,15 @@ found_colony_unrest_ease = 1.0
 found_station_unrest_ease = 0.5
 # Ticket #203 (version 0.08.1). The building is ticket #183's.
 unique = "Spaceport -- replaces the Launch Site, and pays +1 Influence into next turn's Allotment for every Pioneer it lifts off Earth. Off Earth, the Chorus -- replaces the Relay, and adds +1 Influence to the Allotment for every 6 Colonists at its Colony."
-victory = "Diaspora: 42 Colonists living off Earth, on Colonies spread over at least four Bodies with at least 4 Colonists each (Antarctica and stations over Earth do not count)."
-victory_short = "get {first} Colonists living off Earth, spread over {bodies} Bodies,"
+victory = "Diaspora: 42 Colonists living off Earth, on Colonies spread over at least four Bodies with at least 4 Colonists each, one of them holding a Colonial Capital of yours (Antarctica and stations over Earth do not count)."
+victory_short = "get {first} Colonists living off Earth, spread over {bodies} Bodies, one holding a Colonial Capital,"
 # Ticket #506 (version 0.1.0.0): 42 (30 x 50/36) and four Bodies, with the game at fifty turns.
 victory_first = { kind = "colonists_off_earth", bar = 42 }
 victory_second = { kind = "colonies_on_bodies", bodies = 4, colonists_each = 4 }
+# Ticket #514 (version 0.1.0.0): and a Colonial Capital of theirs must stand, at a Colony they direct
+# off Earth, before they win -- a gate on the win like the gate Tech, at the designer's word ("add a
+# requirement to control at least one colonial capital"). Both parts accrue and score as before.
+victory_capital = true
 # Ticket #471 (version 0.09.7): the Opening Objective -- no deadline, met once, rewarded once.
 opening = { kind = "moon_colony", text = "Found a Colony on the Moon, on the ground or in orbit", reward_text = "a free Launch Site in a Region of yours that has none" }
 # Ticket #504 (version 0.1.0.0): the Second Objective, open once the Opening Objective is met.

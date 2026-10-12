@@ -12420,8 +12420,9 @@ fn chronicle_sentence(game: &Game, seat: Seat) -> String {
     let met_line = format!("{} {:.0} of {:.0}, and {}", p.first_name, p.first_value, p.first_bar, p.second_text);
     let (part, value, bar) = p.short_part();
     let short = format!("{part} at {value:.0} of {bar:.0}");
-    // The two sentences the engine writes here take different shapes -- `needs X, not yet
-    // researched` and `the Archive is complete but not running` -- so the joiner is one that fits
+    // The sentences the engine writes here take different shapes -- `needs X, not yet
+    // researched`, `the Archive is complete but not running` and, since ticket #514, `needs a
+    // Colonial Capital of yours, ...` -- so the joiner is one that fits
     // both and puts neither in the wrong grammatical person.
     let held = match &p.first_held_back {
         Some(why) => format!(", held back: {why}"),

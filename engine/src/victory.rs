@@ -118,7 +118,10 @@ impl Game {
                     m.seat = Some(seat);
                 }
             }
-            let one_met = p.first_met() != p.second_met();
+            // Ticket #514 (version 0.1.0.0): not when both bars are reached and only the hold (a
+            // Capital, the gate Tech) stands in the way -- "only X remains, at 42 of 42" said nothing.
+            let both_at_bar = p.first_value >= p.first_bar && p.second_value >= p.second_bar;
+            let one_met = p.first_met() != p.second_met() && !both_at_bar;
             if !self.seat(seat).rival_steps_announced[1] && one_met {
                 self.seat_mut(seat).rival_steps_announced[1] = true;
                 let met = if p.first_met() { p.first_name.clone() } else { p.second_name.clone() };
@@ -199,6 +202,11 @@ impl Game {
             && !self.has_tech(gate)
         {
             first_held_back = Some(format!("needs {}, not yet researched", self.tables.tech(gate).name));
+        }
+        // Ticket #514 (version 0.1.0.0): and, on a card that asks it, a Colonial Capital of the seat's
+        // must stand -- a gate on the win like the Tech, the parts accruing regardless.
+        if first_held_back.is_none() && self.tables.faction(self.kind(seat)).victory_capital && !self.capital_held(seat) {
+            first_held_back = Some("needs a Colonial Capital of yours, at a Colony you hold off Earth".to_string());
         }
         // Ticket #373 (version 0.09.2): the Colonists aboard the seat's Ships, for the parts that
         // count Colonists off Earth and no other -- a Ship in flight has no one Body to count
