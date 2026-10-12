@@ -7876,7 +7876,7 @@ fn policies_block(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, act
             cost_button(ui, game, &session.pending, Order::ExodusCall { state: sid }, "Exodus Call", actions);
             ui.label(
                 RichText::new(format!(
-                    "{} turns recruiting {} Pioneers here instead of {}, and each costs this Region the ordinary population rather than your double. Once per Region, ever.",
+                    "{} turns recruiting {} Pioneers here instead of {}, and each costs this Region the ordinary population rather than your half again. Once per Region, ever.",
                     t.turns,
                     game.emigrants_per_turn(Seat(0)) * t.muster_multiplier,
                     game.emigrants_per_turn(Seat(0))

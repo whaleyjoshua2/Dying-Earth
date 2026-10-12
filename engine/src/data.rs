@@ -789,7 +789,7 @@ pub struct FactionCard {
     /// Ticket #72 (version 0.05.5): a Facility's Materials, times this (the Prospectors' 0.85).
     #[serde(default = "one_f64")]
     pub facility_materials_multiplier: f64,
-    /// Ticket #73 (version 0.05.5): Emigrants mustered a turn, times this (Coach Class's 2.0).
+    /// Ticket #73 (version 0.05.5): Emigrants mustered a turn, times this (Coach Class's 1.5 since ticket #513, 2.0 before).
     #[serde(default = "one_f64")]
     pub emigrants_multiplier: f64,
 }

@@ -392,3 +392,25 @@ against §8's closing sweep:
 - The Archive stands complete in 53 of 80 games, from 51; the Archivists' gate completes in 72 of
   80 at a median turn 25, from 74. The dearer Archive does not stop the computer Archivists building
   it or keeping it lit.
+
+## 10. Coach Class, half again
+
+The authority is [ticket #513](https://github.com/whaleyjoshua2/Dying-Earth/issues/513). The
+designer, on the Arkwrights winning 32 of 80: *"change their ships such that they get 1.5x the
+capacity of everyone else"*, and the rule's other halves follow (*"A"*).
+
+- **Colony Ships carry x1.5** (`colony_ship_capacity_multiplier = 1.5`, from 2.0): 6, 9 and 12 as
+  Expanded Habitats and Generation Ships come, from 8, 12 and 16, rounded down.
+- **Each Pioneer costs the Region x1.5 population** (`lift_population_multiplier`, from 2.0).
+- **They recruit x1.5 a turn**, rounded down: 3 a Region, from 4 (`emigrants_multiplier`, from 2.0).
+- The Colony Ship's price (x0.85) and the four Pioneers waiting on turn one are untouched.
+
+**Measured** over the 80 games
+([`sweeps/ticket-513.txt`](../dev-diary/2026-10-07-version-0.1.0.0/sweeps/ticket-513.txt)),
+against §9's:
+- Wins **3 / 11 / 30 / 7** with **29 collapses**, from 6 / 10 / 32 / 6 and 26: within noise on
+  every count. Half again instead of twice does not reach the Arkwrights' 30-odd wins in computer
+  hands: their gate still lands at a median turn 27 in 75 of 80 games, and the win column is theirs
+  by the same margin.
+- Not traced here. The Arkwrights' edge, measured over the version, survives the climate dial, the
+  Archive's price and now their load; what it rests on is a question for the balance work.

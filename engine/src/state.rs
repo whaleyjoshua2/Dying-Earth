@@ -2315,7 +2315,7 @@ impl Game {
 
     // ---------------------------------------------------------------- Ticket #51: Coach Class and the rest
 
-    /// Ticket #73: how many Emigrants this seat may muster in a turn (Coach Class doubles it).
+    /// Ticket #73: how many Emigrants this seat may muster in a turn (Coach Class raises it by half since ticket #513; doubled it before).
     /// Ticket #427 (version 0.09.5): in EACH state it directs.
     pub fn emigrants_per_turn(&self, seat: Seat) -> u32 {
         (self.tables.emigrants.per_turn as f64 * self.tables.faction(self.kind(seat)).emigrants_multiplier).floor() as u32
@@ -2351,7 +2351,7 @@ impl Game {
     }
 
     /// What one Colony Ship of this seat carries: the card figure, +2 with Expanded Habitats
-    /// (version 0.04 section 4), times the Faction's own multiplier (Coach Class doubles it).
+    /// (version 0.04 section 4), times the Faction's own multiplier (Coach Class's 1.5 since ticket #513, 2.0 before).
     pub fn colony_ship_capacity(&self, seat: Seat) -> u32 {
         // Ticket #84: Generation Ships stacks on Expanded Habitats.
         let base = self.tables.unit(UnitKind::ColonyShip).carries_colonists as i64 + self.tech_addition(seat, TechId::ExpandedHabitats) + self.tech_addition(seat, TechId::GenerationShips);
@@ -2623,7 +2623,7 @@ impl Game {
         }
     }
 
-    /// The population a lift from a Launch Site takes for this many Colonists (Coach Class doubles it).
+    /// The population a lift from a Launch Site takes for this many Colonists (Coach Class's 1.5 since ticket #513, 2.0 before).
     pub fn lift_population(&self, seat: Seat, colonists: u32) -> f64 {
         // Ticket #73: paid when the Emigrants muster, not when a Ship lifts them.
         self.tables.emigrants.population_each * colonists as f64 * self.tables.faction(self.kind(seat)).lift_population_multiplier

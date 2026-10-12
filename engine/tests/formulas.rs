@@ -2090,10 +2090,11 @@ fn coach_class_doubles_an_arkwright_colony_ships_load_and_cuts_its_price() {
     // Capacity: the card figure for everyone else, twice it for the Arkwrights, and Expanded
     // Habitats adds its two before the doubling.
     assert_eq!(g.colony_ship_capacity(Seat(0)), 4);
-    assert_eq!(g.colony_ship_capacity(Seat(2)), 8, "Coach Class carries twice");
+    // Ticket #513 (version 0.1.0.0): half again, where it was twice (8).
+    assert_eq!(g.colony_ship_capacity(Seat(2)), 6, "Coach Class carries half again");
     g.research.done.push(TechId::ExpandedHabitats);
     assert_eq!(g.colony_ship_capacity(Seat(0)), 6);
-    assert_eq!(g.colony_ship_capacity(Seat(2)), 12, "(4 + 2) doubled");
+    assert_eq!(g.colony_ship_capacity(Seat(2)), 9, "(4 + 2) x 1.5, 12 until ticket #513");
     // Price: 30 Materials on the units.toml row; ticket #83 (version 0.06.0): the Arkwrights' 20
     // is retired and every Ship costs them 15% less, so 25.
     let build = Order::BuildShip { site: Place::State(StateId::EastAsia), kind: UnitKind::ColonyShip };
@@ -2107,9 +2108,10 @@ fn coach_class_doubles_an_arkwright_colony_ships_load_and_cuts_its_price() {
     g.state_mut(sid).emigrants = 13;
     let ship = a_colony_ship(&mut g, Seat(2), BodyId::Earth);
     let load = |n: u32| Order::Load { ship, colonists: n, from: LoadSource::State(sid), army: None };
-    assert!(g.check_order(Seat(2), &[], &load(12)).is_ok());
-    let err = g.check_order(Seat(2), &[], &load(13)).unwrap_err();
-    assert_eq!(err.0, "this Ship carries at most 12 Colonists");
+    // Ticket #513 (version 0.1.0.0): nine with Expanded Habitats, where it was twelve.
+    assert!(g.check_order(Seat(2), &[], &load(9)).is_ok());
+    let err = g.check_order(Seat(2), &[], &load(10)).unwrap_err();
+    assert_eq!(err.0, "this Ship carries at most 9 Colonists");
 }
 
 #[test]
@@ -2119,12 +2121,12 @@ fn an_arkwright_muster_takes_twice_the_population_out_of_its_state() {
     g.state_mut(StateId::NorthAfrica).facilities.retain(|f| f.kind != FacilityKind::LaunchSite);
     g.state_mut(StateId::NorthAfrica).facilities.push(facility(FacilityKind::LaunchSite));
     assert!((g.lift_population(Seat(0), 4) - 4.0).abs() < 1e-9, "one unit each: one million people since ticket #333 (version 0.09.0), five million from ticket #143 (version 0.07.3)");
-    assert!((g.lift_population(Seat(2), 4) - 8.0).abs() < 1e-9, "Coach Class costs the state twice");
+    assert!((g.lift_population(Seat(2), 4) - 6.0).abs() < 1e-9, "Coach Class costs the state half again (twice until ticket #513)");
     // Ticket #73: the population is paid when the Emigrants muster, and the lift takes none.
     let before = g.state(StateId::NorthAfrica).population;
     g.commit_orders(Seat(2), &[Order::BuildEmigrants { state: StateId::NorthAfrica, n: 4 }]);
     let taken = before - g.state(StateId::NorthAfrica).population;
-    assert!((taken - 8.0).abs() < 1e-9, "the recruit took {taken}, not 8.0 (two units of one million per Pioneer under Coach Class)");
+    assert!((taken - 6.0).abs() < 1e-9, "the recruit took {taken}, not 6.0 (one and a half units of one million per Pioneer under Coach Class since ticket #513)");
     let after_muster = g.state(StateId::NorthAfrica).population;
     let ship = a_colony_ship(&mut g, Seat(2), BodyId::Earth);
     g.commit_orders(Seat(2), &[Order::Load { ship, colonists: 4, from: LoadSource::State(StateId::NorthAfrica), army: None }]);
@@ -6359,8 +6361,9 @@ fn emigrants_muster_four_a_turn_per_faction_in_one_state_at_one_unit_of_populati
     assert!(g.log.to_vec().iter().any(|l| l.contains("Pioneers recruited in China")), "{:?}", g.log.to_vec());
     // Coach Class: four a state a turn (eight a turn before ticket #427) at twice the population.
     assert_eq!(g.emigrants_per_turn(Seat(0)), 2);
-    assert_eq!(g.emigrants_per_turn(Seat(2)), 4, "the Arkwrights recruit four a state");
-    assert!((g.lift_population(Seat(2), 4) - 8.0).abs() < 1e-9, "at twice the population");
+    // Ticket #513 (version 0.1.0.0): three a state at half again the population, from four at twice.
+    assert_eq!(g.emigrants_per_turn(Seat(2)), 3, "the Arkwrights recruit three a state");
+    assert!((g.lift_population(Seat(2), 4) - 6.0).abs() < 1e-9, "at half again the population");
 }
 
 /// Ticket #73 (b): a Launch Site lifts only the Emigrants waiting in its state; the population was
@@ -6967,7 +6970,7 @@ fn the_gates_general_bonuses_are_for_everyone() {
     assert_eq!(g.colony_ship_capacity(cus), 4);
     with_tech(&mut g, TechId::GenerationShips);
     assert_eq!(g.colony_ship_capacity(cus), 6);
-    assert_eq!(g.colony_ship_capacity(Seat(2)), 12, "(4 + 2) x 2 for the Arkwrights");
+    assert_eq!(g.colony_ship_capacity(Seat(2)), 9, "(4 + 2) x 1.5 for the Arkwrights (ticket #513; x 2 = 12 before)");
     let sink = g.emissions_now().sink;
     with_tech(&mut g, TechId::PlanetaryStewardship);
     assert!((g.emissions_now().sink - sink - 1.5).abs() < 1e-9, "the Sink grows by 1.5: {} then {}", sink, g.emissions_now().sink);
@@ -7045,7 +7048,7 @@ fn a_warming_earth_lets_a_colony_ship_lift_beyond_its_capacity() {
     }
     g.climate.temperature = 2.6;
     assert_eq!(g.colony_ship_crowded_capacity(Seat(0)), 8, "4 + 4");
-    assert_eq!(g.colony_ship_crowded_capacity(Seat(2)), 12, "the Arkwrights' 8 + 4, not + 8");
+    assert_eq!(g.colony_ship_crowded_capacity(Seat(2)), 10, "the Arkwrights' 6 + 4, not + 6 (8 + 4 until ticket #513)");
     g.state_mut(StateId::EastAsia).emigrants = 12;
     let (ship, _) = colony_ship_ready(&mut g, BodyId::Earth);
     g.ship_mut(ship).unwrap().colonists = 0;
@@ -11751,14 +11754,14 @@ fn an_exodus_call_doubles_the_muster_and_suspends_the_double_cost() {
     let sid = g.controlled_states(ark)[0];
     let plain = g.emigrants_per_turn(ark);
     // Ticket #427 (version 0.09.5): four a state, where it was eight in one state.
-    assert_eq!(plain, 4, "Coach Class musters four a state where others muster two");
+    assert_eq!(plain, 3, "Coach Class musters three a state where others muster two (four until ticket #513)");
     assert!((g.muster_population_in(ark, sid, plain) - g.lift_population(ark, plain)).abs() < 1e-9, "and pays double for them until the Call");
 
     g.seats[ark.index()].stockpile.ducats = 500.0;
     held_long_enough(&mut g, sid);
     g.commit_orders(ark, &[Order::ExodusCall { state: sid }]);
     assert!(g.exodus_call_running(sid), "it runs from the turn it is sounded");
-    assert_eq!(g.emigrants_per_turn_in(ark, sid), plain * 2, "eight, not four");
+    assert_eq!(g.emigrants_per_turn_in(ark, sid), plain * 2, "six, not three (eight, not four, until ticket #513)");
 
     // The whole point: eight people cost what eight people cost anybody else.
     let each = g.tables.emigrants.population_each;
@@ -18600,7 +18603,7 @@ fn pioneers_are_recruited_two_a_state_a_turn_in_every_state_a_faction_directs() 
     g.commit_orders(s, &[china, africa]);
     assert_eq!((g.state(StateId::EastAsia).emigrants, g.state(StateId::NorthAfrica).emigrants), (2, 2), "four Pioneers from two states");
     let ark = Seat::ALL.into_iter().find(|x| g.kind(*x) == FactionKind::Arkwrights).unwrap();
-    assert_eq!((g.emigrants_per_turn(s), g.emigrants_per_turn(ark)), (2, 4), "Coach Class keeps its double: four a state");
+    assert_eq!((g.emigrants_per_turn(s), g.emigrants_per_turn(ark)), (2, 3), "Coach Class keeps its half again: three a state (four until ticket #513)");
 }
 
 /// Ticket #427: **a computer seat recruits from as many states as its plan needs, and no further**
@@ -18640,13 +18643,13 @@ fn an_exodus_call_raises_what_the_recruit_offers_in_its_state() {
     let ark = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Arkwrights).unwrap();
     let sid = g.controlled_states(ark)[0];
     g.state_mut(sid).population = 100.0;
-    assert_eq!(g.emigrants_affordable(ark, sid), 4, "four a state, plainly");
+    assert_eq!(g.emigrants_affordable(ark, sid), 3, "three a state, plainly (four until ticket #513)");
     g.seats[ark.index()].stockpile.ducats = 500.0;
     held_long_enough(&mut g, sid);
     g.commit_orders(ark, &[Order::ExodusCall { state: sid }]);
-    assert_eq!(g.emigrants_affordable(ark, sid), 8, "eight under the Call");
+    assert_eq!(g.emigrants_affordable(ark, sid), 6, "six under the Call (eight until ticket #513)");
     g.state_mut(sid).population = 5.0;
-    assert_eq!(g.emigrants_affordable(ark, sid), 5, "five people pay for five at the ordinary price, where the double charge bought two");
+    assert_eq!(g.emigrants_affordable(ark, sid), 5, "five people pay for five at the ordinary price, where the half-again charge buys three (the double, two, until ticket #513)");
 }
 
 // ---------------------------------------------------------------- Ticket #430 (version 0.09.5): fog of war
