@@ -370,3 +370,25 @@ version's closing board:
   80 at a median turn 28. 18 of 80 games are still running at turn 39.
 - The grid's 440 cell read 6 / 8 / 37 / 7 before the Deep Core Survey was made askable (see
   the Notes); the closing sweep is the one that counts.
+
+## 9. The Archive's Energy upkeep
+
+The authority is [ticket #511](https://github.com/whaleyjoshua2/Dying-Earth/issues/511). The
+designer: *"raise the energy requirement for the archive to 20"*, and on the Tech that halved it,
+*"change closed loop colonies from a 50% discount to a 25% discount"*.
+
+- **The Archive draws 20 Energy a turn** once complete (`modules.toml energy_upkeep = 20`, from
+  12), still nothing until its Research is paid in full.
+- **Closed-Loop Colonies** cuts every Module's Energy upkeep to **x0.75**, from x0.5
+  (`techs.toml value = 0.75`), so a complete Archive draws 15 with it, where it drew 6; every
+  other Module's upkeep rises with it (a Mine's 3 reads 2.3, not 1.5).
+- Nothing else moves. The computer reads its Energy deficit and buys or builds as before.
+
+**Measured** over the 80 games
+([`sweeps/ticket-511.txt`](../dev-diary/2026-10-07-version-0.1.0.0/sweeps/ticket-511.txt)),
+against §8's closing sweep:
+- Wins **6 / 10 / 32 / 6** with **26 collapses**, from 6 / 8 / 35 / 9 and 22: within noise on
+  every count.
+- The Archive stands complete in 53 of 80 games, from 51; the Archivists' gate completes in 72 of
+  80 at a median turn 25, from 74. The dearer Archive does not stop the computer Archivists building
+  it or keeping it lit.

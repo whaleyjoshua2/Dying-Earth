@@ -111,7 +111,9 @@ id = "archive"
 name = "The Archive"
 materials = 50
 widgets = 12
-energy_upkeep = 12
+# Ticket #511 (version 0.1.0.0): 20, from 12, at the designer's word; Closed-Loop Colonies takes a
+# quarter off it (15), where it took half.
+energy_upkeep = 20
 
 # Ticket #68: the Research the Archive requires in all, paid into the Archive fund at any pace,
 # and the cap on the fund: nobody may bank more Research than the Archive needs. At that cap a turn

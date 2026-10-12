@@ -1393,17 +1393,20 @@ fn tech_expanded_habitats_holds_four_more() {
 }
 
 #[test]
-fn tech_closed_loop_colonies_halves_module_upkeep() {
+fn tech_closed_loop_colonies_cuts_module_upkeep_by_a_quarter() {
     let mut g = game();
     colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Mine], 0); // upkeep 3
     g.state_mut(StateId::EastAsia).facilities.clear();
     let plain = income_of(&mut g, Seat(0)).energy;
     with_tech(&mut g, TechId::ClosedLoopColonies);
-    let halved = income_of(&mut g, Seat(0)).energy;
+    let cut = income_of(&mut g, Seat(0)).energy;
     // Ticket #164 (version 0.07.5): the Mine's 3 and two Core Modules, the Colony's and the
     // station's, at 1 each.
     assert_eq!(plain, -5.0);
-    assert_eq!(halved, -2.5, "the Mine's 3 halved to 1.5, and each Core Module's 1 halved to 0.5"); // Ticket #387: to the tenth, where each was floored
+    // Ticket #511 (version 0.1.0.0): x0.75, where it was x0.5 (-2.5): the Mine's 3 to 2.3 and each
+    // Core Module's 1 to 0.8, each to the tenth (ticket #387).
+    assert_eq!(g.tables.tech(TechId::ClosedLoopColonies).value, 0.75);
+    assert_eq!(cut, -3.9, "the Mine's 3 cut to 2.3, and each Core Module's 1 to 0.8");
 }
 
 #[test]
@@ -2346,7 +2349,7 @@ fn an_archivists_first_victory_part_reads_the_whole_fund_with_no_archive_standin
 fn ticket_347_moves_the_archives_money_and_none_of_its_other_gates() {
     let mut g = game();
     let card = g.tables.module(ModuleKind::Archive);
-    assert_eq!((card.materials, card.widgets, card.energy_upkeep), (50, 12, 12), "50 Materials, 12 Widgets, 12 Energy");
+    assert_eq!((card.materials, card.widgets, card.energy_upkeep), (50, 12, 20), "50 Materials, 12 Widgets, 20 Energy since ticket #511 (12 before)");
     assert_eq!(g.tables.archive.colonists_to_order, 4, "four Colonists must live there at the order");
     assert_eq!(g.tables.victory_gate(FactionKind::Archivists), Some(TechId::TheUpload), "The Upload is still the gate");
     // And the refusals the order still makes: the Colonists and Earth. Ticket #361 (version 0.09.1)
@@ -2436,7 +2439,7 @@ fn the_archive_is_one_module_of_fifty_materials_and_three_turns_built_once_off_e
     assert_eq!(banked, 4, "only the four still owed are banked");
     assert_eq!(g.seats[3].archive_fund, research);
     assert!(g.archive_complete(Seat(3)));
-    assert_eq!(g.module_yield(Seat(3), mars, ModuleKind::Archive).upkeep, 12.0);
+    assert_eq!(g.module_yield(Seat(3), mars, ModuleKind::Archive).upkeep, 20.0, "20 since ticket #511");
     assert!(g.log.to_vec().iter().any(|l| l.contains("completed the Archive at")), "{:?}", g.log.to_vec());
 }
 
@@ -2488,7 +2491,7 @@ fn a_complete_archive_goes_offline_when_energy_runs_short_and_wins_nothing_that_
     let research = g.tables.archive.research;
     let cid = archive_at(&mut g, Seat(3), BodyId::Mars, research, 12);
     g.seats[3].stockpile.energy = 0.0;
-    assert_eq!(g.module_yield(Seat(3), cid, ModuleKind::Archive).upkeep, 12.0, "a complete Archive draws 12");
+    assert_eq!(g.module_yield(Seat(3), cid, ModuleKind::Archive).upkeep, 20.0, "a complete Archive draws 20 (ticket #511; 12 before)");
     assert_eq!(g.shortfall_order(Seat(3))[0], "The Archive", "the highest upkeep goes first");
     g.income_phase();
     assert!(!g.colony(cid).unwrap().modules.iter().any(|m| m.kind == ModuleKind::Archive && m.online), "shut down");

@@ -161,8 +161,10 @@ cost = 32
 # Ticket #425 (version 0.09.5): Clean Power dropped, at the designer's word ("Clean power no longer
 # needed for either upload or generation ship"). This was Generation Ships' one link to Stewardship.
 needs = ["expanded_habitats"]
-effect = "Module Energy upkeep x0.5; immune to Grid Failure"
-value = 0.5
+# Ticket #511 (version 0.1.0.0): a quarter off, from a half, at the designer's word ("change closed
+# loop colonies from a 50% discount to a 25% discount"), with the Archive's upkeep raised to 20.
+effect = "Module Energy upkeep x0.75; immune to Grid Failure"
+value = 0.75
 
 [[tech]]
 id = "deep_mining"
