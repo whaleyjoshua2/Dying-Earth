@@ -19696,8 +19696,8 @@ fn the_reports_templates_stay_under_their_word_ceiling() {
     // Ticket #496 (version 0.09.9): and by the 17 of a Trade offered, struck, refused or failed.
     // Ticket #503 (version 0.1.0.0): and by the 9 of an upgrade to a Colonial Capital refunded.
     // Ticket #509 (version 0.1.0.0): and by the 5 of an Accord the other side let lapse, and the 7 of
-    // Terms added to one.
-    assert!(words <= 1828, "the Report's templates hold {words} words; the ceiling is 1,828 (15% off 2,031, 54 for the race to the Moon, 2 for a rival's upgrade, 8 for an Accord answered, less a word of slack, 17 for a Trade, 9 for a Capital refunded, 5 for an Accord let lapse, 7 for Terms added)");
+    // Terms added to one, and the 5 of a rival's renewal.
+    assert!(words <= 1833, "the Report's templates hold {words} words; the ceiling is 1,833 (15% off 2,031, 54 for the race to the Moon, 2 for a rival's upgrade, 8 for an Accord answered, less a word of slack, 17 for a Trade, 9 for a Capital refunded, 5 for an Accord let lapse, 7 for Terms added, 5 for a renewal)");
     // "The" is gone before a Faction's name, which is drawn in its colour instead.
     assert!(!text.contains("he {faction}"), "a template still says \"the {{faction}}\"");
 }
@@ -20859,37 +20859,36 @@ fn an_accord_runs_five_turns_and_lapses_unless_both_renew() {
     assert_eq!(left(&g), Some(5), "renewed: the first turn of its next five");
 }
 
-/// Ticket #509: the player is asked to renew in the Accord's last turn, a prompt the turn waits on.
-/// Renew runs it five more turns; Let it lapse lets it lapse, and is no refusal remembered. A
-/// computer seat that will not renew asks nothing, and the Report says it let the Accord lapse.
+/// Ticket #509 (the designer, after the build): the player is not prompted. In the Accord's last
+/// turn a willing rival leaves it renewable, and the player's own Renew order is the acceptance:
+/// it runs five more turns. Without the order it lapses, and nothing is remembered. A rival that
+/// will not renew makes the order refused, and the Report says it let the Accord lapse.
 #[test]
-fn the_player_is_asked_to_renew_and_a_rival_that_will_not_says_so() {
+fn the_player_renews_with_an_order_and_a_rival_that_will_not_says_so() {
     let mut g = game();
     calm(&mut g);
     g.strike_accord(Seat(0), Seat(1), vec![Term::NonAggression, Term::Passage]).unwrap();
     let struck = g.turn;
+    let renew = Order::RenewAccord { with: Seat(1) };
+    assert!(g.check_order(Seat(0), &[], &renew).unwrap_err().0.contains("last turn"), "not before its last turn");
     for _ in 0..4 {
         accord_turn(&mut g);
     }
-    let asks = g.offers_to(Seat(0));
-    assert_eq!(asks.len(), 1, "asked in its last turn");
-    assert_eq!((asks[0].1.ask, asks[0].1.terms.clone()), (AccordAsk::Renew, vec![Term::NonAggression, Term::Passage]));
-    assert!(g.end_turn_refusal().is_some(), "the turn waits on the answer");
-    g.answer_offer(Seat(0), 0, true).unwrap();
+    assert!(g.offers_to(Seat(0)).is_empty(), "no prompt: it looked like a new offer");
+    assert!(!g.end_turn_refusal().unwrap_or_default().contains("Accord"), "and the turn waits on no Accord");
+    assert!(g.check_order(Seat(0), &[], &renew).is_ok(), "{:?}", g.check_order(Seat(0), &[], &renew));
+    g.commit_orders(Seat(0), std::slice::from_ref(&renew));
     assert_eq!(g.accords[0].since, struck + 5);
     accord_turn(&mut g);
     assert!(g.accords.iter().any(|x| x.holds(Seat(0), Seat(1))), "renewed past its fifth turn");
-    // Let it lapse: nothing remembered against anybody, and it goes at its end.
+    // No order: it lapses at its end, and nothing is remembered against anybody.
     for _ in 0..4 {
         accord_turn(&mut g);
     }
-    let (i, o) = g.offers_to(Seat(0))[0];
-    assert_eq!(o.ask, AccordAsk::Renew);
-    g.answer_offer(Seat(0), i, false).unwrap();
-    assert!(!g.refused_recently(Seat(1), Seat(0)), "letting it lapse is no refusal");
     g.settle_accords();
     assert!(g.accords.is_empty(), "lapsed");
-    // A rival that has soured asks nothing and says it let the Accord lapse.
+    assert!(!g.refused_recently(Seat(1), Seat(0)));
+    // A rival that has soured: the order is refused, and the Report says so.
     g.strike_accord(Seat(0), Seat(2), vec![Term::NonAggression]).unwrap();
     g.relations.score[2][0] = -5;
     for _ in 0..3 {
@@ -20897,7 +20896,7 @@ fn the_player_is_asked_to_renew_and_a_rival_that_will_not_says_so() {
     }
     g.report.lines.clear();
     accord_turn(&mut g);
-    assert!(g.offers_to(Seat(0)).is_empty(), "no prompt");
+    assert!(g.check_order(Seat(0), &[], &Order::RenewAccord { with: Seat(2) }).unwrap_err().0.contains("will not renew"));
     assert!(g.report.lines.iter().any(|l| l.kind == LineKind::YourWorks && l.text.contains("let your Accord lapse")), "{:?}", g.report.lines);
 }
 
@@ -20981,7 +20980,7 @@ fn a_kept_accord_pays_at_the_end_of_its_fifth_turn() {
     assert_eq!(held(&g), 2, "and again at the end of the tenth");
 }
 
-/// Ticket #509 (the review): Terms added and a renewal answered in the same last turn, in either
+/// Ticket #509 (the review): Terms added and a renewal given in the same last turn, in either
 /// order: the Accord keeps every Term, and neither shortens what the other gave.
 #[test]
 fn an_addition_and_a_renewal_in_one_turn_keep_every_term_and_the_longer_run() {
@@ -20994,16 +20993,18 @@ fn an_addition_and_a_renewal_in_one_turn_keep_every_term_and_the_longer_run() {
         g.offers.push(Offer { from: Seat(1), to: Seat(0), terms: vec![Term::Passage], trade: None, turn: g.turn, ask: AccordAsk::Add });
         g.turn += 1;
         g.ask_renewals();
-        let find = |g: &Game, ask: AccordAsk| g.offers_to(Seat(0)).iter().find(|(_, o)| o.ask == ask).map(|(i, _)| *i).unwrap();
-        for ask in if add_first { [AccordAsk::Add, AccordAsk::Renew] } else { [AccordAsk::Renew, AccordAsk::Add] } {
-            let i = find(&g, ask);
-            g.answer_offer(Seat(0), i, true).unwrap();
+        let renew = Order::RenewAccord { with: Seat(1) };
+        if add_first {
+            g.answer_offer(Seat(0), 0, true).unwrap();
+            assert!(g.check_order(Seat(0), &[], &renew).is_err(), "restarted by the addition, it is no longer in its last turn");
+        } else {
+            g.commit_orders(Seat(0), std::slice::from_ref(&renew));
+            g.answer_offer(Seat(0), 0, true).unwrap();
         }
         let acc = &g.accords[0];
         assert_eq!(acc.terms, vec![Term::NonAggression, Term::Passage], "add first: {add_first}");
-        let left = g.accord_turns_left(acc);
         if add_first {
-            assert_eq!(left, 5, "restarted by the addition; the renewal adds nothing to it");
+            assert_eq!(g.accord_turns_left(acc), 5, "five turns from the addition");
         } else {
             assert_eq!(acc.since, struck + 5, "renewed from the end of its run, and the addition does not cut it");
         }

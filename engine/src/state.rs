@@ -5381,18 +5381,15 @@ impl Game {
         acc.terms.iter().copied().filter(|t| *t != Term::ResearchAgreement || friendly).collect()
     }
 
-    /// Ticket #509 (version 0.1.0.0): the head of an Accord's last turn, when both sides are asked to
-    /// renew it. A computer seat renews where it would accept the same Terms afresh; one that will
-    /// not lets it lapse, and a human seat with it reads so in the Report. Two computer seats both
-    /// willing renew it at once; a human seat is asked in a prompt the turn waits on.
+    /// Ticket #509 (version 0.1.0.0): the head of an Accord's last turn. A computer seat renews where
+    /// it would accept the same Terms afresh; one that will not lets it lapse, and a human seat with
+    /// it reads so in the Report. Two computer seats both willing renew it at once. A human seat is
+    /// not prompted -- the designer, after the build: the prompt read as a new offer -- the Accord
+    /// stands renewable through its last turn, and the player's own Renew order is the acceptance.
     pub fn ask_renewals(&mut self) {
-        let (turn, run) = (self.turn, self.tables.relations.accord_turns);
         let last: Vec<(Seat, Seat)> = self.accords.iter().filter(|acc| !acc.ending && self.accord_turns_left(acc) == 1).map(|acc| (acc.a, acc.b)).collect();
         for (a, b) in last {
-            let Some(acc) = self.accords.iter().find(|acc| acc.holds(a, b)) else { continue };
-            let terms = self.renewal_terms(acc);
-            let willing = |g: &Game, me: Seat, other: Seat| !g.seat(me).ai || (!terms.is_empty() && g.accord_acceptable(me, other, &terms));
-            let (yes_a, yes_b) = (willing(self, a, b), willing(self, b, a));
+            let (yes_a, yes_b) = (self.renewal_willing(a, b), self.renewal_willing(b, a));
             if !(yes_a && yes_b) {
                 self.log(format!("{} let the Accord with {} lapse.", self.seat_name(if yes_a { b } else { a }), self.seat_name(if yes_a { a } else { b })));
                 for (me, other, theirs) in [(a, b, yes_b), (b, a, yes_a)] {
@@ -5401,22 +5398,33 @@ impl Game {
                         self.report_line_of(me, LineKind::YourWorks, LineKind::Note, None, text);
                     }
                 }
-                continue;
-            }
-            match [a, b].into_iter().find(|s| !self.seat(*s).ai) {
-                Some(human) => {
-                    let from = if human == a { b } else { a };
-                    self.offers.push(Offer { from, to: human, terms, trade: None, turn, ask: AccordAsk::Renew });
-                }
-                None => {
-                    if let Some(acc) = self.accords.iter_mut().find(|acc| acc.holds(a, b)) {
-                        acc.terms = terms;
-                        acc.since = acc.since.max(acc.struck) + run;
-                    }
-                    self.log(format!("{} and {} renewed their Accord.", self.seat_name(a), self.seat_name(b)));
-                }
+            } else if self.seat(a).ai && self.seat(b).ai {
+                self.renew_accord(a, b);
             }
         }
+    }
+
+    /// Ticket #509 (version 0.1.0.0): whether `seat` would renew its Accord with `other` -- a human
+    /// seat by its own order, a computer seat where it would accept the same Terms afresh.
+    pub fn renewal_willing(&self, seat: Seat, other: Seat) -> bool {
+        if !self.seat(seat).ai {
+            return true;
+        }
+        let Some(acc) = self.accords.iter().find(|acc| acc.holds(seat, other)) else { return false };
+        let terms = self.renewal_terms(acc);
+        !terms.is_empty() && self.accord_acceptable(seat, other, &terms)
+    }
+
+    /// Ticket #509: an Accord in its last turn runs five more from the end of this run, with the
+    /// Terms a renewal carries.
+    pub fn renew_accord(&mut self, a: Seat, b: Seat) {
+        let run = self.tables.relations.accord_turns;
+        let Some(terms) = self.accords.iter().find(|acc| acc.holds(a, b)).filter(|acc| self.accord_turns_left(acc) == 1).map(|acc| self.renewal_terms(acc)) else { return };
+        if let Some(acc) = self.accords.iter_mut().find(|acc| acc.holds(a, b)) {
+            acc.terms = terms;
+            acc.since = acc.since.max(acc.struck) + run;
+        }
+        self.log(format!("{} and {} renewed their Accord.", self.seat_name(a), self.seat_name(b)));
     }
 
     /// Ticket #495 (version 0.09.9): the offers waiting on `seat`'s answer, with their index.

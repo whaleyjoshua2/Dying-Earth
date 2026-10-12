@@ -176,16 +176,16 @@ designer's *"offered at five turn intervals"* means an Accord **runs five turns 
 
 - **Five turns**, the turn struck counted (`[relations] accord_turns = 5`). It lapses at the end of
   its fifth unless renewed.
-- **Renewal.** At the head of its last turn both sides are asked. A computer seat renews where it
-  would accept the same Terms as a fresh offer. If both say yes, it runs five more turns from the end
-  of this run. Otherwise it lapses quietly, with no offence and no refusal remembered. The player is
-  asked in the offers prompt, which the turn waits on:
-  *"Your Accord with the Prospectors (non-aggression, passage) lapses next turn. Renew it for five
-  turns?"* **Renew** · **Let it lapse**. A computer seat that will not renew asks nothing, and the
-  Report says *"Prospectors let your Accord lapse."*
+- **Renewal.** In its last turn, a computer seat renews where it would accept the same Terms as a
+  fresh offer. Two computer seats both willing renew it at once, for five more turns from the end of
+  this run. The player is **not prompted**: the designer, after the build, found the prompt read as
+  a new offer. Instead, the held Accord carries **Renew for five turns** in its last turn. The
+  player's order is the acceptance; without it the Accord lapses quietly, with no offence and no
+  refusal remembered. A rival that will not renew greys the button (*"they will not renew it"*), and
+  the Report says *"Prospectors let your Accord lapse."*
 - **A research agreement** renews only while both are Friendly; below that, the rest renews
-  without it, and the prompt says *"The research agreement drops: you are no longer both
-  Friendly."*
+  without it, and the Renew button's hover says *"The research agreement drops: you are no longer
+  both Friendly."*
 - **Offers** carry a research agreement between Friends, from the computer too.
 - **Widening.** An Accord that stands may be offered the Terms it lacks: by the computer, or by
   the player with the checkboxes under the held Accord and **Offer to add**. Once accepted, they join

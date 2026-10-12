@@ -861,6 +861,14 @@ fn build_board(session: &mut Session) {
             let turn = g.turn;
             g.accords.push(Accord { a: Seat(0), b: Seat(1), terms: vec![Term::NonAggression], struck: turn, paid: turn, ending: false, since: turn });
         }
+        // `accord:last` (a building aid, ticket #509, version 0.1.0.0): seat 0 holds non-aggression with
+        // seat 1 in its last turn, so the card's Renew button can be photographed; with `turns:4`, as
+        // an Accord's last turn is its fifth.
+        if std::env::args().any(|a| a == "accord:last") {
+            let at = g.turn.saturating_sub(4);
+            g.accords.retain(|x| !x.holds(Seat(0), Seat(1)));
+            g.accords.push(Accord { a: Seat(0), b: Seat(1), terms: vec![Term::NonAggression], struck: at, paid: at, ending: false, since: at });
+        }
         // `accords:0` (a building aid, ticket #430, version 0.09.5): every Accord struck, so a picture
         // after driven turns shows the fog as a seat with no Accord sees it.
         if std::env::args().any(|a| a == "accords:0") {
@@ -1586,17 +1594,14 @@ fn build_board(session: &mut Session) {
         g.offers.push(dying_earth_engine::state::Offer { from: Seat(1), to: Seat(0), terms: Vec::new(), trade, turn, ask: Default::default() });
         g.offers.push(dying_earth_engine::state::Offer { from: Seat(2), to: Seat(0), terms: vec![Term::NonAggression], trade: None, turn, ask: Default::default() });
     }
-    // Ticket #509 (version 0.1.0.0): `offer:renew` (a building aid): the player's Accord with the
-    // Prospectors in its last turn, asked to renew, beside the Arkwrights offering Passage added to
-    // theirs, so the prompt can be photographed with both.
-    if std::env::args().any(|a| a == "offer:renew")
+    // Ticket #509 (version 0.1.0.0): `offer:add` (a building aid): the Arkwrights offer Passage added
+    // to the player's Accord with them, so the prompt can be photographed with an addition. A renewal
+    // is never prompted (the designer, after the build), so there is none to picture.
+    if std::env::args().any(|a| a == "offer:add")
         && let Some(g) = session.game.as_mut()
     {
         let turn = g.turn;
-        for (with, terms) in [(Seat(1), vec![Term::NonAggression, Term::Passage]), (Seat(2), vec![Term::NonAggression])] {
-            g.accords.push(Accord { a: Seat(0), b: with, terms, struck: turn, paid: turn, ending: false, since: turn });
-        }
-        g.offers.push(dying_earth_engine::state::Offer { from: Seat(1), to: Seat(0), terms: vec![Term::NonAggression, Term::Passage], trade: None, turn, ask: AccordAsk::Renew });
+        g.accords.push(Accord { a: Seat(0), b: Seat(2), terms: vec![Term::NonAggression], struck: turn, paid: turn, ending: false, since: turn });
         g.offers.push(dying_earth_engine::state::Offer { from: Seat(2), to: Seat(0), terms: vec![Term::Passage], trade: None, turn, ask: AccordAsk::Add });
     }
     // Ticket #495 (version 0.09.9): `offer:<n>` (a building aid): the first n computer seats each

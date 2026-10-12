@@ -5344,6 +5344,8 @@ fn order_text(game: &Game, o: &Order) -> String {
             }
         }
         Order::EndAccord { with } => format!("Declare your Accord with the {} over", game.seat_name(*with)),
+        // Ticket #509 (version 0.1.0.0).
+        Order::RenewAccord { with } => format!("Renew your Accord with the {} for five turns", game.seat_name(*with)),
         // Ticket #496 (version 0.09.9).
         Order::ProposeTrade { to, give, get } => format!("Offer {} {} for {}", game.seat_name(*to), trade_good_text(game, *give), trade_good_text(game, *get)),
         // Ticket #332 (version 0.09.0): a rival's build cancelled at a place that changed hands.
@@ -11104,6 +11106,26 @@ fn accords_block(ui: &mut Ui, session: &Session, game: &Game, other: Seat, actio
             // Ticket #509 (version 0.1.0.0): and the turns it has left.
             let held = ui.label(format!("You hold an Accord with the {}: {}; {}.", game.seat_name(other), names.join(", "), turns_left_text(game, acc)));
             rule_tip(held, accord_terms_hover(&acc.terms));
+            // Ticket #509 (version 0.1.0.0): in its last turn, renewed by the player's own order where
+            // the other side is willing -- the designer's acceptance, in place of a prompt.
+            if game.accord_turns_left(acc) == 1 {
+                let renew = Order::RenewAccord { with: other };
+                if session.pending.contains(&renew) {
+                    ui.label(RichText::new("You renew it this turn, for five more.").weak());
+                } else {
+                    let ok = game.check_order(me, &session.pending, &renew);
+                    let dropped = acc.terms.contains(&Term::ResearchAgreement) && !game.renewal_terms(acc).contains(&Term::ResearchAgreement);
+                    let words = if dropped { "Five more turns. The research agreement drops: you are no longer both Friendly." } else { "Five more turns, the same Terms." };
+                    let resp = ui.add_enabled(ok.is_ok(), egui::Button::new("Renew for five turns"));
+                    let resp = match &ok {
+                        Ok(_) => rule_tip(resp, words.to_string()),
+                        Err(e) => rule_tip(resp, refusal_hover(&e.0, None)),
+                    };
+                    if resp.clicked() {
+                        actions.push(Action::Place(renew));
+                    }
+                }
+            }
             let order = Order::EndAccord { with: other };
             let placed = session.pending.contains(&order);
             if placed {

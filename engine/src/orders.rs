@@ -178,6 +178,9 @@ pub enum Order {
     ProposeTrade { to: Seat, give: TradeGood, get: TradeGood },
     /// Ticket #226: declare a standing Accord over. Free, and it lapses at the next turn's start.
     EndAccord { with: Seat },
+    /// Ticket #509 (version 0.1.0.0): renew an Accord in its last turn, for five more, where the other
+    /// side is willing. The player's acceptance; there is no prompt.
+    RenewAccord { with: Seat },
     /// Ticket #226: a fixed gift, one per pair per turn, paying +1 Relations. Fixed rather than a
     /// free amount because the gain is flat: without a fixed price a one-Ducat tribute would buy the
     /// same point as a fifty-Ducat one.
@@ -966,6 +969,28 @@ impl Game {
             Order::EndAccord { with } => {
                 if !self.accords.iter().any(|a| a.holds(seat, *with)) {
                     return fail("you hold no Accord with them");
+                }
+                // Ticket #509 (the review): not while renewing it.
+                if pending.contains(&Order::RenewAccord { with: *with }) {
+                    return fail("you are renewing it this turn");
+                }
+                Ok(cost)
+            }
+            Order::RenewAccord { with } => {
+                let Some(acc) = self.accords.iter().find(|a| a.holds(seat, *with)) else {
+                    return fail("you hold no Accord with them");
+                };
+                if self.accord_turns_left(acc) != 1 {
+                    return fail("an Accord is renewed in its last turn");
+                }
+                if !self.renewal_willing(*with, seat) {
+                    return fail("they will not renew it");
+                }
+                if pending.contains(order) {
+                    return fail("you are renewing it this turn");
+                }
+                if pending.contains(&Order::EndAccord { with: *with }) {
+                    return fail("you have declared it over");
                 }
                 Ok(cost)
             }
@@ -3059,6 +3084,7 @@ impl Game {
                     self.end_accord(seat, *with);
                     self.log(format!("{} declared their Accord with {} over.", self.seat_name(seat), self.seat_name(*with)));
                 }
+                Order::RenewAccord { with } => self.renew_accord(seat, *with),
                 Order::Tribute { to, materials } => {
                     // Ticket #223/#226: one of the two acts that raise Relations. The gain is the
                     // flat act_gain, not scaled by the gift, which is why the price is fixed.
@@ -3363,6 +3389,7 @@ impl Game {
             Order::ProposeAccord { to, .. } => r("propose_accord", &[("faction", self.seat_name(*to))]),
             Order::ProposeTrade { to, .. } => r("propose_trade", &[("faction", self.seat_name(*to))]),
             Order::EndAccord { with } => r("end_accord", &[("faction", self.seat_name(*with))]),
+            Order::RenewAccord { with } => r("renew_accord", &[("faction", self.seat_name(*with))]),
             Order::Tribute { to, .. } => r("tribute", &[("faction", self.seat_name(*to))]),
             Order::Buy { resource, amount } => r("buy", &[("n", amount.to_string()), ("resource", resource.name().to_string())]),
             Order::Sell { resource, amount } => r("sell", &[("n", amount.to_string()), ("resource", resource.name().to_string())]),

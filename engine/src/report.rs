@@ -715,6 +715,7 @@ pub const RIVAL_ARGS: &[(&str, &[&str])] = &[
     ("propose_accord", &["faction"]),
     ("propose_trade", &["faction"]),
     ("end_accord", &["faction"]),
+    ("renew_accord", &["faction"]),
     ("tribute", &["faction"]),
     ("build_facility", &["building", "state"]),
     ("build_facility_ducats", &["building", "state"]),

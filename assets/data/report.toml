@@ -361,6 +361,8 @@ nothing = "{faction} gave no orders."
 propose_accord = "offered {faction} an Accord"
 propose_trade = "offered {faction} a Trade"
 end_accord = "ended their Accord with {faction}"
+# Ticket #509 (version 0.1.0.0): an Accord renewed in its last turn.
+renew_accord = "renewed their Accord with {faction}"
 tribute = "paid {faction} a tribute"
 build_facility = "began a {building} in {state}"
 build_facility_ducats = "bought a {building} in {state}"
