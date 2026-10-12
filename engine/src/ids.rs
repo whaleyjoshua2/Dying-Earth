@@ -673,7 +673,7 @@ pub enum TechId {
     /// Constabulary adds 10 to the challenge margin where it adds 5 without.
     CivilDefense,
     /// Version 0.06.0 (ticket #84): the four gates, one per Faction, on rung 3 until ticket #505
-    /// (version 0.1.0.0) moved them to rung 5. Each opens its Faction's Victory Condition and is a
+    /// (version 0.1.0.0) moved them to rung 4 at 62. Each opens its Faction's Victory Condition and is a
     /// Tech for everyone besides.
     PlanetaryStewardship,
     ExtractionCharter,
@@ -715,14 +715,14 @@ pub enum TechId {
     /// needs it beside Civil Defense. Observatory Research x1.5, on Large Language Models' and The
     /// Upload's.
     OrbitalDataCenters,
-    /// Ticket #505 (version 0.1.0.0): Off-world Living rung 4, needing Closed-Loop Colonies, at 58;
+    /// Ticket #505 (version 0.1.0.0): Off-world Living rung 3, needing Closed-Loop Colonies, at 58;
     /// Generation Ships needs it. A Module built off Earth costs x0.75 Materials and x0.85 Widgets,
     /// inside the in-situ floor.
     RegolithPrinting,
-    /// Ticket #505 (version 0.1.0.0): Extraction rung 4, needing Automated Refining, at 58; the
+    /// Ticket #505 (version 0.1.0.0): Extraction rung 3, needing Automated Refining, at 58; the
     /// Extraction Charter needs it. Every working Mass Driver pays 3 Ducats a turn.
     RailGunFreight,
-    /// Ticket #505 (version 0.1.0.0): Society rung 4, needing Orbital Data Centers, at 58; The
+    /// Ticket #505 (version 0.1.0.0): Society rung 3, needing Orbital Data Centers, at 58; The
     /// Upload needs it. Every Energy output x1.25, in Efficient Grids' chain.
     Superconductors,
 }

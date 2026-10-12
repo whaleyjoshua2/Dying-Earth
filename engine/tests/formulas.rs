@@ -4603,7 +4603,7 @@ fn f_coastal_engineering_is_the_thirteenth_tech() {
     // Ticket #426 (version 0.09.5): twenty-five, with Commodity Finance on Extraction rung 2.
     // Ticket #433 (version 0.09.5): twenty-six, with Orbital Data Centers on Society rung 2.
     // Ticket #505 (version 0.1.0.0): twenty-nine, with Regolith Printing, Rail Gun Freight and
-    // Superconductors on rung 4.
+    // Superconductors on rung 3 at 58.
     assert_eq!(TechId::ALL.len(), 29, "thirteen Techs, the four gates, Civil Defense, #232's two, Missile Technology, Nuclear Rockets, Orbital Refuelling, Cryogenic Tanks, Commodity Finance, Orbital Data Centers and #505's three");
     assert_eq!(g.tables.techs.len(), 29, "and twenty-nine rows in techs.toml");
     let c = g.tables.tech(TechId::CoastalEngineering);
@@ -4620,11 +4620,9 @@ fn f_coastal_engineering_is_the_thirteenth_tech() {
     let on_rung = |r: u32| -> Vec<&str> { TechId::ALL.into_iter().map(|t| g.tables.tech(t)).filter(|t| t.branch == "Stewardship" && t.rung == r).map(|t| t.name.as_str()).collect() };
     assert_eq!(on_rung(1), vec!["Efficient Grids", "Coastal Engineering"], "two boxes on Stewardship rung 1");
     assert_eq!(on_rung(2), vec!["Clean Power", "Green Consensus"]);
-    // Ticket #505 (version 0.1.0.0): Clean Manufacturing up to rung 4 and the gate to rung 5, so the
-    // line's rung 3 is empty.
-    assert!(on_rung(3).is_empty(), "nothing on Stewardship rung 3 since ticket #505");
-    assert_eq!(on_rung(4), vec!["Clean Manufacturing"]);
-    assert_eq!(on_rung(5), vec!["Planetary Stewardship"]);
+    // Ticket #505 (version 0.1.0.0): the gate to rung 4, so Clean Manufacturing has rung 3 to itself.
+    assert_eq!(on_rung(3), vec!["Clean Manufacturing"]);
+    assert_eq!(on_rung(4), vec!["Planetary Stewardship"]);
     // The Sea Wall's card names it as its unlock, and there are fifteen Facilities in version
     // 0.08.0: ten through version 0.07, the School on ticket #185, and the four Unique Facilities on
     // tickets #182 to #186 -- the Investment Bank, the Spaceport, the Reactor and the Academy.
@@ -6848,8 +6846,8 @@ fn the_four_gates_stand_on_rung_three_at_one_price_with_their_prerequisites() {
     let g = game();
     let gates = [
         // Ticket #424 (version 0.09.5): the designer's three, the whole road in Stewardship.
-        // Ticket #505 (version 0.1.0.0): every gate on rung 5 at 62, through its branch's rung-4
-        // Tech, which stands in for the rung-2 Tech under it.
+        // Ticket #505 (version 0.1.0.0): every gate on rung 4 at 62, through its branch's 58-Research
+        // rung-3 Tech, which stands in for the rung-2 Tech under it.
         (FactionKind::Custodians, TechId::PlanetaryStewardship, vec![TechId::CleanManufacturing, TechId::GreenConsensus]),
         // Ticket #242 (version 0.08.3): Beneficiation joined, so the new Tech sits in the
         // branch's spine rather than being a leaf nobody has to take.
@@ -6869,10 +6867,10 @@ fn the_four_gates_stand_on_rung_three_at_one_price_with_their_prerequisites() {
     // ticket guards is that no Faction's gate is dearer than another's, so the figure is checked
     // against the rung rather than against a literal repeated four times.
     let gate_cost = g.tables.tech(TechId::PlanetaryStewardship).cost;
-    assert_eq!(gate_cost, 62, "the gates cost 62 on rung 5 since ticket #505 (version 0.1.0.0); 48 on rung 3 since #231, 45 from #142, 44 from #117, 40 before");
+    assert_eq!(gate_cost, 62, "the gates cost 62 on rung 4 since ticket #505 (version 0.1.0.0); 48 on rung 3 since #231, 45 from #142, 44 from #117, 40 before");
     for (kind, t, needs) in gates {
         let card = g.tables.tech(t);
-        assert_eq!(card.rung, 5, "{t:?}");
+        assert_eq!(card.rung, 4, "{t:?}");
         assert_eq!(card.cost, gate_cost, "every gate costs the same: {t:?}");
         assert_eq!(card.gate_for, Some(kind), "{t:?}");
         assert_eq!(card.needs, needs, "{t:?}");
@@ -6897,7 +6895,7 @@ fn the_four_gates_stand_on_rung_three_at_one_price_with_their_prerequisites() {
     // so the whole Archive chain sits behind those four.
     // Ticket #424 (version 0.09.5): the Archivists' two, all in Society; the Custodians' three,
     // all in Stewardship.
-    // Ticket #505 (version 0.1.0.0): four each, the rung-4 Tech on every road.
+    // Ticket #505 (version 0.1.0.0): four each, the 58-Research Tech on every road.
     assert_eq!(depth(TechId::TheUpload), 4, "the Archivists' gate, two deep since ticket #424, three since #433, four since #505");
     assert_eq!(depth(TechId::PlanetaryStewardship), 4, "the Custodians', three since ticket #424, four since #505");
     // Ticket #425 (version 0.09.5): Clean Power off Closed-Loop Colonies, Efficient Grids off
@@ -10583,12 +10581,14 @@ fn the_tree_costs_eighteen_thirty_two_and_forty_eight_by_rung() {
         if t == TechId::CoastalEngineering || t == TechId::NuclearRockets || t == TechId::OrbitalRefuelling {
             continue;
         }
-        // Ticket #505 (version 0.1.0.0): rung 4 at 58 and the gates' rung 5 at 62.
+        // Ticket #505 (version 0.1.0.0): rung 3 holds four Techs at 58 beside its 48s -- a rung is a
+        // column, the price each Tech's own -- and the gates' rung 4 costs 62.
+        let fifty_eight = [TechId::CleanManufacturing, TechId::RegolithPrinting, TechId::RailGunFreight, TechId::Superconductors];
         let want = match card.rung {
             1 => 18,
             2 => 32,
+            3 if fifty_eight.contains(&t) => 58,
             3 => 48,
-            4 => 58,
             _ => 62,
         };
         assert_eq!(card.cost, want, "rung {} costs {want}: {t:?}", card.rung);
@@ -10596,7 +10596,7 @@ fn the_tree_costs_eighteen_thirty_two_and_forty_eight_by_rung() {
     let total: i64 = TechId::ALL.into_iter().map(|t| g.tables.tech(t).cost).sum();
     assert_eq!(g.tables.tech(TechId::NuclearRockets).cost, 38, "priced above its rung");
     assert_eq!(g.tables.tech(TechId::OrbitalRefuelling).cost, 22, "priced above its rung");
-    assert_eq!(total, 1093, "the whole tree since ticket #505's five rungs (the gates 48 to 62, Clean Manufacturing 48 to 58, three new at 58); 853 since ticket #433's Orbital Data Centers (32 on rung 2); 821 from #426's Commodity Finance (32 on rung 2); 789 from #420's Cryogenic Tanks (32 on rung 2); 757 from #413's Orbital Refuelling (22 on rung 1); 735 from #393, 697 from #343, 649 from #232, 585 from #231, 554 from #201, 507 before that");
+    assert_eq!(total, 1093, "the whole tree since ticket #505's fourth rung (the gates 48 to 62, Clean Manufacturing 48 to 58, three new at 58); 853 since ticket #433's Orbital Data Centers (32 on rung 2); 821 from #426's Commodity Finance (32 on rung 2); 789 from #420's Cryogenic Tanks (32 on rung 2); 757 from #413's Orbital Refuelling (22 on rung 1); 735 from #393, 697 from #343, 649 from #232, 585 from #231, 554 from #201, 507 before that");
 }
 
 // ------------------------------------------------------- 0.08.1 ticket #208: the School's step
@@ -18398,7 +18398,7 @@ fn four_prerequisites_moved_at_the_designers_word() {
     assert_eq!(t.tech(TechId::EfficientTransit).needs, vec![TechId::OrbitalRefuelling], "Orbital Refuelling in place of Clean Propellant");
     assert!(!t.gate_chain(FactionKind::Prospectors).contains(&TechId::EfficientGrids), "the Charter no longer reaches Efficient Grids");
     assert!(!t.gate_chain(FactionKind::Arkwrights).contains(&TechId::CleanPower), "Generation Ships no longer reaches Clean Power");
-    // Ticket #505 (version 0.1.0.0): 202 each, the rung-4 Tech and the gate at 62 on every road.
+    // Ticket #505 (version 0.1.0.0): 202 each, the 58-Research Tech and the gate at 62 on every road.
     assert_eq!(price(FactionKind::Prospectors), 202, "Deep Mining, Automated Refining, Commodity Finance, Rail Gun Freight and the Charter; 130 before #505, 148 before #425");
     // Ticket #438 (version 0.09.6): 130 since Generation Ships needs Relay Networks as well.
     assert_eq!(price(FactionKind::Arkwrights), 202, "Expanded Habitats, Closed-Loop Colonies, Relay Networks, Regolith Printing and Generation Ships; 130 before #505, 98 before #438");
@@ -21346,26 +21346,28 @@ fn ticket_502_a_missing_gulf_refuses_the_table() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
-// ---------------------------------------------------------------- Ticket #505 (version 0.1.0.0): the gates on rung 5, new rung-4 Techs
+// ---------------------------------------------------------------- Ticket #505 (version 0.1.0.0): the gates on rung 4, new 58-Research Techs on rung 3
 
-/// Ticket #505: **five rungs.** Rung 4 costs 58 and holds Clean Manufacturing (up from rung 3) and
-/// three new Techs, one to a branch; the four gates stand on rung 5 at 62, each needing its
-/// branch's rung-4 Tech and the other rung-2 Tech on its road. Every road is 202, the tree 29 Techs
-/// and 1,093 Research. Each computer seat's list opens with its whole road, and the new Techs are
-/// on no rival's list.
+/// Ticket #505: **four rungs, the gates on the fourth.** Rung 3 holds Hardened Hulls and Missile
+/// Technology at 48 and four Techs at 58 -- Clean Manufacturing (raised) and three new, one to a
+/// branch; the four gates stand on rung 4 at 62, each needing its branch's 58-Research Tech and
+/// the other rung-2 Tech on its road. Every road is 202, the tree 29 Techs and 1,093 Research. Each
+/// computer seat's list opens with its whole road, and the new Techs are on no rival's list. (The
+/// 58s were first a rung of their own, the gates a fifth; the designer: "there should only be four
+/// rungs".)
 #[test]
-fn the_gates_stand_on_rung_five_behind_a_rung_four_tech_of_their_own_branch() {
+fn the_gates_stand_on_rung_four_behind_a_fifty_eight_research_tech_of_their_own_branch() {
     let t = tables();
     assert_eq!(TechId::ALL.len(), 29);
     let on_rung = |r: u32| -> Vec<TechId> { TechId::ALL.into_iter().filter(|x| t.tech(*x).rung == r).collect() };
-    assert_eq!(on_rung(4), vec![TechId::CleanManufacturing, TechId::RegolithPrinting, TechId::RailGunFreight, TechId::Superconductors]);
-    assert!(on_rung(4).iter().all(|x| t.tech(*x).cost == 58), "rung 4 costs 58");
-    assert_eq!(on_rung(5), vec![TechId::PlanetaryStewardship, TechId::ExtractionCharter, TechId::GenerationShips, TechId::TheUpload]);
-    assert_eq!(on_rung(3), vec![TechId::HardenedHulls, TechId::MissileTechnology], "Propulsion alone keeps rung 3");
+    assert_eq!(on_rung(3), vec![TechId::CleanManufacturing, TechId::HardenedHulls, TechId::MissileTechnology, TechId::RegolithPrinting, TechId::RailGunFreight, TechId::Superconductors]);
+    assert_eq!(on_rung(3).iter().map(|x| t.tech(*x).cost).collect::<Vec<i64>>(), vec![58, 48, 48, 58, 58, 58], "rung 3: Propulsion's two at 48, the four steps to a gate at 58");
+    assert_eq!(on_rung(4), vec![TechId::PlanetaryStewardship, TechId::ExtractionCharter, TechId::GenerationShips, TechId::TheUpload]);
+    assert_eq!(TechId::ALL.iter().map(|x| t.tech(*x).rung).max(), Some(4), "four rungs and no fifth");
     let fourth = [(FactionKind::Custodians, TechId::CleanManufacturing, TechId::CleanPower), (FactionKind::Prospectors, TechId::RailGunFreight, TechId::AutomatedRefining), (FactionKind::Arkwrights, TechId::RegolithPrinting, TechId::ClosedLoopColonies), (FactionKind::Archivists, TechId::Superconductors, TechId::OrbitalDataCenters)];
     for (k, step, under) in fourth {
         let gate = t.victory_gate(k).unwrap();
-        assert_eq!((t.tech(gate).rung, t.tech(gate).cost), (5, 62), "{k:?}");
+        assert_eq!((t.tech(gate).rung, t.tech(gate).cost), (4, 62), "{k:?}");
         assert_eq!(t.tech(step).needs, vec![under], "{step:?} needs the rung-2 Tech under it alone");
         assert_eq!(t.tech(step).branch, t.tech(gate).branch, "{step:?} is in its gate's branch");
         assert!(t.tech(gate).needs.contains(&step) && !t.tech(gate).needs.contains(&under), "the gate lists {step:?} and not {under:?}, reached through it");
