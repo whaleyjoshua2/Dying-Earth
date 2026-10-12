@@ -16435,7 +16435,8 @@ fn the_report_says_one_net_unrest_line_a_region_with_its_causes() {
     calm(&mut g);
     let unrest_lines = |g: &Game| g.report.lines.iter().filter(|l| l.kind == LineKind::Unrest).map(|l| l.text.clone()).collect::<Vec<_>>();
     // The player's China at 3: a rival agitates (+1), the player pays Relief (-1), the turn's fall
-    // (-1.5). One line, both causes, in the order they landed, and no threshold in it.
+    // (-1.5). One line, both causes, in the order they landed, and no threshold in it. Ticket #520
+    // (version 0.1.0.0): Agitate lands after the fall, so after Relief.
     g.state_mut(StateId::EastAsia).unrest = 3.0;
     g.pending.agitates.push((Seat(1), StateId::EastAsia));
     g.pending.relief.push((Seat(0), StateId::EastAsia));
@@ -16448,7 +16449,7 @@ fn the_report_says_one_net_unrest_line_a_region_with_its_causes() {
     // its Resolution alone writes them here.
     g.report_unrest_net();
     let lines = unrest_lines(&g);
-    assert_eq!(lines, vec!["China: Unrest from 3 to 1.5 (agitation by Prospectors, Relief by Custodians).".to_string()], "{lines:?}");
+    assert_eq!(lines, vec!["China: Unrest from 3 to 1.5 (Relief by Custodians, agitation by Prospectors).".to_string()], "{lines:?}");
     // A rise past the first threshold ends the line with what the threshold means. A Heatwave card
     // and refugees arriving are causes too, in the order they landed; the fall is skipped, as it is
     // in a turn the Region changed hands, so the figures read plainly.
@@ -21965,4 +21966,66 @@ fn a_regions_armies_change_hands_on_hold_where_they_stand_and_the_new_holder_is_
     assert_eq!(a.at, ArmyAt::Place(abroad), "where it stood");
     let name = a.name.clone();
     assert!(g.report.lines.iter().any(|l| l.text.contains(&name) && l.text.contains("now answers to you") && l.text.contains("Hold")), "{:?}", g.report.lines.iter().map(|l| &l.text).collect::<Vec<_>>());
+}
+
+// ---------------------------------------------------------------- the 0.1.0.0 playtest: Agitate, Accords warned, the grace
+
+/// Ticket #520 (version 0.1.0.0): Agitate paid for "Unrest 0 to 0" -- its point landed before the
+/// natural fall, which took it back the same Resolution. At the designer's word (Q1 B) it lands after
+/// the fall, so a calm Region agitated stands at a point for a turn.
+#[test]
+fn agitate_lands_after_the_natural_fall_so_a_calm_region_shows_it() {
+    let mut g = game();
+    calm(&mut g);
+    let (me, them) = (Seat(0), Seat(1));
+    let theirs = g.controlled_states(them)[0];
+    g.state_mut(theirs).unrest = 0.0;
+    g.state_mut(theirs).facilities.retain(|f| f.kind != FacilityKind::Constabulary);
+    g.seats[me.index()].stockpile.ducats = 100.0;
+    g.seats[me.index()].allotment = 20;
+    g.commit_orders(me, &[Order::Agitate { state: theirs }]);
+    g.resolution_phase();
+    assert_eq!(g.state(theirs).unrest, g.tables.unrest.agitate_points, "the point stands for a turn");
+}
+
+/// Ticket #520 (Q2): an order that would break an Accord you hold says so on its cost line -- the
+/// line the window's order list and the text tool both print.
+#[test]
+fn an_order_that_breaks_an_accord_says_so_on_its_cost_line() {
+    let mut g = game();
+    let (me, them) = (Seat(0), Seat(1));
+    let theirs = g.controlled_states(them)[0];
+    let push = Order::Influence { target: Place::State(theirs), amount: 5 };
+    let text = |g: &Game| g.order_price_text(me, &push, g.order_cost(me, &push));
+    assert!(!text(&g).contains("breaks"), "{}", text(&g));
+    g.strike_accord(me, them, vec![Term::NonAggression]).unwrap();
+    let name = g.seat_name(them);
+    assert!(text(&g).contains(&format!("breaks your Accord with {name}")), "{}", text(&g));
+    assert_eq!(g.order_crosses(me, &push), Some(them));
+}
+
+/// Ticket #519 (Q3 A): an Army inherited abroad in a rival's Region has a turn's grace from the rule
+/// that turns an Army on Hold there to Attack (ticket #320); the turn after, the rule applies.
+#[test]
+fn an_inherited_army_abroad_in_a_rivals_region_has_a_turns_grace() {
+    let mut g = game();
+    calm(&mut g);
+    // North Africa's Army stands in another Region of its holder's, at peace there until North
+    // Africa is taken: then it stands in a rival's Region.
+    let (me, them) = (Seat(0), Seat(1));
+    g.state_mut(StateId::NorthAfrica).control = Control::Controlled(them);
+    let abroad = g.controlled_states(them).into_iter().find(|s| *s != StateId::NorthAfrica).unwrap();
+    let army = g.armies.iter().find(|a| a.home == ArmyHome::State(StateId::NorthAfrica)).map(|a| a.id).unwrap();
+    { let a = g.army_mut(army).unwrap(); a.at = ArmyAt::Place(Place::State(abroad)); a.stance = Stance::Attack; }
+    g.seats[me.index()].influence.insert(Place::State(StateId::NorthAfrica), 400);
+    g.seats[me.index()].influenced_this_turn.push(Place::State(StateId::NorthAfrica));
+    g.resolution_phase();
+    assert_eq!(g.state(StateId::NorthAfrica).control, Control::Controlled(me));
+    assert_eq!(g.army(army).unwrap().stance, Stance::Hold);
+    g.turn += 1;
+    g.resolution_phase();
+    assert_eq!(g.army(army).map(|a| a.stance), Some(Stance::Hold), "the turn after it was inherited: still on Hold");
+    g.turn += 1;
+    g.resolution_phase();
+    assert!(g.army(army).is_none_or(|a| a.stance == Stance::Attack), "and then the old rule: on Attack in a rival's Region");
 }

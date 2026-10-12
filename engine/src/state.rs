@@ -1682,6 +1682,9 @@ pub struct Game {
     pub accords: Vec<Accord>,
     /// Ticket #495 (version 0.09.9): the Accords offered and not yet answered.
     pub offers: Vec<Offer>,
+    /// Ticket #519 (version 0.1.0.0): Armies abroad that changed hands with their Region, and the
+    /// turn they did: a turn's grace from the rule that puts a rival's guest on Attack. In the save.
+    pub armies_inherited: Vec<(ArmyId, u32)>,
     /// Ticket #495: refusals remembered, so a refused Faction does not offer again at once.
     pub refusals: Vec<Refusal>,
     /// Ticket #345 (version 0.09.1): who was first to each Body, one row per Body at most,
@@ -1928,6 +1931,7 @@ impl Game {
             market: Market::default(),
             accords: Vec::new(),
             offers: Vec::new(),
+            armies_inherited: Vec::new(),
             refusals: Vec::new(),
             body_firsts: Vec::new(),
             waiting_last: Vec::new(),

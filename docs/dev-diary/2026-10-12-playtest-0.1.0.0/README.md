@@ -55,8 +55,18 @@ belong to the tool are kept apart below.
 4. **Inherited Armies start wars** (testers 3, 4). A Region taken by Influence hands over the old
    holder's Armies still on Attack; they fight unordered, bring Hostility, and in seed 404 conquered
    China and destroyed a Sea Wall.
+   **Fixed (2026-10-12, ticket #519).** Whenever a Region changes hands its Armies stand on Hold
+   where they are, and the new holder is told of each one away from home. One left standing in a
+   rival's Region has a turn's grace there, for its new holder to order it home, before the old rule
+   (a rival's Army in a held Region is on Attack) takes it up.
 5. **Agitate did nothing** (tester 3): 15 Ducats + 5 Influence for "Unrest from 0 to 0", accepted
    under a non-aggression Accord with the holder.
+   **Fixed (2026-10-12, ticket #520).** The point landed before the turn's natural fall, which took it
+   back: it now lands after the fall, so a calm Region agitated stands at 1 for a turn. Agitate under
+   non-aggression is allowed and breaks the Accord, as Influence does; the order now says so beside
+   its price ("…; breaks your Accord with the Archivists"), in the window's order list and the tool.
+   Swept with the #519 grace (`../2026-10-07-version-0.1.0.0/sweeps/ticket-520.txt`): **1 / 30 / 11 /
+   19, 19 collapses**, from 0 / 33 / 11 / 18 and 18, within noise.
 6. **Carbon Levy** (tester 3): the card says +0.5 Unrest; the Report showed Unrest falling. New card.
 7. **Influence bonuses not visible** (tester 4): the Spaceport's "+N Influence next turn" and first-to-
    settle bonuses never showed in "Influence allotment this turn".

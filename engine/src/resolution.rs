@@ -513,12 +513,17 @@ impl Game {
         // Ticket #320 (version 0.08.8): a rival Army standing in a held Region with no Passage
         // behind it is on Attack, as any rival Army in a Region not its seat's would be -- the
         // guest whose Accord ended, at the designer's word. A guest under Passage stands as it is.
+        // Ticket #519 (version 0.1.0.0): an Army inherited by a change of hands has a turn's grace,
+        // on Hold where it stands, for its new holder to order it home, at the designer's word.
         if only_landed.is_none() {
+            let turn = self.turn;
+            self.armies_inherited.retain(|(_, t)| t + 1 >= turn);
             let turned: Vec<ArmyId> = self
                 .armies
                 .iter()
                 .filter(|a| {
                     matches!(a.stance, Stance::Hold | Stance::DigIn)
+                        && !self.armies_inherited.iter().any(|(id, _)| *id == a.id)
                         && matches!(a.at, ArmyAt::Place(Place::State(s)) if matches!(self.state(s).control, Control::Controlled(h) if self.army_seat(a).is_some_and(|seat| seat != h && !self.accord_has(seat, h, Term::Passage))))
                 })
                 .map(|a| a.id)
@@ -1643,6 +1648,8 @@ impl Game {
                 && at != home
             {
                 abroad.push((a.name.clone(), at));
+                self.armies_inherited.retain(|(id, _)| *id != a.id);
+                self.armies_inherited.push((a.id, self.turn));
             }
         }
         let Some(seat) = new.filter(|seat| !self.seat(*seat).ai) else { return };
@@ -3300,26 +3307,6 @@ impl Game {
             self.report_line(LineKind::Note, None, text);
             self.ai_deed(seat, "greenwash", &[("n", amount.to_string())]);
         }
-        // Ticket #269 (version 0.08.4): Agitate lands before Relief, so a holder's Relief the same
-        // turn answers it. One point, damped by a working Constabulary, an offence against the
-        // holder, and a Report line naming who paid.
-        for (seat, sid) in std::mem::take(&mut self.pending.agitates) {
-            let Some(holder) = self.place_control(Place::State(sid)).controller() else { continue };
-            let rose = self.raise_unrest(sid, u.agitate_points, UnrestSource::Agitate);
-            self.offend_by(seat, holder, 1);
-            self.seat_mut(seat).agitates_issued += 1;
-            let (who, name) = (self.seat_name(seat), self.tables.state(sid).name.clone());
-            // Ticket #371 (version 0.09.2): a cause for the Region's one net line, not a line.
-            let cause = if rose > 0.0 {
-                self.log(format!("The {who} agitated in {name}: Unrest rose by {} to {}.", Game::unrest_figure(rose), self.unrest_text(sid)));
-                self.phrase("cause_agitate", &[("faction", who)])
-            } else {
-                self.log(format!("The {who} agitated in {name}; the Constabulary held it to nothing."));
-                self.phrase("cause_agitate_damped", &[("faction", who)])
-            };
-            self.unrest_cause(sid, cause, seat == Seat(0));
-            self.ai_deed_at(seat, "agitate", &[("state", name)], Some(crate::report::ReportPlace::State(sid)));
-        }
         // Relief (rule 3): one point per order, paid for in Ducats at the Orders phase.
         let mut relieved: Vec<(Seat, StateId, f64)> = Vec::new();
         for (seat, sid) in std::mem::take(&mut self.pending.relief) {
@@ -3345,6 +3332,27 @@ impl Game {
             if !self.state(sid).changed_hands {
                 self.lower_unrest(sid, u.natural_fall);
             }
+        }
+        // Ticket #269 (version 0.08.4): Agitate's point, damped by a working Constabulary, an offence
+        // against the holder, and a Report line naming who paid. Ticket #520 (version 0.1.0.0): it
+        // lands after the falls, not before Relief -- the natural fall took it back the turn it was
+        // paid for ("Unrest from 0 to 0"). It stands a turn now, and the holder's Relief answers it next.
+        for (seat, sid) in std::mem::take(&mut self.pending.agitates) {
+            let Some(holder) = self.place_control(Place::State(sid)).controller() else { continue };
+            let rose = self.raise_unrest(sid, u.agitate_points, UnrestSource::Agitate);
+            self.offend_by(seat, holder, 1);
+            self.seat_mut(seat).agitates_issued += 1;
+            let (who, name) = (self.seat_name(seat), self.tables.state(sid).name.clone());
+            // Ticket #371 (version 0.09.2): a cause for the Region's one net line, not a line.
+            let cause = if rose > 0.0 {
+                self.log(format!("The {who} agitated in {name}: Unrest rose by {} to {}.", Game::unrest_figure(rose), self.unrest_text(sid)));
+                self.phrase("cause_agitate", &[("faction", who)])
+            } else {
+                self.log(format!("The {who} agitated in {name}; the Constabulary held it to nothing."));
+                self.phrase("cause_agitate_damped", &[("faction", who)])
+            };
+            self.unrest_cause(sid, cause, seat == Seat(0));
+            self.ai_deed_at(seat, "agitate", &[("state", name)], Some(crate::report::ReportPlace::State(sid)));
         }
         // The throw-off (rule 5), after the falls: a Faction can still buy a state back from the brink.
         for sid in StateId::ALL {

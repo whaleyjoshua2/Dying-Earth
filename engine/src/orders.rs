@@ -482,10 +482,15 @@ impl Game {
         if let Some(fuel) = tank.filter(|f| *f > 0.0) {
             parts.push(format!("{} Fuel from the tank", figure(fuel)));
         }
-        match parts.split_last() {
+        let price = match parts.split_last() {
             None => "free".to_string(),
             Some((last, [])) => last.clone(),
             Some((last, rest)) => format!("{} and {last}", rest.join(", ")),
+        };
+        // Ticket #520 (version 0.1.0.0): an order that breaks an Accord says so where its price is read.
+        match self.order_crosses(seat, order) {
+            Some(partner) => format!("{price}; breaks your Accord with {}", self.seat_name(partner)),
+            None => price,
         }
     }
 

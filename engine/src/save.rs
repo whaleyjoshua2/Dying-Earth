@@ -252,6 +252,9 @@ pub struct SavedGame {
     pub offers: Vec<crate::state::Offer>,
     #[serde(default)]
     pub refusals: Vec<crate::state::Refusal>,
+    /// Ticket #519 (version 0.1.0.0): Armies inherited abroad, and the turn, for their turn's grace.
+    #[serde(default)]
+    pub armies_inherited: Vec<(ArmyId, u32)>,
     /// Ticket #272 (version 0.08.4): the sweep's count of Events drawn with nowhere to land.
     #[serde(default)]
     pub events_no_target: u32,
@@ -336,6 +339,7 @@ impl SavedGame {
             accords,
             offers,
             refusals,
+            armies_inherited,
             events_no_target,
             body_firsts,
             colony_growth,
@@ -376,6 +380,7 @@ impl SavedGame {
             accords: accords.clone(),
             offers: offers.clone(),
             refusals: refusals.clone(),
+            armies_inherited: armies_inherited.clone(),
             events_no_target: *events_no_target,
             levies_raised: *levies_raised,
             neutral_holds: *neutral_holds,
@@ -428,6 +433,7 @@ impl SavedGame {
             accords: self.accords,
             offers: self.offers,
             refusals: self.refusals,
+            armies_inherited: self.armies_inherited,
             events_no_target: self.events_no_target,
             body_firsts: self.body_firsts,
             colony_growth: self.colony_growth,
