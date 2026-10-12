@@ -112,7 +112,8 @@ fn main() {
     let mut all_tree_turns: Vec<u32> = Vec::new();
     let mut all_tech_turns: Vec<Vec<u32>> = vec![Vec::new(); TechId::ALL.len()];
     let mut all_research_by_source = [0f64; 6];
-    // Of the games still running at turn 28, the tree's median finish: how many had it complete.
+    // Of the games still running at turn 39 (28 until ticket #506 made the game fifty turns), the
+    // tree's median finish: how many had it complete.
     let (mut all_reached_28, mut all_reached_28_done) = (0u32, 0u32);
     let (mut all_research_turns, mut all_regions_held_turns, mut all_labs_turns) = (0u32, 0u32, 0u32);
     let mut all_region_base = 0f64;
@@ -339,7 +340,7 @@ fn main() {
                                 *a += v;
                             }
                             all_research_turns += r.research_turns;
-                            if r.last_turn >= 28 {
+                            if r.last_turn >= 39 {
                                 all_reached_28 += 1;
                                 all_reached_28_done += r.tree_done_turn.is_some() as u32;
                             }
@@ -841,7 +842,7 @@ fn main() {
         }
         // Ticket #416 (version 0.09.4): when the tree finishes, and where Research comes from.
         println!("  The whole Tech Tree completed in {} of {all_games} games, median turn {} (the turn its last Tech completed)", all_tree_turns.len(), median_u(&mut all_tree_turns));
-        println!("  Games still running at turn 28: {all_reached_28} of {all_games}; the tree complete at the end in {all_reached_28_done} of them");
+        println!("  Games still running at turn 39: {all_reached_28} of {all_games}; the tree complete at the end in {all_reached_28_done} of them");
         let mut order: Vec<usize> = (0..TechId::ALL.len()).collect();
         let mut meds: Vec<String> = Vec::new();
         for v in all_tech_turns.iter_mut() {

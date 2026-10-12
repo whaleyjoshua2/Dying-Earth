@@ -241,8 +241,11 @@ impl Game {
         self.side_reaches(&c.take_does, seat) && self.side_reaches(&c.refuse_does, seat)
     }
 
+    /// Ticket #506 (version 0.1.0.0): a side with NO effect reaches every seat -- "refuse: nothing"
+    /// is a side a card may have (the Deep Core Survey's), and until this it reached nobody, so the
+    /// card was never asked; the loader still refuses a card with both sides empty.
     fn side_reaches(&self, side: &[CardEffect], seat: Seat) -> bool {
-        !side.is_empty() && side.iter().all(|e| self.card_effect_has_target(e, seat))
+        side.iter().all(|e| self.card_effect_has_target(e, seat))
     }
 
     /// Ticket #388 (version 0.09.3): WHY a card cannot reach this seat, in the engine's own words
@@ -894,7 +897,10 @@ impl Game {
             | EventId::OrbitalDebris
             | EventId::TheWhistleblower
             | EventId::SurplusHabitats
-            | EventId::ConscriptionNotice => (EventTarget::None, format!("{}: {}.", card.name, card.effect)),
+            | EventId::ConscriptionNotice
+            | EventId::CarbonLevy
+            | EventId::DeepCoreSurvey
+            | EventId::TradePact => (EventTarget::None, format!("{}: {}.", card.name, card.effect)),
         };
         DrawnEvent { card: Card::Event(id), target, scale, text }
     }

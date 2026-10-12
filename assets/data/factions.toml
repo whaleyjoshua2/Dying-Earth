@@ -43,13 +43,14 @@ signature = "The Scrubber, Leapfrog and Production Moved. Only they build a Scru
 # Ticket #203 (version 0.08.1): the Unique Facility in one sentence, for the Faction card and the
 # Faction window. Ticket #186 built the Academy; nothing on any card named it until now.
 unique = "Academy -- replaces the School and the Institute, and pays +1 Ducat a turn while it is online."
-victory = "Stabilization (3 consecutive Climate phases with net Emissions below the Natural Sink) plus 12 Colonists living off Earth."
+victory = "Stabilization (4 consecutive Climate phases with net Emissions below the Natural Sink) plus 18 Colonists living off Earth."
 # Ticket #350 (version 0.09.1): the Condition in one clause for the turn-1 Report line, in the
 # designer's approved words. {first}, {second} and {bodies} are filled from the bars below, so a
 # moved bar moves the line; the old line told every Faction "get twelve Colonists off Earth".
 victory_short = "reach Stabilization, {first} Climate phases running with Emissions under the Natural Sink, with {second} Colonists living off Earth,"
-victory_first = { kind = "stabilization_run", bar = 3 }
-victory_second = { kind = "off_world_presence", bar = 12 }
+# Ticket #506 (version 0.1.0.0): a run of four and 18 off Earth, with the game at fifty turns.
+victory_first = { kind = "stabilization_run", bar = 4 }
+victory_second = { kind = "off_world_presence", bar = 18 }
 # Ticket #471 (version 0.09.7): the Opening Objective -- no deadline, met once, rewarded once.
 opening = { kind = "scrubber_working", reward = 0.5, text = "Have a Scrubber working", reward_text = "+0.5 ppm on the Natural Sink, for good" }
 # Ticket #504 (version 0.1.0.0): the Second Objective, open once the Opening Objective is met.
@@ -94,7 +95,7 @@ signature = "Cheap Industry and the Strip Permit. Raising Industry Level costs t
 # Ticket #203 (version 0.08.1). The building is ticket #182's.
 unique = "Investment Bank -- replaces the Bank, and banks 1% interest a turn on the Venture Capital Fund's balance, one building per Region paying, never less than 1 Ducat in all. Off Earth, the Exchange -- replaces the Trade Post, and pays 1 more Ducat a turn."
 # Ticket #72: the Extraction Total is retired; the first part is Ducats banked in the Fund.
-victory = "2500 Ducats in the Venture Capital Fund, plus 12 Colonists living off Earth."
+victory = "3500 Ducats in the Venture Capital Fund, plus 18 Colonists living off Earth."
 victory_short = "put {first} Ducats in the Venture Capital Fund with {second} Colonists living off Earth,"
 # Ticket #182 (version 0.08.0): 750 to 1000, because the Investment Bank pays uncapped interest
 # on the Fund. Measured first: in 40 games nobody EVER reached 750 -- the highest balance ever
@@ -105,8 +106,9 @@ victory_short = "put {first} Ducats in the Venture Capital Fund with {second} Co
 # first: at 2000 the median computer seat ended just across the line (2049 and 2145 in the two
 # seatings read) and the Prospectors won 30 of 80, the most of any seat. At 2500 the median game
 # ends short; "other things will bolster their output". The AI reads this figure, not a copy of it.
-victory_first = { kind = "venture_fund", bar = 2500 }
-victory_second = { kind = "off_world_presence", bar = 12 }
+# Ticket #506 (version 0.1.0.0): 3,500 (2,500 x 50/36) and 18 off Earth, with the game at fifty turns.
+victory_first = { kind = "venture_fund", bar = 3500 }
+victory_second = { kind = "off_world_presence", bar = 18 }
 # Ticket #471 (version 0.09.7): the Opening Objective -- no deadline, met once, rewarded once.
 # Ticket #478 (version 0.09.8): 75 Ducats to 50, and the three Banks must work three Incomes running.
 opening = { kind = "investment_banks", count = 3, turns = 3, reward = 50.0, text = "Keep a working Investment Bank in three places for three turns", reward_text = "50 Ducats into the Venture Capital Fund" }
@@ -177,10 +179,11 @@ found_colony_unrest_ease = 1.0
 found_station_unrest_ease = 0.5
 # Ticket #203 (version 0.08.1). The building is ticket #183's.
 unique = "Spaceport -- replaces the Launch Site, and pays +1 Influence into next turn's Allotment for every Pioneer it lifts off Earth. Off Earth, the Chorus -- replaces the Relay, and adds +1 Influence to the Allotment for every 6 Colonists at its Colony."
-victory = "Diaspora: 30 Colonists living off Earth, on Colonies spread over at least three Bodies with at least 4 Colonists each (Antarctica and stations over Earth do not count)."
+victory = "Diaspora: 42 Colonists living off Earth, on Colonies spread over at least four Bodies with at least 4 Colonists each (Antarctica and stations over Earth do not count)."
 victory_short = "get {first} Colonists living off Earth, spread over {bodies} Bodies,"
-victory_first = { kind = "colonists_off_earth", bar = 30 }
-victory_second = { kind = "colonies_on_bodies", bodies = 3, colonists_each = 4 }
+# Ticket #506 (version 0.1.0.0): 42 (30 x 50/36) and four Bodies, with the game at fifty turns.
+victory_first = { kind = "colonists_off_earth", bar = 42 }
+victory_second = { kind = "colonies_on_bodies", bodies = 4, colonists_each = 4 }
 # Ticket #471 (version 0.09.7): the Opening Objective -- no deadline, met once, rewarded once.
 opening = { kind = "moon_colony", text = "Found a Colony on the Moon, on the ground or in orbit", reward_text = "a free Launch Site in a Region of yours that has none" }
 # Ticket #504 (version 0.1.0.0): the Second Objective, open once the Opening Objective is met.
@@ -228,11 +231,12 @@ unique = "Reactor -- replaces the Power Plant, and takes a quarter off the Energ
 # Ticket #347 (version 0.09.1): 125 of it, and the fund holds the whole figure from the first turn.
 # This bar IS `[archive] research` in modules.toml -- one figure written in two files, the Archive's
 # cost and the Archivists' bar, and a test asserts the two are equal so they cannot drift.
-victory = "Build the Archive at a Colony off Earth (50 Materials, three turns, and four Colonists must live there to begin it), pay 150 Research into it and keep it running, then upload 12 Colonists into it from the people living where it stands."
+victory = "Build the Archive at a Colony off Earth (50 Materials, three turns, and four Colonists must live there to begin it), pay 225 Research into it and keep it running, then upload 18 Colonists into it from the people living where it stands."
 victory_short = "build the Archive off Earth, pay {first} Research into it, and upload {second} Colonists,"
-victory_first = { kind = "archive_research", bar = 150 }
+# Ticket #506 (version 0.1.0.0): 225 and 18 uploads, at the designer's word, with the game at fifty turns.
+victory_first = { kind = "archive_research", bar = 225 }
 # Ticket #192 (version 0.08.0): twelve Colonists UPLOADED, not twelve living beside the Archive.
-victory_second = { kind = "colonists_uploaded", bar = 12 }
+victory_second = { kind = "colonists_uploaded", bar = 18 }
 # Ticket #471 (version 0.09.7): the Opening Objective -- no deadline, met once, rewarded once.
 opening = { kind = "research_pair", count = 2, reward = 10.0, text = "Have two Research Labs or Observatories working, one of them off Earth", reward_text = "10 Research into the Archive fund" }
 # Ticket #504 (version 0.1.0.0): the Second Objective, open once the Opening Objective is met.

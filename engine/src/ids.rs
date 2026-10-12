@@ -823,10 +823,15 @@ pub enum EventId {
     TheWhistleblower,
     SurplusHabitats,
     ConscriptionNotice,
+    /// Ticket #506 (version 0.1.0.0): three more Choice Cards with the game at fifty turns, built
+    /// from effects the deck already had. Appended, as every card since #337 has been.
+    CarbonLevy,
+    DeepCoreSurvey,
+    TradePact,
 }
 
 impl EventId {
-    pub const ALL: [EventId; 40] = [
+    pub const ALL: [EventId; 43] = [
         EventId::SolarStorm,
         EventId::RadiationSurge,
         EventId::CommsBlackout,
@@ -868,6 +873,9 @@ impl EventId {
         EventId::TheWhistleblower,
         EventId::SurplusHabitats,
         EventId::ConscriptionNotice,
+        EventId::CarbonLevy,
+        EventId::DeepCoreSurvey,
+        EventId::TradePact,
     ];
     pub const CLIMATE: [EventId; 6] = [EventId::Heatwave, EventId::Wildfire, EventId::StormSurge, EventId::MethaneBurst, EventId::Drought, EventId::VolcanicEruption];
 }

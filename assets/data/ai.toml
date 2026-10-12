@@ -380,33 +380,38 @@ bounty_least = 1.0
 # and then find the last stretch impossible.
 # Ticket #449 (version 0.09.6): rescaled to the real bar, 2500; it had stood at 1000 since the bar was
 # 1000. A test now holds every `first` schedule to its bar.
+# Ticket #506 (version 0.1.0.0): every turn stretched by 50/36 and every figure to the new bar
+# (the Fund 3,500, 18 off Earth), with the game at fifty turns.
 [pace.prospectors]
-first = [[9, 333], [18, 833], [27, 1500], [34, 2500]]
-colonists = [[12, 4], [22, 12]]
+first = [[12, 467], [25, 1167], [37, 2100], [47, 3500]]
+colonists = [[17, 6], [31, 18]]
 
 [pace.custodians]
 within_ppm = 4.0
-within_by_turn = 12
-under_sink_by_turn = 18
-colonists = [[12, 4], [22, 12]]
+# Ticket #506: 17 and 25, from 12 and 18.
+within_by_turn = 17
+under_sink_by_turn = 25
+colonists = [[17, 6], [31, 18]]
 
 # Ticket #51: Diaspora is 30 Colonists off Earth, so the pace runs to 30.
+# Ticket #506 (version 0.1.0.0): stretched by 50/36 to the Diaspora's 42 and four Bodies.
 [pace.arkwrights]
-first = [[6, 4], [12, 12], [18, 22], [24, 30]]
+first = [[8, 6], [17, 17], [25, 31], [33, 42]]
 # Ticket #449 (version 0.09.6): the Bodies their second part asks for, which nothing paced: one by
 # turn 18, two by 24, three by 30, read as every schedule is (a seat with none is behind at once).
-bodies = [[18, 1], [24, 2], [30, 3]]
-colonists = [[12, 4], [22, 12]]
+bodies = [[25, 1], [33, 2], [40, 3], [47, 4]]
+colonists = [[17, 6], [31, 18]]
 
 # Ticket #51: the pace is in the Archive's first Victory part. Ticket #68 (version 0.05.5): that is
 # Research paid into the Archive, 80 in all, over a thirty-six-turn game. Ticket #439 (version 0.09.6):
 # 150, the Archive's cost since that ticket, on the same turns -- it had stayed at 80 through 125.
+# Ticket #506 (version 0.1.0.0): stretched by 50/36 to the Archive's 225 and 18 uploads.
 [pace.archivists]
-first = [[10, 38], [18, 75], [26, 113], [32, 150]]
+first = [[14, 56], [25, 113], [36, 169], [44, 225]]
 # Ticket #449 (version 0.09.6): the Uploads their second part asks for, which nothing paced: four by
 # turn 26, eight by 30, twelve by 34. Added at the designer's word, so the computer pushes when behind.
-uploads = [[26, 4], [30, 8], [34, 12]]
-colonists = [[12, 4], [22, 12]]
+uploads = [[36, 6], [42, 12], [47, 18]]
+colonists = [[17, 6], [31, 18]]
 
 [thresholds]
 # Ticket #496 (version 0.09.9): a computer seat offers a Trade when a Stockpile good is under
@@ -505,7 +510,8 @@ gate_pick_fraction = 0.5
 # of 36 below any threshold worth having -- so the shared-pot rule had no line left to draw.
 directive_when_wanted = 0
 directive_when_indifferent = 10
-gate_pick_turn = 24
+# Ticket #506 (version 0.1.0.0): 33, from 24 (x 50/36), with the game at fifty turns.
+gate_pick_turn = 33
 # Ticket #332 (version 0.09.0): every seat wants a Mine early in its most Materials-lean Region at
 # the Factory's weight. Through `early_mine_turn`, while the seat directs fewer Mines on Earth
 # (standing or on order) than `early_mines`, the Mine in the Region where one would make the most
@@ -516,7 +522,8 @@ gate_pick_turn = 24
 # turn 1 (the starting board of ticket #332), so the early Mine is the second; a seat that starts
 # without one (the Arkwrights in Saudi Arabia, income nought until turn 8 in the probe that opened
 # this lane) wants both. Eight turns is the window before the first Colony is founded (median 10).
-early_mine_turn = 8
+# Ticket #506 (version 0.1.0.0): 11, from 8 (x 50/36), with the game at fifty turns.
+early_mine_turn = 11
 early_mines = 2
 # Ticket #332: a Factory Module is wanted at a Colony whose queue is this many builds deep, or where
 # a Ship is wanted (a Shipyard standing or on order); nowhere else, since its four Widgets a turn

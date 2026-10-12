@@ -318,3 +318,55 @@ against §6's:
   from 59); the tree completes in 62 of 80, from 50.
 - Why is **not traced**. Two more Regions to hold means more Research Labs and Facilities on the
   board for the same four seats; the fifty-turn ticket fits the length to this board.
+
+## 8. Fifty turns
+
+The authority is [ticket #506](https://github.com/whaleyjoshua2/Dying-Earth/issues/506). The
+designer: *"50 turns scale co2 and victories"*. Built last, on the board the version ships.
+
+- **Fifty turns** of two months (`victory.toml turns = 50`), January 2030 to **March 2038** (turn 36
+  was November 2035; the ticket's "November 2038" was an arithmetic slip, corrected here).
+- **The climate**, swept on the finished board ([`sweeps/co2-grid.md`](../dev-diary/2026-10-07-version-0.1.0.0/sweeps/co2-grid.md)):
+  `ppm_step` **440**, from 330; the Sink stays 8. Nearest to the designer's 20 collapses (22).
+- **The bars**, at the designer's word:
+
+  | Faction | First part | Second part |
+  |---|---|---|
+  | Custodians | a Stabilization run of **4** (3) | **18** off Earth (12) |
+  | Prospectors | **3,500** in the Fund (2,500) | **18** off Earth (12) |
+  | Arkwrights | **42** off Earth (30) | **4 Bodies** at 4 each (3) |
+  | Archivists | the Archive at **225** Research (150) | **18** uploaded (12) |
+
+  The Archive's cost in `modules.toml` is the same 225, as it must be.
+- **The computer** reads the length: its pace tables are stretched by 50/36 and end at the new bars
+  (the Fund by turn 47, the Archive by 44, the Diaspora by 33, four Bodies by 47, 18 uploads by 47,
+  18 off Earth by 31); it picks its gate from turn 33 (24) and wants its early Mines through turn 11 (8).
+- **The deck:** off-Earth cards join on turn 15 (12); three new Choice Cards, built from effects the
+  deck already had, 43 cards and 21 that ask:
+
+  | Card | Take | Refuse | The computer takes it |
+  |---|---|---|---|
+  | **Carbon Levy** | +20 Ducats, 1 ppm off next turn's card emissions (which the Stabilization test does not count), +0.5 Unrest in every Region held | standing −3 in every Region held | under Unrest 3 |
+  | **Deep Core Survey** | −30 Ducats; a Mine Discovery over the Body of the Colony of yours with the most Mines, x1.5 for four turns (a Faction with no Mine at any Colony is not asked) | nothing | with 60 Ducats or more |
+  | **Trade Pact** | Relations +2 with every rival; Materials a Ducat cheaper for two turns; Factories x0.8 at the next Income | Relations −1 with every rival | always |
+
+- **Neutral Regions** develop every 10 turns (9).
+- **Two notes from the build.** A card side with no effect now reaches every seat (`side_reaches`
+  in `events.rs`); until this the Deep Core Survey, whose refusal does nothing, was never asked.
+  And the Trade Pact's "Trading x0.9" of the decision became **Materials a Ducat cheaper for two
+  turns**, since the deck has no multiplier on the Market's prices, only a step; the step is the
+  one Market's, so every seat buys cheaper while it holds.
+- Everything else that reads the length reads `turns` and moved by itself: the dates, the Last Turn to
+  Act, the projections, the computer's flight value, the sweep's checkpoint (turn 39, from 28). A
+  fourth Mars window, spring 2037, is inside the game now.
+
+**Measured** over the 80 games
+([`sweeps/ticket-506.txt`](../dev-diary/2026-10-07-version-0.1.0.0/sweeps/ticket-506.txt)), the
+version's closing board:
+- Wins **6 / 8 / 35 / 9** with **22 collapses**, against the ideal of 15 each and 20. The
+  collapses are where the dial put them; the Arkwrights still take nearly half the games, as they
+  did in every cell of the grid, and the win column is not retuned on this ticket.
+- Every gate completes in 73 to 80 of 80 games at a median turn 25 to 27; the whole tree in 71 of
+  80 at a median turn 28. 18 of 80 games are still running at turn 39.
+- The grid's 440 cell read 6 / 8 / 37 / 7 before the Deep Core Survey was made askable (see
+  the Notes); the closing sweep is the one that counts.

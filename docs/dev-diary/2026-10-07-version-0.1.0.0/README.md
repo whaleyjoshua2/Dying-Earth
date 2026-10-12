@@ -78,3 +78,13 @@ real population; twenty Regions. Spec section 7.
 
 **The sweep** ([`sweeps/ticket-510.txt`](sweeps/ticket-510.txt)): 3 / 20 / 39 / 7 and 8 collapses,
 from 3 / 25 / 31 / 1 and 18. The Archivists' rise and the collapses' fall are past noise; not traced.
+
+## Fifty turns (#506)
+
+The game runs fifty turns, January 2030 to March 2038; `ppm_step` 440 from the climate grid; every
+Victory bar that accumulates scaled, the computer's pace with it; three new Choice Cards; neutral
+development every ten turns. Spec section 8.
+
+**The sweeps.** [`sweeps/co2-grid.md`](sweeps/co2-grid.md) sums the eight climate cells by Faction
+(raw: `ticket-506-grid.txt`, `ticket-506-grid-2.txt`); [`sweeps/ticket-506.txt`](sweeps/ticket-506.txt)
+is the closing sweep at the cell taken.

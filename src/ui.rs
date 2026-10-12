@@ -11590,6 +11590,10 @@ fn card_answers(game: &Game) -> Vec<(EventId, Seat, String)> {
 /// always has something to say.
 fn card_side_text(side: &[CardEffect]) -> String {
     let parts: Vec<String> = side.iter().map(card_effect_text).filter(|s| !s.is_empty()).collect();
+    // Ticket #506 (version 0.1.0.0): a side that does nothing (the Deep Core Survey's refusal) says so.
+    if parts.is_empty() {
+        return "Nothing changes".to_string();
+    }
     parts.join("; ")
 }
 

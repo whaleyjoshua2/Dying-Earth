@@ -78,7 +78,8 @@ baseline_rise = 0.2
 unrest = 2.0
 
 [development]
-turns = 9
+# Ticket #506 (version 0.1.0.0): every tenth turn, from the ninth, with the game at fifty turns.
+turns = 10
 max_level = 4
 stops_at_temperature = 2.5
 
