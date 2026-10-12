@@ -431,8 +431,10 @@ least one colonial capital"*; theirs alone (Q1 A), as a gate on the win (Q3 A).
   hold off Earth*. The gate Tech's note comes first when both hold.
 - **The computer Arkwrights chase it** (`ai.toml capital_chase = 3.0`): holding none, their
   **Capital candidate** is their most peopled ground Colony off Earth on a Body with no Capital; its
-  every upgrade and a disembark into it weigh three times. Measured before the chase: 5 Capitals
-  stood at the end of 80 games.
+  every upgrade and a disembark into it weigh three times. And once their Bodies part is within one
+  of its bar they **gather** there: a Habitat at the candidate while its room is under the Capital's
+  24, and a loaded Ship's crossing to its Body, weigh three times too. Measured before the chase: 5
+  Capitals stood at the end of 80 games; with the chase but no gathering, 7, all in Antarctica.
 - **The sweep** reports who held a Capital at the end, by Faction.
 
 **Measured** over the 80 games
@@ -444,6 +446,15 @@ against §10's 3 / 11 / 30 / 7 and 29 collapses:
   one in Antarctica, which is on Earth and counts for nothing. Off Earth no computer seat gathered
   24 Colonists at one ground Colony in 80 games, with the chase or without it (5 Capitals, all
   Antarctic, before the chase).
-- **The build misses its bar.** The rule is as decided and the chase is in, but the computer cannot
-  meet the requirement, so in computer hands the Arkwrights cannot win. Reported to the designer on
-  the ticket; what moves next is the designer's call.
+- **The gathering** (the designer's option 1) was built in three rounds and swept after each
+  ([`sweeps/ticket-514-gathering.txt`](../dev-diary/2026-10-07-version-0.1.0.0/sweeps/ticket-514-gathering.txt)
+  is the last): Habitats and the crossing lifted, then every Module at the candidate lifted and a
+  fresh Outpost beside it damped, then Habitats built ahead of need. **4 / 12 / 2 / 7 and 55
+  collapses; no Capital held off Earth in 80 games.** Probed: the candidate's slots filled with
+  producers while it held four, a deadlock the Habitat-ahead rule broke; after it the Arkwrights'
+  best place reaches 24 to 28 people with every slot built, but only around turn 40 to 48, and the
+  Capital upgrade is offered in 13 of 80 games, late, and never completes. The requirement is beyond
+  the computer's reach in a game of this length as it plays it.
+- **The build misses its bar.** The rule is as decided and the gathering is in, tested and
+  harmless, but in computer hands the Arkwrights cannot win. Reported to the designer on the ticket;
+  what moves next is the designer's call.

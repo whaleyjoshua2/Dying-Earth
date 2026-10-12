@@ -1189,6 +1189,25 @@ impl Game {
         // bar, a loaded Colony Ship does not land on Earth's ground or over it, and it crosses to the
         // Archive's Body (or the best Body off Earth while there is none) at the homeless lift.
         let ferrying = kind == FactionKind::Archivists && (self.seat(seat).uploaded as f64) < self.tables.faction(kind).victory_second.bar;
+        // Ticket #514 (version 0.1.0.0): a seat whose win waits on a Colonial Capital, holding none,
+        // has a CAPITAL CANDIDATE (its most peopled ground Colony off Earth on a Body with no
+        // Capital), and once its Bodies part is within one of its bar it GATHERS people there: the
+        // candidate's upgrades, every Module built there (so its slots fill for the next tier), a
+        // loaded Ship's crossing to its Body while it has room, and a disembark into it all weigh
+        // `capital_chase` times; a fresh Outpost on its Body weighs a chase less.
+        // Measured before the gathering: the chase on the upgrade and the landing alone left no
+        // Capital off Earth in 80 games (seven stood, all in Antarctica).
+        let capital_candidate = if self.tables.faction(kind).victory_capital { self.capital_candidate(seat) } else { None };
+        let capital_body = capital_candidate.and_then(|c| self.colony(c)).map(|c| c.body);
+        let capital_chase = self.tables.ai.thresholds.capital_chase;
+        // The people the Capital tier wants at one place, the room the candidate builds toward.
+        let capital_room = self.tables.tiers.iter().filter(|t| t.one_per_body).map(|t| t.colonists).max().unwrap_or(0);
+        // Room at the candidate for a landing: a crossing is lifted only where the people can land.
+        let capital_has_room = capital_candidate.and_then(|c| self.colony(c)).is_some_and(|c| self.habitat_room(c) > c.colonists);
+        let gathering = capital_candidate.is_some() && {
+            let sec = self.tables.faction(kind).victory_second;
+            sec.kind != VictorySecondKind::ColoniesOnBodies || self.bodies_settled(seat, sec.colonists_each) + 1 >= sec.bodies
+        };
         // The ferry's SPENDING lift pauses while a site is ready and the Archive is not yet ordered:
         // measured, its Colony Ships spent every Material, and the 50 the Archive wants was never in
         // hand. The route does not pause -- nobody is landed where the Archive cannot use them.
@@ -1850,7 +1869,14 @@ impl Game {
                 let mut opening = false;
                 if mk == ModuleKind::Habitat {
                     let room = self.habitat_room(&col).saturating_sub(col.colonists);
-                    if room >= 4 {
+                    // Ticket #514 (version 0.1.0.0): at the Capital candidate, while gathering, a
+                    // Habitat is built AHEAD of need until the place can hold the Capital's people.
+                    // Measured without this: the candidate's slots filled with Mines, Choruses and
+                    // Trade Posts while it held room for four or five, and with every slot built no
+                    // Habitat could follow, so nobody more could land, no slot could come and no
+                    // tier could rise -- a deadlock at every candidate in 80 games.
+                    let ahead = gathering && capital_candidate == Some(cid) && self.habitat_room(&col) < capital_room;
+                    if room >= 4 && !ahead {
                         continue;
                     }
                     let first_habitat = !col.modules.iter().any(|m| m.kind == ModuleKind::Habitat) && !col.queue.iter().any(|b| b.item == BuildItem::Module(ModuleKind::Habitat));
@@ -1874,6 +1900,10 @@ impl Game {
                     1.0
                 };
                 let (pull, opp) = if opening || speeds_the_queue { (gap, m.opportunity) } else { (gap_for(cat, Some(mk.name())), 1.0) };
+                // Ticket #514 (version 0.1.0.0): every Module at the Capital candidate, while gathering,
+                // so its slots fill for the next tier (a tier rises only with every slot built).
+                // Measured without this: Settlements of 16 to 28 people stood at 9 or 10 Modules of 12.
+                let base = if gathering && capital_candidate == Some(cid) { base * capital_chase } else { base };
                 push(vec![Order::BuildModule { colony: cid, kind: mk }], cat, base, pull, t, opp, format!("build {} at {}", mk.name(), self.place_name(Place::Colony(cid))), None);
             }
             // Ticket #355 (version 0.09.1): a Colony STARVED by a rival's Blockade makes no Widgets,
@@ -2080,9 +2110,8 @@ impl Game {
         // cap, with the people the next tier wants, is raised to it.
         // Ticket #503 (version 0.1.0.0): the Colonial Capital too, where the Body has none (`open_tier`);
         // a station never sees it.
-        // Ticket #514 (version 0.1.0.0): a seat whose win waits on a Colonial Capital and holds none
-        // chases it: every upgrade at its Capital candidate weighs `capital_chase` times more.
-        let capital_candidate = if self.tables.faction(kind).victory_capital { self.capital_candidate(seat) } else { None };
+        // Ticket #514 (version 0.1.0.0): every upgrade at the Capital candidate weighs `capital_chase`
+        // times more (the candidate and the figure are read at the head of this function).
         for c in self.colonies.iter().filter(|c| c.control.director() == Some(seat)) {
             if let Some(next) = self.open_tier(c)
                 && c.colonists >= next.colonists
@@ -2090,7 +2119,7 @@ impl Game {
                 && self.free_module_slots(c) == 0
                 && self.tier_under_way(c).is_none()
             {
-                let chase = if capital_candidate == Some(c.id) { self.tables.ai.thresholds.capital_chase } else { 1.0 };
+                let chase = if capital_candidate == Some(c.id) { capital_chase } else { 1.0 };
                 push(vec![Order::RaiseTier { colony: c.id }], Cat::RaiseTier, self.base_weight(seat, Cat::RaiseTier) * chase, gap_for(Cat::RaiseTier, None), 1.0, 1.0, format!("upgrade {} to a {}", self.place_name(Place::Colony(c.id)), next.name), None);
             }
         }
@@ -2991,6 +3020,10 @@ impl Game {
                         // Ticket #409 (version 0.09.4): it asks for what lands, the most the slot
                         // takes, as every other Unload does; the rest stay aboard as before.
                         let lift = if unclaimed { self.tables.ai.thresholds.first_found_weight } else { 1.0 };
+                        // Ticket #514 (version 0.1.0.0): on the Capital candidate's Body, while gathering,
+                        // a fresh Outpost is worth a chase less than landing in the candidate. Measured
+                        // without this: the people arrived and founded four-person Outposts beside it.
+                        let lift = if gathering && Some(body) == capital_body { lift / capital_chase } else { lift };
                         push(vec![Order::Unload { ship: s.id, colonists: self.unload_most(s.id, UnloadTarget::Slot(body, slot)), army: false, into: UnloadTarget::Slot(body, slot) }], Cat::FoundColony, self.base_weight(seat, Cat::FoundColony) * lift * self.ai_founding_pull(seat), gap_for(Cat::FoundColony, None), 1.0, opp, format!("found a Colony at {} on {}", self.tables.body(body).slots[slot as usize].name, self.tables.body(body).name), None);
                     }
                 }
@@ -3045,8 +3078,8 @@ impl Game {
                             let over_earth = body == BodyId::Earth;
                             let opp = if presence_needed <= n && !over_earth { m.opportunity } else { 1.0 };
                             let (weight, gap) = if over_earth { (self.base_weight(seat, Cat::LoadUnload) * 0.5, 1.0) } else { (self.base_weight(seat, Cat::LoadUnload), gap_for(Cat::LoadUnload, None)) };
-                            // Ticket #514 (version 0.1.0.0): the people gather at the Capital candidate.
-                            let weight = if capital_candidate == Some(c.id) { weight * self.tables.ai.thresholds.capital_chase } else { weight };
+                            // Ticket #514 (version 0.1.0.0): a landing at the Capital candidate, chased or not.
+                            let weight = if capital_candidate == Some(c.id) { weight * capital_chase } else { weight };
                             push(vec![Order::Unload { ship: s.id, colonists: n, army: false, into: UnloadTarget::Colony(c.id) }], Cat::LoadUnload, weight, gap, 1.0, opp, format!("disembark {} Colonists into {}", n, self.place_name(Place::Colony(c.id))), None);
                         }
                     }
@@ -3071,7 +3104,9 @@ impl Game {
                         // it the flight is longer and dearer, so the candidate is worth less --
                         // unless the seat is behind on its pace, where the gap multiplier says go.
                         let window = self.window_preference(seat, body, d);
-                        push(vec![Order::Transit { ship: s.id, to: d, slot: self.ai_destination_orbit(seat, s, d) }], Cat::Transit, self.base_weight(seat, Cat::Transit) * window, gap_for(Cat::Transit, None), 1.0, 1.0, format!("send {} to {}", ship_name, self.tables.body(d).name), None);
+                        // Ticket #514 (version 0.1.0.0): the crossing to the Capital candidate's Body, while gathering.
+                        let gather = if gathering && capital_has_room && Some(d) == capital_body { capital_chase } else { 1.0 };
+                        push(vec![Order::Transit { ship: s.id, to: d, slot: self.ai_destination_orbit(seat, s, d) }], Cat::Transit, self.base_weight(seat, Cat::Transit) * window * gather, gap_for(Cat::Transit, None), 1.0, 1.0, format!("send {} to {}", ship_name, self.tables.body(d).name), None);
                     }
                 }
                 if s.colonists == 0 && body != BodyId::Earth {

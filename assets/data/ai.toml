@@ -473,8 +473,14 @@ archive_target_lift = 2.0
 archive_target_fund = 0.5
 # Ticket #514 (version 0.1.0.0): a seat whose win waits on a Colonial Capital (the Arkwrights) and
 # holds none multiplies by this the upgrade of its CAPITAL CANDIDATE -- its most peopled ground
-# Colony on a Body with no Capital -- and a disembark into it, so the people gather where the
-# Capital can rise. Measured before it: 5 Capitals stood at the end of 80 games (ticket #513).
+# Colony on a Body with no Capital -- and a disembark into it; and, once its Bodies part is within
+# one of its bar, it GATHERS: every Module built at the candidate (so its slots fill for the next
+# tier) and a loaded Ship's crossing to its Body while it has room take the same lift, and a fresh
+# Outpost on that Body weighs a chase less. Measured before any of it: 5 Capitals stood at the end
+# of 80 games (ticket #513; where is not recorded); with the upgrade and the landing lifted alone,
+# 7, all in Antarctica, and no Faction held one off Earth; with Habitats and the crossing lifted as
+# well, 8, one held off Earth -- the Arkwrights' best places stood at 9 or 10 Modules of the 12 the
+# next tier wants, and arrivals founded four-person Outposts beside them.
 capital_chase = 3.0
 # Ticket #448 (version 0.09.6): the market. A seat keeps this many Materials, plus this many turns of
 # the larger of its Materials income and what the turn's own orders spend, and sells the rest; and

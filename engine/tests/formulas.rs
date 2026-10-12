@@ -21706,3 +21706,55 @@ fn the_arkwright_computer_lifts_the_upgrade_and_the_landing_at_its_capital_candi
     g.ai_orders(ark);
     assert!((scored(&g, "upgrade ") - plain).abs() < 1e-6, "held: the plain weight");
 }
+
+/// Ticket #514: **the computer Arkwrights gather at their Capital candidate** once their Bodies
+/// part is within one of its bar: a Module there and a loaded Ship's crossing to its Body (while it
+/// has room) weigh `capital_chase` times; with two Bodies settled nothing is lifted, and with a
+/// Capital of theirs standing nothing is either.
+#[test]
+fn the_arkwright_computer_gathers_people_at_its_capital_candidate() {
+    let mut g = game();
+    calm(&mut g);
+    let ark = Seat(2);
+    let chase = g.tables.ai.thresholds.capital_chase;
+    // Phobos at 4 and Mars at 8 with room: two Bodies settled, Mars the candidate, but two of four is
+    // not within one.
+    colony(&mut g, ark, BodyId::Phobos, &[ModuleKind::Habitat], 4);
+    let mars = colony(&mut g, ark, BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat], 8);
+    assert_eq!(g.bodies_settled(ark, 4), 2);
+    assert_eq!(g.capital_candidate(ark), Some(mars));
+    g.seats[ark.index()].stockpile.materials = 500.0;
+    g.seats[ark.index()].stockpile.energy = 500.0;
+    let mine = format!("build Mine at {}", g.place_name(Place::Colony(mars)));
+    let ship = a_colony_ship(&mut g, ark, BodyId::Earth);
+    g.ship_mut(ship).unwrap().colonists = 6;
+    g.log.clear();
+    g.ai_orders(ark);
+    let (mine_plain, crossing_plain) = (scored(&g, &mine), scored(&g, "to Mars"));
+    assert!(mine_plain > 0.0 && crossing_plain > 0.0, "both are weighed: {:?}", g.log.iter().filter(|l| l.contains("Mine") || l.contains("send")).collect::<Vec<_>>());
+    // A third Body: within one of four, and the gathering begins.
+    let moon = colony(&mut g, ark, BodyId::Moon, &[ModuleKind::Habitat], 4);
+    assert_eq!(g.bodies_settled(ark, 4), 3);
+    g.log.clear();
+    g.ai_orders(ark);
+    let (mine_lifted, crossing_lifted) = (scored(&g, &mine), scored(&g, "to Mars"));
+    assert!((mine_lifted - mine_plain * chase).abs() < 1e-6, "the candidate's Module at {chase}x: {mine_lifted} against {mine_plain}");
+    // The log carries a score to a tenth, so the lifted figure is within three tenths of the product.
+    assert!((crossing_lifted - crossing_plain * chase).abs() <= 0.3, "the crossing to its Body at {chase}x: {crossing_lifted} against {crossing_plain}");
+    // No room at the candidate (the Core's 4 and two Arkwright Habitats of 6): the crossing falls
+    // back, the Module does not.
+    let room = g.habitat_room(g.colony(mars).unwrap());
+    assert_eq!(room, 16, "4 + 6 + 6");
+    g.colony_mut(mars).unwrap().colonists = room;
+    g.log.clear();
+    g.ai_orders(ark);
+    assert!(scored(&g, "to Mars") <= crossing_plain + 0.3, "no room to land: no lift (and no crossing at all unless somewhere else of theirs has room)");
+    assert!((scored(&g, &mine) - mine_plain * chase).abs() < 1e-6, "the Module still lifted");
+    // A Capital of theirs on the Moon: the candidate is nobody, and the Module falls to the plain weight.
+    let capital = g.tables.tiers.iter().position(|t| t.one_per_body).unwrap() as u32;
+    g.colony_mut(moon).unwrap().tier = capital;
+    assert!(g.capital_held(ark) && g.capital_candidate(ark).is_none());
+    g.log.clear();
+    g.ai_orders(ark);
+    assert!((scored(&g, &mine) - mine_plain).abs() < 1e-6, "held: the plain weight");
+}
