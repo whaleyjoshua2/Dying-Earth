@@ -1072,6 +1072,11 @@ pub struct SeatState {
     /// as the first-to-a-Body windfall is; a Tech completed during the Income is paid that turn.
     #[serde(default)]
     pub lead_windfall: i64,
+    /// Ticket #522 (version 0.1.0.0): this turn's Allotment in its parts, set at the Income, each
+    /// windfall added after it named too, for the window's hover and the text tool. They sum to the
+    /// Allotment the Income set, before anything is bought or spent.
+    #[serde(default)]
+    pub allotment_parts: Vec<(String, i64)>,
     /// Ticket #192 (version 0.08.0): Colonists uploaded into the Archive, all told. The Archivists'
     /// second Victory part counts this rather than who happens to be living beside the Module, and
     /// it only ever climbs: an uploaded Colonist cannot be lost to a raid, a crowding death or a
@@ -1749,6 +1754,7 @@ impl Game {
             spaceport_influence: 0,
             first_windfall: 0,
             lead_windfall: 0,
+            allotment_parts: Vec::new(),
             uploaded: 0,
             stabilization_run: 0,
             influence: BTreeMap::new(),
@@ -4011,6 +4017,52 @@ impl Game {
         // and to whoever holds it now, not to whoever raised it.
         let tiers = self.tier_allotment(seat);
         (base as f64 * m).floor() as i64 + outside + tiers + self.seat(seat).spaceport_influence + self.seat(seat).first_windfall + self.seat(seat).lead_windfall + firsts * t.first_settled_allotment
+    }
+
+    /// Ticket #522 (version 0.1.0.0): `influence_allotment` in its named parts, the zero ones left
+    /// out. The two must move together: the test sums these against the Allotment.
+    pub fn influence_allotment_parts(&self, seat: Seat) -> Vec<(String, i64)> {
+        let t = &self.tables.influence;
+        let states: i64 = self.controlled_states(seat).iter().map(|s| self.state_influence_value(*s)).sum();
+        let base = t.allotment_base + states + self.building_allotment(seat);
+        let m = self.tables.faction(self.kind(seat)).influence_multiplier;
+        let firsts: i64 = self.body_firsts.iter().filter(|f| f.seat == seat && self.directs(seat, Place::Colony(f.colony))).count() as i64;
+        let s = self.seat(seat);
+        // The windfall names the worlds just reached: a first claimed in the turn this Income closes.
+        let just: Vec<String> = self
+            .body_firsts
+            .iter()
+            .filter(|f| f.seat == seat && self.colony(f.colony).is_some_and(|c| c.founded_turn + 1 >= self.turn))
+            .map(|f| self.tables.body(f.body).name.clone())
+            .collect();
+        let first = if just.is_empty() { "First to settle".to_string() } else { format!("First to settle {}", just.join(" and ")) };
+        [
+            ("Regions and buildings".to_string(), (base as f64 * m).floor() as i64),
+            ("Chorus".to_string(), self.module_allotments(seat).iter().map(|y| y.1).sum()),
+            ("Colonial Capital".to_string(), self.tier_allotment(seat)),
+            ("Worlds settled first".to_string(), firsts * t.first_settled_allotment),
+            ("Spaceport lifts".to_string(), s.spaceport_influence),
+            (first, s.first_windfall),
+            ("Tech lead".to_string(), s.lead_windfall),
+        ]
+        .into_iter()
+        .filter(|p| p.1 != 0)
+        .collect()
+    }
+
+    /// Ticket #522: a windfall paid into the Allotment after the Income set it, named beside the rest.
+    pub fn add_allotment_part(&mut self, seat: Seat, label: &str, n: i64) {
+        let parts = &mut self.seat_mut(seat).allotment_parts;
+        match parts.iter_mut().find(|p| p.0 == label) {
+            Some(p) => p.1 += n,
+            None => parts.push((label.to_string(), n)),
+        }
+    }
+
+    /// Ticket #522 (version 0.1.0.0): where this turn's Allotment came from, a line a part, the first
+    /// bare and the rest signed -- *"Regions and buildings 14"*, *"Spaceport lifts +9"*. Six at most.
+    pub fn allotment_lines(&self, seat: Seat) -> Vec<String> {
+        self.seat(seat).allotment_parts.iter().take(6).enumerate().map(|(i, (label, n))| if i == 0 { format!("{label} {n}") } else { format!("{label} {n:+}") }).collect()
     }
 
     /// Ticket #345 (version 0.09.1): which seat was first to a Body, and at which Colony.

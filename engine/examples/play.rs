@@ -1072,7 +1072,14 @@ fn print_board(g: &Game) {
             println!("    the {} {}", d.name.strip_prefix("The ").unwrap_or(&d.name), d.at);
         }
     }
-    println!("Influence allotment this turn: {}", g.influence_allotment(me));
+    // Ticket #522 (version 0.1.0.0): the Allotment the Income set, and its parts. This printed the
+    // formula after the Income had paid the Spaceport's and a first landing's Influence and cleared
+    // them, so a tester saw neither.
+    println!("Influence allotment this turn: {}", g.seat(me).allotment);
+    let from = g.allotment_lines(me);
+    if from.len() > 1 {
+        println!("  from: {}", from.join(", "));
+    }
     println!(
         "Blame: {:.2} ppm emitted, {:.2} removed; share {:.0}%, Influence thresholds x{:.2}",
         s.blame_emitted,

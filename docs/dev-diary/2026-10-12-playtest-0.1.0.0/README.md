@@ -76,6 +76,11 @@ belong to the tool are kept apart below.
    within noise.
 7. **Influence bonuses not visible** (tester 4): the Spaceport's "+N Influence next turn" and first-to-
    settle bonuses never showed in "Influence allotment this turn".
+   **Fixed (2026-10-12, ticket #522).** They were paid: a probe seat with 9 from lifts and 20 from a
+   first landing had 43 to spend. The tool printed the formula after the Income had paid those
+   tallies and cleared them (14). It now prints the real Allotment and a `from:` line naming its
+   parts; the window's "of 43 left" hovers the same lines. The Spaceport's line drops "next turn":
+   the points are in the Allotment by the time it is read.
 8. **Contradictory ownership headlines** (testers 1, 2): "X now belongs to the Prospectors
    (Occupation complete)" and "X now belongs to the Custodians (Influence)" in one Report; every
    ownership change prints twice.

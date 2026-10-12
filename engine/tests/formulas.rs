@@ -16422,7 +16422,8 @@ fn the_lift_line_says_what_the_spaceport_will_pay() {
     assert!(g.check_order(Seat(0), &[], &lift).is_ok(), "{:?}", g.check_order(Seat(0), &[], &lift));
     g.commit_orders(Seat(0), &[lift]);
     let line = g.report.lines.iter().find(|l| l.text.contains("Pioneers lifted")).map(|l| l.text.clone()).expect("the lift line");
-    assert!(line.ends_with("(Spaceport: +2 Influence next turn)."), "{line}");
+    // Ticket #522 (version 0.1.0.0): no "next turn" -- the Income at End Turn pays it before the line is read.
+    assert!(line.ends_with("(Spaceport: +2 Influence)."), "{line}");
     // A shut Spaceport pays nothing, and the line says nothing of it.
     g.state_mut(home).facilities.iter_mut().find(|f| f.kind == FacilityKind::Spaceport).unwrap().mothballed = true;
     assert_eq!(g.pay_spaceport(Seat(0), home, 3), 0);
@@ -22059,4 +22060,28 @@ fn a_choice_cards_unrest_lands_after_the_natural_fall() {
         let name = g.tables.event(card).name.clone();
         assert!(g.report.lines.iter().any(|l| l.kind == LineKind::Unrest && l.text.contains(&name) && l.text.contains(&format!("to {}", Game::unrest_figure(figure)))), "{card:?}: {:?}", g.report.lines.iter().filter(|l| l.kind == LineKind::Unrest).map(|l| &l.text).collect::<Vec<_>>());
     }
+}
+
+/// Ticket #522 (version 0.1.0.0): the Spaceport's and the first landing's Influence were paid, but
+/// nothing said where they went: the text tool printed the formula after the Income had cleared
+/// them, and the window's "of 43 left" named no parts. At the designer's word (Q2 A) the Income
+/// keeps the Allotment's parts, which sum to it, for the window's hover and the tool's "from:" line.
+#[test]
+fn the_allotment_keeps_its_parts_and_they_sum_to_it() {
+    let mut g = game();
+    let me = Seat(0);
+    let plain = g.influence_allotment(me);
+    g.seat_mut(me).spaceport_influence = 9;
+    g.seat_mut(me).first_windfall = 20;
+    g.income_phase();
+    let parts = g.seat(me).allotment_parts.clone();
+    assert_eq!(g.seat(me).allotment, plain + 29, "the bonuses are paid");
+    assert_eq!(parts.iter().map(|p| p.1).sum::<i64>(), g.seat(me).allotment, "{parts:?}");
+    assert!(parts.contains(&("Spaceport lifts".to_string(), 9)), "{parts:?}");
+    assert!(parts.iter().any(|p| p.0.starts_with("First to settle") && p.1 == 20), "{parts:?}");
+    let lines = g.allotment_lines(me);
+    assert!(lines.len() <= 6 && lines.iter().any(|l| l == "Spaceport lifts +9"), "{lines:?}");
+    // A turn without them names none.
+    g.income_phase();
+    assert!(!g.seat(me).allotment_parts.iter().any(|p| p.0.starts_with("Spaceport") || p.0.starts_with("First")), "{:?}", g.seat(me).allotment_parts);
 }

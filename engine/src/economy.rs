@@ -375,8 +375,11 @@ impl Game {
         self.discoveries.retain(|d| d.turns_left > 0);
         for seat in Seat::ALL {
             let allot = self.influence_allotment(seat);
+            // Ticket #522 (version 0.1.0.0): its parts, read before the tallies below are cleared.
+            let parts = self.influence_allotment_parts(seat);
             let s = self.seat_mut(seat);
             s.allotment = allot;
+            s.allotment_parts = parts;
             // Ticket #183 (version 0.08.0): last turn's Spaceport Influence has now been paid into
             // this Allotment, so the tally is cleared and begins again.
             s.spaceport_influence = 0;

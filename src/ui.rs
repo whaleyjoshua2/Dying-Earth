@@ -4477,7 +4477,13 @@ fn command_cluster(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewS
                 }
                 ui.label(RichText::new(format!("{influence_left}")).size(22.0 * CLUSTER_SCALE).strong())
                     .on_hover_text("Influence still unspent this turn. It is lost at End Turn: the Allotment does not carry over.");
-                ui.label(RichText::new(format!("of {} left", s.allotment)).size(15.0 * CLUSTER_SCALE));
+                // Ticket #522 (version 0.1.0.0): where the Allotment came from, a line a part.
+                let of = ui.label(RichText::new(format!("of {} left", s.allotment)).size(15.0 * CLUSTER_SCALE));
+                let from = game.allotment_lines(Seat(0));
+                if !from.is_empty() {
+                    of.on_hover_text(from.join("
+"));
+                }
             });
 
             // Spend, on whatever is selected.

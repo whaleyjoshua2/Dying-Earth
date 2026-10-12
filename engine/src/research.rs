@@ -101,6 +101,9 @@ impl Game {
                 let s = self.seat_mut(lead);
                 s.allotment += influence;
                 s.lead_windfall += influence;
+                // Ticket #522 (version 0.1.0.0): named, if the Income has already set the parts;
+                // before it, the Income names it from `lead_windfall`.
+                self.add_allotment_part(lead, "Tech lead", influence);
             }
             let mut eased = 0.0;
             if ease > 0.0 {

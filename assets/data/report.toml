@@ -323,8 +323,9 @@ cause_choice_card = "the {card} card"
 cause_heat = "the heat"
 cause_sea = "the sea"
 cause_break = "the {name}"
-# Ticket #366 (version 0.09.2): what a lift earns from the Spaceport, and when it lands.
-spaceport_pays = " (Spaceport: +{n} Influence next turn)"
+# Ticket #366 (version 0.09.2): what a lift earns from the Spaceport. Ticket #522 (version 0.1.0.0):
+# no "next turn" -- the Income at End Turn has paid it by the time the line is read.
+spaceport_pays = " (Spaceport: +{n} Influence)"
 unrest_past = ", past the {which} threshold: {note}"
 unrest_under = ", back under the {which} threshold"
 # Ticket #351 (version 0.09.1): what the Natural Sink loses with the Scrubbers a Shortfall shut.

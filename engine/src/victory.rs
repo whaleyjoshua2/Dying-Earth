@@ -422,7 +422,11 @@ impl Game {
             }
             // Ticket #504 (version 0.1.0.0): the Second Objectives' rewards. The Influence is this
             // turn's, the Income having just set the Allotment.
-            OpeningKind::Leapfrogs => self.seat_mut(seat).allotment += card.reward as i64,
+            OpeningKind::Leapfrogs => {
+                self.seat_mut(seat).allotment += card.reward as i64;
+                // Ticket #522 (version 0.1.0.0): and named among the Allotment's parts.
+                self.add_allotment_part(seat, "Second Objective", card.reward as i64);
+            }
             OpeningKind::IndustryLevel => {
                 let s = self.seat_mut(seat);
                 s.venture_fund = tenth(s.venture_fund + card.reward);
