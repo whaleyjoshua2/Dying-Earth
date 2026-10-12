@@ -46,6 +46,12 @@ belong to the tool are kept apart below.
 3. **Phantom offers** (tester 2). "STILL OWED" lists a Trade from the Custodians and the Archivists,
    but `trade accept|refuse` answers "they have offered you no Trade"; and Accord offers for an Accord
    struck earlier the same turn block the turn (accept: "you already hold an Accord").
+   **Fixed (2026-10-12, ticket #518).** Three causes. Striking an Accord swept every other offer
+   between the pair, Trades included, so a Trade the turn owed was gone when answered: now only
+   Accord offers are swept. A new Accord offer to a pair that already holds one is dropped at the head
+   of the turn. And in the text tool a yes that could not go through (a Trade whose goods are gone, an
+   Accord already standing) counted as a refused line, so the run was not saved and the turn owed the
+   offer again: it now counts as answered, saying why.
 4. **Inherited Armies start wars** (testers 3, 4). A Region taken by Influence hands over the old
    holder's Armies still on Attack; they fight unordered, bring Hostility, and in seed 404 conquered
    China and destroyed a Sea Wall.

@@ -1523,8 +1523,14 @@ fn main() {
                     Ok(Line::Offer(from, accept, trade)) => {
                         let what = if trade { "Trade" } else { "Accord" };
                         let index = game.offers_to(Seat(0)).into_iter().find(|(_, o)| o.from == from && o.trade.is_some() == trade).map(|(i, _)| i);
+                        let owed_before = game.offers.len();
                         match index.ok_or_else(|| format!("{} have offered you no {what}", game.seat_name(from))).and_then(|i| game.answer_offer(Seat(0), i, accept)) {
                             Ok(()) => println!("line {}: answered: you {} the {} {what}", n + 1, if accept { "accept" } else { "refuse" }, game.seat_name(from)),
+                            // Ticket #518 (version 0.1.0.0): a yes that could not go through (a Trade
+                            // whose goods are gone, an Accord already standing) still answered the
+                            // offer, which is off the table. Counting it refused held the turn and
+                            // threw the answer away with the unsaved run, so the turn owed it again.
+                            Err(e) if game.offers.len() < owed_before => println!("line {}: answered, but {e}", n + 1),
                             Err(e) => {
                                 println!("line {}: REFUSED `{line}`: {e}", n + 1);
                                 bad += 1;

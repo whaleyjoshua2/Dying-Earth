@@ -5700,6 +5700,8 @@ impl Game {
         // Ticket #509 (the review): Terms offered to an Accord that has since lapsed are moot.
         let accords = &self.accords;
         self.offers.retain(|o| o.ask != AccordAsk::Add || accords.iter().any(|a| a.holds(o.from, o.to)));
+        // Ticket #518 (version 0.1.0.0): and a new Accord offered to a pair that holds one already.
+        self.offers.retain(|o| o.trade.is_some() || o.ask != AccordAsk::New || !accords.iter().any(|a| a.holds(o.from, o.to)));
         let mut waiting = Vec::new();
         for offer in std::mem::take(&mut self.offers) {
             if self.seat(offer.to).ai && offer.turn < turn {
@@ -5774,8 +5776,10 @@ impl Game {
             match self.strike_accord(from, to, offer.terms) {
                 Ok(()) => {
                     self.log(format!("{} and {} struck an Accord.", self.seat_name(from), self.seat_name(to)));
-                    // Ticket #495 (the review): one Accord a pair, so any other offer between them is moot.
-                    self.offers.retain(|o| !((o.from == from && o.to == to) || (o.from == to && o.to == from)));
+                    // Ticket #495 (the review): one Accord a pair, so any other ACCORD offer between them
+                    // is moot. Ticket #518 (version 0.1.0.0): a Trade offer is not, and sweeping it too
+                    // left the turn owing a Trade the player was then told did not exist.
+                    self.offers.retain(|o| o.trade.is_some() || !((o.from == from && o.to == to) || (o.from == to && o.to == from)));
                     for (me, other) in [(from, to), (to, from)] {
                         if !self.seat(me).ai {
                             let text = self.say("accord_struck", &[("faction", self.seat_name(other))]);

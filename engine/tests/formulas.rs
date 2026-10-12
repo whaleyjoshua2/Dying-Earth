@@ -21897,3 +21897,43 @@ fn the_computer_keeps_its_non_aggression_and_a_broken_accord_is_reported() {
     assert!(g.report.lines.iter().any(|l| l.text.contains("broke") && l.text.contains("Accord")), "{:?}", g.report.lines);
     let _ = any;
 }
+
+// ---------------------------------------------------------------- the 0.1.0.0 playtest: phantom offers
+
+/// The 0.1.0.0 playtest (ticket #518): the turn waited on a Trade the player then could not answer
+/// ("they have offered you no Trade"). Striking an Accord cleared every other offer between the pair
+/// -- meant for a second Accord offer, which is moot once one stands -- and took their Trade offer
+/// with it. A Trade is not moot because an Accord was struck: it stays to be answered.
+#[test]
+fn striking_an_accord_leaves_a_trade_offer_from_the_same_faction_to_be_answered() {
+    let mut g = game();
+    let (me, them) = (Seat(0), Seat(1));
+    g.seats[me.index()].stockpile.materials = 100.0;
+    g.seats[them.index()].stockpile.fuel = 100.0;
+    g.offers.push(Offer { from: them, to: me, terms: vec![Term::NonAggression], trade: None, turn: g.turn, ask: AccordAsk::New });
+    g.offers.push(Offer { from: them, to: me, terms: vec![], trade: Some((TradeGood::Goods(Resource::Fuel, 10), TradeGood::Goods(Resource::Materials, 10))), turn: g.turn, ask: AccordAsk::New });
+    let accord = g.offers_to(me).into_iter().find(|(_, o)| o.trade.is_none()).map(|(i, _)| i).unwrap();
+    g.answer_offer(me, accord, true).expect("the Accord struck");
+    assert!(g.accords.iter().any(|a| a.holds(me, them)));
+    let trade = g.offers_to(me).into_iter().find(|(_, o)| o.trade.is_some()).map(|(i, _)| i);
+    assert!(trade.is_some(), "the Trade offer is still there to answer: {:?}", g.offers);
+    g.answer_offer(me, trade.unwrap(), false).expect("and it can be answered");
+    assert!(g.end_turn_refusal().is_none_or(|r| !r.contains("Trade")), "nothing owed that cannot be answered");
+}
+
+/// Ticket #518: an Accord offer between a pair that already holds an Accord is moot. It no longer
+/// holds the turn: it is dropped at the head of the turn, and a yes to one still standing says why
+/// and takes it off the table.
+#[test]
+fn an_accord_offer_to_a_pair_that_already_holds_one_does_not_hold_the_turn() {
+    let mut g = game();
+    let (me, them) = (Seat(0), Seat(1));
+    g.strike_accord(me, them, vec![Term::NonAggression]).unwrap();
+    g.offers.push(Offer { from: them, to: me, terms: vec![Term::NonAggression], trade: None, turn: g.turn, ask: AccordAsk::New });
+    let i = g.offers_to(me)[0].0;
+    assert!(g.answer_offer(me, i, true).is_err(), "a yes to a moot offer says why");
+    assert!(g.offers_to(me).is_empty() && g.end_turn_refusal().is_none_or(|r| !r.contains("Accord")), "and the offer is gone, owing nothing");
+    g.offers.push(Offer { from: them, to: me, terms: vec![Term::NonAggression], trade: None, turn: g.turn, ask: AccordAsk::New });
+    g.answer_computer_offers();
+    assert!(g.offers_to(me).is_empty(), "and the head of the turn drops it");
+}
