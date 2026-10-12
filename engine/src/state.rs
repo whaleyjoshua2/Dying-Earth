@@ -2125,7 +2125,12 @@ impl Game {
     /// A multiplier Tech read for one seat: its full value once done, `1 + (value - 1) / 2` under
     /// Provisional Findings, and 1.0 (no effect) otherwise.
     pub fn tech_multiplier(&self, seat: Seat, t: TechId) -> f64 {
-        let v = self.tables.tech(t).value;
+        self.tech_multiplier_of(seat, t, self.tables.tech(t).value)
+    }
+
+    /// Ticket #505 (version 0.1.0.0): the shared body, for a Tech read with a figure other than its
+    /// `value` (Regolith Printing's Widgets).
+    fn tech_multiplier_of(&self, seat: Seat, t: TechId, v: f64) -> f64 {
         if self.has_tech(t) {
             v
         } else if self.reads_half(seat, t) {
@@ -2824,8 +2829,27 @@ impl Game {
             1 => t.one_mine,
             _ => t.two_mines,
         };
-        let price = (row * faction * step).max(row * t.floor);
+        // Ticket #505 (version 0.1.0.0): Regolith Printing, off Earth, inside the same floor.
+        let price = (row * faction * step * self.regolith_multiplier(seat, colony)).max(row * t.floor);
         tenth(price)
+    }
+
+    /// Ticket #505 (version 0.1.0.0): what Regolith Printing does to a Module's price at this
+    /// Colony -- its `value` at a place off Earth (any Body but Earth, or any station), 1 on Earth.
+    fn regolith_multiplier(&self, seat: Seat, colony: ColonyId) -> f64 {
+        if self.colony(colony).is_some_and(|c| self.off_earth(c)) { self.tech_multiplier(seat, TechId::RegolithPrinting) } else { 1.0 }
+    }
+
+    /// Ticket #505 (version 0.1.0.0): a Module's Widgets at this Colony: `build_widgets`, and off
+    /// Earth Regolith Printing's own Widget figure on it, rounded down, never below 1.
+    pub fn module_widgets_at(&self, seat: Seat, colony: ColonyId, kind: ModuleKind) -> u32 {
+        let base = self.build_widgets(seat, BuildItem::Module(kind));
+        if !self.colony(colony).is_some_and(|c| self.off_earth(c)) {
+            return base;
+        }
+        let card = self.tables.tech(TechId::RegolithPrinting);
+        let m = self.tech_multiplier_of(seat, TechId::RegolithPrinting, card.widgets_multiplier.unwrap_or(card.value));
+        ((base as f64 * m).floor() as u32).max(1)
     }
 
     /// Ticket #72 (version 0.05.5): what a Facility costs this seat in Materials: the row's figure
@@ -5014,6 +5038,8 @@ impl Game {
     pub fn build_widgets_at(&self, seat: Seat, place: Place, item: BuildItem) -> u32 {
         match (item, place) {
             (BuildItem::IndustryLevel, Place::State(sid)) => self.industry_widgets(seat, sid),
+            // Ticket #505 (version 0.1.0.0): a Module's are its Colony's, Regolith Printing read.
+            (BuildItem::Module(k), Place::Colony(c)) => self.module_widgets_at(seat, c, k),
             _ => self.build_widgets(seat, item),
         }
     }

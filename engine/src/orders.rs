@@ -450,6 +450,8 @@ impl Game {
             // Ticket #479 (version 0.09.8): a raise's Widgets are its Region's, which rise.
             let n = match order {
                 Order::RaiseIndustry { state } => self.industry_widgets(seat, *state),
+                // Ticket #505 (version 0.1.0.0): a Module's are its Colony's (Regolith Printing).
+                Order::BuildModule { colony, .. } | Order::BuildModuleWithDucats { colony, .. } | Order::BuildArchive { colony } => self.build_widgets_at(seat, Place::Colony(*colony), item),
                 _ => self.build_widgets(seat, item),
             };
             parts.push(format!("{n} Widget{}", if n == 1 { "" } else { "s" }));
@@ -2619,7 +2621,8 @@ impl Game {
                     // Ticket #186: as on Earth -- the Custodians' Institute order raises an Academy.
                     let kind = kind.built_by(self.kind(seat));
                     // Ticket #332: as a Facility; a Ducat buy starts done.
-                    let widgets = self.build_widgets(seat, BuildItem::Module(kind));
+                    // Ticket #505 (version 0.1.0.0): at the Colony's figure (Regolith Printing).
+                    let widgets = self.build_widgets_at(seat, Place::Colony(*colony), BuildItem::Module(kind));
                     let done = if matches!(order, Order::BuildModuleWithDucats { .. }) { widgets } else { 0 };
                     if let Some(c) = self.colony_mut(*colony) {
                         c.queue.push(Build { item: BuildItem::Module(kind), seat, widgets, done, coastal: false, fuel: 0.0 });
@@ -2836,7 +2839,8 @@ impl Game {
                     // Ticket #68: the Module rises in the Colony's queue like any other build, from
                     // its own row (ticket #332: twelve Widgets, its three turns times four); the
                     // Research is paid into the fund once it stands.
-                    let widgets = self.build_widgets(seat, BuildItem::Module(ModuleKind::Archive));
+                    // Ticket #505 (version 0.1.0.0): at the Colony's figure (Regolith Printing).
+                    let widgets = self.build_widgets_at(seat, Place::Colony(*colony), BuildItem::Module(ModuleKind::Archive));
                     if let Some(c) = self.colony_mut(*colony) {
                         c.queue.push(Build { item: BuildItem::Module(ModuleKind::Archive), seat, widgets, done: 0, coastal: false, fuel: 0.0 });
                     }

@@ -233,3 +233,48 @@ The computer leans toward its Second Objective, as toward its first, once the fi
 - The Arkwrights meet theirs in 38 of the 39 games where they meet their first. The Moon, not
   the far Body, is what holds them back.
 - The Archivists meet theirs in none of the 20 games where they sit third.
+
+## 6. The Tech tree: five rungs
+
+The authority is [ticket #505](https://github.com/whaleyjoshua2/Dying-Earth/issues/505). The
+designer: *"move victory gate techs to level 5 cost of 62 - two new level 4 techs move 2 level 3
+techs - check math on victory gates"*, settled on the ticket as one Tech moved and three new, so
+that every gate has a rung-4 Tech of its own branch under it.
+
+- **Rung 4, at 58 Research**: Clean Manufacturing, up from rung 3, and three new Techs, one to a
+  branch, each the last step before its branch's gate.
+
+  | Branch | Tech | Needs | Effect |
+  |---|---|---|---|
+  | Stewardship | Clean Manufacturing (moved) | Clean Power | unchanged |
+  | Off-world Living | **Regolith Printing** | Closed-Loop Colonies | a Module built off Earth (any Body but Earth, or any Space Station) costs x0.75 Materials and x0.85 Widgets, inside the Faction's discount and Build Where You Dig, so the floor of half the row still holds; Antarctica pays the full price |
+  | Extraction | **Rail Gun Freight** | Automated Refining | every working Mass Driver pays its holder 3 Ducats a turn, flat |
+  | Society | **Superconductors** | Orbital Data Centers | every Energy output x1.25 -- Power Plant, Reactor, Generator, Solar Array, Heliostat -- in Efficient Grids' chain, so the two multiply |
+
+- **The gates on rung 5, at 62**, each needing its branch's rung-4 Tech and the other rung-2 Tech
+  on its road (Green Consensus, Commodity Finance, Relay Networks, Civil Defense). The rung-2 Tech
+  under the rung-4 one is reached through it and no longer listed, by the no-redundant-prerequisites
+  rule.
+- **Hardened Hulls and Missile Technology stay on rung 3.** Propulsion, which has no gate, ends there.
+- **The arithmetic.** Every road is 18 + 32 + 32 + 58 + 62 = **202** Research, all four alike,
+  from 130. The tree is 29 Techs and 1,093 Research, from 26 and 853. The drawing takes the fifth
+  rung by itself; nothing else in the interface changed
+  ([`ticket-505/tree.png`](../dev-diary/2026-10-07-version-0.1.0.0/ticket-505/tree.png)).
+- **The computer.** Each seat's gate chain takes its rung-4 Tech by itself, and its pick list names
+  it fourth, after its rung-2 pair; the three new Techs are on no rival's list. Hardened Hulls
+  stays at the end of every list. The computer's appetite for a Mass Driver is unchanged.
+- **Not retuned.** The length is fitted to this tree on the fifty-turn ticket.
+
+**Measured** over the 80 games
+([`sweeps/ticket-505.txt`](../dev-diary/2026-10-07-version-0.1.0.0/sweeps/ticket-505.txt)),
+against §5's:
+- Wins **3 / 25 / 31 / 1** with **18 collapses**, from 1 / 18 / 49 / 1 and 10. The Arkwrights
+  lost 18 wins and the Prospectors gained 7; collapses nearly doubled. A real move, toward the ideal.
+- Every gate completes later and in fewer games: Custodians 68 of 80 at a median turn 25 (71 at
+  23), Prospectors 73 at 25 (78 at 22), Arkwrights 59 at 27 (69 at 24), Archivists 67 at 23 (73
+  at 20). The whole tree completes in 50 of 80 at a median turn 27, from 65 at 24.
+- Why the Arkwrights fall is **not traced**; their gate now lands three turns later in a game
+  that still ends at 36.
+- Rail Gun Freight completes in 78 of 80 games, but the computer seats build almost no Mass
+  Driver (three standing at the end over the batch, one before), so in computer hands its Ducats
+  are near-dead. Measured, not traced; the appetite is a carried note on the map.

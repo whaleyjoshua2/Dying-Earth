@@ -43,3 +43,18 @@ from 2 / 23 / 30 / 2 and 20. Far past noise, away from the ideal.
 
 **Found on the way.** The sweep's per-Body tally read only the first six Bodies, so the first run
 reported no Colony on any new world; fixed, and the batch rerun to the same win column.
+
+## The Tech tree: five rungs (#505)
+
+Clean Manufacturing up to a fourth rung at 58 beside three new Techs (Regolith Printing, Rail Gun
+Freight, Superconductors), the four Victory gates on a fifth at 62; every road 202 Research from
+130. Spec section 6.
+
+**The picture** ([`ticket-505/`](ticket-505/)): [`tree.png`](ticket-505/tree.png), the Tech Tree
+window on turn 1, the Custodians' seat. The fourth column holds the three new Techs and Clean
+Manufacturing; the gates stand in a fifth, each boxed in its Faction's colour; rung 3 is empty in
+the three branches shown, since only Propulsion (below, scrolled) keeps a Tech there.
+
+**The sweep** ([`sweeps/ticket-505.txt`](sweeps/ticket-505.txt)): 3 / 25 / 31 / 1 and 18
+collapses, from 1 / 18 / 49 / 1 and 10. Every gate lands two to three turns later; the tree
+completes in 50 of 80 games, from 65.

@@ -1,4 +1,13 @@
-# COSTS BY RUNG: 18, 32, 48. Coastal Engineering, priced off the rungs, is 15; Nuclear Rockets, priced above its rung on purpose (ticket #393), is 38.
+# COSTS BY RUNG: 18, 32, 48, 58, 62. Coastal Engineering, priced off the rungs, is 15; Nuclear Rockets, priced above its rung on purpose (ticket #393), is 38.
+#
+# Ticket #505 (version 0.1.0.0): FIVE RUNGS. The four Victory gates moved from rung 3 at 48 to rung 5
+# at 62, at the designer's word ("move victory gate techs to level 5 cost of 62"); rung 4 costs 58
+# and holds Clean Manufacturing (moved up from rung 3) and three new Techs, Regolith Printing, Rail
+# Gun Freight and Superconductors, one to a branch, each the last step before its branch's gate.
+# Hardened Hulls and Missile Technology stay on rung 3, so Propulsion, which has no gate, ends there.
+# Every gate is reached for 18 + 32 + 32 + 58 + 62 = 202 Research, all four alike, from 130; the
+# whole tree is 29 Techs and 1,093 Research, from 26 and 853. Nothing is retuned for it here: the
+# fifty-turn ticket fits the length to the deeper tree.
 #
 # Ticket #231 (version 0.08.3): rungs 2 and 3 went 30 to 32 and 45 to 48, and Coastal Engineering
 # 14 to 15, at the designer word. RUNG 1 IS UNCHANGED AT 18, deliberately: the first Tech of the
@@ -79,8 +88,9 @@ value = 0.4
 id = "clean_manufacturing"
 name = "Clean Manufacturing"
 branch = "Stewardship"
-rung = 3
-cost = 48
+# Ticket #505 (version 0.1.0.0): up from rung 3 at 48, the step before Planetary Stewardship.
+rung = 4
+cost = 58
 needs = ["clean_power"]
 effect = "Factory and Refinery Emissions x0.4; Wildfire adds no Emissions"
 value = 0.4
@@ -254,14 +264,16 @@ value = 10.0
 id = "planetary_stewardship"
 name = "Planetary Stewardship"
 branch = "Stewardship"
-rung = 3
-cost = 48
+# Ticket #505 (version 0.1.0.0): rung 5 at 62, through Clean Manufacturing; Clean Power is reached
+# through it and no longer listed.
+rung = 5
+cost = 62
 # Ticket #424 (version 0.09.5): at the end of the Stewardship line, needing the three the designer
-# named -- "instead requires efficient grids, green consensus, and clean power". Drawn stacked
-# under Clean Manufacturing in the line's rung-3 cell. It LISTS only Clean Power and Green Consensus:
-# both need Efficient Grids, so the road is the designer's three, and a line straight from Efficient
+# named -- "instead requires efficient grids, green consensus, and clean power". It LISTED only
+# Clean Power and Green Consensus (until #505 put Clean Manufacturing in Clean Power's place): both
+# need Efficient Grids, so the road is the designer's three, and a line straight from Efficient
 # Grids was only clutter -- "because it already flows though the other two it doesn't need a line".
-needs = ["clean_power", "green_consensus"]
+needs = ["clean_manufacturing", "green_consensus"]
 effect = "Opens the Custodians' Victory Condition; the Natural Sink grows by 1.5 ppm a turn for the world"
 # Ticket #458 (version 0.09.7): 1.5, where it was 1.0.
 value = 1.5
@@ -271,14 +283,16 @@ gate_for = "custodians"
 id = "extraction_charter"
 name = "The Extraction Charter"
 branch = "Extraction"
-rung = 3
-cost = 48
+# Ticket #505 (version 0.1.0.0): rung 5 at 62, through Rail Gun Freight; Automated Refining is
+# reached through it and no longer listed.
+rung = 5
+cost = 62
 # Ticket #242 (version 0.08.3): Beneficiation joins Automated Refining as a prerequisite, at the
 # designer's word -- "beneficiation is now required for extraction charter". It gives the new Tech
 # a place in the branch's spine rather than leaving it a leaf nobody has to take.
 # Ticket #426 (version 0.09.5): Commodity Finance in place of Beneficiation, at the designer's word --
 # "Extraction Charter will require that tech rather than beneficiation; beneficiation stays in the tree".
-needs = ["automated_refining", "commodity_finance"]
+needs = ["rail_gun_freight", "commodity_finance"]
 effect = "Opens the Prospectors' Victory Condition; Mine output x1.25"
 value = 1.25
 gate_for = "prospectors"
@@ -287,11 +301,13 @@ gate_for = "prospectors"
 id = "generation_ships"
 name = "Generation Ships"
 branch = "Off-world Living"
-rung = 3
-cost = 48
+# Ticket #505 (version 0.1.0.0): rung 5 at 62, through Regolith Printing; Closed-Loop Colonies is
+# reached through it and no longer listed.
+rung = 5
+cost = 62
 # Ticket #438 (version 0.09.6): and Relay Networks, at the designer's word ("relay networks needed for
 # generation ship"), so the Arkwrights' road is 130 like every other Faction's.
-needs = ["closed_loop_colonies", "relay_networks"]
+needs = ["regolith_printing", "relay_networks"]
 effect = "Opens the Arkwrights' Victory Condition; a Colony Ship carries +2 Colonists"
 value = 2.0
 gate_for = "arkwrights"
@@ -300,8 +316,10 @@ gate_for = "arkwrights"
 id = "the_upload"
 name = "The Upload"
 branch = "Society"
-rung = 3
-cost = 48
+# Ticket #505 (version 0.1.0.0): rung 5 at 62, through Superconductors; Orbital Data Centers is
+# reached through it and no longer listed.
+rung = 5
+cost = 62
 # Ticket #245 (version 0.08.3): Expanded Habitats was removed for a DRAWING reason that turned into
 # a rules decision -- the edge from Expanded Habitats ran right, passed underneath the Generation
 # Ships box (lines are painted before boxes) and turned down to here, so on screen it read as an
@@ -328,7 +346,7 @@ cost = 48
 #
 # Ticket #433 (version 0.09.5): and Orbital Data Centers beside it, at the designer's word ("q3 B"),
 # so the road is Large Language Models, Civil Defense, Orbital Data Centers and The Upload: 130.
-needs = ["civil_defense", "orbital_data_centers"]
+needs = ["civil_defense", "superconductors"]
 effect = "Opens the Archivists' Victory Condition; Region, Lab and Observatory Research x1.25"
 value = 1.25
 gate_for = "archivists"
@@ -484,3 +502,52 @@ cost = 32
 needs = ["public_science"]
 effect = "Observatory Research x1.5"
 value = 1.5
+
+# Ticket #505 (version 0.1.0.0): the three rung-4 Techs, one to a branch, each the last step before
+# its branch's gate, at the rung's 58. Appended last with their enum variants, as every Tech since
+# #232 has been.
+
+# Regolith Printing, Off-world Living rung 4, needing Closed-Loop Colonies. The designer: "something
+# to do with using regolith to print habs (reduce off world construction costs)". Every Module built
+# at a place off Earth -- a ground Colony on any other Body, or any Space Station -- costs `value`
+# of its Materials and `widgets_multiplier` of its Widgets, inside the Faction's discount and Build
+# Where You Dig, so the in-situ floor (half the row) still holds. Antarctica is on Earth and pays
+# the full price.
+[[tech]]
+id = "regolith_printing"
+name = "Regolith Printing"
+branch = "Off-world Living"
+rung = 4
+cost = 58
+needs = ["closed_loop_colonies"]
+effect = "Modules off Earth cost x0.75 Materials and x0.85 Widgets"
+value = 0.75
+widgets_multiplier = 0.85
+
+# Rail Gun Freight, Extraction rung 4, needing Automated Refining. The designer: "something to do
+# with commercializing rail guns ... +3 ducats per rail gun". A rail gun is the Mass Driver: every
+# working one pays its holder `value` Ducats a turn, flat, beside what it already does for Fuel and
+# Mines. `value` is ADDITIVE, read through `tech_addition`.
+[[tech]]
+id = "rail_gun_freight"
+name = "Rail Gun Freight"
+branch = "Extraction"
+rung = 4
+cost = 58
+needs = ["automated_refining"]
+effect = "Each working Mass Driver pays 3 Ducats a turn"
+value = 3
+
+# Superconductors, Society rung 4, needing Orbital Data Centers. Chosen for the Archive's twelve
+# Energy a turn, the dearest upkeep in the game: every Energy output -- Power Plant, Generator,
+# Solar Array, Heliostat, and the Reactor through the Power Plant's job -- makes x1.25, inside the
+# same chain as Efficient Grids.
+[[tech]]
+id = "superconductors"
+name = "Superconductors"
+branch = "Society"
+rung = 4
+cost = 58
+needs = ["orbital_data_centers"]
+effect = "Energy output x1.25"
+value = 1.25

@@ -416,6 +416,10 @@ pub struct TechCard {
     /// Ticket #413 (version 0.09.4): Fuel this Tech adds to every Ship's tank (Clean Propellant).
     #[serde(default)]
     pub tank_fuel: f64,
+    /// Ticket #505 (version 0.1.0.0): what this Tech multiplies a Module's Widgets by, where it has
+    /// its own figure for them (Regolith Printing); `value` is the Materials'. Absent, `value`.
+    #[serde(default)]
+    pub widgets_multiplier: Option<f64>,
     #[serde(default)]
     pub influence_threshold_multiplier: Option<f64>,
     /// Ticket #84 (version 0.06.0): the Faction whose Victory Condition this Tech opens, if any.

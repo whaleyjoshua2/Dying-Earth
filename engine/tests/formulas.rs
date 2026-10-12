@@ -4602,8 +4602,10 @@ fn f_coastal_engineering_is_the_thirteenth_tech() {
     // Ticket #420 (version 0.09.4): twenty-four, with Cryogenic Tanks on Propulsion rung 2.
     // Ticket #426 (version 0.09.5): twenty-five, with Commodity Finance on Extraction rung 2.
     // Ticket #433 (version 0.09.5): twenty-six, with Orbital Data Centers on Society rung 2.
-    assert_eq!(TechId::ALL.len(), 26, "thirteen Techs, the four gates, Civil Defense, #232's two, Missile Technology, Nuclear Rockets, Orbital Refuelling, Cryogenic Tanks, Commodity Finance and Orbital Data Centers");
-    assert_eq!(g.tables.techs.len(), 26, "and twenty-six rows in techs.toml");
+    // Ticket #505 (version 0.1.0.0): twenty-nine, with Regolith Printing, Rail Gun Freight and
+    // Superconductors on rung 4.
+    assert_eq!(TechId::ALL.len(), 29, "thirteen Techs, the four gates, Civil Defense, #232's two, Missile Technology, Nuclear Rockets, Orbital Refuelling, Cryogenic Tanks, Commodity Finance, Orbital Data Centers and #505's three");
+    assert_eq!(g.tables.techs.len(), 29, "and twenty-nine rows in techs.toml");
     let c = g.tables.tech(TechId::CoastalEngineering);
     assert_eq!(c.name, "Coastal Engineering");
     assert_eq!(c.branch, "Stewardship", "Industry renamed on ticket #424");
@@ -4618,7 +4620,11 @@ fn f_coastal_engineering_is_the_thirteenth_tech() {
     let on_rung = |r: u32| -> Vec<&str> { TechId::ALL.into_iter().map(|t| g.tables.tech(t)).filter(|t| t.branch == "Stewardship" && t.rung == r).map(|t| t.name.as_str()).collect() };
     assert_eq!(on_rung(1), vec!["Efficient Grids", "Coastal Engineering"], "two boxes on Stewardship rung 1");
     assert_eq!(on_rung(2), vec!["Clean Power", "Green Consensus"]);
-    assert_eq!(on_rung(3), vec!["Clean Manufacturing", "Planetary Stewardship"], "Planetary Stewardship the lower box");
+    // Ticket #505 (version 0.1.0.0): Clean Manufacturing up to rung 4 and the gate to rung 5, so the
+    // line's rung 3 is empty.
+    assert!(on_rung(3).is_empty(), "nothing on Stewardship rung 3 since ticket #505");
+    assert_eq!(on_rung(4), vec!["Clean Manufacturing"]);
+    assert_eq!(on_rung(5), vec!["Planetary Stewardship"]);
     // The Sea Wall's card names it as its unlock, and there are fifteen Facilities in version
     // 0.08.0: ten through version 0.07, the School on ticket #185, and the four Unique Facilities on
     // tickets #182 to #186 -- the Investment Bank, the Spaceport, the Reactor and the Academy.
@@ -5942,7 +5948,8 @@ fn coastal_engineering_sits_on_rung_one_below_its_rungs_cost_with_no_prerequisit
     // Ticket #424 (version 0.09.5): and back again, the other way -- Green Consensus moved to the
     // Stewardship line and needs Efficient Grids, and the gate needs all three.
     assert_eq!(g.tables.tech(TechId::GreenConsensus).needs, vec![TechId::EfficientGrids], "Efficient Grids since ticket #424");
-    assert_eq!(g.tables.tech(TechId::PlanetaryStewardship).needs, vec![TechId::CleanPower, TechId::GreenConsensus], "the designer's three, Efficient Grids through both");
+    // Ticket #505 (version 0.1.0.0): Clean Manufacturing in place of Clean Power, reached through it.
+    assert_eq!(g.tables.tech(TechId::PlanetaryStewardship).needs, vec![TechId::CleanManufacturing, TechId::GreenConsensus], "the designer's three and Clean Manufacturing, Efficient Grids through both");
     let w = g.tables.facility(FacilityKind::SeaWall);
     assert_eq!((w.materials, w.widgets), (20, 8), "20 Materials since ticket #77; 8 Widgets since ticket #332");
 }
@@ -6841,35 +6848,37 @@ fn the_four_gates_stand_on_rung_three_at_one_price_with_their_prerequisites() {
     let g = game();
     let gates = [
         // Ticket #424 (version 0.09.5): the designer's three, the whole road in Stewardship.
-        (FactionKind::Custodians, TechId::PlanetaryStewardship, vec![TechId::CleanPower, TechId::GreenConsensus]),
+        // Ticket #505 (version 0.1.0.0): every gate on rung 5 at 62, through its branch's rung-4
+        // Tech, which stands in for the rung-2 Tech under it.
+        (FactionKind::Custodians, TechId::PlanetaryStewardship, vec![TechId::CleanManufacturing, TechId::GreenConsensus]),
         // Ticket #242 (version 0.08.3): Beneficiation joined, so the new Tech sits in the
         // branch's spine rather than being a leaf nobody has to take.
         // Ticket #426 (version 0.09.5): Commodity Finance in its place, at the designer's word.
-        (FactionKind::Prospectors, TechId::ExtractionCharter, vec![TechId::AutomatedRefining, TechId::CommodityFinance]),
+        (FactionKind::Prospectors, TechId::ExtractionCharter, vec![TechId::RailGunFreight, TechId::CommodityFinance]),
         // Ticket #438 (version 0.09.6): and Relay Networks, at the designer's word.
-        (FactionKind::Arkwrights, TechId::GenerationShips, vec![TechId::ClosedLoopColonies, TechId::RelayNetworks]),
+        (FactionKind::Arkwrights, TechId::GenerationShips, vec![TechId::RegolithPrinting, TechId::RelayNetworks]),
         // Ticket #245 (version 0.08.3): Expanded Habitats dropped, and with it the edge that read
         // on screen as an unrelated line into Generation Ships. Ticket #246: and Public Science
         // dropped too, for Closed-Loop Colonies -- the Archive stands at a Colony off Earth, so the
         // Tech that makes such a Colony liveable is what opens its door.
         // Ticket #424 (version 0.09.5): back into Society, through Civil Defense, which needs Large
         // Language Models (Public Science renamed).
-        (FactionKind::Archivists, TechId::TheUpload, vec![TechId::CivilDefense, TechId::OrbitalDataCenters]),
+        (FactionKind::Archivists, TechId::TheUpload, vec![TechId::CivilDefense, TechId::Superconductors]),
     ];
     // Ticket #117 (version 0.07.1): rung 3 went 40 to 44, a tenth rounded to the nearest. What the
     // ticket guards is that no Faction's gate is dearer than another's, so the figure is checked
     // against the rung rather than against a literal repeated four times.
-    let rung_three = g.tables.tech(TechId::PlanetaryStewardship).cost;
-    assert_eq!(rung_three, 48, "rung 3 costs 48 since ticket #231 (version 0.08.3); 45 from #142, 44 from #117, 40 before");
+    let gate_cost = g.tables.tech(TechId::PlanetaryStewardship).cost;
+    assert_eq!(gate_cost, 62, "the gates cost 62 on rung 5 since ticket #505 (version 0.1.0.0); 48 on rung 3 since #231, 45 from #142, 44 from #117, 40 before");
     for (kind, t, needs) in gates {
         let card = g.tables.tech(t);
-        assert_eq!(card.rung, 3, "{t:?}");
-        assert_eq!(card.cost, rung_three, "every gate costs the same: {t:?}");
+        assert_eq!(card.rung, 5, "{t:?}");
+        assert_eq!(card.cost, gate_cost, "every gate costs the same: {t:?}");
         assert_eq!(card.gate_for, Some(kind), "{t:?}");
         assert_eq!(card.needs, needs, "{t:?}");
         assert_eq!(g.tables.victory_gate(kind), Some(t));
     }
-    assert_eq!(TechId::ALL.len(), 26, "eighteen, Beneficiation and Relay Networks since ticket #232, Missile Technology since #343, Nuclear Rockets since #393, Orbital Refuelling since #413, Cryogenic Tanks since #420, Commodity Finance since #426, Orbital Data Centers since #433");
+    assert_eq!(TechId::ALL.len(), 29, "eighteen, Beneficiation and Relay Networks since ticket #232, Missile Technology since #343, Nuclear Rockets since #393, Orbital Refuelling since #413, Cryogenic Tanks since #420, Commodity Finance since #426, Orbital Data Centers since #433, three on rung 4 since #505");
     // Version 0.08.3 moved three of the four gates' prerequisites in three separate tickets, and
     // nothing watched how deep each gate ended up. Counted as Techs that must stand before the
     // gate is reachable, the gate excluded.
@@ -6888,12 +6897,13 @@ fn the_four_gates_stand_on_rung_three_at_one_price_with_their_prerequisites() {
     // so the whole Archive chain sits behind those four.
     // Ticket #424 (version 0.09.5): the Archivists' two, all in Society; the Custodians' three,
     // all in Stewardship.
-    assert_eq!(depth(TechId::TheUpload), 3, "the Archivists' gate, two deep since ticket #424, three since #433");
-    assert_eq!(depth(TechId::PlanetaryStewardship), 3, "the Custodians', three since ticket #424");
+    // Ticket #505 (version 0.1.0.0): four each, the rung-4 Tech on every road.
+    assert_eq!(depth(TechId::TheUpload), 4, "the Archivists' gate, two deep since ticket #424, three since #433, four since #505");
+    assert_eq!(depth(TechId::PlanetaryStewardship), 4, "the Custodians', three since ticket #424, four since #505");
     // Ticket #425 (version 0.09.5): Clean Power off Closed-Loop Colonies, Efficient Grids off
     // Automated Refining -- no road leaves its own row now.
-    assert_eq!(depth(TechId::GenerationShips), 3, "the Arkwrights', Expanded Habitats, Closed-Loop Colonies and, since ticket #438, Relay Networks");
-    assert_eq!(depth(TechId::ExtractionCharter), 3, "the Prospectors', Deep Mining, Automated Refining and Commodity Finance");
+    assert_eq!(depth(TechId::GenerationShips), 4, "the Arkwrights', Expanded Habitats, Closed-Loop Colonies, since ticket #438 Relay Networks and since #505 Regolith Printing");
+    assert_eq!(depth(TechId::ExtractionCharter), 4, "the Prospectors', Deep Mining, Automated Refining, Commodity Finance and since #505 Rail Gun Freight");
 }
 
 /// Ticket #84: with both parts at their bars the Custodians still do not win until Planetary
@@ -6945,7 +6955,8 @@ fn the_gates_general_bonuses_are_for_everyone() {
 fn the_ai_picks_its_gate_as_lead_once_past_half_or_from_turn_24() {
     let mut g = game();
     let cus = Seat(0);
-    for t in [TechId::PublicScience, TechId::CoastalEngineering, TechId::EfficientGrids, TechId::CleanPower, TechId::GreenConsensus] {
+    // Ticket #505 (version 0.1.0.0): and Clean Manufacturing, which the gate needs now.
+    for t in [TechId::PublicScience, TechId::CoastalEngineering, TechId::EfficientGrids, TechId::CleanPower, TechId::GreenConsensus, TechId::CleanManufacturing] {
         with_tech(&mut g, t);
     }
     g.turn = 5;
@@ -10572,17 +10583,20 @@ fn the_tree_costs_eighteen_thirty_two_and_forty_eight_by_rung() {
         if t == TechId::CoastalEngineering || t == TechId::NuclearRockets || t == TechId::OrbitalRefuelling {
             continue;
         }
+        // Ticket #505 (version 0.1.0.0): rung 4 at 58 and the gates' rung 5 at 62.
         let want = match card.rung {
             1 => 18,
             2 => 32,
-            _ => 48,
+            3 => 48,
+            4 => 58,
+            _ => 62,
         };
         assert_eq!(card.cost, want, "rung {} costs {want}: {t:?}", card.rung);
     }
     let total: i64 = TechId::ALL.into_iter().map(|t| g.tables.tech(t).cost).sum();
     assert_eq!(g.tables.tech(TechId::NuclearRockets).cost, 38, "priced above its rung");
     assert_eq!(g.tables.tech(TechId::OrbitalRefuelling).cost, 22, "priced above its rung");
-    assert_eq!(total, 853, "the whole tree since ticket #433's Orbital Data Centers (32 on rung 2); 821 from #426's Commodity Finance (32 on rung 2); 789 from #420's Cryogenic Tanks (32 on rung 2); 757 from #413's Orbital Refuelling (22 on rung 1); 735 from #393, 697 from #343, 649 from #232, 585 from #231, 554 from #201, 507 before that");
+    assert_eq!(total, 1093, "the whole tree since ticket #505's five rungs (the gates 48 to 62, Clean Manufacturing 48 to 58, three new at 58); 853 since ticket #433's Orbital Data Centers (32 on rung 2); 821 from #426's Commodity Finance (32 on rung 2); 789 from #420's Cryogenic Tanks (32 on rung 2); 757 from #413's Orbital Refuelling (22 on rung 1); 735 from #393, 697 from #343, 649 from #232, 585 from #231, 554 from #201, 507 before that");
 }
 
 // ------------------------------------------------------- 0.08.1 ticket #208: the School's step
@@ -16834,6 +16848,8 @@ fn a_computer_seat_picks_its_gate_chain_then_propulsion_then_the_cheapest() {
     g.research.done.push(TechId::EfficientGrids);
     g.research.done.push(TechId::CleanPower);
     g.research.done.push(TechId::GreenConsensus);
+    // Ticket #505 (version 0.1.0.0): and Clean Manufacturing, the road's fourth.
+    g.research.done.push(TechId::CleanManufacturing);
     g.research.shortlist.clear();
     assert!(g.available_techs().contains(&TechId::CoastalEngineering), "the cheapest Tech on the board is open");
     // Ticket #413 (version 0.09.4): Orbital Refuelling heads the Propulsion chain.
@@ -18342,17 +18358,19 @@ fn each_victory_tech_ends_a_line_of_its_own() {
     assert_eq!(t.tech(TechId::GreenConsensus).needs, vec![TechId::EfficientGrids], "Green Consensus needs Efficient Grids");
     let mut ps = t.tech(TechId::PlanetaryStewardship).needs.clone();
     ps.sort_by_key(|x| x.index());
-    assert_eq!(ps, vec![TechId::CleanPower, TechId::GreenConsensus], "the designer's three, Efficient Grids reached through both");
-    assert_eq!(names(t.gate_chain(FactionKind::Custodians)), vec!["Efficient Grids", "Clean Power", "Green Consensus"]);
-    assert_eq!(price(FactionKind::Custodians), 130, "18 + 32 + 32 + 48");
+    // Ticket #505 (version 0.1.0.0): Clean Manufacturing in place of Clean Power, which is reached through it.
+    assert_eq!(ps, vec![TechId::CleanManufacturing, TechId::GreenConsensus], "the designer's three and Clean Manufacturing, Efficient Grids reached through both");
+    assert_eq!(names(t.gate_chain(FactionKind::Custodians)), vec!["Efficient Grids", "Clean Power", "Green Consensus", "Clean Manufacturing"]);
+    assert_eq!(price(FactionKind::Custodians), 202, "18 + 32 + 32 + 58 + 62 since ticket #505; 130 before");
     // The Archivists: the whole road in Society.
     assert_eq!(line(TechId::TheUpload), "Society");
     // Ticket #433 (version 0.09.5): and Orbital Data Centers beside Civil Defense, both needing
     // Large Language Models.
-    assert_eq!(t.tech(TechId::TheUpload).needs, vec![TechId::CivilDefense, TechId::OrbitalDataCenters], "The Upload needs Civil Defense and Orbital Data Centers");
+    // Ticket #505 (version 0.1.0.0): Superconductors in place of Orbital Data Centers, which is reached through it.
+    assert_eq!(t.tech(TechId::TheUpload).needs, vec![TechId::CivilDefense, TechId::Superconductors], "The Upload needs Civil Defense and Superconductors");
     assert!(t.gate_chain(FactionKind::Archivists).iter().all(|x| line(*x) == "Society"), "no Tech outside Society on the Archivists' road");
-    assert_eq!(names(t.gate_chain(FactionKind::Archivists)), vec!["Large Language Models", "Civil Defense", "Orbital Data Centers"]);
-    assert_eq!(price(FactionKind::Archivists), 130, "18 + 32 + 32 + 48, 98 before ticket #433");
+    assert_eq!(names(t.gate_chain(FactionKind::Archivists)), vec!["Large Language Models", "Civil Defense", "Orbital Data Centers", "Superconductors"]);
+    assert_eq!(price(FactionKind::Archivists), 202, "18 + 32 + 32 + 58 + 62 since ticket #505; 130 before, 98 before ticket #433");
     // Each list opens with its own chain: the first entries are the chain and nothing else.
     for k in FactionKind::ALL {
         let chain = t.gate_chain(k);
@@ -18380,9 +18398,10 @@ fn four_prerequisites_moved_at_the_designers_word() {
     assert_eq!(t.tech(TechId::EfficientTransit).needs, vec![TechId::OrbitalRefuelling], "Orbital Refuelling in place of Clean Propellant");
     assert!(!t.gate_chain(FactionKind::Prospectors).contains(&TechId::EfficientGrids), "the Charter no longer reaches Efficient Grids");
     assert!(!t.gate_chain(FactionKind::Arkwrights).contains(&TechId::CleanPower), "Generation Ships no longer reaches Clean Power");
-    assert_eq!(price(FactionKind::Prospectors), 130, "Deep Mining, Automated Refining, Beneficiation and the Charter, 148 before");
+    // Ticket #505 (version 0.1.0.0): 202 each, the rung-4 Tech and the gate at 62 on every road.
+    assert_eq!(price(FactionKind::Prospectors), 202, "Deep Mining, Automated Refining, Commodity Finance, Rail Gun Freight and the Charter; 130 before #505, 148 before #425");
     // Ticket #438 (version 0.09.6): 130 since Generation Ships needs Relay Networks as well.
-    assert_eq!(price(FactionKind::Arkwrights), 130, "Expanded Habitats, Closed-Loop Colonies, Relay Networks and Generation Ships, 98 before");
+    assert_eq!(price(FactionKind::Arkwrights), 202, "Expanded Habitats, Closed-Loop Colonies, Relay Networks, Regolith Printing and Generation Ships; 130 before #505, 98 before #438");
     for k in FactionKind::ALL {
         let chain = t.gate_chain(k);
         let order = &t.ai_tech_picks(k).order;
@@ -18414,12 +18433,13 @@ fn commodity_finance_stands_in_for_beneficiation_under_the_charter() {
     let c = t.tech(TechId::CommodityFinance);
     assert_eq!((c.name.as_str(), c.branch.as_str(), c.rung, c.cost), ("Commodity Finance", "Extraction", 2, 32));
     assert_eq!(c.needs, vec![TechId::DeepMining]);
-    assert_eq!(t.tech(TechId::ExtractionCharter).needs, vec![TechId::AutomatedRefining, TechId::CommodityFinance]);
+    // Ticket #505 (version 0.1.0.0): Rail Gun Freight in place of Automated Refining, reached through it.
+    assert_eq!(t.tech(TechId::ExtractionCharter).needs, vec![TechId::RailGunFreight, TechId::CommodityFinance]);
     assert!(t.techs.iter().all(|x| !x.needs.contains(&TechId::Beneficiation)), "Beneficiation leads nowhere");
     let chain = t.gate_chain(FactionKind::Prospectors);
     assert!(!chain.contains(&TechId::Beneficiation) && chain.contains(&TechId::CommodityFinance));
-    assert_eq!(chain.iter().map(|x| t.tech(*x).cost).sum::<i64>() + t.tech(TechId::ExtractionCharter).cost, 130, "the road stays 130");
-    assert_eq!(TechId::ALL.len(), 26, "twenty-five with it, twenty-six since #433's Orbital Data Centers");
+    assert_eq!(chain.iter().map(|x| t.tech(*x).cost).sum::<i64>() + t.tech(TechId::ExtractionCharter).cost, 202, "the road, 130 until ticket #505's rung-4 Tech and rung-5 gate");
+    assert_eq!(TechId::ALL.len(), 29, "twenty-five with it, twenty-six since #433's Orbital Data Centers, twenty-nine since #505");
 }
 
 /// Ticket #426: **every Bank, Investment Bank, Trade Post and Exchange pays its Ducats x1.15** once
@@ -18505,9 +18525,11 @@ fn orbital_data_centers_lifts_the_observatory_and_opens_the_upload() {
     let c = t.tech(TechId::OrbitalDataCenters);
     assert_eq!((c.name.as_str(), c.branch.as_str(), c.rung, c.cost, c.value), ("Orbital Data Centers", "Society", 2, 32, 1.5));
     assert_eq!(c.needs, vec![TechId::PublicScience]);
-    assert_eq!(t.tech(TechId::TheUpload).needs, vec![TechId::CivilDefense, TechId::OrbitalDataCenters]);
+    // Ticket #505 (version 0.1.0.0): The Upload reaches it through Superconductors; the road is 202.
+    assert_eq!(t.tech(TechId::TheUpload).needs, vec![TechId::CivilDefense, TechId::Superconductors]);
+    assert_eq!(t.tech(TechId::Superconductors).needs, vec![TechId::OrbitalDataCenters]);
     let chain = t.gate_chain(FactionKind::Archivists);
-    assert_eq!(chain.iter().map(|x| t.tech(*x).cost).sum::<i64>() + t.tech(TechId::TheUpload).cost, 130);
+    assert_eq!(chain.iter().map(|x| t.tech(*x).cost).sum::<i64>() + t.tech(TechId::TheUpload).cost, 202, "130 until ticket #505");
     let mut g = game();
     let s = Seat(0);
     let moon = colony(&mut g, s, BodyId::Moon, &[ModuleKind::Observatory], 4);
@@ -18820,10 +18842,11 @@ fn colonists_unloaded_onto_a_station_blend_their_education() {
 fn generation_ships_needs_relay_networks_and_every_road_costs_130() {
     let t = tables();
     let price = |k: FactionKind| -> i64 { t.gate_chain(k).iter().map(|x| t.tech(*x).cost).sum::<i64>() + t.tech(t.victory_gate(k).unwrap()).cost };
-    assert_eq!(t.tech(TechId::GenerationShips).needs, vec![TechId::ClosedLoopColonies, TechId::RelayNetworks]);
+    // Ticket #505 (version 0.1.0.0): Regolith Printing in place of Closed-Loop Colonies, reached through it.
+    assert_eq!(t.tech(TechId::GenerationShips).needs, vec![TechId::RegolithPrinting, TechId::RelayNetworks]);
     assert_eq!(t.tech(TechId::RelayNetworks).cost, 32);
     for k in FactionKind::ALL {
-        assert_eq!(price(k), 130, "the {k:?} road");
+        assert_eq!(price(k), 202, "the {k:?} road, 130 until ticket #505");
     }
     let order = &t.ai_tech_picks(FactionKind::Arkwrights).order;
     assert_eq!(order[..3], [TechId::ExpandedHabitats, TechId::ClosedLoopColonies, TechId::RelayNetworks], "the Arkwrights' list opens with its road");
@@ -21321,4 +21344,101 @@ fn ticket_502_a_missing_gulf_refuses_the_table() {
     let err = Tables::load(&dir).expect_err("a missing gulf is refused");
     assert!(format!("{err:?}").contains("ceres and vesta"), "and the refusal names the pair: {err:?}");
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+// ---------------------------------------------------------------- Ticket #505 (version 0.1.0.0): the gates on rung 5, new rung-4 Techs
+
+/// Ticket #505: **five rungs.** Rung 4 costs 58 and holds Clean Manufacturing (up from rung 3) and
+/// three new Techs, one to a branch; the four gates stand on rung 5 at 62, each needing its
+/// branch's rung-4 Tech and the other rung-2 Tech on its road. Every road is 202, the tree 29 Techs
+/// and 1,093 Research. Each computer seat's list opens with its whole road, and the new Techs are
+/// on no rival's list.
+#[test]
+fn the_gates_stand_on_rung_five_behind_a_rung_four_tech_of_their_own_branch() {
+    let t = tables();
+    assert_eq!(TechId::ALL.len(), 29);
+    let on_rung = |r: u32| -> Vec<TechId> { TechId::ALL.into_iter().filter(|x| t.tech(*x).rung == r).collect() };
+    assert_eq!(on_rung(4), vec![TechId::CleanManufacturing, TechId::RegolithPrinting, TechId::RailGunFreight, TechId::Superconductors]);
+    assert!(on_rung(4).iter().all(|x| t.tech(*x).cost == 58), "rung 4 costs 58");
+    assert_eq!(on_rung(5), vec![TechId::PlanetaryStewardship, TechId::ExtractionCharter, TechId::GenerationShips, TechId::TheUpload]);
+    assert_eq!(on_rung(3), vec![TechId::HardenedHulls, TechId::MissileTechnology], "Propulsion alone keeps rung 3");
+    let fourth = [(FactionKind::Custodians, TechId::CleanManufacturing, TechId::CleanPower), (FactionKind::Prospectors, TechId::RailGunFreight, TechId::AutomatedRefining), (FactionKind::Arkwrights, TechId::RegolithPrinting, TechId::ClosedLoopColonies), (FactionKind::Archivists, TechId::Superconductors, TechId::OrbitalDataCenters)];
+    for (k, step, under) in fourth {
+        let gate = t.victory_gate(k).unwrap();
+        assert_eq!((t.tech(gate).rung, t.tech(gate).cost), (5, 62), "{k:?}");
+        assert_eq!(t.tech(step).needs, vec![under], "{step:?} needs the rung-2 Tech under it alone");
+        assert_eq!(t.tech(step).branch, t.tech(gate).branch, "{step:?} is in its gate's branch");
+        assert!(t.tech(gate).needs.contains(&step) && !t.tech(gate).needs.contains(&under), "the gate lists {step:?} and not {under:?}, reached through it");
+        let chain = t.gate_chain(k);
+        assert_eq!(chain.len(), 4, "{k:?}");
+        assert_eq!(chain.iter().map(|x| t.tech(*x).cost).sum::<i64>() + t.tech(gate).cost, 202, "the {k:?} road is 18 + 32 + 32 + 58 + 62");
+        let order = &t.ai_tech_picks(k).order;
+        assert_eq!(order[3], step, "the {k:?} list takes {step:?} fourth, straight after its rung-2 pair");
+        for other in FactionKind::ALL.into_iter().filter(|o| *o != k) {
+            assert!(!t.ai_tech_picks(other).order.contains(&step), "{step:?} is on no rival's list ({other:?})");
+        }
+    }
+    let total: i64 = TechId::ALL.into_iter().map(|x| t.tech(x).cost).sum();
+    assert_eq!(total, 1093, "the whole tree");
+}
+
+/// Ticket #505: **Regolith Printing** -- a Module built off Earth costs x0.75 Materials and x0.85
+/// Widgets, inside the Faction's discount and Build Where You Dig, so the in-situ floor still
+/// holds; a Module at Antarctica pays the full price.
+#[test]
+fn regolith_printing_cuts_a_modules_materials_and_widgets_off_earth_inside_the_floor() {
+    let mut g = game();
+    let s = Seat(0);
+    let moon = colony(&mut g, s, BodyId::Moon, &[], 3);
+    let dig = colony(&mut g, s, BodyId::Moon, &[ModuleKind::Mine, ModuleKind::Mine], 3);
+    let ice = colony(&mut g, s, BodyId::Earth, &[], 3);
+    let hab = ModuleKind::Habitat;
+    let row = g.tables.module(hab).materials as f64;
+    let plain = g.module_materials_at(s, moon, hab);
+    let plain_widgets = g.build_widgets_at(s, Place::Colony(moon), BuildItem::Module(hab));
+    assert_eq!(g.module_materials_at(s, dig, hab), row * g.tables.in_situ.two_mines, "two Mines, above the floor still");
+    with_tech(&mut g, TechId::RegolithPrinting);
+    assert_eq!(g.module_materials_at(s, moon, hab), tenth(plain * 0.75), "x0.75 Materials on the Moon");
+    assert_eq!(g.build_widgets_at(s, Place::Colony(moon), BuildItem::Module(hab)), ((plain_widgets as f64 * 0.85).floor() as u32).max(1), "x0.85 Widgets on the Moon, rounded down");
+    assert_eq!(g.module_materials_at(s, dig, hab), row * g.tables.in_situ.floor, "two Mines and the Tech would go below the floor, which holds");
+    assert_eq!(g.module_materials_at(s, ice, hab), plain, "Antarctica is on Earth: the full price");
+    assert_eq!(g.build_widgets_at(s, Place::Colony(ice), BuildItem::Module(hab)), plain_widgets);
+    // The order's cost reads the same figures.
+    let cost = g.order_cost(s, &Order::BuildModule { colony: moon, kind: hab });
+    assert_eq!(cost.materials, tenth(plain * 0.75));
+}
+
+/// Ticket #505: **Rail Gun Freight** -- every working Mass Driver pays its holder 3 Ducats at
+/// Income, flat; a mothballed one nothing; nothing at all without the Tech.
+#[test]
+fn rail_gun_freight_pays_three_ducats_a_turn_for_each_working_mass_driver() {
+    let mut g = game();
+    let s = Seat(0);
+    let moon = colony(&mut g, s, BodyId::Moon, &[ModuleKind::Mine, ModuleKind::MassDriver], 3);
+    let plain = income_of(&mut g, s).ducats;
+    with_tech(&mut g, TechId::RailGunFreight);
+    assert_eq!(income_of(&mut g, s).ducats, plain + 3.0, "3 Ducats for the Mass Driver");
+    let i = g.colony(moon).unwrap().modules.iter().position(|m| m.kind == ModuleKind::MassDriver).unwrap();
+    let y = g.module_yield_at(s, moon, i);
+    assert_eq!((y.resource, y.amount), (Some(Resource::Ducats), 3.0));
+    assert!(y.detail.as_deref().is_some_and(|d| d.contains("3 Ducats")), "the card says so: {:?}", y.detail);
+    g.colony_mut(moon).unwrap().modules[i].mothballed = true;
+    assert_eq!(income_of(&mut g, s).ducats, plain, "a mothballed one pays nothing");
+}
+
+/// Ticket #505: **Superconductors** -- every Energy output x1.25: a Power Plant and a Generator
+/// here, in the same chain as Efficient Grids, so the two multiply.
+#[test]
+fn superconductors_lift_every_energy_output_by_a_quarter() {
+    let mut g = game();
+    g.state_mut(StateId::EastAsia).facilities = vec![facility(FacilityKind::PowerPlant)];
+    colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Generator], 0);
+    // Power Plant 6; Generator 5 x 1.375 on the Moon = 6.9; less the ISS's and the Colony's Core Modules.
+    assert_eq!(income_of(&mut g, Seat(0)).energy, 6.0 + 6.9 - 2.0);
+    with_tech(&mut g, TechId::Superconductors);
+    // 6 x 1.25 = 7.5; 5 x 1.375 x 1.25 = 8.6.
+    assert_eq!(income_of(&mut g, Seat(0)).energy, tenth(7.5 + 8.6 - 2.0), "x1.25 on both");
+    with_tech(&mut g, TechId::EfficientGrids);
+    // 6 x 1.5 x 1.25 = 11.3; 5 x 1.375 x 1.5 x 1.25 = 12.9.
+    assert_eq!(income_of(&mut g, Seat(0)).energy, tenth(11.3 + 12.9 - 2.0), "and Efficient Grids multiplies with it");
 }

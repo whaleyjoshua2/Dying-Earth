@@ -10277,7 +10277,8 @@ fn module_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     for (oi, (kind, pi)) in ordered.iter().enumerate() {
         // Ticket #291: ordered this turn; right-click takes the order back. Ticket #332: the face
         // reads `0 of 8`, nothing being done on it until the turn ends; the hover the estimate.
-        let widgets = game.build_widgets(Seat(0), BuildItem::Module(*kind));
+        // Ticket #505 (version 0.1.0.0): at this Colony's figure, which Regolith Printing cuts.
+        let widgets = game.build_widgets_at(Seat(0), Place::Colony(cid), BuildItem::Module(*kind));
         let turns = game.turns_to_build(Seat(0), Place::Colony(cid), BuildItem::Module(*kind));
         let tip = format!("{}: ordered this turn, {widgets} Widgets, {} once the turn ends.\nRight-click to cancel the order.", kind.name(), estimate_words(turns));
         if hab_tile(ui, tile_rect(i), ui.id().with(("hab-ordered", oi)), Some(crate::icons::module_icon(*kind)), kind.name(), TileState::Building { ordered: true, done: 0, widgets }, false, None, tip).secondary_clicked() {

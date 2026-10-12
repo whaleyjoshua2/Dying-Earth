@@ -762,6 +762,14 @@ impl Game {
         if kind == ModuleKind::MassDriver {
             let md = &t.mass_driver;
             y.detail = Some(format!("departures from here {:.0}% less Fuel; each Mine here +{} Materials", md.fuel_cut * 100.0, md.mine_bonus));
+            // Ticket #505 (version 0.1.0.0): and with Rail Gun Freight it pays Ducats, flat.
+            let freight = self.tech_addition(seat, TechId::RailGunFreight);
+            if freight > 0 {
+                y.resource = Some(Resource::Ducats);
+                y.amount = freight as f64;
+                y.chain = Chain::base(freight as f64, "for Rail Gun Freight");
+                y.detail = Some(format!("{freight} Ducats a turn for Rail Gun Freight; departures from here {:.0}% less Fuel; each Mine here +{} Materials", md.fuel_cut * 100.0, md.mine_bonus));
+            }
         }
         // Ticket #51: the Archive draws its Energy only once it is complete; ticket #68: that is
         // standing with its Research paid in full. Until then it costs nothing to run.
@@ -1051,7 +1059,8 @@ impl Game {
             m *= self.solar_maximum_multiplier();
         }
         match kind {
-            FacilityKind::PowerPlant => m *= self.tech_multiplier(seat, TechId::EfficientGrids),
+            // Ticket #505 (version 0.1.0.0): Superconductors, on every Energy output, in this chain.
+            FacilityKind::PowerPlant => m *= self.tech_multiplier(seat, TechId::EfficientGrids) * self.tech_multiplier(seat, TechId::Superconductors),
             // Ticket #332 (version 0.09.0): Deep Mining follows the Materials to the Mine; the
             // Factory makes Widgets now and no Tech lifts those.
             FacilityKind::Mine => m *= self.tech_multiplier(seat, TechId::DeepMining),
@@ -1073,7 +1082,8 @@ impl Game {
             m *= self.solar_maximum_multiplier();
         }
         match kind {
-            ModuleKind::Generator | ModuleKind::SolarArray => m *= self.tech_multiplier(seat, TechId::EfficientGrids),
+            // Ticket #505 (version 0.1.0.0): Superconductors, on every Energy output, in this chain.
+            ModuleKind::Generator | ModuleKind::SolarArray => m *= self.tech_multiplier(seat, TechId::EfficientGrids) * self.tech_multiplier(seat, TechId::Superconductors),
             // Ticket #84: the Extraction Charter stacks on Deep Mining.
             // Ticket #232 (version 0.08.3): and Beneficiation stacks on both, INSIDE this one
             // chain, so the whole product is floored once by the caller. A tenth applied after a
