@@ -7,17 +7,17 @@ pictures and batches that decided it are in
 [`docs/dev-diary/2026-10-07-version-0.1.0.0/`](../dev-diary/2026-10-07-version-0.1.0.0/).
 
 **What the version is.** Version 0.09.9 with the designer's list. **More room**: Mercury, Ceres and
-Vesta join the board (§1).
+Vesta join the board (§1). **A fourth tier**, the Colonial Capital, one to a Body (§2).
 
 **What it did to the win column** (80 games, per Faction):
 
-| | 0.09.9 | the new worlds (§1) | §1, the computer kept off them (a control) | the ideal |
-|---|---|---|---|---|
-| Custodians | 2 | 1 | 3 | 15 |
-| Prospectors | 23 | 15 | 22 | 15 |
-| Arkwrights | 30 | 52 | 32 | 15 |
-| Archivists | 2 | 2 | 4 | 15 |
-| collapses | 20 | 8 | 18 | 20 |
+| | 0.09.9 | the new worlds (§1) | §1, the computer kept off them (a control) | the Colonial Capital (§2) | the ideal |
+|---|---|---|---|---|---|
+| Custodians | 2 | 1 | 3 | 1 | 15 |
+| Prospectors | 23 | 15 | 22 | 15 | 15 |
+| Arkwrights | 30 | 52 | 32 | 52 | 15 |
+| Archivists | 2 | 2 | 4 | 2 | 15 |
+| collapses | 20 | 8 | 18 | 8 | 20 |
 
 The new worlds moved the column far past noise, away from the ideal. The control, the same build
 with the computer forbidden to choose the three as destinations, is within noise of 0.09.9, so the
@@ -119,3 +119,31 @@ stands back a quarter and further right, so the belt is in the picture. Vesta's 
 disc. The window line a hover shows is drawn after every label.
 
 **Saves.** `SAVE_VERSION` moves to **10**: a save of six Bodies is refused.
+
+## 2. The Colonial Capital
+
+The authority is [ticket #503](https://github.com/whaleyjoshua2/Dying-Earth/issues/503).
+
+**A fourth tier**: 24 Module slots, open at 24 Colonists, for 70 Materials and 8 Widgets, raised
+through the Widgets queue as every tier is. In `modules.toml` it is one more `[[tiers]]` entry with
+three keys of its own: `one_per_body`, `ground_only` and `influence = 1`.
+
+- **One to a Body, the first to complete it.** It holds it for good, through trade and capture. An
+  upgrade to it under way anywhere else on that Body is refunded its Materials to the seat that
+  paid, and the Report says so: *"Plato's upgrade refunded, 70 Materials: Tycho is the Moon's
+  Capital."* A new order there is refused: *"The Moon's Capital is Tycho."*
+- **Two completing in one turn** are parted as a contested slot is: the greater fleet in orbit of
+  whoever holds each place now, lots only when level. The other is refunded.
+- **Ground only.** A station stops at Colony; its Upgrade tile is gone.
+- **+1 Influence a turn** to whoever holds it now, at face value, after the Faction multiplier,
+  beside First to a Body's +1: a Body's first Colony that becomes its Capital pays +2.
+- **Antarctica** may carry Earth's. Venus, with no ground, never has one.
+- **The card** reads *"Tycho on the Moon · Colonial Capital"*, the dot before every tier's name.
+  Where another place holds the Body's Capital the Upgrade tile is greyed, its hover *"The Moon's
+  Capital is Plato."*, and a full Colony's warning reads *"Full"*, not *"upgrade for more room"*.
+- **The computer** raises a place to it as to any tier, full and with the people, where the Body
+  has none. It sets no Trade value on it.
+
+**Measured** over the 80 games
+([`sweeps/ticket-503.txt`](../dev-diary/2026-10-07-version-0.1.0.0/sweeps/ticket-503.txt)): the
+sweep is §1's line for line; **no place reached the Colonial Capital**, and 27 reached Colony.

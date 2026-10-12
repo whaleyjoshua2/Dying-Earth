@@ -1918,6 +1918,28 @@ impl Game {
         self.random_tie(&tied)
     }
 
+    /// Ticket #503 (version 0.1.0.0): the Body a build is racing to be the Colonial Capital of, if
+    /// it is one -- a ground Colony's upgrade to a one-per-Body tier.
+    fn capital_build_body(&self, place: Place, b: &Build) -> Option<BodyId> {
+        match (place, b.item) {
+            (Place::Colony(c), BuildItem::Tier(t)) if self.tables.tiers.get(t as usize).is_some_and(|r| r.one_per_body) => self.colony(c).map(|col| col.body),
+            _ => None,
+        }
+    }
+
+    /// Ticket #503: an upgrade to the Colonial Capital that lost the race, its Materials back to the
+    /// seat that paid them, at its price; Widgets are a rate and there are none to give back.
+    fn refund_capital(&mut self, place: Place, b: &Build, body: BodyId) {
+        let refund = self.item_materials(b.seat, place, b.item);
+        let st = &mut self.seat_mut(b.seat).stockpile;
+        *st = Stockpile { materials: st.materials + refund, ..*st }.settled();
+        let capital = self.capital_of(body).and_then(|c| self.colony(c)).map(|c| self.slot_name(c)).unwrap_or_default();
+        let (body_name, at) = (self.tables.body(body).name.clone(), self.place_name(place));
+        self.log(format!("{at}'s upgrade refunded, {} Materials: {capital} is {body_name}'s Capital.", figure(refund)));
+        let text = self.say("capital_refunded", &[("place", at), ("refund", figure(refund)), ("capital", capital), ("body", body_name)]);
+        self.report_line_of(b.seat, LineKind::YourWorks, LineKind::Note, Some(place.into()), text);
+    }
+
     // ------------------------------------------------------------------ (e)
 
     /// Ticket #332 (version 0.09.0): a build completes at the Resolution its place's Widgets reach
@@ -1987,6 +2009,37 @@ impl Game {
                 w.applied[d.index()] += applied;
                 w.applied_last[d.index()] += applied;
                 w.lost[d.index()] += made - applied;
+            }
+        }
+        // Ticket #503 (version 0.1.0.0): two Colonial Capitals completing on one Body in one turn
+        // are parted as a contested slot is -- the greater fleet in orbit, lots only when level --
+        // and the winner goes first, so `complete_build` raises it and refunds the rest. The fleet is
+        // that of whoever holds the place now, who is the one the Capital would go to.
+        let mut bodies: Vec<BodyId> = completed.iter().filter_map(|(p, b)| self.capital_build_body(*p, b)).collect();
+        bodies.sort();
+        bodies.dedup();
+        for body in bodies {
+            let racers: Vec<usize> = (0..completed.len()).filter(|i| self.capital_build_body(completed[*i].0, &completed[*i].1) == Some(body)).collect();
+            let holders: Vec<Seat> = racers
+                .iter()
+                .map(|i| match completed[*i].0 {
+                    Place::Colony(c) => self.colony(c).and_then(|col| col.control.director()).unwrap_or(completed[*i].1.seat),
+                    _ => completed[*i].1.seat,
+                })
+                .collect();
+            let mut seats: Vec<Seat> = Vec::new();
+            for h in &holders {
+                if !seats.contains(h) {
+                    seats.push(*h);
+                }
+            }
+            if seats.len() < 2 {
+                continue;
+            }
+            let winner = self.tiebreak_at_body(body, &seats);
+            if let Some(w) = racers.iter().zip(&holders).find(|(_, h)| **h == winner).map(|(i, _)| *i) {
+                let first = completed.remove(w);
+                completed.insert(racers[0], first);
             }
         }
         for (place, b) in completed {
@@ -2328,9 +2381,29 @@ impl Game {
                 self.state_mut(s).industry_level += 1;
             }
             // Ticket #490 (version 0.09.9): the place stands at its new tier.
+            // Ticket #503 (version 0.1.0.0): unless it is the Colonial Capital and the Body already
+            // has one, when it is refunded and nothing completes. The first to stand at it refunds
+            // every other upgrade to it under way on the Body, there being nothing left to race for.
             (Place::Colony(c), BuildItem::Tier(t)) => {
+                let body = self.capital_build_body(place, &b);
+                if let Some(body) = body
+                    && self.capital_of(body).is_some_and(|h| h != c)
+                {
+                    self.refund_capital(place, &b, body);
+                    return;
+                }
                 if let Some(col) = self.colony_mut(c) {
                     col.tier = col.tier.max(t);
+                }
+                if let Some(body) = body {
+                    let rivals: Vec<ColonyId> = self.colonies.iter().filter(|o| o.body == body && o.id != c).map(|o| o.id).collect();
+                    for r in rivals {
+                        let at = Place::Colony(r);
+                        while let Some(i) = self.queue_at(at).iter().position(|q| self.capital_build_body(at, q).is_some()) {
+                            let Some(lost) = self.colony_mut(r).map(|o| o.queue.remove(i)) else { break };
+                            self.refund_capital(at, &lost, body);
+                        }
+                    }
                 }
             }
             // Ticket #68 (version 0.05.5): the Archive Module stands. If its Research is already paid

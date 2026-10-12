@@ -2049,8 +2049,10 @@ impl Game {
         }
         // Ticket #490 (version 0.09.9): a place of the seat's whose slots are all taken at its tier's
         // cap, with the people the next tier wants, is raised to it.
+        // Ticket #503 (version 0.1.0.0): the Colonial Capital too, where the Body has none (`open_tier`);
+        // a station never sees it.
         for c in self.colonies.iter().filter(|c| c.control.director() == Some(seat)) {
-            if let Some(next) = self.next_tier(c)
+            if let Some(next) = self.open_tier(c)
                 && c.colonists >= next.colonists
                 && self.module_slots(c) >= self.tier_of(c).cap
                 && self.free_module_slots(c) == 0

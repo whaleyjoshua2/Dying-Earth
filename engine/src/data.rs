@@ -1653,6 +1653,16 @@ pub struct TierCard {
     pub colonists: u32,
     pub materials: u32,
     pub widgets: u32,
+    /// Ticket #503 (version 0.1.0.0): at most one place on a Body stands at this tier, the first to
+    /// complete it, and it holds it for good, through trade and capture -- the Colonial Capital.
+    #[serde(default)]
+    pub one_per_body: bool,
+    /// Ticket #503: a Space Station never climbs to this tier.
+    #[serde(default)]
+    pub ground_only: bool,
+    /// Ticket #503: Influence a turn to whoever directs a place at this tier, at face value.
+    #[serde(default)]
+    pub influence: i64,
 }
 
 #[derive(Debug, Clone, Deserialize)]

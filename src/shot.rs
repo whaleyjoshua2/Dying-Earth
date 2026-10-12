@@ -831,6 +831,24 @@ fn build_board(session: &mut Session) {
         {
             g.colony_mut(id).unwrap().modules.push(Module::new(ModuleKind::Habitat));
         }
+        // `capital:ready` (a building aid, ticket #503, version 0.1.0.0): a Colony of seat 0's on the
+        // Moon at the third tier, full at eighteen with twenty-four people, so its Upgrade tile offers
+        // the Colonial Capital; `capital:held` the same with a rival's Colony on the Moon already its
+        // Capital, for the greyed tile; `capital:mine` seat 0's Colony the Capital itself.
+        if let Some(v) = std::env::args().find_map(|a| a.strip_prefix("capital:").map(str::to_owned)) {
+            let plant = |g: &mut Game, seat: Seat, tier: u32| {
+                let slot = g.free_slots_on(BodyId::Moon).first().copied().unwrap_or(0);
+                let id = ColonyId(g.fresh_id());
+                let mut modules = vec![Module::new(ModuleKind::Core)];
+                modules.extend([ModuleKind::Habitat, ModuleKind::Generator, ModuleKind::Mine].iter().cycle().take(18).map(|k| Module::new(*k)));
+                g.colonies.push(Colony { id, body: BodyId::Moon, slot, control: Control::Controlled(seat), modules, colonists: 24, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, tier, in_orbit: false });
+            };
+            if v == "held" {
+                plant(g, Seat(1), 3);
+            }
+            plant(g, Seat(0), if v == "mine" { 3 } else { 2 });
+            g.seats[0].stockpile.materials = 120.0;
+        }
         // `accords:0` (a building aid, ticket #430, version 0.09.5): every Accord struck, so a picture
         // after driven turns shows the fog as a seat with no Accord sees it.
         if std::env::args().any(|a| a == "accords:0") {

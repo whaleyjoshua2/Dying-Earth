@@ -1379,6 +1379,14 @@ impl Game {
                 if pending.iter().any(|o| matches!(o, Order::RaiseTier { colony: c } if c == colony)) || self.tier_under_way(col).is_some() {
                     return fail("already being upgraded");
                 }
+                // Ticket #503 (version 0.1.0.0): one Colonial Capital to a Body, the first's for good.
+                if next.one_per_body
+                    && let Some(cap) = self.capital_of(col.body).and_then(|c| self.colony(c))
+                {
+                    let name = &self.tables.body(col.body).name;
+                    let body = name.strip_prefix("the ").map_or(name.clone(), |rest| format!("The {rest}"));
+                    return fail(format!("{body}'s Capital is {}", self.slot_name(cap)));
+                }
                 if col.colonists < next.colonists {
                     return fail(format!("needs {} Colonists", next.colonists));
                 }
@@ -1468,7 +1476,7 @@ impl Game {
                     let tier = self.tier_of(col);
                     return fail(if self.module_slots(col) < tier.cap {
                         "full until more Colonists live here".to_string()
-                    } else if let Some(next) = self.next_tier(col) {
+                    } else if let Some(next) = self.open_tier(col) {
                         format!("full: upgrade to a {} for more", next.name)
                     } else {
                         format!("full: a {} holds {}", tier.name, tier.cap)

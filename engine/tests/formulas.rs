@@ -19694,7 +19694,8 @@ fn the_reports_templates_stay_under_their_word_ceiling() {
     // 0.09.9): and by the 2 of a rival's upgrade, "upgraded {colony}". Ticket #495 (version 0.09.9):
     // and by the 8 of an Accord answered, struck or refused, less a word of slack the ceiling held.
     // Ticket #496 (version 0.09.9): and by the 17 of a Trade offered, struck, refused or failed.
-    assert!(words <= 1807, "the Report's templates hold {words} words; the ceiling is 1,807 (15% off 2,031, 54 for the race to the Moon, 2 for a rival's upgrade, 8 for an Accord answered, less a word of slack, 17 for a Trade)");
+    // Ticket #503 (version 0.1.0.0): and by the 9 of an upgrade to a Colonial Capital refunded.
+    assert!(words <= 1816, "the Report's templates hold {words} words; the ceiling is 1,816 (15% off 2,031, 54 for the race to the Moon, 2 for a rival's upgrade, 8 for an Accord answered, less a word of slack, 17 for a Trade, 9 for a Capital refunded)");
     // "The" is gone before a Faction's name, which is drawn in its colour instead.
     assert!(!text.contains("he {faction}"), "a template still says \"the {{faction}}\"");
 }
@@ -20190,7 +20191,7 @@ fn a_founding_settles_only_the_people_who_left() {
 fn module_slots_are_the_lower_of_colonists_and_the_tiers_cap() {
     let mut g = game();
     let names: Vec<&str> = g.tables.tiers.iter().map(|t| t.name.as_str()).collect();
-    assert_eq!(names, ["Outpost", "Settlement", "Colony"]);
+    assert_eq!(names, ["Outpost", "Settlement", "Colony", "Colonial Capital"]);
     let c = colony(&mut g, Seat(0), BodyId::Moon, &[], 4);
     assert_eq!(g.colony(c).unwrap().tier, 0, "every place starts an Outpost");
     assert_eq!(g.module_slots(g.colony(c).unwrap()), 4, "four people, four slots");
@@ -20236,9 +20237,9 @@ fn a_tier_is_raised_through_the_queue_once_its_people_live_there() {
     g.resolution_phase();
     assert_eq!(g.colony(c).unwrap().tier, 1);
     // The top refuses.
-    g.colony_mut(c).unwrap().tier = 2;
+    g.colony_mut(c).unwrap().tier = 3;
     g.colony_mut(c).unwrap().colonists = 30;
-    assert!(g.check_order(Seat(0), &[], &raise).unwrap_err().0.contains("already a Colony"));
+    assert!(g.check_order(Seat(0), &[], &raise).unwrap_err().0.contains("already a Colonial Capital"));
 }
 
 /// Ticket #490: a station climbs the same tiers.
@@ -20287,6 +20288,209 @@ fn a_module_refused_at_the_tiers_cap_says_to_upgrade() {
     }
     let err = g.check_order(Seat(0), &[], &build).unwrap_err().0;
     assert!(err.contains("full"), "{err}");
+}
+
+// ---------------------------------------------------------------- #503 the Colonial Capital (version 0.1.0.0)
+
+/// Ticket #503: a Frigate of the seat's holding at a Body, for the fleet that parts a tie.
+fn give_warship(g: &mut Game, seat: Seat, body: BodyId) {
+    let id = ShipId(g.fresh_id());
+    g.ships.push(Ship {
+        name: String::new(), id,
+        kind: UnitKind::Frigate,
+        seat,
+        damage: 0,
+        at: ShipAt::Body(body),
+        colonists: 0, warhead: false, colonists_education: 1.0,
+        army: None,
+        stance: Stance::Hold,
+        escaped: false,
+        arrived_this_turn: false,
+        built_turn: 1,
+        fuel: 30.0, slot: None,
+    });
+}
+
+/// Ticket #503: a ground Colony at the third tier with the people for the fourth.
+fn capital_ready(g: &mut Game, seat: Seat, body: BodyId) -> ColonyId {
+    let c = colony(g, seat, body, &[], 24);
+    g.colony_mut(c).unwrap().tier = 2;
+    g.seats[seat.index()].stockpile.materials = 300.0;
+    c
+}
+
+/// Ticket #503 (version 0.1.0.0): the Colonial Capital is a fourth tier: 24 slots once 24 live
+/// there, for 70 Materials and 8 Widgets, raised through the queue as any tier is.
+#[test]
+fn the_colonial_capital_is_a_fourth_tier_of_twenty_four() {
+    let mut g = game();
+    let c = capital_ready(&mut g, Seat(0), BodyId::Moon);
+    let raise = Order::RaiseTier { colony: c };
+    assert!(g.check_order(Seat(0), &[], &raise).is_ok(), "{:?}", g.check_order(Seat(0), &[], &raise));
+    assert_eq!(g.order_cost(Seat(0), &raise).materials, 70.0);
+    g.colony_mut(c).unwrap().colonists = 23;
+    assert!(g.check_order(Seat(0), &[], &raise).unwrap_err().0.contains("needs 24 Colonists"));
+    g.colony_mut(c).unwrap().colonists = 30;
+    g.commit_orders(Seat(0), std::slice::from_ref(&raise));
+    assert_eq!(g.colony(c).unwrap().queue.last().map(|b| (b.item, b.widgets)), Some((BuildItem::Tier(3), 8)));
+    g.colony_mut(c).unwrap().queue[0].done = 8;
+    g.resolution_phase();
+    assert_eq!(g.tier_of(g.colony(c).unwrap()).name, "Colonial Capital");
+    assert_eq!(g.module_slots(g.colony(c).unwrap()), 24);
+    assert_eq!(g.capital_of(BodyId::Moon), Some(c));
+}
+
+/// Ticket #503: one to a Body. The first to complete holds it; another under way there is refunded
+/// its 70 Materials and leaves the queue; a later order is refused with where the Capital stands.
+/// Another Body is untouched.
+#[test]
+fn the_first_to_complete_the_capital_holds_it_and_the_rest_are_refunded() {
+    let mut g = game();
+    calm(&mut g);
+    let fast = capital_ready(&mut g, Seat(0), BodyId::Moon);
+    let slow = capital_ready(&mut g, Seat(1), BodyId::Moon);
+    g.commit_orders(Seat(0), &[Order::RaiseTier { colony: fast }]);
+    g.commit_orders(Seat(1), &[Order::RaiseTier { colony: slow }]);
+    // The fast one's Widgets are all made; the slow one cannot make eight in a turn.
+    g.colony_mut(fast).unwrap().queue[0].done = 8;
+    let paid = g.seats[1].stockpile.materials;
+    g.resolution_phase();
+    assert_eq!(g.capital_of(BodyId::Moon), Some(fast));
+    assert_eq!(g.colony(slow).unwrap().tier, 2, "the loser stays a Colony");
+    assert!(g.tier_under_way(g.colony(slow).unwrap()).is_none(), "its build is gone");
+    assert!(g.seats[1].stockpile.materials >= paid + 70.0 - 1e-9, "70 Materials back: {} from {paid}", g.seats[1].stockpile.materials);
+    assert!(g.report.lines.iter().any(|l| l.text.contains("upgrade refunded, 70 Materials")), "the refund is reported");
+    let third = capital_ready(&mut g, Seat(2), BodyId::Moon);
+    let err = g.check_order(Seat(2), &[], &Order::RaiseTier { colony: third }).unwrap_err().0;
+    assert_eq!(err, format!("The Moon's Capital is {}", g.slot_name(g.colony(fast).unwrap())));
+    let mars = capital_ready(&mut g, Seat(2), BodyId::Mars);
+    assert!(g.check_order(Seat(2), &[], &Order::RaiseTier { colony: mars }).is_ok());
+}
+
+/// Ticket #503: two completing on one Body in one turn: exactly one is the Capital, the other is
+/// refunded. Here the second seat has a warship over the Moon and the first none, so it wins.
+#[test]
+fn two_capitals_completing_at_once_are_parted_by_the_fleet_in_orbit() {
+    let mut g = game();
+    calm(&mut g);
+    let a = capital_ready(&mut g, Seat(0), BodyId::Moon);
+    let b = capital_ready(&mut g, Seat(1), BodyId::Moon);
+    g.commit_orders(Seat(0), &[Order::RaiseTier { colony: a }]);
+    g.commit_orders(Seat(1), &[Order::RaiseTier { colony: b }]);
+    g.colony_mut(a).unwrap().queue[0].done = 8;
+    g.colony_mut(b).unwrap().queue[0].done = 8;
+    give_warship(&mut g, Seat(1), BodyId::Moon);
+    assert!(g.ship_stack_strength(Seat(1), BodyId::Moon) > g.ship_stack_strength(Seat(0), BodyId::Moon));
+    g.resolution_phase();
+    assert_eq!(g.capital_of(BodyId::Moon), Some(b));
+    assert_eq!(g.colony(a).unwrap().tier, 2);
+    assert_eq!(g.colonies.iter().filter(|c| c.body == BodyId::Moon && c.tier == 3).count(), 1);
+}
+
+/// Ticket #503: the fleet weighed in a race is that of whoever holds the place now, not of whoever
+/// paid for the upgrade: seat 0 pays at one place and seat 1 takes it; seat 2 races it from another.
+#[test]
+fn a_capital_race_weighs_the_fleet_of_whoever_holds_the_place_now() {
+    let mut g = game();
+    calm(&mut g);
+    let taken = capital_ready(&mut g, Seat(0), BodyId::Moon);
+    let other = capital_ready(&mut g, Seat(2), BodyId::Moon);
+    g.commit_orders(Seat(0), &[Order::RaiseTier { colony: taken }]);
+    g.commit_orders(Seat(2), &[Order::RaiseTier { colony: other }]);
+    g.transfer_control(Place::Colony(taken), Seat(1), "Trade");
+    assert!(g.tier_under_way(g.colony(taken).unwrap()).is_some(), "the upgrade goes with the place");
+    g.colony_mut(taken).unwrap().queue[0].done = 8;
+    g.colony_mut(other).unwrap().queue[0].done = 8;
+    give_warship(&mut g, Seat(1), BodyId::Moon);
+    give_warship(&mut g, Seat(1), BodyId::Moon);
+    give_warship(&mut g, Seat(2), BodyId::Moon);
+    g.resolution_phase();
+    assert_eq!(g.capital_of(BodyId::Moon), Some(taken), "two Frigates of the holder's against one");
+}
+
+/// Ticket #503: a full Colony on a Body whose Capital stands elsewhere is not told to upgrade.
+#[test]
+fn a_full_colony_is_not_told_to_upgrade_where_the_capital_stands_elsewhere() {
+    let mut g = game();
+    let c = capital_ready(&mut g, Seat(0), BodyId::Moon);
+    for _ in 0..18 {
+        g.colony_mut(c).unwrap().modules.push(Module::new(ModuleKind::Habitat));
+    }
+    let build = Order::BuildModule { colony: c, kind: ModuleKind::Habitat };
+    assert!(g.check_order(Seat(0), &[], &build).unwrap_err().0.contains("upgrade to a Colonial Capital"));
+    let other = capital_ready(&mut g, Seat(1), BodyId::Moon);
+    g.colony_mut(other).unwrap().tier = 3;
+    let err = g.check_order(Seat(0), &[], &build).unwrap_err().0;
+    assert_eq!(err, "full: a Colony holds 18");
+}
+
+/// Ticket #503: ground only. A station at the third tier has nowhere higher to go.
+#[test]
+fn a_station_stops_at_the_third_tier() {
+    let mut g = game();
+    let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
+    g.colony_mut(iss).unwrap().tier = 2;
+    g.colony_mut(iss).unwrap().colonists = 30;
+    assert!(g.next_tier(g.colony(iss).unwrap()).is_none());
+    assert!(g.check_order(Seat(0), &[], &Order::RaiseTier { colony: iss }).unwrap_err().0.contains("already a Colony"));
+}
+
+/// Ticket #503: the Capital pays +1 Influence a turn to whoever directs it, at face value, beside
+/// the first-to-a-Body +1; taken by another, its +1 goes with it.
+#[test]
+fn the_capital_pays_its_holder_one_influence_and_moves_with_the_place() {
+    let mut g = game();
+    let c = capital_ready(&mut g, Seat(0), BodyId::Moon);
+    let (before0, before1) = (g.influence_allotment(Seat(0)), g.influence_allotment(Seat(1)));
+    g.colony_mut(c).unwrap().tier = 3;
+    assert_eq!(g.tier_allotment(Seat(0)), 1);
+    assert_eq!(g.influence_allotment(Seat(0)), before0 + 1);
+    g.transfer_control(Place::Colony(c), Seat(1), "Trade");
+    assert_eq!(g.tier_allotment(Seat(0)), 0);
+    assert_eq!(g.tier_allotment(Seat(1)), 1);
+    assert_eq!(g.influence_allotment(Seat(1)), before1 + 1);
+}
+
+/// Ticket #503: Antarctica, a ground Colony on Earth, may be Earth's Capital; Venus has no ground.
+#[test]
+fn antarctica_may_hold_earths_capital() {
+    let mut g = game();
+    g.antarctica_open = true;
+    let c = capital_ready(&mut g, Seat(0), BodyId::Earth);
+    assert!(!g.colony(c).unwrap().in_orbit);
+    assert!(g.check_order(Seat(0), &[], &Order::RaiseTier { colony: c }).is_ok(), "{:?}", g.check_order(Seat(0), &[], &Order::RaiseTier { colony: c }));
+}
+
+/// Ticket #503: the computer raises a full Colony with 24 people to the Capital where the Body has
+/// none, and not where it has one.
+#[test]
+fn the_ai_raises_a_capital_only_where_the_body_has_none() {
+    let mut g = game();
+    calm(&mut g);
+    let c = capital_ready(&mut g, Seat(1), BodyId::Moon);
+    for _ in 0..18 {
+        g.colony_mut(c).unwrap().modules.push(Module::new(ModuleKind::Habitat));
+    }
+    let raises = |g: &mut Game| g.ai_orders(Seat(1)).iter().any(|o| matches!(o, Order::RaiseTier { colony } if *colony == c));
+    assert!(raises(&mut g), "full at eighteen, twenty-four people, no Capital on the Moon");
+    let other = capital_ready(&mut g, Seat(2), BodyId::Moon);
+    g.colony_mut(other).unwrap().tier = 3;
+    assert!(!raises(&mut g), "the Moon has its Capital");
+    // Two of its own full on Mars: it races only one of them. Measured, not a rule of its own: the
+    // pick takes one upgrade a turn and passes over the second while the first is under way.
+    let full = |g: &mut Game| {
+        let m = capital_ready(g, Seat(1), BodyId::Mars);
+        for _ in 0..18 {
+            g.colony_mut(m).unwrap().modules.push(Module::new(ModuleKind::Habitat));
+        }
+        m
+    };
+    let (m1, m2) = (full(&mut g), full(&mut g));
+    let mars = |o: &Order| matches!(o, Order::RaiseTier { colony } if *colony == m1 || *colony == m2);
+    let first: Vec<Order> = g.ai_orders(Seat(1)).into_iter().filter(mars).collect();
+    assert_eq!(first.len(), 1, "one Capital raised on Mars");
+    g.commit_orders(Seat(1), &first);
+    assert!(!g.ai_orders(Seat(1)).iter().any(mars), "and not the other while the first is under way");
 }
 
 // ---------------------------------------------------------------- #491 the Exchange's interest (version 0.09.9)

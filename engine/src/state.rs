@@ -3341,8 +3341,34 @@ impl Game {
     }
 
     /// Ticket #490 (version 0.09.9): the tier above it, or None at the top.
+    /// Ticket #503 (version 0.1.0.0): a station's top is the last tier it may climb to.
     pub fn next_tier(&self, c: &Colony) -> Option<&crate::data::TierCard> {
-        self.tables.tiers.get(c.tier as usize + 1)
+        self.tables.tiers.get(c.tier as usize + 1).filter(|t| !(c.in_orbit && t.ground_only))
+    }
+
+    /// Ticket #503 (version 0.1.0.0): the tier above it, if it may still be reached: never the
+    /// Colonial Capital where another Colony on its Body already holds it. What "full: upgrade"
+    /// promises.
+    pub fn open_tier(&self, c: &Colony) -> Option<&crate::data::TierCard> {
+        self.next_tier(c).filter(|t| !(t.one_per_body && self.capital_of(c.body).is_some_and(|h| h != c.id)))
+    }
+
+    /// Ticket #503 (version 0.1.0.0): the Colony that is this Body's Colonial Capital, if one has
+    /// been raised. A Colony is never removed from the board, so once raised it is there for good.
+    pub fn capital_of(&self, body: BodyId) -> Option<ColonyId> {
+        self.colonies.iter().find(|c| c.body == body && !c.in_orbit && self.tier_of(c).one_per_body).map(|c| c.id)
+    }
+
+    /// Ticket #503: "Plato", the Capital's own place name without its Body, for the hover that
+    /// says where it stands.
+    pub fn slot_name(&self, c: &Colony) -> String {
+        self.tables.body(c.body).slots[c.slot as usize].name.clone()
+    }
+
+    /// Ticket #503: the Influence a seat's places pay for their tier, whoever raised them: today
+    /// the Colonial Capital's +1, to its holder.
+    pub fn tier_allotment(&self, seat: Seat) -> i64 {
+        self.colonies.iter().filter(|c| self.directs(seat, Place::Colony(c.id))).map(|c| self.tier_of(c).influence).sum()
     }
 
     /// Ticket #97: the Modules standing or building here that count against the cap. A mothballed
@@ -3871,7 +3897,10 @@ impl Game {
         // Ticket #358 (version 0.09.1): and the Chorus's per-Colonist point, outside the
         // multiplier on the Spaceport's argument, at the designer's word.
         let outside: i64 = self.module_allotments(seat).iter().map(|y| y.1).sum();
-        (base as f64 * m).floor() as i64 + outside + self.seat(seat).spaceport_influence + self.seat(seat).first_windfall + self.seat(seat).lead_windfall + firsts * t.first_settled_allotment
+        // Ticket #503 (version 0.1.0.0): and a Colonial Capital's +1, at face value as the first's,
+        // and to whoever holds it now, not to whoever raised it.
+        let tiers = self.tier_allotment(seat);
+        (base as f64 * m).floor() as i64 + outside + tiers + self.seat(seat).spaceport_influence + self.seat(seat).first_windfall + self.seat(seat).lead_windfall + firsts * t.first_settled_allotment
     }
 
     /// Ticket #345 (version 0.09.1): which seat was first to a Body, and at which Colony.

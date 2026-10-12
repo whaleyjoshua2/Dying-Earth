@@ -7436,9 +7436,11 @@ This turn {:+.2}%: {:+.1} million.", c.population_growth * 100.0, c.population_l
     rule_tip(
         icon_word(ui, "influence", format!("Influence value {}: what it adds to its controller's Allotment each turn (+1 per Industry Level raised)", game.state_influence_value(sid))),
         format!(
-            "The Allotment is what you receive each turn: {}, your Regions, your Embassies, Relays and Choruses, your Spaceports' lifts, a first landing's windfall, and +{} for every Body you were first to and still hold.\nIt does not carry over: what is unspent at End Turn is lost. Ducats buy more, two a point.",
+            "The Allotment is what you receive each turn: {}, your Regions, your Embassies, Relays and Choruses, your Spaceports' lifts, a first landing's windfall, +{} a Body you were first to and still hold, +{} a Capital.\nIt does not carry over: what is unspent at End Turn is lost. Ducats buy more, two a point.",
             game.tables.influence.allotment_base,
-            game.tables.influence.first_settled_allotment
+            game.tables.influence.first_settled_allotment,
+            // Ticket #503 (version 0.1.0.0): the Colonial Capital's own figure, beside the first's.
+            game.tables.tiers.iter().map(|t| t.influence).max().unwrap_or(0)
         ),
     );
     // Ticket #426 (version 0.09.5): the player's own Bank by name (the Prospectors' Investment Bank),
@@ -8088,7 +8090,8 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
         faction_glyph(ui, session, game, col.control.controller(), 22.0);
         ui.label(RichText::new(game.place_name(Place::Colony(cid))).size(22.0).strong());
         // Ticket #490 (version 0.09.9): its tier, beside the name.
-        ui.label(RichText::new(&game.tier_of(col).name).size(22.0).weak());
+        // Ticket #503 (version 0.1.0.0): after a dot, "Tycho on the Moon · Colonial Capital".
+        ui.label(RichText::new(format!("· {}", game.tier_of(col).name)).size(22.0).weak());
     });
     // Ticket #391 (version 0.09.3): the date it was founded, under its name, at the designer's word
     // -- *"each colony/station card has the date it was founded under its name in the header"*. A
@@ -8206,7 +8209,7 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     let resp = card_heading(ui, "colony", format!("Modules {used} of {cap}"));
     if used >= cap {
         // Ticket #474 (version 0.09.8): the warning under the heading when the place is full.
-        let why = if cap < tier.cap { "Full until more Colonists live here" } else if game.next_tier(col).is_some() { "Full: upgrade for more room" } else { "Full" };
+        let why = if cap < tier.cap { "Full until more Colonists live here" } else if game.open_tier(col).is_some() { "Full: upgrade for more room" } else { "Full" };
         ui.colored_label(Color32::YELLOW, why);
     }
     // Ticket #116 (version 0.07.1): the rule behind the cap. Ticket #490: with the tier's ceiling.
@@ -10253,9 +10256,13 @@ fn module_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
                 // One click orders it; greyed, the refusal leads the hover.
                 let order = Order::RaiseTier { colony: cid };
                 let check = game.check_order(Seat(0), &session.pending, &order);
-                let words = format!("Upgrade to a {name}: {}. Up to {} Modules.", game.order_price_text(Seat(0), &order, game.order_cost(Seat(0), &order)), next.cap);
+                // Ticket #503 (version 0.1.0.0): and what a tier pays, the Colonial Capital's +1.
+                let pays = if next.influence > 0 { format!(", +{} Influence a turn", next.influence) } else { String::new() };
+                let words = format!("Upgrade to a {name}: {}. Up to {} Modules{pays}.", game.order_price_text(Seat(0), &order, game.order_cost(Seat(0), &order)), next.cap);
+                // Ticket #503: where the Body's Capital stands elsewhere, that alone, "The Moon's Capital is Plato."
                 let tip = match &check {
                     Ok(_) => words,
+                    Err(e) if next.one_per_body && game.capital_of(col.body).is_some() => format!("{}.", e.0),
                     Err(e) => refusal_hover(&e.0, Some(&words)),
                 };
                 if hab_tile(ui, rect, id, None, name, TileState::Upgrade(check.is_ok()), false, None, tip).clicked() && check.is_ok() {
