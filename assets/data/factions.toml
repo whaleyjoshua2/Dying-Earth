@@ -52,6 +52,8 @@ victory_first = { kind = "stabilization_run", bar = 3 }
 victory_second = { kind = "off_world_presence", bar = 12 }
 # Ticket #471 (version 0.09.7): the Opening Objective -- no deadline, met once, rewarded once.
 opening = { kind = "scrubber_working", reward = 0.5, text = "Have a Scrubber working", reward_text = "+0.5 ppm on the Natural Sink, for good" }
+# Ticket #504 (version 0.1.0.0): the Second Objective, open once the Opening Objective is met.
+second = { kind = "leapfrogs", count = 3, reward = 25.0, text = "Leapfrog three Regions", reward_text = "25 Influence" }
 colour = [0.15, 0.65, 0.6]
 
 [[faction]]
@@ -108,6 +110,8 @@ victory_second = { kind = "off_world_presence", bar = 12 }
 # Ticket #471 (version 0.09.7): the Opening Objective -- no deadline, met once, rewarded once.
 # Ticket #478 (version 0.09.8): 75 Ducats to 50, and the three Banks must work three Incomes running.
 opening = { kind = "investment_banks", count = 3, turns = 3, reward = 50.0, text = "Keep a working Investment Bank in three places for three turns", reward_text = "50 Ducats into the Venture Capital Fund" }
+# Ticket #504 (version 0.1.0.0): the Second Objective, open once the Opening Objective is met.
+second = { kind = "industry_level", count = 5, reward = 100.0, text = "Raise a Region to Industry Level 5", reward_text = "100 Ducats into the Venture Capital Fund" }
 colour = [0.85, 0.5, 0.2]
 
 # Ticket #50 seated two more Factions; ticket #51 gave them their cards.
@@ -179,6 +183,8 @@ victory_first = { kind = "colonists_off_earth", bar = 30 }
 victory_second = { kind = "colonies_on_bodies", bodies = 3, colonists_each = 4 }
 # Ticket #471 (version 0.09.7): the Opening Objective -- no deadline, met once, rewarded once.
 opening = { kind = "moon_colony", text = "Found a Colony on the Moon, on the ground or in orbit", reward_text = "a free Launch Site in a Region of yours that has none" }
+# Ticket #504 (version 0.1.0.0): the Second Objective, open once the Opening Objective is met.
+second = { kind = "far_colony", reward = 1.0, text = "Settle a Body beyond Earth's sphere", reward_text = "a free Colonist at that Colony" }
 colour = [0.44, 0.275, 0.66]
 
 [[faction]]
@@ -229,6 +235,8 @@ victory_first = { kind = "archive_research", bar = 150 }
 victory_second = { kind = "colonists_uploaded", bar = 12 }
 # Ticket #471 (version 0.09.7): the Opening Objective -- no deadline, met once, rewarded once.
 opening = { kind = "research_pair", count = 2, reward = 10.0, text = "Have two Research Labs or Observatories working, one of them off Earth", reward_text = "10 Research into the Archive fund" }
+# Ticket #504 (version 0.1.0.0): the Second Objective, open once the Opening Objective is met.
+second = { kind = "observatories", count = 3, reward = 20.0, text = "Have three Observatories working off Earth", reward_text = "20 Research into the Archive fund" }
 colour = [0.871, 0.322, 0.439]
 
 # Ticket #54 (version 0.05): the [restoration] table is retired with the order; the Custodians'

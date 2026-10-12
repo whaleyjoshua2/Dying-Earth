@@ -1205,6 +1205,40 @@ impl Game {
 
         let opening_unmet = self.seat(seat).opening_met_turn.is_none();
         let opening_kind = self.tables.faction(kind).opening.kind;
+        // Ticket #504 (version 0.1.0.0): and its Second Objective, once the first is met.
+        let second_open = self.seat(seat).opening_met_turn.is_some() && self.seat(seat).second_met_turn.is_none();
+        let second_kind = self.tables.faction(kind).second.as_ref().map(|c| c.kind);
+        fn advances(k: crate::data::OpeningKind, cat: Cat, note: &str) -> bool {
+            use crate::data::OpeningKind;
+            match k {
+                OpeningKind::ScrubberWorking => cat == Cat::Scrubber,
+                OpeningKind::InvestmentBanks => note.starts_with("build Investment Bank in"),
+                OpeningKind::MoonColony => matches!(cat, Cat::FoundColony | Cat::Transit) && note.contains("the Moon"),
+                OpeningKind::ResearchPair => matches!(cat, Cat::Observatory | Cat::ResearchLab),
+                OpeningKind::Leapfrogs | OpeningKind::IndustryLevel | OpeningKind::FarColony | OpeningKind::Observatories => false,
+            }
+        }
+        // The Second Objectives, read from the orders themselves (the review): a Leapfrog of a
+        // Region not yet counted; a raise; Colonists carried or put down beyond Earth and the Moon,
+        // whatever the note calls the place; an Observatory.
+        let far = |b: BodyId| !matches!(b, BodyId::Earth | BodyId::Moon);
+        let second_advances = |cat: Cat, orders: &[Order]| -> bool {
+            use crate::data::OpeningKind;
+            orders.iter().any(|o| match (second_kind, o) {
+                (Some(OpeningKind::Leapfrogs), Order::Leapfrog { state }) => !self.seat(seat).second_leapfrogs.contains(state),
+                (Some(OpeningKind::IndustryLevel), _) => cat == Cat::RaiseIndustry,
+                (Some(OpeningKind::FarColony), Order::Transit { ship, to, .. }) => far(*to) && self.ship(*ship).is_some_and(|s| s.colonists > 0),
+                (Some(OpeningKind::FarColony), Order::Unload { colonists, into, .. }) => {
+                    *colonists > 0
+                        && match into {
+                            crate::orders::UnloadTarget::Slot(b, _) | crate::orders::UnloadTarget::Ring(b, _) => far(*b),
+                            crate::orders::UnloadTarget::Colony(c) => self.colony(*c).is_some_and(|c| far(c.body)),
+                        }
+                }
+                (Some(OpeningKind::Observatories), _) => cat == Cat::Observatory,
+                _ => false,
+            })
+        };
         let opening_lift = self.tables.ai.multipliers.opportunity;
         let mut push = |orders: Vec<Order>, cat: Cat, base: f64, gap: f64, threat: f64, opportunity: f64, note: String, stack: Option<String>| {
             let base = if (homeless_archive || ferry_lift) && matches!(cat, Cat::ColonyShip | Cat::Transit | Cat::FoundColony | Cat::LoadUnload | Cat::LaunchSiteOrShipyard) {
@@ -1215,13 +1249,8 @@ impl Game {
             // Ticket #471 (version 0.09.7): the seat's Opening Objective, until it is met. What
             // advances it takes the opportunity multiplier -- there is no deadline, so it is a
             // lean, not a rush.
-            let opens = opening_unmet
-                && match opening_kind {
-                    crate::data::OpeningKind::ScrubberWorking => cat == Cat::Scrubber,
-                    crate::data::OpeningKind::InvestmentBanks => note.starts_with("build Investment Bank in"),
-                    crate::data::OpeningKind::MoonColony => matches!(cat, Cat::FoundColony | Cat::Transit) && note.contains("the Moon"),
-                    crate::data::OpeningKind::ResearchPair => matches!(cat, Cat::Observatory | Cat::ResearchLab),
-                };
+            // Ticket #504 (version 0.1.0.0): and its Second Objective once the first is met.
+            let opens = (opening_unmet && advances(opening_kind, cat, &note)) || (second_open && second_advances(cat, &orders));
             let opportunity = if opens { opportunity.max(opening_lift) } else { opportunity };
             cands.push(Candidate { orders, cat, base, gap, threat, opportunity, note, stack, pace: 1.0 });
         };

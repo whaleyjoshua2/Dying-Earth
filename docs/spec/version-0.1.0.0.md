@@ -7,17 +7,17 @@ pictures and batches that decided it are in
 [`docs/dev-diary/2026-10-07-version-0.1.0.0/`](../dev-diary/2026-10-07-version-0.1.0.0/).
 
 **What the version is.** Version 0.09.9 with the designer's list. **More room**: Mercury, Ceres and
-Vesta join the board (§1). **A fourth tier**, the Colonial Capital, one to a Body (§2). **An Accord's Terms** on its hover in the Factions window (§3). **Accords of five turns**, renewed or widened (§4).
+Vesta join the board (§1). **A fourth tier**, the Colonial Capital, one to a Body (§2). **An Accord's Terms** on its hover in the Factions window (§3). **Accords of five turns**, renewed or widened (§4). **A Second Objective** for each Faction (§5).
 
 **What it did to the win column** (80 games, per Faction):
 
-| | 0.09.9 | the new worlds (§1) | §1, the computer kept off them (a control) | the Colonial Capital (§2) | Accords of five turns (§4) | the ideal |
-|---|---|---|---|---|---|---|
-| Custodians | 2 | 1 | 3 | 1 | 1 | 15 |
-| Prospectors | 23 | 15 | 22 | 15 | 16 | 15 |
-| Arkwrights | 30 | 52 | 32 | 52 | 49 | 15 |
-| Archivists | 2 | 2 | 4 | 2 | 2 | 15 |
-| collapses | 20 | 8 | 18 | 8 | 10 | 20 |
+| | 0.09.9 | the new worlds (§1) | §1, the computer kept off them (a control) | the Colonial Capital (§2) | Accords of five turns (§4) | the Second Objective (§5) | the ideal |
+|---|---|---|---|---|---|---|---|
+| Custodians | 2 | 1 | 3 | 1 | 1 | 1 | 15 |
+| Prospectors | 23 | 15 | 22 | 15 | 16 | 18 | 15 |
+| Arkwrights | 30 | 52 | 32 | 52 | 49 | 49 | 15 |
+| Archivists | 2 | 2 | 4 | 2 | 2 | 1 | 15 |
+| collapses | 20 | 8 | 18 | 8 | 10 | 10 | 20 |
 
 The new worlds moved the column far past noise, away from the ideal. The control, the same build
 with the computer forbidden to choose the three as destinations, is within noise of 0.09.9, so the
@@ -207,3 +207,29 @@ designer's *"offered at five turn intervals"* means an Accord **runs five turns 
 1 / 16 / 49 / 2 and 10 collapses, within noise of §2's. Accords struck rose from 601 to 644, and those
 standing at the end fell from 87 to 76. Every one standing at the end is non-aggression alone:
 Relations sit at a median of −4 to −7, so pairs are seldom Friendly.
+
+## 5. The Second Objective
+
+The authority is [ticket #504](https://github.com/whaleyjoshua2/Dying-Earth/issues/504).
+
+Each Faction has a second Journal entry, the **Second Objective**, open from the Income after its
+Opening Objective is met. It is met once, at an Income, with no deadline, rewarded once, and shown
+below the first with its own *"Met, <date>"* or progress line. In `factions.toml` it is a `second`
+card beside `opening`.
+
+| Faction | Second Objective | Reward |
+|---|---|---|
+| Custodians | Leapfrog three Regions: three different Regions Leapfrogged after it opens. The Journal counts them (*"Not yet met: 2 of 3 Regions."*). | 25 Influence, this turn |
+| Prospectors | Raise a Region to Industry Level 5: a Region held at level 5 or more, however it got there | 100 Ducats into the Venture Capital Fund |
+| Arkwrights | Settle a Body beyond Earth's sphere: a Colony, ground or station, on any Body but Earth and the Moon | a free Colonist at that Colony, at one with room where there is one |
+| Archivists | Have three Observatories working off Earth | 20 Research into the Archive fund |
+
+The computer leans toward its Second Objective, as toward its first, once the first is met. The lean reads the orders, not their wording: a Leapfrog of a Region not yet counted, a raise, Colonists carried or put down beyond Earth and the Moon, an Observatory.
+
+**Measured** over the 80 games
+([`sweeps/ticket-504.txt`](../dev-diary/2026-10-07-version-0.1.0.0/sweeps/ticket-504.txt)):
+- Wins were 1 / 18 / 49 / 1 with 10 collapses, within noise of §4's.
+- Second Objectives met: Custodians 67, Prospectors 78, Arkwrights 38, Archivists 22, of 80.
+- The Arkwrights meet theirs in 38 of the 39 games where they meet their first. The Moon, not
+  the far Body, is what holds them back.
+- The Archivists meet theirs in none of the 20 games where they sit third.

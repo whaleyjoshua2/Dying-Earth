@@ -2996,6 +2996,28 @@ fn journal_tab(ui: &mut Ui, session: &Session, game: &Game) {
                 ui.label(RichText::new("Not yet met. No deadline.").weak());
             }
         }
+        // Ticket #504 (version 0.1.0.0): the Second Objective, below the first once that is met.
+        if game.seat(seat).opening_met_turn.is_some()
+            && let Some(second) = &game.tables.faction(game.kind(seat)).second
+        {
+            ui.add_space(4.0);
+            ui.label(RichText::new("Second Objective").strong());
+            ui.label(format!("{}.", second.text));
+            ui.label(format!("Reward: {}.", second.reward_text));
+            let leapt = game.seat(seat).second_leapfrogs.len();
+            match game.seat(seat).second_met_turn {
+                Some(turn) => {
+                    ui.label(RichText::new(format!("Met, {}.", game.date(turn).text())).color(Color32::from_rgb(140, 220, 140)));
+                }
+                // The Custodians' counts Regions, and shows the count.
+                None if second.kind == dying_earth_engine::data::OpeningKind::Leapfrogs && leapt > 0 => {
+                    ui.label(RichText::new(format!("Not yet met: {leapt} of {} Regions.", second.count)).weak());
+                }
+                None => {
+                    ui.label(RichText::new("Not yet met. No deadline.").weak());
+                }
+            }
+        }
         ui.add_space(8.0);
     }
 }

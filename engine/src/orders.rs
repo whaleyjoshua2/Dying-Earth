@@ -2970,6 +2970,12 @@ impl Game {
                     let cut = self.tables.climate.leapfrog_baseline_cut;
                     self.state_mut(*state).leapfrog += per;
                     self.state_mut(*state).baseline_cut += cut;
+                    // Ticket #504 (version 0.1.0.0): the Custodians' Second Objective counts each Region
+                    // Leapfrogged once it is open.
+                    let s = self.seat_mut(seat);
+                    if s.opening_met_turn.is_some() && s.second_met_turn.is_none() && !s.second_leapfrogs.contains(state) {
+                        s.second_leapfrogs.push(*state);
+                    }
                     // Ticket #143 (version 0.07.3): the rate is quoted per hundred million, twenty units
                     // then; a hundred since ticket #333 (version 0.09.0), the same figure printed.
                     let per_hundred_million = self.population_coefficient(*state) * self.tables.units_per_hundred_million();

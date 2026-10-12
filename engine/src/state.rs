@@ -1039,6 +1039,12 @@ pub struct SeatState {
     pub opening_run: u32,
     #[serde(default)]
     pub launch_site_owed: bool,
+    /// Ticket #504 (version 0.1.0.0): the turn this seat met its Second Objective, and the Regions
+    /// it has Leapfrogged since the objective opened (the Custodians' counts them).
+    #[serde(default)]
+    pub second_met_turn: Option<u32>,
+    #[serde(default)]
+    pub second_leapfrogs: Vec<StateId>,
     /// Ticket #461 (version 0.09.7): Archives this seat has lost with their Colonies, and the fund
     /// lost with them, over the game, for the sweep.
     #[serde(default)]
@@ -1731,6 +1737,8 @@ impl Game {
             opening_met_turn: None,
             opening_run: 0,
             launch_site_owed: false,
+            second_met_turn: None,
+            second_leapfrogs: Vec::new(),
             archives_lost: 0,
             archive_fund_lost: 0,
             bought_units: 0,

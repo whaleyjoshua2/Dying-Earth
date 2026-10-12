@@ -307,8 +307,13 @@ impl Game {
     /// Ticket #471 (version 0.09.7): whether this seat's **Opening Objective** is true right now.
     /// Each is one early thing its Faction wants anyway (`[faction] opening` in `factions.toml`).
     pub fn opening_true(&self, seat: Seat) -> bool {
+        self.objective_true(seat, &self.tables.faction(self.kind(seat)).opening)
+    }
+
+    /// Ticket #504 (version 0.1.0.0): whether an objective card is true for this seat right now,
+    /// the opening or the second alike.
+    pub fn objective_true(&self, seat: Seat, card: &crate::data::OpeningCard) -> bool {
         use crate::data::OpeningKind;
-        let card = &self.tables.faction(self.kind(seat)).opening;
         let regions = self.controlled_states(seat);
         let working = |sid: &StateId, kind: FacilityKind| self.state(*sid).facilities.iter().filter(|f| f.kind == kind && f.working()).count();
         match card.kind {
@@ -328,7 +333,26 @@ impl Game {
                     .count();
                 observatories >= 1 && (labs + observatories) as u32 >= card.count
             }
+            // Ticket #504 (version 0.1.0.0): the Second Objectives.
+            OpeningKind::Leapfrogs => self.seat(seat).second_leapfrogs.len() as u32 >= card.count,
+            OpeningKind::IndustryLevel => regions.iter().any(|sid| self.state(*sid).industry_level >= card.count),
+            OpeningKind::FarColony => self.far_colony(seat).is_some(),
+            OpeningKind::Observatories => {
+                let working = self.colonies.iter().filter(|c| c.control.controller() == Some(seat)).flat_map(|c| c.modules.iter()).filter(|m| m.kind.does_the_job_of(ModuleKind::Observatory) && m.working()).count();
+                working as u32 >= card.count
+            }
         }
+    }
+
+    /// Ticket #504 (version 0.1.0.0): a Colony of the seat's, ground or station, on a Body beyond
+    /// Earth and the Moon -- the Arkwrights' Second Objective, and where its Colonist lands.
+    pub fn far_colony(&self, seat: Seat) -> Option<ColonyId> {
+        self.colonies.iter().find(|c| c.control.controller() == Some(seat) && !matches!(c.body, BodyId::Earth | BodyId::Moon)).map(|c| c.id)
+    }
+
+    /// Ticket #504 (version 0.1.0.0): whether this seat's **Second Objective** is true right now.
+    pub fn second_true(&self, seat: Seat) -> bool {
+        self.tables.faction(self.kind(seat)).second.as_ref().is_some_and(|card| self.objective_true(seat, card))
     }
 
     /// Ticket #471: read at the end of every Income. An objective is met at the first Income it is
@@ -338,7 +362,6 @@ impl Game {
     /// player's own is reported under Your works. A rival's is logged and not reported: the
     /// designer keeps rivals' objectives quiet.
     pub fn opening_objectives(&mut self) {
-        use crate::data::OpeningKind;
         for seat in Seat::ALL {
             if self.seat(seat).opening_met_turn.is_none() {
                 let run = if self.opening_true(seat) { self.seat(seat).opening_run + 1 } else { 0 };
@@ -347,26 +370,67 @@ impl Game {
             if self.seat(seat).opening_met_turn.is_none() && self.seat(seat).opening_run >= self.tables.faction(self.kind(seat)).opening.turns {
                 let card = self.tables.faction(self.kind(seat)).opening.clone();
                 self.seat_mut(seat).opening_met_turn = Some(self.turn);
-                match card.kind {
-                    OpeningKind::ScrubberWorking => self.climate.natural_sink += card.reward,
-                    OpeningKind::InvestmentBanks => {
-                        let s = self.seat_mut(seat);
-                        s.venture_fund = tenth(s.venture_fund + card.reward);
-                    }
-                    OpeningKind::MoonColony => self.seat_mut(seat).launch_site_owed = true,
-                    OpeningKind::ResearchPair => {
-                        let cap = self.archive_fund_cap(seat);
-                        let s = self.seat_mut(seat);
-                        s.archive_fund = (s.archive_fund + card.reward as i64).min(cap);
-                    }
-                }
+                self.pay_objective(seat, &card);
                 self.log(format!("The {} met their Opening Objective ({}): {}.", self.seat_name(seat), card.text, card.reward_text));
                 if seat == Seat(0) && !self.spectator {
                     let text = self.say("opening_met", &[("reward", card.reward_text.clone())]);
                     self.report_line(LineKind::YourWorks, None, text);
                 }
             }
+            // Ticket #504 (version 0.1.0.0): the Second Objective, open from the Income after the first
+            // was met, and met and paid as the first is.
+            if self.seat(seat).second_met_turn.is_none()
+                && self.seat(seat).opening_met_turn.is_some_and(|t| t < self.turn)
+                && self.second_true(seat)
+                && let Some(card) = self.tables.faction(self.kind(seat)).second.clone()
+            {
+                self.seat_mut(seat).second_met_turn = Some(self.turn);
+                self.pay_objective(seat, &card);
+                self.log(format!("The {} met their Second Objective ({}): {}.", self.seat_name(seat), card.text, card.reward_text));
+                if seat == Seat(0) && !self.spectator {
+                    let text = self.say("opening_met", &[("reward", card.reward_text.clone())]);
+                    self.report_line(LineKind::YourWorks, None, text);
+                }
+            }
             self.grant_owed_launch_site(seat);
+        }
+    }
+
+    /// Ticket #471: an objective's reward, paid once, the turn it is met. Ticket #504 (version
+    /// 0.1.0.0): the second's too.
+    fn pay_objective(&mut self, seat: Seat, card: &crate::data::OpeningCard) {
+        use crate::data::OpeningKind;
+        match card.kind {
+            OpeningKind::ScrubberWorking => self.climate.natural_sink += card.reward,
+            OpeningKind::InvestmentBanks => {
+                let s = self.seat_mut(seat);
+                s.venture_fund = tenth(s.venture_fund + card.reward);
+            }
+            OpeningKind::MoonColony => self.seat_mut(seat).launch_site_owed = true,
+            OpeningKind::ResearchPair => {
+                let cap = self.archive_fund_cap(seat);
+                let s = self.seat_mut(seat);
+                s.archive_fund = (s.archive_fund + card.reward as i64).min(cap);
+            }
+            // Ticket #504 (version 0.1.0.0): the Second Objectives' rewards. The Influence is this
+            // turn's, the Income having just set the Allotment.
+            OpeningKind::Leapfrogs => self.seat_mut(seat).allotment += card.reward as i64,
+            OpeningKind::IndustryLevel => {
+                let s = self.seat_mut(seat);
+                s.venture_fund = tenth(s.venture_fund + card.reward);
+            }
+            // The review: at a far Colony with room for the Colonist, where there is one.
+            OpeningKind::FarColony => {
+                let roomy = self.colonies.iter().find(|c| c.control.controller() == Some(seat) && !matches!(c.body, BodyId::Earth | BodyId::Moon) && c.colonists < self.habitat_room(c)).map(|c| c.id);
+                if let Some(c) = roomy.or_else(|| self.far_colony(seat)).and_then(|c| self.colony_mut(c)) {
+                    c.colonists += card.reward as u32;
+                }
+            }
+            OpeningKind::Observatories => {
+                let cap = self.archive_fund_cap(seat);
+                let s = self.seat_mut(seat);
+                s.archive_fund = (s.archive_fund + card.reward as i64).min(cap);
+            }
         }
     }
 

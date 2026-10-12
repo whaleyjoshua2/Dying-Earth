@@ -19955,6 +19955,147 @@ fn the_computer_leans_toward_its_opening_objective_until_it_is_met() {
     assert!((before - after * g.tables.ai.multipliers.opportunity).abs() < 1e-6, "the lean, and only while unmet: {before} against {after}");
 }
 
+// ---------------------------------------------------------------- #504 the Second Objective (version 0.1.0.0)
+
+/// Ticket #504 (version 0.1.0.0): **each Faction has a Second Objective**, open once its Opening
+/// Objective is met -- true before that, it waits -- met at an Income and rewarded once.
+#[test]
+fn each_faction_has_a_second_objective_open_once_the_first_is_met() {
+    let mut g = game();
+    calm(&mut g);
+    let (cus, pro, ark, arc) = (Seat(0), Seat(1), Seat(2), Seat(3));
+    for s in Seat::ALL {
+        g.seats[s.index()].stockpile.energy = 500.0;
+        assert!(g.tables.faction(g.kind(s)).second.is_some(), "every Faction has one");
+    }
+    // Every second made true before any first is met.
+    g.seats[0].second_leapfrogs = vec![StateId::EastAsia, StateId::Japan, StateId::Russia];
+    let mine = g.controlled_states(pro)[0];
+    g.state_mut(mine).industry_level = 5;
+    let mars = colony(&mut g, ark, BodyId::Mars, &[ModuleKind::Habitat], 4);
+    colony(&mut g, arc, BodyId::Moon, &[ModuleKind::Observatory, ModuleKind::Observatory, ModuleKind::Observatory], 3);
+    for s in [cus, pro, ark] {
+        g.seats[s.index()].opening_met_turn = None;
+    }
+    g.seats[3].opening_met_turn = None;
+    g.income_phase();
+    assert!(Seat::ALL.iter().all(|s| g.seat(*s).second_met_turn.is_none()), "closed until the first is met");
+    // The firsts met an earlier turn: each second is met at this Income, and paid.
+    for s in Seat::ALL {
+        g.seats[s.index()].opening_met_turn = Some(g.turn);
+    }
+    g.turn += 1;
+    let (fund, archive, people) = (g.seats[1].venture_fund, g.seats[3].archive_fund, g.colony(mars).unwrap().colonists);
+    g.seats[1].venture_share = 0.0;
+    g.income_phase();
+    let allot = g.seat(cus).allotment;
+    for s in Seat::ALL {
+        assert_eq!(g.seat(s).second_met_turn, Some(g.turn), "{}", g.seat_name(s));
+    }
+    assert_eq!(allot, g.influence_allotment(cus) + 25, "25 Influence to the Custodians");
+    assert!((g.seats[1].venture_fund - fund - 100.0).abs() < 1e-6, "100 Ducats into the Fund: {} from {fund}", g.seats[1].venture_fund);
+    assert_eq!(g.colony(mars).unwrap().colonists, people + 1, "a free Colonist on Mars");
+    assert_eq!(g.seats[3].archive_fund, (archive + 20).min(g.archive_fund_cap(arc)), "20 Research into the Archive fund");
+    // Once only.
+    let (fund, people) = (g.seats[1].venture_fund, g.colony(mars).unwrap().colonists);
+    g.income_phase();
+    assert!(g.seats[1].venture_fund < fund + 100.0 - 1e-6, "not paid twice");
+    assert_eq!(g.colony(mars).unwrap().colonists, people);
+}
+
+/// Ticket #504: the Custodians' counts Regions Leapfrogged after it opens, each Region once; the
+/// Arkwrights' wants a Body beyond Earth and the Moon; the Prospectors' a Region at level 5; the
+/// Archivists' three Observatories.
+#[test]
+fn each_second_objective_counts_only_what_it_says() {
+    let mut g = game();
+    calm(&mut g);
+    let (cus, pro, ark, arc) = (Seat(0), Seat(1), Seat(2), Seat(3));
+    g.turn = 10;
+    let home = g.controlled_states(cus)[0];
+    g.seats[0].stockpile.ducats = 500.0;
+    let leap = Order::Leapfrog { state: home };
+    assert!(g.check_order(cus, &[], &leap).is_ok(), "{:?}", g.check_order(cus, &[], &leap));
+    g.commit_orders(cus, std::slice::from_ref(&leap));
+    assert!(g.seat(cus).second_leapfrogs.is_empty(), "before it opens, a Leapfrog does not count");
+    g.seats[0].opening_met_turn = Some(1);
+    g.commit_orders(cus, std::slice::from_ref(&leap));
+    g.commit_orders(cus, std::slice::from_ref(&leap));
+    assert_eq!(g.seat(cus).second_leapfrogs, vec![home], "one Region, however often");
+    assert!(!g.second_true(cus));
+    g.seats[0].second_leapfrogs.extend([StateId::Japan, StateId::Russia]);
+    assert!(g.second_true(cus), "three different Regions");
+    // The Prospectors: level 4 is not 5.
+    let mine = g.controlled_states(pro)[0];
+    g.state_mut(mine).industry_level = 4;
+    assert!(!g.second_true(pro));
+    g.state_mut(mine).industry_level = 5;
+    assert!(g.second_true(pro));
+    // The Arkwrights: the Moon is not beyond Earth's sphere; a station over Mars is.
+    colony(&mut g, ark, BodyId::Moon, &[], 4);
+    assert!(!g.second_true(ark), "the Moon is Earth's");
+    let mars = colony(&mut g, ark, BodyId::Mars, &[], 4);
+    g.colony_mut(mars).unwrap().in_orbit = true;
+    assert!(g.second_true(ark), "a station over Mars");
+    // The Archivists: two Observatories are not three.
+    colony(&mut g, arc, BodyId::Mars, &[ModuleKind::Observatory, ModuleKind::Observatory], 2);
+    assert!(!g.second_true(arc));
+    colony(&mut g, arc, BodyId::Moon, &[ModuleKind::Observatory], 1);
+    assert!(g.second_true(arc));
+}
+
+/// Ticket #504: a computer seat leans toward its Second Objective once its first is met, and not
+/// before or after.
+#[test]
+fn the_computer_leans_toward_its_second_objective_once_the_first_is_met() {
+    let mut g = game();
+    calm(&mut g);
+    let pro = Seat(1);
+    g.turn = 3;
+    g.seats[1].stockpile.materials = 500.0;
+    g.seats[1].stockpile.ducats = 500.0;
+    g.seats[1].opening_met_turn = Some(2);
+    let raise = |g: &mut Game| {
+        g.log.clear();
+        g.ai_orders(pro);
+        scored(g, "raise Industry Level in")
+    };
+    let open = raise(&mut g);
+    assert!(open > 0.0, "the premise: a raise is a candidate: {:?}", g.log.iter().filter(|l| l.contains("Industry")).collect::<Vec<_>>());
+    g.seats[1].second_met_turn = Some(2);
+    let met = raise(&mut g);
+    assert!((open - met * g.tables.ai.multipliers.opportunity).abs() < 1e-6, "the lean, and only while open: {open} against {met}");
+}
+
+/// Ticket #504 (the review): the Arkwrights' lean reads where the Colonists go, not the note: a
+/// loaded Colony Ship sent to Mars leans while the objective is open, and the lean is gone once met.
+#[test]
+fn the_arkwrights_lean_toward_colonists_carried_beyond_earths_sphere() {
+    let mut g = game();
+    calm(&mut g);
+    let ark = Seat(2);
+    let (ship, _) = colony_ship_ready(&mut g, BodyId::Earth);
+    g.ship_mut(ship).unwrap().seat = ark;
+    g.seats[2].opening_met_turn = Some(1);
+    at_window(&mut g);
+    let sent = |g: &mut Game| {
+        g.log.clear();
+        g.ai_orders(ark);
+        g.log.iter().filter(|l| l.starts_with("  ") && l.contains("[Transit]") && l.contains("send ")).filter_map(|l| l.split_whitespace().nth(1).and_then(|n| n.parse::<f64>().ok()).map(|v| (l.contains("to Mars") || l.contains("to Mercury") || l.contains("to Vesta") || l.contains("to Ceres") || l.contains("to Phobos") || l.contains("to Deimos") || l.contains("to Venus"), v))).collect::<Vec<_>>()
+    };
+    let open = sent(&mut g);
+    assert!(open.iter().any(|(far, _)| *far), "the premise: a flight beyond is a candidate: {open:?}");
+    g.seats[2].second_met_turn = Some(1);
+    let met = sent(&mut g);
+    // The log lists only what is taken: lifted, the flight beyond was taken; unlifted, it either
+    // drops out or is taken at its own score, the lift's share less.
+    let m = g.tables.ai.multipliers.opportunity;
+    let (far_open, far_met): (f64, f64) = (open.iter().filter(|x| x.0).map(|x| x.1).sum(), met.iter().filter(|x| x.0).map(|x| x.1).sum());
+    assert!(far_met == 0.0 || (far_open - far_met * m).abs() < 1e-6 * far_open.max(1.0), "lifted while open: {far_open} against {far_met}");
+    let (near_open, near_met): (f64, f64) = (open.iter().filter(|x| !x.0).map(|x| x.1).sum(), met.iter().filter(|x| !x.0).map(|x| x.1).sum());
+    assert!((near_open - near_met).abs() < 1e-9, "and the Moon not at all: {near_open} against {near_met}");
+}
+
 // ---------------------------------------------------------------- #489 four Colonists to found (version 0.09.9)
 
 /// Ticket #489 (version 0.09.9): a Colony Ship founds with four. An Unload of fewer onto a free slot

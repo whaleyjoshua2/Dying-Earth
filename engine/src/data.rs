@@ -711,6 +711,9 @@ pub struct FactionCard {
     pub victory_second: VictorySecondCard,
     /// Ticket #471 (version 0.09.7): the Faction's Opening Objective.
     pub opening: OpeningCard,
+    /// Ticket #504 (version 0.1.0.0): its Second Objective, open once the Opening Objective is met.
+    #[serde(default)]
+    pub second: Option<OpeningCard>,
     pub colour: [f32; 3],
     /// Ticket #100 (version 0.07.0), renamed on ticket #195 (version 0.08.0): the Region the start
     /// screen opens its globe on. It has ONE reader, and its only job is pointing the start globe's
@@ -878,6 +881,18 @@ pub enum OpeningKind {
     /// The Archivists: `count` working at once from Research Labs and Observatories, one of them
     /// off Earth. Research into the Archive fund.
     ResearchPair,
+    /// Ticket #504 (version 0.1.0.0), the Custodians' Second Objective: `count` different Regions
+    /// Leapfrogged since it opened. Influence, once.
+    Leapfrogs,
+    /// Ticket #504, the Prospectors': a Region held at Industry Level `count` or more, however it
+    /// got there. Ducats into the Venture Capital Fund.
+    IndustryLevel,
+    /// Ticket #504, the Arkwrights': a Colony, ground or station, on a Body beyond Earth and the
+    /// Moon. A free Colonist there.
+    FarColony,
+    /// Ticket #504, the Archivists': `count` Observatories working, every one of them off Earth as
+    /// an Observatory always is. Research into the Archive fund.
+    Observatories,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize)]

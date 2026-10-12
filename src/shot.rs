@@ -1697,6 +1697,14 @@ fn build_board(session: &mut Session) {
     {
         g.seats[0].opening_run = n;
     }
+    // `second:<n>` (a building aid, ticket #504, version 0.1.0.0): seat 0's Opening Objective met on
+    // the first turn and n Regions Leapfrogged toward its Second, so the Journal shows both entries.
+    if let Some(n) = std::env::args().find_map(|a| a.strip_prefix("second:").and_then(|v| v.parse::<usize>().ok()))
+        && let Some(g) = session.game.as_mut()
+    {
+        g.seats[0].opening_met_turn = Some(1);
+        g.seats[0].second_leapfrogs = [StateId::EastAsia, StateId::Japan, StateId::Russia].into_iter().take(n).collect();
+    }
     if let Some(n) = std::env::args().find_map(|a| a.strip_prefix("ducats:").and_then(|v| v.parse::<i64>().ok()))
         && let Some(g) = session.game.as_mut()
     {

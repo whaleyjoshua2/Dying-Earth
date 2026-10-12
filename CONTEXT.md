@@ -809,8 +809,12 @@ One early thing a Faction is asked to do, since version 0.09.7, rewarded once to
 _Avoid_: quest, mission, starting goal
 
 **Journal**:
-The second tab of the Victory window, since version 0.09.7, listing the player's objectives with each one's reward and whether it is met. It holds the Opening Objective now and is where later objectives will go.
+The second tab of the Victory window, since version 0.09.7, listing the player's objectives with each one's reward and whether it is met. It holds the Opening Objective, and since version 0.1.0.0 the **Second Objective** below it once the first is met.
 _Avoid_: quest log, objectives window
+
+**Second Objective**:
+A Faction's second Journal entry, since version 0.1.0.0, open once its Opening Objective is met and, like it, met once at an Income with no deadline and rewarded once. The Custodians' asks three different Regions Leapfrogged after it opens (25 Influence); the Prospectors', a Region at Industry Level 5 (100 Ducats into the Venture Capital Fund); the Arkwrights', a Colony, ground or station, on a Body beyond Earth and the Moon (a free Colonist there); the Archivists', three Observatories working (20 Research into the Archive fund). A computer Faction leans toward it once its first is met.
+_Avoid_: mid-game objective, quest
 
 **Victory Condition**:
 What one Faction must achieve to win. Since version 0.08.0 the Archivists' second part counts Colonists UPLOADED into the Archive rather than Colonists living beside it, which makes that half monotonic: an uploaded Colonist cannot be lost to a raid, a crowding death or a handover. Each Faction has its own, and meeting it in an End phase wins the game at once; since version 0.06.0 it is not met until the Faction's Victory gate, a Tech of its own on the Tech Tree, stands, though every part of it accrues before that; if more than one seat meets it in the same phase, the larger margin over its own bar wins and an exact tie is a draw. If no Faction has met its condition by the end of the last turn, the seats are ranked by score -- the smaller of their two parts' fractions -- then by Colonists off Earth, then by Colonies held, and the first ranked wins. Since version 0.09.4 the Custodians' percentage carries the Stabilization run's partial credit, so a Custodian that has never met its first part can still rank, and win, on it.
