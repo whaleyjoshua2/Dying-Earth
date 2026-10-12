@@ -455,6 +455,12 @@ against §10's 3 / 11 / 30 / 7 and 29 collapses:
   best place reaches 24 to 28 people with every slot built, but only around turn 40 to 48, and the
   Capital upgrade is offered in 13 of 80 games, late, and never completes. The requirement is beyond
   the computer's reach in a game of this length as it plays it.
-- **The build misses its bar.** The rule is as decided and the gathering is in, tested and
-  harmless, but in computer hands the Arkwrights cannot win. Reported to the designer on the ticket;
-  what moves next is the designer's call.
+- **Slots kept for Habitats** (the designer: *"give the ais an understanding of the necessity to
+  reserve spots for habitats"*): every computer seat's ground Colony off Earth keeps as many Module
+  slots free as the Habitats its next tier's people still need (`habitats_to_reserve`), less any on
+  order; no other Module takes one of them. A station, Antarctica and a place at its last tier
+  reserve nothing. **Measured**
+  ([`sweeps/ticket-514-reserve.txt`](../dev-diary/2026-10-07-version-0.1.0.0/sweeps/ticket-514-reserve.txt)):
+  **4 / 13 / 8 / 9 and 46 collapses**; the Arkwrights held a Capital off Earth at the end of **8 of
+  80** games (none before), 13 Capitals on the board (7 before). The first rule that reaches the
+  requirement; the Arkwrights stand at 8 wins against the 30 the requirement took away.

@@ -3403,6 +3403,32 @@ impl Game {
         self.next_tier(c).filter(|t| !(t.one_per_body && self.capital_of(c.body).is_some_and(|h| h != c.id)))
     }
 
+    /// Ticket #514 (version 0.1.0.0): what one more Habitat at this Colony would hold for whoever
+    /// controls it -- the figure `habitat_room` counts each by.
+    pub fn habitat_holds(&self, c: &Colony) -> u32 {
+        let seat = c.control.controller();
+        let per = self.tables.module(ModuleKind::Habitat).holds_colonists as i64 + seat.map(|s| self.habitat_addition(s, TechId::ExpandedHabitats)).unwrap_or(0);
+        let faction = seat.map(|s| self.tables.faction(self.kind(s)).habitat_capacity_multiplier).unwrap_or(1.0);
+        (per.max(0) as f64 * faction).floor() as u32
+    }
+
+    /// Ticket #514: the Module slots a ground Colony off Earth must keep for Habitats -- the ones
+    /// still wanted to house the people its next tier asks for, less any already on order -- so a
+    /// place does not fill every slot with producers while it holds four and can never grow. The
+    /// designer: "give the ais an understanding of the necessity to reserve spots for habitats".
+    /// Nothing for a station, for Antarctica, or for a place at its last tier.
+    pub fn habitats_to_reserve(&self, c: &Colony) -> u32 {
+        if c.in_orbit || c.body == BodyId::Earth {
+            return 0;
+        }
+        let Some(next) = self.next_tier(c) else { return 0 };
+        let wanted = next.colonists.saturating_sub(self.habitat_room(c));
+        let holds = self.habitat_holds(c).max(1);
+        let needed = wanted.div_ceil(holds);
+        let on_order = c.queue.iter().filter(|b| b.item == BuildItem::Module(ModuleKind::Habitat)).count() as u32;
+        needed.saturating_sub(on_order)
+    }
+
     /// Ticket #514 (version 0.1.0.0): whether this seat holds a Colonial Capital: one standing at a
     /// Colony it CONTROLS (an Occupied one counts for neither side), off Earth. What the Arkwrights'
     /// win waits on.

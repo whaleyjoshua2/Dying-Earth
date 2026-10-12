@@ -1867,6 +1867,13 @@ impl Game {
                 // with the Custodians first, 330 Ducats a game against 2287 with the rule off, and
                 // ten wins against nineteen. An opening is played once.
                 let mut opening = false;
+                // Ticket #514 (version 0.1.0.0): a ground Colony off Earth keeps slots for the Habitats
+                // its next tier's people need (`habitats_to_reserve`): no other Module takes one of
+                // them. Measured without it: every Capital candidate's slots filled with Mines,
+                // Choruses and Trade Posts while it held four, and could never grow.
+                if mk != ModuleKind::Habitat && self.free_module_slots(&col) <= self.habitats_to_reserve(&col) {
+                    continue;
+                }
                 if mk == ModuleKind::Habitat {
                     let room = self.habitat_room(&col).saturating_sub(col.colonists);
                     // Ticket #514 (version 0.1.0.0): at the Capital candidate, while gathering, a

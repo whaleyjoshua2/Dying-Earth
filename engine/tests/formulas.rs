@@ -7516,8 +7516,10 @@ fn the_ai_offers_a_mass_driver_and_weighs_a_mine_higher_beside_one() {
     with_tech(&mut g, TechId::EfficientTransit);
     g.seats[0].stockpile.materials = 300.0;
     g.seats[0].stockpile.energy = 300.0;
-    let moon = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Mine, ModuleKind::Generator], 4);
-    let plain = colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Mine, ModuleKind::Generator], 4);
+    // Ticket #514 (version 0.1.0.0): two Habitats standing, so the place keeps no slot for them and
+    // the Mass Driver may take one, with a slot still free for the Mine after it.
+    let moon = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Mine, ModuleKind::Habitat, ModuleKind::Habitat], 8);
+    let plain = colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Mine, ModuleKind::Habitat, ModuleKind::Habitat], 8);
     g.ai_orders(Seat(0));
     let moon_name = g.place_name(Place::Colony(moon));
     assert!(g.log.iter().any(|l| l.contains(&format!("build Mass Driver at {moon_name}"))), "no Mass Driver offered on the Moon");
@@ -21757,4 +21759,45 @@ fn the_arkwright_computer_gathers_people_at_its_capital_candidate() {
     g.log.clear();
     g.ai_orders(ark);
     assert!((scored(&g, &mine) - mine_plain).abs() < 1e-6, "held: the plain weight");
+}
+
+/// Ticket #514: **a ground Colony off Earth keeps slots for the Habitats its next tier's people
+/// need.** An Outpost of four with the Core alone wants two Habitats of four for the Settlement's
+/// twelve: with two slots free the computer offers no Mine there, only the Habitat; with the two
+/// Habitats standing the reserve is nought and the Mine is offered. A station reserves nothing.
+#[test]
+fn the_computer_keeps_slots_at_a_ground_colony_for_the_habitats_its_next_tier_needs() {
+    let mut g = game();
+    calm(&mut g);
+    let s = Seat(0);
+    g.seats[0].stockpile.materials = 500.0;
+    g.seats[0].stockpile.energy = 500.0;
+    let moon = colony(&mut g, s, BodyId::Moon, &[], 4);
+    let c = g.colony(moon).unwrap().clone();
+    assert_eq!((g.habitat_room(&c), g.habitat_holds(&c), g.free_module_slots(&c)), (4, 4, 4), "the Core's four, four a Habitat, four slots");
+    assert_eq!(g.habitats_to_reserve(&c), 2, "two Habitats for the Settlement's twelve");
+    let name = g.place_name(Place::Colony(moon));
+    g.log.clear();
+    g.ai_orders(s);
+    assert!(scored(&g, &format!("build Habitat at {name}")) > 0.0, "the Habitat is offered: {:?}", g.log.iter().filter(|l| l.contains(&name)).collect::<Vec<_>>());
+    // Two slots free, two reserved: no Mine.
+    g.colony_mut(moon).unwrap().modules.push(Module::new(ModuleKind::Generator));
+    g.colony_mut(moon).unwrap().modules.push(Module::new(ModuleKind::Generator));
+    let c = g.colony(moon).unwrap().clone();
+    assert_eq!(g.free_module_slots(&c), 2);
+    g.log.clear();
+    g.ai_orders(s);
+    assert_eq!(scored(&g, &format!("build Mine at {name}")), 0.0, "the two free slots are the Habitats': {:?}", g.log.iter().filter(|l| l.contains(&name)).collect::<Vec<_>>());
+    // One on order counts; two Habitats standing reserve nothing, and the Mine is back.
+    g.colony_mut(moon).unwrap().modules.push(Module::new(ModuleKind::Habitat));
+    g.colony_mut(moon).unwrap().modules.push(Module::new(ModuleKind::Habitat));
+    g.colony_mut(moon).unwrap().colonists = 6;
+    let c = g.colony(moon).unwrap().clone();
+    assert_eq!((g.habitat_room(&c), g.habitats_to_reserve(&c)), (12, 0));
+    g.log.clear();
+    g.ai_orders(s);
+    assert!(scored(&g, &format!("build Mine at {name}")) > 0.0, "the Mine is offered again: {:?}", g.log.iter().filter(|l| l.contains(&name)).collect::<Vec<_>>());
+    // A station over Earth reserves nothing.
+    let iss = station_of(&g, s, BodyId::Earth).unwrap();
+    assert_eq!(g.habitats_to_reserve(g.colony(iss).unwrap()), 0);
 }
