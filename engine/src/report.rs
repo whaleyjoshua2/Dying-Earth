@@ -363,14 +363,15 @@ impl Report {
     }
 
     /// Every line that is not the headline, in the order the five headings are shown. Ticket #404
-    /// (version 0.09.4): a line marked the player's is under Your works too.
+    /// (version 0.09.4): a line marked the player's is under Your works too. Ticket #523 (version
+    /// 0.1.0.0): under Your works alone, so it reads once.
     pub fn sections(&self) -> Vec<(Section, Vec<&ReportLine>)> {
         let head = self.headline_index();
         Section::ALL
             .into_iter()
             .map(|s| {
                 let lines: Vec<&ReportLine> =
-                    self.lines.iter().enumerate().filter(|(i, l)| Some(*i) != head && (l.section() == s || (l.mine && s == Section::YourWorks))).map(|(_, l)| l).collect();
+                    self.lines.iter().enumerate().filter(|(i, l)| Some(*i) != head && if l.mine { s == Section::YourWorks } else { l.section() == s }).map(|(_, l)| l).collect();
                 (s, lines)
             })
             .filter(|(_, l)| !l.is_empty())
@@ -533,6 +534,7 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     // Ticket #408 (version 0.09.4): the same where nothing rose.
     ("occupation_broken_quiet", &["place", "faction", "holder", "unrest", "standing"]),
     ("control_changed", &["place", "faction", "why"]),
+    ("control_changed_after", &["place", "faction", "why", "earlier", "earlier_why"]),
     // Ticket #366 (version 0.09.2): a transfer and a throw-off in one Resolution, said once.
     ("passed_and_threw_off", &["state", "faction"]),
     ("claim_tied", &["place", "factions"]),

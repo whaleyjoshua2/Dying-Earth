@@ -145,6 +145,8 @@ occupation_broken = "{faction}' Occupation of {place} broke: +{unrest} Unrest."
 # Ticket #408 (version 0.09.4): where nothing rose -- a Colony, or a Region already at the top.
 occupation_broken_quiet = "{faction}' Occupation of {place} broke."
 control_changed = "{place} now belongs to {faction} ({why})."
+# Ticket #523 (version 0.1.0.0): a place handed over twice in one Resolution, in one line.
+control_changed_after = "{place} now belongs to {faction} ({why}), after {earlier} took it ({earlier_why})."
 # Ticket #366 (version 0.09.2): a transfer and a throw-off in one Resolution, said once.
 passed_and_threw_off = "{state} passed to {faction} and threw them off at once: neutral."
 claim_tied = "{factions} tie for {place}; it stays as it is."

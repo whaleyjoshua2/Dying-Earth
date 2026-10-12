@@ -84,6 +84,11 @@ belong to the tool are kept apart below.
 8. **Contradictory ownership headlines** (testers 1, 2): "X now belongs to the Prospectors
    (Occupation complete)" and "X now belongs to the Custodians (Influence)" in one Report; every
    ownership change prints twice.
+   **Fixed (2026-10-12, ticket #523).** Both lines were true, in order: an Army pacified the Region,
+   then a rival's Influence took it the same Resolution. Now one line: "India now belongs to
+   Archivists (Influence), after Prospectors took it (Pacified)", and one Moment for the final
+   holder. "Twice" was the 0.09.4 rule listing the player's lines under its place and under Your
+   works; they are under Your works alone now.
 9. **A win announced late and quietly** (tester 1): "score 1.00 MET" with "the game is still on"; the
    win came a turn later as a buried [Note] while the headline was another country.
 10. **Tech id mismatch** (all four): "Large Language Models" can only be ordered as `publicscience`.

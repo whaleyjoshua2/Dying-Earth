@@ -1782,18 +1782,43 @@ impl Game {
         // can contest the place back.
         let line = format!("{} now belongs to the {} ({}).", self.place_name(place), self.seat_name(seat), why);
         self.log(line);
-        let text = self.say(
-            "control_changed",
-            &[("place", self.place_name(place)), ("faction", self.seat_name(seat)), ("why", why.to_string())],
-        );
-        self.report_line(LineKind::ControlChanged, Some(place.into()), text);
+        // Ticket #523 (version 0.1.0.0): a place already handed over this Resolution is one line,
+        // the final holder first and the earlier step after it, where two lines read as a
+        // contradiction ("India now belongs to Prospectors (Pacified)", then "to Archivists").
+        // Only into a line that is still this place's: one from an earlier Report is never touched.
+        let at = self.pending.transfer_lines.iter().rev().find(|(p, _)| *p == place).map(|(_, i)| *i).filter(|i| self.report.lines.get(*i).is_some_and(|l| l.kind == LineKind::ControlChanged && l.place == Some(place.into())));
+        let earlier = at.and_then(|_| self.pending.transfers.iter().rev().find(|t| t.0 == place).cloned());
+        let mut args = vec![("place", self.place_name(place)), ("faction", self.seat_name(seat)), ("why", why.to_string())];
+        let key = match &earlier {
+            Some((_, was, was_why)) => {
+                args.push(("earlier", self.seat_name(*was)));
+                args.push(("earlier_why", was_why.clone()));
+                "control_changed_after"
+            }
+            None => "control_changed",
+        };
+        let text = self.say(key, &args);
+        self.pending.transfers.push((place, seat, why.to_string()));
         // Ticket #404 (version 0.09.4): a place that became the player's, or stopped being theirs,
-        // is their news: listed under Your works as well as under its place.
+        // is their news, under Your works (ticket #523: there alone).
         // An occupier whose Occupation a third Faction's Influence ends loses the place too.
-        self.mark_mine(&[Some(seat), before, directed]);
-        // Ticket #366 (version 0.09.2): where this line stands, so a throw-off in the same
-        // Resolution can say both in its place.
-        self.pending.transfer_lines.push((place, self.report.lines.len() - 1));
+        let mine = !self.spectator && [Some(seat), before, directed].contains(&Some(Seat(0)));
+        match at.filter(|_| earlier.is_some()) {
+            Some(i) => {
+                let l = &mut self.report.lines[i];
+                l.text = text;
+                l.mine |= mine;
+                // Its Moment is the final holder's, below.
+                self.report.moments.retain(|m| !(m.kind == MomentKind::ControlChanged && m.place == Some(place.into())));
+            }
+            None => {
+                self.report_line(LineKind::ControlChanged, Some(place.into()), text);
+                self.mark_mine(&[Some(seat), before, directed]);
+                // Ticket #366 (version 0.09.2): where this line stands, so a throw-off in the same
+                // Resolution can say both in its place.
+                self.pending.transfer_lines.push((place, self.report.lines.len() - 1));
+            }
+        }
         self.moment(
             MomentKind::ControlChanged,
             &[("place", self.place_name(place)), ("faction", self.seat_name(seat))],

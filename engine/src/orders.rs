@@ -394,6 +394,10 @@ pub struct Pending {
     /// throw-off of the same place in the same pass can say both in that line's place.
     #[serde(default)]
     pub transfer_lines: Vec<(Place, usize)>,
+    /// Ticket #523 (version 0.1.0.0): each transfer this Resolution -- where, to whom, and why -- so
+    /// a place that changes hands twice is one line naming both.
+    #[serde(default)]
+    pub transfers: Vec<(Place, Seat, String)>,
     #[serde(default)]
     pub credit_buys: Vec<(Seat, i64, f64)>,
 }

@@ -17645,7 +17645,8 @@ fn a_change_of_hands_to_or_from_the_player_is_also_under_your_works() {
     let gained = g.report.lines.iter().find(|l| l.kind == LineKind::ControlChanged).expect("the change of hands").text.clone();
     assert_eq!(g.report.headline().map(|h| h.kind), Some(LineKind::ColonyFounded), "the ranking is unchanged");
     assert!(works(&g).contains(&gained), "a gain is under Your works: {:?}", works(&g));
-    assert!(earth(&g).contains(&gained), "and still under its place: {:?}", earth(&g));
+    // Ticket #523 (version 0.1.0.0): under Your works alone, at the designer's word, so it reads once.
+    assert!(!earth(&g).contains(&gained), "and not under its place as well: {:?}", earth(&g));
     // Lost to a rival: the player's news too.
     g.report.lines.retain(|l| l.kind != LineKind::ControlChanged);
     g.transfer_control(Place::State(StateId::NorthAfrica), Seat(1), "Influence");
@@ -19807,7 +19808,8 @@ fn the_reports_templates_stay_under_their_word_ceiling() {
     // Terms added to one, and the 5 of a rival's renewal.
     // Ticket #517 (version 0.1.0.0): and by the 12 of an Accord broken, told to each side.
     // Ticket #519 (version 0.1.0.0): and by the 9 of an Army inherited on Hold.
-    assert!(words <= 1854, "the Report's templates hold {words} words; the ceiling is 1,854 (9 for an Army inherited, 12 for an Accord broken, 15% off 2,031, 54 for the race to the Moon, 2 for a rival's upgrade, 8 for an Accord answered, less a word of slack, 17 for a Trade, 9 for a Capital refunded, 5 for an Accord let lapse, 7 for Terms added, 5 for a renewal)");
+    // Ticket #523 (version 0.1.0.0): and by the 9 of a place handed over twice in a turn.
+    assert!(words <= 1863, "the Report's templates hold {words} words; the ceiling is 1,863 (9 for a place handed over twice, 9 for an Army inherited, 12 for an Accord broken, 15% off 2,031, 54 for the race to the Moon, 2 for a rival's upgrade, 8 for an Accord answered, less a word of slack, 17 for a Trade, 9 for a Capital refunded, 5 for an Accord let lapse, 7 for Terms added, 5 for a renewal)");
     // "The" is gone before a Faction's name, which is drawn in its colour instead.
     assert!(!text.contains("he {faction}"), "a template still says \"the {{faction}}\"");
 }
@@ -22146,4 +22148,32 @@ fn the_tech_tree_of_ticket_527() {
         }
         assert_eq!(road.iter().map(|x| t(*x).cost).sum::<i64>(), 192, "{gate:?}: {road:?}");
     }
+}
+
+/// Ticket #523 (version 0.1.0.0): a place that changed hands twice in one Resolution read as a
+/// contradiction -- "India now belongs to Prospectors (Pacified)", then "India now belongs to
+/// Archivists (Influence)". At the designer's word (Q1 A) it is one line, the final holder first and
+/// the earlier step after it, and the headline names the final holder. (Q2 B) A line of the
+/// player's is listed under Your works only, not under its place as well.
+#[test]
+fn a_place_that_changes_hands_twice_in_a_turn_says_so_in_one_line() {
+    let mut g = game();
+    let india = StateId::SouthAsia;
+    g.report.lines.clear();
+    g.report.moments.clear();
+    g.transfer_control(Place::State(india), Seat(1), "Pacified");
+    g.transfer_control(Place::State(india), Seat(3), "Influence");
+    let lines: Vec<&String> = g.report.lines.iter().filter(|l| l.kind == LineKind::ControlChanged).map(|l| &l.text).collect();
+    let (p, a) = (g.seat_name(Seat(1)), g.seat_name(Seat(3)));
+    assert_eq!(lines, vec![&format!("India now belongs to {a} (Influence), after {p} took it (Pacified).")], "{lines:?}");
+    let moments: Vec<&String> = g.report.moments.iter().filter(|m| m.kind == MomentKind::ControlChanged).map(|m| &m.text).collect();
+    assert_eq!(moments.len(), 1, "one Moment for the place: {moments:?}");
+    // Q2 B: a line of the player's reads once, under Your works.
+    g.transfer_control(Place::State(StateId::Japan), Seat(0), "Influence");
+    let mine = g.report.lines.iter().filter(|l| l.mine).count();
+    assert!(mine > 0);
+    let listed: usize = g.report.sections().iter().map(|(_, ls)| ls.iter().filter(|l| l.mine).count()).sum();
+    let head_mine = g.report.headline_index().is_some_and(|i| g.report.lines[i].mine) as usize;
+    assert_eq!(listed + head_mine, mine, "each of the player's lines once");
+    assert!(g.report.sections().iter().filter(|(s, _)| *s != Section::YourWorks).all(|(_, ls)| ls.iter().all(|l| !l.mine)));
 }
