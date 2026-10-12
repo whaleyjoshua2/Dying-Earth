@@ -98,3 +98,11 @@ parent's plane; a camera pitch the player drags; no belt. Spec section 12.
 turn 1 from its opening forty degrees; [`solar-low.png`](ticket-512/solar-low.png), the same from
 twelve degrees above the ecliptic (`pitch:12`), where Mercury's, Ceres's and Vesta's planes show
 against Earth's.
+
+## The close (#507)
+
+**The closing sweep** ([`sweeps/final-0.1.0.0.txt`](sweeps/final-0.1.0.0.txt), the same 80 games as
+`ticket-514-closing.txt`): **7 / 27 / 17 / 7 and 22 collapses**, against 0.09.9's 2 / 23 / 30 / 2
+and 20 and the ideal of 15 each and 20. The spec's head carries the column after every ticket.
+`GAME_VERSION` 0.1.0.0; `SAVE_VERSION` 12. The kits are `dist/dying-earth-0.1.0.0-windows` (built
+here) and the Linux kit from the release-kits run.

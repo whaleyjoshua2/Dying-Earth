@@ -1,5 +1,5 @@
-DYING EARTH - playtest build, version 0.09.9
-============================================
+DYING EARTH - playtest build, version 0.1.0.0
+=============================================
 
 Thanks for playing. This is an early build of a turn-based strategy game about colonizing
 the solar system before global warming wrecks Earth. It is unfinished and unbalanced on
@@ -16,100 +16,65 @@ HOW TO RUN
 4. The very first launch shows a blank dark window for up to ten seconds while it
    compiles graphics. Later launches are quick.
 5. Needs Windows 10 or 11, 64-bit, and any graphics card from the last ten years.
-6. Saves from 0.09.8 load. Saves from 0.09.7 and before do not: the Load screen says so.
+6. Saves from 0.09.9 and before do not load: the Load screen says so.
 7. This version ships for Windows and for Linux. On Linux, read RUN-ON-LINUX.txt in the
    folder instead of steps 2 to 5.
 
-WHAT CHANGED SINCE 0.09.8
+WHAT CHANGED SINCE 0.09.9
 -------------------------
-The settlement version: colonies grow through tiers you pay for, you can refuse what
-other sides offer you, and the sides can trade. The computer plays every rule below.
+The more-room version: a bigger solar system, a bigger Earth, a longer game, and a deeper
+Tech tree. The computer plays every rule below.
 
-SETTLING
-- EVERY NEW COLONY OR STATION OPENS WITH FOUR PEOPLE, however it is made. A Colony Ship
-  must set down four. Building a station from a country's Launch Site takes four Pioneers
-  waiting there; building one from a Colony, or a Colony from a station, takes four of its
-  people, and it must keep at least as many as its Modules. The Arkwrights start with four
-  Pioneers waiting, so their first station can still go up on turn 1.
-- COLONIES HAVE TIERS: Outpost, Settlement, Colony. Every place starts an Outpost. Its
-  Module slots are its people, up to 6 for an Outpost, 12 for a Settlement, 18 for a
-  Colony. The red "Upgrade" tile after the Module boxes buys the next tier: 30 Materials
-  and 4 Widgets at 12 people, 50 and 6 at 18. The card's title says the tier.
-- THE PROSPECTORS' EXCHANGE, their Trade Post off Earth, now also pays the Investment
-  Bank's interest into their Fund.
+MORE ROOM
+- THREE NEW WORLDS: Mercury, Ceres and Vesta, with six Colony slots and two station slots
+  each. Ceres and Vesta are small worlds, so a Mass Driver may stand there. Each has its
+  own launch windows; Ceres to Vesta needs none.
+- TWO NEW COUNTRIES: Vietnam (the South-East Asian mainland) cut out of Indonesia, and
+  Argentina (the Spanish-speaking mainland) cut out of Brazil. Twenty in all.
+- A FOURTH TIER: the Colonial Capital, 24 people and 70 Materials, one to a world, to
+  whoever completes it first, on the ground only. It adds 1 Influence a turn to its
+  holder.
 
-BARGAINS
-- YOU CAN REFUSE. An Accord another side offers you waits for your answer: a box at the
-  start of your turn, Accept or Refuse, and the turn will not end until you answer. The
-  computer sides answer theirs at the start of their next turn too, and a side you refuse
-  waits three turns before asking again. Your own offers are answered the same way, and
-  the Report tells you how it went.
-- TRADES. On a rival's page of the Faction window, under Accords: give one thing for one
-  thing, Ducats, Materials, Fuel, Energy, or one of your Colonies or stations. They answer
-  next turn, and the goods move only if both of you still have them. A Colony traded
-  changes hands peacefully, people and all. Not with a side that is Hostile. A trade
-  counts as a kindness both ways.
+A LONGER GAME
+- FIFTY TURNS, January 2030 to March 2038. The Victory bars grew with it: the Fund 3,500;
+  the Archive 225 Research and 18 uploads; the Diaspora 42 people over four worlds; four
+  Stabilization phases in a row; 18 people off Earth for the Custodians and Prospectors.
+- THE CLIMATE was refitted to the longer game: it takes 620 ppm to add half a degree now.
+- THREE NEW CARDS with a choice: the Carbon Levy, the Deep Core Survey, the Trade Pact.
+
+THE TECH TREE
+- THE VICTORY GATES moved to a fourth rung at 62 Research, each behind a new 58-Research
+  Tech of its own branch: Clean Manufacturing (raised), Regolith Printing (cheaper
+  Modules off Earth), Rail Gun Freight (a Mass Driver pays 3 Ducats a turn) and
+  Superconductors (Energy x1.25). Every road to a gate is 202 Research.
+
+THE JOURNAL AND THE FACTIONS
+- A SECOND OBJECTIVE for each Faction opens once the first is met: three Leapfrogs, a
+  Region at Industry Level 5, a settlement beyond Earth's sphere, three Observatories.
+- ACCORDS RUN FIVE TURNS. In the last turn a Renew button on the Accord's line extends it,
+  if the other side is willing; Terms can be added to an Accord that stands, and a
+  research agreement may be offered. Hover a held Accord to read its Terms.
+- THE ARCHIVE draws 20 Energy a turn once complete (12 before); Closed-Loop Colonies takes
+  a quarter off a Module's Energy, not half.
+- THE ARKWRIGHTS' SHIPS carry half again what everyone else's do, not twice; and to win
+  they must hold a Colonial Capital off Earth as well as their Diaspora.
 
 THE MAP
-- SOUTH AFRICA NOW RUNS UP THE EAST OF THE CONTINENT: Kenya, Tanzania, Uganda, Rwanda,
-  Burundi, Ethiopia, Somalia and Djibouti joined it from Nigeria. Angola went back to
-  Nigeria; Eritrea went to Egypt. South Africa now borders Egypt and faces Saudi Arabia
-  across the Red Sea.
-
-THE WINDOW
-- STATIONS IN ORBIT are short rows: the station's name in its owner's colour, how many
-  live there, and "blockaded" in red if one is. Hover a row for its Modules.
-- A LINE now divides a Colony's card above its Modules.
-- FOUR HOVERS ARE SHORTER: a world's In orbit heading, Greenwash, a Ship in your roster,
-  and the Modules heading.
+- THE SOLAR SYSTEM MAP IS IN THREE DIMENSIONS: each world's ring lies in its real orbital
+  plane. Drag up and down to tilt the view, sideways to turn it.
 
 WHAT WE WANT TO KNOW
 --------------------
 Write down anything, however small. Especially:
 - The moment you were not sure what to do next.
 - Anything you clicked that did nothing, or did something you did not expect.
-- TIERS: did you find the Upgrade tile? Did the six-Module cap of an Outpost stop you?
-- OFFERS: did the Accept / Refuse box come at a sensible moment? Did you refuse anything?
-- TRADES: did you trade? With whom, and what? Did you ever trade a Colony?
-- FOUR TO FOUND: did needing four people slow your first Colony?
+- THE NEW WORLDS: did you go to Mercury, Ceres or Vesta? Was the window line clear?
+- THE CAPITAL: did you raise one? Did the 24 people feel reachable?
+- FIFTY TURNS: did the game drag in the middle? When did you first feel ahead or behind?
+- ACCORDS: did you renew one? Did you notice one lapse?
+- THE 3D MAP: did tilting it help you read the launch windows, or get in the way?
 - The turn the game got boring, if it did, and the turn you felt you had lost.
 - Crashes: what you were doing, and the "Seed" number shown on the title screen and
   the game-over screen. With the seed the game can be replayed exactly.
 
 Screenshots help. Print Screen, then paste into a message.
-
-KNOWN ROUGH EDGES
------------------
-All the numbers below come from eighty computer-only games, twenty with each side going
-first. These are known. You do not need to report them.
-
-WHAT THIS VERSION KNOWS ABOUT ITSELF
-
-- THE WIN COLUMN: Custodians 2, Prospectors 23, Arkwrights 30, Archivists 2, where last
-  version was 9 / 27 / 18 / 7. Four people to found a Colony moved it most: stations off
-  Earth are much rarer, and the Arkwrights, whose ships carry eight, reach the Moon first
-  far more often. Why the Custodians stopped winning is not yet traced.
-- THE WORLD COLLAPSES IN 20 GAMES OF 80, where it was 17.
-- THE ARCHIVISTS SCORE NOTHING at the end in 50 games of 80.
-- FEW PLACES CLIMB A TIER: at the end of the eighty games, 884 Outposts, 87 Settlements
-  and 41 Colonies.
-- THE COMPUTER OFFERS MANY TRADES AND FEW ARE STRUCK: about 20 a game, one in seven
-  accepted, mostly because the side asked is short of the same thing.
-- THE COMPUTER NEVER TRADES A COLONY, and never offers one.
-- THE COMPUTER NEVER USES EARTH L4 OR L5, AND NEVER BUILDS A MASS DRIVER. Both are yours.
-- A COMPUTER SIDE STARTS IN AUSTRALIA AGAIN, where one started in Saudi Arabia: Saudi
-  Arabia now borders South Africa, which another computer side takes.
-- THE EXCHANGE'S BUILD HOVER RUNS TO SEVEN LINES, one over the limit.
-
-CARRIED OVER, STILL TRUE
-
-- THE COMPUTER BUILDS FEW REFINERIES OFF EARTH, so the better refining on the small moons is
-  mostly yours.
-- THE COMPUTER ALMOST NEVER BUILDS A SHIPYARD ON THE MOON, PHOBOS OR DEIMOS.
-- TWO STACKS THAT ATTACK IN ONE ORBIT IN ONE TURN FIGHT TWO BATTLES, one per attack.
-- WHERE EACH SIDE STARTS IS NOT RANDOM. The computer sides always take the same countries
-  in the same order.
-- RENAMING SHIPS, COLONIES AND STATIONS is still cut.
-- Antarctica's three colony sites have labels that overlap each other when you are zoomed
-  out.
-- No sound.

@@ -6,18 +6,32 @@ The map is [Map: version 0.1.0.0](https://github.com/whaleyjoshua2/Dying-Earth/i
 pictures and batches that decided it are in
 [`docs/dev-diary/2026-10-07-version-0.1.0.0/`](../dev-diary/2026-10-07-version-0.1.0.0/).
 
-**What the version is.** Version 0.09.9 with the designer's list. **More room**: Mercury, Ceres and
-Vesta join the board (§1). **A fourth tier**, the Colonial Capital, one to a Body (§2). **An Accord's Terms** on its hover in the Factions window (§3). **Accords of five turns**, renewed or widened (§4). **A Second Objective** for each Faction (§5).
+**What the version is.** Version 0.09.9 with the designer's list, and what the list led to. **More
+room**: Mercury, Ceres and Vesta join the board (§1). **A fourth tier**, the Colonial Capital, one to
+a Body (§2). **An Accord's Terms** on its hover (§3) and **Accords of five turns**, renewed or widened
+(§4). **A Second Objective** for each Faction (§5). **The Tech tree's gates on a fourth rung** at 62,
+with three new Techs (§6). **Two more Regions**, Vietnam and Argentina (§7). **Fifty turns**, the
+climate and the Victory bars scaled, three new Choice Cards (§8). **The Archive at 20 Energy** and
+Closed-Loop Colonies at a quarter off (§9). **Coach Class at half again** (§10). **The Arkwrights'
+win waits on a Colonial Capital**, the computer chasing and gathering at one and every computer seat
+keeping slots for Habitats, the climate re-swept to a step of 620 (§11). **The Solar System Map in
+three dimensions**, each Body in its orbital plane (§12).
 
-**What it did to the win column** (80 games, per Faction):
+**What it did to the win column** (80 games, per Faction, after each ticket in build order):
 
-| | 0.09.9 | the new worlds (§1) | §1, the computer kept off them (a control) | the Colonial Capital (§2) | Accords of five turns (§4) | the Second Objective (§5) | the ideal |
-|---|---|---|---|---|---|---|---|
-| Custodians | 2 | 1 | 3 | 1 | 1 | 1 | 15 |
-| Prospectors | 23 | 15 | 22 | 15 | 16 | 18 | 15 |
-| Arkwrights | 30 | 52 | 32 | 52 | 49 | 49 | 15 |
-| Archivists | 2 | 2 | 4 | 2 | 2 | 1 | 15 |
-| collapses | 20 | 8 | 18 | 8 | 10 | 10 | 20 |
+| | 0.09.9 | §1 worlds | §2 Capital | §4 Accords | §5 Second | §6 tree | §7 Regions | §8 fifty turns | §9 Archive | §10 Coach Class | §11 closing | the ideal |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Custodians | 2 | 1 | 1 | 1 | 1 | 3 | 3 | 6 | 6 | 3 | **7** | 15 |
+| Prospectors | 23 | 15 | 15 | 16 | 18 | 25 | 20 | 8 | 10 | 11 | **27** | 15 |
+| Arkwrights | 30 | 52 | 52 | 49 | 49 | 31 | 39 | 35 | 32 | 30 | **17** | 15 |
+| Archivists | 2 | 2 | 2 | 2 | 1 | 1 | 7 | 9 | 6 | 7 | **7** | 15 |
+| collapses | 20 | 8 | 8 | 10 | 10 | 18 | 8 | 22 | 26 | 29 | **22** | 20 |
+
+**The closing board** ([`sweeps/final-0.1.0.0.txt`](../dev-diary/2026-10-07-version-0.1.0.0/sweeps/final-0.1.0.0.txt)):
+**7 / 27 / 17 / 7 and 22 collapses.** The collapses meet the ideal; the Prospectors are the one
+Faction over the line, the Custodians and Archivists under 10 in every climate cell of the version.
+The Arkwrights' 17 are 6 outright with a Capital and 11 by the last turn's ranking. Balance work is
+the next version's, at the designer's word. `SAVE_VERSION` is 12: a 0.09.9 save is refused.
 
 The new worlds moved the column far past noise, away from the ideal. The control, the same build
 with the computer forbidden to choose the three as destinations, is within noise of 0.09.9, so the
