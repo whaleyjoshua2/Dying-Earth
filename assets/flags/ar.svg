@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" id="flag-ar" viewBox="0 0 640 480">
+  <!-- Drawn for Dying Earth (ticket #510): the sun as a plain disc on the bands. Not flag-icons' file. -->
+  <path fill="#74acdf" d="M0 0h640v480H0z"/>
+  <path fill="#fff" d="M0 160h640v160H0z"/>
+  <circle cx="320" cy="240" r="44" fill="#f6b40e" stroke="#85340a" stroke-width="3"/>
+</svg>

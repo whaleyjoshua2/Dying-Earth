@@ -487,7 +487,8 @@ fn the_allotment_is_the_base_plus_each_controlled_states_value_times_the_faction
     let total: i64 = StateId::ALL.iter().map(|s| g.tables.state(*s).influence).sum();
     // Ticket #482 (version 0.09.8): 35. South Africa's 1 was added, at the designer's word, where
     // every split before it shared its parent's; Nigeria's card had only the 1 to give.
-    assert_eq!(total, 35, "the eight totalled 34, shared out exactly until South Africa added 1");
+    // Ticket #510 (version 0.1.0.0): 36, Vietnam's 1 added the same way; Indonesia's card had only the 1 to give.
+    assert_eq!(total, 36, "the eight totalled 34, shared out exactly until South Africa added 1 and Vietnam 1");
 }
 
 // ---------------------------------------------------------------- #35 Ducats
@@ -743,7 +744,7 @@ fn antarctica_is_three_colony_slots_on_earth_whose_colonists_stay_on_earth_and_w
     // Ticket #56 re-cut them: abundant ore and Fuel under the ice.
     assert_eq!((earth.mine_yield, earth.generator_yield, earth.refinery_yield, earth.research_yield), (1.75, 0.75, 2.0, 1.0));
     assert_eq!(g.free_slots_on(BodyId::Earth).len(), 3);
-    assert_eq!(StateId::ALL.len(), 18, "eighteen Regions since ticket #482, and Antarctica is none of them");
+    assert_eq!(StateId::ALL.len(), 20, "twenty Regions since ticket #510, eighteen since #482, and Antarctica is none of them");
     let m = g.tables.faction(FactionKind::Custodians).emissions_multiplier;
     let before = g.emissions_now();
     bare_stations(&mut g);
@@ -2811,6 +2812,8 @@ fn b_a_sea_level_threshold_raises_two_a_slot_and_displaces_five_percent_an_expos
     // by that card now, and Iran's Region, which Pakistan and Afghanistan joined.
     g.state_mut(StateId::Kazakhstan).industry_level = 0;
     g.state_mut(StateId::MiddleEast).industry_level = 0;
+    // Ticket #510 (version 0.1.0.0): and Vietnam.
+    g.state_mut(StateId::Vietnam).industry_level = 0;
     g.apply_sea_threshold(StateId::EastAsia, 0);
     assert_eq!(g.unrest(StateId::EastAsia), 2.0, "one per build slot, and Asia is exposed 2");
     let displaced = pop * 0.05 * 2.0;
@@ -2853,6 +2856,8 @@ fn c_heat_refugees_arrive_at_the_neighbours_and_raise_unrest_per_two_and_a_half_
     // by that card now, and Iran's Region, which Pakistan and Afghanistan joined.
     g.state_mut(StateId::Kazakhstan).industry_level = 0;
     g.state_mut(StateId::MiddleEast).industry_level = 0;
+    // Ticket #510 (version 0.1.0.0): and Vietnam.
+    g.state_mut(StateId::Vietnam).industry_level = 0;
     hold_temperature(&mut g, 3.0);
     assert!(g.population_growth_rate() < 0.0);
     g.climate_phase();
@@ -3270,15 +3275,16 @@ fn the_ai_pays_relief_and_raises_a_constabulary_where_unrest_has_taken_hold() {
 fn twelve_nation_states_share_out_the_eight_they_came_from() {
     let g = game();
     let t = &g.tables;
-    assert_eq!(StateId::ALL.len(), 18);
+    assert_eq!(StateId::ALL.len(), 20, "twenty since ticket #510");
     let card = |s: StateId| t.state(s);
     // Asia's 30 GDP and 7 Influence go to East Asia, South Asia and South-East Asia -- and since
     // ticket #125 (version 0.07.2) to Japan and Korea, cut out of East Asia with 6 and 1 of them.
     // Ticket #482 (version 0.09.8): Pakistan and Afghanistan crossed from Asia's share into Iran's
     // Region, so the two pools are counted as one: Asia's 30 and 7 with the Middle East's 5 and 4.
-    let asia = [StateId::EastAsia, StateId::SouthAsia, StateId::SouthEastAsia, StateId::Japan, StateId::Kazakhstan, StateId::MiddleEast, StateId::ArabianPeninsula, StateId::Turkey];
+    // Ticket #510 (version 0.1.0.0): and Vietnam, cut out of South-East Asia's with 1 of its 3 GDP.
+    let asia = [StateId::EastAsia, StateId::SouthAsia, StateId::SouthEastAsia, StateId::Japan, StateId::Kazakhstan, StateId::MiddleEast, StateId::ArabianPeninsula, StateId::Turkey, StateId::Vietnam];
     assert_eq!(asia.iter().map(|s| card(*s).gdp).sum::<i64>(), 30 + 5, "Asia's GDP share, and the Middle East's");
-    assert_eq!(asia.iter().map(|s| card(*s).influence).sum::<i64>(), 7 + 4, "Asia's Influence value, and the Middle East's");
+    assert_eq!(asia.iter().map(|s| card(*s).influence).sum::<i64>(), 7 + 4 + 1, "Asia's Influence value, and the Middle East's, and Vietnam's 1 added by ticket #510 as South Africa's was");
     // Africa's 3 and 2 split at the Sahara; ticket #482 cut South Africa out of the south, and its
     // Influence of 1 is the one figure in the world that was added and not shared.
     let africa = [StateId::SubSaharanAfrica, StateId::NorthAfrica, StateId::SouthAfrica];
@@ -4334,7 +4340,8 @@ fn b_coastal_slots_are_two_an_exposure_capped_and_a_raise_is_inland() {
     // Ticket #453 (version 0.09.6): Pakistan (Exposure 1, two) and the United Kingdom (Exposure 2, four).
     // Ticket #482 (version 0.09.8): Kazakhstan has no coast (two fewer than Pakistan's card had),
     // Turkey is Exposure 1 (two) and South Africa Exposure 2 (four).
-    assert_eq!(world, 50, "50 coastal slots in the world: 46, less Kazakhstan's two, and six on ticket #482's Regions");
+    // Ticket #510 (version 0.1.0.0): Vietnam is Exposure 2 (four) and Argentina Exposure 1 (two).
+    assert_eq!(world, 56, "56 coastal slots in the world: 50 until ticket #510's two Regions brought six");
     // Ticket #70: Europe's Refinery and North America's Factory, third on their cards with an
     // Exposure of 1, now stand inland from the first turn. Ticket #377 (version 0.09.2): Europe is
     // the Prospectors' home and stands with the package (Power Plant, Factory, Mine, Refinery,
@@ -19515,7 +19522,7 @@ fn an_offline_building_records_why() {
 fn the_regions_are_redrawn_around_iran_to_eighteen() {
     let g = game();
     let t = &g.tables;
-    assert_eq!(StateId::ALL.len(), 18);
+    assert_eq!(StateId::ALL.len(), 20, "twenty since ticket #510");
     let card = |s: StateId| t.state(s);
     let (ir, tr, kz, za, ng, uk) = (card(StateId::MiddleEast), card(StateId::Turkey), card(StateId::Kazakhstan), card(StateId::SouthAfrica), card(StateId::SubSaharanAfrica), card(StateId::UnitedKingdom));
     assert_eq!([ir.name.as_str(), tr.name.as_str(), kz.name.as_str(), za.name.as_str(), ng.name.as_str(), uk.name.as_str()], ["Iran", "Turkey", "Kazakhstan", "South Africa", "Nigeria", "The United Kingdom"]);
@@ -21443,4 +21450,53 @@ fn superconductors_lift_every_energy_output_by_a_quarter() {
     with_tech(&mut g, TechId::EfficientGrids);
     // 6 x 1.5 x 1.25 = 11.3; 5 x 1.375 x 1.5 x 1.25 = 12.9.
     assert_eq!(income_of(&mut g, Seat(0)).energy, tenth(11.3 + 12.9 - 2.0), "and Efficient Grids multiplies with it");
+}
+
+// ---------------------------------------------------------------- Ticket #510 (version 0.1.0.0): Vietnam and Argentina
+
+/// Ticket #510: **two more Regions, twenty.** Vietnam (the South-East Asian mainland) is cut out of
+/// Indonesia's Region and Argentina (the Spanish-speaking mainland) out of Brazil's; each takes its
+/// parent's people, GDP and Influence by real population, so the world still holds 7,860 and
+/// nothing is invented; neighbours by real borders, every edge on both cards; neither is anybody's
+/// fixed start, and the computer's start pick still works with them on the board.
+#[test]
+fn vietnam_and_argentina_are_cut_out_of_indonesias_and_brazils_regions() {
+    let g = game();
+    let t = &g.tables;
+    assert_eq!(StateId::ALL.len(), 20);
+    assert_eq!(t.states.len(), 20, "twenty rows in nation_states.toml");
+    let card = |s: StateId| t.state(s);
+    let (vn, id, ar, br) = (card(StateId::Vietnam), card(StateId::SouthEastAsia), card(StateId::Argentina), card(StateId::SouthAmerica));
+    assert_eq!([vn.name.as_str(), id.name.as_str(), ar.name.as_str(), br.name.as_str()], ["Vietnam", "Indonesia", "Argentina", "Brazil"]);
+    assert_eq!([vn.flag.as_str(), ar.flag.as_str()], ["vn", "ar"]);
+    // Indonesia's 680 people and 3 GDP shared by real population; its 1 Influence cannot be, so
+    // Vietnam's 1 is the one figure added.
+    assert_eq!((vn.population + id.population, vn.gdp + id.gdp, vn.influence, id.influence), (680.0, 3, 1, 1));
+    assert_eq!((vn.population, vn.gdp, vn.industry_level, vn.size, vn.coastal_exposure), (250.0, 1, 2, 2, 2));
+    assert_eq!((id.population, id.gdp), (430.0, 2));
+    // Brazil's 450 people, 5 GDP and 2 Influence shared the same way.
+    assert_eq!((ar.population + br.population, ar.gdp + br.gdp, ar.influence + br.influence), (450.0, 5, 2));
+    assert_eq!((ar.population, ar.gdp, ar.industry_level, ar.size, ar.coastal_exposure), (227.0, 2, 1, 3, 1));
+    assert_eq!((br.population, br.gdp, br.influence), (223.0, 3, 1));
+    assert_eq!(StateId::ALL.iter().map(|s| card(*s).population).sum::<f64>(), 7860.0, "nobody was invented");
+    // Borders: Vietnam between Indonesia's Region, China's and India's; Argentina between Brazil's
+    // and Mexico's, and Brazil's Region touches Argentina's alone.
+    assert_eq!(vn.neighbours, vec![StateId::SouthEastAsia, StateId::EastAsia, StateId::SouthAsia]);
+    assert_eq!(ar.neighbours, vec![StateId::SouthAmerica, StateId::CentralAmerica]);
+    assert_eq!(br.neighbours, vec![StateId::Argentina]);
+    assert!(!id.neighbours.contains(&StateId::SouthAsia) && !card(StateId::SouthAsia).neighbours.contains(&StateId::SouthEastAsia), "Indonesia's Region no longer reaches India's");
+    for s in [StateId::Vietnam, StateId::Argentina] {
+        for n in &card(s).neighbours {
+            assert!(card(*n).neighbours.contains(&s), "{n:?} lists {s:?} back");
+        }
+        assert!(g.coastal_slots(s) > 0, "{s:?} has a coast");
+    }
+    // Leans and starts.
+    use dying_earth_engine::Resource;
+    assert_eq!([vn.resource_lean, ar.resource_lean], [Resource::Materials, Resource::Materials]);
+    assert_eq!(vn.start_facilities, vec![FacilityKind::Factory, FacilityKind::Mine, FacilityKind::PowerPlant], "a Mine beside its Factory, as every start Factory has");
+    assert_eq!(ar.start_facilities, vec![FacilityKind::Factory, FacilityKind::Mine]);
+    // The computer's start pick, with every other Region taken, lands on one of the two.
+    let others: Vec<StateId> = StateId::ALL.into_iter().filter(|s| !matches!(s, StateId::Vietnam | StateId::Argentina)).collect();
+    assert!(matches!(t.ai_start_state(&others), StateId::Vietnam | StateId::Argentina));
 }

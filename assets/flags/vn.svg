@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" id="flag-vn" viewBox="0 0 640 480">
+  <!-- Drawn for Dying Earth (ticket #510): a star on red. Not flag-icons' file. -->
+  <path fill="#da251d" d="M0 0h640v480H0z"/>
+  <path fill="#ff0" d="M320 96l35.3 108.6h114.2l-92.4 67.1 35.3 108.6L320 313.2l-92.4 67.1 35.3-108.6-92.4-67.1h114.2z"/>
+</svg>

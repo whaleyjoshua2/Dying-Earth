@@ -198,10 +198,15 @@ pub enum StateId {
     // has been, so no older index moves.
     Turkey,
     SouthAfrica,
+    // Version 0.1.0.0 (ticket #510): Vietnam (the South-East Asian mainland) cut out of Indonesia's
+    // Region, Argentina (the Spanish-speaking mainland) out of Brazil's. Appended, as every split
+    // has been, so no older index moves.
+    Vietnam,
+    Argentina,
 }
 
 impl StateId {
-    pub const ALL: [StateId; 18] = [
+    pub const ALL: [StateId; 20] = [
         StateId::SubSaharanAfrica,
         StateId::NorthAfrica,
         StateId::EastAsia,
@@ -220,6 +225,8 @@ impl StateId {
         StateId::UnitedKingdom,
         StateId::Turkey,
         StateId::SouthAfrica,
+        StateId::Vietnam,
+        StateId::Argentina,
     ];
     pub fn index(self) -> usize {
         self as usize

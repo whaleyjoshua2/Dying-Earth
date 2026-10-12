@@ -7,7 +7,7 @@
 //! the mask, from the `earth.png` already in `assets/textures`, so the borders can be redrawn
 //! without the source JPEGs.
 //!
-//! Mask layout (`assets/textures/earth_states.png`, grey 8-bit): 0 = water, 1..19 = a Region.
+//! Mask layout (`assets/textures/earth_states.png`, grey 8-bit): 0 = water, 1..21 = a Region.
 //! Values 1 to 9 are the order the mask was first painted (Sub-Saharan Africa, Antarctica, East
 //! Asia, Australia and Oceania, Europe, North America, South America, Russia, the Middle East);
 //! since ticket #44 Antarctica is no Region and the window maps its value (2) to none. Ticket #53
@@ -18,8 +18,9 @@
 //! Central Asian republics, 17 the United Kingdom with Ireland and Iceland), and ticket #482
 //! (version 0.09.8) two more (18 Turkey with the Levant, Iraq and the Caucasus, 19 South Africa
 //! with its neighbours), while value 16 became Kazakhstan, the five republics alone, and Pakistan
-//! and Afghanistan went to value 9, the Region called Iran,
-//! so every old value still means what it meant. The Regions have been named for their Nations
+//! and Afghanistan went to value 9, the Region called Iran, and ticket #510 (version 0.1.0.0) two
+//! more (20 Vietnam with the South-East Asian mainland, out of 12; 21 Argentina with the
+//! Spanish-speaking mainland, out of 7), so every old value still means what it meant. The Regions have been named for their Nations
 //! since ticket #122 -- value 3 is the Region called China -- but the mask's names are the
 //! geographic ones it was painted under, since that is what the value covers.
 //!
@@ -68,7 +69,10 @@ const KAZAKHSTAN: u8 = 16;
 const UNITED_KINGDOM: u8 = 17;
 const TURKEY: u8 = 18;
 const SOUTH_AFRICA: u8 = 19;
-const VALUES: usize = 20;
+// Ticket #510 (version 0.1.0.0).
+const VIETNAM: u8 = 20;
+const ARGENTINA: u8 = 21;
+const VALUES: usize = 22;
 
 /// The Region a country belongs to, by Natural Earth's `ADM0_A3`, then by its `SUBREGION`, then by
 /// its `CONTINENT`. Every case the research flagged is decided here by name, so the table can be
@@ -106,6 +110,11 @@ fn region_for(adm0: &str, subregion: &str, continent: &str) -> u8 {
         "EGY" | "LBY" | "TUN" | "DZA" | "MAR" | "ESH" | "SDN" | "ERI" => return NORTH_AFRICA,
         "RUS" => return RUSSIA,
         "ATA" => return ANTARCTICA,
+        // Ticket #510 (version 0.1.0.0): the South-East Asian mainland leaves Indonesia's Region for
+        // the one called Vietnam; the Spanish-speaking mainland leaves Brazil's for Argentina's.
+        // Brazil keeps the Guianas (and the Falklands, by subregion).
+        "VNM" | "THA" | "MMR" | "KHM" | "LAO" => return VIETNAM,
+        "ARG" | "CHL" | "URY" | "PRY" | "BOL" | "PER" | "ECU" | "COL" | "VEN" => return ARGENTINA,
         _ => {}
     }
     match subregion {
@@ -344,7 +353,7 @@ fn main() {
     mask.save(out.join("earth_states.png")).expect("save mask");
     let unassigned: Vec<&(String, u8)> = table.iter().filter(|(_, v)| *v == 0).collect();
     println!("wrote earth_states.png from {} countries; {} land pixels took the nearest Region by flood", table.len(), filled);
-    println!("pixel counts water/SSA/AN/EA/AU/EU/NA/SA/RU/ME/NAF/SAS/SEA/CAC/JK/ARB/KAZ/UK/TUR/ZAF ={counts:?}");
+    println!("pixel counts water/SSA/AN/EA/AU/EU/NA/SA/RU/ME/NAF/SAS/SEA/CAC/JK/ARB/KAZ/UK/TUR/ZAF/VN/AR ={counts:?}");
     if !unassigned.is_empty() {
         println!("left to the flood, having no Region of their own: {}", unassigned.iter().map(|(n, _)| n.as_str()).collect::<Vec<_>>().join(", "));
     }
@@ -374,6 +383,8 @@ fn main() {
             Some(StateId::UnitedKingdom),
             Some(StateId::Turkey),
             Some(StateId::SouthAfrica),
+            Some(StateId::Vietnam),
+            Some(StateId::Argentina),
         ];
         let colours: Vec<[u8; 3]> = MASK_IDS
             .iter()

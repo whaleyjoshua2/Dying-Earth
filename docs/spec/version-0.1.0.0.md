@@ -280,3 +280,41 @@ against §5's; the rung numbers moved after the sweep and change no price, so it
 - Rail Gun Freight completes in 78 of 80 games, but the computer seats build almost no Mass
   Driver (three standing at the end over the batch, one before), so in computer hands its Ducats
   are near-dead. Measured, not traced; the appetite is a carried note on the map.
+
+## 7. Two more Regions: Vietnam and Argentina
+
+The authority is [ticket #510](https://github.com/whaleyjoshua2/Dying-Earth/issues/510). The
+designer: *"add two more nation states"*, and on the choice, *"let's go with Vietnam and
+argentina"*. Twenty Regions, from eighteen.
+
+| Region | Cut from | Covers | People | GDP | Influence | Industry | Education | Coast | Starts with |
+|---|---|---|---|---|---|---|---|---|---|
+| **Vietnam** | Indonesia's (680 to 430) | the South-East Asian mainland: Vietnam, Thailand, Myanmar, Cambodia, Laos | 250 | 1 of Indonesia's 3 | 1, added (Indonesia's card had only 1) | 2 | 0.9 | Exposure 2 | Factory, Mine, Power Plant |
+| **Argentina** | Brazil's (450 to 223) | the Spanish-speaking mainland: Colombia and Venezuela to Chile and Argentina | 227 | 2 of Brazil's 5 | 1 of Brazil's 2 | 1 | 1.1 | Exposure 1 | Factory, Mine |
+
+- **Shares by real population**, the world's 7,860 unchanged. Vietnam's Influence is the one figure
+  added, as South Africa's was in 0.09.8; the world's Influence is 36.
+- **Borders**, every edge on both cards: Vietnam touches Indonesia's Region, China's and (through
+  Myanmar) India's; Indonesia's no longer touches India's. Argentina touches Brazil's and Mexico's
+  (at Panama); Brazil's Region now touches Argentina's alone. Brazil keeps Guyana, Suriname and the
+  Falklands (French Guiana is France's feature, so the European Union's, by the mask's standing
+  rule). Indonesia's Region keeps China's as a sea neighbour, as Australia is its.
+- **The flags** `vn` and `ar` are drawn for the game (a star on red; the sun on the bands, as a
+  plain disc), not flag-icons' files.
+- **No fixed start.** Seats pick their Region as they do today; the computer's pick (best Industry,
+  then people) can land on either.
+- **The map** is redrawn from Natural Earth's 50m borders (public domain, downloaded for the build,
+  not committed), the two Regions' mask values 20 and 21; label points on the Khorat plateau and the
+  pampas; flags `vn` and `ar`. `SAVE_VERSION` 12: a 0.1.0.0 save from before this ticket is refused,
+  as every Region change has been.
+- Nothing else changed: the Amazon Dieback still names Brazil's Region.
+
+**Measured** over the 80 games
+([`sweeps/ticket-510.txt`](../dev-diary/2026-10-07-version-0.1.0.0/sweeps/ticket-510.txt)),
+against §6's:
+- Wins **3 / 20 / 39 / 7** with **8 collapses**, from 3 / 25 / 31 / 1 and 18. The Archivists' six
+  and the collapses' ten are past noise; the Arkwrights' eight is at its edge.
+- Every gate completes a little earlier and in more games (Arkwrights 66 of 80 at a median turn 27,
+  from 59); the tree completes in 62 of 80, from 50.
+- Why is **not traced**. Two more Regions to hold means more Research Labs and Facilities on the
+  board for the same four seats; the fifty-turn ticket fits the length to this board.

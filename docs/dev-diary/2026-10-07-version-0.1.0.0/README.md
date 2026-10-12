@@ -59,3 +59,22 @@ three gated branches; the designer: "there should only be four rungs".
 **The sweep** ([`sweeps/ticket-505.txt`](sweeps/ticket-505.txt)): 3 / 25 / 31 / 1 and 18
 collapses, from 1 / 18 / 49 / 1 and 10. Every gate lands two to three turns later; the tree
 completes in 50 of 80 games, from 65.
+
+## Two more Regions: Vietnam and Argentina (#510)
+
+Vietnam (the South-East Asian mainland) cut out of Indonesia's Region, Argentina (the
+Spanish-speaking mainland) out of Brazil's, each taking its parent's people, GDP and Influence by
+real population; twenty Regions. Spec section 7.
+
+**The pictures** ([`ticket-510/`](ticket-510/)).
+
+- [`mask.png`](ticket-510/mask.png): the redrawn Region mask, every Region in its own colour, the
+  generator's preview. Vietnam teal on the mainland, Argentina light blue down the west and south
+  of South America; Brazil keeps Guyana and Suriname.
+- [`vietnam.png`](ticket-510/vietnam.png): the Earth Map on turn 1 facing Vietnam, between India,
+  China and Indonesia, with its label.
+- [`argentina.png`](ticket-510/argentina.png): facing Argentina with its card open: the flag, 229
+  million people, GDP 2, Industry Level 1 leaning Materials, a Factory and its Mine, five slots free.
+
+**The sweep** ([`sweeps/ticket-510.txt`](sweeps/ticket-510.txt)): 3 / 20 / 39 / 7 and 8 collapses,
+from 3 / 25 / 31 / 1 and 18. The Archivists' rise and the collapses' fall are past noise; not traced.

@@ -105,6 +105,10 @@ pub fn state_lonlat(state: StateId) -> (f32, f32) {
         StateId::UnitedKingdom => (-3.0, 56.5),
         StateId::Turkey => (36.0, 38.0),
         StateId::SouthAfrica => (25.0, -27.0),
+        // Ticket #510 (version 0.1.0.0): Vietnam's on the Khorat plateau, between the Mekong and the
+        // Chao Phraya; Argentina's on the pampas, clear of Brazil's over the Mato Grosso.
+        StateId::Vietnam => (103.0, 17.0),
+        StateId::Argentina => (-65.0, -33.0),
     }
 }
 
