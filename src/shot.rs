@@ -78,6 +78,9 @@ pub struct ShotPlan {
     pub hover: Option<BodyId>,
     /// `look:<lon>,<lat>` (a building aid): every surface picture faces that point.
     pub look: Option<(f32, f32)>,
+    /// Ticket #512 (version 0.1.0.0): `pitch:<degrees>` (a building aid): the Solar System Map is
+    /// seen from this high above the ecliptic.
+    pub pitch: Option<f32>,
     /// Ticket #50: 0 the Faction choice screen is not up yet, 1 it is up, 2 it has been captured.
     pub factions_step: u8,
     /// Ticket #51: `archive:<stage>` planted an Archive at this Colony, so the Body picture opens
@@ -200,6 +203,9 @@ fn apply_aids(plan: &mut ShotPlan, view: &mut ViewState) {
     if let (Some((lon, lat)), View::Surface(_)) = (plan.look, view.view) {
         view.yaw = crate::geo::yaw_facing(lon, lat);
         view.pitch = lat.to_radians().clamp(-1.3, 1.3);
+    }
+    if let (Some(deg), View::Solar) = (plan.pitch, view.view) {
+        view.solar_pitch = deg.to_radians().clamp(crate::geo::SOLAR_PITCH_RANGE.0, crate::geo::SOLAR_PITCH_RANGE.1);
     }
     if plan.climate_toggle && view.view == View::Surface(BodyId::Earth) {
         view.show_climate = false;
@@ -2145,6 +2151,7 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
             let (lon, lat) = a.strip_prefix("look:")?.split_once(',')?;
             Some((lon.parse().ok()?, lat.parse().ok()?))
         });
+        plan.pitch = std::env::args().find_map(|a| a.strip_prefix("pitch:").and_then(|v| v.parse().ok()));
         plan.climate_toggle = std::env::args().any(|a| a == "climate:toggle");
         // Ticket #59: whatever the Save left in the top bar, held up for the rest of the run.
         plan.notice = session.save_notice.as_ref().map(|(text, _)| text.clone());

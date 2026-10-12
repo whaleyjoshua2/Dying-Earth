@@ -4766,6 +4766,18 @@ impl Game {
         crate::ephemeris::position(self.tables.planet(body), self.julian_day(turn)).longitude
     }
 
+    /// Ticket #512 (version 0.1.0.0): how far above or below the ecliptic a Body stands at a turn,
+    /// degrees, north positive; a satellite reads its parent's.
+    pub fn heliocentric_latitude(&self, body: BodyId, turn: u32) -> f64 {
+        crate::ephemeris::position(self.tables.planet(body), self.julian_day(turn)).latitude
+    }
+
+    /// Ticket #512: the plane a Body's orbit lies in at a turn, (inclination, ascending node) in
+    /// degrees; a satellite reads its parent's.
+    pub fn orbital_plane(&self, body: BodyId, turn: u32) -> (f64, f64) {
+        crate::ephemeris::orbital_plane(self.tables.planet(body), self.julian_day(turn))
+    }
+
     /// The phase angle at a turn: Mars's heliocentric longitude less Earth's, folded to -180..180.
     pub fn phase_angle(&self, turn: u32) -> f64 {
         crate::ephemeris::wrap_180(self.heliocentric_longitude(BodyId::Mars, turn) - self.heliocentric_longitude(BodyId::Earth, turn))

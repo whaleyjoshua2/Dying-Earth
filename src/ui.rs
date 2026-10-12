@@ -2360,7 +2360,12 @@ fn game_screen(
         if view.popup == Popup::None && session.screen == Screen::Playing {
             let d = resp.drag_motion();
             match view.view {
-                View::Solar => view.solar_yaw += d.x * 0.01,
+                // Ticket #512 (version 0.1.0.0): dragging up and down tilts the map between nearly
+                // edge-on and nearly straight down; sideways turns it as before.
+                View::Solar => {
+                    view.solar_yaw += d.x * 0.01;
+                    view.solar_pitch = (view.solar_pitch + d.y * 0.008).clamp(geo::SOLAR_PITCH_RANGE.0, geo::SOLAR_PITCH_RANGE.1);
+                }
                 View::Surface(_) => {
                     view.yaw += d.x * 0.008;
                     view.pitch = (view.pitch + d.y * 0.008).clamp(-1.3, 1.3);

@@ -43,8 +43,19 @@ pub fn wrap_180(deg: f64) -> f64 {
 pub struct Position {
     /// Heliocentric ecliptic longitude, J2000 frame, degrees in 0..360.
     pub longitude: f64,
+    /// Ticket #512 (version 0.1.0.0): heliocentric ecliptic latitude, degrees, north positive --
+    /// how far above or below the ecliptic the planet stands, for a map drawn in three dimensions.
+    pub latitude: f64,
     /// Distance from the Sun, in astronomical units.
     pub radius: f64,
+}
+
+/// Ticket #512 (version 0.1.0.0): the plane of a planet's orbit at a date -- its inclination to
+/// the ecliptic and the longitude of its ascending node, both in degrees -- for the ring the map
+/// draws it on.
+pub fn orbital_plane(el: &PlanetElements, jd: f64) -> (f64, f64) {
+    let t = centuries_from_j2000(jd);
+    (el.inclination + el.inclination_rate * t, wrap_360(el.node_longitude + el.node_longitude_rate * t))
 }
 
 /// Where a planet stands at a date, from its elements (JPL's six-step recipe).
@@ -82,6 +93,6 @@ pub fn position(el: &PlanetElements, jd: f64) -> Position {
     let x = (cos_w * cos_o - sin_w * sin_o * cos_i) * x_orbit + (-sin_w * cos_o - cos_w * sin_o * cos_i) * y_orbit;
     let y = (cos_w * sin_o + sin_w * cos_o * cos_i) * x_orbit + (-sin_w * sin_o + cos_w * cos_o * cos_i) * y_orbit;
     let z = (sin_w * sin_i) * x_orbit + (cos_w * sin_i) * y_orbit;
-    // 6. Longitude is all a game on a plane needs.
-    Position { longitude: wrap_360(y.atan2(x).to_degrees()), radius: (x * x + y * y + z * z).sqrt() }
+    // 6. Longitude is all a game on a plane needs; ticket #512 reads the latitude too, for the map.
+    Position { longitude: wrap_360(y.atan2(x).to_degrees()), latitude: z.atan2((x * x + y * y).sqrt()).to_degrees(), radius: (x * x + y * y + z * z).sqrt() }
 }

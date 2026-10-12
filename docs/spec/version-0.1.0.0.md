@@ -473,3 +473,27 @@ against §10's 3 / 11 / 30 / 7 and 29 collapses:
   ([`sweeps/co2-grid.md`](../dev-diary/2026-10-07-version-0.1.0.0/sweeps/co2-grid.md), the second
   grid). At 620 the grid read 7 / 27 / 17 / 7 and 22 collapses; the closing sweep is
   [`sweeps/ticket-514-closing.txt`](../dev-diary/2026-10-07-version-0.1.0.0/sweeps/ticket-514-closing.txt).
+
+## 12. The Solar System Map in three dimensions
+
+The authority is [ticket #512](https://github.com/whaleyjoshua2/Dying-Earth/issues/512). The
+designer: *"solar system map 3d with bodies in their correct orbital plain - no need to draw the
+astroid belt"*.
+
+- **Each ring lies in its Body's orbital plane**: tilted by the real inclination about the real
+  ascending node, both from the ephemeris (`ephemeris::orbital_plane`; the rings read it at the
+  game's first month and the Bodies at the turn's date, the nodes drifting by at most a degree and
+  a half a century, so over the game a ring leaves its Body by three thousandths at Ceres). Mercury 7.0 degrees about a node
+  at 48, Venus 3.4, Mars 1.85, Ceres 10.6, Vesta 7.1; Earth's ring is the ecliptic. The Body rides
+  its tilted ring, so its height above the map is the ring's radius times the sine of its real
+  ecliptic latitude (`Position.latitude`, new), within what its eccentric orbit adds; a test holds
+  every Body to that over the fifty turns.
+- **A satellite** (the Moon, Phobos, Deimos) circles its parent in the parent's plane; a Body's
+  Orbital Control ring and its far orbits lie in that plane too.
+- **The camera** opens where it always did, forty degrees above the ecliptic; dragging up and down
+  tilts it between nearly edge-on (5 degrees) and nearly straight down (85), sideways turns it as
+  before (`solar_pitch`; the shot aid `pitch:<degrees>`).
+- **The belt** of ticket #502 is not drawn; Ceres and Vesta keep their rings. The window line and a
+  flight's arc read the tilted places. The rings' radii are untouched, and the title screen's
+  system, with no sky to read, is flat as before.
+- No rule moves; no sweep.

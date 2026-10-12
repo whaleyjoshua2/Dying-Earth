@@ -88,3 +88,13 @@ development every ten turns. Spec section 8.
 **The sweeps.** [`sweeps/co2-grid.md`](sweeps/co2-grid.md) sums the eight climate cells by Faction
 (raw: `ticket-506-grid.txt`, `ticket-506-grid-2.txt`); [`sweeps/ticket-506.txt`](sweeps/ticket-506.txt)
 is the closing sweep at the cell taken.
+
+## The Solar System Map in three dimensions (#512)
+
+Each ring in its Body's orbital plane, the real tilt about the real node; satellites in their
+parent's plane; a camera pitch the player drags; no belt. Spec section 12.
+
+**The pictures** ([`ticket-512/`](ticket-512/)): [`solar.png`](ticket-512/solar.png), the map on
+turn 1 from its opening forty degrees; [`solar-low.png`](ticket-512/solar-low.png), the same from
+twelve degrees above the ecliptic (`pitch:12`), where Mercury's, Ceres's and Vesta's planes show
+against Earth's.
