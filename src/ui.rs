@@ -1723,65 +1723,75 @@ fn title_screen(root: &mut Ui, session: &mut Session, actions: &mut Vec<Action>)
 /// where anything else the game owes a credit to goes as it grows.
 fn credits_screen(root: &mut Ui, session: &mut Session, icons: &Icons) {
     egui::CentralPanel::default().show(root, |ui| {
-        ui.vertical_centered(|ui| {
-            ui.add_space(60.0);
-            ui.label(RichText::new("Credits").size(40.0).strong());
-            ui.add_space(24.0);
-            ui.label(RichText::new("Icons").size(20.0).strong());
-            ui.label(RichText::new("From game-icons.net, used under Creative Commons BY 3.0.").size(15.0));
-            ui.add_space(10.0);
-            // Ticket #146 (version 0.07.3): thirty-two credits and a drawing no longer fit one column
-            // in an 800-pixel window -- the first picture of this screen ran off its bottom -- so
-            // the list is two columns, the figures and kinds on the left and the buildings on the
-            // right, each row an icon at 22 pixels beside its line.
-            let mut rows: Vec<(String, String)> = crate::icons::CREDITS.iter().map(|c| (c.key(), format!("{}: \"{}\" by {}", c.resource, c.icon, c.author))).collect();
-            // Ticket #135 (version 0.07.3): the game's own drawings, named so the list is complete.
-            for d in crate::icons::DRAWN {
-                rows.push((d.to_string(), format!("{}: drawn for Dying Earth, no credit owed", capitalised(d))));
-            }
-            let half = rows.len().div_ceil(2);
-            ui.horizontal_top(|ui| {
-                ui.add_space(ui.available_width() / 2.0 - 400.0);
-                for column in [&rows[..half], &rows[half..]] {
-                    ui.vertical(|ui| {
-                        ui.set_width(390.0);
-                        for (key, line) in column {
-                            ui.horizontal(|ui| {
-                                ui.spacing_mut().item_spacing.x = 8.0;
-                                if let Some(image) = icons.image(key, 20.0) {
-                                    ui.add(image);
-                                }
-                                ui.label(RichText::new(line).size(13.0));
-                            });
-                        }
-                    });
+        // Ticket #502 (version 0.1.0.0): the list had already run past an 800-pixel window's foot
+        // before the maps were credited, taking the flags and Back with it, so the page scrolls.
+        egui::ScrollArea::vertical().show(ui, |ui| {
+            ui.vertical_centered(|ui| {
+                ui.add_space(60.0);
+                ui.label(RichText::new("Credits").size(40.0).strong());
+                ui.add_space(24.0);
+                ui.label(RichText::new("Icons").size(20.0).strong());
+                ui.label(RichText::new("From game-icons.net, used under Creative Commons BY 3.0.").size(15.0));
+                ui.add_space(10.0);
+                // Ticket #146 (version 0.07.3): thirty-two credits and a drawing no longer fit one column
+                // in an 800-pixel window -- the first picture of this screen ran off its bottom -- so
+                // the list is two columns, the figures and kinds on the left and the buildings on the
+                // right, each row an icon at 22 pixels beside its line.
+                let mut rows: Vec<(String, String)> = crate::icons::CREDITS.iter().map(|c| (c.key(), format!("{}: \"{}\" by {}", c.resource, c.icon, c.author))).collect();
+                // Ticket #135 (version 0.07.3): the game's own drawings, named so the list is complete.
+                for d in crate::icons::DRAWN {
+                    rows.push((d.to_string(), format!("{}: drawn for Dying Earth, no credit owed", capitalised(d))));
                 }
-            });
-            ui.add_space(12.0);
-            ui.label(RichText::new("https://game-icons.net").size(14.0).weak());
-            // Ticket #122 (version 0.07.2): the Nations' flags. MIT asks nothing on screen; they are
-            // named here anyway, since a player who wonders where the art came from should not
-            // have to open a folder to find out, and the provenance caveat the research raised is
-            // worth a line.
-            ui.add_space(18.0);
-            ui.label(RichText::new("Flags").size(20.0).strong());
-            ui.label(RichText::new("From flag-icons (github.com/lipis/flag-icons), under the MIT licence.").size(15.0));
-            ui.label(RichText::new("Its licence text ships beside the flags, in assets/flags.").size(14.0).weak());
-            ui.add_space(8.0);
-            ui.horizontal(|ui| {
-                ui.add_space(ui.available_width() / 2.0 - 6.0 * 40.0);
-                ui.spacing_mut().item_spacing.x = 10.0;
-                for sid in StateId::ALL {
-                    let card = session.tables.state(sid);
-                    if let Some(flag) = Icons::flag_from_ctx(ui.ctx(), &card.flag, 24.0) {
-                        ui.add(flag).on_hover_text(&card.name);
+                let half = rows.len().div_ceil(2);
+                ui.horizontal_top(|ui| {
+                    ui.add_space(ui.available_width() / 2.0 - 400.0);
+                    for column in [&rows[..half], &rows[half..]] {
+                        ui.vertical(|ui| {
+                            ui.set_width(390.0);
+                            for (key, line) in column {
+                                ui.horizontal(|ui| {
+                                    ui.spacing_mut().item_spacing.x = 8.0;
+                                    if let Some(image) = icons.image(key, 20.0) {
+                                        ui.add(image);
+                                    }
+                                    ui.label(RichText::new(line).size(13.0));
+                                });
+                            }
+                        });
                     }
+                });
+                ui.add_space(12.0);
+                ui.label(RichText::new("https://game-icons.net").size(14.0).weak());
+                // Ticket #122 (version 0.07.2): the Nations' flags. MIT asks nothing on screen; they are
+                // named here anyway, since a player who wonders where the art came from should not
+                // have to open a folder to find out, and the provenance caveat the research raised is
+                // worth a line.
+                ui.add_space(18.0);
+                ui.label(RichText::new("Flags").size(20.0).strong());
+                ui.label(RichText::new("From flag-icons (github.com/lipis/flag-icons), under the MIT licence.").size(15.0));
+                ui.label(RichText::new("Its licence text ships beside the flags, in assets/flags.").size(14.0).weak());
+                ui.add_space(8.0);
+                ui.horizontal(|ui| {
+                    ui.add_space(ui.available_width() / 2.0 - 6.0 * 40.0);
+                    ui.spacing_mut().item_spacing.x = 10.0;
+                    for sid in StateId::ALL {
+                        let card = session.tables.state(sid);
+                        if let Some(flag) = Icons::flag_from_ctx(ui.ctx(), &card.flag, 24.0) {
+                            ui.add(flag).on_hover_text(&card.name);
+                        }
+                    }
+                });
+                // Ticket #502 (version 0.1.0.0): the new worlds' maps, credited as their makers ask.
+                ui.add_space(18.0);
+                ui.label(RichText::new("Maps").size(20.0).strong());
+                ui.label(RichText::new("Ceres and Vesta: NASA/JPL-Caltech/UCLA/MPS/DLR/IDA.").size(14.0));
+                ui.label(RichText::new("Mercury: NASA/Johns Hopkins University Applied Physics Laboratory/Carnegie Institution of Washington.").size(14.0));
+                ui.add_space(30.0);
+                if ui.add(egui::Button::new(RichText::new("Back").size(20.0)).min_size(egui::vec2(180.0, 38.0))).clicked() {
+                    session.screen = Screen::Title;
                 }
+                ui.add_space(30.0);
             });
-            ui.add_space(30.0);
-            if ui.add(egui::Button::new(RichText::new("Back").size(20.0)).min_size(egui::vec2(180.0, 38.0))).clicked() {
-                session.screen = Screen::Title;
-            }
         });
     });
 }
@@ -2350,7 +2360,12 @@ fn game_screen(
         if view.popup == Popup::None && session.screen == Screen::Playing {
             let d = resp.drag_motion();
             match view.view {
-                View::Solar => view.solar_yaw += d.x * 0.01,
+                // Ticket #512 (version 0.1.0.0): dragging up and down tilts the map between nearly
+                // edge-on and nearly straight down; sideways turns it as before.
+                View::Solar => {
+                    view.solar_yaw += d.x * 0.01;
+                    view.solar_pitch = (view.solar_pitch + d.y * 0.008).clamp(geo::SOLAR_PITCH_RANGE.0, geo::SOLAR_PITCH_RANGE.1);
+                }
                 View::Surface(_) => {
                     view.yaw += d.x * 0.008;
                     view.pitch = (view.pitch + d.y * 0.008).clamp(-1.3, 1.3);
@@ -2986,6 +3001,28 @@ fn journal_tab(ui: &mut Ui, session: &Session, game: &Game) {
                 ui.label(RichText::new("Not yet met. No deadline.").weak());
             }
         }
+        // Ticket #504 (version 0.1.0.0): the Second Objective, below the first once that is met.
+        if game.seat(seat).opening_met_turn.is_some()
+            && let Some(second) = &game.tables.faction(game.kind(seat)).second
+        {
+            ui.add_space(4.0);
+            ui.label(RichText::new("Second Objective").strong());
+            ui.label(format!("{}.", second.text));
+            ui.label(format!("Reward: {}.", second.reward_text));
+            let leapt = game.seat(seat).second_leapfrogs.len();
+            match game.seat(seat).second_met_turn {
+                Some(turn) => {
+                    ui.label(RichText::new(format!("Met, {}.", game.date(turn).text())).color(Color32::from_rgb(140, 220, 140)));
+                }
+                // The Custodians' counts Regions, and shows the count.
+                None if second.kind == dying_earth_engine::data::OpeningKind::Leapfrogs && leapt > 0 => {
+                    ui.label(RichText::new(format!("Not yet met: {leapt} of {} Regions.", second.count)).weak());
+                }
+                None => {
+                    ui.label(RichText::new("Not yet met. No deadline.").weak());
+                }
+            }
+        }
         ui.add_space(8.0);
     }
 }
@@ -3150,12 +3187,16 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
             // so which of them sits higher is not fixed and no constant stagger can answer it.
             // `label_at` has handed back the block it filled since ticket #335 for exactly this.
             let mut placed: Vec<egui::Rect> = Vec::new();
+            // Ticket #502 (version 0.1.0.0): the window line is drawn after every Body's label, so a
+            // world later in the list (Vesta under Ceres) cannot write over it.
+            let mut window_line: Option<(Pos2, String)> = None;
             for body in BodyId::ALL {
                 let pos = geo::solar_place(game, body);
                 // Ticket #155 (version 0.07.4): a label by Body -- Venus's and the satellites' hang
                 // BELOW their discs where a planet's stands above -- so the words of the two inner
                 // planets never meet at a conjunction, and a moon's never lie over its planet's.
-                let below = matches!(body, BodyId::Venus | BodyId::Moon | BodyId::Phobos | BodyId::Deimos);
+                // Ticket #502 (version 0.1.0.0): and Vesta's, so the two in the belt split the same way.
+                let below = matches!(body, BodyId::Venus | BodyId::Moon | BodyId::Phobos | BodyId::Deimos | BodyId::Vesta);
                 let side = if below { -1.0 } else { 1.0 };
                 let head = project(pos + Vec3::Y * side * (geo::solar_radius(body) + 0.05));
                 if let Some(p) = head {
@@ -3287,7 +3328,7 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                     // how this is presented has to be settled again.
                     let far = game.crossing_offset(BodyId::Earth, body, game.turn).is_some();
                     if far && hovering {
-                        label_on_screen(painter, p + egui::vec2(0.0, 96.0), &game.window_text(body), Color32::from_rgb(255, 220, 140), 13.0);
+                        window_line = Some((p + egui::vec2(0.0, 96.0), game.window_text(body)));
                     }
                     // The Orbital Control flag in the holder's Faction colour. Ticket #335 (version
                     // 0.09.0): Control is of LOW ORBIT, and the flag says so, since a warship at a
@@ -3325,6 +3366,9 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                     label_kind_at(painter, at, Some(Kind::of_ships(ships.iter().filter_map(|id| game.ship(*id)))), &text, seat_colour(session, seat), 12.0);
                     hotspots.push(Hotspot { pos: at, radius: 14.0, hit: Hit::Select(Selection::ShipStack(body, seat)) });
                 }
+            }
+            if let Some((at, text)) = window_line {
+                label_on_screen(painter, at, &text, Color32::from_rgb(255, 220, 140), 13.0);
             }
             // Ticket #430 (version 0.09.5): a rival Ship in flight only with its books open.
             for s in game.ships.iter().filter(|s| !hidden_ship(game, s)) {
@@ -4433,7 +4477,13 @@ fn command_cluster(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewS
                 }
                 ui.label(RichText::new(format!("{influence_left}")).size(22.0 * CLUSTER_SCALE).strong())
                     .on_hover_text("Influence still unspent this turn. It is lost at End Turn: the Allotment does not carry over.");
-                ui.label(RichText::new(format!("of {} left", s.allotment)).size(15.0 * CLUSTER_SCALE));
+                // Ticket #522 (version 0.1.0.0): where the Allotment came from, a line a part.
+                let of = ui.label(RichText::new(format!("of {} left", s.allotment)).size(15.0 * CLUSTER_SCALE));
+                let from = game.allotment_lines(Seat(0));
+                if !from.is_empty() {
+                    of.on_hover_text(from.join("
+"));
+                }
             });
 
             // Spend, on whatever is selected.
@@ -5238,7 +5288,21 @@ fn trade_good_text(game: &Game, g: TradeGood) -> String {
 fn offer_words(game: &Game, o: &dying_earth_engine::state::Offer) -> String {
     match o.trade {
         Some((give, get)) => format!("offer {} for {}.", trade_good_text(game, give), trade_good_text(game, get)),
-        None => format!("offer an Accord: {}.", o.terms.iter().map(|t| term_name(*t)).collect::<Vec<_>>().join(", ")),
+        None => {
+            let names = o.terms.iter().map(|t| term_name(*t)).collect::<Vec<_>>().join(", ");
+            match o.ask {
+                AccordAsk::New => format!("offer an Accord: {names}."),
+                // Ticket #509 (version 0.1.0.0): Terms added to the Accord that stands.
+                AccordAsk::Add => format!("offer to add to your Accord: {names}."),
+                // Ticket #509: the renewal, whole, with no Faction's name before it; and a research
+                // agreement dropped from it said so.
+                AccordAsk::Renew => {
+                    let held = game.accords.iter().find(|a| a.holds(o.from, o.to)).map(|a| a.terms.clone()).unwrap_or_default();
+                    let dropped = if held.contains(&Term::ResearchAgreement) && !o.terms.contains(&Term::ResearchAgreement) { " The research agreement drops: you are no longer both Friendly." } else { "" };
+                    format!("Your Accord with the {} ({names}) lapses next turn. Renew it for five turns?{dropped}", game.seat_name(o.from))
+                }
+            }
+        }
     }
 }
 
@@ -5252,15 +5316,47 @@ fn term_name(t: Term) -> &'static str {
     }
 }
 
+/// Ticket #508 (version 0.1.0.0): a Term in one line, as the hover on a held Accord and the offer's
+/// checkbox both say it.
+fn term_line(t: Term) -> &'static str {
+    match t {
+        Term::NonAggression => "Non-aggression: no Influence or Battle on each other.",
+        Term::Passage => "Passage: Armies march in on Hold; Ships pass freely.",
+        Term::Refuel => "Refuel: at each other's Space Stations.",
+        Term::ResearchAgreement => "Research agreement: +10% Research to both.",
+    }
+}
+
+/// Ticket #509 (version 0.1.0.0): "3 turns left", "1 turn left": an Accord's turns, this one counted.
+fn turns_left_text(game: &Game, acc: &dying_earth_engine::state::Accord) -> String {
+    match game.accord_turns_left(acc) {
+        1 => "1 turn left".to_string(),
+        n => format!("{n} turns left"),
+    }
+}
+
+/// Ticket #508 (version 0.1.0.0): the hover on a held Accord, one line for each Term it holds and
+/// the price of breaking one.
+fn accord_terms_hover(terms: &[Term]) -> String {
+    terms.iter().map(|t| term_line(*t)).chain(["Acting against a term ends the Accord, at a cost."]).collect::<Vec<_>>().join("\n")
+}
+
 fn order_text(game: &Game, o: &Order) -> String {
     match o {
         // Ticket #226 (version 0.08.2): the Accord orders, so a pending one reads in the order list
         // like any other and can be cancelled like any other.
         Order::ProposeAccord { to, terms } => {
             let names: Vec<&str> = terms.iter().map(|t| term_name(*t)).collect();
-            format!("Offer the {} an Accord: {}", game.seat_name(*to), names.join(", "))
+            // Ticket #509 (version 0.1.0.0): to a Faction the player holds an Accord with, Terms added.
+            if game.accords.iter().any(|a| a.holds(Seat(0), *to)) {
+                format!("Offer to add to your Accord with the {}: {}", game.seat_name(*to), names.join(", "))
+            } else {
+                format!("Offer the {} an Accord: {}", game.seat_name(*to), names.join(", "))
+            }
         }
         Order::EndAccord { with } => format!("Declare your Accord with the {} over", game.seat_name(*with)),
+        // Ticket #509 (version 0.1.0.0).
+        Order::RenewAccord { with } => format!("Renew your Accord with the {} for five turns", game.seat_name(*with)),
         // Ticket #496 (version 0.09.9).
         Order::ProposeTrade { to, give, get } => format!("Offer {} {} for {}", game.seat_name(*to), trade_good_text(game, *give), trade_good_text(game, *get)),
         // Ticket #332 (version 0.09.0): a rival's build cancelled at a place that changed hands.
@@ -7419,9 +7515,11 @@ This turn {:+.2}%: {:+.1} million.", c.population_growth * 100.0, c.population_l
     rule_tip(
         icon_word(ui, "influence", format!("Influence value {}: what it adds to its controller's Allotment each turn (+1 per Industry Level raised)", game.state_influence_value(sid))),
         format!(
-            "The Allotment is what you receive each turn: {}, your Regions, your Embassies, Relays and Choruses, your Spaceports' lifts, a first landing's windfall, and +{} for every Body you were first to and still hold.\nIt does not carry over: what is unspent at End Turn is lost. Ducats buy more, two a point.",
+            "The Allotment is what you receive each turn: {}, your Regions, your Embassies, Relays and Choruses, your Spaceports' lifts, a first landing's windfall, +{} a Body you were first to and still hold, +{} a Capital.\nIt does not carry over: what is unspent at End Turn is lost. Ducats buy more, two a point.",
             game.tables.influence.allotment_base,
-            game.tables.influence.first_settled_allotment
+            game.tables.influence.first_settled_allotment,
+            // Ticket #503 (version 0.1.0.0): the Colonial Capital's own figure, beside the first's.
+            game.tables.tiers.iter().map(|t| t.influence).max().unwrap_or(0)
         ),
     );
     // Ticket #426 (version 0.09.5): the player's own Bank by name (the Prospectors' Investment Bank),
@@ -7789,7 +7887,7 @@ fn policies_block(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, act
             cost_button(ui, game, &session.pending, Order::ExodusCall { state: sid }, "Exodus Call", actions);
             ui.label(
                 RichText::new(format!(
-                    "{} turns recruiting {} Pioneers here instead of {}, and each costs this Region the ordinary population rather than your double. Once per Region, ever.",
+                    "{} turns recruiting {} Pioneers here instead of {}, and each costs this Region the ordinary population rather than your half again. Once per Region, ever.",
                     t.turns,
                     game.emigrants_per_turn(Seat(0)) * t.muster_multiplier,
                     game.emigrants_per_turn(Seat(0))
@@ -8071,7 +8169,8 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
         faction_glyph(ui, session, game, col.control.controller(), 22.0);
         ui.label(RichText::new(game.place_name(Place::Colony(cid))).size(22.0).strong());
         // Ticket #490 (version 0.09.9): its tier, beside the name.
-        ui.label(RichText::new(&game.tier_of(col).name).size(22.0).weak());
+        // Ticket #503 (version 0.1.0.0): after a dot, "Tycho on the Moon · Colonial Capital".
+        ui.label(RichText::new(format!("· {}", game.tier_of(col).name)).size(22.0).weak());
     });
     // Ticket #391 (version 0.09.3): the date it was founded, under its name, at the designer's word
     // -- *"each colony/station card has the date it was founded under its name in the header"*. A
@@ -8189,7 +8288,7 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     let resp = card_heading(ui, "colony", format!("Modules {used} of {cap}"));
     if used >= cap {
         // Ticket #474 (version 0.09.8): the warning under the heading when the place is full.
-        let why = if cap < tier.cap { "Full until more Colonists live here" } else if game.next_tier(col).is_some() { "Full: upgrade for more room" } else { "Full" };
+        let why = if cap < tier.cap { "Full until more Colonists live here" } else if game.open_tier(col).is_some() { "Full: upgrade for more room" } else { "Full" };
         ui.colored_label(Color32::YELLOW, why);
     }
     // Ticket #116 (version 0.07.1): the rule behind the cap. Ticket #490: with the tier's ceiling.
@@ -10189,7 +10288,8 @@ fn module_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     for (oi, (kind, pi)) in ordered.iter().enumerate() {
         // Ticket #291: ordered this turn; right-click takes the order back. Ticket #332: the face
         // reads `0 of 8`, nothing being done on it until the turn ends; the hover the estimate.
-        let widgets = game.build_widgets(Seat(0), BuildItem::Module(*kind));
+        // Ticket #505 (version 0.1.0.0): at this Colony's figure, which Regolith Printing cuts.
+        let widgets = game.build_widgets_at(Seat(0), Place::Colony(cid), BuildItem::Module(*kind));
         let turns = game.turns_to_build(Seat(0), Place::Colony(cid), BuildItem::Module(*kind));
         let tip = format!("{}: ordered this turn, {widgets} Widgets, {} once the turn ends.\nRight-click to cancel the order.", kind.name(), estimate_words(turns));
         if hab_tile(ui, tile_rect(i), ui.id().with(("hab-ordered", oi)), Some(crate::icons::module_icon(*kind)), kind.name(), TileState::Building { ordered: true, done: 0, widgets }, false, None, tip).secondary_clicked() {
@@ -10236,9 +10336,13 @@ fn module_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
                 // One click orders it; greyed, the refusal leads the hover.
                 let order = Order::RaiseTier { colony: cid };
                 let check = game.check_order(Seat(0), &session.pending, &order);
-                let words = format!("Upgrade to a {name}: {}. Up to {} Modules.", game.order_price_text(Seat(0), &order, game.order_cost(Seat(0), &order)), next.cap);
+                // Ticket #503 (version 0.1.0.0): and what a tier pays, the Colonial Capital's +1.
+                let pays = if next.influence > 0 { format!(", +{} Influence a turn", next.influence) } else { String::new() };
+                let words = format!("Upgrade to a {name}: {}. Up to {} Modules{pays}.", game.order_price_text(Seat(0), &order, game.order_cost(Seat(0), &order)), next.cap);
+                // Ticket #503: where the Body's Capital stands elsewhere, that alone, "The Moon's Capital is Plato."
                 let tip = match &check {
                     Ok(_) => words,
+                    Err(e) if next.one_per_body && game.capital_of(col.body).is_some() => format!("{}.", e.0),
                     Err(e) => refusal_hover(&e.0, Some(&words)),
                 };
                 if hab_tile(ui, rect, id, None, name, TileState::Upgrade(check.is_ok()), false, None, tip).clicked() && check.is_ok() {
@@ -10404,8 +10508,9 @@ Scarred: this pair can never recover above {floor:+}."));
                     tip.push_str(&format!("
 An Accord between them is over: it lapses at the next turn ({}).", terms.join(", ")));
                 } else {
+                    // Ticket #509 (version 0.1.0.0): and the turns it has left.
                     tip.push_str(&format!("
-An Accord stands: {}.", terms.join(", ")));
+An Accord stands: {}; {}.", terms.join(", "), turns_left_text(game, acc)));
                 }
             }
             ui.label(RichText::new(game.relations_level(viewer, subject)).color(colour)).on_hover_text(tip);
@@ -11005,9 +11110,34 @@ fn accords_block(ui: &mut Ui, session: &Session, game: &Game, other: Seat, actio
             })
             .collect();
         if acc.ending {
-            ui.label(RichText::new(format!("Your Accord with the {} is over: it lapses at the next turn.", game.seat_name(other))).color(Color32::from_rgb(230, 190, 120)));
+            // Ticket #508 (version 0.1.0.0): its Terms bind until it lapses, so it keeps their hover.
+            let over = ui.label(RichText::new(format!("Your Accord with the {} is over: it lapses at the next turn.", game.seat_name(other))).color(Color32::from_rgb(230, 190, 120)));
+            rule_tip(over, accord_terms_hover(&acc.terms));
         } else {
-            ui.label(format!("You hold an Accord with the {}: {}.", game.seat_name(other), names.join(", ")));
+            // Ticket #508 (version 0.1.0.0): what each Term it holds means, on the line.
+            // Ticket #509 (version 0.1.0.0): and the turns it has left.
+            let held = ui.label(format!("You hold an Accord with the {}: {}; {}.", game.seat_name(other), names.join(", "), turns_left_text(game, acc)));
+            rule_tip(held, accord_terms_hover(&acc.terms));
+            // Ticket #509 (version 0.1.0.0): in its last turn, renewed by the player's own order where
+            // the other side is willing -- the designer's acceptance, in place of a prompt.
+            if game.accord_turns_left(acc) == 1 {
+                let renew = Order::RenewAccord { with: other };
+                if session.pending.contains(&renew) {
+                    ui.label(RichText::new("You renew it this turn, for five more.").weak());
+                } else {
+                    let ok = game.check_order(me, &session.pending, &renew);
+                    let dropped = acc.terms.contains(&Term::ResearchAgreement) && !game.renewal_terms(acc).contains(&Term::ResearchAgreement);
+                    let words = if dropped { "Five more turns. The research agreement drops: you are no longer both Friendly." } else { "Five more turns, the same Terms." };
+                    let resp = ui.add_enabled(ok.is_ok(), egui::Button::new("Renew for five turns"));
+                    let resp = match &ok {
+                        Ok(_) => rule_tip(resp, words.to_string()),
+                        Err(e) => rule_tip(resp, refusal_hover(&e.0, None)),
+                    };
+                    if resp.clicked() {
+                        actions.push(Action::Place(renew));
+                    }
+                }
+            }
             let order = Order::EndAccord { with: other };
             let placed = session.pending.contains(&order);
             if placed {
@@ -11020,18 +11150,24 @@ fn accords_block(ui: &mut Ui, session: &Session, game: &Game, other: Seat, actio
                 actions.push(Action::Place(order));
             }
         }
-    } else {
-        // No Accord: the terms to offer. `view` is not threaded in here, so the ticks live in egui's
-        // own memory under this pair's id -- they are a scratch choice, not game state.
+    }
+    // Ticket #509 (version 0.1.0.0): the Terms to offer -- all four with no Accord, and beside one that
+    // stands the Terms it lacks, offered to add. Nothing beside one declared over or holding all four.
+    let have: Vec<Term> = standing.map(|a| a.terms.clone()).unwrap_or_default();
+    let adding = standing.is_some();
+    if standing.is_none_or(|a| !a.ending && a.terms.len() < 4) {
+        // The terms to offer. `view` is not threaded in here, so the ticks live in egui's own memory
+        // under this pair's id -- they are a scratch choice, not game state.
         let id = egui::Id::new(("accord-terms", other.index()));
         let mut picked: Vec<Term> = ui.ctx().memory(|m| m.data.get_temp(id).unwrap_or_default());
+        picked.retain(|t| !have.contains(t));
         let friendly = game.relations_score(me, other) >= 7 && game.relations_score(other, me) >= 7;
-        for (term, label, tip) in [
-            (Term::NonAggression, "Non-aggression", "Neither spends Influence on a place the other holds, nor opens a Battle against them."),
-            (Term::Passage, "Passage", "Either's Armies may march into the other's Regions without attacking, arriving on Hold; neither intercepts the other's Ships, and a Blockade does not shut them out of the orbit it shuts."),
-            (Term::Refuel, "Refuel", "Either may Refuel at the other's Space Stations."),
-            (Term::ResearchAgreement, "Research agreement", "Both parties' Research rises a tenth while it stands. Wants Friendly on both sides to strike, and once struck it stands whatever the scores later do."),
-        ] {
+        // Ticket #508 (version 0.1.0.0): each says what it means in the line the held Accord's hover uses.
+        for (term, label) in [(Term::NonAggression, "Non-aggression"), (Term::Passage, "Passage"), (Term::Refuel, "Refuel"), (Term::ResearchAgreement, "Research agreement")] {
+            if have.contains(&term) {
+                continue;
+            }
+            let tip = term_line(term);
             let mut on = picked.contains(&term);
             let enabled = term != Term::ResearchAgreement || friendly;
             let resp = ui.add_enabled(enabled, egui::Checkbox::new(&mut on, label));
@@ -11051,7 +11187,8 @@ fn accords_block(ui: &mut Ui, session: &Session, game: &Game, other: Seat, actio
             ui.label(RichText::new("Your offer goes to them this turn.").weak());
         } else {
             let ok = game.check_order(me, &session.pending, &order);
-            let resp = ui.add_enabled(ok.is_ok(), egui::Button::new(format!("Offer the {} an Accord", game.seat_name(other))));
+            let label = if adding { "Offer to add".to_string() } else { format!("Offer the {} an Accord", game.seat_name(other)) };
+            let resp = ui.add_enabled(ok.is_ok(), egui::Button::new(label));
             // Ticket #495 (version 0.09.9): the answer waits a turn now.
             let words = "They answer next turn. A refusal costs you nothing: it is not an offence.";
             // Ticket #380 (version 0.09.2): greyed, the refusal first and these words after it.
@@ -11464,6 +11601,10 @@ fn card_answers(game: &Game) -> Vec<(EventId, Seat, String)> {
 /// always has something to say.
 fn card_side_text(side: &[CardEffect]) -> String {
     let parts: Vec<String> = side.iter().map(card_effect_text).filter(|s| !s.is_empty()).collect();
+    // Ticket #506 (version 0.1.0.0): a side that does nothing (the Deep Core Survey's refusal) says so.
+    if parts.is_empty() {
+        return "Nothing changes".to_string();
+    }
     parts.join("; ")
 }
 
@@ -11933,7 +12074,7 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
         // Ticket #495 (version 0.09.9): the Accords offered to the player, one row each, Accept or
         // Refuse. Like the card, an answer is the only way out: no Continue, and Escape holds it.
         Popup::Offers => {
-            let offers: Vec<(usize, Seat, String)> = game.offers_to(Seat(0)).into_iter().map(|(i, o)| (i, o.from, offer_words(game, o))).collect();
+            let offers: Vec<(usize, Seat, String, bool)> = game.offers_to(Seat(0)).into_iter().map(|(i, o)| (i, o.from, offer_words(game, o), o.ask == AccordAsk::Renew)).collect();
             if offers.is_empty() {
                 view.popup = Popup::None;
                 return;
@@ -11942,16 +12083,22 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 ui.set_width(520.0);
                 ui.label(RichText::new(if offers.len() == 1 { "An offer" } else { "Offers" }).size(20.0).strong());
                 ui.add_space(6.0);
-                for (i, from, words) in &offers {
-                    ui.horizontal(|ui| {
-                        ui.label(RichText::new(game.seat_name(*from)).color(seat_colour(session, *from)).size(16.0));
+                for (i, from, words, renewal) in &offers {
+                    // Ticket #509 (version 0.1.0.0): a renewal names the Faction in its own words.
+                    if *renewal {
                         ui.label(RichText::new(words).size(16.0));
-                    });
+                    } else {
+                        ui.horizontal(|ui| {
+                            ui.label(RichText::new(game.seat_name(*from)).color(seat_colour(session, *from)).size(16.0));
+                            ui.label(RichText::new(words).size(16.0));
+                        });
+                    }
+                    let (yes, no) = if *renewal { ("Renew", "Let it lapse") } else { ("Accept", "Refuse") };
                     ui.horizontal(|ui| {
-                        if ui.button(RichText::new("Accept").size(15.0)).clicked() {
+                        if ui.button(RichText::new(yes).size(15.0)).clicked() {
                             actions.push(Action::AnswerOffer(*i, true));
                         }
-                        if ui.button(RichText::new("Refuse").size(15.0)).clicked() {
+                        if ui.button(RichText::new(no).size(15.0)).clicked() {
                             actions.push(Action::AnswerOffer(*i, false));
                         }
                     });
@@ -12284,8 +12431,9 @@ fn chronicle_sentence(game: &Game, seat: Seat) -> String {
     let met_line = format!("{} {:.0} of {:.0}, and {}", p.first_name, p.first_value, p.first_bar, p.second_text);
     let (part, value, bar) = p.short_part();
     let short = format!("{part} at {value:.0} of {bar:.0}");
-    // The two sentences the engine writes here take different shapes -- `needs X, not yet
-    // researched` and `the Archive is complete but not running` -- so the joiner is one that fits
+    // The sentences the engine writes here take different shapes -- `needs X, not yet
+    // researched`, `the Archive is complete but not running` and, since ticket #514, `needs a
+    // Colonial Capital of yours, ...` -- so the joiner is one that fits
     // both and puts neither in the wrong grammatical person.
     let held = match &p.first_held_back {
         Some(why) => format!(", held back: {why}"),
@@ -12456,6 +12604,39 @@ fn chronicle_screen(root: &mut Ui, session: &Session, actions: &mut Vec<Action>)
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Ticket #508 (version 0.1.0.0): a held Accord's hover says each of its Terms in a line, the
+    /// price of breaking one last, and with all four it stays within the six-line ceiling.
+    #[test]
+    fn a_held_accords_hover_says_each_term_in_a_line() {
+        assert_eq!(accord_terms_hover(&[Term::NonAggression]), "Non-aggression: no Influence or Battle on each other.\nActing against a term ends the Accord, at a cost.");
+        let all = accord_terms_hover(&[Term::NonAggression, Term::Passage, Term::Refuel, Term::ResearchAgreement]);
+        assert_eq!(
+            all,
+            "Non-aggression: no Influence or Battle on each other.\nPassage: Armies march in on Hold; Ships pass freely.\nRefuel: at each other's Space Stations.\nResearch agreement: +10% Research to both.\nActing against a term ends the Accord, at a cost."
+        );
+        assert!(hover_lines_estimate(&all) <= HOVER_LINE_CEILING, "{} lines", hover_lines_estimate(&all));
+        assert!(all.lines().all(|l| l.chars().count() <= HOVER_CHARS_PER_LINE), "each term on one rendered line");
+    }
+
+    /// Ticket #509 (version 0.1.0.0): the renewal prompt says the Accord, its Terms and the five
+    /// turns, and a research agreement it drops; the held line's turns left count this one.
+    #[test]
+    fn a_renewal_reads_whole_and_says_a_dropped_research_agreement() {
+        let tables = std::sync::Arc::new(dying_earth_engine::data::Tables::load(&dying_earth_engine::data::default_data_dir()).unwrap());
+        let mut g = Game::new(tables, NewGame { seed: 7, player: FactionKind::Custodians, player_is_ai: false, player_start: StateId::EastAsia });
+        g.relations.score[0][1] = 7;
+        g.relations.score[1][0] = 7;
+        g.strike_accord(Seat(0), Seat(1), vec![Term::NonAggression, Term::ResearchAgreement]).unwrap();
+        assert_eq!(turns_left_text(&g, &g.accords[0]), "5 turns left");
+        g.turn += 4;
+        assert_eq!(turns_left_text(&g, &g.accords[0]), "1 turn left");
+        let renew = dying_earth_engine::state::Offer { from: Seat(1), to: Seat(0), terms: vec![Term::NonAggression], trade: None, turn: g.turn, ask: AccordAsk::Renew };
+        let words = offer_words(&g, &renew);
+        assert_eq!(words, format!("Your Accord with the {} (non-aggression) lapses next turn. Renew it for five turns? The research agreement drops: you are no longer both Friendly.", g.seat_name(Seat(1))));
+        let whole = dying_earth_engine::state::Offer { terms: vec![Term::NonAggression, Term::ResearchAgreement], ..renew };
+        assert!(!offer_words(&g, &whole).contains("drops"), "nothing dropped, nothing said");
+    }
 
     /// Ticket #467 (version 0.09.7): the final report's cell is the total and then the Stockpile.
     #[test]

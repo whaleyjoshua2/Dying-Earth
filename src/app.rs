@@ -362,6 +362,8 @@ pub struct ViewState {
     pub yaw: f32,
     pub pitch: f32,
     pub solar_yaw: f32,
+    /// Ticket #512 (version 0.1.0.0): how high above the ecliptic the Solar System Map is seen from.
+    pub solar_pitch: f32,
     pub zoom: f32,
     pub spin: f32,
     /// Ticket #100 (version 0.07.0): the start-screen globe has been taken hold of, so it stops
@@ -486,6 +488,7 @@ impl Default for ViewState {
             yaw: crate::geo::yaw_facing(0.0, 0.0),
             pitch: 0.0,
             solar_yaw: 0.0,
+            solar_pitch: crate::geo::SOLAR_PITCH_OPENING,
             zoom: 1.0,
             spin: 0.0,
             start_grabbed: false,

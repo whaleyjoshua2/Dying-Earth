@@ -50,6 +50,20 @@ pub fn leg_fuel(delta_v: f64, per: f64) -> f64 {
 pub struct GulfCard {
     pub between: [String; 2],
     pub delta_v: f64,
+    /// Ticket #502 (version 0.1.0.0): the days a crossing of this gulf takes where no window
+    /// prices it, made turns as a window's flight is, Nuclear Rockets and all; a row without it is
+    /// crossed in one turn (Earth to a far orbit).
+    #[serde(default)]
+    pub days: Option<f64>,
+}
+
+/// Ticket #502 (version 0.1.0.0): a crossing with a window of its own between two systems named
+/// by `System::key`, the phase angle read as the second's longitude less the first's.
+#[derive(Debug, Clone, Deserialize)]
+pub struct CrossingTable {
+    pub between: [String; 2],
+    #[serde(flatten)]
+    pub table: TransitTable,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -402,6 +416,10 @@ pub struct TechCard {
     /// Ticket #413 (version 0.09.4): Fuel this Tech adds to every Ship's tank (Clean Propellant).
     #[serde(default)]
     pub tank_fuel: f64,
+    /// Ticket #505 (version 0.1.0.0): what this Tech multiplies a Module's Widgets by, where it has
+    /// its own figure for them (Regolith Printing); `value` is the Materials'. Absent, `value`.
+    #[serde(default)]
+    pub widgets_multiplier: Option<f64>,
     #[serde(default)]
     pub influence_threshold_multiplier: Option<f64>,
     /// Ticket #84 (version 0.06.0): the Faction whose Victory Condition this Tech opens, if any.
@@ -695,13 +713,20 @@ pub struct FactionCard {
     pub victory_first: VictoryFirstCard,
     /// Ticket #51: the second part, generalised the way #50 generalised the first.
     pub victory_second: VictorySecondCard,
+    /// Ticket #514 (version 0.1.0.0): the win waits on a Colonial Capital the Faction holds at a
+    /// Colony it directs off Earth (the Arkwrights'). Absent, false.
+    #[serde(default)]
+    pub victory_capital: bool,
     /// Ticket #471 (version 0.09.7): the Faction's Opening Objective.
     pub opening: OpeningCard,
+    /// Ticket #504 (version 0.1.0.0): its Second Objective, open once the Opening Objective is met.
+    #[serde(default)]
+    pub second: Option<OpeningCard>,
     pub colour: [f32; 3],
     /// Ticket #100 (version 0.07.0), renamed on ticket #195 (version 0.08.0): the Region the start
     /// screen opens its globe on. It has ONE reader, and its only job is pointing the start globe's
     /// camera, which the old name `home` did not say -- it read as a starting position, which it has
-    /// never been: any of the eighteen may still be chosen.
+    /// never been: any of the twenty may still be chosen.
     pub opens_on: StateId,
     /// Ticket #46: the station over Earth the Faction starts with, by name in bodies.toml.
     /// Ticket #50: the Arkwrights start with none, so this is optional.
@@ -768,7 +793,7 @@ pub struct FactionCard {
     /// Ticket #72 (version 0.05.5): a Facility's Materials, times this (the Prospectors' 0.85).
     #[serde(default = "one_f64")]
     pub facility_materials_multiplier: f64,
-    /// Ticket #73 (version 0.05.5): Emigrants mustered a turn, times this (Coach Class's 2.0).
+    /// Ticket #73 (version 0.05.5): Emigrants mustered a turn, times this (Coach Class's 1.5 since ticket #513, 2.0 before).
     #[serde(default = "one_f64")]
     pub emigrants_multiplier: f64,
 }
@@ -864,6 +889,18 @@ pub enum OpeningKind {
     /// The Archivists: `count` working at once from Research Labs and Observatories, one of them
     /// off Earth. Research into the Archive fund.
     ResearchPair,
+    /// Ticket #504 (version 0.1.0.0), the Custodians' Second Objective: `count` different Regions
+    /// Leapfrogged since it opened. Influence, once.
+    Leapfrogs,
+    /// Ticket #504, the Prospectors': a Region held at Industry Level `count` or more, however it
+    /// got there. Ducats into the Venture Capital Fund.
+    IndustryLevel,
+    /// Ticket #504, the Arkwrights': a Colony, ground or station, on a Body beyond Earth and the
+    /// Moon. A free Colonist there.
+    FarColony,
+    /// Ticket #504, the Archivists': `count` Observatories working, every one of them off Earth as
+    /// an Observatory always is. Research into the Archive fund.
+    Observatories,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize)]
@@ -1261,6 +1298,11 @@ struct EphemerisFile {
     transit_venus: TransitTable,
     /// Ticket #486 (version 0.09.8): and Venus to Mars, the phase angle Mars's longitude less Venus's.
     transit_venus_mars: TransitTable,
+    /// Ticket #502 (version 0.1.0.0): every other crossing that has a window.
+    #[serde(default)]
+    crossing: Vec<CrossingTable>,
+    /// Ticket #502: how far the phase angle may move between two readings of one turn.
+    window_sample_degrees: f64,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -1445,6 +1487,9 @@ pub struct AiThresholds {
     /// it under the same test.
     pub archive_target_lift: f64,
     pub archive_target_fund: f64,
+    /// Ticket #514 (version 0.1.0.0): what a seat whose win waits on a Colonial Capital, holding
+    /// none, multiplies the upgrade of its Capital candidate and a landing there by.
+    pub capital_chase: f64,
     /// Ticket #448 (version 0.09.6): what a seat keeps back from the market.
     pub market_materials_reserve: f64,
     pub market_materials_turns: f64,
@@ -1634,6 +1679,16 @@ pub struct TierCard {
     pub colonists: u32,
     pub materials: u32,
     pub widgets: u32,
+    /// Ticket #503 (version 0.1.0.0): at most one place on a Body stands at this tier, the first to
+    /// complete it, and it holds it for good, through trade and capture -- the Colonial Capital.
+    #[serde(default)]
+    pub one_per_body: bool,
+    /// Ticket #503: a Space Station never climbs to this tier.
+    #[serde(default)]
+    pub ground_only: bool,
+    /// Ticket #503: Influence a turn to whoever directs a place at this tier, at face value.
+    #[serde(default)]
+    pub influence: i64,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -1871,6 +1926,9 @@ pub struct RelationsCard {
     /// Ticket #495 (version 0.09.9): the turns a refused Faction waits before offering the one who
     /// refused an Accord again.
     pub offer_refused_turns: u32,
+    /// Ticket #509 (version 0.1.0.0): the turns an Accord runs before it lapses, unless both sides
+    /// renew it in its last.
+    pub accord_turns: u32,
 }
 
 fn turn_cap_default() -> i64 {
@@ -1991,6 +2049,10 @@ pub struct Tables {
     /// Ticket #93 (version 0.06.0): the Earth-Venus transfer.
     pub transit_venus: TransitTable,
     pub transit_venus_mars: TransitTable,
+    /// Ticket #502 (version 0.1.0.0): the crossings to and from the three new worlds.
+    pub crossings: Vec<CrossingTable>,
+    /// Ticket #502: how far the phase angle may move between two readings of one turn.
+    pub window_sample_degrees: f64,
     pub states: Vec<StateCard>,
     /// Ticket #53: how a neutral Nation State develops itself (`nation_states.toml`).
     pub development: DevelopmentTable,
@@ -2116,8 +2178,27 @@ impl Tables {
         if a == b {
             return 0.0;
         }
+        self.gulf_card(a, b).map(|g| g.delta_v).unwrap_or(0.0)
+    }
+
+    /// Ticket #502 (version 0.1.0.0): the row of the gulf between two systems, read either way round.
+    pub fn gulf_card(&self, a: crate::ids::System, b: crate::ids::System) -> Option<&GulfCard> {
         let (x, y) = (a.key(), b.key());
-        self.gulfs.iter().find(|g| (g.between[0] == x && g.between[1] == y) || (g.between[0] == y && g.between[1] == x)).map(|g| g.delta_v).unwrap_or(0.0)
+        self.gulfs.iter().find(|g| (g.between[0] == x && g.between[1] == y) || (g.between[0] == y && g.between[1] == x))
+    }
+
+    /// Ticket #502: the crossing table between two systems' keys, and whether it is read the way
+    /// round it is written (`from` the first-named).
+    pub fn crossing_table(&self, from: &str, to: &str) -> Option<(&TransitTable, bool)> {
+        self.crossings.iter().find_map(|c| {
+            if c.between[0] == from && c.between[1] == to {
+                Some((&c.table, true))
+            } else if c.between[0] == to && c.between[1] == from {
+                Some((&c.table, false))
+            } else {
+                None
+            }
+        })
     }
 
     /// Load every table from a directory (normally `assets/data`).
@@ -2152,6 +2233,8 @@ impl Tables {
             transit: ephemeris.transit,
             transit_venus: ephemeris.transit_venus,
             transit_venus_mars: ephemeris.transit_venus_mars,
+            crossings: ephemeris.crossing,
+            window_sample_degrees: ephemeris.window_sample_degrees,
             bodies: bodies.body,
             states: states.state,
             development: states.development,
@@ -2501,9 +2584,34 @@ impl Tables {
         if !(0.0..1.0).contains(&self.slot_yield_spread) {
             return Err(err("bodies.toml", format!("slot_yield_spread {} must be at least 0 and under 1", self.slot_yield_spread)));
         }
-        for id in [BodyId::Earth, BodyId::Mars, BodyId::Venus] {
+        // Ticket #502 (version 0.1.0.0): every planet a Body is listed under has its row.
+        for id in BodyId::ALL.into_iter().filter(|b| b.primary() == *b) {
             if !self.planets.iter().any(|p| p.id == id) {
-                return Err(err("ephemeris.toml", format!("no [[planet]] row for {}: the sky needs Earth's elements, Mars's and Venus's", id.name())));
+                return Err(err("ephemeris.toml", format!("no [[planet]] row for {}: every planet needs its elements", id.name())));
+            }
+        }
+        // Ticket #502 (version 0.1.0.0): a gulf missing between two systems would price the crossing at nothing.
+        {
+            use crate::ids::System;
+            let systems = System::ALL;
+            for (i, a) in systems.iter().enumerate() {
+                for b in &systems[i..] {
+                    if (a != b || *a == System::Far(0)) && self.gulf_card(*a, *b).is_none() {
+                        return Err(err("bodies.toml", format!("no [[gulf]] between {} and {}", a.key(), b.key())));
+                    }
+                }
+            }
+            if self.window_sample_degrees <= 0.0 {
+                return Err(err("ephemeris.toml", "window_sample_degrees must be above zero"));
+            }
+            for c in &self.crossings {
+                let tr = &c.table;
+                if !c.between.iter().all(|k| systems.iter().any(|s| s.key() == k)) || c.between[0] == c.between[1] {
+                    return Err(err("ephemeris.toml", format!("[[crossing]] {:?}: two different systems by name", c.between)));
+                }
+                if tr.days_at_window <= 0.0 || tr.days_per_turn <= 0.0 || tr.max_turns == 0 || tr.synodic_days <= 0.0 {
+                    return Err(err("ephemeris.toml", format!("[[crossing]] {:?} needs days_at_window, days_per_turn, max_turns and synodic_days above zero", c.between)));
+                }
             }
         }
         for p in &self.planets {

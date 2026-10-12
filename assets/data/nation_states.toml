@@ -78,7 +78,8 @@ baseline_rise = 0.2
 unrest = 2.0
 
 [development]
-turns = 9
+# Ticket #506 (version 0.1.0.0): every tenth turn, from the ninth, with the game at fifty turns.
+turns = 10
 max_level = 4
 stops_at_temperature = 2.5
 
@@ -147,7 +148,7 @@ baseline_emissions = 0.5
 education_level = 1.1
 size = 3
 coastal_exposure = 2
-neighbours = ["russia", "kazakhstan", "middle_east", "south_asia", "south_east_asia", "japan"]
+neighbours = ["russia", "kazakhstan", "middle_east", "south_asia", "south_east_asia", "japan", "vietnam"]
 start_facilities = ["factory", "mine", "power_plant", "refinery"]
 influence = 3
 gdp = 16
@@ -168,7 +169,7 @@ baseline_emissions = 0.4
 education_level = 0.75
 size = 2
 coastal_exposure = 2
-neighbours = ["east_asia", "south_east_asia", "middle_east"]
+neighbours = ["east_asia", "vietnam", "middle_east"]
 start_facilities = ["factory", "mine", "power_plant"]
 influence = 1
 gdp = 3
@@ -176,25 +177,29 @@ unrest = 0.0
 
 # South-East Asia: Myanmar to the Philippines and most of Indonesia, about 680 million people, oil
 # and gas offshore, and more coastline than anywhere.
+# Ticket #510 (version 0.1.0.0): the mainland -- Vietnam, Thailand, Myanmar, Cambodia and Laos --
+# is the Region called Vietnam now, with 250 of the 680 people and 1 of the 3 GDP, by real
+# population; this keeps the islands (Indonesia, the Philippines, Malaysia, Singapore, Brunei,
+# Timor-Leste) at 430. It no longer touches India by land.
 [[state]]
 id = "south_east_asia"
 demonym = "Indonesian"
 name = "Indonesia"
 flag = "id"
 colour = [0.71, 0.47, 0.94]
-population = 680.0
+population = 430.0
 industry_level = 2
 resource_lean = "fuel"
 baseline_emissions = 0.3
 education_level = 0.95
 size = 2
 coastal_exposure = 2
-neighbours = ["east_asia", "south_asia", "australia"]
+neighbours = ["east_asia", "vietnam", "australia"]
 # Ticket #69 (version 0.05.5): a Research Lab added to the start Facilities (as in North America),
 # standing inland; while the state is neutral it pays half its yield into the shared Tech.
 start_facilities = ["refinery", "power_plant", "research_lab"]
 influence = 1
-gdp = 3
+gdp = 2
 unrest = 0.0
 
 [[state]]
@@ -272,29 +277,34 @@ baseline_emissions = 0.3
 education_level = 1.0
 size = 1
 coastal_exposure = 2
-neighbours = ["north_america", "south_america"]
+neighbours = ["north_america", "argentina"]
 start_facilities = ["factory", "mine"]
 influence = 1
 gdp = 2
 unrest = 0.0
 
+# Ticket #510 (version 0.1.0.0): the Spanish-speaking mainland -- Argentina, Chile, Uruguay,
+# Paraguay, Bolivia, Peru, Ecuador, Colombia and Venezuela -- is the Region called Argentina now,
+# with 227 of the 450 people, 2 of the 5 GDP and 1 of the 2 Influence, by real population; Brazil
+# keeps Guyana and Suriname at 223 (French Guiana is France's, so the European Union's, by the
+# mask's standing rule). Only Argentina's Region touches it now: Mexico's reaches it through Colombia.
 [[state]]
 id = "south_america"
 demonym = "Brazilian"
 name = "Brazil"
 flag = "br"
 colour = [0.94, 0.59, 0.51]
-population = 450.0
+population = 223.0
 industry_level = 1
 resource_lean = "fuel"
 baseline_emissions = 0.2
 education_level = 1.1
 size = 3
 coastal_exposure = 1
-neighbours = ["central_america"]
+neighbours = ["argentina"]
 start_facilities = ["refinery"]
-influence = 2
-gdp = 5
+influence = 1
+gdp = 3
 unrest = 0.0
 
 # Ticket #26. Russia: 145 million people, industry between Europe's and Africa's, gas and oil, dirty
@@ -510,4 +520,58 @@ neighbours = ["sub_saharan_africa", "north_africa", "arabian_peninsula"]
 start_facilities = ["mine", "power_plant", "factory"]
 influence = 1
 gdp = 1
+unrest = 0.0
+
+# Ticket #510 (version 0.1.0.0): two more Regions, at the designer's word ("add two more nation
+# states"; the Regions chosen: "let's go with Vietnam and argentina"). Appended last with their enum
+# variants, as every Region since version 0.05 has been, so no older index moves. Each is cut out of
+# a larger Region and takes its share of that Region's people, GDP and Influence by real population,
+# so the world still holds 7,860; its Industry, Education, lean, start Facilities and coast are its
+# own. Neither is anybody's fixed start: seats pick their Region as they do today.
+
+# Vietnam: the South-East Asian mainland -- Vietnam, Thailand, Myanmar, Cambodia and Laos -- about
+# 250 million people, out of Indonesia's Region. Factories and mines, a long coast and the Mekong
+# and Chao Phraya deltas to lose. It touches Indonesia's Region at the Malay border, China's and,
+# through Myanmar, India's.
+[[state]]
+id = "vietnam"
+demonym = "Vietnamese"
+name = "Vietnam"
+flag = "vn"
+colour = [0.36, 0.80, 0.76]
+population = 250.0
+industry_level = 2
+resource_lean = "materials"
+baseline_emissions = 0.3
+education_level = 0.9
+size = 2
+coastal_exposure = 2
+neighbours = ["south_east_asia", "east_asia", "south_asia"]
+start_facilities = ["factory", "mine", "power_plant"]
+influence = 1
+gdp = 1
+unrest = 0.0
+
+# Argentina: the Spanish-speaking mainland of South America -- Argentina, Chile, Uruguay,
+# Paraguay, Bolivia, Peru, Ecuador, Colombia and Venezuela -- about 227 million people, out of
+# Brazil's Region. Copper and lithium under the Andes, the pampas, and a coast on two oceans. It
+# touches Brazil's Region along the whole east and Mexico's at Panama.
+[[state]]
+id = "argentina"
+demonym = "Argentine"
+name = "Argentina"
+flag = "ar"
+colour = [0.60, 0.78, 0.98]
+population = 227.0
+industry_level = 1
+resource_lean = "materials"
+baseline_emissions = 0.2
+education_level = 1.1
+size = 3
+coastal_exposure = 1
+neighbours = ["south_america", "central_america"]
+# A Factory with its Mine beside it, as every start Factory has; one Facility for its Industry Level 1.
+start_facilities = ["factory", "mine"]
+influence = 1
+gdp = 2
 unrest = 0.0

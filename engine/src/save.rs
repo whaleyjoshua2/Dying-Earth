@@ -28,7 +28,18 @@ use std::sync::Arc;
 /// Ticket #482 (version 0.09.8): moved to **9**. Two more Regions joined the board (Turkey, South
 /// Africa), the Region called Pakistan became Kazakhstan, and three cards' figures moved, so a save
 /// of sixteen has no card for two of the eighteen.
-pub const SAVE_VERSION: u32 = 9;
+///
+/// Ticket #502 (version 0.1.0.0): moved to **10**. Three Bodies joined the board (Mercury, Ceres,
+/// Vesta), so a save of six has no card for three of the nine, and the Solar System it was played
+/// in had nowhere further to go.
+///
+/// Ticket #509 (version 0.1.0.0): moved to **11**. An Accord now runs five turns from its `since`,
+/// which a save of 10 lacks: read as nought, every Accord in it would lapse unasked.
+///
+/// Ticket #510 (version 0.1.0.0): moved to **12**. Two Regions joined the board (Vietnam,
+/// Argentina), and `Game.states` is indexed by `StateId`: a save of eighteen rows would index out
+/// of range on the nineteenth.
+pub const SAVE_VERSION: u32 = 12;
 
 /// The rules version this executable plays, named beside the file's own in a refusal.
 ///
@@ -136,7 +147,10 @@ pub const SAVE_VERSION: u32 = 9;
 /// the version, to 9, when the Regions were redrawn to eighteen (#482): a 0.09.7 save is refused.
 /// Ticket #498 (version 0.09.9, the closing ticket): moved to 0.09.9. `SAVE_VERSION` did not move:
 /// every field the version added reads a default from an older file, so a 0.09.8 save loads.
-pub const GAME_VERSION: &str = "0.09.9";
+/// Ticket #507 (version 0.1.0.0, the closing ticket): moved to 0.1.0.0. `SAVE_VERSION` moved three
+/// times this version, to 10 (#502, three Bodies), 11 (#509, an Accord's `since`) and 12 (#510, two
+/// Regions): a 0.09.9 save is refused, and so is a 0.1.0.0 save from before ticket #510.
+pub const GAME_VERSION: &str = "0.1.0.0";
 
 /// The game autosaves at the start of the Report phase of every third turn.
 pub const AUTOSAVE_EVERY: u32 = 3;
@@ -238,6 +252,9 @@ pub struct SavedGame {
     pub offers: Vec<crate::state::Offer>,
     #[serde(default)]
     pub refusals: Vec<crate::state::Refusal>,
+    /// Ticket #519 (version 0.1.0.0): Armies inherited abroad, and the turn, for their turn's grace.
+    #[serde(default)]
+    pub armies_inherited: Vec<(ArmyId, u32)>,
     /// Ticket #272 (version 0.08.4): the sweep's count of Events drawn with nowhere to land.
     #[serde(default)]
     pub events_no_target: u32,
@@ -322,6 +339,7 @@ impl SavedGame {
             accords,
             offers,
             refusals,
+            armies_inherited,
             events_no_target,
             body_firsts,
             colony_growth,
@@ -362,6 +380,7 @@ impl SavedGame {
             accords: accords.clone(),
             offers: offers.clone(),
             refusals: refusals.clone(),
+            armies_inherited: armies_inherited.clone(),
             events_no_target: *events_no_target,
             levies_raised: *levies_raised,
             neutral_holds: *neutral_holds,
@@ -414,6 +433,7 @@ impl SavedGame {
             accords: self.accords,
             offers: self.offers,
             refusals: self.refusals,
+            armies_inherited: self.armies_inherited,
             events_no_target: self.events_no_target,
             body_firsts: self.body_firsts,
             colony_growth: self.colony_growth,

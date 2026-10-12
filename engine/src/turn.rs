@@ -150,7 +150,12 @@ impl Game {
             if !self.seat(o.to).ai {
                 // Ticket #496 (version 0.09.9): or a Trade.
                 let what = if o.trade.is_some() { "a Trade" } else { "an Accord" };
-                owed.push(format!("{} offer {} {what}. Accept it or refuse it.", self.seat_name(o.from), self.seat_name(o.to)));
+                // Ticket #509 (version 0.1.0.0): a renewal, which is not an offer of one.
+                if o.ask == crate::state::AccordAsk::Renew {
+                    owed.push(format!("{}'s Accord with {} lapses next turn. Renew it or let it lapse.", self.seat_name(o.to), self.seat_name(o.from)));
+                } else {
+                    owed.push(format!("{} offer {} {what}. Accept it or refuse it.", self.seat_name(o.from), self.seat_name(o.to)));
+                }
             }
         }
         if let Some(lead) = self.tech_owed_by() {
@@ -273,6 +278,8 @@ impl Game {
         self.log(format!("--- Turn {} ---", self.turn));
         // Ticket #495 (version 0.09.9): the computer seats answer the Accords offered them last turn.
         self.answer_computer_offers();
+        // Ticket #509 (version 0.1.0.0): and an Accord in its last turn is put to both sides.
+        self.ask_renewals();
         // Ticket #173 (version 0.07.6): the Archivists read the Tech under research for the whole of
         // the turn to come, frozen here. Their Provisional Findings gives them half its effect while
         // the turn is still being ordered, and a Lead that may change its pick would otherwise
@@ -290,8 +297,14 @@ impl Game {
         // Ticket #400 (version 0.09.3): the net Unrest lines are written here, after the Climate
         // phase, so the heat and the sea are causes on them; they stood at the Resolution's end.
         self.report_unrest_net();
+        // Ticket #524 (version 0.1.0.0): a bar the Income or the Climate met wins now, not after a
+        // turn of orders.
+        self.victory_at_head();
         self.log("Phase 3: Report");
         self.report_phase();
+        if self.is_over() {
+            return Ok(());
+        }
         // Ticket #337 (version 0.09.0): the next turn's card, drawn before its orders are given.
         self.log("The Question");
         self.question_phase();

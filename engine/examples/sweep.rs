@@ -43,7 +43,7 @@ fn list(flag: &str, default: &[f64]) -> Vec<f64> {
 /// Colonies and stations by Body over the batch, the median ground Colonies off Earth a game, and
 /// for each Body the games whose first ground Colony there stood at the end with the median turn it
 /// was founded -- the pace of settlement, which "first Colony" (Antarctica, by sea) never gave.
-fn off_earth_line(tables: &Tables, ground: &[u32; 6], stations: &[u32; 6], first: &mut [Vec<u32>; 6], per_game: &mut [u32], games: u64) -> String {
+fn off_earth_line(tables: &Tables, ground: &[u32; BodyId::ALL.len()], stations: &[u32; BodyId::ALL.len()], first: &mut [Vec<u32>; BodyId::ALL.len()], per_game: &mut [u32], games: u64) -> String {
     let name = |b: BodyId| tables.body(b).name.clone();
     let bodies: Vec<BodyId> = BodyId::ALL.into_iter().filter(|b| *b != BodyId::Earth).collect();
     let ground_s: Vec<String> = bodies.iter().map(|b| format!("{} {}", name(*b), ground[b.index()])).collect();
@@ -112,7 +112,8 @@ fn main() {
     let mut all_tree_turns: Vec<u32> = Vec::new();
     let mut all_tech_turns: Vec<Vec<u32>> = vec![Vec::new(); TechId::ALL.len()];
     let mut all_research_by_source = [0f64; 6];
-    // Of the games still running at turn 28, the tree's median finish: how many had it complete.
+    // Of the games still running at turn 39 (28 until ticket #506 made the game fifty turns), the
+    // tree's median finish: how many had it complete.
     let (mut all_reached_28, mut all_reached_28_done) = (0u32, 0u32);
     let (mut all_research_turns, mut all_regions_held_turns, mut all_labs_turns) = (0u32, 0u32, 0u32);
     let mut all_region_base = 0f64;
@@ -131,11 +132,11 @@ fn main() {
     // review has ONE total to quote rather than four blocks to add up by hand.
     let mut all_warc = dying_earth_engine::state::WarCounters::default();
     // Version 0.09.3: off Earth at the end, by Body, over every seating.
-    let mut all_ground_by_body = [0u32; 6];
-    let mut all_stations_by_body = [0u32; 6];
+    let mut all_ground_by_body = [0u32; BodyId::ALL.len()];
+    let mut all_stations_by_body = [0u32; BodyId::ALL.len()];
     // Ticket #490 (version 0.09.9): places at the end by tier, over every seating.
     let mut all_by_tier: Vec<u32> = Vec::new();
-    let mut all_first_by_body: [Vec<u32>; 6] = Default::default();
+    let mut all_first_by_body: [Vec<u32>; BodyId::ALL.len()] = Default::default();
     let mut all_ground_off_earth_per_game: Vec<u32> = Vec::new();
     // Ticket #355 (version 0.09.1): the orbital war PER FACTION across every seating, and the games
     // each act happened in at all, which is the bar that ticket is judged by. Per Faction, not per
@@ -211,6 +212,8 @@ fn main() {
                         let (mut colonists_grown, mut colonists_declined) = ([0u32; 4], [0u32; 4]);
                         let (mut archives_lost, mut archive_fund_lost) = (0u32, 0i64);
                         let mut opening_met: [Vec<u32>; 4] = Default::default();
+                        let mut second_met: [Vec<u32>; 4] = Default::default();
+                        let mut capitals_held = [0u32; 4];
                         let (mut levies, mut neutral_holds) = (0u32, 0u32);
                         let mut warc = dying_earth_engine::state::WarCounters::default();
                         // Ticket #343 (version 0.09.1): the Natural Sink at the end of each game.
@@ -286,9 +289,9 @@ fn main() {
                         let (mut venus_stations, mut venus_colonists) = (0u32, 0u32);
                         // Version 0.09.3: off Earth at the end, by Body -- ground Colonies, stations,
                         // and the turn each Body's first ground Colony was founded, over the batch.
-                        let mut ground_by_body = [0u32; 6];
-                        let mut stations_by_body = [0u32; 6];
-                        let mut first_by_body: [Vec<u32>; 6] = Default::default();
+                        let mut ground_by_body = [0u32; BodyId::ALL.len()];
+                        let mut stations_by_body = [0u32; BodyId::ALL.len()];
+                        let mut first_by_body: [Vec<u32>; BodyId::ALL.len()] = Default::default();
                         let mut ground_off_earth_per_game: Vec<u32> = Vec::new();
                         // Ticket #75: seat 0's start state.
                         let mut home_lost = Vec::new();
@@ -338,7 +341,7 @@ fn main() {
                                 *a += v;
                             }
                             all_research_turns += r.research_turns;
-                            if r.last_turn >= 28 {
+                            if r.last_turn >= 39 {
                                 all_reached_28 += 1;
                                 all_reached_28_done += r.tree_done_turn.is_some() as u32;
                             }
@@ -414,7 +417,7 @@ fn main() {
                             for (t, n) in r.places_by_tier.iter().enumerate() {
                                 all_by_tier[t] += n;
                             }
-                            for b in 0..6 {
+                            for b in 0..BodyId::ALL.len() {
                                 ground_by_body[b] += r.ground_colonies_by_body[b];
                                 stations_by_body[b] += r.stations_by_body[b];
                                 all_ground_by_body[b] += r.ground_colonies_by_body[b];
@@ -439,6 +442,14 @@ fn main() {
                             }
                             archive_funds.push(r.archive_fund_at_end.max(0) as u32);
                             archives_lost += r.archives_lost;
+                            for (i, t) in r.second_met.iter().enumerate() {
+                                if let Some(t) = t {
+                                    second_met[i].push(*t);
+                                }
+                            }
+                            for (i, h) in r.capital_held.iter().enumerate() {
+                                capitals_held[i] += *h as u32;
+                            }
                             for (i, t) in r.opening_met.iter().enumerate() {
                                 if let Some(t) = t {
                                     opening_met[i].push(*t);
@@ -631,6 +642,10 @@ fn main() {
                             );
                             println!("      Archives lost with their Colony over the batch: {archives_lost}, the fund lost with them {archive_fund_lost}");
                             println!("      Opening Objectives met, Custodians / Prospectors / Arkwrights / Archivists: {} / {} / {} / {} of {seeds}, median turn {} / {} / {} / {}", opening_met[0].len(), opening_met[1].len(), opening_met[2].len(), opening_met[3].len(), median_u(&mut opening_met[0]), median_u(&mut opening_met[1]), median_u(&mut opening_met[2]), median_u(&mut opening_met[3]));
+                            // Ticket #504 (version 0.1.0.0): the Second Objectives, the same way.
+                            println!("      Second Objectives met, Custodians / Prospectors / Arkwrights / Archivists: {} / {} / {} / {} of {seeds}, median turn {} / {} / {} / {}", second_met[0].len(), second_met[1].len(), second_met[2].len(), second_met[3].len(), median_u(&mut second_met[0]), median_u(&mut second_met[1]), median_u(&mut second_met[2]), median_u(&mut second_met[3]));
+                            // Ticket #514 (version 0.1.0.0): who held a Colonial Capital at the end.
+                            println!("      A Colonial Capital held at the end, Custodians / Prospectors / Arkwrights / Archivists: {} / {} / {} / {} of {seeds}", capitals_held[0], capitals_held[1], capitals_held[2], capitals_held[3]);
                             println!(
                                 "      Neutral Labs paid a median {} Research a game; Coastal Engineering complete in {}/{seeds} seeds (median turn {})",
                                 median_u(&mut neutral_research),
@@ -833,7 +848,7 @@ fn main() {
         }
         // Ticket #416 (version 0.09.4): when the tree finishes, and where Research comes from.
         println!("  The whole Tech Tree completed in {} of {all_games} games, median turn {} (the turn its last Tech completed)", all_tree_turns.len(), median_u(&mut all_tree_turns));
-        println!("  Games still running at turn 28: {all_reached_28} of {all_games}; the tree complete at the end in {all_reached_28_done} of them");
+        println!("  Games still running at turn 39: {all_reached_28} of {all_games}; the tree complete at the end in {all_reached_28_done} of them");
         let mut order: Vec<usize> = (0..TechId::ALL.len()).collect();
         let mut meds: Vec<String> = Vec::new();
         for v in all_tech_turns.iter_mut() {

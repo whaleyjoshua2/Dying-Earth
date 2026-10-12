@@ -4,18 +4,25 @@
 # the engine reads the cards. Ticket #72 (version 0.05.5): the Extraction Total is retired for the
 # Prospectors' Venture Capital Fund (2000 DUCATS on their card since ticket #240, version
 # 0.08.3; it was 1000 Materials from ticket #182, version 0.08.0).
-stabilization_turns = 3
+# Ticket #506 (version 0.1.0.0): 4, with the Custodians' card; nothing in the engine reads this copy.
+stabilization_turns = 4
 # Ticket #406 (version 0.09.4): the Custodians' first part is worth the greater of the best run of
 # the game over the bar and this share of the best the counted gap has closed since the game's
 # opening figure. Three tenths, under the third one turn of run is worth, so a real run always beats
 # any cut.
 stabilization_gap_cap = 0.3
 # Off-world Presence is the same bar for every Faction.
-off_world_presence = 12
+# Ticket #506 (version 0.1.0.0): 18, from 12, with the game at fifty turns; the Factions' cards say
+# the same figure.
+off_world_presence = 18
 # Ticket #27 (version 0.02): twenty-four turns of one month. Ticket #67 (version 0.05.5): thirty-six
 # turns of two months, so the game runs six years; every build time, transit time and per-turn
 # figure stays what it was in turns.
-turns = 36
+# Ticket #506 (version 0.1.0.0): FIFTY turns, at the designer's word ("50 turns scale co2 and
+# victories"), two months each still, so the game runs from January 2030 to March 2038. The
+# climate (`ppm_step`, the Sink), every Victory bar that accumulates, the computer's pace tables,
+# the deck's off-Earth turn and neutral development were scaled with it; see each figure's note.
+turns = 50
 # Ticket #57 (version 0.05): the game begins on 1 January 2030. Ticket #67: a Turn is
 # `months_per_turn` calendar months and is named by its first month alone, so turn 1 is January
 # 2030, turn 2 March 2030 and turn 36 November 2035; each turn's sky is read at the first instant

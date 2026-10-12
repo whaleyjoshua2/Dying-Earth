@@ -69,7 +69,22 @@ degrees_per_ppm_step = 0.5
 # designer's ideal of about 15 wins a Faction and 20 collapses: this cell reads 17 collapses and is
 # the nearest. The dials set the collapses and not the win column: the games saved go mostly to
 # the Prospectors.
-ppm_step = 330.0
+#
+# Ticket #506 (version 0.1.0.0): **step 440, the Sink still 8**, with the game at fifty turns. A
+# longer game heats fourteen turns further, so the step was swept again on the finished twenty-Region
+# board: eight cells, 80 games each (`docs/dev-diary/2026-10-07-version-0.1.0.0/sweeps/co2-grid.md`),
+# against the designer's 20 collapses. At the old 330 the board would have collapsed almost
+# everywhere; 400 reads 29, 430 and 440 read 22, 460 reads 16, 520 reads 6; a Sink of 10 at 460
+# reads 13. 440 is the nearest to 20 at the Sink the world has, and the nearer of the two 22s to
+# 330 x 50/36 = 458, the figure the length alone would ask for. The win column is not retuned here.
+#
+# Ticket #514 (version 0.1.0.0): **step 620**, the Sink still 8, re-swept at the designer's word
+# once the Arkwrights' win waited on a Colonial Capital and the collapses had climbed to 46 of 80
+# (games nobody ends run on until the world collapses). Eight cells again
+# (`docs/dev-diary/2026-10-07-version-0.1.0.0/sweeps/co2-grid.md`): at 440 46 collapses, 500 40,
+# 560 33, 620 22; a Sink of 10 reads 42, 33, 23, 14. 620 is the nearest to 20 at the Sink the world
+# has. The win column is not retuned here.
+ppm_step = 620.0
 natural_sink = 8.0
 collapse_line = 3.0
 temperature_lag_fraction = 0.5

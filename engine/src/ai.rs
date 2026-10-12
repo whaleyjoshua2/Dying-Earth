@@ -1189,6 +1189,25 @@ impl Game {
         // bar, a loaded Colony Ship does not land on Earth's ground or over it, and it crosses to the
         // Archive's Body (or the best Body off Earth while there is none) at the homeless lift.
         let ferrying = kind == FactionKind::Archivists && (self.seat(seat).uploaded as f64) < self.tables.faction(kind).victory_second.bar;
+        // Ticket #514 (version 0.1.0.0): a seat whose win waits on a Colonial Capital, holding none,
+        // has a CAPITAL CANDIDATE (its most peopled ground Colony off Earth on a Body with no
+        // Capital), and once its Bodies part is within one of its bar it GATHERS people there: the
+        // candidate's upgrades, every Module built there (so its slots fill for the next tier), a
+        // loaded Ship's crossing to its Body while it has room, and a disembark into it all weigh
+        // `capital_chase` times; a fresh Outpost on its Body weighs a chase less.
+        // Measured before the gathering: the chase on the upgrade and the landing alone left no
+        // Capital off Earth in 80 games (seven stood, all in Antarctica).
+        let capital_candidate = if self.tables.faction(kind).victory_capital { self.capital_candidate(seat) } else { None };
+        let capital_body = capital_candidate.and_then(|c| self.colony(c)).map(|c| c.body);
+        let capital_chase = self.tables.ai.thresholds.capital_chase;
+        // The people the Capital tier wants at one place, the room the candidate builds toward.
+        let capital_room = self.tables.tiers.iter().filter(|t| t.one_per_body).map(|t| t.colonists).max().unwrap_or(0);
+        // Room at the candidate for a landing: a crossing is lifted only where the people can land.
+        let capital_has_room = capital_candidate.and_then(|c| self.colony(c)).is_some_and(|c| self.habitat_room(c) > c.colonists);
+        let gathering = capital_candidate.is_some() && {
+            let sec = self.tables.faction(kind).victory_second;
+            sec.kind != VictorySecondKind::ColoniesOnBodies || self.bodies_settled(seat, sec.colonists_each) + 1 >= sec.bodies
+        };
         // The ferry's SPENDING lift pauses while a site is ready and the Archive is not yet ordered:
         // measured, its Colony Ships spent every Material, and the 50 the Archive wants was never in
         // hand. The route does not pause -- nobody is landed where the Archive cannot use them.
@@ -1205,6 +1224,40 @@ impl Game {
 
         let opening_unmet = self.seat(seat).opening_met_turn.is_none();
         let opening_kind = self.tables.faction(kind).opening.kind;
+        // Ticket #504 (version 0.1.0.0): and its Second Objective, once the first is met.
+        let second_open = self.seat(seat).opening_met_turn.is_some() && self.seat(seat).second_met_turn.is_none();
+        let second_kind = self.tables.faction(kind).second.as_ref().map(|c| c.kind);
+        fn advances(k: crate::data::OpeningKind, cat: Cat, note: &str) -> bool {
+            use crate::data::OpeningKind;
+            match k {
+                OpeningKind::ScrubberWorking => cat == Cat::Scrubber,
+                OpeningKind::InvestmentBanks => note.starts_with("build Investment Bank in"),
+                OpeningKind::MoonColony => matches!(cat, Cat::FoundColony | Cat::Transit) && note.contains("the Moon"),
+                OpeningKind::ResearchPair => matches!(cat, Cat::Observatory | Cat::ResearchLab),
+                OpeningKind::Leapfrogs | OpeningKind::IndustryLevel | OpeningKind::FarColony | OpeningKind::Observatories => false,
+            }
+        }
+        // The Second Objectives, read from the orders themselves (the review): a Leapfrog of a
+        // Region not yet counted; a raise; Colonists carried or put down beyond Earth and the Moon,
+        // whatever the note calls the place; an Observatory.
+        let far = |b: BodyId| !matches!(b, BodyId::Earth | BodyId::Moon);
+        let second_advances = |cat: Cat, orders: &[Order]| -> bool {
+            use crate::data::OpeningKind;
+            orders.iter().any(|o| match (second_kind, o) {
+                (Some(OpeningKind::Leapfrogs), Order::Leapfrog { state }) => !self.seat(seat).second_leapfrogs.contains(state),
+                (Some(OpeningKind::IndustryLevel), _) => cat == Cat::RaiseIndustry,
+                (Some(OpeningKind::FarColony), Order::Transit { ship, to, .. }) => far(*to) && self.ship(*ship).is_some_and(|s| s.colonists > 0),
+                (Some(OpeningKind::FarColony), Order::Unload { colonists, into, .. }) => {
+                    *colonists > 0
+                        && match into {
+                            crate::orders::UnloadTarget::Slot(b, _) | crate::orders::UnloadTarget::Ring(b, _) => far(*b),
+                            crate::orders::UnloadTarget::Colony(c) => self.colony(*c).is_some_and(|c| far(c.body)),
+                        }
+                }
+                (Some(OpeningKind::Observatories), _) => cat == Cat::Observatory,
+                _ => false,
+            })
+        };
         let opening_lift = self.tables.ai.multipliers.opportunity;
         let mut push = |orders: Vec<Order>, cat: Cat, base: f64, gap: f64, threat: f64, opportunity: f64, note: String, stack: Option<String>| {
             let base = if (homeless_archive || ferry_lift) && matches!(cat, Cat::ColonyShip | Cat::Transit | Cat::FoundColony | Cat::LoadUnload | Cat::LaunchSiteOrShipyard) {
@@ -1215,13 +1268,8 @@ impl Game {
             // Ticket #471 (version 0.09.7): the seat's Opening Objective, until it is met. What
             // advances it takes the opportunity multiplier -- there is no deadline, so it is a
             // lean, not a rush.
-            let opens = opening_unmet
-                && match opening_kind {
-                    crate::data::OpeningKind::ScrubberWorking => cat == Cat::Scrubber,
-                    crate::data::OpeningKind::InvestmentBanks => note.starts_with("build Investment Bank in"),
-                    crate::data::OpeningKind::MoonColony => matches!(cat, Cat::FoundColony | Cat::Transit) && note.contains("the Moon"),
-                    crate::data::OpeningKind::ResearchPair => matches!(cat, Cat::Observatory | Cat::ResearchLab),
-                };
+            // Ticket #504 (version 0.1.0.0): and its Second Objective once the first is met.
+            let opens = (opening_unmet && advances(opening_kind, cat, &note)) || (second_open && second_advances(cat, &orders));
             let opportunity = if opens { opportunity.max(opening_lift) } else { opportunity };
             cands.push(Candidate { orders, cat, base, gap, threat, opportunity, note, stack, pace: 1.0 });
         };
@@ -1819,9 +1867,25 @@ impl Game {
                 // with the Custodians first, 330 Ducats a game against 2287 with the rule off, and
                 // ten wins against nineteen. An opening is played once.
                 let mut opening = false;
+                // Ticket #514 (version 0.1.0.0): a ground Colony off Earth keeps slots for the Habitats
+                // its next tier's people need (`habitats_to_reserve`): no other Module takes one of
+                // them. Measured without it: every Capital candidate's slots filled with Mines,
+                // Choruses and Trade Posts while it held four, and could never grow. The reserve is
+                // the computer's own habit, judged against the board as committed: a Ducat buy, a
+                // card's free Module and the player are not bound by it.
+                if mk != ModuleKind::Habitat && self.free_module_slots(&col) <= self.habitats_to_reserve(&col) {
+                    continue;
+                }
                 if mk == ModuleKind::Habitat {
                     let room = self.habitat_room(&col).saturating_sub(col.colonists);
-                    if room >= 4 {
+                    // Ticket #514 (version 0.1.0.0): at the Capital candidate, while gathering, a
+                    // Habitat is built AHEAD of need until the place can hold the Capital's people.
+                    // Measured without this: the candidate's slots filled with Mines, Choruses and
+                    // Trade Posts while it held room for four or five, and with every slot built no
+                    // Habitat could follow, so nobody more could land, no slot could come and no
+                    // tier could rise -- a deadlock at every candidate in 80 games.
+                    let ahead = gathering && capital_candidate == Some(cid) && self.habitat_room(&col) < capital_room;
+                    if room >= 4 && !ahead {
                         continue;
                     }
                     let first_habitat = !col.modules.iter().any(|m| m.kind == ModuleKind::Habitat) && !col.queue.iter().any(|b| b.item == BuildItem::Module(ModuleKind::Habitat));
@@ -1845,6 +1909,10 @@ impl Game {
                     1.0
                 };
                 let (pull, opp) = if opening || speeds_the_queue { (gap, m.opportunity) } else { (gap_for(cat, Some(mk.name())), 1.0) };
+                // Ticket #514 (version 0.1.0.0): every Module at the Capital candidate, while gathering,
+                // so its slots fill for the next tier (a tier rises only with every slot built).
+                // Measured without this: Settlements of 16 to 28 people stood at 9 or 10 Modules of 12.
+                let base = if gathering && capital_candidate == Some(cid) { base * capital_chase } else { base };
                 push(vec![Order::BuildModule { colony: cid, kind: mk }], cat, base, pull, t, opp, format!("build {} at {}", mk.name(), self.place_name(Place::Colony(cid))), None);
             }
             // Ticket #355 (version 0.09.1): a Colony STARVED by a rival's Blockade makes no Widgets,
@@ -2049,14 +2117,19 @@ impl Game {
         }
         // Ticket #490 (version 0.09.9): a place of the seat's whose slots are all taken at its tier's
         // cap, with the people the next tier wants, is raised to it.
+        // Ticket #503 (version 0.1.0.0): the Colonial Capital too, where the Body has none (`open_tier`);
+        // a station never sees it.
+        // Ticket #514 (version 0.1.0.0): every upgrade at the Capital candidate weighs `capital_chase`
+        // times more (the candidate and the figure are read at the head of this function).
         for c in self.colonies.iter().filter(|c| c.control.director() == Some(seat)) {
-            if let Some(next) = self.next_tier(c)
+            if let Some(next) = self.open_tier(c)
                 && c.colonists >= next.colonists
                 && self.module_slots(c) >= self.tier_of(c).cap
                 && self.free_module_slots(c) == 0
                 && self.tier_under_way(c).is_none()
             {
-                push(vec![Order::RaiseTier { colony: c.id }], Cat::RaiseTier, self.base_weight(seat, Cat::RaiseTier), gap_for(Cat::RaiseTier, None), 1.0, 1.0, format!("upgrade {} to a {}", self.place_name(Place::Colony(c.id)), next.name), None);
+                let chase = if capital_candidate == Some(c.id) { capital_chase } else { 1.0 };
+                push(vec![Order::RaiseTier { colony: c.id }], Cat::RaiseTier, self.base_weight(seat, Cat::RaiseTier) * chase, gap_for(Cat::RaiseTier, None), 1.0, 1.0, format!("upgrade {} to a {}", self.place_name(Place::Colony(c.id)), next.name), None);
             }
         }
         // Ticket #447 (version 0.09.6): **a backup yard.** A seat with exactly one Shipyard, and no
@@ -2398,7 +2471,7 @@ impl Game {
         // offer costs nothing and a refusal is not an offence, so the guard is on frequency rather
         // than on risk: a table where every seat proposed every turn would bury the player.
         for other in Seat::ALL {
-            if other == seat || self.accords.iter().any(|a| a.holds(seat, other)) {
+            if other == seat {
                 continue;
             }
             // Ticket #495 (version 0.09.9): not while its last offer waits on an answer, nor to a
@@ -2421,7 +2494,19 @@ impl Game {
             if self.refuel_worth_offering(seat, other) {
                 terms.push(Term::Refuel);
             }
-            if !self.accord_acceptable(seat, other, &terms) {
+            // Ticket #509 (version 0.1.0.0): a research agreement between Friends; and to a Faction it
+            // holds an Accord with, the Terms that Accord lacks, or nothing.
+            if self.relations_score(seat, other) >= 7 && self.relations_score(other, seat) >= 7 {
+                terms.push(Term::ResearchAgreement);
+            }
+            if let Some(acc) = self.accords.iter().find(|a| a.holds(seat, other)) {
+                // The review: nothing to one in its last turn, which lapses before the answer.
+                if self.accord_turns_left(acc) <= 1 {
+                    continue;
+                }
+                terms.retain(|t| !acc.terms.contains(t));
+            }
+            if terms.is_empty() || !self.accord_acceptable(seat, other, &terms) {
                 continue;
             }
             push(
@@ -2944,6 +3029,10 @@ impl Game {
                         // Ticket #409 (version 0.09.4): it asks for what lands, the most the slot
                         // takes, as every other Unload does; the rest stay aboard as before.
                         let lift = if unclaimed { self.tables.ai.thresholds.first_found_weight } else { 1.0 };
+                        // Ticket #514 (version 0.1.0.0): on the Capital candidate's Body, while gathering,
+                        // a fresh Outpost is worth a chase less than landing in the candidate. Measured
+                        // without this: the people arrived and founded four-person Outposts beside it.
+                        let lift = if gathering && Some(body) == capital_body { lift / capital_chase } else { lift };
                         push(vec![Order::Unload { ship: s.id, colonists: self.unload_most(s.id, UnloadTarget::Slot(body, slot)), army: false, into: UnloadTarget::Slot(body, slot) }], Cat::FoundColony, self.base_weight(seat, Cat::FoundColony) * lift * self.ai_founding_pull(seat), gap_for(Cat::FoundColony, None), 1.0, opp, format!("found a Colony at {} on {}", self.tables.body(body).slots[slot as usize].name, self.tables.body(body).name), None);
                     }
                 }
@@ -2998,6 +3087,8 @@ impl Game {
                             let over_earth = body == BodyId::Earth;
                             let opp = if presence_needed <= n && !over_earth { m.opportunity } else { 1.0 };
                             let (weight, gap) = if over_earth { (self.base_weight(seat, Cat::LoadUnload) * 0.5, 1.0) } else { (self.base_weight(seat, Cat::LoadUnload), gap_for(Cat::LoadUnload, None)) };
+                            // Ticket #514 (version 0.1.0.0): a landing at the Capital candidate, chased or not.
+                            let weight = if capital_candidate == Some(c.id) { weight * capital_chase } else { weight };
                             push(vec![Order::Unload { ship: s.id, colonists: n, army: false, into: UnloadTarget::Colony(c.id) }], Cat::LoadUnload, weight, gap, 1.0, opp, format!("disembark {} Colonists into {}", n, self.place_name(Place::Colony(c.id))), None);
                         }
                     }
@@ -3022,7 +3113,9 @@ impl Game {
                         // it the flight is longer and dearer, so the candidate is worth less --
                         // unless the seat is behind on its pace, where the gap multiplier says go.
                         let window = self.window_preference(seat, body, d);
-                        push(vec![Order::Transit { ship: s.id, to: d, slot: self.ai_destination_orbit(seat, s, d) }], Cat::Transit, self.base_weight(seat, Cat::Transit) * window, gap_for(Cat::Transit, None), 1.0, 1.0, format!("send {} to {}", ship_name, self.tables.body(d).name), None);
+                        // Ticket #514 (version 0.1.0.0): the crossing to the Capital candidate's Body, while gathering.
+                        let gather = if gathering && capital_has_room && Some(d) == capital_body { capital_chase } else { 1.0 };
+                        push(vec![Order::Transit { ship: s.id, to: d, slot: self.ai_destination_orbit(seat, s, d) }], Cat::Transit, self.base_weight(seat, Cat::Transit) * window * gather, gap_for(Cat::Transit, None), 1.0, 1.0, format!("send {} to {}", ship_name, self.tables.body(d).name), None);
                     }
                 }
                 if s.colonists == 0 && body != BodyId::Earth {
@@ -3696,8 +3789,27 @@ impl Game {
         for l in &lines {
             self.log(l.clone());
         }
+        // The 0.1.0.0 playtest (ticket #517): the computer keeps the non-aggression it gives. An order
+        // that would cross a partner -- Influence on, Agitate in, a Smear of, an Army into, a Bombard
+        // or a Launch at a place that partner directs -- is dropped. Measured before: computer seats
+        // struck Accords and broke them the same turn by spending Influence on the partner's Regions,
+        // which players read as an Accord accepted and never struck.
+        chosen.retain(|o| self.order_crosses(seat, o).is_none());
         // Ticket #58: the scored list is the AI's own head, so it stays in the log. What the Report
         // shows is built from the orders this seat actually commits, in `end_turn`.
         chosen
+    }
+
+    /// Ticket #517 (version 0.1.0.0): the Faction this seat holds non-aggression with that this order
+    /// would act against -- the acts that break it. Ticket #520: the player's cost line says so too.
+    pub fn order_crosses(&self, seat: Seat, order: &Order) -> Option<Seat> {
+        let partner = |who: Option<Seat>| who.filter(|w| *w != seat && self.accord_has(seat, *w, Term::NonAggression));
+        match order {
+            Order::Influence { target, .. } | Order::Launch { target, .. } => partner(self.place_control(*target).director()),
+            Order::Agitate { state } | Order::MoveArmy { to: state, .. } => partner(self.place_control(Place::State(*state)).director()),
+            Order::Smear { target, .. } => partner(Some(*target)),
+            Order::Bombard { colony, .. } => partner(self.place_control(Place::Colony(*colony)).director()),
+            _ => None,
+        }
     }
 }

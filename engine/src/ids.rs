@@ -16,10 +16,15 @@ pub enum BodyId {
     /// Version 0.06.0 (ticket #93): Venus, a Body of orbits only: no Colony Slots, three Orbital
     /// Slots, its own Launch Window on the real sky.
     Venus,
+    /// Version 0.1.0.0 (ticket #502): three more worlds, each a system of its own -- Mercury in
+    /// the Sun's glare, Ceres and 4 Vesta out in the belt.
+    Mercury,
+    Ceres,
+    Vesta,
 }
 
 impl BodyId {
-    pub const ALL: [BodyId; 6] = [BodyId::Earth, BodyId::Moon, BodyId::Mars, BodyId::Phobos, BodyId::Deimos, BodyId::Venus];
+    pub const ALL: [BodyId; 9] = [BodyId::Earth, BodyId::Moon, BodyId::Mars, BodyId::Phobos, BodyId::Deimos, BodyId::Venus, BodyId::Mercury, BodyId::Ceres, BodyId::Vesta];
     pub fn index(self) -> usize {
         self as usize
     }
@@ -48,6 +53,9 @@ impl BodyId {
             BodyId::Phobos => "Phobos",
             BodyId::Deimos => "Deimos",
             BodyId::Venus => "Venus",
+            BodyId::Mercury => "Mercury",
+            BodyId::Ceres => "Ceres",
+            BodyId::Vesta => "Vesta",
         }
     }
 }
@@ -107,16 +115,25 @@ pub enum System {
     Earth,
     Venus,
     Mars,
+    /// Ticket #502 (version 0.1.0.0): the three new worlds' systems.
+    Mercury,
+    Ceres,
+    Vesta,
     Far(u32),
 }
 
 impl System {
+    /// Ticket #502 (version 0.1.0.0): every system, a far orbit standing for both.
+    pub const ALL: [System; 7] = [System::Earth, System::Venus, System::Mars, System::Mercury, System::Ceres, System::Vesta, System::Far(0)];
     /// The name `bodies.toml` writes a gulf's two ends in.
     pub fn key(self) -> &'static str {
         match self {
             System::Earth => "earth",
             System::Venus => "venus",
             System::Mars => "mars",
+            System::Mercury => "mercury",
+            System::Ceres => "ceres",
+            System::Vesta => "vesta",
             System::Far(_) => "far",
         }
     }
@@ -181,10 +198,15 @@ pub enum StateId {
     // has been, so no older index moves.
     Turkey,
     SouthAfrica,
+    // Version 0.1.0.0 (ticket #510): Vietnam (the South-East Asian mainland) cut out of Indonesia's
+    // Region, Argentina (the Spanish-speaking mainland) out of Brazil's. Appended, as every split
+    // has been, so no older index moves.
+    Vietnam,
+    Argentina,
 }
 
 impl StateId {
-    pub const ALL: [StateId; 18] = [
+    pub const ALL: [StateId; 20] = [
         StateId::SubSaharanAfrica,
         StateId::NorthAfrica,
         StateId::EastAsia,
@@ -203,6 +225,8 @@ impl StateId {
         StateId::UnitedKingdom,
         StateId::Turkey,
         StateId::SouthAfrica,
+        StateId::Vietnam,
+        StateId::Argentina,
     ];
     pub fn index(self) -> usize {
         self as usize
@@ -655,8 +679,9 @@ pub enum TechId {
     /// Ticket #201 (version 0.08.1): the eighteenth Tech, Society rung 2. With it standing, a
     /// Constabulary adds 10 to the challenge margin where it adds 5 without.
     CivilDefense,
-    /// Version 0.06.0 (ticket #84): the four gates, one per Faction, on rung 3. Each opens its
-    /// Faction's Victory Condition and is a Tech for everyone besides.
+    /// Version 0.06.0 (ticket #84): the four gates, one per Faction, on rung 3 until ticket #505
+    /// (version 0.1.0.0) moved them to rung 4 at 62. Each opens its Faction's Victory Condition and is a
+    /// Tech for everyone besides.
     PlanetaryStewardship,
     ExtractionCharter,
     GenerationShips,
@@ -697,10 +722,20 @@ pub enum TechId {
     /// needs it beside Civil Defense. Observatory Research x1.5, on Large Language Models' and The
     /// Upload's.
     OrbitalDataCenters,
+    /// Ticket #505 (version 0.1.0.0): Off-world Living rung 3, needing Closed-Loop Colonies, at 58;
+    /// Generation Ships needs it. A Module built off Earth costs x0.75 Materials and x0.85 Widgets,
+    /// inside the in-situ floor.
+    RegolithPrinting,
+    /// Ticket #505 (version 0.1.0.0): Extraction rung 3, needing Automated Refining, at 58; the
+    /// Extraction Charter needs it. Every working Mass Driver pays 3 Ducats a turn.
+    RailGunFreight,
+    /// Ticket #505 (version 0.1.0.0): Society rung 3, needing Orbital Data Centers, at 58; The
+    /// Upload needs it. Every Energy output x1.25, in Efficient Grids' chain.
+    Superconductors,
 }
 
 impl TechId {
-    pub const ALL: [TechId; 26] = [
+    pub const ALL: [TechId; 29] = [
         TechId::EfficientGrids,
         TechId::CleanPower,
         TechId::CleanManufacturing,
@@ -727,6 +762,9 @@ impl TechId {
         TechId::CryogenicTanks,
         TechId::CommodityFinance,
         TechId::OrbitalDataCenters,
+        TechId::RegolithPrinting,
+        TechId::RailGunFreight,
+        TechId::Superconductors,
     ];
     pub fn index(self) -> usize {
         self as usize
@@ -785,10 +823,15 @@ pub enum EventId {
     TheWhistleblower,
     SurplusHabitats,
     ConscriptionNotice,
+    /// Ticket #506 (version 0.1.0.0): three more Choice Cards with the game at fifty turns, built
+    /// from effects the deck already had. Appended, as every card since #337 has been.
+    CarbonLevy,
+    DeepCoreSurvey,
+    TradePact,
 }
 
 impl EventId {
-    pub const ALL: [EventId; 40] = [
+    pub const ALL: [EventId; 43] = [
         EventId::SolarStorm,
         EventId::RadiationSurge,
         EventId::CommsBlackout,
@@ -830,6 +873,9 @@ impl EventId {
         EventId::TheWhistleblower,
         EventId::SurplusHabitats,
         EventId::ConscriptionNotice,
+        EventId::CarbonLevy,
+        EventId::DeepCoreSurvey,
+        EventId::TradePact,
     ];
     pub const CLIMATE: [EventId; 6] = [EventId::Heatwave, EventId::Wildfire, EventId::StormSurge, EventId::MethaneBurst, EventId::Drought, EventId::VolcanicEruption];
 }

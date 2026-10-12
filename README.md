@@ -67,7 +67,8 @@ table stops the game with a message naming the file and the row.
 - `src/` — the Bevy window: views, panels, popups, screenshot mode.
 - `assets/data/` — the tables. `assets/textures/` — NASA Blue Marble, LRO Moon and USGS Viking Mars
   maps, plus the Nation State mask derived from the coastlines (`examples/prep_assets.rs` makes it)
-  and, since 0.06.0, a made cloud map for Venus (`examples/prep_assets.rs --venus`).
+  and, since 0.06.0, a made cloud map for Venus (`examples/prep_assets.rs --venus`); since 0.1.0.0,
+  Dawn's Ceres and Vesta and MESSENGER's Mercury (`examples/prep_worlds.rs`).
 - `docs/` — the spec, the glossary's decisions (`docs/adr/`), agent notes and the dev diary.
 
 ## Kits for other systems

@@ -78,6 +78,9 @@ pub struct ShotPlan {
     pub hover: Option<BodyId>,
     /// `look:<lon>,<lat>` (a building aid): every surface picture faces that point.
     pub look: Option<(f32, f32)>,
+    /// Ticket #512 (version 0.1.0.0): `pitch:<degrees>` (a building aid): the Solar System Map is
+    /// seen from this high above the ecliptic.
+    pub pitch: Option<f32>,
     /// Ticket #50: 0 the Faction choice screen is not up yet, 1 it is up, 2 it has been captured.
     pub factions_step: u8,
     /// Ticket #51: `archive:<stage>` planted an Archive at this Colony, so the Body picture opens
@@ -201,6 +204,9 @@ fn apply_aids(plan: &mut ShotPlan, view: &mut ViewState) {
         view.yaw = crate::geo::yaw_facing(lon, lat);
         view.pitch = lat.to_radians().clamp(-1.3, 1.3);
     }
+    if let (Some(deg), View::Solar) = (plan.pitch, view.view) {
+        view.solar_pitch = deg.to_radians().clamp(crate::geo::SOLAR_PITCH_RANGE.0, crate::geo::SOLAR_PITCH_RANGE.1);
+    }
     if plan.climate_toggle && view.view == View::Surface(BodyId::Earth) {
         view.show_climate = false;
         plan.toggled = false;
@@ -210,7 +216,7 @@ fn apply_aids(plan: &mut ShotPlan, view: &mut ViewState) {
     }
 }
 
-const VIEWS: [(&str, View); 7] = [
+const VIEWS: [(&str, View); 10] = [
     ("solar", View::Solar),
     ("earth", View::Surface(BodyId::Earth)),
     ("moon", View::Surface(BodyId::Moon)),
@@ -218,6 +224,10 @@ const VIEWS: [(&str, View); 7] = [
     ("phobos", View::Surface(BodyId::Phobos)),
     ("deimos", View::Surface(BodyId::Deimos)),
     ("venus", View::Surface(BodyId::Venus)),
+    // Ticket #502 (version 0.1.0.0).
+    ("mercury", View::Surface(BodyId::Mercury)),
+    ("ceres", View::Surface(BodyId::Ceres)),
+    ("vesta", View::Surface(BodyId::Vesta)),
 ];
 
 // Ticket #109: the credits picture sits between the Faction cards and the start screen, so the
@@ -613,17 +623,18 @@ fn build_board(session: &mut Session) {
             }
         }
         // `rival:1` (a building aid, ticket #261, version 0.08.4): seat 1 stands three quarters of
-        // the way to its Victory Condition -- nine Colonists on the Moon of twelve, and, for the
-        // Prospectors it usually is, the Fund at 2000 of 2500 -- and a quiet turn runs so the
-        // rival's Moment fires and `moment:rival` can open it in the Report picture.
+        // the way to its Victory Condition -- fourteen Colonists on the Moon of eighteen, and, for
+        // the Prospectors it usually is, the Fund at 2625 of 3500 (ticket #506: nine of twelve and
+        // 2000 of 2500 before) -- and a quiet turn runs so the rival's Moment fires and
+        // `moment:rival` can open it in the Report picture.
         if std::env::args().any(|a| a == "rival:1") {
             let rival = Seat(1);
             let slot = g.free_slots_on(BodyId::Moon).first().copied().unwrap_or(0);
             let id = ColonyId(g.fresh_id());
-            let modules = vec![Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Habitat)];
-            g.colonies.push(Colony { id, body: BodyId::Moon, slot, control: Control::Controlled(rival), modules, colonists: 9, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, tier: 0, in_orbit: false });
-            g.seats[1].venture_fund = 2000.0;
-            g.seats[1].stabilization_run = 3;
+            let modules = vec![Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Habitat)];
+            g.colonies.push(Colony { id, body: BodyId::Moon, slot, control: Control::Controlled(rival), modules, colonists: 14, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, tier: 0, in_orbit: false });
+            g.seats[1].venture_fund = 2625.0;
+            g.seats[1].stabilization_run = 4;
             run_one_quiet_turn(g);
         }
         // `observatory:<n>` (a building aid, ticket #80): seat 0 gets a Colony on Mars with three
@@ -826,6 +837,44 @@ fn build_board(session: &mut Session) {
             && !g.colony(id).unwrap().modules.iter().any(|m| m.kind == ModuleKind::Habitat)
         {
             g.colony_mut(id).unwrap().modules.push(Module::new(ModuleKind::Habitat));
+        }
+        // `capital:ready` (a building aid, ticket #503, version 0.1.0.0): a Colony of seat 0's on the
+        // Moon at the third tier, full at eighteen with twenty-four people, so its Upgrade tile offers
+        // the Colonial Capital; `capital:held` the same with a rival's Colony on the Moon already its
+        // Capital, for the greyed tile; `capital:mine` seat 0's Colony the Capital itself.
+        if let Some(v) = std::env::args().find_map(|a| a.strip_prefix("capital:").map(str::to_owned)) {
+            let plant = |g: &mut Game, seat: Seat, tier: u32| {
+                let slot = g.free_slots_on(BodyId::Moon).first().copied().unwrap_or(0);
+                let id = ColonyId(g.fresh_id());
+                let mut modules = vec![Module::new(ModuleKind::Core)];
+                modules.extend([ModuleKind::Habitat, ModuleKind::Generator, ModuleKind::Mine].iter().cycle().take(18).map(|k| Module::new(*k)));
+                g.colonies.push(Colony { id, body: BodyId::Moon, slot, control: Control::Controlled(seat), modules, colonists: 24, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, tier, in_orbit: false });
+            };
+            if v == "held" {
+                plant(g, Seat(1), 3);
+            }
+            plant(g, Seat(0), if v == "mine" { 3 } else { 2 });
+            g.seats[0].stockpile.materials = 120.0;
+        }
+        // `accord:all` (a building aid, ticket #508, version 0.1.0.0): seat 0 holds an Accord of all four
+        // Terms with seat 1, for the hover on its line in the Factions window.
+        if std::env::args().any(|a| a == "accord:all") {
+            let turn = g.turn;
+            g.accords.push(Accord { a: Seat(0), b: Seat(1), terms: vec![Term::NonAggression, Term::Passage, Term::Refuel, Term::ResearchAgreement], struck: turn, paid: turn, ending: false, since: turn });
+        }
+        // `accord:some` (a building aid, ticket #509, version 0.1.0.0): seat 0 holds non-aggression alone
+        // with seat 1, so the card shows its turns left and the Terms it lacks, to add.
+        if std::env::args().any(|a| a == "accord:some") {
+            let turn = g.turn;
+            g.accords.push(Accord { a: Seat(0), b: Seat(1), terms: vec![Term::NonAggression], struck: turn, paid: turn, ending: false, since: turn });
+        }
+        // `accord:last` (a building aid, ticket #509, version 0.1.0.0): seat 0 holds non-aggression with
+        // seat 1 in its last turn, so the card's Renew button can be photographed; with `turns:4`, as
+        // an Accord's last turn is its fifth.
+        if std::env::args().any(|a| a == "accord:last") {
+            let at = g.turn.saturating_sub(4);
+            g.accords.retain(|x| !x.holds(Seat(0), Seat(1)));
+            g.accords.push(Accord { a: Seat(0), b: Seat(1), terms: vec![Term::NonAggression], struck: at, paid: at, ending: false, since: at });
         }
         // `accords:0` (a building aid, ticket #430, version 0.09.5): every Accord struck, so a picture
         // after driven turns shows the fog as a seat with no Accord sees it.
@@ -1549,8 +1598,18 @@ fn build_board(session: &mut Session) {
     {
         let turn = g.turn;
         let trade = Some((TradeGood::Goods(dying_earth_engine::ids::Resource::Materials, 30), TradeGood::Goods(dying_earth_engine::ids::Resource::Ducats, 60)));
-        g.offers.push(dying_earth_engine::state::Offer { from: Seat(1), to: Seat(0), terms: Vec::new(), trade, turn });
-        g.offers.push(dying_earth_engine::state::Offer { from: Seat(2), to: Seat(0), terms: vec![Term::NonAggression], trade: None, turn });
+        g.offers.push(dying_earth_engine::state::Offer { from: Seat(1), to: Seat(0), terms: Vec::new(), trade, turn, ask: Default::default() });
+        g.offers.push(dying_earth_engine::state::Offer { from: Seat(2), to: Seat(0), terms: vec![Term::NonAggression], trade: None, turn, ask: Default::default() });
+    }
+    // Ticket #509 (version 0.1.0.0): `offer:add` (a building aid): the Arkwrights offer Passage added
+    // to the player's Accord with them, so the prompt can be photographed with an addition. A renewal
+    // is never prompted (the designer, after the build), so there is none to picture.
+    if std::env::args().any(|a| a == "offer:add")
+        && let Some(g) = session.game.as_mut()
+    {
+        let turn = g.turn;
+        g.accords.push(Accord { a: Seat(0), b: Seat(2), terms: vec![Term::NonAggression], struck: turn, paid: turn, ending: false, since: turn });
+        g.offers.push(dying_earth_engine::state::Offer { from: Seat(2), to: Seat(0), terms: vec![Term::Passage], trade: None, turn, ask: AccordAsk::Add });
     }
     // Ticket #495 (version 0.09.9): `offer:<n>` (a building aid): the first n computer seats each
     // offer the player an Accord -- Non-aggression and Passage -- so the prompt can be photographed.
@@ -1559,7 +1618,7 @@ fn build_board(session: &mut Session) {
     {
         let turn = g.turn;
         for from in [Seat(1), Seat(2), Seat(3)].into_iter().take(n) {
-            g.offers.push(dying_earth_engine::state::Offer { from, to: Seat(0), terms: vec![Term::NonAggression, Term::Passage], trade: None, turn });
+            g.offers.push(dying_earth_engine::state::Offer { from, to: Seat(0), terms: vec![Term::NonAggression, Term::Passage], trade: None, turn, ask: Default::default() });
         }
     }
     // Ticket #493 (version 0.09.9): `blockadeiss:1` (a building aid): a Frigate of seat 1's on
@@ -1649,6 +1708,14 @@ fn build_board(session: &mut Session) {
         && let Some(g) = session.game.as_mut()
     {
         g.seats[0].opening_run = n;
+    }
+    // `second:<n>` (a building aid, ticket #504, version 0.1.0.0): seat 0's Opening Objective met on
+    // the first turn and n Regions Leapfrogged toward its Second, so the Journal shows both entries.
+    if let Some(n) = std::env::args().find_map(|a| a.strip_prefix("second:").and_then(|v| v.parse::<usize>().ok()))
+        && let Some(g) = session.game.as_mut()
+    {
+        g.seats[0].opening_met_turn = Some(1);
+        g.seats[0].second_leapfrogs = [StateId::EastAsia, StateId::Japan, StateId::Russia].into_iter().take(n).collect();
     }
     if let Some(n) = std::env::args().find_map(|a| a.strip_prefix("ducats:").and_then(|v| v.parse::<i64>().ok()))
         && let Some(g) = session.game.as_mut()
@@ -2084,6 +2151,7 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
             let (lon, lat) = a.strip_prefix("look:")?.split_once(',')?;
             Some((lon.parse().ok()?, lat.parse().ok()?))
         });
+        plan.pitch = std::env::args().find_map(|a| a.strip_prefix("pitch:").and_then(|v| v.parse().ok()));
         plan.climate_toggle = std::env::args().any(|a| a == "climate:toggle");
         // Ticket #59: whatever the Save left in the top bar, held up for the rest of the run.
         plan.notice = session.save_notice.as_ref().map(|(text, _)| text.clone());

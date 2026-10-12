@@ -118,7 +118,10 @@ impl Game {
                     m.seat = Some(seat);
                 }
             }
-            let one_met = p.first_met() != p.second_met();
+            // Ticket #514 (version 0.1.0.0): not when both bars are reached and only the hold (a
+            // Capital, the gate Tech) stands in the way -- "only X remains, at 42 of 42" said nothing.
+            let both_at_bar = p.first_value >= p.first_bar && p.second_value >= p.second_bar;
+            let one_met = p.first_met() != p.second_met() && !both_at_bar;
             if !self.seat(seat).rival_steps_announced[1] && one_met {
                 self.seat_mut(seat).rival_steps_announced[1] = true;
                 let met = if p.first_met() { p.first_name.clone() } else { p.second_name.clone() };
@@ -200,6 +203,11 @@ impl Game {
         {
             first_held_back = Some(format!("needs {}, not yet researched", self.tables.tech(gate).name));
         }
+        // Ticket #514 (version 0.1.0.0): and, on a card that asks it, a Colonial Capital of the seat's
+        // must stand -- a gate on the win like the Tech, the parts accruing regardless.
+        if first_held_back.is_none() && self.tables.faction(self.kind(seat)).victory_capital && !self.capital_held(seat) {
+            first_held_back = Some("needs a Colonial Capital of yours, at a Colony you hold off Earth".to_string());
+        }
         // Ticket #373 (version 0.09.2): the Colonists aboard the seat's Ships, for the parts that
         // count Colonists off Earth and no other -- a Ship in flight has no one Body to count
         // toward, so the per-Body part carries none. They count toward nothing.
@@ -233,21 +241,7 @@ impl Game {
     pub fn end_phase(&mut self) {
         let progress: Vec<Progress> = Seat::ALL.into_iter().map(|s| self.progress(s)).collect();
         self.rival_moments(&progress);
-        let met: Vec<Seat> = Seat::ALL.into_iter().filter(|s| progress[s.index()].met()).collect();
-        if met.len() == 1 {
-            self.outcome = Some(Outcome::Win { seat: met[0], margin_note: "met its Victory Condition".into() });
-        } else if met.len() > 1 {
-            let best = met.iter().map(|s| progress[s.index()].margin()).fold(f64::MIN, f64::max);
-            let leaders: Vec<Seat> = met.iter().copied().filter(|s| progress[s.index()].margin() >= best).collect();
-            self.outcome = Some(if leaders.len() == 1 {
-                Outcome::Win { seat: leaders[0], margin_note: "more than one met its Victory Condition; the larger margin".into() }
-            } else {
-                Outcome::Draw { note: "more than one met its Victory Condition by the same margin".into() }
-            });
-        }
-        if self.outcome.is_none() && self.climate.temperature >= self.tables.climate.collapse_line {
-            self.outcome = Some(Outcome::Collapse);
-        }
+        self.settle_met(&progress);
         if self.outcome.is_none() && self.turn >= self.tables.victory.turns {
             // Rank every seat by score, then Colonists off Earth, then Colonies held, then a draw.
             let leaders = |key: &dyn Fn(Seat) -> f64, from: &[Seat]| -> Vec<Seat> {
@@ -271,6 +265,44 @@ impl Game {
                 Outcome::Draw { note: "equal at the last turn".into() }
             });
         }
+        self.announce_outcome();
+    }
+
+    /// Ticket #524 (version 0.1.0.0): **Victory checked at the head of the turn**, after the Income
+    /// and the Climate phase, where the Fund's interest and the Custodians' run move. Checked only at
+    /// the End, a bar met there waited a whole turn of orders to win: the Report showed "score 1.00
+    /// MET" and the game went on. A Collapse the Climate phase crossed ends the game here as well.
+    /// The last turn's ranking stays the End's.
+    pub fn victory_at_head(&mut self) {
+        if self.outcome.is_some() {
+            return;
+        }
+        let progress: Vec<Progress> = Seat::ALL.into_iter().map(|s| self.progress(s)).collect();
+        self.settle_met(&progress);
+        self.announce_outcome();
+    }
+
+    /// A Victory Condition met, by one or more seats, and else the Collapse.
+    fn settle_met(&mut self, progress: &[Progress]) {
+        let met: Vec<Seat> = Seat::ALL.into_iter().filter(|s| progress[s.index()].met()).collect();
+        if met.len() == 1 {
+            self.outcome = Some(Outcome::Win { seat: met[0], margin_note: "met its Victory Condition".into() });
+        } else if met.len() > 1 {
+            let best = met.iter().map(|s| progress[s.index()].margin()).fold(f64::MIN, f64::max);
+            let leaders: Vec<Seat> = met.iter().copied().filter(|s| progress[s.index()].margin() >= best).collect();
+            self.outcome = Some(if leaders.len() == 1 {
+                Outcome::Win { seat: leaders[0], margin_note: "more than one met its Victory Condition; the larger margin".into() }
+            } else {
+                Outcome::Draw { note: "more than one met its Victory Condition by the same margin".into() }
+            });
+        }
+        if self.outcome.is_none() && self.climate.temperature >= self.tables.climate.collapse_line {
+            self.outcome = Some(Outcome::Collapse);
+        }
+    }
+
+    /// The game's end, in the log and as the Report's headline (ticket #524: `LineKind::GameOver`).
+    fn announce_outcome(&mut self) {
         if let Some(o) = self.outcome.clone() {
             let line = match &o {
                 Outcome::Win { seat, margin_note } => format!("Game over on turn {}: the {} win ({}).", self.turn, self.seat_name(*seat), margin_note),
@@ -287,7 +319,7 @@ impl Game {
                     self.say("game_over_collapse", &[("turn", self.turn.to_string()), ("temperature", format!("{:+.1}", self.climate.temperature))])
                 }
             };
-            self.report_line(LineKind::Note, None, text);
+            self.report_line(LineKind::GameOver, None, text);
         }
     }
 
@@ -307,8 +339,13 @@ impl Game {
     /// Ticket #471 (version 0.09.7): whether this seat's **Opening Objective** is true right now.
     /// Each is one early thing its Faction wants anyway (`[faction] opening` in `factions.toml`).
     pub fn opening_true(&self, seat: Seat) -> bool {
+        self.objective_true(seat, &self.tables.faction(self.kind(seat)).opening)
+    }
+
+    /// Ticket #504 (version 0.1.0.0): whether an objective card is true for this seat right now,
+    /// the opening or the second alike.
+    pub fn objective_true(&self, seat: Seat, card: &crate::data::OpeningCard) -> bool {
         use crate::data::OpeningKind;
-        let card = &self.tables.faction(self.kind(seat)).opening;
         let regions = self.controlled_states(seat);
         let working = |sid: &StateId, kind: FacilityKind| self.state(*sid).facilities.iter().filter(|f| f.kind == kind && f.working()).count();
         match card.kind {
@@ -328,7 +365,26 @@ impl Game {
                     .count();
                 observatories >= 1 && (labs + observatories) as u32 >= card.count
             }
+            // Ticket #504 (version 0.1.0.0): the Second Objectives.
+            OpeningKind::Leapfrogs => self.seat(seat).second_leapfrogs.len() as u32 >= card.count,
+            OpeningKind::IndustryLevel => regions.iter().any(|sid| self.state(*sid).industry_level >= card.count),
+            OpeningKind::FarColony => self.far_colony(seat).is_some(),
+            OpeningKind::Observatories => {
+                let working = self.colonies.iter().filter(|c| c.control.controller() == Some(seat)).flat_map(|c| c.modules.iter()).filter(|m| m.kind.does_the_job_of(ModuleKind::Observatory) && m.working()).count();
+                working as u32 >= card.count
+            }
         }
+    }
+
+    /// Ticket #504 (version 0.1.0.0): a Colony of the seat's, ground or station, on a Body beyond
+    /// Earth and the Moon -- the Arkwrights' Second Objective, and where its Colonist lands.
+    pub fn far_colony(&self, seat: Seat) -> Option<ColonyId> {
+        self.colonies.iter().find(|c| c.control.controller() == Some(seat) && !matches!(c.body, BodyId::Earth | BodyId::Moon)).map(|c| c.id)
+    }
+
+    /// Ticket #504 (version 0.1.0.0): whether this seat's **Second Objective** is true right now.
+    pub fn second_true(&self, seat: Seat) -> bool {
+        self.tables.faction(self.kind(seat)).second.as_ref().is_some_and(|card| self.objective_true(seat, card))
     }
 
     /// Ticket #471: read at the end of every Income. An objective is met at the first Income it is
@@ -338,7 +394,6 @@ impl Game {
     /// player's own is reported under Your works. A rival's is logged and not reported: the
     /// designer keeps rivals' objectives quiet.
     pub fn opening_objectives(&mut self) {
-        use crate::data::OpeningKind;
         for seat in Seat::ALL {
             if self.seat(seat).opening_met_turn.is_none() {
                 let run = if self.opening_true(seat) { self.seat(seat).opening_run + 1 } else { 0 };
@@ -347,26 +402,71 @@ impl Game {
             if self.seat(seat).opening_met_turn.is_none() && self.seat(seat).opening_run >= self.tables.faction(self.kind(seat)).opening.turns {
                 let card = self.tables.faction(self.kind(seat)).opening.clone();
                 self.seat_mut(seat).opening_met_turn = Some(self.turn);
-                match card.kind {
-                    OpeningKind::ScrubberWorking => self.climate.natural_sink += card.reward,
-                    OpeningKind::InvestmentBanks => {
-                        let s = self.seat_mut(seat);
-                        s.venture_fund = tenth(s.venture_fund + card.reward);
-                    }
-                    OpeningKind::MoonColony => self.seat_mut(seat).launch_site_owed = true,
-                    OpeningKind::ResearchPair => {
-                        let cap = self.archive_fund_cap(seat);
-                        let s = self.seat_mut(seat);
-                        s.archive_fund = (s.archive_fund + card.reward as i64).min(cap);
-                    }
-                }
+                self.pay_objective(seat, &card);
                 self.log(format!("The {} met their Opening Objective ({}): {}.", self.seat_name(seat), card.text, card.reward_text));
                 if seat == Seat(0) && !self.spectator {
                     let text = self.say("opening_met", &[("reward", card.reward_text.clone())]);
                     self.report_line(LineKind::YourWorks, None, text);
                 }
             }
+            // Ticket #504 (version 0.1.0.0): the Second Objective, open from the Income after the first
+            // was met, and met and paid as the first is.
+            if self.seat(seat).second_met_turn.is_none()
+                && self.seat(seat).opening_met_turn.is_some_and(|t| t < self.turn)
+                && self.second_true(seat)
+                && let Some(card) = self.tables.faction(self.kind(seat)).second.clone()
+            {
+                self.seat_mut(seat).second_met_turn = Some(self.turn);
+                self.pay_objective(seat, &card);
+                self.log(format!("The {} met their Second Objective ({}): {}.", self.seat_name(seat), card.text, card.reward_text));
+                if seat == Seat(0) && !self.spectator {
+                    let text = self.say("opening_met", &[("reward", card.reward_text.clone())]);
+                    self.report_line(LineKind::YourWorks, None, text);
+                }
+            }
             self.grant_owed_launch_site(seat);
+        }
+    }
+
+    /// Ticket #471: an objective's reward, paid once, the turn it is met. Ticket #504 (version
+    /// 0.1.0.0): the second's too.
+    fn pay_objective(&mut self, seat: Seat, card: &crate::data::OpeningCard) {
+        use crate::data::OpeningKind;
+        match card.kind {
+            OpeningKind::ScrubberWorking => self.climate.natural_sink += card.reward,
+            OpeningKind::InvestmentBanks => {
+                let s = self.seat_mut(seat);
+                s.venture_fund = tenth(s.venture_fund + card.reward);
+            }
+            OpeningKind::MoonColony => self.seat_mut(seat).launch_site_owed = true,
+            OpeningKind::ResearchPair => {
+                let cap = self.archive_fund_cap(seat);
+                let s = self.seat_mut(seat);
+                s.archive_fund = (s.archive_fund + card.reward as i64).min(cap);
+            }
+            // Ticket #504 (version 0.1.0.0): the Second Objectives' rewards. The Influence is this
+            // turn's, the Income having just set the Allotment.
+            OpeningKind::Leapfrogs => {
+                self.seat_mut(seat).allotment += card.reward as i64;
+                // Ticket #522 (version 0.1.0.0): and named among the Allotment's parts.
+                self.add_allotment_part(seat, "Second Objective", card.reward as i64);
+            }
+            OpeningKind::IndustryLevel => {
+                let s = self.seat_mut(seat);
+                s.venture_fund = tenth(s.venture_fund + card.reward);
+            }
+            // The review: at a far Colony with room for the Colonist, where there is one.
+            OpeningKind::FarColony => {
+                let roomy = self.colonies.iter().find(|c| c.control.controller() == Some(seat) && !matches!(c.body, BodyId::Earth | BodyId::Moon) && c.colonists < self.habitat_room(c)).map(|c| c.id);
+                if let Some(c) = roomy.or_else(|| self.far_colony(seat)).and_then(|c| self.colony_mut(c)) {
+                    c.colonists += card.reward as u32;
+                }
+            }
+            OpeningKind::Observatories => {
+                let cap = self.archive_fund_cap(seat);
+                let s = self.seat_mut(seat);
+                s.archive_fund = (s.archive_fund + card.reward as i64).min(cap);
+            }
         }
     }
 

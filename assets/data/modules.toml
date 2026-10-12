@@ -111,7 +111,9 @@ id = "archive"
 name = "The Archive"
 materials = 50
 widgets = 12
-energy_upkeep = 12
+# Ticket #511 (version 0.1.0.0): 20, from 12, at the designer's word; Closed-Loop Colonies takes a
+# quarter off it (15), where it took half.
+energy_upkeep = 20
 
 # Ticket #68: the Research the Archive requires in all, paid into the Archive fund at any pace,
 # and the cap on the fund: nobody may bank more Research than the Archive needs. At that cap a turn
@@ -146,6 +148,9 @@ per_colonist = 1
 # the lower of its Colonists and its tier's `cap`; the next tier is a paid build through the Widgets
 # queue, open once `colonists` live there, and a place never falls back a tier. Every place starts
 # at the first. A fourth tier is one more entry.
+# Ticket #503 (version 0.1.0.0): the fourth, the Colonial Capital, takes three more keys: one place on
+# a Body at most, the first to complete it (`one_per_body`); never a station (`ground_only`); and the
+# Influence a turn its holder is paid, at face value (`influence`).
 [[tiers]]
 name = "Outpost"
 cap = 6
@@ -167,9 +172,20 @@ colonists = 18
 materials = 50
 widgets = 6
 
+[[tiers]]
+name = "Colonial Capital"
+cap = 24
+colonists = 24
+materials = 70
+widgets = 8
+one_per_body = true
+ground_only = true
+influence = 1
+
 [archive]
 # Ticket #439 (version 0.09.6): 150, at the designer's word; with the bar in `factions.toml`.
-research = 150
+# Ticket #506 (version 0.1.0.0): 225, at the designer's word, with the game at fifty turns.
+research = 225
 # Ticket #192 (version 0.08.0): how many Colonists must live at the place before the Archive may be
 # ORDERED. Checked once, at the order; neither the three-turn build nor the standing Module cares
 # afterwards, and the Victory Condition does its own checking at the end.

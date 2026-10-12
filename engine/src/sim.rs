@@ -107,6 +107,11 @@ pub struct SimResult {
     /// Ticket #471 (version 0.09.7): the turn each FACTION met its Opening Objective, in
     /// `FactionKind::ALL` order, whatever seat it sat in.
     pub opening_met: [Option<u32>; SEAT_COUNT],
+    /// Ticket #504 (version 0.1.0.0): and its Second Objective, in the same order.
+    pub second_met: [Option<u32>; SEAT_COUNT],
+    /// Ticket #514 (version 0.1.0.0): whether each Faction held a Colonial Capital at the end, in
+    /// the same order.
+    pub capital_held: [bool; SEAT_COUNT],
     pub archive_fund_lost: i64,
     /// Ticket #282 (version 0.08.5): Levies raised by neutral Regions, and neutral Regions that held.
     pub levies_raised: u32,
@@ -197,10 +202,10 @@ pub struct SimResult {
     /// on Earth), and **the turn the first ground Colony standing on each Body was founded**, so a
     /// sweep can say how many worlds a game settles and when, which "first Colony" (Antarctica,
     /// turn 9, every game) and the Mars-system line alone could not.
-    pub ground_colonies_by_body: [u32; 6],
-    pub first_ground_colony_turn_by_body: [Option<u32>; 6],
+    pub ground_colonies_by_body: [u32; BodyId::ALL.len()],
+    pub first_ground_colony_turn_by_body: [Option<u32>; BodyId::ALL.len()],
     /// The same for stations, by Body, Earth's slot nought.
-    pub stations_by_body: [u32; 6],
+    pub stations_by_body: [u32; BodyId::ALL.len()],
     /// Ticket #490 (version 0.09.9): Colonies and stations standing at the end, by tier.
     pub places_by_tier: Vec<u32>,
     /// Ticket #72: the Prospectors' Venture Capital Fund at the end.
@@ -715,6 +720,8 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
     let colonists_declined = Seat::ALL.map(|s| game.seat(s).colonists_declined);
     let archives_lost = Seat::ALL.iter().map(|s| game.seat(*s).archives_lost).sum();
     let opening_met = FactionKind::ALL.map(|k| Seat::ALL.into_iter().find(|s| game.kind(*s) == k).and_then(|s| game.seat(s).opening_met_turn));
+    let second_met = FactionKind::ALL.map(|k| Seat::ALL.into_iter().find(|s| game.kind(*s) == k).and_then(|s| game.seat(s).second_met_turn));
+    let capital_held = FactionKind::ALL.map(|k| Seat::ALL.into_iter().find(|s| game.kind(*s) == k).is_some_and(|s| game.capital_held(s)));
     let archive_fund_lost = Seat::ALL.iter().map(|s| game.seat(*s).archive_fund_lost).sum();
     let events_no_target = game.events_no_target;
     let (choice_taken, choice_refused, choice_not_asked) = (game.choice_taken, game.choice_refused, game.choice_not_asked);
@@ -782,6 +789,8 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         colonists_declined,
         archives_lost,
         opening_met,
+        second_met,
+        capital_held,
         archive_fund_lost,
         levies_raised: game.levies_raised,
         neutral_holds: game.neutral_holds,

@@ -42,17 +42,23 @@ pub struct Textures {
     pub deimos: Rgba,
     /// Ticket #93 (version 0.06.0): Venus's clouds, made by `examples/prep_assets.rs --venus`.
     pub venus: Rgba,
-    /// 0 = water, 1..19 = the mask value of a Nation State (see `examples/prep_assets.rs`).
+    /// Ticket #502 (version 0.1.0.0): Mercury (MESSENGER), Ceres and Vesta (Dawn), made by
+    /// `examples/prep_worlds.rs`.
+    pub mercury: Rgba,
+    pub ceres: Rgba,
+    pub vesta: Rgba,
+    /// 0 = water, 1..21 = the mask value of a Nation State (see `examples/prep_assets.rs`).
     pub mask: Vec<u8>,
 }
 
-/// The mask's values, 1 to 19, in the order the file was painted (`examples/prep_assets.rs`).
+/// The mask's values, 1 to 21, in the order the file was painted (`examples/prep_assets.rs`).
 /// Antarctica keeps value 2 though it is no longer a Region (ticket #44); ticket #53's four new
 /// Regions, ticket #125's two (Japan and Korea, the Arabian Peninsula) and ticket #453's two
 /// (Pakistan, the United Kingdom) were appended rather than renumbered, so an old mask still reads
 /// correctly for the Regions that did not move. Ticket #482 (version 0.09.8) appended two more
 /// (Turkey, South Africa); value 16 is Kazakhstan's now.
-const MASK_STATES: [Option<StateId>; 19] = [
+/// Ticket #510 (version 0.1.0.0): values 20 and 21 are Vietnam's and Argentina's.
+const MASK_STATES: [Option<StateId>; 21] = [
     Some(StateId::SubSaharanAfrica),
     None,
     Some(StateId::EastAsia),
@@ -72,6 +78,8 @@ const MASK_STATES: [Option<StateId>; 19] = [
     Some(StateId::UnitedKingdom),
     Some(StateId::Turkey),
     Some(StateId::SouthAfrica),
+    Some(StateId::Vietnam),
+    Some(StateId::Argentina),
 ];
 
 impl Textures {
@@ -86,7 +94,10 @@ impl Textures {
         let phobos = Rgba::load(&dir.join("phobos.png"))?;
         let deimos = Rgba::load(&dir.join("deimos.png"))?;
         let venus = Rgba::load(&dir.join("venus.png"))?;
-        Ok(Textures { earth, moon, mars, phobos, deimos, venus, mask: mask_img.into_raw() })
+        let mercury = Rgba::load(&dir.join("mercury.png"))?;
+        let ceres = Rgba::load(&dir.join("ceres.png"))?;
+        let vesta = Rgba::load(&dir.join("vesta.png"))?;
+        Ok(Textures { earth, moon, mars, phobos, deimos, venus, mercury, ceres, vesta, mask: mask_img.into_raw() })
     }
 
     /// Ticket #126 (version 0.07.2): the Region under a point on the globe, by the mask -- which is

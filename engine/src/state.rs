@@ -1039,6 +1039,12 @@ pub struct SeatState {
     pub opening_run: u32,
     #[serde(default)]
     pub launch_site_owed: bool,
+    /// Ticket #504 (version 0.1.0.0): the turn this seat met its Second Objective, and the Regions
+    /// it has Leapfrogged since the objective opened (the Custodians' counts them).
+    #[serde(default)]
+    pub second_met_turn: Option<u32>,
+    #[serde(default)]
+    pub second_leapfrogs: Vec<StateId>,
     /// Ticket #461 (version 0.09.7): Archives this seat has lost with their Colonies, and the fund
     /// lost with them, over the game, for the sweep.
     #[serde(default)]
@@ -1066,6 +1072,11 @@ pub struct SeatState {
     /// as the first-to-a-Body windfall is; a Tech completed during the Income is paid that turn.
     #[serde(default)]
     pub lead_windfall: i64,
+    /// Ticket #522 (version 0.1.0.0): this turn's Allotment in its parts, set at the Income, each
+    /// windfall added after it named too, for the window's hover and the text tool. They sum to the
+    /// Allotment the Income set, before anything is bought or spent.
+    #[serde(default)]
+    pub allotment_parts: Vec<(String, i64)>,
     /// Ticket #192 (version 0.08.0): Colonists uploaded into the Archive, all told. The Archivists'
     /// second Victory part counts this rather than who happens to be living beside the Module, and
     /// it only ever climbs: an uploaded Colonist cannot be lost to a raid, a crowding death or a
@@ -1465,6 +1476,16 @@ pub enum Term {
     ResearchAgreement,
 }
 
+/// Ticket #509 (version 0.1.0.0): what an Accord offer asks: a new Accord, Terms added to one that
+/// stands, or one in its last turn renewed for another run.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum AccordAsk {
+    #[default]
+    New,
+    Add,
+    Renew,
+}
+
 /// Ticket #495 (version 0.09.9): **an Accord offered and not yet answered.** It is answered at the
 /// head of the receiver's next turn: by a human seat in a prompt before its orders, the turn not
 /// ending until it has; by a computer seat by its own rule, as the turn begins.
@@ -1479,6 +1500,9 @@ pub struct Offer {
     pub trade: Option<(crate::orders::TradeGood, crate::orders::TradeGood)>,
     /// The turn it was made in.
     pub turn: u32,
+    /// Ticket #509 (version 0.1.0.0): new, added to the Accord that stands, or its renewal.
+    #[serde(default)]
+    pub ask: AccordAsk,
 }
 
 /// Ticket #495: a refusal remembered -- `from` offers `to` no Accord again before `until`.
@@ -1508,6 +1532,11 @@ pub struct Accord {
     /// nothing. That also gives the board a visible tell -- an Accord announced as ending is a turn
     /// of warning that something is coming.
     pub ending: bool,
+    /// Ticket #509 (version 0.1.0.0): the first turn of its current run of `accord_turns`: the turn
+    /// struck, the turn Terms were added, or the turn after its last run when renewed. A save from
+    /// before reads nought, and the turn struck stands in for it.
+    #[serde(default)]
+    pub since: u32,
 }
 
 impl Accord {
@@ -1658,6 +1687,9 @@ pub struct Game {
     pub accords: Vec<Accord>,
     /// Ticket #495 (version 0.09.9): the Accords offered and not yet answered.
     pub offers: Vec<Offer>,
+    /// Ticket #519 (version 0.1.0.0): Armies abroad that changed hands with their Region, and the
+    /// turn they did: a turn's grace from the rule that puts a rival's guest on Attack. In the save.
+    pub armies_inherited: Vec<(ArmyId, u32)>,
     /// Ticket #495: refusals remembered, so a refused Faction does not offer again at once.
     pub refusals: Vec<Refusal>,
     /// Ticket #345 (version 0.09.1): who was first to each Body, one row per Body at most,
@@ -1713,6 +1745,8 @@ impl Game {
             opening_met_turn: None,
             opening_run: 0,
             launch_site_owed: false,
+            second_met_turn: None,
+            second_leapfrogs: Vec::new(),
             archives_lost: 0,
             archive_fund_lost: 0,
             bought_units: 0,
@@ -1720,6 +1754,7 @@ impl Game {
             spaceport_influence: 0,
             first_windfall: 0,
             lead_windfall: 0,
+            allotment_parts: Vec::new(),
             uploaded: 0,
             stabilization_run: 0,
             influence: BTreeMap::new(),
@@ -1902,6 +1937,7 @@ impl Game {
             market: Market::default(),
             accords: Vec::new(),
             offers: Vec::new(),
+            armies_inherited: Vec::new(),
             refusals: Vec::new(),
             body_firsts: Vec::new(),
             waiting_last: Vec::new(),
@@ -2099,7 +2135,12 @@ impl Game {
     /// A multiplier Tech read for one seat: its full value once done, `1 + (value - 1) / 2` under
     /// Provisional Findings, and 1.0 (no effect) otherwise.
     pub fn tech_multiplier(&self, seat: Seat, t: TechId) -> f64 {
-        let v = self.tables.tech(t).value;
+        self.tech_multiplier_of(seat, t, self.tables.tech(t).value)
+    }
+
+    /// Ticket #505 (version 0.1.0.0): the shared body, for a Tech read with a figure other than its
+    /// `value` (Regolith Printing's Widgets).
+    fn tech_multiplier_of(&self, seat: Seat, t: TechId, v: f64) -> f64 {
         if self.has_tech(t) {
             v
         } else if self.reads_half(seat, t) {
@@ -2284,7 +2325,7 @@ impl Game {
 
     // ---------------------------------------------------------------- Ticket #51: Coach Class and the rest
 
-    /// Ticket #73: how many Emigrants this seat may muster in a turn (Coach Class doubles it).
+    /// Ticket #73: how many Emigrants this seat may muster in a turn (Coach Class raises it by half since ticket #513; doubled it before).
     /// Ticket #427 (version 0.09.5): in EACH state it directs.
     pub fn emigrants_per_turn(&self, seat: Seat) -> u32 {
         (self.tables.emigrants.per_turn as f64 * self.tables.faction(self.kind(seat)).emigrants_multiplier).floor() as u32
@@ -2320,7 +2361,7 @@ impl Game {
     }
 
     /// What one Colony Ship of this seat carries: the card figure, +2 with Expanded Habitats
-    /// (version 0.04 section 4), times the Faction's own multiplier (Coach Class doubles it).
+    /// (version 0.04 section 4), times the Faction's own multiplier (Coach Class's 1.5 since ticket #513, 2.0 before).
     pub fn colony_ship_capacity(&self, seat: Seat) -> u32 {
         // Ticket #84: Generation Ships stacks on Expanded Habitats.
         let base = self.tables.unit(UnitKind::ColonyShip).carries_colonists as i64 + self.tech_addition(seat, TechId::ExpandedHabitats) + self.tech_addition(seat, TechId::GenerationShips);
@@ -2592,7 +2633,7 @@ impl Game {
         }
     }
 
-    /// The population a lift from a Launch Site takes for this many Colonists (Coach Class doubles it).
+    /// The population a lift from a Launch Site takes for this many Colonists (Coach Class's 1.5 since ticket #513, 2.0 before).
     pub fn lift_population(&self, seat: Seat, colonists: u32) -> f64 {
         // Ticket #73: paid when the Emigrants muster, not when a Ship lifts them.
         self.tables.emigrants.population_each * colonists as f64 * self.tables.faction(self.kind(seat)).lift_population_multiplier
@@ -2798,8 +2839,27 @@ impl Game {
             1 => t.one_mine,
             _ => t.two_mines,
         };
-        let price = (row * faction * step).max(row * t.floor);
+        // Ticket #505 (version 0.1.0.0): Regolith Printing, off Earth, inside the same floor.
+        let price = (row * faction * step * self.regolith_multiplier(seat, colony)).max(row * t.floor);
         tenth(price)
+    }
+
+    /// Ticket #505 (version 0.1.0.0): what Regolith Printing does to a Module's price at this
+    /// Colony -- its `value` at a place off Earth (any Body but Earth, or any station), 1 on Earth.
+    fn regolith_multiplier(&self, seat: Seat, colony: ColonyId) -> f64 {
+        if self.colony(colony).is_some_and(|c| self.off_earth(c)) { self.tech_multiplier(seat, TechId::RegolithPrinting) } else { 1.0 }
+    }
+
+    /// Ticket #505 (version 0.1.0.0): a Module's Widgets at this Colony: `build_widgets`, and off
+    /// Earth Regolith Printing's own Widget figure on it, rounded down, never below 1.
+    pub fn module_widgets_at(&self, seat: Seat, colony: ColonyId, kind: ModuleKind) -> u32 {
+        let base = self.build_widgets(seat, BuildItem::Module(kind));
+        if !self.colony(colony).is_some_and(|c| self.off_earth(c)) {
+            return base;
+        }
+        let card = self.tables.tech(TechId::RegolithPrinting);
+        let m = self.tech_multiplier_of(seat, TechId::RegolithPrinting, card.widgets_multiplier.unwrap_or(card.value));
+        ((base as f64 * m).floor() as u32).max(1)
     }
 
     /// Ticket #72 (version 0.05.5): what a Facility costs this seat in Materials: the row's figure
@@ -3341,8 +3401,90 @@ impl Game {
     }
 
     /// Ticket #490 (version 0.09.9): the tier above it, or None at the top.
+    /// Ticket #503 (version 0.1.0.0): a station's top is the last tier it may climb to.
     pub fn next_tier(&self, c: &Colony) -> Option<&crate::data::TierCard> {
-        self.tables.tiers.get(c.tier as usize + 1)
+        self.tables.tiers.get(c.tier as usize + 1).filter(|t| !(c.in_orbit && t.ground_only))
+    }
+
+    /// Ticket #503 (version 0.1.0.0): the tier above it, if it may still be reached: never the
+    /// Colonial Capital where another Colony on its Body already holds it. What "full: upgrade"
+    /// promises.
+    pub fn open_tier(&self, c: &Colony) -> Option<&crate::data::TierCard> {
+        self.next_tier(c).filter(|t| !(t.one_per_body && self.capital_of(c.body).is_some_and(|h| h != c.id)))
+    }
+
+    /// Ticket #514 (version 0.1.0.0): what one more Habitat at this Colony would hold for whoever
+    /// controls it -- the figure `habitat_room` counts each by.
+    pub fn habitat_holds(&self, c: &Colony) -> u32 {
+        let seat = c.control.controller();
+        let per = self.tables.module(ModuleKind::Habitat).holds_colonists as i64 + seat.map(|s| self.habitat_addition(s, TechId::ExpandedHabitats)).unwrap_or(0);
+        let faction = seat.map(|s| self.tables.faction(self.kind(s)).habitat_capacity_multiplier).unwrap_or(1.0);
+        (per.max(0) as f64 * faction).floor() as u32
+    }
+
+    /// Ticket #514: the Module slots a ground Colony off Earth must keep for Habitats -- the ones
+    /// still wanted to house the people its next tier asks for, less any already on order -- so a
+    /// place does not fill every slot with producers while it holds four and can never grow. The
+    /// designer: "give the ais an understanding of the necessity to reserve spots for habitats".
+    /// Nothing for a station, for Antarctica, or for a place at its last tier -- a Colony whose Body
+    /// already has another's Capital among them (`open_tier`), since it can rise no further -- so
+    /// nobody keeps room for the Moon's Capital once the Moon has one. And once the seat holds a
+    /// Capital, its places keep room only where the next step IS a Capital, on a Body without one
+    /// (a second Capital is never precluded), and not for the lower tiers; the designer: "once a
+    /// colonial capital is raised the rest of the colonies are not still reserving spaces ... so
+    /// long as it does not preclude them raising a second capital on another body".
+    pub fn habitats_to_reserve(&self, c: &Colony) -> u32 {
+        if c.in_orbit || c.body == BodyId::Earth {
+            return 0;
+        }
+        let Some(next) = self.open_tier(c) else { return 0 };
+        if !next.one_per_body && c.control.controller().is_some_and(|s| self.capital_held(s)) {
+            return 0;
+        }
+        let wanted = next.colonists.saturating_sub(self.habitat_room(c));
+        let holds = self.habitat_holds(c).max(1);
+        let needed = wanted.div_ceil(holds);
+        let on_order = c.queue.iter().filter(|b| b.item == BuildItem::Module(ModuleKind::Habitat)).count() as u32;
+        needed.saturating_sub(on_order)
+    }
+
+    /// Ticket #514 (version 0.1.0.0): whether this seat holds a Colonial Capital: one standing at a
+    /// Colony it CONTROLS (an Occupied one counts for neither side), off Earth. What the Arkwrights'
+    /// win waits on.
+    pub fn capital_held(&self, seat: Seat) -> bool {
+        self.colonies.iter().any(|c| c.control == Control::Controlled(seat) && !c.in_orbit && c.body != BodyId::Earth && self.tier_of(c).one_per_body)
+    }
+
+    /// Ticket #514: the Colony a seat chasing a Capital should raise -- its most peopled ground
+    /// Colony off Earth on a Body that has no Capital yet, ties to the lower id. None while it
+    /// holds a Capital already, or has no such Colony.
+    pub fn capital_candidate(&self, seat: Seat) -> Option<ColonyId> {
+        if self.capital_held(seat) {
+            return None;
+        }
+        self.colonies
+            .iter()
+            .filter(|c| c.control.director() == Some(seat) && !c.in_orbit && c.body != BodyId::Earth && self.capital_of(c.body).is_none())
+            .max_by_key(|c| (c.colonists, std::cmp::Reverse(c.id.0)))
+            .map(|c| c.id)
+    }
+
+    /// Ticket #503 (version 0.1.0.0): the Colony that is this Body's Colonial Capital, if one has
+    /// been raised. A Colony is never removed from the board, so once raised it is there for good.
+    pub fn capital_of(&self, body: BodyId) -> Option<ColonyId> {
+        self.colonies.iter().find(|c| c.body == body && !c.in_orbit && self.tier_of(c).one_per_body).map(|c| c.id)
+    }
+
+    /// Ticket #503: "Plato", the Capital's own place name without its Body, for the hover that
+    /// says where it stands.
+    pub fn slot_name(&self, c: &Colony) -> String {
+        self.tables.body(c.body).slots[c.slot as usize].name.clone()
+    }
+
+    /// Ticket #503: the Influence a seat's places pay for their tier, whoever raised them: today
+    /// the Colonial Capital's +1, to its holder.
+    pub fn tier_allotment(&self, seat: Seat) -> i64 {
+        self.colonies.iter().filter(|c| self.directs(seat, Place::Colony(c.id))).map(|c| self.tier_of(c).influence).sum()
     }
 
     /// Ticket #97: the Modules standing or building here that count against the cap. A mothballed
@@ -3871,7 +4013,56 @@ impl Game {
         // Ticket #358 (version 0.09.1): and the Chorus's per-Colonist point, outside the
         // multiplier on the Spaceport's argument, at the designer's word.
         let outside: i64 = self.module_allotments(seat).iter().map(|y| y.1).sum();
-        (base as f64 * m).floor() as i64 + outside + self.seat(seat).spaceport_influence + self.seat(seat).first_windfall + self.seat(seat).lead_windfall + firsts * t.first_settled_allotment
+        // Ticket #503 (version 0.1.0.0): and a Colonial Capital's +1, at face value as the first's,
+        // and to whoever holds it now, not to whoever raised it.
+        let tiers = self.tier_allotment(seat);
+        (base as f64 * m).floor() as i64 + outside + tiers + self.seat(seat).spaceport_influence + self.seat(seat).first_windfall + self.seat(seat).lead_windfall + firsts * t.first_settled_allotment
+    }
+
+    /// Ticket #522 (version 0.1.0.0): `influence_allotment` in its named parts, the zero ones left
+    /// out. The two must move together: the test sums these against the Allotment.
+    pub fn influence_allotment_parts(&self, seat: Seat) -> Vec<(String, i64)> {
+        let t = &self.tables.influence;
+        let states: i64 = self.controlled_states(seat).iter().map(|s| self.state_influence_value(*s)).sum();
+        let base = t.allotment_base + states + self.building_allotment(seat);
+        let m = self.tables.faction(self.kind(seat)).influence_multiplier;
+        let firsts: i64 = self.body_firsts.iter().filter(|f| f.seat == seat && self.directs(seat, Place::Colony(f.colony))).count() as i64;
+        let s = self.seat(seat);
+        // The windfall names the worlds just reached: a first claimed in the turn this Income closes.
+        let just: Vec<String> = self
+            .body_firsts
+            .iter()
+            .filter(|f| f.seat == seat && self.colony(f.colony).is_some_and(|c| c.founded_turn + 1 >= self.turn))
+            .map(|f| self.tables.body(f.body).name.clone())
+            .collect();
+        let first = if just.is_empty() { "First to settle".to_string() } else { format!("First to settle {}", just.join(" and ")) };
+        [
+            ("Regions and buildings".to_string(), (base as f64 * m).floor() as i64),
+            ("Chorus".to_string(), self.module_allotments(seat).iter().map(|y| y.1).sum()),
+            ("Colonial Capital".to_string(), self.tier_allotment(seat)),
+            ("Worlds settled first".to_string(), firsts * t.first_settled_allotment),
+            ("Spaceport lifts".to_string(), s.spaceport_influence),
+            (first, s.first_windfall),
+            ("Tech lead".to_string(), s.lead_windfall),
+        ]
+        .into_iter()
+        .filter(|p| p.1 != 0)
+        .collect()
+    }
+
+    /// Ticket #522: a windfall paid into the Allotment after the Income set it, named beside the rest.
+    pub fn add_allotment_part(&mut self, seat: Seat, label: &str, n: i64) {
+        let parts = &mut self.seat_mut(seat).allotment_parts;
+        match parts.iter_mut().find(|p| p.0 == label) {
+            Some(p) => p.1 += n,
+            None => parts.push((label.to_string(), n)),
+        }
+    }
+
+    /// Ticket #522 (version 0.1.0.0): where this turn's Allotment came from, a line a part, the first
+    /// bare and the rest signed -- *"Regions and buildings 14"*, *"Spaceport lifts +9"*. Six at most.
+    pub fn allotment_lines(&self, seat: Seat) -> Vec<String> {
+        self.seat(seat).allotment_parts.iter().take(6).enumerate().map(|(i, (label, n))| if i == 0 { format!("{label} {n}") } else { format!("{label} {n:+}") }).collect()
     }
 
     /// Ticket #345 (version 0.09.1): which seat was first to a Body, and at which Colony.
@@ -4512,7 +4703,7 @@ impl Game {
         let (turns, delta_v) = self.journey_delta_v(from, to);
         let fuel = crate::data::leg_fuel(delta_v, self.tables.fuel_per_delta_v);
         let (turns, fuel) = match self.crossing_ports(from, to, turn) {
-            None => (turns, fuel),
+            None => (self.gulf_turns(from, to, days_factor).unwrap_or(turns), fuel),
             Some((offset, tr)) => {
                 let days = (tr.days_at_window + tr.days_per_degree * offset.abs()) * days_factor;
                 let turns = ((days / tr.days_per_turn).ceil() as u32).clamp(1, tr.max_turns);
@@ -4547,7 +4738,21 @@ impl Game {
             // A far orbit is already out of every gravity well: nothing to leave, nothing to stop in.
             Port::Far(..) => (0.0, 0.0),
         };
-        (1, ends(from).0 + t.gulf(self.system_of_port(from), self.system_of_port(to)) + ends(to).1)
+        let (a, b) = (self.system_of_port(from), self.system_of_port(to));
+        (self.gulf_turns(from, to, 1.0).unwrap_or(1), ends(from).0 + t.gulf(a, b) + ends(to).1)
+    }
+
+    /// Ticket #502 (version 0.1.0.0): the turns a crossing between two systems takes by its gulf's
+    /// own `days`, where it has no window: the days times Nuclear Rockets' factor, made turns of
+    /// sixty and rounded up, as a window's flight is. `None` inside a system or for a gulf crossed
+    /// in a turn.
+    fn gulf_turns(&self, from: Port, to: Port, days_factor: f64) -> Option<u32> {
+        let (a, b) = (self.system_of_port(from), self.system_of_port(to));
+        if a == b {
+            return None;
+        }
+        let days = self.tables.gulf_card(a, b)?.days?;
+        Some(((days * days_factor / self.tables.transit.days_per_turn).ceil() as u32).max(1))
     }
 
     /// Ticket #486: the end of a journey an orbit of a Body is: the Body, or the far orbit itself.
@@ -4565,6 +4770,9 @@ impl Game {
             Port::Body(BodyId::Earth | BodyId::Moon) => System::Earth,
             Port::Body(BodyId::Mars | BodyId::Phobos | BodyId::Deimos) => System::Mars,
             Port::Body(BodyId::Venus) => System::Venus,
+            Port::Body(BodyId::Mercury) => System::Mercury,
+            Port::Body(BodyId::Ceres) => System::Ceres,
+            Port::Body(BodyId::Vesta) => System::Vesta,
         }
     }
 
@@ -4612,6 +4820,18 @@ impl Game {
     /// (0..360, J2000 frame). The Moon reads Earth's, Phobos and Deimos read Mars's.
     pub fn heliocentric_longitude(&self, body: BodyId, turn: u32) -> f64 {
         crate::ephemeris::position(self.tables.planet(body), self.julian_day(turn)).longitude
+    }
+
+    /// Ticket #512 (version 0.1.0.0): how far above or below the ecliptic a Body stands at a turn,
+    /// degrees, north positive; a satellite reads its parent's.
+    pub fn heliocentric_latitude(&self, body: BodyId, turn: u32) -> f64 {
+        crate::ephemeris::position(self.tables.planet(body), self.julian_day(turn)).latitude
+    }
+
+    /// Ticket #512: the plane a Body's orbit lies in at a turn, (inclination, ascending node) in
+    /// degrees; a satellite reads its parent's.
+    pub fn orbital_plane(&self, body: BodyId, turn: u32) -> (f64, f64) {
+        crate::ephemeris::orbital_plane(self.tables.planet(body), self.julian_day(turn))
     }
 
     /// The phase angle at a turn: Mars's heliocentric longitude less Earth's, folded to -180..180.
@@ -4668,15 +4888,6 @@ impl Game {
         self.crossing(from, to, turn).map(|(offset, _)| offset)
     }
 
-    /// Which system a Body belongs to: 0 the Earth system, 1 the Mars system, 2 Venus (ticket #93).
-    pub fn system_of(body: BodyId) -> u8 {
-        match body {
-            BodyId::Earth | BodyId::Moon => 0,
-            BodyId::Mars | BodyId::Phobos | BodyId::Deimos => 1,
-            BodyId::Venus => 2,
-        }
-    }
-
     /// Ticket #93: whether a leg runs between two Bodies at all. Ticket #486 (version 0.09.8):
     /// every one does; the leg between Venus and the Mars system, refused until now, is flown.
     pub fn leg_allowed(_from: BodyId, _to: BodyId) -> bool {
@@ -4706,67 +4917,90 @@ impl Game {
             (System::Venus, b) if near(b) => (&t.transit_venus, false),
             (System::Venus, System::Mars) => (&t.transit_venus_mars, true),
             (System::Mars, System::Venus) => (&t.transit_venus_mars, false),
-            _ => return None,
+            // Ticket #502 (version 0.1.0.0): the new worlds' crossings are rows of their own, a far
+            // orbit reading Earth's; a pair with no row has no window.
+            (a, b) => {
+                let key = |s: System| if near(s) { "earth" } else { s.key() };
+                t.crossing_table(key(a), key(b))?
+            }
         };
         let (home, away, angle) = if out { (from, to, table.hohmann_angle) } else { (to, from, table.return_hohmann_angle) };
-        Some((self.span_offset_ports(home, away, turn, angle), table))
+        // Ticket #502 (version 0.1.0.0): a point every `window_sample_degrees` the phase angle moves in a turn.
+        let sweep = 360.0 * table.days_per_turn / table.synodic_days;
+        let steps = ((sweep / t.window_sample_degrees).ceil() as u32).max(1);
+        Some((self.span_offset_ports(home, away, turn, angle, steps), table))
     }
 
     /// Ticket #486: where an end of a journey stands in the sky: its Body's heliocentric longitude
     /// (a satellite reads its planet's), and a far orbit its Body's sixty degrees ahead (the first,
     /// L4) or behind (the second, L5).
     pub fn port_longitude(&self, p: Port, turn: u32) -> f64 {
+        self.port_longitude_at(p, self.julian_day(turn))
+    }
+
+    /// Ticket #502 (version 0.1.0.0): the same at any instant.
+    fn port_longitude_at(&self, p: Port, jd: f64) -> f64 {
+        let lon = |b: BodyId| crate::ephemeris::position(self.tables.planet(b), jd).longitude;
         match p {
-            Port::Body(b) => self.heliocentric_longitude(b, turn),
+            Port::Body(b) => lon(b),
             Port::Far(b, n) => {
                 let card = self.tables.body(b);
                 let k = n.saturating_sub(card.orbital_slots.saturating_sub(card.far_slots));
-                self.heliocentric_longitude(b, turn) + if k.is_multiple_of(2) { 60.0 } else { -60.0 }
+                lon(b) + if k.is_multiple_of(2) { 60.0 } else { -60.0 }
             }
         }
     }
 
     /// Ticket #486: `span_offset_of` between any two ends: the nearest the phase angle, away's
     /// longitude less home's, comes to `angle` anywhere in the turn.
-    fn span_offset_ports(&self, home: Port, away: Port, turn: u32, angle: f64) -> f64 {
-        let phase = |t: u32| crate::ephemeris::wrap_180(self.port_longitude(away, t) - self.port_longitude(home, t));
-        let start = crate::ephemeris::wrap_180(phase(turn) - angle);
-        let end = crate::ephemeris::wrap_180(phase(turn + 1) - angle);
-        if start.signum() != end.signum() && (start - end).abs() < 90.0 {
-            0.0
-        } else if start.abs() <= end.abs() {
-            start
-        } else {
-            end
+    ///
+    /// Ticket #502 (version 0.1.0.0): Mercury laps Earth in under two turns, so its phase angle
+    /// sweeps more than half the circle inside one; the turn is read at `steps` points along
+    /// it, each pair of neighbours as the two ends were, so a window passed between them is found.
+    /// A slow crossing reads its two ends alone, as before.
+    fn span_offset_ports(&self, home: Port, away: Port, turn: u32, angle: f64, steps: u32) -> f64 {
+        let (j0, j1) = (self.julian_day(turn), self.julian_day(turn + 1));
+        let off = |k: u32| {
+            let jd = j0 + (j1 - j0) * k as f64 / steps as f64;
+            crate::ephemeris::wrap_180(self.port_longitude_at(away, jd) - self.port_longitude_at(home, jd) - angle)
+        };
+        let mut best = off(0);
+        let mut prev = best;
+        for k in 1..=steps {
+            let next = off(k);
+            if prev.signum() != next.signum() && (prev - next).abs() < 90.0 {
+                return 0.0;
+            }
+            if next.abs() < best.abs() {
+                best = next;
+            }
+            prev = next;
         }
-    }
-
-    /// Ticket #93: the turn Venus's window falls on, looked for from `from` forward over one of its
-    /// synodic cycles.
-    pub fn next_venus_window_turn(&self, from: u32) -> u32 {
-        let tr = &self.tables.transit_venus;
-        let cycle = (tr.synodic_days / tr.days_per_turn).ceil() as u32;
-        let from = from.max(1);
-        let off = |t: u32| self.span_offset_of(BodyId::Venus, t, tr.hohmann_angle).abs();
-        (from..=from + cycle).min_by(|a, b| off(*a).partial_cmp(&off(*b)).unwrap_or(std::cmp::Ordering::Equal)).unwrap_or(from)
+        best
     }
 
     /// The turn the Mars window falls on, looked for from `from` forward over one synodic cycle:
-    /// the turn whose window offset is smallest in magnitude.
+    /// the turn whose window offset is smallest in magnitude. Ticket #502 (version 0.1.0.0): the
+    /// one search every Body's window uses, `next_window_turn_to`, which also replaced Venus's own.
     pub fn next_window_turn(&self, from: u32) -> u32 {
-        let tr = &self.tables.transit;
-        let cycle = (tr.synodic_days / tr.days_per_turn).ceil() as u32;
-        let from = from.max(1);
-        (from..=from + cycle)
-            .min_by(|a, b| self.window_offset(*a).abs().partial_cmp(&self.window_offset(*b).abs()).unwrap_or(std::cmp::Ordering::Equal))
-            .unwrap_or(from)
+        self.next_window_turn_to(BodyId::Mars, from)
     }
 
-    /// The tooltip the Solar System Map shows over Mars, Phobos or Deimos (ticket #57).
+    /// Ticket #502 (version 0.1.0.0): the turn the window from Earth to any Body falls on, looked
+    /// for from `from` forward over one cycle of its crossing; `from` itself for a Body with none.
+    pub fn next_window_turn_to(&self, body: BodyId, from: u32) -> u32 {
+        let from = from.max(1);
+        let Some((_, tr)) = self.crossing(BodyId::Earth, body, from) else { return from };
+        let cycle = (tr.synodic_days / tr.days_per_turn).ceil() as u32;
+        let off = |t: u32| self.crossing_offset(BodyId::Earth, body, t).unwrap_or(0.0).abs();
+        (from..=from + cycle).min_by(|a, b| off(*a).partial_cmp(&off(*b)).unwrap_or(std::cmp::Ordering::Equal)).unwrap_or(from)
+    }
+
+    /// The tooltip the Solar System Map shows over a Body across a gulf (ticket #57).
     pub fn window_text(&self, body: BodyId) -> String {
         let name = self.tables.body(body).name.clone();
-        // Ticket #93: Venus has a window of its own.
-        let window = if body == BodyId::Venus { self.next_venus_window_turn(self.turn) } else { self.next_window_turn(self.turn) };
+        // Ticket #93: Venus has a window of its own; ticket #502, every Body its own.
+        let window = self.next_window_turn_to(body, self.turn);
         let (now_turns, now_fuel) = self.transit_cost_at(BodyId::Earth, body, self.turn);
         let (win_turns, win_fuel) = self.transit_cost_at(BodyId::Earth, body, window);
         let when = match window.saturating_sub(self.turn) {
@@ -4928,6 +5162,8 @@ impl Game {
     pub fn build_widgets_at(&self, seat: Seat, place: Place, item: BuildItem) -> u32 {
         match (item, place) {
             (BuildItem::IndustryLevel, Place::State(sid)) => self.industry_widgets(seat, sid),
+            // Ticket #505 (version 0.1.0.0): a Module's are its Colony's, Regolith Printing read.
+            (BuildItem::Module(k), Place::Colony(c)) => self.module_widgets_at(seat, c, k),
             _ => self.build_widgets(seat, item),
         }
     }
@@ -5278,8 +5514,67 @@ impl Game {
             return Err("a research agreement wants Friendly on both sides".into());
         }
         let turn = self.turn;
-        self.accords.push(Accord { a, b, terms, struck: turn, paid: turn, ending: false });
+        self.accords.push(Accord { a, b, terms, struck: turn, paid: turn, ending: false, since: turn });
         Ok(())
+    }
+
+    /// Ticket #509 (version 0.1.0.0): the turns an Accord has left, this one counted: five on the turn
+    /// it is struck, one in its last.
+    pub fn accord_turns_left(&self, acc: &Accord) -> u32 {
+        (acc.since.max(acc.struck) + self.tables.relations.accord_turns).saturating_sub(self.turn)
+    }
+
+    /// Ticket #509: the Terms a renewal carries: all of them, but a research agreement only while
+    /// both sides are still Friendly, a renewal being a fresh agreement.
+    pub fn renewal_terms(&self, acc: &Accord) -> Vec<Term> {
+        let friendly = self.relations_score(acc.a, acc.b) >= 7 && self.relations_score(acc.b, acc.a) >= 7;
+        acc.terms.iter().copied().filter(|t| *t != Term::ResearchAgreement || friendly).collect()
+    }
+
+    /// Ticket #509 (version 0.1.0.0): the head of an Accord's last turn. A computer seat renews where
+    /// it would accept the same Terms afresh; one that will not lets it lapse, and a human seat with
+    /// it reads so in the Report. Two computer seats both willing renew it at once. A human seat is
+    /// not prompted -- the designer, after the build: the prompt read as a new offer -- the Accord
+    /// stands renewable through its last turn, and the player's own Renew order is the acceptance.
+    pub fn ask_renewals(&mut self) {
+        let last: Vec<(Seat, Seat)> = self.accords.iter().filter(|acc| !acc.ending && self.accord_turns_left(acc) == 1).map(|acc| (acc.a, acc.b)).collect();
+        for (a, b) in last {
+            let (yes_a, yes_b) = (self.renewal_willing(a, b), self.renewal_willing(b, a));
+            if !(yes_a && yes_b) {
+                self.log(format!("{} let the Accord with {} lapse.", self.seat_name(if yes_a { b } else { a }), self.seat_name(if yes_a { a } else { b })));
+                for (me, other, theirs) in [(a, b, yes_b), (b, a, yes_a)] {
+                    if !self.seat(me).ai && !theirs {
+                        let text = self.say("accord_let_lapse", &[("faction", self.seat_name(other))]);
+                        self.report_line_of(me, LineKind::YourWorks, LineKind::Note, None, text);
+                    }
+                }
+            } else if self.seat(a).ai && self.seat(b).ai {
+                self.renew_accord(a, b);
+            }
+        }
+    }
+
+    /// Ticket #509 (version 0.1.0.0): whether `seat` would renew its Accord with `other` -- a human
+    /// seat by its own order, a computer seat where it would accept the same Terms afresh.
+    pub fn renewal_willing(&self, seat: Seat, other: Seat) -> bool {
+        if !self.seat(seat).ai {
+            return true;
+        }
+        let Some(acc) = self.accords.iter().find(|acc| acc.holds(seat, other)) else { return false };
+        let terms = self.renewal_terms(acc);
+        !terms.is_empty() && self.accord_acceptable(seat, other, &terms)
+    }
+
+    /// Ticket #509: an Accord in its last turn runs five more from the end of this run, with the
+    /// Terms a renewal carries.
+    pub fn renew_accord(&mut self, a: Seat, b: Seat) {
+        let run = self.tables.relations.accord_turns;
+        let Some(terms) = self.accords.iter().find(|acc| acc.holds(a, b)).filter(|acc| self.accord_turns_left(acc) == 1).map(|acc| self.renewal_terms(acc)) else { return };
+        if let Some(acc) = self.accords.iter_mut().find(|acc| acc.holds(a, b)) {
+            acc.terms = terms;
+            acc.since = acc.since.max(acc.struck) + run;
+        }
+        self.log(format!("{} and {} renewed their Accord.", self.seat_name(a), self.seat_name(b)));
     }
 
     /// Ticket #495 (version 0.09.9): the offers waiting on `seat`'s answer, with their index.
@@ -5437,8 +5732,12 @@ impl Game {
                 None => Ok(()),
             };
         }
+        // Ticket #509 (version 0.1.0.0): a renewal or an addition wants the Accord still standing.
+        if accept && offer.ask != AccordAsk::New && !self.accords.iter().any(|a| a.holds(offer.from, offer.to)) {
+            return Err(format!("your Accord with {} is over", self.seat_name(offer.from)));
+        }
         // Ticket #495 (the review): a yes that can no longer be struck says why.
-        if accept && self.accords.iter().any(|a| a.holds(offer.from, offer.to)) {
+        if accept && offer.ask == AccordAsk::New && self.accords.iter().any(|a| a.holds(offer.from, offer.to)) {
             return Err(format!("you already hold an Accord with {}", self.seat_name(offer.from)));
         }
         if accept && offer.terms.contains(&Term::ResearchAgreement) && (self.relations_score(offer.from, offer.to) < 7 || self.relations_score(offer.to, offer.from) < 7) {
@@ -5454,6 +5753,11 @@ impl Game {
     pub fn answer_computer_offers(&mut self) {
         let turn = self.turn;
         self.refusals.retain(|r| turn < r.until);
+        // Ticket #509 (the review): Terms offered to an Accord that has since lapsed are moot.
+        let accords = &self.accords;
+        self.offers.retain(|o| o.ask != AccordAsk::Add || accords.iter().any(|a| a.holds(o.from, o.to)));
+        // Ticket #518 (version 0.1.0.0): and a new Accord offered to a pair that holds one already.
+        self.offers.retain(|o| o.trade.is_some() || o.ask != AccordAsk::New || !accords.iter().any(|a| a.holds(o.from, o.to)));
         let mut waiting = Vec::new();
         for offer in std::mem::take(&mut self.offers) {
             if self.seat(offer.to).ai && offer.turn < turn {
@@ -5478,12 +5782,60 @@ impl Game {
             self.settle_trade(from, to, give, get, yes);
             return;
         }
+        // Ticket #509 (version 0.1.0.0): a renewal runs the Accord another five turns from the end of
+        // this run; letting it lapse is no refusal and is not remembered.
+        // The review: it renews the Terms the Accord holds when answered, so Terms added the same turn
+        // are kept; and one an addition has already restarted needs no renewal.
+        if offer.ask == AccordAsk::Renew {
+            let run = self.tables.relations.accord_turns;
+            let renew = self.accords.iter().find(|acc| acc.holds(from, to)).filter(|_| yes).map(|acc| (self.renewal_terms(acc), self.accord_turns_left(acc) == 1));
+            match renew {
+                Some((terms, last)) => {
+                    if let Some(acc) = self.accords.iter_mut().find(|acc| acc.holds(from, to))
+                        && last
+                    {
+                        acc.terms = terms;
+                        acc.since = acc.since.max(acc.struck) + run;
+                    }
+                    self.log(format!("{} and {} renewed their Accord.", self.seat_name(from), self.seat_name(to)));
+                }
+                None => self.log(format!("{} let the Accord with {} lapse.", self.seat_name(to), self.seat_name(from))),
+            }
+            return;
+        }
+        // Ticket #509: Terms added to the Accord that stands, which starts five turns afresh. A no is
+        // remembered as an offer's is.
+        if offer.ask == AccordAsk::Add && yes {
+            let friendly = self.relations_score(from, to) >= 7 && self.relations_score(to, from) >= 7;
+            let turn = self.turn;
+            let Some(acc) = self.accords.iter_mut().find(|acc| acc.holds(from, to)) else {
+                self.log(format!("Terms offered to the Accord between {} and {} lapsed: it is over.", self.seat_name(from), self.seat_name(to)));
+                return;
+            };
+            for t in offer.terms {
+                if !acc.terms.contains(&t) && (t != Term::ResearchAgreement || friendly) {
+                    acc.terms.push(t);
+                }
+            }
+            // The review: five turns from now, or the renewal already given if that runs longer.
+            acc.since = acc.since.max(acc.struck).max(turn);
+            self.log(format!("{} and {} added to their Accord.", self.seat_name(from), self.seat_name(to)));
+            for (me, other) in [(from, to), (to, from)] {
+                if !self.seat(me).ai {
+                    let text = self.say("accord_added", &[("faction", self.seat_name(other))]);
+                    self.report_line_of(me, LineKind::YourWorks, LineKind::Note, None, text);
+                }
+            }
+            return;
+        }
         if yes {
             match self.strike_accord(from, to, offer.terms) {
                 Ok(()) => {
                     self.log(format!("{} and {} struck an Accord.", self.seat_name(from), self.seat_name(to)));
-                    // Ticket #495 (the review): one Accord a pair, so any other offer between them is moot.
-                    self.offers.retain(|o| !((o.from == from && o.to == to) || (o.from == to && o.to == from)));
+                    // Ticket #495 (the review): one Accord a pair, so any other ACCORD offer between them
+                    // is moot. Ticket #518 (version 0.1.0.0): a Trade offer is not, and sweeping it too
+                    // left the turn owing a Trade the player was then told did not exist.
+                    self.offers.retain(|o| o.trade.is_some() || !((o.from == from && o.to == to) || (o.from == to && o.to == from)));
                     for (me, other) in [(from, to), (to, from)] {
                         if !self.seat(me).ai {
                             let text = self.say("accord_struck", &[("faction", self.seat_name(other))]);
@@ -5523,6 +5875,14 @@ impl Game {
         self.offend_by(breaker, other, 3);
         let text = format!("{} broke their Accord with {}.", self.seat_name(breaker), self.seat_name(other));
         self.log(text);
+        // Ticket #517 (version 0.1.0.0): and each player in it is told, where the break was only in
+        // the log and read as an Accord that was never struck.
+        for (me, them, key) in [(breaker, other, "accord_you_broke"), (other, breaker, "accord_broken")] {
+            if !self.seat(me).ai {
+                let text = self.say(key, &[("faction", self.seat_name(them))]);
+                self.report_line_of(me, LineKind::YourWorks, LineKind::Note, None, text);
+            }
+        }
     }
 
     /// Ticket #226 (version 0.08.2): run once a turn, beside the Relations settle.
@@ -5539,10 +5899,13 @@ impl Game {
             self.log(format!("The Accord between {} and {} has lapsed.", self.seat_name(a), self.seat_name(b)));
         }
         self.accords.retain(|a| !a.ending);
+        // Ticket #509 (version 0.1.0.0): kept for `period` turns, the turn struck counted, it pays at
+        // the end of the last of them -- an Accord's five turns paying once -- before a run's end
+        // lapses it.
         let mut paid: Vec<(Seat, Seat)> = Vec::new();
         for acc in self.accords.iter_mut() {
-            if period > 0 && turn.saturating_sub(acc.paid) >= period {
-                acc.paid = turn;
+            if period > 0 && (turn + 1).saturating_sub(acc.paid) >= period {
+                acc.paid = turn + 1;
                 paid.push((acc.a, acc.b));
             }
         }
@@ -5558,6 +5921,13 @@ impl Game {
             }
             self.log(format!("The Accord between {} and {} has held.", self.seat_name(a), self.seat_name(b)));
         }
+        // Ticket #509: the end of an Accord's last turn, not renewed.
+        let ended: Vec<(Seat, Seat)> = self.accords.iter().filter(|acc| self.accord_turns_left(acc) <= 1).map(|acc| (acc.a, acc.b)).collect();
+        for (a, b) in ended {
+            self.log(format!("The Accord between {} and {} has run its course.", self.seat_name(a), self.seat_name(b)));
+        }
+        let run = self.tables.relations.accord_turns;
+        self.accords.retain(|acc| (acc.since.max(acc.struck) + run).saturating_sub(turn) > 1);
     }
 
     /// Ticket #226 (version 0.08.2): would `seat` accept this offer from `from`?

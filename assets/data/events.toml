@@ -1,5 +1,6 @@
 # Spec section 13, amended by ticket #25 (version 0.02) and #32 (0.03): no Calm Cards. Ticket #76
-# (version 0.05.5): the deck holds FORTY cards for a thirty-six-turn game. Each turn from
+# (version 0.05.5): the deck holds FORTY cards for a thirty-six-turn game (ticket #506, version 0.1.0.0:
+# forty-three for a fifty-turn one). Each turn from
 # first_draw_turn (ticket #367, version 0.09.2: turn 2, never the first) a card is drawn with
 # draw_chance_base at +1.2 C, rising by draw_chance_per_step for every full
 # draw_chance_step_degrees above it (50% at +1.2, 72.5% at +3.0). The deck is never reshuffled.
@@ -52,7 +53,8 @@ storm_surge_coastal_multiplier = 0.7
 # 12". Measured before the change over five headless games: about 20 cards drawn a game and 4 of
 # them found nowhere to land, chiefly these seven, each spent for the game -- the deck is never
 # reshuffled. The median first Colony is founded on turn 10.
-off_earth_join_turn = 12
+# Ticket #506 (version 0.1.0.0): turn 15, from 12, with the game at fifty turns.
+off_earth_join_turn = 15
 # Ticket #367 (version 0.09.2): no card of either kind on the first turn, at the designer's word
 # ("do not draw an event card on first turn"). The deck is not touched before this turn, so the
 # card on top simply waits for the first roll; nothing is lost. Before this a card came on turn 1
@@ -666,3 +668,85 @@ army = true
 [[event.choice.refuse_does]]
 effect = "unrest_at_most_populous"
 unrest = 1.0
+
+# Ticket #506 (version 0.1.0.0): three more Choice Cards, at the designer's word ("lets add three
+# cards with a choice") with the game at fifty turns, built from effects the deck already has.
+# Appended last with their enum variants, as every card since #337 has been: 43 cards, 21 asking.
+
+# Carbon Levy: money and a little less carbon, at a little Unrest; refuse and the greens sour.
+[[event]]
+id = "carbon_levy"
+name = "Carbon Levy"
+kind = "choice"
+target = "seat"
+effect = "Levy a carbon tax on your Regions, or let it drop"
+copies = 1
+[event.choice]
+question = "Your Regions would tax carbon: 20 Ducats and a ppm less next turn, for half a point of Unrest. Levy it?"
+take = "Levy it"
+refuse = "Let it drop"
+take_when = { rule = "unrest_below", unrest = 3.0 }
+[[event.choice.take_does]]
+effect = "resources"
+ducats = 20
+[[event.choice.take_does]]
+effect = "emissions_next"
+ppm = -1.0
+[[event.choice.take_does]]
+effect = "unrest_all_held"
+unrest = 0.5
+[[event.choice.refuse_does]]
+effect = "standing_all_held"
+standing = -3
+
+# Deep Core Survey: pay for a seam under a Colony of yours; refusing costs nothing.
+[[event]]
+id = "deep_core_survey"
+name = "Deep Core Survey"
+kind = "choice"
+target = "seat"
+effect = "Fund a survey under a Colony of yours, or save the Ducats"
+copies = 1
+[event.choice]
+question = "Surveyors offer to probe for a seam under a Colony of yours, for 30 Ducats: its Mines x1.5 for four turns. Fund it?"
+take = "Fund it"
+refuse = "Save the Ducats"
+take_when = { rule = "ducats_at_least", ducats = 60 }
+[[event.choice.take_does]]
+effect = "resources"
+ducats = -30
+[[event.choice.take_does]]
+effect = "discovery_at_colony"
+module = "mine"
+multiplier = 1.5
+turns = 4
+
+# Trade Pact: warmer Relations and cheaper Materials for a turn's slower Factories; refuse and
+# every rival cools a little.
+[[event]]
+id = "trade_pact"
+name = "Trade Pact"
+kind = "choice"
+target = "seat"
+effect = "Join the other Factions' trade pact, or stay out"
+copies = 1
+[event.choice]
+question = "The other Factions propose a trade pact: Relations +2 with each and Materials a Ducat cheaper for two turns, but your Factories make x0.8 at the next Income. Join?"
+take = "Join the pact"
+refuse = "Stay out"
+take_when = { rule = "always" }
+[[event.choice.take_does]]
+effect = "relations_all_rivals"
+relations = 2
+[[event.choice.take_does]]
+effect = "trade_price"
+resource = "materials"
+by = -1
+turns = 2
+[[event.choice.take_does]]
+effect = "facility_output_multiplier"
+facility = "factory"
+multiplier = 0.8
+[[event.choice.refuse_does]]
+effect = "relations_all_rivals"
+relations = -1

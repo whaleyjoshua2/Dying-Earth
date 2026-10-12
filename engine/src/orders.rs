@@ -178,6 +178,9 @@ pub enum Order {
     ProposeTrade { to: Seat, give: TradeGood, get: TradeGood },
     /// Ticket #226: declare a standing Accord over. Free, and it lapses at the next turn's start.
     EndAccord { with: Seat },
+    /// Ticket #509 (version 0.1.0.0): renew an Accord in its last turn, for five more, where the other
+    /// side is willing. The player's acceptance; there is no prompt.
+    RenewAccord { with: Seat },
     /// Ticket #226: a fixed gift, one per pair per turn, paying +1 Relations. Fixed rather than a
     /// free amount because the gain is flat: without a fixed price a one-Ducat tribute would buy the
     /// same point as a fifty-Ducat one.
@@ -358,6 +361,9 @@ pub struct Pending {
     /// Ticket #269 (version 0.08.4): Agitate orders paid this turn -- who, where.
     #[serde(default)]
     pub agitates: Vec<(Seat, StateId)>,
+    /// Ticket #521 (version 0.1.0.0): a choice card's Unrest rises, to land after the natural fall.
+    #[serde(default)]
+    pub card_unrest: Vec<(StateId, f64, EventId)>,
     /// Ticket #52: Resettle orders paid this turn, one per Faction at most.
     pub resettle: Vec<(Seat, StateId)>,
     pub influence: Vec<(Seat, Target, i64)>,
@@ -388,6 +394,10 @@ pub struct Pending {
     /// throw-off of the same place in the same pass can say both in that line's place.
     #[serde(default)]
     pub transfer_lines: Vec<(Place, usize)>,
+    /// Ticket #523 (version 0.1.0.0): each transfer this Resolution -- where, to whom, and why -- so
+    /// a place that changes hands twice is one line naming both.
+    #[serde(default)]
+    pub transfers: Vec<(Place, Seat, String)>,
     #[serde(default)]
     pub credit_buys: Vec<(Seat, i64, f64)>,
 }
@@ -447,6 +457,8 @@ impl Game {
             // Ticket #479 (version 0.09.8): a raise's Widgets are its Region's, which rise.
             let n = match order {
                 Order::RaiseIndustry { state } => self.industry_widgets(seat, *state),
+                // Ticket #505 (version 0.1.0.0): a Module's are its Colony's (Regolith Printing).
+                Order::BuildModule { colony, .. } | Order::BuildModuleWithDucats { colony, .. } | Order::BuildArchive { colony } => self.build_widgets_at(seat, Place::Colony(*colony), item),
                 _ => self.build_widgets(seat, item),
             };
             parts.push(format!("{n} Widget{}", if n == 1 { "" } else { "s" }));
@@ -477,10 +489,15 @@ impl Game {
         if let Some(fuel) = tank.filter(|f| *f > 0.0) {
             parts.push(format!("{} Fuel from the tank", figure(fuel)));
         }
-        match parts.split_last() {
+        let price = match parts.split_last() {
             None => "free".to_string(),
             Some((last, [])) => last.clone(),
             Some((last, rest)) => format!("{} and {last}", rest.join(", ")),
+        };
+        // Ticket #520 (version 0.1.0.0): an order that breaks an Accord says so where its price is read.
+        match self.order_crosses(seat, order) {
+            Some(partner) => format!("{price}; breaks your Accord with {}", self.seat_name(partner)),
+            None => price,
         }
     }
 
@@ -911,8 +928,23 @@ impl Game {
                 if terms.is_empty() {
                     return fail("an Accord wants at least one Term");
                 }
-                if self.accords.iter().any(|a| a.holds(seat, *to)) {
-                    return fail("you already hold an Accord with them");
+                // Ticket #509 (the review): not in its last turn -- it lapses before the answer.
+                if let Some(acc) = self.accords.iter().find(|a| a.holds(seat, *to))
+                    && self.accord_turns_left(acc) <= 1
+                {
+                    return fail("your Accord lapses this turn: renew it first");
+                }
+                // Ticket #509 (version 0.1.0.0): an Accord that stands is offered only the Terms it lacks.
+                if let Some(acc) = self.accords.iter().find(|a| a.holds(seat, *to))
+                    && let Some(t) = terms.iter().find(|t| acc.terms.contains(t))
+                {
+                    let name = match t {
+                        Term::NonAggression => "non-aggression",
+                        Term::Passage => "passage",
+                        Term::Refuel => "refuel",
+                        Term::ResearchAgreement => "a research agreement",
+                    };
+                    return fail(format!("your Accord already holds {name}"));
                 }
                 // The Friendly gate is checked at the OFFER as well as at the strike, so a player is
                 // told now rather than after a computer seat has said yes.
@@ -951,6 +983,28 @@ impl Game {
             Order::EndAccord { with } => {
                 if !self.accords.iter().any(|a| a.holds(seat, *with)) {
                     return fail("you hold no Accord with them");
+                }
+                // Ticket #509 (the review): not while renewing it.
+                if pending.contains(&Order::RenewAccord { with: *with }) {
+                    return fail("you are renewing it this turn");
+                }
+                Ok(cost)
+            }
+            Order::RenewAccord { with } => {
+                let Some(acc) = self.accords.iter().find(|a| a.holds(seat, *with)) else {
+                    return fail("you hold no Accord with them");
+                };
+                if self.accord_turns_left(acc) != 1 {
+                    return fail("an Accord is renewed in its last turn");
+                }
+                if !self.renewal_willing(*with, seat) {
+                    return fail("they will not renew it");
+                }
+                if pending.contains(order) {
+                    return fail("you are renewing it this turn");
+                }
+                if pending.contains(&Order::EndAccord { with: *with }) {
+                    return fail("you have declared it over");
                 }
                 Ok(cost)
             }
@@ -1379,6 +1433,14 @@ impl Game {
                 if pending.iter().any(|o| matches!(o, Order::RaiseTier { colony: c } if c == colony)) || self.tier_under_way(col).is_some() {
                     return fail("already being upgraded");
                 }
+                // Ticket #503 (version 0.1.0.0): one Colonial Capital to a Body, the first's for good.
+                if next.one_per_body
+                    && let Some(cap) = self.capital_of(col.body).and_then(|c| self.colony(c))
+                {
+                    let name = &self.tables.body(col.body).name;
+                    let body = name.strip_prefix("the ").map_or(name.clone(), |rest| format!("The {rest}"));
+                    return fail(format!("{body}'s Capital is {}", self.slot_name(cap)));
+                }
                 if col.colonists < next.colonists {
                     return fail(format!("needs {} Colonists", next.colonists));
                 }
@@ -1468,7 +1530,7 @@ impl Game {
                     let tier = self.tier_of(col);
                     return fail(if self.module_slots(col) < tier.cap {
                         "full until more Colonists live here".to_string()
-                    } else if let Some(next) = self.next_tier(col) {
+                    } else if let Some(next) = self.open_tier(col) {
                         format!("full: upgrade to a {} for more", next.name)
                     } else {
                         format!("full: a {} holds {}", tier.name, tier.cap)
@@ -1682,7 +1744,9 @@ impl Game {
                 let want = Orbit::of(*slot);
                 if !self.orbit_exists(body, want) {
                     let slots = self.tables.body(body).orbital_slots;
-                    return fail(format!("{} has low orbit and {} Orbital Slots, numbered 0 to {}", self.tables.body(body).name, slots, slots.saturating_sub(1)));
+                    // The 0.1.0.0 playtest: at a Body with no ground the refusal said "has low orbit".
+                    let low = if self.has_low_orbit(body) { "low orbit and " } else { "no low orbit, only " };
+                    return fail(format!("{} has {low}{} Orbital Slots, numbered 0 to {}", self.tables.body(body).name, slots, slots.saturating_sub(1)));
                 }
                 if self.ship_orbit(s) == want {
                     return fail(format!("already in {}", self.orbit_name(body, want)));
@@ -2093,6 +2157,11 @@ impl Game {
                     UnloadTarget::Slot(b, slot) => {
                         if *b != body {
                             return fail("that slot is not at this Body");
+                        }
+                        // The 0.1.0.0 playtest: a Body with no ground (Venus) has no low orbit to
+                        // move to, and four players stranded Ships following "move to low orbit".
+                        if !self.has_low_orbit(body) {
+                            return fail(format!("{} has no ground to found a Colony on: a Colony Ship founds a Space Station from the station slot's ring it stands in", self.tables.body(body).name));
                         }
                         // Ticket #335 (version 0.09.0): founding a Colony is touching the ground,
                         // and low orbit is what touches the ground.
@@ -2571,7 +2640,8 @@ impl Game {
                     // Ticket #186: as on Earth -- the Custodians' Institute order raises an Academy.
                     let kind = kind.built_by(self.kind(seat));
                     // Ticket #332: as a Facility; a Ducat buy starts done.
-                    let widgets = self.build_widgets(seat, BuildItem::Module(kind));
+                    // Ticket #505 (version 0.1.0.0): at the Colony's figure (Regolith Printing).
+                    let widgets = self.build_widgets_at(seat, Place::Colony(*colony), BuildItem::Module(kind));
                     let done = if matches!(order, Order::BuildModuleWithDucats { .. }) { widgets } else { 0 };
                     if let Some(c) = self.colony_mut(*colony) {
                         c.queue.push(Build { item: BuildItem::Module(kind), seat, widgets, done, coastal: false, fuel: 0.0 });
@@ -2788,7 +2858,8 @@ impl Game {
                     // Ticket #68: the Module rises in the Colony's queue like any other build, from
                     // its own row (ticket #332: twelve Widgets, its three turns times four); the
                     // Research is paid into the fund once it stands.
-                    let widgets = self.build_widgets(seat, BuildItem::Module(ModuleKind::Archive));
+                    // Ticket #505 (version 0.1.0.0): at the Colony's figure (Regolith Printing).
+                    let widgets = self.build_widgets_at(seat, Place::Colony(*colony), BuildItem::Module(ModuleKind::Archive));
                     if let Some(c) = self.colony_mut(*colony) {
                         c.queue.push(Build { item: BuildItem::Module(ModuleKind::Archive), seat, widgets, done: 0, coastal: false, fuel: 0.0 });
                     }
@@ -2947,6 +3018,12 @@ impl Game {
                     let cut = self.tables.climate.leapfrog_baseline_cut;
                     self.state_mut(*state).leapfrog += per;
                     self.state_mut(*state).baseline_cut += cut;
+                    // Ticket #504 (version 0.1.0.0): the Custodians' Second Objective counts each Region
+                    // Leapfrogged once it is open.
+                    let s = self.seat_mut(seat);
+                    if s.opening_met_turn.is_some() && s.second_met_turn.is_none() && !s.second_leapfrogs.contains(state) {
+                        s.second_leapfrogs.push(*state);
+                    }
                     // Ticket #143 (version 0.07.3): the rate is quoted per hundred million, twenty units
                     // then; a hundred since ticket #333 (version 0.09.0), the same figure printed.
                     let per_hundred_million = self.population_coefficient(*state) * self.tables.units_per_hundred_million();
@@ -3016,18 +3093,21 @@ impl Game {
                     // offence: punishing a refusal would make every offer a threat.
                     // Ticket #495 (version 0.09.9): answered at the head of the receiver's next
                     // turn, by a human seat in a prompt, by a computer seat by that rule.
-                    self.offers.push(crate::state::Offer { from: seat, to: *to, terms: terms.clone(), trade: None, turn: self.turn });
+                    // Ticket #509 (version 0.1.0.0): to a Faction it holds an Accord with, Terms added.
+                    let ask = if self.accords.iter().any(|a| a.holds(seat, *to)) { crate::state::AccordAsk::Add } else { crate::state::AccordAsk::New };
+                    self.offers.push(crate::state::Offer { from: seat, to: *to, terms: terms.clone(), trade: None, turn: self.turn, ask });
                     self.log(format!("{} offered {} an Accord.", self.seat_name(seat), self.seat_name(*to)));
                 }
                 // Ticket #496 (version 0.09.9): nothing is held at the offer.
                 Order::ProposeTrade { to, give, get } => {
-                    self.offers.push(crate::state::Offer { from: seat, to: *to, terms: Vec::new(), trade: Some((*give, *get)), turn: self.turn });
+                    self.offers.push(crate::state::Offer { from: seat, to: *to, terms: Vec::new(), trade: Some((*give, *get)), turn: self.turn, ask: crate::state::AccordAsk::New });
                     self.log(format!("{} offered {} a Trade.", self.seat_name(seat), self.seat_name(*to)));
                 }
                 Order::EndAccord { with } => {
                     self.end_accord(seat, *with);
                     self.log(format!("{} declared their Accord with {} over.", self.seat_name(seat), self.seat_name(*with)));
                 }
+                Order::RenewAccord { with } => self.renew_accord(seat, *with),
                 Order::Tribute { to, materials } => {
                     // Ticket #223/#226: one of the two acts that raise Relations. The gain is the
                     // flat act_gain, not scaled by the gift, which is why the price is fixed.
@@ -3332,6 +3412,7 @@ impl Game {
             Order::ProposeAccord { to, .. } => r("propose_accord", &[("faction", self.seat_name(*to))]),
             Order::ProposeTrade { to, .. } => r("propose_trade", &[("faction", self.seat_name(*to))]),
             Order::EndAccord { with } => r("end_accord", &[("faction", self.seat_name(*with))]),
+            Order::RenewAccord { with } => r("renew_accord", &[("faction", self.seat_name(*with))]),
             Order::Tribute { to, .. } => r("tribute", &[("faction", self.seat_name(*to))]),
             Order::Buy { resource, amount } => r("buy", &[("n", amount.to_string()), ("resource", resource.name().to_string())]),
             Order::Sell { resource, amount } => r("sell", &[("n", amount.to_string()), ("resource", resource.name().to_string())]),

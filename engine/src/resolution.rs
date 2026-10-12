@@ -513,12 +513,17 @@ impl Game {
         // Ticket #320 (version 0.08.8): a rival Army standing in a held Region with no Passage
         // behind it is on Attack, as any rival Army in a Region not its seat's would be -- the
         // guest whose Accord ended, at the designer's word. A guest under Passage stands as it is.
+        // Ticket #519 (version 0.1.0.0): an Army inherited by a change of hands has a turn's grace,
+        // on Hold where it stands, for its new holder to order it home, at the designer's word.
         if only_landed.is_none() {
+            let turn = self.turn;
+            self.armies_inherited.retain(|(_, t)| t + 1 >= turn);
             let turned: Vec<ArmyId> = self
                 .armies
                 .iter()
                 .filter(|a| {
                     matches!(a.stance, Stance::Hold | Stance::DigIn)
+                        && !self.armies_inherited.iter().any(|(id, _)| *id == a.id)
                         && matches!(a.at, ArmyAt::Place(Place::State(s)) if matches!(self.state(s).control, Control::Controlled(h) if self.army_seat(a).is_some_and(|seat| seat != h && !self.accord_has(seat, h, Term::Passage))))
                 })
                 .map(|a| a.id)
@@ -1629,6 +1634,31 @@ impl Game {
         }
     }
 
+    /// Ticket #519 (version 0.1.0.0): a Region changed hands. Every Army of it stands on Hold where
+    /// it is -- an Army abroad on Attack fought that turn in its new holder's name, unordered -- and a
+    /// player who now directs it reads a line for each one away from home. At the designer's word:
+    /// Hold, stay where they stand, and say so.
+    pub fn armies_change_hands(&mut self, s: StateId, new: Option<Seat>) {
+        let home = Place::State(s);
+        let mut abroad: Vec<(String, Place)> = Vec::new();
+        for a in self.armies.iter_mut().filter(|a| a.home == ArmyHome::State(s)) {
+            a.stance = Stance::Hold;
+            a.move_to = None;
+            if let ArmyAt::Place(at) = a.at
+                && at != home
+            {
+                abroad.push((a.name.clone(), at));
+                self.armies_inherited.retain(|(id, _)| *id != a.id);
+                self.armies_inherited.push((a.id, self.turn));
+            }
+        }
+        let Some(seat) = new.filter(|seat| !self.seat(*seat).ai) else { return };
+        for (army, at) in abroad {
+            let text = self.say("army_inherited", &[("army", army), ("place", self.place_name(at))]);
+            self.report_line_of(seat, LineKind::YourWorks, LineKind::Note, None, text);
+        }
+    }
+
     fn set_place_control(&mut self, place: Place, control: Control) {
         match place {
             // Ticket #53: a state that changed hands this turn does not get its natural fall.
@@ -1640,6 +1670,15 @@ impl Game {
                 st.changed_hands |= changed;
                 // Ticket #53: the neutrality clock starts over whenever control is written.
                 self.restart_neutrality_clock(s);
+                // Ticket #519 (version 0.1.0.0): a Region that changes hands hands its Armies over on Hold.
+                // Keyed on who the Armies answer to (`army_seat`): the controller, and nobody while
+                // the Region is Occupied -- so an Occupation begun tells nobody, and one completed tells
+                // the new holder (the review: keyed on the director, the occupier was told at the
+                // start and nobody at the hand-over).
+                let owner = |c: Control| match c { Control::Controlled(seat) => Some(seat), _ => None };
+                if owner(was) != owner(control) {
+                    self.armies_change_hands(s, owner(control));
+                }
             }
             Place::Colony(c) => {
                 if let Some(col) = self.colony_mut(c) {
@@ -1743,18 +1782,43 @@ impl Game {
         // can contest the place back.
         let line = format!("{} now belongs to the {} ({}).", self.place_name(place), self.seat_name(seat), why);
         self.log(line);
-        let text = self.say(
-            "control_changed",
-            &[("place", self.place_name(place)), ("faction", self.seat_name(seat)), ("why", why.to_string())],
-        );
-        self.report_line(LineKind::ControlChanged, Some(place.into()), text);
+        // Ticket #523 (version 0.1.0.0): a place already handed over this Resolution is one line,
+        // the final holder first and the earlier step after it, where two lines read as a
+        // contradiction ("India now belongs to Prospectors (Pacified)", then "to Archivists").
+        // Only into a line that is still this place's: one from an earlier Report is never touched.
+        let at = self.pending.transfer_lines.iter().rev().find(|(p, _)| *p == place).map(|(_, i)| *i).filter(|i| self.report.lines.get(*i).is_some_and(|l| l.kind == LineKind::ControlChanged && l.place == Some(place.into())));
+        let earlier = at.and_then(|_| self.pending.transfers.iter().rev().find(|t| t.0 == place).cloned());
+        let mut args = vec![("place", self.place_name(place)), ("faction", self.seat_name(seat)), ("why", why.to_string())];
+        let key = match &earlier {
+            Some((_, was, was_why)) => {
+                args.push(("earlier", self.seat_name(*was)));
+                args.push(("earlier_why", was_why.clone()));
+                "control_changed_after"
+            }
+            None => "control_changed",
+        };
+        let text = self.say(key, &args);
+        self.pending.transfers.push((place, seat, why.to_string()));
         // Ticket #404 (version 0.09.4): a place that became the player's, or stopped being theirs,
-        // is their news: listed under Your works as well as under its place.
+        // is their news, under Your works (ticket #523: there alone).
         // An occupier whose Occupation a third Faction's Influence ends loses the place too.
-        self.mark_mine(&[Some(seat), before, directed]);
-        // Ticket #366 (version 0.09.2): where this line stands, so a throw-off in the same
-        // Resolution can say both in its place.
-        self.pending.transfer_lines.push((place, self.report.lines.len() - 1));
+        let mine = !self.spectator && [Some(seat), before, directed].contains(&Some(Seat(0)));
+        match at.filter(|_| earlier.is_some()) {
+            Some(i) => {
+                let l = &mut self.report.lines[i];
+                l.text = text;
+                l.mine |= mine;
+                // Its Moment is the final holder's, below.
+                self.report.moments.retain(|m| !(m.kind == MomentKind::ControlChanged && m.place == Some(place.into())));
+            }
+            None => {
+                self.report_line(LineKind::ControlChanged, Some(place.into()), text);
+                self.mark_mine(&[Some(seat), before, directed]);
+                // Ticket #366 (version 0.09.2): where this line stands, so a throw-off in the same
+                // Resolution can say both in its place.
+                self.pending.transfer_lines.push((place, self.report.lines.len() - 1));
+            }
+        }
         self.moment(
             MomentKind::ControlChanged,
             &[("place", self.place_name(place)), ("faction", self.seat_name(seat))],
@@ -1918,6 +1982,28 @@ impl Game {
         self.random_tie(&tied)
     }
 
+    /// Ticket #503 (version 0.1.0.0): the Body a build is racing to be the Colonial Capital of, if
+    /// it is one -- a ground Colony's upgrade to a one-per-Body tier.
+    fn capital_build_body(&self, place: Place, b: &Build) -> Option<BodyId> {
+        match (place, b.item) {
+            (Place::Colony(c), BuildItem::Tier(t)) if self.tables.tiers.get(t as usize).is_some_and(|r| r.one_per_body) => self.colony(c).map(|col| col.body),
+            _ => None,
+        }
+    }
+
+    /// Ticket #503: an upgrade to the Colonial Capital that lost the race, its Materials back to the
+    /// seat that paid them, at its price; Widgets are a rate and there are none to give back.
+    fn refund_capital(&mut self, place: Place, b: &Build, body: BodyId) {
+        let refund = self.item_materials(b.seat, place, b.item);
+        let st = &mut self.seat_mut(b.seat).stockpile;
+        *st = Stockpile { materials: st.materials + refund, ..*st }.settled();
+        let capital = self.capital_of(body).and_then(|c| self.colony(c)).map(|c| self.slot_name(c)).unwrap_or_default();
+        let (body_name, at) = (self.tables.body(body).name.clone(), self.place_name(place));
+        self.log(format!("{at}'s upgrade refunded, {} Materials: {capital} is {body_name}'s Capital.", figure(refund)));
+        let text = self.say("capital_refunded", &[("place", at), ("refund", figure(refund)), ("capital", capital), ("body", body_name)]);
+        self.report_line_of(b.seat, LineKind::YourWorks, LineKind::Note, Some(place.into()), text);
+    }
+
     // ------------------------------------------------------------------ (e)
 
     /// Ticket #332 (version 0.09.0): a build completes at the Resolution its place's Widgets reach
@@ -1987,6 +2073,37 @@ impl Game {
                 w.applied[d.index()] += applied;
                 w.applied_last[d.index()] += applied;
                 w.lost[d.index()] += made - applied;
+            }
+        }
+        // Ticket #503 (version 0.1.0.0): two Colonial Capitals completing on one Body in one turn
+        // are parted as a contested slot is -- the greater fleet in orbit, lots only when level --
+        // and the winner goes first, so `complete_build` raises it and refunds the rest. The fleet is
+        // that of whoever holds the place now, who is the one the Capital would go to.
+        let mut bodies: Vec<BodyId> = completed.iter().filter_map(|(p, b)| self.capital_build_body(*p, b)).collect();
+        bodies.sort();
+        bodies.dedup();
+        for body in bodies {
+            let racers: Vec<usize> = (0..completed.len()).filter(|i| self.capital_build_body(completed[*i].0, &completed[*i].1) == Some(body)).collect();
+            let holders: Vec<Seat> = racers
+                .iter()
+                .map(|i| match completed[*i].0 {
+                    Place::Colony(c) => self.colony(c).and_then(|col| col.control.director()).unwrap_or(completed[*i].1.seat),
+                    _ => completed[*i].1.seat,
+                })
+                .collect();
+            let mut seats: Vec<Seat> = Vec::new();
+            for h in &holders {
+                if !seats.contains(h) {
+                    seats.push(*h);
+                }
+            }
+            if seats.len() < 2 {
+                continue;
+            }
+            let winner = self.tiebreak_at_body(body, &seats);
+            if let Some(w) = racers.iter().zip(&holders).find(|(_, h)| **h == winner).map(|(i, _)| *i) {
+                let first = completed.remove(w);
+                completed.insert(racers[0], first);
             }
         }
         for (place, b) in completed {
@@ -2328,9 +2445,29 @@ impl Game {
                 self.state_mut(s).industry_level += 1;
             }
             // Ticket #490 (version 0.09.9): the place stands at its new tier.
+            // Ticket #503 (version 0.1.0.0): unless it is the Colonial Capital and the Body already
+            // has one, when it is refunded and nothing completes. The first to stand at it refunds
+            // every other upgrade to it under way on the Body, there being nothing left to race for.
             (Place::Colony(c), BuildItem::Tier(t)) => {
+                let body = self.capital_build_body(place, &b);
+                if let Some(body) = body
+                    && self.capital_of(body).is_some_and(|h| h != c)
+                {
+                    self.refund_capital(place, &b, body);
+                    return;
+                }
                 if let Some(col) = self.colony_mut(c) {
                     col.tier = col.tier.max(t);
+                }
+                if let Some(body) = body {
+                    let rivals: Vec<ColonyId> = self.colonies.iter().filter(|o| o.body == body && o.id != c).map(|o| o.id).collect();
+                    for r in rivals {
+                        let at = Place::Colony(r);
+                        while let Some(i) = self.queue_at(at).iter().position(|q| self.capital_build_body(at, q).is_some()) {
+                            let Some(lost) = self.colony_mut(r).map(|o| o.queue.remove(i)) else { break };
+                            self.refund_capital(at, &lost, body);
+                        }
+                    }
                 }
             }
             // Ticket #68 (version 0.05.5): the Archive Module stands. If its Research is already paid
@@ -3195,26 +3332,6 @@ impl Game {
             self.report_line(LineKind::Note, None, text);
             self.ai_deed(seat, "greenwash", &[("n", amount.to_string())]);
         }
-        // Ticket #269 (version 0.08.4): Agitate lands before Relief, so a holder's Relief the same
-        // turn answers it. One point, damped by a working Constabulary, an offence against the
-        // holder, and a Report line naming who paid.
-        for (seat, sid) in std::mem::take(&mut self.pending.agitates) {
-            let Some(holder) = self.place_control(Place::State(sid)).controller() else { continue };
-            let rose = self.raise_unrest(sid, u.agitate_points, UnrestSource::Agitate);
-            self.offend_by(seat, holder, 1);
-            self.seat_mut(seat).agitates_issued += 1;
-            let (who, name) = (self.seat_name(seat), self.tables.state(sid).name.clone());
-            // Ticket #371 (version 0.09.2): a cause for the Region's one net line, not a line.
-            let cause = if rose > 0.0 {
-                self.log(format!("The {who} agitated in {name}: Unrest rose by {} to {}.", Game::unrest_figure(rose), self.unrest_text(sid)));
-                self.phrase("cause_agitate", &[("faction", who)])
-            } else {
-                self.log(format!("The {who} agitated in {name}; the Constabulary held it to nothing."));
-                self.phrase("cause_agitate_damped", &[("faction", who)])
-            };
-            self.unrest_cause(sid, cause, seat == Seat(0));
-            self.ai_deed_at(seat, "agitate", &[("state", name)], Some(crate::report::ReportPlace::State(sid)));
-        }
         // Relief (rule 3): one point per order, paid for in Ducats at the Orders phase.
         let mut relieved: Vec<(Seat, StateId, f64)> = Vec::new();
         for (seat, sid) in std::mem::take(&mut self.pending.relief) {
@@ -3241,6 +3358,28 @@ impl Game {
                 self.lower_unrest(sid, u.natural_fall);
             }
         }
+        // Ticket #269 (version 0.08.4): Agitate's point, damped by a working Constabulary, an offence
+        // against the holder, and a Report line naming who paid. Ticket #520 (version 0.1.0.0): it
+        // lands after the falls, not before Relief -- the natural fall took it back the turn it was
+        // paid for ("Unrest from 0 to 0"). It stands a turn now, and the holder's Relief answers it next.
+        for (seat, sid) in std::mem::take(&mut self.pending.agitates) {
+            let Some(holder) = self.place_control(Place::State(sid)).controller() else { continue };
+            let rose = self.raise_unrest(sid, u.agitate_points, UnrestSource::Agitate);
+            self.offend_by(seat, holder, 1);
+            self.seat_mut(seat).agitates_issued += 1;
+            let (who, name) = (self.seat_name(seat), self.tables.state(sid).name.clone());
+            // Ticket #371 (version 0.09.2): a cause for the Region's one net line, not a line.
+            let cause = if rose > 0.0 {
+                self.log(format!("The {who} agitated in {name}: Unrest rose by {} to {}.", Game::unrest_figure(rose), self.unrest_text(sid)));
+                self.phrase("cause_agitate", &[("faction", who)])
+            } else {
+                self.log(format!("The {who} agitated in {name}; the Constabulary held it to nothing."));
+                self.phrase("cause_agitate_damped", &[("faction", who)])
+            };
+            self.unrest_cause(sid, cause, seat == Seat(0));
+            self.ai_deed_at(seat, "agitate", &[("state", name)], Some(crate::report::ReportPlace::State(sid)));
+        }
+        self.land_card_unrest();
         // The throw-off (rule 5), after the falls: a Faction can still buy a state back from the brink.
         for sid in StateId::ALL {
             if self.state(sid).unrest < u.throw_off_threshold {

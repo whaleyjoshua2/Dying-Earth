@@ -64,6 +64,10 @@ pub fn setup_scene(
     let deimos_material = textured(&mut images, &mut materials, &textures.deimos);
     // Ticket #93: Venus's clouds.
     let venus_material = textured(&mut images, &mut materials, &textures.venus);
+    // Ticket #502 (version 0.1.0.0): the three new worlds.
+    let mercury_material = textured(&mut images, &mut materials, &textures.mercury);
+    let ceres_material = textured(&mut images, &mut materials, &textures.ceres);
+    let vesta_material = textured(&mut images, &mut materials, &textures.vesta);
     let colours = session.colours();
     let mut flat = |c: [f32; 3], unlit: bool| {
         materials.add(StandardMaterial { base_color: Color::srgb(c[0], c[1], c[2]), unlit, double_sided: true, cull_mode: None, ..default() })
@@ -80,20 +84,25 @@ pub fn setup_scene(
     let rings: Vec<Handle<StandardMaterial>> = colours.iter().map(|c| flat(*c, true)).collect();
 
     // --- Solar System Map
-    let flat_ring = Transform::from_rotation(Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2));
+    // Ticket #512 (version 0.1.0.0): each ring lies in its Body's own orbital plane, tilted by the
+    // real inclination about the real node (`geo::orbital_tilt`, read at the game's first month; the
+    // nodes drift by at most a degree and a half a century and the inclinations by hundredths, so
+    // over the game's eight years a ring leaves its Body by three thousandths at Ceres, invisible). Ceres and Vesta have rings of their own now
+    // and the belt band of ticket #502 is gone, at the designer's word ("no need to draw the
+    // asteroid belt").
+    let jd0 = dying_earth_engine::ephemeris::julian_day(2030, 1, 1);
+    let ring_tf = |body: BodyId| Transform::from_rotation(geo::orbital_tilt(&session.tables, body, jd0) * Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2));
     // Ticket #155 (version 0.07.4): the rings read the same table the Bodies' places read.
     let mut annulus = |body: BodyId| meshes.add(Annulus::new(geo::solar_ring(body) - 0.02, geo::solar_ring(body) + 0.02));
-    let orbit_earth = annulus(BodyId::Earth);
-    let orbit_mars = annulus(BodyId::Mars);
-    // Ticket #93: Venus's ring, inside Earth's.
-    let orbit_venus = annulus(BodyId::Venus);
+    let ringed = [BodyId::Mercury, BodyId::Venus, BodyId::Earth, BodyId::Mars, BodyId::Vesta, BodyId::Ceres];
+    let orbits: Vec<(BodyId, Handle<Mesh>)> = ringed.iter().map(|b| (*b, annulus(*b))).collect();
     commands
         .spawn((Transform::default(), Visibility::Hidden, SolarRoot))
         .with_children(|p| {
-            p.spawn((Mesh3d(sphere.clone()), MeshMaterial3d(sun.clone()), Transform::from_scale(Vec3::splat(0.8))));
-            p.spawn((Mesh3d(orbit_earth), MeshMaterial3d(orbit.clone()), flat_ring));
-            p.spawn((Mesh3d(orbit_mars), MeshMaterial3d(orbit.clone()), flat_ring));
-            p.spawn((Mesh3d(orbit_venus), MeshMaterial3d(orbit.clone()), flat_ring));
+            p.spawn((Mesh3d(sphere.clone()), MeshMaterial3d(sun.clone()), Transform::from_scale(Vec3::splat(geo::SOLAR_SUN))));
+            for (body, mesh) in orbits {
+                p.spawn((Mesh3d(mesh), MeshMaterial3d(orbit.clone()), ring_tf(body)));
+            }
             for body in BodyId::ALL {
                 let mat = match body {
                     BodyId::Earth => earth_material.clone(),
@@ -102,6 +111,9 @@ pub fn setup_scene(
                     BodyId::Phobos => phobos_material.clone(),
                     BodyId::Deimos => deimos_material.clone(),
                     BodyId::Venus => venus_material.clone(),
+                    BodyId::Mercury => mercury_material.clone(),
+                    BodyId::Ceres => ceres_material.clone(),
+                    BodyId::Vesta => vesta_material.clone(),
                 };
                 p.spawn((
                     Mesh3d(sphere.clone()),
@@ -109,8 +121,8 @@ pub fn setup_scene(
                     Transform::from_scale(Vec3::splat(geo::solar_radius(body))).with_rotation(geo::upright()),
                     SolarBody(body),
                 ));
-                // Orbital Control ring.
-                p.spawn((Mesh3d(ring.clone()), MeshMaterial3d(grey.clone()), Transform::from_scale(Vec3::splat(geo::solar_radius(body) * 1.6)).with_rotation(flat_ring.rotation), Visibility::Hidden, ControlRing(body)));
+                // Orbital Control ring. Ticket #512 (version 0.1.0.0): in the Body's own plane.
+                p.spawn((Mesh3d(ring.clone()), MeshMaterial3d(grey.clone()), Transform::from_scale(Vec3::splat(geo::solar_radius(body) * 1.6)).with_rotation(ring_tf(body).rotation), Visibility::Hidden, ControlRing(body)));
                 // Colony Slot dots in a ring around the body.
                 let n = session.tables.body(body).colony_slots();
                 for slot in 0..n {
@@ -133,6 +145,9 @@ pub fn setup_scene(
             BodyId::Phobos => phobos_material.clone(),
             BodyId::Deimos => deimos_material.clone(),
             BodyId::Venus => venus_material.clone(),
+            BodyId::Mercury => mercury_material.clone(),
+            BodyId::Ceres => ceres_material.clone(),
+            BodyId::Vesta => vesta_material.clone(),
         };
         commands
             .spawn((Transform::default(), Visibility::Hidden, SurfaceRoot(body)))
@@ -307,8 +322,13 @@ pub fn sync_scene(
         *t = match current {
             View::Solar => {
                 // The side panel covers the right of the window, so the system sits a little left.
-                let target = Vec3::new(1.6, 0.0, 0.0);
-                let eye = target + Quat::from_rotation_y(view.solar_yaw) * Vec3::new(0.0, 9.5 * view.zoom, 11.5 * view.zoom);
+                // Ticket #502 (version 0.1.0.0): drawn back a quarter and to the right, so Ceres's and
+                // Vesta's rings are in the picture (the belt band they rode in went on ticket #512).
+                let target = Vec3::new(3.3, 0.0, 0.0);
+                // Ticket #512 (version 0.1.0.0): the eye's height is the pitch the player drags, at
+                // the distance the old (0, 12, 14.5) stood: it opens where it always did.
+                let d = geo::SOLAR_EYE_DISTANCE * view.zoom;
+                let eye = target + Quat::from_rotation_y(view.solar_yaw) * Vec3::new(0.0, d * view.solar_pitch.sin(), d * view.solar_pitch.cos());
                 Transform::from_translation(eye).looking_at(target, Vec3::Y)
             }
             View::Surface(_) => {

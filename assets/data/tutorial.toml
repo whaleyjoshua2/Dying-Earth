@@ -56,7 +56,7 @@
 turn = 1
 figure = "Spend your Influence"
 text = "Influence is your claim on a place. Click a Region on the globe, then spend from the lower right corner; Max spends it all. Unspent Influence is lost at End Turn."
-note = "You are the Custodians: colonise the solar system without wrecking Earth. You need three turns running where the world emits less carbon than it takes back, and twelve Colonists living off Earth."
+note = "You are the Custodians: colonise the solar system without wrecking Earth. You need four turns running where the world emits less carbon than it takes back, and eighteen Colonists living off Earth."
 
 [[note]]
 turn = 2

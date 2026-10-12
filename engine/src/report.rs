@@ -87,6 +87,10 @@ pub enum LineKind {
     /// dispatch with nothing at all; filing the line under a kind that never headlines lets the next
     /// line by rank fall through on its own. Added LAST so a save written before it still loads.
     Card,
+    /// Ticket #524 (version 0.1.0.0): **the game's end** -- a win, a draw or a Collapse. It outranks
+    /// every other line, so the end heads the Report it happens in, where as a Note it never
+    /// headlined and a tester's win sat under "China now belongs to Prospectors". Added last.
+    GameOver,
 }
 
 /// The five headings the dispatch groups its lines under, in the order they are shown (four until
@@ -137,6 +141,7 @@ impl LineKind {
     /// Event, and last a build completed. A kind with no rank never headlines.
     pub fn headline_rank(self) -> Option<u8> {
         Some(match self {
+            LineKind::GameOver => 0,
             LineKind::Seating => 0,
             LineKind::ColonyFounded => 1,
             LineKind::ControlChanged => 2,
@@ -166,7 +171,7 @@ impl LineKind {
             // line has always read; only its headline rank is gone.
             LineKind::Break | LineKind::SeaLevel | LineKind::Event | LineKind::Development | LineKind::Climate | LineKind::Card => Section::TheClimate,
             LineKind::TechComplete | LineKind::YourBuild | LineKind::YourWorks => Section::YourWorks,
-            LineKind::ControlChanged | LineKind::DecisiveBattle | LineKind::Battle | LineKind::BuildComplete | LineKind::Note | LineKind::Seating => by_place(),
+            LineKind::ControlChanged | LineKind::DecisiveBattle | LineKind::Battle | LineKind::BuildComplete | LineKind::Note | LineKind::Seating | LineKind::GameOver => by_place(),
         }
     }
 }
@@ -363,14 +368,15 @@ impl Report {
     }
 
     /// Every line that is not the headline, in the order the five headings are shown. Ticket #404
-    /// (version 0.09.4): a line marked the player's is under Your works too.
+    /// (version 0.09.4): a line marked the player's is under Your works too. Ticket #523 (version
+    /// 0.1.0.0): under Your works alone, so it reads once.
     pub fn sections(&self) -> Vec<(Section, Vec<&ReportLine>)> {
         let head = self.headline_index();
         Section::ALL
             .into_iter()
             .map(|s| {
                 let lines: Vec<&ReportLine> =
-                    self.lines.iter().enumerate().filter(|(i, l)| Some(*i) != head && (l.section() == s || (l.mine && s == Section::YourWorks))).map(|(_, l)| l).collect();
+                    self.lines.iter().enumerate().filter(|(i, l)| Some(*i) != head && if l.mine { s == Section::YourWorks } else { l.section() == s }).map(|(_, l)| l).collect();
                 (s, lines)
             })
             .filter(|(_, l)| !l.is_empty())
@@ -479,7 +485,14 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("disembarked", &["n", "colony"]),
     ("station_built", &["faction", "station"]),
     ("accord_struck", &["faction"]),
+    // Ticket #517 (version 0.1.0.0).
+    ("accord_broken", &["faction"]),
+    ("accord_you_broke", &["faction"]),
+    ("army_inherited", &["army", "place"]),
     ("accord_refused", &["faction"]),
+    // Ticket #509 (version 0.1.0.0): an Accord the other side would not renew.
+    ("accord_let_lapse", &["faction"]),
+    ("accord_added", &["faction"]),
     ("trade_struck", &["faction"]),
     ("trade_refused", &["faction"]),
     ("trade_failed", &["faction", "why"]),
@@ -526,6 +539,7 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     // Ticket #408 (version 0.09.4): the same where nothing rose.
     ("occupation_broken_quiet", &["place", "faction", "holder", "unrest", "standing"]),
     ("control_changed", &["place", "faction", "why"]),
+    ("control_changed_after", &["place", "faction", "why", "earlier", "earlier_why"]),
     // Ticket #366 (version 0.09.2): a transfer and a throw-off in one Resolution, said once.
     ("passed_and_threw_off", &["state", "faction"]),
     ("claim_tied", &["place", "factions"]),
@@ -549,6 +563,8 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("build_lost", &["building", "place"]),
     // Ticket #332 (version 0.09.0): a rival's build cancelled by the place's new holder.
     ("build_cancelled", &["faction", "building", "place", "refund"]),
+    // Ticket #503 (version 0.1.0.0): an upgrade to a Colonial Capital another place completed first.
+    ("capital_refunded",&["place", "refund", "capital", "body"]),
     ("colonists_no_room", &["n", "colony"]),
     // Ticket #191 (version 0.08.0): Relations. Ticket #362 (version 0.09.1): a fall into a worse
     // level of a pair involving the player, one line each way.
@@ -710,6 +726,7 @@ pub const RIVAL_ARGS: &[(&str, &[&str])] = &[
     ("propose_accord", &["faction"]),
     ("propose_trade", &["faction"]),
     ("end_accord", &["faction"]),
+    ("renew_accord", &["faction"]),
     ("tribute", &["faction"]),
     ("build_facility", &["building", "state"]),
     ("build_facility_ducats", &["building", "state"]),
