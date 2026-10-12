@@ -19775,7 +19775,8 @@ fn the_reports_templates_stay_under_their_word_ceiling() {
     // Ticket #509 (version 0.1.0.0): and by the 5 of an Accord the other side let lapse, and the 7 of
     // Terms added to one, and the 5 of a rival's renewal.
     // Ticket #517 (version 0.1.0.0): and by the 12 of an Accord broken, told to each side.
-    assert!(words <= 1845, "the Report's templates hold {words} words; the ceiling is 1,845 (12 for an Accord broken, 15% off 2,031, 54 for the race to the Moon, 2 for a rival's upgrade, 8 for an Accord answered, less a word of slack, 17 for a Trade, 9 for a Capital refunded, 5 for an Accord let lapse, 7 for Terms added, 5 for a renewal)");
+    // Ticket #519 (version 0.1.0.0): and by the 9 of an Army inherited on Hold.
+    assert!(words <= 1854, "the Report's templates hold {words} words; the ceiling is 1,854 (9 for an Army inherited, 12 for an Accord broken, 15% off 2,031, 54 for the race to the Moon, 2 for a rival's upgrade, 8 for an Accord answered, less a word of slack, 17 for a Trade, 9 for a Capital refunded, 5 for an Accord let lapse, 7 for Terms added, 5 for a renewal)");
     // "The" is gone before a Faction's name, which is drawn in its colour instead.
     assert!(!text.contains("he {faction}"), "a template still says \"the {{faction}}\"");
 }
@@ -21936,4 +21937,32 @@ fn an_accord_offer_to_a_pair_that_already_holds_one_does_not_hold_the_turn() {
     g.offers.push(Offer { from: them, to: me, terms: vec![Term::NonAggression], trade: None, turn: g.turn, ask: AccordAsk::New });
     g.answer_computer_offers();
     assert!(g.offers_to(me).is_empty(), "and the head of the turn drops it");
+}
+
+// ---------------------------------------------------------------- the 0.1.0.0 playtest: inherited Armies
+
+/// The 0.1.0.0 playtest (ticket #519): a Region taken by Influence handed over its Armies on the
+/// orders they had, so one standing abroad on Attack fought that turn in its new holder's name. Now,
+/// whenever a Region changes hands, every Army of it stands on Hold, where it is, and the new holder
+/// is told of each one away from home.
+#[test]
+fn a_regions_armies_change_hands_on_hold_where_they_stand_and_the_new_holder_is_told() {
+    let mut g = game();
+    calm(&mut g);
+    // North Africa is the Prospectors'; its Standing Army stands in Europe on Attack.
+    let (me, them) = (Seat(0), Seat(1));
+    g.state_mut(StateId::NorthAfrica).control = Control::Controlled(them);
+    let army = g.armies.iter().find(|a| a.home == ArmyHome::State(StateId::NorthAfrica)).map(|a| a.id).expect("North Africa's Army");
+    let abroad = Place::State(StateId::Europe);
+    { let a = g.army_mut(army).unwrap(); a.at = ArmyAt::Place(abroad); a.stance = Stance::Attack; }
+    g.seats[me.index()].influence.insert(Place::State(StateId::NorthAfrica), 400);
+    g.seats[me.index()].influenced_this_turn.push(Place::State(StateId::NorthAfrica));
+    g.report.lines.clear();
+    g.resolution_phase();
+    assert_eq!(g.state(StateId::NorthAfrica).control, Control::Controlled(me), "the premise: taken by Influence");
+    let a = g.army(army).unwrap();
+    assert_eq!(a.stance, Stance::Hold, "on Hold");
+    assert_eq!(a.at, ArmyAt::Place(abroad), "where it stood");
+    let name = a.name.clone();
+    assert!(g.report.lines.iter().any(|l| l.text.contains(&name) && l.text.contains("now answers to you") && l.text.contains("Hold")), "{:?}", g.report.lines.iter().map(|l| &l.text).collect::<Vec<_>>());
 }

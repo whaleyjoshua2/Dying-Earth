@@ -83,6 +83,8 @@ accord_struck = "Accord struck with {faction}."
 # Ticket #517 (version 0.1.0.0): an Accord broken by an act against its Terms, told to each player in it.
 accord_broken = "{faction} broke their Accord with you."
 accord_you_broke = "You broke your Accord with {faction}."
+# Ticket #519 (version 0.1.0.0): an Army of a Region taken, standing away from home, now the player's.
+army_inherited = "{army}, in {place}, now answers to you, on Hold."
 accord_refused = "{faction} refused your Accord."
 # Ticket #509 (version 0.1.0.0): an Accord in its last turn the other side would not renew.
 accord_let_lapse = "{faction} let your Accord lapse."

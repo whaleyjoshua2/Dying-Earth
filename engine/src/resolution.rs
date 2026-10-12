@@ -1629,6 +1629,29 @@ impl Game {
         }
     }
 
+    /// Ticket #519 (version 0.1.0.0): a Region changed hands. Every Army of it stands on Hold where
+    /// it is -- an Army abroad on Attack fought that turn in its new holder's name, unordered -- and a
+    /// player who now directs it reads a line for each one away from home. At the designer's word:
+    /// Hold, stay where they stand, and say so.
+    pub fn armies_change_hands(&mut self, s: StateId, new: Option<Seat>) {
+        let home = Place::State(s);
+        let mut abroad: Vec<(String, Place)> = Vec::new();
+        for a in self.armies.iter_mut().filter(|a| a.home == ArmyHome::State(s)) {
+            a.stance = Stance::Hold;
+            a.move_to = None;
+            if let ArmyAt::Place(at) = a.at
+                && at != home
+            {
+                abroad.push((a.name.clone(), at));
+            }
+        }
+        let Some(seat) = new.filter(|seat| !self.seat(*seat).ai) else { return };
+        for (army, at) in abroad {
+            let text = self.say("army_inherited", &[("army", army), ("place", self.place_name(at))]);
+            self.report_line_of(seat, LineKind::YourWorks, LineKind::Note, None, text);
+        }
+    }
+
     fn set_place_control(&mut self, place: Place, control: Control) {
         match place {
             // Ticket #53: a state that changed hands this turn does not get its natural fall.
@@ -1640,6 +1663,15 @@ impl Game {
                 st.changed_hands |= changed;
                 // Ticket #53: the neutrality clock starts over whenever control is written.
                 self.restart_neutrality_clock(s);
+                // Ticket #519 (version 0.1.0.0): a Region that changes hands hands its Armies over on Hold.
+                // Keyed on who the Armies answer to (`army_seat`): the controller, and nobody while
+                // the Region is Occupied -- so an Occupation begun tells nobody, and one completed tells
+                // the new holder (the review: keyed on the director, the occupier was told at the
+                // start and nobody at the hand-over).
+                let owner = |c: Control| match c { Control::Controlled(seat) => Some(seat), _ => None };
+                if owner(was) != owner(control) {
+                    self.armies_change_hands(s, owner(control));
+                }
             }
             Place::Colony(c) => {
                 if let Some(col) = self.colony_mut(c) {
