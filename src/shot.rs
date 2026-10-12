@@ -849,6 +849,12 @@ fn build_board(session: &mut Session) {
             plant(g, Seat(0), if v == "mine" { 3 } else { 2 });
             g.seats[0].stockpile.materials = 120.0;
         }
+        // `accord:all` (a building aid, ticket #508, version 0.1.0.0): seat 0 holds an Accord of all four
+        // Terms with seat 1, for the hover on its line in the Factions window.
+        if std::env::args().any(|a| a == "accord:all") {
+            let turn = g.turn;
+            g.accords.push(Accord { a: Seat(0), b: Seat(1), terms: vec![Term::NonAggression, Term::Passage, Term::Refuel, Term::ResearchAgreement], struck: turn, paid: turn, ending: false });
+        }
         // `accords:0` (a building aid, ticket #430, version 0.09.5): every Accord struck, so a picture
         // after driven turns shows the fog as a seat with no Accord sees it.
         if std::env::args().any(|a| a == "accords:0") {

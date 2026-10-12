@@ -7,7 +7,7 @@ pictures and batches that decided it are in
 [`docs/dev-diary/2026-10-07-version-0.1.0.0/`](../dev-diary/2026-10-07-version-0.1.0.0/).
 
 **What the version is.** Version 0.09.9 with the designer's list. **More room**: Mercury, Ceres and
-Vesta join the board (§1). **A fourth tier**, the Colonial Capital, one to a Body (§2).
+Vesta join the board (§1). **A fourth tier**, the Colonial Capital, one to a Body (§2). **An Accord's Terms** on its hover in the Factions window (§3).
 
 **What it did to the win column** (80 games, per Faction):
 
@@ -147,3 +147,24 @@ three keys of its own: `one_per_body`, `ground_only` and `influence = 1`.
 **Measured** over the 80 games
 ([`sweeps/ticket-503.txt`](../dev-diary/2026-10-07-version-0.1.0.0/sweeps/ticket-503.txt)): the
 sweep is §1's line for line; **no place reached the Colonial Capital**, and 27 reached Colony.
+
+## 3. An Accord's Terms on its hover
+
+The authority is [ticket #508](https://github.com/whaleyjoshua2/Dying-Earth/issues/508).
+
+On a rival's page in the Factions window, the line *"You hold an Accord with the Prospectors:
+non-aggression, passage."* carries a hover with one line for each Term held, then the price of
+breaking one:
+
+> Non-aggression: no Influence or Battle on each other.
+> Passage: Armies march in on Hold; Ships pass freely.
+> Refuel: at each other's Space Stations.
+> Research agreement: +10% Research to both.
+> Acting against a term ends the Accord, at a cost.
+
+- An Accord **declared over** keeps the hover until it lapses, its Terms binding until then.
+- The **offer's checkboxes** say each Term in the same line; a greyed research agreement still
+  says both sides must be Friendly.
+- The **Relations grid** still names the Terms a pair holds without explaining them.
+
+No rule moved, so no sweep.

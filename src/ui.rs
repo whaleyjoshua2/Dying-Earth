@@ -5269,6 +5269,23 @@ fn term_name(t: Term) -> &'static str {
     }
 }
 
+/// Ticket #508 (version 0.1.0.0): a Term in one line, as the hover on a held Accord and the offer's
+/// checkbox both say it.
+fn term_line(t: Term) -> &'static str {
+    match t {
+        Term::NonAggression => "Non-aggression: no Influence or Battle on each other.",
+        Term::Passage => "Passage: Armies march in on Hold; Ships pass freely.",
+        Term::Refuel => "Refuel: at each other's Space Stations.",
+        Term::ResearchAgreement => "Research agreement: +10% Research to both.",
+    }
+}
+
+/// Ticket #508 (version 0.1.0.0): the hover on a held Accord, one line for each Term it holds and
+/// the price of breaking one.
+fn accord_terms_hover(terms: &[Term]) -> String {
+    terms.iter().map(|t| term_line(*t)).chain(["Acting against a term ends the Accord, at a cost."]).collect::<Vec<_>>().join("\n")
+}
+
 fn order_text(game: &Game, o: &Order) -> String {
     match o {
         // Ticket #226 (version 0.08.2): the Accord orders, so a pending one reads in the order list
@@ -11029,9 +11046,13 @@ fn accords_block(ui: &mut Ui, session: &Session, game: &Game, other: Seat, actio
             })
             .collect();
         if acc.ending {
-            ui.label(RichText::new(format!("Your Accord with the {} is over: it lapses at the next turn.", game.seat_name(other))).color(Color32::from_rgb(230, 190, 120)));
+            // Ticket #508 (version 0.1.0.0): its Terms bind until it lapses, so it keeps their hover.
+            let over = ui.label(RichText::new(format!("Your Accord with the {} is over: it lapses at the next turn.", game.seat_name(other))).color(Color32::from_rgb(230, 190, 120)));
+            rule_tip(over, accord_terms_hover(&acc.terms));
         } else {
-            ui.label(format!("You hold an Accord with the {}: {}.", game.seat_name(other), names.join(", ")));
+            // Ticket #508 (version 0.1.0.0): what each Term it holds means, on the line.
+            let held = ui.label(format!("You hold an Accord with the {}: {}.", game.seat_name(other), names.join(", ")));
+            rule_tip(held, accord_terms_hover(&acc.terms));
             let order = Order::EndAccord { with: other };
             let placed = session.pending.contains(&order);
             if placed {
@@ -11050,12 +11071,9 @@ fn accords_block(ui: &mut Ui, session: &Session, game: &Game, other: Seat, actio
         let id = egui::Id::new(("accord-terms", other.index()));
         let mut picked: Vec<Term> = ui.ctx().memory(|m| m.data.get_temp(id).unwrap_or_default());
         let friendly = game.relations_score(me, other) >= 7 && game.relations_score(other, me) >= 7;
-        for (term, label, tip) in [
-            (Term::NonAggression, "Non-aggression", "Neither spends Influence on a place the other holds, nor opens a Battle against them."),
-            (Term::Passage, "Passage", "Either's Armies may march into the other's Regions without attacking, arriving on Hold; neither intercepts the other's Ships, and a Blockade does not shut them out of the orbit it shuts."),
-            (Term::Refuel, "Refuel", "Either may Refuel at the other's Space Stations."),
-            (Term::ResearchAgreement, "Research agreement", "Both parties' Research rises a tenth while it stands. Wants Friendly on both sides to strike, and once struck it stands whatever the scores later do."),
-        ] {
+        // Ticket #508 (version 0.1.0.0): each says what it means in the line the held Accord's hover uses.
+        for (term, label) in [(Term::NonAggression, "Non-aggression"), (Term::Passage, "Passage"), (Term::Refuel, "Refuel"), (Term::ResearchAgreement, "Research agreement")] {
+            let tip = term_line(term);
             let mut on = picked.contains(&term);
             let enabled = term != Term::ResearchAgreement || friendly;
             let resp = ui.add_enabled(enabled, egui::Checkbox::new(&mut on, label));
@@ -12480,6 +12498,20 @@ fn chronicle_screen(root: &mut Ui, session: &Session, actions: &mut Vec<Action>)
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Ticket #508 (version 0.1.0.0): a held Accord's hover says each of its Terms in a line, the
+    /// price of breaking one last, and with all four it stays within the six-line ceiling.
+    #[test]
+    fn a_held_accords_hover_says_each_term_in_a_line() {
+        assert_eq!(accord_terms_hover(&[Term::NonAggression]), "Non-aggression: no Influence or Battle on each other.\nActing against a term ends the Accord, at a cost.");
+        let all = accord_terms_hover(&[Term::NonAggression, Term::Passage, Term::Refuel, Term::ResearchAgreement]);
+        assert_eq!(
+            all,
+            "Non-aggression: no Influence or Battle on each other.\nPassage: Armies march in on Hold; Ships pass freely.\nRefuel: at each other's Space Stations.\nResearch agreement: +10% Research to both.\nActing against a term ends the Accord, at a cost."
+        );
+        assert!(hover_lines_estimate(&all) <= HOVER_LINE_CEILING, "{} lines", hover_lines_estimate(&all));
+        assert!(all.lines().all(|l| l.chars().count() <= HOVER_CHARS_PER_LINE), "each term on one rendered line");
+    }
 
     /// Ticket #467 (version 0.09.7): the final report's cell is the total and then the Stockpile.
     #[test]
