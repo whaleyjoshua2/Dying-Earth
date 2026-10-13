@@ -263,3 +263,20 @@ says nothing more); and the only-Launch-Site count read the Regions the player d
 spend reads those it holds (now both read held). For the designer, not changed: "next turn" reads
 the bar as it stands, so the holder's own Embassy rise or decay next turn can make it a false
 alarm or a miss; and in the rare exact tie between two rivals a held-off rival reads "70 of 69".
+
+## The text tool: offer Terms, every Standing, Leapfrog
+
+Ticket [#541](https://github.com/whaleyjoshua2/Dying-Earth/issues/541), spec §11. The text tool alone;
+the window had all three.
+
+**Checked in the tool**, seed 7: `help` reads "leapfrog <state>  the Custodians only, 50 Ducats: the
+Region's people emit 0.03 less per hundred million, for good, never below 0.04"; Japan's listing,
+after a spend of 5, "Standings: Custodians 4"; and on the turn three Accords were offered, each
+printed its Terms above its answer line ("Prospectors offer an Accord: non-aggression."). The first
+build printed only the first offer's; every offer prints now. No picture: the tool is text. No rule
+moved; no sweep.
+
+**The review** (an agent that did not build it) found one defect and two small gaps, all fixed: a
+renewal printed as a fresh Accord offer (now in the window's words, the dropped research agreement
+said; unexercised, since a player is not sent a renewal since #509); the Leapfrog help left out the
+Baseline cut of 0.1 (now said); and a comment named the wrong ticket.

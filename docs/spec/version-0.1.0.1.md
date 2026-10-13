@@ -246,3 +246,18 @@ Ticket: [Playtest information: a rival spending on your Region, your home at ris
   none) or their only working Launch Site's Region.
 - The Pressed list stands. The text tool prints both lines with the Report.
 - No rule moves.
+
+## 11. The text tool: offer Terms, every Standing, Leapfrog
+
+Ticket: [Playtest information: offer Terms, rivals' Standing, Leapfrog](https://github.com/whaleyjoshua2/Dying-Earth/issues/541).
+
+The window had all three; the text tool, which the playtest used, gains them. The window is unchanged.
+
+- **Every offer waiting** prints what it holds before the line that answers it: *"Prospectors offer
+  an Accord: non-aggression."*, *"... offer to add to your Accord: ..."*, or a Trade's *"offer 20
+  Materials for 30 Fuel."*
+- **Every Region and Colony** listed prints *"Standings: Custodians 50, Prospectors 12"* (or
+  *"nobody has any yet"*), as the window's Standings row shows them.
+- **`help`** says what a Leapfrog does: its price, the drop per hundred million, the floor, and the
+  Baseline cut. A renewal offer reads as the window's does.
+- No rule moves.
