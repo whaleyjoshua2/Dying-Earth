@@ -160,3 +160,28 @@ Materials was wanted). The gaps: the Strip Permit test never read that the 25 Du
 also named the voyage test's held Moon yield, which is said above: at the shipped figures the Mars
 system wins every board, prize or none. The market's 20-Material reserve (`ai.toml`) is a
 keeping figure, not a price, and is left.
+
+## A popup when an Accord ends, and a warning the turn before
+
+Ticket [#538](https://github.com/whaleyjoshua2/Dying-Earth/issues/538), spec §7.
+
+**The pictures** ([`ticket-538/`](ticket-538/)), Report menus in `shot:` mode with two new aids:
+`ended-report.png` (`moment:accord`: the Prospectors call off an Accord with the player), the
+Moment "Your Accord with Prospectors has ended: Prospectors called it off." under the Prospectors'
+name in their colour; `warn-report.png` (`accord:warn turns:4`), Your works with "Your Accord with
+Arkwrights ends after this turn." and two more: on this board each computer seat had struck an
+Accord with the player on turn 1, so all three reach their last turn together.
+
+The warning reads "ends after this turn", where the ticket's draft said "ends next turn": it is read
+at the head of the last turn, and the Accord is gone by the next.
+
+**Tests.** Four, each watched red by taking its piece out (no ending Moment, no warning, the cap of
+two applied to it, no rival clause) and green restored. The Report's word ceiling rises by the 46
+words this adds. No rule moved; no sweep.
+
+**The review** (an agent that did not build it) found two small defects, both fixed: a partner's
+refusal to renew was never forgotten, so an Accord renewed or added to after one, and later let run
+out, read "would not renew" (now cleared wherever its run starts afresh; tested, watched red); and
+an Accord declared over in a save from before this version credited its first seat with calling it
+off (now it names nobody). Two tests added at its word: an ending fires once when it is called off
+in its last turn, and two rivals' ending is under the fog (watched red with the fog lifted).

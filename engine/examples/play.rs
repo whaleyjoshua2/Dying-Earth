@@ -371,6 +371,8 @@ DIPLOMACY (ticket #226; `show` prints Relations both ways and every Accord stand
   accord end <faction>                 declare a standing Accord over: free, and it lapses at the
                                        next turn's start -- which gives the board a turn's warning
                                        that something is coming.
+  accord renew <faction>               in an Accord's last turn, renew it for five more; the Report
+                                       warns of that turn ("ends after this turn").
   trade <faction> <give> for <ask>     one thing for one thing: `<n> ducats|materials|fuel|energy`
                                        or a colony id; answered at the head of their next turn, the
                                        goods moving only if both still hold them.
@@ -592,10 +594,12 @@ fn parse_line(g: &Game, line: &str) -> Result<Line, String> {
                     Order::ProposeAccord { to, terms }
                 }
                 "end" => Order::EndAccord { with: seat_of(g, at(2)?)? },
+                // Ticket #538 (version 0.1.0.1): the window's Renew, in an Accord's last turn.
+                "renew" => Order::RenewAccord { with: seat_of(g, at(2)?)? },
                 // Ticket #495 (version 0.09.9): an offer made to you waits for your answer.
                 "accept" => return Ok(Line::Offer(seat_of(g, at(2)?)?, true, false)),
                 "decline" | "refuse" => return Ok(Line::Offer(seat_of(g, at(2)?)?, false, false)),
-                _ => return Err(format!("`accord {what}` is not one of offer, end, accept, refuse")),
+                _ => return Err(format!("`accord {what}` is not one of offer, end, renew, accept, refuse")),
             }
         }
         // Ticket #496 (version 0.09.9): `trade <faction> <n> <good>|<colony id> for <n> <good>|<colony id>`,
@@ -1023,6 +1027,11 @@ fn print_report(g: &Game) {
     }
     if let Some(e) = &g.report.event {
         println!("EVENT: {e}");
+    }
+    // Ticket #538 (version 0.1.0.1): the Moments the window stops the turn for, an Accord's end
+    // among them, where the text tool printed none.
+    for m in g.report.moments_shown(&|k| g.tables.report.moment_on(k)) {
+        println!("MOMENT: {}", m.text);
     }
     // Ticket #404 (version 0.09.4): under the window's headings, so a place that changed hands to
     // or from you reads under Your works as well as under its place.

@@ -11544,7 +11544,7 @@ fn a_rival_closing_on_its_victory_condition_interrupts_the_player_once_a_step() 
     g.end_phase();
     assert_eq!(fired(&g), 2, "rivals only: {:?}", g.report.moments);
     assert_eq!(MomentKind::RivalProgress.rank(), 5, "between a Battle (4) and a Tech (6)");
-    assert_eq!(MomentKind::ALL.len(), 12, "ticket #281 (version 0.08.5) added a place taken by force, #345 (0.09.1) a Body settled first, and #405 (0.09.4) the world under the Sink");
+    assert_eq!(MomentKind::ALL.len(), 13, "ticket #281 (version 0.08.5) added a place taken by force, #345 (0.09.1) a Body settled first, #405 (0.09.4) the world under the Sink, and #538 (0.1.0.1) an Accord ended");
     assert!(g.tables.report.moment_on(MomentKind::RivalProgress), "on by default");
 }
 
@@ -20139,7 +20139,9 @@ fn the_reports_templates_stay_under_their_word_ceiling() {
     // Ticket #517 (version 0.1.0.0): and by the 12 of an Accord broken, told to each side.
     // Ticket #519 (version 0.1.0.0): and by the 9 of an Army inherited on Hold.
     // Ticket #523 (version 0.1.0.0): and by the 9 of a place handed over twice in a turn.
-    assert!(words <= 1863, "the Report's templates hold {words} words; the ceiling is 1,863 (9 for a place handed over twice, 9 for an Army inherited, 12 for an Accord broken, 15% off 2,031, 54 for the race to the Moon, 2 for a rival's upgrade, 8 for an Accord answered, less a word of slack, 17 for a Trade, 9 for a Capital refunded, 5 for an Accord let lapse, 7 for Terms added, 5 for a renewal)");
+    // Ticket #538 (version 0.1.0.1): and by the 46 of an Accord's end: its Moment and five causes,
+    // the warning the turn before, and two rivals' clauses.
+    assert!(words <= 1909, "the Report's templates hold {words} words; the ceiling is 1,909 (46 for an Accord's end, 9 for a place handed over twice, 9 for an Army inherited, 12 for an Accord broken, 15% off 2,031, 54 for the race to the Moon, 2 for a rival's upgrade, 8 for an Accord answered, less a word of slack, 17 for a Trade, 9 for a Capital refunded, 5 for an Accord let lapse, 7 for Terms added, 5 for a renewal)");
     // "The" is gone before a Faction's name, which is drawn in its colour instead.
     assert!(!text.contains("he {faction}"), "a template still says \"the {{faction}}\"");
 }
@@ -22580,4 +22582,195 @@ fn a_poor_seat_still_finds_materials_scarcest_at_the_new_prices() {
     });
     g.seats[0].stockpile = Stockpile { materials: 10.0, fuel: 6.0, energy: 500.0, ducats: 0.0 };
     assert_eq!(g.scarcest(s), Resource::Materials, "10 Materials against three 22s, Fuel 6 of 6");
+}
+
+// ---------------------------------------------------------------- #538 an Accord's end (version 0.1.0.1)
+
+/// Ticket #538: the Accord Ended Moments of this turn's Report, by their words.
+fn accord_endings(g: &Game) -> Vec<String> {
+    g.report.moments.iter().filter(|m| m.kind == MomentKind::AccordEnded).map(|m| m.text.clone()).collect()
+}
+
+/// Ticket #538 (version 0.1.0.1): a Moment, Accord Ended, for every ending the player is party
+/// to, the cause in its words -- its five turns up, the partner would not renew, the partner called
+/// it off, either side broke it -- and none where the player called it off themself.
+#[test]
+fn an_accord_ending_stops_the_turn_and_says_why() {
+    let pro = |g: &Game| g.seat_name(Seat(1));
+    // Its five turns run out, the player not renewing.
+    let mut g = game();
+    calm(&mut g);
+    g.strike_accord(Seat(0), Seat(1), vec![Term::NonAggression]).unwrap();
+    for _ in 0..4 {
+        accord_turn(&mut g);
+    }
+    g.report.moments.clear();
+    g.settle_accords();
+    assert_eq!(accord_endings(&g), vec![format!("Your Accord with {} has ended: its five turns are up.", pro(&g))]);
+    // The partner would not renew.
+    let mut g = game();
+    calm(&mut g);
+    g.strike_accord(Seat(0), Seat(1), vec![Term::NonAggression]).unwrap();
+    g.relations.score[1][0] = -5;
+    for _ in 0..4 {
+        accord_turn(&mut g);
+    }
+    g.report.moments.clear();
+    g.settle_accords();
+    assert_eq!(accord_endings(&g), vec![format!("Your Accord with {} has ended: {} would not renew.", pro(&g), pro(&g))]);
+    // The partner called it off.
+    let mut g = game();
+    calm(&mut g);
+    g.strike_accord(Seat(0), Seat(1), vec![Term::NonAggression]).unwrap();
+    g.end_accord(Seat(1), Seat(0));
+    g.settle_accords();
+    assert_eq!(accord_endings(&g), vec![format!("Your Accord with {} has ended: {} called it off.", pro(&g), pro(&g))]);
+    // The player called it off: no Moment.
+    let mut g = game();
+    calm(&mut g);
+    g.strike_accord(Seat(0), Seat(1), vec![Term::NonAggression]).unwrap();
+    g.end_accord(Seat(0), Seat(1));
+    g.settle_accords();
+    assert!(g.accords.is_empty(), "it lapsed");
+    assert!(accord_endings(&g).is_empty(), "the player knows: {:?}", accord_endings(&g));
+    // Broken, by either side.
+    let mut g = game();
+    g.strike_accord(Seat(0), Seat(1), vec![Term::NonAggression]).unwrap();
+    g.break_accord(Seat(1), Seat(0));
+    assert_eq!(accord_endings(&g), vec![format!("Your Accord with {} has ended: {} broke it.", pro(&g), pro(&g))]);
+    let mut g = game();
+    g.strike_accord(Seat(0), Seat(1), vec![Term::NonAggression]).unwrap();
+    g.break_accord(Seat(0), Seat(1));
+    assert_eq!(accord_endings(&g), vec![format!("Your Accord with {} has ended: you broke it.", pro(&g))]);
+}
+
+/// Ticket #538: the Moment is always shown, past the cap of two a turn.
+#[test]
+fn an_accord_ending_is_shown_past_the_cap() {
+    let mut g = game();
+    for _ in 0..3 {
+        g.moment(MomentKind::ColonyFounded, &[("faction", "x".into()), ("colony", "y".into()), ("note", "z".into()), ("n", "4".into())], None);
+    }
+    g.strike_accord(Seat(0), Seat(1), vec![Term::NonAggression]).unwrap();
+    g.break_accord(Seat(1), Seat(0));
+    let shown: Vec<MomentKind> = g.report.moments_shown(&|_| true).iter().map(|m| m.kind).collect();
+    assert_eq!(shown.iter().filter(|k| **k == MomentKind::ColonyFounded).count(), 2, "the cap holds for the rest: {shown:?}");
+    assert!(shown.contains(&MomentKind::AccordEnded), "and the ending is shown beside them: {shown:?}");
+}
+
+/// Ticket #538: the player is warned at the head of an Accord's last turn, under Your works, in a
+/// line of its own kind (the window opens the Factions window from it); not where the partner has
+/// already refused, which has its own line.
+#[test]
+fn the_player_is_warned_the_turn_before_an_accord_ends() {
+    let mut g = game();
+    calm(&mut g);
+    g.strike_accord(Seat(0), Seat(1), vec![Term::NonAggression]).unwrap();
+    for _ in 0..3 {
+        accord_turn(&mut g);
+    }
+    let warned = |g: &Game| g.report.lines.iter().filter(|l| l.kind == LineKind::Accord).map(|l| l.text.clone()).collect::<Vec<_>>();
+    assert!(warned(&g).is_empty(), "not before its last turn");
+    accord_turn(&mut g);
+    let pro = g.seat_name(Seat(1));
+    assert_eq!(warned(&g), vec![format!("Your Accord with {pro} ends after this turn.")]);
+    assert_eq!(LineKind::Accord.section(None), Section::YourWorks);
+    // A partner that will not renew: its own line, no warning.
+    let mut g = game();
+    calm(&mut g);
+    g.strike_accord(Seat(0), Seat(1), vec![Term::NonAggression]).unwrap();
+    g.relations.score[1][0] = -5;
+    for _ in 0..4 {
+        accord_turn(&mut g);
+    }
+    assert!(warned(&g).is_empty(), "{:?}", warned(&g));
+    assert!(g.report.lines.iter().any(|l| l.text.contains("let your Accord lapse")));
+}
+
+/// Ticket #538: each computer seat's paragraph opened, as the orders phase opens them before the
+/// Resolution and the settle add to them.
+fn open_paragraphs(g: &mut Game) {
+    let ai: Vec<Seat> = Seat::ALL.into_iter().filter(|s| g.seat(*s).ai).collect();
+    for seat in ai {
+        g.report.ai_lines.push(AiReport { seat, deeds: Vec::new(), places: Vec::new() });
+    }
+}
+
+/// Ticket #538: an Accord between two rivals that ends is a clause of a rival's paragraph, under
+/// the fog; no Moment.
+#[test]
+fn a_rivals_accord_ending_is_a_rivals_line() {
+    let mut g = game();
+    calm(&mut g);
+    g.spectator = true;
+    let (a, b) = (Seat(1), Seat(2));
+    g.strike_accord(a, b, vec![Term::NonAggression]).unwrap();
+    open_paragraphs(&mut g);
+    g.break_accord(a, b);
+    assert!(accord_endings(&g).is_empty(), "no Moment for two rivals");
+    let para = g.rival_paragraph(a).unwrap_or_default();
+    assert!(para.contains(&format!("broke their Accord with {}", g.seat_name(b))), "{para}");
+    let mut g = game();
+    calm(&mut g);
+    g.spectator = true;
+    g.strike_accord(a, b, vec![Term::NonAggression]).unwrap();
+    g.relations.score[b.index()][a.index()] = -5;
+    for _ in 0..4 {
+        accord_turn(&mut g);
+    }
+    open_paragraphs(&mut g);
+    g.settle_accords();
+    let para = g.rival_paragraph(b).unwrap_or_default();
+    assert!(para.contains(&format!("let their Accord with {} lapse", g.seat_name(a))), "{para}");
+}
+
+/// Ticket #538, found in review: a refusal to renew is forgotten once the Accord's run starts
+/// afresh, so a later ending is not blamed on it; and an Accord ends once, with one Moment, whatever
+/// else its last turn holds.
+#[test]
+fn an_accord_ending_forgets_an_old_refusal_and_fires_once() {
+    let mut g = game();
+    calm(&mut g);
+    g.strike_accord(Seat(0), Seat(1), vec![Term::NonAggression]).unwrap();
+    g.relations.score[1][0] = -5;
+    for _ in 0..4 {
+        accord_turn(&mut g);
+    }
+    assert_eq!(g.accords[0].refused_by, Some(Seat(1)), "the premise: refused at the head of its last turn");
+    // Renewed in that turn after all: its five start afresh.
+    g.relations.score[1][0] = 0;
+    g.renew_accord(Seat(0), Seat(1));
+    assert_eq!(g.accord_turns_left(&g.accords[0]), 6, "renewed");
+    for _ in 0..5 {
+        accord_turn(&mut g);
+    }
+    g.report.moments.clear();
+    g.settle_accords();
+    let pro = g.seat_name(Seat(1));
+    assert_eq!(accord_endings(&g), vec![format!("Your Accord with {pro} has ended: its five turns are up.")]);
+    // Called off in its last turn: one ending, the calling off.
+    let mut g = game();
+    calm(&mut g);
+    g.strike_accord(Seat(0), Seat(1), vec![Term::NonAggression]).unwrap();
+    for _ in 0..4 {
+        accord_turn(&mut g);
+    }
+    g.report.moments.clear();
+    g.end_accord(Seat(1), Seat(0));
+    g.settle_accords();
+    assert_eq!(accord_endings(&g), vec![format!("Your Accord with {pro} has ended: {pro} called it off.")]);
+}
+
+/// Ticket #538, found in review: two rivals' ending is hidden by the fog from a player who holds no
+/// Accord with either and is not Friendly with them.
+#[test]
+fn a_rivals_accord_ending_is_under_the_fog() {
+    let mut g = game();
+    calm(&mut g);
+    let (a, b) = (Seat(1), Seat(2));
+    g.strike_accord(a, b, vec![Term::NonAggression]).unwrap();
+    open_paragraphs(&mut g);
+    g.break_accord(a, b);
+    assert!(!g.sees_doings(Seat(0), a), "the premise: the fog is down");
+    assert!(g.rival_paragraph(a).is_none_or(|p| !p.contains("broke their Accord")), "{:?}", g.rival_paragraph(a));
 }

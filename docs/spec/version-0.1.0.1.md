@@ -172,3 +172,25 @@ Ticket: [The prices: Influence at 4, Strip Permits at 25, Mines and builds](http
   Mine that makes as much, and a Moon Mine (5.6) no longer matches China's (6.6); Vesta's (6.8) does.
 - **Refutation:** a Strip Permit issued with 24 Ducats, a Habitat priced 25, or a Moon Mine making
   6.6 shows this section unbuilt.
+
+## 7. A popup when an Accord ends, and a warning the turn before
+
+Ticket: [A popup when an Accord ends, and a warning the turn before](https://github.com/whaleyjoshua2/Dying-Earth/issues/538).
+
+- **A Moment, Accord Ended**, for every ending the player is party to, the cause in its words:
+  *"Your Accord with Prospectors has ended: its five turns are up."* / *"... Prospectors would not
+  renew."* / *"... Prospectors called it off."* / *"... Prospectors broke it."* / *"... you broke
+  it."* None where the player called it off themself. Its figure is the partner's name, in its colour.
+- **Always shown**, beside the two Moments a turn may otherwise stop for.
+- **The warning:** at the head of an Accord's last turn, where the partner would renew, a Your works
+  line, *"Your Accord with Prospectors ends after this turn."* (the designer's "ends next turn",
+  worded for the turn it is read in); clicked, it opens the Factions window, where Renew stands.
+  Where the partner will not renew, its own line stands as before ("let your Accord lapse").
+- **Two rivals' Accord** ending is a clause of a rival's paragraph, under the fog: *"broke their
+  Accord with ..."* or *"let their Accord with ... lapse"*. (One called off already has its clause;
+  between two computer seats both willing, an Accord renews and never just runs out.) No Moment.
+- **The text tool** prints the Moments the window stops for (`MOMENT: ...`), the warning among the
+  Report's lines, and takes `accord renew <faction>`.
+- No rule moves.
+- **Refutation:** an Accord of the player's that ends with no Moment, or a last turn with no warning
+  where the partner would renew, shows this section unbuilt.

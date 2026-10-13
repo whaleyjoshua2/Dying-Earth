@@ -128,6 +128,8 @@ fn moment_from_id(name: &str) -> Option<MomentKind> {
         "first" => Some(MomentKind::FirstToABody),
         // Ticket #405 (version 0.09.4): staged by the `moment:sink` aid.
         "sink" => Some(MomentKind::UnderTheSink),
+        // Ticket #538 (version 0.1.0.1): staged by the `moment:accord` aid.
+        "accord" => Some(MomentKind::AccordEnded),
         _ => None,
     }
 }
@@ -867,13 +869,13 @@ fn build_board(session: &mut Session) {
         // Terms with seat 1, for the hover on its line in the Factions window.
         if std::env::args().any(|a| a == "accord:all") {
             let turn = g.turn;
-            g.accords.push(Accord { a: Seat(0), b: Seat(1), terms: vec![Term::NonAggression, Term::Passage, Term::Refuel, Term::ResearchAgreement], struck: turn, paid: turn, ending: false, since: turn });
+            g.accords.push(Accord { a: Seat(0), b: Seat(1), terms: vec![Term::NonAggression, Term::Passage, Term::Refuel, Term::ResearchAgreement], struck: turn, paid: turn, ending: false, since: turn, ended_by: None, refused_by: None });
         }
         // `accord:some` (a building aid, ticket #509, version 0.1.0.0): seat 0 holds non-aggression alone
         // with seat 1, so the card shows its turns left and the Terms it lacks, to add.
         if std::env::args().any(|a| a == "accord:some") {
             let turn = g.turn;
-            g.accords.push(Accord { a: Seat(0), b: Seat(1), terms: vec![Term::NonAggression], struck: turn, paid: turn, ending: false, since: turn });
+            g.accords.push(Accord { a: Seat(0), b: Seat(1), terms: vec![Term::NonAggression], struck: turn, paid: turn, ending: false, since: turn, ended_by: None, refused_by: None });
         }
         // `accord:last` (a building aid, ticket #509, version 0.1.0.0): seat 0 holds non-aggression with
         // seat 1 in its last turn, so the card's Renew button can be photographed; with `turns:4`, as
@@ -881,7 +883,20 @@ fn build_board(session: &mut Session) {
         if std::env::args().any(|a| a == "accord:last") {
             let at = g.turn.saturating_sub(4);
             g.accords.retain(|x| !x.holds(Seat(0), Seat(1)));
-            g.accords.push(Accord { a: Seat(0), b: Seat(1), terms: vec![Term::NonAggression], struck: at, paid: at, ending: false, since: at });
+            g.accords.push(Accord { a: Seat(0), b: Seat(1), terms: vec![Term::NonAggression], struck: at, paid: at, ending: false, since: at, ended_by: None, refused_by: None });
+        }
+        // `moment:accord` (a building aid, ticket #538, version 0.1.0.1): the Prospectors in seat 1
+        // call off an Accord with the player, so the next turn's Report carries its ending.
+        // `accord:warn`: one in its fourth turn, so the next turn's Report warns of its last.
+        if std::env::args().any(|a| a == "moment:accord" || a == "accord:warn") {
+            let at = if std::env::args().any(|a| a == "accord:warn") { g.turn.saturating_sub(3) } else { g.turn };
+            g.accords.retain(|x| !x.holds(Seat(0), Seat(1)));
+            g.accords.push(Accord { a: Seat(0), b: Seat(1), terms: vec![Term::NonAggression], struck: at, paid: at, ending: false, since: at, ended_by: None, refused_by: None });
+            if std::env::args().any(|a| a == "moment:accord") {
+                g.end_accord(Seat(1), Seat(0));
+            }
+            refuse_any_card(g);
+            g.end_turn(std::array::from_fn(|_| Vec::new())).expect("the screenshot harness picks a Tech before it drives turns");
         }
         // `accords:0` (a building aid, ticket #430, version 0.09.5): every Accord struck, so a picture
         // after driven turns shows the fog as a seat with no Accord sees it.
@@ -1647,7 +1662,7 @@ fn build_board(session: &mut Session) {
         && let Some(g) = session.game.as_mut()
     {
         let turn = g.turn;
-        g.accords.push(Accord { a: Seat(0), b: Seat(2), terms: vec![Term::NonAggression], struck: turn, paid: turn, ending: false, since: turn });
+        g.accords.push(Accord { a: Seat(0), b: Seat(2), terms: vec![Term::NonAggression], struck: turn, paid: turn, ending: false, since: turn, ended_by: None, refused_by: None });
         g.offers.push(dying_earth_engine::state::Offer { from: Seat(2), to: Seat(0), terms: vec![Term::Passage], trade: None, turn, ask: AccordAsk::Add });
     }
     // Ticket #495 (version 0.09.9): `offer:<n>` (a building aid): the first n computer seats each

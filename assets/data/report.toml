@@ -88,6 +88,14 @@ army_inherited = "{army}, in {place}, now answers to you, on Hold."
 accord_refused = "{faction} refused your Accord."
 # Ticket #509 (version 0.1.0.0): an Accord in its last turn the other side would not renew.
 accord_let_lapse = "{faction} let your Accord lapse."
+# Ticket #538 (version 0.1.0.1): the warning at the head of an Accord's last turn, and the causes the
+# Accord Ended Moment names.
+accord_ends_soon = "Your Accord with {faction} ends after this turn."
+accord_cause_ran_out = "its {turns} turns are up"
+accord_cause_not_renewed = "{faction} would not renew"
+accord_cause_called_off = "{faction} called it off"
+accord_cause_broken = "{faction} broke it"
+accord_cause_you_broke = "you broke it"
 # Ticket #509: Terms added to an Accord that stands.
 accord_added = "Terms added to your Accord with {faction}."
 # Ticket #496 (version 0.09.9): a Trade answered, or failed for goods gone by the answer.
@@ -371,6 +379,9 @@ propose_trade = "offered {faction} a Trade"
 end_accord = "ended their Accord with {faction}"
 # Ticket #509 (version 0.1.0.0): an Accord renewed in its last turn.
 renew_accord = "renewed their Accord with {faction}"
+# Ticket #538 (version 0.1.0.1): a rivals' Accord ending, as the board could see it.
+accord_lapsed = "let their Accord with {faction} lapse"
+accord_broke = "broke their Accord with {faction}"
 tribute = "paid {faction} a tribute"
 build_facility = "began a {building} in {state}"
 build_facility_ducats = "bought a {building} in {state}"
@@ -462,6 +473,12 @@ text = "{place} changed hands."
 figure = "{faction}"
 
 # Ticket #405 (version 0.09.4): the climate's first good news, in the designer's words.
+# Ticket #538 (version 0.1.0.1): an Accord of the player's has ended.
+[moments.accord_ended]
+on = true
+text = "Your Accord with {faction} has ended: {cause}."
+figure = "{faction}"
+
 [moments.under_the_sink]
 on = true
 text = "For the first time, the world takes more carbon out of the air than it puts in. Unrest eases by {ease} in every Region, {custodians} in the Custodians'."

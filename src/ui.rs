@@ -446,6 +446,9 @@ enum Action {
     AnswerOffer(usize, bool),
     /// Ticket #58: a Report line was clicked; go where it points.
     GoTo(ReportPlace),
+    /// Ticket #538 (version 0.1.0.1): an Accord's warning line was clicked; the Factions window,
+    /// where Renew stands.
+    OpenFactions,
     ChooseFaction(FactionKind),
     NewGame(FactionKind, StateId),
     /// Ticket #169 (version 0.07.5): the Tutorial button on the title screen.
@@ -1579,6 +1582,10 @@ pub fn draw(
                     }
                 }
                 view.attack_preview = false;
+            }
+            Action::OpenFactions => {
+                view.popup = Popup::None;
+                view.show_factions = true;
             }
             Action::Spectate => {
                 session.spectate();
@@ -3088,6 +3095,14 @@ fn faction_coloured(ui: &Ui, game: &Game, session: &Session, text: &str, style: 
 
 /// Ticket #431 (version 0.09.5): one Report line, a way to its place where it has one.
 fn report_line_ui(ui: &mut Ui, game: &Game, session: &Session, l: &dying_earth_engine::report::ReportLine, actions: &mut Vec<Action>) {
+    // Ticket #538 (version 0.1.0.1): an Accord in its last turn opens the Factions window.
+    if l.kind == dying_earth_engine::report::LineKind::Accord {
+        let text = faction_coloured(ui, game, session, &l.text, egui::TextStyle::Button);
+        if ui.add(egui::Button::new(text).frame(false)).on_hover_text("Renew it in the Factions window").clicked() {
+            actions.push(Action::OpenFactions);
+        }
+        return;
+    }
     match l.place {
         Some(place) => {
             // Ticket #127 (version 0.07.2): a line that points somewhere wears the glyph of what it
