@@ -141,19 +141,25 @@ belong to the tool are kept apart below.
 - **Offer contents:** Trades and Accord offers must be answered without seeing their Terms (all four).
 - **Rivals' Standing** in a country; a warning when a rival is spending on one of yours, when your
   home is at risk, and when an Accord ends next turn.
-- **Costs, yields and what a building does** (in the window these are on the build buttons; in the
-  text tool nowhere). What Leapfrog does. Each building's emissions before you build it.
+- **What Leapfrog does.**
 - **The founding rule** (four people) before launch; what "needs 4 Colonists" means for a station
   (4 Pioneers waiting in a Region with a Launch Site); a warning when Pioneers are recruited where
   there is no Launch Site.
 - **The Influence order's result**: "your Standing would be X of Y needed".
-- **The Tech tree's prerequisites**, and the route to each Faction's gate.
 - **A launch window opening next turn**; turns of Energy left; your own losses (sea level, occupation,
   shutdowns) under "Your works".
 - **The win as the headline**, and the doom clock and Victory progress at the top of every Report.
 
 ## 4. Text-tool gaps (not the game window)
 
+- **Costs, yields and what a building does, and its Emissions before you build it** (testers 2, 3).
+  The window has them: the cost on each build button, and on its hover the yield in that Region (an
+  Investment Bank's GDP-scaled Ducats included), what it does, its Energy upkeep and its Emissions;
+  the Scrubber's button carries the state's cap. The text tool printed none of it.
+- **The Tech tree's prerequisites**, and the route to each Faction's gate (tester 3). The window
+  draws the tree with a line from every Tech to each that needs it; a hover lights the hovered Tech's
+  path back to the root and fades the rest, and its tooltip says "Needs: …". The text tool had no
+  command that printed the tree.
 - **No order to raise a tier** (Settlement, Colony, Colonial Capital). All four hit it; it made the
   Arkwrights' Capital requirement **untestable** in this playtest.
   **Fixed (2026-10-12, ticket #526):** `upgrade <colony>` raises a Colony or station to its next
