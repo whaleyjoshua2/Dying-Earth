@@ -1856,6 +1856,9 @@ impl Game {
         // one spend across three orders would cost three times the damage, which is exactly the trap
         // 0.08.0's flat per-turn charge was written to avoid.
         let mut charged: Vec<(Seat, Seat, Target)> = Vec::new();
+        // Ticket #542 (version 0.1.0.1): each rival's spend on a place the player holds, summed, for
+        // the lines written once the takings are settled.
+        let mut on_yours: Vec<(Seat, Place, i64, i64)> = Vec::new();
         for (seat, target, amount) in spent {
             let own = self.place_control(target).controller() == Some(seat);
             // Ticket #187 (version 0.08.0): Resistance. An outsider's Influence buys less Standing at
@@ -1872,6 +1875,15 @@ impl Game {
                 if !charged.contains(&(seat, victim, target)) {
                     charged.push((seat, victim, target));
                     self.offend_by(seat, victim, 1);
+                }
+            }
+            if seat != Seat(0) && !self.spectator && self.place_control(target).controller() == Some(Seat(0)) {
+                match on_yours.iter_mut().find(|(r, p, _, _)| *r == seat && *p == target) {
+                    Some(e) => {
+                        e.2 += amount;
+                        e.3 += gained;
+                    }
+                    None => on_yours.push((seat, target, amount, gained)),
                 }
             }
             let s = self.seat_mut(seat);
@@ -1971,6 +1983,33 @@ impl Game {
                 }
             };
             self.transfer_control(target, winner, "Influence");
+        }
+        self.warn_rival_spending(&on_yours);
+    }
+
+    /// Ticket #542 (version 0.1.0.1): a rival's spend on a place the player still holds is a Your
+    /// works line, the rival's Standing against what takes it, whatever the fog; and where one more
+    /// such turn reaches the bar on the player's home (the Region they started in) or their only
+    /// working Launch Site's Region, a second line says it could fall.
+    fn warn_rival_spending(&mut self, on_yours: &[(Seat, Place, i64, i64)]) {
+        let home = self.seat(Seat(0)).home.map(Place::State);
+        // The review: the Regions the player holds, as the spend's own test reads them, not those it directs.
+        let sites: Vec<StateId> = StateId::ALL.into_iter().filter(|s| self.state(*s).control.controller() == Some(Seat(0)) && self.state(*s).facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working())).collect();
+        let only_site = (sites.len() == 1).then(|| Place::State(sites[0]));
+        for &(rival, target, amount, gained) in on_yours {
+            if self.place_control(target).controller() != Some(Seat(0)) {
+                continue;
+            }
+            let standing = self.seat(rival).influence.get(&target).copied().unwrap_or(0);
+            let needed = self.influence_needed_for(rival, target);
+            let (faction, place) = (self.seat_name(rival), self.place_name(target));
+            let args = [("faction", faction.clone()), ("n", amount.to_string()), ("place", place.clone()), ("standing", standing.to_string()), ("needed", needed.to_string())];
+            let text = self.say("rival_spent_on_yours", &args);
+            self.report_line_of(Seat(0), LineKind::YourWorks, LineKind::Note, Some(target.into()), text);
+            if (Some(target) == home || Some(target) == only_site) && standing + gained >= needed {
+                let text = self.say("could_fall", &[("place", place), ("faction", faction)]);
+                self.report_line_of(Seat(0), LineKind::YourWorks, LineKind::Note, Some(target.into()), text);
+            }
         }
     }
 

@@ -231,3 +231,18 @@ Ticket: [Playtest information: the founding rule, Pioneers without a Launch Site
 - **The text tool:** a Colony Ship's Colonists read aboard/room with "(4 found a Colony)" at one to
   three.
 - No rule moves.
+
+## 10. A rival spending on yours, and your home at risk
+
+Ticket: [Playtest information: a rival spending on your Region, your home at risk](https://github.com/whaleyjoshua2/Dying-Earth/issues/542).
+
+- **A rival's spend on a place the player holds** (Region, Colony or station), summed for the turn,
+  is a Your works line, *"Prospectors spent 12 on China: 60 of 69."*, the rival's Standing after it
+  against what takes it, as the bar stands after the turn's decay. The fog does not hide it. None
+  where the place changed hands that turn.
+- **Home at risk**, a second Your works line, not a Moment: *"China could fall to Prospectors next
+  turn."*, where the rival's Standing plus what it spent there this turn reaches the bar, on the
+  player's home (the Region they started in, recorded from this version; a save from before has
+  none) or their only working Launch Site's Region.
+- The Pressed list stands. The text tool prints both lines with the Report.
+- No rule moves.

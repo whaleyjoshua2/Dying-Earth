@@ -20139,10 +20139,11 @@ fn the_reports_templates_stay_under_their_word_ceiling() {
     // Ticket #517 (version 0.1.0.0): and by the 12 of an Accord broken, told to each side.
     // Ticket #519 (version 0.1.0.0): and by the 9 of an Army inherited on Hold.
     // Ticket #523 (version 0.1.0.0): and by the 9 of a place handed over twice in a turn.
+    // Ticket #542 (version 0.1.0.1): and by the 15 of a rival's spend on yours and a home at risk.
     // Ticket #538 (version 0.1.0.1): and by the 46 of an Accord's end: its Moment and five causes,
     // the warning the turn before, and two rivals' clauses.
     // Ticket #544 (version 0.1.0.1): and by the 33 of a window next turn and the Report's head.
-    assert!(words <= 1942, "the Report's templates hold {words} words; the ceiling is 1,942 (33 for a window and the head, 46 for an Accord's end, 9 for a place handed over twice, 9 for an Army inherited, 12 for an Accord broken, 15% off 2,031, 54 for the race to the Moon, 2 for a rival's upgrade, 8 for an Accord answered, less a word of slack, 17 for a Trade, 9 for a Capital refunded, 5 for an Accord let lapse, 7 for Terms added, 5 for a renewal)");
+    assert!(words <= 1957, "the Report's templates hold {words} words; the ceiling is 1,957 (15 for a rival on yours, 33 for a window and the head, 46 for an Accord's end, 9 for a place handed over twice, 9 for an Army inherited, 12 for an Accord broken, 15% off 2,031, 54 for the race to the Moon, 2 for a rival's upgrade, 8 for an Accord answered, less a word of slack, 17 for a Trade, 9 for a Capital refunded, 5 for an Accord let lapse, 7 for Terms added, 5 for a renewal)");
     // "The" is gone before a Faction's name, which is drawn in its colour instead.
     assert!(!text.contains("he {faction}"), "a template still says \"the {{faction}}\"");
 }
@@ -22832,4 +22833,67 @@ fn the_reports_head_says_the_clock_and_your_victory() {
     // The Victory windows' own rounding, `{:.0}` (found in review).
     let pct = format!("{:.0}", g.progress(Seat(0)).score() * 100.0);
     assert_eq!(g.report_head(), format!("{clock} · Your Victory: {pct}%"));
+}
+
+// ---------------------------------------------------------------- #542 a rival on yours (version 0.1.0.1)
+
+/// Ticket #542 (version 0.1.0.1): a rival's Influence spent on a place the player holds is a Your
+/// works line, whatever the fog -- its Standing after, against what takes it -- and where one more
+/// such turn would take the player's home (or their only working Launch Site's Region), a second
+/// line says so.
+#[test]
+fn a_rival_spending_on_yours_is_your_news_and_your_home_at_risk_says_so() {
+    let mut g = game();
+    calm(&mut g);
+    let home = StateId::EastAsia;
+    let place = Place::State(home);
+    assert_eq!(g.place_control(place).controller(), Some(Seat(0)), "the premise: the player's home");
+    let rival = Seat(1);
+    let needed = g.influence_needed_for(rival, place);
+    let gained = g.standing_from(place, 12);
+    // Short of the bar after the spend, within one more such spend of it.
+    let before = needed - 2 * gained + 1;
+    assert!(before > 0 && gained > 0, "the premise: {before}, {gained} of {needed}");
+    g.seats[1].influence.insert(place, before);
+    g.pending.influence.push((rival, place, 12));
+    g.report.lines.clear();
+    g.resolution_phase();
+    assert_eq!(g.place_control(place).controller(), Some(Seat(0)), "not taken this turn");
+    let after = before + gained;
+    // The bar as it stands after the turn: the holder's own Standing decays in the same Resolution.
+    let needed = g.influence_needed_for(rival, place);
+    let seen = g.report_seen_by(Seat(0));
+    let mine: Vec<&String> = seen.lines.iter().filter(|l| l.mine || l.kind == LineKind::YourWorks).map(|l| &l.text).collect();
+    let (pro, china) = (g.seat_name(rival), g.tables.state(home).name.clone());
+    assert!(mine.contains(&&format!("{pro} spent 12 on {china}: {after} of {needed}.")), "{mine:?} wanted {after} of {needed}, before {before} + {gained}");
+    assert!(mine.contains(&&format!("{china} could fall to {pro} next turn.")), "{mine:?}");
+    assert!(seen.lines.iter().filter(|l| l.text.contains("could fall")).all(|l| l.section() == Section::YourWorks));
+    // Home on its own (found in review): a second working Launch Site, so China is not the only
+    // one, and the warning comes from the home alone.
+    let mut g = game();
+    calm(&mut g);
+    g.take_control(StateId::Japan, Seat(0));
+    g.state_mut(StateId::Japan).facilities.push(facility(FacilityKind::LaunchSite));
+    g.seats[1].influence.insert(place, before);
+    g.pending.influence.push((rival, place, 12));
+    g.report.lines.clear();
+    g.resolution_phase();
+    assert!(g.report.lines.iter().any(|l| l.text == format!("{china} could fall to {pro} next turn.")), "the home alone warns");
+    // Taken this very turn: nothing more than the taking.
+    let mut g = game();
+    calm(&mut g);
+    g.seats[1].influence.insert(place, needed);
+    g.pending.influence.push((rival, place, 12));
+    g.report.lines.clear();
+    g.resolution_phase();
+    assert_eq!(g.place_control(place).controller(), Some(rival), "the premise: taken");
+    assert!(!g.report.lines.iter().any(|l| l.text.contains(" spent 12 on ") || l.text.contains("could fall")), "{:?}", g.report.lines.iter().map(|l| &l.text).collect::<Vec<_>>());
+    // Far from the bar: the spending line alone.
+    let mut g = game();
+    calm(&mut g);
+    g.pending.influence.push((rival, place, 3));
+    g.report.lines.clear();
+    g.resolution_phase();
+    assert!(g.report.lines.iter().any(|l| l.text.starts_with(&format!("{pro} spent 3 on {china}"))));
+    assert!(!g.report.lines.iter().any(|l| l.text.contains("could fall")));
 }

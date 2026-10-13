@@ -237,3 +237,29 @@ and the Ship card's own pins moved to the new hover. No rule moved; no sweep.
 doc comment spliced onto the wrong function, fixed; and a point for the designer, not changed: the
 station's refusal "needs 4 Pioneers here" shows on the orbit's Build button, where "here" reads as
 the slot, and with several Launch Site Regions it does not say which.
+
+## A rival spending on yours, and your home at risk
+
+Ticket [#542](https://github.com/whaleyjoshua2/Dying-Earth/issues/542), spec §10. At the designer's
+word the home warning is a line, not a Moment.
+
+**The picture** ([`ticket-542/`](ticket-542/)): `rival-report.png` (`rival:spend menus:1`, a new
+aid: the Prospectors spend 12 on China, holding a Standing two spends short), Your works with
+"Prospectors spent 12 on China: 60 of 69." and "China could fall to Prospectors next turn.", the
+command cluster's "China is Pressed by a rival." beside it.
+
+**Found on the way.** The game kept no home for a seat once it was seated; each seat now records the
+Region it started in. And the bar a line reports is the one after the turn: the holder's own
+Standing decays in the same Resolution, so 70 before the turn was 69 after it (the test first
+expected 70).
+
+**Tests.** One, watched red before the build (no line at all) and on its risk arm (the spend not
+counted). The word ceiling rises by the 15 words added. No rule moved; no sweep.
+
+**The review** (an agent that did not build it) found no blocking defect. Fixed: the test never
+read the home on its own, since China was both home and the only Launch Site (now a second site
+leaves the home alone to warn, watched red with the home unset, and a place taken that very turn
+says nothing more); and the only-Launch-Site count read the Regions the player directs, where the
+spend reads those it holds (now both read held). For the designer, not changed: "next turn" reads
+the bar as it stands, so the holder's own Embassy rise or decay next turn can make it a false
+alarm or a miss; and in the rare exact tie between two rivals a held-off rival reads "70 of 69".

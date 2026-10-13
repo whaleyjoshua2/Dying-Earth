@@ -898,6 +898,20 @@ fn build_board(session: &mut Session) {
             refuse_any_card(g);
             g.end_turn(std::array::from_fn(|_| Vec::new())).expect("the screenshot harness picks a Tech before it drives turns");
         }
+        // `rival:spend` (a building aid, ticket #542, version 0.1.0.1): the Prospectors spend 12 on
+        // the player's home, holding a Standing within two such spends of taking it, and the turn is
+        // ended, so the next Report says both lines.
+        if std::env::args().any(|a| a == "rival:spend")
+            && let Some(home) = g.seat(Seat(0)).home
+        {
+            let place = Place::State(home);
+            let gained = g.standing_from(place, 12);
+            let before = g.influence_needed_for(Seat(1), place) - 2 * gained + 1;
+            g.seats[1].influence.insert(place, before.max(1));
+            g.pending.influence.push((Seat(1), place, 12));
+            refuse_any_card(g);
+            g.end_turn(std::array::from_fn(|_| Vec::new())).expect("the screenshot harness picks a Tech before it drives turns");
+        }
         // `accords:0` (a building aid, ticket #430, version 0.09.5): every Accord struck, so a picture
         // after driven turns shows the fog as a seat with no Accord sees it.
         if std::env::args().any(|a| a == "accords:0") {

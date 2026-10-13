@@ -92,6 +92,9 @@ accord_let_lapse = "{faction} let your Accord lapse."
 # Accord Ended Moment names.
 # Ticket #544 (version 0.1.0.1): a far world's window the turn before it.
 window_next = "The {bodies} window is next turn: {turns} turns, {fuel} Fuel."
+# Ticket #542 (version 0.1.0.1): a rival on a place of the player's, and the home at risk.
+rival_spent_on_yours = "{faction} spent {n} on {place}: {standing} of {needed}."
+could_fall = "{place} could fall to {faction} next turn."
 accord_ends_soon = "Your Accord with {faction} ends after this turn."
 accord_cause_ran_out = "its {turns} turns are up"
 accord_cause_not_renewed = "{faction} would not renew"

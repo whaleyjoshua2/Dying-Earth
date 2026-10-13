@@ -516,6 +516,9 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("accord_let_lapse", &["faction"]),
     // Ticket #538 (version 0.1.0.1): the warning, and the causes an ending's Moment names.
     ("accord_ends_soon", &["faction"]),
+    // Ticket #542 (version 0.1.0.1).
+    ("rival_spent_on_yours", &["faction", "n", "place", "standing", "needed"]),
+    ("could_fall", &["place", "faction"]),
     // Ticket #544 (version 0.1.0.1).
     ("window_next", &["bodies", "turns", "fuel"]),
     ("accord_cause_ran_out", &["turns"]),
