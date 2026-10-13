@@ -6017,6 +6017,52 @@ impl Game {
         self.accords.retain(|acc| (acc.since.max(acc.struck) + run).saturating_sub(turn) > 1);
     }
 
+    /// Ticket #544 (version 0.1.0.1): the turn before a far world's window, a line under Ships
+    /// naming it, with the flight at the window as the map's hover gives it. A world's moons are
+    /// named with it, since they cross with it; the window's own turn says nothing more.
+    pub fn announce_windows(&mut self) {
+        let next = self.turn + 1;
+        for root in BodyId::ALL {
+            if root == BodyId::Earth || self.tables.body(root).parent.is_some() || self.crossing(BodyId::Earth, root, self.turn).is_none() {
+                continue;
+            }
+            if self.next_window_turn_to(root, self.turn) != next {
+                continue;
+            }
+            let names: Vec<String> = std::iter::once(root).chain(BodyId::ALL.into_iter().filter(|b| self.tables.body(*b).parent == Some(root))).map(|b| self.tables.body(b).name.clone()).collect();
+            let (turns, fuel) = self.transit_cost_at(BodyId::Earth, root, next);
+            let text = self.say("window_next", &[("bodies", Game::comma_list(&names)), ("turns", turns.to_string()), ("fuel", figure(fuel))]);
+            // The review: placeless, since a window is the board's own news and a Ship line at a
+            // world the player cannot see is dropped by the fog -- the very player it is for.
+            self.report_line(LineKind::Ship, None, text);
+        }
+    }
+
+    /// Ticket #544: names in a list with a comma between and "and" before the last.
+    fn comma_list(names: &[String]) -> String {
+        match names {
+            [] => String::new(),
+            [one] => one.clone(),
+            [rest @ .., last] => format!("{} and {last}", rest.join(", ")),
+        }
+    }
+
+    /// Ticket #544 (version 0.1.0.1): the line under the Report's date: the last turn to act, in the
+    /// Climate Panel's words, and the player's Victory as a share; a spectator's has the clock alone.
+    pub fn report_head(&self) -> String {
+        let clock = match self.last_turn_to_act() {
+            crate::climate::LastTurn::Turn(t) => self.phrase("clock_turn", &[("turn", t.to_string())]),
+            crate::climate::LastTurn::TooLate => self.phrase("clock_too_late", &[]),
+            crate::climate::LastTurn::NoCollapse => self.phrase("clock_none", &[]),
+        };
+        if self.spectator {
+            return clock;
+        }
+        // The review: the Victory windows' own rounding.
+        let pct = format!("{:.0}", self.progress(Seat(0)).score() * 100.0);
+        self.phrase("head", &[("clock", clock), ("pct", pct)])
+    }
+
     /// Ticket #538 (version 0.1.0.1): an Accord between `a` and `b` has ended. Each player in it
     /// gets the Accord Ended Moment naming the cause, but not one who called it off themself; two
     /// rivals' ending is a clause of a rival's paragraph (the side that called it off already has

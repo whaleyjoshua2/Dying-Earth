@@ -185,3 +185,30 @@ out, read "would not renew" (now cleared wherever its run starts afresh; tested,
 an Accord declared over in a save from before this version credited its first seat with calling it
 off (now it names nobody). Two tests added at its word: an ending fires once when it is called off
 in its last turn, and two rivals' ending is under the fog (watched red with the fog lifted).
+
+## The Report: a window next turn, your Regions lost to the sea, the clock and your Victory
+
+Ticket [#544](https://github.com/whaleyjoshua2/Dying-Earth/issues/544), spec §8. Energy left was
+dropped at the designer's word ("math is not hard").
+
+**The picture** ([`ticket-544/`](ticket-544/)): `window-report.png` (`turns:5 menus:1 reportopen:1`,
+seed 7), turn 6: under the date "On this path Collapse is not reached · Your Victory: 3%", and under
+Ships "The Mars, Phobos and Deimos window is next turn: 5 turns, 18.1 Fuel."
+
+**Measured, for the designer:** on seed 7 the turns before a window fall at Mars 6; Venus 8 and 17;
+Mercury 2 and 4; Ceres and Vesta 3 and 11. Mercury's window comes about every other turn, so its
+line will be a frequent one.
+
+**Tests.** Three, each watched red by taking its piece out (the line on the window's own turn, the
+sea line not marked the player's, the head with the clock alone) and green restored. A heading test
+listed the five headings without Ships, which its board never had; Ships is listed in its place. The
+word ceiling rises by the 33 words added. No rule moved; no sweep.
+
+**The review** (an agent that did not build it) found one serious defect and two small, all fixed.
+The window line pointed at its world, and the fog drops a Ship line at a world the player cannot
+see, so the player with nothing at Mars, the one it is for, never read it; my test read the raw
+Report. It is placeless now, and the test reads the Report under the fog (watched red: none
+shown). The head's percentage rounded half up where the Victory windows round half to even; it
+uses their rounding now. And the first Report never announced a window on turn 2; it does now
+(untested: seed 7 has none on turn 2). Left as it is: on a game-over Report the clock reads "Cuts
+alone no longer avoid Collapse", as the Climate Panel does.

@@ -483,6 +483,9 @@ impl Game {
         }
         self.log(headline);
         self.report_line(LineKind::SeaLevel, Some(ReportPlace::State(sid)), said.clone());
+        // Ticket #544 (version 0.1.0.1): a Region of the player's lost to the sea is their news.
+        let director = self.state(sid).control.director();
+        self.mark_mine(&[director]);
         self.moment(MomentKind::ClimateThreshold, &[("what", said), ("figure", figure)], Some(ReportPlace::State(sid)));
     }
 

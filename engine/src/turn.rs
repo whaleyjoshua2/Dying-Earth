@@ -50,6 +50,8 @@ impl Game {
             ],
         );
         self.report_line(LineKind::Seating, None, seating);
+        // Ticket #544 (version 0.1.0.1), the review: a window on turn 2 is said on turn 1 too.
+        self.announce_windows();
         let holding = self.say(
             "start_holding",
             &[
@@ -280,6 +282,8 @@ impl Game {
         self.answer_computer_offers();
         // Ticket #509 (version 0.1.0.0): and an Accord in its last turn is put to both sides.
         self.ask_renewals();
+        // Ticket #544 (version 0.1.0.1): and a far world's window the turn before it.
+        self.announce_windows();
         // Ticket #173 (version 0.07.6): the Archivists read the Tech under research for the whole of
         // the turn to come, frozen here. Their Provisional Findings gives them half its effect while
         // the turn is still being ordered, and a Lead that may change its pick would otherwise

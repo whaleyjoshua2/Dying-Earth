@@ -90,6 +90,8 @@ accord_refused = "{faction} refused your Accord."
 accord_let_lapse = "{faction} let your Accord lapse."
 # Ticket #538 (version 0.1.0.1): the warning at the head of an Accord's last turn, and the causes the
 # Accord Ended Moment names.
+# Ticket #544 (version 0.1.0.1): a far world's window the turn before it.
+window_next = "The {bodies} window is next turn: {turns} turns, {fuel} Fuel."
 accord_ends_soon = "Your Accord with {faction} ends after this turn."
 accord_cause_ran_out = "its {turns} turns are up"
 accord_cause_not_renewed = "{faction} would not renew"
@@ -294,6 +296,12 @@ energy_zero = "{faction}: Energy at zero with every producer off."
 # ---------------------------------------------------------------- fragments other sentences use
 [phrase]
 attacks = " and attacks"
+# Ticket #544 (version 0.1.0.1): the Report's head -- the clock in the Climate Panel's words, and
+# the player's Victory.
+head = "{clock} · Your Victory: {pct}%"
+clock_turn = "Last turn to act: {turn}"
+clock_too_late = "Cuts alone no longer avoid Collapse"
+clock_none = "On this path Collapse is not reached"
 # Ticket #481 (version 0.09.8): how far a rival had got in the race to the Moon when it was won.
 moon_no_shipyard = "{faction} had no Shipyard"
 moon_shipyard = "{faction} had a Shipyard"

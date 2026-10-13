@@ -516,6 +516,8 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("accord_let_lapse", &["faction"]),
     // Ticket #538 (version 0.1.0.1): the warning, and the causes an ending's Moment names.
     ("accord_ends_soon", &["faction"]),
+    // Ticket #544 (version 0.1.0.1).
+    ("window_next", &["bodies", "turns", "fuel"]),
     ("accord_cause_ran_out", &["turns"]),
     ("accord_cause_not_renewed", &["faction"]),
     ("accord_cause_called_off", &["faction"]),
@@ -684,6 +686,11 @@ pub fn ordinal(n: usize) -> String {
 
 /// The same for `[phrase]`.
 pub const PHRASE_ARGS: &[(&str, &[&str])] = &[
+    // Ticket #544 (version 0.1.0.1): the Report's head.
+    ("head", &["clock", "pct"]),
+    ("clock_turn", &["turn"]),
+    ("clock_too_late", &[]),
+    ("clock_none", &[]),
     // Ticket #481 (version 0.09.8): a rival's step in the race to the Moon.
     ("moon_no_shipyard", &["faction"]),
     ("moon_shipyard", &["faction"]),

@@ -12325,6 +12325,8 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 ui.set_width(620.0);
                 // Ticket #58: a dated bulletin.
                 ui.label(RichText::new(format!("Report, {}", game.date(game.report.turn).text())).size(20.0).strong());
+                // Ticket #544 (version 0.1.0.1): the clock and the player's Victory, under the date.
+                ui.label(RichText::new(game.report_head()).strong().color(Color32::from_rgb(240, 210, 120)));
                 // Ticket #50: who is at this table, and under which seed.
                 // Ticket #64: a spectator has no seat, so the line names all four.
                 ui.horizontal_wrapped(|ui| {

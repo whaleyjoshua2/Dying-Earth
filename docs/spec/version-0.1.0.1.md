@@ -194,3 +194,23 @@ Ticket: [A popup when an Accord ends, and a warning the turn before](https://git
 - No rule moves.
 - **Refutation:** an Accord of the player's that ends with no Moment, or a last turn with no warning
   where the partner would renew, shows this section unbuilt.
+
+## 8. The Report: a window next turn, your Regions lost to the sea, the clock and your Victory
+
+Ticket: [Playtest information: the Report's launch windows, Energy left, your losses, the clock and Victory at its head](https://github.com/whaleyjoshua2/Dying-Earth/issues/544).
+
+- **A window next turn:** the turn before a far world's window, a line under Ships, *"The Mars, Phobos
+  and Deimos window is next turn: 5 turns, 18.1 Fuel."*, the flight at the window as the Solar System
+  Map's hover gives it; every far world, its moons named with it. The window's own turn says nothing
+  more. It is the board's own news, so the fog does not hide it; the first Report says one on turn 2.
+- **Energy left: dropped** at the designer's word.
+- **A Region of the player's lost to the sea** reads under Your works, there alone (#523's rule for
+  the player's news).
+- **The Report's head:** under the date, *"Last turn to act: 41 · Your Victory: 62%"*; in place of
+  the clock, the Climate Panel's "Cuts alone no longer avoid Collapse" or "On this path Collapse is
+  not reached"; the Victory the Victory window's overall share. A spectator's has the clock alone.
+- **The text tool** prints the head line first under the Report's title, and the new lines with
+  the rest.
+- No rule moves.
+- **Refutation:** a turn before Mars's window whose Report does not say so, or a Report with no
+  clock under its date, shows this section unbuilt.

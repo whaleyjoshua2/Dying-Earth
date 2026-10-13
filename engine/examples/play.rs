@@ -1020,6 +1020,8 @@ fn print_costs(g: &Game) {
 
 fn print_report(g: &Game) {
     println!("\n=== REPORT, turn {} ===", g.report.turn);
+    // Ticket #544 (version 0.1.0.1): the clock and the player's Victory, first.
+    println!("{}", g.report_head());
     // Ticket #430 (version 0.09.5): the Report as seat 0 sees it under the fog (`--reveal` lifts it).
     let report = g.report_seen_by(Seat(0));
     if let Some(h) = report.headline() {

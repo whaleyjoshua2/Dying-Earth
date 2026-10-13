@@ -5426,7 +5426,7 @@ fn every_report_line_carries_its_kind_and_place_and_falls_under_the_right_headin
     let grouped: usize = g.report.sections().iter().map(|(_, l)| l.len()).sum();
     assert_eq!(grouped, g.report.lines.len() - 1, "every line but the headline is under a heading");
     let names: Vec<&str> = g.report.sections().iter().map(|(s, _)| s.name()).collect();
-    let wanted: Vec<&str> = ["In space", "On Earth", "The climate", "Your works"].into_iter().filter(|n| names.contains(n)).collect();
+    let wanted: Vec<&str> = ["In space", "On Earth", "The climate", "Ships", "Your works"].into_iter().filter(|n| names.contains(n)).collect();
     assert_eq!(names, wanted, "the headings come in their fixed order and empty ones are left out");
 }
 
@@ -20141,7 +20141,8 @@ fn the_reports_templates_stay_under_their_word_ceiling() {
     // Ticket #523 (version 0.1.0.0): and by the 9 of a place handed over twice in a turn.
     // Ticket #538 (version 0.1.0.1): and by the 46 of an Accord's end: its Moment and five causes,
     // the warning the turn before, and two rivals' clauses.
-    assert!(words <= 1909, "the Report's templates hold {words} words; the ceiling is 1,909 (46 for an Accord's end, 9 for a place handed over twice, 9 for an Army inherited, 12 for an Accord broken, 15% off 2,031, 54 for the race to the Moon, 2 for a rival's upgrade, 8 for an Accord answered, less a word of slack, 17 for a Trade, 9 for a Capital refunded, 5 for an Accord let lapse, 7 for Terms added, 5 for a renewal)");
+    // Ticket #544 (version 0.1.0.1): and by the 33 of a window next turn and the Report's head.
+    assert!(words <= 1942, "the Report's templates hold {words} words; the ceiling is 1,942 (33 for a window and the head, 46 for an Accord's end, 9 for a place handed over twice, 9 for an Army inherited, 12 for an Accord broken, 15% off 2,031, 54 for the race to the Moon, 2 for a rival's upgrade, 8 for an Accord answered, less a word of slack, 17 for a Trade, 9 for a Capital refunded, 5 for an Accord let lapse, 7 for Terms added, 5 for a renewal)");
     // "The" is gone before a Faction's name, which is drawn in its colour instead.
     assert!(!text.contains("he {faction}"), "a template still says \"the {{faction}}\"");
 }
@@ -22773,4 +22774,62 @@ fn a_rivals_accord_ending_is_under_the_fog() {
     g.break_accord(a, b);
     assert!(!g.sees_doings(Seat(0), a), "the premise: the fog is down");
     assert!(g.rival_paragraph(a).is_none_or(|p| !p.contains("broke their Accord")), "{:?}", g.rival_paragraph(a));
+}
+
+// ---------------------------------------------------------------- #544 the Report's news (version 0.1.0.1)
+
+/// Ticket #544 (version 0.1.0.1): the turn before a far world's window, a line under Ships names it
+/// with the flight at the window; Phobos and Deimos are named with Mars, whose window they share.
+/// The window's own turn says nothing more.
+#[test]
+fn the_report_says_a_launch_window_opens_next_turn() {
+    let mut g = game();
+    let t = (1..60).find(|t| g.next_window_turn_to(BodyId::Mars, *t) == *t + 1).expect("a Mars window within sixty turns");
+    g.turn = t;
+    g.report.lines.clear();
+    g.announce_windows();
+    let (turns, fuel) = g.transit_cost_at(BodyId::Earth, BodyId::Mars, t + 1);
+    // Read as the player reads it, under the fog, with nothing of theirs at Mars (found in review).
+    assert!(!g.spectator && !g.sees_report_place(Seat(0), ReportPlace::Body(BodyId::Mars)), "the premise: Mars unseen");
+    let seen = g.report_seen_by(Seat(0));
+    let lines: Vec<&ReportLine> = seen.lines.iter().filter(|l| l.text.contains("window")).collect();
+    let want = format!("The Mars, Phobos and Deimos window is next turn: {turns} turns, {} Fuel.", figure(fuel));
+    assert!(lines.iter().any(|l| l.text == want && l.kind == LineKind::Ship), "{want}: {:?}", lines.iter().map(|l| &l.text).collect::<Vec<_>>());
+    assert_eq!(LineKind::Ship.section(None), Section::Ships);
+    g.turn = t + 1;
+    g.report.lines.clear();
+    g.announce_windows();
+    assert!(!g.report.lines.iter().any(|l| l.text.contains("Mars")), "the window's own turn says nothing more");
+}
+
+/// Ticket #544: a Region of the player's lost to the sea reads under Your works, there alone.
+#[test]
+fn the_players_region_lost_to_the_sea_reads_under_your_works() {
+    let mut g = game();
+    let sid = StateId::EastAsia;
+    assert_eq!(g.state(sid).control.director(), Some(Seat(0)), "the premise: the player's");
+    g.report.lines.clear();
+    g.apply_sea_threshold(sid, 0);
+    let sea: Vec<&ReportLine> = g.report.lines.iter().filter(|l| l.kind == LineKind::SeaLevel).collect();
+    assert!(!sea.is_empty() && sea.iter().all(|l| l.mine), "{:?}", sea.iter().map(|l| (&l.text, l.mine)).collect::<Vec<_>>());
+    let in_works: usize = g.report.sections().iter().filter(|(s, _)| *s == Section::YourWorks).map(|(_, ls)| ls.iter().filter(|l| l.kind == LineKind::SeaLevel).count()).sum();
+    assert_eq!(in_works, sea.len() - g.report.headline().is_some_and(|h| h.kind == LineKind::SeaLevel) as usize);
+    // A rival's Region is the board's news.
+    g.report.lines.clear();
+    g.apply_sea_threshold(StateId::Europe, 0);
+    assert!(g.report.lines.iter().filter(|l| l.kind == LineKind::SeaLevel).all(|l| !l.mine));
+}
+
+/// Ticket #544: the Report's head: the last turn to act and the player's Victory, in a line.
+#[test]
+fn the_reports_head_says_the_clock_and_your_victory() {
+    let g = game();
+    let clock = match g.last_turn_to_act() {
+        LastTurn::Turn(t) => format!("Last turn to act: {t}"),
+        LastTurn::TooLate => "Cuts alone no longer avoid Collapse".to_string(),
+        LastTurn::NoCollapse => "On this path Collapse is not reached".to_string(),
+    };
+    // The Victory windows' own rounding, `{:.0}` (found in review).
+    let pct = format!("{:.0}", g.progress(Seat(0)).score() * 100.0);
+    assert_eq!(g.report_head(), format!("{clock} · Your Victory: {pct}%"));
 }
