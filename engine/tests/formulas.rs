@@ -22897,3 +22897,24 @@ fn a_rival_spending_on_yours_is_your_news_and_your_home_at_risk_says_so() {
     assert!(g.report.lines.iter().any(|l| l.text.starts_with(&format!("{pro} spent 3 on {china}"))));
     assert!(!g.report.lines.iter().any(|l| l.text.contains("could fall")));
 }
+
+/// Ticket #540 (version 0.1.0.1): the Arkwrights' Victory text says what the engine counts: a
+/// station over Earth counts toward the 42, Antarctica does not, and Earth is not one of the four.
+#[test]
+fn the_arkwrights_victory_text_says_what_the_engine_counts() {
+    let mut g = game();
+    let text = &g.tables.faction(FactionKind::Arkwrights).victory;
+    assert!(text.contains("(Antarctica does not count; Earth is not one of the four)"), "{text}");
+    assert!(!text.contains("stations over Earth do not count"), "{text}");
+    let ark = Seat(2);
+    assert_eq!(g.kind(ark), FactionKind::Arkwrights);
+    let before = g.off_world_colonists(ark);
+    let bodies = g.bodies_settled(ark, 4);
+    let station = colony(&mut g, ark, BodyId::Earth, &[], 6);
+    g.colony_mut(station).unwrap().in_orbit = true;
+    assert_eq!(g.off_world_colonists(ark), before + 6, "a station over Earth counts");
+    let ice = colony(&mut g, ark, BodyId::Earth, &[], 5);
+    assert!(!g.colony(ice).unwrap().in_orbit);
+    assert_eq!(g.off_world_colonists(ark), before + 6, "Antarctica does not");
+    assert_eq!(g.bodies_settled(ark, 4), bodies, "and Earth, its station and Antarctica, is not one of the four");
+}

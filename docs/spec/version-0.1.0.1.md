@@ -261,3 +261,13 @@ The window had all three; the text tool, which the playtest used, gains them. Th
 - **`help`** says what a Leapfrog does: its price, the drop per hundred million, the floor, and the
   Baseline cut. A renewal offer reads as the window's does.
 - No rule moves.
+
+## 12. The Arkwrights' Victory text on stations over Earth
+
+Ticket: [The Arkwrights' Victory text on stations over Earth](https://github.com/whaleyjoshua2/Dying-Earth/issues/540).
+
+- The text follows the engine. The Diaspora's clause reads *"(Antarctica does not count; Earth is
+  not one of the four)"*, where it said "Antarctica and stations over Earth do not count": a
+  station over Earth counts toward the 42; Antarctica does not; Earth, its stations and Antarctica
+  alike, is never one of the four Bodies.
+- No rule moves.

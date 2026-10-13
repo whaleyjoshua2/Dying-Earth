@@ -190,7 +190,7 @@ found_colony_unrest_ease = 1.0
 found_station_unrest_ease = 0.5
 # Ticket #203 (version 0.08.1). The building is ticket #183's.
 unique = "Spaceport -- replaces the Launch Site, and pays +1 Influence into next turn's Allotment for every Pioneer it lifts off Earth. Off Earth, the Chorus -- replaces the Relay, and adds +1 Influence to the Allotment for every 6 Colonists at its Colony."
-victory = "Diaspora: 42 Colonists living off Earth, on Colonies spread over at least four Bodies with at least 4 Colonists each, one of them holding a Colonial Capital of yours (Antarctica and stations over Earth do not count)."
+victory = "Diaspora: 42 Colonists living off Earth, on Colonies spread over at least four Bodies with at least 4 Colonists each, one of them holding a Colonial Capital of yours (Antarctica does not count; Earth is not one of the four)."
 victory_short = "get {first} Colonists living off Earth, spread over {bodies} Bodies, one holding a Colonial Capital,"
 # Ticket #506 (version 0.1.0.0): 42 (30 x 50/36) and four Bodies, with the game at fifty turns.
 victory_first = { kind = "colonists_off_earth", bar = 42 }

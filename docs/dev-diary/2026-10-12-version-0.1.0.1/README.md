@@ -280,3 +280,14 @@ moved; no sweep.
 renewal printed as a fresh Accord offer (now in the window's words, the dropped research agreement
 said; unexercised, since a player is not sent a renewal since #509); the Leapfrog help left out the
 Baseline cut of 0.1 (now said); and a comment named the wrong ticket.
+
+## The Arkwrights' Victory text on stations over Earth
+
+Ticket [#540](https://github.com/whaleyjoshua2/Dying-Earth/issues/540), spec §12. The ticket's draft,
+"(Earth is not one of the four)", would have dropped the half that was true: Antarctica's people
+live on Earth and count for nothing. The clause keeps it: "(Antarctica does not count; Earth is not
+one of the four)".
+
+**Tests.** One, reading the text and the engine side by side: watched red on the old text, and its
+four-Bodies arm watched red with Earth let into `bodies_settled`. No picture: the words are the
+data's, read by the Victory window as they stand. No rule moved; no sweep.
