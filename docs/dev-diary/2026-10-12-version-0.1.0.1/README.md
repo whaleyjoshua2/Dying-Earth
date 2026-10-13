@@ -111,3 +111,52 @@ beside its button. The glyph goes BEFORE the figures, at the designer's word, wh
 rule for a word after a figure would put it behind, so it is drawn as its own piece.
 
 No rule moved; no sweep.
+
+## The prices: Influence at 4, Strip Permits at 25, Mines and builds
+
+Ticket [#537](https://github.com/whaleyjoshua2/Dying-Earth/issues/537), spec §6.
+
+At the designer's word the figures themselves move, with no multiplier behind them: each price row
+x1.1, kept to the tenth (a Habitat 27.5), so the rows now carry tenths; the Earth Mine's row 4.4;
+each Body's Mine yield x0.85, Antarctica's among them.
+
+**The pictures** ([`ticket-537/`](ticket-537/)): `china-builds-earth.png`, China's card, "Scrubber
+33 / or 66" Ducats and "Build Army 27.5", its Output 6.6 Materials (the Mine's 4.4 x 1.5);
+`strip-permit-earth.png`, a Prospectors player's China, "Strip Permit 25" in Ducats. The Influence
+bar's hover is drawn with `on_hover_text`, which no headless picture reaches; a test reads it ("at 4
+Ducats each.", watched red on the old words).
+
+**Tests.** Fourteen pins were moved to the new figures first and watched fail on the old data; when
+the data moved, thirty-nine more failed, each read and set to its new figure. Four fixtures had their premise moved by the figures and were mended, not
+weakened: the Sea Wall, Factory Module and Capital fixtures' Materials x1.1 (the AI spent the old
+amount on the dearer opening Mine first); the Custodians' idle-Mine tests (a Moon or Phobos Mine
+no longer outproduces China's 6.6, so Vesta, and a Moon Mine beside a Mass Driver for the even
+trade); the Colony Ship voyage test (at the new Moon yield the Mars system won all twelve boards
+with no prize at all, so the test holds the Moon's old 1.65 to keep its question). The Strip Permit
+test's refusal at 24 Ducats first passed for the wrong reason (Three Turns Held), found and fixed.
+
+**The sweeps**, one after each move, wins Custodians / Prospectors / Arkwrights / Archivists:
+
+| after | wins | collapses |
+|---|---|---|
+| before (#535) | 0 / 28 / 15 / 16 | 21 |
+| Influence at 4 ([`sweeps/ticket-537-influence.txt`](sweeps/ticket-537-influence.txt)) | 2 / 32 / 11 / 12 | 23 |
+| Strip Permit at 25 ([`sweeps/ticket-537-strip-permit.txt`](sweeps/ticket-537-strip-permit.txt)) | 2 / 31 / 13 / 13 | 21 |
+| Mines and builds ([`sweeps/ticket-537-mines-builds.txt`](sweeps/ticket-537-mines-builds.txt)) | 2 / 20 / 20 / 22 | 15 |
+| after the review's fix ([`sweeps/ticket-537-after-review.txt`](sweeps/ticket-537-after-review.txt)) | 1 / 20 / 20 / 20 | 19 |
+
+Against the ideal of 15 each and 20: dearer Influence alone helped the Prospectors (measured: the
+Arkwrights and Archivists lost about four wins each); the Permit's price moved nothing past noise;
+the Mines and builds took eleven wins off the Prospectors and gave them to the Arkwrights and
+Archivists. The Custodians are still at 2, and collapses fell to 15, five under the target.
+After the review's fix, 1 / 20 / 20 / 20 and 19: three Factions even, the Custodians at 1.
+
+**The review** (an agent that did not build it) found one defect and gaps, all fixed. The defect:
+the computer's scarcest-resource reckoning floored its cheapest builds at the literal 20, the old
+cheapest row; at 22, a seat under 22 Materials matched only the free Core Module and stopped
+finding Materials scarce. The floor is the cheapest paid row now (tested, watched red: Fuel where
+Materials was wanted). The gaps: the Strip Permit test never read that the 25 Ducats were taken
+(now it does, watched red); the `strip:1` aid gave no Ducats; three comments said the old 25. It
+also named the voyage test's held Moon yield, which is said above: at the shipped figures the Mars
+system wins every board, prize or none. The market's 20-Material reserve (`ai.toml`) is a
+keeping figure, not a price, and is left.

@@ -76,6 +76,9 @@ multiplier = 2.0
 baseline_rise = 0.2
 # Ticket #460 (version 0.09.7): 2, where it was 3.
 unrest = 2.0
+# Ticket #537 (version 0.1.0.1): its price, where it was free (the playtest's 2.3: the Prospectors
+# overtuned by a free order).
+ducats = 25
 
 [development]
 # Ticket #506 (version 0.1.0.0): every tenth turn, from the ninth, with the game at fifty turns.

@@ -2147,7 +2147,7 @@ impl Game {
                 let change = self.state(sid).facilities[i].change.unwrap();
                 let kind = self.state(sid).facilities[i].kind;
                 // Ticket #387 (version 0.09.3): to the tenth, where it was rounded down: 12.5 of 25.
-                let refund = tenth(self.tables.facility(kind).materials as f64 / 2.0);
+                let refund = tenth(self.tables.facility(kind).materials / 2.0);
                 let f = &mut self.state_mut(sid).facilities[i];
                 f.change = None;
                 match change.what {

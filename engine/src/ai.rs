@@ -809,10 +809,11 @@ impl Game {
 
     /// Spec 16.2: the resource the seat is shortest of, relative to its next three affordable actions.
     /// Energy is a draining balance, so its shortage is measured in turns of drain over those actions.
-    fn scarcest(&self, seat: Seat) -> Resource {
+    pub fn scarcest(&self, seat: Seat) -> Resource {
         let s = self.seat(seat).stockpile;
         // The three cheapest builds it could afford now stand in for "its next three affordable actions".
-        let mut costs: Vec<(i64, i64)> = Vec::new();
+        // Ticket #537 (version 0.1.0.1): the rows carry tenths.
+        let mut costs: Vec<(f64, i64)> = Vec::new();
         for f in &self.tables.facilities {
             costs.push((f.materials, f.energy_upkeep));
         }
@@ -822,13 +823,15 @@ impl Game {
         for u in &self.tables.units {
             costs.push((u.materials, u.energy_upkeep));
         }
-        costs.sort();
-        let next: Vec<(i64, i64)> = costs.into_iter().filter(|(m, _)| *m as f64 <= s.materials.max(20.0)).take(3).collect();
-        let need_materials: i64 = next.iter().map(|(m, _)| *m).sum::<i64>().max(1);
+        costs.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
+        // Ticket #537: the floor is the cheapest paid row, where it was the literal 20 that row once was.
+        let cheapest = costs.iter().map(|(m, _)| *m).find(|m| *m > 0.0).unwrap_or(0.0);
+        let next: Vec<(f64, i64)> = costs.into_iter().filter(|(m, _)| *m <= s.materials.max(cheapest)).take(3).collect();
+        let need_materials: f64 = next.iter().map(|(m, _)| *m).sum::<f64>().max(1.0);
         let need_upkeep: i64 = next.iter().map(|(_, u)| *u).sum::<i64>();
         let drain = (self.total_upkeep(seat) + need_upkeep - self.energy_production(seat)).max(0);
         let energy_ratio = if drain == 0 { f64::INFINITY } else { s.energy / (3.0 * drain as f64) };
-        let materials_ratio = s.materials / need_materials as f64;
+        let materials_ratio = s.materials / need_materials;
         let has_ships = self.ships.iter().any(|x| x.seat == seat);
         let fuel_ratio = if has_ships { s.fuel / 6.0 } else { f64::INFINITY };
         if energy_ratio <= materials_ratio && energy_ratio <= fuel_ratio {
@@ -1558,7 +1561,8 @@ impl Game {
                 );
             }
             // Ticket #54: the Strip Permit, on the Prospectors' highest-output state while they are
-            // behind on the Extraction pace. It is free, and its price falls due three turns later.
+            // behind on the Extraction pace. Its Ducats are paid at the order (ticket #537, version 0.1.0.1),
+            // its Baseline and Unrest three turns later.
             if kind == FactionKind::Prospectors
                 && behind_on_extraction
                 && !self.state(sid).strip_permit_used

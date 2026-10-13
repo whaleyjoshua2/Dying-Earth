@@ -169,7 +169,8 @@ pub struct StateCard {
 pub struct FacilityCard {
     pub id: FacilityKind,
     pub name: String,
-    pub materials: i64,
+    /// Ticket #537 (version 0.1.0.1): to the tenth, since the +10% put some on a half (27.5).
+    pub materials: f64,
     /// Ticket #332 (version 0.09.0): the Widgets the build needs, four for every turn it took
     /// under the flat count this replaces. It completes at the Resolution its place's Widgets
     /// reach it, so a place making four a turn builds it at the old pace and a busier one slower.
@@ -319,7 +320,8 @@ pub struct WidgetsCard {
 pub struct ModuleCard {
     pub id: ModuleKind,
     pub name: String,
-    pub materials: i64,
+    /// Ticket #537 (version 0.1.0.1): to the tenth, since the +10% put some on a half (27.5).
+    pub materials: f64,
     /// Ticket #332 (version 0.09.0): the Widgets the build needs, four for every former turn.
     pub widgets: u32,
     pub energy_upkeep: i64,
@@ -371,7 +373,8 @@ pub struct MassDriverCard {
 pub struct UnitCard {
     pub id: UnitKind,
     pub name: String,
-    pub materials: i64,
+    /// Ticket #537 (version 0.1.0.1): to the tenth, since the +10% put some on a half (27.5).
+    pub materials: f64,
     /// Ticket #332 (version 0.09.0): the Widgets the build needs, four for every former turn.
     pub widgets: u32,
     pub energy_upkeep: i64,
@@ -764,7 +767,7 @@ pub struct FactionCard {
     pub lift_population_multiplier: f64,
     /// Coach Class: what a Colony Ship costs, in place of the units.toml figure.
     #[serde(default)]
-    pub colony_ship_materials: Option<i64>,
+    pub colony_ship_materials: Option<f64>,
     /// Ticket #83 (version 0.06.0): every Ship's Materials, times this, rounded down (the
     /// Arkwrights' 0.85).
     #[serde(default = "one_f64")]
@@ -1588,13 +1591,13 @@ struct BodiesFile {
     orbit_change_fuel: i64,
     /// Ticket #480 (version 0.09.8): what a move to or from a far orbit costs from the tank.
     #[serde(default = "forty")]
-    station_materials: i64,
+    station_materials: f64,
     /// Ticket #57: how far a Colony Slot's own yields may fall either side of its Body's.
     #[serde(default = "quarter")]
     slot_yield_spread: f64,
 }
-fn forty() -> i64 {
-    40
+fn forty() -> f64 {
+    40.0
 }
 fn quarter() -> f64 {
     0.25
@@ -1636,6 +1639,8 @@ pub struct StripPermitTable {
     pub baseline_rise: f64,
     /// What its Unrest rises by when it ends.
     pub unrest: f64,
+    /// Ticket #537 (version 0.1.0.1): its price in Ducats, where it was free.
+    pub ducats: i64,
 }
 
 /// Ticket #53 (version 0.05): Neutral Development, in `nation_states.toml` under `[development]`.
@@ -1686,7 +1691,8 @@ pub struct TierCard {
     pub name: String,
     pub cap: u32,
     pub colonists: u32,
-    pub materials: u32,
+    /// Ticket #537 (version 0.1.0.1): to the tenth, since the +10% put some on a half (27.5).
+    pub materials: f64,
     pub widgets: u32,
     /// Ticket #503 (version 0.1.0.0): at most one place on a Body stands at this tier, the first to
     /// complete it, and it holds it for good, through trade and capture -- the Colonial Capital.
@@ -2049,7 +2055,7 @@ pub struct Tables {
     /// Ticket #335 (version 0.09.0): the Fuel an orbit change takes from a Ship's own tank.
     pub orbit_change_fuel: i64,
     /// Ticket #46: what a station costs.
-    pub station_materials: i64,
+    pub station_materials: f64,
     /// Ticket #57: how far a Colony Slot's own four yields may fall either side of its Body's.
     pub slot_yield_spread: f64,
     /// Ticket #57: the Keplerian elements of Earth and Mars, and the transit table (`ephemeris.toml`).
@@ -2751,7 +2757,7 @@ impl Tables {
         crate::report::render(
             &self.faction(kind).signature,
             &[
-                ("scrubber_materials", crate::state::figure(s.materials as f64)),
+                ("scrubber_materials", crate::state::figure(s.materials)),
                 ("scrubber_widgets", crate::state::figure(s.widgets as f64)),
                 ("scrubber_upkeep", crate::state::figure(s.energy_upkeep as f64)),
                 ("scrubber_sink", format!("{:.1}", s.sink_per_turn)),

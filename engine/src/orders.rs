@@ -225,9 +225,9 @@ pub enum Order {
     /// Version 0.05 (ticket #54): Leapfrog. The Custodians only, on a Nation State they control:
     /// 50 Ducats lowers its people's Emissions coefficient by one Industry Level's worth, for good.
     Leapfrog { state: StateId },
-    /// Version 0.05 (ticket #54): the Strip Permit. The Prospectors only, free, once per Nation
+    /// Version 0.05 (ticket #54): the Strip Permit. The Prospectors only, once per Nation
     /// State ever: three turns of doubled Facility output, then a permanent price in Baseline
-    /// Emissions and Unrest.
+    /// Emissions and Unrest. Ticket #537 (version 0.1.0.1): 25 Ducats, where it was free.
     StripPermit { state: StateId },
     /// Ticket #237 (version 0.08.3): the Exodus Call. The Arkwrights only, on a state they
     /// control, once per state EVER. While it runs it doubles what they may recruit there and
@@ -534,7 +534,7 @@ impl Game {
             BuildingChange::Mothball => Some(format!("+{} Unrest", figure(u.per_mothball))),
             BuildingChange::Decommission => {
                 let kind = self.state(sid).facilities.get(i)?.kind;
-                Some(format!("+{} Unrest, {} Materials back", figure(u.per_decommission), figure(tenth(self.tables.facility(kind).materials as f64 / 2.0))))
+                Some(format!("+{} Unrest, {} Materials back", figure(u.per_decommission), figure(tenth(self.tables.facility(kind).materials / 2.0))))
             }
             BuildingChange::Restart => None,
         }
@@ -606,14 +606,14 @@ impl Game {
             Order::BuildFacility { kind, .. } => Cost { materials: self.facility_materials(seat, *kind), ..Default::default() },
             Order::RaiseIndustry { state } => Cost { materials: self.industry_cost(seat, *state), ..Default::default() },
             // Ticket #490 (version 0.09.9): the next tier's price, the same for every Faction.
-            Order::RaiseTier { colony } => Cost { materials: self.colony(*colony).and_then(|c| self.next_tier(c)).map_or(0.0, |t| t.materials as f64), ..Default::default() },
+            Order::RaiseTier { colony } => Cost { materials: self.colony(*colony).and_then(|c| self.next_tier(c)).map_or(0.0, |t| t.materials), ..Default::default() },
             // Ticket #51: a Faction's card may make its Modules and its Colony Ships cost less.
             // Ticket #88: and the Colony's working Mines take more off.
             Order::BuildModule { colony, kind } => Cost { materials: self.module_materials_at(seat, *colony, *kind), ..Default::default() },
             // Ticket #87: a Ship is built with a full tank, its Fuel paid at the build.
             // Ticket #398 (version 0.09.3): at the yard's price, so a low-gravity yard with a Mine is cheaper.
             Order::BuildShip { site, kind } => Cost { materials: self.ship_materials_at(seat, *site, *kind), fuel: self.tank_of(seat, *kind), ..Default::default() },
-            Order::BuildArmy { .. } => Cost { materials: t.unit(UnitKind::Army).materials as f64, ..Default::default() },
+            Order::BuildArmy { .. } => Cost { materials: t.unit(UnitKind::Army).materials, ..Default::default() },
             Order::Repair { points, .. } => {
                 Cost { materials: (t.repair.materials_per_point * *points as i64) as f64, ..Default::default() }
             }
@@ -640,8 +640,10 @@ impl Game {
             Order::Smear { amount, .. } => Cost { influence: *amount, ..Default::default() },
             Order::Greenwash { amount } => Cost { influence: *amount, ducats: (*amount * self.tables.influence.greenwash.ducats_per_influence) as f64, ..Default::default() },
             Order::BuyCredits { ppm } => Cost { ducats: self.credit_cost(seat, *ppm).unwrap_or(0.0), ..Default::default() },
-            // Ticket #54: a Mothball and a Strip Permit are free; a Restart costs Materials and a
-            // Leapfrog Ducats; a Decommission pays Materials back, which arrive at its Resolution.
+            // Ticket #54: a Mothball is free; a Restart costs Materials and a Leapfrog Ducats; a
+            // Decommission pays Materials back, which arrive at its Resolution. Ticket #537 (version
+            // 0.1.0.1): a Strip Permit costs Ducats, where it was free.
+            Order::StripPermit { .. } => Cost { ducats: t.strip_permit.ducats as f64, ..Default::default() },
             Order::Change { what: BuildingChange::Restart, .. } => Cost { materials: t.mothball.restart_materials as f64, ..Default::default() },
             Order::Leapfrog { .. } => Cost { ducats: t.ducats.per_leapfrog as f64, ..Default::default() },
             Order::ExodusCall { .. } => Cost { ducats: t.ducats.per_exodus_call as f64, ..Default::default() },

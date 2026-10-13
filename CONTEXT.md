@@ -79,7 +79,7 @@ A permanent settlement a Faction holds on a Body, founded when a Colony Ship unl
 _Avoid_: base
 
 **Tier**:
-How far a Colony or Space Station has grown, since version 0.09.9: an **Outpost**, a **Settlement** or a **Colony**, every place starting an Outpost. Its Module slots are the lower of its Colonists and its tier's cap -- six, twelve, eighteen -- and the next tier is bought with Materials and Widgets once enough people live there, twelve for a Settlement and eighteen for a Colony. A place never falls back a tier. The word Colony names both the place, whatever its tier, and the third tier. Since version 0.1.0.0 a fourth, the **Colonial Capital**: twenty-four slots, open at twenty-four Colonists, for 70 Materials and 8 Widgets, ground only, so a station stops at Colony. A Body has one at most: the first Colony there to complete the upgrade holds it for good, through trade and capture, and anyone else's upgrade to it under way on that Body is refunded its Materials; two completing in one turn are parted as a contested slot is, the greater fleet in orbit and lots only when level. It pays **+1 Influence a turn** to whoever holds it now, at face value, beside a First to a Body's +1. Antarctica may carry Earth's; Venus, with no ground, never has one.
+How far a Colony or Space Station has grown, since version 0.09.9: an **Outpost**, a **Settlement** or a **Colony**, every place starting an Outpost. Its Module slots are the lower of its Colonists and its tier's cap -- six, twelve, eighteen -- and the next tier is bought with Materials and Widgets once enough people live there, twelve for a Settlement and eighteen for a Colony. A place never falls back a tier. The word Colony names both the place, whatever its tier, and the third tier. Since version 0.1.0.0 a fourth, the **Colonial Capital**: twenty-four slots, open at twenty-four Colonists, for 77 Materials (70 before version 0.1.0.1) and 8 Widgets, ground only, so a station stops at Colony. A Body has one at most: the first Colony there to complete the upgrade holds it for good, through trade and capture, and anyone else's upgrade to it under way on that Body is refunded its Materials; two completing in one turn are parted as a contested slot is, the greater fleet in orbit and lots only when level. It pays **+1 Influence a turn** to whoever holds it now, at face value, beside a First to a Body's +1. Antarctica may carry Earth's; Venus, with no ground, never has one.
 _Avoid_: level, rank, size (Size is a Region's)
 
 **Colony Slot**:
@@ -475,7 +475,7 @@ A Unique does its common sibling's **job**, which is what makes the rest of the 
 _Avoid_: unique building, signature module
 
 **Heliostat**:
-The Archivists' Unique Module since version 0.08.3, replacing the Solar Array at the common price: a Space Station's alone, 25 Materials, two turns, no Energy upkeep, and the same 6 Energy scaled by the inverse square of its Body's distance from the Sun. Its clause is **one more Energy, added after that scaling**, so the extra point is worth the same at Mars as at Venus rather than 0.43 of a point at one and 1.91 at the other. A Solar Storm silences it as it silences a Solar Array.
+The Archivists' Unique Module since version 0.08.3, replacing the Solar Array at the common price: a Space Station's alone, 27.5 Materials since version 0.1.0.1 (25 before), two turns, no Energy upkeep, and the same 6 Energy scaled by the inverse square of its Body's distance from the Sun. Its clause is **one more Energy, added after that scaling**, so the extra point is worth the same at Mars as at Venus rather than 0.43 of a point at one and 1.91 at the other. A Solar Storm silences it as it silences a Solar Array.
 _Avoid_: mirror, solar farm, collector, panel
 
 **Exchange**:
@@ -495,7 +495,7 @@ The Custodians' other signature clause: an Orders-phase order paid in Ducats on 
 _Avoid_: clean development, technology transfer, offset, upgrade
 
 **Strip Permit**:
-The Prospectors' other signature clause: an Orders-phase order, free, that may be taken once in a Region's whole life. For three turns every Facility there produces double; when it ends, that state's Baseline Emissions and its Unrest rise for good. Since version 0.08.3 it needs **Three Turns Held**.
+The Prospectors' other signature clause: an Orders-phase order, 25 Ducats since version 0.1.0.1 (free before), that may be taken once in a Region's whole life. For three turns every Facility there produces double; when it ends, that state's Baseline Emissions and its Unrest rise for good. Since version 0.08.3 it needs **Three Turns Held**.
 _Avoid_: licence, boom, overdrive, exploitation
 
 **Three Turns Held**:

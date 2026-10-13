@@ -2821,7 +2821,7 @@ impl Game {
     /// What a Colony Module costs this seat in Materials (ticket #51). Ticket #387 (version
     /// 0.09.3): to the tenth, where it was rounded down.
     pub fn module_materials(&self, seat: Seat, kind: ModuleKind) -> f64 {
-        let base = self.tables.module(kind).materials as f64;
+        let base = self.tables.module(kind).materials;
         tenth(base * self.tables.faction(self.kind(seat)).module_materials_multiplier)
     }
 
@@ -2836,7 +2836,7 @@ impl Game {
     /// the row. Stations never take it; Ships take it at a low-gravity yard since ticket #398
     /// (`ship_materials_at`). Ticket #387 (version 0.09.3): to the tenth, where it was rounded down.
     pub fn module_materials_at(&self, seat: Seat, colony: ColonyId, kind: ModuleKind) -> f64 {
-        let row = self.tables.module(kind).materials as f64;
+        let row = self.tables.module(kind).materials;
         let faction = self.tables.faction(self.kind(seat)).module_materials_multiplier;
         let t = &self.tables.in_situ;
         let step = match self.colony(colony).map(|c| self.working_mines(c)).unwrap_or(0) {
@@ -2871,13 +2871,13 @@ impl Game {
     /// times the Faction's multiplier (the Prospectors' 0.85). Ticket #387 (version 0.09.3): to the
     /// tenth, where it was rounded down: 25 x 0.85 is 21.3.
     pub fn facility_materials(&self, seat: Seat, kind: FacilityKind) -> f64 {
-        let base = self.tables.facility(kind).materials as f64;
+        let base = self.tables.facility(kind).materials;
         tenth(base * self.tables.faction(self.kind(seat)).facility_materials_multiplier)
     }
 
     /// What a Space Station costs this seat in Materials (ticket #51); ticket #387: to the tenth.
     pub fn station_materials(&self, seat: Seat) -> f64 {
-        let base = self.tables.station_materials as f64;
+        let base = self.tables.station_materials;
         tenth(base * self.tables.faction(self.kind(seat)).station_materials_multiplier)
     }
 
@@ -2890,11 +2890,10 @@ impl Game {
 
     /// The row a Ship is priced from: the units.toml figure, or the Faction's own Colony Ship price.
     fn ship_row(&self, seat: Seat, kind: UnitKind) -> f64 {
-        let row = match (kind, self.tables.faction(self.kind(seat)).colony_ship_materials) {
+        match (kind, self.tables.faction(self.kind(seat)).colony_ship_materials) {
             (UnitKind::ColonyShip, Some(m)) => m,
             _ => self.tables.unit(kind).materials,
-        };
-        row as f64
+        }
     }
 
     /// Ticket #398 (version 0.09.3): **what a Ship costs this seat at this yard.** Build Where You
@@ -5725,8 +5724,8 @@ impl Game {
             TradeGood::Goods(Resource::Ducats, n) => n as f64,
             TradeGood::Goods(r, n) => n as f64 * self.trade_price(r).unwrap_or(1) as f64,
             TradeGood::Place(c) => {
-                let modules: f64 = self.colony(c).map(|col| col.modules.iter().filter(|m| m.kind != ModuleKind::Core).map(|m| self.tables.module(m.kind).materials as f64).sum()).unwrap_or(0.0);
-                (self.tables.station_materials as f64 + modules) * materials
+                let modules: f64 = self.colony(c).map(|col| col.modules.iter().filter(|m| m.kind != ModuleKind::Core).map(|m| self.tables.module(m.kind).materials).sum()).unwrap_or(0.0);
+                (self.tables.station_materials + modules) * materials
             }
         }
     }

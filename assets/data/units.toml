@@ -5,10 +5,12 @@
 # its Shipyard's Colony has made it the Widgets, an Army at its place's; the Arkwrights' Ship
 # discount reaches the figure as it reaches the Materials.
 
+# Ticket #537 (version 0.1.0.1): every Ship and Army row's `materials` is a tenth more than it was, kept
+# to the tenth (25 is 27.5); the Widgets are as they were.
 [[unit]]
 id = "colony_ship"
 name = "Colony Ship"
-materials = 30
+materials = 33
 widgets = 4
 energy_upkeep = 1
 strength = 0
@@ -26,7 +28,7 @@ tank = 35
 [[unit]]
 id = "frigate"
 name = "Frigate"
-materials = 25
+materials = 27.5
 widgets = 4
 energy_upkeep = 2
 strength = 3
@@ -39,7 +41,7 @@ tank = 30
 [[unit]]
 id = "battleship"
 name = "Battleship"
-materials = 50
+materials = 55
 widgets = 8
 energy_upkeep = 4
 strength = 7
@@ -57,7 +59,7 @@ tank = 30
 [[unit]]
 id = "carrier"
 name = "Carrier"
-materials = 30
+materials = 33
 widgets = 4
 energy_upkeep = 2
 strength = 0
@@ -70,7 +72,7 @@ tank = 30
 [[unit]]
 id = "army"
 name = "Army"
-materials = 25
+materials = 27.5
 widgets = 4
 energy_upkeep = 2
 strength = 4
@@ -89,7 +91,7 @@ carries_army = false
 [[unit]]
 id = "missile_carrier"
 name = "Missile Carrier"
-materials = 60
+materials = 66
 widgets = 16
 energy_upkeep = 2
 strength = 0

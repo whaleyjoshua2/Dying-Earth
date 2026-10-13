@@ -2509,7 +2509,10 @@ fn bar_resource_with(ui: &mut Ui, icons: &Icons, key: &str, word: &str, value: S
 }
 
 /// The Influence figure's hover, lifted out of the bar when ticket #128 moved the figure.
-const INFLUENCE_HOVER: &str = "The Allotment is what your places and buildings give each turn; bought Influence comes from the Trading window at 2 Ducats each.";
+/// Ticket #537 (version 0.1.0.1): the price read from the table, where the hover said 2 in words.
+fn influence_hover(game: &Game) -> String {
+    format!("The Allotment is what your places and buildings give each turn; bought Influence comes from the Trading window at {} Ducats each.", game.tables.ducats.per_influence)
+}
 
 /// Ticket #128 (version 0.07.2): a button of the bar's second row, one step larger than egui's
 /// default -- "make buttons slightly larger" -- and naming its key in parentheses as the text.
@@ -2623,7 +2626,7 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
                 let influence = if bought > 0 { format!("{} / {} ({} free + {} bought)", influence_left, s.allotment + bought, s.allotment, bought) } else { format!("{} / {}", influence_left, s.allotment) };
                 // Ticket #112 (version 0.07.1): Influence now has a glyph, so on the bar it follows the
                 // same rule the five resources do -- the picture stands in place of the word.
-                bar_resource(ui, icons, "influence", "Influence", influence, INFLUENCE_HOVER.to_string());
+                bar_resource(ui, icons, "influence", "Influence", influence, influence_hover(game));
                 ui.separator();
             }
             // Ticket #112 (version 0.07.1): the bar carries the FIGURE and the hover carries the
@@ -12703,6 +12706,15 @@ fn chronicle_screen(root: &mut Ui, session: &Session, actions: &mut Vec<Action>)
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Ticket #537 (version 0.1.0.1): the Influence hover says the table's price, four Ducats.
+    #[test]
+    fn the_influence_hover_says_the_tables_price() {
+        let tables = std::sync::Arc::new(dying_earth_engine::data::Tables::load(&dying_earth_engine::data::default_data_dir()).unwrap());
+        let g = Game::new(tables, NewGame { seed: 7, player: FactionKind::Custodians, player_is_ai: false, player_start: StateId::EastAsia });
+        assert_eq!(g.tables.ducats.per_influence, 4);
+        assert!(influence_hover(&g).ends_with("at 4 Ducats each."), "{}", influence_hover(&g));
+    }
 
     /// Ticket #508 (version 0.1.0.0): a held Accord's hover says each of its Terms in a line, the
     /// price of breaking one last, and with all four it stays within the six-line ceiling.

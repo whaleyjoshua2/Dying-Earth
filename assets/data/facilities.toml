@@ -10,10 +10,12 @@
 # Ticket #332 (version 0.09.0): the Factory makes WIDGETS, the work half of every build in its
 # Region. The Prospectors' output multiplier, the Strip Permit and Unrest 7 reach the figure; the
 # Region's Materials lean and Deep Mining do not, since they are Materials rules and went to the Mine.
+# Ticket #537 (version 0.1.0.1): every Facility row's `materials` is a tenth more than it was, kept
+# to the tenth (25 is 27.5); the Widgets are as they were.
 [[facility]]
 id = "factory"
 name = "Factory"
-materials = 20
+materials = 22
 widgets = 4
 energy_upkeep = 2
 produces = { resource = "widgets", amount = 4 }
@@ -22,7 +24,7 @@ emissions = 0.75
 [[facility]]
 id = "power_plant"
 name = "Power Plant"
-materials = 25
+materials = 27.5
 widgets = 8
 energy_upkeep = 0
 produces = { resource = "energy", amount = 6 }
@@ -31,7 +33,7 @@ emissions = 1.5
 [[facility]]
 id = "refinery"
 name = "Refinery"
-materials = 20
+materials = 22
 widgets = 4
 energy_upkeep = 3
 # Ticket #421 (version 0.09.4): 4 Fuel on Earth, where it was 3, to pay for a Colony Ship's
@@ -42,7 +44,7 @@ emissions = 1.5
 [[facility]]
 id = "research_lab"
 name = "Research Lab"
-materials = 25
+materials = 27.5
 widgets = 4
 energy_upkeep = 3
 produces = { resource = "research", amount = 2 }
@@ -51,7 +53,7 @@ emissions = 0.0
 [[facility]]
 id = "launch_site"
 name = "Launch Site"
-materials = 30
+materials = 33
 widgets = 8
 energy_upkeep = 2
 does = "lifts Pioneers and Armies from here to any orbit of Earth and to a Space Station over Earth, and a station over Earth can be built from here"
@@ -61,7 +63,7 @@ emissions = 0.0
 [[facility]]
 id = "bank"
 name = "Bank"
-materials = 25
+materials = 27.5
 widgets = 4
 energy_upkeep = 2
 produces = { resource = "ducats", amount = 4 }
@@ -72,7 +74,7 @@ emissions = 0.0
 [[facility]]
 id = "embassy"
 name = "Embassy"
-materials = 30
+materials = 33
 widgets = 4
 energy_upkeep = 2
 emissions = 0.0
@@ -85,7 +87,7 @@ standing_per_turn = 2
 [[facility]]
 id = "constabulary"
 name = "Constabulary"
-materials = 25
+materials = 27.5
 widgets = 4
 energy_upkeep = 2
 # Ticket #408 (version 0.09.4): said as the engine does it, a flat half point off each rise, refugees
@@ -103,7 +105,7 @@ emissions = 0.0
 [[facility]]
 id = "scrubber"
 name = "Scrubber"
-materials = 30
+materials = 33
 widgets = 8
 energy_upkeep = 3
 does = "+3.0 ppm on the Natural Sink and 1 off this state's Unrest a turn, counted as its holder's removal; no build slot; half in another Faction's hands, a quarter in nobody's"
@@ -123,7 +125,7 @@ no_slot = true
 [[facility]]
 id = "sea_wall"
 name = "Sea Wall"
-materials = 20
+materials = 22
 widgets = 8
 energy_upkeep = 1
 does = "holds every Sea Level threshold off this state while it works, and a Storm Surge it holds cuts its coastal Facilities' output by 30% for one turn; no build slot, one to a state; each rise held adds 0.5 Materials a turn to its keep"
@@ -139,7 +141,7 @@ no_slot = true
 [[facility]]
 id = "school"
 name = "School"
-materials = 25
+materials = 27.5
 widgets = 8
 energy_upkeep = 2
 does = "raises this state's Education Level 0.20 a turn, to 2.0; it falls back at the same rate when the School stops"
@@ -160,7 +162,7 @@ emissions = 0.0
 [[facility]]
 id = "investment_bank"
 name = "Investment Bank"
-materials = 25
+materials = 27.5
 widgets = 4
 energy_upkeep = 2
 does = "banks 1% of the Venture Capital Fund's balance back into it each turn, never less than 1 across all your Investment Banks"
@@ -172,7 +174,7 @@ emissions = 0.0
 [[facility]]
 id = "spaceport"
 name = "Spaceport"
-materials = 30
+materials = 33
 widgets = 8
 energy_upkeep = 2
 does = "does a Launch Site's work, and every Pioneer it lifts off Earth adds 1 Influence to next turn's Allotment"
@@ -183,7 +185,7 @@ emissions = 0.0
 [[facility]]
 id = "reactor"
 name = "Reactor"
-materials = 25
+materials = 27.5
 widgets = 8
 energy_upkeep = 0
 does = "pays three quarters of your whole Energy upkeep, the Archive excepted; a second Reactor is an ordinary power station"
@@ -195,7 +197,7 @@ emissions = 1.5
 [[facility]]
 id = "academy"
 name = "Academy"
-materials = 25
+materials = 27.5
 widgets = 8
 energy_upkeep = 2
 does = "does a School's work and pays 1 Ducat a turn while it is online"
@@ -210,10 +212,11 @@ emissions = 0.0
 [[facility]]
 id = "mine"
 name = "Mine"
-materials = 20
+materials = 22
 widgets = 4
 energy_upkeep = 2
-produces = { resource = "materials", amount = 4 }
+# Ticket #537 (version 0.1.0.1): 4.4, where it was 4 -- an Earth Mine makes a tenth more.
+produces = { resource = "materials", amount = 4.4 }
 emissions = 0.75
 
 # Ticket #54: the cap on Scrubbers in one Nation State, from its population -- in units of one
@@ -365,7 +368,7 @@ neutral_share = 0.5
 [[facility]]
 id = "stadium"
 name = "Stadium"
-materials = 20
+materials = 22
 widgets = 4
 energy_upkeep = 1
 does = "halves what the climate adds to this state's Unrest, after a Constabulary's half point (a heat rise of one lands as a quarter with both); an Agitate is untouched"
@@ -379,7 +382,7 @@ emissions = 0.0
 [[facility]]
 id = "nature_reserve"
 name = "Nature Reserve"
-materials = 30
+materials = 33
 widgets = 5
 energy_upkeep = 0
 does = "+1 ppm on the Natural Sink a turn; a sixth off what the climate adds to Unrest here"

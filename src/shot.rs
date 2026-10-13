@@ -1257,6 +1257,8 @@ fn build_board(session: &mut Session) {
             let sid = StateId::EastAsia;
             g.take_control(sid, Seat(0));
             g.seats[0].stockpile.energy = 400.0;
+            // Ticket #537 (version 0.1.0.1): the Permit's 25 Ducats, so the order is not dropped.
+            g.seats[0].stockpile.ducats = g.seats[0].stockpile.ducats.max(g.tables.strip_permit.ducats as f64);
             g.seats[0].ai = false;
             let mut orders: [Vec<Order>; SEAT_COUNT] = std::array::from_fn(|_| Vec::new());
             orders[0] = vec![Order::StripPermit { state: sid }];

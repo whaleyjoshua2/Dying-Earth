@@ -148,3 +148,27 @@ Ticket: [The Colony Ship card shows aboard and room](https://github.com/whaleyjo
   it can take there, with the hover *"4 room, +4 crowded at Earth"*.
 - Other Ships show none; a Carrier's line still says *"carrying an Army"*.
 - No rule moves.
+
+## 6. The prices
+
+Ticket: [The prices: Influence at 4, Strip Permits at 25, Mines and builds](https://github.com/whaleyjoshua2/Dying-Earth/issues/537).
+
+- **Influence costs 4 Ducats a point** (`[ducats] per_influence`), where it cost 2, for every seat;
+  still no cap. The Influence bar's hover reads the price from the table, where it said 2 in words.
+- **A Strip Permit costs 25 Ducats** (`[strip_permit] ducats`), where it was free: charged with the
+  order, refused short of it, shown on its button. The Prospectors' card says so.
+- **No hidden multiplier: the figures themselves move.**
+  - **Builds +10% in Materials:** every Facility, Module, Ship and Army row, a station's founding (44)
+    and the tiers (33, 55, 77), kept **exact, to the tenth** (25 is 27.5), so the rows carry tenths.
+    A Faction's discount reaches the new row as before (a Prospector Factory is 18.7). A Ducat build
+    follows from its Materials; a Decommission's half-refund follows from its row.
+  - **Not** the Widgets, the Industry Level, a Repair or a Rearm; not the starting Stockpile.
+  - **An Earth Mine** (the Region Facility) makes **4.4**, where it made 4.
+  - **Every Body's Mine yield is 85% of what it was**, so every Colony Mine makes 15% less, Techs on
+    top. Antarctica's Mines are Colony Mines, off-world for the purpose (Earth's yield 1.4875).
+- **The computer** reads every figure from the tables: its cheapest-builds reckoning reads the new
+  rows, floored at the cheapest paid one (where it was the literal 20); its Strip Permit and Influence buys are priced by the order and refused where short. A
+  consequence of the figures, not a new rule: the Custodians idle an Earth Mine only for an off-world
+  Mine that makes as much, and a Moon Mine (5.6) no longer matches China's (6.6); Vesta's (6.8) does.
+- **Refutation:** a Strip Permit issued with 24 Ducats, a Habitat priced 25, or a Moon Mine making
+  6.6 shows this section unbuilt.
