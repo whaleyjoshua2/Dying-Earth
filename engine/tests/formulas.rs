@@ -13760,6 +13760,55 @@ fn an_army_lifts_to_low_orbit_without_a_launch_site_and_to_a_ring_only_with_one(
     }
 }
 
+/// Ticket #534 (version 0.1.0.1), at the designer's word: one Launch Site to a Region, by the
+/// Constabulary's rule -- standing, under construction or ordered this turn -- and the Arkwrights'
+/// Spaceport counts as one.
+#[test]
+fn a_region_holds_one_launch_site_and_a_spaceport_counts_as_one() {
+    let mut g = game();
+    let site = |s: StateId| Order::BuildFacility { state: s, kind: FacilityKind::LaunchSite };
+    let refusal = |g: &Game, seat: Seat, pending: &[Order], o: &Order| g.check_order(seat, pending, o).err().map(|e| e.0);
+    g.seats[0].stockpile.materials = 500.0;
+    // Standing: the start Region holds its Launch Site.
+    assert_eq!(refusal(&g, Seat(0), &[], &site(StateId::EastAsia)).as_deref(), Some("this Nation State already has a Launch Site"));
+    assert_eq!(refusal(&g, Seat(0), &[], &Order::BuildFacilityWithDucats { state: StateId::EastAsia, kind: FacilityKind::LaunchSite }).as_deref(), Some("this Nation State already has a Launch Site"), "bought with Ducats, the same");
+    // Ordered this turn, and under construction.
+    g.take_control(StateId::Europe, Seat(0));
+    g.state_mut(StateId::Europe).facilities.retain(|f| !f.kind.does_the_job_of(FacilityKind::LaunchSite));
+    let one = site(StateId::Europe);
+    assert_eq!(refusal(&g, Seat(0), &[], &one), None, "a Region with none builds one");
+    assert_eq!(refusal(&g, Seat(0), std::slice::from_ref(&one), &one).as_deref(), Some("this Nation State already has a Launch Site"), "one ordered this turn");
+    g.commit_orders(Seat(0), std::slice::from_ref(&one));
+    assert_eq!(refusal(&g, Seat(0), &[], &one).as_deref(), Some("this Nation State already has a Launch Site"), "one under construction");
+    // The Arkwrights: their Spaceport is one, and a rival's Launch Site in a Region they take is one.
+    let ark = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Arkwrights).unwrap();
+    g.seats[ark.index()].stockpile.materials = 500.0;
+    let home = g.directed_states(ark)[0];
+    assert_eq!(refusal(&g, ark, &[], &site(home)).as_deref(), Some("this Nation State already has a Spaceport"));
+    g.take_control(StateId::NorthAmerica, ark);
+    g.state_mut(StateId::NorthAmerica).facilities.retain(|f| !f.kind.does_the_job_of(FacilityKind::LaunchSite));
+    g.state_mut(StateId::NorthAmerica).facilities.push(Facility::new(FacilityKind::LaunchSite));
+    assert_eq!(refusal(&g, ark, &[], &site(StateId::NorthAmerica)).as_deref(), Some("this Nation State already has a Launch Site"), "a rival's Launch Site is one");
+}
+
+/// Ticket #534 (found in review): the Arkwrights' free Launch Site, their Opening Objective's
+/// reward, passes over a Region whose Spaceport is under construction, which would hold two once it
+/// stood. With no other Region to take it, it stays owed.
+#[test]
+fn the_free_launch_site_passes_over_a_region_building_one() {
+    let mut g = game();
+    let ark = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Arkwrights).unwrap();
+    g.seats[ark.index()].stockpile.energy = 500.0;
+    g.take_control(StateId::SouthAsia, ark);
+    g.state_mut(StateId::SouthAsia).facilities.retain(|f| !f.kind.does_the_job_of(FacilityKind::LaunchSite));
+    g.state_mut(StateId::SouthAsia).queue.push(Build { item: BuildItem::Facility(FacilityKind::Spaceport), seat: ark, coastal: false, fuel: 0.0, widgets: 99, done: 0 });
+    colony(&mut g, ark, BodyId::Moon, &[ModuleKind::Habitat], 2);
+    g.income_phase();
+    assert!(g.seat(ark).opening_met_turn.is_some(), "the premise: the Moon Colony meets the Objective");
+    assert!(!g.state(StateId::SouthAsia).facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite)), "no free one beside the Spaceport under way");
+    assert!(g.seat(ark).launch_site_owed, "it stays owed");
+}
+
 /// Ticket #533 (version 0.1.0.1), at the designer's word: a lift from a Region and a refuel never
 /// use a Ship's turn, and both happen where the Ship sits, before it moves. Lift at Earth and leave
 /// for the Moon in one turn, the Pioneers aboard; refuel at the ISS and leave.

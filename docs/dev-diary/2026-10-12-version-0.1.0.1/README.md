@@ -58,3 +58,20 @@ collapses**, from 2 / 24 / 15 / 17 and 22. The Arkwrights' 3 and the Archivists'
 of noise. The settling moved past it: the first ground Colony on the Moon in 75 of 80 games at a
 median turn 18, from 70 at turn 24; Phobos in 36 from 30, Deimos in 66 from 59, Ceres 72 ground
 Colonies at the end from 60. Measured behaviour.
+
+## One Launch Site to a Region
+
+Ticket [#534](https://github.com/whaleyjoshua2/Dying-Earth/issues/534), spec §3.
+
+**The picture** ([`ticket-534/second-site-earth.png`](ticket-534/second-site-earth.png)): China's
+build list, its Launch Site standing, the Launch Site button greyed with "this Nation State already
+has a Launch Site".
+
+**Found in review and fixed:** the Arkwrights' free Launch Site (their Opening Objective's reward)
+read only standing buildings, so it could land beside a Spaceport under construction; it passes such
+a Region over now, and stays owed if no other will take it.
+
+**The sweep** ([`sweeps/ticket-534.txt`](sweeps/ticket-534.txt), after the review fix): **2 / 26 / 14 /
+16 and 20 collapses**, from 2 / 25 / 12 / 20 and 20 after #533. The Archivists' 4 is at the edge of
+noise and not traced: the computer never built a second Launch Site before this ticket, and the one
+change on its side is that it no longer offers one beside one under construction.

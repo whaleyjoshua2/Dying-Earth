@@ -1363,7 +1363,9 @@ impl Game {
         // --- Earth builds
         for sid in self.directed_states(seat) {
             let free = self.free_slots(sid);
-            let has_launch = self.state(sid).facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite));
+            // Ticket #534 (version 0.1.0.1): one to a Region, and one under construction counts.
+            let has_launch = self.state(sid).facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite))
+                || self.state(sid).queue.iter().any(|b| matches!(b.item, BuildItem::Facility(k) if k.does_the_job_of(FacilityKind::LaunchSite)));
             if free > 0 {
                 for fk in FacilityKind::ALL {
                     // Ticket #181 (version 0.08.0): a Faction builds its own Unique Facility in

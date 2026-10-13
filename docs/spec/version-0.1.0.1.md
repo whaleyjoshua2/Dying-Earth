@@ -95,3 +95,20 @@ Ticket: [A Ship's lifts from Regions and its refuel do not use its turn](https:/
 - **Refutation:** a Colony Ship given a lift and a flight that leaves without the Pioneers aboard,
   or a refuel and a flight refused for a tank the refuel fills, or a lift accepted beside an unload,
   shows this section unbuilt.
+
+## 3. One Launch Site to a Region
+
+Ticket: [One Launch Site to a Region](https://github.com/whaleyjoshua2/Dying-Earth/issues/534).
+
+- **One to a Region, by the Constabulary's rule:** a Launch Site standing, under construction or
+  ordered this turn closes the door, whether ordered for Materials or bought with Ducats. The
+  Arkwrights' Spaceport counts as one, so a Region holds a Launch Site or a Spaceport, never both;
+  an Arkwrights player who takes a Region holding a rival's Launch Site adds no Spaceport there.
+- **The refusal** names the one there: *"this Nation State already has a Launch Site"* (or *"… a
+  Spaceport"*).
+- **A Region already holding two keeps both**; nothing is torn down.
+- **The computer** reads the same check, and no longer offers one where one is under construction.
+- **The Arkwrights' free Launch Site** (their Opening Objective's reward) goes only to a Region with
+  none standing or under construction; with no such Region it stays owed.
+- **Refutation:** a second Launch Site or Spaceport accepted in a Region that holds, builds or has
+  ordered one shows this section unbuilt.

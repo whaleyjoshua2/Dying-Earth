@@ -480,7 +480,13 @@ impl Game {
         let Some(sid) = self
             .controlled_states(seat)
             .into_iter()
-            .filter(|sid| self.free_slots(*sid) > 0 && !self.state(*sid).facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite)))
+            // Ticket #534 (version 0.1.0.1): one to a Region, so not where one is under construction.
+            .filter(|sid| {
+                let st = self.state(*sid);
+                self.free_slots(*sid) > 0
+                    && !st.facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite))
+                    && !st.queue.iter().any(|b| matches!(b.item, BuildItem::Facility(k) if k.does_the_job_of(FacilityKind::LaunchSite)))
+            })
             .max_by(|a, b| self.state(*a).population.total_cmp(&self.state(*b).population))
         else {
             return;
