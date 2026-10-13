@@ -214,3 +214,20 @@ Ticket: [Playtest information: the Report's launch windows, Energy left, your lo
 - No rule moves.
 - **Refutation:** a turn before Mars's window whose Report does not say so, or a Report with no
   clock under its date, shows this section unbuilt.
+
+## 9. Before the order: the founding rule and the Pioneers' words
+
+Ticket: [Playtest information: the founding rule, Pioneers without a Launch Site, the Influence preview](https://github.com/whaleyjoshua2/Dying-Earth/issues/543).
+
+- **The founding rule:** a Colony Ship's aboard figure (§5) is drawn yellow at one to three aboard,
+  its hover leading with *"4 found a Colony"*; an empty Ship and one of four or more stay plain.
+- **A station's refusal from a Region** reads *"needs 4 Pioneers here"*; from a Colony it stays
+  "needs 4 Colonists to spare".
+- **The Recruit hover** is its two figures, *"2M people, Unrest -0.25."*, at the designer's word
+  after the build ("too damn wordy"): the Launch Site line (§1) says where they lift to, and the
+  sea's own button says Antarctica.
+- **No Influence preview:** built, then withdrawn at the designer's word after its picture.
+- The Trading window's "Buy more Influence" hover reads the price from the table (it still said two).
+- **The text tool:** a Colony Ship's Colonists read aboard/room with "(4 found a Colony)" at one to
+  three.
+- No rule moves.

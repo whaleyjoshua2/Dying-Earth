@@ -20595,7 +20595,7 @@ fn a_station_over_earth_takes_four_pioneers_from_a_launch_site_region() {
     assert_eq!(g.station_founders(Seat(0), BodyId::Earth, &[]), None, "three waiting is not four");
     let build = Order::BuildStation { body: BodyId::Earth, slot: 3, from: LoadSource::State(sid) };
     let err = g.check_order(Seat(0), &[], &build).unwrap_err().0;
-    assert!(err.contains("needs 4 Colonists"), "{err}");
+    assert!(err.contains("needs 4 Pioneers here"), "ticket #543: Pioneers, waiting here: {err}");
     g.state_mut(sid).emigrants = 6;
     assert_eq!(g.station_founders(Seat(0), BodyId::Earth, &[]), Some(LoadSource::State(sid)));
     assert!(g.check_order(Seat(0), &[], &build).is_ok(), "{:?}", g.check_order(Seat(0), &[], &build));

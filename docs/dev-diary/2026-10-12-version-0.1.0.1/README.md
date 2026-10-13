@@ -212,3 +212,28 @@ shown). The head's percentage rounded half up where the Victory windows round ha
 uses their rounding now. And the first Report never announced a window on turn 2; it does now
 (untested: seed 7 has none on turn 2). Left as it is: on a game-over Report the clock reads "Cuts
 alone no longer avoid Collapse", as the Climate Panel does.
+
+## Before the order: the founding rule and the Pioneers' words
+
+Ticket [#543](https://github.com/whaleyjoshua2/Dying-Earth/issues/543), spec §9.
+
+**The pictures** ([`ticket-543/`](ticket-543/)): `short-moon.png` (`settler:moon aboard:3`, a new
+aid), TSV Endeavour's "3/4" in yellow and its hover "4 found a Colony"; `recruit-earth.png`, the
+Recruit hover "2M people, Unrest -0.25."
+
+**After the pictures, at the designer's word.** The Recruit hover first said "No Launch Site here:
+low orbit only" inside its old sentence; the designer: *"mouse over is too damn wordy"*, and the
+Launch Site line already says it, so the hover is its two figures. The Influence preview ("Standing
+4 of 30" beside Spend; the approved "→" was not in the font) was built and photographed, and the
+designer changed their mind: it is gone from the window and the text tool.
+
+**Found on the way.** The "Buy more Influence" hover still said "two a point", missed on the prices
+ticket; it reads the table now.
+
+**Tests.** The refusal's new words, the short flag and the hover's two figures, each watched red,
+and the Ship card's own pins moved to the new hover. No rule moved; no sweep.
+
+**The review** (an agent that did not build it; the tree changed under it) found no rule defect: a
+doc comment spliced onto the wrong function, fixed; and a point for the designer, not changed: the
+station's refusal "needs 4 Pioneers here" shows on the orbit's Build button, where "here" reads as
+the slot, and with several Launch Site Regions it does not say which.

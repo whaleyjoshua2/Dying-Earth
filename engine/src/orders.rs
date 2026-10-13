@@ -593,7 +593,8 @@ impl Game {
             return Ok(());
         }
         Err(OrderError(match from {
-            LoadSource::State(_) => format!("needs {found} Colonists"),
+            // Ticket #543 (version 0.1.0.1): Pioneers waiting in this Region, which is what it means.
+            LoadSource::State(_) => format!("needs {found} Pioneers here"),
             LoadSource::Colony(_) => format!("needs {found} Colonists to spare"),
         }))
     }

@@ -6684,7 +6684,8 @@ fn influence_row(ui: &mut Ui, game: &Game, session: &Session, view: &mut ViewSta
         // Ticket #42: buying Influence lives in the Trading window now.
         if rule_tip(
             ui.small_button("Buy more Influence in the Trading window"),
-            "Ducats buy Influence into this turn's Allotment, two a point, spent like any other. Opens the Trading window.".to_string(),
+            // Ticket #543 (version 0.1.0.1): the price from the table, where it said two in words.
+            format!("Ducats buy Influence into this turn's Allotment, {} a point, spent like any other. Opens the Trading window.", game.tables.ducats.per_influence),
         )
         .clicked()
         {
@@ -7991,6 +7992,17 @@ fn policies_block(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, act
     );
 }
 
+/// Ticket #543 (version 0.1.0.1): the Recruit button's hover, cut to its two figures at the
+/// designer's word ("too damn wordy"): the Launch Site line above says where they lift to, and the
+/// sea's own button says Antarctica.
+fn recruit_hover(game: &Game, sid: StateId, per: u32) -> String {
+    format!(
+        "{} people, Unrest -{}.",
+        game.tables.people_text(game.muster_population_in(Seat(0), sid, per)),
+        Game::unrest_figure(game.tables.emigrants.unrest_fall_each * per as f64)
+    )
+}
+
 /// Ticket #356 (version 0.09.1): the Pioneers block, lifted out of the Orders block and drawn above
 /// the Facilities heading, at the designer's word -- *"move up the buttons to recruit pioneers to
 /// above the building tiles"*. At the foot of the card the Recruit button stood below the fold at
@@ -8024,11 +8036,7 @@ fn pioneers_block(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, act
         &session.pending,
         Order::BuildEmigrants { state: sid, n: per },
         &format!("Recruit {per} Pioneers"),
-        Some(format!(
-            "{} people, on the card at End Turn, and {} off this state's Unrest. A working Launch Site lifts them onto a Ship or straight to a station of yours over Earth; once the ice is open the sea takes them to Antarctica.",
-            game.tables.people_text(game.muster_population_in(Seat(0), sid, per)),
-            Game::unrest_figure(game.tables.emigrants.unrest_fall_each * per as f64)
-        )),
+        Some(recruit_hover(game, sid, per)),
         actions,
     );
     // Ticket #428 (version 0.09.5): ONE slider for every door below -- the sea, the lift, a Colony
@@ -8746,6 +8754,8 @@ struct ColonistRoom {
     aboard: u32,
     room: u32,
     hover: Option<String>,
+    /// Ticket #543 (version 0.1.0.1): some aboard but fewer than found a Colony, drawn yellow.
+    short: bool,
 }
 
 fn colonist_room(game: &Game, s: &Ship) -> Option<ColonistRoom> {
@@ -8754,8 +8764,13 @@ fn colonist_room(game: &Game, s: &Ship) -> Option<ColonistRoom> {
     }
     let base = game.colony_ship_capacity(s.seat);
     let crowd = if s.at == ShipAt::Body(BodyId::Earth) { game.crowd_extra() } else { 0 };
-    let hover = (crowd > 0).then(|| format!("{base} room, +{crowd} crowded at Earth"));
-    Some(ColonistRoom { aboard: s.colonists, room: base + crowd, hover })
+    // Ticket #543 (version 0.1.0.1): the founding rule before launch -- yellow at one to three
+    // aboard, with the rule on the hover; an empty Ship stays plain.
+    let found = game.tables.emigrants.found_with;
+    let short = s.colonists > 0 && s.colonists < found;
+    let lines: Vec<String> = [short.then(|| format!("{found} found a Colony")), (crowd > 0).then(|| format!("{base} room, +{crowd} crowded at Earth"))].into_iter().flatten().collect();
+    let hover = (!lines.is_empty()).then(|| lines.join("\n"));
+    Some(ColonistRoom { aboard: s.colonists, room: base + crowd, hover, short })
 }
 
 /// Ticket #536: the population glyph, then "3/6" -- the glyph BEFORE the figures, at the designer's
@@ -8767,7 +8782,8 @@ fn colonist_room_label(ui: &mut Ui, room: &ColonistRoom) {
             if let Some(image) = Icons::from_ctx(ui.ctx(), "population", 15.0) {
                 ui.add(image);
             }
-            ui.label(format!("{}/{}", room.aboard, room.room));
+            let figures = RichText::new(format!("{}/{}", room.aboard, room.room));
+            ui.label(if room.short { figures.color(Color32::YELLOW) } else { figures });
         })
         .response;
     if let Some(h) = &room.hover {
@@ -12724,6 +12740,29 @@ fn chronicle_screen(root: &mut Ui, session: &Session, actions: &mut Vec<Action>)
 mod tests {
     use super::*;
 
+    /// Ticket #543 (version 0.1.0.1): a Colony Ship with one to three aboard is drawn yellow, the
+    /// founding rule on its hover; an empty one and a full one are plain.
+    #[test]
+    fn a_colony_ship_short_of_four_says_four_found_a_colony() {
+        let tables = std::sync::Arc::new(dying_earth_engine::data::Tables::load(&dying_earth_engine::data::default_data_dir()).unwrap());
+        let g = Game::new(tables, NewGame { seed: 7, player: FactionKind::Custodians, player_is_ai: false, player_start: StateId::EastAsia });
+        let mut s = Ship { name: String::new(), id: ShipId(901), kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Moon), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None };
+        for (n, short) in [(0, false), (1, true), (3, true), (4, false)] {
+            s.colonists = n;
+            let r = colonist_room(&g, &s).unwrap();
+            assert_eq!(r.short, short, "{n} aboard");
+            assert_eq!(r.hover.as_deref() == Some("4 found a Colony"), short, "{n} aboard: {:?}", r.hover);
+        }
+    }
+
+    /// Ticket #543, at the designer's word: the Recruit hover is its two figures and nothing more.
+    #[test]
+    fn the_recruit_hover_is_its_two_figures() {
+        let tables = std::sync::Arc::new(dying_earth_engine::data::Tables::load(&dying_earth_engine::data::default_data_dir()).unwrap());
+        let g = Game::new(tables, NewGame { seed: 7, player: FactionKind::Custodians, player_is_ai: false, player_start: StateId::EastAsia });
+        assert_eq!(recruit_hover(&g, StateId::EastAsia, 2), "2M people, Unrest -0.25.");
+    }
+
     /// Ticket #537 (version 0.1.0.1): the Influence hover says the table's price, four Ducats.
     #[test]
     fn the_influence_hover_says_the_tables_price() {
@@ -12802,7 +12841,8 @@ mod tests {
         let ship = |id: u32, kind: UnitKind, at: ShipAt, colonists: u32| Ship { name: String::new(), id: ShipId(id), kind, seat: Seat(0), damage: 0, at, colonists, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None };
         let at_moon = ship(901, UnitKind::ColonyShip, ShipAt::Body(BodyId::Moon), 3);
         let room = colonist_room(&g, &at_moon).expect("a Colony Ship shows its room");
-        assert_eq!((room.aboard, room.room, room.hover.clone()), (3, base, None), "off Earth, the ordinary room");
+        // Ticket #543 (version 0.1.0.1): three aboard is short of the four that found a Colony.
+        assert_eq!((room.aboard, room.room, room.hover.clone()), (3, base, Some("4 found a Colony".to_string())), "off Earth, the ordinary room");
         let empty = ship(902, UnitKind::ColonyShip, ShipAt::Body(BodyId::Moon), 0);
         assert_eq!(colonist_room(&g, &empty).map(|r| (r.aboard, r.room)), Some((0, base)), "empty, it still shows 0/room");
         assert!(colonist_room(&g, &ship(903, UnitKind::Frigate, ShipAt::Body(BodyId::Moon), 0)).is_none(), "a Frigate shows none");
@@ -12813,7 +12853,9 @@ mod tests {
         let at_earth = ship(904, UnitKind::ColonyShip, ShipAt::Body(BodyId::Earth), 2);
         let r = colonist_room(&g, &at_earth).unwrap();
         assert_eq!(r.room, base + extra, "the room it can take at Earth");
-        assert_eq!(r.hover.as_deref(), Some(format!("{base} room, +{extra} crowded at Earth").as_str()));
+        // Ticket #543: two aboard, so the founding rule leads the hover.
+        assert_eq!(r.hover.as_deref(), Some(format!("4 found a Colony
+{base} room, +{extra} crowded at Earth").as_str()));
     }
 
     /// Ticket #509 (version 0.1.0.0): the renewal prompt says the Accord, its Terms and the five

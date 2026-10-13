@@ -1077,7 +1077,8 @@ fn build_board(session: &mut Session) {
                 seat: Seat(0),
                 damage: 0,
                 at: ShipAt::Body(body),
-                colonists: 8,
+                // `aboard:<n>` (ticket #543, version 0.1.0.1): how many it carries, where it is eight.
+                colonists: std::env::args().find_map(|a| a.strip_prefix("aboard:").and_then(|v| v.parse::<u32>().ok())).unwrap_or(8),
                 colonists_education: 1.0,
                 warhead: false,
                 army: None,

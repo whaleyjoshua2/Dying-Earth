@@ -1018,6 +1018,18 @@ fn print_costs(g: &Game) {
     // Ticket #404 (version 0.09.4): the Market line is on the board every turn, so not here too.
 }
 
+/// Ticket #543 (version 0.1.0.1): a Colony Ship's Colonists as aboard/room, the crowded room at a
+/// warmed Earth, and "(4 found a Colony)" at one to three aboard; any other Ship, its count.
+fn colonists_text(g: &Game, sh: &Ship) -> String {
+    if sh.kind != UnitKind::ColonyShip {
+        return sh.colonists.to_string();
+    }
+    let crowd = if sh.at == ShipAt::Body(BodyId::Earth) { g.crowd_extra() } else { 0 };
+    let found = g.tables.emigrants.found_with;
+    let short = if sh.colonists > 0 && sh.colonists < found { format!(" ({found} found a Colony)") } else { String::new() };
+    format!("{}/{}{short}", sh.colonists, g.colony_ship_capacity(sh.seat) + crowd)
+}
+
 fn print_report(g: &Game) {
     println!("\n=== REPORT, turn {} ===", g.report.turn);
     // Ticket #544 (version 0.1.0.1): the clock and the player's Victory, first.
@@ -1366,7 +1378,9 @@ fn print_board(g: &Game) {
             ship_at_text(g, sh),
             sh.fuel,
             figure(g.tank_of(sh.seat, sh.kind)),
-            sh.colonists,
+            // Ticket #543 (version 0.1.0.1): a Colony Ship's aboard/room, and the founding rule
+            // where it is short of it.
+            colonists_text(g, sh),
             // Ticket #404 (version 0.09.4): a number or a dash, never `Some(2)`.
             sh.army.map(|a| a.0.to_string()).unwrap_or_else(|| "-".to_string()),
             t.unit(sh.kind).hit_points as i64 - sh.damage as i64,
