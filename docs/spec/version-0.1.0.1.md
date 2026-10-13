@@ -1,4 +1,4 @@
-# Dying Earth — version 0.1.0.1
+# Dying Earth — version 0.1.0.1, the counterweight version
 
 Amendments to the specification, one section per decision. Each section names the ticket whose
 resolution comment is the authority; where this document and a ticket disagree, the ticket is right.
@@ -67,3 +67,31 @@ Ticket: [Two panels' prose onto hovers, and Armies lift to low orbit without a L
 - **Refutation:** a Carrier in low orbit over Earth refused an Army waiting in a Region its seat
   directs with no Launch Site, or one in a station's ring accepting it, or a computer seat with a
   Carrier, a free Army and a target never loading it, shows this section unbuilt.
+
+## 2. A Ship's lifts from Regions and its refuel do not use its turn
+
+Ticket: [A Ship's lifts from Regions and its refuel do not use its turn](https://github.com/whaleyjoshua2/Dying-Earth/issues/533).
+
+- **A Ship's turn is its one action:** a flight to another Body, a change of orbit, an unload or a
+  founding, a load off a Colony or station, a Bombard, a Launch or a Rearm.
+- **Two things stand beside it and never use it:**
+  - **a lift from a Region**, Pioneers or an Army, from any number of Regions, one load a Region;
+  - **a refuel**, once a turn, beside any order.
+- **Both happen where the Ship sits when the orders are given, before it moves.** Lift at Earth and
+  leave for the Moon in one turn, the Pioneers aboard; refuel at the ISS and leave, the leg paid
+  from the filled tank. A flight or a change of orbit is checked against the tank as the refuel
+  given beside it will fill it. However the orders were given, a Ship's lifts and refuel are
+  carried out before its move; a Ship that leaves for another Body takes its lifts aboard at End
+  Turn.
+- **Which Regions lift is unchanged:** from low orbit any Region the seat directs; from any other
+  orbit only a Region with a working Launch Site.
+- **A Ship never lifts and unloads in one turn:** *"a Ship loads or unloads in a turn, not both"*.
+  A second refuel: *"this Ship already refuels this turn"*.
+- **Unchanged:** one change of orbit a turn, and it is the turn; Fuel paid as before; taking
+  Colonists off a Colony or station is the turn's action (a lift may stand beside it, the room
+  counted over both); a Ship arrives at Resolution and acts the turn after.
+- **The computer seats** offer a lift that makes the four a founding wants together with the
+  crossing (lift and leave), and a ready Missile Carrier refuels beside its Launch.
+- **Refutation:** a Colony Ship given a lift and a flight that leaves without the Pioneers aboard,
+  or a refuel and a flight refused for a tank the refuel fills, or a lift accepted beside an unload,
+  shows this section unbuilt.

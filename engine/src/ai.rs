@@ -2883,7 +2883,9 @@ impl Game {
             // the same candidate. The plain Refuel from what is held stays on offer beside it, so a
             // turn whose Ducats are held for something else still fills what it can.
             let top_up = self.ai_fuel_top_up(seat, self.tank_of(seat, s.kind) - s.fuel);
-            if s.fuel < self.tank_of(seat, s.kind) && self.refuelling_station(seat, body, orbit) && !ready_to_fire {
+            // Ticket #533 (version 0.1.0.1): a refuel never uses the Ship's turn, so a ready Missile
+            // Carrier fills its tank beside its Launch; only the orbit change below still waits on it.
+            if s.fuel < self.tank_of(seat, s.kind) && self.refuelling_station(seat, body, orbit) {
                 let note = format!("refuel {} at {} ({} of {} in the tank)", ship_name, self.orbit_name(body, orbit), figure(s.fuel), figure(self.tank_of(seat, s.kind)));
                 if let Some(buy) = top_up {
                     push(vec![buy, Order::Refuel { ship: s.id }], Cat::Transit, self.base_weight(seat, Cat::Transit), gap_for(Cat::Transit, None), 1.0, 1.0, format!("{note}, buying the rest"), None);
@@ -3006,6 +3008,20 @@ impl Game {
                         room -= n;
                     }
                     let n = capacity - s.colonists - room;
+                    // Ticket #533 (version 0.1.0.1), at the designer's word: a lift never uses the
+                    // Ship's turn and boards before it moves, so a lift that makes the four a founding
+                    // wants is offered with the crossing too -- lift and leave in one turn -- at the
+                    // crossing's weight, beside the lift alone.
+                    if n > 0 && s.colonists + n >= self.tables.emigrants.found_with {
+                        let d = if ferrying { archive_body.unwrap_or_else(|| self.best_body_for(seat, behind)) } else { self.best_body_for(seat, behind) };
+                        if d != body {
+                            let window = self.window_preference(seat, body, d);
+                            let gather = if gathering && capital_has_room && Some(d) == capital_body { capital_chase } else { 1.0 };
+                            let mut go = loads.clone();
+                            go.push(Order::Transit { ship: s.id, to: d, slot: self.ai_destination_orbit(seat, s, d) });
+                            push(go, Cat::Transit, self.base_weight(seat, Cat::Transit) * window * gather, gap_for(Cat::Transit, None), 1.0, 1.0, format!("load {} Colonists onto {} and send it to {}", n, ship_name, self.tables.body(d).name), None);
+                        }
+                    }
                     if n > 0 {
                         let opp = if presence_needed <= n { m.opportunity } else { 1.0 };
                         push(loads, Cat::LoadUnload, self.base_weight(seat, Cat::LoadUnload), gap_for(Cat::LoadUnload, None), 1.0, opp, format!("load {} Colonists onto {}", n, ship_name), None);

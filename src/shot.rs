@@ -1468,6 +1468,28 @@ fn build_board(session: &mut Session) {
         eprintln!("order:{name} was refused");
         std::process::exit(3);
     }
+    // `liftgo:1` (a building aid, ticket #533, version 0.1.0.1): seat 0's empty Colony Ship at
+    // Earth (one is made in low orbit if it has none), four Pioneers waiting in its start state, and
+    // a lift of the four AND a flight to the Moon both placed, so its card (`stack:earth ship:1`)
+    // can be photographed with the two side by side.
+    if std::env::args().any(|a| a == "liftgo:1")
+        && let Some(g) = session.game.as_mut()
+        && let Some(sid) = g.directed_states(Seat(0)).first().copied()
+    {
+        let here = g.ships.iter().find(|s| s.seat == Seat(0) && s.kind == UnitKind::ColonyShip && s.at == ShipAt::Body(BodyId::Earth) && s.colonists == 0).map(|s| s.id);
+        let id = here.unwrap_or_else(|| {
+            let id = ShipId(g.fresh_id());
+            let name = g.next_ship_name(UnitKind::ColonyShip);
+            let (built_turn, fuel) = (g.turn, g.tank_of(Seat(0), UnitKind::ColonyShip));
+            g.ships.push(Ship { id, name, kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel, slot: None });
+            id
+        });
+        g.state_mut(sid).emigrants = 4;
+        if !session.place(Order::Load { ship: id, colonists: 4, from: LoadSource::State(sid), army: None }) || !session.place(Order::Transit { ship: id, to: BodyId::Moon, slot: None }) {
+            eprintln!("liftgo:1 was refused");
+            std::process::exit(3);
+        }
+    }
     // `raise:1` (a building aid, ticket #476, version 0.09.8): Raise Industry Level is ordered in
     // seat 0's start state and left pending, so its tile can be photographed ordered. The seat is
     // given the Materials first: three turns in it cannot afford one. `raise:afford` gives them and orders nothing.

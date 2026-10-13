@@ -2889,59 +2889,7 @@ impl Game {
         let mut ground_founded: Vec<(Seat, BodyId, ColonyId)> = Vec::new();
         for (seat, order) in cargo {
             match order {
-                Order::Load { ship, colonists, from, army } => {
-                    let Some(s) = self.ship(ship) else { continue };
-                    let ShipAt::Body(body) = s.at else { continue };
-                    // Ticket #366 (version 0.09.2): what the Spaceport paid for this lift, for the line.
-                    let mut paid = 0;
-                    if colonists > 0 {
-                        match from {
-                            LoadSource::State(st) => {
-                                if self.state(st).control.director() != Some(seat) {
-                                    continue;
-                                }
-                                // Ticket #73: the lift takes the Emigrants waiting there; the
-                                // population was paid when they mustered.
-                                if self.state(st).emigrants < colonists {
-                                    continue;
-                                }
-                                // Ticket #189 (version 0.08.0): what they know goes aboard with them.
-                                let taught = self.take_emigrants(st, colonists);
-                                // Ticket #183 (version 0.08.0): a lift onto a Ship is a launch too.
-                                paid = self.pay_spaceport(seat, st, colonists);
-                                self.load_people(ship, colonists, taught);
-                            }
-                            LoadSource::Colony(c) => {
-                                if self.colony(c).map(|col| col.colonists < colonists).unwrap_or(true) {
-                                    continue;
-                                }
-                                let taught = self.take_colonists(c, colonists);
-                                self.load_people(ship, colonists, taught);
-                            }
-                        }
-                    }
-                    if let Some(aid) = army {
-                        let ok = self.army(aid).map(|a| matches!(a.at, ArmyAt::Place(_)) && self.army_seat(a) == Some(seat)).unwrap_or(false);
-                        if ok {
-                            if let Some(a) = self.army_mut(aid) {
-                                a.at = ArmyAt::Aboard(ship);
-                                a.move_to = None;
-                            }
-                            if let Some(s) = self.ship_mut(ship) {
-                                s.army = Some(aid);
-                            }
-                        }
-                    }
-                    let cargo: String = if colonists > 0 { format!("{colonists} Colonists") } else { "an Army".into() };
-                    let line = format!("{} loaded {} at {}.", self.seat_name(seat), cargo, self.tables.body(body).name);
-                    self.log(line);
-                    let spaceport = if paid > 0 { self.phrase("spaceport_pays", &[("n", paid.to_string())]) } else { String::new() };
-                    let text = self.say(
-                        "loaded",
-                        &[("faction", self.seat_name(seat)), ("cargo", cargo), ("body", self.tables.body(body).name.clone()), ("spaceport", spaceport)],
-                    );
-                    self.report_line_of(seat, LineKind::YourWorks, LineKind::Ship, Some(ReportPlace::Body(body)), text);
-                }
+                Order::Load { ship, colonists, from, army } => self.carry_load(seat, ship, colonists, from, army),
                 Order::Unload { ship, colonists, army, into } => {
                     if blocked.contains(&ship) {
                         let line = format!("{}: another Faction took that Colony Slot first.", self.seat_name(seat));
@@ -3477,6 +3425,62 @@ impl Game {
         let divisor = if restive { u.pacification_divisor_unrest } else { u.pacification_divisor };
         let threshold = self.influence_threshold(place);
         if divisor <= 0 { threshold } else { (threshold + divisor - 1) / divisor }
+    }
+
+    /// Ticket #533 (version 0.1.0.1): one Load carried out -- at the cargo step of the Resolution,
+    /// or at End Turn for a Ship that leaves this turn, whose lifts board before it moves.
+    pub(crate) fn carry_load(&mut self, seat: Seat, ship: ShipId, colonists: u32, from: LoadSource, army: Option<ArmyId>) {
+        let Some(s) = self.ship(ship) else { return };
+        let ShipAt::Body(body) = s.at else { return };
+        // Ticket #366 (version 0.09.2): what the Spaceport paid for this lift, for the line.
+        let mut paid = 0;
+        if colonists > 0 {
+            match from {
+                LoadSource::State(st) => {
+                    if self.state(st).control.director() != Some(seat) {
+                        return;
+                    }
+                    // Ticket #73: the lift takes the Emigrants waiting there; the
+                    // population was paid when they mustered.
+                    if self.state(st).emigrants < colonists {
+                        return;
+                    }
+                    // Ticket #189 (version 0.08.0): what they know goes aboard with them.
+                    let taught = self.take_emigrants(st, colonists);
+                    // Ticket #183 (version 0.08.0): a lift onto a Ship is a launch too.
+                    paid = self.pay_spaceport(seat, st, colonists);
+                    self.load_people(ship, colonists, taught);
+                }
+                LoadSource::Colony(c) => {
+                    if self.colony(c).map(|col| col.colonists < colonists).unwrap_or(true) {
+                        return;
+                    }
+                    let taught = self.take_colonists(c, colonists);
+                    self.load_people(ship, colonists, taught);
+                }
+            }
+        }
+        if let Some(aid) = army {
+            let ok = self.army(aid).map(|a| matches!(a.at, ArmyAt::Place(_)) && self.army_seat(a) == Some(seat)).unwrap_or(false);
+            if ok {
+                if let Some(a) = self.army_mut(aid) {
+                    a.at = ArmyAt::Aboard(ship);
+                    a.move_to = None;
+                }
+                if let Some(s) = self.ship_mut(ship) {
+                    s.army = Some(aid);
+                }
+            }
+        }
+        let cargo: String = if colonists > 0 { format!("{colonists} Colonists") } else { "an Army".into() };
+        let line = format!("{} loaded {} at {}.", self.seat_name(seat), cargo, self.tables.body(body).name);
+        self.log(line);
+        let spaceport = if paid > 0 { self.phrase("spaceport_pays", &[("n", paid.to_string())]) } else { String::new() };
+        let text = self.say(
+            "loaded",
+            &[("faction", self.seat_name(seat)), ("cargo", cargo), ("body", self.tables.body(body).name.clone()), ("spaceport", spaceport)],
+        );
+        self.report_line_of(seat, LineKind::YourWorks, LineKind::Ship, Some(ReportPlace::Body(body)), text);
     }
 
     /// Ticket #300 (version 0.08.6): the stance is inferred from whose place it is, no new field --

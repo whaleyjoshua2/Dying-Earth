@@ -1,4 +1,4 @@
-# Version 0.1.0.1
+# Version 0.1.0.1, the counterweight version
 
 The map is [Map: version 0.1.0.1](https://github.com/whaleyjoshua2/Dying-Earth/issues/529); the spec
 is [`docs/spec/version-0.1.0.1.md`](../../spec/version-0.1.0.1.md). The standing baseline is 0.1.0.0's
@@ -37,3 +37,24 @@ hover's first line showed "removed 0 in credit" at zero; with all four moved par
 wrapped to a fourth line as drawn (now said short past 55 characters, tested in rendered lines);
 and nothing tested that a working Launch Site still lifts an Army into a station's ring or from a
 rival's Region (now tested, each watched red by blinding the Launch Site check).
+
+## A Ship's lifts from Regions and its refuel do not use its turn
+
+Ticket [#533](https://github.com/whaleyjoshua2/Dying-Earth/issues/533), spec §2.
+
+**The picture** ([`ticket-533/lift-and-go-earth.png`](ticket-533/lift-and-go-earth.png)), taken with
+a new aid, `liftgo:1`: TSV Endeavour in Earth's low orbit with a lift of four Pioneers from China
+and a flight to the Moon both ordered, its Move buttons greyed with "This Ship already has an
+order" (a change of orbit is the turn).
+
+**Three old tests moved with the rule**, each to the new rule rather than loosened: #443's "never
+beside a move" (a lift now stands beside one), #363's "a Refuel after a Launch is refused" (a
+refuel now stands beside a Launch or a Rearm; a move after one is still refused), and #87's "3 in
+the tank flies nowhere" (the computer now refuels and leaves in one turn, on a leg the filled tank
+pays, which the check of its whole order set confirms).
+
+**The sweep** ([`sweeps/ticket-533.txt`](sweeps/ticket-533.txt)), run after the review fixes: **2 / 25 / 12 / 20 and 20
+collapses**, from 2 / 24 / 15 / 17 and 22. The Arkwrights' 3 and the Archivists' 3 are at the edge
+of noise. The settling moved past it: the first ground Colony on the Moon in 75 of 80 games at a
+median turn 18, from 70 at turn 24; Phobos in 36 from 30, Deimos in 66 from 59, Ceres 72 ground
+Colonies at the end from 60. Measured behaviour.

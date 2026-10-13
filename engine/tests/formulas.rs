@@ -7275,7 +7275,15 @@ fn the_ai_refuels_at_its_station_and_orders_no_leg_its_tank_cannot_pay() {
     g.seats[0].stockpile.energy = 200.0;
     let orders = g.ai_orders(Seat(0));
     assert!(orders.iter().any(|o| matches!(o, Order::Refuel { ship: s } if *s == ship)), "no Refuel at the ISS: {orders:?}");
-    assert!(!orders.iter().any(|o| matches!(o, Order::Transit { ship: s, .. } if *s == ship)), "3 in the tank flies nowhere: {orders:?}");
+    // Ticket #533 (version 0.1.0.1): the refuel lands before the Ship leaves, so it may fill and go
+    // in one turn -- but only on a leg the filled tank pays, which the check of the whole set says.
+    if let Some(Order::Transit { to, slot, .. }) = orders.iter().find(|o| matches!(o, Order::Transit { ship: s, .. } if *s == ship)) {
+        let s = g.ship(ship).unwrap();
+        let leg = g.transit_fuel(Seat(0), s, BodyId::Earth, *to, *slot);
+        let filled = g.tank_after_refuel(Seat(0), &orders, s);
+        assert!(filled >= leg, "3 in the tank flies only on a leg the refuel pays: {filled} filled, {leg} wanted");
+        assert!(filled > 3.0, "it flies only with the refuel beside it: {orders:?}");
+    }
 }
 
 // ---------------------------------------------------------------- 0.06.0 ticket #88: build it where you dig
@@ -8908,11 +8916,16 @@ fn an_order_after_a_launch_rearm_or_bombard_is_refused() {
         assert!(g.check_order(Seat(0), &[], &t).is_ok(), "{t:?} alone is lawful");
     }
     let first = [Order::Launch { ship, target: Place::State(StateId::SouthAsia) }, Order::Rearm { ship }];
-    let then = [Order::ChangeOrbit { ship, slot: None }, Order::Transit { ship, to: BodyId::Moon, slot: None }, Order::Refuel { ship }];
+    let then = [Order::ChangeOrbit { ship, slot: None }, Order::Transit { ship, to: BodyId::Moon, slot: None }];
     for f in &first {
         for t in &then {
             let err = g.check_order(Seat(0), std::slice::from_ref(f), t).err().map(|e| e.0).unwrap_or_default();
             assert!(err.contains("already has an order"), "{t:?} after {f:?} must be refused, got {err:?}");
+        }
+        // Ticket #533 (version 0.1.0.1), at the designer's word: a refuel never uses the Ship's
+        // turn, and it is no move, so it stands beside a Launch or a Rearm.
+        if let Err(e) = g.check_order(Seat(0), std::slice::from_ref(f), &Order::Refuel { ship }) {
+            panic!("a Refuel beside {f:?}: {}", e.0);
         }
     }
 }
@@ -13745,6 +13758,123 @@ fn an_army_lifts_to_low_orbit_without_a_launch_site_and_to_a_ring_only_with_one(
     if let Err(e) = g.check_order(Seat(0), &[], &ring_abroad) {
         panic!("a working Launch Site lifts into a station's ring: {}", e.0);
     }
+}
+
+/// Ticket #533 (version 0.1.0.1), at the designer's word: a lift from a Region and a refuel never
+/// use a Ship's turn, and both happen where the Ship sits, before it moves. Lift at Earth and leave
+/// for the Moon in one turn, the Pioneers aboard; refuel at the ISS and leave.
+#[test]
+fn a_ship_lifts_and_refuels_beside_its_one_action_and_before_it_moves() {
+    let mut g = game();
+    let ship = ship_in(&mut g, Seat(0), UnitKind::ColonyShip, BodyId::Earth, None, Stance::Hold);
+    g.state_mut(StateId::EastAsia).emigrants = 4;
+    let lift = Order::Load { ship, colonists: 4, from: LoadSource::State(StateId::EastAsia), army: None };
+    let go = Order::Transit { ship, to: BodyId::Moon, slot: None };
+    if let Err((i, e)) = g.check_orders(Seat(0), &[lift.clone(), go.clone()]) {
+        panic!("a lift and a flight stand together (order {i}): {}", e.0);
+    }
+    if let Err((i, e)) = g.check_orders(Seat(0), &[go.clone(), lift.clone()]) {
+        panic!("given the other way round too (order {i}): {}", e.0);
+    }
+    g.commit_orders(Seat(0), &[go, lift]);
+    let s = g.ship(ship).unwrap();
+    assert!(matches!(s.at, ShipAt::Transit { to: BodyId::Moon, .. }), "it left: {:?}", s.at);
+    assert_eq!(s.colonists, 4, "the Pioneers boarded before it left");
+    assert_eq!(g.state(StateId::EastAsia).emigrants, 0);
+    assert_eq!(g.climate.launches_pending[0], 1, "the lift is a launch, as before");
+
+    // A refuel, then a flight the tank alone could not pay.
+    let iss = station_of(&g, Seat(0), BodyId::Earth).expect("the ISS");
+    let ring = g.colony(iss).unwrap().slot;
+    let tanker = ship_in(&mut g, Seat(0), UnitKind::ColonyShip, BodyId::Earth, Some(ring), Stance::Hold);
+    g.ship_mut(tanker).unwrap().fuel = 1.0;
+    g.seats[0].stockpile.fuel = 100.0;
+    let refuel = Order::Refuel { ship: tanker };
+    let leave = Order::Transit { ship: tanker, to: BodyId::Moon, slot: None };
+    if let Err((i, e)) = g.check_orders(Seat(0), &[refuel.clone(), leave.clone()]) {
+        panic!("a refuel and a flight stand together (order {i}): {}", e.0);
+    }
+    let tank = g.tank_of(Seat(0), UnitKind::ColonyShip);
+    let leg = g.transit_fuel(Seat(0), g.ship(tanker).unwrap(), BodyId::Earth, BodyId::Moon, None);
+    g.commit_orders(Seat(0), &[refuel, leave]);
+    let t = g.ship(tanker).unwrap();
+    assert!(matches!(t.at, ShipAt::Transit { .. }), "it left: {:?}", t.at);
+    assert!((t.fuel - (tank - leg)).abs() < 0.05, "filled at the ISS, then paid the leg: {} of {tank}, leg {leg}", t.fuel);
+
+    // A refuel given AFTER the flight, with Fuel bought between: it fills from what was bought, as
+    // it was quoted, and the flight is held back until it has.
+    let late = ship_in(&mut g, Seat(0), UnitKind::ColonyShip, BodyId::Earth, Some(ring), Stance::Hold);
+    g.ship_mut(late).unwrap().fuel = 20.0;
+    g.seats[0].stockpile.fuel = 0.0;
+    g.seats[0].stockpile.ducats = 500.0;
+    let set = [Order::Transit { ship: late, to: BodyId::Moon, slot: None }, Order::Buy { resource: Resource::Fuel, amount: 30 }, Order::Refuel { ship: late }];
+    if let Err((i, e)) = g.check_orders(Seat(0), &set) {
+        panic!("a flight, a purchase and a refuel (order {i}): {}", e.0);
+    }
+    let leg = g.transit_fuel(Seat(0), g.ship(late).unwrap(), BodyId::Earth, BodyId::Moon, None);
+    g.commit_orders(Seat(0), &set);
+    let l = g.ship(late).unwrap();
+    assert!(matches!(l.at, ShipAt::Transit { .. }), "it left: {:?}", l.at);
+    assert!((l.fuel - (tank - leg)).abs() < 0.05, "filled from the purchase before leaving: {} of {tank}, leg {leg}", l.fuel);
+
+    // A Carrier lifts an Army and leaves, the same.
+    let carrier = ship_in(&mut g, Seat(0), UnitKind::Carrier, BodyId::Earth, None, Stance::Hold);
+    let army = ArmyId(g.fresh_id());
+    g.armies.push(Army { id: army, name: "the 1st".to_string(), home: ArmyHome::State(StateId::EastAsia), at: ArmyAt::Place(Place::State(StateId::EastAsia)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None, levy: false, raised_strength: 2 });
+    let up = Order::Load { ship: carrier, colonists: 0, from: LoadSource::State(StateId::EastAsia), army: Some(army) };
+    let away = Order::Transit { ship: carrier, to: BodyId::Moon, slot: None };
+    if let Err((i, e)) = g.check_orders(Seat(0), &[away.clone(), up.clone()]) {
+        panic!("an Army's lift and a flight stand together (order {i}): {}", e.0);
+    }
+    g.commit_orders(Seat(0), &[away, up]);
+    assert_eq!(g.ship(carrier).unwrap().army, Some(army), "the Army boarded before it left");
+}
+
+/// Ticket #533: the computer plays to it -- an empty Colony Ship at Earth with four Pioneers
+/// waiting lifts them AND leaves in the one turn, where it took a turn to load and the next to go.
+#[test]
+fn the_computer_lifts_its_pioneers_and_leaves_in_one_turn() {
+    let mut g = game();
+    calm(&mut g);
+    at_window(&mut g);
+    let ship = ship_in(&mut g, Seat(0), UnitKind::ColonyShip, BodyId::Earth, None, Stance::Hold);
+    g.state_mut(StateId::EastAsia).emigrants = 4;
+    g.seats[0].stockpile.energy = 200.0;
+    let orders = g.ai_orders(Seat(0));
+    let lifts = orders.iter().filter(|o| matches!(o, Order::Load { ship: s, from: LoadSource::State(_), .. } if *s == ship)).count();
+    let leaves = orders.iter().any(|o| matches!(o, Order::Transit { ship: s, .. } if *s == ship));
+    assert!(lifts > 0 && leaves, "lift and leave in one turn ({lifts} lifts, leaves {leaves}): {orders:?}");
+}
+
+/// Ticket #533: what still takes the Ship's one turn. A change of orbit, a flight, an unload and a
+/// load off a Colony are each the turn's action; a lift stands beside a change of orbit but never
+/// beside an unload; a Ship refuels once.
+#[test]
+fn a_ship_still_has_one_action_a_turn_and_never_lifts_and_unloads_together() {
+    let mut g = game();
+    let iss = station_of(&g, Seat(0), BodyId::Earth).expect("the ISS");
+    let ring = g.colony(iss).unwrap().slot;
+    let ship = ship_in(&mut g, Seat(0), UnitKind::ColonyShip, BodyId::Earth, Some(ring), Stance::Hold);
+    g.state_mut(StateId::EastAsia).emigrants = 4;
+    g.colony_mut(iss).unwrap().colonists = 2;
+    let lift = Order::Load { ship, colonists: 2, from: LoadSource::State(StateId::EastAsia), army: None };
+    let down = Order::ChangeOrbit { ship, slot: None };
+    let go = Order::Transit { ship, to: BodyId::Moon, slot: None };
+    let off_iss = Order::Load { ship, colonists: 2, from: LoadSource::Colony(iss), army: None };
+    let refuse = |g: &Game, pending: &[Order], o: &Order| g.check_order(Seat(0), pending, o).unwrap_err().0;
+    assert!(g.check_orders(Seat(0), &[lift.clone(), down.clone()]).is_ok(), "a lift beside a change of orbit");
+    assert_eq!(refuse(&g, std::slice::from_ref(&down), &go), "this Ship already has an order", "a change of orbit is the turn");
+    assert_eq!(refuse(&g, std::slice::from_ref(&off_iss), &go), "this Ship already has an order", "a load off a station is the turn");
+    assert!(g.check_orders(Seat(0), &[off_iss.clone(), lift.clone()]).is_ok(), "a lift beside a load off a station");
+    g.ship_mut(ship).unwrap().colonists = 2;
+    let unload = Order::Unload { ship, colonists: 2, army: false, into: UnloadTarget::Colony(iss) };
+    g.colony_mut(iss).unwrap().colonists = 0;
+    assert_eq!(refuse(&g, std::slice::from_ref(&unload), &lift), "a Ship loads or unloads in a turn, not both");
+    assert_eq!(refuse(&g, std::slice::from_ref(&lift), &unload), "a Ship loads or unloads in a turn, not both");
+    g.ship_mut(ship).unwrap().fuel = 1.0;
+    g.seats[0].stockpile.fuel = 100.0;
+    let refuel = Order::Refuel { ship };
+    assert_eq!(refuse(&g, std::slice::from_ref(&refuel), &refuel), "this Ship already refuels this turn");
 }
 
 /// Ticket #532: the computer picks the Army a Carrier loads by the same rule, so a Region with no
@@ -19199,9 +19329,10 @@ fn a_colony_ship_loads_pioneers_from_several_regions_in_one_turn() {
     assert!(g.check_order(Seat(0), std::slice::from_ref(&from_a), &again_a).is_err(), "one Load a Region");
     let too_many = Order::Load { ship, colonists: room - 1, from: LoadSource::State(b), army: None };
     assert!(g.check_order(Seat(0), std::slice::from_ref(&from_a), &too_many).unwrap_err().0.contains("at most"), "the room is the Ship's, over every Region");
-    // Never beside a move.
+    // Ticket #533 (version 0.1.0.1), at the designer's word: beside a move now -- a lift never
+    // uses the Ship's turn -- where #443 held it apart from one.
     let go = Order::ChangeOrbit { ship, slot: Some(0) };
-    assert!(g.check_order(Seat(0), std::slice::from_ref(&from_a), &go).is_err());
+    assert!(g.check_order(Seat(0), std::slice::from_ref(&from_a), &go).is_ok());
     let both = vec![from_a.clone(), from_b.clone()];
     g.commit_orders(Seat(0), &both);
     g.resolution_phase();
