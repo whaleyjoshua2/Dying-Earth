@@ -784,6 +784,10 @@ pub struct FactionCard {
     /// about them and not an oversight.
     #[serde(default = "resentment_default")]
     pub resentment: f64,
+    /// Ticket #535 (version 0.1.0.1), at the designer's word: how far this Faction's Relations
+    /// toward another fall for every `greenwash.resentment_per` Influence that other spends on a
+    /// Greenwash -- the Custodians 0.4, the Arkwrights 0.2, the Archivists 0.1, the Prospectors 0.05.
+    pub greenwash_resentment: f64,
     /// A Space Station's Materials, times this.
     #[serde(default = "one_f64")]
     pub station_materials_multiplier: f64,
@@ -1138,6 +1142,8 @@ pub struct GreenwashTable {
     pub ducats_per_influence: i64,
     /// The Ducats a computer seat keeps back past the campaign's price before it will pay for one.
     pub ai_ducats_reserve: i64,
+    /// Ticket #535 (version 0.1.0.1): the Influence a Faction's `greenwash_resentment` is per.
+    pub resentment_per: i64,
 }
 
 /// Ticket #53 (version 0.05): Blame, in `influence.toml` under `[blame]`.
@@ -1499,6 +1505,9 @@ pub struct AiThresholds {
     pub warships_wanted_blockaded: u32,
     pub evade_damage_fraction: f64,
     pub influence_step: i64,
+    /// Ticket #535 (version 0.1.0.1): how hard the Relations a Greenwash costs with valued Factions
+    /// weigh against it -- the weight over (1 + this x the points lost).
+    pub greenwash_relations_cost: f64,
     /// Ticket #75: a held state's worth on the Influence target list, as a share of a neutral one's.
     pub held_state_weight: f64,
     /// Ticket #336 (version 0.09.0): the price a rival's Colony is weighed against on the same

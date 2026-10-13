@@ -3274,6 +3274,8 @@ impl Game {
         for (seat, amount) in std::mem::take(&mut self.pending.greenwashes) {
             let ppm = amount as f64 * self.tables.influence.greenwash.ppm_per_influence;
             self.seat_mut(seat).blame_cleaned += ppm;
+            // Ticket #535 (version 0.1.0.1): and the campaign is held against it, by what it spent.
+            self.seat_mut(seat).greenwash_spent += amount;
             let who = self.seat_name(seat);
             self.log(format!("The {who} greenwashed: {ppm:.0} ppm off their Blame."));
             let text = self.say("greenwash", &[("faction", who), ("ppm", format!("{ppm:.0}"))]);

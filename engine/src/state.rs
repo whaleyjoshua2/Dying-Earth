@@ -1000,6 +1000,10 @@ pub struct SeatState {
     /// seat took it out of the air.
     #[serde(default)]
     pub blame_cleaned: f64,
+    /// Ticket #535 (version 0.1.0.1): the Influence this seat has spent on Greenwash over the game,
+    /// which the other Factions hold against it (`greenwash_relations_term`). It never falls.
+    #[serde(default)]
+    pub greenwash_spent: i64,
     /// Ticket #279 (version 0.08.5): the ppm this seat's Battles on Earth have put in the air over
     /// the game, for the sweep; it is inside `blame_emitted` already.
     #[serde(default)]
@@ -1733,6 +1737,7 @@ impl Game {
             directive_sink: 0.0,
             blame_smeared: 0.0,
             blame_cleaned: 0.0,
+            greenwash_spent: 0,
             war_ppm: 0.0,
             credits_bought: 0.0,
             credits_sold: 0.0,
@@ -5433,13 +5438,28 @@ impl Game {
     /// challenge margin and the Accords' Friendly gate.
     pub fn relations_score(&self, viewer: Seat, subject: Seat) -> i64 {
         let c = &self.tables.relations;
-        let base = self.relations_deeds(viewer, subject) + self.blame_relations_term(viewer, subject);
+        let base = self.relations_base(viewer, subject);
+        (base + self.directive_relations_applied(viewer, subject)).clamp(c.worst, c.best)
+    }
+
+    /// The score's parts before the shared-Research reward: the deeds, the Blame term and, since
+    /// ticket #535 (version 0.1.0.1), the Greenwash campaigns `subject` has run.
+    fn relations_base(&self, viewer: Seat, subject: Seat) -> i64 {
+        self.relations_deeds(viewer, subject) + self.blame_relations_term(viewer, subject) + self.greenwash_relations_term(viewer, subject)
+    }
+
+    /// Ticket #535 (version 0.1.0.1): the shared-Research reward (#236) as the score ADDS it -- after
+    /// its ceiling, which the raw `directive_relations_term` knows nothing of -- so the Relations
+    /// hover's parts add up to the whole.
+    pub fn directive_relations_applied(&self, viewer: Seat, subject: Seat) -> i64 {
+        let c = &self.tables.relations;
+        let base = self.relations_base(viewer, subject);
         let pot = self.directive_relations_term(subject);
         // Ticket #236 (version 0.08.3): the reward may not lift a pair past the top of Cordial, the
         // step above Neutral. A pair already higher than that by deeds is not dragged DOWN to it --
         // the ceiling binds the boost, not the score.
         let with_pot = if pot > 0 { (base + pot).min(base.max(c.directive_boost_ceiling)) } else { base + pot };
-        with_pot.clamp(c.worst, c.best)
+        with_pot - base
     }
 
     /// Ticket #236 (version 0.08.3): what everyone else makes of how much of its Research `subject`
@@ -5477,6 +5497,25 @@ impl Game {
     /// rule about how everyone feels about the Prospectors, and nobody ever resents the Custodians.
     /// Capped at `blame_cap` -- half the scale -- so Blame can make a pair Cold but never, by itself,
     /// Hostile: the last points are reserved for deeds.
+    /// Ticket #535 (version 0.1.0.1), at the designer's word: what `viewer` holds against `subject`
+    /// for the Greenwash campaigns it has run -- `viewer`'s own `greenwash_resentment` for every
+    /// `resentment_per` Influence spent, toward zero. A TERM, read afresh like Blame's, on a tally
+    /// that never falls: it builds over the game and the quiet turns that heal deeds never touch it.
+    pub fn greenwash_relations_term(&self, viewer: Seat, subject: Seat) -> i64 {
+        // A hair over, so 20 steps of 0.05 make the whole point they are and not 0.9999.
+        -((self.greenwash_relations_fall(viewer, subject, self.seat(subject).greenwash_spent) + 1e-9).trunc() as i64)
+    }
+
+    /// Ticket #535: how far `viewer`'s Relations toward `subject` fall for this much Influence spent
+    /// on Greenwash, before rounding -- what the order's hover quotes for the amount set.
+    pub fn greenwash_relations_fall(&self, viewer: Seat, subject: Seat, influence: i64) -> f64 {
+        let per = self.tables.influence.greenwash.resentment_per;
+        if viewer == subject || per <= 0 {
+            return 0.0;
+        }
+        influence as f64 / per as f64 * self.tables.faction(self.kind(viewer)).greenwash_resentment
+    }
+
     pub fn blame_relations_term(&self, viewer: Seat, subject: Seat) -> i64 {
         if viewer == subject {
             return 0;

@@ -112,3 +112,26 @@ Ticket: [One Launch Site to a Region](https://github.com/whaleyjoshua2/Dying-Ear
   none standing or under construction; with no such Region it stays owed.
 - **Refutation:** a second Launch Site or Spaceport accepted in a Region that holds, builds or has
   ordered one shows this section unbuilt.
+
+## 4. Greenwash costs Relations
+
+Ticket: [Greenwash costs Relations](https://github.com/whaleyjoshua2/Dying-Earth/issues/535).
+
+- **Scaled by what is spent:** for every 10 Influence (`greenwash.resentment_per`) a Faction spends on
+  Greenwash, each other Faction's Relations toward it fall by that Faction's `greenwash_resentment`:
+  the Custodians 0.4, the Arkwrights 0.2, the Archivists 0.1, the Prospectors 0.05.
+- **It builds and never heals:** each Faction keeps the Influence it has spent on Greenwash over the
+  game; the shown score reads a term from it, as it reads the Blame term, rounded toward zero (half
+  a point shows as none). The quiet turns that heal deeds do not touch it. No ceiling of its own; a
+  Faction never resents its own campaign.
+- **The player sees it:** the Greenwash button's hover adds *"Relations: Custodians -0.2, Arkwrights
+  -0.1, Archivists -0.05"* for the amount set (0 where nothing is spent); the Relations hover in the
+  Factions window names *"Greenwash -2"*, and now *"Research shared +1"*, the #236 term it never
+  named, so the parts add up to the whole. Both hovers go through `rule_tip`.
+- **The computer** weighs the cost: a Greenwash's weight is divided by (1 + `greenwash_relations_cost`
+  (5) x the points it would lose with Factions the seat holds an Accord with or stands Cordial or
+  better with).
+- The hover's "Research shared" is the reward as the score adds it, after its #236 ceiling.
+- **Refutation:** a campaign of 50 Influence that leaves the Custodians' Relations toward its
+  campaigner unchanged, or a Greenwash term that recovers over quiet turns, shows this section
+  unbuilt.

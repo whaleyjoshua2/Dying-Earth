@@ -816,6 +816,13 @@ fn build_board(session: &mut Session) {
                 g.seats[1].influence.insert(Place::State(sid), 45);
             }
         }
+        // `greenwashed:<n>` (a building aid, ticket #535, version 0.1.0.1): the Prospectors have spent n
+        // Influence on Greenwash, so the Relations hover's Greenwash part can be photographed.
+        if let Some(n) = std::env::args().find_map(|a| a.strip_prefix("greenwashed:").and_then(|v| v.parse::<i64>().ok()))
+            && let Some(pro) = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Prospectors)
+        {
+            g.seats[pro.index()].greenwash_spent = n;
+        }
         // `emigrants:<n>` (a building aid, ticket #73): n Emigrants wait in seat 0's start state.
         if let Some(n) = std::env::args().find_map(|a| a.strip_prefix("emigrants:").and_then(|v| v.parse::<u32>().ok())) {
             let start = g.controlled_states(Seat(0)).first().copied();

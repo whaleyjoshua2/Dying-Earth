@@ -2434,10 +2434,20 @@ impl Game {
             let step = th.influence_step;
             let price = step * g.ducats_per_influence;
             if over > 0.0 && !credits_to_be_had && allotment >= step && self.seat(seat).stockpile.ducats >= (price + g.ai_ducats_reserve) as f64 {
+                // Ticket #535 (version 0.1.0.1), at the designer's word: the campaign costs Relations
+                // with every other Faction, and the seat weighs what it would lose with those it
+                // values -- an Accord partner, or one that stands Cordial or better toward it.
+                let valued_loss: f64 = seat
+                    .others()
+                    .into_iter()
+                    .filter(|o| self.accords.iter().any(|acc| acc.holds(seat, *o)) || matches!(self.relations_level(*o, seat), "Cordial" | "Friendly"))
+                    .map(|o| self.greenwash_relations_fall(o, seat, step))
+                    .sum();
+                let relations = 1.0 / (1.0 + th.greenwash_relations_cost * valued_loss);
                 push(
                     vec![Order::Greenwash { amount: step }],
                     Cat::Greenwash,
-                    self.base_weight(seat, Cat::Greenwash) * (1.0 + over / fair),
+                    self.base_weight(seat, Cat::Greenwash) * (1.0 + over / fair) * relations,
                     1.0,
                     1.0,
                     1.0,

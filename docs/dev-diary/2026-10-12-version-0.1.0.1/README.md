@@ -75,3 +75,27 @@ a Region over now, and stays owed if no other will take it.
 16 and 20 collapses**, from 2 / 25 / 12 / 20 and 20 after #533. The Archivists' 4 is at the edge of
 noise and not traced: the computer never built a second Launch Site before this ticket, and the one
 change on its side is that it no longer offers one beside one under construction.
+
+## Greenwash costs Relations
+
+Ticket [#535](https://github.com/whaleyjoshua2/Dying-Earth/issues/535), spec §4.
+
+**Measured before:** the computer greenwashes 5 Influence a time, 8 to 25 times a game (three logged
+games), so 40 to 125 Influence; at the decided figures that is the Custodians -1.6 to -5 over a game.
+
+**The pictures** ([`ticket-535/`](ticket-535/)): `hover-earth.png`, the Custodians' own page, the
+Greenwash button's hover with "Relations: Prospectors -0.03, Arkwrights -0.1, Archivists -0.05";
+`relations-earth.png`, the Prospectors' page with 50 Influence greenwashed (`greenwashed:50`, a new
+aid), the Custodians' Neutral in the warning colour, its hover "-1 in all: +0 from what they have
+done, +0 from their Blame. / Greenwash -2 / Research shared +1". The last line is new: the
+shared-Research reward (#236) was a part of the score the hover never named, which the Greenwash line
+made visible because the parts no longer added up.
+
+**The sweep** ([`sweeps/ticket-535.txt`](sweeps/ticket-535.txt)): **0 / 28 / 15 / 16 and 21
+collapses**, from 2 / 26 / 14 / 16 and 20, within noise.
+
+**The review** (an agent that did not build it) found two gaps, both fixed: the "Research shared"
+line printed the raw reward, where the score caps it at the top of Cordial, so the parts could still
+fail to add up (the engine now reports the reward as applied, `directive_relations_applied`, watched
+red by handing back the raw figure); and the "never heals" check set the quiet turns without
+settling them, so it could not fail (it now settles twenty turns and reads the shown score).

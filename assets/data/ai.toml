@@ -495,6 +495,10 @@ warships_wanted = 2
 warships_wanted_blockaded = 4
 evade_damage_fraction = 0.6667
 influence_step = 5
+# Ticket #535 (version 0.1.0.1), at the designer's word: a Greenwash is weighed down by the Relations
+# it costs with the Factions the seat values -- those it holds an Accord with, or stands Cordial or
+# better with -- the weight divided by (1 + this x the points they would lose).
+greenwash_relations_cost = 5.0
 # Ticket #75 (version 0.05.5): what a state another Faction holds is worth on the AI's Influence
 # target list, as a share of a neutral one's worth. 0.6 until now; at 0.3 a held place is attacked
 # only when no neutral one is worth having.

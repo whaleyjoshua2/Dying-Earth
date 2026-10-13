@@ -13760,6 +13760,82 @@ fn an_army_lifts_to_low_orbit_without_a_launch_site_and_to_a_ring_only_with_one(
     }
 }
 
+/// Ticket #535 (version 0.1.0.1), at the designer's word: a Greenwash costs Relations, scaled by
+/// what it spends -- per 10 Influence the Custodians 0.4, the Arkwrights 0.2, the Archivists 0.1,
+/// the Prospectors half that -- building as a running tally, rounded toward zero, never healing,
+/// and never charged by a Faction to itself.
+#[test]
+fn a_greenwash_costs_relations_by_what_it_spends_and_never_heals() {
+    let mut g = game();
+    let seat_of = |g: &Game, k: FactionKind| Seat::ALL.into_iter().find(|s| g.kind(*s) == k).unwrap();
+    let (cus, pro, ark, arc) = (seat_of(&g, FactionKind::Custodians), seat_of(&g, FactionKind::Prospectors), seat_of(&g, FactionKind::Arkwrights), seat_of(&g, FactionKind::Archivists));
+    // A Greenwash of 50 Influence, through the real orders.
+    g.seats[pro.index()].allotment = 100;
+    g.seats[pro.index()].stockpile.ducats = 500.0;
+    let wash = Order::Greenwash { amount: 50 };
+    if let Err(e) = g.check_order(pro, &[], &wash) {
+        panic!("the premise: a Greenwash of 50 is lawful: {}", e.0);
+    }
+    g.commit_orders(pro, &[wash]);
+    g.resolution_phase();
+    assert_eq!(g.seat(pro).greenwash_spent, 50, "the tally is the Influence spent");
+    // 50 / 10 = 5 steps: the Custodians -2, the Arkwrights -1, the Archivists -0.5 -> 0, toward zero.
+    assert_eq!(g.greenwash_relations_term(cus, pro), -2);
+    assert_eq!(g.greenwash_relations_term(ark, pro), -1);
+    assert_eq!(g.greenwash_relations_term(arc, pro), 0, "half a point shows as none");
+    assert_eq!(g.greenwash_relations_term(pro, pro), 0, "no Faction resents its own");
+    // The Prospectors mind a Custodian campaign at half the Archivists': 200 Influence = 20 steps x 0.05 = -1.
+    g.seats[cus.index()].greenwash_spent = 200;
+    assert_eq!(g.greenwash_relations_term(pro, cus), -1);
+    assert_eq!(g.greenwash_relations_term(arc, cus), -2);
+    // It reaches the shown score, and the quiet turns that heal deeds do not touch it.
+    let before = g.relations_score(cus, arc);
+    g.seats[arc.index()].greenwash_spent = 100;
+    assert_eq!(g.relations_score(cus, arc), before - 4, "100 Influence is -4 from the Custodians");
+    // Twenty quiet turns of settling, which heal a deeds deficit a point every four, leave it.
+    for _ in 0..20 {
+        g.settle_relations();
+    }
+    assert_eq!(g.greenwash_relations_term(cus, arc), -4, "never heals");
+    assert_eq!(g.relations_score(cus, arc), before - 4, "and the shown score keeps it");
+    // The shared-Research reward as the score adds it: capped, so the hover's parts add up.
+    g.relations.score[cus.index()][arc.index()] = 6;
+    g.seats[arc.index()].greenwash_spent = 0;
+    g.seats[arc.index()].research_directive = 0;
+    assert!(g.directive_relations_term(arc) > 0, "the premise: the Archivists share all their Research");
+    assert_eq!(g.directive_relations_applied(cus, arc), 0, "at the ceiling the reward adds nothing");
+    let parts = g.relations_deeds(cus, arc) + g.blame_relations_term(cus, arc) + g.greenwash_relations_term(cus, arc) + g.directive_relations_applied(cus, arc);
+    assert_eq!(parts, g.relations_score(cus, arc), "the parts add up at the reward's ceiling");
+}
+
+/// Ticket #535: the computer weighs what a Greenwash costs it with the Factions it values. With an
+/// Accord standing with the Custodians, who mind a campaign most, the same campaign scores less.
+#[test]
+fn the_computer_greenwashes_less_when_it_would_sour_a_partner() {
+    let mut g = game();
+    let pro = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Prospectors).unwrap();
+    let cus = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Custodians).unwrap();
+    for s in Seat::ALL {
+        g.seats[s.index()].blame_emitted = 10.0;
+    }
+    g.seats[pro.index()].blame_emitted = 200.0;
+    g.seats[pro.index()].allotment = 50;
+    g.seats[pro.index()].stockpile.ducats = 500.0;
+    let score = |g: &mut Game| -> f64 {
+        g.log.clear();
+        g.ai_orders(pro);
+        let line = g.log.iter().find(|l| l.contains("greenwash 5 Influence")).cloned().unwrap_or_else(|| panic!("no Greenwash weighed: {:?}", g.log.iter().filter(|l| l.contains("reen")).collect::<Vec<_>>()));
+        line.split_whitespace().nth(1).and_then(|w| w.parse().ok()).unwrap_or_else(|| panic!("no score on {line:?}"))
+    };
+    let alone = score(&mut g.clone());
+    g.relations.score[cus.index()][pro.index()] = 7;
+    g.relations.score[pro.index()][cus.index()] = 7;
+    g.strike_accord(cus, pro, vec![Term::NonAggression]).expect("struck");
+    let partnered = score(&mut g);
+    // 5 Influence costs the Custodians 0.2; the weight is over (1 + 5 x 0.2) = 2.
+    assert!((partnered - alone / 2.0).abs() < 0.15, "halved beside a partner who minds it: {partnered} from {alone}");
+}
+
 /// Ticket #534 (version 0.1.0.1), at the designer's word: one Launch Site to a Region, by the
 /// Constabulary's rule -- standing, under construction or ordered this turn -- and the Arkwrights'
 /// Spaceport counts as one.

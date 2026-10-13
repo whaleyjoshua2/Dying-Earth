@@ -5498,6 +5498,24 @@ const CHANGE_BUTTONS_WIDTH: f32 = 196.0;
 /// the Faction window and the Climate Panel each carried four long lines of it, word for word.
 const BLAME_HOVER: &str = "Blame: CO2 this Faction's places emitted, less what it removed (Scrubbers, Nature Reserves, the Custodians' Sink Directive).\nAbove a quarter share: Influence thresholds rise up to +50% where it doesn't hold, and every rival likes it a point less per step.";
 
+/// Ticket #535 (version 0.1.0.1), at the designer's word: what a Greenwash of this much costs the
+/// campaigner with each rival, to the hundredth: *"Relations: Custodians -0.2, Arkwrights -0.1"*.
+fn greenwash_relations_line(game: &Game, me: Seat, amount: i64) -> String {
+    let parts: Vec<String> = me
+        .others()
+        .into_iter()
+        .map(|o| {
+            let fall = game.greenwash_relations_fall(o, me, amount);
+            if fall < 0.005 {
+                return format!("{} 0", game.seat_name(o));
+            }
+            let fall = format!("{fall:.2}");
+            format!("{} -{}", game.seat_name(o), fall.trim_end_matches('0').trim_end_matches('.'))
+        })
+        .collect();
+    format!("Relations: {}", parts.join(", "))
+}
+
 /// Ticket #532 (version 0.1.0.1), at the designer's word: what a Blame line said after its ppm, on
 /// its hover -- three lines at most, a part shown only when it is not zero. The seat's own panel
 /// draws its share as a bar, so its hover leaves the share out.
@@ -10524,6 +10542,18 @@ fn relations_row(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSta
             let deeds = game.relations_deeds(viewer, subject);
             let floor = game.relations.floor[viewer.index()][subject.index()];
             let mut tip = format!("{:+} in all: {:+} from what they have done, {:+} from their Blame.", v, deeds, blame);
+            // Ticket #535 (version 0.1.0.1): the Greenwash part, once there is one; and the shared
+            // Research's (#236), which the line never named, so the parts add up to the whole.
+            let wash = game.greenwash_relations_term(viewer, subject);
+            if wash != 0 {
+                tip.push_str(&format!("
+Greenwash {wash:+}"));
+            }
+            let shared = game.directive_relations_applied(viewer, subject);
+            if shared != 0 {
+                tip.push_str(&format!("
+Research shared {shared:+}"));
+            }
             if floor < 0 {
                 tip.push_str(&format!("
 Scarred: this pair can never recover above {floor:+}."));
@@ -10558,7 +10588,8 @@ An Accord between them is over: it lapses at the next turn ({}).", terms.join(",
 An Accord stands: {}; {}.", terms.join(", "), turns_left_text(game, acc)));
                 }
             }
-            ui.label(RichText::new(game.relations_level(viewer, subject)).color(colour)).on_hover_text(tip);
+            // Ticket #535 (version 0.1.0.1): through `rule_tip`, so the hover can be photographed.
+            rule_tip(ui.label(RichText::new(game.relations_level(viewer, subject)).color(colour)), tip);
             ui.add_space(10.0);
         }
     });
@@ -11069,11 +11100,16 @@ fn greenwash_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewS
     let order = Order::Greenwash { amount };
     let check = game.check_order(me, &session.pending, &order);
     let resp = ui.add_enabled(check.is_ok(), egui::Button::new(format!("Greenwash with {amount} Influence for {} Ducats", amount * per)));
-    if let Err(e) = &check {
-        // Ticket #380 (version 0.09.2): through `rule_tip`, as every refusal.
-        rule_tip(resp.clone(), e.0.clone());
-    }
-    if resp.on_hover_text(format!("{:.0} ppm off your Blame at End Turn.", amount as f64 * rate)).clicked() {
+    // Ticket #535 (version 0.1.0.1), at the designer's word: and what it costs with each rival. One
+    // hover, through `rule_tip` as every other (ticket #380), the refusal first when there is one.
+    let what = format!("{:.0} ppm off your Blame at End Turn.
+{}", amount as f64 * rate, greenwash_relations_line(game, me, amount));
+    let hover = match &check {
+        Err(e) => format!("{}
+{what}", e.0),
+        Ok(_) => what,
+    };
+    if rule_tip(resp, hover).clicked() {
         actions.push(Action::Place(order));
     }
 }
@@ -12668,6 +12704,20 @@ mod tests {
         let quietest = blame_parts_hover(&g, Seat(1), true);
         assert!(!quietest.contains(" 0"), "no zero shown: {quietest}");
         assert!(blame_parts_hover(&g, Seat(1), false).lines().last().unwrap().starts_with("Thresholds x"), "the own panel's hover has no share");
+    }
+
+    /// Ticket #535 (version 0.1.0.1): the Greenwash hover's Relations line names each rival and what
+    /// it would lose, to the hundredth, and says 0 rather than a bare minus for nothing spent.
+    #[test]
+    fn a_greenwash_hover_says_what_each_rival_would_lose() {
+        let tables = std::sync::Arc::new(dying_earth_engine::data::Tables::load(&dying_earth_engine::data::default_data_dir()).unwrap());
+        let g = Game::new(tables, NewGame { seed: 7, player: FactionKind::Prospectors, player_is_ai: false, player_start: StateId::EastAsia });
+        let line = greenwash_relations_line(&g, Seat(0), 5);
+        for part in ["Custodians -0.2", "Arkwrights -0.1", "Archivists -0.05"] {
+            assert!(line.contains(part), "{part} in {line:?}");
+        }
+        assert!(!line.contains("Prospectors"), "not the campaigner's own: {line:?}");
+        assert!(greenwash_relations_line(&g, Seat(0), 0).contains("Custodians 0"), "nothing spent says 0");
     }
 
     /// Ticket #509 (version 0.1.0.0): the renewal prompt says the Accord, its Terms and the five
