@@ -150,7 +150,9 @@ pub const SAVE_VERSION: u32 = 12;
 /// Ticket #507 (version 0.1.0.0, the closing ticket): moved to 0.1.0.0. `SAVE_VERSION` moved three
 /// times this version, to 10 (#502, three Bodies), 11 (#509, an Accord's `since`) and 12 (#510, two
 /// Regions): a 0.09.9 save is refused, and so is a 0.1.0.0 save from before ticket #510.
-pub const GAME_VERSION: &str = "0.1.0.0";
+/// Ticket #545 (version 0.1.0.1, the closing ticket): moved to 0.1.0.1. `SAVE_VERSION` did not
+/// move: every field the version added reads a default from an older file, so a 0.1.0.0 save loads.
+pub const GAME_VERSION: &str = "0.1.0.1";
 
 /// The game autosaves at the start of the Report phase of every third turn.
 pub const AUTOSAVE_EVERY: u32 = 3;

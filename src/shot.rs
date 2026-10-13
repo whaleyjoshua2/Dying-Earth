@@ -902,7 +902,7 @@ fn build_board(session: &mut Session) {
         // the player's home, holding a Standing within two such spends of taking it, and the turn is
         // ended, so the next Report says both lines.
         if std::env::args().any(|a| a == "rival:spend")
-            && let Some(home) = g.seat(Seat(0)).home
+            && let Some(home) = g.seat(Seat(0)).home_region
         {
             let place = Place::State(home);
             let gained = g.standing_from(place, 12);

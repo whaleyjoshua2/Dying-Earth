@@ -348,3 +348,16 @@ the same offer from a seat not the leader is taken). For the designer, not chang
 reaches Refuel too (Cold at full pressure; every offer carries Non-aggression, so it changes no
 offer), and two rivals tied at the top are both leaders. Measured cost: the pressure reads every
 seat's Victory each call, a constant factor; the sweep ran in 20 seconds.
+
+## The close
+
+Ticket [#545](https://github.com/whaleyjoshua2/Dying-Earth/issues/545). `GAME_VERSION` 0.1.0.1;
+`SAVE_VERSION` stays at 12, and the old-save test now also cuts a seat's Greenwash spent and home
+Region and an Accord's `ended_by` and `refused_by` (watched red with the Greenwash field's default
+taken away; an `Option` reads None with or without one, so it could not be the witness). The seat's
+home field is named `home_region`, where it was `home`: an Army's `home` shares the save's text, and
+the old-save test's cut took both.
+
+**The closing sweep** ([`sweeps/final-0.1.0.1.txt`](sweeps/final-0.1.0.1.txt)): **7 / 24 / 19 / 19 and
+11 collapses**, against 0.1.0.0's 2 / 24 / 15 / 17 and 22. The spec's head carries the win column
+after every ticket. A station's cap at 18 was dropped at the designer's word.

@@ -10,6 +10,37 @@ pictures and batches that decided it are in
 [`final-0.1.0.0-after-playtest.txt`](../dev-diary/2026-10-07-version-0.1.0.0/sweeps/final-0.1.0.0-after-playtest.txt):
 **2 / 24 / 15 / 17 and 22 collapses**, against the designer's 15 each and 20.
 
+**What the version is.** Version 0.1.0.0 with the designer's list and the playtest's answers, most of
+it leaning against whoever runs away. **The computer** races for the Research Lead, the harder the
+nearer its Victory (§13), and every seat presses a runaway leader, organically and through its
+agreements (§14). **The prices**: Influence at 4 Ducats, the Strip Permit at 25, every build a tenth
+dearer, an Earth Mine at 4.4 and every off-world Mine 15% less (§6). **The rules**: a Ship's lifts and
+refuel beside its one action (§2), Armies lifted to low orbit with no Launch Site (§1), one Launch
+Site to a Region (§3), Greenwash costing Relations (§4). **The interface**: two panels' prose onto
+hovers (§1), the Colony Ship card's aboard over room (§5) and its founding rule (§9), a popup when an
+Accord ends and a warning the turn before (§7). **What the playtest could not see**: a window next
+turn, the clock and your Victory at the Report's head (§8), a rival spending on yours and your home
+at risk (§10), offers, Standings and Leapfrog in the text tool (§11), the Arkwrights' Victory text
+(§12). A station's cap at 18 was dropped at the designer's word.
+
+**What it did to the win column** (80 games, per Faction, after each ticket in build order):
+
+| | 0.1.0.0 | §1 hovers, Armies | §2 lifts | §3 one Launch Site | §4 Greenwash | §6 Influence | §6 Permit | §6 Mines, builds | §6 review | §13 the race | §14 the pack: closing | the ideal |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Custodians | 2 | 2 | 2 | 2 | 0 | 2 | 2 | 2 | 1 | 6 | **7** | 15 |
+| Prospectors | 24 | 24 | 25 | 26 | 28 | 32 | 31 | 20 | 20 | 23 | **24** | 15 |
+| Arkwrights | 15 | 15 | 12 | 14 | 15 | 11 | 13 | 20 | 20 | 20 | **19** | 15 |
+| Archivists | 17 | 17 | 20 | 16 | 16 | 12 | 13 | 22 | 20 | 18 | **19** | 15 |
+| collapses | 22 | 22 | 20 | 20 | 21 | 23 | 21 | 15 | 19 | 13 | **11** | 20 |
+
+**The closing board** ([`sweeps/final-0.1.0.1.txt`](../dev-diary/2026-10-12-version-0.1.0.1/sweeps/final-0.1.0.1.txt)):
+**7 / 24 / 19 / 19 and 11 collapses.** Two moves past noise: the Mines and builds (§6) took the
+Prospectors' lead apart and lifted the Arkwrights and Archivists; the race (§13) took the
+Custodians' gate eleven turns sooner and their wins off the floor. The pack (§14) is at work about a
+third of the game and moved nothing past noise. Against the ideal the Custodians are still well
+under and the collapses nine short; the three others sit within five of it. `SAVE_VERSION` stays at
+12: every field the version added reads a default, so a 0.1.0.0 save loads.
+
 ## 1. Two panels' prose onto hovers, and Armies to low orbit without a Launch Site
 
 Ticket: [Two panels' prose onto hovers, and Armies lift to low orbit without a Launch Site](https://github.com/whaleyjoshua2/Dying-Earth/issues/532).

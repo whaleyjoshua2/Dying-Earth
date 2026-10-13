@@ -154,6 +154,9 @@ fn a_save_from_another_version_and_a_damaged_file_are_both_refused_with_a_messag
 /// default, the Opening Objective's count of turns running (#478) among them.
 /// Ticket #498 (version 0.09.9, the closing ticket): `SAVE_VERSION` stays at 9, so a 0.09.8 save
 /// loads: a place's tier (#490), and the offers waiting and refusals remembered (#495), are cut too.
+/// Ticket #545 (version 0.1.0.1, the closing ticket): `SAVE_VERSION` stays at 12, so a 0.1.0.0 save
+/// loads: a seat's Greenwash spent (#535) and its home (#542) are cut too. An Accord's `ended_by`
+/// and `refused_by` (#538) are defaulted the same way, on a board that holds an Accord.
 #[test]
 fn a_save_without_this_versions_fields_still_loads() {
     let dir = TempDir::new("older-fields");
@@ -196,7 +199,7 @@ fn a_save_without_this_versions_fields_still_loads() {
         out
     };
     let mut older = text.clone();
-    for name in ["under_sink_eased", "opening_gap", "best_gap_closed", "best_run", "lead_windfall", "card_price_by", "by", "places", "colony_growth", "offline_cause", "produced_total", "opening_met_turn", "opening_run", "launch_site_owed", "archives_lost", "archive_fund_lost", "tier", "offers", "refusals"] {
+    for name in ["under_sink_eased", "opening_gap", "best_gap_closed", "best_run", "lead_windfall", "card_price_by", "by", "places", "colony_growth", "offline_cause", "produced_total", "opening_met_turn", "opening_run", "launch_site_owed", "archives_lost", "archive_fund_lost", "tier", "offers", "refusals", "greenwash_spent", "home_region", "ended_by", "refused_by"] {
         let before = older.len();
         older = cut(&older, name);
         assert!(older.len() < before, "{name} was in the save and is cut");

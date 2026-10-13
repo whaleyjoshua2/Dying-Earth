@@ -1992,7 +1992,7 @@ impl Game {
     /// such turn reaches the bar on the player's home (the Region they started in) or their only
     /// working Launch Site's Region, a second line says it could fall.
     fn warn_rival_spending(&mut self, on_yours: &[(Seat, Place, i64, i64)]) {
-        let home = self.seat(Seat(0)).home.map(Place::State);
+        let home = self.seat(Seat(0)).home_region.map(Place::State);
         // The review: the Regions the player holds, as the spend's own test reads them, not those it directs.
         let sites: Vec<StateId> = StateId::ALL.into_iter().filter(|s| self.state(*s).control.controller() == Some(Seat(0)) && self.state(*s).facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working())).collect();
         let only_site = (sites.len() == 1).then(|| Place::State(sites[0]));

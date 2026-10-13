@@ -1013,7 +1013,7 @@ pub struct SeatState {
     /// Ticket #542 (version 0.1.0.1): the Region the seat started in, its home; None on a save
     /// from before, which then warns of no home.
     #[serde(default)]
-    pub home: Option<StateId>,
+    pub home_region: Option<StateId>,
     /// Ticket #279 (version 0.08.5): the ppm this seat's Battles on Earth have put in the air over
     /// the game, for the sweep; it is inside `blame_emitted` already.
     #[serde(default)]
@@ -1767,7 +1767,7 @@ impl Game {
             blame_smeared: 0.0,
             blame_cleaned: 0.0,
             greenwash_spent: 0,
-            home: None,
+            home_region: None,
             war_ppm: 0.0,
             credits_bought: 0.0,
             credits_sold: 0.0,
@@ -2011,7 +2011,7 @@ impl Game {
         }
         for (sid, seat) in taken.iter().zip(Seat::ALL) {
             game.take_control(*sid, seat);
-            game.seats[seat.index()].home = Some(*sid);
+            game.seats[seat.index()].home_region = Some(*sid);
             // Ticket #377 (version 0.09.2): **equal starts.** A home Region's card list is set aside
             // and the `[start]` table's package stands in its place -- a Power Plant, a Factory, a
             // Mine, a Refinery and the Launch Site -- plus whatever the Faction's card adds (the
