@@ -3881,6 +3881,12 @@ impl Game {
         Seat::ALL.into_iter().find(|s| self.kind(*s) == FactionKind::Custodians)
     }
 
+    /// Ticket #531 (version 0.1.0.1): a computer seller sells no carbon credits to the runaway leader
+    /// it presses.
+    pub fn withholds_credits(&self, seller: Seat, buyer: Seat) -> bool {
+        self.seat(seller).ai && self.ai_gang_pressure(seller, buyer) > 0.0
+    }
+
     /// Ticket #268: the price multiplier the seller's Relations level toward `buyer` sets, or None
     /// where the seller refuses -- Hostile, or no seller at the table.
     pub fn credit_price_multiplier(&self, buyer: Seat) -> Option<f64> {
@@ -5786,6 +5792,10 @@ impl Game {
         if self.progress(from).score_as_it_stands() >= 0.95 {
             return false;
         }
+        // Ticket #531 (version 0.1.0.1): nothing to a runaway leader.
+        if self.ai_gang_pressure(seat, from) > 0.0 {
+            return false;
+        }
         self.trade_value(give) + 1e-9 >= self.trade_value(get)
     }
 
@@ -6122,7 +6132,13 @@ impl Game {
         if self.progress(from).score_as_it_stands() >= 0.95 {
             return false;
         }
-        let view = self.relations_score(seat, from);
+        // Ticket #531 (version 0.1.0.1): no Accord with a runaway leader, and none renewed; the
+        // pack's own come easier, by the pressure this seat puts on its leader.
+        if self.ai_gang_pressure(seat, from) > 0.0 {
+            return false;
+        }
+        let relax = (self.tables.ai.thresholds.gang_accept_relax * self.ai_gang_felt(seat)).round() as i64;
+        let view = self.relations_score(seat, from) + relax;
         // Non-aggression from somebody it holds nothing against is easy; from somebody it loathes it
         // is not. A research agreement is its own gate and needs no opinion beyond Friendly.
         // Ticket #320 (version 0.08.8): Passage, now a rule for Armies as well as Ships, is accepted

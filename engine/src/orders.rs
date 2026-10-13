@@ -2348,6 +2348,10 @@ impl Game {
                 if self.credit_price_multiplier(seat).is_none() {
                     return fail("the Custodians will not sell to you: they are Hostile");
                 }
+                // Ticket #531 (version 0.1.0.1): nor, as a computer seat, to the runaway leader.
+                if self.withholds_credits(seller, seat) {
+                    return fail("the Custodians will not sell to you: you are too near your Victory");
+                }
                 if pending.iter().any(|o| matches!(o, Order::BuyCredits { .. })) {
                     return fail("one purchase a turn");
                 }

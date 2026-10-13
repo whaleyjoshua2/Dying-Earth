@@ -531,6 +531,18 @@ directive_when_indifferent = 10
 # the Natural Sink for a Tech it is indifferent to falls by the same share. A Lead takes its own gate
 # whenever it is offered; `gate_pick_turn` (33), which held it back till then, is gone.
 race_lab_weight = 1.0
+# Ticket #531 (version 0.1.0.1): the pack on a runaway leader, at the designer's word ("pressure the
+# runaway leader in all the ways available - both organically ... but also through agreements"). A
+# rival is a seat's leader at half its Victory or more and 20 points or more above the seat; the
+# seat's pressure is the leader's ramp (0 at half, 1 at the end) times how far it trails ((gap - 20)
+# / 30, to 1). Every hostile act on the leader weighs x(1 + pressure); from half pressure the leader
+# is cause in itself; no Accord or Trade with it, none renewed, and the Custodians sell it no
+# credits; the pack's own Accords take a bar `gang_accept_relax` x the pressure lower.
+gang_from = 0.5
+gang_ahead = 0.2
+gang_full = 0.3
+gang_cause = 0.5
+gang_accept_relax = 3.0
 # Ticket #332 (version 0.09.0): every seat wants a Mine early in its most Materials-lean Region at
 # the Factory's weight. Through `early_mine_turn`, while the seat directs fewer Mines on Earth
 # (standing or on order) than `early_mines`, the Mine in the Region where one would make the most

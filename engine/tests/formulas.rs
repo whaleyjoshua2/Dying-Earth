@@ -23010,3 +23010,82 @@ fn a_computer_lead_takes_its_gate_whenever_offered() {
     assert!(g.pickable_techs().contains(&gate), "the Lead's gate on its shortlist");
     assert_eq!(g.ai_tech_pick(pro), gate);
 }
+
+// ---------------------------------------------------------------- #531 the pack on the leader (version 0.1.0.1)
+
+/// Ticket #531: the Prospectors at 80% of their Victory -- the Fund at 2800 of 3500, 15 Colonists
+/// off Earth of 18.
+fn prospectors_at_eighty(g: &mut Game) -> Seat {
+    let pro = Seat(1);
+    g.seats[1].venture_fund = 2800.0;
+    colony(g, pro, BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 15);
+    assert!((g.progress(pro).score() - 0.8).abs() < 1e-9, "the premise: 80%, {}", g.progress(pro).score());
+    pro
+}
+
+/// Ticket #531 (version 0.1.0.1), at the designer's word: each computer seat's pressure on its
+/// leader -- a rival at 50% of its Victory or more and 20 points or more above the seat -- is the
+/// leader's ramp (0 at 50%, 1 at 100%) times how far the seat trails ((gap - 20) / 30, to 1).
+#[test]
+fn a_seats_pressure_on_the_leader_scales_with_the_leader_and_its_own_place() {
+    let th = game().tables.ai.thresholds.clone();
+    let p = |lead: f64, own: f64| Game::gang_pressure_of(lead, own, &th);
+    assert!((p(0.8, 0.55) - 0.6 * (0.05 / 0.3)).abs() < 1e-9, "25 points behind: {}", p(0.8, 0.55));
+    assert!((p(0.8, 0.2) - 0.6).abs() < 1e-9, "60 points behind: the whole ramp");
+    assert_eq!(p(0.8, 0.61), 0.0, "19 points behind: no leader");
+    assert_eq!(p(0.49, 0.0), 0.0, "under half: no leader");
+    assert!((p(1.0, 0.0) - 1.0).abs() < 1e-9);
+    // On the board.
+    let mut g = game();
+    calm(&mut g);
+    let pro = prospectors_at_eighty(&mut g);
+    let ark = Seat(2);
+    assert!(g.progress(ark).score() < 0.2, "the premise: the Arkwrights far behind");
+    assert!((g.ai_gang_pressure(ark, pro) - 0.6).abs() < 1e-9, "{}", g.ai_gang_pressure(ark, pro));
+    assert_eq!(g.ai_gang_pressure(ark, Seat(3)), 0.0, "only the leader");
+    assert_eq!(g.ai_gang_pressure(pro, pro), 0.0);
+}
+
+/// Ticket #531: the leader is cause from half pressure, the Wary bar waived; every hostile act on
+/// it weighs x(1 + pressure); no Accord or Trade with it, and other Accords come easier; the
+/// computer Custodians sell it no carbon credits.
+#[test]
+fn the_pack_presses_the_leader_and_draws_together() {
+    let mut g = game();
+    calm(&mut g);
+    let pro = prospectors_at_eighty(&mut g);
+    let (ark, arc) = (Seat(2), Seat(3));
+    assert!(g.relations_score(ark, pro) > g.tables.ai.thresholds.war_cause, "the premise: no grudge");
+    assert!(g.has_cause(ark, pro), "the leader is cause in itself");
+    assert!(!g.has_cause(ark, arc));
+    assert!((g.hostile_lift(ark, pro) - g.emitter_lift(ark, pro) * 1.6).abs() < 1e-9);
+    assert_eq!(g.hostile_lift(ark, arc), g.emitter_lift(ark, arc));
+    // Agreements: none with the leader; the pack's own easier.
+    assert!(!g.accord_acceptable(ark, pro, &[Term::NonAggression]), "no Accord with the leader");
+    // The control (the review): the same view of a seat that is not the leader takes it.
+    let view = g.relations_score(ark, pro);
+    let off = g.relations_score(ark, arc) - g.relations.score[ark.index()][arc.index()];
+    g.relations.score[ark.index()][arc.index()] = view - off;
+    assert!(g.accord_acceptable(ark, arc, &[Term::NonAggression]), "at the same {view}, a seat that is not the leader is taken");
+    // The shown score, which the bar reads: deeds and the other terms beside them.
+    let set_shown = |g: &mut Game, want: i64| {
+        let off = g.relations_score(ark, arc) - g.relations.score[ark.index()][arc.index()];
+        g.relations.score[ark.index()][arc.index()] = want - off;
+        assert_eq!(g.relations_score(ark, arc), want);
+    };
+    // The bar for non-aggression is -2; the pressure (0.6) takes 2 off it.
+    set_shown(&mut g, -4);
+    assert!(g.accord_acceptable(ark, arc, &[Term::NonAggression]), "at -4, Wary, the pack's Accord is taken");
+    set_shown(&mut g, -5);
+    assert!(!g.accord_acceptable(ark, arc, &[Term::NonAggression]), "not at -5");
+    let (give, get) = (TradeGood::Goods(Resource::Materials, 30), TradeGood::Goods(Resource::Fuel, 10));
+    g.seats[ark.index()].stockpile.fuel = 100.0;
+    assert!(!g.trade_acceptable(ark, pro, give, get), "no Trade with the leader");
+    assert!(g.trade_acceptable(ark, arc, give, get), "the same Trade from a seat that is not the leader is taken");
+    // The computer Custodians sell the leader no credits.
+    g.seats[0].ai = true;
+    g.seats[0].credits_offered = 10;
+    g.seats[pro.index()].stockpile.ducats = 500.0;
+    let err = g.check_order(pro, &[], &Order::BuyCredits { ppm: 5 }).unwrap_err().0;
+    assert!(err.contains("too near your Victory"), "{err}");
+}

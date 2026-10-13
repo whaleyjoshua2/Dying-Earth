@@ -321,3 +321,30 @@ was left a dead setting (removed, its comment reworded); the race's second way i
 and the first part half way, was untested (now tested, watched red), and one check compared nought
 with nought. Noted for the designer: the Lab weight reaches Schools and Institutes too, which the
 computer has weighed as Labs since #185.
+
+## The computer seats gang up on a runaway leader
+
+Ticket [#531](https://github.com/whaleyjoshua2/Dying-Earth/issues/531), spec §14. The designer
+redrew it at the start: *"I did not mean armies I meant seats"*. The Army gathering and the allied
+melee rule the ticket asked about are dropped.
+
+**The sweep** ([`sweeps/ticket-531.txt`](sweeps/ticket-531.txt)), against 6 / 23 / 20 / 18 and 13
+before: **7 / 24 / 19 / 19 and 11 collapses**, within noise. The bar (15 each and 20) is missed;
+reported, stopped.
+
+**Measured, to say why** (a throwaway probe, twelve all-computer games, removed after): a seat stood
+at half its Victory or more on 189 of 433 turns, and some seat pressed a leader on 162. The pack is
+at work about a third of the game; as weighted -- x(1 + pressure), at most x2 -- its acts do not
+turn the column.
+
+**Tests.** Two new, each arm watched red (the cause, the lift, the Accord and Trade refusals, the
+eased bar, the credit refusal); the Accord check first read a raw score of -5 that shows as -4, and
+its -3 case could not fail, both mended to set the shown score.
+
+**The review** (an agent that did not build it) found no defect that breaks correctness, and that no
+computer judgement binds the player. Fixed: a doc comment spliced onto the wrong function; the
+credit refusal matched on words the Hostile refusal shares; the two refusals had no control (now
+the same offer from a seat not the leader is taken). For the designer, not changed: the eased bar
+reaches Refuel too (Cold at full pressure; every offer carries Non-aggression, so it changes no
+offer), and two rivals tied at the top are both leaders. Measured cost: the pressure reads every
+seat's Victory each call, a constant factor; the sweep ran in 20 seconds.

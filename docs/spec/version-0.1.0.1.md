@@ -288,3 +288,26 @@ Ticket: [The computer races for the Research Lead](https://github.com/whaleyjosh
 - **Denying rivals** is unchanged: a rival's gate stays last, and the whole cap is kept back while one
   is under research.
 - No rule moves; the shortlist stands.
+
+## 14. The computer seats gang up on a runaway leader
+
+Ticket: [The computer seats gang up on a runaway leader](https://github.com/whaleyjoshua2/Dying-Earth/issues/531).
+
+At the designer's word the seats, not their Armies: *"pressure the runaway leader in all the ways
+available - both organically as all the other seats ramp up pressure but also through agreements."*
+
+- **The leader, seat by seat:** for a computer seat, the rival highest in Victory share (the Victory
+  window's) is its leader when that share is at least 50% (`gang_from`) and at least 20 points
+  (`gang_ahead`) above its own. Its **pressure** is the leader's ramp (0 at 50%, 1 at 100%) times its
+  trail ((gap - 20 points) / 30 points, `gang_full`, to 1). Shown to no one.
+- **Organic:** every hostile act on the leader -- Influence on its places, Smear, Agitate, Battle,
+  Bombard, Blockade, Launch -- weighs x(1 + pressure) beside the Custodians' emitter lift; from
+  pressure 0.5 (`gang_cause`) the leader is cause in itself, the Wary bar waived.
+- **Agreements:** no Accord or Trade with the leader, and none renewed (one standing runs out); the
+  pack's Accords are offered with Passage, weighed x(1 + the most pressure the seat feels), and
+  accepted at a bar `gang_accept_relax` (3) x that pressure lower; a computer Custodians seat sells
+  the leader no carbon credits ("the Custodians will not sell to you: you are too near your
+  Victory").
+- The player may be the leader; when a rival leads, the player is one of the pack.
+- The Armies are not gathered, and allies still fight each other in a melee. No rule moves but the
+  credit refusal, which follows the computer seller's judgement.

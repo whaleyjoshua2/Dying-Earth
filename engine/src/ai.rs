@@ -143,6 +143,43 @@ impl Game {
         (1.0 + th.emitter_k * (share - fair)).min(th.emitter_cap)
     }
 
+    /// Ticket #531 (version 0.1.0.1): the pressure a seat at `own` of its Victory puts on a leader
+    /// at `lead`: the leader's ramp from `gang_from` to the end, times the seat's trail past
+    /// `gang_ahead` over `gang_full`; nought short of either bar.
+    pub fn gang_pressure_of(lead: f64, own: f64, th: &crate::data::AiThresholds) -> f64 {
+        if lead < th.gang_from || lead - own < th.gang_ahead || th.gang_full <= 0.0 {
+            return 0.0;
+        }
+        let ramp = ((lead - th.gang_from) / (1.0 - th.gang_from).max(1e-9)).clamp(0.0, 1.0);
+        let trail = ((lead - own - th.gang_ahead) / th.gang_full).clamp(0.0, 1.0);
+        ramp * trail
+    }
+
+    /// Ticket #531: this seat's pressure on `rival`, if `rival` is its leader -- the rival highest
+    /// in Victory, by the Victory window's share -- and nought otherwise.
+    pub fn ai_gang_pressure(&self, seat: Seat, rival: Seat) -> f64 {
+        if seat == rival {
+            return 0.0;
+        }
+        let share = |s: Seat| self.progress(s).score();
+        let lead = share(rival);
+        if Seat::ALL.into_iter().any(|r| r != seat && r != rival && share(r) > lead) {
+            return 0.0;
+        }
+        Game::gang_pressure_of(lead, share(seat), &self.tables.ai.thresholds)
+    }
+
+    /// Ticket #531: the most pressure this seat puts on any leader, which draws it to the pack.
+    pub fn ai_gang_felt(&self, seat: Seat) -> f64 {
+        Seat::ALL.into_iter().map(|r| self.ai_gang_pressure(seat, r)).fold(0.0, f64::max)
+    }
+
+    /// Ticket #531: what every hostile act on `rival` is weighed by -- the Custodians' emitter lift,
+    /// times one and the pressure on a leader.
+    pub fn hostile_lift(&self, seat: Seat, rival: Seat) -> f64 {
+        self.emitter_lift(seat, rival) * (1.0 + self.ai_gang_pressure(seat, rival))
+    }
+
     /// Ticket #446 (version 0.09.6): whether this seat has cause against a rival -- Relations at
     /// `war_cause` or worse (−5, Wary), or for the computer Custodians against a rival above a fair
     /// quarter of the emissions, `emitter_cause` (−3). Every hostile act's gate reads this.
@@ -151,7 +188,8 @@ impl Game {
         let bar = if self.emitter_lift(seat, rival) > 1.0 { th.emitter_cause } else { th.war_cause };
         // Ticket #447 (version 0.09.6): a Blockade is cause, at once. Relations fall one a turn of
         // it, so a blockaded seat's warships sat on Hold through the turns that mattered.
-        rival != seat && (self.relations_score(seat, rival) <= bar || self.blockaded_by(seat, rival))
+        // Ticket #531 (version 0.1.0.1): and a runaway leader is cause in itself from half pressure.
+        rival != seat && (self.relations_score(seat, rival) <= bar || self.blockaded_by(seat, rival) || self.ai_gang_pressure(seat, rival) >= th.gang_cause)
     }
 
     /// Ticket #447 (version 0.09.6): whether a place of this seat's is starved by that rival's
@@ -1077,7 +1115,7 @@ impl Game {
             // only when no neutral one is worth having.
             let neutral_bonus = if st.control == Control::Neutral { 1.0 } else { th.held_state_weight };
             // Ticket #446 (version 0.09.6): a heavy emitter's Region weighs more to the Custodians.
-            let lift = st.control.controller().map(|r| self.emitter_lift(seat, r)).unwrap_or(1.0);
+            let lift = st.control.controller().map(|r| self.hostile_lift(seat, r)).unwrap_or(1.0);
             targets.push((Place::State(sid), value * neutral_bonus * lift));
         }
         // Ticket #50: any rival's Colony. Ticket #336 (version 0.09.0): weighed by THE PRICE THIS
@@ -1099,7 +1137,7 @@ impl Game {
         for c in &self.colonies {
             if c.control.controller().map(|o| o != seat).unwrap_or(false) {
                 let price = self.influence_needed_for(seat, Place::Colony(c.id)).max(1) as f64;
-                let lift = c.control.controller().map(|r| self.emitter_lift(seat, r)).unwrap_or(1.0);
+                let lift = c.control.controller().map(|r| self.hostile_lift(seat, r)).unwrap_or(1.0);
                 targets.push((Place::Colony(c.id), (th.colony_price_pivot / price).min(3.0) * self.ai_bounty_against(Some(seat), c.id, largest) * lift));
             }
         }
@@ -2385,7 +2423,7 @@ impl Game {
                     push(
                         vec![Order::Agitate { state: sid }],
                         Cat::Agitate,
-                        self.base_weight(seat, Cat::Agitate) * (1.0 + n / ag.max) * self.emitter_lift(seat, holder),
+                        self.base_weight(seat, Cat::Agitate) * (1.0 + n / ag.max) * self.hostile_lift(seat, holder),
                         1.0,
                         1.0,
                         opp,
@@ -2413,7 +2451,7 @@ impl Game {
                     push(
                         vec![Order::Smear { target: rival, amount: step }],
                         Cat::Smear,
-                        self.base_weight(seat, Cat::Smear) * (1.0 + over / fair) * self.emitter_lift(seat, rival),
+                        self.base_weight(seat, Cat::Smear) * (1.0 + over / fair) * self.hostile_lift(seat, rival),
                         1.0,
                         1.0,
                         opp,
@@ -2429,7 +2467,7 @@ impl Game {
         // Ticket #277 (version 0.08.5): and where credits are to be had the seat buys them; a
         // Greenwash is for the seat that cannot -- the seller Hostile or not offering, or itself the seller.
         let mut credits_to_be_had = false;
-        if let Some(seller) = self.credit_seller().filter(|s| *s != seat) {
+        if let Some(seller) = self.credit_seller().filter(|s| *s != seat && !self.withholds_credits(*s, seat)) {
             let c = self.tables.carbon_credits.clone();
             let fair = self.tables.influence.blame.fair_share;
             let over = self.blame_share(seat) - fair;
@@ -2528,7 +2566,8 @@ impl Game {
             // term has somewhere to matter. In the same offer, because one Accord stands per pair
             // and a non-aggression Accord struck first would shut Passage out for good: offered on
             // its own it was struck in no seating of eighty games.
-            if self.passage_worth_offering(seat, other) {
+            // Ticket #531 (version 0.1.0.1): and to the pack while a leader runs, so its Armies may cross.
+            if self.passage_worth_offering(seat, other) || self.ai_gang_felt(seat) > 0.0 {
                 terms.push(Term::Passage);
             }
             // Ticket #325 (version 0.08.8): and Refuel in the same offer, where the other holds a
@@ -2555,7 +2594,8 @@ impl Game {
             push(
                 vec![Order::ProposeAccord { to: other, terms }],
                 Cat::Accord,
-                self.base_weight(seat, Cat::Accord),
+                // Ticket #531: the pack draws together while a leader runs.
+                self.base_weight(seat, Cat::Accord) * (1.0 + self.ai_gang_felt(seat)),
                 1.0,
                 1.0,
                 1.0,
@@ -2575,7 +2615,7 @@ impl Game {
             let long = goods.iter().filter(|(r, n)| Some(*r) != short && n * price(*r) > th.trade_long).max_by(|a, b| (a.1 * price(a.0)).partial_cmp(&(b.1 * price(b.0))).unwrap_or(std::cmp::Ordering::Equal)).map(|(r, _)| *r);
             let partner = Seat::ALL
                 .into_iter()
-                .filter(|o| *o != seat && !self.hostile(seat, *o) && !self.offer_waits(seat, *o) && !self.refused_recently(seat, *o))
+                .filter(|o| *o != seat && !self.hostile(seat, *o) && !self.offer_waits(seat, *o) && !self.refused_recently(seat, *o) && self.ai_gang_pressure(seat, *o) == 0.0)
                 .max_by_key(|o| self.relations_score(seat, *o));
             if let (Some(short), Some(long), Some(other)) = (short, long, partner) {
                 let ask = th.trade_ask;
@@ -3348,11 +3388,11 @@ impl Game {
                 None
             };
             match (attack, blockade) {
-                (Some(odds), _) => push(vec![Order::ShipStance { body, stance: Stance::Attack }], Cat::StanceAttack, self.base_weight(seat, Cat::StanceAttack) * Seat::ALL.into_iter().filter(|r| *r != seat && self.ships.iter().any(|x| x.seat == *r && x.at == ShipAt::Body(body))).map(|r| self.emitter_lift(seat, r)).fold(1.0, f64::max), 1.0, 1.0, 1.0, format!("Attack at {} (odds {:.0}%)", self.tables.body(body).name, odds * 100.0), Some(key.clone())),
+                (Some(odds), _) => push(vec![Order::ShipStance { body, stance: Stance::Attack }], Cat::StanceAttack, self.base_weight(seat, Cat::StanceAttack) * Seat::ALL.into_iter().filter(|r| *r != seat && self.ships.iter().any(|x| x.seat == *r && x.at == ShipAt::Body(body))).map(|r| self.hostile_lift(seat, r)).fold(1.0, f64::max), 1.0, 1.0, 1.0, format!("Attack at {} (odds {:.0}%)", self.tables.body(body).name, odds * 100.0), Some(key.clone())),
                 (None, Some(target)) => push(
                     vec![Order::ShipStance { body, stance: Stance::Blockade }],
                     Cat::StanceBlockade,
-                    self.base_weight(seat, Cat::StanceBlockade) * target.control.director().map(|h| self.emitter_lift(seat, h)).unwrap_or(1.0),
+                    self.base_weight(seat, Cat::StanceBlockade) * target.control.director().map(|h| self.hostile_lift(seat, h)).unwrap_or(1.0),
                     1.0,
                     1.0,
                     1.0,
@@ -3384,7 +3424,7 @@ impl Game {
                         if !holds {
                             continue;
                         }
-                        push(vec![Order::Bombard { ship: s.id, colony: c.id }], Cat::StanceAttack, self.base_weight(seat, Cat::StanceAttack), 1.0, 1.0, 1.0, format!("Bombard {} from {}", self.place_name(Place::Colony(c.id)), self.ship_name(s)), None);
+                        push(vec![Order::Bombard { ship: s.id, colony: c.id }], Cat::StanceAttack, self.base_weight(seat, Cat::StanceAttack) * c.control.director().map(|h| self.hostile_lift(seat, h)).unwrap_or(1.0), 1.0, 1.0, 1.0, format!("Bombard {} from {}", self.place_name(Place::Colony(c.id)), self.ship_name(s)), None);
                     }
                 }
             }
@@ -3412,7 +3452,7 @@ impl Game {
                     at == (body, orbit)
                 });
                 if let Some(target) = touched {
-                    push(vec![Order::Launch { ship: s.id, target }], Cat::Launch, self.base_weight(seat, Cat::Launch), 1.0, 1.0, 1.0, format!("Launch at {} from {}", self.place_name(target), self.ship_name(s)), None);
+                    push(vec![Order::Launch { ship: s.id, target }], Cat::Launch, self.base_weight(seat, Cat::Launch) * self.place_director(target).map(|h| self.hostile_lift(seat, h)).unwrap_or(1.0), 1.0, 1.0, 1.0, format!("Launch at {} from {}", self.place_name(target), self.ship_name(s)), None);
                 }
             }
             // Ticket #343 (version 0.09.1): a carrier at the right Body in the wrong orbit moves to
@@ -3495,7 +3535,7 @@ impl Game {
                 }
             }
             match attack {
-                Some(odds) => push(vec![Order::ArmyStance { place, stance: Stance::Attack }], Cat::StanceAttack, self.base_weight(seat, Cat::StanceAttack) * 1.5 * self.place_director(place).map(|h| self.emitter_lift(seat, h)).unwrap_or(1.0), 1.0, 1.0, 1.0, format!("Attack at {} (odds {:.0}%)", self.place_name(place), odds * 100.0), Some(key.clone())),
+                Some(odds) => push(vec![Order::ArmyStance { place, stance: Stance::Attack }], Cat::StanceAttack, self.base_weight(seat, Cat::StanceAttack) * 1.5 * self.place_director(place).map(|h| self.hostile_lift(seat, h)).unwrap_or(1.0), 1.0, 1.0, 1.0, format!("Attack at {} (odds {:.0}%)", self.place_name(place), odds * 100.0), Some(key.clone())),
                 // Ticket #297 (version 0.08.6): dig in rather than hold where a rival's Army stands
                 // next door and there is no cause to attack, and wherever this seat occupies -- an
                 // occupier stays (#284), and dug in it cannot leave. Hold is what is left.
@@ -3539,7 +3579,7 @@ impl Game {
                             }
                             let value = (self.tables.state(*n).industry_level + self.tables.state(*n).size) as f64 / 7.0;
                             let orders: Vec<Order> = marchable.iter().map(|aid| Order::MoveArmy { army: *aid, to: *n }).collect();
-                            push(orders, Cat::StanceAttack, self.base_weight(seat, Cat::StanceAttack) * (1.0 + value) * own_army * ctrl.controller().map(|h| self.emitter_lift(seat, h)).unwrap_or(1.0), 1.0, 1.0, 1.0, format!("march the stack of {} on {} (odds {:.0}%)", marchable.len(), self.tables.state(*n).name, odds * 100.0), None);
+                            push(orders, Cat::StanceAttack, self.base_weight(seat, Cat::StanceAttack) * (1.0 + value) * own_army * ctrl.controller().map(|h| self.hostile_lift(seat, h)).unwrap_or(1.0), 1.0, 1.0, 1.0, format!("march the stack of {} on {} (odds {:.0}%)", marchable.len(), self.tables.state(*n).name, odds * 100.0), None);
                         }
                     }
                 }
@@ -3570,7 +3610,7 @@ impl Game {
                                 wars_opened += 1;
                             }
                             let value = (self.tables.state(*n).industry_level + self.tables.state(*n).size) as f64 / 7.0;
-                            push(vec![Order::MoveArmy { army: *aid, to: *n }], Cat::StanceAttack, self.base_weight(seat, Cat::StanceAttack) * (1.0 + value) * own_army * ctrl.controller().map(|h| self.emitter_lift(seat, h)).unwrap_or(1.0), 1.0, 1.0, 1.0, format!("march on {} (odds {:.0}%)", self.tables.state(*n).name, odds * 100.0), None);
+                            push(vec![Order::MoveArmy { army: *aid, to: *n }], Cat::StanceAttack, self.base_weight(seat, Cat::StanceAttack) * (1.0 + value) * own_army * ctrl.controller().map(|h| self.hostile_lift(seat, h)).unwrap_or(1.0), 1.0, 1.0, 1.0, format!("march on {} (odds {:.0}%)", self.tables.state(*n).name, odds * 100.0), None);
                         }
                     }
                 }

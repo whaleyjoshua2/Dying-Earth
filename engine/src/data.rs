@@ -1526,6 +1526,21 @@ pub struct AiThresholds {
     /// Observatories: their weight x(1 + this x its Victory share).
     #[serde(default = "one_f64")]
     pub race_lab_weight: f64,
+    /// Ticket #531 (version 0.1.0.1): the pack on a runaway leader. A rival is a seat's leader at
+    /// `gang_from` of its Victory or more and `gang_ahead` or more above the seat; the pressure is
+    /// the leader's ramp from `gang_from` to the end, times the seat's trail past `gang_ahead`
+    /// over `gang_full`. From `gang_cause` the leader is cause in itself; the pack's Accords take a
+    /// bar `gang_accept_relax` x the pressure lower.
+    #[serde(default)]
+    pub gang_from: f64,
+    #[serde(default)]
+    pub gang_ahead: f64,
+    #[serde(default)]
+    pub gang_full: f64,
+    #[serde(default)]
+    pub gang_cause: f64,
+    #[serde(default)]
+    pub gang_accept_relax: f64,
     /// Ticket #236 (version 0.08.3): what a seat directs away from the shared Tech, by how much it
     /// wants the Tech under research. Before this it went to its cap on turn 2 and never moved,
     /// which made any contribution threshold unreachable and the shared-pot rule a flat tax.
