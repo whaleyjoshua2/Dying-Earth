@@ -362,14 +362,39 @@ impl Game {
         None
     }
 
+    /// Ticket #530 (version 0.1.0.1): **the race for the Research Lead.** The Lead picks the next
+    /// Tech, and only the Lead's shortlist keeps a place for its gate, so a seat whose gate waits
+    /// races for the Lead: from the turn its gate is open to research, or its first part stands at
+    /// `gate_pick_fraction`, until the gate is researched. The race runs the harder the nearer its
+    /// Victory, at the Victory window's share (the lower part). Nought when not racing.
+    pub fn ai_race_share(&self, seat: Seat) -> f64 {
+        let Some(gate) = self.tables.victory_gate(self.kind(seat)) else { return 0.0 };
+        if self.has_tech(gate) {
+            return 0.0;
+        }
+        // The review: the cheap test first.
+        let open = self.research.current == Some(gate) || self.available_techs().contains(&gate);
+        let p = self.progress(seat);
+        if !open && p.first_fraction_as_it_stands() < self.tables.ai.thresholds.gate_pick_fraction {
+            return 0.0;
+        }
+        p.score().clamp(0.0, 1.0)
+    }
+
+    /// Ticket #530: what the race multiplies a Lab's and an Observatory's weight by.
+    pub fn ai_race_boost(&self, seat: Seat) -> f64 {
+        1.0 + self.tables.ai.thresholds.race_lab_weight * self.ai_race_share(seat)
+    }
+
     fn base_weight(&self, seat: Seat, cat: Cat) -> f64 {
         let w = self.tables.ai_weights(self.kind(seat));
         match cat {
             Cat::Producer => w.build_producer,
             Cat::RaiseIndustry => w.raise_industry,
             Cat::RaiseTier => w.raise_tier,
-            Cat::ResearchLab => w.build_research_lab,
-            Cat::Observatory => w.build_observatory,
+            // Ticket #530 (version 0.1.0.1): the race for the Lead.
+            Cat::ResearchLab => w.build_research_lab * self.ai_race_boost(seat),
+            Cat::Observatory => w.build_observatory * self.ai_race_boost(seat),
             Cat::Habitat => w.build_habitat,
             Cat::LaunchSiteOrShipyard => w.build_launch_site_or_shipyard,
             Cat::ColonyShip => w.build_colony_ship,
@@ -2218,7 +2243,9 @@ impl Game {
                     } else if picks.never == Some(t) || picks.last.contains(&t) {
                         cap
                     } else {
-                        th.directive_when_indifferent
+                        // Ticket #530 (version 0.1.0.1): a seat racing for the Lead sends less of its
+                        // Research to the Sink, the nearer its Victory.
+                        ((th.directive_when_indifferent as f64) * (1.0 - self.ai_race_share(seat))).round() as _
                     }
                 }
             };

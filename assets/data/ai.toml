@@ -525,8 +525,12 @@ gate_pick_fraction = 0.5
 # of 36 below any threshold worth having -- so the shared-pot rule had no line left to draw.
 directive_when_wanted = 0
 directive_when_indifferent = 10
-# Ticket #506 (version 0.1.0.0): 33, from 24 (x 50/36), with the game at fifty turns.
-gate_pick_turn = 33
+# Ticket #530 (version 0.1.0.1): the race for the Research Lead. From the turn a seat's gate is open
+# to research, or its first part is half way (`gate_pick_fraction`), until the gate is done, Labs,
+# Schools, Institutes and Observatories weigh x(1 + this x its Victory share), and what it sends to
+# the Natural Sink for a Tech it is indifferent to falls by the same share. A Lead takes its own gate
+# whenever it is offered; `gate_pick_turn` (33), which held it back till then, is gone.
+race_lab_weight = 1.0
 # Ticket #332 (version 0.09.0): every seat wants a Mine early in its most Materials-lean Region at
 # the Factory's weight. Through `early_mine_turn`, while the seat directs fewer Mines on Earth
 # (standing or on order) than `early_mines`, the Mine in the Region where one would make the most

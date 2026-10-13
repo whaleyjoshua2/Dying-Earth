@@ -271,3 +271,20 @@ Ticket: [The Arkwrights' Victory text on stations over Earth](https://github.com
   station over Earth counts toward the 42; Antarctica does not; Earth, its stations and Antarctica
   alike, is never one of the four Bodies.
 - No rule moves.
+
+## 13. The computer races for the Research Lead
+
+Ticket: [The computer races for the Research Lead](https://github.com/whaleyjoshua2/Dying-Earth/issues/530).
+
+- **The race:** a computer seat whose gate is not yet researched races for the Lead from the turn its
+  gate is open to research, or its first part stands at `gate_pick_fraction` (half way), until the
+  gate is done. It runs the harder the nearer its Victory, at its Victory share (the Victory
+  window's: the lower of its two parts):
+  - Research Labs, Observatories, and the Schools and Institutes weighed with Labs (#185), weigh
+    x(1 + `race_lab_weight` x share), `race_lab_weight` 1.0;
+  - what it sends to the Natural Sink for a Tech it is indifferent to falls by the same share.
+- **Its own gate**, offered on its shortlist as Lead, is taken whenever offered; the half-way and
+  turn-33 wait is gone, and `gate_pick_turn` with it.
+- **Denying rivals** is unchanged: a rival's gate stays last, and the whole cap is kept back while one
+  is under research.
+- No rule moves; the shortlist stands.

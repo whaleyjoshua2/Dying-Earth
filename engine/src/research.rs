@@ -331,18 +331,13 @@ impl Game {
         let picks = self.tables.ai_tech_picks(self.kind(seat));
         // Ticket #98: the AI is held to the same shortlist a human Lead is.
         let available = self.pickable_techs();
-        // Ticket #84 (version 0.06.0): as Research Lead, the AI opens its own door once its first
-        // part is past `gate_pick_fraction` of its bar or from `gate_pick_turn`, whichever comes
-        // first, the road to the gate standing.
+        // Ticket #84 (version 0.06.0): as Research Lead, the AI opens its own door. Ticket #530
+        // (version 0.1.0.1): whenever it is offered -- its gate on the shortlist is the race for the
+        // Lead won -- where it waited for half its first bar or turn 33.
         if let Some(gate) = self.tables.victory_gate(self.kind(seat))
             && available.contains(&gate)
         {
-            let th = &self.tables.ai.thresholds;
-            let p = self.progress(seat);
-            // Ticket #406 (version 0.09.4): how near the Condition stands, not the partial credit.
-            if p.first_fraction_as_it_stands() >= th.gate_pick_fraction || self.turn >= th.gate_pick_turn {
-                return (gate, "pick_first_choice");
-            }
+            return (gate, "pick_first_choice");
         }
         for t in &picks.order {
             if available.contains(t) {

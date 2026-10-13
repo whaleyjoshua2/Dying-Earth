@@ -7001,9 +7001,10 @@ fn the_gates_general_bonuses_are_for_everyone() {
 }
 
 /// Ticket #84: the Custodian AI, as Research Lead with the road to its gate open, picks Planetary
-/// Stewardship once its first part is past half or from turn 24, and its own list before that.
+/// Stewardship. Ticket #530 (version 0.1.0.1): whenever it is offered, where it waited for half its
+/// first part or turn 33.
 #[test]
-fn the_ai_picks_its_gate_as_lead_once_past_half_or_from_turn_24() {
+fn the_ai_picks_its_gate_as_lead_whenever_offered() {
     let mut g = game();
     let cus = Seat(0);
     // Ticket #505 (version 0.1.0.0): and Clean Manufacturing, which the gate needs now.
@@ -7012,13 +7013,7 @@ fn the_ai_picks_its_gate_as_lead_once_past_half_or_from_turn_24() {
     }
     g.turn = 5;
     g.seats[0].stabilization_run = 0;
-    assert_ne!(g.ai_tech_pick(cus), TechId::PlanetaryStewardship, "too early: its list first");
-    g.seats[0].stabilization_run = 2;
-    assert_eq!(g.ai_tech_pick(cus), TechId::PlanetaryStewardship, "past half of its first part");
-    g.seats[0].stabilization_run = 0;
-    // Ticket #506 (version 0.1.0.0): from turn 33, with the game at fifty turns.
-    g.turn = 33;
-    assert_eq!(g.ai_tech_pick(cus), TechId::PlanetaryStewardship, "from turn 33");
+    assert_eq!(g.ai_tech_pick(cus), TechId::PlanetaryStewardship, "turn 5, nothing of its first part: it takes it");
 }
 
 // ---------------------------------------------------------------- 0.06.0 ticket #85: the Antarctic founding Moment
@@ -17244,6 +17239,9 @@ fn a_computer_seat_picks_its_gate_chain_then_propulsion_then_the_cheapest() {
     g.research.done.push(TechId::CleanManufacturing);
     g.research.shortlist.clear();
     assert!(g.available_techs().contains(&TechId::CoastalEngineering), "the cheapest Tech on the board is open");
+    // Ticket #530 (version 0.1.0.1): the gate itself first, whenever it is open.
+    assert_eq!(g.ai_tech_pick(seat), TechId::PlanetaryStewardship, "the gate, open, first");
+    g.research.done.push(TechId::PlanetaryStewardship);
     // Ticket #413 (version 0.09.4): Orbital Refuelling heads the Propulsion chain.
     assert_eq!(g.ai_tech_pick(seat), TechId::OrbitalRefuelling, "Propulsion comes before the cheapest");
     g.research.done.push(TechId::OrbitalRefuelling);
@@ -22917,4 +22915,98 @@ fn the_arkwrights_victory_text_says_what_the_engine_counts() {
     assert!(!g.colony(ice).unwrap().in_orbit);
     assert_eq!(g.off_world_colonists(ark), before + 6, "Antarctica does not");
     assert_eq!(g.bodies_settled(ark, 4), bodies, "and Earth, its station and Antarctica, is not one of the four");
+}
+
+// ---------------------------------------------------------------- #530 the race for the Lead (version 0.1.0.1)
+
+/// Ticket #530: every Tech the gate needs, done, so the gate itself is open to research.
+fn open_road_to(g: &mut Game, gate: TechId) {
+    let mut road = vec![gate];
+    while let Some(t) = road.pop() {
+        for n in g.tables.tech(t).needs.clone() {
+            if !g.research.done.contains(&n) {
+                g.research.done.push(n);
+                road.push(n);
+            }
+        }
+    }
+}
+
+/// Ticket #530 (version 0.1.0.1), at the designer's word: a computer seat races for the Research
+/// Lead once its gate is open (or its first part half way), until the gate is researched, the harder
+/// the nearer its Victory: Labs and Observatories weigh x(1 + `race_lab_weight` x its Victory share),
+/// and what it sends to the Natural Sink for a Tech it is indifferent to falls by the same share.
+#[test]
+fn a_computer_seat_races_for_the_lead_the_harder_the_nearer_its_victory() {
+    let mut g = game();
+    calm(&mut g);
+    let pro = Seat(1);
+    let gate = g.tables.victory_gate(g.kind(pro)).expect("a gate");
+    assert_eq!(g.ai_race_share(pro), 0.0, "not racing on turn one: the gate shut, the bar far");
+    // The second way in (found in review): the gate shut, the first part half way.
+    let bar = g.progress(pro).first_bar;
+    g.seats[1].venture_fund = bar / 2.0;
+    assert!(!g.available_techs().contains(&gate), "the premise: the gate still shut");
+    assert!(g.progress(pro).score() > 0.0 && g.ai_race_share(pro) == g.progress(pro).score(), "half way, the gate shut: racing at {}", g.ai_race_share(pro));
+    g.seats[1].venture_fund = 0.0;
+    assert_eq!(g.ai_race_share(pro), 0.0, "short of half way, the gate shut: not racing");
+    open_road_to(&mut g, gate);
+    assert!(g.available_techs().contains(&gate), "the premise: the gate open");
+    // A share to see: the Fund half way.
+    let bar = g.progress(pro).first_bar;
+    g.seats[1].venture_fund = bar / 2.0;
+    let share = g.progress(pro).score();
+    assert!(share > 0.0, "the premise: some share ({share})");
+    assert_eq!(g.ai_race_share(pro), share);
+    let k = g.tables.ai.thresholds.race_lab_weight;
+    assert_eq!(k, 1.0);
+    assert!((g.ai_race_boost(pro) - (1.0 + k * share)).abs() < 1e-9, "Labs and Observatories at x{}", 1.0 + k * share);
+    // Done: the race is over.
+    g.research.done.push(gate);
+    assert_eq!(g.ai_race_share(pro), 0.0, "its gate researched, it races no more");
+}
+
+/// Ticket #530: what a racing seat keeps back for a Tech it is indifferent to falls by its share; a
+/// rival's gate under research still takes the whole cap (denying, unchanged).
+#[test]
+fn a_racing_seat_sends_less_to_the_sink() {
+    let mut g = game();
+    calm(&mut g);
+    let pro = Seat(1);
+    let kind = g.kind(pro);
+    let gate = g.tables.victory_gate(kind).unwrap();
+    let picks = g.tables.ai_tech_picks(kind).clone();
+    let indifferent = TechId::ALL.into_iter().find(|t| *t != gate && !picks.order.contains(t) && !picks.last.contains(t) && picks.never != Some(*t)).expect("an indifferent Tech");
+    g.research.current = Some(indifferent);
+    g.seats[1].research_last_turn = 10;
+    g.seats[1].research_directive = 99;
+    let said = |g: &mut Game| {
+        g.ai_orders(pro);
+        g.log.iter().rev().find_map(|l| l.split("direct ").nth(1).and_then(|r| r.split(' ').next()).and_then(|n| n.parse::<u8>().ok()))
+    };
+    let base = g.tables.ai.thresholds.directive_when_indifferent;
+    assert_eq!(said(&mut g), Some(base), "not racing: the indifferent share");
+    open_road_to(&mut g, gate);
+    g.research.done.retain(|t| *t != indifferent);
+    g.seats[1].venture_fund = g.progress(pro).first_bar / 2.0;
+    let share = g.ai_race_share(pro);
+    assert!(share > 0.0);
+    let want = ((base as f64) * (1.0 - share)).round() as u8;
+    assert_eq!(said(&mut g), Some(want), "racing at {share}: {base} x (1 - share)");
+}
+
+/// Ticket #530: a computer Lead takes its gate whenever it is offered; the turn and the half-way
+/// wait are gone.
+#[test]
+fn a_computer_lead_takes_its_gate_whenever_offered() {
+    let mut g = game();
+    calm(&mut g);
+    let pro = Seat(1);
+    let gate = g.tables.victory_gate(g.kind(pro)).unwrap();
+    open_road_to(&mut g, gate);
+    assert!(g.turn < 33 && g.progress(pro).first_fraction_as_it_stands() < g.tables.ai.thresholds.gate_pick_fraction, "the premise: early (the old wait was turn 33), and far from the bar");
+    // The Lead's shortlist reserves its gate once it is open.
+    g.draw_shortlist(pro);
+    assert!(g.pickable_techs().contains(&gate), "the Lead's gate on its shortlist");
+    assert_eq!(g.ai_tech_pick(pro), gate);
 }

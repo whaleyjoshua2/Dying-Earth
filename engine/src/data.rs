@@ -1517,10 +1517,15 @@ pub struct AiThresholds {
     /// list -- the weight is this over what the seat would pay, so the cheapest place ranks first.
     #[serde(default = "colony_price_pivot_default")]
     pub colony_price_pivot: f64,
-    /// Ticket #84 (version 0.06.0): as Research Lead the AI picks its Victory gate once its first
-    /// part is past this fraction of its bar, or from this turn, whichever comes first.
+    /// Ticket #84 (version 0.06.0): as Research Lead the AI picked its Victory gate once its first
+    /// part was past this fraction of its bar. Ticket #530 (version 0.1.0.1): it takes the gate
+    /// whenever offered, and this is where the race for the Lead starts, if the gate is not open
+    /// first; `gate_pick_turn` is gone.
     pub gate_pick_fraction: f64,
-    pub gate_pick_turn: u32,
+    /// Ticket #530 (version 0.1.0.1): how hard a seat racing for the Research Lead leans to Labs and
+    /// Observatories: their weight x(1 + this x its Victory share).
+    #[serde(default = "one_f64")]
+    pub race_lab_weight: f64,
     /// Ticket #236 (version 0.08.3): what a seat directs away from the shared Tech, by how much it
     /// wants the Tech under research. Before this it went to its cap on turn 2 and never moved,
     /// which made any contribution threshold unreachable and the shared-pot rule a flat tax.

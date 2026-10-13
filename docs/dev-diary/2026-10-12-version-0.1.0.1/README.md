@@ -291,3 +291,33 @@ one of the four)".
 **Tests.** One, reading the text and the engine side by side: watched red on the old text, and its
 four-Bodies arm watched red with Earth let into `bodies_settled`. No picture: the words are the
 data's, read by the Victory window as they stand. No rule moved; no sweep.
+
+## The computer races for the Research Lead
+
+Ticket [#530](https://github.com/whaleyjoshua2/Dying-Earth/issues/530), spec §13. At the designer's
+word the race scales with how near the seat's Victory stands, in its builds and in what it sends to
+the Sink.
+
+**The sweep** ([`sweeps/ticket-530.txt`](sweeps/ticket-530.txt)), against 1 / 20 / 20 / 20 and 19
+before: **6 / 23 / 20 / 18 and 13 collapses**. The bar is 15 each and 20; missed, reported, stopped.
+Measured, not a rule: the gates moved most. Median turn and games completed, before and after:
+
+| | before | after |
+|---|---|---|
+| Custodians | turn 26, 75 of 80 | turn 15, 76 of 80 |
+| Prospectors | turn 25, 79 of 80 | turn 27, 80 of 80 |
+| Arkwrights | turn 28, 73 of 80 | turn 32, 66 of 80 |
+| Archivists | turn 26, 77 of 80 | turn 31, 69 of 80 |
+
+The Custodians' road is the shortest, so they race first and take their gate eleven turns sooner;
+the others, losing the Lead to them, come to theirs later and in fewer games. Collapses fell by six,
+consistent with Planetary Stewardship's larger Sink standing earlier (not measured directly).
+
+**Tests.** Three new, each watched red (the share held at nought, the Sink share unscaled, the old
+wait put back); two old tests that pinned the turn-33 wait moved to the new rule. No rule moved.
+
+**The review** (an agent that did not build it) found no blocking defect. Fixed: `gate_pick_turn`
+was left a dead setting (removed, its comment reworded); the race's second way in, the gate shut
+and the first part half way, was untested (now tested, watched red), and one check compared nought
+with nought. Noted for the designer: the Lab weight reaches Schools and Institutes too, which the
+computer has weighed as Labs since #185.
