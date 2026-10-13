@@ -916,6 +916,7 @@ fn build_board(session: &mut Session) {
         // first Facility struck by a Labour Dispute. `unkept`: a Sea Wall there shut for its keep.
         // `half`: the home Region's Unrest at the Facility threshold. `blockade`: a rival Frigate on
         // Blockade in the ring of seat 0's station over Earth.
+        // `launch` (ticket #532, version 0.1.0.1): the home Region's Launch Site dark.
         if let Some(v) = std::env::args().find_map(|a| a.strip_prefix("offline:").map(str::to_owned)) {
             let home = g.controlled_states(Seat(0)).first().copied();
             match (v.as_str(), home) {
@@ -933,6 +934,13 @@ fn build_board(session: &mut Session) {
                     g.state_mut(sid).facilities.push(wall);
                 }
                 ("half", Some(sid)) => g.state_mut(sid).unrest = g.tables.unrest.facility_threshold,
+                // Ticket #532 (version 0.1.0.1): the home Launch Site dark, for its "No" line.
+                ("launch", Some(sid)) => {
+                    if let Some(f) = g.state_mut(sid).facilities.iter_mut().find(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite)) {
+                        f.online = false;
+                        f.offline_cause = Some(OfflineCause::Unkept);
+                    }
+                }
                 ("blockade", _) => {
                     if let Some(slot) = g.colonies.iter().find(|c| c.in_orbit && c.body == BodyId::Earth && c.control.director() == Some(Seat(0))).map(|c| c.slot) {
                         let id = ShipId(g.fresh_id());

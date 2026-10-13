@@ -3126,6 +3126,29 @@ impl Game {
             if s.kind == UnitKind::Carrier && s.army.is_none() && body != BodyId::Earth {
                 push(vec![Order::Transit { ship: s.id, to: BodyId::Earth, slot: self.ai_destination_orbit(seat, s, BodyId::Earth) }], Cat::Transit, self.base_weight(seat, Cat::Transit) * 0.8, 1.0, 1.0, 1.0, format!("send {} back to Earth", ship_name), None);
             }
+            // Load an Army aboard a Carrier at Earth for an attack on a rival Colony (ticket #43).
+            // Ticket #319 (version 0.08.8): any seat that wants a Carrier loads one. Ticket #532
+            // (version 0.1.0.1), at the designer's word: out of the warship block below, which an
+            // empty Carrier -- no warship, no Army aboard -- never entered, so no computer seat had
+            // loaded one since at least #319.
+            if card.carries_army && s.army.is_none() && body == BodyId::Earth && (kind == FactionKind::Prospectors || self.carrier_target_exists(seat)) {
+                // Ticket #46: the Army lifts from its own state. Ticket #532: by the rule's own
+                // check, so a state with no Launch Site lifts into low orbit.
+                let army = self.armies.iter().find_map(|a| match a.at {
+                    ArmyAt::Place(Place::State(st))
+                        if !a.standing
+                            && self.army_seat(a) == Some(seat)
+                            && self.state(st).control.director() == Some(seat)
+                            && self.check_order(seat, &[], &Order::Load { ship: s.id, colonists: 0, from: LoadSource::State(st), army: Some(a.id) }).is_ok() =>
+                    {
+                        Some((a.id, st))
+                    }
+                    _ => None,
+                });
+                if let Some((aid, st)) = army {
+                    push(vec![Order::Load { ship: s.id, colonists: 0, from: LoadSource::State(st), army: Some(aid) }], Cat::LoadUnload, self.base_weight(seat, Cat::LoadUnload) * 0.8, 1.0, 1.0, 1.0, format!("load an Army onto {}", ship_name), None);
+                }
+            }
             if s.kind.is_warship() || s.army.is_some() {
                 // Warships go where the Faction has or wants Colonies, or where a rival is: any
                 // rival, nearest by transit turns first (ticket #50).
@@ -3140,26 +3163,6 @@ impl Game {
                     let threat = if self.enemy_present_or_inbound(seat, d) { m.threat } else { 1.0 };
                     let base = self.base_weight(seat, Cat::Transit) * if kind == FactionKind::Prospectors { 0.9 } else { 0.6 };
                     push(vec![Order::Transit { ship: s.id, to: d, slot: self.ai_destination_orbit(seat, s, d) }], Cat::Transit, base, 1.0, threat, 1.0, format!("send {} to {}", ship_name, self.tables.body(d).name), None);
-                }
-                // Load an Army aboard a Carrier at Earth for an attack on a rival Colony (ticket #43).
-                // Ticket #319 (version 0.08.8): any seat that wants a Carrier loads one.
-                if card.carries_army && s.army.is_none() && body == BodyId::Earth && (kind == FactionKind::Prospectors || self.carrier_target_exists(seat)) {
-                    // Ticket #46: the Army lifts from its own state, which needs a working Launch Site.
-                    let army = self.armies.iter().find_map(|a| match a.at {
-                        ArmyAt::Place(Place::State(st))
-                            if !a.standing
-                                && self.army_seat(a) == Some(seat)
-                                && self.state(st).control.director() == Some(seat)
-                                && self.state(st).facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working()) =>
-                        {
-                            Some((a.id, st))
-                        }
-                        _ => None,
-                    });
-                    let enemy_colony = kind == FactionKind::Prospectors || self.carrier_target_exists(seat);
-                    if let (Some((aid, st)), true) = (army, enemy_colony) {
-                        push(vec![Order::Load { ship: s.id, colonists: 0, from: LoadSource::State(st), army: Some(aid) }], Cat::LoadUnload, self.base_weight(seat, Cat::LoadUnload) * 0.8, 1.0, 1.0, 1.0, format!("load an Army onto {}", ship_name), None);
-                    }
                 }
                 if let Some(aid) = s.army.filter(|_| body != BodyId::Earth) {
                     {

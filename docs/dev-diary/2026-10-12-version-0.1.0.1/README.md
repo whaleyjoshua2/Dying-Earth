@@ -1,0 +1,39 @@
+# Version 0.1.0.1
+
+The map is [Map: version 0.1.0.1](https://github.com/whaleyjoshua2/Dying-Earth/issues/529); the spec
+is [`docs/spec/version-0.1.0.1.md`](../../spec/version-0.1.0.1.md). The standing baseline is 0.1.0.0's
+closing board after its playtest fixes, **2 / 24 / 15 / 17 and 22 collapses**
+([`final-0.1.0.0-after-playtest.txt`](../2026-10-07-version-0.1.0.0/sweeps/final-0.1.0.0-after-playtest.txt)),
+against the designer's 15 each and 20.
+
+## Two panels' prose onto hovers, and Armies to low orbit without a Launch Site
+
+Ticket [#532](https://github.com/whaleyjoshua2/Dying-Earth/issues/532), spec §1.
+
+**The pictures** ([`ticket-532/`](ticket-532/)), taken headlessly in `shot:` mode:
+- `launch-yes-earth.png`: China's card, "Launch Site: Yes" in green, its hover.
+- `launch-dark-earth.png`: the same with the Launch Site dark (`offline:launch`, a new aid), "No" in
+  yellow, the hover's second line "Its Launch Site is dark."
+- `spaceport-earth.png`: an Arkwrights player's card, "Spaceport: Yes".
+- `emissions-hover-earth.png`: the people's sentence gone from the card, its figures the hover of
+  the Emissions line.
+- `blame-hover-earth.png`: the Climate Panel's Blame lines cut to "Custodians: answerable for 6
+  ppm", the hover's two lines on turn one (nothing moved yet, so no middle line).
+
+**Found on the way.** No computer seat had loaded an Army onto an empty Carrier at Earth since at
+least #319: the load stood inside the warship block, which a Carrier with no Army aboard never
+enters. Moved out of it at the designer's word ("fix it").
+
+**The sweep** ([`sweeps/ticket-532.txt`](sweeps/ticket-532.txt)): **2 / 24 / 15 / 17 and 22
+collapses**, the baseline to the game. A few figures elsewhere moved (Sea Wall thresholds held 922
+to 941, Ice Sheets Committed 19 to 20 of 20 in one seating), so games did diverge. The column did
+not move because a computer seat seldom builds a Carrier at all: it wants one only with cause
+(Wary or worse) against the holder of a rival Colony off Earth, every seat alike. Three
+logged games (seeds 1-3, the Custodians' seating) built none. Armies landed at a Colony: 0 in every
+seating, as before. Measured behaviour, not a rule.
+
+**The review** (an agent that did not build it) found no rule defect and three gaps, all fixed: the
+hover's first line showed "removed 0 in credit" at zero; with all four moved parts the middle line
+wrapped to a fourth line as drawn (now said short past 55 characters, tested in rendered lines);
+and nothing tested that a working Launch Site still lifts an Army into a station's ring or from a
+rival's Region (now tested, each watched red by blinding the Launch Site check).

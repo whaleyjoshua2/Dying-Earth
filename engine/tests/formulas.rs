@@ -13712,6 +13712,58 @@ fn a_door_the_orbit_shuts_says_the_move_first() {
     assert!(!err.contains("Move") && err.contains("not at this Body"), "{err}");
 }
 
+/// Ticket #532 (version 0.1.0.1), at the designer's word: an Army lifts to LOW orbit from a Region
+/// with no Launch Site, as Pioneers have since #443; a station's ring is still reached by a working
+/// Launch Site alone.
+#[test]
+fn an_army_lifts_to_low_orbit_without_a_launch_site_and_to_a_ring_only_with_one() {
+    let mut g = game();
+    g.state_mut(StateId::EastAsia).facilities.retain(|f| !f.kind.does_the_job_of(FacilityKind::LaunchSite));
+    let army = ArmyId(g.fresh_id());
+    g.armies.push(Army { id: army, name: "the 1st".to_string(), home: ArmyHome::State(StateId::EastAsia), at: ArmyAt::Place(Place::State(StateId::EastAsia)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None, levy: false, raised_strength: 2 });
+    let lift = |ship| Order::Load { ship, colonists: 0, from: LoadSource::State(StateId::EastAsia), army: Some(army) };
+    let low = ship_in(&mut g, Seat(0), UnitKind::Carrier, BodyId::Earth, None, Stance::Hold);
+    if let Err(e) = g.check_order(Seat(0), &[], &lift(low)) {
+        panic!("low orbit takes an Army from a Region with no Launch Site: {}", e.0);
+    }
+    let slot = g.colony(station_of(&g, Seat(0), BodyId::Earth).expect("the ISS")).unwrap().slot;
+    let ring = ship_in(&mut g, Seat(0), UnitKind::Carrier, BodyId::Earth, Some(slot), Stance::Hold);
+    assert_eq!(g.check_order(Seat(0), &[], &lift(ring)).unwrap_err().0, "a lift above low orbit needs a working Launch Site there");
+    // An Army standing in a Region its seat does not direct gets no lift without a Launch Site there.
+    g.take_control(StateId::Europe, Seat(1));
+    g.state_mut(StateId::Europe).facilities.retain(|f| !f.kind.does_the_job_of(FacilityKind::LaunchSite));
+    g.armies.iter_mut().find(|a| a.id == army).unwrap().at = ArmyAt::Place(Place::State(StateId::Europe));
+    let abroad = Order::Load { ship: low, colonists: 0, from: LoadSource::State(StateId::Europe), army: Some(army) };
+    assert_eq!(g.check_order(Seat(0), &[], &abroad).unwrap_err().0, "a lift from a Region not yours needs a working Launch Site there");
+    // As before: a working Launch Site in the Region lifts the Army anywhere, a rival's Region too,
+    // and into a station's ring.
+    g.state_mut(StateId::Europe).facilities.push(Facility::new(FacilityKind::LaunchSite));
+    if let Err(e) = g.check_order(Seat(0), &[], &abroad) {
+        panic!("a rival's Region with a working Launch Site still lifts: {}", e.0);
+    }
+    let ring_abroad = Order::Load { ship: ring, colonists: 0, from: LoadSource::State(StateId::Europe), army: Some(army) };
+    if let Err(e) = g.check_order(Seat(0), &[], &ring_abroad) {
+        panic!("a working Launch Site lifts into a station's ring: {}", e.0);
+    }
+}
+
+/// Ticket #532: the computer picks the Army a Carrier loads by the same rule, so a Region with no
+/// Launch Site lifts its Army into low orbit for it too.
+#[test]
+fn the_computer_lifts_an_army_to_low_orbit_from_a_region_with_no_launch_site() {
+    let mut g = game();
+    let pro = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Prospectors).unwrap();
+    for s in g.directed_states(pro) {
+        g.state_mut(s).facilities.retain(|f| !f.kind.does_the_job_of(FacilityKind::LaunchSite));
+    }
+    let home = g.directed_states(pro)[0];
+    let army = ArmyId(g.fresh_id());
+    g.armies.push(Army { id: army, name: "the 1st".to_string(), home: ArmyHome::State(home), at: ArmyAt::Place(Place::State(home)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None, levy: false, raised_strength: 2 });
+    let carrier = ship_in(&mut g, pro, UnitKind::Carrier, BodyId::Earth, None, Stance::Hold);
+    let orders = g.ai_orders(pro);
+    assert!(orders.iter().any(|o| matches!(o, Order::Load { ship, army: Some(a), .. } if *ship == carrier && *a == army)), "no Army lifted onto the Carrier in low orbit: {orders:?}");
+}
+
 /// Ticket #335 (R4): Orbital Control is LOW ORBIT's, and a Battery covers its OWN orbit. A warship
 /// at a station's ring holds no Control; a station's Battery denies no Control of low orbit; a
 /// ground Colony's Battery does.

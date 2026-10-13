@@ -5498,6 +5498,41 @@ const CHANGE_BUTTONS_WIDTH: f32 = 196.0;
 /// the Faction window and the Climate Panel each carried four long lines of it, word for word.
 const BLAME_HOVER: &str = "Blame: CO2 this Faction's places emitted, less what it removed (Scrubbers, Nature Reserves, the Custodians' Sink Directive).\nAbove a quarter share: Influence thresholds rise up to +50% where it doesn't hold, and every rival likes it a point less per step.";
 
+/// Ticket #532 (version 0.1.0.1), at the designer's word: what a Blame line said after its ppm, on
+/// its hover -- three lines at most, a part shown only when it is not zero. The seat's own panel
+/// draws its share as a bar, so its hover leaves the share out.
+fn blame_parts_hover(game: &Game, seat: Seat, with_share: bool) -> String {
+    let s = game.seat(seat);
+    let mut lines = Vec::new();
+    let own: Vec<String> = [(s.blame_emitted, "Emitted"), (game.blame_credit(seat), "removed")]
+        .iter()
+        .filter(|(n, _)| *n > 0.0)
+        .map(|(n, what)| if *what == "removed" { format!("removed {n:.0} in credit") } else { format!("{what} {n:.0}") })
+        .collect();
+    if !own.is_empty() {
+        let line = own.join(", ");
+        lines.push(line[..1].to_uppercase() + &line[1..]);
+    }
+    // The four moved parts in full, or in short when in full they would wrap past the hover's width.
+    let parts = [
+        (s.blame_smeared, "laid on by rivals", "by rivals"),
+        (s.credits_bought, "bought as carbon credits", "bought"),
+        (s.credits_sold, "sold as carbon credits", "sold"),
+        (s.blame_cleaned, "cleaned by campaign", "cleaned"),
+    ];
+    let moved = |short: bool| parts.iter().filter(|(n, _, _)| *n > 0.0).map(|(n, long, brief)| format!("{n:.0} {}", if short { brief } else { long })).collect::<Vec<_>>().join(", ");
+    let full = moved(false);
+    if !full.is_empty() {
+        lines.push(if full.chars().count() > HOVER_CHARS_PER_LINE { moved(true) } else { full });
+    }
+    lines.push(if with_share {
+        format!("Share {:.2}, thresholds x{:.2}", game.blame_share(seat), game.blame_threshold_multiplier(seat))
+    } else {
+        format!("Thresholds x{:.2}", game.blame_threshold_multiplier(seat))
+    });
+    lines.join("\n")
+}
+
 /// Ticket #468 (version 0.09.7): what a Widget is, said once -- the place card's hover and the top
 /// bar's each said it in words of their own, both over the six-line ceiling.
 const WIDGET_HOVER: &str = "A Widget is one unit of work; a build completes at the Resolution its Widgets are filled. A place's Widgets go that turn to its own builds, earliest order first. Unapplied, they are lost: never banked, traded or carried.";
@@ -7533,9 +7568,10 @@ This turn {:+.2}%: {:+.1} million.", c.population_growth * 100.0, c.population_l
         icon_word(ui, "ducats", format!("GDP {}: Industry Level {}, leans {:?}", card.gdp, st.industry_level, card.resource_lean)),
         format!("Pays its controller {} Ducats a turn.\nGDP x Industry Level / 5, never below 1.\nA{} {} here would add {}.", pays, if bank == FacilityKind::InvestmentBank { "n" } else { "" }, bank.name(), game.facility_yield(Seat(0), sid, bank).amount),
     );
-    icon_word(ui, "emissions", format!("Emissions this turn: industry {:.1}, Facilities {:.1}, people {:.1}", industry_em, fac_em, game.population_coefficient(sid) * st.population * mult));
-    // Ticket #54: the per-person line, its formula, and what Leapfrog has taken off it.
-    {
+    // Ticket #54: the per-person rate, its formula, and what Leapfrog has taken off it. Ticket #532
+    // (version 0.1.0.1), at the designer's word: no longer a line of its own but the hover of the
+    // Emissions line.
+    let people = {
         let c = &game.tables.climate;
         let n = game.leapfrogs(sid);
         let leaps = match n {
@@ -7544,20 +7580,17 @@ This turn {:+.2}%: {:+.1} million.", c.population_growth * 100.0, c.population_l
             2 => ", Leapfrogged twice".to_string(),
             n => format!(", Leapfrogged {n} times"),
         };
-        ui.label(
-            RichText::new(format!(
-                "Its people emit {:.2} per hundred million ({:.2} base + {:.2} x Industry Level {}{})",
-                // Ticket #143: the rate is kept per hundred million, which is twenty units then and a
-                // hundred since ticket #333 (version 0.09.0).
-                game.population_coefficient(sid) * game.tables.units_per_hundred_million(),
-                c.population_emissions_base * game.tables.units_per_hundred_million(),
-                c.population_emissions_per_level * game.tables.units_per_hundred_million(),
-                st.industry_level,
-                leaps
-            ))
-            .weak(),
-        );
-    }
+        format!(
+            "People: {:.2} per hundred million ({:.2} base + {:.2} x Industry Level {}){leaps}",
+            // Ticket #143: the rate is kept per hundred million, which is twenty units then and a
+            // hundred since ticket #333 (version 0.09.0).
+            game.population_coefficient(sid) * game.tables.units_per_hundred_million(),
+            c.population_emissions_base * game.tables.units_per_hundred_million(),
+            c.population_emissions_per_level * game.tables.units_per_hundred_million(),
+            st.industry_level,
+        )
+    };
+    rule_tip(icon_word(ui, "emissions", format!("Emissions this turn: industry {:.1}, Facilities {:.1}, people {:.1}", industry_em, fac_em, game.population_coefficient(sid) * st.population * mult)), people);
     // Ticket #54: a Strip Permit running here, and what it will cost when it ends.
     if game.strip_permit_running(sid) {
         let left = game.strip_permit_turns_left(sid);
@@ -8043,14 +8076,26 @@ fn pioneers_block(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, act
             cost_button_with_hover(ui, game, &session.pending, order, &format!("Send {n} to {} ({})", game.ship_name(s), where_it_is), hover, actions);
         }
     }
-    // Ticket #46: Ships come from Shipyards; a Launch Site lifts people to orbit.
-    ui.label(
-        RichText::new(if st.facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working()) {
-            "Launch Site: Colonists and Armies lift to any orbit of Earth from here. Ships are built at a Shipyard on a station or Colony."
-        } else {
-            "No working Launch Site: only a Colony Ship in low orbit takes Pioneers from here."
+    // Ticket #46: a Launch Site lifts people to orbit. Ticket #532 (version 0.1.0.1), at the
+    // designer's word: Yes in green or No in yellow, what each means on the hover; the Arkwrights'
+    // word is their Spaceport's.
+    let word = if game.kind(Seat(0)) == FactionKind::Arkwrights { "Spaceport" } else { "Launch Site" };
+    let sites = || st.facilities.iter().filter(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite));
+    let working = sites().any(|f| f.working());
+    let (answer, colour, hover) = if working {
+        ("Yes", Color32::LIGHT_GREEN, "Pioneers and Armies lift to any orbit of Earth.".to_string())
+    } else if sites().next().is_some() {
+        ("No", Color32::YELLOW, format!("Pioneers and Armies lift to low orbit only.\nIts {word} is dark."))
+    } else {
+        ("No", Color32::YELLOW, "Pioneers and Armies lift to low orbit only.".to_string())
+    };
+    rule_tip(
+        ui.horizontal(|ui| {
+            ui.label(RichText::new(format!("{word}:")).weak());
+            ui.label(RichText::new(answer).color(colour));
         })
-        .weak(),
+        .response,
+        hover,
     );
     ui.separator();
 }
@@ -11348,21 +11393,10 @@ fn faction_window(ctx: &egui::Context, session: &Session, game: &Game, view: &mu
                     .text(RichText::new(format!("{:.0}%", share * 100.0)).color(Color32::BLACK)),
             );
             // Ticket #265 (version 0.08.4): answerable for, then how it got there, then the credit.
-            let s = game.seat(seat);
-            // Ticket #267: what rivals laid on by Smear, when any, so the line never says the seat
-            // put it in the air.
-            let smeared = if s.blame_smeared > 0.0 { format!(", {:.0} laid on by rivals", s.blame_smeared) } else { String::new() };
-            let smeared = format!("{smeared}{}{}", if s.credits_bought > 0.0 { format!(", {:.0} bought as carbon credits", s.credits_bought) } else { String::new() }, if s.credits_sold > 0.0 { format!(", {:.0} sold as carbon credits", s.credits_sold) } else { String::new() });
-            // Ticket #277 (version 0.08.5): the sixth clause, at the designer's word.
-            let smeared = format!("{smeared}{}", if s.blame_cleaned > 0.0 { format!(", {:.0} cleaned by campaign", s.blame_cleaned) } else { String::new() });
-            let line = format!(
-                "Answerable for {:.0} ppm (emitted {:.0}, removed {:.0} in credit{smeared}), thresholds x{:.2}",
-                game.blame(seat),
-                s.blame_emitted,
-                game.blame_credit(seat),
-                game.blame_threshold_multiplier(seat)
-            );
-            figures_with_icons(ui, &line, 14.0, ui.visuals().weak_text_color(), &[("ppm", "emissions")]);
+            // Ticket #267: what rivals laid on by Smear, and #277's sixth clause, are on the hover
+            // since ticket #532 (version 0.1.0.1), with the rest of what followed the ppm.
+            let line = format!("Answerable for {:.0} ppm", game.blame(seat));
+            rule_tip(figures_with_icons(ui, &line, 14.0, ui.visuals().weak_text_color(), &[("ppm", "emissions")]), blame_parts_hover(game, seat, false));
         });
         ui.add_space(6.0);
 
@@ -11887,27 +11921,14 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
             ui.separator();
             rule_tip(ui.label(RichText::new("Blame: the CO2 each Faction is answerable for").strong()), BLAME_HOVER.to_string());
             for seat in Seat::ALL {
-                let s = game.seat(seat);
-                // Ticket #265 (version 0.08.4): one form for every seat -- answerable for, how it
-                // got there, and what it holds in credit -- at the designer's word.
-                let smeared = if s.blame_smeared > 0.0 { format!(", {:.0} laid on by rivals", s.blame_smeared) } else { String::new() };
-                let smeared = format!("{smeared}{}{}", if s.credits_bought > 0.0 { format!(", {:.0} bought as carbon credits", s.credits_bought) } else { String::new() }, if s.credits_sold > 0.0 { format!(", {:.0} sold as carbon credits", s.credits_sold) } else { String::new() });
-            // Ticket #277 (version 0.08.5): the sixth clause, at the designer's word.
-            let smeared = format!("{smeared}{}", if s.blame_cleaned > 0.0 { format!(", {:.0} cleaned by campaign", s.blame_cleaned) } else { String::new() });
-                let line = format!(
-                    "{}: answerable for {:.0} ppm (emitted {:.0}, removed {:.0} in credit{smeared}); share {:.2}, thresholds x{:.2}",
-                    game.seat_name(seat),
-                    game.blame(seat),
-                    s.blame_emitted,
-                    game.blame_credit(seat),
-                    game.blame_share(seat),
-                    game.blame_threshold_multiplier(seat)
-                );
+                // Ticket #265 (version 0.08.4): one form for every seat. Ticket #532 (version
+                // 0.1.0.1), at the designer's word: the line is what it is answerable for; how it got
+                // there, its share and thresholds are the hover.
+                let line = format!("{}: answerable for {:.0} ppm", game.seat_name(seat), game.blame(seat));
                 // Ticket #112 (version 0.07.1): each Faction's ppm figures wear the Emissions
                 // glyph, so the figure a Faction is answerable for is marked as the same thing the
-                // Facility lists and the top bar count. "share" and "thresholds" are not ppm and
-                // keep their words.
-                figures_with_icons(ui, &line, 14.0, seat_colour(session, seat), &[("ppm", "emissions")]);
+                // Facility lists and the top bar count.
+                rule_tip(figures_with_icons(ui, &line, 14.0, seat_colour(session, seat), &[("ppm", "emissions")]), blame_parts_hover(game, seat, true));
             }
             // Ticket #306 (version 0.08.7): the sentence that stood here, a clause of the heading's
             // hover word for word, is cut at the designer's word.
@@ -12617,6 +12638,36 @@ mod tests {
         );
         assert!(hover_lines_estimate(&all) <= HOVER_LINE_CEILING, "{} lines", hover_lines_estimate(&all));
         assert!(all.lines().all(|l| l.chars().count() <= HOVER_CHARS_PER_LINE), "each term on one rendered line");
+    }
+
+    /// Ticket #532 (version 0.1.0.1): a Blame line's hover is three lines at most, the moved parts
+    /// on the middle one only when there are any, and the seat's own leaves out the share.
+    #[test]
+    fn a_blame_hover_is_three_lines_at_most_and_shows_only_what_is_not_zero() {
+        let tables = std::sync::Arc::new(dying_earth_engine::data::Tables::load(&dying_earth_engine::data::default_data_dir()).unwrap());
+        let mut g = Game::new(tables, NewGame { seed: 7, player: FactionKind::Custodians, player_is_ai: false, player_start: StateId::EastAsia });
+        g.seats[1].blame_emitted = 520.0;
+        let quiet = blame_parts_hover(&g, Seat(1), true);
+        assert_eq!(quiet.lines().count(), 2, "nothing moved, no middle line: {quiet}");
+        assert!(quiet.lines().nth(1).unwrap().starts_with("Share "), "{quiet}");
+        g.seats[1].blame_smeared = 30.0;
+        g.seats[1].blame_cleaned = 12.0;
+        let moved = blame_parts_hover(&g, Seat(1), true);
+        assert_eq!(moved.lines().nth(1), Some("30 laid on by rivals, 12 cleaned by campaign"), "{moved}");
+        // All four moved, three figures each: still three lines AS RENDERED, the parts in short.
+        g.seats[1].blame_emitted = 520.0;
+        g.seats[1].blame_smeared = 300.0;
+        g.seats[1].blame_cleaned = 120.0;
+        g.seats[1].credits_bought = 150.0;
+        g.seats[1].credits_sold = 100.0;
+        let all = blame_parts_hover(&g, Seat(1), true);
+        assert_eq!(hover_lines_estimate(&all), 3, "three lines as drawn: {all}");
+        assert_eq!(all.lines().nth(1), Some("300 by rivals, 150 bought, 100 sold, 120 cleaned"), "{all}");
+        // Nothing emitted and nothing removed: no first line at all, rather than "Emitted 0".
+        g.seats[1].blame_emitted = 0.0;
+        let quietest = blame_parts_hover(&g, Seat(1), true);
+        assert!(!quietest.contains(" 0"), "no zero shown: {quietest}");
+        assert!(blame_parts_hover(&g, Seat(1), false).lines().last().unwrap().starts_with("Thresholds x"), "the own panel's hover has no share");
     }
 
     /// Ticket #509 (version 0.1.0.0): the renewal prompt says the Accord, its Terms and the five

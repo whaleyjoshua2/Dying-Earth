@@ -2110,8 +2110,18 @@ impl Game {
                     if a.stance == Stance::DigIn {
                         return fail("this Army is dug in: change its stance and wait the turn");
                     }
-                    if matches!(a.at, ArmyAt::Place(Place::State(st)) if !self.state(st).facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working())) {
-                        return fail("a lift to orbit needs a working Launch Site there");
+                    // Ticket #532 (version 0.1.0.1), at the designer's word: as Pioneers since #443,
+                    // not to LOW orbit -- a Ship there takes an Army from any Region its seat directs.
+                    // A station's ring is still reached by a working Launch Site alone.
+                    if let ArmyAt::Place(Place::State(st)) = a.at
+                        && !self.state(st).facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working())
+                    {
+                        if s.slot.is_some() {
+                            return fail("a lift above low orbit needs a working Launch Site there");
+                        }
+                        if self.state(st).control.director() != Some(seat) {
+                            return fail("a lift from a Region not yours needs a working Launch Site there");
+                        }
                     }
                     if matches!(a.home, ArmyHome::Colony(_)) {
                         return fail("a Colony's Army never leaves");
