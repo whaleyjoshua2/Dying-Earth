@@ -4993,6 +4993,8 @@ struct RosterRow {
     /// row of a seat that gives no orders -- and it wears no ring at all.
     mark: Option<bool>,
     jump: Option<(View, Selection)>,
+    /// Ticket #536 (version 0.1.0.1): a Colony Ship's glyph and "3/6", beside the button.
+    room: Option<ColonistRoom>,
 }
 
 /// A roster group: its heading and the line shown when it is empty.
@@ -5035,6 +5037,9 @@ fn roster_group(ui: &mut Ui, group: RosterGroup, rows: Vec<RosterRow>, marks: bo
             }
             if resp.clicked() {
                 *jump = row.jump;
+            }
+            if let Some(room) = &row.room {
+                colonist_room_label(ui, room);
             }
             if let Some(wants) = row.mark {
                 order_ring(ui, wants);
@@ -5097,9 +5102,7 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, seat: Seat, marks: boo
                 figure(s.fuel),
                 tank
             );
-            if s.colonists > 0 {
-                text.push_str(&format!(", {} Colonists aboard", s.colonists));
-            }
+            // Ticket #536 (version 0.1.0.1): the Colonists are the row's glyph and "3/6" now.
             if s.army.is_some() {
                 text.push_str(", an Army aboard");
             }
@@ -5149,7 +5152,7 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, seat: Seat, marks: boo
                 tank
             );
             // Ticket #374 (version 0.09.2): the row opens the SHIP'S card, now that a Ship has one.
-            ships_rows.push(RosterRow { kind: Kind::of_unit(s.kind), text, tip: Some(tip), mark: marks.then_some(!ordered), jump: Some((View::Solar, Selection::Ship(s.id))) });
+            ships_rows.push(RosterRow { kind: Kind::of_unit(s.kind), text, tip: Some(tip), mark: marks.then_some(!ordered), jump: Some((View::Solar, Selection::Ship(s.id))), room: colonist_room(game, s) });
         }
     }
     for s in game.ships.iter().filter(|s| s.seat == seat) {
@@ -5165,6 +5168,7 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, seat: Seat, marks: boo
                 // Ticket #374 (version 0.09.2): a Ship in flight has a card too, so the row opens it
                 // where it used to select nothing.
                 jump: Some((View::Solar, Selection::Ship(s.id))),
+                room: colonist_room(game, s),
             });
         }
     }
@@ -5208,7 +5212,7 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, seat: Seat, marks: boo
             a.stance.one_liner(false),
             game.tables.unrest.army_threshold
         );
-        army_rows.push((where_, RosterRow { kind: Kind::Army, text, tip: Some(tip), mark: None, jump: target }));
+        army_rows.push((where_, RosterRow { kind: Kind::Army, text, tip: Some(tip), mark: None, jump: target, room: None }));
     }
     army_rows.sort_by(|a, b| a.0.cmp(&b.0));
     roster_group(ui, RosterGroup { name: "Armies", empty: "  none" }, army_rows.into_iter().map(|(_, r)| r).collect(), marks, jump);
@@ -5232,7 +5236,7 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, seat: Seat, marks: boo
             c.modules.iter().filter(|m| m.kind != ModuleKind::Core && m.kind != ModuleKind::Archive).count(),
             if building > 0 { format!(", {building} building") } else { String::new() }
         );
-        colony_rows.push(RosterRow { kind: Kind::of_colony(c), text, tip: None, mark: marks.then_some(!ordered), jump: Some((View::Surface(c.body), Selection::Colony(c.id))) });
+        colony_rows.push(RosterRow { kind: Kind::of_colony(c), text, tip: None, mark: marks.then_some(!ordered), jump: Some((View::Surface(c.body), Selection::Colony(c.id))), room: None });
     }
     roster_group(ui, RosterGroup { name: "Colonies and stations", empty: "  none; a Colony Ship founds one" }, colony_rows, marks, jump);
 
@@ -5243,7 +5247,7 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, seat: Seat, marks: boo
         let building = st.queue.len();
         let ordered = building > 0 || pending.iter().any(|o| roster_order_touches_state(o, sid));
         let text = format!("{}{}: {} Facilities, {} free slot(s){}", tag("Region"), game.tables.state(sid).name, st.facilities.len(), game.free_slots(sid), if building > 0 { format!(", {building} building") } else { String::new() });
-        state_rows.push(RosterRow { kind: Kind::Region, text, tip: None, mark: marks.then_some(!ordered), jump: Some((View::Surface(BodyId::Earth), Selection::State(sid))) });
+        state_rows.push(RosterRow { kind: Kind::Region, text, tip: None, mark: marks.then_some(!ordered), jump: Some((View::Surface(BodyId::Earth), Selection::State(sid))), room: None });
     }
     roster_group(ui, RosterGroup { name: "Regions", empty: "  none" }, state_rows, marks, jump);
 }
@@ -8711,27 +8715,60 @@ fn ship_row(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, s
             view.selection = Selection::Ship(s.id);
             view.attack_preview = false;
         }
+        if let Some(room) = colonist_room(game, s) {
+            colonist_room_label(ui, &room);
+        }
         warhead_label(ui, s);
     });
+}
+
+/// Ticket #536 (version 0.1.0.1), at the designer's word: what a Colony Ship carries over the most it
+/// can take, the room at Earth the crowded room (with the crowding said on the hover).
+struct ColonistRoom {
+    aboard: u32,
+    room: u32,
+    hover: Option<String>,
+}
+
+fn colonist_room(game: &Game, s: &Ship) -> Option<ColonistRoom> {
+    if s.kind != UnitKind::ColonyShip {
+        return None;
+    }
+    let base = game.colony_ship_capacity(s.seat);
+    let crowd = if s.at == ShipAt::Body(BodyId::Earth) { game.crowd_extra() } else { 0 };
+    let hover = (crowd > 0).then(|| format!("{base} room, +{crowd} crowded at Earth"));
+    Some(ColonistRoom { aboard: s.colonists, room: base + crowd, hover })
+}
+
+/// Ticket #536: the population glyph, then "3/6" -- the glyph BEFORE the figures, at the designer's
+/// word, where the game's rule for a word after a figure would put it behind.
+fn colonist_room_label(ui: &mut Ui, room: &ColonistRoom) {
+    let resp = ui
+        .horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 3.0;
+            if let Some(image) = Icons::from_ctx(ui.ctx(), "population", 15.0) {
+                ui.add(image);
+            }
+            ui.label(format!("{}/{}", room.aboard, room.room));
+        })
+        .response;
+    if let Some(h) = &room.hover {
+        rule_tip(resp, h.clone());
+    }
 }
 
 /// Ticket #374: **what a Ship is, in one clause** -- "strength 3, damage 0/4, carrying 6 Colonists
 /// and an Army" -- for its row on the stack card and the line on its own card, which say the same
 /// thing after different names.
 fn ship_line(game: &Game, s: &Ship) -> String {
-    let mut extra = Vec::new();
-    if s.colonists > 0 {
-        extra.push(format!("{} Colonists", s.colonists));
-    }
-    if s.army.is_some() {
-        extra.push("an Army".into());
-    }
+    // Ticket #536 (version 0.1.0.1): a Colony Ship's Colonists are its glyph and "3/6" beside the
+    // line now (`colonist_room_label`), not words in it.
     format!(
         "strength {}, damage {}/{}{}",
         game.ship_fighting_strength(s),
         s.damage,
         game.tables.unit(s.kind).hit_points,
-        if extra.is_empty() { String::new() } else { format!(", carrying {}", extra.join(" and ")) },
+        if s.army.is_some() { ", carrying an Army" } else { "" },
     )
 }
 
@@ -8920,7 +8957,12 @@ fn ship_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
     }
     // Ticket #346: the strength it would FIGHT at, dry hulls halved; the Tank block says why.
     ui.horizontal_wrapped(|ui| {
-        ui.label(format!("{}: {}", s.kind.name(), ship_line(game, s)));
+        ui.horizontal(|ui| {
+            ui.label(format!("{}: {}", s.kind.name(), ship_line(game, s)));
+            if let Some(room) = colonist_room(game, s) {
+                colonist_room_label(ui, &room);
+            }
+        });
         warhead_label(ui, s);
     });
     match s.at {
@@ -12718,6 +12760,31 @@ mod tests {
         }
         assert!(!line.contains("Prospectors"), "not the campaigner's own: {line:?}");
         assert!(greenwash_relations_line(&g, Seat(0), 0).contains("Custodians 0"), "nothing spent says 0");
+    }
+
+    /// Ticket #536 (version 0.1.0.1), at the designer's word: a Colony Ship shows what it carries
+    /// over its room, empty or not; at Earth the room is the crowded one, its hover saying the
+    /// crowding; another kind of Ship carries no Colonists and shows none.
+    #[test]
+    fn a_colony_ship_shows_aboard_over_room_and_the_crowded_room_at_earth() {
+        let tables = std::sync::Arc::new(dying_earth_engine::data::Tables::load(&dying_earth_engine::data::default_data_dir()).unwrap());
+        let mut g = Game::new(tables, NewGame { seed: 7, player: FactionKind::Custodians, player_is_ai: false, player_start: StateId::EastAsia });
+        let base = g.colony_ship_capacity(Seat(0));
+        let ship = |id: u32, kind: UnitKind, at: ShipAt, colonists: u32| Ship { name: String::new(), id: ShipId(id), kind, seat: Seat(0), damage: 0, at, colonists, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None };
+        let at_moon = ship(901, UnitKind::ColonyShip, ShipAt::Body(BodyId::Moon), 3);
+        let room = colonist_room(&g, &at_moon).expect("a Colony Ship shows its room");
+        assert_eq!((room.aboard, room.room, room.hover.clone()), (3, base, None), "off Earth, the ordinary room");
+        let empty = ship(902, UnitKind::ColonyShip, ShipAt::Body(BodyId::Moon), 0);
+        assert_eq!(colonist_room(&g, &empty).map(|r| (r.aboard, r.room)), Some((0, base)), "empty, it still shows 0/room");
+        assert!(colonist_room(&g, &ship(903, UnitKind::Frigate, ShipAt::Body(BodyId::Moon), 0)).is_none(), "a Frigate shows none");
+        // A warmed world crowds the lift at Earth.
+        g.climate.temperature = 2.6;
+        let extra = g.crowd_extra();
+        assert!(extra > 0, "the premise: +2.6 crowds the lift");
+        let at_earth = ship(904, UnitKind::ColonyShip, ShipAt::Body(BodyId::Earth), 2);
+        let r = colonist_room(&g, &at_earth).unwrap();
+        assert_eq!(r.room, base + extra, "the room it can take at Earth");
+        assert_eq!(r.hover.as_deref(), Some(format!("{base} room, +{extra} crowded at Earth").as_str()));
     }
 
     /// Ticket #509 (version 0.1.0.0): the renewal prompt says the Accord, its Terms and the five

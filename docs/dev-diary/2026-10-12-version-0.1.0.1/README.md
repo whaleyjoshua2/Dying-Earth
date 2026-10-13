@@ -99,3 +99,15 @@ line printed the raw reward, where the score caps it at the top of Cordial, so t
 fail to add up (the engine now reports the reward as applied, `directive_relations_applied`, watched
 red by handing back the raw figure); and the "never heals" check set the quiet turns without
 settling them, so it could not fail (it now settles twenty turns and reads the shown score).
+
+## The Colony Ship card shows aboard and room
+
+Ticket [#536](https://github.com/whaleyjoshua2/Dying-Earth/issues/536), spec §5.
+
+**The pictures** ([`ticket-536/`](ticket-536/)): `earth-crowded-earth.png`, TSV Endeavour at Earth at
++2.6 C, "[glyph] 0/8" and its hover "4 room, +4 crowded at Earth"; `venus-loaded-venus.png`, the
+same Ship at Ishtar with four aboard, "[glyph] 4/4"; `roster-earth.png`, the roster row's "0/8"
+beside its button. The glyph goes BEFORE the figures, at the designer's word, where the game's
+rule for a word after a figure would put it behind, so it is drawn as its own piece.
+
+No rule moved; no sweep.

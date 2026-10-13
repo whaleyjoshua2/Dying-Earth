@@ -135,3 +135,16 @@ Ticket: [Greenwash costs Relations](https://github.com/whaleyjoshua2/Dying-Earth
 - **Refutation:** a campaign of 50 Influence that leaves the Custodians' Relations toward its
   campaigner unchanged, or a Greenwash term that recovers over quiet turns, shows this section
   unbuilt.
+
+## 5. The Colony Ship card shows aboard and room
+
+Ticket: [The Colony Ship card shows aboard and room](https://github.com/whaleyjoshua2/Dying-Earth/issues/536).
+
+- **Every Colony Ship, empty or not,** shows the population glyph then *aboard/room* -- *[glyph] 3/4*
+  -- beside its line: on its own card's head, on its row on the stack card, and on its roster row
+  (docked or in flight). The words "carrying 3 Colonists" and ", 3 Colonists aboard" are gone.
+- **The room** is the Ship's capacity (the Colony Ship's 4, Expanded Habitats, Generation Ships, the
+  Faction's multiplier). **At Earth, when the warming world crowds the lift,** it is the crowded room
+  it can take there, with the hover *"4 room, +4 crowded at Earth"*.
+- Other Ships show none; a Carrier's line still says *"carrying an Army"*.
+- No rule moves.
