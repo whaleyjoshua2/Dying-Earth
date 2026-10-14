@@ -88,6 +88,19 @@ army_inherited = "{army}, in {place}, now answers to you, on Hold."
 accord_refused = "{faction} refused your Accord."
 # Ticket #509 (version 0.1.0.0): an Accord in its last turn the other side would not renew.
 accord_let_lapse = "{faction} let your Accord lapse."
+# Ticket #538 (version 0.1.0.1): the warning at the head of an Accord's last turn, and the causes the
+# Accord Ended Moment names.
+# Ticket #544 (version 0.1.0.1): a far world's window the turn before it.
+window_next = "The {bodies} window is next turn: {turns} turns, {fuel} Fuel."
+# Ticket #542 (version 0.1.0.1): a rival on a place of the player's, and the home at risk.
+rival_spent_on_yours = "{faction} spent {n} on {place}: {standing} of {needed}."
+could_fall = "{place} could fall to {faction} next turn."
+accord_ends_soon = "Your Accord with {faction} ends after this turn."
+accord_cause_ran_out = "its {turns} turns are up"
+accord_cause_not_renewed = "{faction} would not renew"
+accord_cause_called_off = "{faction} called it off"
+accord_cause_broken = "{faction} broke it"
+accord_cause_you_broke = "you broke it"
 # Ticket #509: Terms added to an Accord that stands.
 accord_added = "Terms added to your Accord with {faction}."
 # Ticket #496 (version 0.09.9): a Trade answered, or failed for goods gone by the answer.
@@ -286,6 +299,12 @@ energy_zero = "{faction}: Energy at zero with every producer off."
 # ---------------------------------------------------------------- fragments other sentences use
 [phrase]
 attacks = " and attacks"
+# Ticket #544 (version 0.1.0.1): the Report's head -- the clock in the Climate Panel's words, and
+# the player's Victory.
+head = "{clock} · Your Victory: {pct}%"
+clock_turn = "Last turn to act: {turn}"
+clock_too_late = "Cuts alone no longer avoid Collapse"
+clock_none = "On this path Collapse is not reached"
 # Ticket #481 (version 0.09.8): how far a rival had got in the race to the Moon when it was won.
 moon_no_shipyard = "{faction} had no Shipyard"
 moon_shipyard = "{faction} had a Shipyard"
@@ -371,6 +390,9 @@ propose_trade = "offered {faction} a Trade"
 end_accord = "ended their Accord with {faction}"
 # Ticket #509 (version 0.1.0.0): an Accord renewed in its last turn.
 renew_accord = "renewed their Accord with {faction}"
+# Ticket #538 (version 0.1.0.1): a rivals' Accord ending, as the board could see it.
+accord_lapsed = "let their Accord with {faction} lapse"
+accord_broke = "broke their Accord with {faction}"
 tribute = "paid {faction} a tribute"
 build_facility = "began a {building} in {state}"
 build_facility_ducats = "bought a {building} in {state}"
@@ -462,6 +484,12 @@ text = "{place} changed hands."
 figure = "{faction}"
 
 # Ticket #405 (version 0.09.4): the climate's first good news, in the designer's words.
+# Ticket #538 (version 0.1.0.1): an Accord of the player's has ended.
+[moments.accord_ended]
+on = true
+text = "Your Accord with {faction} has ended: {cause}."
+figure = "{faction}"
+
 [moments.under_the_sink]
 on = true
 text = "For the first time, the world takes more carbon out of the air than it puts in. Unrest eases by {ease} in every Region, {custodians} in the Custodians'."

@@ -1,4 +1,4 @@
-DYING EARTH - playtest build, version 0.1.0.0
+DYING EARTH - playtest build, version 0.1.0.1
 =============================================
 
 Thanks for playing. This is an early build of a turn-based strategy game about colonizing
@@ -16,77 +16,56 @@ HOW TO RUN
 4. The very first launch shows a blank dark window for up to ten seconds while it
    compiles graphics. Later launches are quick.
 5. Needs Windows 10 or 11, 64-bit, and any graphics card from the last ten years.
-6. Saves from 0.09.9 and before do not load: the Load screen says so.
+6. Saves from 0.1.0.0 load. Saves from 0.09.9 and before do not: the Load screen says so.
 7. This version ships for Windows and for Linux. On Linux, read RUN-ON-LINUX.txt in the
    folder instead of steps 2 to 5.
 
-WHAT CHANGED SINCE 0.09.9
--------------------------
-The more-room version: a bigger solar system, a bigger Earth, a longer game, and a deeper
-Tech tree. The computer plays every rule below.
+WHAT CHANGED SINCE 0.1.0.0
+--------------------------
+The counterweight version: most of it leans against whoever runs away. The computer plays
+every rule below.
 
-MORE ROOM
-- THREE NEW WORLDS: Mercury, Ceres and Vesta, with six Colony slots and two station slots
-  each. Ceres and Vesta are small worlds, so a Mass Driver may stand there. Each has its
-  own launch windows; Ceres to Vesta needs none.
-- TWO NEW COUNTRIES: Vietnam (the South-East Asian mainland) cut out of Indonesia, and
-  Argentina (the Spanish-speaking mainland) cut out of Brazil. Twenty in all.
-- A FOURTH TIER: the Colonial Capital, 24 people and 70 Materials, one to a world, to
-  whoever completes it first, on the ground only. It adds 1 Influence a turn to its
-  holder.
+THE COMPUTER
+- IT RACES FOR THE RESEARCH LEAD once its Victory gate is in reach: more Research Labs and
+  Observatories, less Research to the Sink, the harder the nearer it is to winning. As Lead
+  it takes its gate as soon as it is offered.
+- IT GANGS UP ON A RUNAWAY LEADER, you included: more Influence, Smears, Agitation and
+  attacks on the leader, no Accords, Trades or carbon credits for it, and easier Accords
+  among the rest.
 
-A LONGER GAME
-- FIFTY TURNS, January 2030 to March 2038. The Victory bars grew with it: the Fund 3,500;
-  the Archive 225 Research and 18 uploads; the Diaspora 42 people over four worlds; four
-  Stabilization phases in a row; 18 people off Earth for the Custodians and Prospectors.
-- THE CLIMATE was refitted to the longer game: it takes 620 ppm to add half a degree now.
-- THREE NEW CARDS with a choice: the Carbon Levy, the Deep Core Survey, the Trade Pact.
+THE PRICES
+- Influence costs 4 Ducats a point. A Strip Permit costs 25 Ducats.
+- Every building, Ship and Army costs a tenth more Materials. An Earth Mine makes 4.4;
+  every Mine off Earth makes 15% less.
 
-THE TECH TREE
-- THE VICTORY GATES moved to a fourth rung at 62 Research, each behind a 48-Research
-  Tech of its own branch: Clean Manufacturing, Regolith Printing (cheaper Modules off
-  Earth), Rail Gun Freight (a Mass Driver pays 3 Ducats a turn) and Superconductors
-  (Energy x1.25). Every road to a gate is 192 Research.
-- PROPULSION runs in two lanes: Orbital Refuelling, Cryogenic Tanks, Nuclear Rockets;
-  Clean Propellant, Efficient Transit (now Fuel x0.75), Hardened Hulls. Missile
-  Technology needs both ends, on the fourth rung at 58.
+THE RULES
+- A SHIP'S TURN is one action. Lifting Pioneers or an Army from Regions, and refuelling,
+  stand beside it: lift and leave in the same turn.
+- AN ARMY lifts to low orbit with no Launch Site, as Pioneers do.
+- ONE LAUNCH SITE to a Region.
+- GREENWASH costs Relations, a little with each rival, and it builds up.
 
-THE JOURNAL AND THE FACTIONS
-- A SECOND OBJECTIVE for each Faction opens once the first is met: three Leapfrogs, a
-  Region at Industry Level 5, a settlement beyond Earth's sphere, three Observatories.
-- ACCORDS RUN FIVE TURNS. In the last turn a Renew button on the Accord's line extends it,
-  if the other side is willing; Terms can be added to an Accord that stands, and a
-  research agreement may be offered. Hover a held Accord to read its Terms.
-- THE ARCHIVE draws 20 Energy a turn once complete (12 before); Closed-Loop Colonies takes
-  a quarter off a Module's Energy, not half.
-- THE ARKWRIGHTS' SHIPS carry half again what everyone else's do, not twice; and to win
-  they must hold a Colonial Capital off Earth as well as their Diaspora.
-
-THE MAP
-- THE SOLAR SYSTEM MAP IS IN THREE DIMENSIONS: each world's ring lies in its real orbital
-  plane. Drag up and down to tilt the view, sideways to turn it.
-
-FIXED SINCE THE FIRST 0.1.0.0 PLAYTEST
---------------------------------------
-- A Colony Ship in a Venus station ring founds a station there.
-- The computer keeps the non-aggression Accords it gives; a broken Accord is reported.
-- An order that would break an Accord says so beside its price.
-- Agitate, and the Unrest a card asks you to accept, stand for a turn instead of
-  vanishing into that turn's natural fall.
-- A Region that changes hands puts its Armies on Hold, and you are told of any abroad.
-- Hover "of N left" under your Influence to see where this turn's Influence came from.
-- A win is declared the turn it is met, and heads the Report.
+WHAT YOU CAN SEE NOW
+- The Report says, under its date, your last turn to act on the climate and how far you
+  are to your Victory; and the turn before a far world's launch window, that it opens.
+- A popup when an Accord of yours ends, and why; a line the turn before it ends.
+- A line when a rival spends Influence on a place of yours, and when your home could fall
+  to them next turn.
+- A Colony Ship shows its people over its room, yellow when it is short of the four that
+  found a Colony.
+- The Climate Panel's Blame and the country card's emissions and Launch Site moved onto
+  mouse-overs.
 
 WHAT WE WANT TO KNOW
 --------------------
 Write down anything, however small. Especially:
 - The moment you were not sure what to do next.
 - Anything you clicked that did nothing, or did something you did not expect.
-- THE NEW WORLDS: did you go to Mercury, Ceres or Vesta? Was the window line clear?
-- THE CAPITAL: did you raise one? Did the 24 people feel reachable?
-- FIFTY TURNS: did the game drag in the middle? When did you first feel ahead or behind?
-- ACCORDS: did you renew one? Did you notice one lapse?
-- THE 3D MAP: did tilting it help you read the launch windows, or get in the way?
+- WHEN YOU LED: did the computer gang up on you? Could you tell? Did it feel fair?
+- THE RESEARCH RACE: did a computer seat take the Lead from you to get its gate?
+- THE PRICES: did anything feel too dear, or not dear enough?
+- A SHIP'S TURN: did lifting and leaving in one turn read clearly?
+- The new lines and popups: any you missed, or any that were noise?
 - The turn the game got boring, if it did, and the turn you felt you had lost.
 - Crashes: what you were doing, and the "Seed" number shown on the title screen and
   the game-over screen. With the seed the game can be replayed exactly.

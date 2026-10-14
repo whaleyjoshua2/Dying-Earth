@@ -91,6 +91,10 @@ pub enum LineKind {
     /// every other line, so the end heads the Report it happens in, where as a Note it never
     /// headlined and a tester's win sat under "China now belongs to Prospectors". Added last.
     GameOver,
+    /// Ticket #538 (version 0.1.0.1): **an Accord of the player's in its last turn.** Under Your
+    /// works; the window opens the Factions window from it, where Renew stands. Never a headline.
+    /// Added last.
+    Accord,
 }
 
 /// The five headings the dispatch groups its lines under, in the order they are shown (four until
@@ -170,7 +174,7 @@ impl LineKind {
             // Ticket #353 (version 0.09.1): the turn's card reads under The climate, where an Event
             // line has always read; only its headline rank is gone.
             LineKind::Break | LineKind::SeaLevel | LineKind::Event | LineKind::Development | LineKind::Climate | LineKind::Card => Section::TheClimate,
-            LineKind::TechComplete | LineKind::YourBuild | LineKind::YourWorks => Section::YourWorks,
+            LineKind::TechComplete | LineKind::YourBuild | LineKind::YourWorks | LineKind::Accord => Section::YourWorks,
             LineKind::ControlChanged | LineKind::DecisiveBattle | LineKind::Battle | LineKind::BuildComplete | LineKind::Note | LineKind::Seating | LineKind::GameOver => by_place(),
         }
     }
@@ -227,10 +231,13 @@ pub enum MomentKind {
     /// Ticket #405 (version 0.09.4): the world under the Natural Sink for the first time, once a
     /// game, and every Region's Unrest eased for it. The climate's first good news.
     UnderTheSink,
+    /// Ticket #538 (version 0.1.0.1): an Accord the player is party to has ended, and why. Always
+    /// shown, past the cap of two a turn.
+    AccordEnded,
 }
 
 impl MomentKind {
-    pub const ALL: [MomentKind; 12] = [
+    pub const ALL: [MomentKind; 13] = [
         MomentKind::ColonyFounded,
         MomentKind::ControlChanged,
         MomentKind::ClimateThreshold,
@@ -243,6 +250,7 @@ impl MomentKind {
         MomentKind::PlaceTakenByForce,
         MomentKind::FirstToABody,
         MomentKind::UnderTheSink,
+        MomentKind::AccordEnded,
     ];
 
     /// The key its table carries in `report.toml`.
@@ -260,6 +268,7 @@ impl MomentKind {
             MomentKind::PlaceTakenByForce => "taken_by_force",
             MomentKind::FirstToABody => "first_to_body",
             MomentKind::UnderTheSink => "under_the_sink",
+            MomentKind::AccordEnded => "accord_ended",
         }
     }
 
@@ -278,6 +287,7 @@ impl MomentKind {
             MomentKind::PlaceTakenByForce => "A place taken by force",
             MomentKind::FirstToABody => "A Body settled for the first time",
             MomentKind::UnderTheSink => "The world under the Natural Sink",
+            MomentKind::AccordEnded => "An Accord of yours ended",
         }
     }
 
@@ -292,6 +302,8 @@ impl MomentKind {
             // Ticket #86: lives lost read before a place changing hands.
             MomentKind::LostInTransit => 2,
             MomentKind::ControlChanged => 2,
+            // Ticket #538: with a place changing hands, since an ending is often what lets one go.
+            MomentKind::AccordEnded => 2,
             MomentKind::ClimateThreshold | MomentKind::Antarctica | MomentKind::UnderTheSink => 3,
             MomentKind::DecisiveBattle | MomentKind::PlaceTakenByForce => 4,
             // Ticket #261: a rival about to win reads before a Tech and after a lost unit.
@@ -384,11 +396,21 @@ impl Report {
     }
 
     /// The Moments the turn actually stops for: the switched-on kinds, highest severity first,
-    /// ties in the order they happened, at most two.
+    /// ties in the order they happened, at most two. Ticket #538 (version 0.1.0.1): an Accord's
+    /// ending is always shown, beside the two.
     pub fn moments_shown(&self, on: &dyn Fn(MomentKind) -> bool) -> Vec<&Moment> {
         let mut kept: Vec<(usize, &Moment)> = self.moments.iter().enumerate().filter(|(_, m)| on(m.kind)).collect();
         kept.sort_by_key(|(i, m)| (m.kind.rank(), *i));
-        kept.into_iter().take(MOMENTS_PER_TURN).map(|(_, m)| m).collect()
+        let mut capped = 0;
+        kept.into_iter()
+            .filter(|(_, m)| {
+                m.kind == MomentKind::AccordEnded || {
+                    capped += 1;
+                    capped <= MOMENTS_PER_TURN
+                }
+            })
+            .map(|(_, m)| m)
+            .collect()
     }
 }
 
@@ -492,6 +514,18 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("accord_refused", &["faction"]),
     // Ticket #509 (version 0.1.0.0): an Accord the other side would not renew.
     ("accord_let_lapse", &["faction"]),
+    // Ticket #538 (version 0.1.0.1): the warning, and the causes an ending's Moment names.
+    ("accord_ends_soon", &["faction"]),
+    // Ticket #542 (version 0.1.0.1).
+    ("rival_spent_on_yours", &["faction", "n", "place", "standing", "needed"]),
+    ("could_fall", &["place", "faction"]),
+    // Ticket #544 (version 0.1.0.1).
+    ("window_next", &["bodies", "turns", "fuel"]),
+    ("accord_cause_ran_out", &["turns"]),
+    ("accord_cause_not_renewed", &["faction"]),
+    ("accord_cause_called_off", &["faction"]),
+    ("accord_cause_broken", &["faction"]),
+    ("accord_cause_you_broke", &[]),
     ("accord_added", &["faction"]),
     ("trade_struck", &["faction"]),
     ("trade_refused", &["faction"]),
@@ -655,6 +689,11 @@ pub fn ordinal(n: usize) -> String {
 
 /// The same for `[phrase]`.
 pub const PHRASE_ARGS: &[(&str, &[&str])] = &[
+    // Ticket #544 (version 0.1.0.1): the Report's head.
+    ("head", &["clock", "pct"]),
+    ("clock_turn", &["turn"]),
+    ("clock_too_late", &[]),
+    ("clock_none", &[]),
     // Ticket #481 (version 0.09.8): a rival's step in the race to the Moon.
     ("moon_no_shipyard", &["faction"]),
     ("moon_shipyard", &["faction"]),
@@ -727,6 +766,9 @@ pub const RIVAL_ARGS: &[(&str, &[&str])] = &[
     ("propose_trade", &["faction"]),
     ("end_accord", &["faction"]),
     ("renew_accord", &["faction"]),
+    // Ticket #538 (version 0.1.0.1): a rivals' Accord ending.
+    ("accord_lapsed", &["faction"]),
+    ("accord_broke", &["faction"]),
     ("tribute", &["faction"]),
     ("build_facility", &["building", "state"]),
     ("build_facility_ducats", &["building", "state"]),
@@ -813,6 +855,8 @@ pub const MOMENT_ARGS: &[(&str, &[&str])] = &[
     ("first_to_body", &["faction", "body", "colony", "n", "ease"]),
     // Ticket #405 (version 0.09.4): the same, as a Moment.
     ("under_the_sink", &["ease", "custodians"]),
+    // Ticket #538 (version 0.1.0.1): an Accord's end and its cause.
+    ("accord_ended", &["faction", "cause"]),
 ];
 
 impl ReportTable {

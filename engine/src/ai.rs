@@ -143,6 +143,43 @@ impl Game {
         (1.0 + th.emitter_k * (share - fair)).min(th.emitter_cap)
     }
 
+    /// Ticket #531 (version 0.1.0.1): the pressure a seat at `own` of its Victory puts on a leader
+    /// at `lead`: the leader's ramp from `gang_from` to the end, times the seat's trail past
+    /// `gang_ahead` over `gang_full`; nought short of either bar.
+    pub fn gang_pressure_of(lead: f64, own: f64, th: &crate::data::AiThresholds) -> f64 {
+        if lead < th.gang_from || lead - own < th.gang_ahead || th.gang_full <= 0.0 {
+            return 0.0;
+        }
+        let ramp = ((lead - th.gang_from) / (1.0 - th.gang_from).max(1e-9)).clamp(0.0, 1.0);
+        let trail = ((lead - own - th.gang_ahead) / th.gang_full).clamp(0.0, 1.0);
+        ramp * trail
+    }
+
+    /// Ticket #531: this seat's pressure on `rival`, if `rival` is its leader -- the rival highest
+    /// in Victory, by the Victory window's share -- and nought otherwise.
+    pub fn ai_gang_pressure(&self, seat: Seat, rival: Seat) -> f64 {
+        if seat == rival {
+            return 0.0;
+        }
+        let share = |s: Seat| self.progress(s).score();
+        let lead = share(rival);
+        if Seat::ALL.into_iter().any(|r| r != seat && r != rival && share(r) > lead) {
+            return 0.0;
+        }
+        Game::gang_pressure_of(lead, share(seat), &self.tables.ai.thresholds)
+    }
+
+    /// Ticket #531: the most pressure this seat puts on any leader, which draws it to the pack.
+    pub fn ai_gang_felt(&self, seat: Seat) -> f64 {
+        Seat::ALL.into_iter().map(|r| self.ai_gang_pressure(seat, r)).fold(0.0, f64::max)
+    }
+
+    /// Ticket #531: what every hostile act on `rival` is weighed by -- the Custodians' emitter lift,
+    /// times one and the pressure on a leader.
+    pub fn hostile_lift(&self, seat: Seat, rival: Seat) -> f64 {
+        self.emitter_lift(seat, rival) * (1.0 + self.ai_gang_pressure(seat, rival))
+    }
+
     /// Ticket #446 (version 0.09.6): whether this seat has cause against a rival -- Relations at
     /// `war_cause` or worse (−5, Wary), or for the computer Custodians against a rival above a fair
     /// quarter of the emissions, `emitter_cause` (−3). Every hostile act's gate reads this.
@@ -151,7 +188,8 @@ impl Game {
         let bar = if self.emitter_lift(seat, rival) > 1.0 { th.emitter_cause } else { th.war_cause };
         // Ticket #447 (version 0.09.6): a Blockade is cause, at once. Relations fall one a turn of
         // it, so a blockaded seat's warships sat on Hold through the turns that mattered.
-        rival != seat && (self.relations_score(seat, rival) <= bar || self.blockaded_by(seat, rival))
+        // Ticket #531 (version 0.1.0.1): and a runaway leader is cause in itself from half pressure.
+        rival != seat && (self.relations_score(seat, rival) <= bar || self.blockaded_by(seat, rival) || self.ai_gang_pressure(seat, rival) >= th.gang_cause)
     }
 
     /// Ticket #447 (version 0.09.6): whether a place of this seat's is starved by that rival's
@@ -362,14 +400,39 @@ impl Game {
         None
     }
 
+    /// Ticket #530 (version 0.1.0.1): **the race for the Research Lead.** The Lead picks the next
+    /// Tech, and only the Lead's shortlist keeps a place for its gate, so a seat whose gate waits
+    /// races for the Lead: from the turn its gate is open to research, or its first part stands at
+    /// `gate_pick_fraction`, until the gate is researched. The race runs the harder the nearer its
+    /// Victory, at the Victory window's share (the lower part). Nought when not racing.
+    pub fn ai_race_share(&self, seat: Seat) -> f64 {
+        let Some(gate) = self.tables.victory_gate(self.kind(seat)) else { return 0.0 };
+        if self.has_tech(gate) {
+            return 0.0;
+        }
+        // The review: the cheap test first.
+        let open = self.research.current == Some(gate) || self.available_techs().contains(&gate);
+        let p = self.progress(seat);
+        if !open && p.first_fraction_as_it_stands() < self.tables.ai.thresholds.gate_pick_fraction {
+            return 0.0;
+        }
+        p.score().clamp(0.0, 1.0)
+    }
+
+    /// Ticket #530: what the race multiplies a Lab's and an Observatory's weight by.
+    pub fn ai_race_boost(&self, seat: Seat) -> f64 {
+        1.0 + self.tables.ai.thresholds.race_lab_weight * self.ai_race_share(seat)
+    }
+
     fn base_weight(&self, seat: Seat, cat: Cat) -> f64 {
         let w = self.tables.ai_weights(self.kind(seat));
         match cat {
             Cat::Producer => w.build_producer,
             Cat::RaiseIndustry => w.raise_industry,
             Cat::RaiseTier => w.raise_tier,
-            Cat::ResearchLab => w.build_research_lab,
-            Cat::Observatory => w.build_observatory,
+            // Ticket #530 (version 0.1.0.1): the race for the Lead.
+            Cat::ResearchLab => w.build_research_lab * self.ai_race_boost(seat),
+            Cat::Observatory => w.build_observatory * self.ai_race_boost(seat),
             Cat::Habitat => w.build_habitat,
             Cat::LaunchSiteOrShipyard => w.build_launch_site_or_shipyard,
             Cat::ColonyShip => w.build_colony_ship,
@@ -809,10 +872,11 @@ impl Game {
 
     /// Spec 16.2: the resource the seat is shortest of, relative to its next three affordable actions.
     /// Energy is a draining balance, so its shortage is measured in turns of drain over those actions.
-    fn scarcest(&self, seat: Seat) -> Resource {
+    pub fn scarcest(&self, seat: Seat) -> Resource {
         let s = self.seat(seat).stockpile;
         // The three cheapest builds it could afford now stand in for "its next three affordable actions".
-        let mut costs: Vec<(i64, i64)> = Vec::new();
+        // Ticket #537 (version 0.1.0.1): the rows carry tenths.
+        let mut costs: Vec<(f64, i64)> = Vec::new();
         for f in &self.tables.facilities {
             costs.push((f.materials, f.energy_upkeep));
         }
@@ -822,13 +886,15 @@ impl Game {
         for u in &self.tables.units {
             costs.push((u.materials, u.energy_upkeep));
         }
-        costs.sort();
-        let next: Vec<(i64, i64)> = costs.into_iter().filter(|(m, _)| *m as f64 <= s.materials.max(20.0)).take(3).collect();
-        let need_materials: i64 = next.iter().map(|(m, _)| *m).sum::<i64>().max(1);
+        costs.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
+        // Ticket #537: the floor is the cheapest paid row, where it was the literal 20 that row once was.
+        let cheapest = costs.iter().map(|(m, _)| *m).find(|m| *m > 0.0).unwrap_or(0.0);
+        let next: Vec<(f64, i64)> = costs.into_iter().filter(|(m, _)| *m <= s.materials.max(cheapest)).take(3).collect();
+        let need_materials: f64 = next.iter().map(|(m, _)| *m).sum::<f64>().max(1.0);
         let need_upkeep: i64 = next.iter().map(|(_, u)| *u).sum::<i64>();
         let drain = (self.total_upkeep(seat) + need_upkeep - self.energy_production(seat)).max(0);
         let energy_ratio = if drain == 0 { f64::INFINITY } else { s.energy / (3.0 * drain as f64) };
-        let materials_ratio = s.materials / need_materials as f64;
+        let materials_ratio = s.materials / need_materials;
         let has_ships = self.ships.iter().any(|x| x.seat == seat);
         let fuel_ratio = if has_ships { s.fuel / 6.0 } else { f64::INFINITY };
         if energy_ratio <= materials_ratio && energy_ratio <= fuel_ratio {
@@ -1049,7 +1115,7 @@ impl Game {
             // only when no neutral one is worth having.
             let neutral_bonus = if st.control == Control::Neutral { 1.0 } else { th.held_state_weight };
             // Ticket #446 (version 0.09.6): a heavy emitter's Region weighs more to the Custodians.
-            let lift = st.control.controller().map(|r| self.emitter_lift(seat, r)).unwrap_or(1.0);
+            let lift = st.control.controller().map(|r| self.hostile_lift(seat, r)).unwrap_or(1.0);
             targets.push((Place::State(sid), value * neutral_bonus * lift));
         }
         // Ticket #50: any rival's Colony. Ticket #336 (version 0.09.0): weighed by THE PRICE THIS
@@ -1071,7 +1137,7 @@ impl Game {
         for c in &self.colonies {
             if c.control.controller().map(|o| o != seat).unwrap_or(false) {
                 let price = self.influence_needed_for(seat, Place::Colony(c.id)).max(1) as f64;
-                let lift = c.control.controller().map(|r| self.emitter_lift(seat, r)).unwrap_or(1.0);
+                let lift = c.control.controller().map(|r| self.hostile_lift(seat, r)).unwrap_or(1.0);
                 targets.push((Place::Colony(c.id), (th.colony_price_pivot / price).min(3.0) * self.ai_bounty_against(Some(seat), c.id, largest) * lift));
             }
         }
@@ -1363,7 +1429,9 @@ impl Game {
         // --- Earth builds
         for sid in self.directed_states(seat) {
             let free = self.free_slots(sid);
-            let has_launch = self.state(sid).facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite));
+            // Ticket #534 (version 0.1.0.1): one to a Region, and one under construction counts.
+            let has_launch = self.state(sid).facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite))
+                || self.state(sid).queue.iter().any(|b| matches!(b.item, BuildItem::Facility(k) if k.does_the_job_of(FacilityKind::LaunchSite)));
             if free > 0 {
                 for fk in FacilityKind::ALL {
                     // Ticket #181 (version 0.08.0): a Faction builds its own Unique Facility in
@@ -1556,7 +1624,8 @@ impl Game {
                 );
             }
             // Ticket #54: the Strip Permit, on the Prospectors' highest-output state while they are
-            // behind on the Extraction pace. It is free, and its price falls due three turns later.
+            // behind on the Extraction pace. Its Ducats are paid at the order (ticket #537, version 0.1.0.1),
+            // its Baseline and Unrest three turns later.
             if kind == FactionKind::Prospectors
                 && behind_on_extraction
                 && !self.state(sid).strip_permit_used
@@ -2212,7 +2281,9 @@ impl Game {
                     } else if picks.never == Some(t) || picks.last.contains(&t) {
                         cap
                     } else {
-                        th.directive_when_indifferent
+                        // Ticket #530 (version 0.1.0.1): a seat racing for the Lead sends less of its
+                        // Research to the Sink, the nearer its Victory.
+                        ((th.directive_when_indifferent as f64) * (1.0 - self.ai_race_share(seat))).round() as _
                     }
                 }
             };
@@ -2352,7 +2423,7 @@ impl Game {
                     push(
                         vec![Order::Agitate { state: sid }],
                         Cat::Agitate,
-                        self.base_weight(seat, Cat::Agitate) * (1.0 + n / ag.max) * self.emitter_lift(seat, holder),
+                        self.base_weight(seat, Cat::Agitate) * (1.0 + n / ag.max) * self.hostile_lift(seat, holder),
                         1.0,
                         1.0,
                         opp,
@@ -2380,7 +2451,7 @@ impl Game {
                     push(
                         vec![Order::Smear { target: rival, amount: step }],
                         Cat::Smear,
-                        self.base_weight(seat, Cat::Smear) * (1.0 + over / fair) * self.emitter_lift(seat, rival),
+                        self.base_weight(seat, Cat::Smear) * (1.0 + over / fair) * self.hostile_lift(seat, rival),
                         1.0,
                         1.0,
                         opp,
@@ -2396,7 +2467,7 @@ impl Game {
         // Ticket #277 (version 0.08.5): and where credits are to be had the seat buys them; a
         // Greenwash is for the seat that cannot -- the seller Hostile or not offering, or itself the seller.
         let mut credits_to_be_had = false;
-        if let Some(seller) = self.credit_seller().filter(|s| *s != seat) {
+        if let Some(seller) = self.credit_seller().filter(|s| *s != seat && !self.withholds_credits(*s, seat)) {
             let c = self.tables.carbon_credits.clone();
             let fair = self.tables.influence.blame.fair_share;
             let over = self.blame_share(seat) - fair;
@@ -2432,10 +2503,20 @@ impl Game {
             let step = th.influence_step;
             let price = step * g.ducats_per_influence;
             if over > 0.0 && !credits_to_be_had && allotment >= step && self.seat(seat).stockpile.ducats >= (price + g.ai_ducats_reserve) as f64 {
+                // Ticket #535 (version 0.1.0.1), at the designer's word: the campaign costs Relations
+                // with every other Faction, and the seat weighs what it would lose with those it
+                // values -- an Accord partner, or one that stands Cordial or better toward it.
+                let valued_loss: f64 = seat
+                    .others()
+                    .into_iter()
+                    .filter(|o| self.accords.iter().any(|acc| acc.holds(seat, *o)) || matches!(self.relations_level(*o, seat), "Cordial" | "Friendly"))
+                    .map(|o| self.greenwash_relations_fall(o, seat, step))
+                    .sum();
+                let relations = 1.0 / (1.0 + th.greenwash_relations_cost * valued_loss);
                 push(
                     vec![Order::Greenwash { amount: step }],
                     Cat::Greenwash,
-                    self.base_weight(seat, Cat::Greenwash) * (1.0 + over / fair),
+                    self.base_weight(seat, Cat::Greenwash) * (1.0 + over / fair) * relations,
                     1.0,
                     1.0,
                     1.0,
@@ -2485,7 +2566,8 @@ impl Game {
             // term has somewhere to matter. In the same offer, because one Accord stands per pair
             // and a non-aggression Accord struck first would shut Passage out for good: offered on
             // its own it was struck in no seating of eighty games.
-            if self.passage_worth_offering(seat, other) {
+            // Ticket #531 (version 0.1.0.1): and to the pack while a leader runs, so its Armies may cross.
+            if self.passage_worth_offering(seat, other) || self.ai_gang_felt(seat) > 0.0 {
                 terms.push(Term::Passage);
             }
             // Ticket #325 (version 0.08.8): and Refuel in the same offer, where the other holds a
@@ -2512,7 +2594,8 @@ impl Game {
             push(
                 vec![Order::ProposeAccord { to: other, terms }],
                 Cat::Accord,
-                self.base_weight(seat, Cat::Accord),
+                // Ticket #531: the pack draws together while a leader runs.
+                self.base_weight(seat, Cat::Accord) * (1.0 + self.ai_gang_felt(seat)),
                 1.0,
                 1.0,
                 1.0,
@@ -2532,7 +2615,7 @@ impl Game {
             let long = goods.iter().filter(|(r, n)| Some(*r) != short && n * price(*r) > th.trade_long).max_by(|a, b| (a.1 * price(a.0)).partial_cmp(&(b.1 * price(b.0))).unwrap_or(std::cmp::Ordering::Equal)).map(|(r, _)| *r);
             let partner = Seat::ALL
                 .into_iter()
-                .filter(|o| *o != seat && !self.hostile(seat, *o) && !self.offer_waits(seat, *o) && !self.refused_recently(seat, *o))
+                .filter(|o| *o != seat && !self.hostile(seat, *o) && !self.offer_waits(seat, *o) && !self.refused_recently(seat, *o) && self.ai_gang_pressure(seat, *o) == 0.0)
                 .max_by_key(|o| self.relations_score(seat, *o));
             if let (Some(short), Some(long), Some(other)) = (short, long, partner) {
                 let ask = th.trade_ask;
@@ -2883,7 +2966,9 @@ impl Game {
             // the same candidate. The plain Refuel from what is held stays on offer beside it, so a
             // turn whose Ducats are held for something else still fills what it can.
             let top_up = self.ai_fuel_top_up(seat, self.tank_of(seat, s.kind) - s.fuel);
-            if s.fuel < self.tank_of(seat, s.kind) && self.refuelling_station(seat, body, orbit) && !ready_to_fire {
+            // Ticket #533 (version 0.1.0.1): a refuel never uses the Ship's turn, so a ready Missile
+            // Carrier fills its tank beside its Launch; only the orbit change below still waits on it.
+            if s.fuel < self.tank_of(seat, s.kind) && self.refuelling_station(seat, body, orbit) {
                 let note = format!("refuel {} at {} ({} of {} in the tank)", ship_name, self.orbit_name(body, orbit), figure(s.fuel), figure(self.tank_of(seat, s.kind)));
                 if let Some(buy) = top_up {
                     push(vec![buy, Order::Refuel { ship: s.id }], Cat::Transit, self.base_weight(seat, Cat::Transit), gap_for(Cat::Transit, None), 1.0, 1.0, format!("{note}, buying the rest"), None);
@@ -3006,6 +3091,20 @@ impl Game {
                         room -= n;
                     }
                     let n = capacity - s.colonists - room;
+                    // Ticket #533 (version 0.1.0.1), at the designer's word: a lift never uses the
+                    // Ship's turn and boards before it moves, so a lift that makes the four a founding
+                    // wants is offered with the crossing too -- lift and leave in one turn -- at the
+                    // crossing's weight, beside the lift alone.
+                    if n > 0 && s.colonists + n >= self.tables.emigrants.found_with {
+                        let d = if ferrying { archive_body.unwrap_or_else(|| self.best_body_for(seat, behind)) } else { self.best_body_for(seat, behind) };
+                        if d != body {
+                            let window = self.window_preference(seat, body, d);
+                            let gather = if gathering && capital_has_room && Some(d) == capital_body { capital_chase } else { 1.0 };
+                            let mut go = loads.clone();
+                            go.push(Order::Transit { ship: s.id, to: d, slot: self.ai_destination_orbit(seat, s, d) });
+                            push(go, Cat::Transit, self.base_weight(seat, Cat::Transit) * window * gather, gap_for(Cat::Transit, None), 1.0, 1.0, format!("load {} Colonists onto {} and send it to {}", n, ship_name, self.tables.body(d).name), None);
+                        }
+                    }
                     if n > 0 {
                         let opp = if presence_needed <= n { m.opportunity } else { 1.0 };
                         push(loads, Cat::LoadUnload, self.base_weight(seat, Cat::LoadUnload), gap_for(Cat::LoadUnload, None), 1.0, opp, format!("load {} Colonists onto {}", n, ship_name), None);
@@ -3126,6 +3225,29 @@ impl Game {
             if s.kind == UnitKind::Carrier && s.army.is_none() && body != BodyId::Earth {
                 push(vec![Order::Transit { ship: s.id, to: BodyId::Earth, slot: self.ai_destination_orbit(seat, s, BodyId::Earth) }], Cat::Transit, self.base_weight(seat, Cat::Transit) * 0.8, 1.0, 1.0, 1.0, format!("send {} back to Earth", ship_name), None);
             }
+            // Load an Army aboard a Carrier at Earth for an attack on a rival Colony (ticket #43).
+            // Ticket #319 (version 0.08.8): any seat that wants a Carrier loads one. Ticket #532
+            // (version 0.1.0.1), at the designer's word: out of the warship block below, which an
+            // empty Carrier -- no warship, no Army aboard -- never entered, so no computer seat had
+            // loaded one since at least #319.
+            if card.carries_army && s.army.is_none() && body == BodyId::Earth && (kind == FactionKind::Prospectors || self.carrier_target_exists(seat)) {
+                // Ticket #46: the Army lifts from its own state. Ticket #532: by the rule's own
+                // check, so a state with no Launch Site lifts into low orbit.
+                let army = self.armies.iter().find_map(|a| match a.at {
+                    ArmyAt::Place(Place::State(st))
+                        if !a.standing
+                            && self.army_seat(a) == Some(seat)
+                            && self.state(st).control.director() == Some(seat)
+                            && self.check_order(seat, &[], &Order::Load { ship: s.id, colonists: 0, from: LoadSource::State(st), army: Some(a.id) }).is_ok() =>
+                    {
+                        Some((a.id, st))
+                    }
+                    _ => None,
+                });
+                if let Some((aid, st)) = army {
+                    push(vec![Order::Load { ship: s.id, colonists: 0, from: LoadSource::State(st), army: Some(aid) }], Cat::LoadUnload, self.base_weight(seat, Cat::LoadUnload) * 0.8, 1.0, 1.0, 1.0, format!("load an Army onto {}", ship_name), None);
+                }
+            }
             if s.kind.is_warship() || s.army.is_some() {
                 // Warships go where the Faction has or wants Colonies, or where a rival is: any
                 // rival, nearest by transit turns first (ticket #50).
@@ -3140,26 +3262,6 @@ impl Game {
                     let threat = if self.enemy_present_or_inbound(seat, d) { m.threat } else { 1.0 };
                     let base = self.base_weight(seat, Cat::Transit) * if kind == FactionKind::Prospectors { 0.9 } else { 0.6 };
                     push(vec![Order::Transit { ship: s.id, to: d, slot: self.ai_destination_orbit(seat, s, d) }], Cat::Transit, base, 1.0, threat, 1.0, format!("send {} to {}", ship_name, self.tables.body(d).name), None);
-                }
-                // Load an Army aboard a Carrier at Earth for an attack on a rival Colony (ticket #43).
-                // Ticket #319 (version 0.08.8): any seat that wants a Carrier loads one.
-                if card.carries_army && s.army.is_none() && body == BodyId::Earth && (kind == FactionKind::Prospectors || self.carrier_target_exists(seat)) {
-                    // Ticket #46: the Army lifts from its own state, which needs a working Launch Site.
-                    let army = self.armies.iter().find_map(|a| match a.at {
-                        ArmyAt::Place(Place::State(st))
-                            if !a.standing
-                                && self.army_seat(a) == Some(seat)
-                                && self.state(st).control.director() == Some(seat)
-                                && self.state(st).facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working()) =>
-                        {
-                            Some((a.id, st))
-                        }
-                        _ => None,
-                    });
-                    let enemy_colony = kind == FactionKind::Prospectors || self.carrier_target_exists(seat);
-                    if let (Some((aid, st)), true) = (army, enemy_colony) {
-                        push(vec![Order::Load { ship: s.id, colonists: 0, from: LoadSource::State(st), army: Some(aid) }], Cat::LoadUnload, self.base_weight(seat, Cat::LoadUnload) * 0.8, 1.0, 1.0, 1.0, format!("load an Army onto {}", ship_name), None);
-                    }
                 }
                 if let Some(aid) = s.army.filter(|_| body != BodyId::Earth) {
                     {
@@ -3286,11 +3388,11 @@ impl Game {
                 None
             };
             match (attack, blockade) {
-                (Some(odds), _) => push(vec![Order::ShipStance { body, stance: Stance::Attack }], Cat::StanceAttack, self.base_weight(seat, Cat::StanceAttack) * Seat::ALL.into_iter().filter(|r| *r != seat && self.ships.iter().any(|x| x.seat == *r && x.at == ShipAt::Body(body))).map(|r| self.emitter_lift(seat, r)).fold(1.0, f64::max), 1.0, 1.0, 1.0, format!("Attack at {} (odds {:.0}%)", self.tables.body(body).name, odds * 100.0), Some(key.clone())),
+                (Some(odds), _) => push(vec![Order::ShipStance { body, stance: Stance::Attack }], Cat::StanceAttack, self.base_weight(seat, Cat::StanceAttack) * Seat::ALL.into_iter().filter(|r| *r != seat && self.ships.iter().any(|x| x.seat == *r && x.at == ShipAt::Body(body))).map(|r| self.hostile_lift(seat, r)).fold(1.0, f64::max), 1.0, 1.0, 1.0, format!("Attack at {} (odds {:.0}%)", self.tables.body(body).name, odds * 100.0), Some(key.clone())),
                 (None, Some(target)) => push(
                     vec![Order::ShipStance { body, stance: Stance::Blockade }],
                     Cat::StanceBlockade,
-                    self.base_weight(seat, Cat::StanceBlockade) * target.control.director().map(|h| self.emitter_lift(seat, h)).unwrap_or(1.0),
+                    self.base_weight(seat, Cat::StanceBlockade) * target.control.director().map(|h| self.hostile_lift(seat, h)).unwrap_or(1.0),
                     1.0,
                     1.0,
                     1.0,
@@ -3322,7 +3424,7 @@ impl Game {
                         if !holds {
                             continue;
                         }
-                        push(vec![Order::Bombard { ship: s.id, colony: c.id }], Cat::StanceAttack, self.base_weight(seat, Cat::StanceAttack), 1.0, 1.0, 1.0, format!("Bombard {} from {}", self.place_name(Place::Colony(c.id)), self.ship_name(s)), None);
+                        push(vec![Order::Bombard { ship: s.id, colony: c.id }], Cat::StanceAttack, self.base_weight(seat, Cat::StanceAttack) * c.control.director().map(|h| self.hostile_lift(seat, h)).unwrap_or(1.0), 1.0, 1.0, 1.0, format!("Bombard {} from {}", self.place_name(Place::Colony(c.id)), self.ship_name(s)), None);
                     }
                 }
             }
@@ -3350,7 +3452,7 @@ impl Game {
                     at == (body, orbit)
                 });
                 if let Some(target) = touched {
-                    push(vec![Order::Launch { ship: s.id, target }], Cat::Launch, self.base_weight(seat, Cat::Launch), 1.0, 1.0, 1.0, format!("Launch at {} from {}", self.place_name(target), self.ship_name(s)), None);
+                    push(vec![Order::Launch { ship: s.id, target }], Cat::Launch, self.base_weight(seat, Cat::Launch) * self.place_director(target).map(|h| self.hostile_lift(seat, h)).unwrap_or(1.0), 1.0, 1.0, 1.0, format!("Launch at {} from {}", self.place_name(target), self.ship_name(s)), None);
                 }
             }
             // Ticket #343 (version 0.09.1): a carrier at the right Body in the wrong orbit moves to
@@ -3433,7 +3535,7 @@ impl Game {
                 }
             }
             match attack {
-                Some(odds) => push(vec![Order::ArmyStance { place, stance: Stance::Attack }], Cat::StanceAttack, self.base_weight(seat, Cat::StanceAttack) * 1.5 * self.place_director(place).map(|h| self.emitter_lift(seat, h)).unwrap_or(1.0), 1.0, 1.0, 1.0, format!("Attack at {} (odds {:.0}%)", self.place_name(place), odds * 100.0), Some(key.clone())),
+                Some(odds) => push(vec![Order::ArmyStance { place, stance: Stance::Attack }], Cat::StanceAttack, self.base_weight(seat, Cat::StanceAttack) * 1.5 * self.place_director(place).map(|h| self.hostile_lift(seat, h)).unwrap_or(1.0), 1.0, 1.0, 1.0, format!("Attack at {} (odds {:.0}%)", self.place_name(place), odds * 100.0), Some(key.clone())),
                 // Ticket #297 (version 0.08.6): dig in rather than hold where a rival's Army stands
                 // next door and there is no cause to attack, and wherever this seat occupies -- an
                 // occupier stays (#284), and dug in it cannot leave. Hold is what is left.
@@ -3477,7 +3579,7 @@ impl Game {
                             }
                             let value = (self.tables.state(*n).industry_level + self.tables.state(*n).size) as f64 / 7.0;
                             let orders: Vec<Order> = marchable.iter().map(|aid| Order::MoveArmy { army: *aid, to: *n }).collect();
-                            push(orders, Cat::StanceAttack, self.base_weight(seat, Cat::StanceAttack) * (1.0 + value) * own_army * ctrl.controller().map(|h| self.emitter_lift(seat, h)).unwrap_or(1.0), 1.0, 1.0, 1.0, format!("march the stack of {} on {} (odds {:.0}%)", marchable.len(), self.tables.state(*n).name, odds * 100.0), None);
+                            push(orders, Cat::StanceAttack, self.base_weight(seat, Cat::StanceAttack) * (1.0 + value) * own_army * ctrl.controller().map(|h| self.hostile_lift(seat, h)).unwrap_or(1.0), 1.0, 1.0, 1.0, format!("march the stack of {} on {} (odds {:.0}%)", marchable.len(), self.tables.state(*n).name, odds * 100.0), None);
                         }
                     }
                 }
@@ -3508,7 +3610,7 @@ impl Game {
                                 wars_opened += 1;
                             }
                             let value = (self.tables.state(*n).industry_level + self.tables.state(*n).size) as f64 / 7.0;
-                            push(vec![Order::MoveArmy { army: *aid, to: *n }], Cat::StanceAttack, self.base_weight(seat, Cat::StanceAttack) * (1.0 + value) * own_army * ctrl.controller().map(|h| self.emitter_lift(seat, h)).unwrap_or(1.0), 1.0, 1.0, 1.0, format!("march on {} (odds {:.0}%)", self.tables.state(*n).name, odds * 100.0), None);
+                            push(vec![Order::MoveArmy { army: *aid, to: *n }], Cat::StanceAttack, self.base_weight(seat, Cat::StanceAttack) * (1.0 + value) * own_army * ctrl.controller().map(|h| self.hostile_lift(seat, h)).unwrap_or(1.0), 1.0, 1.0, 1.0, format!("march on {} (odds {:.0}%)", self.tables.state(*n).name, odds * 100.0), None);
                         }
                     }
                 }

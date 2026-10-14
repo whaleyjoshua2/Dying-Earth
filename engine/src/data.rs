@@ -169,7 +169,8 @@ pub struct StateCard {
 pub struct FacilityCard {
     pub id: FacilityKind,
     pub name: String,
-    pub materials: i64,
+    /// Ticket #537 (version 0.1.0.1): to the tenth, since the +10% put some on a half (27.5).
+    pub materials: f64,
     /// Ticket #332 (version 0.09.0): the Widgets the build needs, four for every turn it took
     /// under the flat count this replaces. It completes at the Resolution its place's Widgets
     /// reach it, so a place making four a turn builds it at the old pace and a busier one slower.
@@ -319,7 +320,8 @@ pub struct WidgetsCard {
 pub struct ModuleCard {
     pub id: ModuleKind,
     pub name: String,
-    pub materials: i64,
+    /// Ticket #537 (version 0.1.0.1): to the tenth, since the +10% put some on a half (27.5).
+    pub materials: f64,
     /// Ticket #332 (version 0.09.0): the Widgets the build needs, four for every former turn.
     pub widgets: u32,
     pub energy_upkeep: i64,
@@ -371,7 +373,8 @@ pub struct MassDriverCard {
 pub struct UnitCard {
     pub id: UnitKind,
     pub name: String,
-    pub materials: i64,
+    /// Ticket #537 (version 0.1.0.1): to the tenth, since the +10% put some on a half (27.5).
+    pub materials: f64,
     /// Ticket #332 (version 0.09.0): the Widgets the build needs, four for every former turn.
     pub widgets: u32,
     pub energy_upkeep: i64,
@@ -764,7 +767,7 @@ pub struct FactionCard {
     pub lift_population_multiplier: f64,
     /// Coach Class: what a Colony Ship costs, in place of the units.toml figure.
     #[serde(default)]
-    pub colony_ship_materials: Option<i64>,
+    pub colony_ship_materials: Option<f64>,
     /// Ticket #83 (version 0.06.0): every Ship's Materials, times this, rounded down (the
     /// Arkwrights' 0.85).
     #[serde(default = "one_f64")]
@@ -784,6 +787,10 @@ pub struct FactionCard {
     /// about them and not an oversight.
     #[serde(default = "resentment_default")]
     pub resentment: f64,
+    /// Ticket #535 (version 0.1.0.1), at the designer's word: how far this Faction's Relations
+    /// toward another fall for every `greenwash.resentment_per` Influence that other spends on a
+    /// Greenwash -- the Custodians 0.4, the Arkwrights 0.2, the Archivists 0.1, the Prospectors 0.05.
+    pub greenwash_resentment: f64,
     /// A Space Station's Materials, times this.
     #[serde(default = "one_f64")]
     pub station_materials_multiplier: f64,
@@ -1138,6 +1145,8 @@ pub struct GreenwashTable {
     pub ducats_per_influence: i64,
     /// The Ducats a computer seat keeps back past the campaign's price before it will pay for one.
     pub ai_ducats_reserve: i64,
+    /// Ticket #535 (version 0.1.0.1): the Influence a Faction's `greenwash_resentment` is per.
+    pub resentment_per: i64,
 }
 
 /// Ticket #53 (version 0.05): Blame, in `influence.toml` under `[blame]`.
@@ -1499,16 +1508,39 @@ pub struct AiThresholds {
     pub warships_wanted_blockaded: u32,
     pub evade_damage_fraction: f64,
     pub influence_step: i64,
+    /// Ticket #535 (version 0.1.0.1): how hard the Relations a Greenwash costs with valued Factions
+    /// weigh against it -- the weight over (1 + this x the points lost).
+    pub greenwash_relations_cost: f64,
     /// Ticket #75: a held state's worth on the Influence target list, as a share of a neutral one's.
     pub held_state_weight: f64,
     /// Ticket #336 (version 0.09.0): the price a rival's Colony is weighed against on the same
     /// list -- the weight is this over what the seat would pay, so the cheapest place ranks first.
     #[serde(default = "colony_price_pivot_default")]
     pub colony_price_pivot: f64,
-    /// Ticket #84 (version 0.06.0): as Research Lead the AI picks its Victory gate once its first
-    /// part is past this fraction of its bar, or from this turn, whichever comes first.
+    /// Ticket #84 (version 0.06.0): as Research Lead the AI picked its Victory gate once its first
+    /// part was past this fraction of its bar. Ticket #530 (version 0.1.0.1): it takes the gate
+    /// whenever offered, and this is where the race for the Lead starts, if the gate is not open
+    /// first; `gate_pick_turn` is gone.
     pub gate_pick_fraction: f64,
-    pub gate_pick_turn: u32,
+    /// Ticket #530 (version 0.1.0.1): how hard a seat racing for the Research Lead leans to Labs and
+    /// Observatories: their weight x(1 + this x its Victory share).
+    #[serde(default = "one_f64")]
+    pub race_lab_weight: f64,
+    /// Ticket #531 (version 0.1.0.1): the pack on a runaway leader. A rival is a seat's leader at
+    /// `gang_from` of its Victory or more and `gang_ahead` or more above the seat; the pressure is
+    /// the leader's ramp from `gang_from` to the end, times the seat's trail past `gang_ahead`
+    /// over `gang_full`. From `gang_cause` the leader is cause in itself; the pack's Accords take a
+    /// bar `gang_accept_relax` x the pressure lower.
+    #[serde(default)]
+    pub gang_from: f64,
+    #[serde(default)]
+    pub gang_ahead: f64,
+    #[serde(default)]
+    pub gang_full: f64,
+    #[serde(default)]
+    pub gang_cause: f64,
+    #[serde(default)]
+    pub gang_accept_relax: f64,
     /// Ticket #236 (version 0.08.3): what a seat directs away from the shared Tech, by how much it
     /// wants the Tech under research. Before this it went to its cap on turn 2 and never moved,
     /// which made any contribution threshold unreachable and the shared-pot rule a flat tax.
@@ -1579,13 +1611,13 @@ struct BodiesFile {
     orbit_change_fuel: i64,
     /// Ticket #480 (version 0.09.8): what a move to or from a far orbit costs from the tank.
     #[serde(default = "forty")]
-    station_materials: i64,
+    station_materials: f64,
     /// Ticket #57: how far a Colony Slot's own yields may fall either side of its Body's.
     #[serde(default = "quarter")]
     slot_yield_spread: f64,
 }
-fn forty() -> i64 {
-    40
+fn forty() -> f64 {
+    40.0
 }
 fn quarter() -> f64 {
     0.25
@@ -1627,6 +1659,8 @@ pub struct StripPermitTable {
     pub baseline_rise: f64,
     /// What its Unrest rises by when it ends.
     pub unrest: f64,
+    /// Ticket #537 (version 0.1.0.1): its price in Ducats, where it was free.
+    pub ducats: i64,
 }
 
 /// Ticket #53 (version 0.05): Neutral Development, in `nation_states.toml` under `[development]`.
@@ -1677,7 +1711,8 @@ pub struct TierCard {
     pub name: String,
     pub cap: u32,
     pub colonists: u32,
-    pub materials: u32,
+    /// Ticket #537 (version 0.1.0.1): to the tenth, since the +10% put some on a half (27.5).
+    pub materials: f64,
     pub widgets: u32,
     /// Ticket #503 (version 0.1.0.0): at most one place on a Body stands at this tier, the first to
     /// complete it, and it holds it for good, through trade and capture -- the Colonial Capital.
@@ -2040,7 +2075,7 @@ pub struct Tables {
     /// Ticket #335 (version 0.09.0): the Fuel an orbit change takes from a Ship's own tank.
     pub orbit_change_fuel: i64,
     /// Ticket #46: what a station costs.
-    pub station_materials: i64,
+    pub station_materials: f64,
     /// Ticket #57: how far a Colony Slot's own four yields may fall either side of its Body's.
     pub slot_yield_spread: f64,
     /// Ticket #57: the Keplerian elements of Earth and Mars, and the transit table (`ephemeris.toml`).
@@ -2742,7 +2777,7 @@ impl Tables {
         crate::report::render(
             &self.faction(kind).signature,
             &[
-                ("scrubber_materials", crate::state::figure(s.materials as f64)),
+                ("scrubber_materials", crate::state::figure(s.materials)),
                 ("scrubber_widgets", crate::state::figure(s.widgets as f64)),
                 ("scrubber_upkeep", crate::state::figure(s.energy_upkeep as f64)),
                 ("scrubber_sink", format!("{:.1}", s.sink_per_turn)),

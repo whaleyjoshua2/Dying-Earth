@@ -446,6 +446,9 @@ enum Action {
     AnswerOffer(usize, bool),
     /// Ticket #58: a Report line was clicked; go where it points.
     GoTo(ReportPlace),
+    /// Ticket #538 (version 0.1.0.1): an Accord's warning line was clicked; the Factions window,
+    /// where Renew stands.
+    OpenFactions,
     ChooseFaction(FactionKind),
     NewGame(FactionKind, StateId),
     /// Ticket #169 (version 0.07.5): the Tutorial button on the title screen.
@@ -1580,6 +1583,10 @@ pub fn draw(
                 }
                 view.attack_preview = false;
             }
+            Action::OpenFactions => {
+                view.popup = Popup::None;
+                view.show_factions = true;
+            }
             Action::Spectate => {
                 session.spectate();
                 *view = ViewState::default();
@@ -2509,7 +2516,10 @@ fn bar_resource_with(ui: &mut Ui, icons: &Icons, key: &str, word: &str, value: S
 }
 
 /// The Influence figure's hover, lifted out of the bar when ticket #128 moved the figure.
-const INFLUENCE_HOVER: &str = "The Allotment is what your places and buildings give each turn; bought Influence comes from the Trading window at 2 Ducats each.";
+/// Ticket #537 (version 0.1.0.1): the price read from the table, where the hover said 2 in words.
+fn influence_hover(game: &Game) -> String {
+    format!("The Allotment is what your places and buildings give each turn; bought Influence comes from the Trading window at {} Ducats each.", game.tables.ducats.per_influence)
+}
 
 /// Ticket #128 (version 0.07.2): a button of the bar's second row, one step larger than egui's
 /// default -- "make buttons slightly larger" -- and naming its key in parentheses as the text.
@@ -2623,7 +2633,7 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
                 let influence = if bought > 0 { format!("{} / {} ({} free + {} bought)", influence_left, s.allotment + bought, s.allotment, bought) } else { format!("{} / {}", influence_left, s.allotment) };
                 // Ticket #112 (version 0.07.1): Influence now has a glyph, so on the bar it follows the
                 // same rule the five resources do -- the picture stands in place of the word.
-                bar_resource(ui, icons, "influence", "Influence", influence, INFLUENCE_HOVER.to_string());
+                bar_resource(ui, icons, "influence", "Influence", influence, influence_hover(game));
                 ui.separator();
             }
             // Ticket #112 (version 0.07.1): the bar carries the FIGURE and the hover carries the
@@ -3085,6 +3095,14 @@ fn faction_coloured(ui: &Ui, game: &Game, session: &Session, text: &str, style: 
 
 /// Ticket #431 (version 0.09.5): one Report line, a way to its place where it has one.
 fn report_line_ui(ui: &mut Ui, game: &Game, session: &Session, l: &dying_earth_engine::report::ReportLine, actions: &mut Vec<Action>) {
+    // Ticket #538 (version 0.1.0.1): an Accord in its last turn opens the Factions window.
+    if l.kind == dying_earth_engine::report::LineKind::Accord {
+        let text = faction_coloured(ui, game, session, &l.text, egui::TextStyle::Button);
+        if ui.add(egui::Button::new(text).frame(false)).on_hover_text("Renew it in the Factions window").clicked() {
+            actions.push(Action::OpenFactions);
+        }
+        return;
+    }
     match l.place {
         Some(place) => {
             // Ticket #127 (version 0.07.2): a line that points somewhere wears the glyph of what it
@@ -4993,6 +5011,8 @@ struct RosterRow {
     /// row of a seat that gives no orders -- and it wears no ring at all.
     mark: Option<bool>,
     jump: Option<(View, Selection)>,
+    /// Ticket #536 (version 0.1.0.1): a Colony Ship's glyph and "3/6", beside the button.
+    room: Option<ColonistRoom>,
 }
 
 /// A roster group: its heading and the line shown when it is empty.
@@ -5035,6 +5055,9 @@ fn roster_group(ui: &mut Ui, group: RosterGroup, rows: Vec<RosterRow>, marks: bo
             }
             if resp.clicked() {
                 *jump = row.jump;
+            }
+            if let Some(room) = &row.room {
+                colonist_room_label(ui, room);
             }
             if let Some(wants) = row.mark {
                 order_ring(ui, wants);
@@ -5097,9 +5120,7 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, seat: Seat, marks: boo
                 figure(s.fuel),
                 tank
             );
-            if s.colonists > 0 {
-                text.push_str(&format!(", {} Colonists aboard", s.colonists));
-            }
+            // Ticket #536 (version 0.1.0.1): the Colonists are the row's glyph and "3/6" now.
             if s.army.is_some() {
                 text.push_str(", an Army aboard");
             }
@@ -5149,7 +5170,7 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, seat: Seat, marks: boo
                 tank
             );
             // Ticket #374 (version 0.09.2): the row opens the SHIP'S card, now that a Ship has one.
-            ships_rows.push(RosterRow { kind: Kind::of_unit(s.kind), text, tip: Some(tip), mark: marks.then_some(!ordered), jump: Some((View::Solar, Selection::Ship(s.id))) });
+            ships_rows.push(RosterRow { kind: Kind::of_unit(s.kind), text, tip: Some(tip), mark: marks.then_some(!ordered), jump: Some((View::Solar, Selection::Ship(s.id))), room: colonist_room(game, s) });
         }
     }
     for s in game.ships.iter().filter(|s| s.seat == seat) {
@@ -5165,6 +5186,7 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, seat: Seat, marks: boo
                 // Ticket #374 (version 0.09.2): a Ship in flight has a card too, so the row opens it
                 // where it used to select nothing.
                 jump: Some((View::Solar, Selection::Ship(s.id))),
+                room: colonist_room(game, s),
             });
         }
     }
@@ -5208,7 +5230,7 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, seat: Seat, marks: boo
             a.stance.one_liner(false),
             game.tables.unrest.army_threshold
         );
-        army_rows.push((where_, RosterRow { kind: Kind::Army, text, tip: Some(tip), mark: None, jump: target }));
+        army_rows.push((where_, RosterRow { kind: Kind::Army, text, tip: Some(tip), mark: None, jump: target, room: None }));
     }
     army_rows.sort_by(|a, b| a.0.cmp(&b.0));
     roster_group(ui, RosterGroup { name: "Armies", empty: "  none" }, army_rows.into_iter().map(|(_, r)| r).collect(), marks, jump);
@@ -5232,7 +5254,7 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, seat: Seat, marks: boo
             c.modules.iter().filter(|m| m.kind != ModuleKind::Core && m.kind != ModuleKind::Archive).count(),
             if building > 0 { format!(", {building} building") } else { String::new() }
         );
-        colony_rows.push(RosterRow { kind: Kind::of_colony(c), text, tip: None, mark: marks.then_some(!ordered), jump: Some((View::Surface(c.body), Selection::Colony(c.id))) });
+        colony_rows.push(RosterRow { kind: Kind::of_colony(c), text, tip: None, mark: marks.then_some(!ordered), jump: Some((View::Surface(c.body), Selection::Colony(c.id))), room: None });
     }
     roster_group(ui, RosterGroup { name: "Colonies and stations", empty: "  none; a Colony Ship founds one" }, colony_rows, marks, jump);
 
@@ -5243,7 +5265,7 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, seat: Seat, marks: boo
         let building = st.queue.len();
         let ordered = building > 0 || pending.iter().any(|o| roster_order_touches_state(o, sid));
         let text = format!("{}{}: {} Facilities, {} free slot(s){}", tag("Region"), game.tables.state(sid).name, st.facilities.len(), game.free_slots(sid), if building > 0 { format!(", {building} building") } else { String::new() });
-        state_rows.push(RosterRow { kind: Kind::Region, text, tip: None, mark: marks.then_some(!ordered), jump: Some((View::Surface(BodyId::Earth), Selection::State(sid))) });
+        state_rows.push(RosterRow { kind: Kind::Region, text, tip: None, mark: marks.then_some(!ordered), jump: Some((View::Surface(BodyId::Earth), Selection::State(sid))), room: None });
     }
     roster_group(ui, RosterGroup { name: "Regions", empty: "  none" }, state_rows, marks, jump);
 }
@@ -5497,6 +5519,59 @@ const CHANGE_BUTTONS_WIDTH: f32 = 196.0;
 /// Ticket #452 (version 0.09.6): the Blame hover, cut at the designer's word and written once, where
 /// the Faction window and the Climate Panel each carried four long lines of it, word for word.
 const BLAME_HOVER: &str = "Blame: CO2 this Faction's places emitted, less what it removed (Scrubbers, Nature Reserves, the Custodians' Sink Directive).\nAbove a quarter share: Influence thresholds rise up to +50% where it doesn't hold, and every rival likes it a point less per step.";
+
+/// Ticket #535 (version 0.1.0.1), at the designer's word: what a Greenwash of this much costs the
+/// campaigner with each rival, to the hundredth: *"Relations: Custodians -0.2, Arkwrights -0.1"*.
+fn greenwash_relations_line(game: &Game, me: Seat, amount: i64) -> String {
+    let parts: Vec<String> = me
+        .others()
+        .into_iter()
+        .map(|o| {
+            let fall = game.greenwash_relations_fall(o, me, amount);
+            if fall < 0.005 {
+                return format!("{} 0", game.seat_name(o));
+            }
+            let fall = format!("{fall:.2}");
+            format!("{} -{}", game.seat_name(o), fall.trim_end_matches('0').trim_end_matches('.'))
+        })
+        .collect();
+    format!("Relations: {}", parts.join(", "))
+}
+
+/// Ticket #532 (version 0.1.0.1), at the designer's word: what a Blame line said after its ppm, on
+/// its hover -- three lines at most, a part shown only when it is not zero. The seat's own panel
+/// draws its share as a bar, so its hover leaves the share out.
+fn blame_parts_hover(game: &Game, seat: Seat, with_share: bool) -> String {
+    let s = game.seat(seat);
+    let mut lines = Vec::new();
+    let own: Vec<String> = [(s.blame_emitted, "Emitted"), (game.blame_credit(seat), "removed")]
+        .iter()
+        .filter(|(n, _)| *n > 0.0)
+        .map(|(n, what)| if *what == "removed" { format!("removed {n:.0} in credit") } else { format!("{what} {n:.0}") })
+        .collect();
+    if !own.is_empty() {
+        let line = own.join(", ");
+        lines.push(line[..1].to_uppercase() + &line[1..]);
+    }
+    // The four moved parts in full, or in short when in full they would wrap past the hover's width.
+    let parts = [
+        (s.blame_smeared, "laid on by rivals", "by rivals"),
+        (s.credits_bought, "bought as carbon credits", "bought"),
+        (s.credits_sold, "sold as carbon credits", "sold"),
+        (s.blame_cleaned, "cleaned by campaign", "cleaned"),
+    ];
+    let moved = |short: bool| parts.iter().filter(|(n, _, _)| *n > 0.0).map(|(n, long, brief)| format!("{n:.0} {}", if short { brief } else { long })).collect::<Vec<_>>().join(", ");
+    let full = moved(false);
+    if !full.is_empty() {
+        lines.push(if full.chars().count() > HOVER_CHARS_PER_LINE { moved(true) } else { full });
+    }
+    lines.push(if with_share {
+        format!("Share {:.2}, thresholds x{:.2}", game.blame_share(seat), game.blame_threshold_multiplier(seat))
+    } else {
+        format!("Thresholds x{:.2}", game.blame_threshold_multiplier(seat))
+    });
+    lines.join("\n")
+}
 
 /// Ticket #468 (version 0.09.7): what a Widget is, said once -- the place card's hover and the top
 /// bar's each said it in words of their own, both over the six-line ceiling.
@@ -6609,7 +6684,8 @@ fn influence_row(ui: &mut Ui, game: &Game, session: &Session, view: &mut ViewSta
         // Ticket #42: buying Influence lives in the Trading window now.
         if rule_tip(
             ui.small_button("Buy more Influence in the Trading window"),
-            "Ducats buy Influence into this turn's Allotment, two a point, spent like any other. Opens the Trading window.".to_string(),
+            // Ticket #543 (version 0.1.0.1): the price from the table, where it said two in words.
+            format!("Ducats buy Influence into this turn's Allotment, {} a point, spent like any other. Opens the Trading window.", game.tables.ducats.per_influence),
         )
         .clicked()
         {
@@ -7533,9 +7609,10 @@ This turn {:+.2}%: {:+.1} million.", c.population_growth * 100.0, c.population_l
         icon_word(ui, "ducats", format!("GDP {}: Industry Level {}, leans {:?}", card.gdp, st.industry_level, card.resource_lean)),
         format!("Pays its controller {} Ducats a turn.\nGDP x Industry Level / 5, never below 1.\nA{} {} here would add {}.", pays, if bank == FacilityKind::InvestmentBank { "n" } else { "" }, bank.name(), game.facility_yield(Seat(0), sid, bank).amount),
     );
-    icon_word(ui, "emissions", format!("Emissions this turn: industry {:.1}, Facilities {:.1}, people {:.1}", industry_em, fac_em, game.population_coefficient(sid) * st.population * mult));
-    // Ticket #54: the per-person line, its formula, and what Leapfrog has taken off it.
-    {
+    // Ticket #54: the per-person rate, its formula, and what Leapfrog has taken off it. Ticket #532
+    // (version 0.1.0.1), at the designer's word: no longer a line of its own but the hover of the
+    // Emissions line.
+    let people = {
         let c = &game.tables.climate;
         let n = game.leapfrogs(sid);
         let leaps = match n {
@@ -7544,20 +7621,17 @@ This turn {:+.2}%: {:+.1} million.", c.population_growth * 100.0, c.population_l
             2 => ", Leapfrogged twice".to_string(),
             n => format!(", Leapfrogged {n} times"),
         };
-        ui.label(
-            RichText::new(format!(
-                "Its people emit {:.2} per hundred million ({:.2} base + {:.2} x Industry Level {}{})",
-                // Ticket #143: the rate is kept per hundred million, which is twenty units then and a
-                // hundred since ticket #333 (version 0.09.0).
-                game.population_coefficient(sid) * game.tables.units_per_hundred_million(),
-                c.population_emissions_base * game.tables.units_per_hundred_million(),
-                c.population_emissions_per_level * game.tables.units_per_hundred_million(),
-                st.industry_level,
-                leaps
-            ))
-            .weak(),
-        );
-    }
+        format!(
+            "People: {:.2} per hundred million ({:.2} base + {:.2} x Industry Level {}){leaps}",
+            // Ticket #143: the rate is kept per hundred million, which is twenty units then and a
+            // hundred since ticket #333 (version 0.09.0).
+            game.population_coefficient(sid) * game.tables.units_per_hundred_million(),
+            c.population_emissions_base * game.tables.units_per_hundred_million(),
+            c.population_emissions_per_level * game.tables.units_per_hundred_million(),
+            st.industry_level,
+        )
+    };
+    rule_tip(icon_word(ui, "emissions", format!("Emissions this turn: industry {:.1}, Facilities {:.1}, people {:.1}", industry_em, fac_em, game.population_coefficient(sid) * st.population * mult)), people);
     // Ticket #54: a Strip Permit running here, and what it will cost when it ends.
     if game.strip_permit_running(sid) {
         let left = game.strip_permit_turns_left(sid);
@@ -7918,6 +7992,17 @@ fn policies_block(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, act
     );
 }
 
+/// Ticket #543 (version 0.1.0.1): the Recruit button's hover, cut to its two figures at the
+/// designer's word ("too damn wordy"): the Launch Site line above says where they lift to, and the
+/// sea's own button says Antarctica.
+fn recruit_hover(game: &Game, sid: StateId, per: u32) -> String {
+    format!(
+        "{} people, Unrest -{}.",
+        game.tables.people_text(game.muster_population_in(Seat(0), sid, per)),
+        Game::unrest_figure(game.tables.emigrants.unrest_fall_each * per as f64)
+    )
+}
+
 /// Ticket #356 (version 0.09.1): the Pioneers block, lifted out of the Orders block and drawn above
 /// the Facilities heading, at the designer's word -- *"move up the buttons to recruit pioneers to
 /// above the building tiles"*. At the foot of the card the Recruit button stood below the fold at
@@ -7951,11 +8036,7 @@ fn pioneers_block(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, act
         &session.pending,
         Order::BuildEmigrants { state: sid, n: per },
         &format!("Recruit {per} Pioneers"),
-        Some(format!(
-            "{} people, on the card at End Turn, and {} off this state's Unrest. A working Launch Site lifts them onto a Ship or straight to a station of yours over Earth; once the ice is open the sea takes them to Antarctica.",
-            game.tables.people_text(game.muster_population_in(Seat(0), sid, per)),
-            Game::unrest_figure(game.tables.emigrants.unrest_fall_each * per as f64)
-        )),
+        Some(recruit_hover(game, sid, per)),
         actions,
     );
     // Ticket #428 (version 0.09.5): ONE slider for every door below -- the sea, the lift, a Colony
@@ -8043,14 +8124,26 @@ fn pioneers_block(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, act
             cost_button_with_hover(ui, game, &session.pending, order, &format!("Send {n} to {} ({})", game.ship_name(s), where_it_is), hover, actions);
         }
     }
-    // Ticket #46: Ships come from Shipyards; a Launch Site lifts people to orbit.
-    ui.label(
-        RichText::new(if st.facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working()) {
-            "Launch Site: Colonists and Armies lift to any orbit of Earth from here. Ships are built at a Shipyard on a station or Colony."
-        } else {
-            "No working Launch Site: only a Colony Ship in low orbit takes Pioneers from here."
+    // Ticket #46: a Launch Site lifts people to orbit. Ticket #532 (version 0.1.0.1), at the
+    // designer's word: Yes in green or No in yellow, what each means on the hover; the Arkwrights'
+    // word is their Spaceport's.
+    let word = if game.kind(Seat(0)) == FactionKind::Arkwrights { "Spaceport" } else { "Launch Site" };
+    let sites = || st.facilities.iter().filter(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite));
+    let working = sites().any(|f| f.working());
+    let (answer, colour, hover) = if working {
+        ("Yes", Color32::LIGHT_GREEN, "Pioneers and Armies lift to any orbit of Earth.".to_string())
+    } else if sites().next().is_some() {
+        ("No", Color32::YELLOW, format!("Pioneers and Armies lift to low orbit only.\nIts {word} is dark."))
+    } else {
+        ("No", Color32::YELLOW, "Pioneers and Armies lift to low orbit only.".to_string())
+    };
+    rule_tip(
+        ui.horizontal(|ui| {
+            ui.label(RichText::new(format!("{word}:")).weak());
+            ui.label(RichText::new(answer).color(colour));
         })
-        .weak(),
+        .response,
+        hover,
     );
     ui.separator();
 }
@@ -8648,27 +8741,68 @@ fn ship_row(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, s
             view.selection = Selection::Ship(s.id);
             view.attack_preview = false;
         }
+        if let Some(room) = colonist_room(game, s) {
+            colonist_room_label(ui, &room);
+        }
         warhead_label(ui, s);
     });
+}
+
+/// Ticket #536 (version 0.1.0.1), at the designer's word: what a Colony Ship carries over the most it
+/// can take, the room at Earth the crowded room (with the crowding said on the hover).
+struct ColonistRoom {
+    aboard: u32,
+    room: u32,
+    hover: Option<String>,
+    /// Ticket #543 (version 0.1.0.1): some aboard but fewer than found a Colony, drawn yellow.
+    short: bool,
+}
+
+fn colonist_room(game: &Game, s: &Ship) -> Option<ColonistRoom> {
+    if s.kind != UnitKind::ColonyShip {
+        return None;
+    }
+    let base = game.colony_ship_capacity(s.seat);
+    let crowd = if s.at == ShipAt::Body(BodyId::Earth) { game.crowd_extra() } else { 0 };
+    // Ticket #543 (version 0.1.0.1): the founding rule before launch -- yellow at one to three
+    // aboard, with the rule on the hover; an empty Ship stays plain.
+    let found = game.tables.emigrants.found_with;
+    let short = s.colonists > 0 && s.colonists < found;
+    let lines: Vec<String> = [short.then(|| format!("{found} found a Colony")), (crowd > 0).then(|| format!("{base} room, +{crowd} crowded at Earth"))].into_iter().flatten().collect();
+    let hover = (!lines.is_empty()).then(|| lines.join("\n"));
+    Some(ColonistRoom { aboard: s.colonists, room: base + crowd, hover, short })
+}
+
+/// Ticket #536: the population glyph, then "3/6" -- the glyph BEFORE the figures, at the designer's
+/// word, where the game's rule for a word after a figure would put it behind.
+fn colonist_room_label(ui: &mut Ui, room: &ColonistRoom) {
+    let resp = ui
+        .horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 3.0;
+            if let Some(image) = Icons::from_ctx(ui.ctx(), "population", 15.0) {
+                ui.add(image);
+            }
+            let figures = RichText::new(format!("{}/{}", room.aboard, room.room));
+            ui.label(if room.short { figures.color(Color32::YELLOW) } else { figures });
+        })
+        .response;
+    if let Some(h) = &room.hover {
+        rule_tip(resp, h.clone());
+    }
 }
 
 /// Ticket #374: **what a Ship is, in one clause** -- "strength 3, damage 0/4, carrying 6 Colonists
 /// and an Army" -- for its row on the stack card and the line on its own card, which say the same
 /// thing after different names.
 fn ship_line(game: &Game, s: &Ship) -> String {
-    let mut extra = Vec::new();
-    if s.colonists > 0 {
-        extra.push(format!("{} Colonists", s.colonists));
-    }
-    if s.army.is_some() {
-        extra.push("an Army".into());
-    }
+    // Ticket #536 (version 0.1.0.1): a Colony Ship's Colonists are its glyph and "3/6" beside the
+    // line now (`colonist_room_label`), not words in it.
     format!(
         "strength {}, damage {}/{}{}",
         game.ship_fighting_strength(s),
         s.damage,
         game.tables.unit(s.kind).hit_points,
-        if extra.is_empty() { String::new() } else { format!(", carrying {}", extra.join(" and ")) },
+        if s.army.is_some() { ", carrying an Army" } else { "" },
     )
 }
 
@@ -8857,7 +8991,12 @@ fn ship_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
     }
     // Ticket #346: the strength it would FIGHT at, dry hulls halved; the Tank block says why.
     ui.horizontal_wrapped(|ui| {
-        ui.label(format!("{}: {}", s.kind.name(), ship_line(game, s)));
+        ui.horizontal(|ui| {
+            ui.label(format!("{}: {}", s.kind.name(), ship_line(game, s)));
+            if let Some(room) = colonist_room(game, s) {
+                colonist_room_label(ui, &room);
+            }
+        });
         warhead_label(ui, s);
     });
     match s.at {
@@ -10479,6 +10618,18 @@ fn relations_row(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSta
             let deeds = game.relations_deeds(viewer, subject);
             let floor = game.relations.floor[viewer.index()][subject.index()];
             let mut tip = format!("{:+} in all: {:+} from what they have done, {:+} from their Blame.", v, deeds, blame);
+            // Ticket #535 (version 0.1.0.1): the Greenwash part, once there is one; and the shared
+            // Research's (#236), which the line never named, so the parts add up to the whole.
+            let wash = game.greenwash_relations_term(viewer, subject);
+            if wash != 0 {
+                tip.push_str(&format!("
+Greenwash {wash:+}"));
+            }
+            let shared = game.directive_relations_applied(viewer, subject);
+            if shared != 0 {
+                tip.push_str(&format!("
+Research shared {shared:+}"));
+            }
             if floor < 0 {
                 tip.push_str(&format!("
 Scarred: this pair can never recover above {floor:+}."));
@@ -10513,7 +10664,8 @@ An Accord between them is over: it lapses at the next turn ({}).", terms.join(",
 An Accord stands: {}; {}.", terms.join(", "), turns_left_text(game, acc)));
                 }
             }
-            ui.label(RichText::new(game.relations_level(viewer, subject)).color(colour)).on_hover_text(tip);
+            // Ticket #535 (version 0.1.0.1): through `rule_tip`, so the hover can be photographed.
+            rule_tip(ui.label(RichText::new(game.relations_level(viewer, subject)).color(colour)), tip);
             ui.add_space(10.0);
         }
     });
@@ -11024,11 +11176,16 @@ fn greenwash_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewS
     let order = Order::Greenwash { amount };
     let check = game.check_order(me, &session.pending, &order);
     let resp = ui.add_enabled(check.is_ok(), egui::Button::new(format!("Greenwash with {amount} Influence for {} Ducats", amount * per)));
-    if let Err(e) = &check {
-        // Ticket #380 (version 0.09.2): through `rule_tip`, as every refusal.
-        rule_tip(resp.clone(), e.0.clone());
-    }
-    if resp.on_hover_text(format!("{:.0} ppm off your Blame at End Turn.", amount as f64 * rate)).clicked() {
+    // Ticket #535 (version 0.1.0.1), at the designer's word: and what it costs with each rival. One
+    // hover, through `rule_tip` as every other (ticket #380), the refusal first when there is one.
+    let what = format!("{:.0} ppm off your Blame at End Turn.
+{}", amount as f64 * rate, greenwash_relations_line(game, me, amount));
+    let hover = match &check {
+        Err(e) => format!("{}
+{what}", e.0),
+        Ok(_) => what,
+    };
+    if rule_tip(resp, hover).clicked() {
         actions.push(Action::Place(order));
     }
 }
@@ -11348,21 +11505,10 @@ fn faction_window(ctx: &egui::Context, session: &Session, game: &Game, view: &mu
                     .text(RichText::new(format!("{:.0}%", share * 100.0)).color(Color32::BLACK)),
             );
             // Ticket #265 (version 0.08.4): answerable for, then how it got there, then the credit.
-            let s = game.seat(seat);
-            // Ticket #267: what rivals laid on by Smear, when any, so the line never says the seat
-            // put it in the air.
-            let smeared = if s.blame_smeared > 0.0 { format!(", {:.0} laid on by rivals", s.blame_smeared) } else { String::new() };
-            let smeared = format!("{smeared}{}{}", if s.credits_bought > 0.0 { format!(", {:.0} bought as carbon credits", s.credits_bought) } else { String::new() }, if s.credits_sold > 0.0 { format!(", {:.0} sold as carbon credits", s.credits_sold) } else { String::new() });
-            // Ticket #277 (version 0.08.5): the sixth clause, at the designer's word.
-            let smeared = format!("{smeared}{}", if s.blame_cleaned > 0.0 { format!(", {:.0} cleaned by campaign", s.blame_cleaned) } else { String::new() });
-            let line = format!(
-                "Answerable for {:.0} ppm (emitted {:.0}, removed {:.0} in credit{smeared}), thresholds x{:.2}",
-                game.blame(seat),
-                s.blame_emitted,
-                game.blame_credit(seat),
-                game.blame_threshold_multiplier(seat)
-            );
-            figures_with_icons(ui, &line, 14.0, ui.visuals().weak_text_color(), &[("ppm", "emissions")]);
+            // Ticket #267: what rivals laid on by Smear, and #277's sixth clause, are on the hover
+            // since ticket #532 (version 0.1.0.1), with the rest of what followed the ppm.
+            let line = format!("Answerable for {:.0} ppm", game.blame(seat));
+            rule_tip(figures_with_icons(ui, &line, 14.0, ui.visuals().weak_text_color(), &[("ppm", "emissions")]), blame_parts_hover(game, seat, false));
         });
         ui.add_space(6.0);
 
@@ -11887,27 +12033,14 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
             ui.separator();
             rule_tip(ui.label(RichText::new("Blame: the CO2 each Faction is answerable for").strong()), BLAME_HOVER.to_string());
             for seat in Seat::ALL {
-                let s = game.seat(seat);
-                // Ticket #265 (version 0.08.4): one form for every seat -- answerable for, how it
-                // got there, and what it holds in credit -- at the designer's word.
-                let smeared = if s.blame_smeared > 0.0 { format!(", {:.0} laid on by rivals", s.blame_smeared) } else { String::new() };
-                let smeared = format!("{smeared}{}{}", if s.credits_bought > 0.0 { format!(", {:.0} bought as carbon credits", s.credits_bought) } else { String::new() }, if s.credits_sold > 0.0 { format!(", {:.0} sold as carbon credits", s.credits_sold) } else { String::new() });
-            // Ticket #277 (version 0.08.5): the sixth clause, at the designer's word.
-            let smeared = format!("{smeared}{}", if s.blame_cleaned > 0.0 { format!(", {:.0} cleaned by campaign", s.blame_cleaned) } else { String::new() });
-                let line = format!(
-                    "{}: answerable for {:.0} ppm (emitted {:.0}, removed {:.0} in credit{smeared}); share {:.2}, thresholds x{:.2}",
-                    game.seat_name(seat),
-                    game.blame(seat),
-                    s.blame_emitted,
-                    game.blame_credit(seat),
-                    game.blame_share(seat),
-                    game.blame_threshold_multiplier(seat)
-                );
+                // Ticket #265 (version 0.08.4): one form for every seat. Ticket #532 (version
+                // 0.1.0.1), at the designer's word: the line is what it is answerable for; how it got
+                // there, its share and thresholds are the hover.
+                let line = format!("{}: answerable for {:.0} ppm", game.seat_name(seat), game.blame(seat));
                 // Ticket #112 (version 0.07.1): each Faction's ppm figures wear the Emissions
                 // glyph, so the figure a Faction is answerable for is marked as the same thing the
-                // Facility lists and the top bar count. "share" and "thresholds" are not ppm and
-                // keep their words.
-                figures_with_icons(ui, &line, 14.0, seat_colour(session, seat), &[("ppm", "emissions")]);
+                // Facility lists and the top bar count.
+                rule_tip(figures_with_icons(ui, &line, 14.0, seat_colour(session, seat), &[("ppm", "emissions")]), blame_parts_hover(game, seat, true));
             }
             // Ticket #306 (version 0.08.7): the sentence that stood here, a clause of the heading's
             // hover word for word, is cut at the designer's word.
@@ -12208,6 +12341,8 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 ui.set_width(620.0);
                 // Ticket #58: a dated bulletin.
                 ui.label(RichText::new(format!("Report, {}", game.date(game.report.turn).text())).size(20.0).strong());
+                // Ticket #544 (version 0.1.0.1): the clock and the player's Victory, under the date.
+                ui.label(RichText::new(game.report_head()).strong().color(Color32::from_rgb(240, 210, 120)));
                 // Ticket #50: who is at this table, and under which seed.
                 // Ticket #64: a spectator has no seat, so the line names all four.
                 ui.horizontal_wrapped(|ui| {
@@ -12605,6 +12740,38 @@ fn chronicle_screen(root: &mut Ui, session: &Session, actions: &mut Vec<Action>)
 mod tests {
     use super::*;
 
+    /// Ticket #543 (version 0.1.0.1): a Colony Ship with one to three aboard is drawn yellow, the
+    /// founding rule on its hover; an empty one and a full one are plain.
+    #[test]
+    fn a_colony_ship_short_of_four_says_four_found_a_colony() {
+        let tables = std::sync::Arc::new(dying_earth_engine::data::Tables::load(&dying_earth_engine::data::default_data_dir()).unwrap());
+        let g = Game::new(tables, NewGame { seed: 7, player: FactionKind::Custodians, player_is_ai: false, player_start: StateId::EastAsia });
+        let mut s = Ship { name: String::new(), id: ShipId(901), kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Moon), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None };
+        for (n, short) in [(0, false), (1, true), (3, true), (4, false)] {
+            s.colonists = n;
+            let r = colonist_room(&g, &s).unwrap();
+            assert_eq!(r.short, short, "{n} aboard");
+            assert_eq!(r.hover.as_deref() == Some("4 found a Colony"), short, "{n} aboard: {:?}", r.hover);
+        }
+    }
+
+    /// Ticket #543, at the designer's word: the Recruit hover is its two figures and nothing more.
+    #[test]
+    fn the_recruit_hover_is_its_two_figures() {
+        let tables = std::sync::Arc::new(dying_earth_engine::data::Tables::load(&dying_earth_engine::data::default_data_dir()).unwrap());
+        let g = Game::new(tables, NewGame { seed: 7, player: FactionKind::Custodians, player_is_ai: false, player_start: StateId::EastAsia });
+        assert_eq!(recruit_hover(&g, StateId::EastAsia, 2), "2M people, Unrest -0.25.");
+    }
+
+    /// Ticket #537 (version 0.1.0.1): the Influence hover says the table's price, four Ducats.
+    #[test]
+    fn the_influence_hover_says_the_tables_price() {
+        let tables = std::sync::Arc::new(dying_earth_engine::data::Tables::load(&dying_earth_engine::data::default_data_dir()).unwrap());
+        let g = Game::new(tables, NewGame { seed: 7, player: FactionKind::Custodians, player_is_ai: false, player_start: StateId::EastAsia });
+        assert_eq!(g.tables.ducats.per_influence, 4);
+        assert!(influence_hover(&g).ends_with("at 4 Ducats each."), "{}", influence_hover(&g));
+    }
+
     /// Ticket #508 (version 0.1.0.0): a held Accord's hover says each of its Terms in a line, the
     /// price of breaking one last, and with all four it stays within the six-line ceiling.
     #[test]
@@ -12617,6 +12784,78 @@ mod tests {
         );
         assert!(hover_lines_estimate(&all) <= HOVER_LINE_CEILING, "{} lines", hover_lines_estimate(&all));
         assert!(all.lines().all(|l| l.chars().count() <= HOVER_CHARS_PER_LINE), "each term on one rendered line");
+    }
+
+    /// Ticket #532 (version 0.1.0.1): a Blame line's hover is three lines at most, the moved parts
+    /// on the middle one only when there are any, and the seat's own leaves out the share.
+    #[test]
+    fn a_blame_hover_is_three_lines_at_most_and_shows_only_what_is_not_zero() {
+        let tables = std::sync::Arc::new(dying_earth_engine::data::Tables::load(&dying_earth_engine::data::default_data_dir()).unwrap());
+        let mut g = Game::new(tables, NewGame { seed: 7, player: FactionKind::Custodians, player_is_ai: false, player_start: StateId::EastAsia });
+        g.seats[1].blame_emitted = 520.0;
+        let quiet = blame_parts_hover(&g, Seat(1), true);
+        assert_eq!(quiet.lines().count(), 2, "nothing moved, no middle line: {quiet}");
+        assert!(quiet.lines().nth(1).unwrap().starts_with("Share "), "{quiet}");
+        g.seats[1].blame_smeared = 30.0;
+        g.seats[1].blame_cleaned = 12.0;
+        let moved = blame_parts_hover(&g, Seat(1), true);
+        assert_eq!(moved.lines().nth(1), Some("30 laid on by rivals, 12 cleaned by campaign"), "{moved}");
+        // All four moved, three figures each: still three lines AS RENDERED, the parts in short.
+        g.seats[1].blame_emitted = 520.0;
+        g.seats[1].blame_smeared = 300.0;
+        g.seats[1].blame_cleaned = 120.0;
+        g.seats[1].credits_bought = 150.0;
+        g.seats[1].credits_sold = 100.0;
+        let all = blame_parts_hover(&g, Seat(1), true);
+        assert_eq!(hover_lines_estimate(&all), 3, "three lines as drawn: {all}");
+        assert_eq!(all.lines().nth(1), Some("300 by rivals, 150 bought, 100 sold, 120 cleaned"), "{all}");
+        // Nothing emitted and nothing removed: no first line at all, rather than "Emitted 0".
+        g.seats[1].blame_emitted = 0.0;
+        let quietest = blame_parts_hover(&g, Seat(1), true);
+        assert!(!quietest.contains(" 0"), "no zero shown: {quietest}");
+        assert!(blame_parts_hover(&g, Seat(1), false).lines().last().unwrap().starts_with("Thresholds x"), "the own panel's hover has no share");
+    }
+
+    /// Ticket #535 (version 0.1.0.1): the Greenwash hover's Relations line names each rival and what
+    /// it would lose, to the hundredth, and says 0 rather than a bare minus for nothing spent.
+    #[test]
+    fn a_greenwash_hover_says_what_each_rival_would_lose() {
+        let tables = std::sync::Arc::new(dying_earth_engine::data::Tables::load(&dying_earth_engine::data::default_data_dir()).unwrap());
+        let g = Game::new(tables, NewGame { seed: 7, player: FactionKind::Prospectors, player_is_ai: false, player_start: StateId::EastAsia });
+        let line = greenwash_relations_line(&g, Seat(0), 5);
+        for part in ["Custodians -0.2", "Arkwrights -0.1", "Archivists -0.05"] {
+            assert!(line.contains(part), "{part} in {line:?}");
+        }
+        assert!(!line.contains("Prospectors"), "not the campaigner's own: {line:?}");
+        assert!(greenwash_relations_line(&g, Seat(0), 0).contains("Custodians 0"), "nothing spent says 0");
+    }
+
+    /// Ticket #536 (version 0.1.0.1), at the designer's word: a Colony Ship shows what it carries
+    /// over its room, empty or not; at Earth the room is the crowded one, its hover saying the
+    /// crowding; another kind of Ship carries no Colonists and shows none.
+    #[test]
+    fn a_colony_ship_shows_aboard_over_room_and_the_crowded_room_at_earth() {
+        let tables = std::sync::Arc::new(dying_earth_engine::data::Tables::load(&dying_earth_engine::data::default_data_dir()).unwrap());
+        let mut g = Game::new(tables, NewGame { seed: 7, player: FactionKind::Custodians, player_is_ai: false, player_start: StateId::EastAsia });
+        let base = g.colony_ship_capacity(Seat(0));
+        let ship = |id: u32, kind: UnitKind, at: ShipAt, colonists: u32| Ship { name: String::new(), id: ShipId(id), kind, seat: Seat(0), damage: 0, at, colonists, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None };
+        let at_moon = ship(901, UnitKind::ColonyShip, ShipAt::Body(BodyId::Moon), 3);
+        let room = colonist_room(&g, &at_moon).expect("a Colony Ship shows its room");
+        // Ticket #543 (version 0.1.0.1): three aboard is short of the four that found a Colony.
+        assert_eq!((room.aboard, room.room, room.hover.clone()), (3, base, Some("4 found a Colony".to_string())), "off Earth, the ordinary room");
+        let empty = ship(902, UnitKind::ColonyShip, ShipAt::Body(BodyId::Moon), 0);
+        assert_eq!(colonist_room(&g, &empty).map(|r| (r.aboard, r.room)), Some((0, base)), "empty, it still shows 0/room");
+        assert!(colonist_room(&g, &ship(903, UnitKind::Frigate, ShipAt::Body(BodyId::Moon), 0)).is_none(), "a Frigate shows none");
+        // A warmed world crowds the lift at Earth.
+        g.climate.temperature = 2.6;
+        let extra = g.crowd_extra();
+        assert!(extra > 0, "the premise: +2.6 crowds the lift");
+        let at_earth = ship(904, UnitKind::ColonyShip, ShipAt::Body(BodyId::Earth), 2);
+        let r = colonist_room(&g, &at_earth).unwrap();
+        assert_eq!(r.room, base + extra, "the room it can take at Earth");
+        // Ticket #543: two aboard, so the founding rule leads the hover.
+        assert_eq!(r.hover.as_deref(), Some(format!("4 found a Colony
+{base} room, +{extra} crowded at Earth").as_str()));
     }
 
     /// Ticket #509 (version 0.1.0.0): the renewal prompt says the Accord, its Terms and the five

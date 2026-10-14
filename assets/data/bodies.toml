@@ -30,7 +30,8 @@ orbit_change_fuel = 1
 # orbital slots in `stations`, in order. Ticket #50: five over Earth. The Custodians start with the
 # ISS, the Prospectors with Tiangong and the Archivists with Axiom; the Arkwrights start with none,
 # and two slots stand free.
-station_materials = 40
+# Ticket #537 (version 0.1.0.1): 44, where it was 40 -- every build a tenth dearer.
+station_materials = 44
 # Ticket #57 (version 0.05): every Colony Slot draws its own four yields when the game starts, its
 # Body's figures times a factor from a triangular distribution centred on 1.0 with these limits.
 slot_yield_spread = 0.25
@@ -49,6 +50,9 @@ slot_yield_spread = 0.25
 # all, so nothing can ever land there to claim it. Venus keeps a figure rather than none so that the
 # day a Colony Slot is given to Venus the rule turns on with a number already in its row.
 
+# Ticket #537 (version 0.1.0.1): every Body's `mine_yield` is 85% of what it was (the playtest's 2.5:
+# an off-world Mine made about 35 Materials a turn against 9 on Earth). Earth's is a Colony Mine's
+# on Antarctica, off-world for the purpose; an Earth Mine in a Region is the Facility's 4.4.
 [[body]]
 id = "earth"
 name = "Earth"
@@ -66,7 +70,7 @@ arrive_delta_v = 0.54
 trade_pays = 3
 # Ticket #56 (version 0.05): abundant ore and Fuel under the ice, and Habitats that work as well as
 # anywhere. The slots stay shut until the Temperature has stood at antarctica_opens_at (climate.toml).
-mine_yield = 1.75
+mine_yield = 1.4875
 generator_yield = 0.75
 refinery_yield = 2.0
 research_yield = 1.0
@@ -94,7 +98,7 @@ leave_delta_v = 0.92
 arrive_delta_v = 0.92
 trade_pays = 3.5
 # Ticket #72 (version 0.05.5): all four up a tenth (1.5, 1.25, 0.5, 1.0 before).
-mine_yield = 1.65
+mine_yield = 1.4025
 generator_yield = 1.375
 # Ticket #421 (version 0.09.4): the three low-gravity worlds' Refinery yield a quarter up.
 refinery_yield = 0.6875
@@ -116,7 +120,7 @@ transit_turns = 4
 leave_delta_v = 1.41
 arrive_delta_v = 0.25
 trade_pays = 5
-mine_yield = 1.25
+mine_yield = 1.0625
 generator_yield = 0.75
 refinery_yield = 1.5
 research_yield = 1.3
@@ -147,7 +151,7 @@ transit_turns = 5
 leave_delta_v = 0.94
 arrive_delta_v = 0.66
 trade_pays = 6
-mine_yield = 1.75
+mine_yield = 1.4875
 generator_yield = 0.75
 refinery_yield = 0.625
 research_yield = 0.8
@@ -171,7 +175,7 @@ transit_turns = 5
 leave_delta_v = 0.7
 arrive_delta_v = 0.7
 trade_pays = 6
-mine_yield = 1.0
+mine_yield = 0.85
 generator_yield = 1.0
 refinery_yield = 0.3125
 research_yield = 0.8
@@ -196,7 +200,7 @@ transit_turns = 3
 leave_delta_v = 2.96
 arrive_delta_v = 0.5
 trade_pays = 4
-mine_yield = 1.0
+mine_yield = 0.85
 generator_yield = 1.0
 refinery_yield = 1.0
 research_yield = 1.3
@@ -218,7 +222,7 @@ transit_turns = 2
 leave_delta_v = 1.17
 arrive_delta_v = 1.17
 trade_pays = 6.9
-mine_yield = 1.725
+mine_yield = 1.46625
 generator_yield = 2.3
 refinery_yield = 0.575
 research_yield = 1.38
@@ -242,7 +246,7 @@ transit_turns = 8
 leave_delta_v = 0.11
 arrive_delta_v = 0.11
 trade_pays = 8.05
-mine_yield = 0.8625
+mine_yield = 0.733125
 generator_yield = 0.575
 refinery_yield = 2.0125
 research_yield = 1.265
@@ -267,7 +271,7 @@ transit_turns = 7
 leave_delta_v = 0.08
 arrive_delta_v = 0.08
 trade_pays = 8.05
-mine_yield = 2.0125
+mine_yield = 1.710625
 generator_yield = 0.575
 refinery_yield = 0.575
 research_yield = 1.15

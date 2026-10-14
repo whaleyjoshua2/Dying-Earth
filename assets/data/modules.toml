@@ -5,10 +5,12 @@
 # its Colony's Widgets reach the figure, served in queue order; a Colony or station makes one a
 # turn from its Core Module and four for every working Factory Module (the last row).
 
+# Ticket #537 (version 0.1.0.1): every Module and tier row's `materials` is a tenth more than it was, kept
+# to the tenth (25 is 27.5); the Widgets are as they were.
 [[module]]
 id = "mine"
 name = "Mine"
-materials = 20
+materials = 22
 widgets = 4
 energy_upkeep = 3
 produces = { resource = "materials", amount = 4 }
@@ -18,7 +20,7 @@ earth_emissions = 1.0
 [[module]]
 id = "generator"
 name = "Generator"
-materials = 25
+materials = 27.5
 widgets = 8
 energy_upkeep = 0
 produces = { resource = "energy", amount = 5 }
@@ -27,7 +29,7 @@ earth_emissions = 1.5
 [[module]]
 id = "refinery"
 name = "Refinery"
-materials = 20
+materials = 22
 widgets = 4
 energy_upkeep = 3
 # Ticket #421 (version 0.09.4): 4.5 Fuel off Earth, where it was 3, to pay for a Colony Ship's
@@ -38,7 +40,7 @@ earth_emissions = 1.5
 [[module]]
 id = "habitat"
 name = "Habitat"
-materials = 25
+materials = 27.5
 widgets = 4
 energy_upkeep = 2
 does = "holds 4 Colonists (8 with Expanded Habitats)"
@@ -54,7 +56,7 @@ holds_colonists = 4
 [[module]]
 id = "shipyard"
 name = "Shipyard"
-materials = 35
+materials = 38.5
 widgets = 8
 energy_upkeep = 4
 does = "the only place a Ship can be built"
@@ -62,7 +64,7 @@ does = "the only place a Ship can be built"
 [[module]]
 id = "barracks"
 name = "Barracks"
-materials = 20
+materials = 22
 widgets = 4
 energy_upkeep = 2
 does = "the only place a Colony Army is raised and repaired; holds one"
@@ -76,7 +78,7 @@ does = "the only place a Colony Army is raised and repaired; holds one"
 [[module]]
 id = "trade_post"
 name = "Trade Post"
-materials = 25
+materials = 27.5
 widgets = 4
 energy_upkeep = 2
 produces = { resource = "ducats", amount = 2 }
@@ -94,7 +96,7 @@ mine_bonus = 1
 [[module]]
 id = "relay"
 name = "Relay"
-materials = 25
+materials = 27.5
 widgets = 4
 energy_upkeep = 2
 influence_allotment = 1
@@ -109,7 +111,7 @@ standing_per_turn = 2
 [[module]]
 id = "archive"
 name = "The Archive"
-materials = 50
+materials = 55
 widgets = 12
 # Ticket #511 (version 0.1.0.0): 20, from 12, at the designer's word; Closed-Loop Colonies takes a
 # quarter off it (15), where it took half.
@@ -162,21 +164,21 @@ widgets = 0
 name = "Settlement"
 cap = 12
 colonists = 12
-materials = 30
+materials = 33
 widgets = 4
 
 [[tiers]]
 name = "Colony"
 cap = 18
 colonists = 18
-materials = 50
+materials = 55
 widgets = 6
 
 [[tiers]]
 name = "Colonial Capital"
 cap = 24
 colonists = 24
-materials = 70
+materials = 77
 widgets = 8
 one_per_body = true
 ground_only = true
@@ -209,7 +211,7 @@ colonists_to_order = 4
 [[module]]
 id = "observatory"
 name = "Observatory"
-materials = 28
+materials = 30.8
 widgets = 8
 energy_upkeep = 3
 produces = { resource = "research", amount = 2 }
@@ -225,7 +227,7 @@ research_per_colonist = 0.01
 [[module]]
 id = "solar_array"
 name = "Solar Array"
-materials = 25
+materials = 27.5
 widgets = 8
 energy_upkeep = 0
 produces = { resource = "energy", amount = 6 }
@@ -240,7 +242,7 @@ sun_scaled = true
 [[module]]
 id = "mass_driver"
 name = "Mass Driver"
-materials = 35
+materials = 38.5
 widgets = 8
 energy_upkeep = 4
 needs_tech = "efficient_transit"
@@ -274,7 +276,7 @@ holds_colonists = 4
 [[module]]
 id = "institute"
 name = "Institute"
-materials = 25
+materials = 27.5
 widgets = 8
 energy_upkeep = 2
 does = "raises this place's Education Level 0.20 a turn, to 2.0; it falls back at the same rate when the Institute stops"
@@ -287,20 +289,20 @@ does = "raises this place's Education Level 0.20 a turn, to 2.0; it falls back a
 [[module]]
 id = "academy"
 name = "Academy"
-materials = 25
+materials = 27.5
 widgets = 8
 energy_upkeep = 2
 does = "does an Institute's work and pays 1 Ducat a turn while it is online"
 
 # Ticket #239 (version 0.08.3): the Heliostat, the Archivists' Unique Module, replacing the Solar
-# Array on their build list at the common price -- the same 25 Materials, two turns, no upkeep,
+# Array on their build list at the common price -- the same 27.5 Materials (25 before ticket #537), two turns, no upkeep,
 # station-only and sun-scaled. It makes `heliostat_energy` (facilities.toml) more, added AFTER the
 # inverse square scaling so the extra point is worth the same at every distance. Appended:
 # `Tables::module` indexes ModuleKind by discriminant.
 [[module]]
 id = "heliostat"
 name = "Heliostat"
-materials = 25
+materials = 27.5
 widgets = 8
 energy_upkeep = 0
 produces = { resource = "energy", amount = 6 }
@@ -314,7 +316,7 @@ sun_scaled = true
 [[module]]
 id = "exchange"
 name = "Exchange"
-materials = 25
+materials = 27.5
 widgets = 4
 energy_upkeep = 2
 # Ticket #491 (version 0.09.9): and an Investment Bank's interest, one share a place.
@@ -329,7 +331,7 @@ produces = { resource = "ducats", amount = 2 }
 [[module]]
 id = "chorus"
 name = "Chorus"
-materials = 25
+materials = 27.5
 widgets = 4
 energy_upkeep = 2
 influence_allotment = 1
@@ -347,7 +349,7 @@ standing_per_turn = 2
 [[module]]
 id = "battery"
 name = "Battery"
-materials = 25
+materials = 27.5
 widgets = 4
 energy_upkeep = 3
 strength = 4
@@ -362,7 +364,7 @@ does = "fires at rival Ship stacks in the one orbit it covers; while it stands n
 [[module]]
 id = "factory"
 name = "Factory"
-materials = 20
+materials = 22
 widgets = 4
 energy_upkeep = 3
 produces = { resource = "widgets", amount = 4 }

@@ -495,6 +495,10 @@ warships_wanted = 2
 warships_wanted_blockaded = 4
 evade_damage_fraction = 0.6667
 influence_step = 5
+# Ticket #535 (version 0.1.0.1), at the designer's word: a Greenwash is weighed down by the Relations
+# it costs with the Factions the seat values -- those it holds an Accord with, or stands Cordial or
+# better with -- the weight divided by (1 + this x the points they would lose).
+greenwash_relations_cost = 5.0
 # Ticket #75 (version 0.05.5): what a state another Faction holds is worth on the AI's Influence
 # target list, as a share of a neutral one's worth. 0.6 until now; at 0.3 a held place is attacked
 # only when no neutral one is worth having.
@@ -521,8 +525,24 @@ gate_pick_fraction = 0.5
 # of 36 below any threshold worth having -- so the shared-pot rule had no line left to draw.
 directive_when_wanted = 0
 directive_when_indifferent = 10
-# Ticket #506 (version 0.1.0.0): 33, from 24 (x 50/36), with the game at fifty turns.
-gate_pick_turn = 33
+# Ticket #530 (version 0.1.0.1): the race for the Research Lead. From the turn a seat's gate is open
+# to research, or its first part is half way (`gate_pick_fraction`), until the gate is done, Labs,
+# Schools, Institutes and Observatories weigh x(1 + this x its Victory share), and what it sends to
+# the Natural Sink for a Tech it is indifferent to falls by the same share. A Lead takes its own gate
+# whenever it is offered; `gate_pick_turn` (33), which held it back till then, is gone.
+race_lab_weight = 1.0
+# Ticket #531 (version 0.1.0.1): the pack on a runaway leader, at the designer's word ("pressure the
+# runaway leader in all the ways available - both organically ... but also through agreements"). A
+# rival is a seat's leader at half its Victory or more and 20 points or more above the seat; the
+# seat's pressure is the leader's ramp (0 at half, 1 at the end) times how far it trails ((gap - 20)
+# / 30, to 1). Every hostile act on the leader weighs x(1 + pressure); from half pressure the leader
+# is cause in itself; no Accord or Trade with it, none renewed, and the Custodians sell it no
+# credits; the pack's own Accords take a bar `gang_accept_relax` x the pressure lower.
+gang_from = 0.5
+gang_ahead = 0.2
+gang_full = 0.3
+gang_cause = 0.5
+gang_accept_relax = 3.0
 # Ticket #332 (version 0.09.0): every seat wants a Mine early in its most Materials-lean Region at
 # the Factory's weight. Through `early_mine_turn`, while the seat directs fewer Mines on Earth
 # (standing or on order) than `early_mines`, the Mine in the Region where one would make the most

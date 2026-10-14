@@ -52,6 +52,12 @@ impl Stockpile {
 /// line, a price -- so what is stored is always an exact tenth: 0.1 + 0.2 reads 0.3, never
 /// 0.30000000000000004. The one rounding these four resources take now, where a floor to a whole
 /// stood before.
+/// Ticket #538 (version 0.1.0.1): a small count in words, as a sentence says it ("five turns").
+pub fn number_word(n: u32) -> String {
+    const WORDS: [&str; 11] = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"];
+    WORDS.get(n as usize).map_or_else(|| n.to_string(), |w| (*w).to_string())
+}
+
 pub fn tenth(x: f64) -> f64 {
     (x * 10.0).round() / 10.0
 }
@@ -1000,6 +1006,14 @@ pub struct SeatState {
     /// seat took it out of the air.
     #[serde(default)]
     pub blame_cleaned: f64,
+    /// Ticket #535 (version 0.1.0.1): the Influence this seat has spent on Greenwash over the game,
+    /// which the other Factions hold against it (`greenwash_relations_term`). It never falls.
+    #[serde(default)]
+    pub greenwash_spent: i64,
+    /// Ticket #542 (version 0.1.0.1): the Region the seat started in, its home; None on a save
+    /// from before, which then warns of no home.
+    #[serde(default)]
+    pub home_region: Option<StateId>,
     /// Ticket #279 (version 0.08.5): the ppm this seat's Battles on Earth have put in the air over
     /// the game, for the sweep; it is inside `blame_emitted` already.
     #[serde(default)]
@@ -1537,6 +1551,25 @@ pub struct Accord {
     /// before reads nought, and the turn struck stands in for it.
     #[serde(default)]
     pub since: u32,
+    /// Ticket #538 (version 0.1.0.1): the side that declared it over, so its ending can say who.
+    #[serde(default)]
+    pub ended_by: Option<Seat>,
+    /// Ticket #538: the side that would not renew it in its last turn.
+    #[serde(default)]
+    pub refused_by: Option<Seat>,
+}
+
+/// Ticket #538 (version 0.1.0.1): why an Accord ended, which its Moment names.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AccordEnding {
+    /// Its run of turns is up, nobody renewing.
+    RanOut,
+    /// This side would not renew it.
+    NotRenewed(Seat),
+    /// This side declared it over.
+    CalledOff(Seat),
+    /// This side acted against a term.
+    Broken(Seat),
 }
 
 impl Accord {
@@ -1733,6 +1766,8 @@ impl Game {
             directive_sink: 0.0,
             blame_smeared: 0.0,
             blame_cleaned: 0.0,
+            greenwash_spent: 0,
+            home_region: None,
             war_ppm: 0.0,
             credits_bought: 0.0,
             credits_sold: 0.0,
@@ -1976,6 +2011,7 @@ impl Game {
         }
         for (sid, seat) in taken.iter().zip(Seat::ALL) {
             game.take_control(*sid, seat);
+            game.seats[seat.index()].home_region = Some(*sid);
             // Ticket #377 (version 0.09.2): **equal starts.** A home Region's card list is set aside
             // and the `[start]` table's package stands in its place -- a Power Plant, a Factory, a
             // Mine, a Refinery and the Launch Site -- plus whatever the Faction's card adds (the
@@ -2816,7 +2852,7 @@ impl Game {
     /// What a Colony Module costs this seat in Materials (ticket #51). Ticket #387 (version
     /// 0.09.3): to the tenth, where it was rounded down.
     pub fn module_materials(&self, seat: Seat, kind: ModuleKind) -> f64 {
-        let base = self.tables.module(kind).materials as f64;
+        let base = self.tables.module(kind).materials;
         tenth(base * self.tables.faction(self.kind(seat)).module_materials_multiplier)
     }
 
@@ -2831,7 +2867,7 @@ impl Game {
     /// the row. Stations never take it; Ships take it at a low-gravity yard since ticket #398
     /// (`ship_materials_at`). Ticket #387 (version 0.09.3): to the tenth, where it was rounded down.
     pub fn module_materials_at(&self, seat: Seat, colony: ColonyId, kind: ModuleKind) -> f64 {
-        let row = self.tables.module(kind).materials as f64;
+        let row = self.tables.module(kind).materials;
         let faction = self.tables.faction(self.kind(seat)).module_materials_multiplier;
         let t = &self.tables.in_situ;
         let step = match self.colony(colony).map(|c| self.working_mines(c)).unwrap_or(0) {
@@ -2866,13 +2902,13 @@ impl Game {
     /// times the Faction's multiplier (the Prospectors' 0.85). Ticket #387 (version 0.09.3): to the
     /// tenth, where it was rounded down: 25 x 0.85 is 21.3.
     pub fn facility_materials(&self, seat: Seat, kind: FacilityKind) -> f64 {
-        let base = self.tables.facility(kind).materials as f64;
+        let base = self.tables.facility(kind).materials;
         tenth(base * self.tables.faction(self.kind(seat)).facility_materials_multiplier)
     }
 
     /// What a Space Station costs this seat in Materials (ticket #51); ticket #387: to the tenth.
     pub fn station_materials(&self, seat: Seat) -> f64 {
-        let base = self.tables.station_materials as f64;
+        let base = self.tables.station_materials;
         tenth(base * self.tables.faction(self.kind(seat)).station_materials_multiplier)
     }
 
@@ -2885,11 +2921,10 @@ impl Game {
 
     /// The row a Ship is priced from: the units.toml figure, or the Faction's own Colony Ship price.
     fn ship_row(&self, seat: Seat, kind: UnitKind) -> f64 {
-        let row = match (kind, self.tables.faction(self.kind(seat)).colony_ship_materials) {
+        match (kind, self.tables.faction(self.kind(seat)).colony_ship_materials) {
             (UnitKind::ColonyShip, Some(m)) => m,
             _ => self.tables.unit(kind).materials,
-        };
-        row as f64
+        }
     }
 
     /// Ticket #398 (version 0.09.3): **what a Ship costs this seat at this yard.** Build Where You
@@ -3844,6 +3879,12 @@ impl Game {
     /// Ticket #268 (version 0.08.4): the seat that sells carbon credits -- the Custodians'.
     pub fn credit_seller(&self) -> Option<Seat> {
         Seat::ALL.into_iter().find(|s| self.kind(*s) == FactionKind::Custodians)
+    }
+
+    /// Ticket #531 (version 0.1.0.1): a computer seller sells no carbon credits to the runaway leader
+    /// it presses.
+    pub fn withholds_credits(&self, seller: Seat, buyer: Seat) -> bool {
+        self.seat(seller).ai && self.ai_gang_pressure(seller, buyer) > 0.0
     }
 
     /// Ticket #268: the price multiplier the seller's Relations level toward `buyer` sets, or None
@@ -5433,13 +5474,28 @@ impl Game {
     /// challenge margin and the Accords' Friendly gate.
     pub fn relations_score(&self, viewer: Seat, subject: Seat) -> i64 {
         let c = &self.tables.relations;
-        let base = self.relations_deeds(viewer, subject) + self.blame_relations_term(viewer, subject);
+        let base = self.relations_base(viewer, subject);
+        (base + self.directive_relations_applied(viewer, subject)).clamp(c.worst, c.best)
+    }
+
+    /// The score's parts before the shared-Research reward: the deeds, the Blame term and, since
+    /// ticket #535 (version 0.1.0.1), the Greenwash campaigns `subject` has run.
+    fn relations_base(&self, viewer: Seat, subject: Seat) -> i64 {
+        self.relations_deeds(viewer, subject) + self.blame_relations_term(viewer, subject) + self.greenwash_relations_term(viewer, subject)
+    }
+
+    /// Ticket #535 (version 0.1.0.1): the shared-Research reward (#236) as the score ADDS it -- after
+    /// its ceiling, which the raw `directive_relations_term` knows nothing of -- so the Relations
+    /// hover's parts add up to the whole.
+    pub fn directive_relations_applied(&self, viewer: Seat, subject: Seat) -> i64 {
+        let c = &self.tables.relations;
+        let base = self.relations_base(viewer, subject);
         let pot = self.directive_relations_term(subject);
         // Ticket #236 (version 0.08.3): the reward may not lift a pair past the top of Cordial, the
         // step above Neutral. A pair already higher than that by deeds is not dragged DOWN to it --
         // the ceiling binds the boost, not the score.
         let with_pot = if pot > 0 { (base + pot).min(base.max(c.directive_boost_ceiling)) } else { base + pot };
-        with_pot.clamp(c.worst, c.best)
+        with_pot - base
     }
 
     /// Ticket #236 (version 0.08.3): what everyone else makes of how much of its Research `subject`
@@ -5477,6 +5533,25 @@ impl Game {
     /// rule about how everyone feels about the Prospectors, and nobody ever resents the Custodians.
     /// Capped at `blame_cap` -- half the scale -- so Blame can make a pair Cold but never, by itself,
     /// Hostile: the last points are reserved for deeds.
+    /// Ticket #535 (version 0.1.0.1), at the designer's word: what `viewer` holds against `subject`
+    /// for the Greenwash campaigns it has run -- `viewer`'s own `greenwash_resentment` for every
+    /// `resentment_per` Influence spent, toward zero. A TERM, read afresh like Blame's, on a tally
+    /// that never falls: it builds over the game and the quiet turns that heal deeds never touch it.
+    pub fn greenwash_relations_term(&self, viewer: Seat, subject: Seat) -> i64 {
+        // A hair over, so 20 steps of 0.05 make the whole point they are and not 0.9999.
+        -((self.greenwash_relations_fall(viewer, subject, self.seat(subject).greenwash_spent) + 1e-9).trunc() as i64)
+    }
+
+    /// Ticket #535: how far `viewer`'s Relations toward `subject` fall for this much Influence spent
+    /// on Greenwash, before rounding -- what the order's hover quotes for the amount set.
+    pub fn greenwash_relations_fall(&self, viewer: Seat, subject: Seat, influence: i64) -> f64 {
+        let per = self.tables.influence.greenwash.resentment_per;
+        if viewer == subject || per <= 0 {
+            return 0.0;
+        }
+        influence as f64 / per as f64 * self.tables.faction(self.kind(viewer)).greenwash_resentment
+    }
+
     pub fn blame_relations_term(&self, viewer: Seat, subject: Seat) -> i64 {
         if viewer == subject {
             return 0;
@@ -5514,7 +5589,7 @@ impl Game {
             return Err("a research agreement wants Friendly on both sides".into());
         }
         let turn = self.turn;
-        self.accords.push(Accord { a, b, terms, struck: turn, paid: turn, ending: false, since: turn });
+        self.accords.push(Accord { a, b, terms, struck: turn, paid: turn, ending: false, since: turn, ended_by: None, refused_by: None });
         Ok(())
     }
 
@@ -5541,6 +5616,10 @@ impl Game {
         for (a, b) in last {
             let (yes_a, yes_b) = (self.renewal_willing(a, b), self.renewal_willing(b, a));
             if !(yes_a && yes_b) {
+                let refuser = if yes_a { b } else { a };
+                if let Some(acc) = self.accords.iter_mut().find(|acc| acc.holds(a, b)) {
+                    acc.refused_by = Some(refuser);
+                }
                 self.log(format!("{} let the Accord with {} lapse.", self.seat_name(if yes_a { b } else { a }), self.seat_name(if yes_a { a } else { b })));
                 for (me, other, theirs) in [(a, b, yes_b), (b, a, yes_a)] {
                     if !self.seat(me).ai && !theirs {
@@ -5550,6 +5629,15 @@ impl Game {
                 }
             } else if self.seat(a).ai && self.seat(b).ai {
                 self.renew_accord(a, b);
+            } else {
+                // Ticket #538 (version 0.1.0.1): the partner would renew; the player is told the
+                // Accord ends after this turn, in a line the window opens the Factions window from.
+                for (me, other) in [(a, b), (b, a)] {
+                    if !self.seat(me).ai {
+                        let text = self.say("accord_ends_soon", &[("faction", self.seat_name(other))]);
+                        self.report_line_of(me, LineKind::Accord, LineKind::Note, None, text);
+                    }
+                }
             }
         }
     }
@@ -5573,6 +5661,8 @@ impl Game {
         if let Some(acc) = self.accords.iter_mut().find(|acc| acc.holds(a, b)) {
             acc.terms = terms;
             acc.since = acc.since.max(acc.struck) + run;
+            // Ticket #538 (version 0.1.0.1): a run begun afresh forgets the last one's refusal.
+            acc.refused_by = None;
         }
         self.log(format!("{} and {} renewed their Accord.", self.seat_name(a), self.seat_name(b)));
     }
@@ -5686,8 +5776,8 @@ impl Game {
             TradeGood::Goods(Resource::Ducats, n) => n as f64,
             TradeGood::Goods(r, n) => n as f64 * self.trade_price(r).unwrap_or(1) as f64,
             TradeGood::Place(c) => {
-                let modules: f64 = self.colony(c).map(|col| col.modules.iter().filter(|m| m.kind != ModuleKind::Core).map(|m| self.tables.module(m.kind).materials as f64).sum()).unwrap_or(0.0);
-                (self.tables.station_materials as f64 + modules) * materials
+                let modules: f64 = self.colony(c).map(|col| col.modules.iter().filter(|m| m.kind != ModuleKind::Core).map(|m| self.tables.module(m.kind).materials).sum()).unwrap_or(0.0);
+                (self.tables.station_materials + modules) * materials
             }
         }
     }
@@ -5700,6 +5790,10 @@ impl Game {
             return false;
         }
         if self.progress(from).score_as_it_stands() >= 0.95 {
+            return false;
+        }
+        // Ticket #531 (version 0.1.0.1): nothing to a runaway leader.
+        if self.ai_gang_pressure(seat, from) > 0.0 {
             return false;
         }
         self.trade_value(give) + 1e-9 >= self.trade_value(get)
@@ -5796,6 +5890,7 @@ impl Game {
                     {
                         acc.terms = terms;
                         acc.since = acc.since.max(acc.struck) + run;
+                        acc.refused_by = None;
                     }
                     self.log(format!("{} and {} renewed their Accord.", self.seat_name(from), self.seat_name(to)));
                 }
@@ -5819,6 +5914,7 @@ impl Game {
             }
             // The review: five turns from now, or the renewal already given if that runs longer.
             acc.since = acc.since.max(acc.struck).max(turn);
+            acc.refused_by = None;
             self.log(format!("{} and {} added to their Accord.", self.seat_name(from), self.seat_name(to)));
             for (me, other) in [(from, to), (to, from)] {
                 if !self.seat(me).ai {
@@ -5861,6 +5957,7 @@ impl Game {
     pub fn end_accord(&mut self, a: Seat, b: Seat) {
         if let Some(acc) = self.accords.iter_mut().find(|acc| acc.holds(a, b)) {
             acc.ending = true;
+            acc.ended_by = Some(a);
         }
     }
 
@@ -5873,6 +5970,7 @@ impl Game {
         }
         self.accords.retain(|acc| !acc.holds(breaker, other));
         self.offend_by(breaker, other, 3);
+        self.accord_ended(breaker, other, AccordEnding::Broken(breaker));
         let text = format!("{} broke their Accord with {}.", self.seat_name(breaker), self.seat_name(other));
         self.log(text);
         // Ticket #517 (version 0.1.0.0): and each player in it is told, where the break was only in
@@ -5894,9 +5992,13 @@ impl Game {
     pub fn settle_accords(&mut self) {
         let turn = self.turn;
         let period = self.tables.relations.accord_kept_turns;
-        let lapsed: Vec<(Seat, Seat)> = self.accords.iter().filter(|a| a.ending).map(|a| (a.a, a.b)).collect();
-        for (a, b) in lapsed {
+        let lapsed: Vec<(Seat, Seat, Option<Seat>)> = self.accords.iter().filter(|a| a.ending).map(|a| (a.a, a.b, a.ended_by)).collect();
+        for (a, b, by) in lapsed {
             self.log(format!("The Accord between {} and {} has lapsed.", self.seat_name(a), self.seat_name(b)));
+            // A save from before ticket #538 does not say who called it off, so it names nobody.
+            if let Some(by) = by {
+                self.accord_ended(a, b, AccordEnding::CalledOff(by));
+            }
         }
         self.accords.retain(|a| !a.ending);
         // Ticket #509 (version 0.1.0.0): kept for `period` turns, the turn struck counted, it pays at
@@ -5922,12 +6024,96 @@ impl Game {
             self.log(format!("The Accord between {} and {} has held.", self.seat_name(a), self.seat_name(b)));
         }
         // Ticket #509: the end of an Accord's last turn, not renewed.
-        let ended: Vec<(Seat, Seat)> = self.accords.iter().filter(|acc| self.accord_turns_left(acc) <= 1).map(|acc| (acc.a, acc.b)).collect();
-        for (a, b) in ended {
+        let ended: Vec<(Seat, Seat, Option<Seat>)> = self.accords.iter().filter(|acc| self.accord_turns_left(acc) <= 1).map(|acc| (acc.a, acc.b, acc.refused_by)).collect();
+        for (a, b, refused) in ended {
             self.log(format!("The Accord between {} and {} has run its course.", self.seat_name(a), self.seat_name(b)));
+            self.accord_ended(a, b, refused.map_or(AccordEnding::RanOut, AccordEnding::NotRenewed));
         }
         let run = self.tables.relations.accord_turns;
         self.accords.retain(|acc| (acc.since.max(acc.struck) + run).saturating_sub(turn) > 1);
+    }
+
+    /// Ticket #544 (version 0.1.0.1): the turn before a far world's window, a line under Ships
+    /// naming it, with the flight at the window as the map's hover gives it. A world's moons are
+    /// named with it, since they cross with it; the window's own turn says nothing more.
+    pub fn announce_windows(&mut self) {
+        let next = self.turn + 1;
+        for root in BodyId::ALL {
+            if root == BodyId::Earth || self.tables.body(root).parent.is_some() || self.crossing(BodyId::Earth, root, self.turn).is_none() {
+                continue;
+            }
+            if self.next_window_turn_to(root, self.turn) != next {
+                continue;
+            }
+            let names: Vec<String> = std::iter::once(root).chain(BodyId::ALL.into_iter().filter(|b| self.tables.body(*b).parent == Some(root))).map(|b| self.tables.body(b).name.clone()).collect();
+            let (turns, fuel) = self.transit_cost_at(BodyId::Earth, root, next);
+            let text = self.say("window_next", &[("bodies", Game::comma_list(&names)), ("turns", turns.to_string()), ("fuel", figure(fuel))]);
+            // The review: placeless, since a window is the board's own news and a Ship line at a
+            // world the player cannot see is dropped by the fog -- the very player it is for.
+            self.report_line(LineKind::Ship, None, text);
+        }
+    }
+
+    /// Ticket #544: names in a list with a comma between and "and" before the last.
+    fn comma_list(names: &[String]) -> String {
+        match names {
+            [] => String::new(),
+            [one] => one.clone(),
+            [rest @ .., last] => format!("{} and {last}", rest.join(", ")),
+        }
+    }
+
+    /// Ticket #544 (version 0.1.0.1): the line under the Report's date: the last turn to act, in the
+    /// Climate Panel's words, and the player's Victory as a share; a spectator's has the clock alone.
+    pub fn report_head(&self) -> String {
+        let clock = match self.last_turn_to_act() {
+            crate::climate::LastTurn::Turn(t) => self.phrase("clock_turn", &[("turn", t.to_string())]),
+            crate::climate::LastTurn::TooLate => self.phrase("clock_too_late", &[]),
+            crate::climate::LastTurn::NoCollapse => self.phrase("clock_none", &[]),
+        };
+        if self.spectator {
+            return clock;
+        }
+        // The review: the Victory windows' own rounding.
+        let pct = format!("{:.0}", self.progress(Seat(0)).score() * 100.0);
+        self.phrase("head", &[("clock", clock), ("pct", pct)])
+    }
+
+    /// Ticket #538 (version 0.1.0.1): an Accord between `a` and `b` has ended. Each player in it
+    /// gets the Accord Ended Moment naming the cause, but not one who called it off themself; two
+    /// rivals' ending is a clause of a rival's paragraph (the side that called it off already has
+    /// its own), under the fog.
+    pub fn accord_ended(&mut self, a: Seat, b: Seat, why: AccordEnding) {
+        for (me, other) in [(a, b), (b, a)] {
+            if self.seat(me).ai || why == AccordEnding::CalledOff(me) {
+                continue;
+            }
+            let them = self.seat_name(other);
+            let cause = match why {
+                AccordEnding::RanOut => self.say("accord_cause_ran_out", &[("turns", number_word(self.tables.relations.accord_turns))]),
+                AccordEnding::NotRenewed(_) => self.say("accord_cause_not_renewed", &[("faction", them.clone())]),
+                AccordEnding::CalledOff(_) => self.say("accord_cause_called_off", &[("faction", them.clone())]),
+                AccordEnding::Broken(s) if s == me => self.say("accord_cause_you_broke", &[]),
+                AccordEnding::Broken(_) => self.say("accord_cause_broken", &[("faction", them.clone())]),
+            };
+            let before = self.report.moments.len();
+            self.moment(MomentKind::AccordEnded, &[("faction", them), ("cause", cause)], None);
+            if self.report.moments.len() > before
+                && let Some(m) = self.report.moments.last_mut()
+            {
+                m.seat = Some(other);
+            }
+        }
+        if self.seat(a).ai && self.seat(b).ai {
+            // Two computer seats both willing renew, so between them an Accord never just runs out.
+            let (who, key) = match why {
+                AccordEnding::NotRenewed(s) => (s, "accord_lapsed"),
+                AccordEnding::Broken(s) => (s, "accord_broke"),
+                AccordEnding::CalledOff(_) | AccordEnding::RanOut => return,
+            };
+            let other = if who == a { b } else { a };
+            self.ai_deed(who, key, &[("faction", self.seat_name(other))]);
+        }
     }
 
     /// Ticket #226 (version 0.08.2): would `seat` accept this offer from `from`?
@@ -5946,7 +6132,13 @@ impl Game {
         if self.progress(from).score_as_it_stands() >= 0.95 {
             return false;
         }
-        let view = self.relations_score(seat, from);
+        // Ticket #531 (version 0.1.0.1): no Accord with a runaway leader, and none renewed; the
+        // pack's own come easier, by the pressure this seat puts on its leader.
+        if self.ai_gang_pressure(seat, from) > 0.0 {
+            return false;
+        }
+        let relax = (self.tables.ai.thresholds.gang_accept_relax * self.ai_gang_felt(seat)).round() as i64;
+        let view = self.relations_score(seat, from) + relax;
         // Non-aggression from somebody it holds nothing against is easy; from somebody it loathes it
         // is not. A research agreement is its own gate and needs no opinion beyond Friendly.
         // Ticket #320 (version 0.08.8): Passage, now a rule for Armies as well as Ships, is accepted

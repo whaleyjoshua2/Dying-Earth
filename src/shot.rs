@@ -128,6 +128,8 @@ fn moment_from_id(name: &str) -> Option<MomentKind> {
         "first" => Some(MomentKind::FirstToABody),
         // Ticket #405 (version 0.09.4): staged by the `moment:sink` aid.
         "sink" => Some(MomentKind::UnderTheSink),
+        // Ticket #538 (version 0.1.0.1): staged by the `moment:accord` aid.
+        "accord" => Some(MomentKind::AccordEnded),
         _ => None,
     }
 }
@@ -816,6 +818,13 @@ fn build_board(session: &mut Session) {
                 g.seats[1].influence.insert(Place::State(sid), 45);
             }
         }
+        // `greenwashed:<n>` (a building aid, ticket #535, version 0.1.0.1): the Prospectors have spent n
+        // Influence on Greenwash, so the Relations hover's Greenwash part can be photographed.
+        if let Some(n) = std::env::args().find_map(|a| a.strip_prefix("greenwashed:").and_then(|v| v.parse::<i64>().ok()))
+            && let Some(pro) = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Prospectors)
+        {
+            g.seats[pro.index()].greenwash_spent = n;
+        }
         // `emigrants:<n>` (a building aid, ticket #73): n Emigrants wait in seat 0's start state.
         if let Some(n) = std::env::args().find_map(|a| a.strip_prefix("emigrants:").and_then(|v| v.parse::<u32>().ok())) {
             let start = g.controlled_states(Seat(0)).first().copied();
@@ -860,13 +869,13 @@ fn build_board(session: &mut Session) {
         // Terms with seat 1, for the hover on its line in the Factions window.
         if std::env::args().any(|a| a == "accord:all") {
             let turn = g.turn;
-            g.accords.push(Accord { a: Seat(0), b: Seat(1), terms: vec![Term::NonAggression, Term::Passage, Term::Refuel, Term::ResearchAgreement], struck: turn, paid: turn, ending: false, since: turn });
+            g.accords.push(Accord { a: Seat(0), b: Seat(1), terms: vec![Term::NonAggression, Term::Passage, Term::Refuel, Term::ResearchAgreement], struck: turn, paid: turn, ending: false, since: turn, ended_by: None, refused_by: None });
         }
         // `accord:some` (a building aid, ticket #509, version 0.1.0.0): seat 0 holds non-aggression alone
         // with seat 1, so the card shows its turns left and the Terms it lacks, to add.
         if std::env::args().any(|a| a == "accord:some") {
             let turn = g.turn;
-            g.accords.push(Accord { a: Seat(0), b: Seat(1), terms: vec![Term::NonAggression], struck: turn, paid: turn, ending: false, since: turn });
+            g.accords.push(Accord { a: Seat(0), b: Seat(1), terms: vec![Term::NonAggression], struck: turn, paid: turn, ending: false, since: turn, ended_by: None, refused_by: None });
         }
         // `accord:last` (a building aid, ticket #509, version 0.1.0.0): seat 0 holds non-aggression with
         // seat 1 in its last turn, so the card's Renew button can be photographed; with `turns:4`, as
@@ -874,7 +883,34 @@ fn build_board(session: &mut Session) {
         if std::env::args().any(|a| a == "accord:last") {
             let at = g.turn.saturating_sub(4);
             g.accords.retain(|x| !x.holds(Seat(0), Seat(1)));
-            g.accords.push(Accord { a: Seat(0), b: Seat(1), terms: vec![Term::NonAggression], struck: at, paid: at, ending: false, since: at });
+            g.accords.push(Accord { a: Seat(0), b: Seat(1), terms: vec![Term::NonAggression], struck: at, paid: at, ending: false, since: at, ended_by: None, refused_by: None });
+        }
+        // `moment:accord` (a building aid, ticket #538, version 0.1.0.1): the Prospectors in seat 1
+        // call off an Accord with the player, so the next turn's Report carries its ending.
+        // `accord:warn`: one in its fourth turn, so the next turn's Report warns of its last.
+        if std::env::args().any(|a| a == "moment:accord" || a == "accord:warn") {
+            let at = if std::env::args().any(|a| a == "accord:warn") { g.turn.saturating_sub(3) } else { g.turn };
+            g.accords.retain(|x| !x.holds(Seat(0), Seat(1)));
+            g.accords.push(Accord { a: Seat(0), b: Seat(1), terms: vec![Term::NonAggression], struck: at, paid: at, ending: false, since: at, ended_by: None, refused_by: None });
+            if std::env::args().any(|a| a == "moment:accord") {
+                g.end_accord(Seat(1), Seat(0));
+            }
+            refuse_any_card(g);
+            g.end_turn(std::array::from_fn(|_| Vec::new())).expect("the screenshot harness picks a Tech before it drives turns");
+        }
+        // `rival:spend` (a building aid, ticket #542, version 0.1.0.1): the Prospectors spend 12 on
+        // the player's home, holding a Standing within two such spends of taking it, and the turn is
+        // ended, so the next Report says both lines.
+        if std::env::args().any(|a| a == "rival:spend")
+            && let Some(home) = g.seat(Seat(0)).home_region
+        {
+            let place = Place::State(home);
+            let gained = g.standing_from(place, 12);
+            let before = g.influence_needed_for(Seat(1), place) - 2 * gained + 1;
+            g.seats[1].influence.insert(place, before.max(1));
+            g.pending.influence.push((Seat(1), place, 12));
+            refuse_any_card(g);
+            g.end_turn(std::array::from_fn(|_| Vec::new())).expect("the screenshot harness picks a Tech before it drives turns");
         }
         // `accords:0` (a building aid, ticket #430, version 0.09.5): every Accord struck, so a picture
         // after driven turns shows the fog as a seat with no Accord sees it.
@@ -916,6 +952,7 @@ fn build_board(session: &mut Session) {
         // first Facility struck by a Labour Dispute. `unkept`: a Sea Wall there shut for its keep.
         // `half`: the home Region's Unrest at the Facility threshold. `blockade`: a rival Frigate on
         // Blockade in the ring of seat 0's station over Earth.
+        // `launch` (ticket #532, version 0.1.0.1): the home Region's Launch Site dark.
         if let Some(v) = std::env::args().find_map(|a| a.strip_prefix("offline:").map(str::to_owned)) {
             let home = g.controlled_states(Seat(0)).first().copied();
             match (v.as_str(), home) {
@@ -933,6 +970,13 @@ fn build_board(session: &mut Session) {
                     g.state_mut(sid).facilities.push(wall);
                 }
                 ("half", Some(sid)) => g.state_mut(sid).unrest = g.tables.unrest.facility_threshold,
+                // Ticket #532 (version 0.1.0.1): the home Launch Site dark, for its "No" line.
+                ("launch", Some(sid)) => {
+                    if let Some(f) = g.state_mut(sid).facilities.iter_mut().find(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite)) {
+                        f.online = false;
+                        f.offline_cause = Some(OfflineCause::Unkept);
+                    }
+                }
                 ("blockade", _) => {
                     if let Some(slot) = g.colonies.iter().find(|c| c.in_orbit && c.body == BodyId::Earth && c.control.director() == Some(Seat(0))).map(|c| c.slot) {
                         let id = ShipId(g.fresh_id());
@@ -1047,7 +1091,8 @@ fn build_board(session: &mut Session) {
                 seat: Seat(0),
                 damage: 0,
                 at: ShipAt::Body(body),
-                colonists: 8,
+                // `aboard:<n>` (ticket #543, version 0.1.0.1): how many it carries, where it is eight.
+                colonists: std::env::args().find_map(|a| a.strip_prefix("aboard:").and_then(|v| v.parse::<u32>().ok())).unwrap_or(8),
                 colonists_education: 1.0,
                 warhead: false,
                 army: None,
@@ -1242,6 +1287,8 @@ fn build_board(session: &mut Session) {
             let sid = StateId::EastAsia;
             g.take_control(sid, Seat(0));
             g.seats[0].stockpile.energy = 400.0;
+            // Ticket #537 (version 0.1.0.1): the Permit's 25 Ducats, so the order is not dropped.
+            g.seats[0].stockpile.ducats = g.seats[0].stockpile.ducats.max(g.tables.strip_permit.ducats as f64);
             g.seats[0].ai = false;
             let mut orders: [Vec<Order>; SEAT_COUNT] = std::array::from_fn(|_| Vec::new());
             orders[0] = vec![Order::StripPermit { state: sid }];
@@ -1460,6 +1507,28 @@ fn build_board(session: &mut Session) {
         eprintln!("order:{name} was refused");
         std::process::exit(3);
     }
+    // `liftgo:1` (a building aid, ticket #533, version 0.1.0.1): seat 0's empty Colony Ship at
+    // Earth (one is made in low orbit if it has none), four Pioneers waiting in its start state, and
+    // a lift of the four AND a flight to the Moon both placed, so its card (`stack:earth ship:1`)
+    // can be photographed with the two side by side.
+    if std::env::args().any(|a| a == "liftgo:1")
+        && let Some(g) = session.game.as_mut()
+        && let Some(sid) = g.directed_states(Seat(0)).first().copied()
+    {
+        let here = g.ships.iter().find(|s| s.seat == Seat(0) && s.kind == UnitKind::ColonyShip && s.at == ShipAt::Body(BodyId::Earth) && s.colonists == 0).map(|s| s.id);
+        let id = here.unwrap_or_else(|| {
+            let id = ShipId(g.fresh_id());
+            let name = g.next_ship_name(UnitKind::ColonyShip);
+            let (built_turn, fuel) = (g.turn, g.tank_of(Seat(0), UnitKind::ColonyShip));
+            g.ships.push(Ship { id, name, kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel, slot: None });
+            id
+        });
+        g.state_mut(sid).emigrants = 4;
+        if !session.place(Order::Load { ship: id, colonists: 4, from: LoadSource::State(sid), army: None }) || !session.place(Order::Transit { ship: id, to: BodyId::Moon, slot: None }) {
+            eprintln!("liftgo:1 was refused");
+            std::process::exit(3);
+        }
+    }
     // `raise:1` (a building aid, ticket #476, version 0.09.8): Raise Industry Level is ordered in
     // seat 0's start state and left pending, so its tile can be photographed ordered. The seat is
     // given the Materials first: three turns in it cannot afford one. `raise:afford` gives them and orders nothing.
@@ -1608,7 +1677,7 @@ fn build_board(session: &mut Session) {
         && let Some(g) = session.game.as_mut()
     {
         let turn = g.turn;
-        g.accords.push(Accord { a: Seat(0), b: Seat(2), terms: vec![Term::NonAggression], struck: turn, paid: turn, ending: false, since: turn });
+        g.accords.push(Accord { a: Seat(0), b: Seat(2), terms: vec![Term::NonAggression], struck: turn, paid: turn, ending: false, since: turn, ended_by: None, refused_by: None });
         g.offers.push(dying_earth_engine::state::Offer { from: Seat(2), to: Seat(0), terms: vec![Term::Passage], trade: None, turn, ask: AccordAsk::Add });
     }
     // Ticket #495 (version 0.09.9): `offer:<n>` (a building aid): the first n computer seats each

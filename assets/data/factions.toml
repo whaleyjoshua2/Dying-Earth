@@ -11,6 +11,8 @@ name = "Custodians"
 # Ticket #221 (version 0.08.2): they exist to object to what the Prospectors do, and mind another
 # Faction's Blame at twice the ordinary rate.
 resentment = 2.0
+# Ticket #535 (version 0.1.0.1): Relations lost per 10 Influence another spends on a Greenwash.
+greenwash_resentment = 0.4
 # Version 0.04 (ticket #46): the bare station over Earth the Faction starts with (named in bodies.toml).
 start_station = "ISS"
 # Ticket #290 (version 0.08.6): the Colonists aboard it when the game opens, from nowhere, so the
@@ -91,7 +93,9 @@ ducats_multiplier = 1.2
 market_multiplier = 0.85
 # Ticket #221: zero. They do not mind another Faction's Blame at all, which is a statement about them.
 resentment = 0.0
-signature = "Cheap Industry and the Strip Permit. Raising Industry Level costs them 15 Materials rather than 30, every Facility and Module 15% less; their Regions pay a fifth more Ducats and the Trading window sells to them at 15% off. A Strip Permit is free and may be taken once in a Region's whole life: for three turns every Facility there produces double, and when it ends that Region's Baseline Emissions rise by 0.2 for good and its Unrest by 2. The Venture Capital Fund: each turn they set what share of their Ducat income is banked in it, 0% to 80% in whole percents; a withdrawal returns nine tenths."
+# Ticket #535 (version 0.1.0.1): Relations lost per 10 Influence another spends on a Greenwash.
+greenwash_resentment = 0.05
+signature = "Cheap Industry and the Strip Permit. Raising Industry Level costs them 15 Materials rather than 30, every Facility and Module 15% less; their Regions pay a fifth more Ducats and the Trading window sells to them at 15% off. A Strip Permit costs 25 Ducats and may be taken once in a Region's whole life: for three turns every Facility there produces double, and when it ends that Region's Baseline Emissions rise by 0.2 for good and its Unrest by 2. The Venture Capital Fund: each turn they set what share of their Ducat income is banked in it, 0% to 80% in whole percents; a withdrawal returns nine tenths."
 # Ticket #203 (version 0.08.1). The building is ticket #182's.
 unique = "Investment Bank -- replaces the Bank, and banks 1% interest a turn on the Venture Capital Fund's balance, one building per Region paying, never less than 1 Ducat in all. Off Earth, the Exchange -- replaces the Trade Post, and pays 1 more Ducat a turn."
 # Ticket #72: the Extraction Total is retired; the first part is Ducats banked in the Fund.
@@ -131,6 +135,8 @@ opens_on = "south_asia"
 name = "Arkwrights"
 # Ticket #221: half. Leaving is the point; the smoke behind them is somebody else's argument.
 resentment = 0.5
+# Ticket #535 (version 0.1.0.1): Relations lost per 10 Influence another spends on a Greenwash.
+greenwash_resentment = 0.2
 # The Arkwrights start with no station over Earth (ticket #50): they leave from the ground.
 # Ticket #290 (version 0.08.6): so two Pioneers wait in their start Region on turn one instead, a gift
 # outside Coach Class that takes no population -- the mirror of the two Colonists aboard everybody
@@ -176,7 +182,7 @@ module_materials_multiplier = 0.75
 start_extra_facilities = ["power_plant"]
 # Ticket #407 (version 0.09.4): audited against the data: 16 with Generation Ships too, and a
 # Colony Ship at 25.5 since figures are carried to a tenth.
-signature = "Coach Class. A Colony Ship carries 6 Colonists, 9 with Expanded Habitats and 12 with Generation Ships too, and their Habitats hold half again as many, 6 and 12. They recruit 3 Pioneers a turn in each state where others recruit 2, but every Pioneer takes half again the population. Every Ship costs them 15% less, a Colony Ship 25.5 Materials; a transit burns three quarters of the Fuel; and, starting with no station, a Space Station costs them 20 Materials and a Module three quarters."
+signature = "Coach Class. A Colony Ship carries 6 Colonists, 9 with Expanded Habitats and 12 with Generation Ships too, and their Habitats hold half again as many, 6 and 12. They recruit 3 Pioneers a turn in each state where others recruit 2, but every Pioneer takes half again the population. Every Ship costs them 15% less, a Colony Ship 28.1 Materials; a transit burns three quarters of the Fuel; and, starting with no station, a Space Station costs them 22 Materials and a Module three quarters."
 # Ticket #419 (version 0.09.4): Unrest off every Region they hold, a whole point for each ground
 # Colony they found off Earth (Antarctica excepted) and half a point for each Space Station they
 # build; a place taken counts for nothing.
@@ -184,7 +190,7 @@ found_colony_unrest_ease = 1.0
 found_station_unrest_ease = 0.5
 # Ticket #203 (version 0.08.1). The building is ticket #183's.
 unique = "Spaceport -- replaces the Launch Site, and pays +1 Influence into next turn's Allotment for every Pioneer it lifts off Earth. Off Earth, the Chorus -- replaces the Relay, and adds +1 Influence to the Allotment for every 6 Colonists at its Colony."
-victory = "Diaspora: 42 Colonists living off Earth, on Colonies spread over at least four Bodies with at least 4 Colonists each, one of them holding a Colonial Capital of yours (Antarctica and stations over Earth do not count)."
+victory = "Diaspora: 42 Colonists living off Earth, on Colonies spread over at least four Bodies with at least 4 Colonists each, one of them holding a Colonial Capital of yours (Antarctica does not count; Earth is not one of the four)."
 victory_short = "get {first} Colonists living off Earth, spread over {bodies} Bodies, one holding a Colonial Capital,"
 # Ticket #506 (version 0.1.0.0): 42 (30 x 50/36) and four Bodies, with the game at fifty turns.
 victory_first = { kind = "colonists_off_earth", bar = 42 }
@@ -209,6 +215,8 @@ opens_on = "north_america"
 name = "Archivists"
 # Ticket #221: the ordinary rate.
 resentment = 1.0
+# Ticket #535 (version 0.1.0.1): Relations lost per 10 Influence another spends on a Greenwash.
+greenwash_resentment = 0.1
 start_station = "Axiom"
 # Ticket #290 (version 0.08.6): the Colonists aboard it when the game opens, from nowhere, so the
 # station has two Module slots free from turn one; bare, it had none.
@@ -240,7 +248,7 @@ unique = "Reactor -- replaces the Power Plant, and takes a quarter off the Energ
 # Ticket #347 (version 0.09.1): 125 of it, and the fund holds the whole figure from the first turn.
 # This bar IS `[archive] research` in modules.toml -- one figure written in two files, the Archive's
 # cost and the Archivists' bar, and a test asserts the two are equal so they cannot drift.
-victory = "Build the Archive at a Colony off Earth (50 Materials, three turns, and four Colonists must live there to begin it), pay 225 Research into it and keep it running, then upload 18 Colonists into it from the people living where it stands."
+victory = "Build the Archive at a Colony off Earth (55 Materials, three turns, and four Colonists must live there to begin it), pay 225 Research into it and keep it running, then upload 18 Colonists into it from the people living where it stands."
 victory_short = "build the Archive off Earth, pay {first} Research into it, and upload {second} Colonists,"
 # Ticket #506 (version 0.1.0.0): 225 and 18 uploads, at the designer's word, with the game at fifty turns.
 victory_first = { kind = "archive_research", bar = 225 }
@@ -497,7 +505,9 @@ prospectors_ducats_per_point = 0.8
 arkwrights_fuel_per_point = 0.2
 
 [ducats]
-per_influence = 2
+# Ticket #537 (version 0.1.0.1): four Ducats a point, where it was two (the playtest's 2.2:
+# Influence bought without limit was cheap). Still no cap.
+per_influence = 4
 # Version 0.04 (ticket #41): two Ducats for one of the thing bought, as with Influence. A repair
 # point is 5 Materials, so 10 Ducats. Ticket #54 retired `per_restoration_step` with Restoration and
 # put `per_leapfrog` in its place: what one Leapfrog costs the Custodians on a state they control.

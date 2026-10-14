@@ -371,6 +371,8 @@ DIPLOMACY (ticket #226; `show` prints Relations both ways and every Accord stand
   accord end <faction>                 declare a standing Accord over: free, and it lapses at the
                                        next turn's start -- which gives the board a turn's warning
                                        that something is coming.
+  accord renew <faction>               in an Accord's last turn, renew it for five more; the Report
+                                       warns of that turn ("ends after this turn").
   trade <faction> <give> for <ask>     one thing for one thing: `<n> ducats|materials|fuel|energy`
                                        or a colony id; answered at the head of their next turn, the
                                        goods moving only if both still hold them.
@@ -412,7 +414,9 @@ RESEARCH, THE ARCHIVE AND THE FACTION ORDERS
                                        leave the living population. Free, and irreversible.
   venture-share <percent>              the Prospectors only, in steps of {venturestep}% from 0% to {venturemax}%
   draw-venture <amount>                the Prospectors only
-  leapfrog <state>                     the Custodians only
+  leapfrog <state>                     the Custodians only, {leapprice} Ducats: the Region's people emit
+                                       {leapstep} less per hundred million, for good, never below
+                                       {leapfloor}, and its Baseline Emissions fall {leapbase}
   strip-permit <state>                 the Prospectors only
   exodus-call <state>                  the Arkwrights only, on a Region they control, once per Region
                                        EVER, for {exodus} Ducats: while it runs it doubles what they may
@@ -439,6 +443,11 @@ fn grammar(t: Option<&Tables>) -> String {
         ("{creditprice}", n(|t| t.carbon_credits.price_per_ppm.to_string())),
         ("{creditcap}", n(|t| t.carbon_credits.cap_per_turn.to_string())),
         ("{kept}", n(|t| t.relations.accord_kept_turns.to_string())),
+        // Ticket #541 (version 0.1.0.1): what a Leapfrog does, in the window button's figures.
+        ("{leapprice}", n(|t| t.ducats.per_leapfrog.to_string())),
+        ("{leapstep}", n(|t| format!("{:.2}", t.climate.population_emissions_per_level * t.units_per_hundred_million()))),
+        ("{leapfloor}", n(|t| format!("{:.2}", t.climate.population_emissions_base * t.units_per_hundred_million()))),
+        ("{leapbase}", n(|t| format!("{:.1}", t.climate.leapfrog_baseline_cut))),
         ("{tributeducats}", n(|t| t.relations.tribute_ducats.to_string())),
         ("{tributematerials}", n(|t| t.relations.tribute_materials.to_string())),
         ("{agitateducats}", n(|t| t.unrest.agitate_ducats.to_string())),
@@ -592,10 +601,12 @@ fn parse_line(g: &Game, line: &str) -> Result<Line, String> {
                     Order::ProposeAccord { to, terms }
                 }
                 "end" => Order::EndAccord { with: seat_of(g, at(2)?)? },
+                // Ticket #538 (version 0.1.0.1): the window's Renew, in an Accord's last turn.
+                "renew" => Order::RenewAccord { with: seat_of(g, at(2)?)? },
                 // Ticket #495 (version 0.09.9): an offer made to you waits for your answer.
                 "accept" => return Ok(Line::Offer(seat_of(g, at(2)?)?, true, false)),
                 "decline" | "refuse" => return Ok(Line::Offer(seat_of(g, at(2)?)?, false, false)),
-                _ => return Err(format!("`accord {what}` is not one of offer, end, accept, refuse")),
+                _ => return Err(format!("`accord {what}` is not one of offer, end, renew, accept, refuse")),
             }
         }
         // Ticket #496 (version 0.09.9): `trade <faction> <n> <good>|<colony id> for <n> <good>|<colony id>`,
@@ -795,9 +806,17 @@ fn print_question(g: &Game) {
 /// refuses in its own words; a player reading only those would not know what to write.
 fn owed_answer(g: &Game) -> Option<String> {
     // Ticket #495 (version 0.09.9): an Accord offered is answered by name.
-    if let Some((_, o)) = g.offers_to(Seat(0)).first() {
-        let what = if o.trade.is_some() { "trade" } else { "accord" };
-        return Some(format!("Put `{what} accept {0}` or `{what} refuse {0}` in the order list.", g.seat_name(o.from).to_lowercase()));
+    // Ticket #541 (version 0.1.0.1): what each offer holds, where the playtest answered blind.
+    let offers = g.offers_to(Seat(0));
+    if !offers.is_empty() {
+        let lines: Vec<String> = offers
+            .iter()
+            .map(|(_, o)| {
+                let what = if o.trade.is_some() { "trade" } else { "accord" };
+                format!("{} {}\n  Put `{what} accept {2}` or `{what} refuse {2}` in the order list.", g.seat_name(o.from), offer_words(g, o), g.seat_name(o.from).to_lowercase())
+            })
+            .collect();
+        return Some(lines.join("\n  "));
     }
     let q = g.pending_question()?;
     if q.answer_of(Seat(0)).is_some() {
@@ -814,6 +833,47 @@ fn owed_answer(g: &Game) -> Option<String> {
             format!("You cannot take it: {}, so `answer refuse` is your only move.", g.card_shortfall(Seat(0)).unwrap_or_else(|| "you cannot pay what it asks".to_string()))
         }
     ))
+}
+
+/// Ticket #541 (version 0.1.0.1): an offer's contents, as the window's Offers prompt says them --
+/// the Terms of an Accord, or what a Trade gives for what it asks.
+fn offer_words(g: &Game, o: &dying_earth_engine::state::Offer) -> String {
+    let good = |t: dying_earth_engine::TradeGood| match t {
+        dying_earth_engine::TradeGood::Goods(r, n) => format!("{n} {}", r.name()),
+        dying_earth_engine::TradeGood::Place(c) => g.place_name(Place::Colony(c)),
+    };
+    match o.trade {
+        Some((give, get)) => format!("offer {} for {}.", good(give), good(get)),
+        None => {
+            let names: Vec<&str> = o
+                .terms
+                .iter()
+                .map(|t| match t {
+                    Term::NonAggression => "non-aggression",
+                    Term::Passage => "passage",
+                    Term::Refuel => "refuel",
+                    Term::ResearchAgreement => "a research agreement",
+                })
+                .collect();
+            // The review: a renewal in the window's words, the research agreement it drops said so.
+            match o.ask {
+                dying_earth_engine::state::AccordAsk::New => format!("offer an Accord: {}.", names.join(", ")),
+                dying_earth_engine::state::AccordAsk::Add => format!("offer to add to your Accord: {}.", names.join(", ")),
+                dying_earth_engine::state::AccordAsk::Renew => {
+                    let held = g.accords.iter().find(|a| a.holds(o.from, o.to)).map(|a| a.terms.clone()).unwrap_or_default();
+                    let dropped = if held.contains(&Term::ResearchAgreement) && !o.terms.contains(&Term::ResearchAgreement) { " The research agreement drops: you are no longer both Friendly." } else { "" };
+                    format!("renew your Accord ({}) for five turns? It lapses next turn.{dropped}", names.join(", "))
+                }
+            }
+        }
+    }
+}
+
+/// Ticket #541 (version 0.1.0.1): every Faction's Standing on a place, as the window's Standings
+/// row shows it, where the tool showed the player's own alone.
+fn standings_text(g: &Game, target: Target) -> String {
+    let parts: Vec<String> = Seat::ALL.into_iter().filter_map(|s| g.seat(s).influence.get(&target).copied().filter(|v| *v > 0).map(|v| format!("{} {v}", g.seat_name(s)))).collect();
+    if parts.is_empty() { "Standings: nobody has any yet".to_string() } else { format!("Standings: {}", parts.join(", ")) }
 }
 
 /// What it would take this seat to take `target` as it stands, which on a held place is the
@@ -1014,8 +1074,22 @@ fn print_costs(g: &Game) {
     // Ticket #404 (version 0.09.4): the Market line is on the board every turn, so not here too.
 }
 
+/// Ticket #543 (version 0.1.0.1): a Colony Ship's Colonists as aboard/room, the crowded room at a
+/// warmed Earth, and "(4 found a Colony)" at one to three aboard; any other Ship, its count.
+fn colonists_text(g: &Game, sh: &Ship) -> String {
+    if sh.kind != UnitKind::ColonyShip {
+        return sh.colonists.to_string();
+    }
+    let crowd = if sh.at == ShipAt::Body(BodyId::Earth) { g.crowd_extra() } else { 0 };
+    let found = g.tables.emigrants.found_with;
+    let short = if sh.colonists > 0 && sh.colonists < found { format!(" ({found} found a Colony)") } else { String::new() };
+    format!("{}/{}{short}", sh.colonists, g.colony_ship_capacity(sh.seat) + crowd)
+}
+
 fn print_report(g: &Game) {
     println!("\n=== REPORT, turn {} ===", g.report.turn);
+    // Ticket #544 (version 0.1.0.1): the clock and the player's Victory, first.
+    println!("{}", g.report_head());
     // Ticket #430 (version 0.09.5): the Report as seat 0 sees it under the fog (`--reveal` lifts it).
     let report = g.report_seen_by(Seat(0));
     if let Some(h) = report.headline() {
@@ -1023,6 +1097,11 @@ fn print_report(g: &Game) {
     }
     if let Some(e) = &g.report.event {
         println!("EVENT: {e}");
+    }
+    // Ticket #538 (version 0.1.0.1): the Moments the window stops the turn for, an Accord's end
+    // among them, where the text tool printed none.
+    for m in g.report.moments_shown(&|k| g.tables.report.moment_on(k)) {
+        println!("MOMENT: {}", m.text);
     }
     // Ticket #404 (version 0.09.4): under the window's headings, so a place that changed hands to
     // or from you reads under Your works as well as under its place.
@@ -1237,6 +1316,7 @@ fn print_board(g: &Game) {
             standing_note(g, me, Place::State(st.id)),
             st.emigrants
         );
+        println!("    {}", standings_text(g, Place::State(st.id)));
         println!(
             "    {} | lean {} | GDP {} | facilities: {}",
             card.name,
@@ -1291,6 +1371,7 @@ fn print_board(g: &Game) {
             g.seat(me).influence.get(&Place::Colony(c.id)).copied().unwrap_or(0),
             standing_note(g, me, Place::Colony(c.id))
         );
+        println!("    {}", standings_text(g, Place::Colony(c.id)));
         // Ticket #335: the ORBIT a Ship must sit in to touch this place -- its own for a station,
         // low orbit for a Colony on the ground, since low orbit is what touches the ground.
         let reached = if c.in_orbit {
@@ -1355,7 +1436,9 @@ fn print_board(g: &Game) {
             ship_at_text(g, sh),
             sh.fuel,
             figure(g.tank_of(sh.seat, sh.kind)),
-            sh.colonists,
+            // Ticket #543 (version 0.1.0.1): a Colony Ship's aboard/room, and the founding rule
+            // where it is short of it.
+            colonists_text(g, sh),
             // Ticket #404 (version 0.09.4): a number or a dash, never `Some(2)`.
             sh.army.map(|a| a.0.to_string()).unwrap_or_else(|| "-".to_string()),
             t.unit(sh.kind).hit_points as i64 - sh.damage as i64,

@@ -225,9 +225,9 @@ pub enum Order {
     /// Version 0.05 (ticket #54): Leapfrog. The Custodians only, on a Nation State they control:
     /// 50 Ducats lowers its people's Emissions coefficient by one Industry Level's worth, for good.
     Leapfrog { state: StateId },
-    /// Version 0.05 (ticket #54): the Strip Permit. The Prospectors only, free, once per Nation
+    /// Version 0.05 (ticket #54): the Strip Permit. The Prospectors only, once per Nation
     /// State ever: three turns of doubled Facility output, then a permanent price in Baseline
-    /// Emissions and Unrest.
+    /// Emissions and Unrest. Ticket #537 (version 0.1.0.1): 25 Ducats, where it was free.
     StripPermit { state: StateId },
     /// Ticket #237 (version 0.08.3): the Exodus Call. The Arkwrights only, on a state they
     /// control, once per state EVER. While it runs it doubles what they may recruit there and
@@ -316,6 +316,28 @@ impl std::fmt::Display for OrderError {
 
 fn fail<T>(msg: impl Into<String>) -> Result<T, OrderError> {
     Err(OrderError(msg.into()))
+}
+
+/// Ticket #533 (version 0.1.0.1), at the designer's word: a **lift** from a Region -- Pioneers or
+/// an Army sent up -- never uses a Ship's turn. It boards where the Ship sits, before it moves.
+pub fn is_lift(o: &Order, ship: ShipId) -> bool {
+    matches!(o, Order::Load { ship: x, from: LoadSource::State(_), .. } if *x == ship)
+}
+
+/// Ticket #533: a Ship's **one action** a turn, which a lift and a refuel stand beside: a flight, a
+/// change of orbit, an unload or a founding, a load off a Colony or station, a Bombard, a Launch or
+/// a Rearm.
+pub fn is_ship_action(o: &Order, ship: ShipId) -> bool {
+    match o {
+        Order::Transit { ship: x, .. }
+        | Order::ChangeOrbit { ship: x, .. }
+        | Order::Unload { ship: x, .. }
+        | Order::Bombard { ship: x, .. }
+        | Order::Launch { ship: x, .. }
+        | Order::Rearm { ship: x }
+        | Order::Load { ship: x, from: LoadSource::Colony(_), .. } => *x == ship,
+        _ => false,
+    }
 }
 
 /// Ticket #489 (version 0.09.9): the people who left a place at End Turn to found a station or a
@@ -512,7 +534,7 @@ impl Game {
             BuildingChange::Mothball => Some(format!("+{} Unrest", figure(u.per_mothball))),
             BuildingChange::Decommission => {
                 let kind = self.state(sid).facilities.get(i)?.kind;
-                Some(format!("+{} Unrest, {} Materials back", figure(u.per_decommission), figure(tenth(self.tables.facility(kind).materials as f64 / 2.0))))
+                Some(format!("+{} Unrest, {} Materials back", figure(u.per_decommission), figure(tenth(self.tables.facility(kind).materials / 2.0))))
             }
             BuildingChange::Restart => None,
         }
@@ -571,7 +593,8 @@ impl Game {
             return Ok(());
         }
         Err(OrderError(match from {
-            LoadSource::State(_) => format!("needs {found} Colonists"),
+            // Ticket #543 (version 0.1.0.1): Pioneers waiting in this Region, which is what it means.
+            LoadSource::State(_) => format!("needs {found} Pioneers here"),
             LoadSource::Colony(_) => format!("needs {found} Colonists to spare"),
         }))
     }
@@ -584,14 +607,14 @@ impl Game {
             Order::BuildFacility { kind, .. } => Cost { materials: self.facility_materials(seat, *kind), ..Default::default() },
             Order::RaiseIndustry { state } => Cost { materials: self.industry_cost(seat, *state), ..Default::default() },
             // Ticket #490 (version 0.09.9): the next tier's price, the same for every Faction.
-            Order::RaiseTier { colony } => Cost { materials: self.colony(*colony).and_then(|c| self.next_tier(c)).map_or(0.0, |t| t.materials as f64), ..Default::default() },
+            Order::RaiseTier { colony } => Cost { materials: self.colony(*colony).and_then(|c| self.next_tier(c)).map_or(0.0, |t| t.materials), ..Default::default() },
             // Ticket #51: a Faction's card may make its Modules and its Colony Ships cost less.
             // Ticket #88: and the Colony's working Mines take more off.
             Order::BuildModule { colony, kind } => Cost { materials: self.module_materials_at(seat, *colony, *kind), ..Default::default() },
             // Ticket #87: a Ship is built with a full tank, its Fuel paid at the build.
             // Ticket #398 (version 0.09.3): at the yard's price, so a low-gravity yard with a Mine is cheaper.
             Order::BuildShip { site, kind } => Cost { materials: self.ship_materials_at(seat, *site, *kind), fuel: self.tank_of(seat, *kind), ..Default::default() },
-            Order::BuildArmy { .. } => Cost { materials: t.unit(UnitKind::Army).materials as f64, ..Default::default() },
+            Order::BuildArmy { .. } => Cost { materials: t.unit(UnitKind::Army).materials, ..Default::default() },
             Order::Repair { points, .. } => {
                 Cost { materials: (t.repair.materials_per_point * *points as i64) as f64, ..Default::default() }
             }
@@ -618,8 +641,10 @@ impl Game {
             Order::Smear { amount, .. } => Cost { influence: *amount, ..Default::default() },
             Order::Greenwash { amount } => Cost { influence: *amount, ducats: (*amount * self.tables.influence.greenwash.ducats_per_influence) as f64, ..Default::default() },
             Order::BuyCredits { ppm } => Cost { ducats: self.credit_cost(seat, *ppm).unwrap_or(0.0), ..Default::default() },
-            // Ticket #54: a Mothball and a Strip Permit are free; a Restart costs Materials and a
-            // Leapfrog Ducats; a Decommission pays Materials back, which arrive at its Resolution.
+            // Ticket #54: a Mothball is free; a Restart costs Materials and a Leapfrog Ducats; a
+            // Decommission pays Materials back, which arrive at its Resolution. Ticket #537 (version
+            // 0.1.0.1): a Strip Permit costs Ducats, where it was free.
+            Order::StripPermit { .. } => Cost { ducats: t.strip_permit.ducats as f64, ..Default::default() },
             Order::Change { what: BuildingChange::Restart, .. } => Cost { materials: t.mothball.restart_materials as f64, ..Default::default() },
             Order::Leapfrog { .. } => Cost { ducats: t.ducats.per_leapfrog as f64, ..Default::default() },
             Order::ExodusCall { .. } => Cost { ducats: t.ducats.per_exodus_call as f64, ..Default::default() },
@@ -800,6 +825,15 @@ impl Game {
             return 0.0;
         }
         tenth((per * amount) as f64 / d.sell_divisor as f64)
+    }
+
+    /// Ticket #533 (version 0.1.0.1): the Fuel in a Ship's tank once a refuel given this turn has
+    /// filled it, as that refuel will be paid -- it lands before the Ship moves.
+    pub fn tank_after_refuel(&self, seat: Seat, pending: &[Order], s: &Ship) -> f64 {
+        match pending.iter().position(|o| matches!(o, Order::Refuel { ship } if *ship == s.id)) {
+            Some(i) => tenth(s.fuel + self.refuel_amount_from(s.id, self.remaining(seat, &pending[..i]).0.fuel)),
+            None => s.fuel,
+        }
     }
 
     pub fn remaining(&self, seat: Seat, pending: &[Order]) -> (Stockpile, i64) {
@@ -1381,6 +1415,21 @@ impl Game {
                 {
                     return fail(format!("this Nation State already has a {}", kind.name()));
                 }
+                // Ticket #534 (version 0.1.0.1), at the designer's word: one Launch Site to a Region
+                // by the same door, the Spaceport counted as one. The refusal names the one there.
+                if kind.does_the_job_of(FacilityKind::LaunchSite) {
+                    let st = self.state(*state);
+                    let there = st
+                        .facilities
+                        .iter()
+                        .map(|f| f.kind)
+                        .chain(st.queue.iter().filter_map(|b| if let BuildItem::Facility(k) = b.item { Some(k) } else { None }))
+                        .chain(pending.iter().filter(|o| matches!(o.build_state(), Some(s) if s == *state)).filter_map(|o| o.build_facility().map(|k| k.built_by(self.kind(seat)))))
+                        .find(|k| k.does_the_job_of(FacilityKind::LaunchSite));
+                    if let Some(k) = there {
+                        return fail(format!("this Nation State already has a {}", k.name()));
+                    }
+                }
                 Ok(cost)
             }
             // Ticket #52: Relief, on a state you direct, any number of times a turn.
@@ -1708,7 +1757,8 @@ impl Game {
                 if s.arrived_this_turn {
                     return fail("arrived this turn; it may act next turn");
                 }
-                if pending.iter().any(|o| matches!(o, Order::Transit { ship: x, .. } | Order::Load { ship: x, .. } | Order::Unload { ship: x, .. } | Order::Refuel { ship: x } | Order::Launch { ship: x, .. } | Order::Rearm { ship: x } | Order::Bombard { ship: x, .. } | Order::ChangeOrbit { ship: x, .. } if x == ship)) {
+                // Ticket #533 (version 0.1.0.1): a lift and a refuel stand beside it.
+                if pending.iter().any(|o| is_ship_action(o, *ship)) {
                     return fail("this Ship already has an order");
                 }
                 // Ticket #99 (version 0.07.0): the Orbital Slot it arrives into, chosen with the leg.
@@ -1722,10 +1772,12 @@ impl Game {
                 if slot.is_none() && !self.has_low_orbit(*to) {
                     return fail(format!("{} has no low orbit: name one of its station orbits", self.tables.body(*to).name));
                 }
-                // Ticket #87: the leg is paid from the tank.
+                // Ticket #87: the leg is paid from the tank. Ticket #533 (version 0.1.0.1): filled
+                // first by a refuel given this turn, which lands before the Ship leaves.
                 let fuel = self.transit_fuel(seat, s, from, *to, *slot);
-                if s.fuel < fuel {
-                    return fail(format!("the tank holds {} Fuel of {}; this leg needs {}", figure(s.fuel), figure(self.tank_of(seat, s.kind)), figure(fuel)));
+                let tank = self.tank_after_refuel(seat, pending, s);
+                if tank < fuel {
+                    return fail(format!("the tank holds {} Fuel of {}; this leg needs {}", figure(tank), figure(self.tank_of(seat, s.kind)), figure(fuel)));
                 }
                 Ok(cost)
             }
@@ -1754,13 +1806,14 @@ impl Game {
                 if s.arrived_this_turn {
                     return fail("arrived this turn; it may act next turn");
                 }
+                // Ticket #533 (version 0.1.0.1): a refuel given this turn lands first, and a lift and
+                // a refuel stand beside the change.
                 let fuel = self.orbit_change_cost(seat, body, self.ship_orbit(s), want);
-                if s.fuel < fuel {
-                    return fail(format!("the tank holds {} Fuel; an orbit change needs {}", figure(s.fuel), figure(fuel)));
+                let tank = self.tank_after_refuel(seat, pending, s);
+                if tank < fuel {
+                    return fail(format!("the tank holds {} Fuel; an orbit change needs {}", figure(tank), figure(fuel)));
                 }
-                if pending.iter().any(|o| {
-                    matches!(o, Order::Transit { ship: x, .. } | Order::Load { ship: x, .. } | Order::Unload { ship: x, .. } | Order::Refuel { ship: x } | Order::Bombard { ship: x, .. } | Order::Launch { ship: x, .. } | Order::Rearm { ship: x } | Order::ChangeOrbit { ship: x, .. } if x == ship)
-                }) {
+                if pending.iter().any(|o| is_ship_action(o, *ship)) {
                     return fail("this Ship already has an order");
                 }
                 Ok(cost)
@@ -1798,8 +1851,10 @@ impl Game {
                 if cost.fuel <= 0.0 {
                     return fail("no Fuel in the Stockpile to fill it with");
                 }
-                if pending.iter().any(|o| matches!(o, Order::Transit { ship: x, .. } | Order::Refuel { ship: x } | Order::Launch { ship: x, .. } | Order::Rearm { ship: x } | Order::Bombard { ship: x, .. } | Order::ChangeOrbit { ship: x, .. } if x == ship)) {
-                    return fail("this Ship already has an order");
+                // Ticket #533 (version 0.1.0.1): a refuel never uses the Ship's turn; it fills where
+                // the Ship sits, before it moves. Once a turn.
+                if pending.iter().any(|o| matches!(o, Order::Refuel { ship: x } if x == ship)) {
+                    return fail("this Ship already refuels this turn");
                 }
                 Ok(cost)
             }
@@ -1839,7 +1894,8 @@ impl Game {
                 } else if !self.orbit_uncontested(seat, body, orbit) {
                     return fail(format!("a rival still stands in {}", self.orbit_name(body, orbit)));
                 }
-                if pending.iter().any(|o| matches!(o, Order::Bombard { ship: x, .. } | Order::Transit { ship: x, .. } | Order::ChangeOrbit { ship: x, .. } if x == ship)) {
+                // Ticket #533 (version 0.1.0.1): the Ship's one action, whichever was given first.
+                if pending.iter().any(|o| is_ship_action(o, *ship)) {
                     return fail("this Ship already has an order");
                 }
                 Ok(cost)
@@ -1888,7 +1944,8 @@ impl Game {
                 } else if !self.orbit_uncontested(seat, body, orbit) {
                     return fail(format!("a rival still stands in {}", self.orbit_name(body, orbit)));
                 }
-                if pending.iter().any(|o| matches!(o, Order::Launch { ship: x, .. } | Order::Rearm { ship: x } | Order::Transit { ship: x, .. } | Order::ChangeOrbit { ship: x, .. } if x == ship)) {
+                // Ticket #533 (version 0.1.0.1): the Ship's one action, whichever was given first.
+                if pending.iter().any(|o| is_ship_action(o, *ship)) {
                     return fail("this Ship already has an order");
                 }
                 Ok(cost)
@@ -1914,7 +1971,8 @@ impl Game {
                     RearmSite::NoPlace => return fail("no place of yours in this orbit to rearm at"),
                     RearmSite::NoShipyard => return fail("no working Shipyard here"),
                 }
-                if pending.iter().any(|o| matches!(o, Order::Launch { ship: x, .. } | Order::Rearm { ship: x } | Order::Transit { ship: x, .. } | Order::ChangeOrbit { ship: x, .. } if x == ship)) {
+                // Ticket #533 (version 0.1.0.1): the Ship's one action, whichever was given first.
+                if pending.iter().any(|o| is_ship_action(o, *ship)) {
                     return fail("this Ship already has an order");
                 }
                 Ok(cost)
@@ -2030,21 +2088,32 @@ impl Game {
                     Order::Load { ship: x, from: LoadSource::State(st), army: None, .. } if x == ship => Some(*st),
                     _ => None,
                 };
-                let loading: u32 = pending.iter().filter(|o| from_region(o).is_some()).map(|o| if let Order::Load { colonists, .. } = o { *colonists } else { 0 }).sum();
+                // Ticket #533 (version 0.1.0.1): the room is counted over every load this turn, a lift
+                // beside a load off a Colony included.
+                let loading: u32 = pending.iter().filter_map(|o| match o {
+                    Order::Load { ship: x, colonists, .. } if x == ship => Some(*colonists),
+                    _ => None,
+                }).sum();
                 if s.colonists + loading + *colonists > capacity {
                     return fail(format!("this Ship carries at most {capacity} Colonists"));
                 }
-                let mine = from_region(order);
-                let other = |o: &&Order| matches!(o, Order::Transit { ship: x, .. } | Order::Load { ship: x, .. } | Order::Unload { ship: x, .. } | Order::ChangeOrbit { ship: x, .. } if x == ship);
-                let blocks = |o: &&Order| match (mine, from_region(o)) {
-                    (Some(a), Some(b)) => a == b,
-                    _ => true,
-                };
-                if pending.iter().filter(other).any(|o| blocks(&o)) {
-                    if mine.is_some() && pending.iter().filter(other).all(|o| from_region(o).is_some()) {
+                // Ticket #533, at the designer's word: a lift never uses the Ship's turn, so it
+                // stands beside any one action -- but never beside an unload, and never two from one
+                // Region. A load off a Colony or station IS the turn's action.
+                if pending.iter().any(|o| matches!(o, Order::Unload { ship: x, .. } if x == ship)) {
+                    return fail("a Ship loads or unloads in a turn, not both");
+                }
+                if is_lift(order, *ship) {
+                    if let Some(st) = from_region(order)
+                        && pending.iter().any(|o| from_region(o) == Some(st))
+                    {
                         return fail("this Ship already loads from that Region this turn");
                     }
+                } else if pending.iter().any(|o| is_ship_action(o, *ship)) {
                     return fail("this Ship already has an order");
+                }
+                if army.is_some() && pending.iter().any(|o| matches!(o, Order::Load { ship: x, army: Some(_), .. } if x == ship)) {
+                    return fail("this Ship already carries an Army");
                 }
                 if *colonists > 0 {
                     match from {
@@ -2110,8 +2179,18 @@ impl Game {
                     if a.stance == Stance::DigIn {
                         return fail("this Army is dug in: change its stance and wait the turn");
                     }
-                    if matches!(a.at, ArmyAt::Place(Place::State(st)) if !self.state(st).facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working())) {
-                        return fail("a lift to orbit needs a working Launch Site there");
+                    // Ticket #532 (version 0.1.0.1), at the designer's word: as Pioneers since #443,
+                    // not to LOW orbit -- a Ship there takes an Army from any Region its seat directs.
+                    // A station's ring is still reached by a working Launch Site alone.
+                    if let ArmyAt::Place(Place::State(st)) = a.at
+                        && !self.state(st).facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working())
+                    {
+                        if s.slot.is_some() {
+                            return fail("a lift above low orbit needs a working Launch Site there");
+                        }
+                        if self.state(st).control.director() != Some(seat) {
+                            return fail("a lift from a Region not yours needs a working Launch Site there");
+                        }
                     }
                     if matches!(a.home, ArmyHome::Colony(_)) {
                         return fail("a Colony's Army never leaves");
@@ -2150,7 +2229,11 @@ impl Game {
                 if *colonists == 0 && !*army {
                     return fail("nothing to unload");
                 }
-                if pending.iter().any(|o| matches!(o, Order::Transit { ship: x, .. } | Order::Load { ship: x, .. } | Order::Unload { ship: x, .. } | Order::ChangeOrbit { ship: x, .. } if x == ship)) {
+                // Ticket #533 (version 0.1.0.1), at the designer's word: no lift beside an unload.
+                if pending.iter().any(|o| is_lift(o, *ship)) {
+                    return fail("a Ship loads or unloads in a turn, not both");
+                }
+                if pending.iter().any(|o| is_ship_action(o, *ship)) {
                     return fail("this Ship already has an order");
                 }
                 match into {
@@ -2264,6 +2347,10 @@ impl Game {
                 }
                 if self.credit_price_multiplier(seat).is_none() {
                     return fail("the Custodians will not sell to you: they are Hostile");
+                }
+                // Ticket #531 (version 0.1.0.1): nor, as a computer seat, to the runaway leader.
+                if self.withholds_credits(seller, seat) {
+                    return fail("the Custodians will not sell to you: you are too near your Victory");
                 }
                 if pending.iter().any(|o| matches!(o, Order::BuyCredits { .. })) {
                     return fail("one purchase a turn");
@@ -2598,7 +2685,30 @@ impl Game {
     /// Pay for and record every order of a seat at End Turn (spec 7.3: costs are paid at once).
     pub fn commit_orders(&mut self, seat: Seat, orders: &[Order]) {
         let mut recruited: Vec<(StateId, u32)> = Vec::new();
-        for order in orders {
+        // Ticket #533 (version 0.1.0.1), at the designer's word: a Ship's lifts and its refuel land
+        // where it sits, BEFORE it moves, however the orders were given; and a Ship that leaves for
+        // another Body takes its lifts aboard now, since the Resolution's cargo finds it gone. The
+        // MOVE is held back until after them, not the refuel brought forward: a move is paid from the
+        // Ship's own tank, so holding it moves no Stockpile payment, where a refuel brought forward
+        // past a Buy would take less Fuel than it was quoted.
+        let beside = |o: &Order, ship: ShipId| is_lift(o, ship) || matches!(o, Order::Refuel { ship: x } if *x == ship);
+        let mut held: Vec<(usize, &Order)> = Vec::new();
+        let mut ordered: Vec<&Order> = Vec::with_capacity(orders.len());
+        for (i, o) in orders.iter().enumerate() {
+            if let Order::Transit { ship, .. } | Order::ChangeOrbit { ship, .. } = o
+                && let Some(last) = orders.iter().rposition(|b| beside(b, *ship))
+                && last > i
+            {
+                held.push((last, o));
+                continue;
+            }
+            ordered.push(o);
+            while let Some(k) = held.iter().position(|(after, _)| *after == i) {
+                ordered.push(held.remove(k).1);
+            }
+        }
+        let leaving: Vec<ShipId> = orders.iter().filter_map(|o| if let Order::Transit { ship, .. } = o { Some(*ship) } else { None }).collect();
+        for order in ordered {
             let cost = self.order_cost(seat, order);
             {
                 // Ticket #387 (version 0.09.3): settled, so a tenth paid from a tenth leaves a tenth.
@@ -2817,10 +2927,14 @@ impl Game {
                         a.move_to = Some(*to);
                     }
                 }
-                Order::Load { from: LoadSource::State(_), .. } => {
+                Order::Load { ship, colonists, from: from @ LoadSource::State(_), army } => {
                     // Ticket #46: a lift from a Nation State is a launch.
                     self.climate.launches_pending[seat.index()] += 1;
-                    self.pending.cargo.push((seat, order.clone()));
+                    if leaving.contains(ship) {
+                        self.carry_load(seat, *ship, *colonists, *from, *army);
+                    } else {
+                        self.pending.cargo.push((seat, order.clone()));
+                    }
                 }
                 Order::Load { .. } | Order::Unload { .. } => self.pending.cargo.push((seat, order.clone())),
                 // Ticket #192 (version 0.08.0): the upload lands now. The people leave the living
