@@ -1,0 +1,149 @@
+# Dying Earth 0.1.0.2 -- mouse-over text in the game window (reference for the text-tool playtest)
+
+The text tool has no mouse-overs. In the game window, hovering a figure, a button or a line shows the
+text below. Each line is one mouse-over's wording as the program builds it; `{}` and `{name}` are
+figures filled in at play. Lines are in the order they appear in the interface code, roughly: top
+bar, maps, Report, roster, cards, panels, windows. Read it as a player would read a tooltip.
+
+- The filled marker is the Temperature now, the hollow one what the CO2 Stock already commits the world to. / Breaks (red), Sea Level thresholds and Antarctica's opening (along the foot): / {}
+- A note at the head of each of the first {} turns, saying what that turn is for. Nothing is forced, and it stops after the last one.
+- Choose your starting Region
+- You play the {}.
+- Region population {}
+- The whole Region's people, not its Nation's alone, in units of one million.
+- GDP {}: its economy pays {} Ducats a turn (GDP x Industry Level / 5, never below 1).
+- Next Income is {} Energy short. These go dark, in this order:
+- The Allotment is what your places and buildings give each turn; bought Influence comes from the Trading window at {} Ducats each.
+- The Research Lead is yours: choose what the world researches next. The turn cannot end until you do.
+- {research_hover} / Click to open the Tech Tree.
+- Temperature history
+- Where the heat stands. The CO2 Stock already in the air is heading to {target:+.1} C on its own, with nothing else emitted. The Climate Panel's bar shows what it has crossed and what is next.
+- Write this turn start to a file. Load it again from the title screen.
+- Renew it in the Factions window
+- Paid once, after the landing, to the first Faction ever to settle this world's ground; that Colony's Core then adds +{standing} Influence a turn while they direct it. / A station claims nothing, the other slots stay open, and retaking a lost Colony never pays again.
+- The race to the Moon
+- How far each Faction has got toward landing here, the leader first. Everyone sees it, until somebody lands.
+- Colonies and sites
+- Every Colony on the ground and every site still open, each with its own four yields: what a Mine, a Generator, a Refinery and an Observatory make there, against the figure for the whole Body above. A station reads the Body's figures, so its row below carries none.
+- Room for {}, one to a ring. A station is reached only from its own ring; a Warship on Blockade there starves it.
+- {}: took {took} this round, damage {} of {}, {fate}.
+- Influence still unspent this turn. It is lost at End Turn: the Allotment does not carry over.
+- Raise your Standing on {name}. Its card shows what it would take to hold or take it.
+- Spend all {influence_left} left this turn on {name}.
+- Nothing left to spend this turn.
+- Spend your whole Allotment on this place at the start of every turn from now on. It is placed as an ordinary order you can read and cancel before ending the turn, never spent behind your back; cancelling it, or losing the place, ends it.
+- Click a Region or a Colony first.
+- An older record with no place to go to.
+- Still wants an order from you this turn.
+- Has its order for this turn.
+- Acting against a term ends the Accord, at a cost.
+- Attacking {}: {:.0}% is your chance of holding the orbit when the Battle is over (your strength {mine} against {theirs}).
+- The chance you are victorious: {:.1}%.
+- No rival stands in an orbit of yours here, so an Attack ordered here fights nobody.
+- nothing this turn
+- Widgets {rate} a turn here: {breakdown}.
+- {} reads what the {holder} draw here, building by building:
+- A working Relay at your Colony off Earth, or Embassy in your Region on Earth, shows every rival's income at that Body, building by building; the Faction window gives totals only.
+-   Nothing stands here yet, so there is nothing to read.
+- Widgets: {made} made a turn across the places you direct, {applied} applied at the last Resolution.
+- nothing makes any
+- Nothing here can take the order.
+- How much of this turn's Allotment to put here. It becomes your Standing and stays, whoever holds the place after. / Unspent Allotment is lost at End Turn. A Standing decays {} a turn for the holder, {} for everyone else.
+- Buy more Influence in the Trading window
+- Ducats buy Influence into this turn's Allotment, {} a point, spent like any other. Opens the Trading window.
+- Blame is the CO2 you are answerable for all game: what your places emitted, less what you took back. / Your share is {:.0} per cent, above a fair quarter, so every place you do not hold costs more to win over -- up to half again. / The Climate Panel breaks it down by Faction.
+- No rival has a Standing here.
+- Standing is the Influence a Faction has built up here. It persists, and is never wiped when the place changes hands. / Left alone it decays {} a turn for the controller and {} a turn for everybody else, so a claim you stop paying for slides faster than the holder's.
+- nobody has any yet
+- No Faction has spent here. The first Standing to reach the threshold takes it; two arriving level are settled by lot.
+    // something like Population 12.2 (339M).
+- Growth {:+.2}% a turn, less {:.2}% per tenth of a degree above {:+.1} C.
+This turn {:+.2}%: {:+.1} million.
+- Influence value {}: what it adds to its controller's Allotment each turn (+1 per Industry Level raised)
+- The Allotment is what you receive each turn: {}, your Regions, your Embassies, Relays and Choruses, your Spaceports' lifts, a first landing's windfall, +{} a Body you were first to and still hold, +{} a Capital. / It does not carry over: what is unspent at End Turn is lost. Ducats buy more, two a point.
+- Pays its controller {} Ducats a turn. / GDP x Industry Level / 5, never below 1. / A{} {} here would add {}.
+- Emissions this turn: industry {:.1}, Facilities {:.1}, people {:.1}
+- {:.2} on the card, and {:+.2} from a School. / {EDU}
+- {:.2} on the card, and no School standing. / {EDU}
+- Unrest runs 0 to {:.0}, in quarters, with three thresholds: / at {:.0} the Standing Army stops replenishing, / at {:.0} every Facility here runs at half, / at {:.0} the state throws its controller off. / It falls {:.1} a turn on its own, except the turn the state changed hands.
+- Turn its people against the {}: Unrest rises by {} at End Turn, halved by a working Constabulary. Once a turn here. They will know who paid: it is an offence.
+- Your claim here: spend from the corner's Allotment and it becomes your Standing, which survives any change of hands. / Highest Standing at the threshold takes a free place; a held one wants the holder's plus {}. / Decays {} a turn for the holder, {} for everyone else.
+- {name}: held by you. Moving costs nothing; the stack keeps its stance.
+- {name}: held by the {}, a partner under Passage. Moving costs nothing; the stack arrives on Hold.
+- {name}: held by you. Moving costs nothing; the Army keeps its stance.
+- {name}: held by the {}, a partner under Passage. Moving costs nothing; the Army arrives on Hold and fights nobody while the Accord stands.
+- Repair fully with Ducats
+- Pioneers waiting: {}
+- Recruited here and not yet lifted or sent: a working Launch Site lifts them onto a Ship or straight to a station of yours over Earth, and once the ice is open the sea takes them to Antarctica.
+- not enough people there
+- Aboard at this turn's Resolution. A launch: it emits like any lift. {} has room for {room} more.
+- {how}: producing nothing, upkeep still paid.
+- A warship stack on Blockade in a station's orbit starves it. A ground Colony starves while one rival alone holds Orbital Control of low orbit. / Starved, every Module makes nothing and still pays upkeep; nobody dies, nothing is destroyed. Each turn is an offence against you.
+- A shut Habitat houses people here: everything but Energy at half.
+- A Habitat mothballed, or dark for want of Energy, still houses its Colonists. While more live here than the working Habitats and the Core can hold, the Colony makes everything at half but its Energy. Restart it, or keep an empty one to mothball.
+- {per}{free}, at most {} as a {}. / Mothballed keeps a slot, building reserves one; the Core and the Archive take none.
+- They are read into the Archive and leave the living population here: {} live at this place now. It cannot be undone once the turn ends, and the uploaded can never be lost -- not to a raid, a crowding death or a handover.
+- strength 3, damage 0/4, carrying 6 Colonists
+/// and an Army
+- Move ({}/{} in the tank)
+- {} is {} now. {orbit_fuel} Fuel from its own tank, and it fights this turn's Battle in its new orbit.
+- {} {} The stance is the whole stack's, {where_set}.
+- A Ship in transit cannot be ordered and cannot be intercepted. It arrives Holding, with whatever Fuel it has left.
+- Refuel from the Stockpile
+- stranded: no leg it can pay, and nothing of yours or of a Refuel partner's here to refuel at. A station in orbit here, a working Refinery at a Colony of yours on the ground, or a Refuel Accord with one who holds either, rescues it.
+- {fuel}; no station or Refinery Colony of yours, or of a Refuel partner's, here to refuel at
+- Land the Army to attack {slot_name}
+- One Module of {n} at {place}, drawn at random, rolls a {p:.0}% chance to burn; when a Habitat burns, the Colonists beyond the room left die with it. A rung 3 offence against the {holder}, breaking a non-aggression Accord if one stands. {holds} {} is {} now.
+- A ppm of carbon credit bought comes off your Blame for good. The Custodians sell it at {} Ducats a ppm, times how they think of you -- Friendly x{}, Cordial x{}, Neutral x{}, Wary x{}, Cold x{}; Hostile refuses -- up to {} ppm a turn. / A purchase is an act of friendship both ways.
+- You hold {credit:.0} ppm in credit. You offer {standing} ppm a turn{}; what you sell past your credit goes onto your own Blame.
+-  ({p} from next turn)
+- Stands from next turn until you set it again; nought refuses everyone.
+- The Custodians will not sell to you: they are {level} toward you.
+- Off your Blame at End Turn. If others request first and the offer runs out, the Ducats for what you did not get come back.
+- I would like a window popup showing the modules of the space stations and
+- Open this Faction's page.
+- for factions that have victory funds I'd like to see a condensed version of
+/// the slider and fill bar in the top bar (second row to the right of the window buttons).
+- {what}: {} of the {} the Victory Condition asks.
+- The share of your Research that goes to the shared Tech, from the next Income until you set it again. What you keep back never reaches the Tech, so it counts nothing toward the Research Lead -- and the Lead is the only seat that picks what the table researches next.
+- The share of each turn's Ducat income that goes into the Fund at Income, before you can spend a coin of it, from the next Income until you set it again. Ducats got by selling are not income and never reach it.
+- Venture Capital Fund: banking {share}% of Ducat income
+- {back} Ducats come back to the Stockpile at End Turn; a tenth is lost on the way out.
+- Influence spent on this Faction rather than a place: every point lays {rate} ppm on their Blame for good, and the share every rule reads moves with it. / One campaign a turn against each rival, from this turn's Allotment. They will know who paid: it is an offence.
+- {laid:.0} ppm of their Blame was laid on them by rivals.
+- {:.0} ppm on their Blame at End Turn.
+- Greenwash campaign
+- Each point: {per} Ducat{}, {rate} ppm off your Blame for good. Nothing leaves the air. / One a turn; public, no offence; a rival may answer with a Smear.
+- You hold an Accord with the {}: {}; {}.
+- You renew it this turn, for five more.
+- Free, and it takes a turn's notice: it lapses at the start of the next turn and you may act then. Acting against a term while it still stands is another matter -- it costs 3 and ends the whole Accord at once.
+- Both sides must be Friendly to strike a research agreement.
+- A tribute raises their view of you by one. A fixed gift, one a turn to a Faction: the gain is flat, so a larger one would buy no more.
+- You have already paid them a tribute this turn.
+- {word}. A rival's income is shown as a total only.
+- {word}. No income from buildings last turn.
+- What the {name} think of the others
+- What the others think of the {name}
+- Each state's people emit {:.2} + {:.2} x its Industry Level per hundred million, halved by Green Consensus, times its controller's Emissions multiplier. The Custodians' Leapfrog lowers a state's own figure by {:.2} for good, never below {:.2}.
+- Last turn's Battles on Earth and in its orbit: {} ppm per hit, Blame to whoever landed it; {} per building burned when a three-turn Occupation takes a place, Blame to the taker. / A Battle itself burns nothing; a Pacified place is taken whole; a neutral Army's hits are nobody's.
+- The permafrost has thawed. This much CO2 comes out of the ground every turn now, whatever anybody does. It is nobody's Blame and it does not count against a Stabilization run.
+-  and Scrubbers and Reserves -{:.1}
+- The Temperature the CO2 Stock as it stands will deliver once the lag has caught up. Nothing anybody builds or stops building takes it back.
+- Last turn to act: {t}
+- Cuts alone no longer avoid Collapse.
+- On this path Collapse is not reached.
+- The latest turn on which cutting net Emissions to zero from that turn onward still keeps the Temperature under the Collapse Line by the last turn, counting every Break the world would cross on the way.
+- At this rate, {:+.1} C by turn {}; Collapse at +{:.1} around turn {}.
+- At this rate, {:+.1} C by turn {}; Collapse at +{:.1} not reached.
+- Blame: the CO2 each Faction is answerable for
+- {}: answerable for {:.0} ppm
+- Materials made over the whole game, before upkeep. In brackets: the Stockpile at the end.
+- Fuel made over the whole game. In brackets: the Stockpile at the end.
+- Energy made over the whole game, before upkeep. In brackets: the Stockpile at the end.
+- at 4 Ducats each.
+- Non-aggression: no Influence or Battle on each other. / Acting against a term ends the Accord, at a cost.
+- Non-aggression: no Influence or Battle on each other. / Passage: Armies march in on Hold; Ships pass freely. / Refuel: at each other's Space Stations. / Research agreement: +10% Research to both. / Acting against a term ends the Accord, at a cost.
+- nothing moved, no middle line: {quiet}
+- 30 laid on by rivals, 12 cleaned by campaign
+- not the campaigner's own: {line:?}
+- [BLAME_HOVER] Blame: CO2 this Faction's places emitted, less what it removed (Scrubbers, Nature Reserves, the Custodians' Sink Directive). / Above a quarter share: Influence thresholds rise up to +50% where it doesn't hold, and every rival likes it a point less per step.
