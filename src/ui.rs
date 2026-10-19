@@ -3,6 +3,7 @@
 use crate::app::*;
 use crate::geo;
 use crate::icons::Icons;
+use crate::labels;
 use crate::scene::{Globe, MainCamera, SceneHandles, GLOBE_RADIUS};
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
@@ -1013,6 +1014,145 @@ fn label_kind_at(painter: &egui::Painter, pos: Pos2, kind: Option<Kind>, text: &
     rect
 }
 
+/// Ticket #548 (version 0.1.0.2): one piece of a map label as painted -- a block of text, or a
+/// slot's line of yields.
+enum Piece {
+    Text { at: Pos2, kind: Option<Kind>, text: String, colour: Color32, size: f32 },
+    Yields { at: Pos2, yields: dying_earth_engine::SlotYields },
+}
+
+impl Piece {
+    fn text(at: Pos2, kind: Option<Kind>, text: impl Into<String>, colour: Color32, size: f32) -> Piece {
+        Piece::Text { at, kind, text: text.into(), colour, size }
+    }
+
+    fn rect(&self, painter: &egui::Painter) -> egui::Rect {
+        match self {
+            Piece::Text { at, kind, text, size, .. } => label_block(painter, *at, *kind, text, *size),
+            Piece::Yields { at, yields } => slot_yield_rect(painter, *at, yields),
+        }
+    }
+
+    fn paint(&self, painter: &egui::Painter) {
+        match self {
+            Piece::Text { at, kind, text, colour, size } => {
+                label_kind_at(painter, *at, *kind, text, *colour, *size);
+            }
+            Piece::Yields { at, yields } => slot_yield_label(painter, *at, yields),
+        }
+    }
+}
+
+/// Ticket #548 (version 0.1.0.2): a map label, its full form and its short one (its glyph and name).
+struct MapLabel {
+    id: egui::Id,
+    tier: u8,
+    anchor: Pos2,
+    full: Vec<Piece>,
+    short: Piece,
+}
+
+/// Ticket #548 (version 0.1.0.2): **the map's labels, gathered for one frame and painted last**, so
+/// each can give way to the others and to the fixed marks (`crate::labels`). A label goes in with
+/// the rank of its owner -- or SELECTED -- and the pointer raises it to HOVERED as it is laid out.
+struct MapLabels {
+    /// The selected place, which outranks every other.
+    selection: Selection,
+    labels: Vec<MapLabel>,
+    fixed: Vec<labels::Obstacle>,
+}
+
+/// The rank of a place by whoever directs it.
+fn owner_tier(owner: Option<Seat>, selected: bool) -> u8 {
+    match owner {
+        _ if selected => labels::SELECTED,
+        Some(Seat(0)) => labels::OWN,
+        Some(_) => labels::RIVAL,
+        None => labels::NEUTRAL,
+    }
+}
+
+impl MapLabels {
+    fn new(selection: Selection) -> MapLabels {
+        MapLabels { selection, labels: Vec::new(), fixed: Vec::new() }
+    }
+
+    fn push(&mut self, key: impl std::hash::Hash + std::fmt::Debug, tier: u8, anchor: Pos2, full: Vec<Piece>, short: Piece) {
+        self.labels.push(MapLabel { id: egui::Id::new(("map label", key)), tier, anchor, full, short });
+    }
+
+    /// A fixed mark, set beside the label `owner` keys, which does not give way to it.
+    fn fixed(&mut self, rect: egui::Rect, owner: Option<egui::Id>) {
+        self.fixed.push(labels::Obstacle { rect, owner });
+    }
+
+    fn id(key: impl std::hash::Hash + std::fmt::Debug) -> egui::Id {
+        egui::Id::new(("map label", key))
+    }
+
+    /// Lays every label out against the others and the fixed marks, and paints each in the form it
+    /// takes, fading from the form it held. `memory` keys what the layout remembers between frames.
+    fn finish(mut self, painter: &egui::Painter, memory: &str) {
+        let ctx = painter.ctx().clone();
+        // The open windows (the Climate Panel, the Tech Tree, a card) are fixed marks too: a label
+        // under one is not seen, so it must not push a seen one aside.
+        let windows: Vec<egui::Rect> = ctx.memory(|m| m.areas().visible_layer_ids().into_iter().filter(|l| l.order == egui::Order::Middle).filter_map(|l| m.area_rect(l.id)).collect());
+        for rect in windows {
+            self.fixed(rect, None);
+        }
+        let key = egui::Id::new(memory);
+        let mut mem = ctx.data_mut(|d| d.get_temp::<labels::Memory>(key)).unwrap_or_default();
+        let pointer = ctx.pointer_hover_pos();
+        let centre = painter.clip_rect().center();
+        let cands: Vec<labels::Candidate> = self
+            .labels
+            .iter()
+            .map(|l| {
+                let full = l.full.iter().map(|p| p.rect(painter)).reduce(|a, b| a.union(b)).unwrap_or(egui::Rect::NOTHING);
+                let short = l.short.rect(painter);
+                // Under the pointer: its place, or the block it is showing now.
+                let showing = match mem.form(l.id) {
+                    Some(labels::Form::Short) => short,
+                    Some(labels::Form::Hidden) => egui::Rect::NOTHING,
+                    _ => full,
+                };
+                let hovered = pointer.is_some_and(|q| showing.contains(q) || (q - l.anchor).length() < 24.0);
+                let tier = if hovered { l.tier.min(labels::HOVERED) } else { l.tier };
+                labels::Candidate { id: l.id, full, short, tier, dist: (l.anchor - centre).length() }
+            })
+            .collect();
+        let forms = labels::give_way(&cands, &self.fixed, &|id| mem.form(id));
+        let now = ctx.input(|i| i.time);
+        let laid: Vec<(egui::Id, labels::Form)> = self.labels.iter().zip(&forms).map(|(l, f)| (l.id, *f)).collect();
+        let states = mem.settle(&laid, now);
+        ctx.data_mut(|d| d.insert_temp(key, mem));
+        let paint = |l: &MapLabel, form: labels::Form, alpha: f32| {
+            if alpha <= 0.0 {
+                return;
+            }
+            let mut faded = painter.clone();
+            faded.multiply_opacity(alpha);
+            match form {
+                labels::Form::Full => l.full.iter().for_each(|p| p.paint(&faded)),
+                labels::Form::Short => l.short.paint(&faded),
+                labels::Form::Hidden => {}
+            }
+        };
+        let mut fading = false;
+        for (l, s) in self.labels.iter().zip(states) {
+            let t = s.faded(now);
+            if t < 1.0 {
+                fading = true;
+                paint(l, s.was, 1.0 - t);
+            }
+            paint(l, s.form, t);
+        }
+        if fading {
+            ctx.request_repaint();
+        }
+    }
+}
+
 /// Ticket #136 (version 0.07.3): an orbit as a projected polyline. `points` are the ring's samples
 /// in order, `None` where a sample is hidden behind the globe or off screen; a **dashed** ring is
 /// an empty orbit, drawn three samples on and three off, so room to build is visible without a card.
@@ -1206,6 +1346,7 @@ fn orbit_rings_on_globe(
     cam_right: Vec3,
     project: &dyn Fn(Vec3) -> Option<Pos2>,
     hotspots: &mut Vec<Hotspot>,
+    tags: &mut MapLabels,
 ) {
     let center = globe_gt.translation();
     let Some(c2) = project(center) else { return };
@@ -1287,7 +1428,11 @@ fn orbit_rings_on_globe(
         let a = start + clock * std::f32::consts::TAU / period;
         if let (Some(c), Some(p)) = (station, seen(a)) {
             glyph_at(painter, Kind::Station, p, 18.0, colour);
-            label_at(painter, p + egui::vec2(0.0, 17.0), &game.station_name(body, c.slot), colour, 11.0);
+            tags.fixed(disc(p, 13.0), None);
+            let at = p + egui::vec2(0.0, 17.0);
+            let name = game.station_name(body, c.slot);
+            let tier = owner_tier(c.control.director(), tags.selection == Selection::Colony(c.id));
+            tags.push(("ring station", c.id), tier, at, vec![Piece::text(at, None, name.clone(), colour, 11.0)], Piece::text(at, None, name, colour, 11.0));
             // A moving target: the circle is wider than a fixed glyph's, and the click is taken
             // where the mouse was pressed, so a station cannot slip out from under its own click.
             hotspots.push(Hotspot { pos: p, radius: 16.0, hit: Hit::Select(Selection::Colony(c.id)) });
@@ -1314,7 +1459,11 @@ fn orbit_rings_on_globe(
                 continue;
             };
             glyph_at(painter, Kind::of_ships(here.iter().copied()), p, 16.0, seat_colour(session, seat));
-            label_at(painter, p + egui::vec2(0.0, 15.0), &format!("{} x{}", game.seat_name(seat), here.len()), seat_colour(session, seat), 10.0);
+            tags.fixed(disc(p, 12.0), None);
+            let at = p + egui::vec2(0.0, 15.0);
+            let tier = owner_tier(Some(seat), tags.selection == Selection::ShipStack(body, seat));
+            let full = format!("{} x{}", game.seat_name(seat), here.len());
+            tags.push(("ring stack", body, orbit.slot(), seat), tier, at, vec![Piece::text(at, None, full, seat_colour(session, seat), 10.0)], Piece::text(at, None, format!("x{}", here.len()), seat_colour(session, seat), 10.0));
             hotspots.push(Hotspot { pos: p, radius: 14.0, hit: Hit::Select(Selection::ShipStack(body, seat)) });
             step += 1.0;
         }
@@ -1326,7 +1475,7 @@ fn orbit_rings_on_globe(
             let right: Vec<Pos2> = points.iter().flatten().copied().filter(|p| p.x >= c2.x).collect();
             let anchor = right.iter().copied().min_by(|a, b| a.y.total_cmp(&b.y)).or_else(|| points.iter().flatten().copied().min_by(|a, b| a.y.total_cmp(&b.y)));
             if let Some(p) = anchor {
-                label_at(painter, p, "low orbit", LOW_ORBIT, 11.0);
+                tags.push(("low orbit", body), labels::NEUTRAL, p, vec![Piece::text(p, None, "low orbit", LOW_ORBIT, 11.0)], Piece::text(p, None, "low orbit", LOW_ORBIT, 11.0));
             }
         }
         // Ticket #317 (version 0.08.8) gave the Body one Battle mark. Ticket #335: a Battle is
@@ -1336,6 +1485,7 @@ fn orbit_rings_on_globe(
             && let Some(p) = seen(a - 0.78)
         {
             battle_mark(painter, p, battle_colour(session, game, i));
+            tags.fixed(disc(p, 14.0), None);
             hotspots.push(Hotspot { pos: p, radius: 12.0, hit: Hit::Battle(i) });
         }
     }
@@ -1343,14 +1493,19 @@ fn orbit_rings_on_globe(
 
 /// The same, slid sideways so a long line stays on screen (ticket #57: the launch-window tooltip is
 /// wider than a Body's other labels, and Mars can stand at the edge of its ring).
-fn label_on_screen(painter: &egui::Painter, pos: Pos2, text: &str, colour: Color32, size: f32) {
+fn label_on_screen(painter: &egui::Painter, pos: Pos2, text: &str, colour: Color32, size: f32) -> egui::Rect {
     // The galley here is only measured, never drawn; label_at below does the lifting and the
     // drawing, so lifting a second time here would double it.
     let galley = painter.layout_no_wrap(text.to_string(), FontId::proportional(size), colour);
     let half = galley.size().x / 2.0 + 6.0;
     let clip = painter.clip_rect();
     let x = pos.x.clamp(clip.left() + half, (clip.right() - half).max(clip.left() + half));
-    label_at(painter, Pos2::new(x, pos.y), text, colour, size);
+    label_at(painter, Pos2::new(x, pos.y), text, colour, size)
+}
+
+/// Ticket #548 (version 0.1.0.2): the square a round mark covers, for the labels to give way to.
+fn disc(centre: Pos2, radius: f32) -> egui::Rect {
+    egui::Rect::from_center_size(centre, egui::vec2(radius * 2.0, radius * 2.0))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -2301,6 +2456,9 @@ fn start_screen(
             let painter = ui.painter();
             let center = globe_gt.translation();
             let cam_pos = cam_gt.translation();
+            // Ticket #548 (version 0.1.0.2): the names give way as the game view's labels do. A
+            // name has no shorter form, so it stands or hides.
+            let mut tags = MapLabels::new(Selection::None);
             for sid in StateId::ALL {
                 let (lon, lat) = geo::state_lonlat(sid);
                 let world = globe_gt.transform_point(geo::local_from_lonlat(lon, lat) * 1.01);
@@ -2310,8 +2468,15 @@ fn start_screen(
                 let Some(p) = camera.world_to_viewport(cam_gt, world).ok().map(|v| Pos2::new(v.x, v.y)) else { continue };
                 let card = session.tables.state(sid);
                 let lit = view.start_selected == Some(sid) || view.start_hover == Some(sid);
-                label_kind_at(painter, p, Some(Kind::Region), &card.name, if lit { Color32::WHITE } else { rgb(card.colour) }, if lit { 15.0 } else { 13.0 });
+                let name = || Piece::text(p, Some(Kind::Region), card.name.clone(), if lit { Color32::WHITE } else { rgb(card.colour) }, if lit { 15.0 } else { 13.0 });
+                let tier = match () {
+                    _ if view.start_selected == Some(sid) => labels::SELECTED,
+                    _ if view.start_hover == Some(sid) => labels::HOVERED,
+                    _ => labels::NEUTRAL,
+                };
+                tags.push(("start", sid), tier, p, vec![name()], name());
             }
+            tags.finish(painter, "start labels");
         }
     });
 }
@@ -3195,16 +3360,12 @@ fn doings_open(game: &Game, seat: Seat) -> bool {
 fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &ViewState, camera: &Camera, cam_gt: &GlobalTransform, globes: &Query<(&Globe, &GlobalTransform)>, hotspots: &mut Vec<Hotspot>) {
     let project = |p: Vec3| -> Option<Pos2> { camera.world_to_viewport(cam_gt, p).ok().map(|v| Pos2::new(v.x, v.y)) };
     let cam_pos = cam_gt.translation();
+    // Ticket #548 (version 0.1.0.2): every label on this map is gathered here and painted last, each
+    // giving way to those ranked above it and to the fixed marks.
+    let mut tags = MapLabels::new(view.selection);
+    let selected = view.selection;
     match view.view {
         View::Solar => {
-            // Ticket #345 (version 0.09.1): the blocks the Body labels have already taken, so a
-            // label that hangs BELOW its disc can be dropped clear of one drawn before it. Phobos
-            // and Deimos stand about ten pixels apart on this map and both hang below; this
-            // ticket's second line made their two boxes overlap, and Deimos's background painted
-            // over Phobos's first line. The two moons also MOVE round Mars as the ephemeris turns,
-            // so which of them sits higher is not fixed and no constant stagger can answer it.
-            // `label_at` has handed back the block it filled since ticket #335 for exactly this.
-            let mut placed: Vec<egui::Rect> = Vec::new();
             // Ticket #502 (version 0.1.0.0): the window line is drawn after every Body's label, so a
             // world later in the list (Vesta under Ceres) cannot write over it.
             let mut window_line: Option<(Pos2, String)> = None;
@@ -3266,21 +3427,17 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                     if body == BodyId::Earth && !game.antarctica_open {
                         text.push_str(&format!("\nAntarctica: opens at {:+.1} C", game.tables.climate.antarctica_opens_at));
                     }
-                    // Ticket #345 (version 0.09.1): a label that hangs below its disc is dropped,
-                    // whole, below any Body label already drawn that it would otherwise lie over --
-                    // the rule the orbit band's site labels already follow. Only the ones that hang
-                    // BELOW are moved: a planet's label stands above its disc, under the Orbital
-                    // Control flag and the stack labels, and nudging those downward would walk them
-                    // into the disc. Bounded, so a pathological board cannot spin here.
-                    let mut anchor = p - egui::vec2(0.0, side * (22.0 + 7.5 * lines as f32));
-                    if below {
-                        for _ in 0..BodyId::ALL.len() {
-                            let block = label_block(painter, anchor, None, &text, 13.0);
-                            let Some(hit) = placed.iter().find(|r| r.intersects(block)) else { break };
-                            anchor.y = hit.max.y + block.height() / 2.0 + 3.0;
-                        }
-                    }
-                    placed.push(label_at(painter, anchor, &text, Color32::WHITE, 13.0));
+                    // Ticket #548 (version 0.1.0.2): the label gives way, to the Body's name alone
+                    // and then to nothing, where it would lie over a label ranked above it. It
+                    // replaces #345's drop of a label hanging below its disc. A Body is the
+                    // player's own where the player holds a Colony or station there, a rival's
+                    // where only rivals do.
+                    let anchor = p - egui::vec2(0.0, side * (22.0 + 7.5 * lines as f32));
+                    let holders: Vec<Seat> = game.colonies.iter().filter(|c| c.body == body).filter_map(|c| c.control.director()).collect();
+                    let owner = if holders.contains(&Seat(0)) { Some(Seat(0)) } else { holders.first().copied() };
+                    let tier = if hovering { labels::HOVERED } else { owner_tier(owner, false) };
+                    tags.push(("body", body), tier, anchor, vec![Piece::text(anchor, None, text.clone(), Color32::WHITE, 13.0)], Piece::text(anchor, None, name.clone(), Color32::WHITE, 13.0));
+                    let body_tag = MapLabels::id(("body", body));
                     // Ticket #136: one orbit per Body, the stations on it at spaced positions, dashed
                     // while nothing is in orbit. Five rings will not fit round an eighteen-pixel Earth
                     // without swallowing the Moon, so on this map the slots share one ring; each has
@@ -3309,9 +3466,14 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                                     painter.circle_stroke(q, 5.0, egui::Stroke::new(1.5, on_map(colour)));
                                 }
                             }
-                            label_at(painter, q + egui::vec2(0.0, 15.0), &game.station_name(body, slot), colour, 11.0);
+                            tags.fixed(disc(q, 10.0), None);
+                            let at = q + egui::vec2(0.0, 15.0);
+                            let name = game.station_name(body, slot);
+                            let tier = owner_tier(station.and_then(|c| c.control.director()), station.is_some_and(|c| selected == Selection::Colony(c.id)));
+                            tags.push(("far station", body, slot), tier, at, vec![Piece::text(at, None, name.clone(), colour, 11.0)], Piece::text(at, None, name, colour, 11.0));
                             if let Some(s) = warship_in_slot(game, body, slot) {
                                 glyph_at(painter, Kind::Warship, q + egui::vec2(12.0, 0.0), 12.0, seat_colour(session, s.seat));
+                                tags.fixed(disc(q + egui::vec2(12.0, 0.0), 9.0), None);
                             }
                         }
                         for slot in 0..near {
@@ -3319,9 +3481,11 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                             if let Some(c) = game.colonies.iter().find(|c| c.in_orbit && c.body == body && c.slot == slot) {
                                 let colour = c.control.director().map(|s| seat_colour(session, s)).unwrap_or(Color32::LIGHT_GRAY);
                                 glyph_at(painter, Kind::Station, q, 14.0, colour);
+                                tags.fixed(disc(q, 10.0), None);
                             }
                             if let Some(s) = warship_in_slot(game, body, slot) {
                                 glyph_at(painter, Kind::Warship, q + egui::vec2(12.0, 0.0), 12.0, seat_colour(session, s.seat));
+                                tags.fixed(disc(q + egui::vec2(12.0, 0.0), 9.0), None);
                             }
                         }
                     }
@@ -3337,6 +3501,7 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                         let width = painter.layout_no_wrap(text.clone(), FontId::proportional(13.0), Color32::WHITE).size().x;
                         let at = label_centre - egui::vec2(width / 2.0 + 18.0, 0.0);
                         battle_mark(painter, at, battle_colour(session, game, i));
+                        tags.fixed(disc(at, 14.0), Some(body_tag));
                         hotspots.push(Hotspot { pos: at, radius: 12.0, hit: Hit::Battle(i) });
                     }
                     // Ticket #57: hovering a Body across the gulf says when its launch window is and
@@ -3355,7 +3520,8 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                     // warships hold low orbit.
                     // Ticket #442 (version 0.09.6): and not at a Body with no low orbit.
                     if let Some(s) = game.orbital_control(body).filter(|_| !hidden_body(game, body) && game.has_low_orbit(body)) {
-                        label_at(painter, p - egui::vec2(0.0, side * 40.0), &format!("Orbital Control of low orbit: {}", game.seat_name(s)), seat_colour(session, s), 12.0);
+                        let flag = label_at(painter, p - egui::vec2(0.0, side * 40.0), &format!("Orbital Control of low orbit: {}", game.seat_name(s)), seat_colour(session, s), 12.0);
+                        tags.fixed(flag, Some(body_tag));
                     }
                 }
                 // Ticket #50: up to four stacks at one Body. The markers sit at four fixed angles
@@ -3376,17 +3542,22 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                     row += 1.0;
                     // Ticket #430 (version 0.09.5): a rival stack at a Body the player does not see
                     // is whose and how many, and no card opens on it.
+                    // Ticket #548 (version 0.1.0.2): a stack's label shrinks to its glyph and count.
+                    let count = format!("x{}", ships.len());
+                    let tier = owner_tier(Some(seat), selected == Selection::ShipStack(body, seat));
                     if seat != Seat(0) && hidden_body(game, body) {
-                        label_at(painter, at, &format!("{}: {} Ship{}", game.seat_name(seat), ships.len(), if ships.len() == 1 { "" } else { "s" }), seat_colour(session, seat), 12.0);
+                        let text = format!("{}: {} Ship{}", game.seat_name(seat), ships.len(), if ships.len() == 1 { "" } else { "s" });
+                        tags.push(("stack", body, seat), tier, at, vec![Piece::text(at, None, text, seat_colour(session, seat), 12.0)], Piece::text(at, None, count, seat_colour(session, seat), 12.0));
                         continue;
                     }
                     let text = format!("{} x{}  str {}, {}", game.seat_name(seat), ships.len(), fighting_stack_strength(game, seat, body), stack_orbit_phrase(game, seat, body));
-                    label_kind_at(painter, at, Some(Kind::of_ships(ships.iter().filter_map(|id| game.ship(*id)))), &text, seat_colour(session, seat), 12.0);
+                    let kind = Some(Kind::of_ships(ships.iter().filter_map(|id| game.ship(*id))));
+                    tags.push(("stack", body, seat), tier, at, vec![Piece::text(at, kind, text, seat_colour(session, seat), 12.0)], Piece::text(at, kind, count, seat_colour(session, seat), 12.0));
                     hotspots.push(Hotspot { pos: at, radius: 14.0, hit: Hit::Select(Selection::ShipStack(body, seat)) });
                 }
             }
             if let Some((at, text)) = window_line {
-                label_on_screen(painter, at, &text, Color32::from_rgb(255, 220, 140), 13.0);
+                tags.fixed(label_on_screen(painter, at, &text, Color32::from_rgb(255, 220, 140), 13.0), None);
             }
             // Ticket #430 (version 0.09.5): a rival Ship in flight only with its books open.
             for s in game.ships.iter().filter(|s| !hidden_ship(game, s)) {
@@ -3401,7 +3572,9 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                         // label is drawn in the Faction's colour, so it was saying it three times.
                         // The type stays in words at the designer's word, beside the kind glyph.
                         let text = format!("{} ({}): {} turn(s)", game.ship_name(s), s.kind.name().to_lowercase(), turns_left);
-                        label_kind_at(painter, p, Some(Kind::of_unit(s.kind)), &text, seat_colour(session, s.seat), 12.0);
+                        let (kind, colour) = (Some(Kind::of_unit(s.kind)), seat_colour(session, s.seat));
+                        let tier = owner_tier(Some(s.seat), selected == Selection::Ship(s.id));
+                        tags.push(("flying", s.id), tier, p, vec![Piece::text(p, kind, text, colour, 12.0)], Piece::text(p, kind, game.ship_name(s), colour, 12.0));
                         // Ticket #374 (version 0.09.2): and the label opens the Ship's card, which
                         // a Ship in flight now has.
                         hotspots.push(Hotspot { pos: p, radius: 14.0, hit: Hit::Select(Selection::Ship(s.id)) });
@@ -3420,7 +3593,7 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                 project(world)
             };
             // Ticket #136 (version 0.07.3): one ring per Orbital Slot round the globe.
-            orbit_rings_on_globe(painter, session, game, body, globe_gt, cam_pos, *cam_gt.right(), &project, hotspots);
+            orbit_rings_on_globe(painter, session, game, body, globe_gt, cam_pos, *cam_gt.right(), &project, hotspots, &mut tags);
             match body {
                 BodyId::Earth => {
                     for sid in StateId::ALL {
@@ -3440,14 +3613,18 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                         };
                         let _ = armies;
                         let text = format!("{}\n{}\n{} Facilities, {} free slot(s)", game.tables.state(sid).name, owner, st.facilities.len(), game.free_slots(sid));
-                        label_kind_at(painter, p, Some(Kind::Region), &text, colour, 12.0);
+                        let mut full = vec![Piece::text(p, Some(Kind::Region), text, colour, 12.0)];
                         // Ticket #52: the Unrest figure once it bites, red once Facilities run at half.
+                        // Ticket #548 (version 0.1.0.2): part of the full block, gone when it shrinks.
                         let army_line = game.tables.unrest.army_threshold;
                         if st.unrest >= army_line {
                             let hot = st.unrest >= game.tables.unrest.facility_threshold;
                             let tint = if hot { Color32::from_rgb(255, 90, 80) } else { Color32::from_rgb(255, 190, 90) };
-                            label_at(painter, p - egui::vec2(0.0, 38.0), &format!("Unrest {}", game.unrest_text(sid)), tint, 13.0);
+                            full.push(Piece::text(p - egui::vec2(0.0, 38.0), None, format!("Unrest {}", game.unrest_text(sid)), tint, 13.0));
                         }
+                        let tier = owner_tier(st.control.director(), tags.selection == Selection::State(sid));
+                        tags.push(("region", sid), tier, p, full, Piece::text(p, Some(Kind::Region), game.tables.state(sid).name.clone(), colour, 12.0));
+                        let region_tag = MapLabels::id(("region", sid));
                         hotspots.push(Hotspot { pos: p, radius: 30.0, hit: Hit::Select(Selection::State(sid)) });
                         // Ticket #323 (version 0.08.8): the Regions an armed stack may reach are
                         // outlined, in the roster's ring colour, so a right-click knows its targets.
@@ -3465,6 +3642,7 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                             let lift = if st.unrest >= game.tables.unrest.army_threshold { 56.0 } else { 38.0 };
                             let at = p - egui::vec2(0.0, lift);
                             battle_mark(painter, at, battle_colour(session, game, i));
+                            tags.fixed(disc(at, 14.0), Some(region_tag));
                             hotspots.push(Hotspot { pos: at, radius: 12.0, hit: Hit::Battle(i) });
                         }
                         // Army shields (ticket #31): one per Faction present, grey for a neutral Standing Army.
@@ -3501,6 +3679,7 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                             let centre = p + egui::vec2(-38.0 + 26.0 * i as f32, 36.0);
                             let fill = seat.map(|s| seat_colour(session, s)).unwrap_or(Color32::from_gray(150));
                             shield(painter, centre, fill, strength, *hurt);
+                            tags.fixed(egui::Rect::from_center_size(centre, egui::vec2(20.0, 24.0)), Some(region_tag));
                             if *dug {
                                 painter.line_segment([centre + egui::vec2(-10.0, 15.0), centre + egui::vec2(10.0, 15.0)], egui::Stroke::new(3.0, fill));
                             }
@@ -3515,7 +3694,7 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                     }
                     // Ticket #44: Antarctica's Colony Slots. Earth's globe carries no orbit band,
                     // so nothing here has a rectangle to keep clear of (ticket #335).
-                    slot_labels(painter, session, game, body, &visible, hotspots, None);
+                    slot_labels(painter, session, game, body, &visible, hotspots, &mut tags);
                 }
                 _ => {
                     // The band along the top: Ship stacks in orbit and Orbital Control. Ticket #50:
@@ -3614,11 +3793,13 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                             hotspots.push(Hotspot { pos: at, radius: 14.0, hit: Hit::Select(Selection::ShipStack(body, s)) });
                         }
                     }
-                    slot_labels(painter, session, game, body, &visible, hotspots, Some(band_rect));
+                    tags.fixed(band_rect, None);
+                    slot_labels(painter, session, game, body, &visible, hotspots, &mut tags);
                 }
             }
         }
     }
+    tags.finish(painter, "map labels");
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -3679,21 +3860,41 @@ fn slot_yield_figures(y: &dying_earth_engine::SlotYields) -> [(&'static str, f64
     [("materials", y.mine), ("energy", y.generator), ("fuel", y.refinery), ("research", y.research)]
 }
 
-fn slot_yield_label(painter: &egui::Painter, pos: Pos2, yields: &dying_earth_engine::SlotYields) {
-    let figures = [("materials", yields.mine), ("energy", yields.generator), ("fuel", yields.refinery), ("research", yields.research)];
-    let Some(glyphs) = figures.iter().map(|(key, _)| Icons::texture_from_ctx(painter.ctx(), key)).collect::<Option<Vec<_>>>() else {
-        label_at(painter, pos, &yields.text(), Color32::from_gray(170), 11.0);
-        return;
-    };
+/// The block the glyph line fills, and its figures laid out, so a map label can be measured before
+/// it is painted (ticket #548).
+fn slot_yield_layout(painter: &egui::Painter, pos: Pos2, yields: &dying_earth_engine::SlotYields) -> (egui::Rect, Vec<std::sync::Arc<egui::Galley>>) {
     let font = FontId::proportional(SLOT_YIELD_SIZE);
     let ink = Color32::from_gray(205);
-    let galleys: Vec<_> = figures.iter().map(|(_, v)| painter.layout_no_wrap(format!("{v:.2}"), font.clone(), ink)).collect();
+    let galleys: Vec<_> = slot_yield_figures(yields).iter().map(|(_, v)| painter.layout_no_wrap(format!("{v:.2}"), font.clone(), ink)).collect();
     let gap = 3.0;
     let between = 9.0;
     let width: f32 = galleys.iter().map(|g| SLOT_YIELD_SIZE + gap + g.size().x + between).sum::<f32>() - between;
     let height = SLOT_YIELD_SIZE.max(galleys.iter().map(|g| g.size().y).fold(0.0, f32::max));
-    let rect = egui::Rect::from_center_size(pos, egui::vec2(width + 8.0, height + 4.0));
+    (egui::Rect::from_center_size(pos, egui::vec2(width + 8.0, height + 4.0)), galleys)
+}
+
+/// The four glyphs, or None where any has not loaded and the line falls back to the capitals.
+fn slot_yield_glyphs(painter: &egui::Painter, yields: &dying_earth_engine::SlotYields) -> Option<Vec<egui::TextureId>> {
+    slot_yield_figures(yields).iter().map(|(key, _)| Icons::texture_from_ctx(painter.ctx(), key)).collect()
+}
+
+fn slot_yield_rect(painter: &egui::Painter, pos: Pos2, yields: &dying_earth_engine::SlotYields) -> egui::Rect {
+    if slot_yield_glyphs(painter, yields).is_none() {
+        return label_block(painter, pos, None, &yields.text(), 11.0);
+    }
+    slot_yield_layout(painter, pos, yields).0
+}
+
+fn slot_yield_label(painter: &egui::Painter, pos: Pos2, yields: &dying_earth_engine::SlotYields) {
+    let figures = slot_yield_figures(yields);
+    let Some(glyphs) = slot_yield_glyphs(painter, yields) else {
+        label_at(painter, pos, &yields.text(), Color32::from_gray(170), 11.0);
+        return;
+    };
+    let (rect, galleys) = slot_yield_layout(painter, pos, yields);
     painter.rect_filled(rect, 3.0, Color32::from_black_alpha(170));
+    let gap = 3.0;
+    let between = 9.0;
     let uv = egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0));
     let mut x = rect.min.x + 4.0;
     for ((key, _), (glyph, galley)) in figures.iter().zip(glyphs.into_iter().zip(galleys)) {
@@ -3701,14 +3902,14 @@ fn slot_yield_label(painter: &egui::Painter, pos: Pos2, yields: &dying_earth_eng
         painter.image(glyph, square, uv, crate::icons::fill(key));
         x += SLOT_YIELD_SIZE + gap;
         let w = galley.size().x;
-        painter.galley(egui::pos2(x, pos.y - galley.size().y / 2.0), galley, ink);
+        painter.galley(egui::pos2(x, pos.y - galley.size().y / 2.0), galley, Color32::from_gray(205));
         x += w + between;
     }
 }
 
-/// `band` is the orbit band's rectangle where the Body has one, so a label can step clear of it
-/// (ticket #335).
-fn slot_labels(painter: &egui::Painter, session: &Session, game: &Game, body: BodyId, visible: &dyn Fn(Vec3) -> Option<Pos2>, hotspots: &mut Vec<Hotspot>, band: Option<egui::Rect>) {
+/// Ticket #548 (version 0.1.0.2): the labels go into `tags` and give way there; the orbit band is a
+/// fixed mark they give way to, which replaces #335's step clear of it.
+fn slot_labels(painter: &egui::Painter, session: &Session, game: &Game, body: BodyId, visible: &dyn Fn(Vec3) -> Option<Pos2>, hotspots: &mut Vec<Hotspot>, tags: &mut MapLabels) {
     // Ticket #103 (version 0.07.0): Earth's three slots are Antarctica's, and nothing of them is
     // drawn until the ice opens -- no marker, no name, no yields. A player is told the ice EXISTS
     // and at what warmth it goes, on the Solar System Map and the Climate Panel, so an Antarctic
@@ -3734,19 +3935,10 @@ fn slot_labels(painter: &egui::Painter, session: &Session, game: &Game, body: Bo
                     }
                     None => (format!("{name}: empty"), Color32::LIGHT_GRAY, Hit::Select(Selection::Slot(body, slot)), None),
                 };
-                // Ticket #335 (version 0.09.0): a site that projects near the top centre of the
-                // globe had its name and its four yields painted through the orbit band's rows, a
-                // collision this ticket's extra rows made common. Where the label's block would
-                // land inside the band, the whole of the site's annotation -- name, yields, Battle
-                // mark and hotspot -- drops together to just below the band, keeping the mark above
-                // the name and the click where the text is. Nothing is hidden and nothing shrinks.
-                let block = label_block(painter, p + egui::vec2(0.0, 24.0), kind, &text, 12.0);
-                let dodge = match band {
-                    Some(b) if b.intersects(block) => b.max.y + 8.0 - block.min.y,
-                    _ => 0.0,
-                };
-                let p = p + egui::vec2(0.0, dodge);
-                label_kind_at(painter, p + egui::vec2(0.0, 24.0), kind, &text, colour, 12.0);
+                let selected = matches!(hit, Hit::Select(s) if s == tags.selection);
+                let owner = game.colony_at(body, slot).and_then(|c| c.control.director());
+                let tag = ("slot", body, slot);
+                let slot_tag = MapLabels::id(tag);
                 // Ticket #311 (version 0.08.7): last turn's Battle at this Colony, as a Region's.
                 // Ticket #317 (version 0.08.8): the Battle mark above the slot's point.
                 if let Some(c) = game.colony_at(body, slot)
@@ -3754,6 +3946,7 @@ fn slot_labels(painter: &egui::Painter, session: &Session, game: &Game, body: Bo
                 {
                     let at = p - egui::vec2(0.0, 18.0);
                     battle_mark(painter, at, battle_colour(session, game, i));
+                    tags.fixed(disc(at, 14.0), Some(slot_tag));
                     hotspots.push(Hotspot { pos: at, radius: 12.0, hit: Hit::Battle(i) });
                 }
                 // Ticket #57: every slot carries its own four yields under its name, filled or free;
@@ -3762,8 +3955,12 @@ fn slot_labels(painter: &egui::Painter, session: &Session, game: &Game, body: Bo
                 // a yield lens on and off it should live there instead of over every label at once.
                 // `label_at` centres its block on the point, so the figures clear half the name
                 // block above them and half their own line.
+                // Ticket #548 (version 0.1.0.2): the name, its lines and the yields are the full
+                // block; the short one is the glyph and the site's name.
                 let lines = text.lines().count() as f32;
-                slot_yield_label(painter, p + egui::vec2(0.0, 24.0 + lines * 7.0 + 10.0), &game.slot_yields(body, slot));
+                let at = p + egui::vec2(0.0, 24.0);
+                let full = vec![Piece::text(at, kind, text, colour, 12.0), Piece::Yields { at: p + egui::vec2(0.0, 24.0 + lines * 7.0 + 10.0), yields: game.slot_yields(body, slot) }];
+                tags.push(tag, owner_tier(owner, selected), at, full, Piece::text(at, kind, name.clone(), colour, 12.0));
                 hotspots.push(Hotspot { pos: p, radius: 22.0, hit });
             }
 }
