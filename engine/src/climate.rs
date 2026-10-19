@@ -576,7 +576,7 @@ impl Game {
         self.antarctica_open = true;
         let n = self.tables.body(BodyId::Earth).colony_slots();
         self.log(format!("The Antarctic ice opens: {n} Colony Slots on Earth."));
-        let text = self.say("antarctica_opens", &[("n", n.to_string())]);
+        let text = self.say("antarctica_opens", &[("n", crate::counted(n, "Colony Slot", "Colony Slots"))]);
         self.report_line(LineKind::Antarctica, Some(ReportPlace::Body(BodyId::Earth)), text);
         self.moment(MomentKind::Antarctica, &[("n", crate::counted(n, "Colony Slot", "Colony Slots"))], Some(ReportPlace::Body(BodyId::Earth)));
     }

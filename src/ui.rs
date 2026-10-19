@@ -5401,7 +5401,7 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, seat: Seat, marks: boo
             // the Solar System Map labels the transit, which is the point of naming it in both.
             ships_rows.push(RosterRow {
                 kind: Kind::of_unit(s.kind),
-                text: format!("{}{} ({}) - in transit to {}, {} turn(s) left", tag("Ship"), game.ship_name(s), s.kind.name().to_lowercase(), game.tables.body(to).name, counted(turns_left, "turn", "turns")),
+                text: format!("{}{} ({}) - in transit to {}, {} left", tag("Ship"), game.ship_name(s), s.kind.name().to_lowercase(), game.tables.body(to).name, counted(turns_left, "turn", "turns")),
                 tip: Some("A Ship in transit cannot be ordered and cannot be intercepted. It arrives at its Resolution, Holding, with whatever Fuel it has left.".to_string()),
                 mark: None,
                 // Ticket #374 (version 0.09.2): a Ship in flight has a card too, so the row opens it

@@ -116,3 +116,8 @@ touched.
   8 Facilities, 3 free slots".
 
 No rule moves, so no sweep.
+
+**The review** (an agent that did not build it) found one defect: the Roster's row for a Ship in
+flight read "3 turns turn(s) left", the counted phrase put in front of the old "(s)", which no test
+covers. Fixed, with the Antarctic ice's Report line, which still said "Colony Slots" after a count
+its Moment already counted. Four log-only lines did change ("(s)" in each); nothing reads them.
