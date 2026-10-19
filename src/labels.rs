@@ -5,14 +5,20 @@
 //! marks. The selected label and the one under the pointer are laid over the marks rather than
 //! giving way to them, so pointing at a place always shows its name (the designer, 2026-10-19). This module decides the forms; `ui.rs` gathers the labels and paints them.
 //!
-//! Two dampers keep a turning view from flickering: a label that has given way grows back only when
-//! the larger form would clear everything by `MARGIN`, and a change of form fades over `FADE`.
+//! Two dampers keep a turning view from flickering: for `HOLD` after a label gives way it grows back
+//! only when the larger form would clear everything by `MARGIN`, and a change of form fades over
+//! `FADE`.
 
 use bevy_egui::egui::{Id, Rect};
 use std::collections::HashMap;
 
 /// The pixels a label that has given way must have to spare before it grows back.
 pub const MARGIN: f32 = 6.0;
+/// The seconds the margin holds after a label gives way. After that it grows back as soon as it
+/// fits: labels set flush by hand (the Solar System Map's stack rows, 16 pixels apart, and the
+/// Orbital Control flag under them) never have the margin, and one that hid for a frame stayed
+/// hidden for good until this bound was put on it (found in review).
+pub const HOLD: f64 = 0.5;
 /// The pixels two blocks may overlap and still count as clear: a block pads its text by two pixels
 /// a side, so two backgrounds that kiss leave both texts whole. Without it the Solar System Map's
 /// stack labels, set 16 pixels apart in blocks 19 tall, knocked each other out.
@@ -46,10 +52,13 @@ pub struct Candidate {
     pub dist: f32,
 }
 
-/// A fixed mark. `owner` is the label it is set beside, which does not give way to it.
+/// A fixed mark. `owner` is the label it is set beside, which does not give way to it. A `hard`
+/// mark -- an open window, the panels round the map -- is one every label gives way to, the
+/// selected and hovered included, since a label under it is not seen.
 pub struct Obstacle {
     pub rect: Rect,
     pub owner: Option<Id>,
+    pub hard: bool,
 }
 
 /// Overlap with area, past the slack each block is allowed. Two blocks that only touch along an
@@ -60,22 +69,23 @@ fn overlaps(a: Rect, b: Rect) -> bool {
 }
 
 /// The form each candidate takes, in the candidates' order. `prev` is the form a label held last
-/// frame, `None` for a label new to the view.
-pub fn give_way(cands: &[Candidate], fixed: &[Obstacle], prev: &dyn Fn(Id) -> Option<Form>) -> Vec<Form> {
+/// frame and the seconds it has held it, `None` for a label new to the view.
+pub fn give_way(cands: &[Candidate], fixed: &[Obstacle], prev: &dyn Fn(Id) -> Option<(Form, f64)>) -> Vec<Form> {
     let mut order: Vec<usize> = (0..cands.len()).collect();
     order.sort_by(|a, b| (cands[*a].tier, cands[*a].dist).partial_cmp(&(cands[*b].tier, cands[*b].dist)).unwrap_or(std::cmp::Ordering::Equal));
     let mut placed: Vec<Rect> = Vec::new();
     let mut forms = vec![Form::Hidden; cands.len()];
     for i in order {
         let c = &cands[i];
-        let was = prev(c.id).unwrap_or(Form::Full);
+        let (was, held) = prev(c.id).unwrap_or((Form::Full, 0.0));
+        let fresh = held < HOLD;
         let fits = |rect: Rect, growing: bool| {
             let rect = if growing { rect.expand(MARGIN) } else { rect };
-            !placed.iter().any(|p| overlaps(*p, rect)) && (c.tier <= HOVERED || !fixed.iter().any(|o| o.owner != Some(c.id) && overlaps(o.rect, rect)))
+            !placed.iter().any(|p| overlaps(*p, rect)) && !fixed.iter().any(|o| (o.hard || c.tier > HOVERED) && o.owner != Some(c.id) && overlaps(o.rect, rect))
         };
-        let form = if fits(c.full, was != Form::Full) {
+        let form = if fits(c.full, fresh && was != Form::Full) {
             Form::Full
-        } else if fits(c.short, was == Form::Hidden) {
+        } else if fits(c.short, fresh && was == Form::Hidden) {
             Form::Short
         } else {
             Form::Hidden
@@ -116,6 +126,11 @@ impl Memory {
         self.states.get(&id).map(|s| s.form)
     }
 
+    /// The form a label held last frame and the seconds it has held it.
+    pub fn held(&self, id: Id, now: f64) -> Option<(Form, f64)> {
+        self.states.get(&id).map(|s| (s.form, now - s.since))
+    }
+
     /// Records this frame's forms, starting a fade where one changed, and forgets every label not
     /// laid out this frame. A label new to the view fades in from nothing.
     pub fn settle(&mut self, laid: &[(Id, Form)], now: f64) -> Vec<State> {
@@ -150,7 +165,7 @@ mod tests {
         Candidate { id: Id::new(name), full: block(x, 0.0, 100.0, 40.0), short: block(x, 0.0, 40.0, 14.0), tier, dist }
     }
 
-    fn fresh(_: Id) -> Option<Form> {
+    fn fresh(_: Id) -> Option<(Form, f64)> {
         None
     }
 
@@ -181,19 +196,35 @@ mod tests {
 
     #[test]
     fn gives_way_to_a_fixed_mark_but_not_its_own() {
-        let mark = |owner: Option<&str>| Obstacle { rect: block(30.0, 15.0, 20.0, 24.0), owner: owner.map(Id::new) };
+        let mark = |owner: Option<&str>| Obstacle { rect: block(30.0, 15.0, 20.0, 24.0), owner: owner.map(Id::new), hard: false };
         assert_eq!(give_way(&[label("a", 0.0, OWN, 0.0)], &[mark(None)], &fresh), vec![Form::Short]);
         assert_eq!(give_way(&[label("a", 0.0, OWN, 0.0)], &[mark(Some("a"))], &fresh), vec![Form::Full]);
     }
 
     #[test]
     fn the_selected_and_hovered_are_laid_over_the_marks() {
-        let mark = Obstacle { rect: block(0.0, 0.0, 20.0, 24.0), owner: None };
+        let mark = Obstacle { rect: block(0.0, 0.0, 20.0, 24.0), owner: None, hard: false };
         assert_eq!(give_way(&[label("a", 0.0, RIVAL, 0.0)], std::slice::from_ref(&mark), &fresh), vec![Form::Hidden]);
         assert_eq!(give_way(&[label("a", 0.0, HOVERED, 0.0)], std::slice::from_ref(&mark), &fresh), vec![Form::Full]);
         assert_eq!(give_way(&[label("a", 0.0, SELECTED, 0.0)], std::slice::from_ref(&mark), &fresh), vec![Form::Full]);
         // They still give way to each other.
         assert_eq!(give_way(&[label("a", 0.0, SELECTED, 0.0), label("b", 10.0, HOVERED, 0.0)], &[mark], &fresh), vec![Form::Full, Form::Hidden]);
+    }
+
+    #[test]
+    fn every_label_gives_way_to_a_hard_mark() {
+        let window = Obstacle { rect: block(0.0, 0.0, 300.0, 300.0), owner: None, hard: true };
+        assert_eq!(give_way(&[label("a", 0.0, SELECTED, 0.0)], std::slice::from_ref(&window), &fresh), vec![Form::Hidden]);
+        assert_eq!(give_way(&[label("a", 0.0, HOVERED, 0.0)], &[window], &fresh), vec![Form::Hidden]);
+    }
+
+    #[test]
+    fn a_hidden_label_needs_the_margin_to_take_its_short_form() {
+        // b's short block (40 wide at 69) clears a's full one by three pixels, with the slack.
+        let cands = [label("a", 0.0, OWN, 0.0), label("b", 69.0, NEUTRAL, 0.0)];
+        let hidden = |id: Id| if id == Id::new("b") { Some((Form::Hidden, 0.1)) } else { Some((Form::Full, 9.0)) };
+        assert_eq!(give_way(&cands, &[], &hidden), vec![Form::Full, Form::Hidden]);
+        assert_eq!(give_way(&cands, &[], &fresh), vec![Form::Full, Form::Short]);
     }
 
     #[test]
@@ -212,9 +243,12 @@ mod tests {
     fn grows_back_only_with_the_margin_to_spare() {
         // 99 apart: the full blocks clear, with the slack, by three pixels, under the margin.
         let cands = [label("a", 0.0, OWN, 0.0), label("b", 99.0, NEUTRAL, 0.0)];
-        let shrunk = |id: Id| if id == Id::new("b") { Some(Form::Short) } else { Some(Form::Full) };
+        let shrunk = |id: Id| if id == Id::new("b") { Some((Form::Short, 0.1)) } else { Some((Form::Full, 9.0)) };
         assert_eq!(give_way(&cands, &[], &shrunk), vec![Form::Full, Form::Short]);
-        let full = |_: Id| Some(Form::Full);
+        // Held past HOLD, it grows back as soon as it fits.
+        let long_shrunk = |id: Id| if id == Id::new("b") { Some((Form::Short, 0.6)) } else { Some((Form::Full, 9.0)) };
+        assert_eq!(give_way(&cands, &[], &long_shrunk), vec![Form::Full, Form::Full]);
+        let full = |_: Id| Some((Form::Full, 9.0));
         assert_eq!(give_way(&cands, &[], &full), vec![Form::Full, Form::Full]);
         // Past the margin it grows back.
         let cands = [label("a", 0.0, OWN, 0.0), label("b", 103.0, NEUTRAL, 0.0)];

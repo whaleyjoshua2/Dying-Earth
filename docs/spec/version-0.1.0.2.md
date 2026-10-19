@@ -37,16 +37,24 @@ Ticket: [Map labels give way instead of overlapping, at every view angle](https:
   whoever directs it: a Region's, a Colony's or a station's director, a Ship's or a stack's seat; a
   Body on the Solar System Map is the player's own when the player has a Colony or station there,
   a rival's when only rivals have, and neutral otherwise.
-- **No flicker.** A label that changes form fades into the new one over a fifth of a second. A label
-  that has given way grows back only when the larger form would clear everything by a margin of six
-  pixels; a label already in its form keeps it while it merely touches nothing.
+- **No flicker.** A label that changes form fades into the new one over a fifth of a second, and a
+  label coming into view fades in. For half a second after a label gives way it grows back only
+  when the larger form would clear everything by a margin of six pixels; after that it grows back
+  as soon as it fits. (Found in review: without the half-second bound, labels set flush by hand --
+  the Solar System Map's stack rows and the Orbital Control flag under them -- never had the margin,
+  and one that hid for a frame stayed hidden.)
 - **Fixed marks never give way, and labels give way to them**: Army shields, Battle marks, station
   and warship glyphs, the Orbital Control flag, the launch window line, a Body map's orbit band and
-  the panels. A label does not give way to its own place's marks (a Region's shields, a slot's
-  Battle mark), which are set beside it. **The selected label and the one under the pointer are laid
-  over the marks** instead of giving way to them, so pointing at a place always shows its name. They
-  still give way to each other. (Found in building: a neighbour's shield hid China, the player's own
-  Region, even when selected; the designer chose this answer.)
+  the panels round the map and any open window. A label does not give way to its own place's marks
+  (a Region's shields, a slot's Battle mark, a station's or stack's glyph), which are set beside
+  it. **The selected label and the one under the pointer are laid over the marks** instead of
+  giving way to them, so pointing at a place always shows its name. They still give way to each
+  other. (Found in building: a neighbour's shield hid China, the player's own
+  Region, even when selected; the designer chose this answer.) The panels and open windows are the
+  exception: every label gives way to them, the selected included, since a label under one is not
+  seen.
+- **The pointer raises a label** when it is within 30 pixels of the place, a Region's click circle,
+  or over the block the label is showing.
 - **Two blocks may overlap by two pixels a side** and still count as clear, since a block pads its
   text by two pixels: kissing backgrounds leave both texts whole.
 - **A click stays at the place**, whatever its label is doing: a Region, a slot, a station or a

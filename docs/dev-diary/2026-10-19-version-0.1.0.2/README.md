@@ -13,8 +13,8 @@ Ticket [#548](https://github.com/whaleyjoshua2/Dying-Earth/issues/548), spec §1
 **The pictures** ([`ticket-548/`](ticket-548/)), taken headlessly in `shot:` mode, seed 3, turn 1:
 - `before-earth.png`, `after-earth.png` (`panel:0 look:50,32`): before, Turkey, Iran and Saudi
   Arabia ran together, the United Kingdom lay over the European Union, and China over Japan. After,
-  Egypt, Saudi Arabia, India and Indonesia stand as their glyph and name; the European Union and
-  China hide, each under a neighbour's Army shield.
+  Saudi Arabia, Vietnam and Indonesia stand as their glyph and name; the European Union and China
+  hide, each under a neighbour's Army shield; the ISS and Axiom keep their names.
 - `china-selected-earth.png` (`look:80,35 select:eastasia`): China selected, its full block laid
   over Japan's shield. This is the case that put a question back to the designer (below).
 - `before-solar.png`, `after-solar.png`: before, Mars's label lay across Ceres's, and the Earth L5
@@ -33,9 +33,26 @@ Ticket [#548](https://github.com/whaleyjoshua2/Dying-Earth/issues/548), spec §1
 - Open windows (the Climate Panel, a card) are fixed marks too, so a label under one, which is not
   seen, does not push a seen one aside.
 
-**The tests.** `src/labels.rs` holds the layout, apart from the painting, with nine tests: rank
+**The review** (an agent that did not build it) found two defects and three gaps, all fixed:
+- A station's or stack's name gave way to its own glyph, so the ISS and Axiom vanished from the
+  globe, and a far orbit's name could stick hidden. Each glyph is now its label's own mark.
+- Labels under the side panel or the top bar still claimed room; and the selected label, laid over
+  marks, also ignored open windows. The panels and windows are now hard marks every label gives way
+  to.
+- The pointer raised a label within 24 pixels of its place, a Region's click within 30. Now 30.
+
+Its retake found a third defect: the six-pixel margin for growing back was measured against labels
+set flush by hand, so the Solar System Map's stack rows, once hidden for a frame, stayed hidden for
+good. The margin now holds for half a second after a label gives way. With it, Egypt and India,
+held short by the same fault, stand whole.
+
+**Left as it is**: the Solar System Map's Battle mark is set from the width of the Body's full
+label, so beside a label shrunk to its name it stands off to the left.
+
+**The tests.** `src/labels.rs` holds the layout, apart from the painting, with eleven tests: rank
 order, nearness to the middle within a rank, shrink then hide, a mark's owner exempt, the slack,
-the margin before growing back, the selected and hovered over marks, and the fade's memory. Each
-rule was broken on purpose and its test watched to fail before it was believed.
+the margin and its half-second hold, the margin from hidden to short, the selected and hovered over
+marks, the hard marks, and the fade's memory. Each rule was broken on purpose and its test watched
+to fail before it was believed.
 
 No rule moves, so no sweep.
