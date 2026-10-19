@@ -142,3 +142,16 @@ is the finished build: 4/4, and no row offers more.
 **The test** counts a Ship's own Loads and Unloads and not another Ship's, with the yellow
 following the ordered figure. It was watched red with the pending orders ignored. No rule moves,
 so no sweep.
+
+## Why Mercury is always two turns away
+
+Ticket [#553](https://github.com/whaleyjoshua2/Dying-Earth/issues/553), spec §6. **No change**, at the
+designer's word.
+
+**Measured** (`transit_cost_at(Earth, Mercury, t)`, turns 1 to 50, seed 1; a throwaway example, not
+kept): 2 turns in 26, 3 in 13, 4 in 9, 5 in 2, alternating, every odd turn 2. Venus runs 3 to 7 and
+Mars 5 to 9, changing slowly. The designer then raised that real probes take years and many flybys
+to reach Mercury. That is so (MESSENGER, 2004 to 2011, six flybys), and the game's direct flight is
+the price of skipping them: the dearest Fuel of any crossing from Earth. Offered a slow, cheap flyby
+route beside it, a longer direct flight, or Mercury reached only through Venus, the designer kept
+it as it is.

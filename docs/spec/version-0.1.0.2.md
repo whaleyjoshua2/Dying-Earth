@@ -125,3 +125,15 @@ Ticket: [A Colony Ship's card counts Pioneers as they board](https://github.com/
   Ship"* button offers and states on its hover.
 - **The card's own load sliders** take every Load placed this turn off the room they offer, a
   Colony's row as well as a Region's, so no row offers more than the figure above says is left.
+
+## 6. Mercury's flight: no change
+
+Ticket: [Why Mercury is always two turns away](https://github.com/whaleyjoshua2/Dying-Earth/issues/553).
+
+Decided to stay as it is. Earth to Mercury is the direct 105-day flight, priced in Fuel (about 13
+km/s from low Earth orbit to low Mercury orbit, dearer than Ceres), not the years of flybys real
+probes fly. That stands deliberately for a ship that pays to skip them, as
+`docs/research/new-worlds.md` §3.4 says. Measured over 50 turns it is not always two: every odd
+turn is 2 and the even turns 3 to 5 (2 in 26 turns, 3 in 13, 4 in 9, 5 in 2), since the best
+moment to launch comes round every 116 days against a 60-day turn. Turn 1 is odd, so the first look
+always says 2.
