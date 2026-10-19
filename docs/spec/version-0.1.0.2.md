@@ -98,3 +98,17 @@ Ticket: [The Launch Site line's hover answers the pointer](https://github.com/wh
   opens with the pointer anywhere on the row's words. Until now it opened only in the few pixels
   between them, because egui's selectable text took the pointer from the row.
 - **The area is the row's own**, not stretched across the card.
+
+## 4. Plurals print right
+
+Ticket: [Plurals print right: "1 Facility", "1 slot"](https://github.com/whaleyjoshua2/Dying-Earth/issues/551).
+
+- **Every count a player reads takes its noun singular at one**: "1 Facility", "1 free slot",
+  "1 turn", "1 Colonist", "1 Pioneer", "1 Ship", "1 hit". It applies in the window, the Report,
+  the Moments, the refusals an order gives, and the text tool. No "(s)" is left in any of them.
+  One helper, `dying_earth_engine::counted`, prints the count and its noun.
+- **A verb that must agree** agrees: "1 Colonist waits aboard", "its one turn is up", "1 Colonist
+  ... was lost", "1 Scrubber ... runs".
+- **Not changed**: mass nouns and resources (Fuel, Energy, Influence, ppm), Ducat counts, lines
+  that go only to the game's log (which the sweep tool counts by their words), and the developer
+  sweep tools.

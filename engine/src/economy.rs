@@ -646,7 +646,7 @@ impl Game {
             if extra > 0 {
                 // Ticket #358 (version 0.09.1): outside the Faction multiplier, at the designer's word.
                 y.allotment_outside += extra;
-                y.detail = Some(format!("{} Colonists here, {extra} more Influence", col.colonists));
+                y.detail = Some(format!("{} here, {extra} more Influence", crate::counted(col.colonists, "Colonist", "Colonists")));
             }
         }
         // Ticket #57: the yield is the Colony Slot's own, not its Body's. The Body's figures are
@@ -667,8 +667,8 @@ impl Game {
                 let far: f64 = held.iter().map(|b| t.body(*b).trade_pays).sum();
                 let raw = p.amount * here as f64 + far;
                 let bodies = held.iter().map(|b| format!("{} {}", b.name().trim_start_matches("the "), figure(t.body(*b).trade_pays))).collect::<Vec<_>>().join(" + ");
-                let arithmetic = if held.is_empty() { format!("{} x {here} Colonists", p.amount) } else { format!("{} x {here} Colonists + {bodies}", p.amount) };
-                let mut v = Chain::base(raw, format!("from {here} Colonists here and {} other Bodies held", held.len()));
+                let arithmetic = if held.is_empty() { format!("{} x {}", p.amount, crate::counted(here, "Colonist", "Colonists")) } else { format!("{} x {} + {bodies}", p.amount, crate::counted(here, "Colonist", "Colonists")) };
+                let mut v = Chain::base(raw, format!("from {} here and {} held", crate::counted(here, "Colonist", "Colonists"), crate::counted(held.len(), "other Body", "other Bodies")));
                 v.times(fac.output_multiplier, || format!("as the {}", fac.name));
                 // Ticket #426 (version 0.09.5): Commodity Finance, on a Trade Post and an Exchange
                 // alike, before the Exchange's flat Ducat.
@@ -707,7 +707,7 @@ impl Game {
                 let mut r = Chain::base(p.amount, "base");
                 r.times(science, || "for this site's science".to_string());
                 r.times(col.education, || format!("for Education {:.2}", col.education));
-                r.times(1.0 + col.colonists as f64 * per * col.education, || format!("for {} Colonists, weighted by Education", col.colonists));
+                r.times(1.0 + col.colonists as f64 * per * col.education, || format!("for {}, weighted by Education", crate::counted(col.colonists, "Colonist", "Colonists")));
                 r.times(research_multiplier, || format!("as the {}", fac.name));
                 r.times(self.tech_multiplier(seat, TechId::PublicScience), || t.tech(TechId::PublicScience).name.clone());
                 // Ticket #84: the Upload stacks on Public Science.

@@ -174,19 +174,19 @@ impl Game {
             VictorySecondKind::OffWorldPresence => (
                 self.off_world_colonists(seat) as f64,
                 second.bar,
-                format!("{} of {:.0} Colonists living off Earth", self.off_world_colonists(seat), second.bar),
+                format!("{} of {} living off Earth", self.off_world_colonists(seat), crate::counted(format!("{:.0}", second.bar), "Colonist", "Colonists")),
             ),
             VictorySecondKind::ColoniesOnBodies => (
                 self.bodies_settled(seat, second.colonists_each) as f64,
                 second.bodies as f64,
-                format!("{} of {} Bodies with {} Colonists or more", self.bodies_settled(seat, second.colonists_each), second.bodies, second.colonists_each),
+                format!("{} of {} with {} or more", self.bodies_settled(seat, second.colonists_each), crate::counted(second.bodies, "Body", "Bodies"), crate::counted(second.colonists_each, "Colonist", "Colonists")),
             ),
             // Ticket #192 (version 0.08.0): the uploaded, not the living. Monotonic, and it asks the
             // same question the build gate asks, of the same place.
             VictorySecondKind::ColonistsUploaded => (
                 self.seat(seat).uploaded as f64,
                 second.bar,
-                format!("{} of {:.0} Colonists uploaded into the Archive", self.seat(seat).uploaded, second.bar),
+                format!("{} of {} uploaded into the Archive", self.seat(seat).uploaded, crate::counted(format!("{:.0}", second.bar), "Colonist", "Colonists")),
             ),
         };
         let mut first_held_back = match card.kind {

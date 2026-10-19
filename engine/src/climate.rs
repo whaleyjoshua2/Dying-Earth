@@ -578,7 +578,7 @@ impl Game {
         self.log(format!("The Antarctic ice opens: {n} Colony Slots on Earth."));
         let text = self.say("antarctica_opens", &[("n", n.to_string())]);
         self.report_line(LineKind::Antarctica, Some(ReportPlace::Body(BodyId::Earth)), text);
-        self.moment(MomentKind::Antarctica, &[("n", n.to_string())], Some(ReportPlace::Body(BodyId::Earth)));
+        self.moment(MomentKind::Antarctica, &[("n", crate::counted(n, "Colony Slot", "Colony Slots"))], Some(ReportPlace::Body(BodyId::Earth)));
     }
 
     /// Spec 11.3: growth less 0.15% per full 0.1 C above +1.2.
@@ -697,7 +697,7 @@ impl Game {
             self.move_refugees(sid, lost * u.heat_share, "the heat");
         }
         if heat_regions > 0 || fell_regions > 0 {
-            let text = self.say("heat_board", &[("n", heat_regions.to_string()), ("m", fell_regions.to_string())]);
+            let text = self.say("heat_board", &[("n", crate::counted(heat_regions, "Region", "Regions")), ("m", fell_regions.to_string())]);
             self.report_line(LineKind::Climate, None, text);
         }
     }

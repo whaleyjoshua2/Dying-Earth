@@ -94,3 +94,25 @@ pointer, so the picture shows only that nothing else changed; the test is the ev
 
 The designer allowed "a couple pixels" beyond the words; the row's own area, gaps included, was
 enough, so none were added. No rule moves, so no sweep.
+
+## Plurals print right
+
+Ticket [#551](https://github.com/whaleyjoshua2/Dying-Earth/issues/551), spec §4.
+
+The designer chose the widest scope: every "(s)" and every counted noun that can print with 1. The
+helper `counted` sits in the engine with its own test, watched red with the singular rule broken.
+The sweep of call sites touched the window (`src/ui.rs`), the engine's Report, refusal and Victory
+lines (`orders.rs`, `resolution.rs`, `state.rs`, `economy.rs`, `victory.rs`, `events.rs`,
+`climate.rs`, `turn.rs`), about twenty-five Report templates in `assets/data/report.toml` (the
+number and noun now passed whole from the caller, and three new arguments, `wait`, `are` and
+`were`, for verbs that agree), and the text tool. Lines only written to the game's log were left
+as they are: the sweep tool counts some of them by their words. None of the words it counts were
+touched.
+
+**The pictures** ([`ticket-551/`](ticket-551/)), seed 3, four turns played:
+- `one-facility-report.png`: the Report open over the globe; below it a Region label reads
+  "1 Facility, 5 free slots".
+- `slots-earth.png`: the European Union's "8 Facilities, 0 free slots", and the roster's "China:
+  8 Facilities, 3 free slots".
+
+No rule moves, so no sweep.

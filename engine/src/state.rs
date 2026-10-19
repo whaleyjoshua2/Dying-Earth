@@ -1441,12 +1441,12 @@ impl BattleLine {
             .iter()
             .map(|p| {
                 format!(
-                    "{}{} ({}, strength {}, {} hit(s) landed; destroyed: {}; escaped: {})",
+                    "{}{} ({}, strength {}, {} landed; destroyed: {}; escaped: {})",
                     p.seat.map(names).unwrap_or_else(|| neutral.to_string()),
                     if p.aggressor { ", attacking," } else { "," },
                     p.units,
                     p.strength,
-                    p.hits,
+                    crate::counted(p.hits, "hit", "hits"),
                     if p.destroyed.is_empty() { "none".to_string() } else { p.destroyed.join(", ") },
                     if p.escaped.is_empty() { "none".to_string() } else { p.escaped.join(", ") },
                 )
@@ -5050,13 +5050,13 @@ impl Game {
             n => format!("in {n} turns"),
         };
         format!(
-            "{} window: {} ({}). Flight now: {} turns, {} Fuel. At the window: {} turns, {} Fuel.",
+            "{} window: {} ({}). Flight now: {}, {} Fuel. At the window: {}, {} Fuel.",
             name,
             when,
             self.date(window).text(),
-            now_turns,
+            crate::counted(now_turns, "turn", "turns"),
             now_fuel,
-            win_turns,
+            crate::counted(win_turns, "turn", "turns"),
             win_fuel
         )
     }
@@ -6047,7 +6047,7 @@ impl Game {
             }
             let names: Vec<String> = std::iter::once(root).chain(BodyId::ALL.into_iter().filter(|b| self.tables.body(*b).parent == Some(root))).map(|b| self.tables.body(b).name.clone()).collect();
             let (turns, fuel) = self.transit_cost_at(BodyId::Earth, root, next);
-            let text = self.say("window_next", &[("bodies", Game::comma_list(&names)), ("turns", turns.to_string()), ("fuel", figure(fuel))]);
+            let text = self.say("window_next", &[("bodies", Game::comma_list(&names)), ("turns", crate::counted(turns, "turn", "turns")), ("fuel", figure(fuel))]);
             // The review: placeless, since a window is the board's own news and a Ship line at a
             // world the player cannot see is dropped by the fog -- the very player it is for.
             self.report_line(LineKind::Ship, None, text);
@@ -6090,7 +6090,7 @@ impl Game {
             }
             let them = self.seat_name(other);
             let cause = match why {
-                AccordEnding::RanOut => self.say("accord_cause_ran_out", &[("turns", number_word(self.tables.relations.accord_turns))]),
+                AccordEnding::RanOut => { let k = self.tables.relations.accord_turns; self.say("accord_cause_ran_out", &[("turns", format!("{} {}", number_word(k), if k == 1 { "turn" } else { "turns" })), ("are", (if k == 1 { "is" } else { "are" }).to_string())]) },
                 AccordEnding::NotRenewed(_) => self.say("accord_cause_not_renewed", &[("faction", them.clone())]),
                 AccordEnding::CalledOff(_) => self.say("accord_cause_called_off", &[("faction", them.clone())]),
                 AccordEnding::Broken(s) if s == me => self.say("accord_cause_you_broke", &[]),

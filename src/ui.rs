@@ -3215,7 +3215,7 @@ fn journal_tab(ui: &mut Ui, session: &Session, game: &Game) {
                 }
                 // The Custodians' counts Regions, and shows the count.
                 None if second.kind == dying_earth_engine::data::OpeningKind::Leapfrogs && leapt > 0 => {
-                    ui.label(RichText::new(format!("Not yet met: {leapt} of {} Regions.", second.count)).weak());
+                    ui.label(RichText::new(format!("Not yet met: {leapt} of {}.", counted(second.count, "Region", "Regions"))).weak());
                 }
                 None => {
                     ui.label(RichText::new("Not yet met. No deadline.").weak());
@@ -3410,7 +3410,7 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                     let stations = game.colonies.iter().filter(|c| c.body == body && c.in_orbit).count();
                     let hovering = view.force_hover == Some(body)
                         || painter.ctx().pointer_latest_pos().map(|q| (q - p).length() < 40.0).unwrap_or(false);
-                    let mut text = format!("{name}  {filled}/{slots} slots, {stations}/{orbital} stations");
+                    let mut text = format!("{name}  {filled}/{}, {stations}/{}", counted(slots, "slot", "slots"), counted(orbital, "station", "stations"));
                     // Ticket #136 (version 0.07.3): every Orbital Slot by name and holder. The
                     // designer: *"List orbital slots in the body card."* The list unfolds while the
                     // Body is under the pointer: always open, Earth's six lines lay over the Moon
@@ -3596,7 +3596,7 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                         // NAME goes: the prefix already says whose (TSV, PMV, ARK, ACV) and the
                         // label is drawn in the Faction's colour, so it was saying it three times.
                         // The type stays in words at the designer's word, beside the kind glyph.
-                        let text = format!("{} ({}): {} turn(s)", game.ship_name(s), s.kind.name().to_lowercase(), turns_left);
+                        let text = format!("{} ({}): {}", game.ship_name(s), s.kind.name().to_lowercase(), counted(turns_left, "turn", "turns"));
                         let (kind, colour) = (Some(Kind::of_unit(s.kind)), seat_colour(session, s.seat));
                         let tier = owner_tier(Some(s.seat), selected == Selection::Ship(s.id));
                         tags.push(("flying", s.id), tier, p, vec![Piece::text(p, kind, text, colour, 12.0)], Piece::text(p, kind, game.ship_name(s), colour, 12.0));
@@ -3637,7 +3637,7 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                             None => Color32::LIGHT_GRAY,
                         };
                         let _ = armies;
-                        let text = format!("{}\n{}\n{} Facilities, {} free slot(s)", game.tables.state(sid).name, owner, st.facilities.len(), game.free_slots(sid));
+                        let text = format!("{}\n{}\n{}, {}", game.tables.state(sid).name, owner, counted(st.facilities.len(), "Facility", "Facilities"), counted(game.free_slots(sid), "free slot", "free slots"));
                         let mut full = vec![Piece::text(p, Some(Kind::Region), text, colour, 12.0)];
                         // Ticket #52: the Unrest figure once it bites, red once Facilities run at half.
                         // Ticket #548 (version 0.1.0.2): part of the full block, gone when it shrinks.
@@ -3749,7 +3749,7 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                                 continue;
                             }
                             let strength: i64 = here.iter().map(|s| game.ship_fighting_strength(s)).sum();
-                            let text = format!("{}: {} Ship(s), strength {}, {}", game.seat_name(seat), here.len(), strength, orbit_phrase(game, body, orbit));
+                            let text = format!("{}: {}, strength {}, {}", game.seat_name(seat), counted(here.len(), "Ship", "Ships"), strength, orbit_phrase(game, body, orbit));
                             band.push(BandRow { text, colour: seat_colour(session, seat), kind: Some(Kind::of_ships(here.iter().copied())), seat: Some(seat), battle: None });
                         }
                     }
@@ -3951,7 +3951,7 @@ fn slot_labels(painter: &egui::Painter, session: &Session, game: &Game, body: Bo
                         let army = game.armies.iter().filter(|a| a.at == ArmyAt::Place(Place::Colony(c.id))).count();
                         let owner = c.control.director().map(|s| game.seat_name(s)).unwrap_or_default();
                         (
-                            format!("{}: {}\n{} Colonists\n{}{}", name, owner, c.colonists, mods.join(", "), if army > 0 { format!("\nArmies: {army}") } else { String::new() }),
+                            format!("{}: {}\n{}\n{}{}", name, owner, counted(c.colonists, "Colonist", "Colonists"), mods.join(", "), if army > 0 { format!("\nArmies: {army}") } else { String::new() }),
                             c.control.director().map(|s| seat_colour(session, s)).unwrap_or(Color32::LIGHT_GRAY),
                             Hit::Select(Selection::Colony(c.id)),
                             Some(Kind::of_colony(c)),
@@ -4080,7 +4080,7 @@ fn colonies_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSt
                     Control::Controlled(s) => game.seat_name(s),
                     Control::Occupied { occupier, .. } => format!("occupied by the {}", game.seat_name(occupier)),
                 };
-                (format!("{}: {}, {} Colonists", game.place_name(Place::Colony(c.id)), owner, c.colonists), Selection::Colony(c.id))
+                (format!("{}: {}, {}", game.place_name(Place::Colony(c.id)), owner, counted(c.colonists, "Colonist", "Colonists")), Selection::Colony(c.id))
             }
             None => (format!("{}: empty", card.slots[slot as usize].name), Selection::Slot(body, slot)),
         };
@@ -4105,11 +4105,11 @@ fn stations_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSt
     let count = game.colonies.iter().filter(|c| c.in_orbit && c.body == body).count();
     // Ticket #116 (version 0.07.1): what an orbital slot is for, and what a Warship in one does.
     rule_tip(
-        ui.label(RichText::new(format!("In orbit: {} of {} station slots", count, card.orbital_slots)).strong()),
+        ui.label(RichText::new(format!("In orbit: {} of {}", count, counted(card.orbital_slots, "station slot", "station slots"))).strong()),
         format!(
             // Ticket #497 (version 0.09.9): cut from about 79 words.
-            "Room for {} stations, one to a ring. A station is reached only from its own ring; a Warship on Blockade there starves it.",
-            card.orbital_slots
+            "Room for {}, one to a ring. A station is reached only from its own ring; a Warship on Blockade there starves it.",
+            counted(card.orbital_slots, "station", "stations")
         ),
     );
     // Ticket #493 (version 0.09.9): a station's row, on every Body's card, is its glyph, its name in
@@ -4583,7 +4583,7 @@ fn battle_summary(game: &Game, i: usize) -> String {
         None => format!("A Battle here last turn; {}", b.result),
     }];
     for party in b.parties.iter().take(4) {
-        lines.push(format!("{}: {} ({} hit(s) landed)", who(party.seat), party.units, party.hits));
+        lines.push(format!("{}: {} ({} landed)", who(party.seat), party.units, counted(party.hits, "hit", "hits")));
     }
     lines.push("Click the ring for the Report.".to_string());
     lines.join("\n")
@@ -5401,7 +5401,7 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, seat: Seat, marks: boo
             // the Solar System Map labels the transit, which is the point of naming it in both.
             ships_rows.push(RosterRow {
                 kind: Kind::of_unit(s.kind),
-                text: format!("{}{} ({}) - in transit to {}, {} turn(s) left", tag("Ship"), game.ship_name(s), s.kind.name().to_lowercase(), game.tables.body(to).name, turns_left),
+                text: format!("{}{} ({}) - in transit to {}, {} turn(s) left", tag("Ship"), game.ship_name(s), s.kind.name().to_lowercase(), game.tables.body(to).name, counted(turns_left, "turn", "turns")),
                 tip: Some("A Ship in transit cannot be ordered and cannot be intercepted. It arrives at its Resolution, Holding, with whatever Fuel it has left.".to_string()),
                 mark: None,
                 // Ticket #374 (version 0.09.2): a Ship in flight has a card too, so the row opens it
@@ -5468,11 +5468,11 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, seat: Seat, marks: boo
         // Ticket #165 (version 0.07.5): the count is the one the card shows, which leaves out the
         // Core Module every place has and the Archive, so the roster and the card cannot disagree.
         let text = format!(
-            "{}{}: {} Colonists, {} Modules{}",
+            "{}{}: {}, {}{}",
             tag(if c.in_orbit { "Station" } else { "Colony" }),
             game.place_name(Place::Colony(c.id)),
-            c.colonists,
-            c.modules.iter().filter(|m| m.kind != ModuleKind::Core && m.kind != ModuleKind::Archive).count(),
+            counted(c.colonists, "Colonist", "Colonists"),
+            counted(c.modules.iter().filter(|m| m.kind != ModuleKind::Core && m.kind != ModuleKind::Archive).count(), "Module", "Modules"),
             if building > 0 { format!(", {building} building") } else { String::new() }
         );
         colony_rows.push(RosterRow { kind: Kind::of_colony(c), text, tip: None, mark: marks.then_some(!ordered), jump: Some((View::Surface(c.body), Selection::Colony(c.id))), room: None });
@@ -5485,7 +5485,7 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, seat: Seat, marks: boo
         let st = game.state(sid);
         let building = st.queue.len();
         let ordered = building > 0 || pending.iter().any(|o| roster_order_touches_state(o, sid));
-        let text = format!("{}{}: {} Facilities, {} free slot(s){}", tag("Region"), game.tables.state(sid).name, st.facilities.len(), game.free_slots(sid), if building > 0 { format!(", {building} building") } else { String::new() });
+        let text = format!("{}{}: {}, {}{}", tag("Region"), game.tables.state(sid).name, counted(st.facilities.len(), "Facility", "Facilities"), counted(game.free_slots(sid), "free slot", "free slots"), if building > 0 { format!(", {building} building") } else { String::new() });
         state_rows.push(RosterRow { kind: Kind::Region, text, tip: None, mark: marks.then_some(!ordered), jump: Some((View::Surface(BodyId::Earth), Selection::State(sid))), room: None });
     }
     roster_group(ui, RosterGroup { name: "Regions", empty: "  none" }, state_rows, marks, jump);
@@ -5615,7 +5615,7 @@ fn order_text(game: &Game, o: &Order) -> String {
         Order::BuildModule { colony, kind } => format!("Build {} at {}", kind.name(), game.place_name(Place::Colony(*colony))),
         Order::BuildShip { site, kind } => format!("Build {} at {}", kind.name(), game.place_name(*site)),
         Order::BuildArmy { place } => format!("Build Army at {}", game.place_name(*place)),
-        Order::Repair { unit, points } => format!("Repair {} point(s) on {}", points, unit_name(game, unit)),
+        Order::Repair { unit, points } => format!("Repair {} on {}", counted(points, "point", "points"), unit_name(game, unit)),
         // Ticket #335 (version 0.09.0): a leg names the ORBIT it ends in, low orbit included.
         Order::Transit { ship, to, slot } => format!("Send {} to {}", ship, game.orbit_name(*to, Orbit::of(*slot))),
         Order::ChangeOrbit { ship, slot } => {
@@ -5637,7 +5637,7 @@ fn order_text(game: &Game, o: &Order) -> String {
         Order::Rearm { ship } => format!("Rearm {}", ship),
         Order::ArmyStance { place, stance } => format!("Armies at {}: {}", game.place_name(*place), stance.name()),
         Order::MoveArmy { army, to } => format!("{} to {}", army, game.tables.state(*to).name),
-        Order::Load { ship, colonists, army, .. } => format!("Load {} onto {}", if *colonists > 0 { format!("{colonists} Colonists") } else { format!("{}", army.unwrap_or(ArmyId(0))) }, ship),
+        Order::Load { ship, colonists, army, .. } => format!("Load {} onto {}", if *colonists > 0 { counted(colonists, "Colonist", "Colonists") } else { format!("{}", army.unwrap_or(ArmyId(0))) }, ship),
         Order::Unload { ship, colonists, army, into } => match into {
             // Ticket #409 (version 0.09.4): with the count the slider chose.
             UnloadTarget::Slot(b, s) => format!("Found a Colony at {} on {} with {} from {}", game.tables.body(*b).slots[*s as usize].name, game.tables.body(*b).name, colonists_word(*colonists), ship),
@@ -5646,7 +5646,7 @@ fn order_text(game: &Game, o: &Order) -> String {
         },
         Order::Influence { target, amount } => format!("{} Influence on {}", amount, game.place_name(*target)),
         Order::BuyInfluence { amount } => format!("Buy {} Influence with Ducats", amount),
-        Order::RepairWithDucats { unit, points } => format!("Repair {} point(s) on {} with Ducats", points, unit_name(game, unit)),
+        Order::RepairWithDucats { unit, points } => format!("Repair {} on {} with Ducats", counted(points, "point", "points"), unit_name(game, unit)),
         Order::Buy { resource, amount } => format!("Buy {} {} for {} Ducats", amount, resource.name(), game.order_cost(Seat(0), o).ducats),
         Order::Sell { resource, amount } => format!("Sell {} {} for {} Ducats", amount, resource.name(), -game.order_cost(Seat(0), o).ducats),
         Order::BuildFacilityWithDucats { state, kind } => format!("Build {} in {} for Ducats", kind.name(), game.tables.state(*state).name),
@@ -5661,10 +5661,11 @@ fn order_text(game: &Game, o: &Order) -> String {
         Order::SetResearchDirective { percent: 0 } => "Pay all your Research into the shared Tech from the next Income".to_string(),
         Order::SetResearchDirective { percent } => format!("Direct {percent}% of your Research from the next Income"),
         // Ticket #73.
-        Order::BuildEmigrants { state, n } => format!("Recruit {n} Pioneers in {}", game.tables.state(*state).name),
-        Order::LiftToStation { state, n, colony } => format!("Send {n} Pioneers from {} to {} by lift", game.tables.state(*state).name, game.place_name(Place::Colony(*colony))),
+        Order::BuildEmigrants { state, n } => format!("Recruit {} in {}", counted(n, "Pioneer", "Pioneers"), game.tables.state(*state).name),
+        Order::LiftToStation { state, n, colony } => format!("Send {} from {} to {} by lift", counted(n, "Pioneer", "Pioneers"), game.tables.state(*state).name, game.place_name(Place::Colony(*colony))),
         Order::SendToAntarctica { state, n, into } => format!(
-            "Send {n} Pioneers from {} to {} by sea",
+            "Send {} from {} to {} by sea",
+            counted(n, "Pioneer", "Pioneers"),
             game.tables.state(*state).name,
             match into {
                 UnloadTarget::Slot(_, slot) => game.tables.body(BodyId::Earth).slots[*slot as usize].name.clone(),
@@ -5689,7 +5690,7 @@ fn order_text(game: &Game, o: &Order) -> String {
         Order::StripPermit { state } => format!("Strip Permit in {}: three turns of double output", game.tables.state(*state).name),
         Order::ExodusCall { state } => format!("Exodus Call in {}: a doubled muster at the ordinary cost in people", game.tables.state(*state).name),
         // Ticket #192 (version 0.08.0): the Upload.
-        Order::Upload { colony, n } => format!("Upload {} Colonists into the Archive at {}", n, game.place_name(Place::Colony(*colony))),
+        Order::Upload { colony, n } => format!("Upload {} into the Archive at {}", counted(n, "Colonist", "Colonists"), game.place_name(Place::Colony(*colony))),
     }
 }
 
@@ -6265,7 +6266,7 @@ fn orbit_odds_lines(ui: &mut Ui, game: &Game, body: BodyId) {
     let charge = charge as f64;
     let left_dry = mine_fighting.iter().filter(|s| s.fuel - charge < charge).count();
     if left_dry > 0 {
-        cost.push_str(&format!(" {left_dry} Ship(s) of yours would come out of it under the bar, holding no orbit here and fighting halved until refuelled."));
+        cost.push_str(&format!(" {} of yours would come out of it under the bar, holding no orbit here and fighting halved until refuelled.", counted(left_dry, "Ship", "Ships")));
     }
     ui.label(cost);
 }
@@ -6986,7 +6987,7 @@ fn threshold_breakdown(ui: &mut Ui, game: &Game, target: Place) {
             // Ticket #336 (version 0.09.0): a base under every place off Earth, the station's in
             // place of the Colony's rather than on top of it, so the line names the base it used.
             let base = if station { format!("{} for the station", t.station_threshold_base) } else { format!("{} for the Colony", t.colony_threshold_base) };
-            format!("Threshold {threshold} - {base} + {} for {people} Colonists", t.colony_threshold_per_colonist * people)
+            format!("Threshold {threshold} - {base} + {} for {}", t.colony_threshold_per_colonist * people, counted(people, "Colonist", "Colonists"))
         }
     };
     // Ticket #53 and ticket #43: the two multipliers that already moved this figure and never said
@@ -7770,9 +7771,9 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
             margin_words(game, None, Place::State(st.id))
         ),
         Control::Occupied { occupier, .. } => format!(
-            "An Army of the {} beat its defenders: they choose what is built here but do not direct its Armies.\nControl passes after {} turns, or sooner once the occupier's Influence, gained each turn and halved while Unrest is high, passes the threshold.",
+            "An Army of the {} beat its defenders: they choose what is built here but do not direct its Armies.\nControl passes after {}, or sooner once the occupier's Influence, gained each turn and halved while Unrest is high, passes the threshold.",
             game.seat_name(occupier),
-            game.tables.influence.occupation_turns
+            counted(game.tables.influence.occupation_turns, "turn", "turns")
         ),
     };
     rule_tip(ui.label(owner), owner_tip);
@@ -7860,7 +7861,7 @@ This turn {:+.2}%: {:+.1} million.", c.population_growth * 100.0, c.population_l
                     "Strip Permit: the last doubled turn. At this Resolution its Baseline Emissions rise {:.1} for good and its Unrest by {}.",
                     t.baseline_rise, Game::unrest_figure(t.unrest)
                 ),
-                n => format!("Strip Permit: {} turn(s) left of double output, then +{:.1} Baseline Emissions for good and +{} Unrest.", n, t.baseline_rise, Game::unrest_figure(t.unrest)),
+                n => format!("Strip Permit: {} left of double output, then +{:.1} Baseline Emissions for good and +{} Unrest.", counted(n, "turn", "turns"), t.baseline_rise, Game::unrest_figure(t.unrest)),
             },
         );
     } else if st.baseline_rise > 0.0 {
@@ -7981,7 +7982,7 @@ This turn {:+.2}%: {:+.1} million.", c.population_growth * 100.0, c.population_l
     let ordered_slots = session.pending.iter().filter(|o| o.build_state() == Some(sid) && o.build_facility().is_some_and(|k| game.takes_slot(k.built_by(game.kind(Seat(0)))))).count() as u32;
     let free_now = game.free_slots(sid).saturating_sub(ordered_slots);
     rule_tip(
-        card_heading(ui, "facility_factory", format!("Facilities ({free_now} of {} slots free{})", game.build_slots(sid), if ordered_slots > 0 { format!(", {ordered_slots} ordered this turn") } else { String::new() })),
+        card_heading(ui, "facility_factory", format!("Facilities ({free_now} of {} free{})", counted(game.build_slots(sid), "slot", "slots"), if ordered_slots > 0 { format!(", {ordered_slots} ordered this turn") } else { String::new() })),
         format!(
             // Ticket #452 (version 0.09.6): cut, at the designer's word, every rule kept.
             "Slots: Size {} + {} + starting Industry {}, +1 inland per raise.\n{} coastal: each sea threshold takes one (with its oldest Facility) and turns an inland slot coastal. A Sea Wall stops the taking, not the turning.\nMothballed and building each keep a slot.",
@@ -8178,9 +8179,9 @@ fn policies_block(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, act
             cost_button(ui, game, &session.pending, Order::ExodusCall { state: sid }, "Exodus Call", actions);
             ui.label(
                 RichText::new(format!(
-                    "{} turns recruiting {} Pioneers here instead of {}, and each costs this Region the ordinary population rather than your half again. Once per Region, ever.",
-                    t.turns,
-                    game.emigrants_per_turn(Seat(0)) * t.muster_multiplier,
+                    "{} recruiting {} here instead of {}, and each costs this Region the ordinary population rather than your half again. Once per Region, ever.",
+                    counted(t.turns, "turn", "turns"),
+                    counted(game.emigrants_per_turn(Seat(0)) * t.muster_multiplier, "Pioneer", "Pioneers"),
                     game.emigrants_per_turn(Seat(0))
                 ))
                 .weak(),
@@ -8191,7 +8192,7 @@ fn policies_block(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, act
         let t = &game.tables.strip_permit;
         ui.horizontal(|ui| {
             cost_button(ui, game, &session.pending, Order::StripPermit { state: sid }, "Strip Permit", actions);
-            ui.label(RichText::new(format!("{} turns of double output here, then +{:.1} Baseline Emissions and +{} Unrest, for good", t.turns, t.baseline_rise, Game::unrest_figure(t.unrest))).weak());
+            ui.label(RichText::new(format!("{} of double output here, then +{:.1} Baseline Emissions and +{} Unrest, for good", counted(t.turns, "turn", "turns"), t.baseline_rise, Game::unrest_figure(t.unrest))).weak());
         });
     }
     // Ticket #476 (version 0.09.8): Raise Industry Level is a tile among the Facility boxes now;
@@ -8252,7 +8253,7 @@ fn pioneers_block(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, act
         game,
         &session.pending,
         Order::BuildEmigrants { state: sid, n: per },
-        &format!("Recruit {per} Pioneers"),
+        &format!("Recruit {}", counted(per, "Pioneer", "Pioneers")),
         Some(recruit_hover(game, sid, per)),
         actions,
     );
@@ -8442,7 +8443,7 @@ fn emigrant_loader(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewS
             let why = if waiting == 0 {
                 format!("Nobody is waiting in {}. Recruit Pioneers there first.", game.tables.state(chosen).name)
             } else {
-                format!("{} is full: {} Colonists in {} of room.", game.place_name(Place::Colony(col.id)), col.colonists, game.habitat_room(col))
+                format!("{} is full: {} in {} of room.", game.place_name(Place::Colony(col.id)), counted(col.colonists, "Colonist", "Colonists"), game.habitat_room(col))
             };
             let label = if by_sea { "Bring Pioneers by sea" } else { "Lift Pioneers" };
             ui.add_enabled(false, egui::Button::new(label)).on_disabled_hover_text(why);
@@ -8451,13 +8452,13 @@ fn emigrant_loader(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewS
         let (order, label, hover) = if by_sea {
             (
                 Order::SendToAntarctica { state: chosen, n, into: UnloadTarget::Colony(col.id) },
-                format!("Bring {n} Pioneers by sea"),
+                format!("Bring {} by sea", counted(n, "Pioneer", "Pioneers")),
                 format!("They land here at NEXT turn's Resolution: a sea crossing takes a turn. {} has room for {room} more.", game.place_name(Place::Colony(col.id))),
             )
         } else {
             (
                 Order::LiftToStation { state: chosen, n, colony: col.id },
-                format!("Lift {n} Pioneers"),
+                format!("Lift {}", counted(n, "Pioneer", "Pioneers")),
                 format!("Aboard at this turn's Resolution. A launch: it emits like any lift. {} has room for {room} more.", game.place_name(Place::Colony(col.id))),
             )
         };
@@ -8725,7 +8726,7 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
                         game,
                         &session.pending,
                         Order::Upload { colony: cid, n },
-                        &format!("Upload {n} Colonists"),
+                        &format!("Upload {}", counted(n, "Colonist", "Colonists")),
                         Some(format!(
                             "They are read into the Archive and leave the living population here: {} live at this place now. It cannot be undone once the turn ends, and the uploaded can never be lost -- not to a raid, a crowding death or a handover.",
                             game.colony(cid).map(|c| c.colonists).unwrap_or(0)
@@ -8821,7 +8822,7 @@ fn slot_panel(ui: &mut Ui, session: &Session, game: &Game, body: BodyId, slot: u
 fn attack_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, body: BodyId, ships: &[&Ship], on_ship_card: bool, actions: &mut Vec<Action>) {
     let seat = Seat(0);
     if on_ship_card {
-        ui.label(RichText::new(format!("The stack's stance and Attack: all {} Ship(s) of yours at {}", ships.len(), game.tables.body(body).name)).strong());
+        ui.label(RichText::new(format!("The stack's stance and Attack: all {} of yours at {}", counted(ships.len(), "Ship", "Ships"), game.tables.body(body).name)).strong());
     }
     stance_row(ui, game, &session.pending, ships[0].stance, |s| Order::ShipStance { body, stance: s }, true, actions);
     // Ticket #346 (version 0.09.1): the two sums an Attack is weighed with, at the strength the
@@ -8838,7 +8839,7 @@ fn attack_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
         orbit_odds_lines(ui, game, body);
         let attack = Order::ShipStance { body, stance: Stance::Attack };
         let check = game.check_order(seat, &session.pending, &attack);
-        let label = if on_ship_card { format!("Attack with all {} Ship(s) at {}", ships.len(), game.tables.body(body).name) } else { "Attack this turn".to_string() };
+        let label = if on_ship_card { format!("Attack with all {} at {}", counted(ships.len(), "Ship", "Ships"), game.tables.body(body).name) } else { "Attack this turn".to_string() };
         let mut button = ui.add_enabled(check.is_ok(), egui::Button::new(label));
         button = rule_tip(button, match &check {
             Ok(_) => ATTACK_FIGHTS_NOW.to_string(),
@@ -8848,7 +8849,7 @@ fn attack_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
             view.attack_preview = true;
         }
         if view.attack_preview && check.is_ok() {
-            ui.label(format!("Your {} Ship(s) (strength {}) against {} Ship(s) of {} (strength {} in all). Confirm?", ships.len(), mine, enemy_ships, rivals_text(game, &rivals), enemy));
+            ui.label(format!("Your {} (strength {}) against {} of {} (strength {} in all). Confirm?", counted(ships.len(), "Ship", "Ships"), mine, counted(enemy_ships, "Ship", "Ships"), rivals_text(game, &rivals), enemy));
             // Ticket #383 (version 0.09.2): the point of no return, and it says so: the Battle is
             // fought the moment the button is pressed, on the board as it stands.
             ui.label(RichText::new("The Battle is fought the moment you confirm, on the board as it stands; it cannot be taken back.").weak());
@@ -8875,7 +8876,7 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     // Ticket #430 (version 0.09.5): a rival stack at a Body the player does not see is whose and
     // how many, however its card was reached.
     if seat != Seat(0) && hidden_body(game, body) {
-        ui.label(RichText::new(format!("{}: {} Ships at {}", game.seat_name(seat), ships.len(), game.tables.body(body).name)).size(22.0).strong());
+        ui.label(RichText::new(format!("{}: {} at {}", game.seat_name(seat), counted(ships.len(), "Ship", "Ships"), game.tables.body(body).name)).size(22.0).strong());
         ui.label(RichText::new("Out of sight.").weak());
         return;
     }
@@ -9074,7 +9075,7 @@ fn body_dropdown(ui: &mut Ui, session: &Session, game: &Game, body: BodyId, to: 
     let header = if here {
         format!("{} (here): change orbit, {} Fuel", game.tables.body(to).name, game.tables.orbit_change_fuel)
     } else {
-        format!("To {}: {turns} turn(s), {} Fuel", game.tables.body(to).name, figure(fuel))
+        format!("To {}: {}, {} Fuel", game.tables.body(to).name, counted(turns, "turn", "turns"), figure(fuel))
     };
     let shown = egui::CollapsingHeader::new(RichText::new(header).strong()).id_salt(("moves", salt, to)).default_open(open).show(ui, |ui| {
         if here {
@@ -9235,7 +9236,7 @@ fn ship_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
             // The Resolution that lands it: this turn's if one turn is left, else that many turns
             // on, less one -- and a solar storm or a grounding holds every hull where it is.
             let lands = game.date(game.turn + turns_left.saturating_sub(1)).text();
-            ui.label(format!("In transit from {} to {}, {turns_left} turn(s) left: it lands at the Resolution of {lands}, barring a solar storm or a grounding.", game.tables.body(from).name, game.tables.body(to).name))
+            ui.label(format!("In transit from {} to {}, {} left: it lands at the Resolution of {lands}, barring a solar storm or a grounding.", game.tables.body(from).name, game.tables.body(to).name, counted(turns_left, "turn", "turns")))
                 .on_hover_text("A Ship in transit cannot be ordered and cannot be intercepted. It arrives Holding, with whatever Fuel it has left.");
         }
     }
@@ -9361,7 +9362,7 @@ fn ship_cargo_block(ui: &mut Ui, session: &Session, game: &Game, s: &Ship, body:
                 // Ticket #73: the Pioneers waiting there, no more. Ticket #428 (version 0.09.5): how
                 // many, on a slider.
                 let lift = count_slider(ui, ("load", s.id, st), most, "Pioneers");
-                cost_button(ui, game, &session.pending, Order::Load { ship: s.id, colonists: lift, from: LoadSource::State(st), army: None }, &format!("Load {lift} Pioneers from {}", game.tables.state(st).name), actions);
+                cost_button(ui, game, &session.pending, Order::Load { ship: s.id, colonists: lift, from: LoadSource::State(st), army: None }, &format!("Load {} from {}", counted(lift, "Pioneer", "Pioneers"), game.tables.state(st).name), actions);
             }
         }
         // Ticket #437 (version 0.09.6): over Earth too, from each station of yours with Colonists
@@ -9372,7 +9373,7 @@ fn ship_cargo_block(ui: &mut Ui, session: &Session, game: &Game, s: &Ship, body:
             let k = count_slider(ui, ("load", s.id, c.id), n.min(c.colonists), "Colonists");
             // Ticket #335 (version 0.09.0): by the place's OWN name, which names a station
             // and a ground Colony alike.
-            cost_button(ui, game, &session.pending, Order::Load { ship: s.id, colonists: k, from: LoadSource::Colony(c.id), army: None }, &format!("Load {} Colonists from {}", k, game.place_name(Place::Colony(c.id))), actions);
+            cost_button(ui, game, &session.pending, Order::Load { ship: s.id, colonists: k, from: LoadSource::Colony(c.id), army: None }, &format!("Load {} from {}", counted(k, "Colonist", "Colonists"), game.place_name(Place::Colony(c.id))), actions);
         }
     }
     if card.carries_army && s.army.is_none() {
@@ -10464,7 +10465,7 @@ fn battery_rules(game: &Game, col: &Colony) -> String {
     } else {
         "no rival holds Orbital Control of low orbit, so none may land"
     };
-    format!("\nCovers {orbit} alone, and fights in any Battle there.\nWhile it works, {worth}.\nRepaired here with Materials; destroyed at {} hits.", card.hit_points)
+    format!("\nCovers {orbit} alone, and fights in any Battle there.\nWhile it works, {worth}.\nRepaired here with Materials; destroyed at {}.", counted(card.hit_points, "hit", "hits"))
 }
 
 /// The words a box's hover adds to an offline building's line, and nothing for a working or a
@@ -10694,7 +10695,7 @@ fn module_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
                 let check = game.check_order(Seat(0), &session.pending, &order);
                 // Ticket #503 (version 0.1.0.0): and what a tier pays, the Colonial Capital's +1.
                 let pays = if next.influence > 0 { format!(", +{} Influence a turn", next.influence) } else { String::new() };
-                let words = format!("Upgrade to a {name}: {}. Up to {} Modules{pays}.", game.order_price_text(Seat(0), &order, game.order_cost(Seat(0), &order)), next.cap);
+                let words = format!("Upgrade to a {name}: {}. Up to {}{pays}.", game.order_price_text(Seat(0), &order, game.order_cost(Seat(0), &order)), counted(next.cap, "Module", "Modules"));
                 // Ticket #503: where the Body's Capital stands elsewhere, that alone, "The Moon's Capital is Plato."
                 let tip = match &check {
                     Ok(_) => words,
@@ -11737,9 +11738,9 @@ fn faction_window(ctx: &egui::Context, session: &Session, game: &Game, view: &mu
         // mockups measured at about 950 pixels of content in a 524-wide panel.
         let r = &game.tables.relations;
         let relations_note = format!(
-            "{:+} to {:+} from a neutral {}, read as six levels from Friendly to Hostile. A score is what the pair have DONE to each other plus what this Faction makes of the other's Blame -- hover a level for the two figures. Offences differ in weight and a turn charges every one, to {} at most; quiet mends {} every {} turns below neutral and lapses half as fast above it. A pair crossed on {} turns can never fully recover again.
+            "{:+} to {:+} from a neutral {}, read as six levels from Friendly to Hostile. A score is what the pair have DONE to each other plus what this Faction makes of the other's Blame -- hover a level for the two figures. Offences differ in weight and a turn charges every one, to {} at most; quiet mends {} every {} below neutral and lapses half as fast above it. A pair crossed on {} can never fully recover again.
 A rival that holds you at less than neutral defends its places against you a little harder, and an Accord wants a level it will not strike below.",
-            r.best, r.worst, r.start, r.turn_cap, r.recover, r.quiet_turns, r.scar_turns
+            r.best, r.worst, r.start, r.turn_cap, r.recover, counted(r.quiet_turns, "turn", "turns"), counted(r.scar_turns, "turn", "turns")
         );
         ui.label(RichText::new("Relations").strong()).on_hover_text(relations_note);
         let name = game.seat_name(seat);
@@ -11887,8 +11888,8 @@ fn card_effect_text(e: &CardEffect) -> String {
             format!("{damage} damage to each of your Ships{}", if *in_orbit { " in orbit" } else { "" })
         }
         CardEffect::TradePrice { resource, to, by, turns } => match to {
-            Some(to) => format!("the {} price stands at {to} for {turns} turn(s)", resource.name()),
-            None => format!("the {} price moves {by:+} for {turns} turn(s)", resource.name()),
+            Some(to) => format!("the {} price stands at {to} for {}", resource.name(), counted(turns, "turn", "turns")),
+            None => format!("the {} price moves {by:+} for {}", resource.name(), counted(turns, "turn", "turns")),
         },
         CardEffect::RelationsAllRivals { relations } => format!("{relations:+} Relations with every rival"),
         CardEffect::BlamePpm { ppm } => {
@@ -11903,9 +11904,9 @@ fn card_effect_text(e: &CardEffect) -> String {
             format!("every {} of yours makes {:.0}% of its output at the next Income", facility.name(), multiplier * 100.0)
         }
         CardEffect::DiscoveryAtColony { module, multiplier, turns } => {
-            format!("a Discovery at one of your Colonies: its {} at x{multiplier:.1} for {turns} turn(s)", module.name())
+            format!("a Discovery at one of your Colonies: its {} at x{multiplier:.1} for {}", module.name(), counted(turns, "turn", "turns"))
         }
-        CardEffect::PioneersFree { pioneers } => format!("{pioneers} Pioneers waiting, costing their Region no people"),
+        CardEffect::PioneersFree { pioneers } => format!("{} waiting, costing their Region no people", counted(pioneers, "Pioneer", "Pioneers")),
         CardEffect::FreeBuilding { module, army } => match (module, army) {
             (Some(m), _) => format!("a {} standing free at your smallest Colony", m.name()),
             (None, true) => "an Army raised free in your most populous Region, costing it no people".to_string(),
@@ -12520,7 +12521,7 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                                 (true, None) => ", attacking".to_string(),
                                 _ => String::new(),
                             };
-                            ui.label(RichText::new(format!("{who}{attacking}: {} (strength {}, {} hit(s) landed)", party.units, party.strength, party.hits)).color(colour));
+                            ui.label(RichText::new(format!("{who}{attacking}: {} (strength {}, {} landed)", party.units, party.strength, counted(party.hits, "hit", "hits"))).color(colour));
                         }
                         ui.label(&b.result);
                         battle_log_view(ui, session, game, b);
