@@ -1518,6 +1518,13 @@ fn disc(centre: Pos2, radius: f32) -> egui::Rect {
     egui::Rect::from_center_size(centre, egui::vec2(radius * 2.0, radius * 2.0))
 }
 
+/// Ticket #550 (version 0.1.0.2): text the pointer passes through to the row it sits in.
+fn no_selectable_text(ctx: &egui::Context) {
+    if ctx.global_style().interaction.selectable_labels {
+        ctx.all_styles_mut(|s| s.interaction.selectable_labels = false);
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn draw(
     mut contexts: EguiContexts,
@@ -1532,6 +1539,13 @@ pub fn draw(
     mut exit: MessageWriter<AppExit>,
 ) -> Result {
     let ctx = contexts.ctx_mut()?;
+    // Ticket #550 (version 0.1.0.2): **no text in the game is selectable.** egui's labels select by
+    // default, which makes each one sense a drag, and egui then hands the pointer to the words
+    // rather than to the row they sit in. Every hover hung on a row of a glyph and its words --
+    // "Launch Site: Yes", the Influence value, GDP, Widgets, Emissions, a card's heading -- fired
+    // only in the few pixels between them. The designer: *"can't get mouseover on launch site:
+    // yes/no on country card to work"*. Nothing in the game is meant to be copied.
+    no_selectable_text(ctx);
     let mut root = Ui::new(ctx.clone(), "viewport".into(), egui::UiBuilder::new().layer_id(egui::LayerId::background()).max_rect(ctx.viewport_rect()));
     let mut actions: Vec<Action> = Vec::new();
     // Ticket #109 (version 0.07.0): the resource icons are rendered from SVG once, on the first
@@ -12939,6 +12953,37 @@ mod tests {
             assert_eq!(r.short, short, "{n} aboard");
             assert_eq!(r.hover.as_deref() == Some("4 found a Colony"), short, "{n} aboard: {:?}", r.hover);
         }
+    }
+
+    /// Ticket #550 (version 0.1.0.2): a hover hung on a row of words -- "Launch Site: Yes" --
+    /// answers with the pointer over the words, not only in the gap between them. Red under egui's
+    /// default of selectable text, which hands the pointer to the words.
+    #[test]
+    fn a_rows_hover_answers_over_its_words() {
+        let over_the_words = |selectable: bool| {
+            let ctx = egui::Context::default();
+            if !selectable {
+                no_selectable_text(&ctx);
+            }
+            let (mut row, mut hovered) = (egui::Rect::NOTHING, false);
+            for _ in 0..3 {
+                let mut input = egui::RawInput { screen_rect: Some(egui::Rect::from_min_size(Pos2::ZERO, egui::vec2(400.0, 200.0))), ..Default::default() };
+                if row.is_positive() {
+                    input.events.push(egui::Event::PointerMoved(row.left_center() + egui::vec2(12.0, 0.0)));
+                }
+                let _ = ctx.run_ui(input, |ui| {
+                    let r = ui.horizontal(|ui| {
+                        ui.label("Launch Site:");
+                        ui.label("Yes");
+                    });
+                    row = r.response.rect;
+                    hovered = r.response.hovered();
+                });
+            }
+            hovered
+        };
+        assert!(!over_the_words(true), "egui's default should hand the pointer to the words");
+        assert!(over_the_words(false), "the row should answer over its words");
     }
 
     /// Ticket #543, at the designer's word: the Recruit hover is its two figures and nothing more.

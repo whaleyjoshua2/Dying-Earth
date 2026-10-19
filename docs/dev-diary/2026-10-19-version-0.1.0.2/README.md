@@ -70,3 +70,27 @@ Ticket [#549](https://github.com/whaleyjoshua2/Dying-Earth/issues/549), spec §2
 
 The designer kept the place lines and their queues on the top bar ("cut the rule leave everything
 else"), so with many places directed that hover still runs long. No rule moves, so no sweep.
+
+## The Launch Site line's hover
+
+Ticket [#550](https://github.com/whaleyjoshua2/Dying-Earth/issues/550), spec §3.
+
+**The cause was not the one charted.** The ticket guessed that the row did not sense the pointer at
+all. It does: egui gives every row a hover sense. But egui's labels are selectable by default, so
+each word senses a drag, and egui's hit test then hands the pointer to the words rather than the
+row beneath them. The hover fired only in the gap between "Launch Site:" and "Yes". Every hover
+hung on a glyph-and-words row (`icon_word`, `card_heading`) had the same fault. The fix is one
+line at the root: no text in the game is selectable. The top bar's `.interact(Sense::hover())`
+calls were never what made its hovers work: egui's `Response::interact` re-registers a widget in
+place and does not lift it above its children.
+
+**The test** drives egui with a pointer over the words of a "Launch Site: Yes" row and asks whether
+the row is hovered. It is red under egui's default (asserted in the test) and was watched red with
+the fix undone.
+
+**The picture** ([`ticket-550/launch-site-hover-earth.png`](ticket-550/)): China's card, drawn as
+before, its Launch Site hover forced open (`tip:any orbit`). A headless picture cannot move a
+pointer, so the picture shows only that nothing else changed; the test is the evidence.
+
+The designer allowed "a couple pixels" beyond the words; the row's own area, gaps included, was
+enough, so none were added. No rule moves, so no sweep.

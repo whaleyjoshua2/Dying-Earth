@@ -88,3 +88,13 @@ Ticket: [Fewer words: the top bar's Widgets hover and the Climate Panel's deck l
 - **The Climate Panel's penalty line** reads *"Penalties in force: population growth +1.00% per
   turn."* How often a card comes and what is left in the deck are dropped. The Report's *"No Event
   this turn"* line still gives the chance.
+
+## 3. Hovers on a row of words answer the pointer
+
+Ticket: [The Launch Site line's hover answers the pointer](https://github.com/whaleyjoshua2/Dying-Earth/issues/550).
+
+- **No text in the game is selectable.** A hover hung on a row of words, such as *"Launch Site:
+  Yes"* or a glyph and its words (the Influence value, GDP, Widgets, Emissions, a card's heading),
+  opens with the pointer anywhere on the row's words. Until now it opened only in the few pixels
+  between them, because egui's selectable text took the pointer from the row.
+- **The area is the row's own**, not stretched across the card.
