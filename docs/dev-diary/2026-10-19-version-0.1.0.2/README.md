@@ -234,3 +234,16 @@ part. Left as found, and noted for the designer:
   the weighted sweep measures the effect.
 - **The 95% refusal is stricter**: a Prospector with the Fund full and 17 of 18 off Earth (0.97)
   is now refused a trade it was let through before.
+
+## Closing the version
+
+Ticket [#556](https://github.com/whaleyjoshua2/Dying-Earth/issues/556).
+
+- **The closing sweep** ([`sweeps/final-0.1.0.2.txt`](sweeps/final-0.1.0.2.txt)): **3 / 23 / 26 / 13
+  and 14 collapses**, the weighted run to the game (nothing that moves a rule changed after it).
+- **`GAME_VERSION` 0.1.0.2; `SAVE_VERSION` stays at 12**: the version added no saved field.
+- **A second-agent review of the moons' yields** (#554, which the designer had closed on the
+  sweep): no defect; every re-pinned figure checked by hand. One test comment reasoning from the
+  Moon's old 1.4025 refreshed.
+- **The playtest note** rewritten for the version; the Windows kit built here into `dist/`, the
+  Linux kit from the release-kits run.

@@ -15556,7 +15556,9 @@ fn ticket_345_the_computer_sends_its_colony_ship_to_a_world_nobody_has_settled()
             let mut t = Tables::load(&default_data_dir()).expect("tables load");
             t.ai.thresholds.first_windfall_worth = worth;
             // Ticket #537 (version 0.1.0.1): the Moon's Mine at its old 1.65. At 1.4025 the Mars
-            // system wins all twelve boards without the prize, so nothing is left for it to pull.
+            // system wins all twelve boards without the prize, so nothing is left for it to pull. Since
+            // ticket #554 (version 0.1.0.2) the Moon stands at 1.25 and Phobos and Deimos are richer;
+            // the test still holds the Moon at 1.65, so its premise is the same board as before.
             t.bodies.iter_mut().find(|b| b.id == BodyId::Moon).unwrap().mine_yield = 1.65;
             let mut g = Game::new(Arc::new(t), NewGame { seed, player: FactionKind::Custodians, player_is_ai: false, player_start: StateId::EastAsia });
             calm(&mut g);

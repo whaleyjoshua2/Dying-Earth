@@ -11,7 +11,29 @@ pictures that decided it are in
 **7 / 24 / 19 / 19 and 11 collapses**, against the designer's 15 each and 20.
 
 **What the version is.** Version 0.1.0.1 with the designer's next list, nearly all of it the board
-and its cards saying what they mean, plainly, where the player can read it. The list is still open.
+and its cards saying what they mean, plainly, where the player can read it. **The maps**: labels
+give way at every angle (§1). **The cards**: fewer words on the Widgets hovers and the Climate
+Panel (§2), hovers on a row of words that answer the pointer (§3), plurals right (§4), a Colony
+Ship counting Pioneers as they board (§5). **Questions answered**: Mercury's flight left as it is
+(§6). **The rules**: new yields for the Moon, Phobos and Deimos (§7), and a Victory score that is a
+weighted mean of the two parts (§8).
+
+**What it did to the win column** (80 games, per Faction; §1-§6 move no rule):
+
+| | 0.1.0.1 | §7 the moons | §8 the mean | §8 weighted: closing | the ideal |
+|---|---|---|---|---|---|
+| Custodians | 7 | 5 | 4 | **3** | 15 |
+| Prospectors | 24 | 18 | 22 | **23** | 15 |
+| Arkwrights | 19 | 18 | 33 | **26** | 15 |
+| Archivists | 19 | 22 | 10 | **13** | 15 |
+| collapses | 11 | 17 | 11 | **14** | 20 |
+
+**The closing board** ([`sweeps/final-0.1.0.2.txt`](../dev-diary/2026-10-19-version-0.1.0.2/sweeps/final-0.1.0.2.txt)):
+**3 / 23 / 26 / 13 and 14 collapses**. The moons' yields took six off the Prospectors and added six
+collapses; the weighted score put the Arkwrights up and the Archivists down, against the
+designer's ideal, and was kept at the designer's word. The Custodians remain the farthest from it.
+`GAME_VERSION` is 0.1.0.2; `SAVE_VERSION` stays at 12: the version added no saved field, so a
+0.1.0.1 save loads.
 
 ## 1. Map labels give way
 
