@@ -112,3 +112,16 @@ Ticket: [Plurals print right: "1 Facility", "1 slot"](https://github.com/whaleyj
 - **Not changed**: mass nouns and resources (Fuel, Energy, Influence, ppm), Ducat counts, lines
   that go only to the game's log (which the sweep tool counts by their words), and the developer
   sweep tools.
+
+## 5. A Colony Ship counts Pioneers as they board
+
+Ticket: [A Colony Ship's card counts Pioneers as they board](https://github.com/whaleyjoshua2/Dying-Earth/issues/552).
+
+- **A Colony Ship's *aboard / room* figure counts this turn's orders**: the Colonists aboard, plus
+  every Load and less every Unload placed for that Ship this turn, as if they had already boarded.
+  The Loads are still carried out at the Resolution; only the figure moves.
+- **Everywhere it is shown**: the Ship's card, its row on the stack card, its Roster rows, the
+  yellow of a Ship short of the four that found a Colony, and the room a Region's *"Send n to
+  Ship"* button offers and states on its hover.
+- **The card's own load sliders** take every Load placed this turn off the room they offer, a
+  Colony's row as well as a Region's, so no row offers more than the figure above says is left.

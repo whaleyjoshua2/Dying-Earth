@@ -5391,7 +5391,7 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, seat: Seat, marks: boo
                 tank
             );
             // Ticket #374 (version 0.09.2): the row opens the SHIP'S card, now that a Ship has one.
-            ships_rows.push(RosterRow { kind: Kind::of_unit(s.kind), text, tip: Some(tip), mark: marks.then_some(!ordered), jump: Some((View::Solar, Selection::Ship(s.id))), room: colonist_room(game, s) });
+            ships_rows.push(RosterRow { kind: Kind::of_unit(s.kind), text, tip: Some(tip), mark: marks.then_some(!ordered), jump: Some((View::Solar, Selection::Ship(s.id))), room: colonist_room(game, &session.pending, s) });
         }
     }
     for s in game.ships.iter().filter(|s| s.seat == seat) {
@@ -5407,7 +5407,7 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, seat: Seat, marks: boo
                 // Ticket #374 (version 0.09.2): a Ship in flight has a card too, so the row opens it
                 // where it used to select nothing.
                 jump: Some((View::Solar, Selection::Ship(s.id))),
-                room: colonist_room(game, s),
+                room: colonist_room(game, &session.pending, s),
             });
         }
     }
@@ -8266,7 +8266,7 @@ fn pioneers_block(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, act
     // Ticket #443 (version 0.09.6): a Colony Ship in LOW orbit takes Pioneers from a Region with no
     // Launch Site; one at a station's ring still needs it.
     let ship_reached = |s: &Ship| s.seat == Seat(0) && s.kind == UnitKind::ColonyShip && s.at == ShipAt::Body(BodyId::Earth) && (lifts || s.slot.is_none());
-    let ship_door = game.ships.iter().any(|s| ship_reached(s) && s.colonists < game.colony_ship_capacity(Seat(0)));
+    let ship_door = game.ships.iter().any(|s| ship_reached(s) && aboard_as_ordered(&session.pending, s) < game.colony_ship_capacity(Seat(0)));
     let send = if st.emigrants > 0 && (sea_door || lift_door || ship_door) { count_slider(ui, ("send", sid), st.emigrants, "Pioneers") } else { st.emigrants };
     if game.antarctica_open && st.emigrants > 0 {
         let n = send;
@@ -8326,7 +8326,9 @@ fn pioneers_block(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, act
     if st.emigrants > 0 && ship_door {
         let capacity = game.colony_ship_capacity(Seat(0));
         for s in game.ships.iter().filter(|s| ship_reached(s)) {
-            let room = capacity.saturating_sub(s.colonists);
+            // Ticket #552 (version 0.1.0.2): the room left once this turn's Loads and Unloads stand.
+            let aboard = aboard_as_ordered(&session.pending, s);
+            let room = capacity.saturating_sub(aboard);
             let n = send.min(room);
             if n == 0 {
                 continue;
@@ -8337,7 +8339,7 @@ fn pioneers_block(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, act
             // Ticket #357 (version 0.09.1): a SHUT door's hover is the engine's refusal alone, which
             // says what to do first; the capacity and crowding advice is for an open door.
             let hover = game.check_order(Seat(0), &session.pending, &order).is_ok().then(|| {
-                format!("A launch, aboard at this turn's Resolution. This Ship carries {capacity} and has {} aboard. To crowd it past its capacity, load it from its own card.", s.colonists)
+                format!("A launch, aboard at this turn's Resolution. This Ship carries {capacity} and has {aboard} aboard. To crowd it past its capacity, load it from its own card.")
             });
             cost_button_with_hover(ui, game, &session.pending, order, &format!("Send {n} to {} ({})", game.ship_name(s), where_it_is), hover, actions);
         }
@@ -8959,7 +8961,7 @@ fn ship_row(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, s
             view.selection = Selection::Ship(s.id);
             view.attack_preview = false;
         }
-        if let Some(room) = colonist_room(game, s) {
+        if let Some(room) = colonist_room(game, &session.pending, s) {
             colonist_room_label(ui, &room);
         }
         warhead_label(ui, s);
@@ -8976,19 +8978,37 @@ struct ColonistRoom {
     short: bool,
 }
 
-fn colonist_room(game: &Game, s: &Ship) -> Option<ColonistRoom> {
+/// Ticket #552 (version 0.1.0.2): **who is aboard once this turn's orders stand** -- the Colonists
+/// aboard, plus every Load and less every Unload placed for this Ship this turn. A Load is carried
+/// out at the Resolution, so until #552 the card said what was aboard before the player's own
+/// orders while the Load sliders under it already counted them. The designer: *"while loading
+/// pioneers in now free the population indicator for the ship on its card does not update"*.
+fn aboard_as_ordered(pending: &[Order], s: &Ship) -> u32 {
+    let (mut on, mut off) = (0u32, 0u32);
+    for o in pending {
+        match o {
+            Order::Load { ship, colonists, .. } if *ship == s.id => on += colonists,
+            Order::Unload { ship, colonists, .. } if *ship == s.id => off += colonists,
+            _ => {}
+        }
+    }
+    (s.colonists + on).saturating_sub(off)
+}
+
+fn colonist_room(game: &Game, pending: &[Order], s: &Ship) -> Option<ColonistRoom> {
     if s.kind != UnitKind::ColonyShip {
         return None;
     }
+    let aboard = aboard_as_ordered(pending, s);
     let base = game.colony_ship_capacity(s.seat);
     let crowd = if s.at == ShipAt::Body(BodyId::Earth) { game.crowd_extra() } else { 0 };
     // Ticket #543 (version 0.1.0.1): the founding rule before launch -- yellow at one to three
     // aboard, with the rule on the hover; an empty Ship stays plain.
     let found = game.tables.emigrants.found_with;
-    let short = s.colonists > 0 && s.colonists < found;
+    let short = aboard > 0 && aboard < found;
     let lines: Vec<String> = [short.then(|| format!("{found} found a Colony")), (crowd > 0).then(|| format!("{base} room, +{crowd} crowded at Earth"))].into_iter().flatten().collect();
     let hover = (!lines.is_empty()).then(|| lines.join("\n"));
-    Some(ColonistRoom { aboard: s.colonists, room: base + crowd, hover, short })
+    Some(ColonistRoom { aboard, room: base + crowd, hover, short })
 }
 
 /// Ticket #536: the population glyph, then "3/6" -- the glyph BEFORE the figures, at the designer's
@@ -9211,7 +9231,7 @@ fn ship_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
     ui.horizontal_wrapped(|ui| {
         ui.horizontal(|ui| {
             ui.label(format!("{}: {}", s.kind.name(), ship_line(game, s)));
-            if let Some(room) = colonist_room(game, s) {
+            if let Some(room) = colonist_room(game, &session.pending, s) {
                 colonist_room_label(ui, &room);
             }
         });
@@ -9343,17 +9363,20 @@ fn ship_cargo_block(ui: &mut Ui, session: &Session, game: &Game, s: &Ship, body:
     }
     if capacity > s.colonists {
         let n = capacity - s.colonists;
+        // Ticket #552 (version 0.1.0.2): every Load placed for this Ship this turn, from a Region or
+        // a Colony, comes off the room the sliders offer, as the rule counts it, so no row offers
+        // more than the Ship's figure above says is left.
+        let placed: u32 = session.pending.iter().filter_map(|o| match o {
+            Order::Load { ship, colonists, army: None, .. } if *ship == s.id => Some(*colonists),
+            _ => None,
+        }).sum();
+        let left = n.saturating_sub(placed);
         if body == BodyId::Earth {
             // Ticket #443 (version 0.09.6): a row for EACH Region of yours with Pioneers waiting, where
             // one drop-down chose a single Region: a Colony Ship takes a Load from every one of them
             // in a turn. Each row's slider runs to what the Ship has room for after the Loads already
             // placed this turn, so the rows together never pass its room. A Region with a Load
             // placed is greyed by the rule itself, which names why.
-            let placed: u32 = session.pending.iter().filter_map(|o| match o {
-                Order::Load { ship, colonists, from: LoadSource::State(_), army: None } if *ship == s.id => Some(*colonists),
-                _ => None,
-            }).sum();
-            let left = n.saturating_sub(placed);
             for st in game.directed_states(Seat(0)).into_iter().filter(|st| game.state(*st).emigrants > 0) {
                 let most = left.min(game.state(st).emigrants);
                 if most == 0 {
@@ -9370,7 +9393,11 @@ fn ship_cargo_block(ui: &mut Ui, session: &Session, game: &Game, s: &Ship, body:
         // Regions, so a Colonist lifted to the ISS could not leave it. Elsewhere every place of yours.
         for c in game.colonies.iter().filter(|c| c.body == body && (body != BodyId::Earth || c.in_orbit) && c.control.director() == Some(Seat(0)) && c.colonists > 0) {
             // Ticket #428 (version 0.09.5): how many, on a slider above the place's button.
-            let k = count_slider(ui, ("load", s.id, c.id), n.min(c.colonists), "Colonists");
+            let most = left.min(c.colonists);
+            if most == 0 {
+                continue;
+            }
+            let k = count_slider(ui, ("load", s.id, c.id), most, "Colonists");
             // Ticket #335 (version 0.09.0): by the place's OWN name, which names a station
             // and a ground Colony alike.
             cost_button(ui, game, &session.pending, Order::Load { ship: s.id, colonists: k, from: LoadSource::Colony(c.id), army: None }, &format!("Load {} from {}", counted(k, "Colonist", "Colonists"), game.place_name(Place::Colony(c.id))), actions);
@@ -12950,7 +12977,7 @@ mod tests {
         let mut s = Ship { name: String::new(), id: ShipId(901), kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Moon), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None };
         for (n, short) in [(0, false), (1, true), (3, true), (4, false)] {
             s.colonists = n;
-            let r = colonist_room(&g, &s).unwrap();
+            let r = colonist_room(&g, &[], &s).unwrap();
             assert_eq!(r.short, short, "{n} aboard");
             assert_eq!(r.hover.as_deref() == Some("4 found a Colony"), short, "{n} aboard: {:?}", r.hover);
         }
@@ -13072,22 +13099,38 @@ mod tests {
         let base = g.colony_ship_capacity(Seat(0));
         let ship = |id: u32, kind: UnitKind, at: ShipAt, colonists: u32| Ship { name: String::new(), id: ShipId(id), kind, seat: Seat(0), damage: 0, at, colonists, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None };
         let at_moon = ship(901, UnitKind::ColonyShip, ShipAt::Body(BodyId::Moon), 3);
-        let room = colonist_room(&g, &at_moon).expect("a Colony Ship shows its room");
+        let room = colonist_room(&g, &[], &at_moon).expect("a Colony Ship shows its room");
         // Ticket #543 (version 0.1.0.1): three aboard is short of the four that found a Colony.
         assert_eq!((room.aboard, room.room, room.hover.clone()), (3, base, Some("4 found a Colony".to_string())), "off Earth, the ordinary room");
         let empty = ship(902, UnitKind::ColonyShip, ShipAt::Body(BodyId::Moon), 0);
-        assert_eq!(colonist_room(&g, &empty).map(|r| (r.aboard, r.room)), Some((0, base)), "empty, it still shows 0/room");
-        assert!(colonist_room(&g, &ship(903, UnitKind::Frigate, ShipAt::Body(BodyId::Moon), 0)).is_none(), "a Frigate shows none");
+        assert_eq!(colonist_room(&g, &[], &empty).map(|r| (r.aboard, r.room)), Some((0, base)), "empty, it still shows 0/room");
+        assert!(colonist_room(&g, &[], &ship(903, UnitKind::Frigate, ShipAt::Body(BodyId::Moon), 0)).is_none(), "a Frigate shows none");
         // A warmed world crowds the lift at Earth.
         g.climate.temperature = 2.6;
         let extra = g.crowd_extra();
         assert!(extra > 0, "the premise: +2.6 crowds the lift");
         let at_earth = ship(904, UnitKind::ColonyShip, ShipAt::Body(BodyId::Earth), 2);
-        let r = colonist_room(&g, &at_earth).unwrap();
+        let r = colonist_room(&g, &[], &at_earth).unwrap();
         assert_eq!(r.room, base + extra, "the room it can take at Earth");
         // Ticket #543: two aboard, so the founding rule leads the hover.
         assert_eq!(r.hover.as_deref(), Some(format!("4 found a Colony
 {base} room, +{extra} crowded at Earth").as_str()));
+    }
+
+    /// Ticket #552 (version 0.1.0.2): the figure counts this turn's Loads and Unloads for the Ship,
+    /// and no other Ship's; the yellow of a Ship short of four follows the ordered figure.
+    #[test]
+    fn a_colony_ships_figure_counts_this_turns_loads_and_unloads() {
+        let tables = std::sync::Arc::new(dying_earth_engine::data::Tables::load(&dying_earth_engine::data::default_data_dir()).unwrap());
+        let g = Game::new(tables, NewGame { seed: 7, player: FactionKind::Custodians, player_is_ai: false, player_start: StateId::EastAsia });
+        let s = Ship { name: String::new(), id: ShipId(901), kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 2, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None };
+        let load = |ship: u32, n: u32| Order::Load { ship: ShipId(ship), colonists: n, from: LoadSource::State(StateId::EastAsia), army: None };
+        let pending = [load(901, 3), load(901, 1), load(902, 5)];
+        let r = colonist_room(&g, &pending, &s).unwrap();
+        assert_eq!((r.aboard, r.short), (6, false), "two aboard, four ordered on, another Ship's five not counted");
+        assert!(colonist_room(&g, &[], &s).unwrap().short, "two aboard alone is short of four");
+        let unload = Order::Unload { ship: ShipId(901), colonists: 1, army: false, into: UnloadTarget::Colony(ColonyId(1)) };
+        assert_eq!(colonist_room(&g, &[load(901, 3), unload], &s).unwrap().aboard, 4, "an Unload comes off");
     }
 
     /// Ticket #509 (version 0.1.0.0): the renewal prompt says the Accord, its Terms and the five

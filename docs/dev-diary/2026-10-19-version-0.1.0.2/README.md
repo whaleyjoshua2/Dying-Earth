@@ -121,3 +121,24 @@ No rule moves, so no sweep.
 flight read "3 turns turn(s) left", the counted phrase put in front of the old "(s)", which no test
 covers. Fixed, with the Antarctic ice's Report line, which still said "Colony Slots" after a count
 its Moment already counted. Four log-only lines did change ("(s)" in each); nothing reads them.
+
+## A Colony Ship counts Pioneers as they board
+
+Ticket [#552](https://github.com/whaleyjoshua2/Dying-Earth/issues/552), spec §5.
+
+**The cause**: a Load is an order carried out at the Resolution, and the figure read only who was
+aboard. Version 0.1.0.1 made a lift free of the Ship's turn, not immediate. The figure now reads
+`aboard_as_ordered`, the Colonists aboard plus this turn's Loads less its Unloads for that Ship.
+
+**Found in building**: under the figure, a station's load row still offered the Ship's room before
+this turn's Loads (the Region rows already took them off), so a Ship full by order offered "Load 2
+Colonists from ISS over Earth". Every row now takes every Load placed off the room.
+
+**The pictures** ([`ticket-552/`](ticket-552/)), `liftgo:1 stack:earth ship:1`: an empty Colony
+Ship at Earth with a lift of four placed. `four-ordered-aboard-earth.png` is the first build: the
+figure reads 4/4 (it read 0/4 before), and the ISS row still offered two. `four-ordered-full-earth.png`
+is the finished build: 4/4, and no row offers more.
+
+**The test** counts a Ship's own Loads and Unloads and not another Ship's, with the yellow
+following the ordered figure. It was watched red with the pending orders ignored. No rule moves,
+so no sweep.
