@@ -1860,14 +1860,14 @@ fn the_last_turn_ranks_every_seat_by_score() {
     g.end_phase();
     assert!(matches!(g.outcome, Some(Outcome::Win { seat: Seat(1), .. })), "the highest score of four: {:?}", g.outcome);
     // With the leader's score removed, the next seat down takes it. The Arkwrights hold 4 Colonists
-    // on Phobos: 4 of 42 off Earth and one Body of four, score (4/42 + 1/4) / 2 (ticket #555: the
-    // mean; 4/42, the lower, before). The Archivists hold 4 on the
+    // on Phobos: 4 of 42 off Earth and one Body of four, score 0.6 x 4/42 + 0.4 x 1/4 (ticket #555:
+    // the Colonists weighted 0.6; 4/42, the lower part, before). The Archivists hold 4 on the
     // Moon but have no Archive at all, so their first part is 0 and their score with it.
     let mut g = game();
     g.turn = g.tables.victory.turns;
     colony(&mut g, Seat(2), BodyId::Phobos, &[ModuleKind::Habitat, ModuleKind::Habitat], 4);
     colony(&mut g, Seat(3), BodyId::Moon, &[ModuleKind::Habitat], 4);
-    assert!((g.progress(Seat(2)).score() - (4.0 / 42.0 + 0.25) / 2.0).abs() < 1e-9, "{:?}", g.progress(Seat(2)).score());
+    assert!((g.progress(Seat(2)).score() - (0.6 * 4.0 / 42.0 + 0.4 * 0.25)).abs() < 1e-9, "{:?}", g.progress(Seat(2)).score());
     assert_eq!(g.progress(Seat(3)).score(), 0.0);
     g.end_phase();
     assert!(matches!(g.outcome, Some(Outcome::Win { seat: Seat(2), .. })), "{:?}", g.outcome);

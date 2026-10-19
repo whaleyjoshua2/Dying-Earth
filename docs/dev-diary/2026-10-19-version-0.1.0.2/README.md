@@ -183,7 +183,7 @@ again from the new data, none loosened. One premise broke: no off-world Mine mad
 Asia Mine's 6.6 any more, so the even-trade test moved to Phobos with Deep Mining (9.9 against
 9.9). Not reviewed by a second agent: the designer closed the ticket on the sweep.
 
-## Victory progress is the mean of the two parts
+## Victory progress is a weighted mean of the two parts
 
 Ticket [#555](https://github.com/whaleyjoshua2/Dying-Earth/issues/555), spec §8.
 
@@ -197,7 +197,8 @@ designer took it everywhere, the computer included.
 | | Custodians | Prospectors | Arkwrights | Archivists | collapses |
 |---|---|---|---|---|---|
 | after §7 | 5 | 18 | 18 | 22 | 17 |
-| #555 | 4 | 22 | 33 | 10 | 11 |
+| #555, the even mean | 4 | 22 | 33 | 10 | 11 |
+| #555, weighted | 3 | 23 | 26 | 13 | 14 |
 | the ideal | 15 | 15 | 15 | 15 | 20 |
 
 The Arkwrights' fifteen and the Archivists' twelve are far past noise. Most of it is play, not the
@@ -205,12 +206,18 @@ last-turn ranking: Conditions met outright went Arkwrights 4 to 14 and Archivist
 the last-turn rankings went to the Arkwrights about as often as before (19 of 20). A full Archive
 with nobody uploaded now reads as a leader to every computer seat, which presses it. Put to the
 designer, with the choices of showing the mean only or retuning the computer's thresholds: kept as
-built ("a").
+built ("a"). The designer then asked to weight the two Factions' parts, "because we want both
+archive research for archivists and colonists for the arkwrights to be more threatening", and set
+the Archive fund at 0.4 and the Arkwrights' Colonists off Earth at 0.6
+([`sweeps/ticket-555-weighted.txt`](sweeps/ticket-555-weighted.txt)): the Arkwrights came back 7
+and the Archivists 3 against the even mean. Outright: Archivists 14, Arkwrights 9, Prospectors 21,
+Custodians 3; the Arkwrights placed first 45 times in 80. Kept, at the designer's word.
 
 **The picture** ([`ticket-555/victory-window-turn-21-earth.png`](ticket-555/)), `turns:20 victory:1`:
-the Archivists at "50% of the way there" with the Archive 225 of 225 and nobody uploaded; the
-Arkwrights at 41%, 24 of 42 off Earth and 1 Body of 4.
+the Archivists at "40% of the way there" with the Archive 225 of 225 and nobody uploaded; the
+Arkwrights at 44%, 0.6 x 24/42 + 0.4 x 1/4.
 
 **The tests.** Four pinned the smaller part: the rival's alarm at three quarters, the pack's
 leader at 80% (the Fund now set from the presence held, 17 of 18 with the station's two), and the
-last-turn ranking (the leader asserted highest; the Arkwrights' score now (4/42 + 1/4) / 2).
+last-turn ranking (the leader asserted highest; the Arkwrights' score now 0.6 x 4/42 + 0.4 x
+1/4, watched red with their weight set back to an even half).

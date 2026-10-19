@@ -159,21 +159,25 @@ of its own.
 lost six and the collapses gained six, both toward the ideal; the rest within noise. Phobos is
 settled first in 70 of 80 games (28 before) and Deimos in 41 (69 before).
 
-## 8. Victory progress is the mean of the two parts
+## 8. Victory progress is a weighted mean of the two parts
 
 Ticket: [Victory progress credits the Arkwrights' Colonists off Earth and the Archivists' Research](https://github.com/whaleyjoshua2/Dying-Earth/issues/555).
 
-- **A Faction's score is the mean of its two parts' fractions**, where it was the smaller of them.
+- **A Faction's score is a weighted mean of its two parts' fractions**, where it was the smaller of
+  them. The weight is the first part's, on the Faction's card (`victory_first.weight`), the second
+  counting the rest: **the Archivists' Archive fund 0.4** (uploads 0.6), **the Arkwrights'
+  Colonists off Earth 0.6** (Bodies settled 0.4), the Custodians and Prospectors an even half.
   It is the percentage shown (the Victory window, the Report's head, the game-over screen) and the
   figure every computer seat reads for who leads: the pressure on a leader, the trade and Accord
   refused at 95%, the rival's alarm at three quarters, the Research race, and the last-turn ranking.
   The win itself is unchanged: both parts met, and the gates.
-- **An Archive full and nobody uploaded reads 50%**, not 0%; the Arkwrights' Colonists off Earth
-  count for half the score whatever the Bodies settled.
+- **An Archive full and nobody uploaded reads 40%**, not 0%; the Arkwrights' Colonists off Earth
+  count for six tenths of the score whatever the Bodies settled.
 - **Research spent on Techs does not count toward the Archive's 225**: banking it is the
   Archivists' choice, and counting both would pay it twice.
 - The both-met tiebreak (the larger margin over its own bar) still reads the lower part.
 
 **What it did** ([`sweeps/ticket-555.txt`](../dev-diary/2026-10-19-version-0.1.0.2/sweeps/ticket-555.txt),
-80 games): **4 / 22 / 33 / 10 and 11 collapses**, from 5 / 18 / 18 / 22 and 17 after §7. Kept at
-the designer's word, the swing taken.
+80 games): the even mean gave **4 / 22 / 33 / 10 and 11 collapses**, from 5 / 18 / 18 / 22 and
+17 after §7; with the weights ([`sweeps/ticket-555-weighted.txt`](../dev-diary/2026-10-19-version-0.1.0.2/sweeps/ticket-555-weighted.txt))
+**3 / 23 / 26 / 13 and 14 collapses**, kept at the designer's word.
