@@ -162,7 +162,7 @@ fn population_history(ui: &mut Ui, game: &Game, size: egui::Vec2) {
 
 /// Ticket #264 (version 0.08.4): **the Victory history**, the Emissions history's fourth sibling,
 /// on the Faction window under the Victory progress block: one Faction's progress turn by turn --
-/// its score, the lower of its two parts' fractions, in the Faction's own colour -- and a second
+/// its score, the weighted mean of its two parts' fractions (ticket #555), in the Faction's own colour -- and a second
 /// line for its share of the table's Blame, on a scale of its own at the right with the fair
 /// quarter as a faint line across it. The Breaks ticked red on the date axis as every sibling has
 /// them; Antarctica's opening ticked in the ice's blue on every Faction's chart; the Faction's gate

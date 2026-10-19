@@ -404,7 +404,7 @@ impl Game {
     /// Tech, and only the Lead's shortlist keeps a place for its gate, so a seat whose gate waits
     /// races for the Lead: from the turn its gate is open to research, or its first part stands at
     /// `gate_pick_fraction`, until the gate is researched. The race runs the harder the nearer its
-    /// Victory, at the Victory window's share (since version 0.1.0.2 the mean of the two parts). Nought when not racing.
+    /// Victory, at the Victory window's share (since version 0.1.0.2 the weighted mean of the two parts). Nought when not racing.
     pub fn ai_race_share(&self, seat: Seat) -> f64 {
         let Some(gate) = self.tables.victory_gate(self.kind(seat)) else { return 0.0 };
         if self.has_tech(gate) {

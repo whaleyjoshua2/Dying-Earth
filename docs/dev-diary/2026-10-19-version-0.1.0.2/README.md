@@ -221,3 +221,16 @@ Arkwrights at 44%, 0.6 x 24/42 + 0.4 x 1/4.
 leader at 80% (the Fund now set from the presence held, 17 of 18 with the station's two), and the
 last-turn ranking (the leader asserted highest; the Arkwrights' score now 0.6 x 4/42 + 0.4 x
 1/4, watched red with their weight set back to an even half).
+
+**The review** (an agent that did not build it, asked for by the designer after the ticket was first
+closed; reopened for it) found no defect. Fixed from it: only the Arkwrights' weight was pinned by a
+test, so a test now pins all four weights and a full Archive with nobody uploaded at 0.4, watched
+red with the Archivists at an even half; and five comments that still called the score the lower
+part. Left as found, and noted for the designer:
+- **Two Moments in one turn.** An Arkwright seat at 42 of 42 Colonists and 2 of 4 Bodies scores 0.8,
+  so "three quarters of the way" (naming the Bodies, at half) and "met half their Victory
+  Condition" can fire together. Before, the first wanted both parts at three quarters.
+- **The pack turns sooner.** `gang_from` (0.5) was not retuned, and every score now rises sooner;
+  the weighted sweep measures the effect.
+- **The 95% refusal is stricter**: a Prospector with the Fund full and 17 of 18 off Earth (0.97)
+  is now refused a trade it was let through before.

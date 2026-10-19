@@ -1844,10 +1844,11 @@ fn more_than_one_seat_meeting_its_condition_gives_the_game_to_the_larger_margin(
 fn the_last_turn_ranks_every_seat_by_score() {
     let mut g = game();
     g.turn = g.tables.victory.turns;
-    // Each seat is scored on its own two parts (ticket #51). Custodians: 6 Colonists off Earth of
-    // 18 but no Stabilization run, score 0. Prospectors: 9 of 18 and half the Venture Capital Fund,
-    // score 0.5 (ticket #506: the bars are 18 and 3,500). Arkwrights: 3 Colonists of 42 and no Body
-    // with 4 on it, score 0. Archivists: nothing, score 0.
+    // Each seat is scored on its own two parts (ticket #51), since ticket #555 (version 0.1.0.2) by a
+    // weighted mean of them. Custodians: 6 Colonists off Earth of 18 but no Stabilization run.
+    // Prospectors: 9 of 18 and half the Venture Capital Fund (ticket #506: the bars are 18 and
+    // 3,500). Arkwrights: 3 Colonists of 42 and no Body with 4 on it. Archivists: nothing. The
+    // Prospectors' score is the highest of the four.
     colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat], 6);
     let p = colony(&mut g, Seat(1), BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 9);
     let _ = p;
@@ -1871,6 +1872,26 @@ fn the_last_turn_ranks_every_seat_by_score() {
     assert_eq!(g.progress(Seat(3)).score(), 0.0);
     g.end_phase();
     assert!(matches!(g.outcome, Some(Outcome::Win { seat: Seat(2), .. })), "{:?}", g.outcome);
+}
+
+/// Ticket #555 (version 0.1.0.2), at the designer's word: the score is a weighted mean of the two
+/// parts, the weight the first part's on the Faction's card -- the Archivists' Archive fund 0.4, the
+/// Arkwrights' Colonists off Earth 0.6, the Custodians and Prospectors an even half. A full Archive
+/// with nobody uploaded reads 0.4, where under the lower part it read nought.
+#[test]
+fn the_score_weights_each_factions_parts_as_its_card_says() {
+    let t = game().tables.clone();
+    let w = |k: FactionKind| t.faction(k).victory_first.weight;
+    assert_eq!(
+        (w(FactionKind::Custodians), w(FactionKind::Prospectors), w(FactionKind::Arkwrights), w(FactionKind::Archivists)),
+        (0.5, 0.5, 0.6, 0.4)
+    );
+    let mut g = game();
+    let arc = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Archivists).unwrap();
+    g.seats[arc.index()].archive_fund = t.archive.research;
+    let p = g.progress(arc);
+    assert_eq!((p.first_fraction(), p.second_fraction()), (1.0, 0.0), "the premise: the Archive paid for, nobody uploaded");
+    assert!((p.score() - 0.4).abs() < 1e-9, "{}", p.score());
 }
 
 // ---------------------------------------------------------------- 14.3 the AI seats spread out

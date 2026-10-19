@@ -707,7 +707,8 @@ pub struct EmissionsRecord {
 }
 
 /// Ticket #264 (version 0.08.4): one Faction's standing at the end of one Climate phase -- how far
-/// along its Victory Condition it is (the score, the lower of its two parts' fractions) and its
+/// along its Victory Condition it is (the score, the weighted mean of its two parts' fractions since
+/// ticket #555) and its
 /// share of the table's Blame -- with the three things the chart ticks on its axis: Antarctica
 /// open (the world's), the Faction's gate Tech done, the Archive complete. One record per seat per
 /// Climate phase, written beside the Emissions record so the two charts share an axis, saved with
@@ -3250,7 +3251,7 @@ impl Game {
 
     /// Ticket #338 (version 0.09.0): **the four seats in the order the End phase ranks them**, each
     /// with what separated it from the seat above it. The keys are `end_phase`'s own three, read in
-    /// its order: the score (the mean of the two parts' fractions since version 0.1.0.2), then Colonists off Earth, then
+    /// its order: the score (the weighted mean of the two parts' fractions since version 0.1.0.2), then Colonists off Earth, then
     /// Colonies held. The chronicle page reads this rather than ranking for itself, so the page
     /// cannot order a table differently from the rule that decided the game. Read-only.
     pub fn ranking(&self) -> Vec<(Seat, Tiebreak)> {

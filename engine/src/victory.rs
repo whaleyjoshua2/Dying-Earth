@@ -60,7 +60,7 @@ impl Progress {
     pub fn second_transit_fraction(&self) -> f64 {
         ((self.second_value + self.second_transit as f64) / self.second_bar).clamp(0.0, 1.0) - self.second_fraction()
     }
-    /// Ticket #555 (version 0.1.0.2): **the mean of the two parts' fractions**, where it was the
+    /// Ticket #555 (version 0.1.0.2): **the weighted mean of the two parts' fractions**, where it was the
     /// lower of them. The designer: *"Arkwrights need some credit for their victory progress ...
     /// Archivists too their research pool is 188/255 and they show 0%"* -- under the lower part an
     /// Archive nearly paid for read 0% until the first upload. It is the figure shown and the one
