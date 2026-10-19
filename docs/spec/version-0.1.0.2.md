@@ -137,3 +137,24 @@ probes fly. That stands deliberately for a ship that pays to skip them, as
 turn is 2 and the even turns 3 to 5 (2 in 26 turns, 3 in 13, 4 in 9, 5 in 2), since the best
 moment to launch comes round every 116 days against a 60-day turn. Turn 1 is odd, so the first look
 always says 2.
+
+## 7. The Moon, Phobos and Deimos, new yields
+
+Ticket: [Why Phobos's yields are so low beside Deimos's](https://github.com/whaleyjoshua2/Dying-Earth/issues/554).
+
+At the designer's word, in `assets/data/bodies.toml` (each Colony Slot is still drawn within a
+quarter of its Body's figure):
+
+| Body | Mine | Generator | Refinery | Research |
+|---|---|---|---|---|
+| the Moon | **1.25** (1.4025) | **1.3** (1.375) | 0.6875 | 1.0 |
+| Phobos | 1.4875 | **1.2** (0.75) | 0.625 | **1.2** (0.8) |
+| Deimos | **1.01** (0.85) | **1.1** (1.0) | **0.52** (0.3125) | **1.15** (0.8) |
+
+The computer weighs a slot by the same table, so it plays against the new figures with no change
+of its own.
+
+**What it did** ([`sweeps/ticket-554.txt`](../dev-diary/2026-10-19-version-0.1.0.2/sweeps/ticket-554.txt),
+80 games): **5 / 18 / 18 / 22 and 17 collapses**, from 7 / 24 / 19 / 19 and 11. The Prospectors
+lost six and the collapses gained six, both toward the ideal; the rest within noise. Phobos is
+settled first in 70 of 80 games (28 before) and Deimos in 41 (69 before).

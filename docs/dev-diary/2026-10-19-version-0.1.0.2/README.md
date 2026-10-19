@@ -155,3 +155,30 @@ to reach Mercury. That is so (MESSENGER, 2004 to 2011, six flybys), and the game
 the price of skipping them: the dearest Fuel of any crossing from Earth. Offered a slow, cheap flyby
 route beside it, a longer direct flight, or Mercury reached only through Venus, the designer kept
 it as it is.
+
+## The Moon, Phobos and Deimos, new yields
+
+Ticket [#554](https://github.com/whaleyjoshua2/Dying-Earth/issues/554), spec §7.
+
+The ticket asked why Phobos's yields were low. The answer: it was the mining rock, low elsewhere by
+design, and the 0.1.0.1 Mine cut took it from 1.75 to 1.49. The designer then set new figures for
+three Bodies: the Moon's Mine 1.25 and Generator 1.3; Phobos's Generator and Research 1.2; Deimos's
+Mine 1.01, Generator 1.1, Refinery 0.52, Research 1.15.
+
+**The sweep** ([`sweeps/ticket-554.txt`](sweeps/ticket-554.txt), 20 seeds by four seatings):
+
+| | Custodians | Prospectors | Arkwrights | Archivists | collapses |
+|---|---|---|---|---|---|
+| 0.1.0.1 | 7 | 24 | 19 | 19 | 11 |
+| #554 | 5 | 18 | 18 | 22 | 17 |
+| the ideal | 15 | 15 | 15 | 15 | 20 |
+
+The Prospectors' six and the collapses' six are past noise, both toward the ideal; the rest are
+within it. Off Earth at the end of the batch: Phobos 118 ground Colonies (47 before) and first
+settled in 70 of 80 games (28); Deimos 41 (69) and first settled in 41 games (69): its raise was
+outbid by Phobos's. The Moon held about level, 223 (233).
+
+**The tests.** Fifteen formulas tests pinned the old figures. Each expected value was worked out
+again from the new data, none loosened. One premise broke: no off-world Mine made exactly an East
+Asia Mine's 6.6 any more, so the even-trade test moved to Phobos with Deep Mining (9.9 against
+9.9). Not reviewed by a second agent: the designer closed the ticket on the sweep.

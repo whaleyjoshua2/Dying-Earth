@@ -685,8 +685,8 @@ fn phobos_and_deimos_are_small_different_bodies_one_hop_past_mars() {
     assert_eq!(ph.name, "Phobos");
     assert_eq!(de.name, "Deimos");
     assert_eq!((ph.colony_slots(), de.colony_slots()), (2, 1));
-    assert_eq!((ph.mine_yield, ph.generator_yield, ph.refinery_yield, ph.research_yield), (1.4875, 0.75, 0.625, 0.8), "Refinery a quarter up since ticket #421, the Mine x0.85 since ticket #537");
-    assert_eq!((de.mine_yield, de.generator_yield, de.refinery_yield, de.research_yield), (0.85, 1.0, 0.3125, 0.8), "the Mine x0.85 since ticket #537");
+    assert_eq!((ph.mine_yield, ph.generator_yield, ph.refinery_yield, ph.research_yield), (1.4875, 1.2, 0.625, 1.2), "Refinery a quarter up since ticket #421, the Mine x0.85 since ticket #537, Generator and Research since ticket #554");
+    assert_eq!((de.mine_yield, de.generator_yield, de.refinery_yield, de.research_yield), (1.01, 1.1, 0.52, 1.15), "all four at the designer's word since ticket #554");
     // Reach. Ticket #57 replaced the fixed card turns for a crossing between the Earth system and
     // the Mars system with the real flight: at the window it is the Hohmann 259 days, nine turns,
     // for the card's Fuel. The hops inside a system are untouched by it.
@@ -1189,17 +1189,17 @@ fn solar_maximum_boosts_power_plants_and_generators_at_the_next_income_once() {
     colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Generator], 0);
     drawn(&mut g, EventId::SolarMaximum, EventTarget::Everyone);
     g.apply_event_now();
-    // Power Plant 6 x 1.5 = 9; Generator 5 x 1.375 (the Moon since ticket #72) x 1.5 = 10.
+    // Power Plant 6 x 1.5 = 9; Generator 5 x 1.3 (the Moon since ticket #554) x 1.5 = 9.8.
     // Ticket #164 (version 0.07.5): less the Colony's Core Module, 1 Energy a turn.
     // Ticket #164 (version 0.07.5): less two Core Modules, the Moon Colony's and the station's.
-    assert_eq!(income_of(&mut g, Seat(0)).energy, 19.3 - 2.0); // Ticket #387: the Generator 5 x 1.375 x 1.5 = 10.3, where 10 was floored
-    assert_eq!(income_of(&mut g, Seat(0)).energy, 12.9 - 2.0, "the boost lasts one Income"); // Ticket #387: 6 + 6.9
+    assert_eq!(income_of(&mut g, Seat(0)).energy, 18.8 - 2.0); // Ticket #554: the Generator 5 x 1.3 x 1.5 = 9.75, to the tenth 9.8 (ticket #387)
+    assert_eq!(income_of(&mut g, Seat(0)).energy, 12.5 - 2.0, "the boost lasts one Income"); // Ticket #554: 6 + 6.5
     with_tech(&mut g, TechId::EfficientGrids);
     drawn(&mut g, EventId::SolarMaximum, EventTarget::Everyone);
     g.apply_event_now();
-    // Power Plant 6 x 1.5 x 2 = 18; Generator 5 x 1.375 x 1.5 x 2 = 20 (rounded down).
+    // Power Plant 6 x 1.5 x 2 = 18; Generator 5 x 1.3 x 1.5 x 2 = 19.5 (ticket #554).
     // Ticket #164 (version 0.07.5): less the two Core Modules.
-    assert_eq!(income_of(&mut g, Seat(0)).energy, 38.6 - 2.0, "Efficient Grids makes it x2"); // Ticket #387: 18 + 20.6
+    assert_eq!(income_of(&mut g, Seat(0)).energy, 37.5 - 2.0, "Efficient Grids makes it x2"); // Ticket #554: 18 + 19.5
 }
 
 #[test]
@@ -1421,10 +1421,10 @@ fn tech_deep_mining_raises_mine_output_on_earth_and_off_it() {
     g.state_mut(StateId::EastAsia).facilities = vec![facility(FacilityKind::Mine)];
     colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Mine], 0);
     // Earth Mine: 4 x 1.5 (Asia leans Materials) = 6. Moon Mine: 4 x 1.5 (Moon) = 6.
-    assert_eq!(income_of(&mut g, Seat(0)).materials, 12.2); // Ticket #537: the Earth Mine 4.4 x 1.5 = 6.6, the Moon Mine 4 x 1.4025 = 5.6
+    assert_eq!(income_of(&mut g, Seat(0)).materials, 11.6); // Ticket #537: the Earth Mine 4.4 x 1.5 = 6.6; ticket #554: the Moon Mine 4 x 1.25 = 5
     with_tech(&mut g, TechId::DeepMining);
-    // Ticket #537: the Earth Mine 4.4 x 1.5 x 1.5 = 9.9, the Moon Mine 4 x 1.4025 x 1.5 = 8.4.
-    assert_eq!(income_of(&mut g, Seat(0)).materials, 18.3);
+    // Ticket #537: the Earth Mine 4.4 x 1.5 x 1.5 = 9.9; ticket #554: the Moon Mine 4 x 1.25 x 1.5 = 7.5.
+    assert_eq!(income_of(&mut g, Seat(0)).materials, 17.4);
 }
 
 #[test]
@@ -6159,9 +6159,9 @@ fn the_venture_capital_fund_banks_a_share_of_ducat_income_and_a_draw_returns_nin
     let moon = colony(&mut g, pro, BodyId::Moon, &[ModuleKind::Mine], 0);
     let _ = moon;
     // Europe's economy pays 14 Ducats a turn to this seat. Materials output is 13 and is now
-    // beside the point: an Earth Mine at 4.4 x 1.25 = 5.5 and a Moon Mine at 4 x 1.4025 x 1.25 = 7.0 (ticket #537).
+    // beside the point: an Earth Mine at 4.4 x 1.25 = 5.5 (ticket #537) and a Moon Mine at 4 x 1.25 x 1.25 = 6.25, to the tenth 6.3 (ticket #554).
     let inc = income_of(&mut g, pro);
-    assert_eq!((inc.ducats, inc.materials), (12.2, 12.5), "at 0% nothing is banked and every Ducat lands"); // Ticket #453: 10.2 x 1.2 = 12.24
+    assert_eq!((inc.ducats, inc.materials), (12.2, 11.8), "at 0% nothing is banked and every Ducat lands"); // Ticket #453: 10.2 x 1.2 = 12.24
     assert_eq!(g.seats[pro.index()].venture_fund, 0.0);
     // The share is an order, refused off the steps and to anyone else.
     assert_eq!(g.check_order(Seat(0), &[], &Order::SetVentureShare { share: 50 }).unwrap_err().0, "only the Prospectors have a Venture Capital Fund");
@@ -6175,7 +6175,7 @@ fn the_venture_capital_fund_banks_a_share_of_ducat_income_and_a_draw_returns_nin
     assert!((g.seats[pro.index()].venture_share - 0.5).abs() < 1e-9);
     // Half of 12.2 is 6.1 to the Fund and 6.1 to the Stockpile (ticket #387). Materials are untouched by the share now.
     let inc = income_of(&mut g, pro);
-    assert_eq!((inc.ducats, inc.materials), (6.1, 12.5));
+    assert_eq!((inc.ducats, inc.materials), (6.1, 11.8));
     assert_eq!(g.seats[pro.index()].venture_fund, 6.1);
     assert!(g.seat(pro).income_sources.iter().any(|(name, r, n)| name.contains("Venture Capital Fund") && *r == Resource::Ducats && *n == -6.1), "{:?}", g.seat(pro).income_sources);
     // Ducats taken by SELLING are not income, so the Fund never sees them. This is the clause that
@@ -6224,12 +6224,13 @@ fn twenty_five_hundred_ducats_in_the_fund_is_the_prospectors_first_part() {
 }
 
 /// Ticket #72 (d): the Moon's four yields up a tenth. Ticket #421 (version 0.09.4): its Refinery
-/// yield a quarter up again, 0.55 to 0.6875.
+/// yield a quarter up again, 0.55 to 0.6875. Ticket #554 (version 0.1.0.2) moved its Mine to 1.25
+/// and its Generator to 1.3, at the designer's word, so the name no longer holds for those two.
 #[test]
 fn the_moons_four_yields_are_up_a_tenth() {
     let g = game();
     let m = g.tables.body(BodyId::Moon);
-    assert!((m.mine_yield - 1.4025).abs() < 1e-9 && (m.generator_yield - 1.375).abs() < 1e-9 && (m.refinery_yield - 0.6875).abs() < 1e-9 && (m.research_yield - 1.0).abs() < 1e-9, "{:?}", (m.mine_yield, m.generator_yield, m.refinery_yield, m.research_yield));
+    assert!((m.mine_yield - 1.25).abs() < 1e-9 && (m.generator_yield - 1.3).abs() < 1e-9 && (m.refinery_yield - 0.6875).abs() < 1e-9 && (m.research_yield - 1.0).abs() < 1e-9, "{:?}", (m.mine_yield, m.generator_yield, m.refinery_yield, m.research_yield));
 }
 
 /// Ticket #72 (e): the Prospector AI plays the share as a strategy: nothing before the pace's first
@@ -6345,9 +6346,9 @@ fn a_helium_three_vein_doubles_the_moons_generators_for_two_turns_and_triples_wi
     g.apply_event_now();
     assert_eq!(g.discoveries.len(), 1);
     assert_eq!((g.discoveries[0].body, g.discoveries[0].kind, g.discoveries[0].multiplier), (BodyId::Moon, ModuleKind::Generator, 2.0));
-    // A Moon Generator makes 5 x 1.375 = 6.9 to the tenth (ticket #387; 6 was floored); doubled, 13.8: 6.9 more Energy.
+    // A Moon Generator makes 5 x 1.3 = 6.5 (ticket #554); doubled, 13: 6.5 more Energy.
     let boosted = income_of(&mut g, Seat(0)).energy;
-    assert_eq!(tenth(boosted - plain), 6.9, "{plain} to {boosted}");
+    assert_eq!(tenth(boosted - plain), 6.5, "{plain} to {boosted}");
     income_of(&mut g, Seat(0));
     assert!(g.discoveries.is_empty(), "two Incomes and it is spent");
     with_tech(&mut g, TechId::EfficientGrids);
@@ -6744,12 +6745,12 @@ fn a_custodian_mothballed_mine_doubles_their_best_mine_off_earth_one_for_one() {
     st.facilities.push(facility(FacilityKind::Mine));
     st.facilities.push(facility(FacilityKind::Mine));
     assert!(g.doubled_modules(cus).is_empty(), "no idle Mine, no bonus");
-    assert_eq!(g.module_yield_at(cus, moon, 0).amount, 5.6); // Ticket #537: 4 x 1.4025 = 5.61, to the tenth (6.6 before)
+    assert_eq!(g.module_yield_at(cus, moon, 0).amount, 5.0); // Ticket #554: 4 x 1.25 = 5 (5.6 under ticket #537, 6.6 before), still above Mars's 4.3
     let i = g.state(StateId::EastAsia).facilities.len() - 1;
     g.state_mut(StateId::EastAsia).facilities[i].mothballed = true;
     assert_eq!(g.doubled_modules(cus), vec![(moon, 0)], "one idle Mine, the best Mine off Earth");
     let y = g.module_yield_at(cus, moon, 0);
-    assert_eq!(y.amount, 11.2, "5.6 doubled");
+    assert_eq!(y.amount, 10.0, "5 doubled");
     assert_eq!(y.doubled_by, Some("Mine"), "named for the Mine whose mothball pays for it");
     assert_eq!(g.module_yield_at(cus, mars, 0).amount, 4.3, "the second Mine is not doubled");
     assert_eq!(g.module_yield_at(cus, vostok, 0).amount, 6.0, "Antarctica is Earth: 4 x 1.4875 = 5.95");
@@ -6777,9 +6778,9 @@ fn the_custodian_pairs_and_nobody_elses() {
     d.sort();
     assert_eq!(d, vec![(moon, 0), (moon, 1), (moon, 2)]);
     with_tech(&mut g, TechId::EfficientGrids);
-    // Generator 5 x 1.375 x 1.5 = 10.3 to the tenth, doubled 20.6; Refinery 4.5 x 0.6875 = 3.09, to the tenth 3.1, doubled 6.2 (ticket #421);
+    // Generator 5 x 1.3 x 1.5 = 9.75, to the tenth 9.8, doubled 19.6 (ticket #554); Refinery 4.5 x 0.6875 = 3.09, to the tenth 3.1, doubled 6.2 (ticket #421);
     // Observatory 2 x 1.2 x 1.25 = 3, doubled 6.
-    assert_eq!(g.module_yield_at(cus, moon, 0).amount, 20.6);
+    assert_eq!(g.module_yield_at(cus, moon, 0).amount, 19.6);
     assert_eq!(g.module_yield_at(cus, moon, 1).amount, 6.2);
     assert_eq!(g.module_yield_at(cus, moon, 2).research, 6);
     let pro = Seat(1);
@@ -6805,7 +6806,7 @@ fn the_income_pays_the_doubled_mine() {
     g.state_mut(StateId::EastAsia).facilities.push(f);
     g.income_phase();
     let name = g.place_name(Place::Colony(moon));
-    assert!(g.seat(cus).income_sources.iter().any(|(src, r, n)| src.starts_with(&format!("Mine in {name}")) && src.contains("doubled") && *r == Resource::Materials && *n == 11.2), "{:?}", g.seat(cus).income_sources);
+    assert!(g.seat(cus).income_sources.iter().any(|(src, r, n)| src.starts_with(&format!("Mine in {name}")) && src.contains("doubled") && *r == Resource::Materials && *n == 10.0), "{:?}", g.seat(cus).income_sources);
     assert_eq!(g.seat(cus).doubled_module_turns, 1);
 }
 
@@ -6983,9 +6984,9 @@ fn the_gates_general_bonuses_are_for_everyone() {
     let cus = Seat(0);
     let moon = colony(&mut g, cus, BodyId::Moon, &[ModuleKind::Mine, ModuleKind::Observatory], 0);
     g.state_mut(StateId::EastAsia).facilities.push(facility(FacilityKind::ResearchLab));
-    assert_eq!(g.module_yield(cus, moon, ModuleKind::Mine).amount, 5.6); // Ticket #537: 4 x 1.4025, to the tenth
+    assert_eq!(g.module_yield(cus, moon, ModuleKind::Mine).amount, 5.0); // Ticket #554: 4 x 1.25
     with_tech(&mut g, TechId::ExtractionCharter);
-    assert_eq!(g.module_yield(cus, moon, ModuleKind::Mine).amount, 7.0, "4 x 1.4025 x 1.25 = 7.01, to the tenth");
+    assert_eq!(g.module_yield(cus, moon, ModuleKind::Mine).amount, 6.3, "4 x 1.25 x 1.25 = 6.25, to the tenth (ticket #554)");
     assert_eq!(g.module_yield(cus, moon, ModuleKind::Observatory).research, 2, "2 x 1.25 = 2.5");
     let lab_before = g.facility_yield(cus, StateId::EastAsia, FacilityKind::ResearchLab).amount;
     with_tech(&mut g, TechId::TheUpload);
@@ -7522,10 +7523,10 @@ fn a_mass_driver_cuts_the_owners_departures_by_a_quarter_and_gives_its_mines_one
     let ark = Seat(2);
     colony(&mut g, ark, BodyId::Moon, &[ModuleKind::MassDriver], 0);
     assert_eq!(g.transit_cost_for(ark, BodyId::Moon, BodyId::Earth).1, 2.1, "3.7 x 0.75 = 2.8 for the Arkwrights, x 0.75 again");
-    assert_eq!(g.module_yield(cus, moon, ModuleKind::Mine).amount, 6.6, "4 x 1.4025 = 5.6, +1 (ticket #537)"); // Ticket #387: to the tenth, where 6 was floored
+    assert_eq!(g.module_yield(cus, moon, ModuleKind::Mine).amount, 6.0, "4 x 1.25 = 5, +1 (ticket #554)");
     g.colony_mut(moon).unwrap().modules[1].mothballed = true;
     assert_eq!(g.transit_cost_for(cus, BodyId::Moon, BodyId::Earth).1, 3.7, "mothballed, it throws nothing");
-    assert_eq!(g.module_yield(cus, moon, ModuleKind::Mine).amount, 5.6); // Ticket #537: 4 x 1.4025, to the tenth
+    assert_eq!(g.module_yield(cus, moon, ModuleKind::Mine).amount, 5.0); // Ticket #554: 4 x 1.25
 }
 
 /// Ticket #92: the AI offers a Mass Driver at a low-gravity Colony with a Mine once the Tech
@@ -7899,20 +7900,24 @@ fn the_custodian_ai_weighs_a_mine_off_earth_by_the_doubling_an_idle_earth_mine_w
 /// leave Earth with the output. East Asia's Mine makes 6.6 (a Materials lean); a Moon Mine beside a
 /// Mass Driver makes 5.6 + 1 = 6.6. (Ticket #332, version 0.09.0: the Mine, where this read the
 /// Factory. Ticket #537, version 0.1.0.1: the Mass Driver, since a Moon Mine alone makes 5.6 now.)
+/// Ticket #554 (version 0.1.0.2): the Moon's Mine went to 1.25, so a Moon Mine and Mass Driver make
+/// 6.0, and no off-world Mine meets 6.6 any more. The even trade is restored with Phobos under Deep
+/// Mining: East Asia's Mine 4.4 x 1.5 x 1.5 = 9.9; a Phobos Mine 4 x 1.4875 x 1.5 = 8.9, + 1 = 9.9.
 #[test]
 fn the_custodian_ai_idles_an_earth_mine_for_an_even_trade() {
     let mut g = game();
     calm(&mut g);
+    with_tech(&mut g, TechId::DeepMining);
     g.seats[0].stockpile.energy = 500.0;
     g.seats[0].stockpile.materials = 10.0;
-    let moon = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Mine, ModuleKind::Generator, ModuleKind::MassDriver], 0);
+    let phobos = colony(&mut g, Seat(0), BodyId::Phobos, &[ModuleKind::Mine, ModuleKind::Generator, ModuleKind::MassDriver], 0);
     g.state_mut(StateId::EastAsia).facilities.push(facility(FacilityKind::Mine));
     let i = g.state(StateId::EastAsia).facilities.len() - 1;
-    assert_eq!((g.module_yield_at(Seat(0), moon, 0).amount, g.facility_yield(Seat(0), StateId::EastAsia, FacilityKind::Mine).amount), (6.6, 6.6), "the premise: even");
+    assert_eq!((g.module_yield_at(Seat(0), phobos, 0).amount, g.facility_yield(Seat(0), StateId::EastAsia, FacilityKind::Mine).amount), (9.9, 9.9), "the premise: even");
     let orders = g.ai_orders(Seat(0));
     assert!(
         orders.iter().any(|o| matches!(o, Order::Change { building: BuildingRef::Facility(StateId::EastAsia, j), what: BuildingChange::Mothball } if *j == i)),
-        "an even trade (6.6 for 6.6) is taken: {orders:?}"
+        "an even trade (9.9 for 9.9) is taken: {orders:?}"
     );
 }
 
@@ -10854,7 +10859,9 @@ fn a_research_agreement_wants_friendship_first() {
 /// Mine on every Body measured. The prerequisite is load-bearing, not decoration.
 #[test]
 fn beneficiation_adds_one_to_every_mine_once_deep_mining_stands() {
-    for (body, deep, with_ben, all_three) in [(BodyId::Earth, 8.9, 9.8, 12.3), (BodyId::Moon, 8.4, 9.3, 11.6), (BodyId::Mars, 6.4, 7.0, 8.8), (BodyId::Phobos, 8.9, 9.8, 12.3)] {
+    // Ticket #554 (version 0.1.0.2): the Moon's Mine yield 1.25, so 4 x 1.25 x 1.5 = 7.5; x 1.1 = 8.25,
+    // to the tenth 8.3; x 1.25 = 10.3125, to the tenth 10.3.
+    for (body, deep, with_ben, all_three) in [(BodyId::Earth, 8.9, 9.8, 12.3), (BodyId::Moon, 7.5, 8.3, 10.3), (BodyId::Mars, 6.4, 7.0, 8.8), (BodyId::Phobos, 8.9, 9.8, 12.3)] {
         let mut g = game();
         let seat = Seat(0);
         let c = colony(&mut g, seat, body, &[ModuleKind::Mine], 4);
@@ -21858,14 +21865,14 @@ fn superconductors_lift_every_energy_output_by_a_quarter() {
     let mut g = game();
     g.state_mut(StateId::EastAsia).facilities = vec![facility(FacilityKind::PowerPlant)];
     colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Generator], 0);
-    // Power Plant 6; Generator 5 x 1.375 on the Moon = 6.9; less the ISS's and the Colony's Core Modules.
-    assert_eq!(income_of(&mut g, Seat(0)).energy, 6.0 + 6.9 - 2.0);
+    // Power Plant 6; Generator 5 x 1.3 on the Moon = 6.5 (ticket #554); less the ISS's and the Colony's Core Modules.
+    assert_eq!(income_of(&mut g, Seat(0)).energy, 6.0 + 6.5 - 2.0);
     with_tech(&mut g, TechId::Superconductors);
-    // 6 x 1.25 = 7.5; 5 x 1.375 x 1.25 = 8.6.
-    assert_eq!(income_of(&mut g, Seat(0)).energy, tenth(7.5 + 8.6 - 2.0), "x1.25 on both");
+    // 6 x 1.25 = 7.5; 5 x 1.3 x 1.25 = 8.125, to the tenth 8.1 (ticket #554).
+    assert_eq!(income_of(&mut g, Seat(0)).energy, tenth(7.5 + 8.1 - 2.0), "x1.25 on both");
     with_tech(&mut g, TechId::EfficientGrids);
-    // 6 x 1.5 x 1.25 = 11.3; 5 x 1.375 x 1.5 x 1.25 = 12.9.
-    assert_eq!(income_of(&mut g, Seat(0)).energy, tenth(11.3 + 12.9 - 2.0), "and Efficient Grids multiplies with it");
+    // 6 x 1.5 x 1.25 = 11.3; 5 x 1.3 x 1.5 x 1.25 = 12.1875, to the tenth 12.2 (ticket #554).
+    assert_eq!(income_of(&mut g, Seat(0)).energy, tenth(11.3 + 12.2 - 2.0), "and Efficient Grids multiplies with it");
 }
 
 // ---------------------------------------------------------------- Ticket #510 (version 0.1.0.0): Vietnam and Argentina
@@ -22556,9 +22563,14 @@ fn ticket_537_builds_cost_a_tenth_more_and_off_world_mines_yield_less() {
     assert_eq!((t.repair.materials_per_point, t.nuke.rearm_materials), (5, 40), "a Repair and a Rearm as they were");
     assert_eq!((t.module(ModuleKind::Habitat).widgets, t.unit(UnitKind::Army).widgets), (4, 4), "the Widgets as they were");
     // The Mines.
-    let was = [(BodyId::Earth, 1.75), (BodyId::Moon, 1.65), (BodyId::Mars, 1.25), (BodyId::Phobos, 1.75), (BodyId::Deimos, 1.0), (BodyId::Venus, 1.0), (BodyId::Mercury, 1.725), (BodyId::Ceres, 0.8625), (BodyId::Vesta, 2.0125)];
+    // Ticket #554 (version 0.1.0.2) set the Moon's and Deimos's Mines at the designer's word since
+    // (1.65 and 1.0 x 0.85 before), so those two are pinned at their own figures below.
+    let was = [(BodyId::Earth, 1.75), (BodyId::Mars, 1.25), (BodyId::Phobos, 1.75), (BodyId::Venus, 1.0), (BodyId::Mercury, 1.725), (BodyId::Ceres, 0.8625), (BodyId::Vesta, 2.0125)];
     for (b, y) in was {
         assert!((t.body(b).mine_yield - y * 0.85).abs() < 1e-9, "{b:?}: {} where {} x 0.85 was wanted", t.body(b).mine_yield, y);
+    }
+    for (b, y) in [(BodyId::Moon, 1.25), (BodyId::Deimos, 1.01)] {
+        assert!((t.body(b).mine_yield - y).abs() < 1e-9, "{b:?}: {} where {} was wanted (ticket #554)", t.body(b).mine_yield, y);
     }
     // The price a seat pays is the row's: the Custodians, undiscounted, pay 27.5 for a Habitat.
     assert_eq!(g.order_cost(Seat(0), &Order::BuildStation { body: BodyId::Moon, slot: 0, from: LoadSource::State(StateId::EastAsia) }).materials, 44.0);
