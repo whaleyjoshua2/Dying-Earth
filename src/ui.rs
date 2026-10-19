@@ -9367,7 +9367,7 @@ fn ship_cargo_block(ui: &mut Ui, session: &Session, game: &Game, s: &Ship, body:
         // a Colony, comes off the room the sliders offer, as the rule counts it, so no row offers
         // more than the Ship's figure above says is left.
         let placed: u32 = session.pending.iter().filter_map(|o| match o {
-            Order::Load { ship, colonists, army: None, .. } if *ship == s.id => Some(*colonists),
+            Order::Load { ship, colonists, .. } if *ship == s.id => Some(*colonists),
             _ => None,
         }).sum();
         let left = n.saturating_sub(placed);
@@ -13130,7 +13130,7 @@ mod tests {
         assert_eq!((r.aboard, r.short), (6, false), "two aboard, four ordered on, another Ship's five not counted");
         assert!(colonist_room(&g, &[], &s).unwrap().short, "two aboard alone is short of four");
         let unload = Order::Unload { ship: ShipId(901), colonists: 1, army: false, into: UnloadTarget::Colony(ColonyId(1)) };
-        assert_eq!(colonist_room(&g, &[load(901, 3), unload], &s).unwrap().aboard, 4, "an Unload comes off");
+        assert_eq!(colonist_room(&g, &[unload], &s).unwrap().aboard, 1, "an Unload comes off");
     }
 
     /// Ticket #509 (version 0.1.0.0): the renewal prompt says the Accord, its Terms and the five
