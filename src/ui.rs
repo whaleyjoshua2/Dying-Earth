@@ -5780,7 +5780,6 @@ fn blame_parts_hover(game: &Game, seat: Seat, with_share: bool) -> String {
     lines.join("\n")
 }
 
-
 /// Ticket #116 (version 0.07.1): the rule for what gets a tooltip, so the next person has a test
 /// to apply rather than a list to extend. The designer: *"increase the use of mouse over tooltips."*
 ///
