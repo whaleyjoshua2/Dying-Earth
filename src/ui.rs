@@ -1540,7 +1540,7 @@ pub fn draw(
 ) -> Result {
     let ctx = contexts.ctx_mut()?;
     // Ticket #550 (version 0.1.0.2): **no text in the game is selectable.** egui's labels select by
-    // default, which makes each one sense a drag, and egui then hands the pointer to the words
+    // default, which makes each one sense a click and a drag, and egui then hands the pointer to the words
     // rather than to the row they sit in. Every hover hung on a row of a glyph and its words --
     // "Launch Site: Yes", the Influence value, GDP, Widgets, Emissions, a card's heading -- fired
     // only in the few pixels between them. The designer: *"can't get mouseover on launch site:

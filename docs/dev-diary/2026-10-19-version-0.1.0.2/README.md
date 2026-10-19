@@ -77,7 +77,7 @@ Ticket [#550](https://github.com/whaleyjoshua2/Dying-Earth/issues/550), spec §3
 
 **The cause was not the one charted.** The ticket guessed that the row did not sense the pointer at
 all. It does: egui gives every row a hover sense. But egui's labels are selectable by default, so
-each word senses a drag, and egui's hit test then hands the pointer to the words rather than the
+each word senses a click and a drag, and egui's hit test then hands the pointer to the words rather than the
 row beneath them. The hover fired only in the gap between "Launch Site:" and "Yes". Every hover
 hung on a glyph-and-words row (`icon_word`, `card_heading`) had the same fault. The fix is one
 line at the root: no text in the game is selectable. The top bar's `.interact(Sense::hover())`
