@@ -1853,17 +1853,21 @@ fn the_last_turn_ranks_every_seat_by_score() {
     let _ = p;
     g.seats[1].venture_fund = 1750.0; // half the 3500 bar (ticket #506)
     colony(&mut g, Seat(2), BodyId::Phobos, &[ModuleKind::Habitat], 3);
-    assert!((g.progress(Seat(1)).score() - 0.5).abs() < 1e-9, "{:?}", g.progress(Seat(1)).score());
+    // Ticket #555 (version 0.1.0.2): each score is the mean of its two parts; the Prospectors' is
+    // still the highest of the four.
+    let scores = Seat::ALL.map(|s| g.progress(s).score());
+    assert!(scores.iter().enumerate().all(|(i, x)| i == 1 || *x < scores[1]), "{scores:?}");
     g.end_phase();
     assert!(matches!(g.outcome, Some(Outcome::Win { seat: Seat(1), .. })), "the highest score of four: {:?}", g.outcome);
     // With the leader's score removed, the next seat down takes it. The Arkwrights hold 4 Colonists
-    // on Phobos: 4 of 42 off Earth and one Body of four, score 4/42. The Archivists hold 4 on the
+    // on Phobos: 4 of 42 off Earth and one Body of four, score (4/42 + 1/4) / 2 (ticket #555: the
+    // mean; 4/42, the lower, before). The Archivists hold 4 on the
     // Moon but have no Archive at all, so their first part is 0 and their score with it.
     let mut g = game();
     g.turn = g.tables.victory.turns;
     colony(&mut g, Seat(2), BodyId::Phobos, &[ModuleKind::Habitat, ModuleKind::Habitat], 4);
     colony(&mut g, Seat(3), BodyId::Moon, &[ModuleKind::Habitat], 4);
-    assert!((g.progress(Seat(2)).score() - 4.0 / 42.0).abs() < 1e-9, "{:?}", g.progress(Seat(2)).score());
+    assert!((g.progress(Seat(2)).score() - (4.0 / 42.0 + 0.25) / 2.0).abs() < 1e-9, "{:?}", g.progress(Seat(2)).score());
     assert_eq!(g.progress(Seat(3)).score(), 0.0);
     g.end_phase();
     assert!(matches!(g.outcome, Some(Outcome::Win { seat: Seat(2), .. })), "{:?}", g.outcome);
@@ -11517,7 +11521,10 @@ fn a_rival_closing_on_its_victory_condition_interrupts_the_player_once_a_step() 
     bare_stations(&mut g);
     colony(&mut g, pro, BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 14);
     g.seats[pro.index()].venture_fund = 2625.0;
-    assert!((g.progress(pro).score() - 0.75).abs() < 1e-9, "{}", g.progress(pro).score());
+    // Ticket #555 (version 0.1.0.2): the score is the mean of the parts, (14/18 + 0.75) / 2, past
+    // three quarters; the Fund is still the shorter part, which the Moment names.
+    assert!((g.progress(pro).score() - (14.0 / 18.0 + 0.75) / 2.0).abs() < 1e-9, "{}", g.progress(pro).score());
+    assert!(g.progress(pro).score() >= 0.75);
     g.end_phase();
     assert_eq!(fired(&g), 1, "three quarters: the Moment fires: {:?}", g.report.moments);
     let m = g.report.moments.iter().find(|m| m.kind == MomentKind::RivalProgress).unwrap();
@@ -23025,12 +23032,14 @@ fn a_computer_lead_takes_its_gate_whenever_offered() {
 
 // ---------------------------------------------------------------- #531 the pack on the leader (version 0.1.0.1)
 
-/// Ticket #531: the Prospectors at 80% of their Victory -- the Fund at 2800 of 3500, 15 Colonists
-/// off Earth of 18.
+/// Ticket #531: the Prospectors at 80% of their Victory. Ticket #555 (version 0.1.0.2): the score
+/// is the mean of the two parts, so with 15 Colonists placed off Earth (17 of 18, the station's two
+/// counted) the Fund is set where the mean is 0.8; it was the Fund at 2800, the lower part, at 0.8.
 fn prospectors_at_eighty(g: &mut Game) -> Seat {
     let pro = Seat(1);
-    g.seats[1].venture_fund = 2800.0;
     colony(g, pro, BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 15);
+    let presence = g.progress(pro).second_fraction();
+    g.seats[1].venture_fund = 3500.0 * (1.6 - presence);
     assert!((g.progress(pro).score() - 0.8).abs() < 1e-9, "the premise: 80%, {}", g.progress(pro).score());
     pro
 }

@@ -3250,7 +3250,7 @@ impl Game {
 
     /// Ticket #338 (version 0.09.0): **the four seats in the order the End phase ranks them**, each
     /// with what separated it from the seat above it. The keys are `end_phase`'s own three, read in
-    /// its order: the score (the lower of the two parts' fractions), then Colonists off Earth, then
+    /// its order: the score (the mean of the two parts' fractions since version 0.1.0.2), then Colonists off Earth, then
     /// Colonies held. The chronicle page reads this rather than ranking for itself, so the page
     /// cannot order a table differently from the rule that decided the game. Read-only.
     pub fn ranking(&self) -> Vec<(Seat, Tiebreak)> {

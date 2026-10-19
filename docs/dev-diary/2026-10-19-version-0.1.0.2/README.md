@@ -182,3 +182,35 @@ outbid by Phobos's. The Moon held about level, 223 (233).
 again from the new data, none loosened. One premise broke: no off-world Mine made exactly an East
 Asia Mine's 6.6 any more, so the even-trade test moved to Phobos with Deep Mining (9.9 against
 9.9). Not reviewed by a second agent: the designer closed the ticket on the sweep.
+
+## Victory progress is the mean of the two parts
+
+Ticket [#555](https://github.com/whaleyjoshua2/Dying-Earth/issues/555), spec §8.
+
+The designer's "188/255 and they show 0%" was the Archive's fund (its bar is 225) under a score
+that was the smaller part: no upload, no score. Both parts already had their bars in the Victory
+window; the one figure hid them. Offered the mean on screen only, or the mean everywhere, the
+designer took it everywhere, the computer included.
+
+**The sweep** ([`sweeps/ticket-555.txt`](sweeps/ticket-555.txt)):
+
+| | Custodians | Prospectors | Arkwrights | Archivists | collapses |
+|---|---|---|---|---|---|
+| after §7 | 5 | 18 | 18 | 22 | 17 |
+| #555 | 4 | 22 | 33 | 10 | 11 |
+| the ideal | 15 | 15 | 15 | 15 | 20 |
+
+The Arkwrights' fifteen and the Archivists' twelve are far past noise. Most of it is play, not the
+last-turn ranking: Conditions met outright went Arkwrights 4 to 14 and Archivists 20 to 10, while
+the last-turn rankings went to the Arkwrights about as often as before (19 of 20). A full Archive
+with nobody uploaded now reads as a leader to every computer seat, which presses it. Put to the
+designer, with the choices of showing the mean only or retuning the computer's thresholds: kept as
+built ("a").
+
+**The picture** ([`ticket-555/victory-window-turn-21-earth.png`](ticket-555/)), `turns:20 victory:1`:
+the Archivists at "50% of the way there" with the Archive 225 of 225 and nobody uploaded; the
+Arkwrights at 41%, 24 of 42 off Earth and 1 Body of 4.
+
+**The tests.** Four pinned the smaller part: the rival's alarm at three quarters, the pack's
+leader at 80% (the Fund now set from the presence held, 17 of 18 with the station's two), and the
+last-turn ranking (the leader asserted highest; the Arkwrights' score now (4/42 + 1/4) / 2).

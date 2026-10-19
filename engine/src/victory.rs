@@ -52,14 +52,18 @@ impl Progress {
         (self.first_value / self.first_bar).clamp(0.0, 1.0)
     }
     pub fn score_as_it_stands(&self) -> f64 {
-        self.first_fraction_as_it_stands().min(self.second_fraction())
+        (self.first_fraction_as_it_stands() + self.second_fraction()) / 2.0
     }
     pub fn second_transit_fraction(&self) -> f64 {
         ((self.second_value + self.second_transit as f64) / self.second_bar).clamp(0.0, 1.0) - self.second_fraction()
     }
-    /// The lower fraction of the two parts.
+    /// Ticket #555 (version 0.1.0.2): **the mean of the two parts' fractions**, where it was the
+    /// lower of them. The designer: *"Arkwrights need some credit for their victory progress ...
+    /// Archivists too their research pool is 188/255 and they show 0%"* -- under the lower part an
+    /// Archive nearly paid for read 0% until the first upload. It is the figure shown and the one
+    /// every computer seat reads for who leads; the win still wants both parts met (`met`).
     pub fn score(&self) -> f64 {
-        self.first_fraction().min(self.second_fraction())
+        (self.first_fraction() + self.second_fraction()) / 2.0
     }
     /// Ticket #261: is the first part met on its own terms -- at its bar and not held back?
     pub fn first_met(&self) -> bool {
