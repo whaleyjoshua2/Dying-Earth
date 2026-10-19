@@ -74,3 +74,17 @@ The same rule on every map:
 
 The two one-off dodges, which the rule covers: the Solar System Map's step-down for a label that
 hangs below its Body (ticket #345), and a slot label's step clear of the orbit band (ticket #335).
+
+## 2. Fewer words: the Widgets hovers and the Climate Panel
+
+Ticket: [Fewer words: the top bar's Widgets hover and the Climate Panel's deck lines](https://github.com/whaleyjoshua2/Dying-Earth/issues/549).
+
+- **The rule of what a Widget is goes from every hover** (*"A Widget is one unit of work; ..."*).
+  - The top bar's Widgets hover keeps its header, *"Widgets: 15 made a turn across the places you
+    direct, 0 applied at the last Resolution."*, and its line for each place you direct, with that
+    place's queue.
+  - A place card's *"Widgets 11 a turn"* hover reads its figures alone: *"Widgets 11 a turn here: 4
+    from the Region itself, 3 from Industry Level 3, 4 from the Factory."*
+- **The Climate Panel's penalty line** reads *"Penalties in force: population growth +1.00% per
+  turn."* How often a card comes and what is left in the deck are dropped. The Report's *"No Event
+  this turn"* line still gives the chance.

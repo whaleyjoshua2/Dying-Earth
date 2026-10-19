@@ -56,3 +56,17 @@ marks, the hard marks, and the fade's memory. Each rule was broken on purpose an
 to fail before it was believed.
 
 No rule moves, so no sweep.
+
+## Fewer words: the Widgets hovers and the Climate Panel
+
+Ticket [#549](https://github.com/whaleyjoshua2/Dying-Earth/issues/549), spec §2.
+
+**The pictures** ([`ticket-549/`](ticket-549/)), seed 3, turn 1:
+- `widgets-bar-hover-earth.png` (`tip:across the places`): the top bar's hover, its header and a
+  line each for China and the ISS, the rule gone. The Climate Panel behind it ends its penalty
+  line at the growth figure.
+- `widgets-card-hover-earth.png` (`select:eastasia tip:a turn here`): China's Widgets line, its
+  figures alone.
+
+The designer kept the place lines and their queues on the top bar ("cut the rule leave everything
+else"), so with many places directed that hover still runs long. No rule moves, so no sweep.

@@ -5780,9 +5780,6 @@ fn blame_parts_hover(game: &Game, seat: Seat, with_share: bool) -> String {
     lines.join("\n")
 }
 
-/// Ticket #468 (version 0.09.7): what a Widget is, said once -- the place card's hover and the top
-/// bar's each said it in words of their own, both over the six-line ceiling.
-const WIDGET_HOVER: &str = "A Widget is one unit of work; a build completes at the Resolution its Widgets are filled. A place's Widgets go that turn to its own builds, earliest order first. Unapplied, they are lost: never banked, traded or carried.";
 
 /// Ticket #116 (version 0.07.1): the rule for what gets a tooltip, so the next person has a test
 /// to apply rather than a list to extend. The designer: *"increase the use of mouse over tooltips."*
@@ -6561,9 +6558,9 @@ fn widgets_block(ui: &mut Ui, game: &Game, place: Place) {
     let rate = game.widgets_at(place);
     let makers = widget_makers(game, place);
     let breakdown = if makers.is_empty() { "nothing here makes any".to_string() } else { makers.iter().map(|(name, n)| format!("{n} from {name}")).collect::<Vec<_>>().join(", ") };
-    let hover = format!(
-        "Widgets {rate} a turn here: {breakdown}.\n{WIDGET_HOVER}"
-    );
+    // Ticket #549 (version 0.1.0.2): its figures only. The rule of what a Widget is, #468's
+    // `WIDGET_HOVER`, is gone from here and from the top bar, at the designer's word.
+    let hover = format!("Widgets {rate} a turn here: {breakdown}.");
     rule_tip(icon_word(ui, "widgets", format!("Widgets {rate} a turn")), hover);
     for (b, turns) in game.queue_at(place).iter().zip(game.queue_estimates(place)) {
         ui.label(format!("  {}", queue_line(game, place, b, turns)));
@@ -6635,7 +6632,7 @@ fn eye_source(game: &Game, seat: Seat, body: BodyId) -> String {
 /// the player directs with its rate, its makers and its queue.
 fn widgets_bar_hover(game: &Game, made: i64, applied: i64) -> String {
     let mut lines = vec![format!(
-        "Widgets: {made} made a turn across the places you direct, {applied} applied at the last Resolution.\n{WIDGET_HOVER}"
+        "Widgets: {made} made a turn across the places you direct, {applied} applied at the last Resolution."
     )];
     for place in directed_places(game, Seat(0)) {
         let rate = game.widgets_at(place);
@@ -12191,26 +12188,9 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
             // left is a chart sized by accident.
             ui.separator();
             let growth = game.population_growth_rate() * 100.0;
-            // Ticket #337 (version 0.09.0): and how many of the cards left ask the table a question,
-            // beside how many are Climate cards. The deck is never reshuffled, so both figures only
-            // ever fall, and what is left in it is worth knowing.
-            let asking = game.deck.cards.iter().filter(|c| matches!(c, Card::Event(id) if game.tables.event(*id).asks())).count();
-            // Ticket #367 (version 0.09.2): no card comes before the first drawing turn, so on turn
-            // 1 the chance is not the rule's figure but nil, and the line says which.
-            let first_draw = game.tables.events.first_draw_turn;
-            let card_clause = if game.turn < first_draw {
-                format!("no card comes before turn {first_draw}, then one comes {:.0}% of turns at this Temperature", game.draw_chance() * 100.0)
-            } else {
-                format!("a card comes {:.0}% of turns at this Temperature", game.draw_chance() * 100.0)
-            };
-            ui.label(format!(
-                "Penalties in force: population growth {:+.2}% per turn; {} ({} cards left in the deck, {} of them Climate, {} of them asking a question).",
-                growth,
-                card_clause,
-                game.deck.cards.len(),
-                game.deck.climate_cards_left(),
-                asking
-            ));
+            // Ticket #549 (version 0.1.0.2): the growth penalty alone. How often a card comes
+            // (#367) and what is left in the deck (#337) were dropped at the designer's word.
+            ui.label(format!("Penalties in force: population growth {growth:+.2}% per turn."));
             // Ticket #55: what the Stock already commits the world to, and how long cutting can
             // still avoid the Collapse Line.
             ui.label(
