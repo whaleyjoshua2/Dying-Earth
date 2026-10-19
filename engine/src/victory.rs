@@ -30,6 +30,9 @@ pub struct Progress {
     /// Ticket #406 (version 0.09.4): the first part's row in words where the value alone is not
     /// the figure a player acts on: the Custodians' gap in ppm beside their run. `None` for the rest.
     pub first_label: Option<String>,
+    /// Ticket #555 (version 0.1.0.2): what the first part counts for in the score; the second
+    /// counts the rest.
+    pub first_weight: f64,
 }
 
 impl Progress {
@@ -52,14 +55,20 @@ impl Progress {
         (self.first_value / self.first_bar).clamp(0.0, 1.0)
     }
     pub fn score_as_it_stands(&self) -> f64 {
-        self.first_fraction_as_it_stands().min(self.second_fraction())
+        self.first_weight * self.first_fraction_as_it_stands() + (1.0 - self.first_weight) * self.second_fraction()
     }
     pub fn second_transit_fraction(&self) -> f64 {
         ((self.second_value + self.second_transit as f64) / self.second_bar).clamp(0.0, 1.0) - self.second_fraction()
     }
-    /// The lower fraction of the two parts.
+    /// Ticket #555 (version 0.1.0.2): **the weighted mean of the two parts' fractions**, where it was the
+    /// lower of them. The designer: *"Arkwrights need some credit for their victory progress ...
+    /// Archivists too their research pool is 188/255 and they show 0%"* -- under the lower part an
+    /// Archive nearly paid for read 0% until the first upload. It is the figure shown and the one
+    /// every computer seat reads for who leads; the win still wants both parts met (`met`). The
+    /// mean is weighted by the Faction's card: the designer set the Archivists' Archive fund at 0.4
+    /// and the Arkwrights' Colonists off Earth at 0.6, the others an even half.
     pub fn score(&self) -> f64 {
-        self.first_fraction().min(self.second_fraction())
+        self.first_weight * self.first_fraction() + (1.0 - self.first_weight) * self.second_fraction()
     }
     /// Ticket #261: is the first part met on its own terms -- at its bar and not held back?
     pub fn first_met(&self) -> bool {
@@ -174,19 +183,19 @@ impl Game {
             VictorySecondKind::OffWorldPresence => (
                 self.off_world_colonists(seat) as f64,
                 second.bar,
-                format!("{} of {:.0} Colonists living off Earth", self.off_world_colonists(seat), second.bar),
+                format!("{} of {} living off Earth", self.off_world_colonists(seat), crate::counted(format!("{:.0}", second.bar), "Colonist", "Colonists")),
             ),
             VictorySecondKind::ColoniesOnBodies => (
                 self.bodies_settled(seat, second.colonists_each) as f64,
                 second.bodies as f64,
-                format!("{} of {} Bodies with {} Colonists or more", self.bodies_settled(seat, second.colonists_each), second.bodies, second.colonists_each),
+                format!("{} of {} with {} or more", self.bodies_settled(seat, second.colonists_each), crate::counted(second.bodies, "Body", "Bodies"), crate::counted(second.colonists_each, "Colonist", "Colonists")),
             ),
             // Ticket #192 (version 0.08.0): the uploaded, not the living. Monotonic, and it asks the
             // same question the build gate asks, of the same place.
             VictorySecondKind::ColonistsUploaded => (
                 self.seat(seat).uploaded as f64,
                 second.bar,
-                format!("{} of {:.0} Colonists uploaded into the Archive", self.seat(seat).uploaded, second.bar),
+                format!("{} of {} uploaded into the Archive", self.seat(seat).uploaded, crate::counted(format!("{:.0}", second.bar), "Colonist", "Colonists")),
             ),
         };
         let mut first_held_back = match card.kind {
@@ -234,6 +243,7 @@ impl Game {
                 0.0
             },
             first_label: (card.kind == VictoryFirstKind::StabilizationRun).then(|| self.stabilization_text()),
+            first_weight: card.weight,
         }
     }
 

@@ -147,7 +147,7 @@ impl Game {
                     _ => None,
                 })
                 .unwrap_or_default();
-            let text = self.say("colonists_waiting", &[("n", n.to_string()), ("where", where_), ("blocked", blocked)]);
+            let text = self.say("colonists_waiting", &[("n", crate::counted(n, "Colonist", "Colonists")), ("wait", (if n == 1 { "waits" } else { "wait" }).to_string()), ("where", where_), ("blocked", blocked)]);
             self.waiting_last.push(text.clone());
             if !last.contains(&text) {
                 self.report_line(LineKind::Ship, Some(ReportPlace::Body(body)), text);
@@ -1032,7 +1032,7 @@ impl Game {
         if any_escape {
             self.war.battles_with_escape += 1;
         }
-        let line = BattleLine { place: place.to_string(), parties: listed, result: format!("{} round(s).", stats.rounds), at, log: Some(stats.log), fought_now: false };
+        let line = BattleLine { place: place.to_string(), parties: listed, result: format!("{}.", crate::counted(stats.rounds, "round", "rounds")), at, log: Some(stats.log), fought_now: false };
         // Ticket #381 (version 0.09.2): a Battle that cost a hull or a Battery is kept for the
         // chronicle; an Army lost is the ground's ordinary business and is not.
         let fallen: Vec<String> = parties.iter().flat_map(|(_, _, c)| c.iter()).filter(|c| c.destroyed() && !matches!(c.unit, UnitRef::Army(_))).map(|c| c.name.clone()).collect();
@@ -1146,7 +1146,7 @@ impl Game {
             if ship.colonists > 0 { format!(" with {} Colonists aboard", ship.colonists) } else { String::new() }
         );
         self.log(line);
-        let cargo = if ship.colonists > 0 { self.phrase("cargo_aboard", &[("n", ship.colonists.to_string())]) } else { String::new() };
+        let cargo = if ship.colonists > 0 { self.phrase("cargo_aboard", &[("n", crate::counted(ship.colonists, "Colonist", "Colonists"))]) } else { String::new() };
         let text = self.say(
             "ship_destroyed",
             &[("faction", self.seat_name(ship.seat)), ("ship", self.ship_name(&ship)), ("why", why.to_string()), ("cargo", cargo)],
@@ -1324,7 +1324,7 @@ impl Game {
                 self.war.modules_burned[seat.index()] += 1;
                 let ppm = self.tables.climate.war_ppm_per_building;
                 self.charge_war(false, Some(seat), ppm);
-                let dead_words = if dead > 0 { self.phrase("bombard_dead", &[("n", dead.to_string())]) } else { String::new() };
+                let dead_words = if dead > 0 { self.phrase("bombard_dead", &[("n", crate::counted(dead, "Colonist", "Colonists"))]) } else { String::new() };
                 self.say("bombard_hit", &[("faction", self.seat_name(seat)), ("ship", ship_name.clone()), ("place", place.clone()), ("module", module_name.clone()), ("dead", dead_words)])
             } else {
                 self.say("bombard_miss", &[("faction", self.seat_name(seat)), ("ship", ship_name.clone()), ("place", place.clone()), ("module", module_name.clone())])
@@ -1334,7 +1334,7 @@ impl Game {
             let at = Some(ReportPlace::Orbit(body, orbit));
             self.report_line(if hit { LineKind::DecisiveBattle } else { LineKind::Battle }, at, text.clone());
             if hit {
-                let result = format!("bombarded by the {}: the {} destroyed{}", self.seat_name(seat), module_name, if dead > 0 { format!(", {dead} Colonists dead") } else { String::new() });
+                let result = format!("bombarded by the {}: the {} destroyed{}", self.seat_name(seat), module_name, if dead > 0 { format!(", {} dead", crate::counted(dead, "Colonist", "Colonists")) } else { String::new() });
                 self.moment(MomentKind::DecisiveBattle, &[("place", place.clone()), ("result", result), ("figure", "1 lost".to_string())], at);
             }
             // The Battle mark and the band's row read the Battle record, so a Bombard is one.
@@ -1713,9 +1713,9 @@ impl Game {
             s if (s - 0.25).abs() < 1e-9 => "a quarter".to_string(),
             s => format!("x{s}"),
         };
-        let line = format!("{} Scrubber(s) in {} run at {} now that the state {}.", n, self.tables.state(sid).name, share, why);
+        let line = format!("{} in {} {} at {} now that the state {}.", crate::counted(n, "Scrubber", "Scrubbers"), self.tables.state(sid).name, if n == 1 { "runs" } else { "run" }, share, why);
         self.log(line);
-        let text = self.say("scrubbers_changed_hands", &[("n", n.to_string()), ("state", self.tables.state(sid).name.clone()), ("share", share)]);
+        let text = self.say("scrubbers_changed_hands", &[("n", crate::counted(n, "Scrubber", "Scrubbers")), ("state", self.tables.state(sid).name.clone()), ("share", share), ("run", (if n == 1 { "runs" } else { "run" }).to_string())]);
         self.report_line(LineKind::Climate, Some(ReportPlace::State(sid)), text);
     }
 
@@ -2304,7 +2304,7 @@ impl Game {
                     let where_ = self.place_name(Place::Colony(cid));
                     self.colony_mut(cid).unwrap().colonists = room;
                     lines.push(format!("{lost} Colonists at {where_} had nowhere to live and were lost."));
-                    let text = self.say("colonists_no_room", &[("n", lost.to_string()), ("colony", where_)]);
+                    let text = self.say("colonists_no_room", &[("n", crate::counted(lost, "Colonist", "Colonists")), ("colony", where_), ("were", (if lost == 1 { "was" } else { "were" }).to_string())]);
                     let mine = match self.colony(cid).and_then(|c| c.control.controller()) {
                         Some(seat) => crate::report::line_kind_of(seat, LineKind::YourWorks, LineKind::Archive, self.spectator),
                         None => LineKind::Archive,
@@ -2634,7 +2634,7 @@ impl Game {
                     }
                 }
             }
-            self.log(format!("{} repaired {} point(s).", self.seat_name(seat), points));
+            self.log(format!("{} repaired {}.", self.seat_name(seat), crate::counted(points, "point", "points")));
         }
     }
 
@@ -2677,7 +2677,7 @@ impl Game {
                 st.emigrants_education = blended;
                 let line = format!("{} Pioneers from {} found no room in Antarctica and came home.", s.n, self.tables.state(s.from).name);
                 self.log(line);
-                let text = self.say("emigrants_returned", &[("n", s.n.to_string()), ("state", self.tables.state(s.from).name.clone())]);
+                let text = self.say("emigrants_returned", &[("n", crate::counted(s.n, "Pioneer", "Pioneers")), ("state", self.tables.state(s.from).name.clone())]);
                 self.report_line_of(s.seat, LineKind::YourWorks, LineKind::Note, Some(ReportPlace::State(s.from)), text);
             }
         }
@@ -2723,7 +2723,7 @@ impl Game {
             "colony_founded",
             // Ticket #353 (version 0.09.1): the slot's NAME, which the log beside it has used all
             // along. A number told the player nothing they could find on the board.
-            &[("faction", self.seat_name(seat)), ("slot", slot_name.clone()), ("body", self.tables.body(BodyId::Earth).name.clone()), ("n", moved.to_string())],
+            &[("faction", self.seat_name(seat)), ("slot", slot_name.clone()), ("body", self.tables.body(BodyId::Earth).name.clone()), ("n", crate::counted(moved, "Colonist", "Colonists"))],
         );
         self.report_line(LineKind::ColonyFounded, Some(ReportPlace::Colony(id)), text);
         // Ticket #353 (version 0.09.1): and who found no room. The Core Module holds four, so a sea
@@ -2743,7 +2743,7 @@ impl Game {
         };
         self.moment(
             MomentKind::ColonyFounded,
-            &[("faction", self.seat_name(seat)), ("colony", self.place_name(Place::Colony(id))), ("note", note), ("n", moved.to_string())],
+            &[("faction", self.seat_name(seat)), ("colony", self.place_name(Place::Colony(id))), ("note", note), ("n", crate::counted(moved, "Colonist", "Colonists"))],
             Some(ReportPlace::Colony(id)),
         );
         self.ai_deed_at(seat, "founded", &[("colony", self.place_name(Place::Colony(id)))], Some(crate::report::ReportPlace::Colony(id)));
@@ -2771,7 +2771,7 @@ impl Game {
         }
         let line = format!("{} Pioneers from {} landed in Antarctica and joined {}.", moved, self.tables.state(from).name, self.place_name(Place::Colony(c)));
         self.log(line);
-        let text = self.say("emigrants_arrived", &[("n", moved.to_string()), ("state", self.tables.state(from).name.clone()), ("colony", self.place_name(Place::Colony(c)))]);
+        let text = self.say("emigrants_arrived", &[("n", crate::counted(moved, "Pioneer", "Pioneers")), ("state", self.tables.state(from).name.clone()), ("colony", self.place_name(Place::Colony(c)))]);
         self.report_line(LineKind::Antarctica, Some(ReportPlace::Colony(c)), text);
         // Ticket #353 (version 0.09.1): the ones the Habitats had no room for went home, and until
         // now nothing said so -- the arrival line simply reported a smaller number than was sent.
@@ -2887,7 +2887,7 @@ impl Game {
             }
             let taught = self.take_colonists(from, n);
             self.settle_people(to, n, taught);
-            let text = self.say("sent_down", &[("n", n.to_string()), ("from", self.place_name(Place::Colony(from))), ("to", self.place_name(Place::Colony(to)))]);
+            let text = self.say("sent_down", &[("n", crate::counted(n, "Colonist", "Colonists")), ("from", self.place_name(Place::Colony(from))), ("to", self.place_name(Place::Colony(to)))]);
             self.report_line_of(seat, LineKind::YourWorks, LineKind::Ship, Some(ReportPlace::Colony(to)), text);
         }
         // Founding orders into the same Colony Slot from more than one seat are decided at the Body,
@@ -3016,7 +3016,7 @@ impl Game {
                                     ("faction", self.seat_name(seat)),
                                     ("slot", slot_name),
                                     ("body", self.tables.body(b).name.clone()),
-                                    ("n", moved.to_string()),
+                                    ("n", crate::counted(moved, "Colonist", "Colonists")),
                                     ("ease", crate::state::figure(ease)),
                                 ],
                             );
@@ -3038,7 +3038,7 @@ impl Game {
                                     ("faction", self.seat_name(seat)),
                                     ("colony", self.place_name(Place::Colony(id))),
                                     ("note", note),
-                                    ("n", moved.to_string()),
+                                    ("n", crate::counted(moved, "Colonist", "Colonists")),
                                 ],
                                 Some(ReportPlace::Colony(id)),
                             );
@@ -3097,7 +3097,7 @@ impl Game {
                                 }
                                 let line = format!("{} Colonists disembarked into {}.", n, self.place_name(Place::Colony(cid)));
                                 self.log(line);
-                                let text = self.say("disembarked", &[("n", n.to_string()), ("colony", self.place_name(Place::Colony(cid)))]);
+                                let text = self.say("disembarked", &[("n", crate::counted(n, "Colonist", "Colonists")), ("colony", self.place_name(Place::Colony(cid)))]);
                                 self.report_line_of(seat, LineKind::YourWorks, LineKind::Ship, Some(ReportPlace::Colony(cid)), text);
                                 // Ticket #353 (version 0.09.1): the FOURTH clamp site, which the
                                 // specification did not list -- unloading into a Colony that already
@@ -3513,7 +3513,7 @@ impl Game {
                 }
             }
         }
-        let cargo: String = if colonists > 0 { format!("{colonists} Colonists") } else { "an Army".into() };
+        let cargo: String = if colonists > 0 { crate::counted(colonists, "Colonist", "Colonists") } else { "an Army".into() };
         let line = format!("{} loaded {} at {}.", self.seat_name(seat), cargo, self.tables.body(body).name);
         self.log(line);
         let spaceport = if paid > 0 { self.phrase("spaceport_pays", &[("n", paid.to_string())]) } else { String::new() };

@@ -10,6 +10,7 @@
 mod app;
 mod geo;
 mod icons;
+mod labels;
 mod saves;
 mod scene;
 mod shot;

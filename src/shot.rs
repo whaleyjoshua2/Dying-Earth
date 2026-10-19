@@ -1827,8 +1827,8 @@ fn card_from_id(name: &str) -> Option<EventId> {
 /// Ticket #337, a building aid: make that card the turn's question, by stacking the deck with it
 /// and running the game's OWN Question phase until a roll brings a card -- so the question is asked
 /// exactly as a game asks one, every seat included or passed over by the rule rather than by this
-/// aid. The deck is put back as it would stand with that card drawn, so the Climate Panel's count
-/// of what is left reads a real deck.
+/// aid. The deck is put back as it would stand with that card drawn, so what is left in it is a
+/// real deck.
 fn ask_the_card(g: &mut Game, id: EventId) -> bool {
     // Ticket #367 (version 0.09.2): no card comes before `first_draw_turn`, so a fresh board (turn
     // 1) would never draw and the aid would report the card never came. It stands on the first

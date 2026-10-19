@@ -98,8 +98,9 @@ leave_delta_v = 0.92
 arrive_delta_v = 0.92
 trade_pays = 3.5
 # Ticket #72 (version 0.05.5): all four up a tenth (1.5, 1.25, 0.5, 1.0 before).
-mine_yield = 1.4025
-generator_yield = 1.375
+# Ticket #554 (version 0.1.0.2), at the designer's word: Mine 1.25 and Generator 1.3 (1.4025, 1.375).
+mine_yield = 1.25
+generator_yield = 1.3
 # Ticket #421 (version 0.09.4): the three low-gravity worlds' Refinery yield a quarter up.
 refinery_yield = 0.6875
 research_yield = 1.0
@@ -151,10 +152,11 @@ transit_turns = 5
 leave_delta_v = 0.94
 arrive_delta_v = 0.66
 trade_pays = 6
+# Ticket #554 (version 0.1.0.2), at the designer's word: Generator 1.2 and Research 1.2 (0.75, 0.8).
 mine_yield = 1.4875
-generator_yield = 0.75
+generator_yield = 1.2
 refinery_yield = 0.625
-research_yield = 0.8
+research_yield = 1.2
 orbital_slots = 1
 stations = ["Phobos Gateway"]
 slots = [
@@ -175,10 +177,12 @@ transit_turns = 5
 leave_delta_v = 0.7
 arrive_delta_v = 0.7
 trade_pays = 6
-mine_yield = 0.85
-generator_yield = 1.0
-refinery_yield = 0.3125
-research_yield = 0.8
+# Ticket #554 (version 0.1.0.2), at the designer's word: Mine 1.01, Generator 1.1, Refinery 0.52,
+# Research 1.15 (0.85, 1.0, 0.3125, 0.8).
+mine_yield = 1.01
+generator_yield = 1.1
+refinery_yield = 0.52
+research_yield = 1.15
 orbital_slots = 1
 stations = ["Deimos Gateway"]
 slots = [

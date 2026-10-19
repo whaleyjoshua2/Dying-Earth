@@ -927,6 +927,14 @@ pub struct VictorySecondCard {
 pub struct VictoryFirstCard {
     pub kind: VictoryFirstKind,
     pub bar: f64,
+    /// Ticket #555 (version 0.1.0.2): what the first part counts for in the score, the second part
+    /// counting the rest. Absent, an even half.
+    #[serde(default = "half")]
+    pub weight: f64,
+}
+
+fn half() -> f64 {
+    0.5
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -2394,6 +2402,9 @@ impl Tables {
             }
             if f.victory_first.bar <= 0.0 {
                 return Err(err("factions.toml", format!("row {}: victory_first.bar must be positive", f.name)));
+            }
+            if !(0.0..=1.0).contains(&f.victory_first.weight) {
+                return Err(err("factions.toml", format!("row {}: victory_first.weight must be between 0 and 1", f.name)));
             }
             // Ticket #51: whichever second part a card names, its own figures must be positive.
             let second_ok = match f.victory_second.kind {

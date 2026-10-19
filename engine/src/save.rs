@@ -152,7 +152,10 @@ pub const SAVE_VERSION: u32 = 12;
 /// Regions): a 0.09.9 save is refused, and so is a 0.1.0.0 save from before ticket #510.
 /// Ticket #545 (version 0.1.0.1, the closing ticket): moved to 0.1.0.1. `SAVE_VERSION` did not
 /// move: every field the version added reads a default from an older file, so a 0.1.0.0 save loads.
-pub const GAME_VERSION: &str = "0.1.0.1";
+/// Ticket #556 (version 0.1.0.2, the closing ticket): moved to 0.1.0.2. `SAVE_VERSION` did not move:
+/// the version added no saved field (its Victory weight is a data figure with a default), so a 0.1.0.1
+/// save loads as it is.
+pub const GAME_VERSION: &str = "0.1.0.2";
 
 /// The game autosaves at the start of the Report phase of every third turn.
 pub const AUTOSAVE_EVERY: u32 = 3;

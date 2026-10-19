@@ -597,7 +597,7 @@ impl Game {
                     self.destroy_ship(sid, "a card");
                 }
                 if hit > 0 {
-                    self.log(format!("{}: {hit} Ship(s) damaged by this turn's card.", self.seat_name(seat)));
+                    self.log(format!("{}: {} damaged by this turn's card.", self.seat_name(seat), crate::counted(hit, "Ship", "Ships")));
                 }
             }
             CardEffect::TradePrice { resource, to, by, turns } => {
@@ -823,7 +823,7 @@ impl Game {
             EventId::HeliumVein => {
                 if self.colonies.iter().any(|c| c.body == BodyId::Moon && c.modules.iter().any(|m| m.kind == ModuleKind::Generator)) {
                     let m = if self.has_tech(TechId::EfficientGrids) { t.events.discovery_multiplier_with_tech } else { t.events.discovery_multiplier };
-                    (EventTarget::Body(BodyId::Moon), format!("{}: the Moon's Generators produce x{} for {} turns.", card.name, m, t.events.discovery_turns))
+                    (EventTarget::Body(BodyId::Moon), format!("{}: the Moon's Generators produce x{} for {}.", card.name, m, crate::counted(t.events.discovery_turns, "turn", "turns")))
                 } else {
                     (EventTarget::None, format!("{}: no Generator stands on the Moon, so nothing happens.", card.name))
                 }
@@ -849,7 +849,7 @@ impl Game {
                     Some(b) => {
                         let tech = if id == EventId::RichSeam { TechId::DeepMining } else { TechId::AutomatedRefining };
                         let m = if self.has_tech(tech) { t.events.discovery_multiplier_with_tech } else { t.events.discovery_multiplier };
-                        (EventTarget::Body(b), format!("{} on {}: its {}s produce x{} for {} turns.", card.name, t.body(b).name, kind.name(), m, t.events.discovery_turns))
+                        (EventTarget::Body(b), format!("{} on {}: its {}s produce x{} for {}.", card.name, t.body(b).name, kind.name(), m, crate::counted(t.events.discovery_turns, "turn", "turns")))
                     }
                     None => (EventTarget::None, format!("{}: no {} exists off Earth, so nothing happens.", card.name, kind.name())),
                 }
@@ -995,7 +995,7 @@ impl Game {
                         self.destroy_ship(sid, t.event(id).name.as_str());
                     }
                     if hit > 0 {
-                        let text = self.say("event_damaged_ships", &[("event", t.event(id).name.clone()), ("n", hit.to_string())]);
+                        let text = self.say("event_damaged_ships", &[("event", t.event(id).name.clone()), ("n", crate::counted(hit, "Ship", "Ships"))]);
                         self.report_line(LineKind::Ship, None, text);
                     }
                 }

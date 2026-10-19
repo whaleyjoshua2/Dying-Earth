@@ -1,4 +1,4 @@
-DYING EARTH - playtest build, version 0.1.0.1
+DYING EARTH - playtest build, version 0.1.0.2
 =============================================
 
 Thanks for playing. This is an early build of a turn-based strategy game about colonizing
@@ -16,56 +16,49 @@ HOW TO RUN
 4. The very first launch shows a blank dark window for up to ten seconds while it
    compiles graphics. Later launches are quick.
 5. Needs Windows 10 or 11, 64-bit, and any graphics card from the last ten years.
-6. Saves from 0.1.0.0 load. Saves from 0.09.9 and before do not: the Load screen says so.
+6. Saves from 0.1.0.1 and 0.1.0.0 load. Saves from 0.09.9 and before do not: the Load
+   screen says so.
 7. This version ships for Windows and for Linux. On Linux, read RUN-ON-LINUX.txt in the
    folder instead of steps 2 to 5.
 
-WHAT CHANGED SINCE 0.1.0.0
+WHAT CHANGED SINCE 0.1.0.1
 --------------------------
-The counterweight version: most of it leans against whoever runs away. The computer plays
-every rule below.
+The legibility version: nearly all of it is the board and its cards saying what they mean,
+plainly, where you can read it.
 
-THE COMPUTER
-- IT RACES FOR THE RESEARCH LEAD once its Victory gate is in reach: more Research Labs and
-  Observatories, less Research to the Sink, the harder the nearer it is to winning. As Lead
-  it takes its gate as soon as it is offered.
-- IT GANGS UP ON A RUNAWAY LEADER, you included: more Influence, Smears, Agitation and
-  attacks on the leader, no Accords, Trades or carbon credits for it, and easier Accords
-  among the rest.
+THE MAPS
+- LABELS GIVE WAY instead of piling up, on every map and at every angle. Where two would
+  overlap, the less important one shrinks to its name, and hides if even that will not
+  fit. The place you have selected and the one under your pointer always show in full;
+  then your own places, then rivals', then neutral ones. A shield, a Battle mark or a
+  station stays where it is, and a click on a place works whatever its label is doing.
 
-THE PRICES
-- Influence costs 4 Ducats a point. A Strip Permit costs 25 Ducats.
-- Every building, Ship and Army costs a tenth more Materials. An Earth Mine makes 4.4;
-  every Mine off Earth makes 15% less.
+THE CARDS AND MOUSE-OVERS
+- Mouse-overs on a line of words (Launch Site: Yes, Influence value, GDP, Widgets) now open
+  anywhere on the words. Before, they only opened in the gaps between them.
+- A Colony Ship's people count includes the Pioneers you have ordered aboard this turn.
+- Fewer words: the top bar's Widgets mouse-over and each card's Widgets line lost their
+  explanation of what a Widget is; the Climate Panel no longer lists the card deck.
+- Plurals: "1 Facility", "1 turn", "1 Colonist", never "1 Facilities" or "turn(s)".
 
 THE RULES
-- A SHIP'S TURN is one action. Lifting Pioneers or an Army from Regions, and refuelling,
-  stand beside it: lift and leave in the same turn.
-- AN ARMY lifts to low orbit with no Launch Site, as Pioneers do.
-- ONE LAUNCH SITE to a Region.
-- GREENWASH costs Relations, a little with each rival, and it builds up.
-
-WHAT YOU CAN SEE NOW
-- The Report says, under its date, your last turn to act on the climate and how far you
-  are to your Victory; and the turn before a far world's launch window, that it opens.
-- A popup when an Accord of yours ends, and why; a line the turn before it ends.
-- A line when a rival spends Influence on a place of yours, and when your home could fall
-  to them next turn.
-- A Colony Ship shows its people over its room, yellow when it is short of the four that
-  found a Colony.
-- The Climate Panel's Blame and the country card's emissions and Launch Site moved onto
-  mouse-overs.
+- NEW YIELDS on the Moon (Mine 1.25, Generator 1.3), Phobos (Generator 1.2, Research 1.2)
+  and Deimos (Mine 1.01, Generator 1.1, Refinery 0.52, Research 1.15).
+- VICTORY PROGRESS counts both halves of a Victory Condition. "N% of the way there" is now
+  a blend of the two parts, not the smaller of them: a full Archive with nobody uploaded
+  reads 40%, not 0%. The Archivists' Archive counts 0.4 of it, the Arkwrights' Colonists
+  off Earth 0.6, the others half and half. You still need both parts to win. The computer
+  judges who is leading by the same figure.
 
 WHAT WE WANT TO KNOW
 --------------------
 Write down anything, however small. Especially:
 - The moment you were not sure what to do next.
 - Anything you clicked that did nothing, or did something you did not expect.
-- WHEN YOU LED: did the computer gang up on you? Could you tell? Did it feel fair?
-- THE RESEARCH RACE: did a computer seat take the Lead from you to get its gate?
-- THE PRICES: did anything feel too dear, or not dear enough?
-- A SHIP'S TURN: did lifting and leaving in one turn read clearly?
-- The new lines and popups: any you missed, or any that were noise?
+- THE LABELS: did a name you needed ever vanish? Did any flicker as you turned the globe?
+- THE MOUSE-OVERS: any still hard to open, or any that said too much?
+- VICTORY PROGRESS: did the percentage match how close you felt? Did a rival's?
+- THE MOONS: did you settle Phobos or Deimos, and was it worth it?
 - The turn the game got boring, if it did, and the turn you felt you had lost.
 - Crashes: what you were doing, and the "Seed" number shown on the title screen and
   the game-over screen. With the seed the game can be replayed exactly.

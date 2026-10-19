@@ -339,13 +339,13 @@ CAMPAIGNS AND CARBON CREDITS -- the Blame ledger the Influence thresholds read (
   smear <faction> <amount>             Influence spent on a RIVAL'S name, laying {smear} ppm on their
                                        ledger for good per point spent. One a turn per target; an
                                        offence, and the Report names who paid.
-  greenwash <amount>                   Influence spent on your own name, with {gwducats} Ducat(s) beside
+  greenwash <amount>                   Influence spent on your own name, with {gwducats} beside
                                        every point, taking {greenwash} ppm off your own ledger for good
                                        per point. One a turn, and no offence.
   offer-credits <ppm>                  the Custodians only: the ppm of carbon credit they sell a
                                        turn, standing until it is set again; nought refuses
                                        everybody.
-  buy-credits <ppm>                    buy carbon credit from the Custodians at {creditprice} Ducat(s) a ppm
+  buy-credits <ppm>                    buy carbon credit from the Custodians at {creditprice} a ppm
                                        before their view of you multiplies it, at most {creditcap} ppm a
                                        turn, one purchase a turn, and only while they are offering.
                                        It comes off your ledger at the Resolution. `show` prints
@@ -365,7 +365,7 @@ DIPLOMACY (ticket #226; `show` prints Relations both ways and every Accord stand
                                        One offer a turn to a Faction, none where an Accord already
                                        stands, and none while your last to them waits. It is
                                        answered at the head of their next turn. A refusal is not an
-                                       offence. An Accord kept {kept} turns pays both sides.
+                                       offence. An Accord kept {kept} pays both sides.
   accord accept|refuse <faction>       answer an Accord a Faction offered you; the turn does not
                                        end until every one is answered.
   accord end <faction>                 declare a standing Accord over: free, and it lapses at the
@@ -439,10 +439,10 @@ fn grammar(t: Option<&Tables>) -> String {
         ("{fuel}", n(|t| t.orbit_change_fuel.to_string())),
         ("{smear}", n(|t| format!("{:.2}", t.influence.smear.ppm_per_influence))),
         ("{greenwash}", n(|t| format!("{:.2}", t.influence.greenwash.ppm_per_influence))),
-        ("{gwducats}", n(|t| t.influence.greenwash.ducats_per_influence.to_string())),
-        ("{creditprice}", n(|t| t.carbon_credits.price_per_ppm.to_string())),
+        ("{gwducats}", n(|t| dying_earth_engine::counted(t.influence.greenwash.ducats_per_influence, "Ducat", "Ducats"))),
+        ("{creditprice}", n(|t| dying_earth_engine::counted(t.carbon_credits.price_per_ppm, "Ducat", "Ducats"))),
         ("{creditcap}", n(|t| t.carbon_credits.cap_per_turn.to_string())),
-        ("{kept}", n(|t| t.relations.accord_kept_turns.to_string())),
+        ("{kept}", n(|t| dying_earth_engine::counted(t.relations.accord_kept_turns, "turn", "turns"))),
         // Ticket #541 (version 0.1.0.1): what a Leapfrog does, in the window button's figures.
         ("{leapprice}", n(|t| t.ducats.per_leapfrog.to_string())),
         ("{leapstep}", n(|t| format!("{:.2}", t.climate.population_emissions_per_level * t.units_per_hundred_million()))),
@@ -734,8 +734,8 @@ fn card_effect_text(e: &CardEffect) -> String {
         CardEffect::HoldOneShip => "one Ship of yours holds this turn".to_string(),
         CardEffect::DamageShips { damage, in_orbit } => format!("{damage} damage to each of your Ships{}", if *in_orbit { " in orbit" } else { "" }),
         CardEffect::TradePrice { resource, to, by, turns } => match to {
-            Some(to) => format!("the {} price stands at {to} for {turns} turn(s)", resource.name()),
-            None => format!("the {} price moves {by:+} for {turns} turn(s)", resource.name()),
+            Some(to) => format!("the {} price stands at {to} for {}", resource.name(), dying_earth_engine::counted(turns, "turn", "turns")),
+            None => format!("the {} price moves {by:+} for {}", resource.name(), dying_earth_engine::counted(turns, "turn", "turns")),
         },
         CardEffect::RelationsAllRivals { relations } => format!("{relations:+} Relations with every rival"),
         CardEffect::BlamePpm { ppm } => {
@@ -750,9 +750,9 @@ fn card_effect_text(e: &CardEffect) -> String {
             format!("every {} of yours makes {:.0}% of its output at the next Income", facility.name(), multiplier * 100.0)
         }
         CardEffect::DiscoveryAtColony { module, multiplier, turns } => {
-            format!("a Discovery at one of your Colonies: its {} at x{multiplier:.1} for {turns} turn(s)", module.name())
+            format!("a Discovery at one of your Colonies: its {} at x{multiplier:.1} for {}", module.name(), dying_earth_engine::counted(turns, "turn", "turns"))
         }
-        CardEffect::PioneersFree { pioneers } => format!("{pioneers} Pioneers waiting, costing their Region no people"),
+        CardEffect::PioneersFree { pioneers } => format!("{} waiting, costing their Region no people", dying_earth_engine::counted(pioneers, "Pioneer", "Pioneers")),
         CardEffect::FreeBuilding { module, army } => match (module, army) {
             (Some(m), _) => format!("a {} standing free at your smallest Colony", m.name()),
             (None, true) => "an Army raised free in your most populous Region, costing it no people".to_string(),
@@ -1011,7 +1011,7 @@ fn print_standing(g: &Game) {
             g.seat(seller).credits_offered,
             g.tables.carbon_credits.cap_per_turn,
             match g.credit_cost(me, 1) {
-                Some(d) => format!("a ppm would cost you {d} Ducat(s)"),
+                Some(d) => format!("a ppm would cost you {}", dying_earth_engine::counted(d, "Ducat", "Ducats")),
                 None => "they will not sell to you: they are Hostile".to_string(),
             },
             g.seat(me).credits_bought,
@@ -1255,10 +1255,10 @@ fn print_board(g: &Game) {
         // Colonists are at that place to read in.
         let stands = match g.archive_colony(me) {
             Some(c) => format!(
-                "{} at {}, where {} Colonists stand to be uploaded",
+                "{} at {}, where {} to be uploaded",
                 if g.archive_complete(me) { "is complete" } else { "stands unfinished" },
                 g.place_name(Place::Colony(c)),
-                g.uploadable_at(c, 0)
+                { let k = g.uploadable_at(c, 0); format!("{} {}", dying_earth_engine::counted(k, "Colonist", "Colonists"), if k == 1 { "stands" } else { "stand" }) }
             ),
             None => "is not built at any Colony of yours".to_string(),
         };
@@ -1382,7 +1382,7 @@ fn print_board(g: &Game) {
         println!("    at {reached} | modules: {}", if mods.is_empty() { "none".into() } else { mods.join(", ") });
         // Ticket #526 (version 0.1.0.0): the tier, and what `upgrade` would buy next.
         let next = match g.open_tier(c) {
-            Some(t) => format!("next `upgrade {}`: {} ({} Modules) at {} Colonists, {} Materials and {} Widgets", c.id.0, t.name, t.cap, t.colonists, t.materials, t.widgets),
+            Some(t) => format!("next `upgrade {}`: {} ({}) at {}, {} Materials and {} Widgets", c.id.0, t.name, dying_earth_engine::counted(t.cap, "Module", "Modules"), dying_earth_engine::counted(t.colonists, "Colonist", "Colonists"), t.materials, t.widgets),
             None if g.next_tier(c).is_some() => "the next tier is not open here (the Body's Colonial Capital is another's)".to_string(),
             None => "the last tier".to_string(),
         };
@@ -1595,7 +1595,7 @@ fn main() {
                 print_costs(&game);
             }
             if let Some(n) = flag(&args, "log").and_then(|s| s.parse::<usize>().ok()) {
-                println!("\n--- LOG, last {n} lines ---");
+                println!("\n--- LOG, last {} ---", dying_earth_engine::counted(n, "line", "lines"));
                 let tail: Vec<&String> = game.log.iter().rev().take(n).collect();
                 for l in tail.into_iter().rev() {
                     println!("{l}");
@@ -1676,8 +1676,9 @@ fn main() {
             }
             let (left, influence) = game.remaining(Seat(0), &kept);
             println!(
-                "\n{} order(s) stand, {bad} refused. After them: {}M {}F {}E {}D, {} Influence left of the allotment.",
-                kept.len(),
+                "\n{} {}, {bad} refused. After them: {}M {}F {}E {}D, {} Influence left of the allotment.",
+                dying_earth_engine::counted(kept.len(), "order", "orders"),
+                if kept.len() == 1 { "stands" } else { "stand" },
                 left.materials,
                 left.fuel,
                 left.energy,
@@ -1700,7 +1701,7 @@ fn main() {
                 return;
             }
             if bad > 0 && !args.iter().any(|a| a == "--force") {
-                eprintln!("\nThe turn did NOT end: {bad} line(s) were refused. Fix them, or pass --force to end the turn with the rest.");
+                eprintln!("\nThe turn did NOT end: {} {} refused. Fix them, or pass --force to end the turn with the rest.", dying_earth_engine::counted(bad, "line", "lines"), if bad == 1 { "was" } else { "were" });
                 std::process::exit(1);
             }
             if let Some(why) = owed {

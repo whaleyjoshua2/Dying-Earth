@@ -193,7 +193,8 @@ unique = "Spaceport -- replaces the Launch Site, and pays +1 Influence into next
 victory = "Diaspora: 42 Colonists living off Earth, on Colonies spread over at least four Bodies with at least 4 Colonists each, one of them holding a Colonial Capital of yours (Antarctica does not count; Earth is not one of the four)."
 victory_short = "get {first} Colonists living off Earth, spread over {bodies} Bodies, one holding a Colonial Capital,"
 # Ticket #506 (version 0.1.0.0): 42 (30 x 50/36) and four Bodies, with the game at fifty turns.
-victory_first = { kind = "colonists_off_earth", bar = 42 }
+# Ticket #555 (version 0.1.0.2): the Colonists off Earth count 0.6 of the score, the Bodies 0.4.
+victory_first = { kind = "colonists_off_earth", bar = 42, weight = 0.6 }
 victory_second = { kind = "colonies_on_bodies", bodies = 4, colonists_each = 4 }
 # Ticket #514 (version 0.1.0.0): and a Colonial Capital of theirs must stand, at a Colony they direct
 # off Earth, before they win -- a gate on the win like the gate Tech, at the designer's word ("add a
@@ -251,7 +252,8 @@ unique = "Reactor -- replaces the Power Plant, and takes a quarter off the Energ
 victory = "Build the Archive at a Colony off Earth (55 Materials, three turns, and four Colonists must live there to begin it), pay 225 Research into it and keep it running, then upload 18 Colonists into it from the people living where it stands."
 victory_short = "build the Archive off Earth, pay {first} Research into it, and upload {second} Colonists,"
 # Ticket #506 (version 0.1.0.0): 225 and 18 uploads, at the designer's word, with the game at fifty turns.
-victory_first = { kind = "archive_research", bar = 225 }
+# Ticket #555 (version 0.1.0.2): the Archive fund counts 0.4 of the score, the uploads 0.6.
+victory_first = { kind = "archive_research", bar = 225, weight = 0.4 }
 # Ticket #192 (version 0.08.0): twelve Colonists UPLOADED, not twelve living beside the Archive.
 victory_second = { kind = "colonists_uploaded", bar = 18 }
 # Ticket #471 (version 0.09.7): the Opening Objective -- no deadline, met once, rewarded once.

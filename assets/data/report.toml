@@ -31,7 +31,7 @@ ship_held = "{faction} {ship} held at {body}, answering the call."
 # they wait, one line a Body, in the designer's words -- "colonists wait aboard in low orbit of
 # Mars", with "blocked by rivals' control of the orbit" when a rival's Orbital Control shuts the
 # ground. {where} and {blocked} are the waiting_* phrases below.
-colonists_waiting = "{n} Colonists wait aboard {where}{blocked}."
+colonists_waiting = "{n} {wait} aboard {where}{blocked}."
 # Ticket #335 (version 0.09.0): a Ship that changed orbit rather than flying away.
 orbit_changed = "{faction} {ship} moved to {orbit}."
 ship_destroyed = "{faction} {ship} destroyed ({why}){cargo}."
@@ -47,15 +47,15 @@ neutral_held = "{state} held against the attack and arms: Standing Army now {n}.
 # field when it is over -- as the attack button's hover quotes them, where both said the first
 # exchange's share of the strength.
 battle = "Battle at {place}: {faction} attacked at {odds}% to hold the field; {outcome}."
-event_damaged_ships = "{event} damaged {n} Ship(s)."
+event_damaged_ships = "{event} damaged {n}."
 loaded = "{faction} loaded {cargo} at {body}{spaceport}."
 slot_taken = "{faction}: that Colony Slot was taken first."
 landing_contested = "{faction} could not land at {body}: orbit contested."
 # Ticket #353 (version 0.09.1): the slot is NAMED. "in slot 3 on the Moon" named a place no player
 # could find on the board; {slot} now carries the slot's own name, which is the Colony's name too.
-colony_founded = "{faction} founded a Colony at {slot} on {body} with {n} Colonists."
+colony_founded = "{faction} founded a Colony at {slot} on {body} with {n}."
 # Ticket #419 (version 0.09.4): the same, where the founding eased the founder's Unrest.
-colony_founded_eased = "{faction} founded a Colony at {slot} on {body} with {n} Colonists: -{ease} Unrest."
+colony_founded_eased = "{faction} founded a Colony at {slot} on {body} with {n}: -{ease} Unrest."
 # Ticket #353 (version 0.09.1): who did not land, at every place the engine clamps an arrival to the
 # Habitat room it found -- a founding by sea, a founding by Colony Ship, a join and a disembarkation.
 # One phrase for all four, because it is one rule.
@@ -76,7 +76,7 @@ opening_launch_site = "Free Launch Site in {state}."
 first_to_body_eases = "The first Colony on {body} eased Unrest by {ease} in every Region."
 # Ticket #405 (version 0.09.4): the world under the Natural Sink for the first time, once a game.
 under_the_sink_eases = "First turn under the Natural Sink: Unrest eased by {ease} in every Region, {custodians} in the Custodians'."
-disembarked = "{n} Colonists disembarked into {colony}."
+disembarked = "{n} disembarked into {colony}."
 station_built = "{faction} built {station}."
 # Ticket #495 (version 0.09.9): an Accord answered, in the player's own section.
 accord_struck = "Accord struck with {faction}."
@@ -91,12 +91,12 @@ accord_let_lapse = "{faction} let your Accord lapse."
 # Ticket #538 (version 0.1.0.1): the warning at the head of an Accord's last turn, and the causes the
 # Accord Ended Moment names.
 # Ticket #544 (version 0.1.0.1): a far world's window the turn before it.
-window_next = "The {bodies} window is next turn: {turns} turns, {fuel} Fuel."
+window_next = "The {bodies} window is next turn: {turns}, {fuel} Fuel."
 # Ticket #542 (version 0.1.0.1): a rival on a place of the player's, and the home at risk.
 rival_spent_on_yours = "{faction} spent {n} on {place}: {standing} of {needed}."
 could_fall = "{place} could fall to {faction} next turn."
 accord_ends_soon = "Your Accord with {faction} ends after this turn."
-accord_cause_ran_out = "its {turns} turns are up"
+accord_cause_ran_out = "its {turns} {are} up"
 accord_cause_not_renewed = "{faction} would not renew"
 accord_cause_called_off = "{faction} called it off"
 accord_cause_broken = "{faction} broke it"
@@ -108,15 +108,15 @@ trade_struck = "Trade struck with {faction}."
 trade_refused = "{faction} refused your Trade."
 trade_failed = "Trade with {faction} failed: {why}."
 station_built_eased = "{faction} built {station}: -{ease} Unrest."
-antarctica_opens = "The Antarctic ice opens: {n} Colony Slots on Earth."
+antarctica_opens = "The Antarctic ice opens: {n} on Earth."
 archive_begun = "{faction} began the Archive at {colony}."
 claim_lot = "{factions} tie for {place}; the lot falls to {winner}."
-emigrants_mustered = "{faction} recruited {n} Pioneers: {where}."
+emigrants_mustered = "{faction} recruited {n}: {where}."
 # Ticket #334 (version 0.09.0): an Army is raised from people, and the line says whose.
 army_ordered = "An Army began at {place}: {people} under arms."
-emigrants_arrived = "{n} Pioneers from {state} landed in Antarctica and joined {colony}."
-emigrants_returned = "{n} Pioneers from {state} found no room in Antarctica and came home."
-emigrants_lifted = "{n} Pioneers lifted from {state} to {station}{spaceport}."
+emigrants_arrived = "{n} from {state} landed in Antarctica and joined {colony}."
+emigrants_returned = "{n} from {state} found no room in Antarctica and came home."
+emigrants_lifted = "{n} lifted from {state} to {station}{spaceport}."
 # Ticket #353 (version 0.09.1): and who did NOT go. A lift fills as far as the station's Habitat
 # room goes since this ticket, where it used to refuse the whole order, so a lift can now move
 # fewer people than it asked for and the ones left behind are still standing in their Region. The
@@ -131,7 +131,7 @@ archive_destroyed = "The Archive at {place} was destroyed with its Colony; {fact
 archive_funded = "{faction} are funding the Archive: {banked} Research banked, {fund} of {cap}."
 # Ticket #235 (version 0.08.3): the other three Research Directives. Each says what was given up as
 # well as what was got, because the whole of the decision is the trade.
-exodus_call = "{faction} sounded an Exodus Call in {state}: {n} Pioneers a turn for {turns} turns, at the usual cost."
+exodus_call = "{faction} sounded an Exodus Call in {state}: {n} a turn for {turns}, at the usual cost."
 exodus_call_order = "sounded an Exodus Call in {state}"
 directive_sink = "{faction} directed {research} Research into the Natural Sink: +{ppm} ppm for good, now {sink} a turn."
 directive_ducats = "{faction} directed {research} Research into their coffers: {n} Ducats."
@@ -182,7 +182,7 @@ refugees_net_in_gross = "{state} took in {n} of {gross} arriving."
 refugees_net_out = "{state} lost {n} people to neighbours: {why}."
 refugees_net_out_mostly = "{state} lost {n} people to neighbours: mostly {why}."
 resettled = "{faction} resettled this turn's refugees in {state} (+{standing} Standing)."
-strip_permit = "{faction} issued a Strip Permit in {state}: its Facilities produce double for {turns} turns."
+strip_permit = "{faction} issued a Strip Permit in {state}: its Facilities produce double for {turns}."
 strip_permit_ended = "The Strip Permit in {state} ended: Baseline Emissions now {baseline} for good."
 building_changed_state = "{faction} {done} the {building} in {state}."
 building_decommissioned_state = "{faction} decommissioned the {building} in {state}: {refund} Materials back, slot free."
@@ -191,11 +191,11 @@ building_decommissioned_colony = "{faction} decommissioned the {building} at {co
 build_lost = "{building} at {place} had no slot and was lost."
 # Ticket #197 (version 0.08.0): Colonists lost when a building coming down leaves fewer Habitats
 # than the people living there. It was the one way Colonists went without a word.
-colonists_no_room = "{n} Colonists at {colony} had no room and were lost."
+colonists_no_room = "{n} at {colony} had no room and {were} lost."
 # Ticket #191 (version 0.08.0): Relations. Said in the OFFENDER's Report on a turn a rival's view of
 # them fell, so a player is sent to the grid on the Victory window rather than expected to watch it.
 # Ticket #192 (version 0.08.0): the Upload, in the Report.
-uploaded = "{n} Colonists uploaded at {colony}: {total} in all."
+uploaded = "{n} uploaded at {colony}: {total} in all."
 # Ticket #362 (version 0.09.1): only a pair INVOLVING THE PLAYER, only when it falls into a worse
 # named level, both directions, folded one line each -- at the designer's word, "quiet the 'has
 # not forgiven' spam". `relations_fell` ("The {victim} have not forgiven the {offender}.") is retired.
@@ -265,18 +265,18 @@ sea_took_destroying = "The sea took {n} coastal {slots} from {state} at {tempera
 # Ticket #400 (version 0.09.3): the per-Region heat lines are GONE -- one for every Region on the
 # board whoever held it, twenty thousand of the thirty-two thousand Unrest-bearing lines in eighty
 # games. The heat is a cause on each Region's net line (cause_heat) and the board is this one line.
-heat_board = "The heat raised Unrest in {n} Regions and took people from {m}."
+heat_board = "The heat raised Unrest in {n} and took people from {m}."
 development = "{state} raised its Industry Level to {level}."
 development_woke = "{state} raised its Industry Level to {level} and brought a {building} online."
 # Ticket #445 (version 0.09.6): no longer destroyed; they run at a share in other hands.
-scrubbers_changed_hands = "{n} Scrubber(s) in {state} now run at {share}."
+scrubbers_changed_hands = "{n} in {state} now {run} at {share}."
 # Ticket #442 (version 0.09.6).
 colony_built = "{faction} built {colony}."
 # Ticket #444 (version 0.09.6): a Colony's natural growth and decline, one line a seat.
 colonies_grew = "Colonies grew {up}: {places}."
 colonies_shrank = "Colonies lost {down}: {places}."
 colonies_grew_and_shrank = "Colonies grew {up} and lost {down}: {places}."
-sent_down = "{n} Colonists went down from {from} to {to}."
+sent_down = "{n} went down from {from} to {to}."
 leapfrog = "{faction} Leapfrogged {state}: its people now emit {coefficient} per hundred million."
 
 # Your works
@@ -351,8 +351,8 @@ unrest_past = ", past the {which} threshold: {note}"
 unrest_under = ", back under the {which} threshold"
 # Ticket #351 (version 0.09.1): what the Natural Sink loses with the Scrubbers a Shortfall shut.
 energy_short_sink = "; the Natural Sink loses {ppm} ppm"
-cargo_aboard = " with {n} Colonists aboard"
-bombard_dead = ", {n} Colonists dead with it"
+cargo_aboard = " with {n} aboard"
+bombard_dead = ", {n} dead with it"
 # Ticket #343 (version 0.09.1): the people a Launch killed, counted in units of population -- one
 # unit, one million people, since ticket #333.
 launch_dead = ", {n} million dead"
@@ -405,10 +405,10 @@ build_army = "began an Army at {place}, {people} under arms"
 cancel_build = "cancelled the {building} at {place}"
 build_station = "began a Space Station over {body}"
 build_colony = "began a Colony on {body}"
-send_down = "sent {n} Colonists down to {place}"
+send_down = "sent {n} down to {place}"
 build_archive = "began the Archive at {colony}"
 # Ticket #192 (version 0.08.0): the Upload, in the rival-deeds paragraph.
-upload = "uploaded {n} Colonists at {colony}"
+upload = "uploaded {n} at {colony}"
 # Ticket #353 (version 0.09.1): `fund_archive` is the ARCHIVISTS' clause and theirs alone. It was
 # said of all four, so three Factions in four were reported as paying into a fund they cannot hold.
 # The other three name what their own Directive really buys, in the words the Report line for each
@@ -421,9 +421,9 @@ directive_fuel_order = "directed its Research into propellant"
 unfund_archive = "returned its Research to the shared Tech"
 max_on = "set its whole Allotment on {place} every turn"
 max_off = "set its Influence to be placed by hand again"
-build_emigrants = "recruited {n} Pioneers in {state}"
-send_antarctica = "sent {n} Pioneers from {state} to Antarctica by sea"
-lift_station = "lifted {n} Pioneers from {state} to {station}"
+build_emigrants = "recruited {n} in {state}"
+send_antarctica = "sent {n} from {state} to Antarctica by sea"
+lift_station = "lifted {n} from {state} to {station}"
 set_venture_share = "set the Venture Capital Fund to bank {share}% of Ducat income"
 # Ticket #256 (version 0.08.4): "withdrew", and DUCATS -- this line still said Materials a version
 # after ticket #240 moved the Fund, which nobody saw because no sweep reads the Report.
@@ -440,7 +440,7 @@ rearm = "rearmed a Missile Carrier"
 ship_stance = "set its Ships at {body} to {stance}"
 army_stance = "set its Armies at {place} to {stance}"
 move_army = "moved {army} into {state}"
-load_colonists = "lifted {n} Colonists at {place}"
+load_colonists = "lifted {n} at {place}"
 load_army = "loaded {army} at {place}"
 unload = "unloaded at {place}"
 influence = "spent {n} Influence on {place}"
@@ -469,7 +469,7 @@ founded = "founded {colony}"
 [moments.colony_founded]
 on = true
 text = "{faction} founded {colony}, {note}."
-figure = "{n} Colonists"
+figure = "{n}"
 
 # Ticket #345 (version 0.09.1): the first Faction to put a Colony on the ground of a world.
 [moments.first_to_body]
@@ -533,7 +533,7 @@ figure = "{lead} of {cost}"
 [moments.antarctica]
 on = true
 text = "The Antarctic ice opens: Colony Slots on Earth."
-figure = "{n} Colony Slots"
+figure = "{n}"
 
 [moments.archive_complete]
 on = true

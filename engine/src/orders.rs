@@ -594,8 +594,8 @@ impl Game {
         }
         Err(OrderError(match from {
             // Ticket #543 (version 0.1.0.1): Pioneers waiting in this Region, which is what it means.
-            LoadSource::State(_) => format!("needs {found} Pioneers here"),
-            LoadSource::Colony(_) => format!("needs {found} Colonists to spare"),
+            LoadSource::State(_) => format!("needs {} here", crate::counted(found, "Pioneer", "Pioneers")),
+            LoadSource::Colony(_) => format!("needs {} to spare", crate::counted(found, "Colonist", "Colonists")),
         }))
     }
 
@@ -1197,9 +1197,9 @@ impl Game {
                 if col.colonists < want {
                     let place = self.place_name(Place::Colony(*colony));
                     return fail(match col.colonists {
-                        0 => format!("the Archive wants {want} Colonists living at its Colony; nobody lives at {place}"),
-                        1 => format!("the Archive wants {want} Colonists living at its Colony; one lives at {place}"),
-                        n => format!("the Archive wants {want} Colonists living at its Colony; {n} live at {place}"),
+                        0 => format!("the Archive wants {} living at its Colony; nobody lives at {place}", crate::counted(want, "Colonist", "Colonists")),
+                        1 => format!("the Archive wants {} living at its Colony; one lives at {place}", crate::counted(want, "Colonist", "Colonists")),
+                        n => format!("the Archive wants {} living at its Colony; {n} live at {place}", crate::counted(want, "Colonist", "Colonists")),
                     });
                 }
                 Ok(cost)
@@ -1225,7 +1225,7 @@ impl Game {
                     let place = self.place_name(Place::Colony(*colony));
                     return fail(match room {
                         0 => format!("nobody is left to upload at {place}"),
-                        r => format!("only {r} Colonists are left to upload at {place}"),
+                        r => format!("only {} {} left to upload at {place}", crate::counted(r, "Colonist", "Colonists"), if r == 1 { "is" } else { "are" }),
                     });
                 }
                 Ok(cost)
@@ -1314,7 +1314,7 @@ impl Game {
                 // Ticket #489 (version 0.09.9): less any a Colony built from it this turn takes.
                 let aboard = up.colonists.saturating_sub(self.founders_claimed(pending, LoadSource::Colony(*from)));
                 if aboard < *colonists {
-                    return fail(format!("only {aboard} Colonists aboard"));
+                    return fail(format!("only {} aboard", crate::counted(aboard, "Colonist", "Colonists")));
                 }
                 if self.starved_by(*from).is_some() {
                     return fail("the station is under Blockade");
@@ -1391,7 +1391,7 @@ impl Game {
                         .count() as u32;
                     let cap = self.scrubber_cap(*state);
                     if self.scrubbers_committed(*state) + ordered >= cap {
-                        return fail(format!("this Nation State holds its {cap} Scrubbers already"));
+                        return fail(format!("this Nation State holds its {} already", crate::counted(cap, "Scrubber", "Scrubbers")));
                     }
                 }
                 // Ticket #185 (version 0.08.0): at most one School per Nation State. A second would
@@ -1491,7 +1491,7 @@ impl Game {
                     return fail(format!("{body}'s Capital is {}", self.slot_name(cap)));
                 }
                 if col.colonists < next.colonists {
-                    return fail(format!("needs {} Colonists", next.colonists));
+                    return fail(format!("needs {}", crate::counted(next.colonists, "Colonist", "Colonists")));
                 }
                 Ok(cost)
             }
@@ -2095,7 +2095,7 @@ impl Game {
                     _ => None,
                 }).sum();
                 if s.colonists + loading + *colonists > capacity {
-                    return fail(format!("this Ship carries at most {capacity} Colonists"));
+                    return fail(format!("this Ship carries at most {}", crate::counted(capacity, "Colonist", "Colonists")));
                 }
                 // Ticket #533, at the designer's word: a lift never uses the Ship's turn, so it
                 // stands beside any one action -- but never beside an unload, and never two from one
@@ -2136,7 +2136,7 @@ impl Game {
                             // Ticket #489 (version 0.09.9): less any a station built this turn takes.
                             let waiting = self.state(*st).emigrants.saturating_sub(self.founders_claimed(pending, *from));
                             if waiting < *colonists {
-                                return fail(format!("only {waiting} Pioneers are waiting there"));
+                                return fail(format!("only {} {} waiting there", crate::counted(waiting, "Pioneer", "Pioneers"), if waiting == 1 { "is" } else { "are" }));
                             }
                             // Ticket #357 (version 0.09.1): a lift from a Launch Site reaches ANY
                             // orbit of Earth, at the designer's word, where ticket #335 held it to
@@ -2256,7 +2256,7 @@ impl Game {
                         }
                         // Ticket #489 (version 0.09.9): a Colony is founded with four.
                         if *colonists < self.tables.emigrants.found_with {
-                            return fail(format!("needs {} Colonists", self.tables.emigrants.found_with));
+                            return fail(format!("needs {}", crate::counted(self.tables.emigrants.found_with, "Colonist", "Colonists")));
                         }
                         if !self.free_slots_on(body).contains(slot) {
                             return fail("that Colony Slot is taken");
@@ -2281,7 +2281,7 @@ impl Game {
                         }
                         // Ticket #489 (version 0.09.9): and a station with four.
                         if *colonists < self.tables.emigrants.found_with {
-                            return fail(format!("needs {} Colonists", self.tables.emigrants.found_with));
+                            return fail(format!("needs {}", crate::counted(self.tables.emigrants.found_with, "Colonist", "Colonists")));
                         }
                         if !self.free_orbital_slots(body).contains(slot) {
                             return fail("that station slot is taken");
@@ -2406,7 +2406,7 @@ impl Game {
                 }
                 let cap = self.emigrants_per_turn_in(seat, *state);
                 if *n == 0 || *n > cap {
-                    return fail(format!("up to {cap} Pioneers a turn"));
+                    return fail(format!("up to {} a turn", crate::counted(cap, "Pioneer", "Pioneers")));
                 }
                 if pending.iter().any(|o| matches!(o, Order::BuildEmigrants { state: s, .. } if s == state)) {
                     return fail("Pioneers are already recruiting here this turn");
@@ -2427,7 +2427,7 @@ impl Game {
                 let sending = self.emigrants_leaving(pending, *state);
                 let waiting = self.state(*state).emigrants.saturating_sub(sending);
                 if *n == 0 || *n > waiting {
-                    return fail(format!("{waiting} Pioneers are waiting there"));
+                    return fail(format!("{} {} waiting there", crate::counted(waiting, "Pioneer", "Pioneers"), if waiting == 1 { "is" } else { "are" }));
                 }
                 match into {
                     UnloadTarget::Ring(..) => return fail("the sea reaches the ground, not an orbit"),
@@ -2437,7 +2437,7 @@ impl Game {
                         }
                         // Ticket #489 (version 0.09.9): a Colony is founded with four.
                         if *n < self.tables.emigrants.found_with {
-                            return fail(format!("needs {} Colonists", self.tables.emigrants.found_with));
+                            return fail(format!("needs {}", crate::counted(self.tables.emigrants.found_with, "Colonist", "Colonists")));
                         }
                         if pending.iter().any(|o| matches!(o, Order::SendToAntarctica { into: UnloadTarget::Slot(_, s), .. } if s == slot)) {
                             return fail("Pioneers are already bound for that slot this turn");
@@ -2464,7 +2464,7 @@ impl Game {
                 let sending = self.emigrants_leaving(pending, *state);
                 let waiting = self.state(*state).emigrants.saturating_sub(sending);
                 if *n == 0 || *n > waiting {
-                    return fail(format!("{waiting} Pioneers are waiting there"));
+                    return fail(format!("{} {} waiting there", crate::counted(waiting, "Pioneer", "Pioneers"), if waiting == 1 { "is" } else { "are" }));
                 }
                 let Some(col) = self.colony(*colony) else { return fail("no such station") };
                 if col.body != BodyId::Earth || !col.in_orbit || col.control.director() != Some(seat) {
@@ -2528,7 +2528,7 @@ impl Game {
                 // Ticket #238 (version 0.08.3): three whole turns in hand before a Faction may
                 // remake a country. The turn of the taking does not count.
                 if !self.may_remake(seat, *state) {
-                    return fail(format!("{} has been yours for less than {} turns; you may act there from turn {}", self.tables.state(*state).name, self.tables.faction_orders.min_turns_held, self.may_remake_on_turn(*state)));
+                    return fail(format!("{} has been yours for less than {}; you may act there from turn {}", self.tables.state(*state).name, crate::counted(self.tables.faction_orders.min_turns_held, "turn", "turns"), self.may_remake_on_turn(*state)));
                 }
                 // Every Leapfrog already pending this turn has to come off before the next one bites.
                 let per = self.tables.climate.population_emissions_per_level;
@@ -2555,7 +2555,7 @@ impl Game {
                 // Ticket #238 (version 0.08.3): three whole turns in hand before a Faction may
                 // remake a country. The turn of the taking does not count.
                 if !self.may_remake(seat, *state) {
-                    return fail(format!("{} has been yours for less than {} turns; you may act there from turn {}", self.tables.state(*state).name, self.tables.faction_orders.min_turns_held, self.may_remake_on_turn(*state)));
+                    return fail(format!("{} has been yours for less than {}; you may act there from turn {}", self.tables.state(*state).name, crate::counted(self.tables.faction_orders.min_turns_held, "turn", "turns"), self.may_remake_on_turn(*state)));
                 }
                 if self.state(*state).exodus_call_used {
                     return fail("this Region has answered an Exodus Call once already, and may not again");
@@ -2575,7 +2575,7 @@ impl Game {
                 // Ticket #238 (version 0.08.3): three whole turns in hand before a Faction may
                 // remake a country. The turn of the taking does not count.
                 if !self.may_remake(seat, *state) {
-                    return fail(format!("{} has been yours for less than {} turns; you may act there from turn {}", self.tables.state(*state).name, self.tables.faction_orders.min_turns_held, self.may_remake_on_turn(*state)));
+                    return fail(format!("{} has been yours for less than {}; you may act there from turn {}", self.tables.state(*state).name, crate::counted(self.tables.faction_orders.min_turns_held, "turn", "turns"), self.may_remake_on_turn(*state)));
                 }
                 if self.state(*state).strip_permit_used {
                     return fail("this Nation State has had its Strip Permit");
@@ -2952,7 +2952,7 @@ impl Game {
                         let total = self.seat(seat).uploaded;
                         let line = format!("{} uploaded {} Colonists into the Archive at {}; {} in all.", self.seat_name(seat), taken, place, total);
                         self.log(line);
-                        let text = self.say("uploaded", &[("n", taken.to_string()), ("colony", place), ("total", total.to_string())]);
+                        let text = self.say("uploaded", &[("n", crate::counted(taken, "Colonist", "Colonists")), ("colony", place), ("total", total.to_string())]);
                         self.report_line_of(seat, LineKind::Archive, LineKind::Archive, Some(ReportPlace::Colony(*colony)), text);
                     }
                 }
@@ -3092,7 +3092,7 @@ impl Game {
                     self.log(line);
                     // Ticket #366 (version 0.09.2): and what the Spaceport will pay for them, when.
                     let spaceport = if paid > 0 { self.phrase("spaceport_pays", &[("n", paid.to_string())]) } else { String::new() };
-                    let text = self.say("emigrants_lifted", &[("n", n.to_string()), ("state", self.tables.state(*state).name.clone()), ("station", station.clone()), ("spaceport", spaceport)]);
+                    let text = self.say("emigrants_lifted", &[("n", crate::counted(n, "Pioneer", "Pioneers")), ("state", self.tables.state(*state).name.clone()), ("station", station.clone()), ("spaceport", spaceport)]);
                     self.report_line_of(seat, LineKind::YourWorks, LineKind::Note, Some(ReportPlace::Colony(*colony)), text);
                     // Ticket #353 (version 0.09.1): and WHO STAYED. A lift fills as far as the
                     // station's Habitat room goes now, where it refused the whole order before, so
@@ -3170,7 +3170,7 @@ impl Game {
                         turns
                     );
                     self.log(line);
-                    let text = self.say("exodus_call", &[("faction", self.seat_name(seat)), ("state", self.tables.state(*state).name.clone()), ("n", per.to_string()), ("turns", turns.to_string())]);
+                    let text = self.say("exodus_call", &[("faction", self.seat_name(seat)), ("state", self.tables.state(*state).name.clone()), ("n", crate::counted(per, "Pioneer", "Pioneers")), ("turns", crate::counted(turns, "turn", "turns"))]);
                     // Ticket #431 (version 0.09.5): Your works only when it is the player's Call; a
                     // rival's is its doing, under the fog, where it was filed as the player's.
                     self.report_line_of(seat, LineKind::YourWorks, LineKind::Note, Some(ReportPlace::State(*state)), text);
@@ -3191,7 +3191,7 @@ impl Game {
                     self.log(line);
                     let text = self.say(
                         "strip_permit",
-                        &[("faction", self.seat_name(seat)), ("state", self.tables.state(*state).name.clone()), ("turns", turns.to_string())],
+                        &[("faction", self.seat_name(seat)), ("state", self.tables.state(*state).name.clone()), ("turns", crate::counted(turns, "turn", "turns"))],
                     );
                     // Ticket #431 (the review): the Faction's own act, under the fog.
                     self.report_line_by(seat, LineKind::Note, Some(ReportPlace::State(*state)), text);
@@ -3258,7 +3258,7 @@ impl Game {
         if !recruited.is_empty() {
             let total: u32 = recruited.iter().map(|(_, n)| n).sum();
             let parts: Vec<String> = recruited.iter().map(|(s, n)| self.phrase("recruited_part", &[("n", n.to_string()), ("state", self.tables.state(*s).name.clone())])).collect();
-            let text = self.say("emigrants_mustered", &[("faction", self.seat_name(seat)), ("n", total.to_string()), ("where", parts.join(", "))]);
+            let text = self.say("emigrants_mustered", &[("faction", self.seat_name(seat)), ("n", crate::counted(total, "Pioneer", "Pioneers")), ("where", parts.join(", "))]);
             // One Region is still a line that goes there; several point nowhere in particular.
             let place = if let [(only, _)] = recruited[..] { Some(ReportPlace::State(only)) } else { None };
             self.report_line_of(seat, LineKind::YourWorks, LineKind::Note, place, text);
@@ -3428,7 +3428,7 @@ impl Game {
             Order::BuildStation { body, .. } => r("build_station", &[("body", self.tables.body(*body).name.clone())]),
             // Ticket #442 (version 0.09.6).
             Order::BuildColony { body, .. } => r("build_colony", &[("body", self.tables.body(*body).name.clone())]),
-            Order::SendDown { to, colonists, .. } => r("send_down", &[("n", colonists.to_string()), ("place", place(Place::Colony(*to)))]),
+            Order::SendDown { to, colonists, .. } => r("send_down", &[("n", crate::counted(colonists, "Colonist", "Colonists")), ("place", place(Place::Colony(*to)))]),
             // Ticket #87.
             Order::Refuel { ship } => {
                 let body = self.ship(*ship).and_then(|s| match s.at {
@@ -3438,7 +3438,7 @@ impl Game {
                 r("refuel", &[("unit", unit_of(UnitRef::Ship(*ship))), ("body", body.unwrap_or_else(|| "space".to_string()))])
             }
             Order::BuildArchive { colony } => r("build_archive", &[("colony", place(Place::Colony(*colony)))]),
-            Order::Upload { colony, n } => r("upload", &[("n", n.to_string()), ("colony", place(Place::Colony(*colony)))]),
+            Order::Upload { colony, n } => r("upload", &[("n", crate::counted(n, "Colonist", "Colonists")), ("colony", place(Place::Colony(*colony)))]),
             // Ticket #353 (version 0.09.1): the Directive NAMES WHAT IT BOUGHT. One clause said "set
             // its Labs to pay the Archive fund" of all four Factions, and only the Archivists have an
             // Archive fund: a Custodian's Directive feeds the Natural Sink, a Prospector's their
@@ -3499,7 +3499,7 @@ impl Game {
                     LoadSource::Colony(c) => place(Place::Colony(*c)),
                 };
                 if *colonists > 0 {
-                    r("load_colonists", &[("n", colonists.to_string()), ("place", where_)])
+                    r("load_colonists", &[("n", crate::counted(colonists, "Colonist", "Colonists")), ("place", where_)])
                 } else {
                     r("load_army", &[("army", army.map(army_of).unwrap_or_else(|| "an Army".to_string())), ("place", where_)])
                 }
@@ -3541,9 +3541,9 @@ impl Game {
                 };
                 r(key, &[("building", building(*b)), ("place", place(b.place()))])
             }
-            Order::BuildEmigrants { state, n } => r("build_emigrants", &[("n", n.to_string()), ("state", self.tables.state(*state).name.clone())]),
-            Order::SendToAntarctica { state, n, .. } => r("send_antarctica", &[("n", n.to_string()), ("state", self.tables.state(*state).name.clone())]),
-            Order::LiftToStation { state, n, colony } => r("lift_station", &[("n", n.to_string()), ("state", self.tables.state(*state).name.clone()), ("station", place(Place::Colony(*colony)))]),
+            Order::BuildEmigrants { state, n } => r("build_emigrants", &[("n", crate::counted(n, "Pioneer", "Pioneers")), ("state", self.tables.state(*state).name.clone())]),
+            Order::SendToAntarctica { state, n, .. } => r("send_antarctica", &[("n", crate::counted(n, "Pioneer", "Pioneers")), ("state", self.tables.state(*state).name.clone())]),
+            Order::LiftToStation { state, n, colony } => r("lift_station", &[("n", crate::counted(n, "Pioneer", "Pioneers")), ("state", self.tables.state(*state).name.clone()), ("station", place(Place::Colony(*colony)))]),
             Order::SetVentureShare { share } => r("set_venture_share", &[("share", share.to_string())]),
             Order::DrawVenture { amount } => r("draw_venture", &[("n", amount.to_string())]),
             Order::Leapfrog { state } => r("leapfrog", &[("state", self.tables.state(*state).name.clone())]),

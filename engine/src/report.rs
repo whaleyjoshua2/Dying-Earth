@@ -474,7 +474,7 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     // Ticket #375 (version 0.09.2): the Ship a Distress Call turned aside.
     ("ship_held", &["faction", "ship", "body"]),
     // Ticket #370 (version 0.09.2): the player's Colonists still aboard off Earth, one line a Body.
-    ("colonists_waiting", &["n", "where", "blocked"]),
+    ("colonists_waiting", &["n", "wait", "where", "blocked"]),
     // Ticket #335 (version 0.09.0): a Ship that changed orbit at the Body it stands at.
     ("orbit_changed", &["faction", "ship", "orbit"]),
     ("ship_destroyed", &["faction", "ship", "why", "cargo"]),
@@ -521,7 +521,7 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("could_fall", &["place", "faction"]),
     // Ticket #544 (version 0.1.0.1).
     ("window_next", &["bodies", "turns", "fuel"]),
-    ("accord_cause_ran_out", &["turns"]),
+    ("accord_cause_ran_out", &["turns", "are"]),
     ("accord_cause_not_renewed", &["faction"]),
     ("accord_cause_called_off", &["faction"]),
     ("accord_cause_broken", &["faction"]),
@@ -599,7 +599,7 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("build_cancelled", &["faction", "building", "place", "refund"]),
     // Ticket #503 (version 0.1.0.0): an upgrade to a Colonial Capital another place completed first.
     ("capital_refunded",&["place", "refund", "capital", "body"]),
-    ("colonists_no_room", &["n", "colony"]),
+    ("colonists_no_room", &["n", "colony", "were"]),
     // Ticket #191 (version 0.08.0): Relations. Ticket #362 (version 0.09.1): a fall into a worse
     // level of a pair involving the player, one line each way.
     ("relations_they", &["first", "level", "more"]),
@@ -655,7 +655,7 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("heat_board", &["n", "m"]),
     ("development", &["state", "level"]),
     ("development_woke", &["state", "level", "building"]),
-    ("scrubbers_changed_hands", &["n", "state", "share"]),
+    ("scrubbers_changed_hands", &["n", "state", "share", "run"]),
     ("colony_built", &["faction", "colony"]),
     ("colonies_grew", &["up", "places"]),
     ("colonies_shrank", &["down", "places"]),

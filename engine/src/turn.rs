@@ -256,7 +256,7 @@ impl Game {
                 self.report.ai_lines.push(AiReport { seat, deeds, places });
             }
             self.commit_orders(seat, &kept);
-            self.log(format!("{} gave {} order(s).", self.seat_name(seat), all[seat.index()].len()));
+            self.log(format!("{} gave {}.", self.seat_name(seat), crate::counted(all[seat.index()].len(), "order", "orders")));
         }
         self.log("Phase 5: Event");
         self.event_phase();
