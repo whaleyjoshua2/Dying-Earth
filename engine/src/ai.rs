@@ -2747,9 +2747,9 @@ impl Game {
         }
         // --- Ticket #54: Mothball, Restart and Decommission.
         // A mothball answers an Energy shortfall a turn ahead: the highest-upkeep building that
-        // produces nothing is the one to shut. A Custodian behind on Stabilization with Scrubbers
-        // standing and a run of nothing mothballs its dirtiest Facility instead, since its own
-        // industry is what is keeping the net above the Sink.
+        // produces nothing is the one to shut. A Custodian with Scrubbers standing, a run of nothing
+        // and the net within a building's reach of the Sink mothballs its dirtiest Facility instead,
+        // since then its own industry is what is keeping the net above the Sink (ticket #576).
         {
             let upkeep_of = |b: &BuildingRef| -> f64 {
                 match b {
@@ -2801,11 +2801,21 @@ impl Game {
                 );
             }
             // The Custodians' other reason to mothball: a Stabilization run that will not start.
+            // Ticket #576 (version 0.1.0.3), at the designer's word: only where shutting the building
+            // could start it -- the world's net over the Sink no more than the building's own
+            // Emissions and the pace's `within_ppm`. Measured from East Asia, a Scrubber standing
+            // from turn 1 had this reason shut the Refinery on turn 2, the Power Plant on turn 3 and
+            // the Mine on turn 4, for 1.1 and 0.6 ppm against a world 32 over the Sink: Fuel income
+            // nought from turn 4, Energy at nought by turn 12, and the Colony Ship never paid.
             let scrubbers_stand = self.controlled_states(seat).iter().any(|s| self.scrubbers_online(*s) > 0);
+            // The review: the last Climate phase's net, as `victory_gap` reads it; `over`, since
+            // `gap` is the Victory multiplier in this scope.
+            let over = self.climate.last.net();
+            let within = self.tables.ai_pace(kind).within_ppm;
             if kind == FactionKind::Custodians && self.seat(seat).stabilization_run == 0 && scrubbers_stand {
                 let dirtiest = standing
                     .iter()
-                    .filter(|(_, _, moth, _, em)| !*moth && *em > 0.0)
+                    .filter(|(_, _, moth, _, em)| !*moth && *em > 0.0 && over <= *em + within)
                     .max_by(|a, b| a.4.partial_cmp(&b.4).unwrap_or(std::cmp::Ordering::Equal));
                 if let Some((b, name, _, _, em)) = dirtiest {
                     push(

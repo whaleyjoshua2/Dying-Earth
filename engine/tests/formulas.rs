@@ -24295,3 +24295,66 @@ fn the_cheap_ore_offers_refusal_halves_materials_for_the_refusing_seat_for_a_tur
     let rule = g.tables.event(EventId::CheapOreOffer).choice.clone().unwrap().take_when;
     assert!(matches!(rule, CardRule::DucatsAtLeast { ducats } if ducats == 20), "{rule:?}");
 }
+
+// ---------------------------------------------------------------- #576 The East Asia Custodians never leave Earth (version 0.1.0.3)
+
+/// Ticket #576 (version 0.1.0.3), at the designer's word: the computer Custodians' "run is still
+/// nothing" mothball fires only where shutting the building could start the run -- the world's net
+/// over the Sink no more than the building's own Emissions and the pace's `within_ppm`. Measured
+/// from East Asia: a Scrubber standing from turn 1 had the reason shut the Refinery on turn 2, the
+/// Power Plant on turn 3 and the Mine on turn 4, for 1.1 and 0.6 ppm against a world 32 ppm over,
+/// and the Colony Ship saved for from turn 3 was never paid (35 Fuel, 10.6 held on turn 9).
+#[test]
+fn the_run_is_still_nothing_mothball_fires_only_where_it_could_start_the_run() {
+    // `fresh`, not `game`: the home's starting Refinery, Power Plant and Mine are the point.
+    let mut g = fresh();
+    calm(&mut g);
+    assert_eq!(g.kind(Seat(0)), FactionKind::Custodians);
+    g.seats[0].ai = true;
+    let home = g.controlled_states(Seat(0))[0];
+    g.state_mut(home).facilities.push(facility(FacilityKind::Scrubber));
+    g.seats[0].stockpile.energy = 500.0;
+    g.seats[0].stockpile.fuel = 50.0;
+    assert!(g.scrubbers_online(home) > 0, "the premise: a Scrubber stands");
+    let within = g.tables.ai_pace(FactionKind::Custodians).within_ppm;
+    // The dirtiest producing Facility the reason would shut, and what it emits. The Power Plant and
+    // the Refinery tie; both this and the rule take the last of equal maxima over the same order.
+    let dirtiest = |g: &Game| {
+        g.state(home)
+            .facilities
+            .iter()
+            .enumerate()
+            .filter(|(_, f)| !f.mothballed && g.tables.facility(f.kind).produces.is_some())
+            .map(|(i, f)| (i, g.facility_yield(Seat(0), home, f.kind).emissions))
+            .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
+            .expect("a producing Facility stands")
+    };
+    let mothballs = |g: &mut Game| -> Vec<usize> {
+        g.ai_orders(Seat(0))
+            .into_iter()
+            .filter_map(|o| match o {
+                Order::Change { building: BuildingRef::Facility(s, i), what: BuildingChange::Mothball } if s == home => Some(i),
+                _ => None,
+            })
+            .filter(|i| g.tables.facility(g.state(home).facilities[*i].kind).produces.is_some())
+            .collect()
+    };
+    // Far over the Sink: no producing Facility is shut for the run, since shutting one cannot start it.
+    g.climate_phase();
+    let gap = g.climate.last.net();
+    let (_, em) = dirtiest(&g);
+    assert!(gap > em + within + 5.0, "the premise: far over the Sink: net {gap}, the dirtiest {em}");
+    assert_eq!(g.seat(Seat(0)).stabilization_run, 0, "the premise: no run");
+    assert!(mothballs(&mut g).is_empty(), "nothing shut for a run that cannot start: {:?}", g.ai_orders(Seat(0)));
+    // Within reach: the net over the Sink under the dirtiest building's Emissions plus the pace's
+    // four ppm, and the reason fires on that building. The standing Scrubber's own sink comes off
+    // the net as well, so the margin is set with it; the premise below is what is pinned.
+    let scrubber = g.tables.facility(FacilityKind::Scrubber).sink_per_turn;
+    g.climate.natural_sink = g.climate.last.total() - (em + within + scrubber - 0.5);
+    g.climate_phase();
+    let gap = g.climate.last.net();
+    assert!(gap > 0.0 && gap <= em + within, "the premise: within reach: net {gap}, the dirtiest {em}");
+    assert_eq!(g.seat(Seat(0)).stabilization_run, 0, "the premise: still no run");
+    let (i, _) = dirtiest(&g);
+    assert_eq!(mothballs(&mut g), vec![i], "the dirtiest producing Facility is shut, since that could start the run");
+}

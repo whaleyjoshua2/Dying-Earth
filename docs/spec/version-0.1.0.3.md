@@ -630,3 +630,47 @@ Decided in one round ("that all sounds good let's go"):
 - **The review** (an independent agent) traced the clock through the turn (asked at the head of T, landed at T's Resolution, kept by T's settle, read by T+1's Orders, dropped at T+1's settle: one Orders turn, the three comparisons the card price uses), found every Buy figure going through the one cost door -- the check, the commit, the Resolution's line, the computer's top-up, the window's button -- the sell-back and the build-with-Ducats buttons untouched, the serde tag right, every match on the effect covered, and the save loading an older seat with no cuts at SAVE_VERSION 12. It caught a field on the cut written and never read (dropped); the Fuel Contract rewrite's tolerance accepting the moved price itself (an exact assert again); a spent-cut assertion looking for a card name the line never prints (it looks for the note now); the test's stale doc; two stale docs naming the old 1-Ducat Materials; and the Trading window's price column at some ninety characters for a Prospector with both notes -- one clause now, *"(x0.85 and half for you, this turn)"*. All mended.
 - **Swept** ([`sweeps/ticket-577.txt`](../dev-diary/2026-10-19-version-0.1.0.3/sweeps/ticket-577.txt),
   20 seeds x four seatings): **19 / 49 / 6 / 6 and no collapse**, from 20 / 49 / 4 / 7 -- noise, as a one-copy card's refusal should be. Income per Faction (Materials / Fuel / Energy / Ducats / Research, mean a game): Custodians 1177 / 364 / 2720 / 1602 / 1049; Prospectors 2216 / 432 / 2799 / 1268 / 396; Arkwrights 1589 / 329 / 2307 / 3524 / 270; Archivists 493 / 271 / 1181 / 518 / 755 -- within noise of the last sweep; the Arkwrights' Ducats 3524 from 3391 is the widest move and still inside the batch's swing.
+
+## 20. The East Asia Custodians never leave Earth
+
+Ticket: [The East Asia Custodians never leave Earth](https://github.com/whaleyjoshua2/Dying-Earth/issues/576).
+
+Found closing [The computer Custodians use Production Moved](https://github.com/whaleyjoshua2/Dying-Earth/issues/563):
+nought from the East Asia start. The designer: *"add a ticket to look at that."* Asked whether it
+still stood, the last sweep said yes -- the Custodians from East Asia 0 wins of 20 against 3, 7 and
+9 from the other starts, their gate done in 15 seeds at a median turn 26 against 20 at 11 to 17,
+Production Moved 15 Module-turns against 120 to 195, Materials income 242 against 1150 to 1915.
+
+**The diagnosis**, from a replay of seeds 1 to 3 with every seat on the computer
+([`ticket-576/replay-east-asia.txt`](../dev-diary/2026-10-19-version-0.1.0.3/ticket-576/replay-east-asia.txt)):
+not the Scrubber cap, the Materials reserve or the Influence fight the ticket guessed at, but the
+computer Custodians' own mothball reason *"the run is still nothing"*, which fired every turn once a
+Scrubber stood and the Stabilization run was nought. From East Asia the Scrubber is built on turn 1
+(the biggest cap, a one-turn build, weight 16), so the reason shut the Refinery on turn 2, the Power
+Plant on turn 3 and the Mine on turn 4, for 1.1 and 0.6 ppm against a world 32 ppm over the Sink;
+the Scrubber was then mothballed on turn 4 for Energy, Fuel income was nought from turn 4, Energy at
+nought by turn 12, and the Colony Ship the seat was saving for from turn 3 was never paid (*"needs 35
+Fuel, 10.6 left"* on turn 9, two Fuel sold the turn before). Nothing left Earth but Antarctica by sea
+on turn 16. From Europe the same reason fires, but the Scrubber completes on turn 5 and the Colony
+Ship on turn 7, the Moon on turn 9, before it has gutted the home. Decided in one round ("q1 a q2
+yes q3 sure"):
+
+- **The guard**: the reason fires only where shutting the building could start the run -- the
+  world's net over the Sink (the last Climate record's net, as the run reads it since §18) no more
+  than the building's own Emissions plus the Custodians' pace `within_ppm` (4). Against a 32-ppm gap
+  a mothball for 1.1 ppm is pure loss; late in the game, within reach of the Sink, the reason works
+  as it did. The net is the last Climate phase's, which `Game::new` runs before turn 1's orders.
+- **The turn-one Scrubber** at East Asia is left: with the Power Plant standing the Energy loop that
+  shut it does not start.
+- **The measure**: the Custodians' wins from East Asia above nought, their gate done in 18 or more
+  of 20 seeds at a median turn near the other starts, Production Moved from East Asia well above its
+  15, and no fall from the other three starts.
+- **The replay after**: all three seeds build the Colony Ship on turn 6 and found the Moon on turn
+  8, Antarctica on turns 15 and 17, Deimos or Phobos by turn 25; Energy in the hundreds by turn 16.
+- Red first on one test (`fresh()`, the home's starting Refinery, Power Plant and Mine standing, a
+  Scrubber added, the world far over the Sink): the old reason shut a producing Facility; with the
+  guard it shuts none, and shuts the dirtiest where the net is within its reach. Clippy clean at
+  `-D warnings`; 817 tests green.
+- **The review** (an independent agent) found no blocking defect: the net read is the run's own figure in the same units as a Facility's Emissions, the let chain compiles under the 2024 edition, Modules stay excluded, the Energy and Production Moved reasons are untouched, and the test proves its claim (no other reason can produce the order, the choice is deterministic, the tie between the Power Plant and the Refinery falls the same way on both sides). It asked for the plain read of the last Climate phase's net in place of a dead `Option` (the phase runs inside `Game::new`, so there is always one), a name that does not shadow the Victory multiplier (`over`), the table's stale comment on the reason, and the test's margin to say the standing Scrubber's sink comes off the net too. All mended.
+- **Swept** ([`sweeps/ticket-576.txt`](../dev-diary/2026-10-19-version-0.1.0.3/sweeps/ticket-576.txt),
+  20 seeds x four seatings): **22 / 48 / 1 / 7 and 2 collapses**, from 19 / 49 / 6 / 6 and none. **The measure, part met and part missed.** Met: Production Moved from East Asia 60 Module-turns a game from 15; the Custodians' Materials income from East Asia 977 from 242; no fall from the other three starts (3 / 10 / 9 wins from 3 / 7 / 9). Missed: **the Custodians from East Asia still win 0 of 20**, and their gate is done in 16 seeds at a median turn 24, from 15 at 26 -- short of the 18 at a median near the other starts' 11 to 17. The home is no longer gutted, and the seat leaves Earth (the Moon on turn 8 in every replayed seed), but the seat 0 Custodians do not win from there, and the sweep's own line says what is left in the way: seat 0 loses its start state in 8 of 20 seeds (median turn 28), the ticket's third guess, the Influence fight for East Asia; not traced further. The Arkwrights' 1 win of 80 from 6 is at the edge of noise and not traced. The Custodians everywhere: Income per Faction (Materials / Fuel / Energy / Ducats / Research, mean a game): Custodians 2117 / 718 / 3755 / 1634 / 1320 from 1177 / 364 / 2720 / 1602 / 1049, since the reason gutted the home from every start, only later; Prospectors 2279 / 473 / 2946 / 1249 / 430; Arkwrights 1590 / 348 / 2300 / 3350 / 264; Archivists 468 / 243 / 1114 / 499 / 755.

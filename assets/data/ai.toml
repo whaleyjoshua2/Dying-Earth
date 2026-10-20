@@ -14,8 +14,10 @@
 # the Custodians and carries the same Stabilization victory-gap multiplier, offered on a controlled
 # state under its Scrubber cap while the seat's Energy is not already tight. `mothball` fires when
 # an Energy shortfall is within one turn, on the highest-upkeep Facility or Module that produces
-# nothing, and for a Custodian behind on Stabilization with Scrubbers standing and a run of 0 on its
-# dirtiest Facility instead. `restart` fires once Energy is back above two turns' upkeep, and
+# nothing, and for a Custodian with Scrubbers standing, a run of 0 and the net no more than a
+# Facility's own Emissions plus `within_ppm` over the Sink, on its dirtiest such Facility instead
+# (ticket #576, version 0.1.0.3: before the within-reach test it gutted the East Asia home by turn 4).
+# `restart` fires once Energy is back above two turns' upkeep, and
 # `decommission` only on a mothballed building that cannot be restarted yet. `leapfrog` is the
 # Custodians on their most populous controlled state once they hold more than 60 Ducats;
 # `strip_permit` is the Prospectors on their highest-output state while they are behind on the
