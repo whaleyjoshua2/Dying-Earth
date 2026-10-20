@@ -1,0 +1,380 @@
+seat 0: Custodians starting in EastAsia
+sink  step  perm  after | collapses/20 | collapse turns (median, min..max) | temp at end (median) | wins by seat
+   8   620   4.0    2.0 |  0/20 |   - (-) | +2.45 | [0, 15, 0, 5]
+        Custodians (seat 0):  0 win(s)
+       Prospectors (seat 1): 15 win(s)
+        Arkwrights (seat 2):  0 win(s)
+        Archivists (seat 3):  5 win(s)
+      draws 0, collapses 0/20, median collapse turn -
+      median turn of first Colony 9
+      median Colonists off Earth at the end, all seats 117
+      Scrubbers 156, Leapfrogs 311, Constabularies 13, Stadiums 0, Nature Reserves 8, Sea Walls 376
+      Techs: median 29 completed, highest rung reached 4
+      Observatories standing at the end, all seeds, by seat [2, 20, 11, 56]; median Research made off Earth a game, by seat ["0", "73", "2", "309"]
+      Production Moved: median Module-turns doubled by an idle Facility a game, by seat ["15", "0", "0", "0"]
+      Widgets a game (median), by seat: made ["742", "1874", "876", "1166"], applied ["95", "400", "195", "116"], lost ["654", "1515", "673", "1051"]; median queue depth at Resolution 0
+      Victory gates: completed in [15, 20, 11, 13] seeds by seat, median turn ["26", "15", "27", "22"]
+      Crowded ships: Colonists lost in transit over the batch, by seat [0, 0, 0, 0]
+      Tanks: Ships stranded at the end over the batch, by seat [0, 16, 16, 9]; 249 Refuel orders (5 at a partner's, 7 at a Refinery Colony); 4 stations standing off Earth at the end
+      The opening: Modules beyond the Core on a starting station at the end of turn 3 over the batch, by seat [60, 60, 1, 40]
+      Build it where you dig: 70 ground Colonies with two or more working Mines at the end over the batch; 3.9 Modules per ground Colony
+      Solar Arrays standing at the end over the batch: 141; Trade Posts 133; Mass Drivers 0; Colonies on Phobos or Deimos 33
+      Ducats over a game (median), by seat -- made [778, 1448, 1758, 401], spent [785, 1411, 1604, 479]
+      Materials income over a game (median), by seat [242, 2140, 989, 548]; Mines completed over the batch 633, Factories 168
+      Research Directive: mean % KEPT BACK from the shared pot, by seat [16, 7, 8, 72]; turns under an 85% contribution over the batch [134, 34, 60, 417]
+      Accords STRUCK over the batch: 155 (against 78 standing at the end)
+      Exodus Calls sounded over the batch: 133, worth 804 Pioneers
+      Unique Modules standing at the end over the batch: Academy 0, Heliostat 23, Exchange 55, Chorus 57
+      Batteries standing at the end over the batch, by seat [3, 1, 2, 0]
+      Venus: 0 stations at the end over the batch, 0 Colonists living there
+      Off Earth at the end over the batch: ground Colonies the Moon 66, Mars 3, Phobos 28, Deimos 5, Venus 0, Mercury 27, Ceres 12, Vesta 18 (median 8 a game); stations the Moon 2, Mars 0, Phobos 0, Deimos 1, Venus 0, Mercury 0, Ceres 0, Vesta 1; first ground Colony founded: the Moon in 20/20 (median turn 9); Mars in 3/20 (median turn 24); Phobos in 17/20 (median turn 23); Deimos in 5/20 (median turn 24); Venus in 0/20 (median turn -); Mercury in 16/20 (median turn 26); Ceres in 12/20 (median turn 27); Vesta in 9/20 (median turn 19)
+      Mars system: a Colony founded in 18/20 seeds, median first turn 23; Antarctic Colonies founded 60
+      The Archive: standing in 14/20 seeds (median turn 19), complete in 14/20 (median turn 20), median fund at the end 250
+      Archives lost with their Colony over the batch: 0, the fund lost with them 0
+      Opening Objectives met, Custodians / Prospectors / Arkwrights / Archivists: 20 / 20 / 8 / 20 of 20, median turn 2 / 17 / 25 / 7
+      Second Objectives met, Custodians / Prospectors / Arkwrights / Archivists: 11 / 20 / 6 / 12 of 20, median turn 25 / 18 / 26 / 25
+      A Colonial Capital held at the end, Custodians / Prospectors / Arkwrights / Archivists: 0 / 0 / 0 / 0 of 20
+      Neutral Labs paid a median 203 Research a game; Coastal Engineering complete in 19/20 seeds (median turn 21)
+      The sea: median 41 coastal slots lost a game, 23 Facilities drowned, 56 inland slots turned coastal
+      The Prospectors' Venture Capital Fund at the end: median 4386 Ducats of the 4250 their Victory Condition asks
+      The deck: median 15 cards drawn a game, empty at the end in 0/20 seeds
+      Pioneers: 2198 batches recruited, 59 Antarctic Colonies founded by sea
+      First to a Body: the Moon in 20/20 (median turn 9; Prospectors 19, Archivists 1); Mars in 3/20 (median turn 24; Prospectors 3); Phobos in 17/20 (median turn 23; Arkwrights 15, Archivists 2); Deimos in 5/20 (median turn 24; Arkwrights 3, Archivists 2); Mercury in 16/20 (median turn 26; Prospectors 1, Arkwrights 11, Archivists 4); Ceres in 12/20 (median turn 27; Prospectors 12); Vesta in 9/20 (median turn 19; Arkwrights 5, Archivists 4)
+      Seat 0 lost its start state in 7/20 seeds (median turn 29)
+      Victory Conditions met outright: seed 1 Prospectors (seat 1), seed 2 Prospectors (seat 1), seed 3 Archivists (seat 3), seed 4 Prospectors (seat 1), seed 5 Prospectors (seat 1), seed 6 Prospectors (seat 1), seed 7 Archivists (seat 3), seed 8 Prospectors (seat 1), seed 9 Prospectors (seat 1), seed 10 Archivists (seat 3), seed 11 Prospectors (seat 1), seed 12 Prospectors (seat 1), seed 13 Archivists (seat 3), seed 14 Prospectors (seat 1), seed 15 Prospectors (seat 1), seed 16 Prospectors (seat 1), seed 17 Prospectors (seat 1), seed 18 Prospectors (seat 1), seed 19 Archivists (seat 3), seed 20 Prospectors (seat 1)
+      Blame share at the end, by seat (median): [0.05, 0.52, 0.22, 0.22]
+      Blame in ppm at the end, by seat (median): [56, 731, 297, 293]; in credit [12, 0, 0, 0]; laid on by Smear [0, 10, 0, 0]; taken off by Greenwash [0, 2, 0, 0]
+      Carbon credits over the batch: bought by seat [0, 847, 180, 24], sold by seat [1051, 0, 0, 0]; Agitates landed by seat [75, 12, 3, 6]
+      Blockade-turns over the batch: suffered by seat [10, 0, 0, 0], imposed by seat [0, 10, 0, 0]
+      Natural growth over the batch: Colonists grown by seat [0, 1, 23, 7], lost to decline by seat [10, 4, 0, 0]
+      War in ppm a game, by seat (median): [0, 2, 0, 0]; nobody's (median) 0
+      Neutral states: 105 threat episodes armed for over the batch, 3 attacks held against
+      Industry Level raises completed by the Factions over the batch: 490
+      Stations founded at Earth L4 or L5 over the batch: 0, in 0/20 seeds
+      Sea Walls: 376 built over the batch, 203 standing at the end, 399 thresholds held
+      Events drawn with nowhere to land over the batch: 11; the Fund at or past its bar in 15/20 seeds
+      Choice cards over the batch, by seat: taken [101, 130, 122, 101], refused [23, 25, 20, 38], not asked [36, 5, 18, 21]
+      Relations at the end over 240 ordered pairs: median 0, 28 at Cold or worse, 12% carrying a scar floor
+      Accords standing at the end: 78 (non-aggression 78, passage 63, refuel 1, research 0)
+      Trading window units, by seat: bought [1416, 5078, 3674, 1787], sold [1012, 3667, 534, 1751]
+      Places taken by Influence over the batch: 334
+      Of those, by kind and seat: Regions [40, 144, 58, 92], ground Colonies [0, 0, 0, 0], stations [0, 0, 0, 0] (334 Regions, 0 Colonies, 0 stations)
+      War over the batch: Battles opened by seat [7, 16, 5, 0], 14 against neutrals; attacks in orbit [0, 5, 0, 0]; marches on neutrals [0, 14, 19, 0], on held Regions [11, 3, 0, 0]
+      Armies built [10, 33, 39, 12], lost [1, 0, 0, 0], Standing Armies lost 20; warships built [0, 117, 11, 0], lost [0, 0, 0, 0]; Occupations begun [7, 10, 5, 0], broken [2, 0, 0, 0]; places taken by force [4, 6, 5, 0]
+      Army raises refused for want of people, by seat [0, 0, 0, 0]
+      Escapes over the batch: units escaped by seat [2, 3, 3, 0], neutral 0; Battles with an escape 6 of 28
+      Dig In orders over the batch, by seat [17, 74, 27, 40]
+      Armies landed at a Colony over the batch, by seat [0, 0, 0, 0]
+      Interceptions over the batch, by seat [0, 2, 0, 0]
+      Batteries lost over the batch, by seat [0, 0, 0, 0]
+      Bombards over the batch, by seat [0, 0, 0, 0]; Modules burned [0, 0, 0, 0]
+      Orbit changes over the batch, by seat [5, 188, 23, 129]; Blockades ordered [0, 18, 1, 0]
+      The nuke over the batch, by seat: Missile Carriers built [0, 4, 0, 0], Launches [0, 0, 0, 0], buildings burned [0, 0, 0, 0], people killed [0, 0, 0, 0], Industry Levels lost [0, 0, 0, 0]
+      Fuel burned in Battle over the batch, by seat [0, 10, 2, 8] (20 in all); hulls left dry by a Battle [0, 0, 0, 0] (0 in all)
+      Natural Sink at the end: median 6.90 over 20 games
+      The world under the Natural Sink at least once in 0/20 seeds (median first turn -)
+      The whole Tech Tree completed in 10/20 seeds (median turn 27)
+      Breaks fired: Coral Die-off 20/20, Permafrost Thaw 20/20, The Sink Weakens 19/20, Ice Sheets Committed 15/20, Amazon Dieback 0/20
+seat 0: Prospectors starting in EastAsia
+sink  step  perm  after | collapses/20 | collapse turns (median, min..max) | temp at end (median) | wins by seat
+   8   620   4.0    2.0 |  0/20 |   - (-) | +2.46 | [15, 4, 1, 0]
+       Prospectors (seat 0): 15 win(s)
+        Custodians (seat 1):  4 win(s)
+        Arkwrights (seat 2):  1 win(s)
+        Archivists (seat 3):  0 win(s)
+      draws 0, collapses 0/20, median collapse turn -
+      median turn of first Colony 7
+      median Colonists off Earth at the end, all seats 155
+      Scrubbers 414, Leapfrogs 698, Constabularies 138, Stadiums 32, Nature Reserves 69, Sea Walls 564
+      Techs: median 29 completed, highest rung reached 4
+      Observatories standing at the end, all seeds, by seat [5, 20, 30, 40]; median Research made off Earth a game, by seat ["0", "232", "66", "365"]
+      Production Moved: median Module-turns doubled by an idle Facility a game, by seat ["0", "120", "0", "0"]
+      Widgets a game (median), by seat: made ["2767", "1811", "1637", "922"], applied ["457", "333", "462", "101"], lost ["1995", "1571", "1192", "801"]; median queue depth at Resolution 0
+      Victory gates: completed in [20, 20, 18, 17] seeds by seat, median turn ["23", "14", "32", "31"]
+      Crowded ships: Colonists lost in transit over the batch, by seat [2, 0, 0, 0]
+      Tanks: Ships stranded at the end over the batch, by seat [29, 2, 28, 12]; 363 Refuel orders (11 at a partner's, 29 at a Refinery Colony); 17 stations standing off Earth at the end
+      The opening: Modules beyond the Core on a starting station at the end of turn 3 over the batch, by seat [60, 60, 0, 40]
+      Build it where you dig: 103 ground Colonies with two or more working Mines at the end over the batch; 5.1 Modules per ground Colony
+      Solar Arrays standing at the end over the batch: 209; Trade Posts 148; Mass Drivers 4; Colonies on Phobos or Deimos 53
+      Ducats over a game (median), by seat -- made [2331, 1561, 3347, 137], spent [2582, 1660, 3257, 307]
+      Materials income over a game (median), by seat [2896, 1150, 2190, 368]; Mines completed over the batch 869, Factories 299
+      Research Directive: mean % KEPT BACK from the shared pot, by seat [11, 31, 7, 73]; turns under an 85% contribution over the batch [89, 492, 63, 570]
+      Accords STRUCK over the batch: 168 (against 51 standing at the end)
+      Exodus Calls sounded over the batch: 208, worth 1260 Pioneers
+      Unique Modules standing at the end over the batch: Academy 0, Heliostat 29, Exchange 65, Chorus 153
+      Batteries standing at the end over the batch, by seat [0, 4, 11, 5]
+      Venus: 1 stations at the end over the batch, 7 Colonists living there
+      Off Earth at the end over the batch: ground Colonies the Moon 71, Mars 12, Phobos 34, Deimos 19, Venus 0, Mercury 69, Ceres 6, Vesta 21 (median 12 a game); stations the Moon 6, Mars 0, Phobos 7, Deimos 1, Venus 1, Mercury 2, Ceres 0, Vesta 0; first ground Colony founded: the Moon in 20/20 (median turn 7); Mars in 7/20 (median turn 35); Phobos in 20/20 (median turn 23); Deimos in 19/20 (median turn 30); Venus in 0/20 (median turn -); Mercury in 20/20 (median turn 26); Ceres in 6/20 (median turn 28); Vesta in 12/20 (median turn 27)
+      Mars system: a Colony founded in 20/20 seeds, median first turn 23; Antarctic Colonies founded 60
+      The Archive: standing in 10/20 seeds (median turn 30), complete in 10/20 (median turn 30), median fund at the end 250
+      Archives lost with their Colony over the batch: 8, the fund lost with them 2000
+      Opening Objectives met, Custodians / Prospectors / Arkwrights / Archivists: 20 / 19 / 17 / 20 of 20, median turn 4 / 15 / 29 / 6
+      Second Objectives met, Custodians / Prospectors / Arkwrights / Archivists: 19 / 19 / 16 / 9 of 20, median turn 19 / 16 / 30 / 30
+      A Colonial Capital held at the end, Custodians / Prospectors / Arkwrights / Archivists: 0 / 0 / 3 / 0 of 20
+      Neutral Labs paid a median 125 Research a game; Coastal Engineering complete in 20/20 seeds (median turn 25)
+      The sea: median 37 coastal slots lost a game, 28 Facilities drowned, 56 inland slots turned coastal
+      The Prospectors' Venture Capital Fund at the end: median 7470 Ducats of the 4250 their Victory Condition asks
+      The deck: median 24 cards drawn a game, empty at the end in 0/20 seeds
+      Pioneers: 2971 batches recruited, 60 Antarctic Colonies founded by sea
+      First to a Body: the Moon in 20/20 (median turn 7; Custodians 2, Prospectors 18); Mars in 7/20 (median turn 35; Prospectors 4, Arkwrights 2, Archivists 1); Phobos in 20/20 (median turn 23; Custodians 2, Prospectors 1, Arkwrights 16, Archivists 1); Deimos in 19/20 (median turn 30; Custodians 5, Prospectors 5, Arkwrights 8, Archivists 1); Mercury in 20/20 (median turn 26; Prospectors 5, Arkwrights 12, Archivists 3); Ceres in 6/20 (median turn 28; Prospectors 5, Arkwrights 1); Vesta in 12/20 (median turn 27; Custodians 1, Prospectors 7, Arkwrights 2, Archivists 2)
+      Seat 0 lost its start state in 16/20 seeds (median turn 21)
+      Victory Conditions met outright: seed 1 Prospectors (seat 0), seed 2 Custodians (seat 1), seed 3 Custodians (seat 1), seed 4 Prospectors (seat 0), seed 5 Prospectors (seat 0), seed 6 Prospectors (seat 0), seed 7 Custodians (seat 1), seed 8 Prospectors (seat 0), seed 9 Prospectors (seat 0), seed 11 Prospectors (seat 0), seed 12 Prospectors (seat 0), seed 13 Prospectors (seat 0), seed 14 Arkwrights (seat 2), seed 15 Prospectors (seat 0), seed 16 Prospectors (seat 0), seed 17 Prospectors (seat 0), seed 18 Prospectors (seat 0), seed 19 Prospectors (seat 0), seed 20 Prospectors (seat 0)
+      Blame share at the end, by seat (median): [0.65, 0.01, 0.22, 0.11]
+      Blame in ppm at the end, by seat (median): [1174, 20, 398, 180]; in credit [14, 169, 0, 0]; laid on by Smear [280, 0, 0, 1]; taken off by Greenwash [42, 0, 2, 0]
+      Carbon credits over the batch: bought by seat [1604, 0, 386, 0], sold by seat [0, 1990, 0, 0]; Agitates landed by seat [139, 177, 118, 35]
+      Blockade-turns over the batch: suffered by seat [5, 56, 20, 6], imposed by seat [80, 0, 7, 0]
+      Natural growth over the batch: Colonists grown by seat [34, 9, 81, 2], lost to decline by seat [11, 59, 22, 9]
+      War in ppm a game, by seat (median): [29, 10, 4, 0]; nobody's (median) 3
+      Neutral states: 115 threat episodes armed for over the batch, 12 attacks held against
+      Industry Level raises completed by the Factions over the batch: 816
+      Stations founded at Earth L4 or L5 over the batch: 0, in 0/20 seeds
+      Sea Walls: 564 built over the batch, 258 standing at the end, 540 thresholds held
+      Events drawn with nowhere to land over the batch: 12; the Fund at or past its bar in 18/20 seeds
+      Choice cards over the batch, by seat: taken [156, 152, 157, 121], refused [40, 40, 34, 51], not asked [17, 21, 22, 41]
+      Relations at the end over 240 ordered pairs: median -3, 105 at Cold or worse, 41% carrying a scar floor
+      Accords standing at the end: 51 (non-aggression 51, passage 45, refuel 8, research 0)
+      Trading window units, by seat: bought [6770, 2711, 8387, 1550], sold [6114, 4303, 843, 2556]
+      Places taken by Influence over the batch: 496
+      Of those, by kind and seat: Regions [115, 195, 111, 39], ground Colonies [3, 17, 5, 0], stations [4, 7, 0, 0] (460 Regions, 25 Colonies, 11 stations)
+      War over the batch: Battles opened by seat [157, 63, 36, 3], 54 against neutrals; attacks in orbit [16, 6, 12, 0]; marches on neutrals [61, 4, 31, 0], on held Regions [168, 132, 37, 17]
+      Armies built [54, 20, 50, 7], lost [3, 6, 3, 1], Standing Armies lost 187; warships built [52, 4, 22, 0], lost [5, 0, 0, 0]; Occupations begun [154, 99, 31, 13], broken [14, 28, 6, 7]; places taken by force [134, 60, 21, 4]
+      Army raises refused for want of people, by seat [0, 0, 0, 0]
+      Escapes over the batch: units escaped by seat [39, 17, 13, 3], neutral 0; Battles with an escape 64 of 259
+      Dig In orders over the batch, by seat [285, 302, 118, 75]
+      Armies landed at a Colony over the batch, by seat [7, 0, 2, 0]
+      Interceptions over the batch, by seat [5, 0, 1, 0]
+      Batteries lost over the batch, by seat [0, 2, 0, 0]
+      Bombards over the batch, by seat [0, 0, 0, 0]; Modules burned [0, 0, 0, 0]
+      Orbit changes over the batch, by seat [289, 176, 77, 38]; Blockades ordered [94, 2, 17, 0]
+      The nuke over the batch, by seat: Missile Carriers built [19, 4, 10, 0], Launches [17, 3, 2, 0], buildings burned [87, 14, 3, 0], people killed [2237, 14, 1, 0], Industry Levels lost [4, 0, 0, 0]
+      Fuel burned in Battle over the batch, by seat [83, 8, 95.2, 25.1] (211.3 in all); hulls left dry by a Battle [2, 1, 4, 2] (9 in all)
+      Natural Sink at the end: median 11.72 over 20 games
+      The world under the Natural Sink at least once in 5/20 seeds (median first turn 36)
+      The whole Tech Tree completed in 17/20 seeds (median turn 32)
+      Breaks fired: Coral Die-off 20/20, Permafrost Thaw 20/20, The Sink Weakens 17/20, Ice Sheets Committed 17/20, Amazon Dieback 4/20
+seat 0: Arkwrights starting in EastAsia
+sink  step  perm  after | collapses/20 | collapse turns (median, min..max) | temp at end (median) | wins by seat
+   8   620   4.0    2.0 |  0/20 |   - (-) | +2.10 | [2, 7, 11, 0]
+        Arkwrights (seat 0):  2 win(s)
+        Custodians (seat 1):  7 win(s)
+       Prospectors (seat 2): 11 win(s)
+        Archivists (seat 3):  0 win(s)
+      draws 0, collapses 0/20, median collapse turn -
+      median turn of first Colony 8
+      median Colonists off Earth at the end, all seats 113
+      Scrubbers 560, Leapfrogs 1031, Constabularies 24, Stadiums 0, Nature Reserves 14, Sea Walls 488
+      Techs: median 29 completed, highest rung reached 4
+      Observatories standing at the end, all seeds, by seat [16, 9, 4, 46]; median Research made off Earth a game, by seat ["38", "0", "0", "478"]
+      Production Moved: median Module-turns doubled by an idle Facility a game, by seat ["0", "146", "0", "0"]
+      Widgets a game (median), by seat: made ["1827", "3763", "1523", "949"], applied ["274", "407", "266", "86"], lost ["1603", "3480", "1234", "846"]; median queue depth at Resolution 0
+      Victory gates: completed in [18, 20, 19, 19] seeds by seat, median turn ["35", "17", "36", "35"]
+      Crowded ships: Colonists lost in transit over the batch, by seat [0, 1, 0, 0]
+      Tanks: Ships stranded at the end over the batch, by seat [12, 8, 11, 11]; 199 Refuel orders (15 at a partner's, 37 at a Refinery Colony); 20 stations standing off Earth at the end
+      The opening: Modules beyond the Core on a starting station at the end of turn 3 over the batch, by seat [0, 60, 60, 40]
+      Build it where you dig: 59 ground Colonies with two or more working Mines at the end over the batch; 4.9 Modules per ground Colony
+      Solar Arrays standing at the end over the batch: 112; Trade Posts 143; Mass Drivers 4; Colonies on Phobos or Deimos 50
+      Ducats over a game (median), by seat -- made [3585, 1907, 782, 107], spent [3356, 1869, 885, 348]
+      Materials income over a game (median), by seat [1328, 1243, 1774, 275]; Mines completed over the batch 571, Factories 238
+      Research Directive: mean % KEPT BACK from the shared pot, by seat [10, 30, 10, 68]; turns under an 85% contribution over the batch [99, 483, 103, 574]
+      Accords STRUCK over the batch: 157 (against 43 standing at the end)
+      Exodus Calls sounded over the batch: 186, worth 1128 Pioneers
+      Unique Modules standing at the end over the batch: Academy 0, Heliostat 31, Exchange 62, Chorus 353
+      Batteries standing at the end over the batch, by seat [4, 0, 1, 2]
+      Venus: 4 stations at the end over the batch, 58 Colonists living there
+      Off Earth at the end over the batch: ground Colonies the Moon 71, Mars 5, Phobos 36, Deimos 14, Venus 0, Mercury 78, Ceres 12, Vesta 9 (median 12 a game); stations the Moon 8, Mars 0, Phobos 7, Deimos 0, Venus 4, Mercury 1, Ceres 0, Vesta 0; first ground Colony founded: the Moon in 20/20 (median turn 8); Mars in 4/20 (median turn 37); Phobos in 18/20 (median turn 24); Deimos in 14/20 (median turn 36); Venus in 0/20 (median turn -); Mercury in 20/20 (median turn 26); Ceres in 9/20 (median turn 33); Vesta in 7/20 (median turn 34)
+      Mars system: a Colony founded in 20/20 seeds, median first turn 24; Antarctic Colonies founded 60
+      The Archive: standing in 6/20 seeds (median turn 33), complete in 6/20 (median turn 33), median fund at the end 250
+      Archives lost with their Colony over the batch: 3, the fund lost with them 750
+      Opening Objectives met, Custodians / Prospectors / Arkwrights / Archivists: 20 / 14 / 16 / 20 of 20, median turn 6 / 19 / 34 / 7
+      Second Objectives met, Custodians / Prospectors / Arkwrights / Archivists: 20 / 14 / 16 / 10 of 20, median turn 17 / 21 / 35 / 31
+      A Colonial Capital held at the end, Custodians / Prospectors / Arkwrights / Archivists: 0 / 0 / 1 / 0 of 20
+      Neutral Labs paid a median 124 Research a game; Coastal Engineering complete in 20/20 seeds (median turn 26)
+      The sea: median 28 coastal slots lost a game, 20 Facilities drowned, 19 inland slots turned coastal
+      The Prospectors' Venture Capital Fund at the end: median 4266 Ducats of the 4250 their Victory Condition asks
+      The deck: median 22 cards drawn a game, empty at the end in 0/20 seeds
+      Pioneers: 2568 batches recruited, 60 Antarctic Colonies founded by sea
+      First to a Body: the Moon in 20/20 (median turn 8; Custodians 4, Prospectors 16); Mars in 4/20 (median turn 37; Prospectors 4); Phobos in 18/20 (median turn 24; Custodians 3, Arkwrights 12, Archivists 3); Deimos in 14/20 (median turn 36; Custodians 2, Prospectors 4, Arkwrights 5, Archivists 3); Mercury in 20/20 (median turn 26; Custodians 1, Prospectors 1, Arkwrights 14, Archivists 4); Ceres in 9/20 (median turn 33; Prospectors 5, Arkwrights 1, Archivists 3); Vesta in 7/20 (median turn 34; Prospectors 6, Arkwrights 1)
+      Seat 0 lost its start state in 9/20 seeds (median turn 29)
+      Victory Conditions met outright: seed 1 Prospectors (seat 2), seed 2 Custodians (seat 1), seed 3 Prospectors (seat 2), seed 4 Prospectors (seat 2), seed 5 Custodians (seat 1), seed 6 Custodians (seat 1), seed 7 Prospectors (seat 2), seed 9 Prospectors (seat 2), seed 10 Custodians (seat 1), seed 11 Prospectors (seat 2), seed 12 Arkwrights (seat 0), seed 14 Prospectors (seat 2), seed 15 Prospectors (seat 2), seed 16 Custodians (seat 1), seed 17 Prospectors (seat 2), seed 18 Prospectors (seat 2), seed 19 Custodians (seat 1), seed 20 Custodians (seat 1)
+      Blame share at the end, by seat (median): [0.43, 0.00, 0.40, 0.15]
+      Blame in ppm at the end, by seat (median): [548, 0, 524, 188]; in credit [0, 378, 0, 0]; laid on by Smear [110, 0, 110, 1]; taken off by Greenwash [52, 0, 0, 0]
+      Carbon credits over the batch: bought by seat [1656, 0, 2942, 0], sold by seat [0, 4598, 0, 0]; Agitates landed by seat [58, 57, 57, 4]
+      Blockade-turns over the batch: suffered by seat [34, 11, 0, 30], imposed by seat [0, 0, 75, 0]
+      Natural growth over the batch: Colonists grown by seat [44, 18, 41, 5], lost to decline by seat [24, 11, 0, 12]
+      War in ppm a game, by seat (median): [1, 2, 3, 0]; nobody's (median) 0
+      Neutral states: 37 threat episodes armed for over the batch, 1 attacks held against
+      Industry Level raises completed by the Factions over the batch: 510
+      Stations founded at Earth L4 or L5 over the batch: 1, in 1/20 seeds
+      Sea Walls: 488 built over the batch, 244 standing at the end, 169 thresholds held
+      Events drawn with nowhere to land over the batch: 11; the Fund at or past its bar in 11/20 seeds
+      Choice cards over the batch, by seat: taken [158, 178, 140, 115], refused [32, 31, 53, 56], not asked [26, 7, 23, 45]
+      Relations at the end over 240 ordered pairs: median -3, 107 at Cold or worse, 43% carrying a scar floor
+      Accords standing at the end: 43 (non-aggression 43, passage 37, refuel 8, research 0)
+      Trading window units, by seat: bought [7207, 4136, 3075, 2079], sold [588, 4862, 6149, 2826]
+      Places taken by Influence over the batch: 472
+      Of those, by kind and seat: Regions [129, 252, 36, 26], ground Colonies [7, 6, 0, 1], stations [7, 6, 1, 1] (443 Regions, 14 Colonies, 15 stations)
+      War over the batch: Battles opened by seat [32, 16, 29, 2], 9 against neutrals; attacks in orbit [8, 0, 8, 0]; marches on neutrals [0, 0, 17, 0], on held Regions [38, 37, 15, 1]
+      Armies built [18, 17, 28, 15], lost [3, 1, 0, 0], Standing Armies lost 40; warships built [9, 0, 26, 0], lost [0, 0, 4, 0]; Occupations begun [29, 38, 20, 1], broken [6, 5, 2, 0]; places taken by force [20, 30, 16, 1]
+      Army raises refused for want of people, by seat [0, 0, 0, 0]
+      Escapes over the batch: units escaped by seat [6, 7, 9, 2], neutral 0; Battles with an escape 22 of 79
+      Dig In orders over the batch, by seat [84, 125, 35, 17]
+      Armies landed at a Colony over the batch, by seat [0, 1, 1, 0]
+      Interceptions over the batch, by seat [0, 0, 0, 0]
+      Batteries lost over the batch, by seat [0, 0, 0, 0]
+      Bombards over the batch, by seat [0, 0, 0, 0]; Modules burned [0, 0, 0, 0]
+      Orbit changes over the batch, by seat [76, 40, 77, 44]; Blockades ordered [3, 0, 44, 0]
+      The nuke over the batch, by seat: Missile Carriers built [13, 4, 13, 0], Launches [6, 2, 9, 0], buildings burned [16, 8, 34, 0], people killed [15, 9, 42, 0], Industry Levels lost [0, 0, 0, 0]
+      Fuel burned in Battle over the batch, by seat [28.6, 12, 28.6, 12.6] (81.8 in all); hulls left dry by a Battle [0, 0, 5, 0] (5 in all)
+      Natural Sink at the end: median 14.34 over 20 games
+      The world under the Natural Sink at least once in 9/20 seeds (median first turn 34)
+      The whole Tech Tree completed in 18/20 seeds (median turn 37)
+      Breaks fired: Coral Die-off 20/20, Permafrost Thaw 20/20, The Sink Weakens 15/20, Ice Sheets Committed 5/20, Amazon Dieback 0/20
+seat 0: Archivists starting in EastAsia
+sink  step  perm  after | collapses/20 | collapse turns (median, min..max) | temp at end (median) | wins by seat
+   8   620   4.0    2.0 |  0/20 |   - (-) | +1.97 | [2, 9, 8, 1]
+        Archivists (seat 0):  2 win(s)
+        Custodians (seat 1):  9 win(s)
+       Prospectors (seat 2):  8 win(s)
+        Arkwrights (seat 3):  1 win(s)
+      draws 0, collapses 0/20, median collapse turn -
+      median turn of first Colony 8
+      median Colonists off Earth at the end, all seats 142
+      Scrubbers 639, Leapfrogs 936, Constabularies 34, Stadiums 2, Nature Reserves 36, Sea Walls 626
+      Techs: median 29 completed, highest rung reached 4
+      Observatories standing at the end, all seeds, by seat [47, 19, 3, 28]; median Research made off Earth a game, by seat ["590", "411", "0", "133"]
+      Production Moved: median Module-turns doubled by an idle Facility a game, by seat ["0", "192", "0", "0"]
+      Widgets a game (median), by seat: made ["1235", "4130", "1819", "1237"], applied ["171", "516", "400", "308"], lost ["1036", "3564", "1381", "811"]; median queue depth at Resolution 0
+      Victory gates: completed in [20, 20, 20, 20] seeds by seat, median turn ["27", "11", "29", "30"]
+      Crowded ships: Colonists lost in transit over the batch, by seat [0, 0, 1, 0]
+      Tanks: Ships stranded at the end over the batch, by seat [8, 4, 19, 10]; 438 Refuel orders (64 at a partner's, 61 at a Refinery Colony); 25 stations standing off Earth at the end
+      The opening: Modules beyond the Core on a starting station at the end of turn 3 over the batch, by seat [40, 60, 60, 0]
+      Build it where you dig: 98 ground Colonies with two or more working Mines at the end over the batch; 5.1 Modules per ground Colony
+      Solar Arrays standing at the end over the batch: 213; Trade Posts 159; Mass Drivers 1; Colonies on Phobos or Deimos 42
+      Ducats over a game (median), by seat -- made [1169, 1767, 840, 3408], spent [1156, 2030, 979, 3302]
+      Materials income over a game (median), by seat [630, 1915, 2632, 1647]; Mines completed over the batch 931, Factories 291
+      Research Directive: mean % KEPT BACK from the shared pot, by seat [54, 36, 11, 11]; turns under an 85% contribution over the batch [442, 578, 98, 92]
+      Accords STRUCK over the batch: 156 (against 50 standing at the end)
+      Exodus Calls sounded over the batch: 128, worth 768 Pioneers
+      Unique Modules standing at the end over the batch: Academy 0, Heliostat 56, Exchange 72, Chorus 135
+      Batteries standing at the end over the batch, by seat [3, 2, 1, 11]
+      Venus: 4 stations at the end over the batch, 50 Colonists living there
+      Off Earth at the end over the batch: ground Colonies the Moon 70, Mars 4, Phobos 32, Deimos 10, Venus 0, Mercury 70, Ceres 8, Vesta 22 (median 11 a game); stations the Moon 7, Mars 0, Phobos 1, Deimos 1, Venus 4, Mercury 12, Ceres 0, Vesta 0; first ground Colony founded: the Moon in 20/20 (median turn 8); Mars in 3/20 (median turn 29); Phobos in 18/20 (median turn 29); Deimos in 10/20 (median turn 35); Venus in 0/20 (median turn -); Mercury in 20/20 (median turn 22); Ceres in 6/20 (median turn 33); Vesta in 15/20 (median turn 29)
+      Mars system: a Colony founded in 19/20 seeds, median first turn 27; Antarctic Colonies founded 60
+      The Archive: standing in 9/20 seeds (median turn 35), complete in 9/20 (median turn 35), median fund at the end 250
+      Archives lost with their Colony over the batch: 4, the fund lost with them 1000
+      Opening Objectives met, Custodians / Prospectors / Arkwrights / Archivists: 20 / 19 / 16 / 20 of 20, median turn 6 / 19 / 28 / 5
+      Second Objectives met, Custodians / Prospectors / Arkwrights / Archivists: 20 / 19 / 16 / 11 of 20, median turn 19 / 20 / 29 / 34
+      A Colonial Capital held at the end, Custodians / Prospectors / Arkwrights / Archivists: 0 / 0 / 1 / 0 of 20
+      Neutral Labs paid a median 167 Research a game; Coastal Engineering complete in 20/20 seeds (median turn 13)
+      The sea: median 5 coastal slots lost a game, 3 Facilities drowned, 19 inland slots turned coastal
+      The Prospectors' Venture Capital Fund at the end: median 4172 Ducats of the 4250 their Victory Condition asks
+      The deck: median 22 cards drawn a game, empty at the end in 0/20 seeds
+      Pioneers: 2658 batches recruited, 60 Antarctic Colonies founded by sea
+      First to a Body: the Moon in 20/20 (median turn 8; Custodians 1, Prospectors 19); Mars in 3/20 (median turn 29; Prospectors 3); Phobos in 18/20 (median turn 29; Custodians 5, Prospectors 2, Arkwrights 7, Archivists 4); Deimos in 10/20 (median turn 35; Custodians 2, Prospectors 4, Arkwrights 2, Archivists 2); Mercury in 20/20 (median turn 22; Custodians 3, Prospectors 2, Arkwrights 15); Ceres in 6/20 (median turn 33; Prospectors 5, Arkwrights 1); Vesta in 15/20 (median turn 29; Prospectors 15)
+      Seat 0 lost its start state in 6/20 seeds (median turn 35)
+      Victory Conditions met outright: seed 1 Archivists (seat 0), seed 2 Custodians (seat 1), seed 3 Archivists (seat 0), seed 4 Prospectors (seat 2), seed 5 Custodians (seat 1), seed 6 Prospectors (seat 2), seed 7 Prospectors (seat 2), seed 8 Custodians (seat 1), seed 9 Prospectors (seat 2), seed 10 Prospectors (seat 2), seed 11 Custodians (seat 1), seed 12 Custodians (seat 1), seed 13 Custodians (seat 1), seed 14 Custodians (seat 1), seed 15 Prospectors (seat 2), seed 16 Custodians (seat 1), seed 17 Prospectors (seat 2), seed 18 Arkwrights (seat 3), seed 19 Prospectors (seat 2), seed 20 Custodians (seat 1)
+      Blame share at the end, by seat (median): [0.24, 0.00, 0.50, 0.28]
+      Blame in ppm at the end, by seat (median): [291, 0, 561, 284]; in credit [0, 557, 0, 0]; laid on by Smear [1, 0, 133, 20]; taken off by Greenwash [0, 0, 10, 2]
+      Carbon credits over the batch: bought by seat [788, 0, 3214, 370], sold by seat [0, 4372, 0, 0]; Agitates landed by seat [14, 48, 48, 15]
+      Blockade-turns over the batch: suffered by seat [21, 34, 0, 9], imposed by seat [0, 0, 52, 12]
+      Natural growth over the batch: Colonists grown by seat [0, 9, 23, 195], lost to decline by seat [21, 28, 1, 10]
+      War in ppm a game, by seat (median): [0, 2, 22, 0]; nobody's (median) 0
+      Neutral states: 53 threat episodes armed for over the batch, 0 attacks held against
+      Industry Level raises completed by the Factions over the batch: 768
+      Stations founded at Earth L4 or L5 over the batch: 0, in 0/20 seeds
+      Sea Walls: 626 built over the batch, 323 standing at the end, 320 thresholds held
+      Events drawn with nowhere to land over the batch: 23; the Fund at or past its bar in 9/20 seeds
+      Choice cards over the batch, by seat: taken [133, 169, 136, 152], refused [37, 33, 49, 26], not asked [37, 5, 22, 29]
+      Relations at the end over 240 ordered pairs: median -2, 86 at Cold or worse, 44% carrying a scar floor
+      Accords standing at the end: 50 (non-aggression 50, passage 44, refuel 13, research 0)
+      Trading window units, by seat: bought [4205, 3234, 2495, 11061], sold [2277, 9978, 5577, 1607]
+      Places taken by Influence over the batch: 459
+      Of those, by kind and seat: Regions [31, 273, 55, 61], ground Colonies [0, 20, 1, 2], stations [0, 9, 2, 5] (420 Regions, 23 Colonies, 16 stations)
+      War over the batch: Battles opened by seat [7, 19, 42, 20], 8 against neutrals; attacks in orbit [5, 2, 11, 6]; marches on neutrals [0, 0, 20, 0], on held Regions [5, 44, 38, 21]
+      Armies built [26, 27, 41, 45], lost [0, 2, 2, 1], Standing Armies lost 53; warships built [0, 4, 36, 19], lost [0, 0, 3, 1]; Occupations begun [2, 33, 34, 12], broken [0, 3, 6, 3]; places taken by force [0, 27, 26, 7]
+      Army raises refused for want of people, by seat [0, 0, 0, 3]
+      Escapes over the batch: units escaped by seat [3, 1, 9, 6], neutral 0; Battles with an escape 17 of 88
+      Dig In orders over the batch, by seat [27, 183, 56, 47]
+      Armies landed at a Colony over the batch, by seat [0, 0, 0, 2]
+      Interceptions over the batch, by seat [0, 0, 0, 0]
+      Batteries lost over the batch, by seat [3, 1, 0, 0]
+      Bombards over the batch, by seat [0, 0, 0, 0]; Modules burned [0, 0, 0, 0]
+      Orbit changes over the batch, by seat [50, 216, 322, 97]; Blockades ordered [0, 1, 57, 22]
+      The nuke over the batch, by seat: Missile Carriers built [1, 5, 15, 13], Launches [0, 1, 17, 7], buildings burned [0, 7, 101, 25], people killed [0, 12, 942, 16], Industry Levels lost [0, 0, 1, 0]
+      Fuel burned in Battle over the batch, by seat [24.6, 12, 60, 57.1] (153.7 in all); hulls left dry by a Battle [1, 1, 5, 3] (10 in all)
+      Natural Sink at the end: median 23.60 over 20 games
+      The world under the Natural Sink at least once in 14/20 seeds (median first turn 36)
+      The whole Tech Tree completed in 20/20 seeds (median turn 30)
+      Breaks fired: Coral Die-off 20/20, Permafrost Thaw 20/20, The Sink Weakens 8/20, Ice Sheets Committed 4/20, Amazon Dieback 0/20
+
+ACROSS ALL FOUR SEATINGS, 80 games:
+    Custodians: 20 win(s) of 80
+   Prospectors: 49 win(s) of 80
+    Arkwrights:  4 win(s) of 80
+    Archivists:  7 win(s) of 80
+  collapses 0 of 80
+    Custodians: Victory gate completed in 75 of 80 games, median turn 15
+   Prospectors: Victory gate completed in 79 of 80 games, median turn 26
+    Arkwrights: Victory gate completed in 67 of 80 games, median turn 31
+    Archivists: Victory gate completed in 69 of 80 games, median turn 30
+  The whole Tech Tree completed in 65 of 80 games, median turn 32 (the turn its last Tech completed)
+  Games still running at turn 39: 43 of 80; the tree complete at the end in 43 of them
+  Each Tech: completed in N games, median turn
+              EfficientGrids: 80 of 80, median turn 3
+                  CleanPower: 80 of 80, median turn 6
+             CleanPropellant: 80 of 80, median turn 18
+            EfficientTransit: 80 of 80, median turn 21
+            ExpandedHabitats: 80 of 80, median turn 15
+                  DeepMining: 80 of 80, median turn 12
+           AutomatedRefining: 80 of 80, median turn 17
+               PublicScience: 80 of 80, median turn 21
+              GreenConsensus: 80 of 80, median turn 10
+           OrbitalRefuelling: 80 of 80, median turn 18
+              CryogenicTanks: 80 of 80, median turn 22
+               HardenedHulls: 79 of 80, median turn 26
+          ClosedLoopColonies: 79 of 80, median turn 21
+          CoastalEngineering: 79 of 80, median turn 21
+                CivilDefense: 79 of 80, median turn 26
+           ExtractionCharter: 79 of 80, median turn 26
+            CommodityFinance: 79 of 80, median turn 21
+              RailGunFreight: 79 of 80, median turn 24
+               Beneficiation: 78 of 80, median turn 28
+              NuclearRockets: 78 of 80, median turn 25
+          OrbitalDataCenters: 78 of 80, median turn 28
+          CleanManufacturing: 77 of 80, median turn 11
+               RelayNetworks: 77 of 80, median turn 26
+        PlanetaryStewardship: 75 of 80, median turn 15
+           MissileTechnology: 75 of 80, median turn 28
+             Superconductors: 72 of 80, median turn 30
+            RegolithPrinting: 71 of 80, median turn 29
+                   TheUpload: 69 of 80, median turn 30
+             GenerationShips: 67 of 80, median turn 31
+  The world's Research a turn, mean over 3047 game-turns: 71.2 -- Regions' own 32.3, Research Labs 15.4, Observatories 19.8, research agreements 0.0, neutral Regions and occupied Labs 3.8, the rest 0.0
+  The world's Research at turn 5 / 10 / 20 / 30, median: 23 / 28 / 58 / 119 (games alive 80 / 80 / 80 / 70)
+  Regions held a turn, mean 14.0; Research Labs working a turn, mean 14.2; a base of 1 a Region, scaled by population and Education as a Lab is, before multipliers: 19.1 a turn
+    Custodians: score at the end median 0.49, nought in 0; placed 1st / 2nd / 3rd / 4th in 19 / 5 / 16 / 40
+   Prospectors: score at the end median 1.00, nought in 0; placed 1st / 2nd / 3rd / 4th in 43 / 16 / 13 / 8
+    Arkwrights: score at the end median 0.82, nought in 0; placed 1st / 2nd / 3rd / 4th in 4 / 58 / 16 / 2
+    Archivists: score at the end median 0.40, nought in 0; placed 1st / 2nd / 3rd / 4th in 14 / 1 / 35 / 30
+  Unrest, per Faction over the batch (Region-turns held; at 4 or more; at 7 or more; throw-offs; start state lost as seat 0, to a throw-off / to a taking):
+    Custodians: 19881 held; 390 at 4+ (2%); 111 at 7+ (1%); 10 throw-offs; start lost 1 / 6
+   Prospectors: 8913 held; 390 at 4+ (4%); 102 at 7+ (1%); 12 throw-offs; start lost 1 / 15
+    Arkwrights: 7306 held; 139 at 4+ (2%); 46 at 7+ (1%); 4 throw-offs; start lost 0 / 9
+    Archivists: 6361 held; 46 at 4+ (1%); 5 at 7+ (0%); 1 throw-offs; start lost 0 / 6
+  Techs led over the batch, per Faction: Custodians 1054, Prospectors 586, Arkwrights 172, Archivists 438
+  Income over the batch, per Faction, mean a game (Materials / Fuel / Energy / Ducats / Research):
+    Custodians:    1185 /     370 /    2740 /    1613 /   1045
+   Prospectors:    2216 /     433 /    2796 /    1264 /    396
+    Arkwrights:    1561 /     316 /    2273 /    3391 /    261
+    Archivists:     497 /     272 /    1179 /     514 /    757
+  the world under the Natural Sink at least once in 28 of 80 games (median first turn 35)
+  Off Earth at the end over the batch: ground Colonies the Moon 278, Mars 24, Phobos 130, Deimos 48, Venus 0, Mercury 244, Ceres 38, Vesta 70 (median 10 a game); stations the Moon 23, Mars 0, Phobos 15, Deimos 3, Venus 9, Mercury 15, Ceres 0, Vesta 1; first ground Colony founded: the Moon in 80/80 (median turn 8); Mars in 17/80 (median turn 29); Phobos in 73/80 (median turn 24); Deimos in 48/80 (median turn 32); Venus in 0/80 (median turn -); Mercury in 76/80 (median turn 24); Ceres in 33/80 (median turn 28); Vesta in 43/80 (median turn 28)
+  Colonies and stations at the end over the batch, by tier: Outpost 1399, Settlement 89, Colony 42, Colonial Capital 7
+  the nuke, all seats and seatings: Missile Carriers built 101, Launches 64, buildings burned 295, people killed 3288, Industry Levels lost 5
+  the orbital war, per Faction (orbital Battles opened, of them off Earth / Blockades / Launches / Bombards / Interceptions):
+    Custodians: 8 (0 off Earth) / 3 / 6 / 0 / 0
+   Prospectors: 40 (26 off Earth) / 213 / 43 / 0 / 7
+    Arkwrights: 26 (24 off Earth) / 43 / 15 / 0 / 1
+    Archivists: 5 (5 off Earth) / 0 / 0 / 0 / 0
+  games with an orbital Battle 28 of 80, with a Blockade 34, with a Launch 31
+  Battles cost, all seats and seatings: Fuel burned in Battle 466.8, hulls left dry by a Battle 24

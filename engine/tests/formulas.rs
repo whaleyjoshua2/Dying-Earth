@@ -1205,8 +1205,11 @@ fn solar_maximum_boosts_power_plants_and_generators_at_the_next_income_once() {
     assert_eq!(income_of(&mut g, Seat(0)).energy, 37.5 - 2.0, "Efficient Grids makes it x2"); // Ticket #554: 18 + 19.5
 }
 
+/// Ticket #578 (version 0.1.0.3): on the cards' own line, and counted against a Stabilization run,
+/// where the card was exempt from it: a Sink one over the sources is under without the card and over
+/// with it.
 #[test]
-fn the_methane_burst_adds_scaled_emissions_next_turn_that_do_not_count_against_stabilization() {
+fn the_methane_burst_adds_scaled_emissions_next_turn_on_the_cards_line_and_against_stabilization() {
     let mut g = game();
     g.climate.temperature = 2.2; // scale 1.5
     drawn(&mut g, EventId::MethaneBurst, EventTarget::Everyone);
@@ -1214,6 +1217,13 @@ fn the_methane_burst_adds_scaled_emissions_next_turn_that_do_not_count_against_s
     let e = g.emissions_now();
     assert!((e.cards - 3.75).abs() < 1e-9, "2.5 x 1.5: {}", e.cards);
     assert!((e.total() - e.counted() - 3.75).abs() < 1e-9);
+    {
+        let mut h = g.clone();
+        h.climate.permafrost = 0.0;
+        h.climate.natural_sink = h.emissions_now().counted() + 1.0;
+        h.climate_phase();
+        assert_eq!(h.seat(Seat(0)).stabilization_run, 0, "the card's 3.75 breaks a run the sources alone would have kept (ticket #578)");
+    }
     with_tech(&mut g, TechId::GreenConsensus);
     g.climate.card_emissions_next = 0.0;
     drawn(&mut g, EventId::MethaneBurst, EventTarget::Everyone);
@@ -4220,10 +4230,11 @@ fn b_coral_die_off_costs_the_exposed_coasts_their_people_and_their_calm() {
     assert!(g.state(StateId::NorthAmerica).population > 0.0 || g.state(StateId::SouthAmerica).population > 0.0, "the people who left went to the neighbours");
 }
 
-/// (c) Permafrost Thaw: 4.0 ppm every Climate phase after it, on its own line, nobody's Blame and
-/// never counted against a Stabilization run.
+/// (c) Permafrost Thaw: 4.0 ppm every Climate phase after it, on its own line, nobody's Blame.
+/// Ticket #578 (version 0.1.0.3), at the designer's word: it counts against a Stabilization run,
+/// as the cards do, since the run reads the same net the temperature does.
 #[test]
-fn c_the_permafrost_break_adds_four_ppm_a_turn_on_its_own_line_outside_blame_and_stabilization() {
+fn c_the_permafrost_break_adds_four_ppm_a_turn_on_its_own_line_outside_blame_and_inside_stabilization() {
     let mut g = game();
     calm(&mut g);
     breaks_ahead(&mut g);
@@ -4237,7 +4248,7 @@ fn c_the_permafrost_break_adds_four_ppm_a_turn_on_its_own_line_outside_blame_and
     assert_eq!(e.counted(), 0.0, "and not among the counted sources");
     assert!((e.total() - 4.0).abs() < 1e-9, "but in the total that reaches the air: {}", e.total());
 
-    // A Sink of 2.0: 0 counted is under it, 4.0 of Permafrost would not be.
+    // A Sink of 2.0: 0 from the sources is under it, 4.0 of Permafrost is not.
     g.climate.natural_sink = 2.0;
     let blame_before: f64 = Seat::ALL.into_iter().map(|s| g.seat(s).blame_emitted).sum();
     let co2_before = g.climate.co2;
@@ -4246,7 +4257,7 @@ fn c_the_permafrost_break_adds_four_ppm_a_turn_on_its_own_line_outside_blame_and
     assert!((g.climate.co2 - (co2_before + 4.0 - 2.0)).abs() < 1e-9, "4.0 ppm again, every Climate phase from then on: {}", g.climate.co2);
     let blame_after: f64 = Seat::ALL.into_iter().map(|s| g.seat(s).blame_emitted).sum();
     assert_eq!(blame_after, blame_before, "nobody's Blame");
-    assert_eq!(g.seat(Seat(0)).stabilization_run, run_before + 1, "exempt from Stabilization: the run goes on");
+    assert_eq!(g.seat(Seat(0)).stabilization_run, 0, "it counts against Stabilization: the run breaks (ticket #578); it stood at {run_before}");
 }
 
 /// (d) The Sink Weakens: the Natural Sink falls by 2.0 for good, and Stabilization is measured
@@ -4264,18 +4275,22 @@ fn d_the_sink_weakens_lowers_the_sink_and_the_stabilization_bar_with_it() {
     g.climate_phase();
     assert_eq!(g.climate.natural_sink, 6.0, "the Sink Weakens took it to 6.0");
     assert_eq!(g.emissions_now().sink, 6.0, "and the panel's Sink line with it");
-    assert!(g.seat(Seat(0)).stabilization_run > 0, "0 counted was under the Sink");
+    // Ticket #578 (version 0.1.0.3), from the review: the Permafrost Thaw fired at 1.6 with the Sink
+    // Weakens at 2.0, and its 4.0 counts against the run now; this test is about the Sink, so the
+    // thaw is set aside, or 7.0 + 4.0 would be over the old Sink of 8.0 as well.
+    g.climate.permafrost = 0.0;
+    assert!(g.seat(Seat(0)).stabilization_run > 0, "nought from the sources was under the Sink");
 
-    // 7.0 counted Emissions: under the old Sink of 8.0, over the new one of 6.0. A neutral state,
-    // so no Faction's Emissions multiplier stands between the card and the sum.
+    // 7.0 of Emissions: under the old Sink of 8.0, over the new one of 6.0. A neutral state, so no
+    // Faction's Emissions multiplier stands between the card and the sum.
     g.state_mut(StateId::MiddleEast).control = Control::Neutral;
     g.state_mut(StateId::MiddleEast).industry_level = 14; // Baseline 0.5 x 14
     let e = g.emissions_now();
-    assert!((e.counted() - 7.0).abs() < 1e-9, "7.0 counted: {}", e.counted());
+    assert!((e.total() - 7.0).abs() < 1e-9, "7.0 of Emissions: {}", e.total());
     g.climate_phase();
     assert_eq!(g.seat(Seat(0)).stabilization_run, 0, "7.0 breaks a run against a Sink of 6.0, where it would have held against 8.0");
-    // The Custodian AI steers by this same figure (`victory_gap` reads `climate.last.total_sink()`),
-    // so a weakened Sink moves its pace with it.
+    // The Custodian AI steers by this same figure (`victory_gap` reads `climate.last.net()`), so a
+    // weakened Sink moves its pace with it.
     assert_eq!(g.climate.last.total_sink(), 6.0, "the Sink the AI reads is the weakened one");
 }
 
@@ -8950,7 +8965,7 @@ fn a_battle_on_earth_pollutes_by_hits_and_buildings_burned_and_one_at_mars_does_
     let b = &g.climate.last;
     assert!((b.war - want_total).abs() < 1e-9, "the War source: {} against {want_total}", b.war);
     let rest = b.state_industry + b.factories + b.power_plants + b.refineries + b.launches + b.population;
-    assert!((b.counted() - rest - b.war).abs() < 1e-9, "counted against Stabilization, beside the buildings, launches and people");
+    assert!((b.counted() - rest - b.war).abs() < 1e-9, "in the sources' sum beside the buildings, launches and people, and so in the total the run reads");
     assert!((g.climate.co2 - co2_before - b.net()).abs() < 1e-9, "and on the stock");
     assert!((g.seats[0].blame_emitted - emitted_before - b.by_seat[0]).abs() < 1e-9 && b.by_seat[0] >= want_mine - 1e-9, "seat 0's share is its Blame, emitted");
     assert!((g.seats[0].war_ppm - want_mine).abs() < 1e-9 && (g.climate.war_nobody_total - theirs as f64 * per_hit).abs() < 1e-9, "kept for the sweep");
@@ -18664,10 +18679,11 @@ fn the_first_turn_under_the_sink_eases_every_region_once() {
     }
 }
 
-/// Ticket #405 (after review): **"under the Sink" is the Stabilization test, not the Climate
-/// Panel's net**, and **once a game survives a broken run.** Counted Emissions under the Sink with
-/// the Permafrost pushing the full net over it still eases; a run that breaks and starts again does
-/// not ease a second time.
+/// Ticket #405 (after review): **"under the Sink" is the Stabilization test**, and **once a game
+/// survives a broken run.** Ticket #578 (version 0.1.0.3): the test is the Climate Panel's net
+/// now, cards and permafrost counted, so the Permafrost pushing the net over the Sink breaks the
+/// run and nothing eases; under by every figure, the run starts and the ease fires; a run that
+/// breaks and starts again does not ease a second time.
 #[test]
 fn the_sink_ease_reads_the_stabilization_test_and_survives_a_broken_run() {
     let mut g = game();
@@ -18681,7 +18697,18 @@ fn the_sink_ease_reads_the_stabilization_test_and_survives_a_broken_run() {
     control.climate.under_sink_eased = true;
     g.climate_phase();
     control.climate_phase();
-    assert!(g.climate.last.net() > 0.0, "the premise: the Climate Panel's net is over the Sink: {}", g.climate.last.net());
+    assert!(g.climate.last.net() > 0.0, "the premise: the net is over the Sink: {}", g.climate.last.net());
+    assert_eq!(g.seat(Seat(0)).stabilization_run, 0, "the permafrost counts: no run (ticket #578)");
+    for sid in StateId::ALL {
+        assert_eq!(g.state(sid).unrest, control.state(sid).unrest, "{sid:?}: nothing eases over the Sink");
+    }
+    g.climate.permafrost = 0.0;
+    control.climate.permafrost = 0.0;
+    g.climate.natural_sink = 1000.0;
+    control.climate.natural_sink = 1000.0;
+    g.climate_phase();
+    control.climate_phase();
+    assert!(g.climate.last.net() < 0.0, "the premise: under by every figure");
     assert_eq!(g.seat(Seat(0)).stabilization_run, 1, "the premise: the Stabilization test is under");
     assert!(g.state(StateId::SubSaharanAfrica).unrest < control.state(StateId::SubSaharanAfrica).unrest, "the ease reads the Stabilization test");
     // Over the Sink, the run breaks; under again, the run starts again, and nothing more eases.
@@ -18708,15 +18735,16 @@ fn the_sink_ease_reads_the_stabilization_test_and_survives_a_broken_run() {
 }
 
 /// Ticket #406 (version 0.09.4): **the Custodians' first part earns partial credit**: the greater
-/// of the best run of the game over its bar and three tenths of the best share of the counted gap
-/// closed since the game's opening figure. Neither falls back; the Condition is still three turns in
+/// of the best run of the game over its bar and three tenths of the best share of the net gap
+/// (ticket #578: cards and permafrost counted) closed since the game's opening figure. Neither falls back; the Condition is still three turns in
 /// a row. Seat 0 is the Custodians.
 #[test]
 fn the_custodians_run_earns_partial_credit_for_the_best_run_and_the_gap_closed() {
     let mut g = game();
     let cap = g.tables.victory.stabilization_gap_cap;
     assert_eq!(cap, 0.3, "the designer's three tenths");
-    let gap = |g: &Game| g.climate.last.counted() - g.climate.last.total_sink();
+    // Ticket #578 (version 0.1.0.3): the gap is the net's, cards and permafrost counted.
+    let gap = |g: &Game| g.climate.last.total() - g.climate.last.total_sink();
     // The opening Climate phase sets the figure every later gap is measured against.
     g.climate_phase();
     let open = gap(&g);
@@ -18773,9 +18801,10 @@ fn the_custodians_run_earns_partial_credit_for_the_best_run_and_the_gap_closed()
 fn the_stabilization_row_says_the_gap_in_ppm_beside_the_run() {
     let mut g = game();
     g.climate_phase();
-    let (c, s) = (g.climate.last.counted(), g.climate.last.total_sink());
+    // Ticket #578 (version 0.1.0.3): the Emissions whole, as the run reads them, where it said "counted".
+    let (c, s) = (g.climate.last.total(), g.climate.last.total_sink());
     let over = g.progress(Seat(0)).first_label.expect("the Custodians' row");
-    assert_eq!(over, format!("Stabilization: {:.1} ppm over the Sink (counted {c:.1}, Sink {s:.1}), run 0 of 4", c - s));
+    assert_eq!(over, format!("Stabilization: {:.1} ppm over the Sink (Emissions {c:.1}, Sink {s:.1}), run 0 of 4", c - s));
     g.climate.natural_sink = 1000.0;
     g.climate_phase();
     let under = g.progress(Seat(0)).first_label.expect("the Custodians' row");

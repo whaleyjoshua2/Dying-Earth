@@ -594,8 +594,9 @@ impl Game {
         }
         let first_ratio = match self.first_kind(seat) {
             // A Stabilization run has no useful interpolation: the pace is in ppm off the Sink.
+            // Ticket #578 (version 0.1.0.3): the net the run reads, cards and permafrost counted.
             VictoryFirstKind::StabilizationRun => {
-                let net = self.climate.last.counted() - self.climate.last.total_sink();
+                let net = self.climate.last.net();
                 if turn >= pace.under_sink_by_turn {
                     if net < 0.0 { 1.0 } else { (1.0 - net / 10.0).clamp(0.0, 1.0) }
                 } else if turn >= pace.within_by_turn {

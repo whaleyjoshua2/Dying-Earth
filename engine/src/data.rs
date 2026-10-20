@@ -1034,7 +1034,7 @@ pub enum BreakEffect {
     /// climate rise, and loses `population_loss` of its people, who flow as refugees. No climate effect.
     CoastalUnrest,
     /// `emissions` ppm join the world's Emissions in this and every later Climate phase, on their
-    /// own line: nobody's Blame, and never counted against a Stabilization run.
+    /// own line: nobody's Blame; since ticket #578 (version 0.1.0.3) counted against a Stabilization run.
     EmissionsPerTurn,
     /// `sink_cut` comes off the Natural Sink for good. This one does bear on Stabilization: the
     /// Sink is the bar the run is measured against. Ticket #343 (version 0.09.1): a SUBTRACTION,
@@ -1045,7 +1045,9 @@ pub enum BreakEffect {
     /// out of sequence. The scheduled thresholds still fire on their own turns.
     SeaLevelThreshold,
     /// `co2` ppm join the CO2 Stock once, and `baseline_rise` is added to `state`'s Baseline
-    /// Emissions for good. Both are the world's doing: nobody's Blame, exempt from Stabilization.
+    /// Emissions for good. Both are the world's doing and nobody's Blame; the pulse lands on the
+    /// Stock outside any phase's Emissions, and the Baseline rise is the state's own industry line,
+    /// counted against a Stabilization run like any industry.
     CarbonPulse,
 }
 

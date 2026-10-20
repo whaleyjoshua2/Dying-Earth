@@ -673,10 +673,11 @@ pub struct EmissionsBreakdown {
     pub refineries: f64,
     pub launches: f64,
     pub population: f64,
-    /// Emissions added by Event cards (Wildfire, the Methane Burst); never counted against Stabilization.
+    /// Emissions added by Event cards (Wildfire, the Methane Burst): nobody's Blame; since ticket
+    /// #578 (version 0.1.0.3) counted against a Stabilization run, as every Emission is.
     pub cards: f64,
     /// Ticket #55: what the Permafrost Thaw Break adds every Climate phase once it has fired. Its
-    /// own line: nobody's Blame, and never counted against a Stabilization run.
+    /// own line: nobody's Blame; since ticket #578 counted against a Stabilization run.
     pub permafrost: f64,
     /// Ticket #279 (version 0.08.5): what the Battles fought on Earth and in Earth orbit last turn
     /// put in the air -- so many ppm a hit landed and so many a building burned. A Faction's own
@@ -694,8 +695,10 @@ pub struct EmissionsBreakdown {
 }
 
 impl EmissionsBreakdown {
-    /// Emissions that count against a Stabilization run: buildings, launches, population and, since
-    /// ticket #279, war -- not cards and not the permafrost.
+    /// The sources' own Emissions: buildings, launches, population and, since ticket #279, war --
+    /// not cards and not the permafrost. Until ticket #578 (version 0.1.0.3) this was what a
+    /// Stabilization run read; the run reads `total()` now, the figure the temperature does, and
+    /// this is the breakdown's sum of the sources somebody owns.
     pub fn counted(&self) -> f64 {
         self.state_industry + self.factories + self.power_plants + self.refineries + self.launches + self.population + self.war
     }
@@ -784,7 +787,7 @@ pub struct Climate {
     /// Region's Unrest has eased for it; it eases once a game. A save from before carries false.
     #[serde(default)]
     pub under_sink_eased: bool,
-    /// Ticket #406 (version 0.09.4): the counted gap over the Sink at the game's first Climate
+    /// Ticket #406 (version 0.09.4): the net gap (ticket #578: cards and permafrost counted) over the Sink at the game's first Climate
     /// phase; the best share of it closed since, never falling back; and the longest Stabilization
     /// run of the game. The Custodians' partial credit. A save from before opens its gap at the next
     /// Climate phase.

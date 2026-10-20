@@ -178,16 +178,16 @@ impl Game {
     }
 
     /// Ticket #406 (version 0.09.4): the Stabilization row in ppm, off the last Climate phase, by
-    /// the test the run uses (counted Emissions against the Sink and the Scrubbers): *"Stabilization:
-    /// 21.3 ppm over the Sink (counted 27.6, Sink 6.3), run 0 of 3"*, the bar the Custodians' card
-    /// names. The Victory window, the Climate Panel and the headless driver all print it, so they
-    /// never disagree.
+    /// the test the run uses -- since ticket #578 (version 0.1.0.3) the whole of the Emissions, cards
+    /// and permafrost counted, against the Sink and the Scrubbers: *"Stabilization: 21.3 ppm over the
+    /// Sink (Emissions 27.6, Sink 6.3), run 0 of 4"*, the bar the Custodians' card names. The Victory
+    /// window, the Climate Panel and the headless driver all print it, so they never disagree.
     pub fn stabilization_text(&self) -> String {
-        let (counted, sink) = (self.climate.last.counted(), self.climate.last.total_sink());
-        let gap = counted - sink;
+        let (total, sink) = (self.climate.last.total(), self.climate.last.total_sink());
+        let gap = total - sink;
         let side = if gap < 0.0 { "under" } else { "over" };
         let bar = self.tables.faction(FactionKind::Custodians).victory_first.bar;
-        format!("Stabilization: {:.1} ppm {side} the Sink (counted {:.1}, Sink {:.1}), run {} of {:.0}", gap.abs(), counted, sink, self.seat(Seat(0)).stabilization_run, bar)
+        format!("Stabilization: {:.1} ppm {side} the Sink (Emissions {:.1}, Sink {:.1}), run {} of {:.0}", gap.abs(), total, sink, self.seat(Seat(0)).stabilization_run, bar)
     }
 
     pub fn progress(&self, seat: Seat) -> Progress {

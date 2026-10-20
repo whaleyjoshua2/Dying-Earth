@@ -481,3 +481,14 @@ recommendation; the designer asked for the Archivists' wins to be reported and l
 sweep seeing the version whole. Three tests red at *left: 225, right: 250* before the tables moved.
 
 **The sweep** ([`sweeps/ticket-579.txt`](sweeps/ticket-579.txt)): **20 / 48 / 5 / 7 and no collapse**, from 21 / 48 / 4 / 7 -- noise, the Archivists' seven wins of eighty unmoved by the higher bar, their gate still completed in 68 of 80 games (69 before) at a median turn 30 (29); the computer paces to the new figure, the median fund at the end 250 in every seating where the Archive stands (225 before). Income per Faction (Materials / Fuel / Energy / Ducats / Research, mean a game): Custodians 1157 / 366 / 2641 / 1580 / 970; Prospectors 2190 / 434 / 2769 / 1234 / 390; Arkwrights 1554 / 316 / 2230 / 3273 / 256; Archivists 481 / 264 / 1137 / 474 / 734 -- the Archivists' Research 734 from 740, within noise. Reported and left, at the designer's word; the close-out's sweep sees the version whole.
+
+## Card and permafrost Emissions count toward the Stabilization run
+
+Ticket [#578](https://github.com/whaleyjoshua2/Dying-Earth/issues/578), spec §18. The run read the
+sources alone and the temperature read everything, so the world could warm while a phase counted
+as under; the designer had the run read the net. One round, four questions, all at the
+recommendation: the run, the partial credit, the ease and the computer Custodians' pace all on the
+one figure, and the texts following. Three tests red first, the Permafrost Thaw's own among them,
+which had pinned the exemption since 0.05.5.
+
+**The sweep** ([`sweeps/ticket-578.txt`](sweeps/ticket-578.txt)): **20 / 49 / 4 / 7 and no collapse**, from 20 / 48 / 5 / 7 -- noise; the Custodians' twenty wins unmoved, their gate still completed in 75 of 80 games at a median turn 15. The world under the Natural Sink at least once, which the sweep counts by the run's test, in 28 of 80 games (median first turn 35) from 30 (34): the cards and the permafrost cost the computer Custodians two games' first run and a turn, no more, which says the late permafrost rarely decides it. Income per Faction (Materials / Fuel / Energy / Ducats / Research, mean a game): Custodians 1185 / 370 / 2740 / 1613 / 1045; Prospectors 2216 / 433 / 2796 / 1264 / 396; Arkwrights 1561 / 316 / 2273 / 3391 / 261; Archivists 497 / 272 / 1179 / 514 / 757 -- the Custodians' Research 1045 from 970, the one figure past noise; not traced.

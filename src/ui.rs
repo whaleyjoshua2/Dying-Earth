@@ -12326,10 +12326,10 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 ));
             }
             // Ticket #55: the Permafrost Thaw Break's own line, once it has fired. It is the world's
-            // carbon: nobody's Blame, and it never counts against a Stabilization run.
+            // carbon: nobody's Blame. Ticket #578 (version 0.1.0.3): it counts against a Stabilization run.
             if e.permafrost > 0.0 {
                 ui.label(format!("Permafrost {:.1}", e.permafrost))
-                    .on_hover_text("The permafrost has thawed. This much CO2 comes out of the ground every turn now, whatever anybody does. It is nobody's Blame and it does not count against a Stabilization run.");
+                    .on_hover_text("The permafrost has thawed. This much CO2 comes out of the ground every turn now, whatever anybody does. It is nobody's Blame, and it counts against a Stabilization run.");
             }
             // Ticket #54: the Scrubbers stand beside the Natural Sink in the same line.
             ui.label(format!("Natural Sink -{:.1}{}", e.sink, if e.scrubbers > 0.0 { format!(" and Scrubbers and Reserves -{:.1}", e.scrubbers) } else { String::new() }));

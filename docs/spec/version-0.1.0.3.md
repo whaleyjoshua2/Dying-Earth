@@ -561,3 +561,36 @@ game at fifty turns. Decided in one round ("q1 yes q2 a q3 report and leave it")
 - **The review** (an independent agent) found no stray 225 and the pace's rounding right (62.2 / 125.6 / 187.8 to the nearest), and every intermediate pin relative to the table. It caught the Archivists' long Victory text still typing its figure where ticket #580 gave the card a placeholder -- it reads `{first}` and `{second}` now, pinned by a test, and the #347 test that pinned the typed copy pins the rendered text; a dead test arm setting the Archivists' Research total where their first part is scored on the fund -- it sets the fund from the table now; and a test name still saying 150 -- renamed. All mended.
 - **Swept** ([`sweeps/ticket-579.txt`](../dev-diary/2026-10-19-version-0.1.0.3/sweeps/ticket-579.txt),
   20 seeds x four seatings): **20 / 48 / 5 / 7 and no collapse**, from 21 / 48 / 4 / 7 -- noise, the Archivists' seven wins of eighty unmoved by the higher bar, their gate still completed in 68 of 80 games (69 before) at a median turn 30 (29); the computer paces to the new figure, the median fund at the end 250 in every seating where the Archive stands (225 before). Income per Faction (Materials / Fuel / Energy / Ducats / Research, mean a game): Custodians 1157 / 366 / 2641 / 1580 / 970; Prospectors 2190 / 434 / 2769 / 1234 / 390; Arkwrights 1554 / 316 / 2230 / 3273 / 256; Archivists 481 / 264 / 1137 / 474 / 734 -- the Archivists' Research 734 from 740, within noise. Reported and left, at the designer's word; the close-out's sweep sees the version whole.
+
+## 18. Card and permafrost Emissions count toward the Stabilization run
+
+Ticket: [Card and permafrost Emissions count toward the Stabilization run](https://github.com/whaleyjoshua2/Dying-Earth/issues/578).
+
+The designer: *"make event and permafrost emissions count toward the custodian run."* In the tree the
+run read the **counted** Emissions -- the sources somebody owns: industry, Factories, Power Plants,
+Refineries, launches, population and war -- against the Sink and the Scrubbers, and left out the
+Event cards' Emissions and the permafrost, which the net and the temperature count. So the world
+could warm while a phase counted as under. Decided in one round ("q1 yes q2 a q3 yes q4 yes"):
+
+- **The run reads the net.** A Climate phase counts toward the Stabilization run when the whole of
+  the Emissions, cards and permafrost included, stand under the Natural Sink and the Scrubbers
+  together (`climate.rs`: `breakdown.total() < breakdown.total_sink()`). One figure, one truth: the
+  one the temperature reads. A card's Emissions land in one phase, so a single draw can break a run;
+  the permafrost only ever rises, so a late run is harder and never easier.
+- **The partial credit and the ease read it too**: the Custodians' opening gap and best share of it
+  closed, and the once-a-game Under the Sink ease, read the net gap beside the run, so nothing in the
+  game says "under the Sink" by two measures.
+- **The computer Custodians** pace their run on the net (`victory_gap`), so their Scrubbers and
+  Production Moved push against what the run reads.
+- **The texts**: the Stabilization line reads *"Stabilization: 13.7 ppm over the Sink (Emissions 21.7,
+  Sink 8.0), run 0 of 4"* where it said "counted"; the permafrost hover says it counts against a run
+  where it said it did not; the glossary's Stabilization entry follows. Nothing new in the Report: the
+  Climate line already prints the cards and the permafrost. `counted()` stays as the breakdown's sum
+  of the sources somebody owns, which the Blame ledger is made of.
+- Red first on three tests: the Permafrost Thaw's phase, which asserted *"exempt from Stabilization:
+  the run goes on"* (left 2, right 0 now); the Under-the-Sink ease, which asserted the run under with
+  the permafrost pushing the net over (left 1, right 0); and the Stabilization row's words ("counted"
+  against "Emissions"). Clippy clean at `-D warnings`; 815 tests green.
+- **The review** (an independent agent) found every reader right -- the run, the opening gap, the ease, the computer's pace, the Production Moved worth and the three printers of the line all on the net, `counted()` with no caller left but `total()`, and the Blame ledger untouched. It caught the Sink Weakens test proving its claim for the wrong reason (the Permafrost Thaw fires at 1.6 beside the Sink Weakens at 2.0, and its 4.0 now put the second phase over the old Sink as well -- the thaw is set aside in that test, which is about the Sink); the Methane Burst test named for the abolished exemption (renamed, and it witnesses a card breaking a run now); and five lines of prose still saying "counted" or "exempt" -- the glossary's opening gap, `unrest.toml`'s ease, the `opening_gap` field, the Carbon Pulse's doc and the permafrost line's comment. All mended. **One note, left as built**: a save from 0.1.0.2 carries an opening gap measured on the sources alone, so on that save the best share closed is compared across two measures for the rest of the game; it never falls back, so nothing is lost.
+- **Swept** ([`sweeps/ticket-578.txt`](../dev-diary/2026-10-19-version-0.1.0.3/sweeps/ticket-578.txt),
+  20 seeds x four seatings): **20 / 49 / 4 / 7 and no collapse**, from 20 / 48 / 5 / 7 -- noise; the Custodians' twenty wins unmoved, their gate still completed in 75 of 80 games at a median turn 15. The world under the Natural Sink at least once, which the sweep counts by the run's test, in 28 of 80 games (median first turn 35) from 30 (34): the cards and the permafrost cost the computer Custodians two games' first run and a turn, no more, which says the late permafrost rarely decides it. Income per Faction (Materials / Fuel / Energy / Ducats / Research, mean a game): Custodians 1185 / 370 / 2740 / 1613 / 1045; Prospectors 2216 / 433 / 2796 / 1264 / 396; Arkwrights 1561 / 316 / 2273 / 3391 / 261; Archivists 497 / 272 / 1179 / 514 / 757 -- the Custodians' Research 1045 from 970, the one figure past noise; not traced.
