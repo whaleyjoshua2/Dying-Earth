@@ -114,7 +114,10 @@ victory_short = "put {first} Ducats in the Venture Capital Fund with {second} Co
 # seatings read) and the Prospectors won 30 of 80, the most of any seat. At 2500 the median game
 # ends short; "other things will bolster their output". The AI reads this figure, not a copy of it.
 # Ticket #506 (version 0.1.0.0): 3,500 (2,500 x 50/36) and 18 off Earth, with the game at fifty turns.
-victory_first = { kind = "venture_fund", bar = 3500 }
+# Ticket #567 (version 0.1.0.3): the Fund counts 0.7 of the score, the Presence 0.3 -- the Fund is the
+# long pole (3,500 against 18 Colonists met by turn 12), and a Fund at 17% beside a full Presence
+# read 59%; it reads 42%.
+victory_first = { kind = "venture_fund", bar = 3500, weight = 0.7 }
 victory_second = { kind = "off_world_presence", bar = 18 }
 # Ticket #471 (version 0.09.7): the Opening Objective -- no deadline, met once, rewarded once.
 # Ticket #478 (version 0.09.8): 75 Ducats to 50, and the three Banks must work three Incomes running.
@@ -197,7 +200,9 @@ victory = "Diaspora: 42 Colonists living off Earth, on Colonies spread over at l
 victory_short = "get {first} Colonists living off Earth, spread over {bodies} Bodies, one holding a Colonial Capital,"
 # Ticket #506 (version 0.1.0.0): 42 (30 x 50/36) and four Bodies, with the game at fifty turns.
 # Ticket #555 (version 0.1.0.2): the Colonists off Earth count 0.6 of the score, the Bodies 0.4.
-victory_first = { kind = "colonists_off_earth", bar = 42, weight = 0.6 }
+# Ticket #567 (version 0.1.0.3): the Capital they must hold is a tenth of the score -- 0.6 Colonists,
+# 0.3 Bodies, 0.1 Capital -- so both bars met without one reads 90%, where it read 100%.
+victory_first = { kind = "colonists_off_earth", bar = 42, weight = 0.6, capital_weight = 0.1 }
 victory_second = { kind = "colonies_on_bodies", bodies = 4, colonists_each = 4 }
 # Ticket #514 (version 0.1.0.0): and a Colonial Capital of theirs must stand, at a Colony they direct
 # off Earth, before they win -- a gate on the win like the gate Tech, at the designer's word ("add a

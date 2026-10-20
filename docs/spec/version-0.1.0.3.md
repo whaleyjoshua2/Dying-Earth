@@ -246,3 +246,36 @@ share alone.
   bar at 4,250 (ticketed) are this version's brakes; the last sweep's Fund at the end was median
   3,742 / 8,419 / 3,582 / 3,597 by seating.
 - No rule moves, so no sweep.
+
+## 10. The Venture Fund and the Capital weighed into the percentage
+
+Ticket: [The Venture Fund and the missing Capital weighed into the Victory percentage](https://github.com/whaleyjoshua2/Dying-Earth/issues/567).
+
+The playtest: *"Your Victory: 59%"* with the Fund at 17% and the Presence full; *"100%"* while a
+missing Colonial Capital held the win. The score is the weighted mean of the two parts' fractions
+(ticket #555); the Capital and the gate Tech were holds `met()` read and `score()` never did.
+
+- **The Prospectors' Fund counts 0.7** of their score, the Presence 0.3 (`weight = 0.7` on the card):
+  the Fund is the long pole, 3,500 against 18 Colonists met by turn 12. The playtest's board reads 42%.
+- **The Arkwrights' Capital is a part of its own**, `capital_weight = 0.1` on the card: the score is
+  0.6 x Colonists off Earth + 0.3 x Bodies + 0.1 x Capital (held or not), so both bars met without one
+  reads 90%. Every computer seat reads it as it reads the score: the leader for gang pressure, the
+  three-quarters Moment, the Accord door at 95% and the last-turn ranking. The data refuses a
+  `capital_weight` on a card that asks no Capital, or weights summing past one.
+- **A headline with both parts full and a hold standing names the hold** in a few words after the
+  percentage -- **"100% - needs Generation Ships"**, **"90% - needs a Colonial Capital"**, "100% - the
+  Archive is not running" -- in the Victory window's row, the Report's head, the game-over page and
+  the ranking. Short of the bars the percentage stands alone; the row's first line names the hold
+  beneath as before, and the text tool already printed it. The parts are read as the percentage
+  reads them (the review): the Custodians' best run fills their first part short of the bar (§406),
+  and that 100% names its hold too.
+- **The review** also noted what the Capital's tenth does to the computer seats' doors: a Trade or
+  an Accord is refused to a seat at 95% or more of its Victory as it stands, and an Arkwright seat
+  with both bars met and no Capital read 100% and now reads 90%, so rivals deal with it where they
+  refused before, the win one upgrade away. A loosening, left standing for the designer's eye. The
+  ranking page names a hold twice, the heading's few words over the chronicle's sentence.
+- **Swept** (`sweeps/ticket-567.txt`, 20 seeds x four seatings): **9 / 60 / 5 / 6 and no collapse**,
+  from 12 / 58 / 6 / 2 and 1 -- noise. Three games of 80 went to the last-turn ranking (one to the
+  Prospectors, two to the Arkwrights), the rest met outright. The computer Arkwrights held a Capital
+  at the end in 4 games of 80, so the tenth is off their score in nearly every game; the Fund at the
+  end by seating 3,780 / 8,025 / 3,578 / 3,585; Income per Faction as the sweep file.

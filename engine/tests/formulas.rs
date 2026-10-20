@@ -1865,14 +1865,15 @@ fn the_last_turn_ranks_every_seat_by_score() {
     g.end_phase();
     assert!(matches!(g.outcome, Some(Outcome::Win { seat: Seat(1), .. })), "the highest score of four: {:?}", g.outcome);
     // With the leader's score removed, the next seat down takes it. The Arkwrights hold 4 Colonists
-    // on Phobos: 4 of 42 off Earth and one Body of four, score 0.6 x 4/42 + 0.4 x 1/4 (ticket #555:
-    // the Colonists weighted 0.6; 4/42, the lower part, before). The Archivists hold 4 on the
-    // Moon but have no Archive at all, so their first part is 0 and their score with it.
+    // on Phobos: 4 of 42 off Earth and one Body of four, score 0.6 x 4/42 + 0.3 x 1/4 (ticket #555:
+    // the Colonists weighted 0.6; 4/42, the lower part, before; ticket #567: the Capital they do not
+    // hold is the last tenth). The Archivists hold 4 on the Moon but have no Archive at all, so
+    // their first part is 0 and their score with it.
     let mut g = game();
     g.turn = g.tables.victory.turns;
     colony(&mut g, Seat(2), BodyId::Phobos, &[ModuleKind::Habitat, ModuleKind::Habitat], 4);
     colony(&mut g, Seat(3), BodyId::Moon, &[ModuleKind::Habitat], 4);
-    assert!((g.progress(Seat(2)).score() - (0.6 * 4.0 / 42.0 + 0.4 * 0.25)).abs() < 1e-9, "{:?}", g.progress(Seat(2)).score());
+    assert!((g.progress(Seat(2)).score() - (0.6 * 4.0 / 42.0 + 0.3 * 0.25)).abs() < 1e-9, "{:?}", g.progress(Seat(2)).score());
     assert_eq!(g.progress(Seat(3)).score(), 0.0);
     g.end_phase();
     assert!(matches!(g.outcome, Some(Outcome::Win { seat: Seat(2), .. })), "{:?}", g.outcome);
@@ -1886,9 +1887,10 @@ fn the_last_turn_ranks_every_seat_by_score() {
 fn the_score_weights_each_factions_parts_as_its_card_says() {
     let t = game().tables.clone();
     let w = |k: FactionKind| t.faction(k).victory_first.weight;
+    // Ticket #567 (version 0.1.0.3): the Prospectors' Fund 0.7, the long pole of their two parts.
     assert_eq!(
         (w(FactionKind::Custodians), w(FactionKind::Prospectors), w(FactionKind::Arkwrights), w(FactionKind::Archivists)),
-        (0.5, 0.5, 0.6, 0.4)
+        (0.5, 0.7, 0.6, 0.4)
     );
     let mut g = game();
     let arc = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Archivists).unwrap();
@@ -1896,6 +1898,91 @@ fn the_score_weights_each_factions_parts_as_its_card_says() {
     let p = g.progress(arc);
     assert_eq!((p.first_fraction(), p.second_fraction()), (1.0, 0.0), "the premise: the Archive paid for, nobody uploaded");
     assert!((p.score() - 0.4).abs() < 1e-9, "{}", p.score());
+}
+
+/// Ticket #567 (version 0.1.0.3), at the designer's word: **the Prospectors' Fund counts seven
+/// tenths of their score**, the Presence three. The Fund is the long pole (3,500 against 18
+/// Colonists met by turn 12), and the playtest read 59% with the Fund at 17% and the Presence
+/// full; it reads 42% now.
+#[test]
+fn the_prospectors_fund_counts_seven_tenths_of_their_score() {
+    let mut g = game();
+    let pro = Seat(1);
+    assert_eq!(g.kind(pro), FactionKind::Prospectors);
+    bare_stations(&mut g);
+    colony(&mut g, pro, BodyId::Mars, &[ModuleKind::Habitat; 4], 18);
+    g.seats[1].venture_fund = 595.0;
+    let p = g.progress(pro);
+    assert!((p.first_fraction() - 0.17).abs() < 1e-9 && p.second_fraction() == 1.0, "the premise: the Fund at 17%, the Presence full: {p:?}");
+    assert!((p.score() - 0.419).abs() < 1e-9, "0.7 x 0.17 + 0.3, 42% where it read 59%: {}", p.score());
+    assert_eq!(p.hold_suffix(), "", "short of the bars, the percentage alone");
+}
+
+/// Ticket #567 (version 0.1.0.3), at the designer's word: **the Arkwrights' Capital is a tenth of
+/// their score** -- 0.6 Colonists off Earth, 0.3 Bodies, 0.1 a Capital held or not -- so both bars
+/// met without one reads 90%, where it read 100% and the playtest took it for a win. And **a
+/// headline with both bars met and a hold standing names the hold** in a few words -- "90% - needs
+/// a Colonial Capital", "100% - needs Generation Ships" -- in the Victory window's row, the
+/// Report's head and the game-over page; short of the bars the percentage stands alone, the row's
+/// first line naming the hold beneath as before.
+#[test]
+fn the_capital_is_a_tenth_of_the_arkwrights_score_and_a_held_headline_names_the_hold() {
+    let tables = Arc::new(Tables::load(&default_data_dir()).expect("tables load"));
+    let mut g = Game::new(tables, NewGame { seed: 7, player: FactionKind::Arkwrights, player_is_ai: false, player_start: StateId::EastAsia });
+    let ark = Seat(0);
+    let card = g.tables.faction(FactionKind::Arkwrights).victory_first;
+    assert_eq!((card.weight, card.capital_weight), (0.6, 0.1));
+    assert!(FactionKind::ALL.iter().filter(|k| **k != FactionKind::Arkwrights).all(|k| g.tables.faction(*k).victory_first.capital_weight == 0.0), "the Arkwrights alone");
+    let capital = g.tables.tiers.iter().position(|t| t.one_per_body).expect("the Capital tier") as u32;
+    bare_stations(&mut g);
+    open_gates(&mut g);
+    // Short of the bars: 4 of 42 over one Body of four, no Capital: 0.6 x 4/42 + 0.3 x 1/4 + 0.1 x 0.
+    colony(&mut g, ark, BodyId::Phobos, &[ModuleKind::Habitat], 4);
+    let p = g.progress(ark);
+    assert!((p.score() - (0.6 * 4.0 / 42.0 + 0.3 * 0.25)).abs() < 1e-9, "{}", p.score());
+    assert!(p.first_held_back.is_some(), "the premise: the Capital holds the win");
+    assert_eq!(p.hold_suffix(), "", "short of the bars, the percentage alone");
+    // Both bars met and no Capital: 90%, and every headline says why.
+    let mars = colony(&mut g, ark, BodyId::Mars, &[ModuleKind::Habitat], 30);
+    for body in [BodyId::Moon, BodyId::Deimos] {
+        colony(&mut g, ark, body, &[ModuleKind::Habitat], 4);
+    }
+    let p = g.progress(ark);
+    assert!(p.first_value >= p.first_bar && p.second_value >= p.second_bar, "the premise: both bars reached: {p:?}");
+    assert!((p.score() - 0.9).abs() < 1e-9, "{}", p.score());
+    assert_eq!(p.hold_suffix(), " - needs a Colonial Capital");
+    assert!(g.report_head().ends_with("Your Victory: 90% - needs a Colonial Capital"), "{}", g.report_head());
+    // The gate Tech's hold comes first, in the same few words.
+    g.research.done.retain(|t| *t != TechId::GenerationShips);
+    assert_eq!(g.progress(ark).hold_suffix(), " - needs Generation Ships");
+    // The Capital held: the last tenth, and the Tech alone holds.
+    g.colony_mut(mars).unwrap().tier = capital;
+    let p = g.progress(ark);
+    assert!((p.score() - 1.0).abs() < 1e-9, "{}", p.score());
+    assert!(g.report_head().ends_with("Your Victory: 100% - needs Generation Ships"), "{}", g.report_head());
+    open_gates(&mut g);
+    let p = g.progress(ark);
+    assert!(p.met());
+    assert_eq!(p.hold_suffix(), "", "met: nothing to name");
+}
+
+/// Ticket #567, from the review: **the Custodians' partial credit fills the first part short of its
+/// bar** (ticket #406: the best run of the game never falls back), so a Custodian whose run reached
+/// the bar before Planetary Stewardship stood, and broke, reads 100% with the run at nought. The
+/// suffix keys on the parts as the percentage reads them, so the headline names the hold there too.
+#[test]
+fn the_custodians_held_hundred_on_partial_credit_names_the_hold_too() {
+    let mut g = game();
+    let cus = Seat(0);
+    assert_eq!(g.kind(cus), FactionKind::Custodians);
+    bare_stations(&mut g);
+    colony(&mut g, cus, BodyId::Mars, &[ModuleKind::Habitat; 4], 18);
+    g.climate.best_run = g.tables.faction(FactionKind::Custodians).victory_first.bar as u32;
+    let p = g.progress(cus);
+    assert!(p.first_value < p.first_bar && (p.score() - 1.0).abs() < 1e-9, "the premise: 100% on the best run, the run itself at nought: {p:?}");
+    assert!(!p.met() && p.first_held_back.as_deref().unwrap_or("").contains("Planetary Stewardship"), "{p:?}");
+    assert_eq!(p.hold_suffix(), " - needs Planetary Stewardship");
+    assert!(g.report_head().ends_with("Your Victory: 100% - needs Planetary Stewardship"), "{}", g.report_head());
 }
 
 // ---------------------------------------------------------------- 14.3 the AI seats spread out
@@ -11712,8 +11799,9 @@ fn a_rival_closing_on_its_victory_condition_interrupts_the_player_once_a_step() 
     colony(&mut g, pro, BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 14);
     g.seats[pro.index()].venture_fund = 2625.0;
     // Ticket #555 (version 0.1.0.2): the score is the mean of the parts, (14/18 + 0.75) / 2, past
-    // three quarters; the Fund is still the shorter part, which the Moment names.
-    assert!((g.progress(pro).score() - (14.0 / 18.0 + 0.75) / 2.0).abs() < 1e-9, "{}", g.progress(pro).score());
+    // three quarters; the Fund is still the shorter part, which the Moment names. Ticket #567
+    // (version 0.1.0.3): the Fund counts 0.7 of it, 0.7 x 0.75 + 0.3 x 14/18.
+    assert!((g.progress(pro).score() - (0.7 * 0.75 + 0.3 * 14.0 / 18.0)).abs() < 1e-9, "{}", g.progress(pro).score());
     assert!(g.progress(pro).score() >= 0.75);
     g.end_phase();
     assert_eq!(fired(&g), 1, "three quarters: the Moment fires: {:?}", g.report.moments);
@@ -22449,7 +22537,8 @@ fn the_arkwrights_win_waits_on_a_colonial_capital_they_hold() {
     assert!(p.first_value >= p.first_bar && p.second_value >= p.second_bar, "both parts stand: {p:?}");
     assert!(!p.met(), "no Capital: held back");
     assert_eq!(p.first_held_back.as_deref(), Some("needs a Colonial Capital of yours, at a Colony you hold off Earth"));
-    assert!((p.score() - 1.0).abs() < 1e-9, "the score is untouched by the hold");
+    // Ticket #567 (version 0.1.0.3): the Capital is a tenth of the score, so the hold reads 90%.
+    assert!((p.score() - 0.9).abs() < 1e-9, "the Capital's tenth missing: {}", p.score());
     // The rival's Moment does not call this "half met, only Colonists off Earth remains at 42 of 42".
     g.end_phase();
     assert!(!g.report.moments.iter().any(|m| m.text.contains("met half")), "{:?}", g.report.moments);
@@ -23455,7 +23544,9 @@ fn prospectors_at_eighty(g: &mut Game) -> Seat {
     let pro = Seat(1);
     colony(g, pro, BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 15);
     let presence = g.progress(pro).second_fraction();
-    g.seats[1].venture_fund = 3500.0 * (1.6 - presence);
+    // Ticket #567 (version 0.1.0.3): the Fund counts 0.7 of the score, read from the card.
+    let w = g.tables.faction(FactionKind::Prospectors).victory_first.weight;
+    g.seats[1].venture_fund = 3500.0 * (0.8 - (1.0 - w) * presence) / w;
     assert!((g.progress(pro).score() - 0.8).abs() < 1e-9, "the premise: 80%, {}", g.progress(pro).score());
     pro
 }

@@ -950,9 +950,14 @@ pub struct VictoryFirstCard {
     pub kind: VictoryFirstKind,
     pub bar: f64,
     /// Ticket #555 (version 0.1.0.2): what the first part counts for in the score, the second part
-    /// counting the rest. Absent, an even half.
+    /// counting the rest (ticket #567: what this and `capital_weight` leave). Absent, an even half.
     #[serde(default = "half")]
     pub weight: f64,
+    /// Ticket #567 (version 0.1.0.3): what a Colonial Capital held counts for in the score, on a
+    /// card that asks one (`victory_capital`); the second part counts what the two leave. The
+    /// Arkwrights' is a tenth, so a seat with both bars met and no Capital reads 90%. Absent, nought.
+    #[serde(default)]
+    pub capital_weight: f64,
 }
 
 fn half() -> f64 {
@@ -2444,6 +2449,14 @@ impl Tables {
             }
             if !(0.0..=1.0).contains(&f.victory_first.weight) {
                 return Err(err("factions.toml", format!("row {}: victory_first.weight must be between 0 and 1", f.name)));
+            }
+            // Ticket #567 (version 0.1.0.3): the Capital's share, only on a card that asks a Capital,
+            // and the three shares summing to one at most.
+            if f.victory_first.capital_weight < 0.0 || f.victory_first.weight + f.victory_first.capital_weight > 1.0 {
+                return Err(err("factions.toml", format!("row {}: victory_first.capital_weight must not be negative, and weight + capital_weight no more than 1", f.name)));
+            }
+            if f.victory_first.capital_weight > 0.0 && !f.victory_capital {
+                return Err(err("factions.toml", format!("row {}: victory_first.capital_weight wants victory_capital = true", f.name)));
             }
             // Ticket #51: whichever second part a card names, its own figures must be positive.
             let second_ok = match f.victory_second.kind {

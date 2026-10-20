@@ -691,7 +691,7 @@ pub fn ordinal(n: usize) -> String {
 /// The same for `[phrase]`.
 pub const PHRASE_ARGS: &[(&str, &[&str])] = &[
     // Ticket #544 (version 0.1.0.1): the Report's head.
-    ("head", &["clock", "pct"]),
+    ("head", &["clock", "pct", "hold"]),
     ("clock_turn", &["turn"]),
     ("clock_too_late", &[]),
     ("clock_none", &[]),

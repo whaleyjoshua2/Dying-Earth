@@ -290,3 +290,28 @@ field (ten of interest against nought) and a window test on the line. No rule mo
 paid at the end of the Income): the reward is kept too and named on that turn alone; a stranded doc
 comment moved back to its function; and the reset to nought on an Income with no Bank paying is
 pinned.
+
+## The Fund and the Capital weighed into the percentage
+
+Ticket [#567](https://github.com/whaleyjoshua2/Dying-Earth/issues/567), spec §10. Decided in one
+round: the Prospectors' Fund at 0.7; the Arkwrights' Capital a tenth of their score, a part of its
+own; a headline with both parts full and a hold standing names the hold ("100% - needs Generation
+Ships"); a sweep. Built: `capital_weight` on the card and in `Progress`, `hold_suffix` appended by
+the window's row, the Report's head, the game-over page and the ranking. Red first on the figures
+(the Prospectors' 59% against 42%, the Arkwrights' 100% against 90%) and the headline's suffix, with
+the card's field and the helper stubbed; five older pins moved with the weights.
+
+**The review** found the suffix keyed on the bars where the percentage reads the parts: the
+Custodians' best run fills their first part short of the bar (#406), so a broken run that once
+reached 4 read 100% with no hold named -- the ticket's own shape. Keyed on the parts now, red first.
+Also from the review: a `percent_text` helper nothing in the product called is dropped, stale
+comments on the first weight mended, and two things stated for the designer -- the Capital's tenth
+opens the computer seats' Trade and Accord door (refused at 95%) to an Arkwright seat one upgrade
+from winning, and the ranking page names a hold twice, heading and chronicle.
+
+**Swept** ([`sweeps/ticket-567.txt`](sweeps/ticket-567.txt)): 9 / 60 / 5 / 6 and no collapse, from
+12 / 58 / 6 / 2 and 1 -- noise. Three games of 80 went to the last-turn ranking. The computer
+Arkwrights held a Capital at the end in 4 of 80, so their tenth is off in nearly every game. Income
+per Faction (Materials / Fuel / Energy / Ducats / Research, mean a game): Custodians 999 / 274 /
+2299 / 1403 / 827; Prospectors 2092 / 461 / 2881 / 1572 / 402; Arkwrights 1658 / 370 / 2407 / 3268 /
+286; Archivists 469 / 266 / 1175 / 484 / 749.

@@ -12350,7 +12350,9 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 // Factions and the next thought is "tell me more about that one". A Region card's
                 // `Held by the Archivists` and the roster are deliberately left alone: there a Faction's
                 // name describes a PLACE, and a click there must go on selecting the place.
-                faction_link(ui, view, seat, RichText::new(format!("{} - {:.0}% of the way there", game.seat_name(seat), p.score() * 100.0)).strong().color(seat_colour(session, seat)));
+                // Ticket #567 (version 0.1.0.3): with both bars reached and a hold standing, the hold
+                // in a few words after the percentage, where a held 100% read as a win.
+                faction_link(ui, view, seat, RichText::new(format!("{} - {:.0}% of the way there{}", game.seat_name(seat), p.score() * 100.0, p.hold_suffix())).strong().color(seat_colour(session, seat)));
                 // Ticket #306 (version 0.08.7): the Victory Condition sentence that stood here is
                 // cut, at the designer's word, as a restatement of the two labelled bars beneath
                 // it; the Rulebook keeps its copy.
@@ -12799,13 +12801,14 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 let p = game.progress(seat);
                 ui.label(
                     RichText::new(format!(
-                        "{}: {} {:.0} of {:.0}; {} ({:.0}% of its Victory Condition).",
+                        "{}: {} {:.0} of {:.0}; {} ({:.0}% of its Victory Condition{}).",
                         game.seat_name(seat),
                         p.first_name,
                         p.first_value,
                         p.first_bar,
                         p.second_text,
-                        p.score() * 100.0
+                        p.score() * 100.0,
+                        p.hold_suffix()
                     ))
                     .color(seat_colour(session, seat)),
                 );
@@ -12921,7 +12924,8 @@ fn chronicle_screen(root: &mut Ui, session: &Session, actions: &mut Vec<Action>)
             for (place, (seat, separated)) in ranking.iter().enumerate() {
                 let colour = seat_colour(session, *seat);
                 ui.add_space(4.0);
-                ui.label(RichText::new(format!("{}. The {} -- {:.0}% of the way to their Victory Condition", place + 1, game.seat_name(*seat), game.progress(*seat).score() * 100.0)).size(17.0).strong().color(colour));
+                let p = game.progress(*seat);
+                ui.label(RichText::new(format!("{}. The {} -- {:.0}% of the way to their Victory Condition{}", place + 1, game.seat_name(*seat), p.score() * 100.0, p.hold_suffix())).size(17.0).strong().color(colour));
                 ui.label(RichText::new(chronicle_sentence(game, *seat)).size(15.0));
                 // The tiebreak NAMED, where one decided the order rather than the score. Two seats
                 // level on all three keys are told so too, since the order between them then means

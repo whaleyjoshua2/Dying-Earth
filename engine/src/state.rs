@@ -6143,8 +6143,11 @@ impl Game {
             return clock;
         }
         // The review: the Victory windows' own rounding.
-        let pct = format!("{:.0}", self.progress(Seat(0)).score() * 100.0);
-        self.phrase("head", &[("clock", clock), ("pct", pct)])
+        // Ticket #567 (version 0.1.0.3): and the hold named, with both bars reached ("100% - needs
+        // Generation Ships"), where a held 100% read as a win.
+        let p = self.progress(Seat(0));
+        let pct = format!("{:.0}", p.score() * 100.0);
+        self.phrase("head", &[("clock", clock), ("pct", pct), ("hold", p.hold_suffix())])
     }
 
     /// Ticket #538 (version 0.1.0.1): an Accord between `a` and `b` has ended. Each player in it

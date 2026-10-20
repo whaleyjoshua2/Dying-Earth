@@ -303,7 +303,7 @@ energy_zero = "{faction}: Energy at zero with every producer off."
 attacks = " and attacks"
 # Ticket #544 (version 0.1.0.1): the Report's head -- the clock in the Climate Panel's words, and
 # the player's Victory.
-head = "{clock} · Your Victory: {pct}%"
+head = "{clock} · Your Victory: {pct}%{hold}"
 clock_turn = "Last turn to act: {turn}"
 clock_too_late = "Cuts alone no longer avoid Collapse"
 clock_none = "On this path Collapse is not reached"
