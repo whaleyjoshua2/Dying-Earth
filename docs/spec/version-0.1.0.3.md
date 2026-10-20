@@ -594,3 +594,39 @@ could warm while a phase counted as under. Decided in one round ("q1 yes q2 a q3
 - **The review** (an independent agent) found every reader right -- the run, the opening gap, the ease, the computer's pace, the Production Moved worth and the three printers of the line all on the net, `counted()` with no caller left but `total()`, and the Blame ledger untouched. It caught the Sink Weakens test proving its claim for the wrong reason (the Permafrost Thaw fires at 1.6 beside the Sink Weakens at 2.0, and its 4.0 now put the second phase over the old Sink as well -- the thaw is set aside in that test, which is about the Sink); the Methane Burst test named for the abolished exemption (renamed, and it witnesses a card breaking a run now); and five lines of prose still saying "counted" or "exempt" -- the glossary's opening gap, `unrest.toml`'s ease, the `opening_gap` field, the Carbon Pulse's doc and the permafrost line's comment. All mended. **One note, left as built**: a save from 0.1.0.2 carries an opening gap measured on the sources alone, so on that save the best share closed is compared across two measures for the rest of the game; it never falls back, so nothing is lost.
 - **Swept** ([`sweeps/ticket-578.txt`](../dev-diary/2026-10-19-version-0.1.0.3/sweeps/ticket-578.txt),
   20 seeds x four seatings): **20 / 49 / 4 / 7 and no collapse**, from 20 / 48 / 5 / 7 -- noise; the Custodians' twenty wins unmoved, their gate still completed in 75 of 80 games at a median turn 15. The world under the Natural Sink at least once, which the sweep counts by the run's test, in 28 of 80 games (median first turn 35) from 30 (34): the cards and the permafrost cost the computer Custodians two games' first run and a turn, no more, which says the late permafrost rarely decides it. Income per Faction (Materials / Fuel / Energy / Ducats / Research, mean a game): Custodians 1185 / 370 / 2740 / 1613 / 1045; Prospectors 2216 / 433 / 2796 / 1264 / 396; Arkwrights 1561 / 316 / 2273 / 3391 / 261; Archivists 497 / 272 / 1179 / 514 / 757 -- the Custodians' Research 1045 from 970, the one figure past noise; not traced.
+
+## 19. The Cheap Ore Offer's refusal halves Materials for the refusing seat, one turn
+
+Ticket: [The Cheap Ore Offer lasts one turn, and a refusal halves Materials for the refusing seat alone](https://github.com/whaleyjoshua2/Dying-Earth/issues/577).
+
+The designer: *"Cheap Ore Offer now last for a single turn, a refusal makes material costs half for
+just that seat."* The card is answered the turn it is drawn ("this turn only"), so the single turn is
+the refusal's effect, two turns in the tree; and that effect set the **market's** Materials row to
+1 Ducat for the whole table, rivals included, at a third of the banded price rather than half.
+Decided in one round ("that all sounds good let's go"):
+
+- **A refusal halves the Trading window's Materials price for the refusing seat alone**, every lot
+  bought that turn (`CardEffect::SeatPrice`, `PriceCut` on the seat, in the save with a serde
+  default). The market's own price does not move; a rival pays the window's price; the Materials
+  cost of builds and the build-with-Ducats buttons are untouched -- the card is a broker's offer,
+  and the market is where it lands.
+- **One turn**: the refusal lands at the Resolution of the turn it is answered in, after that turn's
+  trading, so the half price stands through the next Orders turn and is forgotten at its settle, as
+  a card's market price counts its turns.
+- **With the Prospectors' 0.85**: multiplied, to the tenth, as the lot is priced (`lot_price`): a
+  Prospector pays 0.425 of the price.
+- **The computer**: takes the lot when it holds 20 Ducats, as before -- thirty Materials for 20
+  Ducats beats a turn of half price unless the seat would buy sixty -- and a computer refuser buys
+  at its own price that turn through the same door as any Buy.
+- **The texts**: the refuse line reads *"Let it go: Materials at half price for you next turn"*;
+  the card's effect reads *"Materials at half price for you next turn"*; the Market line and the
+  Trading window's price column say *"half for you, this turn"* beside Materials while it stands;
+  a Prospector's column reads the two as one clause, *"(x0.85 and half for you, this turn)"*, since
+  the cell is 340 wide (the review). Rivals see nothing.
+- Red first: the new test and the Market line's test failed on the old card held back (its refusal
+  still a market price), and compiled red on the new calls before that; the band-override test of
+  ticket #337 reads the Fuel Contract now, since the Cheap Ore Offer no longer moves the market.
+  Clippy clean at `-D warnings`; 816 tests green.
+- **The review** (an independent agent) traced the clock through the turn (asked at the head of T, landed at T's Resolution, kept by T's settle, read by T+1's Orders, dropped at T+1's settle: one Orders turn, the three comparisons the card price uses), found every Buy figure going through the one cost door -- the check, the commit, the Resolution's line, the computer's top-up, the window's button -- the sell-back and the build-with-Ducats buttons untouched, the serde tag right, every match on the effect covered, and the save loading an older seat with no cuts at SAVE_VERSION 12. It caught a field on the cut written and never read (dropped); the Fuel Contract rewrite's tolerance accepting the moved price itself (an exact assert again); a spent-cut assertion looking for a card name the line never prints (it looks for the note now); the test's stale doc; two stale docs naming the old 1-Ducat Materials; and the Trading window's price column at some ninety characters for a Prospector with both notes -- one clause now, *"(x0.85 and half for you, this turn)"*. All mended.
+- **Swept** ([`sweeps/ticket-577.txt`](../dev-diary/2026-10-19-version-0.1.0.3/sweeps/ticket-577.txt),
+  20 seeds x four seatings): **19 / 49 / 6 / 6 and no collapse**, from 20 / 49 / 4 / 7 -- noise, as a one-copy card's refusal should be. Income per Faction (Materials / Fuel / Energy / Ducats / Research, mean a game): Custodians 1177 / 364 / 2720 / 1602 / 1049; Prospectors 2216 / 432 / 2799 / 1268 / 396; Arkwrights 1589 / 329 / 2307 / 3524 / 270; Archivists 493 / 271 / 1181 / 518 / 755 -- within noise of the last sweep; the Arkwrights' Ducats 3524 from 3391 is the widest move and still inside the batch's swing.

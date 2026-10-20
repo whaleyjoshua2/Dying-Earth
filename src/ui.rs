@@ -9777,9 +9777,10 @@ fn ship_weapons_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut Vi
 /// Ticket #369 (version 0.09.2): a Trading window button whose face is a verb and a Ducat figure
 /// with its glyph -- "Buy for 48 [ducats]" -- greyed with the engine's refusal on hover when the
 /// order is refused. Through `priced_button`, which is how a glyph reaches a button face; but that
-/// helper drops a nought from a price, and a nought is reachable here (Materials at 1 Ducat, one
-/// unit, the Prospectors' 15% off), so a nought is written out in words rather than leaving the
-/// face reading a bare "Buy for".
+/// helper drops a nought from a price, and a nought was reachable here when the Cheap Ore Offer
+/// set Materials to 1 Ducat (one unit, the Prospectors' 15% off); since ticket #577 (version
+/// 0.1.0.3) the cheapest lot is Energy at its band's floor, which rounds to a tenth and not to
+/// nought, but the words stay rather than trust the arithmetic from a comment.
 fn ducat_button(ui: &mut Ui, game: &Game, session: &Session, verb: &str, ducats: f64, order: &Order) -> egui::Response {
     let ok = game.check_order(Seat(0), &session.pending, order);
     let mut resp = if ducats > 0.0 {
@@ -9823,9 +9824,17 @@ fn trading_window(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSt
             icon_word(ui, key, name);
             let sells = matches!(res, Some(dying_earth_engine::Resource::Materials) | Some(dying_earth_engine::Resource::Fuel));
             // Ticket #83: the Prospectors' 15% off is taken over the lot, so the button's figure is
-            // the price; the line says so.
+            // the price; the line says so. Ticket #577 (version 0.1.0.3): and the seat's own cut
+            // from a card, beside it.
             let off = game.tables.faction(game.kind(Seat(0))).market_multiplier;
-            let discount = if res.is_some() && off != 1.0 { format!(" (x{off} for you, over the lot)") } else { String::new() };
+            // The review: one clause where both stand, since the cell is 340 wide.
+            let cut = res.and_then(Game::market_row).and_then(|row| game.seat_price_note(Seat(0), row));
+            let discount = match (res.is_some() && off != 1.0, cut) {
+                (true, Some(note)) => format!(" (x{off} and {note})"),
+                (true, None) => format!(" (x{off} for you, over the lot)"),
+                (false, Some(note)) => format!(" ({note})"),
+                (false, None) => String::new(),
+            };
             let price = if sells { format!("{per} Ducats each; sells for {} Ducats{discount}", figure(per / game.tables.ducats.sell_divisor.max(1) as f64)) } else { format!("{per} Ducats each{discount}") };
             // The glyph line wraps at the width it is given, and a Grid cell has none until its
             // content has one, so left alone it wrapped one word to a line (the first picture of
@@ -12035,6 +12044,13 @@ fn card_effect_text(e: &CardEffect) -> String {
             Some(to) => format!("the {} price stands at {to} for {}", resource.name(), counted(turns, "turn", "turns")),
             None => format!("the {} price moves {by:+} for {}", resource.name(), counted(turns, "turn", "turns")),
         },
+        // Ticket #577 (version 0.1.0.3): the seat's own cut.
+        CardEffect::SeatPrice { resource, multiplier, turns } => format!(
+            "{} at {} for you {}",
+            resource.name(),
+            if (*multiplier - 0.5).abs() < 1e-9 { "half price".to_string() } else { format!("x{multiplier}") },
+            if *turns == 1 { "next turn".to_string() } else { format!("for {}", counted(*turns, "turn", "turns")) }
+        ),
         CardEffect::RelationsAllRivals { relations } => format!("{relations:+} Relations with every rival"),
         CardEffect::BlamePpm { ppm } => {
             if *ppm < 0.0 {

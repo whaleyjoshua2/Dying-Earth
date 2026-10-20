@@ -492,3 +492,14 @@ one figure, and the texts following. Three tests red first, the Permafrost Thaw'
 which had pinned the exemption since 0.05.5.
 
 **The sweep** ([`sweeps/ticket-578.txt`](sweeps/ticket-578.txt)): **20 / 49 / 4 / 7 and no collapse**, from 20 / 48 / 5 / 7 -- noise; the Custodians' twenty wins unmoved, their gate still completed in 75 of 80 games at a median turn 15. The world under the Natural Sink at least once, which the sweep counts by the run's test, in 28 of 80 games (median first turn 35) from 30 (34): the cards and the permafrost cost the computer Custodians two games' first run and a turn, no more, which says the late permafrost rarely decides it. Income per Faction (Materials / Fuel / Energy / Ducats / Research, mean a game): Custodians 1185 / 370 / 2740 / 1613 / 1045; Prospectors 2216 / 433 / 2796 / 1264 / 396; Arkwrights 1561 / 316 / 2273 / 3391 / 261; Archivists 497 / 272 / 1179 / 514 / 757 -- the Custodians' Research 1045 from 970, the one figure past noise; not traced.
+
+## The Cheap Ore Offer's refusal halves Materials for the refusing seat, one turn
+
+Ticket [#577](https://github.com/whaleyjoshua2/Dying-Earth/issues/577), spec §19. A card ticket:
+the refusal set the whole table's Materials to 1 Ducat for two turns; it is the refusing seat's own
+half price for one turn now, a new card effect (`seat_price`) and a seat-scoped, timed cut the
+Trading window reads beside the Prospectors' 0.85. One round, five questions, all at the
+recommendation ("that all sounds good let's go"). The red: the old card held back under the new
+code, the new test and the Market line's test failing on it.
+
+**The sweep** ([`sweeps/ticket-577.txt`](sweeps/ticket-577.txt)): **19 / 49 / 6 / 6 and no collapse**, from 20 / 49 / 4 / 7 -- noise, as a one-copy card's refusal should be. Income per Faction (Materials / Fuel / Energy / Ducats / Research, mean a game): Custodians 1177 / 364 / 2720 / 1602 / 1049; Prospectors 2216 / 432 / 2799 / 1268 / 396; Arkwrights 1589 / 329 / 2307 / 3524 / 270; Archivists 493 / 271 / 1181 / 518 / 755 -- within noise of the last sweep; the Arkwrights' Ducats 3524 from 3391 is the widest move and still inside the batch's swing.

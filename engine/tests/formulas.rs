@@ -15201,28 +15201,31 @@ fn grounding_the_fleet_holds_that_seats_transits_and_nobody_elses() {
 /// The turns it names are the turns of ORDERS that follow it: the answer lands at the Resolution of
 /// the turn it was given in, by which time that turn's trading is done, so a countdown spent at the
 /// settle would burn one of its turns before a single order had been priced at it.
+/// Ticket #577 (version 0.1.0.3): read on the Fuel Contract, whose refusal moves the Fuel price,
+/// since the Cheap Ore Offer's refusal no longer touches the market at all.
 #[test]
 fn a_card_that_moves_a_price_overrides_the_band_for_the_turns_it_names() {
     let mut g = game();
-    let refuse = g.tables.event(EventId::CheapOreOffer).choice.clone().expect("it asks").refuse_does;
-    let (to, turns) = match refuse.first().expect("the refusing side is a list of effects") {
-        CardEffect::TradePrice { to, turns, .. } => (to.expect("the Cheap Ore Offer SETS the price"), *turns),
-        e => panic!("the refusing side of the Cheap Ore Offer is a price: {e:?}"),
+    let refuse = g.tables.event(EventId::FuelContract).choice.clone().expect("it asks").refuse_does;
+    let (by, turns) = match refuse.first().expect("the refusing side is a list of effects") {
+        CardEffect::TradePrice { to: None, by, turns, .. } => (*by, *turns),
+        e => panic!("the refusing side of the Fuel Contract moves a price: {e:?}"),
     };
-    let row = Game::market_row(Resource::Materials).expect("Materials are traded");
+    assert_ne!(by, 0, "the card moves the price");
+    let row = Game::market_row(Resource::Fuel).expect("Fuel is traded");
     let band = g.market_price_at(row);
-    assert_ne!(band, to, "the card's price is outside the band the market opens at");
-    // The offer is 30 Materials for 20 Ducats, and a seat that cannot pay the 20 is not asked at
-    // all -- a price it cannot meet is an effect that cannot land. So it is given the money first.
-    g.seats[0].stockpile.ducats = 100.0;
-    ask_the_card(&mut g, EventId::CheapOreOffer);
+    let to = band + by;
+    // The contract asks 20 Fuel, and a seat that cannot pay is not asked at all -- an effect that
+    // cannot land. So it is given the Fuel first.
+    g.seats[0].stockpile.fuel = 100.0;
+    ask_the_card(&mut g, EventId::FuelContract);
     let answered_on = g.turn;
-    g.answer_card(Seat(0), false).expect("the offer can be refused");
+    g.answer_card(Seat(0), false).expect("the contract can be refused");
     g.apply_card_answers();
     g.settle_market(); // the end of the turn it was answered in
     for t in answered_on + 1..answered_on + 1 + turns {
         g.turn = t;
-        assert_eq!(g.market_price_at(row), to, "turn {t}: the price the card named stands");
+        assert_eq!(g.market_price_at(row), to, "turn {t}: the price the card moved to stands");
         g.settle_market();
     }
     g.turn = answered_on + 1 + turns;
@@ -18453,8 +18456,10 @@ fn a_move_that_spends_the_tank_says_so() {
 }
 
 /// Ticket #404 (4): **the Market line names a price a card has set, and the turns it has left.**
-/// A price moves at most a step a turn inside its band, but the Cheap Ore Offer puts Materials at 1
-/// for two turns; the driver printed no price at all after the first turn.
+/// A price moves at most a step a turn inside its band, but a card can put it outside; the driver
+/// printed no price at all after the first turn. Ticket #577 (version 0.1.0.3): the Cheap Ore
+/// Offer's refusal is the seat's own cut now, and the line names that beside the price, on the
+/// refusing seat's line alone, for its one turn.
 #[test]
 fn the_market_line_names_a_price_a_card_has_set() {
     let mut g = game();
@@ -18467,13 +18472,15 @@ fn the_market_line_names_a_price_a_card_has_set() {
     g.apply_card_answers();
     g.settle_market();
     g.turn += 1;
+    // Ticket #577 (version 0.1.0.3): the refusal is the seat's own half price for one turn, named
+    // on its line alone; the market's price does not move and a rival's line says nothing.
     let line = g.market_line(Seat(0));
-    assert!(line.contains("Materials 1 (Cheap Ore Offer, 1 more turn)"), "the first turn of two: {line}");
+    let half = figure(g.lot_price(Seat(0), Resource::Materials, g.trade_price(Resource::Materials).unwrap() as f64));
+    assert!(line.contains(&format!("Materials {half} (half for you, this turn)")), "the one turn: {line}");
+    assert!(!g.market_line(Seat(1)).contains('('), "nothing on a rival's line: {}", g.market_line(Seat(1)));
+    g.settle_market();
     g.turn += 1;
-    let line = g.market_line(Seat(0));
-    assert!(line.contains("Materials 1 (Cheap Ore Offer, its last turn)"), "the second: {line}");
-    g.turn += 1;
-    assert!(!g.market_line(Seat(0)).contains("Cheap Ore Offer"), "and spent after");
+    assert!(!g.market_line(Seat(0)).contains('('), "and spent after: {}", g.market_line(Seat(0)));
 }
 
 /// Ticket #404 (6, Q7): **a place changing hands to or from the player is also listed under Your
@@ -24235,4 +24242,56 @@ fn a_counter_is_answered_at_once_by_the_trade_rule() {
     g.answer_computer_offers();
     assert!(g.offers.is_empty());
     assert!(g.refused_recently(Seat(0), Seat(1)), "refused outright, no counter made");
+}
+
+// ---------------------------------------------------------------- #577 The Cheap Ore Offer's refusal (version 0.1.0.3)
+
+/// Ticket #577 (version 0.1.0.3), at the designer's word: a refusal of the Cheap Ore Offer halves
+/// the Trading window's Materials price for the refusing seat alone, for the one turn of orders
+/// after the answer, where it set the market's row to 1 Ducat for two turns for the whole table.
+/// The market's own price does not move; a rival pays the window's price; the Prospectors' 0.85 and
+/// the half multiply, to the tenth; the cut is gone at the turn's settle. The computer's answer is
+/// unchanged: it buys the lot when it holds 20 Ducats.
+#[test]
+fn the_cheap_ore_offers_refusal_halves_materials_for_the_refusing_seat_for_a_turn() {
+    let mut g = game();
+    let refuse = g.tables.event(EventId::CheapOreOffer).choice.clone().expect("it asks").refuse_does;
+    let (multiplier, turns) = match refuse.first().expect("the refusing side is a list of effects") {
+        CardEffect::SeatPrice { resource: Resource::Materials, multiplier, turns } => (*multiplier, *turns),
+        e => panic!("the refusing side of the Cheap Ore Offer is the seat's own Materials price: {e:?}"),
+    };
+    assert_eq!((multiplier, turns), (0.5, 1), "half, for one turn");
+    let row = Game::market_row(Resource::Materials).unwrap();
+    let band = g.market_price_at(row);
+    g.seats[0].stockpile.ducats = 100.0;
+    ask_the_card(&mut g, EventId::CheapOreOffer);
+    g.answer_card(Seat(0), false).expect("the offer can be refused");
+    g.apply_card_answers();
+    assert_eq!(g.market_price_at(row), band, "the market's own price does not move");
+    g.settle_market();
+    g.turn += 1;
+    for s in Seat::ALL {
+        g.seats[s.index()].stockpile.ducats = 1000.0;
+    }
+    let lot = |g: &Game, seat: Seat| g.check_order(seat, &[], &Order::Buy { resource: Resource::Materials, amount: 10 }).expect("a buy of ten").ducats;
+    let price = g.trade_price(Resource::Materials).unwrap() as f64;
+    assert_eq!(lot(&g, Seat(0)), tenth(price * 10.0 * 0.5), "half for the refusing seat");
+    assert_eq!(lot(&g, Seat(2)), tenth(price * 10.0), "a rival pays the window's price");
+    assert_eq!(g.market_price_at(row), band, "and the market still has not moved");
+    // The Prospectors' 0.85 and the half multiply, to the tenth, as the lot is priced.
+    let pro = Seat(1);
+    assert_eq!(g.kind(pro), FactionKind::Prospectors);
+    assert_eq!(g.tables.faction(FactionKind::Prospectors).market_multiplier, 0.85);
+    let cut = g.seats[0].price_cuts[0];
+    g.seats[pro.index()].price_cuts.push(cut);
+    assert_eq!(lot(&g, pro), tenth(price * 10.0 * 0.85 * 0.5), "0.425 of the price for a Prospector");
+    // One turn: gone at the settle, and the next turn's lot is at the window's price.
+    g.settle_market();
+    g.turn += 1;
+    assert!(g.seats[0].price_cuts.is_empty(), "the cut is spent");
+    let price = g.trade_price(Resource::Materials).unwrap() as f64;
+    assert_eq!(lot(&g, Seat(0)), tenth(price * 10.0));
+    // The computer's answer: the lot when it holds the 20 Ducats, as before.
+    let rule = g.tables.event(EventId::CheapOreOffer).choice.clone().unwrap().take_when;
+    assert!(matches!(rule, CardRule::DucatsAtLeast { ducats } if ducats == 20), "{rule:?}");
 }

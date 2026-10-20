@@ -1003,6 +1003,10 @@ pub struct SeatState {
     pub kind: FactionKind,
     pub ai: bool,
     pub stockpile: Stockpile,
+    /// Ticket #577 (version 0.1.0.3): price cuts of this seat's own, from a card -- the Cheap Ore
+    /// Offer's refusal: half the Materials price for a turn. One a market row. In the save.
+    #[serde(default)]
+    pub price_cuts: Vec<PriceCut>,
     /// Ticket #72 (version 0.05.5): Ducats banked in the Venture Capital Fund (the Prospectors'
     /// first Victory part), the share of Ducat income banked each Income, and what last
     /// Income banked. The running Extraction Total this replaces is retired.
@@ -1644,6 +1648,16 @@ impl Accord {
 /// sees one-way upward pressure from the computer, and Fuel and Energy move only when a human
 /// trades them. The designer chose to ship it anyway; giving the seats an appetite to sell, and to
 /// buy the other two, is a separate ticket.
+/// Ticket #577 (version 0.1.0.3): a seat's own price cut from a card: the market row, the
+/// multiplier, and the last turn it stands (counted as a card's price is: the turns of orders
+/// after the answer). The Market line names the cut, not the card.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct PriceCut {
+    pub row: usize,
+    pub multiplier: f64,
+    pub until: u32,
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Market {
     /// The live price of Materials, Fuel and Energy, in that order. Zero means "not opened yet" and
@@ -1817,6 +1831,7 @@ impl Game {
             kind,
             ai,
             stockpile: start,
+            price_cuts: Vec::new(),
             venture_fund: 0.0,
             venture_share: 0.0,
             venture_banked_last_turn: 0.0,

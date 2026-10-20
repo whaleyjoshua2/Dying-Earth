@@ -673,8 +673,9 @@ impl Game {
             // add it without a special case; a sale is the mirror, with a negative Ducat cost.
             Order::Buy { resource, amount } => {
                 // Ticket #83: the lot's price, times the seat's market multiplier; ticket #387
-                // (version 0.09.3): to the tenth, where it was rounded down.
-                let ducats = self.market_price(seat, (self.trade_price(*resource).unwrap_or(0) * *amount) as f64);
+                // (version 0.09.3): to the tenth, where it was rounded down. Ticket #577 (version
+                // 0.1.0.3): and times the seat's own cut on that good, where a card gave it one.
+                let ducats = self.lot_price(seat, *resource, (self.trade_price(*resource).unwrap_or(0) * *amount) as f64);
                 match resource {
                     Resource::Materials => Cost { materials: -*amount as f64, ducats, ..Default::default() },
                     Resource::Fuel => Cost { fuel: -*amount as f64, ducats, ..Default::default() },
@@ -738,8 +739,10 @@ impl Game {
     /// or a save written before this version -- and reads as the card figure.
     pub fn market_price_at(&self, row: usize) -> i64 {
         // Ticket #337 (version 0.09.0): a choice card may OVERRIDE the price, outside the band,
-        // through the last turn it named -- a Materials price of 1 is the whole point of the Cheap
-        // Ore Offer. The banded price goes on underneath and resumes when the override runs out.
+        // through the last turn it named -- the Fuel Contract's refusal moves Fuel a step, the
+        // Trade Pact takes a step off Materials. The banded price goes on underneath and resumes
+        // when the override runs out. (The Cheap Ore Offer set Materials to 1 until ticket #577,
+        // version 0.1.0.3; its refusal is the seat's own cut now, `lot_price`.)
         if self.market.card_price[row] > 0 && self.turn <= self.market.card_price_until[row] {
             return self.market.card_price[row];
         }
@@ -758,8 +761,10 @@ impl Game {
     /// A price moves a step a turn inside its band; a card is what swings it from 4 to 1.
     pub fn market_line(&self, seat: Seat) -> String {
         let price = |r: Resource, name: &str| {
-            let p = self.market_price(seat, self.trade_price(r).unwrap_or(0) as f64);
-            let note = Game::market_row(r).and_then(|row| self.market_card_note(row)).map(|n| format!(" ({n})")).unwrap_or_default();
+            let p = self.lot_price(seat, r, self.trade_price(r).unwrap_or(0) as f64);
+            // Ticket #577 (version 0.1.0.3): and the seat's own cut, beside the card over the row.
+            let notes: Vec<String> = Game::market_row(r).into_iter().flat_map(|row| [self.market_card_note(row), self.seat_price_note(seat, row)]).flatten().collect();
+            let note = if notes.is_empty() { String::new() } else { format!(" ({})", notes.join("; ")) };
             format!("{name} {}{note}", figure(p))
         };
         format!(
@@ -787,6 +792,30 @@ impl Game {
         })
     }
 
+    /// Ticket #577 (version 0.1.0.3): the seat's own cut on a row this turn, where a card gave it
+    /// one, or `None`.
+    pub fn seat_price_cut(&self, seat: Seat, row: usize) -> Option<PriceCut> {
+        self.seat(seat).price_cuts.iter().copied().find(|c| c.row == row && self.turn <= c.until)
+    }
+
+    /// Ticket #577: the cut's words for the Market line and the Trading window's price column:
+    /// *"half for you, this turn"*.
+    pub fn seat_price_note(&self, seat: Seat, row: usize) -> Option<String> {
+        let c = self.seat_price_cut(seat, row)?;
+        let how = if (c.multiplier - 0.5).abs() < 1e-9 { "half".to_string() } else { format!("x{}", c.multiplier) };
+        Some(match c.until - self.turn {
+            0 => format!("{how} for you, this turn"),
+            n => format!("{how} for you, {}", crate::counted(n + 1, "turn", "turns")),
+        })
+    }
+
+    /// Ticket #577: what the window charges this seat for a lot of `resource` priced at `ducats`:
+    /// the Faction's multiplier and the seat's own cut on that good, to the tenth.
+    pub fn lot_price(&self, seat: Seat, resource: Resource, ducats: f64) -> f64 {
+        let cut = Game::market_row(resource).and_then(|row| self.seat_price_cut(seat, row)).map_or(1.0, |c| c.multiplier);
+        tenth(ducats * self.tables.faction(self.kind(seat)).market_multiplier * cut)
+    }
+
     /// Ticket #220 (version 0.08.2): the turn's trading moves each price, once, at the settle.
     ///
     /// `price_step_units` net units bought moves it a step up, the same sold moves it a step down,
@@ -807,6 +836,11 @@ impl Game {
                 self.market.card_price[row] = 0;
                 self.market.card_price_until[row] = 0;
             }
+        }
+        // Ticket #577 (version 0.1.0.3): a seat's own cut is forgotten the same way.
+        let turn = self.turn;
+        for s in &mut self.seats {
+            s.price_cuts.retain(|c| turn < c.until);
         }
         for row in 0..3 {
             let base = self.market_base(row);

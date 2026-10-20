@@ -323,7 +323,7 @@ impl Game {
         let t = &self.tables;
         let lacks = |has: bool, key: &str, args: &[(&str, String)]| if has { None } else { Some(self.say(key, args)) };
         match e {
-            CardEffect::Resources { .. } | CardEffect::EmissionsNext { .. } | CardEffect::TradePrice { .. } | CardEffect::RelationsAllRivals { .. } | CardEffect::BlamePpm { .. } => None,
+            CardEffect::Resources { .. } | CardEffect::EmissionsNext { .. } | CardEffect::TradePrice { .. } | CardEffect::SeatPrice { .. } | CardEffect::RelationsAllRivals { .. } | CardEffect::BlamePpm { .. } => None,
             CardEffect::PerUnitCost { per: CardThing::Facility(kind), .. } => lacks(self.card_things(seat, CardThing::Facility(*kind)) > 0, "lack_facility", &[("facility", t.facility(*kind).name.clone())]),
             CardEffect::PerUnitCost { per: CardThing::ShipInOrbit, .. } => lacks(self.card_things(seat, CardThing::ShipInOrbit) > 0, "lack_ship_in_orbit", &[]),
             CardEffect::PopulationToMostPopulous { .. } | CardEffect::StandingAtMostPopulous { .. } | CardEffect::UnrestAtMostPopulous { .. } | CardEffect::PioneersFree { .. } | CardEffect::FreeBuilding { army: true, .. } => {
@@ -614,6 +614,15 @@ impl Game {
                 self.market.card_price_until[row] = self.turn + turns;
                 // Ticket #404 (version 0.09.4): and which card, for the Market line.
                 self.market.card_price_by[row] = self.question.as_ref().map(|q| q.card);
+            }
+            // Ticket #577 (version 0.1.0.3): the seat's own cut, landing as a card's price does --
+            // at this turn's Resolution, for the turns of orders that follow it.
+            CardEffect::SeatPrice { resource, multiplier, turns } => {
+                let Some(row) = Game::market_row(*resource) else { return };
+                let until = self.turn + turns;
+                let cuts = &mut self.seat_mut(seat).price_cuts;
+                cuts.retain(|c| c.row != row);
+                cuts.push(PriceCut { row, multiplier: *multiplier, until });
             }
             CardEffect::RelationsAllRivals { relations } => {
                 let c = self.tables.relations.clone();
