@@ -27,3 +27,17 @@ cause: the cap takes Ducats from every seat alike (the computer builds Banks as 
 four), and the Arkwrights, the poorest in Ducats, lost the most; the Prospectors' Fund is paid by
 interest, one Investment Bank a Region already, so the cap cost them nothing there. Measured
 behaviour, not a rule; the next tickets (Influence at 5, the Fund's weight) move the same seats.
+
+## A Scrubber at 4 Energy and 1 Ducat, one per 300 million
+
+Ticket [#561](https://github.com/whaleyjoshua2/Dying-Earth/issues/561), spec §2.
+
+The designer's "one per 3 pop" read as one per 300 million (the game writes emissions "per hundred
+million"), floor 1, at the designer's word. A general `ducats_upkeep` field on the Facility card,
+charged at the Income beside the Energy; a test written first and watched red with the charge
+stubbed out ("two Scrubbers cost 2 Ducats a turn: 9.6 to 9.6"), then green. The cap test re-pinned
+to the new figures (Russia 1, India 6, the ceiling at 3,300 million).
+
+**The picture** ([`ticket-561/china-three-of-five-earth.png`](ticket-561/)), seed 3 after eight
+turns: China's card reads "Scrubber (3 of 5)" (1,461 million / 300 = 4.9), with three standing,
+all mothballed by the computer Custodians for want of Energy. Measured behaviour, not a rule.

@@ -176,6 +176,10 @@ pub struct FacilityCard {
     /// reach it, so a place making four a turn builds it at the old pace and a busier one slower.
     pub widgets: u32,
     pub energy_upkeep: i64,
+    /// Ticket #561 (version 0.1.0.3): Ducats a turn while the Facility is online, charged at the
+    /// Income beside the Energy. The Scrubber carries 1; absent, nought.
+    #[serde(default)]
+    pub ducats_upkeep: f64,
     pub produces: Option<Produces>,
     /// Ticket #280 (version 0.08.5): what the building does, in a sentence, where it is not a
     /// resource or beside one; drawn where the row said "no output" before.
@@ -2791,6 +2795,7 @@ impl Tables {
                 ("scrubber_materials", crate::state::figure(s.materials)),
                 ("scrubber_widgets", crate::state::figure(s.widgets as f64)),
                 ("scrubber_upkeep", crate::state::figure(s.energy_upkeep as f64)),
+                ("scrubber_ducats", crate::state::figure(s.ducats_upkeep)),
                 ("scrubber_sink", format!("{:.1}", s.sink_per_turn)),
                 ("scrubber_fall", crate::state::figure(self.unrest.scrubber_fall)),
                 ("scrubber_min", self.scrubber.min.to_string()),

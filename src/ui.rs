@@ -7251,7 +7251,7 @@ fn standings_row(ui: &mut Ui, game: &Game, session: &Session, target: Place, thr
 }
 
 /// Ticket #390 (version 0.09.3): what a standing Scrubber or Sea Wall says on its one line --
-/// *Scrubber: +3.0 ppm Sink, 1 off Unrest a turn, 3 Energy upkeep*; *Sea Wall: holds the sea off; 3
+/// *Scrubber: +3.0 ppm Sink, 1 off Unrest a turn, 4 Energy, 1 Ducat upkeep*; *Sea Wall: holds the sea off; 3
 /// rises held, 1.5 Materials a turn to keep* (or *nothing held yet*, and *unkept this turn* when it
 /// is) -- the figures the data holds, glyph-rendered by the row, in the resolution's words.
 fn no_slot_figures(game: &Game, sid: StateId, f: &Facility) -> String {
@@ -7261,7 +7261,8 @@ fn no_slot_figures(game: &Game, sid: StateId, f: &Facility) -> String {
         // Ticket #445 (version 0.09.6): at the share its holder runs it at, and no upkeep with nobody.
         _ => {
             let share = game.scrubber_share(sid);
-            let upkeep = if game.state(sid).control.controller().is_some() { format!(", {} Energy upkeep", card.energy_upkeep) } else { String::new() };
+            // Ticket #561 (version 0.1.0.3): and the Ducat a turn beside the Energy.
+            let upkeep = if game.state(sid).control.controller().is_some() { format!(", {} Energy, {} upkeep", card.energy_upkeep, counted(figure(card.ducats_upkeep), "Ducat", "Ducats")) } else { String::new() };
             let at = if share < 1.0 { format!(" (x{share})") } else { String::new() };
             let sink = card.sink_per_turn * share;
             let sink = if (sink * 10.0).fract().abs() < 1e-9 { format!("{sink:.1}") } else { format!("{sink:.2}") };

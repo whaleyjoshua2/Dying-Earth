@@ -1576,10 +1576,13 @@ impl Game {
             // Ticket #54: a Scrubber takes no build slot, so it is offered whether or not one is
             // free, up to the state's cap, and only while the seat's Energy is not already tight:
             // 4 Energy upkeep with nothing to run it is a Facility shut down at the next Income.
+            // Ticket #561 (version 0.1.0.3): and only while last turn's Ducat income covers one
+            // more Scrubber's Ducat upkeep, so a seat short of Ducats builds fewer.
             if kind == FactionKind::Custodians
                 && self.state(sid).control == Control::Controlled(seat)
                 && self.scrubbers_committed(sid) < self.scrubber_cap(sid)
                 && !tight
+                && self.seat(seat).income_last_turn.ducats >= self.tables.facility(FacilityKind::Scrubber).ducats_upkeep
             {
                 let cat = Cat::Scrubber;
                 let opp = if self.scrubbers_online(sid) == 0 { m.opportunity } else { 1.0 };

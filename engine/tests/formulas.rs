@@ -3875,15 +3875,19 @@ fn e_a_scrubber_enlarges_the_sink_and_is_capped_captured_at_half_and_calming() {
     let card = g.tables.facility(FacilityKind::Scrubber);
     // Version 0.07.0: the Scrubber runs on 3 Energy, down from 4.
     // Ticket #332 (version 0.09.0): 8 Widgets, four for each of its two turns.
-    assert_eq!((card.materials, card.widgets, card.energy_upkeep, card.emissions), (33.0, 8, 3, 0.0));
+    // Ticket #561 (version 0.1.0.3), at the designer's word: 4 Energy and 1 Ducat a turn (3 Energy
+    // before), and one per 300 million people with a floor of 1 (200 and 2 before).
+    assert_eq!((card.materials, card.widgets, card.energy_upkeep, card.ducats_upkeep, card.emissions), (33.0, 8, 4, 1.0, 0.0));
     assert!(card.no_slot, "a Scrubber takes no build slot");
-    // The cap: one per two hundred million people (ticket #333, version 0.09.0: 200 units of one
-    // million; 40 units of five million before), between 2 and 10.
-    assert_eq!(g.tables.scrubber.per_population, 200.0, "two hundred million people a Scrubber");
-    assert_eq!(g.scrubber_cap(StateId::Russia), 2, "Russia at 150 takes the floor");
-    // Ticket #453 (version 0.09.6): India at 1,660 no longer reaches the ceiling; nobody does at the start.
-    assert_eq!(g.scrubber_cap(StateId::SouthAsia), 8, "India at 1660: eight");
-    g.state_mut(StateId::SouthAsia).population = 2400.0;
+    // The cap: one per three hundred million people (ticket #333, version 0.09.0: units of one
+    // million), with a floor of 1 and a ceiling of 10.
+    assert_eq!((g.tables.scrubber.per_population, g.tables.scrubber.min), (300.0, 1), "three hundred million people a Scrubber, one at least");
+    assert_eq!(g.scrubber_cap(StateId::Russia), 1, "Russia at 150 rounds to one");
+    g.state_mut(StateId::Russia).population = 50.0;
+    assert_eq!(g.scrubber_cap(StateId::Russia), 1, "the smallest Region takes the floor");
+    g.state_mut(StateId::Russia).population = 150.0;
+    assert_eq!(g.scrubber_cap(StateId::SouthAsia), 6, "India at 1660: six");
+    g.state_mut(StateId::SouthAsia).population = 3300.0;
     assert_eq!(g.scrubber_cap(StateId::SouthAsia), 10, "the ceiling");
     g.state_mut(StateId::SouthAsia).population = 1660.0;
     // Only the Custodians, and only on a state they control. Every seat that is not the Custodians
@@ -18395,7 +18399,8 @@ fn the_custodians_text_reads_its_figures_from_the_data_and_says_the_lever() {
     let t = tables();
     let s = t.facility(FacilityKind::Scrubber);
     let text = t.signature(FactionKind::Custodians);
-    assert!(text.contains(&format!("{} Materials, {} Widgets, {} Energy upkeep", s.materials, s.widgets, s.energy_upkeep)), "{text}");
+    // Ticket #561 (version 0.1.0.3): and the Ducat beside the Energy.
+    assert!(text.contains(&format!("{} Materials, {} Widgets, {} Energy and {} Ducat upkeep", s.materials, s.widgets, s.energy_upkeep, figure(s.ducats_upkeep))), "{text}");
     assert!(text.contains(&format!("each Mothball there costs +{} Unrest", figure(t.unrest.per_mothball))), "{text}");
     assert!(t.signature(FactionKind::Archivists).contains(&format!("at least {}%", t.research_directive.provisional_min_contribution)));
     for k in FactionKind::ALL {
@@ -19462,6 +19467,33 @@ fn the_ai_buys_the_fuel_for_a_warships_tank() {
     // figure: a Frigate costs none, so Ducats are wanted only for the Fuel bought beside it. Without
     // the purchase the line was "skip ... (needs 25 Materials, 0 left)", the bundle the build alone.
     assert!(lines.iter().any(|l| l.starts_with("  take") || l.contains("Ducats")), "the Frigate is weighed with its tank bought: {lines:#?}");
+}
+
+/// Ticket #561 (version 0.1.0.3), at the designer's word: a Scrubber's Ducat upkeep is charged at
+/// the Income beside its Energy, named in the income sources, and only while it is online; a
+/// mothballed one pays neither. A general field, so any Facility may carry one.
+#[test]
+fn a_scrubbers_ducat_upkeep_is_charged_at_income_while_it_runs() {
+    let mut g = game();
+    calm(&mut g);
+    let cus = seat_of(&g, FactionKind::Custodians);
+    let sid = g.controlled_states(cus)[0];
+    let per = g.tables.facility(FacilityKind::Scrubber).ducats_upkeep;
+    assert!(per > 0.0, "the premise: the Scrubber carries a Ducat upkeep");
+    g.seats[cus.index()].stockpile.energy = 500.0;
+    let before = income_of(&mut g, cus);
+    g.state_mut(sid).facilities.push(Facility::new(FacilityKind::Scrubber));
+    g.state_mut(sid).facilities.push(Facility::new(FacilityKind::Scrubber));
+    let with = income_of(&mut g, cus);
+    assert!((before.ducats - with.ducats - 2.0 * per).abs() < 1e-9, "two Scrubbers cost {} Ducats a turn: {} to {}", 2.0 * per, before.ducats, with.ducats);
+    assert!(g.seat(cus).income_sources.iter().any(|(src, r, n)| src.starts_with("Scrubber in") && src.ends_with("(upkeep)") && *r == Resource::Ducats && (*n + per).abs() < 1e-9), "{:?}", g.seat(cus).income_sources);
+    let n = g.state(sid).facilities.len();
+    g.state_mut(sid).facilities[n - 1].mothballed = true;
+    g.state_mut(sid).facilities[n - 2].mothballed = true;
+    let idle = income_of(&mut g, cus);
+    assert!((idle.ducats - before.ducats).abs() < 1e-9, "mothballed, neither pays: {} against {}", idle.ducats, before.ducats);
+    let text = g.facility_yield(cus, sid, FacilityKind::Scrubber).text();
+    assert!(text.contains("4 Energy upkeep") && text.contains("1 Ducat upkeep"), "{text}");
 }
 
 /// Ticket #445 (version 0.09.6): **a captured Scrubber runs at half, where it was destroyed.** Taken

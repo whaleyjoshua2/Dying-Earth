@@ -30,6 +30,8 @@ struct Producer {
     name: &'static str,
     is_module: bool,
     upkeep: f64,
+    /// Ticket #561: Ducats a turn while online.
+    ducats_upkeep: f64,
     output: Option<(Resource, f64)>,
     /// Materials or Fuel from a Mine, Refinery or Factory count toward the Extraction Total.
     research: i64,
@@ -49,6 +51,8 @@ pub struct Yield {
     pub research: i64,
     /// Ticket #387: Energy upkeep, to a tenth once a multiplier has touched it.
     pub upkeep: f64,
+    /// Ticket #561 (version 0.1.0.3): Ducats a turn while online, the Scrubber's 1; nought else.
+    pub ducats_upkeep: f64,
     pub emissions: f64,
     /// Ticket #36: Influence Allotment added while it stands, and standing raised each turn.
     pub allotment: i64,
@@ -259,6 +263,9 @@ impl Yield {
         }
         if self.upkeep > 0.0 {
             parts.push(format!("{} Energy upkeep", figure(self.upkeep)));
+        }
+        if self.ducats_upkeep > 0.0 {
+            parts.push(crate::counted(figure(self.ducats_upkeep), "Ducat upkeep", "Ducats upkeep"));
         }
         if self.emissions > 0.0 {
             parts.push(format!("{:.1} Emissions", self.emissions));
@@ -520,7 +527,7 @@ impl Game {
         let fac = t.faction(self.kind(seat));
         let card = t.state(sid);
         let fc = t.facility(kind);
-        let mut y = Yield { resource: None, amount: 0.0, research: 0, upkeep: fc.energy_upkeep as f64, emissions: 0.0, allotment: fc.influence_allotment, standing: fc.standing_per_turn, doubled_by: None, detail: None, does: fc.does.clone(), chain: Chain::default(), allotment_outside: 0 };
+        let mut y = Yield { resource: None, amount: 0.0, research: 0, upkeep: fc.energy_upkeep as f64, ducats_upkeep: fc.ducats_upkeep, emissions: 0.0, allotment: fc.influence_allotment, standing: fc.standing_per_turn, doubled_by: None, detail: None, does: fc.does.clone(), chain: Chain::default(), allotment_outside: 0 };
         if let Some(p) = &fc.produces {
             match p.resource {
                 Resource::Research => {
@@ -621,7 +628,7 @@ impl Game {
         let t = &self.tables;
         let fac = t.faction(self.kind(seat));
         let mc = t.module(kind);
-        let mut y = Yield { resource: None, amount: 0.0, research: 0, upkeep: mc.energy_upkeep as f64, emissions: 0.0, allotment: mc.influence_allotment, standing: mc.standing_per_turn, doubled_by: None, detail: None, does: mc.does.clone(), chain: Chain::default(), allotment_outside: 0 };
+        let mut y = Yield { resource: None, amount: 0.0, research: 0, upkeep: mc.energy_upkeep as f64, ducats_upkeep: 0.0, emissions: 0.0, allotment: mc.influence_allotment, standing: mc.standing_per_turn, doubled_by: None, detail: None, does: mc.does.clone(), chain: Chain::default(), allotment_outside: 0 };
         // Ticket #239 (version 0.08.3): a Unique Module does its sibling's job, so every lookup
         // keyed by kind -- the Techs that multiply it, the slot's yield, a Discovery on it --
         // reads the COMMON kind. Without this the Arkwrights' Chorus would be the one Relay in
@@ -826,7 +833,7 @@ impl Game {
     /// `doubled_modules`, named for the Facility whose mothball pays for it.
     pub fn module_yield_at(&self, seat: Seat, cid: ColonyId, index: usize) -> Yield {
         let Some(kind) = self.colony(cid).and_then(|c| c.modules.get(index)).map(|m| m.kind) else {
-            return Yield { resource: None, amount: 0.0, research: 0, upkeep: 0.0, emissions: 0.0, allotment: 0, standing: 0, doubled_by: None, detail: None, does: None, chain: Chain::default(), allotment_outside: 0 };
+            return Yield { resource: None, amount: 0.0, research: 0, upkeep: 0.0, ducats_upkeep: 0.0, emissions: 0.0, allotment: 0, standing: 0, doubled_by: None, detail: None, does: None, chain: Chain::default(), allotment_outside: 0 };
         };
         let mut y = self.module_yield(seat, cid, kind);
         if self.doubled_modules(seat).contains(&(cid, index)) {
@@ -1003,6 +1010,7 @@ impl Game {
                     name: f.kind.name(),
                     is_module: false,
                     upkeep: y.upkeep,
+                    ducats_upkeep: y.ducats_upkeep,
                     output: y.resource.map(|r| (r, if r == Resource::Widgets { (y.amount * scale).floor() } else { halve(y.amount) })),
                     research: halve_whole(y.research),
                     online: !f.offline_until_resolution,
@@ -1031,6 +1039,7 @@ impl Game {
                     name: m.kind.name(),
                     is_module: true,
                     upkeep: y.upkeep,
+                    ducats_upkeep: 0.0,
                     output: if starved { None } else { y.resource.map(|r| (r, y.amount)) },
                     // Ticket #80: an Observatory's Research. Ticket #359: halved in `module_yield_at`.
                     research: if starved { 0 } else { y.research },
@@ -1465,6 +1474,11 @@ impl Game {
             }
             if p.upkeep > 0.0 {
                 sources.push((format!("{} in {} (upkeep)", p.name, where_), Resource::Energy, -p.upkeep));
+            }
+            // Ticket #561 (version 0.1.0.3): a Ducat upkeep, the Scrubber's, charged beside it.
+            if p.ducats_upkeep > 0.0 {
+                gained.ducats -= p.ducats_upkeep;
+                sources.push((format!("{} in {} (upkeep)", p.name, where_), Resource::Ducats, -p.ducats_upkeep));
             }
         }
         let unit_upkeep = self.unit_upkeep(seat);

@@ -107,7 +107,10 @@ id = "scrubber"
 name = "Scrubber"
 materials = 33
 widgets = 8
-energy_upkeep = 3
+# Ticket #561 (version 0.1.0.3), at the designer's word: 4 Energy and 1 Ducat a turn (3 Energy and
+# nothing before). The 0.1.0.2 playtest won two Custodian games on Scrubbers alone.
+energy_upkeep = 4
+ducats_upkeep = 1
 does = "+3.0 ppm on the Natural Sink and 1 off this state's Unrest a turn, counted as its holder's removal; no build slot; half in another Faction's hands, a quarter in nobody's"
 emissions = 0.0
 sink_per_turn = 3.0
@@ -222,16 +225,17 @@ emissions = 0.75
 # Ticket #54: the cap on Scrubbers in one Nation State, from its population -- in units of one
 # million since ticket #333 (version 0.09.0; five million from ticket #143, version 0.07.3, when this
 # was 40), so 200 units is the two hundred million each Scrubber wants:
-# clamp(round(population / per_population), min, max). Russia at 150 gets the floor of 2; India at
-# 1940 gets the ceiling of 10.
+# clamp(round(population / per_population), min, max). Ticket #561 (version 0.1.0.3), at the
+# designer's word: one per 300 million with a floor of 1 (200 and 2 before): China at 1660 holds 6,
+# India at 1370 holds 5, the Regions about 500 hold 2, the rest 1.
 [scrubber]
 # Ticket #445 (version 0.09.6): a Scrubber runs whole under the Custodians, at `captured_share` in any
 # other Faction's hands (its Sink and its calm, credited to the holder, the upkeep whole), and at
 # `neutral_share` in a neutral Region (to nobody's Blame, no upkeep). It is no longer destroyed.
 captured_share = 0.5
 neutral_share = 0.25
-per_population = 200.0
-min = 2
+per_population = 300.0
+min = 1
 max = 10
 
 # Ticket #257 (version 0.08.4): the Sea Wall STANDS. It took one threshold and was destroyed doing

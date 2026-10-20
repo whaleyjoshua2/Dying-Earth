@@ -27,3 +27,18 @@ Ticket: [One Bank or Investment Bank to a Region](https://github.com/whaleyjoshu
   Bank"*, naming the one there. The window greys the tile with the same words.
 - **Any beyond one already standing** stay as they are: the rule is read at the order.
 - The Prospectors' Opening Objective counts Regions with a working Investment Bank, so it stands.
+
+## 2. A Scrubber at 4 Energy and 1 Ducat, one per 300 million
+
+Ticket: [A Scrubber at 4 Energy and 1 Ducat, one per 3 population](https://github.com/whaleyjoshua2/Dying-Earth/issues/561).
+
+- **A Scrubber draws 4 Energy and 1 Ducat a turn** while online (3 Energy and nothing before). The
+  Ducat is charged at the Income beside the Energy, named in the income sources as the Energy is,
+  and a mothballed Scrubber pays neither. The Ducat upkeep is a general field on the Facility card
+  (`ducats_upkeep`), nought on every other building.
+- **A Region holds one Scrubber per 300 million people**, rounded, one at least (200 million and
+  two before): China 6 (5 at the start's 1,461), India 5, the Regions about 500 million 2, the
+  rest 1. The ceiling of 10 stands, unreached.
+- **The computer Custodians** offer a Scrubber only while last turn's Ducat income covers one more
+  Scrubber's Ducat, beside the Energy check they already make.
+- The Custodians' signature text, the card's standing line and the glossary say the Ducat.
