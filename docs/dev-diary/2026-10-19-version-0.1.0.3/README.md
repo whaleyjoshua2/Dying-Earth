@@ -361,6 +361,6 @@ and says so. The withdrawal has no test of its own -- it lives in the window's a
 spend on a partner's place used to pass `check_order`, take the Influence budget and be dropped at
 the end of `ai_orders`, the Influence wasted; refused at the candidate stage now, the next candidate
 spends it, and the Accord-keeping seats (the Custodians above all) stop throwing Influence away.
-Income per Faction (Materials / Fuel / Energy / Ducats / Research, mean a game): Custodians 1054 /
-292 / 2425 / 1431 / 866; Prospectors 2139 / 442 / 2709 / 1190 / 386; Arkwrights 1538 / 319 / 2309 /
+Income per Faction (Materials / Fuel / Energy / Ducats / Research, mean a game): Custodians 1100 /
+352 / 2535 / 1561 / 931; Prospectors 2139 / 442 / 2709 / 1190 / 386; Arkwrights 1538 / 319 / 2309 /
 3210 / 266; Archivists 477 / 261 / 1149 / 484 / 746.
