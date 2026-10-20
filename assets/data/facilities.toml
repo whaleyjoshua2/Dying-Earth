@@ -392,3 +392,21 @@ energy_upkeep = 0
 does = "+1 ppm on the Natural Sink a turn; a sixth off what the climate adds to Unrest here"
 emissions = 0.0
 sink_per_turn = 1.0
+
+# Ticket #559 (version 0.1.0.3): the Wind Farm, clean power at half the Power Plant's output: 3 Energy
+# a turn for no emissions and a Ducat a turn, a slot as a Power Plant takes, behind Clean Power. Its
+# output takes the multipliers a Power Plant's takes (the lean, Solar Maximum, Efficient Grids,
+# Superconductors) and nothing else of the Power Plant's: Production Moved does not pair it and a
+# Reactor's rule does not read it. A standing Power Plant may be REPLACED with one through the
+# Region's queue at half this row's price, 12.5 Materials and 4 Widgets. Appended last with its
+# enum variant.
+[[facility]]
+id = "wind_farm"
+name = "Wind Farm"
+materials = 25
+widgets = 8
+energy_upkeep = 0
+ducats_upkeep = 1
+produces = { resource = "energy", amount = 3 }
+emissions = 0.0
+needs_tech = "clean_power"

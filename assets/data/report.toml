@@ -457,6 +457,8 @@ resettle = "resettled its refugees in {state}"
 mothball = "mothballed the {building} at {place}"
 restart = "restarted the {building} at {place}"
 decommission = "decommissioned the {building} at {place}"
+# Ticket #559 (version 0.1.0.3): the Replace, ordered; the Wind Farm's completion says the rest.
+replace = "ordered the {building} at {place} replaced with a Wind Farm"
 leapfrog = "Leapfrogged {state}"
 strip_permit = "issued a Strip Permit in {state}"
 arrived = "its {unit} reached {body}"

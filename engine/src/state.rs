@@ -135,6 +135,12 @@ pub enum BuildingChange {
     Restart,
     /// A turn: half its Materials come back, its slot is freed and it is gone.
     Decommission,
+    /// Ticket #559 (version 0.1.0.3): **Replace** a standing Power Plant with a Wind Farm, at half
+    /// the Wind Farm's price, through the Region's queue as a build is. The Power Plant runs until
+    /// the Wind Farm completes and is gone the Resolution it does; the slot never stands empty. It is
+    /// never written on the building as a `PendingChange`: the building carries `replacing` and the
+    /// queue carries the `BuildItem::Replace`.
+    Replace,
 }
 
 impl BuildingChange {
@@ -143,6 +149,7 @@ impl BuildingChange {
             BuildingChange::Mothball => "Mothball",
             BuildingChange::Restart => "Restart",
             BuildingChange::Decommission => "Decommission",
+            BuildingChange::Replace => "Replace",
         }
     }
     /// The past tense the Report uses when the change lands.
@@ -151,6 +158,7 @@ impl BuildingChange {
             BuildingChange::Mothball => "mothballed",
             BuildingChange::Restart => "restarted",
             BuildingChange::Decommission => "decommissioned",
+            BuildingChange::Replace => "replaced",
         }
     }
 }
@@ -206,11 +214,16 @@ pub struct Facility {
     /// `sea_wall_upkeep_per_rise` Materials a turn to its keep. Zero on every other kind.
     #[serde(default)]
     pub rises_held: u32,
+    /// Ticket #559 (version 0.1.0.3): a Replace ordered on this Power Plant, its Wind Farm in the
+    /// Region's queue. The first flagged Power Plant becomes the Wind Farm when the build completes.
+    /// False on every other kind, and in a save older than the field.
+    #[serde(default)]
+    pub replacing: bool,
 }
 
 impl Facility {
     pub fn new(kind: FacilityKind) -> Facility {
-        Facility { kind, online: true, offline_until_resolution: false, self_run: false, mothballed: false, change: None, coastal: false, rises_held: 0, offline_cause: None }
+        Facility { kind, online: true, offline_until_resolution: false, self_run: false, mothballed: false, change: None, coastal: false, rises_held: 0, offline_cause: None, replacing: false }
     }
     /// Ticket #56: a Facility standing in a coastal slot.
     pub fn in_coastal_slot(kind: FacilityKind) -> Facility {
@@ -219,6 +232,10 @@ impl Facility {
     /// Ticket #54: standing, running and not mothballed - what every "while it is online" rule means.
     pub fn working(&self) -> bool {
         self.online && !self.mothballed
+    }
+    /// Ticket #559 (version 0.1.0.3): a change of any kind is on it, a Replace included.
+    pub fn changing(&self) -> bool {
+        self.change.is_some() || self.replacing
     }
 }
 
@@ -264,12 +281,17 @@ pub enum BuildItem {
     /// Widgets as well as Materials, and Widgets are a place's rate: it sits in the yard's queue
     /// like anything else and lands at the Resolution the yard has made it.
     Warhead(ShipId),
+    /// Ticket #559 (version 0.1.0.3): a **Replace** under way in a Region: a standing Power Plant
+    /// flagged `replacing` becomes this kind (the Wind Farm) at the Resolution it completes. Half the
+    /// kind's Widgets; it takes no slot of its own, the Power Plant's being the one it stands in.
+    Replace(FacilityKind),
 }
 
 impl BuildItem {
     pub fn name(self) -> String {
         match self {
             BuildItem::Facility(k) => k.name().to_string(),
+            BuildItem::Replace(k) => format!("{} (replacing a Power Plant)", k.name()),
             BuildItem::IndustryLevel => "Industry Level".to_string(),
             BuildItem::Tier(_) => "Upgrade".to_string(),
             BuildItem::Module(k) => k.name().to_string(),
@@ -481,6 +503,8 @@ impl SlotYields {
             // the same everywhere now, and a Trade Post (which followed the Habitat yield from
             // ticket #35 until the network of ticket #90 stopped reading it) reads nothing.
             ModuleKind::Observatory => self.research,
+            // Ticket #559 (version 0.1.0.3): the Wind Farm reads the Generator's yield, at half the base.
+            ModuleKind::WindFarm => self.generator,
             _ => 1.0,
         }
     }

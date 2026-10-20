@@ -853,8 +853,12 @@ impl Game {
         for sid in self.directed_states(seat) {
             let lean = if self.tables.state(sid).resource_lean == Resource::Energy { 1.5 } else { 1.0 };
             for f in self.state(sid).facilities.iter().filter(|f| !f.mothballed) {
-                if f.kind.does_the_job_of(FacilityKind::PowerPlant) {
-                    e += (6.0 * lean * fac * grids).floor();
+                // Ticket #559 (version 0.1.0.3): the card's figure, so a Wind Farm counts its 3 beside a
+                // Power Plant's 6, where a flat 6 was counted for every Power Plant's job.
+                if let Some(p) = &self.tables.facility(f.kind).produces
+                    && p.resource == Resource::Energy
+                {
+                    e += (p.amount * lean * fac * grids).floor();
                 }
             }
         }
@@ -1001,8 +1005,14 @@ impl Game {
 
     /// Spec 16.2: the Energy balance is within one turn's upkeep of zero.
     fn energy_tight(&self, seat: Seat) -> bool {
-        let drain = self.total_upkeep(seat) - self.energy_production(seat);
-        self.seat(seat).stockpile.energy - drain as f64 <= self.total_upkeep(seat) as f64
+        self.energy_tight_losing(seat, 0.0)
+    }
+
+    /// Ticket #559 (version 0.1.0.3): the same test with `lost` Energy a turn gone from the production
+    /// -- what a Power Plant replaced with a Wind Farm would stop making.
+    fn energy_tight_losing(&self, seat: Seat, lost: f64) -> bool {
+        let drain = self.total_upkeep(seat) as f64 - self.energy_production(seat) as f64 + lost;
+        self.seat(seat).stockpile.energy - drain <= self.total_upkeep(seat) as f64
     }
 
     /// Ticket #332 (version 0.09.0): the place and item a build order would queue, for the pace
@@ -1200,8 +1210,24 @@ impl Game {
             let col = self.colony(*c).unwrap();
             col.modules.iter().any(|m| m.kind == ModuleKind::Shipyard) || col.queue.iter().any(|b| b.item == BuildItem::Module(ModuleKind::Shipyard))
         });
-        let queued_power: i64 = self.states.iter().flat_map(|s| s.queue.iter()).filter(|b| b.seat == seat && matches!(b.item, BuildItem::Facility(k) if k.does_the_job_of(FacilityKind::PowerPlant))).count() as i64 * 6
-            + self.colonies.iter().flat_map(|c| c.queue.iter()).filter(|b| b.seat == seat && b.item == BuildItem::Module(ModuleKind::Generator)).count() as i64 * 5;
+        // Ticket #559 (version 0.1.0.3): each build's own card figure, where a flat 6 was counted
+        // for every Power Plant's job, so a Wind Farm on order counts its 3 and a Replace under way
+        // trades the Power Plant's figure for the Wind Farm's.
+        let energy_of = |k: FacilityKind| self.tables.facility(k).produces.as_ref().filter(|p| p.resource == Resource::Energy).map_or(0.0, |p| p.amount);
+        let generator = self.tables.module(ModuleKind::Generator).produces.as_ref().map_or(0.0, |p| p.amount);
+        let queued_power: i64 = (self
+            .states
+            .iter()
+            .flat_map(|s| s.queue.iter())
+            .filter(|b| b.seat == seat)
+            .map(|b| match b.item {
+                BuildItem::Facility(k) => energy_of(k),
+                BuildItem::Replace(k) => energy_of(k) - energy_of(FacilityKind::PowerPlant),
+                _ => 0.0,
+            })
+            .sum::<f64>()
+            + self.colonies.iter().flat_map(|c| c.queue.iter()).filter(|b| b.seat == seat && b.item == BuildItem::Module(ModuleKind::Generator)).count() as f64 * generator)
+            .floor() as i64;
         let energy_short = self.energy_production(seat) + queued_power < self.total_upkeep(seat) + 2;
         // Bootstrap needs: a producer of one of these counts as advancing whatever the seat is behind on.
         // The merely scarcest resource only gets the within-category preference.
@@ -1451,10 +1477,27 @@ impl Game {
                     if job == FacilityKind::Factory && self.state(sid).queue.len() < th.factory_module_queue_depth {
                         continue;
                     }
+                    // Ticket #559 (version 0.1.0.3): once Clean Power stands the Wind Farm takes the
+                    // Power Plant's place on the list, unless Energy is tight, when the Power Plant's 6
+                    // is wanted and the Wind Farm's 3 is not. The Archivists' first Reactor is still a
+                    // Reactor -- its clause is the upkeep cut, which no Wind Farm gives -- and a second
+                    // is an ordinary power station, so it gives way as the Power Plant does.
+                    if job == FacilityKind::PowerPlant && self.has_tech(TechId::CleanPower) && !tight {
+                        let first_reactor = fk == FacilityKind::Reactor
+                            && !self.directed_states(seat).iter().any(|s| self.state(*s).facilities.iter().any(|f| f.kind == FacilityKind::Reactor))
+                            && !self.states.iter().flat_map(|s| s.queue.iter()).any(|b| b.seat == seat && b.item == BuildItem::Facility(FacilityKind::Reactor));
+                        if !first_reactor {
+                            continue;
+                        }
+                    }
+                    if job == FacilityKind::WindFarm && tight {
+                        continue;
+                    }
                     let (cat, mut base) = match job {
                         // Ticket #332 (version 0.09.0): the Mine is a producer as the Factory was;
                         // the Factory, making Widgets now, keeps its arm behind the queue test above.
-                        FacilityKind::Factory | FacilityKind::Mine | FacilityKind::PowerPlant | FacilityKind::Refinery | FacilityKind::Bank => (Cat::Producer, self.base_weight(seat, Cat::Producer)),
+                        // Ticket #559 (version 0.1.0.3): and the Wind Farm, an Energy producer.
+                        FacilityKind::Factory | FacilityKind::Mine | FacilityKind::PowerPlant | FacilityKind::WindFarm | FacilityKind::Refinery | FacilityKind::Bank => (Cat::Producer, self.base_weight(seat, Cat::Producer)),
                         FacilityKind::ResearchLab => (Cat::ResearchLab, self.base_weight(seat, Cat::ResearchLab)),
                         // Ticket #185 (version 0.08.0): the School is a Research building in all but
                         // name, so it is weighed as one. Ticket #416 (version 0.09.4): every Region
@@ -1743,6 +1786,8 @@ impl Game {
                     // Ticket #89: a Solar Array is an Energy producer; the Energy-shortage bonus below
                     // is what makes the AI raise one when the Stockpile is within a turn of nothing.
                     ModuleKind::SolarArray => (Cat::Producer, self.base_weight(seat, Cat::Producer)),
+                    // Ticket #559 (version 0.1.0.3): the Wind Farm Module, an Energy producer on Mars.
+                    ModuleKind::WindFarm => (Cat::Producer, self.base_weight(seat, Cat::Producer)),
                     // Ticket #80: an Observatory once the Colony holds enough Colonists to make it worth
                     // its keep (`observatory_colonists`), at the Research Lab's weight.
                     // Ticket #185 (version 0.08.0): an Institute multiplies an Observatory exactly as
@@ -2805,6 +2850,34 @@ impl Game {
                         format!("decommission the mothballed {} in {} for its slot", name, self.tables.state(*sid).name),
                         None,
                     );
+                }
+            }
+        }
+
+        // --- Ticket #559 (version 0.1.0.3): Replace a Power Plant with a Wind Farm, where the seat's
+        // Blame share stands above the fair quarter and its Energy is not short -- not tight now, and
+        // not tight once the Power Plant's figure is traded for the Wind Farm's. Weighed as a Greenwash
+        // is, by how far above the quarter the share stands, on the Producer's base; one Region a
+        // turn at most, the first standing Power Plant in each. A Reactor is never offered:
+        // `check_change` refuses it, and the Reactor's clause is worth more than its smoke.
+        if self.has_tech(TechId::CleanPower) && !tight {
+            let fair = self.tables.influence.blame.fair_share;
+            let over = self.blame_share(seat) - fair;
+            let lost = energy_of(FacilityKind::PowerPlant) - energy_of(FacilityKind::WindFarm);
+            if over > 0.0 && !self.energy_tight_losing(seat, lost) {
+                for sid in self.directed_states(seat) {
+                    if let Some(i) = self.state(sid).facilities.iter().position(|f| f.kind == FacilityKind::PowerPlant && !f.mothballed && !f.changing()) {
+                        push(
+                            vec![Order::Change { building: BuildingRef::Facility(sid, i), what: BuildingChange::Replace }],
+                            Cat::Producer,
+                            self.base_weight(seat, Cat::Producer) * (1.0 + over / fair),
+                            1.0,
+                            1.0,
+                            1.0,
+                            format!("replace the Power Plant in {} with a Wind Farm (share {:.2})", self.tables.state(sid).name, self.blame_share(seat)),
+                            None,
+                        );
+                    }
                 }
             }
         }

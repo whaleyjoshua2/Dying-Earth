@@ -370,6 +370,20 @@ energy_upkeep = 3
 produces = { resource = "widgets", amount = 4 }
 earth_emissions = 1.0
 
+# Ticket #559 (version 0.1.0.3): the Wind Farm Module, on the ground of Mars alone (`mars_only`):
+# half a Generator's base, scaled by the site's Generator yield as every Module is (about 1.9 on
+# Mars), no emissions, a Ducat a turn, behind Clean Power. Appended last, as the Factory was.
+[[module]]
+id = "wind_farm"
+name = "Wind Farm"
+materials = 25
+widgets = 8
+energy_upkeep = 0
+ducats_upkeep = 1
+produces = { resource = "energy", amount = 2.5 }
+needs_tech = "clean_power"
+mars_only = true
+
 # Ticket #88 (version 0.06.0): build it where you dig. A Module (the Archive included) built at a
 # Colony with one working Mine costs `one_mine` of its price, with two or more `two_mines`,
 # multiplicative with the Faction's own discount, to the tenth (ticket #387), never below `floor` of the row.

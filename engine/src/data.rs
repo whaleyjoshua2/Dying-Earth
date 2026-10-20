@@ -362,6 +362,13 @@ pub struct ModuleCard {
     /// Ticket #92: only a ground Colony on a low-gravity Body holds it.
     #[serde(default)]
     pub low_gravity_only: bool,
+    /// Ticket #559 (version 0.1.0.3): only a ground Colony on Mars holds it (the Wind Farm).
+    #[serde(default)]
+    pub mars_only: bool,
+    /// Ticket #559: Ducats a turn while the Module is online, charged at the Income beside the
+    /// Energy, as a Facility's `ducats_upkeep` is. The Wind Farm carries 1; absent, nought.
+    #[serde(default)]
+    pub ducats_upkeep: f64,
 }
 
 /// Ticket #92 (version 0.06.0): the Mass Driver's figures: the Fuel it takes off the owner's

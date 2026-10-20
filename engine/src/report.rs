@@ -830,6 +830,8 @@ pub const RIVAL_ARGS: &[(&str, &[&str])] = &[
     ("mothball", &["building", "place"]),
     ("restart", &["building", "place"]),
     ("decommission", &["building", "place"]),
+    // Ticket #559 (version 0.1.0.3).
+    ("replace", &["building", "place"]),
     ("leapfrog", &["state"]),
     ("strip_permit", &["state"]),
     ("arrived", &["unit", "body"]),

@@ -5712,6 +5712,11 @@ fn change_row(ui: &mut Ui, game: &Game, pending: &[Order], b: BuildingRef, mothb
         ui.label(RichText::new(format!("    {} ordered, lands at turn {}'s Resolution", c.what.name(), c.due_turn)).weak());
         return;
     }
+    // Ticket #559 (version 0.1.0.3): a Replace lands with its build, not on a due turn.
+    if replacing(game, b) {
+        ui.label(RichText::new("    Replace ordered: a Wind Farm when its build in the queue completes").weak());
+        return;
+    }
     ui.horizontal(|ui| {
         ui.add_space(16.0);
         change_buttons(ui, game, pending, b, mothballed, false, actions);
@@ -5723,20 +5728,44 @@ fn change_row(ui: &mut Ui, game: &Game, pending: &[Order], b: BuildingRef, mothb
 /// adds from the right, so that they still read Mothball then Decommission.
 fn change_buttons(ui: &mut Ui, game: &Game, pending: &[Order], b: BuildingRef, mothballed: bool, reversed: bool, actions: &mut Vec<Action>) {
     let wanted = if mothballed { BuildingChange::Restart } else { BuildingChange::Mothball };
-    let mut pair = [wanted, BuildingChange::Decommission];
+    let mut row = vec![wanted, BuildingChange::Decommission];
+    // Ticket #559 (version 0.1.0.3): a Power Plant's third button, Replace with a Wind Farm, once
+    // Clean Power stands; its hover the Wind Farm's figures here, under the price and the Widgets.
+    if offers_replace(game, b) {
+        row.push(BuildingChange::Replace);
+    }
     if reversed {
-        pair.reverse();
+        row.reverse();
     }
-    for what in pair {
+    for what in row {
         // Ticket #407 (version 0.09.4): the price in a Region, "+1 Unrest"; nothing in a Colony.
-        cost_button_with_hover(ui, game, pending, Order::Change { building: b, what }, what.name(), game.change_price_text(b, what), actions);
+        let hover = match (what, b) {
+            (BuildingChange::Replace, BuildingRef::Facility(sid, _)) => Some(format!("With a Wind Farm: {}", yield_with_chain(&game.facility_yield(Seat(0), sid, FacilityKind::WindFarm)))),
+            _ => game.change_price_text(b, what),
+        };
+        cost_button_with_hover(ui, game, pending, Order::Change { building: b, what }, what.name(), hover, actions);
     }
+}
+
+/// Ticket #559 (version 0.1.0.3): a standing Power Plant -- never a Reactor -- with Clean Power
+/// researched carries the Replace button.
+fn offers_replace(game: &Game, b: BuildingRef) -> bool {
+    let BuildingRef::Facility(sid, i) = b else { return false };
+    game.state(sid).facilities.get(i).is_some_and(|f| f.kind == FacilityKind::PowerPlant) && game.has_tech(TechId::CleanPower)
+}
+
+/// Ticket #559: a Replace is ordered on this building and its Wind Farm is in the queue.
+fn replacing(game: &Game, b: BuildingRef) -> bool {
+    let BuildingRef::Facility(sid, i) = b else { return false };
+    game.state(sid).facilities.get(i).is_some_and(|f| f.replacing)
 }
 
 /// Ticket #138 (version 0.07.3): the room a building's name line needs to its right for its two
 /// buttons. With less than this the buttons go beneath the line as they did before, so a narrowed
 /// panel degrades to the old shape rather than to clipped buttons.
 const CHANGE_BUTTONS_WIDTH: f32 = 196.0;
+/// Ticket #559 (version 0.1.0.3): with the Replace button beside the two, a Power Plant's line.
+const CHANGE_BUTTONS_WIDTH_THREE: f32 = 300.0;
 
 /// Ticket #452 (version 0.09.6): the Blame hover, cut at the designer's word and written once, where
 /// the Faction window and the Climate Panel each carried four long lines of it, word for word.
@@ -6390,6 +6419,8 @@ fn build_item_of(game: &Game, order: &Order) -> Option<(Place, BuildItem, bool)>
     match order {
         Order::BuildFacility { state, kind } => Some((Place::State(*state), BuildItem::Facility(*kind), false)),
         Order::BuildFacilityWithDucats { state, kind } => Some((Place::State(*state), BuildItem::Facility(*kind), true)),
+        // Ticket #559 (version 0.1.0.3): a Replace is a build in the Region's queue, half a Wind Farm.
+        Order::Change { building: BuildingRef::Facility(state, _), what: BuildingChange::Replace } => Some((Place::State(*state), BuildItem::Replace(FacilityKind::WindFarm), false)),
         Order::RaiseIndustry { state } => Some((Place::State(*state), BuildItem::IndustryLevel, false)),
         Order::BuildModule { colony, kind } => Some((Place::Colony(*colony), BuildItem::Module(*kind), false)),
         Order::BuildModuleWithDucats { colony, kind } => Some((Place::Colony(*colony), BuildItem::Module(*kind), true)),
@@ -7375,10 +7406,12 @@ fn facility_row(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, i: us
         // Ticket #154 (version 0.07.4): coastal or inland only where the building has a slot to be
         // on; a Scrubber or Sea Wall is neither.
         let side = if !game.takes_slot(f.kind) { "" } else if f.coastal { " (coastal)" } else { " (inland)" };
+        // Ticket #559 (version 0.1.0.3): a Power Plant with a Replace under way says so on its line.
+        let replace = if f.replacing { " (Replace ordered)" } else { "" };
         let resp = figures_with_icons(
             ui,
             // Ticket #306 (version 0.08.7): the offline suffix is the box's hover's alone now.
-            &format!("{}{}: {}", f.kind.name(), side, figures),
+            &format!("{}{}{}: {}", f.kind.name(), replace, side, figures),
             14.0,
             colour,
             &[],
@@ -7394,7 +7427,8 @@ fn facility_row(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, i: us
             None => rules,
         };
         rule_tip(resp, tip);
-        if mine && f.change.is_none() && ui.available_width() >= CHANGE_BUTTONS_WIDTH {
+        let width = if offers_replace(game, BuildingRef::Facility(sid, i)) { CHANGE_BUTTONS_WIDTH_THREE } else { CHANGE_BUTTONS_WIDTH };
+        if mine && !f.changing() && ui.available_width() >= width {
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 change_buttons(ui, game, &session.pending, BuildingRef::Facility(sid, i), f.mothballed, true, actions);
             });
@@ -7657,7 +7691,9 @@ fn slot_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
             SlotBoxKind::Standing(i) => {
                 let f = &st.facilities[*i];
                 let state = if f.mothballed { TileState::Mothballed } else if !f.online { TileState::Offline } else { TileState::Standing };
-                let heading = format!("{} ({side}): {}{}", f.kind.name(), facility_figures(game, sid, f, director), facility_offline_words(game, sid, f));
+                // Ticket #559 (version 0.1.0.3): a Replace under way, on the tile's hover.
+                let replace = if f.replacing { " (Replace ordered)" } else { "" };
+                let heading = format!("{}{replace} ({side}): {}{}", f.kind.name(), facility_figures(game, sid, f, director), facility_offline_words(game, sid, f));
                 let tip = facility_rules(&heading, f.coastal);
                 // Ticket #352 (version 0.09.1): with its arithmetic, where the figure is multiplied.
                 let tip = match director.filter(|_| !f.mothballed && earnings_seen(game, Place::State(sid), director)).map(|d| game.facility_yield(d, sid, f.kind).chain).filter(|c| c.multiplied()) {

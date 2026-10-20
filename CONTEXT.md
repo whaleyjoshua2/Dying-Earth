@@ -449,7 +449,7 @@ _Avoid_: primary power (the charting phrase; not the game's word), country, capi
 ### Earth
 
 **Facility**:
-A building placed in a Region. Eighteen kinds since version 0.09.4, which added the Nature Reserve (seventeen from 0.09.3, which added the Stadium; sixteen from 0.09.0): Factory, Mine, Power Plant, Refinery, Launch Site, Research Lab, Bank, Embassy, Constabulary, the Stadium, the Nature Reserve, the School, the four Unique Facilities, and the Sea Wall and the Scrubber, which take no build slot (the Sea Wall stood in a Coastal Slot until version 0.05.5). Since version 0.09.0 the Factory makes Widgets and the Mine, new that version, makes the Materials the Factory used to; the two carry the names of the Modules that do the same jobs off Earth, as the Refinery always has. Since version 0.04 a Launch Site builds no Ship: it lifts Pioneers and Armies from its state into orbit.
+A building placed in a Region. Nineteen kinds since version 0.1.0.3, which added the Wind Farm (eighteen from 0.09.4, which added the Nature Reserve; seventeen from 0.09.3, which added the Stadium; sixteen from 0.09.0): Factory, Mine, Power Plant, the Wind Farm, Refinery, Launch Site, Research Lab, Bank, Embassy, Constabulary, the Stadium, the Nature Reserve, the School, the four Unique Facilities, and the Sea Wall and the Scrubber, which take no build slot (the Sea Wall stood in a Coastal Slot until version 0.05.5). Since version 0.09.0 the Factory makes Widgets and the Mine, new that version, makes the Materials the Factory used to; the two carry the names of the Modules that do the same jobs off Earth, as the Refinery always has. Since version 0.04 a Launch Site builds no Ship: it lifts Pioneers and Armies from its state into orbit.
 _Avoid_: item, building, module (that is the Colony word), structure
 
 **Launch Site**:
@@ -516,7 +516,7 @@ A standing building that is not mothballed and is not running. Four things put o
 _Avoid_: broken, damaged, disabled, unpowered, dark
 
 **Production Moved**:
-The Custodians' third signature rule, since version 0.06.0. While a Factory, Mine, Power Plant, Refinery or Research Lab of theirs on Earth is mothballed, one Factory, Mine, Generator, Refinery or Observatory of theirs off Earth makes double, one Facility for one Module of the same job, the most productive undoubled Module first, on its final figure. Since version 0.09.0 the Factory pairs with the Factory Module and the Mine with the Mine, so a mothballed Earth Factory doubles Widgets off Earth, which is what the name always said; before 0.09.0 the Factory paired with the Mine. A Restart ends it; with no idle Facility of the pair there is no bonus.
+The Custodians' third signature rule, since version 0.06.0. While a Factory, Mine, Power Plant, Refinery or Research Lab of theirs on Earth is mothballed, one Factory, Mine, Generator, Refinery or Observatory of theirs off Earth makes double, one Facility for one Module of the same job, the most productive undoubled Module first, on its final figure. Since version 0.09.0 the Factory pairs with the Factory Module and the Mine with the Mine, so a mothballed Earth Factory doubles Widgets off Earth, which is what the name always said; before 0.09.0 the Factory paired with the Mine. The Wind Farm (version 0.1.0.3) pairs with nothing. A Restart ends it; with no idle Facility of the pair there is no bonus.
 _Avoid_: offshoring, relocation bonus, the mothball bonus
 
 **Decommission**:
@@ -891,6 +891,10 @@ _Avoid_: absorption, offset, carbon capture
 **Nature Reserve**:
 A Region Facility, since version 0.09.4, any Faction may build, one to a Region: land given back. While it stands it adds 1 ppm a turn to the Natural Sink, credited as removal to the Faction that directs its Region (the occupier during an Occupation), and it takes a sixth off what the climate adds to its Region's Unrest, a third of what a Stadium does, multiplying with a Stadium's where both stand.
 _Avoid_: park, forest, wilderness
+
+**Wind Farm**:
+A Region Facility since version 0.1.0.3, any Faction may build once Clean Power stands, in a slot as a Power Plant takes: 3 Energy a turn, half a Power Plant's, for no emissions and a Ducat a turn. Its output takes every multiplier a Power Plant's takes (the Energy lean, Efficient Grids, Superconductors, a Solar Maximum) and nothing else of the Power Plant's: Production Moved does not pair it and a Reactor's rule does not read it. A standing Power Plant, never a Reactor, may be **Replaced** with one, a fourth building change beside Mothball, Restart and Decommission, through the Region's queue at half the Wind Farm's price (12.5 Materials, 4 Widgets); the Power Plant runs until the Wind Farm completes and is gone the Resolution it does, so the slot never stands empty. Off Earth it is a Module of the same name on the ground of Mars alone, half a Generator's base scaled by the site's Generator yield. The computer builds one where it would build a Power Plant once Clean Power stands, unless its Energy is tight, and replaces a Power Plant when its Energy is not tight and its Blame share stands above the fair quarter.
+_Avoid_: turbine, windmill, renewable, clean plant, green power
 
 **Sea Level**:
 How far the oceans have risen with the Temperature. It is drawn on the globe as a band of drowned land along every coast, widening with each threshold, and at each of its thresholds it permanently takes Coastal Slots from every Region, as many as the state's Coastal Exposure and never more than it has left, and then, since version 0.08.5, turns one Inland Slot coastal, wall or no wall, so a coast never runs out. It takes nothing else and takes nothing from a state with no Coastal Slots left that rise, but it reaches every state that has a coast at all.

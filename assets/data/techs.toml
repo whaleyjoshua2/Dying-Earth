@@ -74,7 +74,7 @@ branch = "Stewardship"
 rung = 1
 cost = 18
 needs = []
-effect = "Power Plant and Generator output x1.5"
+effect = "Power Plant, Wind Farm and Generator output x1.5"
 value = 1.5
 
 [[tech]]

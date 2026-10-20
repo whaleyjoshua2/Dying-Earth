@@ -86,7 +86,7 @@ const RESOURCES: [Resource; 5] = [Resource::Materials, Resource::Fuel, Resource:
 // stack is given, and Dig In is an Army's. The driver offered neither, so seat 0 could not give a
 // Blockade at all -- the very move ticket #335 handed the player an orbit to give it from.
 const STANCES: [Stance; 6] = [Stance::Attack, Stance::Hold, Stance::Intercept, Stance::Evade, Stance::Blockade, Stance::DigIn];
-const CHANGES: [BuildingChange; 3] = [BuildingChange::Mothball, BuildingChange::Restart, BuildingChange::Decommission];
+const CHANGES: [BuildingChange; 4] = [BuildingChange::Mothball, BuildingChange::Restart, BuildingChange::Decommission, BuildingChange::Replace];
 // Ticket #226 (version 0.08.2): the four Terms an Accord may hold. The driver could name none of
 // them, so the whole of the diplomacy -- the one system a seat cannot reach alone -- was invisible
 // from here and would have been reported as absent from the game.
@@ -394,7 +394,8 @@ REGIONS AND PEOPLE
                                        Launch Site straight onto a station of yours over Earth, as
                                        far as its Habitat room goes. A launch: it emits, and what it
                                        emits goes on your Blame.
-  change facility <state> <index> <mothball|restart|decommission>
+  change facility <state> <index> <mothball|restart|decommission|replace>
+                                       replace: a Power Plant with a Wind Farm, through the queue
   change module <colony> <index> <mothball|restart|decommission>
 
 RESEARCH, THE ARCHIVE AND THE FACTION ORDERS

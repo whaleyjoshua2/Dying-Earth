@@ -282,6 +282,26 @@ fn build_board(session: &mut Session) {
             }
             g.seats[0].ai = spectate;
         }
+        // `standing:<facility>` (a building aid, ticket #559): a Facility of the named kind stands in
+        // seat 0's start Region, so its tile and its glyph can be photographed without a game that
+        // builds one. By the enum's spelling, case and underscores ignored: `standing:wind_farm`.
+        for id in std::env::args().filter_map(|a| a.strip_prefix("standing:").map(|s| s.replace('_', ""))) {
+            if let Some(kind) = FacilityKind::ALL.into_iter().find(|k| format!("{k:?}").eq_ignore_ascii_case(&id))
+                && let Some(home) = g.controlled_states(Seat(0)).first().copied()
+            {
+                g.state_mut(home).facilities.push(Facility::new(kind));
+            }
+        }
+        // `researched:<tech>` (a building aid, ticket #559): the named Tech stands done, so a picture
+        // can show what waits behind it -- the Wind Farm on a build list, say. By the enum's spelling,
+        // case and underscores ignored: `researched:clean_power`. Any number may be given.
+        for id in std::env::args().filter_map(|a| a.strip_prefix("researched:").map(|s| s.replace('_', ""))) {
+            if let Some(t) = TechId::ALL.into_iter().find(|t| format!("{t:?}").eq_ignore_ascii_case(&id))
+                && !g.has_tech(t)
+            {
+                g.research.done.push(t);
+            }
+        }
         for seat in Seat::ALL {
             if !g.ships_at(seat, BodyId::Mars).is_empty() {
                 continue;

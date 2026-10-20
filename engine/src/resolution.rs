@@ -2202,6 +2202,9 @@ impl Game {
                         self.state_mut(sid).facilities.remove(i);
                         self.seat_mut(change.seat).stockpile.materials = tenth(self.seat(change.seat).stockpile.materials + refund);
                     }
+                    // Ticket #559 (version 0.1.0.3): a Replace is never written here; it is a build
+                    // in the Region's queue and lands in `complete_build`.
+                    BuildingChange::Replace => {}
                 }
                 let where_ = self.tables.state(sid).name.clone();
                 lines.push(match change.what {
@@ -2263,6 +2266,8 @@ impl Game {
                         let st = &mut self.seat_mut(change.seat).stockpile;
                         st.materials = tenth(st.materials + refund);
                     }
+                    // Ticket #559: a Replace is refused on a Module.
+                    BuildingChange::Replace => {}
                 }
                 let where_ = self.place_name(Place::Colony(cid));
                 lines.push(match change.what {
@@ -2482,6 +2487,21 @@ impl Game {
             }
             (Place::State(s), BuildItem::IndustryLevel) => {
                 self.state_mut(s).industry_level += 1;
+            }
+            // Ticket #559 (version 0.1.0.3): the Power Plant flagged for it becomes the Wind Farm in
+            // its own slot, coastal or inland as it stood, working from this Resolution; the slot
+            // never stands empty. With no flagged Power Plant left (the sea or a capture took it) the
+            // build is lost, as a Facility with no slot left is.
+            (Place::State(s), BuildItem::Replace(k)) => {
+                let Some(i) = self.state(s).facilities.iter().position(|f| f.replacing && f.kind == FacilityKind::PowerPlant) else {
+                    let line = format!("{} at {} had no Power Plant left to replace and was lost.", name, self.place_name(place));
+                    self.log(line);
+                    let text = self.say("build_lost", &[("building", name.clone()), ("place", self.place_name(place))]);
+                    self.report_line_by(b.seat, LineKind::Note, Some(place.into()), text);
+                    return;
+                };
+                let coastal = self.state(s).facilities[i].coastal;
+                self.state_mut(s).facilities[i] = if coastal { Facility::in_coastal_slot(k) } else { Facility::new(k) };
             }
             // Ticket #490 (version 0.09.9): the place stands at its new tier.
             // Ticket #503 (version 0.1.0.0): unless it is the Colonial Capital and the Body already

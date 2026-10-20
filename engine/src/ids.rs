@@ -291,10 +291,16 @@ pub enum FacilityKind {
     /// adds to its Region's Unrest (a third of the Stadium's half). Every Faction's alike, one to a
     /// Region, a slot. Appended last.
     NatureReserve,
+    /// Ticket #559 (version 0.1.0.3): the **Wind Farm**, clean power: 3 Energy a turn for no
+    /// emissions and a Ducat a turn, behind Clean Power, in a slot as a Power Plant is. It takes the
+    /// Power Plant's multipliers but is NOT a Power Plant: Production Moved does not pair it, and a
+    /// Reactor's rule does not read it. A standing Power Plant may be **Replaced** with one. Appended
+    /// last, for `Tables::facility`.
+    WindFarm,
 }
 
 impl FacilityKind {
-    pub const ALL: [FacilityKind; 18] = [
+    pub const ALL: [FacilityKind; 19] = [
         FacilityKind::Factory,
         FacilityKind::PowerPlant,
         FacilityKind::Refinery,
@@ -313,6 +319,7 @@ impl FacilityKind {
         FacilityKind::Mine,
         FacilityKind::Stadium,
         FacilityKind::NatureReserve,
+        FacilityKind::WindFarm,
     ];
     pub fn name(self) -> &'static str {
         match self {
@@ -335,6 +342,7 @@ impl FacilityKind {
             FacilityKind::Mine => "Mine",
             FacilityKind::Stadium => "Stadium",
             FacilityKind::NatureReserve => "Nature Reserve",
+            FacilityKind::WindFarm => "Wind Farm",
         }
     }
 
@@ -449,10 +457,14 @@ pub enum ModuleKind {
     /// Core Module's one. Production Moved pairs the Earth Factory with it. Appended last, as the
     /// Battery was, for `Tables::module`.
     Factory,
+    /// Ticket #559 (version 0.1.0.3): the **Wind Farm** Module, on Mars alone: half a Generator's
+    /// base, scaled by the site's Generator yield as every Module is, no emissions, a Ducat a turn,
+    /// behind Clean Power. Appended last, as the Factory was, for `Tables::module`.
+    WindFarm,
 }
 
 impl ModuleKind {
-    pub const ALL: [ModuleKind; 20] = [
+    pub const ALL: [ModuleKind; 21] = [
         ModuleKind::Mine,
         ModuleKind::Generator,
         ModuleKind::Refinery,
@@ -473,9 +485,10 @@ impl ModuleKind {
         ModuleKind::Chorus,
         ModuleKind::Battery,
         ModuleKind::Factory,
+        ModuleKind::WindFarm,
     ];
     /// The Modules an ordinary build order may place (ticket #51: the Archive is not one of them).
-    pub const BUILDABLE: [ModuleKind; 18] = [
+    pub const BUILDABLE: [ModuleKind; 19] = [
         ModuleKind::Mine,
         ModuleKind::Generator,
         ModuleKind::Refinery,
@@ -494,6 +507,7 @@ impl ModuleKind {
         ModuleKind::Chorus,
         ModuleKind::Battery,
         ModuleKind::Factory,
+        ModuleKind::WindFarm,
     ];
     pub fn name(self) -> &'static str {
         match self {
@@ -518,6 +532,8 @@ impl ModuleKind {
             ModuleKind::Battery => "Battery",
             // Ticket #332 (version 0.09.0): one name in both lists, by the Refinery precedent.
             ModuleKind::Factory => "Factory",
+            // Ticket #559 (version 0.1.0.3): one name in both lists, as the Factory and the Mine.
+            ModuleKind::WindFarm => "Wind Farm",
         }
     }
 

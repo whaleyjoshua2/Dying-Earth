@@ -537,6 +537,8 @@ impl Game {
                 Some(format!("+{} Unrest, {} Materials back", figure(u.per_decommission), figure(tenth(self.tables.facility(kind).materials / 2.0))))
             }
             BuildingChange::Restart => None,
+            // Ticket #559 (version 0.1.0.3): the button says its Materials and Widgets itself.
+            BuildingChange::Replace => None,
         }
     }
 
@@ -646,6 +648,8 @@ impl Game {
             // 0.1.0.1): a Strip Permit costs Ducats, where it was free.
             Order::StripPermit { .. } => Cost { ducats: t.strip_permit.ducats as f64, ..Default::default() },
             Order::Change { what: BuildingChange::Restart, .. } => Cost { materials: t.mothball.restart_materials as f64, ..Default::default() },
+            // Ticket #559 (version 0.1.0.3): a Replace is half the Wind Farm's price, paid at the order.
+            Order::Change { building, what: BuildingChange::Replace } => Cost { materials: self.item_materials(seat, building.place(), BuildItem::Replace(FacilityKind::WindFarm)), ..Default::default() },
             Order::Leapfrog { .. } => Cost { ducats: t.ducats.per_leapfrog as f64, ..Default::default() },
             Order::ExodusCall { .. } => Cost { ducats: t.ducats.per_exodus_call as f64, ..Default::default() },
             Order::BuyInfluence { amount } => Cost { ducats: (t.ducats.per_influence * *amount) as f64, ..Default::default() },
@@ -1574,6 +1578,10 @@ impl Game {
                 }
                 if self.tables.module(*kind).low_gravity_only && (col.in_orbit || !self.tables.body(col.body).low_gravity) {
                     return fail(format!("a {} stands only on the ground of a low-gravity Body (the Moon, Phobos, Deimos)", kind.name()));
+                }
+                // Ticket #559 (version 0.1.0.3): the Wind Farm stands on the ground of Mars alone.
+                if self.tables.module(*kind).mars_only && (col.in_orbit || col.body != BodyId::Mars) {
+                    return fail(format!("a {} stands on Mars alone", kind.name()));
                 }
                 if matches!(kind, ModuleKind::Shipyard | ModuleKind::Barracks | ModuleKind::MassDriver) {
                     let has = col.modules.iter().any(|m| m.kind == *kind)
@@ -2617,7 +2625,8 @@ impl Game {
         }
         let (mothballed, changing, fixed) = match building {
             BuildingRef::Facility(sid, i) => match self.state(sid).facilities.get(i) {
-                Some(f) => (f.mothballed, f.change.is_some(), None),
+                // Ticket #559 (version 0.1.0.3): a Replace under way is a change on it too.
+                Some(f) => (f.mothballed, f.changing(), None),
                 None => return fail("no such Facility"),
             },
             BuildingRef::Module(cid, i) => match self.colony(cid).and_then(|c| c.modules.get(i)) {
@@ -2634,7 +2643,20 @@ impl Game {
             _ => {}
         }
         if changing {
-            return fail("this building is already being mothballed, restarted or decommissioned");
+            return fail("this building is already being mothballed, restarted, decommissioned or replaced");
+        }
+        // Ticket #559 (version 0.1.0.3): a Replace is a Power Plant's alone -- never a Reactor, which
+        // is a Power Plant everywhere but here, and never a Module -- and waits on the Wind Farm's Tech.
+        if what == BuildingChange::Replace {
+            let BuildingRef::Facility(sid, i) = building else { return fail("only a Power Plant in a Region is replaced with a Wind Farm") };
+            if self.state(sid).facilities[i].kind != FacilityKind::PowerPlant {
+                return fail("only a Power Plant is replaced with a Wind Farm");
+            }
+            if let Some(t) = self.tables.facility(FacilityKind::WindFarm).needs_tech
+                && !self.has_tech(t)
+            {
+                return fail(format!("a Wind Farm needs {}", self.tables.tech(t).name));
+            }
         }
         match what {
             BuildingChange::Mothball if mothballed => fail("it is already mothballed"),
@@ -2824,6 +2846,12 @@ impl Game {
                         Place::Colony(c) => self.colony_mut(*c).and_then(|c| (*index < c.queue.len()).then(|| c.queue.remove(*index))),
                     };
                     if let Some(b) = removed {
+                        // Ticket #559 (version 0.1.0.3): a cancelled Replace frees its Power Plant.
+                        if let (BuildItem::Replace(_), Place::State(s)) = (b.item, *place)
+                            && let Some(f) = self.state_mut(s).facilities.iter_mut().find(|f| f.replacing)
+                        {
+                            f.replacing = false;
+                        }
                         let refund = -cost.materials;
                         let (who, name, at) = (self.seat_name(seat), b.item.name(), self.place_name(*place));
                         self.log(format!("{who} cancelled the {name} under way at {at}: {} Materials to their Stockpile.", figure(refund)));
@@ -3034,11 +3062,24 @@ impl Game {
                 }
                 // Ticket #54: the change is written on the building itself and lands at the
                 // Resolution of its due turn, so nothing has to track a position between turns.
+                // Ticket #559 (version 0.1.0.3): a Replace goes through the Region's queue as a build
+                // does, half the Wind Farm's Widgets, and the Power Plant is flagged for it; nothing
+                // is written as a `PendingChange`, since nothing lands on a due turn.
+                Order::Change { building: BuildingRef::Facility(sid, i), what: BuildingChange::Replace } => {
+                    let widgets = self.build_widgets(seat, BuildItem::Replace(FacilityKind::WindFarm));
+                    if let Some(f) = self.state_mut(*sid).facilities.get_mut(*i) {
+                        f.replacing = true;
+                    }
+                    self.state_mut(*sid).queue.push(Build { item: BuildItem::Replace(FacilityKind::WindFarm), seat, widgets, done: 0, coastal: false, fuel: 0.0 });
+                }
+                // A Replace on a Module is refused by `check_change`; nothing to record.
+                Order::Change { building: BuildingRef::Module(..), what: BuildingChange::Replace } => {}
                 Order::Change { building, what } => {
                     let turns = match what {
                         BuildingChange::Mothball => 1,
                         BuildingChange::Restart => self.tables.mothball.restart_turns.max(1),
                         BuildingChange::Decommission => self.tables.mothball.decommission_turns.max(1),
+                        BuildingChange::Replace => unreachable!("a Replace is queued above"),
                     };
                     let due = turn + turns - 1;
                     let change = PendingChange { what: *what, due_turn: due, seat };
@@ -3555,6 +3596,7 @@ impl Game {
                     BuildingChange::Mothball => "mothball",
                     BuildingChange::Restart => "restart",
                     BuildingChange::Decommission => "decommission",
+                    BuildingChange::Replace => "replace",
                 };
                 r(key, &[("building", building(*b)), ("place", place(b.place()))])
             }

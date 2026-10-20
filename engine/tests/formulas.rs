@@ -4698,8 +4698,10 @@ fn f_coastal_engineering_is_the_thirteenth_tech() {
     // tickets #182 to #186 -- the Investment Bank, the Spaceport, the Reactor and the Academy.
     assert_eq!(g.tables.facility(FacilityKind::SeaWall).needs_tech, Some(TechId::CoastalEngineering));
     // Ticket #332 (version 0.09.0): and the Mine, sixteen. Ticket #389 (version 0.09.3): and the
-    // Stadium, seventeen. Ticket #411 (version 0.09.4): and the Nature Reserve, eighteen.
-    assert_eq!(FacilityKind::ALL.len(), 18, "eighteen Facilities");
+    // Stadium, seventeen. Ticket #411 (version 0.09.4): and the Nature Reserve, eighteen. Ticket
+    // #559 (version 0.1.0.3): and the Wind Farm, nineteen, behind Clean Power.
+    assert_eq!(FacilityKind::ALL.len(), 19, "nineteen Facilities");
+    assert_eq!(g.tables.facility(FacilityKind::WindFarm).needs_tech, Some(TechId::CleanPower));
 }
 
 /// (g) Antarctica opens the first Climate phase the Temperature stands at +1.6, stays open, and its
@@ -12936,11 +12938,14 @@ fn four_makers_the_factory_makes_widgets_the_mine_makes_materials_and_the_start_
     let mut g = game();
     calm(&mut g);
     // Ticket #389 (version 0.09.3): the Stadium stands after the Mine now, appended last in its turn;
-    // ticket #411 (version 0.09.4): and the Nature Reserve after it.
-    assert_eq!(FacilityKind::ALL[FacilityKind::ALL.len() - 3], FacilityKind::Mine, "appended after every kind before it");
-    assert_eq!(FacilityKind::ALL[FacilityKind::ALL.len() - 2], FacilityKind::Stadium);
-    assert_eq!(FacilityKind::ALL.last(), Some(&FacilityKind::NatureReserve), "appended last");
-    assert_eq!(ModuleKind::ALL.last(), Some(&ModuleKind::Factory), "appended last");
+    // ticket #411 (version 0.09.4): and the Nature Reserve after it; ticket #559 (version 0.1.0.3):
+    // and the Wind Farm after that, on both lists.
+    assert_eq!(FacilityKind::ALL[FacilityKind::ALL.len() - 4], FacilityKind::Mine, "appended after every kind before it");
+    assert_eq!(FacilityKind::ALL[FacilityKind::ALL.len() - 3], FacilityKind::Stadium);
+    assert_eq!(FacilityKind::ALL[FacilityKind::ALL.len() - 2], FacilityKind::NatureReserve);
+    assert_eq!(FacilityKind::ALL.last(), Some(&FacilityKind::WindFarm), "appended last");
+    assert_eq!(ModuleKind::ALL[ModuleKind::ALL.len() - 2], ModuleKind::Factory, "appended after every kind before it");
+    assert_eq!(ModuleKind::ALL.last(), Some(&ModuleKind::WindFarm), "appended last");
     assert!(ModuleKind::BUILDABLE.contains(&ModuleKind::Factory));
     assert_eq!((FacilityKind::Mine.name(), ModuleKind::Factory.name()), ("Mine", "Factory"), "one name in both lists");
     let t = &g.tables;
@@ -23201,4 +23206,267 @@ fn the_pack_presses_the_leader_and_draws_together() {
     g.seats[pro.index()].stockpile.ducats = 500.0;
     let err = g.check_order(pro, &[], &Order::BuyCredits { ppm: 5 }).unwrap_err().0;
     assert!(err.contains("too near your Victory"), "{err}");
+}
+
+// ---------------------------------------------------------------- Ticket #559 (version 0.1.0.3): the Wind Farm
+
+/// Ticket #559 (version 0.1.0.3), R1: **the rows.** The Wind Farm Facility is appended last with its
+/// variant: 25 Materials, 8 Widgets, no Energy upkeep, 3 Energy a turn, no emissions, a Ducat a turn,
+/// a slot, behind Clean Power. The Module is appended last too, buildable: 2.5 Energy base (half a
+/// Generator's 5), a Ducat a turn, Mars alone, behind Clean Power.
+#[test]
+fn the_wind_farm_rows_need_clean_power_and_carry_a_ducat_a_turn() {
+    let g = game();
+    assert_eq!(FacilityKind::ALL.last(), Some(&FacilityKind::WindFarm), "appended last, for Tables::facility");
+    assert_eq!(FacilityKind::WindFarm.name(), "Wind Farm");
+    assert_eq!((FacilityKind::WindFarm.common(), FacilityKind::WindFarm.unique_to()), (None, None), "a common kind, and not a Power Plant");
+    assert!(!FacilityKind::WindFarm.does_the_job_of(FacilityKind::PowerPlant), "Production Moved and the Reactor's rule read the Power Plant's job; the Wind Farm is not it");
+    let f = g.tables.facility(FacilityKind::WindFarm);
+    assert_eq!((f.materials, f.widgets, f.energy_upkeep, f.emissions), (25.0, 8, 0, 0.0), "the designer's figures");
+    assert_eq!(f.produces.as_ref().map(|p| (p.resource, p.amount)), Some((Resource::Energy, 3.0)));
+    assert_eq!(f.ducats_upkeep, 1.0, "a Ducat a turn");
+    assert_eq!(f.needs_tech, Some(TechId::CleanPower), "behind Clean Power");
+    assert!(g.takes_slot(FacilityKind::WindFarm), "a slot, as a Power Plant takes");
+    let p = g.tables.facility(FacilityKind::PowerPlant);
+    assert_eq!((p.materials, p.widgets, p.emissions, p.ducats_upkeep), (27.5, 8, 1.5, 0.0), "the premise: the Power Plant as it was");
+    assert_eq!(ModuleKind::ALL.last(), Some(&ModuleKind::WindFarm), "appended last, for Tables::module");
+    assert!(ModuleKind::BUILDABLE.contains(&ModuleKind::WindFarm));
+    assert_eq!(ModuleKind::WindFarm.name(), "Wind Farm", "one name in both lists");
+    assert!(!ModuleKind::WindFarm.stands_on_a_station(), "the ground of Mars, never a station");
+    let m = g.tables.module(ModuleKind::WindFarm);
+    assert_eq!((m.materials, m.widgets, m.energy_upkeep, m.earth_emissions), (25.0, 8, 0, 0.0));
+    assert_eq!(m.produces.as_ref().map(|p| (p.resource, p.amount)), Some((Resource::Energy, 2.5)), "half a Generator's 5");
+    assert_eq!(m.ducats_upkeep, 1.0, "a Ducat a turn");
+    assert_eq!(m.needs_tech, Some(TechId::CleanPower), "behind Clean Power");
+    assert!(m.mars_only, "Mars alone");
+    assert!(!m.station_only && !m.low_gravity_only && !m.sun_scaled);
+}
+
+/// Ticket #559, R2: **the output.** 3 Energy a turn in a Region that leans elsewhere, taking every
+/// multiplier a Power Plant's takes -- Efficient Grids, Superconductors, a Solar Maximum, the
+/// Energy lean -- so it is always half the Power Plant beside it; no emissions whatever Clean Power
+/// says; and its Ducat is charged at Income while it runs, not while it is mothballed.
+#[test]
+fn a_wind_farm_makes_half_a_power_plants_energy_under_the_same_multipliers_with_no_emissions_and_a_ducat_upkeep() {
+    let mut g = game();
+    calm(&mut g);
+    let sid = StateId::EastAsia;
+    assert_eq!(g.tables.state(sid).resource_lean, Resource::Materials, "the premise: no Energy lean here");
+    g.state_mut(sid).facilities = vec![facility(FacilityKind::PowerPlant), facility(FacilityKind::WindFarm)];
+    let pair = |g: &Game| (g.facility_yield(Seat(0), sid, FacilityKind::PowerPlant), g.facility_yield(Seat(0), sid, FacilityKind::WindFarm));
+    let (pp, wf) = pair(&g);
+    assert_eq!((wf.amount, wf.resource), (3.0, Some(Resource::Energy)), "3 Energy a turn");
+    assert_eq!(wf.emissions, 0.0, "no emissions");
+    assert!(pp.emissions > 0.0, "the premise: the Power Plant smokes");
+    assert_eq!((wf.upkeep, wf.ducats_upkeep), (0.0, 1.0), "no Energy upkeep, a Ducat a turn");
+    with_tech(&mut g, TechId::EfficientGrids);
+    let (pp, wf) = pair(&g);
+    assert_eq!(wf.amount, 4.5, "Efficient Grids x1.5: {}", wf.amount);
+    assert_eq!(wf.amount * 2.0, pp.amount, "half the Power Plant under Efficient Grids");
+    with_tech(&mut g, TechId::Superconductors);
+    let (pp, wf) = pair(&g);
+    assert_eq!(wf.amount, 5.6, "Superconductors x1.25: 3 x 1.5 x 1.25 = 5.625, to the tenth");
+    // Each figure is settled to the tenth on its own, so the halves can part by a tenth: 11.25 is 11.3.
+    assert!((wf.amount * 2.0 - pp.amount).abs() <= 0.1 + 1e-9, "half the Power Plant under Superconductors: {} against {}", wf.amount, pp.amount);
+    g.solar_maximum_next = true;
+    let (pp, wf) = pair(&g);
+    assert!(wf.amount > 5.6, "a Solar Maximum lifts it: {}", wf.amount);
+    assert!((wf.amount * 2.0 - pp.amount).abs() <= 0.1 + 1e-9, "half the Power Plant in a Solar Maximum: {} against {}", wf.amount, pp.amount);
+    g.solar_maximum_next = false;
+    with_tech(&mut g, TechId::CleanPower);
+    let (pp, wf) = pair(&g);
+    assert_eq!(wf.emissions, 0.0, "still nothing with Clean Power, which cuts the Power Plant's to {}", pp.emissions);
+    // The Energy lean reaches it as it reaches the Power Plant.
+    let lean = StateId::ALL.into_iter().find(|s| g.tables.state(*s).resource_lean == Resource::Energy).expect("a Region leans Energy");
+    g.take_control(lean, Seat(0));
+    let (pp, wf) = (g.facility_yield(Seat(0), lean, FacilityKind::PowerPlant), g.facility_yield(Seat(0), lean, FacilityKind::WindFarm));
+    assert!((wf.amount * 2.0 - pp.amount).abs() <= 0.1 + 1e-9, "half the Power Plant under the Energy lean: {} against {}", wf.amount, pp.amount);
+    assert!(wf.chain.multiplied(), "the hover shows the arithmetic");
+    // The Ducat at Income, while it runs.
+    g.seats[0].stockpile.energy = 500.0;
+    g.state_mut(sid).facilities = vec![facility(FacilityKind::PowerPlant)];
+    let before = income_of(&mut g, Seat(0));
+    g.state_mut(sid).facilities.push(facility(FacilityKind::WindFarm));
+    let with = income_of(&mut g, Seat(0));
+    assert!((before.ducats - with.ducats - 1.0).abs() < 1e-9, "a Wind Farm costs 1 Ducat a turn: {} to {}", before.ducats, with.ducats);
+    assert!(g.seat(Seat(0)).income_sources.iter().any(|(src, r, n)| src.starts_with("Wind Farm in") && src.ends_with("(upkeep)") && *r == Resource::Ducats && (*n + 1.0).abs() < 1e-9), "{:?}", g.seat(Seat(0)).income_sources);
+    g.state_mut(sid).facilities[1].mothballed = true;
+    let idle = income_of(&mut g, Seat(0));
+    assert!((idle.ducats - before.ducats).abs() < 1e-9, "mothballed, it pays nothing: {} against {}", idle.ducats, before.ducats);
+    let text = g.facility_yield(Seat(0), sid, FacilityKind::WindFarm).text();
+    assert!(text.contains("1 Ducat upkeep") && !text.contains("Energy upkeep"), "{text}");
+}
+
+/// Ticket #559, R3: **refused without Clean Power**, naming the Tech; built once it stands; never
+/// paired by Production Moved (the Custodians pair the Power Plant with the Generator, the Wind Farm
+/// with nothing).
+#[test]
+fn a_wind_farm_is_refused_without_clean_power_and_production_moved_does_not_pair_it() {
+    let mut g = game();
+    let sid = StateId::EastAsia;
+    directed(&mut g, sid);
+    let build = Order::BuildFacility { state: sid, kind: FacilityKind::WindFarm };
+    let err = g.check_order(Seat(0), &[], &build).expect_err("refused without Clean Power").0;
+    assert!(err.contains("Clean Power"), "{err}");
+    with_tech(&mut g, TechId::CleanPower);
+    g.check_order(Seat(0), &[], &build).expect("built once Clean Power stands");
+    assert_eq!(g.order_cost(Seat(0), &build).materials, 25.0);
+    // Production Moved: a mothballed Wind Farm doubles nothing off Earth; a Power Plant doubles a Generator.
+    assert!(g.tables.faction(FactionKind::Custodians).mothball_pairs.iter().any(|(f, m)| *f == FacilityKind::PowerPlant && *m == ModuleKind::Generator), "the premise");
+    assert!(!g.tables.faction(FactionKind::Custodians).mothball_pairs.iter().any(|(f, _)| *f == FacilityKind::WindFarm), "the Wind Farm pairs with nothing");
+    let mars = colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Generator], 4);
+    g.state_mut(sid).facilities.push(Facility { mothballed: true, ..Facility::new(FacilityKind::WindFarm) });
+    assert!(g.doubled_modules(Seat(0)).is_empty(), "an idle Wind Farm doubles nothing");
+    g.state_mut(sid).facilities.push(Facility { mothballed: true, ..Facility::new(FacilityKind::PowerPlant) });
+    assert_eq!(g.doubled_modules(Seat(0)), vec![(mars, 0)], "an idle Power Plant doubles the Generator");
+}
+
+/// Ticket #559, R4: **the Module, on Mars alone.** Half a Generator's base scaled by the site's
+/// Generator yield -- 2.5 x 0.75 is about 1.9 on Mars, beside a Generator's 3.8 -- lifted by the
+/// Generator's Techs; refused on the Moon with the spec's words, on a station, and without Clean
+/// Power; its Ducat charged at Income.
+#[test]
+fn the_wind_farm_module_stands_on_mars_alone_at_half_a_generators_yield() {
+    let mut g = game();
+    calm(&mut g);
+    g.seats[0].stockpile.materials = 300.0;
+    let mars = colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Generator], 4);
+    let moon = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Generator], 4);
+    assert_eq!(g.tables.body(BodyId::Mars).generator_yield, 0.75, "the premise");
+    let wf = g.module_yield(Seat(0), mars, ModuleKind::WindFarm);
+    let generator = g.module_yield(Seat(0), mars, ModuleKind::Generator);
+    assert_eq!((wf.amount, wf.resource), (1.9, Some(Resource::Energy)), "2.5 x 0.75 = 1.875, to the tenth");
+    assert_eq!(generator.amount, 3.8, "the premise: a Generator's 5 x 0.75");
+    assert_eq!((wf.upkeep, wf.ducats_upkeep, wf.emissions), (0.0, 1.0, 0.0));
+    with_tech(&mut g, TechId::EfficientGrids);
+    assert_eq!(g.module_yield(Seat(0), mars, ModuleKind::WindFarm).amount, 2.8, "x1.5 as the Generator: 2.8125 to the tenth");
+    let build = |c| Order::BuildModule { colony: c, kind: ModuleKind::WindFarm };
+    let err = g.check_order(Seat(0), &[], &build(mars)).expect_err("refused without Clean Power").0;
+    assert!(err.contains("Clean Power"), "{err}");
+    with_tech(&mut g, TechId::CleanPower);
+    g.check_order(Seat(0), &[], &build(mars)).expect("on Mars, with the Tech");
+    let err = g.check_order(Seat(0), &[], &build(moon)).expect_err("not on the Moon").0;
+    assert_eq!(err, "a Wind Farm stands on Mars alone");
+    let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
+    assert!(g.check_order(Seat(0), &[], &build(iss)).is_err(), "not on a station");
+    // The Ducat at Income, while it runs.
+    g.seats[0].stockpile.energy = 500.0;
+    let before = income_of(&mut g, Seat(0));
+    g.colony_mut(mars).unwrap().modules.push(Module::new(ModuleKind::WindFarm));
+    let with = income_of(&mut g, Seat(0));
+    assert!((before.ducats - with.ducats - 1.0).abs() < 1e-9, "a Wind Farm Module costs 1 Ducat a turn: {} to {}", before.ducats, with.ducats);
+    assert!(with.energy > before.energy, "and makes Energy: {} to {}", before.energy, with.energy);
+    let n = g.colony(mars).unwrap().modules.len();
+    g.colony_mut(mars).unwrap().modules[n - 1].mothballed = true;
+    let idle = income_of(&mut g, Seat(0));
+    assert!((idle.ducats - before.ducats).abs() < 1e-9, "mothballed, it pays nothing");
+}
+
+/// Ticket #559, R5: **Replace.** On a standing Power Plant alone -- never a Reactor, a Factory or a
+/// Module -- behind Clean Power, at half the Wind Farm's price, 12.5 Materials and 4 Widgets through
+/// the Region's queue. The Power Plant runs until the Wind Farm completes, then stands as a Wind
+/// Farm in the same slot, coastal as it was; a second Replace on the same building is refused; a
+/// cancel refunds the Materials and frees the building.
+#[test]
+fn a_power_plant_is_replaced_with_a_wind_farm_through_the_queue_at_half_price() {
+    let mut g = game();
+    calm(&mut g);
+    let sid = StateId::EastAsia;
+    directed(&mut g, sid);
+    g.state_mut(sid).facilities = vec![Facility::in_coastal_slot(FacilityKind::PowerPlant), facility(FacilityKind::Factory), facility(FacilityKind::Reactor), facility(FacilityKind::PowerPlant)];
+    let replace = |i| Order::Change { building: BuildingRef::Facility(sid, i), what: BuildingChange::Replace };
+    let err = g.check_order(Seat(0), &[], &replace(0)).expect_err("refused without Clean Power").0;
+    assert!(err.contains("Clean Power"), "{err}");
+    with_tech(&mut g, TechId::CleanPower);
+    assert_eq!(g.order_cost(Seat(0), &replace(0)).materials, 12.5, "half the Wind Farm's 25");
+    g.check_order(Seat(0), &[], &replace(0)).expect("a Power Plant, with the Tech");
+    let err = g.check_order(Seat(0), &[], &replace(1)).expect_err("not a Factory").0;
+    assert!(err.contains("Power Plant"), "{err}");
+    let err = g.check_order(Seat(0), &[], &replace(2)).expect_err("never a Reactor").0;
+    assert!(err.contains("Power Plant"), "{err}");
+    let mars = colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Generator], 4);
+    assert!(g.check_order(Seat(0), &[], &Order::Change { building: BuildingRef::Module(mars, 0), what: BuildingChange::Replace }).is_err(), "never a Module");
+    assert!(g.check_order(Seat(0), std::slice::from_ref(&replace(0)), &replace(0)).is_err(), "one order a turn on a building");
+    let materials = g.seats[0].stockpile.materials;
+    g.commit_orders(Seat(0), &[replace(0)]);
+    assert_eq!(g.seats[0].stockpile.materials, materials - 12.5, "paid at the order");
+    assert_eq!(g.state(sid).queue.iter().map(|b| (b.item, b.widgets, b.done)).collect::<Vec<_>>(), vec![(BuildItem::Replace(FacilityKind::WindFarm), 4, 0)], "4 Widgets through the queue");
+    assert!(g.state(sid).facilities[0].replacing, "the Power Plant is flagged");
+    assert!(g.state(sid).facilities[0].change.is_none(), "and carries no due turn: it lands with the build");
+    assert_eq!(g.state(sid).facilities[0].kind, FacilityKind::PowerPlant, "and runs until the Wind Farm completes");
+    assert!(g.facility_yield(Seat(0), sid, g.state(sid).facilities[0].kind).amount > 0.0);
+    let err = g.check_order(Seat(0), &[], &replace(0)).expect_err("already being replaced").0;
+    assert!(err.contains("already"), "{err}");
+    assert!(g.check_order(Seat(0), &[], &Order::Change { building: BuildingRef::Facility(sid, 0), what: BuildingChange::Mothball }).is_err(), "nor mothballed meanwhile");
+    g.check_order(Seat(0), &[], &replace(3)).expect("the other Power Plant may be");
+    // The slot count is untouched: the Replace reserves no slot of its own.
+    let used = g.slots_used(sid);
+    assert_eq!(used, 4, "four standing, nothing reserved by the Replace: {used}");
+    // It completes at the Resolution its Widgets reach it, and the Power Plant is gone that Resolution.
+    g.state_mut(sid).queue[0].done = 4;
+    g.resolution_phase();
+    assert!(g.state(sid).queue.is_empty(), "the build is done");
+    let f = &g.state(sid).facilities[0];
+    assert_eq!((f.kind, f.coastal, f.replacing, f.mothballed, f.online), (FacilityKind::WindFarm, true, false, false, true), "a Wind Farm in the same coastal slot");
+    assert_eq!(g.state(sid).facilities.len(), 4, "the slot never stood empty");
+    assert_eq!(g.state(sid).facilities[3].kind, FacilityKind::PowerPlant, "the other Power Plant stands");
+    // A cancel refunds the Materials and frees the building for another order.
+    g.commit_orders(Seat(0), &[replace(3)]);
+    assert!(g.state(sid).facilities[3].replacing);
+    let materials = g.seats[0].stockpile.materials;
+    let cancel = Order::CancelBuild { place: Place::State(sid), index: 0 };
+    assert_eq!(g.order_cost(Seat(0), &cancel).materials, -12.5, "the refund");
+    g.commit_orders(Seat(0), &[cancel]);
+    assert_eq!(g.seats[0].stockpile.materials, materials + 12.5);
+    assert!(!g.state(sid).facilities[3].replacing, "cancelled, the Power Plant is free again");
+    g.check_order(Seat(0), &[], &replace(3)).expect("and may be ordered again");
+}
+
+/// Ticket #559, R6: **the computer.** Once Clean Power stands it builds a Wind Farm where it would
+/// build a Power Plant, unless its Energy is tight, when it prefers the Power Plant's 6; and it
+/// replaces a standing Power Plant with a Wind Farm when its Energy is not short and its Blame share
+/// stands above the fair quarter, never when its Blame is clean.
+#[test]
+fn the_computer_builds_a_wind_farm_for_a_power_plant_once_clean_power_stands_unless_energy_is_tight() {
+    let mut g = game();
+    calm(&mut g);
+    let pro = seat_of(&g, FactionKind::Prospectors);
+    let sid = g.directed_states(pro)[0];
+    g.seats[pro.index()].stockpile.materials = 500.0;
+    g.seats[pro.index()].stockpile.ducats = 500.0;
+    let power = |orders: &[Order]| -> (bool, bool) {
+        let has = |k: FacilityKind| orders.iter().any(|o| matches!(o, Order::BuildFacility { kind, .. } | Order::BuildFacilityWithDucats { kind, .. } if *kind == k));
+        (has(FacilityKind::PowerPlant), has(FacilityKind::WindFarm))
+    };
+    // Without Clean Power, Energy a turn from short: the Power Plant, as ever.
+    g.seats[pro.index()].stockpile.energy = 0.0;
+    let orders = g.ai_orders(pro);
+    assert_eq!(power(&orders), (true, false), "no Clean Power: a Power Plant and never a Wind Farm: {orders:?}");
+    // With it, Energy tight: still the Power Plant's 6.
+    with_tech(&mut g, TechId::CleanPower);
+    let orders = g.ai_orders(pro);
+    assert_eq!(power(&orders), (true, false), "Energy tight: the Power Plant's 6: {orders:?}");
+    // With it, Energy in hand but no producer yet: the Wind Farm in the Power Plant's place.
+    g.seats[pro.index()].stockpile.energy = 1000.0;
+    let orders = g.ai_orders(pro);
+    assert_eq!(power(&orders), (false, true), "Energy in hand: a Wind Farm where the Power Plant was: {orders:?}");
+    // Replace: a standing Power Plant, Energy not short, Blame weighing.
+    g.state_mut(sid).facilities.push(facility(FacilityKind::PowerPlant));
+    let replaces = |orders: &[Order]| orders.iter().filter(|o| matches!(o, Order::Change { building: BuildingRef::Facility(s, _), what: BuildingChange::Replace } if *s == sid)).count();
+    for s in Seat::ALL {
+        g.seats[s.index()].blame_emitted = 0.0;
+    }
+    let orders = g.ai_orders(pro);
+    assert_eq!(replaces(&orders), 0, "Blame clean: the Power Plant stands: {orders:?}");
+    g.seats[pro.index()].blame_emitted = 100.0;
+    assert!(g.blame_share(pro) > g.tables.influence.blame.fair_share, "the premise: its Blame weighs");
+    let orders = g.ai_orders(pro);
+    assert_eq!(replaces(&orders), 1, "Blame weighing, Energy in hand: Replace the Power Plant: {orders:?}");
+    // Tight: nothing in the Stockpile and the Labs' upkeep past what the Power Plant makes.
+    g.seats[pro.index()].stockpile.energy = 0.0;
+    g.state_mut(sid).facilities.push(facility(FacilityKind::ResearchLab));
+    g.state_mut(sid).facilities.push(facility(FacilityKind::ResearchLab));
+    let orders = g.ai_orders(pro);
+    assert_eq!(replaces(&orders), 0, "Energy tight: it keeps the Power Plant's 6: {orders:?}");
+    assert!(!power(&orders).1, "and raises no Wind Farm either: {orders:?}");
 }

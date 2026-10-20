@@ -49,3 +49,22 @@ before (493 against 464 in the first seating): the Ducat gate (`income_last_turn
 nearly always open, and 4 Energy against 3 shut none the Energy check had not already. Measured
 behaviour, not a rule: the dearer Scrubber bites a human spamming nineteen of them more than a
 computer building a handful.
+
+## The Wind Farm
+
+Ticket [#559](https://github.com/whaleyjoshua2/Dying-Earth/issues/559), spec §3.
+
+Built by an agent against the spec, each test watched red first (six, all for the stated reason:
+the row without its Ducat, the order accepted without Clean Power, the Mars Module at 2.5 before the
+yield, Replace accepted without the Tech, the computer ordering both power kinds). **The design
+choice for Replace**: a fourth `BuildingChange`, a `BuildItem::Replace` in the Region's queue and a
+`replacing` flag on the Power Plant, rather than a slot index, because the sea and a Decommission
+shift the indices. The computer's power counts now read each card's Energy figure where `* 6` was
+hard-coded. One judgement left open for the designer: the Archivists' first Reactor is still
+offered when Clean Power stands, since its clause is the upkeep cut; a second gives way to the
+Wind Farm.
+
+**The pictures** ([`ticket-559/`](ticket-559/)): the build list with "Wind Farm 25, 8 Widgets, or
+50 Ducats" (`researched:clean_power`, a new shot aid); a Power Plant's strip with "Mothball,
+Decommission, 4 Widgets 12.5 Replace"; a standing Wind Farm's tile and line, "+3 Energy, 1 Ducat
+upkeep" (`standing:wind_farm`, another new aid).

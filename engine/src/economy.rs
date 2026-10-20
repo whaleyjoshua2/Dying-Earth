@@ -628,7 +628,8 @@ impl Game {
         let t = &self.tables;
         let fac = t.faction(self.kind(seat));
         let mc = t.module(kind);
-        let mut y = Yield { resource: None, amount: 0.0, research: 0, upkeep: mc.energy_upkeep as f64, ducats_upkeep: 0.0, emissions: 0.0, allotment: mc.influence_allotment, standing: mc.standing_per_turn, doubled_by: None, detail: None, does: mc.does.clone(), chain: Chain::default(), allotment_outside: 0 };
+        // Ticket #559 (version 0.1.0.3): a Module's Ducat upkeep (the Wind Farm's), as a Facility's.
+        let mut y = Yield { resource: None, amount: 0.0, research: 0, upkeep: mc.energy_upkeep as f64, ducats_upkeep: mc.ducats_upkeep, emissions: 0.0, allotment: mc.influence_allotment, standing: mc.standing_per_turn, doubled_by: None, detail: None, does: mc.does.clone(), chain: Chain::default(), allotment_outside: 0 };
         // Ticket #239 (version 0.08.3): a Unique Module does its sibling's job, so every lookup
         // keyed by kind -- the Techs that multiply it, the slot's yield, a Discovery on it --
         // reads the COMMON kind. Without this the Arkwrights' Chorus would be the one Relay in
@@ -1039,7 +1040,8 @@ impl Game {
                     name: m.kind.name(),
                     is_module: true,
                     upkeep: y.upkeep,
-                    ducats_upkeep: 0.0,
+                    // Ticket #559 (version 0.1.0.3): the Wind Farm Module's Ducat, charged as a Facility's.
+                    ducats_upkeep: y.ducats_upkeep,
                     output: if starved { None } else { y.resource.map(|r| (r, y.amount)) },
                     // Ticket #80: an Observatory's Research. Ticket #359: halved in `module_yield_at`.
                     research: if starved { 0 } else { y.research },
@@ -1067,12 +1069,14 @@ impl Game {
         // Efficient Grids reaches a Reactor and the Solar Maximum bites it.
         let kind = kind.common().unwrap_or(kind);
         let mut m = 1.0;
-        if kind == FacilityKind::PowerPlant {
+        // Ticket #559 (version 0.1.0.3): the Wind Farm takes every multiplier a Power Plant's output
+        // takes -- here and nowhere else, since it is not a Power Plant by its job.
+        if matches!(kind, FacilityKind::PowerPlant | FacilityKind::WindFarm) {
             m *= self.solar_maximum_multiplier();
         }
         match kind {
             // Ticket #505 (version 0.1.0.0): Superconductors, on every Energy output, in this chain.
-            FacilityKind::PowerPlant => m *= self.tech_multiplier(seat, TechId::EfficientGrids) * self.tech_multiplier(seat, TechId::Superconductors),
+            FacilityKind::PowerPlant | FacilityKind::WindFarm => m *= self.tech_multiplier(seat, TechId::EfficientGrids) * self.tech_multiplier(seat, TechId::Superconductors),
             // Ticket #332 (version 0.09.0): Deep Mining follows the Materials to the Mine; the
             // Factory makes Widgets now and no Tech lifts those.
             FacilityKind::Mine => m *= self.tech_multiplier(seat, TechId::DeepMining),
@@ -1089,13 +1093,14 @@ impl Game {
     /// Mines standing over twenty games went from 16 to 329.
     pub(crate) fn tech_output_multiplier_module(&self, seat: Seat, kind: ModuleKind) -> f64 {
         let mut m = 1.0;
-        // Ticket #89: a Solar Array reads the Sun as a Generator does.
-        if matches!(kind, ModuleKind::Generator | ModuleKind::SolarArray) {
+        // Ticket #89: a Solar Array reads the Sun as a Generator does. Ticket #559 (version
+        // 0.1.0.3): and the Wind Farm Module, on Mars.
+        if matches!(kind, ModuleKind::Generator | ModuleKind::SolarArray | ModuleKind::WindFarm) {
             m *= self.solar_maximum_multiplier();
         }
         match kind {
             // Ticket #505 (version 0.1.0.0): Superconductors, on every Energy output, in this chain.
-            ModuleKind::Generator | ModuleKind::SolarArray => m *= self.tech_multiplier(seat, TechId::EfficientGrids) * self.tech_multiplier(seat, TechId::Superconductors),
+            ModuleKind::Generator | ModuleKind::SolarArray | ModuleKind::WindFarm => m *= self.tech_multiplier(seat, TechId::EfficientGrids) * self.tech_multiplier(seat, TechId::Superconductors),
             // Ticket #84: the Extraction Charter stacks on Deep Mining.
             // Ticket #232 (version 0.08.3): and Beneficiation stacks on both, INSIDE this one
             // chain, so the whole product is floored once by the caller. A tenth applied after a
@@ -1174,6 +1179,8 @@ impl Game {
             // Ticket #343 (version 0.09.1): a Warhead is priced flat, the Faction's Ship discount
             // left out. The discount is a shipwright's, and reloading is not shipbuilding.
             BuildItem::Warhead(_) => (t.nuke.rearm_widgets, 1.0),
+            // Ticket #559 (version 0.1.0.3): a Replace is half the kind's Widgets, 4 of the Wind Farm's 8.
+            BuildItem::Replace(k) => (t.facility(k).widgets / 2, fac.facility_materials_multiplier),
         };
         ((row as f64 * m).floor() as u32).max(1)
     }
@@ -1239,6 +1246,8 @@ impl Game {
             (BuildItem::Unit(k), site) => self.ship_materials_at(seat, site, k),
             // Ticket #343 (version 0.09.1): the rearm's flat price, for the same reason.
             (BuildItem::Warhead(_), _) => self.tables.nuke.rearm_materials as f64,
+            // Ticket #559 (version 0.1.0.3): a Replace is half the kind's price, at the seat's own.
+            (BuildItem::Replace(k), _) => tenth(self.facility_materials(seat, k) / 2.0),
         }
     }
 
