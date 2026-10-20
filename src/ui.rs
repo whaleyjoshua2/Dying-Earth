@@ -9734,7 +9734,7 @@ fn trading_window(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSt
         for (i, res, key, name) in lines {
             let per = match res {
                 None => game.tables.ducats.per_influence,
-                Some(r) => game.trade_price(r).unwrap_or(0),
+                Some(r) => game.trade_price(r).unwrap_or(0) as f64,
             };
             icon_word(ui, key, name);
             let sells = matches!(res, Some(dying_earth_engine::Resource::Materials) | Some(dying_earth_engine::Resource::Fuel));
@@ -9742,7 +9742,7 @@ fn trading_window(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSt
             // the price; the line says so.
             let off = game.tables.faction(game.kind(Seat(0))).market_multiplier;
             let discount = if res.is_some() && off != 1.0 { format!(" (x{off} for you, over the lot)") } else { String::new() };
-            let price = if sells { format!("{per} Ducats each; sells for {} Ducats{discount}", figure(per as f64 / game.tables.ducats.sell_divisor.max(1) as f64)) } else { format!("{per} Ducats each{discount}") };
+            let price = if sells { format!("{per} Ducats each; sells for {} Ducats{discount}", figure(per / game.tables.ducats.sell_divisor.max(1) as f64)) } else { format!("{per} Ducats each{discount}") };
             // The glyph line wraps at the width it is given, and a Grid cell has none until its
             // content has one, so left alone it wrapped one word to a line (the first picture of
             // ticket #369).
@@ -13060,13 +13060,13 @@ mod tests {
     }
 
     /// Ticket #537 (version 0.1.0.1): the Influence hover says the table's price, four Ducats;
-    /// ticket #562 (version 0.1.0.3): five.
+    /// ticket #562 (version 0.1.0.3): four and a half.
     #[test]
     fn the_influence_hover_says_the_tables_price() {
         let tables = std::sync::Arc::new(dying_earth_engine::data::Tables::load(&dying_earth_engine::data::default_data_dir()).unwrap());
         let g = Game::new(tables, NewGame { seed: 7, player: FactionKind::Custodians, player_is_ai: false, player_start: StateId::EastAsia });
-        assert_eq!(g.tables.ducats.per_influence, 5);
-        assert!(influence_hover(&g).ends_with("at 5 Ducats each."), "{}", influence_hover(&g));
+        assert_eq!(g.tables.ducats.per_influence, 4.5);
+        assert!(influence_hover(&g).ends_with("at 4.5 Ducats each."), "{}", influence_hover(&g));
     }
 
     /// Ticket #508 (version 0.1.0.0): a held Accord's hover says each of its Terms in a line, the

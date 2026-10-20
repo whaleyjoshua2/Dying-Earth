@@ -107,12 +107,13 @@ Scrubber. Reported to the designer; nothing changed on the strength of it.
 before the Fuel rule (10 / 24 / 20 / 17 and 9), the collapses' six are near noise's edge and the
 Archivists' seven past it; the rest are back where they were.
 
-## 5. Influence at 5 Ducats a point; Distress Call at +2
+## 5. Influence at 4.5 Ducats a point; Distress Call at +2
 
-Ticket: [Influence at 5 Ducats a point, and Distress Call at +2 Relations](https://github.com/whaleyjoshua2/Dying-Earth/issues/562).
+Ticket: [Influence at 4.5 Ducats a point, and Distress Call at +2 Relations](https://github.com/whaleyjoshua2/Dying-Earth/issues/562).
 
-- **A point of Influence costs 5 Ducats** at the Trading window (4 since 0.1.0.1, 2 before). Still
-  no cap. The computer reads the price from the table.
+- **A point of Influence costs 4.5 Ducats** at the Trading window (4 since 0.1.0.1, 2 before; 5
+  for one build of this version, cut to 4.5 on its sweep). Still no cap; the price may be a
+  fraction, so eleven points cost 49.5. The computer reads the price from the table.
 - **Distress Call** pays +2 Relations with every rival for holding a Ship a turn (+5 before);
   refusing still costs 3.
 
@@ -120,5 +121,11 @@ Ticket: [Influence at 5 Ducats a point, and Distress Call at +2 Relations](https
 80 games, the reserve's second fix included): **5 / 36 / 13 / 10 and 16 collapses**, from 10 / 25 /
 20 / 10 and 15. The Prospectors' eleven, the Arkwrights' seven and the Custodians' five are all
 past noise, and all one way: the price of a point hurts the seats poor in Ducats and leaves the
-richest, the Prospectors, with the only Allotment that still buys. Reported to the designer;
-nothing changed on the strength of it.
+richest, the Prospectors, with the only Allotment that still buys. Reported to the designer, who
+set the price at 4.5.
+
+**At 4.5** ([`sweeps/ticket-562-45.txt`](../dev-diary/2026-10-19-version-0.1.0.3/sweeps/ticket-562-45.txt),
+80 games): **8 / 29 / 17 / 14 and 12 collapses**. The Prospectors give back seven of the eleven,
+the Arkwrights take back four, the Custodians three; the Archivists' fourteen is the version's
+best. Beside the figures before the ticket (10 / 25 / 20 / 10 and 15), only the Prospectors' +4 and
+the Archivists' +4 stand at the edge of noise.

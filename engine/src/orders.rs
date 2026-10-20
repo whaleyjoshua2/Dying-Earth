@@ -652,7 +652,7 @@ impl Game {
             Order::Change { building, what: BuildingChange::Replace } => Cost { materials: self.item_materials(seat, building.place(), BuildItem::Replace(FacilityKind::WindFarm)), ..Default::default() },
             Order::Leapfrog { .. } => Cost { ducats: t.ducats.per_leapfrog as f64, ..Default::default() },
             Order::ExodusCall { .. } => Cost { ducats: t.ducats.per_exodus_call as f64, ..Default::default() },
-            Order::BuyInfluence { amount } => Cost { ducats: (t.ducats.per_influence * *amount) as f64, ..Default::default() },
+            Order::BuyInfluence { amount } => Cost { ducats: t.ducats.per_influence * *amount as f64, ..Default::default() },
             // A purchase is a negative cost in the resource bought, so `remaining` and `commit_orders`
             // add it without a special case; a sale is the mirror, with a negative Ducat cost.
             Order::Buy { resource, amount } => {

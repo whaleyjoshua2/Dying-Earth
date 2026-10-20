@@ -985,7 +985,8 @@ pub struct ResearchDirectiveCard {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct DucatsCard {
-    pub per_influence: i64,
+    /// Ticket #562 (version 0.1.0.3): a fraction since the designer set four and a half.
+    pub per_influence: f64,
     /// Ticket #54: what one Leapfrog costs the Custodians; it replaced `per_restoration_step`.
     pub per_leapfrog: i64,
     pub per_exodus_call: i64,

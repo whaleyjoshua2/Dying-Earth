@@ -535,15 +535,15 @@ fn a_controlled_state_pays_ducats_from_gdp_times_industry_and_a_bank_adds_more()
 }
 
 #[test]
-fn ducats_buy_influence_five_for_one_and_the_bought_influence_is_spendable_at_once() {
+fn ducats_buy_influence_at_four_and_a_half_a_point_and_the_bought_influence_is_spendable_at_once() {
     // Ticket #537 (version 0.1.0.1): four Ducats a point, where it was two. Ticket #562 (version
-    // 0.1.0.3): five.
+    // 0.1.0.3): four and a half, at the designer's word, after five starved the poor seats.
     let mut g = game();
-    g.seats[0].stockpile.ducats = 50.0;
+    g.seats[0].stockpile.ducats = 45.0;
     g.seats[0].allotment = 22;
     let buy = Order::BuyInfluence { amount: 10 };
-    assert_eq!(g.order_cost(Seat(0), &buy).ducats, 50.0);
-    assert!(g.check_order(Seat(0), &[], &Order::BuyInfluence { amount: 11 }).is_err(), "55 Ducats needed, 50 held");
+    assert_eq!(g.order_cost(Seat(0), &buy).ducats, 45.0);
+    assert!(g.check_order(Seat(0), &[], &Order::BuyInfluence { amount: 11 }).is_err(), "49.5 Ducats needed, 45 held");
     let pending = vec![buy.clone()];
     let (_, left) = g.remaining(Seat(0), &pending);
     assert_eq!(left, 32, "the Allotment plus the bought 10");
@@ -856,7 +856,7 @@ fn selling_materials_or_fuel_returns_half_the_buying_price() {
     let pending = vec![m.clone()];
     let (left, _) = g.remaining(Seat(0), &pending);
     assert_eq!((left.materials, left.ducats), (0.0, 15.0));
-    assert!(g.check_order(Seat(0), &pending, &Order::BuyInfluence { amount: 3 }).is_ok(), "12 of the 15 Ducats");
+    assert!(g.check_order(Seat(0), &pending, &Order::BuyInfluence { amount: 3 }).is_ok(), "13.5 of the 15 Ducats");
     g.commit_orders(Seat(0), &[m, f]);
     assert_eq!(g.seats[0].stockpile, Stockpile { materials: 0.0, fuel: 0.0, energy: 20.0, ducats: 18.0 }, "15 and 3, Fuel at 3 since ticket #421");
 }
@@ -2674,7 +2674,7 @@ fn the_ai_buys_fuel_for_a_colony_ship_or_a_refuel() {
     g.seats[0].stockpile.fuel = 0.0;
     // And the computer takes it, where Influence cannot outbid it for the Ducats.
     let mut t = Tables::load(&default_data_dir()).expect("tables load");
-    t.ducats.per_influence = 1_000_000;
+    t.ducats.per_influence = 1_000_000.0;
     let mut h = Game::new(Arc::new(t), NewGame { seed: 7, player: FactionKind::Custodians, player_is_ai: false, player_start: StateId::EastAsia });
     calm(&mut h);
     h.seats[0].stockpile.fuel = 0.0;
@@ -6904,7 +6904,7 @@ fn the_prospectors_buy_at_fifteen_per_cent_off() {
     assert_eq!(g.order_cost(pro, &buy(Resource::Materials, 10)).ducats, 25.5, "30 x 0.85 = 25.5"); // Ticket #387: to the tenth, where 25 was floored
     assert_eq!(g.order_cost(pro, &buy(Resource::Fuel, 5)).ducats, 12.8, "15 x 0.85 = 12.75, to the tenth (Fuel at 3 since ticket #421)");
     assert_eq!(g.order_cost(pro, &buy(Resource::Energy, 10)).ducats, 17.0, "20 x 0.85 = 17.0");
-    assert_eq!(g.order_cost(pro, &Order::BuyInfluence { amount: 5 }).ducats, 25.0, "Influence is not a commodity (five a point since ticket #562)");
+    assert_eq!(g.order_cost(pro, &Order::BuyInfluence { amount: 5 }).ducats, 22.5, "Influence is not a commodity (4.5 a point since ticket #562)");
     assert_eq!(g.order_cost(pro, &Order::Sell { resource: Resource::Materials, amount: 10 }).ducats, -15.0, "selling is not discounted: half of 3 each, undiscounted");
     let sid = g.controlled_states(pro)[0];
     let outright = Order::BuildFacilityWithDucats { state: sid, kind: FacilityKind::Factory };
@@ -19490,7 +19490,7 @@ fn the_computer_keeps_fuel_on_hand_for_its_power() {
     // Influence priced out of reach, as `the_ai_buys_fuel_for_a_colony_ship_or_a_refuel` does, so a
     // bought point does not take the Ducats a Fuel buy is weighed against.
     let mut t = Tables::load(&default_data_dir()).expect("tables load");
-    t.ducats.per_influence = 1_000_000;
+    t.ducats.per_influence = 1_000_000.0;
     let mut g = Game::new(Arc::new(t), NewGame { seed: 7, player: FactionKind::Custodians, player_is_ai: false, player_start: StateId::EastAsia });
     calm(&mut g);
     let cus = seat_of(&g, FactionKind::Custodians);

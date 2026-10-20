@@ -2143,7 +2143,7 @@ impl Game {
             let needed = self.influence_needed_for(seat, *target);
             let base = self.base_weight(seat, Cat::Influence) * (1.0 - 0.15 * rank as f64).max(0.3);
             let opp = if needed - have <= step { m.opportunity } else { 1.0 };
-            let bought = if self.tables.ducats.per_influence > 0 { (self.seat(seat).stockpile.ducats / self.tables.ducats.per_influence as f64).floor() as i64 } else { 0 };
+            let bought = if self.tables.ducats.per_influence > 0.0 { (self.seat(seat).stockpile.ducats / self.tables.ducats.per_influence).floor() as i64 } else { 0 };
             let copies = ((allotment + bought) / step).max(0);
             for _ in 0..copies {
                 push(vec![Order::Influence { target: *target, amount: step }], Cat::Influence, base, 1.0, 1.0, opp, format!("spend {} Influence on {}", step, self.place_name(*target)), None);
@@ -2152,9 +2152,9 @@ impl Game {
         // Buy Influence with Ducats (ticket #35), in units of the step, weighted like Influence itself.
         let ducats = self.seat(seat).stockpile.ducats;
         let per = self.tables.ducats.per_influence;
-        let buys = if per > 0 { (ducats / (per * step) as f64).floor() as i64 } else { 0 };
+        let buys = if per > 0.0 { (ducats / (per * step as f64)).floor() as i64 } else { 0 };
         for _ in 0..buys {
-            push(vec![Order::BuyInfluence { amount: step }], Cat::Influence, self.base_weight(seat, Cat::Influence) * 0.9, 1.0, 1.0, 1.0, format!("buy {} Influence for {} Ducats", step, per * step), None);
+            push(vec![Order::BuyInfluence { amount: step }], Cat::Influence, self.base_weight(seat, Cat::Influence) * 0.9, 1.0, 1.0, 1.0, format!("buy {} Influence for {} Ducats", step, per * step as f64), None);
         }
         // Ticket #42: the trading window. While Materials are the scarcest resource (or the bootstrap
         // need), Ducats buy them in lots of 10 at a producer's weight; it sells, since ticket
@@ -2205,7 +2205,7 @@ impl Game {
         // threshold, nor count the decay), and measured by the sweep on the ticket.
         let mut owned: Vec<Place> = self.controlled_states(seat).into_iter().map(Place::State).collect();
         owned.extend(self.colonies.iter().filter(|c| c.control.controller() == Some(seat)).map(|c| Place::Colony(c.id)));
-        let bought_steps = if per > 0 { (ducats / per as f64).floor() as i64 } else { 0 };
+        let bought_steps = if per > 0.0 { (ducats / per).floor() as i64 } else { 0 };
         for place in owned {
             let rival = self.rival_standing(seat, place);
             let mine = self.seat(seat).influence.get(&place).copied().unwrap_or(0);

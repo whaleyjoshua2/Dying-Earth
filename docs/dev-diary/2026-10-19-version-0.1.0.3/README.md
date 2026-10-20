@@ -122,11 +122,11 @@ whole want stands above the reserve. And the buy up to the reserve, placed in th
 everything else was chosen, never fired, since the Ducats were spent by then; it is a trading
 candidate now, weighed as the Energy buy is. The test witnesses both, red first.
 
-## Influence at 5 Ducats a point; Distress Call at +2
+## Influence at 4.5 Ducats a point; Distress Call at +2
 
 Ticket [#562](https://github.com/whaleyjoshua2/Dying-Earth/issues/562), spec §5. Two figures in
-the data; the two tests that pinned 4 re-pinned to 5. The sweep below carries the reserve's second
-fix as well, so its figures are the two together.
+the data; built first at 5, the two tests that pinned 4 re-pinned to 5. The sweep below carries the
+reserve's second fix as well, so its figures are the two together.
 
 **The sweep** ([`sweeps/ticket-562.txt`](sweeps/ticket-562.txt)): **5 / 36 / 13 / 10 and 16
 collapses**, from 10 / 25 / 20 / 10 and 15. Prospectors +11 (34 of them outright), Arkwrights -7,
@@ -134,7 +134,18 @@ Custodians -5, every one past noise and all the same way. The reading: a dearer 
 is paid by the seats that have Ducats, and only the Prospectors do (80 to 170 a turn against the
 Arkwrights' and Archivists' 1 to 6, the playtest measured); the brake meant for the human buying
 the world fell on the computer's poor seats instead, and the Prospectors bought what the others no
-longer could. Measured behaviour, reported; nothing changed on the strength of it.
+longer could. Measured behaviour, reported; the designer set the price at 4.5.
+
+**At 4.5.** The price became a fraction, so `per_influence` is an `f64` now (it was an integer):
+four readers changed, the cost of a `BuyInfluence`, the computer's two buy counts, and the Trading
+window's price column. The three pins were re-pinned to 4.5 and watched red against the data still
+at 5 (5.0 against 4.5; 25 against 22.5; 50 against 45) before the figure moved.
+
+**The sweep at 4.5** ([`sweeps/ticket-562-45.txt`](sweeps/ticket-562-45.txt)): **8 / 29 / 17 / 14
+and 12 collapses**. Most of the way back from the sweep at 5: Prospectors -7, Arkwrights +4,
+Custodians +3, Archivists +4. Against the figures before the ticket (10 / 25 / 20 / 10 and 15) the
+Prospectors hold +4 and the Archivists +4, both at the edge of noise, and the collapses are three
+fewer. The dearer point still costs the poor seats something, less than at 5.
 
 **The reserve's second review** found two minor defects, both fixed and witnessed red: a rich seat
 bought the reserve and a Ship's top-up (which covers the reserve beside the want) in the same turn,
