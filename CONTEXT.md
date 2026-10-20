@@ -518,7 +518,7 @@ A standing building that is not mothballed and is not running. Four things put o
 _Avoid_: broken, damaged, disabled, unpowered, dark
 
 **Production Moved**:
-The Custodians' third signature rule, since version 0.06.0. While a Factory, Mine, Power Plant, Refinery or Research Lab of theirs on Earth is mothballed, one Factory, Mine, Generator, Refinery or Observatory of theirs off Earth makes double, one Facility for one Module of the same job, the most productive undoubled Module first, on its final figure. Since version 0.09.0 the Factory pairs with the Factory Module and the Mine with the Mine, so a mothballed Earth Factory doubles Widgets off Earth, which is what the name always said; before 0.09.0 the Factory paired with the Mine. The Wind Farm (version 0.1.0.3) pairs with nothing. A Restart ends it; with no idle Facility of the pair there is no bonus.
+The Custodians' third signature rule, since version 0.06.0. While a Factory, Mine, Power Plant, Refinery or Research Lab of theirs on Earth is mothballed, one Factory, Mine, Generator, Refinery or Observatory of theirs off Earth makes x2.08 (double before version 0.1.0.3), one Facility for one Module of the same job, the most productive undoubled Module first, on its final figure. Since version 0.09.0 the Factory pairs with the Factory Module and the Mine with the Mine, so a mothballed Earth Factory doubles Widgets off Earth, which is what the name always said; before 0.09.0 the Factory paired with the Mine. The Wind Farm (version 0.1.0.3) pairs with nothing. A Restart ends it; with no idle Facility of the pair there is no bonus.
 _Avoid_: offshoring, relocation bonus, the mothball bonus
 
 **Decommission**:

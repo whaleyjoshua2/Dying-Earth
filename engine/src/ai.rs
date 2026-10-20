@@ -743,7 +743,8 @@ impl Game {
         let facilities = self.directed_states(seat).iter().flat_map(|s| self.state(*s).facilities.iter()).filter(|f| f.kind.common().unwrap_or(f.kind) == *fk).count();
         let doubled = self.doubled_modules(seat).iter().filter(|(cid, i)| self.colony(*cid).and_then(|c| c.modules.get(*i)).map(|m| m.kind == mk).unwrap_or(false)).count();
         if facilities > doubled {
-            2.0
+            // Ticket #563 (version 0.1.0.3): the factor the rule applies, 2.08.
+            self.tables.faction(self.kind(seat)).production_moved_factor
         } else {
             1.0
         }
@@ -2786,6 +2787,11 @@ impl Game {
             // is idled, kept idle and counted as the Power Plant the rule treats it as.
             let job = |k: FacilityKind| k.common().unwrap_or(k);
             let mut in_use: Vec<FacilityKind> = Vec::new();
+            // Ticket #563 (version 0.1.0.3), at the designer's word: the factor the rule applies, and
+            // what a point of Emissions leaving Earth is worth to the run -- the table's figure times
+            // the Stabilization gap multiplier, 1 on pace and up to 3 behind.
+            let factor = self.tables.faction(kind).production_moved_factor;
+            let worth = self.tables.ai.thresholds.production_moved_emission_worth * self.victory_gap(seat).0;
             for (fk, mk) in pairs {
                 let idle = self.directed_states(seat).iter().flat_map(|s| self.state(*s).facilities.iter()).filter(|f| job(f.kind) == *fk && f.mothballed).count();
                 let paired = doubled.iter().filter(|(cid, i)| self.colony(*cid).and_then(|c| c.modules.get(*i)).map(|m| m.kind == *mk).unwrap_or(false)).count();
@@ -2816,15 +2822,19 @@ impl Game {
                         let out = y.amount.max(y.research as f64);
                         // The 0.06.0 AI sweep (ticket #94): an even trade is a win for the Custodians,
                         // since the idled Facility's Emissions leave Earth with the output.
-                        if out <= best {
+                        // Ticket #563 (version 0.1.0.3): the trade weighed whole -- the Module's lift
+                        // (its output times the factor less one) plus the Emissions' worth, against
+                        // the Facility's output; the dirtiest per output weighed first.
+                        let gain = best * (factor - 1.0) + y.emissions * worth;
+                        if gain + 1e-9 >= out {
                             push(
                                 vec![Order::Change { building: BuildingRef::Facility(sid, i), what: BuildingChange::Mothball }],
                                 Cat::Mothball,
-                                self.base_weight(seat, Cat::Mothball) * self.ai_mothball_price(BuildingRef::Facility(sid, i)),
+                                self.base_weight(seat, Cat::Mothball) * self.ai_mothball_price(BuildingRef::Facility(sid, i)) * (1.0 + y.emissions / out.max(0.1)),
                                 1.0,
                                 1.0,
                                 m.opportunity,
-                                format!("mothball the {} in {} (a {} off Earth making {} would double)", f.kind.name(), self.tables.state(sid).name, mk.name(), figure(best)),
+                                format!("mothball the {} in {} (a {} off Earth making {} would make {}; {:.2} Emissions leave Earth, worth {})", f.kind.name(), self.tables.state(sid).name, mk.name(), figure(best), figure(tenth(best * factor)), y.emissions, figure(y.emissions * worth)),
                                 None,
                             );
                         }

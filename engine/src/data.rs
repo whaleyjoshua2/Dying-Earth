@@ -704,6 +704,10 @@ pub struct FactionCard {
     /// double. Empty on every other card.
     #[serde(default)]
     pub mothball_pairs: std::collections::BTreeMap<FacilityKind, ModuleKind>,
+    /// Ticket #563 (version 0.1.0.3), at the designer's word: what a paired Module makes while its
+    /// Facility stands idle, 2.08 on the Custodians' card where it doubled; 2 where a card is silent.
+    #[serde(default = "production_moved_factor_default")]
+    pub production_moved_factor: f64,
     pub signature: String,
     /// Ticket #412 (version 0.09.4): what the Faction wins each time it leads a Tech to completion,
     /// in Influence and in Unrest off every Region it holds. Nought for all but the Archivists.
@@ -1533,6 +1537,10 @@ pub struct AiThresholds {
     /// Ticket #575 (version 0.1.0.3), at the designer's word: the turns of its buildings' Fuel burn
     /// a computer seat keeps in the tank; under it Fuel is its scarcest resource and no Ship refuels.
     pub power_fuel_reserve_turns: f64,
+    /// Ticket #563 (version 0.1.0.3), at the designer's word: what a point of a Facility's Emissions
+    /// leaving Earth is worth to the Custodians' computer, in output, before the Stabilization gap
+    /// multiplier; it carries a Production Moved trade the Module's lift alone falls short of.
+    pub production_moved_emission_worth: f64,
     /// Ticket #447 (version 0.09.6): the standing fleet, and the fleet while blockaded.
     pub warships_wanted: u32,
     pub warships_wanted_blockaded: u32,
@@ -2820,6 +2828,7 @@ impl Tables {
                 ("scrubber_max", self.scrubber.max.to_string()),
                 ("leapfrog", self.ducats.per_leapfrog.to_string()),
                 ("mothball", crate::state::figure(self.unrest.per_mothball)),
+                ("moved_factor", self.faction(kind).production_moved_factor.to_string()),
                 ("scrubber_people", self.people_text(self.scrubber.per_population)),
                 ("provisional", self.research_directive.provisional_min_contribution.to_string()),
             ],
@@ -3020,6 +3029,10 @@ fn accord_kept_default() -> u32 {
 /// Ticket #227 (version 0.08.2).
 fn accord_weight_default() -> f64 {
     3.0
+}
+
+fn production_moved_factor_default() -> f64 {
+    2.0
 }
 
 /// Ticket #350 (version 0.09.1): a Victory figure as a sentence says it -- under ten in words,

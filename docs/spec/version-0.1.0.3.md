@@ -129,3 +129,40 @@ set the price at 4.5.
 the Arkwrights take back four, the Custodians three; the Archivists' fourteen is the version's
 best. Beside the figures before the ticket (10 / 25 / 20 / 10 and 15), only the Prospectors' +4 and
 the Archivists' +4 stand at the edge of noise.
+
+## 6. Production Moved makes x2.08; the computer weighs the trade whole
+
+Ticket: [The computer Custodians use Production Moved](https://github.com/whaleyjoshua2/Dying-Earth/issues/563).
+
+The ticket's premise, corrected: the computer Custodians did use Production Moved from three of
+the four starts (20 to 30 Module-turns a game); from East Asia, never, since its Materials lean
+makes its Mine 6.6 and no Module off Earth reached that. The designer: "rather than just doubling
+it let's give them a small boost to entice them ... say 208% but also add some decision calculus on
+the value of lower emissions to their victory condition."
+
+- **Production Moved makes x2.08** (double before), on the Module's final figure, to the tenth;
+  Widgets stay whole, floored (4 x 2.08 = 8); Research whole, to the nearest (3 x 2.08 = 6). The
+  figure is `production_moved_factor` on the Custodians' card; the card line reads "x2.08 for an
+  idle Mine on Earth", the Income source likewise, and the signature reads the figure.
+- **The computer's trade.** A Facility is idled when the Module's lift plus the Emissions' worth
+  reaches the Facility's output: `M x (2.08 - 1) + E x k x g >= F`, with M the best undoubled
+  Module's output, F the Facility's, E the Facility's Emissions as the Custodians emit them (their
+  x0.75: Mine and Factory 0.56, Power Plant and Refinery 1.12), k = `production_moved_emission_worth`
+  = 1.0 (`ai.toml`), and g the computer's
+  Stabilization gap multiplier (1 on pace, up to 3 as net Emissions stand over the Sink). Several
+  qualifying, each candidate's weight is scaled by its Emissions per output, so the dirtiest is
+  taken first. The build-side boost reads the same factor.
+- **From East Asia**: a plain Moon Mine (5.0) lifts 5.4; with the Mine's 0.56 a point it reaches
+  6.6 at g >= 2.1, the run well behind. Beside a Mass Driver (6.0) it lifts 6.48 and the 0.56
+  carries it to 7.04 on pace, where the old doubling's 6.56 fell short. The Power Plant (6) against
+  a Moon Generator (6.5): 7.02 + 1.12, taken.
+- **The measure**: the sweep's Production Moved line above nought in the East Asia seating too, and
+  no fall in the other three.
+
+**What it did** ([`sweeps/ticket-563.txt`](../dev-diary/2026-10-19-version-0.1.0.3/sweeps/ticket-563.txt),
+80 games): **17 / 21 / 20 / 11 and 11 collapses**, from 8 / 29 / 17 / 14 and 12. Production Moved by
+seating 0 / 34 / 31 / 36 Module-turns a game, from 0 / 21 / 27 / 30. East Asia stays at nought: the
+computer Custodians starting there build nothing off Earth through turn 30 and lose the Region by
+then in most seeds, so the rule has nothing to double -- a matter of their opening, not of this
+trade. The sweep also prints each Faction's Income over a game (Materials / Fuel / Energy / Ducats /
+Research, mean over the batch), at the designer's word.

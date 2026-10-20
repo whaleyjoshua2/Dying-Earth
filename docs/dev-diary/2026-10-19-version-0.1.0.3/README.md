@@ -154,3 +154,44 @@ scarcity assertion in the reserve's test was green without the reserve, its arit
 the free Core row among the three cheapest; the figure moved to where the reserve alone turns the
 answer. The earlier commit, 0a2b166, carried a failing older test for a turn, the top-up suppressed
 under the reserve; that cut is undone here.
+
+## Production Moved makes x2.08; the computer weighs the trade whole
+
+Ticket [#563](https://github.com/whaleyjoshua2/Dying-Earth/issues/563), spec §6. The ticket's
+premise did not survive a read of the sweeps: the Production Moved line is 0 only in the seating
+where the Custodians start in East Asia; from the other three starts they double 20 to 30
+Module-turns a game. East Asia's Materials lean makes its Mine 6.6, and no Module off Earth reached
+that (a plain Moon Mine makes 5.0 since 0.1.0.2). The designer answered with a rule change and a
+calculus: x2.08 where it doubled, and the Emissions leaving Earth weighed into the trade by the
+Stabilization gap.
+
+**Built.** `production_moved_factor = 2.08` on the Custodians' card, read by the yield (to the
+tenth; Widgets floored, Research to the nearest), the card line ("x2.08 for an idle Mine on
+Earth"), the Income source, the signature (`{moved_factor}`) and the computer's build boost. The
+computer's trade is `M x 1.08 + E x k x g >= F`, k = `production_moved_emission_worth` = 1.0, g the
+gap multiplier; several qualifying Facilities are weighed by Emissions per output. Two slips of mine
+on the way, both caught by the tree: I wrote 5.6 for a Moon Mine (it is 5.0) and 0.75 for the Mine's
+Emissions (the Custodians' x0.75 makes it 0.56); the spec carries the corrected figures. The red
+run, with the code reading a factor the data did not yet carry (default 2): 10.0 against 10.4, 18
+against 18.7, and from East Asia the Mine beside a Mass Driver was no candidate at all (6 + 0.56 =
+6.56 against 6.6); at 2.08 it is (7.04). Five older pins re-pinned.
+
+**For the designer, mid-ticket**: the sweep now prints each Faction's Income over a game, net of
+its buildings' upkeep (Materials / Fuel / Energy / Ducats / Research, the mean over the batch), from
+a running total on the seat (`produced`, with `research_total`).
+
+**The sweep** ([`sweeps/ticket-563.txt`](sweeps/ticket-563.txt)): **17 / 21 / 20 / 11 and 11
+collapses**, from 8 / 29 / 17 / 14 and 12. Custodians +9 and Prospectors -8, both past noise; the
+Arkwrights +3 and the Archivists -3 are not. Production Moved by seating: **0 / 34 / 31 / 36**
+Module-turns a game (median), from 0 / 21 / 27 / 30: up by a third from the three starts that used
+it, and still nought from East Asia. A replay of seeds 1 to 3 from East Asia says why: the computer
+Custodians there build no Module off Earth at all through turn 30 (one Observatory on a station over
+Earth in seed 1), and lose East Asia by turn 30 in two of the three; from turn 2 the Energy reads a
+turn from short every turn and the Scrubber is mothballed and restarted in a loop. Nothing off Earth,
+nothing to double. The ticket's bar -- above nought from East Asia -- is missed, and the cause lies
+outside its question, in the East Asia Custodians' opening. Reported to the designer.
+
+Income over the batch, per Faction, mean a game (Materials / Fuel / Energy / Ducats / Research), the
+new line: Custodians 466 / 608 / 2497 / 2472 / 1310; Prospectors 2180 / 546 / 3217 / 1285 / 516;
+Arkwrights 2363 / 517 / 3557 / 4429 / 377; Archivists 641 / 318 / 1417 / 718 / 1001. Income only:
+what the market pays a seller is not in it.

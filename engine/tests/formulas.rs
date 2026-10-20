@@ -6785,7 +6785,8 @@ fn a_custodian_mothballed_mine_doubles_their_best_mine_off_earth_one_for_one() {
     g.state_mut(StateId::EastAsia).facilities[i].mothballed = true;
     assert_eq!(g.doubled_modules(cus), vec![(moon, 0)], "one idle Mine, the best Mine off Earth");
     let y = g.module_yield_at(cus, moon, 0);
-    assert_eq!(y.amount, 10.0, "5 doubled");
+    assert_eq!(y.amount, 10.4, "5 x 2.08 = 10.4 (ticket #563; doubled before)");
+    assert_eq!(y.doubled_factor, 2.08);
     assert_eq!(y.doubled_by, Some("Mine"), "named for the Mine whose mothball pays for it");
     assert_eq!(g.module_yield_at(cus, mars, 0).amount, 4.3, "the second Mine is not doubled");
     assert_eq!(g.module_yield_at(cus, vostok, 0).amount, 6.0, "Antarctica is Earth: 4 x 1.4875 = 5.95");
@@ -6813,10 +6814,10 @@ fn the_custodian_pairs_and_nobody_elses() {
     d.sort();
     assert_eq!(d, vec![(moon, 0), (moon, 1), (moon, 2)]);
     with_tech(&mut g, TechId::EfficientGrids);
-    // Generator 5 x 1.3 x 1.5 = 9.75, to the tenth 9.8, doubled 19.6 (ticket #554); Refinery 4.5 x 0.6875 = 3.09, to the tenth 3.1, doubled 6.2 (ticket #421);
-    // Observatory 2 x 1.2 x 1.25 = 3, doubled 6.
-    assert_eq!(g.module_yield_at(cus, moon, 0).amount, 19.6);
-    assert_eq!(g.module_yield_at(cus, moon, 1).amount, 6.2);
+    // Generator 5 x 1.3 x 1.5 = 9.75, to the tenth 9.8, x2.08 = 20.4 (ticket #554; ticket #563 for the factor, where it doubled to 19.6);
+    // Refinery 4.5 x 0.6875 = 3.09, to the tenth 3.1, x2.08 = 6.4 (ticket #421); Observatory 2 x 1.2 x 1.25 = 3, x2.08 = 6.24, whole 6.
+    assert_eq!(g.module_yield_at(cus, moon, 0).amount, 20.4);
+    assert_eq!(g.module_yield_at(cus, moon, 1).amount, 6.4);
     assert_eq!(g.module_yield_at(cus, moon, 2).research, 6);
     let pro = Seat(1);
     let theirs = colony(&mut g, pro, BodyId::Moon, &[ModuleKind::Mine], 0);
@@ -6841,7 +6842,7 @@ fn the_income_pays_the_doubled_mine() {
     g.state_mut(StateId::EastAsia).facilities.push(f);
     g.income_phase();
     let name = g.place_name(Place::Colony(moon));
-    assert!(g.seat(cus).income_sources.iter().any(|(src, r, n)| src.starts_with(&format!("Mine in {name}")) && src.contains("doubled") && *r == Resource::Materials && *n == 10.0), "{:?}", g.seat(cus).income_sources);
+    assert!(g.seat(cus).income_sources.iter().any(|(src, r, n)| src.starts_with(&format!("Mine in {name}")) && src.contains("x2.08 for an idle Mine on Earth") && *r == Resource::Materials && *n == 10.4), "{:?}", g.seat(cus).income_sources);
     assert_eq!(g.seat(cus).doubled_module_turns, 1);
 }
 
@@ -7931,7 +7932,9 @@ fn the_custodian_ai_weighs_a_mine_off_earth_by_the_doubling_an_idle_earth_mine_w
         l.split_whitespace().nth(1).and_then(|n| n.parse().ok()).unwrap()
     };
     let (with, without) = (score_of_moon_mine(true), score_of_moon_mine(false));
-    assert!(without > 0.0 && (with - 2.0 * without).abs() < 1e-6, "a Moon Mine with an Earth Mine to idle should score twice one without: {with} vs {without}");
+    // Ticket #563 (version 0.1.0.3): the factor the rule applies, 2.08, where it was 2.
+    // The log prints a weight to one decimal, so the ratio is read to a tenth.
+    assert!(without > 0.0 && (with - 2.08 * without).abs() < 0.1, "a Moon Mine with an Earth Mine to idle should score 2.08 times one without: {with} vs {without}");
 }
 
 /// The AI sweep: the Custodian AI idles an Earth Mine for an even trade too, since the Emissions
@@ -7957,6 +7960,42 @@ fn the_custodian_ai_idles_an_earth_mine_for_an_even_trade() {
         orders.iter().any(|o| matches!(o, Order::Change { building: BuildingRef::Facility(StateId::EastAsia, j), what: BuildingChange::Mothball } if *j == i)),
         "an even trade (9.9 for 9.9) is taken: {orders:?}"
     );
+}
+
+/// Ticket #563 (version 0.1.0.3), at the designer's word: the computer Custodians weigh the trade
+/// whole. East Asia's Mine makes 6.6 (the Materials lean); a Moon Mine beside a Mass Driver makes
+/// 5 + 1 = 6. Idled, the Moon Mine makes x2.08: a lift of 6 x 1.08 = 6.48, short of 6.6 on its own;
+/// the Mine's Emissions leaving Earth (0.75 x the Custodians' 0.75 = 0.56), a point worth 1 output
+/// on pace, carry it to 7.04. With the worth at nought the trade is refused, so the term is live;
+/// at the old doubling it was no candidate at all (6 + 0.56 = 6.56). And the Power Plant (1.12
+/// Emissions on 6 Energy, against a Moon Generator's 6.5) is weighed above the Mine (0.56 on 6.6).
+#[test]
+fn the_custodian_ai_weighs_the_emissions_leaving_earth_into_the_production_moved_trade() {
+    let mut g = game();
+    calm(&mut g);
+    g.seats[0].stockpile.energy = 500.0;
+    g.seats[0].stockpile.materials = 10.0;
+    g.seats[0].stockpile.fuel = 500.0;
+    let moon = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Mine, ModuleKind::Generator, ModuleKind::MassDriver], 0);
+    g.state_mut(StateId::EastAsia).facilities.retain(|f| f.kind != FacilityKind::Mine && f.kind != FacilityKind::PowerPlant);
+    g.state_mut(StateId::EastAsia).facilities.push(facility(FacilityKind::Mine));
+    g.state_mut(StateId::EastAsia).facilities.push(facility(FacilityKind::PowerPlant));
+    let mine = g.state(StateId::EastAsia).facilities.len() - 2;
+    assert_eq!((g.module_yield_at(Seat(0), moon, 0).amount, g.facility_yield(Seat(0), StateId::EastAsia, FacilityKind::Mine).amount), (6.0, 6.6), "the premise: the Moon Mine is short of the Earth Mine");
+    assert_eq!(g.tables.ai.thresholds.production_moved_emission_worth, 1.0, "the table");
+    let orders = g.ai_orders(Seat(0));
+    assert!(orders.iter().any(|o| matches!(o, Order::Change { building: BuildingRef::Facility(StateId::EastAsia, j), what: BuildingChange::Mothball } if *j == mine)), "6.48 + 0.56 reaches 6.6: the Mine is idled: {:?}", g.log.iter().filter(|l| l.contains("othball")).collect::<Vec<_>>());
+    let weight_of = |g: &Game, name: &str| -> f64 {
+        let l = g.log.iter().find(|l| l.contains(&format!("mothball the {name} in"))).unwrap_or_else(|| panic!("no {name} candidate: {:?}", g.log)).clone();
+        l.split_whitespace().nth(1).and_then(|n| n.parse().ok()).unwrap()
+    };
+    assert!(weight_of(&g, "Power Plant") > weight_of(&g, "Mine"), "the dirtier per output first: {} vs {}", weight_of(&g, "Power Plant"), weight_of(&g, "Mine"));
+    // The worth at nought: the lift alone, 6.48, is short of 6.6, and the Mine stands.
+    let mut t = (*g.tables).clone();
+    t.ai.thresholds.production_moved_emission_worth = 0.0;
+    g.tables = std::sync::Arc::new(t);
+    let orders = g.ai_orders(Seat(0));
+    assert!(!orders.iter().any(|o| matches!(o, Order::Change { building: BuildingRef::Facility(StateId::EastAsia, j), what: BuildingChange::Mothball } if *j == mine)), "without the Emissions' worth the trade is refused: {orders:?}");
 }
 
 /// Version 0.07.0: Fund the Archive is decided BEFORE Income, so a turn whose Research completes
@@ -13034,7 +13073,7 @@ fn production_moved_pairs_factory_to_factory_and_doubles_a_factory_modules_widge
     f.mothballed = true;
     g.state_mut(StateId::EastAsia).facilities.push(f);
     let y = g.module_yield_at(cus, moon, 0);
-    assert_eq!((y.amount, y.doubled_by), (8.0, Some("Factory")), "doubled by the idle Factory on Earth");
+    assert_eq!((y.amount, y.doubled_by), (8.0, Some("Factory")), "x2.08 for the idle Factory on Earth, Widgets floored: 8.32 -> 8");
     assert_eq!(g.widgets_at(Place::Colony(moon)), 12, "8 and the Core Module's 4");
     // A mothballed Mine on Earth does not reach it: the Mine pairs with the Mine.
     g.state_mut(StateId::EastAsia).facilities.clear();

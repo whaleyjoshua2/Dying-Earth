@@ -1147,6 +1147,11 @@ pub struct SeatState {
     #[serde(default)]
     pub lost_in_transit: i64,
     pub income_last_turn: Stockpile,
+    /// Ticket #563 (version 0.1.0.3), at the designer's word: every Income this seat was paid over
+    /// the game, net of its buildings' upkeep, for the sweep's per-Faction line. Research is
+    /// `research_total`.
+    #[serde(default)]
+    pub produced: Stockpile,
     /// Last Income by source (ticket #31): "Factory in Asia", the resource, the amount; upkeep as negatives.
     pub income_sources: Vec<(String, Resource, f64)>,
     /// Ticket #51: Research banked for the Archive, capped at what its remaining stages still need.
@@ -1827,6 +1832,7 @@ impl Game {
             doubled_module_turns: 0,
             lost_in_transit: 0,
             income_last_turn: Stockpile::default(),
+            produced: Stockpile::default(),
             income_sources: Vec::new(),
             archive_fund: 0,
             funding_archive: false,

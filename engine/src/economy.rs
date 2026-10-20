@@ -66,6 +66,9 @@ pub struct Yield {
     /// Ticket #82 (version 0.06.0): the Facility on Earth whose mothball doubles this Module, if
     /// one does (the Custodians' signature).
     pub doubled_by: Option<&'static str>,
+    /// Ticket #563 (version 0.1.0.3): the factor Production Moved applied, 2.08 on the Custodians'
+    /// card; 1 where nothing did.
+    pub doubled_factor: f64,
     /// Ticket #90 (version 0.06.0): how the figure was reached, for the card ("2 x 12 Colonists +
     /// Earth 3 + Moon 3.5" since ticket #397), when a Module's arithmetic is worth showing.
     pub detail: Option<String>,
@@ -251,7 +254,7 @@ impl Yield {
         }
         // Ticket #82: the Custodians' Production Moved.
         if let Some(f) = self.doubled_by {
-            parts.push(format!("doubled by an idle {f} on Earth"));
+            parts.push(format!("x{} for an idle {f} on Earth", self.doubled_factor));
         }
         // Ticket #280 (version 0.08.5): what it does, in the data's words.
         if let Some(d) = &self.does {
@@ -536,7 +539,7 @@ impl Game {
         let fac = t.faction(self.kind(seat));
         let card = t.state(sid);
         let fc = t.facility(kind);
-        let mut y = Yield { resource: None, amount: 0.0, research: 0, upkeep: fc.energy_upkeep as f64, ducats_upkeep: fc.ducats_upkeep, fuel_upkeep: fc.fuel_upkeep, emissions: 0.0, allotment: fc.influence_allotment, standing: fc.standing_per_turn, doubled_by: None, detail: None, does: fc.does.clone(), chain: Chain::default(), allotment_outside: 0 };
+        let mut y = Yield { resource: None, amount: 0.0, research: 0, upkeep: fc.energy_upkeep as f64, ducats_upkeep: fc.ducats_upkeep, fuel_upkeep: fc.fuel_upkeep, emissions: 0.0, allotment: fc.influence_allotment, standing: fc.standing_per_turn, doubled_by: None, doubled_factor: 1.0, detail: None, does: fc.does.clone(), chain: Chain::default(), allotment_outside: 0 };
         if let Some(p) = &fc.produces {
             match p.resource {
                 Resource::Research => {
@@ -638,7 +641,7 @@ impl Game {
         let fac = t.faction(self.kind(seat));
         let mc = t.module(kind);
         // Ticket #559 (version 0.1.0.3): a Module's Ducat upkeep (the Wind Farm's), as a Facility's.
-        let mut y = Yield { resource: None, amount: 0.0, research: 0, upkeep: mc.energy_upkeep as f64, ducats_upkeep: mc.ducats_upkeep, fuel_upkeep: mc.fuel_upkeep, emissions: 0.0, allotment: mc.influence_allotment, standing: mc.standing_per_turn, doubled_by: None, detail: None, does: mc.does.clone(), chain: Chain::default(), allotment_outside: 0 };
+        let mut y = Yield { resource: None, amount: 0.0, research: 0, upkeep: mc.energy_upkeep as f64, ducats_upkeep: mc.ducats_upkeep, fuel_upkeep: mc.fuel_upkeep, emissions: 0.0, allotment: mc.influence_allotment, standing: mc.standing_per_turn, doubled_by: None, doubled_factor: 1.0, detail: None, does: mc.does.clone(), chain: Chain::default(), allotment_outside: 0 };
         // Ticket #239 (version 0.08.3): a Unique Module does its sibling's job, so every lookup
         // keyed by kind -- the Techs that multiply it, the slot's yield, a Discovery on it --
         // reads the COMMON kind. Without this the Arkwrights' Chorus would be the one Relay in
@@ -843,16 +846,31 @@ impl Game {
     /// `doubled_modules`, named for the Facility whose mothball pays for it.
     pub fn module_yield_at(&self, seat: Seat, cid: ColonyId, index: usize) -> Yield {
         let Some(kind) = self.colony(cid).and_then(|c| c.modules.get(index)).map(|m| m.kind) else {
-            return Yield { resource: None, amount: 0.0, research: 0, upkeep: 0.0, ducats_upkeep: 0.0, fuel_upkeep: 0.0, emissions: 0.0, allotment: 0, standing: 0, doubled_by: None, detail: None, does: None, chain: Chain::default(), allotment_outside: 0 };
+            return Yield { resource: None, amount: 0.0, research: 0, upkeep: 0.0, ducats_upkeep: 0.0, fuel_upkeep: 0.0, emissions: 0.0, allotment: 0, standing: 0, doubled_by: None, doubled_factor: 1.0, detail: None, does: None, chain: Chain::default(), allotment_outside: 0 };
         };
         let mut y = self.module_yield(seat, cid, kind);
         if self.doubled_modules(seat).contains(&(cid, index)) {
-            let pairs = &self.tables.faction(self.kind(seat)).mothball_pairs;
-            y.amount *= 2.0;
-            y.research *= 2;
-            y.doubled_by = pairs.iter().find(|(_, m)| **m == kind).map(|(f, _)| f.name());
+            let card = self.tables.faction(self.kind(seat));
+            // Ticket #563 (version 0.1.0.3), at the designer's word: x2.08, where it doubled. A
+            // resource figure keeps its tenth; Widgets stay whole, floored; Research whole, nearest.
+            let factor = card.production_moved_factor;
+            y.amount = if y.resource == Some(Resource::Widgets) { (y.amount * factor).floor() } else { tenth(y.amount * factor) };
+            y.research = (y.research as f64 * factor).round() as i64;
+            y.doubled_by = card.mothball_pairs.iter().find(|(_, m)| **m == kind).map(|(f, _)| f.name());
+            y.doubled_factor = factor;
             let by = y.doubled_by.unwrap_or("Facility");
-            y.chain.times(2.0, || format!("for an idle {by} on Earth"));
+            y.chain.times(factor, || format!("for an idle {by} on Earth"));
+            match y.resource {
+                Some(Resource::Widgets) => {
+                    y.chain.floor();
+                }
+                Some(_) => {
+                    y.chain.tenth();
+                }
+                None => {
+                    y.chain.round();
+                }
+            }
         }
         // Ticket #359 (version 0.09.1): an occupied Habitat standing shut halves everything but
         // the Energy. Ticket #352 (version 0.09.1): applied HERE, on the one figure every reader
@@ -1509,7 +1527,7 @@ impl Game {
             let where_ = match p.doubled_by {
                 Some(f) => {
                     doubled_turns += 1;
-                    format!("{where_} (doubled by an idle {f} on Earth)")
+                    format!("{where_} (x{} for an idle {f} on Earth)", self.tables.faction(self.kind(seat)).production_moved_factor)
                 }
                 None => where_,
             };
@@ -1719,6 +1737,11 @@ impl Game {
             s.stockpile.fuel = tenth(s.stockpile.fuel + gained.fuel);
             s.stockpile.energy = clamped;
             s.stockpile.ducats = tenth(s.stockpile.ducats + gained.ducats);
+            // Ticket #563 (version 0.1.0.3): the game's running total, for the sweep.
+            s.produced.materials += gained.materials;
+            s.produced.fuel += gained.fuel;
+            s.produced.energy += gained.energy;
+            s.produced.ducats += gained.ducats;
             s.income_last_turn = Stockpile {
                 materials: gained.materials,
                 fuel: gained.fuel,

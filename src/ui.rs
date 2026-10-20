@@ -6517,7 +6517,7 @@ fn widget_makers(game: &Game, place: Place) -> Vec<(String, i64)> {
                 }
                 let y = game.module_yield_at(seat, cid, i);
                 if y.resource == Some(dying_earth_engine::Resource::Widgets) {
-                    let name = if y.doubled_by.is_some() { format!("the {}, doubled", m.kind.name()) } else { format!("the {}", m.kind.name()) };
+                    let name = if y.doubled_by.is_some() { format!("the {}, x{}", m.kind.name(), y.doubled_factor) } else { format!("the {}", m.kind.name()) };
                     parts.push((name, y.amount as i64));
                 }
             }
