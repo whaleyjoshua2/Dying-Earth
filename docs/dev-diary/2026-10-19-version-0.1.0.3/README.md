@@ -391,3 +391,35 @@ byte-for-byte [`ticket-569.txt`](sweeps/ticket-569.txt), 19 / 49 / 4 / 8 and no 
 Faction (Materials / Fuel / Energy / Ducats / Research, mean a game): Custodians 1100 / 352 / 2535 /
 1561 / 931; Prospectors 2139 / 442 / 2709 / 1190 / 386; Arkwrights 1538 / 319 / 2309 / 3210 / 266;
 Archivists 477 / 261 / 1149 / 484 / 746 -- unchanged to the unit.
+
+## A Ship blocks a landing only on Blockade, and Passage exempts
+
+Ticket [#570](https://github.com/whaleyjoshua2/Dying-Earth/issues/570), spec §14. Read first: the
+ring already had the rule the designer asked for (a warship on Blockade, Passage exempt, since
+0.08.5 and 0.08.8); the ground had the older one, Orbital Control on any stance, read at the
+Resolution alone. And the computer never ordered a Blockade in low orbit -- its candidate was a
+rival station in the ring it sat in -- so once the ground reads the Blockade rule it could shut
+nobody's ground. One round, four questions, all at the recommendation: the ground reads the ring's
+rule; Orbital Control stays for the Bombard, the Launch, the starving and the flag; refused at the
+order with the words; the computer gets the mirror candidate for low orbit. Built: `may_land` one
+line, `blockaded_words` for the door and the Resolution's line, the two Unload checks, the `{why}`
+on `landing_contested`, the candidate's low-orbit arm. Red first on six tests.
+
+**The review** found no hole; it caught the ring founding's door and re-read saying two different
+things (one wording now), a test assertion passing for the wrong reason (one Battery below is a
+fight the computer would rather open, so the Blockade was off before the Battery filter was read --
+three Batteries now, and no Attack asserted beside no Blockade), and a dozen stale comments and
+glossary clauses. Two flags for the designer, left as built: the computer's new arm has no Earth
+guard, as its ring arm has none, so it will blockade Earth's low orbit over a rival's Antarctic
+Colony; and a Blockade of a Passage partner's ground starves it and counts offences though it shuts
+no landing, as the ring arm always has.
+
+**Swept** ([`sweeps/ticket-570.txt`](sweeps/ticket-570.txt)): 19 / 47 / 4 / 10 and no collapse, from
+19 / 49 / 4 / 8 -- noise on the wins, and the rule plainly reaching the computer seats: Blockades
+ordered over the batch 254 from 12, Blockade-turns suffered 217 from 10. The Prospectors are the
+blockaders (192 of the 254, 91 of them in the seating where they sit at seat 0) and the Custodians
+the blockaded (150 of the 217 turns). The nuke killed 2,318 over the batch from 6,930, on one Launch
+fewer. Income per Faction (Materials / Fuel / Energy / Ducats / Research, mean a game): Custodians
+1087 / 357 / 2492 / 1532 / 921; Prospectors 2109 / 436 / 2720 / 1195 / 387; Arkwrights 1500 / 303 /
+2251 / 3180 / 255; Archivists 470 / 257 / 1125 / 473 / 735 -- every Faction a little down on
+Materials and Energy, the starving under those Blockades.

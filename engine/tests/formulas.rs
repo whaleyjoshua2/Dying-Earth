@@ -1824,9 +1824,9 @@ fn orbital_control_needs_the_only_engaged_warship_at_the_body() {
         s.escaped = true;
     }
     assert_eq!(g.orbital_control(BodyId::Mars), Some(Seat(2)), "only the Arkwrights are still engaged");
-    // Landing follows control.
+    // Landing followed control until ticket #570 (version 0.1.0.3): a warship on Hold shuts nobody.
     assert!(g.may_land(Seat(2), BodyId::Mars));
-    assert!(!g.may_land(Seat(0), BodyId::Mars));
+    assert!(g.may_land(Seat(0), BodyId::Mars), "ticket #570: Control alone no longer shuts the ground");
 }
 
 // ---------------------------------------------------------------- 15 victory over four seats
@@ -8627,29 +8627,38 @@ fn a_warship_blockades_the_orbital_slot_it_sits_in_and_nothing_more() {
     assert!(!g.slot_blockaded_against(Seat(1), body, slot), "it does not blockade itself");
 }
 
-/// Ticket #99: the ground answers to Orbital Control alone, and only a RIVAL holding it outright
-/// shuts the surface. Two rivals' warships present used to deny everybody, punishing the bystander.
+/// Ticket #99: the ground answered to Orbital Control alone, and only a RIVAL holding it outright
+/// shut the surface. Ticket #570 (version 0.1.0.3), at the designer's word -- *"ships do not block
+/// landing unless they are actively blockading"* -- the ground reads the ring's rule: a rival
+/// warship on Blockade in low orbit shuts it, whatever Orbital Control says; a Passage partner never
+/// does; your own ground Colony's working Battery lifts it. A rival on Hold shuts nothing, held
+/// outright or not. The playtest had a Frigate on Hold under two Accords shut a player out of their
+/// own Colony.
 #[test]
-fn only_a_rival_holding_orbital_control_shuts_the_ground() {
+fn a_rival_blockade_of_low_orbit_shuts_the_ground_and_control_alone_does_not() {
     let mut g = game();
     let body = BodyId::Moon;
-    let push = |g: &mut Game, seat: Seat| {
+    let push = |g: &mut Game, seat: Seat, stance: Stance| {
         let id = ShipId(g.fresh_id());
         g.ships.push(Ship {
             id,
             name: String::new(), kind: UnitKind::Frigate, seat, damage: 0, at: ShipAt::Body(body), colonists: 0, warhead: false, colonists_education: 1.0, army: None,
-            stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None,
+            stance, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None,
         });
+        id
     };
     assert!(g.may_land(Seat(0), body), "an empty orbit lands anyone");
-    push(&mut g, Seat(1));
-    assert_eq!(g.orbital_control(body), Some(Seat(1)));
-    assert!(!g.may_land(Seat(0), body), "a rival holding the orbit outright shuts the ground");
+    let rival = push(&mut g, Seat(1), Stance::Hold);
+    assert_eq!(g.orbital_control(body), Some(Seat(1)), "held outright");
+    assert!(g.may_land(Seat(0), body), "a rival holding the orbit outright on Hold shuts nothing");
+    g.ship_mut(rival).unwrap().stance = Stance::Blockade;
+    assert!(!g.may_land(Seat(0), body), "on Blockade it shuts the ground");
     assert!(g.may_land(Seat(1), body), "its holder lands freely");
-    // A second rival contests it: nobody holds it, so nobody is shut out.
-    push(&mut g, Seat(2));
+    // A second rival contests the orbit: Control goes, the Blockade stands, as a ring's would.
+    push(&mut g, Seat(2), Stance::Hold);
     assert_eq!(g.orbital_control(body), None);
-    assert!(g.may_land(Seat(0), body), "a contested orbit no longer punishes the bystander");
+    assert!(!g.may_land(Seat(0), body), "a contested orbit lifts no Blockade");
+    assert!(!g.may_land(Seat(2), body), "the contender is blockaded too: a Blockade shuts every other Faction");
 }
 
 /// Ticket #286 (version 0.08.5): the war is counted on the game, at the event, never scraped: a
@@ -9033,12 +9042,12 @@ fn a_ground_colony_starves_under_outright_orbital_control_with_a_blockading_stac
     };
     let rival = push(&mut g, Seat(1), Stance::Hold);
     assert_eq!(g.orbital_control(body), Some(Seat(1)), "held outright");
-    assert_eq!(g.starved_by(cid), None, "held outright on Hold: the ground is shut to landings and nothing more");
+    assert_eq!(g.starved_by(cid), None, "held outright on Hold: nothing starves (and since ticket #570 nothing is shut)");
     g.ship_mut(rival).unwrap().stance = Stance::Blockade;
     assert_eq!(g.starved_by(cid), Some(Seat(1)), "ordered to Blockade, the Colony on the ground starves");
     push(&mut g, Seat(2), Stance::Hold);
     assert_eq!(g.orbital_control(body), None, "contested");
-    assert_eq!(g.starved_by(cid), None, "a contested orbit starves nobody, as it lands nobody");
+    assert_eq!(g.starved_by(cid), None, "a contested orbit starves nobody");
 }
 
 /// Ticket #278 (version 0.08.5): a computer seat whose warship sits in a rival station's slot is
@@ -12800,7 +12809,7 @@ fn a_battery_denies_orbital_control_and_the_blockade_and_falls_in_a_battle() {
     let name = g.next_ship_name(UnitKind::Frigate);
     g.ships.push(Ship { id: low, name, kind: UnitKind::Frigate, seat: Seat(1), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None });
     assert_eq!(g.orbital_control(BodyId::Earth), Some(Seat(1)), "a lone rival warship in low orbit holds Orbital Control");
-    assert!(!g.may_land(Seat(0), BodyId::Earth), "so the ground is shut");
+    assert!(g.may_land(Seat(0), BodyId::Earth), "ticket #570 (version 0.1.0.3): on Hold it shuts no landing");
     g.ships.retain(|s| s.id != low);
     // The Repair order: the owner's, at its Colony, for no more than its damage.
     g.colony_mut(station).unwrap().modules[index].damage = 2;
@@ -14429,6 +14438,71 @@ fn a_load_off_a_station_is_free_and_boards_before_the_ship_leaves() {
     assert!(refuse(&g, &[], &Order::Refuel { ship: low }).contains("its own orbit alone"), "the own-orbit rule, kept");
 }
 
+/// Ticket #570 (version 0.1.0.3), at the designer's word: **a landing is refused at the order** when a
+/// rival warship blockades low orbit -- a founding and an unload into a ground Colony alike, where
+/// they used to pass the check and fail at the Resolution a turn later with "orbit contested" -- and
+/// a Passage partner's Blockade shuts nothing; your own ground Battery lifts it; the Resolution's
+/// re-read says the same words; and the computer, with cause, blockades low orbit over a rival's
+/// ground Colony as it blockades a rival station's ring.
+#[test]
+fn a_landing_is_refused_at_the_order_under_a_blockade_of_low_orbit_and_the_computer_blockades_the_ground() {
+    let mut g = game();
+    calm(&mut g);
+    let body = BodyId::Mars;
+    let mine = colony(&mut g, Seat(0), body, &[ModuleKind::Habitat], 2);
+    let ship = ship_in(&mut g, Seat(0), UnitKind::ColonyShip, body, None, Stance::Hold);
+    g.ship_mut(ship).unwrap().colonists = 4;
+    let slot = g.free_slots_on(body)[0];
+    let found = Order::Unload { ship, colonists: 4, army: false, into: UnloadTarget::Slot(body, slot) };
+    let unload = Order::Unload { ship, colonists: 2, army: false, into: UnloadTarget::Colony(mine) };
+    assert!(g.check_order(Seat(0), &[], &found).is_ok(), "an empty orbit founds");
+    assert!(g.check_order(Seat(0), &[], &unload).is_ok(), "and unloads");
+    let rival = ship_in(&mut g, Seat(1), UnitKind::Frigate, body, None, Stance::Hold);
+    assert_eq!(g.orbital_control(body), Some(Seat(1)), "the rival holds Control outright");
+    assert!(g.check_order(Seat(0), &[], &found).is_ok(), "on Hold it refuses no founding");
+    assert!(g.check_order(Seat(0), &[], &unload).is_ok(), "nor an unload");
+    g.ship_mut(rival).unwrap().stance = Stance::Blockade;
+    let refuse = |g: &Game, o: &Order| g.check_order(Seat(0), &[], o).unwrap_err().0;
+    assert_eq!(refuse(&g, &found), "a rival warship blockades low orbit over Mars");
+    assert_eq!(refuse(&g, &unload), "a rival warship blockades low orbit over Mars");
+    // A Passage partner's Blockade shuts nothing.
+    g.strike_accord(Seat(0), Seat(1), vec![Term::Passage]).expect("Passage struck");
+    assert!(g.check_order(Seat(0), &[], &found).is_ok(), "a Passage partner never blocks");
+    g.accords.clear();
+    assert!(g.check_order(Seat(0), &[], &found).is_err());
+    // Your own ground Colony's working Battery lifts it.
+    g.colony_mut(mine).unwrap().modules.push(Module::new(ModuleKind::Battery));
+    assert!(g.check_order(Seat(0), &[], &unload).is_ok(), "a ground Battery of yours lifts the Blockade of low orbit");
+    g.colony_mut(mine).unwrap().modules.retain(|m| m.kind != ModuleKind::Battery);
+    // The Resolution re-reads it: an unload placed while the orbit was open, then blockaded before
+    // the Resolution, is turned back with the same words where it said "orbit contested".
+    g.ship_mut(rival).unwrap().stance = Stance::Hold;
+    g.commit_orders(Seat(0), std::slice::from_ref(&unload));
+    g.ship_mut(rival).unwrap().stance = Stance::Blockade;
+    g.resolution_phase();
+    assert_eq!(g.ship(ship).unwrap().colonists, 4, "nobody landed");
+    assert!(g.report.lines.iter().any(|l| l.text.ends_with("could not land at Mars: a rival warship blockades low orbit over Mars.")), "{:?}", g.report.lines.iter().map(|l| l.text.clone()).collect::<Vec<_>>());
+    // The computer: its Frigate in low orbit over a rival's ground Colony holds, calm; with cause it
+    // blockades, as it does a rival station's ring (#278, #355). The Colony Ship goes first, since
+    // with cause a rival hull in the orbit is an Attack, and an Attack is offered before a Blockade.
+    g.ships.retain(|s| s.id != ship);
+    let orders = g.ai_orders(Seat(1));
+    assert!(!orders.iter().any(|o| matches!(o, Order::ShipStance { stance: Stance::Blockade, .. })), "no cause, no Blockade: {orders:?}");
+    g.relations.score[1][0] = g.tables.ai.thresholds.war_cause - 5;
+    let orders = g.ai_orders(Seat(1));
+    assert!(orders.iter().any(|o| matches!(o, Order::ShipStance { body: b, stance: Stance::Blockade } if *b == body)), "a Blockade of low orbit over the rival's ground Colony: {orders:?}");
+    // Not under the rival's ground Batteries, which would lift it. Three of them (the review): one
+    // is a fight the Frigate's odds carry, and an Attack offered forces the Blockade off before the
+    // Battery filter is read; three put the odds under the bar, so Hold is what the filter leaves.
+    for _ in 0..3 {
+        g.colony_mut(mine).unwrap().modules.push(Module::new(ModuleKind::Battery));
+    }
+    let orders = g.ai_orders(Seat(1));
+    assert!(!orders.iter().any(|o| matches!(o, Order::ShipStance { stance: Stance::Attack, .. })), "three Batteries: no Attack offered either: {orders:?}");
+    assert!(!orders.iter().any(|o| matches!(o, Order::ShipStance { stance: Stance::Blockade, .. })), "Batteries below: no Blockade offered: {orders:?}");
+    assert!(orders.iter().any(|o| matches!(o, Order::ShipStance { body: b, stance: Stance::Hold } if *b == body)), "it holds: {orders:?}");
+}
+
 /// Ticket #532: the computer picks the Army a Carrier loads by the same rule, so a Region with no
 /// Launch Site lifts its Army into low orbit for it too.
 #[test]
@@ -14459,7 +14533,7 @@ fn orbital_control_is_low_orbits_and_a_battery_covers_its_own_orbit() {
     assert_eq!(g.orbital_control(BodyId::Mars), None, "a warship at a station's ring holds no Control of low orbit");
     g.ship_mut(ship).unwrap().slot = None;
     assert_eq!(g.orbital_control(BodyId::Mars), Some(Seat(0)), "in low orbit it holds it");
-    assert!(!g.may_land(Seat(1), BodyId::Mars), "and the ground is shut to the rival");
+    assert!(g.may_land(Seat(1), BodyId::Mars), "ticket #570 (version 0.1.0.3): on Hold the ground stays open to the rival");
     // A rival's Battery on the STATION covers its own ring and nothing else.
     g.colony_mut(station).unwrap().modules.push(Module::new(ModuleKind::Battery));
     assert!(g.battery_stands_against(Seat(0), BodyId::Mars, Orbit::Slot(station_slot)), "it covers the station's ring");
@@ -17240,7 +17314,8 @@ fn the_report_says_one_net_unrest_line_a_region_with_its_causes() {
 
 /// Ticket #370 (version 0.09.2): **the player's Colonists still aboard off Earth are reported every
 /// turn they wait**, one line a Body, under Ships; a rival's are not; and the line says when a
-/// rival's Orbital Control stops the landing.
+/// rival's Blockade of low orbit stops the landing (ticket #570, version 0.1.0.3: a Blockade, where
+/// Orbital Control alone used to).
 #[test]
 fn colonists_waiting_aboard_off_earth_are_reported_under_ships_when_the_line_changes() {
     let mut g = fresh();
@@ -17268,16 +17343,16 @@ fn colonists_waiting_aboard_off_earth_are_reported_under_ships_when_the_line_cha
     quiet_turn(&mut g);
     assert_eq!(waiting(&g).len(), 0, "not said again while nothing changed");
     // The blocked landing below changes the line, so it is said again there.
-    // A rival warship takes Orbital Control of the Moon, and the line says the landing is blocked.
+    // A rival warship blockades low orbit of the Moon, and the line says the landing is blocked.
     // The Resolution is run by hand, since the computer plays seat 1 and would order the frigate
     // elsewhere in a whole turn; the Report is cleared first, as a new turn clears it.
-    ship_in(&mut g, Seat(1), UnitKind::Frigate, BodyId::Moon, None, Stance::Hold);
-    assert_eq!(g.orbital_control(BodyId::Moon), Some(Seat(1)), "the fixture: the rival holds the orbit");
+    ship_in(&mut g, Seat(1), UnitKind::Frigate, BodyId::Moon, None, Stance::Blockade);
+    assert!(!g.may_land(Seat(0), BodyId::Moon), "the fixture: the rival blockades low orbit");
     g.report.lines.clear();
     g.resolution_phase();
     let lines = waiting(&g);
     assert_eq!(lines.len(), 1, "{lines:?}");
-    assert_eq!(lines[0].text, "4 Colonists wait aboard in low orbit of the Moon, blocked: rivals control the orbit.");
+    assert_eq!(lines[0].text, "4 Colonists wait aboard in low orbit of the Moon, blocked: a rival warship blockades low orbit.");
 }
 
 /// Ticket #370: **every Ship line reads under Ships**, a heading of its own above Your works, where

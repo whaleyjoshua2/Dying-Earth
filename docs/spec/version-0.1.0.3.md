@@ -382,3 +382,57 @@ a Colony or station was the Ship's action; the refuel was free already, its felt
   the people aboard, the station two down -- and three stale comments. It also noted a gap older than
   this ticket: a Load off a station and a Send Down from it in one turn each pass their check without
   counting the other, and the loser is dropped silently at the Resolution. Not touched here.
+
+## 14. A Ship blocks a landing only on Blockade, and Passage exempts
+
+Ticket: [A Ship blocks a landing only on Blockade, and Passage exempts](https://github.com/whaleyjoshua2/Dying-Earth/issues/570).
+
+The designer: *"ships do not block landing unless they are actively blockading."* The playtest: a
+rival Frigate on Hold in low orbit shut a player out of their own Colony with non-aggression and
+Passage Accords standing, twice, and the Report said "orbit contested" a turn after the order. In the
+tree the ground answered to Orbital Control -- the one seat with a fuelled warship in low orbit, any
+stance, Passage ignored, read at the Resolution alone -- while a station's ring already wanted a
+warship on Blockade and exempted Passage. Decided in one round ("q1 yes q2 stays q3 yes q4 a"):
+
+- **The ground reads the ring's rule** (`may_land` is `!orbit_blockaded_against(.., Orbit::Low)`): a
+  landing or founding is shut only by a rival warship on Blockade in low orbit, fuelled for a Battle;
+  a Passage partner never shuts it; the seat's own ground Colony's working Battery lifts it. A rival
+  on Hold, Attack or Intercept shuts nothing, held outright or not, and a contested orbit lifts no
+  Blockade, as it lifts none of a ring's.
+- **Orbital Control stays** for everything else it gated: a Bombard and a Launch from low orbit, the
+  starving of a ground Colony (which wanted a Blockade too, already), and the flag on the map.
+- **Refused at the order** (`blockaded_words`): the ground founding and the unload into a Colony --
+  a station's too, which the door never read either -- refuse with *"a rival warship blockades low
+  orbit over Mars"* or *"a rival warship blockades Ares"*, where they passed and failed at the
+  Resolution a turn later. The Resolution's re-read says the same words through a `{why}` on
+  `landing_contested`, or *"the Ship is not in the orbit that touches it"* when that is the reason;
+  "orbit contested" named a rule that shuts nothing now. The Colonists-waiting line reads *"blocked: a
+  rival warship blockades low orbit"*.
+- **The computer blockades the ground**: its one Blockade candidate was against a rival station in
+  the ring its warship sat in, so it never ordered one in low orbit and, with the ground off Orbital
+  Control, could shut nobody's ground at all. It gains the mirror: a warship in low orbit over a
+  rival's ground Colony whose holder it has cause against, no Battery of that holder below. That
+  Blockade also starves the Colony under an outright Control and shuts its Refinery depot, standing
+  rules the computer never reached.
+- Red first on six tests: four pins that read Control as the landing rule, the waiting line's words,
+  and the new test (the door, Passage, the Battery, the Resolution's words, the computer's
+  candidate). Clippy clean at `-D warnings`; 813 tests green.
+- **The review** (an independent agent) found no hole. The ring founding's door said "a rival warship
+  holds Orbital Slot 2 over Mars" where its re-read said "blockades Ares": one wording now. The
+  test's Battery-below assertion passed for the wrong reason (one Battery is a fight the Frigate's
+  odds carry, and an Attack offered forces the Blockade off before the filter is read): three
+  Batteries now, and no Attack asserted beside no Blockade. A dozen comments and glossary clauses
+  still read Control as the landing rule: mended. Two flags for the designer, left as built: the
+  computer's low-orbit arm has no Earth guard, where the ring arm has none either, so a computer
+  hull with cause will blockade Earth's low orbit over a rival's Antarctic Colony, shutting Antarctic
+  foundings for every rival and starving it under an outright Control; and a Blockade of a Passage
+  partner's ground shuts no landing but still starves it and counts offences, as the ring arm always
+  has. The Attack trigger "my Colony here and Control held against me" now opens a war on a rival that
+  threatens only a Bombard or a Launch; left, the sweep measures it.
+- **Swept** (`sweeps/ticket-570.txt`, 20 seeds x four seatings): **19 / 47 / 4 / 10 and no collapse**,
+  from 19 / 49 / 4 / 8 -- noise on the wins. The rule reached the computer seats where it was meant to:
+  Blockades ordered over the batch 254 from 12, Blockade-turns suffered 217 from 10. The Prospectors
+  order 192 of them (91 in the seating where they sit at seat 0) and the Custodians suffer 150 of the
+  turns; the Arkwrights order most of the rest. People killed by the nuke over the batch 2,318 from
+  6,930 on one Launch fewer (45 from 46). Income per Faction as the sweep file, within a few percent
+  of the last.

@@ -29,8 +29,9 @@ ship_arrived = "{faction} {ship} arrived at {body}."
 ship_held = "{faction} {ship} held at {body}, answering the call."
 # Ticket #370 (version 0.09.2): the player's own Colonists still aboard a Ship off Earth, every turn
 # they wait, one line a Body, in the designer's words -- "colonists wait aboard in low orbit of
-# Mars", with "blocked by rivals' control of the orbit" when a rival's Orbital Control shuts the
-# ground. {where} and {blocked} are the waiting_* phrases below.
+# Mars", with "blocked: a rival warship blockades low orbit" when a rival's Blockade of low orbit
+# shuts the ground (ticket #570, version 0.1.0.3; a rival's Orbital Control did before). {where} and
+# {blocked} are the waiting_* phrases below.
 colonists_waiting = "{n} {wait} aboard {where}{blocked}."
 # Ticket #335 (version 0.09.0): a Ship that changed orbit rather than flying away.
 orbit_changed = "{faction} {ship} moved to {orbit}."
@@ -50,7 +51,10 @@ battle = "Battle at {place}: {faction} attacked at {odds}% to hold the field; {o
 event_damaged_ships = "{event} damaged {n}."
 loaded = "{faction} loaded {cargo} at {body}{spaceport}."
 slot_taken = "{faction}: that Colony Slot was taken first."
-landing_contested = "{faction} could not land at {body}: orbit contested."
+# Ticket #570 (version 0.1.0.3): {why} is the door's own refusal -- "a rival warship blockades low
+# orbit over Mars" -- or that the Ship is not in the orbit that touches the place; "orbit contested"
+# before, which named a rule that no longer shuts anything.
+landing_contested = "{faction} could not land at {body}: {why}."
 # Ticket #353 (version 0.09.1): the slot is NAMED. "in slot 3 on the Moon" named a place no player
 # could find on the board; {slot} now carries the slot's own name, which is the Colony's name too.
 colony_founded = "{faction} founded a Colony at {slot} on {body} with {n}."
@@ -316,7 +320,7 @@ moon_bound = "{faction} were on the way"
 moon_in_orbit = "{faction} were in its orbit"
 # Ticket #370 (version 0.09.2): where the player's Colonists wait aboard, and what blocks them. One
 # orbit reads "in low orbit of Mars" or "at Ares over Mars"; more than one, "at Mars: 2 in low
-# orbit, 2 at Ares". A rival's Orbital Control of low orbit shuts the ground, in the designer's
+# orbit, 2 at Ares". A rival's Blockade of low orbit shuts the ground (ticket #570), in the designer's
 # words; a rival's Blockade of a station's orbit is a different thing in the glossary and says so.
 waiting_low = "in low orbit of {body}"
 waiting_station = "at {station} over {body}"
@@ -325,7 +329,8 @@ waiting_part_low = "{n} in low orbit"
 # Ticket #463 (version 0.09.7): one Region of a Faction's recruiting line.
 recruited_part = "{n} in {state}"
 waiting_part_station = "{n} at {station}"
-waiting_blocked = ", blocked: rivals control the orbit"
+# Ticket #570 (version 0.1.0.3): a Blockade of low orbit, where "rivals control the orbit" stood.
+waiting_blocked = ", blocked: a rival warship blockades low orbit"
 waiting_blockaded = ", blockaded at {station}"
 # Ticket #371 (version 0.09.2): the causes a Region's unrest_net line names, in the order they
 # landed, and the ending where a threshold was crossed.

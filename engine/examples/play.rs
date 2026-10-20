@@ -308,7 +308,9 @@ const GRAMMAR: &str = r#"ORDER LINES (one per line; `#` starts a comment; blank 
   Bombarding one. A STATION'S OWN ORBIT is what touches that station: unloading into it, refuelling
   at it, blockading it, attacking it. A LIFT FROM A LAUNCH SITE reaches ANY orbit of Earth (ticket
   #357, version 0.09.1). A refusal that a change of orbit would cure names the move first. Orbital Control is
-  of LOW orbit and gates the ground. A BLOCKADE IS A STANCE, chosen (`ship-stance <body> blockade`)
+  of LOW orbit and gates a Bombard and a Launch at the ground, and its starving. A LANDING OR FOUNDING
+  IS SHUT ONLY BY A BLOCKADE OF LOW ORBIT (ticket #570, version 0.1.0.3), never by a Ship on Hold,
+  never by a Passage partner. A BLOCKADE IS A STANCE, chosen (`ship-stance <body> blockade`)
   and shutting the orbit the stack sits in -- never a side effect of arriving anywhere. A
   rival's working Battery in that orbit opens a Battle on a blockader (ticket #363). `show` names
   the orbit every Ship sits in, and lists each Body's orbits under FREE SLOTS.

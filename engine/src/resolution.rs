@@ -95,8 +95,9 @@ impl Game {
     /// Ticket #370 (version 0.09.2): **the player's Colonists still aboard a Ship off Earth are
     /// reported while they wait** -- since ticket #431 (version 0.09.5) only on a turn the line
     /// changes -- one line a Body, under Ships, at the designer's word --
-    /// *"colonists wait aboard in low orbit of Mars"*, and *"blocked by rivals' control of the
-    /// orbit"* when a rival's Orbital Control shuts the ground or a blockade shuts the station they
+    /// *"colonists wait aboard in low orbit of Mars"*, and *"blocked: a rival warship blockades low
+    /// orbit"* (ticket #570, version 0.1.0.3; a rival's Orbital Control shut the ground before) when a
+    /// rival's Blockade of low orbit shuts the ground or a blockade shuts the station they
     /// are docked at. Any orbit off Earth counts; a Ship in transit does not, since nothing can be
     /// done about it yet. The player's own Ships only: a rival's waiting Colonists are not the
     /// player's business, and the Report was quieted a version ago. Runs after every landing this
@@ -140,8 +141,9 @@ impl Game {
                     self.phrase("waiting_many", &[("body", name), ("parts", parts.join(", "))])
                 }
             };
-            // A rival's Orbital Control shuts the ground below low orbit; a rival's Blockade shuts
-            // the station a Ship is docked at. Different things in the glossary, so different words.
+            // A rival's Blockade of low orbit shuts the ground below it (ticket #570, version 0.1.0.3;
+            // Orbital Control did before); a rival's Blockade of a ring shuts the station a Ship is
+            // docked at. Different places, so different words.
             let blocked = orbits
                 .iter()
                 .find_map(|o| match o {
@@ -2974,16 +2976,22 @@ impl Game {
                     // place -- low orbit for the ground, a station's own ring for the station. The
                     // gate said so when the order was given; it is read again here because the
                     // orbit changes and the Battles have run since.
-                    let barred = match into {
-                        UnloadTarget::Colony(cid) => !self.may_unload_into(seat, cid) || !self.colony(cid).map(|c| self.ship_may_touch(s, c)).unwrap_or(false),
-                        UnloadTarget::Slot(_, _) => !self.may_land(seat, body) || !self.ship_in_orbit(s, body, Orbit::Low),
+                    // Ticket #570 (version 0.1.0.3): one test for every target -- the orbit that
+                    // touches the place, blockaded against the seat, or the Ship not in it -- and the
+                    // line says which, in the door's own words, where it said "orbit contested".
+                    let orbit = match into {
+                        UnloadTarget::Colony(cid) => self.colony(cid).filter(|c| c.body == body).map(|c| self.colony_orbit(c)),
+                        UnloadTarget::Slot(_, _) => Some(Orbit::Low),
                         // Ticket #442 (version 0.09.6): a station founded from its own ring.
-                        UnloadTarget::Ring(_, n) => !self.ship_in_orbit(s, body, Orbit::Slot(n)) || self.slot_blockaded_against(seat, body, n),
+                        UnloadTarget::Ring(_, n) => Some(Orbit::Slot(n)),
                     };
-                    if barred {
-                        let line = format!("{} could not land at {}: the orbit is contested.", self.seat_name(seat), self.tables.body(body).name);
+                    let Some(orbit) = orbit else { continue };
+                    let shut = self.orbit_blockaded_against(seat, body, orbit);
+                    if shut || !self.ship_in_orbit(s, body, orbit) {
+                        let why = if shut { self.blockaded_words(body, orbit) } else { "the Ship is not in the orbit that touches it".to_string() };
+                        let line = format!("{} could not land at {}: {why}.", self.seat_name(seat), self.tables.body(body).name);
                         self.log(line);
-                        let text = self.say("landing_contested", &[("faction", self.seat_name(seat)), ("body", self.tables.body(body).name.clone())]);
+                        let text = self.say("landing_contested", &[("faction", self.seat_name(seat)), ("body", self.tables.body(body).name.clone()), ("why", why)]);
                         self.report_line(LineKind::Ship, Some(ReportPlace::Body(body)), text);
                         continue;
                     }

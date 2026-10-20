@@ -250,12 +250,14 @@ impl Game {
 
     /// Ticket #335 (version 0.09.0): whether this seat wants the GROUND of a Body -- a landing, a
     /// founding, a Bombard of a ground Colony, or simply denying a rival the surface it already
-    /// keeps a Colony on. What a seat that wants the ground wants is **Orbital Control of low
-    /// orbit**, since low orbit is the one orbit that touches the surface and the only one Control
-    /// is held in, so its warships go there and the contest its stance reads is low orbit's.
+    /// keeps a Colony on. What a seat that wants the ground wants is **low orbit**, the one orbit
+    /// that touches the surface: Orbital Control is held there, and since ticket #570 (version
+    /// 0.1.0.3) a Blockade there is what shuts the surface, so its warships go there and the
+    /// contest its stance reads is low orbit's.
     pub fn ai_wants_the_ground(&self, seat: Seat, body: BodyId) -> bool {
         // A Colony of its own on the surface to keep, or one a rival holds that it has cause
-        // against: either way the surface is the thing, and the surface is shut from low orbit.
+        // against: either way the surface is the thing, and the surface is shut from low orbit --
+        // by a Blockade there since ticket #570 (version 0.1.0.3), by Orbital Control before.
         let on_the_ground = self.colonies.iter().any(|c| {
             !c.in_orbit
                 && c.body == body
@@ -3529,11 +3531,15 @@ impl Game {
             // Ticket #355 (version 0.09.1): a Blockade, where one applies, IS the stance, on
             // #284's reading for the Attack. Offered beside Hold it lost every time: over twenty
             // games 33 warship-turns sat at a rival's ring with cause and every one held.
+            // Ticket #570 (version 0.1.0.3), at the designer's word: and in LOW ORBIT, against a
+            // rival's ground Colony below, with cause and no Battery of its holder's there -- a
+            // Blockade of low orbit is what shuts the ground now, where Control on any stance did,
+            // and the computer never ordered one there before.
             let blockade = if attack.is_none() {
-                stack
-                    .iter()
-                    .filter(|s| s.kind.is_warship())
-                    .find_map(|s| self.station_at(body, s.slot?).filter(|c| self.rival_holds(seat, c) && c.control.director().is_some_and(|h| self.has_cause(seat, h) && self.batteries_at(h, body, Orbit::Slot(c.slot)).is_empty())))
+                stack.iter().filter(|s| s.kind.is_warship()).find_map(|s| match s.slot {
+                    Some(slot) => self.station_at(body, slot).filter(|c| self.rival_holds(seat, c) && c.control.director().is_some_and(|h| self.has_cause(seat, h) && self.batteries_at(h, body, Orbit::Slot(c.slot)).is_empty())),
+                    None => self.colonies.iter().find(|c| c.body == body && !c.in_orbit && self.rival_holds(seat, c) && c.control.director().is_some_and(|h| self.has_cause(seat, h) && self.batteries_at(h, body, Orbit::Low).is_empty())),
+                })
             } else {
                 None
             };

@@ -6913,7 +6913,8 @@ fn stance_row(ui: &mut Ui, game: &Game, pending: &[Order], current: Stance, make
             // it rather than over the ceiling; nothing a player could not read elsewhere was lost.
             let bar = game.tables.melee.battle_fuel;
             let orbit_rule = match (ships, st) {
-                (true, Stance::Blockade) => format!("\nA station's own orbit starves that station; low orbit starves the ground while you hold Orbital Control of it outright.\nA warship with less than {bar} Fuel in the tank blockades nothing."),
+                // Ticket #570 (version 0.1.0.3): a Blockade of low orbit shuts the ground to rivals' landings.
+                (true, Stance::Blockade) => format!("\nA station's own orbit shuts and starves that station; low orbit shuts the ground to rivals' landings, and starves it while you hold Orbital Control outright.\nA warship with less than {bar} Fuel in the tank blockades nothing."),
                 (true, Stance::Intercept) => format!("\nA hull with less than {bar} Fuel in the tank catches nobody."),
                 _ => String::new(),
             };
@@ -10591,7 +10592,7 @@ fn battery_rules(game: &Game, col: &Colony) -> String {
     let worth = if col.in_orbit {
         "no rival's Blockade shuts this station, and a blockader here is fired on"
     } else {
-        "no rival holds Orbital Control of low orbit, so none may land"
+        "no rival's Blockade of low orbit shuts the ground, and none holds Orbital Control of it"
     };
     format!("\nCovers {orbit} alone, and fights in any Battle there.\nWhile it works, {worth}.\nRepaired here with Materials; destroyed at {}.", counted(card.hit_points, "hit", "hits"))
 }

@@ -2045,8 +2045,9 @@ impl Game {
                 // Ticket #278 (version 0.08.5): a Blockade is chosen against a place, so it wants a
                 // warship of the seat's sitting in an orbit it may shut. Ticket #335 (version
                 // 0.09.0): **the orbit it is given in** -- LOW ORBIT, which starves the ground
-                // under an outright Orbital Control, or an Orbital Slot that is not its own
-                // station's: a rival's, or an empty one held against a builder.
+                // under an outright Orbital Control and (ticket #570, version 0.1.0.3) shuts it to
+                // rivals' landings, or an Orbital Slot that is not its own station's: a rival's, or
+                // an empty one held against a builder.
                 // Ticket #346 (version 0.09.1): an Intercept is a Battle opened on an arrival, so
                 // a stack with nothing in it that can pay the Battle charge catches nobody and the
                 // order is refused rather than given to no effect. This gate is NEW: the
@@ -2302,6 +2303,11 @@ impl Game {
                         if !self.ship_in_orbit(s, body, Orbit::Low) {
                             return fail(self.move_first(body, Orbit::Low, "found the Colony", "a Colony is founded from low orbit alone."));
                         }
+                        // Ticket #570 (version 0.1.0.3): refused at the order, where it passed and
+                        // failed at the Resolution a turn later.
+                        if !self.may_land(seat, body) {
+                            return fail(self.blockaded_words(body, Orbit::Low));
+                        }
                         if s.kind != UnitKind::ColonyShip || *colonists == 0 {
                             return fail("only a Colony Ship with Colonists founds a Colony");
                         }
@@ -2340,8 +2346,10 @@ impl Game {
                         if !self.ship_in_orbit(s, body, Orbit::Slot(*slot)) {
                             return fail(self.move_first(body, Orbit::Slot(*slot), "found the station", "a station is founded from its own orbit."));
                         }
+                        // Ticket #570 (version 0.1.0.3), from the review: the door and the
+                        // Resolution's re-read say the same words.
                         if self.slot_blockaded_against(seat, body, *slot) {
-                            return fail(format!("a rival warship holds Orbital Slot {slot} over {}", self.tables.body(body).name));
+                            return fail(self.blockaded_words(body, Orbit::Slot(*slot)));
                         }
                     }
                     UnloadTarget::Colony(c) => {
@@ -2353,6 +2361,12 @@ impl Game {
                         // orbit, a Colony on the ground from low orbit.
                         if !self.ship_may_touch(s, col) {
                             return fail(self.move_first(body, self.colony_orbit(col), "unload", &format!("{} is reached from there alone.", self.place_name(Place::Colony(*c)))));
+                        }
+                        // Ticket #570 (version 0.1.0.3): refused at the order -- a Blockade of low
+                        // orbit for the ground, of the ring for a station -- where it passed and
+                        // failed at the Resolution a turn later.
+                        if !self.may_unload_into(seat, *c) {
+                            return fail(self.blockaded_words(body, self.colony_orbit(col)));
                         }
                         if *colonists > 0 {
                             if col.control.director() != Some(seat) {

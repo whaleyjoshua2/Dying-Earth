@@ -1518,7 +1518,8 @@ pub enum Term {
     /// enforced by refusing the order: the act is allowed and costs +3, and ends the whole Accord.
     NonAggression,
     /// Neither treats the other's Ships as a target, and a Blockade does not shut the other out of
-    /// the slot. Measured near-dead on today's board -- the Blockade rung fired zero times in 80
+    /// the orbit -- a ring, or since ticket #570 (version 0.1.0.3) the ground under low orbit.
+    /// Measured near-dead on today's board -- the Blockade rung fired zero times in 80
     /// games -- and kept deliberately, because it will matter for Mars.
     Passage,
     /// Either may Refuel at the other's Space Stations. Also near-dead today: off-Earth stations run
@@ -4545,13 +4546,15 @@ impl Game {
     ///
     /// Ticket #335 (version 0.09.0): **Orbital Control is of LOW ORBIT**, since low orbit is what
     /// touches the ground and the ground is all Control governs. A warship in a station's orbit
-    /// holds nothing by sitting there; it must come down to low orbit to shut the surface.
+    /// holds nothing by sitting there; it must come down to low orbit. Ticket #570 (version
+    /// 0.1.0.3): Control governs a Bombard, a Launch and the starving of the ground; it shuts no
+    /// landing, which a Blockade of low orbit does (`may_land`).
     pub fn orbital_control(&self, body: BodyId) -> Option<Seat> {
         let mut holders = Seat::ALL
             .into_iter()
             // Ticket #346 (version 0.09.1): and holding the Fuel bar. A warship whose tank cannot
             // pay the Battle charge holds nothing: it could not fight for the orbit it is sitting
-            // in, so it does not shut the ground below it either.
+            // in.
             .filter(|seat| {
                 self.ships.iter().any(|s| s.seat == *seat && self.ship_in_orbit(s, body, Orbit::Low) && s.kind.is_warship() && !s.escaped && self.ship_holds_the_battle_bar(s))
             });
@@ -4566,7 +4569,7 @@ impl Game {
 
     /// Ticket #335 (version 0.09.0): whether a seat stands alone in one orbit -- no rival warship
     /// still engaged in it and no rival working Battery covering it. Orbital Control is low
-    /// orbit's and gates the ground; THIS is what a station's own orbit asks of the Ship that
+    /// orbit's and gates a Bombard and a Launch there; THIS is what a station's own orbit asks of the Ship that
     /// would Bombard the station standing there.
     pub fn orbit_uncontested(&self, seat: Seat, body: BodyId, orbit: Orbit) -> bool {
         // Ticket #346 (version 0.09.1): a DRY rival warship is not a rival warship for this test.
@@ -4626,10 +4629,24 @@ impl Game {
     /// frigate in Earth orbit locked a Faction out of its own Space Station for nine turns, and two
     /// rivals' warships present punished the bystander hardest by denying everybody. A blockade is
     /// now the business of one Orbital Slot: see `slot_blockaded_against`.
+    ///
+    /// Ticket #570 (version 0.1.0.3), at the designer's word -- *"ships do not block landing unless
+    /// they are actively blockading"*: **the ground reads the ring's rule.** A rival warship on
+    /// Blockade in low orbit, fuelled for a Battle, shuts it; a Passage partner never does; the
+    /// seat's own ground Colony's working Battery lifts it. A rival holding Orbital Control on any
+    /// other stance shuts nothing -- the playtest had a Frigate on Hold under two Accords shut a
+    /// player out of their own Colony. Control still gates a Bombard, a Launch and the starving of
+    /// the ground.
     pub fn may_land(&self, seat: Seat, body: BodyId) -> bool {
-        match self.orbital_control(body) {
-            Some(s) => s == seat,
-            None => true,
+        !self.orbit_blockaded_against(seat, body, Orbit::Low)
+    }
+
+    /// Ticket #570: the refusal a Blockade earns, by the orbit it shuts -- the order's door and the
+    /// Resolution's re-read say the same words.
+    pub fn blockaded_words(&self, body: BodyId, orbit: Orbit) -> String {
+        match orbit {
+            Orbit::Low => format!("a rival warship blockades low orbit over {}", self.tables.body(body).name),
+            Orbit::Slot(n) => format!("a rival warship blockades {}", self.station_name(body, n)),
         }
     }
 

@@ -487,7 +487,7 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("event_damaged_ships", &["event", "n"]),
     ("loaded", &["faction", "cargo", "body", "spaceport"]),
     ("slot_taken", &["faction"]),
-    ("landing_contested", &["faction", "body"]),
+    ("landing_contested", &["faction", "body", "why"]),
     ("colony_founded", &["faction", "slot", "body", "n"]),
     // Ticket #419 (version 0.09.4).
     ("colony_founded_eased", &["faction", "slot", "body", "n", "ease"]),
