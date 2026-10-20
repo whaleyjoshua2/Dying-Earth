@@ -371,13 +371,13 @@ fn influence_threshold_takes_control_and_decay_takes_two_from_untouched_targets(
         g.state_mut(s).schooling = pivot - g.tables.state(s).education_level;
     }
     g.seats[0].allotment = 100;
-    g.pending.influence.push((Seat(0), Place::State(StateId::NorthAfrica), 39));
-    g.pending.influence.push((Seat(0), Place::State(StateId::Europe), 10));
+    g.pending.influence.push((Seat(0), Place::State(StateId::NorthAfrica), 39, g.place_control(Place::State(StateId::NorthAfrica)).director()));
+    g.pending.influence.push((Seat(0), Place::State(StateId::Europe), 10, g.place_control(Place::State(StateId::Europe)).director()));
     g.resolution_phase();
     assert_eq!(g.state(StateId::NorthAfrica).control, Control::Neutral, "39 is under the threshold");
     assert_eq!(g.seats[0].influence[&Place::State(StateId::NorthAfrica)], 39);
     // Next turn: 1 more on North Africa flips it; Europe, untouched, decays by 2.
-    g.pending.influence.push((Seat(0), Place::State(StateId::NorthAfrica), 1));
+    g.pending.influence.push((Seat(0), Place::State(StateId::NorthAfrica), 1, g.place_control(Place::State(StateId::NorthAfrica)).director()));
     g.resolution_phase();
     assert_eq!(g.state(StateId::NorthAfrica).control, Control::Controlled(Seat(0)));
     assert_eq!(g.seats[0].influence[&Place::State(StateId::NorthAfrica)], 40, "the standing persists through the transfer (#33)");
@@ -395,7 +395,7 @@ fn spending_on_your_own_place_raises_your_standing_and_it_decays_one_a_turn() {
     let c = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Habitat], 4);
     g.seats[1].influence.insert(Place::Colony(c), 30);
     g.seats[1].influenced_this_turn.push(Place::Colony(c));
-    g.pending.influence.push((Seat(0), Place::Colony(c), 12));
+    g.pending.influence.push((Seat(0), Place::Colony(c), 12, g.place_control(Place::Colony(c)).director()));
     g.resolution_phase();
     assert_eq!(g.seats[1].influence[&Place::Colony(c)], 30, "the rival's standing is untouched");
     assert_eq!(g.seats[0].influence[&Place::Colony(c)], 12, "your own standing rose");
@@ -547,7 +547,7 @@ fn ducats_buy_influence_at_four_and_a_half_a_point_and_the_bought_influence_is_s
     let pending = vec![buy.clone()];
     let (_, left) = g.remaining(Seat(0), &pending);
     assert_eq!(left, 32, "the Allotment plus the bought 10");
-    let spend = Order::Influence { target: Place::State(StateId::NorthAfrica), amount: 30 };
+    let spend = Order::Influence { target: Place::State(StateId::NorthAfrica), amount: 30, break_accord: false };
     assert!(g.check_order(Seat(0), &pending, &spend).is_ok());
     g.commit_orders(Seat(0), &[buy, spend]);
     assert_eq!(g.seats[0].stockpile.ducats, 0.0);
@@ -3627,12 +3627,12 @@ fn e_a_transfer_uses_the_challengers_own_threshold() {
     assert_eq!(g.influence_threshold(target), 40);
     assert_eq!(g.influence_threshold_for(Seat(1), target), 60);
     // 45 clears the plain threshold of 40 and not the Prospectors' own 60.
-    g.pending.influence.push((Seat(1), target, 45));
+    g.pending.influence.push((Seat(1), target, 45, g.place_control(target).director()));
     g.resolution_phase();
     assert_eq!(g.state(StateId::NorthAfrica).control, Control::Neutral, "45 does not reach a Blamed Faction's 60");
     assert_eq!(g.seats[1].influence[&target], 45, "the Standing is there; it is the threshold that moved");
     // The Arkwrights, with no Blame at all, take it on 40.
-    g.pending.influence.push((Seat(2), target, 40));
+    g.pending.influence.push((Seat(2), target, 40, g.place_control(target).director()));
     g.resolution_phase();
     assert_eq!(g.state(StateId::NorthAfrica).control, Control::Controlled(Seat(2)), "40 is enough for a Faction with no Blame");
 }
@@ -5609,7 +5609,7 @@ fn a_rivals_paragraph_names_its_visible_orders_and_none_of_its_scores() {
         Order::BuildEmigrants { state: StateId::EastAsia, n: 4 },
         Order::SendToAntarctica { state: StateId::EastAsia, n: 2, into: UnloadTarget::Slot(BodyId::Earth, 0) },
         Order::Unload { ship, colonists: 2, army: false, into: UnloadTarget::Slot(BodyId::Moon, 0) },
-        Order::Influence { target: Place::State(StateId::Europe), amount: 5 },
+        Order::Influence { target: Place::State(StateId::Europe), amount: 5, break_accord: false },
         Order::BuyInfluence { amount: 3 },
         Order::Buy { resource: Resource::Materials, amount: 4 },
         Order::Sell { resource: Resource::Fuel, amount: 4 },
@@ -6685,7 +6685,7 @@ fn an_ai_holder_pushes_as_many_holds_as_it_takes_when_a_rival_comes_within_reach
     g.seats[0].influence.insert(here, 25);
     g.seats[1].allotment = 40;
     g.seats[1].stockpile.energy = 200.0;
-    let held = |orders: &[Order]| -> i64 { orders.iter().map(|o| match o { Order::Influence { target: Place::State(StateId::Europe), amount } => *amount, _ => 0 }).sum() };
+    let held = |orders: &[Order]| -> i64 { orders.iter().map(|o| match o { Order::Influence { target: Place::State(StateId::Europe), amount, .. } => *amount, _ => 0 }).sum() };
     let orders = g.ai_orders(Seat(1));
     // 25 + the margin + two steps of 5 - 30: as many holds as that takes, within an Allotment of 40.
     let need = (25 + margin + 10 - 30).min(40);
@@ -9866,14 +9866,14 @@ fn resistance_bites_an_outsider_and_never_the_controller() {
 
     // Seat 1 is an outsider here, and pays the tax.
     g.seats[1].allotment = 100;
-    g.commit_orders(Seat(1), &[Order::Influence { target: place, amount: 30 }]);
+    g.commit_orders(Seat(1), &[Order::Influence { target: place, amount: 30, break_accord: false }]);
     g.resolution_phase();
     assert_eq!(g.seat(Seat(1)).influence.get(&place).copied().unwrap_or(0), 27, "an outsider's 30 becomes 27");
 
     // Seat 0 holds it, and converts in full.
     let before = g.seat(Seat(0)).influence.get(&place).copied().unwrap_or(0);
     g.seats[0].allotment = 100;
-    g.commit_orders(Seat(0), &[Order::Influence { target: place, amount: 30 }]);
+    g.commit_orders(Seat(0), &[Order::Influence { target: place, amount: 30, break_accord: false }]);
     g.resolution_phase();
     let after = g.seat(Seat(0)).influence.get(&place).copied().unwrap_or(0);
     assert_eq!(after - before, 30, "the controller's own 30 is worth 30");
@@ -10472,9 +10472,9 @@ fn relations_fall_once_a_turn_for_spending_on_a_place_a_rival_holds() {
     assert_eq!(g.relations_score(offender, victim), 0, "and in both directions");
 
     // Two spends on the same victim in one turn cost one point, not two.
-    g.pending.influence.push((offender, held, 10));
-    g.pending.influence.push((offender, held, 10));
-    g.pending.influence.push((offender, neutral, 10));
+    g.pending.influence.push((offender, held, 10, g.place_control(held).director()));
+    g.pending.influence.push((offender, held, 10, g.place_control(held).director()));
+    g.pending.influence.push((offender, neutral, 10, g.place_control(neutral).director()));
     g.resolution_phase();
     g.settle_relations();
     assert_eq!(g.relations_score(victim, offender), -1, "charged once for the turn, however many orders");
@@ -22889,13 +22889,68 @@ fn an_order_that_breaks_an_accord_says_so_on_its_cost_line() {
     let mut g = game();
     let (me, them) = (Seat(0), Seat(1));
     let theirs = g.controlled_states(them)[0];
-    let push = Order::Influence { target: Place::State(theirs), amount: 5 };
+    let push = Order::Influence { target: Place::State(theirs), amount: 5, break_accord: false };
     let text = |g: &Game| g.order_price_text(me, &push, g.order_cost(me, &push));
     assert!(!text(&g).contains("breaks"), "{}", text(&g));
     g.strike_accord(me, them, vec![Term::NonAggression]).unwrap();
     let name = g.seat_name(them);
     assert!(text(&g).contains(&format!("breaks your Accord with {name}")), "{}", text(&g));
     assert_eq!(g.order_crosses(me, &push), Some(them));
+}
+
+/// Ticket #569 (version 0.1.0.3), at the designer's word: **an Influence spend on a non-aggression
+/// partner's place is refused unless the order says break.** The playtest broke seven Accords by
+/// accident through an "ok ... breaks your Accord" line nobody read. Meant, it is placed and the
+/// Accord breaks at the Resolution as before; the other five crossing orders still warn in the price
+/// alone.
+#[test]
+fn an_influence_spend_on_a_partners_place_is_refused_unless_it_says_break() {
+    let mut g = game();
+    let (me, them) = (Seat(0), Seat(1));
+    let theirs = g.controlled_states(them)[0];
+    g.seats[0].allotment = 20;
+    let push = Order::Influence { target: Place::State(theirs), amount: 5, break_accord: false };
+    assert!(g.check_order(me, &[], &push).is_ok(), "no Accord: an ordinary spend on a rival's place");
+    g.strike_accord(me, them, vec![Term::NonAggression]).unwrap();
+    let name = g.seat_name(them);
+    let err = g.check_order(me, &[], &push).unwrap_err();
+    assert_eq!(err.0, format!("breaks your Accord with {name}: order it with break to break it"));
+    let meant = Order::Influence { target: Place::State(theirs), amount: 5, break_accord: true };
+    assert!(g.check_order(me, &[], &meant).is_ok(), "meant: placed");
+    // An Agitate on the same place still goes through with its warning in the price (Q3: Influence alone).
+    g.seats[0].stockpile.ducats = 100.0;
+    assert!(g.check_order(me, &[], &Order::Agitate { state: theirs }).is_ok(), "{:?}", g.check_order(me, &[], &Order::Agitate { state: theirs }));
+    g.commit_orders(me, &[meant]);
+    g.resolution_phase();
+    assert!(!g.accord_has(me, them, Term::NonAggression), "meant and paid: the Accord is broken");
+}
+
+/// Ticket #569 (Q4), at the designer's word: **the offence of a spend falls on whoever directed the
+/// place when the order was given** -- the aim -- not on whoever holds it when the spend settles. A
+/// rival's place that passes to a partner before the Resolution offends the rival and leaves the
+/// Accord standing; a neutral place a partner takes in the same turn offends nobody.
+#[test]
+fn an_influence_spend_offends_whoever_directed_the_place_when_it_was_given() {
+    let mut g = game();
+    let (me, partner, rival) = (Seat(0), Seat(1), Seat(2));
+    g.strike_accord(me, partner, vec![Term::NonAggression]).unwrap();
+    let sid = g.controlled_states(rival)[0];
+    g.seats[0].allotment = 20;
+    g.commit_orders(me, &[Order::Influence { target: Place::State(sid), amount: 5, break_accord: false }]);
+    // The place passes to the partner before the spend settles.
+    g.state_mut(sid).control = Control::Controlled(partner);
+    g.resolution_phase();
+    assert!(g.accord_has(me, partner, Term::NonAggression), "the Accord stands: the spend was aimed at the rival");
+    assert!(g.relations.offended[rival.index()][me.index()], "the rival, who held the place when the order was given, is offended");
+    assert!(!g.relations.offended[partner.index()][me.index()], "and the partner is not");
+    // A neutral place the partner takes in the same turn: nobody is offended.
+    let neutral = StateId::ALL.into_iter().find(|s| g.place_control(Place::State(*s)).director().is_none()).expect("a neutral Region");
+    g.seats[0].allotment = 20;
+    g.commit_orders(me, &[Order::Influence { target: Place::State(neutral), amount: 5, break_accord: false }]);
+    g.state_mut(neutral).control = Control::Controlled(partner);
+    g.resolution_phase();
+    assert!(g.accord_has(me, partner, Term::NonAggression), "a neutral place taken by the partner: no breach");
+    assert!(!g.relations.offended[partner.index()][me.index()]);
 }
 
 /// Ticket #519 (Q3 A): an Army inherited abroad in a rival's Region has a turn's grace from the rule
@@ -23384,7 +23439,7 @@ fn a_rival_spending_on_yours_is_your_news_and_your_home_at_risk_says_so() {
     let before = needed - 2 * gained + 1;
     assert!(before > 0 && gained > 0, "the premise: {before}, {gained} of {needed}");
     g.seats[1].influence.insert(place, before);
-    g.pending.influence.push((rival, place, 12));
+    g.pending.influence.push((rival, place, 12, g.place_control(place).director()));
     g.report.lines.clear();
     g.resolution_phase();
     assert_eq!(g.place_control(place).controller(), Some(Seat(0)), "not taken this turn");
@@ -23404,7 +23459,7 @@ fn a_rival_spending_on_yours_is_your_news_and_your_home_at_risk_says_so() {
     g.take_control(StateId::Japan, Seat(0));
     g.state_mut(StateId::Japan).facilities.push(facility(FacilityKind::LaunchSite));
     g.seats[1].influence.insert(place, before);
-    g.pending.influence.push((rival, place, 12));
+    g.pending.influence.push((rival, place, 12, g.place_control(place).director()));
     g.report.lines.clear();
     g.resolution_phase();
     assert!(g.report.lines.iter().any(|l| l.text == format!("{china} could fall to {pro} next turn.")), "the home alone warns");
@@ -23412,7 +23467,7 @@ fn a_rival_spending_on_yours_is_your_news_and_your_home_at_risk_says_so() {
     let mut g = game();
     calm(&mut g);
     g.seats[1].influence.insert(place, needed);
-    g.pending.influence.push((rival, place, 12));
+    g.pending.influence.push((rival, place, 12, g.place_control(place).director()));
     g.report.lines.clear();
     g.resolution_phase();
     assert_eq!(g.place_control(place).controller(), Some(rival), "the premise: taken");
@@ -23420,7 +23475,7 @@ fn a_rival_spending_on_yours_is_your_news_and_your_home_at_risk_says_so() {
     // Far from the bar: the spending line alone.
     let mut g = game();
     calm(&mut g);
-    g.pending.influence.push((rival, place, 3));
+    g.pending.influence.push((rival, place, 3, g.place_control(place).director()));
     g.report.lines.clear();
     g.resolution_phase();
     assert!(g.report.lines.iter().any(|l| l.text.starts_with(&format!("{pro} spent 3 on {china}"))));

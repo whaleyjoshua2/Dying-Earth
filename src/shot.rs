@@ -929,7 +929,7 @@ fn build_board(session: &mut Session) {
             let gained = g.standing_from(place, 12);
             let before = g.influence_needed_for(Seat(1), place) - 2 * gained + 1;
             g.seats[1].influence.insert(place, before.max(1));
-            g.pending.influence.push((Seat(1), place, 12));
+            g.pending.influence.push((Seat(1), place, 12, g.place_control(place).director()));
             refuse_any_card(g);
             g.end_turn(std::array::from_fn(|_| Vec::new())).expect("the screenshot harness picks a Tech before it drives turns");
         }

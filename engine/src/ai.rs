@@ -2181,7 +2181,7 @@ impl Game {
             let bought = if self.tables.ducats.per_influence > 0.0 { (self.seat(seat).stockpile.ducats / self.tables.ducats.per_influence).floor() as i64 } else { 0 };
             let copies = ((allotment + bought) / step).max(0);
             for _ in 0..copies {
-                push(vec![Order::Influence { target: *target, amount: step }], Cat::Influence, base, 1.0, 1.0, opp, format!("spend {} Influence on {}", step, self.place_name(*target)), None);
+                push(vec![Order::Influence { target: *target, amount: step, break_accord: false }], Cat::Influence, base, 1.0, 1.0, opp, format!("spend {} Influence on {}", step, self.place_name(*target)), None);
             }
         }
         // Buy Influence with Ducats (ticket #35), in units of the step, weighted like Influence itself.
@@ -2253,7 +2253,7 @@ impl Game {
                 let copies = ((need + step - 1) / step).clamp(1, can);
                 let opp = if rival + step >= mine { m.opportunity } else { 1.0 };
                 for _ in 0..copies {
-                    push(vec![Order::Influence { target: place, amount: step }], Cat::Influence, self.base_weight(seat, Cat::Influence), 1.0, m.threat, opp, format!("hold {} with {} Influence", self.place_name(place), step), None);
+                    push(vec![Order::Influence { target: place, amount: step, break_accord: false }], Cat::Influence, self.base_weight(seat, Cat::Influence), 1.0, m.threat, opp, format!("hold {} with {} Influence", self.place_name(place), step), None);
                 }
             }
         }
@@ -4058,6 +4058,9 @@ impl Game {
         // or a Launch at a place that partner directs -- is dropped. Measured before: computer seats
         // struck Accords and broke them the same turn by spending Influence on the partner's Regions,
         // which players read as an Accord accepted and never struck.
+        // Ticket #569 (version 0.1.0.3): an Influence spend that crosses is refused at `check_order`
+        // above, before it takes the Influence budget, so the next candidate gets the Influence it
+        // used to waste; measured 19 / 49 / 4 / 8 from 9 / 59 / 5 / 7. The other five are dropped here.
         chosen.retain(|o| self.order_crosses(seat, o).is_none());
         // Ticket #58: the scored list is the AI's own head, so it stays in the log. What the Report
         // shows is built from the orders this seat actually commits, in `end_turn`.

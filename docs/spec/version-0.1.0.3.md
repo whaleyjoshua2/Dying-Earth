@@ -303,3 +303,42 @@ The designer, closing the race for the Moon (§7): *"add a ticket to increase th
   still running at turn 39, 40 of 80 from 37; their Fund at the end by seating 4,495 / 8,113 / 3,753
   / 4,352, from 3,780 / 8,025 / 3,578 / 3,585 -- up by about the bar's fifth, since the pace table
   scaled with it and the computer Prospectors bank to their pace. Income per Faction as the sweep file.
+
+## 12. An Influence spend that would break an Accord is refused unless it says break
+
+Ticket: [An Influence spend that would break an Accord warns before the order stands](https://github.com/whaleyjoshua2/Dying-Earth/issues/569).
+
+The playtest: all four testers broke an Accord by accident, seven times, through an Influence order
+that went through as "ok ... breaks your Accord with X". The engine warned in the price alone; the
+window's Spend and Max buttons carried fixed hovers; the breach fell on whoever held the place as the
+spend settled. Decided in one round ("that all looks good"):
+
+- **The order says break** (`Order::Influence { break_accord }`): a spend on a non-aggression
+  partner's place is refused without it -- *"breaks your Accord with X: order it with break to break
+  it"* -- and placed with it, the Accord breaking at the Resolution as before. The tool: `influence
+  southasia 17 break`. The computer seats never set it; they drop such orders themselves (#520).
+- **The window's three Influence buttons** (Spend, Max, the place card's Spend) share one helper:
+  where the spend would cross, a red *"breaks your Accord with X"* stands beside the button and in
+  its hover; the first click arms it and it reads **"Break the Accord with X and spend 17"** in red;
+  the second places the order with the break meant. A spend that crosses nobody is placed at once.
+- **Influence alone** is refused; Launch, Agitate, Army move, Smear and Bombard warn in the price as
+  before, since nobody gives those by mistake.
+- **The offence falls on the aim**: the pending spend carries the place's director as the order was
+  given, and the Resolution offends that seat -- a rival's place that passed to a partner offends the
+  rival and the Accord stands; a neutral place a partner took in the same Resolution offends nobody
+  (the playtest's T13).
+- A standing Max already ends by itself with a Report line when its place is no longer yours (#134),
+  and spends on your own place alone, so it cannot cross.
+- **The review**: the arming is keyed on the place and the amount, and any click elsewhere or End
+  Turn disarms it (as the stack's, #323), so the second click confirms what the first proposed; the
+  buttons' hovers go through `rule_tip`, the refusal first and the words after (#380); and an
+  Influence order already placed when an Accord with that partner is struck in the same turn is
+  withdrawn at once with the word -- *"Withdrawn: 17 Influence on South Asia. It would break the
+  Accord you just struck."* -- where End Turn would have refused and dropped it silently.
+- **Swept** (`sweeps/ticket-569.txt`, 20 seeds x four seatings): **19 / 49 / 4 / 8 and no collapse**,
+  from 9 / 59 / 5 / 7 -- the Custodians doubled, the Prospectors down ten, the swing in the two
+  seatings where the Custodians sit at seat 1. Not the aim rule: with it alone reverted the table
+  reads 19 / 48 / 4 / 9. It is the door reaching the computer seats: a candidate spend on a partner's
+  place used to pass `check_order`, take the Influence budget and be dropped at the end, the
+  Influence wasted; refused at the candidate stage now, the next candidate spends it. Income per
+  Faction as the sweep file.

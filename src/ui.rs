@@ -1720,8 +1720,12 @@ pub fn draw(
             }
             Action::AnswerOffer(index, accept) => {
                 let result = session.game.as_mut().map(|g| g.answer_offer(Seat(0), index, accept));
-                if let Some(Err(e)) = result {
-                    session.last_error = Some(e);
+                match result {
+                    Some(Err(e)) => session.last_error = Some(e),
+                    // Ticket #569 (version 0.1.0.3), from the review: an Influence order already aimed
+                    // at the new partner's place is withdrawn, with the word.
+                    Some(Ok(())) if accept => session.withdraw_crossing_influence(),
+                    _ => {}
                 }
             }
             Action::GoTo(place) => {
@@ -4188,7 +4192,9 @@ fn nearest_slot(game: &Game, body: BodyId, lon: f32, lat: f32) -> Option<u32> {
 fn pick(pos: Pos2, session: &Session, game: &Game, view: &mut ViewState, camera: &Camera, cam_gt: &GlobalTransform, globes: &Query<(&Globe, &GlobalTransform)>, textures: &Textures, hotspots: &[Hotspot]) {
     let _ = session;
     // Ticket #323 (version 0.08.8): any left-click disarms the stack; a shield's click re-arms it.
+    // Ticket #569 (version 0.1.0.3): and an Influence button armed to break an Accord.
     view.armed_stack = None;
+    view.accord_break_armed = None;
     // Labels and markers first.
     let mut best: Option<(f32, Hit)> = None;
     for h in hotspots {
@@ -4753,14 +4759,10 @@ fn command_cluster(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewS
             ui.horizontal(|ui| {
                 match &target {
                     Some((place, name)) => {
-                        let order = Order::Influence { target: *place, amount };
-                        let check = game.check_order(Seat(0), &session.pending, &order);
-                        let resp = ui.add_enabled(check.is_ok(), egui::Button::new(format!("Spend {amount} on {name}")));
-                        if let Err(e) = &check {
-                            // Ticket #380 (version 0.09.2): through `rule_tip`, as every refusal.
-                            rule_tip(resp.clone(), e.0.clone());
-                        }
-                        if resp.on_hover_text(format!("Raise your Standing on {name}. Its card shows what it would take to hold or take it.")).clicked() {
+                        // Ticket #569 (version 0.1.0.3): two clicks where the spend would break an Accord.
+                        let face = RichText::new(format!("Spend {amount} on {name}"));
+                        let hover = format!("Raise your Standing on {name}. Its card shows what it would take to hold or take it.");
+                        if let Some(order) = influence_button(ui, view, game, &session.pending, *place, amount, face, hover) {
                             actions.push(Action::Place(order));
                         }
                     }
@@ -4782,14 +4784,9 @@ fn command_cluster(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewS
                 let button = egui::Button::new(RichText::new("Max").strong());
                 match &target {
                     Some((place, name)) if influence_left > 0 => {
-                        let order = Order::Influence { target: *place, amount: influence_left };
-                        let check = game.check_order(Seat(0), &session.pending, &order);
-                        let resp = ui.add_enabled(check.is_ok(), button);
-                        if let Err(e) = &check {
-                            // Ticket #380 (version 0.09.2): through `rule_tip`, as every refusal.
-                            rule_tip(resp.clone(), e.0.clone());
-                        }
-                        if resp.on_hover_text(format!("Spend all {influence_left} left this turn on {name}.")).clicked() {
+                        // Ticket #569 (version 0.1.0.3): two clicks where the spend would break an Accord.
+                        let hover = format!("Spend all {influence_left} left this turn on {name}.");
+                        if let Some(order) = influence_button(ui, view, game, &session.pending, *place, influence_left, RichText::new("Max").strong(), hover) {
                             view.influence_amount = influence_left;
                             actions.push(Action::Place(order));
                         }
@@ -5021,8 +5018,10 @@ fn can_end_turn(game: &Game, view: &ViewState) -> bool {
 /// than ending the turn; on that confirmation, pressing again confirms. A spectator has no
 /// Influence to lose and no confirmation.
 fn press_end_turn(session: &Session, game: &Game, view: &mut ViewState, actions: &mut Vec<Action>) {
-    // Ticket #323 (version 0.08.8): End Turn disarms the stack.
+    // Ticket #323 (version 0.08.8): End Turn disarms the stack. Ticket #569 (version 0.1.0.3): and an
+    // Influence button armed to break an Accord.
     view.armed_stack = None;
+    view.accord_break_armed = None;
     if view.popup == Popup::ConfirmEndTurn {
         view.popup = Popup::None;
         actions.push(Action::EndTurn);
@@ -5075,7 +5074,8 @@ fn side_panel(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
             if !session.pending.iter().any(|o| matches!(o, Order::Influence { .. })) {
                 let (_, influence_left) = game.remaining(Seat(0), &session.pending);
                 if influence_left > 0 {
-                    actions.push(Action::Place(Order::Influence { target: place, amount: influence_left }));
+                    // Ticket #569 (version 0.1.0.3): a standing Max spends on a place of yours; it crosses nobody.
+                    actions.push(Action::Place(Order::Influence { target: place, amount: influence_left, break_accord: false }));
                 }
             }
         }
@@ -5654,7 +5654,7 @@ fn order_text(game: &Game, o: &Order) -> String {
             UnloadTarget::Colony(c) => format!("Unload {} from {} into {}", if *colonists > 0 { colonists_word(*colonists) } else if *army { "the Army".into() } else { "nothing".into() }, ship, game.place_name(Place::Colony(*c))),
             UnloadTarget::Ring(b, s) => format!("Found {} with {} from {}", game.slot_place_name(*b, *s), colonists_word(*colonists), ship),
         },
-        Order::Influence { target, amount } => format!("{} Influence on {}", amount, game.place_name(*target)),
+        Order::Influence { target, amount, .. } => format!("{} Influence on {}", amount, game.place_name(*target)),
         Order::BuyInfluence { amount } => format!("Buy {} Influence with Ducats", amount),
         Order::RepairWithDucats { unit, points } => format!("Repair {} on {} with Ducats", counted(points, "point", "points"), unit_name(game, unit)),
         Order::Buy { resource, amount } => format!("Buy {} {} for {} Ducats", amount, resource.name(), game.order_cost(Seat(0), o).ducats),
@@ -5872,6 +5872,61 @@ fn tip_fires(ctx: &egui::Context, text: &str) -> bool {
     let seen = if seen_pass == pass { seen } else { 0 };
     ctx.data_mut(|d| d.insert_temp(egui::Id::new("tip_seen"), (pass, seen + 1)));
     seen + 1 == wanted
+}
+
+/// Ticket #569 (version 0.1.0.3): the colour of a break -- the Climate chart's.
+const ACCORD_BREAK: Color32 = Color32::from_rgb(236, 88, 76);
+
+/// Ticket #569 (version 0.1.0.3): the words for an Influence spend that would break an Accord --
+/// the red note beside the button, "breaks your Accord with X", and the face the armed button
+/// wears, "Break the Accord with X and spend N" -- or `None` where the spend crosses nobody.
+fn influence_break(game: &Game, target: Place, amount: i64) -> Option<(String, String)> {
+    let partner = game.order_crosses(Seat(0), &Order::Influence { target, amount, break_accord: false })?;
+    let name = game.seat_name(partner);
+    Some((format!("breaks your Accord with {name}"), format!("Break the Accord with {name} and spend {amount}")))
+}
+
+/// Ticket #569 (version 0.1.0.3), at the designer's word: an Influence button. A spend that crosses
+/// nobody is placed at the first click. One that would break an Accord carries the red note beside
+/// it and in its hover, and wants two clicks: the first arms it -- this place at this amount, the
+/// review -- and it reads "Break the Accord with X and spend N" in red; the second places the order
+/// with the break meant, which the engine's door otherwise refuses. Returns the order to place. The
+/// hover goes through `rule_tip`, the refusal first and the words after it (ticket #380).
+#[allow(clippy::too_many_arguments)]
+fn influence_button(ui: &mut Ui, view: &mut ViewState, game: &Game, pending: &[Order], target: Place, amount: i64, face: RichText, hover: String) -> Option<Order> {
+    let breaking = influence_break(game, target, amount);
+    if breaking.is_none() && view.accord_break_armed.is_some_and(|(p, _)| p == target) {
+        view.accord_break_armed = None;
+    }
+    let armed = breaking.is_some() && view.accord_break_armed == Some((target, amount));
+    let order = Order::Influence { target, amount, break_accord: breaking.is_some() };
+    let check = game.check_order(Seat(0), pending, &order);
+    let face = match &breaking {
+        Some((_, armed_face)) if armed => RichText::new(armed_face.clone()).strong().color(ACCORD_BREAK),
+        _ => face,
+    };
+    let hover = match &breaking {
+        Some((note, _)) if !armed => format!("{hover}\n{note}. Click again to break it."),
+        _ => hover,
+    };
+    let resp = ui.add_enabled(check.is_ok(), egui::Button::new(face));
+    let resp = match &check {
+        Ok(_) => rule_tip(resp, hover),
+        Err(e) => rule_tip(resp, refusal_hover(&e.0, Some(&hover))),
+    };
+    let clicked = resp.clicked();
+    if let Some((note, _)) = &breaking {
+        ui.label(RichText::new(note).color(ACCORD_BREAK));
+    }
+    if !clicked {
+        return None;
+    }
+    if breaking.is_some() && !armed {
+        view.accord_break_armed = Some((target, amount));
+        return None;
+    }
+    view.accord_break_armed = None;
+    Some(order)
 }
 
 fn rule_tip(response: egui::Response, text: String) -> egui::Response {
@@ -6922,21 +6977,16 @@ fn influence_row(ui: &mut Ui, game: &Game, session: &Session, view: &mut ViewSta
                     game.tables.influence.decay_controlled, game.tables.influence.decay
                 ),
             );
-            let order = Order::Influence { target, amount: view.influence_amount };
-            let ok = game.check_order(Seat(0), &session.pending, &order);
-            let spend = ui.add_enabled(ok.is_ok(), egui::Button::new("Spend"));
+            let amount = view.influence_amount;
             let needed = game.influence_needed_for(Seat(0), target);
             let mine = game.seat(Seat(0)).influence.get(&target).copied().unwrap_or(0);
             let words = format!("Adds the figure beside it to your Standing here, now {mine}. You take this place at {needed}.");
-            // Ticket #380 (version 0.09.2): greyed, the refusal first and these words after it.
-            let spend = match &ok {
-                Ok(_) => rule_tip(spend, words),
-                Err(e) => rule_tip(spend, refusal_hover(&e.0, Some(&words))),
-            };
-            if spend.clicked() {
+            // Ticket #569 (version 0.1.0.3): two clicks where the spend would break an Accord; the
+            // refusal, where there is one, through `rule_tip` first (ticket #380) and these words after.
+            if let Some(order) = influence_button(ui, view, game, &session.pending, target, amount, RichText::new("Spend"), words) {
                 actions.push(Action::Place(order));
             }
-            if let Err(e) = ok {
+            if let Err(e) = game.check_order(Seat(0), &session.pending, &Order::Influence { target, amount, break_accord: true }) {
                 ui.label(RichText::new(e.0).weak());
             }
         });
@@ -13071,6 +13121,21 @@ mod tests {
         let tables = std::sync::Arc::new(dying_earth_engine::data::Tables::load(&dying_earth_engine::data::default_data_dir()).unwrap());
         let g = Game::new(tables, NewGame { seed: 7, player: FactionKind::Custodians, player_is_ai: false, player_start: StateId::EastAsia });
         assert_eq!(recruit_hover(&g, StateId::EastAsia, 2), "2M people, Unrest -0.25.");
+    }
+
+    /// Ticket #569 (version 0.1.0.3): the words of an Influence button whose spend would break an
+    /// Accord -- the red note and the armed face -- and nothing where it crosses nobody.
+    #[test]
+    fn an_influence_button_that_would_break_an_accord_says_so() {
+        let tables = std::sync::Arc::new(dying_earth_engine::data::Tables::load(&dying_earth_engine::data::default_data_dir()).unwrap());
+        let mut g = Game::new(tables, NewGame { seed: 7, player: FactionKind::Custodians, player_is_ai: false, player_start: StateId::EastAsia });
+        let theirs = Place::State(g.controlled_states(Seat(1))[0]);
+        assert_eq!(influence_break(&g, theirs, 17), None, "no Accord: nothing to say");
+        g.strike_accord(Seat(0), Seat(1), vec![Term::NonAggression]).unwrap();
+        let name = g.seat_name(Seat(1));
+        assert_eq!(influence_break(&g, theirs, 17), Some((format!("breaks your Accord with {name}"), format!("Break the Accord with {name} and spend 17"))));
+        let mine = Place::State(g.controlled_states(Seat(0))[0]);
+        assert_eq!(influence_break(&g, mine, 17), None, "a place of your own crosses nobody");
     }
 
     /// Ticket #566 (version 0.1.0.3): the Fund line says last turn's growth whole, banked and interest.

@@ -326,7 +326,7 @@ const GRAMMAR: &str = r#"ORDER LINES (one per line; `#` starts a comment; blank 
                                        working Shipyard, in that place's own orbit. It is a build
                                        in that yard's queue: Materials now, Widgets over the turns.
 
-  influence <place> <amount>
+  influence <place> <amount> [break]   `break` means it, where the spend would break an Accord
   buy-influence <amount>
   max <place>                          repeat next turn's WHOLE Allotment on one place you hold,
   max off                              turn after turn until it is switched off. Free, and it
@@ -566,7 +566,8 @@ fn parse_line(g: &Game, line: &str) -> Result<Line, String> {
         "army-stance" => Order::ArmyStance { place: place(at(1)?)?, stance: pick(&STANCES, at(2)?)? },
         "repair" => Order::Repair { unit: unit_ref(at(1)?)?, points: count(at(2)?)? },
         "repair-ducats" => Order::RepairWithDucats { unit: unit_ref(at(1)?)?, points: count(at(2)?)? },
-        "influence" => Order::Influence { target: place(at(1)?)?, amount: number(at(2)?)? },
+        // Ticket #569 (version 0.1.0.3): `break` after the amount means the Accord it would break.
+        "influence" => Order::Influence { target: place(at(1)?)?, amount: number(at(2)?)?, break_accord: w.get(3).is_some_and(|x| x.eq_ignore_ascii_case("break")) },
         "buy-influence" => Order::BuyInfluence { amount: number(at(1)?)? },
         // Version 0.07.3 (ticket #134): Max, the standing order. `max off` switches it off.
         "max" => {

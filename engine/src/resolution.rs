@@ -1862,7 +1862,7 @@ impl Game {
         // Ticket #542 (version 0.1.0.1): each rival's spend on a place the player holds, summed, for
         // the lines written once the takings are settled.
         let mut on_yours: Vec<(Seat, Place, i64, i64)> = Vec::new();
-        for (seat, target, amount) in spent {
+        for (seat, target, amount, aimed) in spent {
             let own = self.place_control(target).controller() == Some(seat);
             // Ticket #187 (version 0.08.0): Resistance. An outsider's Influence buys less Standing at
             // a well-schooled place and more at a badly-schooled one; the controller converts in full.
@@ -1871,7 +1871,12 @@ impl Game {
             // and their view of you falls once for the turn however many orders you put in. A
             // NEUTRAL place is never an offence, however hotly contested: two Factions bidding for
             // empty ground are competing, not crossing each other.
-            if let Some(victim) = self.place_control(target).director()
+            // Ticket #569 (version 0.1.0.3), at the designer's word: the victim is whoever DIRECTED the
+            // place as the order was given -- the aim -- not whoever holds it as the spend settles. A
+            // neutral Region a partner took in the same Resolution broke an Accord with no warning
+            // possible at order time (the playtest, T13); a rival's place that passed to a partner
+            // offends the rival, whom the spend was aimed at.
+            if let Some(victim) = aimed
                 && victim != seat
             {
                 // Ticket #222: rung 1, once per place per turn.

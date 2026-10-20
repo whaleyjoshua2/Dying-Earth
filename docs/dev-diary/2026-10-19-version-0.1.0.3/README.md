@@ -337,3 +337,30 @@ the bar, and the computer Prospectors bank to their pace. Income per Faction (Ma
 Energy / Ducats / Research, mean a game): Custodians 986 / 277 / 2352 / 1421 / 844; Prospectors
 2274 / 481 / 3053 / 1481 / 447; Arkwrights 1688 / 366 / 2437 / 3368 / 292; Archivists 476 / 271 /
 1187 / 504 / 786.
+
+## An Influence spend that would break an Accord is refused unless it says break
+
+Ticket [#569](https://github.com/whaleyjoshua2/Dying-Earth/issues/569), spec §12. One round, five
+questions, all at the recommendation: the buttons warn in red; refuse unless the order says break
+(a two-click button, the tool's word); Influence alone; the offence falls on whoever directed the
+place as the order was given; a sweep. Built: `break_accord` on the order, the door in
+`check_order`, the aim carried with the pending spend, one `influence_button` helper behind the
+window's three buttons. Red first on the door (an unrefused spend), the aim (a broken Accord) and
+the button's words.
+
+**The review** found the arming stale across a selection change and End Turn, and shared across the
+three buttons whatever the amount: keyed on place and amount now, disarmed by any click elsewhere and
+by End Turn. The card's greyed Spend had lost its words under the refusal: the hovers go through
+`rule_tip`. And an Accord struck after an Influence order was already aimed at the partner's place
+left End Turn refusing and dropping the order with a log line alone: the window withdraws it at once
+and says so. The withdrawal has no test of its own -- it lives in the window's action handler.
+
+**Swept** ([`sweeps/ticket-569.txt`](sweeps/ticket-569.txt)): 19 / 49 / 4 / 8 and no collapse, from
+9 / 59 / 5 / 7. Too big for a relations rule, so an experiment: the aim rule alone reverted reads
+19 / 48 / 4 / 9 -- the same table. The mover is the door reaching the computer seats: a candidate
+spend on a partner's place used to pass `check_order`, take the Influence budget and be dropped at
+the end of `ai_orders`, the Influence wasted; refused at the candidate stage now, the next candidate
+spends it, and the Accord-keeping seats (the Custodians above all) stop throwing Influence away.
+Income per Faction (Materials / Fuel / Energy / Ducats / Research, mean a game): Custodians 1054 /
+292 / 2425 / 1431 / 866; Prospectors 2139 / 442 / 2709 / 1190 / 386; Arkwrights 1538 / 319 / 2309 /
+3210 / 266; Archivists 477 / 261 / 1149 / 484 / 746.

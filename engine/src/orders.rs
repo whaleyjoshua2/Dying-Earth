@@ -101,7 +101,16 @@ pub enum Order {
     MoveArmy { army: ArmyId, to: StateId },
     Load { ship: ShipId, colonists: u32, from: LoadSource, army: Option<ArmyId> },
     Unload { ship: ShipId, colonists: u32, army: bool, into: UnloadTarget },
-    Influence { target: Target, amount: i64 },
+    /// Ticket #569 (version 0.1.0.3): `break_accord` -- the spend is meant to break a non-aggression
+    /// Accord whose partner's place it lands on. Without it such a spend is refused, since the
+    /// playtest broke seven Accords by accident through an "ok" line nobody read; the computer
+    /// seats never set it, dropping such orders themselves.
+    Influence {
+        target: Target,
+        amount: i64,
+        #[serde(default)]
+        break_accord: bool,
+    },
     /// Version 0.03 (ticket #35): Ducats buy Influence for this turn's Allotment, and pay for
     /// repairs in place of Materials. Ticket #54 retired Restoration and both its orders.
     BuyInfluence { amount: i64 },
@@ -388,7 +397,8 @@ pub struct Pending {
     pub card_unrest: Vec<(StateId, f64, EventId)>,
     /// Ticket #52: Resettle orders paid this turn, one per Faction at most.
     pub resettle: Vec<(Seat, StateId)>,
-    pub influence: Vec<(Seat, Target, i64)>,
+    /// Ticket #569 (version 0.1.0.3): and the seat directing the place as the order was given.
+    pub influence: Vec<(Seat, Target, i64, Option<Seat>)>,
     /// Ticket #267 (version 0.08.4): Smear campaigns paid this turn -- who, whom, how much Influence.
     #[serde(default)]
     pub smears: Vec<(Seat, Seat, i64)>,
@@ -2411,7 +2421,7 @@ impl Game {
                 }
                 Ok(cost)
             }
-            Order::Influence { target, amount } => {
+            Order::Influence { target, amount, break_accord } => {
                 if *amount <= 0 {
                     return fail("spend a positive amount");
                 }
@@ -2422,6 +2432,14 @@ impl Game {
                             return fail("no such Colony");
                         }
                     }
+                }
+                // Ticket #569 (version 0.1.0.3), at the designer's word: a spend on a non-aggression
+                // partner's place is refused unless the order says break -- the playtest broke seven
+                // Accords by accident through an "ok ... breaks your Accord" line nobody read. The
+                // window's button wants a second click for it; the tool the word `break`; the computer
+                // seats drop such orders themselves. The other five crossing orders warn in the price.
+                if !*break_accord && let Some(partner) = self.order_crosses(seat, order) {
+                    return fail(format!("breaks your Accord with {}: order it with break to break it", self.seat_name(partner)));
                 }
                 Ok(cost)
             }
@@ -3058,7 +3076,9 @@ impl Game {
                     self.seat_mut(seat).resettle_to = Some(*state);
                     self.pending.resettle.push((seat, *state));
                 }
-                Order::Influence { target, amount } => self.pending.influence.push((seat, *target, *amount)),
+                // Ticket #569 (version 0.1.0.3): with the place's director as the order is given, the
+                // seat the spend is aimed at.
+                Order::Influence { target, amount, .. } => self.pending.influence.push((seat, *target, *amount, self.place_control(*target).director())),
                 Order::Smear { target, amount } => self.pending.smears.push((seat, *target, *amount)),
                 Order::Greenwash { amount } => self.pending.greenwashes.push((seat, *amount)),
                 Order::OfferCredits { ppm } => self.pending.credit_offers.push((seat, *ppm)),
@@ -3337,10 +3357,10 @@ pub fn merged_for_report(list: &[Order]) -> Vec<Order> {
     let mut out: Vec<Order> = Vec::new();
     for o in list {
         let merged = match o {
-            Order::Influence { target, amount } => out
+            Order::Influence { target, amount, .. } => out
                 .iter_mut()
                 .find_map(|x| match x {
-                    Order::Influence { target: t, amount: a } if t == target => Some(a),
+                    Order::Influence { target: t, amount: a, .. } if t == target => Some(a),
                     _ => None,
                 })
                 .map(|a| *a += amount),
@@ -3581,7 +3601,7 @@ impl Game {
                 };
                 r("unload", &[("place", where_)])
             }
-            Order::Influence { target, amount } => r("influence", &[("n", amount.to_string()), ("place", place(*target))]),
+            Order::Influence { target, amount, .. } => r("influence", &[("n", amount.to_string()), ("place", place(*target))]),
             Order::Smear { target, amount } => r("smear", &[("n", amount.to_string()), ("faction", self.seat_name(*target))]),
             Order::Greenwash { amount } => r("greenwash", &[("n", amount.to_string())]),
             Order::OfferCredits { ppm } => r("offer_credits", &[("n", ppm.to_string())]),
