@@ -531,3 +531,20 @@ kind's name -- the ticket thought the refusal did not exist; it did, and read ba
 Exodus Call already says it. One round, all at the recommendation, the designer keeping the ok
 line's echo as it is. No rule moves, so no sweep. The red was the tool's own refusals and one engine
 test.
+
+## Closing the version
+
+Ticket [#574](https://github.com/whaleyjoshua2/Dying-Earth/issues/574).
+
+- **The closing sweep** ([`sweeps/final-0.1.0.3.txt`](sweeps/final-0.1.0.3.txt)): **22 / 48 / 1 / 7
+  and 2 collapses**, the East Asia board (#576), since nothing that moves a rule changed after it;
+  from 0.1.0.2's 3 / 23 / 26 / 13 and 14. The Prospectors at 48 and the Arkwrights at 1 are the
+  figures farthest from the designer's 15 each; the collapses at 2 against 20.
+- **`GAME_VERSION` 0.1.0.3; `SAVE_VERSION` stays at 12**: the last Trade refused per pair (#572)
+  and a seat's price cuts (#577) read a default from an older save; the Wind Farm's Ducat upkeep is
+  a data figure. A 0.1.0.2, 0.1.0.1 or 0.1.0.0 save loads.
+- **The glossary** audited against the version: the Wind Farm, the Upload's cap, Orbital Control's
+  reach, the Scrubber, Production Moved and the Fund already carried their 0.1.0.3 lines; the Bank's
+  one-a-Region and Influence's 4.5 Ducats were missing and are in.
+- **The playtest note** rewritten for the version; the Windows kit built here into `dist/`, the
+  Linux kit from the release-kits run.

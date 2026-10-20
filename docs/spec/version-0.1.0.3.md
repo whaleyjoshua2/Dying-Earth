@@ -13,7 +13,36 @@ pictures and sweeps that decided it are in
 **What the version is.** Version 0.1.0.2 with the designer's list after the 0.1.0.2 playtest
 ([`docs/dev-diary/2026-10-19-playtest-0.1.0.2/`](../dev-diary/2026-10-19-playtest-0.1.0.2/)), most
 of it taking the slack out of the board: the loops that win alone, the chores that steal turns, and
-the rules the computer never used.
+the rules the computer never used. **Earth**: one Bank to a Region (§1), a Scrubber that costs and
+is capped by people (§2), the Wind Farm (§3), power that burns Fuel (§4), Influence at 4.5 (§5).
+**The computer**: Production Moved at x2.08 and weighed whole (§6), every seat racing for the Moon
+(§7), the East Asia Custodians leaving Earth (§20). **Victory**: the Upload at 16 by fours with an
+Archive that draws more as it fills (§8), the Fund's growth shown (§9), the Fund and the Capital
+weighed in (§10), the Fund at 4,250 (§11), the Archive at 250 (§17), a Stabilization run that reads
+the net (§18). **Diplomacy**: an Influence spend that would break an Accord refused unless it says
+break (§12), a refused offer waiting three turns with a counter on a Trade (§16), the Cheap Ore
+Offer's refusal for the refusing seat alone (§19). **Ships**: loading free of the Ship's turn (§13),
+a landing shut only by a Blockade (§14). **The texts**: a station by its name or colony id (§15),
+and the tool's texts (§21).
+
+**What it did to the win column** (80 games, per Faction; every section's own sweep is in it):
+
+| | 0.1.0.2 | §1-§5 Earth | §7 the Moon race | §12 the Accord hold | §20 East Asia: closing | the ideal |
+|---|---|---|---|---|---|---|
+| Custodians | 3 | 8 | 11 | 19 | **22** | 15 |
+| Prospectors | 23 | 29 | 53 | 49 | **48** | 15 |
+| Arkwrights | 26 | 17 | 7 | 4 | **1** | 15 |
+| Archivists | 13 | 14 | 7 | 8 | **7** | 15 |
+| collapses | 14 | 12 | 2 | 0 | **2** | 20 |
+
+**The closing board** ([`sweeps/final-0.1.0.3.txt`](../dev-diary/2026-10-19-version-0.1.0.3/sweeps/final-0.1.0.3.txt)):
+**22 / 48 / 1 / 7 and 2 collapses**, the same board as §20's, since nothing that moves a rule
+changed after it. The Earth tickets lifted the Custodians and cut the Arkwrights; the Moon race
+(§7) handed the Prospectors the table and emptied the collapses, and the Upload, the Fund and the
+Accord hold moved the rest. The Prospectors at 48 are the farthest from the ideal, the Arkwrights
+at 1 the next; the collapses at 2 against 20 wanted are the third figure to watch. `GAME_VERSION`
+is 0.1.0.3; `SAVE_VERSION` stays at 12: the two saved fields the version added read a default, so
+a 0.1.0.2, 0.1.0.1 or 0.1.0.0 save loads.
 
 ## 1. One Bank to a Region
 
