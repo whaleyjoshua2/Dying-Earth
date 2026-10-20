@@ -2162,6 +2162,17 @@ impl Game {
         // Ticket #448 (version 0.09.6): **Energy**, where the seat would be short at Income -- the
         // shortfall that shuts its buildings -- bought ahead of the spending, at a producer's weight
         // and the opportunity multiplier, since a building switched off pays for nothing.
+        // Ticket #575 (version 0.1.0.3), at the designer's word: **the power reserve**, bought ahead
+        // of everything else when the tank stands under it, at the Energy buy's weight and the
+        // opportunity multiplier, since power at a quarter shuts the rest at the next Income.
+        {
+            let s = self.seat(seat);
+            let power_reserve = self.fuel_reserve(seat);
+            if s.stockpile.fuel < power_reserve {
+                let n = (power_reserve - s.stockpile.fuel).ceil() as i64;
+                push(vec![Order::Buy { resource: Resource::Fuel, amount: n }], Cat::Producer, self.base_weight(seat, Cat::Producer) * 1.5, 1.0, 1.0, m.opportunity, format!("buy {n} Fuel for the power reserve ({power_reserve:.1})"), None);
+            }
+        }
         {
             let s = self.seat(seat);
             let short = s.stockpile.energy + s.income_last_turn.energy;
@@ -3061,7 +3072,9 @@ impl Game {
                 if let Some(buy) = top_up {
                     push(vec![buy, Order::Refuel { ship: s.id }], Cat::Transit, self.base_weight(seat, Cat::Transit), gap_for(Cat::Transit, None), 1.0, 1.0, format!("{note}, buying the rest"), None);
                 }
-                if self.seat(seat).stockpile.fuel > fuel_reserve {
+                // The review of #575: a Refuel takes what the tank wants down to nought, so the plain
+                // one is offered only when the whole want stands above the reserve.
+                if self.seat(seat).stockpile.fuel - fuel_reserve >= self.tank_of(seat, s.kind) - s.fuel {
                     push(vec![Order::Refuel { ship: s.id }], Cat::Transit, self.base_weight(seat, Cat::Transit), gap_for(Cat::Transit, None), 1.0, 1.0, note, None);
                 }
             }

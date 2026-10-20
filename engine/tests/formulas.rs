@@ -536,13 +536,14 @@ fn a_controlled_state_pays_ducats_from_gdp_times_industry_and_a_bank_adds_more()
 
 #[test]
 fn ducats_buy_influence_four_for_one_and_the_bought_influence_is_spendable_at_once() {
-    // Ticket #537 (version 0.1.0.1): four Ducats a point, where it was two.
+    // Ticket #537 (version 0.1.0.1): four Ducats a point, where it was two. Ticket #562 (version
+    // 0.1.0.3): five.
     let mut g = game();
-    g.seats[0].stockpile.ducats = 40.0;
+    g.seats[0].stockpile.ducats = 50.0;
     g.seats[0].allotment = 22;
     let buy = Order::BuyInfluence { amount: 10 };
-    assert_eq!(g.order_cost(Seat(0), &buy).ducats, 40.0);
-    assert!(g.check_order(Seat(0), &[], &Order::BuyInfluence { amount: 11 }).is_err(), "44 Ducats needed, 40 held");
+    assert_eq!(g.order_cost(Seat(0), &buy).ducats, 50.0);
+    assert!(g.check_order(Seat(0), &[], &Order::BuyInfluence { amount: 11 }).is_err(), "55 Ducats needed, 50 held");
     let pending = vec![buy.clone()];
     let (_, left) = g.remaining(Seat(0), &pending);
     assert_eq!(left, 32, "the Allotment plus the bought 10");
@@ -6903,7 +6904,7 @@ fn the_prospectors_buy_at_fifteen_per_cent_off() {
     assert_eq!(g.order_cost(pro, &buy(Resource::Materials, 10)).ducats, 25.5, "30 x 0.85 = 25.5"); // Ticket #387: to the tenth, where 25 was floored
     assert_eq!(g.order_cost(pro, &buy(Resource::Fuel, 5)).ducats, 12.8, "15 x 0.85 = 12.75, to the tenth (Fuel at 3 since ticket #421)");
     assert_eq!(g.order_cost(pro, &buy(Resource::Energy, 10)).ducats, 17.0, "20 x 0.85 = 17.0");
-    assert_eq!(g.order_cost(pro, &Order::BuyInfluence { amount: 5 }).ducats, 20.0, "Influence is not a commodity");
+    assert_eq!(g.order_cost(pro, &Order::BuyInfluence { amount: 5 }).ducats, 25.0, "Influence is not a commodity (five a point since ticket #562)");
     assert_eq!(g.order_cost(pro, &Order::Sell { resource: Resource::Materials, amount: 10 }).ducats, -15.0, "selling is not discounted: half of 3 each, undiscounted");
     let sid = g.controlled_states(pro)[0];
     let outright = Order::BuildFacilityWithDucats { state: sid, kind: FacilityKind::Factory };
@@ -19498,12 +19499,14 @@ fn the_computer_keeps_fuel_on_hand_for_its_power() {
     assert!((burn - 1.6).abs() < 1e-9, "the premise: two Power Plants burn 1.6: {burn}");
     let reserve = g.fuel_reserve(cus);
     assert!((reserve - 3.0 * burn).abs() < 1e-9, "three turns of it: {reserve}");
-    g.seats[cus.index()].stockpile.materials = 500.0;
+    g.seats[cus.index()].stockpile.materials = 70.0;
     g.seats[cus.index()].stockpile.energy = 500.0;
     g.seats[cus.index()].stockpile.ducats = 0.0;
-    // Under the reserve, Fuel is the scarcest resource; above it, not.
-    g.seats[cus.index()].stockpile.fuel = reserve - 1.0;
-    assert_eq!(g.scarcest(cus), Resource::Fuel, "under the reserve");
+    // Fourteen Fuel against 70 Materials: read whole, 14 / 10.8 = 1.3 stands above the Materials'
+    // 70 / 66 = 1.06 and Materials is the scarcest; less the reserve of 4.8, 9.2 / 10.8 = 0.85 and
+    // Fuel is. The figure sits where the reserve alone turns the answer.
+    g.seats[cus.index()].stockpile.fuel = 14.0;
+    assert_eq!(g.scarcest(cus), Resource::Fuel, "the reserve makes Fuel the scarcest");
     g.seats[cus.index()].stockpile.fuel = reserve + 300.0;
     assert_ne!(g.scarcest(cus), Resource::Fuel, "well above it");
     // A Ship short of its tank: refuelled only from what stands above the reserve.
@@ -19511,15 +19514,26 @@ fn the_computer_keeps_fuel_on_hand_for_its_power() {
     let col = g.colony(cid).unwrap();
     let (body, slot) = (col.body, col.slot);
     let _ = cid;
-    let ship = Ship { name: String::new(), id: ShipId(950), kind: UnitKind::ColonyShip, seat: cus, damage: 0, at: ShipAt::Body(body), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 5.0, slot: Some(slot) };
+    let tank = g.tank_of(cus, UnitKind::ColonyShip);
+    let ship = Ship { name: String::new(), id: ShipId(950), kind: UnitKind::ColonyShip, seat: cus, damage: 0, at: ShipAt::Body(body), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: tank - 15.0, slot: Some(slot) };
     g.ships.push(ship);
-    g.seats[cus.index()].stockpile.fuel = reserve;
+    // The want is 15. With the reserve and 10 above it, no Refuel: it would take the reserve too.
+    g.seats[cus.index()].stockpile.fuel = reserve + 10.0;
     g.ai_orders(cus);
-    assert!(!g.log.iter().any(|l| l.contains("take") && l.contains("refuel")), "at the reserve, no refuel from the tank: {:?}", g.log.iter().filter(|l| l.contains("refuel")).collect::<Vec<_>>());
+    assert!(!g.log.iter().any(|l| l.contains("take") && l.contains("refuel")), "the want not standing above the reserve, no refuel: {:?}", g.log.iter().filter(|l| l.contains("refuel")).collect::<Vec<_>>());
     g.log.clear();
+    // With the whole want above it, the Refuel is taken and the reserve stands after.
     g.seats[cus.index()].stockpile.fuel = reserve + 20.0;
-    g.ai_orders(cus);
-    assert!(g.log.iter().any(|l| l.contains("take") && l.contains("refuel")), "above it, the refuel is taken: {:?}", g.log.iter().filter(|l| l.contains("refuel")).collect::<Vec<_>>());
+    let orders = g.ai_orders(cus);
+    assert!(g.log.iter().any(|l| l.contains("take") && l.contains("refuel")), "the want above it, the refuel is taken: {:?}", g.log.iter().filter(|l| l.contains("refuel")).collect::<Vec<_>>());
+    assert!(g.remaining(cus, &orders).0.fuel + 1e-9 >= reserve, "the reserve stands after the turn's orders: {} of {}", g.remaining(cus, &orders).0.fuel, reserve);
+    // Short of the reserve with Ducats in hand, the market buys up to it.
+    g.log.clear();
+    g.ships.retain(|s| s.id != ShipId(950));
+    g.seats[cus.index()].stockpile.fuel = 0.0;
+    g.seats[cus.index()].stockpile.ducats = 200.0;
+    let orders = g.ai_orders(cus);
+    assert!(orders.iter().any(|o| matches!(o, Order::Buy { resource: Resource::Fuel, amount } if *amount as f64 >= reserve)), "a buy up to the reserve: {:?}", g.log.iter().filter(|l| l.contains("Fuel")).collect::<Vec<_>>());
 }
 
 /// Ticket #575 (version 0.1.0.3), at the designer's word: a Power Plant, a Reactor and a Generator
