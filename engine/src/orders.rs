@@ -333,9 +333,16 @@ pub fn is_lift(o: &Order, ship: ShipId) -> bool {
     matches!(o, Order::Load { ship: x, from: LoadSource::State(_), .. } if *x == ship)
 }
 
-/// Ticket #533: a Ship's **one action** a turn, which a lift and a refuel stand beside: a flight, a
-/// change of orbit, an unload or a founding, a load off a Colony or station, a Bombard, a Launch or
-/// a Rearm.
+/// Ticket #568 (version 0.1.0.3), at the designer's word: any **load** onto a Ship -- a lift from a
+/// Region or a load off a Colony or station -- never uses its turn. It boards where the Ship sits,
+/// before it moves.
+pub fn is_load(o: &Order, ship: ShipId) -> bool {
+    matches!(o, Order::Load { ship: x, .. } if *x == ship)
+}
+
+/// Ticket #533: a Ship's **one action** a turn, which a load and a refuel stand beside: a flight, a
+/// change of orbit, an unload or a founding, a Bombard, a Launch or a Rearm. Ticket #568 (version
+/// 0.1.0.3): a load off a Colony or station was the action until then; it is free now, as a lift.
 pub fn is_ship_action(o: &Order, ship: ShipId) -> bool {
     match o {
         Order::Transit { ship: x, .. }
@@ -343,8 +350,7 @@ pub fn is_ship_action(o: &Order, ship: ShipId) -> bool {
         | Order::Unload { ship: x, .. }
         | Order::Bombard { ship: x, .. }
         | Order::Launch { ship: x, .. }
-        | Order::Rearm { ship: x }
-        | Order::Load { ship: x, from: LoadSource::Colony(_), .. } => *x == ship,
+        | Order::Rearm { ship: x } => *x == ship,
         _ => false,
     }
 }
@@ -1798,7 +1804,8 @@ impl Game {
                 if s.arrived_this_turn {
                     return fail("arrived this turn; it may act next turn");
                 }
-                // Ticket #533 (version 0.1.0.1): a lift and a refuel stand beside it.
+                // Ticket #533 (version 0.1.0.1): a lift and a refuel stand beside it; ticket #568
+                // (version 0.1.0.3): any load.
                 if pending.iter().any(|o| is_ship_action(o, *ship)) {
                     return fail("this Ship already has an order");
                 }
@@ -1848,7 +1855,7 @@ impl Game {
                     return fail("arrived this turn; it may act next turn");
                 }
                 // Ticket #533 (version 0.1.0.1): a refuel given this turn lands first, and a lift and
-                // a refuel stand beside the change.
+                // a refuel stand beside the change; ticket #568 (version 0.1.0.3): any load.
                 let fuel = self.orbit_change_cost(seat, body, self.ship_orbit(s), want);
                 let tank = self.tank_after_refuel(seat, pending, s);
                 if tank < fuel {
@@ -2140,18 +2147,20 @@ impl Game {
                 }
                 // Ticket #533, at the designer's word: a lift never uses the Ship's turn, so it
                 // stands beside any one action -- but never beside an unload, and never two from one
-                // Region. A load off a Colony or station IS the turn's action.
+                // Region. Ticket #568 (version 0.1.0.3), at the designer's word: a load off a Colony
+                // or station the same, where it was the turn's action; never two off one place.
                 if pending.iter().any(|o| matches!(o, Order::Unload { ship: x, .. } if x == ship)) {
                     return fail("a Ship loads or unloads in a turn, not both");
                 }
-                if is_lift(order, *ship) {
-                    if let Some(st) = from_region(order)
-                        && pending.iter().any(|o| from_region(o) == Some(st))
-                    {
-                        return fail("this Ship already loads from that Region this turn");
-                    }
-                } else if pending.iter().any(|o| is_ship_action(o, *ship)) {
-                    return fail("this Ship already has an order");
+                if let Some(st) = from_region(order)
+                    && pending.iter().any(|o| from_region(o) == Some(st))
+                {
+                    return fail("this Ship already loads from that Region this turn");
+                }
+                if let LoadSource::Colony(c) = from
+                    && pending.iter().any(|o| matches!(o, Order::Load { ship: x, from: LoadSource::Colony(y), .. } if x == ship && y == c))
+                {
+                    return fail("this Ship already loads from that place this turn");
                 }
                 if army.is_some() && pending.iter().any(|o| matches!(o, Order::Load { ship: x, army: Some(_), .. } if x == ship)) {
                     return fail("this Ship already carries an Army");
@@ -2271,7 +2280,8 @@ impl Game {
                     return fail("nothing to unload");
                 }
                 // Ticket #533 (version 0.1.0.1), at the designer's word: no lift beside an unload.
-                if pending.iter().any(|o| is_lift(o, *ship)) {
+                // Ticket #568 (version 0.1.0.3): nor a load off a Colony or station, free now too.
+                if pending.iter().any(|o| is_load(o, *ship)) {
                     return fail("a Ship loads or unloads in a turn, not both");
                 }
                 if pending.iter().any(|o| is_ship_action(o, *ship)) {
@@ -2748,13 +2758,14 @@ impl Game {
     /// Pay for and record every order of a seat at End Turn (spec 7.3: costs are paid at once).
     pub fn commit_orders(&mut self, seat: Seat, orders: &[Order]) {
         let mut recruited: Vec<(StateId, u32)> = Vec::new();
-        // Ticket #533 (version 0.1.0.1), at the designer's word: a Ship's lifts and its refuel land
+        // Ticket #533 (version 0.1.0.1), at the designer's word: a Ship's loads and its refuel land
         // where it sits, BEFORE it moves, however the orders were given; and a Ship that leaves for
-        // another Body takes its lifts aboard now, since the Resolution's cargo finds it gone. The
+        // another Body takes its loads aboard now, since the Resolution's cargo finds it gone. The
         // MOVE is held back until after them, not the refuel brought forward: a move is paid from the
         // Ship's own tank, so holding it moves no Stockpile payment, where a refuel brought forward
-        // past a Buy would take less Fuel than it was quoted.
-        let beside = |o: &Order, ship: ShipId| is_lift(o, ship) || matches!(o, Order::Refuel { ship: x } if *x == ship);
+        // past a Buy would take less Fuel than it was quoted. Ticket #568 (version 0.1.0.3): a load
+        // off a Colony or station is a load like a lift here.
+        let beside = |o: &Order, ship: ShipId| is_load(o, ship) || matches!(o, Order::Refuel { ship: x } if *x == ship);
         let mut held: Vec<(usize, &Order)> = Vec::new();
         let mut ordered: Vec<&Order> = Vec::with_capacity(orders.len());
         for (i, o) in orders.iter().enumerate() {
@@ -2996,16 +3007,20 @@ impl Game {
                         a.move_to = Some(*to);
                     }
                 }
-                Order::Load { ship, colonists, from: from @ LoadSource::State(_), army } => {
-                    // Ticket #46: a lift from a Nation State is a launch.
-                    self.climate.launches_pending[seat.index()] += 1;
+                Order::Load { ship, colonists, from, army } => {
+                    // Ticket #46: a lift from a Nation State is a launch. Ticket #568 (version
+                    // 0.1.0.3): a load off a Colony or station is none, but boards before the Ship
+                    // leaves as a lift does.
+                    if is_lift(order, *ship) {
+                        self.climate.launches_pending[seat.index()] += 1;
+                    }
                     if leaving.contains(ship) {
                         self.carry_load(seat, *ship, *colonists, *from, *army);
                     } else {
                         self.pending.cargo.push((seat, order.clone()));
                     }
                 }
-                Order::Load { .. } | Order::Unload { .. } => self.pending.cargo.push((seat, order.clone())),
+                Order::Unload { .. } => self.pending.cargo.push((seat, order.clone())),
                 // Ticket #192 (version 0.08.0): the upload lands now. The people leave the living
                 // population -- the place shrinks as it uploads, and Module slots go with them, though
                 // nothing already standing is destroyed: a cap that falls below what stands simply

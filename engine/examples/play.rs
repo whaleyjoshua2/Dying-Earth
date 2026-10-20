@@ -283,7 +283,13 @@ const GRAMMAR: &str = r#"ORDER LINES (one per line; `#` starts a comment; blank 
   refuel <ship>                        fill the tank at a station of yours (or of a Refuel partner's)
                                        AT THAT STATION'S OWN ORBIT: a Ship in low orbit, or at
                                        another station's ring, refuels at nothing until it moves.
+                                       FREE OF THE SHIP'S TURN (ticket #533): give the refuel first
+                                       and the transit after it, in one turn; it fills before it goes.
   load <ship> <n> from <place> [army <army>]
+                                       FREE OF THE SHIP'S TURN (ticket #568, version 0.1.0.3): a load
+                                       off any place, Region, Colony or station, stands beside the
+                                       Ship's one action and boards before it moves. One load per
+                                       place a turn; never beside an unload.
   unload <ship> <n> [army] into slot <body> <slot>
   unload <ship> <n> [army] into colony <n>
   unload <ship> <n> into ring <body> <slot>

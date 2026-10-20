@@ -342,3 +342,43 @@ spend settled. Decided in one round ("that all looks good"):
   place used to pass `check_order`, take the Influence budget and be dropped at the end, the
   Influence wasted; refused at the candidate stage now, the next candidate spends it. Income per
   Faction as the sweep file.
+
+## 13. A load off a Colony or station is free of the Ship's turn
+
+Ticket: [Loading from anywhere and refuelling take no turn](https://github.com/whaleyjoshua2/Dying-Earth/issues/568).
+
+The designer: *"Loading ships from anywhere including stations should not take a turn"* and
+*"Refueling a free action that does not take a turn"*. The playtest: "change-orbit, refuel, load, fly,
+unload: four or five turns a shipload". In the tree a lift from a Region was free (#533) and a load off
+a Colony or station was the Ship's action; the refuel was free already, its felt cost the orbit rule
+(#335). Decided in one round ("q1 yes q2 a q3 yes q4 leave it"):
+
+- **A load off a Colony or station never uses the Ship's turn** (`is_load`; `is_ship_action` drops
+  it). It stands beside the one action as a lift does and boards where the Ship sits, before it moves:
+  a Ship that leaves for another Body takes it aboard at the commit (`carry_load`), one beside a change
+  of orbit lands with the Resolution's cargo. Loads off several places of yours in one turn, within the
+  room, counted over all of them; **never two off one place** -- *"this Ship already loads from that
+  place this turn"* -- as never two lifts from one Region; **never beside an unload**, either way round
+  (*"a Ship loads or unloads in a turn, not both"*). A load off a place is no launch.
+- **The refuel's orbit rule stands**: a station fills a Ship in its own ring alone, a Refinery Colony
+  low orbit (#335, #396). The refuel is free of the turn already (#533) and the words already say
+  where it fills -- the card's tank line, the refusal, the tool's help. The tool's `refuel` help
+  gains the one line it lacked, that the refuel is free of the turn and goes before the transit:
+  the playtest's tester 4 sat in the ISS ring and spent a turn on it from the one-order belief.
+- **The 15.6 / 15.7 Fuel line** comes off the map: the designer rules it no trap -- an agent player's
+  complaint at not reaching the Moon twice on one tank, which a slightly smaller tank would never have
+  raised. Out of scope, not fog.
+- The computer seats never load off a Colony or station (`ai.rs` lifts from Regions alone), so the
+  rule reaches them through nothing. **Swept** to confirm (`sweeps/ticket-568.txt`, 20 seeds x four
+  seatings): the file is byte-for-byte the Accord ticket's, 19 / 49 / 4 / 8 and no collapse, the
+  Income table the same.
+- Red first on the pin (`a load off a station beside a flight`) and the new test
+  (`a_load_off_a_station_is_free_and_boards_before_the_ship_leaves`), both refused *"this Ship
+  already has an order"* under the old rule. Clippy clean at `-D warnings`; 812 tests green.
+- **The review** (an independent agent) found no hole: the touch rule is read against the orbit the
+  Ship sits in as the order is given, whichever way round the load and the move are typed, as a lift's
+  Launch Site rule is. It asked for the change-of-orbit path to be pinned through the Resolution, not
+  checked alone -- the test now commits a load off the ISS beside a drop to low orbit and resolves it,
+  the people aboard, the station two down -- and three stale comments. It also noted a gap older than
+  this ticket: a Load off a station and a Send Down from it in one turn each pass their check without
+  counting the other, and the loser is dropped silently at the Resolution. Not touched here.

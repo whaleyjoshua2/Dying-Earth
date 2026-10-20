@@ -3497,7 +3497,8 @@ impl Game {
     }
 
     /// Ticket #533 (version 0.1.0.1): one Load carried out -- at the cargo step of the Resolution,
-    /// or at End Turn for a Ship that leaves this turn, whose lifts board before it moves.
+    /// or at End Turn for a Ship that leaves this turn, whose loads board before it moves (lifts;
+    /// since ticket #568, version 0.1.0.3, loads off a Colony or station too).
     pub(crate) fn carry_load(&mut self, seat: Seat, ship: ShipId, colonists: u32, from: LoadSource, army: Option<ArmyId>) {
         let Some(s) = self.ship(ship) else { return };
         let ShipAt::Body(body) = s.at else { return };

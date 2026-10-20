@@ -364,3 +364,30 @@ spends it, and the Accord-keeping seats (the Custodians above all) stop throwing
 Income per Faction (Materials / Fuel / Energy / Ducats / Research, mean a game): Custodians 1100 /
 352 / 2535 / 1561 / 931; Prospectors 2139 / 442 / 2709 / 1190 / 386; Arkwrights 1538 / 319 / 2309 /
 3210 / 266; Archivists 477 / 261 / 1149 / 484 / 746.
+
+## A load off a Colony or station is free of the Ship's turn
+
+Ticket [#568](https://github.com/whaleyjoshua2/Dying-Earth/issues/568), spec §13. Read first: the
+refuel was free already (#533), the lift was free, the load off a Colony or station was the one that
+used the turn, and the refuel's felt cost was its orbit rule. One round, four questions: the load
+free, yes; the refuel's orbit rule kept, at the designer's word, where I had recommended letting any
+depot at the Body fill any orbit; load-and-unload still refused; and the 15.6 / 15.7 Fuel line left
+alone -- *"its not a trap ... I don't belive this is a valid complaint"* -- so it comes off the map as
+out of scope rather than fog. Built: `is_load` beside `is_lift`, the Load check losing its
+`is_ship_action` arm and gaining "never two off one place", the Unload check and the commit's
+`beside` ordering reading any load, the commit carrying a Colony load aboard a leaving Ship as it
+carries a lift. Red first on the flipped pin and the new test. The computer never loads off a Colony
+or station, so nothing reaches it.
+
+**The review** found no hole and asked for one more pin -- the load beside a change of orbit,
+committed and resolved, not checked alone -- and three stale comments. It reported a gap older than
+this ticket, left alone: a Load off a station and a Send Down from it in one turn each pass their
+check without counting the other. A side session the designer ran on the playtest notes found the
+tool's `refuel` help never said the refuel is free of the turn, which is the belief tester 4 lost a
+turn to while sitting in the ISS ring; the line is added.
+
+**Swept** ([`sweeps/ticket-568.txt`](sweeps/ticket-568.txt)) to confirm that: the file is
+byte-for-byte [`ticket-569.txt`](sweeps/ticket-569.txt), 19 / 49 / 4 / 8 and no collapse. Income per
+Faction (Materials / Fuel / Energy / Ducats / Research, mean a game): Custodians 1100 / 352 / 2535 /
+1561 / 931; Prospectors 2139 / 442 / 2709 / 1190 / 386; Arkwrights 1538 / 319 / 2309 / 3210 / 266;
+Archivists 477 / 261 / 1149 / 484 / 746 -- unchanged to the unit.
