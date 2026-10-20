@@ -294,6 +294,8 @@ capital_refunded = "{place}'s upgrade refunded, {refund} Materials: {capital} is
 # Ticket #351 (version 0.09.1): {sink} is `energy_short_sink` below when Scrubbers were shut, and
 # empty otherwise -- a Custodian lost three Scrubbers this way in the playtest with nothing said.
 energy_short = "{faction}: Energy ran short; shut down {buildings}{sink}."
+# Ticket #575 (version 0.1.0.3): a power building whose Fuel was not there ran at a quarter.
+fuel_short = "{faction}: Fuel ran short; {buildings} ran at a quarter."
 energy_zero = "{faction}: Energy at zero with every producer off."
 
 # ---------------------------------------------------------------- fragments other sentences use

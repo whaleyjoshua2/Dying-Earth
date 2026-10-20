@@ -668,6 +668,7 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("tech_complete_rewarded_influence", &["tech", "faction", "shares", "influence", "ease"]),
     ("build_complete", &["faction", "building", "place"]),
     ("energy_short", &["faction", "buildings", "sink"]),
+    ("fuel_short", &["faction", "buildings"]),
     ("energy_zero", &["faction"]),
 ];
 

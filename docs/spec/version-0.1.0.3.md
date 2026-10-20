@@ -77,9 +77,10 @@ Archivists' six and the collapses' six are past noise, both from cleaner power a
 
 ## 4. Power burns Fuel
 
-Ticket: [Power Plants, Reactors and their off-world counterparts burn 0.75 Fuel a turn](https://github.com/whaleyjoshua2/Dying-Earth/issues/575).
+Ticket: [Power Plants, Reactors and their off-world counterparts burn 0.8 Fuel a turn](https://github.com/whaleyjoshua2/Dying-Earth/issues/575).
 
-- **A Power Plant, a Reactor and a Generator burn 0.75 Fuel a turn** while online, charged at the
+- **A Power Plant, a Reactor and a Generator burn 0.8 Fuel a turn** (the designer's 0.75, moved to
+  the tenth the stockpile keeps, at the designer's word) while online, charged at the
   Income beside the Energy and the Ducat and named in the income sources; mothballed, they burn
   nothing. The Solar Array, the Heliostat and the Wind Farm burn nothing.
 - **Short of Fuel**, the bill is paid building by building as far as the stockpile goes, in the

@@ -23,6 +23,8 @@ name = "Generator"
 materials = 27.5
 widgets = 8
 energy_upkeep = 0
+# Ticket #575 (version 0.1.0.3): 0.8 Fuel a turn, the Power Plant's pair off Earth.
+fuel_upkeep = 0.8
 produces = { resource = "energy", amount = 5 }
 earth_emissions = 1.5
 

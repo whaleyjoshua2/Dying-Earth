@@ -32,6 +32,10 @@ struct Producer {
     upkeep: f64,
     /// Ticket #561: Ducats a turn while online.
     ducats_upkeep: f64,
+    /// Ticket #575: Fuel a turn while online, and whether the stockpile covered it when the
+    /// producers were gathered; unpaid, the output above is already a quarter.
+    fuel_upkeep: f64,
+    fuel_paid: bool,
     output: Option<(Resource, f64)>,
     /// Materials or Fuel from a Mine, Refinery or Factory count toward the Extraction Total.
     research: i64,
@@ -53,6 +57,8 @@ pub struct Yield {
     pub upkeep: f64,
     /// Ticket #561 (version 0.1.0.3): Ducats a turn while online, the Scrubber's 1; nought else.
     pub ducats_upkeep: f64,
+    /// Ticket #575 (version 0.1.0.3): Fuel a turn while online, the power buildings' 0.8.
+    pub fuel_upkeep: f64,
     pub emissions: f64,
     /// Ticket #36: Influence Allotment added while it stands, and standing raised each turn.
     pub allotment: i64,
@@ -266,6 +272,9 @@ impl Yield {
         }
         if self.ducats_upkeep > 0.0 {
             parts.push(crate::counted(figure(self.ducats_upkeep), "Ducat upkeep", "Ducats upkeep"));
+        }
+        if self.fuel_upkeep > 0.0 {
+            parts.push(format!("{} Fuel upkeep", figure(self.fuel_upkeep)));
         }
         if self.emissions > 0.0 {
             parts.push(format!("{:.1} Emissions", self.emissions));
@@ -527,7 +536,7 @@ impl Game {
         let fac = t.faction(self.kind(seat));
         let card = t.state(sid);
         let fc = t.facility(kind);
-        let mut y = Yield { resource: None, amount: 0.0, research: 0, upkeep: fc.energy_upkeep as f64, ducats_upkeep: fc.ducats_upkeep, emissions: 0.0, allotment: fc.influence_allotment, standing: fc.standing_per_turn, doubled_by: None, detail: None, does: fc.does.clone(), chain: Chain::default(), allotment_outside: 0 };
+        let mut y = Yield { resource: None, amount: 0.0, research: 0, upkeep: fc.energy_upkeep as f64, ducats_upkeep: fc.ducats_upkeep, fuel_upkeep: fc.fuel_upkeep, emissions: 0.0, allotment: fc.influence_allotment, standing: fc.standing_per_turn, doubled_by: None, detail: None, does: fc.does.clone(), chain: Chain::default(), allotment_outside: 0 };
         if let Some(p) = &fc.produces {
             match p.resource {
                 Resource::Research => {
@@ -629,7 +638,7 @@ impl Game {
         let fac = t.faction(self.kind(seat));
         let mc = t.module(kind);
         // Ticket #559 (version 0.1.0.3): a Module's Ducat upkeep (the Wind Farm's), as a Facility's.
-        let mut y = Yield { resource: None, amount: 0.0, research: 0, upkeep: mc.energy_upkeep as f64, ducats_upkeep: mc.ducats_upkeep, emissions: 0.0, allotment: mc.influence_allotment, standing: mc.standing_per_turn, doubled_by: None, detail: None, does: mc.does.clone(), chain: Chain::default(), allotment_outside: 0 };
+        let mut y = Yield { resource: None, amount: 0.0, research: 0, upkeep: mc.energy_upkeep as f64, ducats_upkeep: mc.ducats_upkeep, fuel_upkeep: mc.fuel_upkeep, emissions: 0.0, allotment: mc.influence_allotment, standing: mc.standing_per_turn, doubled_by: None, detail: None, does: mc.does.clone(), chain: Chain::default(), allotment_outside: 0 };
         // Ticket #239 (version 0.08.3): a Unique Module does its sibling's job, so every lookup
         // keyed by kind -- the Techs that multiply it, the slot's yield, a Discovery on it --
         // reads the COMMON kind. Without this the Arkwrights' Chorus would be the one Relay in
@@ -834,7 +843,7 @@ impl Game {
     /// `doubled_modules`, named for the Facility whose mothball pays for it.
     pub fn module_yield_at(&self, seat: Seat, cid: ColonyId, index: usize) -> Yield {
         let Some(kind) = self.colony(cid).and_then(|c| c.modules.get(index)).map(|m| m.kind) else {
-            return Yield { resource: None, amount: 0.0, research: 0, upkeep: 0.0, ducats_upkeep: 0.0, emissions: 0.0, allotment: 0, standing: 0, doubled_by: None, detail: None, does: None, chain: Chain::default(), allotment_outside: 0 };
+            return Yield { resource: None, amount: 0.0, research: 0, upkeep: 0.0, ducats_upkeep: 0.0, fuel_upkeep: 0.0, emissions: 0.0, allotment: 0, standing: 0, doubled_by: None, detail: None, does: None, chain: Chain::default(), allotment_outside: 0 };
         };
         let mut y = self.module_yield(seat, cid, kind);
         if self.doubled_modules(seat).contains(&(cid, index)) {
@@ -982,8 +991,30 @@ impl Game {
         Some(out)
     }
 
+    /// Ticket #575 (version 0.1.0.3): the Fuel a turn the seat's online power buildings burn, for the
+    /// computer's reading of how scarce its Fuel is.
+    pub fn fuel_burned_by_buildings(&self, seat: Seat) -> f64 {
+        let facilities: f64 = self.directed_states(seat).into_iter().flat_map(|sid| self.state(sid).facilities.iter().filter(|f| f.working()).map(|f| self.tables.facility(f.kind).fuel_upkeep).collect::<Vec<_>>()).sum();
+        let modules: f64 = self.directed_colonies(seat).into_iter().flat_map(|cid| self.colony(cid).map(|c| c.modules.iter().filter(|m| m.working()).map(|m| self.tables.module(m.kind).fuel_upkeep).collect::<Vec<_>>()).unwrap_or_default()).sum();
+        tenth(facilities + modules)
+    }
+
     fn producers_of(&self, seat: Seat) -> Vec<Producer> {
         let mut out = Vec::new();
+        // Ticket #575 (version 0.1.0.3): the Fuel in the tank pays each burning building in turn, as
+        // far as it goes; a building it does not reach runs at a quarter this Income.
+        let mut fuel_budget = self.seat(seat).stockpile.fuel;
+        let mut pay = |fuel: f64| -> bool {
+            if fuel <= 0.0 {
+                return true;
+            }
+            if fuel_budget + 1e-9 >= fuel {
+                fuel_budget = tenth(fuel_budget - fuel);
+                true
+            } else {
+                false
+            }
+        };
         for sid in self.directed_states(seat) {
             let st = self.state(sid);
             for (i, f) in st.facilities.iter().enumerate() {
@@ -1006,13 +1037,17 @@ impl Game {
                 // Ticket #387 (version 0.09.3): to the tenth, where it was floored; Research whole.
                 let halve = |v: f64| if scale < 1.0 { tenth(v * scale) } else { v };
                 let halve_whole = |v: i64| if scale < 1.0 { (v as f64 * scale).floor() as i64 } else { v };
+                let fuel_paid = f.offline_until_resolution || pay(y.fuel_upkeep);
+                let quarter = |v: f64| if fuel_paid { v } else { tenth(v * 0.25) };
                 out.push(Producer {
                     place: ProducerPlace::Facility(sid, i),
                     name: f.kind.name(),
                     is_module: false,
                     upkeep: y.upkeep,
                     ducats_upkeep: y.ducats_upkeep,
-                    output: y.resource.map(|r| (r, if r == Resource::Widgets { (y.amount * scale).floor() } else { halve(y.amount) })),
+                    fuel_upkeep: y.fuel_upkeep,
+                    fuel_paid,
+                    output: y.resource.map(|r| (r, if r == Resource::Widgets { (y.amount * scale).floor() } else { quarter(halve(y.amount)) })),
                     research: halve_whole(y.research),
                     online: !f.offline_until_resolution,
                     doubled_by: None,
@@ -1035,6 +1070,8 @@ impl Game {
                 }
                 // Ticket #82: the doubling, if this Module has one, is on the figure.
                 let y = self.module_yield_at(seat, cid, i);
+                let fuel_paid = starved || col.grid_failed || m.offline_until_resolution || pay(y.fuel_upkeep);
+                let quarter = |v: f64| if fuel_paid { v } else { tenth(v * 0.25) };
                 out.push(Producer {
                     place: ProducerPlace::Module(cid, i),
                     name: m.kind.name(),
@@ -1042,7 +1079,9 @@ impl Game {
                     upkeep: y.upkeep,
                     // Ticket #559 (version 0.1.0.3): the Wind Farm Module's Ducat, charged as a Facility's.
                     ducats_upkeep: y.ducats_upkeep,
-                    output: if starved { None } else { y.resource.map(|r| (r, y.amount)) },
+                    fuel_upkeep: y.fuel_upkeep,
+                    fuel_paid,
+                    output: if starved { None } else { y.resource.map(|r| (r, quarter(y.amount))) },
                     // Ticket #80: an Observatory's Research. Ticket #359: halved in `module_yield_at`.
                     research: if starved { 0 } else { y.research },
                     online: !col.grid_failed && !m.offline_until_resolution && !(m.kind == ModuleKind::Archive && occupied),
@@ -1416,6 +1455,8 @@ impl Game {
         let mut off_earth = 0;
         let mut doubled_turns = 0;
         let mut sources: Vec<(String, Resource, f64)> = Vec::new();
+        // Ticket #575 (version 0.1.0.3): the buildings whose Fuel was not there, for the Report.
+        let mut fuel_short: Vec<String> = Vec::new();
         for p in &producers {
             let where_ = match p.place {
                 ProducerPlace::Facility(sid, i) => {
@@ -1488,6 +1529,16 @@ impl Game {
             if p.ducats_upkeep > 0.0 {
                 gained.ducats -= p.ducats_upkeep;
                 sources.push((format!("{} in {} (upkeep)", p.name, where_), Resource::Ducats, -p.ducats_upkeep));
+            }
+            // Ticket #575 (version 0.1.0.3): the Fuel a power building burns, where the tank covered
+            // it; where it did not, the building already runs at a quarter and the bill is forgiven.
+            if p.fuel_upkeep > 0.0 {
+                if p.fuel_paid {
+                    gained.fuel -= p.fuel_upkeep;
+                    sources.push((format!("{} in {} (upkeep)", p.name, where_), Resource::Fuel, -p.fuel_upkeep));
+                } else {
+                    fuel_short.push(format!("{} in {}", p.name, where_));
+                }
             }
         }
         let unit_upkeep = self.unit_upkeep(seat);
@@ -1687,6 +1738,12 @@ impl Game {
             let line = format!("{}: Materials ran short; the Sea Wall in {} stands unkept this turn and holds nothing.", self.seat_name(seat), Game::and_list(&names));
             self.log(line.clone());
             let text = self.say("sea_wall_unkept", &[("faction", self.seat_name(seat)), ("states", Game::and_list(&names))]);
+            self.report_line_of(seat, LineKind::YourWorks, LineKind::Note, None, text);
+        }
+        if !fuel_short.is_empty() {
+            let line = format!("{}: Fuel ran short; {} ran at a quarter.", self.seat_name(seat), fuel_short.join(", "));
+            self.log(line);
+            let text = self.say("fuel_short", &[("faction", self.seat_name(seat)), ("buildings", Game::and_list(&fuel_short))]);
             self.report_line_of(seat, LineKind::YourWorks, LineKind::Note, None, text);
         }
         if !shut.is_empty() {

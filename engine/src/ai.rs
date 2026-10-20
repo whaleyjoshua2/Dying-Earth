@@ -900,7 +900,9 @@ impl Game {
         let energy_ratio = if drain == 0 { f64::INFINITY } else { s.energy / (3.0 * drain as f64) };
         let materials_ratio = s.materials / need_materials;
         let has_ships = self.ships.iter().any(|x| x.seat == seat);
-        let fuel_ratio = if has_ships { s.fuel / 6.0 } else { f64::INFINITY };
+        // Ticket #575 (version 0.1.0.3): and the Fuel its power burns, three turns of it.
+        let burn = self.fuel_burned_by_buildings(seat);
+        let fuel_ratio = if has_ships || burn > 0.0 { s.fuel / (6.0 + 3.0 * burn) } else { f64::INFINITY };
         if energy_ratio <= materials_ratio && energy_ratio <= fuel_ratio {
             Resource::Energy
         } else if materials_ratio <= fuel_ratio {

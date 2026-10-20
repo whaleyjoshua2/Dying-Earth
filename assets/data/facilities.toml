@@ -27,6 +27,9 @@ name = "Power Plant"
 materials = 27.5
 widgets = 8
 energy_upkeep = 0
+# Ticket #575 (version 0.1.0.3), at the designer's word: it burns 0.8 Fuel a turn, as the Reactor
+# and the Generator do; short of Fuel it runs at a quarter.
+fuel_upkeep = 0.8
 produces = { resource = "energy", amount = 6 }
 emissions = 1.5
 
@@ -191,6 +194,8 @@ name = "Reactor"
 materials = 27.5
 widgets = 8
 energy_upkeep = 0
+# Ticket #575 (version 0.1.0.3): 0.8 Fuel a turn, as a Power Plant.
+fuel_upkeep = 0.8
 does = "pays three quarters of your whole Energy upkeep, the Archive excepted; a second Reactor is an ordinary power station"
 produces = { resource = "energy", amount = 6 }
 emissions = 1.5

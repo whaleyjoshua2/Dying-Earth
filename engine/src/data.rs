@@ -180,6 +180,10 @@ pub struct FacilityCard {
     /// Income beside the Energy. The Scrubber carries 1; absent, nought.
     #[serde(default)]
     pub ducats_upkeep: f64,
+    /// Ticket #575 (version 0.1.0.3): Fuel a turn while online, charged at the Income beside the
+    /// Energy; the Power Plant and the Reactor burn 0.8. Short of Fuel the building runs at a quarter.
+    #[serde(default)]
+    pub fuel_upkeep: f64,
     pub produces: Option<Produces>,
     /// Ticket #280 (version 0.08.5): what the building does, in a sentence, where it is not a
     /// resource or beside one; drawn where the row said "no output" before.
@@ -369,6 +373,9 @@ pub struct ModuleCard {
     /// Energy, as a Facility's `ducats_upkeep` is. The Wind Farm carries 1; absent, nought.
     #[serde(default)]
     pub ducats_upkeep: f64,
+    /// Ticket #575 (version 0.1.0.3): Fuel a turn while online; the Generator burns 0.8.
+    #[serde(default)]
+    pub fuel_upkeep: f64,
 }
 
 /// Ticket #92 (version 0.06.0): the Mass Driver's figures: the Fuel it takes off the owner's

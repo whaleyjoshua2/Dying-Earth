@@ -1573,6 +1573,8 @@ fn building_yields_on_the_card_equal_what_income_pays() {
                 _ => {}
             }
             expect.energy -= y.upkeep;
+            // Ticket #575 (version 0.1.0.3): and the Fuel a power building burns.
+            expect.fuel -= y.fuel_upkeep;
         }
     }
     let research = research_f.floor() as i64;
@@ -1585,6 +1587,7 @@ fn building_yields_on_the_card_equal_what_income_pays() {
             _ => {}
         }
         expect.energy -= y.upkeep;
+        expect.fuel -= y.fuel_upkeep;
     }
     // Ticket #164 (version 0.07.5): the seat's station over Earth carries a Core Module of its own,
     // whose Energy the loops above never walk, so account for every Core Module the seat holds.
@@ -7912,6 +7915,9 @@ fn the_custodian_ai_weighs_a_mine_off_earth_by_the_doubling_an_idle_earth_mine_w
         calm(&mut g);
         g.seats[0].stockpile.energy = 500.0;
         g.seats[0].stockpile.materials = 500.0;
+        // Ticket #575 (version 0.1.0.3): the Moon Generator burns Fuel, which made Fuel the scarcest
+        // resource in one scenario and not the other; the tank is filled so the premise holds.
+        g.seats[0].stockpile.fuel = 500.0;
         colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Generator], 4);
         for st in &mut g.states {
             st.facilities.retain(|f| f.kind != FacilityKind::Mine);
@@ -19472,6 +19478,58 @@ fn the_ai_buys_the_fuel_for_a_warships_tank() {
     // figure: a Frigate costs none, so Ducats are wanted only for the Fuel bought beside it. Without
     // the purchase the line was "skip ... (needs 25 Materials, 0 left)", the bundle the build alone.
     assert!(lines.iter().any(|l| l.starts_with("  take") || l.contains("Ducats")), "the Frigate is weighed with its tank bought: {lines:#?}");
+}
+
+/// Ticket #575 (version 0.1.0.3), at the designer's word: a Power Plant, a Reactor and a Generator
+/// burn 0.8 Fuel a turn while online, charged at the Income beside the Energy and named in the
+/// income sources; the Solar Array and the Wind Farm burn nothing; a mothballed one burns nothing.
+/// Short of Fuel, the bill is paid building by building as far as the stockpile goes, and a building
+/// whose Fuel is not there runs at a quarter that Income, with a Report line saying so.
+#[test]
+fn power_burns_fuel_and_runs_at_a_quarter_without_it() {
+    let mut g = game();
+    calm(&mut g);
+    let cus = seat_of(&g, FactionKind::Custodians);
+    let sid = g.controlled_states(cus)[0];
+    let t = g.tables.clone();
+    assert_eq!((t.facility(FacilityKind::PowerPlant).fuel_upkeep, t.facility(FacilityKind::Reactor).fuel_upkeep, t.module(ModuleKind::Generator).fuel_upkeep), (0.8, 0.8, 0.8), "the premise: the three burn 0.8");
+    assert_eq!((t.module(ModuleKind::SolarArray).fuel_upkeep, t.facility(FacilityKind::WindFarm).fuel_upkeep, t.module(ModuleKind::WindFarm).fuel_upkeep), (0.0, 0.0, 0.0), "and the clean three nothing");
+    // One Power Plant standing: 0.75 Fuel off the Income, named.
+    g.seats[cus.index()].stockpile.fuel = 50.0;
+    g.state_mut(sid).facilities.retain(|f| f.kind != FacilityKind::PowerPlant);
+    g.state_mut(sid).facilities.push(Facility::new(FacilityKind::PowerPlant));
+    let one = income_of(&mut g, cus);
+    assert!(g.seat(cus).income_sources.iter().any(|(src, r, n)| src.starts_with("Power Plant in") && src.ends_with("(upkeep)") && *r == Resource::Fuel && (*n + 0.8).abs() < 1e-9), "{:?}", g.seat(cus).income_sources);
+    g.state_mut(sid).facilities.push(Facility::new(FacilityKind::PowerPlant));
+    let two = income_of(&mut g, cus);
+    assert!((one.fuel - two.fuel - 0.8).abs() < 1e-9, "a second Power Plant burns 0.8 more: {} to {}", one.fuel, two.fuel);
+    let charges: Vec<f64> = g.seat(cus).income_sources.iter().filter(|(src, r, _)| src.starts_with("Power Plant in") && src.ends_with("(upkeep)") && *r == Resource::Fuel).map(|(_, _, n)| *n).collect();
+    assert_eq!(charges, vec![-0.8, -0.8], "{:?}", g.seat(cus).income_sources);
+    let text = g.facility_yield(cus, sid, FacilityKind::PowerPlant).text();
+    assert!(text.contains("0.8 Fuel upkeep"), "{text}");
+    // Mothballed, it burns nothing.
+    let n = g.state(sid).facilities.len();
+    g.state_mut(sid).facilities[n - 1].mothballed = true;
+    let idle = income_of(&mut g, cus);
+    assert!((idle.fuel - one.fuel).abs() < 1e-9, "mothballed, no Fuel: {} against {}", idle.fuel, one.fuel);
+    g.state_mut(sid).facilities[n - 1].mothballed = false;
+    // Short of Fuel: the tank at nought, no Refinery, both Power Plants run at a quarter and the
+    // Report says so; the Fuel bill is forgiven.
+    g.state_mut(sid).facilities.retain(|f| f.kind != FacilityKind::Refinery);
+    g.seats[cus.index()].stockpile.fuel = 0.0;
+    let full_energy = g.facility_yield(cus, sid, FacilityKind::PowerPlant).amount;
+    let short = income_of(&mut g, cus);
+    assert!((short.fuel - 0.0).abs() < 1e-9, "nothing to pay with, nothing paid: {}", short.fuel);
+    let plants: Vec<f64> = g.seat(cus).income_sources.iter().filter(|(src, r, _)| src.starts_with("Power Plant in") && !src.ends_with("(upkeep)") && *r == Resource::Energy).map(|(_, _, n)| *n).collect();
+    assert_eq!(plants.len(), 2, "{:?}", g.seat(cus).income_sources);
+    assert!(plants.iter().all(|v| (*v - tenth(full_energy * 0.25)).abs() < 1e-9), "a quarter of {full_energy}: {plants:?}");
+    assert!(g.report.lines.iter().any(|l| l.text.contains("Fuel ran short") && l.text.contains("Power Plant")), "{:?}", g.report.lines.iter().map(|l| l.text.clone()).collect::<Vec<_>>());
+    // With Fuel for one of the two, the first in the Income's order runs whole and the second at a quarter.
+    g.seats[cus.index()].stockpile.fuel = 1.0;
+    let _ = income_of(&mut g, cus);
+    let plants: Vec<f64> = g.seat(cus).income_sources.iter().filter(|(src, r, _)| src.starts_with("Power Plant in") && !src.ends_with("(upkeep)") && *r == Resource::Energy).map(|(_, _, n)| *n).collect();
+    assert_eq!(plants.len(), 2);
+    assert!((plants[0] - full_energy).abs() < 1e-9 && (plants[1] - tenth(full_energy * 0.25)).abs() < 1e-9, "one paid, one short: {plants:?}");
 }
 
 /// Ticket #561 (version 0.1.0.3), at the designer's word: a Scrubber's Ducat upkeep is charged at
