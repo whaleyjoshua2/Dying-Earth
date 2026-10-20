@@ -48,3 +48,25 @@ Ticket: [A Scrubber at 4 Energy and 1 Ducat, one per 3 population](https://githu
 Prospectors' five is past noise; the rest within it. The computer built about as many Scrubbers
 as before (493 against 464 in one seating): a Ducat a turn does not deter a seat whose Ducat income
 is in the tens.
+
+## 3. The Wind Farm
+
+Ticket: [The Wind Farm: clean power on Earth, half on Mars, replacing a Power Plant at half cost](https://github.com/whaleyjoshua2/Dying-Earth/issues/559).
+
+- **A new Facility, the Wind Farm**: 25 Materials, 8 Widgets, **3 Energy a turn, no emissions, 1
+  Ducat a turn upkeep** (the Power Plant: 27.5 Materials, 8 Widgets, 6 Energy, 1.5 emissions, no
+  upkeep). It takes a build slot as a Power Plant does and **needs Clean Power**. Its output takes
+  the multipliers a Power Plant's takes (the lean, Solar Maximum, Efficient Grids, Superconductors).
+- **A new Module, the Wind Farm, on Mars only**: base 2.5 Energy, half a Generator's 5, scaled by
+  the site's Generator yield as every Module is (about 1.9 on Mars), no emissions, 1 Ducat a turn,
+  25 Materials and 8 Widgets, needing Clean Power. Refused on every other Body: *"a Wind Farm stands
+  on Mars alone"*.
+- **Replace**: a new change on a standing Power Plant, *Replace with a Wind Farm*, at half the Wind
+  Farm's price, 12.5 Materials and 4 Widgets, through the Region's queue as a build is. The Power
+  Plant runs until the Wind Farm completes and is gone the Resolution it does; the slot never stands
+  empty. A Power Plant only, never a Reactor; Clean Power needed.
+- **The computer** builds a Wind Farm where it would build a Power Plant once Clean Power stands,
+  **unless its Energy is tight**, when it prefers the Power Plant's 6; and it replaces a Power Plant
+  with a Wind Farm when it is not short of Energy and its Blame weighs on it.
+- Mothball, Restart and Decommission apply to a Wind Farm as to any Facility. Production Moved does
+  not pair it (the Power Plant pairs with the Generator; the Wind Farm with nothing).
