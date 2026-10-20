@@ -101,3 +101,8 @@ where the computer plays the Custodians: their Scrubbers fell (421 to 312 in one
 Natural Sink with them (19.1 to 12.6). A reading, not a measured cause: a computer seat short of
 Fuel runs its power at a quarter, reads its Energy as tight, and a tight seat is offered no
 Scrubber. Reported to the designer; nothing changed on the strength of it.
+
+**With the reserve** ([`sweeps/ticket-575-reserve.txt`](../dev-diary/2026-10-19-version-0.1.0.3/sweeps/ticket-575-reserve.txt)):
+**10 / 25 / 20 / 10 and 15 collapses**, from 8 / 21 / 17 / 10 and 24 without it. Against the board
+before the Fuel rule (10 / 24 / 20 / 17 and 9), the collapses' six are near noise's edge and the
+Archivists' seven past it; the rest are back where they were.

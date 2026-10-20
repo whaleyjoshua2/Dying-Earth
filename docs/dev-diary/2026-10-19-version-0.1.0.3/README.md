@@ -103,3 +103,15 @@ a quarter, reads Energy as tight, and a tight seat is offered no Scrubber (`ai.r
 candidate's `!tight`); the Custodians' climate lever is the first thing a Fuel shortage shuts. It is
 measured behaviour, reported, with nothing changed on the strength of it: the designer decides
 whether the computer should keep a Fuel reserve for its power, or the rule should bite less.
+
+**The reserve.** The designer: *"have the AI keep some fuel on hand."* Three turns of the buildings'
+burn (`power_fuel_reserve_turns = 3`): under it Fuel is the seat's scarcest resource, no Ship is
+refuelled from it, a Ship's top-up buys it back, the market neither sells it nor leaves it short.
+The test was watched red with the turns set to nought. The review's one gap fixed in the same
+commit: the Energy shortfall forecast now reads the Fuel this turn's orders leave, not the live tank.
+
+**The sweep with it** ([`sweeps/ticket-575-reserve.txt`](sweeps/ticket-575-reserve.txt)): **10 / 25 /
+20 / 10 and 15 collapses**: nine collapses back of the twenty-four, the first seating still 13 of 20
+(8 before the Fuel rule, 15 without the reserve), its Scrubbers 154 against 176. The Archivists stay
+at 10 against 17 before the rule: they burn Fuel for the Archive's power and fly nothing that would
+earn it. Reported; nothing further changed.
