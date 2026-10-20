@@ -189,7 +189,8 @@ influence = 1
 [archive]
 # Ticket #439 (version 0.09.6): 150, at the designer's word; with the bar in `factions.toml`.
 # Ticket #506 (version 0.1.0.0): 225, at the designer's word, with the game at fifty turns.
-research = 225
+# Ticket #579 (version 0.1.0.3): 250, at the designer's word.
+research = 250
 # Ticket #192 (version 0.08.0): how many Colonists must live at the place before the Archive may be
 # ORDERED. Checked once, at the order; neither the three-turn build nor the standing Module cares
 # afterwards, and the Victory Condition does its own checking at the end.

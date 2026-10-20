@@ -964,7 +964,8 @@ fn meet_first(g: &mut Game, seat: Seat) {
         FactionKind::Prospectors => g.seats[seat.index()].venture_fund = 4250.0,
         FactionKind::Custodians => g.seats[seat.index()].stabilization_run = 4,
         FactionKind::Arkwrights => {}
-        FactionKind::Archivists => g.seats[seat.index()].research_total = 225,
+        // Ticket #579 (the review): the first part is scored on the fund, read from the table.
+        FactionKind::Archivists => g.seats[seat.index()].archive_fund = g.tables.archive.research,
     }
 }
 
@@ -2412,7 +2413,7 @@ fn funding_the_archive_banks_this_turns_research_and_contributes_nothing_to_the_
 #[test]
 fn the_archives_research_and_the_archivists_victory_bar_are_one_figure() {
     let g = game();
-    assert_eq!(g.tables.archive.research, 225, "the designer's figure: 125 for ticket #347, 150 from ticket #439 (version 0.09.6), 225 since #506");
+    assert_eq!(g.tables.archive.research, 250, "the designer's figure: 125 for ticket #347, 150 from ticket #439 (version 0.09.6), 225 from #506, 250 since #579 (version 0.1.0.3)");
     let bar = g.tables.faction(FactionKind::Archivists).victory_first.bar;
     assert_eq!(
         bar, g.tables.archive.research as f64,
@@ -2495,16 +2496,17 @@ fn ticket_347_moves_the_archives_money_and_none_of_its_other_gates() {
 }
 
 /// Ticket #347, R5: **what the game says.** The Archivists' Victory sentence on their Faction card
-/// is read out to the player whole, and it quotes the Research the Archive wants. It is written by
-/// hand beside a figure the loader reads, so it is the one line in the data that can go on saying
-/// 80 after every rule has moved to 125.
+/// is read out to the player whole, and it quotes the Research the Archive wants. It was written by
+/// hand beside a figure the loader reads, so it was the one line in the data that could go on saying
+/// 80 after every rule had moved to 125. Ticket #579 (version 0.1.0.3), from the review: it reads the
+/// bar through `{first}` now, as the Prospectors' has since #580, so the rendered text is what is pinned.
 #[test]
 fn the_archivists_victory_sentence_quotes_the_figure_the_rules_use() {
     let g = game();
-    let card = g.tables.faction(FactionKind::Archivists);
+    let text = g.tables.victory_text(FactionKind::Archivists);
     let research = g.tables.archive.research;
-    assert!(card.victory.contains(&format!("pay {research} Research into it")), "the sentence must quote {research}: {:?}", card.victory);
-    assert!(!card.victory.contains("80"), "and must not still say 80: {:?}", card.victory);
+    assert!(text.contains(&format!("pay {research} Research into it")), "the sentence must quote {research}: {text:?}");
+    assert!(!text.contains("80"), "and must not still say 80: {text:?}");
 }
 
 /// Ticket #68 (version 0.05.5): the Archive is one Module of 50 Materials and three turns, built
@@ -16764,7 +16766,7 @@ fn ticket_350_the_turn_one_line_names_each_factions_own_condition() {
         (FactionKind::Prospectors, "Build, spread Influence and put 4,250 Ducats in the Venture Capital Fund with 18 Colonists living off Earth, before +3.0 C."),
         // Ticket #514 (version 0.1.0.0): and a Colonial Capital.
         (FactionKind::Arkwrights, "Build, spread Influence and get 42 Colonists living off Earth, spread over four Bodies, one holding a Colonial Capital, before +3.0 C."),
-        (FactionKind::Archivists, "Build, spread Influence and build the Archive off Earth, pay 225 Research into it, and upload 16 Colonists, before +3.0 C."), // Ticket #565 (version 0.1.0.3): 16, from 18
+        (FactionKind::Archivists, "Build, spread Influence and build the Archive off Earth, pay 250 Research into it, and upload 16 Colonists, before +3.0 C."), // Ticket #565 (version 0.1.0.3): 16, from 18; ticket #579: 250, from 225
     ] {
         let line = turn_one_line(kind);
         assert!(line.ends_with(words), "{kind:?}: {line}");
@@ -19766,11 +19768,16 @@ fn generation_ships_needs_relay_networks_and_every_road_costs_130() {
 /// the Archivists' Victory bar one figure still; and the computer Archivists' pace runs to 150 on
 /// the same turns, where it ran to 80 and was never moved for 125.
 #[test]
-fn the_archive_costs_150_and_the_computer_paces_to_it() {
+fn the_archives_cost_and_the_computer_pace_are_one_figure() {
     let t = tables();
-    assert_eq!(t.archive.research, 225, "225 since ticket #506, 150 before");
-    assert_eq!(t.faction(FactionKind::Archivists).victory_first.bar, 225.0);
-    assert_eq!(t.ai_pace(FactionKind::Archivists).first, vec![[14, 56], [25, 113], [36, 169], [44, 225]], "stretched by 50/36 on ticket #506");
+    assert_eq!(t.archive.research, 250, "250 since ticket #579 (version 0.1.0.3), 225 from #506, 150 before");
+    assert_eq!(t.faction(FactionKind::Archivists).victory_first.bar, 250.0);
+    assert_eq!(t.ai_pace(FactionKind::Archivists).first, vec![[14, 62], [25, 126], [36, 188], [44, 250]], "stretched by 50/36 on ticket #506, scaled by 250/225 on the same turns on #579");
+    // Ticket #579 (the review): the card's long text reads the bar, as the Prospectors' does since
+    // #580, so the next move cannot leave a typed copy lying.
+    let text = t.victory_text(FactionKind::Archivists);
+    assert!(text.contains("pay 250 Research into it") && text.contains("upload 16 Colonists"), "{text}");
+    assert!(!t.faction(FactionKind::Archivists).victory.contains("250"), "the figure is read, not typed");
 }
 
 /// Ticket #440 (version 0.09.6): **the Custodians' Influence multiplier is 1.15**, at the
@@ -20697,7 +20704,7 @@ fn the_computer_goes_after_a_half_full_archive_and_the_archivists_defend_it() {
     g.relations.score[rival.index()][arch.index()] = g.tables.relations.worst;
     assert!(g.has_cause(rival, arch));
     assert_eq!(value(&g), plain, "under half full it is no threat yet");
-    // Ticket #506 (version 0.1.0.0): the cap is 225, odd, so half of it rounds up.
+    // Ticket #506 (version 0.1.0.0): the cap was 225, odd, so half of it rounds up; 250 since #579, so exact.
     g.seats[arch.index()].archive_fund = (cap + 1) / 2;
     assert!((value(&g) - plain * lift).abs() < 1e-9, "half full and with cause: double, {} against {plain}", value(&g));
     // Without cause, nothing.

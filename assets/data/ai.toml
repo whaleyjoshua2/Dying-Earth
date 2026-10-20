@@ -407,8 +407,9 @@ colonists = [[17, 6], [31, 18]]
 # Research paid into the Archive, 80 in all, over a thirty-six-turn game. Ticket #439 (version 0.09.6):
 # 150, the Archive's cost since that ticket, on the same turns -- it had stayed at 80 through 125.
 # Ticket #506 (version 0.1.0.0): stretched by 50/36 to the Archive's 225 and 18 uploads.
+# Ticket #579 (version 0.1.0.3): the Archive at 250, the values scaled by 250/225 on the same turns.
 [pace.archivists]
-first = [[14, 56], [25, 113], [36, 169], [44, 225]]
+first = [[14, 62], [25, 126], [36, 188], [44, 250]]
 # Ticket #449 (version 0.09.6): the Uploads their second part asks for, which nothing paced: four by
 # turn 26, eight by 30, twelve by 34. Added at the designer's word, so the computer pushes when behind.
 # Ticket #565 (version 0.1.0.3): the bar at 16, four a turn at most, so 5 / 11 / 16.

@@ -539,3 +539,25 @@ q6 b q7 yes"):
   renew` help silent on what a run-out now costs, and "three turns" hard-coded where the help
   templates its figures (`{refusedturns}` now); and a counter written in the offer's own order
   refused without saying the form the line wants -- it says it now.
+
+## 17. The Archive fund at 250
+
+Ticket: [The Archive fund at 250](https://github.com/whaleyjoshua2/Dying-Earth/issues/579).
+
+The designer: *"archive fund at 250."* One figure in two files: the Archive's Research cost
+(`[archive] research`, `modules.toml`) and the Archivists' first Victory part (`victory_first.bar`,
+`factions.toml`), a test holding them equal since ticket #439. 150 at #439, 225 at #506 with the
+game at fifty turns. Decided in one round ("q1 yes q2 a q3 report and leave it"):
+
+- **Both figures to 250.** The Fund the Archive order's cap, the `archive_funded` Report line, the
+  Victory text on the Faction card, the turn-one line and the tool's `show` all read the figure.
+- **The computer Archivists' pace** (`[pace.archivists] first`, `ai.toml`) is scaled by 250/225 on
+  the same turns: 62 / 126 / 188 / 250 by turns 14 / 25 / 36 / 44, where it ran 56 / 113 / 169 / 225.
+  A bar the computer does not pace to is a bar it stops short of.
+- Nothing else by rule. The glossary's Archive entry reads 250 since 0.1.0.3.
+- Red first on three tests (the one-figure test, the tables test with the pace, the turn-one line),
+  each failing *left: 225, right: 250* before the tables moved. Clippy clean at `-D warnings`; 815
+  tests green.
+- **The review** (an independent agent) found no stray 225 and the pace's rounding right (62.2 / 125.6 / 187.8 to the nearest), and every intermediate pin relative to the table. It caught the Archivists' long Victory text still typing its figure where ticket #580 gave the card a placeholder -- it reads `{first}` and `{second}` now, pinned by a test, and the #347 test that pinned the typed copy pins the rendered text; a dead test arm setting the Archivists' Research total where their first part is scored on the fund -- it sets the fund from the table now; and a test name still saying 150 -- renamed. All mended.
+- **Swept** ([`sweeps/ticket-579.txt`](../dev-diary/2026-10-19-version-0.1.0.3/sweeps/ticket-579.txt),
+  20 seeds x four seatings): **20 / 48 / 5 / 7 and no collapse**, from 21 / 48 / 4 / 7 -- noise, the Archivists' seven wins of eighty unmoved by the higher bar, their gate still completed in 68 of 80 games (69 before) at a median turn 30 (29); the computer paces to the new figure, the median fund at the end 250 in every seating where the Archive stands (225 before). Income per Faction (Materials / Fuel / Energy / Ducats / Research, mean a game): Custodians 1157 / 366 / 2641 / 1580 / 970; Prospectors 2190 / 434 / 2769 / 1234 / 390; Arkwrights 1554 / 316 / 2230 / 3273 / 256; Archivists 481 / 264 / 1137 / 474 / 734 -- the Archivists' Research 734 from 740, within noise. Reported and left, at the designer's word; the close-out's sweep sees the version whole.
