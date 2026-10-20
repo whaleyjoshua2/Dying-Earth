@@ -42,3 +42,9 @@ Ticket: [A Scrubber at 4 Energy and 1 Ducat, one per 3 population](https://githu
 - **The computer Custodians** offer a Scrubber only while last turn's Ducat income covers one more
   Scrubber's Ducat, beside the Energy check they already make.
 - The Custodians' signature text, the card's standing line and the glossary say the Ducat.
+
+**What it did** ([`sweeps/ticket-561.txt`](../dev-diary/2026-10-19-version-0.1.0.3/sweeps/ticket-561.txt),
+80 games): **9 / 24 / 20 / 11 and 15 collapses**, from 10 / 29 / 16 / 12 and 13 after §1. The
+Prospectors' five is past noise; the rest within it. The computer built about as many Scrubbers
+as before (493 against 464 in one seating): a Ducat a turn does not deter a seat whose Ducat income
+is in the tens.

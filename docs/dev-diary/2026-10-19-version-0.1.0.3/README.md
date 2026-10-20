@@ -41,3 +41,11 @@ to the new figures (Russia 1, India 6, the ceiling at 3,300 million).
 **The picture** ([`ticket-561/china-three-of-five-earth.png`](ticket-561/)), seed 3 after eight
 turns: China's card reads "Scrubber (3 of 5)" (1,461 million / 300 = 4.9), with three standing,
 all mothballed by the computer Custodians for want of Energy. Measured behaviour, not a rule.
+
+**The sweep** ([`sweeps/ticket-561.txt`](sweeps/ticket-561.txt)): **9 / 24 / 20 / 11 and 15
+collapses**, from 10 / 29 / 16 / 12 and 13. The Prospectors -5 is past noise, the Arkwrights +4 at
+its edge, the Custodians unmoved at 9. The computer Custodians built about as many Scrubbers as
+before (493 against 464 in the first seating): the Ducat gate (`income_last_turn.ducats >= 1`) is
+nearly always open, and 4 Energy against 3 shut none the Energy check had not already. Measured
+behaviour, not a rule: the dearer Scrubber bites a human spamming nineteen of them more than a
+computer building a handful.
