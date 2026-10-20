@@ -70,3 +70,17 @@ Ticket: [The Wind Farm: clean power on Earth, half on Mars, replacing a Power Pl
   with a Wind Farm when it is not short of Energy and its Blame weighs on it.
 - Mothball, Restart and Decommission apply to a Wind Farm as to any Facility. Production Moved does
   not pair it (the Power Plant pairs with the Generator; the Wind Farm with nothing).
+
+## 4. Power burns Fuel
+
+Ticket: [Power Plants, Reactors and their off-world counterparts burn 0.75 Fuel a turn](https://github.com/whaleyjoshua2/Dying-Earth/issues/575).
+
+- **A Power Plant, a Reactor and a Generator burn 0.75 Fuel a turn** while online, charged at the
+  Income beside the Energy and the Ducat and named in the income sources; mothballed, they burn
+  nothing. The Solar Array, the Heliostat and the Wind Farm burn nothing.
+- **Short of Fuel**, the bill is paid building by building as far as the stockpile goes, in the
+  Income's order; **a building whose Fuel is not there runs at a quarter** that Income, and the
+  Report says so. Nothing goes dark for want of Fuel.
+- The Fuel upkeep is a general field on both the Facility and the Module card (`fuel_upkeep`),
+  nought on every other building.
+- The computer's Refinery weight reads the drain, so a seat burning Fuel for power refines more.
