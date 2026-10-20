@@ -56,6 +56,34 @@ fn pick<T: Copy + std::fmt::Debug>(list: &[T], word: &str) -> Result<T, String> 
 /// leading "The" ignored, then any unique prefix of either. The ids alone were matched, so a Tech
 /// renamed on the board (Large Language Models, still `public_science`) could not be typed by the
 /// name the list printed, and `united` went silently to the one Region whose id began so.
+/// Ticket #573 (version 0.1.0.3), at the designer's word: a building or a queued build by its index
+/// as `show` lists it, or by its name (any unique prefix). Two of a kind by name are refused with
+/// their indices, since the sea, a Decommission or a loss shifts the numbering: a playtester's
+/// `change facility northamerica 3 decommission` scrapped a Launch Site after the sea had moved
+/// the indices. An index past the list is refused with the list, where the engine would refuse it
+/// in its own words; an empty list (a place out of sight, or none) passes a number through so the
+/// engine does.
+fn indexed(names: &[String], word: &str, what: &str) -> Result<usize, String> {
+    let listed = || if names.is_empty() { "there are none".to_string() } else { format!("they are {}", names.iter().enumerate().map(|(i, n)| format!("{i}:{n}")).collect::<Vec<_>>().join(", ")) };
+    if let Ok(i) = word.parse::<usize>() {
+        if !names.is_empty() && i >= names.len() {
+            return Err(format!("{i} is past the list; {}", listed()));
+        }
+        return Ok(i);
+    }
+    let w = norm(word);
+    if w.is_empty() || w.chars().all(|c| c.is_ascii_digit()) {
+        return Err(format!("{word:?} is not a whole number or a name"));
+    }
+    let exact: Vec<usize> = (0..names.len()).filter(|i| norm(&names[*i]) == w).collect();
+    let hits: Vec<usize> = if exact.is_empty() { (0..names.len()).filter(|i| norm(&names[*i]).starts_with(&w)).collect() } else { exact };
+    match hits.as_slice() {
+        [i] => Ok(*i),
+        [] => Err(format!("{word:?} is not {what}; {}", listed())),
+        _ => Err(format!("{word:?} is more than one here ({}); say the index", hits.iter().map(|i| format!("{i}:{}", names[*i])).collect::<Vec<_>>().join(", "))),
+    }
+}
+
 fn pick_named<T: Copy + std::fmt::Debug>(list: &[T], word: &str, name: impl Fn(T) -> String, what: &str) -> Result<T, String> {
     let w = norm(word);
     if w.is_empty() {
@@ -316,7 +344,7 @@ const GRAMMAR: &str = r#"ORDER LINES (one per line; `#` starts a comment; blank 
                                        Colony, and on the ground the Colonial Capital (one to a
                                        Body). `show` prints each place's tier and what the next costs;
                                        a tier wants every Module slot built and its people living there.
-  cancel-build <place> <index>         cancel a build ANOTHER seat began at a place you now direct,
+  cancel-build <place> <index|name>    cancel a build ANOTHER seat began at a place you now direct,
                                        which is what a conquest leaves behind: its Materials come
                                        back at your own price and the Widgets done are lost. One a
                                        turn at a place, and never a build of your own -- take that
@@ -327,8 +355,9 @@ const GRAMMAR: &str = r#"ORDER LINES (one per line; `#` starts a comment; blank 
   A BUILD HAS NO TURN COUNT (ticket #332, version 0.09.0). Materials are paid in full at the order,
   and a build needs a figure in WIDGETS, which the place makes at its own rate every turn and spends
   on its queue in the order the builds were given. `show` prints each place's Widgets a turn, what
-  its queue owes, and every build as `done/needed w`. The `-ducats` forms buy a building outright
-  at twice its Materials and complete at the next Resolution whatever their Widget figure.
+  its queue owes, and every build as `done/needed w`. The `-ducats` forms buy a building outright,
+  paid in Ducats at the market price of twice its Materials, and complete at the next Resolution
+  whatever their Widget figure.
 
   transit <ship> <body> [orbit|low]    fly, spending the Ship's own tank. The leg names the ORBIT it
                                        ends in: a ring, or `low` (or nothing at all) for low orbit.
@@ -474,9 +503,13 @@ REGIONS AND PEOPLE
                                        Launch Site straight onto a station of yours over Earth, as
                                        far as its Habitat room goes. A launch: it emits, and what it
                                        emits goes on your Blame.
-  change facility <state> <index> <mothball|restart|decommission|replace>
+  change facility <state> <index|name> <mothball|restart|decommission|replace>
                                        replace: a Power Plant with a Wind Farm, through the queue
-  change module <colony> <index> <mothball|restart|decommission>
+  change module <colony> <index|name> <mothball|restart|decommission>
+                                       the building by its index as `show` lists it, or by its NAME
+                                       (ticket #573): the sea, a Decommission or a loss shifts the
+                                       indices, and a bare index once scrapped a Launch Site. Two
+                                       of a kind by name are refused with their indices.
 
 RESEARCH, THE ARCHIVE AND THE FACTION ORDERS
 
@@ -498,7 +531,9 @@ RESEARCH, THE ARCHIVE AND THE FACTION ORDERS
   leapfrog <state>                     the Custodians only, {leapprice} Ducats: the Region's people emit
                                        {leapstep} less per hundred million, for good, never below
                                        {leapfloor}, and its Baseline Emissions fall {leapbase}
-  strip-permit <state>                 the Prospectors only
+  strip-permit <state>                 the Prospectors only, {stripprice} Ducats, once per Region EVER:
+                                       {stripturns} of double output, then its Baseline Emissions and
+                                       Unrest rise for good
   exodus-call <state>                  the Arkwrights only, on a Region they control, once per Region
                                        EVER, for {exodus} Ducats: while it runs it doubles what they may
                                        recruit there and suspends Coach Class's double population
@@ -539,6 +574,8 @@ fn grammar(t: Option<&Tables>) -> String {
         ("{venturestep}", n(|t| format!("{:.0}", t.venture.share_step * 100.0))),
         ("{venturemax}", n(|t| format!("{:.0}", t.venture.max_share * 100.0))),
         ("{exodus}", n(|t| t.ducats.per_exodus_call.to_string())),
+        ("{stripprice}", n(|t| t.strip_permit.ducats.to_string())),
+        ("{stripturns}", n(|t| dying_earth_engine::counted(t.strip_permit.turns, "turn", "turns"))),
     ] {
         s = s.replace(key, &value);
     }
@@ -606,7 +643,15 @@ fn parse_line(g: &Game, line: &str) -> Result<Line, String> {
         // tier (Settlement, Colony, and on the ground the Colonial Capital).
         "upgrade" => Order::RaiseTier { colony: colony_id(at(1)?)? },
         // Ticket #332 (version 0.09.0): a build another seat began at a place that has changed hands.
-        "cancel-build" => Order::CancelBuild { place: place(at(1)?)?, index: count(at(2)?)? as usize },
+        // Ticket #573 (version 0.1.0.3): the build by its index or its name.
+        "cancel-build" => {
+            let place = place(at(1)?)?;
+            // The review: a rival's queue seat 0 does not see is not read here either, as `show`
+            // keeps it out of sight; an empty list lets the engine refuse in its own words.
+            let hidden = g.place_control(place).director().is_some_and(|d| d != Seat(0)) && !g.sees_place(Seat(0), place);
+            let names: Vec<String> = if hidden { Vec::new() } else { g.queue_at(place).iter().map(|b| b.item.name().to_string()).collect() };
+            Order::CancelBuild { place, index: indexed(&names, at(2)?, "a build in that queue")? }
+        }
         "transit" => {
             let ship = ship_id(at(1)?)?;
             let to = pick(&BodyId::ALL, at(2)?)?;
@@ -768,13 +813,21 @@ fn parse_line(g: &Game, line: &str) -> Result<Line, String> {
         "send-antarctica" => Order::SendToAntarctica { state: pick_state(at(1)?)?, n: count(at(2)?)?, into: unload_target(g, &w[3..])? },
         // Version 0.07.3 (ticket #141): Pioneers lifted from a Launch Site onto a station over Earth.
         "lift" => Order::LiftToStation { state: pick_state(at(1)?)?, n: count(at(2)?)?, colony: colony_id(at(3)?)? },
+        // Ticket #573 (version 0.1.0.3): the building by its index or its name.
         "change" => {
             let what = at(1)?.to_ascii_lowercase();
-            let index = count(at(3)?)? as usize;
             let change = pick(&CHANGES, at(4)?)?;
             let building = match what.as_str() {
-                "facility" => BuildingRef::Facility(pick_state(at(2)?)?, index),
-                "module" => BuildingRef::Module(colony_id(at(2)?)?, index),
+                "facility" => {
+                    let sid = pick_state(at(2)?)?;
+                    let names: Vec<String> = g.state(sid).facilities.iter().map(|f| f.kind.name().to_string()).collect();
+                    BuildingRef::Facility(sid, indexed(&names, at(3)?, "a Facility there")?)
+                }
+                "module" => {
+                    let cid = colony_id(at(2)?)?;
+                    let names: Vec<String> = g.colony(cid).map(|c| c.modules.iter().map(|m| m.kind.name().to_string()).collect()).unwrap_or_default();
+                    BuildingRef::Module(cid, indexed(&names, at(3)?, "a Module there")?)
+                }
                 _ => return Err("`change` wants `facility` or `module`".into()),
             };
             Order::Change { building, what: change }

@@ -520,3 +520,14 @@ Antarctica by sea on turn 16, Energy at nought by turn 12; after, the Colony Shi
 Moon on turn 8, Deimos or Phobos by turn 25, in all three seeds.
 
 **The sweep** ([`sweeps/ticket-576.txt`](sweeps/ticket-576.txt)): **22 / 48 / 1 / 7 and 2 collapses**, from 19 / 49 / 6 / 6 and none. **The measure, part met and part missed.** Met: Production Moved from East Asia 60 Module-turns a game from 15; the Custodians' Materials income from East Asia 977 from 242; no fall from the other three starts (3 / 10 / 9 wins from 3 / 7 / 9). Missed: **the Custodians from East Asia still win 0 of 20**, and their gate is done in 16 seeds at a median turn 24, from 15 at 26 -- short of the 18 at a median near the other starts' 11 to 17. The home is no longer gutted, and the seat leaves Earth (the Moon on turn 8 in every replayed seed), but the seat 0 Custodians do not win from there, and the sweep's own line says what is left in the way: seat 0 loses its start state in 8 of 20 seeds (median turn 28), the ticket's third guess, the Influence fight for East Asia; not traced further. The Arkwrights' 1 win of 80 from 6 is at the edge of noise and not traced. The Custodians everywhere: Income per Faction (Materials / Fuel / Energy / Ducats / Research, mean a game): Custodians 2117 / 718 / 3755 / 1634 / 1320 from 1177 / 364 / 2720 / 1602 / 1049, since the reason gutted the home from every start, only later; Prospectors 2279 / 473 / 2946 / 1249 / 430; Arkwrights 1590 / 348 / 2300 / 3350 / 264; Archivists 468 / 243 / 1114 / 499 / 755.
+
+## The tool's texts
+
+Ticket [#573](https://github.com/whaleyjoshua2/Dying-Earth/issues/573), spec §21. Four playtest
+items in one: the calm line silenced, `change` and `cancel-build` by name as well as index (the sea
+had shifted a tester's indices and a bare index scrapped a Launch Site), the Refinery refusal by the
+kind's name -- the ticket thought the refusal did not exist; it did, and read backwards -- the
+`-ducats` help as the engine charges, and the Strip Permit's "once per Region, ever" where the
+Exodus Call already says it. One round, all at the recommendation, the designer keeping the ok
+line's echo as it is. No rule moves, so no sweep. The red was the tool's own refusals and one engine
+test.

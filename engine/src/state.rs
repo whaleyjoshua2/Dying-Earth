@@ -5497,7 +5497,10 @@ impl Game {
         } else if n >= u.army_threshold {
             "the Standing Army no longer replenishes".to_string()
         } else {
-            "calm enough: the Standing Army replenishes and Facilities run in full".to_string()
+            // Ticket #573 (version 0.1.0.3), at the designer's word: calm says nothing. "Calm
+            // enough: the Standing Army replenishes and Facilities run in full" followed every
+            // battle report twenty times in the tool.
+            String::new()
         }
     }
 

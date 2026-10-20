@@ -8015,7 +8015,11 @@ This turn {:+.2}%: {:+.1} million.", c.population_growth * 100.0, c.population_l
         };
         let u = &game.tables.unrest;
         rule_tip(
-            ui.colored_label(colour, format!("Unrest {}: {}", game.unrest_text(sid), game.unrest_note(sid))),
+            // Ticket #573 (version 0.1.0.3): a calm Region's note is empty, and the colon goes with it.
+            ui.colored_label(colour, match game.unrest_note(sid).as_str() {
+                "" => format!("Unrest {}", game.unrest_text(sid)),
+                note => format!("Unrest {}: {note}", game.unrest_text(sid)),
+            }),
             format!(
                 "Unrest runs 0 to {:.0}, in quarters, with three thresholds:\nat {:.0} the Standing Army stops replenishing,\nat {:.0} every Facility here runs at half,\nat {:.0} the state throws its controller off.\nIt falls {:.1} a turn on its own, except the turn the state changed hands.",
                 u.max, u.army_threshold, u.facility_threshold, u.max, u.natural_fall
@@ -8309,7 +8313,8 @@ fn policies_block(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, act
         let t = &game.tables.strip_permit;
         ui.horizontal(|ui| {
             cost_button(ui, game, &session.pending, Order::StripPermit { state: sid }, "Strip Permit", actions);
-            ui.label(RichText::new(format!("{} of double output here, then +{:.1} Baseline Emissions and +{} Unrest, for good", counted(t.turns, "turn", "turns"), t.baseline_rise, Game::unrest_figure(t.unrest))).weak());
+            // Ticket #573 (version 0.1.0.3): "once per Region, ever", as the Exodus Call's line says.
+            ui.label(RichText::new(format!("{} of double output here, then +{:.1} Baseline Emissions and +{} Unrest, for good. Once per Region, ever.", counted(t.turns, "turn", "turns"), t.baseline_rise, Game::unrest_figure(t.unrest))).weak());
         });
     }
     // Ticket #476 (version 0.09.8): Raise Industry Level is a tile among the Facility boxes now;

@@ -1597,7 +1597,9 @@ impl Game {
                 // station-only, could be built nowhere at all.
                 if col.in_orbit && !kind.stands_on_a_station() {
                     // Ticket #497 (version 0.09.9): the build list shows what a station holds.
-                    return fail("not on a station");
+                    // Ticket #573 (version 0.1.0.3): by the kind's name; "not on a station" read as
+                    // "this place is not a station" to a tester building a Refinery on Tiangong.
+                    return fail(format!("a {} stands on the ground, not on a station", kind.name()));
                 }
                 // Ticket #186 (version 0.08.0): nobody but the Custodians builds an Academy off
                 // Earth either, captured ones included.

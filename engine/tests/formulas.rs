@@ -24358,3 +24358,24 @@ fn the_run_is_still_nothing_mothball_fires_only_where_it_could_start_the_run() {
     let (i, _) = dirtiest(&g);
     assert_eq!(mothballs(&mut g), vec![i], "the dirtiest producing Facility is shut, since that could start the run");
 }
+
+// ---------------------------------------------------------------- #573 The tool's texts (version 0.1.0.3)
+
+/// Ticket #573 (version 0.1.0.3), at the designer's word: a calm Region says nothing, where "calm
+/// enough: the Standing Army replenishes and Facilities run in full" followed every battle report
+/// twenty times; and a Module that stands on the ground is refused on a station by its own name,
+/// where "not on a station" read as "this place is not a station".
+#[test]
+fn a_calm_region_says_nothing_and_a_ground_module_is_refused_on_a_station_by_name() {
+    let mut g = game();
+    calm(&mut g);
+    let home = g.controlled_states(Seat(0))[0];
+    assert!(g.state(home).unrest < g.tables.unrest.army_threshold, "the premise: calm");
+    assert_eq!(g.unrest_note(home), "", "calm says nothing");
+    g.state_mut(home).unrest = g.tables.unrest.army_threshold;
+    assert!(g.unrest_note(home).contains("no longer replenishes"), "{}", g.unrest_note(home));
+    let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
+    g.seats[0].stockpile.materials = 300.0;
+    let err = g.check_order(Seat(0), &[], &Order::BuildModule { colony: iss, kind: ModuleKind::Refinery }).unwrap_err().0;
+    assert_eq!(err, "a Refinery stands on the ground, not on a station");
+}

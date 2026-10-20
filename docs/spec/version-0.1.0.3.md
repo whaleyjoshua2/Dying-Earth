@@ -674,3 +674,39 @@ yes q3 sure"):
 - **The review** (an independent agent) found no blocking defect: the net read is the run's own figure in the same units as a Facility's Emissions, the let chain compiles under the 2024 edition, Modules stay excluded, the Energy and Production Moved reasons are untouched, and the test proves its claim (no other reason can produce the order, the choice is deterministic, the tie between the Power Plant and the Refinery falls the same way on both sides). It asked for the plain read of the last Climate phase's net in place of a dead `Option` (the phase runs inside `Game::new`, so there is always one), a name that does not shadow the Victory multiplier (`over`), the table's stale comment on the reason, and the test's margin to say the standing Scrubber's sink comes off the net too. All mended.
 - **Swept** ([`sweeps/ticket-576.txt`](../dev-diary/2026-10-19-version-0.1.0.3/sweeps/ticket-576.txt),
   20 seeds x four seatings): **22 / 48 / 1 / 7 and 2 collapses**, from 19 / 49 / 6 / 6 and none. **The measure, part met and part missed.** Met: Production Moved from East Asia 60 Module-turns a game from 15; the Custodians' Materials income from East Asia 977 from 242; no fall from the other three starts (3 / 10 / 9 wins from 3 / 7 / 9). Missed: **the Custodians from East Asia still win 0 of 20**, and their gate is done in 16 seeds at a median turn 24, from 15 at 26 -- short of the 18 at a median near the other starts' 11 to 17. The home is no longer gutted, and the seat leaves Earth (the Moon on turn 8 in every replayed seed), but the seat 0 Custodians do not win from there, and the sweep's own line says what is left in the way: seat 0 loses its start state in 8 of 20 seeds (median turn 28), the ticket's third guess, the Influence fight for East Asia; not traced further. The Arkwrights' 1 win of 80 from 6 is at the edge of noise and not traced. The Custodians everywhere: Income per Faction (Materials / Fuel / Energy / Ducats / Research, mean a game): Custodians 2117 / 718 / 3755 / 1634 / 1320 from 1177 / 364 / 2720 / 1602 / 1049, since the reason gutted the home from every start, only later; Prospectors 2279 / 473 / 2946 / 1249 / 430; Arkwrights 1590 / 348 / 2300 / 3350 / 264; Archivists 468 / 243 / 1114 / 499 / 755.
+
+## 21. The tool's texts: the calm line silenced, index orders by name, refusal and help wording, the Strip Permit's once
+
+Ticket: [The tool's texts: the calm line silenced, index orders that echo, refusal and help wording, the Strip Permit's once](https://github.com/whaleyjoshua2/Dying-Earth/issues/573).
+
+The designer's four items from the playtest. Read in the tree first: the Refinery refusal the ticket
+could not find does exist -- *"not on a station"*, at the Module placement check, for a kind that does
+not stand on a station (a station takes the Shipyard, Habitat, Observatory, Solar Array, Trade Post,
+Institute, Battery and Factory), and it read as "this place is not a station"; the tester was right
+and the ticket's reading of the data wrong. Decided in one round ("q1 yes q2 yes no echo q3 yes q4
+yes q5 yes"):
+
+- **The calm line**: a calm Region's note is empty, so the tool's `show` prints nothing for it and
+  the Region card reads *"Unrest 0"* with no colon, where *"calm enough: the Standing Army
+  replenishes and Facilities run in full"* followed every battle report twenty times.
+- **Index orders by name**: `change facility|module <place> <index|name> <change>` and `cancel-build
+  <place> <index|name>` take the building's or the queued build's name, any unique prefix, as well
+  as the index `show` lists (`indexed` in `play.rs`). Two of a kind by name are refused with their
+  indices (*"mine" is more than one here (2:Mine, 5:Mine); say the index*); an index past the list
+  is refused with the list (*9 is past the list; they are 0:Power Plant, ...*), where the engine
+  used to refuse it in its own words; a name that is not there is refused with the list. The ok
+  line's echo is unchanged, at the designer's word.
+- **The Refinery refusal**: *"a Refinery stands on the ground, not on a station"*, by the kind's name.
+- **The `-ducats` help**: *"paid in Ducats at the market price of twice its Materials"*, as the
+  engine charges.
+- **The Strip Permit's once**: *"Once per Region, ever."* on the window's button line, as the Exodus
+  Call's has it; the tool's help line reads *"the Prospectors only, 25 Ducats, once per Region EVER:
+  3 turns of double output, then its Baseline Emissions and Unrest rise for good"*, its figures from
+  the table (`{stripprice}`, `{stripturns}`); the signature text already said "once in a Region's
+  whole life" and stays.
+- No rule moves, so no sweep. Red first: one engine test (the calm note *left: "calm enough: ..."*,
+  *right: ""*; the Refinery refusal by name), and the tool's own refusals before the grammar took a
+  name -- *"launchsite" is not a whole number*, *"mine" is not a whole number* -- with twenty "calm
+  enough" lines in one `show` of the playtest save, and none after. Clippy clean at `-D warnings`;
+  818 tests green.
+- **The review** (an independent agent) found the name matching right (a digit-looking word refused, a prefix of two kinds refused as more than one, two of a kind refused with their indices), the index space the engine's own, every other reader of the calm note guarded, the test proving its claim at the placement check, and the Strip Permit line the Exodus Call's construct. It caught one defect: `cancel-build` by name read a rival's queue seat 0 does not see and would have printed it in the refusal where `show` keeps it out of sight -- guarded now, the engine refusing in its own words; and two prose nits, the helper's doc and the glossary's `-ducats` wording. All mended.
