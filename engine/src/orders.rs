@@ -1430,6 +1430,23 @@ impl Game {
                         return fail(format!("this Nation State already has a {}", k.name()));
                     }
                 }
+                // Ticket #560 (version 0.1.0.3), at the designer's word: one Bank to a Region by
+                // the same door, the Investment Bank counted as one. The 0.1.0.2 playtest filled
+                // every slot with Investment Banks and ran income from 16 to 300 Ducats a turn by
+                // turn 12. Any already standing beyond one stay: the rule is read at the order.
+                if kind.does_the_job_of(FacilityKind::Bank) {
+                    let st = self.state(*state);
+                    let there = st
+                        .facilities
+                        .iter()
+                        .map(|f| f.kind)
+                        .chain(st.queue.iter().filter_map(|b| if let BuildItem::Facility(k) = b.item { Some(k) } else { None }))
+                        .chain(pending.iter().filter(|o| matches!(o.build_state(), Some(s) if s == *state)).filter_map(|o| o.build_facility().map(|k| k.built_by(self.kind(seat)))))
+                        .find(|k| k.does_the_job_of(FacilityKind::Bank));
+                    if let Some(k) = there {
+                        return fail(format!("this Nation State already has {} {}", if k == FacilityKind::InvestmentBank { "an" } else { "a" }, k.name()));
+                    }
+                }
                 Ok(cost)
             }
             // Ticket #52: Relief, on a state you direct, any number of times a turn.

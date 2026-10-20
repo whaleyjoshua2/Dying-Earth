@@ -9787,6 +9787,9 @@ fn a_faction_builds_its_own_version_of_the_common_building() {
 
     let err = g.check_order(cus, &[], &Order::BuildFacility { state: cs, kind: FacilityKind::InvestmentBank }).unwrap_err();
     assert_eq!(err.0, "only the Prospectors build the Investment Bank");
+    // Ticket #560 (version 0.1.0.3): one Bank to a Region, so the queued one is cleared before the
+    // Investment Bank is ordered by its own name.
+    g.state_mut(ps).queue.clear();
     assert!(g.check_order(pro, &[], &Order::BuildFacility { state: ps, kind: FacilityKind::InvestmentBank }).is_ok(), "by its own name too");
 
     // The cap reads the JOB, not the name: an Academy standing blocks a School order and back.
@@ -13914,6 +13917,40 @@ fn a_region_holds_one_launch_site_and_a_spaceport_counts_as_one() {
     g.state_mut(StateId::NorthAmerica).facilities.retain(|f| !f.kind.does_the_job_of(FacilityKind::LaunchSite));
     g.state_mut(StateId::NorthAmerica).facilities.push(Facility::new(FacilityKind::LaunchSite));
     assert_eq!(refusal(&g, ark, &[], &site(StateId::NorthAmerica)).as_deref(), Some("this Nation State already has a Launch Site"), "a rival's Launch Site is one");
+}
+
+/// Ticket #560 (version 0.1.0.3), at the designer's word: one Bank to a Region, by the Launch
+/// Site's door -- standing, under construction or ordered this turn -- and the Prospectors'
+/// Investment Bank counts as one, so a Region holds one of either kind and never both. The playtest
+/// of 0.1.0.2 filled every slot with Investment Banks and ran income from 16 to 300 Ducats a turn.
+#[test]
+fn a_region_holds_one_bank_and_an_investment_bank_counts_as_one() {
+    let mut g = game();
+    let bank = |s: StateId| Order::BuildFacility { state: s, kind: FacilityKind::Bank };
+    let refusal = |g: &Game, seat: Seat, pending: &[Order], o: &Order| g.check_order(seat, pending, o).err().map(|e| e.0);
+    g.seats[0].stockpile.materials = 500.0;
+    // Two neutral Regions for the player, so no computer seat's home is taken from under it.
+    let mut neutral = StateId::ALL.into_iter().filter(|s| matches!(g.state(*s).control, Control::Neutral));
+    let (first, second) = (neutral.next().unwrap(), neutral.next().unwrap());
+    g.take_control(first, Seat(0));
+    g.state_mut(first).facilities.retain(|f| !f.kind.does_the_job_of(FacilityKind::Bank));
+    let one = bank(first);
+    assert_eq!(refusal(&g, Seat(0), &[], &one), None, "a Region with none builds one");
+    assert_eq!(refusal(&g, Seat(0), std::slice::from_ref(&one), &one).as_deref(), Some("this Nation State already has a Bank"), "one ordered this turn");
+    g.commit_orders(Seat(0), std::slice::from_ref(&one));
+    assert_eq!(refusal(&g, Seat(0), &[], &one).as_deref(), Some("this Nation State already has a Bank"), "one under construction");
+    assert_eq!(refusal(&g, Seat(0), &[], &Order::BuildFacilityWithDucats { state: first, kind: FacilityKind::Bank }).as_deref(), Some("this Nation State already has a Bank"), "bought with Ducats, the same");
+    // The Prospectors: their Investment Bank is one, and a captured one blocks a Bank by its job.
+    let pro = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Prospectors).unwrap();
+    g.seats[pro.index()].stockpile.materials = 500.0;
+    let home = g.controlled_states(pro)[0];
+    g.state_mut(home).facilities.retain(|f| !f.kind.does_the_job_of(FacilityKind::Bank));
+    g.state_mut(home).facilities.push(Facility::new(FacilityKind::InvestmentBank));
+    assert_eq!(refusal(&g, pro, &[], &bank(home)).as_deref(), Some("this Nation State already has an Investment Bank"));
+    g.take_control(second, Seat(0));
+    g.state_mut(second).facilities.retain(|f| !f.kind.does_the_job_of(FacilityKind::Bank));
+    g.state_mut(second).facilities.push(Facility::new(FacilityKind::InvestmentBank));
+    assert_eq!(refusal(&g, Seat(0), &[], &bank(second)).as_deref(), Some("this Nation State already has an Investment Bank"), "a captured Investment Bank is the Region's one Bank");
 }
 
 /// Ticket #534 (found in review): the Arkwrights' free Launch Site, their Opening Objective's
