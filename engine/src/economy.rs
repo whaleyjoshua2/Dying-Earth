@@ -1771,6 +1771,8 @@ impl Game {
             s.venture_banked_last_turn = banked;
             // Ticket #566 (version 0.1.0.3): and the interest, so the Fund line says the growth whole.
             s.venture_interest_last_turn = interest_to_fund;
+            // The review of #566: an Objective's reward lands at the end of this Income, after this.
+            s.venture_reward_last_turn = 0.0;
         }
         if keep_short {
             let mut names = Vec::new();

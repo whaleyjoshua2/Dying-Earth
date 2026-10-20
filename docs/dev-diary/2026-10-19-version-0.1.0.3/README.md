@@ -285,3 +285,8 @@ pay-ins and a line that named one. Decided in one round: show the growth whole w
 the rate. Built: `venture_interest_last_turn` set at Income beside the banked share; the window's
 line and the tool read "Fund 3742; +312 last turn (100 banked, 212 interest)." Red first on the
 field (ten of interest against nought) and a window test on the line. No rule moves, so no sweep.
+
+**The review** found the line still short on the two turns an Objective's reward lands (50 or 100,
+paid at the end of the Income): the reward is kept too and named on that turn alone; a stranded doc
+comment moved back to its function; and the reset to nought on an Income with no Bank paying is
+pinned.

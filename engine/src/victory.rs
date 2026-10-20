@@ -447,6 +447,7 @@ impl Game {
             OpeningKind::InvestmentBanks => {
                 let s = self.seat_mut(seat);
                 s.venture_fund = tenth(s.venture_fund + card.reward);
+                s.venture_reward_last_turn = tenth(s.venture_reward_last_turn + card.reward);
             }
             OpeningKind::MoonColony => self.seat_mut(seat).launch_site_owed = true,
             OpeningKind::ResearchPair => {
@@ -464,6 +465,7 @@ impl Game {
             OpeningKind::IndustryLevel => {
                 let s = self.seat_mut(seat);
                 s.venture_fund = tenth(s.venture_fund + card.reward);
+                s.venture_reward_last_turn = tenth(s.venture_reward_last_turn + card.reward);
             }
             // The review: at a far Colony with room for the Colonist, where there is one.
             OpeningKind::FarColony => {

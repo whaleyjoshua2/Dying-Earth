@@ -1013,6 +1013,10 @@ pub struct SeatState {
     /// Fund last Income, kept beside the banked share so the Fund line can say the growth whole.
     #[serde(default)]
     pub venture_interest_last_turn: f64,
+    /// The review of #566: and an Objective's reward paid into the Fund at the end of the last
+    /// Income, so the line misses nothing the Fund took.
+    #[serde(default)]
+    pub venture_reward_last_turn: f64,
     /// Ticket #261 (version 0.08.4): which steps of the rival's Moment this seat has fired -- three
     /// quarters of the way, and one part met. Once each, so a seat that dips and recrosses is not
     /// announced twice.
@@ -1798,6 +1802,7 @@ impl Game {
             venture_share: 0.0,
             venture_banked_last_turn: 0.0,
             venture_interest_last_turn: 0.0,
+            venture_reward_last_turn: 0.0,
             rival_steps_announced: [false; 2],
             victory_history: Vec::new(),
             directive_sink: 0.0,

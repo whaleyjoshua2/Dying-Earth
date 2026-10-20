@@ -10133,6 +10133,14 @@ fn an_investment_bank_banks_a_hundredth_of_the_fund_one_per_region() {
     g.seats[pro.index()].venture_fund = 50.0;
     g.income_phase();
     assert_eq!(g.seats[pro.index()].venture_fund, 51.0, "one Material, Faction-wide, not one per Region");
+    // The review of #566: an Income with no Bank paying writes nought, no stale figure.
+    for sid in [a, b] {
+        for f in g.state_mut(sid).facilities.iter_mut().filter(|f| f.kind == FacilityKind::InvestmentBank) {
+            f.mothballed = true;
+        }
+    }
+    g.income_phase();
+    assert_eq!(g.seats[pro.index()].venture_interest_last_turn, 0.0, "nothing paid, nothing shown");
 }
 
 /// Ticket #182: in a non-Prospector's hands the same share applies to that Faction's DUCAT income
@@ -20723,6 +20731,10 @@ fn the_prospectors_opening_objective_wants_three_turns_running() {
     g.income_phase();
     assert_eq!(g.seat(pro).opening_met_turn, Some(g.turn), "the third Income running");
     assert!((g.seats[1].venture_fund - (second + grows + 50.0)).abs() < 1e-9, "50 Ducats into the Fund: {} from {second}, which grows {grows} a turn", g.seats[1].venture_fund);
+    // The review of #566: the reward is kept for the Fund line, this Income only.
+    assert_eq!(g.seats[1].venture_reward_last_turn, 50.0, "the reward beside the banked share and the interest");
+    g.income_phase();
+    assert_eq!(g.seats[1].venture_reward_last_turn, 0.0, "and gone the Income after");
 }
 
 /// Ticket #471 (version 0.09.7): **each Faction has an opening objective**, with no deadline, met

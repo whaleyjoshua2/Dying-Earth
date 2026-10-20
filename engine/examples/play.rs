@@ -1245,12 +1245,13 @@ fn print_board(g: &Game) {
     if s.kind == FactionKind::Prospectors {
         // Ticket #566 (version 0.1.0.3): the growth whole, with its parts.
         println!(
-            "Venture Capital Fund: {} Ducats, banking {:.0}% of Ducat income; +{} last turn ({} banked, {} interest)",
+            "Venture Capital Fund: {} Ducats, banking {:.0}% of Ducat income; +{} last turn ({} banked, {} interest{})",
             figure(s.venture_fund),
             s.venture_share * 100.0,
-            figure(s.venture_banked_last_turn + s.venture_interest_last_turn),
+            figure(s.venture_banked_last_turn + s.venture_interest_last_turn + s.venture_reward_last_turn),
             figure(s.venture_banked_last_turn),
-            figure(s.venture_interest_last_turn)
+            figure(s.venture_interest_last_turn),
+            if s.venture_reward_last_turn > 0.0 { format!(", {} reward", figure(s.venture_reward_last_turn)) } else { String::new() }
         );
     }
     if s.kind == FactionKind::Archivists {

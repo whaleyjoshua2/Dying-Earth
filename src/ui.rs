@@ -2704,15 +2704,17 @@ fn bar_resource_with(ui: &mut Ui, icons: &Icons, key: &str, word: &str, value: S
     rule_tip_ui(resp, word, add);
 }
 
-/// The Influence figure's hover, lifted out of the bar when ticket #128 moved the figure.
-/// Ticket #537 (version 0.1.0.1): the price read from the table, where the hover said 2 in words.
-/// Ticket #566 (version 0.1.0.3): the Fund line, the growth whole with its parts.
+/// Ticket #566 (version 0.1.0.3): the Fund line, the growth whole with its parts; an Objective's
+/// reward named only on the turn it lands (the review).
 fn fund_line(game: &Game, me: Seat) -> String {
     let s = game.seat(me);
-    let (banked, interest) = (s.venture_banked_last_turn, s.venture_interest_last_turn);
-    format!("Fund {}; +{} last turn ({} banked, {} interest).", figure(s.venture_fund), figure(banked + interest), figure(banked), figure(interest))
+    let (banked, interest, reward) = (s.venture_banked_last_turn, s.venture_interest_last_turn, s.venture_reward_last_turn);
+    let reward_part = if reward > 0.0 { format!(", {} reward", figure(reward)) } else { String::new() };
+    format!("Fund {}; +{} last turn ({} banked, {} interest{reward_part}).", figure(s.venture_fund), figure(banked + interest + reward), figure(banked), figure(interest))
 }
 
+/// The Influence figure's hover, lifted out of the bar when ticket #128 moved the figure.
+/// Ticket #537 (version 0.1.0.1): the price read from the table, where the hover said 2 in words.
 fn influence_hover(game: &Game) -> String {
     format!("The Allotment is what your places and buildings give each turn; bought Influence comes from the Trading window at {} Ducats each.", game.tables.ducats.per_influence)
 }
@@ -13075,6 +13077,8 @@ mod tests {
         g.seats[0].venture_banked_last_turn = 100.0;
         g.seats[0].venture_interest_last_turn = 212.0;
         assert_eq!(fund_line(&g, Seat(0)), "Fund 3742; +312 last turn (100 banked, 212 interest).");
+        g.seats[0].venture_reward_last_turn = 50.0;
+        assert_eq!(fund_line(&g, Seat(0)), "Fund 3742; +362 last turn (100 banked, 212 interest, 50 reward).", "the review: an Objective's reward on the turn it lands");
     }
 
     /// Ticket #537 (version 0.1.0.1): the Influence hover says the table's price, four Ducats;

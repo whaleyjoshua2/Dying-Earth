@@ -240,7 +240,8 @@ share alone.
 
 - **The interest is kept beside the share** (`venture_interest_last_turn`), and the Fund line says
   the growth whole: **"Fund 3742; +312 last turn (100 banked, 212 interest)."** in the window and
-  the tool. Rewards land at the Resolution and keep their Report line.
+  the tool. An Objective's reward, paid at the end of an Income, is named on that turn alone:
+  "(100 banked, 212 interest, 50 reward)" (the review).
 - **The rate stands** (designer: "leave it"): one Bank a Region, the dearer Influence and the Fund
   bar at 4,250 (ticketed) are this version's brakes; the last sweep's Fund at the end was median
   3,742 / 8,419 / 3,582 / 3,597 by seating.
