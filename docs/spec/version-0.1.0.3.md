@@ -89,3 +89,11 @@ Ticket: [Power Plants, Reactors and their off-world counterparts burn 0.8 Fuel a
 - The Fuel upkeep is a general field on both the Facility and the Module card (`fuel_upkeep`),
   nought on every other building.
 - The computer's Refinery weight reads the drain, so a seat burning Fuel for power refines more.
+
+**What it did** ([`sweeps/ticket-575.txt`](../dev-diary/2026-10-19-version-0.1.0.3/sweeps/ticket-575.txt),
+80 games): **8 / 21 / 17 / 10 and 24 collapses**, from 10 / 24 / 20 / 17 and 9 after §3. The
+collapses' fifteen and the Archivists' seven are past noise. The collapses gather in the seatings
+where the computer plays the Custodians: their Scrubbers fell (421 to 312 in one seating) and the
+Natural Sink with them (19.1 to 12.6). A reading, not a measured cause: a computer seat short of
+Fuel runs its power at a quarter, reads its Energy as tight, and a tight seat is offered no
+Scrubber. Reported to the designer; nothing changed on the strength of it.

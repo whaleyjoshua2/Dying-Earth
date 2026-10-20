@@ -80,3 +80,26 @@ alone, and land nine short; it now keeps one Replace in flight at a time. Clean 
 now says it unlocks the Wind Farm. Left for the designer: a coastal Power Plant the sea drowns while
 its Replace is queued leaves the Replace eating Widgets until it completes and is lost with its 12.5
 Materials, as any coastal build is lost today, with no cue until then.
+
+## Power burns Fuel
+
+Ticket [#575](https://github.com/whaleyjoshua2/Dying-Earth/issues/575), spec §4. The designer's
+0.75 became 0.8 at the designer's word ("go with .8"), since the stockpile keeps tenths and a test
+on 0.75 could only read 0.7 or 0.8.
+
+A general `fuel_upkeep` on both building cards; in `producers_of` a Fuel budget from the tank pays
+each burning building in the Income's order, and one it does not reach runs at a quarter. The test
+was watched red twice, once with the charge stubbed ("a second Power Plant burns 0.8 more") and
+once with the quarter stubbed. Two older tests re-pinned: the card-equals-Income test now takes a
+building's Fuel off the expected Income, and the Custodian AI's Moon-Mine test fills the tank, since
+the Moon Generator's burn had made Fuel the scarcest resource in one of its two scenarios.
+
+**The sweep** ([`sweeps/ticket-575.txt`](sweeps/ticket-575.txt)): **8 / 21 / 17 / 10 and 24
+collapses**, from 10 / 24 / 20 / 17 and 9. Collapses +15 and the Archivists -7 are past noise, every
+seat down 2 or 3. The collapses sit in the two seatings where a computer seat plays the Custodians
+(15 and 9 of 20, from 8 and 1): Scrubbers built fell 421 to 312 and the Sink's median from 19.1 to
+12.6 in the second seating. The reading: a computer seat that lets its tank run dry has its power at
+a quarter, reads Energy as tight, and a tight seat is offered no Scrubber (`ai.rs`, the Scrubber
+candidate's `!tight`); the Custodians' climate lever is the first thing a Fuel shortage shuts. It is
+measured behaviour, reported, with nothing changed on the strength of it: the designer decides
+whether the computer should keep a Fuel reserve for its power, or the rule should bite less.
