@@ -5064,7 +5064,8 @@ impl Game {
 
     // ---------------------------------------------------------------- Ticket #54: the Scrubber
 
-    /// How many Scrubbers one Nation State may hold: clamp(round(population / 2), 2, 10).
+    /// How many Scrubbers one Nation State may hold: clamp(round(population / per_population), min, max);
+    /// since ticket #561 (version 0.1.0.3) one per 300 million, one at least.
     pub fn scrubber_cap(&self, s: StateId) -> u32 {
         let c = &self.tables.scrubber;
         if c.per_population <= 0.0 {

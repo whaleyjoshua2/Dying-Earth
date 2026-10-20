@@ -37,7 +37,7 @@ Ticket: [A Scrubber at 4 Energy and 1 Ducat, one per 3 population](https://githu
   and a mothballed Scrubber pays neither. The Ducat upkeep is a general field on the Facility card
   (`ducats_upkeep`), nought on every other building.
 - **A Region holds one Scrubber per 300 million people**, rounded, one at least (200 million and
-  two before): China 6 (5 at the start's 1,461), India 5, the Regions about 500 million 2, the
+  two before): India 6, China 5 (1,370; 1,461 by turn 9), the Regions about 500 million 2, the
   rest 1. The ceiling of 10 stands, unreached.
 - **The computer Custodians** offer a Scrubber only while last turn's Ducat income covers one more
   Scrubber's Ducat, beside the Energy check they already make.
