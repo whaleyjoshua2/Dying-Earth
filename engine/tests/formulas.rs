@@ -535,7 +535,7 @@ fn a_controlled_state_pays_ducats_from_gdp_times_industry_and_a_bank_adds_more()
 }
 
 #[test]
-fn ducats_buy_influence_four_for_one_and_the_bought_influence_is_spendable_at_once() {
+fn ducats_buy_influence_five_for_one_and_the_bought_influence_is_spendable_at_once() {
     // Ticket #537 (version 0.1.0.1): four Ducats a point, where it was two. Ticket #562 (version
     // 0.1.0.3): five.
     let mut g = game();
@@ -19502,10 +19502,11 @@ fn the_computer_keeps_fuel_on_hand_for_its_power() {
     g.seats[cus.index()].stockpile.materials = 70.0;
     g.seats[cus.index()].stockpile.energy = 500.0;
     g.seats[cus.index()].stockpile.ducats = 0.0;
-    // Fourteen Fuel against 70 Materials: read whole, 14 / 10.8 = 1.3 stands above the Materials'
-    // 70 / 66 = 1.06 and Materials is the scarcest; less the reserve of 4.8, 9.2 / 10.8 = 0.85 and
-    // Fuel is. The figure sits where the reserve alone turns the answer.
-    g.seats[cus.index()].stockpile.fuel = 14.0;
+    // Twenty Fuel against 70 Materials: read whole, 20 / 10.8 = 1.85 stands above the Materials'
+    // 70 / 44 = 1.59 (the three cheapest rows are the free Core and two at 22) and Materials is the
+    // scarcest; less the reserve of 4.8, 15.2 / 10.8 = 1.41 and Fuel is. The figure sits where the
+    // reserve alone turns the answer (the review of #575: a first figure of 14 did not).
+    g.seats[cus.index()].stockpile.fuel = 20.0;
     assert_eq!(g.scarcest(cus), Resource::Fuel, "the reserve makes Fuel the scarcest");
     g.seats[cus.index()].stockpile.fuel = reserve + 300.0;
     assert_ne!(g.scarcest(cus), Resource::Fuel, "well above it");
@@ -19527,13 +19528,15 @@ fn the_computer_keeps_fuel_on_hand_for_its_power() {
     let orders = g.ai_orders(cus);
     assert!(g.log.iter().any(|l| l.contains("take") && l.contains("refuel")), "the want above it, the refuel is taken: {:?}", g.log.iter().filter(|l| l.contains("refuel")).collect::<Vec<_>>());
     assert!(g.remaining(cus, &orders).0.fuel + 1e-9 >= reserve, "the reserve stands after the turn's orders: {} of {}", g.remaining(cus, &orders).0.fuel, reserve);
-    // Short of the reserve with Ducats in hand, the market buys up to it.
+    // Short of the reserve with Ducats in hand, the reserve is bought, once: the Ship's own top-up
+    // waits a turn rather than buy the same Fuel twice (the review of #575).
     g.log.clear();
-    g.ships.retain(|s| s.id != ShipId(950));
     g.seats[cus.index()].stockpile.fuel = 0.0;
     g.seats[cus.index()].stockpile.ducats = 200.0;
     let orders = g.ai_orders(cus);
-    assert!(orders.iter().any(|o| matches!(o, Order::Buy { resource: Resource::Fuel, amount } if *amount as f64 >= reserve)), "a buy up to the reserve: {:?}", g.log.iter().filter(|l| l.contains("Fuel")).collect::<Vec<_>>());
+    let buys: Vec<i64> = orders.iter().filter_map(|o| if let Order::Buy { resource: Resource::Fuel, amount } = o { Some(*amount) } else { None }).collect();
+    assert_eq!(buys.len(), 1, "one Fuel buy, not two: {buys:?}; {:?}", g.log.iter().filter(|l| l.contains("Fuel")).collect::<Vec<_>>());
+    assert!(buys[0] as f64 >= reserve && (buys[0] as f64) < reserve + 1.0, "up to the reserve: {buys:?}");
 }
 
 /// Ticket #575 (version 0.1.0.3), at the designer's word: a Power Plant, a Reactor and a Generator

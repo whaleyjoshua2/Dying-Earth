@@ -3064,7 +3064,9 @@ impl Game {
             // Ticket #575 (version 0.1.0.3): the tank is filled from what stands above the power
             // reserve, and the top-up buys the reserve back too.
             let fuel_reserve = self.fuel_reserve(seat);
-            let top_up = self.ai_fuel_top_up(seat, self.tank_of(seat, s.kind) - s.fuel + fuel_reserve);
+            // The review of #575: while the tank stands under the reserve the reserve buy is the
+            // turn's purchase, and the top-up waits a turn, or the two would buy the same Fuel twice.
+            let top_up = if self.seat(seat).stockpile.fuel < fuel_reserve { None } else { self.ai_fuel_top_up(seat, self.tank_of(seat, s.kind) - s.fuel + fuel_reserve) };
             // Ticket #533 (version 0.1.0.1): a refuel never uses the Ship's turn, so a ready Missile
             // Carrier fills its tank beside its Launch; only the orbit change below still waits on it.
             if s.fuel < self.tank_of(seat, s.kind) && self.refuelling_station(seat, body, orbit) {
