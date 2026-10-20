@@ -252,13 +252,14 @@ unique = "Reactor -- replaces the Power Plant, and takes a quarter off the Energ
 # Ticket #347 (version 0.09.1): 125 of it, and the fund holds the whole figure from the first turn.
 # This bar IS `[archive] research` in modules.toml -- one figure written in two files, the Archive's
 # cost and the Archivists' bar, and a test asserts the two are equal so they cannot drift.
-victory = "Build the Archive at a Colony off Earth (55 Materials, three turns, and four Colonists must live there to begin it), pay 225 Research into it and keep it running, then upload 18 Colonists into it from the people living where it stands."
+victory = "Build the Archive at a Colony off Earth (55 Materials, three turns, and four Colonists must live there to begin it), pay 225 Research into it and keep it running, then upload 16 Colonists into it, four a turn at most, from the people living where it stands."
 victory_short = "build the Archive off Earth, pay {first} Research into it, and upload {second} Colonists,"
 # Ticket #506 (version 0.1.0.0): 225 and 18 uploads, at the designer's word, with the game at fifty turns.
 # Ticket #555 (version 0.1.0.2): the Archive fund counts 0.4 of the score, the uploads 0.6.
 victory_first = { kind = "archive_research", bar = 225, weight = 0.4 }
 # Ticket #192 (version 0.08.0): twelve Colonists UPLOADED, not twelve living beside the Archive.
-victory_second = { kind = "colonists_uploaded", bar = 18 }
+# Ticket #565 (version 0.1.0.3), at the designer's word: 16, at most four a turn.
+victory_second = { kind = "colonists_uploaded", bar = 16 }
 # Ticket #471 (version 0.09.7): the Opening Objective -- no deadline, met once, rewarded once.
 opening = { kind = "research_pair", count = 2, reward = 10.0, text = "Have two Research Labs or Observatories working, one of them off Earth", reward_text = "10 Research into the Archive fund" }
 # Ticket #504 (version 0.1.0.0): the Second Objective, open once the Opening Objective is met.

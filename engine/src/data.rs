@@ -1773,6 +1773,12 @@ pub struct ArchiveCard {
     pub research: i64,
     /// Ticket #192 (version 0.08.0): Colonists who must live at the place before it may be ORDERED.
     pub colonists_to_order: u32,
+    /// Ticket #565 (version 0.1.0.3), at the designer's word: the most Colonists that upload in one
+    /// turn, pending Uploads counted.
+    pub upload_per_turn: u32,
+    /// Ticket #565 (version 0.1.0.3): Energy a turn the complete Archive draws for each Colonist
+    /// uploaded, on top of its card's upkeep.
+    pub energy_per_uploaded: f64,
 }
 
 /// Ticket #80 (version 0.06.0): the Observatory's one figure beyond its row: the share of its

@@ -197,3 +197,34 @@ Colony Ship (33 Materials, 4 Widgets), at weights that compete with every build 
 median turn 9 / 7 / 8 / 8 by seating, every game: the bar met. The Prospectors win the race 16 to
 19 times in 20 and 56 of the 80 games; the designer closed the ticket on the measure and ticketed
 their Venture Fund bar at 4250.
+
+## 8. The Upload at 16, four a turn; an Archive that draws more as it fills; Modules dark without people
+
+Ticket: [The Upload at 16, four a turn, an Archive that eats more as it fills, and Modules dark without people](https://github.com/whaleyjoshua2/Dying-Earth/issues/565).
+
+The playtest ended Archivist games in one order (`upload 27 18`). The designer: *"Archive upload now
+only requires 16 but capped at 4 per turn, energy upkeep grows by 1 per uploaded colonists, if any
+modules at the archive's site lack the population to run it they go offline."*
+
+- **The bar is 16** (18 since 0.1.0.0), and **at most four Colonists upload in a turn**, pending
+  Uploads counted (`[archive] upload_per_turn = 4`): "four a turn; 2 already ordered". The room
+  check comes first ("only 3 Colonists are left to upload"). The computer Archivists upload four a
+  turn and accept what goes dark; their pace table is 5 / 11 / 16 by turns 36 / 42 / 47.
+- **The Archive's draw is 20 Energy + 1 per uploaded Colonist** (`energy_per_uploaded = 1`), once
+  complete as before, Closed-Loop Colonies' x0.75 on the whole; the card's detail reads "20 + 7
+  uploaded".
+- **Modules dark without people**, every Colony, one rule read off the slot formula backwards: a
+  Colony's slots are one per living Colonist (base 0) up to its tier's cap, and the Core and the
+  Archive stand outside the count. Walk the Modules in build order, each slot-taking Module taking a
+  slot while slots remain; a Module past the count is **offline, "too few people to run it"**, and
+  comes back as people return. **The Habitat is never darkened**: it houses the people who run the
+  rest, and a dark Habitat would crowd the place on top of the uploads. A dark Module keeps its
+  slot, pays no upkeep and makes nothing, as the Energy shortfall's shut Module does. So an Archive
+  site uploaded from 16 to nought keeps its Core, its Archive and its housing, and everything else
+  goes dark.
+- **The measure**: the sweep's Archivists (5 of 80 at ticket #564) and their gate's median turn.
+
+**What it did** ([`sweeps/ticket-565.txt`](../dev-diary/2026-10-19-version-0.1.0.3/sweeps/ticket-565.txt),
+80 games): **12 / 58 / 6 / 2 and 1 collapse**, from 14 / 56 / 4 / 5 and 1 -- inside noise but for
+the Archivists' direction, five to two, four turns of uploading now standing between a complete
+Archive (median turn 34 to 35) and the win. Their gate's median turn is 28, as before.

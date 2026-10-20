@@ -204,6 +204,11 @@ research = 225
 # had the three turns the Module needs left. The Archivists direct exactly one off-Earth place in
 # every game, so the gate could not be routed around. Four is reachable; twelve was near-total.
 colonists_to_order = 4
+# Ticket #565 (version 0.1.0.3), at the designer's word: at most four Colonists upload in a turn
+# (the playtest ended a game in one order, `upload 27 18`), and the complete Archive draws one more
+# Energy a turn for each Colonist uploaded, so a full Archive of 16 draws 20 + 16.
+upload_per_turn = 4
+energy_per_uploaded = 1.0
 
 # Ticket #80 (version 0.06.0): the Observatory, the one Module that makes Research, on a Colony, a
 # Space Station or in Antarctica. It takes no Body yield and no output multiplier: `amount`

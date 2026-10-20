@@ -186,6 +186,8 @@ pub enum OfflineCause {
     Occupied,
     /// A Sea Wall whose keep went unpaid.
     Unkept,
+    /// Ticket #565 (version 0.1.0.3): a Module past what its Colony's living Colonists can run.
+    Unmanned,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -3574,6 +3576,30 @@ impl Game {
     /// nothing: it simply leaves no room until the count is back under.
     pub fn free_module_slots(&self, c: &Colony) -> u32 {
         self.module_slots(c).saturating_sub(self.module_slots_used(c))
+    }
+
+    /// Ticket #565 (version 0.1.0.3), at the designer's word: the Modules here past what the living
+    /// can run, by index. The slot formula read backwards: walked in build order, each slot-taking
+    /// Module takes a slot while `module_slots` has one; a Module past the count is dark at Income,
+    /// and comes back as people return. The Core and the Archive stand outside the count as they do
+    /// for the cap; the Habitat takes its slot but is never darkened, since it houses the people who
+    /// run the rest.
+    pub fn unmanned_modules(&self, c: &Colony) -> Vec<usize> {
+        let exempt = |k: ModuleKind| k == ModuleKind::Archive || k == ModuleKind::Core;
+        let slots = self.module_slots(c);
+        let mut used = 0;
+        let mut dark = Vec::new();
+        for (i, m) in c.modules.iter().enumerate() {
+            if exempt(m.kind) {
+                continue;
+            }
+            if used < slots {
+                used += 1;
+            } else if m.kind != ModuleKind::Habitat {
+                dark.push(i);
+            }
+        }
+        dark
     }
 
     pub fn habitat_room(&self, c: &Colony) -> u32 {

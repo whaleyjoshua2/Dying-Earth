@@ -8759,7 +8759,11 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
                 let room = game.uploadable_at(cid, already);
                 ui.label(format!("Uploaded: {uploaded} of {bar}"));
                 if room > 0 {
-                    let n = room.min(bar.saturating_sub(uploaded).max(1));
+                    // The review of #565: the one button is sized to the turn's cap less what is
+                    // already ordered, or with eight living it offered "Upload 8" alone and the door
+                    // refused it; at the cap it offers one, greyed, with the door's words.
+                    let cap_left = game.tables.archive.upload_per_turn.saturating_sub(already);
+                    let n = room.min(bar.saturating_sub(uploaded).max(1)).min(cap_left.max(1));
                     cost_button_with_hover(
                         ui,
                         game,
@@ -10548,6 +10552,7 @@ fn offline_cause_words(cause: Option<&OfflineCause>, until_resolution: bool, gri
         Some(OfflineCause::Grid) => "\nOffline: grid down.".to_string(),
         Some(OfflineCause::Occupied) => "\nOffline: Colony occupied.".to_string(),
         Some(OfflineCause::Unkept) => "\nOffline: upkeep unpaid.".to_string(),
+        Some(OfflineCause::Unmanned) => "\nOffline: too few people to run it.".to_string(),
         None if until_resolution => "\nOffline until next turn: struck by a card.".to_string(),
         None if grid => "\nOffline: grid down.".to_string(),
         None if occupied_archive => "\nOffline: Colony occupied.".to_string(),

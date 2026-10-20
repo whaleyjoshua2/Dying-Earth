@@ -798,7 +798,13 @@ impl Game {
         // standing with its Research paid in full. Until then it costs nothing to run.
         if kind == ModuleKind::Archive {
             let complete = self.seat(seat).archive_fund >= t.archive.research;
-            y.upkeep = if complete { mc.energy_upkeep as f64 } else { 0.0 };
+            // Ticket #565 (version 0.1.0.3), at the designer's word: and one more for each Colonist
+            // uploaded, so a full Archive of 16 draws 20 + 16.
+            let uploaded = self.seat(seat).uploaded as f64;
+            y.upkeep = if complete { mc.energy_upkeep as f64 + t.archive.energy_per_uploaded * uploaded } else { 0.0 };
+            if complete && uploaded > 0.0 {
+                y.detail = Some(format!("{} + {} uploaded", mc.energy_upkeep, figure(t.archive.energy_per_uploaded * uploaded)));
+            }
         }
         // Ticket #387 (version 0.09.3): to the tenth, where it was floored.
         y.upkeep = tenth(y.upkeep * self.tech_multiplier(seat, TechId::ClosedLoopColonies));
@@ -1095,6 +1101,8 @@ impl Game {
             // makes NOTHING and still pays its upkeep, at the designer's word: the squeeze is the
             // point, and the offline switch below, which forgives the upkeep, is the wrong shape.
             let starved = self.starved_by(cid).is_some();
+            // Ticket #565 (version 0.1.0.3): the Modules past what the living can run are dark.
+            let dark = self.unmanned_modules(col);
             for (i, m) in col.modules.iter().enumerate() {
                 // Ticket #54: a mothballed Module, the same way.
                 if m.mothballed {
@@ -1102,7 +1110,8 @@ impl Game {
                 }
                 // Ticket #82: the doubling, if this Module has one, is on the figure.
                 let y = self.module_yield_at(seat, cid, i);
-                let fuel_paid = starved || col.grid_failed || m.offline_until_resolution || pay(y.fuel_upkeep);
+                // The review of #565: a dark Module burns nothing, so it reserves nothing.
+                let fuel_paid = dark.contains(&i) || starved || col.grid_failed || m.offline_until_resolution || pay(y.fuel_upkeep);
                 let quarter = |v: f64| if fuel_paid { v } else { tenth(v * 0.25) };
                 out.push(Producer {
                     place: ProducerPlace::Module(cid, i),
@@ -1116,7 +1125,7 @@ impl Game {
                     output: if starved { None } else { y.resource.map(|r| (r, quarter(y.amount))) },
                     // Ticket #80: an Observatory's Research. Ticket #359: halved in `module_yield_at`.
                     research: if starved { 0 } else { y.research },
-                    online: !col.grid_failed && !m.offline_until_resolution && !(m.kind == ModuleKind::Archive && occupied),
+                    online: !dark.contains(&i) && !col.grid_failed && !m.offline_until_resolution && !(m.kind == ModuleKind::Archive && occupied),
                     doubled_by: y.doubled_by,
                 });
             }
@@ -1501,6 +1510,8 @@ impl Game {
                     self.tables.state(sid).name.clone()
                 }
                 ProducerPlace::Module(cid, i) => {
+                    // Ticket #565 (version 0.1.0.3): dark for want of people, read before the grid.
+                    let unmanned = self.colony(cid).map(|c| self.unmanned_modules(c).contains(&i)).unwrap_or(false);
                     if let Some(c) = self.colony_mut(cid) {
                         let (grid, occupied) = (c.grid_failed, c.control.is_occupied());
                         let m = &mut c.modules[i];
@@ -1509,6 +1520,8 @@ impl Game {
                             None
                         } else if m.offline_until_resolution {
                             m.offline_cause.take()
+                        } else if unmanned {
+                            Some(OfflineCause::Unmanned)
                         } else if grid {
                             Some(OfflineCause::Grid)
                         } else if m.kind == ModuleKind::Archive && occupied {

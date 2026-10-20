@@ -1225,6 +1225,12 @@ impl Game {
                 }
                 let already: u32 = pending.iter().map(|o| if let Order::Upload { colony: c, n } = o { if c == colony { *n } else { 0 } } else { 0 }).sum();
                 let room = self.uploadable_at(*colony, already);
+                // Ticket #565 (version 0.1.0.3), at the designer's word: four a turn at most, pending
+                // Uploads counted; the room is answered first.
+                let cap = self.tables.archive.upload_per_turn;
+                if *n <= room && already + *n > cap {
+                    return fail(format!("{} a turn; {already} already ordered", crate::data::figure(cap as f64)));
+                }
                 if *n > room {
                     let place = self.place_name(Place::Colony(*colony));
                     return fail(match room {

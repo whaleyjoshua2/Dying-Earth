@@ -242,3 +242,38 @@ Ducats / Research): Custodians 1001 / 322 / 2399 / 1408 / 881; Prospectors 2066 
 1586 / 408; Arkwrights 1613 / 368 / 2401 / 3269 / 271; Archivists 482 / 274 / 1199 / 484 / 803.
 The designer closed the ticket on the Moon measure and asked for a ticket raising the Prospectors'
 Venture Fund bar to 4250.
+
+## The Upload at 16, four a turn; the Archive's draw; Modules dark without people
+
+Ticket [#565](https://github.com/whaleyjoshua2/Dying-Earth/issues/565), spec §8. Decided in one
+round: the bar 16 and four a turn, the Archive's draw 20 + 1 per uploaded, dark Modules at every
+Colony by the slot formula read backwards (Core, Archive and Habitat never darkened), and the
+computer uploads four a turn and accepts what goes dark.
+
+**Built.** `upload_per_turn = 4` and `energy_per_uploaded = 1` on the Archive card; the Upload's door
+answers the room first, then "four a turn; 2 already ordered". The Archive's card detail reads "20 +
+4 uploaded". `unmanned_modules` walks a Colony's Modules in build order giving each a slot while
+`module_slots` has one; a Module past the count is offline at Income with its own cause ("too few
+people to run it") and comes back as people return. Red first: the cap's door open, the Modules all
+running at one Colonist, the computer uploading six. The dark rule reached ten older fixtures that
+built Modules on Colonies nobody lived at; each is crewed now, one person a Module, since the rule
+makes such a place impossible. The pace table for Uploads is 5 / 11 / 16.
+
+**The sweep** ([`sweeps/ticket-565.txt`](sweeps/ticket-565.txt)): **12 / 58 / 6 / 2 and 1 collapse**,
+from 14 / 56 / 4 / 5 and 1. Every move is inside noise but the Archivists' direction: five to two,
+their gate's median turn 28 as before, the Archive complete at median turn 34 to 35 in three of
+the four seatings and four turns of uploading after it, where one order used to end the game. The
+Prospectors' 58 is the standing matter of [The Prospectors' Venture Fund at 4250](https://github.com/whaleyjoshua2/Dying-Earth/issues/580).
+Income per Faction, mean a game (Materials / Fuel / Energy / Ducats / Research): Custodians 1001 /
+325 / 2408 / 1417 / 884; Prospectors 2078 / 457 / 2946 / 1597 / 410; Arkwrights 1603 / 363 / 2388 /
+3269 / 266; Archivists 476 / 275 / 1194 / 480 / 769.
+
+**The review** found one lockout and three leaks, all fixed: the human Archivist's one Upload
+button was sized to the room alone, so with eight living it offered "Upload 8" and the door refused
+it (sized to the cap less what is ordered now); a dark Generator still reserved its 0.8 Fuel ahead
+of the buildings behind it (it reserves nothing now); the computer's Energy picture summed the card
+upkeep of dark Modules and a flat 20 for the Archive, and counted dark Generators' output (it reads
+the yield's figure and skips the dark now); and the Resolution's grid and card clears woke a dark
+Module until the next Income (they keep it dark). Two more uncrewed fixtures surfaced on the last.
+The sweep above predates these fixes; none touches a rule the sweep's figures turn on, and the next
+ticket's sweep carries them.

@@ -851,7 +851,18 @@ impl Game {
         self.unit_upkeep(seat) as i64
             // Ticket #54: a mothballed building pays no upkeep, so it is no part of the drain.
             + self.directed_states(seat).iter().flat_map(|s| self.state(*s).facilities.iter()).filter(|f| !f.mothballed).map(|f| self.tables.facility(f.kind).energy_upkeep).sum::<i64>()
-            + self.directed_colonies(seat).iter().flat_map(|c| self.colony(*c).unwrap().modules.iter()).filter(|m| !m.mothballed).map(|m| self.tables.module(m.kind).energy_upkeep).sum::<i64>()
+            // The review of #565: the yield's figure, so a dark Module counts nothing, the Archive
+            // its 20 plus its uploaded, and an incomplete Archive nothing.
+            + self
+                .directed_colonies(seat)
+                .iter()
+                .map(|c| {
+                    let col = self.colony(*c).unwrap();
+                    let dark = self.unmanned_modules(col);
+                    col.modules.iter().enumerate().filter(|(i, m)| !m.mothballed && !dark.contains(i)).map(|(i, _)| self.module_yield_at(seat, *c, i).upkeep).sum::<f64>()
+                })
+                .sum::<f64>()
+                .round() as i64
     }
 
     /// Energy the seat's producers make in a turn, at current multipliers.
@@ -873,7 +884,9 @@ impl Game {
         }
         for cid in self.directed_colonies(seat) {
             let col = self.colony(cid).unwrap();
-            for m in col.modules.iter().filter(|m| !m.mothballed) {
+            // The review of #565: a dark Generator makes nothing.
+            let dark = self.unmanned_modules(col);
+            for (_, m) in col.modules.iter().enumerate().filter(|(i, m)| !m.mothballed && !dark.contains(i)) {
                 if m.kind == ModuleKind::Generator {
                     // Ticket #57: the Colony's slot makes the Energy, not the Body's average.
                     e += (5.0 * self.colony_yields(col).generator * fac * grids).floor();
@@ -2456,7 +2469,9 @@ impl Game {
                 let here = self.colony(cid).map(|c| c.colonists).unwrap_or(0);
                 let bar = self.tables.faction(kind).victory_second.bar as u32;
                 let still_wanted = bar.saturating_sub(self.seat(seat).uploaded);
-                let n = here.min(still_wanted);
+                // Ticket #565 (version 0.1.0.3): four a turn at most; what goes dark at the site is
+                // accepted, at the designer's word -- an uploaded Colonist cannot be lost.
+                let n = here.min(still_wanted).min(self.tables.archive.upload_per_turn);
                 if n > 0 {
                     let opp = if self.seat(seat).uploaded + n >= bar { m.opportunity } else { 1.0 };
                     push(

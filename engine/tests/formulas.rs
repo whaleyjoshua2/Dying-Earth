@@ -165,7 +165,7 @@ fn income_shortfall_shuts_highest_upkeep_first_modules_before_facilities_then_al
     st.facilities.push(facility(FacilityKind::Factory)); // upkeep 2
     st.facilities.push(facility(FacilityKind::ResearchLab)); // upkeep 3
     st.facilities.push(facility(FacilityKind::Refinery)); // upkeep 3
-    colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Mine], 0); // upkeep 3, a Module
+    colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Mine], 1); // upkeep 3, a Module; ticket #565: people to run the Modules
     let order = g.shortfall_order(Seat(0));
     assert_eq!(order, vec!["Mine", "Refinery", "Research Lab", "Factory"]);
 }
@@ -1187,7 +1187,7 @@ fn drawn(g: &mut Game, id: EventId, target: EventTarget) {
 fn solar_maximum_boosts_power_plants_and_generators_at_the_next_income_once() {
     let mut g = game();
     g.state_mut(StateId::EastAsia).facilities = vec![facility(FacilityKind::PowerPlant)];
-    colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Generator], 0);
+    colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Generator], 1); // Ticket #565 (version 0.1.0.3): people to run the Modules, or they are dark
     drawn(&mut g, EventId::SolarMaximum, EventTarget::Everyone);
     g.apply_event_now();
     // Power Plant 6 x 1.5 = 9; Generator 5 x 1.3 (the Moon since ticket #554) x 1.5 = 9.8.
@@ -1238,8 +1238,8 @@ fn meteor_shower_hits_ships_in_orbit_not_in_transit_and_hardened_hulls_shrug() {
 #[test]
 fn dust_storm_knocks_every_module_on_mars_offline_until_the_next_resolution() {
     let mut g = game();
-    let mars = colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Mine], 0);
-    let moon = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Mine], 0);
+    let mars = colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Mine], 1); // Ticket #565 (version 0.1.0.3): people to run the Modules, or they are dark
+    let moon = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Mine], 1); // Ticket #565 (version 0.1.0.3): people to run the Modules, or they are dark
     drawn(&mut g, EventId::DustStorm, EventTarget::Body(BodyId::Mars));
     g.apply_event_now();
     assert!(!g.colony(mars).unwrap().modules[0].online);
@@ -1258,7 +1258,7 @@ fn dust_storm_knocks_every_module_on_mars_offline_until_the_next_resolution() {
 #[test]
 fn reactor_leak_stops_generators_until_resolution_and_costs_five_energy() {
     let mut g = game();
-    let c = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Generator, ModuleKind::Mine], 0);
+    let c = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Generator, ModuleKind::Mine], 2); // Ticket #565 (version 0.1.0.3): people to run the Modules, or they are dark
     g.seats[0].stockpile.energy = 20.0;
     drawn(&mut g, EventId::ReactorLeak, EventTarget::Colony(c));
     g.apply_event_now();
@@ -1400,7 +1400,7 @@ fn tech_expanded_habitats_holds_four_more() {
 #[test]
 fn tech_closed_loop_colonies_cuts_module_upkeep_by_a_quarter() {
     let mut g = game();
-    colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Mine], 0); // upkeep 3
+    colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Mine], 1); // upkeep 3; ticket #565: people to run the Modules
     g.state_mut(StateId::EastAsia).facilities.clear();
     let plain = income_of(&mut g, Seat(0)).energy;
     with_tech(&mut g, TechId::ClosedLoopColonies);
@@ -1420,7 +1420,7 @@ fn tech_deep_mining_raises_mine_output_on_earth_and_off_it() {
     // Ticket #332 (version 0.09.0): the Mine on Earth, where the Factory stood; Deep Mining
     // followed the Materials to it.
     g.state_mut(StateId::EastAsia).facilities = vec![facility(FacilityKind::Mine)];
-    colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Mine], 0);
+    colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Mine], 1); // Ticket #565 (version 0.1.0.3): people to run the Modules, or they are dark
     // Earth Mine: 4 x 1.5 (Asia leans Materials) = 6. Moon Mine: 4 x 1.5 (Moon) = 6.
     assert_eq!(income_of(&mut g, Seat(0)).materials, 11.6); // Ticket #537: the Earth Mine 4.4 x 1.5 = 6.6; ticket #554: the Moon Mine 4 x 1.25 = 5
     with_tech(&mut g, TechId::DeepMining);
@@ -1556,7 +1556,7 @@ fn building_yields_on_the_card_equal_what_income_pays() {
     g.state_mut(StateId::EastAsia).facilities = vec![facility(FacilityKind::Factory), facility(FacilityKind::Refinery), facility(FacilityKind::ResearchLab), facility(FacilityKind::PowerPlant)];
     g.state_mut(StateId::NorthAfrica).control = Control::Controlled(Seat(0));
     g.state_mut(StateId::NorthAfrica).facilities = vec![facility(FacilityKind::Factory)];
-    let c = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Mine, ModuleKind::Generator, ModuleKind::Refinery], 0);
+    let c = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Mine, ModuleKind::Generator, ModuleKind::Refinery], 3); // Ticket #565 (version 0.1.0.3): people to run the Modules, or they are dark
     g.research.done.push(TechId::DeepMining);
     g.research.current = Some(TechId::CleanPower);
     let mut expect = Stockpile::default();
@@ -2533,7 +2533,8 @@ fn a_complete_archive_goes_offline_when_energy_runs_short_and_wins_nothing_that_
     let research = g.tables.archive.research;
     let cid = archive_at(&mut g, Seat(3), BodyId::Mars, research, 12);
     g.seats[3].stockpile.energy = 0.0;
-    assert_eq!(g.module_yield(Seat(3), cid, ModuleKind::Archive).upkeep, 20.0, "a complete Archive draws 20 (ticket #511; 12 before)");
+    // Ticket #565 (version 0.1.0.3): the fixture reads its twelve in, and each adds one to the draw.
+    assert_eq!(g.module_yield(Seat(3), cid, ModuleKind::Archive).upkeep, 32.0, "a complete Archive draws 20 + 12 uploaded (ticket #565; 20 at ticket #511; 12 before)");
     assert_eq!(g.shortfall_order(Seat(3))[0], "The Archive", "the highest upkeep goes first");
     g.income_phase();
     assert!(!g.colony(cid).unwrap().modules.iter().any(|m| m.kind == ModuleKind::Archive && m.online), "shut down");
@@ -2589,7 +2590,7 @@ fn the_archivists_win_with_the_archive_running_and_twelve_colonists_uploaded() {
     assert!(g.archive_online(Seat(3)));
     let p = g.progress(Seat(3));
     assert_eq!((p.first_value, p.first_bar), (research as f64, research as f64));
-    assert_eq!((p.second_value, p.second_bar), (18.0, 18.0), "18 since ticket #506");
+    assert_eq!((p.second_value, p.second_bar), (18.0, 16.0), "18 uploaded against the bar of 16 (ticket #565; 18 since ticket #506)");
     assert!(p.met());
     g.end_phase();
     assert!(matches!(g.outcome, Some(Outcome::Win { seat: Seat(3), .. })), "{:?}", g.outcome);
@@ -6201,7 +6202,7 @@ fn the_venture_capital_fund_banks_a_share_of_ducat_income_and_a_draw_returns_nin
     g.take_control(StateId::Europe, pro);
     // Ticket #332 (version 0.09.0): a Mine on Earth, since it is Materials this reads.
     g.state_mut(StateId::Europe).facilities = vec![facility(FacilityKind::Mine)];
-    let moon = colony(&mut g, pro, BodyId::Moon, &[ModuleKind::Mine], 0);
+    let moon = colony(&mut g, pro, BodyId::Moon, &[ModuleKind::Mine], 1); // Ticket #565 (version 0.1.0.3): people to run the Modules, or they are dark
     let _ = moon;
     // Europe's economy pays 14 Ducats a turn to this seat. Materials output is 13 and is now
     // beside the point: an Earth Mine at 4.4 x 1.25 = 5.5 (ticket #537) and a Moon Mine at 4 x 1.25 x 1.25 = 6.25, to the tenth 6.3 (ticket #554).
@@ -6384,7 +6385,7 @@ fn a_moonquake_idles_every_module_on_the_moon_and_nothing_on_mars() {
 #[test]
 fn a_helium_three_vein_doubles_the_moons_generators_for_two_turns_and_triples_with_efficient_grids() {
     let mut g = game();
-    let moon = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Generator], 0);
+    let moon = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Generator], 1); // Ticket #565 (version 0.1.0.3): people to run the Modules, or they are dark
     let _ = moon;
     let plain = income_of(&mut g, Seat(0)).energy;
     drawn(&mut g, EventId::HeliumVein, EventTarget::Body(BodyId::Moon));
@@ -6668,7 +6669,7 @@ fn observatory_research_flows_into_the_income() {
     let mut g = game();
     let ark = Seat(3);
     g.seats[ark.index()].stockpile.energy = 100.0;
-    let mars = colony(&mut g, ark, BodyId::Mars, &[ModuleKind::Observatory, ModuleKind::Generator], 0);
+    let mars = colony(&mut g, ark, BodyId::Mars, &[ModuleKind::Observatory, ModuleKind::Generator], 2); // Ticket #565 (version 0.1.0.3): people to run the Modules, or they are dark
     // Ticket #140 (version 0.07.3): the figure carries the slot's drawn Research yield.
     let want = g.module_yield(ark, mars, ModuleKind::Observatory).research;
     assert!(want >= 3, "at least 2 x 1.6 on Mars: {want}");
@@ -6845,7 +6846,7 @@ fn the_income_pays_the_doubled_mine() {
     let mut g = game();
     let cus = Seat(0);
     g.seats[0].stockpile.energy = 100.0;
-    let moon = colony(&mut g, cus, BodyId::Moon, &[ModuleKind::Mine, ModuleKind::Generator], 0);
+    let moon = colony(&mut g, cus, BodyId::Moon, &[ModuleKind::Mine, ModuleKind::Generator], 2); // Ticket #565 (version 0.1.0.3): people to run the Modules, or they are dark
     // Ticket #332 (version 0.09.0): the Mine pairs with the Mine.
     let mut f = facility(FacilityKind::Mine);
     f.mothballed = true;
@@ -10544,15 +10545,59 @@ fn uploading_reads_colonists_into_the_archive_and_they_leave_the_living() {
 
     // In batches, and never more than live there.
     assert!(g.check_order(arc, &[], &upload(9)).unwrap_err().0.starts_with("only 8 Colonists are left to upload"));
-    assert!(g.check_order(arc, &[upload(5)], &upload(4)).unwrap_err().0.starts_with("only 3 Colonists are left to upload"), "a pending order takes its people first");
+    assert!(g.check_order(arc, &[upload(2)], &upload(7)).unwrap_err().0.starts_with("only 6 Colonists are left to upload"), "a pending order takes its people first");
+    // Ticket #565 (version 0.1.0.3): four a turn at most, pending Uploads counted.
+    assert_eq!(g.tables.archive.upload_per_turn, 4, "the table");
+    assert_eq!(g.check_order(arc, &[], &upload(5)).unwrap_err().0, "four a turn; 0 already ordered");
+    assert_eq!(g.check_order(arc, &[upload(2)], &upload(3)).unwrap_err().0, "four a turn; 2 already ordered");
+    assert!(g.check_order(arc, &[upload(2)], &upload(2)).is_ok(), "two and two");
 
+    assert_eq!(g.module_yield(arc, cid, ModuleKind::Archive).upkeep, 20.0, "complete and nobody uploaded: the card's 20");
     g.commit_orders(arc, &[upload(4)]);
     assert_eq!(g.seats[arc.index()].uploaded, 4, "four read in");
     assert_eq!(g.colony(cid).unwrap().colonists, 4, "and four fewer living");
+    // Ticket #565: and the Archive draws one more for each of them.
+    let y = g.module_yield(arc, cid, ModuleKind::Archive);
+    assert_eq!((y.upkeep, y.detail.as_deref()), (24.0, Some("20 + 4 uploaded")), "20 + 4");
     g.commit_orders(arc, &[upload(4)]);
     assert_eq!(g.seats[arc.index()].uploaded, 8);
     assert_eq!(g.colony(cid).unwrap().colonists, 0, "the place shrinks as it uploads");
     assert_eq!(g.check_order(arc, &[], &upload(1)).unwrap_err().0.split(" at ").next().unwrap(), "nobody is left to upload");
+}
+
+/// Ticket #565 (version 0.1.0.3), at the designer's word ("if any modules at the archive's site lack
+/// the population to run it they go offline"): every Colony, one rule read off the slot formula --
+/// one slot a living Colonist, the Core and the Archive outside the count. Walked in build order, a
+/// Module past the count is offline, "too few people to run it", and comes back as people return;
+/// the Habitat is never darkened, since it houses the people who run the rest.
+#[test]
+fn modules_past_what_the_living_can_run_go_dark_and_come_back_with_the_people() {
+    let mut g = game();
+    calm(&mut g);
+    let cus = Seat(0);
+    g.seats[0].stockpile.energy = 500.0;
+    g.seats[0].stockpile.fuel = 500.0;
+    let moon = colony(&mut g, cus, BodyId::Moon, &[ModuleKind::Mine, ModuleKind::Generator, ModuleKind::Observatory, ModuleKind::Habitat], 3);
+    assert_eq!(g.module_slots(g.colony(moon).unwrap()), 3, "the premise: three living, three slots");
+    let online = |g: &Game| g.colony(moon).unwrap().modules.iter().map(|m| (m.kind, m.online, m.offline_cause.clone())).collect::<Vec<_>>();
+    g.income_phase();
+    assert!(online(&g).iter().all(|(_, on, _)| *on), "three people, three slots and a Habitat: everything runs: {:?}", online(&g));
+    // One left living: the Mine keeps the one slot; the Generator and the Observatory, built after
+    // it, go dark; the Habitat stands.
+    g.colony_mut(moon).unwrap().colonists = 1;
+    g.income_phase();
+    let now = online(&g);
+    let state = |k: ModuleKind| now.iter().find(|(kind, _, _)| *kind == k).map(|(_, on, why)| (*on, why.clone())).unwrap();
+    assert_eq!(state(ModuleKind::Mine), (true, None), "{now:?}");
+    assert_eq!(state(ModuleKind::Generator), (false, Some(OfflineCause::Unmanned)), "{now:?}");
+    assert_eq!(state(ModuleKind::Observatory), (false, Some(OfflineCause::Unmanned)), "{now:?}");
+    assert_eq!(state(ModuleKind::Habitat), (true, None), "the Habitat is never darkened: {now:?}");
+    assert_eq!(state(ModuleKind::Core), (true, None), "{now:?}");
+    assert!(g.seat(cus).income_sources.iter().all(|(src, _, _)| !src.starts_with("Generator") && !src.starts_with("Observatory")), "a dark Module makes nothing and pays nothing: {:?}", g.seat(cus).income_sources);
+    // The people back, the Modules back.
+    g.colony_mut(moon).unwrap().colonists = 3;
+    g.income_phase();
+    assert!(online(&g).iter().all(|(_, on, _)| *on), "three living again, everything runs: {:?}", online(&g));
 }
 
 /// Ticket #192: the second Victory part counts the UPLOADED and not the living. The count is
@@ -10564,8 +10609,9 @@ fn the_archivists_second_part_counts_the_uploaded_not_the_living() {
     let mut g = game();
     let arc = seat_of(&g, FactionKind::Archivists);
     let research = g.tables.archive.research;
-    let cid = archive_at(&mut g, arc, BodyId::Mars, research, 18);
-    // Eighteen standing beside a finished Archive, and nobody read in: no win (ticket #506: 18, from 12).
+    let cid = archive_at(&mut g, arc, BodyId::Mars, research, 16);
+    // Sixteen standing beside a finished Archive, and nobody read in: no win (ticket #506: 18, from
+    // 12; ticket #565: 16).
     g.seats[arc.index()].uploaded = 0;
     open_gates(&mut g);
     g.seats[arc.index()].stockpile.energy = 200.0;
@@ -10575,16 +10621,19 @@ fn the_archivists_second_part_counts_the_uploaded_not_the_living() {
     assert_eq!((p.first_value, p.second_value), (research as f64, 0.0), "standing next to it is worth nothing now");
     assert!(!p.met());
 
-    // Read them in, and the same eighteen win it -- while the Colony itself stands empty.
-    g.commit_orders(arc, &[Order::Upload { colony: cid, n: 18 }]);
+    // Read them in, in fours (the turn's cap is the door's, witnessed in the Upload test; the
+    // commit takes what it is given), and the same sixteen win it -- while the Colony stands empty.
+    for _ in 0..4 {
+        g.commit_orders(arc, &[Order::Upload { colony: cid, n: 4 }]);
+    }
     assert_eq!(g.colony(cid).unwrap().colonists, 0);
     let p = g.progress(arc);
-    assert_eq!((p.second_value, p.second_bar), (18.0, 18.0));
+    assert_eq!((p.second_value, p.second_bar), (16.0, 16.0));
     assert!(p.met());
 
     // And it cannot be taken back: losing the Colony outright leaves the count where it was.
     g.colonies.retain(|c| c.id != cid);
-    assert_eq!(g.progress(arc).second_value, 18.0, "the uploaded are beyond reach");
+    assert_eq!(g.progress(arc).second_value, 16.0, "the uploaded are beyond reach");
 }
 
 /// Ticket #192: the computer must be taught both halves or the Archivists win nothing at all. It
@@ -10607,16 +10656,17 @@ fn the_archivist_ai_uploads_whenever_the_archive_is_complete_and_anybody_lives_t
     match orders.iter().find_map(|o| if let Order::Upload { colony, n } = o { Some((*colony, *n)) } else { None }) {
         Some((c, n)) => {
             assert_eq!(c, cid, "at the Archive's own place");
-            assert_eq!(n, 6, "everyone living there");
+            // Ticket #565 (version 0.1.0.3): four a turn at most, of the six living there.
+            assert_eq!(n, 4, "four a turn, of the six living there");
         }
         None => panic!("the Archivist AI never uploads: {orders:?}"),
     }
 
     // And it asks for no more than the bar still wants.
-    g.seats[arc.index()].uploaded = 16;
+    g.seats[arc.index()].uploaded = 14;
     let orders = g.ai_orders(arc);
     let n = orders.iter().find_map(|o| if let Order::Upload { n, .. } = o { Some(*n) } else { None }).expect("an upload order");
-    assert_eq!(n, 2, "two short of eighteen, so two");
+    assert_eq!(n, 2, "two short of sixteen, so two");
 }
 
 // ---------------------------------------------------------------- 0.08.1 ticket #210: Ship names
@@ -16469,7 +16519,7 @@ fn ticket_350_the_turn_one_line_names_each_factions_own_condition() {
         (FactionKind::Prospectors, "Build, spread Influence and put 3,500 Ducats in the Venture Capital Fund with 18 Colonists living off Earth, before +3.0 C."),
         // Ticket #514 (version 0.1.0.0): and a Colonial Capital.
         (FactionKind::Arkwrights, "Build, spread Influence and get 42 Colonists living off Earth, spread over four Bodies, one holding a Colonial Capital, before +3.0 C."),
-        (FactionKind::Archivists, "Build, spread Influence and build the Archive off Earth, pay 225 Research into it, and upload 18 Colonists, before +3.0 C."),
+        (FactionKind::Archivists, "Build, spread Influence and build the Archive off Earth, pay 225 Research into it, and upload 16 Colonists, before +3.0 C."), // Ticket #565 (version 0.1.0.3): 16, from 18
     ] {
         let line = turn_one_line(kind);
         assert!(line.ends_with(words), "{kind:?}: {line}");
@@ -22222,7 +22272,7 @@ fn rail_gun_freight_pays_three_ducats_a_turn_for_each_working_mass_driver() {
 fn superconductors_lift_every_energy_output_by_a_quarter() {
     let mut g = game();
     g.state_mut(StateId::EastAsia).facilities = vec![facility(FacilityKind::PowerPlant)];
-    colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Generator], 0);
+    colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Generator], 1); // Ticket #565 (version 0.1.0.3): people to run the Modules, or they are dark
     // Power Plant 6; Generator 5 x 1.3 on the Moon = 6.5 (ticket #554); less the ISS's and the Colony's Core Modules.
     assert_eq!(income_of(&mut g, Seat(0)).energy, 6.0 + 6.5 - 2.0);
     with_tech(&mut g, TechId::Superconductors);

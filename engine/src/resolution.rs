@@ -20,18 +20,21 @@ impl Game {
                 }
             }
         }
-        for c in &mut self.colonies {
+        // The review of #565: a Module dark for want of people stays dark through these clears,
+        // or it would run until the next Income.
+        let darks: Vec<Vec<usize>> = self.colonies.iter().map(|c| self.unmanned_modules(c)).collect();
+        for (c, dark) in self.colonies.iter_mut().zip(darks) {
             if c.grid_failed {
                 c.grid_failed = false;
-                for m in &mut c.modules {
-                    m.online = !m.mothballed;
-                    m.offline_cause = None;
+                for (i, m) in c.modules.iter_mut().enumerate() {
+                    m.online = !m.mothballed && !dark.contains(&i);
+                    m.offline_cause = if m.online || m.mothballed { None } else { Some(OfflineCause::Unmanned) };
                 }
             }
-            for m in c.modules.iter_mut().filter(|m| m.offline_until_resolution) {
+            for (i, m) in c.modules.iter_mut().enumerate().filter(|(_, m)| m.offline_until_resolution) {
                 m.offline_until_resolution = false;
-                m.online = !m.mothballed;
-                m.offline_cause = None;
+                m.online = !m.mothballed && !dark.contains(&i);
+                m.offline_cause = if m.online || m.mothballed { None } else { Some(OfflineCause::Unmanned) };
             }
         }
         // Ticket #371 (version 0.09.2): where every Region's Unrest stands as the Resolution opens,
