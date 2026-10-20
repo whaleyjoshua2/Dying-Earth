@@ -115,3 +115,15 @@ commit: the Energy shortfall forecast now reads the Fuel this turn's orders leav
 (8 before the Fuel rule, 15 without the reserve), its Scrubbers 154 against 176. The Archivists stay
 at 10 against 17 before the rule: they burn Fuel for the Archive's power and fly nothing that would
 earn it. Reported; nothing further changed.
+
+**The reserve's review** found one gap, fixed: a Refuel takes the tank's want down to nought, so a
+seat too poor for a top-up could drain its reserve through the plain Refuel; it now waits until the
+whole want stands above the reserve. And the buy up to the reserve, placed in the market block after
+everything else was chosen, never fired, since the Ducats were spent by then; it is a trading
+candidate now, weighed as the Energy buy is. The test witnesses both, red first.
+
+## Influence at 5 Ducats a point; Distress Call at +2
+
+Ticket [#562](https://github.com/whaleyjoshua2/Dying-Earth/issues/562), spec §5. Two figures in
+the data; the two tests that pinned 4 re-pinned to 5. The sweep below carries the reserve's second
+fix as well, so its figures are the two together.

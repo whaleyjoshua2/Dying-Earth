@@ -508,8 +508,9 @@ arkwrights_fuel_per_point = 0.2
 
 [ducats]
 # Ticket #537 (version 0.1.0.1): four Ducats a point, where it was two (the playtest's 2.2:
-# Influence bought without limit was cheap). Still no cap.
-per_influence = 4
+# Influence bought without limit was cheap). Still no cap. Ticket #562 (version 0.1.0.3), at the
+# designer's word: five, after the 0.1.0.2 playtest sold Materials for Influence and bought the world.
+per_influence = 5
 # Version 0.04 (ticket #41): two Ducats for one of the thing bought, as with Influence. A repair
 # point is 5 Materials, so 10 Ducats. Ticket #54 retired `per_restoration_step` with Restoration and
 # put `per_leapfrog` in its place: what one Leapfrog costs the Custodians on a state they control.

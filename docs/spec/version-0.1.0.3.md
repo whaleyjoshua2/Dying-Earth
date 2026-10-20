@@ -106,3 +106,12 @@ Scrubber. Reported to the designer; nothing changed on the strength of it.
 **10 / 25 / 20 / 10 and 15 collapses**, from 8 / 21 / 17 / 10 and 24 without it. Against the board
 before the Fuel rule (10 / 24 / 20 / 17 and 9), the collapses' six are near noise's edge and the
 Archivists' seven past it; the rest are back where they were.
+
+## 5. Influence at 5 Ducats a point; Distress Call at +2
+
+Ticket: [Influence at 5 Ducats a point, and Distress Call at +2 Relations](https://github.com/whaleyjoshua2/Dying-Earth/issues/562).
+
+- **A point of Influence costs 5 Ducats** at the Trading window (4 since 0.1.0.1, 2 before). Still
+  no cap. The computer reads the price from the table.
+- **Distress Call** pays +2 Relations with every rival for holding a Ship a turn (+5 before);
+  refusing still costs 3.

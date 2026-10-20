@@ -13059,13 +13059,14 @@ mod tests {
         assert_eq!(recruit_hover(&g, StateId::EastAsia, 2), "2M people, Unrest -0.25.");
     }
 
-    /// Ticket #537 (version 0.1.0.1): the Influence hover says the table's price, four Ducats.
+    /// Ticket #537 (version 0.1.0.1): the Influence hover says the table's price, four Ducats;
+    /// ticket #562 (version 0.1.0.3): five.
     #[test]
     fn the_influence_hover_says_the_tables_price() {
         let tables = std::sync::Arc::new(dying_earth_engine::data::Tables::load(&dying_earth_engine::data::default_data_dir()).unwrap());
         let g = Game::new(tables, NewGame { seed: 7, player: FactionKind::Custodians, player_is_ai: false, player_start: StateId::EastAsia });
-        assert_eq!(g.tables.ducats.per_influence, 4);
-        assert!(influence_hover(&g).ends_with("at 4 Ducats each."), "{}", influence_hover(&g));
+        assert_eq!(g.tables.ducats.per_influence, 5);
+        assert!(influence_hover(&g).ends_with("at 5 Ducats each."), "{}", influence_hover(&g));
     }
 
     /// Ticket #508 (version 0.1.0.0): a held Accord's hover says each of its Terms in a line, the

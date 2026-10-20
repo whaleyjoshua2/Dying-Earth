@@ -471,7 +471,8 @@ take_when = { rule = "no_landing_under_way" }
 effect = "hold_one_ship"
 [[event.choice.take_does]]
 effect = "relations_all_rivals"
-relations = 5
+# Ticket #562 (version 0.1.0.3), at the designer's word: +2, where +5 was a free lunch; refusing still costs 3.
+relations = 2
 [[event.choice.refuse_does]]
 effect = "relations_all_rivals"
 relations = -3
