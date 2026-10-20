@@ -1600,6 +1600,9 @@ pub struct AiThresholds {
     /// worth to the AI when it picks where to send a loaded Colony Ship, in the units a Colony
     /// Slot's yields are weighed in. Nought here and the computer seats never read the new rule.
     pub first_windfall_worth: f64,
+    /// Ticket #564 (version 0.1.0.3), at the designer's word: what a seat's Shipyard and Colony Ship
+    /// are weighed at, times their base, while it holds no Colony Ship and a Body is still unclaimed.
+    pub moon_race_weight: f64,
     /// Ticket #345: what the founding appetite is multiplied by at a Body whose first is still
     /// unclaimed -- the landing that takes a world is worth more than the landing that joins one.
     pub first_found_weight: f64,

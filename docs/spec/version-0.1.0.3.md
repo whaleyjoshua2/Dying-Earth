@@ -166,3 +166,34 @@ computer Custodians starting there build nothing off Earth through turn 30 and l
 then in most seeds, so the rule has nothing to double -- a matter of their opening, not of this
 trade. The sweep also prints each Faction's Income over a game (Materials / Fuel / Energy / Ducats /
 Research, mean over the batch), at the designer's word.
+
+## 7. Every computer seat races for the first landing
+
+Ticket: [Every computer seat pursues the first Moon landing](https://github.com/whaleyjoshua2/Dying-Earth/issues/564).
+
+The playtest's human was first to the Moon in sixteen games of sixteen, by turns 6 to 10; the
+computer's first landing came at median turn 15 / 26 / 32 by seating, and the Arkwrights took the
+Moon in 37 of the 50 games anyone did. The path is a Shipyard (38.5 Materials, 8 Widgets) then a
+Colony Ship (33 Materials, 4 Widgets), at weights that compete with every build on Earth.
+
+- **The race weight**: while the seat holds no Colony Ship, built or on order, and **the Moon** is
+  still unclaimed with a free slot (`first_at` is none), its Shipyard and Colony Ship candidates are
+  weighed at `moon_race_weight` = **3** times their base (`ai.toml`), above the Prospectors' Bank
+  (9) and the Custodians' Scrubber (8). The lift ends with the seat's first Colony Ship or the first
+  landing, and returns for no other Body.
+- **The first Ship flies to the Moon**: while the Moon is unclaimed and the seat directs no ground
+  Colony off Earth, its Colony Ship's destination is the Moon, whatever the windfalls say
+  (`best_body_for`). The computer's rule only; the windfalls are untouched. Tried first and
+  withdrawn: a race for any unclaimed Body -- the Ships came early and the windfalls sent them past
+  the Moon, the Prospectors to Mars by turn 11, and they took 53 of 80 games (47 at a weight of 2);
+  `sweeps/ticket-564.txt` and `ticket-564-x2.txt` keep the figures.
+- **Every seat** races; all four count Colonists off Earth.
+- **The measure**: the sweep's "First to a Body: the Moon" median turn 12 or under in every seating,
+  who wins it spread beyond the Arkwrights, and no fall in the four Factions' wins. The Income line
+  per Faction is read beside it, at the designer's word.
+
+**What it did** ([`sweeps/ticket-564-moon.txt`](../dev-diary/2026-10-19-version-0.1.0.3/sweeps/ticket-564-moon.txt),
+80 games): **14 / 56 / 4 / 5 and 1 collapse**, from 17 / 21 / 20 / 11 and 11. The Moon landed at
+median turn 9 / 7 / 8 / 8 by seating, every game: the bar met. The Prospectors win the race 16 to
+19 times in 20 and 56 of the 80 games; the designer closed the ticket on the measure and ticketed
+their Venture Fund bar at 4250.

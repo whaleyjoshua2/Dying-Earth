@@ -2773,6 +2773,13 @@ fn the_archivist_ai_builds_its_way_off_earth_and_then_the_archive() {
 
 /// Every state calm, with every sea-level threshold already fired, so a Climate-phase test sees
 /// only what it set up.
+/// Ticket #564 (version 0.1.0.3): a Colony Ship of the seat's parked over `body`, so the race for
+/// the first landing is over for it and its Shipyard and Colony Ship weigh their base. A budget
+/// test that ranks other builds reads its figures without the race in the way.
+fn parked_colony_ship(g: &mut Game, seat: Seat, body: BodyId) {
+    g.ships.push(Ship { name: String::new(), id: ShipId(9000 + seat.index() as u32), kind: UnitKind::ColonyShip, seat, damage: 0, at: ShipAt::Body(body), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 35.0, slot: None });
+}
+
 fn calm(g: &mut Game) {
     let n = g.tables.climate.sea_level_thresholds.len();
     for s in &mut g.states {
@@ -5873,6 +5880,9 @@ fn a_custodian_ai_behind_on_pace_builds_a_constabulary_where_unrest_has_reached_
     g.seats[seat.index()].stockpile.materials = 115.0;
     g.seats[seat.index()].stockpile.energy = 100.0;
     g.state_mut(StateId::EastAsia).unrest = 7.0;
+    // Ticket #564 (version 0.1.0.3): with no Colony Ship the Shipyard weighs 54 in the race for the
+    // first landing and takes the budget; a Ship parked over Earth ends the race for this seat.
+    parked_colony_ship(&mut g, seat, BodyId::Earth);
     assert!(g.free_slots(StateId::EastAsia) > 0, "a free slot to build it in");
     let orders = g.ai_orders(seat);
     let scored: Vec<String> = g.log.iter().filter(|&l| l.contains("take") || l.contains("skip")).take(12).cloned().collect();
@@ -7440,6 +7450,9 @@ fn the_ai_raises_a_solar_array_on_its_station_when_energy_is_tight() {
     // Ticket #164 (version 0.07.5): a station nobody lives on has no Module slots, so nothing can
     // be raised on it at all. Its Core Module holds four, so put people there first.
     g.colony_mut(iss).unwrap().colonists = 2;
+    // Ticket #564 (version 0.1.0.3): with no Colony Ship the race for the first landing puts a
+    // Shipyard at 54 in the station's slot first; a Ship parked over Earth ends the race.
+    parked_colony_ship(&mut g, Seat(0), BodyId::Earth);
     let orders = g.ai_orders(Seat(0));
     assert!(orders.iter().any(|o| matches!(o, Order::BuildModule { colony, kind: ModuleKind::SolarArray } if *colony == iss)), "no Solar Array on the ISS: {orders:?}");
 }
@@ -7960,6 +7973,46 @@ fn the_custodian_ai_idles_an_earth_mine_for_an_even_trade() {
         orders.iter().any(|o| matches!(o, Order::Change { building: BuildingRef::Facility(StateId::EastAsia, j), what: BuildingChange::Mothball } if *j == i)),
         "an even trade (9.9 for 9.9) is taken: {orders:?}"
     );
+}
+
+/// Ticket #564 (version 0.1.0.3), at the designer's word: every computer seat races for the first
+/// landing. With no Colony Ship built or on order and the Moon unclaimed, the Shipyard and the Colony
+/// Ship are weighed at three times their base; once the seat holds a Colony Ship, at their base.
+#[test]
+fn every_computer_seat_races_for_the_first_landing_until_it_holds_a_colony_ship() {
+    let mut g = game();
+    calm(&mut g);
+    let cus = Seat(0);
+    g.seats[0].stockpile.energy = 500.0;
+    g.seats[0].stockpile.materials = 500.0;
+    g.seats[0].stockpile.fuel = 500.0;
+    g.seats[0].stockpile.ducats = 500.0;
+    assert!(g.first_at(BodyId::Moon).is_none() && !g.ships.iter().any(|s| s.seat == cus && s.kind == UnitKind::ColonyShip), "the premise: the Moon unclaimed, no Colony Ship");
+    assert_eq!(g.tables.ai.thresholds.moon_race_weight, 3.0, "the table");
+    let weight_of = |g: &mut Game, what: &str| -> f64 {
+        g.log.clear();
+        g.ai_orders(cus);
+        let l = g.log.iter().find(|l| l.contains(&format!("build {what} at"))).unwrap_or_else(|| panic!("no {what} candidate: {:?}", g.log.iter().filter(|l| l.contains("build")).collect::<Vec<_>>())).clone();
+        l.split_whitespace().nth(1).and_then(|n| n.parse().ok()).unwrap()
+    };
+    let yard_racing = weight_of(&mut g, "Shipyard");
+    // A yard standing: the Colony Ship is offered, at the race weight too.
+    let (iss, body, slot) = g.colonies.iter().find(|c| c.control.director() == Some(cus) && c.in_orbit).map(|c| (c.id, c.body, c.slot)).expect("the seat's station");
+    g.colony_mut(iss).unwrap().modules.push(Module::new(ModuleKind::Shipyard));
+    let ship_racing = weight_of(&mut g, "Colony Ship");
+    // The seat's first Colony Ship ends the lift on both.
+    g.ships.push(Ship { name: String::new(), id: ShipId(960), kind: UnitKind::ColonyShip, seat: cus, damage: 0, at: ShipAt::Body(body), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 35.0, slot: Some(slot) });
+    let ship_plain = weight_of(&mut g, "Colony Ship");
+    g.colony_mut(iss).unwrap().modules.retain(|m| m.kind != ModuleKind::Shipyard);
+    let yard_plain = weight_of(&mut g, "Shipyard");
+    assert!(yard_plain > 0.0 && (yard_racing - 3.0 * yard_plain).abs() <= 0.1 * yard_plain, "the Shipyard at three times its base while the race is on: {yard_racing} vs {yard_plain}");
+    assert!(ship_plain > 0.0 && (ship_racing - 3.0 * ship_plain).abs() <= 0.1 * ship_plain, "the Colony Ship at three times its base while the race is on: {ship_racing} vs {ship_plain}");
+    // The race is for the Moon: with the Moon claimed by a rival and the seat's Ship gone, no lift.
+    g.ships.retain(|s| s.id != ShipId(960));
+    let rival = colony(&mut g, Seat(1), BodyId::Moon, &[], 2);
+    g.body_firsts.push(BodyFirst { body: BodyId::Moon, seat: Seat(1), colony: rival });
+    let yard_after = weight_of(&mut g, "Shipyard");
+    assert!((yard_after - yard_plain).abs() <= 0.1 * yard_plain, "the Moon claimed, the Shipyard weighs its base: {yard_after} vs {yard_plain}");
 }
 
 /// Ticket #563 (version 0.1.0.3), at the designer's word: the computer Custodians weigh the trade
@@ -12294,12 +12347,21 @@ fn a_dug_in_army_fights_two_stronger_never_disengages_and_cannot_march_until_it_
 /// Habitat in; the Prospectors score the Exchange above it and take the Exchange; the Archivists,
 /// in Australia, score their first Shipyard above it and take the Shipyard. Neither orders a
 /// Habitat on turn one. The designer accepted this over exempting the Array from the slot count.
+///
+/// Ticket #564 (version 0.1.0.3): the race for the first landing comes first. With no Colony Ship
+/// and the Moon unclaimed, every seat with a station puts its Shipyard into the one free slot on
+/// turn one, at three times its base, and no Habitat; the by-Faction opening above is what the
+/// same seat orders once it holds a Colony Ship and the race is over for it.
 #[test]
 fn the_computer_opens_its_stations_one_free_slot_with_a_habitat_an_exchange_or_a_shipyard_by_faction() {
     let mut g = fresh();
     for seat in Seat::ALL {
         let Some(id) = station_of(&g, seat, BodyId::Earth) else { continue };
         assert_eq!(g.free_module_slots(g.colony(id).unwrap()), 1, "one slot free beside the Solar Array");
+        let racing = g.ai_orders(seat);
+        assert!(racing.iter().any(|o| matches!(o, Order::BuildModule { colony, kind: ModuleKind::Shipyard } if *colony == id)), "{:?} open with the Shipyard while the race is on: {racing:?}", g.kind(seat));
+        assert!(!racing.iter().any(|o| matches!(o, Order::BuildModule { colony, kind: ModuleKind::Habitat } if *colony == id)), "{:?} order no Habitat on turn one, the slot being the Shipyard's: {racing:?}", g.kind(seat));
+        parked_colony_ship(&mut g, seat, BodyId::Earth);
         let orders = g.ai_orders(seat);
         let ordered = |kind: ModuleKind| orders.iter().any(|o| matches!(o, Order::BuildModule { colony, kind: k } if *colony == id && *k == kind));
         match g.kind(seat) {
@@ -13274,6 +13336,9 @@ fn the_ai_wants_a_factory_module_where_a_colonys_queue_is_two_deep() {
     let iss = station_of(&g, cust, BodyId::Earth).unwrap();
     g.colony_mut(iss).unwrap().colonists = 0;
     let moon = colony(&mut g, cust, BodyId::Moon, &[], 4);
+    // Ticket #564 (version 0.1.0.3): with no Colony Ship the race for the first landing puts a
+    // Shipyard at 54 on the Moon ahead of everything; a Ship parked there ends the race.
+    parked_colony_ship(&mut g, cust, BodyId::Moon);
     for _ in 0..2 {
         g.colony_mut(moon).unwrap().queue.push(Build { item: BuildItem::Module(ModuleKind::Habitat), seat: cust, widgets: 4, done: 0, coastal: false, fuel: 0.0 });
     }
@@ -15640,10 +15705,15 @@ fn ticket_345_a_body_reached_by_two_seats_at_once_goes_to_the_greater_fleet() {
 /// prize. The witness is the FIGURE: the same twelve boards are put to the computer twice, once
 /// with `first_windfall_worth` as `ai.toml` has it and once with it at nought, and nothing else
 /// differs.
+///
+/// Ticket #564 (version 0.1.0.3), at the designer's word ("the race is for the Moon"): a seat's first
+/// Colony Ship flies to the Moon while it is unclaimed, whatever the windfalls say -- on these twelve
+/// boards, twelve of twelve. So the windfall's pull is read with the Moon already claimed by a rival,
+/// where the rule stands aside and the old ranking chooses.
 #[test]
 fn ticket_345_the_computer_sends_its_colony_ship_to_a_world_nobody_has_settled() {
-    let mars_system_picks = |worth: f64, claimed: bool| -> usize {
-        let mut picked = 0;
+    let picks = |worth: f64, moon_claimed: bool, all_claimed: bool| -> (usize, usize) {
+        let (mut moon, mut picked) = (0, 0);
         for seed in 1..13u64 {
             let mut t = Tables::load(&default_data_dir()).expect("tables load");
             t.ai.thresholds.first_windfall_worth = worth;
@@ -15655,10 +15725,13 @@ fn ticket_345_the_computer_sends_its_colony_ship_to_a_world_nobody_has_settled()
             let mut g = Game::new(Arc::new(t), NewGame { seed, player: FactionKind::Custodians, player_is_ai: false, player_start: StateId::EastAsia });
             calm(&mut g);
             g.turn = g.next_window_turn(1);
-            if claimed {
+            if moon_claimed {
                 // The record alone, with no Colony planted: nothing else about the board moves.
-                for (i, b) in [BodyId::Moon, BodyId::Mars, BodyId::Phobos, BodyId::Deimos].into_iter().enumerate() {
-                    g.body_firsts.push(BodyFirst { body: b, seat: Seat(2), colony: ColonyId(9_000 + i as u32) });
+                g.body_firsts.push(BodyFirst { body: BodyId::Moon, seat: Seat(2), colony: ColonyId(9_000) });
+            }
+            if all_claimed {
+                for (i, b) in [BodyId::Mars, BodyId::Phobos, BodyId::Deimos].into_iter().enumerate() {
+                    g.body_firsts.push(BodyFirst { body: b, seat: Seat(2), colony: ColonyId(9_001 + i as u32) });
                 }
             }
             let id = ShipId(g.fresh_id());
@@ -15676,15 +15749,20 @@ fn ticket_345_the_computer_sends_its_colony_ship_to_a_world_nobody_has_settled()
             if matches!(dest, Some(BodyId::Mars) | Some(BodyId::Phobos) | Some(BodyId::Deimos)) {
                 picked += 1;
             }
+            if dest == Some(BodyId::Moon) {
+                moon += 1;
+            }
         }
-        picked
+        (moon, picked)
     };
     let figure = Tables::load(&default_data_dir()).expect("tables load").ai.thresholds.first_windfall_worth;
     assert!(figure > 0.0, "the figure is in ai.toml and is not nought");
-    let (with_prize, without) = (mars_system_picks(figure, false), mars_system_picks(0.0, false));
+    // Ticket #564: the Moon unclaimed, the first Ship flies there on every board, windfall or none.
+    assert_eq!(picks(figure, false, false).0, 12, "the Moon unclaimed, twelve of twelve first Ships fly to it");
+    let (with_prize, without) = (picks(figure, true, false).1, picks(0.0, true, false).1);
     assert!(with_prize > without, "the windfall pulls the voyage out to the Mars system: {with_prize} boards of twelve against {without}");
     // And what it reads is the RECORD: with every first already claimed the figure buys nothing.
-    let spent = mars_system_picks(figure, true);
+    let spent = picks(figure, true, true).1;
     assert_eq!(spent, without, "a Body already claimed pays nothing, so the old ranking stands: {spent} against {without}");
 }
 
@@ -20802,6 +20880,9 @@ fn the_arkwrights_lean_toward_colonists_carried_beyond_earths_sphere() {
     let (ship, _) = colony_ship_ready(&mut g, BodyId::Earth);
     g.ship_mut(ship).unwrap().seat = ark;
     g.seats[2].opening_met_turn = Some(1);
+    // Ticket #564 (version 0.1.0.3): the Moon claimed by a rival, or the first Ship flies there and
+    // no flight beyond is a candidate.
+    g.body_firsts.push(BodyFirst { body: BodyId::Moon, seat: Seat(0), colony: ColonyId(9_100) });
     at_window(&mut g);
     let sent = |g: &mut Game| {
         g.log.clear();
@@ -21340,6 +21421,9 @@ fn the_ai_raises_a_capital_only_where_the_body_has_none() {
     for _ in 0..18 {
         g.colony_mut(c).unwrap().modules.push(Module::new(ModuleKind::Habitat));
     }
+    // Ticket #564 (version 0.1.0.3): a Colony Ship of the seat's, so the race for the first landing
+    // does not put a Shipyard at 54 ahead of the Capital in the budget.
+    parked_colony_ship(&mut g, Seat(1), BodyId::Moon);
     let raises = |g: &mut Game| g.ai_orders(Seat(1)).iter().any(|o| matches!(o, Order::RaiseTier { colony } if *colony == c));
     assert!(raises(&mut g), "full at eighteen, twenty-four people, no Capital on the Moon: {:#?}", g.log.iter().filter(|l| l.contains("upgrade") || l.starts_with("  take")).collect::<Vec<_>>());
     let other = capital_ready(&mut g, Seat(2), BodyId::Moon);

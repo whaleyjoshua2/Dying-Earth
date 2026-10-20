@@ -452,6 +452,14 @@ founding_pull_double_at = 9.0
 # the Mars system in eighty measured games. Both fall away the moment a Body is claimed, so the
 # pull is toward whatever world is still unsettled and never toward one that is.
 first_windfall_worth = 0.12
+# Ticket #564 (version 0.1.0.3), at the designer's word ("AI seats pursue first moon landing"):
+# while a seat holds no Colony Ship, built or on order, and the Moon is still unclaimed, its Shipyard
+# and Colony Ship are weighed at this times their base -- above the Bank (9) and the Scrubber (8) --
+# and its first Ship flies to the Moon. Measured before: the human landed on the Moon by turn 6 to
+# 10 in every playtest; the computer's first landing came at median turn 15 to 32, the Arkwrights'
+# nearly always. A race for ANY unclaimed Body was tried first: the Ships came early and flew past
+# the Moon to the bigger windfalls, the Prospectors to Mars by turn 11, and took 53 of 80 games.
+moon_race_weight = 3.0
 first_found_weight = 1.5
 attack_odds = 0.6
 # Ticket #284 (version 0.08.5): every seat may attack a place it did not lose, on the odds, given a

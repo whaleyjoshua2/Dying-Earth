@@ -787,6 +787,14 @@ impl Game {
         if bodies.is_empty() {
             return BodyId::Moon;
         }
+        // Ticket #564 (version 0.1.0.3), at the designer's word ("the race is for the Moon"): while
+        // the Moon is unclaimed with a free slot and the seat directs no ground Colony off Earth, its
+        // first Ship flies there, whatever the windfalls say. Measured before: the race weight alone
+        // built the Ship early and the windfalls sent it past the Moon, the Prospectors to Mars by
+        // turn 11, and they took 53 of 80 games.
+        if self.first_at(BodyId::Moon).is_none() && bodies.contains(&BodyId::Moon) && !self.colonies.iter().any(|c| c.control.director() == Some(seat) && !c.in_orbit && c.body != BodyId::Earth) {
+            return BodyId::Moon;
+        }
         // Ticket #51, the Arkwrights' spread rule: once one Body of theirs holds the 4 Colonists
         // Diaspora asks of each, the next Colony goes to a Body they are not on yet.
         let each = t.faction(self.kind(seat)).victory_second.colonists_each;
@@ -1216,6 +1224,17 @@ impl Game {
             let col = self.colony(*c).unwrap();
             col.modules.iter().any(|m| m.kind == ModuleKind::Shipyard) || col.queue.iter().any(|b| b.item == BuildItem::Module(ModuleKind::Shipyard))
         });
+        // Ticket #564 (version 0.1.0.3), at the designer's word: the race for the first Moon landing.
+        // While the seat holds no Colony Ship, built or on order, and the Moon is still unclaimed
+        // with a free slot, its Shipyard and Colony Ship are weighed at `moon_race_weight` times
+        // their base; the lift ends with the first Ship or the first landing. Measured before: the
+        // computer's first Moon landing came at median turn 15 to 32 against the human's 6 to 10;
+        // a race for any unclaimed Body sent the first Ships past the Moon (see `best_body_for`).
+        let moon_race = {
+            let has_colony_ship = self.ships.iter().any(|s| s.seat == seat && s.kind == UnitKind::ColonyShip) || self.queues_of(seat).any(|b| b.item == BuildItem::Unit(UnitKind::ColonyShip));
+            let unclaimed = self.first_at(BodyId::Moon).is_none() && !self.free_slots_on(BodyId::Moon).is_empty();
+            if !has_colony_ship && unclaimed { th.moon_race_weight } else { 1.0 }
+        };
         // Ticket #559 (version 0.1.0.3): each build's own card figure, where a flat 6 was counted
         // for every Power Plant's job, so a Wind Farm on order counts its 3 and a Replace under way
         // trades the Power Plant's figure for the Wind Farm's.
@@ -1925,7 +1944,7 @@ impl Game {
                             continue;
                         }
                         // Ticket #398 (version 0.09.3): sought where Build Where You Dig reaches its Ships.
-                        (Cat::LaunchSiteOrShipyard, self.base_weight(seat, Cat::LaunchSiteOrShipyard) * self.ai_shipyard_bonus(cid))
+                        (Cat::LaunchSiteOrShipyard, self.base_weight(seat, Cat::LaunchSiteOrShipyard) * self.ai_shipyard_bonus(cid) * moon_race)
                     }
                     ModuleKind::Barracks => {
                         if col.modules.iter().any(|m| m.kind == ModuleKind::Barracks) {
@@ -2127,7 +2146,9 @@ impl Game {
                     Some(buy) => vec![buy, build],
                     None => vec![build],
                 };
-                push(orders, cat, self.base_weight(seat, cat), gap_for(cat, None), lift, if cat == Cat::Warship { fleet_opp } else { 1.0 }, format!("build {} at {}", uk.name(), self.place_name(Place::Colony(cid))), None);
+                // Ticket #564 (version 0.1.0.3): the Colony Ship at the race weight while it stands.
+                let race = if cat == Cat::ColonyShip { moon_race } else { 1.0 };
+                push(orders, cat, self.base_weight(seat, cat) * race, gap_for(cat, None), lift, if cat == Cat::Warship { fleet_opp } else { 1.0 }, format!("build {} at {}", uk.name(), self.place_name(Place::Colony(cid))), None);
             }
         }
 

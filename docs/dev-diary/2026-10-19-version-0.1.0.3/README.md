@@ -195,3 +195,50 @@ Income over the batch, per Faction, mean a game (Materials / Fuel / Energy / Duc
 new line: Custodians 466 / 608 / 2497 / 2472 / 1310; Prospectors 2180 / 546 / 3217 / 1285 / 516;
 Arkwrights 2363 / 517 / 3557 / 4429 / 377; Archivists 641 / 318 / 1417 / 718 / 1001. Income only:
 what the market pays a seller is not in it.
+
+## Every computer seat races for the first landing
+
+Ticket [#564](https://github.com/whaleyjoshua2/Dying-Earth/issues/564), spec §7. The human landed
+on the Moon by turn 6 to 10 in every playtest; the computer's first landing came at median turn 15
+to 32 by seating, the Arkwrights' in 37 of the 50 games anyone landed. Decided in one round: a race
+weight of 3 on the Shipyard and the Colony Ship while the seat holds no Colony Ship and a Body is
+unclaimed, every seat, the Mars window contested the same way, and the bar at median turn 12.
+
+**Built.** `moon_race_weight = 3.0` (`ai.toml`), read once a turn in `ai_orders` and multiplied
+into the Shipyard candidate and the Colony Ship's. Red first with the rule stubbed to 1: "the
+Shipyard at three times its base while the race is on: 6 vs 6". The weight reaches far: five older
+budget tests that read a fifth build or a station's one slot found a Shipyard at 54 in the way, and
+each now parks a Colony Ship of the seat's first (`parked_colony_ship`), so the race is over for it
+and the figure it read stands; the turn-one opening test reads the race first (every seat with a
+station opens with its Shipyard, no Habitat) and the old by-Faction opening once a Ship is parked.
+
+**The first sweep, a race for any unclaimed Body at x3** ([`sweeps/ticket-564.txt`](sweeps/ticket-564.txt)):
+**11 / 53 / 7 / 7 and 2 collapses**, from 17 / 21 / 20 / 11 and 11. The race built the Ships early
+and the destination rule sent them past the Moon to the bigger windfalls (the Moon's 5 against
+Mars's 15 and Phobos's 20): Mars was landed at median turn 11 to 13 in every seating, the
+Prospectors every time, and they met their Victory outright in most seeds. The Moon's first landing
+came at median turn 15 / 22 / 14 / 26, the bar of 12 missed, though its winners spread beyond the
+Arkwrights at last. A side effect worth keeping in view: Production Moved from East Asia read 15
+(the Custodians there left Earth), and 83 / 127 / 105 from the other starts. **At x2**
+([`sweeps/ticket-564-x2.txt`](sweeps/ticket-564-x2.txt)): 9 / 47 / 14 / 6 and 4, the Moon no
+sooner (14 / 24 / 28 / 28), East Asia back at nought. The designer: "the race is for the Moon".
+
+**The second build**: the lift stands only while the Moon is unclaimed, and a seat's first Colony
+Ship flies to the Moon while it is, whatever the windfalls say (`best_body_for`), the windfalls
+themselves untouched. Red first with the destination rule removed, on ticket #345's twelve boards:
+"the Moon unclaimed, twelve of twelve first Ships fly to it: 0". Two destination tests re-pinned
+with the Moon claimed by a rival before they read the windfalls' pull.
+
+**The sweep, the race for the Moon** ([`sweeps/ticket-564-moon.txt`](sweeps/ticket-564-moon.txt)):
+**14 / 56 / 4 / 5 and 1 collapse**. The Moon is landed at median turn **9 / 7 / 8 / 8** by seating,
+20 of 20 games in each, where the human landed at 6 to 10: the ticket's bar met. Its guard -- no
+fall in the four Factions' wins -- is missed by a distance: the Prospectors are first to the Moon in
+19 / 18 / 16 / 19 of 20 and win 56 of 80, the Arkwrights fall from 20 to 4 and the Archivists from
+11 to 5. The Prospectors' Victory gate moved only 27 to 25, so the early Moon Colony carries them
+through the rest rather than the gate. Production Moved from East Asia holds at 15 and reads 93 /
+162 / 170 from the other starts; the Custodians' Materials Income doubled (466 to 1001 a game), the
+Moon Mine under Production Moved. Income per Faction, mean a game (Materials / Fuel / Energy /
+Ducats / Research): Custodians 1001 / 322 / 2399 / 1408 / 881; Prospectors 2066 / 454 / 2935 /
+1586 / 408; Arkwrights 1613 / 368 / 2401 / 3269 / 271; Archivists 482 / 274 / 1199 / 484 / 803.
+The designer closed the ticket on the Moon measure and asked for a ticket raising the Prospectors'
+Venture Fund bar to 4250.
