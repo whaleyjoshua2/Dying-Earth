@@ -102,7 +102,8 @@ signature = "Cheap Industry and the Strip Permit. Raising Industry Level costs t
 # Ticket #203 (version 0.08.1). The building is ticket #182's.
 unique = "Investment Bank -- replaces the Bank, and banks 1% interest a turn on the Venture Capital Fund's balance, one building per Region paying, never less than 1 Ducat in all. Off Earth, the Exchange -- replaces the Trade Post, and pays 1 more Ducat a turn."
 # Ticket #72: the Extraction Total is retired; the first part is Ducats banked in the Fund.
-victory = "3500 Ducats in the Venture Capital Fund, plus 18 Colonists living off Earth."
+# Ticket #580 (version 0.1.0.3): the figures read from the bars below, as the short text's are.
+victory = "{first} Ducats in the Venture Capital Fund, plus {second} Colonists living off Earth."
 victory_short = "put {first} Ducats in the Venture Capital Fund with {second} Colonists living off Earth,"
 # Ticket #182 (version 0.08.0): 750 to 1000, because the Investment Bank pays uncapped interest
 # on the Fund. Measured first: in 40 games nobody EVER reached 750 -- the highest balance ever
@@ -117,7 +118,9 @@ victory_short = "put {first} Ducats in the Venture Capital Fund with {second} Co
 # Ticket #567 (version 0.1.0.3): the Fund counts 0.7 of the score, the Presence 0.3 -- the Fund is the
 # long pole (3,500 against 18 Colonists met by turn 12), and a Fund at 17% beside a full Presence
 # read 59%; it reads 42%.
-victory_first = { kind = "venture_fund", bar = 3500, weight = 0.7 }
+# Ticket #580 (version 0.1.0.3), at the designer's word: 4,250 (3,500 x 17/14), with the race for the
+# Moon (#564) putting the Prospectors first there in 16 to 19 games of 20 and at 56 wins of 80.
+victory_first = { kind = "venture_fund", bar = 4250, weight = 0.7 }
 victory_second = { kind = "off_world_presence", bar = 18 }
 # Ticket #471 (version 0.09.7): the Opening Objective -- no deadline, met once, rewarded once.
 # Ticket #478 (version 0.09.8): 75 Ducats to 50, and the three Banks must work three Incomes running.

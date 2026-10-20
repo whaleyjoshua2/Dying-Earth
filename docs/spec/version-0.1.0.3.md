@@ -279,3 +279,27 @@ missing Colonial Capital held the win. The score is the weighted mean of the two
   Prospectors, two to the Arkwrights), the rest met outright. The computer Arkwrights held a Capital
   at the end in 4 games of 80, so the tenth is off their score in nearly every game; the Fund at the
   end by seating 3,780 / 8,025 / 3,578 / 3,585; Income per Faction as the sweep file.
+
+## 11. The Prospectors' Venture Fund at 4,250
+
+Ticket: [The Prospectors' Venture Fund at 4250](https://github.com/whaleyjoshua2/Dying-Earth/issues/580).
+
+The designer, closing the race for the Moon (§7): *"add a ticket to increase their victory fund to
+4250"*. The race put the Prospectors first to the Moon in 16 to 19 games of 20 and at 56 wins of 80,
+60 in the last sweep; their gate's median turn moved only 27 to 25.
+
+- **The bar is 4,250** (`victory_first.bar`, 3,500 x 17/14). The card's long text reads the bar
+  (`{first}`, `{second}`) as the short text does, through `Tables::victory_text`, and the data
+  refuses a placeholder the card cannot fill; the other three cards' long texts still type their
+  figures and read as written.
+- **The computer Prospectors' pace** scales with it: 567 / 1,417 / 2,550 / 4,250 at turns 12 / 25 /
+  37 / 47. The waypoints keep their turns; the pace asks a fifth more Fund at every turn, so a seat
+  with the same Fund reads behind earlier and banks harder (the review).
+- **The review** found the headless shot aid `rival:1` still setting the Fund at 2625, which at the
+  new bar scored 0.67 and fired no Moment, so the Report's rival-Moment picture was dead: 3230 now.
+- Nine older pins moved with the bar (margins at 5,100, the Moment's "3230 of 4250", the turn-one line).
+- **Swept** (`sweeps/ticket-580.txt`, 20 seeds x four seatings): **9 / 59 / 5 / 7 and no collapse**,
+  from 9 / 60 / 5 / 6 -- the bar did not bite. The Prospectors' gate median turn 25 as before; games
+  still running at turn 39, 40 of 80 from 37; their Fund at the end by seating 4,495 / 8,113 / 3,753
+  / 4,352, from 3,780 / 8,025 / 3,578 / 3,585 -- up by about the bar's fifth, since the pace table
+  scaled with it and the computer Prospectors bank to their pace. Income per Faction as the sweep file.

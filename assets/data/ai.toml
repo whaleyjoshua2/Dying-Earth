@@ -382,8 +382,9 @@ bounty_least = 1.0
 # 1000. A test now holds every `first` schedule to its bar.
 # Ticket #506 (version 0.1.0.0): every turn stretched by 50/36 and every figure to the new bar
 # (the Fund 3,500, 18 off Earth), with the game at fifty turns.
+# Ticket #580 (version 0.1.0.3): every figure x 4250/3500 with the bar, the turns as they were.
 [pace.prospectors]
-first = [[12, 467], [25, 1167], [37, 2100], [47, 3500]]
+first = [[12, 567], [25, 1417], [37, 2550], [47, 4250]]
 colonists = [[17, 6], [31, 18]]
 
 [pace.custodians]

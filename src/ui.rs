@@ -2266,7 +2266,8 @@ fn faction_rulebook(ui: &mut Ui, session: &Session, kind: FactionKind) {
     draw_with_icons(ui, &session.tables.signature(kind), 14.0, ink, &[]);
     ui.add_space(6.0);
     ui.label(RichText::new("Victory Condition").strong());
-    draw_with_icons(ui, &card.victory, 14.0, ink, &[]);
+    // Ticket #580 (version 0.1.0.3): with its bars read from the data, as the signature rule's are.
+    draw_with_icons(ui, &session.tables.victory_text(kind), 14.0, ink, &[]);
     // Ticket #84: the gate Tech it waits on.
     if let Some(gate) = session.tables.victory_gate(kind) {
         let t = session.tables.tech(gate);

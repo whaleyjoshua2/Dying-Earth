@@ -315,3 +315,25 @@ Arkwrights held a Capital at the end in 4 of 80, so their tenth is off in nearly
 per Faction (Materials / Fuel / Energy / Ducats / Research, mean a game): Custodians 999 / 274 /
 2299 / 1403 / 827; Prospectors 2092 / 461 / 2881 / 1572 / 402; Arkwrights 1658 / 370 / 2407 / 3268 /
 286; Archivists 469 / 266 / 1175 / 484 / 749.
+
+## The Prospectors' Venture Fund at 4,250
+
+Ticket [#580](https://github.com/whaleyjoshua2/Dying-Earth/issues/580), spec §11. The designer's
+figure, from the race for the Moon. One round: the bar and its text, the pace scaled, a sweep.
+Built: `bar = 4250`; the card's long text reads the bar through `victory_text` (it carried a typed
+3500); the pace table x 4250/3500. Red first on the bar, the text and the pace, with the renderer
+stubbed to the text as written; nine older pins moved.
+
+**The review** found the headless shot aid `rival:1` still at a Fund of 2625, which at 4,250 scores
+0.67 and fires no Moment, so the Report's rival-Moment picture was dead: 3230 now. Also from the
+review: the pace asks a fifth more at every turn, so the computer Prospectors read behind earlier,
+not "at the same turns" as the spec first said; stale pin comments mended.
+
+**Swept** ([`sweeps/ticket-580.txt`](sweeps/ticket-580.txt)): 9 / 59 / 5 / 7 and no collapse, from
+9 / 60 / 5 / 6 -- the bar did not bite. The gate's median turn 25 as before; games still running at
+turn 39, 40 of 80 from 37. The Prospectors' Fund at the end rose by about the bar's fifth (4,495 /
+8,113 / 3,753 / 4,352 by seating, from 3,780 / 8,025 / 3,578 / 3,585): the pace table scaled with
+the bar, and the computer Prospectors bank to their pace. Income per Faction (Materials / Fuel /
+Energy / Ducats / Research, mean a game): Custodians 986 / 277 / 2352 / 1421 / 844; Prospectors
+2274 / 481 / 3053 / 1481 / 447; Arkwrights 1688 / 366 / 2437 / 3368 / 292; Archivists 476 / 271 /
+1187 / 504 / 786.

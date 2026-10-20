@@ -2478,6 +2478,10 @@ impl Tables {
             if let Some(p) = crate::report::placeholders(&f.victory_short).into_iter().find(|p| !fillable.contains(&p.as_str())) {
                 return Err(err("factions.toml", format!("row {}: victory_short uses {{{p}}}, which its Victory Condition cannot fill", f.name)));
             }
+            // Ticket #580 (version 0.1.0.3): and the long text, which may read the same bars.
+            if let Some(p) = crate::report::placeholders(&f.victory).into_iter().find(|p| !fillable.contains(&p.as_str())) {
+                return Err(err("factions.toml", format!("row {}: victory uses {{{p}}}, which its Victory Condition cannot fill", f.name)));
+            }
             for (what, m) in [
                 ("habitat_capacity_multiplier", f.habitat_capacity_multiplier),
                 ("transit_fuel_multiplier", f.transit_fuel_multiplier),
@@ -2825,6 +2829,20 @@ impl Tables {
         let f = self.faction(kind);
         crate::report::render(
             &f.victory_short,
+            &[
+                ("first", figure(f.victory_first.bar)),
+                ("second", figure(f.victory_second.bar)),
+                ("bodies", figure(f.victory_second.bodies as f64)),
+            ],
+        )
+    }
+    /// Ticket #580 (version 0.1.0.3): the Faction's Victory Condition in full, its figures filled
+    /// from its own bars as `victory_short` fills them, so a moved bar cannot leave a typed copy
+    /// lying (the Prospectors' card said 3500 at a bar of 4,250). A text naming none reads as written.
+    pub fn victory_text(&self, kind: FactionKind) -> String {
+        let f = self.faction(kind);
+        crate::report::render(
+            &f.victory,
             &[
                 ("first", figure(f.victory_first.bar)),
                 ("second", figure(f.victory_second.bar)),

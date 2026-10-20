@@ -646,16 +646,17 @@ fn build_board(session: &mut Session) {
         }
         // `rival:1` (a building aid, ticket #261, version 0.08.4): seat 1 stands three quarters of
         // the way to its Victory Condition -- fourteen Colonists on the Moon of eighteen, and, for
-        // the Prospectors it usually is, the Fund at 2625 of 3500 (ticket #506: nine of twelve and
-        // 2000 of 2500 before) -- and a quiet turn runs so the rival's Moment fires and
-        // `moment:rival` can open it in the Report picture.
+        // the Prospectors it usually is, the Fund at 3230 of 4250 (ticket #580, version 0.1.0.3,
+        // from the review: 2625 of 3500 since ticket #506, nine of twelve and 2000 of 2500 before;
+        // at the 4,250 bar 2625 scored 0.67 and the Moment never fired) -- and a quiet turn runs so
+        // the rival's Moment fires and `moment:rival` can open it in the Report picture.
         if std::env::args().any(|a| a == "rival:1") {
             let rival = Seat(1);
             let slot = g.free_slots_on(BodyId::Moon).first().copied().unwrap_or(0);
             let id = ColonyId(g.fresh_id());
             let modules = vec![Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Habitat)];
             g.colonies.push(Colony { id, body: BodyId::Moon, slot, control: Control::Controlled(rival), modules, colonists: 14, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, tier: 0, in_orbit: false });
-            g.seats[1].venture_fund = 2625.0;
+            g.seats[1].venture_fund = 3230.0;
             g.seats[1].stabilization_run = 4;
             run_one_quiet_turn(g);
         }
