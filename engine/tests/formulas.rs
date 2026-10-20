@@ -10120,6 +10120,9 @@ fn an_investment_bank_banks_a_hundredth_of_the_fund_one_per_region() {
     let before = g.seats[pro.index()].stockpile.materials;
     g.income_phase();
     assert_eq!(g.seats[pro.index()].venture_fund, 500.0 + 10.0, "1% of 500 is 5, once per Region, twice");
+    // Ticket #566 (version 0.1.0.3): the interest is kept beside the banked share, so the Fund line
+    // can say the growth whole; the playtest read "+566 in a turn that said 90 banked" as a bug.
+    assert_eq!((g.seats[pro.index()].venture_interest_last_turn, g.seats[pro.index()].venture_banked_last_turn), (10.0, 0.0), "ten of interest, nothing banked");
     assert_eq!(g.seats[pro.index()].stockpile.materials - before, g.seats[pro.index()].income_last_turn.materials, "the interest is created, never taken from the Stockpile");
 
     // And it compounds: next turn's interest reads the larger balance.

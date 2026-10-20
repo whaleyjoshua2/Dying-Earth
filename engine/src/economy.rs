@@ -1769,6 +1769,8 @@ impl Game {
             s.doubled_module_turns += doubled_turns;
             s.venture_fund = tenth(s.venture_fund + banked + interest_to_fund);
             s.venture_banked_last_turn = banked;
+            // Ticket #566 (version 0.1.0.3): and the interest, so the Fund line says the growth whole.
+            s.venture_interest_last_turn = interest_to_fund;
         }
         if keep_short {
             let mut names = Vec::new();

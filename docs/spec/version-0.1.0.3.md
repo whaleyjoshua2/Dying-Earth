@@ -228,3 +228,20 @@ modules at the archive's site lack the population to run it they go offline."*
 80 games): **12 / 58 / 6 / 2 and 1 collapse**, from 14 / 56 / 4 / 5 and 1 -- inside noise but for
 the Archivists' direction, five to two, four turns of uploading now standing between a complete
 Archive (median turn 34 to 35) and the win. Their gate's median turn is 28, as before.
+
+## 9. The Venture Fund's growth, shown whole
+
+Ticket: [The Venture Fund grows past its banked line: explained and shown](https://github.com/whaleyjoshua2/Dying-Earth/issues/566).
+
+Three testers read a Fund up 566 beside "90 banked last turn" as a bug. It is not: the Fund takes the
+banked share of Ducat income, the Investment Banks' and Exchanges' interest (a hundredth of the
+balance per payer, floor 1, compounding) and the Objectives' one-off rewards, and the line read the
+share alone.
+
+- **The interest is kept beside the share** (`venture_interest_last_turn`), and the Fund line says
+  the growth whole: **"Fund 3742; +312 last turn (100 banked, 212 interest)."** in the window and
+  the tool. Rewards land at the Resolution and keep their Report line.
+- **The rate stands** (designer: "leave it"): one Bank a Region, the dearer Influence and the Fund
+  bar at 4,250 (ticketed) are this version's brakes; the last sweep's Fund at the end was median
+  3,742 / 8,419 / 3,582 / 3,597 by seating.
+- No rule moves, so no sweep.

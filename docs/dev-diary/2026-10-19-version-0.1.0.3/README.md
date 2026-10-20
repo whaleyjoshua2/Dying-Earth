@@ -277,3 +277,11 @@ the yield's figure and skips the dark now); and the Resolution's grid and card c
 Module until the next Income (they keep it dark). Two more uncrewed fixtures surfaced on the last.
 The sweep above predates these fixes; none touches a rule the sweep's figures turn on, and the next
 ticket's sweep carries them.
+
+## The Venture Fund's growth, shown whole
+
+Ticket [#566](https://github.com/whaleyjoshua2/Dying-Earth/issues/566), spec §9. Not a bug: three
+pay-ins and a line that named one. Decided in one round: show the growth whole with its parts; leave
+the rate. Built: `venture_interest_last_turn` set at Income beside the banked share; the window's
+line and the tool read "Fund 3742; +312 last turn (100 banked, 212 interest)." Red first on the
+field (ten of interest against nought) and a window test on the line. No rule moves, so no sweep.

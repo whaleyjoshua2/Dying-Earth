@@ -2706,6 +2706,13 @@ fn bar_resource_with(ui: &mut Ui, icons: &Icons, key: &str, word: &str, value: S
 
 /// The Influence figure's hover, lifted out of the bar when ticket #128 moved the figure.
 /// Ticket #537 (version 0.1.0.1): the price read from the table, where the hover said 2 in words.
+/// Ticket #566 (version 0.1.0.3): the Fund line, the growth whole with its parts.
+fn fund_line(game: &Game, me: Seat) -> String {
+    let s = game.seat(me);
+    let (banked, interest) = (s.venture_banked_last_turn, s.venture_interest_last_turn);
+    format!("Fund {}; +{} last turn ({} banked, {} interest).", figure(s.venture_fund), figure(banked + interest), figure(banked), figure(interest))
+}
+
 fn influence_hover(game: &Game) -> String {
     format!("The Allotment is what your places and buildings give each turn; bought Influence comes from the Trading window at {} Ducats each.", game.tables.ducats.per_influence)
 }
@@ -11292,14 +11299,9 @@ fn venture_fund_control(ui: &mut Ui, session: &Session, game: &Game, view: &mut 
     }
     share = share.min(cap);
     let fund = game.seat(me).venture_fund;
-    let banked = game.seat(me).venture_banked_last_turn;
-    ui.label(
-        RichText::new(format!(
-            "The Fund holds {fund} Ducats; {banked} went in last turn.{}",
-            pending_set.filter(|p| *p != standing).map(|p| format!(" {p}% from the next Income.")).unwrap_or_default()
-        ))
-        .weak(),
-    );
+    // Ticket #566 (version 0.1.0.3), at the designer's word: the growth whole, with its parts. The
+    // playtest read a Fund up 566 beside "90 banked" as a bug; the rest was the Banks' interest.
+    ui.label(RichText::new(format!("{}{}", fund_line(game, me), pending_set.filter(|p| *p != standing).map(|p| format!(" {p}% from the next Income.")).unwrap_or_default())).weak());
     // Ticket #380 (version 0.09.2): as the Research Directive's rail, which this copies: the check
     // runs against the orders that will stand, and a refusal holds the rail and is remembered on
     // it until the next accepted setting.
@@ -13062,6 +13064,17 @@ mod tests {
         let tables = std::sync::Arc::new(dying_earth_engine::data::Tables::load(&dying_earth_engine::data::default_data_dir()).unwrap());
         let g = Game::new(tables, NewGame { seed: 7, player: FactionKind::Custodians, player_is_ai: false, player_start: StateId::EastAsia });
         assert_eq!(recruit_hover(&g, StateId::EastAsia, 2), "2M people, Unrest -0.25.");
+    }
+
+    /// Ticket #566 (version 0.1.0.3): the Fund line says last turn's growth whole, banked and interest.
+    #[test]
+    fn the_fund_line_says_the_growth_whole() {
+        let tables = std::sync::Arc::new(dying_earth_engine::data::Tables::load(&dying_earth_engine::data::default_data_dir()).unwrap());
+        let mut g = Game::new(tables, NewGame { seed: 7, player: FactionKind::Prospectors, player_is_ai: false, player_start: StateId::EastAsia });
+        g.seats[0].venture_fund = 3742.0;
+        g.seats[0].venture_banked_last_turn = 100.0;
+        g.seats[0].venture_interest_last_turn = 212.0;
+        assert_eq!(fund_line(&g, Seat(0)), "Fund 3742; +312 last turn (100 banked, 212 interest).");
     }
 
     /// Ticket #537 (version 0.1.0.1): the Influence hover says the table's price, four Ducats;
