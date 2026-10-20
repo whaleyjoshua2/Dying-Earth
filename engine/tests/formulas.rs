@@ -21959,6 +21959,7 @@ fn an_accord_runs_five_turns_and_lapses_unless_both_renew() {
     assert_eq!(left(&g), Some(1), "its last turn");
     g.settle_accords();
     assert_eq!(left(&g), None, "lapsed at the end of its fifth turn");
+    assert!(g.refusals.is_empty(), "ticket #572 (the review): a run-out between computer seats is no refusal");
     // Both willing: renewed for another five, from the turn after its last.
     g.relations.score[b.index()][a.index()] = 0;
     g.strike_accord(a, b, vec![Term::NonAggression]).unwrap();
@@ -21971,8 +21972,9 @@ fn an_accord_runs_five_turns_and_lapses_unless_both_renew() {
 
 /// Ticket #509 (the designer, after the build): the player is not prompted. In the Accord's last
 /// turn a willing rival leaves it renewable, and the player's own Renew order is the acceptance:
-/// it runs five more turns. Without the order it lapses, and nothing is remembered. A rival that
-/// will not renew makes the order refused, and the Report says it let the Accord lapse.
+/// it runs five more turns. Without the order it lapses; ticket #572 (version 0.1.0.3): and the
+/// willing rival remembers the run-out as a refusal. A rival that will not renew makes the order
+/// refused, and the Report says it let the Accord lapse.
 #[test]
 fn the_player_renews_with_an_order_and_a_rival_that_will_not_says_so() {
     let mut g = game();
@@ -21991,13 +21993,19 @@ fn the_player_renews_with_an_order_and_a_rival_that_will_not_says_so() {
     assert_eq!(g.accords[0].since, struck + 5);
     accord_turn(&mut g);
     assert!(g.accords.iter().any(|x| x.holds(Seat(0), Seat(1))), "renewed past its fifth turn");
-    // No order: it lapses at its end, and nothing is remembered against anybody.
+    assert!(!g.refused_recently(Seat(1), Seat(0)), "a renewal is no refusal (ticket #572)");
+    // No order: it lapses at its end. Ticket #572 (version 0.1.0.3), at the designer's word: the
+    // partner that would have renewed remembers the run-out as a refusal, so its fresh offer waits
+    // the cooldown where it came the next turn ("every five turns they re-offer non-aggression").
     for _ in 0..4 {
         accord_turn(&mut g);
     }
+    assert!(g.renewal_willing(Seat(1), Seat(0)), "the premise: the Prospectors would renew");
+    assert!(!g.refused_recently(Seat(1), Seat(0)), "nothing remembered while it stands");
     g.settle_accords();
     assert!(g.accords.is_empty(), "lapsed");
-    assert!(!g.refused_recently(Seat(1), Seat(0)));
+    assert!(g.refused_recently(Seat(1), Seat(0)), "the run-out counts as a refusal of the Prospectors");
+    assert!(!g.refused_recently(Seat(0), Seat(1)), "and not the other way about");
     // A rival that has soured: the order is refused, and the Report says so.
     g.strike_accord(Seat(0), Seat(2), vec![Term::NonAggression]).unwrap();
     g.relations.score[2][0] = -5;
@@ -22008,6 +22016,11 @@ fn the_player_renews_with_an_order_and_a_rival_that_will_not_says_so() {
     accord_turn(&mut g);
     assert!(g.check_order(Seat(0), &[], &Order::RenewAccord { with: Seat(2) }).unwrap_err().0.contains("will not renew"));
     assert!(g.report.lines.iter().any(|l| l.kind == LineKind::YourWorks && l.text.contains("let your Accord lapse")), "{:?}", g.report.lines);
+    // Ticket #572 (the review): the run-out of an Accord the partner would not renew is its own
+    // refusal, not the player's: nothing is remembered against the player.
+    g.settle_accords();
+    assert!(g.accords.iter().all(|x| !x.holds(Seat(0), Seat(2))), "lapsed");
+    assert!(!g.refused_recently(Seat(2), Seat(0)));
 }
 
 /// Ticket #509: a research agreement renews only while both are still Friendly; below it, the rest
@@ -24081,4 +24094,109 @@ fn the_computer_builds_a_wind_farm_for_a_power_plant_once_clean_power_stands_unl
     let orders = g.ai_orders(pro);
     assert_eq!(replaces(&orders), 0, "Energy tight: it keeps the Power Plant's 6: {orders:?}");
     assert!(!power(&orders).1, "and raises no Wind Farm either: {orders:?}");
+}
+
+// ---------------------------------------------------------------- #572 A refused offer waits (version 0.1.0.3)
+
+/// Ticket #572 (version 0.1.0.3), at the designer's word: the last Trade a seat refused is
+/// remembered per pair by its two goods, and the computer offers that seat no Trade of the same two
+/// goods again, the cooldown over or not, until a Trade of different goods has been refused in its
+/// place. The amounts do not count.
+#[test]
+fn a_refused_trade_is_not_offered_again_with_the_same_goods() {
+    let mut g = game();
+    calm(&mut g);
+    // The Prospectors, out of Fuel and long on Energy, stand best with the player.
+    g.seats[1].stockpile.fuel = 0.0;
+    g.seats[1].stockpile.energy = 10_000.0;
+    g.seats[1].stockpile.materials = 50.0;
+    g.seats[1].stockpile.ducats = 50.0;
+    g.relations.score[1][0] = 9;
+    let trade_to_player = |g: &mut Game| {
+        g.ai_orders(Seat(1)).into_iter().find_map(|o| match o {
+            Order::ProposeTrade { to: Seat(0), give, get } => Some((give, get)),
+            _ => None,
+        })
+    };
+    let (give, get) = trade_to_player(&mut g).expect("the premise: the computer offers the player a Trade");
+    assert!(matches!(give, TradeGood::Goods(Resource::Energy, _)) && matches!(get, TradeGood::Goods(Resource::Fuel, _)), "{give:?} for {get:?}");
+    g.commit_orders(Seat(1), &[Order::ProposeTrade { to: Seat(0), give, get }]);
+    g.answer_offer(Seat(0), 0, false).unwrap();
+    assert!(g.trade_refused_before(Seat(1), Seat(0), Resource::Energy, Resource::Fuel));
+    assert!(!g.trade_refused_before(Seat(1), Seat(0), Resource::Fuel, Resource::Energy), "the two goods, each on its side");
+    g.turn += g.tables.relations.offer_refused_turns;
+    assert!(!g.refused_recently(Seat(1), Seat(0)), "the cooldown is over");
+    assert!(trade_to_player(&mut g).is_none(), "but Energy for Fuel is not offered again");
+    // A Trade of different goods refused in its place frees them.
+    g.commit_orders(Seat(1), &[Order::ProposeTrade { to: Seat(0), give: TradeGood::Goods(Resource::Materials, 5), get: TradeGood::Goods(Resource::Ducats, 5) }]);
+    g.answer_offer(Seat(0), 0, false).unwrap();
+    assert!(!g.trade_refused_before(Seat(1), Seat(0), Resource::Energy, Resource::Fuel));
+    assert!(g.trade_refused_before(Seat(1), Seat(0), Resource::Materials, Resource::Ducats));
+    g.turn += g.tables.relations.offer_refused_turns;
+    assert!(trade_to_player(&mut g).is_some(), "and may offer Energy for Fuel again");
+}
+
+/// Ticket #572: a Trade offered to the player may be countered once -- the same two goods, the
+/// player's own amounts -- and the offerer answers at once by its Trade rule. A seat short of the
+/// good it asked for pays up to `trade_counter_margin` over fair value; one not short pays fair
+/// value alone, as for any Trade. A refused counter is the refusal, remembered as one, and the
+/// offer is gone either way. A counter the player cannot pay is refused at the door and the offer
+/// stays.
+#[test]
+fn a_counter_is_answered_at_once_by_the_trade_rule() {
+    let mut g = game();
+    calm(&mut g);
+    assert_eq!(g.tables.ai.thresholds.trade_counter_margin, 0.25);
+    let short = g.tables.ai.thresholds.trade_short;
+    let fuel = g.trade_price(Resource::Fuel).unwrap() as u32;
+    g.seats[1].stockpile.fuel = 0.0;
+    g.seats[1].stockpile.ducats = 10_000.0;
+    g.seats[0].stockpile.fuel = 1_000.0;
+    let (d0, f0) = (g.seats[0].stockpile.ducats, g.seats[0].stockpile.fuel);
+    // The Prospectors, out of Fuel, offer the player 20 Fuel's worth of Ducats for 20 Fuel.
+    let offer = |g: &mut Game| g.commit_orders(Seat(1), &[Order::ProposeTrade { to: Seat(0), give: TradeGood::Goods(Resource::Ducats, 20 * fuel), get: TradeGood::Goods(Resource::Fuel, 20) }]);
+    offer(&mut g);
+    assert_eq!(g.offers.len(), 1);
+    // A quarter over fair value is the most a short seat pays: a Ducat more is refused at once, and
+    // that is the refusal -- the offer gone, the cooldown running, the goods remembered, a line read.
+    g.report.lines.clear();
+    assert_eq!(g.counter_offer(Seat(0), 0, 20, 25 * fuel + 1), Ok(false));
+    assert!(g.offers.is_empty(), "the offer is gone");
+    assert_eq!(g.seats[0].stockpile.fuel, f0, "nothing moved");
+    assert!(g.refused_recently(Seat(1), Seat(0)), "the cooldown runs");
+    assert!(g.trade_refused_before(Seat(1), Seat(0), Resource::Ducats, Resource::Fuel), "and the goods are remembered");
+    assert!(g.report.lines.iter().any(|l| l.kind == LineKind::YourWorks && l.text.contains("refused your counter")), "{:?}", g.report.lines);
+    assert!(g.counter_offer(Seat(0), 0, 20, 20 * fuel).is_err(), "no second counter: nothing is left to counter");
+    // At the margin it is taken at once: the goods move, and both sides credit the other.
+    g.refusals.clear();
+    offer(&mut g);
+    assert_eq!(g.counter_offer(Seat(0), 0, 20, 25 * fuel), Ok(true));
+    assert!(g.offers.is_empty());
+    assert_eq!(g.seats[0].stockpile.fuel, f0 - 20.0);
+    assert_eq!(g.seats[0].stockpile.ducats, d0 + (25 * fuel) as f64);
+    assert_eq!(g.seats[1].stockpile.fuel, 20.0);
+    assert!(g.relations.credited[1][0] && g.relations.credited[0][1], "an act of friendship each way");
+    // Not short of it: fair value alone, as any Trade is taken.
+    g.seats[1].stockpile.fuel = short;
+    offer(&mut g);
+    assert_eq!(g.counter_offer(Seat(0), 0, 20, 20 * fuel + 1), Ok(false));
+    g.refusals.clear();
+    offer(&mut g);
+    assert_eq!(g.counter_offer(Seat(0), 0, 20, 20 * fuel), Ok(true));
+    // A counter the player cannot pay is refused at the door, and the offer stays; so is nought.
+    g.seats[0].stockpile.fuel = 5.0;
+    offer(&mut g);
+    let err = g.counter_offer(Seat(0), 0, 20, 20 * fuel).unwrap_err();
+    assert!(err.contains("hold 5 Fuel"), "{err}");
+    assert_eq!(g.offers.len(), 1, "the offer stays");
+    assert!(g.counter_offer(Seat(0), 0, 0, 20 * fuel).is_err(), "a counter names amounts above nought");
+    assert_eq!(g.offers.len(), 1);
+    // And the player's own offer to a computer seat is answered yes or no, as before.
+    g.offers.clear();
+    g.seats[0].stockpile.fuel = 1_000.0;
+    g.commit_orders(Seat(0), &[Order::ProposeTrade { to: Seat(1), give: TradeGood::Goods(Resource::Fuel, 20), get: TradeGood::Goods(Resource::Ducats, 20 * fuel + 1) }]);
+    g.turn += 1;
+    g.answer_computer_offers();
+    assert!(g.offers.is_empty());
+    assert!(g.refused_recently(Seat(0), Seat(1)), "refused outright, no counter made");
 }

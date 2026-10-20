@@ -111,6 +111,8 @@ accord_added = "Terms added to your Accord with {faction}."
 trade_struck = "Trade struck with {faction}."
 trade_refused = "{faction} refused your Trade."
 trade_failed = "Trade with {faction} failed: {why}."
+# Ticket #572 (version 0.1.0.3): a counter-offer refused; one taken reads as a Trade struck.
+trade_counter_refused = "{faction} refused your counter."
 station_built_eased = "{faction} built {station}: -{ease} Unrest."
 antarctica_opens = "The Antarctic ice opens: {n} on Earth."
 archive_begun = "{faction} began the Archive at {colony}."

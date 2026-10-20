@@ -1568,6 +1568,19 @@ pub struct Refusal {
     pub until: u32,
 }
 
+/// Ticket #572 (version 0.1.0.3), at the designer's word: **the last Trade `to` refused `from`**, by
+/// its two goods -- what `from` gave and what it asked. The computer offers that seat no Trade of the
+/// same two goods again, the cooldown over or not, until a Trade of different goods is refused in its
+/// place. The amounts do not count: 20 Energy for 20 Fuel and 20 Energy for 25 Fuel are one Trade.
+/// The playtest: "they keep offering the same 20 Energy for 20 Fuel trade" (three testers).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RefusedTrade {
+    pub from: Seat,
+    pub to: Seat,
+    pub give: Resource,
+    pub get: Resource,
+}
+
 /// Ticket #226 (version 0.08.2): an Accord between two Factions, holding one or more Terms.
 ///
 /// `diplomacy` is on Relations' own `_Avoid_` list in the glossary, so the system has a word of its
@@ -1766,6 +1779,8 @@ pub struct Game {
     pub armies_inherited: Vec<(ArmyId, u32)>,
     /// Ticket #495: refusals remembered, so a refused Faction does not offer again at once.
     pub refusals: Vec<Refusal>,
+    /// Ticket #572 (version 0.1.0.3): the last Trade refused per pair, by its goods. In the save.
+    pub refused_trades: Vec<RefusedTrade>,
     /// Ticket #345 (version 0.09.1): who was first to each Body, one row per Body at most,
     /// appended when a first is claimed and never rewritten. In the save.
     pub body_firsts: Vec<BodyFirst>,
@@ -2018,6 +2033,7 @@ impl Game {
             offers: Vec::new(),
             armies_inherited: Vec::new(),
             refusals: Vec::new(),
+            refused_trades: Vec::new(),
             body_firsts: Vec::new(),
             waiting_last: Vec::new(),
             colony_growth: BTreeMap::new(),
@@ -5768,9 +5784,7 @@ impl Game {
             }
         };
         if !yes {
-            let until = self.turn + self.tables.relations.offer_refused_turns;
-            self.refusals.retain(|r| !(r.from == from && r.to == to));
-            self.refusals.push(Refusal { from, to, until });
+            self.remember_refused_trade(from, to, give, get);
             self.log(format!("{} declined a Trade from {}.", self.seat_name(to), self.seat_name(from)));
             line(self, from, "trade_refused", to, "");
             return;
@@ -5812,6 +5826,19 @@ impl Game {
         self.log(format!("{} and {} struck a Trade.", self.seat_name(from), self.seat_name(to)));
         line(self, from, "trade_struck", to, "");
         line(self, to, "trade_struck", from, "");
+    }
+
+    /// Ticket #495: a Trade refused is remembered for the cooldown, as an Accord's is; ticket #572
+    /// (version 0.1.0.3): and by its two goods, so the same Trade is not offered that seat again.
+    fn remember_refused_trade(&mut self, from: Seat, to: Seat, give: crate::orders::TradeGood, get: crate::orders::TradeGood) {
+        use crate::orders::TradeGood;
+        let until = self.turn + self.tables.relations.offer_refused_turns;
+        self.refusals.retain(|r| !(r.from == from && r.to == to));
+        self.refusals.push(Refusal { from, to, until });
+        if let (TradeGood::Goods(give, _), TradeGood::Goods(get, _)) = (give, get) {
+            self.refused_trades.retain(|r| !(r.from == from && r.to == to));
+            self.refused_trades.push(RefusedTrade { from, to, give, get });
+        }
     }
 
     /// Ticket #496: whether either of a pair holds the other Hostile.
@@ -5871,6 +5898,12 @@ impl Game {
     /// what it cannot pay, never to a Faction it is Hostile with or that is at the door, and only
     /// where what it gets is worth at least what it gives.
     pub fn trade_acceptable(&self, seat: Seat, from: Seat, give: crate::orders::TradeGood, get: crate::orders::TradeGood) -> bool {
+        self.trade_acceptable_at(seat, from, give, get, 1.0)
+    }
+
+    /// Ticket #572 (version 0.1.0.3): the same at a margin: it accepts where what it gets, times
+    /// `margin`, is worth what it gives. The counter-offer's quarter over fair value; 1 for any Trade.
+    pub fn trade_acceptable_at(&self, seat: Seat, from: Seat, give: crate::orders::TradeGood, get: crate::orders::TradeGood, margin: f64) -> bool {
         if matches!(get, crate::orders::TradeGood::Place(_)) || self.hostile(seat, from) || self.holds_good(seat, get).is_err() {
             return false;
         }
@@ -5881,7 +5914,7 @@ impl Game {
         if self.ai_gang_pressure(seat, from) > 0.0 {
             return false;
         }
-        self.trade_value(give) + 1e-9 >= self.trade_value(get)
+        self.trade_value(give) * margin + 1e-9 >= self.trade_value(get)
     }
 
     /// Ticket #495: whether an offer from `from` to `to` is waiting on its answer.
@@ -5892,6 +5925,47 @@ impl Game {
     /// Ticket #495: whether `from` was refused by `to` recently enough not to offer again.
     pub fn refused_recently(&self, from: Seat, to: Seat) -> bool {
         self.refusals.iter().any(|r| r.from == from && r.to == to && self.turn < r.until)
+    }
+
+    /// Ticket #572 (version 0.1.0.3): whether the last Trade `to` refused `from` gave `give` for `get`.
+    pub fn trade_refused_before(&self, from: Seat, to: Seat, give: Resource, get: Resource) -> bool {
+        self.refused_trades.iter().any(|r| r.from == from && r.to == to && r.give == give && r.get == get)
+    }
+
+    /// Ticket #572 (version 0.1.0.3), at the designer's word: **a human seat counters a Trade offered
+    /// it, once** -- the same two goods, its own amounts: `you_give` of the good asked of it, `you_get`
+    /// of the good offered. The offerer answers at once by its Trade rule, so the goods move or the
+    /// counter is refused before the turn goes on; a seat still short of the good it asked for (under
+    /// `trade_short`) pays up to `trade_counter_margin` over fair value, since a seat that is short
+    /// pays over the odds, and one not short pays fair value alone, as for any Trade. A refused
+    /// counter is the refusal: the cooldown runs and the goods are remembered. Either way the offer
+    /// is gone, so no second counter follows. A counter the seat cannot pay, of nought, or on a
+    /// place, is refused here and the offer stays. A computer seat never counters.
+    pub fn counter_offer(&mut self, seat: Seat, index: usize, you_give: u32, you_get: u32) -> Result<bool, String> {
+        use crate::orders::TradeGood;
+        let Some(offer) = self.offers.get(index).filter(|o| o.to == seat) else { return Err("there is no such offer to answer".into()) };
+        let Some((TradeGood::Goods(theirs, _), TradeGood::Goods(yours, _))) = offer.trade else {
+            return Err("a counter changes the amounts of a Trade in goods".into());
+        };
+        if you_give == 0 || you_get == 0 {
+            return Err("a counter names amounts above nought".into());
+        }
+        let from = offer.from;
+        let (take, pay) = (TradeGood::Goods(theirs, you_get), TradeGood::Goods(yours, you_give));
+        self.holds_good(seat, pay)?;
+        let th = &self.tables.ai.thresholds;
+        let margin = if self.seat(from).stockpile.of(yours) < th.trade_short { 1.0 + th.trade_counter_margin } else { 1.0 };
+        let yes = self.trade_acceptable_at(from, seat, pay, take, margin);
+        self.offers.remove(index);
+        if yes {
+            self.settle_trade(from, seat, take, pay, true);
+        } else {
+            self.remember_refused_trade(from, seat, take, pay);
+            self.log(format!("{} refused a counter from {}.", self.seat_name(from), self.seat_name(seat)));
+            let text = self.say("trade_counter_refused", &[("faction", self.seat_name(from))]);
+            self.report_line_of(seat, LineKind::YourWorks, LineKind::Note, None, text);
+        }
+        Ok(yes)
     }
 
     /// Ticket #495: a human seat answers an offer made to it. Accept strikes the Accord at once,
@@ -5962,7 +6036,9 @@ impl Game {
             return;
         }
         // Ticket #509 (version 0.1.0.0): a renewal runs the Accord another five turns from the end of
-        // this run; letting it lapse is no refusal and is not remembered.
+        // this run; letting it lapse here is no refusal and is not remembered. Ticket #572 (version
+        // 0.1.0.3): the run-out of a human seat's Accord that its computer partner would have renewed
+        // is remembered in `settle_accords`, not here.
         // The review: it renews the Terms the Accord holds when answered, so Terms added the same turn
         // are kept; and one an addition has already restarted needs no renewal.
         if offer.ask == AccordAsk::Renew {
@@ -6112,6 +6188,21 @@ impl Game {
         let ended: Vec<(Seat, Seat, Option<Seat>)> = self.accords.iter().filter(|acc| self.accord_turns_left(acc) <= 1).map(|acc| (acc.a, acc.b, acc.refused_by)).collect();
         for (a, b, refused) in ended {
             self.log(format!("The Accord between {} and {} has run its course.", self.seat_name(a), self.seat_name(b)));
+            // Ticket #572 (version 0.1.0.3), at the designer's word: a human seat that gave no Renew
+            // while its computer partner would have is remembered by that partner as refusing it, so
+            // the fresh offer waits the cooldown where it came the next turn -- the playtest's "every
+            // five turns all three rivals re-offer non-aggression".
+            if refused.is_none() {
+                for (me, other) in [(a, b), (b, a)] {
+                    // The review: willingness is read here, at the settle, where `ask_renewals` read it
+                    // at the turn's head; a partner soured in between remembers nothing, which is right.
+                    if !self.seat(me).ai && self.seat(other).ai && self.renewal_willing(other, me) {
+                        let until = self.turn + self.tables.relations.offer_refused_turns;
+                        self.refusals.retain(|r| !(r.from == other && r.to == me));
+                        self.refusals.push(Refusal { from: other, to: me, until });
+                    }
+                }
+            }
             self.accord_ended(a, b, refused.map_or(AccordEnding::RanOut, AccordEnding::NotRenewed));
         }
         let run = self.tables.relations.accord_turns;

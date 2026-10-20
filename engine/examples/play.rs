@@ -442,11 +442,21 @@ DIPLOMACY (ticket #226; `show` prints Relations both ways and every Accord stand
                                        next turn's start -- which gives the board a turn's warning
                                        that something is coming.
   accord renew <faction>               in an Accord's last turn, renew it for five more; the Report
-                                       warns of that turn ("ends after this turn").
+                                       warns of that turn ("ends after this turn"). Let it run out
+                                       while they would have renewed, and they count it a refusal:
+                                       no offer from them for {refusedturns} (ticket #572).
   trade <faction> <give> for <ask>     one thing for one thing: `<n> ducats|materials|fuel|energy`
                                        or a colony id; answered at the head of their next turn, the
                                        goods moving only if both still hold them.
   trade accept|refuse <faction>        answer a Trade a Faction offered you.
+  trade counter <faction> <give> for <ask>
+                                       or counter it, once (ticket #572, version 0.1.0.3): the same
+                                       two goods in your own amounts, `<n> <good> for <n> <good>`.
+                                       They answer at once by their Trade rule; a seat short of
+                                       the good it asked pays up to a quarter over fair value. A
+                                       refused counter is a refusal. A refused Faction offers you
+                                       nothing for {refusedturns}, and never the same two goods
+                                       again until you refuse it a Trade of other goods.
   tribute <faction> ducats             a fixed gift, one per Faction per turn, paying Relations:
   tribute <faction> materials          {tributeducats} Ducats, or {tributematerials} Materials.
 
@@ -514,6 +524,7 @@ fn grammar(t: Option<&Tables>) -> String {
         ("{creditprice}", n(|t| dying_earth_engine::counted(t.carbon_credits.price_per_ppm, "Ducat", "Ducats"))),
         ("{creditcap}", n(|t| t.carbon_credits.cap_per_turn.to_string())),
         ("{kept}", n(|t| dying_earth_engine::counted(t.relations.accord_kept_turns, "turn", "turns"))),
+        ("{refusedturns}", n(|t| dying_earth_engine::counted(t.relations.offer_refused_turns, "turn", "turns"))),
         // Ticket #541 (version 0.1.0.1): what a Leapfrog does, in the window button's figures.
         ("{leapprice}", n(|t| t.ducats.per_leapfrog.to_string())),
         ("{leapstep}", n(|t| format!("{:.2}", t.climate.population_emissions_per_level * t.units_per_hundred_million()))),
@@ -543,6 +554,9 @@ enum Line {
     /// Ticket #495 (version 0.09.9): this seat's answer to the Accord a Faction offered it; ticket
     /// #496, or the Trade (`true` in the last field).
     Offer(Seat, bool, bool),
+    /// Ticket #572 (version 0.1.0.3): this seat's counter to the Trade a Faction offered it -- what
+    /// it gives and what it asks, the same two goods in its own amounts.
+    Counter(Seat, (Resource, u32), (Resource, u32)),
 }
 
 /// The game is read here as well as written: a Faction is named by its own name, and which seat
@@ -702,15 +716,26 @@ fn parse_line(g: &Game, line: &str) -> Result<Line, String> {
             }
         }
         // Ticket #496 (version 0.09.9): `trade <faction> <n> <good>|<colony id> for <n> <good>|<colony id>`,
-        // and `trade accept|refuse <faction>` to answer one offered.
+        // and `trade accept|refuse <faction>` to answer one offered. Ticket #572 (version 0.1.0.3):
+        // `trade counter <faction> <n> <good> for <n> <good>`, the same two goods in your amounts.
         "trade" => {
             let first = at(1)?.to_ascii_lowercase();
             if first == "accept" || first == "refuse" || first == "decline" {
                 return Ok(Line::Offer(seat_of(g, at(2)?)?, first == "accept", true));
             }
-            let to = seat_of(g, at(1)?)?;
-            let rest: Vec<&str> = w[2..].to_vec();
-            let split = rest.iter().position(|x| x.eq_ignore_ascii_case("for")).ok_or("a Trade reads `trade <faction> <what you give> for <what you ask>`")?;
+            let counter = first == "counter";
+            let to = seat_of(g, at(if counter { 2 } else { 1 })?)?;
+            let rest: Vec<&str> = w[if counter { 3 } else { 2 }..].to_vec();
+            let split = rest.iter().position(|x| x.eq_ignore_ascii_case("for")).ok_or(if counter { "a counter reads `trade counter <faction> <n> <good> for <n> <good>`" } else { "a Trade reads `trade <faction> <what you give> for <what you ask>`" })?;
+            if counter {
+                let amount = |words: &[&str]| -> Result<(Resource, u32), String> {
+                    match words {
+                        [n, r] => Ok((pick(&[Resource::Ducats, Resource::Materials, Resource::Fuel, Resource::Energy], r)?, count(n)?)),
+                        _ => Err("each side of a counter is `<n> <ducats|materials|fuel|energy>`".into()),
+                    }
+                };
+                return Ok(Line::Counter(to, amount(&rest[..split])?, amount(&rest[split + 1..])?));
+            }
             let good = |words: &[&str]| -> Result<dying_earth_engine::TradeGood, String> {
                 match words {
                     [n, r] => {
@@ -1746,6 +1771,27 @@ fn main() {
                             // offer, which is off the table. Counting it refused held the turn and
                             // threw the answer away with the unsaved run, so the turn owed it again.
                             Err(e) if game.offers.len() < owed_before => println!("line {}: answered, but {e}", n + 1),
+                            Err(e) => {
+                                println!("line {}: REFUSED `{line}`: {e}", n + 1);
+                                bad += 1;
+                            }
+                        }
+                    }
+                    // Ticket #572 (version 0.1.0.3): a counter to a Trade offered, answered at once by
+                    // the offerer's rule; a refused counter is the refusal.
+                    Ok(Line::Counter(from, (give_r, give_n), (get_r, get_n))) => {
+                        let found = game.offers_to(Seat(0)).into_iter().find_map(|(i, o)| match o.trade {
+                            Some((dying_earth_engine::TradeGood::Goods(theirs, _), dying_earth_engine::TradeGood::Goods(yours, _))) if o.from == from => Some((i, theirs, yours)),
+                            _ => None,
+                        });
+                        let answered = match found {
+                            None => Err(format!("{} have offered you no Trade in goods", game.seat_name(from))),
+                            Some((_, theirs, yours)) if yours != give_r || theirs != get_r => Err(format!("a counter keeps the goods: {} offered {} for {}; write `trade counter {} <n> {} for <n> {}`", game.seat_name(from), theirs.name(), yours.name(), game.seat_name(from).to_ascii_lowercase().replace(' ', ""), yours.name().to_ascii_lowercase(), theirs.name().to_ascii_lowercase())),
+                            Some((i, _, _)) => game.counter_offer(Seat(0), i, give_n, get_n),
+                        };
+                        match answered {
+                            Ok(true) => println!("line {}: answered: the {} took your counter: the Trade is struck", n + 1, game.seat_name(from)),
+                            Ok(false) => println!("line {}: answered: the {} refused your counter", n + 1, game.seat_name(from)),
                             Err(e) => {
                                 println!("line {}: REFUSED `{line}`: {e}", n + 1);
                                 bad += 1;

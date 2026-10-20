@@ -1508,6 +1508,9 @@ pub struct AiThresholds {
     pub trade_short: f64,
     pub trade_long: f64,
     pub trade_ask: u32,
+    /// Ticket #572 (version 0.1.0.3): how far over fair value a seat short of the good it asked for
+    /// goes to take a counter-offer (a quarter: 0.25).
+    pub trade_counter_margin: f64,
     /// Ticket #410 (version 0.09.4): the Unrest the computer seats act on (see `ai.toml`).
     pub constabulary_from: f64,
     pub stadium_from: f64,

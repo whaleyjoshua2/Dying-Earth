@@ -422,6 +422,10 @@ colonists = [[17, 6], [31, 18]]
 trade_short = 15.0
 trade_long = 150.0
 trade_ask = 20
+# Ticket #572 (version 0.1.0.3): a human seat may counter a Trade offered it, once, with its own
+# amounts of the same two goods. A seat still short of the good it asked for (under `trade_short`)
+# takes a counter worth up to this much over fair value; one not short takes fair value alone.
+trade_counter_margin = 0.25
 # Ticket #410 (version 0.09.4): how the computer seats manage Unrest, after a sweep found a third of
 # every Faction's held Region-turns at 4 or more and one in seven at 7 or more. The Constabulary is
 # offered from `constabulary_from` (where the Standing Army stops replenishing, not a point past

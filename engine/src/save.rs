@@ -257,6 +257,9 @@ pub struct SavedGame {
     pub offers: Vec<crate::state::Offer>,
     #[serde(default)]
     pub refusals: Vec<crate::state::Refusal>,
+    /// Ticket #572 (version 0.1.0.3): the last Trade refused per pair, by its goods.
+    #[serde(default)]
+    pub refused_trades: Vec<crate::state::RefusedTrade>,
     /// Ticket #519 (version 0.1.0.0): Armies inherited abroad, and the turn, for their turn's grace.
     #[serde(default)]
     pub armies_inherited: Vec<(ArmyId, u32)>,
@@ -344,6 +347,7 @@ impl SavedGame {
             accords,
             offers,
             refusals,
+            refused_trades,
             armies_inherited,
             events_no_target,
             body_firsts,
@@ -385,6 +389,7 @@ impl SavedGame {
             accords: accords.clone(),
             offers: offers.clone(),
             refusals: refusals.clone(),
+            refused_trades: refused_trades.clone(),
             armies_inherited: armies_inherited.clone(),
             events_no_target: *events_no_target,
             levies_raised: *levies_raised,
@@ -438,6 +443,7 @@ impl SavedGame {
             accords: self.accords,
             offers: self.offers,
             refusals: self.refusals,
+            refused_trades: self.refused_trades,
             armies_inherited: self.armies_inherited,
             events_no_target: self.events_no_target,
             body_firsts: self.body_firsts,

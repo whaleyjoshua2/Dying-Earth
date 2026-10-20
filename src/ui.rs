@@ -445,6 +445,9 @@ enum Action {
     AnswerCard(bool),
     /// Ticket #495 (version 0.09.9): an Accord offered to the player, by its index, accepted or not.
     AnswerOffer(usize, bool),
+    /// Ticket #572 (version 0.1.0.3): a Trade offered to the player countered, by its index, with
+    /// what the player gives and what they get.
+    CounterOffer(usize, u32, u32),
     /// Ticket #58: a Report line was clicked; go where it points.
     GoTo(ReportPlace),
     /// Ticket #538 (version 0.1.0.1): an Accord's warning line was clicked; the Factions window,
@@ -1726,6 +1729,18 @@ pub fn draw(
                     // at the new partner's place is withdrawn, with the word.
                     Some(Ok(())) if accept => session.withdraw_crossing_influence(),
                     _ => {}
+                }
+            }
+            // Ticket #572 (version 0.1.0.3): answered at once by the offerer's rule, and said so.
+            Action::CounterOffer(index, give, get) => {
+                let who = session.game.as_ref().and_then(|g| g.offers.get(index).map(|o| g.seat_name(o.from))).unwrap_or_default();
+                let result = session.game.as_mut().map(|g| g.counter_offer(Seat(0), index, give, get));
+                match result {
+                    Some(Err(e)) => session.last_error = Some(e),
+                    // The review: a Trade in goods strikes no Accord, so no Influence order is withdrawn.
+                    Some(Ok(true)) => session.last_error = Some(format!("The {who} took your counter: the Trade is struck.")),
+                    Some(Ok(false)) => session.last_error = Some(format!("The {who} refused your counter.")),
+                    None => {}
                 }
             }
             Action::GoTo(place) => {
@@ -5535,6 +5550,10 @@ fn trade_good_text(game: &Game, g: TradeGood) -> String {
         TradeGood::Place(c) => game.place_name(Place::Colony(c)),
     }
 }
+
+/// A row of the offers prompt: the offer's index, who made it, its words, whether it is a renewal,
+/// and (ticket #572, version 0.1.0.3) the Trade's two goods, for the counter.
+type OfferRow = (usize, Seat, String, bool, Option<(TradeGood, TradeGood)>);
 
 /// Ticket #496: an offer's words after its Faction's name in the prompt: what an Accord holds, or
 /// what a Trade gives for what it asks.
@@ -12109,6 +12128,7 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
     // nothing else is up, so the turn's Report and Moments come first.
     if view.popup == Popup::None && !game.seat(Seat(0)).ai && !game.offers_to(Seat(0)).is_empty() {
         view.popup = Popup::Offers;
+        view.counters.clear();
     }
     if view.show_trade && !session.spectator {
         let mut open = true;
@@ -12535,7 +12555,7 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
         // Ticket #495 (version 0.09.9): the Accords offered to the player, one row each, Accept or
         // Refuse. Like the card, an answer is the only way out: no Continue, and Escape holds it.
         Popup::Offers => {
-            let offers: Vec<(usize, Seat, String, bool)> = game.offers_to(Seat(0)).into_iter().map(|(i, o)| (i, o.from, offer_words(game, o), o.ask == AccordAsk::Renew)).collect();
+            let offers: Vec<OfferRow> = game.offers_to(Seat(0)).into_iter().map(|(i, o)| (i, o.from, offer_words(game, o), o.ask == AccordAsk::Renew, o.trade)).collect();
             if offers.is_empty() {
                 view.popup = Popup::None;
                 return;
@@ -12544,7 +12564,7 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 ui.set_width(520.0);
                 ui.label(RichText::new(if offers.len() == 1 { "An offer" } else { "Offers" }).size(20.0).strong());
                 ui.add_space(6.0);
-                for (i, from, words, renewal) in &offers {
+                for (i, from, words, renewal, trade) in &offers {
                     // Ticket #509 (version 0.1.0.0): a renewal names the Faction in its own words.
                     if *renewal {
                         ui.label(RichText::new(words).size(16.0));
@@ -12563,6 +12583,23 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                             actions.push(Action::AnswerOffer(*i, false));
                         }
                     });
+                    // Ticket #572 (version 0.1.0.3): a Trade in goods may be countered, once: the same
+                    // two goods, your own amounts, prefilled from the offer; answered at once.
+                    if let Some((TradeGood::Goods(theirs, n_theirs), TradeGood::Goods(yours, n_yours))) = trade {
+                        let (give, get) = view.counters.entry(from.index()).or_insert((*n_yours as i64, *n_theirs as i64));
+                        ui.horizontal(|ui| {
+                            ui.label(RichText::new("Or counter: give").size(15.0));
+                            ui.add(egui::DragValue::new(give).range(1..=9999).speed(1.0));
+                            ui.label(RichText::new(format!("{} for", yours.name())).size(15.0));
+                            ui.add(egui::DragValue::new(get).range(1..=9999).speed(1.0));
+                            ui.label(RichText::new(theirs.name()).size(15.0));
+                            if ui.button(RichText::new("Counter").size(15.0)).clicked() {
+                                actions.push(Action::CounterOffer(*i, (*give).max(1) as u32, (*get).max(1) as u32));
+                            }
+                        })
+                        .response
+                        .on_hover_text("Once. They answer at once; a seat short of the good it asked pays up to a quarter over fair value. A refused counter is a refusal.");
+                    }
                     ui.add_space(6.0);
                 }
             });

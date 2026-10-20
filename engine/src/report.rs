@@ -530,6 +530,8 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("trade_struck", &["faction"]),
     ("trade_refused", &["faction"]),
     ("trade_failed", &["faction", "why"]),
+    // Ticket #572 (version 0.1.0.3).
+    ("trade_counter_refused", &["faction"]),
     // Ticket #419 (version 0.09.4).
     ("station_built_eased", &["faction", "station", "ease"]),
     ("antarctica_opens", &["n"]),

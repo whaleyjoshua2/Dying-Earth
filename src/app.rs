@@ -435,6 +435,9 @@ pub struct ViewState {
     /// Ticket #146 (version 0.07.3): the slot box clicked on the selected Region's card.
     pub slot_box: Option<SlotBox>,
     pub trade_amounts: [i64; 4],
+    /// Ticket #572 (version 0.1.0.3): the counter-offer's amounts in the offers prompt, by the
+    /// offering seat's index -- what you give, what you get -- prefilled from the offer.
+    pub counters: std::collections::BTreeMap<usize, (i64, i64)>,
     /// Ticket #204 (version 0.08.1): the Region a Colony's own loader draws from, kept apart from the
     /// Ship card's choice so the two never moved together; since ticket #443 (version 0.09.6) the Ship
     /// card lists every Region and chooses none.
@@ -539,6 +542,7 @@ impl Default for ViewState {
             hab_tile: None,
             slot_box: None,
             trade_amounts: [5, 10, 10, 10],
+            counters: std::collections::BTreeMap::new(),
             lift_state: None,
             launch_target: None,
             influence_amount: 5,

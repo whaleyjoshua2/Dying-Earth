@@ -438,3 +438,36 @@ slots is refused with the orbits listed, where the engine used to take it -- the
 refusal listing "low" at Venus which has none, a hidden rival hull in flight answered by its
 whereabouts where the engine says "not your Ship", and `build station` still taking a bare number
 alone, which the decision's "every order that takes an orbit" covers. All four mended.
+
+## A refused offer waits three turns before it comes again
+
+Ticket [#572](https://github.com/whaleyjoshua2/Dying-Earth/issues/572), spec §16. The cooldown the
+designer asked for already stood at three turns; what the testers felt was an Accord running out
+(no refusal, so a fresh offer the next turn) and the same Trade offered back after every cooldown.
+Two rounds. The designer kept three turns and the pair as the key, took the same-goods memory on
+condition that a counter could be negotiated -- *"a player is offered 20 energy for 20 fuel, they
+counter with 25, that refused then rule stands"* -- and the run-out as a refusal, and declined a
+refuse-all. The counter's shape in the second round: once, the same two goods in the player's
+amounts, answered at once by the Trade rule, a seat short of the good it asked paying up to a
+quarter over fair value (`trade_counter_margin`), a refused counter being the refusal.
+
+**The picture** ([`ticket-572/offer-counter-solar.png`](ticket-572/)), the `offer:trade` shot aid:
+the Prospectors' Trade with its Accept and Refuse, and under them *"Or counter: give [60] Ducats for
+[30] Materials [Counter]"*, prefilled from the offer; the Arkwrights' Accord below it has no such row.
+
+The red was watched three ways: the new calls staged as stubs so the two new tests and the reversed
+assertion of the #509 renewal test each failed on its rule; and the tool's own refusal of
+`trade counter ...` as "not a Faction" before the grammar took it.
+
+**The sweep** ([`sweeps/ticket-572.txt`](sweeps/ticket-572.txt)): 21 / 48 / 4 / 7, no collapse, from
+19 / 47 / 4 / 10; Accords struck 646 from 656. Noise, as expected: both new rules face a human seat
+or move a computer's Trade to another partner, and the batch has no human in it. Income over the
+batch, per Faction (Materials / Fuel / Energy / Ducats / Research, mean a game): Custodians 1072 /
+348 / 2524 / 1507 / 928; Prospectors 2142 / 443 / 2739 / 1188 / 382; Arkwrights 1528 / 306 / 2277 /
+3212 / 261; Archivists 473 / 259 / 1139 / 467 / 740.
+
+**The review** passed every orientation and the save, and caught a taken counter withdrawing a
+crossing Influence order as if an Accord had been struck, three assertions the tests lacked (a
+renewal is no refusal, read before the cooldown could expire; a partner that would not renew
+remembers nothing against the player; two computer seats remember nothing), a stale comment, the
+`accord renew` help, and a counter in the wrong order refused without the form it wants. All mended.

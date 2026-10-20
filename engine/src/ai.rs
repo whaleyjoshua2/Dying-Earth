@@ -2712,6 +2712,8 @@ impl Game {
         // Ticket #496 (version 0.09.9): **a Trade**, at most one a turn: where a Stockpile good is
         // short and another long, ask the short one of the Faction this seat stands best with, giving
         // as much of the long one as it is worth at the Trading window's prices. Never a place.
+        // Ticket #572 (version 0.1.0.3): and never the same two goods again to a Faction whose last
+        // refusal was of them, the cooldown over or not, until a Trade of other goods is refused.
         {
             let th = &self.tables.ai.thresholds;
             let s = self.seat(seat).stockpile;
@@ -2722,6 +2724,7 @@ impl Game {
             let partner = Seat::ALL
                 .into_iter()
                 .filter(|o| *o != seat && !self.hostile(seat, *o) && !self.offer_waits(seat, *o) && !self.refused_recently(seat, *o) && self.ai_gang_pressure(seat, *o) == 0.0)
+                .filter(|o| !matches!((short, long), (Some(s), Some(l)) if self.trade_refused_before(seat, *o, l, s)))
                 .max_by_key(|o| self.relations_score(seat, *o));
             if let (Some(short), Some(long), Some(other)) = (short, long, partner) {
                 let ask = th.trade_ask;

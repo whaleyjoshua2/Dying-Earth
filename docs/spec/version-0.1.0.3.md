@@ -472,3 +472,70 @@ confusion. Decided in one round ("q1 yes q2 yes q3 nothing"):
   orbits now; `change-orbit` answers "not your Ship" before it reads where a hull is, as the engine
   does, so a hidden hull in flight gives nothing away; and `build station <body> <orbit>` takes the
   ring by name or colony id too, being an order that takes an orbit.
+
+## 16. A refused offer waits three turns before it comes again
+
+Ticket: [A refused offer waits three turns before it comes again](https://github.com/whaleyjoshua2/Dying-Earth/issues/572).
+
+The designer: *"If an offer is refused the AI must wait 3 turns before offering it again."* The
+playtest: "every 5 turns all three rivals re-offer non-aggression, and they keep offering the same 20
+Energy for 20 Fuel trade; the turn refuses until I answer each one" (three testers). Read in the tree
+first: the cooldown already stood at three turns (`offer_refused_turns`), keyed by the pair, so a
+refusal silenced that rival's Accords and Trades alike; and a human is never prompted to renew --
+since 0.1.0.1 an Accord in its last turn is renewed by the player's own Renew order -- so what the
+testers felt as "every five turns" was the turn after an Accord ran out, which was no refusal, and
+the fresh offer came at once. Decided in two rounds ("q1 a q2 [with a counter] q3 yes q4 no", "q5 yes
+q6 b q7 yes"):
+
+- **The cooldown stays at three turns, keyed by the pair** (Q1 a). Three rivals on their own clocks
+  give about three offers in four turns under blanket refusal; the two real nags are the next two.
+- **The same Trade again** (Q2): the last Trade a seat refused is remembered per pair by its two
+  goods -- what the offerer gave and what it asked (`RefusedTrade`, in the save) -- and the computer
+  offers that seat no Trade of the same two goods again, the cooldown over or not, until a Trade of
+  different goods has been refused in its place. The amounts do not count: 20 Energy for 20 Fuel and
+  20 Energy for 25 Fuel are one Trade. The designer took this on condition that a counter could be
+  negotiated, which is the next point.
+- **The counter-offer** (Q5, Q6 b, Q7): a Trade in goods offered to the player may be countered once
+  -- the same two goods, the player's own amounts -- and the offerer answers **at once**, in the same
+  prompt, by its Trade rule (`counter_offer`): the goods move, or the counter is refused, before the
+  turn goes on. A seat still **short of the good it asked for** (under `trade_short`, 15) pays up to
+  **a quarter over fair value** at the Trading window's prices (`trade_counter_margin`, 0.25 in
+  `ai.toml`), since a seat that is short pays over the odds; one not short pays fair value alone, as
+  it takes any Trade. A refused counter is the refusal: the cooldown runs and the goods are
+  remembered, and the Report reads *"{faction} refused your counter."*; a taken one reads as a Trade
+  struck. Either way the offer is gone, so no second counter follows. A counter the player cannot
+  pay, of nought, or on a place, is refused at the door and the offer stays. A computer seat never
+  counters. The window: the offers prompt gives a Trade in goods a row *"Or counter: give [60]
+  Ducats for [30] Materials [Counter]"*, prefilled from the offer. The tool: `trade counter <faction>
+  <n> <good> for <n> <good>`, the player's give first and their ask second, mirroring `trade`; a
+  counter naming other goods than the offer's is refused with the offer's goods named.
+- **An Accord the player lets run out** (Q3): when the computer partner would have renewed and the
+  player gave no Renew, the run-out is remembered by that partner as a refusal, so its fresh offer
+  waits the cooldown where it came the next turn. A partner that would not renew, an Accord called
+  off or broken, and two computer seats (who both renew or one refuses) are untouched.
+- **No "refuse all"** (Q4).
+- Red first on three tests: the two new ones below and the renewal test of ticket #509, whose
+  "nothing is remembered" the decision reverses. Staged with the new calls as stubs so each failed
+  on its rule, not on the compiler: *`Err("a counter is not yet answered")`* against `Ok(false)`,
+  *`trade_refused_before` false* after a refusal, and *the run-out counts as a refusal* false. The
+  tool's red: `trade counter prospectors 20 fuel for 25 ducats` refused *"counter" is not one of:
+  custodians, prospectors, ...* before, and reaching the engine's door after (*Prospectors have
+  offered you no Trade in goods*). Clippy clean at `-D warnings`; 815 tests green.
+- **Swept** ([`sweeps/ticket-572.txt`](../dev-diary/2026-10-19-version-0.1.0.3/sweeps/ticket-572.txt),
+  20 seeds x four seatings): 21 / 48 / 4 / 7 and no collapse, from 19 / 47 / 4 / 10 -- noise. Accords
+  struck over the four seatings 646 (156 / 168 / 166 / 156) from 656: the run-out rule reaches only a
+  human seat's partner, and the same-goods rule only moves a computer seat's Trade to another
+  partner, so the computer-only batch is unmoved, as it should be. Income per Faction (Materials /
+  Fuel / Energy / Ducats / Research, mean a game): Custodians 1072 / 348 / 2524 / 1507 / 928;
+  Prospectors 2142 / 443 / 2739 / 1188 / 382; Arkwrights 1528 / 306 / 2277 / 3212 / 261; Archivists
+  473 / 259 / 1139 / 467 / 740 -- all within noise of the last sweep.
+- **The review** (an independent agent) found every orientation right (who is `from` and `to` in
+  each memory, the counter's give and get against the Trade rule and the settle, the save) and the
+  AI test's premise holding for the right reason. It caught a taken counter withdrawing a crossing
+  Influence order as a struck Accord does, which a Trade in goods never is -- removed; three test
+  gaps -- a renewal asserted no refusal only after the cooldown would have run out, and no test of
+  the run-out when the partner would not renew or between two computer seats -- all three asserted
+  now; the stale "letting it lapse is no refusal" comment on a refused Renew offer; the `accord
+  renew` help silent on what a run-out now costs, and "three turns" hard-coded where the help
+  templates its figures (`{refusedturns}` now); and a counter written in the offer's own order
+  refused without saying the form the line wants -- it says it now.
