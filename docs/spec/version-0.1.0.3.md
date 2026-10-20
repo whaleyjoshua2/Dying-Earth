@@ -115,3 +115,10 @@ Ticket: [Influence at 5 Ducats a point, and Distress Call at +2 Relations](https
   no cap. The computer reads the price from the table.
 - **Distress Call** pays +2 Relations with every rival for holding a Ship a turn (+5 before);
   refusing still costs 3.
+
+**What it did** ([`sweeps/ticket-562.txt`](../dev-diary/2026-10-19-version-0.1.0.3/sweeps/ticket-562.txt),
+80 games, the reserve's second fix included): **5 / 36 / 13 / 10 and 16 collapses**, from 10 / 25 /
+20 / 10 and 15. The Prospectors' eleven, the Arkwrights' seven and the Custodians' five are all
+past noise, and all one way: the price of a point hurts the seats poor in Ducats and leaves the
+richest, the Prospectors, with the only Allotment that still buys. Reported to the designer;
+nothing changed on the strength of it.

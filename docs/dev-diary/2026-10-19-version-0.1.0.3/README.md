@@ -127,3 +127,11 @@ candidate now, weighed as the Energy buy is. The test witnesses both, red first.
 Ticket [#562](https://github.com/whaleyjoshua2/Dying-Earth/issues/562), spec §5. Two figures in
 the data; the two tests that pinned 4 re-pinned to 5. The sweep below carries the reserve's second
 fix as well, so its figures are the two together.
+
+**The sweep** ([`sweeps/ticket-562.txt`](sweeps/ticket-562.txt)): **5 / 36 / 13 / 10 and 16
+collapses**, from 10 / 25 / 20 / 10 and 15. Prospectors +11 (34 of them outright), Arkwrights -7,
+Custodians -5, every one past noise and all the same way. The reading: a dearer point of Influence
+is paid by the seats that have Ducats, and only the Prospectors do (80 to 170 a turn against the
+Arkwrights' and Archivists' 1 to 6, the playtest measured); the brake meant for the human buying
+the world fell on the computer's poor seats instead, and the Prospectors bought what the others no
+longer could. Measured behaviour, reported; nothing changed on the strength of it.
