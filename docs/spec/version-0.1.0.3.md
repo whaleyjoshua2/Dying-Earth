@@ -71,6 +71,10 @@ Ticket: [The Wind Farm: clean power on Earth, half on Mars, replacing a Power Pl
 - Mothball, Restart and Decommission apply to a Wind Farm as to any Facility. Production Moved does
   not pair it (the Power Plant pairs with the Generator; the Wind Farm with nothing).
 
+**What it did** ([`sweeps/ticket-559.txt`](../dev-diary/2026-10-19-version-0.1.0.3/sweeps/ticket-559.txt),
+80 games): **10 / 24 / 20 / 17 and 9 collapses**, from 9 / 24 / 20 / 11 and 15 after §2. The
+Archivists' six and the collapses' six are past noise, both from cleaner power across the board.
+
 ## 4. Power burns Fuel
 
 Ticket: [Power Plants, Reactors and their off-world counterparts burn 0.75 Fuel a turn](https://github.com/whaleyjoshua2/Dying-Earth/issues/575).

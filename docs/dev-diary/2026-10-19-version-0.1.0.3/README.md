@@ -68,3 +68,8 @@ Wind Farm.
 50 Ducats" (`researched:clean_power`, a new shot aid); a Power Plant's strip with "Mothball,
 Decommission, 4 Widgets 12.5 Replace"; a standing Wind Farm's tile and line, "+3 Energy, 1 Ducat
 upkeep" (`standing:wind_farm`, another new aid).
+
+**The sweep** ([`sweeps/ticket-559.txt`](sweeps/ticket-559.txt)): **10 / 24 / 20 / 17 and 9
+collapses**, from 9 / 24 / 20 / 11 and 15. The Archivists +6 and the collapses -6 are past noise:
+every seat with Clean Power now raises Wind Farms where it raised Power Plants, and the world warms
+slower. The Custodians still sit at 10 against the ideal's 15.
