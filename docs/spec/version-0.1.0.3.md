@@ -88,7 +88,11 @@ Ticket: [Power Plants, Reactors and their off-world counterparts burn 0.8 Fuel a
   Report says so. Nothing goes dark for want of Fuel.
 - The Fuel upkeep is a general field on both the Facility and the Module card (`fuel_upkeep`),
   nought on every other building.
-- The computer's Refinery weight reads the drain, so a seat burning Fuel for power refines more.
+- **The computer keeps a Fuel reserve for its power**, three turns of what its buildings burn
+  (`power_fuel_reserve_turns`), at the designer's word after the first sweep: under it Fuel is its
+  scarcest resource, a Ship is refuelled only from what stands above it, a Ship's top-up buys the
+  reserve back, the market sells nothing out of it and buys up to it when its Ducats allow.
+- The Energy shortfall forecast reads the Fuel this turn's orders leave, as the Income will.
 
 **What it did** ([`sweeps/ticket-575.txt`](../dev-diary/2026-10-19-version-0.1.0.3/sweeps/ticket-575.txt),
 80 games): **8 / 21 / 17 / 10 and 24 collapses**, from 10 / 24 / 20 / 17 and 9 after §3. The

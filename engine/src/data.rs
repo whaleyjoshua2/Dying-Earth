@@ -1529,6 +1529,9 @@ pub struct AiThresholds {
     pub market_materials_reserve: f64,
     pub market_materials_turns: f64,
     pub market_fuel_reserve: f64,
+    /// Ticket #575 (version 0.1.0.3), at the designer's word: the turns of its buildings' Fuel burn
+    /// a computer seat keeps in the tank; under it Fuel is its scarcest resource and no Ship refuels.
+    pub power_fuel_reserve_turns: f64,
     /// Ticket #447 (version 0.09.6): the standing fleet, and the fleet while blockaded.
     pub warships_wanted: u32,
     pub warships_wanted_blockaded: u32,

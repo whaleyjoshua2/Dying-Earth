@@ -489,6 +489,12 @@ capital_chase = 3.0
 market_materials_reserve = 20.0
 market_materials_turns = 3.0
 market_fuel_reserve = 10.0
+# Ticket #575 (version 0.1.0.3), at the designer's word ("have the AI keep some fuel on hand"): the
+# turns of what its Power Plants, Reactors and Generators burn that a seat keeps in the tank. Under
+# it Fuel is its scarcest resource, a Ship is refuelled only from what stands above it, and the
+# market buys up to it. The first sweep without it doubled the collapses: a seat run dry had its
+# power at a quarter, read Energy as tight, and was offered no Scrubber.
+power_fuel_reserve_turns = 3.0
 # Ticket #447 (version 0.09.6): the warships a seat with a Shipyard keeps as a standing fleet, and
 # while any place of its own is under Blockade. Below the figure a warship takes the threat's lift.
 warships_wanted = 2

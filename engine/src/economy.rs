@@ -999,11 +999,25 @@ impl Game {
         tenth(facilities + modules)
     }
 
+    /// Ticket #575 (version 0.1.0.3): the Fuel a computer seat keeps for its power, three turns of the
+    /// burn (`power_fuel_reserve_turns`).
+    pub fn fuel_reserve(&self, seat: Seat) -> f64 {
+        tenth(self.tables.ai.thresholds.power_fuel_reserve_turns * self.fuel_burned_by_buildings(seat))
+    }
+
     fn producers_of(&self, seat: Seat) -> Vec<Producer> {
+        self.producers_with_tank(seat, self.seat(seat).stockpile.fuel)
+    }
+
+    /// The producers with the Fuel budget given, which the shortfall forecast reads from what this
+    /// turn's orders leave (the review of #575: a pending Refuel spends the tank before the Income).
+    fn producers_with_tank(&self, seat: Seat, tank: f64) -> Vec<Producer> {
         let mut out = Vec::new();
         // Ticket #575 (version 0.1.0.3): the Fuel in the tank pays each burning building in turn, as
-        // far as it goes; a building it does not reach runs at a quarter this Income.
-        let mut fuel_budget = self.seat(seat).stockpile.fuel;
+        // far as it goes; a building it does not reach runs at a quarter this Income. A building the
+        // Energy shortfall later shuts keeps its reservation, uncharged: no burning building carries
+        // an Energy upkeep today, so none is ever shut that way.
+        let mut fuel_budget = tank;
         let mut pay = |fuel: f64| -> bool {
             if fuel <= 0.0 {
                 return true;
@@ -1327,14 +1341,15 @@ impl Game {
     /// nothing would go dark. The designer: *"alarm when there is a
     /// projected energy deficit and buildings will go offline next turn."*
     pub fn shortfall_forecast(&self, seat: Seat, pending: &[crate::orders::Order]) -> Option<ShortfallForecast> {
-        let stored = self.remaining(seat, pending).0.energy;
-        let mut producers = self.producers_of(seat);
+        let left = self.remaining(seat, pending).0;
+        let stored = left.energy;
+        let mut producers = self.producers_with_tank(seat, left.fuel);
         let (_, shut) = self.apply_shortfall(seat, &mut producers, stored);
         if shut.is_empty() {
             return None;
         }
         // The deficit is the balance with everything still running, read before a single thing is shut.
-        let short_by = -self.energy_balance(seat, &self.producers_of(seat), stored);
+        let short_by = -self.energy_balance(seat, &self.producers_with_tank(seat, left.fuel), stored);
         let dark = shut
             .into_iter()
             .map(|i| GoesDark { name: producers[i].name.to_string(), at: self.producer_place_text(&producers[i]) })

@@ -900,9 +900,12 @@ impl Game {
         let energy_ratio = if drain == 0 { f64::INFINITY } else { s.energy / (3.0 * drain as f64) };
         let materials_ratio = s.materials / need_materials;
         let has_ships = self.ships.iter().any(|x| x.seat == seat);
-        // Ticket #575 (version 0.1.0.3): and the Fuel its power burns, three turns of it.
+        // Ticket #575 (version 0.1.0.3): and the Fuel its power burns, three turns of it, kept as a
+        // reserve: what stands under the reserve counts for nothing, so a tank at the reserve reads
+        // as empty and Fuel is the scarcest resource.
         let burn = self.fuel_burned_by_buildings(seat);
-        let fuel_ratio = if has_ships || burn > 0.0 { s.fuel / (6.0 + 3.0 * burn) } else { f64::INFINITY };
+        let reserve = self.fuel_reserve(seat);
+        let fuel_ratio = if has_ships || burn > 0.0 { (s.fuel - reserve).max(0.0) / (6.0 + 3.0 * burn) } else { f64::INFINITY };
         if energy_ratio <= materials_ratio && energy_ratio <= fuel_ratio {
             Resource::Energy
         } else if materials_ratio <= fuel_ratio {
@@ -2119,7 +2122,7 @@ impl Game {
                 let build = Order::BuildShip { site: Place::Colony(cid), kind: uk };
                 // Ticket #455 (version 0.09.6): every Ship, a warship included, where the Colony Ship alone
                 // was planned for and a warship short of its tank was refused for want of Fuel.
-                let orders = match self.ai_fuel_top_up(seat, self.tank_of(seat, uk)) {
+                let orders = match self.ai_fuel_top_up(seat, self.tank_of(seat, uk) + self.fuel_reserve(seat)) {
                     Some(buy) => vec![buy, build],
                     None => vec![build],
                 };
@@ -3047,7 +3050,10 @@ impl Game {
             // Ticket #421 (version 0.09.4): short of the Fuel to fill it, the seat buys the rest, in
             // the same candidate. The plain Refuel from what is held stays on offer beside it, so a
             // turn whose Ducats are held for something else still fills what it can.
-            let top_up = self.ai_fuel_top_up(seat, self.tank_of(seat, s.kind) - s.fuel);
+            // Ticket #575 (version 0.1.0.3): the tank is filled from what stands above the power
+            // reserve, and the top-up buys the reserve back too.
+            let fuel_reserve = self.fuel_reserve(seat);
+            let top_up = self.ai_fuel_top_up(seat, self.tank_of(seat, s.kind) - s.fuel + fuel_reserve);
             // Ticket #533 (version 0.1.0.1): a refuel never uses the Ship's turn, so a ready Missile
             // Carrier fills its tank beside its Launch; only the orbit change below still waits on it.
             if s.fuel < self.tank_of(seat, s.kind) && self.refuelling_station(seat, body, orbit) {
@@ -3055,7 +3061,7 @@ impl Game {
                 if let Some(buy) = top_up {
                     push(vec![buy, Order::Refuel { ship: s.id }], Cat::Transit, self.base_weight(seat, Cat::Transit), gap_for(Cat::Transit, None), 1.0, 1.0, format!("{note}, buying the rest"), None);
                 }
-                if self.seat(seat).stockpile.fuel > 0.0 {
+                if self.seat(seat).stockpile.fuel > fuel_reserve {
                     push(vec![Order::Refuel { ship: s.id }], Cat::Transit, self.base_weight(seat, Cat::Transit), gap_for(Cat::Transit, None), 1.0, 1.0, note, None);
                 }
             }
@@ -3924,8 +3930,20 @@ impl Game {
                 }
             }
             let tanks: f64 = self.ships.iter().filter(|s| s.seat == seat).map(|s| (self.tank_of(seat, s.kind) - s.fuel).max(0.0)).sum();
-            let keep = tanks + th.market_fuel_reserve;
+            // Ticket #575 (version 0.1.0.3): and the power reserve, kept and bought back when short.
+            let power_reserve = self.fuel_reserve(seat);
+            let keep = tanks + th.market_fuel_reserve + power_reserve;
             let left = self.remaining(seat, &chosen).0;
+            let mut bought_f = bought_f;
+            if left.fuel < power_reserve && !bought_f {
+                let short = (power_reserve - left.fuel).ceil() as i64;
+                let buy = Order::Buy { resource: Resource::Fuel, amount: short };
+                if self.order_cost(seat, &buy).ducats <= left.ducats && self.check_order(seat, &chosen, &buy).is_ok() {
+                    lines.push(format!("  take          buy {short} Fuel for the power reserve ({power_reserve:.1})"));
+                    chosen.push(buy);
+                    bought_f = true;
+                }
+            }
             let surplus = (left.fuel - keep).floor() as i64;
             // Not while Fuel is held for the Mars window (ticket #57): a sale is a spend.
             if surplus > 0 && self.market_price_at(1) >= self.market_base(1) && !self.window_within(2) && !bought_f {

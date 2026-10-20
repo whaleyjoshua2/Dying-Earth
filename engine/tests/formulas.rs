@@ -19480,6 +19480,48 @@ fn the_ai_buys_the_fuel_for_a_warships_tank() {
     assert!(lines.iter().any(|l| l.starts_with("  take") || l.contains("Ducats")), "the Frigate is weighed with its tank bought: {lines:#?}");
 }
 
+/// Ticket #575 (version 0.1.0.3), at the designer's word ("have the AI keep some fuel on hand"): a
+/// computer seat keeps a Fuel reserve for its power, three turns of what its buildings burn. Under it
+/// Fuel is its scarcest resource; it refuels a Ship only from what stands above it, and buys up to
+/// it at the market when its Ducats allow.
+#[test]
+fn the_computer_keeps_fuel_on_hand_for_its_power() {
+    let mut g = game();
+    calm(&mut g);
+    let cus = seat_of(&g, FactionKind::Custodians);
+    let sid = g.controlled_states(cus)[0];
+    g.state_mut(sid).facilities.retain(|f| f.kind != FacilityKind::PowerPlant);
+    g.state_mut(sid).facilities.push(Facility::new(FacilityKind::PowerPlant));
+    g.state_mut(sid).facilities.push(Facility::new(FacilityKind::PowerPlant));
+    g.income_phase();
+    let burn = g.fuel_burned_by_buildings(cus);
+    assert!((burn - 1.6).abs() < 1e-9, "the premise: two Power Plants burn 1.6: {burn}");
+    let reserve = g.fuel_reserve(cus);
+    assert!((reserve - 3.0 * burn).abs() < 1e-9, "three turns of it: {reserve}");
+    g.seats[cus.index()].stockpile.materials = 500.0;
+    g.seats[cus.index()].stockpile.energy = 500.0;
+    g.seats[cus.index()].stockpile.ducats = 0.0;
+    // Under the reserve, Fuel is the scarcest resource; above it, not.
+    g.seats[cus.index()].stockpile.fuel = reserve - 1.0;
+    assert_eq!(g.scarcest(cus), Resource::Fuel, "under the reserve");
+    g.seats[cus.index()].stockpile.fuel = reserve + 300.0;
+    assert_ne!(g.scarcest(cus), Resource::Fuel, "well above it");
+    // A Ship short of its tank: refuelled only from what stands above the reserve.
+    let (cid, _) = g.colonies.iter().find(|c| c.control.director() == Some(cus) && c.in_orbit).map(|c| (c.id, c.body)).expect("a station of the seat's");
+    let col = g.colony(cid).unwrap();
+    let (body, slot) = (col.body, col.slot);
+    let _ = cid;
+    let ship = Ship { name: String::new(), id: ShipId(950), kind: UnitKind::ColonyShip, seat: cus, damage: 0, at: ShipAt::Body(body), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 5.0, slot: Some(slot) };
+    g.ships.push(ship);
+    g.seats[cus.index()].stockpile.fuel = reserve;
+    g.ai_orders(cus);
+    assert!(!g.log.iter().any(|l| l.contains("take") && l.contains("refuel")), "at the reserve, no refuel from the tank: {:?}", g.log.iter().filter(|l| l.contains("refuel")).collect::<Vec<_>>());
+    g.log.clear();
+    g.seats[cus.index()].stockpile.fuel = reserve + 20.0;
+    g.ai_orders(cus);
+    assert!(g.log.iter().any(|l| l.contains("take") && l.contains("refuel")), "above it, the refuel is taken: {:?}", g.log.iter().filter(|l| l.contains("refuel")).collect::<Vec<_>>());
+}
+
 /// Ticket #575 (version 0.1.0.3), at the designer's word: a Power Plant, a Reactor and a Generator
 /// burn 0.8 Fuel a turn while online, charged at the Income beside the Energy and named in the
 /// income sources; the Solar Array and the Wind Farm burn nothing; a mothballed one burns nothing.
@@ -19494,7 +19536,7 @@ fn power_burns_fuel_and_runs_at_a_quarter_without_it() {
     let t = g.tables.clone();
     assert_eq!((t.facility(FacilityKind::PowerPlant).fuel_upkeep, t.facility(FacilityKind::Reactor).fuel_upkeep, t.module(ModuleKind::Generator).fuel_upkeep), (0.8, 0.8, 0.8), "the premise: the three burn 0.8");
     assert_eq!((t.module(ModuleKind::SolarArray).fuel_upkeep, t.facility(FacilityKind::WindFarm).fuel_upkeep, t.module(ModuleKind::WindFarm).fuel_upkeep), (0.0, 0.0, 0.0), "and the clean three nothing");
-    // One Power Plant standing: 0.75 Fuel off the Income, named.
+    // One Power Plant standing: 0.8 Fuel off the Income, named.
     g.seats[cus.index()].stockpile.fuel = 50.0;
     g.state_mut(sid).facilities.retain(|f| f.kind != FacilityKind::PowerPlant);
     g.state_mut(sid).facilities.push(Facility::new(FacilityKind::PowerPlant));
