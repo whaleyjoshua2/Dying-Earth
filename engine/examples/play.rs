@@ -194,20 +194,77 @@ fn colony_id(word: &str) -> Result<ColonyId, String> {
 
 /// Ticket #335 (version 0.09.0): an ORBIT as an order names it -- `low` (or nothing at all) for low
 /// orbit, a number for that Orbital Slot's ring. The shape `Transit` and `ChangeOrbit` both carry.
-fn orbit_slot(word: &str) -> Result<Option<u32>, String> {
+///
+/// Ticket #571 (version 0.1.0.3), at the designer's word: **or the ring by its station's name** --
+/// any unique prefix, spaces and case ignored, as every other name here -- **or by a standing
+/// station's colony id** as `colony:21` / `c21`. A bare number is the slot number, as it always
+/// was, so nothing already written changes meaning; a number past the Body's slots is refused here
+/// with the slots listed. The playtest: Axiom was colony 21 and orbit 2, and `change-orbit 26 21`
+/// sent a Ship to a ring that did not exist, stranding it for three turns.
+fn orbit_arg(g: &Game, body: BodyId, word: &str) -> Result<Option<u32>, String> {
     let w = word.to_ascii_lowercase();
     if w == "low" || w == "-" {
         return Ok(None);
     }
-    Ok(Some(count(&w)?))
+    let slots: Vec<u32> = (0..g.tables.body(body).orbital_slots).collect();
+    // The review: "low" only where the Body has one -- Venus has no ground and no low orbit, the
+    // very wording the 0.1.0.0 playtest stranded four Ships on.
+    let listed = || {
+        g.orbits_of(body)
+            .iter()
+            .map(|o| match o {
+                Orbit::Low => "low".to_string(),
+                Orbit::Slot(n) => format!("{n} {}", g.station_name(body, *n)),
+            })
+            .collect::<Vec<_>>()
+            .join(", ")
+    };
+    if let Ok(n) = w.parse::<u32>() {
+        if !slots.contains(&n) {
+            return Err(format!("{} has no orbit {n}; its orbits are {}", body.name(), listed()));
+        }
+        return Ok(Some(n));
+    }
+    // The review: a word that is not a number but norms to digits ("1.", "-1") would match the
+    // slot's number form in `pick_named`; refused here instead.
+    if !norm(word).is_empty() && norm(word).chars().all(|c| c.is_ascii_digit()) {
+        return Err(format!("{word:?} is not a whole number"));
+    }
+    if let Some(rest) = w.strip_prefix("colony").or_else(|| w.strip_prefix('c'))
+        && let Ok(id) = count(rest.trim_start_matches(':'))
+    {
+        return match g.colony(ColonyId(id)) {
+            Some(c) if c.in_orbit && c.body == body => Ok(Some(c.slot)),
+            Some(c) if c.in_orbit => Err(format!("colony {id} ({}) is over {}, not {}", g.station_name(c.body, c.slot), c.body.name(), body.name())),
+            Some(_) => Err(format!("colony {id} is on the ground, not a station")),
+            None => Err(format!("no colony {id}; the orbits over {} are {}", body.name(), listed())),
+        };
+    }
+    pick_named(&slots, word, |n| g.station_name(body, n), &format!("an orbit over {} ({})", body.name(), listed())).map(Some)
 }
 
-/// `slot <body> <n>` or `colony <n>`, as an unload or an Antarctic landing wants it.
-fn unload_target(words: &[&str]) -> Result<UnloadTarget, String> {
+/// Ticket #571: a GROUND slot the same way -- its number as `show` lists it, or its name.
+fn slot_arg(g: &Game, body: BodyId, word: &str) -> Result<u32, String> {
+    let slots: Vec<u32> = (0..g.tables.body(body).slots.len() as u32).collect();
+    if let Ok(n) = word.parse::<u32>() {
+        if !slots.contains(&n) {
+            return Err(format!("{} has no ground slot {n}; they are {}", body.name(), slots.iter().map(|n| format!("{n} {}", slot_name(g, body, *n))).collect::<Vec<_>>().join(", ")));
+        }
+        return Ok(n);
+    }
+    if !norm(word).is_empty() && norm(word).chars().all(|c| c.is_ascii_digit()) {
+        return Err(format!("{word:?} is not a whole number"));
+    }
+    pick_named(&slots, word, |n| slot_name(g, body, n), &format!("a ground slot on {}", body.name()))
+}
+
+/// `slot <body> <slot>` or `colony <n>`, as an unload or an Antarctic landing wants it. Ticket #571:
+/// the slot and the ring by name as well as number (`orbit_arg`, `slot_arg`).
+fn unload_target(g: &Game, words: &[&str]) -> Result<UnloadTarget, String> {
     match words.first().map(|w| w.to_ascii_lowercase()).as_deref() {
         Some("slot") => {
             let body = pick(&BodyId::ALL, words.get(1).ok_or("slot needs a Body")?)?;
-            let n = count(words.get(2).ok_or("slot needs a number")?)?;
+            let n = slot_arg(g, body, words.get(2).ok_or("slot needs a number or a name")?)?;
             Ok(UnloadTarget::Slot(body, n))
         }
         Some("colony") => Ok(UnloadTarget::Colony(colony_id(words.get(1).ok_or("colony needs a number")?)?)),
@@ -216,10 +273,10 @@ fn unload_target(words: &[&str]) -> Result<UnloadTarget, String> {
         // four players stranded Ships at Venus for want of it.
         Some("ring") => {
             let body = pick(&BodyId::ALL, words.get(1).ok_or("ring needs a Body")?)?;
-            let n = count(words.get(2).ok_or("ring needs a station slot number")?)?;
+            let n = orbit_arg(g, body, words.get(2).ok_or("ring needs a station slot number or name")?)?.ok_or("a station is founded in a ring, not low orbit")?;
             Ok(UnloadTarget::Ring(body, n))
         }
-        _ => Err("expected `slot <body> <n>`, `colony <n>` or `ring <body> <n>`".into()),
+        _ => Err("expected `slot <body> <slot>`, `colony <n>` or `ring <body> <orbit>`".into()),
     }
 }
 
@@ -248,7 +305,7 @@ const GRAMMAR: &str = r#"ORDER LINES (one per line; `#` starts a comment; blank 
                                        Materials and Widgets AND PEOPLE (ticket #334, version
                                        0.09.0): a Region loses population for it, a Colony a
                                        Colonist, and a place without the people to spare is refused.
-  build station <body> <slot>          e.g. build station moon 0; Materials alone, no Widgets
+  build station <body> <orbit>         e.g. build station moon 0, or moon gateway; Materials alone, no Widgets
   build archive <colony>               the Archivists only, at a Colony OFF EARTH (neither Antarctica
                                        nor a station over Earth), where four Colonists already live.
                                        Both are checked at the order and never again. The Upload
@@ -273,10 +330,14 @@ const GRAMMAR: &str = r#"ORDER LINES (one per line; `#` starts a comment; blank 
   its queue owes, and every build as `done/needed w`. The `-ducats` forms buy a building outright
   at twice its Materials and complete at the next Resolution whatever their Widget figure.
 
-  transit <ship> <body> [slot|low]     fly, spending the Ship's own tank. The leg names the ORBIT it
-                                       ends in: a slot number for that Orbital Slot's ring, or `low`
-                                       (or nothing at all) for low orbit.
-  change-orbit <ship> <slot|low>       move a Ship between the orbits of the Body it ALREADY stands
+  transit <ship> <body> [orbit|low]    fly, spending the Ship's own tank. The leg names the ORBIT it
+                                       ends in: a ring, or `low` (or nothing at all) for low orbit.
+                                       AN ORBIT (ticket #571, version 0.1.0.3) is the slot number as
+                                       `show` lists it, the station's NAME (any unique prefix:
+                                       `tiangong`, `orb`), or a standing station's colony id as
+                                       `colony:21` -- a bare number is always the slot number. A
+                                       colony id and an orbit number are two different numberings.
+  change-orbit <ship> <orbit|low>      move a Ship between the orbits of the Body it ALREADY stands
                                        at, for {fuel} Fuel out of its own tank. Resolved with the
                                        transits, before the Battles, so a Ship that changes orbit
                                        fights in its new orbit.
@@ -291,8 +352,9 @@ const GRAMMAR: &str = r#"ORDER LINES (one per line; `#` starts a comment; blank 
                                        Ship's one action and boards before it moves. One load per
                                        place a turn; never beside an unload.
   unload <ship> <n> [army] into slot <body> <slot>
+                                       the ground slot by its number or its name (ticket #571).
   unload <ship> <n> [army] into colony <n>
-  unload <ship> <n> into ring <body> <slot>
+  unload <ship> <n> into ring <body> <orbit>
                                        found a SPACE STATION with a Colony Ship's Colonists, from
                                        the station slot's ring the Ship sits in (no Materials). The
                                        one way to settle Venus, which has no ground.
@@ -514,7 +576,13 @@ fn parse_line(g: &Game, line: &str) -> Result<Line, String> {
                 "module-ducats" => Order::BuildModuleWithDucats { colony: colony_id(at(2)?)?, kind: pick(&ModuleKind::BUILDABLE, at(3)?)? },
                 "ship" => Order::BuildShip { site: place(at(2)?)?, kind: pick(&UnitKind::SHIPS, at(3)?)? },
                 "army" => Order::BuildArmy { place: place(at(2)?)? },
-                "station" => g.station_order(Seat(0), pick(&BodyId::ALL, at(2)?)?, count(at(3)?)?, &[]),
+                // Ticket #571 (version 0.1.0.3), from the review: the ring by name or colony id
+                // too, as every order that takes an orbit.
+                "station" => {
+                    let body = pick(&BodyId::ALL, at(2)?)?;
+                    let slot = orbit_arg(g, body, at(3)?)?.ok_or("a station is built in a ring, not low orbit")?;
+                    g.station_order(Seat(0), body, slot, &[])
+                }
                 "archive" => Order::BuildArchive { colony: colony_id(at(2)?)? },
                 _ => return Err(format!("`build {what}` is not one of facility, module, ship, army, station, archive")),
             }
@@ -525,19 +593,33 @@ fn parse_line(g: &Game, line: &str) -> Result<Line, String> {
         "upgrade" => Order::RaiseTier { colony: colony_id(at(1)?)? },
         // Ticket #332 (version 0.09.0): a build another seat began at a place that has changed hands.
         "cancel-build" => Order::CancelBuild { place: place(at(1)?)?, index: count(at(2)?)? as usize },
-        "transit" => Order::Transit {
-            ship: ship_id(at(1)?)?,
-            to: pick(&BodyId::ALL, at(2)?)?,
+        "transit" => {
+            let ship = ship_id(at(1)?)?;
+            let to = pick(&BodyId::ALL, at(2)?)?;
             // Ticket #99: the Orbital Slot to arrive into. Ticket #335 (version 0.09.0): the leg
             // names the ORBIT it ends in, and a leg naming none ends in low orbit, which is an
-            // orbit like any other and not "the Body at large".
-            slot: match w.get(3) {
+            // orbit like any other and not "the Body at large". Ticket #571 (version 0.1.0.3): by
+            // the station's name or colony id too.
+            let slot = match w.get(3) {
                 None => None,
-                Some(v) => orbit_slot(v)?,
-            },
-        },
+                Some(v) => orbit_arg(g, to, v)?,
+            };
+            Order::Transit { ship, to, slot }
+        }
         // Ticket #335 (version 0.09.0): between the orbits of the Body the Ship already stands at.
-        "change-orbit" => Order::ChangeOrbit { ship: ship_id(at(1)?)?, slot: orbit_slot(at(2)?)? },
+        // Ticket #571 (version 0.1.0.3): the orbit by name or colony id too, read at that Body.
+        "change-orbit" => {
+            let ship = ship_id(at(1)?)?;
+            // The review: a rival's hull answers "not your Ship" here as the engine would, so a
+            // hidden one in flight gives nothing away.
+            let body = match g.ship(ship).map(|s| (s.seat, s.at)) {
+                Some((seat, _)) if seat != Seat(0) => return Err("not your Ship".into()),
+                Some((_, ShipAt::Body(b))) => b,
+                Some((_, ShipAt::Transit { .. })) => return Err(format!("Ship {} is in transit", ship.0)),
+                None => return Err(format!("no Ship {}", ship.0)),
+            };
+            Order::ChangeOrbit { ship, slot: orbit_arg(g, body, at(2)?)? }
+        }
         "refuel" => Order::Refuel { ship: ship_id(at(1)?)? },
         // Ticket #328 (version 0.08.8), and ticket #335 (version 0.09.0) for the orbit: the
         // Battleship acts in the orbit it sits in, so the line names no orbit of its own.
@@ -567,7 +649,7 @@ fn parse_line(g: &Game, line: &str) -> Result<Line, String> {
             let rest: Vec<&str> = w[3..].to_vec();
             let army = rest.iter().any(|x| x.eq_ignore_ascii_case("army"));
             let i = rest.iter().position(|x| x.eq_ignore_ascii_case("into")).ok_or("unload wants `into ...`")?;
-            Order::Unload { ship, colonists, army, into: unload_target(&rest[i + 1..])? }
+            Order::Unload { ship, colonists, army, into: unload_target(g, &rest[i + 1..])? }
         }
         "move-army" => Order::MoveArmy { army: army_id(at(1)?)?, to: pick_state(at(2)?)? },
         "ship-stance" => Order::ShipStance { body: pick(&BodyId::ALL, at(1)?)?, stance: pick(&STANCES, at(2)?)? },
@@ -658,7 +740,7 @@ fn parse_line(g: &Game, line: &str) -> Result<Line, String> {
         "agitate" => Order::Agitate { state: pick_state(at(1)?)? },
         "resettle" => Order::Resettle { state: pick_state(at(1)?)? },
         "emigrants" => Order::BuildEmigrants { state: pick_state(at(1)?)?, n: count(at(2)?)? },
-        "send-antarctica" => Order::SendToAntarctica { state: pick_state(at(1)?)?, n: count(at(2)?)?, into: unload_target(&w[3..])? },
+        "send-antarctica" => Order::SendToAntarctica { state: pick_state(at(1)?)?, n: count(at(2)?)?, into: unload_target(g, &w[3..])? },
         // Version 0.07.3 (ticket #141): Pioneers lifted from a Launch Site onto a station over Earth.
         "lift" => Order::LiftToStation { state: pick_state(at(1)?)?, n: count(at(2)?)?, colony: colony_id(at(3)?)? },
         "change" => {
@@ -1360,9 +1442,11 @@ fn print_board(g: &Game) {
             })
             .collect();
         let q = queue_text(g, Place::Colony(c.id));
-        let name = if c.in_orbit { g.station_name(c.body, c.slot) } else { slot_name(g, c.body, c.slot) };
+        // Ticket #571 (version 0.1.0.3): a station's orbit number beside its name, since its colony
+        // id and its orbit are two numberings and a player read one for the other.
+        let name = if c.in_orbit { format!("{} (orbit {})", g.station_name(c.body, c.slot), c.slot) } else { slot_name(g, c.body, c.slot) };
         println!(
-            "colony {:<3} {:<22} {:<7} {:<30} colonists {} (room {}) | Modules {}/{} | yields {}",
+            "colony {:<3} {:<26} {:<7} {:<30} colonists {} (room {}) | Modules {}/{} | yields {}",
             c.id.0,
             name,
             if c.in_orbit { "orbit" } else { "ground" },

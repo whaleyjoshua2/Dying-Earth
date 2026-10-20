@@ -436,3 +436,39 @@ warship on Blockade and exempted Passage. Decided in one round ("q1 yes q2 stays
   turns; the Arkwrights order most of the rest. People killed by the nuke over the batch 2,318 from
   6,930 on one Launch fewer (45 from 46). Income per Faction as the sweep file, within a few percent
   of the last.
+
+## 15. A station's colony id and its orbit number agree
+
+Ticket: [A station's colony id and its orbit number agree](https://github.com/whaleyjoshua2/Dying-Earth/issues/571).
+
+The designer: *"Make Colony ids and orbit-slot numbers match for the same station."* The playtest: Axiom
+was colony 21 and orbit 2, and a `change-orbit` typed with the colony id sent a Ship to a ring that
+did not exist, stranding it for three turns; another player asked for `change-orbit 27 tiangong`. In
+the tree a Colony's id is a global counter and a station's orbit is its slot index per Body, so one
+number cannot be made equal; the text tool took a slot number alone, and `show` never printed the
+slot beside the station. The window selects by click and names orbits by name, so it had no such
+confusion. Decided in one round ("q1 yes q2 yes q3 nothing"):
+
+- **Every order that takes an orbit takes a name or a colony id too** (`orbit_arg` in `play.rs`):
+  `transit <ship> <body> [orbit]`, `change-orbit <ship> <orbit>`, `unload ... into ring <body>
+  <orbit>`. An orbit is `low`, the slot number as `show` lists it, the station's name by any unique
+  prefix with spaces and case ignored (`tiangong`, `orb`, `marsbase`), or a standing station's
+  colony id as `colony:21` / `c21`. **A bare number is always the slot number**, as it was, so nothing
+  already written changes meaning; a number past the Body's slots is refused with the orbits listed,
+  where the engine used to take it and the Ship flew to nothing. A colony id over another Body or on
+  the ground is refused by name. The ground's `into slot <body> <slot>` takes the slot's name too
+  (`slot_arg`).
+- **`show`** prints the orbit number beside the station's name on its colony line -- `Tiangong
+  (orbit 1)` -- so the two numberings sit side by side where the player reads them. The Ship's line
+  stays "Earth, at Tiangong", since the name is now enough to type.
+- **The window**: nothing.
+- No rule moves, so no sweep. Red witnessed through the tool itself, which has no tests of its own:
+  `change-orbit 1 tiangong` and `change-orbit 1 colony:21` refused *"is not a whole number"* by the
+  parser before, and passed through to the engine's own door after. Clippy clean at `-D warnings`;
+  813 tests green.
+- **The review** (an independent agent): a word that is no number but norms to digits (`1.`, `-1`)
+  would have matched the slot's number form in the name matcher -- refused as "not a whole number"
+  now; the refusal's orbit list said "low" at Venus, which has none -- built from the Body's own
+  orbits now; `change-orbit` answers "not your Ship" before it reads where a hull is, as the engine
+  does, so a hidden hull in flight gives nothing away; and `build station <body> <orbit>` takes the
+  ring by name or colony id too, being an order that takes an orbit.

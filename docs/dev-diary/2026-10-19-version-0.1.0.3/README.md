@@ -423,3 +423,18 @@ fewer. Income per Faction (Materials / Fuel / Energy / Ducats / Research, mean a
 1087 / 357 / 2492 / 1532 / 921; Prospectors 2109 / 436 / 2720 / 1195 / 387; Arkwrights 1500 / 303 /
 2251 / 3180 / 255; Archivists 470 / 257 / 1125 / 473 / 735 -- every Faction a little down on
 Materials and Energy, the starving under those Blockades.
+
+## A station's colony id and its orbit number agree
+
+Ticket [#571](https://github.com/whaleyjoshua2/Dying-Earth/issues/571), spec §15. A tool ticket: the
+two numberings cannot be made one (a colony id is a global counter, an orbit a per-Body slot index),
+so every order that takes an orbit takes the station's name or its colony id as well, a bare number
+staying the slot number, and `show` prints `Tiangong (orbit 1)`. One round, three questions, all at
+the recommendation. The red was the tool's own refusal, *"tiangong" is not a whole number*, since the
+tool has no tests; after the change the same lines reach the engine's door. A number past the Body's
+slots is refused with the orbits listed, where the engine used to take it -- the stranding itself.
+
+**The review** caught a digit-looking word (`1.`) slipping through the name matcher as orbit 1, the
+refusal listing "low" at Venus which has none, a hidden rival hull in flight answered by its
+whereabouts where the engine says "not your Ship", and `build station` still taking a bare number
+alone, which the decision's "every order that takes an orbit" covers. All four mended.
