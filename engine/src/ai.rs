@@ -2168,7 +2168,10 @@ impl Game {
         {
             let s = self.seat(seat);
             let power_reserve = self.fuel_reserve(seat);
-            if s.stockpile.fuel < power_reserve {
+            // The review of #575: a Ship's top-up buys the reserve beside its want, so while one is
+            // on offer this buy stands down, or the two would buy the same Fuel twice.
+            let top_up_on_offer = self.ships.iter().any(|sh| sh.seat == seat && matches!(sh.at, ShipAt::Body(_)) && sh.fuel < self.tank_of(seat, sh.kind) && self.ai_fuel_top_up(seat, self.tank_of(seat, sh.kind) - sh.fuel + power_reserve).is_some());
+            if s.stockpile.fuel < power_reserve && !top_up_on_offer {
                 let n = (power_reserve - s.stockpile.fuel).ceil() as i64;
                 push(vec![Order::Buy { resource: Resource::Fuel, amount: n }], Cat::Producer, self.base_weight(seat, Cat::Producer) * 1.5, 1.0, 1.0, m.opportunity, format!("buy {n} Fuel for the power reserve ({power_reserve:.1})"), None);
             }
@@ -3064,9 +3067,7 @@ impl Game {
             // Ticket #575 (version 0.1.0.3): the tank is filled from what stands above the power
             // reserve, and the top-up buys the reserve back too.
             let fuel_reserve = self.fuel_reserve(seat);
-            // The review of #575: while the tank stands under the reserve the reserve buy is the
-            // turn's purchase, and the top-up waits a turn, or the two would buy the same Fuel twice.
-            let top_up = if self.seat(seat).stockpile.fuel < fuel_reserve { None } else { self.ai_fuel_top_up(seat, self.tank_of(seat, s.kind) - s.fuel + fuel_reserve) };
+            let top_up = self.ai_fuel_top_up(seat, self.tank_of(seat, s.kind) - s.fuel + fuel_reserve);
             // Ticket #533 (version 0.1.0.1): a refuel never uses the Ship's turn, so a ready Missile
             // Carrier fills its tank beside its Launch; only the orbit change below still waits on it.
             if s.fuel < self.tank_of(seat, s.kind) && self.refuelling_station(seat, body, orbit) {

@@ -135,3 +135,11 @@ is paid by the seats that have Ducats, and only the Prospectors do (80 to 170 a 
 Arkwrights' and Archivists' 1 to 6, the playtest measured); the brake meant for the human buying
 the world fell on the computer's poor seats instead, and the Prospectors bought what the others no
 longer could. Measured behaviour, reported; nothing changed on the strength of it.
+
+**The reserve's second review** found two minor defects, both fixed and witnessed red: a rich seat
+bought the reserve and a Ship's top-up (which covers the reserve beside the want) in the same turn,
+[5, 20] for a need of 20; the reserve's buy now stands down while a top-up is on offer. And the
+scarcity assertion in the reserve's test was green without the reserve, its arithmetic having missed
+the free Core row among the three cheapest; the figure moved to where the reserve alone turns the
+answer. The earlier commit, 0a2b166, carried a failing older test for a turn, the top-up suppressed
+under the reserve; that cut is undone here.

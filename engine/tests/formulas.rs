@@ -19487,7 +19487,11 @@ fn the_ai_buys_the_fuel_for_a_warships_tank() {
 /// it at the market when its Ducats allow.
 #[test]
 fn the_computer_keeps_fuel_on_hand_for_its_power() {
-    let mut g = game();
+    // Influence priced out of reach, as `the_ai_buys_fuel_for_a_colony_ship_or_a_refuel` does, so a
+    // bought point does not take the Ducats a Fuel buy is weighed against.
+    let mut t = Tables::load(&default_data_dir()).expect("tables load");
+    t.ducats.per_influence = 1_000_000;
+    let mut g = Game::new(Arc::new(t), NewGame { seed: 7, player: FactionKind::Custodians, player_is_ai: false, player_start: StateId::EastAsia });
     calm(&mut g);
     let cus = seat_of(&g, FactionKind::Custodians);
     let sid = g.controlled_states(cus)[0];
@@ -19528,14 +19532,24 @@ fn the_computer_keeps_fuel_on_hand_for_its_power() {
     let orders = g.ai_orders(cus);
     assert!(g.log.iter().any(|l| l.contains("take") && l.contains("refuel")), "the want above it, the refuel is taken: {:?}", g.log.iter().filter(|l| l.contains("refuel")).collect::<Vec<_>>());
     assert!(g.remaining(cus, &orders).0.fuel + 1e-9 >= reserve, "the reserve stands after the turn's orders: {} of {}", g.remaining(cus, &orders).0.fuel, reserve);
-    // Short of the reserve with Ducats in hand, the reserve is bought, once: the Ship's own top-up
-    // waits a turn rather than buy the same Fuel twice (the review of #575).
+    // Short of the reserve with Ducats in hand and the Ship still wanting: ONE Fuel buy, the Ship's
+    // top-up, which covers the reserve beside the want; the reserve's own buy stands down rather
+    // than buy the same Fuel twice (the review of #575).
     g.log.clear();
     g.seats[cus.index()].stockpile.fuel = 0.0;
     g.seats[cus.index()].stockpile.ducats = 200.0;
     let orders = g.ai_orders(cus);
     let buys: Vec<i64> = orders.iter().filter_map(|o| if let Order::Buy { resource: Resource::Fuel, amount } = o { Some(*amount) } else { None }).collect();
     assert_eq!(buys.len(), 1, "one Fuel buy, not two: {buys:?}; {:?}", g.log.iter().filter(|l| l.contains("Fuel")).collect::<Vec<_>>());
+    assert!(buys[0] as f64 >= 15.0 + reserve, "the want and the reserve together: {buys:?}");
+    assert!(orders.iter().any(|o| matches!(o, Order::Refuel { .. })), "and the Refuel beside it");
+    // With no Ship wanting, the reserve's own buy, up to the reserve.
+    g.log.clear();
+    g.ships.retain(|s| s.id != ShipId(950));
+    g.seats[cus.index()].stockpile.fuel = 0.0;
+    let orders = g.ai_orders(cus);
+    let buys: Vec<i64> = orders.iter().filter_map(|o| if let Order::Buy { resource: Resource::Fuel, amount } = o { Some(*amount) } else { None }).collect();
+    assert_eq!(buys.len(), 1, "one buy: {buys:?}");
     assert!(buys[0] as f64 >= reserve && (buys[0] as f64) < reserve + 1.0, "up to the reserve: {buys:?}");
 }
 
