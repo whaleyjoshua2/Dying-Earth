@@ -84,7 +84,7 @@ branch = "Stewardship"
 rung = 2
 cost = 32
 needs = ["efficient_grids"]
-effect = "Power Plant Emissions x0.4"
+effect = "Power Plant Emissions x0.4; unlocks the Wind Farm"
 value = 0.4
 
 [[tech]]

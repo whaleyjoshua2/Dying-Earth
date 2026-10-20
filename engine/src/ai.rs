@@ -2860,13 +2860,17 @@ impl Game {
         // is, by how far above the quarter the share stands, on the Producer's base; one Region a
         // turn at most, the first standing Power Plant in each. A Reactor is never offered:
         // `check_change` refuses it, and the Reactor's clause is worth more than its smoke.
-        if self.has_tech(TechId::CleanPower) && !tight {
+        // The review of #559: one Replace in flight at a time, anywhere, since each is guarded
+        // against its own 3 Energy alone and three ordered at once would land 9 short.
+        let replace_in_flight = self.states.iter().any(|s| s.queue.iter().any(|b| b.seat == seat && matches!(b.item, BuildItem::Replace(_))));
+        if self.has_tech(TechId::CleanPower) && !tight && !replace_in_flight {
             let fair = self.tables.influence.blame.fair_share;
             let over = self.blame_share(seat) - fair;
             let lost = energy_of(FacilityKind::PowerPlant) - energy_of(FacilityKind::WindFarm);
             if over > 0.0 && !self.energy_tight_losing(seat, lost) {
-                for sid in self.directed_states(seat) {
-                    if let Some(i) = self.state(sid).facilities.iter().position(|f| f.kind == FacilityKind::PowerPlant && !f.mothballed && !f.changing()) {
+                // The first standing Power Plant of the first Region that has one: one candidate.
+                if let Some((sid, i)) = self.directed_states(seat).into_iter().find_map(|sid| self.state(sid).facilities.iter().position(|f| f.kind == FacilityKind::PowerPlant && !f.mothballed && !f.changing()).map(|i| (sid, i))) {
+                    {
                         push(
                             vec![Order::Change { building: BuildingRef::Facility(sid, i), what: BuildingChange::Replace }],
                             Cat::Producer,

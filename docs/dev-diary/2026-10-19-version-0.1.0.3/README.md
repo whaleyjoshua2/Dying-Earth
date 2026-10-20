@@ -73,3 +73,10 @@ upkeep" (`standing:wind_farm`, another new aid).
 collapses**, from 9 / 24 / 20 / 11 and 15. The Archivists +6 and the collapses -6 are past noise:
 every seat with Clean Power now raises Wind Farms where it raised Power Plants, and the world warms
 slower. The Custodians still sit at 10 against the ideal's 15.
+
+**The review** (an agent that did not build it) found no defect and two gaps, one fixed: the
+computer could order a Replace in every Region in one turn, each guarded against its own 3 Energy
+alone, and land nine short; it now keeps one Replace in flight at a time. Clean Power's effect text
+now says it unlocks the Wind Farm. Left for the designer: a coastal Power Plant the sea drowns while
+its Replace is queued leaves the Replace eating Widgets until it completes and is lost with its 12.5
+Materials, as any coastal build is lost today, with no cue until then.
