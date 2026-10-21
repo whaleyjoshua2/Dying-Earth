@@ -1,4 +1,4 @@
-DYING EARTH - playtest build, version 0.1.0.2
+DYING EARTH - playtest build, version 0.1.0.3
 =============================================
 
 Thanks for playing. This is an early build of a turn-based strategy game about colonizing
@@ -16,49 +16,74 @@ HOW TO RUN
 4. The very first launch shows a blank dark window for up to ten seconds while it
    compiles graphics. Later launches are quick.
 5. Needs Windows 10 or 11, 64-bit, and any graphics card from the last ten years.
-6. Saves from 0.1.0.1 and 0.1.0.0 load. Saves from 0.09.9 and before do not: the Load
-   screen says so.
+6. Saves from 0.1.0.2, 0.1.0.1 and 0.1.0.0 load. Saves from 0.09.9 and before do not: the
+   Load screen says so.
 7. This version ships for Windows and for Linux. On Linux, read RUN-ON-LINUX.txt in the
    folder instead of steps 2 to 5.
 
-WHAT CHANGED SINCE 0.1.0.1
+WHAT CHANGED SINCE 0.1.0.2
 --------------------------
-The legibility version: nearly all of it is the board and its cards saying what they mean,
-plainly, where you can read it.
+The fair-fight version: most of it takes the slack out of the board, the loops that won
+alone, the chores that stole turns, and the rules the computer never used.
 
-THE MAPS
-- LABELS GIVE WAY instead of piling up, on every map and at every angle. Where two would
-  overlap, the less important one shrinks to its name, and hides if even that will not
-  fit. The place you have selected and the one under your pointer always show in full;
-  then your own places, then rivals', then neutral ones. A shield, a Battle mark or a
-  station stays where it is, and a click on a place works whatever its label is doing.
+EARTH
+- ONE BANK TO A REGION, and the Prospectors' Investment Bank counts as one.
+- A SCRUBBER costs 4 Energy and 1 Ducat a turn, and a Region holds one per 300 million
+  people (India 6, China 5, most Regions 1).
+- THE WIND FARM: a new Facility anybody with Clean Power may build, 3 Energy a turn for no
+  Fuel and no Emissions, at 1 Ducat a turn; a Mars Module too. The computer builds it.
+- POWER BURNS FUEL: a Power Plant, a Reactor or a Generator burns 0.8 Fuel a turn, and one
+  short of Fuel runs at a quarter. The computer keeps a reserve.
+- INFLUENCE costs 4.5 Ducats a point; the Distress Call card gives +2.
+- THE PROSPECTORS open with 60 Materials where the other three open with 80. Every Faction's
+  card now says what it opens with, in a line above its signature rule.
+- A STRIP PERMIT is once per Region, ever, and the button and the help say so.
 
-THE CARDS AND MOUSE-OVERS
-- Mouse-overs on a line of words (Launch Site: Yes, Influence value, GDP, Widgets) now open
-  anywhere on the words. Before, they only opened in the gaps between them.
-- A Colony Ship's people count includes the Pioneers you have ordered aboard this turn.
-- Fewer words: the top bar's Widgets mouse-over and each card's Widgets line lost their
-  explanation of what a Widget is; the Climate Panel no longer lists the card deck.
-- Plurals: "1 Facility", "1 turn", "1 Colonist", never "1 Facilities" or "turn(s)".
+SPACE
+- LOADING a Ship from a Colony or a station is free of the Ship's turn, as a lift is, so
+  a Ship can load and leave in one turn.
+- A SHIP BLOCKS A LANDING only when it is on Blockade in low orbit; a passing or holding
+  warship does not. A Passage partner never blocks you. Orbital Control still gates the
+  Bombard, the Launch and the starving.
+- Every computer seat RACES FOR THE MOON from turn one.
+- The Custodians' computer uses PRODUCTION MOVED (an idle Factory makes its pair off Earth
+  x2.08), and the Custodians starting in East Asia now leave Earth like the rest.
 
-THE RULES
-- NEW YIELDS on the Moon (Mine 1.25, Generator 1.3), Phobos (Generator 1.2, Research 1.2)
-  and Deimos (Mine 1.01, Generator 1.1, Refinery 0.52, Research 1.15).
-- VICTORY PROGRESS counts both halves of a Victory Condition. "N% of the way there" is now
-  a blend of the two parts, not the smaller of them: a full Archive with nobody uploaded
-  reads 40%, not 0%. The Archivists' Archive counts 0.4 of it, the Arkwrights' Colonists
-  off Earth 0.6, the others half and half. You still need both parts to win. The computer
-  judges who is leading by the same figure.
+DIPLOMACY
+- An INFLUENCE SPEND that would break an Accord is refused unless you say break (the
+  button wants a second click).
+- A REFUSED OFFER waits three turns. A computer that you refused a Trade will not offer
+  the same two goods again until you refuse it a different Trade. You can COUNTER a Trade
+  once, with your own amounts: it answers at once. Letting an Accord run out when the
+  partner would have renewed counts as a refusal.
+- The CHEAP ORE OFFER: refuse it and Materials are half price for you alone next turn.
+
+VICTORY AND THE CLIMATE
+- The ARCHIVE wants 250 Research; the UPLOAD is 16 Colonists, four a turn at most, and the
+  Archive draws more Energy as it fills. Modules at a place without the people to run them
+  go dark.
+- The PROSPECTORS' bar is 4,250 Ducats in the Venture Fund; the Fund counts 0.7 of their
+  score, and the Arkwrights' Colonial Capital a tenth of theirs. The Fund's growth is
+  shown whole on the card.
+- The STABILIZATION RUN counts everything the temperature does, cards and permafrost
+  included.
+
+THE TEXT AND THE TOOL
+- Station orders take the station's NAME or its colony id as well as the orbit number.
+- `change` and `cancel-build` take a building's name as well as its index.
+- The "calm enough" line is gone from calm Regions. Several refusals and help lines read
+  as the rules do.
 
 WHAT WE WANT TO KNOW
 --------------------
 Write down anything, however small. Especially:
 - The moment you were not sure what to do next.
 - Anything you clicked that did nothing, or did something you did not expect.
-- THE LABELS: did a name you needed ever vanish? Did any flicker as you turned the globe?
-- THE MOUSE-OVERS: any still hard to open, or any that said too much?
-- VICTORY PROGRESS: did the percentage match how close you felt? Did a rival's?
-- THE MOONS: did you settle Phobos or Deimos, and was it worth it?
+- THE WIND FARM: did you build it, and did the Fuel for power change what you built?
+- THE OFFERS: did the computer's offers feel fair? Did you counter a Trade, and what came
+  of it?
+- THE MOON: who got there first, and did the race matter?
+- THE CUSTODIANS: did Stabilization ever feel within reach?
 - The turn the game got boring, if it did, and the turn you felt you had lost.
 - Crashes: what you were doing, and the "Seed" number shown on the title screen and
   the game-over screen. With the seed the game can be replayed exactly.

@@ -101,7 +101,16 @@ pub enum Order {
     MoveArmy { army: ArmyId, to: StateId },
     Load { ship: ShipId, colonists: u32, from: LoadSource, army: Option<ArmyId> },
     Unload { ship: ShipId, colonists: u32, army: bool, into: UnloadTarget },
-    Influence { target: Target, amount: i64 },
+    /// Ticket #569 (version 0.1.0.3): `break_accord` -- the spend is meant to break a non-aggression
+    /// Accord whose partner's place it lands on. Without it such a spend is refused, since the
+    /// playtest broke seven Accords by accident through an "ok" line nobody read; the computer
+    /// seats never set it, dropping such orders themselves.
+    Influence {
+        target: Target,
+        amount: i64,
+        #[serde(default)]
+        break_accord: bool,
+    },
     /// Version 0.03 (ticket #35): Ducats buy Influence for this turn's Allotment, and pay for
     /// repairs in place of Materials. Ticket #54 retired Restoration and both its orders.
     BuyInfluence { amount: i64 },
@@ -324,9 +333,16 @@ pub fn is_lift(o: &Order, ship: ShipId) -> bool {
     matches!(o, Order::Load { ship: x, from: LoadSource::State(_), .. } if *x == ship)
 }
 
-/// Ticket #533: a Ship's **one action** a turn, which a lift and a refuel stand beside: a flight, a
-/// change of orbit, an unload or a founding, a load off a Colony or station, a Bombard, a Launch or
-/// a Rearm.
+/// Ticket #568 (version 0.1.0.3), at the designer's word: any **load** onto a Ship -- a lift from a
+/// Region or a load off a Colony or station -- never uses its turn. It boards where the Ship sits,
+/// before it moves.
+pub fn is_load(o: &Order, ship: ShipId) -> bool {
+    matches!(o, Order::Load { ship: x, .. } if *x == ship)
+}
+
+/// Ticket #533: a Ship's **one action** a turn, which a load and a refuel stand beside: a flight, a
+/// change of orbit, an unload or a founding, a Bombard, a Launch or a Rearm. Ticket #568 (version
+/// 0.1.0.3): a load off a Colony or station was the action until then; it is free now, as a lift.
 pub fn is_ship_action(o: &Order, ship: ShipId) -> bool {
     match o {
         Order::Transit { ship: x, .. }
@@ -334,8 +350,7 @@ pub fn is_ship_action(o: &Order, ship: ShipId) -> bool {
         | Order::Unload { ship: x, .. }
         | Order::Bombard { ship: x, .. }
         | Order::Launch { ship: x, .. }
-        | Order::Rearm { ship: x }
-        | Order::Load { ship: x, from: LoadSource::Colony(_), .. } => *x == ship,
+        | Order::Rearm { ship: x } => *x == ship,
         _ => false,
     }
 }
@@ -388,7 +403,8 @@ pub struct Pending {
     pub card_unrest: Vec<(StateId, f64, EventId)>,
     /// Ticket #52: Resettle orders paid this turn, one per Faction at most.
     pub resettle: Vec<(Seat, StateId)>,
-    pub influence: Vec<(Seat, Target, i64)>,
+    /// Ticket #569 (version 0.1.0.3): and the seat directing the place as the order was given.
+    pub influence: Vec<(Seat, Target, i64, Option<Seat>)>,
     /// Ticket #267 (version 0.08.4): Smear campaigns paid this turn -- who, whom, how much Influence.
     #[serde(default)]
     pub smears: Vec<(Seat, Seat, i64)>,
@@ -537,6 +553,8 @@ impl Game {
                 Some(format!("+{} Unrest, {} Materials back", figure(u.per_decommission), figure(tenth(self.tables.facility(kind).materials / 2.0))))
             }
             BuildingChange::Restart => None,
+            // Ticket #559 (version 0.1.0.3): the button says its Materials and Widgets itself.
+            BuildingChange::Replace => None,
         }
     }
 
@@ -646,15 +664,18 @@ impl Game {
             // 0.1.0.1): a Strip Permit costs Ducats, where it was free.
             Order::StripPermit { .. } => Cost { ducats: t.strip_permit.ducats as f64, ..Default::default() },
             Order::Change { what: BuildingChange::Restart, .. } => Cost { materials: t.mothball.restart_materials as f64, ..Default::default() },
+            // Ticket #559 (version 0.1.0.3): a Replace is half the Wind Farm's price, paid at the order.
+            Order::Change { building, what: BuildingChange::Replace } => Cost { materials: self.item_materials(seat, building.place(), BuildItem::Replace(FacilityKind::WindFarm)), ..Default::default() },
             Order::Leapfrog { .. } => Cost { ducats: t.ducats.per_leapfrog as f64, ..Default::default() },
             Order::ExodusCall { .. } => Cost { ducats: t.ducats.per_exodus_call as f64, ..Default::default() },
-            Order::BuyInfluence { amount } => Cost { ducats: (t.ducats.per_influence * *amount) as f64, ..Default::default() },
+            Order::BuyInfluence { amount } => Cost { ducats: t.ducats.per_influence * *amount as f64, ..Default::default() },
             // A purchase is a negative cost in the resource bought, so `remaining` and `commit_orders`
             // add it without a special case; a sale is the mirror, with a negative Ducat cost.
             Order::Buy { resource, amount } => {
                 // Ticket #83: the lot's price, times the seat's market multiplier; ticket #387
-                // (version 0.09.3): to the tenth, where it was rounded down.
-                let ducats = self.market_price(seat, (self.trade_price(*resource).unwrap_or(0) * *amount) as f64);
+                // (version 0.09.3): to the tenth, where it was rounded down. Ticket #577 (version
+                // 0.1.0.3): and times the seat's own cut on that good, where a card gave it one.
+                let ducats = self.lot_price(seat, *resource, (self.trade_price(*resource).unwrap_or(0) * *amount) as f64);
                 match resource {
                     Resource::Materials => Cost { materials: -*amount as f64, ducats, ..Default::default() },
                     Resource::Fuel => Cost { fuel: -*amount as f64, ducats, ..Default::default() },
@@ -718,8 +739,10 @@ impl Game {
     /// or a save written before this version -- and reads as the card figure.
     pub fn market_price_at(&self, row: usize) -> i64 {
         // Ticket #337 (version 0.09.0): a choice card may OVERRIDE the price, outside the band,
-        // through the last turn it named -- a Materials price of 1 is the whole point of the Cheap
-        // Ore Offer. The banded price goes on underneath and resumes when the override runs out.
+        // through the last turn it named -- the Fuel Contract's refusal moves Fuel a step, the
+        // Trade Pact takes a step off Materials. The banded price goes on underneath and resumes
+        // when the override runs out. (The Cheap Ore Offer set Materials to 1 until ticket #577,
+        // version 0.1.0.3; its refusal is the seat's own cut now, `lot_price`.)
         if self.market.card_price[row] > 0 && self.turn <= self.market.card_price_until[row] {
             return self.market.card_price[row];
         }
@@ -738,8 +761,10 @@ impl Game {
     /// A price moves a step a turn inside its band; a card is what swings it from 4 to 1.
     pub fn market_line(&self, seat: Seat) -> String {
         let price = |r: Resource, name: &str| {
-            let p = self.market_price(seat, self.trade_price(r).unwrap_or(0) as f64);
-            let note = Game::market_row(r).and_then(|row| self.market_card_note(row)).map(|n| format!(" ({n})")).unwrap_or_default();
+            let p = self.lot_price(seat, r, self.trade_price(r).unwrap_or(0) as f64);
+            // Ticket #577 (version 0.1.0.3): and the seat's own cut, beside the card over the row.
+            let notes: Vec<String> = Game::market_row(r).into_iter().flat_map(|row| [self.market_card_note(row), self.seat_price_note(seat, row)]).flatten().collect();
+            let note = if notes.is_empty() { String::new() } else { format!(" ({})", notes.join("; ")) };
             format!("{name} {}{note}", figure(p))
         };
         format!(
@@ -767,6 +792,30 @@ impl Game {
         })
     }
 
+    /// Ticket #577 (version 0.1.0.3): the seat's own cut on a row this turn, where a card gave it
+    /// one, or `None`.
+    pub fn seat_price_cut(&self, seat: Seat, row: usize) -> Option<PriceCut> {
+        self.seat(seat).price_cuts.iter().copied().find(|c| c.row == row && self.turn <= c.until)
+    }
+
+    /// Ticket #577: the cut's words for the Market line and the Trading window's price column:
+    /// *"half for you, this turn"*.
+    pub fn seat_price_note(&self, seat: Seat, row: usize) -> Option<String> {
+        let c = self.seat_price_cut(seat, row)?;
+        let how = if (c.multiplier - 0.5).abs() < 1e-9 { "half".to_string() } else { format!("x{}", c.multiplier) };
+        Some(match c.until - self.turn {
+            0 => format!("{how} for you, this turn"),
+            n => format!("{how} for you, {}", crate::counted(n + 1, "turn", "turns")),
+        })
+    }
+
+    /// Ticket #577: what the window charges this seat for a lot of `resource` priced at `ducats`:
+    /// the Faction's multiplier and the seat's own cut on that good, to the tenth.
+    pub fn lot_price(&self, seat: Seat, resource: Resource, ducats: f64) -> f64 {
+        let cut = Game::market_row(resource).and_then(|row| self.seat_price_cut(seat, row)).map_or(1.0, |c| c.multiplier);
+        tenth(ducats * self.tables.faction(self.kind(seat)).market_multiplier * cut)
+    }
+
     /// Ticket #220 (version 0.08.2): the turn's trading moves each price, once, at the settle.
     ///
     /// `price_step_units` net units bought moves it a step up, the same sold moves it a step down,
@@ -787,6 +836,11 @@ impl Game {
                 self.market.card_price[row] = 0;
                 self.market.card_price_until[row] = 0;
             }
+        }
+        // Ticket #577 (version 0.1.0.3): a seat's own cut is forgotten the same way.
+        let turn = self.turn;
+        for s in &mut self.seats {
+            s.price_cuts.retain(|c| turn < c.until);
         }
         for row in 0..3 {
             let base = self.market_base(row);
@@ -1221,6 +1275,12 @@ impl Game {
                 }
                 let already: u32 = pending.iter().map(|o| if let Order::Upload { colony: c, n } = o { if c == colony { *n } else { 0 } } else { 0 }).sum();
                 let room = self.uploadable_at(*colony, already);
+                // Ticket #565 (version 0.1.0.3), at the designer's word: four a turn at most, pending
+                // Uploads counted; the room is answered first.
+                let cap = self.tables.archive.upload_per_turn;
+                if *n <= room && already + *n > cap {
+                    return fail(format!("{} a turn; {already} already ordered", crate::data::figure(cap as f64)));
+                }
                 if *n > room {
                     let place = self.place_name(Place::Colony(*colony));
                     return fail(match room {
@@ -1430,6 +1490,23 @@ impl Game {
                         return fail(format!("this Nation State already has a {}", k.name()));
                     }
                 }
+                // Ticket #560 (version 0.1.0.3), at the designer's word: one Bank to a Region by
+                // the same door, the Investment Bank counted as one. The 0.1.0.2 playtest filled
+                // every slot with Investment Banks and ran income from 16 to 300 Ducats a turn by
+                // turn 12. Any already standing beyond one stay: the rule is read at the order.
+                if kind.does_the_job_of(FacilityKind::Bank) {
+                    let st = self.state(*state);
+                    let there = st
+                        .facilities
+                        .iter()
+                        .map(|f| f.kind)
+                        .chain(st.queue.iter().filter_map(|b| if let BuildItem::Facility(k) = b.item { Some(k) } else { None }))
+                        .chain(pending.iter().filter(|o| matches!(o.build_state(), Some(s) if s == *state)).filter_map(|o| o.build_facility().map(|k| k.built_by(self.kind(seat)))))
+                        .find(|k| k.does_the_job_of(FacilityKind::Bank));
+                    if let Some(k) = there {
+                        return fail(format!("this Nation State already has {} {}", if k == FacilityKind::InvestmentBank { "an" } else { "a" }, k.name()));
+                    }
+                }
                 Ok(cost)
             }
             // Ticket #52: Relief, on a state you direct, any number of times a turn.
@@ -1520,7 +1597,9 @@ impl Game {
                 // station-only, could be built nowhere at all.
                 if col.in_orbit && !kind.stands_on_a_station() {
                     // Ticket #497 (version 0.09.9): the build list shows what a station holds.
-                    return fail("not on a station");
+                    // Ticket #573 (version 0.1.0.3): by the kind's name; "not on a station" read as
+                    // "this place is not a station" to a tester building a Refinery on Tiangong.
+                    return fail(format!("a {} stands on the ground, not on a station", kind.name()));
                 }
                 // Ticket #186 (version 0.08.0): nobody but the Custodians builds an Academy off
                 // Earth either, captured ones included.
@@ -1557,6 +1636,10 @@ impl Game {
                 }
                 if self.tables.module(*kind).low_gravity_only && (col.in_orbit || !self.tables.body(col.body).low_gravity) {
                     return fail(format!("a {} stands only on the ground of a low-gravity Body (the Moon, Phobos, Deimos)", kind.name()));
+                }
+                // Ticket #559 (version 0.1.0.3): the Wind Farm stands on the ground of Mars alone.
+                if self.tables.module(*kind).mars_only && (col.in_orbit || col.body != BodyId::Mars) {
+                    return fail(format!("a {} stands on Mars alone", kind.name()));
                 }
                 if matches!(kind, ModuleKind::Shipyard | ModuleKind::Barracks | ModuleKind::MassDriver) {
                     let has = col.modules.iter().any(|m| m.kind == *kind)
@@ -1757,7 +1840,8 @@ impl Game {
                 if s.arrived_this_turn {
                     return fail("arrived this turn; it may act next turn");
                 }
-                // Ticket #533 (version 0.1.0.1): a lift and a refuel stand beside it.
+                // Ticket #533 (version 0.1.0.1): a lift and a refuel stand beside it; ticket #568
+                // (version 0.1.0.3): any load.
                 if pending.iter().any(|o| is_ship_action(o, *ship)) {
                     return fail("this Ship already has an order");
                 }
@@ -1807,7 +1891,7 @@ impl Game {
                     return fail("arrived this turn; it may act next turn");
                 }
                 // Ticket #533 (version 0.1.0.1): a refuel given this turn lands first, and a lift and
-                // a refuel stand beside the change.
+                // a refuel stand beside the change; ticket #568 (version 0.1.0.3): any load.
                 let fuel = self.orbit_change_cost(seat, body, self.ship_orbit(s), want);
                 let tank = self.tank_after_refuel(seat, pending, s);
                 if tank < fuel {
@@ -1997,8 +2081,9 @@ impl Game {
                 // Ticket #278 (version 0.08.5): a Blockade is chosen against a place, so it wants a
                 // warship of the seat's sitting in an orbit it may shut. Ticket #335 (version
                 // 0.09.0): **the orbit it is given in** -- LOW ORBIT, which starves the ground
-                // under an outright Orbital Control, or an Orbital Slot that is not its own
-                // station's: a rival's, or an empty one held against a builder.
+                // under an outright Orbital Control and (ticket #570, version 0.1.0.3) shuts it to
+                // rivals' landings, or an Orbital Slot that is not its own station's: a rival's, or
+                // an empty one held against a builder.
                 // Ticket #346 (version 0.09.1): an Intercept is a Battle opened on an arrival, so
                 // a stack with nothing in it that can pay the Battle charge catches nobody and the
                 // order is refused rather than given to no effect. This gate is NEW: the
@@ -2099,18 +2184,20 @@ impl Game {
                 }
                 // Ticket #533, at the designer's word: a lift never uses the Ship's turn, so it
                 // stands beside any one action -- but never beside an unload, and never two from one
-                // Region. A load off a Colony or station IS the turn's action.
+                // Region. Ticket #568 (version 0.1.0.3), at the designer's word: a load off a Colony
+                // or station the same, where it was the turn's action; never two off one place.
                 if pending.iter().any(|o| matches!(o, Order::Unload { ship: x, .. } if x == ship)) {
                     return fail("a Ship loads or unloads in a turn, not both");
                 }
-                if is_lift(order, *ship) {
-                    if let Some(st) = from_region(order)
-                        && pending.iter().any(|o| from_region(o) == Some(st))
-                    {
-                        return fail("this Ship already loads from that Region this turn");
-                    }
-                } else if pending.iter().any(|o| is_ship_action(o, *ship)) {
-                    return fail("this Ship already has an order");
+                if let Some(st) = from_region(order)
+                    && pending.iter().any(|o| from_region(o) == Some(st))
+                {
+                    return fail("this Ship already loads from that Region this turn");
+                }
+                if let LoadSource::Colony(c) = from
+                    && pending.iter().any(|o| matches!(o, Order::Load { ship: x, from: LoadSource::Colony(y), .. } if x == ship && y == c))
+                {
+                    return fail("this Ship already loads from that place this turn");
                 }
                 if army.is_some() && pending.iter().any(|o| matches!(o, Order::Load { ship: x, army: Some(_), .. } if x == ship)) {
                     return fail("this Ship already carries an Army");
@@ -2230,7 +2317,8 @@ impl Game {
                     return fail("nothing to unload");
                 }
                 // Ticket #533 (version 0.1.0.1), at the designer's word: no lift beside an unload.
-                if pending.iter().any(|o| is_lift(o, *ship)) {
+                // Ticket #568 (version 0.1.0.3): nor a load off a Colony or station, free now too.
+                if pending.iter().any(|o| is_load(o, *ship)) {
                     return fail("a Ship loads or unloads in a turn, not both");
                 }
                 if pending.iter().any(|o| is_ship_action(o, *ship)) {
@@ -2250,6 +2338,11 @@ impl Game {
                         // and low orbit is what touches the ground.
                         if !self.ship_in_orbit(s, body, Orbit::Low) {
                             return fail(self.move_first(body, Orbit::Low, "found the Colony", "a Colony is founded from low orbit alone."));
+                        }
+                        // Ticket #570 (version 0.1.0.3): refused at the order, where it passed and
+                        // failed at the Resolution a turn later.
+                        if !self.may_land(seat, body) {
+                            return fail(self.blockaded_words(body, Orbit::Low));
                         }
                         if s.kind != UnitKind::ColonyShip || *colonists == 0 {
                             return fail("only a Colony Ship with Colonists founds a Colony");
@@ -2289,8 +2382,10 @@ impl Game {
                         if !self.ship_in_orbit(s, body, Orbit::Slot(*slot)) {
                             return fail(self.move_first(body, Orbit::Slot(*slot), "found the station", "a station is founded from its own orbit."));
                         }
+                        // Ticket #570 (version 0.1.0.3), from the review: the door and the
+                        // Resolution's re-read say the same words.
                         if self.slot_blockaded_against(seat, body, *slot) {
-                            return fail(format!("a rival warship holds Orbital Slot {slot} over {}", self.tables.body(body).name));
+                            return fail(self.blockaded_words(body, Orbit::Slot(*slot)));
                         }
                     }
                     UnloadTarget::Colony(c) => {
@@ -2302,6 +2397,12 @@ impl Game {
                         // orbit, a Colony on the ground from low orbit.
                         if !self.ship_may_touch(s, col) {
                             return fail(self.move_first(body, self.colony_orbit(col), "unload", &format!("{} is reached from there alone.", self.place_name(Place::Colony(*c)))));
+                        }
+                        // Ticket #570 (version 0.1.0.3): refused at the order -- a Blockade of low
+                        // orbit for the ground, of the ring for a station -- where it passed and
+                        // failed at the Resolution a turn later.
+                        if !self.may_unload_into(seat, *c) {
+                            return fail(self.blockaded_words(body, self.colony_orbit(col)));
                         }
                         if *colonists > 0 {
                             if col.control.director() != Some(seat) {
@@ -2380,7 +2481,7 @@ impl Game {
                 }
                 Ok(cost)
             }
-            Order::Influence { target, amount } => {
+            Order::Influence { target, amount, break_accord } => {
                 if *amount <= 0 {
                     return fail("spend a positive amount");
                 }
@@ -2391,6 +2492,14 @@ impl Game {
                             return fail("no such Colony");
                         }
                     }
+                }
+                // Ticket #569 (version 0.1.0.3), at the designer's word: a spend on a non-aggression
+                // partner's place is refused unless the order says break -- the playtest broke seven
+                // Accords by accident through an "ok ... breaks your Accord" line nobody read. The
+                // window's button wants a second click for it; the tool the word `break`; the computer
+                // seats drop such orders themselves. The other five crossing orders warn in the price.
+                if !*break_accord && let Some(partner) = self.order_crosses(seat, order) {
+                    return fail(format!("breaks your Accord with {}: order it with break to break it", self.seat_name(partner)));
                 }
                 Ok(cost)
             }
@@ -2600,7 +2709,8 @@ impl Game {
         }
         let (mothballed, changing, fixed) = match building {
             BuildingRef::Facility(sid, i) => match self.state(sid).facilities.get(i) {
-                Some(f) => (f.mothballed, f.change.is_some(), None),
+                // Ticket #559 (version 0.1.0.3): a Replace under way is a change on it too.
+                Some(f) => (f.mothballed, f.changing(), None),
                 None => return fail("no such Facility"),
             },
             BuildingRef::Module(cid, i) => match self.colony(cid).and_then(|c| c.modules.get(i)) {
@@ -2617,7 +2727,20 @@ impl Game {
             _ => {}
         }
         if changing {
-            return fail("this building is already being mothballed, restarted or decommissioned");
+            return fail("this building is already being mothballed, restarted, decommissioned or replaced");
+        }
+        // Ticket #559 (version 0.1.0.3): a Replace is a Power Plant's alone -- never a Reactor, which
+        // is a Power Plant everywhere but here, and never a Module -- and waits on the Wind Farm's Tech.
+        if what == BuildingChange::Replace {
+            let BuildingRef::Facility(sid, i) = building else { return fail("only a Power Plant in a Region is replaced with a Wind Farm") };
+            if self.state(sid).facilities[i].kind != FacilityKind::PowerPlant {
+                return fail("only a Power Plant is replaced with a Wind Farm");
+            }
+            if let Some(t) = self.tables.facility(FacilityKind::WindFarm).needs_tech
+                && !self.has_tech(t)
+            {
+                return fail(format!("a Wind Farm needs {}", self.tables.tech(t).name));
+            }
         }
         match what {
             BuildingChange::Mothball if mothballed => fail("it is already mothballed"),
@@ -2685,13 +2808,14 @@ impl Game {
     /// Pay for and record every order of a seat at End Turn (spec 7.3: costs are paid at once).
     pub fn commit_orders(&mut self, seat: Seat, orders: &[Order]) {
         let mut recruited: Vec<(StateId, u32)> = Vec::new();
-        // Ticket #533 (version 0.1.0.1), at the designer's word: a Ship's lifts and its refuel land
+        // Ticket #533 (version 0.1.0.1), at the designer's word: a Ship's loads and its refuel land
         // where it sits, BEFORE it moves, however the orders were given; and a Ship that leaves for
-        // another Body takes its lifts aboard now, since the Resolution's cargo finds it gone. The
+        // another Body takes its loads aboard now, since the Resolution's cargo finds it gone. The
         // MOVE is held back until after them, not the refuel brought forward: a move is paid from the
         // Ship's own tank, so holding it moves no Stockpile payment, where a refuel brought forward
-        // past a Buy would take less Fuel than it was quoted.
-        let beside = |o: &Order, ship: ShipId| is_lift(o, ship) || matches!(o, Order::Refuel { ship: x } if *x == ship);
+        // past a Buy would take less Fuel than it was quoted. Ticket #568 (version 0.1.0.3): a load
+        // off a Colony or station is a load like a lift here.
+        let beside = |o: &Order, ship: ShipId| is_load(o, ship) || matches!(o, Order::Refuel { ship: x } if *x == ship);
         let mut held: Vec<(usize, &Order)> = Vec::new();
         let mut ordered: Vec<&Order> = Vec::with_capacity(orders.len());
         for (i, o) in orders.iter().enumerate() {
@@ -2807,6 +2931,12 @@ impl Game {
                         Place::Colony(c) => self.colony_mut(*c).and_then(|c| (*index < c.queue.len()).then(|| c.queue.remove(*index))),
                     };
                     if let Some(b) = removed {
+                        // Ticket #559 (version 0.1.0.3): a cancelled Replace frees its Power Plant.
+                        if let (BuildItem::Replace(_), Place::State(s)) = (b.item, *place)
+                            && let Some(f) = self.state_mut(s).facilities.iter_mut().find(|f| f.replacing)
+                        {
+                            f.replacing = false;
+                        }
                         let refund = -cost.materials;
                         let (who, name, at) = (self.seat_name(seat), b.item.name(), self.place_name(*place));
                         self.log(format!("{who} cancelled the {name} under way at {at}: {} Materials to their Stockpile.", figure(refund)));
@@ -2927,16 +3057,20 @@ impl Game {
                         a.move_to = Some(*to);
                     }
                 }
-                Order::Load { ship, colonists, from: from @ LoadSource::State(_), army } => {
-                    // Ticket #46: a lift from a Nation State is a launch.
-                    self.climate.launches_pending[seat.index()] += 1;
+                Order::Load { ship, colonists, from, army } => {
+                    // Ticket #46: a lift from a Nation State is a launch. Ticket #568 (version
+                    // 0.1.0.3): a load off a Colony or station is none, but boards before the Ship
+                    // leaves as a lift does.
+                    if is_lift(order, *ship) {
+                        self.climate.launches_pending[seat.index()] += 1;
+                    }
                     if leaving.contains(ship) {
                         self.carry_load(seat, *ship, *colonists, *from, *army);
                     } else {
                         self.pending.cargo.push((seat, order.clone()));
                     }
                 }
-                Order::Load { .. } | Order::Unload { .. } => self.pending.cargo.push((seat, order.clone())),
+                Order::Unload { .. } => self.pending.cargo.push((seat, order.clone())),
                 // Ticket #192 (version 0.08.0): the upload lands now. The people leave the living
                 // population -- the place shrinks as it uploads, and Module slots go with them, though
                 // nothing already standing is destroyed: a cap that falls below what stands simply
@@ -3007,7 +3141,9 @@ impl Game {
                     self.seat_mut(seat).resettle_to = Some(*state);
                     self.pending.resettle.push((seat, *state));
                 }
-                Order::Influence { target, amount } => self.pending.influence.push((seat, *target, *amount)),
+                // Ticket #569 (version 0.1.0.3): with the place's director as the order is given, the
+                // seat the spend is aimed at.
+                Order::Influence { target, amount, .. } => self.pending.influence.push((seat, *target, *amount, self.place_control(*target).director())),
                 Order::Smear { target, amount } => self.pending.smears.push((seat, *target, *amount)),
                 Order::Greenwash { amount } => self.pending.greenwashes.push((seat, *amount)),
                 Order::OfferCredits { ppm } => self.pending.credit_offers.push((seat, *ppm)),
@@ -3017,11 +3153,24 @@ impl Game {
                 }
                 // Ticket #54: the change is written on the building itself and lands at the
                 // Resolution of its due turn, so nothing has to track a position between turns.
+                // Ticket #559 (version 0.1.0.3): a Replace goes through the Region's queue as a build
+                // does, half the Wind Farm's Widgets, and the Power Plant is flagged for it; nothing
+                // is written as a `PendingChange`, since nothing lands on a due turn.
+                Order::Change { building: BuildingRef::Facility(sid, i), what: BuildingChange::Replace } => {
+                    let widgets = self.build_widgets(seat, BuildItem::Replace(FacilityKind::WindFarm));
+                    if let Some(f) = self.state_mut(*sid).facilities.get_mut(*i) {
+                        f.replacing = true;
+                    }
+                    self.state_mut(*sid).queue.push(Build { item: BuildItem::Replace(FacilityKind::WindFarm), seat, widgets, done: 0, coastal: false, fuel: 0.0 });
+                }
+                // A Replace on a Module is refused by `check_change`; nothing to record.
+                Order::Change { building: BuildingRef::Module(..), what: BuildingChange::Replace } => {}
                 Order::Change { building, what } => {
                     let turns = match what {
                         BuildingChange::Mothball => 1,
                         BuildingChange::Restart => self.tables.mothball.restart_turns.max(1),
                         BuildingChange::Decommission => self.tables.mothball.decommission_turns.max(1),
+                        BuildingChange::Replace => unreachable!("a Replace is queued above"),
                     };
                     let due = turn + turns - 1;
                     let change = PendingChange { what: *what, due_turn: due, seat };
@@ -3273,10 +3422,10 @@ pub fn merged_for_report(list: &[Order]) -> Vec<Order> {
     let mut out: Vec<Order> = Vec::new();
     for o in list {
         let merged = match o {
-            Order::Influence { target, amount } => out
+            Order::Influence { target, amount, .. } => out
                 .iter_mut()
                 .find_map(|x| match x {
-                    Order::Influence { target: t, amount: a } if t == target => Some(a),
+                    Order::Influence { target: t, amount: a, .. } if t == target => Some(a),
                     _ => None,
                 })
                 .map(|a| *a += amount),
@@ -3517,7 +3666,7 @@ impl Game {
                 };
                 r("unload", &[("place", where_)])
             }
-            Order::Influence { target, amount } => r("influence", &[("n", amount.to_string()), ("place", place(*target))]),
+            Order::Influence { target, amount, .. } => r("influence", &[("n", amount.to_string()), ("place", place(*target))]),
             Order::Smear { target, amount } => r("smear", &[("n", amount.to_string()), ("faction", self.seat_name(*target))]),
             Order::Greenwash { amount } => r("greenwash", &[("n", amount.to_string())]),
             Order::OfferCredits { ppm } => r("offer_credits", &[("n", ppm.to_string())]),
@@ -3538,6 +3687,7 @@ impl Game {
                     BuildingChange::Mothball => "mothball",
                     BuildingChange::Restart => "restart",
                     BuildingChange::Decommission => "decommission",
+                    BuildingChange::Replace => "replace",
                 };
                 r(key, &[("building", building(*b)), ("place", place(b.place()))])
             }

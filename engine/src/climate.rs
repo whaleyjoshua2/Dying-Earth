@@ -72,8 +72,11 @@ impl Game {
         for s in &mut self.states {
             s.wildfire_emissions_next = 0.0;
         }
-        // Stabilization runs (spec 15): net counted Emissions below the Sink.
-        let stabilized = breakdown.counted() < breakdown.total_sink();
+        // Stabilization runs (spec 15): net Emissions below the Sink. Ticket #578 (version 0.1.0.3),
+        // at the designer's word: the whole of them, cards and permafrost counted -- the figure the
+        // temperature reads -- where the run read the sources alone and the world could warm while
+        // a turn counted as under.
+        let stabilized = breakdown.total() < breakdown.total_sink();
         for seat in Seat::ALL {
             let s = self.seat_mut(seat);
             if stabilized {
@@ -82,10 +85,10 @@ impl Game {
                 s.stabilization_run = 0;
             }
         }
-        // Ticket #406 (version 0.09.4): the Custodians' partial credit. The counted gap at the first
+        // Ticket #406 (version 0.09.4): the Custodians' partial credit. The net gap at the first
         // Climate phase is the opening figure; the best share of it closed since, and the longest
-        // run, are kept and never fall back.
-        let gap = breakdown.counted() - breakdown.total_sink();
+        // run, are kept and never fall back. Ticket #578: the net's, as the run's.
+        let gap = breakdown.total() - breakdown.total_sink();
         if self.climate.opening_gap <= 0.0 && gap > 0.0 {
             self.climate.opening_gap = gap;
         }
@@ -361,7 +364,8 @@ impl Game {
             b.by_seat[seat.index()] += charged;
         }
         // Ticket #55: the live Sink, which the Sink Weakens Break lowers for good, and the
-        // Permafrost line, which is the world's: nobody's Blame and outside `counted()`.
+        // Permafrost line, which is the world's: nobody's Blame and outside `counted()`, the
+        // sources' sum; in `total()`, which the run reads since ticket #578 (version 0.1.0.3).
         b.sink = self.climate.natural_sink;
         // Ticket #84 (version 0.06.0): Planetary Stewardship enlarges the Sink for the world once
         // it stands; a whole Tech or none, so Provisional Findings has nothing to halve.

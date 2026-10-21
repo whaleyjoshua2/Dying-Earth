@@ -337,22 +337,25 @@ id = "cheap_ore_offer"
 name = "Cheap Ore Offer"
 kind = "choice"
 target = "seat"
-effect = "Buy the ore, or let it go to the open market"
+effect = "Buy the ore, or let it go for half-price Materials next turn"
 copies = 1
 [event.choice]
 question = "A broker offers 30 Materials for 20 Ducats, this turn only. Buy?"
 take = "Buy the lot"
-refuse = "Let it go to market"
+# Ticket #577 (version 0.1.0.3), at the designer's word: a refusal halves the Trading window's
+# Materials price for the refusing seat alone, for the one turn after the answer, where it set the
+# market's row to 1 Ducat for two turns for the whole table, rivals included.
+refuse = "Let it go: Materials at half price for you next turn"
 take_when = { rule = "ducats_at_least", ducats = 20 }
 [[event.choice.take_does]]
 effect = "resources"
 materials = 30
 ducats = -20
 [[event.choice.refuse_does]]
-effect = "trade_price"
+effect = "seat_price"
 resource = "materials"
-to = 1
-turns = 2
+multiplier = 0.5
+turns = 1
 
 [[event]]
 id = "overtime_at_the_yards"
@@ -471,7 +474,8 @@ take_when = { rule = "no_landing_under_way" }
 effect = "hold_one_ship"
 [[event.choice.take_does]]
 effect = "relations_all_rivals"
-relations = 5
+# Ticket #562 (version 0.1.0.3), at the designer's word: +2, where +5 was a free lunch; refusing still costs 3.
+relations = 2
 [[event.choice.refuse_does]]
 effect = "relations_all_rivals"
 relations = -3

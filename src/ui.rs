@@ -445,6 +445,9 @@ enum Action {
     AnswerCard(bool),
     /// Ticket #495 (version 0.09.9): an Accord offered to the player, by its index, accepted or not.
     AnswerOffer(usize, bool),
+    /// Ticket #572 (version 0.1.0.3): a Trade offered to the player countered, by its index, with
+    /// what the player gives and what they get.
+    CounterOffer(usize, u32, u32),
     /// Ticket #58: a Report line was clicked; go where it points.
     GoTo(ReportPlace),
     /// Ticket #538 (version 0.1.0.1): an Accord's warning line was clicked; the Factions window,
@@ -1720,8 +1723,24 @@ pub fn draw(
             }
             Action::AnswerOffer(index, accept) => {
                 let result = session.game.as_mut().map(|g| g.answer_offer(Seat(0), index, accept));
-                if let Some(Err(e)) = result {
-                    session.last_error = Some(e);
+                match result {
+                    Some(Err(e)) => session.last_error = Some(e),
+                    // Ticket #569 (version 0.1.0.3), from the review: an Influence order already aimed
+                    // at the new partner's place is withdrawn, with the word.
+                    Some(Ok(())) if accept => session.withdraw_crossing_influence(),
+                    _ => {}
+                }
+            }
+            // Ticket #572 (version 0.1.0.3): answered at once by the offerer's rule, and said so.
+            Action::CounterOffer(index, give, get) => {
+                let who = session.game.as_ref().and_then(|g| g.offers.get(index).map(|o| g.seat_name(o.from))).unwrap_or_default();
+                let result = session.game.as_mut().map(|g| g.counter_offer(Seat(0), index, give, get));
+                match result {
+                    Some(Err(e)) => session.last_error = Some(e),
+                    // The review: a Trade in goods strikes no Accord, so no Influence order is withdrawn.
+                    Some(Ok(true)) => session.last_error = Some(format!("The {who} took your counter: the Trade is struck.")),
+                    Some(Ok(false)) => session.last_error = Some(format!("The {who} refused your counter.")),
+                    None => {}
                 }
             }
             Action::GoTo(place) => {
@@ -2176,8 +2195,9 @@ fn faction_heading(ui: &mut Ui, session: &Session, kind: FactionKind, glyph: f32
     });
 }
 
-/// **The Faction rulebook**: blurb, multipliers, Unique Facility, signature rule, Victory Condition
-/// and gate Tech, in that order, with no head of its own -- `faction_heading` draws that.
+/// **The Faction rulebook**: blurb, multipliers, Unique Facility, the goods it opens with (ticket
+/// #582), signature rule, Victory Condition and gate Tech, in that order, with no head of its own --
+/// `faction_heading` draws that.
 ///
 /// Ticket #203 (version 0.08.1): factored out of `faction_card` so the setup screen's card and the
 /// Faction window's collapsing header are the SAME code and can never drift. Everything a player
@@ -2260,18 +2280,41 @@ fn faction_rulebook(ui: &mut Ui, session: &Session, kind: FactionKind) {
     ui.label(RichText::new("Unique Facility").strong());
     ui.label(&card.unique);
     ui.add_space(6.0);
+    // Ticket #582 (version 0.1.0.3), at the designer's word: the goods the seat opens with, one
+    // line of figures and glyphs directly above the signature rule, so the Prospectors' 60 Materials
+    // reads against the other cards' 80 glyph under glyph.
+    let goods: Vec<RowPart> = start_goods(&session.tables, kind)
+        .into_iter()
+        .enumerate()
+        .map(|(i, (n, key, word))| RowPart { before: if i == 0 { format!("Opens with {n}") } else { n.to_string() }, icon: Some(key), after: String::new(), hover: Some(format!("{n} {word} in the Stockpile on turn one")) })
+        .collect();
+    glyph_row(ui, &goods, 15.0);
+    ui.add_space(6.0);
     let ink = ui.visuals().text_color();
     ui.label(RichText::new("Signature rule").strong());
     // Ticket #407 (version 0.09.4): with its figures read from the data.
     draw_with_icons(ui, &session.tables.signature(kind), 14.0, ink, &[]);
     ui.add_space(6.0);
     ui.label(RichText::new("Victory Condition").strong());
-    draw_with_icons(ui, &card.victory, 14.0, ink, &[]);
+    // Ticket #580 (version 0.1.0.3): with its bars read from the data, as the signature rule's are.
+    draw_with_icons(ui, &session.tables.victory_text(kind), 14.0, ink, &[]);
     // Ticket #84: the gate Tech it waits on.
     if let Some(gate) = session.tables.victory_gate(kind) {
         let t = session.tables.tech(gate);
         ui.label(RichText::new(format!("Waits on {}, a rung-{} Tech ({} Research): {}.", t.name, t.rung, t.cost, t.effect)).weak());
     }
+}
+
+/// Ticket #582 (version 0.1.0.3): the figures a seat of the Faction opens with, in the Stockpile's
+/// order with each one's glyph key and word -- the Ducats only when the table gives any, since a
+/// `0` on every card says nothing. Read from `start_stockpile`, the figure `Game::new` hands out.
+fn start_goods(tables: &dying_earth_engine::data::Tables, kind: FactionKind) -> Vec<(i64, &'static str, &'static str)> {
+    let s = tables.start_stockpile(kind);
+    let mut out = vec![(s.materials as i64, "materials", "Materials"), (s.fuel as i64, "fuel", "Fuel"), (s.energy as i64, "energy", "Energy")];
+    if s.ducats > 0.0 {
+        out.push((s.ducats as i64, "ducats", "Ducats"));
+    }
+    out
 }
 
 /// One Faction's card on the setup screen: its symbol and name, the rulebook, the button that plays
@@ -2702,6 +2745,15 @@ fn bar_resource_with(ui: &mut Ui, icons: &Icons, key: &str, word: &str, value: S
         .response
         .interact(egui::Sense::hover());
     rule_tip_ui(resp, word, add);
+}
+
+/// Ticket #566 (version 0.1.0.3): the Fund line, the growth whole with its parts; an Objective's
+/// reward named only on the turn it lands (the review).
+fn fund_line(game: &Game, me: Seat) -> String {
+    let s = game.seat(me);
+    let (banked, interest, reward) = (s.venture_banked_last_turn, s.venture_interest_last_turn, s.venture_reward_last_turn);
+    let reward_part = if reward > 0.0 { format!(", {} reward", figure(reward)) } else { String::new() };
+    format!("Fund {}; +{} last turn ({} banked, {} interest{reward_part}).", figure(s.venture_fund), figure(banked + interest + reward), figure(banked), figure(interest))
 }
 
 /// The Influence figure's hover, lifted out of the bar when ticket #128 moved the figure.
@@ -4178,7 +4230,9 @@ fn nearest_slot(game: &Game, body: BodyId, lon: f32, lat: f32) -> Option<u32> {
 fn pick(pos: Pos2, session: &Session, game: &Game, view: &mut ViewState, camera: &Camera, cam_gt: &GlobalTransform, globes: &Query<(&Globe, &GlobalTransform)>, textures: &Textures, hotspots: &[Hotspot]) {
     let _ = session;
     // Ticket #323 (version 0.08.8): any left-click disarms the stack; a shield's click re-arms it.
+    // Ticket #569 (version 0.1.0.3): and an Influence button armed to break an Accord.
     view.armed_stack = None;
+    view.accord_break_armed = None;
     // Labels and markers first.
     let mut best: Option<(f32, Hit)> = None;
     for h in hotspots {
@@ -4743,14 +4797,10 @@ fn command_cluster(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewS
             ui.horizontal(|ui| {
                 match &target {
                     Some((place, name)) => {
-                        let order = Order::Influence { target: *place, amount };
-                        let check = game.check_order(Seat(0), &session.pending, &order);
-                        let resp = ui.add_enabled(check.is_ok(), egui::Button::new(format!("Spend {amount} on {name}")));
-                        if let Err(e) = &check {
-                            // Ticket #380 (version 0.09.2): through `rule_tip`, as every refusal.
-                            rule_tip(resp.clone(), e.0.clone());
-                        }
-                        if resp.on_hover_text(format!("Raise your Standing on {name}. Its card shows what it would take to hold or take it.")).clicked() {
+                        // Ticket #569 (version 0.1.0.3): two clicks where the spend would break an Accord.
+                        let face = RichText::new(format!("Spend {amount} on {name}"));
+                        let hover = format!("Raise your Standing on {name}. Its card shows what it would take to hold or take it.");
+                        if let Some(order) = influence_button(ui, view, game, &session.pending, *place, amount, face, hover) {
                             actions.push(Action::Place(order));
                         }
                     }
@@ -4772,14 +4822,9 @@ fn command_cluster(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewS
                 let button = egui::Button::new(RichText::new("Max").strong());
                 match &target {
                     Some((place, name)) if influence_left > 0 => {
-                        let order = Order::Influence { target: *place, amount: influence_left };
-                        let check = game.check_order(Seat(0), &session.pending, &order);
-                        let resp = ui.add_enabled(check.is_ok(), button);
-                        if let Err(e) = &check {
-                            // Ticket #380 (version 0.09.2): through `rule_tip`, as every refusal.
-                            rule_tip(resp.clone(), e.0.clone());
-                        }
-                        if resp.on_hover_text(format!("Spend all {influence_left} left this turn on {name}.")).clicked() {
+                        // Ticket #569 (version 0.1.0.3): two clicks where the spend would break an Accord.
+                        let hover = format!("Spend all {influence_left} left this turn on {name}.");
+                        if let Some(order) = influence_button(ui, view, game, &session.pending, *place, influence_left, RichText::new("Max").strong(), hover) {
                             view.influence_amount = influence_left;
                             actions.push(Action::Place(order));
                         }
@@ -5011,8 +5056,10 @@ fn can_end_turn(game: &Game, view: &ViewState) -> bool {
 /// than ending the turn; on that confirmation, pressing again confirms. A spectator has no
 /// Influence to lose and no confirmation.
 fn press_end_turn(session: &Session, game: &Game, view: &mut ViewState, actions: &mut Vec<Action>) {
-    // Ticket #323 (version 0.08.8): End Turn disarms the stack.
+    // Ticket #323 (version 0.08.8): End Turn disarms the stack. Ticket #569 (version 0.1.0.3): and an
+    // Influence button armed to break an Accord.
     view.armed_stack = None;
+    view.accord_break_armed = None;
     if view.popup == Popup::ConfirmEndTurn {
         view.popup = Popup::None;
         actions.push(Action::EndTurn);
@@ -5065,7 +5112,8 @@ fn side_panel(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
             if !session.pending.iter().any(|o| matches!(o, Order::Influence { .. })) {
                 let (_, influence_left) = game.remaining(Seat(0), &session.pending);
                 if influence_left > 0 {
-                    actions.push(Action::Place(Order::Influence { target: place, amount: influence_left }));
+                    // Ticket #569 (version 0.1.0.3): a standing Max spends on a place of yours; it crosses nobody.
+                    actions.push(Action::Place(Order::Influence { target: place, amount: influence_left, break_accord: false }));
                 }
             }
         }
@@ -5526,6 +5574,10 @@ fn trade_good_text(game: &Game, g: TradeGood) -> String {
     }
 }
 
+/// A row of the offers prompt: the offer's index, who made it, its words, whether it is a renewal,
+/// and (ticket #572, version 0.1.0.3) the Trade's two goods, for the counter.
+type OfferRow = (usize, Seat, String, bool, Option<(TradeGood, TradeGood)>);
+
 /// Ticket #496: an offer's words after its Faction's name in the prompt: what an Accord holds, or
 /// what a Trade gives for what it asks.
 fn offer_words(game: &Game, o: &dying_earth_engine::state::Offer) -> String {
@@ -5644,7 +5696,7 @@ fn order_text(game: &Game, o: &Order) -> String {
             UnloadTarget::Colony(c) => format!("Unload {} from {} into {}", if *colonists > 0 { colonists_word(*colonists) } else if *army { "the Army".into() } else { "nothing".into() }, ship, game.place_name(Place::Colony(*c))),
             UnloadTarget::Ring(b, s) => format!("Found {} with {} from {}", game.slot_place_name(*b, *s), colonists_word(*colonists), ship),
         },
-        Order::Influence { target, amount } => format!("{} Influence on {}", amount, game.place_name(*target)),
+        Order::Influence { target, amount, .. } => format!("{} Influence on {}", amount, game.place_name(*target)),
         Order::BuyInfluence { amount } => format!("Buy {} Influence with Ducats", amount),
         Order::RepairWithDucats { unit, points } => format!("Repair {} on {} with Ducats", counted(points, "point", "points"), unit_name(game, unit)),
         Order::Buy { resource, amount } => format!("Buy {} {} for {} Ducats", amount, resource.name(), game.order_cost(Seat(0), o).ducats),
@@ -5712,6 +5764,11 @@ fn change_row(ui: &mut Ui, game: &Game, pending: &[Order], b: BuildingRef, mothb
         ui.label(RichText::new(format!("    {} ordered, lands at turn {}'s Resolution", c.what.name(), c.due_turn)).weak());
         return;
     }
+    // Ticket #559 (version 0.1.0.3): a Replace lands with its build, not on a due turn.
+    if replacing(game, b) {
+        ui.label(RichText::new("    Replace ordered: a Wind Farm when its build in the queue completes").weak());
+        return;
+    }
     ui.horizontal(|ui| {
         ui.add_space(16.0);
         change_buttons(ui, game, pending, b, mothballed, false, actions);
@@ -5723,20 +5780,44 @@ fn change_row(ui: &mut Ui, game: &Game, pending: &[Order], b: BuildingRef, mothb
 /// adds from the right, so that they still read Mothball then Decommission.
 fn change_buttons(ui: &mut Ui, game: &Game, pending: &[Order], b: BuildingRef, mothballed: bool, reversed: bool, actions: &mut Vec<Action>) {
     let wanted = if mothballed { BuildingChange::Restart } else { BuildingChange::Mothball };
-    let mut pair = [wanted, BuildingChange::Decommission];
+    let mut row = vec![wanted, BuildingChange::Decommission];
+    // Ticket #559 (version 0.1.0.3): a Power Plant's third button, Replace with a Wind Farm, once
+    // Clean Power stands; its hover the Wind Farm's figures here, under the price and the Widgets.
+    if offers_replace(game, b) {
+        row.push(BuildingChange::Replace);
+    }
     if reversed {
-        pair.reverse();
+        row.reverse();
     }
-    for what in pair {
+    for what in row {
         // Ticket #407 (version 0.09.4): the price in a Region, "+1 Unrest"; nothing in a Colony.
-        cost_button_with_hover(ui, game, pending, Order::Change { building: b, what }, what.name(), game.change_price_text(b, what), actions);
+        let hover = match (what, b) {
+            (BuildingChange::Replace, BuildingRef::Facility(sid, _)) => Some(format!("With a Wind Farm: {}", yield_with_chain(&game.facility_yield(Seat(0), sid, FacilityKind::WindFarm)))),
+            _ => game.change_price_text(b, what),
+        };
+        cost_button_with_hover(ui, game, pending, Order::Change { building: b, what }, what.name(), hover, actions);
     }
+}
+
+/// Ticket #559 (version 0.1.0.3): a standing Power Plant -- never a Reactor -- with Clean Power
+/// researched carries the Replace button.
+fn offers_replace(game: &Game, b: BuildingRef) -> bool {
+    let BuildingRef::Facility(sid, i) = b else { return false };
+    game.state(sid).facilities.get(i).is_some_and(|f| f.kind == FacilityKind::PowerPlant) && game.has_tech(TechId::CleanPower)
+}
+
+/// Ticket #559: a Replace is ordered on this building and its Wind Farm is in the queue.
+fn replacing(game: &Game, b: BuildingRef) -> bool {
+    let BuildingRef::Facility(sid, i) = b else { return false };
+    game.state(sid).facilities.get(i).is_some_and(|f| f.replacing)
 }
 
 /// Ticket #138 (version 0.07.3): the room a building's name line needs to its right for its two
 /// buttons. With less than this the buttons go beneath the line as they did before, so a narrowed
 /// panel degrades to the old shape rather than to clipped buttons.
 const CHANGE_BUTTONS_WIDTH: f32 = 196.0;
+/// Ticket #559 (version 0.1.0.3): with the Replace button beside the two, a Power Plant's line.
+const CHANGE_BUTTONS_WIDTH_THREE: f32 = 300.0;
 
 /// Ticket #452 (version 0.09.6): the Blame hover, cut at the designer's word and written once, where
 /// the Faction window and the Climate Panel each carried four long lines of it, word for word.
@@ -5833,6 +5914,61 @@ fn tip_fires(ctx: &egui::Context, text: &str) -> bool {
     let seen = if seen_pass == pass { seen } else { 0 };
     ctx.data_mut(|d| d.insert_temp(egui::Id::new("tip_seen"), (pass, seen + 1)));
     seen + 1 == wanted
+}
+
+/// Ticket #569 (version 0.1.0.3): the colour of a break -- the Climate chart's.
+const ACCORD_BREAK: Color32 = Color32::from_rgb(236, 88, 76);
+
+/// Ticket #569 (version 0.1.0.3): the words for an Influence spend that would break an Accord --
+/// the red note beside the button, "breaks your Accord with X", and the face the armed button
+/// wears, "Break the Accord with X and spend N" -- or `None` where the spend crosses nobody.
+fn influence_break(game: &Game, target: Place, amount: i64) -> Option<(String, String)> {
+    let partner = game.order_crosses(Seat(0), &Order::Influence { target, amount, break_accord: false })?;
+    let name = game.seat_name(partner);
+    Some((format!("breaks your Accord with {name}"), format!("Break the Accord with {name} and spend {amount}")))
+}
+
+/// Ticket #569 (version 0.1.0.3), at the designer's word: an Influence button. A spend that crosses
+/// nobody is placed at the first click. One that would break an Accord carries the red note beside
+/// it and in its hover, and wants two clicks: the first arms it -- this place at this amount, the
+/// review -- and it reads "Break the Accord with X and spend N" in red; the second places the order
+/// with the break meant, which the engine's door otherwise refuses. Returns the order to place. The
+/// hover goes through `rule_tip`, the refusal first and the words after it (ticket #380).
+#[allow(clippy::too_many_arguments)]
+fn influence_button(ui: &mut Ui, view: &mut ViewState, game: &Game, pending: &[Order], target: Place, amount: i64, face: RichText, hover: String) -> Option<Order> {
+    let breaking = influence_break(game, target, amount);
+    if breaking.is_none() && view.accord_break_armed.is_some_and(|(p, _)| p == target) {
+        view.accord_break_armed = None;
+    }
+    let armed = breaking.is_some() && view.accord_break_armed == Some((target, amount));
+    let order = Order::Influence { target, amount, break_accord: breaking.is_some() };
+    let check = game.check_order(Seat(0), pending, &order);
+    let face = match &breaking {
+        Some((_, armed_face)) if armed => RichText::new(armed_face.clone()).strong().color(ACCORD_BREAK),
+        _ => face,
+    };
+    let hover = match &breaking {
+        Some((note, _)) if !armed => format!("{hover}\n{note}. Click again to break it."),
+        _ => hover,
+    };
+    let resp = ui.add_enabled(check.is_ok(), egui::Button::new(face));
+    let resp = match &check {
+        Ok(_) => rule_tip(resp, hover),
+        Err(e) => rule_tip(resp, refusal_hover(&e.0, Some(&hover))),
+    };
+    let clicked = resp.clicked();
+    if let Some((note, _)) = &breaking {
+        ui.label(RichText::new(note).color(ACCORD_BREAK));
+    }
+    if !clicked {
+        return None;
+    }
+    if breaking.is_some() && !armed {
+        view.accord_break_armed = Some((target, amount));
+        return None;
+    }
+    view.accord_break_armed = None;
+    Some(order)
 }
 
 fn rule_tip(response: egui::Response, text: String) -> egui::Response {
@@ -6390,6 +6526,8 @@ fn build_item_of(game: &Game, order: &Order) -> Option<(Place, BuildItem, bool)>
     match order {
         Order::BuildFacility { state, kind } => Some((Place::State(*state), BuildItem::Facility(*kind), false)),
         Order::BuildFacilityWithDucats { state, kind } => Some((Place::State(*state), BuildItem::Facility(*kind), true)),
+        // Ticket #559 (version 0.1.0.3): a Replace is a build in the Region's queue, half a Wind Farm.
+        Order::Change { building: BuildingRef::Facility(state, _), what: BuildingChange::Replace } => Some((Place::State(*state), BuildItem::Replace(FacilityKind::WindFarm), false)),
         Order::RaiseIndustry { state } => Some((Place::State(*state), BuildItem::IndustryLevel, false)),
         Order::BuildModule { colony, kind } => Some((Place::Colony(*colony), BuildItem::Module(*kind), false)),
         Order::BuildModuleWithDucats { colony, kind } => Some((Place::Colony(*colony), BuildItem::Module(*kind), true)),
@@ -6486,7 +6624,7 @@ fn widget_makers(game: &Game, place: Place) -> Vec<(String, i64)> {
                 }
                 let y = game.module_yield_at(seat, cid, i);
                 if y.resource == Some(dying_earth_engine::Resource::Widgets) {
-                    let name = if y.doubled_by.is_some() { format!("the {}, doubled", m.kind.name()) } else { format!("the {}", m.kind.name()) };
+                    let name = if y.doubled_by.is_some() { format!("the {}, x{}", m.kind.name(), y.doubled_factor) } else { format!("the {}", m.kind.name()) };
                     parts.push((name, y.amount as i64));
                 }
             }
@@ -6817,7 +6955,8 @@ fn stance_row(ui: &mut Ui, game: &Game, pending: &[Order], current: Stance, make
             // it rather than over the ceiling; nothing a player could not read elsewhere was lost.
             let bar = game.tables.melee.battle_fuel;
             let orbit_rule = match (ships, st) {
-                (true, Stance::Blockade) => format!("\nA station's own orbit starves that station; low orbit starves the ground while you hold Orbital Control of it outright.\nA warship with less than {bar} Fuel in the tank blockades nothing."),
+                // Ticket #570 (version 0.1.0.3): a Blockade of low orbit shuts the ground to rivals' landings.
+                (true, Stance::Blockade) => format!("\nA station's own orbit shuts and starves that station; low orbit shuts the ground to rivals' landings, and starves it while you hold Orbital Control outright.\nA warship with less than {bar} Fuel in the tank blockades nothing."),
                 (true, Stance::Intercept) => format!("\nA hull with less than {bar} Fuel in the tank catches nobody."),
                 _ => String::new(),
             };
@@ -6881,21 +7020,16 @@ fn influence_row(ui: &mut Ui, game: &Game, session: &Session, view: &mut ViewSta
                     game.tables.influence.decay_controlled, game.tables.influence.decay
                 ),
             );
-            let order = Order::Influence { target, amount: view.influence_amount };
-            let ok = game.check_order(Seat(0), &session.pending, &order);
-            let spend = ui.add_enabled(ok.is_ok(), egui::Button::new("Spend"));
+            let amount = view.influence_amount;
             let needed = game.influence_needed_for(Seat(0), target);
             let mine = game.seat(Seat(0)).influence.get(&target).copied().unwrap_or(0);
             let words = format!("Adds the figure beside it to your Standing here, now {mine}. You take this place at {needed}.");
-            // Ticket #380 (version 0.09.2): greyed, the refusal first and these words after it.
-            let spend = match &ok {
-                Ok(_) => rule_tip(spend, words),
-                Err(e) => rule_tip(spend, refusal_hover(&e.0, Some(&words))),
-            };
-            if spend.clicked() {
+            // Ticket #569 (version 0.1.0.3): two clicks where the spend would break an Accord; the
+            // refusal, where there is one, through `rule_tip` first (ticket #380) and these words after.
+            if let Some(order) = influence_button(ui, view, game, &session.pending, target, amount, RichText::new("Spend"), words) {
                 actions.push(Action::Place(order));
             }
-            if let Err(e) = ok {
+            if let Err(e) = game.check_order(Seat(0), &session.pending, &Order::Influence { target, amount, break_accord: true }) {
                 ui.label(RichText::new(e.0).weak());
             }
         });
@@ -7251,7 +7385,7 @@ fn standings_row(ui: &mut Ui, game: &Game, session: &Session, target: Place, thr
 }
 
 /// Ticket #390 (version 0.09.3): what a standing Scrubber or Sea Wall says on its one line --
-/// *Scrubber: +3.0 ppm Sink, 1 off Unrest a turn, 3 Energy upkeep*; *Sea Wall: holds the sea off; 3
+/// *Scrubber: +3.0 ppm Sink, 1 off Unrest a turn, 4 Energy, 1 Ducat upkeep*; *Sea Wall: holds the sea off; 3
 /// rises held, 1.5 Materials a turn to keep* (or *nothing held yet*, and *unkept this turn* when it
 /// is) -- the figures the data holds, glyph-rendered by the row, in the resolution's words.
 fn no_slot_figures(game: &Game, sid: StateId, f: &Facility) -> String {
@@ -7261,7 +7395,8 @@ fn no_slot_figures(game: &Game, sid: StateId, f: &Facility) -> String {
         // Ticket #445 (version 0.09.6): at the share its holder runs it at, and no upkeep with nobody.
         _ => {
             let share = game.scrubber_share(sid);
-            let upkeep = if game.state(sid).control.controller().is_some() { format!(", {} Energy upkeep", card.energy_upkeep) } else { String::new() };
+            // Ticket #561 (version 0.1.0.3): and the Ducat a turn beside the Energy.
+            let upkeep = if game.state(sid).control.controller().is_some() { format!(", {} Energy, {} upkeep", card.energy_upkeep, counted(figure(card.ducats_upkeep), "Ducat", "Ducats")) } else { String::new() };
             let at = if share < 1.0 { format!(" (x{share})") } else { String::new() };
             let sink = card.sink_per_turn * share;
             let sink = if (sink * 10.0).fract().abs() < 1e-9 { format!("{sink:.1}") } else { format!("{sink:.2}") };
@@ -7374,10 +7509,12 @@ fn facility_row(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, i: us
         // Ticket #154 (version 0.07.4): coastal or inland only where the building has a slot to be
         // on; a Scrubber or Sea Wall is neither.
         let side = if !game.takes_slot(f.kind) { "" } else if f.coastal { " (coastal)" } else { " (inland)" };
+        // Ticket #559 (version 0.1.0.3): a Power Plant with a Replace under way says so on its line.
+        let replace = if f.replacing { " (Replace ordered)" } else { "" };
         let resp = figures_with_icons(
             ui,
             // Ticket #306 (version 0.08.7): the offline suffix is the box's hover's alone now.
-            &format!("{}{}: {}", f.kind.name(), side, figures),
+            &format!("{}{}{}: {}", f.kind.name(), replace, side, figures),
             14.0,
             colour,
             &[],
@@ -7393,7 +7530,8 @@ fn facility_row(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, i: us
             None => rules,
         };
         rule_tip(resp, tip);
-        if mine && f.change.is_none() && ui.available_width() >= CHANGE_BUTTONS_WIDTH {
+        let width = if offers_replace(game, BuildingRef::Facility(sid, i)) { CHANGE_BUTTONS_WIDTH_THREE } else { CHANGE_BUTTONS_WIDTH };
+        if mine && !f.changing() && ui.available_width() >= width {
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 change_buttons(ui, game, &session.pending, BuildingRef::Facility(sid, i), f.mothballed, true, actions);
             });
@@ -7656,7 +7794,9 @@ fn slot_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
             SlotBoxKind::Standing(i) => {
                 let f = &st.facilities[*i];
                 let state = if f.mothballed { TileState::Mothballed } else if !f.online { TileState::Offline } else { TileState::Standing };
-                let heading = format!("{} ({side}): {}{}", f.kind.name(), facility_figures(game, sid, f, director), facility_offline_words(game, sid, f));
+                // Ticket #559 (version 0.1.0.3): a Replace under way, on the tile's hover.
+                let replace = if f.replacing { " (Replace ordered)" } else { "" };
+                let heading = format!("{}{replace} ({side}): {}{}", f.kind.name(), facility_figures(game, sid, f, director), facility_offline_words(game, sid, f));
                 let tip = facility_rules(&heading, f.coastal);
                 // Ticket #352 (version 0.09.1): with its arithmetic, where the figure is multiplied.
                 let tip = match director.filter(|_| !f.mothballed && earnings_seen(game, Place::State(sid), director)).map(|d| game.facility_yield(d, sid, f.kind).chain).filter(|c| c.multiplied()) {
@@ -7898,7 +8038,11 @@ This turn {:+.2}%: {:+.1} million.", c.population_growth * 100.0, c.population_l
         };
         let u = &game.tables.unrest;
         rule_tip(
-            ui.colored_label(colour, format!("Unrest {}: {}", game.unrest_text(sid), game.unrest_note(sid))),
+            // Ticket #573 (version 0.1.0.3): a calm Region's note is empty, and the colon goes with it.
+            ui.colored_label(colour, match game.unrest_note(sid).as_str() {
+                "" => format!("Unrest {}", game.unrest_text(sid)),
+                note => format!("Unrest {}: {note}", game.unrest_text(sid)),
+            }),
             format!(
                 "Unrest runs 0 to {:.0}, in quarters, with three thresholds:\nat {:.0} the Standing Army stops replenishing,\nat {:.0} every Facility here runs at half,\nat {:.0} the state throws its controller off.\nIt falls {:.1} a turn on its own, except the turn the state changed hands.",
                 u.max, u.army_threshold, u.facility_threshold, u.max, u.natural_fall
@@ -8192,7 +8336,8 @@ fn policies_block(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, act
         let t = &game.tables.strip_permit;
         ui.horizontal(|ui| {
             cost_button(ui, game, &session.pending, Order::StripPermit { state: sid }, "Strip Permit", actions);
-            ui.label(RichText::new(format!("{} of double output here, then +{:.1} Baseline Emissions and +{} Unrest, for good", counted(t.turns, "turn", "turns"), t.baseline_rise, Game::unrest_figure(t.unrest))).weak());
+            // Ticket #573 (version 0.1.0.3): "once per Region, ever", as the Exodus Call's line says.
+            ui.label(RichText::new(format!("{} of double output here, then +{:.1} Baseline Emissions and +{} Unrest, for good. Once per Region, ever.", counted(t.turns, "turn", "turns"), t.baseline_rise, Game::unrest_figure(t.unrest))).weak());
         });
     }
     // Ticket #476 (version 0.09.8): Raise Industry Level is a tile among the Facility boxes now;
@@ -8722,7 +8867,11 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
                 let room = game.uploadable_at(cid, already);
                 ui.label(format!("Uploaded: {uploaded} of {bar}"));
                 if room > 0 {
-                    let n = room.min(bar.saturating_sub(uploaded).max(1));
+                    // The review of #565: the one button is sized to the turn's cap less what is
+                    // already ordered, or with eight living it offered "Upload 8" alone and the door
+                    // refused it; at the cap it offers one, greyed, with the door's words.
+                    let cap_left = game.tables.archive.upload_per_turn.saturating_sub(already);
+                    let n = room.min(bar.saturating_sub(uploaded).max(1)).min(cap_left.max(1));
                     cost_button_with_hover(
                         ui,
                         game,
@@ -9656,9 +9805,10 @@ fn ship_weapons_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut Vi
 /// Ticket #369 (version 0.09.2): a Trading window button whose face is a verb and a Ducat figure
 /// with its glyph -- "Buy for 48 [ducats]" -- greyed with the engine's refusal on hover when the
 /// order is refused. Through `priced_button`, which is how a glyph reaches a button face; but that
-/// helper drops a nought from a price, and a nought is reachable here (Materials at 1 Ducat, one
-/// unit, the Prospectors' 15% off), so a nought is written out in words rather than leaving the
-/// face reading a bare "Buy for".
+/// helper drops a nought from a price, and a nought was reachable here when the Cheap Ore Offer
+/// set Materials to 1 Ducat (one unit, the Prospectors' 15% off); since ticket #577 (version
+/// 0.1.0.3) the cheapest lot is Energy at its band's floor, which rounds to a tenth and not to
+/// nought, but the words stay rather than trust the arithmetic from a comment.
 fn ducat_button(ui: &mut Ui, game: &Game, session: &Session, verb: &str, ducats: f64, order: &Order) -> egui::Response {
     let ok = game.check_order(Seat(0), &session.pending, order);
     let mut resp = if ducats > 0.0 {
@@ -9697,15 +9847,23 @@ fn trading_window(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSt
         for (i, res, key, name) in lines {
             let per = match res {
                 None => game.tables.ducats.per_influence,
-                Some(r) => game.trade_price(r).unwrap_or(0),
+                Some(r) => game.trade_price(r).unwrap_or(0) as f64,
             };
             icon_word(ui, key, name);
             let sells = matches!(res, Some(dying_earth_engine::Resource::Materials) | Some(dying_earth_engine::Resource::Fuel));
             // Ticket #83: the Prospectors' 15% off is taken over the lot, so the button's figure is
-            // the price; the line says so.
+            // the price; the line says so. Ticket #577 (version 0.1.0.3): and the seat's own cut
+            // from a card, beside it.
             let off = game.tables.faction(game.kind(Seat(0))).market_multiplier;
-            let discount = if res.is_some() && off != 1.0 { format!(" (x{off} for you, over the lot)") } else { String::new() };
-            let price = if sells { format!("{per} Ducats each; sells for {} Ducats{discount}", figure(per as f64 / game.tables.ducats.sell_divisor.max(1) as f64)) } else { format!("{per} Ducats each{discount}") };
+            // The review: one clause where both stand, since the cell is 340 wide.
+            let cut = res.and_then(Game::market_row).and_then(|row| game.seat_price_note(Seat(0), row));
+            let discount = match (res.is_some() && off != 1.0, cut) {
+                (true, Some(note)) => format!(" (x{off} and {note})"),
+                (true, None) => format!(" (x{off} for you, over the lot)"),
+                (false, Some(note)) => format!(" ({note})"),
+                (false, None) => String::new(),
+            };
+            let price = if sells { format!("{per} Ducats each; sells for {} Ducats{discount}", figure(per / game.tables.ducats.sell_divisor.max(1) as f64)) } else { format!("{per} Ducats each{discount}") };
             // The glyph line wraps at the width it is given, and a Grid cell has none until its
             // content has one, so left alone it wrapped one word to a line (the first picture of
             // ticket #369).
@@ -10490,7 +10648,7 @@ fn battery_rules(game: &Game, col: &Colony) -> String {
     let worth = if col.in_orbit {
         "no rival's Blockade shuts this station, and a blockader here is fired on"
     } else {
-        "no rival holds Orbital Control of low orbit, so none may land"
+        "no rival's Blockade of low orbit shuts the ground, and none holds Orbital Control of it"
     };
     format!("\nCovers {orbit} alone, and fights in any Battle there.\nWhile it works, {worth}.\nRepaired here with Materials; destroyed at {}.", counted(card.hit_points, "hit", "hits"))
 }
@@ -10511,6 +10669,7 @@ fn offline_cause_words(cause: Option<&OfflineCause>, until_resolution: bool, gri
         Some(OfflineCause::Grid) => "\nOffline: grid down.".to_string(),
         Some(OfflineCause::Occupied) => "\nOffline: Colony occupied.".to_string(),
         Some(OfflineCause::Unkept) => "\nOffline: upkeep unpaid.".to_string(),
+        Some(OfflineCause::Unmanned) => "\nOffline: too few people to run it.".to_string(),
         None if until_resolution => "\nOffline until next turn: struck by a card.".to_string(),
         None if grid => "\nOffline: grid down.".to_string(),
         None if occupied_archive => "\nOffline: Colony occupied.".to_string(),
@@ -11250,14 +11409,9 @@ fn venture_fund_control(ui: &mut Ui, session: &Session, game: &Game, view: &mut 
     }
     share = share.min(cap);
     let fund = game.seat(me).venture_fund;
-    let banked = game.seat(me).venture_banked_last_turn;
-    ui.label(
-        RichText::new(format!(
-            "The Fund holds {fund} Ducats; {banked} went in last turn.{}",
-            pending_set.filter(|p| *p != standing).map(|p| format!(" {p}% from the next Income.")).unwrap_or_default()
-        ))
-        .weak(),
-    );
+    // Ticket #566 (version 0.1.0.3), at the designer's word: the growth whole, with its parts. The
+    // playtest read a Fund up 566 beside "90 banked" as a bug; the rest was the Banks' interest.
+    ui.label(RichText::new(format!("{}{}", fund_line(game, me), pending_set.filter(|p| *p != standing).map(|p| format!(" {p}% from the next Income.")).unwrap_or_default())).weak());
     // Ticket #380 (version 0.09.2): as the Research Directive's rail, which this copies: the check
     // runs against the orders that will stand, and a refusal holds the rail and is remembered on
     // it until the next accepted setting.
@@ -11918,6 +12072,13 @@ fn card_effect_text(e: &CardEffect) -> String {
             Some(to) => format!("the {} price stands at {to} for {}", resource.name(), counted(turns, "turn", "turns")),
             None => format!("the {} price moves {by:+} for {}", resource.name(), counted(turns, "turn", "turns")),
         },
+        // Ticket #577 (version 0.1.0.3): the seat's own cut.
+        CardEffect::SeatPrice { resource, multiplier, turns } => format!(
+            "{} at {} for you {}",
+            resource.name(),
+            if (*multiplier - 0.5).abs() < 1e-9 { "half price".to_string() } else { format!("x{multiplier}") },
+            if *turns == 1 { "next turn".to_string() } else { format!("for {}", counted(*turns, "turn", "turns")) }
+        ),
         CardEffect::RelationsAllRivals { relations } => format!("{relations:+} Relations with every rival"),
         CardEffect::BlamePpm { ppm } => {
             if *ppm < 0.0 {
@@ -12011,6 +12172,7 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
     // nothing else is up, so the turn's Report and Moments come first.
     if view.popup == Popup::None && !game.seat(Seat(0)).ai && !game.offers_to(Seat(0)).is_empty() {
         view.popup = Popup::Offers;
+        view.counters.clear();
     }
     if view.show_trade && !session.spectator {
         let mut open = true;
@@ -12208,10 +12370,10 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 ));
             }
             // Ticket #55: the Permafrost Thaw Break's own line, once it has fired. It is the world's
-            // carbon: nobody's Blame, and it never counts against a Stabilization run.
+            // carbon: nobody's Blame. Ticket #578 (version 0.1.0.3): it counts against a Stabilization run.
             if e.permafrost > 0.0 {
                 ui.label(format!("Permafrost {:.1}", e.permafrost))
-                    .on_hover_text("The permafrost has thawed. This much CO2 comes out of the ground every turn now, whatever anybody does. It is nobody's Blame and it does not count against a Stabilization run.");
+                    .on_hover_text("The permafrost has thawed. This much CO2 comes out of the ground every turn now, whatever anybody does. It is nobody's Blame, and it counts against a Stabilization run.");
             }
             // Ticket #54: the Scrubbers stand beside the Natural Sink in the same line.
             ui.label(format!("Natural Sink -{:.1}{}", e.sink, if e.scrubbers > 0.0 { format!(" and Scrubbers and Reserves -{:.1}", e.scrubbers) } else { String::new() }));
@@ -12304,7 +12466,9 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 // Factions and the next thought is "tell me more about that one". A Region card's
                 // `Held by the Archivists` and the roster are deliberately left alone: there a Faction's
                 // name describes a PLACE, and a click there must go on selecting the place.
-                faction_link(ui, view, seat, RichText::new(format!("{} - {:.0}% of the way there", game.seat_name(seat), p.score() * 100.0)).strong().color(seat_colour(session, seat)));
+                // Ticket #567 (version 0.1.0.3): with both bars reached and a hold standing, the hold
+                // in a few words after the percentage, where a held 100% read as a win.
+                faction_link(ui, view, seat, RichText::new(format!("{} - {:.0}% of the way there{}", game.seat_name(seat), p.score() * 100.0, p.hold_suffix())).strong().color(seat_colour(session, seat)));
                 // Ticket #306 (version 0.08.7): the Victory Condition sentence that stood here is
                 // cut, at the designer's word, as a restatement of the two labelled bars beneath
                 // it; the Rulebook keeps its copy.
@@ -12435,7 +12599,7 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
         // Ticket #495 (version 0.09.9): the Accords offered to the player, one row each, Accept or
         // Refuse. Like the card, an answer is the only way out: no Continue, and Escape holds it.
         Popup::Offers => {
-            let offers: Vec<(usize, Seat, String, bool)> = game.offers_to(Seat(0)).into_iter().map(|(i, o)| (i, o.from, offer_words(game, o), o.ask == AccordAsk::Renew)).collect();
+            let offers: Vec<OfferRow> = game.offers_to(Seat(0)).into_iter().map(|(i, o)| (i, o.from, offer_words(game, o), o.ask == AccordAsk::Renew, o.trade)).collect();
             if offers.is_empty() {
                 view.popup = Popup::None;
                 return;
@@ -12444,7 +12608,7 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 ui.set_width(520.0);
                 ui.label(RichText::new(if offers.len() == 1 { "An offer" } else { "Offers" }).size(20.0).strong());
                 ui.add_space(6.0);
-                for (i, from, words, renewal) in &offers {
+                for (i, from, words, renewal, trade) in &offers {
                     // Ticket #509 (version 0.1.0.0): a renewal names the Faction in its own words.
                     if *renewal {
                         ui.label(RichText::new(words).size(16.0));
@@ -12463,6 +12627,23 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                             actions.push(Action::AnswerOffer(*i, false));
                         }
                     });
+                    // Ticket #572 (version 0.1.0.3): a Trade in goods may be countered, once: the same
+                    // two goods, your own amounts, prefilled from the offer; answered at once.
+                    if let Some((TradeGood::Goods(theirs, n_theirs), TradeGood::Goods(yours, n_yours))) = trade {
+                        let (give, get) = view.counters.entry(from.index()).or_insert((*n_yours as i64, *n_theirs as i64));
+                        ui.horizontal(|ui| {
+                            ui.label(RichText::new("Or counter: give").size(15.0));
+                            ui.add(egui::DragValue::new(give).range(1..=9999).speed(1.0));
+                            ui.label(RichText::new(format!("{} for", yours.name())).size(15.0));
+                            ui.add(egui::DragValue::new(get).range(1..=9999).speed(1.0));
+                            ui.label(RichText::new(theirs.name()).size(15.0));
+                            if ui.button(RichText::new("Counter").size(15.0)).clicked() {
+                                actions.push(Action::CounterOffer(*i, (*give).max(1) as u32, (*get).max(1) as u32));
+                            }
+                        })
+                        .response
+                        .on_hover_text("Once. They answer at once; a seat short of the good it asked pays up to a quarter over fair value. A refused counter is a refusal.");
+                    }
                     ui.add_space(6.0);
                 }
             });
@@ -12753,13 +12934,14 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 let p = game.progress(seat);
                 ui.label(
                     RichText::new(format!(
-                        "{}: {} {:.0} of {:.0}; {} ({:.0}% of its Victory Condition).",
+                        "{}: {} {:.0} of {:.0}; {} ({:.0}% of its Victory Condition{}).",
                         game.seat_name(seat),
                         p.first_name,
                         p.first_value,
                         p.first_bar,
                         p.second_text,
-                        p.score() * 100.0
+                        p.score() * 100.0,
+                        p.hold_suffix()
                     ))
                     .color(seat_colour(session, seat)),
                 );
@@ -12875,7 +13057,8 @@ fn chronicle_screen(root: &mut Ui, session: &Session, actions: &mut Vec<Action>)
             for (place, (seat, separated)) in ranking.iter().enumerate() {
                 let colour = seat_colour(session, *seat);
                 ui.add_space(4.0);
-                ui.label(RichText::new(format!("{}. The {} -- {:.0}% of the way to their Victory Condition", place + 1, game.seat_name(*seat), game.progress(*seat).score() * 100.0)).size(17.0).strong().color(colour));
+                let p = game.progress(*seat);
+                ui.label(RichText::new(format!("{}. The {} -- {:.0}% of the way to their Victory Condition{}", place + 1, game.seat_name(*seat), p.score() * 100.0, p.hold_suffix())).size(17.0).strong().color(colour));
                 ui.label(RichText::new(chronicle_sentence(game, *seat)).size(15.0));
                 // The tiebreak NAMED, where one decided the order rather than the score. Two seats
                 // level on all three keys are told so too, since the order between them then means
@@ -12968,6 +13151,16 @@ fn chronicle_screen(root: &mut Ui, session: &Session, actions: &mut Vec<Action>)
 mod tests {
     use super::*;
 
+    /// Ticket #582 (version 0.1.0.3): the opening goods line on a Faction's card lists the figures
+    /// the seat opens with, each with its glyph, the Ducats only when there are any: the Prospectors'
+    /// 60 Materials where the other cards say 80. Red before the card carried a `start_materials`.
+    #[test]
+    fn the_opening_goods_line_lists_each_figure_with_its_glyph_and_skips_an_empty_one() {
+        let tables = dying_earth_engine::data::Tables::load(&dying_earth_engine::data::default_data_dir()).unwrap();
+        assert_eq!(start_goods(&tables, FactionKind::Prospectors), vec![(60, "materials", "Materials"), (20, "fuel", "Fuel"), (20, "energy", "Energy")]);
+        assert_eq!(start_goods(&tables, FactionKind::Custodians), vec![(80, "materials", "Materials"), (20, "fuel", "Fuel"), (20, "energy", "Energy")]);
+    }
+
     /// Ticket #543 (version 0.1.0.1): a Colony Ship with one to three aboard is drawn yellow, the
     /// founding rule on its hover; an empty one and a full one are plain.
     #[test]
@@ -13022,13 +13215,42 @@ mod tests {
         assert_eq!(recruit_hover(&g, StateId::EastAsia, 2), "2M people, Unrest -0.25.");
     }
 
-    /// Ticket #537 (version 0.1.0.1): the Influence hover says the table's price, four Ducats.
+    /// Ticket #569 (version 0.1.0.3): the words of an Influence button whose spend would break an
+    /// Accord -- the red note and the armed face -- and nothing where it crosses nobody.
+    #[test]
+    fn an_influence_button_that_would_break_an_accord_says_so() {
+        let tables = std::sync::Arc::new(dying_earth_engine::data::Tables::load(&dying_earth_engine::data::default_data_dir()).unwrap());
+        let mut g = Game::new(tables, NewGame { seed: 7, player: FactionKind::Custodians, player_is_ai: false, player_start: StateId::EastAsia });
+        let theirs = Place::State(g.controlled_states(Seat(1))[0]);
+        assert_eq!(influence_break(&g, theirs, 17), None, "no Accord: nothing to say");
+        g.strike_accord(Seat(0), Seat(1), vec![Term::NonAggression]).unwrap();
+        let name = g.seat_name(Seat(1));
+        assert_eq!(influence_break(&g, theirs, 17), Some((format!("breaks your Accord with {name}"), format!("Break the Accord with {name} and spend 17"))));
+        let mine = Place::State(g.controlled_states(Seat(0))[0]);
+        assert_eq!(influence_break(&g, mine, 17), None, "a place of your own crosses nobody");
+    }
+
+    /// Ticket #566 (version 0.1.0.3): the Fund line says last turn's growth whole, banked and interest.
+    #[test]
+    fn the_fund_line_says_the_growth_whole() {
+        let tables = std::sync::Arc::new(dying_earth_engine::data::Tables::load(&dying_earth_engine::data::default_data_dir()).unwrap());
+        let mut g = Game::new(tables, NewGame { seed: 7, player: FactionKind::Prospectors, player_is_ai: false, player_start: StateId::EastAsia });
+        g.seats[0].venture_fund = 3742.0;
+        g.seats[0].venture_banked_last_turn = 100.0;
+        g.seats[0].venture_interest_last_turn = 212.0;
+        assert_eq!(fund_line(&g, Seat(0)), "Fund 3742; +312 last turn (100 banked, 212 interest).");
+        g.seats[0].venture_reward_last_turn = 50.0;
+        assert_eq!(fund_line(&g, Seat(0)), "Fund 3742; +362 last turn (100 banked, 212 interest, 50 reward).", "the review: an Objective's reward on the turn it lands");
+    }
+
+    /// Ticket #537 (version 0.1.0.1): the Influence hover says the table's price, four Ducats;
+    /// ticket #562 (version 0.1.0.3): four and a half.
     #[test]
     fn the_influence_hover_says_the_tables_price() {
         let tables = std::sync::Arc::new(dying_earth_engine::data::Tables::load(&dying_earth_engine::data::default_data_dir()).unwrap());
         let g = Game::new(tables, NewGame { seed: 7, player: FactionKind::Custodians, player_is_ai: false, player_start: StateId::EastAsia });
-        assert_eq!(g.tables.ducats.per_influence, 4);
-        assert!(influence_hover(&g).ends_with("at 4 Ducats each."), "{}", influence_hover(&g));
+        assert_eq!(g.tables.ducats.per_influence, 4.5);
+        assert!(influence_hover(&g).ends_with("at 4.5 Ducats each."), "{}", influence_hover(&g));
     }
 
     /// Ticket #508 (version 0.1.0.0): a held Accord's hover says each of its Terms in a line, the

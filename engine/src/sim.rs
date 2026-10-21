@@ -231,6 +231,10 @@ pub struct SimResult {
     pub throw_offs_by_seat: [u32; SEAT_COUNT],
     /// Ticket #412 (version 0.09.4): the Techs each seat led to completion.
     pub leads_by_seat: [u32; SEAT_COUNT],
+    /// Ticket #563 (version 0.1.0.3), at the designer's word: each seat's Income over the game, net
+    /// of its buildings' upkeep, and all the Research its Labs made.
+    pub produced_by_seat: [Stockpile; SEAT_COUNT],
+    pub research_by_seat: [i64; SEAT_COUNT],
     pub start_lost_to_throw_off: bool,
     pub final_place: [u8; SEAT_COUNT],
     /// Ticket #58: how many Moments the turns of this game earned, how many the cap of two and the
@@ -862,6 +866,8 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         unrest_turns,
         throw_offs_by_seat,
         leads_by_seat,
+        produced_by_seat: Seat::ALL.map(|s| game.seat(s).produced),
+        research_by_seat: Seat::ALL.map(|s| game.seat(s).research_total),
         start_lost_to_throw_off,
         emigrant_batches: game.log.iter().filter(|l| l.contains("Pioneers recruited in")).count() as u32,
         antarctic_by_sea: game.log.iter().filter(|l| l.contains("in Antarctica with")).count() as u32,

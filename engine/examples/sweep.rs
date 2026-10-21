@@ -127,6 +127,9 @@ fn main() {
     let mut all_throw_offs = [0u32; 4];
     // Ticket #412 (version 0.09.4): the Techs each Faction led, over the batch.
     let mut all_leads = [0u32; 4];
+    // Ticket #563 (version 0.1.0.3), at the designer's word: Income over the batch per Faction --
+    // Materials, Fuel, Energy, Ducats, Research.
+    let mut all_produced = [[0f64; 5]; 4];
     let mut all_start_lost = [[0u32; 2]; 4];
     // Ticket #343 (version 0.09.1): the nuke's counters across every seating, so the closing
     // review has ONE total to quote rather than four blocks to add up by hand.
@@ -224,6 +227,7 @@ fn main() {
                         let mut cell_unrest = [[0u32; 3]; 4];
                         let mut cell_throw_offs = [0u32; 4];
                         let mut cell_leads = [0u32; 4];
+                        let mut cell_produced = [[0f64; 5]; 4];
                         let mut cell_start_lost = [0u32; 2];
                         let mut war_ppm: [Vec<f64>; 4] = Default::default();
                         let mut war_nobody: Vec<f64> = Vec::new();
@@ -487,6 +491,10 @@ fn main() {
                                 }
                                 cell_throw_offs[s.index()] += r.throw_offs_by_seat[s.index()];
                                 cell_leads[s.index()] += r.leads_by_seat[s.index()];
+                                let p = r.produced_by_seat[s.index()];
+                                for (c, v) in cell_produced[s.index()].iter_mut().zip([p.materials, p.fuel, p.energy, p.ducats, r.research_by_seat[s.index()] as f64]) {
+                                    *c += v;
+                                }
                                 cell_scores[s.index()].push(r.final_score[s.index()]);
                                 cell_places[s.index()][(r.final_place[s.index()].clamp(1, 4) - 1) as usize] += 1;
                             }
@@ -556,6 +564,9 @@ fn main() {
                                 }
                                 all_throw_offs[at] += cell_throw_offs[s.index()];
                                 all_leads[at] += cell_leads[s.index()];
+                                for (a, v) in all_produced[at].iter_mut().zip(cell_produced[s.index()]) {
+                                    *a += v;
+                                }
                                 if s == Seat(0) {
                                     for (a, n) in all_start_lost[at].iter_mut().zip(cell_start_lost) {
                                         *a += n;
@@ -887,6 +898,13 @@ fn main() {
             "  Techs led over the batch, per Faction: {}",
             FactionKind::ALL.into_iter().enumerate().map(|(i, k)| format!("{} {}", k.name(), all_leads[i])).collect::<Vec<_>>().join(", ")
         );
+        // Ticket #563 (version 0.1.0.3), at the designer's word: what each Faction was paid at Income
+        // over a game, net of its buildings' upkeep, the mean over the batch.
+        println!("  Income over the batch, per Faction, mean a game (Materials / Fuel / Energy / Ducats / Research):");
+        for (i, k) in FactionKind::ALL.into_iter().enumerate() {
+            let p = all_produced[i].map(|v| v / all_games.max(1) as f64);
+            println!("  {:>12}: {:>7.0} / {:>7.0} / {:>7.0} / {:>7.0} / {:>6.0}", k.name(), p[0], p[1], p[2], p[3], p[4]);
+        }
         println!("  the world under the Natural Sink at least once in {} of {all_games} games (median first turn {})", all_under_sink.len(), median_u(&mut all_under_sink));
         // Version 0.09.3: the worlds settled, over every seating.
         println!("  {}", off_earth_line(&base, &all_ground_by_body, &all_stations_by_body, &mut all_first_by_body, &mut all_ground_off_earth_per_game, all_games as u64));

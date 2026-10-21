@@ -289,6 +289,28 @@ impl Session {
         }
     }
 
+    /// Ticket #569 (version 0.1.0.3), from the review: an Accord just struck with an Influence order
+    /// already aimed at the partner's place. End Turn would refuse it and drop it without a word, so
+    /// it is withdrawn here, with the word, and the Allotment is the player's to place again.
+    pub fn withdraw_crossing_influence(&mut self) {
+        let Some(game) = &self.game else { return };
+        let crosses = |o: &Order| matches!(o, Order::Influence { break_accord: false, .. }) && game.order_crosses(Seat(0), o).is_some();
+        let gone: Vec<String> = self
+            .pending
+            .iter()
+            .filter(|o| crosses(o))
+            .map(|o| match o {
+                Order::Influence { target, amount, .. } => format!("{amount} Influence on {}", game.place_name(*target)),
+                _ => String::new(),
+            })
+            .collect();
+        if gone.is_empty() {
+            return;
+        }
+        self.pending.retain(|o| !crosses(o));
+        self.last_error = Some(format!("Withdrawn: {}. It would break the Accord you just struck.", gone.join(", ")));
+    }
+
     pub fn end_turn(&mut self) {
         let Some(game) = &mut self.game else { return };
         let orders = std::mem::take(&mut self.pending);
@@ -413,6 +435,9 @@ pub struct ViewState {
     /// Ticket #146 (version 0.07.3): the slot box clicked on the selected Region's card.
     pub slot_box: Option<SlotBox>,
     pub trade_amounts: [i64; 4],
+    /// Ticket #572 (version 0.1.0.3): the counter-offer's amounts in the offers prompt, by the
+    /// offering seat's index -- what you give, what you get -- prefilled from the offer.
+    pub counters: std::collections::BTreeMap<usize, (i64, i64)>,
     /// Ticket #204 (version 0.08.1): the Region a Colony's own loader draws from, kept apart from the
     /// Ship card's choice so the two never moved together; since ticket #443 (version 0.09.6) the Ship
     /// card lists every Region and chooses none.
@@ -470,6 +495,11 @@ pub struct ViewState {
     /// Ticket #114 (version 0.07.1), Max since ticket #134: the last turn the standing order was placed, so it is
     /// placed once a turn and not once a frame.
     pub max_placed: Option<u32>,
+    /// Ticket #569 (version 0.1.0.3): the place and amount whose Influence button has been clicked
+    /// once where the spend would break an Accord; the second click places the order with the break
+    /// meant. The review: keyed on the amount too, and disarmed by any click elsewhere and by End
+    /// Turn, as the stack is, so the second click confirms the thing the first proposed.
+    pub accord_break_armed: Option<(Place, i64)>,
     /// Ticket #128 (version 0.07.2): a shortcut pressed and not yet acted on.
     pub hotkey: Option<HotKey>,
     /// Ticket #126 (version 0.07.2): on the start screen, the Region under the pointer, the Region
@@ -512,6 +542,7 @@ impl Default for ViewState {
             hab_tile: None,
             slot_box: None,
             trade_amounts: [5, 10, 10, 10],
+            counters: std::collections::BTreeMap::new(),
             lift_state: None,
             launch_target: None,
             influence_amount: 5,
@@ -526,6 +557,7 @@ impl Default for ViewState {
             force_hover: None,
             card_aside: false,
             max_placed: None,
+            accord_break_armed: None,
             hotkey: None,
             start_hover: None,
             start_selected: None,

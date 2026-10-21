@@ -155,7 +155,11 @@ pub const SAVE_VERSION: u32 = 12;
 /// Ticket #556 (version 0.1.0.2, the closing ticket): moved to 0.1.0.2. `SAVE_VERSION` did not move:
 /// the version added no saved field (its Victory weight is a data figure with a default), so a 0.1.0.1
 /// save loads as it is.
-pub const GAME_VERSION: &str = "0.1.0.2";
+/// Ticket #574 (version 0.1.0.3, the closing ticket): moved to 0.1.0.3. `SAVE_VERSION` did not move:
+/// the two fields the version added to the save (the last Trade refused per pair, #572; a seat's
+/// price cuts, #577) read a default from an older file, and the Wind Farm's Ducat upkeep is a data
+/// figure, so a 0.1.0.2, 0.1.0.1 or 0.1.0.0 save loads.
+pub const GAME_VERSION: &str = "0.1.0.3";
 
 /// The game autosaves at the start of the Report phase of every third turn.
 pub const AUTOSAVE_EVERY: u32 = 3;
@@ -257,6 +261,9 @@ pub struct SavedGame {
     pub offers: Vec<crate::state::Offer>,
     #[serde(default)]
     pub refusals: Vec<crate::state::Refusal>,
+    /// Ticket #572 (version 0.1.0.3): the last Trade refused per pair, by its goods.
+    #[serde(default)]
+    pub refused_trades: Vec<crate::state::RefusedTrade>,
     /// Ticket #519 (version 0.1.0.0): Armies inherited abroad, and the turn, for their turn's grace.
     #[serde(default)]
     pub armies_inherited: Vec<(ArmyId, u32)>,
@@ -344,6 +351,7 @@ impl SavedGame {
             accords,
             offers,
             refusals,
+            refused_trades,
             armies_inherited,
             events_no_target,
             body_firsts,
@@ -385,6 +393,7 @@ impl SavedGame {
             accords: accords.clone(),
             offers: offers.clone(),
             refusals: refusals.clone(),
+            refused_trades: refused_trades.clone(),
             armies_inherited: armies_inherited.clone(),
             events_no_target: *events_no_target,
             levies_raised: *levies_raised,
@@ -438,6 +447,7 @@ impl SavedGame {
             accords: self.accords,
             offers: self.offers,
             refusals: self.refusals,
+            refused_trades: self.refused_trades,
             armies_inherited: self.armies_inherited,
             events_no_target: self.events_no_target,
             body_firsts: self.body_firsts,

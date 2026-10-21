@@ -34,14 +34,17 @@ research_multiplier = 1.25
 influence_multiplier = 1.15
 # Ticket #82: Production Moved. While a Facility of one of these kinds in a state they direct is
 # mothballed, one Module of the paired kind off Earth (a station over Earth included, Antarctica
-# not) makes double: one for one, the most productive undoubled Module first, on its final figure.
+# not) makes x`production_moved_factor` (double before version 0.1.0.3): one for one, the most productive undoubled Module first, on its final figure.
 # Ticket #332 (version 0.09.0): the Factory pairs with the Factory Module and the Mine with the
 # Mine, now that each list has both; before, the Factory paired with the Mine.
 mothball_pairs = { factory = "factory", mine = "mine", power_plant = "generator", refinery = "refinery", research_lab = "observatory" }
+# Ticket #563 (version 0.1.0.3), at the designer's word ("a small boost to entice them"): x2.08,
+# where it doubled; the leaned Facilities of a Materials home outproduced every Module off Earth.
+production_moved_factor = 2.08
 # Ticket #407 (version 0.09.4): the figures in braces are read from the data where the text is
 # shown, so the text cannot go stale again (it said 4 Energy upkeep and 2 turns, where the Scrubber
 # costs 3 and is paid in Widgets); and the last sentence says their lever on Earth and its price.
-signature = "The Scrubber, Leapfrog and Production Moved. Only they build a Scrubber, in a Region they control, without a slot: {scrubber_materials} Materials, {scrubber_widgets} Widgets, {scrubber_upkeep} Energy upkeep. Online it adds {scrubber_sink} ppm a turn to the Natural Sink and takes {scrubber_fall} off the Region's Unrest; one per {scrubber_people} people, {scrubber_min} to {scrubber_max}; half if another Faction takes the Region, a quarter if it goes neutral. A Leapfrog costs {leapfrog} Ducats and cuts a Region's Emissions for good. Production Moved: while a Factory, Mine, Power Plant, Refinery or Research Lab of theirs stands mothballed, a matching Module of theirs off Earth makes double, one for one. Their lever on Earth is switching industry off, at home or in a Region they have taken: each Mothball there costs +{mothball} Unrest."
+signature = "The Scrubber, Leapfrog and Production Moved. Only they build a Scrubber, in a Region they control, without a slot: {scrubber_materials} Materials, {scrubber_widgets} Widgets, {scrubber_upkeep} Energy and {scrubber_ducats} Ducat upkeep. Online it adds {scrubber_sink} ppm a turn to the Natural Sink and takes {scrubber_fall} off the Region's Unrest; one per {scrubber_people} people, {scrubber_min} to {scrubber_max}; half if another Faction takes the Region, a quarter if it goes neutral. A Leapfrog costs {leapfrog} Ducats and cuts a Region's Emissions for good. Production Moved: while a Factory, Mine, Power Plant, Refinery or Research Lab of theirs stands mothballed, a matching Module of theirs off Earth makes x{moved_factor}, one for one. Their lever on Earth is switching industry off, at home or in a Region they have taken: each Mothball there costs +{mothball} Unrest."
 # Ticket #203 (version 0.08.1): the Unique Facility in one sentence, for the Faction card and the
 # Faction window. Ticket #186 built the Academy; nothing on any card named it until now.
 unique = "Academy -- replaces the School and the Institute, and pays +1 Ducat a turn while it is online."
@@ -71,6 +74,10 @@ start_station = "Tiangong"
 # Ticket #290 (version 0.08.6): the Colonists aboard it when the game opens, from nowhere, so the
 # station has two Module slots free from turn one; bare, it had none.
 start_colonists = 2
+# Ticket #582 (version 0.1.0.3), at the designer's word, after the closing sweep put them at 48 wins
+# of 80: they open with 60 Materials where `[start]` gives the other three 80. At their 0.85 on a
+# Facility or a Module, 60 buys them about what 70 buys another seat. Only this row carries one.
+start_materials = 60
 # Ticket #210 (version 0.08.1): the prefix every Ship of theirs wears in front of its name --
 # Prospector Mining Venture. Chosen at the designer's word, "dealers choice". It belongs to the
 # HOLDER, not the hull: the name is the ship's and travels with it, the prefix is whoever flies it.
@@ -95,11 +102,12 @@ market_multiplier = 0.85
 resentment = 0.0
 # Ticket #535 (version 0.1.0.1): Relations lost per 10 Influence another spends on a Greenwash.
 greenwash_resentment = 0.05
-signature = "Cheap Industry and the Strip Permit. Raising Industry Level costs them 15 Materials rather than 30, every Facility and Module 15% less; their Regions pay a fifth more Ducats and the Trading window sells to them at 15% off. A Strip Permit costs 25 Ducats and may be taken once in a Region's whole life: for three turns every Facility there produces double, and when it ends that Region's Baseline Emissions rise by 0.2 for good and its Unrest by 2. The Venture Capital Fund: each turn they set what share of their Ducat income is banked in it, 0% to 80% in whole percents; a withdrawal returns nine tenths."
+signature = "Cheap Industry and the Strip Permit. Raising Industry Level costs them 15 Materials rather than 30, every Facility and Module 15% less; their Regions pay a fifth more Ducats and the Trading window sells to them at 15% off. A Strip Permit costs 25 Ducats and may be taken once in a Region's whole life: for three turns every Facility there produces double, and when it ends that Region's Baseline Emissions rise by 0.2 for good and its Unrest by 2. The Venture Capital Fund: each turn they set what share of their Ducat income is banked in it, 0% to 80% in whole percents; a withdrawal returns nine tenths. They open with {start_materials} Materials, where others hold {common_materials}."
 # Ticket #203 (version 0.08.1). The building is ticket #182's.
 unique = "Investment Bank -- replaces the Bank, and banks 1% interest a turn on the Venture Capital Fund's balance, one building per Region paying, never less than 1 Ducat in all. Off Earth, the Exchange -- replaces the Trade Post, and pays 1 more Ducat a turn."
 # Ticket #72: the Extraction Total is retired; the first part is Ducats banked in the Fund.
-victory = "3500 Ducats in the Venture Capital Fund, plus 18 Colonists living off Earth."
+# Ticket #580 (version 0.1.0.3): the figures read from the bars below, as the short text's are.
+victory = "{first} Ducats in the Venture Capital Fund, plus {second} Colonists living off Earth."
 victory_short = "put {first} Ducats in the Venture Capital Fund with {second} Colonists living off Earth,"
 # Ticket #182 (version 0.08.0): 750 to 1000, because the Investment Bank pays uncapped interest
 # on the Fund. Measured first: in 40 games nobody EVER reached 750 -- the highest balance ever
@@ -111,7 +119,12 @@ victory_short = "put {first} Ducats in the Venture Capital Fund with {second} Co
 # seatings read) and the Prospectors won 30 of 80, the most of any seat. At 2500 the median game
 # ends short; "other things will bolster their output". The AI reads this figure, not a copy of it.
 # Ticket #506 (version 0.1.0.0): 3,500 (2,500 x 50/36) and 18 off Earth, with the game at fifty turns.
-victory_first = { kind = "venture_fund", bar = 3500 }
+# Ticket #567 (version 0.1.0.3): the Fund counts 0.7 of the score, the Presence 0.3 -- the Fund is the
+# long pole (3,500 against 18 Colonists met by turn 12), and a Fund at 17% beside a full Presence
+# read 59%; it reads 42%.
+# Ticket #580 (version 0.1.0.3), at the designer's word: 4,250 (3,500 x 17/14), with the race for the
+# Moon (#564) putting the Prospectors first there in 16 to 19 games of 20 and at 56 wins of 80.
+victory_first = { kind = "venture_fund", bar = 4250, weight = 0.7 }
 victory_second = { kind = "off_world_presence", bar = 18 }
 # Ticket #471 (version 0.09.7): the Opening Objective -- no deadline, met once, rewarded once.
 # Ticket #478 (version 0.09.8): 75 Ducats to 50, and the three Banks must work three Incomes running.
@@ -194,7 +207,9 @@ victory = "Diaspora: 42 Colonists living off Earth, on Colonies spread over at l
 victory_short = "get {first} Colonists living off Earth, spread over {bodies} Bodies, one holding a Colonial Capital,"
 # Ticket #506 (version 0.1.0.0): 42 (30 x 50/36) and four Bodies, with the game at fifty turns.
 # Ticket #555 (version 0.1.0.2): the Colonists off Earth count 0.6 of the score, the Bodies 0.4.
-victory_first = { kind = "colonists_off_earth", bar = 42, weight = 0.6 }
+# Ticket #567 (version 0.1.0.3): the Capital they must hold is a tenth of the score -- 0.6 Colonists,
+# 0.3 Bodies, 0.1 Capital -- so both bars met without one reads 90%, where it read 100%.
+victory_first = { kind = "colonists_off_earth", bar = 42, weight = 0.6, capital_weight = 0.1 }
 victory_second = { kind = "colonies_on_bodies", bodies = 4, colonists_each = 4 }
 # Ticket #514 (version 0.1.0.0): and a Colonial Capital of theirs must stand, at a Colony they direct
 # off Earth, before they win -- a gate on the win like the gate Tech, at the designer's word ("add a
@@ -249,13 +264,15 @@ unique = "Reactor -- replaces the Power Plant, and takes a quarter off the Energ
 # Ticket #347 (version 0.09.1): 125 of it, and the fund holds the whole figure from the first turn.
 # This bar IS `[archive] research` in modules.toml -- one figure written in two files, the Archive's
 # cost and the Archivists' bar, and a test asserts the two are equal so they cannot drift.
-victory = "Build the Archive at a Colony off Earth (55 Materials, three turns, and four Colonists must live there to begin it), pay 225 Research into it and keep it running, then upload 18 Colonists into it from the people living where it stands."
+victory = "Build the Archive at a Colony off Earth (55 Materials, three turns, and four Colonists must live there to begin it), pay {first} Research into it and keep it running, then upload {second} Colonists into it, four a turn at most, from the people living where it stands."
 victory_short = "build the Archive off Earth, pay {first} Research into it, and upload {second} Colonists,"
 # Ticket #506 (version 0.1.0.0): 225 and 18 uploads, at the designer's word, with the game at fifty turns.
 # Ticket #555 (version 0.1.0.2): the Archive fund counts 0.4 of the score, the uploads 0.6.
-victory_first = { kind = "archive_research", bar = 225, weight = 0.4 }
+# Ticket #579 (version 0.1.0.3): 250, at the designer's word.
+victory_first = { kind = "archive_research", bar = 250, weight = 0.4 }
 # Ticket #192 (version 0.08.0): twelve Colonists UPLOADED, not twelve living beside the Archive.
-victory_second = { kind = "colonists_uploaded", bar = 18 }
+# Ticket #565 (version 0.1.0.3), at the designer's word: 16, at most four a turn.
+victory_second = { kind = "colonists_uploaded", bar = 16 }
 # Ticket #471 (version 0.09.7): the Opening Objective -- no deadline, met once, rewarded once.
 opening = { kind = "research_pair", count = 2, reward = 10.0, text = "Have two Research Labs or Observatories working, one of them off Earth", reward_text = "10 Research into the Archive fund" }
 # Ticket #504 (version 0.1.0.0): the Second Objective, open once the Opening Objective is met.
@@ -452,7 +469,8 @@ antarctica_turns = 1
 found_with = 4
 
 [start]
-# Raised from 60 on ticket #24, since income now flows from turn one.
+# Raised from 60 on ticket #24, since income now flows from turn one. Ticket #582 (version 0.1.0.3):
+# a Faction's row may carry `start_materials` in place of this figure; the Prospectors' says 60.
 materials = 80
 fuel = 20
 energy = 20
@@ -508,8 +526,10 @@ arkwrights_fuel_per_point = 0.2
 
 [ducats]
 # Ticket #537 (version 0.1.0.1): four Ducats a point, where it was two (the playtest's 2.2:
-# Influence bought without limit was cheap). Still no cap.
-per_influence = 4
+# Influence bought without limit was cheap). Still no cap. Ticket #562 (version 0.1.0.3), at the
+# designer's word: five, after the 0.1.0.2 playtest sold Materials for Influence and bought the world;
+# then four and a half, the sweep at five having starved the seats poor in Ducats (5/36/13/10).
+per_influence = 4.5
 # Version 0.04 (ticket #41): two Ducats for one of the thing bought, as with Influence. A repair
 # point is 5 Materials, so 10 Ducats. Ticket #54 retired `per_restoration_step` with Restoration and
 # put `per_leapfrog` in its place: what one Leapfrog costs the Custodians on a state they control.

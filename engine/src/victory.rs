@@ -31,8 +31,18 @@ pub struct Progress {
     /// the figure a player acts on: the Custodians' gap in ppm beside their run. `None` for the rest.
     pub first_label: Option<String>,
     /// Ticket #555 (version 0.1.0.2): what the first part counts for in the score; the second
-    /// counts the rest.
+    /// counts the rest (ticket #567: what the first and the Capital's part leave).
     pub first_weight: f64,
+    /// Ticket #567 (version 0.1.0.3): what a Colonial Capital held counts for in the score, on a
+    /// card that asks one (the Arkwrights', a tenth); nought on the rest. The second part counts
+    /// what the first and this leave.
+    pub capital_weight: f64,
+    /// Ticket #567: whether the seat holds a Colonial Capital off Earth, for the score.
+    pub capital_held: bool,
+    /// Ticket #567: the hold in a few words -- "needs Generation Ships", "needs a Colonial Capital",
+    /// "the Archive is not running" -- for the headline beside the percentage. Set with
+    /// `first_held_back`.
+    pub first_held_short: Option<String>,
 }
 
 impl Progress {
@@ -55,7 +65,27 @@ impl Progress {
         (self.first_value / self.first_bar).clamp(0.0, 1.0)
     }
     pub fn score_as_it_stands(&self) -> f64 {
-        self.first_weight * self.first_fraction_as_it_stands() + (1.0 - self.first_weight) * self.second_fraction()
+        self.first_weight * self.first_fraction_as_it_stands() + self.capital_weight * self.capital_fraction() + self.second_weight() * self.second_fraction()
+    }
+    /// Ticket #567 (version 0.1.0.3): the Capital's part, whole or nothing.
+    fn capital_fraction(&self) -> f64 {
+        if self.capital_held { 1.0 } else { 0.0 }
+    }
+    /// Ticket #567: what the second part counts for -- what the first and the Capital leave.
+    fn second_weight(&self) -> f64 {
+        1.0 - self.first_weight - self.capital_weight
+    }
+    /// Ticket #567 (version 0.1.0.3): what every headline that prints the percentage (`{:.0}%`)
+    /// appends -- with both parts full and a hold standing, the hold in a few words: "100% - needs
+    /// Generation Ships", "90% - needs a Colonial Capital". The playtest read a held 100% as a win.
+    /// Short of the bars the percentage stands alone; the Victory window's row names the hold
+    /// beneath. The parts are read as the percentage reads them (the review): the Custodians' best
+    /// run fills the first part short of its bar (ticket #406), and that 100% names its hold too.
+    pub fn hold_suffix(&self) -> String {
+        match &self.first_held_short {
+            Some(short) if self.first_fraction() >= 1.0 && self.second_fraction() >= 1.0 => format!(" - {short}"),
+            _ => String::new(),
+        }
     }
     pub fn second_transit_fraction(&self) -> f64 {
         ((self.second_value + self.second_transit as f64) / self.second_bar).clamp(0.0, 1.0) - self.second_fraction()
@@ -67,8 +97,11 @@ impl Progress {
     /// every computer seat reads for who leads; the win still wants both parts met (`met`). The
     /// mean is weighted by the Faction's card: the designer set the Archivists' Archive fund at 0.4
     /// and the Arkwrights' Colonists off Earth at 0.6, the others an even half.
+    /// Ticket #567 (version 0.1.0.3): the Prospectors' Fund at 0.7, the long pole; and the Capital a
+    /// card asks is a part of its own (the Arkwrights' a tenth, 0.6 / 0.3 / 0.1), so both bars met
+    /// without one reads 90%, where the hold left 100% showing and the playtest took it for a win.
     pub fn score(&self) -> f64 {
-        self.first_weight * self.first_fraction() + (1.0 - self.first_weight) * self.second_fraction()
+        self.first_weight * self.first_fraction() + self.capital_weight * self.capital_fraction() + self.second_weight() * self.second_fraction()
     }
     /// Ticket #261: is the first part met on its own terms -- at its bar and not held back?
     pub fn first_met(&self) -> bool {
@@ -145,16 +178,16 @@ impl Game {
     }
 
     /// Ticket #406 (version 0.09.4): the Stabilization row in ppm, off the last Climate phase, by
-    /// the test the run uses (counted Emissions against the Sink and the Scrubbers): *"Stabilization:
-    /// 21.3 ppm over the Sink (counted 27.6, Sink 6.3), run 0 of 3"*, the bar the Custodians' card
-    /// names. The Victory window, the Climate Panel and the headless driver all print it, so they
-    /// never disagree.
+    /// the test the run uses -- since ticket #578 (version 0.1.0.3) the whole of the Emissions, cards
+    /// and permafrost counted, against the Sink and the Scrubbers: *"Stabilization: 21.3 ppm over the
+    /// Sink (Emissions 27.6, Sink 6.3), run 0 of 4"*, the bar the Custodians' card names. The Victory
+    /// window, the Climate Panel and the headless driver all print it, so they never disagree.
     pub fn stabilization_text(&self) -> String {
-        let (counted, sink) = (self.climate.last.counted(), self.climate.last.total_sink());
-        let gap = counted - sink;
+        let (total, sink) = (self.climate.last.total(), self.climate.last.total_sink());
+        let gap = total - sink;
         let side = if gap < 0.0 { "under" } else { "over" };
         let bar = self.tables.faction(FactionKind::Custodians).victory_first.bar;
-        format!("Stabilization: {:.1} ppm {side} the Sink (counted {:.1}, Sink {:.1}), run {} of {:.0}", gap.abs(), counted, sink, self.seat(Seat(0)).stabilization_run, bar)
+        format!("Stabilization: {:.1} ppm {side} the Sink (Emissions {:.1}, Sink {:.1}), run {} of {:.0}", gap.abs(), total, sink, self.seat(Seat(0)).stabilization_run, bar)
     }
 
     pub fn progress(&self, seat: Seat) -> Progress {
@@ -198,25 +231,29 @@ impl Game {
                 format!("{} of {} uploaded into the Archive", self.seat(seat).uploaded, crate::counted(format!("{:.0}", second.bar), "Colonist", "Colonists")),
             ),
         };
-        let mut first_held_back = match card.kind {
+        // Ticket #567 (version 0.1.0.3): each hold in the row's words and in the headline's few.
+        let mut held = match card.kind {
             VictoryFirstKind::ArchiveResearch if self.archive_complete(seat) && !self.archive_online(seat) => {
-                Some("the Archive is complete but not running".to_string())
+                Some(("the Archive is complete but not running".to_string(), "the Archive is not running".to_string()))
             }
             _ => None,
         };
         // Ticket #84 (version 0.06.0): the Faction's gate Tech must stand before it can win.
         // Progress accrues regardless; Provisional Findings opens nothing.
-        if first_held_back.is_none()
+        if held.is_none()
             && let Some(gate) = self.tables.victory_gate(self.kind(seat))
             && !self.has_tech(gate)
         {
-            first_held_back = Some(format!("needs {}, not yet researched", self.tables.tech(gate).name));
+            let name = &self.tables.tech(gate).name;
+            held = Some((format!("needs {name}, not yet researched"), format!("needs {name}")));
         }
         // Ticket #514 (version 0.1.0.0): and, on a card that asks it, a Colonial Capital of the seat's
         // must stand -- a gate on the win like the Tech, the parts accruing regardless.
-        if first_held_back.is_none() && self.tables.faction(self.kind(seat)).victory_capital && !self.capital_held(seat) {
-            first_held_back = Some("needs a Colonial Capital of yours, at a Colony you hold off Earth".to_string());
+        let capital_held = self.capital_held(seat);
+        if held.is_none() && self.tables.faction(self.kind(seat)).victory_capital && !capital_held {
+            held = Some(("needs a Colonial Capital of yours, at a Colony you hold off Earth".to_string(), "needs a Colonial Capital".to_string()));
         }
+        let (first_held_back, first_held_short) = held.unzip();
         // Ticket #373 (version 0.09.2): the Colonists aboard the seat's Ships, for the parts that
         // count Colonists off Earth and no other -- a Ship in flight has no one Body to count
         // toward, so the per-Body part carries none. They count toward nothing.
@@ -244,6 +281,9 @@ impl Game {
             },
             first_label: (card.kind == VictoryFirstKind::StabilizationRun).then(|| self.stabilization_text()),
             first_weight: card.weight,
+            capital_weight: card.capital_weight,
+            capital_held,
+            first_held_short,
         }
     }
 
@@ -447,6 +487,7 @@ impl Game {
             OpeningKind::InvestmentBanks => {
                 let s = self.seat_mut(seat);
                 s.venture_fund = tenth(s.venture_fund + card.reward);
+                s.venture_reward_last_turn = tenth(s.venture_reward_last_turn + card.reward);
             }
             OpeningKind::MoonColony => self.seat_mut(seat).launch_site_owed = true,
             OpeningKind::ResearchPair => {
@@ -464,6 +505,7 @@ impl Game {
             OpeningKind::IndustryLevel => {
                 let s = self.seat_mut(seat);
                 s.venture_fund = tenth(s.venture_fund + card.reward);
+                s.venture_reward_last_turn = tenth(s.venture_reward_last_turn + card.reward);
             }
             // The review: at a far Colony with room for the Colonist, where there is one.
             OpeningKind::FarColony => {

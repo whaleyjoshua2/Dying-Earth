@@ -23,6 +23,8 @@ name = "Generator"
 materials = 27.5
 widgets = 8
 energy_upkeep = 0
+# Ticket #575 (version 0.1.0.3): 0.8 Fuel a turn, the Power Plant's pair off Earth.
+fuel_upkeep = 0.8
 produces = { resource = "energy", amount = 5 }
 earth_emissions = 1.5
 
@@ -187,7 +189,8 @@ influence = 1
 [archive]
 # Ticket #439 (version 0.09.6): 150, at the designer's word; with the bar in `factions.toml`.
 # Ticket #506 (version 0.1.0.0): 225, at the designer's word, with the game at fifty turns.
-research = 225
+# Ticket #579 (version 0.1.0.3): 250, at the designer's word.
+research = 250
 # Ticket #192 (version 0.08.0): how many Colonists must live at the place before the Archive may be
 # ORDERED. Checked once, at the order; neither the three-turn build nor the standing Module cares
 # afterwards, and the Victory Condition does its own checking at the end.
@@ -202,6 +205,11 @@ research = 225
 # had the three turns the Module needs left. The Archivists direct exactly one off-Earth place in
 # every game, so the gate could not be routed around. Four is reachable; twelve was near-total.
 colonists_to_order = 4
+# Ticket #565 (version 0.1.0.3), at the designer's word: at most four Colonists upload in a turn
+# (the playtest ended a game in one order, `upload 27 18`), and the complete Archive draws one more
+# Energy a turn for each Colonist uploaded, so a full Archive of 16 draws 20 + 16.
+upload_per_turn = 4
+energy_per_uploaded = 1.0
 
 # Ticket #80 (version 0.06.0): the Observatory, the one Module that makes Research, on a Colony, a
 # Space Station or in Antarctica. It takes no Body yield and no output multiplier: `amount`
@@ -369,6 +377,20 @@ widgets = 4
 energy_upkeep = 3
 produces = { resource = "widgets", amount = 4 }
 earth_emissions = 1.0
+
+# Ticket #559 (version 0.1.0.3): the Wind Farm Module, on the ground of Mars alone (`mars_only`):
+# half a Generator's base, scaled by the site's Generator yield as every Module is (about 1.9 on
+# Mars), no emissions, a Ducat a turn, behind Clean Power. Appended last, as the Factory was.
+[[module]]
+id = "wind_farm"
+name = "Wind Farm"
+materials = 25
+widgets = 8
+energy_upkeep = 0
+ducats_upkeep = 1
+produces = { resource = "energy", amount = 2.5 }
+needs_tech = "clean_power"
+mars_only = true
 
 # Ticket #88 (version 0.06.0): build it where you dig. A Module (the Archive included) built at a
 # Colony with one working Mine costs `one_mine` of its price, with two or more `two_mines`,

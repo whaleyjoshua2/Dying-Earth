@@ -487,7 +487,7 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("event_damaged_ships", &["event", "n"]),
     ("loaded", &["faction", "cargo", "body", "spaceport"]),
     ("slot_taken", &["faction"]),
-    ("landing_contested", &["faction", "body"]),
+    ("landing_contested", &["faction", "body", "why"]),
     ("colony_founded", &["faction", "slot", "body", "n"]),
     // Ticket #419 (version 0.09.4).
     ("colony_founded_eased", &["faction", "slot", "body", "n", "ease"]),
@@ -530,6 +530,8 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("trade_struck", &["faction"]),
     ("trade_refused", &["faction"]),
     ("trade_failed", &["faction", "why"]),
+    // Ticket #572 (version 0.1.0.3).
+    ("trade_counter_refused", &["faction"]),
     // Ticket #419 (version 0.09.4).
     ("station_built_eased", &["faction", "station", "ease"]),
     ("antarctica_opens", &["n"]),
@@ -668,6 +670,7 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("tech_complete_rewarded_influence", &["tech", "faction", "shares", "influence", "ease"]),
     ("build_complete", &["faction", "building", "place"]),
     ("energy_short", &["faction", "buildings", "sink"]),
+    ("fuel_short", &["faction", "buildings"]),
     ("energy_zero", &["faction"]),
 ];
 
@@ -690,7 +693,7 @@ pub fn ordinal(n: usize) -> String {
 /// The same for `[phrase]`.
 pub const PHRASE_ARGS: &[(&str, &[&str])] = &[
     // Ticket #544 (version 0.1.0.1): the Report's head.
-    ("head", &["clock", "pct"]),
+    ("head", &["clock", "pct", "hold"]),
     ("clock_turn", &["turn"]),
     ("clock_too_late", &[]),
     ("clock_none", &[]),
@@ -830,6 +833,8 @@ pub const RIVAL_ARGS: &[(&str, &[&str])] = &[
     ("mothball", &["building", "place"]),
     ("restart", &["building", "place"]),
     ("decommission", &["building", "place"]),
+    // Ticket #559 (version 0.1.0.3).
+    ("replace", &["building", "place"]),
     ("leapfrog", &["state"]),
     ("strip_permit", &["state"]),
     ("arrived", &["unit", "body"]),

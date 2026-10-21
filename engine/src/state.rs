@@ -135,6 +135,12 @@ pub enum BuildingChange {
     Restart,
     /// A turn: half its Materials come back, its slot is freed and it is gone.
     Decommission,
+    /// Ticket #559 (version 0.1.0.3): **Replace** a standing Power Plant with a Wind Farm, at half
+    /// the Wind Farm's price, through the Region's queue as a build is. The Power Plant runs until
+    /// the Wind Farm completes and is gone the Resolution it does; the slot never stands empty. It is
+    /// never written on the building as a `PendingChange`: the building carries `replacing` and the
+    /// queue carries the `BuildItem::Replace`.
+    Replace,
 }
 
 impl BuildingChange {
@@ -143,6 +149,7 @@ impl BuildingChange {
             BuildingChange::Mothball => "Mothball",
             BuildingChange::Restart => "Restart",
             BuildingChange::Decommission => "Decommission",
+            BuildingChange::Replace => "Replace",
         }
     }
     /// The past tense the Report uses when the change lands.
@@ -151,6 +158,7 @@ impl BuildingChange {
             BuildingChange::Mothball => "mothballed",
             BuildingChange::Restart => "restarted",
             BuildingChange::Decommission => "decommissioned",
+            BuildingChange::Replace => "replaced",
         }
     }
 }
@@ -178,6 +186,8 @@ pub enum OfflineCause {
     Occupied,
     /// A Sea Wall whose keep went unpaid.
     Unkept,
+    /// Ticket #565 (version 0.1.0.3): a Module past what its Colony's living Colonists can run.
+    Unmanned,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -206,11 +216,16 @@ pub struct Facility {
     /// `sea_wall_upkeep_per_rise` Materials a turn to its keep. Zero on every other kind.
     #[serde(default)]
     pub rises_held: u32,
+    /// Ticket #559 (version 0.1.0.3): a Replace ordered on this Power Plant, its Wind Farm in the
+    /// Region's queue. The first flagged Power Plant becomes the Wind Farm when the build completes.
+    /// False on every other kind, and in a save older than the field.
+    #[serde(default)]
+    pub replacing: bool,
 }
 
 impl Facility {
     pub fn new(kind: FacilityKind) -> Facility {
-        Facility { kind, online: true, offline_until_resolution: false, self_run: false, mothballed: false, change: None, coastal: false, rises_held: 0, offline_cause: None }
+        Facility { kind, online: true, offline_until_resolution: false, self_run: false, mothballed: false, change: None, coastal: false, rises_held: 0, offline_cause: None, replacing: false }
     }
     /// Ticket #56: a Facility standing in a coastal slot.
     pub fn in_coastal_slot(kind: FacilityKind) -> Facility {
@@ -219,6 +234,10 @@ impl Facility {
     /// Ticket #54: standing, running and not mothballed - what every "while it is online" rule means.
     pub fn working(&self) -> bool {
         self.online && !self.mothballed
+    }
+    /// Ticket #559 (version 0.1.0.3): a change of any kind is on it, a Replace included.
+    pub fn changing(&self) -> bool {
+        self.change.is_some() || self.replacing
     }
 }
 
@@ -264,12 +283,17 @@ pub enum BuildItem {
     /// Widgets as well as Materials, and Widgets are a place's rate: it sits in the yard's queue
     /// like anything else and lands at the Resolution the yard has made it.
     Warhead(ShipId),
+    /// Ticket #559 (version 0.1.0.3): a **Replace** under way in a Region: a standing Power Plant
+    /// flagged `replacing` becomes this kind (the Wind Farm) at the Resolution it completes. Half the
+    /// kind's Widgets; it takes no slot of its own, the Power Plant's being the one it stands in.
+    Replace(FacilityKind),
 }
 
 impl BuildItem {
     pub fn name(self) -> String {
         match self {
             BuildItem::Facility(k) => k.name().to_string(),
+            BuildItem::Replace(k) => format!("{} (replacing a Power Plant)", k.name()),
             BuildItem::IndustryLevel => "Industry Level".to_string(),
             BuildItem::Tier(_) => "Upgrade".to_string(),
             BuildItem::Module(k) => k.name().to_string(),
@@ -481,6 +505,8 @@ impl SlotYields {
             // the same everywhere now, and a Trade Post (which followed the Habitat yield from
             // ticket #35 until the network of ticket #90 stopped reading it) reads nothing.
             ModuleKind::Observatory => self.research,
+            // Ticket #559 (version 0.1.0.3): the Wind Farm reads the Generator's yield, at half the base.
+            ModuleKind::WindFarm => self.generator,
             _ => 1.0,
         }
     }
@@ -647,10 +673,11 @@ pub struct EmissionsBreakdown {
     pub refineries: f64,
     pub launches: f64,
     pub population: f64,
-    /// Emissions added by Event cards (Wildfire, the Methane Burst); never counted against Stabilization.
+    /// Emissions added by Event cards (Wildfire, the Methane Burst): nobody's Blame; since ticket
+    /// #578 (version 0.1.0.3) counted against a Stabilization run, as every Emission is.
     pub cards: f64,
     /// Ticket #55: what the Permafrost Thaw Break adds every Climate phase once it has fired. Its
-    /// own line: nobody's Blame, and never counted against a Stabilization run.
+    /// own line: nobody's Blame; since ticket #578 counted against a Stabilization run.
     pub permafrost: f64,
     /// Ticket #279 (version 0.08.5): what the Battles fought on Earth and in Earth orbit last turn
     /// put in the air -- so many ppm a hit landed and so many a building burned. A Faction's own
@@ -668,8 +695,10 @@ pub struct EmissionsBreakdown {
 }
 
 impl EmissionsBreakdown {
-    /// Emissions that count against a Stabilization run: buildings, launches, population and, since
-    /// ticket #279, war -- not cards and not the permafrost.
+    /// The sources' own Emissions: buildings, launches, population and, since ticket #279, war --
+    /// not cards and not the permafrost. Until ticket #578 (version 0.1.0.3) this was what a
+    /// Stabilization run read; the run reads `total()` now, the figure the temperature does, and
+    /// this is the breakdown's sum of the sources somebody owns.
     pub fn counted(&self) -> f64 {
         self.state_industry + self.factories + self.power_plants + self.refineries + self.launches + self.population + self.war
     }
@@ -758,7 +787,7 @@ pub struct Climate {
     /// Region's Unrest has eased for it; it eases once a game. A save from before carries false.
     #[serde(default)]
     pub under_sink_eased: bool,
-    /// Ticket #406 (version 0.09.4): the counted gap over the Sink at the game's first Climate
+    /// Ticket #406 (version 0.09.4): the net gap (ticket #578: cards and permafrost counted) over the Sink at the game's first Climate
     /// phase; the best share of it closed since, never falling back; and the longest Stabilization
     /// run of the game. The Custodians' partial credit. A save from before opens its gap at the next
     /// Climate phase.
@@ -974,6 +1003,10 @@ pub struct SeatState {
     pub kind: FactionKind,
     pub ai: bool,
     pub stockpile: Stockpile,
+    /// Ticket #577 (version 0.1.0.3): price cuts of this seat's own, from a card -- the Cheap Ore
+    /// Offer's refusal: half the Materials price for a turn. One a market row. In the save.
+    #[serde(default)]
+    pub price_cuts: Vec<PriceCut>,
     /// Ticket #72 (version 0.05.5): Ducats banked in the Venture Capital Fund (the Prospectors'
     /// first Victory part), the share of Ducat income banked each Income, and what last
     /// Income banked. The running Extraction Total this replaces is retired.
@@ -983,6 +1016,14 @@ pub struct SeatState {
     pub venture_share: f64,
     #[serde(default)]
     pub venture_banked_last_turn: f64,
+    /// Ticket #566 (version 0.1.0.3): the interest the Investment Banks and Exchanges paid into the
+    /// Fund last Income, kept beside the banked share so the Fund line can say the growth whole.
+    #[serde(default)]
+    pub venture_interest_last_turn: f64,
+    /// The review of #566: and an Objective's reward paid into the Fund at the end of the last
+    /// Income, so the line misses nothing the Fund took.
+    #[serde(default)]
+    pub venture_reward_last_turn: f64,
     /// Ticket #261 (version 0.08.4): which steps of the rival's Moment this seat has fired -- three
     /// quarters of the way, and one part met. Once each, so a seat that dips and recrosses is not
     /// announced twice.
@@ -1123,6 +1164,11 @@ pub struct SeatState {
     #[serde(default)]
     pub lost_in_transit: i64,
     pub income_last_turn: Stockpile,
+    /// Ticket #563 (version 0.1.0.3), at the designer's word: every Income this seat was paid over
+    /// the game, net of its buildings' upkeep, for the sweep's per-Faction line. Research is
+    /// `research_total`.
+    #[serde(default)]
+    pub produced: Stockpile,
     /// Last Income by source (ticket #31): "Factory in Asia", the resource, the amount; upkeep as negatives.
     pub income_sources: Vec<(String, Resource, f64)>,
     /// Ticket #51: Research banked for the Archive, capped at what its remaining stages still need.
@@ -1479,7 +1525,8 @@ pub enum Term {
     /// enforced by refusing the order: the act is allowed and costs +3, and ends the whole Accord.
     NonAggression,
     /// Neither treats the other's Ships as a target, and a Blockade does not shut the other out of
-    /// the slot. Measured near-dead on today's board -- the Blockade rung fired zero times in 80
+    /// the orbit -- a ring, or since ticket #570 (version 0.1.0.3) the ground under low orbit.
+    /// Measured near-dead on today's board -- the Blockade rung fired zero times in 80
     /// games -- and kept deliberately, because it will matter for Mars.
     Passage,
     /// Either may Refuel at the other's Space Stations. Also near-dead today: off-Earth stations run
@@ -1526,6 +1573,19 @@ pub struct Refusal {
     pub from: Seat,
     pub to: Seat,
     pub until: u32,
+}
+
+/// Ticket #572 (version 0.1.0.3), at the designer's word: **the last Trade `to` refused `from`**, by
+/// its two goods -- what `from` gave and what it asked. The computer offers that seat no Trade of the
+/// same two goods again, the cooldown over or not, until a Trade of different goods is refused in its
+/// place. The amounts do not count: 20 Energy for 20 Fuel and 20 Energy for 25 Fuel are one Trade.
+/// The playtest: "they keep offering the same 20 Energy for 20 Fuel trade" (three testers).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RefusedTrade {
+    pub from: Seat,
+    pub to: Seat,
+    pub give: Resource,
+    pub get: Resource,
 }
 
 /// Ticket #226 (version 0.08.2): an Accord between two Factions, holding one or more Terms.
@@ -1588,6 +1648,16 @@ impl Accord {
 /// sees one-way upward pressure from the computer, and Fuel and Energy move only when a human
 /// trades them. The designer chose to ship it anyway; giving the seats an appetite to sell, and to
 /// buy the other two, is a separate ticket.
+/// Ticket #577 (version 0.1.0.3): a seat's own price cut from a card: the market row, the
+/// multiplier, and the last turn it stands (counted as a card's price is: the turns of orders
+/// after the answer). The Market line names the cut, not the card.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct PriceCut {
+    pub row: usize,
+    pub multiplier: f64,
+    pub until: u32,
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Market {
     /// The live price of Materials, Fuel and Energy, in that order. Zero means "not opened yet" and
@@ -1726,6 +1796,8 @@ pub struct Game {
     pub armies_inherited: Vec<(ArmyId, u32)>,
     /// Ticket #495: refusals remembered, so a refused Faction does not offer again at once.
     pub refusals: Vec<Refusal>,
+    /// Ticket #572 (version 0.1.0.3): the last Trade refused per pair, by its goods. In the save.
+    pub refused_trades: Vec<RefusedTrade>,
     /// Ticket #345 (version 0.09.1): who was first to each Body, one row per Body at most,
     /// appended when a first is claimed and never rewritten. In the save.
     pub body_firsts: Vec<BodyFirst>,
@@ -1754,14 +1826,18 @@ pub struct NewGame {
 impl Game {
     pub fn new(tables: std::sync::Arc<Tables>, setup: NewGame) -> Game {
         let mut rng = ChaCha8Rng::seed_from_u64(setup.seed);
-        let start = Stockpile { materials: tables.start.materials as f64, fuel: tables.start.fuel as f64, energy: tables.start.energy as f64, ducats: tables.start.ducats as f64 };
+        // Ticket #582 (version 0.1.0.3): the opening Stockpile is the Faction's -- the table's
+        // figures, the Materials the card's own where it says -- so the Prospectors open with 60.
         let seat = |kind: FactionKind, ai: bool| SeatState {
             kind,
             ai,
-            stockpile: start,
+            stockpile: tables.start_stockpile(kind),
+            price_cuts: Vec::new(),
             venture_fund: 0.0,
             venture_share: 0.0,
             venture_banked_last_turn: 0.0,
+            venture_interest_last_turn: 0.0,
+            venture_reward_last_turn: 0.0,
             rival_steps_announced: [false; 2],
             victory_history: Vec::new(),
             directive_sink: 0.0,
@@ -1803,6 +1879,7 @@ impl Game {
             doubled_module_turns: 0,
             lost_in_transit: 0,
             income_last_turn: Stockpile::default(),
+            produced: Stockpile::default(),
             income_sources: Vec::new(),
             archive_fund: 0,
             funding_archive: false,
@@ -1975,6 +2052,7 @@ impl Game {
             offers: Vec::new(),
             armies_inherited: Vec::new(),
             refusals: Vec::new(),
+            refused_trades: Vec::new(),
             body_firsts: Vec::new(),
             waiting_last: Vec::new(),
             colony_growth: BTreeMap::new(),
@@ -3546,6 +3624,30 @@ impl Game {
         self.module_slots(c).saturating_sub(self.module_slots_used(c))
     }
 
+    /// Ticket #565 (version 0.1.0.3), at the designer's word: the Modules here past what the living
+    /// can run, by index. The slot formula read backwards: walked in build order, each slot-taking
+    /// Module takes a slot while `module_slots` has one; a Module past the count is dark at Income,
+    /// and comes back as people return. The Core and the Archive stand outside the count as they do
+    /// for the cap; the Habitat takes its slot but is never darkened, since it houses the people who
+    /// run the rest.
+    pub fn unmanned_modules(&self, c: &Colony) -> Vec<usize> {
+        let exempt = |k: ModuleKind| k == ModuleKind::Archive || k == ModuleKind::Core;
+        let slots = self.module_slots(c);
+        let mut used = 0;
+        let mut dark = Vec::new();
+        for (i, m) in c.modules.iter().enumerate() {
+            if exempt(m.kind) {
+                continue;
+            }
+            if used < slots {
+                used += 1;
+            } else if m.kind != ModuleKind::Habitat {
+                dark.push(i);
+            }
+        }
+        dark
+    }
+
     pub fn habitat_room(&self, c: &Colony) -> u32 {
         self.room_of(c, false)
     }
@@ -4479,13 +4581,15 @@ impl Game {
     ///
     /// Ticket #335 (version 0.09.0): **Orbital Control is of LOW ORBIT**, since low orbit is what
     /// touches the ground and the ground is all Control governs. A warship in a station's orbit
-    /// holds nothing by sitting there; it must come down to low orbit to shut the surface.
+    /// holds nothing by sitting there; it must come down to low orbit. Ticket #570 (version
+    /// 0.1.0.3): Control governs a Bombard, a Launch and the starving of the ground; it shuts no
+    /// landing, which a Blockade of low orbit does (`may_land`).
     pub fn orbital_control(&self, body: BodyId) -> Option<Seat> {
         let mut holders = Seat::ALL
             .into_iter()
             // Ticket #346 (version 0.09.1): and holding the Fuel bar. A warship whose tank cannot
             // pay the Battle charge holds nothing: it could not fight for the orbit it is sitting
-            // in, so it does not shut the ground below it either.
+            // in.
             .filter(|seat| {
                 self.ships.iter().any(|s| s.seat == *seat && self.ship_in_orbit(s, body, Orbit::Low) && s.kind.is_warship() && !s.escaped && self.ship_holds_the_battle_bar(s))
             });
@@ -4500,7 +4604,7 @@ impl Game {
 
     /// Ticket #335 (version 0.09.0): whether a seat stands alone in one orbit -- no rival warship
     /// still engaged in it and no rival working Battery covering it. Orbital Control is low
-    /// orbit's and gates the ground; THIS is what a station's own orbit asks of the Ship that
+    /// orbit's and gates a Bombard and a Launch there; THIS is what a station's own orbit asks of the Ship that
     /// would Bombard the station standing there.
     pub fn orbit_uncontested(&self, seat: Seat, body: BodyId, orbit: Orbit) -> bool {
         // Ticket #346 (version 0.09.1): a DRY rival warship is not a rival warship for this test.
@@ -4560,10 +4664,24 @@ impl Game {
     /// frigate in Earth orbit locked a Faction out of its own Space Station for nine turns, and two
     /// rivals' warships present punished the bystander hardest by denying everybody. A blockade is
     /// now the business of one Orbital Slot: see `slot_blockaded_against`.
+    ///
+    /// Ticket #570 (version 0.1.0.3), at the designer's word -- *"ships do not block landing unless
+    /// they are actively blockading"*: **the ground reads the ring's rule.** A rival warship on
+    /// Blockade in low orbit, fuelled for a Battle, shuts it; a Passage partner never does; the
+    /// seat's own ground Colony's working Battery lifts it. A rival holding Orbital Control on any
+    /// other stance shuts nothing -- the playtest had a Frigate on Hold under two Accords shut a
+    /// player out of their own Colony. Control still gates a Bombard, a Launch and the starving of
+    /// the ground.
     pub fn may_land(&self, seat: Seat, body: BodyId) -> bool {
-        match self.orbital_control(body) {
-            Some(s) => s == seat,
-            None => true,
+        !self.orbit_blockaded_against(seat, body, Orbit::Low)
+    }
+
+    /// Ticket #570: the refusal a Blockade earns, by the orbit it shuts -- the order's door and the
+    /// Resolution's re-read say the same words.
+    pub fn blockaded_words(&self, body: BodyId, orbit: Orbit) -> String {
+        match orbit {
+            Orbit::Low => format!("a rival warship blockades low orbit over {}", self.tables.body(body).name),
+            Orbit::Slot(n) => format!("a rival warship blockades {}", self.station_name(body, n)),
         }
     }
 
@@ -5064,7 +5182,8 @@ impl Game {
 
     // ---------------------------------------------------------------- Ticket #54: the Scrubber
 
-    /// How many Scrubbers one Nation State may hold: clamp(round(population / 2), 2, 10).
+    /// How many Scrubbers one Nation State may hold: clamp(round(population / per_population), min, max);
+    /// since ticket #561 (version 0.1.0.3) one per 300 million, one at least.
     pub fn scrubber_cap(&self, s: StateId) -> u32 {
         let c = &self.tables.scrubber;
         if c.per_population <= 0.0 {
@@ -5379,7 +5498,10 @@ impl Game {
         } else if n >= u.army_threshold {
             "the Standing Army no longer replenishes".to_string()
         } else {
-            "calm enough: the Standing Army replenishes and Facilities run in full".to_string()
+            // Ticket #573 (version 0.1.0.3), at the designer's word: calm says nothing. "Calm
+            // enough: the Standing Army replenishes and Facilities run in full" followed every
+            // battle report twenty times in the tool.
+            String::new()
         }
     }
 
@@ -5684,9 +5806,7 @@ impl Game {
             }
         };
         if !yes {
-            let until = self.turn + self.tables.relations.offer_refused_turns;
-            self.refusals.retain(|r| !(r.from == from && r.to == to));
-            self.refusals.push(Refusal { from, to, until });
+            self.remember_refused_trade(from, to, give, get);
             self.log(format!("{} declined a Trade from {}.", self.seat_name(to), self.seat_name(from)));
             line(self, from, "trade_refused", to, "");
             return;
@@ -5728,6 +5848,19 @@ impl Game {
         self.log(format!("{} and {} struck a Trade.", self.seat_name(from), self.seat_name(to)));
         line(self, from, "trade_struck", to, "");
         line(self, to, "trade_struck", from, "");
+    }
+
+    /// Ticket #495: a Trade refused is remembered for the cooldown, as an Accord's is; ticket #572
+    /// (version 0.1.0.3): and by its two goods, so the same Trade is not offered that seat again.
+    fn remember_refused_trade(&mut self, from: Seat, to: Seat, give: crate::orders::TradeGood, get: crate::orders::TradeGood) {
+        use crate::orders::TradeGood;
+        let until = self.turn + self.tables.relations.offer_refused_turns;
+        self.refusals.retain(|r| !(r.from == from && r.to == to));
+        self.refusals.push(Refusal { from, to, until });
+        if let (TradeGood::Goods(give, _), TradeGood::Goods(get, _)) = (give, get) {
+            self.refused_trades.retain(|r| !(r.from == from && r.to == to));
+            self.refused_trades.push(RefusedTrade { from, to, give, get });
+        }
     }
 
     /// Ticket #496: whether either of a pair holds the other Hostile.
@@ -5787,6 +5920,12 @@ impl Game {
     /// what it cannot pay, never to a Faction it is Hostile with or that is at the door, and only
     /// where what it gets is worth at least what it gives.
     pub fn trade_acceptable(&self, seat: Seat, from: Seat, give: crate::orders::TradeGood, get: crate::orders::TradeGood) -> bool {
+        self.trade_acceptable_at(seat, from, give, get, 1.0)
+    }
+
+    /// Ticket #572 (version 0.1.0.3): the same at a margin: it accepts where what it gets, times
+    /// `margin`, is worth what it gives. The counter-offer's quarter over fair value; 1 for any Trade.
+    pub fn trade_acceptable_at(&self, seat: Seat, from: Seat, give: crate::orders::TradeGood, get: crate::orders::TradeGood, margin: f64) -> bool {
         if matches!(get, crate::orders::TradeGood::Place(_)) || self.hostile(seat, from) || self.holds_good(seat, get).is_err() {
             return false;
         }
@@ -5797,7 +5936,7 @@ impl Game {
         if self.ai_gang_pressure(seat, from) > 0.0 {
             return false;
         }
-        self.trade_value(give) + 1e-9 >= self.trade_value(get)
+        self.trade_value(give) * margin + 1e-9 >= self.trade_value(get)
     }
 
     /// Ticket #495: whether an offer from `from` to `to` is waiting on its answer.
@@ -5808,6 +5947,47 @@ impl Game {
     /// Ticket #495: whether `from` was refused by `to` recently enough not to offer again.
     pub fn refused_recently(&self, from: Seat, to: Seat) -> bool {
         self.refusals.iter().any(|r| r.from == from && r.to == to && self.turn < r.until)
+    }
+
+    /// Ticket #572 (version 0.1.0.3): whether the last Trade `to` refused `from` gave `give` for `get`.
+    pub fn trade_refused_before(&self, from: Seat, to: Seat, give: Resource, get: Resource) -> bool {
+        self.refused_trades.iter().any(|r| r.from == from && r.to == to && r.give == give && r.get == get)
+    }
+
+    /// Ticket #572 (version 0.1.0.3), at the designer's word: **a human seat counters a Trade offered
+    /// it, once** -- the same two goods, its own amounts: `you_give` of the good asked of it, `you_get`
+    /// of the good offered. The offerer answers at once by its Trade rule, so the goods move or the
+    /// counter is refused before the turn goes on; a seat still short of the good it asked for (under
+    /// `trade_short`) pays up to `trade_counter_margin` over fair value, since a seat that is short
+    /// pays over the odds, and one not short pays fair value alone, as for any Trade. A refused
+    /// counter is the refusal: the cooldown runs and the goods are remembered. Either way the offer
+    /// is gone, so no second counter follows. A counter the seat cannot pay, of nought, or on a
+    /// place, is refused here and the offer stays. A computer seat never counters.
+    pub fn counter_offer(&mut self, seat: Seat, index: usize, you_give: u32, you_get: u32) -> Result<bool, String> {
+        use crate::orders::TradeGood;
+        let Some(offer) = self.offers.get(index).filter(|o| o.to == seat) else { return Err("there is no such offer to answer".into()) };
+        let Some((TradeGood::Goods(theirs, _), TradeGood::Goods(yours, _))) = offer.trade else {
+            return Err("a counter changes the amounts of a Trade in goods".into());
+        };
+        if you_give == 0 || you_get == 0 {
+            return Err("a counter names amounts above nought".into());
+        }
+        let from = offer.from;
+        let (take, pay) = (TradeGood::Goods(theirs, you_get), TradeGood::Goods(yours, you_give));
+        self.holds_good(seat, pay)?;
+        let th = &self.tables.ai.thresholds;
+        let margin = if self.seat(from).stockpile.of(yours) < th.trade_short { 1.0 + th.trade_counter_margin } else { 1.0 };
+        let yes = self.trade_acceptable_at(from, seat, pay, take, margin);
+        self.offers.remove(index);
+        if yes {
+            self.settle_trade(from, seat, take, pay, true);
+        } else {
+            self.remember_refused_trade(from, seat, take, pay);
+            self.log(format!("{} refused a counter from {}.", self.seat_name(from), self.seat_name(seat)));
+            let text = self.say("trade_counter_refused", &[("faction", self.seat_name(from))]);
+            self.report_line_of(seat, LineKind::YourWorks, LineKind::Note, None, text);
+        }
+        Ok(yes)
     }
 
     /// Ticket #495: a human seat answers an offer made to it. Accept strikes the Accord at once,
@@ -5878,7 +6058,9 @@ impl Game {
             return;
         }
         // Ticket #509 (version 0.1.0.0): a renewal runs the Accord another five turns from the end of
-        // this run; letting it lapse is no refusal and is not remembered.
+        // this run; letting it lapse here is no refusal and is not remembered. Ticket #572 (version
+        // 0.1.0.3): the run-out of a human seat's Accord that its computer partner would have renewed
+        // is remembered in `settle_accords`, not here.
         // The review: it renews the Terms the Accord holds when answered, so Terms added the same turn
         // are kept; and one an addition has already restarted needs no renewal.
         if offer.ask == AccordAsk::Renew {
@@ -6028,6 +6210,21 @@ impl Game {
         let ended: Vec<(Seat, Seat, Option<Seat>)> = self.accords.iter().filter(|acc| self.accord_turns_left(acc) <= 1).map(|acc| (acc.a, acc.b, acc.refused_by)).collect();
         for (a, b, refused) in ended {
             self.log(format!("The Accord between {} and {} has run its course.", self.seat_name(a), self.seat_name(b)));
+            // Ticket #572 (version 0.1.0.3), at the designer's word: a human seat that gave no Renew
+            // while its computer partner would have is remembered by that partner as refusing it, so
+            // the fresh offer waits the cooldown where it came the next turn -- the playtest's "every
+            // five turns all three rivals re-offer non-aggression".
+            if refused.is_none() {
+                for (me, other) in [(a, b), (b, a)] {
+                    // The review: willingness is read here, at the settle, where `ask_renewals` read it
+                    // at the turn's head; a partner soured in between remembers nothing, which is right.
+                    if !self.seat(me).ai && self.seat(other).ai && self.renewal_willing(other, me) {
+                        let until = self.turn + self.tables.relations.offer_refused_turns;
+                        self.refusals.retain(|r| !(r.from == other && r.to == me));
+                        self.refusals.push(Refusal { from: other, to: me, until });
+                    }
+                }
+            }
             self.accord_ended(a, b, refused.map_or(AccordEnding::RanOut, AccordEnding::NotRenewed));
         }
         let run = self.tables.relations.accord_turns;
@@ -6076,8 +6273,11 @@ impl Game {
             return clock;
         }
         // The review: the Victory windows' own rounding.
-        let pct = format!("{:.0}", self.progress(Seat(0)).score() * 100.0);
-        self.phrase("head", &[("clock", clock), ("pct", pct)])
+        // Ticket #567 (version 0.1.0.3): and the hold named, with both bars reached ("100% - needs
+        // Generation Ships"), where a held 100% read as a win.
+        let p = self.progress(Seat(0));
+        let pct = format!("{:.0}", p.score() * 100.0);
+        self.phrase("head", &[("clock", clock), ("pct", pct), ("hold", p.hold_suffix())])
     }
 
     /// Ticket #538 (version 0.1.0.1): an Accord between `a` and `b` has ended. Each player in it

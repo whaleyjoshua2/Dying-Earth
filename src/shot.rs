@@ -282,6 +282,26 @@ fn build_board(session: &mut Session) {
             }
             g.seats[0].ai = spectate;
         }
+        // `standing:<facility>` (a building aid, ticket #559): a Facility of the named kind stands in
+        // seat 0's start Region, so its tile and its glyph can be photographed without a game that
+        // builds one. By the enum's spelling, case and underscores ignored: `standing:wind_farm`.
+        for id in std::env::args().filter_map(|a| a.strip_prefix("standing:").map(|s| s.replace('_', ""))) {
+            if let Some(kind) = FacilityKind::ALL.into_iter().find(|k| format!("{k:?}").eq_ignore_ascii_case(&id))
+                && let Some(home) = g.controlled_states(Seat(0)).first().copied()
+            {
+                g.state_mut(home).facilities.push(Facility::new(kind));
+            }
+        }
+        // `researched:<tech>` (a building aid, ticket #559): the named Tech stands done, so a picture
+        // can show what waits behind it -- the Wind Farm on a build list, say. By the enum's spelling,
+        // case and underscores ignored: `researched:clean_power`. Any number may be given.
+        for id in std::env::args().filter_map(|a| a.strip_prefix("researched:").map(|s| s.replace('_', ""))) {
+            if let Some(t) = TechId::ALL.into_iter().find(|t| format!("{t:?}").eq_ignore_ascii_case(&id))
+                && !g.has_tech(t)
+            {
+                g.research.done.push(t);
+            }
+        }
         for seat in Seat::ALL {
             if !g.ships_at(seat, BodyId::Mars).is_empty() {
                 continue;
@@ -626,16 +646,17 @@ fn build_board(session: &mut Session) {
         }
         // `rival:1` (a building aid, ticket #261, version 0.08.4): seat 1 stands three quarters of
         // the way to its Victory Condition -- fourteen Colonists on the Moon of eighteen, and, for
-        // the Prospectors it usually is, the Fund at 2625 of 3500 (ticket #506: nine of twelve and
-        // 2000 of 2500 before) -- and a quiet turn runs so the rival's Moment fires and
-        // `moment:rival` can open it in the Report picture.
+        // the Prospectors it usually is, the Fund at 3230 of 4250 (ticket #580, version 0.1.0.3,
+        // from the review: 2625 of 3500 since ticket #506, nine of twelve and 2000 of 2500 before;
+        // at the 4,250 bar 2625 scored 0.67 and the Moment never fired) -- and a quiet turn runs so
+        // the rival's Moment fires and `moment:rival` can open it in the Report picture.
         if std::env::args().any(|a| a == "rival:1") {
             let rival = Seat(1);
             let slot = g.free_slots_on(BodyId::Moon).first().copied().unwrap_or(0);
             let id = ColonyId(g.fresh_id());
             let modules = vec![Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Habitat)];
             g.colonies.push(Colony { id, body: BodyId::Moon, slot, control: Control::Controlled(rival), modules, colonists: 14, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, tier: 0, in_orbit: false });
-            g.seats[1].venture_fund = 2625.0;
+            g.seats[1].venture_fund = 3230.0;
             g.seats[1].stabilization_run = 4;
             run_one_quiet_turn(g);
         }
@@ -908,7 +929,7 @@ fn build_board(session: &mut Session) {
             let gained = g.standing_from(place, 12);
             let before = g.influence_needed_for(Seat(1), place) - 2 * gained + 1;
             g.seats[1].influence.insert(place, before.max(1));
-            g.pending.influence.push((Seat(1), place, 12));
+            g.pending.influence.push((Seat(1), place, 12, g.place_control(place).director()));
             refuse_any_card(g);
             g.end_turn(std::array::from_fn(|_| Vec::new())).expect("the screenshot harness picks a Tech before it drives turns");
         }

@@ -1,0 +1,170 @@
+Ticket #576: the computer Custodians from East Asia, seeds 1 to 3, every seat on the computer
+(`sim.exe <seed> --player=custodians --start=east --log`), the Custodians' mothballs, restarts,
+completions and foundings through turn 30, with their Income every fourth turn.
+
+===== BEFORE the guard (the tree at 5711405), seed 1 =====
+T 1 Custodians completed Scrubber at China.
+T 2 The Custodians mothballed the Refinery in China.
+T 2 Custodians completed Shipyard at ISS over Earth.
+T 3 The Custodians mothballed the Power Plant in China.
+T 4 Income Custodians: +6.6 Materials, +0 Fuel, Energy 23 -> 14, Research 1.
+T 4 The Custodians mothballed the Scrubber in China.
+T 4 The Custodians mothballed the Mine in China.
+T 4 The Custodians mothballed the Factory in China.
+T 8 Income Custodians: +9.9 Materials, +0 Fuel, Energy 7 -> 4, Research 1.
+T12 Income Custodians: +9.9 Materials, +0 Fuel, Energy 1 -> 0, Research 1.
+T16 Income Custodians: +9.9 Materials, +-0.8 Fuel, Energy 31 -> 35, Research 1.
+T16 Custodians completed Scrubber at China.
+T16 The Custodians founded a Colony at Ross Ice Shelf in Antarctica with 4 Pioneers from China.
+T17 The Custodians mothballed the Mine in China.
+T18 The Custodians mothballed the Power Plant in China.
+T18 The Custodians founded a Colony at Antarctic Peninsula in Antarctica with 4 Pioneers from China.
+T19 The Custodians mothballed the Scrubber in China.
+T19 The Custodians mothballed the Mine in India.
+T20 Income Custodians: +10 Materials, +-0.8 Fuel, Energy 28 -> 29, Research 2.
+T21 Custodians completed Scrubber at China.
+T22 The Custodians mothballed the Mine in Kazakhstan.
+T23 The Custodians mothballed the Power Plant in Kazakhstan.
+T24 The Custodians mothballed the Power Plant in India.
+T25 The Custodians mothballed the Scrubber in China.
+T25 Custodians completed Scrubber at India.
+T26 The Custodians mothballed the Scrubber in India.
+T27 The Custodians mothballed the Sea Wall in India.
+T28 The Custodians mothballed the Sea Wall in China.
+
+===== BEFORE the guard (the tree at 5711405), seed 2 =====
+T 1 Custodians completed Scrubber at China.
+T 2 The Custodians mothballed the Refinery in China.
+T 2 Custodians completed Shipyard at ISS over Earth.
+T 3 The Custodians mothballed the Power Plant in China.
+T 4 Income Custodians: +6.6 Materials, +0 Fuel, Energy 23 -> 14, Research 1.
+T 4 The Custodians mothballed the Scrubber in China.
+T 4 The Custodians mothballed the Mine in China.
+T 4 The Custodians mothballed the Factory in China.
+T 8 Income Custodians: +9.9 Materials, +0 Fuel, Energy 7 -> 4, Research 1.
+T12 Income Custodians: +9.9 Materials, +0 Fuel, Energy 13 -> 8, Research 1.
+T16 Income Custodians: +9.9 Materials, +-0.8 Fuel, Energy 13 -> 17, Research 1.
+T16 The Custodians founded a Colony at Ross Ice Shelf in Antarctica with 4 Pioneers from China.
+T18 Custodians completed Scrubber at China.
+T18 The Custodians founded a Colony at Antarctic Peninsula in Antarctica with 4 Pioneers from China.
+T19 The Custodians mothballed the Mine in China.
+T20 Income Custodians: +0 Materials, +-1.6 Fuel, Energy 48 -> 48, Research 1.
+T20 The Custodians mothballed the Power Plant in China.
+T21 The Custodians mothballed the Power Plant in China.
+T23 The Custodians mothballed the Scrubber in China.
+T24 The Custodians mothballed the Sea Wall in China.
+T27 The Custodians mothballed the Constabulary in China.
+
+===== BEFORE the guard (the tree at 5711405), seed 3 =====
+T 1 Custodians completed Scrubber at China.
+T 2 The Custodians mothballed the Refinery in China.
+T 2 Custodians completed Shipyard at ISS over Earth.
+T 3 The Custodians mothballed the Power Plant in China.
+T 4 Income Custodians: +6.6 Materials, +0 Fuel, Energy 23 -> 14, Research 1.
+T 4 The Custodians mothballed the Scrubber in China.
+T 4 The Custodians mothballed the Mine in China.
+T 4 The Custodians mothballed the Factory in China.
+T 8 Income Custodians: +9.9 Materials, +0 Fuel, Energy 7 -> 4, Research 2.
+T12 Income Custodians: +9.9 Materials, +0 Fuel, Energy 1 -> 0, Research 2.
+T16 Income Custodians: +9.9 Materials, +-1.6 Fuel, Energy 13 -> 26, Research 2.
+T16 The Custodians founded a Colony at Ross Ice Shelf in Antarctica with 4 Pioneers from China.
+T18 Custodians completed Scrubber at China.
+T18 The Custodians founded a Colony at Antarctic Peninsula in Antarctica with 4 Pioneers from China.
+T19 The Custodians mothballed the Mine in India.
+T20 Income Custodians: +9.9 Materials, +-2.4 Fuel, Energy 65 -> 79, Research 4.
+T20 The Custodians mothballed the Mine in China.
+T20 Custodians completed Scrubber at India.
+T21 The Custodians restarted the Scrubber in China.
+T21 The Custodians restarted the Refinery in China.
+T21 The Custodians restarted the Mine in China.
+T21 The Custodians mothballed the Power Plant in India.
+T22 The Custodians mothballed the Refinery in China.
+
+===== AFTER the guard, seed 1 =====
+T 1 Custodians completed Scrubber at China.
+T 2 Custodians completed Shipyard at ISS over Earth.
+T 3 The Custodians mothballed the Scrubber in China.
+T 4 Income Custodians: +6.6 Materials, +3.2 Fuel, Energy 20 -> 21, Research 1.
+T 4 The Custodians mothballed the Factory in China.
+T 6 Custodians completed Colony Ship at ISS over Earth.
+T 8 Income Custodians: +9.9 Materials, +3.2 Fuel, Energy 29 -> 31, Research 1.
+T 8 The Custodians founded a Colony at Mare Tranquillitatis on the Moon with 4 Colonists.
+T12 Income Custodians: +28.3 Materials, +4.4 Fuel, Energy 17.5 -> 22.2, Research 1.
+T12 The Custodians mothballed the Power Plant in China.
+T15 Custodians completed Scrubber at China.
+T15 The Custodians founded a Colony at Ross Ice Shelf in Antarctica with 4 Pioneers from China.
+T16 Income Custodians: +28.3 Materials, +3.6 Fuel, Energy 111.5 -> 131.8, Research 1.
+T17 The Custodians mothballed the Mine in China.
+T17 The Custodians mothballed the Mine in China.
+T17 The Custodians founded a Colony at Antarctic Peninsula in Antarctica with 4 Pioneers from China.
+T18 The Custodians mothballed the Power Plant in China.
+T18 The Custodians mothballed the Power Plant in China.
+T19 Custodians completed Scrubber at China.
+T20 Income Custodians: +52.9 Materials, +3.6 Fuel, Energy 178.2 -> 185, Research 3.
+T20 Custodians completed Scrubber at India.
+T22 Custodians completed Scrubber at India.
+T24 The Custodians founded a Colony at Swift on Deimos with 4 Colonists.
+T24 Custodians completed Scrubber at Kazakhstan.
+T25 Custodians completed Scrubber at China.
+T27 The Custodians mothballed the Power Plant in India.
+T27 The Custodians mothballed the Power Plant in Kazakhstan.
+T28 Custodians completed Scrubber at India.
+
+===== AFTER the guard, seed 2 =====
+T 1 Custodians completed Scrubber at China.
+T 2 Custodians completed Shipyard at ISS over Earth.
+T 3 The Custodians mothballed the Scrubber in China.
+T 4 Income Custodians: +6.6 Materials, +3.2 Fuel, Energy 20 -> 21, Research 1.
+T 4 The Custodians mothballed the Factory in China.
+T 6 Custodians completed Colony Ship at ISS over Earth.
+T 8 Income Custodians: +9.9 Materials, +3.2 Fuel, Energy 29 -> 31, Research 1.
+T 8 The Custodians founded a Colony at Tycho on the Moon with 4 Colonists.
+T12 Income Custodians: +26.6 Materials, +4.4 Fuel, Energy 22 -> 28, Research 1.
+T12 The Custodians mothballed the Power Plant in China.
+T13 Custodians completed Scrubber at China.
+T14 The Custodians mothballed the Scrubber in China.
+T15 The Custodians mothballed the Mine in Japan.
+T15 The Custodians mothballed the Mine in Japan.
+T15 Custodians completed Scrubber at Japan.
+T15 The Custodians founded a Colony at Ross Ice Shelf in Antarctica with 4 Pioneers from China.
+T16 Income Custodians: +33.9 Materials, +3.6 Fuel, Energy 59.5 -> 83, Research 3.
+T17 Custodians completed Scrubber at China.
+T17 The Custodians founded a Colony at Antarctic Peninsula in Antarctica with 4 Pioneers from China.
+T18 The Custodians mothballed the Power Plant in China.
+T18 The Custodians mothballed the Factory in Japan.
+T18 The Custodians mothballed the Power Plant in Japan.
+T18 Custodians completed Scrubber at China.
+T19 The Custodians mothballed the Scrubber in Japan.
+T20 Income Custodians: +47.4 Materials, +2.8 Fuel, Energy 62 -> 103.5, Research 6.
+T21 Custodians completed Scrubber at India.
+T22 Custodians completed Scrubber at India.
+T23 Custodians completed Scrubber at China.
+T25 The Custodians founded a Colony at Roche on Phobos with 4 Colonists.
+T28 The Custodians mothballed the Power Plant in India.
+
+===== AFTER the guard, seed 3 =====
+T 1 Custodians completed Scrubber at China.
+T 2 Custodians completed Shipyard at ISS over Earth.
+T 3 The Custodians mothballed the Scrubber in China.
+T 4 Income Custodians: +6.6 Materials, +3.2 Fuel, Energy 20 -> 21, Research 1.
+T 4 The Custodians mothballed the Factory in China.
+T 6 Custodians completed Colony Ship at ISS over Earth.
+T 8 Income Custodians: +9.9 Materials, +3.2 Fuel, Energy 29 -> 31, Research 2.
+T 8 The Custodians founded a Colony at South Pole-Aitken Basin on the Moon with 4 Colonists.
+T12 Income Custodians: +19.8 Materials, +4.4 Fuel, Energy 28 -> 36.8, Research 2.
+T12 The Custodians mothballed the Power Plant in China.
+T14 Custodians completed Scrubber at China.
+T15 The Custodians founded a Colony at Ross Ice Shelf in Antarctica with 4 Pioneers from China.
+T16 Income Custodians: +19.8 Materials, +4.4 Fuel, Energy 83.6 -> 96.8, Research 2.
+T17 The Custodians mothballed the Mine in China.
+T17 The Custodians mothballed the Mine in China.
+T17 The Custodians mothballed the Power Plant in India.
+T17 The Custodians mothballed the Mine in India.
+T17 Custodians completed Scrubber at India.
+T20 Income Custodians: +21.4 Materials, +4.4 Fuel, Energy 117.6 -> 125.8, Research 5.
+T22 The Custodians mothballed the Power Plant in Vietnam.
+T23 The Custodians mothballed the Research Lab in China.
+T24 The Custodians founded a Colony at Swift on Deimos with 4 Colonists.
+T24 Custodians completed Scrubber at Vietnam.
+T30 The Custodians mothballed the Research Lab in India.
+

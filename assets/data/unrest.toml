@@ -82,7 +82,8 @@ scrubber_fall = 1.0
 # does not count; a station is no settling.
 first_colony_ease = 0.5
 # Ticket #405 (version 0.09.4): the first Climate phase the world is EVER under the Natural Sink (the
-# Stabilization test: counted Emissions against the Sink and the Scrubbers) takes this off every
+# Stabilization test: since version 0.1.0.3 the whole of the Emissions, cards and permafrost
+# counted, against the Sink and the Scrubbers) takes this off every
 # Region's Unrest, held or nobody's, once a game, whatever the next turn does; a Region the
 # Custodians hold takes the second figure instead. The designer's ".5 / 1 for custodians".
 under_sink_ease = 0.5

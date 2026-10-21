@@ -199,7 +199,8 @@ fn a_save_without_this_versions_fields_still_loads() {
         out
     };
     let mut older = text.clone();
-    for name in ["under_sink_eased", "opening_gap", "best_gap_closed", "best_run", "lead_windfall", "card_price_by", "by", "places", "colony_growth", "offline_cause", "produced_total", "opening_met_turn", "opening_run", "launch_site_owed", "archives_lost", "archive_fund_lost", "tier", "offers", "refusals", "greenwash_spent", "home_region", "ended_by", "refused_by"] {
+    // Ticket #559 (version 0.1.0.3): a Facility's `replacing` is cut too.
+    for name in ["under_sink_eased", "opening_gap", "best_gap_closed", "best_run", "lead_windfall", "card_price_by", "by", "places", "colony_growth", "offline_cause", "produced_total", "opening_met_turn", "opening_run", "launch_site_owed", "archives_lost", "archive_fund_lost", "tier", "offers", "refusals", "greenwash_spent", "home_region", "ended_by", "refused_by", "replacing"] {
         let before = older.len();
         older = cut(&older, name);
         assert!(older.len() < before, "{name} was in the save and is cut");

@@ -127,6 +127,8 @@ pub fn facility_icon(kind: dying_earth_engine::FacilityKind) -> &'static str {
         Stadium => "facility_stadium",
         // Ticket #411 (version 0.09.4): the Nature Reserve, a beech, chosen by the designer.
         NatureReserve => "facility_nature_reserve",
+        // Ticket #559 (version 0.1.0.3): the Wind Farm, a turbine drawn for the game, in DRAWN.
+        WindFarm => "facility_wind_farm",
         SeaWall => "facility_sea_wall",
         Scrubber => "facility_scrubber",
         // Ticket #185 (version 0.08.0): the School.
@@ -179,6 +181,8 @@ pub fn module_icon(kind: dying_earth_engine::ModuleKind) -> &'static str {
         // Ticket #332 (version 0.09.0): the Factory Module wears the Earth Factory's picture, as
         // the Institute wears the School's; the interface lane settles the glyphs.
         Factory => "facility_factory",
+        // Ticket #559 (version 0.1.0.3): the Wind Farm Module wears the Facility's turbine.
+        WindFarm => "facility_wind_farm",
         // Ticket #164 (version 0.07.5): the Core Module wears the station glyph the game drew for
         // itself on ticket #135 -- two solar panels on a bar with a module between them, which is
         // what a core module is. It owes no credit. A ground Colony's Core Module wears it too,
@@ -231,7 +235,10 @@ pub fn faction_symbol(kind: dying_earth_engine::FactionKind) -> &'static str {
 /// Ticket #474 (version 0.09.8): two heading glyphs for the cards, drawn by hand: **policies**, a
 /// gavel on its block, and **orders**, a list of three ticked-off rows. Neither is a figure or
 /// a kind, so both wear the neutral fill.
-pub const DRAWN: [&str; 9] = ["station", "facility_school", "battle", "module_battery", "widgets", "missile_carrier", "facility_stadium", "policies", "orders"];
+/// Ticket #559 (version 0.1.0.3): the Wind Farm's glyph, a turbine -- a mast on its footing and
+/// three blades round the hub -- drawn by hand, so it owes no credit. game-icons.net's turbine was
+/// passed over on ticket #184's finding: at 16 pixels it is the Scrubber's computer fan exactly.
+pub const DRAWN: [&str; 10] = ["station", "facility_school", "battle", "module_battery", "widgets", "missile_carrier", "facility_stadium", "policies", "orders", "facility_wind_farm"];
 
 impl Credit {
     /// The file stem in `assets/icons/` this credit is for: the name, lower-cased, spaces to

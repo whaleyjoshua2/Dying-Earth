@@ -20,18 +20,21 @@ impl Game {
                 }
             }
         }
-        for c in &mut self.colonies {
+        // The review of #565: a Module dark for want of people stays dark through these clears,
+        // or it would run until the next Income.
+        let darks: Vec<Vec<usize>> = self.colonies.iter().map(|c| self.unmanned_modules(c)).collect();
+        for (c, dark) in self.colonies.iter_mut().zip(darks) {
             if c.grid_failed {
                 c.grid_failed = false;
-                for m in &mut c.modules {
-                    m.online = !m.mothballed;
-                    m.offline_cause = None;
+                for (i, m) in c.modules.iter_mut().enumerate() {
+                    m.online = !m.mothballed && !dark.contains(&i);
+                    m.offline_cause = if m.online || m.mothballed { None } else { Some(OfflineCause::Unmanned) };
                 }
             }
-            for m in c.modules.iter_mut().filter(|m| m.offline_until_resolution) {
+            for (i, m) in c.modules.iter_mut().enumerate().filter(|(_, m)| m.offline_until_resolution) {
                 m.offline_until_resolution = false;
-                m.online = !m.mothballed;
-                m.offline_cause = None;
+                m.online = !m.mothballed && !dark.contains(&i);
+                m.offline_cause = if m.online || m.mothballed { None } else { Some(OfflineCause::Unmanned) };
             }
         }
         // Ticket #371 (version 0.09.2): where every Region's Unrest stands as the Resolution opens,
@@ -92,8 +95,9 @@ impl Game {
     /// Ticket #370 (version 0.09.2): **the player's Colonists still aboard a Ship off Earth are
     /// reported while they wait** -- since ticket #431 (version 0.09.5) only on a turn the line
     /// changes -- one line a Body, under Ships, at the designer's word --
-    /// *"colonists wait aboard in low orbit of Mars"*, and *"blocked by rivals' control of the
-    /// orbit"* when a rival's Orbital Control shuts the ground or a blockade shuts the station they
+    /// *"colonists wait aboard in low orbit of Mars"*, and *"blocked: a rival warship blockades low
+    /// orbit"* (ticket #570, version 0.1.0.3; a rival's Orbital Control shut the ground before) when a
+    /// rival's Blockade of low orbit shuts the ground or a blockade shuts the station they
     /// are docked at. Any orbit off Earth counts; a Ship in transit does not, since nothing can be
     /// done about it yet. The player's own Ships only: a rival's waiting Colonists are not the
     /// player's business, and the Report was quieted a version ago. Runs after every landing this
@@ -137,8 +141,9 @@ impl Game {
                     self.phrase("waiting_many", &[("body", name), ("parts", parts.join(", "))])
                 }
             };
-            // A rival's Orbital Control shuts the ground below low orbit; a rival's Blockade shuts
-            // the station a Ship is docked at. Different things in the glossary, so different words.
+            // A rival's Blockade of low orbit shuts the ground below it (ticket #570, version 0.1.0.3;
+            // Orbital Control did before); a rival's Blockade of a ring shuts the station a Ship is
+            // docked at. Different places, so different words.
             let blocked = orbits
                 .iter()
                 .find_map(|o| match o {
@@ -1859,7 +1864,7 @@ impl Game {
         // Ticket #542 (version 0.1.0.1): each rival's spend on a place the player holds, summed, for
         // the lines written once the takings are settled.
         let mut on_yours: Vec<(Seat, Place, i64, i64)> = Vec::new();
-        for (seat, target, amount) in spent {
+        for (seat, target, amount, aimed) in spent {
             let own = self.place_control(target).controller() == Some(seat);
             // Ticket #187 (version 0.08.0): Resistance. An outsider's Influence buys less Standing at
             // a well-schooled place and more at a badly-schooled one; the controller converts in full.
@@ -1868,7 +1873,12 @@ impl Game {
             // and their view of you falls once for the turn however many orders you put in. A
             // NEUTRAL place is never an offence, however hotly contested: two Factions bidding for
             // empty ground are competing, not crossing each other.
-            if let Some(victim) = self.place_control(target).director()
+            // Ticket #569 (version 0.1.0.3), at the designer's word: the victim is whoever DIRECTED the
+            // place as the order was given -- the aim -- not whoever holds it as the spend settles. A
+            // neutral Region a partner took in the same Resolution broke an Accord with no warning
+            // possible at order time (the playtest, T13); a rival's place that passed to a partner
+            // offends the rival, whom the spend was aimed at.
+            if let Some(victim) = aimed
                 && victim != seat
             {
                 // Ticket #222: rung 1, once per place per turn.
@@ -2202,6 +2212,9 @@ impl Game {
                         self.state_mut(sid).facilities.remove(i);
                         self.seat_mut(change.seat).stockpile.materials = tenth(self.seat(change.seat).stockpile.materials + refund);
                     }
+                    // Ticket #559 (version 0.1.0.3): a Replace is never written here; it is a build
+                    // in the Region's queue and lands in `complete_build`.
+                    BuildingChange::Replace => {}
                 }
                 let where_ = self.tables.state(sid).name.clone();
                 lines.push(match change.what {
@@ -2263,6 +2276,8 @@ impl Game {
                         let st = &mut self.seat_mut(change.seat).stockpile;
                         st.materials = tenth(st.materials + refund);
                     }
+                    // Ticket #559: a Replace is refused on a Module.
+                    BuildingChange::Replace => {}
                 }
                 let where_ = self.place_name(Place::Colony(cid));
                 lines.push(match change.what {
@@ -2482,6 +2497,21 @@ impl Game {
             }
             (Place::State(s), BuildItem::IndustryLevel) => {
                 self.state_mut(s).industry_level += 1;
+            }
+            // Ticket #559 (version 0.1.0.3): the Power Plant flagged for it becomes the Wind Farm in
+            // its own slot, coastal or inland as it stood, working from this Resolution; the slot
+            // never stands empty. With no flagged Power Plant left (the sea or a capture took it) the
+            // build is lost, as a Facility with no slot left is.
+            (Place::State(s), BuildItem::Replace(k)) => {
+                let Some(i) = self.state(s).facilities.iter().position(|f| f.replacing && f.kind == FacilityKind::PowerPlant) else {
+                    let line = format!("{} at {} had no Power Plant left to replace and was lost.", name, self.place_name(place));
+                    self.log(line);
+                    let text = self.say("build_lost", &[("building", name.clone()), ("place", self.place_name(place))]);
+                    self.report_line_by(b.seat, LineKind::Note, Some(place.into()), text);
+                    return;
+                };
+                let coastal = self.state(s).facilities[i].coastal;
+                self.state_mut(s).facilities[i] = if coastal { Facility::in_coastal_slot(k) } else { Facility::new(k) };
             }
             // Ticket #490 (version 0.09.9): the place stands at its new tier.
             // Ticket #503 (version 0.1.0.0): unless it is the Colonial Capital and the Body already
@@ -2946,16 +2976,22 @@ impl Game {
                     // place -- low orbit for the ground, a station's own ring for the station. The
                     // gate said so when the order was given; it is read again here because the
                     // orbit changes and the Battles have run since.
-                    let barred = match into {
-                        UnloadTarget::Colony(cid) => !self.may_unload_into(seat, cid) || !self.colony(cid).map(|c| self.ship_may_touch(s, c)).unwrap_or(false),
-                        UnloadTarget::Slot(_, _) => !self.may_land(seat, body) || !self.ship_in_orbit(s, body, Orbit::Low),
+                    // Ticket #570 (version 0.1.0.3): one test for every target -- the orbit that
+                    // touches the place, blockaded against the seat, or the Ship not in it -- and the
+                    // line says which, in the door's own words, where it said "orbit contested".
+                    let orbit = match into {
+                        UnloadTarget::Colony(cid) => self.colony(cid).filter(|c| c.body == body).map(|c| self.colony_orbit(c)),
+                        UnloadTarget::Slot(_, _) => Some(Orbit::Low),
                         // Ticket #442 (version 0.09.6): a station founded from its own ring.
-                        UnloadTarget::Ring(_, n) => !self.ship_in_orbit(s, body, Orbit::Slot(n)) || self.slot_blockaded_against(seat, body, n),
+                        UnloadTarget::Ring(_, n) => Some(Orbit::Slot(n)),
                     };
-                    if barred {
-                        let line = format!("{} could not land at {}: the orbit is contested.", self.seat_name(seat), self.tables.body(body).name);
+                    let Some(orbit) = orbit else { continue };
+                    let shut = self.orbit_blockaded_against(seat, body, orbit);
+                    if shut || !self.ship_in_orbit(s, body, orbit) {
+                        let why = if shut { self.blockaded_words(body, orbit) } else { "the Ship is not in the orbit that touches it".to_string() };
+                        let line = format!("{} could not land at {}: {why}.", self.seat_name(seat), self.tables.body(body).name);
                         self.log(line);
-                        let text = self.say("landing_contested", &[("faction", self.seat_name(seat)), ("body", self.tables.body(body).name.clone())]);
+                        let text = self.say("landing_contested", &[("faction", self.seat_name(seat)), ("body", self.tables.body(body).name.clone()), ("why", why)]);
                         self.report_line(LineKind::Ship, Some(ReportPlace::Body(body)), text);
                         continue;
                     }
@@ -3469,7 +3505,8 @@ impl Game {
     }
 
     /// Ticket #533 (version 0.1.0.1): one Load carried out -- at the cargo step of the Resolution,
-    /// or at End Turn for a Ship that leaves this turn, whose lifts board before it moves.
+    /// or at End Turn for a Ship that leaves this turn, whose loads board before it moves (lifts;
+    /// since ticket #568, version 0.1.0.3, loads off a Colony or station too).
     pub(crate) fn carry_load(&mut self, seat: Seat, ship: ShipId, colonists: u32, from: LoadSource, army: Option<ArmyId>) {
         let Some(s) = self.ship(ship) else { return };
         let ShipAt::Body(body) = s.at else { return };

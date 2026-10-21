@@ -250,12 +250,14 @@ impl Game {
 
     /// Ticket #335 (version 0.09.0): whether this seat wants the GROUND of a Body -- a landing, a
     /// founding, a Bombard of a ground Colony, or simply denying a rival the surface it already
-    /// keeps a Colony on. What a seat that wants the ground wants is **Orbital Control of low
-    /// orbit**, since low orbit is the one orbit that touches the surface and the only one Control
-    /// is held in, so its warships go there and the contest its stance reads is low orbit's.
+    /// keeps a Colony on. What a seat that wants the ground wants is **low orbit**, the one orbit
+    /// that touches the surface: Orbital Control is held there, and since ticket #570 (version
+    /// 0.1.0.3) a Blockade there is what shuts the surface, so its warships go there and the
+    /// contest its stance reads is low orbit's.
     pub fn ai_wants_the_ground(&self, seat: Seat, body: BodyId) -> bool {
         // A Colony of its own on the surface to keep, or one a rival holds that it has cause
-        // against: either way the surface is the thing, and the surface is shut from low orbit.
+        // against: either way the surface is the thing, and the surface is shut from low orbit --
+        // by a Blockade there since ticket #570 (version 0.1.0.3), by Orbital Control before.
         let on_the_ground = self.colonies.iter().any(|c| {
             !c.in_orbit
                 && c.body == body
@@ -404,7 +406,7 @@ impl Game {
     /// Tech, and only the Lead's shortlist keeps a place for its gate, so a seat whose gate waits
     /// races for the Lead: from the turn its gate is open to research, or its first part stands at
     /// `gate_pick_fraction`, until the gate is researched. The race runs the harder the nearer its
-    /// Victory, at the Victory window's share (since version 0.1.0.2 the weighted mean of the two parts). Nought when not racing.
+    /// Victory, at the Victory window's share (since version 0.1.0.2 the weighted mean of the parts). Nought when not racing.
     pub fn ai_race_share(&self, seat: Seat) -> f64 {
         let Some(gate) = self.tables.victory_gate(self.kind(seat)) else { return 0.0 };
         if self.has_tech(gate) {
@@ -592,8 +594,9 @@ impl Game {
         }
         let first_ratio = match self.first_kind(seat) {
             // A Stabilization run has no useful interpolation: the pace is in ppm off the Sink.
+            // Ticket #578 (version 0.1.0.3): the net the run reads, cards and permafrost counted.
             VictoryFirstKind::StabilizationRun => {
-                let net = self.climate.last.counted() - self.climate.last.total_sink();
+                let net = self.climate.last.net();
                 if turn >= pace.under_sink_by_turn {
                     if net < 0.0 { 1.0 } else { (1.0 - net / 10.0).clamp(0.0, 1.0) }
                 } else if turn >= pace.within_by_turn {
@@ -743,7 +746,8 @@ impl Game {
         let facilities = self.directed_states(seat).iter().flat_map(|s| self.state(*s).facilities.iter()).filter(|f| f.kind.common().unwrap_or(f.kind) == *fk).count();
         let doubled = self.doubled_modules(seat).iter().filter(|(cid, i)| self.colony(*cid).and_then(|c| c.modules.get(*i)).map(|m| m.kind == mk).unwrap_or(false)).count();
         if facilities > doubled {
-            2.0
+            // Ticket #563 (version 0.1.0.3): the factor the rule applies, 2.08.
+            self.tables.faction(self.kind(seat)).production_moved_factor
         } else {
             1.0
         }
@@ -784,6 +788,14 @@ impl Game {
             .filter(|b| *b != BodyId::Earth && (!self.free_slots_on(*b).is_empty() || venus_open(*b)) && flight(*b) < turns_left && payable(*b))
             .collect();
         if bodies.is_empty() {
+            return BodyId::Moon;
+        }
+        // Ticket #564 (version 0.1.0.3), at the designer's word ("the race is for the Moon"): while
+        // the Moon is unclaimed with a free slot and the seat directs no ground Colony off Earth, its
+        // first Ship flies there, whatever the windfalls say. Measured before: the race weight alone
+        // built the Ship early and the windfalls sent it past the Moon, the Prospectors to Mars by
+        // turn 11, and they took 53 of 80 games.
+        if self.first_at(BodyId::Moon).is_none() && bodies.contains(&BodyId::Moon) && !self.colonies.iter().any(|c| c.control.director() == Some(seat) && !c.in_orbit && c.body != BodyId::Earth) {
             return BodyId::Moon;
         }
         // Ticket #51, the Arkwrights' spread rule: once one Body of theirs holds the 4 Colonists
@@ -842,7 +854,18 @@ impl Game {
         self.unit_upkeep(seat) as i64
             // Ticket #54: a mothballed building pays no upkeep, so it is no part of the drain.
             + self.directed_states(seat).iter().flat_map(|s| self.state(*s).facilities.iter()).filter(|f| !f.mothballed).map(|f| self.tables.facility(f.kind).energy_upkeep).sum::<i64>()
-            + self.directed_colonies(seat).iter().flat_map(|c| self.colony(*c).unwrap().modules.iter()).filter(|m| !m.mothballed).map(|m| self.tables.module(m.kind).energy_upkeep).sum::<i64>()
+            // The review of #565: the yield's figure, so a dark Module counts nothing, the Archive
+            // its 20 plus its uploaded, and an incomplete Archive nothing.
+            + self
+                .directed_colonies(seat)
+                .iter()
+                .map(|c| {
+                    let col = self.colony(*c).unwrap();
+                    let dark = self.unmanned_modules(col);
+                    col.modules.iter().enumerate().filter(|(i, m)| !m.mothballed && !dark.contains(i)).map(|(i, _)| self.module_yield_at(seat, *c, i).upkeep).sum::<f64>()
+                })
+                .sum::<f64>()
+                .round() as i64
     }
 
     /// Energy the seat's producers make in a turn, at current multipliers.
@@ -853,14 +876,20 @@ impl Game {
         for sid in self.directed_states(seat) {
             let lean = if self.tables.state(sid).resource_lean == Resource::Energy { 1.5 } else { 1.0 };
             for f in self.state(sid).facilities.iter().filter(|f| !f.mothballed) {
-                if f.kind.does_the_job_of(FacilityKind::PowerPlant) {
-                    e += (6.0 * lean * fac * grids).floor();
+                // Ticket #559 (version 0.1.0.3): the card's figure, so a Wind Farm counts its 3 beside a
+                // Power Plant's 6, where a flat 6 was counted for every Power Plant's job.
+                if let Some(p) = &self.tables.facility(f.kind).produces
+                    && p.resource == Resource::Energy
+                {
+                    e += (p.amount * lean * fac * grids).floor();
                 }
             }
         }
         for cid in self.directed_colonies(seat) {
             let col = self.colony(cid).unwrap();
-            for m in col.modules.iter().filter(|m| !m.mothballed) {
+            // The review of #565: a dark Generator makes nothing.
+            let dark = self.unmanned_modules(col);
+            for (_, m) in col.modules.iter().enumerate().filter(|(i, m)| !m.mothballed && !dark.contains(i)) {
                 if m.kind == ModuleKind::Generator {
                     // Ticket #57: the Colony's slot makes the Energy, not the Body's average.
                     e += (5.0 * self.colony_yields(col).generator * fac * grids).floor();
@@ -896,7 +925,12 @@ impl Game {
         let energy_ratio = if drain == 0 { f64::INFINITY } else { s.energy / (3.0 * drain as f64) };
         let materials_ratio = s.materials / need_materials;
         let has_ships = self.ships.iter().any(|x| x.seat == seat);
-        let fuel_ratio = if has_ships { s.fuel / 6.0 } else { f64::INFINITY };
+        // Ticket #575 (version 0.1.0.3): and the Fuel its power burns, three turns of it, kept as a
+        // reserve: what stands under the reserve counts for nothing, so a tank at the reserve reads
+        // as empty and Fuel is the scarcest resource.
+        let burn = self.fuel_burned_by_buildings(seat);
+        let reserve = self.fuel_reserve(seat);
+        let fuel_ratio = if has_ships || burn > 0.0 { (s.fuel - reserve).max(0.0) / (6.0 + 3.0 * burn) } else { f64::INFINITY };
         if energy_ratio <= materials_ratio && energy_ratio <= fuel_ratio {
             Resource::Energy
         } else if materials_ratio <= fuel_ratio {
@@ -1001,8 +1035,14 @@ impl Game {
 
     /// Spec 16.2: the Energy balance is within one turn's upkeep of zero.
     fn energy_tight(&self, seat: Seat) -> bool {
-        let drain = self.total_upkeep(seat) - self.energy_production(seat);
-        self.seat(seat).stockpile.energy - drain as f64 <= self.total_upkeep(seat) as f64
+        self.energy_tight_losing(seat, 0.0)
+    }
+
+    /// Ticket #559 (version 0.1.0.3): the same test with `lost` Energy a turn gone from the production
+    /// -- what a Power Plant replaced with a Wind Farm would stop making.
+    fn energy_tight_losing(&self, seat: Seat, lost: f64) -> bool {
+        let drain = self.total_upkeep(seat) as f64 - self.energy_production(seat) as f64 + lost;
+        self.seat(seat).stockpile.energy - drain <= self.total_upkeep(seat) as f64
     }
 
     /// Ticket #332 (version 0.09.0): the place and item a build order would queue, for the pace
@@ -1200,8 +1240,35 @@ impl Game {
             let col = self.colony(*c).unwrap();
             col.modules.iter().any(|m| m.kind == ModuleKind::Shipyard) || col.queue.iter().any(|b| b.item == BuildItem::Module(ModuleKind::Shipyard))
         });
-        let queued_power: i64 = self.states.iter().flat_map(|s| s.queue.iter()).filter(|b| b.seat == seat && matches!(b.item, BuildItem::Facility(k) if k.does_the_job_of(FacilityKind::PowerPlant))).count() as i64 * 6
-            + self.colonies.iter().flat_map(|c| c.queue.iter()).filter(|b| b.seat == seat && b.item == BuildItem::Module(ModuleKind::Generator)).count() as i64 * 5;
+        // Ticket #564 (version 0.1.0.3), at the designer's word: the race for the first Moon landing.
+        // While the seat holds no Colony Ship, built or on order, and the Moon is still unclaimed
+        // with a free slot, its Shipyard and Colony Ship are weighed at `moon_race_weight` times
+        // their base; the lift ends with the first Ship or the first landing. Measured before: the
+        // computer's first Moon landing came at median turn 15 to 32 against the human's 6 to 10;
+        // a race for any unclaimed Body sent the first Ships past the Moon (see `best_body_for`).
+        let moon_race = {
+            let has_colony_ship = self.ships.iter().any(|s| s.seat == seat && s.kind == UnitKind::ColonyShip) || self.queues_of(seat).any(|b| b.item == BuildItem::Unit(UnitKind::ColonyShip));
+            let unclaimed = self.first_at(BodyId::Moon).is_none() && !self.free_slots_on(BodyId::Moon).is_empty();
+            if !has_colony_ship && unclaimed { th.moon_race_weight } else { 1.0 }
+        };
+        // Ticket #559 (version 0.1.0.3): each build's own card figure, where a flat 6 was counted
+        // for every Power Plant's job, so a Wind Farm on order counts its 3 and a Replace under way
+        // trades the Power Plant's figure for the Wind Farm's.
+        let energy_of = |k: FacilityKind| self.tables.facility(k).produces.as_ref().filter(|p| p.resource == Resource::Energy).map_or(0.0, |p| p.amount);
+        let generator = self.tables.module(ModuleKind::Generator).produces.as_ref().map_or(0.0, |p| p.amount);
+        let queued_power: i64 = (self
+            .states
+            .iter()
+            .flat_map(|s| s.queue.iter())
+            .filter(|b| b.seat == seat)
+            .map(|b| match b.item {
+                BuildItem::Facility(k) => energy_of(k),
+                BuildItem::Replace(k) => energy_of(k) - energy_of(FacilityKind::PowerPlant),
+                _ => 0.0,
+            })
+            .sum::<f64>()
+            + self.colonies.iter().flat_map(|c| c.queue.iter()).filter(|b| b.seat == seat && b.item == BuildItem::Module(ModuleKind::Generator)).count() as f64 * generator)
+            .floor() as i64;
         let energy_short = self.energy_production(seat) + queued_power < self.total_upkeep(seat) + 2;
         // Bootstrap needs: a producer of one of these counts as advancing whatever the seat is behind on.
         // The merely scarcest resource only gets the within-category preference.
@@ -1451,10 +1518,27 @@ impl Game {
                     if job == FacilityKind::Factory && self.state(sid).queue.len() < th.factory_module_queue_depth {
                         continue;
                     }
+                    // Ticket #559 (version 0.1.0.3): once Clean Power stands the Wind Farm takes the
+                    // Power Plant's place on the list, unless Energy is tight, when the Power Plant's 6
+                    // is wanted and the Wind Farm's 3 is not. The Archivists' first Reactor is still a
+                    // Reactor -- its clause is the upkeep cut, which no Wind Farm gives -- and a second
+                    // is an ordinary power station, so it gives way as the Power Plant does.
+                    if job == FacilityKind::PowerPlant && self.has_tech(TechId::CleanPower) && !tight {
+                        let first_reactor = fk == FacilityKind::Reactor
+                            && !self.directed_states(seat).iter().any(|s| self.state(*s).facilities.iter().any(|f| f.kind == FacilityKind::Reactor))
+                            && !self.states.iter().flat_map(|s| s.queue.iter()).any(|b| b.seat == seat && b.item == BuildItem::Facility(FacilityKind::Reactor));
+                        if !first_reactor {
+                            continue;
+                        }
+                    }
+                    if job == FacilityKind::WindFarm && tight {
+                        continue;
+                    }
                     let (cat, mut base) = match job {
                         // Ticket #332 (version 0.09.0): the Mine is a producer as the Factory was;
                         // the Factory, making Widgets now, keeps its arm behind the queue test above.
-                        FacilityKind::Factory | FacilityKind::Mine | FacilityKind::PowerPlant | FacilityKind::Refinery | FacilityKind::Bank => (Cat::Producer, self.base_weight(seat, Cat::Producer)),
+                        // Ticket #559 (version 0.1.0.3): and the Wind Farm, an Energy producer.
+                        FacilityKind::Factory | FacilityKind::Mine | FacilityKind::PowerPlant | FacilityKind::WindFarm | FacilityKind::Refinery | FacilityKind::Bank => (Cat::Producer, self.base_weight(seat, Cat::Producer)),
                         FacilityKind::ResearchLab => (Cat::ResearchLab, self.base_weight(seat, Cat::ResearchLab)),
                         // Ticket #185 (version 0.08.0): the School is a Research building in all but
                         // name, so it is weighed as one. Ticket #416 (version 0.09.4): every Region
@@ -1576,10 +1660,13 @@ impl Game {
             // Ticket #54: a Scrubber takes no build slot, so it is offered whether or not one is
             // free, up to the state's cap, and only while the seat's Energy is not already tight:
             // 4 Energy upkeep with nothing to run it is a Facility shut down at the next Income.
+            // Ticket #561 (version 0.1.0.3): and only while last turn's Ducat income covers one
+            // more Scrubber's Ducat upkeep, so a seat short of Ducats builds fewer.
             if kind == FactionKind::Custodians
                 && self.state(sid).control == Control::Controlled(seat)
                 && self.scrubbers_committed(sid) < self.scrubber_cap(sid)
                 && !tight
+                && self.seat(seat).income_last_turn.ducats >= self.tables.facility(FacilityKind::Scrubber).ducats_upkeep
             {
                 let cat = Cat::Scrubber;
                 let opp = if self.scrubbers_online(sid) == 0 { m.opportunity } else { 1.0 };
@@ -1740,6 +1827,8 @@ impl Game {
                     // Ticket #89: a Solar Array is an Energy producer; the Energy-shortage bonus below
                     // is what makes the AI raise one when the Stockpile is within a turn of nothing.
                     ModuleKind::SolarArray => (Cat::Producer, self.base_weight(seat, Cat::Producer)),
+                    // Ticket #559 (version 0.1.0.3): the Wind Farm Module, an Energy producer on Mars.
+                    ModuleKind::WindFarm => (Cat::Producer, self.base_weight(seat, Cat::Producer)),
                     // Ticket #80: an Observatory once the Colony holds enough Colonists to make it worth
                     // its keep (`observatory_colonists`), at the Research Lab's weight.
                     // Ticket #185 (version 0.08.0): an Institute multiplies an Observatory exactly as
@@ -1871,7 +1960,7 @@ impl Game {
                             continue;
                         }
                         // Ticket #398 (version 0.09.3): sought where Build Where You Dig reaches its Ships.
-                        (Cat::LaunchSiteOrShipyard, self.base_weight(seat, Cat::LaunchSiteOrShipyard) * self.ai_shipyard_bonus(cid))
+                        (Cat::LaunchSiteOrShipyard, self.base_weight(seat, Cat::LaunchSiteOrShipyard) * self.ai_shipyard_bonus(cid) * moon_race)
                     }
                     ModuleKind::Barracks => {
                         if col.modules.iter().any(|m| m.kind == ModuleKind::Barracks) {
@@ -2069,11 +2158,13 @@ impl Game {
                 let build = Order::BuildShip { site: Place::Colony(cid), kind: uk };
                 // Ticket #455 (version 0.09.6): every Ship, a warship included, where the Colony Ship alone
                 // was planned for and a warship short of its tank was refused for want of Fuel.
-                let orders = match self.ai_fuel_top_up(seat, self.tank_of(seat, uk)) {
+                let orders = match self.ai_fuel_top_up(seat, self.tank_of(seat, uk) + self.fuel_reserve(seat)) {
                     Some(buy) => vec![buy, build],
                     None => vec![build],
                 };
-                push(orders, cat, self.base_weight(seat, cat), gap_for(cat, None), lift, if cat == Cat::Warship { fleet_opp } else { 1.0 }, format!("build {} at {}", uk.name(), self.place_name(Place::Colony(cid))), None);
+                // Ticket #564 (version 0.1.0.3): the Colony Ship at the race weight while it stands.
+                let race = if cat == Cat::ColonyShip { moon_race } else { 1.0 };
+                push(orders, cat, self.base_weight(seat, cat) * race, gap_for(cat, None), lift, if cat == Cat::Warship { fleet_opp } else { 1.0 }, format!("build {} at {}", uk.name(), self.place_name(Place::Colony(cid))), None);
             }
         }
 
@@ -2090,18 +2181,18 @@ impl Game {
             let needed = self.influence_needed_for(seat, *target);
             let base = self.base_weight(seat, Cat::Influence) * (1.0 - 0.15 * rank as f64).max(0.3);
             let opp = if needed - have <= step { m.opportunity } else { 1.0 };
-            let bought = if self.tables.ducats.per_influence > 0 { (self.seat(seat).stockpile.ducats / self.tables.ducats.per_influence as f64).floor() as i64 } else { 0 };
+            let bought = if self.tables.ducats.per_influence > 0.0 { (self.seat(seat).stockpile.ducats / self.tables.ducats.per_influence).floor() as i64 } else { 0 };
             let copies = ((allotment + bought) / step).max(0);
             for _ in 0..copies {
-                push(vec![Order::Influence { target: *target, amount: step }], Cat::Influence, base, 1.0, 1.0, opp, format!("spend {} Influence on {}", step, self.place_name(*target)), None);
+                push(vec![Order::Influence { target: *target, amount: step, break_accord: false }], Cat::Influence, base, 1.0, 1.0, opp, format!("spend {} Influence on {}", step, self.place_name(*target)), None);
             }
         }
         // Buy Influence with Ducats (ticket #35), in units of the step, weighted like Influence itself.
         let ducats = self.seat(seat).stockpile.ducats;
         let per = self.tables.ducats.per_influence;
-        let buys = if per > 0 { (ducats / (per * step) as f64).floor() as i64 } else { 0 };
+        let buys = if per > 0.0 { (ducats / (per * step as f64)).floor() as i64 } else { 0 };
         for _ in 0..buys {
-            push(vec![Order::BuyInfluence { amount: step }], Cat::Influence, self.base_weight(seat, Cat::Influence) * 0.9, 1.0, 1.0, 1.0, format!("buy {} Influence for {} Ducats", step, per * step), None);
+            push(vec![Order::BuyInfluence { amount: step }], Cat::Influence, self.base_weight(seat, Cat::Influence) * 0.9, 1.0, 1.0, 1.0, format!("buy {} Influence for {} Ducats", step, per * step as f64), None);
         }
         // Ticket #42: the trading window. While Materials are the scarcest resource (or the bootstrap
         // need), Ducats buy them in lots of 10 at a producer's weight; it sells, since ticket
@@ -2109,6 +2200,20 @@ impl Game {
         // Ticket #448 (version 0.09.6): **Energy**, where the seat would be short at Income -- the
         // shortfall that shuts its buildings -- bought ahead of the spending, at a producer's weight
         // and the opportunity multiplier, since a building switched off pays for nothing.
+        // Ticket #575 (version 0.1.0.3), at the designer's word: **the power reserve**, bought ahead
+        // of everything else when the tank stands under it, at the Energy buy's weight and the
+        // opportunity multiplier, since power at a quarter shuts the rest at the next Income.
+        {
+            let s = self.seat(seat);
+            let power_reserve = self.fuel_reserve(seat);
+            // The review of #575: a Ship's top-up buys the reserve beside its want, so while one is
+            // on offer this buy stands down, or the two would buy the same Fuel twice.
+            let top_up_on_offer = self.ships.iter().any(|sh| sh.seat == seat && matches!(sh.at, ShipAt::Body(_)) && sh.fuel < self.tank_of(seat, sh.kind) && self.ai_fuel_top_up(seat, self.tank_of(seat, sh.kind) - sh.fuel + power_reserve).is_some());
+            if s.stockpile.fuel < power_reserve && !top_up_on_offer {
+                let n = (power_reserve - s.stockpile.fuel).ceil() as i64;
+                push(vec![Order::Buy { resource: Resource::Fuel, amount: n }], Cat::Producer, self.base_weight(seat, Cat::Producer) * 1.5, 1.0, 1.0, m.opportunity, format!("buy {n} Fuel for the power reserve ({power_reserve:.1})"), None);
+            }
+        }
         {
             let s = self.seat(seat);
             let short = s.stockpile.energy + s.income_last_turn.energy;
@@ -2138,7 +2243,7 @@ impl Game {
         // threshold, nor count the decay), and measured by the sweep on the ticket.
         let mut owned: Vec<Place> = self.controlled_states(seat).into_iter().map(Place::State).collect();
         owned.extend(self.colonies.iter().filter(|c| c.control.controller() == Some(seat)).map(|c| Place::Colony(c.id)));
-        let bought_steps = if per > 0 { (ducats / per as f64).floor() as i64 } else { 0 };
+        let bought_steps = if per > 0.0 { (ducats / per).floor() as i64 } else { 0 };
         for place in owned {
             let rival = self.rival_standing(seat, place);
             let mine = self.seat(seat).influence.get(&place).copied().unwrap_or(0);
@@ -2151,7 +2256,7 @@ impl Game {
                 let copies = ((need + step - 1) / step).clamp(1, can);
                 let opp = if rival + step >= mine { m.opportunity } else { 1.0 };
                 for _ in 0..copies {
-                    push(vec![Order::Influence { target: place, amount: step }], Cat::Influence, self.base_weight(seat, Cat::Influence), 1.0, m.threat, opp, format!("hold {} with {} Influence", self.place_name(place), step), None);
+                    push(vec![Order::Influence { target: place, amount: step, break_accord: false }], Cat::Influence, self.base_weight(seat, Cat::Influence), 1.0, m.threat, opp, format!("hold {} with {} Influence", self.place_name(place), step), None);
                 }
             }
         }
@@ -2367,7 +2472,9 @@ impl Game {
                 let here = self.colony(cid).map(|c| c.colonists).unwrap_or(0);
                 let bar = self.tables.faction(kind).victory_second.bar as u32;
                 let still_wanted = bar.saturating_sub(self.seat(seat).uploaded);
-                let n = here.min(still_wanted);
+                // Ticket #565 (version 0.1.0.3): four a turn at most; what goes dark at the site is
+                // accepted, at the designer's word -- an uploaded Colonist cannot be lost.
+                let n = here.min(still_wanted).min(self.tables.archive.upload_per_turn);
                 if n > 0 {
                     let opp = if self.seat(seat).uploaded + n >= bar { m.opportunity } else { 1.0 };
                     push(
@@ -2606,6 +2713,8 @@ impl Game {
         // Ticket #496 (version 0.09.9): **a Trade**, at most one a turn: where a Stockpile good is
         // short and another long, ask the short one of the Faction this seat stands best with, giving
         // as much of the long one as it is worth at the Trading window's prices. Never a place.
+        // Ticket #572 (version 0.1.0.3): and never the same two goods again to a Faction whose last
+        // refusal was of them, the cooldown over or not, until a Trade of other goods is refused.
         {
             let th = &self.tables.ai.thresholds;
             let s = self.seat(seat).stockpile;
@@ -2616,6 +2725,7 @@ impl Game {
             let partner = Seat::ALL
                 .into_iter()
                 .filter(|o| *o != seat && !self.hostile(seat, *o) && !self.offer_waits(seat, *o) && !self.refused_recently(seat, *o) && self.ai_gang_pressure(seat, *o) == 0.0)
+                .filter(|o| !matches!((short, long), (Some(s), Some(l)) if self.trade_refused_before(seat, *o, l, s)))
                 .max_by_key(|o| self.relations_score(seat, *o));
             if let (Some(short), Some(long), Some(other)) = (short, long, partner) {
                 let ask = th.trade_ask;
@@ -2637,9 +2747,9 @@ impl Game {
         }
         // --- Ticket #54: Mothball, Restart and Decommission.
         // A mothball answers an Energy shortfall a turn ahead: the highest-upkeep building that
-        // produces nothing is the one to shut. A Custodian behind on Stabilization with Scrubbers
-        // standing and a run of nothing mothballs its dirtiest Facility instead, since its own
-        // industry is what is keeping the net above the Sink.
+        // produces nothing is the one to shut. A Custodian with Scrubbers standing, a run of nothing
+        // and the net within a building's reach of the Sink mothballs its dirtiest Facility instead,
+        // since then its own industry is what is keeping the net above the Sink (ticket #576).
         {
             let upkeep_of = |b: &BuildingRef| -> f64 {
                 match b {
@@ -2691,11 +2801,21 @@ impl Game {
                 );
             }
             // The Custodians' other reason to mothball: a Stabilization run that will not start.
+            // Ticket #576 (version 0.1.0.3), at the designer's word: only where shutting the building
+            // could start it -- the world's net over the Sink no more than the building's own
+            // Emissions and the pace's `within_ppm`. Measured from East Asia, a Scrubber standing
+            // from turn 1 had this reason shut the Refinery on turn 2, the Power Plant on turn 3 and
+            // the Mine on turn 4, for 1.1 and 0.6 ppm against a world 32 over the Sink: Fuel income
+            // nought from turn 4, Energy at nought by turn 12, and the Colony Ship never paid.
             let scrubbers_stand = self.controlled_states(seat).iter().any(|s| self.scrubbers_online(*s) > 0);
+            // The review: the last Climate phase's net, as `victory_gap` reads it; `over`, since
+            // `gap` is the Victory multiplier in this scope.
+            let over = self.climate.last.net();
+            let within = self.tables.ai_pace(kind).within_ppm;
             if kind == FactionKind::Custodians && self.seat(seat).stabilization_run == 0 && scrubbers_stand {
                 let dirtiest = standing
                     .iter()
-                    .filter(|(_, _, moth, _, em)| !*moth && *em > 0.0)
+                    .filter(|(_, _, moth, _, em)| !*moth && *em > 0.0 && over <= *em + within)
                     .max_by(|a, b| a.4.partial_cmp(&b.4).unwrap_or(std::cmp::Ordering::Equal));
                 if let Some((b, name, _, _, em)) = dirtiest {
                     push(
@@ -2719,6 +2839,11 @@ impl Game {
             // is idled, kept idle and counted as the Power Plant the rule treats it as.
             let job = |k: FacilityKind| k.common().unwrap_or(k);
             let mut in_use: Vec<FacilityKind> = Vec::new();
+            // Ticket #563 (version 0.1.0.3), at the designer's word: the factor the rule applies, and
+            // what a point of Emissions leaving Earth is worth to the run -- the table's figure times
+            // the Stabilization gap multiplier, 1 on pace and up to 3 behind.
+            let factor = self.tables.faction(kind).production_moved_factor;
+            let worth = self.tables.ai.thresholds.production_moved_emission_worth * self.victory_gap(seat).0;
             for (fk, mk) in pairs {
                 let idle = self.directed_states(seat).iter().flat_map(|s| self.state(*s).facilities.iter()).filter(|f| job(f.kind) == *fk && f.mothballed).count();
                 let paired = doubled.iter().filter(|(cid, i)| self.colony(*cid).and_then(|c| c.modules.get(*i)).map(|m| m.kind == *mk).unwrap_or(false)).count();
@@ -2749,15 +2874,19 @@ impl Game {
                         let out = y.amount.max(y.research as f64);
                         // The 0.06.0 AI sweep (ticket #94): an even trade is a win for the Custodians,
                         // since the idled Facility's Emissions leave Earth with the output.
-                        if out <= best {
+                        // Ticket #563 (version 0.1.0.3): the trade weighed whole -- the Module's lift
+                        // (its output times the factor less one) plus the Emissions' worth, against
+                        // the Facility's output; the dirtiest per output weighed first.
+                        let gain = best * (factor - 1.0) + y.emissions * worth;
+                        if gain + 1e-9 >= out {
                             push(
                                 vec![Order::Change { building: BuildingRef::Facility(sid, i), what: BuildingChange::Mothball }],
                                 Cat::Mothball,
-                                self.base_weight(seat, Cat::Mothball) * self.ai_mothball_price(BuildingRef::Facility(sid, i)),
+                                self.base_weight(seat, Cat::Mothball) * self.ai_mothball_price(BuildingRef::Facility(sid, i)) * (1.0 + y.emissions / out.max(0.1)),
                                 1.0,
                                 1.0,
                                 m.opportunity,
-                                format!("mothball the {} in {} (a {} off Earth making {} would double)", f.kind.name(), self.tables.state(sid).name, mk.name(), figure(best)),
+                                format!("mothball the {} in {} (a {} off Earth making {} would make {}; {:.2} Emissions leave Earth, worth {})", f.kind.name(), self.tables.state(sid).name, mk.name(), figure(best), figure(tenth(best * factor)), y.emissions, figure(y.emissions * worth)),
                                 None,
                             );
                         }
@@ -2802,6 +2931,38 @@ impl Game {
                         format!("decommission the mothballed {} in {} for its slot", name, self.tables.state(*sid).name),
                         None,
                     );
+                }
+            }
+        }
+
+        // --- Ticket #559 (version 0.1.0.3): Replace a Power Plant with a Wind Farm, where the seat's
+        // Blame share stands above the fair quarter and its Energy is not short -- not tight now, and
+        // not tight once the Power Plant's figure is traded for the Wind Farm's. Weighed as a Greenwash
+        // is, by how far above the quarter the share stands, on the Producer's base; one Region a
+        // turn at most, the first standing Power Plant in each. A Reactor is never offered:
+        // `check_change` refuses it, and the Reactor's clause is worth more than its smoke.
+        // The review of #559: one Replace in flight at a time, anywhere, since each is guarded
+        // against its own 3 Energy alone and three ordered at once would land 9 short.
+        let replace_in_flight = self.states.iter().any(|s| s.queue.iter().any(|b| b.seat == seat && matches!(b.item, BuildItem::Replace(_))));
+        if self.has_tech(TechId::CleanPower) && !tight && !replace_in_flight {
+            let fair = self.tables.influence.blame.fair_share;
+            let over = self.blame_share(seat) - fair;
+            let lost = energy_of(FacilityKind::PowerPlant) - energy_of(FacilityKind::WindFarm);
+            if over > 0.0 && !self.energy_tight_losing(seat, lost) {
+                // The first standing Power Plant of the first Region that has one: one candidate.
+                if let Some((sid, i)) = self.directed_states(seat).into_iter().find_map(|sid| self.state(sid).facilities.iter().position(|f| f.kind == FacilityKind::PowerPlant && !f.mothballed && !f.changing()).map(|i| (sid, i))) {
+                    {
+                        push(
+                            vec![Order::Change { building: BuildingRef::Facility(sid, i), what: BuildingChange::Replace }],
+                            Cat::Producer,
+                            self.base_weight(seat, Cat::Producer) * (1.0 + over / fair),
+                            1.0,
+                            1.0,
+                            1.0,
+                            format!("replace the Power Plant in {} with a Wind Farm (share {:.2})", self.tables.state(sid).name, self.blame_share(seat)),
+                            None,
+                        );
+                    }
                 }
             }
         }
@@ -2965,7 +3126,10 @@ impl Game {
             // Ticket #421 (version 0.09.4): short of the Fuel to fill it, the seat buys the rest, in
             // the same candidate. The plain Refuel from what is held stays on offer beside it, so a
             // turn whose Ducats are held for something else still fills what it can.
-            let top_up = self.ai_fuel_top_up(seat, self.tank_of(seat, s.kind) - s.fuel);
+            // Ticket #575 (version 0.1.0.3): the tank is filled from what stands above the power
+            // reserve, and the top-up buys the reserve back too.
+            let fuel_reserve = self.fuel_reserve(seat);
+            let top_up = self.ai_fuel_top_up(seat, self.tank_of(seat, s.kind) - s.fuel + fuel_reserve);
             // Ticket #533 (version 0.1.0.1): a refuel never uses the Ship's turn, so a ready Missile
             // Carrier fills its tank beside its Launch; only the orbit change below still waits on it.
             if s.fuel < self.tank_of(seat, s.kind) && self.refuelling_station(seat, body, orbit) {
@@ -2973,7 +3137,9 @@ impl Game {
                 if let Some(buy) = top_up {
                     push(vec![buy, Order::Refuel { ship: s.id }], Cat::Transit, self.base_weight(seat, Cat::Transit), gap_for(Cat::Transit, None), 1.0, 1.0, format!("{note}, buying the rest"), None);
                 }
-                if self.seat(seat).stockpile.fuel > 0.0 {
+                // The review of #575: a Refuel takes what the tank wants down to nought, so the plain
+                // one is offered only when the whole want stands above the reserve.
+                if self.seat(seat).stockpile.fuel - fuel_reserve >= self.tank_of(seat, s.kind) - s.fuel {
                     push(vec![Order::Refuel { ship: s.id }], Cat::Transit, self.base_weight(seat, Cat::Transit), gap_for(Cat::Transit, None), 1.0, 1.0, note, None);
                 }
             }
@@ -3379,11 +3545,15 @@ impl Game {
             // Ticket #355 (version 0.09.1): a Blockade, where one applies, IS the stance, on
             // #284's reading for the Attack. Offered beside Hold it lost every time: over twenty
             // games 33 warship-turns sat at a rival's ring with cause and every one held.
+            // Ticket #570 (version 0.1.0.3), at the designer's word: and in LOW ORBIT, against a
+            // rival's ground Colony below, with cause and no Battery of its holder's there -- a
+            // Blockade of low orbit is what shuts the ground now, where Control on any stance did,
+            // and the computer never ordered one there before.
             let blockade = if attack.is_none() {
-                stack
-                    .iter()
-                    .filter(|s| s.kind.is_warship())
-                    .find_map(|s| self.station_at(body, s.slot?).filter(|c| self.rival_holds(seat, c) && c.control.director().is_some_and(|h| self.has_cause(seat, h) && self.batteries_at(h, body, Orbit::Slot(c.slot)).is_empty())))
+                stack.iter().filter(|s| s.kind.is_warship()).find_map(|s| match s.slot {
+                    Some(slot) => self.station_at(body, slot).filter(|c| self.rival_holds(seat, c) && c.control.director().is_some_and(|h| self.has_cause(seat, h) && self.batteries_at(h, body, Orbit::Slot(c.slot)).is_empty())),
+                    None => self.colonies.iter().find(|c| c.body == body && !c.in_orbit && self.rival_holds(seat, c) && c.control.director().is_some_and(|h| self.has_cause(seat, h) && self.batteries_at(h, body, Orbit::Low).is_empty())),
+                })
             } else {
                 None
             };
@@ -3842,8 +4012,20 @@ impl Game {
                 }
             }
             let tanks: f64 = self.ships.iter().filter(|s| s.seat == seat).map(|s| (self.tank_of(seat, s.kind) - s.fuel).max(0.0)).sum();
-            let keep = tanks + th.market_fuel_reserve;
+            // Ticket #575 (version 0.1.0.3): and the power reserve, kept and bought back when short.
+            let power_reserve = self.fuel_reserve(seat);
+            let keep = tanks + th.market_fuel_reserve + power_reserve;
             let left = self.remaining(seat, &chosen).0;
+            let mut bought_f = bought_f;
+            if left.fuel < power_reserve && !bought_f {
+                let short = (power_reserve - left.fuel).ceil() as i64;
+                let buy = Order::Buy { resource: Resource::Fuel, amount: short };
+                if self.order_cost(seat, &buy).ducats <= left.ducats && self.check_order(seat, &chosen, &buy).is_ok() {
+                    lines.push(format!("  take          buy {short} Fuel for the power reserve ({power_reserve:.1})"));
+                    chosen.push(buy);
+                    bought_f = true;
+                }
+            }
             let surplus = (left.fuel - keep).floor() as i64;
             // Not while Fuel is held for the Mars window (ticket #57): a sale is a spend.
             if surplus > 0 && self.market_price_at(1) >= self.market_base(1) && !self.window_within(2) && !bought_f {
@@ -3896,6 +4078,9 @@ impl Game {
         // or a Launch at a place that partner directs -- is dropped. Measured before: computer seats
         // struck Accords and broke them the same turn by spending Influence on the partner's Regions,
         // which players read as an Accord accepted and never struck.
+        // Ticket #569 (version 0.1.0.3): an Influence spend that crosses is refused at `check_order`
+        // above, before it takes the Influence budget, so the next candidate gets the Influence it
+        // used to waste; measured 19 / 49 / 4 / 8 from 9 / 59 / 5 / 7. The other five are dropped here.
         chosen.retain(|o| self.order_crosses(seat, o).is_none());
         // Ticket #58: the scored list is the AI's own head, so it stays in the log. What the Report
         // shows is built from the orders this seat actually commits, in `end_turn`.

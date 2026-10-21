@@ -30,6 +30,12 @@ struct Producer {
     name: &'static str,
     is_module: bool,
     upkeep: f64,
+    /// Ticket #561: Ducats a turn while online.
+    ducats_upkeep: f64,
+    /// Ticket #575: Fuel a turn while online, and whether the stockpile covered it when the
+    /// producers were gathered; unpaid, the output above is already a quarter.
+    fuel_upkeep: f64,
+    fuel_paid: bool,
     output: Option<(Resource, f64)>,
     /// Materials or Fuel from a Mine, Refinery or Factory count toward the Extraction Total.
     research: i64,
@@ -49,6 +55,10 @@ pub struct Yield {
     pub research: i64,
     /// Ticket #387: Energy upkeep, to a tenth once a multiplier has touched it.
     pub upkeep: f64,
+    /// Ticket #561 (version 0.1.0.3): Ducats a turn while online, the Scrubber's 1; nought else.
+    pub ducats_upkeep: f64,
+    /// Ticket #575 (version 0.1.0.3): Fuel a turn while online, the power buildings' 0.8.
+    pub fuel_upkeep: f64,
     pub emissions: f64,
     /// Ticket #36: Influence Allotment added while it stands, and standing raised each turn.
     pub allotment: i64,
@@ -56,6 +66,9 @@ pub struct Yield {
     /// Ticket #82 (version 0.06.0): the Facility on Earth whose mothball doubles this Module, if
     /// one does (the Custodians' signature).
     pub doubled_by: Option<&'static str>,
+    /// Ticket #563 (version 0.1.0.3): the factor Production Moved applied, 2.08 on the Custodians'
+    /// card; 1 where nothing did.
+    pub doubled_factor: f64,
     /// Ticket #90 (version 0.06.0): how the figure was reached, for the card ("2 x 12 Colonists +
     /// Earth 3 + Moon 3.5" since ticket #397), when a Module's arithmetic is worth showing.
     pub detail: Option<String>,
@@ -241,7 +254,7 @@ impl Yield {
         }
         // Ticket #82: the Custodians' Production Moved.
         if let Some(f) = self.doubled_by {
-            parts.push(format!("doubled by an idle {f} on Earth"));
+            parts.push(format!("x{} for an idle {f} on Earth", self.doubled_factor));
         }
         // Ticket #280 (version 0.08.5): what it does, in the data's words.
         if let Some(d) = &self.does {
@@ -259,6 +272,12 @@ impl Yield {
         }
         if self.upkeep > 0.0 {
             parts.push(format!("{} Energy upkeep", figure(self.upkeep)));
+        }
+        if self.ducats_upkeep > 0.0 {
+            parts.push(crate::counted(figure(self.ducats_upkeep), "Ducat upkeep", "Ducats upkeep"));
+        }
+        if self.fuel_upkeep > 0.0 {
+            parts.push(format!("{} Fuel upkeep", figure(self.fuel_upkeep)));
         }
         if self.emissions > 0.0 {
             parts.push(format!("{:.1} Emissions", self.emissions));
@@ -520,7 +539,7 @@ impl Game {
         let fac = t.faction(self.kind(seat));
         let card = t.state(sid);
         let fc = t.facility(kind);
-        let mut y = Yield { resource: None, amount: 0.0, research: 0, upkeep: fc.energy_upkeep as f64, emissions: 0.0, allotment: fc.influence_allotment, standing: fc.standing_per_turn, doubled_by: None, detail: None, does: fc.does.clone(), chain: Chain::default(), allotment_outside: 0 };
+        let mut y = Yield { resource: None, amount: 0.0, research: 0, upkeep: fc.energy_upkeep as f64, ducats_upkeep: fc.ducats_upkeep, fuel_upkeep: fc.fuel_upkeep, emissions: 0.0, allotment: fc.influence_allotment, standing: fc.standing_per_turn, doubled_by: None, doubled_factor: 1.0, detail: None, does: fc.does.clone(), chain: Chain::default(), allotment_outside: 0 };
         if let Some(p) = &fc.produces {
             match p.resource {
                 Resource::Research => {
@@ -621,7 +640,8 @@ impl Game {
         let t = &self.tables;
         let fac = t.faction(self.kind(seat));
         let mc = t.module(kind);
-        let mut y = Yield { resource: None, amount: 0.0, research: 0, upkeep: mc.energy_upkeep as f64, emissions: 0.0, allotment: mc.influence_allotment, standing: mc.standing_per_turn, doubled_by: None, detail: None, does: mc.does.clone(), chain: Chain::default(), allotment_outside: 0 };
+        // Ticket #559 (version 0.1.0.3): a Module's Ducat upkeep (the Wind Farm's), as a Facility's.
+        let mut y = Yield { resource: None, amount: 0.0, research: 0, upkeep: mc.energy_upkeep as f64, ducats_upkeep: mc.ducats_upkeep, fuel_upkeep: mc.fuel_upkeep, emissions: 0.0, allotment: mc.influence_allotment, standing: mc.standing_per_turn, doubled_by: None, doubled_factor: 1.0, detail: None, does: mc.does.clone(), chain: Chain::default(), allotment_outside: 0 };
         // Ticket #239 (version 0.08.3): a Unique Module does its sibling's job, so every lookup
         // keyed by kind -- the Techs that multiply it, the slot's yield, a Discovery on it --
         // reads the COMMON kind. Without this the Arkwrights' Chorus would be the one Relay in
@@ -778,7 +798,13 @@ impl Game {
         // standing with its Research paid in full. Until then it costs nothing to run.
         if kind == ModuleKind::Archive {
             let complete = self.seat(seat).archive_fund >= t.archive.research;
-            y.upkeep = if complete { mc.energy_upkeep as f64 } else { 0.0 };
+            // Ticket #565 (version 0.1.0.3), at the designer's word: and one more for each Colonist
+            // uploaded, so a full Archive of 16 draws 20 + 16.
+            let uploaded = self.seat(seat).uploaded as f64;
+            y.upkeep = if complete { mc.energy_upkeep as f64 + t.archive.energy_per_uploaded * uploaded } else { 0.0 };
+            if complete && uploaded > 0.0 {
+                y.detail = Some(format!("{} + {} uploaded", mc.energy_upkeep, figure(t.archive.energy_per_uploaded * uploaded)));
+            }
         }
         // Ticket #387 (version 0.09.3): to the tenth, where it was floored.
         y.upkeep = tenth(y.upkeep * self.tech_multiplier(seat, TechId::ClosedLoopColonies));
@@ -826,16 +852,31 @@ impl Game {
     /// `doubled_modules`, named for the Facility whose mothball pays for it.
     pub fn module_yield_at(&self, seat: Seat, cid: ColonyId, index: usize) -> Yield {
         let Some(kind) = self.colony(cid).and_then(|c| c.modules.get(index)).map(|m| m.kind) else {
-            return Yield { resource: None, amount: 0.0, research: 0, upkeep: 0.0, emissions: 0.0, allotment: 0, standing: 0, doubled_by: None, detail: None, does: None, chain: Chain::default(), allotment_outside: 0 };
+            return Yield { resource: None, amount: 0.0, research: 0, upkeep: 0.0, ducats_upkeep: 0.0, fuel_upkeep: 0.0, emissions: 0.0, allotment: 0, standing: 0, doubled_by: None, doubled_factor: 1.0, detail: None, does: None, chain: Chain::default(), allotment_outside: 0 };
         };
         let mut y = self.module_yield(seat, cid, kind);
         if self.doubled_modules(seat).contains(&(cid, index)) {
-            let pairs = &self.tables.faction(self.kind(seat)).mothball_pairs;
-            y.amount *= 2.0;
-            y.research *= 2;
-            y.doubled_by = pairs.iter().find(|(_, m)| **m == kind).map(|(f, _)| f.name());
+            let card = self.tables.faction(self.kind(seat));
+            // Ticket #563 (version 0.1.0.3), at the designer's word: x2.08, where it doubled. A
+            // resource figure keeps its tenth; Widgets stay whole, floored; Research whole, nearest.
+            let factor = card.production_moved_factor;
+            y.amount = if y.resource == Some(Resource::Widgets) { (y.amount * factor).floor() } else { tenth(y.amount * factor) };
+            y.research = (y.research as f64 * factor).round() as i64;
+            y.doubled_by = card.mothball_pairs.iter().find(|(_, m)| **m == kind).map(|(f, _)| f.name());
+            y.doubled_factor = factor;
             let by = y.doubled_by.unwrap_or("Facility");
-            y.chain.times(2.0, || format!("for an idle {by} on Earth"));
+            y.chain.times(factor, || format!("for an idle {by} on Earth"));
+            match y.resource {
+                Some(Resource::Widgets) => {
+                    y.chain.floor();
+                }
+                Some(_) => {
+                    y.chain.tenth();
+                }
+                None => {
+                    y.chain.round();
+                }
+            }
         }
         // Ticket #359 (version 0.09.1): an occupied Habitat standing shut halves everything but
         // the Energy. Ticket #352 (version 0.09.1): applied HERE, on the one figure every reader
@@ -974,8 +1015,44 @@ impl Game {
         Some(out)
     }
 
+    /// Ticket #575 (version 0.1.0.3): the Fuel a turn the seat's online power buildings burn, for the
+    /// computer's reading of how scarce its Fuel is.
+    pub fn fuel_burned_by_buildings(&self, seat: Seat) -> f64 {
+        let facilities: f64 = self.directed_states(seat).into_iter().flat_map(|sid| self.state(sid).facilities.iter().filter(|f| f.working()).map(|f| self.tables.facility(f.kind).fuel_upkeep).collect::<Vec<_>>()).sum();
+        let modules: f64 = self.directed_colonies(seat).into_iter().flat_map(|cid| self.colony(cid).map(|c| c.modules.iter().filter(|m| m.working()).map(|m| self.tables.module(m.kind).fuel_upkeep).collect::<Vec<_>>()).unwrap_or_default()).sum();
+        tenth(facilities + modules)
+    }
+
+    /// Ticket #575 (version 0.1.0.3): the Fuel a computer seat keeps for its power, three turns of the
+    /// burn (`power_fuel_reserve_turns`).
+    pub fn fuel_reserve(&self, seat: Seat) -> f64 {
+        tenth(self.tables.ai.thresholds.power_fuel_reserve_turns * self.fuel_burned_by_buildings(seat))
+    }
+
     fn producers_of(&self, seat: Seat) -> Vec<Producer> {
+        self.producers_with_tank(seat, self.seat(seat).stockpile.fuel)
+    }
+
+    /// The producers with the Fuel budget given, which the shortfall forecast reads from what this
+    /// turn's orders leave (the review of #575: a pending Refuel spends the tank before the Income).
+    fn producers_with_tank(&self, seat: Seat, tank: f64) -> Vec<Producer> {
         let mut out = Vec::new();
+        // Ticket #575 (version 0.1.0.3): the Fuel in the tank pays each burning building in turn, as
+        // far as it goes; a building it does not reach runs at a quarter this Income. A building the
+        // Energy shortfall later shuts keeps its reservation, uncharged: no burning building carries
+        // an Energy upkeep today, so none is ever shut that way.
+        let mut fuel_budget = tank;
+        let mut pay = |fuel: f64| -> bool {
+            if fuel <= 0.0 {
+                return true;
+            }
+            if fuel_budget + 1e-9 >= fuel {
+                fuel_budget = tenth(fuel_budget - fuel);
+                true
+            } else {
+                false
+            }
+        };
         for sid in self.directed_states(seat) {
             let st = self.state(sid);
             for (i, f) in st.facilities.iter().enumerate() {
@@ -998,12 +1075,17 @@ impl Game {
                 // Ticket #387 (version 0.09.3): to the tenth, where it was floored; Research whole.
                 let halve = |v: f64| if scale < 1.0 { tenth(v * scale) } else { v };
                 let halve_whole = |v: i64| if scale < 1.0 { (v as f64 * scale).floor() as i64 } else { v };
+                let fuel_paid = f.offline_until_resolution || pay(y.fuel_upkeep);
+                let quarter = |v: f64| if fuel_paid { v } else { tenth(v * 0.25) };
                 out.push(Producer {
                     place: ProducerPlace::Facility(sid, i),
                     name: f.kind.name(),
                     is_module: false,
                     upkeep: y.upkeep,
-                    output: y.resource.map(|r| (r, if r == Resource::Widgets { (y.amount * scale).floor() } else { halve(y.amount) })),
+                    ducats_upkeep: y.ducats_upkeep,
+                    fuel_upkeep: y.fuel_upkeep,
+                    fuel_paid,
+                    output: y.resource.map(|r| (r, if r == Resource::Widgets { (y.amount * scale).floor() } else { quarter(halve(y.amount)) })),
                     research: halve_whole(y.research),
                     online: !f.offline_until_resolution,
                     doubled_by: None,
@@ -1019,6 +1101,8 @@ impl Game {
             // makes NOTHING and still pays its upkeep, at the designer's word: the squeeze is the
             // point, and the offline switch below, which forgives the upkeep, is the wrong shape.
             let starved = self.starved_by(cid).is_some();
+            // Ticket #565 (version 0.1.0.3): the Modules past what the living can run are dark.
+            let dark = self.unmanned_modules(col);
             for (i, m) in col.modules.iter().enumerate() {
                 // Ticket #54: a mothballed Module, the same way.
                 if m.mothballed {
@@ -1026,15 +1110,22 @@ impl Game {
                 }
                 // Ticket #82: the doubling, if this Module has one, is on the figure.
                 let y = self.module_yield_at(seat, cid, i);
+                // The review of #565: a dark Module burns nothing, so it reserves nothing.
+                let fuel_paid = dark.contains(&i) || starved || col.grid_failed || m.offline_until_resolution || pay(y.fuel_upkeep);
+                let quarter = |v: f64| if fuel_paid { v } else { tenth(v * 0.25) };
                 out.push(Producer {
                     place: ProducerPlace::Module(cid, i),
                     name: m.kind.name(),
                     is_module: true,
                     upkeep: y.upkeep,
-                    output: if starved { None } else { y.resource.map(|r| (r, y.amount)) },
+                    // Ticket #559 (version 0.1.0.3): the Wind Farm Module's Ducat, charged as a Facility's.
+                    ducats_upkeep: y.ducats_upkeep,
+                    fuel_upkeep: y.fuel_upkeep,
+                    fuel_paid,
+                    output: if starved { None } else { y.resource.map(|r| (r, quarter(y.amount))) },
                     // Ticket #80: an Observatory's Research. Ticket #359: halved in `module_yield_at`.
                     research: if starved { 0 } else { y.research },
-                    online: !col.grid_failed && !m.offline_until_resolution && !(m.kind == ModuleKind::Archive && occupied),
+                    online: !dark.contains(&i) && !col.grid_failed && !m.offline_until_resolution && !(m.kind == ModuleKind::Archive && occupied),
                     doubled_by: y.doubled_by,
                 });
             }
@@ -1058,12 +1149,14 @@ impl Game {
         // Efficient Grids reaches a Reactor and the Solar Maximum bites it.
         let kind = kind.common().unwrap_or(kind);
         let mut m = 1.0;
-        if kind == FacilityKind::PowerPlant {
+        // Ticket #559 (version 0.1.0.3): the Wind Farm takes every multiplier a Power Plant's output
+        // takes -- here and nowhere else, since it is not a Power Plant by its job.
+        if matches!(kind, FacilityKind::PowerPlant | FacilityKind::WindFarm) {
             m *= self.solar_maximum_multiplier();
         }
         match kind {
             // Ticket #505 (version 0.1.0.0): Superconductors, on every Energy output, in this chain.
-            FacilityKind::PowerPlant => m *= self.tech_multiplier(seat, TechId::EfficientGrids) * self.tech_multiplier(seat, TechId::Superconductors),
+            FacilityKind::PowerPlant | FacilityKind::WindFarm => m *= self.tech_multiplier(seat, TechId::EfficientGrids) * self.tech_multiplier(seat, TechId::Superconductors),
             // Ticket #332 (version 0.09.0): Deep Mining follows the Materials to the Mine; the
             // Factory makes Widgets now and no Tech lifts those.
             FacilityKind::Mine => m *= self.tech_multiplier(seat, TechId::DeepMining),
@@ -1080,13 +1173,14 @@ impl Game {
     /// Mines standing over twenty games went from 16 to 329.
     pub(crate) fn tech_output_multiplier_module(&self, seat: Seat, kind: ModuleKind) -> f64 {
         let mut m = 1.0;
-        // Ticket #89: a Solar Array reads the Sun as a Generator does.
-        if matches!(kind, ModuleKind::Generator | ModuleKind::SolarArray) {
+        // Ticket #89: a Solar Array reads the Sun as a Generator does. Ticket #559 (version
+        // 0.1.0.3): and the Wind Farm Module, on Mars.
+        if matches!(kind, ModuleKind::Generator | ModuleKind::SolarArray | ModuleKind::WindFarm) {
             m *= self.solar_maximum_multiplier();
         }
         match kind {
             // Ticket #505 (version 0.1.0.0): Superconductors, on every Energy output, in this chain.
-            ModuleKind::Generator | ModuleKind::SolarArray => m *= self.tech_multiplier(seat, TechId::EfficientGrids) * self.tech_multiplier(seat, TechId::Superconductors),
+            ModuleKind::Generator | ModuleKind::SolarArray | ModuleKind::WindFarm => m *= self.tech_multiplier(seat, TechId::EfficientGrids) * self.tech_multiplier(seat, TechId::Superconductors),
             // Ticket #84: the Extraction Charter stacks on Deep Mining.
             // Ticket #232 (version 0.08.3): and Beneficiation stacks on both, INSIDE this one
             // chain, so the whole product is floored once by the caller. A tenth applied after a
@@ -1165,6 +1259,8 @@ impl Game {
             // Ticket #343 (version 0.09.1): a Warhead is priced flat, the Faction's Ship discount
             // left out. The discount is a shipwright's, and reloading is not shipbuilding.
             BuildItem::Warhead(_) => (t.nuke.rearm_widgets, 1.0),
+            // Ticket #559 (version 0.1.0.3): a Replace is half the kind's Widgets, 4 of the Wind Farm's 8.
+            BuildItem::Replace(k) => (t.facility(k).widgets / 2, fac.facility_materials_multiplier),
         };
         ((row as f64 * m).floor() as u32).max(1)
     }
@@ -1230,6 +1326,8 @@ impl Game {
             (BuildItem::Unit(k), site) => self.ship_materials_at(seat, site, k),
             // Ticket #343 (version 0.09.1): the rearm's flat price, for the same reason.
             (BuildItem::Warhead(_), _) => self.tables.nuke.rearm_materials as f64,
+            // Ticket #559 (version 0.1.0.3): a Replace is half the kind's price, at the seat's own.
+            (BuildItem::Replace(k), _) => tenth(self.facility_materials(seat, k) / 2.0),
         }
     }
 
@@ -1270,14 +1368,15 @@ impl Game {
     /// nothing would go dark. The designer: *"alarm when there is a
     /// projected energy deficit and buildings will go offline next turn."*
     pub fn shortfall_forecast(&self, seat: Seat, pending: &[crate::orders::Order]) -> Option<ShortfallForecast> {
-        let stored = self.remaining(seat, pending).0.energy;
-        let mut producers = self.producers_of(seat);
+        let left = self.remaining(seat, pending).0;
+        let stored = left.energy;
+        let mut producers = self.producers_with_tank(seat, left.fuel);
         let (_, shut) = self.apply_shortfall(seat, &mut producers, stored);
         if shut.is_empty() {
             return None;
         }
         // The deficit is the balance with everything still running, read before a single thing is shut.
-        let short_by = -self.energy_balance(seat, &self.producers_of(seat), stored);
+        let short_by = -self.energy_balance(seat, &self.producers_with_tank(seat, left.fuel), stored);
         let dark = shut
             .into_iter()
             .map(|i| GoesDark { name: producers[i].name.to_string(), at: self.producer_place_text(&producers[i]) })
@@ -1398,6 +1497,8 @@ impl Game {
         let mut off_earth = 0;
         let mut doubled_turns = 0;
         let mut sources: Vec<(String, Resource, f64)> = Vec::new();
+        // Ticket #575 (version 0.1.0.3): the buildings whose Fuel was not there, for the Report.
+        let mut fuel_short: Vec<String> = Vec::new();
         for p in &producers {
             let where_ = match p.place {
                 ProducerPlace::Facility(sid, i) => {
@@ -1409,6 +1510,8 @@ impl Game {
                     self.tables.state(sid).name.clone()
                 }
                 ProducerPlace::Module(cid, i) => {
+                    // Ticket #565 (version 0.1.0.3): dark for want of people, read before the grid.
+                    let unmanned = self.colony(cid).map(|c| self.unmanned_modules(c).contains(&i)).unwrap_or(false);
                     if let Some(c) = self.colony_mut(cid) {
                         let (grid, occupied) = (c.grid_failed, c.control.is_occupied());
                         let m = &mut c.modules[i];
@@ -1417,6 +1520,8 @@ impl Game {
                             None
                         } else if m.offline_until_resolution {
                             m.offline_cause.take()
+                        } else if unmanned {
+                            Some(OfflineCause::Unmanned)
                         } else if grid {
                             Some(OfflineCause::Grid)
                         } else if m.kind == ModuleKind::Archive && occupied {
@@ -1435,7 +1540,7 @@ impl Game {
             let where_ = match p.doubled_by {
                 Some(f) => {
                     doubled_turns += 1;
-                    format!("{where_} (doubled by an idle {f} on Earth)")
+                    format!("{where_} (x{} for an idle {f} on Earth)", self.tables.faction(self.kind(seat)).production_moved_factor)
                 }
                 None => where_,
             };
@@ -1465,6 +1570,21 @@ impl Game {
             }
             if p.upkeep > 0.0 {
                 sources.push((format!("{} in {} (upkeep)", p.name, where_), Resource::Energy, -p.upkeep));
+            }
+            // Ticket #561 (version 0.1.0.3): a Ducat upkeep, the Scrubber's, charged beside it.
+            if p.ducats_upkeep > 0.0 {
+                gained.ducats -= p.ducats_upkeep;
+                sources.push((format!("{} in {} (upkeep)", p.name, where_), Resource::Ducats, -p.ducats_upkeep));
+            }
+            // Ticket #575 (version 0.1.0.3): the Fuel a power building burns, where the tank covered
+            // it; where it did not, the building already runs at a quarter and the bill is forgiven.
+            if p.fuel_upkeep > 0.0 {
+                if p.fuel_paid {
+                    gained.fuel -= p.fuel_upkeep;
+                    sources.push((format!("{} in {} (upkeep)", p.name, where_), Resource::Fuel, -p.fuel_upkeep));
+                } else {
+                    fuel_short.push(format!("{} in {}", p.name, where_));
+                }
             }
         }
         let unit_upkeep = self.unit_upkeep(seat);
@@ -1630,6 +1750,11 @@ impl Game {
             s.stockpile.fuel = tenth(s.stockpile.fuel + gained.fuel);
             s.stockpile.energy = clamped;
             s.stockpile.ducats = tenth(s.stockpile.ducats + gained.ducats);
+            // Ticket #563 (version 0.1.0.3): the game's running total, for the sweep.
+            s.produced.materials += gained.materials;
+            s.produced.fuel += gained.fuel;
+            s.produced.energy += gained.energy;
+            s.produced.ducats += gained.ducats;
             s.income_last_turn = Stockpile {
                 materials: gained.materials,
                 fuel: gained.fuel,
@@ -1644,6 +1769,10 @@ impl Game {
             s.doubled_module_turns += doubled_turns;
             s.venture_fund = tenth(s.venture_fund + banked + interest_to_fund);
             s.venture_banked_last_turn = banked;
+            // Ticket #566 (version 0.1.0.3): and the interest, so the Fund line says the growth whole.
+            s.venture_interest_last_turn = interest_to_fund;
+            // The review of #566: an Objective's reward lands at the end of this Income, after this.
+            s.venture_reward_last_turn = 0.0;
         }
         if keep_short {
             let mut names = Vec::new();
@@ -1664,6 +1793,12 @@ impl Game {
             let line = format!("{}: Materials ran short; the Sea Wall in {} stands unkept this turn and holds nothing.", self.seat_name(seat), Game::and_list(&names));
             self.log(line.clone());
             let text = self.say("sea_wall_unkept", &[("faction", self.seat_name(seat)), ("states", Game::and_list(&names))]);
+            self.report_line_of(seat, LineKind::YourWorks, LineKind::Note, None, text);
+        }
+        if !fuel_short.is_empty() {
+            let line = format!("{}: Fuel ran short; {} ran at a quarter.", self.seat_name(seat), fuel_short.join(", "));
+            self.log(line);
+            let text = self.say("fuel_short", &[("faction", self.seat_name(seat)), ("buildings", Game::and_list(&fuel_short))]);
             self.report_line_of(seat, LineKind::YourWorks, LineKind::Note, None, text);
         }
         if !shut.is_empty() {
