@@ -130,6 +130,9 @@ fn main() {
     // Ticket #563 (version 0.1.0.3), at the designer's word: Income over the batch per Faction --
     // Materials, Fuel, Energy, Ducats, Research.
     let mut all_produced = [[0f64; 5]; 4];
+    // At the designer's word (version 0.1.0.4): production over the batch, per Faction, TOTALS --
+    // Materials, Fuel, Energy, Ducats gross at Income before upkeep, Research, Widgets made.
+    let mut all_gross = [[0f64; 6]; 4];
     let mut all_start_lost = [[0u32; 2]; 4];
     // Ticket #343 (version 0.09.1): the nuke's counters across every seating, so the closing
     // review has ONE total to quote rather than four blocks to add up by hand.
@@ -228,6 +231,7 @@ fn main() {
                         let mut cell_throw_offs = [0u32; 4];
                         let mut cell_leads = [0u32; 4];
                         let mut cell_produced = [[0f64; 5]; 4];
+                        let mut cell_gross = [[0f64; 6]; 4];
                         let mut cell_start_lost = [0u32; 2];
                         let mut war_ppm: [Vec<f64>; 4] = Default::default();
                         let mut war_nobody: Vec<f64> = Vec::new();
@@ -495,6 +499,10 @@ fn main() {
                                 for (c, v) in cell_produced[s.index()].iter_mut().zip([p.materials, p.fuel, p.energy, p.ducats, r.research_by_seat[s.index()] as f64]) {
                                     *c += v;
                                 }
+                                let g = r.gross_by_seat[s.index()];
+                                for (c, v) in cell_gross[s.index()].iter_mut().zip([g.materials, g.fuel, g.energy, g.ducats, r.research_by_seat[s.index()] as f64, r.widgets_made[s.index()] as f64]) {
+                                    *c += v;
+                                }
                                 cell_scores[s.index()].push(r.final_score[s.index()]);
                                 cell_places[s.index()][(r.final_place[s.index()].clamp(1, 4) - 1) as usize] += 1;
                             }
@@ -565,6 +573,9 @@ fn main() {
                                 all_throw_offs[at] += cell_throw_offs[s.index()];
                                 all_leads[at] += cell_leads[s.index()];
                                 for (a, v) in all_produced[at].iter_mut().zip(cell_produced[s.index()]) {
+                                    *a += v;
+                                }
+                                for (a, v) in all_gross[at].iter_mut().zip(cell_gross[s.index()]) {
                                     *a += v;
                                 }
                                 if s == Seat(0) {
@@ -905,6 +916,21 @@ fn main() {
             let p = all_produced[i].map(|v| v / all_games.max(1) as f64);
             println!("  {:>12}: {:>7.0} / {:>7.0} / {:>7.0} / {:>7.0} / {:>6.0}", k.name(), p[0], p[1], p[2], p[3], p[4]);
         }
+        // At the designer's word (version 0.1.0.4): production TOTALS over the batch, per Faction and
+        // for the whole table -- gross, made at Income before any upkeep, so what the buildings made
+        // rather than what was left -- and the whole table's net of upkeep beside it.
+        println!("  Production over the batch, totals, gross before upkeep (Materials / Fuel / Energy / Ducats / Research / Widgets made):");
+        let mut world = [0f64; 6];
+        for (i, k) in FactionKind::ALL.into_iter().enumerate() {
+            let p = all_gross[i];
+            for (w, v) in world.iter_mut().zip(p) {
+                *w += v;
+            }
+            println!("  {:>12}: {:>9.0} / {:>8.0} / {:>9.0} / {:>8.0} / {:>8.0} / {:>9.0}", k.name(), p[0], p[1], p[2], p[3], p[4], p[5]);
+        }
+        println!("  {:>12}: {:>9.0} / {:>8.0} / {:>9.0} / {:>8.0} / {:>8.0} / {:>9.0}", "all four", world[0], world[1], world[2], world[3], world[4], world[5]);
+        let net: Vec<f64> = (0..5).map(|j| all_produced.iter().map(|p| p[j]).sum()).collect();
+        println!("  {:>12}: {:>9.0} / {:>8.0} / {:>9.0} / {:>8.0} / {:>8.0}   (net of upkeep, all four)", "net", net[0], net[1], net[2], net[3], net[4]);
         println!("  the world under the Natural Sink at least once in {} of {all_games} games (median first turn {})", all_under_sink.len(), median_u(&mut all_under_sink));
         // Version 0.09.3: the worlds settled, over every seating.
         println!("  {}", off_earth_line(&base, &all_ground_by_body, &all_stations_by_body, &mut all_first_by_body, &mut all_ground_off_earth_per_game, all_games as u64));

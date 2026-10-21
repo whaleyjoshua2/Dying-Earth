@@ -235,6 +235,9 @@ pub struct SimResult {
     /// of its buildings' upkeep, and all the Research its Labs made.
     pub produced_by_seat: [Stockpile; SEAT_COUNT],
     pub research_by_seat: [i64; SEAT_COUNT],
+    /// At the designer's word (version 0.1.0.4): each seat's production over the game, GROSS --
+    /// made at Income before upkeep (`produced_total`) -- for the sweep's production totals.
+    pub gross_by_seat: [Stockpile; SEAT_COUNT],
     pub start_lost_to_throw_off: bool,
     pub final_place: [u8; SEAT_COUNT],
     /// Ticket #58: how many Moments the turns of this game earned, how many the cap of two and the
@@ -868,6 +871,7 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         leads_by_seat,
         produced_by_seat: Seat::ALL.map(|s| game.seat(s).produced),
         research_by_seat: Seat::ALL.map(|s| game.seat(s).research_total),
+        gross_by_seat: Seat::ALL.map(|s| game.seat(s).produced_total),
         start_lost_to_throw_off,
         emigrant_batches: game.log.iter().filter(|l| l.contains("Pioneers recruited in")).count() as u32,
         antarctic_by_sea: game.log.iter().filter(|l| l.contains("in Antarctica with")).count() as u32,

@@ -1761,7 +1761,10 @@ impl Game {
             // Ticket #563 (version 0.1.0.3): the game's running total, for the sweep.
             s.produced.materials += gained.materials;
             s.produced.fuel += gained.fuel;
-            s.produced.energy += gained.energy;
+            // Version 0.1.0.4, found adding the sweep's production totals: `gained.energy` is the
+            // output before upkeep, which is taken from the balance, so the "net of upkeep" line had
+            // carried gross Energy. The net is what the Income left: the balance less what was stored.
+            s.produced.energy += balance - before.energy;
             s.produced.ducats += gained.ducats;
             s.income_last_turn = Stockpile {
                 materials: gained.materials,
