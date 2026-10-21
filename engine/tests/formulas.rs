@@ -8480,7 +8480,8 @@ fn the_shortlist_carries_the_next_rung_of_the_leads_chain() {
 }
 
 /// Ticket #348, R2, the second witness: the gate and a forced antecedent are NEVER forced together,
-/// which is why the shortlist can reserve ONE place of its three and stay three Techs long.
+/// which is why the shortlist can reserve ONE place of its three and stay three Techs long (four
+/// since ticket #592, once Orbital Data Centers stands).
 ///
 /// The gate is available only when every antecedent is done; an unresearched antecedent exists only
 /// when some antecedent is not done. Walked here over every state the chain can actually be in --
@@ -8525,11 +8526,14 @@ fn a_draw_never_forces_both_the_gate_and_its_chain() {
                 assert!(g.available_techs().contains(&r), "the {kind:?} are offered a rung whose own prerequisites are unmet");
                 assert!(chain.contains(&r), "the {kind:?} are offered a rung that is not on their chain");
             }
-            if g.available_techs().len() <= size {
+            // Ticket #592 (version 0.1.0.4): four once Orbital Data Centers stands, on the Archivists'
+            // road, and the free-choice guard reads the same figure (the review).
+            let want = size + if g.research.done.contains(&TechId::OrbitalDataCenters) { 1 } else { 0 };
+            if g.available_techs().len() <= want {
                 continue;
             }
             g.draw_shortlist(seat);
-            assert_eq!(g.research.shortlist.len(), size, "the {kind:?} list is no longer {size} Techs long");
+            assert_eq!(g.research.shortlist.len(), want, "the {kind:?} list is no longer {want} Techs long");
             if let Some(r) = rung {
                 assert!(g.research.shortlist.contains(&r), "the {kind:?} rung was not drawn");
                 assert!(!g.research.shortlist.contains(&gate), "the {kind:?} drew both their gate and a rung of its chain");
@@ -19472,12 +19476,13 @@ fn the_custodian_ai_keeps_a_held_reactor_idle_while_it_doubles_a_generator() {
 
 /// Ticket #433: **Orbital Data Centers**, Society rung 2 at 32 needing Large Language Models;
 /// The Upload needs it beside Civil Defense, so the Archivists' road is 130; and an Observatory's
-/// Research is x1.5 once it stands, on top of the Techs that already lift it.
+/// Research is x1.5 once it stands, on top of the Techs that already lift it. Ticket #592 (version
+/// 0.1.0.4), at the designer's word: x1.25.
 #[test]
 fn orbital_data_centers_lifts_the_observatory_and_opens_the_upload() {
     let t = tables();
     let c = t.tech(TechId::OrbitalDataCenters);
-    assert_eq!((c.name.as_str(), c.branch.as_str(), c.rung, c.cost, c.value), ("Orbital Data Centers", "Society", 2, 32, 1.5));
+    assert_eq!((c.name.as_str(), c.branch.as_str(), c.rung, c.cost, c.value), ("Orbital Data Centers", "Society", 2, 32, 1.25));
     assert_eq!(c.needs, vec![TechId::PublicScience]);
     // Ticket #505 (version 0.1.0.0): The Upload reaches it through Superconductors; the road is 202.
     assert_eq!(t.tech(TechId::TheUpload).needs, vec![TechId::CivilDefense, TechId::Superconductors]);
@@ -19494,9 +19499,41 @@ fn orbital_data_centers_lifts_the_observatory_and_opens_the_upload() {
     assert!(before > 0.0 && region > 0.0 && lab > 0.0, "the premise: each makes Research");
     with_tech(&mut g, TechId::OrbitalDataCenters);
     let y = g.module_yield(s, moon, ModuleKind::Observatory);
-    assert!((y.chain.value() / before - 1.5).abs() < 1e-9, "x1.5: {before} -> {}", y.chain.value());
+    // Ticket #592 (version 0.1.0.4): the chain is floored to whole Research, so at x1.25 the ratio of
+    // two floored figures is not the multiplier; the step itself is read, and the figure must rise.
+    assert!(y.chain.steps.iter().any(|st| matches!(st, dying_earth_engine::economy::Step::Times(f, why) if (*f - 1.25).abs() < 1e-9 && why == "Orbital Data Centers")), "x1.25: {:?}", y.chain.steps);
+    assert!(y.chain.value() > before, "{before} -> {}", y.chain.value());
     assert_eq!(g.region_research_chain(s, StateId::EastAsia).value(), region, "a Region's Research is untouched");
     assert_eq!(g.facility_yield(s, StateId::EastAsia, FacilityKind::ResearchLab).chain.value(), lab, "a Lab's is untouched");
+}
+
+/// Ticket #592 (version 0.1.0.4), at the designer's word: once Orbital Data Centers stands, every
+/// shortlist is drawn at four, whichever seat leads the pick; before it, three. The Lead's own gate
+/// or the next rung of its chain still takes one of the places. Red before the Tech's row carried a
+/// `shortlist_bonus`: three either side.
+#[test]
+fn orbital_data_centers_draws_every_shortlist_at_four() {
+    let mut g = game();
+    for t in [TechId::PublicScience, TechId::EfficientGrids, TechId::CleanPower] {
+        with_tech(&mut g, t);
+    }
+    assert!(g.available_techs().len() > 4, "the premise: more than four to draw from");
+    for seat in Seat::ALL {
+        g.draw_shortlist(seat);
+        assert_eq!(g.research.shortlist.len(), 3, "{seat:?} before Orbital Data Centers");
+    }
+    with_tech(&mut g, TechId::OrbitalDataCenters);
+    assert_eq!(g.tables.tech(TechId::OrbitalDataCenters).shortlist_bonus, 1);
+    for seat in Seat::ALL {
+        g.draw_shortlist(seat);
+        let list = g.research.shortlist.clone();
+        assert_eq!(list.len(), 4, "{seat:?} leads with Orbital Data Centers standing: {list:?}");
+        assert_eq!(g.pickable_techs(), list);
+        if let Some(r) = g.next_gate_rung(seat) {
+            assert!(list.contains(&r), "{seat:?}'s next rung is still reserved: {list:?}");
+        }
+    }
+    assert!(g.tables.tech(TechId::OrbitalDataCenters).effect.contains("4 Techs"), "{}", g.tables.tech(TechId::OrbitalDataCenters).effect);
 }
 
 // ---------------------------------------------------------------- Ticket #427 (version 0.09.5): two Pioneers a state a turn

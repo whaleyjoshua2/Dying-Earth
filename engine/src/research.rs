@@ -182,7 +182,8 @@ impl Game {
     /// climbed by luck. The Custodians' chain is two Techs and every one of them was on their list;
     /// the other three are four Techs and each was missing some of its own.
     ///
-    /// THE RESERVED PLACE IS STILL ONE OF THREE. The gate is available only when every antecedent
+    /// THE RESERVED PLACE IS STILL ONE OF THE LIST (three, four since ticket #592 once Orbital Data
+    /// Centers stands). The gate is available only when every antecedent
     /// is done, and a rung is owed only when some antecedent is not, so at most one of the two
     /// clauses below can ever fire. They are written as two independent `if`s rather than an
     /// `else`, because the claim belongs in a test that can watch it rather than in a branch that
@@ -192,7 +193,10 @@ impl Game {
     /// draw whoever holds the seat.
     pub fn draw_shortlist(&mut self, lead: Seat) {
         let available = self.available_techs();
-        let size = self.tables.shortlist.size;
+        // Ticket #592 (version 0.1.0.4): a Tech standing may draw every shortlist larger -- Orbital
+        // Data Centers, four from three, whichever seat leads.
+        let bonus: usize = self.research.done.iter().map(|t| self.tables.tech(*t).shortlist_bonus).sum();
+        let size = self.tables.shortlist.size + bonus;
         if available.len() <= size {
             self.research.shortlist = Vec::new();
             return;

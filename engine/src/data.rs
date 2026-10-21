@@ -427,6 +427,11 @@ pub struct TechCard {
     pub needs: Vec<TechId>,
     pub effect: String,
     pub value: f64,
+    /// Ticket #592 (version 0.1.0.4), at the designer's word: once this Tech stands, every
+    /// shortlist is drawn this many Techs larger, whichever seat leads the pick. Orbital Data
+    /// Centers' row says 1; every other row nothing.
+    #[serde(default)]
+    pub shortlist_bonus: usize,
     /// Ticket #207 (version 0.08.1): Expanded Habitats is read in TWO places -- what a Habitat
     /// holds and what a Colony Ship carries -- and until now one `value` served both, so neither
     /// could be moved without the other. This is the Habitat clause where a Tech wants its own

@@ -41,6 +41,8 @@ EARTH
   card's opening line shows it.
 - THE ARKWRIGHTS draw +1 Research a turn for each Body off Earth where they hold a Colonist
   (a station over it counts). The Research income lists it as "Bodies settled".
+- ORBITAL DATA CENTERS lifts an Observatory's Research x1.25, from x1.5, and once it stands
+  every Tech pick is from four, not three, whoever leads it.
 - A STRIP PERMIT is once per Region, ever, and the button and the help say so.
 
 SPACE

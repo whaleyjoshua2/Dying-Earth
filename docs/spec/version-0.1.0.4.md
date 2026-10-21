@@ -80,3 +80,23 @@ lowest of the four (285 a game on §2's board, against the Custodians' 1,372).
 - **Swept** (`sweeps/ticket-589.txt`): **28 / 38 / 4 / 9 and 1 collapse**, from §2's 28 / 37 / 5 /
   10 and none: noise. The Arkwrights' Research is 325 a game from 285 and the Techs they led 193
   from 168; their gate completes in 66 of 80 at a median turn 30, from 65 at 30. Reported and left.
+
+## 4. Orbital Data Centers at x1.25, and a fourth Tech to choose from
+
+Ticket: [Orbital Data Centers at x1.25, and a fourth Tech to choose from](https://github.com/whaleyjoshua2/Dying-Earth/issues/592).
+
+The designer: *"Orbital data centers at x1.25 and now provide 4 tech options to winner to choose from
+going forward"*.
+
+- **x1.25** on an Observatory's Research, from x1.5 (`value`).
+- **Four to choose from**: once Orbital Data Centers stands, every shortlist is drawn at four,
+  **whichever seat leads the pick**, at the designer's word (over the seat that led the Tech itself,
+  since the tree is shared and every seat holds it). A `shortlist_bonus` on a Tech's row, 1 on this
+  one, sums into the draw's size; the Lead's gate or next rung still takes one place, and a free
+  choice still opens when no more than the size are available. No saved field.
+- **The effect text**: *"Observatory Research x1.25; every pick from 4 Techs"*.
+- **The computer** picks from whatever list it is drawn; nothing to add.
+- **Swept** (`sweeps/ticket-592.txt`): **24 / 40 / 5 / 11 and no collapse**, from §3's 28 / 38 / 4 /
+  9 and 1. The Custodians' four off is at the edge of noise, the rest noise. Observatories make 18.9
+  Research a world-turn from 21.1; the Archivists' gate completes in 72 of 80 at a median turn 30,
+  from 73 at 29. Reported and left.

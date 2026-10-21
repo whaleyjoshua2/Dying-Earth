@@ -302,6 +302,13 @@ fn build_board(session: &mut Session) {
                 g.research.done.push(t);
             }
         }
+        // `shortlist:1` (a building aid, ticket #592, version 0.1.0.4): with `pick:0`, the pick owed
+        // is drawn as a completed Tech's would be, over whatever `researched:` stood done, so the
+        // Tech Tree's shortlist can be photographed -- four once Orbital Data Centers stands.
+        if leave_pick && std::env::args().any(|a| a == "shortlist:1") {
+            g.draw_shortlist(Seat(0));
+            g.research.awaiting_pick = Some(Seat(0));
+        }
         for seat in Seat::ALL {
             if !g.ships_at(seat, BodyId::Mars).is_empty() {
                 continue;

@@ -59,3 +59,35 @@ card, the signature ending *"They draw +1 [Research] a turn for each Body they h
 - **The sweep** ([`sweeps/ticket-589.txt`](sweeps/ticket-589.txt)): **28 / 38 / 4 / 9 and 1
   collapse**, from 28 / 37 / 5 / 10 and none: noise. The Arkwrights' Research is 325 a game from 285
   and the Techs they led 193 from 168; the win column does not move. Reported and left.
+
+## Orbital Data Centers at x1.25, and a fourth Tech to choose from
+
+Ticket [#592](https://github.com/whaleyjoshua2/Dying-Earth/issues/592), spec §4.
+
+The Tech's `value` to 1.25 and a `shortlist_bonus = 1` that the draw sums over every Tech done. The
+designer chose "whoever leads a pick" over "the seat that led Orbital Data Centers", so no seat owns
+it and nothing is saved. A test was written first and watched red (the bonus 0, the list three),
+then green; two older pins moved with it: the Observatory test now reads the x1.25 step itself,
+since the floored ratio of two whole figures is only exact at x1.5, and the Archivists' chain walk
+expects four once the Tech is done.
+
+**The picture** ([`ticket-592/tech-tree-shortlist.png`](ticket-592/tech-tree-shortlist.png)): the
+Tech Tree with Orbital Data Centers done and a pick owed, three of the four Pick buttons in view
+(Coastal Engineering, Green Consensus, Expanded Habitats). The tree's fourth branch is cut at the
+window's fold at 1280x800, so the picture cannot show the fourth button; the test that draws four for
+every seat is the proof of it. A new building aid, `shortlist:1` with `pick:0`, draws the owed pick
+over the `researched:` Techs for it.
+
+- **The sweep** ([`sweeps/ticket-592.txt`](sweeps/ticket-592.txt)): **24 / 40 / 5 / 11 and no
+  collapse**, from 28 / 38 / 4 / 9 and 1. The Custodians' four off is at the edge of noise.
+  Observatories 18.9 Research a world-turn from 21.1. Reported and left.
+- **Production over the batch, totals**, gross before upkeep (the sweep's new block):
+
+| | Materials | Fuel | Energy | Ducats | Research | Widgets |
+|---|---|---|---|---|---|---|
+| Custodians | 167,093 | 80,720 | 315,881 | 137,927 | 107,896 | 235,017 |
+| Prospectors | 180,403 | 47,464 | 220,737 | 432,185 | 30,556 | 141,465 |
+| Arkwrights | 129,760 | 43,150 | 207,976 | 281,050 | 25,860 | 123,749 |
+| Archivists | 38,032 | 22,546 | 87,593 | 40,181 | 52,086 | 76,683 |
+| all four | 515,289 | 193,880 | 832,188 | 891,343 | 216,398 | 576,914 |
+| net of upkeep | 509,381 | 153,752 | 121,381 | 529,675 | 216,398 | |
