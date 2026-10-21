@@ -39,6 +39,8 @@ EARTH
   card now says what it opens with, in a line above its signature rule.
 - THE ARKWRIGHTS and THE ARCHIVISTS open with 10 Ducats; the other two open with none. The
   card's opening line shows it.
+- THE ARKWRIGHTS draw +1 Research a turn for each Body off Earth where they hold a Colonist
+  (a station over it counts). The Research income lists it as "Bodies settled".
 - A STRIP PERMIT is once per Region, ever, and the button and the help say so.
 
 SPACE

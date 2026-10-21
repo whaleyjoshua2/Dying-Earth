@@ -43,3 +43,19 @@ screen's second row, the Arkwrights and the Archivists, each opening line readin
 - **The sweep** ([`sweeps/ticket-585.txt`](sweeps/ticket-585.txt)): **28 / 37 / 5 / 10 and no
   collapse**, from 30 / 36 / 3 / 9, 1 collapse and 1 draw. Noise throughout: the Arkwrights +2,
   the Archivists +1. In a logged game neither seat spends the Ducats on turn one. Reported and left.
+
+## The Arkwrights draw +1 Research for every Body settled
+
+Ticket [#589](https://github.com/whaleyjoshua2/Dying-Earth/issues/589), spec §3.
+
+A `research_per_body_settled` on the Faction's row, 1 on the Arkwrights', paid flat at Income for
+each Body off Earth holding at least one of their Colonists. The designer chose any Colonist over the
+Diaspora's four and over ground Colonies only, and a signature clause. The test was written first and
+watched red (no "Bodies settled" source, the Research unmoved), then green.
+
+**The picture** ([`ticket-589/arkwrights-card.png`](ticket-589/arkwrights-card.png)): the Arkwrights'
+card, the signature ending *"They draw +1 [Research] a turn for each Body they have settled."*
+
+- **The sweep** ([`sweeps/ticket-589.txt`](sweeps/ticket-589.txt)): **28 / 38 / 4 / 9 and 1
+  collapse**, from 28 / 37 / 5 / 10 and none: noise. The Arkwrights' Research is 325 a game from 285
+  and the Techs they led 193 from 168; the win column does not move. Reported and left.

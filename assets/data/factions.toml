@@ -170,6 +170,9 @@ ship_prefix = "ARK"
 output_multiplier = 1.0
 emissions_multiplier = 1.0
 research_multiplier = 1.0
+# Ticket #589 (version 0.1.0.4), at the designer's word: +1 Research a turn for each Body off Earth
+# where they hold at least one Colonist, a station over it counting; Earth and its orbit never.
+research_per_body_settled = 1
 influence_multiplier = 0.8
 # Ticket #51: Habitats hold half again as many, and a transit burns three quarters of the Fuel
 # (applied before Efficient Transit, multiplicative).
@@ -199,7 +202,7 @@ module_materials_multiplier = 0.75
 start_extra_facilities = ["power_plant"]
 # Ticket #407 (version 0.09.4): audited against the data: 16 with Generation Ships too, and a
 # Colony Ship at 25.5 since figures are carried to a tenth.
-signature = "Coach Class. A Colony Ship carries 6 Colonists, 9 with Expanded Habitats and 12 with Generation Ships too, and their Habitats hold half again as many, 6 and 12. They recruit 3 Pioneers a turn in each state where others recruit 2, but every Pioneer takes half again the population. Every Ship costs them 15% less, a Colony Ship 28.1 Materials; a transit burns three quarters of the Fuel; and, starting with no station, a Space Station costs them 22 Materials and a Module three quarters."
+signature = "Coach Class. A Colony Ship carries 6 Colonists, 9 with Expanded Habitats and 12 with Generation Ships too, and their Habitats hold half again as many, 6 and 12. They recruit 3 Pioneers a turn in each state where others recruit 2, but every Pioneer takes half again the population. Every Ship costs them 15% less, a Colony Ship 28.1 Materials; a transit burns three quarters of the Fuel; and, starting with no station, a Space Station costs them 22 Materials and a Module three quarters. They draw +{per_body} Research a turn for each Body they have settled."
 # Ticket #419 (version 0.09.4): Unrest off every Region they hold, a whole point for each ground
 # Colony they found off Earth (Antarctica excepted) and half a point for each Space Station they
 # build; a place taken counts for nothing.

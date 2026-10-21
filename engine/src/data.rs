@@ -702,6 +702,11 @@ pub struct FactionCard {
     /// over Earth included, Antarctica not); absent, the one figure serves both.
     #[serde(default)]
     pub research_multiplier_off_earth: Option<f64>,
+    /// Ticket #589 (version 0.1.0.4), at the designer's word: Research a turn for each Body off
+    /// Earth where the seat controls at least one Colonist (`bodies_settled(seat, 1)`), flat; the
+    /// Arkwrights' row says 1, every other row nothing.
+    #[serde(default)]
+    pub research_per_body_settled: i64,
     pub influence_multiplier: f64,
     /// Ticket #82 (version 0.06.0): the Custodians' Production Moved. While a Facility of the key's
     /// kind in a state they direct is mothballed, one Module of the value's kind off Earth makes
@@ -2912,6 +2917,8 @@ impl Tables {
                 // Ticket #582 (version 0.1.0.3): the Prospectors' opening Materials against the table's.
                 ("start_materials", crate::state::figure(self.start_stockpile(kind).materials)),
                 ("common_materials", self.start.materials.to_string()),
+                // Ticket #589 (version 0.1.0.4): the Arkwrights' Research a Body settled.
+                ("per_body", self.faction(kind).research_per_body_settled.to_string()),
             ],
         )
     }

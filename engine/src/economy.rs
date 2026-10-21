@@ -1699,6 +1699,14 @@ impl Game {
             sources.push(("Population and Education".to_string(), Resource::Research, tenth(own)));
         }
         research += (own + labs_research).floor() as i64;
+        // Ticket #589 (version 0.1.0.4): the Arkwrights' Research for each Body they have settled,
+        // flat, after every multiplier and before a Research agreement's lift.
+        let per_body = self.tables.faction(self.kind(seat)).research_per_body_settled;
+        let settled = per_body * self.bodies_settled(seat, 1) as i64;
+        if settled > 0 {
+            sources.push(("Bodies settled".to_string(), Resource::Research, settled as f64));
+            research += settled;
+        }
         let agreement = self.research_agreement_multiplier(seat);
         if agreement > 1.0 && research > 0 {
             let lifted = (research as f64 * agreement).floor() as i64;

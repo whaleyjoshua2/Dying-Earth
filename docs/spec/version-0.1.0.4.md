@@ -60,3 +60,23 @@ on §1's board, the Arkwrights the farthest seat below the ideal.
   9, 1 collapse and 1 draw. The Arkwrights +2 and the Archivists +1 are noise; so is the rest. The
   gates: the Arkwrights' in 65 of 80 at a median turn 30 (70 at 31), the Archivists' 68 at 30 (70 at
   29). Ten Ducats on turn one do not move the board. Reported and left.
+
+## 3. The Arkwrights draw +1 Research for every Body settled
+
+Ticket: [The Arkwrights draw +1 Research for every Body settled](https://github.com/whaleyjoshua2/Dying-Earth/issues/589).
+
+The designer: *"Arkwright's get +1 research for every body they've settled"*. Their Research was the
+lowest of the four (285 a game on §2's board, against the Custodians' 1,372).
+
+- **A Body settled** is one off Earth where the seat controls at least one Colonist,
+  `bodies_settled(seat, 1)`: a station over a Body counts as there, Earth and its orbit never. At the
+  designer's word, over the Diaspora's four a Body and over ground Colonies only.
+- **The figure** is `research_per_body_settled` on the Faction's row, 1 on the Arkwrights', nothing
+  elsewhere. It is flat, added to the turn's Research after every multiplier and before a Research
+  agreement's lift, and the income's sources name it *"Bodies settled"*.
+- **The card** says it in the signature, at the designer's word: *"They draw +1 Research a turn for
+  each Body they have settled."*, the word drawn as its glyph.
+- **The computer** needs nothing: the Research lands where it is read.
+- **Swept** (`sweeps/ticket-589.txt`): **28 / 38 / 4 / 9 and 1 collapse**, from §2's 28 / 37 / 5 /
+  10 and none: noise. The Arkwrights' Research is 325 a game from 285 and the Techs they led 193
+  from 168; their gate completes in 66 of 80 at a median turn 30, from 65 at 30. Reported and left.

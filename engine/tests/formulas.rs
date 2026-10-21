@@ -24429,3 +24429,28 @@ fn the_arkwrights_and_archivists_open_with_10_ducats() {
         assert!(!t.signature(kind).contains("open with"), "the glyph line says it, not the signature: {}", t.signature(kind));
     }
 }
+
+/// Ticket #589 (version 0.1.0.4), at the designer's word: the Arkwrights draw +1 Research a turn for
+/// each Body off Earth where they control at least one Colonist, a station over a Body counting as
+/// there, Earth and its orbit never; flat, onto the turn's Research before a Research agreement, and
+/// named "Bodies settled" among the sources. No other Faction draws it, and the signature says it.
+/// Red before the row carried a `research_per_body_settled`: no source line, the Research unmoved.
+#[test]
+fn the_arkwrights_draw_one_research_for_each_body_settled() {
+    let mut g = fresh();
+    let ark = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Arkwrights).unwrap();
+    let cus = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Custodians).unwrap();
+    let line = |g: &Game, seat: Seat| g.seat(seat).income_sources.iter().find(|(n, _, _)| n == "Bodies settled").map(|(_, r, v)| (*r, *v));
+    income_of(&mut g, ark);
+    assert_eq!(line(&g, ark), None, "nothing settled, no line");
+    let bare = g.seat(ark).research_last_turn;
+    colony(&mut g, ark, BodyId::Moon, &[ModuleKind::Habitat], 1);
+    colony(&mut g, ark, BodyId::Mars, &[ModuleKind::Habitat], 3);
+    colony(&mut g, cus, BodyId::Phobos, &[ModuleKind::Habitat], 4);
+    income_of(&mut g, ark);
+    assert_eq!(line(&g, ark), Some((Resource::Research, 2.0)), "the Moon and Mars: {:?}", g.seat(ark).income_sources);
+    assert_eq!(g.seat(ark).research_last_turn, bare + 2, "paid into the turn's Research");
+    assert_eq!(line(&g, cus), None, "the Custodians draw none");
+    assert_eq!(g.bodies_settled(ark, 1), 2, "Earth and its orbit are never a Body settled");
+    assert!(g.tables.signature(FactionKind::Arkwrights).contains("+1 Research a turn for each Body they have settled"), "{}", g.tables.signature(FactionKind::Arkwrights));
+}
