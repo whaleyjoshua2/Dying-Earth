@@ -159,6 +159,8 @@ greenwash_resentment = 0.2
 # Ticket #489 (version 0.09.9): four, from two, the four a station built over Earth now takes, so
 # their first can still be ordered on turn one.
 start_emigrants = 4
+# Ticket #585 (version 0.1.0.4), at the designer's word: 10 Ducats where the table gives none.
+start_ducats = 10
 blurb = "Leave Earth: the diaspora is the point."
 motto = "Nothing left behind but the Earth."
 # Ticket #210 (version 0.08.1): the prefix every Ship of theirs wears in front of its name --
@@ -239,6 +241,8 @@ start_station = "Axiom"
 # Ticket #290 (version 0.08.6): the Colonists aboard it when the game opens, from nowhere, so the
 # station has two Module slots free from turn one; bare, it had none.
 start_colonists = 2
+# Ticket #585 (version 0.1.0.4), at the designer's word: 10 Ducats where the table gives none.
+start_ducats = 10
 # Ticket #210 (version 0.08.1): the prefix every Ship of theirs wears in front of its name --
 # Archive Class Vessel. Chosen at the designer's word, "dealers choice". It belongs to the
 # HOLDER, not the hull: the name is the ship's and travels with it, the prefix is whoever flies it.
@@ -473,6 +477,7 @@ found_with = 4
 [start]
 # Raised from 60 on ticket #24, since income now flows from turn one. Ticket #582 (version 0.1.0.3):
 # a Faction's row may carry `start_materials` in place of this figure; the Prospectors' says 60.
+# Ticket #585 (version 0.1.0.4): and `start_ducats`; the Arkwrights' and Archivists' say 10.
 materials = 80
 fuel = 20
 energy = 20

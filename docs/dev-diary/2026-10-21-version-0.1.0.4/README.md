@@ -25,3 +25,21 @@ playtest note. No picture: a figure, nothing on the screen changes shape.
   third; their gate completes in 79 of 80 at a median turn 27, as before. The computer sets its
   banking share from the bar each turn, so a higher bar is met by a higher share. Reported and left
   at the designer's word.
+
+## The Arkwrights and the Archivists open with 10 Ducats
+
+Ticket [#585](https://github.com/whaleyjoshua2/Dying-Earth/issues/585), spec §2.
+
+A `start_ducats` beside the Prospectors' `start_materials` on the Faction's row, read by the one
+function `Game::new` and the card both use; the Arkwrights' and Archivists' rows say 10. Two tests
+were written first and watched red (the seats at 0 Ducats; the card's glyph line with no Ducats),
+then green. The designer chose the glyph line alone over a signature clause.
+
+**The picture** ([`ticket-585/faction-cards-low.png`](ticket-585/faction-cards-low.png)): the Faction
+screen's second row, the Arkwrights and the Archivists, each opening line reading *"Opens with 80 · 20
+· 20 · 10"* with the Ducat glyph; the signature rules unchanged. The second row sits below the fold at
+1280x800, so the shot needed a new building aid, `cards:low`, which scrolls the cards down one row.
+
+- **The sweep** ([`sweeps/ticket-585.txt`](sweeps/ticket-585.txt)): **28 / 37 / 5 / 10 and no
+  collapse**, from 30 / 36 / 3 / 9, 1 collapse and 1 draw. Noise throughout: the Arkwrights +2,
+  the Archivists +1. In a logged game neither seat spends the Ducats on turn one. Reported and left.

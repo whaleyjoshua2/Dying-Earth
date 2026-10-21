@@ -1827,7 +1827,8 @@ impl Game {
     pub fn new(tables: std::sync::Arc<Tables>, setup: NewGame) -> Game {
         let mut rng = ChaCha8Rng::seed_from_u64(setup.seed);
         // Ticket #582 (version 0.1.0.3): the opening Stockpile is the Faction's -- the table's
-        // figures, the Materials the card's own where it says -- so the Prospectors open with 60.
+        // figures, the Materials the card's own where it says -- so the Prospectors open with 60;
+        // since ticket #585 (version 0.1.0.4) the Ducats too, the Arkwrights' and Archivists' 10.
         let seat = |kind: FactionKind, ai: bool| SeatState {
             kind,
             ai,

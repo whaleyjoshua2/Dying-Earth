@@ -24409,3 +24409,23 @@ fn the_prospectors_open_with_60_materials_where_the_others_hold_80() {
     assert!(sig.contains("They open with 60 Materials, where others hold 80."), "{sig}");
     assert!(!t.signature(FactionKind::Custodians).contains("open with"));
 }
+
+/// Ticket #585 (version 0.1.0.4), at the designer's word: the Arkwrights and the Archivists open with
+/// 10 Ducats where the table gives none, the card's `start_ducats` read in place of the table's as
+/// `start_materials` is; the Custodians and the Prospectors open with the table's 0. The signature
+/// texts do not say it: the card's glyph line does. Red with both rows silent: every seat at 0.
+#[test]
+fn the_arkwrights_and_archivists_open_with_10_ducats() {
+    let g = fresh();
+    let t = &g.tables;
+    assert_eq!(t.start.ducats, 0);
+    for seat in 0..4 {
+        let s = &g.seats[seat];
+        let want = if matches!(s.kind, FactionKind::Arkwrights | FactionKind::Archivists) { 10.0 } else { 0.0 };
+        assert_eq!(s.stockpile.ducats, want, "{:?} opens with {} Ducats", s.kind, s.stockpile.ducats);
+        assert_eq!(s.stockpile, t.start_stockpile(s.kind), "{:?} reads start_stockpile", s.kind);
+    }
+    for kind in [FactionKind::Arkwrights, FactionKind::Archivists] {
+        assert!(!t.signature(kind).contains("open with"), "the glyph line says it, not the signature: {}", t.signature(kind));
+    }
+}

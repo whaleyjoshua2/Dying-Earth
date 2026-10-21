@@ -2130,8 +2130,14 @@ fn faction_screen(root: &mut Ui, session: &Session, actions: &mut Vec<Action>) {
         // the state a player is in when the screen opens. A non-floating bar is laid out solidly
         // whenever the content overflows, and is absent entirely when it does not.
         ui.style_mut().spacing.scroll.floating = false;
-        egui::ScrollArea::vertical()
-            .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::VisibleWhenNeeded)
+        let mut area = egui::ScrollArea::vertical().scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::VisibleWhenNeeded);
+        // Ticket #585 (version 0.1.0.4), a building aid: `cards:low` scrolls the cards to the
+        // second row, the Arkwrights and the Archivists, which a headless capture cannot reach; one
+        // card row down at the default 1280x800 (an unbounded offset lays out nothing).
+        if !session.shot_prefix.is_empty() && std::env::args().any(|a| a == "cards:low") {
+            area = area.vertical_scroll_offset(575.0);
+        }
+        area
             .show(ui, |ui| {
                 // All four cards take ONE height, the tallest's, so the screen reads as a 2x2 matrix
                 // rather than as four cards of their own lengths. The height cannot be known before
@@ -2306,8 +2312,9 @@ fn faction_rulebook(ui: &mut Ui, session: &Session, kind: FactionKind) {
 }
 
 /// Ticket #582 (version 0.1.0.3): the figures a seat of the Faction opens with, in the Stockpile's
-/// order with each one's glyph key and word -- the Ducats only when the table gives any, since a
-/// `0` on every card says nothing. Read from `start_stockpile`, the figure `Game::new` hands out.
+/// order with each one's glyph key and word -- the Ducats only when the seat opens with any (since
+/// ticket #585 the Arkwrights' and Archivists' 10), since a `0` says nothing. Read from
+/// `start_stockpile`, the figure `Game::new` hands out.
 fn start_goods(tables: &dying_earth_engine::data::Tables, kind: FactionKind) -> Vec<(i64, &'static str, &'static str)> {
     let s = tables.start_stockpile(kind);
     let mut out = vec![(s.materials as i64, "materials", "Materials"), (s.fuel as i64, "fuel", "Fuel"), (s.energy as i64, "energy", "Energy")];
@@ -13159,6 +13166,11 @@ mod tests {
         let tables = dying_earth_engine::data::Tables::load(&dying_earth_engine::data::default_data_dir()).unwrap();
         assert_eq!(start_goods(&tables, FactionKind::Prospectors), vec![(60, "materials", "Materials"), (20, "fuel", "Fuel"), (20, "energy", "Energy")]);
         assert_eq!(start_goods(&tables, FactionKind::Custodians), vec![(80, "materials", "Materials"), (20, "fuel", "Fuel"), (20, "energy", "Energy")]);
+        // Ticket #585 (version 0.1.0.4): the Arkwrights' and Archivists' 10 Ducats, the glyph line
+        // the one place the card says it.
+        for kind in [FactionKind::Arkwrights, FactionKind::Archivists] {
+            assert_eq!(start_goods(&tables, kind), vec![(80, "materials", "Materials"), (20, "fuel", "Fuel"), (20, "energy", "Energy"), (10, "ducats", "Ducats")], "{kind:?}");
+        }
     }
 
     /// Ticket #543 (version 0.1.0.1): a Colony Ship with one to three aboard is drawn yellow, the

@@ -40,3 +40,23 @@ the computer Prospectors bank to their pace, and the Fund at the end rose by abo
   seatings and unmoved in the third, since the pace table rose with it and the computer banks
   harder to meet it. Reported and left; the Fund is a pace the computer sets to the bar, so a bar
   alone does not slow it.
+
+## 2. The Arkwrights and the Archivists open with 10 Ducats
+
+Ticket: [The Arkwrights and Archivists open with 10 Ducats](https://github.com/whaleyjoshua2/Dying-Earth/issues/585).
+
+The designer: *"Arkwrights and Archivists start with 10 duckets"*. They stood at 3 and 9 wins of 80
+on §1's board, the Arkwrights the farthest seat below the ideal.
+
+- **A `start_ducats` on a Faction's row**, read by `Tables::start_stockpile` in place of the `[start]`
+  table's 0 as `start_materials` is (0.1.0.3 §22), and refused when negative. The Arkwrights' and
+  Archivists' rows say 10; the Custodians and the Prospectors open with the table's 0.
+- **The card** says it on its opening glyph line alone, *"Opens with 80 · 20 · 20 · 10"* with the
+  Ducat glyph, which already showed the Ducats wherever there were any; the signature texts do not
+  repeat it, at the designer's word.
+- **The computer** needs nothing: the stockpile is the seat's. In a logged game (seed 7) neither seat
+  spends the Ducats on turn one; both sell Fuel and keep them.
+- **Swept** (`sweeps/ticket-585.txt`): **28 / 37 / 5 / 10 and no collapse**, from §1's 30 / 36 / 3 /
+  9, 1 collapse and 1 draw. The Arkwrights +2 and the Archivists +1 are noise; so is the rest. The
+  gates: the Arkwrights' in 65 of 80 at a median turn 30 (70 at 31), the Archivists' 68 at 30 (70 at
+  29). Ten Ducats on turn one do not move the board. Reported and left.

@@ -779,9 +779,14 @@ pub struct FactionCard {
     pub start_extra_facilities: Vec<FacilityKind>,
     /// Ticket #582 (version 0.1.0.3), at the designer's word: the Materials this Faction opens with,
     /// read in place of `[start] materials` where a row carries one; the Prospectors' row says 60
-    /// where the table says 80. Fuel, Energy and Ducats are the table's for every seat.
+    /// where the table says 80. Fuel and Energy are the table's for every seat.
     #[serde(default)]
     pub start_materials: Option<i64>,
+    /// Ticket #585 (version 0.1.0.4), at the designer's word: the Ducats this Faction opens with,
+    /// read in place of `[start] ducats` where a row carries one; the Arkwrights' and Archivists'
+    /// rows say 10 where the table says 0.
+    #[serde(default)]
+    pub start_ducats: Option<i64>,
     // Ticket #51: the per-Faction figures the Arkwrights' card carries. Every one is neutral by
     // default, so a card that names none plays exactly as it did before.
     /// What a Habitat here holds, times this.
@@ -2461,6 +2466,9 @@ impl Tables {
             if f.start_materials.is_some_and(|m| m < 0) {
                 return Err(err("factions.toml", format!("row {}: start_materials must not be negative", f.name)));
             }
+            if f.start_ducats.is_some_and(|d| d < 0) {
+                return Err(err("factions.toml", format!("row {}: start_ducats must not be negative", f.name)));
+            }
             if f.victory_first.bar <= 0.0 {
                 return Err(err("factions.toml", format!("row {}: victory_first.bar must be positive", f.name)));
             }
@@ -2840,14 +2848,16 @@ impl Tables {
         &self.factions[kind as usize]
     }
     /// Ticket #582 (version 0.1.0.3): the Stockpile a seat of this Faction opens with -- the
-    /// `[start]` table's figures, the Materials the card's own where it says (the Prospectors' 60).
+    /// `[start]` table's figures, the Materials the card's own where it says (the Prospectors' 60),
+    /// and since ticket #585 (version 0.1.0.4) the Ducats too (the Arkwrights' and Archivists' 10).
     /// `Game::new` and the card's opening goods line both read it, so they cannot drift.
     pub fn start_stockpile(&self, kind: FactionKind) -> crate::state::Stockpile {
+        let f = self.faction(kind);
         crate::state::Stockpile {
-            materials: self.faction(kind).start_materials.unwrap_or(self.start.materials) as f64,
+            materials: f.start_materials.unwrap_or(self.start.materials) as f64,
             fuel: self.start.fuel as f64,
             energy: self.start.energy as f64,
-            ducats: self.start.ducats as f64,
+            ducats: f.start_ducats.unwrap_or(self.start.ducats) as f64,
         }
     }
     /// Ticket #350 (version 0.09.1): the Faction's Victory Condition in one clause, its figures

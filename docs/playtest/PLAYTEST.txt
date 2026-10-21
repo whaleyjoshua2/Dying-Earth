@@ -37,6 +37,8 @@ EARTH
 - INFLUENCE costs 4.5 Ducats a point; the Distress Call card gives +2.
 - THE PROSPECTORS open with 60 Materials where the other three open with 80. Every Faction's
   card now says what it opens with, in a line above its signature rule.
+- THE ARKWRIGHTS and THE ARCHIVISTS open with 10 Ducats; the other two open with none. The
+  card's opening line shows it.
 - A STRIP PERMIT is once per Region, ever, and the button and the help say so.
 
 SPACE
