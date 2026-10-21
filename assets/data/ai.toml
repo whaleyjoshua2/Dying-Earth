@@ -385,8 +385,9 @@ bounty_least = 1.0
 # Ticket #506 (version 0.1.0.0): every turn stretched by 50/36 and every figure to the new bar
 # (the Fund 3,500, 18 off Earth), with the game at fifty turns.
 # Ticket #580 (version 0.1.0.3): every figure x 4250/3500 with the bar, the turns as they were.
+# Ticket #584 (version 0.1.0.4): every figure x 5000/4250 with the bar, the turns as they were.
 [pace.prospectors]
-first = [[12, 567], [25, 1417], [37, 2550], [47, 4250]]
+first = [[12, 667], [25, 1667], [37, 3000], [47, 5000]]
 colonists = [[17, 6], [31, 18]]
 
 [pace.custodians]

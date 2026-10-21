@@ -62,7 +62,7 @@ VICTORY AND THE CLIMATE
 - The ARCHIVE wants 250 Research; the UPLOAD is 16 Colonists, four a turn at most, and the
   Archive draws more Energy as it fills. Modules at a place without the people to run them
   go dark.
-- The PROSPECTORS' bar is 4,250 Ducats in the Venture Fund; the Fund counts 0.7 of their
+- The PROSPECTORS' bar is 5,000 Ducats in the Venture Fund; the Fund counts 0.7 of their
   score, and the Arkwrights' Colonial Capital a tenth of theirs. The Fund's growth is
   shown whole on the card.
 - The STABILIZATION RUN counts everything the temperature does, cards and permafrost

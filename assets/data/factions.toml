@@ -124,7 +124,9 @@ victory_short = "put {first} Ducats in the Venture Capital Fund with {second} Co
 # read 59%; it reads 42%.
 # Ticket #580 (version 0.1.0.3), at the designer's word: 4,250 (3,500 x 17/14), with the race for the
 # Moon (#564) putting the Prospectors first there in 16 to 19 games of 20 and at 56 wins of 80.
-victory_first = { kind = "venture_fund", bar = 4250, weight = 0.7 }
+# Ticket #584 (version 0.1.0.4), at the designer's word: 5,000, with the Prospectors at 41 wins of 80 on
+# 0.1.0.3's closing board and the 4,250 bar not biting (the computer banks to its pace).
+victory_first = { kind = "venture_fund", bar = 5000, weight = 0.7 }
 victory_second = { kind = "off_world_presence", bar = 18 }
 # Ticket #471 (version 0.09.7): the Opening Objective -- no deadline, met once, rewarded once.
 # Ticket #478 (version 0.09.8): 75 Ducats to 50, and the three Banks must work three Incomes running.
