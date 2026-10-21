@@ -1040,8 +1040,8 @@ pub struct DucatsCard {
     #[serde(default = "price_band_default")]
     pub price_band: i64,
     /// Ticket #220: the NET units of one resource, bought less sold across the whole table in a
-    /// turn, that move its price one step; since ticket #593 (version 0.1.0.4) unit by unit within
-    /// the turn, every lot priced at the running net. 20 is a measured figure: a trading turn carries a median
+    /// turn, that move its price one step; since ticket #593 (version 0.1.0.4) also unit by unit
+    /// within the turn, each seat's lots priced at its own running net, the table's banked at the settle. 20 is a measured figure: a trading turn carries a median
     /// 20 units across all four seats, so a normal turn's trading is visible without pegging the
     /// price at its band's edge.
     #[serde(default = "price_step_default")]

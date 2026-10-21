@@ -109,31 +109,37 @@ The designer: *"Check the way the market floats price changes - it should increa
 are bought and decrease when sold"*. It floated once a turn, one Ducat at most, inside a band of 1,
 and every lot of a turn cost the same.
 
-- **Every lot re-prices**, at the designer's word: each unit is priced at the table's running net
-  for that good this turn (bought less sold, every seat), a Ducat for every `price_step_units` (20)
-  from where the turn opened. A Buy of 40 Materials at 3 costs 20 x 3 + 20 x 4; a Sale of 40 fetches
-  half of 20 x 3 + 20 x 2. Seats commit in seat order, so a later seat buys after an earlier one.
-- **The seat's own pending trades count**: the Trading window quotes the next unit and the next lot
-  after them, the orders list prices each trade after the ones ahead of it, and `remaining` and the
-  order check pay them as quoted (`trade_cost`).
+- **Every lot re-prices**, at the designer's word: each unit is priced at the **seat's own** running
+  net for that good this turn (bought less sold by that seat), a Ducat for every `price_step_units`
+  (20) from where the turn opened. A Buy of 40 Materials at 3 costs 20 x 3 + 20 x 4; a Sale of 40
+  fetches half of 20 x 3 + 20 x 2.
+- **Another seat's trading moves nothing a seat is quoted this turn**: every seat orders blind of
+  the others, so the whole table's net is banked at the settle and moves the next turn's price.
+  The first build priced each unit at the whole table's running net, and a seat that committed
+  after a big buyer paid a price it had not been quoted (216 order lists over a sweep had their
+  first dropped order refused for Ducats; the turn logs only a list's first). Planning each
+  computer seat after the seats before it had committed cured the drops and handed the last seat
+  to plan an edge: wins by seat 14 / 38 / 16 / 10 became 10 / 30 / 13 / 25, the Archivists' gain
+  all from seat 3 (`sweeps/ticket-593-planning.txt`). Both were taken back, at the designer's word,
+  for this rule: every seat plans before any commits, as before.
+- **The seat's pending trades count**: the Trading window quotes the next unit and the next lot
+  after them, the orders list prices each trade after the ones ahead of it, and `remaining`, the
+  order check and the commit pay them as quoted (`trade_cost`).
 - **The band is 2** either side of the card figure (`price_band`, from 1), **never under 1**:
   Materials and Fuel 1 to 5, Energy 1 to 4. **The step stays 20 units**.
-- **The settle** banks where the trading left the price (a step per 20 of net, where it moved one
-  step at most); a quiet turn still drifts it one step home. A card's override stands flat.
-- **The Price column's hover**: *"+1 Ducat for every 20 anyone buys this turn, -1 for every 20
-  sold. Up to 2 either side of the usual price, never under 1."*
+- **The settle** banks where the table's trading left the price (a step per 20 of net, where it
+  moved one step at most); a quiet turn still drifts it one step home. A card's override stands flat.
+- **The Price column's hover**: *"+1 Ducat for every 20 you buy this turn, -1 for every 20 you
+  sell; up to 2 either side, never under 1. Everyone's trading moves next turn's price."*
 - **The computer** prices every trade the same way, and its Fuel buy is checked after its earlier
-  trades. Its at-or-above-base sale check reads the price at its planning, and a big sale walks
-  itself down from there.
-- **Each computer seat plans after the seats before it have committed**, at the designer's word
-  after the first build: every seat had planned before any committed, so a seat after a big buyer
-  was quoted a price that had moved and had its Buy dropped (216 order lists over the sweep's batch
-  had their first dropped order refused for Ducats; the turn logs only a list's first).
-  The Orders phase now plans and commits one seat at a time in seat order, the player first. A
-  later computer seat therefore also sees what the earlier seats' orders did at once: a build
-  queued, a Ship gone into flight, a Leapfrog or tribute paid. The sweep counts the Ducat drops.
+  trades. Its at-or-above-base sale check reads the opening price, and a big sale walks itself down
+  from there. The sweep counts order lists with an order dropped for want of Ducats.
 - **Swept** (`sweeps/ticket-593.txt`): **26 / 37 / 3 / 12 and 2 collapses**, from §4's 24 / 40 / 5
   / 11 and none: noise. Units bought 58,018 from 63,624, sold 77,827 from 73,384. Reported and left.
 - **Swept again** with the planning order (`sweeps/ticket-593-planning.txt`): **21 / 25 / 8 / 24
   and 2 collapses**, from 26 / 37 / 3 / 12 and 2; order lists with a Ducat drop **0, from 216**.
   The Prospectors' twelve off and the Archivists' twelve on are past noise.
+- **Swept with each seat priced by its own trades** (`sweeps/ticket-593-own-trades.txt`), every
+  seat planning before any commits: **25 / 40 / 3 / 9 and 2 collapses**; wins by seat 15 / 39 / 17 /
+  6; order lists with a Ducat drop **0**. The planning order's 21 / 25 / 8 / 24 was the seat-order
+  edge, as the designer suspected: without it the board is back where §5's first build left it.

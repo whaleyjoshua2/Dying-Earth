@@ -43,9 +43,9 @@ EARTH
   (a station over it counts). The Research income lists it as "Bodies settled".
 - ORBITAL DATA CENTERS lifts an Observatory's Research x1.25, from x1.5, and once it stands
   every Tech pick is from four, not three, whoever leads it.
- - THE MARKET re-prices every lot: each 20 bought this turn makes the next a Ducat dearer, each
-   20 sold a Ducat cheaper, 2 either side of the usual price. Buy 40 Materials and watch the
-   second 20 cost more.
+ - THE MARKET re-prices every lot: each 20 you buy this turn makes your next a Ducat dearer, each
+   20 you sell a Ducat cheaper, 2 either side of the usual price; everyone's trading moves next
+   turn's price. Buy 40 Materials and watch the second 20 cost more.
 - A STRIP PERMIT is once per Region, ever, and the button and the help say so.
 
 SPACE

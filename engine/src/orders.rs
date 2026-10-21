@@ -692,7 +692,7 @@ impl Game {
     }
 
     /// Ticket #593 (version 0.1.0.4): a Buy or a Sell priced after the seat's `earlier` trades this
-    /// turn, which move the running net as committed trades do, so the window quotes the next lot
+    /// turn, which move its own running net, so the window quotes the next lot
     /// and a list is paid as it was quoted. Anything else is `order_cost`'s.
     pub fn trade_cost(&self, seat: Seat, earlier: &[Order], order: &Order) -> Cost {
         let ahead = |r: Resource| -> i64 {
@@ -709,7 +709,7 @@ impl Game {
                 // Ticket #83: the lot's price, times the seat's market multiplier; ticket #387
                 // (version 0.09.3): to the tenth, where it was rounded down. Ticket #577 (version
                 // 0.1.0.3): and times the seat's own cut on that good, where a card gave it one.
-                // Ticket #593 (version 0.1.0.4): each unit at the running net, so a big lot climbs.
+                // Ticket #593 (version 0.1.0.4): each unit at the seat's own running net, so a big lot climbs.
                 let ducats = self.lot_price(seat, *resource, self.lot_ducats(*resource, *amount, ahead(*resource)) as f64);
                 match resource {
                     Resource::Materials => Cost { materials: -*amount as f64, ducats, ..Default::default() },
@@ -761,14 +761,20 @@ impl Game {
         // through the last turn it named -- the Fuel Contract's refusal moves Fuel a step, the
         // Trade Pact takes a step off Materials. The banded price goes on underneath and resumes
         // when the override runs out. (The Cheap Ore Offer set Materials to 1 until ticket #577,
-        // version 0.1.0.3; its refusal is the seat's own cut now, `lot_price`.)
-        self.unit_price_at(row, self.market.net[row])
+        // version 0.1.0.3; its refusal is the seat's own cut now, `lot_price`.) Ticket #593 (version
+        // 0.1.0.4): the price a seat's first unit of the turn is quoted, whatever the table traded.
+        self.unit_price_at(row, 0)
     }
 
     /// Ticket #593 (version 0.1.0.4), at the designer's word: the price of one unit with `net` units
-    /// of the good bought less sold across the table ahead of it this turn. Every
+    /// of the good bought less sold ahead of it this turn BY THE SAME SEAT. Every
     /// `price_step_units` of net moves it a Ducat from where the turn opened, inside the band and
-    /// never under 1. A card's override stands flat over the band, whatever is traded.
+    /// never under 1. A card's override stands flat over the band, whatever is traded. Another
+    /// seat's trading this turn moves nothing until the settle, since every seat orders blind of
+    /// the others: a first build priced each unit at the whole table's running net, so a seat that
+    /// committed after a big buyer paid a price it could not have been quoted (216 order lists in a
+    /// sweep had a Buy dropped for it), and planning each seat after the ones before it committed
+    /// handed the last seat an edge (its wins 10 to 25 of 80).
     pub fn unit_price_at(&self, row: usize, net: i64) -> i64 {
         if self.market.card_price[row] > 0 && self.turn <= self.market.card_price_until[row] {
             return self.market.card_price[row];
@@ -782,13 +788,12 @@ impl Game {
         price.clamp((base - band).max(1), (base + band).max(1))
     }
 
-    /// Ticket #593: the Ducats for `amount` units of `resource` bought, each at the running net,
-    /// with `ahead` more units of the seat's own pending trades before them. The window's price
-    /// before the Faction's multiplier and a seat's cut, which `lot_price` takes.
+    /// Ticket #593: the Ducats for `amount` units of `resource` bought, each at the seat's own
+    /// running net, `ahead` being its trades in that good before them this turn. The window's
+    /// price before the Faction's multiplier and a seat's cut, which `lot_price` takes.
     pub fn lot_ducats(&self, resource: Resource, amount: i64, ahead: i64) -> i64 {
         let Some(row) = Self::market_row(resource) else { return 0 };
-        let net = self.market.net[row] + ahead;
-        (0..amount.max(0)).map(|i| self.unit_price_at(row, net + i)).sum()
+        (0..amount.max(0)).map(|i| self.unit_price_at(row, ahead + i)).sum()
     }
 
     /// Ticket #337: the price the band alone says, with no card over it. The settle reads this, so
@@ -860,8 +865,8 @@ impl Game {
     }
 
     /// Ticket #220 (version 0.08.2): the turn's trading is banked into each price at the settle.
-    /// Ticket #593 (version 0.1.0.4): the price moves unit by unit during the turn (`unit_price_at`)
-    /// and the settle keeps where the trading left it: every `price_step_units` of net bought a step
+    /// Ticket #593 (version 0.1.0.4): within the turn each seat's units are priced by its own trading
+    /// (`unit_price_at`), and the settle banks the whole table's net: every `price_step_units` of net bought a step
     /// up, the same sold a step down, and it sticks at the edge of its band -- the window does NOT begin refusing there, which
     /// would quietly invent a stock limit this game does not have (`check_order` tests only that the
     /// amount is positive and the resource has a price; nothing is ever decremented window-side).
@@ -912,7 +917,7 @@ impl Game {
     /// #387 (version 0.09.3): to the tenth, where the division was whole: one Material at 3 Ducats
     /// over the divisor of 2 sells for 1.5, where the whole division paid 1 and lost the half.
     ///
-    /// Ticket #593 (version 0.1.0.4): each unit sold at the running net, so a big sale fetches
+    /// Ticket #593 (version 0.1.0.4): each unit sold at the seat's own running net, so a big sale fetches
     /// less; `ahead` is the seat's own pending trades before it, as `lot_ducats` takes them.
     pub fn sale_price_after(&self, resource: Resource, amount: i64, ahead: i64) -> f64 {
         if !matches!(resource, Resource::Materials | Resource::Fuel) {
@@ -923,8 +928,7 @@ impl Game {
         if d.sell_divisor <= 0 {
             return 0.0;
         }
-        let net = self.market.net[row] + ahead;
-        let per: i64 = (0..amount.max(0)).map(|i| self.unit_price_at(row, net - i)).sum();
+        let per: i64 = (0..amount.max(0)).map(|i| self.unit_price_at(row, ahead - i)).sum();
         tenth(per as f64 / d.sell_divisor as f64)
     }
 
@@ -2881,8 +2885,14 @@ impl Game {
             }
         }
         let leaving: Vec<ShipId> = orders.iter().filter_map(|o| if let Order::Transit { ship, .. } = o { Some(*ship) } else { None }).collect();
+        // Ticket #593 (version 0.1.0.4): a trade is paid after this seat's own trades ahead of it,
+        // as `remaining` and the check quoted it.
+        let mut traded: Vec<Order> = Vec::new();
         for order in ordered {
-            let cost = self.order_cost(seat, order);
+            let cost = self.trade_cost(seat, &traded, order);
+            if matches!(order, Order::Buy { .. } | Order::Sell { .. }) {
+                traded.push(order.clone());
+            }
             {
                 // Ticket #387 (version 0.09.3): settled, so a tenth paid from a tenth leaves a tenth.
                 let st = &mut self.seat_mut(seat).stockpile;

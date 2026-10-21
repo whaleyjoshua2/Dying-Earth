@@ -24495,14 +24495,14 @@ fn the_arkwrights_draw_one_research_for_each_body_settled() {
 
 // ---------------------------------------------------------------- #593 The market's price rises as lots are bought and falls as they are sold (version 0.1.0.4)
 
-/// Ticket #593 (version 0.1.0.4), at the designer's word: **every lot re-prices as the turn's
-/// trading builds**, where the price moved once, at the settle. Each unit is priced at the table's
-/// running net for that good this turn: every 20 bought ahead of it adds a Ducat, every 20 sold
-/// takes one off, inside a band of 2 either side of the card figure and never under 1. The seat's
-/// own pending trades count, so the window quotes the next lot, and the settle banks where the
-/// trading left the price.
+/// Ticket #593 (version 0.1.0.4), at the designer's word: **every lot re-prices as the seat's own
+/// trading builds**, where the price moved once, at the settle. Each unit is priced at the seat's
+/// own running net for that good this turn: every 20 it bought ahead of it adds a Ducat, every 20
+/// sold takes one off, inside a band of 2 either side of the card figure and never under 1. Its
+/// pending trades count, so the window quotes the next lot; another seat's trading moves nothing it
+/// is quoted, and the settle banks the whole table's net.
 #[test]
-fn the_market_prices_each_lot_at_the_running_net() {
+fn the_market_prices_each_lot_at_the_seats_own_running_net() {
     let mut g = game();
     let me = Seat(0);
     assert_eq!(g.tables.faction(g.kind(me)).market_multiplier, 1.0, "a seat at the window's own price");
@@ -24522,27 +24522,30 @@ fn the_market_prices_each_lot_at_the_running_net() {
     // A sale of 40 fetches half of 20 at the figure and 20 a Ducat cheaper.
     assert_eq!(-cost(&g, &[], &sell(40)), (20 * base + 20 * (base - 1)) as f64 / 2.0, "a big sale fetches less");
 
-    // Committed, the table's net moves the price the next buyer sees, inside the band.
-    g.commit_orders(me, &[buy(40)]);
-    assert_eq!(g.trade_price(Resource::Materials), Some(base + 2), "40 bought: two Ducats up");
-    g.commit_orders(me, &[buy(100)]);
-    assert_eq!(g.trade_price(Resource::Materials), Some(base + band), "stuck at the band's edge");
-    // The settle banks where the trading left it.
+    // Committed, a seat's list is paid as it was quoted: 20 at the figure, 20 a Ducat dearer.
+    g.commit_orders(me, &[buy(20), buy(20)]);
+    assert_eq!(g.seats[0].stockpile.ducats, 10_000.0 - (20 * base + 20 * (base + 1)) as f64, "paid as quoted");
+    // Another seat's trading this turn moves nothing it is quoted: every seat orders blind.
+    let rival = Seat(2);
+    assert_eq!(g.tables.faction(g.kind(rival)).market_multiplier, 1.0);
+    g.seats[rival.index()].stockpile.ducats = 10_000.0;
+    assert_eq!(g.check_order(rival, &[], &buy(20)).unwrap().ducats, (20 * base) as f64, "the rival is quoted the opening price");
+    g.commit_orders(rival, &[buy(100)]);
+    assert_eq!(g.trade_price(Resource::Materials), Some(base), "and the window still opens at the figure");
+    // The settle banks the whole table's net: 140 bought, past the band's edge.
     g.settle_market();
-    assert_eq!(g.market_price_at(0), base + band, "the next turn opens where this one closed");
+    assert_eq!(g.market_price_at(0), base + band, "the next turn opens where the table's trading left it");
 
     // Energy runs down to 1 and no lower.
-    let energy = Game::market_row(Resource::Energy).unwrap();
-    g.market.net[energy] = -200;
-    assert_eq!(g.trade_price(Resource::Energy), Some(1), "never under a Ducat");
+    assert_eq!(g.lot_ducats(Resource::Energy, 1, -200), 1, "never under a Ducat");
 }
 
-/// Ticket #593 (version 0.1.0.4), the designer's follow-up: **each computer seat plans after the
-/// seats before it have traded**, so it is quoted the price their trading left and never has a Buy
-/// dropped for a price that moved under it. Seats plan and commit in seat order, one at a time,
-/// where every seat planned before any committed.
+/// Ticket #593 (version 0.1.0.4), the designer's follow-up: **every seat plans before any seat
+/// commits**, so no computer seat plans knowing what an earlier seat's orders did. A build that
+/// planned each seat after the seats before it had committed gave the last seat to plan 25 wins of
+/// 80 from 10; it was taken back when each seat's trades came to be priced by its own trades alone.
 #[test]
-fn a_computer_seat_plans_after_the_seats_before_it_have_traded() {
+fn every_seat_plans_before_any_seat_commits() {
     let mut g = game();
     assert!(!g.seat(Seat(0)).ai && Seat::ALL[1..].iter().all(|s| g.seat(*s).ai), "the player first, the computer after");
     g.seats[0].stockpile.ducats = 1000.0;
@@ -24552,11 +24555,9 @@ fn a_computer_seat_plans_after_the_seats_before_it_have_traded() {
     g.end_turn(orders).expect("the turn ends");
     let log = g.log.to_vec();
     let at = |needle: &str| log.iter().position(|l| l.contains(needle)).unwrap_or_else(|| panic!("no {needle:?} in the log"));
-    let bought = at("bought 100 Materials");
+    let bought = at(&format!("{} bought 100 Materials", g.seat_name(Seat(0))));
     for s in &Seat::ALL[1..] {
         let planned = at(&format!("AI {} scored", g.seat_name(*s)));
-        assert!(bought < planned, "{} planned before the player's trade was paid", g.seat_name(*s));
+        assert!(planned < bought, "{} planned after the player's trade was paid", g.seat_name(*s));
     }
-    // The last seat plans after the seats ahead of it have committed theirs.
-    assert!(at(&format!("{} gave", g.seat_name(Seat(2)))) < at(&format!("AI {} scored", g.seat_name(Seat(3)))));
 }

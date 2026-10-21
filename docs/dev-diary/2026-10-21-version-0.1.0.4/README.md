@@ -144,3 +144,26 @@ watched red (the Prospectors scored their actions before the player's Buy was lo
 | Archivists | 36,441 | 22,810 | 87,553 | 29,456 | 53,501 | 82,623 |
 | all four | 484,400 | 170,815 | 784,922 | 901,432 | 204,607 | 567,200 |
 | net of upkeep | 478,687 | 132,692 | 111,272 | 532,738 | 204,607 | |
+
+**Taken back: the planning order.** The designer suspected the better board came from seat order
+and what a later seat could see. Counted by seat position it did: wins by seat 14 / 38 / 16 / 10
+with the old order became 10 / 30 / 13 / 25, and the Archivists' twelve all came from seat 3, where
+three of the sweep's four seatings put them. At the designer's word every seat plans before any
+commits again, and each seat's trades are priced by its own trades this turn alone; the whole
+table's net is banked at the settle and moves the next turn's price. Two tests were written first
+and watched red on the planning-order build (the rival quoted the table's moved price; the
+Prospectors planned after the player's trade was paid), then green.
+
+- **The sweep** ([`sweeps/ticket-593-own-trades.txt`](sweeps/ticket-593-own-trades.txt)): **25 / 40
+  / 3 / 9 and 2 collapses**; wins by seat 15 / 39 / 17 / 6; order lists with a Ducat drop **0**. The
+  board is back where the first build left it (26 / 37 / 3 / 12): the seat-order edge was the whole
+  of the better spread. Units bought 61,087, sold 70,742.
+
+Income per Faction, mean a game, net of upkeep:
+
+| | Materials | Fuel | Energy | Ducats | Research |
+|---|---|---|---|---|---|
+| Custodians | 2,166 | 840 | 671 | 1,637 | 1,470 |
+| Prospectors | 2,332 | 468 | 290 | 1,176 | 405 |
+| Arkwrights | 1,758 | 433 | 366 | 3,795 | 341 |
+| Archivists | 521 | 235 | 75 | 512 | 659 |

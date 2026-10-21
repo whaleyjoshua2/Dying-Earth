@@ -9857,8 +9857,8 @@ fn trading_window(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSt
         ui.label(RichText::new("Line").strong());
         // Ticket #593 (version 0.1.0.4): the rule the price column follows, on its head.
         let d = &game.tables.ducats;
-        ui.label(RichText::new("Price").strong()).on_hover_text(format!("+1 Ducat for every {n} anyone buys this turn, -1 for every {n} sold.
-Up to {b} either side of the usual price, never under 1.", n = d.price_step_units, b = d.price_band));
+        ui.label(RichText::new("Price").strong()).on_hover_text(format!("+1 Ducat for every {n} you buy this turn, -1 for every {n} you sell; up to {b} either side, never under 1.
+Everyone's trading moves next turn's price.", n = d.price_step_units, b = d.price_band));
         ui.label(RichText::new("Quantity").strong());
         ui.label(RichText::new("Buy").strong());
         ui.label(RichText::new("Sell").strong());
