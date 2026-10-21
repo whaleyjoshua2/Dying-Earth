@@ -1536,6 +1536,19 @@ fn build_board(session: &mut Session) {
         eprintln!("order:{name} was refused");
         std::process::exit(3);
     }
+    // `buy:<n>` (a building aid, ticket #593, version 0.1.0.4): two Buys of n Materials placed and
+    // left pending, the seat given the Ducats, so the Trading window (`trade:1`) shows the second lot
+    // and the next one quoted dearer than the first.
+    if let Some(n) = std::env::args().find_map(|a| a.strip_prefix("buy:").and_then(|n| n.parse::<i64>().ok())) {
+        if let Some(g) = session.game.as_mut() {
+            g.seats[0].stockpile.ducats = 1000.0;
+        }
+        let buy = Order::Buy { resource: dying_earth_engine::ids::Resource::Materials, amount: n };
+        if !session.place(buy.clone()) || !session.place(buy) {
+            eprintln!("buy:{n} was refused");
+            std::process::exit(3);
+        }
+    }
     // `liftgo:1` (a building aid, ticket #533, version 0.1.0.1): seat 0's empty Colony Ship at
     // Earth (one is made in low orbit if it has none), four Pioneers waiting in its start state, and
     // a lift of the four AND a flight to the Moon both placed, so its card (`stack:earth ship:1`)

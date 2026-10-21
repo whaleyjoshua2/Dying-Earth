@@ -803,7 +803,8 @@ fn the_trading_window_sells_materials_fuel_and_energy_at_the_table_prices() {
     assert!(g.check_order(Seat(0), &[], &factory).is_err(), "no Materials yet");
     let pending = vec![Order::Buy { resource: Resource::Materials, amount: 22 }];
     let (left, _) = g.remaining(Seat(0), &pending);
-    assert_eq!((left.materials, left.ducats), (22.0, 34.0));
+    // Ticket #593 (version 0.1.0.4): the 21st and 22nd at 4, the running net past the step: 60 + 8.
+    assert_eq!((left.materials, left.ducats), (22.0, 32.0));
     assert!(g.check_order(Seat(0), &pending, &factory).is_ok());
     let f = Order::Buy { resource: Resource::Fuel, amount: 2 };
     assert_eq!(g.order_cost(Seat(0), &f).ducats, 6.0, "Fuel is 3 Ducats each since ticket #421, 4 from #220");
@@ -811,7 +812,7 @@ fn the_trading_window_sells_materials_fuel_and_energy_at_the_table_prices() {
     assert_eq!(g.order_cost(Seat(0), &e).ducats, 10.0, "Energy is 2 Ducats each since ticket #220");
     assert!(g.check_order(Seat(0), &[], &Order::Buy { resource: Resource::Materials, amount: 0 }).is_err(), "a positive amount");
     assert!(g.check_order(Seat(0), &[], &Order::Buy { resource: Resource::Ducats, amount: 5 }).is_err(), "Ducats are not for sale");
-    assert!(g.check_order(Seat(0), &[], &Order::Buy { resource: Resource::Materials, amount: 34 }).is_err(), "102 Ducats needed, 100 held");
+    assert!(g.check_order(Seat(0), &[], &Order::Buy { resource: Resource::Materials, amount: 34 }).is_err(), "116 Ducats needed (20 at 3, 14 at 4), 100 held");
     g.commit_orders(Seat(0), &[m, f, e]);
     assert_eq!(g.seats[0].stockpile, Stockpile { materials: 10.0, fuel: 2.0, energy: 5.0, ducats: 54.0 }, "Fuel at 3 since ticket #421");
 }
@@ -24490,4 +24491,48 @@ fn the_arkwrights_draw_one_research_for_each_body_settled() {
     assert_eq!(line(&g, cus), None, "the Custodians draw none");
     assert_eq!(g.bodies_settled(ark, 1), 2, "Earth and its orbit are never a Body settled");
     assert!(g.tables.signature(FactionKind::Arkwrights).contains("+1 Research a turn for each Body they have settled"), "{}", g.tables.signature(FactionKind::Arkwrights));
+}
+
+// ---------------------------------------------------------------- #593 The market's price rises as lots are bought and falls as they are sold (version 0.1.0.4)
+
+/// Ticket #593 (version 0.1.0.4), at the designer's word: **every lot re-prices as the turn's
+/// trading builds**, where the price moved once, at the settle. Each unit is priced at the table's
+/// running net for that good this turn: every 20 bought ahead of it adds a Ducat, every 20 sold
+/// takes one off, inside a band of 2 either side of the card figure and never under 1. The seat's
+/// own pending trades count, so the window quotes the next lot, and the settle banks where the
+/// trading left the price.
+#[test]
+fn the_market_prices_each_lot_at_the_running_net() {
+    let mut g = game();
+    let me = Seat(0);
+    assert_eq!(g.tables.faction(g.kind(me)).market_multiplier, 1.0, "a seat at the window's own price");
+    let (step, band) = (g.tables.ducats.price_step_units, g.tables.ducats.price_band);
+    assert_eq!((step, band), (20, 2), "20 units a Ducat, 2 either side");
+    g.seats[0].stockpile.ducats = 10_000.0;
+    let base = g.market_base(0);
+    let buy = |n: i64| Order::Buy { resource: Resource::Materials, amount: n };
+    let sell = |n: i64| Order::Sell { resource: Resource::Materials, amount: n };
+    let cost = |g: &Game, pending: &[Order], o: &Order| g.check_order(me, pending, o).expect("a legal trade").ducats;
+
+    // One lot of 40: 20 at the card figure, 20 a Ducat dearer.
+    assert_eq!(cost(&g, &[], &buy(40)), (20 * base + 20 * (base + 1)) as f64, "the second 20 of a lot cost more");
+    // Two lots of 20: the second is quoted after the first.
+    assert_eq!(cost(&g, &[buy(20)], &buy(20)), (20 * (base + 1)) as f64, "the next lot is dearer");
+    assert_eq!(g.remaining(me, &[buy(20), buy(20)]).0.ducats, 10_000.0 - (20 * base + 20 * (base + 1)) as f64, "and paid as quoted");
+    // A sale of 40 fetches half of 20 at the figure and 20 a Ducat cheaper.
+    assert_eq!(-cost(&g, &[], &sell(40)), (20 * base + 20 * (base - 1)) as f64 / 2.0, "a big sale fetches less");
+
+    // Committed, the table's net moves the price the next buyer sees, inside the band.
+    g.commit_orders(me, &[buy(40)]);
+    assert_eq!(g.trade_price(Resource::Materials), Some(base + 2), "40 bought: two Ducats up");
+    g.commit_orders(me, &[buy(100)]);
+    assert_eq!(g.trade_price(Resource::Materials), Some(base + band), "stuck at the band's edge");
+    // The settle banks where the trading left it.
+    g.settle_market();
+    assert_eq!(g.market_price_at(0), base + band, "the next turn opens where this one closed");
+
+    // Energy runs down to 1 and no lower.
+    let energy = Game::market_row(Resource::Energy).unwrap();
+    g.market.net[energy] = -200;
+    assert_eq!(g.trade_price(Resource::Energy), Some(1), "never under a Ducat");
 }

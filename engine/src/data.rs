@@ -1035,11 +1035,13 @@ pub struct DucatsCard {
     /// which is now the MIDPOINT of its band rather than a constant. At 1 every price stays a whole
     /// number and no resource can become free, which is why all three base prices rose by one to
     /// make room -- Materials 2 to 3, Fuel 3 to 4, Energy 1 to 2. Kept optional so an old table
-    /// still loads, as `trade_post_base` is.
+    /// still loads, as `trade_post_base` is, at the old 1. Ticket #593 (version 0.1.0.4): 2 on the
+    /// table, and no price under 1, so Energy at 2 runs 1 to 4.
     #[serde(default = "price_band_default")]
     pub price_band: i64,
     /// Ticket #220: the NET units of one resource, bought less sold across the whole table in a
-    /// turn, that move its price one step. 20 is a measured figure: a trading turn carries a median
+    /// turn, that move its price one step; since ticket #593 (version 0.1.0.4) unit by unit within
+    /// the turn, every lot priced at the running net. 20 is a measured figure: a trading turn carries a median
     /// 20 units across all four seats, so a normal turn's trading is visible without pegging the
     /// price at its band's edge.
     #[serde(default = "price_step_default")]

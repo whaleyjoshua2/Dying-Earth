@@ -100,3 +100,32 @@ going forward"*.
   9 and 1. The Custodians' four off is at the edge of noise, the rest noise. Observatories make 18.9
   Research a world-turn from 21.1; the Archivists' gate completes in 72 of 80 at a median turn 30,
   from 73 at 29. Reported and left.
+
+## 5. The market's price rises as lots are bought and falls as they are sold
+
+Ticket: [The market's price rises as lots are bought and falls as they are sold](https://github.com/whaleyjoshua2/Dying-Earth/issues/593).
+
+The designer: *"Check the way the market floats price changes - it should increase when large lots
+are bought and decrease when sold"*. It floated once a turn, one Ducat at most, inside a band of 1,
+and every lot of a turn cost the same.
+
+- **Every lot re-prices**, at the designer's word: each unit is priced at the table's running net
+  for that good this turn (bought less sold, every seat), a Ducat for every `price_step_units` (20)
+  from where the turn opened. A Buy of 40 Materials at 3 costs 20 x 3 + 20 x 4; a Sale of 40 fetches
+  half of 20 x 3 + 20 x 2. Seats commit in seat order, so a later seat buys after an earlier one.
+- **The seat's own pending trades count**: the Trading window quotes the next unit and the next lot
+  after them, the orders list prices each trade after the ones ahead of it, and `remaining` and the
+  order check pay them as quoted (`trade_cost`).
+- **The band is 2** either side of the card figure (`price_band`, from 1), **never under 1**:
+  Materials and Fuel 1 to 5, Energy 1 to 4. **The step stays 20 units**.
+- **The settle** banks where the trading left the price (a step per 20 of net, where it moved one
+  step at most); a quiet turn still drifts it one step home. A card's override stands flat.
+- **The Price column's hover**: *"+1 Ducat for every 20 anyone buys this turn, -1 for every 20
+  sold. Up to 2 either side of the usual price, never under 1."*
+- **The computer** prices every trade the same way, and its Fuel buy is checked after its earlier
+  trades. Every seat plans before any commits, so a computer seat plans at the turn's opening price;
+  a seat after a big buyer can find a Buy it planned unaffordable, and the turn drops it with a
+  note, as any refused order. Its at-or-above-base sale check reads the opening price, and a big
+  sale walks itself down from there.
+- **Swept** (`sweeps/ticket-593.txt`): **26 / 37 / 3 / 12 and 2 collapses**, from §4's 24 / 40 / 5
+  / 11 and none: noise. Units bought 58,018 from 63,624, sold 77,827 from 73,384. Reported and left.

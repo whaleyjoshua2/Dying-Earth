@@ -5142,7 +5142,9 @@ fn side_panel(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
             for (i, o) in session.pending.iter().enumerate() {
                 ui.horizontal(|ui| {
                     // Ticket #404 (version 0.09.4): everything the order pays, as the driver's confirm says it.
-                    ui.label(format!("{} ({})", order_text(game, o), game.order_price_text(Seat(0), o, game.order_cost(Seat(0), o))));
+                    // Ticket #593 (version 0.1.0.4): a trade, after the trades ahead of it.
+                    let earlier = &session.pending[..i];
+                    ui.label(format!("{} ({})", order_text(game, earlier, o), game.order_price_text(Seat(0), o, game.trade_cost(Seat(0), earlier, o))));
                     if ui.small_button("cancel").clicked() {
                         cancel = Some(i);
                     }
@@ -5643,7 +5645,7 @@ fn accord_terms_hover(terms: &[Term]) -> String {
     terms.iter().map(|t| term_line(*t)).chain(["Acting against a term ends the Accord, at a cost."]).collect::<Vec<_>>().join("\n")
 }
 
-fn order_text(game: &Game, o: &Order) -> String {
+fn order_text(game: &Game, earlier: &[Order], o: &Order) -> String {
     match o {
         // Ticket #226 (version 0.08.2): the Accord orders, so a pending one reads in the order list
         // like any other and can be cancelled like any other.
@@ -5706,8 +5708,8 @@ fn order_text(game: &Game, o: &Order) -> String {
         Order::Influence { target, amount, .. } => format!("{} Influence on {}", amount, game.place_name(*target)),
         Order::BuyInfluence { amount } => format!("Buy {} Influence with Ducats", amount),
         Order::RepairWithDucats { unit, points } => format!("Repair {} on {} with Ducats", counted(points, "point", "points"), unit_name(game, unit)),
-        Order::Buy { resource, amount } => format!("Buy {} {} for {} Ducats", amount, resource.name(), game.order_cost(Seat(0), o).ducats),
-        Order::Sell { resource, amount } => format!("Sell {} {} for {} Ducats", amount, resource.name(), -game.order_cost(Seat(0), o).ducats),
+        Order::Buy { resource, amount } => format!("Buy {} {} for {} Ducats", amount, resource.name(), game.trade_cost(Seat(0), earlier, o).ducats),
+        Order::Sell { resource, amount } => format!("Sell {} {} for {} Ducats", amount, resource.name(), -game.trade_cost(Seat(0), earlier, o).ducats),
         Order::BuildFacilityWithDucats { state, kind } => format!("Build {} in {} for Ducats", kind.name(), game.tables.state(*state).name),
         Order::BuildModuleWithDucats { colony, kind } => format!("Build {} at {} for Ducats", kind.name(), game.place_name(Place::Colony(*colony))),
         Order::BuildStation { body, slot, .. } => format!("Build {}", game.slot_place_name(*body, *slot)),
@@ -9843,10 +9845,20 @@ fn trading_window(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSt
     text_with_icons(ui, &format!("{} Ducats to spend this turn (+{} Ducats last Income).", figure(left.ducats), figure(game.seat(Seat(0)).income_last_turn.ducats)), 14.0, head);
     ui.label("What you buy is yours at once, for this turn's orders. Ducats come from your Regions' economies, Banks and Trade Posts.");
     ui.separator();
+    let ahead = |r: dying_earth_engine::Resource| -> i64 {
+        session.pending.iter().map(|o| match o {
+            Order::Buy { resource, amount } if *resource == r => *amount,
+            Order::Sell { resource, amount } if *resource == r => -*amount,
+            _ => 0,
+        }).sum()
+    };
     let lines: [(usize, Option<dying_earth_engine::Resource>, &str, &str); 4] = [(0, None, "influence", "Influence"), (1, Some(dying_earth_engine::Resource::Materials), "materials", "Materials"), (2, Some(dying_earth_engine::Resource::Fuel), "fuel", "Fuel"), (3, Some(dying_earth_engine::Resource::Energy), "energy", "Energy")];
     egui::Grid::new("trade_grid").num_columns(5).spacing((12.0, 6.0)).show(ui, |ui| {
         ui.label(RichText::new("Line").strong());
-        ui.label(RichText::new("Price").strong());
+        // Ticket #593 (version 0.1.0.4): the rule the price column follows, on its head.
+        let d = &game.tables.ducats;
+        ui.label(RichText::new("Price").strong()).on_hover_text(format!("+1 Ducat for every {n} anyone buys this turn, -1 for every {n} sold.
+Up to {b} either side of the usual price, never under 1.", n = d.price_step_units, b = d.price_band));
         ui.label(RichText::new("Quantity").strong());
         ui.label(RichText::new("Buy").strong());
         ui.label(RichText::new("Sell").strong());
@@ -9854,7 +9866,8 @@ fn trading_window(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSt
         for (i, res, key, name) in lines {
             let per = match res {
                 None => game.tables.ducats.per_influence,
-                Some(r) => game.trade_price(r).unwrap_or(0) as f64,
+                // Ticket #593 (version 0.1.0.4): the next unit's price, after this turn's trading.
+                Some(r) => game.lot_ducats(r, 1, ahead(r)) as f64,
             };
             icon_word(ui, key, name);
             let sells = matches!(res, Some(dying_earth_engine::Resource::Materials) | Some(dying_earth_engine::Resource::Fuel));
@@ -9884,13 +9897,13 @@ fn trading_window(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSt
                 None => Order::BuyInfluence { amount: n },
                 Some(r) => Order::Buy { resource: r, amount: n },
             };
-            let cost = game.order_cost(Seat(0), &buy).ducats;
+            let cost = game.trade_cost(Seat(0), &session.pending, &buy).ducats;
             if ducat_button(ui, game, session, "Buy for", cost, &buy).clicked() {
                 actions.push(Action::Place(buy));
             }
             if let Some(r) = res.filter(|_| sells) {
                 let sell = Order::Sell { resource: r, amount: n };
-                let gain = -game.order_cost(Seat(0), &sell).ducats;
+                let gain = -game.trade_cost(Seat(0), &session.pending, &sell).ducats;
                 if ducat_button(ui, game, session, "Sell for", gain, &sell).clicked() {
                     actions.push(Action::Place(sell));
                 }
@@ -9907,7 +9920,7 @@ fn trading_window(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSt
     // Ticket #369: drawn by the same rule; no figure in this sentence is a quantity of a good, so no
     // glyph lands in it, and that is the rule working rather than a gap.
     text_with_icons(ui, &format!("Buildings: every build button on a Region or Colony card has an \"or\" beside it that buys the building outright for Ducats, at {} times its Materials cost.", game.tables.ducats.per_building_material), 14.0, body);
-    let trades: Vec<String> = session.pending.iter().filter(|o| matches!(o, Order::Buy { .. } | Order::Sell { .. } | Order::BuyInfluence { .. } | Order::BuildFacilityWithDucats { .. } | Order::BuildModuleWithDucats { .. } | Order::BuyCredits { .. } | Order::OfferCredits { .. })).map(|o| order_text(game, o)).collect();
+    let trades: Vec<String> = session.pending.iter().enumerate().filter(|(_, o)| matches!(o, Order::Buy { .. } | Order::Sell { .. } | Order::BuyInfluence { .. } | Order::BuildFacilityWithDucats { .. } | Order::BuildModuleWithDucats { .. } | Order::BuyCredits { .. } | Order::OfferCredits { .. })).map(|(i, o)| order_text(game, &session.pending[..i], o)).collect();
     if !trades.is_empty() {
         ui.separator();
         ui.label(RichText::new("Trades this turn (undo them in the orders list)").strong());

@@ -91,3 +91,34 @@ over the `researched:` Techs for it.
 | Archivists | 38,032 | 22,546 | 87,593 | 40,181 | 52,086 | 76,683 |
 | all four | 515,289 | 193,880 | 832,188 | 891,343 | 216,398 | 576,914 |
 | net of upkeep | 509,381 | 153,752 | 121,381 | 529,675 | 216,398 | |
+
+## The market's price rises as lots are bought and falls as they are sold
+
+Ticket [#593](https://github.com/whaleyjoshua2/Dying-Earth/issues/593), spec §5.
+
+Every unit is priced at the table's running net for its good this turn, a Ducat for every 20 bought
+ahead of it and a Ducat off for every 20 sold; the band is 2 either side of the card figure, never
+under 1; the step stays 20. The designer chose all three as recommended. One door, `trade_cost`,
+prices a trade after the seat's own earlier pending trades, and the window, the orders list,
+`remaining`, the order check and the computer's Fuel buy all read it; commit reads the table's net
+as it moves. The settle banks where the trading left the price. A test was written first and watched
+red (the band at 1), then green; one older pin moved: 22 Materials bought from 100 Ducats leave 32,
+the 21st and 22nd at 4.
+
+**The picture** ([`ticket-593/trading-window.png`](ticket-593/trading-window.png)): two pending Buys
+of 20 Materials, *"Buy 20 for 60"* then *"Buy 20 for 80"*, and the next Materials quoted at 5. A new
+building aid, `buy:<n>`, places the two Buys. The Sell button reads 20.5 for 10, not 25: the sale's
+own units walk the price down from 5.
+
+- **The sweep** ([`sweeps/ticket-593.txt`](sweeps/ticket-593.txt)): **26 / 37 / 3 / 12 and 2
+  collapses**, from §4's 24 / 40 / 5 / 11 and none: noise. Units bought over the batch 58,018 from
+  63,624, sold 77,827 from 73,384. Reported and left.
+
+| | Materials | Fuel | Energy | Ducats | Research | Widgets |
+|---|---|---|---|---|---|---|
+| Custodians | 183,836 | 86,100 | 339,731 | 145,393 | 115,623 | 248,865 |
+| Prospectors | 179,203 | 43,457 | 215,425 | 424,505 | 27,552 | 136,754 |
+| Arkwrights | 133,932 | 42,606 | 196,351 | 283,342 | 25,236 | 124,520 |
+| Archivists | 42,800 | 24,522 | 91,965 | 47,029 | 54,711 | 80,615 |
+| all four | 539,772 | 196,685 | 843,473 | 900,269 | 223,122 | 590,754 |
+| net of upkeep | 532,732 | 153,713 | 110,459 | 544,790 | 223,122 | |

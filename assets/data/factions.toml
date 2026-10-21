@@ -549,7 +549,7 @@ per_leapfrog = 50
 per_exodus_call = 50
 per_repair_point = 10
 # Version 0.04 (ticket #42): the trading window. Ducats per unit bought; a sale returns the buying
-# price divided by sell_divisor (rounded down over the lot); a building bought for Ducats costs its
+# price divided by sell_divisor (to the tenth, each unit at its running price since #593); a building bought for Ducats costs its
 # Materials times per_building_material.
 # Ticket #220 (version 0.08.2): each of the three rose by ONE and is now the MIDPOINT of a band
 # `price_band` wide, not a constant. Energy at 1 had no downward step at all in whole Ducats, and
@@ -558,10 +558,12 @@ per_repair_point = 10
 # Energy +100%, on a currency that also buys Influence, Relief, Resettle and Leapfrogs, and the
 # AI's fixed lot of ten Materials now costs 30 Ducats where it cost 20.
 per_materials = 3
-# Ticket #421 (version 0.09.4): a quarter off, 4 to 3, its band 2 to 4.
+# Ticket #421 (version 0.09.4): a quarter off, 4 to 3, its band 2 to 4 (1 to 5 since #593).
 per_fuel = 3
 per_energy = 2
-price_band = 1
+# Ticket #593 (version 0.1.0.4), at the designer's word: 2 either side, from 1, and every lot priced at
+# the turn's running net, every `price_step_units` a Ducat (never under 1).
+price_band = 2
 price_step_units = 20
 sell_divisor = 2
 per_building_material = 2
