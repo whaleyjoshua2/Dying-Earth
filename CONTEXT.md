@@ -704,7 +704,7 @@ _Avoid_: science, research points, RP, fourth resource
 ### The turn
 
 **Turn**:
-Two calendar months of game time since version 0.05.5 (one before), and the unit the whole game runs in. The game begins in January 2030 and runs fifty turns since version 0.1.0.0 (thirty-six before), so turn 1 is January 2030, turn 2 March 2030 and the fiftieth March 2038; a turn is named by its first month alone, and the top bar names it. All four Factions order simultaneously against the same board, then the turn runs through its phases.
+Two calendar months of game time since version 0.05.5 (one before), and the unit the whole game runs in. The game begins in January 2030 and runs fifty turns since version 0.1.0.0 (thirty-six before), so turn 1 is January 2030, turn 2 March 2030 and the fiftieth March 2038; a turn is named by its first month alone, and the top bar names it. All four Factions order simultaneously against the same board, then the turn runs through its phases. Since version 0.1.0.4 the computer seats plan in seat order after the player's orders are committed, each after the seats before it have committed theirs, so each is quoted the market prices their trading left and sees what else those orders did at once (a build queued, a Ship gone into flight); the player still orders blind.
 _Avoid_: round, month, tick, cycle
 
 **Phase**:

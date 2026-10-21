@@ -122,3 +122,25 @@ own units walk the price down from 5.
 | Archivists | 42,800 | 24,522 | 91,965 | 47,029 | 54,711 | 80,615 |
 | all four | 539,772 | 196,685 | 843,473 | 900,269 | 223,122 | 590,754 |
 | net of upkeep | 532,732 | 153,713 | 110,459 | 544,790 | 223,122 | |
+
+**The planning order**, the designer's follow-up: a computer seat now plans after the seats before it
+have committed, where every seat planned first and committed after. The review had found that a
+later seat was quoted the turn's opening price and paid the price the seats ahead of it had moved;
+the sweep, given a count of order lists whose first dropped order was refused for Ducats (the turn
+logs only a list's first, so a floor), put it at 216 over the batch with the old order (the same 26 / 37 / 3 / 12 re-run) and 0 with the new. A test was written first and
+watched red (the Prospectors scored their actions before the player's Buy was logged), then green.
+
+- **The sweep** ([`sweeps/ticket-593-planning.txt`](sweeps/ticket-593-planning.txt)): **21 / 25 / 8
+  / 24 and 2 collapses**, from 26 / 37 / 3 / 12 and 2. The Prospectors' twelve off and the
+  Archivists' twelve on are past noise, the nearest board yet to the designer's 15 each. A later
+  seat also sees an earlier seat's queued builds and departed Ships as it plans; which of that and
+  the prices moved the column is not measured. Reported and left.
+
+| | Materials | Fuel | Energy | Ducats | Research | Widgets |
+|---|---|---|---|---|---|---|
+| Custodians | 157,583 | 73,561 | 289,496 | 128,069 | 95,139 | 227,545 |
+| Prospectors | 169,569 | 40,104 | 214,737 | 438,889 | 30,263 | 136,688 |
+| Arkwrights | 120,806 | 34,339 | 193,136 | 305,017 | 25,704 | 120,344 |
+| Archivists | 36,441 | 22,810 | 87,553 | 29,456 | 53,501 | 82,623 |
+| all four | 484,400 | 170,815 | 784,922 | 901,432 | 204,607 | 567,200 |
+| net of upkeep | 478,687 | 132,692 | 111,272 | 532,738 | 204,607 | |

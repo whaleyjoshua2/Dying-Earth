@@ -24536,3 +24536,27 @@ fn the_market_prices_each_lot_at_the_running_net() {
     g.market.net[energy] = -200;
     assert_eq!(g.trade_price(Resource::Energy), Some(1), "never under a Ducat");
 }
+
+/// Ticket #593 (version 0.1.0.4), the designer's follow-up: **each computer seat plans after the
+/// seats before it have traded**, so it is quoted the price their trading left and never has a Buy
+/// dropped for a price that moved under it. Seats plan and commit in seat order, one at a time,
+/// where every seat planned before any committed.
+#[test]
+fn a_computer_seat_plans_after_the_seats_before_it_have_traded() {
+    let mut g = game();
+    assert!(!g.seat(Seat(0)).ai && Seat::ALL[1..].iter().all(|s| g.seat(*s).ai), "the player first, the computer after");
+    g.seats[0].stockpile.ducats = 1000.0;
+    let mut orders: [Vec<Order>; SEAT_COUNT] = std::array::from_fn(|_| Vec::new());
+    orders[0] = vec![Order::Buy { resource: Resource::Materials, amount: 100 }];
+    pick_a_tech(&mut g);
+    g.end_turn(orders).expect("the turn ends");
+    let log = g.log.to_vec();
+    let at = |needle: &str| log.iter().position(|l| l.contains(needle)).unwrap_or_else(|| panic!("no {needle:?} in the log"));
+    let bought = at("bought 100 Materials");
+    for s in &Seat::ALL[1..] {
+        let planned = at(&format!("AI {} scored", g.seat_name(*s)));
+        assert!(bought < planned, "{} planned before the player's trade was paid", g.seat_name(*s));
+    }
+    // The last seat plans after the seats ahead of it have committed theirs.
+    assert!(at(&format!("{} gave", g.seat_name(Seat(2)))) < at(&format!("AI {} scored", g.seat_name(Seat(3)))));
+}

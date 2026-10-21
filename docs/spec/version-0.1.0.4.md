@@ -123,9 +123,17 @@ and every lot of a turn cost the same.
 - **The Price column's hover**: *"+1 Ducat for every 20 anyone buys this turn, -1 for every 20
   sold. Up to 2 either side of the usual price, never under 1."*
 - **The computer** prices every trade the same way, and its Fuel buy is checked after its earlier
-  trades. Every seat plans before any commits, so a computer seat plans at the turn's opening price;
-  a seat after a big buyer can find a Buy it planned unaffordable, and the turn drops it with a
-  note, as any refused order. Its at-or-above-base sale check reads the opening price, and a big
-  sale walks itself down from there.
+  trades. Its at-or-above-base sale check reads the price at its planning, and a big sale walks
+  itself down from there.
+- **Each computer seat plans after the seats before it have committed**, at the designer's word
+  after the first build: every seat had planned before any committed, so a seat after a big buyer
+  was quoted a price that had moved and had its Buy dropped (216 order lists over the sweep's batch
+  had their first dropped order refused for Ducats; the turn logs only a list's first).
+  The Orders phase now plans and commits one seat at a time in seat order, the player first. A
+  later computer seat therefore also sees what the earlier seats' orders did at once: a build
+  queued, a Ship gone into flight, a Leapfrog or tribute paid. The sweep counts the Ducat drops.
 - **Swept** (`sweeps/ticket-593.txt`): **26 / 37 / 3 / 12 and 2 collapses**, from §4's 24 / 40 / 5
   / 11 and none: noise. Units bought 58,018 from 63,624, sold 77,827 from 73,384. Reported and left.
+- **Swept again** with the planning order (`sweeps/ticket-593-planning.txt`): **21 / 25 / 8 / 24
+  and 2 collapses**, from 26 / 37 / 3 / 12 and 2; order lists with a Ducat drop **0, from 216**.
+  The Prospectors' twelve off and the Archivists' twelve on are past noise.

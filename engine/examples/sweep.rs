@@ -108,6 +108,7 @@ fn main() {
     let mut all_gate_turns: [Vec<u32>; 4] = Default::default();
     // Ticket #405 (version 0.09.4): the turn the world was first under the Sink, every seating.
     let mut all_under_sink: Vec<u32> = Vec::new();
+    let mut all_ducat_drops = 0u32;
     // Ticket #416 (version 0.09.4): the tree's finish, each Tech's, and the world's Research.
     let mut all_tree_turns: Vec<u32> = Vec::new();
     let mut all_tech_turns: Vec<Vec<u32>> = vec![Vec::new(); TechId::ALL.len()];
@@ -510,6 +511,7 @@ fn main() {
                                 under_sink.push(t);
                                 all_under_sink.push(t);
                             }
+                            all_ducat_drops += r.ducat_drops;
                             all_warc.add(&r.war);
                             for (i, k) in r.seat_kinds().into_iter().enumerate() {
                                 let f = FactionKind::ALL.iter().position(|x| *x == k).unwrap();
@@ -931,6 +933,9 @@ fn main() {
         println!("  {:>12}: {:>9.0} / {:>8.0} / {:>9.0} / {:>8.0} / {:>8.0} / {:>9.0}", "all four", world[0], world[1], world[2], world[3], world[4], world[5]);
         let net: Vec<f64> = (0..5).map(|j| all_produced.iter().map(|p| p[j]).sum()).collect();
         println!("  {:>12}: {:>9.0} / {:>8.0} / {:>9.0} / {:>8.0} / {:>8.0}   (net of upkeep, all four)", "net", net[0], net[1], net[2], net[3], net[4]);
+        // Ticket #593 (version 0.1.0.4): order lists whose first refusal at the commit was for want
+        // of Ducats (the turn logs only a list's first dropped order), so a floor on the orders.
+        println!("  order lists with an order dropped for want of Ducats over the batch: {all_ducat_drops}");
         println!("  the world under the Natural Sink at least once in {} of {all_games} games (median first turn {})", all_under_sink.len(), median_u(&mut all_under_sink));
         // Version 0.09.3: the worlds settled, over every seating.
         println!("  {}", off_earth_line(&base, &all_ground_by_body, &all_stations_by_body, &mut all_first_by_body, &mut all_ground_off_earth_per_game, all_games as u64));

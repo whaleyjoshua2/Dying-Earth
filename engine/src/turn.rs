@@ -224,14 +224,13 @@ impl Game {
         // drawn from `report.turn`. Without it the last Report of every game read January 2030. A turn
         // that carries on overwrites this with the new turn in `report_phase`, exactly as before.
         self.report.turn = self.turn;
+        // Ticket #593 (version 0.1.0.4), at the designer's word: a computer seat plans HERE, after
+        // the seats before it have committed, where every seat planned before any committed. A
+        // trade is priced at the table's running net, so a seat that planned blind was quoted a
+        // price the seats ahead of it had moved, and its Buy was dropped; now it is quoted what it
+        // will pay.
         for seat in Seat::ALL {
-            if self.seat(seat).ai {
-                all[seat.index()] = self.ai_orders(seat);
-            } else {
-                all[seat.index()] = orders[seat.index()].clone();
-            }
-        }
-        for seat in Seat::ALL {
+            all[seat.index()] = if self.seat(seat).ai { self.ai_orders(seat) } else { orders[seat.index()].clone() };
             let list = all[seat.index()].clone();
             let kept = if let Err((i, e)) = self.check_orders(seat, &list) {
                 // An illegal order in a list is dropped with a note; the rest stand.
