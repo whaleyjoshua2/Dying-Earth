@@ -777,6 +777,11 @@ pub struct FactionCard {
     /// every other seat's station carries.
     #[serde(default)]
     pub start_extra_facilities: Vec<FacilityKind>,
+    /// Ticket #582 (version 0.1.0.3), at the designer's word: the Materials this Faction opens with,
+    /// read in place of `[start] materials` where a row carries one; the Prospectors' row says 60
+    /// where the table says 80. Fuel, Energy and Ducats are the table's for every seat.
+    #[serde(default)]
+    pub start_materials: Option<i64>,
     // Ticket #51: the per-Faction figures the Arkwrights' card carries. Every one is neutral by
     // default, so a card that names none plays exactly as it did before.
     /// What a Habitat here holds, times this.
@@ -2453,6 +2458,9 @@ impl Tables {
             if f.start_colonists > self.module(ModuleKind::Core).holds_colonists {
                 return Err(err("factions.toml", format!("row {}: start_colonists {} would not fit in the Core Module", f.name, f.start_colonists)));
             }
+            if f.start_materials.is_some_and(|m| m < 0) {
+                return Err(err("factions.toml", format!("row {}: start_materials must not be negative", f.name)));
+            }
             if f.victory_first.bar <= 0.0 {
                 return Err(err("factions.toml", format!("row {}: victory_first.bar must be positive", f.name)));
             }
@@ -2831,6 +2839,17 @@ impl Tables {
     pub fn faction(&self, kind: FactionKind) -> &FactionCard {
         &self.factions[kind as usize]
     }
+    /// Ticket #582 (version 0.1.0.3): the Stockpile a seat of this Faction opens with -- the
+    /// `[start]` table's figures, the Materials the card's own where it says (the Prospectors' 60).
+    /// `Game::new` and the card's opening goods line both read it, so they cannot drift.
+    pub fn start_stockpile(&self, kind: FactionKind) -> crate::state::Stockpile {
+        crate::state::Stockpile {
+            materials: self.faction(kind).start_materials.unwrap_or(self.start.materials) as f64,
+            fuel: self.start.fuel as f64,
+            energy: self.start.energy as f64,
+            ducats: self.start.ducats as f64,
+        }
+    }
     /// Ticket #350 (version 0.09.1): the Faction's Victory Condition in one clause, its figures
     /// filled from its own bars -- a bar under ten in words and a thousand with its comma, so the
     /// Custodians read "three Climate phases" and the Prospectors "2,500 Ducats".
@@ -2880,6 +2899,9 @@ impl Tables {
                 ("moved_factor", self.faction(kind).production_moved_factor.to_string()),
                 ("scrubber_people", self.people_text(self.scrubber.per_population)),
                 ("provisional", self.research_directive.provisional_min_contribution.to_string()),
+                // Ticket #582 (version 0.1.0.3): the Prospectors' opening Materials against the table's.
+                ("start_materials", crate::state::figure(self.start_stockpile(kind).materials)),
+                ("common_materials", self.start.materials.to_string()),
             ],
         )
     }

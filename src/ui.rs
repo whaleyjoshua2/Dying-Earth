@@ -2195,8 +2195,9 @@ fn faction_heading(ui: &mut Ui, session: &Session, kind: FactionKind, glyph: f32
     });
 }
 
-/// **The Faction rulebook**: blurb, multipliers, Unique Facility, signature rule, Victory Condition
-/// and gate Tech, in that order, with no head of its own -- `faction_heading` draws that.
+/// **The Faction rulebook**: blurb, multipliers, Unique Facility, the goods it opens with (ticket
+/// #582), signature rule, Victory Condition and gate Tech, in that order, with no head of its own --
+/// `faction_heading` draws that.
 ///
 /// Ticket #203 (version 0.08.1): factored out of `faction_card` so the setup screen's card and the
 /// Faction window's collapsing header are the SAME code and can never drift. Everything a player
@@ -2279,6 +2280,16 @@ fn faction_rulebook(ui: &mut Ui, session: &Session, kind: FactionKind) {
     ui.label(RichText::new("Unique Facility").strong());
     ui.label(&card.unique);
     ui.add_space(6.0);
+    // Ticket #582 (version 0.1.0.3), at the designer's word: the goods the seat opens with, one
+    // line of figures and glyphs directly above the signature rule, so the Prospectors' 60 Materials
+    // reads against the other cards' 80 glyph under glyph.
+    let goods: Vec<RowPart> = start_goods(&session.tables, kind)
+        .into_iter()
+        .enumerate()
+        .map(|(i, (n, key, word))| RowPart { before: if i == 0 { format!("Opens with {n}") } else { n.to_string() }, icon: Some(key), after: String::new(), hover: Some(format!("{n} {word} in the Stockpile on turn one")) })
+        .collect();
+    glyph_row(ui, &goods, 15.0);
+    ui.add_space(6.0);
     let ink = ui.visuals().text_color();
     ui.label(RichText::new("Signature rule").strong());
     // Ticket #407 (version 0.09.4): with its figures read from the data.
@@ -2292,6 +2303,18 @@ fn faction_rulebook(ui: &mut Ui, session: &Session, kind: FactionKind) {
         let t = session.tables.tech(gate);
         ui.label(RichText::new(format!("Waits on {}, a rung-{} Tech ({} Research): {}.", t.name, t.rung, t.cost, t.effect)).weak());
     }
+}
+
+/// Ticket #582 (version 0.1.0.3): the figures a seat of the Faction opens with, in the Stockpile's
+/// order with each one's glyph key and word -- the Ducats only when the table gives any, since a
+/// `0` on every card says nothing. Read from `start_stockpile`, the figure `Game::new` hands out.
+fn start_goods(tables: &dying_earth_engine::data::Tables, kind: FactionKind) -> Vec<(i64, &'static str, &'static str)> {
+    let s = tables.start_stockpile(kind);
+    let mut out = vec![(s.materials as i64, "materials", "Materials"), (s.fuel as i64, "fuel", "Fuel"), (s.energy as i64, "energy", "Energy")];
+    if s.ducats > 0.0 {
+        out.push((s.ducats as i64, "ducats", "Ducats"));
+    }
+    out
 }
 
 /// One Faction's card on the setup screen: its symbol and name, the rulebook, the button that plays
@@ -13127,6 +13150,16 @@ fn chronicle_screen(root: &mut Ui, session: &Session, actions: &mut Vec<Action>)
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Ticket #582 (version 0.1.0.3): the opening goods line on a Faction's card lists the figures
+    /// the seat opens with, each with its glyph, the Ducats only when there are any: the Prospectors'
+    /// 60 Materials where the other cards say 80. Red before the card carried a `start_materials`.
+    #[test]
+    fn the_opening_goods_line_lists_each_figure_with_its_glyph_and_skips_an_empty_one() {
+        let tables = dying_earth_engine::data::Tables::load(&dying_earth_engine::data::default_data_dir()).unwrap();
+        assert_eq!(start_goods(&tables, FactionKind::Prospectors), vec![(60, "materials", "Materials"), (20, "fuel", "Fuel"), (20, "energy", "Energy")]);
+        assert_eq!(start_goods(&tables, FactionKind::Custodians), vec![(80, "materials", "Materials"), (20, "fuel", "Fuel"), (20, "energy", "Energy")]);
+    }
 
     /// Ticket #543 (version 0.1.0.1): a Colony Ship with one to three aboard is drawn yellow, the
     /// founding rule on its hover; an empty one and a full one are plain.

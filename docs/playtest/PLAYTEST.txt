@@ -35,6 +35,8 @@ EARTH
 - POWER BURNS FUEL: a Power Plant, a Reactor or a Generator burns 0.8 Fuel a turn, and one
   short of Fuel runs at a quarter. The computer keeps a reserve.
 - INFLUENCE costs 4.5 Ducats a point; the Distress Call card gives +2.
+- THE PROSPECTORS open with 60 Materials where the other three open with 80. Every Faction's
+  card now says what it opens with, in a line above its signature rule.
 - A STRIP PERMIT is once per Region, ever, and the button and the help say so.
 
 SPACE

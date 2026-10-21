@@ -1826,11 +1826,12 @@ pub struct NewGame {
 impl Game {
     pub fn new(tables: std::sync::Arc<Tables>, setup: NewGame) -> Game {
         let mut rng = ChaCha8Rng::seed_from_u64(setup.seed);
-        let start = Stockpile { materials: tables.start.materials as f64, fuel: tables.start.fuel as f64, energy: tables.start.energy as f64, ducats: tables.start.ducats as f64 };
+        // Ticket #582 (version 0.1.0.3): the opening Stockpile is the Faction's -- the table's
+        // figures, the Materials the card's own where it says -- so the Prospectors open with 60.
         let seat = |kind: FactionKind, ai: bool| SeatState {
             kind,
             ai,
-            stockpile: start,
+            stockpile: tables.start_stockpile(kind),
             price_cuts: Vec::new(),
             venture_fund: 0.0,
             venture_share: 0.0,

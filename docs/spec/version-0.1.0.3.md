@@ -23,24 +23,26 @@ the net (§18). **Diplomacy**: an Influence spend that would break an Accord ref
 break (§12), a refused offer waiting three turns with a counter on a Trade (§16), the Cheap Ore
 Offer's refusal for the refusing seat alone (§19). **Ships**: loading free of the Ship's turn (§13),
 a landing shut only by a Blockade (§14). **The texts**: a station by its name or colony id (§15),
-and the tool's texts (§21).
+and the tool's texts (§21). **After the close-out**: the Prospectors open with 60 Materials (§22).
 
 **What it did to the win column** (80 games, per Faction; every section's own sweep is in it):
 
-| | 0.1.0.2 | §1-§5 Earth | §7 the Moon race | §12 the Accord hold | §20 East Asia: closing | the ideal |
-|---|---|---|---|---|---|---|
-| Custodians | 3 | 8 | 11 | 19 | **22** | 15 |
-| Prospectors | 23 | 29 | 53 | 49 | **48** | 15 |
-| Arkwrights | 26 | 17 | 7 | 4 | **1** | 15 |
-| Archivists | 13 | 14 | 7 | 8 | **7** | 15 |
-| collapses | 14 | 12 | 2 | 0 | **2** | 20 |
+| | 0.1.0.2 | §1-§5 Earth | §7 the Moon race | §12 the Accord hold | §20 East Asia: the close-out | §22 the Prospectors' 60: closing | the ideal |
+|---|---|---|---|---|---|---|---|
+| Custodians | 3 | 8 | 11 | 19 | 22 | **26** | 15 |
+| Prospectors | 23 | 29 | 53 | 49 | 48 | **41** | 15 |
+| Arkwrights | 26 | 17 | 7 | 4 | 1 | **5** | 15 |
+| Archivists | 13 | 14 | 7 | 8 | 7 | **8** | 15 |
+| collapses | 14 | 12 | 2 | 0 | 2 | **0** | 20 |
 
-**The closing board** ([`sweeps/final-0.1.0.3.txt`](../dev-diary/2026-10-19-version-0.1.0.3/sweeps/final-0.1.0.3.txt)):
-**22 / 48 / 1 / 7 and 2 collapses**, the same board as §20's, since nothing that moves a rule
-changed after it. The Earth tickets lifted the Custodians and cut the Arkwrights; the Moon race
-(§7) handed the Prospectors the table and emptied the collapses, and the Upload, the Fund and the
-Accord hold moved the rest. The Prospectors at 48 are the farthest from the ideal, the Arkwrights
-at 1 the next; the collapses at 2 against 20 wanted are the third figure to watch. `GAME_VERSION`
+**The closing board** ([`sweeps/ticket-582.txt`](../dev-diary/2026-10-19-version-0.1.0.3/sweeps/ticket-582.txt)):
+**26 / 41 / 5 / 8 and 0 collapses**. The close-out (§20's board, [`sweeps/final-0.1.0.3.txt`](../dev-diary/2026-10-19-version-0.1.0.3/sweeps/final-0.1.0.3.txt))
+stood at 22 / 48 / 1 / 7 and 2; the designer then cut the Prospectors' opening Materials (§22),
+which took seven wins off them and spread them over the other three. The Earth tickets lifted the
+Custodians and cut the Arkwrights; the Moon race (§7) handed the Prospectors the table and emptied
+the collapses, and the Upload, the Fund and the Accord hold moved the rest. The Prospectors at 41
+are still the farthest from the ideal, the Arkwrights at 5 the next; the collapses at 0 against 20
+wanted are the third figure to watch. `GAME_VERSION`
 is 0.1.0.3; `SAVE_VERSION` stays at 12: the two saved fields the version added read a default, so
 a 0.1.0.2, 0.1.0.1 or 0.1.0.0 save loads.
 
@@ -739,3 +741,49 @@ yes q5 yes"):
   enough" lines in one `show` of the playtest save, and none after. Clippy clean at `-D warnings`;
   818 tests green.
 - **The review** (an independent agent) found the name matching right (a digit-looking word refused, a prefix of two kinds refused as more than one, two of a kind refused with their indices), the index space the engine's own, every other reader of the calm note guarded, the test proving its claim at the placement check, and the Strip Permit line the Exodus Call's construct. It caught one defect: `cancel-build` by name read a rival's queue seat 0 does not see and would have printed it in the refusal where `show` keeps it out of sight -- guarded now, the engine refusing in its own words; and two prose nits, the helper's doc and the glossary's `-ducats` wording. All mended.
+
+## 22. The Prospectors open with 60 Materials
+
+Ticket: [The Prospectors start with 60 Materials, not 80](https://github.com/whaleyjoshua2/Dying-Earth/issues/582).
+
+The designer, after the close-out's board put the Prospectors at 48 wins of 80: their opening is
+cut. Read in the tree first: the opening Stockpile was one shared `[start]` table (80 Materials,
+raised from 60 on ticket #24; 20 Fuel; 20 Energy; no Ducats), built once in `Game::new` and handed
+to all four seats, with no per-Faction figure anywhere. Decided in one round ("q1 put the starting
+goods in their selection cards with glyphs, single line right above their special [rule] q2 yes
+q3 a q4 report and leave"):
+
+- **The figure**: the Prospectors' row in `factions.toml` carries `start_materials = 60`, read in
+  place of the table's 80 (`Tables::start_stockpile`, which `Game::new` now reads per seat); the
+  other three rows carry nothing and open on the table's figure. Materials only: Fuel, Energy and
+  Ducats are the table's for every seat. At their 0.85 on a Facility or a Module, 60 buys them
+  about what 70 buys another seat, where 80 bought about 94. A negative figure is refused at load.
+- **On the card**: one line of figures and glyphs directly above the Signature rule on every
+  Faction's selection card, *Opens with 80 [cart] · 20 [jerrycan] · 20 [bolt]*, the Prospectors'
+  reading 60, each part's words on its hover ("60 Materials in the Stockpile on turn one"); the
+  Ducats only when the table gives any. The in-game Faction window carries the same rulebook, so it
+  shows the line too. The picture: [`ticket-582/faction-cards.png`](../dev-diary/2026-10-19-version-0.1.0.3/ticket-582/faction-cards.png).
+- **In the words**: the Prospectors' signature text ends *"They open with 60 Materials, where
+  others hold 80."*, both figures read from the data; the glossary's Home Region entry says it.
+- **Saves**: a new-game figure; a save in play keeps its Stockpile. `SAVE_VERSION` stays at 12.
+- **The sweep** ([`sweeps/ticket-582.txt`](../dev-diary/2026-10-19-version-0.1.0.3/sweeps/ticket-582.txt)):
+  **26 / 41 / 5 / 8 and 0 collapses**, from 22 / 48 / 1 / 7 and 2. Seven wins off the Prospectors,
+  spread four to the Custodians, four to the Arkwrights and one to the Archivists; the two
+  collapses gone. The Prospectors' Victory gate still completes in 80 of 80 at a median turn 27
+  (the Fund is the long pole, not the opening); seat 0 loses its home in 9 / 17 / 15 / 9 of 20 by
+  seating, from 8 / 15 / 12 / 6; the world under the Natural Sink at least once in 35 of 80 from
+  25. Income over the batch, mean a game (Materials / Fuel / Energy / Ducats / Research), against
+  the close-out's:
+
+  | | Materials | Fuel | Energy | Ducats | Research |
+  |---|---|---|---|---|---|
+  | Custodians | 2190 (2117) | 802 (718) | 4312 (3755) | 1727 (1634) | 1557 (1320) |
+  | Prospectors | 2194 (2279) | 424 (473) | 2725 (2946) | 1186 (1249) | 363 (430) |
+  | Arkwrights | 1655 (1590) | 390 (348) | 2512 (2300) | 3738 (3350) | 296 (264) |
+  | Archivists | 524 (468) | 248 (243) | 1191 (1114) | 582 (499) | 725 (755) |
+
+  The bar was "report and leave": the Prospectors at 41 are still the farthest from 15, and the
+  figure stays at 60 at the designer's word; a second cut is a second decision.
+- Red first: the engine test with the Prospectors' row stashed (*left: None, right: Some(60)* on the
+  card's figure, every seat at 80) and the card line's test beside it; green with the row back.
+  Clippy clean at `-D warnings`; 820 tests green.

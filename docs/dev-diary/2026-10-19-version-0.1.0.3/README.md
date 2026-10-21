@@ -548,3 +548,18 @@ Ticket [#574](https://github.com/whaleyjoshua2/Dying-Earth/issues/574).
   one-a-Region and Influence's 4.5 Ducats were missing and are in.
 - **The playtest note** rewritten for the version; the Windows kit built here into `dist/`, the
   Linux kit from the release-kits run.
+
+## The Prospectors open with 60 Materials
+
+Ticket [#582](https://github.com/whaleyjoshua2/Dying-Earth/issues/582), spec §22, added after the
+close-out when the designer read the Prospectors' 48 wins. The opening Stockpile was one shared
+table; the Prospectors' row now carries `start_materials = 60`, Materials only, and every selection
+card says what it opens with in one line of glyphs above the signature rule
+([`ticket-582/faction-cards.png`](ticket-582/faction-cards.png)). One round, the designer choosing
+the card line.
+
+- **The sweep** ([`sweeps/ticket-582.txt`](sweeps/ticket-582.txt)): **26 / 41 / 5 / 8 and 0
+  collapses**, from the close-out's 22 / 48 / 1 / 7 and 2: seven wins off the Prospectors, four to
+  the Custodians, four to the Arkwrights, one to the Archivists. Their gate still completes in 80 of
+  80 at a median turn 27, so the Fund is the long pole, not the opening. Reported and left at the
+  designer's word; the Prospectors are still the figure farthest from 15.

@@ -24379,3 +24379,27 @@ fn a_calm_region_says_nothing_and_a_ground_module_is_refused_on_a_station_by_nam
     let err = g.check_order(Seat(0), &[], &Order::BuildModule { colony: iss, kind: ModuleKind::Refinery }).unwrap_err().0;
     assert_eq!(err, "a Refinery stands on the ground, not on a station");
 }
+
+/// Ticket #582 (version 0.1.0.3), at the designer's word: the Prospectors open with 60 Materials
+/// where the other three hold the table's 80; Fuel and Energy are the table's for all four. The
+/// figure is the card's `start_materials`, read in place of the table's where a row carries one,
+/// and the signature text says it. Red with the Prospectors' row silent: every seat at 80, and the
+/// clause reading 80 against 80.
+#[test]
+fn the_prospectors_open_with_60_materials_where_the_others_hold_80() {
+    let g = fresh();
+    let t = &g.tables;
+    assert_eq!(t.faction(FactionKind::Prospectors).start_materials, Some(60));
+    assert_eq!(t.start.materials, 80);
+    for seat in 0..4 {
+        let s = &g.seats[seat];
+        let want = if s.kind == FactionKind::Prospectors { 60.0 } else { 80.0 };
+        assert_eq!(s.stockpile.materials, want, "{:?} opens with {} Materials", s.kind, s.stockpile.materials);
+        assert_eq!(s.stockpile.fuel, t.start.fuel as f64, "{:?} Fuel", s.kind);
+        assert_eq!(s.stockpile.energy, t.start.energy as f64, "{:?} Energy", s.kind);
+        assert_eq!(s.stockpile, t.start_stockpile(s.kind), "{:?} reads start_stockpile", s.kind);
+    }
+    let sig = t.signature(FactionKind::Prospectors);
+    assert!(sig.contains("They open with 60 Materials, where others hold 80."), "{sig}");
+    assert!(!t.signature(FactionKind::Custodians).contains("open with"));
+}
