@@ -252,3 +252,19 @@ works, and the Ice Sheets Break raising two Moments; all fixed, a test watched r
 (the surge, the name, an occupied rival's Region), then green. The dead `slot`/`slots` phrases went.
 
 No rule moves, so no sweep.
+
+## The help without ticket numbers, and three lines
+
+Ticket [#599](https://github.com/whaleyjoshua2/Dying-Earth/issues/599), spec §9. The first ticket
+worked with the `grilling` and `domain-modeling` skills loaded: one round of four questions, the
+designer taking the recommendation on each but the tie line, where a tie reads "random among the
+tied" and names nobody. Three tests were written first and watched red (the help's history, the old
+tie line, "needs 4 Pioneers here"), then green; one older pin moved to "in China". No new term, so
+no glossary entry.
+
+**The review** found "in The United States", a lone leader shown a made-up 25% when nothing had
+been contributed, and two help sentences left without the colon the cut ticket tag had carried; all
+fixed, the first two with tests watched red, and the help test now catches any "#" before a digit.
+
+**The help as printed** ([`ticket-599/help.txt`](ticket-599/help.txt)): no ticket or version
+reference, the `-ducats` sentence in the designer's words. No rule moves, so no sweep.

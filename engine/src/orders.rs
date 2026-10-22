@@ -624,7 +624,13 @@ impl Game {
         }
         Err(OrderError(match from {
             // Ticket #543 (version 0.1.0.1): Pioneers waiting in this Region, which is what it means.
-            LoadSource::State(_) => format!("needs {} here", crate::counted(found, "Pioneer", "Pioneers")),
+            // Ticket #599 (version 0.1.0.4), at the designer's word: the Region named where Pioneers
+            // wait in one of the seat's, and where they must wait where none does.
+            LoadSource::State(sid) => {
+                let waiting = self.state(sid).control.director().is_some_and(|seat| self.directed_states(seat).into_iter().any(|r| self.founders_spare(LoadSource::State(r), pending) > 0));
+                let n = crate::counted(found, "Pioneer", "Pioneers");
+                if waiting { format!("needs {n} in {}", self.state_name_mid(sid)) } else { format!("needs {n} waiting in a Launch Site Region of yours") }
+            }
             LoadSource::Colony(_) => format!("needs {} to spare", crate::counted(found, "Colonist", "Colonists")),
         }))
     }

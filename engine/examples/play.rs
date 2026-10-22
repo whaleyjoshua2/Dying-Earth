@@ -312,10 +312,9 @@ const GRAMMAR: &str = r#"ORDER LINES (one per line; `#` starts a comment; blank 
 
   answer take                          answer THIS TURN'S CHOICE CARD: take the offer,
   answer refuse                        or refuse it.
-                                       Ticket #337 (version 0.09.0): a card is drawn at the HEAD of
-                                       the turn, before orders, and the turn CANNOT END while this
-                                       seat owes it an answer.
-                                       Ticket #367 (version 0.09.2): no card comes on turn 1. `show` prints the card, its question
+                                       A card is drawn at the HEAD of the turn, before orders, and
+                                       the turn CANNOT END while this seat owes it an answer.
+                                       No card comes on turn 1. `show` prints the card, its question
                                        and what each side does; a seat that cannot pay the offer may
                                        only refuse.
 
@@ -325,20 +324,19 @@ const GRAMMAR: &str = r#"ORDER LINES (one per line; `#` starts a comment; blank 
   build facility-ducats <state> <facility>
   build module <colony> <module>       e.g. build module 1 habitat
   build module-ducats <colony> <module>
-  build ship <colony> <ship>           at a Colony or station of yours with a WORKING SHIPYARD
-                                       (ticket #46): never in a Nation State, whatever its Launch
+  build ship <colony> <ship>           at a Colony or station of yours with a WORKING SHIPYARD:
+                                       never in a Nation State, whatever its Launch
                                        Site. The new Ship starts in the orbit of the yard that built
                                        it -- a station's own orbit, or low orbit for a ground Colony.
   build army <place>                   a Nation State you control, or a Colony with a Barracks.
-                                       Materials and Widgets AND PEOPLE (ticket #334, version
-                                       0.09.0): a Region loses population for it, a Colony a
+                                       Materials and Widgets AND PEOPLE: a Region loses
+                                       population for it, a Colony a
                                        Colonist, and a place without the people to spare is refused.
   build station <body> <orbit>         e.g. build station moon 0, or moon gateway; Materials alone, no Widgets
   build archive <colony>               the Archivists only, at a Colony OFF EARTH (neither Antarctica
                                        nor a station over Earth), where four Colonists already live.
                                        Both are checked at the order and never again. The Upload
-                                       gates the Archivists' WIN, not this order (ticket #361,
-                                       version 0.09.1, undoing ticket #199).
+                                       gates the Archivists' WIN, not this order.
   industry <state>                     raise the Industry Level
   upgrade <colony>                     raise a Colony or station to its next tier: Settlement,
                                        Colony, and on the ground the Colonial Capital (one to a
@@ -352,16 +350,16 @@ const GRAMMAR: &str = r#"ORDER LINES (one per line; `#` starts a comment; blank 
                                        number `show` prints beside the item in that place's
                                        `building:` list.
 
-  A BUILD HAS NO TURN COUNT (ticket #332, version 0.09.0). Materials are paid in full at the order,
+  A BUILD HAS NO TURN COUNT. Materials are paid in full at the order,
   and a build needs a figure in WIDGETS, which the place makes at its own rate every turn and spends
   on its queue in the order the builds were given. `show` prints each place's Widgets a turn, what
-  its queue owes, and every build as `done/needed w`. The `-ducats` forms buy a building outright,
-  paid in Ducats at the market price of twice its Materials, and complete at the next Resolution
-  whatever their Widget figure.
+  its queue owes, and every build as `done/needed w`. The `-ducats` forms buy a building outright
+  for Ducats, twice its Materials' worth, and complete at the next Resolution whatever their
+  Widget figure.
 
   transit <ship> <body> [orbit|low]    fly, spending the Ship's own tank. The leg names the ORBIT it
                                        ends in: a ring, or `low` (or nothing at all) for low orbit.
-                                       AN ORBIT (ticket #571, version 0.1.0.3) is the slot number as
+                                       AN ORBIT is the slot number as
                                        `show` lists it, the station's NAME (any unique prefix:
                                        `tiangong`, `orb`), or a standing station's colony id as
                                        `colony:21` -- a bare number is always the slot number. A
@@ -373,15 +371,15 @@ const GRAMMAR: &str = r#"ORDER LINES (one per line; `#` starts a comment; blank 
   refuel <ship>                        fill the tank at a station of yours (or of a Refuel partner's)
                                        AT THAT STATION'S OWN ORBIT: a Ship in low orbit, or at
                                        another station's ring, refuels at nothing until it moves.
-                                       FREE OF THE SHIP'S TURN (ticket #533): give the refuel first
+                                       FREE OF THE SHIP'S TURN: give the refuel first
                                        and the transit after it, in one turn; it fills before it goes.
   load <ship> <n> from <place> [army <army>]
-                                       FREE OF THE SHIP'S TURN (ticket #568, version 0.1.0.3): a load
+                                       FREE OF THE SHIP'S TURN: a load
                                        off any place, Region, Colony or station, stands beside the
                                        Ship's one action and boards before it moves. One load per
                                        place a turn; never beside an unload.
   unload <ship> <n> [army] into slot <body> <slot>
-                                       the ground slot by its number or its name (ticket #571).
+                                       the ground slot by its number or its name.
   unload <ship> <n> [army] into colony <n>
   unload <ship> <n> into ring <body> <orbit>
                                        found a SPACE STATION with a Colony Ship's Colonists, from
@@ -393,21 +391,21 @@ const GRAMMAR: &str = r#"ORDER LINES (one per line; `#` starts a comment; blank 
   repair <unit> <points>               unit = ship:<n>, army:<n> or battery:<colony>:<index>
   repair-ducats <unit> <points>
 
-  A BODY'S ORBITS (ticket #335, version 0.09.0) are LOW ORBIT and one per Orbital Slot, and every
+  A BODY'S ORBITS are LOW ORBIT and one per Orbital Slot, and every
   Ship at a Body sits in exactly one of them; there is no Body at large. LOW ORBIT is what touches
   the ground: landing an Army at a ground Colony, unloading Colonists into one, founding one, and
   Bombarding one. A STATION'S OWN ORBIT is what touches that station: unloading into it, refuelling
-  at it, blockading it, attacking it. A LIFT FROM A LAUNCH SITE reaches ANY orbit of Earth (ticket
-  #357, version 0.09.1). A refusal that a change of orbit would cure names the move first. Orbital Control is
+  at it, blockading it, attacking it. A LIFT FROM A LAUNCH SITE reaches ANY orbit of Earth.
+  A refusal that a change of orbit would cure names the move first. Orbital Control is
   of LOW orbit and gates a Bombard and a Launch at the ground, and its starving. A LANDING OR FOUNDING
-  IS SHUT ONLY BY A BLOCKADE OF LOW ORBIT (ticket #570, version 0.1.0.3), never by a Ship on Hold,
+  IS SHUT ONLY BY A BLOCKADE OF LOW ORBIT, never by a Ship on Hold,
   never by a Passage partner. A BLOCKADE IS A STANCE, chosen (`ship-stance <body> blockade`)
   and shutting the orbit the stack sits in -- never a side effect of arriving anywhere. A
-  rival's working Battery in that orbit opens a Battle on a blockader (ticket #363). `show` names
+  rival's working Battery in that orbit opens a Battle on a blockader. `show` names
   the orbit every Ship sits in, and lists each Body's orbits under FREE SLOTS.
 
   bombard <ship> <colony>              a Battleship of yours breaks one Module of a RIVAL'S Colony,
-                                       never over Earth. Ticket #335 (version 0.09.0): IT ACTS IN
+                                       never over Earth. IT ACTS IN
                                        THE ORBIT IT SITS IN. A Colony on the ground is bombarded
                                        from LOW ORBIT and wants Orbital Control of that Body
                                        outright; a station from that station's own orbit, which must
@@ -416,8 +414,8 @@ const GRAMMAR: &str = r#"ORDER LINES (one per line; `#` starts a comment; blank 
                                        turn: a Ship takes one order a turn, and a Bombard is one.
 
   launch <ship> <place>                a Missile Carrier of yours fires its one Warhead at a RIVAL'S
-                                       Region, ground Colony or Space Station. Ticket #343 (version
-                                       0.09.1): the same orbit rule a Bombard reads -- low orbit for
+                                       Region, ground Colony or Space Station. It reads the same
+                                       orbit rule a Bombard does -- low orbit for
                                        the ground (and Orbital Control of that Body outright), a
                                        station's own orbit for a station -- but EARTH IS NOT
                                        EXCEPTED, and a Region is a lawful target. Free.
@@ -450,7 +448,7 @@ CAMPAIGNS AND CARBON CREDITS -- the Blame ledger the Influence thresholds read (
                                        It comes off your ledger at the Resolution. `show` prints
                                        what stands offered and what a ppm would cost you.
 
-DIPLOMACY (ticket #226; `show` prints Relations both ways and every Accord standing)
+DIPLOMACY (`show` prints Relations both ways and every Accord standing)
 
   accord offer <faction> <term>...     offer an Accord holding one or more Terms:
                                          non-aggression  neither spends Influence on a place the
@@ -473,13 +471,13 @@ DIPLOMACY (ticket #226; `show` prints Relations both ways and every Accord stand
   accord renew <faction>               in an Accord's last turn, renew it for five more; the Report
                                        warns of that turn ("ends after this turn"). Let it run out
                                        while they would have renewed, and they count it a refusal:
-                                       no offer from them for {refusedturns} (ticket #572).
+                                       no offer from them for {refusedturns}.
   trade <faction> <give> for <ask>     one thing for one thing: `<n> ducats|materials|fuel|energy`
                                        or a colony id; answered at the head of their next turn, the
                                        goods moving only if both still hold them.
   trade accept|refuse <faction>        answer a Trade a Faction offered you.
   trade counter <faction> <give> for <ask>
-                                       or counter it, once (ticket #572, version 0.1.0.3): the same
+                                       or counter it, once: the same
                                        two goods in your own amounts, `<n> <good> for <n> <good>`.
                                        They answer at once by their Trade rule; a seat short of
                                        the good it asked pays up to a quarter over fair value. A
@@ -506,8 +504,8 @@ REGIONS AND PEOPLE
   change facility <state> <index|name> <mothball|restart|decommission|replace>
                                        replace: a Power Plant with a Wind Farm, through the queue
   change module <colony> <index|name> <mothball|restart|decommission>
-                                       the building by its index as `show` lists it, or by its NAME
-                                       (ticket #573): the sea, a Decommission or a loss shifts the
+                                       the building by its index as `show` lists it, or by its NAME:
+                                       the sea, a Decommission or a loss shifts the
                                        indices, and a bare index once scrapped a Launch Site. Two
                                        of a kind by name are refused with their indices.
 

@@ -213,3 +213,18 @@ Ticket: [The Report's lines: the sea in one line and your loss in Your works, "J
   the player only occupies is not theirs to be invaded.
 - **Planetary Stewardship's effect**: *"Natural Sink +1.5 ppm"*, alone, at the designer's word.
 - No rule moves; no sweep.
+
+## 9. The help without ticket numbers, the -ducats line, the tie line, the Pioneers' Region
+
+Ticket: [The help without ticket numbers, the -ducats line, the tie line, and the Pioneers' Region named](https://github.com/whaleyjoshua2/Dying-Earth/issues/599).
+
+- **The tool's help** carries no ticket or version reference (21 cut); the rules' words stand.
+- **`-ducats`**: *"buy a building outright for Ducats, twice its Materials' worth"*.
+- **The Research Lead line** (the tool every turn, the Tech Tree's hover): *"Next pick: random among
+  the tied."* or *"Next pick: Custodians (41%)."*, the other shares dropped; the Archive-funding
+  sentence after it where it stands. A leader with nothing contributed yet (just after a Tech
+  completes) reads *"Next pick: Arkwrights."*, no share (the review). The Tech Tree's share row is
+  unchanged.
+- **The Pioneers' refusal**: *"needs 4 Pioneers in China"* ("in the United States" mid-sentence)
+  where Pioneers wait in one of the seat's Regions; *"needs 4 Pioneers waiting in a Launch Site Region of yours"* where none does.
+- No rule moves; no sweep.

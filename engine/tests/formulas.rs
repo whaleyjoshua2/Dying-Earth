@@ -21365,7 +21365,7 @@ fn a_station_over_earth_takes_four_pioneers_from_a_launch_site_region() {
     assert_eq!(g.station_founders(Seat(0), BodyId::Earth, &[]), None, "three waiting is not four");
     let build = Order::BuildStation { body: BodyId::Earth, slot: 3, from: LoadSource::State(sid) };
     let err = g.check_order(Seat(0), &[], &build).unwrap_err().0;
-    assert!(err.contains("needs 4 Pioneers here"), "ticket #543: Pioneers, waiting here: {err}");
+    assert!(err.contains("needs 4 Pioneers in China"), "ticket #599: the Region named: {err}");
     g.state_mut(sid).emigrants = 6;
     assert_eq!(g.station_founders(Seat(0), BodyId::Earth, &[]), Some(LoadSource::State(sid)));
     assert!(g.check_order(Seat(0), &[], &build).is_ok(), "{:?}", g.check_order(Seat(0), &[], &build));
@@ -24771,4 +24771,64 @@ fn the_ice_sheets_break_is_one_moment_and_one_sea_line() {
     assert_eq!(climate, 1, "the Break's Moment alone: {:?}", g.report.moments);
     let rose = g.report.lines.iter().filter(|l| l.kind == LineKind::SeaLevel && l.text.starts_with("Sea rose at")).count();
     assert_eq!(rose, 1, "and the rise's one line: {:?}", g.report.lines);
+}
+
+// ---------------------------------------------------------------- #599 The help and three lines (version 0.1.0.4)
+
+/// Ticket #599 (version 0.1.0.4), at the designer's word: **the Research Lead's line is the next
+/// pick alone** -- "Next pick: random among the tied." or "Next pick: Custodians (41%)." -- where it
+/// listed every Faction's share first.
+#[test]
+fn the_research_lead_line_is_the_next_pick() {
+    let mut g = game();
+    g.research.contributions = [0; SEAT_COUNT];
+    assert!(g.research_lead_text().starts_with("Next pick: random among the tied."), "{}", g.research_lead_text());
+    g.research.contributions = [41, 30, 20, 9];
+    assert!(g.research_lead_text().starts_with("Next pick: Custodians (41%)."), "{}", g.research_lead_text());
+    assert!(!g.research_lead_text().contains("Prospectors 30%"), "the other shares are dropped: {}", g.research_lead_text());
+    // The review: a lone leader with nothing contributed yet (the shares reset when a Tech completes,
+    // the tie broken by who picked longest ago) names no share it has not got.
+    g.research.contributions = [0; SEAT_COUNT];
+    g.research.last_picked_turn = [Some(3), Some(2), None, Some(1)];
+    assert_eq!(g.research_lead_text(), "Next pick: Arkwrights.", "no made-up 25%");
+}
+
+/// Ticket #599: **"needs 4 Pioneers here" names the Region** where Pioneers wait in it, and says
+/// where they must wait where none of the seat's Regions has any.
+#[test]
+fn the_pioneers_refusal_names_the_region_or_where_they_must_wait() {
+    let mut g = game();
+    g.seats[0].stockpile.materials = 300.0;
+    let sid = StateId::EastAsia;
+    for s in g.directed_states(Seat(0)) {
+        g.state_mut(s).emigrants = 0;
+    }
+    let build = Order::BuildStation { body: BodyId::Earth, slot: 3, from: LoadSource::State(sid) };
+    let err = g.check_order(Seat(0), &[], &build).unwrap_err().0;
+    assert!(err.contains("needs 4 Pioneers waiting in a Launch Site Region of yours"), "none waiting anywhere: {err}");
+    g.state_mut(sid).emigrants = 3;
+    let err = g.check_order(Seat(0), &[], &build).unwrap_err().0;
+    assert!(err.contains("needs 4 Pioneers in China"), "three waiting in China: {err}");
+    // The review: a name opening "The" reads "the" mid-sentence.
+    let us = StateId::NorthAmerica;
+    g.take_control(us, Seat(0));
+    g.state_mut(us).facilities.push(Facility::new(FacilityKind::LaunchSite));
+    g.state_mut(us).emigrants = 3;
+    let from_us = Order::BuildStation { body: BodyId::Earth, slot: 3, from: LoadSource::State(us) };
+    let err = g.check_order(Seat(0), &[], &from_us).unwrap_err().0;
+    assert!(err.contains("needs 4 Pioneers in the United States"), "{err}");
+}
+
+/// Ticket #599: **the headless tool's help carries no developer history** -- no ticket and no
+/// version reference -- and buys a building outright "for Ducats, twice its Materials' worth".
+#[test]
+fn the_tools_help_has_no_ticket_or_version_references() {
+    let src = include_str!("../examples/play.rs");
+    let start = src.find("const GRAMMAR: &str = r#\"").expect("the help");
+    let end = start + src[start..].find("\"#;").expect("its end");
+    let help = &src[start..end];
+    // The review: any "#" before a digit, not only "#5".
+    let hash_digit = help.as_bytes().windows(2).any(|w| w[0] == b'#' && w[1].is_ascii_digit());
+    assert!(!help.contains("icket #") && !hash_digit && !help.contains("version 0."), "history in the help");
+    assert!(help.contains("for Ducats, twice its Materials' worth"), "the -ducats line");
 }
