@@ -268,3 +268,36 @@ fixed, the first two with tests watched red, and the help test now catches any "
 
 **The help as printed** ([`ticket-599/help.txt`](ticket-599/help.txt)): no ticket or version
 reference, the `-ducats` sentence in the designer's words. No rule moves, so no sweep.
+
+## Every computer seat races for Mars
+
+Ticket [#596](https://github.com/whaleyjoshua2/Dying-Earth/issues/596), spec §10.
+
+Grilled in three rounds. The designer took the race opening on the Moon's claim, Mars itself, every
+seat, at 2.5 (not 3.0), the window first held at two turns, the Colony Ship's tank cut to 32 (the leg
+table was measured first: what 32 closes was put to them), and the prize as it stands. One
+correction owed: I told the designer the computer already held its Mars flights to two turns of the
+window; it weighs the window softly, so the hold was built as a rule of the race's own. A test was
+written first and watched red (no such figure), then green; eight older pins moved with the tank,
+and the windfall test stands the Mars race aside as it stands the Moon race.
+
+The first build held a racer to two turns of the window: Mars in 80 of 80 at the same median turn
+24, and the far Bodies emptied (Phobos 33 from 76, Deimos 9, Vesta 7), 27 / 42 / 4 / 7. **The
+review** found why: the hold looked forward only, so a Ship loaded the turn after the window waited
+ten; every loaded Ship was forced to Mars and held, not the seat's runner; the end-game check left
+the wait out; and a Ship flying home was not counted as the runner. The runner, the end-game and the
+homebound fixes stand, a test watched red on the one-sided hold first; then, at the designer's word,
+the two-turn hold went and the soft window preference came back.
+
+- **The sweep** ([`sweeps/ticket-596.txt`](sweeps/ticket-596.txt)): **32 / 34 / 6 / 7 and 1
+  collapse**, from 26 / 39 / 7 / 8 and none: the Custodians +6 and the Prospectors -5 at the edge of
+  noise. Mars founded in **80 of 80, from 28**, at a **median turn 23, from 24**. The other far
+  Bodies settle less: Phobos 58 from 76, Deimos 28 from 44, Mercury 70 from 77, Ceres 12 from 30,
+  Vesta 9 from 37.
+
+| | Materials | Fuel | Energy | Ducats | Research |
+|---|---|---|---|---|---|
+| Custodians | 2,281 | 885 | 681 | 1,752 | 1,544 |
+| Prospectors | 2,173 | 428 | 374 | 1,029 | 327 |
+| Arkwrights | 1,700 | 391 | 284 | 3,611 | 332 |
+| Archivists | 435 | 218 | 79 | 503 | 615 |

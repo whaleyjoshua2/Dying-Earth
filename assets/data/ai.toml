@@ -460,7 +460,8 @@ founding_pull_double_at = 9.0
 # Without these two the rule would not exist in play: the destination list was yields against
 # flight time, the Moon won it from turn one, and no computer seat founded a Colony anywhere in
 # the Mars system in eighty measured games. Both fall away the moment a Body is claimed, so the
-# pull is toward whatever world is still unsettled and never toward one that is.
+# pull is toward whatever world is still unsettled and never toward one that is (save the races
+# below, which send one Ship of each seat to the Moon and then to Mars first).
 first_windfall_worth = 0.12
 # Ticket #564 (version 0.1.0.3), at the designer's word ("AI seats pursue first moon landing"):
 # while a seat holds no Colony Ship, built or on order, and the Moon is still unclaimed, its Shipyard
@@ -470,6 +471,14 @@ first_windfall_worth = 0.12
 # nearly always. A race for ANY unclaimed Body was tried first: the Ships came early and flew past
 # the Moon to the bigger windfalls, the Prospectors to Mars by turn 11, and took 53 of 80 games.
 moon_race_weight = 3.0
+# Ticket #596 (version 0.1.0.4), at the designer's word ("race to Mars"): a second race, opening once
+# the Moon is claimed by anyone and ending with the first ground Colony on Mars itself (Phobos and
+# Deimos are Bodies of their own). While a seat holds no Colony Ship free or bound for Mars, built or
+# on order, its Shipyard and Colony Ship are weighed at this times their base, and its runner -- one
+# loaded Colony Ship -- is sent to Mars, the crossing weighed by the window as any is; its other Ships
+# go where the ranking below sends them. Gated on the Moon, which the
+# withdrawn any-Body race above lacked. Measured before: Mars founded in 28 of 80, median turn 24.
+mars_race_weight = 2.5
 first_found_weight = 1.5
 attack_odds = 0.6
 # Ticket #284 (version 0.08.5): every seat may attack a place it did not lose, on the odds, given a

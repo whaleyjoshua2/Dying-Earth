@@ -1643,8 +1643,12 @@ pub struct AiThresholds {
     /// Slot's yields are weighed in. Nought here and the computer seats never read the new rule.
     pub first_windfall_worth: f64,
     /// Ticket #564 (version 0.1.0.3), at the designer's word: what a seat's Shipyard and Colony Ship
-    /// are weighed at, times their base, while it holds no Colony Ship and a Body is still unclaimed.
+    /// are weighed at, times their base, while it holds no Colony Ship and the Moon is still unclaimed.
     pub moon_race_weight: f64,
+    /// Ticket #596 (version 0.1.0.4), at the designer's word: the same, once the Moon is claimed and
+    /// while Mars itself has no ground Colony, for a seat with no Colony Ship free or bound for Mars.
+    #[serde(default)]
+    pub mars_race_weight: f64,
     /// Ticket #345: what the founding appetite is multiplied by at a Body whose first is still
     /// unclaimed -- the landing that takes a world is worth more than the landing that joins one.
     pub first_found_weight: f64,

@@ -228,3 +228,31 @@ Ticket: [The help without ticket numbers, the -ducats line, the tie line, and th
 - **The Pioneers' refusal**: *"needs 4 Pioneers in China"* ("in the United States" mid-sentence)
   where Pioneers wait in one of the seat's Regions; *"needs 4 Pioneers waiting in a Launch Site Region of yours"* where none does.
 - No rule moves; no sweep.
+
+## 10. Every computer seat races for Mars
+
+Ticket: [Every computer seat races for Mars](https://github.com/whaleyjoshua2/Dying-Earth/issues/596).
+
+The designer: *"Race to mars"*.
+
+- **A second race, opening once the Moon is claimed** by anyone, ending with the first ground Colony
+  on Mars itself (Phobos and Deimos are Bodies of their own), for **every computer seat**. While a
+  seat holds no Colony Ship free or bound for Mars, built or on order, its Shipyard and Colony Ship
+  are weighed at **2.5** times their base (`mars_race_weight`), and its **runner** -- one loaded
+  Colony Ship, none of its others flying to Mars or loaded ahead of it -- is sent to Mars where its
+  tank pays the crossing now or at the window and it lands before the game ends. Its other Ships go
+  where the ranking sends them.
+- **The window**: the computer's soft preference, at the designer's word -- full weight at the window,
+  a quarter at the far side of the cycle; a crossing the tank cannot pay is refused and the Ship goes
+  when it can. A hard hold to two turns of the window was built (the designer had been told, wrongly,
+  that the computer already did this), swept, and taken back.
+- **The Colony Ship's tank is 32**, from 35, for every seat: Earth to Mars at the window (18) is
+  untouched; off it four Mars turns of fifty close, Earth to Vesta closes and the Arkwrights' Moon to
+  Mercury, until a tank Tech stands.
+- **The prize** is First to a Body's as it stands (Mars: 15 Influence, +1 a turn, the world eased).
+- **Swept** (`sweeps/ticket-596.txt`): **32 / 34 / 6 / 7 and 1 collapse**, from 26 / 39 / 7 / 8 and
+  none: the Custodians' six on and the Prospectors' five off at the edge of noise. **Mars founded in
+  80 of 80, from 28, at a median turn 23, from 24**: the Mars windows fall on turns 7, 20, 33 and 46
+  and the Moon is claimed at a median turn 8. The other far Bodies settle less: Phobos 58 of 80 from
+  76, Deimos 28 from 44, Mercury 70 from 77, Ceres 12 from 30, Vesta 9 from 37. With the two-turn
+  hold (taken back): 27 / 42 / 4 / 7, Mars 80 at 24, Phobos 33, Deimos 9, Vesta 7.

@@ -2779,7 +2779,9 @@ fn the_ai_buys_fuel_for_a_colony_ship_or_a_refuel() {
     assert_eq!(g.remaining(Seat(0), &queued).0.fuel, 34.0, "25 of the 59 went into the tank");
     let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
     g.colony_mut(iss).unwrap().modules.push(Module::new(ModuleKind::Shipyard));
-    assert!(g.check_order(Seat(0), &queued, &Order::BuildShip { site: Place::Colony(iss), kind: UnitKind::ColonyShip }).is_err(), "35 wanted since ticket #455, 34 left");
+    // Ticket #596 (version 0.1.0.4): 32. 33 left would pay it, so the third Buy is one more.
+    let queued = vec![Order::Buy { resource: Resource::Fuel, amount: 24 }, refuel.clone(), Order::Buy { resource: Resource::Fuel, amount: 31 }];
+    assert!(g.check_order(Seat(0), &queued, &Order::BuildShip { site: Place::Colony(iss), kind: UnitKind::ColonyShip }).is_err(), "32 wanted since ticket #596, 31 left");
     g.seats[0].stockpile.fuel = 0.0;
     // And the computer takes it, where Influence cannot outbid it for the Ducats.
     let mut t = Tables::load(&default_data_dir()).expect("tables load");
@@ -6238,7 +6240,8 @@ fn every_journey_is_priced_the_same_way_each_direction_for_itself() {
     for (a, b) in [(System::Earth, System::Venus), (System::Earth, System::Mars), (System::Earth, System::Far(5)), (System::Venus, System::Mars), (System::Venus, System::Far(6)), (System::Mars, System::Far(5)), (System::Far(5), System::Far(6))] {
         assert!(g.tables.gulf(a, b) > 0.0 && g.tables.gulf(a, b) == g.tables.gulf(b, a), "{a:?} and {b:?}");
     }
-    assert_eq!((g.tank_of(Seat(0), UnitKind::ColonyShip), g.tank_of(Seat(0), UnitKind::Frigate)), (35.0, 30.0), "the tanks are as they were");
+    // Ticket #596 (version 0.1.0.4): 32.
+    assert_eq!((g.tank_of(Seat(0), UnitKind::ColonyShip), g.tank_of(Seat(0), UnitKind::Frigate)), (32.0, 30.0), "the tanks are as they were");
 }
 
 /// Ticket #486 (version 0.09.8): **every journey between two systems has a window the same way.**
@@ -7355,7 +7358,8 @@ fn a_ship_is_built_with_a_full_tank_paid_from_the_stockpile() {
     let mut g = game();
     // Ticket #420 (version 0.09.4): the Colony Ship's is 40, every warship's 30.
     for k in UnitKind::SHIPS {
-        assert_eq!(g.tables.unit(k).tank, if k == UnitKind::ColonyShip { 35 } else { 30 }, "{k:?}");
+        // Ticket #596 (version 0.1.0.4): 32.
+        assert_eq!(g.tables.unit(k).tank, if k == UnitKind::ColonyShip { 32 } else { 30 }, "{k:?}");
     }
     assert_eq!(g.tables.unit(UnitKind::Army).tank, 0);
     let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
@@ -8140,11 +8144,69 @@ fn every_computer_seat_races_for_the_first_landing_until_it_holds_a_colony_ship(
     assert!(yard_plain > 0.0 && (yard_racing - 3.0 * yard_plain).abs() <= 0.1 * yard_plain, "the Shipyard at three times its base while the race is on: {yard_racing} vs {yard_plain}");
     assert!(ship_plain > 0.0 && (ship_racing - 3.0 * ship_plain).abs() <= 0.1 * ship_plain, "the Colony Ship at three times its base while the race is on: {ship_racing} vs {ship_plain}");
     // The race is for the Moon: with the Moon claimed by a rival and the seat's Ship gone, no lift.
+    // Ticket #596 (version 0.1.0.4): and with Mars claimed too, so the Mars race is not on either.
     g.ships.retain(|s| s.id != ShipId(960));
     let rival = colony(&mut g, Seat(1), BodyId::Moon, &[], 2);
     g.body_firsts.push(BodyFirst { body: BodyId::Moon, seat: Seat(1), colony: rival });
+    let on_mars = colony(&mut g, Seat(2), BodyId::Mars, &[], 2);
+    g.body_firsts.push(BodyFirst { body: BodyId::Mars, seat: Seat(2), colony: on_mars });
     let yard_after = weight_of(&mut g, "Shipyard");
     assert!((yard_after - yard_plain).abs() <= 0.1 * yard_plain, "the Moon claimed, the Shipyard weighs its base: {yard_after} vs {yard_plain}");
+}
+
+/// Ticket #596 (version 0.1.0.4), at the designer's word ("race to Mars"): **once the Moon is
+/// claimed, every computer seat races for Mars** -- its Shipyard and Colony Ship at 2.5 times their
+/// base while Mars itself has no ground Colony and the seat has no Colony Ship free or bound there,
+/// its runner sent to Mars whenever its tank pays the crossing, weighed softly by the window as every
+/// crossing is (a hard hold to two turns of the window was built and taken back, at the designer's
+/// word). And the Colony Ship's tank is 32, where it was 35.
+#[test]
+fn every_computer_seat_races_for_mars_once_the_moon_is_claimed() {
+    let mut g = game();
+    calm(&mut g);
+    let cus = Seat(0);
+    assert_eq!(g.tables.ai.thresholds.mars_race_weight, 2.5, "the table");
+    assert_eq!(g.tables.unit(UnitKind::ColonyShip).tank, 32, "the Colony Ship's tank");
+    for r in [&mut g.seats[0].stockpile.energy, &mut g.seats[0].stockpile.materials, &mut g.seats[0].stockpile.fuel, &mut g.seats[0].stockpile.ducats] {
+        *r = 500.0;
+    }
+    let weight_of = |g: &mut Game, what: &str| -> f64 {
+        g.log.clear();
+        g.ai_orders(cus);
+        let l = g.log.iter().find(|l| l.contains(&format!("build {what} at"))).unwrap_or_else(|| panic!("no {what} candidate")).clone();
+        l.split_whitespace().nth(1).and_then(|n| n.parse().ok()).unwrap()
+    };
+    let rival = colony(&mut g, Seat(1), BodyId::Moon, &[], 2);
+    g.body_firsts.push(BodyFirst { body: BodyId::Moon, seat: Seat(1), colony: rival });
+    let racing = weight_of(&mut g, "Shipyard");
+    let on_mars = colony(&mut g, Seat(2), BodyId::Mars, &[], 2);
+    g.body_firsts.push(BodyFirst { body: BodyId::Mars, seat: Seat(2), colony: on_mars });
+    let plain = weight_of(&mut g, "Shipyard");
+    assert!(plain > 0.0 && (racing - 2.5 * plain).abs() <= 0.1 * plain, "the Moon claimed and Mars not: 2.5 times: {racing} vs {plain}");
+
+    // A loaded Colony Ship at Earth: to Mars at the window, held off it.
+    let mut g = game();
+    calm(&mut g);
+    let rival = colony(&mut g, Seat(1), BodyId::Moon, &[], 2);
+    g.body_firsts.push(BodyFirst { body: BodyId::Moon, seat: Seat(1), colony: rival });
+    g.ships.push(Ship { name: String::new(), id: ShipId(961), kind: UnitKind::ColonyShip, seat: cus, damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 4, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 32.0, slot: None });
+    let to_mars = |g: &mut Game| g.ai_orders(cus).iter().any(|o| matches!(o, Order::Transit { ship: ShipId(961), to: BodyId::Mars, .. }));
+    let w = g.next_window_turn(g.turn);
+    g.turn = w;
+    assert!(to_mars(&mut g), "at the window it flies to Mars");
+    // Off the window it still goes while the tank pays (about 22 Fuel the turn after).
+    g.turn = w + 1;
+    assert!(to_mars(&mut g), "a turn after the window it still flies");
+    // Where the tank cannot pay the crossing, it stays.
+    g.turn = w + 6;
+    assert!(g.transit_cost_for(cus, BodyId::Earth, BodyId::Mars).1 > 32.0, "the premise: off the window, past the tank");
+    assert!(!to_mars(&mut g), "past what the tank pays it waits");
+    // The review: only the seat's runner is held for Mars; a second loaded Ship founds elsewhere.
+    g.ships.push(Ship { name: String::new(), id: ShipId(962), kind: UnitKind::ColonyShip, seat: cus, damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 4, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 32.0, slot: None });
+    g.seats[0].stockpile.fuel = 200.0;
+    let orders = g.ai_orders(cus);
+    assert!(!orders.iter().any(|o| matches!(o, Order::Transit { ship: ShipId(961), .. })), "the runner waits for the window: {orders:?}");
+    assert!(orders.iter().any(|o| matches!(o, Order::Transit { ship: ShipId(962), to, .. } if *to != BodyId::Mars)), "the second flies to another world: {:?}", g.log.iter().filter(|l| l.contains("send") || l.contains("Transit")).collect::<Vec<_>>());
 }
 
 /// Ticket #563 (version 0.1.0.3), at the designer's word: the computer Custodians weigh the trade
@@ -10953,21 +11015,22 @@ fn cryogenic_tanks_adds_fifteen_to_every_tank_on_clean_propellants_five() {
     assert_eq!(card.needs, vec![TechId::OrbitalRefuelling]);
     assert!(TechId::ALL.iter().filter(|t| g.tables.tech(**t).needs.contains(&TechId::CryogenicTanks)).eq([TechId::NuclearRockets].iter()), "needed by Nuclear Rockets alone");
     let tanks = |g: &Game| (g.tank_of(Seat(0), UnitKind::ColonyShip), g.tank_of(Seat(0), UnitKind::Frigate), g.tank_of(Seat(0), UnitKind::MissileCarrier));
-    assert_eq!(tanks(&g), (35.0, 30.0, 30.0));
+    // Ticket #596 (version 0.1.0.4): 32.
+    assert_eq!(tanks(&g), (32.0, 30.0, 30.0));
     with_tech(&mut g, TechId::CleanPropellant);
-    assert_eq!(tanks(&g), (40.0, 35.0, 35.0));
+    assert_eq!(tanks(&g), (37.0, 35.0, 35.0));
     with_tech(&mut g, TechId::CryogenicTanks);
-    assert_eq!(tanks(&g), (55.0, 50.0, 50.0));
+    assert_eq!(tanks(&g), (52.0, 50.0, 50.0));
     assert_eq!(g.tank_of(Seat(0), UnitKind::Army), 0.0, "an Army has no tank");
     let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
-    assert_eq!(g.order_cost(Seat(0), &Order::BuildShip { site: Place::Colony(iss), kind: UnitKind::ColonyShip }).fuel, 55.0, "the build fills the whole tank: 35 since ticket #455");
+    assert_eq!(g.order_cost(Seat(0), &Order::BuildShip { site: Place::Colony(iss), kind: UnitKind::ColonyShip }).fuel, 52.0, "the build fills the whole tank: 32 since ticket #596");
     // Under Provisional Findings, the Archivists', half of 15, rounded down: 7.
     let mut g = game();
     let arc = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Archivists).unwrap();
     g.research.current = Some(TechId::CryogenicTanks);
     g.research.findings_tech = Some(TechId::CryogenicTanks);
     assert!(g.provisional_findings(arc));
-    assert_eq!(g.tank_of(arc, UnitKind::ColonyShip), 42.0, "35 + 7, ticket #455");
+    assert_eq!(g.tank_of(arc, UnitKind::ColonyShip), 39.0, "32 + 7, ticket #596");
     for k in FactionKind::ALL {
         let order = &g.tables.ai.tech_picks[&k].order;
         let at = |t: TechId| order.iter().position(|x| *x == t);
@@ -16060,6 +16123,9 @@ fn ticket_345_the_computer_sends_its_colony_ship_to_a_world_nobody_has_settled()
         for seed in 1..13u64 {
             let mut t = Tables::load(&default_data_dir()).expect("tables load");
             t.ai.thresholds.first_windfall_worth = worth;
+            // Ticket #596 (version 0.1.0.4): the Mars race forces Mars once the Moon is claimed, so
+            // the windfall's pull is read with it stood aside, as the Moon race is above.
+            t.ai.thresholds.mars_race_weight = 0.0;
             // Ticket #537 (version 0.1.0.1): the Moon's Mine at its old 1.65. At 1.4025 the Mars
             // system wins all twelve boards without the prize, so nothing is left for it to pull. Since
             // ticket #554 (version 0.1.0.2) the Moon stands at 1.25 and Phobos and Deimos are richer;
@@ -18296,10 +18362,11 @@ fn a_colony_with_a_working_refinery_refuels_its_low_orbit_and_rescues_a_stranded
     assert!(g.check_order(Seat(0), &[], &refuel).is_ok(), "a working Refinery below fuels low orbit: {:?}", g.check_order(Seat(0), &[], &refuel));
     assert!(!g.stranded(far), "the depot rescues it");
     // Ticket #420 (version 0.09.4): a Colony Ship's tank is 40; 35 since ticket #455 (version 0.09.6).
-    assert_eq!(g.order_cost(Seat(0), &refuel).fuel, 34.0, "35 - 1 wanted, 50 held");
+    // Ticket #596 (version 0.1.0.4): 32.
+    assert_eq!(g.order_cost(Seat(0), &refuel).fuel, 31.0, "32 - 1 wanted, 50 held");
     g.commit_orders(Seat(0), std::slice::from_ref(&refuel));
-    assert_eq!(g.ship(far).unwrap().fuel, 35.0, "filled from the Stockpile");
-    assert_eq!(g.seats[0].stockpile.fuel, 16.0);
+    assert_eq!(g.ship(far).unwrap().fuel, 32.0, "filled from the Stockpile");
+    assert_eq!(g.seats[0].stockpile.fuel, 19.0, "50 less the 31");
     assert!(g.log.iter().any(|l| l.contains(" refuels ") && l.contains("at a Refinery Colony")), "the log says where: {:?}", g.log.last());
     // The Refinery mothballed: the depot is shut.
     g.ship_mut(far).unwrap().fuel = 1.0;
@@ -19924,11 +19991,12 @@ fn a_shipyard_wants_one_factory_module_and_no_more() {
     assert_eq!(scored(&g, "build Factory at Mare"), 0.0, "nor beside one on order");
 }
 
-/// Ticket #455 (version 0.09.6): **a Colony Ship's tank is 35**, at the designer's word.
+/// Ticket #455 (version 0.09.6): **a Colony Ship's tank is 35**, at the designer's word; 32 since
+/// ticket #596 (version 0.1.0.4), with the race to Mars.
 #[test]
-fn a_colony_ships_tank_is_35() {
+fn a_colony_ships_tank_is_32() {
     let t = tables();
-    assert_eq!(t.unit(UnitKind::ColonyShip).tank, 35);
+    assert_eq!(t.unit(UnitKind::ColonyShip).tank, 32);
 }
 
 /// Ticket #455 (version 0.09.6): **a Ship is built with the tank it was paid for.** The Fuel is
