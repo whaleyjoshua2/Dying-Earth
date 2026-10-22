@@ -24747,3 +24747,28 @@ fn the_sea_at_a_threshold_is_one_line_and_your_losses_are_your_works() {
     g.apply_sea_threshold(us, 0);
     assert!(!g.report.lines.iter().any(|l| l.text.contains("your")), "an occupied rival's Region is not the player's: {:?}", g.report.lines);
 }
+
+/// Ticket #600 (version 0.1.0.4), the review: **the Ice Sheets Committed Break is one pop-up**. The
+/// Break raises its own Moment; the sea it brings everywhere writes the rise's one line without a
+/// second, where the first build raised both and the turn's two Moments went to one event.
+#[test]
+fn the_ice_sheets_break_is_one_moment_and_one_sea_line() {
+    let mut g = game();
+    breaks_ahead(&mut g);
+    for s in &mut g.states {
+        s.population = 0.0;
+    }
+    // Past +1.8 and the Sink Weakens at +2.0 first, each with its own Moment.
+    for t in [1.85, 2.05] {
+        hold_temperature(&mut g, t);
+        g.climate_phase();
+    }
+    g.report.moments.clear();
+    g.report.lines.clear();
+    hold_temperature(&mut g, 2.25);
+    g.climate_phase();
+    let climate = g.report.moments.iter().filter(|m| m.kind == MomentKind::ClimateThreshold).count();
+    assert_eq!(climate, 1, "the Break's Moment alone: {:?}", g.report.moments);
+    let rose = g.report.lines.iter().filter(|l| l.kind == LineKind::SeaLevel && l.text.starts_with("Sea rose at")).count();
+    assert_eq!(rose, 1, "and the rise's one line: {:?}", g.report.lines);
+}
