@@ -143,3 +143,20 @@ and every lot of a turn cost the same.
   seat planning before any commits: **25 / 40 / 3 / 9 and 2 collapses**; wins by seat 15 / 39 / 17 /
   6; order lists with a Ducat drop **0**. The planning order's 21 / 25 / 8 / 24 was the seat-order
   edge, as the designer suspected: without it the board is back where §5's first build left it.
+
+## 6. The Cheap Ore Offer's refusal: a third off the refusing seat's Materials
+
+Ticket: [The Cheap Ore Offer's refusal cuts the market's Materials price by a third](https://github.com/whaleyjoshua2/Dying-Earth/issues/597).
+
+The designer: *"Cheap ore refusal now cuts market price by 1/3"*.
+
+- **The refusing seat's own price**, at the designer's word, over the market's for everyone: the
+  card's `seat_price` multiplier is two thirds, where it was a half (#577). One turn, as before.
+- **Flat while it stands**: the seat's Materials lots do not climb with its own trading that turn,
+  as a price a card has set does not (`lot_ducats`); a rival's do.
+- **The words**: the refuse side *"Let it go: Materials a third off next turn"*; the effect line
+  *"Buy the ore, or let it go for a third off Materials next turn"*; the window and the Market line
+  *"(a third off for you, this turn)"*.
+- **The computer's** answer stands: it takes the lot when it holds 20 Ducats.
+- **Swept** (`sweeps/ticket-597.txt`): **25 / 40 / 3 / 9 and 2 collapses**, as §5's last build; the
+  computer takes the offer whenever it can pay, so the refusal seldom fires in a sweep.

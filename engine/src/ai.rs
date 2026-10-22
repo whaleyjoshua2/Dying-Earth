@@ -2226,7 +2226,7 @@ impl Game {
         if (scarce == Resource::Materials || needs.contains(&Resource::Materials)) && per_materials > 0 {
             let lots = (self.seat(seat).stockpile.ducats / (per_materials * 10) as f64).floor() as i64;
             for _ in 0..lots.min(4) {
-                push(vec![Order::Buy { resource: Resource::Materials, amount: 10 }], Cat::Producer, self.base_weight(seat, Cat::Producer) * 1.5, 1.0, 1.0, 1.0, format!("buy 10 Materials for {} Ducats", self.lot_ducats(Resource::Materials, 10, 0)), None);
+                push(vec![Order::Buy { resource: Resource::Materials, amount: 10 }], Cat::Producer, self.base_weight(seat, Cat::Producer) * 1.5, 1.0, 1.0, 1.0, format!("buy 10 Materials for {} Ducats", self.lot_ducats(seat, Resource::Materials, 10, 0)), None);
             }
         }
         // Hold own places where a rival's standing approaches yours (ticket #33: spending raises your standing).

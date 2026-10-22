@@ -167,3 +167,28 @@ Income per Faction, mean a game, net of upkeep:
 | Prospectors | 2,332 | 468 | 290 | 1,176 | 405 |
 | Arkwrights | 1,758 | 433 | 366 | 3,795 | 341 |
 | Archivists | 521 | 235 | 75 | 512 | 659 |
+
+## The Cheap Ore Offer's refusal: a third off the refusing seat's Materials
+
+Ticket [#597](https://github.com/whaleyjoshua2/Dying-Earth/issues/597), spec §6.
+
+The designer chose the refusing seat's own price over the market's for everyone, one turn, flat while
+it stands, and the card's words "a third off". The card's multiplier is two thirds; `lot_ducats`
+prices a seat's lots flat at the opening price while it holds a cut on the good; the cut's note reads
+"a third off". A test was written first and watched red (the multiplier 0.5), then green; the 0.1.0.3
+test and the Market-line test moved from half to a third off.
+
+**The picture** ([`ticket-597/trading-window.png`](ticket-597/trading-window.png)): the Materials row
+*"3 each; sells for 1.5 (a third off for you, this turn)"*, and two pending Buys of 20 at 40 Ducats
+each, flat. A new building aid, `orecut:1`, gives seat 0 the cut.
+
+- **The sweep** ([`sweeps/ticket-597.txt`](sweeps/ticket-597.txt)): **25 / 40 / 3 / 9 and 2
+  collapses**, as before: the computer takes the offer whenever it holds 20 Ducats, so the refusal
+  seldom fires in a sweep. Reported and left.
+
+| | Materials | Fuel | Energy | Ducats | Research |
+|---|---|---|---|---|---|
+| Custodians | 2,167 | 841 | 672 | 1,637 | 1,469 |
+| Prospectors | 2,332 | 468 | 290 | 1,176 | 405 |
+| Arkwrights | 1,757 | 432 | 366 | 3,797 | 341 |
+| Archivists | 520 | 236 | 74 | 508 | 658 |

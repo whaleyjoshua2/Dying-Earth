@@ -710,7 +710,7 @@ impl Game {
                 // (version 0.09.3): to the tenth, where it was rounded down. Ticket #577 (version
                 // 0.1.0.3): and times the seat's own cut on that good, where a card gave it one.
                 // Ticket #593 (version 0.1.0.4): each unit at the seat's own running net, so a big lot climbs.
-                let ducats = self.lot_price(seat, *resource, self.lot_ducats(*resource, *amount, ahead(*resource)) as f64);
+                let ducats = self.lot_price(seat, *resource, self.lot_ducats(seat, *resource, *amount, ahead(*resource)) as f64);
                 match resource {
                     Resource::Materials => Cost { materials: -*amount as f64, ducats, ..Default::default() },
                     Resource::Fuel => Cost { fuel: -*amount as f64, ducats, ..Default::default() },
@@ -791,8 +791,14 @@ impl Game {
     /// Ticket #593: the Ducats for `amount` units of `resource` bought, each at the seat's own
     /// running net, `ahead` being its trades in that good before them this turn. The window's
     /// price before the Faction's multiplier and a seat's cut, which `lot_price` takes.
-    pub fn lot_ducats(&self, resource: Resource, amount: i64, ahead: i64) -> i64 {
+    ///
+    /// Ticket #597 (version 0.1.0.4), at the designer's word: while the seat has its own cut on the
+    /// good (`seat_price_cut`), its lots are flat at the opening price, as a card's price is.
+    pub fn lot_ducats(&self, seat: Seat, resource: Resource, amount: i64, ahead: i64) -> i64 {
         let Some(row) = Self::market_row(resource) else { return 0 };
+        if self.seat_price_cut(seat, row).is_some() {
+            return self.unit_price_at(row, 0) * amount.max(0);
+        }
         (0..amount.max(0)).map(|i| self.unit_price_at(row, ahead + i)).sum()
     }
 
@@ -850,7 +856,14 @@ impl Game {
     /// *"half for you, this turn"*.
     pub fn seat_price_note(&self, seat: Seat, row: usize) -> Option<String> {
         let c = self.seat_price_cut(seat, row)?;
-        let how = if (c.multiplier - 0.5).abs() < 1e-9 { "half".to_string() } else { format!("x{}", c.multiplier) };
+        // Ticket #597 (version 0.1.0.4): the Cheap Ore Offer's two thirds read "a third off".
+        let how = if (c.multiplier - 0.5).abs() < 1e-9 {
+            "half".to_string()
+        } else if (c.multiplier - 2.0 / 3.0).abs() < 1e-9 {
+            "a third off".to_string()
+        } else {
+            format!("x{}", c.multiplier)
+        };
         Some(match c.until - self.turn {
             0 => format!("{how} for you, this turn"),
             n => format!("{how} for you, {}", crate::counted(n + 1, "turn", "turns")),

@@ -46,6 +46,8 @@ EARTH
  - THE MARKET re-prices every lot: each 20 you buy this turn makes your next a Ducat dearer, each
    20 you sell a Ducat cheaper, 2 either side of the usual price; everyone's trading moves next
    turn's price. Buy 40 Materials and watch the second 20 cost more.
+ - The CHEAP ORE OFFER's refusal takes a third off your Materials next turn, where it was half,
+   and your lots stay flat while it stands.
 - A STRIP PERMIT is once per Region, ever, and the button and the help say so.
 
 SPACE

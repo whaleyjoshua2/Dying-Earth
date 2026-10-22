@@ -1536,6 +1536,14 @@ fn build_board(session: &mut Session) {
         eprintln!("order:{name} was refused");
         std::process::exit(3);
     }
+    // `orecut:1` (a building aid, ticket #597, version 0.1.0.4): seat 0 has refused the Cheap Ore
+    // Offer, its Materials a third off for this turn, so the Trading window shows the cut.
+    if std::env::args().any(|a| a == "orecut:1")
+        && let Some(g) = session.game.as_mut()
+    {
+        let until = g.turn;
+        g.seats[0].price_cuts.push(dying_earth_engine::state::PriceCut { row: 0, multiplier: 2.0 / 3.0, until });
+    }
     // `buy:<n>` (a building aid, ticket #593, version 0.1.0.4): two Buys of n Materials placed and
     // left pending, the seat given the Ducats, so the Trading window (`trade:1`) shows the second lot
     // and the next one quoted dearer than the first.

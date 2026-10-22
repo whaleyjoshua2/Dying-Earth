@@ -9867,7 +9867,7 @@ Everyone's trading moves next turn's price.", n = d.price_step_units, b = d.pric
             let per = match res {
                 None => game.tables.ducats.per_influence,
                 // Ticket #593 (version 0.1.0.4): the next unit's price, after this turn's trading.
-                Some(r) => game.lot_ducats(r, 1, ahead(r)) as f64,
+                Some(r) => game.lot_ducats(Seat(0), r, 1, ahead(r)) as f64,
             };
             icon_word(ui, key, name);
             let sells = matches!(res, Some(dying_earth_engine::Resource::Materials) | Some(dying_earth_engine::Resource::Fuel));
