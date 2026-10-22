@@ -8209,6 +8209,29 @@ fn every_computer_seat_races_for_mars_once_the_moon_is_claimed() {
     assert!(orders.iter().any(|o| matches!(o, Order::Transit { ship: ShipId(962), to, .. } if *to != BodyId::Mars)), "the second flies to another world: {:?}", g.log.iter().filter(|l| l.contains("send") || l.contains("Transit")).collect::<Vec<_>>());
 }
 
+/// Ticket #596 (version 0.1.0.4), at the designer's word: **the runner's send to Mars is weighed at
+/// the race weight**, as the race's Shipyard and Colony Ship are. At its own weight, falling off the
+/// window, the send lost every turn to the Ship's own moves between low orbit and the station, and
+/// the runner never left. Measured in a real game: seed 1, the Prospectors in East Asia, turn 10,
+/// the Archivists' runner.
+#[test]
+fn the_race_sends_its_runner_to_mars_over_the_ships_own_moves() {
+    let mut g = Game::new(tables(), NewGame { seed: 1, player: FactionKind::Prospectors, player_is_ai: true, player_start: StateId::EastAsia });
+    g.start();
+    while g.turn < 10 {
+        g.end_turn(std::array::from_fn(|_| Vec::new())).unwrap();
+    }
+    let arc = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Archivists).unwrap();
+    assert!(g.first_at(BodyId::Moon).is_some() && g.first_at(BodyId::Mars).is_none(), "the premise: the Moon claimed, Mars not");
+    g.log.clear();
+    let orders = g.ai_orders(arc);
+    assert!(
+        orders.iter().any(|o| matches!(o, Order::Transit { to: BodyId::Mars, .. })),
+        "the Archivists' runner to Mars on turn 10: {:?}",
+        g.log.iter().filter(|l| l.contains("Colony Ship")).collect::<Vec<_>>()
+    );
+}
+
 /// Ticket #563 (version 0.1.0.3), at the designer's word: the computer Custodians weigh the trade
 /// whole. East Asia's Mine makes 6.6 (the Materials lean); a Moon Mine beside a Mass Driver makes
 /// 5 + 1 = 6. Idled, the Moon Mine makes x2.08: a lift of 6 x 1.08 = 6.48, short of 6.6 on its own;

@@ -3421,7 +3421,12 @@ impl Game {
                         let window = self.window_preference(seat, body, d);
                         // Ticket #514 (version 0.1.0.0): the crossing to the Capital candidate's Body, while gathering.
                         let gather = if gathering && capital_has_room && Some(d) == capital_body { capital_chase } else { 1.0 };
-                        push(vec![Order::Transit { ship: s.id, to: d, slot: self.ai_destination_orbit(seat, s, d) }], Cat::Transit, self.base_weight(seat, Cat::Transit) * window * gather, gap_for(Cat::Transit, None), 1.0, 1.0, format!("send {} to {}", ship_name, self.tables.body(d).name), None);
+                        // Ticket #596 (version 0.1.0.4), at the designer's word: the seat's runner sent
+                        // to Mars at the race weight, as the race's builds are. Measured before: at
+                        // 4.9 and falling off the window the send lost every turn to the Ship's own
+                        // 6.0 moves between low orbit and the station, and it never left.
+                        let race = if d == BodyId::Mars && self.mars_race_open() && self.mars_runner(seat, s.id) { th.mars_race_weight.max(1.0) } else { 1.0 };
+                        push(vec![Order::Transit { ship: s.id, to: d, slot: self.ai_destination_orbit(seat, s, d) }], Cat::Transit, self.base_weight(seat, Cat::Transit) * window * gather * race, gap_for(Cat::Transit, None), 1.0, 1.0, format!("send {} to {}", ship_name, self.tables.body(d).name), None);
                     }
                 }
                 if s.colonists == 0 && body != BodyId::Earth {

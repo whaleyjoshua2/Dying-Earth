@@ -301,3 +301,35 @@ the two-turn hold went and the soft window preference came back.
 | Prospectors | 2,173 | 428 | 374 | 1,029 | 327 |
 | Arkwrights | 1,700 | 391 | 284 | 3,611 | 332 |
 | Archivists | 435 | 218 | 79 | 503 | 615 |
+
+**The timing**, left open for the designer, grilled in four more rounds: Mars fell a window after
+the Moon. The designer asked for the race to open on the Moon launch, then from turn one, then for
+the seat second to the Moon to go to Mars. Each was built, test first and watched red, and swept:
+
+- *From the launch*: nothing moved. A correction owed: I told the designer each computer seat plans
+  after the seats before it commit. That was 6b979f2, taken back in 6c02535: every seat plans before
+  any commits, and the Moon is a turn away, so no seat ever sees a launch.
+- *From turn one*: no seat holds a Colony Ship before turn 7 (a probe of four games: Shipyards by
+  turn 3 to 5, the first Ship on turn 7, the second on 15 or later), so the turn-7 window cannot be
+  met by a second Ship; 23 / 40 / 8 / 8, Mars at 23.
+- *Second to the Moon*: Mars at 15, but the Prospectors at 50. A probe found the Custodians' Ship
+  sent to Mars never left: the send, at 4.9 and falling off the window, lost every turn to the
+  Ship's own 6.0 moves between low orbit and the station. **Weighing the send at the race's 2.5**
+  sent it; Mars stayed at 15 and the Prospectors took the Moon, 19 / 51 / 3 / 7.
+
+The designer took the send at 2.5 alone and dropped second to the Moon: a seat does not know it will
+lose the Moon, so its Ship goes there. The stalled send was the runner's too, measured in a real
+game (seed 1, the Prospectors in East Asia, turn 10: the Archivists' runner took a 30.0 move to low
+orbit over the 21.3 send); the test was watched red there with the lift taken out.
+
+- **The sweep** ([`sweeps/ticket-596-race-send.txt`](sweeps/ticket-596-race-send.txt)): **32 / 33 /
+  4 / 10 and 1 collapse**. Mars in **80 of 80 at a median turn 22** (15 / 17 / 23 / 23 by seating),
+  the Moon contested as before. The far Bodies, accepted at the designer's word: Phobos 56, Deimos
+  16, Mercury 65, Ceres 10, Vesta 6.
+
+| | Materials | Fuel | Energy | Ducats | Research |
+|---|---|---|---|---|---|
+| Custodians | 2,151 | 849 | 595 | 1,657 | 1,415 |
+| Prospectors | 2,221 | 436 | 326 | 1,058 | 352 |
+| Arkwrights | 1,566 | 331 | 257 | 3,184 | 274 |
+| Archivists | 424 | 212 | 58 | 405 | 623 |

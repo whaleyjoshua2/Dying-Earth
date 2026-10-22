@@ -249,10 +249,26 @@ The designer: *"Race to mars"*.
 - **The Colony Ship's tank is 32**, from 35, for every seat: Earth to Mars at the window (18) is
   untouched; off it four Mars turns of fifty close, Earth to Vesta closes and the Arkwrights' Moon to
   Mercury, until a tank Tech stands.
+- **The runner's send** to Mars is weighed at the race weight, 2.5, as its Shipyard and Colony Ship
+  are, at the designer's word. At its own weight, falling off the window (4.9, 4.3, 3.7), the send
+  lost every turn to the Ship's own 6.0 moves between low orbit and the station, and the runner
+  never left.
 - **The prize** is First to a Body's as it stands (Mars: 15 Influence, +1 a turn, the world eased).
-- **Swept** (`sweeps/ticket-596.txt`): **32 / 34 / 6 / 7 and 1 collapse**, from 26 / 39 / 7 / 8 and
-  none: the Custodians' six on and the Prospectors' five off at the edge of noise. **Mars founded in
-  80 of 80, from 28, at a median turn 23, from 24**: the Mars windows fall on turns 7, 20, 33 and 46
-  and the Moon is claimed at a median turn 8. The other far Bodies settle less: Phobos 58 of 80 from
-  76, Deimos 28 from 44, Mercury 70 from 77, Ceres 12 from 30, Vesta 9 from 37. With the two-turn
-  hold (taken back): 27 / 42 / 4 / 7, Mars 80 at 24, Phobos 33, Deimos 9, Vesta 7.
+- **Until the Moon is claimed every seat's Ship goes to the Moon**, the runners-up too, at the
+  designer's word: a seat does not know it will lose the Moon.
+- **Swept** (`sweeps/ticket-596-race-send.txt`): **32 / 33 / 4 / 10 and 1 collapse**, from 26 / 39 /
+  7 / 8 and none before the ticket. **Mars founded in 80 of 80, from 28, at a median turn 22, from
+  24** (15 / 17 / 23 / 23 by seating): the Mars windows fall on turns 7, 20, 33 and 46 and the Moon is
+  claimed at a median turn 8. The other far Bodies settle less, accepted at the designer's word:
+  Phobos 56 of 80 from 76, Deimos 16 from 44, Mercury 65 from 77, Ceres 10 from 30, Vesta 6 from 37.
+- **Built and taken back**, at the designer's word:
+  - *A hold to two turns of the window*: 27 / 42 / 4 / 7, Mars 80 at 24, Phobos 33, Deimos 9, Vesta 7.
+  - *The race without the runner's send* (the first commit, `sweeps/ticket-596.txt`): 32 / 34 / 6 /
+    7 and 1 collapse, Mars 80 at 23.
+  - *The race open from the first launch for the Moon*: no seat ever sees one, since every seat
+    plans before any commits and the Moon is a turn away; nothing moved.
+  - *The race on from turn one*, each seat's first Ship to the Moon and its second lifted: no seat
+    holds a Colony Ship before turn 7, so the turn-7 window went unmet; 23 / 40 / 8 / 8, Mars at 23.
+  - *Second to the Moon goes to Mars*, a seat whose first Ship stood behind a rival's sending it to
+    Mars: Mars at a median turn 15 and the far Bodies back (Phobos 71, Vesta 31), but the Custodians
+    gave the Moon to the Prospectors, 19 / 51 / 3 / 7 and none.
