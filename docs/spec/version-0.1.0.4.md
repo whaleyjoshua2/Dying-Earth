@@ -189,3 +189,27 @@ count for 6% of the victory"*.
 - **Not changed, for the designer**: the Custodians' first part counts their best run, so with
   Planetary Stewardship standing, the best run at the bar and the run since broken, they read 100%
   unwon, with no hold to name. It predates this ticket.
+
+## 8. The Report's lines
+
+Ticket: [The Report's lines: the sea in one line and your loss in Your works, "Japan revolted", the invasion as headline, "Natural Sink +1.5 ppm"](https://github.com/whaleyjoshua2/Dying-Earth/issues/600).
+
+- **The sea, one line a rise**: *"Sea rose at +1.8 C: you lost a Power Plant, a Factory and a Mine
+  (China); rivals lost 5 Facilities."*, the player's losses named by Region, the rivals' counted, a
+  Region nobody holds in neither; *"no buildings lost"* where nothing was. Built after every
+  Region's loss at the threshold (`report_sea_rise`), one Moment with it; the per-Region lines and
+  the window's sea fold are gone. A Sea Wall that held keeps its own line. A Region of the player's
+  that lost only slots still makes the line theirs. **Whose** is the Region's holder, as an invasion
+  reads it: a Region the player only occupies is not theirs, one a rival occupies still is. A Storm
+  Surge's one Region reads *"Sea rose early in Australia: you lost a Factory."*; the Ice Sheets
+  Break's rise carries no second Moment beside the Break's own (the review).
+- **Your own losses**: a Your works line for each building, *"The sea took your Power Plant in
+  China."*
+- **The revolt**, both the passed-and-thrown-off and the plain throw-off: *"Japan revolted against
+  Arkwrights: now neutral."* The designer chose "against the Arkwrights"; the Report's standing rule
+  (a Faction's name drawn in its colour, never after "the") drops the article.
+- **The invasion headline**: a rival taking a Region the player holds, or beginning an Occupation of
+  it, is `LineKind::Invasion`, rank 1, above a Colony founded; every other rank a step down. A Region
+  the player only occupies is not theirs to be invaded.
+- **Planetary Stewardship's effect**: *"Natural Sink +1.5 ppm"*, alone, at the designer's word.
+- No rule moves; no sweep.

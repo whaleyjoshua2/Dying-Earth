@@ -3376,15 +3376,16 @@ fn report_line_ui(ui: &mut Ui, game: &Game, session: &Session, l: &dying_earth_e
 }
 
 /// Ticket #431 (version 0.09.5): **a heading's lines with their repeats folded**, at the designer's
-/// word: the sea at every Region, the Refugees and the Unrest of Regions not the player's, and each
-/// rival's completed builds become one line apiece that opens to the full list. The player's own
+/// word: the Refugees and the Unrest of Regions not the player's, and each rival's completed builds,
+/// become one line apiece that opens to the full list (the sea at every Region too, until ticket
+/// #600 made it one line a rise). The player's own
 /// Regions keep their Unrest and Refugee lines.
 fn report_lines(ui: &mut Ui, game: &Game, session: &Session, lines: &[&dying_earth_engine::report::ReportLine], actions: &mut Vec<Action>) {
     use dying_earth_engine::report::{LineKind, ReportLine};
     let own = |l: &ReportLine| l.mine || matches!(l.place, Some(ReportPlace::State(s)) if game.state(s).control.director() == Some(Seat(0)));
     let fold_key = |l: &ReportLine| -> Option<(LineKind, Option<Seat>)> {
         match l.kind {
-            LineKind::SeaLevel => Some((l.kind, None)),
+            // Ticket #600 (version 0.1.0.4): the sea is one line a rise now, so it folds no more.
             // The review: only a line at a Region folds; a world-wide Unrest line stands alone.
             LineKind::Refugees | LineKind::Unrest if !own(l) && l.place.is_some() => Some((l.kind, None)),
             LineKind::BuildComplete => Some((l.kind, l.by)),
@@ -3408,7 +3409,6 @@ fn report_lines(ui: &mut Ui, game: &Game, session: &Session, lines: &[&dying_ear
         done.push(key);
         let n = group.len();
         let title = match key {
-            (LineKind::SeaLevel, _) => format!("The sea at {n} Regions"),
             (LineKind::Refugees, _) => format!("Refugees in {n} other Regions"),
             (LineKind::Unrest, _) => format!("Unrest moved in {n} other Regions"),
             (_, Some(seat)) => format!("{}: {n} buildings completed", game.seat_name(seat)),

@@ -284,7 +284,8 @@ cost = 62
 # need Efficient Grids, so the road is the designer's three, and a line straight from Efficient
 # Grids was only clutter -- "because it already flows though the other two it doesn't need a line".
 needs = ["clean_manufacturing", "green_consensus"]
-effect = "Opens the Custodians' Victory Condition; the Natural Sink grows by 1.5 ppm a turn for the world"
+# Ticket #600 (version 0.1.0.4), at the designer's word: "Natural Sink +1.5 ppm", alone.
+effect = "Natural Sink +1.5 ppm"
 # Ticket #458 (version 0.09.7): 1.5, where it was 1.0.
 value = 1.5
 gate_for = "custodians"

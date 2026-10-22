@@ -95,6 +95,11 @@ pub enum LineKind {
     /// works; the window opens the Factions window from it, where Renew stands. Never a headline.
     /// Added last.
     Accord,
+    /// Ticket #600 (version 0.1.0.4), at the designer's word: **a rival invading a Region of the
+    /// player's** -- taking it, or beginning an Occupation of it. It outranks every line but the
+    /// game's end, a Colony founded included: "invasions of your own Regions must be the HEADLINE".
+    /// Added last.
+    Invasion,
 }
 
 /// The five headings the dispatch groups its lines under, in the order they are shown (four until
@@ -140,21 +145,24 @@ pub fn line_kind_of(seat: Seat, mine: LineKind, theirs: LineKind, spectator: boo
 }
 
 impl LineKind {
-    /// The severity order the headline is chosen by: a Colony founded, then a place changing
+    /// The severity order the headline is chosen by: a rival invading the player's Region (ticket
+    /// #600, version 0.1.0.4), a Colony founded, then a place changing
     /// controller, a Break or a Sea Level threshold, a decisive Battle, an Occupation, a Tech, an
     /// Event, and last a build completed. A kind with no rank never headlines.
     pub fn headline_rank(self) -> Option<u8> {
         Some(match self {
             LineKind::GameOver => 0,
             LineKind::Seating => 0,
-            LineKind::ColonyFounded => 1,
-            LineKind::ControlChanged => 2,
-            LineKind::Break | LineKind::SeaLevel | LineKind::Antarctica => 3,
-            LineKind::DecisiveBattle => 4,
-            LineKind::Occupation => 5,
-            LineKind::TechComplete => 6,
-            LineKind::Event => 7,
-            LineKind::BuildComplete | LineKind::YourBuild => 8,
+            // Ticket #600 (version 0.1.0.4): above everything but the end; the rest a step down.
+            LineKind::Invasion => 1,
+            LineKind::ColonyFounded => 2,
+            LineKind::ControlChanged => 3,
+            LineKind::Break | LineKind::SeaLevel | LineKind::Antarctica => 4,
+            LineKind::DecisiveBattle => 5,
+            LineKind::Occupation => 6,
+            LineKind::TechComplete => 7,
+            LineKind::Event => 8,
+            LineKind::BuildComplete | LineKind::YourBuild => 9,
             _ => return None,
         })
     }
@@ -175,7 +183,7 @@ impl LineKind {
             // line has always read; only its headline rank is gone.
             LineKind::Break | LineKind::SeaLevel | LineKind::Event | LineKind::Development | LineKind::Climate | LineKind::Card => Section::TheClimate,
             LineKind::TechComplete | LineKind::YourBuild | LineKind::YourWorks | LineKind::Accord => Section::YourWorks,
-            LineKind::ControlChanged | LineKind::DecisiveBattle | LineKind::Battle | LineKind::BuildComplete | LineKind::Note | LineKind::Seating | LineKind::GameOver => by_place(),
+            LineKind::ControlChanged | LineKind::Invasion | LineKind::DecisiveBattle | LineKind::Battle | LineKind::BuildComplete | LineKind::Note | LineKind::Seating | LineKind::GameOver => by_place(),
         }
     }
 }
@@ -650,9 +658,10 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     // Ticket #269: an Agitate landed, named for who paid.
     ("storm_surge_wall", &["state", "percent"]),
     ("sea_wall_unkept", &["faction", "states"]),
-    ("sea_nothing_left", &["temperature", "state"]),
-    ("sea_took", &["n", "slots", "state", "temperature"]),
-    ("sea_took_destroying", &["n", "slots", "state", "temperature", "destroyed"]),
+    // Ticket #600 (version 0.1.0.4): one line a rise, and the player's own losses.
+    ("sea_rose", &["temperature", "what"]),
+    ("sea_took_yours", &["what", "state"]),
+    ("sea_rose_in", &["state", "what"]),
     // Ticket #400 (version 0.09.3): the heat is a cause on the net line; the board is one line.
     ("heat_board", &["n", "m"]),
     ("development", &["state", "level"]),
@@ -746,14 +755,15 @@ pub const PHRASE_ARGS: &[(&str, &[&str])] = &[
     // Ticket #346 (version 0.09.1): what a Battle cost in Fuel, and the hulls that fought dry.
     ("battle_fuel", &["n"]),
     ("battle_fought_dry", &["hulls"]),
+    ("sea_rose_yours", &["what"]),
+    ("sea_rose_rivals", &["n"]),
+    ("sea_rose_none", &[]),
     ("sea_inland", &[]),
     ("sea_inland_flipped", &["what"]),
     ("first_colony", &[]),
     ("more_colonies", &["ordinal"]),
     ("first_antarctic_colony", &[]),
     ("more_antarctic_colonies", &["ordinal"]),
-    ("slot", &[]),
-    ("slots", &[]),
     ("pick_first_choice", &["faction", "tech"]),
     ("pick_cheapest", &["faction", "tech"]),
     ("pick_last", &["faction", "tech"]),

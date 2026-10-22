@@ -1536,6 +1536,21 @@ fn build_board(session: &mut Session) {
         eprintln!("order:{name} was refused");
         std::process::exit(3);
     }
+    // `searise:1` (a building aid, ticket #600, version 0.1.0.4): the sea's first threshold now,
+    // seat 0's home Region all on the coast so a building of the player's drowns, so the Report
+    // (`menus:1`) shows the rise's one line and the player's own loss.
+    if std::env::args().any(|a| a == "searise:1")
+        && let Some(g) = session.game.as_mut()
+    {
+        if let Some(home) = g.directed_states(Seat(0)).first().copied() {
+            for f in g.state_mut(home).facilities.iter_mut() {
+                f.coastal = true;
+            }
+        }
+        g.report.lines.clear();
+        g.climate.temperature = g.tables.climate.sea_level_thresholds[0];
+        g.sea_level_check();
+    }
     // `orecut:1` (a building aid, ticket #597, version 0.1.0.4): seat 0 has refused the Cheap Ore
     // Offer, its Materials a third off for this turn, so the Trading window shows the cut.
     if std::env::args().any(|a| a == "orecut:1")

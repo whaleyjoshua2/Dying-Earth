@@ -8,6 +8,12 @@ use crate::state::*;
 use rand::Rng;
 
 impl Game {
+    /// Ticket #600 (version 0.1.0.4): is this a rival taking, or beginning to occupy, a Region the
+    /// player held? A Colony is not a Region; a game with no player has no invasions.
+    pub fn invades_the_player(&self, place: Place, taker: Seat, held_by: Option<Seat>) -> bool {
+        !self.spectator && matches!(place, Place::State(_)) && held_by == Some(Seat(0)) && taker != Seat(0)
+    }
+
     pub fn resolution_phase(&mut self) {
         // Flags that last "until the next Resolution" clear now.
         // Ticket #54: a mothballed building is never woken by a flag clearing; only a Restart wakes it.
@@ -1604,7 +1610,10 @@ impl Game {
                         let line = format!("The {} occupy {}.", self.seat_name(seat), self.place_name(place));
                         self.log(line);
                         let text = self.say("occupation_begun", &[("faction", self.seat_name(seat)), ("place", self.place_name(place))]);
-                        self.report_line(LineKind::Occupation, Some(place.into()), text);
+                        // Ticket #600 (version 0.1.0.4): a rival occupying a Region of the player's
+                        // is the headline.
+                        let kind = if self.invades_the_player(place, seat, previous) { LineKind::Invasion } else { LineKind::Occupation };
+                        self.report_line(kind, Some(place.into()), text);
                         // Ticket #404 (version 0.09.4): as a change of hands, the player's news.
                         self.mark_mine(&[Some(seat), previous]);
                         let gain = self.occupation_gain(place, seat);
@@ -1791,7 +1800,7 @@ impl Game {
         // the final holder first and the earlier step after it, where two lines read as a
         // contradiction ("India now belongs to Prospectors (Pacified)", then "to Archivists").
         // Only into a line that is still this place's: one from an earlier Report is never touched.
-        let at = self.pending.transfer_lines.iter().rev().find(|(p, _)| *p == place).map(|(_, i)| *i).filter(|i| self.report.lines.get(*i).is_some_and(|l| l.kind == LineKind::ControlChanged && l.place == Some(place.into())));
+        let at = self.pending.transfer_lines.iter().rev().find(|(p, _)| *p == place).map(|(_, i)| *i).filter(|i| self.report.lines.get(*i).is_some_and(|l| matches!(l.kind, LineKind::ControlChanged | LineKind::Invasion) && l.place == Some(place.into())));
         let earlier = at.and_then(|_| self.pending.transfers.iter().rev().find(|t| t.0 == place).cloned());
         let mut args = vec![("place", self.place_name(place)), ("faction", self.seat_name(seat)), ("why", why.to_string())];
         let key = match &earlier {
@@ -1808,16 +1817,22 @@ impl Game {
         // is their news, under Your works (ticket #523: there alone).
         // An occupier whose Occupation a third Faction's Influence ends loses the place too.
         let mine = !self.spectator && [Some(seat), before, directed].contains(&Some(Seat(0)));
+        // Ticket #600 (version 0.1.0.4): a rival taking a Region the player holds is the headline;
+        // one the player only occupies is not the player's own.
+        let invaded = self.invades_the_player(place, seat, before);
         match at.filter(|_| earlier.is_some()) {
             Some(i) => {
                 let l = &mut self.report.lines[i];
                 l.text = text;
                 l.mine |= mine;
+                if invaded {
+                    l.kind = LineKind::Invasion;
+                }
                 // Its Moment is the final holder's, below.
                 self.report.moments.retain(|m| !(m.kind == MomentKind::ControlChanged && m.place == Some(place.into())));
             }
             None => {
-                self.report_line(LineKind::ControlChanged, Some(place.into()), text);
+                self.report_line(if invaded { LineKind::Invasion } else { LineKind::ControlChanged }, Some(place.into()), text);
                 self.mark_mine(&[Some(seat), before, directed]);
                 // Ticket #366 (version 0.09.2): where this line stands, so a throw-off in the same
                 // Resolution can say both in its place.

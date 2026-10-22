@@ -229,3 +229,26 @@ is put to the designer; and stale "90%" comments, corrected.
 | Prospectors | 2,255 | 448 | 323 | 1,181 | 391 |
 | Arkwrights | 1,785 | 489 | 410 | 3,812 | 381 |
 | Archivists | 497 | 234 | 73 | 538 | 672 |
+
+## The Report's lines
+
+Ticket [#600](https://github.com/whaleyjoshua2/Dying-Earth/issues/600), spec §8.
+
+The designer chose the sea's one line with their losses named and rivals' counted, a Your works line
+per building, "revolted against", both invasions as the headline, and Planetary Stewardship's effect
+as "Natural Sink +1.5 ppm" alone. The sea's loss now returns what each Region lost (`SeaLoss`) and
+one function writes the rise's line; `LineKind::Invasion` heads the ranks. The new sea test was
+written before the build but first ran after it; the old pins that moved (the ranks, the revolt
+words, the sea's per-Region lines, an invasion's kind) each failed on the new code and were moved.
+The revolt drops the designer's "the" by the Report's standing rule, which a test enforces.
+
+**The picture** ([`ticket-600/report.png`](ticket-600/report.png)): the Report at the sea's first
+threshold, headlined *"Sea rose at +1.8 C: you lost a Power Plant, a Factory and a Mine (China);
+rivals lost 5 Facilities."*, Your works listing each of the three. A new building aid, `searise:1`.
+
+**The review** found the Storm Surge's one Region written as a world's rise with no Region named,
+"you" read as the director by the sea and the holder by an invasion, "in The United States" in Your
+works, and the Ice Sheets Break raising two Moments; all fixed, a test watched red on the first three
+(the surge, the name, an occupied rival's Region), then green. The dead `slot`/`slots` phrases went.
+
+No rule moves, so no sweep.

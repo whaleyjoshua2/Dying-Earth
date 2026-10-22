@@ -3227,7 +3227,8 @@ fn e_four_stops_replenishment_seven_halves_output_ten_throws_the_controller_off(
     assert_eq!(g.state(StateId::NorthAfrica).queue.len(), 1, "the build queue is kept");
     assert_eq!(g.army(id).unwrap().home, ArmyHome::State(StateId::NorthAfrica), "the Armies there become the state's own");
     assert!(g.army_seat(g.army(id).unwrap()).is_none(), "so they fight for nobody");
-    assert!(g.report.lines.iter().any(|l| l.text.contains("threw off")), "a Report line names it: {:?}", g.report.lines);
+    // Ticket #600 (version 0.1.0.4): "revolted".
+    assert!(g.report.lines.iter().any(|l| l.text.contains("revolted against")), "a Report line names it: {:?}", g.report.lines);
 }
 
 /// (f) A neutral state's Unrest is capped at 9, and a Faction taking it by Influence inherits it.
@@ -4620,8 +4621,9 @@ fn d_the_sea_takes_coastal_slots_only_oldest_first_and_then_nothing() {
     assert_eq!(g.coastal_slots(sid), 2, "the Power Plant's slot and the one just turned");
     assert_eq!(standing(&g, sid, true), vec![FacilityKind::PowerPlant], "the Refinery went with the second rise");
     assert_eq!(standing(&g, sid, false), vec![FacilityKind::ResearchLab], "the inland Research Lab has not moved: an empty slot turned each time");
+    // Ticket #600 (version 0.1.0.4): the rise's one line, and the player's loss in Your works.
     assert!(
-        g.report.lines.iter().any(|l| l.text.contains("The sea took 2 coastal slots from Australia")),
+        g.report.lines.iter().any(|l| l.text == "Sea rose early in Australia: you lost a Factory.") && g.report.lines.iter().any(|l| l.text == "The sea took your Factory in Australia."),
         "the Report names what the sea took: {:?}",
         g.report.lines
     );
@@ -4629,7 +4631,8 @@ fn d_the_sea_takes_coastal_slots_only_oldest_first_and_then_nothing() {
     // A third rise takes the two coastal slots that are left, and with no empty inland slot left
     // the Research Lab's slot turns, Lab and all: the coast has reached the last of the state.
     g.apply_sea_loss(sid, 2.9);
-    assert!(g.report.lines.iter().any(|l| l.text.contains("The sea took 2 coastal slots from Australia") && l.text.contains("Power Plant")), "the Power Plant drowned: {:?}", g.report.lines);
+    // Ticket #600 (version 0.1.0.4): the player's loss is a Your works line of its own.
+    assert!(g.report.lines.iter().any(|l| l.text == "The sea took your Power Plant in Australia."), "the Power Plant drowned: {:?}", g.report.lines);
     assert_eq!((g.coastal_slots(sid), g.inland_slots(sid)), (1, 0), "one coastal slot, the turned one, and nothing inland");
     assert_eq!(standing(&g, sid, true), vec![FacilityKind::ResearchLab], "the Research Lab stands on the coast now");
     assert_eq!(g.build_slots(sid), 1, "seven slots less six taken");
@@ -4638,8 +4641,12 @@ fn d_the_sea_takes_coastal_slots_only_oldest_first_and_then_nothing() {
     g.apply_sea_loss(sid, 3.0);
     assert_eq!(g.build_slots(sid), 0, "the state is all sea");
     assert!(g.state(sid).facilities.is_empty(), "the Research Lab drowned with the last slot");
-    g.apply_sea_loss(sid, 3.1);
-    assert!(g.report.lines.iter().any(|l| l.text.contains("no coastal slots left")), "with nothing left the Report says so: {:?}", g.report.lines);
+    // Ticket #600 (version 0.1.0.4): a rise that finds nothing left takes nothing and says so in the
+    // rise's one line, where the Region had a line of its own.
+    let loss = g.apply_sea_loss(sid, 3.1);
+    assert!(loss.lost.is_empty() && loss.took == 0, "nothing left to take");
+    g.report_sea_rise(3.1, &[loss]);
+    assert!(g.report.lines.iter().any(|l| l.text == "Sea rose at +3.1 C: no buildings lost."), "with nothing left the Report says so: {:?}", g.report.lines);
 }
 
 /// Ticket #276 (version 0.08.5): the sea reaches inland. Every rise turns one inland slot coastal
@@ -4674,7 +4681,8 @@ fn d2_every_rise_turns_one_inland_slot_coastal_wall_or_no_wall() {
     assert_eq!(standing(&g, sid, true), vec![FacilityKind::Refinery, FacilityKind::PowerPlant], "the Factory drowned, oldest first, as before");
     assert_eq!(standing(&g, sid, false), vec![FacilityKind::ResearchLab], "the empty slot turned, not the Research Lab's");
     assert_eq!(g.free_coastal(sid), 1, "the turned slot is coastal and empty, waiting for the next rise");
-    assert!(g.report.lines.iter().any(|l| l.text.contains("The coast moved one slot inland.")), "the Report says the coast moved: {:?}", g.report.lines);
+    // Ticket #600 (version 0.1.0.4): the coast's moving is in the log; the Report's one line says what was lost.
+    assert!(g.log.to_vec().iter().any(|l| l.contains("The coast now reaches one slot further in.")), "the log says the coast moved");
 
     // A wall: the rise takes nothing, and STILL turns one inland slot -- the last empty one.
     g.state_mut(sid).facilities.push(Facility::new(FacilityKind::SeaWall));
@@ -5527,7 +5535,9 @@ fn the_headline_takes_the_most_severe_line_whatever_order_it_came_in() {
     .iter()
     .map(|k| k.headline_rank())
     .collect();
-    assert_eq!(ranks, vec![Some(1), Some(2), Some(3), Some(3), Some(4), Some(5), Some(6), Some(7), Some(8)]);
+    // Ticket #600 (version 0.1.0.4): every rank a step down, an invasion of the player's at 1.
+    assert_eq!(ranks, vec![Some(2), Some(3), Some(4), Some(4), Some(5), Some(6), Some(7), Some(8), Some(9)]);
+    assert_eq!(LineKind::Invasion.headline_rank(), Some(1));
 }
 
 /// (b) Every line carries its kind and its place, and the four headings take them by both.
@@ -8902,7 +8912,8 @@ fn a_battle_is_a_report_line_at_its_place_by_name_with_odds_and_a_moment_when_a_
         assert_eq!(moments, 1, "and is a Moment");
         assert!(g.report.moments.iter().any(|m| m.kind == MomentKind::DecisiveBattle && m.text.contains(lost[0].as_str())), "the Moment names it: {:?}", g.report.moments);
     }
-    assert!(LineKind::Battle.headline_rank().is_none() && LineKind::DecisiveBattle.headline_rank() == Some(4));
+    // Ticket #600 (version 0.1.0.4): a step down, under an invasion.
+    assert!(LineKind::Battle.headline_rank().is_none() && LineKind::DecisiveBattle.headline_rank() == Some(5));
     assert_eq!(LineKind::Battle.section(Some(ReportPlace::Body(BodyId::Mars))), Section::InSpace, "a Battle in orbit files under In space");
 
     // An Army destroyed is a line by name, wherever it dies.
@@ -17247,7 +17258,8 @@ fn a_transfer_thrown_off_in_the_same_resolution_is_one_line() {
     assert_eq!(g.state(europe).control, Control::Neutral, "thrown off");
     let lines: Vec<String> = g.report.lines.iter().filter(|l| l.kind == LineKind::ControlChanged && l.place == Some(ReportPlace::State(europe))).map(|l| l.text.clone()).collect();
     assert_eq!(lines.len(), 1, "one line, not a transfer and a throw-off: {lines:?}");
-    assert!(lines[0].contains("passed to Custodians and threw them off at once: neutral"), "{lines:?}");
+    // Ticket #600 (version 0.1.0.4), at the designer's word: "revolted".
+    assert_eq!(lines[0], "The European Union revolted against Custodians: now neutral.", "{lines:?}");
 }
 
 /// Ticket #366, defect 4: **a rival's founding names the slot**, where it said "slot 1" of slot 0.
@@ -18522,10 +18534,11 @@ fn a_change_of_hands_to_or_from_the_player_is_also_under_your_works() {
     // Lost to a rival: the player's news too.
     g.report.lines.retain(|l| l.kind != LineKind::ControlChanged);
     g.transfer_control(Place::State(StateId::NorthAfrica), Seat(1), "Influence");
-    let lost = g.report.lines.iter().find(|l| l.kind == LineKind::ControlChanged).expect("the change of hands").text.clone();
-    assert!(works(&g).contains(&lost), "a loss is under Your works: {:?}", works(&g));
+    // Ticket #600 (version 0.1.0.4): a rival taking the player's Region is an invasion, the headline.
+    let lost = g.report.lines.iter().find(|l| l.kind == LineKind::Invasion).expect("the change of hands").text.clone();
+    assert_eq!(g.report.headline().map(|h| h.text.clone()), Some(lost), "an invasion outranks the Colony founded");
     // Between two rivals: not the player's.
-    g.report.lines.retain(|l| l.kind != LineKind::ControlChanged);
+    g.report.lines.retain(|l| !matches!(l.kind, LineKind::ControlChanged | LineKind::Invasion));
     g.transfer_control(Place::State(StateId::NorthAfrica), Seat(2), "Influence");
     let theirs = g.report.lines.iter().find(|l| l.kind == LineKind::ControlChanged).expect("the change of hands").text.clone();
     assert!(!works(&g).contains(&theirs), "a rival's change of hands is not the player's: {:?}", works(&g));
@@ -18645,7 +18658,8 @@ fn an_occupation_on_the_players_place_and_one_taken_from_them_are_under_your_wor
     g.report.lines.clear();
     g.resolution_phase();
     assert!(matches!(g.state(sid).control, Control::Occupied { occupier: Seat(1), previous: Some(Seat(0)), .. }), "the premise: the Prospectors occupy the player's Region");
-    let line = g.report.lines.iter().find(|l| l.kind == LineKind::Occupation).expect("the Occupation line");
+    // Ticket #600 (version 0.1.0.4): a rival occupying the player's Region is an invasion.
+    let line = g.report.lines.iter().find(|l| l.kind == LineKind::Invasion).expect("the Occupation line");
     assert!(line.mine, "the player's place, occupied: {}", line.text);
     // The player occupies a rival's Region, and a third Faction takes it by Influence.
     let mut g = game();
@@ -18902,7 +18916,8 @@ fn the_cut_report_lines_say_only_what_they_must() {
         "Prospectors' Occupation of Egypt broke: +2 Unrest."
     );
     assert_eq!(say("first_to_body", &[("faction", "Archivists"), ("body", "the Moon"), ("colony", "Tycho"), ("n", "5"), ("ease", "0.5")]), "Archivists are first to settle the Moon: +5 Influence.");
-    assert_eq!(say("threw_off", &[("state", "Egypt"), ("faction", "Custodians"), ("unrest", "5")]), "Egypt threw off Custodians.");
+    // Ticket #600 (version 0.1.0.4): "revolted".
+    assert_eq!(say("threw_off", &[("state", "Egypt"), ("faction", "Custodians"), ("unrest", "5")]), "Egypt revolted against Custodians: now neutral.");
     assert_eq!(say("sea_wall", &[("state", "China"), ("whose", "China's"), ("temperature", "1.8"), ("keep", "4")]), "China's Sea Wall held the sea; keep now 4 Materials.");
     assert_eq!(say("occupation_broken_quiet", &[("faction", "Prospectors"), ("place", "Tycho on the Moon"), ("holder", "Custodians"), ("unrest", "0"), ("standing", "0")]), "Prospectors' Occupation of Tycho on the Moon broke.");
 }
@@ -24677,4 +24692,58 @@ fn the_door_reads_the_parts_without_the_gate() {
     assert!(g.progress(pro).score_as_it_stands() - g.progress(ark).score_as_it_stands() < 0.2, "the premise: no runaway lead");
     assert!(!g.accord_acceptable(ark, pro, &[Term::NonAggression]), "no Accord with a seat at the door");
     assert!(!g.trade_acceptable_at(ark, pro, TradeGood::Goods(Resource::Ducats, 100), TradeGood::Goods(Resource::Materials, 1), 1.0), "no Trade either");
+}
+
+// ---------------------------------------------------------------- #600 The Report's lines (version 0.1.0.4)
+
+/// Ticket #600 (version 0.1.0.4), at the designer's word: **the sea at a threshold is one line**,
+/// "Sea rose at +X C: you lost a Power Plant (China); rivals lost N Facilities.", where every Region
+/// had a line of its own; and **each of the player's buildings lost** is a line in Your works, "The
+/// sea took your Power Plant in China."
+#[test]
+fn the_sea_at_a_threshold_is_one_line_and_your_losses_are_your_works() {
+    let mut g = game();
+    let home = StateId::Australia;
+    // The player's, its four coastal slots full, so the rise (Exposure 2) drowns the oldest.
+    let st = g.state_mut(home);
+    st.control = Control::Controlled(Seat(0));
+    st.facilities = vec![
+        Facility::in_coastal_slot(FacilityKind::Factory),
+        Facility::in_coastal_slot(FacilityKind::Refinery),
+        Facility::in_coastal_slot(FacilityKind::PowerPlant),
+        Facility::in_coastal_slot(FacilityKind::Mine),
+    ];
+    let thr = g.tables.climate.sea_level_thresholds[0];
+    g.climate.temperature = thr;
+    g.sea_level_check();
+    let rose: Vec<&ReportLine> = g.report.lines.iter().filter(|l| l.kind == LineKind::SeaLevel && l.text.starts_with(&format!("Sea rose at {thr:+.1} C:"))).collect();
+    assert_eq!(rose.len(), 1, "one line for the whole rise: {:?}", g.report.lines);
+    assert!(rose[0].text.starts_with(&format!("Sea rose at {thr:+.1} C: you lost a Factory and a Refinery (Australia)")) && rose[0].mine, "{}", rose[0].text);
+    assert!(!g.report.lines.iter().any(|l| l.text.contains("coastal slot")), "no line a Region: {:?}", g.report.lines);
+    let drowned = g.state(home).drowned.clone();
+    assert_eq!(drowned, vec![FacilityKind::Factory, FacilityKind::Refinery], "the premise: the two oldest drowned");
+    for k in drowned {
+        let want = format!("The sea took your {} in Australia.", k.name());
+        assert!(g.report.lines.iter().any(|l| l.kind == LineKind::YourWorks && l.text == want), "{want}: {:?}", g.report.lines);
+    }
+    assert_eq!(g.report.moments.iter().filter(|m| m.kind == MomentKind::ClimateThreshold).count(), 1, "one Moment for the rise");
+    // The review: one Region's sea brought early (a Storm Surge) names the Region, and a name with
+    // "The" reads "the" mid-sentence in both lines; a Region the player holds is theirs, one they only
+    // occupy is not.
+    let mut g = game();
+    let us = StateId::NorthAmerica;
+    let st = g.state_mut(us);
+    st.control = Control::Controlled(Seat(0));
+    st.facilities = vec![Facility::in_coastal_slot(FacilityKind::Factory), Facility::in_coastal_slot(FacilityKind::Refinery), Facility::in_coastal_slot(FacilityKind::PowerPlant), Facility::in_coastal_slot(FacilityKind::Mine)];
+    g.report.lines.clear();
+    g.apply_sea_threshold(us, 0);
+    assert!(g.report.lines.iter().any(|l| l.kind == LineKind::SeaLevel && l.text.starts_with("Sea rose early in the United States: you lost a Factory")), "{:?}", g.report.lines);
+    assert!(g.report.lines.iter().any(|l| l.text == "The sea took your Factory in the United States."), "{:?}", g.report.lines);
+    let mut g = game();
+    let st = g.state_mut(us);
+    st.control = Control::Occupied { occupier: Seat(0), previous: Some(Seat(1)), turns: 1, banked: 0 };
+    st.facilities = vec![Facility::in_coastal_slot(FacilityKind::Factory), Facility::in_coastal_slot(FacilityKind::Refinery), Facility::in_coastal_slot(FacilityKind::PowerPlant), Facility::in_coastal_slot(FacilityKind::Mine)];
+    g.report.lines.clear();
+    g.apply_sea_threshold(us, 0);
+    assert!(!g.report.lines.iter().any(|l| l.text.contains("your")), "an occupied rival's Region is not the player's: {:?}", g.report.lines);
 }

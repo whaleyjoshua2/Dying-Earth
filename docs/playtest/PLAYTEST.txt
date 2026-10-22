@@ -50,6 +50,9 @@ EARTH
    and your lots stay flat while it stands.
  - YOUR VICTORY's gate Tech (and the Archivists' running Archive) is 6% of it, so both bars met
    without the gate reads 94% - needs ..., never 100%.
+ - THE REPORT: the sea is one line a rise (your losses named, rivals' counted) and each
+   building of yours it takes is a line in Your works; a rival taking or occupying your Region
+   is the headline; a Region throwing off its holder reads "revolted".
 - A STRIP PERMIT is once per Region, ever, and the button and the help say so.
 
 SPACE
