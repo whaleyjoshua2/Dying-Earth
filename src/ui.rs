@@ -12093,10 +12093,11 @@ fn card_effect_text(e: &CardEffect) -> String {
             None => format!("the {} price moves {by:+} for {}", resource.name(), counted(turns, "turn", "turns")),
         },
         // Ticket #577 (version 0.1.0.3): the seat's own cut.
+        // Ticket #597 (version 0.1.0.4): in the words the engine gives the cut, "a third off".
         CardEffect::SeatPrice { resource, multiplier, turns } => format!(
-            "{} at {} for you {}",
+            "{} {} for you {}",
             resource.name(),
-            if (*multiplier - 0.5).abs() < 1e-9 { "half price".to_string() } else { format!("x{multiplier}") },
+            dying_earth_engine::orders::seat_cut_phrase(*multiplier),
             if *turns == 1 { "next turn".to_string() } else { format!("for {}", counted(*turns, "turn", "turns")) }
         ),
         CardEffect::RelationsAllRivals { relations } => format!("{relations:+} Relations with every rival"),

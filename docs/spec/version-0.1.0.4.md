@@ -152,11 +152,15 @@ The designer: *"Cheap ore refusal now cuts market price by 1/3"*.
 
 - **The refusing seat's own price**, at the designer's word, over the market's for everyone: the
   card's `seat_price` multiplier is two thirds, where it was a half (#577). One turn, as before.
-- **Flat while it stands**: the seat's Materials lots do not climb with its own trading that turn,
-  as a price a card has set does not (`lot_ducats`); a rival's do.
+- **Flat while it stands**, both ways: the seat's Materials Buys and Sales do not move with its own
+  trading that turn, as a price a card has set does not (`lot_ducats`, `sale_price_after`); a
+  rival's do. The review found that with only the Buys flat, cheap Buys sold back up the price they
+  raised: 100 bought for 200, sold for 221.
 - **The words**: the refuse side *"Let it go: Materials a third off next turn"*; the effect line
-  *"Buy the ore, or let it go for a third off Materials next turn"*; the window and the Market line
-  *"(a third off for you, this turn)"*.
+  *"Buy the ore, or let it go for a third off Materials next turn"*; the refuse button's effect
+  *"Materials a third off for you next turn"* (`seat_cut_phrase`, shared with the driver, where it
+  would have printed x0.6666666666666666); the window and the Market line *"(a third off for you,
+  this turn)"*.
 - **The computer's** answer stands: it takes the lot when it holds 20 Ducats.
 - **Swept** (`sweeps/ticket-597.txt`): **25 / 40 / 3 / 9 and 2 collapses**, as §5's last build; the
   computer takes the offer whenever it can pay, so the refusal seldom fires in a sweep.

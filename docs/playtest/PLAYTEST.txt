@@ -67,7 +67,7 @@ DIPLOMACY
   the same two goods again until you refuse it a different Trade. You can COUNTER a Trade
   once, with your own amounts: it answers at once. Letting an Accord run out when the
   partner would have renewed counts as a refusal.
-- The CHEAP ORE OFFER: refuse it and Materials are half price for you alone next turn.
+- The CHEAP ORE OFFER: refuse it and Materials are a third off for you alone next turn.
 
 VICTORY AND THE CLIMATE
 - The ARCHIVE wants 250 Research; the UPLOAD is 16 Colonists, four a turn at most, and the

@@ -182,6 +182,13 @@ test and the Market-line test moved from half to a third off.
 *"3 each; sells for 1.5 (a third off for you, this turn)"*, and two pending Buys of 20 at 40 Ducats
 each, flat. A new building aid, `orecut:1`, gives seat 0 the cut.
 
+**The review** found two defects, both fixed with a test watched red first: with only the Buys flat,
+a seat holding the cut sold its cheap Buys back up the price they raised (100 bought for 200, sold
+for 221: the test read 221 against 150), so its Sales are flat too; and the card's refuse button
+would have read "x0.6666666666666666", so the cut's words come from one engine function. **The
+card** ([`ticket-597/card.png`](ticket-597/card.png)): *"Let it go: Materials a third off next turn
+/ Materials a third off for you next turn"*.
+
 - **The sweep** ([`sweeps/ticket-597.txt`](sweeps/ticket-597.txt)): **25 / 40 / 3 / 9 and 2
   collapses**, as before: the computer takes the offer whenever it holds 20 Ducats, so the refusal
   seldom fires in a sweep. Reported and left.

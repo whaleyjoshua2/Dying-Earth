@@ -323,6 +323,18 @@ impl std::fmt::Display for OrderError {
     }
 }
 
+/// Ticket #597 (version 0.1.0.4): a seat's own price cut in the card's words -- "at half price",
+/// "a third off" -- for the card's sides here, in the window and in the headless driver alike.
+pub fn seat_cut_phrase(multiplier: f64) -> String {
+    if (multiplier - 0.5).abs() < 1e-9 {
+        "at half price".to_string()
+    } else if (multiplier - 2.0 / 3.0).abs() < 1e-9 {
+        "a third off".to_string()
+    } else {
+        format!("at x{multiplier}")
+    }
+}
+
 fn fail<T>(msg: impl Into<String>) -> Result<T, OrderError> {
     Err(OrderError(msg.into()))
 }
@@ -719,7 +731,7 @@ impl Game {
                 }
             }
             Order::Sell { resource, amount } => {
-                let ducats = -self.sale_price_after(*resource, *amount, ahead(*resource));
+                let ducats = -self.sale_price_after(seat, *resource, *amount, ahead(*resource));
                 match resource {
                     Resource::Materials => Cost { materials: *amount as f64, ducats, ..Default::default() },
                     Resource::Fuel => Cost { fuel: *amount as f64, ducats, ..Default::default() },
@@ -853,7 +865,7 @@ impl Game {
     }
 
     /// Ticket #577: the cut's words for the Market line and the Trading window's price column:
-    /// *"half for you, this turn"*.
+    /// *"half for you, this turn"*; since ticket #597 (version 0.1.0.4) *"a third off for you"*.
     pub fn seat_price_note(&self, seat: Seat, row: usize) -> Option<String> {
         let c = self.seat_price_cut(seat, row)?;
         // Ticket #597 (version 0.1.0.4): the Cheap Ore Offer's two thirds read "a third off".
@@ -932,7 +944,11 @@ impl Game {
     ///
     /// Ticket #593 (version 0.1.0.4): each unit sold at the seat's own running net, so a big sale fetches
     /// less; `ahead` is the seat's own pending trades before it, as `lot_ducats` takes them.
-    pub fn sale_price_after(&self, resource: Resource, amount: i64, ahead: i64) -> f64 {
+    ///
+    /// Ticket #597 (version 0.1.0.4): flat at the opening price while the seat holds its own cut on
+    /// the good, as its Buys are; the review found a cut seat's flat Buys sold back up the price
+    /// they raised, 100 bought for 200 and sold for 221.
+    pub fn sale_price_after(&self, seat: Seat, resource: Resource, amount: i64, ahead: i64) -> f64 {
         if !matches!(resource, Resource::Materials | Resource::Fuel) {
             return 0.0;
         }
@@ -941,7 +957,11 @@ impl Game {
         if d.sell_divisor <= 0 {
             return 0.0;
         }
-        let per: i64 = (0..amount.max(0)).map(|i| self.unit_price_at(row, ahead - i)).sum();
+        let per: i64 = if self.seat_price_cut(seat, row).is_some() {
+            self.unit_price_at(row, 0) * amount.max(0)
+        } else {
+            (0..amount.max(0)).map(|i| self.unit_price_at(row, ahead - i)).sum()
+        };
         tenth(per as f64 / d.sell_divisor as f64)
     }
 

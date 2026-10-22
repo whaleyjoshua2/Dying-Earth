@@ -606,8 +606,9 @@ pub enum CardEffect {
         turns: u32,
     },
     /// Ticket #577 (version 0.1.0.3): a good's price times `multiplier` for the answering seat
-    /// alone, for `turns` turns of orders after the answer -- the Cheap Ore Offer's refusal, half
-    /// price for one turn. The market's own price does not move, and rivals see nothing.
+    /// alone, for `turns` turns of orders after the answer -- the Cheap Ore Offer's refusal, a third
+    /// off for one turn since ticket #597 (version 0.1.0.4; half before). The market's own price does
+    /// not move, and rivals see nothing.
     SeatPrice { resource: Resource, multiplier: f64, turns: u32 },
     /// A change to what every other seat thinks of this one.
     RelationsAllRivals { relations: i64 },

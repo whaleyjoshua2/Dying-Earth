@@ -18483,7 +18483,7 @@ fn the_market_line_names_a_price_a_card_has_set() {
     g.apply_card_answers();
     g.settle_market();
     g.turn += 1;
-    // Ticket #577 (version 0.1.0.3): the refusal is the seat's own half price for one turn, named
+    // Ticket #577 (version 0.1.0.3): the refusal is the seat's own cut for one turn (a third off since #597), named
     // on its line alone; the market's price does not move and a rival's line says nothing.
     let line = g.market_line(Seat(0));
     let half = figure(g.lot_price(Seat(0), Resource::Materials, g.trade_price(Resource::Materials).unwrap() as f64));
@@ -24600,4 +24600,12 @@ fn the_cheap_ore_offers_refusal_takes_a_third_off_the_refusing_seats_materials_f
     assert_eq!(g.check_order(rival, &[], &buy(40)).unwrap().ducats, (20 * price + 20 * (price + 1)) as f64, "a rival's lots climb");
     let line = g.market_line(me);
     assert!(line.contains("(a third off for you, this turn)"), "the Market line: {line}");
+    // The review: a sale is flat too while the cut stands, so cheap flat Buys cannot be sold back
+    // up a price they raised -- 100 bought for 200 sold for 221, Ducats from nothing.
+    let sell = |n: i64| Order::Sell { resource: Resource::Materials, amount: n };
+    assert_eq!(-g.check_order(me, &[buy(100)], &sell(100)).unwrap().ducats, tenth((100 * price) as f64 / 2.0), "flat, half the opening price");
+    assert!(-g.check_order(me, &[buy(100)], &sell(100)).unwrap().ducats < g.check_order(me, &[], &buy(100)).unwrap().ducats, "a round trip loses");
+    // And the card's own words name the cut, not a figure.
+    assert_eq!(dying_earth_engine::orders::seat_cut_phrase(2.0 / 3.0), "a third off");
+    assert_eq!(dying_earth_engine::orders::seat_cut_phrase(0.5), "at half price");
 }
