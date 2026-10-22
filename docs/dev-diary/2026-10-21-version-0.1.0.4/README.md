@@ -199,3 +199,33 @@ card** ([`ticket-597/card.png`](ticket-597/card.png)): *"Let it go: Materials a 
 | Prospectors | 2,332 | 468 | 290 | 1,176 | 405 |
 | Arkwrights | 1,757 | 432 | 366 | 3,797 | 341 |
 | Archivists | 520 | 236 | 74 | 508 | 658 |
+
+## Every Victory gate is 6% of the whole
+
+Ticket [#601](https://github.com/whaleyjoshua2/Dying-Earth/issues/601), spec §7.
+
+The designer chose all four as recommended: 6% for all four Factions (`gate_weight` in
+`victory.toml`), the Archivists' offline Archive costing the same 6%, today's short words, no
+partial credit. `Progress` carries `gate_open` and `gate_weight`; `score` and `score_as_it_stands`
+both take the gate's share, so the computer reads what the player sees. A test was written first and
+watched red (no such field), then green; nine older pins moved by the one rule -- the parts are 94%
+of the score, the gate the rest -- and the rival-Moment test's premise rose to 15 of 18 and 4,000 of
+5,000 (14 and 3,800 read 72%, under its three quarters). No picture: staging both bars met needs a
+shot aid this ticket did not warrant; the Report-head test pins "94% - needs Planetary Stewardship".
+
+**The review** found the computer's door had moved: no seat helps a Faction at 95%, and a seat with
+both bars met and no gate, refused at 100% before, read 94% and got through. The door now reads the
+parts without the gate (`parts_as_it_stands`); a test isolating it (the runaway-leader rule kept out
+of the way) was watched red, then green. It also found the Custodians can still read 100% unwon --
+the gate standing, the best run at the bar, the run since broken -- which predates this ticket and
+is put to the designer; and stale "90%" comments, corrected.
+
+- **The sweep** ([`sweeps/ticket-601.txt`](sweeps/ticket-601.txt)): **26 / 39 / 7 / 8 and no
+  collapse**, from 25 / 40 / 3 / 9 and 2: noise. Reported and left.
+
+| | Materials | Fuel | Energy | Ducats | Research |
+|---|---|---|---|---|---|
+| Custodians | 2,092 | 795 | 603 | 1,528 | 1,383 |
+| Prospectors | 2,255 | 448 | 323 | 1,181 | 391 |
+| Arkwrights | 1,785 | 489 | 410 | 3,812 | 381 |
+| Archivists | 497 | 234 | 73 | 538 | 672 |

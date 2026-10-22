@@ -13025,7 +13025,7 @@ fn chronicle_sentence(game: &Game, seat: Seat) -> String {
         return format!("The {name} met their Victory Condition too -- {met_line} -- but the game went elsewhere.");
     }
     // Ticket #338: **both bars reached and the Condition still not met**, which the first picture
-    // caught: a seat whose gate Tech is unresearched stands at 100% -- the score is a fraction of
+    // caught: a seat whose gate Tech is unresearched stood at 100% (94% since ticket #601) -- the score is a fraction of
     // its bars and clamped -- so "short on" a part that is OVER its bar is a contradiction. The
     // sentence says what actually held it back instead, in the engine's own words.
     if p.first_value >= p.first_bar && p.second_value >= p.second_bar && let Some(why) = &p.first_held_back {

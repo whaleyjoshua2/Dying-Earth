@@ -980,7 +980,8 @@ pub struct VictoryFirstCard {
     pub weight: f64,
     /// Ticket #567 (version 0.1.0.3): what a Colonial Capital held counts for in the score, on a
     /// card that asks one (`victory_capital`); the second part counts what the two leave. The
-    /// Arkwrights' is a tenth, so a seat with both bars met and no Capital reads 90%. Absent, nought.
+    /// Arkwrights' is a tenth, so a seat with both bars met and no Capital reads 90% (91% with the
+    /// gate's 6% since ticket #601, version 0.1.0.4). Absent, nought.
     #[serde(default)]
     pub capital_weight: f64,
 }
@@ -1296,6 +1297,10 @@ pub struct UnrestTable {
 #[derive(Debug, Clone, Deserialize)]
 pub struct VictoryTable {
     pub stabilization_turns: u32,
+    /// Ticket #601 (version 0.1.0.4), at the designer's word: what the gate is worth of the Victory
+    /// percentage, whole or nothing, the parts sharing the rest. Absent, nought: the old score.
+    #[serde(default)]
+    pub gate_weight: f64,
     /// Ticket #406 (version 0.09.4): what closing the whole counted gap is worth to the
     /// Custodians' first part, short of a run.
     pub stabilization_gap_cap: f64,

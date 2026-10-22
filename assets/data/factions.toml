@@ -215,7 +215,8 @@ victory_short = "get {first} Colonists living off Earth, spread over {bodies} Bo
 # Ticket #506 (version 0.1.0.0): 42 (30 x 50/36) and four Bodies, with the game at fifty turns.
 # Ticket #555 (version 0.1.0.2): the Colonists off Earth count 0.6 of the score, the Bodies 0.4.
 # Ticket #567 (version 0.1.0.3): the Capital they must hold is a tenth of the score -- 0.6 Colonists,
-# 0.3 Bodies, 0.1 Capital -- so both bars met without one reads 90%, where it read 100%.
+# 0.3 Bodies, 0.1 Capital -- so both bars met without one reads 90%, where it read 100%. Ticket #601
+# (version 0.1.0.4): the parts are 94% of the whole beside the gate's 6%, so that reads 91%.
 victory_first = { kind = "colonists_off_earth", bar = 42, weight = 0.6, capital_weight = 0.1 }
 victory_second = { kind = "colonies_on_bodies", bodies = 4, colonists_each = 4 }
 # Ticket #514 (version 0.1.0.0): and a Colonial Capital of theirs must stand, at a Colony they direct

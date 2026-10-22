@@ -164,3 +164,28 @@ The designer: *"Cheap ore refusal now cuts market price by 1/3"*.
 - **The computer's** answer stands: it takes the lot when it holds 20 Ducats.
 - **Swept** (`sweeps/ticket-597.txt`): **25 / 40 / 3 / 9 and 2 collapses**, as §5's last build; the
   computer takes the offer whenever it can pay, so the refusal seldom fires in a sweep.
+
+## 7. Every Victory gate is 6% of the whole
+
+Ticket: [Every Victory gate is 6% of the whole: never 100% while a gate is held](https://github.com/whaleyjoshua2/Dying-Earth/issues/601).
+
+The designer: *"Never show 'Your Victory: 100%' while a gate is held ... every victory gate should
+count for 6% of the victory"*.
+
+- **The gate is 6% of the percentage** (`gate_weight = 0.06` in `victory.toml`, one figure for all
+  four), whole or nothing, no partial credit for Research toward it. The parts share the 94% left in
+  their old proportions (the Arkwrights' 0.6 / 0.3 / Capital 0.1 become 56.4 / 28.2 / 9.4).
+- **What the gate is**: the Faction's gate Tech standing and, for the Archivists, no complete
+  Archive standing offline; both cost the same 6%, at the designer's word. A missing Colonial
+  Capital is still a part of its own.
+- **The words**: today's short form on the lower figure, *"94% - needs Generation Ships"*; the
+  Arkwrights with both bars and the gate but no Capital read *"91% - needs a Colonial Capital"*.
+- **The computer** reads the same score (`score_as_it_stands` takes the gate too), except at **the
+  door**: no seat helps a Faction whose parts stand at 95% (`parts_as_it_stands`, without the gate),
+  so a seat with both bars met and no gate is refused a Trade or Accord as it was at 100%; the
+  review found the 6% had let it through at 94%.
+- **Swept** (`sweeps/ticket-601.txt`): **26 / 39 / 7 / 8 and no collapse**, from §6's 25 / 40 / 3
+  / 9 and 2: noise.
+- **Not changed, for the designer**: the Custodians' first part counts their best run, so with
+  Planetary Stewardship standing, the best run at the bar and the run since broken, they read 100%
+  unwon, with no hold to name. It predates this ticket.

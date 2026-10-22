@@ -1888,7 +1888,8 @@ fn the_last_turn_ranks_every_seat_by_score() {
     g.turn = g.tables.victory.turns;
     colony(&mut g, Seat(2), BodyId::Phobos, &[ModuleKind::Habitat, ModuleKind::Habitat], 4);
     colony(&mut g, Seat(3), BodyId::Moon, &[ModuleKind::Habitat], 4);
-    assert!((g.progress(Seat(2)).score() - (0.6 * 4.0 / 42.0 + 0.3 * 0.25)).abs() < 1e-9, "{:?}", g.progress(Seat(2)).score());
+    // Ticket #601 (version 0.1.0.4): the parts are 94% of the whole, the gate (not standing) the rest.
+    assert!((g.progress(Seat(2)).score() - 0.94 * (0.6 * 4.0 / 42.0 + 0.3 * 0.25)).abs() < 1e-9, "{:?}", g.progress(Seat(2)).score());
     assert_eq!(g.progress(Seat(3)).score(), 0.0);
     g.end_phase();
     assert!(matches!(g.outcome, Some(Outcome::Win { seat: Seat(2), .. })), "{:?}", g.outcome);
@@ -1912,7 +1913,8 @@ fn the_score_weights_each_factions_parts_as_its_card_says() {
     g.seats[arc.index()].archive_fund = t.archive.research;
     let p = g.progress(arc);
     assert_eq!((p.first_fraction(), p.second_fraction()), (1.0, 0.0), "the premise: the Archive paid for, nobody uploaded");
-    assert!((p.score() - 0.4).abs() < 1e-9, "{}", p.score());
+    // Ticket #601 (version 0.1.0.4): of the 94% the parts share, the gate not standing.
+    assert!((p.score() - 0.94 * 0.4).abs() < 1e-9, "{}", p.score());
 }
 
 /// Ticket #567 (version 0.1.0.3), at the designer's word: **the Prospectors' Fund counts seven
@@ -1929,7 +1931,8 @@ fn the_prospectors_fund_counts_seven_tenths_of_their_score() {
     g.seats[1].venture_fund = 850.0; // 0.17 x 5,000 (ticket #584)
     let p = g.progress(pro);
     assert!((p.first_fraction() - 0.17).abs() < 1e-9 && p.second_fraction() == 1.0, "the premise: the Fund at 17%, the Presence full: {p:?}");
-    assert!((p.score() - 0.419).abs() < 1e-9, "0.7 x 0.17 + 0.3, 42% where it read 59%: {}", p.score());
+    // Ticket #601 (version 0.1.0.4): of the 94% the parts share, the gate not standing: 39%.
+    assert!((p.score() - 0.94 * 0.419).abs() < 1e-9, "0.94 x (0.7 x 0.17 + 0.3), 39% where it read 59%: {}", p.score());
     assert_eq!(p.hold_suffix(), "", "short of the bars, the percentage alone");
 }
 
@@ -1951,10 +1954,11 @@ fn the_capital_is_a_tenth_of_the_arkwrights_score_and_a_held_headline_names_the_
     let capital = g.tables.tiers.iter().position(|t| t.one_per_body).expect("the Capital tier") as u32;
     bare_stations(&mut g);
     open_gates(&mut g);
-    // Short of the bars: 4 of 42 over one Body of four, no Capital: 0.6 x 4/42 + 0.3 x 1/4 + 0.1 x 0.
+    // Short of the bars: 4 of 42 over one Body of four, no Capital: 0.6 x 4/42 + 0.3 x 1/4 + 0.1 x 0;
+    // Ticket #601 (version 0.1.0.4): the gate standing, its 6% and the parts 94% of the rest.
     colony(&mut g, ark, BodyId::Phobos, &[ModuleKind::Habitat], 4);
     let p = g.progress(ark);
-    assert!((p.score() - (0.6 * 4.0 / 42.0 + 0.3 * 0.25)).abs() < 1e-9, "{}", p.score());
+    assert!((p.score() - (0.06 + 0.94 * (0.6 * 4.0 / 42.0 + 0.3 * 0.25))).abs() < 1e-9, "{}", p.score());
     assert!(p.first_held_back.is_some(), "the premise: the Capital holds the win");
     assert_eq!(p.hold_suffix(), "", "short of the bars, the percentage alone");
     // Both bars met and no Capital: 90%, and every headline says why.
@@ -1964,20 +1968,20 @@ fn the_capital_is_a_tenth_of_the_arkwrights_score_and_a_held_headline_names_the_
     }
     let p = g.progress(ark);
     assert!(p.first_value >= p.first_bar && p.second_value >= p.second_bar, "the premise: both bars reached: {p:?}");
-    assert!((p.score() - 0.9).abs() < 1e-9, "{}", p.score());
+    assert!((p.score() - (0.06 + 0.94 * 0.9)).abs() < 1e-9, "{}", p.score());
     assert_eq!(p.hold_suffix(), " - needs a Colonial Capital");
-    assert!(g.report_head().ends_with("Your Victory: 90% - needs a Colonial Capital"), "{}", g.report_head());
+    assert!(g.report_head().ends_with("Your Victory: 91% - needs a Colonial Capital"), "{}", g.report_head());
     // The gate Tech's hold comes first, in the same few words.
     g.research.done.retain(|t| *t != TechId::GenerationShips);
     assert_eq!(g.progress(ark).hold_suffix(), " - needs Generation Ships");
-    // The Capital held: the last tenth, and the Tech alone holds.
+    // The Capital held: the last tenth, and the Tech alone holds -- Ticket #601 (version 0.1.0.4): at 94%, never 100%.
     g.colony_mut(mars).unwrap().tier = capital;
     let p = g.progress(ark);
-    assert!((p.score() - 1.0).abs() < 1e-9, "{}", p.score());
-    assert!(g.report_head().ends_with("Your Victory: 100% - needs Generation Ships"), "{}", g.report_head());
+    assert!((p.score() - 0.94).abs() < 1e-9, "{}", p.score());
+    assert!(g.report_head().ends_with("Your Victory: 94% - needs Generation Ships"), "{}", g.report_head());
     open_gates(&mut g);
     let p = g.progress(ark);
-    assert!(p.met());
+    assert!(p.met() && (p.score() - 1.0).abs() < 1e-9, "met: 100%: {}", p.score());
     assert_eq!(p.hold_suffix(), "", "met: nothing to name");
 }
 
@@ -1994,10 +1998,11 @@ fn the_custodians_held_hundred_on_partial_credit_names_the_hold_too() {
     colony(&mut g, cus, BodyId::Mars, &[ModuleKind::Habitat; 4], 18);
     g.climate.best_run = g.tables.faction(FactionKind::Custodians).victory_first.bar as u32;
     let p = g.progress(cus);
-    assert!(p.first_value < p.first_bar && (p.score() - 1.0).abs() < 1e-9, "the premise: 100% on the best run, the run itself at nought: {p:?}");
+    // Ticket #601 (version 0.1.0.4): 94%, the gate not standing.
+    assert!(p.first_value < p.first_bar && (p.score() - 0.94).abs() < 1e-9, "the premise: 94% on the best run, the run itself at nought: {p:?}");
     assert!(!p.met() && p.first_held_back.as_deref().unwrap_or("").contains("Planetary Stewardship"), "{p:?}");
     assert_eq!(p.hold_suffix(), " - needs Planetary Stewardship");
-    assert!(g.report_head().ends_with("Your Victory: 100% - needs Planetary Stewardship"), "{}", g.report_head());
+    assert!(g.report_head().ends_with("Your Victory: 94% - needs Planetary Stewardship"), "{}", g.report_head());
 }
 
 // ---------------------------------------------------------------- 14.3 the AI seats spread out
@@ -11839,20 +11844,22 @@ fn a_rival_closing_on_its_victory_condition_interrupts_the_player_once_a_step() 
     // before. Ticket #290 (version 0.08.6): Tiangong's two aboard would make it 16 of 18, so it is
     // emptied first.
     bare_stations(&mut g);
-    colony(&mut g, pro, BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 14);
-    g.seats[pro.index()].venture_fund = 3800.0;
+    // Ticket #601 (version 0.1.0.4): 15 of 18 and 4000 of 5000, where 14 and 3800 read 72% with
+    // the parts at 94% of the score, the gate not standing.
+    colony(&mut g, pro, BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 15);
+    g.seats[pro.index()].venture_fund = 4000.0;
     // Ticket #555 (version 0.1.0.2): the score is the mean of the parts, past three quarters; the
     // Fund is still the shorter part, which the Moment names. Ticket #567 (version 0.1.0.3): the Fund
     // counts 0.7 of it, 0.7 x 0.76 + 0.3 x 14/18.
-    assert!((g.progress(pro).score() - (0.7 * 3800.0 / 5000.0 + 0.3 * 14.0 / 18.0)).abs() < 1e-9, "{}", g.progress(pro).score());
+    assert!((g.progress(pro).score() - 0.94 * (0.7 * 4000.0 / 5000.0 + 0.3 * 15.0 / 18.0)).abs() < 1e-9, "{}", g.progress(pro).score());
     assert!(g.progress(pro).score() >= 0.75);
     g.end_phase();
     assert_eq!(fired(&g), 1, "three quarters: the Moment fires: {:?}", g.report.moments);
     let m = g.report.moments.iter().find(|m| m.kind == MomentKind::RivalProgress).unwrap();
     assert!(m.text.contains("Prospectors") && m.text.contains("three quarters"), "{}", m.text);
     // Ticket #506 (version 0.1.0.0): the Fund, at 0.75, is the shorter part now; Presence is 14 of 18.
-    assert!(m.text.contains("3800 of 5000"), "the part still short is the figure: {}", m.text);
-    assert_eq!(m.figure, "3800 of 5000");
+    assert!(m.text.contains("4000 of 5000"), "the part still short is the figure: {}", m.text);
+    assert_eq!(m.figure, "4000 of 5000");
     g.end_phase();
     assert_eq!(fired(&g), 1, "once: it does not fire again while the seat sits there");
     // The Fund full but its gate shut is held back, not met.
@@ -11864,7 +11871,7 @@ fn a_rival_closing_on_its_victory_condition_interrupts_the_player_once_a_step() 
     g.end_phase();
     assert_eq!(fired(&g), 2, "one part met: the second step fires: {:?}", g.report.moments);
     let m = g.report.moments.iter().rev().find(|m| m.kind == MomentKind::RivalProgress).unwrap();
-    assert!(m.text.contains("met half") && m.text.contains("Venture Capital Fund") && m.text.contains("14 of 18"), "{}", m.text);
+    assert!(m.text.contains("met half") && m.text.contains("Venture Capital Fund") && m.text.contains("15 of 18"), "{}", m.text);
     g.end_phase();
     assert_eq!(fired(&g), 2, "once");
     assert!(g.outcome.is_none(), "nobody has won");
@@ -22785,7 +22792,8 @@ fn the_arkwrights_win_waits_on_a_colonial_capital_they_hold() {
     assert!(!p.met(), "no Capital: held back");
     assert_eq!(p.first_held_back.as_deref(), Some("needs a Colonial Capital of yours, at a Colony you hold off Earth"));
     // Ticket #567 (version 0.1.0.3): the Capital is a tenth of the score, so the hold reads 90%.
-    assert!((p.score() - 0.9).abs() < 1e-9, "the Capital's tenth missing: {}", p.score());
+    // Ticket #601 (version 0.1.0.4): the gate standing, its 6% and 94% of the 0.9.
+    assert!((p.score() - (0.06 + 0.94 * 0.9)).abs() < 1e-9, "the Capital's tenth missing: {}", p.score());
     // The rival's Moment does not call this "half met, only Colonists off Earth remains at 42 of 42".
     g.end_phase();
     assert!(!g.report.moments.iter().any(|m| m.text.contains("met half")), "{:?}", g.report.moments);
@@ -23848,7 +23856,9 @@ fn prospectors_at_eighty(g: &mut Game) -> Seat {
     let presence = g.progress(pro).second_fraction();
     // Ticket #567 (version 0.1.0.3): the Fund counts 0.7 of the score, read from the card.
     let w = g.tables.faction(FactionKind::Prospectors).victory_first.weight;
-    g.seats[1].venture_fund = 5000.0 * (0.8 - (1.0 - w) * presence) / w; // ticket #584: the bar 5,000
+    // Ticket #601 (version 0.1.0.4): the parts are 94% of the score, the gate not standing.
+    let parts = 0.8 / (1.0 - g.tables.victory.gate_weight);
+    g.seats[1].venture_fund = 5000.0 * (parts - (1.0 - w) * presence) / w; // ticket #584: the bar 5,000
     assert!((g.progress(pro).score() - 0.8).abs() < 1e-9, "the premise: 80%, {}", g.progress(pro).score());
     pro
 }
@@ -24608,4 +24618,63 @@ fn the_cheap_ore_offers_refusal_takes_a_third_off_the_refusing_seats_materials_f
     // And the card's own words name the cut, not a figure.
     assert_eq!(dying_earth_engine::orders::seat_cut_phrase(2.0 / 3.0), "a third off");
     assert_eq!(dying_earth_engine::orders::seat_cut_phrase(0.5), "at half price");
+}
+
+// ---------------------------------------------------------------- #601 Every Victory gate is 6% of the whole (version 0.1.0.4)
+
+/// Ticket #601 (version 0.1.0.4), at the designer's word: **the gate is 6% of the Victory
+/// percentage**, the other parts sharing the 94% left in their old proportions, so both bars met
+/// without the gate Tech reads **94% - needs ...** and never 100%; with the gate standing, 100%. An
+/// Archivists' Archive that is complete but offline costs the same 6%. No partial credit: 0 or 6.
+#[test]
+fn the_victory_gate_is_six_percent_of_the_whole() {
+    let mut g = game();
+    assert_eq!(g.tables.victory.gate_weight, 0.06, "one figure for all four");
+    for seat in Seat::ALL {
+        let kind = g.kind(seat);
+        let gate = g.tables.victory_gate(kind).expect("every Faction has a gate");
+        let mut p = g.progress(seat);
+        assert!(!p.gate_open, "{kind:?}: no gate Tech at the start");
+        p.first_value = p.first_bar;
+        p.second_value = p.second_bar;
+        p.capital_held = true;
+        p.first_held_short = Some(format!("needs {}", g.tables.tech(gate).name));
+        assert!((p.score() - 0.94).abs() < 1e-9, "{kind:?}: both bars met, no gate: {}", p.score());
+        assert!((p.score_as_it_stands() - 0.94).abs() < 1e-9, "{kind:?}: and the computer reads the same");
+        assert_eq!(format!("{:.0}%{}", p.score() * 100.0, p.hold_suffix()), format!("94% - needs {}", g.tables.tech(gate).name));
+        p.gate_open = true;
+        assert!((p.score() - 1.0).abs() < 1e-9, "{kind:?}: the gate standing: {}", p.score());
+        // The gate's 6% is whole or nothing; the rest keep their proportions inside the 94%.
+        p.gate_open = false;
+        p.second_value = 0.0;
+        let first = p.first_weight;
+        assert!((p.score() - 0.94 * (first + p.capital_weight)).abs() < 1e-9, "{kind:?}: the parts scaled by 0.94");
+        // Reading the board: the gate Tech done opens it.
+        g.research.done.push(gate);
+        assert!(g.progress(seat).gate_open, "{kind:?}: the gate Tech done");
+    }
+}
+
+/// Ticket #601, the review: **the computer's door stays where it was.** No seat helps a Faction
+/// whose parts stand at 95% (`accord_acceptable`, `trade_acceptable_at`); with the gate's 6% a seat
+/// with both bars met and no gate reads 94%, so the door reads the parts alone, as before.
+#[test]
+fn the_door_reads_the_parts_without_the_gate() {
+    let mut g = game();
+    let pro = Seat(1);
+    assert_eq!(g.kind(pro), FactionKind::Prospectors);
+    bare_stations(&mut g);
+    colony(&mut g, pro, BodyId::Mars, &[ModuleKind::Habitat; 4], 18);
+    g.seats[1].venture_fund = 5000.0;
+    let p = g.progress(pro);
+    assert!(!p.gate_open && (p.score_as_it_stands() - 0.94).abs() < 1e-9, "the premise: both bars, no gate, 94%");
+    // The Arkwrights near too, so no runaway lead refuses first: only the door can.
+    let ark = Seat(2);
+    colony(&mut g, ark, BodyId::Moon, &[ModuleKind::Habitat; 4], 30);
+    for body in [BodyId::Phobos, BodyId::Deimos, BodyId::Ceres] {
+        colony(&mut g, ark, body, &[ModuleKind::Habitat], 4);
+    }
+    assert!(g.progress(pro).score_as_it_stands() - g.progress(ark).score_as_it_stands() < 0.2, "the premise: no runaway lead");
+    assert!(!g.accord_acceptable(ark, pro, &[Term::NonAggression]), "no Accord with a seat at the door");
+    assert!(!g.trade_acceptable_at(ark, pro, TradeGood::Goods(Resource::Ducats, 100), TradeGood::Goods(Resource::Materials, 1), 1.0), "no Trade either");
 }

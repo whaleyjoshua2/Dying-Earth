@@ -48,6 +48,8 @@ EARTH
    turn's price. Buy 40 Materials and watch the second 20 cost more.
  - The CHEAP ORE OFFER's refusal takes a third off your Materials next turn, where it was half,
    and your lots stay flat while it stands.
+ - YOUR VICTORY's gate Tech (and the Archivists' running Archive) is 6% of it, so both bars met
+   without the gate reads 94% - needs ..., never 100%.
 - A STRIP PERMIT is once per Region, ever, and the button and the help say so.
 
 SPACE

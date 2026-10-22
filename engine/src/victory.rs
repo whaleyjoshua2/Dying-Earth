@@ -43,6 +43,10 @@ pub struct Progress {
     /// "the Archive is not running" -- for the headline beside the percentage. Set with
     /// `first_held_back`.
     pub first_held_short: Option<String>,
+    /// Ticket #601 (version 0.1.0.4): the gate stands -- the Faction's gate Tech done and, for the
+    /// Archivists, no complete Archive standing offline -- worth `gate_weight` of the score.
+    pub gate_open: bool,
+    pub gate_weight: f64,
 }
 
 impl Progress {
@@ -64,8 +68,21 @@ impl Progress {
     pub fn first_fraction_as_it_stands(&self) -> f64 {
         (self.first_value / self.first_bar).clamp(0.0, 1.0)
     }
-    pub fn score_as_it_stands(&self) -> f64 {
+    /// Ticket #601 (version 0.1.0.4), the review: the parts as they stand, without the gate's 6%
+    /// -- how near the door stands, which the computer's refusals read so that a seat with both
+    /// bars met and no gate (94%) is refused as it was at 100%.
+    pub fn parts_as_it_stands(&self) -> f64 {
         self.first_weight * self.first_fraction_as_it_stands() + self.capital_weight * self.capital_fraction() + self.second_weight() * self.second_fraction()
+    }
+    pub fn score_as_it_stands(&self) -> f64 {
+        self.gated(self.first_weight * self.first_fraction_as_it_stands() + self.capital_weight * self.capital_fraction() + self.second_weight() * self.second_fraction())
+    }
+    /// Ticket #601 (version 0.1.0.4), at the designer's word: the gate is `gate_weight` (6%) of the
+    /// whole, whole or nothing, and the parts' weighted mean the rest, so a held win never reads
+    /// 100%: both bars met without the gate Tech is 94%.
+    fn gated(&self, parts: f64) -> f64 {
+        let w = self.gate_weight.clamp(0.0, 1.0);
+        w * if self.gate_open { 1.0 } else { 0.0 } + (1.0 - w) * parts
     }
     /// Ticket #567 (version 0.1.0.3): the Capital's part, whole or nothing.
     fn capital_fraction(&self) -> f64 {
@@ -77,7 +94,8 @@ impl Progress {
     }
     /// Ticket #567 (version 0.1.0.3): what every headline that prints the percentage (`{:.0}%`)
     /// appends -- with both parts full and a hold standing, the hold in a few words: "100% - needs
-    /// Generation Ships", "90% - needs a Colonial Capital". The playtest read a held 100% as a win.
+    /// Generation Ships", "90% - needs a Colonial Capital" (94% and 91% since ticket #601, version
+    /// 0.1.0.4, the gate being 6% of the whole). The playtest read a held 100% as a win.
     /// Short of the bars the percentage stands alone; the Victory window's row names the hold
     /// beneath. The parts are read as the percentage reads them (the review): the Custodians' best
     /// run fills the first part short of its bar (ticket #406), and that 100% names its hold too.
@@ -100,8 +118,9 @@ impl Progress {
     /// Ticket #567 (version 0.1.0.3): the Prospectors' Fund at 0.7, the long pole; and the Capital a
     /// card asks is a part of its own (the Arkwrights' a tenth, 0.6 / 0.3 / 0.1), so both bars met
     /// without one reads 90%, where the hold left 100% showing and the playtest took it for a win.
+    /// Ticket #601 (version 0.1.0.4): the whole is 94% of this and the gate's 6% (`gated`).
     pub fn score(&self) -> f64 {
-        self.first_weight * self.first_fraction() + self.capital_weight * self.capital_fraction() + self.second_weight() * self.second_fraction()
+        self.gated(self.first_weight * self.first_fraction() + self.capital_weight * self.capital_fraction() + self.second_weight() * self.second_fraction())
     }
     /// Ticket #261: is the first part met on its own terms -- at its bar and not held back?
     pub fn first_met(&self) -> bool {
@@ -231,6 +250,11 @@ impl Game {
                 format!("{} of {} uploaded into the Archive", self.seat(seat).uploaded, crate::counted(format!("{:.0}", second.bar), "Colonist", "Colonists")),
             ),
         };
+        // Ticket #601 (version 0.1.0.4): the gate's share stands while neither of the two holds that
+        // are the gate does -- the Archive offline, the gate Tech missing; a missing Capital is a
+        // part of its own (ticket #567) and costs that part, not the gate's.
+        let archive_offline = card.kind == VictoryFirstKind::ArchiveResearch && self.archive_complete(seat) && !self.archive_online(seat);
+        let gate_open = !archive_offline && self.tables.victory_gate(self.kind(seat)).is_none_or(|gate| self.has_tech(gate));
         // Ticket #567 (version 0.1.0.3): each hold in the row's words and in the headline's few.
         let mut held = match card.kind {
             VictoryFirstKind::ArchiveResearch if self.archive_complete(seat) && !self.archive_online(seat) => {
@@ -284,6 +308,8 @@ impl Game {
             capital_weight: card.capital_weight,
             capital_held,
             first_held_short,
+            gate_open,
+            gate_weight: self.tables.victory.gate_weight,
         }
     }
 

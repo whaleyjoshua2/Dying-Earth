@@ -5930,7 +5930,8 @@ impl Game {
         if matches!(get, crate::orders::TradeGood::Place(_)) || self.hostile(seat, from) || self.holds_good(seat, get).is_err() {
             return false;
         }
-        if self.progress(from).score_as_it_stands() >= 0.95 {
+        // Ticket #601 (version 0.1.0.4): the parts, without the gate's 6%, so the door stays put.
+        if self.progress(from).parts_as_it_stands() >= 0.95 {
             return false;
         }
         // Ticket #531 (version 0.1.0.1): nothing to a runaway leader.
@@ -6275,7 +6276,7 @@ impl Game {
         }
         // The review: the Victory windows' own rounding.
         // Ticket #567 (version 0.1.0.3): and the hold named, with both bars reached ("100% - needs
-        // Generation Ships"), where a held 100% read as a win.
+        // Generation Ships", 94% since ticket #601), where a held 100% read as a win.
         let p = self.progress(Seat(0));
         let pct = format!("{:.0}", p.score() * 100.0);
         self.phrase("head", &[("clock", clock), ("pct", pct), ("hold", p.hold_suffix())])
@@ -6331,7 +6332,8 @@ impl Game {
     pub fn accord_acceptable(&self, seat: Seat, from: Seat, terms: &[Term]) -> bool {
         // Never help somebody already at the door.
         // Ticket #406 (version 0.09.4): how near the door stands, not the Custodians' partial credit.
-        if self.progress(from).score_as_it_stands() >= 0.95 {
+        // Ticket #601 (version 0.1.0.4): the parts, without the gate's 6%, so the door stays put.
+        if self.progress(from).parts_as_it_stands() >= 0.95 {
             return false;
         }
         // Ticket #531 (version 0.1.0.1): no Accord with a runaway leader, and none renewed; the
