@@ -1305,8 +1305,8 @@ impl Game {
                     // Ticket #209 (version 0.08.1): the message names the new rule. It said
                     // "off Earth; Antarctica will not do" while a station over Earth still counted,
                     // and would now be actively misleading -- a player reading it at Axiom would
-                    // think the problem was the ice.
-                    return fail("the Archive stands at a Colony on another Body; neither Antarctica nor a station over Earth will do");
+                    // think the problem was the ice. Ticket #588 (version 0.1.0.4): the ground only.
+                    return fail("the Archive stands on the ground of another Body");
                 }
                 // At most one Archive per Faction, wherever it stands.
                 if let Some(home) = self.archive_colony(seat)

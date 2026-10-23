@@ -704,6 +704,8 @@ impl Game {
             let dark = !col.modules.iter().any(|m| m.kind == ModuleKind::Core && m.working());
             let starved = self.starved_by(id).is_some();
             let room = self.habitat_room(col).saturating_sub(col.colonists);
+            // Ticket #588 (version 0.1.0.4), at the designer's word: Earth orbit grows faster.
+            let rate = if self.in_earth_orbit(col) { self.tables.climate.colony_growth_earth_orbit } else { rate };
             let (seat, now) = (col.control.director(), col.colonists);
             let change: i64 = if dark || starved {
                 self.colony_growth.remove(&id);

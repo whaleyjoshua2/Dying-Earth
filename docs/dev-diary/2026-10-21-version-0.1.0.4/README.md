@@ -375,3 +375,48 @@ watched red on the table and on the home being counted, then green.
 ![India's card with three Regions held](ticket-591/card-three-held.png)
 
 With one Region held the term is hidden ([`ticket-591/card-one-held.png`](ticket-591/card-one-held.png)).
+
+## People in Earth orbit count for no Victory, and grow faster
+
+Ticket [#588](https://github.com/whaleyjoshua2/Dying-Earth/issues/588), spec §12.
+
+Grilled in three rounds. A probe first (ten games a seating): about half of every Faction's people
+off Earth live over Earth -- at the end the Custodians 12.3 of 21.7, the Prospectors 10.7 of 18.5,
+the Arkwrights 42.9 of 73.7, the Archivists 12.0 of 24.0. The designer took every Victory reader and
+the computer's pace onto the new count, L4 and L5 counting, the bars kept for the sweep to judge,
+growth an even 0.03, and the words "beyond Earth orbit". A correction owed: I asked whether an
+Archive over Earth should still take Uploads; it never could stand there, not since version 0.08.1.
+The designer answered by putting the Archive on the ground of another Body; a second probe found the
+computer had never put it on a station anyway (40 games: the Moon 12, Mars 12, Mercury 3, Phobos 3,
+none 10).
+
+Three tests were written first and watched red (a station over Earth counted 6; ten people over
+Earth still 10 after four turns; the Moon's ring took the Archive). Eleven older tests moved: six
+pinned the old words, four built a station's people as the seat's Presence and now give it one on
+the Moon, and the Archivists' pace test moved its Archive to the Moon's ground. The Mars race's test
+(#596) moved to the Arkwrights' runner, since seed 1 now plays otherwise; **it no longer witnesses
+the race weight**: the send is taken without it, and sixteen real games showed no state where only
+the race weight sent a runner -- every seat reads itself behind on its people from turn 1 now, and
+that lift sends the runner on its own.
+
+The first sweep ([`sweeps/ticket-588-archivists-paced.txt`](sweeps/ticket-588-archivists-paced.txt)):
+25 / 46 / 2 / 6 and 1, the Archive standing in 32 of 80 games from 60. The Archivists' computer paces
+itself in people as every seat does; with the starting station uncounted it read itself behind from
+turn 1, the pull a note in the code says once kept them from the Archive. Swept with their people
+pace off, the Archive came back to 44 and their wins to 11; the designer took that, and kept the
+Arkwrights' 42 though they fall to last in 50 of 80.
+
+- **The sweep** ([`sweeps/ticket-588.txt`](sweeps/ticket-588.txt)): **35 / 32 / 2 / 11 and no
+  collapse**. The Moon at a median turn 6, Mars at 13 (from 22), Phobos in 71 of 80, Deimos 42,
+  Mercury 69, Ceres 23; people off Earth at the end a median 146 to 175 by seating.
+
+| | Materials | Fuel | Energy | Ducats | Research |
+|---|---|---|---|---|---|
+| Custodians | 1,986 | 598 | 765 | 1,195 | 1,005 |
+| Prospectors | 1,895 | 392 | 425 | 1,563 | 279 |
+| Arkwrights | 718 | 150 | 178 | 2,533 | 233 |
+| Archivists | 428 | 240 | 61 | 344 | 617 |
+
+![The Victory window at turn one](ticket-588/victory-window.png)
+
+![The Faction cards' Victory lines](ticket-588/faction-cards.png)

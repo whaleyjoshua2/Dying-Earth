@@ -296,3 +296,36 @@ The designer: *"scale with the number of Regions you already hold"*.
   - *+2* and *+3*: 9 / 52 / 1 / 17 and 1; 8 / 51 / 5 / 16 and none.
   - *+5 with the Custodians left out*, my misreading of the designer's answer
     (`sweeps/ticket-591-custodians-exempt.txt`): 35 / 34 / 2 / 9 and none.
+
+## 12. People in Earth orbit count for no Victory, and grow faster
+
+Ticket: [People in Earth orbit count for no Victory, and grow a third faster](https://github.com/whaleyjoshua2/Dying-Earth/issues/588).
+
+The designer: *"populations in orbit around earth no longer count toward victory conditions but
+population growth there is 1/3rd faster"*.
+
+- **Earth orbit** is every station over Earth but Earth L4 and L5. People there count for no
+  Victory: the Custodians' and Prospectors' Presence (18), the Arkwrights' 42, the tiebreak at the
+  last turn and the computer's pace all read people **beyond Earth orbit**. L4 and L5 count. Every
+  other reader of the people off Earth -- the Observatory, Regolith Printing, the world's count, the
+  end-of-game table -- is unchanged. The bars stay at 18 and 42, at the designer's word.
+- **Growth in Earth orbit is 3% a turn** (`colony_growth_earth_orbit`), from 2%, at the designer's
+  word ("an even .03"); still capped by Habitat room, still declining when the Core is off. L4, L5
+  and every other Body grow at 2%.
+- **The Archive stands on the ground of another Body**, at the designer's word: no station will do,
+  where one over another Body did. Measured before, the computer had never put it on one (40 games).
+  The refusal: *"the Archive stands on the ground of another Body"*.
+- **The words**: "living beyond Earth orbit" on the three Victory lines, the Archive's lines ("on
+  the ground beyond Earth orbit"), the Arkwrights' part ("Colonists beyond Earth orbit"), both
+  tiebreak hovers, and the tutorial's turn-4 note (*"People in Earth orbit count for no Victory:
+  eighteen living beyond it is half your Victory Condition."*).
+- **The Archivists' computer has no people pace** (`colonists = []`), at the designer's word: their
+  Victory counts no one living anywhere, and the pace, reading nobody beyond Earth orbit at turn 1,
+  pulled them from the Archive.
+- **Swept** (`sweeps/ticket-588.txt`): **35 / 32 / 2 / 11 and none**, from 18 / 45 / 5 / 11 and 1.
+  The system fills faster: the Moon at a median turn 6 from 8, Mars at 13 from 22, Deimos in 42 of
+  80 from 19, Ceres 23 from 10. The Arkwrights score a median 0.31 at the end, from 0.84, last in
+  50 of 80; their 42 stands at the designer's word, their recovery a pass of its own. Archives
+  standing: 44 of 80, from 60.
+- **Swept and taken back**: *the Archivists paced in people beyond Earth orbit*
+  (`sweeps/ticket-588-archivists-paced.txt`): 25 / 46 / 2 / 6 and 1; Archives 32 of 80.

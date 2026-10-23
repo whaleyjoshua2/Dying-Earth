@@ -216,7 +216,7 @@ impl Game {
         let first_value = match card.kind {
             VictoryFirstKind::VentureFund => s.venture_fund,
             VictoryFirstKind::StabilizationRun => s.stabilization_run as f64,
-            VictoryFirstKind::ColonistsOffEarth => self.off_world_colonists(seat) as f64,
+            VictoryFirstKind::ColonistsOffEarth => self.victory_colonists(seat) as f64,
             VictoryFirstKind::ResearchProduced => s.research_total as f64,
             // Ticket #68: the Research paid into the Archive; the bar only tells while the Archive
             // is running.
@@ -233,9 +233,9 @@ impl Game {
         let second = self.tables.faction(s.kind).victory_second;
         let (second_value, second_bar, second_text) = match second.kind {
             VictorySecondKind::OffWorldPresence => (
-                self.off_world_colonists(seat) as f64,
+                self.victory_colonists(seat) as f64,
                 second.bar,
-                format!("{} of {} living off Earth", self.off_world_colonists(seat), crate::counted(format!("{:.0}", second.bar), "Colonist", "Colonists")),
+                format!("{} of {} living beyond Earth orbit", self.victory_colonists(seat), crate::counted(format!("{:.0}", second.bar), "Colonist", "Colonists")),
             ),
             VictorySecondKind::ColoniesOnBodies => (
                 self.bodies_settled(seat, second.colonists_each) as f64,
@@ -328,8 +328,8 @@ impl Game {
             let mut note = "higher score at the last turn";
             let mut top = leaders(&|s| progress[s.index()].score(), &all);
             if top.len() > 1 {
-                note = "tie broken by Colonists off Earth";
-                top = leaders(&|s| self.off_world_colonists(s) as f64, &top);
+                note = "tie broken by Colonists beyond Earth orbit";
+                top = leaders(&|s| self.victory_colonists(s) as f64, &top);
             }
             if top.len() > 1 {
                 note = "tie broken by Colonies held";

@@ -574,7 +574,7 @@ impl Game {
         let m = &self.tables.ai.multipliers;
         let turn = self.turn;
         let ratio_of = |actual: f64, expected: f64| if expected <= 0.0 { 1.0 } else { (actual / expected).min(1.0) };
-        let mut presence_ratio = ratio_of(self.off_world_colonists(seat) as f64, Self::expected(&pace.colonists, turn));
+        let mut presence_ratio = ratio_of(self.victory_colonists(seat) as f64, Self::expected(&pace.colonists, turn));
         // Ticket #449 (version 0.09.6): a second part that counts BODIES is paced in Bodies. Nothing
         // read them: the Arkwrights' computer judged itself by Colonists off Earth alone, filled one
         // station over Earth, and scored nought with no Body settled.
@@ -3012,7 +3012,7 @@ impl Game {
         // or Antarctica settled a batch must muster in a state the seat directs: those with a
         // working Launch Site, or, with the ice open, any (several since ticket #427, below). It musters while fewer
         // wait than two Ship loads (and one more while the ice is open), and never for nothing.
-        let presence_needed = self.tables.victory.off_world_presence.saturating_sub(self.off_world_colonists(seat));
+        let presence_needed = self.tables.victory.off_world_presence.saturating_sub(self.victory_colonists(seat));
         // Ticket #237 (version 0.08.3): the Exodus Call. Sounded where the Arkwrights hold their
         // MOST populous Region, since a Call is once per Region ever and a doubled muster is worth
         // most where there are most people to take -- and since the measured problem is that their

@@ -2422,8 +2422,10 @@ impl Game {
         format!("{} {}", self.tables.faction(self.kind(s.seat)).ship_prefix, s.name)
     }
 
+    /// Ticket #588 (version 0.1.0.4), at the designer's word: the Archive stands on the ground of another
+    /// Body -- no station will do, over Earth or anywhere.
     pub fn may_hold_archive(&self, c: &Colony) -> bool {
-        c.body != BodyId::Earth
+        c.body != BodyId::Earth && !c.in_orbit
     }
 
     /// Ticket #209 (version 0.08.1): the Archivists have nowhere to put the Archive and have not
@@ -3334,7 +3336,7 @@ impl Game {
     /// Colonies held. The chronicle page reads this rather than ranking for itself, so the page
     /// cannot order a table differently from the rule that decided the game. Read-only.
     pub fn ranking(&self) -> Vec<(Seat, Tiebreak)> {
-        let key = |s: Seat| (self.progress(s).score(), self.off_world_colonists(s), self.owned_colonies(s).len());
+        let key = |s: Seat| (self.progress(s).score(), self.victory_colonists(s), self.owned_colonies(s).len());
         let mut seats: Vec<Seat> = Seat::ALL.to_vec();
         seats.sort_by(|a, b| key(*b).partial_cmp(&key(*a)).unwrap_or(std::cmp::Ordering::Equal));
         seats
@@ -3726,6 +3728,20 @@ impl Game {
         // Ticket #44: Colonists in Antarctica live on Earth. Ticket #81: those on a station over
         // Earth do not.
         self.colonies.iter().filter(|c| c.control.controller() == Some(seat) && self.off_earth(c)).map(|c| c.colonists).sum()
+    }
+
+    /// Ticket #588 (version 0.1.0.4): whether a Colony is a station in **Earth orbit** -- over Earth
+    /// and not in a far orbit, Earth's L4 and L5 being no orbit around Earth for this.
+    pub fn in_earth_orbit(&self, c: &Colony) -> bool {
+        c.body == BodyId::Earth && c.in_orbit && !self.far_slot(c.body, c.slot)
+    }
+
+    /// Ticket #588 (version 0.1.0.4), at the designer's word: the seat's Colonists **beyond Earth
+    /// orbit**, the count every Victory reader takes -- the Presence part, the Arkwrights' 42, the
+    /// tiebreak and the computer's pace. People in Earth orbit count for no Victory; every other
+    /// reader of the off-Earth count still takes `off_world_colonists`.
+    pub fn victory_colonists(&self, seat: Seat) -> u32 {
+        self.colonies.iter().filter(|c| c.control.controller() == Some(seat) && self.off_earth(c) && !self.in_earth_orbit(c)).map(|c| c.colonists).sum()
     }
 
     pub fn influence_threshold(&self, target: Target) -> i64 {

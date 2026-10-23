@@ -877,7 +877,7 @@ impl VictoryFirstKind {
         match self {
             VictoryFirstKind::VentureFund => "Venture Capital Fund",
             VictoryFirstKind::StabilizationRun => "Stabilization run",
-            VictoryFirstKind::ColonistsOffEarth => "Colonists off Earth",
+            VictoryFirstKind::ColonistsOffEarth => "Colonists beyond Earth orbit",
             VictoryFirstKind::ResearchProduced => "Research produced",
             VictoryFirstKind::ArchiveResearch => "The Archive",
         }
@@ -1121,6 +1121,8 @@ pub struct ClimateTable {
     pub population_growth: f64,
     /// Ticket #444 (version 0.09.6): a Colony's growth share a turn, and its loss a turn when starved.
     pub colony_growth: f64,
+    /// Ticket #588 (version 0.1.0.4): the growth share instead at a station in Earth's near orbits.
+    pub colony_growth_earth_orbit: f64,
     pub colony_decline: u32,
     /// Ticket #333 (version 0.09.0): the population figure's unit, in people. A Region's figure, a
     /// Colonist and a Pioneer are all counted in it, so `Region population 380.0` is 380 million

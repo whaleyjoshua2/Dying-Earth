@@ -2509,7 +2509,7 @@ fn ticket_347_moves_the_archives_money_and_none_of_its_other_gates() {
     g.colony_mut(mars).unwrap().colonists = 3;
     assert!(g.check_order(Seat(3), &[], &Order::BuildArchive { colony: mars }).unwrap_err().0.contains("4 Colonists"), "three is not four");
     let home = colony(&mut g, Seat(3), BodyId::Earth, &[ModuleKind::Habitat], 8);
-    assert!(g.check_order(Seat(3), &[], &Order::BuildArchive { colony: home }).unwrap_err().0.contains("at a Colony on another Body"), "not on Earth");
+    assert!(g.check_order(Seat(3), &[], &Order::BuildArchive { colony: home }).unwrap_err().0.contains("on the ground of another Body"), "not on Earth");
 }
 
 /// Ticket #347, R5: **what the game says.** The Archivists' Victory sentence on their Faction card
@@ -2551,7 +2551,7 @@ fn the_archive_is_one_module_of_fifty_materials_and_three_turns_built_once_off_e
     g.settle_people(axiom, 4, 1.0);
     assert_eq!(
         g.check_order(Seat(3), &[], &Order::BuildArchive { colony: axiom }).unwrap_err().0,
-        "the Archive stands at a Colony on another Body; neither Antarctica nor a station over Earth will do"
+        "the Archive stands on the ground of another Body"
     );
     // Nobody else builds one, and the ordinary Module button never places it.
     let mine = colony(&mut g, Seat(0), BodyId::Mars, &[], 0);
@@ -6389,7 +6389,7 @@ fn twenty_five_hundred_ducats_in_the_fund_is_the_prospectors_first_part() {
     // Ticket #580: the card's long text reads the bar, where it carried a typed copy; the
     // computer Prospectors' pace stretches with it (467 / 1167 / 2100 / 3500 before, then
     // 567 / 1417 / 2550 / 4250).
-    assert_eq!(g.tables.victory_text(FactionKind::Prospectors), "5,000 Ducats in the Venture Capital Fund, plus 18 Colonists living off Earth.");
+    assert_eq!(g.tables.victory_text(FactionKind::Prospectors), "5,000 Ducats in the Venture Capital Fund, plus 18 Colonists living beyond Earth orbit.");
     assert_eq!(g.tables.ai_pace(FactionKind::Prospectors).first, vec![[12, 667], [25, 1667], [37, 3000], [47, 5000]], "scaled by 5000/4250");
     g.seats[pro.index()].venture_fund = 2000.0;
     let p = g.progress(pro);
@@ -7588,6 +7588,9 @@ fn the_ai_raises_a_solar_array_on_its_station_when_energy_is_tight() {
     g.colony_mut(iss).unwrap().colonists = 2;
     // Ticket #564 (version 0.1.0.3): with no Colony Ship the race for the first landing puts a
     // Shipyard at 54 in the station's slot first; a Ship parked over Earth ends the race.
+    // Ticket #588 (version 0.1.0.4): the station's people are in Earth orbit and count for no
+    // Victory, so a seat with nobody beyond it reads itself behind on Presence; one on the Moon.
+    colony(&mut g, Seat(0), BodyId::Moon, &[], 1);
     parked_colony_ship(&mut g, Seat(0), BodyId::Earth);
     let orders = g.ai_orders(Seat(0));
     assert!(orders.iter().any(|o| matches!(o, Order::BuildModule { colony, kind: ModuleKind::SolarArray } if *colony == iss)), "no Solar Array on the ISS: {orders:?}");
@@ -8212,8 +8215,10 @@ fn every_computer_seat_races_for_mars_once_the_moon_is_claimed() {
 /// Ticket #596 (version 0.1.0.4), at the designer's word: **the runner's send to Mars is weighed at
 /// the race weight**, as the race's Shipyard and Colony Ship are. At its own weight, falling off the
 /// window, the send lost every turn to the Ship's own moves between low orbit and the station, and
-/// the runner never left. Measured in a real game: seed 1, the Prospectors in East Asia, turn 10,
-/// the Archivists' runner.
+/// the runner never left. Measured in a real game: seed 1, the Prospectors in East Asia, turn 10, the
+/// Arkwrights' runner (the Archivists' until ticket #588 moved the game). Since ticket #588 this state
+/// no longer witnesses the race weight: the send is taken without it, and sixteen real games showed
+/// no state where only the race weight sent a runner. It holds the behaviour, the runner leaving.
 #[test]
 fn the_race_sends_its_runner_to_mars_over_the_ships_own_moves() {
     let mut g = Game::new(tables(), NewGame { seed: 1, player: FactionKind::Prospectors, player_is_ai: true, player_start: StateId::EastAsia });
@@ -8221,13 +8226,13 @@ fn the_race_sends_its_runner_to_mars_over_the_ships_own_moves() {
     while g.turn < 10 {
         g.end_turn(std::array::from_fn(|_| Vec::new())).unwrap();
     }
-    let arc = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Archivists).unwrap();
+    let ark = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Arkwrights).unwrap();
     assert!(g.first_at(BodyId::Moon).is_some() && g.first_at(BodyId::Mars).is_none(), "the premise: the Moon claimed, Mars not");
     g.log.clear();
-    let orders = g.ai_orders(arc);
+    let orders = g.ai_orders(ark);
     assert!(
         orders.iter().any(|o| matches!(o, Order::Transit { to: BodyId::Mars, .. })),
-        "the Archivists' runner to Mars on turn 10: {:?}",
+        "the Arkwrights' runner to Mars on turn 10: {:?}",
         g.log.iter().filter(|l| l.contains("Colony Ship")).collect::<Vec<_>>()
     );
 }
@@ -12992,6 +12997,9 @@ fn the_computer_wants_a_battery_where_a_rival_warship_stands() {
         col.modules.push(Module::new(ModuleKind::TradePost));
         col.colonists = 8;
     }
+    // Ticket #588 (version 0.1.0.4): the station's people are in Earth orbit and count for no
+    // Victory, so a seat with nobody beyond it reads itself behind on Presence; one on the Moon.
+    colony(&mut g, Seat(0), BodyId::Moon, &[], 1);
     let before: Vec<Order> = g.ai_orders(Seat(0));
     assert!(!before.iter().any(|o| matches!(o, Order::BuildModule { kind: ModuleKind::Battery, .. })), "no rival warship here, no Battery: {before:?}");
     let id = ShipId(g.fresh_id());
@@ -16895,14 +16903,14 @@ fn ticket_350_the_turn_one_line_names_each_factions_own_condition() {
     for (kind, words) in [
         (
             FactionKind::Custodians,
-            "Build, spread Influence and reach Stabilization, four Climate phases running with Emissions under the Natural Sink, with 18 Colonists living off Earth, before +3.0 C.",
+            "Build, spread Influence and reach Stabilization, four Climate phases running with Emissions under the Natural Sink, with 18 Colonists living beyond Earth orbit, before +3.0 C.",
         ),
         // Ticket #506 (version 0.1.0.0): the fifty-turn bars.
         // Ticket #584 (version 0.1.0.4): the Fund 5,000.
-        (FactionKind::Prospectors, "Build, spread Influence and put 5,000 Ducats in the Venture Capital Fund with 18 Colonists living off Earth, before +3.0 C."),
+        (FactionKind::Prospectors, "Build, spread Influence and put 5,000 Ducats in the Venture Capital Fund with 18 Colonists living beyond Earth orbit, before +3.0 C."),
         // Ticket #514 (version 0.1.0.0): and a Colonial Capital.
-        (FactionKind::Arkwrights, "Build, spread Influence and get 42 Colonists living off Earth, spread over four Bodies, one holding a Colonial Capital, before +3.0 C."),
-        (FactionKind::Archivists, "Build, spread Influence and build the Archive off Earth, pay 250 Research into it, and upload 16 Colonists, before +3.0 C."), // Ticket #565 (version 0.1.0.3): 16, from 18; ticket #579: 250, from 225
+        (FactionKind::Arkwrights, "Build, spread Influence and get 42 Colonists living beyond Earth orbit, spread over four Bodies, one holding a Colonial Capital, before +3.0 C."),
+        (FactionKind::Archivists, "Build, spread Influence and build the Archive on the ground beyond Earth orbit, pay 250 Research into it, and upload 16 Colonists, before +3.0 C."), // Ticket #565 (version 0.1.0.3): 16, from 18; ticket #579: 250, from 225
     ] {
         let line = turn_one_line(kind);
         assert!(line.ends_with(words), "{kind:?}: {line}");
@@ -16917,7 +16925,7 @@ fn ticket_350_a_moved_bar_moves_the_line() {
     let mut t = (*tables()).clone();
     t.factions[FactionKind::Prospectors as usize].victory_first.bar = 3000.0;
     t.factions[FactionKind::Prospectors as usize].victory_second.bar = 8.0;
-    assert_eq!(t.victory_short(FactionKind::Prospectors), "put 3,000 Ducats in the Venture Capital Fund with eight Colonists living off Earth,");
+    assert_eq!(t.victory_short(FactionKind::Prospectors), "put 3,000 Ducats in the Venture Capital Fund with eight Colonists living beyond Earth orbit,");
     let start = t.faction(FactionKind::Prospectors).opens_on;
     let mut g = Game::new(Arc::new(t), NewGame { seed: 7, player: FactionKind::Prospectors, player_is_ai: false, player_start: start });
     g.start();
@@ -18910,8 +18918,11 @@ fn the_custodians_run_earns_partial_credit_for_the_best_run_and_the_gap_closed()
     }
     g.climate.natural_sink = 0.0;
     g.climate_phase();
+    // Ticket #588 (version 0.1.0.4): the starting station's people are in Earth orbit and count for
+    // no Victory, so the Custodians' Presence is given a Colony on the Moon.
+    colony(&mut g, Seat(0), BodyId::Moon, &[], 6);
     let p = g.progress(Seat(0));
-    assert_eq!(p.first_fraction(), 0.75, "the best run of three, over the bar of four since ticket #506");
+    assert_eq!(p.first_fraction(), 0.75,"the best run of three, over the bar of four since ticket #506");
     assert!(p.first_held_back.is_none(), "the premise: the gate stands");
     assert!(!p.first_met() && !p.met(), "the Condition is still three in a row, as it stands");
     assert_eq!(p.first_fraction_as_it_stands(), 0.0, "and the computer seats read the run as it stands");
@@ -19815,6 +19826,9 @@ fn a_computer_seat_ignores_a_rival_carrier_in_flight_it_cannot_see() {
         col.colonists = 8;
     }
     let id = ShipId(g.fresh_id());
+    // Ticket #588 (version 0.1.0.4): the station's people are in Earth orbit and count for no
+    // Victory, so a seat with nobody beyond it reads itself behind on Presence; one on the Moon.
+    colony(&mut g, Seat(0), BodyId::Moon, &[], 1);
     let name = g.next_ship_name(UnitKind::Carrier);
     g.ships.push(Ship { id, name, kind: UnitKind::Carrier, seat: Seat(1), damage: 0, at: ShipAt::Transit { from: BodyId::Moon, to: BodyId::Earth, turns_left: 1 }, colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None });
     let battery = |orders: &[Order]| orders.iter().any(|o| matches!(o, Order::BuildModule { colony, kind: ModuleKind::Battery } if *colony == station));
@@ -20643,10 +20657,12 @@ fn the_archivists_computer_is_paced_in_uploads() {
     // Ticket #506 (version 0.1.0.0): the Uploads pace begins at turn 36 now, from 26.
     g.turn = 42;
     g.seats[arc.index()].archive_fund = g.tables.archive.research;
-    let slot = g.free_orbital_slots(BodyId::Earth)[0];
+    // Ticket #588 (version 0.1.0.4): on the Moon's ground, where an Archive may stand -- a station
+    // over Earth never could, and people there count for no Victory.
+    let slot = g.free_slots_on(BodyId::Moon)[0];
     let id = ColonyId(g.fresh_id());
     let modules: Vec<Module> = [ModuleKind::Core, ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Archive].into_iter().map(Module::new).collect();
-    g.colonies.push(Colony { id, body: BodyId::Earth, slot, control: Control::Controlled(arc), modules, colonists: 18, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, tier: 0, in_orbit: true });
+    g.colonies.push(Colony { id, body: BodyId::Moon, slot, control: Control::Controlled(arc), modules, colonists: 18, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, tier: 0, in_orbit: false });
     assert!(g.off_world_colonists(arc) >= 18 && g.seats[arc.index()].uploaded == 0, "the premise");
     g.ai_orders(arc);
     let head = g.log.iter().find(|l| l.starts_with("AI ") && l.contains("scored")).cloned().unwrap();
@@ -23836,24 +23852,24 @@ fn a_rival_spending_on_yours_is_your_news_and_your_home_at_risk_says_so() {
     assert!(!g.report.lines.iter().any(|l| l.text.contains("could fall")));
 }
 
-/// Ticket #540 (version 0.1.0.1): the Arkwrights' Victory text says what the engine counts: a
-/// station over Earth counts toward the 42, Antarctica does not, and Earth is not one of the four.
+/// Ticket #540 (version 0.1.0.1): the Arkwrights' Victory text says what the engine counts. Ticket
+/// #588 (version 0.1.0.4): the 42 live beyond Earth orbit -- neither a station over Earth nor
+/// Antarctica counts -- and Earth is not one of the four.
 #[test]
 fn the_arkwrights_victory_text_says_what_the_engine_counts() {
     let mut g = game();
     let text = &g.tables.faction(FactionKind::Arkwrights).victory;
-    assert!(text.contains("(Antarctica does not count; Earth is not one of the four)"), "{text}");
-    assert!(!text.contains("stations over Earth do not count"), "{text}");
+    assert!(text.contains("42 Colonists living beyond Earth orbit") && text.contains("(Earth is not one of the four)"), "{text}");
     let ark = Seat(2);
     assert_eq!(g.kind(ark), FactionKind::Arkwrights);
-    let before = g.off_world_colonists(ark);
+    let before = g.victory_colonists(ark);
     let bodies = g.bodies_settled(ark, 4);
     let station = colony(&mut g, ark, BodyId::Earth, &[], 6);
     g.colony_mut(station).unwrap().in_orbit = true;
-    assert_eq!(g.off_world_colonists(ark), before + 6, "a station over Earth counts");
+    assert_eq!(g.victory_colonists(ark), before, "a station over Earth does not count");
     let ice = colony(&mut g, ark, BodyId::Earth, &[], 5);
     assert!(!g.colony(ice).unwrap().in_orbit);
-    assert_eq!(g.off_world_colonists(ark), before + 6, "Antarctica does not");
+    assert_eq!(g.victory_colonists(ark), before, "nor Antarctica");
     assert_eq!(g.bodies_settled(ark, 4), bodies, "and Earth, its station and Antarctica, is not one of the four");
 }
 
@@ -24959,4 +24975,75 @@ fn a_neutral_regions_threshold_rises_one_for_every_region_held_past_the_first() 
     // A held Region and a Colony: untouched.
     assert_eq!(g.influence_needed_for(Seat(0), Place::State(rival)), rival_before, "a held Region's price unchanged");
     assert_eq!(g.influence_needed_for(Seat(0), colony), colony_before, "a Colony's price unchanged");
+}
+
+/// Ticket #588 (version 0.1.0.4), at the designer's word: **people in Earth orbit count for no
+/// Victory**. Every Victory reader of the count -- the Presence part, the Arkwrights' 42 -- counts
+/// people **beyond Earth orbit**: a station over Earth's near orbits is out, Earth's L4 and L5 and a
+/// station over any other Body are in. The world's off-Earth count is untouched.
+#[test]
+fn people_in_earth_orbit_count_for_no_victory_and_l4_and_other_bodies_do() {
+    let mut g = game();
+    bare_stations(&mut g);
+    let (cus, ark) = (Seat(0), Seat(2));
+    assert_eq!((g.kind(cus), g.kind(ark)), (FactionKind::Custodians, FactionKind::Arkwrights), "the premise: the seats");
+    let (cus_before, ark_before, off_before) = (g.progress(cus).second_value, g.progress(ark).first_value, g.off_world_colonists(ark));
+    let station = |g: &mut Game, seat: Seat, body: BodyId, slot: u32, people: u32| {
+        let id = station_at(g, seat, body);
+        let c = g.colony_mut(id).unwrap();
+        c.slot = slot;
+        c.colonists = people;
+    };
+    assert!(!g.far_slot(BodyId::Earth, 0) && g.far_slot(BodyId::Earth, 5), "the premise: slot 0 near, slot 5 Earth L4");
+    station(&mut g, ark, BodyId::Earth, 0, 6);
+    station(&mut g, cus, BodyId::Earth, 1, 6);
+    assert_eq!(g.progress(ark).first_value, ark_before, "the Arkwrights' 42: a station over Earth counts for nothing");
+    assert_eq!(g.progress(cus).second_value, cus_before, "Presence: nor here");
+    assert!(g.progress(cus).second_text.contains("living beyond Earth orbit"), "{}", g.progress(cus).second_text);
+    station(&mut g, ark, BodyId::Earth, 5, 4);
+    assert_eq!(g.progress(ark).first_value, ark_before + 4.0, "Earth L4 counts");
+    station(&mut g, ark, BodyId::Moon, 0, 3);
+    assert_eq!(g.progress(ark).first_value, ark_before + 7.0, "a station over the Moon counts");
+    assert_eq!(g.off_world_colonists(ark), off_before + 13, "the world's off-Earth count still holds them all");
+}
+
+/// Ticket #588 (version 0.1.0.4), at the designer's word: **people in Earth orbit grow at 3% a
+/// turn**, where every other Colony grows at 2% -- Earth's L4 and L5 at the 2% too. Ten people: a
+/// Colonist after four turns over Earth, after five elsewhere.
+#[test]
+fn people_in_earth_orbit_grow_at_three_percent_a_turn() {
+    let mut g = game();
+    assert!((g.tables.climate.colony_growth_earth_orbit - 0.03).abs() < 1e-9, "the table");
+    let place = |g: &mut Game, body: BodyId, slot: u32| {
+        let id = station_at(g, Seat(0), body);
+        let c = g.colony_mut(id).unwrap();
+        c.slot = slot;
+        c.colonists = 10;
+        c.modules = [ModuleKind::Core, ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat].iter().map(|k| Module::new(*k)).collect();
+        id
+    };
+    let (near, far, moon) = (place(&mut g, BodyId::Earth, 0), place(&mut g, BodyId::Earth, 5), place(&mut g, BodyId::Moon, 0));
+    for c in [near, far, moon] {
+        assert!(g.habitat_room(g.colony(c).unwrap()) >= 12, "the premise: room to grow");
+    }
+    for _ in 0..4 {
+        g.colony_growth_step();
+    }
+    let people = |g: &Game, c: ColonyId| g.colony(c).unwrap().colonists;
+    assert_eq!(people(&g, near), 11, "over Earth: 1.2 after four turns");
+    assert_eq!(people(&g, far), 10, "Earth L4: 0.8");
+    assert_eq!(people(&g, moon), 10, "over the Moon: 0.8");
+}
+
+/// Ticket #588 (version 0.1.0.4), at the designer's word: **the Archive stands on the ground of
+/// another Body** -- a station over the Moon will no longer do, as one over Earth and Antarctica
+/// never would.
+#[test]
+fn the_archive_stands_on_the_ground_of_another_body() {
+    let mut g = game();
+    let arc = Seat(3);
+    let ground = colony(&mut g, arc, BodyId::Moon, &[], 4);
+    let ring = station_at(&mut g, arc, BodyId::Moon);
+    assert!(g.may_hold_archive(g.colony(ground).unwrap()), "the Moon's ground will do");
+    assert!(!g.may_hold_archive(g.colony(ring).unwrap()), "a station over the Moon will not");
 }

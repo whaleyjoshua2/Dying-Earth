@@ -13096,8 +13096,8 @@ fn chronicle_screen(root: &mut Ui, session: &Session, actions: &mut Vec<Action>)
                 if *separated != Tiebreak::Score {
                     let above = game.seat_name(ranking[place - 1].0);
                     let line = match separated {
-                        Tiebreak::ColonistsOffEarth => format!("Level with the {above} on the score; placed below them on the first tiebreak, Colonists off Earth."),
-                        Tiebreak::ColoniesHeld => format!("Level with the {above} on the score and on Colonists off Earth; placed below them on the second tiebreak, Colonies held."),
+                        Tiebreak::ColonistsOffEarth => format!("Level with the {above} on the score; placed below them on the first tiebreak, Colonists beyond Earth orbit."),
+                        Tiebreak::ColoniesHeld => format!("Level with the {above} on the score and on Colonists beyond Earth orbit; placed below them on the second tiebreak, Colonies held."),
                         _ => format!("Level with the {above} on the score and on both tiebreaks: nothing the End phase reads separated them."),
                     };
                     ui.label(RichText::new(line).size(14.0).weak());
