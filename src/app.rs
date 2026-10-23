@@ -76,6 +76,10 @@ pub enum Popup {
     /// Ticket #58: the nth Moment of this turn, shown before the Report.
     Moment(usize),
     Report,
+    /// Ticket #594 (version 0.1.0.4), at the designer's word: **the signature moves**, each
+    /// Faction's line, on turn one in the Report's place. It hands on to the tutorial's note in a
+    /// tutorial game and to nothing otherwise; the Report button still opens the Report.
+    Opening,
     /// End Turn pressed with Influence unspent (ticket #31): ask once.
     ConfirmEndTurn,
     /// Ticket #105 (version 0.07.0): the turn was refused, and this says why. A rule nobody can see
@@ -481,6 +485,9 @@ pub struct ViewState {
     pub battle_end: usize,
     pub battles_then_head: bool,
     pub battles_then_note: bool,
+    /// Ticket #594 (version 0.1.0.4): turn one's signature moves hand on to the tutorial's note,
+    /// and that note to nothing, where it would hand on to the Report.
+    pub opening_then_note: bool,
     /// Ticket #58: which Moment kinds are switched on, remembered for the session. `None` until the
     /// player touches a checkbox, when it is filled from the defaults in `report.toml`.
     pub moments_on: Option<[bool; dying_earth_engine::MomentKind::ALL.len()]>,
@@ -552,7 +559,7 @@ impl Default for ViewState {
             credits_amount: 10,
             credits_offer: 0,
             attack_preview: false, empty_move: Vec::new(), empty_move_text: String::new(), armed_stack: None, armed_scroll: false, stack_scroll: None,
-            battle_end: 0, battles_then_head: false, battles_then_note: false,
+            battle_end: 0, battles_then_head: false, battles_then_note: false, opening_then_note: false,
             moments_on: None,
             force_hover: None,
             card_aside: false,

@@ -2164,6 +2164,11 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
                     }
                     view.popup = Popup::Tutorial;
                 }
+                // `opening:1` (a building aid, ticket #594): turn one's signature moves stand in the
+                // Report picture's place, as a new game opens on them.
+                if std::env::args().any(|a| a == "opening:1") {
+                    view.popup = Popup::Opening;
+                }
                 view.show_climate = false;
             }
             _ => {

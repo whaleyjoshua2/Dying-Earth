@@ -626,7 +626,14 @@ fn card_owed(game: Option<&Game>) -> bool {
 /// one per Battle the Resolution fought, and hand on to whatever the turn would have opened with;
 /// a window raised for a Battle fought mid-turn hands on to nothing.
 fn advance_popup(view: &mut ViewState, moments: usize, has_event: bool, card: bool) {
+    // Ticket #594 (version 0.1.0.4): turn one opens on the signature moves in the Report's place,
+    // so its note hands on to nothing and the Report is not raised.
+    if view.popup == Popup::Tutorial && std::mem::take(&mut view.opening_then_note) {
+        view.popup = Popup::None;
+        return;
+    }
     view.popup = match view.popup {
+        Popup::Opening if view.opening_then_note => Popup::Tutorial,
         // Ticket #383 (version 0.09.2): the Battle windows run one after another, then hand on to
         // the turn's head when they opened it, and to nothing when one was fought mid-turn.
         Popup::Battle(i) if i + 1 < view.battle_end => Popup::Battle(i + 1),
@@ -1811,7 +1818,10 @@ pub fn draw(
                 session.tutorial = tutorial;
                 session.tutorial_ticked = false;
                 *view = ViewState::default();
-                view.popup = if tutorial { Popup::Tutorial } else { Popup::Report };
+                // Ticket #594 (version 0.1.0.4), at the designer's word: the signature moves first,
+                // in the Report's place, and then the tutorial's note.
+                view.popup = Popup::Opening;
+                view.opening_then_note = tutorial;
                 let (lon, lat) = geo::state_lonlat(s);
                 view.yaw = geo::yaw_facing(lon, lat);
             }
@@ -12924,6 +12934,30 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 }
             });
         }
+        // Ticket #594 (version 0.1.0.4), at the designer's word: turn one's signature moves, every
+        // Faction's in one line, the player's own first and strong.
+        Popup::Opening => {
+            egui::Modal::new("opening".into()).show(ctx, |ui| {
+                ui.set_width(520.0);
+                ui.label(RichText::new("Signature moves").size(26.0).strong().color(Color32::from_rgb(255, 220, 150)));
+                ui.add_space(4.0);
+                for seat in Seat::ALL {
+                    let mine = seat == Seat(0) && !session.spectator;
+                    let line = session.tables.opening_moves(game.kind(seat), mine);
+                    ui.horizontal(|ui| {
+                        faction_glyph(ui, session, game, Some(seat), 22.0);
+                        let name = RichText::new(game.seat_name(seat)).size(17.0).strong().color(seat_colour(session, seat));
+                        ui.label(name);
+                        let words = RichText::new(line).size(17.0);
+                        ui.label(if mine { words.strong() } else { words });
+                    });
+                }
+                ui.add_space(8.0);
+                if ui.button("Go on").clicked() {
+                    advance_popup(view, 0, false, false);
+                }
+            });
+        }
         Popup::Tutorial => {
             // Ticket #169 (version 0.07.5): the tutorial's note for this turn. Drawn as a Moment is
             // drawn, because it is the same thing to the player: the turn stops for one short
@@ -13502,6 +13536,27 @@ mod tests {
         assert_eq!(next(Popup::Tutorial, 0, false), Popup::Report, "no Event and no Moments: straight to the Report");
         // An Event already on screen never hands on to itself, whatever the flag says.
         assert_eq!(next(Popup::Event, 0, true), Popup::Report, "the Event is the thing being dismissed");
+    }
+
+    /// Ticket #594 (version 0.1.0.4), at the designer's word: **turn one opens on the signature
+    /// moves in the Report's place.** They hand on to the tutorial's note in a tutorial game, and
+    /// that note hands on to nothing; in any other game they hand on to nothing. The Report is not
+    /// raised on turn one at all.
+    #[test]
+    fn turn_one_opens_on_the_signature_moves_and_never_raises_the_report() {
+        let mut view = ViewState { popup: Popup::Opening, opening_then_note: true, ..Default::default() };
+        advance_popup(&mut view, 0, false, false);
+        assert_eq!(view.popup, Popup::Tutorial, "a tutorial game: on to the turn's note");
+        advance_popup(&mut view, 0, false, false);
+        assert_eq!(view.popup, Popup::None, "and the note to nothing, not the Report");
+        // A later turn's note is not turn one's: it hands on to the Report as before.
+        let mut later = ViewState { popup: Popup::Tutorial, ..Default::default() };
+        advance_popup(&mut later, 0, false, false);
+        assert_eq!(later.popup, Popup::Report, "a later note still hands on to the Report");
+
+        let mut view = ViewState { popup: Popup::Opening, ..Default::default() };
+        advance_popup(&mut view, 0, false, false);
+        assert_eq!(view.popup, Popup::None, "any other game: on to nothing");
     }
 
     /// Ticket #337 (version 0.09.0): **a question owed is never handed on from.** Escape, a

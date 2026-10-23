@@ -45,6 +45,9 @@ production_moved_factor = 2.08
 # shown, so the text cannot go stale again (it said 4 Energy upkeep and 2 turns, where the Scrubber
 # costs 3 and is paid in Widgets); and the last sentence says their lever on Earth and its price.
 signature = "The Scrubber, Leapfrog and Production Moved. Only they build a Scrubber, in a Region they control, without a slot: {scrubber_materials} Materials, {scrubber_widgets} Widgets, {scrubber_upkeep} Energy and {scrubber_ducats} Ducat upkeep. Online it adds {scrubber_sink} ppm a turn to the Natural Sink and takes {scrubber_fall} off the Region's Unrest; one per {scrubber_people} people, {scrubber_min} to {scrubber_max}; half if another Faction takes the Region, a quarter if it goes neutral. A Leapfrog costs {leapfrog} Ducats and cuts a Region's Emissions for good. Production Moved: while a Factory, Mine, Power Plant, Refinery or Research Lab of theirs stands mothballed, a matching Module of theirs off Earth makes x{moved_factor}, one for one. Their lever on Earth is switching industry off, at home or in a Region they have taken: each Mothball there costs +{mothball} Unrest."
+# Ticket #594 (version 0.1.0.4), at the designer's word: the signature moves turn one opens with,
+# in the Report's place. {your} is "their" on a rival's row; the Archive's line names no Body.
+opening_moves = "Build Scrubbers and Nature Reserves; Leapfrog {your} Regions"
 # Ticket #203 (version 0.08.1): the Unique Facility in one sentence, for the Faction card and the
 # Faction window. Ticket #186 built the Academy; nothing on any card named it until now.
 unique = "Academy -- replaces the School and the Institute, and pays +1 Ducat a turn while it is online."
@@ -103,6 +106,7 @@ resentment = 0.0
 # Ticket #535 (version 0.1.0.1): Relations lost per 10 Influence another spends on a Greenwash.
 greenwash_resentment = 0.05
 signature = "Cheap Industry and the Strip Permit. Raising Industry Level costs them 15 Materials rather than 30, every Facility and Module 15% less; their Regions pay a fifth more Ducats and the Trading window sells to them at 15% off. A Strip Permit costs 25 Ducats and may be taken once in a Region's whole life: for three turns every Facility there produces double, and when it ends that Region's Baseline Emissions rise by 0.2 for good and its Unrest by 2. The Venture Capital Fund: each turn they set what share of their Ducat income is banked in it, 0% to 80% in whole percents; a withdrawal returns nine tenths. They open with {start_materials} Materials, where others hold {common_materials}."
+opening_moves = "Investment Banks + Venture share"
 # Ticket #203 (version 0.08.1). The building is ticket #182's.
 unique = "Investment Bank -- replaces the Bank, and banks 1% interest a turn on the Venture Capital Fund's balance, one building per Region paying, never less than 1 Ducat in all. Off Earth, the Exchange -- replaces the Trade Post, and pays 1 more Ducat a turn."
 # Ticket #72: the Extraction Total is retired; the first part is Ducats banked in the Fund.
@@ -203,6 +207,7 @@ start_extra_facilities = ["power_plant"]
 # Ticket #407 (version 0.09.4): audited against the data: 16 with Generation Ships too, and a
 # Colony Ship at 25.5 since figures are carried to a tenth.
 signature = "Coach Class. A Colony Ship carries 6 Colonists, 9 with Expanded Habitats and 12 with Generation Ships too, and their Habitats hold half again as many, 6 and 12. They recruit 3 Pioneers a turn in each state where others recruit 2, but every Pioneer takes half again the population. Every Ship costs them 15% less, a Colony Ship 28.1 Materials; a transit burns three quarters of the Fuel; and, starting with no station, a Space Station costs them 22 Materials and a Module three quarters. They draw +{per_body} Research a turn for each Body they have settled."
+opening_moves = "Colony Ships to four Bodies"
 # Ticket #419 (version 0.09.4): Unrest off every Region they hold, a whole point for each ground
 # Colony they found off Earth (Antarctica excepted) and half a point for each Space Station they
 # build; a place taken counts for nothing.
@@ -264,6 +269,7 @@ influence_multiplier = 1.0
 # Ticket #407 (version 0.09.4): audited against the data: the 75% contribution of ticket #235,
 # which the text had never said.
 signature = "Provisional Findings. While at least {provisional}% of their Research went to the shared Tech last turn, they already have half the effect of the Tech under research: a multiplier x reads 1 + (x - 1) / 2, an addition reads half rounded down, and immunities do not carry. Keeping back more switches it off for the turn after. Their Research is x1.5 on Earth and x1.75 off it, an Observatory on a station over Earth counting as off."
+opening_moves = "Labs + Directive; Archive"
 # Ticket #412 (version 0.09.4): each time they lead a Tech to completion, 5 Influence at once and
 # half a point of Unrest off every Region they hold.
 lead_influence = 5

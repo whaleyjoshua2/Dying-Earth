@@ -367,3 +367,26 @@ the world's, the Sink same place the stock pile meter is shown for prospectors/a
   Panel's Stabilization lines are unchanged.
 - The Arkwrights still have nothing in that place; a line in the map's fog.
 - No rule moves; no sweep.
+
+## 15. Turn one opens on the signature moves
+
+Ticket: [Turn one opens with each Faction's signature moves, in place of the Report](https://github.com/whaleyjoshua2/Dying-Earth/issues/594).
+
+The designer: *"When game starts on turn one provide a popup Name each factions signature moves on
+turn 1 ... replace turn one report with this overview"*.
+
+- **The window**, *"Signature moves"*: the four Factions, each its glyph, its name in its colour and
+  its line, the player's own first and its line strong; a "Go on". A new game opens on it in the
+  Report's place; a tutorial game then shows its first note, which hands on to nothing. The Report
+  is not raised on turn one; the Report button still opens it.
+- **The lines** (`opening_moves` on each Faction's row), the designer's: Custodians *"Build Scrubbers
+  and Nature Reserves; Leapfrog your Regions"* ("their Regions" on a rival's screen); Prospectors
+  *"Investment Banks + Venture share"*; Arkwrights *"Colony Ships to four Bodies"*; Archivists
+  *"Labs + Directive; Archive"* -- "on the Moon" cut at the designer's word, since the Archive may
+  stand on any Body's ground beyond Earth orbit.
+- **No home Region on the rows**, at the designer's word: a Faction's home is where the map opens,
+  and any Faction may start anywhere.
+- **The tool**: `new` prints the four lines, the player's marked "(you)", in the Report's place;
+  `show` still prints the Report.
+- The Faction selection card is unchanged.
+- No rule moves; no sweep.

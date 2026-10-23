@@ -25047,3 +25047,17 @@ fn the_archive_stands_on_the_ground_of_another_body() {
     assert!(g.may_hold_archive(g.colony(ground).unwrap()), "the Moon's ground will do");
     assert!(!g.may_hold_archive(g.colony(ring).unwrap()), "a station over the Moon will not");
 }
+
+/// Ticket #594 (version 0.1.0.4), at the designer's word: each Faction's **signature moves**, the
+/// line turn one opens with in the Report's place. The Custodians' Leapfrog is "your" Regions to
+/// their own player and "their" Regions to a rival; the Archive's line names no Body, since it
+/// may stand on any Body's ground beyond Earth orbit.
+#[test]
+fn each_faction_names_its_signature_moves() {
+    let t = tables();
+    assert_eq!(t.opening_moves(FactionKind::Custodians, true), "Build Scrubbers and Nature Reserves; Leapfrog your Regions");
+    assert_eq!(t.opening_moves(FactionKind::Custodians, false), "Build Scrubbers and Nature Reserves; Leapfrog their Regions");
+    assert_eq!(t.opening_moves(FactionKind::Prospectors, false), "Investment Banks + Venture share");
+    assert_eq!(t.opening_moves(FactionKind::Arkwrights, false), "Colony Ships to four Bodies");
+    assert_eq!(t.opening_moves(FactionKind::Archivists, true), "Labs + Directive; Archive");
+}

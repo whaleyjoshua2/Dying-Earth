@@ -1745,6 +1745,16 @@ fn store(game: &Game, path: &Path) {
     }
 }
 
+/// Ticket #594 (version 0.1.0.4), at the designer's word: turn one opens on each Faction's
+/// signature moves, the player's own first, in the Report's place; `show` still prints the Report.
+fn print_opening(g: &Game) {
+    println!("--- SIGNATURE MOVES ---");
+    for seat in Seat::ALL {
+        let mine = seat == Seat(0);
+        println!("{}{}: {}", g.seat_name(seat), if mine { " (you)" } else { "" }, g.tables.opening_moves(g.kind(seat), mine));
+    }
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let command = args.first().cloned().unwrap_or_else(|| "help".into());
@@ -1778,7 +1788,7 @@ fn main() {
             };
             let mut game = Game::new(tables, NewGame { seed, player, player_is_ai: false, player_start: start });
             game.start();
-            print_report(&game);
+            print_opening(&game);
             print_board(&game);
             print_costs(&game);
             store(&game, &path);

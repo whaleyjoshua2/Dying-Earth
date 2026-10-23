@@ -724,6 +724,11 @@ pub struct FactionCard {
     #[serde(default = "production_moved_factor_default")]
     pub production_moved_factor: f64,
     pub signature: String,
+    /// Ticket #594 (version 0.1.0.4), at the designer's word: the Faction's **signature moves**,
+    /// one line, shown on turn one in the Report's place. `{your}` reads "your" to the Faction's
+    /// own player and "their" to a rival.
+    #[serde(default)]
+    pub opening_moves: String,
     /// Ticket #412 (version 0.09.4): what the Faction wins each time it leads a Tech to completion,
     /// in Influence and in Unrest off every Region it holds. Nought for all but the Archivists.
     #[serde(default)]
@@ -2918,6 +2923,12 @@ impl Tables {
     /// Ticket #407 (version 0.09.4): a Faction's signature rule with its figures read from the
     /// data, so the text cannot go stale: the Scrubber's price, upkeep, Sink and cap, the Leapfrog's
     /// price and a Mothball's Unrest. A text that names none of them reads as written.
+    /// Ticket #594 (version 0.1.0.4): the Faction's signature moves, as its own player (`yours`) or
+    /// a rival reads them.
+    pub fn opening_moves(&self, kind: FactionKind, yours: bool) -> String {
+        crate::report::render(&self.faction(kind).opening_moves, &[("your", if yours { "your" } else { "their" }.to_string())])
+    }
+
     pub fn signature(&self, kind: FactionKind) -> String {
         let s = self.facility(FacilityKind::Scrubber);
         crate::report::render(

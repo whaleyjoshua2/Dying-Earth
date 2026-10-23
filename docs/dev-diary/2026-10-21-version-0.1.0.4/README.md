@@ -481,3 +481,23 @@ The label is the run alone, "0/4"; the glyph went with the figures, which are th
 clock fits on the row again at turn 1.
 
 ![The meter, the run alone](ticket-595/run-only-meter.png)
+
+## Turn one opens on the signature moves
+
+Ticket [#594](https://github.com/whaleyjoshua2/Dying-Earth/issues/594), spec §15. One round of six
+questions: the designer took the window, its place before the tutorial's note and the tool line;
+took "their Regions" for a rival's Custodians and cut "on the Moon" from the Archivists' line; and
+turned down the home Region on each row, since any Faction may start anywhere.
+
+Two tests were written first and watched red: the four lines as each reader sees them (the field
+empty), and the order of windows on turn one (the signature moves handing on to nothing where the
+tutorial's note was owed). Both green after. **Signature moves** is a
+new glossary entry, and the Report's entry says it is not raised on turn one.
+
+- **The tool's new game** ([`ticket-594/tool-new.txt`](ticket-594/tool-new.txt)): the four lines,
+  the player's marked "(you)", a mark I added since the tool cannot draw strong text.
+- **The window**, as the Prospectors and as the Custodians ("Leapfrog your Regions", strong):
+
+![As the Prospectors](ticket-594/prospectors.png)
+
+![As the Custodians](ticket-594/custodians.png)
