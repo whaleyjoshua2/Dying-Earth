@@ -420,3 +420,27 @@ Arkwrights' 42 though they fall to last in 50 of 80.
 ![The Victory window at turn one](ticket-588/victory-window.png)
 
 ![The Faction cards' Victory lines](ticket-588/faction-cards.png)
+
+## The Region card's lines
+
+Ticket [#598](https://github.com/whaleyjoshua2/Dying-Earth/issues/598), spec §13. One round of five
+questions; the designer took each recommendation, and the line for a place not held was cut to the
+held line's shape though the list named only the held one. The calm line needed nothing: #573 had
+already taken it out everywhere.
+
+No test reads these lines: the long ones were the text tool's alone and the empty row the window's.
+The witness was the tool's board at seed 3 before and after (42 old lines, then none) and a picture
+of Egypt's card before and after. No new term, so no glossary entry.
+
+- **The tool's board** ([before](ticket-598/tool-before.txt), [after](ticket-598/tool-after.txt)).
+- **Egypt, nobody's Standing**: "Standings: nobody has any yet · Threshold 40" before, "Threshold
+  40" after. The breakdown line below it also opens "Threshold 40 - 20 + 20 for size 2", so the
+  figure reads twice; it did before too, behind the cut words.
+
+![Egypt's card before](ticket-598/empty-before.png)
+
+![Egypt's card after](ticket-598/empty-after.png)
+
+- **China, held**: unchanged, the Custodians' chip and "A rival takes it at 70".
+
+![China's card](ticket-598/held.png)

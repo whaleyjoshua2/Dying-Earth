@@ -7298,23 +7298,26 @@ fn margin_words(game: &Game, challenger: Option<Seat>, target: Place) -> String 
 /// Ticket #372 (version 0.09.2): on a held place the figure is the price to take it.
 fn standings_row(ui: &mut Ui, game: &Game, session: &Session, target: Place, threshold: i64, explain: String) {
     let row = ui.horizontal_wrapped(|ui| {
+        // Ticket #598 (version 0.1.0.4), at the designer's word: where no Faction has Standing the
+        // row is the threshold alone, where it read "Standings: nobody has any yet".
+        let any = Seat::ALL.into_iter().any(|s| game.seat(s).influence.get(&target).copied().unwrap_or(0) > 0);
         // Ticket #116 (version 0.07.1): what a Standing IS, which the row shows four of and never
         // explains. The decay figures are the reason a Standing left alone slides, and the reason
         // holding a place costs less than taking one.
-        rule_tip(
-            ui.label("Standings:"),
-            format!(
-                "Standing is the Influence a Faction has built up here. It persists, and is never wiped when the place changes hands.\nLeft alone it decays {} a turn for the controller and {} a turn for everybody else, so a claim you stop paying for slides faster than the holder's.",
-                game.tables.influence.decay_controlled, game.tables.influence.decay
-            ),
-        );
-        let mut any = false;
+        if any {
+            rule_tip(
+                ui.label("Standings:"),
+                format!(
+                    "Standing is the Influence a Faction has built up here. It persists, and is never wiped when the place changes hands.\nLeft alone it decays {} a turn for the controller and {} a turn for everybody else, so a claim you stop paying for slides faster than the holder's.",
+                    game.tables.influence.decay_controlled, game.tables.influence.decay
+                ),
+            );
+        }
         for s in Seat::ALL {
             let v = game.seat(s).influence.get(&target).copied().unwrap_or(0);
             if v <= 0 {
                 continue;
             }
-            any = true;
             let chip = ui.label(RichText::new(format!(" {} {} ", game.seat_name(s), v)).color(Color32::BLACK).background_color(seat_colour(session, s)));
             // Ticket #161 (version 0.07.5): a chip of its own says whose the Standing is and how far
             // it has to go, which the line's hover -- written for the player's own case -- cannot.
@@ -7351,13 +7354,9 @@ fn standings_row(ui: &mut Ui, game: &Game, session: &Session, target: Place, thr
             };
             rule_tip(chip, format!("{whose} {rest}"));
         }
-        if !any {
-            rule_tip(
-                ui.label(RichText::new("nobody has any yet").weak()),
-                "No Faction has spent here. The first Standing to reach the threshold takes it; two arriving level are settled by lot.".to_string(),
-            );
+        if any {
+            ui.label(RichText::new("·").weak());
         }
-        ui.label(RichText::new("·").weak());
         // Ticket #161: what a threshold IS and what sets it. The line's hover uses the word and
         // never defines it.
         let t = &game.tables.influence;

@@ -329,3 +329,20 @@ population growth there is 1/3rd faster"*.
   standing: 44 of 80, from 60.
 - **Swept and taken back**: *the Archivists paced in people beyond Earth orbit*
   (`sweeps/ticket-588-archivists-paced.txt`): 25 / 46 / 2 / 6 and 1; Archives 32 of 80.
+
+## 13. The Region card's lines: "Standing 40 (yours)", "nobody has any yet" cut
+
+Ticket: [The Region card's lines: "Standing 40 (yours)", the calm line, "nobody has any yet"](https://github.com/whaleyjoshua2/Dying-Earth/issues/598).
+
+- **The tool's Standing**, on every Region and Colony row: *"Standing 40 (yours)"* on a place the
+  seat holds, *"Standing 40 (yours, the Arkwrights occupy it)"* on one held in name, and *"Standing
+  12, 60 to take it from the Prospectors"* / *"Standing 0, 40 to take it"* elsewhere, where it read
+  "your Standing 40, you hold it on 40 Standing, over which a rival must climb by the challenge
+  margin" and "... 60 needed to take it ...".
+- **The tool's Standings line** lists every Faction as before, and is left out where nobody has any,
+  where it read "Standings: nobody has any yet".
+- **The window's Standings row**, where no Faction has Standing, is the threshold alone (*"Threshold
+  40"*): the "Standings:" label, the dot and "nobody has any yet" with its hover go.
+- **The calm line** was already gone (#573): nothing below the Army threshold, on the card, in the
+  tool and in the Report. The designer's "show only when not calm" stands as the rule.
+- No rule moves; no sweep.

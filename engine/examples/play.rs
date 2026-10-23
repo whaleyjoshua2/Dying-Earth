@@ -1046,31 +1046,32 @@ fn offer_words(g: &Game, o: &dying_earth_engine::state::Offer) -> String {
 }
 
 /// Ticket #541 (version 0.1.0.1): every Faction's Standing on a place, as the window's Standings
-/// row shows it, where the tool showed the player's own alone.
-fn standings_text(g: &Game, target: Target) -> String {
+/// row shows it, where the tool showed the player's own alone. Ticket #598 (version 0.1.0.4), at
+/// the designer's word: nothing where nobody has any, where it read "nobody has any yet".
+fn standings_text(g: &Game, target: Target) -> Option<String> {
     let parts: Vec<String> = Seat::ALL.into_iter().filter_map(|s| g.seat(s).influence.get(&target).copied().filter(|v| *v > 0).map(|v| format!("{} {v}", g.seat_name(s)))).collect();
-    if parts.is_empty() { "Standings: nobody has any yet".to_string() } else { format!("Standings: {}", parts.join(", ")) }
+    (!parts.is_empty()).then(|| format!("Standings: {}", parts.join(", ")))
 }
 
 /// What it would take this seat to take `target` as it stands, which on a held place is the
 /// greater of its own threshold and the holder's Standing plus the challenge margin. The bare
 /// threshold is NOT the bar on a held place, and printing it understates what a push costs.
+/// Ticket #598 (version 0.1.0.4), at the designer's word: the seat's own Standing leads, and a held
+/// place says "(yours)" where it explained the challenge margin on every row.
 fn standing_note(g: &Game, seat: Seat, target: Target) -> String {
     let need = g.influence_needed_for(seat, target);
     let mine = g.seat(seat).influence.get(&target).copied().unwrap_or(0);
     match g.place_control(target).controller() {
         Some(c) if c == seat => {
-            // A rival's own bar is its threshold or this Standing plus the margin, whichever is
-            // greater; the threshold half is the rival's to know, so only the margin is named.
-            // Ticket #366 (version 0.09.2): and an OCCUPIED place says so here, where "you hold
-            // it" beside "occupied by the Custodians" read as a contradiction.
+            // Ticket #366 (version 0.09.2): an OCCUPIED place says so here, where "you hold it"
+            // beside "occupied by the Custodians" read as a contradiction.
             match g.place_control(target) {
-                Control::Occupied { occupier, .. } => format!("you hold it in name on {} Standing; the {} occupy it", mine, g.seat_name(occupier)),
-                _ => format!("you hold it on {} Standing, over which a rival must climb by the challenge margin", mine),
+                Control::Occupied { occupier, .. } => format!("Standing {mine} (yours, the {} occupy it)", g.seat_name(occupier)),
+                _ => format!("Standing {mine} (yours)"),
             }
         }
-        Some(c) => format!("{} needed to take it from the {}", need, g.seat_name(c)),
-        None => format!("{need} needed to take it"),
+        Some(c) => format!("Standing {mine}, {need} to take it from the {}", g.seat_name(c)),
+        None => format!("Standing {mine}, {need} to take it"),
     }
 }
 
@@ -1481,9 +1482,8 @@ fn print_board(g: &Game) {
             })
             .collect();
         let q = queue_text(g, Place::State(st.id));
-        let inf = g.seat(me).influence.get(&Place::State(st.id)).copied().unwrap_or(0);
         println!(
-            "{:<16} {:<30} pop {:.1} ind {} unrest {} | free slots {}/{} (coastal {}) | your Standing {}, {} | emigrants {}",
+            "{:<16} {:<30} pop {:.1} ind {} unrest {} | free slots {}/{} (coastal {}) | {} | emigrants {}",
             format!("{:?}", st.id),
             control_text(g, st.control),
             st.population,
@@ -1492,11 +1492,12 @@ fn print_board(g: &Game) {
             g.free_slots(st.id),
             g.build_slots(st.id),
             g.free_coastal(st.id),
-            inf,
             standing_note(g, me, Place::State(st.id)),
             st.emigrants
         );
-        println!("    {}", standings_text(g, Place::State(st.id)));
+        if let Some(line) = standings_text(g, Place::State(st.id)) {
+            println!("    {line}");
+        }
         println!(
             "    {} | lean {} | GDP {} | facilities: {}",
             card.name,
@@ -1548,12 +1549,10 @@ fn print_board(g: &Game) {
                 println!("    *** BLOCKADED by the {} : no unloading here, and it refuels nothing ***", rivals.join(" and the "));
             }
         }
-        println!(
-            "    your Standing {}, {}",
-            g.seat(me).influence.get(&Place::Colony(c.id)).copied().unwrap_or(0),
-            standing_note(g, me, Place::Colony(c.id))
-        );
-        println!("    {}", standings_text(g, Place::Colony(c.id)));
+        println!("    {}", standing_note(g, me, Place::Colony(c.id)));
+        if let Some(line) = standings_text(g, Place::Colony(c.id)) {
+            println!("    {line}");
+        }
         // Ticket #335: the ORBIT a Ship must sit in to touch this place -- its own for a station,
         // low orbit for a Colony on the ground, since low orbit is what touches the ground.
         let reached = if c.in_orbit {
