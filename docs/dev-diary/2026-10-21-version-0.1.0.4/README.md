@@ -475,3 +475,9 @@ first with the word, cut off.
 **Seen and left**: at turn 21 the top bar's first row already runs past 1280 ("Earth 8.30B ·
 Spa..."), and the clock, placed from that row's width, is drawn half off the screen; the Prospectors'
 bar does the same at turn 21 without this ticket.
+
+**After the close**, the designer: *"there are too many characters cut everything back to 0/4"*.
+The label is the run alone, "0/4"; the glyph went with the figures, which are the hover's. The
+clock fits on the row again at turn 1.
+
+![The meter, the run alone](ticket-595/run-only-meter.png)

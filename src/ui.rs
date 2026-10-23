@@ -11265,11 +11265,9 @@ fn condensed_fund(ui: &mut Ui, session: &Session, game: &Game, actions: &mut Vec
             ui.horizontal(|ui| {
                 ui.spacing_mut().item_spacing.x = 6.0;
                 fill_bar(ui, colour, if world > 0.0 { sink / world } else { 1.0 }, RAIL).on_hover_text(hover.clone());
-                // The glyph for the word, as the funds lead with theirs: the word did not fit at 1280.
-                if let Some(image) = Icons::from_ctx(ui.ctx(), "emissions", 15.0) {
-                    ui.add(image).on_hover_text(hover.clone());
-                }
-                ui.label(RichText::new(format!("{world:.0} (yours {yours:.0}) · Sink {sink:.0} · run {run} of {bar:.0}")).weak()).on_hover_text(hover);
+                // The run alone beside the bar, at the designer's word ("too many characters"); the
+                // figures are the hover's.
+                ui.label(RichText::new(format!("{run}/{bar:.0}")).weak()).on_hover_text(hover);
             });
         }
         _ => {}

@@ -356,10 +356,10 @@ the world's, the Sink same place the stock pile meter is shown for prospectors/a
 
 - **The meter**, on the top bar's second row where the Archivists' and Prospectors' funds stand: a
   bar the funds' size in the Custodians' colour, filled by the Sink over the world's Emissions last
-  turn (full when the world is under the Sink); then the Emissions glyph and *"41 (yours 6) · Sink
-  8 · run 0 of 4"*, whole figures. The glyph stands for the word "Emissions", which did not fit at
-  1280 wide, at the designer's word.
-- **The hover**, on the bar, glyph and figures: *"The world emitted 40.7 ppm last turn; you 5.8. /
+  turn (full when the world is under the Sink); then the run alone, *"0/4"*, at the designer's word
+  after the review ("too many characters"). Built first as the Emissions glyph and *"41 (yours 6) ·
+  Sink 8 · run 0 of 4"*, and before that with the word "Emissions", which did not fit at 1280.
+- **The hover**, on the bar and the run: *"The world emitted 40.7 ppm last turn; you 5.8. /
   The Sink took 8.0 (Scrubbers 0). / Four turns in a row under the Sink is Stabilization: run 0 of
   4."*
 - **The tool**: a Custodians' line after the Research Lead's, *"Stabilization: 32.7 ppm over the
