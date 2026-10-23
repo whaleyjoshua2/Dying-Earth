@@ -346,3 +346,24 @@ Ticket: [The Region card's lines: "Standing 40 (yours)", the calm line, "nobody 
 - **The calm line** was already gone (#573): nothing below the Army threshold, on the card, in the
   tool and in the Report. The designer's "show only when not calm" stands as the rule.
 - No rule moves; no sweep.
+
+## 14. The Custodians' Stabilization meter
+
+Ticket: [The Custodians' Stabilization meter: your Emissions, the world's, the Sink](https://github.com/whaleyjoshua2/Dying-Earth/issues/595).
+
+The designer: *"The Custodians need a visible plan. Show a 'Stabilization meter': your emissions,
+the world's, the Sink same place the stock pile meter is shown for prospectors/archivists."*
+
+- **The meter**, on the top bar's second row where the Archivists' and Prospectors' funds stand: a
+  bar the funds' size in the Custodians' colour, filled by the Sink over the world's Emissions last
+  turn (full when the world is under the Sink); then the Emissions glyph and *"41 (yours 6) · Sink
+  8 · run 0 of 4"*, whole figures. The glyph stands for the word "Emissions", which did not fit at
+  1280 wide, at the designer's word.
+- **The hover**, on the bar, glyph and figures: *"The world emitted 40.7 ppm last turn; you 5.8. /
+  The Sink took 8.0 (Scrubbers 0). / Four turns in a row under the Sink is Stabilization: run 0 of
+  4."*
+- **The tool**: a Custodians' line after the Research Lead's, *"Stabilization: 32.7 ppm over the
+  Sink (Emissions 40.7, yours 5.8, Sink 8.0), run 0 of 4"*. The Victory window's and the Climate
+  Panel's Stabilization lines are unchanged.
+- The Arkwrights still have nothing in that place; a line in the map's fog.
+- No rule moves; no sweep.

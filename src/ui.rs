@@ -11249,6 +11249,29 @@ fn condensed_fund(ui: &mut Ui, session: &Session, game: &Game, actions: &mut Vec
                 place_venture_share(ui, session, game, actions, resp, share, standing, pending_set);
             });
         }
+        // Ticket #595 (version 0.1.0.4), at the designer's word: the Custodians' plan where the
+        // others' funds stand -- the Sink against the world's Emissions last turn, full when the
+        // world is under it, with their own Emissions and the run beside it.
+        FactionKind::Custodians => {
+            let b = &game.climate.last;
+            let (world, yours, sink) = (b.total(), b.by_seat[me.index()], b.total_sink());
+            let run = game.seat(me).stabilization_run;
+            let bar = game.tables.faction(FactionKind::Custodians).victory_first.bar;
+            let hover = format!(
+                "The world emitted {world:.1} ppm last turn; you {yours:.1}.\nThe Sink took {sink:.1} (Scrubbers {}).\nFour turns in a row under the Sink is Stabilization: run {run} of {bar:.0}.",
+                figure(b.scrubbers)
+            );
+            ui.add_space(10.0);
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = 6.0;
+                fill_bar(ui, colour, if world > 0.0 { sink / world } else { 1.0 }, RAIL).on_hover_text(hover.clone());
+                // The glyph for the word, as the funds lead with theirs: the word did not fit at 1280.
+                if let Some(image) = Icons::from_ctx(ui.ctx(), "emissions", 15.0) {
+                    ui.add(image).on_hover_text(hover.clone());
+                }
+                ui.label(RichText::new(format!("{world:.0} (yours {yours:.0}) · Sink {sink:.0} · run {run} of {bar:.0}")).weak()).on_hover_text(hover);
+            });
+        }
         _ => {}
     }
 }
@@ -11276,18 +11299,25 @@ fn condensed_rail<T: egui::emath::Numeric>(ui: &mut Ui, value: &mut T, width: f3
     resp
 }
 
-/// Ticket #382: **the fill bar**, the fund against its bar in the Faction's colour, `width` by
-/// sixteen with the figures beside it -- the shape of `research_race_bar`, figures and all. Not
-/// written on the fill: no text reads on both Factions' fills, and the race bar sets the precedent.
-fn fund_bar(ui: &mut Ui, colour: Color32, fund: f64, bar: f64, width: f32, what: &str) {
+/// The bar itself, `width` by fourteen, filled `share` of the way in `colour`: the funds' and, since
+/// ticket #595 (version 0.1.0.4), the Custodians' Sink against the world's Emissions.
+fn fill_bar(ui: &mut Ui, colour: Color32, share: f64, width: f32) -> egui::Response {
     let (rect, resp) = ui.allocate_exact_size(egui::vec2(width, 14.0), egui::Sense::hover());
     let painter = ui.painter_at(rect);
     painter.rect_filled(rect, 3.0, Color32::from_gray(45));
-    let share = if bar > 0.0 { (fund / bar).clamp(0.0, 1.0) as f32 } else { 0.0 };
+    let share = share.clamp(0.0, 1.0) as f32;
     if share > 0.0 {
         painter.rect_filled(egui::Rect::from_min_size(rect.min, egui::vec2(rect.width() * share, rect.height())), 3.0, colour);
     }
     painter.rect_stroke(rect, 3.0, egui::Stroke::new(1.0, Color32::from_gray(120)), egui::StrokeKind::Inside);
+    resp
+}
+
+/// Ticket #382: **the fill bar**, the fund against its bar in the Faction's colour, `width` by
+/// sixteen with the figures beside it -- the shape of `research_race_bar`, figures and all. Not
+/// written on the fill: no text reads on both Factions' fills, and the race bar sets the precedent.
+fn fund_bar(ui: &mut Ui, colour: Color32, fund: f64, bar: f64, width: f32, what: &str) {
+    let resp = fill_bar(ui, colour, if bar > 0.0 { fund / bar } else { 0.0 }, width);
     let hover = format!("{what}: {} of the {} the Victory Condition asks.", figure(fund), figure(bar));
     resp.on_hover_text(hover.clone());
     ui.label(RichText::new(format!("{} of {}", figure(fund), figure(bar))).weak()).on_hover_text(hover);

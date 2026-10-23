@@ -1430,6 +1430,22 @@ fn print_board(g: &Game) {
             if s.venture_reward_last_turn > 0.0 { format!(", {} reward", figure(s.venture_reward_last_turn)) } else { String::new() }
         );
     }
+    if s.kind == FactionKind::Custodians {
+        // Ticket #595 (version 0.1.0.4), at the designer's word: the Custodians' plan in figures --
+        // the world's Emissions last turn, their own, the Sink and the run.
+        let b = &g.climate.last;
+        let gap = b.total() - b.total_sink();
+        println!(
+            "Stabilization: {:.1} ppm {} the Sink (Emissions {:.1}, yours {:.1}, Sink {:.1}), run {} of {:.0}",
+            gap.abs(),
+            if gap < 0.0 { "under" } else { "over" },
+            b.total(),
+            b.by_seat[me.index()],
+            b.total_sink(),
+            s.stabilization_run,
+            t.faction(FactionKind::Custodians).victory_first.bar
+        );
+    }
     if s.kind == FactionKind::Archivists {
         // Ticket #192 (version 0.08.0): what an `upload` line needs to know -- where the Archive
         // stands, whether it is complete (nothing may be uploaded until it is), and how many

@@ -444,3 +444,34 @@ of Egypt's card before and after. No new term, so no glossary entry.
 - **China, held**: unchanged, the Custodians' chip and "A rival takes it at 70".
 
 ![China's card](ticket-598/held.png)
+
+## The Custodians' Stabilization meter
+
+Ticket [#595](https://github.com/whaleyjoshua2/Dying-Earth/issues/595), spec §14. Two rounds: the
+designer took each recommendation in the first, then, with the label cut off at 1280 wide, the
+Emissions glyph in place of the word.
+
+Measured first, three seeds with the Custodians on the computer: the world's Emissions 41 at turn 1
+and 70 to 90 by turn 21, the Sink 8 rising to 10 to 19 with Scrubbers, the Custodians' own 6 falling
+under 1. So the bar sits a tenth to a fifth full most of a game: what it shows is how far off the
+run is.
+
+No test reads these lines: the meter is the window's and the line the tool's. The witness was the
+tool's board before and after (no Custodians' line, then one), and the top bar's pictures, the
+first with the word, cut off.
+
+- **With the word**: "Emissions 41 (yours 6) · Sink 8 · run 0 of" -- the label ran off the edge.
+
+![The meter with the word](ticket-595/with-the-word.png)
+
+- **With the glyph**, turn 1 and turn 21:
+
+![The meter at turn 1](ticket-595/turn-1-meter.png)
+
+![The meter at turn 21](ticket-595/turn-21-meter.png)
+
+![The board at turn 21](ticket-595/turn-21.png)
+
+**Seen and left**: at turn 21 the top bar's first row already runs past 1280 ("Earth 8.30B ·
+Spa..."), and the clock, placed from that row's width, is drawn half off the screen; the Prospectors'
+bar does the same at turn 21 without this ticket.
