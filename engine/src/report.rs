@@ -614,7 +614,8 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     // level of a pair involving the player, one line each way.
     ("relations_they", &["first", "level", "more"]),
     ("relations_you", &["list"]),
-    ("uploaded", &["n", "colony", "total"]),
+    ("uploaded", &["n", "place"]),
+    ("uploaded_rival", &["faction", "n", "place"]),
     // Ticket #332 (version 0.09.0): the fire takes the Region's Widgets for the turn.
     ("launch_pad_fire", &["place", "widgets"]),
     ("game_over_win", &["turn", "faction", "note"]),

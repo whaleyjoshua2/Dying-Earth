@@ -390,3 +390,24 @@ turn 1 ... replace turn one report with this overview"*.
   `show` still prints the Report.
 - The Faction selection card is unchanged.
 - No rule moves; no sweep.
+
+## 16. The Upload as a story moment
+
+Ticket: [The Upload as a story moment: a line naming the place and its people, and "10 remembered here"](https://github.com/whaleyjoshua2/Dying-Earth/issues/587).
+
+The designer: *"Make the Upload a story moment: a line naming the place and count ('Ten of Mare
+Imbrium's people were read into the Archive'), and the colony card keeps '10 remembered here'."*
+
+- **The Report line** names the place by its slot alone and the people read in, as a numeral:
+  the player's *"4 of Olympus Mons's people were read into the Archive."*, under Your works; a
+  rival's *"Archivists read 4 of Olympus Mons's people into the Archive."*, under In space, with no
+  "The" before the Faction's name, as every Report line since ticket #463. The "{total} in all" is
+  gone; the card and the Victory line carry it. It never headlines, and there is no Moment.
+- **The card**: *"10 remembered here"* in place of "Uploaded: 10 of 16", *"0 remembered here"*
+  before the first; its hover *"Of 16 for Victory."*
+- **The Upload button's hover**: *"Read into the Archive; 8 stay. Cannot be undone."*, the figure
+  the people living at the place now.
+- **The rival paragraph** ("uploaded 4 Colonists at ...") is unchanged, at the designer's word, and
+  so is the log line. **The tool**'s Archive line ends "10 remembered here".
+- Once Colonies carry names, the line reads the name; that belongs to the naming ticket.
+- No rule moves; no sweep.

@@ -72,7 +72,7 @@ _Avoid_: first blood, land grab, colonization bonus, discovery bonus, claim
 
 **Upload**:
 Reading Colonists at the Archive's own place into it, from version 0.08.0. An order, because it is irreversible, and free, because the Archive's Research and Energy are already its price; it needs the Archive complete, it draws only from the people living where the Archive stands, and it may be done in batches. An uploaded Colonist LEAVES THE LIVING POPULATION -- the place shrinks as it uploads -- and is counted for the Archivists' Victory Condition for good.
-Since version 0.1.0.3 at most four Colonists upload in a turn, pending Uploads counted, and the bar is sixteen; each Colonist uploaded adds one Energy a turn to the Archive's draw.
+Since version 0.1.0.3 at most four Colonists upload in a turn, pending Uploads counted, and the bar is sixteen; each Colonist uploaded adds one Energy a turn to the Archive's draw. Since version 0.1.0.4 the Archive's Colony card counts them as *remembered here*, and the Report names the place and its people read in.
 _Avoid_: digitize, archive (that is the Module), store, ascend, sacrifice
 
 **Colony**:

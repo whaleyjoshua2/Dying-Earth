@@ -25061,3 +25061,27 @@ fn each_faction_names_its_signature_moves() {
     assert_eq!(t.opening_moves(FactionKind::Arkwrights, false), "Colony Ships to four Bodies");
     assert_eq!(t.opening_moves(FactionKind::Archivists, true), "Labs + Directive; Archive");
 }
+
+/// Ticket #587 (version 0.1.0.4): the Upload as a story moment, at the designer's word. The line
+/// names the place and its people, and for the player it reads under Your works.
+#[test]
+fn an_upload_names_the_place_and_its_people() {
+    for player in [FactionKind::Archivists, FactionKind::Custodians] {
+        let mut g = Game::new(tables(), NewGame { seed: 7, player, player_is_ai: false, player_start: StateId::EastAsia });
+        let arc = seat_of(&g, FactionKind::Archivists);
+        let research = g.tables.archive.research;
+        let cid = archive_at(&mut g, arc, BodyId::Mars, research, 10);
+        g.seats[arc.index()].uploaded = 0;
+        g.report.lines.clear();
+        g.commit_orders(arc, &[Order::Upload { colony: cid, n: 4 }]);
+        let place = g.slot_name(g.colony(cid).unwrap());
+        let line = g.report.lines.iter().find(|l| l.by == Some(arc)).expect("the Upload's line");
+        if arc == Seat(0) {
+            assert_eq!(line.text, format!("4 of {place}'s people were read into the Archive."));
+            assert_eq!(line.kind, LineKind::YourWorks);
+        } else {
+            assert_eq!(line.text, format!("Archivists read 4 of {place}'s people into the Archive."));
+            assert_eq!(line.kind, LineKind::Archive);
+        }
+    }
+}

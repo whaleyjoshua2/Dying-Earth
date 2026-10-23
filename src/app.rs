@@ -371,6 +371,9 @@ pub enum StackBlock {
     /// stranded warning and the dry warning all stand. It is far enough down the card that no
     /// picture had ever reached it.
     Tanks,
+    /// Ticket #587 (version 0.1.0.4): the Archive's Upload row on a Colony's card, its count and
+    /// its button, which stand below a 720-high frame.
+    Archive,
 }
 
 /// Ticket #146 (version 0.07.3): what is clicked among a Region card's slot boxes -- a standing

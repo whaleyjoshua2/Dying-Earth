@@ -3184,8 +3184,15 @@ impl Game {
                         let total = self.seat(seat).uploaded;
                         let line = format!("{} uploaded {} Colonists into the Archive at {}; {} in all.", self.seat_name(seat), taken, place, total);
                         self.log(line);
-                        let text = self.say("uploaded", &[("n", crate::counted(taken, "Colonist", "Colonists")), ("colony", place), ("total", total.to_string())]);
-                        self.report_line_of(seat, LineKind::Archive, LineKind::Archive, Some(ReportPlace::Colony(*colony)), text);
+                        // Ticket #587 (version 0.1.0.4): a story moment, at the designer's word: the
+                        // place by its own name and the people read in, the player's under Your works.
+                        let site = self.colony(*colony).map(|c| self.slot_name(c)).unwrap_or_default();
+                        let text = if seat == Seat(0) && !self.spectator {
+                            self.say("uploaded", &[("n", taken.to_string()), ("place", site)])
+                        } else {
+                            self.say("uploaded_rival", &[("faction", self.seat_name(seat)), ("n", taken.to_string()), ("place", site)])
+                        };
+                        self.report_line_of(seat, LineKind::YourWorks, LineKind::Archive, Some(ReportPlace::Colony(*colony)), text);
                     }
                 }
                 // Ticket #489 (version 0.09.9): the four leave their source now, as Pioneers sent by

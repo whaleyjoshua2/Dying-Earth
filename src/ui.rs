@@ -8892,7 +8892,12 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
                 let uploaded = game.seat(Seat(0)).uploaded;
                 let already: u32 = session.pending.iter().map(|o| if let Order::Upload { colony: c, n } = o { if *c == cid { *n } else { 0 } } else { 0 }).sum();
                 let room = game.uploadable_at(cid, already);
-                ui.label(format!("Uploaded: {uploaded} of {bar}"));
+                // Ticket #587 (version 0.1.0.4): the count is a place's memory, at the designer's
+                // word; the bar it is measured against is in the hover and on the Victory line.
+                let remembered = ui.label(format!("{uploaded} remembered here")).on_hover_text(format!("Of {bar} for Victory."));
+                if view.stack_scroll == Some(StackBlock::Archive) {
+                    remembered.scroll_to_me(Some(egui::Align::Center));
+                }
                 if room > 0 {
                     // The review of #565: the one button is sized to the turn's cap less what is
                     // already ordered, or with eight living it offered "Upload 8" alone and the door
@@ -8905,10 +8910,7 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
                         &session.pending,
                         Order::Upload { colony: cid, n },
                         &format!("Upload {}", counted(n, "Colonist", "Colonists")),
-                        Some(format!(
-                            "They are read into the Archive and leave the living population here: {} live at this place now. It cannot be undone once the turn ends, and the uploaded can never be lost -- not to a raid, a crowding death or a handover.",
-                            game.colony(cid).map(|c| c.colonists).unwrap_or(0)
-                        )),
+                        Some(format!("Read into the Archive; {} stay. Cannot be undone.", game.colony(cid).map(|c| c.colonists).unwrap_or(0))),
                         actions,
                     );
                 } else {

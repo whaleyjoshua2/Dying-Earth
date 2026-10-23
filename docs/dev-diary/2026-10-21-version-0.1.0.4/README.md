@@ -501,3 +501,33 @@ new glossary entry, and the Report's entry says it is not raised on turn one.
 ![As the Prospectors](ticket-594/prospectors.png)
 
 ![As the Custodians](ticket-594/custodians.png)
+
+## The Upload as a story moment
+
+Ticket [#587](https://github.com/whaleyjoshua2/Dying-Earth/issues/587), spec §16. One round of
+seven questions: the designer took the line, the card's "remembered here" (with "0 remembered
+here" before the first), the button's cut hover; turned down a Moment; and kept the rival
+paragraph as it was. The tool's line and the naming of Colonies were not answered; I built the
+recommendations (the tool reads "remembered here", and the slot name stands until Colonies carry
+their own).
+
+The test was written first and watched red (the old *"4 Colonists uploaded at Olympus Mons on
+Mars: 4 in all."*), then green. The suite's word ceiling on the Report's templates then caught the
+rival line's "The Archivists": Faction names have gone without "The" since ticket #463, so the
+rival's line reads *"Archivists read 4 of ..."*, a departure from the wording I put to the
+designer. The words stayed under the ceiling. Two shot aids were added: `uploaded:N` and
+`upload:1` beside `archive:2`, and `scroll:archive` for the card's Upload row.
+
+- **The Report** after four were read in, under Your works ("Colonies lost 1" is the staged
+  Colony's, not the Upload's):
+
+![The Report](ticket-587/report-your-works.png)
+
+- **The card** at ten, and before the first:
+
+![Ten remembered](ticket-587/card-ten-remembered.png)
+
+![None yet](ticket-587/card-none-yet.png)
+
+- **The card after the Upload** ([`ticket-587/card-after-upload.png`](ticket-587/card-after-upload.png)):
+  "4 remembered here", three living, the button offering three.

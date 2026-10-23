@@ -201,8 +201,10 @@ build_lost = "{building} at {place} had no slot and was lost."
 colonists_no_room = "{n} at {colony} had no room and {were} lost."
 # Ticket #191 (version 0.08.0): Relations. Said in the OFFENDER's Report on a turn a rival's view of
 # them fell, so a player is sent to the grid on the Victory window rather than expected to watch it.
-# Ticket #192 (version 0.08.0): the Upload, in the Report.
-uploaded = "{n} uploaded at {colony}: {total} in all."
+# Ticket #192 (version 0.08.0): the Upload, in the Report. Ticket #587 (version 0.1.0.4): a story
+# moment, at the designer's word, naming the place and its people; the total is the card's.
+uploaded = "{n} of {place}'s people were read into the Archive."
+uploaded_rival = "{faction} read {n} of {place}'s people into the Archive."
 # Ticket #362 (version 0.09.1): only a pair INVOLVING THE PLAYER, only when it falls into a worse
 # named level, both directions, folded one line each -- at the designer's word, "quiet the 'has
 # not forgiven' spam". `relations_fell` ("The {victim} have not forgiven the {offender}.") is retired.

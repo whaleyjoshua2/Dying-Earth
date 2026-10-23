@@ -1459,7 +1459,7 @@ fn print_board(g: &Game) {
             ),
             None => "is not built at any Colony of yours".to_string(),
         };
-        println!("Archive fund: {} of a cap of {}; the Archive {stands}; {} uploaded so far", s.archive_fund, g.archive_fund_cap(me), s.uploaded);
+        println!("Archive fund: {} of a cap of {}; the Archive {stands}; {} remembered here", s.archive_fund, g.archive_fund_cap(me), s.uploaded);
     }
     print_standing(g);
 

@@ -445,7 +445,17 @@ fn build_board(session: &mut Session) {
             };
             g.seats[0].stockpile.materials = 120.0;
             g.seats[0].stockpile.energy = 60.0;
+            // Ticket #587 (version 0.1.0.4): `uploaded:N`, a count already read in, for the card's
+            // "N remembered here".
+            g.seats[0].uploaded = std::env::args().find_map(|a| a.strip_prefix("uploaded:").and_then(|v| v.parse().ok())).unwrap_or(0);
             ARCHIVE_COLONY.with(|c| c.set(Some(id)));
+            // Ticket #587 (version 0.1.0.4): `upload:1`, four read in and the turn ended, so the
+            // Report (`menus:1`) carries the Upload's line.
+            if std::env::args().any(|a| a == "upload:1") {
+                let mut orders: [Vec<Order>; 4] = std::array::from_fn(|_| Vec::new());
+                orders[0].push(Order::Upload { colony: id, n: 4 });
+                g.end_turn(orders).expect("a Tech is picked before the turn ends");
+            }
         }
         // `battery:1` (a building aid, ticket #324, version 0.08.8): seat 0 gets a Colony on Mars
         // with a Battery standing, two hits on it, and seat 1 a Frigate in Mars orbit on Hold; so
@@ -2286,6 +2296,8 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
             Some("orbits") => Some(StackBlock::ChangeOrbit),
             // Ticket #346 (version 0.09.1): the Tanks block, which carries the dry warning.
             Some("tanks") => Some(StackBlock::Tanks),
+            // Ticket #587 (version 0.1.0.4): the Archive's Upload row on the Colony's card.
+            Some("archive") => Some(StackBlock::Archive),
             _ => None,
         });
         // Ticket #337 (version 0.09.0): the turn's Choice Card stands in every picture of the run,
