@@ -7079,7 +7079,8 @@ fn influence_row(ui: &mut Ui, game: &Game, session: &Session, view: &mut ViewSta
             RichText::new(format!(
                 "Blame: your threshold here is {}, not {} (share {:.2}, x{:.2}). Emit less, or take back what you emit, and it comes down.",
                 threshold,
-                game.influence_threshold(target),
+                // Ticket #591: the Regions-held term on both sides, so the gap is Blame's alone.
+                game.influence_threshold(target) + game.regions_held_term(Seat(0), target),
                 game.blame_share(Seat(0)),
                 blame_mult
             ))
@@ -7122,7 +7123,13 @@ fn threshold_breakdown(ui: &mut Ui, game: &Game, target: Place) {
     let mut line = match target {
         Place::State(s) => {
             let size = game.tables.state(s).size as i64;
-            format!("Threshold {threshold} - {} + {} for size {size}", t.state_threshold_base, t.state_threshold_per_size * size)
+            let mut line = format!("Threshold {threshold} - {} + {} for size {size}", t.state_threshold_base, t.state_threshold_per_size * size);
+            // Ticket #591 (version 0.1.0.4), at the designer's word: the Regions-held term, hidden at +0.
+            let held = game.regions_held_term(Seat(0), target);
+            if held > 0 {
+                line.push_str(&format!(" + {held} for Regions held"));
+            }
+            line
         }
         Place::Colony(c) => {
             let people = game.colony(c).map(|x| x.colonists).unwrap_or(0) as i64;
@@ -7355,7 +7362,9 @@ fn standings_row(ui: &mut Ui, game: &Game, session: &Session, target: Place, thr
         // never defines it.
         let t = &game.tables.influence;
         let from = match target {
-            Place::State(s) => format!("{}, plus {} a size step; this state's size is {}.", t.state_threshold_base, t.state_threshold_per_size, game.tables.state(s).size),
+            // Ticket #591 (version 0.1.0.4), at the designer's word: the Regions-held term in the rule,
+            // and the size clause cut (the breakdown line beside it names the size).
+            Place::State(_) => format!("{}, plus {} a size step and {} a Region you hold past your first.", t.state_threshold_base, t.state_threshold_per_size, t.threshold_per_region_held),
             // Ticket #336 (version 0.09.0): the base is the station's on a station and the Colony's
             // on the ground, and one replaces the other, so the sentence names one figure and not two.
             Place::Colony(_) => format!(

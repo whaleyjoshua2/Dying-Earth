@@ -24923,3 +24923,40 @@ fn the_tools_help_has_no_ticket_or_version_references() {
     assert!(!help.contains("icket #") && !hash_digit && !help.contains("version 0."), "history in the help");
     assert!(help.contains("for Ducats, twice its Materials' worth"), "the -ducats line");
 }
+
+/// Ticket #591 (version 0.1.0.4), at the designer's word: **a neutral Region's threshold rises 1 for
+/// every Region the taker holds past its first** -- the home Region counted as held, an Occupied one
+/// not. Flat, after Green Consensus and Blame; a held Region's price and every Colony's untouched.
+#[test]
+fn a_neutral_regions_threshold_rises_one_for_every_region_held_past_the_first() {
+    let mut g = fresh();
+    let t = g.tables.influence.clone();
+    assert_eq!(t.threshold_per_region_held, 1, "the table");
+    let neutral: Vec<StateId> = StateId::ALL.into_iter().filter(|s| g.state(*s).control.controller().is_none()).collect();
+    let (target, more) = (neutral[0], [neutral[1], neutral[2]]);
+    let place = Place::State(target);
+    let bare = t.state_threshold_base + t.state_threshold_per_size * g.tables.state(target).size as i64;
+    let rival = g.controlled_states(Seat(1))[0];
+    // The holder's Standing at nought, so the threshold is the figure that binds on its Region.
+    g.seats[1].influence.insert(Place::State(rival), 0);
+    let rival_before = g.influence_needed_for(Seat(0), Place::State(rival));
+    let colony = g.colonies.iter().find(|c| c.control.director() == Some(Seat(1))).map(|c| Place::Colony(c.id)).expect("a rival's station");
+    let colony_before = g.influence_needed_for(Seat(0), colony);
+    // One Region held, the home: the bare threshold.
+    assert_eq!(g.controlled_states(Seat(0)).len(), 1, "the premise: the home alone");
+    assert_eq!(g.influence_threshold_for(Seat(0), place), bare, "one held: +0");
+    // Three held: +10, in the price as in the threshold, and nothing on a rival's count.
+    for s in more {
+        g.state_mut(s).control = Control::Controlled(Seat(0));
+    }
+    assert_eq!(g.influence_threshold_for(Seat(0), place), bare + 2, "three held: +2");
+    assert_eq!(g.influence_needed_for(Seat(0), place), bare + 2, "the price the Resolution and the computer read");
+    assert_eq!(g.influence_threshold_for(Seat(1), place), bare, "the rival holds one: +0");
+    // Flat: after Green Consensus.
+    with_tech(&mut g, TechId::GreenConsensus);
+    assert_eq!(g.influence_threshold_for(Seat(0), place), (bare as f64 * 0.75 + 1e-9).floor() as i64 + 2, "flat after Green Consensus");
+    g.research.done.retain(|x| *x != TechId::GreenConsensus);
+    // A held Region and a Colony: untouched.
+    assert_eq!(g.influence_needed_for(Seat(0), Place::State(rival)), rival_before, "a held Region's price unchanged");
+    assert_eq!(g.influence_needed_for(Seat(0), colony), colony_before, "a Colony's price unchanged");
+}

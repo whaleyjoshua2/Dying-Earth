@@ -292,6 +292,13 @@ fn build_board(session: &mut Session) {
                 g.state_mut(home).facilities.push(Facility::new(kind));
             }
         }
+        // `held:<state>` (a building aid, ticket #591): seat 0 controls the named Region, so a neutral
+        // Region's card shows the Regions-held term. By the enum's spelling, case ignored; any number.
+        for id in std::env::args().filter_map(|a| a.strip_prefix("held:").map(str::to_owned)) {
+            if let Some(s) = StateId::ALL.into_iter().find(|s| format!("{s:?}").eq_ignore_ascii_case(&id)) {
+                g.state_mut(s).control = Control::Controlled(Seat(0));
+            }
+        }
         // `researched:<tech>` (a building aid, ticket #559): the named Tech stands done, so a picture
         // can show what waits behind it -- the Wind Farm on a build list, say. By the enum's spelling,
         // case and underscores ignored: `researched:clean_power`. Any number may be given.

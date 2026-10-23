@@ -272,3 +272,27 @@ The designer: *"Race to mars"*.
   - *Second to the Moon goes to Mars*, a seat whose first Ship stood behind a rival's sending it to
     Mars: Mars at a median turn 15 and the far Bodies back (Phobos 71, Vesta 31), but the Custodians
     gave the Moon to the Prospectors, 19 / 51 / 3 / 7 and none.
+
+## 11. A neutral Region's threshold rises for every Region the taker holds
+
+Ticket: [A neutral Region's threshold rises 5 for every Region the taker holds](https://github.com/whaleyjoshua2/Dying-Earth/issues/591).
+
+The designer: *"scale with the number of Regions you already hold"*.
+
+- **A neutral Region's threshold rises 1 for every Region the taker holds past its first**
+  (`threshold_per_region_held`), at the designer's word, for every Faction alike. The home Region
+  counts as held; an Occupied Region does not. One held is +0, three +2.
+- **Flat**, added after Green Consensus and Blame. **Neutral Regions only**: a held Region's price,
+  and every Colony's and station's, is untouched.
+- **The card** adds the term to the breakdown line, hidden at +0: *Threshold 42 - 20 + 20 for size 2
+  + 2 for Regions held*. The definition hover reads *"20, plus 10 a size step and 1 a Region you hold
+  past your first."* Blame's note on the card leaves the term out of Blame's gap.
+- **Swept** (`sweeps/ticket-591.txt`): **18 / 45 / 5 / 11 and 1 collapse**, from 32 / 33 / 4 / 10
+  and 1. The term falls on the Custodians' Victory: a Scrubber stands only in a Region they hold,
+  and with fewer Regions the Sink no longer outruns the Emissions for the four phases of a
+  Stabilization run. Scrubbers built 2,325, from 2,570.
+- **Swept and taken back**, at the designer's word:
+  - *+5* (`sweeps/ticket-591-plus5.txt`): 7 / 57 / 4 / 12 and none; Scrubbers 2,047.
+  - *+2* and *+3*: 9 / 52 / 1 / 17 and 1; 8 / 51 / 5 / 16 and none.
+  - *+5 with the Custodians left out*, my misreading of the designer's answer
+    (`sweeps/ticket-591-custodians-exempt.txt`): 35 / 34 / 2 / 9 and none.

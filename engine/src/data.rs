@@ -1154,6 +1154,9 @@ pub struct InfluenceTable {
     pub allotment_base: i64,
     pub state_threshold_base: i64,
     pub state_threshold_per_size: i64,
+    /// Ticket #591 (version 0.1.0.4): what a neutral Region's threshold rises, for the taker, for
+    /// every Region it holds past its first.
+    pub threshold_per_region_held: i64,
     pub colony_threshold_per_colonist: i64,
     /// Ticket #336 (version 0.09.0): the base under every place off Earth, so an empty one is not
     /// free to take. `station_threshold_base` REPLACES it on a station rather than adding to it.

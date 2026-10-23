@@ -3744,7 +3744,18 @@ impl Game {
         } else {
             1.0
         };
-        self.threshold_with(target, m * self.blame_threshold_multiplier_on(seat, target))
+        self.threshold_with(target, m * self.blame_threshold_multiplier_on(seat, target)) + self.regions_held_term(seat, target)
+    }
+
+    /// Ticket #591 (version 0.1.0.4), at the designer's word: what a NEUTRAL Region's threshold rises
+    /// for this seat -- `threshold_per_region_held` for every Region it controls past its first, the
+    /// home counted as held, an Occupied Region not. Flat, outside the multipliers; nought on a held
+    /// Region and on every Colony and station.
+    pub fn regions_held_term(&self, seat: Seat, target: Target) -> i64 {
+        match target {
+            Place::State(s) if self.state(s).control.controller().is_none() => self.tables.influence.threshold_per_region_held * (self.controlled_states(seat).len() as i64 - 1).max(0),
+            _ => 0,
+        }
     }
 
     /// Ticket #60: the Standing this seat needs to take `target` as it stands now -- its own

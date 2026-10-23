@@ -333,3 +333,45 @@ orbit over the 21.3 send); the test was watched red there with the lift taken ou
 | Prospectors | 2,221 | 436 | 326 | 1,058 | 352 |
 | Arkwrights | 1,566 | 331 | 257 | 3,184 | 274 |
 | Archivists | 424 | 212 | 58 | 405 | 623 |
+
+## A neutral Region's threshold rises for every Region the taker holds
+
+Ticket [#591](https://github.com/whaleyjoshua2/Dying-Earth/issues/591), spec §11.
+
+Grilled in two rounds. The designer took the term past the first Region held, the home counted and
+an Occupied Region not, flat after Green Consensus and Blame, on neutral Regions alone, the breakdown
+line's term hidden at +0, and the definition hover cut after its first clause. A test was written
+first and watched red (no such figure, then 50 where 60 was wanted); a guard on a held Region's price
+was watched red with the neutral-only condition broken.
+
+**At +5** the sweep ([`sweeps/ticket-591-plus5.txt`](sweeps/ticket-591-plus5.txt)) gave **7 / 57 /
+4 / 12 and none**, from 32 / 33 / 4 / 10 and 1. The designer asked why first. A throwaway probe
+played every game of the batch with the term at 0 and at 5: every Custodian win at 0 came with a
+Stabilization run of four, and with the term the run almost never formed, the net Emissions at the
+end of the lost games turning from below the Sink to above it. A Scrubber stands only in a Region the
+Custodians hold; Scrubbers built fell from 2,570 to 2,047. The Prospectors did not grow stronger:
+their win turns mostly moved a turn or two later, and they took the games the Custodians stopped
+winning. The designer pointed out that the Prospectors' win leans on Regions too, through each
+Investment Bank's interest, but Colonies off Earth make it up; the Custodians have nothing in place
+of a Scrubber.
+
+Swept at +1, +2 and +3: 18 / 45 / 5 / 11 and 1; 9 / 52 / 1 / 17 and 1; 8 / 51 / 5 / 16 and none.
+Then a correction owed: I read the designer's answer as leaving the Custodians out of the term and
+built and swept that, 35 / 34 / 2 / 9 and none
+([`sweeps/ticket-591-custodians-exempt.txt`](sweeps/ticket-591-custodians-exempt.txt)). They had
+meant +1 across the board for all seats. The exemption came out, the test moved to +1 and was
+watched red on the table and on the home being counted, then green.
+
+- **The sweep** ([`sweeps/ticket-591.txt`](sweeps/ticket-591.txt)), +1 for every seat: **18 / 45 /
+  5 / 11 and 1 collapse**. Custodian Region-turns 20,218, from 21,407; Scrubbers 2,325.
+
+| | Materials | Fuel | Energy | Ducats | Research |
+|---|---|---|---|---|---|
+| Custodians | 2,080 | 733 | 604 | 1,569 | 1,392 |
+| Prospectors | 2,446 | 471 | 309 | 1,139 | 403 |
+| Arkwrights | 1,604 | 344 | 258 | 3,528 | 302 |
+| Archivists | 497 | 222 | 54 | 441 | 670 |
+
+![India's card with three Regions held](ticket-591/card-three-held.png)
+
+With one Region held the term is hidden ([`ticket-591/card-one-held.png`](ticket-591/card-one-held.png)).
