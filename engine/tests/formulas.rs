@@ -25503,7 +25503,8 @@ fn ticket_613_one_more_colony_slot_on_the_moon_phobos_and_deimos() {
         let s = &t.body(b).slots;
         for i in 0..s.len() {
             for j in 0..i {
-                assert!(s[i].name != s[j].name && ((s[i].lon - s[j].lon).abs() > 5.0 || (s[i].lat - s[j].lat).abs() > 5.0), "{:?}: {} and {} sit together", b, s[i].name, s[j].name);
+                let dlon = ((s[i].lon - s[j].lon).abs() + 180.0).rem_euclid(360.0) - 180.0; // the shorter way round
+                assert!(s[i].name != s[j].name && (dlon.abs() > 5.0 || (s[i].lat - s[j].lat).abs() > 5.0), "{:?}: {} and {} sit together", b, s[i].name, s[j].name);
             }
         }
     }

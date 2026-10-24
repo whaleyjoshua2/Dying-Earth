@@ -113,6 +113,8 @@ the names as proposed, *"those three"*.
   Phobos's third **Todd** (lon -153, lat -9), Deimos's second **Voltaire** (lon 3.5, lat -22). A slot
   carries no yield of its own; the Body's yields are per Colony, and the computer reads the free slots
   from the table, so the Moon stays open one founding longer and the Mars moons offer two more landings.
+  `SAVE_VERSION` stays at 12: a 0.1.0.4 save loads with the new slots free, their yields the Body's
+  flat figures rather than a drawn spread, since the spread is drawn at a game's start.
 - **The pictures** (`ticket-613/slots-moon.png`, `slots-phobos.png`, `slots-deimos.png`): each globe
   with its new site drawn clear of the others.
 - **Swept** (`sweeps/ticket-613.txt`, 20 seeds x four seatings): **29 / 51 / 0 / 0 and 0 collapses**,
