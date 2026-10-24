@@ -214,7 +214,7 @@ emissions = 0.0
 # Ticket #332 (version 0.09.0): the Mine, the Earth Facility that makes Materials now that the
 # Factory makes Widgets. The Factory's old row with the Factory's old output: the Region's Materials
 # lean (x1.5), Deep Mining and the Strip Permit follow the Materials here; Clean Manufacturing stays
-# with the Factory, so a Mine emits its full 1.0. Every Region that starts with a Factory starts
+# with the Factory, so a Mine emits its full figure (0.85 since ticket #604). Every Region that starts with a Factory starts
 # with a Mine beside it (nation_states.toml), so opening Materials are as they were. Appended last:
 # `Tables::facility` indexes FacilityKind by discriminant.
 [[facility]]
