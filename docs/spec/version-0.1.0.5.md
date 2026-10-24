@@ -239,3 +239,26 @@ cut it move to hover q2 yes"*.
 - **The pictures** (`ticket-608/neutral-earth.png`, `own-earth.png`): the hover on a neutral
   Region's "Threshold 40" and on the player's own Region's "A rival takes it at".
 - The tool prints its own Standing line and no breakdown; untouched. No rule moves; no sweep.
+
+## 9. The top bar's Widgets hover in the Fuel's shape, and the Energy hover by place
+
+Ticket: [The top bar's Widgets hover in the Fuel's shape, and the Energy hover naming where it comes from](https://github.com/whaleyjoshua2/Dying-Earth/issues/609).
+
+The designer: *"the n/x configuration in the top bar for widgets what does applied at last resolution
+mean can we clean up that mouse over its very clunky, make it closer to the fuel or duckets one"* and
+*"fix mouse over on power too I want to see where i'm getting it than have a line that just says
+upkeep -x only show moduls in danger of going off line if the next turn will result in negative
+energy"*; on the ticket's questions, *"q1 yes but keep the /n part q2 b"*.
+
+- **Widgets**: the figure stays *"12 / 10"* (made a turn, applied at the last Resolution). The hover
+  is the Fuel's shape: *"Made a turn: 12"*, then one line a maker, *"+4  the Factory (China)"*, *"+4
+  the Region itself (China)"*, *"+4  Core Module (ISS over Earth)"*, closing *"10 went into builds
+  last turn."* The per-place queue lines go; every hatched tile carries its own.
+- **Energy**: the Income keeps, beside its source lines, each place's Energy made and upkeep
+  (`energy_by_place`, a `serde(default)` field recomputed every Income, so `SAVE_VERSION` stays), the
+  Ships' and Armies' upkeep as a place of its own. The hover is one line a place, net, the parts in
+  brackets: *"Last Income:"*, *"+8  China (12 made, 4 upkeep)"*, *"-1  ISS over Earth"*, *"-3  Ships
+  and Armies"*. While this turn's orders forecast a shortfall the figure turns red as before, and what
+  goes dark is appended under the lines, where it replaced them.
+- **The pictures** (`ticket-609/widgets-earth.png`, `energy-earth.png`): the two hovers on turn one.
+- No rule moves; no sweep.

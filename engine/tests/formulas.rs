@@ -25596,3 +25596,31 @@ fn ticket_610_facilities_and_modules_cost_a_fifth_more_widgets_and_a_frigate_six
     assert_eq!(t.tiers.iter().map(|x| x.widgets).collect::<Vec<_>>(), vec![0, 4, 6, 8]);
     assert_eq!((t.industry_level.widgets, t.industry_level.widgets_step), (4, 1));
 }
+
+/// Ticket #609 (version 0.1.0.5), at the designer's word: **Energy by place**, for the top bar's
+/// hover -- one line a place, net, its parts in brackets. The Income keeps, beside its source
+/// lines, each place's Energy made and upkeep, and the Ships' and Armies' upkeep as a place of
+/// its own, so the hover reads figures the engine summed rather than parsing the source names.
+#[test]
+fn ticket_609_the_income_keeps_energy_made_and_upkeep_by_place() {
+    let mut g = game();
+    calm(&mut g);
+    let home = g.directed_states(Seat(0))[0];
+    g.state_mut(home).facilities.push(facility(FacilityKind::PowerPlant)); // the fixture's home holds none
+    g.income_phase();
+    let by_place = g.seat(Seat(0)).energy_by_place.clone();
+    assert!(!by_place.is_empty(), "the home Region at least");
+    let name = g.tables.state(home).name.clone();
+    let (_, made, upkeep) = by_place.iter().find(|(p, _, _)| *p == name).expect("the home Region's line");
+    // Every Energy source line of that place sums to the same figures.
+    let sum_made: f64 = g.seat(Seat(0)).income_sources.iter().filter(|(n, r, v)| *r == Resource::Energy && n.ends_with(&format!(" in {name}")) && *v > 0.0).map(|(_, _, v)| v).sum();
+    let sum_upkeep: f64 = g.seat(Seat(0)).income_sources.iter().filter(|(n, r, v)| *r == Resource::Energy && n.ends_with(&format!(" in {name} (upkeep)")) && *v < 0.0).map(|(_, _, v)| -v).sum();
+    assert!((made - sum_made).abs() < 1e-9 && (upkeep - sum_upkeep).abs() < 1e-9, "{name}: {made} made, {upkeep} upkeep against the source lines {sum_made} and {sum_upkeep}");
+    assert!(*made > 0.0, "a home Region makes Energy: {by_place:?}; sources {:?}", g.seat(Seat(0)).income_sources.iter().filter(|(_, r, _)| *r == Resource::Energy).collect::<Vec<_>>());
+    // The Ships and Armies line carries the unit upkeep alone.
+    let units = by_place.iter().find(|(p, _, _)| p == "Ships and Armies").expect("the units' line");
+    assert_eq!((units.1, units.2), (0.0, g.unit_upkeep(Seat(0))));
+    // And the whole agrees with the Income's Energy, made less upkeep.
+    let net: f64 = by_place.iter().map(|(_, m, u)| m - u).sum();
+    assert!((net - g.seat(Seat(0)).income_last_turn.energy).abs() < 1e-9, "net {net} against the Income's {}", g.seat(Seat(0)).income_last_turn.energy);
+}

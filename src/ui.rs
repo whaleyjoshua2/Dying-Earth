@@ -2866,27 +2866,26 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
             // anything -- counting what this turn's orders do to the Energy -- the figure turns red and
             // its hover names what goes dark, in order, in place of the Last Income breakdown.
             let energy = format!("{} ({})", figure(left.energy), signed(inc.energy));
-            match (!session.spectator).then(|| game.shortfall_forecast(Seat(0), &session.pending)).flatten() {
-                Some(f) => {
-                    let resp = ui
-                        .horizontal(|ui| {
-                            ui.spacing_mut().item_spacing.x = 4.0;
-                            match icons.image("energy", 16.0) {
-                                Some(image) => {
-                                    ui.add(image);
-                                    ui.label(RichText::new(energy).strong().color(SHORT_RED));
-                                }
-                                None => {
-                                    ui.label(RichText::new(format!("Energy {energy}")).strong().color(SHORT_RED));
-                                }
-                            }
-                        })
-                        .response
-                        .interact(egui::Sense::hover());
-                    rule_tip(resp, shortfall_hover(&f));
-                }
-                None => bar_resource(ui, icons, "energy", "Energy", energy, sources(dying_earth_engine::Resource::Energy)),
-            }
+            // Ticket #609 (version 0.1.0.5): one drawing for both cases, through `rule_tip` as the
+            // Widgets figure is, so the hover reads the same shape short or not and the `tip:` aid
+            // can photograph it; the figure turns red while a shortfall is forecast, as before, and
+            // what goes dark is appended under the sources rather than replacing them.
+            let short = (!session.spectator).then(|| game.shortfall_forecast(Seat(0), &session.pending)).flatten();
+            let resp = ui
+                .horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = 4.0;
+                    let text = match icons.image("energy", 16.0) {
+                        Some(image) => {
+                            ui.add(image);
+                            RichText::new(energy).strong()
+                        }
+                        None => RichText::new(format!("Energy {energy}")).strong(),
+                    };
+                    ui.label(if short.is_some() { text.color(SHORT_RED) } else { text });
+                })
+                .response
+                .interact(egui::Sense::hover());
+            rule_tip(resp, energy_bar_hover(game, short.as_ref()));
             ui.separator();
             bar_resource(ui, icons, "ducats", "Ducats", format!("{} ({})", figure(left.ducats), signed(inc.ducats)), sources(dying_earth_engine::Resource::Ducats));
             // Ticket #72: the Prospectors' Fund stood beside their Materials from version 0.05.5,
@@ -6828,17 +6827,45 @@ fn eye_source(game: &Game, seat: Seat, body: BodyId) -> String {
 
 /// Ticket #332: the top bar's Widgets hover -- the two figures explained, then a line per place
 /// the player directs with its rate, its makers and its queue.
+/// Ticket #609 (version 0.1.0.5), at the designer's word: the Fuel's shape -- "Made a turn:" then
+/// one line a maker, "+4  the Factory (China)", closing with what went into builds at the last
+/// Resolution; the queue lines go, every hatched tile carrying its own.
 fn widgets_bar_hover(game: &Game, made: i64, applied: i64) -> String {
-    let mut lines = vec![format!(
-        "Widgets: {made} made a turn across the places you direct, {applied} applied at the last Resolution."
-    )];
+    let mut lines = vec![format!("Made a turn: {made}")];
     for place in directed_places(game, Seat(0)) {
-        let rate = game.widgets_at(place);
-        let makers = widget_makers(game, place);
-        let breakdown = if makers.is_empty() { "nothing makes any".to_string() } else { makers.iter().map(|(name, n)| format!("{n} from {name}")).collect::<Vec<_>>().join(", ") };
-        let queue: Vec<String> = game.queue_at(place).iter().zip(game.queue_estimates(place)).map(|(b, t)| queue_line(game, place, b, t)).collect();
-        let queue = if queue.is_empty() { "nothing under way".to_string() } else { queue.join("; ") };
-        lines.push(format!("{}: {rate} a turn ({breakdown}). {queue}.", game.place_name(place)));
+        for (name, n) in widget_makers(game, place) {
+            lines.push(format!("{}  {name} ({})", signed(n as f64), game.place_name(place)));
+        }
+    }
+    if lines.len() == 1 {
+        lines[0] = "Nothing makes Widgets at the places you direct.".to_string();
+    }
+    lines.push(format!("{applied} went into builds last turn."));
+    lines.join("\n")
+}
+
+/// Ticket #609 (version 0.1.0.5), at the designer's word: the top bar's Energy hover, one line a
+/// place, net, its parts in brackets -- "+8  China (12 made, 4 upkeep)", "-3  Ships and Armies" --
+/// from the figures the Income kept by place; what goes dark is appended under it only while the
+/// coming Resolution's forecast is short, where it replaced the list.
+fn energy_bar_hover(game: &Game, short: Option<&dying_earth_engine::ShortfallForecast>) -> String {
+    let mut lines: Vec<String> = game
+        .seat(Seat(0))
+        .energy_by_place
+        .iter()
+        .filter(|(_, made, upkeep)| *made != 0.0 || *upkeep != 0.0)
+        .map(|(place, made, upkeep)| {
+            let net = signed(made - upkeep);
+            if *made == 0.0 { format!("{net}  {place}") } else { format!("{net}  {place} ({} made, {} upkeep)", figure(*made), figure(*upkeep)) }
+        })
+        .collect();
+    if lines.is_empty() {
+        lines.push("No Energy made or owed last turn.".to_string());
+    } else {
+        lines.insert(0, "Last Income:".to_string());
+    }
+    if let Some(f) = short {
+        lines.push(shortfall_hover(f));
     }
     lines.join("\n")
 }
@@ -13923,5 +13950,34 @@ mod ticket_608 {
                 assert!(tip.contains(" = ") && !tip.contains(" - ") && !tip.contains(".,"), "the sums, never a dash or a stray stop: {tip}");
             }
         }
+    }
+}
+
+/// Ticket #609 (version 0.1.0.5), at the designer's word: the top bar's Widgets hover in the Fuel's
+/// shape, and the Energy hover one line a place with what goes dark appended only when short.
+#[cfg(test)]
+mod ticket_609 {
+    use super::*;
+    use dying_earth_engine::data::{default_data_dir, Tables};
+    use dying_earth_engine::{FactionKind, NewGame, ShortfallForecast, StateId};
+
+    #[test]
+    fn the_widgets_and_energy_hovers_read_makers_and_places_not_queues() {
+        let tables = std::sync::Arc::new(Tables::load(&default_data_dir()).expect("tables load"));
+        let mut g = Game::new(tables, NewGame { seed: 7, player: FactionKind::Custodians, player_is_ai: false, player_start: StateId::EastAsia });
+        let w = widgets_bar_hover(&g, 12, 10);
+        assert!(w.starts_with("Made a turn: 12\n+"), "{w}");
+        assert!(w.ends_with("10 went into builds last turn."), "{w}");
+        assert!(!w.contains("under way") && !w.contains("applied at the last Resolution"), "the queues and the old sentence are gone: {w}");
+        // Energy: the Income's figures by place, net first, the parts in brackets; the units bare.
+        g.seats[0].energy_by_place = vec![("China".to_string(), 12.0, 4.0), ("ISS over Earth".to_string(), 0.0, 1.0), ("Ships and Armies".to_string(), 0.0, 3.0), ("Nowhere".to_string(), 0.0, 0.0)];
+        let e = energy_bar_hover(&g, None);
+        assert_eq!(e, "Last Income:\n+8  China (12 made, 4 upkeep)\n-1  ISS over Earth\n-3  Ships and Armies", "{e}");
+        // Short: the same lines, then what goes dark.
+        let f = ShortfallForecast { short_by: 2.0, dark: vec![] };
+        let e = energy_bar_hover(&g, Some(&f));
+        assert!(e.starts_with("Last Income:\n+8  China") && e.contains("Next Income is 2 Energy short"), "{e}");
+        g.seats[0].energy_by_place.clear();
+        assert_eq!(energy_bar_hover(&g, None), "No Energy made or owed last turn.");
     }
 }

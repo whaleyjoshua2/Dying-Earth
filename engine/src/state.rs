@@ -1171,6 +1171,12 @@ pub struct SeatState {
     pub produced: Stockpile,
     /// Last Income by source (ticket #31): "Factory in Asia", the resource, the amount; upkeep as negatives.
     pub income_sources: Vec<(String, Resource, f64)>,
+    /// Ticket #609 (version 0.1.0.5): last Income's Energy BY PLACE -- the place's name, the Energy
+    /// its buildings made, the upkeep they paid -- in the order the Income met them, the Ships' and
+    /// Armies' upkeep last as a place of its own. The top bar's Energy hover reads it, one line a
+    /// place. Recomputed every Income, so an older save loads with it empty until its first.
+    #[serde(default)]
+    pub energy_by_place: Vec<(String, f64, f64)>,
     /// Ticket #51: Research banked for the Archive, capped at what its remaining stages still need.
     pub archive_fund: i64,
     /// Ticket #51: Fund the Archive was ordered this turn, so this turn's Lab Research went to the
@@ -1889,6 +1895,7 @@ impl Game {
             income_last_turn: Stockpile::default(),
             produced: Stockpile::default(),
             income_sources: Vec::new(),
+            energy_by_place: Vec::new(),
             archive_fund: 0,
             funding_archive: false,
             research_directive: 0,

@@ -144,3 +144,21 @@ sentence that repeated the sums and the neutral tip's held-place sentence were c
 [`own-earth.png`](ticket-608/own-earth.png)), looked at: Egypt's card with "Threshold 40 = 20 + 20
 for size 2" as the hover's first line, and China's with the price sum. A first own-Region shot had
 caught the Influence heading's tip instead, the `tip:` aid matching a word that tip also carries.
+
+## The top bar's Widgets hover in the Fuel's shape, and the Energy hover by place
+
+Ticket [#609](https://github.com/whaleyjoshua2/Dying-Earth/issues/609), spec §9.
+
+The Income now keeps Energy by place beside its source lines, summed where the lines are made rather
+than parsed back out of their names; an engine test holds each place's figures to its source lines
+and the whole to the Income's Energy (it found the test fixture's home Region holds no Power Plant,
+and was given one). The window's two hovers were rewritten with a window test beside them: the Widgets
+hover opens on "Made a turn" and closes on what went into builds, the Energy hover is one net line a
+place and appends the shortfall's dark list instead of replacing the lines. No sweep.
+
+**The pictures** ([`ticket-609/widgets-earth.png`](ticket-609/widgets-earth.png),
+[`energy-earth.png`](ticket-609/energy-earth.png)), looked at: the Widgets hover "Made a turn: 15" with four
+makers and "0 went into builds last turn", the Energy hover "-3  China (6 made, 9 upkeep)" and "+5  ISS
+over Earth (6 made, 1 upkeep)", summing to the bar's +2. The Energy figure had to be drawn through
+`rule_tip` as the Widgets figure is before the `tip:` aid could photograph it; a shortfall picture
+was not taken, since the aid cannot place an order that overspends the Energy.
