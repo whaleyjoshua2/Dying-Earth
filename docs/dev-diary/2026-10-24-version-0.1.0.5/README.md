@@ -128,3 +128,19 @@ beside it, with [`tool-new.txt`](ticket-607/tool-new.txt)): the window over the 
 moves", the Faction's glyph and name in its colour, the two sentences wrapped on two lines, "Go on".
 Looked at, all four; a first run had kept the solar view, where the window never stands, and was
 reshot through the menu captures.
+
+## The Region card's threshold lines cut to the hover, and one hover per element
+
+Ticket [#608](https://github.com/whaleyjoshua2/Dying-Earth/issues/608), spec §8.
+
+The two weak lines under the Standings row were cut and their terms became `threshold_terms` and
+`held_price_terms`, sums on the threshold label's hover through one `threshold_label` the row and
+the test both read; the row's own `rule_tip`, the second hover, went. A window test holds every
+label's tip under six lines, and it bit twice before the shape settled: with the sums appended to the
+old sentences the own-Region tip estimated at eight lines, and the neutral tip at seven, so the
+sentence that repeated the sums and the neutral tip's held-place sentence were cut. No sweep.
+
+**The pictures** ([`ticket-608/neutral-earth.png`](ticket-608/neutral-earth.png),
+[`own-earth.png`](ticket-608/own-earth.png)), looked at: Egypt's card with "Threshold 40 = 20 + 20
+for size 2" as the hover's first line, and China's with the price sum. A first own-Region shot had
+caught the Influence heading's tip instead, the `tip:` aid matching a word that tip also carries.

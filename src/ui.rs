@@ -7044,13 +7044,9 @@ fn stance_row(ui: &mut Ui, game: &Game, pending: &[Order], current: Stance, make
 fn influence_row(ui: &mut Ui, game: &Game, session: &Session, view: &mut ViewState, target: Place, controls: bool, actions: &mut Vec<Action>) {
     // Ticket #64: a spectator reads every Faction's Standing here and spends nothing.
     if session.spectator {
-        let threshold = game.influence_threshold(target);
-        // Ticket #372 (version 0.09.2): the margin as the rule reads it, not the flat base.
-        let explain = match game.place_control(target).controller() {
-            Some(c) => format!("Held by the {}. A rival needs their Standing plus {}, and at least the threshold. Decays {} a turn for the holder.", game.seat_name(c), margin_words(game, None, target), game.tables.influence.decay_controlled),
-            None => format!("First to {threshold} takes it. Decays {} a turn.", game.tables.influence.decay),
-        };
-        standings_row(ui, game, session, target, threshold, explain);
+        // Ticket #608 (version 0.1.0.5): the row's own hover went with the player's; the spectator
+        // reads the label's tip, the sums in it.
+        standings_row(ui, game, session, target);
         return;
     }
     if controls {
@@ -7097,17 +7093,10 @@ fn influence_row(ui: &mut Ui, game: &Game, session: &Session, view: &mut ViewSta
     // over that relays the same information in far fewer words."*
     // Ticket #372 (version 0.09.2): the price by the rule that takes the place, and the margin as
     // that rule reads it. On the player's own place this quoted the PLAYER's price as a rival's.
-    let explain = match game.place_control(target).controller() {
-        Some(Seat(0)) => format!(
-            "A rival takes it at {}: your Standing plus {}, and at least their threshold. Decays {} a turn.",
-            cheapest_rival(game, target).1,
-            margin_words(game, Some(cheapest_rival(game, target).0), target),
-            game.tables.influence.decay_controlled
-        ),
-        Some(_) => format!("You take it at {}: their Standing plus {}, and at least your threshold. Decays {} a turn.", game.influence_needed_for(Seat(0), target), margin_words(game, Some(Seat(0)), target), game.tables.influence.decay),
-        None => format!("First to {threshold} takes it. Decays {} a turn.", game.tables.influence.decay),
-    };
-    standings_row(ui, game, session, target, threshold, explain);
+    // Ticket #608 (version 0.1.0.5), at the designer's word: the row's own hover goes (it fired
+    // under the label's and the chips'), and the sentence it carried with it: the label's tip and
+    // the Standings tip say the same, the decay among them.
+    standings_row(ui, game, session, target);
     threshold_breakdown(ui, game, target);
     // Ticket #53: on every Region the player does not hold, what its Blame is costing it here.
     let blame_mult = game.blame_threshold_multiplier_on(Seat(0), target);
@@ -7144,6 +7133,11 @@ fn influence_row(ui: &mut Ui, game: &Game, session: &Session, view: &mut ViewSta
 /// Your Influence converts at 0.91
 /// ```
 ///
+/// Ticket #608 (version 0.1.0.5), at the designer's word: the first two lines are CUT from the card
+/// -- their dash read as a minus ("31 - 20 + 10 for size 1") -- and their terms ride as sums on the
+/// hover of the row's threshold label (`threshold_terms`, `held_price_terms`). The card keeps the
+/// challenger sentence, the threat line and the conversion line.
+///
 /// Ticket #336 (version 0.09.0): off Earth the first line names the base the place used, since a
 /// station's replaces a Colony's rather than sitting on top of it -- `Threshold 80 - 40 for the
 /// station + 40 for 2 Colonists`, and on the ground `40 for the Colony` in its place.
@@ -7154,13 +7148,16 @@ fn influence_row(ui: &mut Ui, game: &Game, session: &Session, view: &mut ViewSta
 /// x1.00 in 66% of takes. The conversion line is new with Resistance (ticket #187) and belongs
 /// beside the threshold rather than inside it: it prices what your SPENDING is worth here, where the
 /// other two lines price the gate.
-fn threshold_breakdown(ui: &mut Ui, game: &Game, target: Place) {
+/// Ticket #608 (version 0.1.0.5): the threshold's terms as a SUM, for the threshold label's hover --
+/// `Threshold 31 = 20 + 10 for size 1 + 1 for Regions held`, then `, x1.10 (Blame)` and `, cut by
+/// Green Consensus` while they bite. Off Earth the base is the station's or the Colony's (#336).
+fn threshold_terms(game: &Game, target: Place) -> String {
     let t = &game.tables.influence;
     let threshold = game.influence_threshold_for(Seat(0), target);
     let mut line = match target {
         Place::State(s) => {
             let size = game.tables.state(s).size as i64;
-            let mut line = format!("Threshold {threshold} - {} + {} for size {size}", t.state_threshold_base, t.state_threshold_per_size * size);
+            let mut line = format!("Threshold {threshold} = {} + {} for size {size}", t.state_threshold_base, t.state_threshold_per_size * size);
             // Ticket #591 (version 0.1.0.4), at the designer's word: the Regions-held term, hidden at +0.
             let held = game.regions_held_term(Seat(0), target);
             if held > 0 {
@@ -7171,14 +7168,12 @@ fn threshold_breakdown(ui: &mut Ui, game: &Game, target: Place) {
         Place::Colony(c) => {
             let people = game.colony(c).map(|x| x.colonists).unwrap_or(0) as i64;
             let station = game.colony(c).map(|x| x.in_orbit).unwrap_or(false);
-            // Ticket #336 (version 0.09.0): a base under every place off Earth, the station's in
-            // place of the Colony's rather than on top of it, so the line names the base it used.
             let base = if station { format!("{} for the station", t.station_threshold_base) } else { format!("{} for the Colony", t.colony_threshold_base) };
-            format!("Threshold {threshold} - {base} + {} for {}", t.colony_threshold_per_colonist * people, counted(people, "Colonist", "Colonists"))
+            format!("Threshold {threshold} = {base} + {} for {}", t.colony_threshold_per_colonist * people, counted(people, "Colonist", "Colonists"))
         }
     };
     // Ticket #53 and ticket #43: the two multipliers that already moved this figure and never said
-    // so. Shown only while they bite, so the usual card is three lines.
+    // so. Shown only while they bite.
     let blame = game.blame_threshold_multiplier_on(Seat(0), target);
     if blame > 1.0 {
         line.push_str(&format!(", x{blame:.2} (Blame)"));
@@ -7186,32 +7181,40 @@ fn threshold_breakdown(ui: &mut Ui, game: &Game, target: Place) {
     if game.research.done.contains(&TechId::GreenConsensus) {
         line.push_str(", cut by Green Consensus");
     }
-    ui.label(RichText::new(line).weak());
+    line
+}
 
-    // The second line: what the holder's Standing and the margin make of it.
+/// Ticket #608 (version 0.1.0.5): on a held place, the price to take it as a SUM of the holder's
+/// Standing and the margin -- `Take at 58 = 38 (their Standing) + 20 (margin) + 5 (Constabulary)` --
+/// for the label's hover; where the threshold stands over that sum, it says so. None on a neutral place.
+fn held_price_terms(game: &Game, target: Place) -> Option<String> {
+    let c = game.place_control(target).controller()?;
+    let standing = game.seat(c).influence.get(&target).copied().unwrap_or(0);
+    // Ticket #372 (version 0.09.2): the margin and the price of the challenger the row names -- the
+    // player on a rival's place, the cheapest rival on the player's own -- in the engine's parts.
+    let (challenger, needed) = if c == Seat(0) { cheapest_rival(game, target) } else { (Seat(0), game.influence_needed_for(Seat(0), target)) };
+    let (base, relations, guard) = game.challenge_margin_parts(Some(challenger), target);
+    let margin = base + relations + guard;
+    let whose = if c == Seat(0) { "your Standing" } else { "their Standing" };
+    let head = if c == Seat(0) { "A rival takes it at" } else { "Take at" };
+    // A holder with little Standing is protected by the THRESHOLD rather than by the margin, and the
+    // line has to say so or it reads as bad arithmetic: "80 = 0 + 20" is not 80.
+    if standing + margin < needed {
+        return Some(format!("{head} {needed}: {whose} {standing} + the margin {margin} comes to {}, under the threshold, so the threshold stands.", standing + margin));
+    }
+    let mut line = format!("{head} {needed} = {standing} ({whose}) + {base} (margin)");
+    if relations > 0 {
+        line.push_str(&format!(" + {relations} (relations)"));
+    }
+    if guard > 0 {
+        line.push_str(&format!(" + {guard} (Constabulary)"));
+    }
+    Some(line)
+}
+
+fn threshold_breakdown(ui: &mut Ui, game: &Game, target: Place) {
     if let Some(c) = game.place_control(target).controller() {
         let standing = game.seat(c).influence.get(&target).copied().unwrap_or(0);
-        // Ticket #372 (version 0.09.2): the margin and the price of the challenger the row names --
-        // the player on a rival's place, the cheapest rival on the player's own -- in the engine's
-        // parts, where this read the margin with no challenger and the player's own price on the
-        // player's own place, which agreed with the row only by coincidence.
-        let (challenger, needed) = if c == Seat(0) { cheapest_rival(game, target) } else { (Seat(0), game.influence_needed_for(Seat(0), target)) };
-        let (base, relations, guard) = game.challenge_margin_parts(Some(challenger), target);
-        let margin = base + relations + guard;
-        let held = if c == Seat(0) { "Held by you".to_string() } else { format!("Held by the {}", game.seat_name(c)) };
-        let mut second = format!("{held}: {needed} - {standing} + {base} (margin)");
-        if relations > 0 {
-            second.push_str(&format!(" + {relations} (relations)"));
-        }
-        if guard > 0 {
-            second.push_str(&format!(" + {guard} (Constabulary)"));
-        }
-        // A holder with little Standing is protected by the THRESHOLD rather than by the margin, and
-        // the line has to say so or it reads as bad arithmetic: "80 - 0 + 20" is not 80.
-        if standing + margin < needed {
-            second.push_str(&format!(" comes to {}, under the threshold, so the threshold stands", standing + margin));
-        }
-        ui.label(RichText::new(second).weak());
         // Ticket #262 (version 0.08.4): **the challenger line**, on a place the player holds: the
         // rival nearest to taking it -- nearest its OWN price, since Blame and Relations move one
         // rival's price and not another's -- and how far off it stands. The designer's sentence,
@@ -7333,8 +7336,11 @@ fn margin_words(game: &Game, challenger: Option<Seat>, target: Place) -> String 
 /// hold or take the place as a hover on the line -- the figure (ticket #60: the engine's own, which
 /// the Resolution and the AI read too) stays in view, and the reasoning is one hover away.
 /// Ticket #372 (version 0.09.2): on a held place the figure is the price to take it.
-fn standings_row(ui: &mut Ui, game: &Game, session: &Session, target: Place, threshold: i64, explain: String) {
-    let row = ui.horizontal_wrapped(|ui| {
+/// Ticket #608 (version 0.1.0.5), at the designer's word: one hover per element -- the row carried
+/// a tip of its own that fired under the label's and the chips', two hovers one over the other --
+/// and the threshold label's tip carries the sums the card's cut lines held.
+fn standings_row(ui: &mut Ui, game: &Game, session: &Session, target: Place) {
+    ui.horizontal_wrapped(|ui| {
         // Ticket #598 (version 0.1.0.4), at the designer's word: where no Faction has Standing the
         // row is the threshold alone, where it read "Standings: nobody has any yet".
         let any = Seat::ALL.into_iter().any(|s| game.seat(s).influence.get(&target).copied().unwrap_or(0) > 0);
@@ -7415,27 +7421,32 @@ fn standings_row(ui: &mut Ui, game: &Game, session: &Session, target: Place, thr
         // that takes it -- where it was the bare threshold whatever the holder stood at, so a
         // place held on 47 read "Threshold 50" when the price was 67. On the player's own place it
         // is the lowest price a rival pays; on nobody's it is still the threshold.
-        let holder = game.place_control(target).controller();
-        let (label, tip) = match holder {
-            Some(Seat(0)) if !session.spectator => {
-                let (r, price) = cheapest_rival(game, target);
-                (
-                    format!("A rival takes it at {price}"),
-                    format!("The lowest price a rival pays to take this from you: the {}, at the greater of their threshold and your Standing plus {}.\nThreshold: {from}", game.seat_name(r), margin_words(game, Some(r), target)),
-                )
-            }
-            Some(_) if !session.spectator => (
-                format!("Take at {}", game.influence_needed_for(Seat(0), target)),
-                format!("The greater of your threshold, {threshold}, and the holder's Standing plus {}.\nThreshold: {from}\nGreen Consensus cuts a quarter off it; your Blame adds to it.", margin_words(game, Some(Seat(0)), target)),
-            ),
-            _ => (
-                format!("Threshold {threshold}"),
-                format!("What a Standing must reach to take this place: {from}\nGreen Consensus cuts a quarter off it; your Blame adds to it on places you do not hold.\nA held place also wants the holder's Standing plus {}.", margin_words(game, None, target)),
-            ),
-        };
+        let (label, tip) = threshold_label(game, target, session.spectator, &from);
         rule_tip(ui.label(label), tip);
     });
-    rule_tip(row.response, explain);
+}
+
+/// Ticket #372 (version 0.09.2): on a held place the row's figure is THE PRICE TO TAKE IT, read by
+/// the rule that takes it; on the player's own place the lowest price a rival pays; on nobody's the
+/// threshold. Ticket #608 (version 0.1.0.5), at the designer's word: the tip opens on the sums the
+/// card's cut lines held (the price as the holder's Standing plus the margin, the threshold as its
+/// terms), then the rule in `from`, and the sentence that repeated the sums in words is gone, so the
+/// whole stays under six lines.
+fn threshold_label(game: &Game, target: Place, spectator: bool, from: &str) -> (String, String) {
+    let threshold = game.influence_threshold_for(Seat(0), target);
+    let terms = threshold_terms(game, target);
+    match game.place_control(target).controller() {
+        Some(Seat(0)) if !spectator => {
+            let (r, price) = cheapest_rival(game, target);
+            let held = held_price_terms(game, target).unwrap_or_default();
+            (format!("A rival takes it at {price}"), format!("{held}, the {} cheapest.\n{terms}\nThreshold: {from}", game.seat_name(r)))
+        }
+        Some(_) if !spectator => {
+            let held = held_price_terms(game, target).unwrap_or_default();
+            (format!("Take at {}", game.influence_needed_for(Seat(0), target)), format!("{held}\n{terms}\nThreshold: {from}\nGreen Consensus cuts a quarter off it; your Blame adds to it."))
+        }
+        _ => (format!("Threshold {threshold}"), format!("{terms}\nThreshold: {from}\nGreen Consensus cuts a quarter off it; your Blame adds to it.")),
+    }
 }
 
 /// Ticket #390 (version 0.09.3): what a standing Scrubber or Sea Wall says on its one line --
@@ -13863,4 +13874,37 @@ fn colony_growth_words(game: &Game, col: &dying_earth_engine::Colony) -> String 
     let banked = game.colony_growth.get(&col.id).copied().unwrap_or(0.0);
     let turns = ((1.0 - banked) / per).ceil().max(1.0) as u32;
     format!("Growing: {:+.1} a turn, next Colonist in {} turn{}.", per, turns, if turns == 1 { "" } else { "s" })
+}
+
+/// Ticket #608 (version 0.1.0.5), at the designer's word: the Region card's threshold line and its
+/// held-place line are cut, and their terms ride the threshold label's hover as sums.
+#[cfg(test)]
+mod ticket_608 {
+    use super::*;
+    use dying_earth_engine::data::{default_data_dir, Tables};
+    use dying_earth_engine::{FactionKind, NewGame, StateId};
+
+    #[test]
+    fn the_threshold_terms_are_a_sum_on_the_hover_and_the_tip_stays_under_six_lines() {
+        let tables = std::sync::Arc::new(Tables::load(&default_data_dir()).expect("tables load"));
+        let g = Game::new(tables, NewGame { seed: 7, player: FactionKind::Custodians, player_is_ai: false, player_start: StateId::EastAsia });
+        let home = Place::State(StateId::EastAsia);
+        let terms = threshold_terms(&g, home);
+        assert!(terms.starts_with("Threshold ") && terms.contains(" = ") && !terms.contains(" - "), "a sum, never a dash: {terms}");
+        let held = held_price_terms(&g, home).expect("the home Region is held");
+        assert!(held.starts_with("A rival takes it at ") && held.contains("(your Standing)") && held.contains("(margin)"), "{held}");
+        let neutral = StateId::ALL.into_iter().find(|s| g.state(*s).control.controller().is_none()).expect("a neutral Region");
+        assert_eq!(held_price_terms(&g, Place::State(neutral)), None, "nothing to take from on a neutral place");
+        // Every tip the label carries, the sums in it, stays within the six-line rule: the player's
+        // own Region, a neutral one, and a rival's, with the rule sentence the card passes in.
+        let t = &g.tables.influence;
+        let from = format!("{}, plus {} a size step and {} a Region you hold past your first.", t.state_threshold_base, t.state_threshold_per_size, t.threshold_per_region_held);
+        let rivals = StateId::ALL.into_iter().find(|s| g.state(*s).control.controller().is_some_and(|c| c != Seat(0))).expect("a rival's Region");
+        for (place, word) in [(home, "A rival takes it at"), (Place::State(neutral), "Threshold "), (Place::State(rivals), "Take at ")] {
+            let (label, tip) = threshold_label(&g, place, false, &from);
+            assert!(label.starts_with(word), "{label}");
+            assert!(hover_lines_estimate(&tip) <= 6, "{} lines: {tip}", hover_lines_estimate(&tip));
+            assert!(tip.contains(" = ") && !tip.contains(" - "), "the sums, never a dash: {tip}");
+        }
+    }
 }

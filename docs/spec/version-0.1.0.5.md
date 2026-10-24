@@ -211,3 +211,29 @@ ticket's questions, *"those but remove the Turn one:/Turn two: q2 yes"*.
 - **The pictures** (`ticket-607/<faction>-report.png`, four): the window for each Faction, over the
   Earth map where the Report would stand.
 - No rule moves; no sweep.
+
+## 8. The Region card's threshold lines cut to the hover, and one hover per element
+
+Ticket: [The Region card's threshold line reads as a subtraction, and its Standing and threshold hovers stack](https://github.com/whaleyjoshua2/Dying-Earth/issues/608).
+
+The designer: *"threshold calculation is off e.g threshold 31 next line 31-20+10 for size 1 +1 for
+regions held. what is being calculated here because its not threshold that always the first term
+regardless of cost. do we even need this line?"* and *"mouse over on standing: or threshold on nation
+card procs two mouse overs one on top of another, check and fix"*; on the ticket's questions, *"q1
+cut it move to hover q2 yes"*.
+
+- **The card's two weak lines go**: *"Threshold 31 - 20 + 10 for size 1 + 1 for Regions held"* and,
+  on a held place, *"Held by the Archivists: 58 - 38 + 20 (margin) + 5 (Constabulary)"*. Their dash
+  was a separator read as a minus; the arithmetic was right. The challenger sentence (*"The
+  Prospectors stand at 31; they take this at 54."*), the threat line and the conversion line stay.
+- **The terms ride the threshold label's hover as sums**, its first lines: *"Threshold 31 = 20 + 10
+  for size 1 + 1 for Regions held"* (then *", x1.10 (Blame)"* and *", cut by Green Consensus"* while
+  they bite), and on a held place *"A rival takes it at 58 = 38 (your Standing) + 20 (margin) + 5
+  (Constabulary), the Prospectors cheapest."* or *"Take at 58 = 38 (their Standing) + 20 (margin)"*;
+  where the threshold stands over that sum the line says so. The sentence that said the same in
+  words is cut, and the neutral tip's last sentence with it, so every tip stays under six lines.
+- **One hover per element**: the row's own tip, which fired under the label's and the Standings
+  chips', goes, for the player and the spectator alike; its decay figures are on the Standings tip.
+- **The pictures** (`ticket-608/neutral-earth.png`, `own-earth.png`): the hover on a neutral
+  Region's "Threshold 40" and on the player's own Region's "A rival takes it at".
+- The tool prints its own Standing line and no breakdown; untouched. No rule moves; no sweep.
