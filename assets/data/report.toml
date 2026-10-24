@@ -158,6 +158,9 @@ bombard_miss = "{faction} bombarded {place} from {ship}: the {module} was struck
 launch_hit = "{faction} launched a Warhead from {ship} at {place}: {lost} destroyed{dead}."
 launch_miss = "{faction} launched a Warhead from {ship} at {place}: nothing of it burned{dead}."
 occupation_begun = "{faction} occupy {place}."
+# Ticket #615 (version 0.1.0.5): a held place; {holder} is the prior holder, whose Standing there is
+# halved, and {standing} what they keep.
+occupation_begun_held = "{faction} occupy {place}; {holder}' Standing there falls to {standing}."
 occupation_ended = "{faction} Occupation of {place} ended."
 # Ticket #299 (version 0.08.6): a break costs. {holder} is the previous holder, or nobody.
 occupation_broken = "{faction}' Occupation of {place} broke: +{unrest} Unrest."

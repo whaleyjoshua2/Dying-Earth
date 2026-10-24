@@ -1197,6 +1197,10 @@ pub struct InfluenceTable {
     /// founder still directs it. See `influence.toml`.
     pub first_settled_allotment: i64,
     pub occupation_turns: u32,
+    /// Ticket #615 (version 0.1.0.5), at the designer's word: the share of their Standing at the place
+    /// the prior holder keeps the turn an Occupation begins (rounded down), every time one begins; a
+    /// broken Occupation hands the place back and restores nothing. See `influence.toml`.
+    pub occupation_standing_kept: f64,
     pub destruction_chance: f64,
     /// Ticket #187 (version 0.08.0): how far a place's schooling bends what an outsider's Influence
     /// buys there. See `influence.toml`.

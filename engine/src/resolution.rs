@@ -1610,7 +1610,26 @@ impl Game {
                         }
                         let line = format!("The {} occupy {}.", self.seat_name(seat), self.place_name(place));
                         self.log(line);
-                        let text = self.say("occupation_begun", &[("faction", self.seat_name(seat)), ("place", self.place_name(place))]);
+                        // Ticket #615 (version 0.1.0.5), at the designer's word: the prior holder keeps
+                        // `occupation_standing_kept` of their Standing here, rounded down, every time
+                        // an Occupation begins; a break hands the place back and restores nothing. Their
+                        // wall at this one place falls; the occupier's banked Standing, Pacification
+                        // and the Allotment are untouched. The line names the holder, every seat reading it.
+                        let halved = previous.and_then(|p| {
+                            let had = self.seat(p).influence.get(&place).copied().unwrap_or(0);
+                            (had > 0).then(|| {
+                                let kept = (had as f64 * self.tables.influence.occupation_standing_kept).floor() as i64;
+                                self.seat_mut(p).influence.insert(place, kept);
+                                (p, kept)
+                            })
+                        });
+                        let text = match halved {
+                            Some((holder, kept)) => self.say(
+                                "occupation_begun_held",
+                                &[("faction", self.seat_name(seat)), ("place", self.place_name(place)), ("holder", self.seat_name(holder)), ("standing", kept.to_string())],
+                            ),
+                            None => self.say("occupation_begun", &[("faction", self.seat_name(seat)), ("place", self.place_name(place))]),
+                        };
                         // Ticket #600 (version 0.1.0.4): a rival occupying a Region of the player's
                         // is the headline.
                         let kind = if self.invades_the_player(place, seat, previous) { LineKind::Invasion } else { LineKind::Occupation };

@@ -458,7 +458,8 @@ fn occupation_transfer_keeps_the_old_controllers_standing() {
         g.resolution_phase();
     }
     assert_eq!(g.state(StateId::Europe).control, Control::Controlled(Seat(0)));
-    assert_eq!(g.seats[1].influence[&Place::State(StateId::Europe)], 40, "the old controller keeps its standing");
+    // Ticket #615 (version 0.1.0.5): the Occupation's start halved it to 20; the transfer takes nothing more.
+    assert_eq!(g.seats[1].influence[&Place::State(StateId::Europe)], 20, "the old controller keeps what the halving left");
     let threshold = g.influence_threshold(Place::State(StateId::Europe));
     assert!(g.seats[0].influence[&Place::State(StateId::Europe)] >= threshold, "the occupier's gains are its standing");
 }
@@ -21040,7 +21041,8 @@ fn the_reports_templates_stay_under_their_word_ceiling() {
     // Ticket #538 (version 0.1.0.1): and by the 46 of an Accord's end: its Moment and five causes,
     // the warning the turn before, and two rivals' clauses.
     // Ticket #544 (version 0.1.0.1): and by the 33 of a window next turn and the Report's head.
-    assert!(words <= 1957, "the Report's templates hold {words} words; the ceiling is 1,957 (15 for a rival on yours, 33 for a window and the head, 46 for an Accord's end, 9 for a place handed over twice, 9 for an Army inherited, 12 for an Accord broken, 15% off 2,031, 54 for the race to the Moon, 2 for a rival's upgrade, 8 for an Accord answered, less a word of slack, 17 for a Trade, 9 for a Capital refunded, 5 for an Accord let lapse, 7 for Terms added, 5 for a renewal)");
+    // Ticket #615 (version 0.1.0.5): and by the 9 of an Occupation that halves the holder's Standing.
+    assert!(words <= 1966, "the Report's templates hold {words} words; the ceiling is 1,966 (9 for an Occupation's holder, 15 for a rival on yours, 33 for a window and the head, 46 for an Accord's end, 9 for a place handed over twice, 9 for an Army inherited, 12 for an Accord broken, 15% off 2,031, 54 for the race to the Moon, 2 for a rival's upgrade, 8 for an Accord answered, less a word of slack, 17 for a Trade, 9 for a Capital refunded, 5 for an Accord let lapse, 7 for Terms added, 5 for a renewal)");
     // "The" is gone before a Faction's name, which is drawn in its colour instead.
     assert!(!text.contains("he {faction}"), "a template still says \"the {{faction}}\"");
 }
@@ -25438,4 +25440,47 @@ fn ticket_625_the_archivists_keep_ferrying_until_a_colony_tier_site_stands() {
     g.ai_orders(arc);
     let plain = scored(&g, &habitat);
     assert!(plain > 0.0 && (lifted - plain * bonus).abs() < 1e-6, "an Outpost is not a site: the Habitat at {bonus}x until it climbs: {lifted} against {plain}");
+}
+
+/// Ticket #615 (version 0.1.0.5), at the designer's word: **an Occupation halves the prior holder's
+/// Standing** at the place, once, rounded down, the turn it begins; a broken Occupation hands the
+/// place back and the loss stands; a second Occupation halves it again. The Report's occupation line
+/// says so, naming the holder, since every seat reads it.
+#[test]
+fn ticket_615_an_occupation_halves_the_prior_holders_standing_and_the_loss_stands() {
+    let mut g = game();
+    assert_eq!(g.tables.influence.occupation_standing_kept, 0.5, "the prior holder keeps half");
+    g.armies.retain(|a| a.home != ArmyHome::State(StateId::Europe));
+    let europe = Place::State(StateId::Europe);
+    assert_eq!(g.state(StateId::Europe).control, Control::Controlled(Seat(1)), "the premise: a held Region");
+    g.seats[1].influence.insert(europe, 41);
+    let a = occupier_in(&mut g, StateId::EastAsia, StateId::Europe);
+    g.resolution_phase();
+    assert!(matches!(g.state(StateId::Europe).control, Control::Occupied { occupier: Seat(0), previous: Some(Seat(1)), .. }));
+    let decay = g.tables.influence.decay_controlled;
+    assert_eq!(g.seat(Seat(1)).influence.get(&europe).copied(), Some(20 - decay), "41 halves to 20, rounded down, then the turn's decay");
+    let holder = g.seat_name(Seat(1));
+    assert!(
+        g.report.lines.iter().any(|l| l.text.contains(&format!("occupy {}; {holder}' Standing there falls to 20.", g.place_name(europe)))),
+        "the line names the holder and the figure: {:?}",
+        g.report.lines.iter().filter(|l| l.text.contains("Europe")).map(|l| l.text.clone()).collect::<Vec<_>>()
+    );
+    // The Occupation breaks: the place hands back, and the loss stands.
+    g.armies.retain(|x| x.id != a);
+    g.resolution_phase();
+    assert_eq!(g.state(StateId::Europe).control, Control::Controlled(Seat(1)));
+    assert!(g.seat(Seat(1)).influence.get(&europe).copied().unwrap_or(0) <= 20, "not restored: {:?}", g.seat(Seat(1)).influence.get(&europe));
+    // Occupied again: halved again.
+    g.seats[1].influence.insert(europe, 20);
+    occupier_in(&mut g, StateId::EastAsia, StateId::Europe);
+    g.resolution_phase();
+    assert!(matches!(g.state(StateId::Europe).control, Control::Occupied { occupier: Seat(0), previous: Some(Seat(1)), .. }));
+    assert_eq!(g.seat(Seat(1)).influence.get(&europe).copied(), Some(10 - decay), "20 halves to 10, then the decay");
+    // A neutral place has no prior holder: nothing halves, and the plain line is said.
+    let mut g = game();
+    g.armies.retain(|a| a.home != ArmyHome::State(StateId::NorthAfrica));
+    occupier_in(&mut g, StateId::EastAsia, StateId::NorthAfrica);
+    g.resolution_phase();
+    let africa = g.place_name(Place::State(StateId::NorthAfrica));
+    assert!(g.report.lines.iter().any(|l| l.text.ends_with(&format!("occupy {africa}."))), "{:?}", g.report.lines.iter().filter(|l| l.text.contains("Africa")).map(|l| l.text.clone()).collect::<Vec<_>>());
 }

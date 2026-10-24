@@ -50,3 +50,18 @@ x1.6 lift moved with it. No picture: a figure the screen never shows.
   collapse**, from 26 / 48 / 2 / 2 and 2: noise. Accords struck over the batch 620 from 620, games
   with an orbital Battle 24 from 27, the computer's Archive 9 of 80 from 11. The earlier pack did not
   bite on the Prospectors' 50; reported and left.
+
+## An Occupation halves the prior holder's Standing
+
+Ticket [#615](https://github.com/whaleyjoshua2/Dying-Earth/issues/615), spec §3.
+
+One data key (`occupation_standing_kept = 0.5`, the share kept), one rule at the Occupation's start in
+`resolution.rs`, one Report phrase that names the holder and the figure. The test was written first
+and watched red (41 stayed 40, the turn's decay alone), then green at 20 less the decay; the old test
+that had the prior holder keep 40 through a transfer now reads 20, and the Report's word ceiling rose
+by the phrase's nine words. No picture: a figure on the Region card's Standing line.
+
+- **The sweep** ([`sweeps/ticket-615.txt`](sweeps/ticket-615.txt)): **26 / 49 / 2 / 2 and 1
+  collapse**, from 25 / 50 / 2 / 2 and 1: noise. Occupations begun over the batch 204 from 197, broken
+  37 from 36. The halving changes what a retake costs, not how often the computer occupies; reported
+  and left.

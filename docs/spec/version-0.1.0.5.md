@@ -78,3 +78,26 @@ The designer: *"Drop threshold for gang-ups from 50% to 40%"*.
   620 from 620, games with an orbital Battle 24 from 27. The computer's Archive 9 of 80 (11 before),
   noise. Reported and left: the figure is the designer's word, and what the pack does with its
   earlier start is a question for the contest and defence tickets, which give it Influence to spend.
+
+## 3. An Occupation halves the prior holder's Standing
+
+Ticket: [An Occupation halves the prior holder's Standing](https://github.com/whaleyjoshua2/Dying-Earth/issues/615).
+
+The designer: *"upon occupation prior holder loses half their influence"*; on the ticket's questions,
+*"q1 that q2 yes q3 loss stands"*.
+
+- **The turn an Occupation begins**, the prior holder's Standing at that place is halved, rounded down
+  (`influence.toml [influence] occupation_standing_kept = 0.5`, the share kept). A neutral place has no
+  prior holder and nothing halves. Their Allotment and stockpile are untouched; so are the occupier's
+  banked Standing and Pacification, which reads the occupier's Standing against the bare threshold.
+- **Every Occupation** halves it again, by another seat or the same one after a break: 41 to 20 to 10.
+- **A broken Occupation** hands the place back and restores nothing: the loss stands.
+- **The Report's occupation line** carries it where a holder lost: *"Arkwrights occupy Japan; Custodians'
+  Standing there falls to 20."* (`occupation_begun_held`), read by every seat; a neutral place keeps the
+  plain line. The tool prints the Report. No Moment of its own.
+- **The computer** reads Standing from the table: a prior holder's retake is priced on what it has left,
+  and nothing in `ai.rs` carried a copy.
+- **Swept** (`sweeps/ticket-615.txt`, 20 seeds x four seatings): **26 / 49 / 2 / 2 and 1 collapse**,
+  from the same day's 25 / 50 / 2 / 2 and 1 (§2): noise. Occupations begun over the batch 204 from
+  197, broken 37 from 36: the computer occupies no more and no less for the halving, and the win
+  column does not move. Reported and left.
