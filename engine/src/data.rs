@@ -713,6 +713,10 @@ pub struct FactionCard {
     /// Arkwrights' row says 1, every other row nothing.
     #[serde(default)]
     pub research_per_body_settled: i64,
+    /// Ticket #590 (version 0.1.0.4): the capital building this Faction takes, where it is free,
+    /// for a pick left unmade, and what the computer's pick leans to.
+    #[serde(default)]
+    pub capital_building: Option<CapitalBuilding>,
     pub influence_multiplier: f64,
     /// Ticket #82 (version 0.06.0): the Custodians' Production Moved. While a Facility of the key's
     /// kind in a state they direct is mothballed, one Module of the value's kind off Earth makes
@@ -1582,6 +1586,9 @@ pub struct AiThresholds {
     /// Ticket #514 (version 0.1.0.0): what a seat whose win waits on a Colonial Capital, holding
     /// none, multiplies the upgrade of its Capital candidate and a landing there by.
     pub capital_chase: f64,
+    /// Ticket #590 (version 0.1.0.4): what the run's need adds to a capital building's score, the
+    /// Faction's own counting 1.
+    pub capital_pick_need: f64,
     /// Ticket #448 (version 0.09.6): what a seat keeps back from the market.
     pub market_materials_reserve: f64,
     pub market_materials_turns: f64,
@@ -1821,6 +1828,45 @@ pub struct TierCard {
     /// Ticket #503: Influence a turn to whoever directs a place at this tier, at face value.
     #[serde(default)]
     pub influence: i64,
+    /// Ticket #590 (version 0.1.0.4): the tier's capital building stands in one Module slot, which
+    /// must be open to order it; the upgrade reserves it while it builds. The Colonial Capital.
+    #[serde(default)]
+    pub takes_slot: bool,
+}
+
+/// Ticket #590 (version 0.1.0.4): one of the eight capital buildings, flat and after every
+/// multiplier. `here` at the Capital, `others` at each other place on its Body its holder directs.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CapitalBuildingCard {
+    pub id: CapitalBuilding,
+    /// The pick window's line.
+    pub does: String,
+    /// The yield it pays, with `here` and `others`.
+    #[serde(default)]
+    pub resource: Option<Resource>,
+    #[serde(default)]
+    pub here: f64,
+    #[serde(default)]
+    pub others: f64,
+    /// Influence a turn to its holder's Allotment, at the Capital and for each other place.
+    #[serde(default)]
+    pub influence_here: i64,
+    #[serde(default)]
+    pub influence_others: i64,
+    /// The share off the Widgets of a Ship built at a Shipyard at the Capital, and at the others.
+    #[serde(default)]
+    pub ship_widgets_cut_here: f64,
+    #[serde(default)]
+    pub ship_widgets_cut_others: f64,
+    /// Colonists' growth a turn added at the Capital, and at the others.
+    #[serde(default)]
+    pub growth_here: f64,
+    #[serde(default)]
+    pub growth_others: f64,
+    /// Unrest off every Region on Earth its holder controls, once, the turn it is chosen.
+    #[serde(default)]
+    pub earth_unrest: f64,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -1858,6 +1904,7 @@ struct ModulesFile {
     module: Vec<ModuleCard>,
     slots: SlotsCard,
     tiers: Vec<TierCard>,
+    capital_building: Vec<CapitalBuildingCard>,
     archive: ArchiveCard,
     observatory: ObservatoryCard,
     in_situ: InSituCard,
@@ -2222,6 +2269,8 @@ pub struct Tables {
     pub slots: SlotsCard,
     /// Ticket #490 (version 0.09.9): the tiers that cap them, in order, the first where every place starts.
     pub tiers: Vec<TierCard>,
+    /// Ticket #590 (version 0.1.0.4): the eight capital buildings, in `CapitalBuilding` order.
+    pub capital_buildings: Vec<CapitalBuildingCard>,
     /// Ticket #98: how many Techs the Research Lead chooses between.
     pub shortlist: ShortlistCard,
     /// Ticket #51: the Archive's stages and their Research price.
@@ -2391,6 +2440,7 @@ impl Tables {
             unique: facilities.unique,
             slots: modules.slots,
             tiers: modules.tiers,
+            capital_buildings: modules.capital_building,
             archive: modules.archive,
             observatory: modules.observatory,
             in_situ: modules.in_situ,
@@ -2435,9 +2485,11 @@ impl Tables {
         if self.tiers.is_empty() {
             return Err(err("modules.toml", "no tiers".to_string()));
         }
-        if self.tiers.windows(2).any(|w| w[1].cap <= w[0].cap || w[1].colonists < w[0].colonists) {
+        // Ticket #590 (version 0.1.0.4): a tier whose building takes a slot asks a slot, not people.
+        if self.tiers.windows(2).any(|w| w[1].cap <= w[0].cap || (!w[1].takes_slot && w[1].colonists < w[0].colonists)) {
             return Err(err("modules.toml", "each tier must allow more slots, and want no fewer Colonists, than the one before".to_string()));
         }
+        check_rows("modules.toml", &CapitalBuilding::ALL, self.capital_buildings.iter().map(|b| b.id))?;
         // Ticket #58: every sentence the Report says, with every placeholder the engine supplies.
         self.report.check().map_err(|m| err("report.toml", m))?;
         // Every fixed id must have exactly one row, in the engine's order.
@@ -2866,6 +2918,9 @@ impl Tables {
     }
     pub fn module(&self, kind: ModuleKind) -> &ModuleCard {
         &self.modules[kind as usize]
+    }
+    pub fn capital_building(&self, b: CapitalBuilding) -> &CapitalBuildingCard {
+        &self.capital_buildings[b as usize]
     }
     pub fn unit(&self, kind: UnitKind) -> &UnitCard {
         &self.units[kind as usize]

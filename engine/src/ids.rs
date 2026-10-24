@@ -599,6 +599,57 @@ impl ModuleKind {
     }
 }
 
+/// Ticket #590 (version 0.1.0.4): the eight **capital buildings**, one of which a Colonial Capital's
+/// holder chooses, each standing at one Capital in the whole game at most. In the table's order,
+/// which `Tables::capital_building` indexes by discriminant and a tie among the computer's scores
+/// breaks by.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CapitalBuilding {
+    StockMarket,
+    AssayOffice,
+    FuelDepot,
+    CentralGrid,
+    GreatLibrary,
+    Chancery,
+    Spaceport,
+    Arcology,
+}
+
+impl CapitalBuilding {
+    pub const ALL: [CapitalBuilding; 8] = [
+        CapitalBuilding::StockMarket,
+        CapitalBuilding::AssayOffice,
+        CapitalBuilding::FuelDepot,
+        CapitalBuilding::CentralGrid,
+        CapitalBuilding::GreatLibrary,
+        CapitalBuilding::Chancery,
+        CapitalBuilding::Spaceport,
+        CapitalBuilding::Arcology,
+    ];
+    pub fn name(self) -> &'static str {
+        match self {
+            CapitalBuilding::StockMarket => "Stock Market",
+            CapitalBuilding::AssayOffice => "Assay Office",
+            CapitalBuilding::FuelDepot => "Fuel Depot",
+            CapitalBuilding::CentralGrid => "Central Grid",
+            CapitalBuilding::GreatLibrary => "Great Library",
+            CapitalBuilding::Chancery => "Chancery",
+            CapitalBuilding::Spaceport => "Spaceport",
+            CapitalBuilding::Arcology => "Arcology",
+        }
+    }
+    /// The tool's word for it: the name in lower case without its space, "stockmarket", or its
+    /// first word alone where that is not another's, "stock".
+    pub fn parse(word: &str) -> Option<CapitalBuilding> {
+        let w = word.to_ascii_lowercase().replace([' ', '_', '-'], "");
+        CapitalBuilding::ALL.into_iter().find(|b| {
+            let name = b.name().to_ascii_lowercase();
+            name.replace(' ', "") == w || name.split(' ').next() == Some(w.as_str())
+        })
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum UnitKind {

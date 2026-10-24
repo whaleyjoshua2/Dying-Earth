@@ -304,6 +304,8 @@ build_cancelled = "{faction} cancelled the {building} at {place}: {refund} Mater
 # Ticket #503 (version 0.1.0.0): an upgrade to the Colonial Capital that another place on the Body
 # completed first, refunded to whoever paid for it.
 capital_refunded = "{place}'s upgrade refunded, {refund} Materials: {capital} is {body}'s Capital."
+# Ticket #590 (version 0.1.0.4): a capital building chosen, for good.
+capital_building = "{faction} built the {building} at {place}."
 # Ticket #351 (version 0.09.1): {sink} is `energy_short_sink` below when Scrubbers were shut, and
 # empty otherwise -- a Custodian lost three Scrubbers this way in the playtest with nothing said.
 energy_short = "{faction}: Energy ran short; shut down {buildings}{sink}."

@@ -93,6 +93,10 @@ pub enum Popup {
     /// Ticket #429 (version 0.09.5): a right-click would move an empty Colony Ship or Carrier; ask
     /// once. The orders wait in `ViewState::empty_move`, the question in `empty_move_text`.
     ConfirmEmptyMove,
+    /// Ticket #590 (version 0.1.0.4): **a capital building to choose** for a Capital of the
+    /// player's standing without one. Raised once nothing else is up, as the Accords are; "Later"
+    /// holds it off for the turn (`capital_later`), and End Turn makes a pick left unmade.
+    Capital,
 }
 
 #[derive(Resource)]
@@ -435,6 +439,9 @@ pub struct ViewState {
     /// Ticket #42: the trading window, and the quantity on each of its four lines
     /// (Influence, Materials, Fuel, Energy).
     pub show_trade: bool,
+    /// Ticket #590 (version 0.1.0.4): the turn the capital building's window was put off, so it is
+    /// not raised again that turn; the bar's button still opens it.
+    pub capital_later: Option<u32>,
     /// Ticket #145 (version 0.07.3): the Hab View, open on one station or Colony, and the tile
     /// clicked in it -- a standing Module by index, or a free slot, whose strip offers the build
     /// buttons.
@@ -549,6 +556,7 @@ impl Default for ViewState {
             faction_seat: Seat(0),
             faction_rulebook_open: false,
             show_trade: false,
+            capital_later: None,
             hab_tile: None,
             slot_box: None,
             trade_amounts: [5, 10, 10, 10],

@@ -457,6 +457,25 @@ fn build_board(session: &mut Session) {
                 g.end_turn(orders).expect("a Tech is picked before the turn ends");
             }
         }
+        // `capital:none` or `capital:<building>` (a building aid, ticket #590): seat 0 holds the
+        // Moon's Colonial Capital, unchosen or with that building, beside a second place of its own
+        // there; seat 1 holds Mars's with the Stock Market, so the pick window greys one.
+        if let Some(arg) = std::env::args().find_map(|a| a.strip_prefix("capital:").map(str::to_string)) {
+            let capital = g.tables.tiers.iter().position(|t| t.takes_slot).unwrap_or(0) as u32;
+            let place = |g: &mut Game, seat: Seat, body: BodyId, tier: u32, modules: Vec<Module>, colonists: u32| {
+                let slot = g.free_slots_on(body).first().copied().unwrap_or(0);
+                let id = ColonyId(g.fresh_id());
+                g.colonies.push(Colony { id, body, slot, control: Control::Controlled(seat), modules, colonists, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, tier, in_orbit: false });
+                id
+            };
+            let moon = place(g, Seat(0), BodyId::Moon, capital, vec![Module::new(ModuleKind::Core), Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Mine), Module::new(ModuleKind::Generator), Module::new(ModuleKind::Shipyard)], 9);
+            place(g, Seat(0), BodyId::Moon, 0, vec![Module::new(ModuleKind::Core), Module::new(ModuleKind::Mine)], 4);
+            let mars = place(g, Seat(1), BodyId::Mars, capital, vec![Module::new(ModuleKind::Core), Module::new(ModuleKind::Habitat)], 6);
+            g.pick_capital_building(Seat(1), mars, CapitalBuilding::StockMarket).ok();
+            if let Some(b) = CapitalBuilding::parse(&arg) {
+                g.pick_capital_building(Seat(0), moon, b).ok();
+            }
+        }
         // `battery:1` (a building aid, ticket #324, version 0.08.8): seat 0 gets a Colony on Mars
         // with a Battery standing, two hits on it, and seat 1 a Frigate in Mars orbit on Hold; so
         // the Mars band reads the Battery's row and why nobody holds Orbital Control, and the

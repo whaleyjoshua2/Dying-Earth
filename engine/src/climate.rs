@@ -706,6 +706,8 @@ impl Game {
             let room = self.habitat_room(col).saturating_sub(col.colonists);
             // Ticket #588 (version 0.1.0.4), at the designer's word: Earth orbit grows faster.
             let rate = if self.in_earth_orbit(col) { self.tables.climate.colony_growth_earth_orbit } else { rate };
+            // Ticket #590 (version 0.1.0.4): and an Arcology's, at its Capital and its holder's others.
+            let rate = rate + self.capital_growth(id);
             let (seat, now) = (col.control.director(), col.colonists);
             let change: i64 = if dark || starved {
                 self.colony_growth.remove(&id);

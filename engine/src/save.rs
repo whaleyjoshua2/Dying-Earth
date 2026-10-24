@@ -305,6 +305,9 @@ pub struct SavedGame {
     /// Ticket #444 (version 0.09.6): each Colony's growth toward its next Colonist.
     #[serde(default)]
     pub colony_growth: BTreeMap<ColonyId, f64>,
+    /// Ticket #590 (version 0.1.0.4): each capital building chosen, and its Capital.
+    #[serde(default)]
+    pub capital_buildings: BTreeMap<CapitalBuilding, ColonyId>,
 }
 
 impl SavedGame {
@@ -356,6 +359,7 @@ impl SavedGame {
             events_no_target,
             body_firsts,
             colony_growth,
+            capital_buildings,
             reveal_all: _,
             waiting_last: _,
         } = g;
@@ -403,6 +407,7 @@ impl SavedGame {
             widgets: widgets.clone(),
             body_firsts: body_firsts.clone(),
             colony_growth: colony_growth.clone(),
+            capital_buildings: capital_buildings.clone(),
         }
     }
 
@@ -452,6 +457,7 @@ impl SavedGame {
             events_no_target: self.events_no_target,
             body_firsts: self.body_firsts,
             colony_growth: self.colony_growth,
+            capital_buildings: self.capital_buildings,
             log: self.log,
             reveal_all: false,
             waiting_last: Vec::new(),

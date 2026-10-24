@@ -1245,6 +1245,42 @@ impl Game {
         }
     }
 
+    /// Ticket #590 (version 0.1.0.4): the capital building a computer seat takes for `capital`: of
+    /// the free ones, the best score -- 1 for the Faction's own, plus `capital_pick_need` where the
+    /// run needs what it gives (a stockpile yield its last Income lost; a Shipyard of its on the
+    /// Capital's Body for the Spaceport; a Region of its past the first Unrest threshold for the
+    /// Arcology) -- ties to the table's order.
+    pub fn ai_capital_pick(&self, seat: Seat, capital: ColonyId) -> Option<CapitalBuilding> {
+        let own = self.tables.faction(self.kind(seat)).capital_building;
+        let need = self.tables.ai.thresholds.capital_pick_need;
+        let last = self.seat(seat).income_last_turn;
+        let body = self.colony(capital)?.body;
+        let yard = self.colonies.iter().any(|c| c.body == body && c.control.director() == Some(seat) && c.modules.iter().any(|m| m.kind == ModuleKind::Shipyard));
+        let restive = self.controlled_states(seat).iter().any(|s| self.unrest(*s) >= self.tables.unrest.army_threshold);
+        let needed = |b: CapitalBuilding| -> bool {
+            match self.tables.capital_building(b).resource {
+                Some(Resource::Ducats) => last.ducats < 0.0,
+                Some(Resource::Materials) => last.materials < 0.0,
+                Some(Resource::Fuel) => last.fuel < 0.0,
+                Some(Resource::Energy) => last.energy < 0.0,
+                _ => match b {
+                    CapitalBuilding::Spaceport => yard,
+                    CapitalBuilding::Arcology => restive,
+                    _ => false,
+                },
+            }
+        };
+        let score = |b: CapitalBuilding| f64::from(u8::from(own == Some(b))) + if needed(b) { need } else { 0.0 };
+        let mut best: Option<(CapitalBuilding, f64)> = None;
+        for b in self.free_capital_buildings() {
+            let s = score(b);
+            if best.is_none_or(|(_, top)| s > top) {
+                best = Some((b, s));
+            }
+        }
+        best.map(|(b, _)| b)
+    }
+
     pub fn ai_orders(&mut self, seat: Seat) -> Vec<Order> {
         // Ticket #337 (version 0.09.0): the seat answers this turn's choice card HERE, before it
         // reads its own board for anything else, so a held fleet or a paid bill is already true of
@@ -1375,7 +1411,8 @@ impl Game {
         let capital_body = capital_candidate.and_then(|c| self.colony(c)).map(|c| c.body);
         let capital_chase = self.tables.ai.thresholds.capital_chase;
         // The people the Capital tier wants at one place, the room the candidate builds toward.
-        let capital_room = self.tables.tiers.iter().filter(|t| t.one_per_body).map(|t| t.colonists).max().unwrap_or(0);
+        // Ticket #590 (version 0.1.0.4): the Capital asks none, so the most any tier on the way asks.
+        let capital_room = self.tables.tiers.iter().take_while(|t| !t.one_per_body).chain(self.tables.tiers.iter().filter(|t| t.one_per_body)).map(|t| t.colonists).max().unwrap_or(0);
         // Room at the candidate for a landing: a crossing is lifted only where the people can land.
         let capital_has_room = capital_candidate.and_then(|c| self.colony(c)).is_some_and(|c| self.habitat_room(c) > c.colonists);
         let gathering = capital_candidate.is_some() && {
@@ -2075,6 +2112,12 @@ impl Game {
                 if mk != ModuleKind::Habitat && self.free_module_slots(&col) <= self.habitats_to_reserve(&col) {
                     continue;
                 }
+                // Ticket #590 (version 0.1.0.4): and the seat's Capital site on a Body keeps one slot
+                // open, the one its Capital's building will stand in, Habitats and all. Measured
+                // without it: a slot open went to an Exchange ahead of the upgrade every turn.
+                if self.capital_site(seat, col.body) == Some(cid) && self.free_module_slots(&col) <= 1 {
+                    continue;
+                }
                 if mk == ModuleKind::Habitat {
                     let room = self.habitat_room(&col).saturating_sub(col.colonists);
                     // Ticket #514 (version 0.1.0.0): at the Capital candidate, while gathering, a
@@ -2337,10 +2380,10 @@ impl Game {
         // Ticket #514 (version 0.1.0.0): every upgrade at the Capital candidate weighs `capital_chase`
         // times more (the candidate and the figure are read at the head of this function).
         for c in self.colonies.iter().filter(|c| c.control.director() == Some(seat)) {
+            // Ticket #590 (version 0.1.0.4): the Capital wants one slot open, not every slot built.
             if let Some(next) = self.open_tier(c)
                 && c.colonists >= next.colonists
-                && self.module_slots(c) >= self.tier_of(c).cap
-                && self.free_module_slots(c) == 0
+                && (if next.takes_slot { self.capital_site(seat, c.body) == Some(c.id) && self.free_module_slots(c) >= 1 } else { self.module_slots(c) >= self.tier_of(c).cap && self.free_module_slots(c) == 0 })
                 && self.tier_under_way(c).is_none()
             {
                 let chase = if capital_candidate == Some(c.id) { capital_chase } else { 1.0 };

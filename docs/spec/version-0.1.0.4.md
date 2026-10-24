@@ -411,3 +411,61 @@ Imbrium's people were read into the Archive'), and the colony card keeps '10 rem
   so is the log line. **The tool**'s Archive line ends "10 remembered here".
 - Once Colonies carry names, the line reads the name; that belongs to the naming ticket.
 - No rule moves; no sweep.
+
+## 17. The Colonial Capital on one slot, with a choice of eight capital buildings
+
+Ticket: [The Colonial Capital on one slot, with a choice of one of six capital buildings](https://github.com/whaleyjoshua2/Dying-Earth/issues/590).
+
+The designer: *"colonial capital will now require one slot and only slot open. When upgraded the
+player will be present a choice of 1 of 6 possible 'capital buildings' that provide a bonus, for
+example 'stock market' +3 duckets there an +1 ducket to each colony on the body"*; in the grilling,
+two more (the Spaceport and the Arcology), and *"each building can only be picked once, its unique"*.
+Colonial Capitals standing at the end of 0.1.0.3's closing sweep: 4 over 80 games.
+
+- **The Capital stays the fourth tier**: 24 slots, 77 Materials, 8 Widgets, ground only, one to a
+  Body, +1 Influence a turn. **The 24 Colonists are no longer asked.** It is ordered at a
+  Colony-tier place with **one open Module slot**, and its capital building stands in that slot:
+  the upgrade reserves it while it builds, and the building keeps it for good (`takes_slot` on the
+  tier's row; its `colonists` 0).
+- **The pick.** A Capital standing without a building is owed one by whoever directs it. The
+  player chooses from a window of the eight, which opens on the turn the Capital stands, a taken
+  one greyed with its holder ("Stock Market (Prospectors)"); a red button on the bar reopens it.
+  The pick is not provisional: it stands the moment it is made. It does not stop End Turn: a pick
+  left unmade is made at the head of End Turn, the Faction's own building if it is free, else the
+  first free in the table's order. The computer seats pick at the same moment, after every pick
+  the player made that turn. Tool: `capital <colony> <building>`.
+- **Each building is unique in the whole game**: once one stands, no other Capital may take it.
+  Eight buildings for eight Bodies with ground, so a Capital is never without one.
+- **The building passes with the Capital**, through capture and handover, its bonus to whoever
+  directs it, as the +1 Influence.
+- **The eight** (`[[capital_building]]` in `modules.toml`), flat and after every multiplier.
+  "Others" are the other Colonies and stations on the Body that the holder directs, never a
+  rival's. A place starved by a Blockade makes nothing of it, as of everything.
+
+  | Building | At the Capital | Each other place of the holder's on the Body |
+  |---|---|---|
+  | Stock Market | +3 Ducats | +1 Ducat |
+  | Assay Office | +3 Materials | +1 Material |
+  | Fuel Depot | +3 Fuel | +1 Fuel |
+  | Central Grid | +3 Energy | +1 Energy |
+  | Great Library | +3 Research | +1 Research |
+  | Chancery | +2 Influence | +1 Influence |
+  | Spaceport | a Ship built at its Shipyard takes half the Widgets | three quarters |
+  | Arcology | Colonists grow +2% a turn (4%) | +1% (3%) |
+
+  The Arcology also takes 1 Unrest off every Region on Earth its holder controls, once, the turn
+  it is chosen. The Spaceport shares its name with the Earth Facility, at the designer's word.
+  Widgets round up, never below 1.
+- **The Report**: *"Prospectors built the Stock Market at Plato."*, under Your works for the
+  player's own.
+- **The computer** (`[capital_pick]` in `ai.toml`) scores each free building as its Faction's own
+  (`capital_building` on the Faction's row: the Custodians the Central Grid, the Prospectors the
+  Stock Market, the Arkwrights the Arcology, the Archivists the Great Library) plus its need in the
+  run: a yield its last Income lost, Ships at the Capital's Body for the Spaceport, a Region of its
+  past the first Unrest threshold for the Arcology, the Influence the Chancery pays; the highest
+  wins, ties to the table's order. Its upgrade reads the open slot in place of the people, and the
+  Capital candidate of a seat whose win waits on a Capital keeps that slot free.
+- **Refuted if** a Capital is ordered with no open slot, two Capitals hold one building, a rival's
+  Colony on the Body draws a holder's +1, or the sweep's Capitals at the end stay at 4 in 80.
+- `SAVE_VERSION` unmoved: the buildings chosen are one map on the game, `serde(default)`; a
+  Capital in an older save is owed its pick.

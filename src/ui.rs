@@ -440,6 +440,8 @@ enum Action {
     Notice(String),
     EndTurn,
     PickTech(TechId),
+    /// Ticket #590 (version 0.1.0.4): the player's capital building for a Capital of theirs.
+    PickCapital(ColonyId, CapitalBuilding),
     /// Ticket #337 (version 0.09.0): seat 0 answered this turn's choice card. A PLACEHOLDER, so
     /// the card can be answered at all while the interface for it is built in its own lane.
     AnswerCard(bool),
@@ -1719,6 +1721,15 @@ pub fn draw(
                     session.last_error = Some(e);
                 }
             }
+            Action::PickCapital(c, b) => {
+                let result = session.game.as_mut().map(|g| g.pick_capital_building(Seat(0), c, b));
+                if let Some(Err(e)) = result {
+                    session.last_error = Some(e);
+                }
+                if view.popup == Popup::Capital {
+                    view.popup = Popup::None;
+                }
+            }
             // Ticket #337 (version 0.09.0): the answer goes to the engine, which records it, stops
             // refusing End Turn and applies the side chosen at this turn's Resolution. The modal
             // hands on to the turn's Moments and its Report as it goes (`Popup::Card`).
@@ -2920,6 +2931,14 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
                 let pick = egui::Button::new(RichText::new("Pick a Tech").strong()).fill(TURN_RED);
                 if ui.add(pick).on_hover_text("The Research Lead is yours: choose what the world researches next. The turn cannot end until you do.").clicked() {
                     view.show_tech = true;
+                }
+                ui.separator();
+            }
+            // Ticket #590 (version 0.1.0.4): a Capital of the player's owed its building.
+            if !session.spectator && !game.capital_picks_owed(Seat(0)).is_empty() {
+                let pick = egui::Button::new(RichText::new("Capital building").strong()).fill(TURN_RED);
+                if ui.add_enabled(view.popup == Popup::None, pick).on_hover_text("Choose one for your Capital.").clicked() {
+                    view.popup = Popup::Capital;
                 }
                 ui.separator();
             }
@@ -10802,7 +10821,11 @@ fn module_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
         let queued = game.tier_under_way(col);
         (next, pending, queued)
     });
-    let total = standing.len() + building.len() + ordered.len() + free + usize::from(upgrade.is_some());
+    // Ticket #590 (version 0.1.0.4): the Capital's building, its own tile in the slot it holds; a
+    // Capital ordered this turn takes its slot from the free count, as a Module ordered does.
+    let capital = game.tier_of(col).takes_slot && !col.in_orbit;
+    let free = if upgrade.is_some_and(|(next, pending, _)| next.takes_slot && pending.is_some()) { free.saturating_sub(1) } else { free };
+    let total = standing.len() + usize::from(capital) + building.len() + ordered.len() + free + usize::from(upgrade.is_some());
     let rows = total.div_ceil(MODULE_COLS).max(1);
     let archive = col.modules.iter().position(|m| m.kind == ModuleKind::Archive);
     let archive_rows = if archive.is_some() { 1 } else { 0 };
@@ -10850,6 +10873,17 @@ fn module_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
         }
         if hab_tile(ui, tile_rect(i), ui.id().with(("hab", mi)), Some(crate::icons::module_icon(m.kind)), &label, state, selected, None, tip).clicked() {
             view.hab_tile = Some(HabTile::Module(mi));
+        }
+        i += 1;
+    }
+    if capital {
+        let (label, tip) = match game.capital_building_at(cid) {
+            Some(b) => (b.name().to_string(), format!("{}: {}.", b.name(), game.tables.capital_building(b).does)),
+            None if mine => ("Choose".to_string(), "Choose a capital building: click.".to_string()),
+            None => ("Capital".to_string(), "No capital building chosen yet.".to_string()),
+        };
+        if hab_tile(ui, tile_rect(i), ui.id().with("hab-capital"), None, &label, TileState::Standing, false, None, tip).clicked() && mine && game.capital_building_at(cid).is_none() && view.popup == Popup::None {
+            view.popup = Popup::Capital;
         }
         i += 1;
     }
@@ -12243,6 +12277,11 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
         view.popup = Popup::Offers;
         view.counters.clear();
     }
+    // Ticket #590 (version 0.1.0.4): a Capital of the player's owed its building, the same way,
+    // once a turn.
+    if view.popup == Popup::None && !session.spectator && !game.seat(Seat(0)).ai && view.capital_later != Some(game.turn) && !game.capital_picks_owed(Seat(0)).is_empty() {
+        view.popup = Popup::Capital;
+    }
     if view.show_trade && !session.spectator {
         let mut open = true;
         // Ticket #292 (version 0.08.6): under the bar and to the right of the Faction window's
@@ -12667,6 +12706,40 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
         }
         // Ticket #495 (version 0.09.9): the Accords offered to the player, one row each, Accept or
         // Refuse. Like the card, an answer is the only way out: no Continue, and Escape holds it.
+        // Ticket #590 (version 0.1.0.4): the eight, a taken one greyed with its holder.
+        Popup::Capital => {
+            let Some(cid) = game.capital_picks_owed(Seat(0)).first().copied() else {
+                view.popup = Popup::None;
+                return;
+            };
+            let place = game.colony(cid).map(|c| game.slot_name(c)).unwrap_or_default();
+            egui::Modal::new("capital".into()).show(ctx, |ui| {
+                ui.set_width(620.0);
+                ui.label(RichText::new(format!("{place}: a capital building")).size(26.0).strong().color(Color32::from_rgb(255, 220, 150)));
+                ui.add_space(4.0);
+                for b in CapitalBuilding::ALL {
+                    let holder = game.capital_buildings.get(&b).map(|c| game.colony(*c).and_then(|c| c.control.director()));
+                    let name = match holder {
+                        Some(Some(s)) => format!("{} ({})", b.name(), game.seat_name(s)),
+                        Some(None) => format!("{} (taken)", b.name()),
+                        None => b.name().to_string(),
+                    };
+                    ui.horizontal(|ui| {
+                        let button = egui::Button::new(RichText::new(name).size(16.0).strong()).min_size(egui::vec2(220.0, 0.0));
+                        if ui.add_enabled(holder.is_none(), button).clicked() {
+                            actions.push(Action::PickCapital(cid, b));
+                        }
+                        ui.label(RichText::new(&game.tables.capital_building(b).does).size(15.0));
+                    });
+                }
+                ui.add_space(8.0);
+                let later = game.capital_default(Seat(0)).map(|b| format!("Unchosen at End Turn: the {}.", b.name())).unwrap_or_default();
+                if ui.button("Later").on_hover_text(later).clicked() {
+                    view.capital_later = Some(game.turn);
+                    view.popup = Popup::None;
+                }
+            });
+        }
         Popup::Offers => {
             let offers: Vec<OfferRow> = game.offers_to(Seat(0)).into_iter().map(|(i, o)| (i, o.from, offer_words(game, o), o.ask == AccordAsk::Renew, o.trade)).collect();
             if offers.is_empty() {

@@ -2,6 +2,9 @@
 
 [[faction]]
 id = "custodians"
+# Ticket #590 (version 0.1.0.4): the capital building it takes for a pick left unmade, and the
+# computer's lean.
+capital_building = "central_grid"
 # Ticket #100 (version 0.07.0), renamed on ticket #195 (version 0.08.0): the Region the start
 # screen opens the globe on for this Faction. It changes nothing else -- no starting position, and
 # any of the eighteen may still be chosen -- which is what the old name `home` did not say.
@@ -67,6 +70,7 @@ colour = [0.15, 0.65, 0.6]
 
 [[faction]]
 id = "prospectors"
+capital_building = "stock_market"
 # Ticket #100 (version 0.07.0), renamed on ticket #195 (version 0.08.0): the Region the start
 # screen opens the globe on for this Faction. It changes nothing else -- no starting position, and
 # any of the eighteen may still be chosen -- which is what the old name `home` did not say.
@@ -143,6 +147,7 @@ colour = [0.85, 0.5, 0.2]
 
 [[faction]]
 id = "arkwrights"
+capital_building = "arcology"
 # Ticket #100 (version 0.07.0), renamed on ticket #195 (version 0.08.0): the Region the start
 # screen opens the globe on for this Faction. It changes nothing else -- no starting position, and
 # any of the eighteen may still be chosen -- which is what the old name `home` did not say.
@@ -236,6 +241,7 @@ colour = [0.44, 0.275, 0.66]
 
 [[faction]]
 id = "archivists"
+capital_building = "great_library"
 # Ticket #100 (version 0.07.0), renamed on ticket #195 (version 0.08.0): the Region the start
 # screen opens the globe on for this Faction. It changes nothing else -- no starting position, and
 # any of the eighteen may still be chosen -- which is what the old name `home` did not say.

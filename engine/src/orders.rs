@@ -509,6 +509,7 @@ impl Game {
                 Order::RaiseIndustry { state } => self.industry_widgets(seat, *state),
                 // Ticket #505 (version 0.1.0.0): a Module's are its Colony's (Regolith Printing).
                 Order::BuildModule { colony, .. } | Order::BuildModuleWithDucats { colony, .. } | Order::BuildArchive { colony } => self.build_widgets_at(seat, Place::Colony(*colony), item),
+                Order::BuildShip { site, .. } => self.build_widgets_at(seat, *site, item),
                 _ => self.build_widgets(seat, item),
             };
             parts.push(format!("{n} Widget{}", if n == 1 { "" } else { "s" }));
@@ -1662,6 +1663,13 @@ impl Game {
                 if col.colonists < next.colonists {
                     return fail(format!("needs {}", crate::counted(next.colonists, "Colonist", "Colonists")));
                 }
+                // Ticket #590 (version 0.1.0.4): the Capital's building stands in a slot, open now.
+                if next.takes_slot {
+                    let ordered = pending.iter().filter(|o| matches!(o.build_module(), Some((c, k)) if c == *colony && k != ModuleKind::Archive)).count() as u32;
+                    if self.module_slots_used(col) + ordered >= self.module_slots(col) {
+                        return fail("needs 1 open slot");
+                    }
+                }
                 Ok(cost)
             }
             Order::BuildModule { colony, kind } => {
@@ -1745,16 +1753,17 @@ impl Game {
                 // count, as do the ones already ordered this turn; the Archive counts on neither
                 // side. A cap that has fallen below what stands destroys nothing: there is simply
                 // no room until Colonists arrive.
+                // Ticket #590 (version 0.1.0.4): a Capital ordered this turn has its slot already.
                 let ordered = pending
                     .iter()
-                    .filter(|o| matches!(o.build_module(), Some((c, k)) if c == *colony && k != ModuleKind::Archive))
+                    .filter(|o| matches!(o.build_module(), Some((c, k)) if c == *colony && k != ModuleKind::Archive) || matches!(o, Order::RaiseTier { colony: c } if c == colony && self.next_tier(col).is_some_and(|t| t.takes_slot)))
                     .count() as u32;
                 if self.module_slots_used(col) + ordered >= self.module_slots(col) {
                     // Ticket #490 (version 0.09.9): full at its tier's cap, it wants the upgrade, not people.
                     let tier = self.tier_of(col);
                     return fail(if self.module_slots(col) < tier.cap {
                         "full until more Colonists live here".to_string()
-                    } else if let Some(next) = self.open_tier(col) {
+                    } else if let Some(next) = self.open_tier(col).filter(|t| !t.takes_slot) {
                         format!("full: upgrade to a {} for more", next.name)
                     } else {
                         format!("full: a {} holds {}", tier.name, tier.cap)
@@ -2980,7 +2989,8 @@ impl Game {
                     }
                 }
                 Order::BuildShip { site, kind } => {
-                    let widgets = self.build_widgets(seat, BuildItem::Unit(*kind));
+                    // Ticket #590 (version 0.1.0.4): at its site's figure (a Spaceport).
+                    let widgets = self.build_widgets_at(seat, *site, BuildItem::Unit(*kind));
                     // Ticket #455 (version 0.09.6): the tank's Fuel paid just above rides with the build.
                     let b = Build { item: BuildItem::Unit(*kind), seat, widgets, done: 0, coastal: false, fuel: cost.fuel };
                     match site {

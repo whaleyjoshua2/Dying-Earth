@@ -531,3 +531,40 @@ designer. The words stayed under the ceiling. Two shot aids were added: `uploade
 
 - **The card after the Upload** ([`ticket-587/card-after-upload.png`](ticket-587/card-after-upload.png)):
   "4 remembered here", three living, the button offering three.
+
+## The Colonial Capital on one slot, with eight capital buildings
+
+Ticket [#590](https://github.com/whaleyjoshua2/Dying-Earth/issues/590), spec §17. Three rounds of
+grilling: the reading of "one slot open" (the Capital stays the fourth tier; one open slot in place
+of the 24 Colonists, its building in that slot), six buildings grown to eight (the Spaceport, the
+Arcology), each unique in the whole game, and the names (Assay Office, Central Grid, Chancery).
+
+Eleven tests were each watched red against a deliberate break of the rule they hold. One break
+survived at first: letting a building's +1 reach a rival's Colony passed, because the test read the
+rival's card, which never shows the holder's figures. The test now reads the holder's Income
+(3 and 1, not 3, 1 and 1). Five older Capital tests moved to the new rule.
+
+Two computer habits were changed. Under the old rule a Colony could build nothing more once full,
+so the upgrade never competed with a Module. With one slot open it does, and the slot went to an
+Exchange (34.5) ahead of the upgrade (5.0). So each seat keeps the last slot open at its Capital
+site on a Body, and raises only that one. The Arkwrights' gathering built Habitats toward the
+Capital's 24 people, and now builds toward the 18 the Colony tier on the way asks.
+
+- **The sweep** ([`sweeps/ticket-590.txt`](sweeps/ticket-590.txt)): **36 / 32 / 1 / 11 and no
+  collapse**, from 35 / 32 / 2 / 11 at #588, noise. **No Colonial Capital at the end of any of the
+  80 games** (4 at the baseline, 2 at #588), and so no capital building.
+- **With the gathering at 18** ([`sweeps/ticket-590-gather.txt`](sweeps/ticket-590-gather.txt)):
+  **35 / 33 / 1 / 11 and 0**; still no Capital.
+- **Why.** Traced over twenty games: every Settlement or Colony standing at the end is a station
+  over Earth, which stops at the Colony tier, or a place in Antarctica. No computer place off Earth
+  reached a Settlement, which wants 12 people and its 6 slots built. The Capital's own step was
+  never reached, so this rule cannot move the count.
+
+- **The pick window**, the Moon's Capital unchosen and the Stock Market taken by the Prospectors on
+  Mars; the bar's "Capital building" button beside the figures:
+
+![The pick](ticket-590/pick-window.png)
+
+- **The card** with the Central Grid chosen: its tile in the slot it holds, "Modules 6 of 9":
+
+![The Central Grid](ticket-590/card-central-grid.png)

@@ -224,6 +224,17 @@ impl Game {
         // drawn from `report.turn`. Without it the last Report of every game read January 2030. A turn
         // that carries on overwrites this with the new turn in `report_phase`, exactly as before.
         self.report.turn = self.turn;
+        // Ticket #590 (version 0.1.0.4): every Capital still owed its building gets one now, after
+        // whatever the player chose this turn: a computer seat's by its score, a player's left
+        // unmade by the Faction's own where it is free. Seat by seat, so a building goes once.
+        for seat in Seat::ALL {
+            for capital in self.capital_picks_owed(seat) {
+                let pick = if self.seat(seat).ai { self.ai_capital_pick(seat, capital) } else { self.capital_default(seat) };
+                if let Some(b) = pick {
+                    let _ = self.pick_capital_building(seat, capital, b);
+                }
+            }
+        }
         for seat in Seat::ALL {
             if self.seat(seat).ai {
                 all[seat.index()] = self.ai_orders(seat);

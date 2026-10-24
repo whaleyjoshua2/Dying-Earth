@@ -21785,25 +21785,40 @@ fn capital_ready(g: &mut Game, seat: Seat, body: BodyId) -> ColonyId {
     c
 }
 
-/// Ticket #503 (version 0.1.0.0): the Colonial Capital is a fourth tier: 24 slots once 24 live
-/// there, for 77 Materials (70 before ticket #537) and 8 Widgets, raised through the queue as any tier is.
+/// Ticket #503 (version 0.1.0.0): the Colonial Capital is a fourth tier of 24 slots, for 77
+/// Materials (70 before ticket #537) and 8 Widgets, raised through the queue as any tier is.
+/// Ticket #590 (version 0.1.0.4): it asks one open slot, not 24 people, and its building takes the
+/// slot -- reserved while the upgrade builds, held once it stands.
 #[test]
-fn the_colonial_capital_is_a_fourth_tier_of_twenty_four() {
+fn the_colonial_capital_wants_one_open_slot_and_keeps_it() {
     let mut g = game();
     let c = capital_ready(&mut g, Seat(0), BodyId::Moon);
     let raise = Order::RaiseTier { colony: c };
     assert!(g.check_order(Seat(0), &[], &raise).is_ok(), "{:?}", g.check_order(Seat(0), &[], &raise));
     assert_eq!(g.order_cost(Seat(0), &raise).materials, 77.0, "70 x 1.1 since ticket #537");
-    g.colony_mut(c).unwrap().colonists = 23;
-    assert!(g.check_order(Seat(0), &[], &raise).unwrap_err().0.contains("needs 24 Colonists"));
-    g.colony_mut(c).unwrap().colonists = 30;
+    // Five people, five slots, every one built: refused; one open: ordered, at five people.
+    g.colony_mut(c).unwrap().colonists = 5;
+    for _ in 0..5 {
+        g.colony_mut(c).unwrap().modules.push(Module::new(ModuleKind::Mine));
+    }
+    assert_eq!(g.check_order(Seat(0), &[], &raise).unwrap_err().0, "needs 1 open slot");
+    g.colony_mut(c).unwrap().modules.pop();
+    assert!(g.check_order(Seat(0), &[], &raise).is_ok(), "{:?}", g.check_order(Seat(0), &[], &raise));
+    // A Module ordered this turn into the open slot, and the Capital is refused; the reverse too.
+    let mine = Order::BuildModule { colony: c, kind: ModuleKind::Mine };
+    assert_eq!(g.check_order(Seat(0), std::slice::from_ref(&mine), &raise).unwrap_err().0, "needs 1 open slot");
+    assert!(g.check_order(Seat(0), std::slice::from_ref(&raise), &mine).is_err());
     g.commit_orders(Seat(0), std::slice::from_ref(&raise));
     assert_eq!(g.colony(c).unwrap().queue.last().map(|b| (b.item, b.widgets)), Some((BuildItem::Tier(3), 8)));
+    assert_eq!(g.free_module_slots(g.colony(c).unwrap()), 0, "the upgrade holds the slot");
     g.colony_mut(c).unwrap().queue[0].done = 8;
     g.resolution_phase();
     assert_eq!(g.tier_of(g.colony(c).unwrap()).name, "Colonial Capital");
-    assert_eq!(g.module_slots(g.colony(c).unwrap()), 24);
     assert_eq!(g.capital_of(BodyId::Moon), Some(c));
+    let col = g.colony(c).unwrap().clone();
+    assert_eq!((g.module_slots(&col), g.module_slots_used(&col)), (5, 5), "its building holds the slot");
+    g.colony_mut(c).unwrap().colonists = 30;
+    assert_eq!(g.module_slots(g.colony(c).unwrap()), 24);
 }
 
 /// Ticket #503: one to a Body. The first to complete holds it; another under way there is refunded
@@ -21883,7 +21898,9 @@ fn a_full_colony_is_not_told_to_upgrade_where_the_capital_stands_elsewhere() {
         g.colony_mut(c).unwrap().modules.push(Module::new(ModuleKind::Habitat));
     }
     let build = Order::BuildModule { colony: c, kind: ModuleKind::Habitat };
-    assert!(g.check_order(Seat(0), &[], &build).unwrap_err().0.contains("upgrade to a Colonial Capital"));
+    // Ticket #590 (version 0.1.0.4): full, it cannot be a Capital, which wants a slot open.
+    assert_eq!(g.check_order(Seat(0), &[], &build).unwrap_err().0, "full: a Colony holds 18");
+    assert_eq!(g.check_order(Seat(0), &[], &Order::RaiseTier { colony: c }).unwrap_err().0, "needs 1 open slot");
     let other = capital_ready(&mut g, Seat(1), BodyId::Moon);
     g.colony_mut(other).unwrap().tier = 3;
     let err = g.check_order(Seat(0), &[], &build).unwrap_err().0;
@@ -21928,20 +21945,20 @@ fn antarctica_may_hold_earths_capital() {
 }
 
 /// Ticket #503: the computer raises a full Colony with 24 people to the Capital where the Body has
-/// none, and not where it has one.
+/// none, and not where it has one. Ticket #590 (version 0.1.0.4): a Colony with one slot open.
 #[test]
 fn the_ai_raises_a_capital_only_where_the_body_has_none() {
     let mut g = game();
     calm(&mut g);
     let c = capital_ready(&mut g, Seat(1), BodyId::Moon);
-    for _ in 0..18 {
+    for _ in 0..17 {
         g.colony_mut(c).unwrap().modules.push(Module::new(ModuleKind::Habitat));
     }
     // Ticket #564 (version 0.1.0.3): a Colony Ship of the seat's, so the race for the first landing
     // does not put a Shipyard at 54 ahead of the Capital in the budget.
     parked_colony_ship(&mut g, Seat(1), BodyId::Moon);
     let raises = |g: &mut Game| g.ai_orders(Seat(1)).iter().any(|o| matches!(o, Order::RaiseTier { colony } if *colony == c));
-    assert!(raises(&mut g), "full at eighteen, twenty-four people, no Capital on the Moon: {:#?}", g.log.iter().filter(|l| l.contains("upgrade") || l.starts_with("  take")).collect::<Vec<_>>());
+    assert!(raises(&mut g), "a slot open, no Capital on the Moon: {:#?}", g.log.iter().filter(|l| l.contains("upgrade") || l.starts_with("  take")).collect::<Vec<_>>());
     let other = capital_ready(&mut g, Seat(2), BodyId::Moon);
     g.colony_mut(other).unwrap().tier = 3;
     assert!(!raises(&mut g), "the Moon has its Capital");
@@ -21949,12 +21966,14 @@ fn the_ai_raises_a_capital_only_where_the_body_has_none() {
     // pick takes one upgrade a turn and passes over the second while the first is under way.
     let full = |g: &mut Game| {
         let m = capital_ready(g, Seat(1), BodyId::Mars);
-        for _ in 0..18 {
+        for _ in 0..17 {
             g.colony_mut(m).unwrap().modules.push(Module::new(ModuleKind::Habitat));
         }
         m
     };
     let (m1, m2) = (full(&mut g), full(&mut g));
+    // Ticket #590 (version 0.1.0.4): Materials enough, a slot open at both now feeding the producers too.
+    g.seats[1].stockpile.materials = 2000.0;
     let mars = |o: &Order| matches!(o, Order::RaiseTier { colony } if *colony == m1 || *colony == m2);
     let first: Vec<Order> = g.ai_orders(Seat(1)).into_iter().filter(mars).collect();
     assert_eq!(first.len(), 1, "one Capital raised on Mars");
@@ -22947,11 +22966,11 @@ fn the_arkwright_computer_lifts_the_upgrade_and_the_landing_at_its_capital_candi
     let (ark, cus) = (Seat(2), Seat(0));
     let chase = g.tables.ai.thresholds.capital_chase;
     assert_eq!(chase, 3.0);
-    // Two identical places at the Colony tier, full to its cap, with the Capital's 24 people: one the
+    // Two identical places at the Colony tier, one slot open for the Capital (ticket #590): one the
     // Arkwrights', one the Custodians'.
     let colony_tier = g.tables.tiers.iter().position(|t| t.cap == 18).expect("the Colony tier") as u32;
     let place = |g: &mut Game, seat: Seat, body: BodyId| {
-        let c = colony(g, seat, body, &[ModuleKind::Habitat; 18], 24);
+        let c = colony(g, seat, body, &[ModuleKind::Habitat; 17], 24);
         g.colony_mut(c).unwrap().tier = colony_tier;
         g.seats[seat.index()].stockpile.materials = 500.0;
         g.seats[seat.index()].stockpile.energy = 500.0;
@@ -23090,7 +23109,8 @@ fn the_computer_keeps_slots_at_a_ground_colony_for_the_habitats_its_next_tier_ne
     assert_eq!(g.habitats_to_reserve(g.colony(mars).unwrap()), 0, "a Capital held: the Outpost reserves nothing for its Settlement");
     let big = colony(&mut g, s, BodyId::Mars, &[ModuleKind::Habitat; 4], 20);
     g.colony_mut(big).unwrap().tier = capital - 1;
-    assert_eq!(g.habitats_to_reserve(g.colony(big).unwrap()), 1, "room 20 of the Capital's 24: one Habitat kept, a second Capital never precluded");
+    // Ticket #590 (version 0.1.0.4): the Capital asks no people, so no Habitat is kept for it.
+    assert_eq!(g.habitats_to_reserve(g.colony(big).unwrap()), 0, "the Capital wants a slot, not people");
 }
 
 // ---------------------------------------------------------------- the 0.1.0.0 playtest: the Venus soft-lock
@@ -25084,4 +25104,151 @@ fn an_upload_names_the_place_and_its_people() {
             assert_eq!(line.kind, LineKind::Archive);
         }
     }
+}
+
+// ---------------------------------------------------------------- #590 the capital buildings (version 0.1.0.4)
+
+/// Ticket #590: a Capital standing at `body` for `seat`, with `colonists` there and no Modules.
+fn capital_at(g: &mut Game, seat: Seat, body: BodyId, colonists: u32) -> ColonyId {
+    let c = colony(g, seat, body, &[], colonists);
+    g.colony_mut(c).unwrap().tier = g.tables.tiers.iter().position(|t| t.takes_slot).unwrap() as u32;
+    c
+}
+
+/// Ticket #590 (version 0.1.0.4): a Capital without its building is owed one by whoever directs it;
+/// each building stands at one Capital in the game; it passes with the place.
+#[test]
+fn each_capital_building_stands_once_and_passes_with_its_capital() {
+    let mut g = game();
+    let moon = capital_at(&mut g, Seat(0), BodyId::Moon, 6);
+    assert_eq!(g.capital_picks_owed(Seat(0)), vec![moon]);
+    g.pick_capital_building(Seat(0), moon, CapitalBuilding::StockMarket).unwrap();
+    assert!(g.capital_picks_owed(Seat(0)).is_empty());
+    assert_eq!(g.capital_building_at(moon), Some(CapitalBuilding::StockMarket));
+    assert!(g.report.lines.iter().any(|l| l.text == format!("Custodians built the Stock Market at {}.", g.slot_name(g.colony(moon).unwrap()))));
+    // Taken: refused elsewhere, by where it stands and whose; another is free.
+    let mars = capital_at(&mut g, Seat(1), BodyId::Mars, 6);
+    let err = g.pick_capital_building(Seat(1), mars, CapitalBuilding::StockMarket).unwrap_err();
+    assert_eq!(err, format!("the Stock Market stands at {} (Custodians)", g.slot_name(g.colony(moon).unwrap())));
+    assert!(!g.free_capital_buildings().contains(&CapitalBuilding::StockMarket));
+    assert!(g.pick_capital_building(Seat(0), mars, CapitalBuilding::FuelDepot).is_err(), "not the Custodians' to choose");
+    g.pick_capital_building(Seat(1), mars, CapitalBuilding::FuelDepot).unwrap();
+    assert!(g.pick_capital_building(Seat(1), mars, CapitalBuilding::Chancery).is_err(), "one to a Capital, for good");
+    // Captured: the building stays, now the captor's.
+    g.transfer_control(Place::Colony(moon), Seat(2), "Trade");
+    assert_eq!(g.capital_building_at(moon), Some(CapitalBuilding::StockMarket));
+    assert!(g.capital_picks_owed(Seat(2)).is_empty());
+}
+
+/// Ticket #590: a yield building pays +3 at its Capital and +1 at each other place on the Body its
+/// holder directs, a rival's none; flat, beside nothing else there.
+#[test]
+fn the_stock_market_pays_three_here_and_one_at_each_other_place_of_its_holders() {
+    let mut g = game();
+    let cap = capital_at(&mut g, Seat(0), BodyId::Moon, 6);
+    let own = colony(&mut g, Seat(0), BodyId::Moon, &[], 4);
+    let rival = colony(&mut g, Seat(1), BodyId::Moon, &[], 4);
+    let ducats = |g: &Game, c: ColonyId| g.place_output(Place::Colony(c)).map_or(0.0, |o| o.ducats);
+    assert_eq!((ducats(&g, cap), ducats(&g, own), ducats(&g, rival)), (0.0, 0.0, 0.0));
+    g.pick_capital_building(Seat(0), cap, CapitalBuilding::StockMarket).unwrap();
+    assert_eq!((ducats(&g, cap), ducats(&g, own), ducats(&g, rival)), (3.0, 1.0, 0.0));
+    // Research the same way, whole, to the Tech.
+    let mars = capital_at(&mut g, Seat(0), BodyId::Mars, 6);
+    g.pick_capital_building(Seat(0), mars, CapitalBuilding::GreatLibrary).unwrap();
+    assert_eq!(g.place_output(Place::Colony(mars)).map(|o| o.research), Some(3.0));
+    // At Income the Ducats land, 3 and 1 and nothing for the rival's place.
+    g.income_phase();
+    let market: Vec<f64> = g.seats[0].income_sources.iter().filter(|(n, r, _)| n.starts_with("Stock Market in") && *r == Resource::Ducats).map(|(_, _, v)| *v).collect();
+    assert_eq!(market, vec![3.0, 1.0], "{:?}", g.seats[0].income_sources);
+}
+
+/// Ticket #590: the Chancery's Influence, +2 and +1 for each other place of the holder's on the Body.
+#[test]
+fn the_chancery_pays_two_influence_and_one_for_each_other_place() {
+    let mut g = game();
+    let cap = capital_at(&mut g, Seat(0), BodyId::Moon, 6);
+    colony(&mut g, Seat(0), BodyId::Moon, &[], 4);
+    colony(&mut g, Seat(1), BodyId::Moon, &[], 4);
+    let before = g.influence_allotment(Seat(0));
+    g.pick_capital_building(Seat(0), cap, CapitalBuilding::Chancery).unwrap();
+    assert_eq!(g.capital_building_allotment(Seat(0)), 3);
+    assert_eq!(g.influence_allotment(Seat(0)), before + 3);
+    assert!(g.influence_allotment_parts(Seat(0)).contains(&("Chancery".to_string(), 3)));
+}
+
+/// Ticket #590: the Spaceport: a Ship at the Capital for half the Widgets, at the holder's other
+/// places on the Body for three quarters, rounded up; a rival's and an Army's untouched.
+#[test]
+fn the_spaceport_halves_a_ships_widgets_at_its_capital() {
+    let mut g = game();
+    let cap = capital_at(&mut g, Seat(0), BodyId::Moon, 6);
+    let own = colony(&mut g, Seat(0), BodyId::Moon, &[], 4);
+    let rival = colony(&mut g, Seat(1), BodyId::Moon, &[], 4);
+    let ship = BuildItem::Unit(UnitKind::Battleship);
+    let base = g.build_widgets(Seat(0), ship);
+    g.pick_capital_building(Seat(0), cap, CapitalBuilding::Spaceport).unwrap();
+    assert_eq!(g.build_widgets_at(Seat(0), Place::Colony(cap), ship), base.div_ceil(2));
+    assert_eq!(g.build_widgets_at(Seat(0), Place::Colony(own), ship), (base * 3).div_ceil(4));
+    assert_eq!(g.build_widgets_at(Seat(1), Place::Colony(rival), ship), g.build_widgets(Seat(1), ship));
+    let army = BuildItem::Unit(UnitKind::Army);
+    assert_eq!(g.build_widgets_at(Seat(0), Place::Colony(cap), army), g.build_widgets(Seat(0), army));
+}
+
+/// Ticket #590: the Arcology: +2% growth at its Capital, +1% at the holder's others, and 1 Unrest off
+/// each Region its holder controls, once, when chosen.
+#[test]
+fn the_arcology_grows_its_capital_and_eases_the_holders_regions_once() {
+    let mut g = game();
+    calm(&mut g);
+    let cap = capital_at(&mut g, Seat(0), BodyId::Moon, 6);
+    let own = colony(&mut g, Seat(0), BodyId::Moon, &[], 4);
+    let regions = g.controlled_states(Seat(0));
+    for s in &regions {
+        g.state_mut(*s).unrest = 3.0;
+    }
+    g.pick_capital_building(Seat(0), cap, CapitalBuilding::Arcology).unwrap();
+    assert_eq!((g.capital_growth(cap), g.capital_growth(own)), (0.02, 0.01));
+    assert!(regions.iter().all(|s| g.unrest(*s) == 2.0), "{:?}", regions.iter().map(|s| g.unrest(*s)).collect::<Vec<_>>());
+    // Growth at the Capital: 4% of 50 is two a turn, with the room for them.
+    g.colony_mut(cap).unwrap().colonists = 50;
+    for _ in 0..20 {
+        g.colony_mut(cap).unwrap().modules.push(Module::new(ModuleKind::Habitat));
+    }
+    g.colony_growth_step();
+    assert_eq!(g.colony(cap).unwrap().colonists, 52);
+}
+
+/// Ticket #590: at End Turn every Capital still owed a building gets one: the player's by the
+/// Faction's own (the Custodians' Central Grid), a computer seat's by its score.
+#[test]
+fn end_turn_gives_every_capital_owed_its_building() {
+    let mut g = game();
+    calm(&mut g);
+    pick_a_tech(&mut g);
+    let ark = seat_of(&g, FactionKind::Arkwrights);
+    let mine = capital_at(&mut g, Seat(0), BodyId::Moon, 6);
+    let theirs = capital_at(&mut g, ark, BodyId::Mars, 6);
+    g.end_turn(std::array::from_fn(|_| Vec::new())).expect("the turn should end");
+    assert_eq!(g.capital_building_at(mine), Some(CapitalBuilding::CentralGrid));
+    assert_eq!(g.capital_building_at(theirs), Some(CapitalBuilding::Arcology));
+}
+
+/// Ticket #590: the computer's score -- its Faction's own counts 1, the run's need 1.5: a yield
+/// its last Income lost outranks the Faction's own; with the own taken and no need, the first free.
+#[test]
+fn the_computers_capital_pick_weighs_its_faction_and_its_need() {
+    let mut g = game();
+    let pro = seat_of(&g, FactionKind::Prospectors);
+    let cap = capital_at(&mut g, pro, BodyId::Moon, 6);
+    g.seats[pro.index()].income_last_turn = Stockpile::default();
+    assert_eq!(g.ai_capital_pick(pro, cap), Some(CapitalBuilding::StockMarket));
+    g.seats[pro.index()].income_last_turn.fuel = -2.0;
+    assert_eq!(g.ai_capital_pick(pro, cap), Some(CapitalBuilding::FuelDepot));
+    g.seats[pro.index()].income_last_turn.fuel = 0.0;
+    let other = capital_at(&mut g, Seat(0), BodyId::Mars, 6);
+    g.pick_capital_building(Seat(0), other, CapitalBuilding::StockMarket).unwrap();
+    assert_eq!(g.ai_capital_pick(pro, cap), Some(CapitalBuilding::AssayOffice), "its own taken: the first free");
+    // A Shipyard of theirs on the Capital's Body asks the Spaceport.
+    g.colony_mut(cap).unwrap().modules.push(Module::new(ModuleKind::Shipyard));
+    assert_eq!(g.ai_capital_pick(pro, cap), Some(CapitalBuilding::Spaceport));
 }

@@ -29,7 +29,7 @@
 
 use dying_earth_engine::data::BreakEffect;
 use dying_earth_engine::data::{default_data_dir, Tables};
-use dying_earth_engine::ids::{BodyId, FactionKind, Seat, StateId, TechId};
+use dying_earth_engine::ids::{BodyId, CapitalBuilding, FactionKind, Seat, StateId, TechId};
 use dying_earth_engine::state::{figure, tenth, Outcome};
 use std::sync::Arc;
 
@@ -143,6 +143,8 @@ fn main() {
     let mut all_stations_by_body = [0u32; BodyId::ALL.len()];
     // Ticket #490 (version 0.09.9): places at the end by tier, over every seating.
     let mut all_by_tier: Vec<u32> = Vec::new();
+    // Ticket #590 (version 0.1.0.4): capital buildings at the end, by building and by Faction.
+    let mut all_capital_buildings: std::collections::BTreeMap<CapitalBuilding, [u32; 5]> = std::collections::BTreeMap::new();
     let mut all_first_by_body: [Vec<u32>; BodyId::ALL.len()] = Default::default();
     let mut all_ground_off_earth_per_game: Vec<u32> = Vec::new();
     // Ticket #355 (version 0.09.1): the orbital war PER FACTION across every seating, and the games
@@ -423,6 +425,10 @@ fn main() {
                             venus_stations += r.venus_stations;
                             venus_colonists += r.venus_colonists;
                             all_by_tier.resize(all_by_tier.len().max(r.places_by_tier.len()), 0);
+                            for (b, k) in &r.capital_buildings {
+                                let i = k.map_or(4, |k| FactionKind::ALL.iter().position(|f| *f == k).unwrap_or(4));
+                                all_capital_buildings.entry(*b).or_default()[i] += 1;
+                            }
                             for (t, n) in r.places_by_tier.iter().enumerate() {
                                 all_by_tier[t] += n;
                             }
@@ -941,6 +947,11 @@ fn main() {
         println!("  {}", off_earth_line(&base, &all_ground_by_body, &all_stations_by_body, &mut all_first_by_body, &mut all_ground_off_earth_per_game, all_games as u64));
         let tiers: Vec<String> = base.tiers.iter().zip(&all_by_tier).map(|(t, n)| format!("{} {n}", t.name)).collect();
         println!("  Colonies and stations at the end over the batch, by tier: {}", tiers.join(", "));
+        let built: Vec<String> = CapitalBuilding::ALL.iter().map(|b| {
+            let n = all_capital_buildings.get(b).copied().unwrap_or_default();
+            format!("{} {} ({}/{}/{}/{})", b.name(), n.iter().sum::<u32>(), n[0], n[1], n[2], n[3])
+        }).collect();
+        println!("  Capital buildings at the end over the batch, all (Custodians/Prospectors/Arkwrights/Archivists): {}", built.join(", "));
         // Ticket #343 (version 0.09.1): summed over every seat of every seating -- a TOTAL, never
         // a per-Faction figure, since seat 0 is a different Faction in each seating.
         println!(

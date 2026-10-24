@@ -341,7 +341,12 @@ const GRAMMAR: &str = r#"ORDER LINES (one per line; `#` starts a comment; blank 
   upgrade <colony>                     raise a Colony or station to its next tier: Settlement,
                                        Colony, and on the ground the Colonial Capital (one to a
                                        Body). `show` prints each place's tier and what the next costs;
-                                       a tier wants every Module slot built and its people living there.
+                                       a tier wants every Module slot built and its people living there;
+                                       the Capital wants one slot open, its building's.
+  capital <colony> <building>          the capital building for a Capital of yours, for good, one of
+                                       Stock Market, Assay Office, Fuel Depot, Central Grid, Great
+                                       Library, Chancery, Spaceport, Arcology; each stands once in
+                                       the game. Unchosen at End Turn: your Faction's own.
   cancel-build <place> <index|name>    cancel a build ANOTHER seat began at a place you now direct,
                                        which is what a conquest leaves behind: its Materials come
                                        back at your own price and the Widgets done are lost. One a
@@ -592,6 +597,8 @@ enum Line {
     /// Ticket #572 (version 0.1.0.3): this seat's counter to the Trade a Faction offered it -- what
     /// it gives and what it asks, the same two goods in its own amounts.
     Counter(Seat, (Resource, u32), (Resource, u32)),
+    /// Ticket #590 (version 0.1.0.4): the capital building for a Capital of this seat's.
+    Capital(ColonyId, CapitalBuilding),
 }
 
 /// The game is read here as well as written: a Faction is named by its own name, and which seat
@@ -608,6 +615,13 @@ fn parse_line(g: &Game, line: &str) -> Result<Line, String> {
         }
         // Ticket #337 (version 0.09.0): the only door the driver has onto the turn's question. It
         // is not an Order -- it is answered the moment the line is read, as a `tech` pick is.
+        // Ticket #590 (version 0.1.0.4): not an Order either; it stands the moment it is read.
+        "capital" => {
+            let c = colony_id(at(1)?)?;
+            let words = w[2..].concat();
+            let b = CapitalBuilding::parse(&words).ok_or_else(|| format!("{words:?} is not one of {}", CapitalBuilding::ALL.map(|b| b.name()).join(", ")))?;
+            return Ok(Line::Capital(c, b));
+        }
         "answer" => {
             let side = at(1)?.to_ascii_lowercase();
             return match side.as_str() {
@@ -1579,11 +1593,19 @@ fn print_board(g: &Game) {
         println!("    at {reached} | modules: {}", if mods.is_empty() { "none".into() } else { mods.join(", ") });
         // Ticket #526 (version 0.1.0.0): the tier, and what `upgrade` would buy next.
         let next = match g.open_tier(c) {
+            // Ticket #590 (version 0.1.0.4): the Capital at a slot open, not people.
+            Some(t) if t.takes_slot => format!("next `upgrade {}`: {} ({}) with 1 slot open, {} Materials and {} Widgets", c.id.0, t.name, dying_earth_engine::counted(t.cap, "Module", "Modules"), t.materials, t.widgets),
             Some(t) => format!("next `upgrade {}`: {} ({}) at {}, {} Materials and {} Widgets", c.id.0, t.name, dying_earth_engine::counted(t.cap, "Module", "Modules"), dying_earth_engine::counted(t.colonists, "Colonist", "Colonists"), t.materials, t.widgets),
             None if g.next_tier(c).is_some() => "the next tier is not open here (the Body's Colonial Capital is another's)".to_string(),
             None => "the last tier".to_string(),
         };
-        println!("    tier: {} | {next}", g.tier_of(c).name);
+        // Ticket #590 (version 0.1.0.4): a Capital's building, or the pick it is owed.
+        let building = match g.capital_building_at(c.id) {
+            Some(b) => format!(" | {}: {}", b.name(), g.tables.capital_building(b).does),
+            None if g.tier_of(c).takes_slot => format!(" | no capital building: `capital {} <building>`", c.id.0),
+            None => String::new(),
+        };
+        println!("    tier: {}{building} | {next}", g.tier_of(c).name);
         println!("    {}", widgets_text(g, Place::Colony(c.id), &q));
     }
 
@@ -1882,6 +1904,13 @@ fn main() {
                             }
                         }
                     }
+                    Ok(Line::Capital(c, b)) => match game.pick_capital_building(Seat(0), c, b) {
+                        Ok(()) => println!("line {}: built the {}", n + 1, b.name()),
+                        Err(e) => {
+                            println!("line {}: REFUSED `{line}`: {e}", n + 1);
+                            bad += 1;
+                        }
+                    },
                     Ok(Line::Tech(t)) => match game.pick_tech(Seat(0), t) {
                         Ok(()) => println!("line {}: picked {}", n + 1, game.tables.tech(t).name),
                         Err(e) => {

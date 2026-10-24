@@ -208,6 +208,9 @@ pub struct SimResult {
     pub stations_by_body: [u32; BodyId::ALL.len()],
     /// Ticket #490 (version 0.09.9): Colonies and stations standing at the end, by tier.
     pub places_by_tier: Vec<u32>,
+    /// Ticket #590 (version 0.1.0.4): each capital building standing at the end, and the Faction
+    /// directing its Capital (none where nobody does).
+    pub capital_buildings: Vec<(CapitalBuilding, Option<FactionKind>)>,
     /// Ticket #72: the Prospectors' Venture Capital Fund at the end.
     pub venture_fund_at_end: f64,
     /// Ticket #76: cards drawn over the game, and whether the deck ran dry.
@@ -862,6 +865,7 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         first_ground_colony_turn_by_body: BodyId::ALL.map(|b| if b == BodyId::Earth { None } else { game.colonies.iter().filter(|c| !c.in_orbit && c.body == b).map(|c| c.founded_turn).min() }),
         stations_by_body: BodyId::ALL.map(|b| if b == BodyId::Earth { 0 } else { game.colonies.iter().filter(|c| c.in_orbit && c.body == b).count() as u32 }),
         places_by_tier: (0..tables.tiers.len() as u32).map(|t| game.colonies.iter().filter(|c| c.tier == t).count() as u32).collect(),
+        capital_buildings: game.capital_buildings.iter().map(|(b, c)| (*b, game.colony(*c).and_then(|c| c.control.director()).map(|s| game.kind(s)))).collect(),
         venture_fund_at_end: Seat::ALL.into_iter().find(|s| game.kind(*s) == FactionKind::Prospectors).map(|s| game.seat(s).venture_fund).unwrap_or(0.0),
         cards_drawn: game.deck.drawn.len() as u32,
         deck_empty: game.deck.cards.is_empty(),
