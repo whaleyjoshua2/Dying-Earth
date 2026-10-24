@@ -228,10 +228,12 @@ cut it move to hover q2 yes"*.
   Prospectors stand at 31; they take this at 54."*), the threat line and the conversion line stay.
 - **The terms ride the threshold label's hover as sums**, its first lines: *"Threshold 31 = 20 + 10
   for size 1 + 1 for Regions held"* (then *", x1.10 (Blame)"* and *", cut by Green Consensus"* while
-  they bite), and on a held place *"A rival takes it at 58 = 38 (your Standing) + 20 (margin) + 5
-  (Constabulary), the Prospectors cheapest."* or *"Take at 58 = 38 (their Standing) + 20 (margin)"*;
+  they bite), and on a held place *"The Prospectors take it at 58 = 38 (your Standing) + 20 (margin) + 5
+  (Constabulary)"* (the cheapest rival named) or *"Take at 58 = 38 (their Standing) + 20 (margin)"*;
   where the threshold stands over that sum the line says so. The sentence that said the same in
-  words is cut, and the neutral tip's last sentence with it, so every tip stays under six lines.
+  words is cut, the rule line is one rendered line, and a held place's tip carries no further
+  sentence, so every tip stays under six lines with a Constabulary, relations, Blame or Green
+  Consensus in it (the review found the first shape could reach seven or eight).
 - **One hover per element**: the row's own tip, which fired under the label's and the Standings
   chips', goes, for the player and the spectator alike; its decay figures are on the Standings tip.
 - **The pictures** (`ticket-608/neutral-earth.png`, `own-earth.png`): the hover on a neutral
