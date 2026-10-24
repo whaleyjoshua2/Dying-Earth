@@ -15,7 +15,8 @@ widgets = 4
 energy_upkeep = 3
 produces = { resource = "materials", amount = 4 }
 # Version 0.04 (ticket #44): on Earth (Antarctica) a Module emits as its counterpart Facility does.
-earth_emissions = 1.0
+# Ticket #604 (version 0.1.0.4), at the designer's word: 0.85, the Region Mine's, where it was 1.0.
+earth_emissions = 0.85
 
 [[module]]
 id = "generator"

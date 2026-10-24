@@ -535,3 +535,22 @@ The designer (2026-10-24): *"let's cut clean power to .5"*.
   the median of the four seatings. Noise.
 - **Refuted if** a Power Plant under Clean Power emits other than half its figure times its
   Faction's multiplier.
+
+## 20. A Mine emits 0.85, in a Region and in Antarctica alike
+
+Ticket: [A Mine emits 0.85, in a Region and in Antarctica alike](https://github.com/whaleyjoshua2/Dying-Earth/issues/604).
+
+The designer (2026-10-24): *"make the antarctic mine 0.85 along with region mines"*.
+
+- **A Region's Mine** emits **0.85** a turn (`facilities.toml`), from 0.75, times its Faction's
+  multiplier; still no Tech cuts it.
+- **A Mine Module in Antarctica** emits **0.85** (`earth_emissions` in `modules.toml`), from 1.0,
+  and under the Region Mine's rule: **Clean Manufacturing no longer reaches it**, as it never
+  reached a Region's Mine (ticket #332). Off Earth a Mine still emits nothing.
+- **The computer** reads a Mine's Emissions from the table where it weighs idling one: nothing of
+  its own moves.
+- **The sweep** (20 seeds x four seatings), against section 19's at x0.5: wins 23 / 42 / 4 / 10
+  from 27 / 40 / 4 / 9, collapses 1 from 0, the temperature at the end +0.05 C on the median of
+  the four seatings. The Custodians' four is at the edge of noise.
+- **Refuted if** a Mine, in a Region or in Antarctica, emits other than 0.85 times its Faction's
+  multiplier (halved at Unrest 7 in a Region), or Clean Manufacturing moves either.

@@ -640,3 +640,25 @@ Income a game, mean (Materials / Fuel / Energy / Ducats / Research), x0.5: Custo
 791 / 1201 / 1028, Prospectors 2136 / 433 / 293 / 1500 / 329, Arkwrights 705 / 142 / 165 / 2342 /
 228, Archivists 488 / 233 / 60 / 432 / 628. The baseline matches #590's last sweep to the win, so
 the Blockade follow-up moved nothing. Noise throughout.
+
+## A Mine emits 0.85, in a Region and in Antarctica alike
+
+Ticket [#604](https://github.com/whaleyjoshua2/Dying-Earth/issues/604), spec section 20, filed and
+built at the designer's word: *"make the antarctic mine 0.85 along with region mines"*. A Region's
+Mine emitted 0.75 and no Tech cut it; Antarctica's Mine Module emitted 1.0 and Clean
+Manufacturing cut it, though its comment said it emitted as its Facility did. Both are 0.85 now,
+under the Region Mine's rule. Three asserts were moved first and watched fail on the old tables:
+the Antarctic Mine's 0.85 (it read 0.75), the Region Mine's 0.85 x 0.75 (0.5625), and, with the
+tables moved but the climate not, Clean Manufacturing leaving the Antarctic Mine whole (0.255).
+A mothball test had read a Factory's Emissions in the Mine's place, the two figures being one;
+it reads the Mine's.
+
+| Sweep | Wins C / P / Ark / Arc | Collapses | Temperature at the end, by seating (median) |
+|---|---|---|---|
+| Section 19, the Mines as they were ([`ticket-603.txt`](sweeps/ticket-603.txt)) | 27 / 40 / 4 / 9 | 0 | +2.26 / +2.17 / +2.07 / +1.94 |
+| The Mines at 0.85 ([`ticket-604.txt`](sweeps/ticket-604.txt)) | 23 / 42 / 4 / 10 | 1 | +2.35 / +2.19 / +2.15 / +1.96 |
+
+Income a game, mean (Materials / Fuel / Energy / Ducats / Research): Custodians 2101 / 591 / 808 /
+1237 / 1082, Prospectors 2169 / 439 / 290 / 1566 / 330, Arkwrights 735 / 137 / 156 / 2442 / 245,
+Archivists 500 / 239 / 61 / 467 / 659. The Custodians, whose Victory asks the air held under the
+Sink, give up four, at the edge of noise.

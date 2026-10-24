@@ -751,11 +751,23 @@ fn antarctica_is_three_colony_slots_on_earth_whose_colonists_stay_on_earth_and_w
     assert_eq!(StateId::ALL.len(), 20, "twenty Regions since ticket #510, eighteen since #482, and Antarctica is none of them");
     let m = g.tables.faction(FactionKind::Custodians).emissions_multiplier;
     let before = g.emissions_now();
+    // Ticket #604 (version 0.1.0.4): the same board under Clean Manufacturing, for the Mine below.
+    let before_clean = {
+        let mut h = g.clone();
+        with_tech(&mut h, TechId::CleanManufacturing);
+        h.emissions_now()
+    };
     bare_stations(&mut g);
     colony(&mut g, Seat(0), BodyId::Earth, &[ModuleKind::Habitat, ModuleKind::Mine, ModuleKind::Refinery, ModuleKind::Generator], 4);
     assert_eq!(g.off_world_colonists(Seat(0)), 0, "Antarctic Colonists live on Earth");
     let after = g.emissions_now();
-    assert!((after.factories - before.factories - 1.0 * m).abs() < 1e-9, "a Mine on Earth emits as a Factory does");
+    // Ticket #604 (version 0.1.0.4), at the designer's word: 0.85, as a Region's Mine, where it was
+    // 1.0; and, as a Region's Mine, untouched by Clean Manufacturing, which used to cut it.
+    assert!((after.factories - before.factories - 0.85 * m).abs() < 1e-9, "a Mine on Earth emits as a Region's Mine does: {}", after.factories - before.factories);
+    let mut h = g.clone();
+    with_tech(&mut h, TechId::CleanManufacturing);
+    let cleaned = h.emissions_now().factories - before_clean.factories;
+    assert!((cleaned - 0.85 * m).abs() < 1e-9, "Clean Manufacturing leaves the Antarctic Mine whole: {cleaned}");
     assert!((after.refineries - before.refineries - 1.5 * m).abs() < 1e-9, "a Refinery on Earth emits as one on a state does");
     assert!((after.power_plants - before.power_plants - 1.5 * m).abs() < 1e-9, "a Generator on Earth emits as a Power Plant does");
     // Off Earth a Mine emits nothing, as before.
@@ -3841,7 +3853,8 @@ fn a_a_mothballed_facility_makes_nothing_costs_nothing_and_keeps_its_slot() {
     change_now(&mut g, Seat(0), BuildingRef::Facility(sid, idx), BuildingChange::Mothball);
     assert!(g.state(sid).facilities[idx].mothballed, "it is mothballed at the Resolution");
     assert_eq!(g.slots_used(sid), slots, "a mothballed Facility keeps its slot");
-    assert_eq!(g.emissions_now().factories, emissions_before - g.facility_yield(Seat(0), sid, FacilityKind::Factory).emissions, "it emits nothing");
+    // Ticket #604 (version 0.1.0.4): the Mine's own figure, which the Factory's stood in for while both were 0.75.
+    assert_eq!(g.emissions_now().factories, emissions_before - g.facility_yield(Seat(0), sid, FacilityKind::Mine).emissions, "it emits nothing");
 
     g.seats[0].stockpile.energy = 20.0;
     let before = g.seats[0].stockpile;
@@ -13364,10 +13377,11 @@ fn four_makers_the_factory_makes_widgets_the_mine_makes_materials_and_the_start_
     assert_eq!((FacilityKind::Mine.name(), ModuleKind::Factory.name()), ("Mine", "Factory"), "one name in both lists");
     let t = &g.tables;
     let (f, m) = (t.facility(FacilityKind::Factory), t.facility(FacilityKind::Mine));
-    // The Factory and the Mine each smoke 0.75, at the designer's word.
+    // The Factory and the Mine each smoke 0.75, at the designer's word. Ticket #604 (version
+    // 0.1.0.4), at the designer's word: the Mine 0.85.
     assert_eq!((f.materials, f.widgets, f.energy_upkeep, f.emissions), (22.0, 4, 2, 0.75));
     assert_eq!(f.produces.as_ref().map(|p| (p.resource, p.amount)), Some((Resource::Widgets, 4.0)));
-    assert_eq!((m.materials, m.widgets, m.energy_upkeep, m.emissions), (22.0, 4, 2, 0.75));
+    assert_eq!((m.materials, m.widgets, m.energy_upkeep, m.emissions), (22.0, 4, 2, 0.85));
     assert_eq!(m.produces.as_ref().map(|p| (p.resource, p.amount)), Some((Resource::Materials, 4.4)), "an Earth Mine 4.4 since ticket #537");
     let fm = t.module(ModuleKind::Factory);
     assert_eq!((fm.materials, fm.widgets, fm.energy_upkeep, fm.earth_emissions), (22.0, 4, 3, 1.0));
@@ -13390,6 +13404,9 @@ fn four_makers_the_factory_makes_widgets_the_mine_makes_materials_and_the_start_
     let (fac_after, mine_after) = (g.facility_yield(Seat(0), sid, FacilityKind::Factory).emissions, g.facility_yield(Seat(0), sid, FacilityKind::Mine).emissions);
     assert!(fac_after < fac_before, "Clean Manufacturing thins the Factory: {fac_before} -> {fac_after}");
     assert!((mine_after - mine_before).abs() < 1e-9, "and not the Mine: {mine_before} -> {mine_after}");
+    // Ticket #604 (version 0.1.0.4), at the designer's word: a Mine emits 0.85, where it was 0.75.
+    let m = g.tables.faction(g.kind(Seat(0))).emissions_multiplier;
+    assert!((mine_before - 0.85 * m).abs() < 1e-9, "a Region's Mine emits 0.85 x {m}: {mine_before}");
     g.state_mut(sid).facilities = vec![facility(FacilityKind::Mine)];
     assert!(g.emissions_now().factories > 0.0, "a Mine's Emissions are charged");
     // Off Earth: a Factory Module's 4 flat at Mars (Materials yield 1.65), the Core's 4.

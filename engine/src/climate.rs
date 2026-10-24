@@ -346,7 +346,10 @@ impl Game {
                 let charged = match md.kind {
                     // Ticket #332 (version 0.09.0): a Factory Module in Antarctica emits as the
                     // Facility does, Clean Manufacturing reaching it.
-                    ModuleKind::Mine | ModuleKind::Refinery | ModuleKind::Factory => e * fr_mult * m,
+                    ModuleKind::Refinery | ModuleKind::Factory => e * fr_mult * m,
+                    // Ticket #604 (version 0.1.0.4), at the designer's word: a Mine as a Region's
+                    // Mine, which Clean Manufacturing never reached (ticket #332), where it cut this.
+                    ModuleKind::Mine => e * m,
                     ModuleKind::Generator => e * pp_mult * m,
                     _ => 0.0,
                 };
