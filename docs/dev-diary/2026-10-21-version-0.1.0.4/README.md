@@ -588,3 +588,31 @@ accepted.
 - **The card** with the Central Grid chosen: its tile in the slot it holds, "Modules 6 of 9":
 
 ![The Central Grid](ticket-590/card-central-grid.png)
+
+## Colonies, Ships and Armies by name, never by number
+
+Ticket [#586](https://github.com/whaleyjoshua2/Dying-Earth/issues/586), spec section 18. Charted as
+Colonies named by the player; the designer took that back -- *"I don't want the player to be able
+to name it"* -- and asked what the 0.1.0.2 playtesters had said. Tester 4 wanted to call "colony 27"
+Shackleton Base, though the Report already named it South Pole-Aitken Basin: the number was the text
+tool's. Testers 2 and 4 mistook colony numbers for orbit numbers (since mended), and tester 2's
+`load 27` met "no such Ship". Three rounds: the tool takes the names (a Region before a Colony, a
+word fitting both refused), Ships and Armies too, and **no number is shown** for any of them, a
+number given still reaching its id; the Ship's hovers *"TSV Beagle [Colony Ship]"* in its Faction's
+colour; the card's date at the size of the line under it.
+
+`ShipId`, `ArmyId` and `ColonyId` lost their `Display`, so the compiler listed every line that
+printed one: the window's order list ("Send Ship 26 to ..."), the Army roster's "aboard", the
+Repair line, three log lines. The tool printed the bare numbers itself and was mended by hand; a
+30-turn game driven through it printed no Colony, Ship or Army id
+([`tool-by-name.txt`](ticket-586/tool-by-name.txt) keeps the lines before and after). The tool has
+no tests, so the red was its own refusal, *"iss" is not a whole number*, on six lines that reach the
+engine now; the help's test failed on the old help. Built, no sweep.
+
+- **The Ship card**, its name hovered (the `tip:` aid):
+
+![The Ship's hover](ticket-586/ship-card-moon.png)
+
+- **The station card**: "Built January 2030" at the size of "Held by the Custodians":
+
+![The date](ticket-586/colony-card-earth.png)

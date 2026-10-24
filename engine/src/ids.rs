@@ -2,7 +2,6 @@
 //! Names follow `CONTEXT.md`.
 
 use serde::{Deserialize, Serialize};
-use std::fmt;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -1090,18 +1089,6 @@ impl Stance {
     pub const PERSISTS: &'static str = "A stance persists until it is changed.";
 }
 
-impl fmt::Display for ShipId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Ship {}", self.0)
-    }
-}
-impl fmt::Display for ArmyId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Army {}", self.0)
-    }
-}
-impl fmt::Display for ColonyId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Colony {}", self.0)
-    }
-}
+// Ticket #586 (version 0.1.0.4), at the designer's word: a Ship, an Army and a Colony print no
+// number to a player, so their ids carry no `Display`: a line names them (`Game::ship_called`,
+// `army_called`, `place_name`), and one that tried to print an id would not compile.

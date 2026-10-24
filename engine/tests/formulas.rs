@@ -24965,6 +24965,22 @@ fn the_tools_help_has_no_ticket_or_version_references() {
     assert!(help.contains("for Ducats, twice its Materials' worth"), "the -ducats line");
 }
 
+/// Ticket #586 (version 0.1.0.4), at the designer's word: **the tool's help names Colonies, Ships
+/// and Armies, never numbers them.** It said "Colonies, ships and armies are named by the numbers
+/// the board prints beside them", and took `colony <n>`, `ship:<n>` and a colony id; the board now
+/// prints no number, and the parser takes the name (witnessed on the tool itself, as it has no tests).
+#[test]
+fn the_tools_help_takes_colonies_ships_and_armies_by_name() {
+    let src = include_str!("../examples/play.rs");
+    let start = src.find("const GRAMMAR: &str = r#\"").expect("the help");
+    let end = start + src[start..].find("\"#;").expect("its end");
+    let help = &src[start..end];
+    for numbered in ["colony <n>", "ship:<n>", "army:<n>", "colony id", "numbers the board prints", "build module 1 "] {
+        assert!(!help.contains(numbered), "the help still numbers: {numbered:?}");
+    }
+    assert!(help.contains("Colonies, Ships and Armies go by their names"), "the help says how they are named");
+}
+
 /// Ticket #591 (version 0.1.0.4), at the designer's word: **a neutral Region's threshold rises 1 for
 /// every Region the taker holds past its first** -- the home Region counted as held, an Occupied one
 /// not. Flat, after Green Consensus and Blame; a held Region's price and every Colony's untouched.

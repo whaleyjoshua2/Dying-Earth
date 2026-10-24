@@ -171,11 +171,14 @@ fn pick_state(word: &str) -> Result<StateId, String> {
     }
 }
 
-/// `europe`, `state:europe`, `colony:3`, `c:3` or a bare colony number.
-fn place(word: &str) -> Result<Place, String> {
+/// `europe`, `state:europe`, `colony:tycho`, `c:tycho`, or a Colony's name.
+/// Ticket #586 (version 0.1.0.4), at the designer's word: a word that fits a Region alone is the
+/// Region, one that fits a Colony alone the Colony, and one that fits both is refused, naming both.
+/// A number still reaches a Colony's id, as it always did; the board shows none.
+fn place(g: &Game, word: &str) -> Result<Place, String> {
     let w = word.to_ascii_lowercase();
     if let Some(rest) = w.strip_prefix("colony:").or_else(|| w.strip_prefix("c:")) {
-        return Ok(Place::Colony(ColonyId(count(rest)?)));
+        return Ok(Place::Colony(colony_id(g, rest)?));
     }
     if let Some(rest) = w.strip_prefix("state:").or_else(|| w.strip_prefix("s:")) {
         return Ok(Place::State(pick_state(rest)?));
@@ -183,41 +186,111 @@ fn place(word: &str) -> Result<Place, String> {
     if let Ok(n) = w.parse::<u32>() {
         return Ok(Place::Colony(ColonyId(n)));
     }
-    Ok(Place::State(pick_state(&w)?))
+    match (pick_state(&w), colony_id(g, &w)) {
+        (Ok(s), Ok(c)) => Err(format!("{word:?} could be the Region {} or the Colony {}; put `state:` or `colony:` before it", g.tables.state(s).name, g.place_name(Place::Colony(c)))),
+        (Ok(s), Err(_)) => Ok(Place::State(s)),
+        (Err(_), Ok(c)) => Ok(Place::Colony(c)),
+        // A word short for two of either kind says so, where "neither" would mislead.
+        (Err(r), Err(c)) => Err([c, r].into_iter().find(|e| e.contains("could be more than one")).unwrap_or_else(|| format!("{word:?} is neither a Region nor a Colony"))),
+    }
+}
+
+/// Ticket #586 (version 0.1.0.4), at the designer's word: a Colony, a Ship or an Army by its NAME,
+/// the board printing no number for any of them -- an exact name first, then any unique prefix,
+/// case and spaces ignored, as every other name here. Two that fit are refused, both named.
+fn pick_by_name<T: Copy>(list: &[T], word: &str, forms: impl Fn(T) -> Vec<String>, shown: impl Fn(T) -> String, what: &str) -> Result<T, String> {
+    let w = norm(word);
+    if w.is_empty() {
+        return Err(format!("expected {what} here"));
+    }
+    let exact: Vec<T> = list.iter().copied().filter(|t| forms(*t).iter().any(|f| norm(f) == w)).collect();
+    let hits: Vec<T> = if exact.is_empty() { list.iter().copied().filter(|t| forms(*t).iter().any(|f| norm(f).starts_with(&w))).collect() } else { exact };
+    let names = |ts: &[T]| ts.iter().map(|t| shown(*t)).collect::<Vec<_>>().join(", ");
+    match hits.as_slice() {
+        [t] => Ok(*t),
+        [] if list.is_empty() => Err(format!("{word:?} is not {what}; there are none")),
+        [] => Err(format!("{word:?} is not {what}; they are {}", names(list))),
+        _ => Err(format!("{word:?} could be more than one: {}", names(&hits))),
+    }
+}
+
+/// Ticket #586: the number a script may still give for an id -- `27`, or the old forms `c27`,
+/// `colony:27`, `ship:4` -- which reaches the id unshown. None where the word is a name.
+fn id_number(word: &str, prefixes: &[&str]) -> Option<u32> {
+    let w = word.to_ascii_lowercase();
+    if let Ok(n) = w.parse::<u32>() {
+        return Some(n);
+    }
+    prefixes.iter().find_map(|p| w.strip_prefix(p)).and_then(|rest| rest.trim_start_matches(':').parse::<u32>().ok())
+}
+
+/// Ticket #586: what a Colony answers to -- its slot's name on the ground, its station's in orbit,
+/// and its whole place name.
+fn colony_forms(g: &Game, c: ColonyId) -> Vec<String> {
+    match g.colony(c) {
+        Some(col) if col.in_orbit => vec![g.station_name(col.body, col.slot), g.place_name(Place::Colony(c))],
+        Some(col) => vec![slot_name(g, col.body, col.slot), g.place_name(Place::Colony(c))],
+        None => Vec::new(),
+    }
+}
+
+/// Ticket #586: the word to type for a Colony, as the board's hints print it: its first name,
+/// spaces and case taken out.
+fn colony_word(g: &Game, c: ColonyId) -> String {
+    colony_forms(g, c).first().map(|n| norm(n)).unwrap_or_default()
 }
 
 /// `ship:4`, `army:2`, `ship4`, `army2`, or -- ticket #324 (version 0.08.8) -- `battery:<colony>:<n>`
 /// for a Colony's Battery, which a Battle damages and a Repair may name, and which the driver could
 /// not write at all.
-fn unit_ref(word: &str) -> Result<UnitRef, String> {
+/// Ticket #586 (version 0.1.0.4): `ship:magellan`, `army:2ndchinese`, `battery:tycho:1`.
+fn unit_ref(g: &Game, word: &str) -> Result<UnitRef, String> {
     let w = word.to_ascii_lowercase();
     if let Some(rest) = w.strip_prefix("battery") {
         let mut parts = rest.trim_start_matches(':').split(':');
-        let colony = colony_id(parts.next().unwrap_or(""))?;
+        let colony = colony_id(g, parts.next().unwrap_or(""))?;
         let index = count(parts.next().ok_or("a Battery is battery:<colony>:<index>")?)? as usize;
         return Ok(UnitRef::Battery { colony, index });
     }
     if let Some(rest) = w.strip_prefix("ship") {
-        return Ok(UnitRef::Ship(ShipId(count(rest.trim_start_matches(':'))?)));
+        return Ok(UnitRef::Ship(ship_id(g, rest.trim_start_matches(':'))?));
     }
     if let Some(rest) = w.strip_prefix("army") {
-        return Ok(UnitRef::Army(ArmyId(count(rest.trim_start_matches(':'))?)));
+        return Ok(UnitRef::Army(army_id(g, rest.trim_start_matches(':'))?));
     }
-    Err(format!("{word:?} should be ship:<n>, army:<n> or battery:<colony>:<index>"))
+    Err(format!("{word:?} should be ship:<ship>, army:<army> or battery:<colony>:<index>"))
 }
 
-fn ship_id(word: &str) -> Result<ShipId, String> {
-    Ok(ShipId(count(word.to_ascii_lowercase().trim_start_matches("ship").trim_start_matches(':'))?))
+/// Ticket #586: a Ship by its name, its Faction's prefix or not, among the Ships seat 0 sees.
+fn ship_id(g: &Game, word: &str) -> Result<ShipId, String> {
+    if let Some(n) = id_number(word, &["ship"]) {
+        return Ok(ShipId(n));
+    }
+    let seen: Vec<ShipId> = g.ships.iter().filter(|s| g.sees_ship(Seat(0), s)).map(|s| s.id).collect();
+    pick_by_name(&seen, word, |id| g.ship(id).map(|s| vec![s.name.clone(), g.ship_name(s)]).unwrap_or_default(), |id| g.ship_called(id), "a Ship")
 }
 
-fn army_id(word: &str) -> Result<ArmyId, String> {
-    Ok(ArmyId(count(word.to_ascii_lowercase().trim_start_matches("army").trim_start_matches(':'))?))
+/// Ticket #586: an Army by its name, "The" or not, among the Armies seat 0 sees.
+fn army_id(g: &Game, word: &str) -> Result<ArmyId, String> {
+    if let Some(n) = id_number(word, &["army"]) {
+        return Ok(ArmyId(n));
+    }
+    let seen: Vec<ArmyId> = g.armies.iter().filter(|a| g.sees_army(Seat(0), a)).map(|a| a.id).collect();
+    let forms = |id: ArmyId| {
+        let name = g.army_called(id);
+        let bare = name.strip_prefix("the ").or_else(|| name.strip_prefix("The ")).unwrap_or(&name).to_string();
+        vec![name, bare]
+    };
+    pick_by_name(&seen, word, forms, |id| g.army_called(id), "an Army")
 }
 
-fn colony_id(word: &str) -> Result<ColonyId, String> {
-    let w = word.to_ascii_lowercase();
-    let w = w.trim_start_matches("colony").trim_start_matches('c').trim_start_matches(':');
-    Ok(ColonyId(count(w)?))
+/// Ticket #586: a Colony or station by its name (`colony_forms`).
+fn colony_id(g: &Game, word: &str) -> Result<ColonyId, String> {
+    if let Some(n) = id_number(word, &["colony", "c"]) {
+        return Ok(ColonyId(n));
+    }
+    let all: Vec<ColonyId> = g.colonies.iter().map(|c| c.id).collect();
+    pick_by_name(&all, word, |c| colony_forms(g, c), |c| g.place_name(Place::Colony(c)), "a Colony")
 }
 
 /// Ticket #335 (version 0.09.0): an ORBIT as an order names it -- `low` (or nothing at all) for low
@@ -261,11 +334,12 @@ fn orbit_arg(g: &Game, body: BodyId, word: &str) -> Result<Option<u32>, String> 
     if let Some(rest) = w.strip_prefix("colony").or_else(|| w.strip_prefix('c'))
         && let Ok(id) = count(rest.trim_start_matches(':'))
     {
+        // Ticket #586 (version 0.1.0.4): named, never numbered, in the refusal.
         return match g.colony(ColonyId(id)) {
             Some(c) if c.in_orbit && c.body == body => Ok(Some(c.slot)),
-            Some(c) if c.in_orbit => Err(format!("colony {id} ({}) is over {}, not {}", g.station_name(c.body, c.slot), c.body.name(), body.name())),
-            Some(_) => Err(format!("colony {id} is on the ground, not a station")),
-            None => Err(format!("no colony {id}; the orbits over {} are {}", body.name(), listed())),
+            Some(c) if c.in_orbit => Err(format!("{} is over {}, not {}", g.station_name(c.body, c.slot), c.body.name(), body.name())),
+            Some(c) => Err(format!("{} is on the ground, not a station", g.place_name(Place::Colony(c.id)))),
+            None => Err(format!("no such station; the orbits over {} are {}", body.name(), listed())),
         };
     }
     pick_named(&slots, word, |n| g.station_name(body, n), &format!("an orbit over {} ({})", body.name(), listed())).map(Some)
@@ -295,7 +369,7 @@ fn unload_target(g: &Game, words: &[&str]) -> Result<UnloadTarget, String> {
             let n = slot_arg(g, body, words.get(2).ok_or("slot needs a number or a name")?)?;
             Ok(UnloadTarget::Slot(body, n))
         }
-        Some("colony") => Ok(UnloadTarget::Colony(colony_id(words.get(1).ok_or("colony needs a number")?)?)),
+        Some("colony") => Ok(UnloadTarget::Colony(colony_id(g, words.get(1).ok_or("colony needs a name")?)?)),
         // The 0.1.0.0 playtest: a Space Station founded by a Colony Ship in a station slot's ring
         // (ticket #442), which the window offers on the Ship card and this tool could not say --
         // four players stranded Ships at Venus for want of it.
@@ -304,7 +378,7 @@ fn unload_target(g: &Game, words: &[&str]) -> Result<UnloadTarget, String> {
             let n = orbit_arg(g, body, words.get(2).ok_or("ring needs a station slot number or name")?)?.ok_or("a station is founded in a ring, not low orbit")?;
             Ok(UnloadTarget::Ring(body, n))
         }
-        _ => Err("expected `slot <body> <slot>`, `colony <n>` or `ring <body> <orbit>`".into()),
+        _ => Err("expected `slot <body> <slot>`, `colony <colony>` or `ring <body> <orbit>`".into()),
     }
 }
 
@@ -322,7 +396,7 @@ const GRAMMAR: &str = r#"ORDER LINES (one per line; `#` starts a comment; blank 
 
   build facility <state> <facility>    e.g. build facility europe factory
   build facility-ducats <state> <facility>
-  build module <colony> <module>       e.g. build module 1 habitat
+  build module <colony> <module>       e.g. build module iss habitat
   build module-ducats <colony> <module>
   build ship <colony> <ship>           at a Colony or station of yours with a WORKING SHIPYARD:
                                        never in a Nation State, whatever its Launch
@@ -365,10 +439,8 @@ const GRAMMAR: &str = r#"ORDER LINES (one per line; `#` starts a comment; blank 
   transit <ship> <body> [orbit|low]    fly, spending the Ship's own tank. The leg names the ORBIT it
                                        ends in: a ring, or `low` (or nothing at all) for low orbit.
                                        AN ORBIT is the slot number as
-                                       `show` lists it, the station's NAME (any unique prefix:
-                                       `tiangong`, `orb`), or a standing station's colony id as
-                                       `colony:21` -- a bare number is always the slot number. A
-                                       colony id and an orbit number are two different numberings.
+                                       `show` lists it, or the station's NAME (any unique prefix:
+                                       `tiangong`, `orb`).
   change-orbit <ship> <orbit|low>      move a Ship between the orbits of the Body it ALREADY stands
                                        at, for {fuel} Fuel out of its own tank. Resolved with the
                                        transits, before the Battles, so a Ship that changes orbit
@@ -385,7 +457,7 @@ const GRAMMAR: &str = r#"ORDER LINES (one per line; `#` starts a comment; blank 
                                        place a turn; never beside an unload.
   unload <ship> <n> [army] into slot <body> <slot>
                                        the ground slot by its number or its name.
-  unload <ship> <n> [army] into colony <n>
+  unload <ship> <n> [army] into colony <colony>
   unload <ship> <n> into ring <body> <orbit>
                                        found a SPACE STATION with a Colony Ship's Colonists, from
                                        the station slot's ring the Ship sits in (no Materials). The
@@ -393,7 +465,7 @@ const GRAMMAR: &str = r#"ORDER LINES (one per line; `#` starts a comment; blank 
   move-army <army> <state>
   ship-stance <body> <stance>          stance = attack|hold|intercept|evade|blockade
   army-stance <place> <stance>         stance = attack|evade|digin (hold does nothing to an Army)
-  repair <unit> <points>               unit = ship:<n>, army:<n> or battery:<colony>:<index>
+  repair <unit> <points>               unit = ship:<ship>, army:<army> or battery:<colony>:<index>
   repair-ducats <unit> <points>
 
   A BODY'S ORBITS are LOW ORBIT and one per Orbital Slot, and every
@@ -478,7 +550,7 @@ DIPLOMACY (`show` prints Relations both ways and every Accord standing)
                                        while they would have renewed, and they count it a refusal:
                                        no offer from them for {refusedturns}.
   trade <faction> <give> for <ask>     one thing for one thing: `<n> ducats|materials|fuel|energy`
-                                       or a colony id; answered at the head of their next turn, the
+                                       or a Colony; answered at the head of their next turn, the
                                        goods moving only if both still hold them.
   trade accept|refuse <faction>        answer a Trade a Faction offered you.
   trade counter <faction> <give> for <ask>
@@ -501,7 +573,7 @@ REGIONS AND PEOPLE
   resettle <state>
   emigrants <state> <n>                recruit Pioneers
   send-antarctica <state> <n> slot earth <slot>
-  send-antarctica <state> <n> colony <n>
+  send-antarctica <state> <n> colony <colony>
   lift <state> <n> <colony>            lift waiting Pioneers from a Region of yours with a working
                                        Launch Site straight onto a station of yours over Earth, as
                                        far as its Habitat room goes. A launch: it emits, and what it
@@ -546,7 +618,9 @@ A FACTION is named by its own name, shortened as far as it stays unique (`ark` i
 or by its seat number. `show` prints both beside every Faction.
 
 Names may be shortened as long as they stay unique: `eur` is Europe, `colonys` is a Colony Ship.
-Colonies, ships and armies are named by the numbers the board prints beside them."#;
+Colonies, Ships and Armies go by their names as `show` prints them, spaces left out: `tycho`, `iss`,
+`magellan`, `1stchinese`. A word that names a Region and a Colony both is refused; put `state:` or
+`colony:` before it."#;
 
 /// The grammar with this game's own figures written into it, so a table that moves a figure moves
 /// the help with it. Where the data directory cannot be found at all, every figure reads `?` and
@@ -616,7 +690,7 @@ fn parse_line(g: &Game, line: &str) -> Result<Line, String> {
         // Ticket #590 (version 0.1.0.4): not an Order, as a `tech` pick is not; it stands the moment
         // it is read.
         "capital" => {
-            let c = colony_id(at(1)?)?;
+            let c = colony_id(g, at(1)?)?;
             let words = w[2..].concat();
             let b = CapitalBuilding::parse(&words).ok_or_else(|| format!("{words:?} is not one of {}", CapitalBuilding::ALL.map(|b| b.name()).join(", ")))?;
             return Ok(Line::Capital(c, b));
@@ -636,10 +710,10 @@ fn parse_line(g: &Game, line: &str) -> Result<Line, String> {
             match what.as_str() {
                 "facility" => Order::BuildFacility { state: pick_state(at(2)?)?, kind: pick(&FacilityKind::ALL, at(3)?)? },
                 "facility-ducats" => Order::BuildFacilityWithDucats { state: pick_state(at(2)?)?, kind: pick(&FacilityKind::ALL, at(3)?)? },
-                "module" => Order::BuildModule { colony: colony_id(at(2)?)?, kind: pick(&ModuleKind::BUILDABLE, at(3)?)? },
-                "module-ducats" => Order::BuildModuleWithDucats { colony: colony_id(at(2)?)?, kind: pick(&ModuleKind::BUILDABLE, at(3)?)? },
-                "ship" => Order::BuildShip { site: place(at(2)?)?, kind: pick(&UnitKind::SHIPS, at(3)?)? },
-                "army" => Order::BuildArmy { place: place(at(2)?)? },
+                "module" => Order::BuildModule { colony: colony_id(g, at(2)?)?, kind: pick(&ModuleKind::BUILDABLE, at(3)?)? },
+                "module-ducats" => Order::BuildModuleWithDucats { colony: colony_id(g, at(2)?)?, kind: pick(&ModuleKind::BUILDABLE, at(3)?)? },
+                "ship" => Order::BuildShip { site: place(g, at(2)?)?, kind: pick(&UnitKind::SHIPS, at(3)?)? },
+                "army" => Order::BuildArmy { place: place(g, at(2)?)? },
                 // Ticket #571 (version 0.1.0.3), from the review: the ring by name or colony id
                 // too, as every order that takes an orbit.
                 "station" => {
@@ -647,18 +721,18 @@ fn parse_line(g: &Game, line: &str) -> Result<Line, String> {
                     let slot = orbit_arg(g, body, at(3)?)?.ok_or("a station is built in a ring, not low orbit")?;
                     g.station_order(Seat(0), body, slot, &[])
                 }
-                "archive" => Order::BuildArchive { colony: colony_id(at(2)?)? },
+                "archive" => Order::BuildArchive { colony: colony_id(g, at(2)?)? },
                 _ => return Err(format!("`build {what}` is not one of facility, module, ship, army, station, archive")),
             }
         }
         "industry" => Order::RaiseIndustry { state: pick_state(at(1)?)? },
         // Ticket #526 (version 0.1.0.0): the window's Upgrade tile -- a Colony or station to its next
         // tier (Settlement, Colony, and on the ground the Colonial Capital).
-        "upgrade" => Order::RaiseTier { colony: colony_id(at(1)?)? },
+        "upgrade" => Order::RaiseTier { colony: colony_id(g, at(1)?)? },
         // Ticket #332 (version 0.09.0): a build another seat began at a place that has changed hands.
         // Ticket #573 (version 0.1.0.3): the build by its index or its name.
         "cancel-build" => {
-            let place = place(at(1)?)?;
+            let place = place(g, at(1)?)?;
             // The review: a rival's queue seat 0 does not see is not read here either, as `show`
             // keeps it out of sight; an empty list lets the engine refuse in its own words.
             let hidden = g.place_control(place).director().is_some_and(|d| d != Seat(0)) && !g.sees_place(Seat(0), place);
@@ -666,7 +740,7 @@ fn parse_line(g: &Game, line: &str) -> Result<Line, String> {
             Order::CancelBuild { place, index: indexed(&names, at(2)?, "a build in that queue")? }
         }
         "transit" => {
-            let ship = ship_id(at(1)?)?;
+            let ship = ship_id(g, at(1)?)?;
             let to = pick(&BodyId::ALL, at(2)?)?;
             // Ticket #99: the Orbital Slot to arrive into. Ticket #335 (version 0.09.0): the leg
             // names the ORBIT it ends in, and a leg naming none ends in low orbit, which is an
@@ -681,60 +755,60 @@ fn parse_line(g: &Game, line: &str) -> Result<Line, String> {
         // Ticket #335 (version 0.09.0): between the orbits of the Body the Ship already stands at.
         // Ticket #571 (version 0.1.0.3): the orbit by name or colony id too, read at that Body.
         "change-orbit" => {
-            let ship = ship_id(at(1)?)?;
+            let ship = ship_id(g, at(1)?)?;
             // The review: a rival's hull answers "not your Ship" here as the engine would, so a
             // hidden one in flight gives nothing away.
             let body = match g.ship(ship).map(|s| (s.seat, s.at)) {
                 Some((seat, _)) if seat != Seat(0) => return Err("not your Ship".into()),
                 Some((_, ShipAt::Body(b))) => b,
-                Some((_, ShipAt::Transit { .. })) => return Err(format!("Ship {} is in transit", ship.0)),
-                None => return Err(format!("no Ship {}", ship.0)),
+                Some((_, ShipAt::Transit { .. })) => return Err(format!("{} is in transit", g.ship_called(ship))),
+                None => return Err("no such Ship".into()),
             };
             Order::ChangeOrbit { ship, slot: orbit_arg(g, body, at(2)?)? }
         }
-        "refuel" => Order::Refuel { ship: ship_id(at(1)?)? },
+        "refuel" => Order::Refuel { ship: ship_id(g, at(1)?)? },
         // Ticket #328 (version 0.08.8), and ticket #335 (version 0.09.0) for the orbit: the
         // Battleship acts in the orbit it sits in, so the line names no orbit of its own.
-        "bombard" => Order::Bombard { ship: ship_id(at(1)?)?, colony: colony_id(at(2)?)? },
+        "bombard" => Order::Bombard { ship: ship_id(g, at(1)?)?, colony: colony_id(g, at(2)?)? },
         // Ticket #343 (version 0.09.1): the Missile Carrier fires its one Warhead, and loads
         // another at a yard of its own. Both act in the orbit the hull sits in.
-        "launch" => Order::Launch { ship: ship_id(at(1)?)?, target: place(at(2)?)? },
-        "rearm" => Order::Rearm { ship: ship_id(at(1)?)? },
+        "launch" => Order::Launch { ship: ship_id(g, at(1)?)?, target: place(g, at(2)?)? },
+        "rearm" => Order::Rearm { ship: ship_id(g, at(1)?)? },
         "load" => {
-            let ship = ship_id(at(1)?)?;
+            let ship = ship_id(g, at(1)?)?;
             let colonists = count(at(2)?)?;
             let rest: Vec<&str> = w[3..].to_vec();
             let i = rest.iter().position(|x| x.eq_ignore_ascii_case("from")).ok_or("load wants `from <place>`")?;
-            let from = match place(rest.get(i + 1).ok_or("load wants a place after `from`")?)? {
+            let from = match place(g, rest.get(i + 1).ok_or("load wants a place after `from`")?)? {
                 Place::State(s) => LoadSource::State(s),
                 Place::Colony(c) => LoadSource::Colony(c),
             };
             let army = match rest.iter().position(|x| x.eq_ignore_ascii_case("army")) {
-                Some(j) => Some(army_id(rest.get(j + 1).ok_or("`army` wants a number")?)?),
+                Some(j) => Some(army_id(g, rest.get(j + 1).ok_or("`army` wants an Army")?)?),
                 None => None,
             };
             Order::Load { ship, colonists, from, army }
         }
         "unload" => {
-            let ship = ship_id(at(1)?)?;
+            let ship = ship_id(g, at(1)?)?;
             let colonists = count(at(2)?)?;
             let rest: Vec<&str> = w[3..].to_vec();
             let army = rest.iter().any(|x| x.eq_ignore_ascii_case("army"));
             let i = rest.iter().position(|x| x.eq_ignore_ascii_case("into")).ok_or("unload wants `into ...`")?;
             Order::Unload { ship, colonists, army, into: unload_target(g, &rest[i + 1..])? }
         }
-        "move-army" => Order::MoveArmy { army: army_id(at(1)?)?, to: pick_state(at(2)?)? },
+        "move-army" => Order::MoveArmy { army: army_id(g, at(1)?)?, to: pick_state(at(2)?)? },
         "ship-stance" => Order::ShipStance { body: pick(&BodyId::ALL, at(1)?)?, stance: pick(&STANCES, at(2)?)? },
-        "army-stance" => Order::ArmyStance { place: place(at(1)?)?, stance: pick(&STANCES, at(2)?)? },
-        "repair" => Order::Repair { unit: unit_ref(at(1)?)?, points: count(at(2)?)? },
-        "repair-ducats" => Order::RepairWithDucats { unit: unit_ref(at(1)?)?, points: count(at(2)?)? },
+        "army-stance" => Order::ArmyStance { place: place(g, at(1)?)?, stance: pick(&STANCES, at(2)?)? },
+        "repair" => Order::Repair { unit: unit_ref(g, at(1)?)?, points: count(at(2)?)? },
+        "repair-ducats" => Order::RepairWithDucats { unit: unit_ref(g, at(1)?)?, points: count(at(2)?)? },
         // Ticket #569 (version 0.1.0.3): `break` after the amount means the Accord it would break.
-        "influence" => Order::Influence { target: place(at(1)?)?, amount: number(at(2)?)?, break_accord: w.get(3).is_some_and(|x| x.eq_ignore_ascii_case("break")) },
+        "influence" => Order::Influence { target: place(g, at(1)?)?, amount: number(at(2)?)?, break_accord: w.get(3).is_some_and(|x| x.eq_ignore_ascii_case("break")) },
         "buy-influence" => Order::BuyInfluence { amount: number(at(1)?)? },
         // Version 0.07.3 (ticket #134): Max, the standing order. `max off` switches it off.
         "max" => {
             let word = at(1)?.to_ascii_lowercase();
-            let target = if word == "off" || word == "none" { None } else { Some(place(&word)?) };
+            let target = if word == "off" || word == "none" { None } else { Some(place(g, &word)?) };
             Order::SetMaxStanding { target }
         }
         // Ticket #267 (version 0.08.4) and ticket #275/#277 (version 0.08.5): the two campaigns
@@ -800,8 +874,8 @@ fn parse_line(g: &Game, line: &str) -> Result<Line, String> {
                         let r = pick(&[Resource::Ducats, Resource::Materials, Resource::Fuel, Resource::Energy], r)?;
                         Ok(dying_earth_engine::TradeGood::Goods(r, count(n)?))
                     }
-                    [c] => Ok(dying_earth_engine::TradeGood::Place(colony_id(c)?)),
-                    _ => Err("each side is `<n> <ducats|materials|fuel|energy>` or a colony id".into()),
+                    [c] => Ok(dying_earth_engine::TradeGood::Place(colony_id(g, c)?)),
+                    _ => Err("each side is `<n> <ducats|materials|fuel|energy>` or a Colony".into()),
                 }
             };
             Order::ProposeTrade { to, give: good(&rest[..split])?, get: good(&rest[split + 1..])? }
@@ -825,7 +899,7 @@ fn parse_line(g: &Game, line: &str) -> Result<Line, String> {
         "emigrants" => Order::BuildEmigrants { state: pick_state(at(1)?)?, n: count(at(2)?)? },
         "send-antarctica" => Order::SendToAntarctica { state: pick_state(at(1)?)?, n: count(at(2)?)?, into: unload_target(g, &w[3..])? },
         // Version 0.07.3 (ticket #141): Pioneers lifted from a Launch Site onto a station over Earth.
-        "lift" => Order::LiftToStation { state: pick_state(at(1)?)?, n: count(at(2)?)?, colony: colony_id(at(3)?)? },
+        "lift" => Order::LiftToStation { state: pick_state(at(1)?)?, n: count(at(2)?)?, colony: colony_id(g, at(3)?)? },
         // Ticket #573 (version 0.1.0.3): the building by its index or its name.
         "change" => {
             let what = at(1)?.to_ascii_lowercase();
@@ -837,7 +911,7 @@ fn parse_line(g: &Game, line: &str) -> Result<Line, String> {
                     BuildingRef::Facility(sid, indexed(&names, at(3)?, "a Facility there")?)
                 }
                 "module" => {
-                    let cid = colony_id(at(2)?)?;
+                    let cid = colony_id(g, at(2)?)?;
                     let names: Vec<String> = g.colony(cid).map(|c| c.modules.iter().map(|m| m.kind.name().to_string()).collect()).unwrap_or_default();
                     BuildingRef::Module(cid, indexed(&names, at(3)?, "a Module there")?)
                 }
@@ -852,7 +926,7 @@ fn parse_line(g: &Game, line: &str) -> Result<Line, String> {
         "fund-archive" => Order::SetResearchDirective { percent: g.research_directive_cap(Seat(0)) },
         "unfund-archive" => Order::SetResearchDirective { percent: 0 },
         // Ticket #192 (version 0.08.0): the Upload, which is what the Archive is for.
-        "upload" => Order::Upload { colony: colony_id(at(1)?)?, n: count(at(2)?)? },
+        "upload" => Order::Upload { colony: colony_id(g, at(1)?)?, n: count(at(2)?)? },
         "venture-share" => Order::SetVentureShare { share: count(at(1)?)? },
         "draw-venture" => Order::DrawVenture { amount: number(at(1)?)? },
         "leapfrog" => Order::Leapfrog { state: pick_state(at(1)?)? },
@@ -1560,10 +1634,11 @@ fn print_board(g: &Game) {
         let q = queue_text(g, Place::Colony(c.id));
         // Ticket #571 (version 0.1.0.3): a station's orbit number beside its name, since its colony
         // id and its orbit are two numberings and a player read one for the other.
+        // Ticket #586 (version 0.1.0.4), at the designer's word: by its name alone, the word an order
+        // takes; its id is never shown.
         let name = if c.in_orbit { format!("{} (orbit {})", g.station_name(c.body, c.slot), c.slot) } else { slot_name(g, c.body, c.slot) };
         println!(
-            "colony {:<3} {:<26} {:<7} {:<30} colonists {} (room {}) | Modules {}/{} | yields {}",
-            c.id.0,
+            "{:<30} {:<7} {:<30} colonists {} (room {}) | Modules {}/{} | yields {}",
             name,
             if c.in_orbit { "orbit" } else { "ground" },
             control_text(g, c.control),
@@ -1595,15 +1670,15 @@ fn print_board(g: &Game) {
         // Ticket #526 (version 0.1.0.0): the tier, and what `upgrade` would buy next.
         let next = match g.open_tier(c) {
             // Ticket #590 (version 0.1.0.4): the Capital at a slot open, not people.
-            Some(t) if t.takes_slot => format!("next `upgrade {}`: {} ({}) with 1 slot open, {} Materials and {} Widgets", c.id.0, t.name, dying_earth_engine::counted(t.cap, "Module", "Modules"), t.materials, t.widgets),
-            Some(t) => format!("next `upgrade {}`: {} ({}) at {}, {} Materials and {} Widgets", c.id.0, t.name, dying_earth_engine::counted(t.cap, "Module", "Modules"), dying_earth_engine::counted(t.colonists, "Colonist", "Colonists"), t.materials, t.widgets),
+            Some(t) if t.takes_slot => format!("next `upgrade {}`: {} ({}) with 1 slot open, {} Materials and {} Widgets", colony_word(g, c.id), t.name, dying_earth_engine::counted(t.cap, "Module", "Modules"), t.materials, t.widgets),
+            Some(t) => format!("next `upgrade {}`: {} ({}) at {}, {} Materials and {} Widgets", colony_word(g, c.id), t.name, dying_earth_engine::counted(t.cap, "Module", "Modules"), dying_earth_engine::counted(t.colonists, "Colonist", "Colonists"), t.materials, t.widgets),
             None if g.next_tier(c).is_some() => "the next tier is not open here (the Body's Colonial Capital is another's)".to_string(),
             None => "the last tier".to_string(),
         };
         // Ticket #590 (version 0.1.0.4): a Capital's building, or the pick it is owed.
         let building = match g.capital_building_at(c.id) {
             Some(b) => format!(" | {}: {}", b.name(), g.tables.capital_building(b).does),
-            None if g.tier_of(c).takes_slot => format!(" | no capital building: `capital {} <building>`", c.id.0),
+            None if g.tier_of(c).takes_slot => format!(" | no capital building: `capital {} <building>`", colony_word(g, c.id)),
             None => String::new(),
         };
         println!("    tier: {}{building} | {next}", g.tier_of(c).name);
@@ -1642,15 +1717,16 @@ fn print_board(g: &Game) {
         // and one in flight is not listed at all unless its books are open (`--reveal` lifts it).
         if !g.sees_ship(me, sh) {
             if let ShipAt::Body(b) = sh.at {
-                println!("ship ?   seat {} at {} (out of sight)", sh.seat.0, b.name());
+                println!("a Ship of seat {} at {} (out of sight)", sh.seat.0, b.name());
             }
             continue;
         }
         // Ticket #335 (version 0.09.0): the ORBIT, not the bare Body and a slot number, so a Ship at
         // a station's ring can be told from one in low orbit without doing the arithmetic.
+        // Ticket #586 (version 0.1.0.4): by its name, the word an order takes, never its id.
         println!(
-            "ship {:<3} {:<12} seat {} at {:<34} tank {}/{} | colonists {} | army {} | hp {} | {}{}",
-            sh.id.0,
+            "{:<22} {:<16} seat {} at {:<34} tank {}/{} | colonists {} | army {} | hp {} | {}{}",
+            g.ship_name(sh),
             sh.kind.name(),
             sh.seat.0,
             ship_at_text(g, sh),
@@ -1659,8 +1735,8 @@ fn print_board(g: &Game) {
             // Ticket #543 (version 0.1.0.1): a Colony Ship's aboard/room, and the founding rule
             // where it is short of it.
             colonists_text(g, sh),
-            // Ticket #404 (version 0.09.4): a number or a dash, never `Some(2)`.
-            sh.army.map(|a| a.0.to_string()).unwrap_or_else(|| "-".to_string()),
+            // Ticket #404 (version 0.09.4): a dash, never `Some(2)`. Ticket #586: a name, not a number.
+            sh.army.map(|a| g.army_called(a)).unwrap_or_else(|| "-".to_string()),
             t.unit(sh.kind).hit_points as i64 - sh.damage as i64,
             sh.stance.name(),
             if g.stranded(sh.id) { "  *** STRANDED ***" } else { "" }
@@ -1681,17 +1757,17 @@ fn print_board(g: &Game) {
         // Ticket #430 (version 0.09.5): an Army out of sight is whose and where.
         if !g.sees_army(me, a) {
             if let ArmyAt::Place(p) = a.at {
-                println!("army ?   seat {} at {} (out of sight)", g.army_seat(a).map(|s| s.0.to_string()).unwrap_or_else(|| "-".to_string()), g.place_name(p));
+                println!("an Army of seat {} at {} (out of sight)", g.army_seat(a).map(|s| s.0.to_string()).unwrap_or_else(|| "-".to_string()), g.place_name(p));
             }
             continue;
         }
         let at = match a.at {
             ArmyAt::Place(p) => g.place_name(p),
-            ArmyAt::Aboard(s) => format!("aboard ship {}", s.0),
+            ArmyAt::Aboard(s) => format!("aboard {}", g.ship_called(s)),
         };
         println!(
-            "army {:<3} seat {} at {:<26} hp {} | {}{}",
-            a.id.0,
+            "{:<30} seat {} at {:<26} hp {} | {}{}",
+            g.army_name(a),
             // Ticket #404 (version 0.09.4): `seat 0` as a Ship row prints it, `seat -` for nobody's.
             g.army_seat(a).map(|s| s.0.to_string()).unwrap_or_else(|| "-".to_string()),
             at,

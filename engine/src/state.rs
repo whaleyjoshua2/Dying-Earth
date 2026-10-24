@@ -2230,7 +2230,8 @@ impl Game {
                 Some(col) if col.in_orbit => self.slot_place_name(col.body, col.slot),
                 // Ticket #45: a Colony is named for its slot, a real place on its Body.
                 Some(col) => format!("{} on {}", self.tables.body(col.body).slots[col.slot as usize].name, self.tables.body(col.body).name),
-                None => format!("{c}"),
+                // Ticket #586 (version 0.1.0.4): never reached, a Colony being never removed.
+                None => "a lost Colony".to_string(),
             },
         }
     }
@@ -2429,6 +2430,17 @@ impl Game {
             return format!("{} {}", s.kind.name(), s.id.0);
         }
         format!("{} {}", self.tables.faction(self.kind(s.seat)).ship_prefix, s.name)
+    }
+
+    /// Ticket #586 (version 0.1.0.4), at the designer's word: a Ship named by its id, as the ids
+    /// are never shown -- `ShipId` prints nothing by itself. One gone reads "a lost Ship".
+    pub fn ship_called(&self, id: ShipId) -> String {
+        self.ship(id).map(|s| self.ship_name(s)).unwrap_or_else(|| "a lost Ship".to_string())
+    }
+
+    /// Ticket #586: an Army named by its id, the same way.
+    pub fn army_called(&self, id: ArmyId) -> String {
+        self.army(id).map(|a| self.army_name(a)).unwrap_or_else(|| "a lost Army".to_string())
     }
 
     /// Ticket #588 (version 0.1.0.4), at the designer's word: the Archive stands on the ground of another

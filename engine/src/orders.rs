@@ -3087,7 +3087,7 @@ impl Game {
                         // what `None` has always meant and is now drawn and named.
                         s.slot = *slot;
                     }
-                    self.log(format!("{} launches {} toward {} ({} turns, {} Fuel from the tank).", self.seat_name(seat), ship, name, turns, figure(fuel)));
+                    self.log(format!("{} launches {} toward {} ({} turns, {} Fuel from the tank).", self.seat_name(seat), self.ship_called(*ship), name, turns, figure(fuel)));
                     // Ticket #481 (version 0.09.8): a loaded Colony Ship sent to the Moon before
                     // anybody has landed there is the world's news, whoever sent it and whatever
                     // the fog hides: it carries no place and no seat, so every seat reads it.
@@ -3114,7 +3114,7 @@ impl Game {
                     self.pending.orbit_changes.push((seat, *ship, *slot));
                     if let Some(b) = body {
                         let to = self.orbit_name(b, Orbit::of(*slot));
-                        self.log(format!("{} moves {} to {} ({} Fuel from the tank).", self.seat_name(seat), ship, to, figure(fuel)));
+                        self.log(format!("{} moves {} to {} ({} Fuel from the tank).", self.seat_name(seat), self.ship_called(*ship), to, figure(fuel)));
                     }
                 }
                 // Ticket #87: the Fuel came out of the Stockpile with the order's cost; it goes into the tank.
@@ -3137,7 +3137,7 @@ impl Game {
                         Some((false, true)) => " at a partner's Refinery Colony",
                         _ => "",
                     };
-                    self.log(format!("{} refuels {} with {} Fuel{}.", self.seat_name(seat), ship, amount, where_));
+                    self.log(format!("{} refuels {} with {} Fuel{}.", self.seat_name(seat), self.ship_called(*ship), amount, where_));
                 }
                 Order::ShipStance { body, stance } => {
                     self.set_stack_stance(seat, *body, *stance);

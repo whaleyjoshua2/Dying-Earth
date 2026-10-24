@@ -486,3 +486,35 @@ Colonial Capitals standing at the end of 0.1.0.3's closing sweep: 4 over 80 game
   Colony on the Body draws a holder's +1, or the sweep's Capitals at the end stay at 4 in 80.
 - `SAVE_VERSION` unmoved: the buildings chosen are one map on the game, `serde(default)`; a
   Capital in an older save is owed its pick.
+
+## 18. Colonies, Ships and Armies by name, never by number
+
+Ticket: [Colonies, Ships and Armies by name, never by number, and the found date at the card's size](https://github.com/whaleyjoshua2/Dying-Earth/issues/586).
+
+The playtest of 0.1.0.2: *"I can't NAME the colony. It's 'colony 27'"* (tester 4), the text tool
+listing and taking every Colony, Ship and Army by a number; *"`load 27` -> no such Ship: my Colony
+Ship is #26; ids skip around"* (tester 2). The designer: no name chosen by the player; **the numbers
+go**, the names the places and units already carry stand in for them.
+
+- **The tool takes a Colony by its name**: a ground Colony by its slot's (`tycho`, `southpole`), a
+  station by its own (`iss`, `axiom`), or by its whole place name; an exact name first, then any
+  unique prefix, case and spaces ignored, as Regions and Techs. A prefix that fits two is refused,
+  naming both. **A Ship** by its name, with its Faction's prefix or without (`magellan`,
+  `tsvmagellan`), among the Ships the player sees; **an Army** by its name, "The" or not
+  (`1stchinese`, `the1stchinesearmy`), among the Armies seen. A Battery is `battery:<colony>:<index>`,
+  the index its place in that Colony's list.
+- **A Region or a Colony**, where an order takes either (`influence`, `build ship`, `load ... from`,
+  `max`, ...): a word that fits a Region alone is the Region, one that fits a Colony alone the
+  Colony, and one that fits both is refused, naming both; `state:` or `colony:` before it says which.
+- **No number is shown**: the board lists a Colony, Ship or Army by its name, and no message, hint
+  or help line prints its id. **A number given still reaches the id** (`27`, `colony:27`, `c27`,
+  `ship:4`), so a script or a replay written with numbers runs; the board never offers one.
+- **The window**: the order list names every Ship and Army ("Send TSV Magellan to ..."); a Ship's
+  hover on its row and on its card reads *"TSV Magellan [Frigate]"* in its Faction's colour, where
+  it read "Frigate 26".
+- **The card's date** ("Founded March 2034") at the size of the line after it, still weak.
+- **The engine**: `ShipId`, `ArmyId` and `ColonyId` carry no `Display`, so no line can print one.
+- The Upload's line (section 16) reads the slot's name, as before: no Colony is named by the player.
+- No rule moves: the computer seats untouched, no sweep; no saved field, `SAVE_VERSION` unmoved.
+- **Refuted if** a board, help or message line shows a Colony, Ship or Army id, a unique name or
+  prefix is refused, or a number that worked before no longer reaches its id.

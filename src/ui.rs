@@ -715,6 +715,12 @@ fn seat_colour(session: &Session, seat: Seat) -> Color32 {
     rgb(session.colours()[seat.index()])
 }
 
+/// Ticket #586 (version 0.1.0.4), at the designer's word: a Ship as its hovers name it, "TSV
+/// Magellan [Frigate]", in its Faction's colour.
+fn ship_called_coloured(session: &Session, game: &Game, s: &Ship) -> RichText {
+    RichText::new(format!("{} [{}]", game.ship_name(s), s.kind.name())).color(seat_colour(session, s.seat))
+}
+
 /// Ticket #50: every other seat with Ships at a Body, in seat order, with its stack strength.
 /// Ticket #346 (version 0.09.1): at what its hulls would ACTUALLY fight -- a dry rival is a weaker
 /// rival, and this line is read to decide whether to attack it.
@@ -5514,7 +5520,7 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, seat: Seat, marks: boo
             ArmyAt::Place(Place::State(s)) => (game.tables.state(s).name.clone(), Some((View::Surface(BodyId::Earth), Selection::State(s)))),
             ArmyAt::Place(Place::Colony(c)) => (game.place_name(Place::Colony(c)), game.colony(c).map(|col| (View::Surface(col.body), Selection::Colony(c)))),
             // Ticket #374 (version 0.09.2): an Army aboard jumps to the Ship's own card, in flight or not.
-            ArmyAt::Aboard(ship) => (format!("aboard {ship}"), game.ship(ship).map(|_| (View::Solar, Selection::Ship(ship)))),
+            ArmyAt::Aboard(ship) => (format!("aboard {}", game.ship_called(ship)), game.ship(ship).map(|_| (View::Solar, Selection::Ship(ship)))),
         };
         // Ticket #115: the heading already says "Armies", so every row repeating the word was pure
         // width, and "damage 0" is true of almost every Army almost always.
@@ -5707,32 +5713,33 @@ fn order_text(game: &Game, earlier: &[Order], o: &Order) -> String {
         Order::BuildArmy { place } => format!("Build Army at {}", game.place_name(*place)),
         Order::Repair { unit, points } => format!("Repair {} on {}", counted(points, "point", "points"), unit_name(game, unit)),
         // Ticket #335 (version 0.09.0): a leg names the ORBIT it ends in, low orbit included.
-        Order::Transit { ship, to, slot } => format!("Send {} to {}", ship, game.orbit_name(*to, Orbit::of(*slot))),
+        // Ticket #586 (version 0.1.0.4): every Ship and Army by its name, never its number.
+        Order::Transit { ship, to, slot } => format!("Send {} to {}", game.ship_called(*ship), game.orbit_name(*to, Orbit::of(*slot))),
         Order::ChangeOrbit { ship, slot } => {
             let body = game.ship(*ship).and_then(|s| match s.at {
                 ShipAt::Body(b) => Some(b),
                 _ => None,
             });
             match body {
-                Some(b) => format!("Move {} to {}", ship, game.orbit_name(b, Orbit::of(*slot))),
-                None => format!("Move {ship} to another orbit"),
+                Some(b) => format!("Move {} to {}", game.ship_called(*ship), game.orbit_name(b, Orbit::of(*slot))),
+                None => format!("Move {} to another orbit", game.ship_called(*ship)),
             }
         }
-        Order::Refuel { ship } => format!("Refuel {} ({} Fuel from the Stockpile)", ship, figure(game.refuel_amount(Seat(0), *ship))),
+        Order::Refuel { ship } => format!("Refuel {} ({} Fuel from the Stockpile)", game.ship_called(*ship), figure(game.refuel_amount(Seat(0), *ship))),
         Order::ShipStance { body, stance } => format!("Ships at {}: {}", game.tables.body(*body).name, stance.name()),
-        Order::Bombard { ship, colony } => format!("Bombard {} from {}", game.place_name(Place::Colony(*colony)), ship),
+        Order::Bombard { ship, colony } => format!("Bombard {} from {}", game.place_name(Place::Colony(*colony)), game.ship_called(*ship)),
         // Ticket #343 (version 0.09.1): the engine lane's two new orders, so the order list can
         // name them. The buttons that give them are the interface lane's work.
-        Order::Launch { ship, target } => format!("Launch a Warhead at {} from {}", game.place_name(*target), ship),
-        Order::Rearm { ship } => format!("Rearm {}", ship),
+        Order::Launch { ship, target } => format!("Launch a Warhead at {} from {}", game.place_name(*target), game.ship_called(*ship)),
+        Order::Rearm { ship } => format!("Rearm {}", game.ship_called(*ship)),
         Order::ArmyStance { place, stance } => format!("Armies at {}: {}", game.place_name(*place), stance.name()),
-        Order::MoveArmy { army, to } => format!("{} to {}", army, game.tables.state(*to).name),
-        Order::Load { ship, colonists, army, .. } => format!("Load {} onto {}", if *colonists > 0 { counted(colonists, "Colonist", "Colonists") } else { format!("{}", army.unwrap_or(ArmyId(0))) }, ship),
+        Order::MoveArmy { army, to } => format!("{} to {}", game.army_called(*army), game.tables.state(*to).name),
+        Order::Load { ship, colonists, army, .. } => format!("Load {} onto {}", if *colonists > 0 { counted(colonists, "Colonist", "Colonists") } else { army.map(|a| game.army_called(a)).unwrap_or_else(|| "an Army".to_string()) }, game.ship_called(*ship)),
         Order::Unload { ship, colonists, army, into } => match into {
             // Ticket #409 (version 0.09.4): with the count the slider chose.
-            UnloadTarget::Slot(b, s) => format!("Found a Colony at {} on {} with {} from {}", game.tables.body(*b).slots[*s as usize].name, game.tables.body(*b).name, colonists_word(*colonists), ship),
-            UnloadTarget::Colony(c) => format!("Unload {} from {} into {}", if *colonists > 0 { colonists_word(*colonists) } else if *army { "the Army".into() } else { "nothing".into() }, ship, game.place_name(Place::Colony(*c))),
-            UnloadTarget::Ring(b, s) => format!("Found {} with {} from {}", game.slot_place_name(*b, *s), colonists_word(*colonists), ship),
+            UnloadTarget::Slot(b, s) => format!("Found a Colony at {} on {} with {} from {}", game.tables.body(*b).slots[*s as usize].name, game.tables.body(*b).name, colonists_word(*colonists), game.ship_called(*ship)),
+            UnloadTarget::Colony(c) => format!("Unload {} from {} into {}", if *colonists > 0 { colonists_word(*colonists) } else if *army { "the Army".into() } else { "nothing".into() }, game.ship_called(*ship), game.place_name(Place::Colony(*c))),
+            UnloadTarget::Ring(b, s) => format!("Found {} with {} from {}", game.slot_place_name(*b, *s), colonists_word(*colonists), game.ship_called(*ship)),
         },
         Order::Influence { target, amount, .. } => format!("{} Influence on {}", amount, game.place_name(*target)),
         Order::BuyInfluence { amount } => format!("Buy {} Influence with Ducats", amount),
@@ -8679,8 +8686,9 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     // Ticket #391 (version 0.09.3): the date it was founded, under its name, at the designer's word
     // -- *"each colony/station card has the date it was founded under its name in the header"*. A
     // station is built and a Colony founded, as the glossary has them; a starting station reads
-    // the game's first date.
-    ui.label(RichText::new(format!("{} {}", if col.in_orbit && !game.far_slot(col.body, col.slot) { "Built" } else { "Founded" }, game.date(col.founded_turn).text())).weak().small());
+    // the game's first date. Ticket #586 (version 0.1.0.4), at the designer's word: at the size of
+    // the line after it, no longer small.
+    ui.label(RichText::new(format!("{} {}", if col.in_orbit && !game.far_slot(col.body, col.slot) { "Built" } else { "Founded" }, game.date(col.founded_turn).text())).weak());
     // Ticket #283 (version 0.08.5): what the ground is worth, under the heading, in glyphs. A
     // station reads the Body's figures, which the planet card shows, so it carries no row.
     if !col.in_orbit {
@@ -9154,7 +9162,19 @@ fn ship_row(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, s
     ui.horizontal(|ui| {
         faction_glyph(ui, session, game, Some(s.seat), 16.0);
         let text = format!("{}: {}", game.ship_name(s), ship_line(game, s));
-        if ui.link(text).on_hover_text(format!("{} {}. Opens the Ship's card.", s.kind.name(), s.id.0)).clicked() {
+        // Ticket #586 (version 0.1.0.4), at the designer's word: its name and kind in its Faction's
+        // colour, "TSV Magellan [Frigate]", where its number stood.
+        // Headless, the `tip:` aid photographs it.
+        let named = ship_called_coloured(session, game, s);
+        let tip = |ui: &mut Ui| {
+            ui.label(named.clone());
+            ui.label("Opens the Ship's card.");
+        };
+        let response = ui.link(text);
+        if forced_tip(&format!("{}\nOpens the Ship's card.", named.text())) {
+            response.show_tooltip_ui(tip);
+        }
+        if response.on_hover_ui(tip).clicked() {
             view.selection = Selection::Ship(s.id);
             view.attack_preview = false;
         }
@@ -9406,7 +9426,16 @@ fn ship_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 8.0;
         faction_glyph(ui, session, game, Some(s.seat), 22.0);
-        ui.label(RichText::new(game.ship_name(s)).size(22.0).strong()).on_hover_text(format!("{} {}", s.kind.name(), s.id.0));
+        let named = ship_called_coloured(session, game, s);
+        let response = ui.label(RichText::new(game.ship_name(s)).size(22.0).strong());
+        if forced_tip(named.text()) {
+            response.show_tooltip_ui(|ui| {
+                ui.label(named.clone());
+            });
+        }
+        response.on_hover_ui(|ui| {
+            ui.label(named);
+        });
     });
     // The way back: to the stack the Ship stands in, or, in flight, to the roster. In words, with
     // no arrow in front: the interface font has no U+2190 and drew a hollow box for it on the
@@ -10689,8 +10718,8 @@ fn core_first_words(game: &Game, col: &Colony, cid: ColonyId) -> String {
 /// Ticket #324 (version 0.08.8): what a Repair order's line calls the thing it repairs.
 fn unit_name(game: &Game, unit: &UnitRef) -> String {
     match unit {
-        UnitRef::Ship(s) => s.to_string(),
-        UnitRef::Army(a) => a.to_string(),
+        UnitRef::Ship(s) => game.ship_called(*s),
+        UnitRef::Army(a) => game.army_called(*a),
         UnitRef::Battery { colony, .. } => format!("the Battery at {}", game.place_name(Place::Colony(*colony))),
     }
 }

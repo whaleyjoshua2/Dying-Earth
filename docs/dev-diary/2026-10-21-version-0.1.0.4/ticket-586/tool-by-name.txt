@@ -1,0 +1,50 @@
+# Ticket 586: the text tool by name. Seed 501, Custodians, turn 1 (g.json) and turn 30 (g-501.json).
+
+## Before (the tool at 39fd22b..ce4e070, turn 1)
+line 1: REFUSED `build module iss habitat`: "iss" is not a whole number
+line 2: REFUSED `upgrade iss`: "iss" is not a whole number
+line 3: REFUSED `move-army chinese india`: "chinese" is not a whole number
+line 4: REFUSED `build ship iss frigate`: "iss" is not a Region; they are Nigeria, Egypt, China, ...
+line 5: REFUSED `influence tiangong 5`: "tiangong" is not a Region; they are Nigeria, Egypt, China, ...
+line 6: ok `build module 21 habitat` costs 27.5 Materials and 4 Widgets
+
+## After, turn 1
+line 1: ok `build module iss habitat` costs 27.5 Materials and 4 Widgets
+line 2: REFUSED `upgrade iss`: needs 12 Colonists
+line 3: REFUSED `move-army chinese india`: "chinese" is not an Army; they are the 1st Chinese Army, the 1st Indian Army, the 1st Indonesian Army, the 1st Russian Army, the 1st Iranian Army, the 1st Japanese Army, the 1st Kazakh Army, the 1st Vietnamese Army
+line 4: REFUSED `build ship iss frigate`: no Shipyard here
+line 5: ok `influence tiangong 5` costs 5 Influence
+line 6: REFUSED `build module 21 habitat`: full until more Colonists live here
+line 1: ok `move-army 1stchinese india` costs free
+line 2: REFUSED `move-army the1stchinesearmy india`: this Army already has an order
+line 3: REFUSED `move-army 1 india`: not your Army
+line 4: REFUSED `move-army 3 india`: this Army already has an order
+
+## After, turn 30, fog lifted (--reveal) so rival Ships are seen
+line 1: REFUSED `refuel valiant`: not your Ship
+line 2: REFUSED `refuel pmvvaliant`: not your Ship
+line 3: REFUSED `refuel v`: "v" could be more than one: PMV Valiant, PMV Vanguard, ARK Vostok
+line 4: REFUSED `repair ship:implacable 1`: not your Ship
+line 5: REFUSED `move-army 1stchinese india`: not your Army
+line 6: REFUSED `move-army the1stchinesearmy india`: not your Army
+line 7: REFUSED `influence m 1`: "m" could be more than one: Mare Tranquillitatis on the Moon, Mare Imbrium on the Moon
+line 8: ok `influence h 1` costs 1 Influence
+line 9: ok `influence mex 1` costs 1 Influence
+line 10: REFUSED `influence state:m 1`: "m" could be more than one: Mexico, Iran
+line 11: REFUSED `influence colony:m 1`: "m" could be more than one: Mare Tranquillitatis on the Moon, Mare Imbrium on the Moon
+line 12: REFUSED `influence zzz 1`: "zzz" is neither a Region nor a Colony
+line 13: REFUSED `build module 21 habitat`: you do not direct this Colony
+line 14: REFUSED `upgrade c21`: not yours
+line 15: REFUSED `transit valiant moon iss`: "iss" is not an orbit over the Moon (low, 0 Gateway, 1 Selene); they are Gateway, Selene
+
+## A word that fits one Region and one Colony
+line 1: REFUSED `influence ch 1`: "ch" could be the Region China or the Colony Chryse Planitia on Mars; put `state:` or `colony:` before it
+line 2: ok `influence state:ch 1` costs 1 Influence
+line 3: ok `influence colony:ch 1` costs 1 Influence
+
+## The board's Ship rows, turn 30, fog lifted (first five)
+PMV Magellan           Colony Ship      seat 1 at Phobos -> Earth, at ISS (3 left)   tank 1.2/52 | colonists 0/8 | army - | hp 3 | Hold
+ACV Challenger         Colony Ship      seat 3 at Mars, low orbit                    tank 3.4/52 | colonists 0/8 | army - | hp 2 | Hold  *** STRANDED ***
+ACV Endeavour          Colony Ship      seat 3 at the Moon, low orbit                tank 37.4/52 | colonists 0/8 | army - | hp 2 | Hold
+ACV Beagle             Colony Ship      seat 3 at the Moon, low orbit                tank 20.8/52 | colonists 5/8 | army - | hp 2 | Hold
+PMV Valiant            Frigate          seat 1 at Earth, low orbit                   tank 10.6/50 | colonists 0 | army - | hp 3 | Hold
