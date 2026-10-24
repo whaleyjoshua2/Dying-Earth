@@ -1291,7 +1291,7 @@ impl Game {
             // Ticket #343 (version 0.09.1): a Warhead is priced flat, the Faction's Ship discount
             // left out. The discount is a shipwright's, and reloading is not shipbuilding.
             BuildItem::Warhead(_) => (t.nuke.rearm_widgets, 1.0),
-            // Ticket #559 (version 0.1.0.3): a Replace is half the kind's Widgets, 4 of the Wind Farm's 8.
+            // Ticket #559 (version 0.1.0.3): a Replace is half the kind's Widgets, 5 of the Wind Farm's 10 (4 of 8 before ticket #610).
             BuildItem::Replace(k) => (t.facility(k).widgets / 2, fac.facility_materials_multiplier),
         };
         ((row as f64 * m).floor() as u32).max(1)

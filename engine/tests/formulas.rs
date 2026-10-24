@@ -2580,7 +2580,7 @@ fn the_archive_is_one_module_of_fifty_materials_and_three_turns_built_once_off_e
     assert_eq!(g.check_order(Seat(3), &[], &order).unwrap_err().0, "the Archive is already building");
     assert!(g.log.to_vec().iter().any(|l| l.contains("began the Archive at")), "{:?}", g.log.to_vec());
     // Ticket #332 (version 0.09.0): twelve Widgets to raise, four for each of its three turns, and (ticket #610, version 0.1.0.5: fourteen, so a fourth Resolution)
-    // a Colony with only its Core Module makes four a turn, so it stands after the third Resolution.
+    // a Colony with only its Core Module makes four a turn, so it stood after the third Resolution; at fourteen it stands after the fourth.
     let b = g.colony(mars).unwrap().queue.iter().find(|b| b.item == BuildItem::Module(ModuleKind::Archive)).expect("queued").clone();
     assert_eq!((b.widgets, b.done), (14, 0), "the Archivists' Module discount is 1.0");
     assert_eq!(g.widgets_at(Place::Colony(mars)), 4, "the Core Module's four");
@@ -4017,7 +4017,7 @@ fn e_a_scrubber_enlarges_the_sink_and_is_capped_captured_at_half_and_calming() {
     let sid = StateId::EastAsia;
     let card = g.tables.facility(FacilityKind::Scrubber);
     // Version 0.07.0: the Scrubber runs on 3 Energy, down from 4.
-    // Ticket #332 (version 0.09.0): 8 Widgets, four for each of its two turns.
+    // Ticket #332 (version 0.09.0): 8 Widgets, four for each of its two turns; ticket #610 (version 0.1.0.5): 10.
     // Ticket #561 (version 0.1.0.3), at the designer's word: 4 Energy and 1 Ducat a turn (3 Energy
     // before), and one per 300 million people with a floor of 1 (200 and 2 before).
     assert_eq!((card.materials, card.widgets, card.energy_upkeep, card.ducats_upkeep, card.emissions), (33.0, 10, 4, 1.0, 0.0));
@@ -13275,7 +13275,7 @@ fn a_build_carries_a_widget_figure_at_four_per_former_turn_and_a_count() {
     let sid = StateId::EastAsia;
     directed(&mut g, sid);
     let t = &g.tables;
-    // The rows, at four per former turn.
+    // The rows, at four per former turn, a fifth more since ticket #610 (version 0.1.0.5).
     assert_eq!((t.facility(FacilityKind::Factory).widgets, t.facility(FacilityKind::PowerPlant).widgets, t.facility(FacilityKind::SeaWall).widgets), (5, 10, 10), "ticket #610 (version 0.1.0.5): a fifth over 4, 8, 8");
     assert_eq!((t.module(ModuleKind::Habitat).widgets, t.module(ModuleKind::Shipyard).widgets, t.module(ModuleKind::Archive).widgets), (5, 10, 14), "ticket #610 (version 0.1.0.5): a fifth over 4, 8, 12");
     assert_eq!((t.unit(UnitKind::Frigate).widgets, t.unit(UnitKind::Battleship).widgets, t.unit(UnitKind::Army).widgets), (6, 8, 4), "ticket #610 (version 0.1.0.5): the Frigate 6, from 4; the Battleship and the Army as they were");
@@ -13301,7 +13301,7 @@ fn a_build_carries_a_widget_figure_at_four_per_former_turn_and_a_count() {
     assert_eq!((q[0].item, q[0].widgets, q[0].done), (BuildItem::Facility(FacilityKind::PowerPlant), 10, 0));
     assert_eq!((q[1].item, q[1].widgets, q[1].done), (BuildItem::Facility(FacilityKind::Embassy), 5, 5), "bought outright: done at the order");
     // East Asia makes 7: the Embassy, done already, stands at this Resolution ahead of the Power
-    // Plant queued before it, which takes the 7 of its 8 and waits.
+    // Plant queued before it, which takes the 7 of its 10 (8 before ticket #610) and waits.
     g.resolution_phase();
     assert!(g.state(sid).facilities.iter().any(|f| f.kind == FacilityKind::Embassy), "the Ducat buy stands");
     assert!(!g.state(sid).facilities.iter().any(|f| f.kind == FacilityKind::PowerPlant), "the Power Plant does not");
@@ -13312,7 +13312,7 @@ fn a_build_carries_a_widget_figure_at_four_per_former_turn_and_a_count() {
 /// fresh board Nigeria holds one Factory at Industry Level 1 and makes 9 a turn (a flat 4, 1 for
 /// the level, 4 for the Factory): a single 1-turn Facility ordered on turn N stands at turn N's
 /// Resolution (9 against 4), and of a Bank and a Power Plant ordered together the Power Plant
-/// waits for turn N+1 with 5 of 8 done. A build never completes short of its figure; what is
+/// waits for turn N+1 with 4 of 10 done (5 of 8 before ticket #610). A build never completes short of its figure; what is
 /// applied never exceeds what was made. A Launch Pad Fire takes the turn's Widgets from its
 /// Region, unless Clean Propellant is held.
 #[test]
@@ -13333,12 +13333,12 @@ fn the_queue_is_served_in_order_and_a_launch_pad_fire_takes_the_turns_widgets() 
     let plants = |g: &Game| g.state(sid).facilities.iter().filter(|f| f.kind == FacilityKind::PowerPlant).count();
     assert_eq!((banks(&g), plants(&g)), (1, 0), "the first stands at turn N; the second does not");
     assert_eq!(g.state(sid).queue.len(), 1);
-    assert_eq!((g.state(sid).queue[0].widgets, g.state(sid).queue[0].done), (10, 4), "the Power Plant took what flowed on: 4 of 10, the Factory ahead of it taking 5 (ticket #610; 5 of 8 before)");
+    assert_eq!((g.state(sid).queue[0].widgets, g.state(sid).queue[0].done), (10, 4), "the Power Plant took what flowed on: 4 of 10, the Bank ahead of it taking 5 (ticket #610; 5 of 8 before)");
     g.turn += 1;
     g.resolution_phase();
     assert_eq!((banks(&g), plants(&g)), (1, 1), "the second stands at turn N+1");
     assert!(g.state(sid).queue.is_empty());
-    // The counters (before ticket #610 raised the rows): 9 made and all 9 applied at turn N, 9 made and 3 applied at N+1, so 12 applied
+    // The counters: 9 made and all 9 applied at turn N (the Bank's 5 and 4 of the Power Plant's 10), 9 made and 6 applied at N+1, so 15 applied (12 before ticket #610)
     // in all across the seat's places, and lost is exactly what was made and not applied.
     let (made, applied, lost) = (g.widgets.made[0] - before.0, g.widgets.applied[0] - before.1, g.widgets.lost[0] - before.2);
     assert_eq!(applied, 15, "ticket #610 (version 0.1.0.5): the rows a fifth dearer, 15 applied across the two turns (4 + 5 at turn N and 3 at N+1, 12, before)");
