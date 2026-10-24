@@ -308,6 +308,9 @@ pub struct SavedGame {
     /// Ticket #590 (version 0.1.0.4): each capital building chosen, and its Capital.
     #[serde(default)]
     pub capital_buildings: BTreeMap<CapitalBuilding, ColonyId>,
+    /// Ticket #590, from the review: the buildings chosen this turn, not yet told.
+    #[serde(default)]
+    pub capital_built_now: Vec<CapitalBuilding>,
 }
 
 impl SavedGame {
@@ -360,6 +363,7 @@ impl SavedGame {
             body_firsts,
             colony_growth,
             capital_buildings,
+            capital_built_now,
             reveal_all: _,
             waiting_last: _,
         } = g;
@@ -408,6 +412,7 @@ impl SavedGame {
             body_firsts: body_firsts.clone(),
             colony_growth: colony_growth.clone(),
             capital_buildings: capital_buildings.clone(),
+            capital_built_now: capital_built_now.clone(),
         }
     }
 
@@ -458,6 +463,7 @@ impl SavedGame {
             body_firsts: self.body_firsts,
             colony_growth: self.colony_growth,
             capital_buildings: self.capital_buildings,
+            capital_built_now: self.capital_built_now,
             log: self.log,
             reveal_all: false,
             waiting_last: Vec::new(),

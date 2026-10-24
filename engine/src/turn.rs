@@ -235,6 +235,7 @@ impl Game {
                 }
             }
         }
+        self.tell_capital_buildings();
         for seat in Seat::ALL {
             if self.seat(seat).ai {
                 all[seat.index()] = self.ai_orders(seat);

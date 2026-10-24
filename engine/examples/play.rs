@@ -613,15 +613,16 @@ fn parse_line(g: &Game, line: &str) -> Result<Line, String> {
             at(1)?;
             return Ok(Line::Tech(pick_named(&TechId::ALL, &w[1..].concat(), |t| g.tables.tech(t).name.clone(), "a Tech")?));
         }
-        // Ticket #337 (version 0.09.0): the only door the driver has onto the turn's question. It
-        // is not an Order -- it is answered the moment the line is read, as a `tech` pick is.
-        // Ticket #590 (version 0.1.0.4): not an Order either; it stands the moment it is read.
+        // Ticket #590 (version 0.1.0.4): not an Order, as a `tech` pick is not; it stands the moment
+        // it is read.
         "capital" => {
             let c = colony_id(at(1)?)?;
             let words = w[2..].concat();
             let b = CapitalBuilding::parse(&words).ok_or_else(|| format!("{words:?} is not one of {}", CapitalBuilding::ALL.map(|b| b.name()).join(", ")))?;
             return Ok(Line::Capital(c, b));
         }
+        // Ticket #337 (version 0.09.0): the only door the driver has onto the turn's question. It
+        // is not an Order -- it is answered the moment the line is read, as a `tech` pick is.
         "answer" => {
             let side = at(1)?.to_ascii_lowercase();
             return match side.as_str() {

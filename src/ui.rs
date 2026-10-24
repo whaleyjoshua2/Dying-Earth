@@ -12704,8 +12704,6 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 });
             });
         }
-        // Ticket #495 (version 0.09.9): the Accords offered to the player, one row each, Accept or
-        // Refuse. Like the card, an answer is the only way out: no Continue, and Escape holds it.
         // Ticket #590 (version 0.1.0.4): the eight, a taken one greyed with its holder.
         Popup::Capital => {
             let Some(cid) = game.capital_picks_owed(Seat(0)).first().copied() else {
@@ -12740,6 +12738,8 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 }
             });
         }
+        // Ticket #495 (version 0.09.9): the Accords offered to the player, one row each, Accept or
+        // Refuse. Like the card, an answer is the only way out: no Continue, and Escape holds it.
         Popup::Offers => {
             let offers: Vec<OfferRow> = game.offers_to(Seat(0)).into_iter().map(|(i, o)| (i, o.from, offer_words(game, o), o.ask == AccordAsk::Renew, o.trade)).collect();
             if offers.is_empty() {

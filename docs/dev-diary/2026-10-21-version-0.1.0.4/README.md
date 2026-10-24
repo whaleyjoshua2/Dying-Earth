@@ -577,7 +577,8 @@ by Faction: 5 / 6 / 5 / 3. Buildings taken: Central Grid 7, Fuel Depot 3, Arcolo
 2, Spaceport 1. Mars still founded in 79 of 80 games, median turn 13. Income a game, mean
 (Materials / Fuel / Energy / Ducats / Research): Custodians 2033 / 581 / 761 / 1202 / 1043,
 Prospectors 2161 / 454 / 255 / 1510 / 336, Arkwrights 759 / 156 / 194 / 2387 / 256, Archivists
-503 / 244 / 72 / 477 / 644.
+503 / 244 / 72 / 477 / 644. The designer kept the gathering for every seat, the Prospectors' rise
+accepted.
 
 - **The pick window**, the Moon's Capital unchosen and the Stock Market taken by the Prospectors on
   Mars; the bar's "Capital building" button beside the figures:

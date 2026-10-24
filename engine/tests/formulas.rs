@@ -25130,7 +25130,6 @@ fn each_capital_building_stands_once_and_passes_with_its_capital() {
     g.pick_capital_building(Seat(0), moon, CapitalBuilding::StockMarket).unwrap();
     assert!(g.capital_picks_owed(Seat(0)).is_empty());
     assert_eq!(g.capital_building_at(moon), Some(CapitalBuilding::StockMarket));
-    assert!(g.report.lines.iter().any(|l| l.text == format!("Custodians built the Stock Market at {}.", g.slot_name(g.colony(moon).unwrap()))));
     // Taken: refused elsewhere, by where it stands and whose; another is free.
     let mars = capital_at(&mut g, Seat(1), BodyId::Mars, 6);
     let err = g.pick_capital_building(Seat(1), mars, CapitalBuilding::StockMarket).unwrap_err();
@@ -25236,6 +25235,21 @@ fn end_turn_gives_every_capital_owed_its_building() {
     g.end_turn(std::array::from_fn(|_| Vec::new())).expect("the turn should end");
     assert_eq!(g.capital_building_at(mine), Some(CapitalBuilding::CentralGrid));
     assert_eq!(g.capital_building_at(theirs), Some(CapitalBuilding::Arcology));
+}
+
+/// Ticket #590 (version 0.1.0.4), from the review: a building chosen in the window during the turn
+/// is told in the Report End Turn brings, as one chosen at End Turn is. Written into the Report being
+/// read, it was reset there and never shown.
+#[test]
+fn a_capital_building_chosen_in_the_turn_is_told_in_the_coming_report() {
+    let mut g = game();
+    calm(&mut g);
+    pick_a_tech(&mut g);
+    let moon = capital_at(&mut g, Seat(0), BodyId::Moon, 6);
+    g.pick_capital_building(Seat(0), moon, CapitalBuilding::StockMarket).unwrap();
+    let line = format!("Custodians built the Stock Market at {}.", g.slot_name(g.colony(moon).unwrap()));
+    g.end_turn(std::array::from_fn(|_| Vec::new())).expect("the turn should end");
+    assert!(g.report.lines.iter().any(|l| l.text == line), "{line} in the coming Report");
 }
 
 /// Ticket #590: the computer's score -- its Faction's own counts 1, the run's need 1.5: a yield

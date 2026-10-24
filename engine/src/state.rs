@@ -1808,6 +1808,9 @@ pub struct Game {
     /// Keyed by the building, so one stands at one Capital at most; a Colony is never removed, so
     /// the building passes with the place to whoever directs it.
     pub capital_buildings: BTreeMap<CapitalBuilding, ColonyId>,
+    /// Ticket #590, from the review: the buildings chosen since the last End Turn, told in the
+    /// Report it brings; one chosen during the turn would be lost in the Report then reset.
+    pub capital_built_now: Vec<CapitalBuilding>,
     /// Ticket #431 (version 0.09.5): last turn's "Colonists wait aboard" lines, so one that has not
     /// changed is not written again. Not saved: after a load each shows once.
     pub waiting_last: Vec<String>,
@@ -2062,6 +2065,7 @@ impl Game {
             waiting_last: Vec::new(),
             colony_growth: BTreeMap::new(),
             capital_buildings: BTreeMap::new(),
+            capital_built_now: Vec::new(),
             reveal_all: false,
             tables,
         };
@@ -3651,7 +3655,7 @@ impl Game {
     }
 
     /// Ticket #590: `b` stands at the Capital `colony`, for good, the moment it is chosen. The
-    /// Arcology eases its holder's Regions once; the Report says it.
+    /// Arcology eases its holder's Regions once; the Report End Turn brings says it.
     pub fn pick_capital_building(&mut self, seat: Seat, colony: ColonyId, b: CapitalBuilding) -> Result<(), String> {
         if let Some(why) = self.capital_pick_refusal(seat, colony, b) {
             return Err(why);
@@ -3665,9 +3669,20 @@ impl Game {
         }
         let place = self.slot_name(self.colony(colony).unwrap());
         self.log(format!("{} built the {} at {}.", self.seat_name(seat), b.name(), place));
-        let text = self.say("capital_building", &[("faction", self.seat_name(seat)), ("building", b.name().to_string()), ("place", place)]);
-        self.report_line_of(seat, LineKind::YourBuild, LineKind::BuildComplete, Some(ReportPlace::Colony(colony)), text);
+        self.capital_built_now.push(b);
         Ok(())
+    }
+
+    /// Ticket #590, from the review: the Report's line for each building chosen since the last End
+    /// Turn, written once that Report is the one being collected.
+    pub fn tell_capital_buildings(&mut self) {
+        for b in std::mem::take(&mut self.capital_built_now) {
+            let Some(colony) = self.capital_buildings.get(&b).copied() else { continue };
+            let Some(seat) = self.colony(colony).and_then(|c| c.control.director()) else { continue };
+            let place = self.slot_name(self.colony(colony).unwrap());
+            let text = self.say("capital_building", &[("faction", self.seat_name(seat)), ("building", b.name().to_string()), ("place", place)]);
+            self.report_line_of(seat, LineKind::YourBuild, LineKind::BuildComplete, Some(ReportPlace::Colony(colony)), text);
+        }
     }
 
     /// Ticket #590: the pick a seat makes for a Capital where nobody chose: the Faction's own where

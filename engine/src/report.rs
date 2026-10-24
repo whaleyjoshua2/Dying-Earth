@@ -609,6 +609,7 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("build_cancelled", &["faction", "building", "place", "refund"]),
     // Ticket #503 (version 0.1.0.0): an upgrade to a Colonial Capital another place completed first.
     ("capital_refunded",&["place", "refund", "capital", "body"]),
+    // Ticket #590 (version 0.1.0.4): a capital building chosen at a Capital.
     ("capital_building", &["faction", "building", "place"]),
     ("colonists_no_room", &["n", "colony", "were"]),
     // Ticket #191 (version 0.08.0): Relations. Ticket #362 (version 0.09.1): a fall into a worse

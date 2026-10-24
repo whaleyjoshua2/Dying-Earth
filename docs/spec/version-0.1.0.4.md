@@ -478,6 +478,8 @@ Colonial Capitals standing at the end of 0.1.0.3's closing sweep: 4 over 80 game
   - every seat has a Capital candidate and **gathers** at it, as the Arkwrights did alone: Habitats
     built ahead, its Modules, a loaded Ship's crossing to its Body and a landing there at
     `capital_chase`; the Arkwrights still only once their Bodies part is within one of its bar.
+  Its cost, accepted at the designer's word: wins 28 / 39 / 4 / 8 from 36 / 32 / 1 / 11, the
+  gathering lifting the Prospectors, for 20 Capitals at the end of 80 games.
 - **Refuted if** a Capital is ordered with no open slot, two Capitals hold one building, a rival's
   Colony on the Body draws a holder's +1, or the sweep's Capitals at the end stay at 4 in 80.
 - `SAVE_VERSION` unmoved: the buildings chosen are one map on the game, `serde(default)`; a

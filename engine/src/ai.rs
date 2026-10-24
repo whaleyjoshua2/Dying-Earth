@@ -1423,8 +1423,8 @@ impl Game {
         let capital_body = capital_candidate.and_then(|c| self.colony(c)).map(|c| c.body);
         let capital_chase = self.tables.ai.thresholds.capital_chase;
         // The people the Capital tier wants at one place, the room the candidate builds toward.
-        // Ticket #590 (version 0.1.0.4): the Capital asks none, so the most any tier on the way asks.
-        let capital_room = self.tables.tiers.iter().take_while(|t| !t.one_per_body).chain(self.tables.tiers.iter().filter(|t| t.one_per_body)).map(|t| t.colonists).max().unwrap_or(0);
+        // Ticket #590 (version 0.1.0.4): the Capital asks none, so the most any tier asks.
+        let capital_room = self.tables.tiers.iter().map(|t| t.colonists).max().unwrap_or(0);
         // Room at the candidate for a landing: a crossing is lifted only where the people can land.
         let capital_has_room = capital_candidate.and_then(|c| self.colony(c)).is_some_and(|c| self.habitat_room(c) > c.colonists);
         let gathering = capital_candidate.is_some() && {

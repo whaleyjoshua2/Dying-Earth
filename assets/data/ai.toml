@@ -514,7 +514,8 @@ archive_target_fund = 0.5
 capital_chase = 3.0
 # Ticket #590 (version 0.1.0.4): a capital building's score is 1 for the Faction's own, plus this
 # where the run needs what it gives: a yield the last Income lost, Ships at the Capital's Body,
-# a Region past the first Unrest threshold, the Influence. The highest free one is taken.
+# a Region past the first Unrest threshold; the Chancery and the Great Library by the Faction
+# alone. The highest free one is taken.
 capital_pick_need = 1.5
 # Ticket #590 (version 0.1.0.4), at the designer's word: a seat builds up its most peopled ground
 # Colony off Earth, its upgrade weighing this many times. Without it the upgrade, at 5 or 6, was
