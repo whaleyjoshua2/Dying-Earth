@@ -199,7 +199,9 @@ ticket's questions, *"those but remove the Turn one:/Turn two: q2 yes"*.
   - Archivists: *"Build a Research Lab and set the Directive. Recruit Pioneers and build a Habitat on
     Axiom."*
 
-  The last two at the designer's second word (*"Archivists needs to say Build a Research Lab and Set
+  The Custodians' Leapfrog is refused before turn four (Three Turns Held) and costs 50 Ducats they do not
+  open with; raised from the review, the designer kept the line: *"just leave it"*. The last two at the
+  designer's second word (*"Archivists needs to say Build a Research Lab and Set
   Directive. Recruit Prioneers and build a Habitat on Axiom. For the Arkwrights just add the word Put
   at the start of the second sentence"*), "Set Directive" read as the window's own "set the Directive".
 - **The turn-one window** shows the player's Faction alone: "Signature moves", the Faction's glyph
