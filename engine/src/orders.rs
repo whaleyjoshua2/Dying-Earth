@@ -1343,11 +1343,9 @@ impl Game {
                 // Ticket #625 (version 0.1.0.5), at the designer's word: the place's TIER, where it
                 // was four Colonists living there. The tier is read, not the people: a place never
                 // falls back a tier, so eighteen who climbed it and left still leave a Colony.
-                let want = self.tables.archive_tier();
-                if col.tier < want {
+                if !self.may_site_archive(col) {
                     let place = self.place_name(Place::Colony(*colony));
-                    let tier = &self.tier_of(col).name;
-                    return fail(format!("the Archive wants a place of {} tier; {place} is {} {tier}", self.tables.archive.tier_to_order, crate::article(tier)));
+                    return fail(format!("the Archive wants a place of {} tier; {place} is {}", self.tables.archive.tier_to_order, Self::with_article(&self.tier_of(col).name)));
                 }
                 Ok(cost)
             }

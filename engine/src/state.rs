@@ -2449,6 +2449,13 @@ impl Game {
         c.body != BodyId::Earth && !c.in_orbit
     }
 
+    /// Ticket #625 (version 0.1.0.5): a SITE for the Archive -- a place that may hold it and has
+    /// climbed to the tier it asks for (the Colony tier; a higher one counts). Read by the order's
+    /// check and by the computer Archivists, who name a site and ferry people until one stands.
+    pub fn may_site_archive(&self, c: &Colony) -> bool {
+        self.may_hold_archive(c) && c.tier >= self.tables.archive_tier()
+    }
+
     /// Ticket #209 (version 0.08.1): the Archivists have nowhere to put the Archive and have not
     /// begun it. Their whole Victory Condition waits on a journey they have never made -- their AI
     /// already weights founding a Colony at 9 and a Colony Ship at 8, yet Antarctica and Earth orbit

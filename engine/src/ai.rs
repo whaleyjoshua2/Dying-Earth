@@ -1439,8 +1439,7 @@ impl Game {
         // home, not a site: the lift stays on, so people keep arriving and the place can climb.
         // Measured without this: the lift paused at the first Outpost, and no computer Archive stood
         // in 80 games (43 before the tier).
-        let archive_tier = self.tables.archive_tier();
-        let site_stands = self.colonies.iter().any(|c| c.control.director() == Some(seat) && self.may_hold_archive(c) && c.tier >= archive_tier);
+        let site_stands = self.colonies.iter().any(|c| c.control.director() == Some(seat) && self.may_site_archive(c));
         let site_ready = kind == FactionKind::Archivists && !homeless_archive && site_stands && !self.archive_ordered(seat) && !self.archive_built(seat);
         let ferry_lift = ferrying && !site_ready;
         let archive_body: Option<BodyId> = if kind == FactionKind::Archivists {
@@ -2561,11 +2560,10 @@ impl Game {
                 // in. The first place with enough people, oldest first as before.
                 // Ticket #625 (version 0.1.0.5): the first place that has climbed to the tier the
                 // Archive asks for (the Colony tier), where it was the first with four people.
-                let want = self.tables.archive_tier();
                 let home = self
                     .colonies
                     .iter()
-                    .filter(|c| c.control.director() == Some(seat) && self.may_hold_archive(c) && c.tier >= want)
+                    .filter(|c| c.control.director() == Some(seat) && self.may_site_archive(c))
                     .min_by_key(|c| (c.founded_turn, c.id.0))
                     .map(|c| c.id);
                 if let Some(cid) = home {

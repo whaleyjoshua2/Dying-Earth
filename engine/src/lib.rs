@@ -42,15 +42,6 @@ pub fn counted(n: impl std::fmt::Display, one: &str, many: &str) -> String {
     format!("{n} {noun}")
 }
 
-/// Ticket #625 (version 0.1.0.5): **the indefinite article before a noun** -- "an Outpost", "a
-/// Settlement" -- by its first letter, for a line that names a tier.
-pub fn article(noun: &str) -> &'static str {
-    match noun.chars().next().map(|c| c.to_ascii_lowercase()) {
-        Some('a' | 'e' | 'i' | 'o' | 'u') => "an",
-        _ => "a",
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::counted;

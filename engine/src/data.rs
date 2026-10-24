@@ -3043,13 +3043,13 @@ impl Tables {
         &self.ai.tech_picks[&kind]
     }
 
-    /// Ticket #84 (version 0.06.0): the Tech that opens this Faction's Victory Condition, if one does.
     /// Ticket #625 (version 0.1.0.5): the index of the tier a place must have climbed to before the
     /// Archive may be ordered there; `validate` holds that the name is a tier's.
     pub fn archive_tier(&self) -> u32 {
-        self.tiers.iter().position(|t| t.name == self.archive.tier_to_order).unwrap_or(0) as u32
+        self.tiers.iter().position(|t| t.name == self.archive.tier_to_order).expect("validate holds that [archive] tier_to_order names a tier") as u32
     }
 
+    /// Ticket #84 (version 0.06.0): the Tech that opens this Faction's Victory Condition, if one does.
     pub fn victory_gate(&self, kind: FactionKind) -> Option<TechId> {
         self.techs.iter().find(|t| t.gate_for == Some(kind)).map(|t| t.id)
     }

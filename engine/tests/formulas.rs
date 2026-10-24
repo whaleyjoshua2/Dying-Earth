@@ -2333,7 +2333,7 @@ fn an_arkwright_pays_half_for_a_station_and_three_quarters_for_a_module() {
 fn diaspora_wants_four_bodies_with_six_colonists_each_and_counts_no_antarctic_one() {
     let mut g = game();
     let p = g.progress(Seat(2));
-    // Ticket #506 (version 0.1.0.0): 42 over four Bodies, from 30 over three.
+    // Ticket #506 (version 0.1.0.0): 42 over four Bodies, from 30 over three; ticket #625 (version 0.1.0.5): 44, six on each.
     assert_eq!(p.first_bar, 44.0, "44 Colonists off Earth (ticket #625; 42 before)");
     assert_eq!(p.second_bar, 4.0, "on at least four Bodies");
     colony(&mut g, Seat(2), BodyId::Mars, &[ModuleKind::Habitat], 6);
@@ -11965,7 +11965,8 @@ fn a_rival_closing_on_its_victory_condition_interrupts_the_player_once_a_step() 
     // emptied first.
     bare_stations(&mut g);
     // Ticket #601 (version 0.1.0.4): 15 of 18 and 4000 of 5000, where 14 and 3800 read 72% with
-    // the parts at 94% of the score, the gate not standing.
+    // the parts at 94% of the score, the gate not standing. Ticket #625 (version 0.1.0.5): 16 of 20,
+    // since Presence is 20 and 15 of 20 would read under three quarters.
     colony(&mut g, pro, BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 16);
     g.seats[pro.index()].venture_fund = 4000.0;
     // Ticket #555 (version 0.1.0.2): the score is the mean of the parts, past three quarters; the
@@ -20622,6 +20623,10 @@ fn every_pace_table_ends_at_its_victory_bar() {
         if let Some(last) = pace.uploads.last() {
             assert_eq!(last[1] as f64, t.faction(k).victory_second.bar, "the {k:?} Uploads pace ends at its bar");
         }
+        // Ticket #625 (version 0.1.0.5): and a people pace ends at Off-world Presence, which it is a copy of.
+        if let Some(last) = pace.colonists.last() {
+            assert_eq!(last[1] as u32, t.victory.off_world_presence, "the {k:?} people pace ends at Off-world Presence");
+        }
     }
 }
 
@@ -20648,7 +20653,7 @@ fn the_arkwrights_computer_is_paced_in_bodies() {
     g.colonies.push(Colony { id, body: BodyId::Earth, slot, control: Control::Controlled(ark), modules, colonists: 32, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, tier: 0, in_orbit: true });
     // Ticket #506 (version 0.1.0.0): read at turn 25, where the pace wants one Body and 31 off Earth:
     // thirty-two aboard are on pace for the first part and short of a Body, which is what halves the
-    // lift; at 42 nothing is short and no lift is weighed at all.
+    // lift; at the bar (44 since ticket #625; 42 before) nothing is short and no lift is weighed at all.
     g.turn = 25;
     assert!(g.off_world_colonists(ark) >= 32 && g.bodies_settled(ark, 6) == 0, "the premise: thirty-two in orbit, no Body");
     g.ai_orders(ark);
@@ -25365,7 +25370,8 @@ fn ticket_625_the_archive_wants_a_place_of_colony_tier() {
     let mut g = game();
     let arc = seat_of(&g, FactionKind::Archivists);
     g.seats[arc.index()].stockpile.materials = 200.0;
-    let colony_tier = g.tables.tiers.iter().position(|t| t.name == "Colony").expect("the Colony tier") as u32;
+    let colony_tier = g.tables.archive_tier();
+    assert_eq!(g.tables.tiers[colony_tier as usize].name, "Colony", "the tier the Archive asks for is the Colony tier");
     let mars = colony(&mut g, arc, BodyId::Mars, &[ModuleKind::Habitat; 6], 18);
     let order = Order::BuildArchive { colony: mars };
     let err = g.check_order(arc, &[], &order).unwrap_err().0;
@@ -25389,7 +25395,7 @@ fn ticket_625_the_computer_archivists_order_the_archive_only_at_the_colony_tier(
     let arc = seat_of(&g, FactionKind::Archivists);
     g.seats[arc.index()].stockpile.materials = 5000.0;
     g.seats[arc.index()].stockpile.energy = 500.0;
-    let colony_tier = g.tables.tiers.iter().position(|t| t.name == "Colony").expect("the Colony tier") as u32;
+    let colony_tier = g.tables.archive_tier();
     // Every slot the tier allows is built, so the Archive (outside the cap) is the one thing left to
     // order there, and its absence is the rule and not the Materials going elsewhere.
     let mars = colony(&mut g, arc, BodyId::Mars, &[ModuleKind::Habitat; 6], 18);
