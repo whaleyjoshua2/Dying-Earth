@@ -513,7 +513,7 @@ The Custodians' other signature clause: an Orders-phase order paid in Ducats on 
 _Avoid_: clean development, technology transfer, offset, upgrade
 
 **Strip Permit**:
-The Prospectors' other signature clause: an Orders-phase order, 25 Ducats since version 0.1.0.1 (free before), that may be taken once in a Region's whole life. For three turns every Facility there produces double; when it ends, that state's Baseline Emissions and its Unrest rise for good. Since version 0.08.3 it needs **Three Turns Held**.
+The Prospectors' other signature clause: an Orders-phase order, 25 Ducats since version 0.1.0.1 (free before), that may be taken once in a Region's whole life. For three turns every Facility there produces double; when it ends, that state's Baseline Emissions and its Unrest rise for good (the Emissions by 0.3 since version 0.1.0.5, 0.2 before). Since version 0.08.3 it needs **Three Turns Held**. Since version 0.1.0.5 the turn it is spent takes a point off Relations with every rival -- a fall on the deeds score, never an Offence, so no Accord breaks over it -- and the Region does not grow while the permit runs.
 _Avoid_: licence, boom, overdrive, exploitation
 
 **Three Turns Held**:

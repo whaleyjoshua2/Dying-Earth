@@ -80,3 +80,18 @@ Phobos's two and Deimos's one moved with it.
 each globe from the headless shot: Oceanus Procellarum at the Moon's left, labelled with its yields, beside Mare Imbrium and Tycho; Voltaire low on Deimos under Swift; Todd on Phobos's far side, so a second shot turned to face it ([`todd-phobos.png`](ticket-613/todd-phobos.png), `look:-153,-9`) shows it centred. Looked at, all four; the prescreen's SUSPECT is the known full-bleed false positive.
 
 - **The sweep** ([`sweeps/ticket-613.txt`](sweeps/ticket-613.txt)): **29 / 51 / 0 / 0 and 0 collapses**, from 26 / 49 / 2 / 2 and 1. The landings moved: ground Colonies at the end over the batch on Phobos 165 from 127, Deimos 57 from 40, the Moon 290 from 270. The Arkwrights' and Archivists' nought is within noise of their 2, and reported.
+
+## The Strip Permit: more CO2, a point off with every rival, no growth while it runs
+
+Ticket [#622](https://github.com/whaleyjoshua2/Dying-Earth/issues/622), spec §5.
+
+Two figures in `nation_states.toml` (the rise 0.3, `relations = 1`), the point taken off the deeds
+score at the permit's commit the way a card's `RelationsAllRivals` takes it (never `offend_by`, so no
+Accord breaks), and the Region's growth rate clamped to nought while the permit runs. The test was
+written first and watched red (every rival's view unmoved), then green; the old permit test's 0.2
+moved to 0.3, and the Report's word ceiling rose by the phrase's eight words. No picture: a Report
+line and three figures.
+
+- **The sweep** ([`sweeps/ticket-622.txt`](sweeps/ticket-622.txt)): **27 / 49 / 3 / 0 and 0
+  collapses**, from 29 / 51 / 0 / 0 and 0: noise. Accords struck over the batch 616 from 613: the point
+  off with every rival breaks nothing and costs the Prospectors no partner. Reported and left.

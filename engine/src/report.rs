@@ -600,7 +600,8 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("refugees_net_out", &["n", "state", "why"]),
     ("refugees_net_out_mostly", &["n", "state", "why"]),
     ("resettled", &["faction", "state", "standing"]),
-    ("strip_permit", &["faction", "state", "turns"]),
+    // Ticket #622 (version 0.1.0.5): and the Relations fall.
+    ("strip_permit", &["faction", "state", "turns", "fall"]),
     ("strip_permit_ended", &["state", "baseline"]),
     ("building_changed_state", &["faction", "done", "building", "state"]),
     ("building_decommissioned_state", &["faction", "building", "state", "refund"]),

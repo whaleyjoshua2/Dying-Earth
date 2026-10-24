@@ -122,3 +122,28 @@ the names as proposed, *"those three"*.
   is within noise, but their seats have now read 2, 2, 2, 0 and 0 across the version's five sweeps.
   The landings moved as the slots meant them to: ground Colonies at the end over the batch on Phobos
   165 from 127, on Deimos 57 from 40, on the Moon 290 from 270. Reported and left.
+
+## 5. The Strip Permit: more CO2, a point off with every rival, and no growth while it runs
+
+Ticket: [The Strip Permit: a little more CO2, a little more damage to Relations](https://github.com/whaleyjoshua2/Dying-Earth/issues/622).
+
+The designer: *"Nudge strip permit a bit more co2 output and a bit more damage to relations"*; on the
+ticket's questions, *"q1 a q2 c I don't want it to break an accord; Can we also add a 0% pop growth
+during the strip minned turns"*.
+
+- **The permanent rise is 0.3** in the Region's Baseline Emissions when the permit ends
+  (`nation_states.toml [strip_permit] baseline_rise`, from 0.2); the three doubled turns emit as they
+  did.
+- **A point off Relations with every rival** the turn the permit is spent (`relations = 1`): a flat
+  fall on the deeds score, as a card's is, and never an Offence, so no Non-Aggression Accord breaks
+  over it and nothing goes on the Offence ledger.
+- **No growth while it runs**: a Region under a running permit does not grow for its three turns; the
+  heat's loss, folded into the same rate, still bites. Growth returns when the permit ends.
+- **The Report**: *"Prospectors issued a Strip Permit in Brazil: its Facilities produce double for 3
+  turns, nobody grows there meanwhile, and 1 point off with every rival."* The tool prints the same.
+- **The computer Prospectors** weigh the permit as before and read every figure from the table.
+- **The texts**: the Prospectors' signature sentence (0.3, the point, no growth), the order's note, the
+  running permit's hover ("and no growth"), the glossary.
+- **Swept** (`sweeps/ticket-622.txt`, 20 seeds x four seatings): **27 / 49 / 3 / 0 and 0 collapses**,
+  from the same day's 29 / 51 / 0 / 0 and 0 (§4): noise. Accords struck over the batch 616 from 613,
+  so the point off breaks nothing and costs the Prospectors no partner. Reported and left.

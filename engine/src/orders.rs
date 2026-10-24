@@ -3444,16 +3444,32 @@ impl Game {
                         st.strip_permit_used = true;
                         st.strip_permit_ends = Some(turn + turns);
                     }
+                    // Ticket #622 (version 0.1.0.5), at the designer's word: a flat point off
+                    // Relations with every rival, on the deeds score as a card's is (events.rs,
+                    // `RelationsAllRivals`) and never through `offend_by`, so no Non-Aggression
+                    // Accord breaks over it -- the designer: "I don't want it to break an accord".
+                    let fall = self.tables.strip_permit.relations;
+                    if fall > 0 {
+                        let c = self.tables.relations.clone();
+                        for rival in Seat::ALL {
+                            if rival == seat {
+                                continue;
+                            }
+                            let (v, o) = (rival.index(), seat.index());
+                            self.relations.score[v][o] = (self.relations.score[v][o] - fall).clamp(c.worst, c.deeds_ceiling);
+                        }
+                    }
                     let line = format!(
-                        "The {} issued a Strip Permit in {}: every Facility there produces double for {} turns.",
+                        "The {} issued a Strip Permit in {}: every Facility there produces double for {} turns, nobody grows there meanwhile, and every rival likes them {} less.",
                         self.seat_name(seat),
                         self.tables.state(*state).name,
-                        turns
+                        turns,
+                        crate::counted(fall, "point", "points")
                     );
                     self.log(line);
                     let text = self.say(
                         "strip_permit",
-                        &[("faction", self.seat_name(seat)), ("state", self.tables.state(*state).name.clone()), ("turns", crate::counted(turns, "turn", "turns"))],
+                        &[("faction", self.seat_name(seat)), ("state", self.tables.state(*state).name.clone()), ("turns", crate::counted(turns, "turn", "turns")), ("fall", crate::counted(fall, "point", "points"))],
                     );
                     // Ticket #431 (the review): the Faction's own act, under the fog.
                     self.report_line_by(seat, LineKind::Note, Some(ReportPlace::State(*state)), text);

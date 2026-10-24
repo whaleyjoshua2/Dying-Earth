@@ -1771,6 +1771,10 @@ pub struct StripPermitTable {
     pub unrest: f64,
     /// Ticket #537 (version 0.1.0.1): its price in Ducats, where it was free.
     pub ducats: i64,
+    /// Ticket #622 (version 0.1.0.5), at the designer's word: the points off Relations with every
+    /// rival the turn a permit is spent -- a flat fall on the deeds score, never an Offence, so it
+    /// breaks no Accord.
+    pub relations: i64,
 }
 
 /// Ticket #53 (version 0.05): Neutral Development, in `nation_states.toml` under `[development]`.

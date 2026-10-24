@@ -767,6 +767,10 @@ impl Game {
         let (mut heat_regions, mut fell_regions) = (0u32, 0u32);
         for sid in StateId::ALL {
             let before = self.state(sid).population;
+            // Ticket #622 (version 0.1.0.5), at the designer's word ("0% pop growth during the strip
+            // mined turns"): a Region under a running Strip Permit does not grow; the heat's loss,
+            // folded into the same rate, still bites.
+            let rate = if self.strip_permit_running(sid) { rate.min(0.0) } else { rate };
             let after = (before * (1.0 + rate)).max(0.0);
             self.state_mut(sid).population = after;
             if after < before && before > 0.0 {

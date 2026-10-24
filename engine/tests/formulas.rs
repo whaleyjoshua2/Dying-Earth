@@ -4117,7 +4117,7 @@ fn f_a_strip_permit_doubles_output_for_three_turns_then_charges_its_price() {
     g.take_control(sid, Seat(1));
     g.state_mut(sid).facilities.push(facility(FacilityKind::Factory));
     let t = g.tables.strip_permit.clone();
-    assert_eq!((t.turns, t.multiplier, t.baseline_rise, t.unrest), (3, 2.0, 0.2, 2.0));
+    assert_eq!((t.turns, t.multiplier, t.baseline_rise, t.unrest), (3, 2.0, 0.3, 2.0), "0.3 since ticket #622 (version 0.1.0.5), 0.2 before");
     // The Custodians have no Strip Permit.
     assert!(g.check_order(Seat(0), &[], &Order::StripPermit { state: StateId::EastAsia }).is_err(), "only the Prospectors issue one");
     let o = Order::StripPermit { state: sid };
@@ -4152,7 +4152,7 @@ fn f_a_strip_permit_doubles_output_for_three_turns_then_charges_its_price() {
         g.resolution_phase();
     }
     assert_eq!(g.facility_yield(Seat(1), sid, FacilityKind::Factory).amount, normal, "and back to normal afterwards");
-    assert!((g.baseline_emissions(sid) - (baseline + 0.2)).abs() < 1e-9, "its Baseline Emissions rose 0.2 for good");
+    assert!((g.baseline_emissions(sid) - (baseline + 0.3)).abs() < 1e-9, "its Baseline Emissions rose 0.3 for good (0.2 before ticket #622)");
     // The rise is 2; the turn's own fall of 1.5 comes off it in the same Resolution.
     let expected = 2.0 + 2.0 - g.tables.unrest.natural_fall;
     assert!((g.unrest(sid) - expected).abs() < 1e-9, "Unrest {} where {expected} was wanted", g.unrest(sid));
@@ -21042,7 +21042,8 @@ fn the_reports_templates_stay_under_their_word_ceiling() {
     // the warning the turn before, and two rivals' clauses.
     // Ticket #544 (version 0.1.0.1): and by the 33 of a window next turn and the Report's head.
     // Ticket #615 (version 0.1.0.5): and by the 9 of an Occupation that halves the holder's Standing.
-    assert!(words <= 1966, "the Report's templates hold {words} words; the ceiling is 1,966 (9 for an Occupation's holder, 15 for a rival on yours, 33 for a window and the head, 46 for an Accord's end, 9 for a place handed over twice, 9 for an Army inherited, 12 for an Accord broken, 15% off 2,031, 54 for the race to the Moon, 2 for a rival's upgrade, 8 for an Accord answered, less a word of slack, 17 for a Trade, 9 for a Capital refunded, 5 for an Accord let lapse, 7 for Terms added, 5 for a renewal)");
+    // Ticket #622 (version 0.1.0.5): and by the 8 of a Strip Permit's growth and Relations clauses.
+    assert!(words <= 1974, "the Report's templates hold {words} words; the ceiling is 1,974 (8 for a Strip Permit's clauses, 9 for an Occupation's holder, 15 for a rival on yours, 33 for a window and the head, 46 for an Accord's end, 9 for a place handed over twice, 9 for an Army inherited, 12 for an Accord broken, 15% off 2,031, 54 for the race to the Moon, 2 for a rival's upgrade, 8 for an Accord answered, less a word of slack, 17 for a Trade, 9 for a Capital refunded, 5 for an Accord let lapse, 7 for Terms added, 5 for a renewal)");
     // "The" is gone before a Faction's name, which is drawn in its colour instead.
     assert!(!text.contains("he {faction}"), "a template still says \"the {{faction}}\"");
 }
@@ -25511,4 +25512,57 @@ fn ticket_613_one_more_colony_slot_on_the_moon_phobos_and_deimos() {
     // A new slot is a free slot the game can found on.
     let g = game();
     assert!(g.free_slots_on(BodyId::Deimos).contains(&1), "Voltaire is free at the start");
+}
+
+/// Ticket #622 (version 0.1.0.5), at the designer's word: **the Strip Permit costs more.** Its
+/// permanent rise is 0.3 (0.2); the turn it is spent, a flat point off Relations with every rival,
+/// outside the Offence rungs, so it breaks no Accord; and the Region does not grow while the permit
+/// runs (the heat's loss still bites).
+#[test]
+fn ticket_622_a_strip_permit_rises_more_costs_a_point_with_every_rival_and_stops_growth() {
+    let mut g = game();
+    calm(&mut g);
+    let t = g.tables.strip_permit.clone();
+    assert_eq!((t.baseline_rise, t.relations), (0.3, 1), "0.3 from 0.2, and a point");
+    let pro = Seat(1);
+    let sid = StateId::SouthAmerica;
+    g.take_control(sid, pro);
+    g.seats[pro.index()].stockpile.ducats = 25.0;
+    g.turn += 3;
+    // A Non-Aggression Accord with the Custodians, which an Offence would break and this must not.
+    g.strike_accord(Seat(0), pro, vec![Term::NonAggression]).expect("the Accord stands");
+    let before: Vec<i64> = Seat::ALL.iter().map(|s| g.relations.score[s.index()][pro.index()]).collect();
+    g.commit_orders(pro, &[Order::StripPermit { state: sid }]);
+    for s in Seat::ALL {
+        let after = g.relations.score[s.index()][pro.index()];
+        if s == pro {
+            assert_eq!(after, before[s.index()], "a seat's view of itself is untouched");
+        } else {
+            assert_eq!(after, before[s.index()] - 1, "{s:?} likes the Prospectors a point less");
+        }
+    }
+    assert!(g.accord_has(Seat(0), pro, Term::NonAggression), "no Offence: the Accord stands");
+    assert!(g.relations.owed.iter().all(|row| row[pro.index()] == 0), "nothing on the Offence ledger");
+    assert!(g.report.lines.iter().any(|l| l.text.contains("off with every rival")), "{:?}", g.report.lines.iter().filter(|l| l.text.contains("Permit")).map(|l| l.text.clone()).collect::<Vec<_>>());
+    // No growth while it runs: the stripped Region stands still where another grows.
+    assert!(g.population_growth_rate() > 0.0, "the premise: a calm world grows");
+    let other = StateId::Europe;
+    let (was, other_was) = (g.state(sid).population, g.state(other).population);
+    g.turn += 1;
+    assert!(g.strip_permit_running(sid));
+    g.climate_phase(); // growth is the Climate phase's, at the head of the turn
+    assert!((g.state(sid).population - was).abs() < 1e-9, "the stripped Region did not grow: {} from {was}", g.state(sid).population);
+    assert!(g.state(other).population > other_was, "another Region did");
+    // The permit over: the rise is 0.3, and growth returns.
+    let baseline = g.baseline_emissions(sid);
+    for _ in 0..3 {
+        g.turn += 1;
+        g.resolution_phase();
+    }
+    assert!(!g.strip_permit_running(sid));
+    assert!((g.baseline_emissions(sid) - (baseline + 0.3)).abs() < 1e-9, "0.3 for good: {} from {baseline}", g.baseline_emissions(sid));
+    let was = g.state(sid).population;
+    g.turn += 1;
+    g.climate_phase();
+    assert!(g.state(sid).population > was, "growth returns once the permit has ended");
 }
