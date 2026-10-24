@@ -440,7 +440,9 @@ Colonial Capitals standing at the end of 0.1.0.3's closing sweep: 4 over 80 game
   directs it, as the +1 Influence.
 - **The eight** (`[[capital_building]]` in `modules.toml`), flat and after every multiplier.
   "Others" are the other Colonies and stations on the Body that the holder directs, never a
-  rival's. A place starved by a Blockade makes nothing of it, as of everything.
+  rival's. A place starved by a Blockade makes nothing of it, as of everything: no yield, no
+  Chancery Influence, no Spaceport cut, and no growth (a starved place loses people), at the
+  designer's word after the review.
 
   | Building | At the Capital | Each other place of the holder's on the Body |
   |---|---|---|

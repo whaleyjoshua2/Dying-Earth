@@ -3739,8 +3739,11 @@ impl Game {
     }
 
     /// Ticket #590: the share a capital building takes off the Widgets of a Ship built at `colony`
-    /// (the Spaceport's).
+    /// (the Spaceport's). At the designer's word, none at a place under Blockade, as of everything.
     pub fn capital_ship_cut(&self, colony: ColonyId) -> f64 {
+        if self.starved_by(colony).is_some() {
+            return 0.0;
+        }
         match self.capital_reaching(colony) {
             Some((b, here)) => {
                 let card = self.tables.capital_building(b);
@@ -3752,13 +3755,16 @@ impl Game {
 
     /// Ticket #590: the Chancery's Influence to the seat directing it, at face value as the
     /// Capital's own +1: its figure here and one for each other place of the holder's on the Body.
+    /// At the designer's word, none from a place under Blockade, as of everything.
     pub fn capital_building_allotment(&self, seat: Seat) -> i64 {
         let Some(at) = self.capital_buildings.get(&CapitalBuilding::Chancery) else { return 0 };
         if !self.directs(seat, Place::Colony(*at)) {
             return 0;
         }
         let card = self.tables.capital_building(CapitalBuilding::Chancery);
-        card.influence_here + card.influence_others * self.capital_others(*at).len() as i64
+        let fed = |c: ColonyId| self.starved_by(c).is_none();
+        let here = if fed(*at) { card.influence_here } else { 0 };
+        here + card.influence_others * self.capital_others(*at).into_iter().filter(|c| fed(*c)).count() as i64
     }
 
     /// Ticket #97: the Modules standing or building here that count against the cap. A mothballed

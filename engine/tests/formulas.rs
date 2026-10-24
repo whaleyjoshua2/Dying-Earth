@@ -25120,6 +25120,17 @@ fn capital_at(g: &mut Game, seat: Seat, body: BodyId, colonists: u32) -> ColonyI
     c
 }
 
+/// Ticket #590, at the designer's word: `seat`'s Frigate blockading `body`'s low orbit, so every
+/// rival place on its ground starves.
+fn blockade_ground(g: &mut Game, seat: Seat, body: BodyId) {
+    let id = ShipId(g.fresh_id());
+    g.ships.push(Ship {
+        id,
+        name: String::new(), kind: UnitKind::Frigate, seat, damage: 0, at: ShipAt::Body(body), colonists: 0, warhead: false, colonists_education: 1.0, army: None,
+        stance: Stance::Blockade, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None,
+    });
+}
+
 /// Ticket #590 (version 0.1.0.4): a Capital without its building is owed one by whoever directs it;
 /// each building stands at one Capital in the game; it passes with the place.
 #[test]
@@ -25178,6 +25189,9 @@ fn the_chancery_pays_two_influence_and_one_for_each_other_place() {
     assert_eq!(g.capital_building_allotment(Seat(0)), 3);
     assert_eq!(g.influence_allotment(Seat(0)), before + 3);
     assert!(g.influence_allotment_parts(Seat(0)).contains(&("Chancery".to_string(), 3)));
+    // At the designer's word: a place under Blockade makes nothing of it, as of everything.
+    blockade_ground(&mut g, Seat(1), BodyId::Moon);
+    assert_eq!(g.capital_building_allotment(Seat(0)), 0, "the Capital and the other both starve");
 }
 
 /// Ticket #590: the Spaceport: a Ship at the Capital for half the Widgets, at the holder's other
@@ -25196,6 +25210,10 @@ fn the_spaceport_halves_a_ships_widgets_at_its_capital() {
     assert_eq!(g.build_widgets_at(Seat(1), Place::Colony(rival), ship), g.build_widgets(Seat(1), ship));
     let army = BuildItem::Unit(UnitKind::Army);
     assert_eq!(g.build_widgets_at(Seat(0), Place::Colony(cap), army), g.build_widgets(Seat(0), army));
+    // At the designer's word: a place under Blockade makes nothing of it, as of everything.
+    blockade_ground(&mut g, Seat(1), BodyId::Moon);
+    assert_eq!(g.build_widgets_at(Seat(0), Place::Colony(cap), ship), base, "starved: the full price");
+    assert_eq!(g.build_widgets_at(Seat(0), Place::Colony(own), ship), base);
 }
 
 /// Ticket #590: the Arcology: +2% growth at its Capital, +1% at the holder's others, and 1 Unrest off
