@@ -2678,6 +2678,10 @@ impl Tables {
         if !(0.0..=1.0).contains(&n.destruction_chance) {
             return Err(err("units.toml", "[nuke] destruction_chance must be between 0 and 1"));
         }
+        // Ticket #615 (version 0.1.0.5): a share kept over 1 would raise the holder's Standing on an Occupation.
+        if !(0.0..=1.0).contains(&self.influence.occupation_standing_kept) {
+            return Err(err("influence.toml", "occupation_standing_kept must be between 0 and 1"));
+        }
         if !(0.0..=1.0).contains(&n.people_min) || !(0.0..=1.0).contains(&n.people_max) || n.people_min > n.people_max {
             return Err(err("units.toml", "[nuke] people_min and people_max must be between 0 and 1, and people_min no greater than people_max"));
         }
