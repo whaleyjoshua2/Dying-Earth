@@ -10,7 +10,8 @@ closing board, **23 / 42 / 4 / 10 and 1 collapse**
 
 Ticket [#625](https://github.com/whaleyjoshua2/Dying-Earth/issues/625), spec §1.
 
-Three bars moved in the data (Off-world Presence 20, the Diaspora 44 over four Bodies of 6) and the
+Two bars moved in the data (Off-world Presence 20, the Diaspora 44; its four on each of four Bodies
+kept, after a first build at six on a misread answer was put back at the designer's word) and the
 Upload stayed at 16, at the designer's word; in its place the Archive asks a place of Colony tier,
 `[archive] tier_to_order = "Colony"` in place of `colonists_to_order = 4`. Three tests were written
 first and watched red: the bars (left 18, right 20), the order's refusal (an `Ok` where the Outpost of
@@ -27,9 +28,11 @@ picture: figures and a refusal line, nothing on the screen changes shape.
 - **The fix**: a site is a place that may hold the Archive AND stands at the Colony tier; the lift
   stays on until one does. A fourth test, red first (the Habitat at the Outpost weighed as at a
   Colony), then green.
-- **The sweep** ([`sweeps/ticket-625.txt`](sweeps/ticket-625.txt)): **25 / 50 / 2 / 3 and 0
-  collapses**. The computer's Archive stands in 13 of 80 at a median turn 35 (43 at about 30 before);
-  the Archivists win 3 from 10, the Arkwrights 2 from 4, and the Prospectors take what both lose, 50
-  from 42, eight past noise. Colony-tier places at the end 37 from 23, Capitals 24 from 16. **Reported
-  and left**: the tier is the designer's word, and what more the computer should do to climb -- or
-  whether the tier should be the Settlement's -- is theirs to say.
+- **The second sweep** ([`sweeps/ticket-625-six-each.txt`](sweeps/ticket-625-six-each.txt)), with the
+  ferry fixed but the per-Body figure still at six: 25 / 50 / 2 / 3 and 0, the Archive in 13 of 80.
+- **The sweep** ([`sweeps/ticket-625.txt`](sweeps/ticket-625.txt)), the four on each Body back:
+  **26 / 48 / 2 / 2 and 2 collapses**. The computer's Archive stands in 11 of 80 at a median turn 35
+  (43 at about 30 before); the Archivists win 2 from 10, the Arkwrights 2 from 4, and the Prospectors
+  take what both lose, 48 from 42, six past noise. Colony-tier places at the end 34 from 23, Capitals
+  28 from 16. **Reported and left**: the tier is the designer's word, and what more the computer
+  should do to climb -- or whether the tier should be the Settlement's -- is theirs to say.

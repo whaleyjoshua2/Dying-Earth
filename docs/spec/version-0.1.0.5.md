@@ -25,8 +25,10 @@ offered a tier under the Archive, living people kept beside the Upload, or a Res
 the count: *"option 1 but make it a colony"*.
 
 - **Off-world Presence is 20** (`victory.toml`, from 18): the Custodians' and the Prospectors' second
-  part, one figure. The Diaspora is **44 over four Bodies of 6** (`factions.toml`, from 42 and 4). The
-  Upload **stays at 16**, in fours.
+  part, one figure. The Diaspora is **44** (`factions.toml`, from 42), **the four on each of four Bodies
+  kept**: it was first built at six on a misread answer and put back at the designer's word the same
+  day (*"I'm pretty sure i'd asked to keep Diaspora with four on each of four bodies"*). The Upload
+  **stays at 16**, in fours.
 - **The Archive may be ordered only at a place of Colony tier** (`modules.toml [archive]
   tier_to_order = "Colony"`, in place of `colonists_to_order = 4`). The tier is read, not the people:
   a place never falls back a tier, so eighteen who climbed it and then left still leave a Colony;
@@ -46,11 +48,12 @@ the count: *"option 1 but make it a colony"*.
   and Archivists' rows (20; 44 and 6; "at a place of Colony tier"), the tutorial's two notes (twenty),
   the tool's `build archive` help, the glossary (Diaspora, Off-world Presence, the Archive, the
   Archivists).
-- **Swept** (`sweeps/ticket-625.txt`, 20 seeds x four seatings): **25 / 50 / 2 / 3 and 0 collapses**,
-  from 23 / 42 / 4 / 10 and 1. The computer's Archive stands in **13 of 80** games at a median turn 35
-  (43 of 80 at about 30 on the baseline; 0 with the ferry paused), so the Archivists win 3 from 10;
-  the Arkwrights, at 44 and 6 on each Body, 2 from 4; the Prospectors take the games both lose, 50
-  from 42, eight past noise. Colony-tier places at the end over the batch 37 (23 on the baseline),
-  Capitals 24 (16). **The miss is reported and left**: the Colony tier is the designer's word, and
-  the computer Archivists reach it in a sixth of their games; what more the computer should do to
-  climb, or whether the tier should be the Settlement's, is the designer's call.
+- **Swept** (`sweeps/ticket-625.txt`, 20 seeds x four seatings, the four on each Body kept): **26 / 48
+  / 2 / 2 and 2 collapses**, from 23 / 42 / 4 / 10 and 1. The computer's Archive stands in **11 of 80**
+  games at a median turn 35 (43 of 80 at about 30 on the baseline; 0 with the ferry paused; 13 with
+  six on each Body, `sweeps/ticket-625-six-each.txt`, 25 / 50 / 2 / 3), so the Archivists win 2 from
+  10; the Arkwrights, at 44, 2 from 4; the Prospectors take the games both lose, 48 from 42, six
+  past noise. Colony-tier places at the end over the batch 34 (23 on the baseline), Capitals 28 (16).
+  **The miss is reported and left**: the Colony tier is the designer's word, and the computer
+  Archivists reach it in about one game in seven; what more the computer should do to climb, or
+  whether the tier should be the Settlement's, is the designer's call.

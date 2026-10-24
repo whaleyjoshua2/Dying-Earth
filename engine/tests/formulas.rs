@@ -1899,10 +1899,10 @@ fn the_last_turn_ranks_every_seat_by_score() {
     // their first part is 0 and their score with it.
     let mut g = game();
     g.turn = g.tables.victory.turns;
-    colony(&mut g, Seat(2), BodyId::Phobos, &[ModuleKind::Habitat, ModuleKind::Habitat], 6);
+    colony(&mut g, Seat(2), BodyId::Phobos, &[ModuleKind::Habitat, ModuleKind::Habitat], 4);
     colony(&mut g, Seat(3), BodyId::Moon, &[ModuleKind::Habitat], 4);
     // Ticket #601 (version 0.1.0.4): the parts are 94% of the whole, the gate (not standing) the rest.
-    assert!((g.progress(Seat(2)).score() - 0.94 * (0.6 * 6.0 / 44.0 + 0.3 * 0.25)).abs() < 1e-9, "{:?}", g.progress(Seat(2)).score());
+    assert!((g.progress(Seat(2)).score() - 0.94 * (0.6 * 4.0 / 44.0 + 0.3 * 0.25)).abs() < 1e-9, "{:?}", g.progress(Seat(2)).score());
     assert_eq!(g.progress(Seat(3)).score(), 0.0);
     g.end_phase();
     assert!(matches!(g.outcome, Some(Outcome::Win { seat: Seat(2), .. })), "{:?}", g.outcome);
@@ -1967,17 +1967,17 @@ fn the_capital_is_a_tenth_of_the_arkwrights_score_and_a_held_headline_names_the_
     let capital = g.tables.tiers.iter().position(|t| t.one_per_body).expect("the Capital tier") as u32;
     bare_stations(&mut g);
     open_gates(&mut g);
-    // Short of the bars: 6 of 44 over one Body of four, no Capital: 0.6 x 6/44 + 0.3 x 1/4 + 0.1 x 0;
+    // Short of the bars: 4 of 44 over one Body of four, no Capital: 0.6 x 4/44 + 0.3 x 1/4 + 0.1 x 0;
     // Ticket #601 (version 0.1.0.4): the gate standing, its 6% and the parts 94% of the rest.
-    colony(&mut g, ark, BodyId::Phobos, &[ModuleKind::Habitat], 6);
+    colony(&mut g, ark, BodyId::Phobos, &[ModuleKind::Habitat], 4);
     let p = g.progress(ark);
-    assert!((p.score() - (0.06 + 0.94 * (0.6 * 6.0 / 44.0 + 0.3 * 0.25))).abs() < 1e-9, "{}", p.score());
+    assert!((p.score() - (0.06 + 0.94 * (0.6 * 4.0 / 44.0 + 0.3 * 0.25))).abs() < 1e-9, "{}", p.score());
     assert!(p.first_held_back.is_some(), "the premise: the Capital holds the win");
     assert_eq!(p.hold_suffix(), "", "short of the bars, the percentage alone");
     // Both bars met and no Capital: 90%, and every headline says why.
-    let mars = colony(&mut g, ark, BodyId::Mars, &[ModuleKind::Habitat], 26);
+    let mars = colony(&mut g, ark, BodyId::Mars, &[ModuleKind::Habitat], 32);
     for body in [BodyId::Moon, BodyId::Deimos] {
-        colony(&mut g, ark, body, &[ModuleKind::Habitat], 6);
+        colony(&mut g, ark, body, &[ModuleKind::Habitat], 4);
     }
     let p = g.progress(ark);
     assert!(p.first_value >= p.first_bar && p.second_value >= p.second_bar, "the premise: both bars reached: {p:?}");
@@ -2330,21 +2330,21 @@ fn an_arkwright_pays_half_for_a_station_and_three_quarters_for_a_module() {
 }
 
 #[test]
-fn diaspora_wants_four_bodies_with_six_colonists_each_and_counts_no_antarctic_one() {
+fn diaspora_wants_four_bodies_with_four_colonists_each_and_counts_no_antarctic_one() {
     let mut g = game();
     let p = g.progress(Seat(2));
-    // Ticket #506 (version 0.1.0.0): 42 over four Bodies, from 30 over three; ticket #625 (version 0.1.0.5): 44, six on each.
+    // Ticket #506 (version 0.1.0.0): 42 over four Bodies, from 30 over three; ticket #625 (version 0.1.0.5): 44, the four on each kept.
     assert_eq!(p.first_bar, 44.0, "44 Colonists off Earth (ticket #625; 42 before)");
     assert_eq!(p.second_bar, 4.0, "on at least four Bodies");
-    colony(&mut g, Seat(2), BodyId::Mars, &[ModuleKind::Habitat], 6);
-    colony(&mut g, Seat(2), BodyId::Moon, &[ModuleKind::Habitat], 6);
+    colony(&mut g, Seat(2), BodyId::Mars, &[ModuleKind::Habitat], 4);
+    colony(&mut g, Seat(2), BodyId::Moon, &[ModuleKind::Habitat], 4);
     // Antarctica is Earth's, so a Colony there settles no Body.
-    colony(&mut g, Seat(2), BodyId::Earth, &[ModuleKind::Habitat], 6);
+    colony(&mut g, Seat(2), BodyId::Earth, &[ModuleKind::Habitat], 4);
     assert_eq!(g.progress(Seat(2)).second_value, 2.0, "Antarctica is not a third Body");
-    // Five Colonists on Phobos are not six (ticket #625: six, from four).
-    let ph = colony(&mut g, Seat(2), BodyId::Phobos, &[ModuleKind::Habitat], 5);
+    // Three Colonists on Phobos are not four.
+    let ph = colony(&mut g, Seat(2), BodyId::Phobos, &[ModuleKind::Habitat], 3);
     assert_eq!(g.progress(Seat(2)).second_value, 2.0);
-    g.colony_mut(ph).unwrap().colonists = 6;
+    g.colony_mut(ph).unwrap().colonists = 4;
     assert_eq!(g.progress(Seat(2)).second_value, 3.0);
     // A station over another Body counts for that Body.
     let sid = ColonyId(g.fresh_id());
@@ -2354,7 +2354,7 @@ fn diaspora_wants_four_bodies_with_six_colonists_each_and_counts_no_antarctic_on
         slot: 0,
         control: Control::Controlled(Seat(2)),
         modules: vec![Module::new(ModuleKind::Habitat)],
-        colonists: 6, education: 1.0, settler_education: 1.0,
+        colonists: 4, education: 1.0, settler_education: 1.0,
         queue: Vec::new(),
         grid_failed: false,
         founded_turn: 1,
@@ -2363,8 +2363,8 @@ fn diaspora_wants_four_bodies_with_six_colonists_each_and_counts_no_antarctic_on
     });
     assert_eq!(g.progress(Seat(2)).second_value, 4.0);
     // Both parts together: 44 off Earth as well (ticket #625; 42 since #506, 30 before).
-    assert!(!g.progress(Seat(2)).met(), "24 Colonists off Earth is not 44");
-    g.colony_mut(ph).unwrap().colonists = 26;
+    assert!(!g.progress(Seat(2)).met(), "16 Colonists off Earth is not 44");
+    g.colony_mut(ph).unwrap().colonists = 32;
     assert_eq!(g.progress(Seat(2)).first_value, 44.0);
     open_gates(&mut g);
     // Ticket #514 (version 0.1.0.0): and a Colonial Capital of theirs must stand, at a Colony they hold.
@@ -20655,7 +20655,7 @@ fn the_arkwrights_computer_is_paced_in_bodies() {
     // thirty-two aboard are on pace for the first part and short of a Body, which is what halves the
     // lift; at the bar (44 since ticket #625; 42 before) nothing is short and no lift is weighed at all.
     g.turn = 25;
-    assert!(g.off_world_colonists(ark) >= 32 && g.bodies_settled(ark, 6) == 0, "the premise: thirty-two in orbit, no Body");
+    assert!(g.off_world_colonists(ark) >= 32 && g.bodies_settled(ark, 4) == 0, "the premise: thirty-two in orbit, no Body");
     g.ai_orders(ark);
     let head = g.log.iter().find(|l| l.starts_with("AI ") && l.contains("scored")).cloned().unwrap();
     assert!(!head.contains("gap x1.00"), "thirty-two over Earth and no Body is behind: {head}");
@@ -20663,10 +20663,10 @@ fn the_arkwrights_computer_is_paced_in_bodies() {
     assert!(short > 0.0, "the lift is still weighed: {:#?}", g.log.iter().filter(|l| l.contains("lift")).collect::<Vec<_>>());
     // Four Bodies settled (ticket #506; three before): the lift takes its full weight again.
     for body in [BodyId::Moon, BodyId::Mars, BodyId::Phobos, BodyId::Deimos] {
-        let c = colony(&mut g, ark, body, &[], 6);
-        assert_eq!(g.colony(c).unwrap().colonists, 6);
+        let c = colony(&mut g, ark, body, &[], 4);
+        assert_eq!(g.colony(c).unwrap().colonists, 4);
     }
-    assert_eq!(g.bodies_settled(ark, 6), 4);
+    assert_eq!(g.bodies_settled(ark, 4), 4);
     g.state_mut(home).emigrants = 4;
     g.log.clear();
     g.ai_orders(ark);
@@ -22949,10 +22949,10 @@ fn the_arkwrights_win_waits_on_a_colonial_capital_they_hold() {
     assert!(g.tables.faction(FactionKind::Arkwrights).victory_capital);
     assert!(FactionKind::ALL.iter().filter(|k| **k != FactionKind::Arkwrights).all(|k| !g.tables.faction(*k).victory_capital), "the Arkwrights alone");
     let capital = g.tables.tiers.iter().position(|t| t.one_per_body).expect("the Capital tier") as u32;
-    // The two parts met: 44 off Earth over four Bodies of 6 (ticket #625).
-    let mars = colony(&mut g, ark, BodyId::Mars, &[ModuleKind::Habitat], 26);
+    // The two parts met: 44 off Earth over four Bodies of 4 (ticket #625: 44, from 42).
+    let mars = colony(&mut g, ark, BodyId::Mars, &[ModuleKind::Habitat], 32);
     for body in [BodyId::Moon, BodyId::Phobos, BodyId::Deimos] {
-        colony(&mut g, ark, body, &[ModuleKind::Habitat], 6);
+        colony(&mut g, ark, body, &[ModuleKind::Habitat], 4);
     }
     open_gates(&mut g);
     let p = g.progress(ark);
@@ -23041,9 +23041,9 @@ fn the_arkwright_computer_gathers_people_at_its_capital_candidate() {
     let chase = g.tables.ai.thresholds.capital_chase;
     // Phobos at 4 and Mars at 8 with room: two Bodies settled, Mars the candidate, but two of four is
     // not within one.
-    colony(&mut g, ark, BodyId::Phobos, &[ModuleKind::Habitat], 6);
+    colony(&mut g, ark, BodyId::Phobos, &[ModuleKind::Habitat], 4);
     let mars = colony(&mut g, ark, BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat], 8);
-    assert_eq!(g.bodies_settled(ark, 6), 2);
+    assert_eq!(g.bodies_settled(ark, 4), 2);
     assert_eq!(g.capital_candidate(ark), Some(mars));
     g.seats[ark.index()].stockpile.materials = 500.0;
     g.seats[ark.index()].stockpile.energy = 500.0;
@@ -23055,8 +23055,8 @@ fn the_arkwright_computer_gathers_people_at_its_capital_candidate() {
     let (mine_plain, crossing_plain) = (scored(&g, &mine), scored(&g, "to Mars"));
     assert!(mine_plain > 0.0 && crossing_plain > 0.0, "both are weighed: {:?}", g.log.iter().filter(|l| l.contains("Mine") || l.contains("send")).collect::<Vec<_>>());
     // A third Body: within one of four, and the gathering begins.
-    let moon = colony(&mut g, ark, BodyId::Moon, &[ModuleKind::Habitat], 6);
-    assert_eq!(g.bodies_settled(ark, 6), 3);
+    let moon = colony(&mut g, ark, BodyId::Moon, &[ModuleKind::Habitat], 4);
+    assert_eq!(g.bodies_settled(ark, 4), 3);
     g.log.clear();
     g.ai_orders(ark);
     let (mine_lifted, crossing_lifted) = (scored(&g, &mine), scored(&g, "to Mars"));
@@ -24844,9 +24844,9 @@ fn the_door_reads_the_parts_without_the_gate() {
     assert!(!p.gate_open && (p.score_as_it_stands() - 0.94).abs() < 1e-9, "the premise: both bars, no gate, 94%");
     // The Arkwrights near too, so no runaway lead refuses first: only the door can.
     let ark = Seat(2);
-    colony(&mut g, ark, BodyId::Moon, &[ModuleKind::Habitat; 4], 26);
+    colony(&mut g, ark, BodyId::Moon, &[ModuleKind::Habitat; 4], 32);
     for body in [BodyId::Phobos, BodyId::Deimos, BodyId::Ceres] {
-        colony(&mut g, ark, body, &[ModuleKind::Habitat], 6);
+        colony(&mut g, ark, body, &[ModuleKind::Habitat], 4);
     }
     assert!(g.progress(pro).score_as_it_stands() - g.progress(ark).score_as_it_stands() < 0.2, "the premise: no runaway lead");
     assert!(!g.accord_acceptable(ark, pro, &[Term::NonAggression]), "no Accord with a seat at the door");
@@ -25334,7 +25334,7 @@ fn the_computers_capital_pick_weighs_its_faction_and_its_need() {
 }
 
 /// Ticket #625 (version 0.1.0.5), at the designer's word: **every off-world population bar up by
-/// 2** -- Off-world Presence 20 (18), the Diaspora 44 (42) over four Bodies of 6 (4) -- and the
+/// 2** -- Off-world Presence 20 (18), the Diaspora 44 (42) over four Bodies of 4, kept -- and the
 /// Upload kept at 16 ("they go in groups of four"). The computer's paces, copies of the bars, move
 /// with them on the same turns; the Archivists' do not move.
 #[test]
@@ -25345,19 +25345,19 @@ fn ticket_625_every_off_world_population_bar_rose_by_two() {
         assert_eq!(t.faction(k).victory_second.bar, 20.0, "the {k:?} second part is Off-world Presence");
     }
     assert_eq!(t.faction(FactionKind::Arkwrights).victory_first.bar, 44.0, "the Diaspora 44, from 42");
-    assert_eq!((t.faction(FactionKind::Arkwrights).victory_second.bodies, t.faction(FactionKind::Arkwrights).victory_second.colonists_each), (4, 6), "four Bodies of 6, from 4");
+    assert_eq!((t.faction(FactionKind::Arkwrights).victory_second.bodies, t.faction(FactionKind::Arkwrights).victory_second.colonists_each), (4, 4), "four Bodies of 4, kept at the designer's word");
     assert_eq!(t.faction(FactionKind::Archivists).victory_second.bar, 16.0, "the Upload stays at 16");
     for k in [FactionKind::Custodians, FactionKind::Prospectors, FactionKind::Arkwrights] {
         assert_eq!(t.ai_pace(k).colonists, vec![[17, 7], [31, 20]], "the {k:?} people pace ends at 20");
     }
     assert_eq!(t.ai_pace(FactionKind::Arkwrights).first, vec![[8, 6], [17, 18], [25, 32], [33, 44]], "x 44/42 on the same turns");
     assert_eq!(t.ai_pace(FactionKind::Archivists).uploads, vec![[36, 5], [42, 11], [47, 16]], "unmoved");
-    // The spread bites at 6: five on Mars settle no Body for the Diaspora, six do.
+    // The spread is still four: three on Mars settle no Body for the Diaspora, four do.
     let mut g = game();
-    let mars = colony(&mut g, Seat(2), BodyId::Mars, &[ModuleKind::Habitat], 5);
-    assert_eq!(g.progress(Seat(2)).second_value, 0.0, "five are not six");
-    g.colony_mut(mars).unwrap().colonists = 6;
-    assert_eq!(g.progress(Seat(2)).second_value, 1.0, "six settle the Body");
+    let mars = colony(&mut g, Seat(2), BodyId::Mars, &[ModuleKind::Habitat], 3);
+    assert_eq!(g.progress(Seat(2)).second_value, 0.0, "three are not four");
+    g.colony_mut(mars).unwrap().colonists = 4;
+    assert_eq!(g.progress(Seat(2)).second_value, 1.0, "four settle the Body");
     assert_eq!(g.progress(Seat(2)).first_bar, 44.0);
 }
 
