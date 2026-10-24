@@ -1589,6 +1589,8 @@ pub struct AiThresholds {
     /// Ticket #590 (version 0.1.0.4): what the run's need adds to a capital building's score, the
     /// Faction's own counting 1.
     pub capital_pick_need: f64,
+    /// Ticket #590 (version 0.1.0.4): what an upgrade at a seat's best place off Earth weighs, times.
+    pub build_up: f64,
     /// Ticket #448 (version 0.09.6): what a seat keeps back from the market.
     pub market_materials_reserve: f64,
     pub market_materials_turns: f64,

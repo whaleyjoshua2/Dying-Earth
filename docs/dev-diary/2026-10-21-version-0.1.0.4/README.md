@@ -560,6 +560,25 @@ Capital's 24 people, and now builds toward the 18 the Colony tier on the way ask
   reached a Settlement, which wants 12 people and its 6 slots built. The Capital's own step was
   never reached, so this rule cannot move the count.
 
+**Widened (B), at the designer's word: the computer builds up its best place off Earth.** Three
+habits, each swept, each witnessed red:
+
+| Sweep | Wins C / P / Ark / Arc | Collapses | Settlements | Colonies | Capitals |
+|---|---|---|---|---|---|
+| As first built ([`ticket-590.txt`](sweeps/ticket-590.txt)) | 36 / 32 / 1 / 11 | 0 | 93 | 21 | 0 |
+| Raised once people fill the cap ([`cap-filled`](sweeps/ticket-590-cap-filled.txt)) | 35 / 33 / 1 / 11 | 0 | 83 | 24 | 0 |
+| + the best place's upgrade x5 ([`build-up`](sweeps/ticket-590-build-up.txt)) | 35 / 32 / 2 / 11 | 0 | 96 | 20 | 5 |
+| + every seat gathers ([`every-seat`](sweeps/ticket-590-every-seat.txt)) | **28 / 39 / 4 / 8** | 0 | 146 | 27 | **20** |
+| Gathering without the x5 ([`gathering-alone`](sweeps/ticket-590-gathering-alone.txt)) | 30 / 40 / 0 / 9 | 0 | 154 | 19 | 0 |
+
+The tiers count stations over Earth and Antarctica too. The gathering makes the Settlements and
+lifts the Prospectors (40 with it alone); the x5 makes the Capitals. Capitals at the end of the last,
+by Faction: 5 / 6 / 5 / 3. Buildings taken: Central Grid 7, Fuel Depot 3, Arcology 3, Stock Market
+2, Spaceport 1. Mars still founded in 79 of 80 games, median turn 13. Income a game, mean
+(Materials / Fuel / Energy / Ducats / Research): Custodians 2033 / 581 / 761 / 1202 / 1043,
+Prospectors 2161 / 454 / 255 / 1510 / 336, Arkwrights 759 / 156 / 194 / 2387 / 256, Archivists
+503 / 244 / 72 / 477 / 644.
+
 - **The pick window**, the Moon's Capital unchosen and the Stock Market taken by the Prospectors on
   Mars; the bar's "Capital building" button beside the figures:
 

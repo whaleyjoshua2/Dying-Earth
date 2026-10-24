@@ -5437,8 +5437,9 @@ fn the_ai_banks_fuel_when_the_mars_window_is_within_two_turns() {
     // 15), so a seat with a full tank on the window now reaches past Mars for one of its moons.
     // This test is about the FUEL BANK letting the crossing happen at all, not about which of the
     // three it picks.
+    // Ticket #590 (version 0.1.0.4): or to the Moon, where every seat now gathers at its best place.
     assert!(
-        orders.iter().any(|o| matches!(o, Order::Transit { to: BodyId::Mars | BodyId::Phobos | BodyId::Deimos, .. })),
+        orders.iter().any(|o| matches!(o, Order::Transit { ship, .. } if at.ship(*ship).is_some_and(|s| s.kind == UnitKind::ColonyShip))),
         "a full tank on the window crosses: {orders:?}"
     );
 }
@@ -21717,20 +21718,19 @@ fn a_station_climbs_the_same_tiers() {
     assert!(g.check_order(Seat(0), &[], &Order::RaiseTier { colony: iss }).is_ok());
 }
 
-/// Ticket #490: the computer upgrades a place whose slots are full at its cap and whose people are
-/// enough for the next tier, and not one with room left.
+/// Ticket #490: the computer upgrades a place whose people are enough for the next tier.
+/// Ticket #590 (version 0.1.0.4): once its people fill its tier's cap, built or not; measured, 28
+/// people stood at an Outpost with 4 of 6 slots built. Eleven people at an Outpost: no.
 #[test]
-fn the_ai_upgrades_a_full_place_with_the_people_for_it() {
+fn the_ai_upgrades_a_place_with_the_people_for_it() {
     let mut g = game();
     calm(&mut g);
     g.seats[1].stockpile.materials = 300.0;
-    let c = colony(&mut g, Seat(1), BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 12);
+    let c = colony(&mut g, Seat(1), BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 11);
     let raises = |g: &mut Game| g.ai_orders(Seat(1)).iter().any(|o| matches!(o, Order::RaiseTier { colony } if *colony == c));
-    assert!(!raises(&mut g), "three of six slots used: room left");
-    for _ in 0..3 {
-        g.colony_mut(c).unwrap().modules.push(Module::new(ModuleKind::Habitat));
-    }
-    assert!(raises(&mut g), "six of six, twelve people");
+    assert!(!raises(&mut g), "eleven people: the Settlement wants twelve");
+    g.colony_mut(c).unwrap().colonists = 12;
+    assert!(raises(&mut g), "twelve people, three of six slots built");
 }
 
 /// Ticket #490 (the review): a Module refused at the tier's cap says to upgrade, not to wait for
@@ -22958,43 +22958,48 @@ fn the_arkwrights_win_waits_on_a_colonial_capital_they_hold() {
 
 /// Ticket #514: **the computer Arkwrights chase a Capital.** Holding none, their most peopled ground
 /// Colony on a Body without one is the candidate: its upgrade weighs `capital_chase` times another
-/// seat's identical upgrade, and a disembark there the same; with a Capital held, nothing is lifted.
+/// identical upgrade, and a disembark there the same; with a Capital held, nothing is lifted.
+/// Ticket #590 (version 0.1.0.4), at the designer's word: every seat has a candidate, and its best
+/// place off Earth -- the same place here -- weighs `build_up` times more again.
 #[test]
-fn the_arkwright_computer_lifts_the_upgrade_and_the_landing_at_its_capital_candidate() {
+fn the_computer_lifts_the_upgrade_at_its_capital_candidate_and_its_best_place() {
     let mut g = game();
     calm(&mut g);
-    let (ark, cus) = (Seat(2), Seat(0));
     let chase = g.tables.ai.thresholds.capital_chase;
-    assert_eq!(chase, 3.0);
-    // Two identical places at the Colony tier, one slot open for the Capital (ticket #590): one the
-    // Arkwrights', one the Custodians'.
+    let up = g.tables.ai.thresholds.build_up;
+    assert_eq!((chase, up), (3.0, 5.0));
+    // Places at the Colony tier, one slot open for the Capital: the seat's best (24 people) and a
+    // lesser one on another Body (23), which is its Capital site there but neither candidate nor best.
     let colony_tier = g.tables.tiers.iter().position(|t| t.cap == 18).expect("the Colony tier") as u32;
-    let place = |g: &mut Game, seat: Seat, body: BodyId| {
-        let c = colony(g, seat, body, &[ModuleKind::Habitat; 17], 24);
+    let place = |g: &mut Game, seat: Seat, body: BodyId, people: u32| {
+        let c = colony(g, seat, body, &[ModuleKind::Habitat; 17], people);
         g.colony_mut(c).unwrap().tier = colony_tier;
-        g.seats[seat.index()].stockpile.materials = 500.0;
+        g.seats[seat.index()].stockpile.materials = 5000.0;
         g.seats[seat.index()].stockpile.energy = 500.0;
         c
     };
-    let theirs = place(&mut g, ark, BodyId::Mars);
-    let others = place(&mut g, cus, BodyId::Moon);
-    assert_eq!(g.capital_candidate(ark), Some(theirs));
-    assert_eq!(g.capital_candidate(cus), Some(others), "a candidate by the same rule, but no card of theirs asks a Capital, so the computer never reads it");
-    g.log.clear();
-    g.ai_orders(ark);
-    let lifted = scored(&g, "upgrade ");
-    g.log.clear();
-    g.ai_orders(cus);
-    let plain = scored(&g, "upgrade ");
-    assert!(plain > 0.0 && (lifted - plain * chase).abs() < 1e-6, "the candidate's upgrade at {chase}x: {lifted} against {plain}");
-    // With a Capital of theirs standing, the candidate is nobody and the lift is gone.
+    for (seat, best_at, other_at) in [(Seat(2), BodyId::Mars, BodyId::Phobos), (Seat(0), BodyId::Moon, BodyId::Deimos)] {
+        let best = place(&mut g, seat, best_at, 24);
+        let other = place(&mut g, seat, other_at, 23);
+        assert_eq!((g.capital_candidate(seat), g.best_off_earth(seat)), (Some(best), Some(best)));
+        g.log.clear();
+        g.ai_orders(seat);
+        let lifted = scored(&g, &format!("upgrade {}", g.place_name(Place::Colony(best))));
+        let plain = scored(&g, &format!("upgrade {}", g.place_name(Place::Colony(other))));
+        assert!(plain > 0.0 && (lifted - plain * chase * up).abs() < 1e-6, "{:?}: the best place's upgrade at {chase} x {up}: {lifted} against {plain}", g.kind(seat));
+    }
+    // With a Capital of the Arkwrights' standing, the candidate is nobody: the best place alone lifts.
+    let ark = Seat(2);
     let capital = g.tables.tiers.iter().position(|t| t.one_per_body).unwrap() as u32;
     let moon = colony(&mut g, ark, BodyId::Moon, &[ModuleKind::Habitat], 4);
     g.colony_mut(moon).unwrap().tier = capital;
     assert_eq!(g.capital_candidate(ark), None);
     g.log.clear();
     g.ai_orders(ark);
-    assert!((scored(&g, "upgrade ") - plain).abs() < 1e-6, "held: the plain weight");
+    let best = g.best_off_earth(ark).unwrap();
+    let other = g.colonies.iter().find(|c| c.body == BodyId::Phobos && c.control.director() == Some(ark) && c.colonists == 23).unwrap().id;
+    let (lifted, plain) = (scored(&g, &format!("upgrade {}", g.place_name(Place::Colony(best)))), scored(&g, &format!("upgrade {}", g.place_name(Place::Colony(other)))));
+    assert!(plain > 0.0 && (lifted - plain * up).abs() < 1e-6, "held: the best place's {up} alone: {lifted} against {plain}");
 }
 
 /// Ticket #514: **the computer Arkwrights gather at their Capital candidate** once their Bodies

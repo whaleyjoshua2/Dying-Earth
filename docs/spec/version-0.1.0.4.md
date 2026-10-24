@@ -468,6 +468,16 @@ Colonial Capitals standing at the end of 0.1.0.3's closing sweep: 4 over 80 game
   (its most peopled place there whose next step is the Capital, none under way) keeps its last
   slot open, and only the site is raised. The Arkwrights' gathering builds Habitats toward the 18
   the Colony tier asks, where it built toward the Capital's 24.
+- **Widened, at the designer's word: the computer builds up its best place off Earth.** Swept as
+  first built, no Capital stood in 80 games, for no computer place off Earth passed Outpost. Three
+  habits, every seat:
+  - a place is raised once its people fill its tier's cap, built or not (it waited for every slot:
+    28 people stood at an Outpost with 4 of 6 built);
+  - the upgrade at its **best place off Earth** (its most peopled ground Colony beyond Earth)
+    weighs `build_up` = 5 times (`ai.toml`): at 5 or 6 it was held every turn for builds at 20 to 45;
+  - every seat has a Capital candidate and **gathers** at it, as the Arkwrights did alone: Habitats
+    built ahead, its Modules, a loaded Ship's crossing to its Body and a landing there at
+    `capital_chase`; the Arkwrights still only once their Bodies part is within one of its bar.
 - **Refuted if** a Capital is ordered with no open slot, two Capitals hold one building, a rival's
   Colony on the Body draws a holder's +1, or the sweep's Capitals at the end stay at 4 in 80.
 - `SAVE_VERSION` unmoved: the buildings chosen are one map on the game, `serde(default)`; a

@@ -1281,6 +1281,16 @@ impl Game {
         best.map(|(b, _)| b)
     }
 
+    /// Ticket #590 (version 0.1.0.4): the place a seat builds up off Earth -- its most peopled ground
+    /// Colony beyond Earth, ties to the lower id.
+    pub fn best_off_earth(&self, seat: Seat) -> Option<ColonyId> {
+        self.colonies
+            .iter()
+            .filter(|c| c.control.director() == Some(seat) && !c.in_orbit && c.body != BodyId::Earth)
+            .max_by_key(|c| (c.colonists, std::cmp::Reverse(c.id.0)))
+            .map(|c| c.id)
+    }
+
     pub fn ai_orders(&mut self, seat: Seat) -> Vec<Order> {
         // Ticket #337 (version 0.09.0): the seat answers this turn's choice card HERE, before it
         // reads its own board for anything else, so a held fleet or a paid bill is already true of
@@ -1407,7 +1417,9 @@ impl Game {
         // `capital_chase` times; a fresh Outpost on its Body weighs a chase less.
         // Measured before the gathering: the chase on the upgrade and the landing alone left no
         // Capital off Earth in 80 games (seven stood, all in Antarctica).
-        let capital_candidate = if self.tables.faction(kind).victory_capital { self.capital_candidate(seat) } else { None };
+        // Ticket #590 (version 0.1.0.4), at the designer's word: every seat builds up its best place off
+        // Earth, so every seat has a candidate and gathers at it; the Arkwrights once their Bodies are near.
+        let capital_candidate = self.capital_candidate(seat);
         let capital_body = capital_candidate.and_then(|c| self.colony(c)).map(|c| c.body);
         let capital_chase = self.tables.ai.thresholds.capital_chase;
         // The people the Capital tier wants at one place, the room the candidate builds toward.
@@ -2380,13 +2392,19 @@ impl Game {
         // Ticket #514 (version 0.1.0.0): every upgrade at the Capital candidate weighs `capital_chase`
         // times more (the candidate and the figure are read at the head of this function).
         for c in self.colonies.iter().filter(|c| c.control.director() == Some(seat)) {
-            // Ticket #590 (version 0.1.0.4): the Capital wants one slot open, not every slot built.
+            // Ticket #590 (version 0.1.0.4): the Capital wants one slot open, not every slot built; a
+            // lower tier, the people to fill its cap, not every slot built either: measured, 28 people
+            // stood at an Outpost with 4 of its 6 slots built for want of the last two.
             if let Some(next) = self.open_tier(c)
                 && c.colonists >= next.colonists
-                && (if next.takes_slot { self.capital_site(seat, c.body) == Some(c.id) && self.free_module_slots(c) >= 1 } else { self.module_slots(c) >= self.tier_of(c).cap && self.free_module_slots(c) == 0 })
+                && (if next.takes_slot { self.capital_site(seat, c.body) == Some(c.id) && self.free_module_slots(c) >= 1 } else { self.module_slots(c) >= self.tier_of(c).cap })
                 && self.tier_under_way(c).is_none()
             {
                 let chase = if capital_candidate == Some(c.id) { capital_chase } else { 1.0 };
+                // Ticket #590 (version 0.1.0.4), at the designer's word: the seat builds up its best
+                // place off Earth. Measured without it: its upgrade at 5 or 6 was held every turn for
+                // the Materials of builds at 20 to 45, and no place off Earth passed Outpost.
+                let chase = if self.best_off_earth(seat) == Some(c.id) { chase * self.tables.ai.thresholds.build_up } else { chase };
                 push(vec![Order::RaiseTier { colony: c.id }], Cat::RaiseTier, self.base_weight(seat, Cat::RaiseTier) * chase, gap_for(Cat::RaiseTier, None), 1.0, 1.0, format!("upgrade {} to a {}", self.place_name(Place::Colony(c.id)), next.name), None);
             }
         }
