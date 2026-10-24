@@ -1,7 +1,8 @@
 # Builds the playtest kits on GitHub's runners: a Linux (Ubuntu) kit that this Windows machine
 # cannot build itself, and a Windows kit for parity. Run it by hand from the Actions tab (or
-# `gh workflow run release-kits.yml --ref <branch> -f version=0.05`); each kit lands as a
-# downloadable artifact named dying-earth-<version>-<os>. Suitable for uploading to itch.io as is.
+# `gh workflow run release-kits.yml --ref <branch>`); each kit lands as a downloadable artifact
+# named dying-earth-<version>-<os>, the version read from GAME_VERSION in engine/src/save.rs
+# unless `-f version=<label>` gives another. Suitable for uploading to itch.io as is.
 #
 # Optional: if the repository has a secret BUTLER_API_KEY and a variable ITCH_TARGET (for example
 # "whaleyjoshua2/dying-earth"), the Linux and Windows kits are also pushed to itch.io with butler,
@@ -12,9 +13,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version label for the kit folder and zip (for example 0.05)"
-        required: true
-        default: "0.05"
+        description: "Version label for the kit folder and zip; empty reads GAME_VERSION"
+        required: false
+        default: ""
 
 jobs:
   linux:
@@ -36,6 +37,10 @@ jobs:
         run: |
           set -eu
           V="${{ github.event.inputs.version }}"
+          # Version 0.1.0.4: the label is the game's own unless one is given; it read 0.05.
+          if [ -z "$V" ]; then V=$(sed -n 's/^pub const GAME_VERSION: &str = "\(.*\)";.*/\1/p' engine/src/save.rs); fi
+          test -n "$V" || { echo "no version label and no GAME_VERSION found"; exit 1; }
+          echo "V=$V" >> "$GITHUB_ENV"
           K="dying-earth-$V-linux"
           rm -rf "$K" && mkdir -p "$K"
           cp target/release/dying-earth "$K/dying-earth"
@@ -69,7 +74,7 @@ jobs:
         run: |
           curl -L -o butler.zip https://broth.itch.zone/butler/linux-amd64/LATEST/archive/default
           unzip -q butler.zip && chmod +x butler
-          ./butler push "$KIT" "${{ vars.ITCH_TARGET }}:linux" --userversion "${{ github.event.inputs.version }}"
+          ./butler push "$KIT" "${{ vars.ITCH_TARGET }}:linux" --userversion "$V"
 
   windows:
     name: Windows kit
@@ -84,6 +89,9 @@ jobs:
         shell: pwsh
         run: |
           $V = "${{ github.event.inputs.version }}"
+          # Version 0.1.0.4: the label is the game's own unless one is given; it read 0.05.
+          if (-not $V) { $V = (Select-String -Path engine/src/save.rs -Pattern '^pub const GAME_VERSION: &str = "(.*)";').Matches[0].Groups[1].Value }
+          if (-not $V) { throw "no version label and no GAME_VERSION found" }
           $K = "dying-earth-$V-windows"
           New-Item -ItemType Directory -Force $K | Out-Null
           Copy-Item target/release/dying-earth.exe "$K/dying-earth.exe"
