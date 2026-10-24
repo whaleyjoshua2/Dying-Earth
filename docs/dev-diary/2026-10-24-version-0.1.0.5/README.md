@@ -112,3 +112,19 @@ loop among them (four Resolutions now). No picture: figures every hover reads fr
   game up by about a sixth for every seat, Materials and Energy made over the batch down six per cent
   for the Custodians and the Prospectors, within two for the other two. The computer's Archive 3 of
   80 from 9, at the edge of its noise. Reported and left.
+
+## Turn one's signature moves: one sentence, the player's Faction alone
+
+Ticket [#607](https://github.com/whaleyjoshua2/Dying-Earth/issues/607), spec §7.
+
+Four sentences on the Faction rows at the designer's word (the drafts with the turn labels cut), the
+window cut to the player's own row, the tool's `new` to one line, the `{your}` placeholder gone with
+its only rival reader. The test was moved to the new sentences first and watched red on the old
+(a first sed had folded it into one commented line, which "passed" with nothing in it, and was put
+right before the red was believed). No rule moves; no sweep.
+
+**The pictures** ([`ticket-607/custodians-report.png`](ticket-607/custodians-report.png) and the three
+beside it, with [`tool-new.txt`](ticket-607/tool-new.txt)): the window over the Earth map, "Signature
+moves", the Faction's glyph and name in its colour, the two sentences wrapped on two lines, "Go on".
+Looked at, all four; a first run had kept the solar view, where the window never stands, and was
+reshot through the menu captures.

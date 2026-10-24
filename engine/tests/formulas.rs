@@ -25129,11 +25129,12 @@ fn the_archive_stands_on_the_ground_of_another_body() {
 #[test]
 fn each_faction_names_its_signature_moves() {
     let t = tables();
-    assert_eq!(t.opening_moves(FactionKind::Custodians, true), "Build Scrubbers and Nature Reserves; Leapfrog your Regions");
-    assert_eq!(t.opening_moves(FactionKind::Custodians, false), "Build Scrubbers and Nature Reserves; Leapfrog their Regions");
-    assert_eq!(t.opening_moves(FactionKind::Prospectors, false), "Investment Banks + Venture share");
-    assert_eq!(t.opening_moves(FactionKind::Arkwrights, false), "Colony Ships to four Bodies");
-    assert_eq!(t.opening_moves(FactionKind::Archivists, true), "Labs + Directive; Archive");
+    // Ticket #607 (version 0.1.0.5), at the designer's word: two sentences each, the first turn's
+    // orders then the second's, no turn labels, read by the player's own Faction alone.
+    assert_eq!(t.opening_moves(FactionKind::Custodians), "Build a Scrubber at home and spend your Influence. Leapfrog a Region you hold and recruit Pioneers.");
+    assert_eq!(t.opening_moves(FactionKind::Prospectors), "Build an Investment Bank and set your Venture share. Raise Industry Level and recruit Pioneers.");
+    assert_eq!(t.opening_moves(FactionKind::Arkwrights), "Build a Space Station over Earth and recruit Pioneers. A Shipyard on it, for the Colony Ship that takes them to the Moon.");
+    assert_eq!(t.opening_moves(FactionKind::Archivists), "Build a Research Lab and set the Directive. Recruit Pioneers and a Habitat on Axiom, for the Moon and the Archive.");
 }
 
 /// Ticket #587 (version 0.1.0.4): the Upload as a story moment, at the designer's word. The line

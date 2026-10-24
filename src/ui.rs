@@ -13045,22 +13045,19 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
         }
         // Ticket #594 (version 0.1.0.4), at the designer's word: turn one's signature moves, every
         // Faction's in one line, the player's own first and strong.
+        // Ticket #607 (version 0.1.0.5), at the designer's word: the player's own Faction alone, its
+        // name as the heading and the two sentences under it; the rivals' rows go.
         Popup::Opening => {
             egui::Modal::new("opening".into()).show(ctx, |ui| {
                 ui.set_width(520.0);
                 ui.label(RichText::new("Signature moves").size(26.0).strong().color(Color32::from_rgb(255, 220, 150)));
                 ui.add_space(4.0);
-                for seat in Seat::ALL {
-                    let mine = seat == Seat(0) && !session.spectator;
-                    let line = session.tables.opening_moves(game.kind(seat), mine);
-                    ui.horizontal(|ui| {
-                        faction_glyph(ui, session, game, Some(seat), 22.0);
-                        let name = RichText::new(game.seat_name(seat)).size(17.0).strong().color(seat_colour(session, seat));
-                        ui.label(name);
-                        let words = RichText::new(line).size(17.0);
-                        ui.label(if mine { words.strong() } else { words });
-                    });
-                }
+                let seat = Seat(0);
+                ui.horizontal(|ui| {
+                    faction_glyph(ui, session, game, Some(seat), 22.0);
+                    ui.label(RichText::new(game.seat_name(seat)).size(17.0).strong().color(seat_colour(session, seat)));
+                });
+                ui.label(RichText::new(session.tables.opening_moves(game.kind(seat))).size(17.0));
                 ui.add_space(8.0);
                 if ui.button("Go on").clicked() {
                     advance_popup(view, 0, false, false);

@@ -179,3 +179,29 @@ modules only q2 frigate alone"*.
   Six per cent off the Custodians' and the Prospectors' Materials, the Arkwrights' and the Archivists'
   within two; the computer's Archive stands in 3 of 80 (9 before), at the edge of its noise. Reported
   and left.
+
+## 7. Turn one's signature moves: one sentence, the player's Faction alone
+
+Ticket: [Turn one's signature moves: one sentence, the player's Faction alone, a direction for turns one and two](https://github.com/whaleyjoshua2/Dying-Earth/issues/607).
+
+The designer: *"signature moves - make a sentence and show only the selected faction and give them some
+direction to go in for the first and second turn e.g. build power plant, recruit pioneers"*; on the
+ticket's questions, *"those but remove the Turn one:/Turn two: q2 yes"*.
+
+- **Each Faction's `opening_moves`** (`factions.toml`) is two sentences, the first turn's orders then
+  the second's, with no turn labels:
+  - Custodians: *"Build a Scrubber at home and spend your Influence. Leapfrog a Region you hold and
+    recruit Pioneers."*
+  - Prospectors: *"Build an Investment Bank and set your Venture share. Raise Industry Level and
+    recruit Pioneers."*
+  - Arkwrights: *"Build a Space Station over Earth and recruit Pioneers. A Shipyard on it, for the
+    Colony Ship that takes them to the Moon."*
+  - Archivists: *"Build a Research Lab and set the Directive. Recruit Pioneers and a Habitat on
+    Axiom, for the Moon and the Archive."*
+- **The turn-one window** shows the player's Faction alone: "Signature moves", the Faction's glyph
+  and name, the two sentences under it, "Go on". The rivals' rows go; the Faction card's signature
+  rule says what each does. The `{your}` placeholder goes with them, the line having one reader.
+- **The text tool's `new`** prints the one line, *"Custodians (you): Build a Scrubber ..."*.
+- **The pictures** (`ticket-607/<faction>-report.png`, four): the window for each Faction, over the
+  Earth map where the Report would stand.
+- No rule moves; no sweep.

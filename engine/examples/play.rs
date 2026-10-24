@@ -1878,12 +1878,10 @@ fn store(game: &Game, path: &Path) {
 
 /// Ticket #594 (version 0.1.0.4), at the designer's word: turn one opens on each Faction's
 /// signature moves, the player's own first, in the Report's place; `show` still prints the Report.
+/// Ticket #607 (version 0.1.0.5), at the designer's word: the player's own Faction alone.
 fn print_opening(g: &Game) {
     println!("--- SIGNATURE MOVES ---");
-    for seat in Seat::ALL {
-        let mine = seat == Seat(0);
-        println!("{}{}: {}", g.seat_name(seat), if mine { " (you)" } else { "" }, g.tables.opening_moves(g.kind(seat), mine));
-    }
+    println!("{} (you): {}", g.seat_name(Seat(0)), g.tables.opening_moves(g.kind(Seat(0))));
 }
 
 fn main() {

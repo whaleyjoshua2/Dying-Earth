@@ -3000,8 +3000,9 @@ impl Tables {
     /// price and a Mothball's Unrest. A text that names none of them reads as written.
     /// Ticket #594 (version 0.1.0.4): the Faction's signature moves, as its own player (`yours`) or
     /// a rival reads them.
-    pub fn opening_moves(&self, kind: FactionKind, yours: bool) -> String {
-        crate::report::render(&self.faction(kind).opening_moves, &[("your", if yours { "your" } else { "their" }.to_string())])
+    /// Ticket #607 (version 0.1.0.5): the player's own Faction alone reads it, so no "your"/"their" placeholder.
+    pub fn opening_moves(&self, kind: FactionKind) -> String {
+        self.faction(kind).opening_moves.clone()
     }
 
     pub fn signature(&self, kind: FactionKind) -> String {
