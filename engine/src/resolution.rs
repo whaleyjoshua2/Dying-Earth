@@ -261,7 +261,8 @@ impl Game {
                 continue;
             }
             // Ticket #210 (version 0.08.1): the Report names the hull, not its kind and id.
-            let ship_name = self.ship(*id).map(|s| self.ship_name(s)).unwrap_or_else(|| format!("{} {}", kind.name(), id.0));
+            // Ticket #586 (version 0.1.0.4): one gone reads by its kind alone, never its id.
+            let ship_name = self.ship(*id).map(|s| self.ship_name(s)).unwrap_or_else(|| format!("a {}", kind.name()));
             if let Some(s) = self.ship_mut(*id) {
                 s.colonists -= lost;
             }

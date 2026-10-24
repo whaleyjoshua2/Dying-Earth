@@ -175,6 +175,8 @@ fn pick_state(word: &str) -> Result<StateId, String> {
 /// Ticket #586 (version 0.1.0.4), at the designer's word: a word that fits a Region alone is the
 /// Region, one that fits a Colony alone the Colony, and one that fits both is refused, naming both.
 /// A number still reaches a Colony's id, as it always did; the board shows none.
+/// The review: every Region and Colony a word fits is counted, so `i` -- India, Indonesia, Iran and
+/// the ISS -- is refused with all four, where the Regions' own refusal had let the ISS through.
 fn place(g: &Game, word: &str) -> Result<Place, String> {
     let w = word.to_ascii_lowercase();
     if let Some(rest) = w.strip_prefix("colony:").or_else(|| w.strip_prefix("c:")) {
@@ -186,25 +188,47 @@ fn place(g: &Game, word: &str) -> Result<Place, String> {
     if let Ok(n) = w.parse::<u32>() {
         return Ok(Place::Colony(ColonyId(n)));
     }
-    match (pick_state(&w), colony_id(g, &w)) {
-        (Ok(s), Ok(c)) => Err(format!("{word:?} could be the Region {} or the Colony {}; put `state:` or `colony:` before it", g.tables.state(s).name, g.place_name(Place::Colony(c)))),
-        (Ok(s), Err(_)) => Ok(Place::State(s)),
-        (Err(_), Ok(c)) => Ok(Place::Colony(c)),
-        // A word short for two of either kind says so, where "neither" would mislead.
-        (Err(r), Err(c)) => Err([c, r].into_iter().find(|e| e.contains("could be more than one")).unwrap_or_else(|| format!("{word:?} is neither a Region nor a Colony"))),
+    let names = STATE_NAMES.get();
+    let states = fits(&StateId::ALL, &w, |s| {
+        let shown = names.map(|n| n[s.index()].clone()).unwrap_or_default();
+        let bare = shown.strip_prefix("The ").map(str::to_string);
+        [Some(format!("{s:?}")), Some(shown), bare].into_iter().flatten().collect()
+    });
+    let colonies = fits(&g.colonies.iter().map(|c| c.id).collect::<Vec<_>>(), &w, |c| colony_forms(g, c));
+    match (states.as_slice(), colonies.as_slice()) {
+        ([s], []) => Ok(Place::State(*s)),
+        ([], [c]) => Ok(Place::Colony(*c)),
+        ([], []) => Err(format!("{word:?} is neither a Region nor a Colony")),
+        _ => {
+            let all: Vec<String> = states.iter().map(|s| g.tables.state(*s).name.clone()).chain(colonies.iter().map(|c| g.place_name(Place::Colony(*c)))).collect();
+            let say = if states.is_empty() || colonies.is_empty() { "" } else { "; put `state:` or `colony:` before it" };
+            Err(format!("{word:?} could be more than one: {}{say}", all.join(", ")))
+        }
     }
+}
+
+/// Ticket #586 (version 0.1.0.4): what a word fits in `list` -- every exact name, or failing one,
+/// every name it begins -- case, spaces and separators ignored.
+fn fits<T: Copy>(list: &[T], word: &str, forms: impl Fn(T) -> Vec<String>) -> Vec<T> {
+    let w = norm(word);
+    if w.is_empty() {
+        return Vec::new();
+    }
+    let exact: Vec<T> = list.iter().copied().filter(|t| forms(*t).iter().any(|f| norm(f) == w)).collect();
+    if !exact.is_empty() {
+        return exact;
+    }
+    list.iter().copied().filter(|t| forms(*t).iter().any(|f| norm(f).starts_with(&w))).collect()
 }
 
 /// Ticket #586 (version 0.1.0.4), at the designer's word: a Colony, a Ship or an Army by its NAME,
 /// the board printing no number for any of them -- an exact name first, then any unique prefix,
-/// case and spaces ignored, as every other name here. Two that fit are refused, both named.
+/// as every other name here (`fits`). Two that fit are refused, both named.
 fn pick_by_name<T: Copy>(list: &[T], word: &str, forms: impl Fn(T) -> Vec<String>, shown: impl Fn(T) -> String, what: &str) -> Result<T, String> {
-    let w = norm(word);
-    if w.is_empty() {
+    if norm(word).is_empty() {
         return Err(format!("expected {what} here"));
     }
-    let exact: Vec<T> = list.iter().copied().filter(|t| forms(*t).iter().any(|f| norm(f) == w)).collect();
-    let hits: Vec<T> = if exact.is_empty() { list.iter().copied().filter(|t| forms(*t).iter().any(|f| norm(f).starts_with(&w))).collect() } else { exact };
+    let hits = fits(list, word, forms);
     let names = |ts: &[T]| ts.iter().map(|t| shown(*t)).collect::<Vec<_>>().join(", ");
     match hits.as_slice() {
         [t] => Ok(*t),
@@ -262,10 +286,13 @@ fn unit_ref(g: &Game, word: &str) -> Result<UnitRef, String> {
 }
 
 /// Ticket #586: a Ship by its name, its Faction's prefix or not, among the Ships seat 0 sees.
+/// The review: `ship:nautilus` as well, as `repair` takes it.
 fn ship_id(g: &Game, word: &str) -> Result<ShipId, String> {
     if let Some(n) = id_number(word, &["ship"]) {
         return Ok(ShipId(n));
     }
+    let lower = word.to_ascii_lowercase();
+    let word = lower.strip_prefix("ship:").unwrap_or(&lower);
     let seen: Vec<ShipId> = g.ships.iter().filter(|s| g.sees_ship(Seat(0), s)).map(|s| s.id).collect();
     pick_by_name(&seen, word, |id| g.ship(id).map(|s| vec![s.name.clone(), g.ship_name(s)]).unwrap_or_default(), |id| g.ship_called(id), "a Ship")
 }
@@ -275,6 +302,8 @@ fn army_id(g: &Game, word: &str) -> Result<ArmyId, String> {
     if let Some(n) = id_number(word, &["army"]) {
         return Ok(ArmyId(n));
     }
+    let lower = word.to_ascii_lowercase();
+    let word = lower.strip_prefix("army:").unwrap_or(&lower);
     let seen: Vec<ArmyId> = g.armies.iter().filter(|a| g.sees_army(Seat(0), a)).map(|a| a.id).collect();
     let forms = |id: ArmyId| {
         let name = g.army_called(id);
@@ -284,11 +313,14 @@ fn army_id(g: &Game, word: &str) -> Result<ArmyId, String> {
     pick_by_name(&seen, word, forms, |id| g.army_called(id), "an Army")
 }
 
-/// Ticket #586: a Colony or station by its name (`colony_forms`).
+/// Ticket #586: a Colony or station by its name (`colony_forms`). The review: `colony:iss` and
+/// `c:iss` as well, as an order taking a Region or a Colony takes them.
 fn colony_id(g: &Game, word: &str) -> Result<ColonyId, String> {
     if let Some(n) = id_number(word, &["colony", "c"]) {
         return Ok(ColonyId(n));
     }
+    let lower = word.to_ascii_lowercase();
+    let word = lower.strip_prefix("colony:").or_else(|| lower.strip_prefix("c:")).unwrap_or(&lower);
     let all: Vec<ColonyId> = g.colonies.iter().map(|c| c.id).collect();
     pick_by_name(&all, word, |c| colony_forms(g, c), |c| g.place_name(Place::Colony(c)), "a Colony")
 }

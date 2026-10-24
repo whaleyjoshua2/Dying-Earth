@@ -357,7 +357,7 @@ One line a Faction says of itself, under its name on the selection card and in t
 _Avoid_: slogan, tagline, catchphrase
 
 **Ship name**:
-The name a Ship is given when it is built, since version 0.08.1, drawn from one of two lists -- the ships of exploration for a Colony Ship, the ships of the line for a Frigate, a Battleship, the Carrier and, since version 0.09.1, the Missile Carrier. It is unique across the whole board and is taken as the first unused name in list order, which draws no randomness and so cannot shift a seeded game. The **prefix** in front of it belongs to whoever flies the ship and is its Faction's -- TSV, PMV, ARK, ACV -- where the name belongs to the hull. Since version 0.1.0.4 no Ship's, Army's or Colony's id is shown: each is read and ordered by its name, and a Ship's hover reads *TSV Magellan [Frigate]* in its Faction's colour, where until then its id survived on every hover.
+The name a Ship is given when it is built, since version 0.08.1, drawn from one of two lists -- the ships of exploration for a Colony Ship, the ships of the line for a Frigate, a Battleship, the Carrier and, since version 0.09.1, the Missile Carrier. It is unique across the whole board and is taken as the first unused name in list order, which draws no randomness and so cannot shift a seeded game. The **prefix** in front of it belongs to whoever flies the ship and is its Faction's -- TSV, PMV, ARK, ACV -- where the name belongs to the hull. Since version 0.1.0.4 no Ship's, Army's or Colony's id is shown: each is read and ordered by its name, where until then a Ship's id survived on every hover.
 _Avoid_: callsign, registry, hull number, designation
 
 **Home Region**:

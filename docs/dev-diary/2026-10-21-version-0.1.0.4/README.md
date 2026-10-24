@@ -609,6 +609,13 @@ Repair line, three log lines. The tool printed the bare numbers itself and was m
 no tests, so the red was its own refusal, *"iss" is not a whole number*, on six lines that reach the
 engine now; the help's test failed on the old help. Built, no sweep.
 
+**The review** found the computer's scored list, which `show --log` prints, still naming "Frigate
+35"; `i` taken as the ISS though it fits India, Indonesia and Iran too (every Region and Colony a
+word fits is now counted, all named in the refusal); and `colony:iss` and `ship:nautilus` refused
+where an order takes only a Colony or a Ship. Each was seen on the tool before the mend and after
+it; the computer's notes carry the Ship's name, and nothing reads them but two checks on Investment
+Banks and the Moon, so its play is unchanged.
+
 - **The Ship card**, its name hovered (the `tip:` aid):
 
 ![The Ship's hover](ticket-586/ship-card-moon.png)

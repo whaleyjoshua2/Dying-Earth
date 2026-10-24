@@ -5734,7 +5734,7 @@ fn order_text(game: &Game, earlier: &[Order], o: &Order) -> String {
         Order::Rearm { ship } => format!("Rearm {}", game.ship_called(*ship)),
         Order::ArmyStance { place, stance } => format!("Armies at {}: {}", game.place_name(*place), stance.name()),
         Order::MoveArmy { army, to } => format!("{} to {}", game.army_called(*army), game.tables.state(*to).name),
-        Order::Load { ship, colonists, army, .. } => format!("Load {} onto {}", if *colonists > 0 { counted(colonists, "Colonist", "Colonists") } else { army.map(|a| game.army_called(a)).unwrap_or_else(|| "an Army".to_string()) }, game.ship_called(*ship)),
+        Order::Load { ship, colonists, army, .. } => format!("Load {} onto {}", if *colonists > 0 { counted(colonists, "Colonist", "Colonists") } else { army.map(|a| game.army_called(a)).unwrap_or_else(|| "the Army".to_string()) }, game.ship_called(*ship)),
         Order::Unload { ship, colonists, army, into } => match into {
             // Ticket #409 (version 0.09.4): with the count the slider chose.
             UnloadTarget::Slot(b, s) => format!("Found a Colony at {} on {} with {} from {}", game.tables.body(*b).slots[*s as usize].name, game.tables.body(*b).name, colonists_word(*colonists), game.ship_called(*ship)),
@@ -9166,12 +9166,13 @@ fn ship_row(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, s
         // colour, "TSV Magellan [Frigate]", where its number stood.
         // Headless, the `tip:` aid photographs it.
         let named = ship_called_coloured(session, game, s);
+        let opens = "Opens the Ship's card.";
         let tip = |ui: &mut Ui| {
             ui.label(named.clone());
-            ui.label("Opens the Ship's card.");
+            ui.label(opens);
         };
         let response = ui.link(text);
-        if forced_tip(&format!("{}\nOpens the Ship's card.", named.text())) {
+        if forced_tip(&format!("{}\n{opens}", named.text())) {
             response.show_tooltip_ui(tip);
         }
         if response.on_hover_ui(tip).clicked() {
@@ -9426,6 +9427,8 @@ fn ship_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 8.0;
         faction_glyph(ui, session, game, Some(s.seat), 22.0);
+        // Ticket #586 (version 0.1.0.4), at the designer's word: "TSV Magellan [Frigate]" in its
+        // Faction's colour, where its kind and number stood; the `tip:` aid photographs it.
         let named = ship_called_coloured(session, game, s);
         let response = ui.label(RichText::new(game.ship_name(s)).size(22.0).strong());
         if forced_tip(named.text()) {

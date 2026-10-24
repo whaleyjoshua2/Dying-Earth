@@ -3206,7 +3206,9 @@ impl Game {
         for s in &ships {
             let ShipAt::Body(body) = s.at else { continue };
             let card = self.tables.unit(s.kind);
-            let ship_name = format!("{} {}", s.kind.name(), s.id.0);
+            // Ticket #586 (version 0.1.0.4), from the review: its name in the scored list, which the
+            // tool's `--log` prints, never its id.
+            let ship_name = self.ship_name(s);
             // Ticket #87: refuel at a station of its own whenever the tank is short and the
             // Stockpile has Fuel; a leg the tank cannot pay is refused at the check, so the AI
             // never flies on an empty tank.
