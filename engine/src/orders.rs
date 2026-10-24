@@ -323,6 +323,18 @@ impl std::fmt::Display for OrderError {
     }
 }
 
+/// Ticket #597 (version 0.1.0.4): a seat's own price cut in the card's words -- "at half price",
+/// "a third off" -- for the card's sides here, in the window and in the headless driver alike.
+pub fn seat_cut_phrase(multiplier: f64) -> String {
+    if (multiplier - 0.5).abs() < 1e-9 {
+        "at half price".to_string()
+    } else if (multiplier - 2.0 / 3.0).abs() < 1e-9 {
+        "a third off".to_string()
+    } else {
+        format!("at x{multiplier}")
+    }
+}
+
 fn fail<T>(msg: impl Into<String>) -> Result<T, OrderError> {
     Err(OrderError(msg.into()))
 }
@@ -497,6 +509,7 @@ impl Game {
                 Order::RaiseIndustry { state } => self.industry_widgets(seat, *state),
                 // Ticket #505 (version 0.1.0.0): a Module's are its Colony's (Regolith Printing).
                 Order::BuildModule { colony, .. } | Order::BuildModuleWithDucats { colony, .. } | Order::BuildArchive { colony } => self.build_widgets_at(seat, Place::Colony(*colony), item),
+                Order::BuildShip { site, .. } => self.build_widgets_at(seat, *site, item),
                 _ => self.build_widgets(seat, item),
             };
             parts.push(format!("{n} Widget{}", if n == 1 { "" } else { "s" }));
@@ -612,7 +625,13 @@ impl Game {
         }
         Err(OrderError(match from {
             // Ticket #543 (version 0.1.0.1): Pioneers waiting in this Region, which is what it means.
-            LoadSource::State(_) => format!("needs {} here", crate::counted(found, "Pioneer", "Pioneers")),
+            // Ticket #599 (version 0.1.0.4), at the designer's word: the Region named where Pioneers
+            // wait in one of the seat's, and where they must wait where none does.
+            LoadSource::State(sid) => {
+                let waiting = self.state(sid).control.director().is_some_and(|seat| self.directed_states(seat).into_iter().any(|r| self.founders_spare(LoadSource::State(r), pending) > 0));
+                let n = crate::counted(found, "Pioneer", "Pioneers");
+                if waiting { format!("needs {n} in {}", self.state_name_mid(sid)) } else { format!("needs {n} waiting in a Launch Site Region of yours") }
+            }
             LoadSource::Colony(_) => format!("needs {} to spare", crate::counted(found, "Colonist", "Colonists")),
         }))
     }
@@ -669,28 +688,8 @@ impl Game {
             Order::Leapfrog { .. } => Cost { ducats: t.ducats.per_leapfrog as f64, ..Default::default() },
             Order::ExodusCall { .. } => Cost { ducats: t.ducats.per_exodus_call as f64, ..Default::default() },
             Order::BuyInfluence { amount } => Cost { ducats: t.ducats.per_influence * *amount as f64, ..Default::default() },
-            // A purchase is a negative cost in the resource bought, so `remaining` and `commit_orders`
-            // add it without a special case; a sale is the mirror, with a negative Ducat cost.
-            Order::Buy { resource, amount } => {
-                // Ticket #83: the lot's price, times the seat's market multiplier; ticket #387
-                // (version 0.09.3): to the tenth, where it was rounded down. Ticket #577 (version
-                // 0.1.0.3): and times the seat's own cut on that good, where a card gave it one.
-                let ducats = self.lot_price(seat, *resource, (self.trade_price(*resource).unwrap_or(0) * *amount) as f64);
-                match resource {
-                    Resource::Materials => Cost { materials: -*amount as f64, ducats, ..Default::default() },
-                    Resource::Fuel => Cost { fuel: -*amount as f64, ducats, ..Default::default() },
-                    Resource::Energy => Cost { energy: -*amount as f64, ducats, ..Default::default() },
-                    _ => Cost::default(),
-                }
-            }
-            Order::Sell { resource, amount } => {
-                let ducats = -self.sale_price(*resource, *amount);
-                match resource {
-                    Resource::Materials => Cost { materials: *amount as f64, ducats, ..Default::default() },
-                    Resource::Fuel => Cost { fuel: *amount as f64, ducats, ..Default::default() },
-                    _ => Cost::default(),
-                }
-            }
+            // Ticket #593 (version 0.1.0.4): a Buy and a Sell are priced in `trade_cost`.
+            Order::Buy { .. } | Order::Sell { .. } => self.trade_cost(seat, &[], order),
             Order::BuildFacilityWithDucats { kind, .. } => Cost { ducats: self.market_price(seat, self.facility_materials(seat, *kind) * t.ducats.per_building_material as f64), ..Default::default() },
             // Ticket #332 (version 0.09.0): the refund is a negative cost, as a purchase is, so
             // `remaining` and `commit_orders` credit it without a special case.
@@ -708,6 +707,45 @@ impl Game {
             Order::Resettle { .. } => Cost { ducats: t.unrest.resettle_ducats as f64, ..Default::default() },
             Order::RepairWithDucats { points, .. } => Cost { ducats: (t.ducats.per_repair_point * *points as i64) as f64, ..Default::default() },
             _ => Cost::default(),
+        }
+    }
+
+    /// Ticket #593 (version 0.1.0.4): a Buy or a Sell priced after the seat's `earlier` trades this
+    /// turn, which move its own running net, so the window quotes the next lot
+    /// and a list is paid as it was quoted. Anything else is `order_cost`'s.
+    pub fn trade_cost(&self, seat: Seat, earlier: &[Order], order: &Order) -> Cost {
+        let ahead = |r: Resource| -> i64 {
+            earlier.iter().map(|o| match o {
+                Order::Buy { resource, amount } if *resource == r => *amount,
+                Order::Sell { resource, amount } if *resource == r => -*amount,
+                _ => 0,
+            }).sum()
+        };
+        match order {
+            // A purchase is a negative cost in the resource bought, so `remaining` and `commit_orders`
+            // add it without a special case; a sale is the mirror, with a negative Ducat cost.
+            Order::Buy { resource, amount } => {
+                // Ticket #83: the lot's price, times the seat's market multiplier; ticket #387
+                // (version 0.09.3): to the tenth, where it was rounded down. Ticket #577 (version
+                // 0.1.0.3): and times the seat's own cut on that good, where a card gave it one.
+                // Ticket #593 (version 0.1.0.4): each unit at the seat's own running net, so a big lot climbs.
+                let ducats = self.lot_price(seat, *resource, self.lot_ducats(seat, *resource, *amount, ahead(*resource)) as f64);
+                match resource {
+                    Resource::Materials => Cost { materials: -*amount as f64, ducats, ..Default::default() },
+                    Resource::Fuel => Cost { fuel: -*amount as f64, ducats, ..Default::default() },
+                    Resource::Energy => Cost { energy: -*amount as f64, ducats, ..Default::default() },
+                    _ => Cost::default(),
+                }
+            }
+            Order::Sell { resource, amount } => {
+                let ducats = -self.sale_price_after(seat, *resource, *amount, ahead(*resource));
+                match resource {
+                    Resource::Materials => Cost { materials: *amount as f64, ducats, ..Default::default() },
+                    Resource::Fuel => Cost { fuel: *amount as f64, ducats, ..Default::default() },
+                    _ => Cost::default(),
+                }
+            }
+            _ => self.order_cost(seat, order),
         }
     }
 
@@ -742,11 +780,45 @@ impl Game {
         // through the last turn it named -- the Fuel Contract's refusal moves Fuel a step, the
         // Trade Pact takes a step off Materials. The banded price goes on underneath and resumes
         // when the override runs out. (The Cheap Ore Offer set Materials to 1 until ticket #577,
-        // version 0.1.0.3; its refusal is the seat's own cut now, `lot_price`.)
+        // version 0.1.0.3; its refusal is the seat's own cut now, `lot_price`.) Ticket #593 (version
+        // 0.1.0.4): the price a seat's first unit of the turn is quoted, whatever the table traded.
+        self.unit_price_at(row, 0)
+    }
+
+    /// Ticket #593 (version 0.1.0.4), at the designer's word: the price of one unit with `net` units
+    /// of the good bought less sold ahead of it this turn BY THE SAME SEAT. Every
+    /// `price_step_units` of net moves it a Ducat from where the turn opened, inside the band and
+    /// never under 1. A card's override stands flat over the band, whatever is traded. Another
+    /// seat's trading this turn moves nothing until the settle, since every seat orders blind of
+    /// the others: a first build priced each unit at the whole table's running net, so a seat that
+    /// committed after a big buyer paid a price it could not have been quoted (216 order lists in a
+    /// sweep had a Buy dropped for it), and planning each seat after the ones before it committed
+    /// handed the last seat an edge (its wins 10 to 25 of 80).
+    pub fn unit_price_at(&self, row: usize, net: i64) -> i64 {
         if self.market.card_price[row] > 0 && self.turn <= self.market.card_price_until[row] {
             return self.market.card_price[row];
         }
-        self.banded_price_at(row)
+        self.band_clamp(row, self.banded_price_at(row) + net / self.tables.ducats.price_step_units.max(1))
+    }
+
+    /// Ticket #593: a price held inside its row's band, and never under a Ducat.
+    fn band_clamp(&self, row: usize, price: i64) -> i64 {
+        let (base, band) = (self.market_base(row), self.tables.ducats.price_band.max(0));
+        price.clamp((base - band).max(1), (base + band).max(1))
+    }
+
+    /// Ticket #593: the Ducats for `amount` units of `resource` bought, each at the seat's own
+    /// running net, `ahead` being its trades in that good before them this turn. The window's
+    /// price before the Faction's multiplier and a seat's cut, which `lot_price` takes.
+    ///
+    /// Ticket #597 (version 0.1.0.4), at the designer's word: while the seat has its own cut on the
+    /// good (`seat_price_cut`), its lots are flat at the opening price, as a card's price is.
+    pub fn lot_ducats(&self, seat: Seat, resource: Resource, amount: i64, ahead: i64) -> i64 {
+        let Some(row) = Self::market_row(resource) else { return 0 };
+        if self.seat_price_cut(seat, row).is_some() {
+            return self.unit_price_at(row, 0) * amount.max(0);
+        }
+        (0..amount.max(0)).map(|i| self.unit_price_at(row, ahead + i)).sum()
     }
 
     /// Ticket #337: the price the band alone says, with no card over it. The settle reads this, so
@@ -758,7 +830,8 @@ impl Game {
 
     /// Ticket #404 (version 0.09.4): the Market as the headless driver prints it every turn, at the
     /// seat's own price, **a price a card has set named with the card and the turns it has left**.
-    /// A price moves a step a turn inside its band; a card is what swings it from 4 to 1.
+    /// A price moves with the turn's trading inside its band (ticket #593, version 0.1.0.4); a card
+    /// is what sets it outside.
     pub fn market_line(&self, seat: Seat) -> String {
         let price = |r: Resource, name: &str| {
             let p = self.lot_price(seat, r, self.trade_price(r).unwrap_or(0) as f64);
@@ -799,10 +872,17 @@ impl Game {
     }
 
     /// Ticket #577: the cut's words for the Market line and the Trading window's price column:
-    /// *"half for you, this turn"*.
+    /// *"half for you, this turn"*; since ticket #597 (version 0.1.0.4) *"a third off for you"*.
     pub fn seat_price_note(&self, seat: Seat, row: usize) -> Option<String> {
         let c = self.seat_price_cut(seat, row)?;
-        let how = if (c.multiplier - 0.5).abs() < 1e-9 { "half".to_string() } else { format!("x{}", c.multiplier) };
+        // Ticket #597 (version 0.1.0.4): the Cheap Ore Offer's two thirds read "a third off".
+        let how = if (c.multiplier - 0.5).abs() < 1e-9 {
+            "half".to_string()
+        } else if (c.multiplier - 2.0 / 3.0).abs() < 1e-9 {
+            "a third off".to_string()
+        } else {
+            format!("x{}", c.multiplier)
+        };
         Some(match c.until - self.turn {
             0 => format!("{how} for you, this turn"),
             n => format!("{how} for you, {}", crate::counted(n + 1, "turn", "turns")),
@@ -816,19 +896,18 @@ impl Game {
         tenth(ducats * self.tables.faction(self.kind(seat)).market_multiplier * cut)
     }
 
-    /// Ticket #220 (version 0.08.2): the turn's trading moves each price, once, at the settle.
-    ///
-    /// `price_step_units` net units bought moves it a step up, the same sold moves it a step down,
-    /// and it sticks at the edge of its band -- the window does NOT begin refusing there, which
+    /// Ticket #220 (version 0.08.2): the turn's trading is banked into each price at the settle.
+    /// Ticket #593 (version 0.1.0.4): within the turn each seat's units are priced by its own trading
+    /// (`unit_price_at`), and the settle banks the whole table's net: every `price_step_units` of net bought a step
+    /// up, the same sold a step down, and it sticks at the edge of its band -- the window does NOT begin refusing there, which
     /// would quietly invent a stock limit this game does not have (`check_order` tests only that the
     /// amount is positive and the resource has a price; nothing is ever decremented window-side).
     ///
-    /// A price comes home only on a turn in which NOBODY traded that resource at all. A resource
+    /// A price comes home only on a turn whose net in that resource is nought. A resource
     /// under steady demand therefore stays dear rather than sliding back between purchases, which is
     /// what makes cornering Fuel before a Launch Window worth doing.
     pub fn settle_market(&mut self) {
         let step = self.tables.ducats.price_step_units.max(1);
-        let band = self.tables.ducats.price_band.max(0);
         // Ticket #337 (version 0.09.0): an override whose last turn has been played is forgotten
         // here, and the band -- which never stopped moving -- is the price again from the next turn.
         for row in 0..3 {
@@ -846,15 +925,15 @@ impl Game {
             let base = self.market_base(row);
             let mut price = self.banded_price_at(row);
             let net = self.market.net[row];
-            if net >= step {
-                price += 1;
-            } else if net <= -step {
-                price -= 1;
-            } else if net == 0 {
+            if net == 0 {
                 // Quiet in this resource: one step home, and no further than home.
                 price += (base - price).signum();
+            } else {
+                // Ticket #593 (version 0.1.0.4): where the turn's trading left it, a step for every
+                // `step` of net, where it moved one step at most.
+                price += net / step;
             }
-            self.market.price[row] = price.clamp(base - band, base + band);
+            self.market.price[row] = self.band_clamp(row, price);
             self.market.net[row] = 0;
         }
     }
@@ -869,16 +948,28 @@ impl Game {
     /// Ticket #42: what the window pays for a lot, or None for what it does not buy back. Ticket
     /// #387 (version 0.09.3): to the tenth, where the division was whole: one Material at 3 Ducats
     /// over the divisor of 2 sells for 1.5, where the whole division paid 1 and lost the half.
-    pub fn sale_price(&self, resource: Resource, amount: i64) -> f64 {
+    ///
+    /// Ticket #593 (version 0.1.0.4): each unit sold at the seat's own running net, so a big sale fetches
+    /// less; `ahead` is the seat's own pending trades before it, as `lot_ducats` takes them.
+    ///
+    /// Ticket #597 (version 0.1.0.4): flat at the opening price while the seat holds its own cut on
+    /// the good, as its Buys are; the review found a cut seat's flat Buys sold back up the price
+    /// they raised, 100 bought for 200 and sold for 221.
+    pub fn sale_price_after(&self, seat: Seat, resource: Resource, amount: i64, ahead: i64) -> f64 {
         if !matches!(resource, Resource::Materials | Resource::Fuel) {
             return 0.0;
         }
         let d = &self.tables.ducats;
-        let per = self.trade_price(resource).unwrap_or(0);
+        let Some(row) = Self::market_row(resource) else { return 0.0 };
         if d.sell_divisor <= 0 {
             return 0.0;
         }
-        tenth((per * amount) as f64 / d.sell_divisor as f64)
+        let per: i64 = if self.seat_price_cut(seat, row).is_some() {
+            self.unit_price_at(row, 0) * amount.max(0)
+        } else {
+            (0..amount.max(0)).map(|i| self.unit_price_at(row, ahead - i)).sum()
+        };
+        tenth(per as f64 / d.sell_divisor as f64)
     }
 
     /// Ticket #533 (version 0.1.0.1): the Fuel in a Ship's tank once a refuel given this turn has
@@ -893,12 +984,13 @@ impl Game {
     pub fn remaining(&self, seat: Seat, pending: &[Order]) -> (Stockpile, i64) {
         let mut cost = Cost::default();
         let mut bought = 0;
-        for o in pending {
+        for (i, o) in pending.iter().enumerate() {
             // Ticket #421 (version 0.09.4): a Refuel takes what is left when it is paid, as commit
-            // pays it, not what the Stockpile held before the orders ahead of it.
+            // pays it, not what the Stockpile held before the orders ahead of it. Ticket #593
+            // (version 0.1.0.4): a trade, after the trades ahead of it.
             let c = match o {
                 Order::Refuel { ship } => Cost { fuel: self.refuel_amount_from(*ship, self.seat(seat).stockpile.fuel - cost.fuel), ..Default::default() },
-                _ => self.order_cost(seat, o),
+                _ => self.trade_cost(seat, &pending[..i], o),
             };
             cost.add(c);
             if let Order::BuyInfluence { amount } = o {
@@ -992,10 +1084,11 @@ impl Game {
     /// Ticket #339 (version 0.09.0): is the order legal at all, price aside? The half of the check
     /// that names a RULE. Every arm returns the order's cost so the caller above can price it.
     fn check_order_rules(&self, seat: Seat, pending: &[Order], order: &Order) -> Result<Cost, OrderError> {
-        // Ticket #421 (version 0.09.4): a Refuel is priced at the Fuel left after the pending orders.
+        // Ticket #421 (version 0.09.4): a Refuel is priced at the Fuel left after the pending orders;
+        // ticket #593 (version 0.1.0.4), a trade after the pending trades.
         let cost = match order {
             Order::Refuel { ship } => Cost { fuel: self.refuel_amount_from(*ship, self.remaining(seat, pending).0.fuel), ..Default::default() },
-            _ => self.order_cost(seat, order),
+            _ => self.trade_cost(seat, pending, order),
         };
         match order {
             Order::BuyInfluence { amount } => {
@@ -1213,8 +1306,8 @@ impl Game {
                     // Ticket #209 (version 0.08.1): the message names the new rule. It said
                     // "off Earth; Antarctica will not do" while a station over Earth still counted,
                     // and would now be actively misleading -- a player reading it at Axiom would
-                    // think the problem was the ice.
-                    return fail("the Archive stands at a Colony on another Body; neither Antarctica nor a station over Earth will do");
+                    // think the problem was the ice. Ticket #588 (version 0.1.0.4): the ground only.
+                    return fail("the Archive stands on the ground of another Body");
                 }
                 // At most one Archive per Faction, wherever it stands.
                 if let Some(home) = self.archive_colony(seat)
@@ -1570,6 +1663,13 @@ impl Game {
                 if col.colonists < next.colonists {
                     return fail(format!("needs {}", crate::counted(next.colonists, "Colonist", "Colonists")));
                 }
+                // Ticket #590 (version 0.1.0.4): the Capital's building stands in a slot, open now.
+                if next.takes_slot {
+                    let ordered = pending.iter().filter(|o| matches!(o.build_module(), Some((c, k)) if c == *colony && k != ModuleKind::Archive)).count() as u32;
+                    if self.module_slots_used(col) + ordered >= self.module_slots(col) {
+                        return fail("needs 1 open slot");
+                    }
+                }
                 Ok(cost)
             }
             Order::BuildModule { colony, kind } => {
@@ -1653,16 +1753,17 @@ impl Game {
                 // count, as do the ones already ordered this turn; the Archive counts on neither
                 // side. A cap that has fallen below what stands destroys nothing: there is simply
                 // no room until Colonists arrive.
+                // Ticket #590 (version 0.1.0.4): a Capital ordered this turn has its slot already.
                 let ordered = pending
                     .iter()
-                    .filter(|o| matches!(o.build_module(), Some((c, k)) if c == *colony && k != ModuleKind::Archive))
+                    .filter(|o| matches!(o.build_module(), Some((c, k)) if c == *colony && k != ModuleKind::Archive) || matches!(o, Order::RaiseTier { colony: c } if c == colony && self.next_tier(col).is_some_and(|t| t.takes_slot)))
                     .count() as u32;
                 if self.module_slots_used(col) + ordered >= self.module_slots(col) {
                     // Ticket #490 (version 0.09.9): full at its tier's cap, it wants the upgrade, not people.
                     let tier = self.tier_of(col);
                     return fail(if self.module_slots(col) < tier.cap {
                         "full until more Colonists live here".to_string()
-                    } else if let Some(next) = self.open_tier(col) {
+                    } else if let Some(next) = self.open_tier(col).filter(|t| !t.takes_slot) {
                         format!("full: upgrade to a {} for more", next.name)
                     } else {
                         format!("full: a {} holds {}", tier.name, tier.cap)
@@ -2832,8 +2933,14 @@ impl Game {
             }
         }
         let leaving: Vec<ShipId> = orders.iter().filter_map(|o| if let Order::Transit { ship, .. } = o { Some(*ship) } else { None }).collect();
+        // Ticket #593 (version 0.1.0.4): a trade is paid after this seat's own trades ahead of it,
+        // as `remaining` and the check quoted it.
+        let mut traded: Vec<Order> = Vec::new();
         for order in ordered {
-            let cost = self.order_cost(seat, order);
+            let cost = self.trade_cost(seat, &traded, order);
+            if matches!(order, Order::Buy { .. } | Order::Sell { .. }) {
+                traded.push(order.clone());
+            }
             {
                 // Ticket #387 (version 0.09.3): settled, so a tenth paid from a tenth leaves a tenth.
                 let st = &mut self.seat_mut(seat).stockpile;
@@ -2882,7 +2989,8 @@ impl Game {
                     }
                 }
                 Order::BuildShip { site, kind } => {
-                    let widgets = self.build_widgets(seat, BuildItem::Unit(*kind));
+                    // Ticket #590 (version 0.1.0.4): at its site's figure (a Spaceport).
+                    let widgets = self.build_widgets_at(seat, *site, BuildItem::Unit(*kind));
                     // Ticket #455 (version 0.09.6): the tank's Fuel paid just above rides with the build.
                     let b = Build { item: BuildItem::Unit(*kind), seat, widgets, done: 0, coastal: false, fuel: cost.fuel };
                     match site {
@@ -2979,7 +3087,7 @@ impl Game {
                         // what `None` has always meant and is now drawn and named.
                         s.slot = *slot;
                     }
-                    self.log(format!("{} launches {} toward {} ({} turns, {} Fuel from the tank).", self.seat_name(seat), ship, name, turns, figure(fuel)));
+                    self.log(format!("{} launches {} toward {} ({} turns, {} Fuel from the tank).", self.seat_name(seat), self.ship_called(*ship), name, turns, figure(fuel)));
                     // Ticket #481 (version 0.09.8): a loaded Colony Ship sent to the Moon before
                     // anybody has landed there is the world's news, whoever sent it and whatever
                     // the fog hides: it carries no place and no seat, so every seat reads it.
@@ -3006,7 +3114,7 @@ impl Game {
                     self.pending.orbit_changes.push((seat, *ship, *slot));
                     if let Some(b) = body {
                         let to = self.orbit_name(b, Orbit::of(*slot));
-                        self.log(format!("{} moves {} to {} ({} Fuel from the tank).", self.seat_name(seat), ship, to, figure(fuel)));
+                        self.log(format!("{} moves {} to {} ({} Fuel from the tank).", self.seat_name(seat), self.ship_called(*ship), to, figure(fuel)));
                     }
                 }
                 // Ticket #87: the Fuel came out of the Stockpile with the order's cost; it goes into the tank.
@@ -3029,7 +3137,7 @@ impl Game {
                         Some((false, true)) => " at a partner's Refinery Colony",
                         _ => "",
                     };
-                    self.log(format!("{} refuels {} with {} Fuel{}.", self.seat_name(seat), ship, amount, where_));
+                    self.log(format!("{} refuels {} with {} Fuel{}.", self.seat_name(seat), self.ship_called(*ship), amount, where_));
                 }
                 Order::ShipStance { body, stance } => {
                     self.set_stack_stance(seat, *body, *stance);
@@ -3086,8 +3194,15 @@ impl Game {
                         let total = self.seat(seat).uploaded;
                         let line = format!("{} uploaded {} Colonists into the Archive at {}; {} in all.", self.seat_name(seat), taken, place, total);
                         self.log(line);
-                        let text = self.say("uploaded", &[("n", crate::counted(taken, "Colonist", "Colonists")), ("colony", place), ("total", total.to_string())]);
-                        self.report_line_of(seat, LineKind::Archive, LineKind::Archive, Some(ReportPlace::Colony(*colony)), text);
+                        // Ticket #587 (version 0.1.0.4): a story moment, at the designer's word: the
+                        // place by its own name and the people read in, the player's under Your works.
+                        let site = self.colony(*colony).map(|c| self.slot_name(c)).unwrap_or_default();
+                        let text = if seat == Seat(0) && !self.spectator {
+                            self.say("uploaded", &[("n", taken.to_string()), ("place", site)])
+                        } else {
+                            self.say("uploaded_rival", &[("faction", self.seat_name(seat)), ("n", taken.to_string()), ("place", site)])
+                        };
+                        self.report_line_of(seat, LineKind::YourWorks, LineKind::Archive, Some(ReportPlace::Colony(*colony)), text);
                     }
                 }
                 // Ticket #489 (version 0.09.9): the four leave their source now, as Pioneers sent by

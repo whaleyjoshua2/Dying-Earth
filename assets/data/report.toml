@@ -167,9 +167,10 @@ control_changed = "{place} now belongs to {faction} ({why})."
 # Ticket #523 (version 0.1.0.0): a place handed over twice in one Resolution, in one line.
 control_changed_after = "{place} now belongs to {faction} ({why}), after {earlier} took it ({earlier_why})."
 # Ticket #366 (version 0.09.2): a transfer and a throw-off in one Resolution, said once.
-passed_and_threw_off = "{state} passed to {faction} and threw them off at once: neutral."
+# Ticket #600 (version 0.1.0.4), at the designer's word: "Japan revolted", both ways.
+passed_and_threw_off = "{state} revolted against {faction}: now neutral."
 claim_tied = "{factions} tie for {place}; it stays as it is."
-threw_off = "{state} threw off {faction}."
+threw_off = "{state} revolted against {faction}: now neutral."
 # Ticket #371 (version 0.09.2): ONE net line a Region about its Unrest, at the end of the Resolution,
 # at the designer's word ("quiet unrest spam"). It replaced six lines written in phase order -- a
 # Mothball's, a Climate card's, a Strip Permit's, an Agitate's, a Relief's and a threshold's -- and
@@ -200,8 +201,10 @@ build_lost = "{building} at {place} had no slot and was lost."
 colonists_no_room = "{n} at {colony} had no room and {were} lost."
 # Ticket #191 (version 0.08.0): Relations. Said in the OFFENDER's Report on a turn a rival's view of
 # them fell, so a player is sent to the grid on the Victory window rather than expected to watch it.
-# Ticket #192 (version 0.08.0): the Upload, in the Report.
-uploaded = "{n} uploaded at {colony}: {total} in all."
+# Ticket #192 (version 0.08.0): the Upload, in the Report. Ticket #587 (version 0.1.0.4): a story
+# moment, at the designer's word, naming the place and its people; the total is the card's.
+uploaded = "{n} of {place}'s people were read into the Archive."
+uploaded_rival = "{faction} read {n} of {place}'s people into the Archive."
 # Ticket #362 (version 0.09.1): only a pair INVOLVING THE PLAYER, only when it falls into a worse
 # named level, both directions, folded one line each -- at the designer's word, "quiet the 'has
 # not forgiven' spam". `relations_fell` ("The {victim} have not forgiven the {offender}.") is retired.
@@ -265,9 +268,13 @@ sea_wall = "{whose} Sea Wall held the sea; keep now {keep} Materials."
 neutral_sea_wall = "{state} built a Sea Wall."
 storm_surge_wall = "Storm Surge in {state}: the Sea Wall held. Coastal Facilities make {percent}% less next Income."
 sea_wall_unkept = "Materials ran short: the Sea Wall in {states} is unkept and holds nothing."
-sea_nothing_left = "Sea level at {temperature} C: {state} has no coastal slots left."
-sea_took = "The sea took {n} coastal {slots} from {state} at {temperature} C."
-sea_took_destroying = "The sea took {n} coastal {slots} from {state} at {temperature} C: {destroyed}."
+# Ticket #600 (version 0.1.0.4), at the designer's word: the sea at a threshold is ONE line for the
+# world, the player's losses named and the rivals' counted, where every Region had a line of its own
+# (twenty a rise); and each building of the player's lost is a line in Your works.
+sea_rose = "Sea rose at {temperature} C: {what}."
+sea_took_yours = "The sea took your {what} in {state}."
+# The review: one Region's sea brought early by a Storm Surge, named.
+sea_rose_in = "Sea rose early in {state}: {what}."
 # Ticket #400 (version 0.09.3): the per-Region heat lines are GONE -- one for every Region on the
 # board whoever held it, twenty thousand of the thirty-two thousand Unrest-bearing lines in eighty
 # games. The heat is a cause on each Region's net line (cause_heat) and the board is this one line.
@@ -297,6 +304,8 @@ build_cancelled = "{faction} cancelled the {building} at {place}: {refund} Mater
 # Ticket #503 (version 0.1.0.0): an upgrade to the Colonial Capital that another place on the Body
 # completed first, refunded to whoever paid for it.
 capital_refunded = "{place}'s upgrade refunded, {refund} Materials: {capital} is {body}'s Capital."
+# Ticket #590 (version 0.1.0.4): a capital building chosen, for good.
+capital_building = "{faction} built the {building} at {place}."
 # Ticket #351 (version 0.09.1): {sink} is `energy_short_sink` below when Scrubbers were shut, and
 # empty otherwise -- a Custodian lost three Scrubbers this way in the playtest with nothing said.
 energy_short = "{faction}: Energy ran short; shut down {buildings}{sink}."
@@ -373,6 +382,10 @@ battle_fought_dry = " {hulls} fought dry, at half strength."
 # Ticket #400 (version 0.09.3): the sea's Unrest is a cause on the net line (cause_sea); the suffix is gone.
 # Ticket #276 (version 0.08.5): every rise turns one inland slot coastal, wall or no wall; an empty
 # slot first, else the oldest inland Facility with its slot.
+# Ticket #600 (version 0.1.0.4): the pieces of the one sea line.
+sea_rose_yours = "you lost {what}"
+sea_rose_rivals = "rivals lost {n}"
+sea_rose_none = "no buildings lost"
 sea_inland = " The coast moved one slot inland."
 sea_inland_flipped = " The coast moved one slot inland, onto {what}."
 # Ticket #85 (version 0.06.0): the count is an ordinal ("second", "twelfth", "13th"), and a
@@ -381,8 +394,6 @@ first_colony = "their first Colony off Earth"
 more_colonies = "their {ordinal} Colony off Earth"
 first_antarctic_colony = "their first Colony in Antarctica"
 more_antarctic_colonies = "their {ordinal} Colony in Antarctica"
-slot = "slot"
-slots = "slots"
 pick_first_choice = "{faction} pick {tech}, their first choice."
 pick_cheapest = "{faction} pick {tech}, the cheapest left."
 pick_last = "{faction} pick {tech}, left until last."

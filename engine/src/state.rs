@@ -1804,6 +1804,13 @@ pub struct Game {
     /// Ticket #444 (version 0.09.6): each Colony's growth toward its next Colonist, a fraction
     /// below one; a Colony with none has nothing banked.
     pub colony_growth: BTreeMap<ColonyId, f64>,
+    /// Ticket #590 (version 0.1.0.4): each capital building chosen, and the Capital it stands at.
+    /// Keyed by the building, so one stands at one Capital at most; a Colony is never removed, so
+    /// the building passes with the place to whoever directs it.
+    pub capital_buildings: BTreeMap<CapitalBuilding, ColonyId>,
+    /// Ticket #590, from the review: the buildings chosen since the last End Turn, told in the
+    /// Report it brings; one chosen during the turn would be lost in the Report then reset.
+    pub capital_built_now: Vec<CapitalBuilding>,
     /// Ticket #431 (version 0.09.5): last turn's "Colonists wait aboard" lines, so one that has not
     /// changed is not written again. Not saved: after a load each shows once.
     pub waiting_last: Vec<String>,
@@ -1827,7 +1834,8 @@ impl Game {
     pub fn new(tables: std::sync::Arc<Tables>, setup: NewGame) -> Game {
         let mut rng = ChaCha8Rng::seed_from_u64(setup.seed);
         // Ticket #582 (version 0.1.0.3): the opening Stockpile is the Faction's -- the table's
-        // figures, the Materials the card's own where it says -- so the Prospectors open with 60.
+        // figures, the Materials the card's own where it says -- so the Prospectors open with 60;
+        // since ticket #585 (version 0.1.0.4) the Ducats too, the Arkwrights' and Archivists' 10.
         let seat = |kind: FactionKind, ai: bool| SeatState {
             kind,
             ai,
@@ -2056,6 +2064,8 @@ impl Game {
             body_firsts: Vec::new(),
             waiting_last: Vec::new(),
             colony_growth: BTreeMap::new(),
+            capital_buildings: BTreeMap::new(),
+            capital_built_now: Vec::new(),
             reveal_all: false,
             tables,
         };
@@ -2220,7 +2230,8 @@ impl Game {
                 Some(col) if col.in_orbit => self.slot_place_name(col.body, col.slot),
                 // Ticket #45: a Colony is named for its slot, a real place on its Body.
                 Some(col) => format!("{} on {}", self.tables.body(col.body).slots[col.slot as usize].name, self.tables.body(col.body).name),
-                None => format!("{c}"),
+                // Ticket #586 (version 0.1.0.4): never reached, a Colony being never removed.
+                None => "a lost Colony".to_string(),
             },
         }
     }
@@ -2421,8 +2432,21 @@ impl Game {
         format!("{} {}", self.tables.faction(self.kind(s.seat)).ship_prefix, s.name)
     }
 
+    /// Ticket #586 (version 0.1.0.4), at the designer's word: a Ship named by its id, as the ids
+    /// are never shown -- `ShipId` prints nothing by itself. One gone reads "a lost Ship".
+    pub fn ship_called(&self, id: ShipId) -> String {
+        self.ship(id).map(|s| self.ship_name(s)).unwrap_or_else(|| "a lost Ship".to_string())
+    }
+
+    /// Ticket #586: an Army named by its id, the same way.
+    pub fn army_called(&self, id: ArmyId) -> String {
+        self.army(id).map(|a| self.army_name(a)).unwrap_or_else(|| "a lost Army".to_string())
+    }
+
+    /// Ticket #588 (version 0.1.0.4), at the designer's word: the Archive stands on the ground of another
+    /// Body -- no station will do, over Earth or anywhere.
     pub fn may_hold_archive(&self, c: &Colony) -> bool {
-        c.body != BodyId::Earth
+        c.body != BodyId::Earth && !c.in_orbit
     }
 
     /// Ticket #209 (version 0.08.1): the Archivists have nowhere to put the Archive and have not
@@ -3333,7 +3357,7 @@ impl Game {
     /// Colonies held. The chronicle page reads this rather than ranking for itself, so the page
     /// cannot order a table differently from the rule that decided the game. Read-only.
     pub fn ranking(&self) -> Vec<(Seat, Tiebreak)> {
-        let key = |s: Seat| (self.progress(s).score(), self.off_world_colonists(s), self.owned_colonies(s).len());
+        let key = |s: Seat| (self.progress(s).score(), self.victory_colonists(s), self.owned_colonies(s).len());
         let mut seats: Vec<Seat> = Seat::ALL.to_vec();
         seats.sort_by(|a, b| key(*b).partial_cmp(&key(*a)).unwrap_or(std::cmp::Ordering::Equal));
         seats
@@ -3601,9 +3625,164 @@ impl Game {
         self.colonies.iter().filter(|c| self.directs(seat, Place::Colony(c.id))).map(|c| self.tier_of(c).influence).sum()
     }
 
+    /// Ticket #590 (version 0.1.0.4): the capital building standing at this Colony, if one is chosen.
+    pub fn capital_building_at(&self, c: ColonyId) -> Option<CapitalBuilding> {
+        self.capital_buildings.iter().find(|(_, at)| **at == c).map(|(b, _)| *b)
+    }
+
+    /// Ticket #590: the capital buildings no Capital has taken, in the table's order.
+    pub fn free_capital_buildings(&self) -> Vec<CapitalBuilding> {
+        CapitalBuilding::ALL.into_iter().filter(|b| !self.capital_buildings.contains_key(b)).collect()
+    }
+
+    /// Ticket #590: the Capitals this seat directs that stand without a building, while one is free.
+    pub fn capital_picks_owed(&self, seat: Seat) -> Vec<ColonyId> {
+        if self.free_capital_buildings().is_empty() {
+            return Vec::new();
+        }
+        self.colonies
+            .iter()
+            .filter(|c| c.control.director() == Some(seat) && !c.in_orbit && self.tier_of(c).takes_slot && self.capital_building_at(c.id).is_none())
+            .map(|c| c.id)
+            .collect()
+    }
+
+    /// Ticket #590: why `seat` may not put `b` at `colony` now, or nothing.
+    pub fn capital_pick_refusal(&self, seat: Seat, colony: ColonyId, b: CapitalBuilding) -> Option<String> {
+        let Some(c) = self.colony(colony) else { return Some("no such Colony".into()) };
+        if c.control.director() != Some(seat) {
+            return Some("not yours".into());
+        }
+        if c.in_orbit || !self.tier_of(c).takes_slot {
+            return Some("not a Colonial Capital".into());
+        }
+        if let Some(had) = self.capital_building_at(colony) {
+            return Some(format!("its {} stands", had.name()));
+        }
+        if let Some(at) = self.capital_buildings.get(&b).and_then(|at| self.colony(*at)) {
+            let by = at.control.director().map(|s| self.seat_name(s)).unwrap_or_else(|| "nobody".into());
+            return Some(format!("the {} stands at {} ({by})", b.name(), self.slot_name(at)));
+        }
+        None
+    }
+
+    /// Ticket #590: `b` stands at the Capital `colony`, for good, the moment it is chosen. The
+    /// Arcology eases its holder's Regions once; the Report End Turn brings says it.
+    pub fn pick_capital_building(&mut self, seat: Seat, colony: ColonyId, b: CapitalBuilding) -> Result<(), String> {
+        if let Some(why) = self.capital_pick_refusal(seat, colony, b) {
+            return Err(why);
+        }
+        self.capital_buildings.insert(b, colony);
+        let ease = self.tables.capital_building(b).earth_unrest;
+        if ease > 0.0 {
+            for sid in self.controlled_states(seat) {
+                self.lower_unrest(sid, ease);
+            }
+        }
+        let place = self.slot_name(self.colony(colony).unwrap());
+        self.log(format!("{} built the {} at {}.", self.seat_name(seat), b.name(), place));
+        self.capital_built_now.push(b);
+        Ok(())
+    }
+
+    /// Ticket #590, from the review: the Report's line for each building chosen since the last End
+    /// Turn, written once that Report is the one being collected.
+    pub fn tell_capital_buildings(&mut self) {
+        for b in std::mem::take(&mut self.capital_built_now) {
+            let Some(colony) = self.capital_buildings.get(&b).copied() else { continue };
+            let Some(seat) = self.colony(colony).and_then(|c| c.control.director()) else { continue };
+            let place = self.slot_name(self.colony(colony).unwrap());
+            let text = self.say("capital_building", &[("faction", self.seat_name(seat)), ("building", b.name().to_string()), ("place", place)]);
+            self.report_line_of(seat, LineKind::YourBuild, LineKind::BuildComplete, Some(ReportPlace::Colony(colony)), text);
+        }
+    }
+
+    /// Ticket #590: the pick a seat makes for a Capital where nobody chose: the Faction's own where
+    /// it is free, else the first free in the table's order.
+    pub fn capital_default(&self, seat: Seat) -> Option<CapitalBuilding> {
+        let free = self.free_capital_buildings();
+        self.tables.faction(self.kind(seat)).capital_building.filter(|b| free.contains(b)).or_else(|| free.first().copied())
+    }
+
+    /// Ticket #590: the places a capital building at `capital` reaches beside the Capital itself:
+    /// every other Colony and station on its Body that the Capital's director directs.
+    pub fn capital_others(&self, capital: ColonyId) -> Vec<ColonyId> {
+        let Some(c) = self.colony(capital) else { return Vec::new() };
+        let Some(seat) = c.control.director() else { return Vec::new() };
+        self.colonies.iter().filter(|o| o.body == c.body && o.id != capital && o.control.director() == Some(seat)).map(|o| o.id).collect()
+    }
+
+    /// Ticket #590: the capital building whose figure reaches `colony` -- its own, or its Body's
+    /// Capital's where the same seat directs both -- with whether it is the Capital itself.
+    pub fn capital_reaching(&self, colony: ColonyId) -> Option<(CapitalBuilding, bool)> {
+        let c = self.colony(colony)?;
+        if let Some(b) = self.capital_building_at(colony) {
+            return Some((b, true));
+        }
+        let cap = self.capital_of(c.body)?;
+        let b = self.capital_building_at(cap)?;
+        (c.control.director().is_some() && self.colony(cap)?.control.director() == c.control.director()).then_some((b, false))
+    }
+
+    /// Ticket #590: the place a seat would raise to the Capital on `body`: its most peopled place
+    /// there whose next step is the Capital, ties to the lower id. None where the Body has its
+    /// Capital, the seat no such place, or an upgrade of the seat's to it under way there already.
+    pub fn capital_site(&self, seat: Seat, body: BodyId) -> Option<ColonyId> {
+        let mine = |c: &&Colony| c.body == body && c.control.director() == Some(seat) && self.open_tier(c).is_some_and(|t| t.takes_slot);
+        if self.colonies.iter().filter(mine).any(|c| self.tier_under_way(c).is_some()) {
+            return None;
+        }
+        self.colonies
+            .iter()
+            .filter(mine)
+            .max_by_key(|c| (c.colonists, std::cmp::Reverse(c.id.0)))
+            .map(|c| c.id)
+    }
+
+    /// Ticket #590: the growth a turn a capital building adds at `colony` (the Arcology's).
+    pub fn capital_growth(&self, colony: ColonyId) -> f64 {
+        match self.capital_reaching(colony) {
+            Some((b, here)) => {
+                let card = self.tables.capital_building(b);
+                if here { card.growth_here } else { card.growth_others }
+            }
+            None => 0.0,
+        }
+    }
+
+    /// Ticket #590: the share a capital building takes off the Widgets of a Ship built at `colony`
+    /// (the Spaceport's). At the designer's word, none at a place under Blockade, as of everything.
+    pub fn capital_ship_cut(&self, colony: ColonyId) -> f64 {
+        if self.starved_by(colony).is_some() {
+            return 0.0;
+        }
+        match self.capital_reaching(colony) {
+            Some((b, here)) => {
+                let card = self.tables.capital_building(b);
+                if here { card.ship_widgets_cut_here } else { card.ship_widgets_cut_others }
+            }
+            None => 0.0,
+        }
+    }
+
+    /// Ticket #590: the Chancery's Influence to the seat directing it, at face value as the
+    /// Capital's own +1: its figure here and one for each other place of the holder's on the Body.
+    /// At the designer's word, none from a place under Blockade, as of everything.
+    pub fn capital_building_allotment(&self, seat: Seat) -> i64 {
+        let Some(at) = self.capital_buildings.get(&CapitalBuilding::Chancery) else { return 0 };
+        if !self.directs(seat, Place::Colony(*at)) {
+            return 0;
+        }
+        let card = self.tables.capital_building(CapitalBuilding::Chancery);
+        let fed = |c: ColonyId| self.starved_by(c).is_none();
+        let here = if fed(*at) { card.influence_here } else { 0 };
+        here + card.influence_others * self.capital_others(*at).into_iter().filter(|c| fed(*c)).count() as i64
+    }
+
     /// Ticket #97: the Modules standing or building here that count against the cap. A mothballed
     /// Module keeps its slot and one under construction reserves one, exactly as a Facility does in
     /// a Nation State; the Archive is exempt and counted on neither side.
+    /// Ticket #590 (version 0.1.0.4): and the Capital's building, reserved while the upgrade builds.
     pub fn module_slots_used(&self, c: &Colony) -> u32 {
         // Ticket #164 (version 0.07.5): the Core Module is exempt as the Archive is -- it is what a
         // founding gives, not something bought out of the allowance.
@@ -3614,7 +3793,8 @@ impl Game {
             .iter()
             .filter(|b| matches!(b.item, BuildItem::Module(k) if !exempt(k)))
             .count() as u32;
-        standing + building
+        let capital = self.tier_of(c).takes_slot || c.queue.iter().any(|b| matches!(b.item, BuildItem::Tier(t) if self.tables.tiers.get(t as usize).is_some_and(|t| t.takes_slot)));
+        standing + building + u32::from(capital)
     }
 
     /// Ticket #97: the room left. A cap that has fallen below what already stands (Colonists lost
@@ -3633,7 +3813,8 @@ impl Game {
     pub fn unmanned_modules(&self, c: &Colony) -> Vec<usize> {
         let exempt = |k: ModuleKind| k == ModuleKind::Archive || k == ModuleKind::Core;
         let slots = self.module_slots(c);
-        let mut used = 0;
+        // Ticket #590 (version 0.1.0.4): the Capital's building holds its slot first.
+        let mut used = u32::from(self.tier_of(c).takes_slot);
         let mut dark = Vec::new();
         for (i, m) in c.modules.iter().enumerate() {
             if exempt(m.kind) {
@@ -3727,6 +3908,20 @@ impl Game {
         self.colonies.iter().filter(|c| c.control.controller() == Some(seat) && self.off_earth(c)).map(|c| c.colonists).sum()
     }
 
+    /// Ticket #588 (version 0.1.0.4): whether a Colony is a station in **Earth orbit** -- over Earth
+    /// and not in a far orbit, Earth's L4 and L5 being no orbit around Earth for this.
+    pub fn in_earth_orbit(&self, c: &Colony) -> bool {
+        c.body == BodyId::Earth && c.in_orbit && !self.far_slot(c.body, c.slot)
+    }
+
+    /// Ticket #588 (version 0.1.0.4), at the designer's word: the seat's Colonists **beyond Earth
+    /// orbit**, the count every Victory reader takes -- the Presence part, the Arkwrights' 42, the
+    /// tiebreak and the computer's pace. People in Earth orbit count for no Victory; every other
+    /// reader of the off-Earth count still takes `off_world_colonists`.
+    pub fn victory_colonists(&self, seat: Seat) -> u32 {
+        self.colonies.iter().filter(|c| c.control.controller() == Some(seat) && self.off_earth(c) && !self.in_earth_orbit(c)).map(|c| c.colonists).sum()
+    }
+
     pub fn influence_threshold(&self, target: Target) -> i64 {
         self.threshold_with(target, if self.has_tech(TechId::GreenConsensus) { self.green_consensus_multiplier() } else { 1.0 })
     }
@@ -3743,7 +3938,18 @@ impl Game {
         } else {
             1.0
         };
-        self.threshold_with(target, m * self.blame_threshold_multiplier_on(seat, target))
+        self.threshold_with(target, m * self.blame_threshold_multiplier_on(seat, target)) + self.regions_held_term(seat, target)
+    }
+
+    /// Ticket #591 (version 0.1.0.4), at the designer's word: what a NEUTRAL Region's threshold rises
+    /// for this seat -- `threshold_per_region_held` for every Region it controls past its first, the
+    /// home counted as held, an Occupied Region not. Flat, outside the multipliers; nought on a held
+    /// Region and on every Colony and station.
+    pub fn regions_held_term(&self, seat: Seat, target: Target) -> i64 {
+        match target {
+            Place::State(s) if self.state(s).control.controller().is_none() => self.tables.influence.threshold_per_region_held * (self.controlled_states(seat).len() as i64 - 1).max(0),
+            _ => 0,
+        }
     }
 
     /// Ticket #60: the Standing this seat needs to take `target` as it stands now -- its own
@@ -4159,7 +4365,7 @@ impl Game {
         let outside: i64 = self.module_allotments(seat).iter().map(|y| y.1).sum();
         // Ticket #503 (version 0.1.0.0): and a Colonial Capital's +1, at face value as the first's,
         // and to whoever holds it now, not to whoever raised it.
-        let tiers = self.tier_allotment(seat);
+        let tiers = self.tier_allotment(seat) + self.capital_building_allotment(seat);
         (base as f64 * m).floor() as i64 + outside + tiers + self.seat(seat).spaceport_influence + self.seat(seat).first_windfall + self.seat(seat).lead_windfall + firsts * t.first_settled_allotment
     }
 
@@ -4184,6 +4390,7 @@ impl Game {
             ("Regions and buildings".to_string(), (base as f64 * m).floor() as i64),
             ("Chorus".to_string(), self.module_allotments(seat).iter().map(|y| y.1).sum()),
             ("Colonial Capital".to_string(), self.tier_allotment(seat)),
+            (CapitalBuilding::Chancery.name().to_string(), self.capital_building_allotment(seat)),
             ("Worlds settled first".to_string(), firsts * t.first_settled_allotment),
             ("Spaceport lifts".to_string(), s.spaceport_influence),
             (first, s.first_windfall),
@@ -5325,6 +5532,12 @@ impl Game {
             (BuildItem::IndustryLevel, Place::State(sid)) => self.industry_widgets(seat, sid),
             // Ticket #505 (version 0.1.0.0): a Module's are its Colony's, Regolith Printing read.
             (BuildItem::Module(k), Place::Colony(c)) => self.module_widgets_at(seat, c, k),
+            // Ticket #590 (version 0.1.0.4): a Ship at a Spaceport's Capital, or beside it, for less;
+            // rounded up, never below 1.
+            (BuildItem::Unit(k), Place::Colony(c)) if k != UnitKind::Army && self.capital_ship_cut(c) > 0.0 => {
+                let w = self.build_widgets(seat, item) as f64 * (1.0 - self.capital_ship_cut(c));
+                ((w - 1e-9).ceil() as u32).max(1)
+            }
             _ => self.build_widgets(seat, item),
         }
     }
@@ -5929,7 +6142,8 @@ impl Game {
         if matches!(get, crate::orders::TradeGood::Place(_)) || self.hostile(seat, from) || self.holds_good(seat, get).is_err() {
             return false;
         }
-        if self.progress(from).score_as_it_stands() >= 0.95 {
+        // Ticket #601 (version 0.1.0.4): the parts, without the gate's 6%, so the door stays put.
+        if self.progress(from).parts_as_it_stands() >= 0.95 {
             return false;
         }
         // Ticket #531 (version 0.1.0.1): nothing to a runaway leader.
@@ -6274,7 +6488,7 @@ impl Game {
         }
         // The review: the Victory windows' own rounding.
         // Ticket #567 (version 0.1.0.3): and the hold named, with both bars reached ("100% - needs
-        // Generation Ships"), where a held 100% read as a win.
+        // Generation Ships", 94% since ticket #601), where a held 100% read as a win.
         let p = self.progress(Seat(0));
         let pct = format!("{:.0}", p.score() * 100.0);
         self.phrase("head", &[("clock", clock), ("pct", pct), ("hold", p.hold_suffix())])
@@ -6330,7 +6544,8 @@ impl Game {
     pub fn accord_acceptable(&self, seat: Seat, from: Seat, terms: &[Term]) -> bool {
         // Never help somebody already at the door.
         // Ticket #406 (version 0.09.4): how near the door stands, not the Custodians' partial credit.
-        if self.progress(from).score_as_it_stands() >= 0.95 {
+        // Ticket #601 (version 0.1.0.4): the parts, without the gate's 6%, so the door stays put.
+        if self.progress(from).parts_as_it_stands() >= 0.95 {
             return false;
         }
         // Ticket #531 (version 0.1.0.1): no Accord with a runaway leader, and none renewed; the

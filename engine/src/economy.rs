@@ -290,6 +290,8 @@ impl Yield {
 enum ProducerPlace {
     Facility(StateId, usize),
     Module(ColonyId, usize),
+    /// Ticket #590 (version 0.1.0.4): a capital building's yield, landing at this Colony.
+    Capital(ColonyId),
 }
 
 /// Ticket #391 (version 0.09.3): one place's output this turn, for the *Output* row on its card:
@@ -319,7 +321,7 @@ impl Game {
     fn producer_place_text(&self, p: &Producer) -> String {
         match p.place {
             ProducerPlace::Facility(sid, _) => format!("in {}", self.tables.state(sid).name),
-            ProducerPlace::Module(cid, _) => format!("at {}", self.place_name(Place::Colony(cid))),
+            ProducerPlace::Module(cid, _) | ProducerPlace::Capital(cid) => format!("at {}", self.place_name(Place::Colony(cid))),
         }
     }
 
@@ -982,6 +984,7 @@ impl Game {
             let (here, working) = match p.place {
                 ProducerPlace::Facility(sid, i) => (place == Place::State(sid), self.state(sid).facilities[i].working()),
                 ProducerPlace::Module(cid, i) => (place == Place::Colony(cid), self.colony(cid).map(|c| c.modules[i].working()).unwrap_or(false)),
+                ProducerPlace::Capital(cid) => (place == Place::Colony(cid), true),
             };
             if !here || !working || !p.online {
                 continue;
@@ -1127,6 +1130,35 @@ impl Game {
                     research: if starved { 0 } else { y.research },
                     online: !dark.contains(&i) && !col.grid_failed && !m.offline_until_resolution && !(m.kind == ModuleKind::Archive && occupied),
                     doubled_by: y.doubled_by,
+                });
+            }
+        }
+        // Ticket #590 (version 0.1.0.4): each capital building of a Capital this seat directs, its
+        // figure at the Capital and at each other place of the seat's on its Body, flat, after every
+        // multiplier; a place under Blockade makes nothing of it, as of everything.
+        for (&b, &cap) in &self.capital_buildings {
+            let card = self.tables.capital_building(b);
+            let Some(res) = card.resource else { continue };
+            if self.colony(cap).and_then(|c| c.control.director()) != Some(seat) {
+                continue;
+            }
+            for (cid, v) in std::iter::once((cap, card.here)).chain(self.capital_others(cap).into_iter().map(|c| (c, card.others))) {
+                if v <= 0.0 || self.starved_by(cid).is_some() {
+                    continue;
+                }
+                let research = res == Resource::Research;
+                out.push(Producer {
+                    place: ProducerPlace::Capital(cid),
+                    name: b.name(),
+                    is_module: false,
+                    upkeep: 0.0,
+                    ducats_upkeep: 0.0,
+                    fuel_upkeep: 0.0,
+                    fuel_paid: true,
+                    output: (!research).then_some((res, v)),
+                    research: if research { v as i64 } else { 0 },
+                    online: true,
+                    doubled_by: None,
                 });
             }
         }
@@ -1406,7 +1438,7 @@ impl Game {
     fn controls_producer(&self, seat: Seat, place: ProducerPlace) -> bool {
         match place {
             ProducerPlace::Facility(sid, _) => self.state(sid).control == Control::Controlled(seat),
-            ProducerPlace::Module(cid, _) => self.colony(cid).map(|c| c.control == Control::Controlled(seat)).unwrap_or(false),
+            ProducerPlace::Module(cid, _) | ProducerPlace::Capital(cid) => self.colony(cid).map(|c| c.control == Control::Controlled(seat)).unwrap_or(false),
         }
     }
 
@@ -1532,6 +1564,7 @@ impl Game {
                     }
                     self.place_name(Place::Colony(cid))
                 }
+                ProducerPlace::Capital(cid) => self.place_name(Place::Colony(cid)),
             };
             if !p.online {
                 continue;
@@ -1699,6 +1732,14 @@ impl Game {
             sources.push(("Population and Education".to_string(), Resource::Research, tenth(own)));
         }
         research += (own + labs_research).floor() as i64;
+        // Ticket #589 (version 0.1.0.4): the Arkwrights' Research for each Body they have settled,
+        // flat, after every multiplier and before a Research agreement's lift.
+        let per_body = self.tables.faction(self.kind(seat)).research_per_body_settled;
+        let settled = per_body * self.bodies_settled(seat, 1) as i64;
+        if settled > 0 {
+            sources.push(("Bodies settled".to_string(), Resource::Research, settled as f64));
+            research += settled;
+        }
         let agreement = self.research_agreement_multiplier(seat);
         if agreement > 1.0 && research > 0 {
             let lifted = (research as f64 * agreement).floor() as i64;
@@ -1753,7 +1794,10 @@ impl Game {
             // Ticket #563 (version 0.1.0.3): the game's running total, for the sweep.
             s.produced.materials += gained.materials;
             s.produced.fuel += gained.fuel;
-            s.produced.energy += gained.energy;
+            // Version 0.1.0.4, found adding the sweep's production totals: `gained.energy` is the
+            // output before upkeep, which is taken from the balance, so the "net of upkeep" line had
+            // carried gross Energy. The net is what the Income left: the balance less what was stored.
+            s.produced.energy += balance - before.energy;
             s.produced.ducats += gained.ducats;
             s.income_last_turn = Stockpile {
                 materials: gained.materials,

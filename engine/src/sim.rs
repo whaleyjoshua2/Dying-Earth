@@ -208,6 +208,9 @@ pub struct SimResult {
     pub stations_by_body: [u32; BodyId::ALL.len()],
     /// Ticket #490 (version 0.09.9): Colonies and stations standing at the end, by tier.
     pub places_by_tier: Vec<u32>,
+    /// Ticket #590 (version 0.1.0.4): each capital building standing at the end, and the Faction
+    /// directing its Capital (none where nobody does).
+    pub capital_buildings: Vec<(CapitalBuilding, Option<FactionKind>)>,
     /// Ticket #72: the Prospectors' Venture Capital Fund at the end.
     pub venture_fund_at_end: f64,
     /// Ticket #76: cards drawn over the game, and whether the deck ran dry.
@@ -235,6 +238,12 @@ pub struct SimResult {
     /// of its buildings' upkeep, and all the Research its Labs made.
     pub produced_by_seat: [Stockpile; SEAT_COUNT],
     pub research_by_seat: [i64; SEAT_COUNT],
+    /// At the designer's word (version 0.1.0.4): each seat's production over the game, GROSS --
+    /// made at Income before upkeep (`produced_total`) -- for the sweep's production totals.
+    pub gross_by_seat: [Stockpile; SEAT_COUNT],
+    /// Ticket #593 (version 0.1.0.4): order lists that had an order dropped at the commit for want
+    /// of Ducats, off the turn's "order N dropped: needs .. Ducats" line.
+    pub ducat_drops: u32,
     pub start_lost_to_throw_off: bool,
     pub final_place: [u8; SEAT_COUNT],
     /// Ticket #58: how many Moments the turns of this game earned, how many the cap of two and the
@@ -856,6 +865,7 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         first_ground_colony_turn_by_body: BodyId::ALL.map(|b| if b == BodyId::Earth { None } else { game.colonies.iter().filter(|c| !c.in_orbit && c.body == b).map(|c| c.founded_turn).min() }),
         stations_by_body: BodyId::ALL.map(|b| if b == BodyId::Earth { 0 } else { game.colonies.iter().filter(|c| c.in_orbit && c.body == b).count() as u32 }),
         places_by_tier: (0..tables.tiers.len() as u32).map(|t| game.colonies.iter().filter(|c| c.tier == t).count() as u32).collect(),
+        capital_buildings: game.capital_buildings.iter().map(|(b, c)| (*b, game.colony(*c).and_then(|c| c.control.director()).map(|s| game.kind(s)))).collect(),
         venture_fund_at_end: Seat::ALL.into_iter().find(|s| game.kind(*s) == FactionKind::Prospectors).map(|s| game.seat(s).venture_fund).unwrap_or(0.0),
         cards_drawn: game.deck.drawn.len() as u32,
         deck_empty: game.deck.cards.is_empty(),
@@ -868,6 +878,8 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         leads_by_seat,
         produced_by_seat: Seat::ALL.map(|s| game.seat(s).produced),
         research_by_seat: Seat::ALL.map(|s| game.seat(s).research_total),
+        gross_by_seat: Seat::ALL.map(|s| game.seat(s).produced_total),
+        ducat_drops: game.log.iter().filter(|l| l.contains(" dropped: needs ") && l.contains(" Ducats, ")).count() as u32,
         start_lost_to_throw_off,
         emigrant_batches: game.log.iter().filter(|l| l.contains("Pioneers recruited in")).count() as u32,
         antarctic_by_sea: game.log.iter().filter(|l| l.contains("in Antarctica with")).count() as u32,

@@ -74,7 +74,7 @@ note = "Every figure on a card explains itself. Rest the pointer on a number and
 turn = 4
 figure = "Send them to the ISS"
 text = "The ISS holds eight now, two of them already there, so both fit. Send them up from the Region's own card, or ask for them from the ISS's."
-note = "That is the last of these notes that asks you for anything. Twelve people living off Earth is half your Victory Condition."
+note = "That is the last of these notes that asks you for anything. People in Earth orbit count for no Victory: eighteen living beyond it is half your Victory Condition."
 
 [[note]]
 turn = 5

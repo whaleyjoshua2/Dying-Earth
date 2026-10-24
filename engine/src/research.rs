@@ -182,7 +182,8 @@ impl Game {
     /// climbed by luck. The Custodians' chain is two Techs and every one of them was on their list;
     /// the other three are four Techs and each was missing some of its own.
     ///
-    /// THE RESERVED PLACE IS STILL ONE OF THREE. The gate is available only when every antecedent
+    /// THE RESERVED PLACE IS STILL ONE OF THE LIST (three, four since ticket #592 once Orbital Data
+    /// Centers stands). The gate is available only when every antecedent
     /// is done, and a rung is owed only when some antecedent is not, so at most one of the two
     /// clauses below can ever fire. They are written as two independent `if`s rather than an
     /// `else`, because the claim belongs in a test that can watch it rather than in a branch that
@@ -192,7 +193,10 @@ impl Game {
     /// draw whoever holds the seat.
     pub fn draw_shortlist(&mut self, lead: Seat) {
         let available = self.available_techs();
-        let size = self.tables.shortlist.size;
+        // Ticket #592 (version 0.1.0.4): a Tech standing may draw every shortlist larger -- Orbital
+        // Data Centers, four from three, whichever seat leads.
+        let bonus: usize = self.research.done.iter().map(|t| self.tables.tech(*t).shortlist_bonus).sum();
+        let size = self.tables.shortlist.size + bonus;
         if available.len() <= size {
             self.research.shortlist = Vec::new();
             return;
@@ -491,21 +495,24 @@ impl Game {
         self.seat(seat).funding_archive
     }
 
-    /// The tech panel line: every seat's share of the Tech under research, and who picks next.
+    /// The tech panel line: who picks next and, where they have one, their share of the Tech under
+    /// research; then who is funding the Archive (ticket #599, version 0.1.0.4).
     pub fn research_lead_text(&self) -> String {
         let c = self.research.contributions;
         let total: i64 = c.iter().sum();
         let pct = |v: i64| if total == 0 { 100 / SEAT_COUNT as i64 } else { v * 100 / total };
-        let shares: Vec<String> = Seat::ALL.into_iter().map(|s| format!("{} {}%", self.seat_name(s), pct(c[s.index()]))).collect();
         let funders: Vec<String> = Seat::ALL.into_iter().filter(|s| self.funding_archive(*s)).map(|s| self.seat_name(s)).collect();
         let tied = self.research_lead_candidates();
+        // Ticket #599 (version 0.1.0.4), at the designer's word: the next pick alone, where every
+        // Faction's share came first and a tie named all its members.
         let next = if tied.len() == 1 {
-            format!("{} pick next", self.seat_name(tied[0]))
+            // The review: no share where nothing has been contributed (a tie broken by who picked
+            // longest ago), where it read a made-up 25%.
+            if total == 0 { format!("Next pick: {}.", self.seat_name(tied[0])) } else { format!("Next pick: {} ({}%).", self.seat_name(tied[0]), pct(c[tied[0].index()])) }
         } else {
-            let names: Vec<String> = tied.iter().map(|s| self.seat_name(*s)).collect();
-            format!("{} are tied; the next pick is drawn at random", names.join(" and "))
+            "Next pick: random among the tied.".to_string()
         };
         let funding = if funders.is_empty() { String::new() } else { format!(" The {} are funding the Archive this turn.", funders.join(" and ")) };
-        format!("{} - {}.{}", shares.join(", "), next, funding)
+        format!("{next}{funding}")
     }
 }

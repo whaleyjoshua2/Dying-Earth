@@ -15,7 +15,8 @@ widgets = 4
 energy_upkeep = 3
 produces = { resource = "materials", amount = 4 }
 # Version 0.04 (ticket #44): on Earth (Antarctica) a Module emits as its counterpart Facility does.
-earth_emissions = 1.0
+# Ticket #604 (version 0.1.0.4), at the designer's word: 0.85, the Region Mine's, where it was 1.0.
+earth_emissions = 0.85
 
 [[module]]
 id = "generator"
@@ -179,12 +180,73 @@ widgets = 6
 [[tiers]]
 name = "Colonial Capital"
 cap = 24
-colonists = 24
+# Ticket #590 (version 0.1.0.4), at the designer's word: no people asked, one open slot, which
+# its capital building takes (`takes_slot`). It was 24 Colonists.
+colonists = 0
 materials = 77
 widgets = 8
 one_per_body = true
 ground_only = true
 influence = 1
+takes_slot = true
+
+# Ticket #590 (version 0.1.0.4): the eight capital buildings a Colonial Capital's holder chooses
+# one of, each at one Capital in the whole game at most, at the designer's word. Flat, after every
+# multiplier: `here` at the Capital, `others` at each other Colony or station on its Body its
+# holder directs. In the engine's order.
+[[capital_building]]
+id = "stock_market"
+does = "+3 Ducats here, +1 at your other places on the Body"
+resource = "ducats"
+here = 3
+others = 1
+
+[[capital_building]]
+id = "assay_office"
+does = "+3 Materials here, +1 at your other places on the Body"
+resource = "materials"
+here = 3
+others = 1
+
+[[capital_building]]
+id = "fuel_depot"
+does = "+3 Fuel here, +1 at your other places on the Body"
+resource = "fuel"
+here = 3
+others = 1
+
+[[capital_building]]
+id = "central_grid"
+does = "+3 Energy here, +1 at your other places on the Body"
+resource = "energy"
+here = 3
+others = 1
+
+[[capital_building]]
+id = "great_library"
+does = "+3 Research here, +1 at your other places on the Body"
+resource = "research"
+here = 3
+others = 1
+
+[[capital_building]]
+id = "chancery"
+does = "+2 Influence here, +1 for your other places on the Body"
+influence_here = 2
+influence_others = 1
+
+[[capital_building]]
+id = "spaceport"
+does = "Ships at half the Widgets here, a quarter off at your other places on the Body"
+ship_widgets_cut_here = 0.5
+ship_widgets_cut_others = 0.25
+
+[[capital_building]]
+id = "arcology"
+does = "Growth +2% here, +1% at your other places on the Body; -1 Unrest in your Regions, once"
+growth_here = 0.02
+growth_others = 0.01
+earth_unrest = 1.0
 
 [archive]
 # Ticket #439 (version 0.09.6): 150, at the designer's word; with the bar in `factions.toml`.

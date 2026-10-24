@@ -24,6 +24,19 @@ pub struct Projection {
     pub collapse_turn: Option<u32>,
 }
 
+/// Ticket #600 (version 0.1.0.4): what one Region lost to one rise of the sea -- who held it
+/// (`director` names the holder, the controller) and the buildings drowned, bare-named -- for the
+/// rise's one Report line.
+#[derive(Debug, Clone)]
+pub struct SeaLoss {
+    pub state: StateId,
+    pub director: Option<Seat>,
+    pub lost: Vec<String>,
+    /// Coastal slots the sea took there: a Region of the player's that lost only slots is still
+    /// the player's news.
+    pub took: u32,
+}
+
 impl Game {
     /// Phase 2: Climate.
     pub fn climate_phase(&mut self) {
@@ -333,7 +346,10 @@ impl Game {
                 let charged = match md.kind {
                     // Ticket #332 (version 0.09.0): a Factory Module in Antarctica emits as the
                     // Facility does, Clean Manufacturing reaching it.
-                    ModuleKind::Mine | ModuleKind::Refinery | ModuleKind::Factory => e * fr_mult * m,
+                    ModuleKind::Refinery | ModuleKind::Factory => e * fr_mult * m,
+                    // Ticket #604 (version 0.1.0.4), at the designer's word: a Mine as a Region's
+                    // Mine, which Clean Manufacturing never reached (ticket #332), where it cut this.
+                    ModuleKind::Mine => e * m,
                     ModuleKind::Generator => e * pp_mult * m,
                     _ => 0.0,
                 };
@@ -379,37 +395,110 @@ impl Game {
     }
 
     /// Sea level (spec 11.4): each threshold fires once per state.
-    fn sea_level_check(&mut self) {
+    pub fn sea_level_check(&mut self) {
         let thresholds = self.tables.climate.sea_level_thresholds.clone();
         let temp = self.climate.temperature;
         for (i, thr) in thresholds.iter().enumerate() {
             if temp < *thr {
                 continue;
             }
+            // Ticket #600 (version 0.1.0.4): every Region's loss first, then the rise's one line.
+            let mut losses = Vec::new();
             for sid in StateId::ALL {
                 if !self.state(sid).thresholds_fired[i] {
-                    self.apply_sea_threshold(sid, i);
+                    losses.push(self.fire_sea_threshold(sid, i));
                 }
             }
+            self.report_sea_rise(*thr, &losses);
         }
     }
 
     /// Apply sea-level threshold `i` to one state now (also used by Storm Surge): it is marked
     /// fired for that state, so it never fires again there.
+    /// Ticket #600 (version 0.1.0.4): with its one Report line, naming the Region, as a Storm Surge
+    /// brings the sea to one Region early (the review: a world's line there named nowhere).
     pub fn apply_sea_threshold(&mut self, sid: StateId, i: usize) {
+        let loss = self.fire_sea_threshold(sid, i);
+        let thr = self.tables.climate.sea_level_thresholds[i];
+        self.report_sea(thr, &[loss], Some(sid), true);
+    }
+
+    /// The threshold for one state, with no Report line: the caller writes one for the rise.
+    fn fire_sea_threshold(&mut self, sid: StateId, i: usize) -> SeaLoss {
         let thr = self.tables.climate.sea_level_thresholds[i];
         self.state_mut(sid).thresholds_fired[i] = true;
-        self.apply_sea_loss(sid, thr);
+        self.apply_sea_loss(sid, thr)
+    }
+
+    /// Ticket #600 (version 0.1.0.4), at the designer's word: **one line for a rise**, "Sea rose at
+    /// +1.8 C: you lost a Power Plant (the European Union), a Factory (Japan); rivals lost 7
+    /// Facilities.", the player's losses named by Region and the rivals' counted, where every Region
+    /// had a line of its own; and one Moment for it. A Region nobody holds is in neither.
+    pub fn report_sea_rise(&mut self, thr: f64, losses: &[SeaLoss]) {
+        self.report_sea(thr, losses, None, true);
+    }
+
+    /// Ticket #600: a Region's name mid-sentence, "the United States" where it opens "The".
+    pub fn state_name_mid(&self, sid: StateId) -> String {
+        let name = &self.tables.state(sid).name;
+        name.strip_prefix("The ").map(|n| format!("the {n}")).unwrap_or_else(|| name.clone())
+    }
+
+    /// The rise's line, for the world or (`one`) a single Region the sea reached early, with its
+    /// Moment unless the caller has one already (the Ice Sheets Break, the review).
+    fn report_sea(&mut self, thr: f64, losses: &[SeaLoss], one: Option<StateId>, with_moment: bool) {
+        if losses.is_empty() {
+            return;
+        }
+        let me = (!self.spectator).then_some(Seat(0));
+        let mid = |name: &str| name.strip_prefix("The ").map(|n| format!("the {n}")).unwrap_or_else(|| name.to_string());
+        let yours: Vec<String> = losses
+            .iter()
+            .filter(|l| l.director.is_some() && l.director == me && !l.lost.is_empty())
+            .map(|l| {
+                let what = Game::and_list(&l.lost.iter().map(|n| Game::with_article(n)).collect::<Vec<_>>());
+                // One Region's line names it already; the world's names each.
+                if one.is_some() { what } else { format!("{what} ({})", mid(&self.tables.state(l.state).name)) }
+            })
+            .collect();
+        let rivals: usize = losses.iter().filter(|l| l.director.is_some() && l.director != me).map(|l| l.lost.len()).sum();
+        let mut parts = Vec::new();
+        if !yours.is_empty() {
+            parts.push(self.phrase("sea_rose_yours", &[("what", yours.join(", "))]));
+        }
+        if rivals > 0 {
+            parts.push(self.phrase("sea_rose_rivals", &[("n", crate::counted(rivals, "Facility", "Facilities"))]));
+        }
+        if parts.is_empty() {
+            parts.push(self.phrase("sea_rose_none", &[]));
+        }
+        let temperature = format!("{thr:+.1}");
+        let said = match one {
+            Some(sid) => self.say("sea_rose_in", &[("state", self.state_name_mid(sid)), ("what", parts.join("; "))]),
+            None => self.say("sea_rose", &[("temperature", temperature.clone()), ("what", parts.join("; "))]),
+        };
+        self.report_line(LineKind::SeaLevel, one.map(ReportPlace::State), said.clone());
+        let directors: Vec<Option<Seat>> = losses.iter().filter(|l| !l.lost.is_empty() || l.took > 0).map(|l| l.director).collect();
+        self.mark_mine(&directors);
+        if with_moment {
+            self.moment(MomentKind::ClimateThreshold, &[("what", said), ("figure", format!("{temperature} C"))], one.map(ReportPlace::State));
+        }
     }
 
     /// Ticket #55: one Sea Level threshold's slot loss, displacement and Unrest, without marking a
     /// scheduled index. The Ice Sheets Committed Break fires one out of sequence this way, so the
     /// three scheduled thresholds still fire on their own turns and a game reaching +2.8 takes four.
-    pub fn apply_sea_loss(&mut self, sid: StateId, thr: f64) {
+    pub fn apply_sea_loss(&mut self, sid: StateId, thr: f64) -> SeaLoss {
         let exposure = self.tables.state(sid).coastal_exposure;
         let name = self.tables.state(sid).name.clone();
+        // The review: the Region's HOLDER, as an invasion reads it -- a Region the player only
+        // occupies is not theirs, and one a rival occupies still is. The Sea Wall line keeps the
+        // director, whose Report it was.
+        let director = self.state(sid).control.director();
+        let holder = self.state(sid).control.controller();
+        let mut loss = SeaLoss { state: sid, director: holder, lost: Vec::new(), took: 0 };
         if exposure == 0 {
-            return;
+            return loss;
         }
         // Ticket #56: a Sea Wall standing and working takes the whole threshold; no coastal slot is
         // lost. A mothballed wall is not working and absorbs nothing.
@@ -420,14 +509,15 @@ impl Game {
         let wall = self.state(sid).facilities.iter().position(|f| f.kind == FacilityKind::SeaWall && f.working());
         let temperature = format!("{thr:+.1}");
         // Ticket #58: the dispatch says the same thing in the words of report.toml; the log keeps its own.
-        let said;
-        let mut figure = "the Sea Wall".to_string();
+        // Ticket #600 (version 0.1.0.4): the wall's line alone is the Region's own; the slots the
+        // sea took are in the rise's one line.
+        let mut said = None;
         let mut headline = if let Some(i) = wall {
             self.state_mut(sid).facilities[i].rises_held += 1;
             let keep = self.state(sid).facilities[i].rises_held as f64 * self.tables.sea_wall.upkeep_per_rise;
             // Ticket #408 (version 0.09.4): "The United States' Sea Wall", not "…States's".
             let whose = if name.ends_with('s') { format!("{name}'") } else { format!("{name}'s") };
-            said = self.say("sea_wall", &[("temperature", temperature.clone()), ("state", name.clone()), ("whose", whose), ("keep", crate::state::figure(keep))]);
+            said = Some(self.say("sea_wall", &[("temperature", temperature.clone()), ("state", name.clone()), ("whose", whose), ("keep", crate::state::figure(keep))]));
             format!("Sea level at {thr:+.1} C: the Sea Wall in {name} took the sea and stands; it costs {} Materials a turn to keep now.", crate::state::figure(keep))
         } else {
             // Ticket #56: the sea takes COASTAL slots only, and nothing once they are gone.
@@ -435,22 +525,25 @@ impl Game {
             self.state_mut(sid).lost_slots += take;
             let destroyed = self.drown_coastal(sid);
             let slots = if take == 1 { "slot" } else { "slots" };
-            let word = self.phrase(if take == 1 { "slot" } else { "slots" }, &[]);
-            figure = format!("{take} coastal {word}");
-            let mut args = vec![("n", take.to_string()), ("slots", word), ("state", name.clone()), ("temperature", temperature.clone())];
+            let named: Vec<String> = destroyed.iter().map(|n| Game::with_article(n)).collect();
+            // Ticket #600: each building of the player's lost is a line of its own in Your works.
+            if holder == Some(Seat(0)) && !self.spectator {
+                for what in &destroyed {
+                    let line = self.say("sea_took_yours", &[("what", what.clone()), ("state", self.state_name_mid(sid))]);
+                    self.report_line(LineKind::YourWorks, Some(ReportPlace::State(sid)), line);
+                    self.mark_mine(&[Some(Seat(0))]);
+                }
+            }
+            loss.lost = destroyed;
+            loss.took = take;
             if take == 0 {
-                said = self.say("sea_nothing_left", &[("temperature", temperature.clone()), ("state", name.clone())]);
                 format!("Sea level at {thr:+.1} C: {name} has no coastal slots left to lose.")
-            } else if destroyed.is_empty() {
-                said = self.say("sea_took", &args);
+            } else if named.is_empty() {
                 format!("The sea took {take} coastal {slots} from {name} at {thr:+.1} C.")
             } else {
-                args.push(("destroyed", Game::and_list(&destroyed)));
-                said = self.say("sea_took_destroying", &args);
-                format!("The sea took {take} coastal {slots} from {name} at {thr:+.1} C: {}.", Game::and_list(&destroyed))
+                format!("The sea took {take} coastal {slots} from {name} at {thr:+.1} C: {}.", Game::and_list(&named))
             }
         };
-        let mut said = said;
         // Ticket #276 (version 0.08.5): the sea reaches inland. Every rise turns one inland slot
         // coastal, wall or no wall -- the designer's word was "regardless of sea wall" -- and it does
         // so AFTER the rise has taken what it takes, so the slot it turns faces the next rise and not
@@ -459,11 +552,15 @@ impl Game {
             (false, _) => {}
             (true, None) => {
                 headline.push_str(" The coast now reaches one slot further in.");
-                said.push_str(&self.phrase("sea_inland", &[]));
+                if let Some(s) = said.as_mut() {
+                    s.push_str(&self.phrase("sea_inland", &[]));
+                }
             }
             (true, Some(what)) => {
                 headline.push_str(&format!(" The coast now reaches one slot further in: {what} stands on it now."));
-                said.push_str(&self.phrase("sea_inland_flipped", &[("what", what)]));
+                if let Some(s) = said.as_mut() {
+                    s.push_str(&self.phrase("sea_inland_flipped", &[("what", what)]));
+                }
             }
         }
         // Ticket #52: the Unrest and the displacement key on the threshold FIRING, not on the slots
@@ -486,11 +583,13 @@ impl Game {
             self.unrest_cause(sid, cause, false);
         }
         self.log(headline);
-        self.report_line(LineKind::SeaLevel, Some(ReportPlace::State(sid)), said.clone());
-        // Ticket #544 (version 0.1.0.1): a Region of the player's lost to the sea is their news.
-        let director = self.state(sid).control.director();
-        self.mark_mine(&[director]);
-        self.moment(MomentKind::ClimateThreshold, &[("what", said), ("figure", figure)], Some(ReportPlace::State(sid)));
+        // The Sea Wall that held is the Region's own line, as before.
+        if let Some(said) = said {
+            self.report_line(LineKind::SeaLevel, Some(ReportPlace::State(sid)), said);
+            // Ticket #544 (version 0.1.0.1): a Region of the player's lost to the sea is their news.
+            self.mark_mine(&[director]);
+        }
+        loss
     }
 
     /// Ticket #276 (version 0.08.5): one inland slot turns coastal. An EMPTY inland slot turns first,
@@ -537,7 +636,8 @@ impl Game {
             let Some(idx) = self.state(sid).facilities.iter().position(|f| f.coastal && self.takes_slot(f.kind)) else { break };
             let f = self.state_mut(sid).facilities.remove(idx);
             self.state_mut(sid).drowned.push(f.kind);
-            destroyed.push(Game::with_article(f.kind.name()));
+            // Ticket #600 (version 0.1.0.4): bare names; the lines put the article on.
+            destroyed.push(f.kind.name().to_string());
         }
         // Coastal builds beyond the slots are lost too, without refund.
         loop {
@@ -547,7 +647,7 @@ impl Game {
             let st = self.state_mut(sid);
             if let Some(pos) = st.queue.iter().rposition(|b| b.coastal && matches!(b.item, BuildItem::Facility(_))) {
                 let b = st.queue.remove(pos);
-                destroyed.push(format!("{} under construction", Game::with_article(&b.item.name())));
+                destroyed.push(format!("{} under construction", b.item.name()));
             } else {
                 break;
             }
@@ -607,6 +707,10 @@ impl Game {
             let dark = !col.modules.iter().any(|m| m.kind == ModuleKind::Core && m.working());
             let starved = self.starved_by(id).is_some();
             let room = self.habitat_room(col).saturating_sub(col.colonists);
+            // Ticket #588 (version 0.1.0.4), at the designer's word: Earth orbit grows faster.
+            let rate = if self.in_earth_orbit(col) { self.tables.climate.colony_growth_earth_orbit } else { rate };
+            // Ticket #590 (version 0.1.0.4): and an Arcology's, at its Capital and its holder's others.
+            let rate = rate + self.capital_growth(id);
             let (seat, now) = (col.control.director(), col.colonists);
             let change: i64 = if dark || starved {
                 self.colony_growth.remove(&id);
@@ -885,9 +989,10 @@ impl Game {
             BreakEffect::WeakenSink => self.climate.natural_sink = (self.climate.natural_sink - b.sink_cut).max(0.0),
             // Ice Sheets Committed: a Sea Level threshold at once, for every state, out of sequence.
             BreakEffect::SeaLevelThreshold => {
-                for sid in StateId::ALL {
-                    self.apply_sea_loss(sid, b.temperature);
-                }
+                // Ticket #600 (version 0.1.0.4): one line for the rise.
+                // The Break has its own Moment, so the rise's line comes without one.
+                let losses: Vec<SeaLoss> = StateId::ALL.into_iter().map(|sid| self.apply_sea_loss(sid, b.temperature)).collect();
+                self.report_sea(b.temperature, &losses, None, false);
             }
             // Amazon Dieback: a pulse into the CO2 Stock and a state left dirtier for good.
             BreakEffect::CarbonPulse => {

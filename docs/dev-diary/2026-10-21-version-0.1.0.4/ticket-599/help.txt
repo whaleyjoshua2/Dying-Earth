@@ -1,0 +1,234 @@
+ORDER LINES (one per line; `#` starts a comment; blank lines are skipped)
+
+  answer take                          answer THIS TURN'S CHOICE CARD: take the offer,
+  answer refuse                        or refuse it.
+                                       A card is drawn at the HEAD of the turn, before orders, and
+                                       the turn CANNOT END while this seat owes it an answer.
+                                       No card comes on turn 1. `show` prints the card, its question
+                                       and what each side does; a seat that cannot pay the offer may
+                                       only refuse.
+
+  tech <tech>                          pick the next shared Tech (when the board says one is awaited), by its name
+
+  build facility <state> <facility>    e.g. build facility europe factory
+  build facility-ducats <state> <facility>
+  build module <colony> <module>       e.g. build module 1 habitat
+  build module-ducats <colony> <module>
+  build ship <colony> <ship>           at a Colony or station of yours with a WORKING SHIPYARD:
+                                       never in a Nation State, whatever its Launch
+                                       Site. The new Ship starts in the orbit of the yard that built
+                                       it -- a station's own orbit, or low orbit for a ground Colony.
+  build army <place>                   a Nation State you control, or a Colony with a Barracks.
+                                       Materials and Widgets AND PEOPLE: a Region loses
+                                       population for it, a Colony a
+                                       Colonist, and a place without the people to spare is refused.
+  build station <body> <orbit>         e.g. build station moon 0, or moon gateway; Materials alone, no Widgets
+  build archive <colony>               the Archivists only, at a Colony OFF EARTH (neither Antarctica
+                                       nor a station over Earth), where four Colonists already live.
+                                       Both are checked at the order and never again. The Upload
+                                       gates the Archivists' WIN, not this order.
+  industry <state>                     raise the Industry Level
+  upgrade <colony>                     raise a Colony or station to its next tier: Settlement,
+                                       Colony, and on the ground the Colonial Capital (one to a
+                                       Body). `show` prints each place's tier and what the next costs;
+                                       a tier wants every Module slot built and its people living there.
+  cancel-build <place> <index|name>    cancel a build ANOTHER seat began at a place you now direct,
+                                       which is what a conquest leaves behind: its Materials come
+                                       back at your own price and the Widgets done are lost. One a
+                                       turn at a place, and never a build of your own -- take that
+                                       back out of this turn's order list instead. The index is the
+                                       number `show` prints beside the item in that place's
+                                       `building:` list.
+
+  A BUILD HAS NO TURN COUNT. Materials are paid in full at the order,
+  and a build needs a figure in WIDGETS, which the place makes at its own rate every turn and spends
+  on its queue in the order the builds were given. `show` prints each place's Widgets a turn, what
+  its queue owes, and every build as `done/needed w`. The `-ducats` forms buy a building outright
+  for Ducats, twice its Materials' worth, and complete at the next Resolution whatever their
+  Widget figure.
+
+  transit <ship> <body> [orbit|low]    fly, spending the Ship's own tank. The leg names the ORBIT it
+                                       ends in: a ring, or `low` (or nothing at all) for low orbit.
+                                       AN ORBIT is the slot number as
+                                       `show` lists it, the station's NAME (any unique prefix:
+                                       `tiangong`, `orb`), or a standing station's colony id as
+                                       `colony:21` -- a bare number is always the slot number. A
+                                       colony id and an orbit number are two different numberings.
+  change-orbit <ship> <orbit|low>      move a Ship between the orbits of the Body it ALREADY stands
+                                       at, for 1 Fuel out of its own tank. Resolved with the
+                                       transits, before the Battles, so a Ship that changes orbit
+                                       fights in its new orbit.
+  refuel <ship>                        fill the tank at a station of yours (or of a Refuel partner's)
+                                       AT THAT STATION'S OWN ORBIT: a Ship in low orbit, or at
+                                       another station's ring, refuels at nothing until it moves.
+                                       FREE OF THE SHIP'S TURN: give the refuel first
+                                       and the transit after it, in one turn; it fills before it goes.
+  load <ship> <n> from <place> [army <army>]
+                                       FREE OF THE SHIP'S TURN: a load
+                                       off any place, Region, Colony or station, stands beside the
+                                       Ship's one action and boards before it moves. One load per
+                                       place a turn; never beside an unload.
+  unload <ship> <n> [army] into slot <body> <slot>
+                                       the ground slot by its number or its name.
+  unload <ship> <n> [army] into colony <n>
+  unload <ship> <n> into ring <body> <orbit>
+                                       found a SPACE STATION with a Colony Ship's Colonists, from
+                                       the station slot's ring the Ship sits in (no Materials). The
+                                       one way to settle Venus, which has no ground.
+  move-army <army> <state>
+  ship-stance <body> <stance>          stance = attack|hold|intercept|evade|blockade
+  army-stance <place> <stance>         stance = attack|evade|digin (hold does nothing to an Army)
+  repair <unit> <points>               unit = ship:<n>, army:<n> or battery:<colony>:<index>
+  repair-ducats <unit> <points>
+
+  A BODY'S ORBITS are LOW ORBIT and one per Orbital Slot, and every
+  Ship at a Body sits in exactly one of them; there is no Body at large. LOW ORBIT is what touches
+  the ground: landing an Army at a ground Colony, unloading Colonists into one, founding one, and
+  Bombarding one. A STATION'S OWN ORBIT is what touches that station: unloading into it, refuelling
+  at it, blockading it, attacking it. A LIFT FROM A LAUNCH SITE reaches ANY orbit of Earth.
+  A refusal that a change of orbit would cure names the move first. Orbital Control is
+  of LOW orbit and gates a Bombard and a Launch at the ground, and its starving. A LANDING OR FOUNDING
+  IS SHUT ONLY BY A BLOCKADE OF LOW ORBIT, never by a Ship on Hold,
+  never by a Passage partner. A BLOCKADE IS A STANCE, chosen (`ship-stance <body> blockade`)
+  and shutting the orbit the stack sits in -- never a side effect of arriving anywhere. A
+  rival's working Battery in that orbit opens a Battle on a blockader. `show` names
+  the orbit every Ship sits in, and lists each Body's orbits under FREE SLOTS.
+
+  bombard <ship> <colony>              a Battleship of yours breaks one Module of a RIVAL'S Colony,
+                                       never over Earth. IT ACTS IN
+                                       THE ORBIT IT SITS IN. A Colony on the ground is bombarded
+                                       from LOW ORBIT and wants Orbital Control of that Body
+                                       outright; a station from that station's own orbit, which must
+                                       hold no rival warship and no rival working Battery. Move the
+                                       Battleship there first with `change-orbit`, and in an EARLIER
+                                       turn: a Ship takes one order a turn, and a Bombard is one.
+
+  launch <ship> <place>                a Missile Carrier of yours fires its one Warhead at a RIVAL'S
+                                       Region, ground Colony or Space Station. It reads the same
+                                       orbit rule a Bombard does -- low orbit for
+                                       the ground (and Orbital Control of that Body outright), a
+                                       station's own orbit for a station -- but EARTH IS NOT
+                                       EXCEPTED, and a Region is a lawful target. Free.
+  rearm <ship>                         load another Warhead, at a Colony or station of yours with a
+                                       working Shipyard, in that place's own orbit. It is a build
+                                       in that yard's queue: Materials now, Widgets over the turns.
+
+  influence <place> <amount> [break]   `break` means it, where the spend would break an Accord
+  buy-influence <amount>
+  max <place>                          repeat next turn's WHOLE Allotment on one place you hold,
+  max off                              turn after turn until it is switched off. Free, and it
+                                       spends nothing by itself.
+  buy <resource> <amount>              materials|fuel|energy
+  sell <resource> <amount>             materials|fuel
+
+CAMPAIGNS AND CARBON CREDITS -- the Blame ledger the Influence thresholds read (`show` prints it)
+
+  smear <faction> <amount>             Influence spent on a RIVAL'S name, laying 2.00 ppm on their
+                                       ledger for good per point spent. One a turn per target; an
+                                       offence, and the Report names who paid.
+  greenwash <amount>                   Influence spent on your own name, with 1 Ducat beside
+                                       every point, taking 2.00 ppm off your own ledger for good
+                                       per point. One a turn, and no offence.
+  offer-credits <ppm>                  the Custodians only: the ppm of carbon credit they sell a
+                                       turn, standing until it is set again; nought refuses
+                                       everybody.
+  buy-credits <ppm>                    buy carbon credit from the Custodians at 1 Ducat a ppm
+                                       before their view of you multiplies it, at most 10 ppm a
+                                       turn, one purchase a turn, and only while they are offering.
+                                       It comes off your ledger at the Resolution. `show` prints
+                                       what stands offered and what a ppm would cost you.
+
+DIPLOMACY (`show` prints Relations both ways and every Accord standing)
+
+  accord offer <faction> <term>...     offer an Accord holding one or more Terms:
+                                         non-aggression  neither spends Influence on a place the
+                                                         other holds, nor opens a Battle on them
+                                         passage         neither treats the other's Ships as a
+                                                         target, a Blockade does not shut the other
+                                                         out of a slot, and an Army may cross
+                                         refuel          either may Refuel at the other's stations
+                                         research        both parties' Research rises a tenth; it
+                                                         wants Friendly on BOTH sides to strike
+                                       One offer a turn to a Faction, none where an Accord already
+                                       stands, and none while your last to them waits. It is
+                                       answered at the head of their next turn. A refusal is not an
+                                       offence. An Accord kept 5 turns pays both sides.
+  accord accept|refuse <faction>       answer an Accord a Faction offered you; the turn does not
+                                       end until every one is answered.
+  accord end <faction>                 declare a standing Accord over: free, and it lapses at the
+                                       next turn's start -- which gives the board a turn's warning
+                                       that something is coming.
+  accord renew <faction>               in an Accord's last turn, renew it for five more; the Report
+                                       warns of that turn ("ends after this turn"). Let it run out
+                                       while they would have renewed, and they count it a refusal:
+                                       no offer from them for 3 turns.
+  trade <faction> <give> for <ask>     one thing for one thing: `<n> ducats|materials|fuel|energy`
+                                       or a colony id; answered at the head of their next turn, the
+                                       goods moving only if both still hold them.
+  trade accept|refuse <faction>        answer a Trade a Faction offered you.
+  trade counter <faction> <give> for <ask>
+                                       or counter it, once: the same
+                                       two goods in your own amounts, `<n> <good> for <n> <good>`.
+                                       They answer at once by their Trade rule; a seat short of
+                                       the good it asked pays up to a quarter over fair value. A
+                                       refused counter is a refusal. A refused Faction offers you
+                                       nothing for 3 turns, and never the same two goods
+                                       again until you refuse it a Trade of other goods.
+  tribute <faction> ducats             a fixed gift, one per Faction per turn, paying Relations:
+  tribute <faction> materials          25 Ducats, or 15 Materials.
+
+REGIONS AND PEOPLE
+
+  relief <state>                       Ducats lower by one the Unrest of a Region you direct
+  agitate <state>                      Relief's mirror: 15 Ducats and 5 Influence raise
+                                       by one the Unrest of a Region a RIVAL holds, once a turn per
+                                       Region. An offence.
+  resettle <state>
+  emigrants <state> <n>                recruit Pioneers
+  send-antarctica <state> <n> slot earth <slot>
+  send-antarctica <state> <n> colony <n>
+  lift <state> <n> <colony>            lift waiting Pioneers from a Region of yours with a working
+                                       Launch Site straight onto a station of yours over Earth, as
+                                       far as its Habitat room goes. A launch: it emits, and what it
+                                       emits goes on your Blame.
+  change facility <state> <index|name> <mothball|restart|decommission|replace>
+                                       replace: a Power Plant with a Wind Farm, through the queue
+  change module <colony> <index|name> <mothball|restart|decommission>
+                                       the building by its index as `show` lists it, or by its NAME:
+                                       the sea, a Decommission or a loss shifts the
+                                       indices, and a bare index once scrapped a Launch Site. Two
+                                       of a kind by name are refused with their indices.
+
+RESEARCH, THE ARCHIVE AND THE FACTION ORDERS
+
+  directive <percent>                  the RESEARCH DIRECTIVE: the share of your Labs' Research that
+                                       goes somewhere other than the shared Tech, at ANY whole
+                                       percent. The Archivists may go to 100%, which fills the
+                                       Archive fund; every other Faction to 50%, and what that
+                                       share turns into is its own -- the Custodians' into the
+                                       Natural Sink, the Prospectors' into Ducats, the Arkwrights'
+                                       into Fuel. `show` names yours and its rate. Read at the next
+                                       Income, and it holds until it is set again.
+  fund-archive                         the same order at your Faction's cap,
+  unfund-archive                       and the same order at nought.
+  upload <colony> <n>                  the Archivists only, and only once the Archive is COMPLETE:
+                                       Colonists at the Archive's own place are read into it and
+                                       leave the living population. Free, and irreversible.
+  venture-share <percent>              the Prospectors only, in steps of 1% from 0% to 80%
+  draw-venture <amount>                the Prospectors only
+  leapfrog <state>                     the Custodians only, 50 Ducats: the Region's people emit
+                                       0.03 less per hundred million, for good, never below
+                                       0.04, and its Baseline Emissions fall 0.1
+  strip-permit <state>                 the Prospectors only, 25 Ducats, once per Region EVER:
+                                       3 turns of double output, then its Baseline Emissions and
+                                       Unrest rise for good
+  exodus-call <state>                  the Arkwrights only, on a Region they control, once per Region
+                                       EVER, for 50 Ducats: while it runs it doubles what they may
+                                       recruit there and suspends Coach Class's double population
+                                       charge.
+
+A FACTION is named by its own name, shortened as far as it stays unique (`ark` is the Arkwrights),
+or by its seat number. `show` prints both beside every Faction.
+
+Names may be shortened as long as they stay unique: `eur` is Europe, `colonys` is a Colony Ship.
+Colonies, ships and armies are named by the numbers the board prints beside them.

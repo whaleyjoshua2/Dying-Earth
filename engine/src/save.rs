@@ -159,7 +159,10 @@ pub const SAVE_VERSION: u32 = 12;
 /// the two fields the version added to the save (the last Trade refused per pair, #572; a seat's
 /// price cuts, #577) read a default from an older file, and the Wind Farm's Ducat upkeep is a data
 /// figure, so a 0.1.0.2, 0.1.0.1 or 0.1.0.0 save loads.
-pub const GAME_VERSION: &str = "0.1.0.3";
+/// Ticket #602 (version 0.1.0.4, the closing ticket): moved to 0.1.0.4. `SAVE_VERSION` did not move:
+/// the two fields the version added to the save (the capital buildings chosen and those not yet
+/// told, #590) read a default from an older file, so a 0.1.0.3 save and those before it load.
+pub const GAME_VERSION: &str = "0.1.0.4";
 
 /// The game autosaves at the start of the Report phase of every third turn.
 pub const AUTOSAVE_EVERY: u32 = 3;
@@ -305,6 +308,12 @@ pub struct SavedGame {
     /// Ticket #444 (version 0.09.6): each Colony's growth toward its next Colonist.
     #[serde(default)]
     pub colony_growth: BTreeMap<ColonyId, f64>,
+    /// Ticket #590 (version 0.1.0.4): each capital building chosen, and its Capital.
+    #[serde(default)]
+    pub capital_buildings: BTreeMap<CapitalBuilding, ColonyId>,
+    /// Ticket #590, from the review: the buildings chosen this turn, not yet told.
+    #[serde(default)]
+    pub capital_built_now: Vec<CapitalBuilding>,
 }
 
 impl SavedGame {
@@ -356,6 +365,8 @@ impl SavedGame {
             events_no_target,
             body_firsts,
             colony_growth,
+            capital_buildings,
+            capital_built_now,
             reveal_all: _,
             waiting_last: _,
         } = g;
@@ -403,6 +414,8 @@ impl SavedGame {
             widgets: widgets.clone(),
             body_firsts: body_firsts.clone(),
             colony_growth: colony_growth.clone(),
+            capital_buildings: capital_buildings.clone(),
+            capital_built_now: capital_built_now.clone(),
         }
     }
 
@@ -452,6 +465,8 @@ impl SavedGame {
             events_no_target: self.events_no_target,
             body_firsts: self.body_firsts,
             colony_growth: self.colony_growth,
+            capital_buildings: self.capital_buildings,
+            capital_built_now: self.capital_built_now,
             log: self.log,
             reveal_all: false,
             waiting_last: Vec::new(),

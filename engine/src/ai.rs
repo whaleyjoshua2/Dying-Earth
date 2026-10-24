@@ -574,7 +574,7 @@ impl Game {
         let m = &self.tables.ai.multipliers;
         let turn = self.turn;
         let ratio_of = |actual: f64, expected: f64| if expected <= 0.0 { 1.0 } else { (actual / expected).min(1.0) };
-        let mut presence_ratio = ratio_of(self.off_world_colonists(seat) as f64, Self::expected(&pace.colonists, turn));
+        let mut presence_ratio = ratio_of(self.victory_colonists(seat) as f64, Self::expected(&pace.colonists, turn));
         // Ticket #449 (version 0.09.6): a second part that counts BODIES is paced in Bodies. Nothing
         // read them: the Arkwrights' computer judged itself by Colonists off Earth alone, filled one
         // station over Earth, and scored nought with no Body settled.
@@ -766,7 +766,7 @@ impl Game {
     /// share of the game left that the flight from Earth would eat: a Mars seventeen turns away is
     /// worth little next to a Moon one turn away, and a Body the Ship cannot reach before the last
     /// turn is not offered at all.
-    fn best_body_for(&self, seat: Seat, behind: Behind) -> BodyId {
+    fn best_body_for(&self, seat: Seat, behind: Behind, ship: ShipId) -> BodyId {
         let t = &self.tables;
         let turns_left = t.victory.turns.saturating_sub(self.turn).max(1) as f64;
         let flight = |b: BodyId| self.transit_cost_for(seat, BodyId::Earth, b).0 as f64;
@@ -797,6 +797,19 @@ impl Game {
         // turn 11, and they took 53 of 80 games.
         if self.first_at(BodyId::Moon).is_none() && bodies.contains(&BodyId::Moon) && !self.colonies.iter().any(|c| c.control.director() == Some(seat) && !c.in_orbit && c.body != BodyId::Earth) {
             return BodyId::Moon;
+        }
+        // Ticket #596 (version 0.1.0.4), at the designer's word: the race to Mars, once the Moon is
+        // claimed -- Mars, whatever the windfalls say, for the seat's runner alone, where the tank
+        // pays the crossing now or at the window and it lands before the game ends. The crossing
+        // keeps the computer's soft window preference (`window_preference`), at the designer's word,
+        // over a hold to two turns of the window that was built and taken back; a crossing the tank
+        // cannot pay this turn is refused at the check, and the Ship goes when it can.
+        if self.mars_race_open() && self.mars_runner(seat, ship) {
+            let depart = if self.transit_cost_for(seat, BodyId::Earth, BodyId::Mars).1 <= tank { self.turn } else { self.next_window_turn(self.turn) };
+            let (turns, fuel) = self.transit_cost_for_at(seat, BodyId::Earth, BodyId::Mars, depart);
+            if ((depart - self.turn + turns) as f64) < turns_left && fuel <= tank {
+                return BodyId::Mars;
+            }
         }
         // Ticket #51, the Arkwrights' spread rule: once one Body of theirs holds the 4 Colonists
         // Diaspora asks of each, the next Colony goes to a Body they are not on yet.
@@ -842,6 +855,24 @@ impl Game {
         }
         // A quarter of the weight at the far side of the cycle, all of it at the window.
         1.0 - 0.75 * (offset.abs() / 180.0).clamp(0.0, 1.0)
+    }
+
+    /// Ticket #596 (version 0.1.0.4): the race to Mars is on -- the Moon claimed, Mars itself with no
+    /// ground Colony and a free slot.
+    fn mars_race_open(&self) -> bool {
+        self.tables.ai.thresholds.mars_race_weight > 0.0 && self.first_at(BodyId::Moon).is_some() && self.first_at(BodyId::Mars).is_none() && !self.free_slots_on(BodyId::Mars).is_empty()
+    }
+
+    /// Ticket #596 (the review): this Colony Ship is the seat's runner for Mars -- none of its others
+    /// is flying there, and none loaded to found waits at Earth ahead of it (the lowest id first).
+    fn mars_runner(&self, seat: Seat, ship: ShipId) -> bool {
+        let found = self.tables.emigrants.found_with;
+        !self.ships.iter().any(|o| {
+            o.seat == seat
+                && o.kind == UnitKind::ColonyShip
+                && o.id != ship
+                && (matches!(o.at, ShipAt::Transit { to: BodyId::Mars, .. }) || (o.at == ShipAt::Body(BodyId::Earth) && o.colonists >= found && o.id.0 < ship.0))
+        })
     }
 
     /// Ticket #57: whether the Mars window is close enough that Fuel is worth holding for it.
@@ -1214,6 +1245,52 @@ impl Game {
         }
     }
 
+    /// Ticket #590 (version 0.1.0.4): the capital building a computer seat takes for `capital`: of
+    /// the free ones, the best score -- 1 for the Faction's own, plus `capital_pick_need` where the
+    /// run needs what it gives (a stockpile yield its last Income lost; a Shipyard of its on the
+    /// Capital's Body for the Spaceport; a Region of its past the first Unrest threshold for the
+    /// Arcology) -- ties to the table's order.
+    pub fn ai_capital_pick(&self, seat: Seat, capital: ColonyId) -> Option<CapitalBuilding> {
+        let own = self.tables.faction(self.kind(seat)).capital_building;
+        let need = self.tables.ai.thresholds.capital_pick_need;
+        let last = self.seat(seat).income_last_turn;
+        let body = self.colony(capital)?.body;
+        let yard = self.colonies.iter().any(|c| c.body == body && c.control.director() == Some(seat) && c.modules.iter().any(|m| m.kind == ModuleKind::Shipyard));
+        let restive = self.controlled_states(seat).iter().any(|s| self.unrest(*s) >= self.tables.unrest.army_threshold);
+        let needed = |b: CapitalBuilding| -> bool {
+            match self.tables.capital_building(b).resource {
+                Some(Resource::Ducats) => last.ducats < 0.0,
+                Some(Resource::Materials) => last.materials < 0.0,
+                Some(Resource::Fuel) => last.fuel < 0.0,
+                Some(Resource::Energy) => last.energy < 0.0,
+                _ => match b {
+                    CapitalBuilding::Spaceport => yard,
+                    CapitalBuilding::Arcology => restive,
+                    _ => false,
+                },
+            }
+        };
+        let score = |b: CapitalBuilding| f64::from(u8::from(own == Some(b))) + if needed(b) { need } else { 0.0 };
+        let mut best: Option<(CapitalBuilding, f64)> = None;
+        for b in self.free_capital_buildings() {
+            let s = score(b);
+            if best.is_none_or(|(_, top)| s > top) {
+                best = Some((b, s));
+            }
+        }
+        best.map(|(b, _)| b)
+    }
+
+    /// Ticket #590 (version 0.1.0.4): the place a seat builds up off Earth -- its most peopled ground
+    /// Colony beyond Earth, ties to the lower id.
+    pub fn best_off_earth(&self, seat: Seat) -> Option<ColonyId> {
+        self.colonies
+            .iter()
+            .filter(|c| c.control.director() == Some(seat) && !c.in_orbit && c.body != BodyId::Earth)
+            .max_by_key(|c| (c.colonists, std::cmp::Reverse(c.id.0)))
+            .map(|c| c.id)
+    }
+
     pub fn ai_orders(&mut self, seat: Seat) -> Vec<Order> {
         // Ticket #337 (version 0.09.0): the seat answers this turn's choice card HERE, before it
         // reads its own board for anything else, so a held fleet or a paid bill is already true of
@@ -1251,6 +1328,16 @@ impl Game {
             let unclaimed = self.first_at(BodyId::Moon).is_none() && !self.free_slots_on(BodyId::Moon).is_empty();
             if !has_colony_ship && unclaimed { th.moon_race_weight } else { 1.0 }
         };
+        // Ticket #596 (version 0.1.0.4), at the designer's word: the race to Mars, once the Moon is
+        // claimed. A Colony Ship in flight to another Body is busy; one anywhere else, or bound for
+        // Mars, or on order, is the seat's runner already.
+        let mars_race = {
+            // The review: one flying home to Earth is the runner too, a turn from free.
+            let runner = self.ships.iter().any(|s| s.seat == seat && s.kind == UnitKind::ColonyShip && !matches!(s.at, ShipAt::Transit { to, .. } if to != BodyId::Mars && to != BodyId::Earth))
+                || self.queues_of(seat).any(|b| b.item == BuildItem::Unit(UnitKind::ColonyShip));
+            if self.mars_race_open() && !runner { th.mars_race_weight.max(1.0) } else { 1.0 }
+        };
+        let moon_race = if moon_race > 1.0 { moon_race } else { mars_race };
         // Ticket #559 (version 0.1.0.3): each build's own card figure, where a flat 6 was counted
         // for every Power Plant's job, so a Wind Farm on order counts its 3 and a Replace under way
         // trades the Power Plant's figure for the Wind Farm's.
@@ -1330,11 +1417,14 @@ impl Game {
         // `capital_chase` times; a fresh Outpost on its Body weighs a chase less.
         // Measured before the gathering: the chase on the upgrade and the landing alone left no
         // Capital off Earth in 80 games (seven stood, all in Antarctica).
-        let capital_candidate = if self.tables.faction(kind).victory_capital { self.capital_candidate(seat) } else { None };
+        // Ticket #590 (version 0.1.0.4), at the designer's word: every seat builds up its best place off
+        // Earth, so every seat has a candidate and gathers at it; the Arkwrights once their Bodies are near.
+        let capital_candidate = self.capital_candidate(seat);
         let capital_body = capital_candidate.and_then(|c| self.colony(c)).map(|c| c.body);
         let capital_chase = self.tables.ai.thresholds.capital_chase;
         // The people the Capital tier wants at one place, the room the candidate builds toward.
-        let capital_room = self.tables.tiers.iter().filter(|t| t.one_per_body).map(|t| t.colonists).max().unwrap_or(0);
+        // Ticket #590 (version 0.1.0.4): the Capital asks none, so the most any tier asks.
+        let capital_room = self.tables.tiers.iter().map(|t| t.colonists).max().unwrap_or(0);
         // Room at the candidate for a landing: a crossing is lifted only where the people can land.
         let capital_has_room = capital_candidate.and_then(|c| self.colony(c)).is_some_and(|c| self.habitat_room(c) > c.colonists);
         let gathering = capital_candidate.is_some() && {
@@ -2034,6 +2124,12 @@ impl Game {
                 if mk != ModuleKind::Habitat && self.free_module_slots(&col) <= self.habitats_to_reserve(&col) {
                     continue;
                 }
+                // Ticket #590 (version 0.1.0.4): and the seat's Capital site on a Body keeps one slot
+                // open, the one its Capital's building will stand in, Habitats and all. Measured
+                // without it: a slot open went to an Exchange ahead of the upgrade every turn.
+                if self.capital_site(seat, col.body) == Some(cid) && self.free_module_slots(&col) <= 1 {
+                    continue;
+                }
                 if mk == ModuleKind::Habitat {
                     let room = self.habitat_room(&col).saturating_sub(col.colonists);
                     // Ticket #514 (version 0.1.0.0): at the Capital candidate, while gathering, a
@@ -2226,7 +2322,7 @@ impl Game {
         if (scarce == Resource::Materials || needs.contains(&Resource::Materials)) && per_materials > 0 {
             let lots = (self.seat(seat).stockpile.ducats / (per_materials * 10) as f64).floor() as i64;
             for _ in 0..lots.min(4) {
-                push(vec![Order::Buy { resource: Resource::Materials, amount: 10 }], Cat::Producer, self.base_weight(seat, Cat::Producer) * 1.5, 1.0, 1.0, 1.0, format!("buy 10 Materials for {} Ducats", per_materials * 10), None);
+                push(vec![Order::Buy { resource: Resource::Materials, amount: 10 }], Cat::Producer, self.base_weight(seat, Cat::Producer) * 1.5, 1.0, 1.0, 1.0, format!("buy 10 Materials for {} Ducats", self.lot_ducats(seat, Resource::Materials, 10, 0)), None);
             }
         }
         // Hold own places where a rival's standing approaches yours (ticket #33: spending raises your standing).
@@ -2296,13 +2392,19 @@ impl Game {
         // Ticket #514 (version 0.1.0.0): every upgrade at the Capital candidate weighs `capital_chase`
         // times more (the candidate and the figure are read at the head of this function).
         for c in self.colonies.iter().filter(|c| c.control.director() == Some(seat)) {
+            // Ticket #590 (version 0.1.0.4): the Capital wants one slot open, not every slot built; a
+            // lower tier, the people to fill its cap, not every slot built either: measured, 28 people
+            // stood at an Outpost with 4 of its 6 slots built for want of the last two.
             if let Some(next) = self.open_tier(c)
                 && c.colonists >= next.colonists
-                && self.module_slots(c) >= self.tier_of(c).cap
-                && self.free_module_slots(c) == 0
+                && (if next.takes_slot { self.capital_site(seat, c.body) == Some(c.id) && self.free_module_slots(c) >= 1 } else { self.module_slots(c) >= self.tier_of(c).cap })
                 && self.tier_under_way(c).is_none()
             {
                 let chase = if capital_candidate == Some(c.id) { capital_chase } else { 1.0 };
+                // Ticket #590 (version 0.1.0.4), at the designer's word: the seat builds up its best
+                // place off Earth. Measured without it: its upgrade at 5 or 6 was held every turn for
+                // the Materials of builds at 20 to 45, and no place off Earth passed Outpost.
+                let chase = if self.best_off_earth(seat) == Some(c.id) { chase * self.tables.ai.thresholds.build_up } else { chase };
                 push(vec![Order::RaiseTier { colony: c.id }], Cat::RaiseTier, self.base_weight(seat, Cat::RaiseTier) * chase, gap_for(Cat::RaiseTier, None), 1.0, 1.0, format!("upgrade {} to a {}", self.place_name(Place::Colony(c.id)), next.name), None);
             }
         }
@@ -2971,7 +3073,7 @@ impl Game {
         // or Antarctica settled a batch must muster in a state the seat directs: those with a
         // working Launch Site, or, with the ice open, any (several since ticket #427, below). It musters while fewer
         // wait than two Ship loads (and one more while the ice is open), and never for nothing.
-        let presence_needed = self.tables.victory.off_world_presence.saturating_sub(self.off_world_colonists(seat));
+        let presence_needed = self.tables.victory.off_world_presence.saturating_sub(self.victory_colonists(seat));
         // Ticket #237 (version 0.08.3): the Exodus Call. Sounded where the Arkwrights hold their
         // MOST populous Region, since a Call is once per Region ever and a doubled muster is worth
         // most where there are most people to take -- and since the measured problem is that their
@@ -3104,7 +3206,9 @@ impl Game {
         for s in &ships {
             let ShipAt::Body(body) = s.at else { continue };
             let card = self.tables.unit(s.kind);
-            let ship_name = format!("{} {}", s.kind.name(), s.id.0);
+            // Ticket #586 (version 0.1.0.4), from the review: its name in the scored list, which the
+            // tool's `--log` prints, never its id.
+            let ship_name = self.ship_name(s);
             // Ticket #87: refuel at a station of its own whenever the tank is short and the
             // Stockpile has Fuel; a leg the tank cannot pay is refused at the check, so the AI
             // never flies on an empty tank.
@@ -3262,7 +3366,7 @@ impl Game {
                     // wants is offered with the crossing too -- lift and leave in one turn -- at the
                     // crossing's weight, beside the lift alone.
                     if n > 0 && s.colonists + n >= self.tables.emigrants.found_with {
-                        let d = if ferrying { archive_body.unwrap_or_else(|| self.best_body_for(seat, behind)) } else { self.best_body_for(seat, behind) };
+                        let d = if ferrying { archive_body.unwrap_or_else(|| self.best_body_for(seat, behind, s.id)) } else { self.best_body_for(seat, behind, s.id) };
                         if d != body {
                             let window = self.window_preference(seat, body, d);
                             let gather = if gathering && capital_has_room && Some(d) == capital_body { capital_chase } else { 1.0 };
@@ -3360,7 +3464,7 @@ impl Game {
                 }
                 if s.colonists > 0 && body == BodyId::Earth {
                     // Ticket #361: a ferrying Archivist crosses to its Archive's Body first.
-                    let dest = if ferrying { archive_body.unwrap_or_else(|| self.best_body_for(seat, behind)) } else { self.best_body_for(seat, behind) };
+                    let dest = if ferrying { archive_body.unwrap_or_else(|| self.best_body_for(seat, behind, s.id)) } else { self.best_body_for(seat, behind, s.id) };
                     let own_room = self.colonies.iter().any(|c| c.control.director() == Some(seat) && self.habitat_room(c) > c.colonists);
                     // Ticket #489 (version 0.09.9): with fewer than four aboard it founds nowhere, so
                     // it sails only to a place of its own with room; with none it stays to load.
@@ -3380,7 +3484,12 @@ impl Game {
                         let window = self.window_preference(seat, body, d);
                         // Ticket #514 (version 0.1.0.0): the crossing to the Capital candidate's Body, while gathering.
                         let gather = if gathering && capital_has_room && Some(d) == capital_body { capital_chase } else { 1.0 };
-                        push(vec![Order::Transit { ship: s.id, to: d, slot: self.ai_destination_orbit(seat, s, d) }], Cat::Transit, self.base_weight(seat, Cat::Transit) * window * gather, gap_for(Cat::Transit, None), 1.0, 1.0, format!("send {} to {}", ship_name, self.tables.body(d).name), None);
+                        // Ticket #596 (version 0.1.0.4), at the designer's word: the seat's runner sent
+                        // to Mars at the race weight, as the race's builds are. Measured before: at
+                        // 4.9 and falling off the window the send lost every turn to the Ship's own
+                        // 6.0 moves between low orbit and the station, and it never left.
+                        let race = if d == BodyId::Mars && self.mars_race_open() && self.mars_runner(seat, s.id) { th.mars_race_weight.max(1.0) } else { 1.0 };
+                        push(vec![Order::Transit { ship: s.id, to: d, slot: self.ai_destination_orbit(seat, s, d) }], Cat::Transit, self.base_weight(seat, Cat::Transit) * window * gather * race, gap_for(Cat::Transit, None), 1.0, 1.0, format!("send {} to {}", ship_name, self.tables.body(d).name), None);
                     }
                 }
                 if s.colonists == 0 && body != BodyId::Earth {
@@ -4020,7 +4129,7 @@ impl Game {
             if left.fuel < power_reserve && !bought_f {
                 let short = (power_reserve - left.fuel).ceil() as i64;
                 let buy = Order::Buy { resource: Resource::Fuel, amount: short };
-                if self.order_cost(seat, &buy).ducats <= left.ducats && self.check_order(seat, &chosen, &buy).is_ok() {
+                if self.trade_cost(seat, &chosen, &buy).ducats <= left.ducats && self.check_order(seat, &chosen, &buy).is_ok() {
                     lines.push(format!("  take          buy {short} Fuel for the power reserve ({power_reserve:.1})"));
                     chosen.push(buy);
                     bought_f = true;

@@ -76,6 +76,10 @@ pub enum Popup {
     /// Ticket #58: the nth Moment of this turn, shown before the Report.
     Moment(usize),
     Report,
+    /// Ticket #594 (version 0.1.0.4), at the designer's word: **the signature moves**, each
+    /// Faction's line, on turn one in the Report's place. It hands on to the tutorial's note in a
+    /// tutorial game and to nothing otherwise; the Report button still opens the Report.
+    Opening,
     /// End Turn pressed with Influence unspent (ticket #31): ask once.
     ConfirmEndTurn,
     /// Ticket #105 (version 0.07.0): the turn was refused, and this says why. A rule nobody can see
@@ -89,6 +93,10 @@ pub enum Popup {
     /// Ticket #429 (version 0.09.5): a right-click would move an empty Colony Ship or Carrier; ask
     /// once. The orders wait in `ViewState::empty_move`, the question in `empty_move_text`.
     ConfirmEmptyMove,
+    /// Ticket #590 (version 0.1.0.4): **a capital building to choose** for a Capital of the
+    /// player's standing without one. Raised once nothing else is up, as the Accords are; "Later"
+    /// holds it off for the turn (`capital_later`), and End Turn makes a pick left unmade.
+    Capital,
 }
 
 #[derive(Resource)]
@@ -367,6 +375,9 @@ pub enum StackBlock {
     /// stranded warning and the dry warning all stand. It is far enough down the card that no
     /// picture had ever reached it.
     Tanks,
+    /// Ticket #587 (version 0.1.0.4): the Archive's Upload row on a Colony's card, its count and
+    /// its button, which stand below a 720-high frame.
+    Archive,
 }
 
 /// Ticket #146 (version 0.07.3): what is clicked among a Region card's slot boxes -- a standing
@@ -428,6 +439,9 @@ pub struct ViewState {
     /// Ticket #42: the trading window, and the quantity on each of its four lines
     /// (Influence, Materials, Fuel, Energy).
     pub show_trade: bool,
+    /// Ticket #590 (version 0.1.0.4): the turn the capital building's window was put off, so it is
+    /// not raised again that turn; the bar's button still opens it.
+    pub capital_later: Option<u32>,
     /// Ticket #145 (version 0.07.3): the Hab View, open on one station or Colony, and the tile
     /// clicked in it -- a standing Module by index, or a free slot, whose strip offers the build
     /// buttons.
@@ -481,6 +495,9 @@ pub struct ViewState {
     pub battle_end: usize,
     pub battles_then_head: bool,
     pub battles_then_note: bool,
+    /// Ticket #594 (version 0.1.0.4): turn one's signature moves hand on to the tutorial's note,
+    /// and that note to nothing, where it would hand on to the Report.
+    pub opening_then_note: bool,
     /// Ticket #58: which Moment kinds are switched on, remembered for the session. `None` until the
     /// player touches a checkbox, when it is filled from the defaults in `report.toml`.
     pub moments_on: Option<[bool; dying_earth_engine::MomentKind::ALL.len()]>,
@@ -539,6 +556,7 @@ impl Default for ViewState {
             faction_seat: Seat(0),
             faction_rulebook_open: false,
             show_trade: false,
+            capital_later: None,
             hab_tile: None,
             slot_box: None,
             trade_amounts: [5, 10, 10, 10],
@@ -552,7 +570,7 @@ impl Default for ViewState {
             credits_amount: 10,
             credits_offer: 0,
             attack_preview: false, empty_move: Vec::new(), empty_move_text: String::new(), armed_stack: None, armed_scroll: false, stack_scroll: None,
-            battle_end: 0, battles_then_head: false, battles_then_note: false,
+            battle_end: 0, battles_then_head: false, battles_then_note: false, opening_then_note: false,
             moments_on: None,
             force_hover: None,
             card_aside: false,

@@ -427,6 +427,11 @@ pub struct TechCard {
     pub needs: Vec<TechId>,
     pub effect: String,
     pub value: f64,
+    /// Ticket #592 (version 0.1.0.4), at the designer's word: once this Tech stands, every
+    /// shortlist is drawn this many Techs larger, whichever seat leads the pick. Orbital Data
+    /// Centers' row says 1; every other row nothing.
+    #[serde(default)]
+    pub shortlist_bonus: usize,
     /// Ticket #207 (version 0.08.1): Expanded Habitats is read in TWO places -- what a Habitat
     /// holds and what a Colony Ship carries -- and until now one `value` served both, so neither
     /// could be moved without the other. This is the Habitat clause where a Tech wants its own
@@ -601,8 +606,9 @@ pub enum CardEffect {
         turns: u32,
     },
     /// Ticket #577 (version 0.1.0.3): a good's price times `multiplier` for the answering seat
-    /// alone, for `turns` turns of orders after the answer -- the Cheap Ore Offer's refusal, half
-    /// price for one turn. The market's own price does not move, and rivals see nothing.
+    /// alone, for `turns` turns of orders after the answer -- the Cheap Ore Offer's refusal, a third
+    /// off for one turn since ticket #597 (version 0.1.0.4; half before). The market's own price does
+    /// not move, and rivals see nothing.
     SeatPrice { resource: Resource, multiplier: f64, turns: u32 },
     /// A change to what every other seat thinks of this one.
     RelationsAllRivals { relations: i64 },
@@ -702,6 +708,15 @@ pub struct FactionCard {
     /// over Earth included, Antarctica not); absent, the one figure serves both.
     #[serde(default)]
     pub research_multiplier_off_earth: Option<f64>,
+    /// Ticket #589 (version 0.1.0.4), at the designer's word: Research a turn for each Body off
+    /// Earth where the seat controls at least one Colonist (`bodies_settled(seat, 1)`), flat; the
+    /// Arkwrights' row says 1, every other row nothing.
+    #[serde(default)]
+    pub research_per_body_settled: i64,
+    /// Ticket #590 (version 0.1.0.4): the capital building this Faction takes, where it is free,
+    /// for a pick left unmade, and what the computer's pick leans to.
+    #[serde(default)]
+    pub capital_building: Option<CapitalBuilding>,
     pub influence_multiplier: f64,
     /// Ticket #82 (version 0.06.0): the Custodians' Production Moved. While a Facility of the key's
     /// kind in a state they direct is mothballed, one Module of the value's kind off Earth makes
@@ -713,6 +728,11 @@ pub struct FactionCard {
     #[serde(default = "production_moved_factor_default")]
     pub production_moved_factor: f64,
     pub signature: String,
+    /// Ticket #594 (version 0.1.0.4), at the designer's word: the Faction's **signature moves**,
+    /// one line, shown on turn one in the Report's place. `{your}` reads "your" to the Faction's
+    /// own player and "their" to a rival.
+    #[serde(default)]
+    pub opening_moves: String,
     /// Ticket #412 (version 0.09.4): what the Faction wins each time it leads a Tech to completion,
     /// in Influence and in Unrest off every Region it holds. Nought for all but the Archivists.
     #[serde(default)]
@@ -779,9 +799,14 @@ pub struct FactionCard {
     pub start_extra_facilities: Vec<FacilityKind>,
     /// Ticket #582 (version 0.1.0.3), at the designer's word: the Materials this Faction opens with,
     /// read in place of `[start] materials` where a row carries one; the Prospectors' row says 60
-    /// where the table says 80. Fuel, Energy and Ducats are the table's for every seat.
+    /// where the table says 80. Fuel and Energy are the table's for every seat.
     #[serde(default)]
     pub start_materials: Option<i64>,
+    /// Ticket #585 (version 0.1.0.4), at the designer's word: the Ducats this Faction opens with,
+    /// read in place of `[start] ducats` where a row carries one; the Arkwrights' and Archivists'
+    /// rows say 10 where the table says 0.
+    #[serde(default)]
+    pub start_ducats: Option<i64>,
     // Ticket #51: the per-Faction figures the Arkwrights' card carries. Every one is neutral by
     // default, so a card that names none plays exactly as it did before.
     /// What a Habitat here holds, times this.
@@ -861,7 +886,7 @@ impl VictoryFirstKind {
         match self {
             VictoryFirstKind::VentureFund => "Venture Capital Fund",
             VictoryFirstKind::StabilizationRun => "Stabilization run",
-            VictoryFirstKind::ColonistsOffEarth => "Colonists off Earth",
+            VictoryFirstKind::ColonistsOffEarth => "Colonists beyond Earth orbit",
             VictoryFirstKind::ResearchProduced => "Research produced",
             VictoryFirstKind::ArchiveResearch => "The Archive",
         }
@@ -964,7 +989,8 @@ pub struct VictoryFirstCard {
     pub weight: f64,
     /// Ticket #567 (version 0.1.0.3): what a Colonial Capital held counts for in the score, on a
     /// card that asks one (`victory_capital`); the second part counts what the two leave. The
-    /// Arkwrights' is a tenth, so a seat with both bars met and no Capital reads 90%. Absent, nought.
+    /// Arkwrights' is a tenth, so a seat with both bars met and no Capital reads 90% (91% with the
+    /// gate's 6% since ticket #601, version 0.1.0.4). Absent, nought.
     #[serde(default)]
     pub capital_weight: f64,
 }
@@ -1020,11 +1046,13 @@ pub struct DucatsCard {
     /// which is now the MIDPOINT of its band rather than a constant. At 1 every price stays a whole
     /// number and no resource can become free, which is why all three base prices rose by one to
     /// make room -- Materials 2 to 3, Fuel 3 to 4, Energy 1 to 2. Kept optional so an old table
-    /// still loads, as `trade_post_base` is.
+    /// still loads, as `trade_post_base` is, at the old 1. Ticket #593 (version 0.1.0.4): 2 on the
+    /// table, and no price under 1, so Energy at 2 runs 1 to 4.
     #[serde(default = "price_band_default")]
     pub price_band: i64,
     /// Ticket #220: the NET units of one resource, bought less sold across the whole table in a
-    /// turn, that move its price one step. 20 is a measured figure: a trading turn carries a median
+    /// turn, that move its price one step; since ticket #593 (version 0.1.0.4) also unit by unit
+    /// within the turn, each seat's lots priced at its own running net, the table's banked at the settle. 20 is a measured figure: a trading turn carries a median
     /// 20 units across all four seats, so a normal turn's trading is visible without pegging the
     /// price at its band's edge.
     #[serde(default = "price_step_default")]
@@ -1102,6 +1130,8 @@ pub struct ClimateTable {
     pub population_growth: f64,
     /// Ticket #444 (version 0.09.6): a Colony's growth share a turn, and its loss a turn when starved.
     pub colony_growth: f64,
+    /// Ticket #588 (version 0.1.0.4): the growth share instead at a station in Earth's near orbits.
+    pub colony_growth_earth_orbit: f64,
     pub colony_decline: u32,
     /// Ticket #333 (version 0.09.0): the population figure's unit, in people. A Region's figure, a
     /// Colonist and a Pioneer are all counted in it, so `Region population 380.0` is 380 million
@@ -1135,6 +1165,9 @@ pub struct InfluenceTable {
     pub allotment_base: i64,
     pub state_threshold_base: i64,
     pub state_threshold_per_size: i64,
+    /// Ticket #591 (version 0.1.0.4): what a neutral Region's threshold rises, for the taker, for
+    /// every Region it holds past its first.
+    pub threshold_per_region_held: i64,
     pub colony_threshold_per_colonist: i64,
     /// Ticket #336 (version 0.09.0): the base under every place off Earth, so an empty one is not
     /// free to take. `station_threshold_base` REPLACES it on a station rather than adding to it.
@@ -1278,6 +1311,10 @@ pub struct UnrestTable {
 #[derive(Debug, Clone, Deserialize)]
 pub struct VictoryTable {
     pub stabilization_turns: u32,
+    /// Ticket #601 (version 0.1.0.4), at the designer's word: what the gate is worth of the Victory
+    /// percentage, whole or nothing, the parts sharing the rest. Absent, nought: the old score.
+    #[serde(default)]
+    pub gate_weight: f64,
     /// Ticket #406 (version 0.09.4): what closing the whole counted gap is worth to the
     /// Custodians' first part, short of a run.
     pub stabilization_gap_cap: f64,
@@ -1549,6 +1586,11 @@ pub struct AiThresholds {
     /// Ticket #514 (version 0.1.0.0): what a seat whose win waits on a Colonial Capital, holding
     /// none, multiplies the upgrade of its Capital candidate and a landing there by.
     pub capital_chase: f64,
+    /// Ticket #590 (version 0.1.0.4): what the run's need adds to a capital building's score, the
+    /// Faction's own counting 1.
+    pub capital_pick_need: f64,
+    /// Ticket #590 (version 0.1.0.4): what an upgrade at a seat's best place off Earth weighs, times.
+    pub build_up: f64,
     /// Ticket #448 (version 0.09.6): what a seat keeps back from the market.
     pub market_materials_reserve: f64,
     pub market_materials_turns: f64,
@@ -1620,8 +1662,12 @@ pub struct AiThresholds {
     /// Slot's yields are weighed in. Nought here and the computer seats never read the new rule.
     pub first_windfall_worth: f64,
     /// Ticket #564 (version 0.1.0.3), at the designer's word: what a seat's Shipyard and Colony Ship
-    /// are weighed at, times their base, while it holds no Colony Ship and a Body is still unclaimed.
+    /// are weighed at, times their base, while it holds no Colony Ship and the Moon is still unclaimed.
     pub moon_race_weight: f64,
+    /// Ticket #596 (version 0.1.0.4), at the designer's word: the same, once the Moon is claimed and
+    /// while Mars itself has no ground Colony, for a seat with no Colony Ship free or bound for Mars.
+    #[serde(default)]
+    pub mars_race_weight: f64,
     /// Ticket #345: what the founding appetite is multiplied by at a Body whose first is still
     /// unclaimed -- the landing that takes a world is worth more than the landing that joins one.
     pub first_found_weight: f64,
@@ -1784,6 +1830,45 @@ pub struct TierCard {
     /// Ticket #503: Influence a turn to whoever directs a place at this tier, at face value.
     #[serde(default)]
     pub influence: i64,
+    /// Ticket #590 (version 0.1.0.4): the tier's capital building stands in one Module slot, which
+    /// must be open to order it; the upgrade reserves it while it builds. The Colonial Capital.
+    #[serde(default)]
+    pub takes_slot: bool,
+}
+
+/// Ticket #590 (version 0.1.0.4): one of the eight capital buildings, flat and after every
+/// multiplier. `here` at the Capital, `others` at each other place on its Body its holder directs.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CapitalBuildingCard {
+    pub id: CapitalBuilding,
+    /// The pick window's line.
+    pub does: String,
+    /// The yield it pays, with `here` and `others`.
+    #[serde(default)]
+    pub resource: Option<Resource>,
+    #[serde(default)]
+    pub here: f64,
+    #[serde(default)]
+    pub others: f64,
+    /// Influence a turn to its holder's Allotment, at the Capital and for each other place.
+    #[serde(default)]
+    pub influence_here: i64,
+    #[serde(default)]
+    pub influence_others: i64,
+    /// The share off the Widgets of a Ship built at a Shipyard at the Capital, and at the others.
+    #[serde(default)]
+    pub ship_widgets_cut_here: f64,
+    #[serde(default)]
+    pub ship_widgets_cut_others: f64,
+    /// Colonists' growth a turn added at the Capital, and at the others.
+    #[serde(default)]
+    pub growth_here: f64,
+    #[serde(default)]
+    pub growth_others: f64,
+    /// Unrest off every Region on Earth its holder controls, once, the turn it is chosen.
+    #[serde(default)]
+    pub earth_unrest: f64,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -1821,6 +1906,7 @@ struct ModulesFile {
     module: Vec<ModuleCard>,
     slots: SlotsCard,
     tiers: Vec<TierCard>,
+    capital_building: Vec<CapitalBuildingCard>,
     archive: ArchiveCard,
     observatory: ObservatoryCard,
     in_situ: InSituCard,
@@ -2185,6 +2271,8 @@ pub struct Tables {
     pub slots: SlotsCard,
     /// Ticket #490 (version 0.09.9): the tiers that cap them, in order, the first where every place starts.
     pub tiers: Vec<TierCard>,
+    /// Ticket #590 (version 0.1.0.4): the eight capital buildings, in `CapitalBuilding` order.
+    pub capital_buildings: Vec<CapitalBuildingCard>,
     /// Ticket #98: how many Techs the Research Lead chooses between.
     pub shortlist: ShortlistCard,
     /// Ticket #51: the Archive's stages and their Research price.
@@ -2354,6 +2442,7 @@ impl Tables {
             unique: facilities.unique,
             slots: modules.slots,
             tiers: modules.tiers,
+            capital_buildings: modules.capital_building,
             archive: modules.archive,
             observatory: modules.observatory,
             in_situ: modules.in_situ,
@@ -2398,9 +2487,11 @@ impl Tables {
         if self.tiers.is_empty() {
             return Err(err("modules.toml", "no tiers".to_string()));
         }
-        if self.tiers.windows(2).any(|w| w[1].cap <= w[0].cap || w[1].colonists < w[0].colonists) {
+        // Ticket #590 (version 0.1.0.4): a tier whose building takes a slot asks a slot, not people.
+        if self.tiers.windows(2).any(|w| w[1].cap <= w[0].cap || (!w[1].takes_slot && w[1].colonists < w[0].colonists)) {
             return Err(err("modules.toml", "each tier must allow more slots, and want no fewer Colonists, than the one before".to_string()));
         }
+        check_rows("modules.toml", &CapitalBuilding::ALL, self.capital_buildings.iter().map(|b| b.id))?;
         // Ticket #58: every sentence the Report says, with every placeholder the engine supplies.
         self.report.check().map_err(|m| err("report.toml", m))?;
         // Every fixed id must have exactly one row, in the engine's order.
@@ -2460,6 +2551,9 @@ impl Tables {
             }
             if f.start_materials.is_some_and(|m| m < 0) {
                 return Err(err("factions.toml", format!("row {}: start_materials must not be negative", f.name)));
+            }
+            if f.start_ducats.is_some_and(|d| d < 0) {
+                return Err(err("factions.toml", format!("row {}: start_ducats must not be negative", f.name)));
             }
             if f.victory_first.bar <= 0.0 {
                 return Err(err("factions.toml", format!("row {}: victory_first.bar must be positive", f.name)));
@@ -2827,6 +2921,9 @@ impl Tables {
     pub fn module(&self, kind: ModuleKind) -> &ModuleCard {
         &self.modules[kind as usize]
     }
+    pub fn capital_building(&self, b: CapitalBuilding) -> &CapitalBuildingCard {
+        &self.capital_buildings[b as usize]
+    }
     pub fn unit(&self, kind: UnitKind) -> &UnitCard {
         &self.units[kind as usize]
     }
@@ -2840,14 +2937,16 @@ impl Tables {
         &self.factions[kind as usize]
     }
     /// Ticket #582 (version 0.1.0.3): the Stockpile a seat of this Faction opens with -- the
-    /// `[start]` table's figures, the Materials the card's own where it says (the Prospectors' 60).
+    /// `[start]` table's figures, the Materials the card's own where it says (the Prospectors' 60),
+    /// and since ticket #585 (version 0.1.0.4) the Ducats too (the Arkwrights' and Archivists' 10).
     /// `Game::new` and the card's opening goods line both read it, so they cannot drift.
     pub fn start_stockpile(&self, kind: FactionKind) -> crate::state::Stockpile {
+        let f = self.faction(kind);
         crate::state::Stockpile {
-            materials: self.faction(kind).start_materials.unwrap_or(self.start.materials) as f64,
+            materials: f.start_materials.unwrap_or(self.start.materials) as f64,
             fuel: self.start.fuel as f64,
             energy: self.start.energy as f64,
-            ducats: self.start.ducats as f64,
+            ducats: f.start_ducats.unwrap_or(self.start.ducats) as f64,
         }
     }
     /// Ticket #350 (version 0.09.1): the Faction's Victory Condition in one clause, its figures
@@ -2881,6 +2980,12 @@ impl Tables {
     /// Ticket #407 (version 0.09.4): a Faction's signature rule with its figures read from the
     /// data, so the text cannot go stale: the Scrubber's price, upkeep, Sink and cap, the Leapfrog's
     /// price and a Mothball's Unrest. A text that names none of them reads as written.
+    /// Ticket #594 (version 0.1.0.4): the Faction's signature moves, as its own player (`yours`) or
+    /// a rival reads them.
+    pub fn opening_moves(&self, kind: FactionKind, yours: bool) -> String {
+        crate::report::render(&self.faction(kind).opening_moves, &[("your", if yours { "your" } else { "their" }.to_string())])
+    }
+
     pub fn signature(&self, kind: FactionKind) -> String {
         let s = self.facility(FacilityKind::Scrubber);
         crate::report::render(
@@ -2902,6 +3007,8 @@ impl Tables {
                 // Ticket #582 (version 0.1.0.3): the Prospectors' opening Materials against the table's.
                 ("start_materials", crate::state::figure(self.start_stockpile(kind).materials)),
                 ("common_materials", self.start.materials.to_string()),
+                // Ticket #589 (version 0.1.0.4): the Arkwrights' Research a Body settled.
+                ("per_body", self.faction(kind).research_per_body_settled.to_string()),
             ],
         )
     }

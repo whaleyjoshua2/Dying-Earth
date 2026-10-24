@@ -337,15 +337,17 @@ id = "cheap_ore_offer"
 name = "Cheap Ore Offer"
 kind = "choice"
 target = "seat"
-effect = "Buy the ore, or let it go for half-price Materials next turn"
+effect = "Buy the ore, or let it go for a third off Materials next turn"
 copies = 1
 [event.choice]
 question = "A broker offers 30 Materials for 20 Ducats, this turn only. Buy?"
 take = "Buy the lot"
 # Ticket #577 (version 0.1.0.3), at the designer's word: a refusal halves the Trading window's
 # Materials price for the refusing seat alone, for the one turn after the answer, where it set the
-# market's row to 1 Ducat for two turns for the whole table, rivals included.
-refuse = "Let it go: Materials at half price for you next turn"
+# market's row to 1 Ducat for two turns for the whole table, rivals included. Ticket #597 (version
+# 0.1.0.4), at the designer's word: a third off, where it was half, the refusing seat's alone still,
+# and flat while it stands, as a price a card has set is.
+refuse = "Let it go: Materials a third off next turn"
 take_when = { rule = "ducats_at_least", ducats = 20 }
 [[event.choice.take_does]]
 effect = "resources"
@@ -354,7 +356,8 @@ ducats = -20
 [[event.choice.refuse_does]]
 effect = "seat_price"
 resource = "materials"
-multiplier = 0.5
+# Two thirds, to the last place a float holds, so 30 Materials at 3 cost 60 and not 60.1.
+multiplier = 0.6666666666666666
 turns = 1
 
 [[event]]

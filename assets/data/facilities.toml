@@ -214,7 +214,7 @@ emissions = 0.0
 # Ticket #332 (version 0.09.0): the Mine, the Earth Facility that makes Materials now that the
 # Factory makes Widgets. The Factory's old row with the Factory's old output: the Region's Materials
 # lean (x1.5), Deep Mining and the Strip Permit follow the Materials here; Clean Manufacturing stays
-# with the Factory, so a Mine emits its full 1.0. Every Region that starts with a Factory starts
+# with the Factory, so a Mine emits its full figure (0.85 since ticket #604). Every Region that starts with a Factory starts
 # with a Mine beside it (nation_states.toml), so opening Materials are as they were. Appended last:
 # `Tables::facility` indexes FacilityKind by discriminant.
 [[facility]]
@@ -225,7 +225,9 @@ widgets = 4
 energy_upkeep = 2
 # Ticket #537 (version 0.1.0.1): 4.4, where it was 4 -- an Earth Mine makes a tenth more.
 produces = { resource = "materials", amount = 4.4 }
-emissions = 0.75
+# Ticket #604 (version 0.1.0.4), at the designer's word: 0.85, where it was 0.75, the Antarctic
+# Mine Module's figure with it.
+emissions = 0.85
 
 # Ticket #54: the cap on Scrubbers in one Nation State, from its population -- in units of one
 # million since ticket #333 (version 0.09.0; five million from ticket #143, version 0.07.3, when this

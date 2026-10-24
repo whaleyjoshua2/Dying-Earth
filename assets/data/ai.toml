@@ -372,7 +372,8 @@ bounty_least = 1.0
 # `first` is the Faction's first Victory part by turn, as [turn, value]; a Faction whose first part
 # is a Stabilization run has no useful interpolation, so it names ppm figures instead: within
 # `within_ppm` of the Sink by `within_by_turn`, and under it by `under_sink_by_turn`.
-# `colonists` is the Colonists off Earth the Faction should hold, as [turn, colonists].
+# `colonists` is the Colonists off Earth the Faction should hold, as [turn, colonists]; since ticket #588
+# (version 0.1.0.4) beyond Earth orbit, the count every Victory reader takes.
 
 # Ticket #72 (version 0.05.5): the pace is Ducats banked in the Venture Capital Fund, by turn 34
 # of thirty-six; the AI sets its share each turn to stay on it.
@@ -385,8 +386,9 @@ bounty_least = 1.0
 # Ticket #506 (version 0.1.0.0): every turn stretched by 50/36 and every figure to the new bar
 # (the Fund 3,500, 18 off Earth), with the game at fifty turns.
 # Ticket #580 (version 0.1.0.3): every figure x 4250/3500 with the bar, the turns as they were.
+# Ticket #584 (version 0.1.0.4): every figure x 5000/4250 with the bar, the turns as they were.
 [pace.prospectors]
-first = [[12, 567], [25, 1417], [37, 2550], [47, 4250]]
+first = [[12, 667], [25, 1667], [37, 3000], [47, 5000]]
 colonists = [[17, 6], [31, 18]]
 
 [pace.custodians]
@@ -416,7 +418,9 @@ first = [[14, 62], [25, 126], [36, 188], [44, 250]]
 # turn 26, eight by 30, twelve by 34. Added at the designer's word, so the computer pushes when behind.
 # Ticket #565 (version 0.1.0.3): the bar at 16, four a turn at most, so 5 / 11 / 16.
 uploads = [[36, 5], [42, 11], [47, 16]]
-colonists = [[17, 6], [31, 18]]
+# Ticket #588 (version 0.1.0.4), at the designer's word: no people pace. Their Victory counts no one
+# living anywhere, and reading people beyond Earth orbit pulled them from the Archive from turn 1.
+colonists = []
 
 [thresholds]
 # Ticket #496 (version 0.09.9): a computer seat offers a Trade when a Stockpile good is under
@@ -459,7 +463,8 @@ founding_pull_double_at = 9.0
 # Without these two the rule would not exist in play: the destination list was yields against
 # flight time, the Moon won it from turn one, and no computer seat founded a Colony anywhere in
 # the Mars system in eighty measured games. Both fall away the moment a Body is claimed, so the
-# pull is toward whatever world is still unsettled and never toward one that is.
+# pull is toward whatever world is still unsettled and never toward one that is (save the races
+# below, which send one Ship of each seat to the Moon and then to Mars first).
 first_windfall_worth = 0.12
 # Ticket #564 (version 0.1.0.3), at the designer's word ("AI seats pursue first moon landing"):
 # while a seat holds no Colony Ship, built or on order, and the Moon is still unclaimed, its Shipyard
@@ -469,6 +474,14 @@ first_windfall_worth = 0.12
 # nearly always. A race for ANY unclaimed Body was tried first: the Ships came early and flew past
 # the Moon to the bigger windfalls, the Prospectors to Mars by turn 11, and took 53 of 80 games.
 moon_race_weight = 3.0
+# Ticket #596 (version 0.1.0.4), at the designer's word ("race to Mars"): a second race, opening once
+# the Moon is claimed by anyone and ending with the first ground Colony on Mars itself (Phobos and
+# Deimos are Bodies of their own). While a seat holds no Colony Ship free or bound for Mars, built or
+# on order, its Shipyard and Colony Ship are weighed at this times their base, and its runner -- one
+# loaded Colony Ship -- is sent to Mars, the crossing weighed by the window as any is; its other Ships
+# go where the ranking below sends them. Gated on the Moon, which the
+# withdrawn any-Body race above lacked. Measured before: Mars founded in 28 of 80, median turn 24.
+mars_race_weight = 2.5
 first_found_weight = 1.5
 attack_odds = 0.6
 # Ticket #284 (version 0.08.5): every seat may attack a place it did not lose, on the odds, given a
@@ -499,6 +512,15 @@ archive_target_fund = 0.5
 # well, 8, one held off Earth -- the Arkwrights' best places stood at 9 or 10 Modules of the 12 the
 # next tier wants, and arrivals founded four-person Outposts beside them.
 capital_chase = 3.0
+# Ticket #590 (version 0.1.0.4): a capital building's score is 1 for the Faction's own, plus this
+# where the run needs what it gives: a yield the last Income lost, Ships at the Capital's Body,
+# a Region past the first Unrest threshold; the Chancery and the Great Library by the Faction
+# alone. The highest free one is taken.
+capital_pick_need = 1.5
+# Ticket #590 (version 0.1.0.4), at the designer's word: a seat builds up its most peopled ground
+# Colony off Earth, its upgrade weighing this many times. Without it the upgrade, at 5 or 6, was
+# held every turn for builds at 20 to 45, and no place off Earth passed Outpost in 80 games.
+build_up = 5.0
 # Ticket #448 (version 0.09.6): the market. A seat keeps this many Materials, plus this many turns of
 # the larger of its Materials income and what the turn's own orders spend, and sells the rest; and
 # keeps its Ships' empty tank room plus this much Fuel, selling the rest -- each only at or above the

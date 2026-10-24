@@ -1,0 +1,28 @@
+--- NATION STATES ---
+SubSaharanAfrica neutral                        pop 625.2 ind 1 unrest 0 | free slots 5/7 (coastal 0) | your Standing 0, 50 needed to take it | emigrants 0
+    Standings: nobody has any yet
+    Nigeria | lean Materials | GDP 1 | facilities: 0:Factory, 1:Mine
+    Widgets 5 a turn, 0 owed | building: nothing
+NorthAfrica      neutral                        pop 266.6 ind 1 unrest 0 | free slots 5/6 (coastal 1) | your Standing 0, 40 needed to take it | emigrants 0
+    Standings: nobody has any yet
+    Egypt | lean Fuel | GDP 1 | facilities: 0:Refinery
+    Widgets 5 a turn, 0 owed | building: nothing
+EastAsia         Custodians (seat 0)            pop 1383.7 ind 3 unrest 0 | free slots 4/9 (coastal 0) | your Standing 50, you hold it on 50 Standing, over which a rival must climb by the challenge margin | emigrants 0
+    Standings: Custodians 50
+    China | lean Materials | GDP 16 | facilities: 0:Power Plant, 1:Factory, 2:Mine, 3:Refinery, 4:Launch Site
+    Widgets 11 a turn, 0 owed | building: nothing
+SouthAsia        neutral                        pop 1676.6 ind 2 unrest 0 | free slots 4/7 (coastal 1) | your Standing 0, 40 needed to take it | emigrants 0
+    Standings: nobody has any yet
+    India | lean Materials | GDP 3 | facilities: 0:Factory, 1:Mine, 2:Power Plant
+    Widgets 6 a turn, 0 owed | building: nothing
+SouthEastAsia    neutral                        pop 434.3 ind 2 unrest 0 | free slots 4/7 (coastal 2) | your Standing 0, 40 needed to take it | emigrants 0
+    Standings: nobody has any yet
+    Indonesia | lean Fuel | GDP 2 | facilities: 0:Refinery, 1:Power Plant, 2:Research Lab
+    Widgets 6 a turn, 0 owed | building: nothing
+Australia        Archivists (seat 3)            pop 50.5 ind 2 unrest 0 | free slots 2/7 (coastal 0) | your Standing 0, 60 needed to take it from the Archivists | emigrants 0
+    Standings: Archivists 40
+    Australia | lean Energy | GDP 2 | facilities: 0:Reactor, 1:Factory, 2:Mine, 3:Refinery, 4:Launch Site
+    Widgets 10 a turn, 0 owed | building: (out of sight)
+Europe           Prospectors (seat 1)           pop 530.2 ind 3 unrest 0 | free slots 3/8 (coastal 0) | your Standing 0, 60 needed to take it from the Prospectors | emigrants 0
+    Standings: Prospectors 40
+    The European Union | lean Energy | GDP 17 | facilities: 0:Power Plant, 1:Factory, 2:Mine, 3:Refinery, 4:Launch Site

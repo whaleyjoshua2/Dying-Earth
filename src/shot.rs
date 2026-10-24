@@ -292,6 +292,13 @@ fn build_board(session: &mut Session) {
                 g.state_mut(home).facilities.push(Facility::new(kind));
             }
         }
+        // `held:<state>` (a building aid, ticket #591): seat 0 controls the named Region, so a neutral
+        // Region's card shows the Regions-held term. By the enum's spelling, case ignored; any number.
+        for id in std::env::args().filter_map(|a| a.strip_prefix("held:").map(str::to_owned)) {
+            if let Some(s) = StateId::ALL.into_iter().find(|s| format!("{s:?}").eq_ignore_ascii_case(&id)) {
+                g.state_mut(s).control = Control::Controlled(Seat(0));
+            }
+        }
         // `researched:<tech>` (a building aid, ticket #559): the named Tech stands done, so a picture
         // can show what waits behind it -- the Wind Farm on a build list, say. By the enum's spelling,
         // case and underscores ignored: `researched:clean_power`. Any number may be given.
@@ -301,6 +308,13 @@ fn build_board(session: &mut Session) {
             {
                 g.research.done.push(t);
             }
+        }
+        // `shortlist:1` (a building aid, ticket #592, version 0.1.0.4): with `pick:0`, the pick owed
+        // is drawn as a completed Tech's would be, over whatever `researched:` stood done, so the
+        // Tech Tree's shortlist can be photographed -- four once Orbital Data Centers stands.
+        if leave_pick && std::env::args().any(|a| a == "shortlist:1") {
+            g.draw_shortlist(Seat(0));
+            g.research.awaiting_pick = Some(Seat(0));
         }
         for seat in Seat::ALL {
             if !g.ships_at(seat, BodyId::Mars).is_empty() {
@@ -431,7 +445,36 @@ fn build_board(session: &mut Session) {
             };
             g.seats[0].stockpile.materials = 120.0;
             g.seats[0].stockpile.energy = 60.0;
+            // Ticket #587 (version 0.1.0.4): `uploaded:N`, a count already read in, for the card's
+            // "N remembered here".
+            g.seats[0].uploaded = std::env::args().find_map(|a| a.strip_prefix("uploaded:").and_then(|v| v.parse().ok())).unwrap_or(0);
             ARCHIVE_COLONY.with(|c| c.set(Some(id)));
+            // Ticket #587 (version 0.1.0.4): `upload:1`, four read in and the turn ended, so the
+            // Report (`menus:1`) carries the Upload's line.
+            if std::env::args().any(|a| a == "upload:1") {
+                let mut orders: [Vec<Order>; 4] = std::array::from_fn(|_| Vec::new());
+                orders[0].push(Order::Upload { colony: id, n: 4 });
+                g.end_turn(orders).expect("a Tech is picked before the turn ends");
+            }
+        }
+        // `capital:none` or `capital:<building>` (a building aid, ticket #590): seat 0 holds the
+        // Moon's Colonial Capital, unchosen or with that building, beside a second place of its own
+        // there; seat 1 holds Mars's with the Stock Market, so the pick window greys one.
+        if let Some(arg) = std::env::args().find_map(|a| a.strip_prefix("capital:").map(str::to_string)) {
+            let capital = g.tables.tiers.iter().position(|t| t.takes_slot).unwrap_or(0) as u32;
+            let place = |g: &mut Game, seat: Seat, body: BodyId, tier: u32, modules: Vec<Module>, colonists: u32| {
+                let slot = g.free_slots_on(body).first().copied().unwrap_or(0);
+                let id = ColonyId(g.fresh_id());
+                g.colonies.push(Colony { id, body, slot, control: Control::Controlled(seat), modules, colonists, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, tier, in_orbit: false });
+                id
+            };
+            let moon = place(g, Seat(0), BodyId::Moon, capital, vec![Module::new(ModuleKind::Core), Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Mine), Module::new(ModuleKind::Generator), Module::new(ModuleKind::Shipyard)], 9);
+            place(g, Seat(0), BodyId::Moon, 0, vec![Module::new(ModuleKind::Core), Module::new(ModuleKind::Mine)], 4);
+            let mars = place(g, Seat(1), BodyId::Mars, capital, vec![Module::new(ModuleKind::Core), Module::new(ModuleKind::Habitat)], 6);
+            g.pick_capital_building(Seat(1), mars, CapitalBuilding::StockMarket).ok();
+            if let Some(b) = CapitalBuilding::parse(&arg) {
+                g.pick_capital_building(Seat(0), moon, b).ok();
+            }
         }
         // `battery:1` (a building aid, ticket #324, version 0.08.8): seat 0 gets a Colony on Mars
         // with a Battery standing, two hits on it, and seat 1 a Frigate in Mars orbit on Hold; so
@@ -646,17 +689,18 @@ fn build_board(session: &mut Session) {
         }
         // `rival:1` (a building aid, ticket #261, version 0.08.4): seat 1 stands three quarters of
         // the way to its Victory Condition -- fourteen Colonists on the Moon of eighteen, and, for
-        // the Prospectors it usually is, the Fund at 3230 of 4250 (ticket #580, version 0.1.0.3,
-        // from the review: 2625 of 3500 since ticket #506, nine of twelve and 2000 of 2500 before;
-        // at the 4,250 bar 2625 scored 0.67 and the Moment never fired) -- and a quiet turn runs so
-        // the rival's Moment fires and `moment:rival` can open it in the Report picture.
+        // the Prospectors it usually is, the Fund at 3800 of 5000 (ticket #584, version 0.1.0.4;
+        // 3230 of 4250 since ticket #580, from the review: 2625 of 3500 since ticket #506, nine of
+        // twelve and 2000 of 2500 before; at the 4,250 bar 2625 scored 0.67 and the Moment never
+        // fired) -- and a quiet turn runs so the rival's Moment fires and `moment:rival` can open it
+        // in the Report picture.
         if std::env::args().any(|a| a == "rival:1") {
             let rival = Seat(1);
             let slot = g.free_slots_on(BodyId::Moon).first().copied().unwrap_or(0);
             let id = ColonyId(g.fresh_id());
             let modules = vec![Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Habitat)];
             g.colonies.push(Colony { id, body: BodyId::Moon, slot, control: Control::Controlled(rival), modules, colonists: 14, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, tier: 0, in_orbit: false });
-            g.seats[1].venture_fund = 3230.0;
+            g.seats[1].venture_fund = 3800.0;
             g.seats[1].stabilization_run = 4;
             run_one_quiet_turn(g);
         }
@@ -1528,6 +1572,42 @@ fn build_board(session: &mut Session) {
         eprintln!("order:{name} was refused");
         std::process::exit(3);
     }
+    // `searise:1` (a building aid, ticket #600, version 0.1.0.4): the sea's first threshold now,
+    // seat 0's home Region all on the coast so a building of the player's drowns, so the Report
+    // (`menus:1`) shows the rise's one line and the player's own loss.
+    if std::env::args().any(|a| a == "searise:1")
+        && let Some(g) = session.game.as_mut()
+    {
+        if let Some(home) = g.directed_states(Seat(0)).first().copied() {
+            for f in g.state_mut(home).facilities.iter_mut() {
+                f.coastal = true;
+            }
+        }
+        g.report.lines.clear();
+        g.climate.temperature = g.tables.climate.sea_level_thresholds[0];
+        g.sea_level_check();
+    }
+    // `orecut:1` (a building aid, ticket #597, version 0.1.0.4): seat 0 has refused the Cheap Ore
+    // Offer, its Materials a third off for this turn, so the Trading window shows the cut.
+    if std::env::args().any(|a| a == "orecut:1")
+        && let Some(g) = session.game.as_mut()
+    {
+        let until = g.turn;
+        g.seats[0].price_cuts.push(dying_earth_engine::state::PriceCut { row: 0, multiplier: 2.0 / 3.0, until });
+    }
+    // `buy:<n>` (a building aid, ticket #593, version 0.1.0.4): two Buys of n Materials placed and
+    // left pending, the seat given the Ducats, so the Trading window (`trade:1`) shows the second lot
+    // and the next one quoted dearer than the first.
+    if let Some(n) = std::env::args().find_map(|a| a.strip_prefix("buy:").and_then(|n| n.parse::<i64>().ok())) {
+        if let Some(g) = session.game.as_mut() {
+            g.seats[0].stockpile.ducats = 1000.0;
+        }
+        let buy = Order::Buy { resource: dying_earth_engine::ids::Resource::Materials, amount: n };
+        if !session.place(buy.clone()) || !session.place(buy) {
+            eprintln!("buy:{n} was refused");
+            std::process::exit(3);
+        }
+    }
     // `liftgo:1` (a building aid, ticket #533, version 0.1.0.1): seat 0's empty Colony Ship at
     // Earth (one is made in low orbit if it has none), four Pioneers waiting in its start state, and
     // a lift of the four AND a flight to the Moon both placed, so its card (`stack:earth ship:1`)
@@ -2113,6 +2193,11 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
                     }
                     view.popup = Popup::Tutorial;
                 }
+                // `opening:1` (a building aid, ticket #594): turn one's signature moves stand in the
+                // Report picture's place, as a new game opens on them.
+                if std::env::args().any(|a| a == "opening:1") {
+                    view.popup = Popup::Opening;
+                }
                 view.show_climate = false;
             }
             _ => {
@@ -2230,6 +2315,8 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
             Some("orbits") => Some(StackBlock::ChangeOrbit),
             // Ticket #346 (version 0.09.1): the Tanks block, which carries the dry warning.
             Some("tanks") => Some(StackBlock::Tanks),
+            // Ticket #587 (version 0.1.0.4): the Archive's Upload row on the Colony's card.
+            Some("archive") => Some(StackBlock::Archive),
             _ => None,
         });
         // Ticket #337 (version 0.09.0): the turn's Choice Card stands in every picture of the run,
