@@ -662,3 +662,23 @@ Income a game, mean (Materials / Fuel / Energy / Ducats / Research): Custodians 
 1237 / 1082, Prospectors 2169 / 439 / 290 / 1566 / 330, Arkwrights 735 / 137 / 156 / 2442 / 245,
 Archivists 500 / 239 / 61 / 467 / 659. The Custodians, whose Victory asks the air held under the
 Sink, give up four, at the edge of noise.
+
+## Closing the version
+
+Ticket [#602](https://github.com/whaleyjoshua2/Dying-Earth/issues/602).
+
+- **The closing sweep** ([`sweeps/final-0.1.0.4.txt`](sweeps/final-0.1.0.4.txt)): **23 / 42 / 4 / 10
+  and 1 collapse**, #604's board to the figure, since nothing that moves a rule changed after it;
+  from 0.1.0.3's 26 / 41 / 5 / 8 and 0. Mars founded in 80 of 80 at a median turn 13 (28 of 80 at
+  24 in 0.1.0.3); 16 Colonial Capitals at the end (4). The Prospectors at 42 and the Arkwrights at 4
+  are the figures farthest from the designer's 15 each; the collapses at 1 against 20.
+- **`GAME_VERSION` 0.1.0.4; `SAVE_VERSION` stays at 12**: the capital buildings chosen and those not
+  yet told (#590) read a default from an older save. The save test cuts both from a save and loads
+  it; with their defaults taken away it failed (*missing field named `capital_buildings`*).
+- **The glossary** audited against the version by an agent that did not write it: nine lines gave an
+  old rule (the Colony Ship's tank, the Victory's 90%, the Archive's ground, the Earth-orbit
+  Colonist, the market's step, the opening Ducats, the top bar's meter, the capital pick's fallback,
+  the Launch Site's avoid list) and are mended; the Cheap Ore Offer and the Mars race had no entry
+  and have one.
+- **The playtest note** rewritten for the version; the Windows kit built here into `dist/`, the
+  Linux kit from the release-kits run.

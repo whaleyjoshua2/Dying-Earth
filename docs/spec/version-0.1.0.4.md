@@ -11,8 +11,38 @@ pictures and sweeps that decided it are in
 **26 / 41 / 5 / 8 and 0 collapses**, against the designer's 15 each and 20.
 
 **What the version is.** Version 0.1.0.3 with the designer's list of 2026-10-21, most of it making the
-game tell its own story in plain words, beside the figures that move. The summary and the win column
-are written at the close-out.
+game tell its own story in plain words, beside the figures that move. **The story**: the Report's
+lines (§8), the Region card's (§13), the Custodians' Stabilization meter (§14), the signature moves
+on turn one (§15), the Upload told as a line about a place and its people (§16), and Colonies, Ships
+and Armies by name, never by number (§18). **The figures**: the Fund at 5,000 (§1), 10 Ducats for
+the Arkwrights and Archivists (§2), the Arkwrights' Research per Body (§3), Orbital Data Centers at
+x1.25 with a fourth Tech (§4), a market that floats with the lots (§5), the Cheap Ore refusal a
+third off (§6), every Victory gate 6% (§7), and, after the list, Clean Power at x0.5 (§19) and a
+Mine at 0.85 (§20). **The rules**: a neutral threshold rising with Regions held (§11), people in
+Earth orbit out of the Victory count and growing faster (§12), and the Colonial Capital on one slot
+with eight capital buildings (§17). **The computer**: every seat racing for Mars (§10) and building
+up its best place off Earth (§17). **The texts**: the help without its history (§9).
+
+**What it did to the win column** (80 games, per Faction; every section's own sweep is in it):
+
+| | 0.1.0.3 | §1-§4 the figures | §5-§7 market and gates | §10 the Mars race | §11 thresholds | §12 Earth orbit | §17 the Capital | §19-§20: closing | the ideal |
+|---|---|---|---|---|---|---|---|---|---|
+| Custodians | 26 | 24 | 26 | 32 | 18 | 35 | 28 | **23** | 15 |
+| Prospectors | 41 | 40 | 39 | 33 | 45 | 32 | 39 | **42** | 15 |
+| Arkwrights | 5 | 5 | 7 | 4 | 5 | 2 | 4 | **4** | 15 |
+| Archivists | 8 | 11 | 8 | 10 | 11 | 11 | 8 | **10** | 15 |
+| collapses | 0 | 0 | 0 | 1 | 1 | 0 | 0 | **1** | 20 |
+
+**The closing board** ([`sweeps/final-0.1.0.4.txt`](../dev-diary/2026-10-21-version-0.1.0.4/sweeps/final-0.1.0.4.txt)):
+**23 / 42 / 4 / 10 and 1 collapse**, the board of §20 to the figure, since nothing that moves a
+rule changed after it. The Mars race (§10) took Mars from 28 of 80 games at a median turn 24 to 80
+of 80 at turn 22 (turn 13 on the closing board) and briefly evened the Custodians and the Prospectors; the thresholds (§11) and
+Earth orbit (§12) swung the Custodians 14 wins down and 17 back; the Capital's gathering (§17) handed
+the Prospectors seven, accepted at the designer's word for 20 Capitals at the end where 4 stood
+(16 on the closing board). The Prospectors at 42 are still the farthest from the ideal, the
+Arkwrights at 4 the next; the collapses at 1 against 20 wanted are the third figure to watch.
+`GAME_VERSION` is 0.1.0.4; `SAVE_VERSION` stays at 12: the two saved fields the version added (the
+capital buildings, §17) read a default, so a 0.1.0.3 save and those before it to 0.1.0.0 load.
 
 ## 1. The Prospectors' Venture Fund at 5,000
 

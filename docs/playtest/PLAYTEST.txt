@@ -1,4 +1,4 @@
-DYING EARTH - playtest build, version 0.1.0.3
+DYING EARTH - playtest build, version 0.1.0.4
 =============================================
 
 Thanks for playing. This is an early build of a turn-based strategy game about colonizing
@@ -16,90 +16,71 @@ HOW TO RUN
 4. The very first launch shows a blank dark window for up to ten seconds while it
    compiles graphics. Later launches are quick.
 5. Needs Windows 10 or 11, 64-bit, and any graphics card from the last ten years.
-6. Saves from 0.1.0.2, 0.1.0.1 and 0.1.0.0 load. Saves from 0.09.9 and before do not: the
-   Load screen says so.
+6. Saves from 0.1.0.3, 0.1.0.2, 0.1.0.1 and 0.1.0.0 load. Saves from 0.09.9 and before do
+   not: the Load screen says so.
 7. This version ships for Windows and for Linux. On Linux, read RUN-ON-LINUX.txt in the
    folder instead of steps 2 to 5.
 
-WHAT CHANGED SINCE 0.1.0.2
+WHAT CHANGED SINCE 0.1.0.3
 --------------------------
-The fair-fight version: most of it takes the slack out of the board, the loops that won
-alone, the chores that stole turns, and the rules the computer never used.
+The storyteller version: most of it makes the game tell its own story in plain words, beside
+a few figures that move.
 
-EARTH
-- ONE BANK TO A REGION, and the Prospectors' Investment Bank counts as one.
-- A SCRUBBER costs 4 Energy and 1 Ducat a turn, and a Region holds one per 300 million
-  people (India 6, China 5, most Regions 1).
-- THE WIND FARM: a new Facility anybody with Clean Power may build, 3 Energy a turn for no
-  Fuel and no Emissions, at 1 Ducat a turn; a Mars Module too. The computer builds it.
-- POWER BURNS FUEL: a Power Plant, a Reactor or a Generator burns 0.8 Fuel a turn, and one
-  short of Fuel runs at a quarter. The computer keeps a reserve.
-- INFLUENCE costs 4.5 Ducats a point; the Distress Call card gives +2.
-- THE PROSPECTORS open with 60 Materials where the other three open with 80. Every Faction's
-  card now says what it opens with, in a line above its signature rule.
-- THE ARKWRIGHTS and THE ARCHIVISTS open with 10 Ducats; the other two open with none. The
-  card's opening line shows it.
-- THE ARKWRIGHTS draw +1 Research a turn for each Body off Earth where they hold a Colonist
-  (a station over it counts). The Research income lists it as "Bodies settled".
-- ORBITAL DATA CENTERS lifts an Observatory's Research x1.25, from x1.5, and once it stands
-  every Tech pick is from four, not three, whoever leads it.
- - THE MARKET re-prices every lot: each 20 you buy this turn makes your next a Ducat dearer, each
-   20 you sell a Ducat cheaper, 2 either side of the usual price; everyone's trading moves next
-   turn's price. Buy 40 Materials and watch the second 20 cost more.
- - The CHEAP ORE OFFER's refusal takes a third off your Materials next turn, where it was half,
-   and your lots stay flat while it stands.
- - YOUR VICTORY's gate Tech (and the Archivists' running Archive) is 6% of it, so both bars met
-   without the gate reads 94% - needs ..., never 100%.
- - THE REPORT: the sea is one line a rise (your losses named, rivals' counted) and each
-   building of yours it takes is a line in Your works; a rival taking or occupying your Region
-   is the headline; a Region throwing off its holder reads "revolted".
-- A STRIP PERMIT is once per Region, ever, and the button and the help say so.
+THE STORY
+- TURN ONE opens on each Faction's SIGNATURE MOVES, yours first, in place of the Report.
+- THE CUSTODIANS get a STABILIZATION METER where the other funds' bars stand: your Emissions,
+  the world's, and the Sink.
+- THE UPLOAD reads as a story: "4 of Olympus Mons's people were read into the Archive", and
+  the card says "10 remembered here".
+- THE REPORT: the sea is one line a rise (your losses named, rivals' counted) and each
+  building of yours it takes is a line in Your works; a rival taking or occupying your Region
+  is the headline; a Region throwing off its holder "revolted"; "Natural Sink +1.5 ppm".
+- THE REGION CARD reads "Standing 40 (yours)"; "nobody has any yet" is gone.
+- A SHIP'S HOVER reads its name and kind in its Faction's colour: "TSV Beagle [Colony Ship]".
+  A Colony's founding date is drawn larger.
 
-SPACE
-- LOADING a Ship from a Colony or a station is free of the Ship's turn, as a lift is, so
-  a Ship can load and leave in one turn.
-- A SHIP BLOCKS A LANDING only when it is on Blockade in low orbit; a passing or holding
-  warship does not. A Passage partner never blocks you. Orbital Control still gates the
-  Bombard, the Launch and the starving.
-- Every computer seat RACES FOR THE MOON from turn one.
-- The Custodians' computer uses PRODUCTION MOVED (an idle Factory makes its pair off Earth
-  x2.08), and the Custodians starting in East Asia now leave Earth like the rest.
+THE FIGURES
+- THE PROSPECTORS' bar is 5,000 Ducats in the Venture Fund.
+- THE ARKWRIGHTS and THE ARCHIVISTS open with 10 Ducats; the other two open with none.
+- THE ARKWRIGHTS draw +1 Research a turn for each Body off Earth where they hold a Colonist.
+- ORBITAL DATA CENTERS lifts an Observatory's Research x1.25, and once it stands every Tech
+  pick is from four, not three.
+- THE MARKET re-prices every lot: each 20 you buy this turn makes your next a Ducat dearer,
+  each 20 you sell a Ducat cheaper; everyone's trading moves next turn's price.
+- The CHEAP ORE OFFER's refusal takes a third off your Materials next turn.
+- YOUR VICTORY's gate Tech (and the Archivists' running Archive) is 6% of it, so both bars
+  met without the gate reads 94% - needs ..., never 100%.
+- CLEAN POWER halves a Power Plant's Emissions (it cut them to 0.4). A MINE emits 0.85 a
+  turn, in a Region or in Antarctica, and Clean Manufacturing no longer cuts the Antarctic one.
 
-DIPLOMACY
-- An INFLUENCE SPEND that would break an Accord is refused unless you say break (the
-  button wants a second click).
-- A REFUSED OFFER waits three turns. A computer that you refused a Trade will not offer
-  the same two goods again until you refuse it a different Trade. You can COUNTER a Trade
-  once, with your own amounts: it answers at once. Letting an Accord run out when the
-  partner would have renewed counts as a refusal.
-- The CHEAP ORE OFFER: refuse it and Materials are a third off for you alone next turn.
-
-VICTORY AND THE CLIMATE
-- The ARCHIVE wants 250 Research; the UPLOAD is 16 Colonists, four a turn at most, and the
-  Archive draws more Energy as it fills. Modules at a place without the people to run them
-  go dark.
-- The PROSPECTORS' bar is 5,000 Ducats in the Venture Fund; the Fund counts 0.7 of their
-  score, and the Arkwrights' Colonial Capital a tenth of theirs. The Fund's growth is
-  shown whole on the card.
-- The STABILIZATION RUN counts everything the temperature does, cards and permafrost
-  included.
+THE RULES
+- PEOPLE IN EARTH ORBIT count for no Victory, and a station there grows a third faster (3% a
+  turn). The Archive stands on the ground of another Body, never on a station.
+- A NEUTRAL REGION's threshold rises 1 for every Region the taker holds past its first.
+- THE COLONIAL CAPITAL needs one open Module slot instead of 24 Colonists, and brings a
+  CAPITAL BUILDING you choose, each one only once in the whole game: the Stock Market, Assay
+  Office, Fuel Depot, Central Grid or Great Library (+3 of its resource there, +1 at your
+  other places on the Body), the Chancery (Influence), the Spaceport (cheaper Ships) or the
+  Arcology (faster growth, and calmer Regions at home). Unchosen at End Turn, your Faction's
+  own is built. A Blockade stops it at a blockaded place.
+- THE COMPUTER races for MARS once the Moon is claimed, and builds up its best place off
+  Earth toward a Capital.
 
 THE TEXT AND THE TOOL
-- Station orders take the station's NAME or its colony id as well as the orbit number.
-- `change` and `cancel-build` take a building's name as well as its index.
-- The "calm enough" line is gone from calm Regions. Several refusals and help lines read
-  as the rules do.
+- The text tool takes Colonies, Ships and Armies by NAME (`build module tycho habitat`,
+  `refuel magellan`, `move-army 1stchinese india`) and shows no numbers for them.
+- The help carries no developer history; a few help lines and refusals are clearer.
 
 WHAT WE WANT TO KNOW
 --------------------
 Write down anything, however small. Especially:
 - The moment you were not sure what to do next.
 - Anything you clicked that did nothing, or did something you did not expect.
-- THE WIND FARM: did you build it, and did the Fuel for power change what you built?
-- THE OFFERS: did the computer's offers feel fair? Did you counter a Trade, and what came
-  of it?
-- THE MOON: who got there first, and did the race matter?
-- THE CUSTODIANS: did Stabilization ever feel within reach?
+- TURN ONE: did the signature moves tell you what to do first?
+- THE CAPITAL: did you reach one, which building did you choose, and why?
+- MARS: who got there first, and did the race matter?
+- THE CUSTODIANS: did the Stabilization meter make the plan clear?
+- THE STORY: which Report lines did you read, and which did you skip?
 - The turn the game got boring, if it did, and the turn you felt you had lost.
 - Crashes: what you were doing, and the "Seed" number shown on the title screen and
   the game-over screen. With the seed the game can be replayed exactly.

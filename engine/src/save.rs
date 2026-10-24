@@ -159,7 +159,10 @@ pub const SAVE_VERSION: u32 = 12;
 /// the two fields the version added to the save (the last Trade refused per pair, #572; a seat's
 /// price cuts, #577) read a default from an older file, and the Wind Farm's Ducat upkeep is a data
 /// figure, so a 0.1.0.2, 0.1.0.1 or 0.1.0.0 save loads.
-pub const GAME_VERSION: &str = "0.1.0.3";
+/// Ticket #602 (version 0.1.0.4, the closing ticket): moved to 0.1.0.4. `SAVE_VERSION` did not move:
+/// the two fields the version added to the save (the capital buildings chosen and those not yet
+/// told, #590) read a default from an older file, so a 0.1.0.3 save and those before it load.
+pub const GAME_VERSION: &str = "0.1.0.4";
 
 /// The game autosaves at the start of the Report phase of every third turn.
 pub const AUTOSAVE_EVERY: u32 = 3;
