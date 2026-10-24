@@ -458,13 +458,16 @@ Colonial Capitals standing at the end of 0.1.0.3's closing sweep: 4 over 80 game
   Widgets round up, never below 1.
 - **The Report**: *"Prospectors built the Stock Market at Plato."*, under Your works for the
   player's own.
-- **The computer** (`[capital_pick]` in `ai.toml`) scores each free building as its Faction's own
-  (`capital_building` on the Faction's row: the Custodians the Central Grid, the Prospectors the
-  Stock Market, the Arkwrights the Arcology, the Archivists the Great Library) plus its need in the
-  run: a yield its last Income lost, Ships at the Capital's Body for the Spaceport, a Region of its
-  past the first Unrest threshold for the Arcology, the Influence the Chancery pays; the highest
-  wins, ties to the table's order. Its upgrade reads the open slot in place of the people, and the
-  Capital candidate of a seat whose win waits on a Capital keeps that slot free.
+- **The computer** scores each free building 1 for its Faction's own (`capital_building` on the
+  Faction's row: the Custodians the Central Grid, the Prospectors the Stock Market, the Arkwrights
+  the Arcology, the Archivists the Great Library), plus 1.5 (`capital_pick_need` in `ai.toml`)
+  where the run needs it: a stockpile yield its last Income lost, a Shipyard of its on the Capital's
+  Body for the Spaceport, a Region of its past the first Unrest threshold for the Arcology; the
+  Chancery and the Great Library by the Faction alone. The highest wins, ties to the table's order.
+  Its upgrade reads the open slot in place of the people. Each seat's **Capital site** on a Body
+  (its most peopled place there whose next step is the Capital, none under way) keeps its last
+  slot open, and only the site is raised. The Arkwrights' gathering builds Habitats toward the 18
+  the Colony tier asks, where it built toward the Capital's 24.
 - **Refuted if** a Capital is ordered with no open slot, two Capitals hold one building, a rival's
   Colony on the Body draws a holder's +1, or the sweep's Capitals at the end stay at 4 in 80.
 - `SAVE_VERSION` unmoved: the buildings chosen are one map on the game, `serde(default)`; a
