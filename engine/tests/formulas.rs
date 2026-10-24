@@ -21042,8 +21042,8 @@ fn the_reports_templates_stay_under_their_word_ceiling() {
     // the warning the turn before, and two rivals' clauses.
     // Ticket #544 (version 0.1.0.1): and by the 33 of a window next turn and the Report's head.
     // Ticket #615 (version 0.1.0.5): and by the 9 of an Occupation that halves the holder's Standing.
-    // Ticket #622 (version 0.1.0.5): and by the 8 of a Strip Permit's growth and Relations clauses.
-    assert!(words <= 1974, "the Report's templates hold {words} words; the ceiling is 1,974 (8 for a Strip Permit's clauses, 9 for an Occupation's holder, 15 for a rival on yours, 33 for a window and the head, 46 for an Accord's end, 9 for a place handed over twice, 9 for an Army inherited, 12 for an Accord broken, 15% off 2,031, 54 for the race to the Moon, 2 for a rival's upgrade, 8 for an Accord answered, less a word of slack, 17 for a Trade, 9 for a Capital refunded, 5 for an Accord let lapse, 7 for Terms added, 5 for a renewal)");
+    // Ticket #622 (version 0.1.0.5): and by the 10 of a Strip Permit's growth and Relations clauses.
+    assert!(words <= 1976, "the Report's templates hold {words} words; the ceiling is 1,976 (10 for a Strip Permit's clauses, 9 for an Occupation's holder, 15 for a rival on yours, 33 for a window and the head, 46 for an Accord's end, 9 for a place handed over twice, 9 for an Army inherited, 12 for an Accord broken, 15% off 2,031, 54 for the race to the Moon, 2 for a rival's upgrade, 8 for an Accord answered, less a word of slack, 17 for a Trade, 9 for a Capital refunded, 5 for an Accord let lapse, 7 for Terms added, 5 for a renewal)");
     // "The" is gone before a Faction's name, which is drawn in its colour instead.
     assert!(!text.contains("he {faction}"), "a template still says \"the {{faction}}\"");
 }

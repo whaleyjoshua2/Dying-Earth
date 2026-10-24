@@ -5784,6 +5784,7 @@ fn order_text(game: &Game, earlier: &[Order], o: &Order) -> String {
         // Ticket #54.
         Order::Change { building, what } => format!("{} the {} at {}", what.name(), building_name(game, *building), game.place_name(building.place())),
         Order::Leapfrog { state } => format!("Leapfrog {}: its people emit {:.2} less per hundred million", game.tables.state(*state).name, game.tables.climate.population_emissions_per_level * game.tables.units_per_hundred_million()),
+        // Ticket #622 (version 0.1.0.5): the growth and the point, in the note.
         Order::StripPermit { state } => format!("Strip Permit in {}: three turns of double output, no growth there, a point off with every rival", game.tables.state(*state).name),
         Order::ExodusCall { state } => format!("Exodus Call in {}: a doubled muster at the ordinary cost in people", game.tables.state(*state).name),
         // Ticket #192 (version 0.08.0): the Upload.
@@ -8054,6 +8055,7 @@ This turn {:+.2}%: {:+.1} million.", c.population_growth * 100.0, c.population_l
                     "Strip Permit: the last doubled turn. At this Resolution its Baseline Emissions rise {:.1} for good and its Unrest by {}.",
                     t.baseline_rise, Game::unrest_figure(t.unrest)
                 ),
+                // Ticket #622 (version 0.1.0.5): and no growth while it runs.
                 n => format!("Strip Permit: {} left of double output and no growth, then +{:.1} Baseline Emissions for good and +{} Unrest.", counted(n, "turn", "turns"), t.baseline_rise, Game::unrest_figure(t.unrest)),
             },
         );

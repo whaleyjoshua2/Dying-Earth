@@ -89,7 +89,7 @@ Two figures in `nation_states.toml` (the rise 0.3, `relations = 1`), the point t
 score at the permit's commit the way a card's `RelationsAllRivals` takes it (never `offend_by`, so no
 Accord breaks), and the Region's growth rate clamped to nought while the permit runs. The test was
 written first and watched red (every rival's view unmoved), then green; the old permit test's 0.2
-moved to 0.3, and the Report's word ceiling rose by the phrase's eight words. No picture: a Report
+moved to 0.3, and the Report's word ceiling rose by the phrase's ten words. No picture: a Report
 line and three figures.
 
 - **The sweep** ([`sweeps/ticket-622.txt`](sweeps/ticket-622.txt)): **27 / 49 / 3 / 0 and 0

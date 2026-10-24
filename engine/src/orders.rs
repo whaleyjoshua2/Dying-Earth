@@ -3449,16 +3449,7 @@ impl Game {
                     // `RelationsAllRivals`) and never through `offend_by`, so no Non-Aggression
                     // Accord breaks over it -- the designer: "I don't want it to break an accord".
                     let fall = self.tables.strip_permit.relations;
-                    if fall > 0 {
-                        let c = self.tables.relations.clone();
-                        for rival in Seat::ALL {
-                            if rival == seat {
-                                continue;
-                            }
-                            let (v, o) = (rival.index(), seat.index());
-                            self.relations.score[v][o] = (self.relations.score[v][o] - fall).clamp(c.worst, c.deeds_ceiling);
-                        }
-                    }
+                    self.move_deeds_with_every_rival(seat, -fall);
                     let line = format!(
                         "The {} issued a Strip Permit in {}: every Facility there produces double for {} turns, nobody grows there meanwhile, and every rival likes them {} less.",
                         self.seat_name(seat),

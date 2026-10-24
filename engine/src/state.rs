@@ -5783,6 +5783,20 @@ impl Game {
     /// is what keeps the spirit of 0.08.0's per-turn charge while giving the designer the
     /// proportionality they asked for: a turn pushing on three of a rival's places genuinely costs
     /// three times a turn pushing on one.
+    /// Ticket #622 (version 0.1.0.5): **a move on the deeds score with every rival at once**, by
+    /// `delta`, clamped to the scale -- never an Offence, so nothing goes on the ledger and no
+    /// Accord breaks. A card's `RelationsAllRivals` and the Strip Permit's point off both read it.
+    pub fn move_deeds_with_every_rival(&mut self, seat: Seat, delta: i64) {
+        let c = self.tables.relations.clone();
+        for rival in Seat::ALL {
+            if rival == seat {
+                continue;
+            }
+            let (v, o) = (rival.index(), seat.index());
+            self.relations.score[v][o] = (self.relations.score[v][o] + delta).clamp(c.worst, c.deeds_ceiling);
+        }
+    }
+
     pub fn offend_by(&mut self, offender: Seat, victim: Seat, weight: i64) {
         if offender == victim || weight <= 0 {
             return;

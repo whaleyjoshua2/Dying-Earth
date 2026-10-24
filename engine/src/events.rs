@@ -625,14 +625,8 @@ impl Game {
                 cuts.push(PriceCut { row, multiplier: *multiplier, until });
             }
             CardEffect::RelationsAllRivals { relations } => {
-                let c = self.tables.relations.clone();
-                for rival in Seat::ALL {
-                    if rival == seat {
-                        continue;
-                    }
-                    let (v, o) = (rival.index(), seat.index());
-                    self.relations.score[v][o] = (self.relations.score[v][o] + relations).clamp(c.worst, c.deeds_ceiling);
-                }
+                // Ticket #622 (version 0.1.0.5): the one reader, shared with the Strip Permit.
+                self.move_deeds_with_every_rival(seat, *relations);
             }
             // The Smear and the Greenwash ledgers: ppm laid on, or taken off, for good.
             CardEffect::BlamePpm { ppm } => {
