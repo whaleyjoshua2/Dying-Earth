@@ -36,3 +36,17 @@ picture: figures and a refusal line, nothing on the screen changes shape.
   take what both lose, 48 from 42, six past noise. Colony-tier places at the end 34 from 23, Capitals
   28 from 16. **Reported and left**: the tier is the designer's word, and what more the computer
   should do to climb -- or whether the tier should be the Settlement's -- is theirs to say.
+
+## The pack on a runaway leader forms at 40% of Victory
+
+Ticket [#621](https://github.com/whaleyjoshua2/Dying-Earth/issues/621), spec §2.
+
+One figure moved: `gang_from` 0.5 -> 0.4 in `ai.toml`, at the designer's word; `gang_ahead` and
+`gang_full` as they were. The pressure test was moved to the new ramp first (a leader at 80% reads two
+thirds, not 0.6; 45% is a leader, 39% not) and watched red on the old figure, then the pack test's
+x1.6 lift moved with it. No picture: a figure the screen never shows.
+
+- **The sweep** ([`sweeps/ticket-621.txt`](sweeps/ticket-621.txt)): **25 / 50 / 2 / 2 and 1
+  collapse**, from 26 / 48 / 2 / 2 and 2: noise. Accords struck over the batch 620 from 620, games
+  with an orbital Battle 24 from 27, the computer's Archive 9 of 80 from 11. The earlier pack did not
+  bite on the Prospectors' 50; reported and left.

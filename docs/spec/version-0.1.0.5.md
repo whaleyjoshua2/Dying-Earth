@@ -57,3 +57,24 @@ the count: *"option 1 but make it a colony"*.
   **The miss is reported and left**: the Colony tier is the designer's word, and the computer
   Archivists reach it in about one game in seven; what more the computer should do to climb, or
   whether the tier should be the Settlement's, is the designer's call.
+
+## 2. The pack on a runaway leader forms at 40% of Victory
+
+Ticket: [The pack on a runaway leader forms at 40% of Victory, not 50%](https://github.com/whaleyjoshua2/Dying-Earth/issues/621).
+
+The designer: *"Drop threshold for gang-ups from 50% to 40%"*.
+
+- **`gang_from` is 0.4** (`ai.toml [thresholds]`, from 0.5; ticket #531's pack). A rival is a seat's
+  leader at 40% of its Victory or more and 20 points or more above the seat (`gang_ahead` 0.2, as it
+  was), and the leader's ramp runs 0 at 40% to 1 at the end, so a leader at 80% reads two thirds
+  where it read 0.6; the seat's trail over `gang_full` (0.3) is unchanged. Every hostile act on the
+  leader weighs x(1 + pressure), the leader is cause from half pressure, no Accord or Trade with it,
+  the pack's own Accords `gang_accept_relax` (3) x the pressure easier, as before.
+- **The tests** that pinned the ramp at 0.6 and the lift at x1.6 moved to two thirds, watched red on
+  the old figure first; a leader at 45% is a leader now, at 39% not.
+- **Swept** (`sweeps/ticket-621.txt`, 20 seeds x four seatings): **25 / 50 / 2 / 2 and 1 collapse**,
+  from the same day's 26 / 48 / 2 / 2 and 2 (§1): noise. The pack forming ten points sooner did not
+  bite on the Prospectors, who lead most games from the Moon's claim: Accords struck over the batch
+  620 from 620, games with an orbital Battle 24 from 27. The computer's Archive 9 of 80 (11 before),
+  noise. Reported and left: the figure is the designer's word, and what the pack does with its
+  earlier start is a question for the contest and defence tickets, which give it Influence to spend.

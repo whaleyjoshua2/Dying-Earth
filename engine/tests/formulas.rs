@@ -24040,14 +24040,17 @@ fn prospectors_at_eighty(g: &mut Game) -> Seat {
 /// Ticket #531 (version 0.1.0.1), at the designer's word: each computer seat's pressure on its
 /// leader -- a rival at 50% of its Victory or more and 20 points or more above the seat -- is the
 /// leader's ramp (0 at 50%, 1 at 100%) times how far the seat trails ((gap - 20) / 30, to 1).
+/// Ticket #621 (version 0.1.0.5), at the designer's word: the pack forms at 40%, so the ramp runs
+/// 0 at 40% to 1 at 100%, and a leader at 80% reads two thirds where it read 0.6.
 #[test]
 fn a_seats_pressure_on_the_leader_scales_with_the_leader_and_its_own_place() {
     let th = game().tables.ai.thresholds.clone();
     let p = |lead: f64, own: f64| Game::gang_pressure_of(lead, own, &th);
-    assert!((p(0.8, 0.55) - 0.6 * (0.05 / 0.3)).abs() < 1e-9, "25 points behind: {}", p(0.8, 0.55));
-    assert!((p(0.8, 0.2) - 0.6).abs() < 1e-9, "60 points behind: the whole ramp");
+    assert!((p(0.8, 0.55) - (2.0 / 3.0) * (0.05 / 0.3)).abs() < 1e-9, "25 points behind: {}", p(0.8, 0.55));
+    assert!((p(0.8, 0.2) - 2.0 / 3.0).abs() < 1e-9, "60 points behind: the whole ramp");
     assert_eq!(p(0.8, 0.61), 0.0, "19 points behind: no leader");
-    assert_eq!(p(0.49, 0.0), 0.0, "under half: no leader");
+    assert_eq!(p(0.39, 0.0), 0.0, "under 40%: no leader");
+    assert!((p(0.45, 0.0) - (0.05 / 0.6) * (0.25 / 0.3)).abs() < 1e-9, "at 45%: a leader since ticket #621, a twelfth up the ramp times the trail: {}", p(0.45, 0.0));
     assert!((p(1.0, 0.0) - 1.0).abs() < 1e-9);
     // On the board.
     let mut g = game();
@@ -24055,7 +24058,7 @@ fn a_seats_pressure_on_the_leader_scales_with_the_leader_and_its_own_place() {
     let pro = prospectors_at_eighty(&mut g);
     let ark = Seat(2);
     assert!(g.progress(ark).score() < 0.2, "the premise: the Arkwrights far behind");
-    assert!((g.ai_gang_pressure(ark, pro) - 0.6).abs() < 1e-9, "{}", g.ai_gang_pressure(ark, pro));
+    assert!((g.ai_gang_pressure(ark, pro) - 2.0 / 3.0).abs() < 1e-9, "{}", g.ai_gang_pressure(ark, pro));
     assert_eq!(g.ai_gang_pressure(ark, Seat(3)), 0.0, "only the leader");
     assert_eq!(g.ai_gang_pressure(pro, pro), 0.0);
 }
@@ -24072,7 +24075,7 @@ fn the_pack_presses_the_leader_and_draws_together() {
     assert!(g.relations_score(ark, pro) > g.tables.ai.thresholds.war_cause, "the premise: no grudge");
     assert!(g.has_cause(ark, pro), "the leader is cause in itself");
     assert!(!g.has_cause(ark, arc));
-    assert!((g.hostile_lift(ark, pro) - g.emitter_lift(ark, pro) * 1.6).abs() < 1e-9);
+    assert!((g.hostile_lift(ark, pro) - g.emitter_lift(ark, pro) * (1.0 + 2.0 / 3.0)).abs() < 1e-9, "x(1 + pressure), the pressure two thirds since ticket #621 (0.6 before)");
     assert_eq!(g.hostile_lift(ark, arc), g.emitter_lift(ark, arc));
     // Agreements: none with the leader; the pack's own easier.
     assert!(!g.accord_acceptable(ark, pro, &[Term::NonAggression]), "no Accord with the leader");
@@ -24087,7 +24090,7 @@ fn the_pack_presses_the_leader_and_draws_together() {
         g.relations.score[ark.index()][arc.index()] = want - off;
         assert_eq!(g.relations_score(ark, arc), want);
     };
-    // The bar for non-aggression is -2; the pressure (0.6) takes 2 off it.
+    // The bar for non-aggression is -2; the pressure (two thirds since ticket #621, 0.6 before) x 3 takes 2 off it.
     set_shown(&mut g, -4);
     assert!(g.accord_acceptable(ark, arc, &[Term::NonAggression]), "at -4, Wary, the pack's Accord is taken");
     set_shown(&mut g, -5);

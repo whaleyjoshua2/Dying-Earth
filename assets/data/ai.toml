@@ -593,7 +593,10 @@ race_lab_weight = 1.0
 # / 30, to 1). Every hostile act on the leader weighs x(1 + pressure); from half pressure the leader
 # is cause in itself; no Accord or Trade with it, none renewed, and the Custodians sell it no
 # credits; the pack's own Accords take a bar `gang_accept_relax` x the pressure lower.
-gang_from = 0.5
+# Ticket #621 (version 0.1.0.5), at the designer's word: the pack forms at 40%, from 50%; the ramp runs 0
+# at 40% to 1 at the end, so a leader at 80% reads two thirds where it read 0.6. `gang_ahead` and
+# `gang_full` as they were.
+gang_from = 0.4
 gang_ahead = 0.2
 gang_full = 0.3
 gang_cause = 0.5
