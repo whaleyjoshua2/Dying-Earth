@@ -266,7 +266,14 @@ research = 250
 # twelve gate the Archive was orderable in 29 games of 80, at a median turn 17, and only 17 of those
 # had the three turns the Module needs left. The Archivists direct exactly one off-Earth place in
 # every game, so the gate could not be routed around. Four is reachable; twelve was near-total.
-colonists_to_order = 4
+#
+# Ticket #625 (version 0.1.0.5), at the designer's word ("option 1 but make it a colony"): the four
+# Colonists give way to a TIER. The Archive may be ordered only at a place that has climbed to this
+# tier (named as `[[tiers]]` names it; a higher tier counts). Still checked once, at the order, and
+# the tier is what is read, not the people living there that turn: a place never falls back a tier.
+# The Upload stays at 16, in fours; this is the Archivists' people requirement in its place, where
+# every other Faction's off-world bar rose by 2.
+tier_to_order = "Colony"
 # Ticket #565 (version 0.1.0.3), at the designer's word: at most four Colonists upload in a turn
 # (the playtest ended a game in one order, `upload 27 18`), and the complete Archive draws one more
 # Energy a turn for each Colonist uploaded, so a full Archive of 16 draws 20 + 16.

@@ -1434,7 +1434,14 @@ impl Game {
         // The ferry's SPENDING lift pauses while a site is ready and the Archive is not yet ordered:
         // measured, its Colony Ships spent every Material, and the 50 the Archive wants was never in
         // hand. The route does not pause -- nobody is landed where the Archive cannot use them.
-        let site_ready = kind == FactionKind::Archivists && !homeless_archive && !self.archive_ordered(seat) && !self.archive_built(seat);
+        // Ticket #625 (version 0.1.0.5): a site is a place that may hold the Archive AND has climbed
+        // to the tier the Archive asks for (the Colony tier). An Outpost of theirs off Earth is a
+        // home, not a site: the lift stays on, so people keep arriving and the place can climb.
+        // Measured without this: the lift paused at the first Outpost, and no computer Archive stood
+        // in 80 games (43 before the tier).
+        let archive_tier = self.tables.archive_tier();
+        let site_stands = self.colonies.iter().any(|c| c.control.director() == Some(seat) && self.may_hold_archive(c) && c.tier >= archive_tier);
+        let site_ready = kind == FactionKind::Archivists && !homeless_archive && site_stands && !self.archive_ordered(seat) && !self.archive_built(seat);
         let ferry_lift = ferrying && !site_ready;
         let archive_body: Option<BodyId> = if kind == FactionKind::Archivists {
             self.archive_colony(seat)
@@ -2552,11 +2559,13 @@ impl Game {
                 // of every one of 80 measured games, at a station with nobody on it; without this it
                 // would simply spend that turn on a refused order, every turn, until somebody moved
                 // in. The first place with enough people, oldest first as before.
-                let want = self.tables.archive.colonists_to_order;
+                // Ticket #625 (version 0.1.0.5): the first place that has climbed to the tier the
+                // Archive asks for (the Colony tier), where it was the first with four people.
+                let want = self.tables.archive_tier();
                 let home = self
                     .colonies
                     .iter()
-                    .filter(|c| c.control.director() == Some(seat) && self.may_hold_archive(c) && c.colonists >= want)
+                    .filter(|c| c.control.director() == Some(seat) && self.may_hold_archive(c) && c.tier >= want)
                     .min_by_key(|c| (c.founded_turn, c.id.0))
                     .map(|c| c.id);
                 if let Some(cid) = home {

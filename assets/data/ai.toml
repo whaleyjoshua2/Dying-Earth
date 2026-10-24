@@ -387,25 +387,27 @@ bounty_least = 1.0
 # (the Fund 3,500, 18 off Earth), with the game at fifty turns.
 # Ticket #580 (version 0.1.0.3): every figure x 4250/3500 with the bar, the turns as they were.
 # Ticket #584 (version 0.1.0.4): every figure x 5000/4250 with the bar, the turns as they were.
+# Ticket #625 (version 0.1.0.5): every people pace to 20 with Off-world Presence, the Arkwrights' first
+# x 44/42 with the Diaspora, the turns as they were; the Archivists' paces unmoved.
 [pace.prospectors]
 first = [[12, 667], [25, 1667], [37, 3000], [47, 5000]]
-colonists = [[17, 6], [31, 18]]
+colonists = [[17, 7], [31, 20]]
 
 [pace.custodians]
 within_ppm = 4.0
 # Ticket #506: 17 and 25, from 12 and 18.
 within_by_turn = 17
 under_sink_by_turn = 25
-colonists = [[17, 6], [31, 18]]
+colonists = [[17, 7], [31, 20]]
 
 # Ticket #51: Diaspora is 30 Colonists off Earth, so the pace runs to 30.
 # Ticket #506 (version 0.1.0.0): stretched by 50/36 to the Diaspora's 42 and four Bodies.
 [pace.arkwrights]
-first = [[8, 6], [17, 17], [25, 31], [33, 42]]
+first = [[8, 6], [17, 18], [25, 32], [33, 44]]
 # Ticket #449 (version 0.09.6): the Bodies their second part asks for, which nothing paced: one by
 # turn 18, two by 24, three by 30, read as every schedule is (a seat with none is behind at once).
 bodies = [[25, 1], [33, 2], [40, 3], [47, 4]]
-colonists = [[17, 6], [31, 18]]
+colonists = [[17, 7], [31, 20]]
 
 # Ticket #51: the pace is in the Archive's first Victory part. Ticket #68 (version 0.05.5): that is
 # Research paid into the Archive, 80 in all, over a thirty-six-turn game. Ticket #439 (version 0.09.6):

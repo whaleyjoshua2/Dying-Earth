@@ -986,7 +986,7 @@ fn meet_first(g: &mut Game, seat: Seat) {
 #[test]
 fn a_faction_meeting_both_parts_wins_before_collapse_is_checked() {
     let mut g = game();
-    colony(&mut g, Seat(1), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 18);
+    colony(&mut g, Seat(1), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 20);
     meet_first(&mut g, Seat(1));
     open_gates(&mut g);
     g.climate.temperature = 3.2;
@@ -1012,8 +1012,8 @@ fn both_met_the_larger_margin_wins() {
 fn both_met_by_the_same_margin_is_a_draw() {
     let mut g = game();
     bare_stations(&mut g);
-    colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 18);
-    colony(&mut g, Seat(1), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 18);
+    colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 20);
+    colony(&mut g, Seat(1), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 20);
     g.seats[0].stabilization_run = 4;
     g.seats[1].venture_fund = 6000.0; // the lower fraction is the presence, 1.0, on both sides (ticket #584: the bar is 5000)
     open_gates(&mut g);
@@ -1899,10 +1899,10 @@ fn the_last_turn_ranks_every_seat_by_score() {
     // their first part is 0 and their score with it.
     let mut g = game();
     g.turn = g.tables.victory.turns;
-    colony(&mut g, Seat(2), BodyId::Phobos, &[ModuleKind::Habitat, ModuleKind::Habitat], 4);
+    colony(&mut g, Seat(2), BodyId::Phobos, &[ModuleKind::Habitat, ModuleKind::Habitat], 6);
     colony(&mut g, Seat(3), BodyId::Moon, &[ModuleKind::Habitat], 4);
     // Ticket #601 (version 0.1.0.4): the parts are 94% of the whole, the gate (not standing) the rest.
-    assert!((g.progress(Seat(2)).score() - 0.94 * (0.6 * 4.0 / 42.0 + 0.3 * 0.25)).abs() < 1e-9, "{:?}", g.progress(Seat(2)).score());
+    assert!((g.progress(Seat(2)).score() - 0.94 * (0.6 * 6.0 / 44.0 + 0.3 * 0.25)).abs() < 1e-9, "{:?}", g.progress(Seat(2)).score());
     assert_eq!(g.progress(Seat(3)).score(), 0.0);
     g.end_phase();
     assert!(matches!(g.outcome, Some(Outcome::Win { seat: Seat(2), .. })), "{:?}", g.outcome);
@@ -1940,7 +1940,7 @@ fn the_prospectors_fund_counts_seven_tenths_of_their_score() {
     let pro = Seat(1);
     assert_eq!(g.kind(pro), FactionKind::Prospectors);
     bare_stations(&mut g);
-    colony(&mut g, pro, BodyId::Mars, &[ModuleKind::Habitat; 4], 18);
+    colony(&mut g, pro, BodyId::Mars, &[ModuleKind::Habitat; 4], 20);
     g.seats[1].venture_fund = 850.0; // 0.17 x 5,000 (ticket #584)
     let p = g.progress(pro);
     assert!((p.first_fraction() - 0.17).abs() < 1e-9 && p.second_fraction() == 1.0, "the premise: the Fund at 17%, the Presence full: {p:?}");
@@ -1967,17 +1967,17 @@ fn the_capital_is_a_tenth_of_the_arkwrights_score_and_a_held_headline_names_the_
     let capital = g.tables.tiers.iter().position(|t| t.one_per_body).expect("the Capital tier") as u32;
     bare_stations(&mut g);
     open_gates(&mut g);
-    // Short of the bars: 4 of 42 over one Body of four, no Capital: 0.6 x 4/42 + 0.3 x 1/4 + 0.1 x 0;
+    // Short of the bars: 6 of 44 over one Body of four, no Capital: 0.6 x 6/44 + 0.3 x 1/4 + 0.1 x 0;
     // Ticket #601 (version 0.1.0.4): the gate standing, its 6% and the parts 94% of the rest.
-    colony(&mut g, ark, BodyId::Phobos, &[ModuleKind::Habitat], 4);
+    colony(&mut g, ark, BodyId::Phobos, &[ModuleKind::Habitat], 6);
     let p = g.progress(ark);
-    assert!((p.score() - (0.06 + 0.94 * (0.6 * 4.0 / 42.0 + 0.3 * 0.25))).abs() < 1e-9, "{}", p.score());
+    assert!((p.score() - (0.06 + 0.94 * (0.6 * 6.0 / 44.0 + 0.3 * 0.25))).abs() < 1e-9, "{}", p.score());
     assert!(p.first_held_back.is_some(), "the premise: the Capital holds the win");
     assert_eq!(p.hold_suffix(), "", "short of the bars, the percentage alone");
     // Both bars met and no Capital: 90%, and every headline says why.
-    let mars = colony(&mut g, ark, BodyId::Mars, &[ModuleKind::Habitat], 30);
+    let mars = colony(&mut g, ark, BodyId::Mars, &[ModuleKind::Habitat], 26);
     for body in [BodyId::Moon, BodyId::Deimos] {
-        colony(&mut g, ark, body, &[ModuleKind::Habitat], 4);
+        colony(&mut g, ark, body, &[ModuleKind::Habitat], 6);
     }
     let p = g.progress(ark);
     assert!(p.first_value >= p.first_bar && p.second_value >= p.second_bar, "the premise: both bars reached: {p:?}");
@@ -2008,7 +2008,7 @@ fn the_custodians_held_hundred_on_partial_credit_names_the_hold_too() {
     let cus = Seat(0);
     assert_eq!(g.kind(cus), FactionKind::Custodians);
     bare_stations(&mut g);
-    colony(&mut g, cus, BodyId::Mars, &[ModuleKind::Habitat; 4], 18);
+    colony(&mut g, cus, BodyId::Mars, &[ModuleKind::Habitat; 4], 20);
     g.climate.best_run = g.tables.faction(FactionKind::Custodians).victory_first.bar as u32;
     let p = g.progress(cus);
     // Ticket #601 (version 0.1.0.4): 94%, the gate not standing.
@@ -2330,21 +2330,21 @@ fn an_arkwright_pays_half_for_a_station_and_three_quarters_for_a_module() {
 }
 
 #[test]
-fn diaspora_wants_three_bodies_with_four_colonists_each_and_counts_no_antarctic_one() {
+fn diaspora_wants_four_bodies_with_six_colonists_each_and_counts_no_antarctic_one() {
     let mut g = game();
     let p = g.progress(Seat(2));
     // Ticket #506 (version 0.1.0.0): 42 over four Bodies, from 30 over three.
-    assert_eq!(p.first_bar, 42.0, "42 Colonists off Earth");
+    assert_eq!(p.first_bar, 44.0, "44 Colonists off Earth (ticket #625; 42 before)");
     assert_eq!(p.second_bar, 4.0, "on at least four Bodies");
-    colony(&mut g, Seat(2), BodyId::Mars, &[ModuleKind::Habitat], 4);
-    colony(&mut g, Seat(2), BodyId::Moon, &[ModuleKind::Habitat], 4);
+    colony(&mut g, Seat(2), BodyId::Mars, &[ModuleKind::Habitat], 6);
+    colony(&mut g, Seat(2), BodyId::Moon, &[ModuleKind::Habitat], 6);
     // Antarctica is Earth's, so a Colony there settles no Body.
-    colony(&mut g, Seat(2), BodyId::Earth, &[ModuleKind::Habitat], 4);
+    colony(&mut g, Seat(2), BodyId::Earth, &[ModuleKind::Habitat], 6);
     assert_eq!(g.progress(Seat(2)).second_value, 2.0, "Antarctica is not a third Body");
-    // Three Colonists on Phobos are not four.
-    let ph = colony(&mut g, Seat(2), BodyId::Phobos, &[ModuleKind::Habitat], 3);
+    // Five Colonists on Phobos are not six (ticket #625: six, from four).
+    let ph = colony(&mut g, Seat(2), BodyId::Phobos, &[ModuleKind::Habitat], 5);
     assert_eq!(g.progress(Seat(2)).second_value, 2.0);
-    g.colony_mut(ph).unwrap().colonists = 4;
+    g.colony_mut(ph).unwrap().colonists = 6;
     assert_eq!(g.progress(Seat(2)).second_value, 3.0);
     // A station over another Body counts for that Body.
     let sid = ColonyId(g.fresh_id());
@@ -2354,7 +2354,7 @@ fn diaspora_wants_three_bodies_with_four_colonists_each_and_counts_no_antarctic_
         slot: 0,
         control: Control::Controlled(Seat(2)),
         modules: vec![Module::new(ModuleKind::Habitat)],
-        colonists: 4, education: 1.0, settler_education: 1.0,
+        colonists: 6, education: 1.0, settler_education: 1.0,
         queue: Vec::new(),
         grid_failed: false,
         founded_turn: 1,
@@ -2362,10 +2362,10 @@ fn diaspora_wants_three_bodies_with_four_colonists_each_and_counts_no_antarctic_
         in_orbit: true,
     });
     assert_eq!(g.progress(Seat(2)).second_value, 4.0);
-    // Both parts together: 42 off Earth as well (ticket #506; 30 before).
-    assert!(!g.progress(Seat(2)).met(), "16 Colonists off Earth is not 42");
-    g.colony_mut(ph).unwrap().colonists = 30;
-    assert_eq!(g.progress(Seat(2)).first_value, 42.0);
+    // Both parts together: 44 off Earth as well (ticket #625; 42 since #506, 30 before).
+    assert!(!g.progress(Seat(2)).met(), "24 Colonists off Earth is not 44");
+    g.colony_mut(ph).unwrap().colonists = 26;
+    assert_eq!(g.progress(Seat(2)).first_value, 44.0);
     open_gates(&mut g);
     // Ticket #514 (version 0.1.0.0): and a Colonial Capital of theirs must stand, at a Colony they hold.
     let p = g.progress(Seat(2));
@@ -2512,15 +2512,17 @@ fn ticket_347_moves_the_archives_money_and_none_of_its_other_gates() {
     let mut g = game();
     let card = g.tables.module(ModuleKind::Archive);
     assert_eq!((card.materials, card.widgets, card.energy_upkeep), (55.0, 12, 20), "55 Materials (50 before ticket #537), 12 Widgets, 20 Energy since ticket #511 (12 before)");
-    assert_eq!(g.tables.archive.colonists_to_order, 4, "four Colonists must live there at the order");
+    // Ticket #625 (version 0.1.0.5): the Colony tier, where it was four Colonists living there.
+    assert_eq!(g.tables.archive.tier_to_order, "Colony", "a place of Colony tier at the order");
     assert_eq!(g.tables.victory_gate(FactionKind::Archivists), Some(TechId::TheUpload), "The Upload is still the gate");
-    // And the refusals the order still makes: the Colonists and Earth. Ticket #361 (version 0.09.1)
+    // And the refusals the order still makes: the tier and Earth. Ticket #361 (version 0.09.1)
     // took the gate Tech off the order at the designer's word; it gates the win.
     g.seats[3].stockpile.materials = 200.0;
     let mars = colony(&mut g, Seat(3), BodyId::Mars, &[ModuleKind::Habitat], 4);
-    assert!(g.check_order(Seat(3), &[], &Order::BuildArchive { colony: mars }).is_ok(), "four Colonists off Earth, with or without the Tech: allowed");
-    g.colony_mut(mars).unwrap().colonists = 3;
-    assert!(g.check_order(Seat(3), &[], &Order::BuildArchive { colony: mars }).unwrap_err().0.contains("4 Colonists"), "three is not four");
+    g.colony_mut(mars).unwrap().tier = g.tables.archive_tier();
+    assert!(g.check_order(Seat(3), &[], &Order::BuildArchive { colony: mars }).is_ok(), "the Colony tier off Earth, with or without the Tech: allowed");
+    g.colony_mut(mars).unwrap().tier = 0;
+    assert!(g.check_order(Seat(3), &[], &Order::BuildArchive { colony: mars }).unwrap_err().0.contains("Colony tier"), "an Outpost is not a Colony");
     let home = colony(&mut g, Seat(3), BodyId::Earth, &[ModuleKind::Habitat], 8);
     assert!(g.check_order(Seat(3), &[], &Order::BuildArchive { colony: home }).unwrap_err().0.contains("on the ground of another Body"), "not on Earth");
 }
@@ -2550,6 +2552,7 @@ fn the_archive_is_one_module_of_fifty_materials_and_three_turns_built_once_off_e
     g.seats[3].stockpile.materials = 200.0;
     the_upload(&mut g);
     let mars = colony(&mut g, Seat(3), BodyId::Mars, &[ModuleKind::Habitat], 4);
+    g.colony_mut(mars).unwrap().tier = g.tables.archive_tier(); // Ticket #625 (version 0.1.0.5): the Colony tier
     let order = Order::BuildArchive { colony: mars };
     assert_eq!(g.order_cost(Seat(3), &order).materials, 55.0, "50 x 1.1 since ticket #537");
     assert!(g.check_order(Seat(3), &[], &order).is_ok(), "no Research needs banking first");
@@ -2862,7 +2865,9 @@ fn the_archivist_ai_builds_its_way_off_earth_and_then_the_archive() {
     let arc = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Archivists).unwrap();
     g.seats[arc.index()].stockpile.materials = 200.0;
     g.seats[arc.index()].stockpile.energy = 200.0;
-    let mars = colony(&mut g, arc, BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Mine, ModuleKind::Generator], 4);
+    let mars = colony(&mut g, arc, BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Mine, ModuleKind::Generator, ModuleKind::TradePost], 4);
+    g.colony_mut(mars).unwrap().tier = g.tables.archive_tier(); // Ticket #625 (version 0.1.0.5): the Colony tier, where four people did
+    // Every slot its four people allow is built, so no Colonial Capital (one open slot) outbids the Archive for the Materials.
     // Ticket #199 (version 0.08.0): without the gate Tech the Archive is refused, and the computer
     // must neither order it nor FREEZE ITS MATERIALS waiting for it -- a candidate it cannot afford
     // yet makes the seat hold its Materials and build nothing else, which over the fifteen turns the
@@ -6404,13 +6409,13 @@ fn twenty_five_hundred_ducats_in_the_fund_is_the_prospectors_first_part() {
     // Ticket #580: the card's long text reads the bar, where it carried a typed copy; the
     // computer Prospectors' pace stretches with it (467 / 1167 / 2100 / 3500 before, then
     // 567 / 1417 / 2550 / 4250).
-    assert_eq!(g.tables.victory_text(FactionKind::Prospectors), "5,000 Ducats in the Venture Capital Fund, plus 18 Colonists living beyond Earth orbit.");
+    assert_eq!(g.tables.victory_text(FactionKind::Prospectors), "5,000 Ducats in the Venture Capital Fund, plus 20 Colonists living beyond Earth orbit.");
     assert_eq!(g.tables.ai_pace(FactionKind::Prospectors).first, vec![[12, 667], [25, 1667], [37, 3000], [47, 5000]], "scaled by 5000/4250");
     g.seats[pro.index()].venture_fund = 2000.0;
     let p = g.progress(pro);
     assert_eq!((p.first_value, p.first_bar), (2000.0, 5000.0));
     assert!((p.first_fraction() - 0.4).abs() < 1e-9);
-    colony(&mut g, pro, BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 18);
+    colony(&mut g, pro, BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 20);
     g.seats[pro.index()].venture_fund = 5000.0;
     open_gates(&mut g);
     assert!(g.progress(pro).met());
@@ -7160,7 +7165,7 @@ fn the_four_gates_stand_on_rung_three_at_one_price_with_their_prerequisites() {
 fn a_victory_condition_waits_on_its_gate() {
     let mut g = game();
     let cus = Seat(0);
-    colony(&mut g, cus, BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 18);
+    colony(&mut g, cus, BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 20);
     g.seats[0].stabilization_run = 4;
     let p = g.progress(cus);
     assert!(p.first_value >= p.first_bar && p.second_value >= p.second_bar, "both parts stand: {p:?}");
@@ -7354,7 +7359,7 @@ fn the_ai_lifts_a_crowded_load_only_when_behind_on_presence() {
         _ => None,
     });
     assert_eq!(lifted, Some(8), "behind on Presence with 0 off Earth: the crowded load: {orders:?}");
-    colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 18);
+    colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 20);
     let orders = g.ai_orders(Seat(0));
     let lifted = orders.iter().find_map(|o| match o {
         Order::Load { ship: s, colonists, .. } if *s == ship => Some(*colonists),
@@ -10730,34 +10735,32 @@ fn relations_do_nothing_mechanical_in_this_version() {
 /// order. Neither the three-turn build nor the standing Module cares afterwards: a build that could
 /// stall halfway would be a new state to hold in the save, draw on the card and say in the Report,
 /// for a case that fires rarely, and the Victory Condition does its own checking at the end.
+/// Ticket #625 (version 0.1.0.5): the place's tier in place of the four Colonists, checked once still.
 #[test]
-fn ordering_the_archive_wants_four_colonists_at_the_place_and_only_at_the_order() {
+fn ordering_the_archive_wants_the_colony_tier_at_the_place_and_only_at_the_order() {
     let mut g = game();
     let arc = seat_of(&g, FactionKind::Archivists);
     g.seats[arc.index()].stockpile.materials = 200.0;
     let cid = colony(&mut g, arc, BodyId::Mars, &[ModuleKind::Habitat], 0);
     let order = Order::BuildArchive { colony: cid };
+    let colony_tier = g.tables.archive_tier();
 
     // Ticket #361 (version 0.09.1): The Upload gates the WIN, not the order, at the designer's word
     // -- as before ticket #199, whose premise reversed: measured, The Upload now lands at a median
     // turn 28 and an Archivist Colony off Earth at 22. The order stands without it.
     assert!(!g.has_tech(TechId::TheUpload), "the premise: The Upload is not researched");
-    g.colony_mut(cid).unwrap().colonists = 4;
+    g.colony_mut(cid).unwrap().tier = colony_tier;
     assert!(g.check_order(arc, &[], &order).is_ok(), "the Archive is ordered before The Upload");
     assert!(g.tables.victory_gate(FactionKind::Archivists) == Some(TechId::TheUpload), "and The Upload still gates their win");
 
-    assert_eq!(g.tables.archive.colonists_to_order, 4, "the card figure");
-    for (living, expected) in [
-        (0, "the Archive wants 4 Colonists living at its Colony; nobody lives at"),
-        (1, "the Archive wants 4 Colonists living at its Colony; one lives at"),
-        (3, "the Archive wants 4 Colonists living at its Colony; 3 live at"),
-    ] {
-        g.colony_mut(cid).unwrap().colonists = living;
+    assert_eq!(g.tables.archive.tier_to_order, "Colony", "the card figure");
+    for (tier, expected) in [(0, "the Archive wants a place of Colony tier; Olympus Mons on Mars is an Outpost"), (1, "the Archive wants a place of Colony tier; Olympus Mons on Mars is a Settlement")] {
+        g.colony_mut(cid).unwrap().tier = tier;
         let err = g.check_order(arc, &[], &order).unwrap_err().0;
-        assert!(err.starts_with(expected), "at {living}: {err}");
+        assert_eq!(err, expected, "at tier {tier}");
     }
-    g.colony_mut(cid).unwrap().colonists = 4;
-    assert!(g.check_order(arc, &[], &order).is_ok(), "four is enough");
+    g.colony_mut(cid).unwrap().tier = colony_tier;
+    assert!(g.check_order(arc, &[], &order).is_ok(), "the Colony tier is enough, whoever lives there");
 
     // Once ordered, the place may empty and the build RUNS TO COMPLETION regardless. A build that
     // could stall halfway would be a new state to hold in the save, draw on the card and say in the
@@ -11963,18 +11966,18 @@ fn a_rival_closing_on_its_victory_condition_interrupts_the_player_once_a_step() 
     bare_stations(&mut g);
     // Ticket #601 (version 0.1.0.4): 15 of 18 and 4000 of 5000, where 14 and 3800 read 72% with
     // the parts at 94% of the score, the gate not standing.
-    colony(&mut g, pro, BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 15);
+    colony(&mut g, pro, BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 16);
     g.seats[pro.index()].venture_fund = 4000.0;
     // Ticket #555 (version 0.1.0.2): the score is the mean of the parts, past three quarters; the
     // Fund is still the shorter part, which the Moment names. Ticket #567 (version 0.1.0.3): the Fund
-    // counts 0.7 of it, 0.7 x 0.76 + 0.3 x 14/18.
-    assert!((g.progress(pro).score() - 0.94 * (0.7 * 4000.0 / 5000.0 + 0.3 * 15.0 / 18.0)).abs() < 1e-9, "{}", g.progress(pro).score());
+    // counts 0.7 of it, 0.7 x 0.76 + 0.3 x 14/18; ticket #625 (version 0.1.0.5): 16 of 20.
+    assert!((g.progress(pro).score() - 0.94 * (0.7 * 4000.0 / 5000.0 + 0.3 * 16.0 / 20.0)).abs() < 1e-9, "{}", g.progress(pro).score());
     assert!(g.progress(pro).score() >= 0.75);
     g.end_phase();
     assert_eq!(fired(&g), 1, "three quarters: the Moment fires: {:?}", g.report.moments);
     let m = g.report.moments.iter().find(|m| m.kind == MomentKind::RivalProgress).unwrap();
     assert!(m.text.contains("Prospectors") && m.text.contains("three quarters"), "{}", m.text);
-    // Ticket #506 (version 0.1.0.0): the Fund, at 0.75, is the shorter part now; Presence is 14 of 18.
+    // Ticket #506 (version 0.1.0.0): the Fund, at 0.75, is the shorter part now; Presence is 14 of 18 (16 of 20 since ticket #625).
     assert!(m.text.contains("4000 of 5000"), "the part still short is the figure: {}", m.text);
     assert_eq!(m.figure, "4000 of 5000");
     g.end_phase();
@@ -11988,7 +11991,7 @@ fn a_rival_closing_on_its_victory_condition_interrupts_the_player_once_a_step() 
     g.end_phase();
     assert_eq!(fired(&g), 2, "one part met: the second step fires: {:?}", g.report.moments);
     let m = g.report.moments.iter().rev().find(|m| m.kind == MomentKind::RivalProgress).unwrap();
-    assert!(m.text.contains("met half") && m.text.contains("Venture Capital Fund") && m.text.contains("15 of 18"), "{}", m.text);
+    assert!(m.text.contains("met half") && m.text.contains("Venture Capital Fund") && m.text.contains("16 of 20"), "{}", m.text);
     g.end_phase();
     assert_eq!(fired(&g), 2, "once");
     assert!(g.outcome.is_none(), "nobody has won");
@@ -16896,7 +16899,8 @@ fn the_drivers_build_archive_entry_names_the_three_rules_the_engine_enforces() {
     assert!(entry.contains("Archivists"), "{entry}");
     assert!(entry.contains("The Upload"), "the Tech the engine's own refusal names: {entry}");
     assert!(entry.to_ascii_lowercase().contains("off earth"), "off Earth, which neither Antarctica nor a station over Earth is: {entry}");
-    assert!(entry.to_ascii_lowercase().contains("four colonists"), "and the four Colonists who must already live there: {entry}");
+    // Ticket #625 (version 0.1.0.5): the Colony tier, where four Colonists had to live there.
+    assert!(entry.to_ascii_lowercase().contains("colony tier"), "and the Colony tier the place must have climbed to: {entry}");
 }
 
 // ---------------------------------------------------------------- Ticket #350: your own Condition
@@ -16922,13 +16926,13 @@ fn ticket_350_the_turn_one_line_names_each_factions_own_condition() {
     for (kind, words) in [
         (
             FactionKind::Custodians,
-            "Build, spread Influence and reach Stabilization, four Climate phases running with Emissions under the Natural Sink, with 18 Colonists living beyond Earth orbit, before +3.0 C.",
+            "Build, spread Influence and reach Stabilization, four Climate phases running with Emissions under the Natural Sink, with 20 Colonists living beyond Earth orbit, before +3.0 C.",
         ),
         // Ticket #506 (version 0.1.0.0): the fifty-turn bars.
         // Ticket #584 (version 0.1.0.4): the Fund 5,000.
-        (FactionKind::Prospectors, "Build, spread Influence and put 5,000 Ducats in the Venture Capital Fund with 18 Colonists living beyond Earth orbit, before +3.0 C."),
+        (FactionKind::Prospectors, "Build, spread Influence and put 5,000 Ducats in the Venture Capital Fund with 20 Colonists living beyond Earth orbit, before +3.0 C."),
         // Ticket #514 (version 0.1.0.0): and a Colonial Capital.
-        (FactionKind::Arkwrights, "Build, spread Influence and get 42 Colonists living beyond Earth orbit, spread over four Bodies, one holding a Colonial Capital, before +3.0 C."),
+        (FactionKind::Arkwrights, "Build, spread Influence and get 44 Colonists living beyond Earth orbit, spread over four Bodies, one holding a Colonial Capital, before +3.0 C."),
         (FactionKind::Archivists, "Build, spread Influence and build the Archive on the ground beyond Earth orbit, pay 250 Research into it, and upload 16 Colonists, before +3.0 C."), // Ticket #565 (version 0.1.0.3): 16, from 18; ticket #579: 250, from 225
     ] {
         let line = turn_one_line(kind);
@@ -20646,7 +20650,7 @@ fn the_arkwrights_computer_is_paced_in_bodies() {
     // thirty-two aboard are on pace for the first part and short of a Body, which is what halves the
     // lift; at 42 nothing is short and no lift is weighed at all.
     g.turn = 25;
-    assert!(g.off_world_colonists(ark) >= 32 && g.bodies_settled(ark, 4) == 0, "the premise: thirty-two in orbit, no Body");
+    assert!(g.off_world_colonists(ark) >= 32 && g.bodies_settled(ark, 6) == 0, "the premise: thirty-two in orbit, no Body");
     g.ai_orders(ark);
     let head = g.log.iter().find(|l| l.starts_with("AI ") && l.contains("scored")).cloned().unwrap();
     assert!(!head.contains("gap x1.00"), "thirty-two over Earth and no Body is behind: {head}");
@@ -20654,10 +20658,10 @@ fn the_arkwrights_computer_is_paced_in_bodies() {
     assert!(short > 0.0, "the lift is still weighed: {:#?}", g.log.iter().filter(|l| l.contains("lift")).collect::<Vec<_>>());
     // Four Bodies settled (ticket #506; three before): the lift takes its full weight again.
     for body in [BodyId::Moon, BodyId::Mars, BodyId::Phobos, BodyId::Deimos] {
-        let c = colony(&mut g, ark, body, &[], 4);
-        assert_eq!(g.colony(c).unwrap().colonists, 4);
+        let c = colony(&mut g, ark, body, &[], 6);
+        assert_eq!(g.colony(c).unwrap().colonists, 6);
     }
-    assert_eq!(g.bodies_settled(ark, 4), 4);
+    assert_eq!(g.bodies_settled(ark, 6), 4);
     g.state_mut(home).emigrants = 4;
     g.log.clear();
     g.ai_orders(ark);
@@ -22940,10 +22944,10 @@ fn the_arkwrights_win_waits_on_a_colonial_capital_they_hold() {
     assert!(g.tables.faction(FactionKind::Arkwrights).victory_capital);
     assert!(FactionKind::ALL.iter().filter(|k| **k != FactionKind::Arkwrights).all(|k| !g.tables.faction(*k).victory_capital), "the Arkwrights alone");
     let capital = g.tables.tiers.iter().position(|t| t.one_per_body).expect("the Capital tier") as u32;
-    // The two parts met: 42 off Earth over four Bodies.
-    let mars = colony(&mut g, ark, BodyId::Mars, &[ModuleKind::Habitat], 30);
+    // The two parts met: 44 off Earth over four Bodies of 6 (ticket #625).
+    let mars = colony(&mut g, ark, BodyId::Mars, &[ModuleKind::Habitat], 26);
     for body in [BodyId::Moon, BodyId::Phobos, BodyId::Deimos] {
-        colony(&mut g, ark, body, &[ModuleKind::Habitat], 4);
+        colony(&mut g, ark, body, &[ModuleKind::Habitat], 6);
     }
     open_gates(&mut g);
     let p = g.progress(ark);
@@ -23032,9 +23036,9 @@ fn the_arkwright_computer_gathers_people_at_its_capital_candidate() {
     let chase = g.tables.ai.thresholds.capital_chase;
     // Phobos at 4 and Mars at 8 with room: two Bodies settled, Mars the candidate, but two of four is
     // not within one.
-    colony(&mut g, ark, BodyId::Phobos, &[ModuleKind::Habitat], 4);
+    colony(&mut g, ark, BodyId::Phobos, &[ModuleKind::Habitat], 6);
     let mars = colony(&mut g, ark, BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat], 8);
-    assert_eq!(g.bodies_settled(ark, 4), 2);
+    assert_eq!(g.bodies_settled(ark, 6), 2);
     assert_eq!(g.capital_candidate(ark), Some(mars));
     g.seats[ark.index()].stockpile.materials = 500.0;
     g.seats[ark.index()].stockpile.energy = 500.0;
@@ -23046,8 +23050,8 @@ fn the_arkwright_computer_gathers_people_at_its_capital_candidate() {
     let (mine_plain, crossing_plain) = (scored(&g, &mine), scored(&g, "to Mars"));
     assert!(mine_plain > 0.0 && crossing_plain > 0.0, "both are weighed: {:?}", g.log.iter().filter(|l| l.contains("Mine") || l.contains("send")).collect::<Vec<_>>());
     // A third Body: within one of four, and the gathering begins.
-    let moon = colony(&mut g, ark, BodyId::Moon, &[ModuleKind::Habitat], 4);
-    assert_eq!(g.bodies_settled(ark, 4), 3);
+    let moon = colony(&mut g, ark, BodyId::Moon, &[ModuleKind::Habitat], 6);
+    assert_eq!(g.bodies_settled(ark, 6), 3);
     g.log.clear();
     g.ai_orders(ark);
     let (mine_lifted, crossing_lifted) = (scored(&g, &mine), scored(&g, "to Mars"));
@@ -23514,7 +23518,7 @@ fn a_place_that_changes_hands_twice_in_a_turn_says_so_in_one_line() {
 fn a_bar_met_at_the_head_of_a_turn_wins_then_and_heads_the_report() {
     let mut g = game();
     assert_eq!(g.kind(Seat(0)), FactionKind::Custodians);
-    colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 18);
+    colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 20);
     open_gates(&mut g);
     g.seats[0].stabilization_run = 3;
     // The world under the Sink, so the coming Climate phase makes the run four.
@@ -23902,7 +23906,7 @@ fn a_rival_spending_on_yours_is_your_news_and_your_home_at_risk_says_so() {
 fn the_arkwrights_victory_text_says_what_the_engine_counts() {
     let mut g = game();
     let text = &g.tables.faction(FactionKind::Arkwrights).victory;
-    assert!(text.contains("42 Colonists living beyond Earth orbit") && text.contains("(Earth is not one of the four)"), "{text}");
+    assert!(text.contains("44 Colonists living beyond Earth orbit") && text.contains("(Earth is not one of the four)"), "{text}");
     let ark = Seat(2);
     assert_eq!(g.kind(ark), FactionKind::Arkwrights);
     let before = g.victory_colonists(ark);
@@ -24829,15 +24833,15 @@ fn the_door_reads_the_parts_without_the_gate() {
     let pro = Seat(1);
     assert_eq!(g.kind(pro), FactionKind::Prospectors);
     bare_stations(&mut g);
-    colony(&mut g, pro, BodyId::Mars, &[ModuleKind::Habitat; 4], 18);
+    colony(&mut g, pro, BodyId::Mars, &[ModuleKind::Habitat; 4], 20);
     g.seats[1].venture_fund = 5000.0;
     let p = g.progress(pro);
     assert!(!p.gate_open && (p.score_as_it_stands() - 0.94).abs() < 1e-9, "the premise: both bars, no gate, 94%");
     // The Arkwrights near too, so no runaway lead refuses first: only the door can.
     let ark = Seat(2);
-    colony(&mut g, ark, BodyId::Moon, &[ModuleKind::Habitat; 4], 30);
+    colony(&mut g, ark, BodyId::Moon, &[ModuleKind::Habitat; 4], 26);
     for body in [BodyId::Phobos, BodyId::Deimos, BodyId::Ceres] {
-        colony(&mut g, ark, body, &[ModuleKind::Habitat], 4);
+        colony(&mut g, ark, body, &[ModuleKind::Habitat], 6);
     }
     assert!(g.progress(pro).score_as_it_stands() - g.progress(ark).score_as_it_stands() < 0.2, "the premise: no runaway lead");
     assert!(!g.accord_acceptable(ark, pro, &[Term::NonAggression]), "no Accord with a seat at the door");
@@ -25322,4 +25326,107 @@ fn the_computers_capital_pick_weighs_its_faction_and_its_need() {
     // A Shipyard of theirs on the Capital's Body asks the Spaceport.
     g.colony_mut(cap).unwrap().modules.push(Module::new(ModuleKind::Shipyard));
     assert_eq!(g.ai_capital_pick(pro, cap), Some(CapitalBuilding::Spaceport));
+}
+
+/// Ticket #625 (version 0.1.0.5), at the designer's word: **every off-world population bar up by
+/// 2** -- Off-world Presence 20 (18), the Diaspora 44 (42) over four Bodies of 6 (4) -- and the
+/// Upload kept at 16 ("they go in groups of four"). The computer's paces, copies of the bars, move
+/// with them on the same turns; the Archivists' do not move.
+#[test]
+fn ticket_625_every_off_world_population_bar_rose_by_two() {
+    let t = tables();
+    assert_eq!(t.victory.off_world_presence, 20, "Off-world Presence 20, from 18");
+    for k in [FactionKind::Custodians, FactionKind::Prospectors] {
+        assert_eq!(t.faction(k).victory_second.bar, 20.0, "the {k:?} second part is Off-world Presence");
+    }
+    assert_eq!(t.faction(FactionKind::Arkwrights).victory_first.bar, 44.0, "the Diaspora 44, from 42");
+    assert_eq!((t.faction(FactionKind::Arkwrights).victory_second.bodies, t.faction(FactionKind::Arkwrights).victory_second.colonists_each), (4, 6), "four Bodies of 6, from 4");
+    assert_eq!(t.faction(FactionKind::Archivists).victory_second.bar, 16.0, "the Upload stays at 16");
+    for k in [FactionKind::Custodians, FactionKind::Prospectors, FactionKind::Arkwrights] {
+        assert_eq!(t.ai_pace(k).colonists, vec![[17, 7], [31, 20]], "the {k:?} people pace ends at 20");
+    }
+    assert_eq!(t.ai_pace(FactionKind::Arkwrights).first, vec![[8, 6], [17, 18], [25, 32], [33, 44]], "x 44/42 on the same turns");
+    assert_eq!(t.ai_pace(FactionKind::Archivists).uploads, vec![[36, 5], [42, 11], [47, 16]], "unmoved");
+    // The spread bites at 6: five on Mars settle no Body for the Diaspora, six do.
+    let mut g = game();
+    let mars = colony(&mut g, Seat(2), BodyId::Mars, &[ModuleKind::Habitat], 5);
+    assert_eq!(g.progress(Seat(2)).second_value, 0.0, "five are not six");
+    g.colony_mut(mars).unwrap().colonists = 6;
+    assert_eq!(g.progress(Seat(2)).second_value, 1.0, "six settle the Body");
+    assert_eq!(g.progress(Seat(2)).first_bar, 44.0);
+}
+
+/// Ticket #625 (version 0.1.0.5), at the designer's word ("option 1 but make it a colony"): **the
+/// Archive may be ordered only at a place of Colony tier**, in place of the four-Colonist rule
+/// (ticket #192). The tier is what is read, not the people: eighteen at an Outpost are refused, four
+/// at a place that has climbed are not; a Colonial Capital counts; checked once, at the order.
+#[test]
+fn ticket_625_the_archive_wants_a_place_of_colony_tier() {
+    let mut g = game();
+    let arc = seat_of(&g, FactionKind::Archivists);
+    g.seats[arc.index()].stockpile.materials = 200.0;
+    let colony_tier = g.tables.tiers.iter().position(|t| t.name == "Colony").expect("the Colony tier") as u32;
+    let mars = colony(&mut g, arc, BodyId::Mars, &[ModuleKind::Habitat; 6], 18);
+    let order = Order::BuildArchive { colony: mars };
+    let err = g.check_order(arc, &[], &order).unwrap_err().0;
+    assert!(err.starts_with("the Archive wants a place of Colony tier;") && err.ends_with("is an Outpost"), "eighteen at an Outpost: {err}");
+    g.colony_mut(mars).unwrap().tier = colony_tier - 1;
+    let err = g.check_order(arc, &[], &order).unwrap_err().0;
+    assert!(err.ends_with("is a Settlement"), "a Settlement: {err}");
+    g.colony_mut(mars).unwrap().tier = colony_tier;
+    assert!(g.check_order(arc, &[], &order).is_ok(), "the Colony tier: allowed");
+    g.colony_mut(mars).unwrap().colonists = 4;
+    assert!(g.check_order(arc, &[], &order).is_ok(), "the tier is read, not the people living there now");
+    g.colony_mut(mars).unwrap().tier = colony_tier + 1;
+    assert!(g.check_order(arc, &[], &order).is_ok(), "a Colonial Capital counts");
+}
+
+/// Ticket #625 (version 0.1.0.5): **the computer Archivists name only a place of Colony tier** for
+/// the Archive, as the validator would refuse any other; eighteen people at an Outpost do not do.
+#[test]
+fn ticket_625_the_computer_archivists_order_the_archive_only_at_the_colony_tier() {
+    let mut g = game();
+    let arc = seat_of(&g, FactionKind::Archivists);
+    g.seats[arc.index()].stockpile.materials = 5000.0;
+    g.seats[arc.index()].stockpile.energy = 500.0;
+    let colony_tier = g.tables.tiers.iter().position(|t| t.name == "Colony").expect("the Colony tier") as u32;
+    // Every slot the tier allows is built, so the Archive (outside the cap) is the one thing left to
+    // order there, and its absence is the rule and not the Materials going elsewhere.
+    let mars = colony(&mut g, arc, BodyId::Mars, &[ModuleKind::Habitat; 6], 18);
+    assert_eq!(g.free_module_slots(g.colony(mars).unwrap()), 0, "the premise: an Outpost full at its cap");
+    let orders = g.ai_orders(arc);
+    assert!(!orders.iter().any(|o| matches!(o, Order::BuildArchive { .. })), "an Outpost of eighteen is not named: {orders:?}");
+    g.colony_mut(mars).unwrap().tier = colony_tier;
+    for _ in 0..12 {
+        g.colony_mut(mars).unwrap().modules.push(Module::new(ModuleKind::Habitat));
+    }
+    assert_eq!(g.free_module_slots(g.colony(mars).unwrap()), 0, "the premise: a Colony full at its cap");
+    let orders = g.ai_orders(arc);
+    assert!(orders.iter().any(|o| matches!(o, Order::BuildArchive { colony } if *colony == mars)), "at the Colony tier it orders the Archive: {orders:?}");
+}
+
+/// Ticket #625 (version 0.1.0.5): **the Archivists' ferry runs until a Colony-tier site stands.**
+/// With the Archive asking the Colony tier, an Outpost of theirs off Earth is a home but not a site:
+/// the Habitat there keeps the homeless lift, so people keep arriving and the place can climb, and
+/// the lift comes off only once it has. Measured before this: the ferry's spending lift paused the
+/// moment any place could hold the Archive, and no computer Archive stood in 80 games (43 before
+/// the tier).
+#[test]
+fn ticket_625_the_archivists_keep_ferrying_until_a_colony_tier_site_stands() {
+    let mut g = game();
+    calm(&mut g);
+    let arc = seat_of(&g, FactionKind::Archivists);
+    g.seats[arc.index()].stockpile.materials = 5000.0;
+    g.seats[arc.index()].stockpile.energy = 500.0;
+    let bonus = g.tables.ai.multipliers.archive_needs_a_place;
+    assert_eq!(bonus, 5.0);
+    let mars = colony(&mut g, arc, BodyId::Mars, &[ModuleKind::Habitat], 4);
+    let habitat = format!("build Habitat at {}", g.place_name(Place::Colony(mars)));
+    g.ai_orders(arc);
+    let lifted = scored(&g, &habitat);
+    g.colony_mut(mars).unwrap().tier = g.tables.archive_tier();
+    g.log.clear();
+    g.ai_orders(arc);
+    let plain = scored(&g, &habitat);
+    assert!(plain > 0.0 && (lifted - plain * bonus).abs() < 1e-6, "an Outpost is not a site: the Habitat at {bonus}x until it climbs: {lifted} against {plain}");
 }

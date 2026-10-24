@@ -1875,8 +1875,10 @@ pub struct CapitalBuildingCard {
 #[serde(deny_unknown_fields)]
 pub struct ArchiveCard {
     pub research: i64,
-    /// Ticket #192 (version 0.08.0): Colonists who must live at the place before it may be ORDERED.
-    pub colonists_to_order: u32,
+    /// Ticket #192 (version 0.08.0): what the place must be before the Archive may be ORDERED. Four
+    /// Colonists living there until ticket #625 (version 0.1.0.5), at the designer's word; since then
+    /// the name of the tier it must have climbed to (`[[tiers]]`), a higher one counting.
+    pub tier_to_order: String,
     /// Ticket #565 (version 0.1.0.3), at the designer's word: the most Colonists that upload in one
     /// turn, pending Uploads counted.
     pub upload_per_turn: u32,
@@ -2492,6 +2494,10 @@ impl Tables {
             return Err(err("modules.toml", "each tier must allow more slots, and want no fewer Colonists, than the one before".to_string()));
         }
         check_rows("modules.toml", &CapitalBuilding::ALL, self.capital_buildings.iter().map(|b| b.id))?;
+        // Ticket #625 (version 0.1.0.5): the tier the Archive asks for is one of the tiers.
+        if !self.tiers.iter().any(|t| t.name == self.archive.tier_to_order) {
+            return Err(err("modules.toml", format!("[archive] tier_to_order {:?} names no [[tiers]] row", self.archive.tier_to_order)));
+        }
         // Ticket #58: every sentence the Report says, with every placeholder the engine supplies.
         self.report.check().map_err(|m| err("report.toml", m))?;
         // Every fixed id must have exactly one row, in the engine's order.
@@ -3038,6 +3044,12 @@ impl Tables {
     }
 
     /// Ticket #84 (version 0.06.0): the Tech that opens this Faction's Victory Condition, if one does.
+    /// Ticket #625 (version 0.1.0.5): the index of the tier a place must have climbed to before the
+    /// Archive may be ordered there; `validate` holds that the name is a tier's.
+    pub fn archive_tier(&self) -> u32 {
+        self.tiers.iter().position(|t| t.name == self.archive.tier_to_order).unwrap_or(0) as u32
+    }
+
     pub fn victory_gate(&self, kind: FactionKind) -> Option<TechId> {
         self.techs.iter().find(|t| t.gate_for == Some(kind)).map(|t| t.id)
     }

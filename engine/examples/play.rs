@@ -440,7 +440,7 @@ const GRAMMAR: &str = r#"ORDER LINES (one per line; `#` starts a comment; blank 
                                        Colonist, and a place without the people to spare is refused.
   build station <body> <orbit>         e.g. build station moon 0, or moon gateway; Materials alone, no Widgets
   build archive <colony>               the Archivists only, at a Colony OFF EARTH (neither Antarctica
-                                       nor a station over Earth), where four Colonists already live.
+                                       nor a station over Earth) that has climbed to the Colony tier.
                                        Both are checked at the order and never again. The Upload
                                        gates the Archivists' WIN, not this order.
   industry <state>                     raise the Industry Level

@@ -1340,14 +1340,14 @@ impl Game {
                 // stall halfway would be a new state to hold in the save, draw on the card and say in
                 // the Report, for a case that fires rarely, and the Victory Condition does its own
                 // checking at the end.
-                let want = self.tables.archive.colonists_to_order;
-                if col.colonists < want {
+                // Ticket #625 (version 0.1.0.5), at the designer's word: the place's TIER, where it
+                // was four Colonists living there. The tier is read, not the people: a place never
+                // falls back a tier, so eighteen who climbed it and left still leave a Colony.
+                let want = self.tables.archive_tier();
+                if col.tier < want {
                     let place = self.place_name(Place::Colony(*colony));
-                    return fail(match col.colonists {
-                        0 => format!("the Archive wants {} living at its Colony; nobody lives at {place}", crate::counted(want, "Colonist", "Colonists")),
-                        1 => format!("the Archive wants {} living at its Colony; one lives at {place}", crate::counted(want, "Colonist", "Colonists")),
-                        n => format!("the Archive wants {} living at its Colony; {n} live at {place}", crate::counted(want, "Colonist", "Colonists")),
-                    });
+                    let tier = &self.tier_of(col).name;
+                    return fail(format!("the Archive wants a place of {} tier; {place} is {} {tier}", self.tables.archive.tier_to_order, crate::article(tier)));
                 }
                 Ok(cost)
             }

@@ -18,7 +18,9 @@ stabilization_gap_cap = 0.3
 # Off-world Presence is the same bar for every Faction.
 # Ticket #506 (version 0.1.0.0): 18, from 12, with the game at fifty turns; the Factions' cards say
 # the same figure.
-off_world_presence = 18
+# Ticket #625 (version 0.1.0.5), at the designer's word: 20, from 18 -- every off-world population
+# bar up by 2.
+off_world_presence = 20
 # Ticket #27 (version 0.02): twenty-four turns of one month. Ticket #67 (version 0.05.5): thirty-six
 # turns of two months, so the game runs six years; every build time, transit time and per-turn
 # figure stays what it was in turns.
