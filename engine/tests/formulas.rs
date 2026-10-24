@@ -1346,7 +1346,8 @@ fn tech_clean_power_cuts_power_plant_emissions() {
     with_tech(&mut g, TechId::CleanPower);
     let clean = g.emissions_now().power_plants;
     assert!((plain - 1.5 * 0.75).abs() < 1e-9, "Custodians x0.75: {plain}");
-    assert!((clean - 1.5 * 0.4 * 0.75).abs() < 1e-9);
+    // Ticket #603 (version 0.1.0.4), at the designer's word: x0.5, from x0.4.
+    assert!((clean - 1.5 * 0.5 * 0.75).abs() < 1e-9, "Clean Power x0.5: {clean}");
 }
 
 #[test]

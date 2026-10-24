@@ -623,3 +623,20 @@ Banks and the Moon, so its play is unchanged.
 - **The station card**: "Built January 2030" at the size of "Held by the Custodians":
 
 ![The date](ticket-586/colony-card-earth.png)
+
+## Clean Power at x0.5
+
+Ticket [#603](https://github.com/whaleyjoshua2/Dying-Earth/issues/603), spec section 19, filed and
+built at the designer's word: *"let's cut clean power to .5"*. One figure in `techs.toml`, read by
+the climate; the computer reads only whether the Tech stands. The test pinning x0.4 was moved to
+x0.5 first and failed on the old table (0.45 where 0.5625 was wanted), then passed.
+
+| Sweep | Wins C / P / Ark / Arc | Collapses | Temperature at the end, by seating (median) |
+|---|---|---|---|
+| x0.4, the same day ([`ticket-603-baseline.txt`](sweeps/ticket-603-baseline.txt)) | 28 / 39 / 4 / 8 | 0 | +2.22 / +2.08 / +2.08 / +1.91 |
+| x0.5 ([`ticket-603.txt`](sweeps/ticket-603.txt)) | 27 / 40 / 4 / 9 | 0 | +2.26 / +2.17 / +2.07 / +1.94 |
+
+Income a game, mean (Materials / Fuel / Energy / Ducats / Research), x0.5: Custodians 2050 / 592 /
+791 / 1201 / 1028, Prospectors 2136 / 433 / 293 / 1500 / 329, Arkwrights 705 / 142 / 165 / 2342 /
+228, Archivists 488 / 233 / 60 / 432 / 628. The baseline matches #590's last sweep to the win, so
+the Blockade follow-up moved nothing. Noise throughout.

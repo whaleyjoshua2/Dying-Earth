@@ -518,3 +518,20 @@ go**, the names the places and units already carry stand in for them.
 - No rule moves: the computer seats untouched, no sweep; no saved field, `SAVE_VERSION` unmoved.
 - **Refuted if** a board, help or message line shows a Colony, Ship or Army id, a unique name or
   prefix is refused, or a number that worked before no longer reaches its id.
+
+## 19. Clean Power at x0.5
+
+Ticket: [Clean Power at x0.5](https://github.com/whaleyjoshua2/Dying-Earth/issues/603).
+
+The designer (2026-10-24): *"let's cut clean power to .5"*.
+
+- **Clean Power** takes a Power Plant's Emissions to **x0.5**, from x0.4 (`value` in `techs.toml`);
+  its effect line reads "Power Plant Emissions x0.5; unlocks the Wind Farm". A Custodians' Power
+  Plant emits 0.5625 ppm a turn under it, from 0.45; a Prospectors' 0.9375, from 0.75.
+- **The computer** reads the figure from the table through the climate, and of the Tech only
+  whether it stands (the Wind Farm in a Power Plant's place): nothing of its own moves.
+- **The sweep** (20 seeds x four seatings), against a baseline swept the same day at x0.4: wins
+  27 / 40 / 4 / 9 from 28 / 39 / 4 / 8, collapses 0 and 0, the temperature at the end +0.04 C on
+  the median of the four seatings. Noise.
+- **Refuted if** a Power Plant under Clean Power emits other than half its figure times its
+  Faction's multiplier.
