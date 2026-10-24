@@ -729,8 +729,9 @@ pub struct FactionCard {
     pub production_moved_factor: f64,
     pub signature: String,
     /// Ticket #594 (version 0.1.0.4), at the designer's word: the Faction's **signature moves**,
-    /// one line, shown on turn one in the Report's place. `{your}` reads "your" to the Faction's
-    /// own player and "their" to a rival.
+    /// shown on turn one in the Report's place. Ticket #607 (version 0.1.0.5): two sentences, the
+    /// first turn's orders then the second's, read by the Faction's own player alone, so no
+    /// placeholder.
     #[serde(default)]
     pub opening_moves: String,
     /// Ticket #412 (version 0.09.4): what the Faction wins each time it leads a Tech to completion,

@@ -216,7 +216,7 @@ start_extra_facilities = ["power_plant"]
 # Ticket #407 (version 0.09.4): audited against the data: 16 with Generation Ships too, and a
 # Colony Ship at 25.5 since figures are carried to a tenth.
 signature = "Coach Class. A Colony Ship carries 6 Colonists, 9 with Expanded Habitats and 12 with Generation Ships too, and their Habitats hold half again as many, 6 and 12. They recruit 3 Pioneers a turn in each state where others recruit 2, but every Pioneer takes half again the population. Every Ship costs them 15% less, a Colony Ship 28.1 Materials; a transit burns three quarters of the Fuel; and, starting with no station, a Space Station costs them 22 Materials and a Module three quarters. They draw +{per_body} Research a turn for each Body they have settled."
-opening_moves = "Build a Space Station over Earth and recruit Pioneers. A Shipyard on it, for the Colony Ship that takes them to the Moon."
+opening_moves = "Build a Space Station over Earth and recruit Pioneers. Put a Shipyard on it, for the Colony Ship that takes them to the Moon."
 # Ticket #419 (version 0.09.4): Unrest off every Region they hold, a whole point for each ground
 # Colony they found off Earth (Antarctica excepted) and half a point for each Space Station they
 # build; a place taken counts for nothing.
@@ -281,7 +281,7 @@ influence_multiplier = 1.0
 # Ticket #407 (version 0.09.4): audited against the data: the 75% contribution of ticket #235,
 # which the text had never said.
 signature = "Provisional Findings. While at least {provisional}% of their Research went to the shared Tech last turn, they already have half the effect of the Tech under research: a multiplier x reads 1 + (x - 1) / 2, an addition reads half rounded down, and immunities do not carry. Keeping back more switches it off for the turn after. Their Research is x1.5 on Earth and x1.75 off it, an Observatory on a station over Earth counting as off."
-opening_moves = "Build a Research Lab and set the Directive. Recruit Pioneers and a Habitat on Axiom, for the Moon and the Archive."
+opening_moves = "Build a Research Lab and set the Directive. Recruit Pioneers and build a Habitat on Axiom."
 # Ticket #412 (version 0.09.4): each time they lead a Tech to completion, 5 Influence at once and
 # half a point of Unrest off every Region they hold.
 lead_influence = 5

@@ -194,10 +194,14 @@ ticket's questions, *"those but remove the Turn one:/Turn two: q2 yes"*.
     recruit Pioneers."*
   - Prospectors: *"Build an Investment Bank and set your Venture share. Raise Industry Level and
     recruit Pioneers."*
-  - Arkwrights: *"Build a Space Station over Earth and recruit Pioneers. A Shipyard on it, for the
-    Colony Ship that takes them to the Moon."*
-  - Archivists: *"Build a Research Lab and set the Directive. Recruit Pioneers and a Habitat on
-    Axiom, for the Moon and the Archive."*
+  - Arkwrights: *"Build a Space Station over Earth and recruit Pioneers. Put a Shipyard on it, for
+    the Colony Ship that takes them to the Moon."*
+  - Archivists: *"Build a Research Lab and set the Directive. Recruit Pioneers and build a Habitat on
+    Axiom."*
+
+  The last two at the designer's second word (*"Archivists needs to say Build a Research Lab and Set
+  Directive. Recruit Prioneers and build a Habitat on Axiom. For the Arkwrights just add the word Put
+  at the start of the second sentence"*), "Set Directive" read as the window's own "set the Directive".
 - **The turn-one window** shows the player's Faction alone: "Signature moves", the Faction's glyph
   and name, the two sentences under it, "Go on". The rivals' rows go; the Faction card's signature
   rule says what each does. The `{your}` placeholder goes with them, the line having one reader.
