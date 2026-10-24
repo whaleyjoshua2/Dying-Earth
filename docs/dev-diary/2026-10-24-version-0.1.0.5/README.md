@@ -95,3 +95,20 @@ line and three figures.
 - **The sweep** ([`sweeps/ticket-622.txt`](sweeps/ticket-622.txt)): **27 / 49 / 3 / 0 and 0
   collapses**, from 29 / 51 / 0 / 0 and 0: noise. Accords struck over the batch 616 from 613: the point
   off with every rival breaks nothing and costs the Prospectors no partner. Reported and left.
+
+## Every Facility and Module costs a fifth more Widgets, and a Frigate 6
+
+Ticket [#610](https://github.com/whaleyjoshua2/Dying-Earth/issues/610), spec §6.
+
+Thirty-nine rows in `facilities.toml` and `modules.toml` moved (4 to 5, 5 to 6, 8 to 10, 12 to 14), by
+a pass over the two tables that touched only `[[facility]]` and `[[module]]` rows, so the tiers and
+Industry Level stayed; the Frigate's row alone in `units.toml`. The test was written first (every row
+in {5, 6, 10, 14}, the Core at nought, the Frigate 6, the rest pinned) and watched red on the
+Factory's 4, then green; twenty-two pins in older tests moved with the rows, the Archive's build
+loop among them (four Resolutions now). No picture: figures every hover reads from the table.
+
+- **The sweep** ([`sweeps/ticket-610.txt`](sweeps/ticket-610.txt)): **25 / 51 / 2 / 0 and 2
+  collapses**, from 27 / 49 / 3 / 0 and 0: noise. The fifth shows where it should: Widgets applied a
+  game up by about a sixth for every seat, Materials and Energy made over the batch down six per cent
+  for the Custodians and the Prospectors, within two for the other two. The computer's Archive 3 of
+  80 from 9, at the edge of its noise. Reported and left.

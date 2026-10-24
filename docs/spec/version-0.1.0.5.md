@@ -147,3 +147,35 @@ during the strip minned turns"*.
 - **Swept** (`sweeps/ticket-622.txt`, 20 seeds x four seatings): **27 / 49 / 3 / 0 and 0 collapses**,
   from the same day's 29 / 51 / 0 / 0 and 0 (§4): noise. Accords struck over the batch 616 from 613,
   so the point off breaks nothing and costs the Prospectors no partner. Reported and left.
+
+## 6. Every Facility and Module costs a fifth more Widgets, and a Frigate 6
+
+Ticket: [Every building costs a fifth more Widgets, never less than one more, and a Frigate 6](https://github.com/whaleyjoshua2/Dying-Earth/issues/610).
+
+The designer: *"20% increase in widget cost for buildings rounded to nearest integer but no building
+get less than a +1"* and *"A frigate is 6 widgets"*; on the ticket's questions, *"q1 facilities and
+modules only q2 frigate alone"*.
+
+- **Every Facility and Module row's Widgets** rise by a fifth, rounded to the nearest whole
+  (`facilities.toml`, `modules.toml`): 4 to 5, 5 to 6 (the Nature Reserve), 8 to 10, the Archive's 12
+  to 14 (14.4). The +1 floor binds nowhere, since 4 x 0.2 rounds up. The Core's nought stays.
+- **The Colony tiers** (4, 6, 8) and **Industry Level** (4, +1 a step) stay: a place growing is not a
+  building, and the Capital was repriced in 0.1.0.4.
+- **The Frigate is 6 Widgets**, from 4; every other Ship, the Army and a Rearm stay.
+- **What follows from the tables**: the Prospectors' 15% off and the Arkwrights' Module discount floor
+  the new rows (a Power Plant 8 for the Prospectors, a Shipyard 7 for the Arkwrights); the Archive
+  takes four Resolutions at a Core's four Widgets a turn, where it took three; every hover reads the
+  figure through its placeholder, and the computer reads every price from the table.
+- **Swept** (`sweeps/ticket-610.txt`, 20 seeds x four seatings): **25 / 51 / 2 / 0 and 2 collapses**,
+  from the same day's 27 / 49 / 3 / 0 and 0 (§5): noise. Dearer builds take their fifth where it
+  shows: Widgets applied a game (median, the player's seating) 353 / 517 / 180 / 174 from 302 / 440 /
+  158 / 167, and production over the batch, gross, Materials / Energy:
+
+  | | Custodians | Prospectors | Arkwrights | Archivists |
+  |---|---|---|---|---|
+  | before (§5) | 175,237 / 295,249 | 190,479 / 234,734 | 62,935 / 136,177 | 39,090 / 81,859 |
+  | after | 164,820 / 276,074 | 178,668 / 229,114 | 62,393 / 132,979 | 36,970 / 81,883 |
+
+  Six per cent off the Custodians' and the Prospectors' Materials, the Arkwrights' and the Archivists'
+  within two; the computer's Archive stands in 3 of 80 (9 before), at the edge of its noise. Reported
+  and left.

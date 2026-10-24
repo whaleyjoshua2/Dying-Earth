@@ -2512,7 +2512,7 @@ fn an_archivists_first_victory_part_reads_the_whole_fund_with_no_archive_standin
 fn ticket_347_moves_the_archives_money_and_none_of_its_other_gates() {
     let mut g = game();
     let card = g.tables.module(ModuleKind::Archive);
-    assert_eq!((card.materials, card.widgets, card.energy_upkeep), (55.0, 12, 20), "55 Materials (50 before ticket #537), 12 Widgets, 20 Energy since ticket #511 (12 before)");
+    assert_eq!((card.materials, card.widgets, card.energy_upkeep), (55.0, 14, 20), "55 Materials (50 before ticket #537), 14 Widgets since ticket #610 (12 before), 20 Energy since ticket #511 (12 before)");
     // Ticket #625 (version 0.1.0.5): the Colony tier, where it was four Colonists living there.
     assert_eq!(g.tables.archive.tier_to_order, "Colony", "a place of Colony tier at the order");
     assert_eq!(g.tables.victory_gate(FactionKind::Archivists), Some(TechId::TheUpload), "The Upload is still the gate");
@@ -2579,18 +2579,18 @@ fn the_archive_is_one_module_of_fifty_materials_and_three_turns_built_once_off_e
     assert!(g.archive_ordered(Seat(3)));
     assert_eq!(g.check_order(Seat(3), &[], &order).unwrap_err().0, "the Archive is already building");
     assert!(g.log.to_vec().iter().any(|l| l.contains("began the Archive at")), "{:?}", g.log.to_vec());
-    // Ticket #332 (version 0.09.0): twelve Widgets to raise, four for each of its three turns, and
+    // Ticket #332 (version 0.09.0): twelve Widgets to raise, four for each of its three turns, and (ticket #610, version 0.1.0.5: fourteen, so a fourth Resolution)
     // a Colony with only its Core Module makes four a turn, so it stands after the third Resolution.
     let b = g.colony(mars).unwrap().queue.iter().find(|b| b.item == BuildItem::Module(ModuleKind::Archive)).expect("queued").clone();
-    assert_eq!((b.widgets, b.done), (12, 0), "the Archivists' Module discount is 1.0");
+    assert_eq!((b.widgets, b.done), (14, 0), "the Archivists' Module discount is 1.0");
     assert_eq!(g.widgets_at(Place::Colony(mars)), 4, "the Core Module's four");
-    for n in 1..3 {
+    for n in 1..4 {
         g.resolution_phase();
-        assert!(!g.archive_built(Seat(3)), "{} Widgets of 12", n * 4);
+        assert!(!g.archive_built(Seat(3)), "{} Widgets of 14", n * 4);
         g.turn += 1;
     }
     g.resolution_phase();
-    assert!(g.archive_built(Seat(3)), "twelve Widgets");
+    assert!(g.archive_built(Seat(3)), "fourteen Widgets, four a turn: the fourth Resolution");
     assert_eq!(g.archive_colony(Seat(3)), Some(mars));
     assert!(!g.archive_complete(Seat(3)), "standing is not complete: the Research is still owed");
     let research = g.tables.archive.research;
@@ -4020,7 +4020,7 @@ fn e_a_scrubber_enlarges_the_sink_and_is_capped_captured_at_half_and_calming() {
     // Ticket #332 (version 0.09.0): 8 Widgets, four for each of its two turns.
     // Ticket #561 (version 0.1.0.3), at the designer's word: 4 Energy and 1 Ducat a turn (3 Energy
     // before), and one per 300 million people with a floor of 1 (200 and 2 before).
-    assert_eq!((card.materials, card.widgets, card.energy_upkeep, card.ducats_upkeep, card.emissions), (33.0, 8, 4, 1.0, 0.0));
+    assert_eq!((card.materials, card.widgets, card.energy_upkeep, card.ducats_upkeep, card.emissions), (33.0, 10, 4, 1.0, 0.0));
     assert!(card.no_slot, "a Scrubber takes no build slot");
     // The cap: one per three hundred million people (ticket #333, version 0.09.0: units of one
     // million), with a floor of 1 and a ceiling of 10.
@@ -6189,7 +6189,7 @@ fn coastal_engineering_sits_on_rung_one_below_its_rungs_cost_with_no_prerequisit
     // Ticket #505 (version 0.1.0.0): Clean Manufacturing in place of Clean Power, reached through it.
     assert_eq!(g.tables.tech(TechId::PlanetaryStewardship).needs, vec![TechId::CleanManufacturing, TechId::GreenConsensus], "the designer's three and Clean Manufacturing, Efficient Grids through both");
     let w = g.tables.facility(FacilityKind::SeaWall);
-    assert_eq!((w.materials, w.widgets), (22.0, 8), "22 Materials since ticket #537; 8 Widgets since ticket #332");
+    assert_eq!((w.materials, w.widgets), (22.0, 10), "22 Materials since ticket #537; 10 Widgets since ticket #610 (8 since #332)");
 }
 
 // ---------------------------------------------------------------- Ticket #72 (version 0.05.5): the Venture Capital Fund, the 15% discount, the Moon's yields
@@ -7592,7 +7592,7 @@ fn a_solar_array_stands_only_on_a_station() {
     let err = g.check_order(Seat(0), &[], &Order::BuildModule { colony: ground, kind: ModuleKind::SolarArray }).unwrap_err().0;
     assert!(err.contains("station"), "{err}");
     assert_eq!(g.tables.module(ModuleKind::SolarArray).materials, 27.5, "25 x 1.1 since ticket #537");
-    assert_eq!(g.tables.module(ModuleKind::SolarArray).widgets, 8, "ticket #332: four Widgets for each of its two turns");
+    assert_eq!(g.tables.module(ModuleKind::SolarArray).widgets, 10, "ticket #610 (version 0.1.0.5): 10, a fifth over #332's 8");
 }
 
 /// Ticket #89: the AI raises a Solar Array on a station of its own when Energy is within a turn's
@@ -7696,7 +7696,7 @@ fn the_mass_driver_stands_on_a_low_gravity_colony_behind_efficient_transit_one_p
         assert_eq!(g.tables.body(b).low_gravity, matches!(b, BodyId::Moon | BodyId::Phobos | BodyId::Deimos | BodyId::Ceres | BodyId::Vesta), "{b:?}");
     }
     let card = g.tables.module(ModuleKind::MassDriver);
-    assert_eq!((card.materials, card.widgets, card.energy_upkeep), (38.5, 8, 4), "ticket #332: 8 Widgets for its two turns");
+    assert_eq!((card.materials, card.widgets, card.energy_upkeep), (38.5, 10, 4), "ticket #610 (version 0.1.0.5): 10 Widgets, from #332's 8");
     assert_eq!(card.needs_tech, Some(TechId::EfficientTransit));
     g.seats[0].stockpile.materials = 300.0;
     // Ticket #164 (version 0.07.5): people, or there are no slots to build a Mass Driver into.
@@ -13276,19 +13276,19 @@ fn a_build_carries_a_widget_figure_at_four_per_former_turn_and_a_count() {
     directed(&mut g, sid);
     let t = &g.tables;
     // The rows, at four per former turn.
-    assert_eq!((t.facility(FacilityKind::Factory).widgets, t.facility(FacilityKind::PowerPlant).widgets, t.facility(FacilityKind::SeaWall).widgets), (4, 8, 8));
-    assert_eq!((t.module(ModuleKind::Habitat).widgets, t.module(ModuleKind::Shipyard).widgets, t.module(ModuleKind::Archive).widgets), (4, 8, 12));
-    assert_eq!((t.unit(UnitKind::Frigate).widgets, t.unit(UnitKind::Battleship).widgets, t.unit(UnitKind::Army).widgets), (4, 8, 4));
+    assert_eq!((t.facility(FacilityKind::Factory).widgets, t.facility(FacilityKind::PowerPlant).widgets, t.facility(FacilityKind::SeaWall).widgets), (5, 10, 10), "ticket #610 (version 0.1.0.5): a fifth over 4, 8, 8");
+    assert_eq!((t.module(ModuleKind::Habitat).widgets, t.module(ModuleKind::Shipyard).widgets, t.module(ModuleKind::Archive).widgets), (5, 10, 14), "ticket #610 (version 0.1.0.5): a fifth over 4, 8, 12");
+    assert_eq!((t.unit(UnitKind::Frigate).widgets, t.unit(UnitKind::Battleship).widgets, t.unit(UnitKind::Army).widgets), (6, 8, 4), "ticket #610 (version 0.1.0.5): the Frigate 6, from 4; the Battleship and the Army as they were");
     assert_eq!(t.industry_level.widgets, 4, "an Industry raise");
     assert_eq!(t.module(ModuleKind::Core).widgets, 0, "nobody orders the Core Module");
     // The Faction discounts reach the figure: the Prospectors' 15% off a Facility and an Industry
     // raise, the Arkwrights' three quarters on a Module and 15% off a Ship; an Army has none.
     let pro = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Prospectors).unwrap();
     let ark = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Arkwrights).unwrap();
-    assert_eq!(g.build_widgets(Seat(0), BuildItem::Facility(FacilityKind::PowerPlant)), 8, "the Custodians pay the row");
-    assert_eq!(g.build_widgets(pro, BuildItem::Facility(FacilityKind::PowerPlant)), 6, "8 x 0.85 = 6.8, floored");
+    assert_eq!(g.build_widgets(Seat(0), BuildItem::Facility(FacilityKind::PowerPlant)), 10, "the Custodians pay the row (10 since ticket #610, 8 before)");
+    assert_eq!(g.build_widgets(pro, BuildItem::Facility(FacilityKind::PowerPlant)), 8, "10 x 0.85 = 8.5, floored");
     assert_eq!(g.build_widgets(pro, BuildItem::IndustryLevel), 3, "4 x 0.85 = 3.4, floored");
-    assert_eq!(g.build_widgets(ark, BuildItem::Module(ModuleKind::Shipyard)), 6, "8 x 0.75");
+    assert_eq!(g.build_widgets(ark, BuildItem::Module(ModuleKind::Shipyard)), 7, "10 x 0.75 = 7.5, floored");
     assert_eq!(g.build_widgets(ark, BuildItem::Unit(UnitKind::Battleship)), 6, "8 x 0.85 = 6.8, floored");
     assert_eq!(g.build_widgets(pro, BuildItem::Unit(UnitKind::Army)), 4, "an Army takes no discount");
     assert_eq!(g.build_widgets(ark, BuildItem::Module(ModuleKind::Core)), 1, "a figure that floors to nought is 1");
@@ -13298,14 +13298,14 @@ fn a_build_carries_a_widget_figure_at_four_per_former_turn_and_a_count() {
     g.commit_orders(Seat(0), &[plant, embassy]);
     let q = g.state(sid).queue.clone();
     assert_eq!(q.len(), 2);
-    assert_eq!((q[0].item, q[0].widgets, q[0].done), (BuildItem::Facility(FacilityKind::PowerPlant), 8, 0));
-    assert_eq!((q[1].item, q[1].widgets, q[1].done), (BuildItem::Facility(FacilityKind::Embassy), 4, 4), "bought outright: done at the order");
+    assert_eq!((q[0].item, q[0].widgets, q[0].done), (BuildItem::Facility(FacilityKind::PowerPlant), 10, 0));
+    assert_eq!((q[1].item, q[1].widgets, q[1].done), (BuildItem::Facility(FacilityKind::Embassy), 5, 5), "bought outright: done at the order");
     // East Asia makes 7: the Embassy, done already, stands at this Resolution ahead of the Power
     // Plant queued before it, which takes the 7 of its 8 and waits.
     g.resolution_phase();
     assert!(g.state(sid).facilities.iter().any(|f| f.kind == FacilityKind::Embassy), "the Ducat buy stands");
     assert!(!g.state(sid).facilities.iter().any(|f| f.kind == FacilityKind::PowerPlant), "the Power Plant does not");
-    assert_eq!((g.state(sid).queue.len(), g.state(sid).queue[0].done), (1, 7), "7 of 8");
+    assert_eq!((g.state(sid).queue.len(), g.state(sid).queue[0].done), (1, 7), "7 of 10 (of 8 before ticket #610)");
 }
 
 /// Ticket #332, R3: the queue is served in order, and the specification's own refutation. On a
@@ -13333,15 +13333,15 @@ fn the_queue_is_served_in_order_and_a_launch_pad_fire_takes_the_turns_widgets() 
     let plants = |g: &Game| g.state(sid).facilities.iter().filter(|f| f.kind == FacilityKind::PowerPlant).count();
     assert_eq!((banks(&g), plants(&g)), (1, 0), "the first stands at turn N; the second does not");
     assert_eq!(g.state(sid).queue.len(), 1);
-    assert_eq!((g.state(sid).queue[0].widgets, g.state(sid).queue[0].done), (8, 5), "the Power Plant took what flowed on: 5 of 8");
+    assert_eq!((g.state(sid).queue[0].widgets, g.state(sid).queue[0].done), (10, 4), "the Power Plant took what flowed on: 4 of 10, the Factory ahead of it taking 5 (ticket #610; 5 of 8 before)");
     g.turn += 1;
     g.resolution_phase();
     assert_eq!((banks(&g), plants(&g)), (1, 1), "the second stands at turn N+1");
     assert!(g.state(sid).queue.is_empty());
-    // The counters: 9 made and all 9 applied at turn N, 9 made and 3 applied at N+1, so 12 applied
+    // The counters (before ticket #610 raised the rows): 9 made and all 9 applied at turn N, 9 made and 3 applied at N+1, so 12 applied
     // in all across the seat's places, and lost is exactly what was made and not applied.
     let (made, applied, lost) = (g.widgets.made[0] - before.0, g.widgets.applied[0] - before.1, g.widgets.lost[0] - before.2);
-    assert_eq!(applied, 12, "4 + 5 at turn N, 3 at turn N+1");
+    assert_eq!(applied, 15, "ticket #610 (version 0.1.0.5): the rows a fifth dearer, 15 applied across the two turns (4 + 5 at turn N and 3 at N+1, 12, before)");
     assert!(made >= 18, "at least Nigeria's two turns: {made}");
     assert_eq!(lost, made - applied);
     // A Launch Pad Fire at Nigeria: no Widgets applied there this turn, nothing completes.
@@ -13384,12 +13384,12 @@ fn four_makers_the_factory_makes_widgets_the_mine_makes_materials_and_the_start_
     let (f, m) = (t.facility(FacilityKind::Factory), t.facility(FacilityKind::Mine));
     // The Factory and the Mine each smoke 0.75, at the designer's word. Ticket #604 (version
     // 0.1.0.4), at the designer's word: the Mine 0.85.
-    assert_eq!((f.materials, f.widgets, f.energy_upkeep, f.emissions), (22.0, 4, 2, 0.75));
+    assert_eq!((f.materials, f.widgets, f.energy_upkeep, f.emissions), (22.0, 5, 2, 0.75), "ticket #610 (version 0.1.0.5): 5 Widgets, from 4");
     assert_eq!(f.produces.as_ref().map(|p| (p.resource, p.amount)), Some((Resource::Widgets, 4.0)));
-    assert_eq!((m.materials, m.widgets, m.energy_upkeep, m.emissions), (22.0, 4, 2, 0.85));
+    assert_eq!((m.materials, m.widgets, m.energy_upkeep, m.emissions), (22.0, 5, 2, 0.85), "ticket #610 (version 0.1.0.5): 5 Widgets, from 4");
     assert_eq!(m.produces.as_ref().map(|p| (p.resource, p.amount)), Some((Resource::Materials, 4.4)), "an Earth Mine 4.4 since ticket #537");
     let fm = t.module(ModuleKind::Factory);
-    assert_eq!((fm.materials, fm.widgets, fm.energy_upkeep, fm.earth_emissions), (22.0, 4, 3, 1.0));
+    assert_eq!((fm.materials, fm.widgets, fm.energy_upkeep, fm.earth_emissions), (22.0, 5, 3, 1.0), "ticket #610 (version 0.1.0.5): 5 Widgets, from 4");
     assert_eq!(fm.produces.as_ref().map(|p| (p.resource, p.amount)), Some((Resource::Widgets, 4.0)));
     assert_eq!(t.module(ModuleKind::Core).produces.as_ref().map(|p| (p.resource, p.amount)), Some((Resource::Widgets, 4.0)));
     // China leans Materials: a Mine there makes 6, not 4, and 9 with Deep Mining; a Factory there
@@ -13524,7 +13524,7 @@ fn a_transferred_place_keeps_its_queue_and_a_cancel_refunds_the_canceller_at_the
     g.seats[pro.index()].stockpile.materials = 500.0;
     // An Embassy, then a Bank -- which the Prospectors' order raises as their Investment Bank.
     g.commit_orders(pro, &[Order::BuildFacility { state: sid, kind: FacilityKind::Embassy }, Order::BuildFacility { state: sid, kind: FacilityKind::Bank }]);
-    assert_eq!(g.state(sid).queue.iter().map(|b| (b.seat, b.widgets, b.done)).collect::<Vec<_>>(), vec![(pro, 3, 0), (pro, 3, 0)], "the Prospectors' figures");
+    assert_eq!(g.state(sid).queue.iter().map(|b| (b.seat, b.widgets, b.done)).collect::<Vec<_>>(), vec![(pro, 4, 0), (pro, 4, 0)], "the Prospectors' figures: 5 x 0.85 (ticket #610; 3 before)");
     assert_eq!(g.state(sid).queue[1].item, BuildItem::Facility(FacilityKind::InvestmentBank));
     g.state_mut(sid).queue[0].done = 2;
     g.transfer_control(Place::State(sid), Seat(0), "Influence");
@@ -13587,7 +13587,7 @@ fn turns_to_build_estimates_at_the_places_rate_behind_its_queue() {
     assert_eq!(g.queue_estimates(place), vec![1]);
     // A place that makes nothing: the Core Module idled.
     let moon = colony(&mut g, Seat(0), BodyId::Moon, &[], 4);
-    assert_eq!(g.turns_to_build(Seat(0), Place::Colony(moon), BuildItem::Module(ModuleKind::Shipyard)), 2, "8 at the Core Module's 4");
+    assert_eq!(g.turns_to_build(Seat(0), Place::Colony(moon), BuildItem::Module(ModuleKind::Shipyard)), 3, "10 at the Core Module's 4 (ticket #610; 8 in 2 before)");
     let core = g.colony(moon).unwrap().modules.iter().position(|m| m.kind == ModuleKind::Core).unwrap();
     g.colony_mut(moon).unwrap().modules[core].mothballed = true;
     assert_eq!(g.turns_to_build(Seat(0), Place::Colony(moon), BuildItem::Module(ModuleKind::Shipyard)), u32::MAX, "nothing here makes Widgets");
@@ -18184,7 +18184,7 @@ fn a_stadium_halves_a_climate_rise_and_quarters_it_with_a_constabulary() {
     assert_eq!(g.raise_unrest(sid, 1.0, UnrestSource::Agitate), 0.5, "the Constabulary alone damps an Agitate");
     assert_eq!(g.tables.unrest.stadium_factor, 0.5, "the figure lives in unrest.toml");
     let row = g.tables.facility(FacilityKind::Stadium);
-    assert_eq!((row.materials, row.widgets, row.energy_upkeep, row.no_slot, row.needs_tech.is_some()), (22.0, 4, 1, false, false), "the cheaper row, a slot, no Tech");
+    assert_eq!((row.materials, row.widgets, row.energy_upkeep, row.no_slot, row.needs_tech.is_some()), (22.0, 5, 1, false, false), "the cheaper row, a slot, no Tech; 5 Widgets since ticket #610");
 }
 
 /// Ticket #389: **one Stadium to a Region**, as one Constabulary; the second is refused at the door,
@@ -19401,7 +19401,7 @@ fn a_nature_reserve_grows_the_sink_and_calms_a_climate_rise() {
     let mut g = game();
     let sid = StateId::EastAsia;
     let card = g.tables.facility(FacilityKind::NatureReserve).clone();
-    assert_eq!((card.materials, card.widgets, card.energy_upkeep, card.sink_per_turn), (33.0, 5, 0, 1.0), "the designer's figures");
+    assert_eq!((card.materials, card.widgets, card.energy_upkeep, card.sink_per_turn), (33.0, 6, 0, 1.0), "the designer's figures; 6 Widgets since ticket #610 (5 before)");
     let before = g.scrubber_removal_by_seat()[0];
     g.state_mut(sid).facilities.push(facility(FacilityKind::NatureReserve));
     assert!((g.scrubber_removal_by_seat()[0] - before - 1.0).abs() < 1e-9, "+1 on the Sink, the holder's");
@@ -23560,7 +23560,7 @@ fn ticket_537_builds_cost_a_tenth_more_and_off_world_mines_yield_less() {
     // What stays.
     assert_eq!((t.industry_level.materials, t.industry_level.materials_cheap_industry), (30, 15), "the Industry Level is not a building");
     assert_eq!((t.repair.materials_per_point, t.nuke.rearm_materials), (5, 40), "a Repair and a Rearm as they were");
-    assert_eq!((t.module(ModuleKind::Habitat).widgets, t.unit(UnitKind::Army).widgets), (4, 4), "the Widgets as they were");
+    assert_eq!((t.module(ModuleKind::Habitat).widgets, t.unit(UnitKind::Army).widgets), (5, 4), "the Widgets as they were at #537; the Habitat 5 since ticket #610, the Army still 4");
     // The Mines.
     // Ticket #554 (version 0.1.0.2) set the Moon's and Deimos's Mines at the designer's word since
     // (1.65 and 1.0 x 0.85 before), so those two are pinned at their own figures below.
@@ -24124,19 +24124,19 @@ fn the_wind_farm_rows_need_clean_power_and_carry_a_ducat_a_turn() {
     assert_eq!((FacilityKind::WindFarm.common(), FacilityKind::WindFarm.unique_to()), (None, None), "a common kind, and not a Power Plant");
     assert!(!FacilityKind::WindFarm.does_the_job_of(FacilityKind::PowerPlant), "Production Moved and the Reactor's rule read the Power Plant's job; the Wind Farm is not it");
     let f = g.tables.facility(FacilityKind::WindFarm);
-    assert_eq!((f.materials, f.widgets, f.energy_upkeep, f.emissions), (25.0, 8, 0, 0.0), "the designer's figures");
+    assert_eq!((f.materials, f.widgets, f.energy_upkeep, f.emissions), (25.0, 10, 0, 0.0), "the designer's figures; 10 Widgets since ticket #610 (8 before)");
     assert_eq!(f.produces.as_ref().map(|p| (p.resource, p.amount)), Some((Resource::Energy, 3.0)));
     assert_eq!(f.ducats_upkeep, 1.0, "a Ducat a turn");
     assert_eq!(f.needs_tech, Some(TechId::CleanPower), "behind Clean Power");
     assert!(g.takes_slot(FacilityKind::WindFarm), "a slot, as a Power Plant takes");
     let p = g.tables.facility(FacilityKind::PowerPlant);
-    assert_eq!((p.materials, p.widgets, p.emissions, p.ducats_upkeep), (27.5, 8, 1.5, 0.0), "the premise: the Power Plant as it was");
+    assert_eq!((p.materials, p.widgets, p.emissions, p.ducats_upkeep), (27.5, 10, 1.5, 0.0), "the premise: the Power Plant as it was (10 Widgets since ticket #610, 8 before)");
     assert_eq!(ModuleKind::ALL.last(), Some(&ModuleKind::WindFarm), "appended last, for Tables::module");
     assert!(ModuleKind::BUILDABLE.contains(&ModuleKind::WindFarm));
     assert_eq!(ModuleKind::WindFarm.name(), "Wind Farm", "one name in both lists");
     assert!(!ModuleKind::WindFarm.stands_on_a_station(), "the ground of Mars, never a station");
     let m = g.tables.module(ModuleKind::WindFarm);
-    assert_eq!((m.materials, m.widgets, m.energy_upkeep, m.earth_emissions), (25.0, 8, 0, 0.0));
+    assert_eq!((m.materials, m.widgets, m.energy_upkeep, m.earth_emissions), (25.0, 10, 0, 0.0), "ticket #610 (version 0.1.0.5): 10 Widgets, from 8");
     assert_eq!(m.produces.as_ref().map(|p| (p.resource, p.amount)), Some((Resource::Energy, 2.5)), "half a Generator's 5");
     assert_eq!(m.ducats_upkeep, 1.0, "a Ducat a turn");
     assert_eq!(m.needs_tech, Some(TechId::CleanPower), "behind Clean Power");
@@ -24292,7 +24292,7 @@ fn a_power_plant_is_replaced_with_a_wind_farm_through_the_queue_at_half_price() 
     let materials = g.seats[0].stockpile.materials;
     g.commit_orders(Seat(0), &[replace(0)]);
     assert_eq!(g.seats[0].stockpile.materials, materials - 12.5, "paid at the order");
-    assert_eq!(g.state(sid).queue.iter().map(|b| (b.item, b.widgets, b.done)).collect::<Vec<_>>(), vec![(BuildItem::Replace(FacilityKind::WindFarm), 4, 0)], "4 Widgets through the queue");
+    assert_eq!(g.state(sid).queue.iter().map(|b| (b.item, b.widgets, b.done)).collect::<Vec<_>>(), vec![(BuildItem::Replace(FacilityKind::WindFarm), 5, 0)], "5 Widgets through the queue (ticket #610; 4 before)");
     assert!(g.state(sid).facilities[0].replacing, "the Power Plant is flagged");
     assert!(g.state(sid).facilities[0].change.is_none(), "and carries no due turn: it lands with the build");
     assert_eq!(g.state(sid).facilities[0].kind, FacilityKind::PowerPlant, "and runs until the Wind Farm completes");
@@ -25565,4 +25565,33 @@ fn ticket_622_a_strip_permit_rises_more_costs_a_point_with_every_rival_and_stops
     g.turn += 1;
     g.climate_phase();
     assert!(g.state(sid).population > was, "growth returns once the permit has ended");
+}
+
+/// Ticket #610 (version 0.1.0.5), at the designer's word: **every Facility and Module costs a fifth
+/// more Widgets**, rounded to the nearest whole and never less than one more -- 4 to 5, 5 to 6, 8 to
+/// 10, the Archive's 12 to 14; the Core's nought stays -- and **a Frigate 6**. The Colony tiers,
+/// Industry Level and every other unit stay where they were.
+#[test]
+fn ticket_610_facilities_and_modules_cost_a_fifth_more_widgets_and_a_frigate_six() {
+    let t = tables();
+    for f in &t.facilities {
+        assert!(matches!(f.widgets, 5 | 6 | 10), "{}: {} Widgets is none of 5, 6, 10", f.name, f.widgets);
+    }
+    assert_eq!((t.facility(FacilityKind::Factory).widgets, t.facility(FacilityKind::NatureReserve).widgets, t.facility(FacilityKind::Scrubber).widgets), (5, 6, 10));
+    for m in &t.modules {
+        if m.name == "Core Module" {
+            assert_eq!(m.widgets, 0, "the Core is never bought");
+        } else {
+            assert!(matches!(m.widgets, 5 | 10 | 14), "{}: {} Widgets is none of 5, 10, 14", m.name, m.widgets);
+        }
+    }
+    assert_eq!((t.module(ModuleKind::Habitat).widgets, t.module(ModuleKind::Shipyard).widgets, t.module(ModuleKind::Archive).widgets), (5, 10, 14));
+    // The Ships: the Frigate alone.
+    assert_eq!(t.unit(UnitKind::Frigate).widgets, 6, "a Frigate is 6 Widgets");
+    for (k, w) in [(UnitKind::ColonyShip, 4), (UnitKind::Carrier, 4), (UnitKind::Army, 4), (UnitKind::Battleship, 8), (UnitKind::MissileCarrier, 16)] {
+        assert_eq!(t.unit(k).widgets, w, "{k:?} stays");
+    }
+    // The tiers and Industry Level stay.
+    assert_eq!(t.tiers.iter().map(|x| x.widgets).collect::<Vec<_>>(), vec![0, 4, 6, 8]);
+    assert_eq!((t.industry_level.widgets, t.industry_level.widgets_step), (4, 1));
 }

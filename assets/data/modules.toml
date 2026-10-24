@@ -11,7 +11,8 @@
 id = "mine"
 name = "Mine"
 materials = 22
-widgets = 4
+# Ticket #610 (version 0.1.0.5), at the designer's word: a fifth more, 5 from 4.
+widgets = 5
 energy_upkeep = 3
 produces = { resource = "materials", amount = 4 }
 # Version 0.04 (ticket #44): on Earth (Antarctica) a Module emits as its counterpart Facility does.
@@ -22,7 +23,8 @@ earth_emissions = 0.85
 id = "generator"
 name = "Generator"
 materials = 27.5
-widgets = 8
+# Ticket #610 (version 0.1.0.5), at the designer's word: a fifth more, 10 from 8.
+widgets = 10
 energy_upkeep = 0
 # Ticket #575 (version 0.1.0.3): 0.8 Fuel a turn, the Power Plant's pair off Earth.
 fuel_upkeep = 0.8
@@ -33,7 +35,8 @@ earth_emissions = 1.5
 id = "refinery"
 name = "Refinery"
 materials = 22
-widgets = 4
+# Ticket #610 (version 0.1.0.5), at the designer's word: a fifth more, 5 from 4.
+widgets = 5
 energy_upkeep = 3
 # Ticket #421 (version 0.09.4): 4.5 Fuel off Earth, where it was 3, to pay for a Colony Ship's
 # 40-Fuel tank, at the designer's word.
@@ -44,7 +47,8 @@ earth_emissions = 1.5
 id = "habitat"
 name = "Habitat"
 materials = 27.5
-widgets = 4
+# Ticket #610 (version 0.1.0.5), at the designer's word: a fifth more, 5 from 4.
+widgets = 5
 energy_upkeep = 2
 does = "holds 4 Colonists (8 with Expanded Habitats)"
 # Ticket #80 (version 0.06.0): 8, from 4 (the Arkwrights 12; Expanded Habitats still +2).
@@ -60,7 +64,8 @@ holds_colonists = 4
 id = "shipyard"
 name = "Shipyard"
 materials = 38.5
-widgets = 8
+# Ticket #610 (version 0.1.0.5), at the designer's word: a fifth more, 10 from 8.
+widgets = 10
 energy_upkeep = 4
 does = "the only place a Ship can be built"
 
@@ -68,7 +73,8 @@ does = "the only place a Ship can be built"
 id = "barracks"
 name = "Barracks"
 materials = 22
-widgets = 4
+# Ticket #610 (version 0.1.0.5), at the designer's word: a fifth more, 5 from 4.
+widgets = 5
 energy_upkeep = 2
 does = "the only place a Colony Army is raised and repaired; holds one"
 
@@ -82,7 +88,8 @@ does = "the only place a Colony Army is raised and repaired; holds one"
 id = "trade_post"
 name = "Trade Post"
 materials = 27.5
-widgets = 4
+# Ticket #610 (version 0.1.0.5), at the designer's word: a fifth more, 5 from 4.
+widgets = 5
 energy_upkeep = 2
 produces = { resource = "ducats", amount = 2 }
 
@@ -100,7 +107,8 @@ mine_bonus = 1
 id = "relay"
 name = "Relay"
 materials = 27.5
-widgets = 4
+# Ticket #610 (version 0.1.0.5), at the designer's word: a fifth more, 5 from 4.
+widgets = 5
 energy_upkeep = 2
 influence_allotment = 1
 standing_per_turn = 2
@@ -115,7 +123,8 @@ standing_per_turn = 2
 id = "archive"
 name = "The Archive"
 materials = 55
-widgets = 12
+# Ticket #610 (version 0.1.0.5), at the designer's word: a fifth more, 14 from 12 (14.4).
+widgets = 14
 # Ticket #511 (version 0.1.0.0): 20, from 12, at the designer's word; Closed-Loop Colonies takes a
 # quarter off it (15), where it took half.
 energy_upkeep = 20
@@ -289,7 +298,8 @@ energy_per_uploaded = 1.0
 id = "observatory"
 name = "Observatory"
 materials = 30.8
-widgets = 8
+# Ticket #610 (version 0.1.0.5), at the designer's word: a fifth more, 10 from 8.
+widgets = 10
 energy_upkeep = 3
 produces = { resource = "research", amount = 2 }
 
@@ -305,7 +315,8 @@ research_per_colonist = 0.01
 id = "solar_array"
 name = "Solar Array"
 materials = 27.5
-widgets = 8
+# Ticket #610 (version 0.1.0.5), at the designer's word: a fifth more, 10 from 8.
+widgets = 10
 energy_upkeep = 0
 produces = { resource = "energy", amount = 6 }
 station_only = true
@@ -320,7 +331,8 @@ sun_scaled = true
 id = "mass_driver"
 name = "Mass Driver"
 materials = 38.5
-widgets = 8
+# Ticket #610 (version 0.1.0.5), at the designer's word: a fifth more, 10 from 8.
+widgets = 10
 energy_upkeep = 4
 needs_tech = "efficient_transit"
 low_gravity_only = true
@@ -354,7 +366,8 @@ holds_colonists = 4
 id = "institute"
 name = "Institute"
 materials = 27.5
-widgets = 8
+# Ticket #610 (version 0.1.0.5), at the designer's word: a fifth more, 10 from 8.
+widgets = 10
 energy_upkeep = 2
 does = "raises this place's Education Level 0.20 a turn, to 2.0; it falls back at the same rate when the Institute stops"
 
@@ -367,7 +380,8 @@ does = "raises this place's Education Level 0.20 a turn, to 2.0; it falls back a
 id = "academy"
 name = "Academy"
 materials = 27.5
-widgets = 8
+# Ticket #610 (version 0.1.0.5), at the designer's word: a fifth more, 10 from 8.
+widgets = 10
 energy_upkeep = 2
 does = "does an Institute's work and pays 1 Ducat a turn while it is online"
 
@@ -380,7 +394,8 @@ does = "does an Institute's work and pays 1 Ducat a turn while it is online"
 id = "heliostat"
 name = "Heliostat"
 materials = 27.5
-widgets = 8
+# Ticket #610 (version 0.1.0.5), at the designer's word: a fifth more, 10 from 8.
+widgets = 10
 energy_upkeep = 0
 produces = { resource = "energy", amount = 6 }
 station_only = true
@@ -394,7 +409,8 @@ sun_scaled = true
 id = "exchange"
 name = "Exchange"
 materials = 27.5
-widgets = 4
+# Ticket #610 (version 0.1.0.5), at the designer's word: a fifth more, 5 from 4.
+widgets = 5
 energy_upkeep = 2
 # Ticket #491 (version 0.09.9): and an Investment Bank's interest, one share a place.
 does = "+1 Ducat over a Trade Post, and a Bank's interest"
@@ -409,7 +425,8 @@ produces = { resource = "ducats", amount = 2 }
 id = "chorus"
 name = "Chorus"
 materials = 27.5
-widgets = 4
+# Ticket #610 (version 0.1.0.5), at the designer's word: a fifth more, 5 from 4.
+widgets = 5
 energy_upkeep = 2
 influence_allotment = 1
 standing_per_turn = 2
@@ -427,7 +444,8 @@ standing_per_turn = 2
 id = "battery"
 name = "Battery"
 materials = 27.5
-widgets = 4
+# Ticket #610 (version 0.1.0.5), at the designer's word: a fifth more, 5 from 4.
+widgets = 5
 energy_upkeep = 3
 strength = 4
 hit_points = 6
@@ -442,7 +460,8 @@ does = "fires at rival Ship stacks in the one orbit it covers; while it stands n
 id = "factory"
 name = "Factory"
 materials = 22
-widgets = 4
+# Ticket #610 (version 0.1.0.5), at the designer's word: a fifth more, 5 from 4.
+widgets = 5
 energy_upkeep = 3
 produces = { resource = "widgets", amount = 4 }
 earth_emissions = 1.0
@@ -454,7 +473,8 @@ earth_emissions = 1.0
 id = "wind_farm"
 name = "Wind Farm"
 materials = 25
-widgets = 8
+# Ticket #610 (version 0.1.0.5), at the designer's word: a fifth more, 10 from 8.
+widgets = 10
 energy_upkeep = 0
 ducats_upkeep = 1
 produces = { resource = "energy", amount = 2.5 }
