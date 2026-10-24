@@ -101,3 +101,22 @@ The designer: *"upon occupation prior holder loses half their influence"*; on th
   from the same day's 25 / 50 / 2 / 2 and 1 (§2): noise. Occupations begun over the batch 204 from
   197, broken 37 from 36: the computer occupies no more and no less for the halving, and the win
   column does not move. Reported and left.
+
+## 4. One more Colony Slot on the Moon, Phobos and Deimos
+
+Ticket: [One more Colony Slot on the Moon, and one each on Phobos and Deimos](https://github.com/whaleyjoshua2/Dying-Earth/issues/613).
+
+The designer: *"add one additional slot for a lunar colony"*, *"add one on Deimos and Phobos as well"*;
+the names as proposed, *"those three"*.
+
+- **Three rows in `bodies.toml`**: the Moon's fifth slot **Oceanus Procellarum** (lon -57, lat 18),
+  Phobos's third **Todd** (lon -153, lat -9), Deimos's second **Voltaire** (lon 3.5, lat -22). A slot
+  carries no yield of its own; the Body's yields are per Colony, and the computer reads the free slots
+  from the table, so the Moon stays open one founding longer and the Mars moons offer two more landings.
+- **The pictures** (`ticket-613/slots-moon.png`, `slots-phobos.png`, `slots-deimos.png`): each globe
+  with its new site drawn clear of the others.
+- **Swept** (`sweeps/ticket-613.txt`, 20 seeds x four seatings): **29 / 51 / 0 / 0 and 0 collapses**,
+  from the same day's 26 / 49 / 2 / 2 and 1 (§3). The Arkwrights' and Archivists' two each to nought
+  is within noise, but their seats have now read 2, 2, 2, 0 and 0 across the version's five sweeps.
+  The landings moved as the slots meant them to: ground Colonies at the end over the batch on Phobos
+  165 from 127, on Deimos 57 from 40, on the Moon 290 from 270. Reported and left.

@@ -686,7 +686,7 @@ fn phobos_and_deimos_are_small_different_bodies_one_hop_past_mars() {
     let de = g.tables.body(BodyId::Deimos).clone();
     assert_eq!(ph.name, "Phobos");
     assert_eq!(de.name, "Deimos");
-    assert_eq!((ph.colony_slots(), de.colony_slots()), (2, 1));
+    assert_eq!((ph.colony_slots(), de.colony_slots()), (3, 2), "ticket #613 (version 0.1.0.5): one more each, from 2 and 1");
     assert_eq!((ph.mine_yield, ph.generator_yield, ph.refinery_yield, ph.research_yield), (1.4875, 1.2, 0.625, 1.2), "Refinery a quarter up since ticket #421, the Mine x0.85 since ticket #537, Generator and Research since ticket #554");
     assert_eq!((de.mine_yield, de.generator_yield, de.refinery_yield, de.research_yield), (1.01, 1.1, 0.52, 1.15), "all four at the designer's word since ticket #554");
     // Reach. Ticket #57 replaced the fixed card turns for a crossing between the Earth system and
@@ -25483,4 +25483,31 @@ fn ticket_615_an_occupation_halves_the_prior_holders_standing_and_the_loss_stand
     g.resolution_phase();
     let africa = g.place_name(Place::State(StateId::NorthAfrica));
     assert!(g.report.lines.iter().any(|l| l.text.ends_with(&format!("occupy {africa}."))), "{:?}", g.report.lines.iter().filter(|l| l.text.contains("Africa")).map(|l| l.text.clone()).collect::<Vec<_>>());
+}
+
+/// Ticket #613 (version 0.1.0.5), at the designer's word: **one more Colony Slot on the Moon, Phobos
+/// and Deimos** -- Oceanus Procellarum, Todd and Voltaire -- each a named site clear of the others
+/// on its globe, carrying no yield of its own.
+#[test]
+fn ticket_613_one_more_colony_slot_on_the_moon_phobos_and_deimos() {
+    let t = tables();
+    let last = |b: BodyId| t.body(b).slots.last().map(|s| (s.name.as_str(), s.lon, s.lat));
+    assert_eq!(t.body(BodyId::Moon).colony_slots(), 5, "the Moon's fifth");
+    assert_eq!(last(BodyId::Moon), Some(("Oceanus Procellarum", -57.0, 18.0)));
+    assert_eq!(t.body(BodyId::Phobos).colony_slots(), 3, "Phobos's third");
+    assert_eq!(last(BodyId::Phobos), Some(("Todd", -153.0, -9.0)));
+    assert_eq!(t.body(BodyId::Deimos).colony_slots(), 2, "Deimos's second");
+    assert_eq!(last(BodyId::Deimos), Some(("Voltaire", 3.5, -22.0)));
+    // No two slots of a Body share a site.
+    for b in [BodyId::Moon, BodyId::Phobos, BodyId::Deimos] {
+        let s = &t.body(b).slots;
+        for i in 0..s.len() {
+            for j in 0..i {
+                assert!(s[i].name != s[j].name && ((s[i].lon - s[j].lon).abs() > 5.0 || (s[i].lat - s[j].lat).abs() > 5.0), "{:?}: {} and {} sit together", b, s[i].name, s[j].name);
+            }
+        }
+    }
+    // A new slot is a free slot the game can found on.
+    let g = game();
+    assert!(g.free_slots_on(BodyId::Deimos).contains(&1), "Voltaire is free at the start");
 }

@@ -111,6 +111,8 @@ slots = [
     { name = "Mare Imbrium", lon = -15.6, lat = 32.8 },
     { name = "Tycho", lon = -11.4, lat = -43.3 },
     { name = "South Pole-Aitken Basin", lon = -171.0, lat = -53.0 },
+    # Ticket #613 (version 0.1.0.5), at the designer's word: a fifth, the great western sea.
+    { name = "Oceanus Procellarum", lon = -57.0, lat = 18.0 },
 ]
 
 [[body]]
@@ -162,6 +164,8 @@ stations = ["Phobos Gateway"]
 slots = [
     { name = "Stickney", lon = -50.0, lat = 1.0 },
     { name = "Roche", lon = 177.0, lat = 53.0 },
+    # Ticket #613 (version 0.1.0.5), at the designer's word: a third, the far side from Stickney.
+    { name = "Todd", lon = -153.0, lat = -9.0 },
 ]
 
 [[body]]
@@ -187,6 +191,8 @@ orbital_slots = 1
 stations = ["Deimos Gateway"]
 slots = [
     { name = "Swift", lon = -2.0, lat = 12.5 },
+    # Ticket #613 (version 0.1.0.5), at the designer's word: a second, the only other named crater.
+    { name = "Voltaire", lon = 3.5, lat = -22.0 },
 ]
 
 # Version 0.06.0 (ticket #93): Venus, a Body of orbits only. Three turns and 16 Fuel from Earth on

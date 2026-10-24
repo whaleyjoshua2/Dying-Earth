@@ -65,3 +65,18 @@ by the phrase's nine words. No picture: a figure on the Region card's Standing l
   collapse**, from 25 / 50 / 2 / 2 and 1: noise. Occupations begun over the batch 204 from 197, broken
   37 from 36. The halving changes what a retake costs, not how often the computer occupies; reported
   and left.
+
+## One more Colony Slot on the Moon, Phobos and Deimos
+
+Ticket [#613](https://github.com/whaleyjoshua2/Dying-Earth/issues/613), spec §4.
+
+Three rows in `bodies.toml`, at the designer's word on the names: Oceanus Procellarum on the Moon, Todd
+on Phobos, Voltaire on Deimos. The test was written first (five, three and two slots, the new names
+last, no two sites within five degrees) and watched red on the Moon's four, then green; the old pin of
+Phobos's two and Deimos's one moved with it.
+
+**The pictures** ([`ticket-613/slots-moon.png`](ticket-613/slots-moon.png),
+[`slots-phobos.png`](ticket-613/slots-phobos.png), [`slots-deimos.png`](ticket-613/slots-deimos.png)):
+each globe from the headless shot: Oceanus Procellarum at the Moon's left, labelled with its yields, beside Mare Imbrium and Tycho; Voltaire low on Deimos under Swift; Todd on Phobos's far side, so a second shot turned to face it ([`todd-phobos.png`](ticket-613/todd-phobos.png), `look:-153,-9`) shows it centred. Looked at, all four; the prescreen's SUSPECT is the known full-bleed false positive.
+
+- **The sweep** ([`sweeps/ticket-613.txt`](sweeps/ticket-613.txt)): **29 / 51 / 0 / 0 and 0 collapses**, from 26 / 49 / 2 / 2 and 1. The landings moved: ground Colonies at the end over the batch on Phobos 165 from 127, Deimos 57 from 40, the Moon 290 from 270. The Arkwrights' and Archivists' nought is within noise of their 2, and reported.
