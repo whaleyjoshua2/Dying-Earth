@@ -345,3 +345,46 @@ on the ticket's questions, *"q1 a q2 yes"*.
   seats 0 and 1 alone to Mars: *"you won"* over *"Battle at Mars orbit: your TSV Valiant and TSV
   Vanguard destroyed the Prospectors' PMV Magellan and PMV Indomitable."*
 - No rule moves; no sweep.
+
+## 13. Nine hovers cut to the designer's lines
+
+Ticket: [The window's hovers cut: the Accord's notice, the first landing, Pioneers waiting, the Blockade, the Directive, the standing order, the Allotment, Unrest, Overcrowded](https://github.com/whaleyjoshua2/Dying-Earth/issues/616).
+
+The designer's cuts are on the map's Notes, from the 0.1.0.2 playtest's mouse-over dump; on the
+ticket's questions, *"q1 c q2 that q3 yes q4 keep 587s q5 b q6 b q7 yes"*.
+
+- **The Accord's notice** (the *"Declare it over"* button): *"Lapses next turn. Breaking a term sooner
+  costs 3 Relations and ends it."* Both facts of the two cuts given; the 3 is `break_accord`'s offence
+  weight.
+- **The first landing** (a Body card's windfall line): *"First to land here: +{standing} Influence a
+  turn while held."* over a second line, *"A station claims nothing."*, the one clause of the old
+  hover that bites.
+- **Pioneers waiting**: *"Waiting. A Launch Site lifts them; once the ice opens, ships take them to
+  Antarctica."*
+- **The starved line**: the line already names the cause and the squeeze (*"Blockaded by the
+  Prospectors: producing nothing, upkeep still paid."*), so the hover says what it does not: *"Nobody
+  dies, nothing is destroyed. Each turn is an offence against you."* The designer's cut repeated the
+  line.
+- **The Directive** (both the condensed widget and the Faction window's control): *"Share of your
+  Research paid into the shared Tech from the next Income. Research kept back counts nothing toward
+  the Research Lead."*
+- **The standing order** (the *"every turn"* checkbox): *"Spend your whole Allotment here every turn
+  until cancelled."*
+- **The Allotment** (a Region card's Influence value): the figures by source, the top bar's "of N
+  left" lines, on one line: *"Influence each turn: Regions and buildings 14. Unspent is lost."* On
+  turn one, before any Income has recorded them, the parts are read live.
+- **Unrest**: *"Unrest to 10: Army stops at 4, Facilities halve at 7, revolt at 10. Falls 1.5 a
+  turn."*, the figures from `unrest.toml`.
+- **Overcrowded**: *"Overcrowded: everything but Energy at half. Restart a Habitat."*
+- **The Upload** keeps ticket #587's line, *"Read into the Archive; {} stay. Cannot be undone."*, the
+  later word.
+- **The Blame tag**: *"[BLAME_HOVER]"* is the dump's label for the constant; the screen draws it bare
+  (`ticket-616/blame-climate-earth.png`). The dump was made by hand from the source, which is why the
+  developer notes (two code comments and four test names) appear in it; none is drawn.
+- Every cut hover is drawn through `rule_tip`, so the `tip:` aid can photograph it. The starved and
+  overcrowded lines have no picture: no aid starves or overfills a Colony on turn one's board.
+- **The pictures** (`ticket-616/`): `pioneers-earth.png`, `unrest-earth.png`, `allotment-earth.png`
+  (China's card), `landing-moon.png` (the Moon's card), `accord-factions-mars.png` (the Prospectors'
+  page under `accord:some`), `directive-tech-mars.png` (the Tech Tree window), `blame-climate-earth.png`
+  (the Climate Panel's heading).
+- No rule moves; no sweep.

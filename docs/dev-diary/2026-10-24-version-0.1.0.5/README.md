@@ -221,3 +221,32 @@ Prospectors' PMV Magellan and PMV Indomitable."* The first shot read *"your  des
 Frigates had rolled a disengage in the round their blows landed, so no unit "stayed" and the
 destroyer's name was empty. A side that left whole is now named whole, held by a third test written
 red first.
+
+## Nine hovers cut to the designer's lines
+
+Ticket [#616](https://github.com/whaleyjoshua2/Dying-Earth/issues/616), spec §13.
+
+Seven questions in one round (two cuts given for the Accord's notice and the Directive, the first
+landing's second clause, the Upload already cut by #587, what the Allotment's `{breakdown}` is, a
+Blockade hover that repeated its own line, Unrest's first figure), answered *"q1 c q2 that q3 yes q4
+keep 587s q5 b q6 b q7 yes"*. The texts went into constants and three small functions beside the
+Directive's sentence, pinned by a test mod watched red on the missing names; the six that hung on
+`on_hover_text` were moved onto `rule_tip` so the `tip:` aid could photograph them. The Allotment's
+hover reads the recorded parts and, on turn one before any Income, the live ones: the test caught the
+empty case, *"Influence each turn. Unspent is lost."*, on a fresh game.
+
+**The pictures** ([`ticket-616/`](ticket-616/)), each looked at: China's card with the Pioneers line
+([`pioneers-earth.png`](ticket-616/pioneers-earth.png)), the Unrest line
+([`unrest-earth.png`](ticket-616/unrest-earth.png), "Unrest to 10: Army stops at 4, Facilities halve
+at 7, revolt at 10. Falls 1.5 a turn.") and the Influence value
+([`allotment-earth.png`](ticket-616/allotment-earth.png), "Influence each turn: Regions and buildings
+14. Unspent is lost."); the Moon's card ([`landing-moon.png`](ticket-616/landing-moon.png), "First to
+land here: +1 Influence a turn while held." over "A station claims nothing."); the Prospectors' page
+with the Accord's notice ([`accord-factions-mars.png`](ticket-616/accord-factions-mars.png), on the
+Mars view, where no Climate Panel covers the Factions window); the Directive in the Tech Tree window
+([`directive-tech-mars.png`](ticket-616/directive-tech-mars.png)); and the Climate Panel's Blame
+heading ([`blame-climate-earth.png`](ticket-616/blame-climate-earth.png)), drawn bare, the
+"[BLAME_HOVER]" tag being the dump's. Three aids were tried before the right ones: `menus:1`
+photographs the Faction CHOICE screen, `factions:1` opens the Factions window under the Earth view's
+Climate Panel, and the Directive is in the Tech Tree window (`tech:1`), not the Faction window. No
+picture of the starved or overcrowded lines: no aid starves or overfills a Colony on turn one's board.

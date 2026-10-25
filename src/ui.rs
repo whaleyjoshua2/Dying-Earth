@@ -4107,12 +4107,8 @@ fn first_to_body_line(ui: &mut Ui, session: &Session, game: &Game, body: BodyId)
     };
     rule_tip(
         resp,
-        format!(
-            // Measured on the capture: the first draft of this hover ran to seven rendered lines
-            // against a ceiling of six, so it lost the words that said where the windfall lands and
-            // whose Allotment the trickle joins. Both are on the Colony's own card.
-            "Paid once, after the landing, to the first Faction ever to settle this world's ground; that Colony's Core then adds +{standing} Influence a turn while they direct it.\nA station claims nothing, the other slots stay open, and retaking a lost Colony never pays again."
-        ),
+        // Ticket #616 (version 0.1.0.5): cut to the designer's line, with the clause that bites kept.
+        first_landing_hover(standing),
     );
 }
 
@@ -4895,7 +4891,7 @@ fn command_cluster(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewS
                 let can_tick = on || target.is_some();
                 let resp = ui.add_enabled(can_tick, egui::Checkbox::new(&mut on, label));
                 let resp = resp
-                    .on_hover_text("Spend your whole Allotment on this place at the start of every turn from now on. It is placed as an ordinary order you can read and cancel before ending the turn, never spent behind your back; cancelling it, or losing the place, ends it.")
+                    .on_hover_text(ALLOTMENT_ORDER_HOVER)
                     .on_disabled_hover_text("Click a Region or a Colony first.");
                 if resp.changed() {
                     if let Some(i) = session.pending.iter().position(|o| matches!(o, Order::SetMaxStanding { .. })) {
@@ -8054,13 +8050,8 @@ This turn {:+.2}%: {:+.1} million.", c.population_growth * 100.0, c.population_l
     // not a seventh line.
     rule_tip(
         icon_word(ui, "influence", format!("Influence value {}: what it adds to its controller's Allotment each turn (+1 per Industry Level raised)", game.state_influence_value(sid))),
-        format!(
-            "The Allotment is what you receive each turn: {}, your Regions, your Embassies, Relays and Choruses, your Spaceports' lifts, a first landing's windfall, +{} a Body you were first to and still hold, +{} a Capital.\nIt does not carry over: what is unspent at End Turn is lost. Ducats buy more, two a point.",
-            game.tables.influence.allotment_base,
-            game.tables.influence.first_settled_allotment,
-            // Ticket #503 (version 0.1.0.0): the Colonial Capital's own figure, beside the first's.
-            game.tables.tiers.iter().map(|t| t.influence).max().unwrap_or(0)
-        ),
+        // Ticket #616 (version 0.1.0.5): the figures by source, as the top bar draws them, on one line.
+        allotment_hover(game),
     );
     // Ticket #426 (version 0.09.5): the player's own Bank by name (the Prospectors' Investment Bank),
     // at its real figure, the Faction's output multiplier and Commodity Finance included.
@@ -8150,10 +8141,8 @@ This turn {:+.2}%: {:+.1} million.", c.population_growth * 100.0, c.population_l
                 "" => format!("Unrest {}", game.unrest_text(sid)),
                 note => format!("Unrest {}: {note}", game.unrest_text(sid)),
             }),
-            format!(
-                "Unrest runs 0 to {:.0}, in quarters, with three thresholds:\nat {:.0} the Standing Army stops replenishing,\nat {:.0} every Facility here runs at half,\nat {:.0} the state throws its controller off.\nIt falls {:.1} a turn on its own, except the turn the state changed hands.",
-                u.max, u.army_threshold, u.facility_threshold, u.max, u.natural_fall
-            ),
+            // Ticket #616 (version 0.1.0.5): the thresholds in a line, the ceiling first.
+            unrest_hover(u),
         );
         // Ticket #269 (version 0.08.4): Agitate, on a Region a rival holds -- Relief's mirror, at
         // the top of the card where the holder's Relief would be on their own.
@@ -8490,9 +8479,7 @@ fn pioneers_block(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, act
     // -- in the Influence block, some way up the card, and only while it was above zero -- so a
     // player who mustered and then looked for the result found the line had simply not been
     // there a moment ago. At nought it now says so, which is the answer to "did that work?".
-    ui.label(format!("Pioneers waiting: {}", st.emigrants)).on_hover_text(
-        "Recruited here and not yet lifted or sent: a working Launch Site lifts them onto a Ship or straight to a station of yours over Earth, and once the ice is open the sea takes them to Antarctica.",
-    );
+    rule_tip(ui.label(format!("Pioneers waiting: {}", st.emigrants)), PIONEERS_WAITING_HOVER.to_string());
     // Ticket #196 (version 0.08.0): as many as this state's people can pay for, where the button
     // always asked for the whole batch. Coach Class costs the Arkwrights twice the population for
     // twice the batch -- 16.0 people -- and Australia carries 10.1 to 12.6, so the button was dead
@@ -8789,20 +8776,14 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     // Ticket #278 (version 0.08.5): a starved Colony says so, in the designer's words, and how.
     if let Some(by) = game.starved_by(cid) {
         let how = if col.in_orbit { format!("Blockaded by the {}", game.seat_name(by)) } else { format!("Under the {}' Orbital Control", game.seat_name(by)) };
-        ui.label(RichText::new(format!("{how}: producing nothing, upkeep still paid.")).color(Color32::from_rgb(230, 110, 90))).on_hover_text(
-            // Ticket #335 (version 0.09.0): a Blockade shuts the ORBIT it is given in, so a station
-            // starves under a Blockade of its own ring and the ground starves under one in low
-            // orbit; a stack blockading elsewhere at the Body starves nothing.
-            "A warship stack on Blockade in a station's orbit starves it. A ground Colony starves while one rival alone holds Orbital Control of low orbit.\nStarved, every Module makes nothing and still pays upkeep; nobody dies, nothing is destroyed. Each turn is an offence against you.",
-        );
+        // Ticket #616 (version 0.1.0.5): the line names the cause; the hover says what it does not.
+        rule_tip(ui.label(RichText::new(format!("{how}: producing nothing, upkeep still paid.")).color(Color32::from_rgb(230, 110, 90))), STARVED_HOVER.to_string());
     }
     // Ticket #359 (version 0.09.1): an occupied Habitat standing shut halves the Colony, and the
     // Module rows below still read their whole figures, so the card says so where the starved
     // line says its own squeeze.
     if game.habitat_halves(cid) {
-        ui.label(RichText::new("A shut Habitat houses people here: everything but Energy at half.").color(Color32::from_rgb(230, 170, 90))).on_hover_text(
-            "A Habitat mothballed, or dark for want of Energy, still houses its Colonists. While more live here than the working Habitats and the Core can hold, the Colony makes everything at half but its Energy. Restart it, or keep an empty one to mothball.",
-        );
+        rule_tip(ui.label(RichText::new("A shut Habitat houses people here: everything but Energy at half.").color(Color32::from_rgb(230, 170, 90))), OVERCROWDED_HOVER.to_string());
     }
     // Ticket #164 (version 0.07.5): the room is the Core Module's four and the Habitats' eight
     // each, so the line no longer names Habitats alone.
@@ -11346,7 +11327,7 @@ fn condensed_fund(ui: &mut Ui, session: &Session, game: &Game, actions: &mut Vec
             ui.add_space(10.0);
             ui.horizontal(|ui| {
                 ui.spacing_mut().item_spacing.x = 6.0;
-                icon_word(ui, "research", format!("{contribution}%")).on_hover_text(DIRECTIVE_SENTENCE);
+                rule_tip(icon_word(ui, "research", format!("{contribution}%")), DIRECTIVE_SENTENCE.to_string());
                 let resp = condensed_rail(ui, &mut contribution, RAIL, |r, painter| {
                     // The unreachable part below the floor, dimmed as the full rail dims it; the
                     // Archivists' floor is nought with the shipped table, so nothing paints.
@@ -11454,7 +11435,34 @@ fn fund_bar(ui: &mut Ui, colour: Color32, fund: f64, bar: f64, width: f32, what:
 }
 
 /// Ticket #382: the two full controls' own sentences, on the condensed widget's hover.
-const DIRECTIVE_SENTENCE: &str = "The share of your Research that goes to the shared Tech, from the next Income until you set it again. What you keep back never reaches the Tech, so it counts nothing toward the Research Lead -- and the Lead is the only seat that picks what the table researches next.";
+/// Ticket #616 (version 0.1.0.5): the Directive's cut to the designer's line, with a short first
+/// sentence kept to say what the slider is.
+const DIRECTIVE_SENTENCE: &str = "Share of your Research paid into the shared Tech from the next Income. Research kept back counts nothing toward the Research Lead.";
+// Ticket #616 (version 0.1.0.5): hovers cut to the designer's lines, from the 0.1.0.2 playtest's
+// mouse-over dump. The 3 is `break_accord`'s offence weight, written out as the old text wrote it.
+const ACCORD_NOTICE_HOVER: &str = "Lapses next turn. Breaking a term sooner costs 3 Relations and ends it.";
+const PIONEERS_WAITING_HOVER: &str = "Waiting. A Launch Site lifts them; once the ice opens, ships take them to Antarctica.";
+/// On the starved line, which already says who starves the place and that it makes nothing: the
+/// hover says what the line does not (the designer's cut repeated the line).
+const STARVED_HOVER: &str = "Nobody dies, nothing is destroyed. Each turn is an offence against you.";
+const ALLOTMENT_ORDER_HOVER: &str = "Spend your whole Allotment here every turn until cancelled.";
+const OVERCROWDED_HOVER: &str = "Overcrowded: everything but Energy at half. Restart a Habitat.";
+/// The first landing's windfall line keeps the one clause that bites, a station claiming nothing.
+fn first_landing_hover(standing: i64) -> String {
+    format!("First to land here: +{standing} Influence a turn while held.\nA station claims nothing.")
+}
+/// The Allotment by source, the figures the top bar's "of N left" already draws, on one line.
+/// Turn one has had no Income, so nothing is recorded yet: the parts are then read live.
+fn allotment_hover(game: &Game) -> String {
+    let mut from = game.allotment_lines(Seat(0));
+    if from.is_empty() {
+        from = game.influence_allotment_parts(Seat(0)).iter().take(6).enumerate().map(|(i, (label, n))| if i == 0 { format!("{label} {n}") } else { format!("{label} {n:+}") }).collect();
+    }
+    format!("Influence each turn: {}. Unspent is lost.", from.join(", "))
+}
+fn unrest_hover(u: &dying_earth_engine::data::UnrestTable) -> String {
+    format!("Unrest to {:.0}: Army stops at {:.0}, Facilities halve at {:.0}, revolt at {:.0}. Falls {:.1} a turn.", u.max, u.army_threshold, u.facility_threshold, u.max, u.natural_fall)
+}
 const VENTURE_SENTENCE: &str = "The share of each turn's Ducat income that goes into the Fund at Income, before you can spend a coin of it, from the next Income until you set it again. Ducats got by selling are not income and never reach it.";
 
 /// Ticket #235 (version 0.08.3): the **Research Directive** -- the share of a Faction's Research
@@ -11484,7 +11492,7 @@ fn research_directive_control(ui: &mut Ui, session: &Session, game: &Game, actio
     });
     let mut contribution = pending_set.unwrap_or(standing);
 
-    ui.label(RichText::new(format!("Research Directive: {contribution}%")).strong()).on_hover_text(DIRECTIVE_SENTENCE);
+    rule_tip(ui.label(RichText::new(format!("Research Directive: {contribution}%")).strong()), DIRECTIVE_SENTENCE.to_string());
 
     // The scale is 0 to 100 for EVERY Faction, so the four controls read alike and the Archivists'
     // extra reach is visible rather than implied: their slider runs the whole way, and everyone
@@ -11886,11 +11894,7 @@ fn accords_block(ui: &mut Ui, session: &Session, game: &Game, other: Seat, actio
             let placed = session.pending.contains(&order);
             if placed {
                 ui.label(RichText::new("You have declared it over this turn.").weak());
-            } else if ui
-                .button("Declare it over")
-                .on_hover_text("Free, and it takes a turn's notice: it lapses at the start of the next turn and you may act then. Acting against a term while it still stands is another matter -- it costs 3 and ends the whole Accord at once.")
-                .clicked()
-            {
+            } else if rule_tip(ui.button("Declare it over"), ACCORD_NOTICE_HOVER.to_string()).clicked() {
                 actions.push(Action::Place(order));
             }
         }
@@ -14020,5 +14024,46 @@ mod ticket_611 {
         assert!(line.starts_with("Refinery: ") && line.contains(", refuels its Faction's Ships in low orbit, "), "the sentence rides the yield's text, between the Fuel and the upkeep: {line}");
         assert!(!module_line(&g, &col, id, 1, Some(Seat(0))).contains("refuels"), "the Core says nothing of it");
         assert!(!line.contains("your Ships"), "never 'your': the line is drawn on a rival's tile too");
+    }
+}
+
+/// Ticket #616 (version 0.1.0.5): nine hovers cut to the designer's lines, each within the ceiling.
+#[cfg(test)]
+mod ticket_616 {
+    use super::*;
+    use dying_earth_engine::data::{default_data_dir, Tables};
+    use dying_earth_engine::{FactionKind, NewGame, StateId};
+
+    fn fresh() -> Game {
+        let tables = std::sync::Arc::new(Tables::load(&default_data_dir()).expect("tables load"));
+        Game::new(tables, NewGame { seed: 7, player: FactionKind::Custodians, player_is_ai: false, player_start: StateId::EastAsia })
+    }
+
+    #[test]
+    fn the_fixed_hovers_are_the_designers_lines() {
+        assert_eq!(ACCORD_NOTICE_HOVER, "Lapses next turn. Breaking a term sooner costs 3 Relations and ends it.");
+        assert_eq!(PIONEERS_WAITING_HOVER, "Waiting. A Launch Site lifts them; once the ice opens, ships take them to Antarctica.");
+        assert_eq!(STARVED_HOVER, "Nobody dies, nothing is destroyed. Each turn is an offence against you.");
+        assert_eq!(ALLOTMENT_ORDER_HOVER, "Spend your whole Allotment here every turn until cancelled.");
+        assert_eq!(OVERCROWDED_HOVER, "Overcrowded: everything but Energy at half. Restart a Habitat.");
+        assert_eq!(DIRECTIVE_SENTENCE, "Share of your Research paid into the shared Tech from the next Income. Research kept back counts nothing toward the Research Lead.");
+        // Each under half the six-line ceiling; the Directive's two sentences run to three.
+        for text in [ACCORD_NOTICE_HOVER, PIONEERS_WAITING_HOVER, STARVED_HOVER, ALLOTMENT_ORDER_HOVER, OVERCROWDED_HOVER, DIRECTIVE_SENTENCE] {
+            assert!(hover_lines_estimate(text) <= 3, "{} lines: {text}", hover_lines_estimate(text));
+        }
+    }
+
+    #[test]
+    fn the_figured_hovers_carry_their_figures() {
+        let g = fresh();
+        assert_eq!(first_landing_hover(2), "First to land here: +2 Influence a turn while held.\nA station claims nothing.");
+        let allotment = allotment_hover(&g);
+        assert!(allotment.starts_with("Influence each turn: ") && allotment.ends_with(". Unspent is lost."), "{allotment}");
+        assert!(allotment.chars().any(|c| c.is_ascii_digit()), "the figures, not the sources' names: {allotment}");
+        assert!(hover_lines_estimate(&allotment) <= HOVER_LINE_CEILING, "{allotment}");
+        let u = &g.tables.unrest;
+        let unrest = unrest_hover(u);
+        assert_eq!(unrest, format!("Unrest to {:.0}: Army stops at {:.0}, Facilities halve at {:.0}, revolt at {:.0}. Falls {:.1} a turn.", u.max, u.army_threshold, u.facility_threshold, u.max, u.natural_fall));
+        assert!(hover_lines_estimate(&unrest) <= 2, "{unrest}");
     }
 }
