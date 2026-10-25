@@ -525,13 +525,21 @@ before collapse."*; on the ticket's questions, *"q1 yes q2 a q3 a q4 yes q5 yes"
   heading (`projection().collapse_turn`), against the seat's own win turn, this turn plus the rest
   of its first Victory bar at the rate it has made it so far. The race is lost while the Collapse
   falls at or before the win. A Stabilization run has no win turn and never loses the race: its win
-  is the cure. Before this the computer read no Collapse at all.
+  is the cure. The rate is averaged from turn one, so a part that opens late (the Arkwrights'
+  Colonists off Earth, the Archivists' fund) reads slower than it is and its seat loses the race
+  sooner; the pace tables would read it finer, and are the lever if that proves too eager. The win
+  turn is clamped to the game's last turn (from the review: a tiny rate wrapped the cast). Before
+  this the computer read no Collapse at all.
 - **The answer** (`ai_collapse_weight`): while the race is lost, every candidate's weight is
   multiplied once, across the whole list: an emitting order (a Strip Permit, an Industry Level, a
-  Facility whose card carries Emissions: the Factory, Mine, Power Plant, Refinery and Reactor) by
-  `collapse_emit_weight` (0.5), a cleaner one (a Facility with a sink, the Scrubber and the Nature
-  Reserve; the Wind Farm; a Leapfrog) by `collapse_clean_weight` (1.5), the rest by 1. In full the
-  moment the race is lost, no scaling (the designer's a). `ai.toml [thresholds]`.
+  Facility whose card carries Emissions: the Factory, Mine, Power Plant, Refinery and Reactor,
+  built or restarted) by `collapse_emit_weight` (0.5), a cleaner one (a Facility with a sink, the
+  Scrubber and the Nature Reserve; the Wind Farm; a Leapfrog; an emitter mothballed) by
+  `collapse_clean_weight` (1.5), the rest by 1. In full the moment the race is lost, no scaling
+  (the designer's a). `ai.toml [thresholds]`. The ticket's draft had named a Mothball and "Clean
+  Power on the Directive" among the cleaners; the question put to the designer named the four
+  buildings, the Mothball and the Restart came back from the review, and the Directive is a
+  Research pick the Lead makes, not a build the planner weighs, so it stays out.
 - **Who reads it**: every computer seat (the designer's a); in play the Prospectors most, and the
   Custodians never, their Victory being the run under the Sink.
 - **A win in sight**: within `win_in_sight` (3) turns of the bar at the current rate, the weighing is
@@ -543,8 +551,10 @@ before collapse."*; on the ticket's questions, *"q1 yes q2 a q3 a q4 yes q5 yes"
   seating from +2.50 / +2.40 / +2.33 / +2.07: within noise, a hair cooler. The rule fires: turns
   weighed by seat 0 / 201 / 154 / 38, 180 / 0 / 65 / 3, 8 / 0 / 121 / 59 and 0 / 0 / 3 / 0, the
   Prospectors' seat the most in every seating and the Custodians' never; about a fifth of the
-  Prospectors' turns in the two hot seatings, three turns in the cool fourth, where no Collapse is
-  on the heading. Nature Reserves over a seating 64 / 58 / 29 / 6 from 36 / 57 / 15 / 10, Leapfrogs
+  Prospectors' turns in the two hot seatings, three turns in the cool fourth, where a Collapse is
+  seldom on the heading. Nature Reserves over a seating 64 / 58 / 29 / 6 from 36 / 57 / 15 / 10, Leapfrogs
   359 / 586 / 809 / 689 from 303 / 575 / 876 / 683. The reading: the sweep's worlds seldom head for
   a Collapse (0 to 3 of 80 all version), so the rule has little to weigh there; it bites in a game
-  like the designer's, where the heading said turn 34. Reported and left.
+  like the designer's, where the heading said turn 34. Reported and left. The review's build (the
+  Mothball and Restart weights) was re-swept and came out identical, every figure: the computer
+  mothballs no emitter while the race is lost in those 80 games.

@@ -25921,7 +25921,8 @@ fn ticket_620_a_computer_seat_weighs_collapse_against_its_win() {
     // The win turn: 1,000 of the bar banked by turn 10 is 100 a turn, the rest 40 turns off.
     g.turn = 10;
     g.seats[pro.index()].venture_fund = 1000.0;
-    assert_eq!(g.ai_win_turn(pro), Some(10 + ((bar - 1000.0) / 100.0).ceil() as u32));
+    assert_eq!(bar, 5000.0, "the premise: the Fund's bar");
+    assert_eq!(g.ai_win_turn(pro), Some(50));
     assert!(!g.ai_loses_the_race(pro), "still no Collapse on the heading");
     // The air at a Collapse's worth of CO2: the heading reaches +3.0 within a few turns, well before
     // the win, and the race is lost.
@@ -25942,9 +25943,20 @@ fn ticket_620_a_computer_seat_weighs_collapse_against_its_win() {
         assert!((w(Order::BuildFacility { state: sid, kind }) - 1.5).abs() < 1e-9, "{kind:?} is cleaner");
     }
     assert!((w(Order::Leapfrog { state: sid }) - 1.5).abs() < 1e-9, "a Leapfrog");
+    // An emitter mothballed cleans, restarted emits; a Lab either way is neither (the fixture
+    // strips every Facility but Launch Sites, so the two are planted).
+    g.add_start_facility(sid, FacilityKind::PowerPlant);
+    g.add_start_facility(sid, FacilityKind::ResearchLab);
+    let at = |g: &Game, kind: FacilityKind| g.state(sid).facilities.iter().position(|f| f.kind == kind).expect("planted");
+    let (plant, lab) = (at(&g, FacilityKind::PowerPlant), at(&g, FacilityKind::ResearchLab));
+    let w = |o: Order| g.ai_collapse_weight(&o);
+    assert!((w(Order::Change { building: BuildingRef::Facility(sid, plant), what: BuildingChange::Mothball }) - 1.5).abs() < 1e-9, "a Power Plant mothballed");
+    assert!((w(Order::Change { building: BuildingRef::Facility(sid, plant), what: BuildingChange::Restart }) - 0.5).abs() < 1e-9, "a Power Plant restarted");
+    assert!((w(Order::Change { building: BuildingRef::Facility(sid, lab), what: BuildingChange::Mothball }) - 1.0).abs() < 1e-9, "a Lab mothballed is neither");
     assert!((w(Order::BuildFacility { state: sid, kind: FacilityKind::ResearchLab }) - 1.0).abs() < 1e-9, "a Lab is neither");
     assert!((w(Order::Influence { target: Place::State(sid), amount: 5, break_accord: false }) - 1.0).abs() < 1e-9, "Influence is neither");
-    // A turn weighed is counted for the sweep.
+    // A turn weighed is counted for the sweep (the count says the branch ran, not what it did:
+    // the weights are pinned above, the list is the planner's own).
     g.ai_orders(pro);
     assert_eq!(g.war.collapse_weighed[pro.index()], 1);
     // A win in sight switches it off: 50 short of the bar at 165 a turn is next turn.

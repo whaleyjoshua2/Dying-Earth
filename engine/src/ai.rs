@@ -1273,7 +1273,9 @@ impl Game {
             return None;
         }
         let rate = p.first_value / self.turn as f64;
-        Some(self.turn + ((p.first_bar - p.first_value).max(0.0) / rate).ceil() as u32)
+        // Clamped to the game's last turn: a tiny rate must not wrap the cast (the review).
+        let last = self.tables.victory.turns;
+        Some(self.turn.saturating_add(((p.first_bar - p.first_value).max(0.0) / rate).ceil().min(last as f64) as u32).min(last))
     }
 
     /// Ticket #620: **whether the Collapse on the climate's heading falls at or before this seat's
@@ -1289,17 +1291,18 @@ impl Game {
     }
 
     /// Ticket #620: **the weight an order takes while the race is lost**: `collapse_emit_weight` on
-    /// an emitting one (a Strip Permit, an Industry Level, a Facility whose card carries Emissions),
-    /// `collapse_clean_weight` on a cleaner one (a Facility with a sink, the Wind Farm, a Leapfrog),
-    /// 1 on the rest.
+    /// an emitting one (a Strip Permit, an Industry Level, a Facility whose card carries Emissions,
+    /// built or restarted), `collapse_clean_weight` on a cleaner one (a Facility with a sink, the
+    /// Wind Farm, a Leapfrog, an emitter mothballed), 1 on the rest.
     pub fn ai_collapse_weight(&self, o: &Order) -> f64 {
         let th = &self.tables.ai.thresholds;
+        let emits = |kind: FacilityKind| self.tables.facility(kind).emissions > 0.0;
         match o {
             Order::StripPermit { .. } | Order::RaiseIndustry { .. } => th.collapse_emit_weight,
             Order::Leapfrog { .. } => th.collapse_clean_weight,
             Order::BuildFacility { kind, .. } => {
                 let card = self.tables.facility(*kind);
-                if card.emissions > 0.0 {
+                if emits(*kind) {
                     th.collapse_emit_weight
                 } else if card.sink_per_turn > 0.0 || *kind == FacilityKind::WindFarm {
                     th.collapse_clean_weight
@@ -1307,6 +1310,13 @@ impl Game {
                     1.0
                 }
             }
+            // The review: a Mothball of an emitter cleans and its Restart emits; a Module off Earth
+            // is neither, the Collapse being Earth's air.
+            Order::Change { building: BuildingRef::Facility(sid, i), what } => match (self.state(*sid).facilities.get(*i).map(|f| emits(f.kind)), what) {
+                (Some(true), BuildingChange::Mothball) => th.collapse_clean_weight,
+                (Some(true), BuildingChange::Restart) => th.collapse_emit_weight,
+                _ => 1.0,
+            },
             _ => 1.0,
         }
     }
@@ -4132,8 +4142,8 @@ impl Game {
         // emits weighs less and what cleans weighs more, across the whole list.
         if self.ai_loses_the_race(seat) {
             for c in cands.iter_mut() {
-                if let Some(first) = c.orders.first() {
-                    c.base *= self.ai_collapse_weight(first);
+                if let [o] = c.orders.as_slice() {
+                    c.base *= self.ai_collapse_weight(o);
                 }
             }
             self.log(format!("AI {}: the Collapse falls before the win; emitting x{}, cleaner x{}", self.seat_name(seat), th.collapse_emit_weight, th.collapse_clean_weight));

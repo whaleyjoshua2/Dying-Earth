@@ -370,3 +370,12 @@ the same).
   fifth of the Prospectors' turns in the two hot seatings and almost never in the cool fourth,
   since the sweep's worlds seldom head for a Collapse. It bites in a game like the designer's G3.
   Reported and left.
+
+**The review** (an agent that did not build it) found the ticket's draft cleaners cut without a
+word: the Mothball of an emitter now cleans and its Restart emits (the fixture had to be given a
+Power Plant and a Lab to witness them, stripped as it is); the Directive stays out, being a Research
+pick, and the spec says so. Also from the review: the win turn clamped to the game's last turn,
+where a tiny rate wrapped the cast; the rate averaged from turn one reads a late-opening part slow,
+said in the spec with the pace tables as the lever; the test's win turn written as the figure, 50;
+the counter assertion marked for what it proves; and one wording slip in the sweep paragraph. The
+fixed build re-swept identical to the figure, so the duplicate file was not kept.
