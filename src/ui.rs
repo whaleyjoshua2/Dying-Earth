@@ -2836,7 +2836,7 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
             // Ticket #332 (version 0.09.0): Widgets, the work half of every build, beside the
             // Materials half. The figure is MADE / APPLIED -- what every place the player directs
             // makes a turn, and what was applied at the last Resolution -- Faction-wide, at the
-            // designer's word; the hover lists each place's rate, its makers and its queue. Drawn
+            // designer's word; the hover (ticket #609, version 0.1.0.5) lists the makers and what went into builds. Drawn
             // by hand rather than through `bar_resource`, so the hover goes through `rule_tip` and
             // the `tip:` aid can photograph it.
             {
@@ -2864,7 +2864,7 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
             ui.separator();
             // Ticket #351 (version 0.09.1): the Shortfall alarm. While the next Income would shut
             // anything -- counting what this turn's orders do to the Energy -- the figure turns red and
-            // its hover names what goes dark, in order, in place of the Last Income breakdown.
+            // its hover names what goes dark, in order -- under the Last Income lines since ticket #609.
             let energy = format!("{} ({})", figure(left.energy), signed(inc.energy));
             // Ticket #609 (version 0.1.0.5): one drawing for both cases, through `rule_tip` as the
             // Widgets figure is, so the hover reads the same shape short or not and the `tip:` aid
@@ -5968,9 +5968,10 @@ const ACCORD_BREAK: Color32 = Color32::from_rgb(236, 88, 76);
 /// the red note beside the button, "breaks your Accord with X", and the face the armed button
 /// wears, "Break the Accord with X and spend N" -- or `None` where the spend crosses nobody.
 fn influence_break(game: &Game, target: Place, amount: i64) -> Option<(String, String)> {
-    let partner = game.order_crosses(Seat(0), &Order::Influence { target, amount, break_accord: false })?;
-    let name = game.seat_name(partner);
-    Some((format!("breaks your Accord with {name}"), format!("Break the Accord with {name} and spend {amount}")))
+    // Ticket #611 (version 0.1.0.5), at the designer's word: "breaks Accord", no name -- the Accord
+    // row names the partner -- on the note and on the armed button alike.
+    game.order_crosses(Seat(0), &Order::Influence { target, amount, break_accord: false })?;
+    Some(("breaks Accord".to_string(), format!("Break the Accord and spend {amount}")))
 }
 
 /// Ticket #569 (version 0.1.0.3), at the designer's word: an Influence button. A spend that crosses
@@ -6619,7 +6620,9 @@ fn build_words(game: &Game, order: &Order) -> Option<String> {
     if matches!(order, Order::BuildShip { .. }) && cost.fuel > 0.0 {
         return Some(format!("{} Materials, {widgets} Widgets, {when}.\nBuilt full: {} Fuel", cost.materials, cost.fuel));
     }
-    Some(format!("{} Materials, {widgets} Widgets{people}, {when}", cost.materials))
+    // Ticket #611 (version 0.1.0.5), at the designer's word: said where a player decides to build one.
+    let note = if matches!(order, Order::BuildModule { kind: ModuleKind::Refinery, .. }) { "Refuels your Ships in low orbit. " } else { "" };
+    Some(format!("{note}{} Materials, {widgets} Widgets{people}, {when}", cost.materials))
 }
 
 /// Ticket #332: an estimate in words, for a queue line, a hatched tile and the Under way block
@@ -6825,7 +6828,7 @@ fn eye_source(game: &Game, seat: Seat, body: BodyId) -> String {
     }
 }
 
-/// Ticket #332: the top bar's Widgets hover -- the two figures explained, then a line per place
+/// Ticket #332: the top bar's Widgets hover -- until ticket #609 the two figures explained, then a line per place
 /// the player directs with its rate, its makers and its queue.
 /// Ticket #609 (version 0.1.0.5), at the designer's word: the Fuel's shape -- "Made a turn:" then
 /// one line a maker, "+4  the Factory (China)", closing with what went into builds at the last
@@ -6849,16 +6852,22 @@ fn widgets_bar_hover(game: &Game, made: i64, applied: i64) -> String {
 /// from the figures the Income kept by place; what goes dark is appended under it only while the
 /// coming Resolution's forecast is short, where it replaced the list.
 fn energy_bar_hover(game: &Game, short: Option<&dying_earth_engine::ShortfallForecast>) -> String {
-    let mut lines: Vec<String> = game
-        .seat(Seat(0))
-        .energy_by_place
-        .iter()
-        .filter(|(_, made, upkeep)| *made != 0.0 || *upkeep != 0.0)
-        .map(|(place, made, upkeep)| {
-            let net = signed(made - upkeep);
-            if *made == 0.0 { format!("{net}  {place}") } else { format!("{net}  {place} ({} made, {} upkeep)", figure(*made), figure(*upkeep)) }
-        })
-        .collect();
+    // A line is bare where only one side has a figure ("-1  ISS over Earth", "+6  Reactor relief");
+    // the brackets only where both do.
+    let line = |place: &str, made: f64, upkeep: f64| {
+        let net = signed(made - upkeep);
+        if made == 0.0 || upkeep == 0.0 { format!("{net}  {place}") } else { format!("{net}  {place} ({} made, {} upkeep)", figure(made), figure(upkeep)) }
+    };
+    let places: Vec<&(String, f64, f64)> = game.seat(Seat(0)).energy_by_place.iter().filter(|(_, made, upkeep)| *made != 0.0 || *upkeep != 0.0).collect();
+    // Six lines (the review): the heading and at most five lines under it, the places past the
+    // fourth folded into one net line, so a wide board does not run the hover down the screen.
+    const SHOWN: usize = 4;
+    let mut lines: Vec<String> = places.iter().take(if places.len() > SHOWN + 1 { SHOWN } else { places.len() }).map(|(p, m, u)| line(p, *m, *u)).collect();
+    if places.len() > SHOWN + 1 {
+        let rest = &places[SHOWN..];
+        let (made, upkeep) = rest.iter().fold((0.0, 0.0), |(m, u), (_, pm, pu)| (m + pm, u + pu));
+        lines.push(line(&format!("{} more places", rest.len()), made, upkeep));
+    }
     if lines.is_empty() {
         lines.push("No Energy made or owed last turn.".to_string());
     } else {
@@ -10735,7 +10744,10 @@ fn module_line(game: &Game, col: &Colony, cid: ColonyId, mi: usize, director: Op
     };
     // Ticket #345 (version 0.09.1): the Core's line, and only the Core's, carries the Body's first.
     let first = if m.kind == ModuleKind::Core { core_first_words(game, col, cid) } else { String::new() };
-    format!("{}: {}{}", m.kind.name(), figures, first)
+    // Ticket #611 (version 0.1.0.5), at the designer's word: a Refinery's line says what a player
+    // learnt at turn 23 from a refusal -- its Colony refuels Ships in its low orbit (ticket #575).
+    let refuels = if m.kind == ModuleKind::Refinery && !m.mothballed { "; refuels your Ships in low orbit" } else { "" };
+    format!("{}: {}{}{}", m.kind.name(), figures, first, refuels)
 }
 
 /// Ticket #345 (version 0.09.1): what a **Core Module** adds to its tile's line and to its tile's
@@ -13470,8 +13482,7 @@ mod tests {
         let theirs = Place::State(g.controlled_states(Seat(1))[0]);
         assert_eq!(influence_break(&g, theirs, 17), None, "no Accord: nothing to say");
         g.strike_accord(Seat(0), Seat(1), vec![Term::NonAggression]).unwrap();
-        let name = g.seat_name(Seat(1));
-        assert_eq!(influence_break(&g, theirs, 17), Some((format!("breaks your Accord with {name}"), format!("Break the Accord with {name} and spend 17"))));
+        assert_eq!(influence_break(&g, theirs, 17), Some(("breaks Accord".to_string(), "Break the Accord and spend 17".to_string())), "ticket #611 (version 0.1.0.5): no name on the note or the button");
         let mine = Place::State(g.controlled_states(Seat(0))[0]);
         assert_eq!(influence_break(&g, mine, 17), None, "a place of your own crosses nobody");
     }
@@ -13970,14 +13981,47 @@ mod ticket_609 {
         assert!(w.ends_with("10 went into builds last turn."), "{w}");
         assert!(!w.contains("under way") && !w.contains("applied at the last Resolution"), "the queues and the old sentence are gone: {w}");
         // Energy: the Income's figures by place, net first, the parts in brackets; the units bare.
-        g.seats[0].energy_by_place = vec![("China".to_string(), 12.0, 4.0), ("ISS over Earth".to_string(), 0.0, 1.0), ("Ships and Armies".to_string(), 0.0, 3.0), ("Nowhere".to_string(), 0.0, 0.0)];
+        g.seats[0].energy_by_place = vec![("China".to_string(), 12.0, 4.0), ("ISS over Earth".to_string(), 0.0, 1.0), ("Ships and Armies".to_string(), 0.0, 3.0), ("Nowhere".to_string(), 0.0, 0.0), ("Reactor relief".to_string(), 6.0, 0.0)];
         let e = energy_bar_hover(&g, None);
-        assert_eq!(e, "Last Income:\n+8  China (12 made, 4 upkeep)\n-1  ISS over Earth\n-3  Ships and Armies", "{e}");
+        assert_eq!(e, "Last Income:\n+8  China (12 made, 4 upkeep)\n-1  ISS over Earth\n-3  Ships and Armies\n+6  Reactor relief", "{e}");
+        // Six lines: a wide board folds its places past the fourth into one net line.
+        g.seats[0].energy_by_place = (1..=7).map(|i| (format!("Place {i}"), 10.0, i as f64)).collect();
+        let e = energy_bar_hover(&g, None);
+        assert_eq!(e.lines().count(), 6, "{e}");
+        assert!(e.ends_with("+12  3 more places (30 made, 18 upkeep)"), "{e}");
+        g.seats[0].energy_by_place = (1..=5).map(|i| (format!("Place {i}"), 10.0, i as f64)).collect();
+        assert_eq!(energy_bar_hover(&g, None).lines().count(), 6, "five places fit without folding");
         // Short: the same lines, then what goes dark.
+        g.seats[0].energy_by_place = vec![("China".to_string(), 12.0, 4.0)];
         let f = ShortfallForecast { short_by: 2.0, dark: vec![] };
         let e = energy_bar_hover(&g, Some(&f));
         assert!(e.starts_with("Last Income:\n+8  China") && e.contains("Next Income is 2 Energy short"), "{e}");
         g.seats[0].energy_by_place.clear();
         assert_eq!(energy_bar_hover(&g, None), "No Energy made or owed last turn.");
+    }
+}
+
+/// Ticket #611 (version 0.1.0.5), at the designer's word: a Refinery says, on its tile's line and on
+/// its build button's hover, that it refuels Ships in its Colony's low orbit.
+#[cfg(test)]
+mod ticket_611 {
+    use super::*;
+    use dying_earth_engine::data::{default_data_dir, Tables};
+    use dying_earth_engine::{BodyId, Colony, ColonyId, Control, FactionKind, NewGame, StateId};
+
+    #[test]
+    fn a_refinery_says_it_refuels_ships_in_low_orbit() {
+        let tables = std::sync::Arc::new(Tables::load(&default_data_dir()).expect("tables load"));
+        let mut g = Game::new(tables, NewGame { seed: 7, player: FactionKind::Custodians, player_is_ai: false, player_start: StateId::EastAsia });
+        let id = ColonyId(g.fresh_id());
+        let slot = g.free_slots_on(BodyId::Mars)[0];
+        g.colonies.push(Colony { id, body: BodyId::Mars, slot, control: Control::Controlled(Seat(0)), modules: vec![Module::new(ModuleKind::Refinery), Module::new(ModuleKind::Core)], colonists: 4, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, tier: 0, in_orbit: false });
+        let col = g.colony(id).unwrap().clone();
+        let line = module_line(&g, &col, id, 0, Some(Seat(0)));
+        assert!(line.starts_with("Refinery: ") && line.ends_with("; refuels your Ships in low orbit"), "{line}");
+        assert!(!module_line(&g, &col, id, 1, Some(Seat(0))).contains("refuels"), "the Core says nothing of it");
+        let hover = build_words(&g, &Order::BuildModule { colony: id, kind: ModuleKind::Refinery }).expect("a build");
+        assert!(hover.starts_with("Refuels your Ships in low orbit. ") && hover.contains(" Materials, "), "{hover}");
+        assert!(!build_words(&g, &Order::BuildModule { colony: id, kind: ModuleKind::Habitat }).unwrap().contains("Refuels"), "a Habitat's hover is the price alone");
     }
 }

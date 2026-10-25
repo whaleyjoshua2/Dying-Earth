@@ -337,7 +337,8 @@ id = "cheap_ore_offer"
 name = "Cheap Ore Offer"
 kind = "choice"
 target = "seat"
-effect = "Buy the ore, or let it go for a third off Materials next turn"
+# Ticket #611 (version 0.1.0.5), at the designer's word: the figure once, on the button.
+effect = "A broker's lot, or let it go"
 copies = 1
 [event.choice]
 question = "A broker offers 30 Materials for 20 Ducats, this turn only. Buy?"

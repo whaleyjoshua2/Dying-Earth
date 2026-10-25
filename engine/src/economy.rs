@@ -1639,8 +1639,14 @@ impl Game {
         if unit_upkeep > 0.0 {
             sources.push(("Ships and Armies (upkeep)".to_string(), Resource::Energy, -unit_upkeep));
         }
-        // Ticket #609 (version 0.1.0.5): the units' upkeep as a place of its own, even at nought.
+        // Ticket #609 (version 0.1.0.5): the units' upkeep as a place of its own, even at nought,
+        // and the Reactor's relief as one (the review): without it the lines could not sum to the
+        // Income's Energy while a Reactor stands.
         energy_by_place.push(("Ships and Armies".to_string(), 0.0, unit_upkeep));
+        let relief = self.reactor_relief(seat, &producers);
+        if relief > 0.0 {
+            energy_by_place.push(("Reactor relief".to_string(), relief, 0.0));
+        }
         // Ticket #35: every controlled state's economy pays Ducats, gdp x Industry Level / 10.
         for sid in self.controlled_states(seat) {
             let v = self.state_ducats(sid);

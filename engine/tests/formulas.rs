@@ -23319,7 +23319,7 @@ fn an_order_that_breaks_an_accord_says_so_on_its_cost_line() {
     assert!(!text(&g).contains("breaks"), "{}", text(&g));
     g.strike_accord(me, them, vec![Term::NonAggression]).unwrap();
     let name = g.seat_name(them);
-    assert!(text(&g).contains(&format!("breaks your Accord with {name}")), "{}", text(&g));
+    assert!(text(&g).contains("breaks Accord") && !text(&g).contains(&format!("breaks your Accord with {name}")), "ticket #611 (version 0.1.0.5): no name, the Accord row names them: {}", text(&g));
     assert_eq!(g.order_crosses(me, &push), Some(them));
 }
 
@@ -23337,9 +23337,8 @@ fn an_influence_spend_on_a_partners_place_is_refused_unless_it_says_break() {
     let push = Order::Influence { target: Place::State(theirs), amount: 5, break_accord: false };
     assert!(g.check_order(me, &[], &push).is_ok(), "no Accord: an ordinary spend on a rival's place");
     g.strike_accord(me, them, vec![Term::NonAggression]).unwrap();
-    let name = g.seat_name(them);
     let err = g.check_order(me, &[], &push).unwrap_err();
-    assert_eq!(err.0, format!("breaks your Accord with {name}: order it with break to break it"));
+    assert_eq!(err.0, "breaks Accord: order it with break to break it", "ticket #611 (version 0.1.0.5): no name");
     let meant = Order::Influence { target: Place::State(theirs), amount: 5, break_accord: true };
     assert!(g.check_order(me, &[], &meant).is_ok(), "meant: placed");
     // An Agitate on the same place still goes through with its warning in the price (Q3: Influence alone).

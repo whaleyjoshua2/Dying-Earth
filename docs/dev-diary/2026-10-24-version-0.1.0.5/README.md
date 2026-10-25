@@ -162,3 +162,18 @@ makers and "0 went into builds last turn", the Energy hover "-3  China (6 made, 
 over Earth (6 made, 1 upkeep)", summing to the bar's +2. The Energy figure had to be drawn through
 `rule_tip` as the Widgets figure is before the `tip:` aid could photograph it; a shortfall picture
 was not taken, since the aid cannot place an order that overspends the Energy.
+
+## Three texts: the Cheap Ore refusal, "breaks Accord", the Refinery's refuelling
+
+Ticket [#611](https://github.com/whaleyjoshua2/Dying-Earth/issues/611), spec §10.
+
+Three pins moved first and watched red (the window's armed-button test, the engine's two Accord lines),
+then the texts. The Refinery's sentence was first written into the Module row's `does` field, which
+turned out to be read by nothing in the window or the tool -- every `does` in the two tables is dead
+data -- so it was taken back out and drawn in code, on the tile's line and the build hover, with a
+window test. No rule moves; no sweep. No picture: no Colony with a Refinery stands on turn one's board and a station offers none, so the headless aid has nothing to hover; the two strings are held by the test.
+
+The top-bar ticket's review (#609) found the Reactor's relief missing from the per-place lines, so they
+could not sum to the Income's Energy while one stood, and the hover unbounded on a wide board; both
+fixed, with the window test grown to cover the relief line, the fold past the fourth place and the
+five-place case, and the three comments the review found stale.

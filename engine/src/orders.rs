@@ -547,7 +547,8 @@ impl Game {
         };
         // Ticket #520 (version 0.1.0.0): an order that breaks an Accord says so where its price is read.
         match self.order_crosses(seat, order) {
-            Some(partner) => format!("{price}; breaks your Accord with {}", self.seat_name(partner)),
+            // Ticket #611 (version 0.1.0.5), at the designer's word: no name; the Accord list names them.
+            Some(_) => format!("{price}; breaks Accord"),
             None => price,
         }
     }
@@ -2597,8 +2598,8 @@ impl Game {
                 // Accords by accident through an "ok ... breaks your Accord" line nobody read. The
                 // window's button wants a second click for it; the tool the word `break`; the computer
                 // seats drop such orders themselves. The other five crossing orders warn in the price.
-                if !*break_accord && let Some(partner) = self.order_crosses(seat, order) {
-                    return fail(format!("breaks your Accord with {}: order it with break to break it", self.seat_name(partner)));
+                if !*break_accord && self.order_crosses(seat, order).is_some() {
+                    return fail("breaks Accord: order it with break to break it".to_string()); // Ticket #611 (version 0.1.0.5): no name
                 }
                 Ok(cost)
             }

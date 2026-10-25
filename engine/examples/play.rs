@@ -477,7 +477,8 @@ const GRAMMAR: &str = r#"ORDER LINES (one per line; `#` starts a comment; blank 
                                        at, for {fuel} Fuel out of its own tank. Resolved with the
                                        transits, before the Battles, so a Ship that changes orbit
                                        fights in its new orbit.
-  refuel <ship>                        fill the tank at a station of yours (or of a Refuel partner's)
+  refuel <ship>                        fill the tank at a station of yours (or of a Refuel partner's),
+                                       or in the low orbit of a Colony of yours with a working Refinery,
                                        AT THAT STATION'S OWN ORBIT: a Ship in low orbit, or at
                                        another station's ring, refuels at nothing until it moves.
                                        FREE OF THE SHIP'S TURN: give the refuel first

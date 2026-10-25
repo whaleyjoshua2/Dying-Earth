@@ -259,6 +259,30 @@ energy"*; on the ticket's questions, *"q1 yes but keep the /n part q2 b"*.
   Ships' and Armies' upkeep as a place of its own. The hover is one line a place, net, the parts in
   brackets: *"Last Income:"*, *"+8  China (12 made, 4 upkeep)"*, *"-1  ISS over Earth"*, *"-3  Ships
   and Armies"*. While this turn's orders forecast a shortfall the figure turns red as before, and what
-  goes dark is appended under the lines, where it replaced them.
+  goes dark is appended under the lines, where it replaced them. From the review: a Reactor's relief
+  is a line of its own (*"+6  Reactor relief"*), so the lines sum to the Income's Energy while one
+  stands; a line is bare where only one side has a figure; and the places past the fourth fold into
+  one net line (*"+12  3 more places (30 made, 18 upkeep)"*), so the hover is six lines at most
+  before the dark list. The makers' lines read *"+4  the Factory (China)"*, the place in brackets.
 - **The pictures** (`ticket-609/widgets-earth.png`, `energy-earth.png`): the two hovers on turn one.
+- No rule moves; no sweep.
+
+## 10. Three texts: the Cheap Ore refusal said once, "breaks Accord", a Refinery's refuelling said on its card
+
+Ticket: [Three texts: the Cheap Ore refusal said once, "breaks Accord", and a Refinery's refuelling said at the start](https://github.com/whaleyjoshua2/Dying-Earth/issues/611).
+
+The designer: *"cheap ore offer rejection text is says the same thing twice"*; *"rather than 'breaks your
+accord with prospectors' it should just say 'breaks accord'"*; *"Say at the start that a Colony with a
+Refinery refuels ships in its low orbit. I found out at G2 T23 from a refusal message."*; on the
+ticket's questions, *"q1 button q2 yes q3 b"*.
+
+- **The Cheap Ore Offer** (`events.toml`): the effect line reads *"A broker's lot, or let it go"*; the
+  refuse button keeps the figure, *"Let it go: Materials a third off next turn"*.
+- **"breaks Accord"**: the red note beside the Influence button, the armed button (*"Break the Accord
+  and spend 17"*), the tool's price line (*"17; breaks Accord"*) and its refusal (*"breaks Accord:
+  order it with break to break it"*); the partner's name nowhere, the Accord row naming them.
+- **The Refinery**: its tile's line ends *"; refuels your Ships in low orbit"*, and its build button's
+  hover opens *"Refuels your Ships in low orbit."* before the price. The text tool's `refuel` help
+  names a Colony with a working Refinery beside a station. (The Module rows' `does` field in the
+  data is read by nothing, so the sentence is drawn in code, not stored there.)
 - No rule moves; no sweep.
