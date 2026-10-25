@@ -406,3 +406,23 @@ figures now, sixteen of twenty and 5,000 of 6,250, and the Moment fires
 ([`ticket-623/rival-report.png`](ticket-623/rival-report.png), looked at). Also from the review: two
 readers of 5,000 in `CONTEXT.md` moved; three stale comments; an invented range in the table's
 comment ("53 to 58 wins" where the version's sweeps run 36 to 58) made the measured one.
+
+## Closing the version
+
+Ticket [#624](https://github.com/whaleyjoshua2/Dying-Earth/issues/624).
+
+- **The closing sweep** ([`sweeps/final-0.1.0.5.txt`](sweeps/final-0.1.0.5.txt)): **18 / 61 / 0 / 1
+  and 0 collapses**, #623's board to the figure, since nothing that moves a rule changed after it;
+  from 0.1.0.4's 23 / 42 / 4 / 10 and 1. The Archive at Colony tier (#625) took the Archivists from
+  10 to 2 and they stayed there; the contest (#618) and the defence (#619) pulled the top two
+  fourteen wins one way and eighteen back. The Prospectors at 61 are the farthest from the
+  designer's 15 the version has been; the Arkwrights at 0 and the Archivists at 1 next; the
+  collapses at 0 against 20.
+- **`GAME_VERSION` 0.1.0.5; `SAVE_VERSION` stays at 12**: the Energy by place (#609) and the contest,
+  home and Collapse counters (#618 to #620) read a default from an older save; the save test cuts
+  them and loads it. A Battle party's names (#614) default the same way, but a turn-four save holds
+  no Battle, so the test's first draft, which cut them too, failed on their absence and was trimmed.
+- **The glossary** audited against the version by an agent that did not write it (its findings are
+  below, in the version's resolution on the ticket).
+- **The playtest note** rewritten for the version; the Windows kit built here into `dist/`, the
+  Linux kit from the release-kits run.

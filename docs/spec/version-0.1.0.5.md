@@ -11,9 +11,43 @@ pictures and sweeps that decided it are in
 **23 / 42 / 4 / 10 and 1 collapse**, against the designer's 15 each and 20.
 
 **What the version is.** Version 0.1.0.4 with the designer's list of 2026-10-24, most of it pushing
-back: the computer seats contesting a rival's climb, defending their own Regions, weighing Collapse
-and packing at 40%; the interface pushed back to its figures. (The summary and the win column are
-written by the closing ticket, as each section lands.)
+back. **The computer pushes back**: it contests a rival's climb on a neutral Region, the human's and
+a computer's alike (§15), defends a Region it holds and keeps a floor at home (§16), weighs the
+Collapse against its own win (§17), and packs on a runaway leader at 40% (§2). **The figures**:
+every off-world population bar up by 2 and the Archive at Colony tier (§1), a fourth slot on the
+Moon, Phobos and Deimos (§4), the Strip Permit's three costs (§5), a fifth more Widgets on every
+building and a Frigate at 6 (§6), the Scrubber cap at one per 200 million (§11), the Fund at 6,250
+(§18); **the rules**: an Occupation halving the holder's Standing (§3). **The interface pushed back
+to its figures**: the signature moves as one sentence of the player's own Faction (§7), the Region
+card's threshold line and its doubled hover (§8), the top bar's Widgets and Energy hovers by place
+(§9), three texts (§10), the Battle Moment naming the winner (§12), nine hovers cut to a line each
+(§13), and the text tool's first landing, race and Tech tree (§14).
+
+**What it did to the win column** (80 games, per Faction; every section's own sweep is in it):
+
+| | 0.1.0.4 | §1 the bars | §2 the pack | §3 Occupation | §4 the slots | §5 the Permit | §6 Widgets | §11 Scrubbers | §15 the contest | §16 the defence | §17 Collapse | §18 the Fund: closing | the ideal |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Custodians | 23 | 26 | 25 | 26 | 29 | 27 | 25 | 23 | 37 | 19 | 17 | **18** | 15 |
+| Prospectors | 42 | 48 | 50 | 49 | 51 | 49 | 51 | 53 | 39 | 58 | 58 | **61** | 15 |
+| Arkwrights | 4 | 2 | 2 | 2 | 0 | 3 | 2 | 1 | 1 | 2 | 2 | **0** | 15 |
+| Archivists | 10 | 2 | 2 | 2 | 0 | 0 | 0 | 0 | 2 | 1 | 2 | **1** | 15 |
+| collapses | 1 | 2 | 1 | 1 | 0 | 0 | 2 | 3 | 1 | 0 | 1 | **0** | 20 |
+
+**The closing board** ([`sweeps/final-0.1.0.5.txt`](../dev-diary/2026-10-24-version-0.1.0.5/sweeps/final-0.1.0.5.txt)):
+**18 / 61 / 0 / 1 and 0 collapses**, §18's board to the figure, since nothing that moves a rule
+changed after it; from 0.1.0.4's 23 / 42 / 4 / 10 and 1. Two moves made the column. The Archive at
+Colony tier (§1) took the Archivists from 10 wins to 2 and they never came back: the computer
+Archivist's ferry paused at an Outpost and 11 Archives stood in 80 games where 43 had (reported in
+§1 and left). The contest (§15) and the defence (§16) pulled against each other: the contest swung
+the Custodians up 14 and the Prospectors down 14, the defence swung them back 18 and 19, the
+Allotment being one budget and a seat that defends taking fewer Regions, which costs the
+Custodians their Victory and the Prospectors nothing. The Prospectors at 61 are the farthest from
+the ideal the version has been; the Arkwrights at 0 and the Archivists at 1 the next; the
+collapses at 0 against 20 wanted the third figure to watch. The Fund at 6,250 (§18) did not bite:
+the computer banks to its pace. `GAME_VERSION` is 0.1.0.5; `SAVE_VERSION` stays at 12: every
+field the version added to the save (the Energy by place, §9; a Battle party's names, §12; the
+contest, home and Collapse counters, §15 to §17) reads a default, so a 0.1.0.4 save and those
+before it to 0.1.0.0 load.
 
 ## 1. Every off-world population bar up by 2, and the Archive at a place of Colony tier
 
