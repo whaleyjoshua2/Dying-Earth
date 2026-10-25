@@ -443,18 +443,27 @@ should outbid. In four games the AI contested one Region of mine once."*; on the
   the seats not climbing (strictly the most, and some), and any computer seat holding a neighbour.
   Four seats piling onto one Region is the pack's job (ticket #531), not this.
 - **The answer**: the Region's weight on the seat's Influence target list x(1 + 2 x the climb), so
-  x2 at half the threshold and x3 at it (`Game::ai_contest`); and every Influence step on it takes
-  the opportunity multiplier, so the planner stacks steps there and outbids where the Allotment
-  allows. Agitate is not a lever here: it is an order against a Region a rival HOLDS, and a neutral
-  one has no holder to raise Unrest against.
+  x2 at half the threshold and x3 at it (`Game::ai_contest_lift`; the climb is the climber's
+  Standing over the threshold as the climber reads it, capped at 1); and the Influence steps that
+  would pass the climber's Standing this turn take the opportunity multiplier, enough to outbid
+  where the Allotment allows, else all of it (from the review: the first build lifted every step
+  alike and sized nothing). Agitate is not a lever here: it is an order against a Region a rival
+  HOLDS, and a neutral one has no holder to raise Unrest against.
 - **The measure**: `war.contests`, by seat, a contest counted once a Region a turn when the seat's
-  chosen orders place Influence on a contested Region; the sweep prints it beside the escapes.
+  chosen orders place Influence on a contested Region (counted before End Turn commits them, so a
+  refused step counts still); the sweep prints it beside the escapes. The ticket's baseline figure,
+  23 / 42 / 4 / 10, was the version's opening sweep; the comparison here is to the latest, §11's.
 - **Swept** (`sweeps/ticket-618.txt`, 20 seeds x four seatings): **41 / 36 / 2 / 0 and 1 collapse**,
   from the same day's 23 / 53 / 1 / 0 and 3 (§11). Not noise: the Custodians gain 18 wins and the
   Prospectors lose 17, the swing in the three seatings where the Custodians do not sit first
   (10 / 15 / 15 from 5 / 10 / 8, the Prospectors 10 / 4 / 5 from 15 / 10 / 12); the Custodians' own
   seating is unchanged (1 / 17 / 1 / 0 from 0 / 16 / 1 / 0). Contests over a seating's 20 games run
-  380 to 610 by seat, about 25 a game across the table, so the rule fires every turn somewhere.
+  466 to 609 across the four seats (76 to 213 by seat), about 25 a game across the table, so the
+  rule fires every turn somewhere. That sweep was of the first build, every step lifted alike;
+  **the sized spend re-swept** (`sweeps/ticket-618-sized.txt`): **37 / 39 / 1 / 2 and 1 collapse**,
+  the Custodians 1 / 9 / 13 / 14 by seating and the Prospectors 16 / 11 / 6 / 6, contests 436 to
+  535 a seating, Places taken by Influence 373 / 430 / 413 / 419. The two builds sit within noise
+  of each other; the swing is the rule's, not the sizing's.
   Places taken by Influence 398 / 414 / 460 / 411 by seating from 394 / 404 / 402 / 401. The
   reading: the Prospectors' snipes were the sniping, and a contest on them costs the sniper more
   than the contest on the Custodians' slower climbs costs them. Reported and left: the figure is

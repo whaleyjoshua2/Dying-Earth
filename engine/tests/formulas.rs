@@ -25783,10 +25783,15 @@ fn ticket_618_a_computer_seat_contests_a_rivals_climb_on_a_neutral_region() {
     g.seats[contester.index()].influence.insert(Place::State(sid), 3);
     let weight = |g: &Game| g.ai_influence_targets(contester).into_iter().find(|(p, _)| *p == Place::State(sid)).map(|(_, w)| w).expect("a neutral Region is a target");
     let quiet = weight(&g);
-    assert!((g.ai_contest(contester, sid) - 1.0).abs() < 1e-9, "nobody climbing: no contest");
-    // The human climbs to half the threshold: x2 for the seat with the most Standing there.
-    g.seats[0].influence.insert(Place::State(sid), (th as f64 * 0.5).ceil() as i64);
-    let half = g.ai_contest(contester, sid);
+    assert!((g.ai_contest_lift(contester, sid) - 1.0).abs() < 1e-9, "nobody climbing: no contest");
+    // The human climbs, short of half the threshold: nothing yet.
+    g.seats[0].influence.insert(Place::State(sid), (th as f64 * 0.4).floor() as i64);
+    assert_eq!(g.ai_climb_on(contester, sid), None, "under contest_from it is no climb");
+    // To half the threshold: x2 for the seat with the most Standing there.
+    let half_way = (th as f64 * 0.5).ceil() as i64;
+    g.seats[0].influence.insert(Place::State(sid), half_way);
+    assert_eq!(g.ai_climb_on(contester, sid), Some((Seat(0), half_way)), "the climber and the Standing to pass");
+    let half = g.ai_contest_lift(contester, sid);
     assert!((2.0..2.1).contains(&half), "x2 at half: {half}");
     assert!(weight(&g) > quiet * 1.9, "and the Region's weight rises with it: {} from {quiet}", weight(&g));
     // A seat with less Standing there and no neighbour does not answer; one holding a neighbour does
@@ -25794,23 +25799,35 @@ fn ticket_618_a_computer_seat_contests_a_rivals_climb_on_a_neutral_region() {
     let neighbours = g.tables.state(sid).neighbours.clone();
     let holds_next_door = |g: &Game, s: Seat| neighbours.iter().any(|n| g.state(*n).control.controller() == Some(s));
     let aloof = Seat::ALL.into_iter().find(|s| *s != Seat(0) && *s != contester && !holds_next_door(&g, *s)).expect("a computer seat holding no neighbour of Egypt");
-    assert!((g.ai_contest(aloof, sid) - 1.0).abs() < 1e-9, "{} has less Standing there and no neighbour", g.seat_name(aloof));
+    assert!((g.ai_contest_lift(aloof, sid) - 1.0).abs() < 1e-9, "{} has less Standing there and no neighbour", g.seat_name(aloof));
+    g.seats[aloof.index()].influence.insert(Place::State(sid), 2);
+    assert!((g.ai_contest_lift(aloof, sid) - 1.0).abs() < 1e-9, "some Standing, but not the most: still no");
+    // A tie for the most answers for nobody (the contester may hold a neighbour, so the tie is read
+    // on the aloof seat).
+    g.seats[aloof.index()].influence.insert(Place::State(sid), 3);
+    assert!((g.ai_contest_lift(aloof, sid) - 1.0).abs() < 1e-9, "a tie is not the most");
+    g.seats[aloof.index()].influence.remove(&Place::State(sid));
     g.state_mut(neighbours[0]).control = Control::Controlled(aloof);
-    assert!(g.ai_contest(aloof, sid) > 1.9, "holding a neighbour, it answers");
-    // At the threshold, x3.
+    assert!(g.ai_contest_lift(aloof, sid) > 1.9, "holding a neighbour, it answers");
+    // At the threshold, x3; over it, x3 still.
     g.seats[0].influence.insert(Place::State(sid), th);
-    let full = g.ai_contest(contester, sid);
+    let full = g.ai_contest_lift(contester, sid);
     assert!((full - 3.0).abs() < 1e-9, "x3 at the threshold: {full}");
+    g.seats[0].influence.insert(Place::State(sid), th * 2);
+    assert!((g.ai_contest_lift(contester, sid) - 3.0).abs() < 1e-9, "capped at x3");
     // A computer rival's climb is contested the same way: the Prospectors' snipes too.
     g.seats[0].influence.remove(&Place::State(sid));
     g.seats[2].influence.insert(Place::State(sid), th);
-    assert!((g.ai_contest(contester, sid) - 3.0).abs() < 1e-9, "the climber's seat does not matter");
-    assert!((g.ai_contest(Seat(2), sid) - 1.0).abs() < 1e-9, "the climber does not contest itself");
-    // The orders: the contester spends there, and the contest is counted once a Region a turn.
-    g.seats[contester.index()].allotment = 10;
+    assert!((g.ai_contest_lift(contester, sid) - 3.0).abs() < 1e-9, "the climber's seat does not matter");
+    assert!((g.ai_contest_lift(Seat(2), sid) - 1.0).abs() < 1e-9, "the climber does not contest itself");
+    // The orders: sized to outbid. The climber stands at the threshold, the contester at 3, so the
+    // steps that pass it are lifted and, with the Allotment for them, all go there; the contest is
+    // counted once for the Region, however many steps.
+    let step = g.tables.ai.thresholds.influence_step;
+    g.seats[contester.index()].allotment = th + 2 * step;
     let orders = g.ai_orders(contester);
     let spent: i64 = orders.iter().filter_map(|o| if let Order::Influence { target: Place::State(s), amount, .. } = o { (*s == sid).then_some(*amount) } else { None }).sum();
-    assert!(spent >= 5, "the seat spends on the contested Region: {orders:?}");
+    assert!(spent + 3 > th, "the seat outbids the climber ({th}) from 3: spent {spent}; {orders:?}");
+    assert!(spent / step >= 2, "in more than one step: {spent}");
     assert_eq!(g.war.contests[contester.index()], 1, "counted once for the Region this turn");
-    assert_eq!(g.war.contests[0], 0);
 }

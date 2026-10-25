@@ -1622,7 +1622,7 @@ pub struct AiThresholds {
     /// Ticket #75: a held state's worth on the Influence target list, as a share of a neutral one's.
     pub held_state_weight: f64,
     /// Ticket #618 (version 0.1.0.5): a rival's Standing on a neutral Region at or over this share
-    /// of its threshold is a climb the computer contests (`Game::ai_contest`).
+    /// of its threshold is a climb the computer contests (`Game::ai_climb_on`).
     #[serde(default = "contest_from_default")]
     pub contest_from: f64,
     /// Ticket #336 (version 0.09.0): the price a rival's Colony is weighed against on the same

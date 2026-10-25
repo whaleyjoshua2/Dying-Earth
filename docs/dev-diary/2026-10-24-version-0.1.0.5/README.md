@@ -308,3 +308,15 @@ dropped out of the answer on a read of the order: it wants a holder.
   the Custodians do not sit first; the Custodians' own seating is unchanged. Contests run about 25 a
   game across the table. The reading is that the Prospectors were the snipers and a contest costs
   the sniper most. Reported and left for the designer: `contest_from` and the lift are the levers.
+
+**The review** (an agent that did not build it) found the spend not sized: the designer's yes was
+to "outbids where the Allotment allows", and the build had lifted every step alike and sized nothing.
+The steps that would pass the climber's Standing now take the multiplier, enough to outbid, else all
+the Allotment; the test outbids a climber at the threshold from 3 in several steps and counts one
+contest. Also fixed: the climb read against the climber's own threshold (Blame, Green Consensus, the
+Regions-held term) rather than the board's; the #394 doc comment left over the new function; the
+multiplier named `ai_contest_lift` with `ai_climb_on` and `ai_contested` beside it; the spec's
+contest figures (by seat they run 76 to 213, a seating 466 to 609, not "380 to 610 by seat"); ties
+and the figure's edge pinned in the test, a vacuous assertion dropped. The sized build re-swept
+([`sweeps/ticket-618-sized.txt`](sweeps/ticket-618-sized.txt)): 37 / 39 / 1 / 2 and 1, within noise
+of the first build's 41 / 36 / 2 / 0 and 1; the swing is the rule's.
