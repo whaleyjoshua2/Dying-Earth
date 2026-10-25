@@ -1819,6 +1819,13 @@ impl Game {
         // anything, since a Region and a Colony read the same.
         // Ticket #496 (version 0.09.9): a place traded changes hands in peace, counted as neither.
         if self.place_control(place).controller() != Some(seat) && why != "Trade" {
+            // Ticket #619 (version 0.1.0.5): a home Region lost, by loser and by taker.
+            if let (Place::State(sid), Some(loser)) = (place, self.place_control(place).controller())
+                && self.seat(loser).home_region == Some(sid)
+            {
+                self.war.homes_lost[loser.index()] += 1;
+                self.war.homes_taken[seat.index()] += 1;
+            }
             if why != "Influence" {
                 self.war.takes_by_force[seat.index()] += 1;
             } else {

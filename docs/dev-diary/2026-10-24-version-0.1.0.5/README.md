@@ -320,3 +320,24 @@ contest figures (by seat they run 76 to 213, a seating 466 to 609, not "380 to 6
 and the figure's edge pinned in the test, a vacuous assertion dropped. The sized build re-swept
 ([`sweeps/ticket-618-sized.txt`](sweeps/ticket-618-sized.txt)): 37 / 39 / 1 / 2 and 1, within noise
 of the first build's 41 / 36 / 2 / 0 and 1; the swing is the rule's.
+
+## The computer defends its Regions, and keeps a floor at home
+
+Ticket [#619](https://github.com/whaleyjoshua2/Dying-Earth/issues/619), spec §16.
+
+Four questions, answered *"q1 yes q2 yes q3 b q4 yes"*. The test was written first (the floor, a
+held Region quiet then climbed to under and at half its price, the home at a quarter, the orders
+sized past the climber's Standing plus their Allotment, a home lost counted by loser and taker) and
+watched red on the eight missing names. Its first failure after the build was the premise: a home
+starts with the threshold banked (ticket #75), not nothing, so the floor of 20 first bites around
+turn 20; the spec says so, and that the question put to the designer had it wrong. One old test
+wiped every Region Standing and then found seat 0 pouring its Allotment into its own home: the new
+rule working in a fixture that had taken the home under the floor; the fixture keeps the home at
+its floor now.
+
+- **The sweep** ([`sweeps/ticket-619.txt`](sweeps/ticket-619.txt)): **19 / 58 / 2 / 1 and 0**,
+  from 37 / 39 / 1 / 2 and 1. Not noise, and the contest ticket's swing reversed and then some.
+  Homes lost fall for seat 0 (7 / 13 / 4 / 5 of 20 seeds from 11 / 18 / 11 / 9), the Prospectors
+  lose theirs most and win regardless, the Custodians take the most homes and win least. The
+  reading is that the Allotment is one budget and a seat that defends takes fewer Regions.
+  Reported and left for the designer: the triggers, the lifts and the floor are the levers.

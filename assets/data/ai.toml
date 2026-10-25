@@ -564,6 +564,17 @@ held_state_weight = 0.3
 # every Influence step there at the opportunity multiplier. Any rival: the human's climbs and a
 # computer seat's snipes alike. Measured before: no computer seat read a rival's Standing at all.
 contest_from = 0.5
+# Ticket #619 (version 0.1.0.5), at the designer's word: a rival's Standing on a Region the seat HOLDS
+# at or over `defend_from` of the price to take it (the greater of the threshold and the holder's
+# Standing plus the margin), or `defend_home_from` of it on the home Region, puts the Region on the
+# seat's target list -- x2 at half the price, x3 at it, the home doubled -- with the steps that put
+# the price back above the climber's Standing plus their Allotment at the opportunity multiplier.
+# And the home floor: the home Region is topped up to `home_floor` Standing, so a capital's price
+# starts above the bare threshold. Measured before: a held place was never spent on, a home started
+# with no Standing banked, and the designer took two computer capitals in one turn each.
+defend_from = 0.5
+defend_home_from = 0.25
+home_floor = 20
 # Ticket #336 (version 0.09.0): what a rival's Colony is worth on the same list, read as this price
 # divided by the price the seat would actually pay for it -- CHEAPEST FIRST, where the rule from
 # ticket #50 ranked by fewest Colonists and never read the threshold at all. Without this the

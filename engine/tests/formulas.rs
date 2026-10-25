@@ -15060,6 +15060,10 @@ fn the_computer_wants_the_cheaper_rival_colony_not_the_emptier() {
     for s in Seat::ALL {
         g.seat_mut(s).influence.retain(|p, _| !matches!(p, Place::State(_)));
     }
+    // Ticket #619 (version 0.1.0.5): a home under its floor is topped up first, so the home keeps
+    // its floor here and the spend is the Colonies' to show.
+    let home = g.seats[0].home_region.expect("a home");
+    g.seats[0].influence.insert(Place::State(home), g.tables.ai.thresholds.home_floor);
     // The three starting stations over Earth are rivals' Colonies too, and two Colonists apiece
     // makes them the cheapest places on the board; they go to seat 0 so the pick is the planted two.
     for c in g.colonies.iter_mut() {
@@ -25830,4 +25834,66 @@ fn ticket_618_a_computer_seat_contests_a_rivals_climb_on_a_neutral_region() {
     assert!(spent + 3 > th, "the seat outbids the climber ({th}) from 3: spent {spent}; {orders:?}");
     assert!(spent / step >= 2, "in more than one step: {spent}");
     assert_eq!(g.war.contests[contester.index()], 1, "counted once for the Region this turn");
+}
+
+// Ticket #619 (version 0.1.0.5), at the designer's word: **a computer seat defends a Region it
+// holds** -- a rival's Standing there at or over `defend_from` of the price to take it (a quarter,
+// `defend_home_from`, on the home Region) puts the Region on the seat's Influence target list, lifted
+// x(1 + 2 x the climb), the home doubled, with the steps that put the price back above the climber's
+// Standing plus their Allotment at the opportunity multiplier; and **keeps a floor at home**: the
+// home Region is topped up to `home_floor` Standing, so a capital's price starts above the bare
+// threshold. A home lost is counted by loser and taker. Before this a held place was skipped outright.
+#[test]
+fn ticket_619_a_computer_seat_defends_a_held_region_and_keeps_a_floor_at_home() {
+    let mut g = game();
+    calm(&mut g);
+    let th = g.tables.ai.thresholds.clone();
+    assert!((th.defend_from - 0.5).abs() < 1e-9 && (th.defend_home_from - 0.25).abs() < 1e-9 && th.home_floor == 20, "the designer's figures, in ai.toml");
+    let holder = Seat(1);
+    let home = g.seats[holder.index()].home_region.expect("every seat has a home");
+    let on_list = |g: &Game, sid: StateId| g.ai_influence_targets(holder).into_iter().find(|(p, _)| *p == Place::State(sid)).map(|(_, w)| w);
+    // The floor: a home starts with Standing banked (40, the threshold's worth) and decays a point
+    // a turn; once under the floor it wants the difference, and is on the list for it.
+    assert_eq!(g.ai_home_topup(holder), 0, "at the start the home stands over the floor");
+    assert!(on_list(&g, home).is_none(), "and is no target");
+    g.seats[holder.index()].influence.insert(Place::State(home), th.home_floor - 5);
+    assert_eq!(g.ai_home_topup(holder), 5);
+    assert!(on_list(&g, home).is_some(), "the home is a target while under its floor");
+    g.seats[holder.index()].influence.insert(Place::State(home), th.home_floor);
+    assert_eq!(g.ai_home_topup(holder), 0);
+    assert!(on_list(&g, home).is_none(), "at the floor, with nobody climbing, it is not");
+    // A held Region nobody climbs is no target.
+    let other = StateId::NorthAfrica;
+    g.take_control(other, holder);
+    g.seats[holder.index()].influence.insert(Place::State(other), 30);
+    assert_eq!(g.ai_defence(holder, other), None);
+    assert!(on_list(&g, other).is_none(), "held and quiet: skipped as before");
+    // The human climbs: under half the price, nothing; at half, the defence, x2.
+    let price = g.influence_needed_for(Seat(0), Place::State(other));
+    g.seats[0].influence.insert(Place::State(other), price / 2 - 1);
+    assert_eq!(g.ai_defence(holder, other), None, "under defend_from");
+    let half_way = (price + 1) / 2;
+    g.seats[0].influence.insert(Place::State(other), half_way);
+    assert_eq!(g.ai_defence(holder, other), Some((Seat(0), half_way)), "the climber and the Standing to answer");
+    let lift = g.ai_defence_lift(holder, other);
+    assert!((2.0..2.1).contains(&lift), "x2 at half the price: {lift}");
+    assert!(on_list(&g, other).is_some(), "and the held Region is a target now");
+    // At home a quarter of the price is enough, and the lift is doubled: (1 + 2 x 0.25) x 2 = 3.
+    let home_price = g.influence_needed_for(Seat(0), Place::State(home));
+    g.seats[0].influence.insert(Place::State(home), (home_price + 3) / 4);
+    let at_home = g.ai_defence_lift(holder, home);
+    assert!((2.9..3.3).contains(&at_home), "the home Region, at a quarter: {at_home}");
+    // The orders: the steps that put the price back above the climber's Standing plus their
+    // Allotment are taken, within the seat's means.
+    g.seats[0].allotment = 10;
+    g.seats[0].influence.remove(&Place::State(home));
+    g.seats[holder.index()].allotment = price + 10;
+    let orders = g.ai_orders(holder);
+    let spent: i64 = orders.iter().filter_map(|o| if let Order::Influence { target: Place::State(s), amount, .. } = o { (*s == other).then_some(*amount) } else { None }).sum();
+    let wall = 30 + spent + g.challenge_margin_for(Some(Seat(0)), Place::State(other));
+    assert!(wall > half_way + 10, "the wall ({wall}) stands above the climber ({half_way}) plus their Allotment (10): spent {spent}; {orders:?}");
+    // A home lost is counted, by loser and by taker.
+    g.transfer_control(Place::State(home), Seat(0), "Influence");
+    assert_eq!((g.war.homes_lost[holder.index()], g.war.homes_taken[0]), (1, 1));
+    assert_eq!(g.war.homes_lost[0], 0);
 }

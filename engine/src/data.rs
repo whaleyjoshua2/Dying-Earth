@@ -1625,6 +1625,15 @@ pub struct AiThresholds {
     /// of its threshold is a climb the computer contests (`Game::ai_climb_on`).
     #[serde(default = "contest_from_default")]
     pub contest_from: f64,
+    /// Ticket #619 (version 0.1.0.5): a rival's Standing on a Region the seat holds at or over this
+    /// share of the price to take it is a climb the seat defends against (`Game::ai_defence`); on
+    /// the home Region, `defend_home_from`. `home_floor` is the Standing the seat keeps at home.
+    #[serde(default = "defend_from_default")]
+    pub defend_from: f64,
+    #[serde(default = "defend_home_from_default")]
+    pub defend_home_from: f64,
+    #[serde(default = "home_floor_default")]
+    pub home_floor: i64,
     /// Ticket #336 (version 0.09.0): the price a rival's Colony is weighed against on the same
     /// list -- the weight is this over what the seat would pay, so the cheapest place ranks first.
     #[serde(default = "colony_price_pivot_default")]
@@ -3227,6 +3236,18 @@ fn colony_price_pivot_default() -> f64 {
 
 fn contest_from_default() -> f64 {
     0.5
+}
+
+fn defend_from_default() -> f64 {
+    0.5
+}
+
+fn defend_home_from_default() -> f64 {
+    0.25
+}
+
+fn home_floor_default() -> i64 {
+    20
 }
 
 

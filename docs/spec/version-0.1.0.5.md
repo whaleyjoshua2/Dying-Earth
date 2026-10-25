@@ -469,3 +469,40 @@ should outbid. In four games the AI contested one Region of mine once."*; on the
   than the contest on the Custodians' slower climbs costs them. Reported and left: the figure is
   the designer's to move (a higher `contest_from`, or a smaller lift), and the balance target is
   15 / 15 / 15 / 15 and 20 collapses.
+
+## 16. The computer defends its Regions, and keeps a floor at home
+
+Ticket: [The computer defends its Regions: a rival's climb is answered with Influence](https://github.com/whaleyjoshua2/Dying-Earth/issues/619).
+
+The designer: *"Defend the home Region: answer a rival's Standing climb with Influence. I took two
+AI capitals in one turn each."*; on the ticket's questions, *"q1 yes q2 yes q3 b q4 yes"*.
+
+- **The premise, corrected**: a seat's home Region does NOT start with no Standing. Ticket #75 banks
+  the threshold there on turn one (40 for a size-2 Region), so a capital's price opens at 60, the
+  Standing plus the margin, and decays a point a turn; the computer never spent on a place it held,
+  so by the twenties a capital stood at about the threshold and one Allotment took it. The question
+  put to the designer said "the bare threshold"; the floor was chosen on that reading.
+- **The trigger**: a rival's Standing on a Region the seat holds at or over `defend_from` (0.5) of
+  the price that rival would pay, the greater of the threshold and the holder's Standing plus the
+  margin; on the home Region `defend_home_from` (0.25). `ai.toml [thresholds]`.
+- **The answer**: the held Region enters the seat's Influence target list (a held place was skipped
+  outright before), lifted x(1 + 2 x the climb), the home doubled (`Game::ai_defence_lift`: x2 at
+  half the price, x3 at it, x6 at it on the home); the Influence steps that put the price back above
+  the climber's Standing plus the climber's Allotment take the opportunity multiplier
+  (`ai_defence_wanted`), within the seat's means.
+- **The home floor**: the home Region is topped up to `home_floor` (20) Standing whenever it falls
+  under it, the top-up's steps at the opportunity multiplier. With the start at 40 and a point's
+  decay a turn, the floor first bites about turn 20; before that the defence alone answers.
+- **The measure**: `war.homes_lost` and `homes_taken`, by seat, counted at `transfer_control`
+  (by Influence or by force), printed by the sweep beside the contests.
+- **Swept** (`sweeps/ticket-619.txt`, 20 seeds x four seatings): **19 / 58 / 2 / 1 and 0
+  collapses**, from §15's 37 / 39 / 1 / 2 and 1. Not noise, and the other way: the Custodians 0 / 3
+  / 7 / 9 by seating from 1 / 9 / 13 / 14, the Prospectors 19 / 17 / 11 / 11 from 16 / 11 / 6 / 6.
+  Home Regions lost over a seating's 20 games: 14 / 25 / 16 / 25, the Prospectors losing the most
+  (5 / 16 / 10 / 11) and the Custodians taking the most (3 / 14 / 9 / 21); seat 0's start state lost
+  in 7 / 13 / 4 / 5 of 20 seeds from 11 / 18 / 11 / 9. Places taken by Influence 338 / 359 / 359 /
+  374 from 373 / 430 / 413 / 419. The reading: the Allotment is one budget, and a seat that defends
+  takes fewer Regions; the Custodians, whose Victory is Regions on Earth, pay for their defence in
+  wins, while the Prospectors lose their homes most and win regardless, their Victory being the
+  Fund and people off Earth. Reported and left: the triggers, the lifts and the floor are the
+  designer's levers, against the 15 / 15 / 15 / 15 target.
