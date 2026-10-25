@@ -173,8 +173,14 @@ touched a card field that is drawn nowhere (the duplicate was the refuse button'
 line the card generates under it, so the face is now bare), and the Refinery's sentence was drawn in
 code on a wrong belief that a Module row's `does` field is dead, when the yield's text reads it; it is
 the row's `does` now, owner-neutral, with the window test holding the drawn line. The tool's refuel
-help was also made to contradict itself and was rewritten. No picture: no Refinery stands on turn
-one's board for the headless aid to hover.
+help was also made to contradict itself and was rewritten.
+
+**The pictures** ([`ticket-611/ore-earth.png`](ticket-611/ore-earth.png),
+[`accord-earth.png`](ticket-611/accord-earth.png)), looked at, taken after the designer asked where the
+screenshots were: the Cheap Ore card with the refuse button bare, "Let it go", over its generated
+"Materials a third off for you next turn"; and the European Union's card under a Non-Aggression Accord
+with its holder, "breaks Accord" in red beside the Spend and Max buttons. The Refinery's line has no
+picture: no aid plants a Refinery Colony on turn one's board.
 
 The top-bar ticket's review (#609) found the Reactor's relief missing from the per-place lines, so they
 could not sum to the Income's Energy while one stood, and the hover unbounded on a wide board; both
@@ -187,7 +193,12 @@ Ticket [#612](https://github.com/whaleyjoshua2/Dying-Earth/issues/612), spec §1
 
 One figure, `per_population` 300 -> 200, at the designer's word from a table of what 300, 200 and 150
 give every Region. The cap test's pins moved first (India eight, a Region of 380 two) and were watched
-red on the 300, then green. No picture: a figure the card reads from the table.
+red on the 300, then green.
+
+**The picture** ([`ticket-612/cap-factions.png`](ticket-612/cap-factions.png)), looked at, taken after
+the designer asked: the Custodians' Faction card, whose signature rule reads the cap from the table,
+"one per 200M people, 1 to 10". The Region card's "Scrubber (2 of 7)" button sits below the fold at
+the shot's 800 pixels, so the Faction card is the picture.
 
 - **The sweep** ([`sweeps/ticket-612.txt`](sweeps/ticket-612.txt)): **23 / 53 / 1 / 0 and 3
   collapses**, from 25 / 51 / 2 / 0 and 2: noise. Scrubbers built over the batch 2,262 from 2,113,
@@ -202,4 +213,11 @@ The test was written first from the designer's own case -- the Defiant sinking t
 nothing -- and watched red on the card as it was, "A Battle at Mars low orbit: PMV Valiant destroyed"
 over "1 lost"; then the parties were given their units' names and the Moment's sentence and figure
 rebuilt from the losses. Five cases held: won, lost, both lost, the player out of it, and a bloodless
-Battle with no Moment. No picture: turn one's board has no Battle for the headless aid to raise a Moment from, and the `moment:` aid shows only a Moment the game has made; the five texts are held by the test.
+Battle with no Moment. The picture, [ticket-614/battle-report.png](ticket-614/battle-report.png), came
+after the ticket closed, at the designer's word: the new `battle:two` aid brings seats 0 and 1 alone
+to Mars (the old `battle:1` brings three, and a three-sided Battle reads the losses alone), and the
+card reads *"you won"* over *"Battle at Mars orbit: your TSV Valiant and TSV Vanguard destroyed the
+Prospectors' PMV Magellan and PMV Indomitable."* The first shot read *"your  destroyed"*: both
+Frigates had rolled a disengage in the round their blows landed, so no unit "stayed" and the
+destroyer's name was empty. A side that left whole is now named whole, held by a third test written
+red first.

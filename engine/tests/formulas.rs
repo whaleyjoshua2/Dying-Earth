@@ -25687,3 +25687,19 @@ fn ticket_614_an_escaped_unit_is_no_destroyer() {
     let m = g.report.moments.iter().find(|m| m.kind == MomentKind::DecisiveBattle).expect("a Moment");
     assert_eq!((m.text.as_str(), m.figure.as_str()), (format!("Battle at Mars low orbit: your TSV Defiant destroyed the {pro_name}' PMV Valiant.").as_str(), "you won"), "the Beagle, which fled, is no destroyer");
 }
+
+// Ticket #614 (version 0.1.0.5), from the diary shot: a side whose every unit disengaged in the
+// round its blows landed has no unit that stayed, and the sentence read "your  destroyed ...". The
+// kills were made before they left, so a side that left whole is named whole.
+#[test]
+fn ticket_614_a_side_that_left_whole_is_still_named_as_the_destroyer() {
+    let mut g = game();
+    let pro = Seat(1);
+    let pro_name = g.seat_name(pro);
+    let names = vec!["TSV Defiant".to_string(), "TSV Beagle".to_string()];
+    let a = BattleParty { seat: Some(Seat(0)), aggressor: true, units: String::new(), strength: 3, hits: 2, destroyed: Vec::new(), escaped: names.clone(), odds: None, names };
+    let b = BattleParty { seat: Some(pro), aggressor: false, units: String::new(), strength: 3, hits: 0, destroyed: vec!["PMV Valiant".to_string()], escaped: Vec::new(), odds: None, names: vec!["PMV Valiant".to_string()] };
+    g.battle_line_and_moment(&BattleLine { place: "Mars low orbit".to_string(), parties: vec![a, b], result: "1 round.".to_string(), at: Some(ReportPlace::Body(BodyId::Mars)), log: None, fought_now: false });
+    let m = g.report.moments.iter().find(|m| m.kind == MomentKind::DecisiveBattle).expect("a Moment");
+    assert_eq!((m.text.as_str(), m.figure.as_str()), (format!("Battle at Mars low orbit: your TSV Defiant and TSV Beagle destroyed the {pro_name}' PMV Valiant.").as_str(), "you won"), "nobody stayed, so the whole side is named");
+}

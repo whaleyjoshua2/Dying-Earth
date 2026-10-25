@@ -1108,8 +1108,13 @@ impl Game {
             };
             format!("{prefix}{}", Game::and_list(names))
         };
-        // The destroyers are the side's units that stayed: one that escaped destroyed nothing.
-        let stayed = |p: &BattleParty| -> Vec<String> { p.names.iter().filter(|n| !p.escaped.contains(n)).cloned().collect() };
+        // The destroyers are the side's units that stayed: one that escaped destroyed nothing. A side
+        // whose every unit left (a disengage rolled in the round its blows landed) is named whole,
+        // since the kills were made before it went; the diary shot read "your  destroyed" otherwise.
+        let stayed = |p: &BattleParty| -> Vec<String> {
+            let kept: Vec<String> = p.names.iter().filter(|n| !p.escaped.contains(n)).cloned().collect();
+            if kept.is_empty() { p.names.clone() } else { kept }
+        };
         let plain = (format!("{} destroyed.", Game::and_list(&lost)), format!("{} destroyed", lost.len()));
         let [a, b] = line.parties.as_slice() else { return plain };
         if a.seat.is_none() || b.seat.is_none() || a.names.is_empty() || b.names.is_empty() {

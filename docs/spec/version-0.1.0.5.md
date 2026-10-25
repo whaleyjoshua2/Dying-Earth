@@ -286,6 +286,10 @@ ticket's questions, *"q1 button q2 yes q3 b"*.
   in low orbit"*, drawn through the yield's text on the tile's line and the build hover's "once it
   stands" line, as the Habitat's is; owner-neutral, since a rival's tile draws the same line. The text
   tool's `refuel` help names a Colony with a working Refinery beside a station.
+- **The pictures** (`ticket-611/ore-earth.png`, `accord-earth.png`): the card with its bare refuse
+  button over the generated line, and "breaks Accord" in red beside the Spend and Max buttons under
+  a Non-Aggression Accord with the Region's holder. The Refinery's line has no picture: no aid plants
+  a Refinery Colony on turn one's board.
 - No rule moves; no sweep.
 
 ## 11. The Scrubber cap: one per 200 million
@@ -302,6 +306,9 @@ population"*; on the ticket's questions, *"q1 200 q2 as they are"*.
   under 300 million one still. The floor of 1 and the ceiling of 10 stay.
 - The computer Custodians build to the cap; the card's *"Scrubber (1 of 2)"* and the signature
   sentence read the figures from the table.
+- **The picture** (`ticket-612/cap-factions.png`): the Custodians' Faction card, whose signature rule
+  reads the cap from the table, *"one per 200M people, 1 to 10"*; the Region card's *"Scrubber (2 of
+  7)"* button sits below the fold at the shot's height.
 - **Swept** (`sweeps/ticket-612.txt`, 20 seeds x four seatings): **23 / 53 / 1 / 0 and 3 collapses**,
   from the same day's 25 / 51 / 2 / 0 and 2 (§6): noise. Scrubbers built over the batch 2,262 from
   2,113, seven per cent more; the end Temperatures by seating +2.47 / +2.29 / +2.23 / +2.04 from +2.45
@@ -329,7 +336,12 @@ on the ticket's questions, *"q1 a q2 yes"*.
 - **The record**: each party now keeps its units' names beside its losses (`BattleParty.names`, a
   `serde(default)` field, so `SAVE_VERSION` stays); a party without them, or a neutral one, or a
   three-sided Battle, reads the losses alone; a unit that escaped is no destroyer and is left out of
-  the names. A bloodless Battle is no Moment, as before. A bombardment's and a Launch's Moments keep
+  the names, unless every unit of its side escaped, when the side is named whole (the kills were made
+  before it left; the diary shot read *"your  destroyed"* otherwise). A bloodless Battle is no Moment,
+  as before. A bombardment's and a Launch's Moments keep
   their own sentences, and their figures count *"destroyed"* where they read *"lost"* (from the
   review: the same misreading on those two cards). The Report line is unchanged.
+- **The picture** (`ticket-614/battle-report.png`): the card from the `battle:two` aid, which brings
+  seats 0 and 1 alone to Mars: *"you won"* over *"Battle at Mars orbit: your TSV Valiant and TSV
+  Vanguard destroyed the Prospectors' PMV Magellan and PMV Indomitable."*
 - No rule moves; no sweep.

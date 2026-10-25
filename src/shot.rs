@@ -392,13 +392,23 @@ fn build_board(session: &mut Session) {
         // Ticket #279 (version 0.08.5): `battle:earth` fights it in Earth orbit instead and runs a
         // second quiet turn, so the Climate Panel's War line has last turn's Battle to show.
         let earth_battle = std::env::args().any(|a| a == "battle:earth");
-        if std::env::args().any(|a| a == "battle:1") || earth_battle {
+        // Ticket #614 (version 0.1.0.5): `battle:two` brings seats 0 and 1 alone, so the Battle
+        // Moment can be photographed in its two-party form, the one that says who won.
+        let two_party = std::env::args().any(|a| a == "battle:two");
+        if std::env::args().any(|a| a == "battle:1") || earth_battle || two_party {
             let body = if earth_battle { BodyId::Earth } else { BodyId::Mars };
-            for seat in [Seat(0), Seat(1), Seat(2)] {
+            for seat in &[Seat(0), Seat(1), Seat(2)][..if two_party { 2 } else { 3 }] {
+                let seat = *seat;
                 let id = ShipId(g.fresh_id());
                 let built_turn = g.turn;
                 let name = g.next_ship_name(UnitKind::Frigate);
                 g.ships.push(Ship { id, name, kind: UnitKind::Frigate, seat, damage: 0, at: ShipAt::Body(body), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Attack, escaped: false, arrived_this_turn: false, built_turn, fuel: 30.0, slot: None });
+            }
+            // The two-party form wants two parties: the other seats' Ships leave the Body for Earth.
+            if two_party {
+                for s in g.ships.iter_mut().filter(|s| s.at == ShipAt::Body(body) && s.seat != Seat(0) && s.seat != Seat(1)) {
+                    s.at = ShipAt::Body(BodyId::Earth);
+                }
             }
             for s in g.ships.iter_mut().filter(|s| s.at == ShipAt::Body(body)) {
                 s.stance = Stance::Attack;
