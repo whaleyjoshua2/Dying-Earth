@@ -168,10 +168,13 @@ was not taken, since the aid cannot place an order that overspends the Energy.
 Ticket [#611](https://github.com/whaleyjoshua2/Dying-Earth/issues/611), spec §10.
 
 Three pins moved first and watched red (the window's armed-button test, the engine's two Accord lines),
-then the texts. The Refinery's sentence was first written into the Module row's `does` field, which
-turned out to be read by nothing in the window or the tool -- every `does` in the two tables is dead
-data -- so it was taken back out and drawn in code, on the tile's line and the build hover, with a
-window test. No rule moves; no sweep. No picture: no Colony with a Refinery stands on turn one's board and a station offers none, so the headless aid has nothing to hover; the two strings are held by the test.
+then the texts. The first build went wrong twice and the review caught both: the Cheap Ore change
+touched a card field that is drawn nowhere (the duplicate was the refuse button's own face over the
+line the card generates under it, so the face is now bare), and the Refinery's sentence was drawn in
+code on a wrong belief that a Module row's `does` field is dead, when the yield's text reads it; it is
+the row's `does` now, owner-neutral, with the window test holding the drawn line. The tool's refuel
+help was also made to contradict itself and was rewritten. No picture: no Refinery stands on turn
+one's board for the headless aid to hover.
 
 The top-bar ticket's review (#609) found the Reactor's relief missing from the per-place lines, so they
 could not sum to the Income's Energy while one stood, and the hover unbounded on a wide board; both

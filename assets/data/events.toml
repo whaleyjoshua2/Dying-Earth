@@ -337,8 +337,7 @@ id = "cheap_ore_offer"
 name = "Cheap Ore Offer"
 kind = "choice"
 target = "seat"
-# Ticket #611 (version 0.1.0.5), at the designer's word: the figure once, on the button.
-effect = "A broker's lot, or let it go"
+effect = "Buy the ore, or let it go for a third off Materials next turn"
 copies = 1
 [event.choice]
 question = "A broker offers 30 Materials for 20 Ducats, this turn only. Buy?"
@@ -348,7 +347,9 @@ take = "Buy the lot"
 # market's row to 1 Ducat for two turns for the whole table, rivals included. Ticket #597 (version
 # 0.1.0.4), at the designer's word: a third off, where it was half, the refusing seat's alone still,
 # and flat while it stands, as a price a card has set is.
-refuse = "Let it go: Materials a third off next turn"
+# Ticket #611 (version 0.1.0.5), at the designer's word: the button's face alone; the figure is on the
+# generated line under it ("Materials a third off for you next turn"), which said it twice.
+refuse = "Let it go"
 take_when = { rule = "ducats_at_least", ducats = 20 }
 [[event.choice.take_does]]
 effect = "resources"

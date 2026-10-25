@@ -276,13 +276,14 @@ accord with prospectors' it should just say 'breaks accord'"*; *"Say at the star
 Refinery refuels ships in its low orbit. I found out at G2 T23 from a refusal message."*; on the
 ticket's questions, *"q1 button q2 yes q3 b"*.
 
-- **The Cheap Ore Offer** (`events.toml`): the effect line reads *"A broker's lot, or let it go"*; the
-  refuse button keeps the figure, *"Let it go: Materials a third off next turn"*.
+- **The Cheap Ore Offer** (`events.toml`): the refuse button's face is *"Let it go"* alone; the figure
+  stands once, on the line the card generates under it (*"Materials a third off for you next turn"*),
+  which the old face repeated. (A choice card's `effect` field is drawn nowhere, so it is untouched.)
 - **"breaks Accord"**: the red note beside the Influence button, the armed button (*"Break the Accord
   and spend 17"*), the tool's price line (*"17; breaks Accord"*) and its refusal (*"breaks Accord:
   order it with break to break it"*); the partner's name nowhere, the Accord row naming them.
-- **The Refinery**: its tile's line ends *"; refuels your Ships in low orbit"*, and its build button's
-  hover opens *"Refuels your Ships in low orbit."* before the price. The text tool's `refuel` help
-  names a Colony with a working Refinery beside a station. (The Module rows' `does` field in the
-  data is read by nothing, so the sentence is drawn in code, not stored there.)
+- **The Refinery**: its row's card line (`modules.toml`, `does`) reads *"refuels its Faction's Ships
+  in low orbit"*, drawn through the yield's text on the tile's line and the build hover's "once it
+  stands" line, as the Habitat's is; owner-neutral, since a rival's tile draws the same line. The text
+  tool's `refuel` help names a Colony with a working Refinery beside a station.
 - No rule moves; no sweep.

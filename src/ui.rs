@@ -5965,8 +5965,9 @@ fn tip_fires(ctx: &egui::Context, text: &str) -> bool {
 const ACCORD_BREAK: Color32 = Color32::from_rgb(236, 88, 76);
 
 /// Ticket #569 (version 0.1.0.3): the words for an Influence spend that would break an Accord --
-/// the red note beside the button, "breaks your Accord with X", and the face the armed button
-/// wears, "Break the Accord with X and spend N" -- or `None` where the spend crosses nobody.
+/// the red note beside the button, "breaks Accord", and the face the armed button wears, "Break the
+/// Accord and spend N" (both named the partner until ticket #611) -- or `None` where the spend
+/// crosses nobody.
 fn influence_break(game: &Game, target: Place, amount: i64) -> Option<(String, String)> {
     // Ticket #611 (version 0.1.0.5), at the designer's word: "breaks Accord", no name -- the Accord
     // row names the partner -- on the note and on the armed button alike.
@@ -5977,7 +5978,7 @@ fn influence_break(game: &Game, target: Place, amount: i64) -> Option<(String, S
 /// Ticket #569 (version 0.1.0.3), at the designer's word: an Influence button. A spend that crosses
 /// nobody is placed at the first click. One that would break an Accord carries the red note beside
 /// it and in its hover, and wants two clicks: the first arms it -- this place at this amount, the
-/// review -- and it reads "Break the Accord with X and spend N" in red; the second places the order
+/// review -- and it reads "Break the Accord and spend N" in red; the second places the order
 /// with the break meant, which the engine's door otherwise refuses. Returns the order to place. The
 /// hover goes through `rule_tip`, the refusal first and the words after it (ticket #380).
 #[allow(clippy::too_many_arguments)]
@@ -6620,9 +6621,7 @@ fn build_words(game: &Game, order: &Order) -> Option<String> {
     if matches!(order, Order::BuildShip { .. }) && cost.fuel > 0.0 {
         return Some(format!("{} Materials, {widgets} Widgets, {when}.\nBuilt full: {} Fuel", cost.materials, cost.fuel));
     }
-    // Ticket #611 (version 0.1.0.5), at the designer's word: said where a player decides to build one.
-    let note = if matches!(order, Order::BuildModule { kind: ModuleKind::Refinery, .. }) { "Refuels your Ships in low orbit. " } else { "" };
-    Some(format!("{note}{} Materials, {widgets} Widgets{people}, {when}", cost.materials))
+    Some(format!("{} Materials, {widgets} Widgets{people}, {when}", cost.materials))
 }
 
 /// Ticket #332: an estimate in words, for a queue line, a hatched tile and the Under way block
@@ -10744,10 +10743,7 @@ fn module_line(game: &Game, col: &Colony, cid: ColonyId, mi: usize, director: Op
     };
     // Ticket #345 (version 0.09.1): the Core's line, and only the Core's, carries the Body's first.
     let first = if m.kind == ModuleKind::Core { core_first_words(game, col, cid) } else { String::new() };
-    // Ticket #611 (version 0.1.0.5), at the designer's word: a Refinery's line says what a player
-    // learnt at turn 23 from a refusal -- its Colony refuels Ships in its low orbit (ticket #575).
-    let refuels = if m.kind == ModuleKind::Refinery && !m.mothballed { "; refuels your Ships in low orbit" } else { "" };
-    format!("{}: {}{}{}", m.kind.name(), figures, first, refuels)
+    format!("{}: {}{}", m.kind.name(), figures, first)
 }
 
 /// Ticket #345 (version 0.09.1): what a **Core Module** adds to its tile's line and to its tile's
@@ -14017,11 +14013,12 @@ mod ticket_611 {
         let slot = g.free_slots_on(BodyId::Mars)[0];
         g.colonies.push(Colony { id, body: BodyId::Mars, slot, control: Control::Controlled(Seat(0)), modules: vec![Module::new(ModuleKind::Refinery), Module::new(ModuleKind::Core)], colonists: 4, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, tier: 0, in_orbit: false });
         let col = g.colony(id).unwrap().clone();
+        // The sentence is the row's `does`, read through the yield's text as the Habitat's is, and
+        // owner-neutral: a rival's Refinery fills nothing of yours (the review).
+        assert_eq!(g.tables.module(ModuleKind::Refinery).does.as_deref(), Some("refuels its Faction's Ships in low orbit"));
         let line = module_line(&g, &col, id, 0, Some(Seat(0)));
-        assert!(line.starts_with("Refinery: ") && line.ends_with("; refuels your Ships in low orbit"), "{line}");
+        assert!(line.starts_with("Refinery: ") && line.contains(", refuels its Faction's Ships in low orbit, "), "the sentence rides the yield's text, between the Fuel and the upkeep: {line}");
         assert!(!module_line(&g, &col, id, 1, Some(Seat(0))).contains("refuels"), "the Core says nothing of it");
-        let hover = build_words(&g, &Order::BuildModule { colony: id, kind: ModuleKind::Refinery }).expect("a build");
-        assert!(hover.starts_with("Refuels your Ships in low orbit. ") && hover.contains(" Materials, "), "{hover}");
-        assert!(!build_words(&g, &Order::BuildModule { colony: id, kind: ModuleKind::Habitat }).unwrap().contains("Refuels"), "a Habitat's hover is the price alone");
+        assert!(!line.contains("your Ships"), "never 'your': the line is drawn on a rival's tile too");
     }
 }
