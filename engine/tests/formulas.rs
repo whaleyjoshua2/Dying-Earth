@@ -25625,3 +25625,51 @@ fn ticket_609_the_income_keeps_energy_made_and_upkeep_by_place() {
     let net: f64 = by_place.iter().map(|(_, m, u)| m - u).sum();
     assert!((net - g.seat(Seat(0)).income_last_turn.energy).abs() < 1e-9, "net {net} against the Income's {}", g.seat(Seat(0)).income_last_turn.energy);
 }
+
+/// Ticket #614 (version 0.1.0.5), at the designer's word: **the Battle Moment says who won.** "Won"
+/// is read off the losses -- the side that lost nothing while the other lost a unit; both losing,
+/// or neither, is no verdict. With the player's units in it the text reads "your TSV Defiant
+/// destroyed the Prospectors' PMV Valiant." and the figure "you won" / "you lost" / "both sides
+/// lost a unit"; with the player out of it, the Factions are named and the figure counts.
+/// The designer's own card read "A Battle at ...: PMV Valiant destroyed" over "1 lost" for a Battle
+/// they had won.
+#[test]
+fn ticket_614_the_battle_moment_says_who_won() {
+    let party = |seat: Option<Seat>, names: &[&str], destroyed: &[&str]| BattleParty {
+        seat,
+        aggressor: seat == Some(Seat(0)),
+        units: String::new(),
+        strength: 3,
+        hits: 0,
+        destroyed: destroyed.iter().map(|s| s.to_string()).collect(),
+        escaped: Vec::new(),
+        odds: None,
+        names: names.iter().map(|s| s.to_string()).collect(),
+    };
+    let line = |parties: Vec<BattleParty>| BattleLine { place: "Mars low orbit".to_string(), parties, result: "2 rounds.".to_string(), at: Some(ReportPlace::Body(BodyId::Mars)), log: None, fought_now: false };
+    let moment = |g: &Game| g.report.moments.iter().find(|m| m.kind == MomentKind::DecisiveBattle).map(|m| (m.text.clone(), m.figure.clone())).expect("a Moment");
+    let pro = Seat(1);
+    let pro_name = game().seat_name(pro);
+    // The designer's case: their Defiant (seat 0) sank the Valiant and lost nothing.
+    let mut g = game();
+    g.battle_line_and_moment(&line(vec![party(Some(Seat(0)), &["TSV Defiant"], &[]), party(Some(pro), &["PMV Valiant"], &["PMV Valiant"])]));
+    assert_eq!(moment(&g), (format!("Battle at Mars low orbit: your TSV Defiant destroyed the {pro_name}' PMV Valiant."), "you won".to_string()));
+    // The other way round.
+    let mut g = game();
+    g.battle_line_and_moment(&line(vec![party(Some(Seat(0)), &["TSV Defiant"], &["TSV Defiant"]), party(Some(pro), &["PMV Valiant"], &[])]));
+    assert_eq!(moment(&g), (format!("Battle at Mars low orbit: the {pro_name}' PMV Valiant destroyed your TSV Defiant."), "you lost".to_string()));
+    // Both lost one: no verdict, the losses named.
+    let mut g = game();
+    g.battle_line_and_moment(&line(vec![party(Some(Seat(0)), &["TSV Defiant", "TSV Beagle"], &["TSV Beagle"]), party(Some(pro), &["PMV Valiant"], &["PMV Valiant"])]));
+    assert_eq!(moment(&g), (format!("Battle at Mars low orbit: your TSV Beagle and the {pro_name}' PMV Valiant destroyed."), "both sides lost a unit".to_string()));
+    // The player not in it: the Factions named, the figure a count.
+    let mut g = game();
+    let cus = Seat(2);
+    let cus_name = g.seat_name(cus);
+    g.battle_line_and_moment(&line(vec![party(Some(cus), &["ARK Defiant"], &[]), party(Some(pro), &["PMV Valiant", "PMV Aurora"], &["PMV Valiant", "PMV Aurora"])]));
+    assert_eq!(moment(&g), (format!("Battle at Mars low orbit: the {cus_name}' ARK Defiant destroyed the {pro_name}' PMV Valiant and PMV Aurora."), "2 destroyed".to_string()));
+    // Nobody lost a unit: no Moment at all, as before.
+    let mut g = game();
+    g.battle_line_and_moment(&line(vec![party(Some(Seat(0)), &["TSV Defiant"], &[]), party(Some(pro), &["PMV Valiant"], &[])]));
+    assert!(g.report.moments.iter().all(|m| m.kind != MomentKind::DecisiveBattle), "a bloodless Battle stops nobody's turn");
+}

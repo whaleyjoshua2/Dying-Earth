@@ -193,3 +193,13 @@ red on the 300, then green. No picture: a figure the card reads from the table.
   collapses**, from 25 / 51 / 2 / 0 and 2: noise. Scrubbers built over the batch 2,262 from 2,113,
   seven per cent more, the end Temperatures and the Sink within noise; that reads as the cap binding in few
   Regions, an inference from the count rather than a measured one. Reported and left.
+
+## The Battle Moment says who won
+
+Ticket [#614](https://github.com/whaleyjoshua2/Dying-Earth/issues/614), spec §12.
+
+The test was written first from the designer's own case -- the Defiant sinking the Valiant and losing
+nothing -- and watched red on the card as it was, "A Battle at Mars low orbit: PMV Valiant destroyed"
+over "1 lost"; then the parties were given their units' names and the Moment's sentence and figure
+rebuilt from the losses. Five cases held: won, lost, both lost, the player out of it, and a bloodless
+Battle with no Moment. No picture: turn one's board has no Battle for the headless aid to raise a Moment from, and the `moment:` aid shows only a Moment the game has made; the five texts are held by the test.

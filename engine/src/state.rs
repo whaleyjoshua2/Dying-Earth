@@ -1460,6 +1460,11 @@ pub struct BattleParty {
     /// and is wiped at the next, so no save carries a first-round figure under this name for long.
     #[serde(default)]
     pub odds: Option<f64>,
+    /// Ticket #614 (version 0.1.0.5): every unit of the party by name, destroyed or not, so the
+    /// Moment can say who destroyed whom; `units` is prose and `destroyed` the losses alone. Empty
+    /// on a bombardment or a Launch, and in a save from before this ticket.
+    #[serde(default)]
+    pub names: Vec<String>,
 }
 
 /// One line of the Battle Report (spec 10.3), amended by ticket #50: every party present.

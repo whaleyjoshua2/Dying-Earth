@@ -307,3 +307,26 @@ population"*; on the ticket's questions, *"q1 200 q2 as they are"*.
   2,113, seven per cent more; the end Temperatures by seating +2.47 / +2.29 / +2.23 / +2.04 from +2.45
   / +2.24 / +2.18 / +1.99, and the Natural Sink at the end mixed, both ways within noise. The seven per cent
   reads as the cap binding in few Regions, an inference from the count, not a measured one. Reported and left.
+
+## 12. The Battle Moment says who won
+
+Ticket: [The Battle Moment says who won: a Battle you won read as one you lost](https://github.com/whaleyjoshua2/Dying-Earth/issues/614).
+
+The designer: *"getting a popup I lost a battle I did not lose - my tsv defiant beat the pmv valiant"*;
+on the ticket's questions, *"q1 a q2 yes"*.
+
+- **The card as it was**: *"A Battle at Mars low orbit: PMV Valiant destroyed"* over the figure *"1
+  lost"*, the figure counting everybody's losses, so a Battle the player won read as theirs. The
+  designer's own case was not replayed (no save was to hand); the test reproduces it from the record.
+- **"Won" is read off the losses**: the side that lost nothing while the other lost a unit; both
+  losing, or neither, is no verdict. The engine records no field-holder and starts none.
+- **The wording**: with the player's units in it, *"Battle at Mars low orbit: your TSV Defiant
+  destroyed the Prospectors' PMV Valiant."* and the figure *"you won"*, or *"the Prospectors' PMV
+  Valiant destroyed your TSV Defiant."* and *"you lost"*, or both sides' losses named and *"both sides
+  lost a unit"*; with the player out of it, *"the Custodians' ARK Defiant destroyed the Prospectors' PMV
+  Valiant and PMV Aurora."* and the figure *"2 destroyed"*.
+- **The record**: each party now keeps its units' names beside its losses (`BattleParty.names`, a
+  `serde(default)` field, so `SAVE_VERSION` stays); a party without them, or a neutral one, or a
+  three-sided Battle, reads the losses alone. A bloodless Battle is no Moment, as before; a
+  bombardment's and a Launch's Moments are their own and unchanged. The Report line is unchanged.
+- No rule moves; no sweep.

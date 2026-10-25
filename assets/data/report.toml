@@ -528,7 +528,8 @@ figure = "{figure}"
 
 [moments.decisive_battle]
 on = true
-text = "A Battle at {place}: {result}"
+# Ticket #614 (version 0.1.0.5): {result} is the whole sentence, who destroyed whom, and {figure} the verdict.
+text = "Battle at {place}: {result}"
 figure = "{figure}"
 
 # Ticket #281 (version 0.08.5): buildings burned on a taking, under their own name. The Battle's
