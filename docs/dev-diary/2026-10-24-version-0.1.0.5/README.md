@@ -379,3 +379,21 @@ where a tiny rate wrapped the cast; the rate averaged from turn one reads a late
 said in the spec with the pace tables as the lever; the test's win turn written as the figure, 50;
 the counter assertion marked for what it proves; and one wording slip in the sweep paragraph. The
 fixed build re-swept identical to the figure, so the duplicate file was not kept.
+
+## The Prospectors' Venture Fund at 6,250
+
+Ticket [#623](https://github.com/whaleyjoshua2/Dying-Earth/issues/623), spec §18.
+
+A figure the designer gave while charting, so no round of questions: the bar 5,000 -> 6,250, the
+computer's pace x 6250/5000 on the same turns (the designer, mid-build: *"make sure the seat is
+repaced"*; it was, and a test holds it). The pins moved first and were watched red (two tests), then
+the data; seven more fixtures stood on the old bar in figures of their own (a Moment's "4000 of
+5000", a share test's output, the turn-one line, the pack's 80% premise) and moved after.
+
+**The picture** ([`ticket-623/fund-faction.png`](ticket-623/fund-faction.png)), looked at: the
+Faction choice screen, "6,250 in the Venture Capital Fund, plus 20 living beyond Earth orbit."
+
+- **The sweep** ([`sweeps/ticket-623.txt`](sweeps/ticket-623.txt)): **18 / 61 / 0 / 1 and 0**, from
+  17 / 58 / 2 / 2 and 1: noise. The bar does not bite: the Fund ends a median 6,368 to 6,775 of the
+  6,250 asked, over it by the same margin it was over 5,000, the computer banking to its pace. It
+  bites on the human Prospector, whose Fund is not paced. Reported and left.

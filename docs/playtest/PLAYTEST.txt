@@ -40,7 +40,7 @@ THE STORY
   A Colony's founding date is drawn larger.
 
 THE FIGURES
-- THE PROSPECTORS' bar is 5,000 Ducats in the Venture Fund.
+- THE PROSPECTORS' bar is 6,250 Ducats in the Venture Fund.
 - THE ARKWRIGHTS and THE ARCHIVISTS open with 10 Ducats; the other two open with none.
 - THE ARKWRIGHTS draw +1 Research a turn for each Body off Earth where they hold a Colonist.
 - ORBITAL DATA CENTERS lifts an Observatory's Research x1.25, and once it stands every Tech

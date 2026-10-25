@@ -975,8 +975,8 @@ fn occupation_of_a_controlled_state_returns_it_to_its_owner_when_broken() {
 fn meet_first(g: &mut Game, seat: Seat) {
     match g.kind(seat) {
         // Ticket #506 (version 0.1.0.0): the fifty-turn bars. Ticket #580 (version 0.1.0.3): 4,250.
-        // Ticket #584 (version 0.1.0.4): 5,000.
-        FactionKind::Prospectors => g.seats[seat.index()].venture_fund = 5000.0,
+        // Ticket #584 (version 0.1.0.4): 5,000. Ticket #623 (version 0.1.0.5): 6,250.
+        FactionKind::Prospectors => g.seats[seat.index()].venture_fund = 6250.0,
         FactionKind::Custodians => g.seats[seat.index()].stabilization_run = 4,
         FactionKind::Arkwrights => {}
         // Ticket #579 (the review): the first part is scored on the fund, read from the table.
@@ -999,11 +999,12 @@ fn a_faction_meeting_both_parts_wins_before_collapse_is_checked() {
 fn both_met_the_larger_margin_wins() {
     let mut g = game();
     // Ticket #506 (version 0.1.0.0): the bars are 18 off Earth, a run of 4 and a Fund of 3,500;
-    // ticket #580 (version 0.1.0.3): the Fund 4,250; ticket #584 (version 0.1.0.4): 5,000.
+    // ticket #580 (version 0.1.0.3): the Fund 4,250; ticket #584 (version 0.1.0.4): 5,000; ticket
+    // #623 (version 0.1.0.5): 6,250.
     colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 18);
     colony(&mut g, Seat(1), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 22);
     g.seats[0].stabilization_run = 4; // parts 1.0 and 1.0 -> margin 1.0
-    g.seats[1].venture_fund = 6000.0; // parts 1.2 and 1.22 -> margin 1.2 (ticket #584: the bar is 5000)
+    g.seats[1].venture_fund = 7500.0; // parts 1.2 and 1.22 -> margin 1.2 (ticket #623: the bar is 6250)
     open_gates(&mut g);
     g.end_phase();
     assert!(matches!(g.outcome, Some(Outcome::Win { seat: Seat(1), .. })), "{:?}", g.outcome);
@@ -1016,7 +1017,7 @@ fn both_met_by_the_same_margin_is_a_draw() {
     colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 20);
     colony(&mut g, Seat(1), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 20);
     g.seats[0].stabilization_run = 4;
-    g.seats[1].venture_fund = 6000.0; // the lower fraction is the presence, 1.0, on both sides (ticket #584: the bar is 5000)
+    g.seats[1].venture_fund = 7500.0; // the lower fraction is the presence, 1.0, on both sides (ticket #623: the bar is 6250)
     open_gates(&mut g);
     g.end_phase();
     assert!(matches!(g.outcome, Some(Outcome::Draw { .. })), "{:?}", g.outcome);
@@ -1863,11 +1864,12 @@ fn more_than_one_seat_meeting_its_condition_gives_the_game_to_the_larger_margin(
     let mut g = game();
     // The Custodians and the Prospectors both meet theirs; the Prospectors by the larger margin.
     // Ticket #506 (version 0.1.0.0): the bars are 18 off Earth, a run of 4 and a Fund of 3,500;
-    // ticket #580 (version 0.1.0.3): the Fund 4,250; ticket #584 (version 0.1.0.4): 5,000.
+    // ticket #580 (version 0.1.0.3): the Fund 4,250; ticket #584 (version 0.1.0.4): 5,000; ticket
+    // #623 (version 0.1.0.5): 6,250.
     colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 18);
     colony(&mut g, Seat(1), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 22);
     g.seats[0].stabilization_run = 4; // parts 1.0 and 1.0 -> margin 1.0
-    g.seats[1].venture_fund = 6000.0; // parts 1.2 and 1.22 -> margin 1.2 (ticket #584: the bar is 5000)
+    g.seats[1].venture_fund = 7500.0; // parts 1.2 and 1.22 -> margin 1.2 (ticket #623: the bar is 6250)
     open_gates(&mut g);
     g.end_phase();
     assert!(matches!(g.outcome, Some(Outcome::Win { seat: Seat(1), .. })), "{:?}", g.outcome);
@@ -1885,7 +1887,7 @@ fn the_last_turn_ranks_every_seat_by_score() {
     colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat], 6);
     let p = colony(&mut g, Seat(1), BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 9);
     let _ = p;
-    g.seats[1].venture_fund = 2500.0; // half the 5000 bar (ticket #584)
+    g.seats[1].venture_fund = 3125.0; // half the 6250 bar (ticket #623)
     colony(&mut g, Seat(2), BodyId::Phobos, &[ModuleKind::Habitat], 3);
     // Ticket #555 (version 0.1.0.2): each score is the mean of its two parts; the Prospectors' is
     // still the highest of the four.
@@ -1942,7 +1944,7 @@ fn the_prospectors_fund_counts_seven_tenths_of_their_score() {
     assert_eq!(g.kind(pro), FactionKind::Prospectors);
     bare_stations(&mut g);
     colony(&mut g, pro, BodyId::Mars, &[ModuleKind::Habitat; 4], 20);
-    g.seats[1].venture_fund = 850.0; // 0.17 x 5,000 (ticket #584)
+    g.seats[1].venture_fund = 1062.5; // 0.17 x 6,250 (ticket #623)
     let p = g.progress(pro);
     assert!((p.first_fraction() - 0.17).abs() < 1e-9 && p.second_fraction() == 1.0, "the premise: the Fund at 17%, the Presence full: {p:?}");
     // Ticket #601 (version 0.1.0.4): of the 94% the parts share, the gate not standing: 39%.
@@ -6406,20 +6408,20 @@ fn twenty_five_hundred_ducats_in_the_fund_is_the_prospectors_first_part() {
     // Ticket #506 (version 0.1.0.0): 3,500, from 2,500. Ticket #580 (version 0.1.0.3), at the
     // designer's word: 4,250, with the race for the Moon putting the Prospectors at 56 wins of 80.
     // Ticket #584 (version 0.1.0.4), at the designer's word: 5,000, the Prospectors at 41 of 80 on
-    // 0.1.0.3's closing board.
-    assert_eq!((card.kind, card.bar), (dying_earth_engine::data::VictoryFirstKind::VentureFund, 5000.0));
+    // 0.1.0.3's closing board. Ticket #623 (version 0.1.0.5), at the designer's word: 6,250.
+    assert_eq!((card.kind, card.bar), (dying_earth_engine::data::VictoryFirstKind::VentureFund, 6250.0));
     assert_eq!(card.kind.name(), "Venture Capital Fund");
     // Ticket #580: the card's long text reads the bar, where it carried a typed copy; the
     // computer Prospectors' pace stretches with it (467 / 1167 / 2100 / 3500 before, then
     // 567 / 1417 / 2550 / 4250).
-    assert_eq!(g.tables.victory_text(FactionKind::Prospectors), "5,000 Ducats in the Venture Capital Fund, plus 20 Colonists living beyond Earth orbit.");
-    assert_eq!(g.tables.ai_pace(FactionKind::Prospectors).first, vec![[12, 667], [25, 1667], [37, 3000], [47, 5000]], "scaled by 5000/4250");
-    g.seats[pro.index()].venture_fund = 2000.0;
+    assert_eq!(g.tables.victory_text(FactionKind::Prospectors), "6,250 Ducats in the Venture Capital Fund, plus 20 Colonists living beyond Earth orbit.");
+    assert_eq!(g.tables.ai_pace(FactionKind::Prospectors).first, vec![[12, 834], [25, 2084], [37, 3750], [47, 6250]], "scaled by 6250/5000, the turns as they were");
+    g.seats[pro.index()].venture_fund = 2500.0;
     let p = g.progress(pro);
-    assert_eq!((p.first_value, p.first_bar), (2000.0, 5000.0));
+    assert_eq!((p.first_value, p.first_bar), (2500.0, 6250.0));
     assert!((p.first_fraction() - 0.4).abs() < 1e-9);
     colony(&mut g, pro, BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 20);
-    g.seats[pro.index()].venture_fund = 5000.0;
+    g.seats[pro.index()].venture_fund = 6250.0;
     open_gates(&mut g);
     assert!(g.progress(pro).met());
     g.end_phase();
@@ -6452,7 +6454,9 @@ fn the_prospector_ai_sets_its_share_to_reach_the_fund_in_time_and_maxes_it_when_
     // Ticket #256 (version 0.08.4): 120 to 200. At the bar of 2500, 120 a turn over the 24 turns left
     // wants 87% and the seat maxes -- which is the AI READING the new bar, watched here when the
     // bar moved and this line had not.
-    g.seats[pro.index()].income_last_turn.ducats = 200.0;
+    // Ticket #623 (version 0.1.0.5): 300, at the 6,250 bar; 200 over the 34 turns from the first
+    // waypoint wanted 92% and the seat maxed, the AI reading the new bar again.
+    g.seats[pro.index()].income_last_turn.ducats = 300.0;
     g.seats[pro.index()].stockpile.energy = 500.0;
     g.turn = 4;
     let orders = g.ai_orders(pro);
@@ -11969,25 +11973,26 @@ fn a_rival_closing_on_its_victory_condition_interrupts_the_player_once_a_step() 
     bare_stations(&mut g);
     // Ticket #601 (version 0.1.0.4): 15 of 18 and 4000 of 5000, where 14 and 3800 read 72% with
     // the parts at 94% of the score, the gate not standing. Ticket #625 (version 0.1.0.5): 16 of 20,
-    // since Presence is 20 and 15 of 20 would read under three quarters.
+    // since Presence is 20 and 15 of 20 would read under three quarters. Ticket #623 (version
+    // 0.1.0.5): 5,000 of 6,250, the same four fifths.
     colony(&mut g, pro, BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 16);
-    g.seats[pro.index()].venture_fund = 4000.0;
+    g.seats[pro.index()].venture_fund = 5000.0;
     // Ticket #555 (version 0.1.0.2): the score is the mean of the parts, past three quarters; the
     // Fund is still the shorter part, which the Moment names. Ticket #567 (version 0.1.0.3): the Fund
     // counts 0.7 of it, 0.7 x 0.76 + 0.3 x 14/18; ticket #625 (version 0.1.0.5): 16 of 20.
-    assert!((g.progress(pro).score() - 0.94 * (0.7 * 4000.0 / 5000.0 + 0.3 * 16.0 / 20.0)).abs() < 1e-9, "{}", g.progress(pro).score());
+    assert!((g.progress(pro).score() - 0.94 * (0.7 * 5000.0 / 6250.0 + 0.3 * 16.0 / 20.0)).abs() < 1e-9, "{}", g.progress(pro).score());
     assert!(g.progress(pro).score() >= 0.75);
     g.end_phase();
     assert_eq!(fired(&g), 1, "three quarters: the Moment fires: {:?}", g.report.moments);
     let m = g.report.moments.iter().find(|m| m.kind == MomentKind::RivalProgress).unwrap();
     assert!(m.text.contains("Prospectors") && m.text.contains("three quarters"), "{}", m.text);
     // Ticket #506 (version 0.1.0.0): the Fund, at 0.75, is the shorter part now; Presence is 14 of 18 (16 of 20 since ticket #625).
-    assert!(m.text.contains("4000 of 5000"), "the part still short is the figure: {}", m.text);
-    assert_eq!(m.figure, "4000 of 5000");
+    assert!(m.text.contains("5000 of 6250"), "the part still short is the figure: {}", m.text);
+    assert_eq!(m.figure, "5000 of 6250");
     g.end_phase();
     assert_eq!(fired(&g), 1, "once: it does not fire again while the seat sits there");
     // The Fund full but its gate shut is held back, not met.
-    g.seats[pro.index()].venture_fund = 5000.0;
+    g.seats[pro.index()].venture_fund = 6250.0;
     g.end_phase();
     assert_eq!(fired(&g), 1, "a part held back by its gate Tech is not a part met");
     // The gate open: one part met, the other short.
@@ -16937,8 +16942,8 @@ fn ticket_350_the_turn_one_line_names_each_factions_own_condition() {
             "Build, spread Influence and reach Stabilization, four Climate phases running with Emissions under the Natural Sink, with 20 Colonists living beyond Earth orbit, before +3.0 C.",
         ),
         // Ticket #506 (version 0.1.0.0): the fifty-turn bars.
-        // Ticket #584 (version 0.1.0.4): the Fund 5,000.
-        (FactionKind::Prospectors, "Build, spread Influence and put 5,000 Ducats in the Venture Capital Fund with 20 Colonists living beyond Earth orbit, before +3.0 C."),
+        // Ticket #584 (version 0.1.0.4): the Fund 5,000. Ticket #623 (version 0.1.0.5): 6,250.
+        (FactionKind::Prospectors, "Build, spread Influence and put 6,250 Ducats in the Venture Capital Fund with 20 Colonists living beyond Earth orbit, before +3.0 C."),
         // Ticket #514 (version 0.1.0.0): and a Colonial Capital.
         (FactionKind::Arkwrights, "Build, spread Influence and get 44 Colonists living beyond Earth orbit, spread over four Bodies, one holding a Colonial Capital, before +3.0 C."),
         (FactionKind::Archivists, "Build, spread Influence and build the Archive on the ground beyond Earth orbit, pay 250 Research into it, and upload 16 Colonists, before +3.0 C."), // Ticket #565 (version 0.1.0.3): 16, from 18; ticket #579: 250, from 225
@@ -24040,7 +24045,7 @@ fn prospectors_at_eighty(g: &mut Game) -> Seat {
     let w = g.tables.faction(FactionKind::Prospectors).victory_first.weight;
     // Ticket #601 (version 0.1.0.4): the parts are 94% of the score, the gate not standing.
     let parts = 0.8 / (1.0 - g.tables.victory.gate_weight);
-    g.seats[1].venture_fund = 5000.0 * (parts - (1.0 - w) * presence) / w; // ticket #584: the bar 5,000
+    g.seats[1].venture_fund = 6250.0 * (parts - (1.0 - w) * presence) / w; // ticket #623: the bar 6,250
     assert!((g.progress(pro).score() - 0.8).abs() < 1e-9, "the premise: 80%, {}", g.progress(pro).score());
     pro
 }
@@ -24850,7 +24855,7 @@ fn the_door_reads_the_parts_without_the_gate() {
     assert_eq!(g.kind(pro), FactionKind::Prospectors);
     bare_stations(&mut g);
     colony(&mut g, pro, BodyId::Mars, &[ModuleKind::Habitat; 4], 20);
-    g.seats[1].venture_fund = 5000.0;
+    g.seats[1].venture_fund = 6250.0; // ticket #623: the bar 6,250
     let p = g.progress(pro);
     assert!(!p.gate_open && (p.score_as_it_stands() - 0.94).abs() < 1e-9, "the premise: both bars, no gate, 94%");
     // The Arkwrights near too, so no runaway lead refuses first: only the door can.
@@ -25918,10 +25923,10 @@ fn ticket_620_a_computer_seat_weighs_collapse_against_its_win() {
     let bar = g.tables.faction(FactionKind::Prospectors).victory_first.bar;
     assert_eq!(g.projection().collapse_turn, None, "the premise: no Collapse on turn one's heading");
     assert!(!g.ai_loses_the_race(pro), "no Collapse, no race lost");
-    // The win turn: 1,000 of the bar banked by turn 10 is 100 a turn, the rest 40 turns off.
+    // The win turn: 1,250 of the bar banked by turn 10 is 125 a turn, the rest 40 turns off.
     g.turn = 10;
-    g.seats[pro.index()].venture_fund = 1000.0;
-    assert_eq!(bar, 5000.0, "the premise: the Fund's bar");
+    g.seats[pro.index()].venture_fund = 1250.0;
+    assert_eq!(bar, 6250.0, "the premise: the Fund's bar (ticket #623)");
     assert_eq!(g.ai_win_turn(pro), Some(50));
     assert!(!g.ai_loses_the_race(pro), "still no Collapse on the heading");
     // The air at a Collapse's worth of CO2: the heading reaches +3.0 within a few turns, well before

@@ -389,8 +389,9 @@ bounty_least = 1.0
 # Ticket #584 (version 0.1.0.4): every figure x 5000/4250 with the bar, the turns as they were.
 # Ticket #625 (version 0.1.0.5): every people pace to 20 with Off-world Presence, the Arkwrights' first
 # x 44/42 with the Diaspora, the turns as they were; the Archivists' paces unmoved.
+# Ticket #623 (version 0.1.0.5): the Prospectors' first x 6250/5000 with the bar, the turns as they were.
 [pace.prospectors]
-first = [[12, 667], [25, 1667], [37, 3000], [47, 5000]]
+first = [[12, 834], [25, 2084], [37, 3750], [47, 6250]]
 colonists = [[17, 7], [31, 20]]
 
 [pace.custodians]

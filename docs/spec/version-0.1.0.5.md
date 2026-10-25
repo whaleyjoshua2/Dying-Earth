@@ -558,3 +558,31 @@ before collapse."*; on the ticket's questions, *"q1 yes q2 a q3 a q4 yes q5 yes"
   like the designer's, where the heading said turn 34. Reported and left. The review's build (the
   Mothball and Restart weights) was re-swept and came out identical, every figure: the computer
   mothballs no emitter while the race is lost in those 80 games.
+
+## 18. The Prospectors' Venture Fund at 6,250
+
+Ticket: [The Prospectors' Venture Fund at 6,250](https://github.com/whaleyjoshua2/Dying-Earth/issues/623).
+
+The designer, while charting: *"prospectors fund requires 6250"*; on the build, *"make sure the seat
+is repaced"*.
+
+- **The bar**: `factions.toml`, `victory_first = { kind = "venture_fund", bar = 6250, weight = 0.7 }`,
+  from 5,000 (ticket #584). The Faction card, the Victory window, the turn-one line and the text
+  tool read it from the table: *"6,250 in the Venture Capital Fund, plus 20 living beyond Earth
+  orbit."*
+- **The seat repaced**: `ai.toml [pace.prospectors] first = [[12, 834], [25, 2084], [37, 3750],
+  [47, 6250]]`, every figure x 6250/5000 on the same turns, as the bar's last two moves were; the
+  test that holds the pace to the bar moved first and was watched red.
+- The fixtures that stood on the bar moved with it: the Moment at three quarters now reads *"5000
+  of 6250"*; the share test's fat output is 300 Ducats a turn, where 200 over the 34 turns from the
+  first waypoint wanted 92% and the seat maxed (the AI reading the new bar, as at #256); the
+  `rival:1` shot aid plants 4,750 of 6,250; `docs/playtest/PLAYTEST.txt` says 6,250.
+- **The picture** (`ticket-623/fund-faction.png`): the Faction choice screen, the Prospectors' Victory
+  Condition reading the new bar.
+- **Swept** (`sweeps/ticket-623.txt`, 20 seeds x four seatings): **18 / 61 / 0 / 1 and 0 collapses**,
+  from §17's 17 / 58 / 2 / 2 and 1: noise. **The bar does not bite**: the Fund at the end a median
+  6,775 / 6,716 / 6,459 / 6,368 by seating of the 6,250 asked, from 5,344 / 5,311 / 5,117 / 5,026 of
+  5,000, the computer banking to its pace, as the ticket foresaw of #584; the Prospectors' gate
+  completed in 80 of 80, median turn 29, unchanged. The reading: a bar the computer paces to moves
+  nothing on the sweep board; it bites on the human Prospector, whose Fund is not paced. Reported
+  and left.
