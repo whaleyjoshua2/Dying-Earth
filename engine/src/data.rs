@@ -417,6 +417,10 @@ pub struct RepairCard {
     pub materials_per_point: i64,
 }
 
+/// Ticket #617 (version 0.1.0.5): the order the Tech tree's branches are drawn in, the window's
+/// bands (settled on ticket #424) and the text tool's lines alike.
+pub const TECH_BRANCH_ORDER: [&str; 5] = ["Society", "Stewardship", "Off-world Living", "Extraction", "Propulsion"];
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct TechCard {
     pub id: TechId,

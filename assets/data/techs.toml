@@ -241,7 +241,7 @@ branch = "Stewardship"
 rung = 1
 cost = 15
 needs = []
-effect = "Unlocks the Sea Wall."
+effect = "Unlocks the Sea Wall"
 value = 1.0
 
 

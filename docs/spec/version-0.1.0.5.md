@@ -402,20 +402,26 @@ neither. (tool)"*; on the ticket's questions, *"q1 a q2 yes q3 a q4 a"*.
 
 - **The first landing**, one line under every Body in the FREE SLOTS block but Earth, whose windfall
   is 0: *"first landing: nobody yet, 5 Influence to the first"*; claimed, *"first landing: the
-  Prospectors, at Olympus Mons"*. The engine keeps no turn for a first, so the place names it where
-  the ticket's draft had a turn.
+  Prospectors, turn 13"*, the turn being the first Colony's founding turn (a first's Colony is never
+  removed, ticket #586). The build first named the place, on the mistaken premise that no turn was
+  kept; the review found the turn, and the line took the form the designer had said yes to.
 - **The race to the Moon**, under the Moon's line, the window's block in one line: *"race to the
   Moon: Custodians no Shipyard, Prospectors no Shipyard, Arkwrights no Shipyard, Archivists no
   Shipyard"*, leader first, in the steps' own words (now `MoonStep::words`, which the window reads
   too); gone once somebody lands. The ticket's draft, a Colony-Ship-bound line for every Body, was
   not what the window has and was not taken.
 - **The Tech tree**, behind `show --techs` as the costs are behind `--costs`, since the board print
-  is long already: by branch in the window's band order (`TECH_BRANCH_ORDER`, now the engine's and
-  read by the window), each Tech a line, *"Clean Power (32, rung 2): locked, needs Efficient Grids;
-  Power Plant Emissions x0.5; unlocks the Wind Farm"*; the states *done*, *under research 10/18*,
-  *chosen this turn, 0/32*, *available*, *locked, needs ...*; a Victory gate marked *"the Archivists'
-  gate"*; the Research Lead's line last.
+  is long already: by branch in the window's band order (`tech_branches`, now the engine's and read
+  by the window) and within a rung in the window's order (a card's `stack` first), each Tech a line,
+  *"Clean Power (32, rung 2): locked, needs Efficient Grids; Power Plant Emissions x0.5; unlocks the
+  Wind Farm"*; the states *done*, *under research 10/18*, *chosen this turn, 0/32*, *available* (the
+  window's reading: with a shortlist drawn, only its Techs), *unlocked, not on this pick's shortlist*
+  (where the window says *locked*; the tool names no needs a Tech has met), *locked, needs ...*
+  (joined as an and-list); a Victory gate marked *"the Archivists' gate"*; the Research Lead's line
+  last.
 - The lines are the engine's (`first_landing_line`, `moon_race_line`, `tech_tree_lines`), held by
-  three tests; the tool prints them. `help` says where the tree is.
+  three tests; the tool prints them. `help` says where the tree is; the module doc lists `show`'s
+  three flags; `docs/playtest/PLAYTEST.txt` has a line on it. Coastal Engineering's effect loses the
+  one full stop in the table, which the tree's lines showed up.
 - **The artifacts** (`ticket-617/bodies.txt`, `tech-tree.txt`): the tool's two outputs on turn one.
 - No rule moves; no sweep.

@@ -10262,16 +10262,9 @@ fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, ac
     // Ticket #424 (version 0.09.5): Industry renamed STEWARDSHIP and lifted to second, directly above
     // Off-world Living, at the designer's word -- "bring that whole branch up above off world
     // living". Each Faction's Victory Tech now ends a band of its own.
-    // Ticket #617 (version 0.1.0.5): the order is the engine's, so the text tool's tree runs the same.
-    const BAND_ORDER: [&str; 5] = dying_earth_engine::TECH_BRANCH_ORDER;
-    let mut branches: Vec<String> = Vec::new();
-    for t in TechId::ALL {
-        let b = &game.tables.tech(t).branch;
-        if !branches.contains(b) {
-            branches.push(b.clone());
-        }
-    }
-    branches.sort_by_key(|b| BAND_ORDER.iter().position(|x| x == b).unwrap_or(BAND_ORDER.len()));
+    // Ticket #617 (version 0.1.0.5): the list and its order are the engine's, so the text tool's
+    // tree runs the same.
+    let branches = game.tech_branches();
     let rungs = TechId::ALL.iter().map(|t| game.tables.tech(*t).rung).max().unwrap_or(1).max(1) as usize;
     // Ticket #56: a branch may hold more than one Tech on a rung (Efficient Grids and Coastal
     // Engineering both sit on Industry 1). Ticket #133: they sat SIDE BY SIDE. Ticket #156

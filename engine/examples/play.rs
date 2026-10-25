@@ -3,8 +3,7 @@
 //!
 //!   cargo run -q -p dying-earth-engine --example play -- new --save G.ron --seed 7 \
 //!       --faction custodians --start europe
-//!   cargo run -q -p dying-earth-engine --example play -- show --save G.ron
-//!   cargo run -q -p dying-earth-engine --example play -- show --save G.ron --techs
+//!   cargo run -q -p dying-earth-engine --example play -- show --save G.ron [--costs] [--techs] [--log N]
 //!   cargo run -q -p dying-earth-engine --example play -- turn --save G.ron --orders turn.txt
 //!   cargo run -q -p dying-earth-engine --example play -- help
 //!
@@ -1746,7 +1745,8 @@ fn print_board(g: &Game) {
         if let Some(line) = g.first_landing_line(b) {
             println!("        {line}");
         }
-        if let Some(line) = g.moon_race_line().filter(|_| b == BodyId::Moon) {
+        let race = if b == BodyId::Moon { g.moon_race_line() } else { None };
+        if let Some(line) = race {
             println!("        {line}");
         }
     }

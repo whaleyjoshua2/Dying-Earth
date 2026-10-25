@@ -71,10 +71,6 @@ pub enum Orbit {
     Slot(u32),
 }
 
-/// Ticket #617 (version 0.1.0.5): the order the Tech tree's branches are drawn in, the window's
-/// bands (settled on ticket #424) and the text tool's lines alike.
-pub const TECH_BRANCH_ORDER: [&str; 5] = ["Society", "Stewardship", "Off-world Living", "Extraction", "Propulsion"];
-
 /// Ticket #481 (version 0.09.8): **a step toward landing on the Moon**, in order, the race the
 /// Moon's card shows for every Faction until somebody lands.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

@@ -70,6 +70,8 @@ THE TEXT AND THE TOOL
 - The text tool takes Colonies, Ships and Armies by NAME (`build module tycho habitat`,
   `refuel magellan`, `move-army 1stchinese india`) and shows no numbers for them.
 - The help carries no developer history; a few help lines and refusals are clearer.
+- `show --techs` prints the Tech tree by branch, each Tech's state and effect; the Bodies block
+  says who landed first on each world and, until somebody lands, the race to the Moon.
 
 WHAT WE WANT TO KNOW
 --------------------

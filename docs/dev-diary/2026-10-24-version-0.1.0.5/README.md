@@ -278,3 +278,16 @@ game, looked at: the Moon carries *"first landing: nobody yet, 5 Influence to th
 *"race to the Moon: Custodians no Shipyard, ..."*, Earth carries neither, and the tree opens on
 Society with Large Language Models available and The Upload locked behind two Techs with the
 Archivists' gate marked.
+
+**The review** (an agent that did not build it) found the tree's in-rung order departing from the
+window's (a card's `stack` ignored: Commodity Finance drawn above Automated Refining in the window,
+printed below it), the tool's "available" wider than the window's (every unlocked Tech, where the
+window reads the drawn shortlist), the needs joined "A and B and C", the spec's premise that no turn
+is kept for a first wrong (the first's Colony stays and carries its founding turn, so the line reads
+"turn 13" as the designer had said yes to), the race test's second arm dead (the fixture strips
+every Shipyard), the race computed for all nine Bodies and dropped for eight, the branch list copied
+from the window, the order constant in `ids.rs` rather than beside the Tech card, the playtest sheet
+and the module doc silent on the flag, and one effect with a full stop. All fixed: the tree sorts by
+(rung, stack), reads the shortlist and says "unlocked, not on this pick's shortlist" for the rest,
+joins needs as an and-list; the race test pins the exact line and then a Shipyard leading it; the
+window and the tool read one `tech_branches`.

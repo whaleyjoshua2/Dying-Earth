@@ -4446,14 +4446,18 @@ impl Game {
     }
 
     /// Ticket #617 (version 0.1.0.5): the text tool's line under a Body -- who landed first and
-    /// where, or the prize still open. None for a Body with no first to claim (Earth's windfall is 0).
+    /// when (the Colony's founding turn: a first's Colony is never removed, ticket #586), or the
+    /// prize still open. None for a Body with no first to claim (Earth's windfall is 0).
     pub fn first_landing_line(&self, body: BodyId) -> Option<String> {
         let card = self.tables.body(body);
         if card.first_windfall == 0 {
             return None;
         }
         Some(match self.first_at(body) {
-            Some((seat, colony)) => format!("first landing: the {}, at {}", self.seat_name(seat), self.place_name(Place::Colony(colony))),
+            Some((seat, colony)) => match self.colony(colony) {
+                Some(c) => format!("first landing: the {}, turn {}", self.seat_name(seat), c.founded_turn),
+                None => format!("first landing: the {}", self.seat_name(seat)),
+            },
             None => format!("first landing: nobody yet, {} Influence to the first", card.first_windfall),
         })
     }

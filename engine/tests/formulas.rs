@@ -25718,18 +25718,21 @@ fn ticket_617_the_first_landing_line_names_the_prize_then_the_first() {
     g.colonies.push(Colony { id, body: BodyId::Moon, slot, control: Control::Controlled(Seat(1)), modules: vec![Module::new(ModuleKind::Core)], colonists: 2, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, tier: 0, in_orbit: false });
     g.body_firsts.push(BodyFirst { body: BodyId::Moon, seat: Seat(1), colony: id });
     let line = g.first_landing_line(BodyId::Moon).unwrap();
-    assert_eq!(line, format!("first landing: the {}, at {}", g.seat_name(Seat(1)), g.place_name(Place::Colony(id))));
+    assert_eq!(line, format!("first landing: the {}, turn 1", g.seat_name(Seat(1))), "the Colony's founding turn");
 }
 
 #[test]
 fn ticket_617_the_race_to_the_moon_is_a_line_until_somebody_lands() {
     let mut g = game();
-    let line = g.moon_race_line().expect("a race while nobody has landed");
-    assert!(line.starts_with("race to the Moon: "), "{line}");
-    for s in Seat::ALL {
-        assert!(line.contains(&format!("{} no Shipyard", g.seat_name(s))) || line.contains(&format!("{} has a Shipyard", g.seat_name(s))), "every seat, in the window's words: {line}");
-    }
-    assert_eq!(line.matches(", ").count(), 3, "four seats, comma-separated: {line}");
+    // The fixture strips every Facility but Launch Sites, so nobody has a Shipyard (the review:
+    // the exact line, then a Shipyard to lead it).
+    let names: Vec<String> = Seat::ALL.into_iter().map(|s| format!("{} no Shipyard", g.seat_name(s))).collect();
+    assert_eq!(g.moon_race_line().as_deref(), Some(format!("race to the Moon: {}", names.join(", ")).as_str()));
+    let yard = ColonyId(g.fresh_id());
+    let slot = g.free_slots_on(BodyId::Mars)[0];
+    g.colonies.push(Colony { id: yard, body: BodyId::Mars, slot, control: Control::Controlled(Seat(1)), modules: vec![Module::new(ModuleKind::Shipyard), Module::new(ModuleKind::Core)], colonists: 2, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, tier: 0, in_orbit: false });
+    let line = g.moon_race_line().unwrap();
+    assert!(line.starts_with(&format!("race to the Moon: {} has a Shipyard, ", g.seat_name(Seat(1)))), "the leader first, in the step's words: {line}");
     let id = ColonyId(g.fresh_id());
     g.body_firsts.push(BodyFirst { body: BodyId::Moon, seat: Seat(2), colony: id });
     assert_eq!(g.moon_race_line(), None, "gone once somebody lands");
@@ -25747,6 +25750,11 @@ fn ticket_617_the_tech_tree_lines_run_by_branch_with_each_techs_state() {
     assert!(lines.contains(&"  Efficient Grids (18, rung 1): under research 10/18; Power Plant, Wind Farm and Generator output x1.5".to_string()), "{lines:?}");
     assert!(lines.contains(&"  Clean Power (32, rung 2): locked, needs Efficient Grids; Power Plant Emissions x0.5; unlocks the Wind Farm".to_string()), "{lines:?}");
     assert!(lines.iter().any(|l| l.contains("rung 1): available; ")), "a rung-1 Tech with nothing before it is available: {lines:?}");
+    // Within a rung the window's order, a card's `stack` first: Commodity Finance (stack -1) is
+    // drawn above Automated Refining on Extraction's second rung.
+    let at = |name: &str| lines.iter().position(|l| l.trim_start().starts_with(name)).unwrap_or_else(|| panic!("{name} in {lines:?}"));
+    assert!(at("Commodity Finance") < at("Automated Refining") && at("Automated Refining") < at("Beneficiation"), "{lines:?}");
+    assert!(at("Orbital Refuelling") < at("Cryogenic Tanks"), "{lines:?}");
     assert!(lines.iter().any(|l| l.contains("' gate; ")), "a Victory gate is marked: {lines:?}");
     assert_eq!(lines.last().unwrap(), &g.research_lead_text(), "the Lead line last");
     g.research.done.push(TechId::EfficientGrids);
