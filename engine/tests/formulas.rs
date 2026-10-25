@@ -4019,7 +4019,7 @@ fn e_a_scrubber_enlarges_the_sink_and_is_capped_captured_at_half_and_calming() {
     // Version 0.07.0: the Scrubber runs on 3 Energy, down from 4.
     // Ticket #332 (version 0.09.0): 8 Widgets, four for each of its two turns; ticket #610 (version 0.1.0.5): 10.
     // Ticket #561 (version 0.1.0.3), at the designer's word: 4 Energy and 1 Ducat a turn (3 Energy
-    // before), and one per 300 million people with a floor of 1 (200 and 2 before).
+    // before), and one per 300 million people with a floor of 1 (200 and 2 before; 200 again since ticket #612).
     assert_eq!((card.materials, card.widgets, card.energy_upkeep, card.ducats_upkeep, card.emissions), (33.0, 10, 4, 1.0, 0.0));
     assert!(card.no_slot, "a Scrubber takes no build slot");
     // The cap: one per two hundred million people since ticket #612 (version 0.1.0.5; three hundred

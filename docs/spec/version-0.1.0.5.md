@@ -296,7 +296,7 @@ The designer: *"check scrubber build count it seems its only one per country sho
 population"*; on the ticket's questions, *"q1 200 q2 as they are"*.
 
 - **The cap was already by population**: a Region's people over `per_population`, rounded, within a
-  floor of 1 and a ceiling of 10; at 300 million a Scrubber twelve of the twenty Regions held one.
+  floor of 1 and a ceiling of 10; at 300 million a Scrubber fifteen of the twenty Regions held one.
 - **`per_population` is 200** (`facilities.toml [scrubber]`, from 300): India 8, China 7, Nigeria, the
   European Union and South Africa 3, Indonesia, the United States and Iran 2, the twelve Regions
   under 300 million one still. The floor of 1 and the ceiling of 10 stay.
@@ -305,5 +305,5 @@ population"*; on the ticket's questions, *"q1 200 q2 as they are"*.
 - **Swept** (`sweeps/ticket-612.txt`, 20 seeds x four seatings): **23 / 53 / 1 / 0 and 3 collapses**,
   from the same day's 25 / 51 / 2 / 0 and 2 (§6): noise. Scrubbers built over the batch 2,262 from
   2,113, seven per cent more; the end Temperatures by seating +2.47 / +2.29 / +2.23 / +2.04 from +2.45
-  / +2.24 / +2.18 / +1.99. The cap was binding in few Regions: the computer Custodians were not
-  building to it where it stood at one. Reported and left.
+  / +2.24 / +2.18 / +1.99, and the Natural Sink at the end mixed, both ways within noise. The seven per cent
+  reads as the cap binding in few Regions, an inference from the count, not a measured one. Reported and left.

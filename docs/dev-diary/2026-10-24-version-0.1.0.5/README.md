@@ -191,5 +191,5 @@ red on the 300, then green. No picture: a figure the card reads from the table.
 
 - **The sweep** ([`sweeps/ticket-612.txt`](sweeps/ticket-612.txt)): **23 / 53 / 1 / 0 and 3
   collapses**, from 25 / 51 / 2 / 0 and 2: noise. Scrubbers built over the batch 2,262 from 2,113,
-  seven per cent more, the end Temperatures within a few hundredths: the cap bound in few Regions, the
-  computer Custodians not having built to it where it stood at one. Reported and left.
+  seven per cent more, the end Temperatures and the Sink within noise; that reads as the cap binding in few
+  Regions, an inference from the count rather than a measured one. Reported and left.

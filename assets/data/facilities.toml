@@ -249,8 +249,8 @@ emissions = 0.85
 # million since ticket #333 (version 0.09.0; five million from ticket #143, version 0.07.3, when this
 # was 40), so 200 units is the two hundred million each Scrubber wants:
 # clamp(round(population / per_population), min, max). Ticket #561 (version 0.1.0.3), at the
-# designer's word: one per 300 million with a floor of 1 (200 and 2 before; 200 again since ticket #612): India at 1660 held 6,
-# China at 1370 holds 5, the Regions about 500 hold 2, the rest 1.
+# designer's word: one per 300 million with a floor of 1 (200 and 2 before): India at 1660 held 6, China at 1370
+# held 5, the Regions about 500 two, the rest one; one per 200 million again since ticket #612 (version 0.1.0.5).
 [scrubber]
 # Ticket #445 (version 0.09.6): a Scrubber runs whole under the Custodians, at `captured_share` in any
 # other Faction's hands (its Sink and its calm, credited to the holder, the upkeep whole), and at
