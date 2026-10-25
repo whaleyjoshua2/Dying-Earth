@@ -31,7 +31,8 @@ tank = 32
 id = "frigate"
 name = "Frigate"
 materials = 27.5
-widgets = 4
+# Ticket #610 (version 0.1.0.5), at the designer's word: 6, from 4; the Frigate alone.
+widgets = 6
 energy_upkeep = 2
 strength = 3
 hit_points = 4

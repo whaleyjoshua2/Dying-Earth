@@ -547,7 +547,8 @@ impl Game {
         };
         // Ticket #520 (version 0.1.0.0): an order that breaks an Accord says so where its price is read.
         match self.order_crosses(seat, order) {
-            Some(partner) => format!("{price}; breaks your Accord with {}", self.seat_name(partner)),
+            // Ticket #611 (version 0.1.0.5), at the designer's word: no name; the Accord list names them.
+            Some(_) => format!("{price}; breaks Accord"),
             None => price,
         }
     }
@@ -1340,14 +1341,12 @@ impl Game {
                 // stall halfway would be a new state to hold in the save, draw on the card and say in
                 // the Report, for a case that fires rarely, and the Victory Condition does its own
                 // checking at the end.
-                let want = self.tables.archive.colonists_to_order;
-                if col.colonists < want {
+                // Ticket #625 (version 0.1.0.5), at the designer's word: the place's TIER, where it
+                // was four Colonists living there. The tier is read, not the people: a place never
+                // falls back a tier, so eighteen who climbed it and left still leave a Colony.
+                if !self.may_site_archive(col) {
                     let place = self.place_name(Place::Colony(*colony));
-                    return fail(match col.colonists {
-                        0 => format!("the Archive wants {} living at its Colony; nobody lives at {place}", crate::counted(want, "Colonist", "Colonists")),
-                        1 => format!("the Archive wants {} living at its Colony; one lives at {place}", crate::counted(want, "Colonist", "Colonists")),
-                        n => format!("the Archive wants {} living at its Colony; {n} live at {place}", crate::counted(want, "Colonist", "Colonists")),
-                    });
+                    return fail(format!("the Archive wants a place of {} tier; {place} is {}", self.tables.archive.tier_to_order, Self::with_article(&self.tier_of(col).name)));
                 }
                 Ok(cost)
             }
@@ -2599,8 +2598,8 @@ impl Game {
                 // Accords by accident through an "ok ... breaks your Accord" line nobody read. The
                 // window's button wants a second click for it; the tool the word `break`; the computer
                 // seats drop such orders themselves. The other five crossing orders warn in the price.
-                if !*break_accord && let Some(partner) = self.order_crosses(seat, order) {
-                    return fail(format!("breaks your Accord with {}: order it with break to break it", self.seat_name(partner)));
+                if !*break_accord && self.order_crosses(seat, order).is_some() {
+                    return fail("breaks Accord: order it with break to break it".to_string()); // Ticket #611 (version 0.1.0.5): no name
                 }
                 Ok(cost)
             }
@@ -3446,16 +3445,23 @@ impl Game {
                         st.strip_permit_used = true;
                         st.strip_permit_ends = Some(turn + turns);
                     }
+                    // Ticket #622 (version 0.1.0.5), at the designer's word: a flat point off
+                    // Relations with every rival, on the deeds score as a card's is (events.rs,
+                    // `RelationsAllRivals`) and never through `offend_by`, so no Non-Aggression
+                    // Accord breaks over it -- the designer: "I don't want it to break an accord".
+                    let fall = self.tables.strip_permit.relations;
+                    self.move_deeds_with_every_rival(seat, -fall);
                     let line = format!(
-                        "The {} issued a Strip Permit in {}: every Facility there produces double for {} turns.",
+                        "The {} issued a Strip Permit in {}: every Facility there produces double for {} turns, nobody grows there meanwhile, and every rival likes them {} less.",
                         self.seat_name(seat),
                         self.tables.state(*state).name,
-                        turns
+                        turns,
+                        crate::counted(fall, "point", "points")
                     );
                     self.log(line);
                     let text = self.say(
                         "strip_permit",
-                        &[("faction", self.seat_name(seat)), ("state", self.tables.state(*state).name.clone()), ("turns", crate::counted(turns, "turn", "turns"))],
+                        &[("faction", self.seat_name(seat)), ("state", self.tables.state(*state).name.clone()), ("turns", crate::counted(turns, "turn", "turns")), ("fall", crate::counted(fall, "point", "points"))],
                     );
                     // Ticket #431 (the review): the Faction's own act, under the fog.
                     self.report_line_by(seat, LineKind::Note, Some(ReportPlace::State(*state)), text);

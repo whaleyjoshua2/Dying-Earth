@@ -1165,10 +1165,186 @@ impl Game {
         self.archive_at_risk(seat, cid) && seat.others().iter().any(|r| self.has_cause(*r, seat))
     }
 
+    /// Ticket #618 (version 0.1.0.5), at the designer's word: **a rival's climb on a neutral Region,
+    /// as this seat sees it** -- the climber (the rival with the most Standing there, the last on a
+    /// tie) and the Standing to pass, where that Standing is at or over `contest_from` of the
+    /// threshold as the climber reads it; else None. A held Region is nobody's climb. Any rival: the
+    /// human's climbs and a computer seat's snipes alike. Before this no computer seat read a rival's
+    /// Standing on a Region at all, and the one contest the designer saw in four games was a
+    /// coincidence of the Region's value.
+    pub fn ai_climb_on(&self, seat: Seat, sid: StateId) -> Option<(Seat, i64)> {
+        if self.state(sid).control != Control::Neutral {
+            return None;
+        }
+        let target = Place::State(sid);
+        let (climber, top) = self.ai_top_rival_on(seat, target)?;
+        let threshold = self.influence_threshold_for(climber, target).max(1);
+        (top as f64 / threshold as f64 >= self.tables.ai.thresholds.contest_from).then_some((climber, top))
+    }
+
+    /// Tickets #618 and #619: the rival with the most Standing at a place, and that Standing; the
+    /// last seat on a tie. None only with no rival at all.
+    fn ai_top_rival_on(&self, seat: Seat, target: Place) -> Option<(Seat, i64)> {
+        Seat::ALL.into_iter().filter(|s| *s != seat).map(|s| (s, self.seat(s).influence.get(&target).copied().unwrap_or(0))).max_by_key(|(_, n)| *n)
+    }
+
+    /// Tickets #618 and #619: what a climb lifts a Region by -- 1 + 2 x the climb, the climb capped
+    /// at 1, so x2 at half the figure and x3 at it.
+    fn climb_lift(climb: f64) -> f64 {
+        1.0 + 2.0 * climb.min(1.0)
+    }
+
+    /// Ticket #618: **how much a rival's climb lifts a neutral Region for this seat.** The climb is
+    /// answered by the computer seat with the most Standing there among the seats not climbing
+    /// (strictly the most, and some: a tie answers for nobody), and by any computer seat holding a
+    /// neighbour: 1 + 2 x the climb (the Standing over the threshold, capped at 1), so x2 at half
+    /// the threshold and x3 at it. No climb, or a seat with no claim: 1. A second rival over the
+    /// figure is "not climbing" here, so two seats climbing one Region lift it for each other.
+    pub fn ai_contest_lift(&self, seat: Seat, sid: StateId) -> f64 {
+        let Some((climber, top)) = self.ai_climb_on(seat, sid) else { return 1.0 };
+        let target = Place::State(sid);
+        let standing = |s: Seat| self.seat(s).influence.get(&target).copied().unwrap_or(0);
+        let mine = standing(seat);
+        let most = mine > 0 && Seat::ALL.into_iter().filter(|s| *s != seat && *s != climber).all(|s| standing(s) < mine);
+        let next_door = self.tables.state(sid).neighbours.iter().any(|n| self.state(*n).control.controller() == Some(seat));
+        if most || next_door { Self::climb_lift(top as f64 / self.influence_threshold_for(climber, target).max(1) as f64) } else { 1.0 }
+    }
+
+    /// Ticket #618: whether this seat contests the Region -- the lift is more than 1.
+    pub fn ai_contested(&self, seat: Seat, sid: StateId) -> bool {
+        self.ai_contest_lift(seat, sid) > 1.0
+    }
+
+    /// Ticket #619 (version 0.1.0.5), at the designer's word: **a rival's climb on a Region this
+    /// seat holds** -- the climber (the rival with the most Standing there) and their Standing, where
+    /// it is at or over `defend_from` of the price the climber would pay (`defend_home_from` on the
+    /// home Region); else None. Before this a held place was never spent on: its Standing was what
+    /// the take banked, less a point a turn, and the designer took two computer capitals in one turn
+    /// each.
+    pub fn ai_defence(&self, seat: Seat, sid: StateId) -> Option<(Seat, i64)> {
+        if self.state(sid).control.controller() != Some(seat) {
+            return None;
+        }
+        let (climber, top) = self.ai_top_rival_on(seat, Place::State(sid))?;
+        if top <= 0 {
+            return None;
+        }
+        let th = &self.tables.ai.thresholds;
+        let from = if self.ai_home_is(seat, sid) { th.defend_home_from } else { th.defend_from };
+        (self.ai_climb_against(climber, sid, top) >= from).then_some((climber, top))
+    }
+
+    /// Ticket #619: the climb as a share of the price the climber would pay for the held Region.
+    fn ai_climb_against(&self, climber: Seat, sid: StateId, top: i64) -> f64 {
+        top as f64 / self.influence_needed_for(climber, Place::State(sid)).max(1) as f64
+    }
+
+    /// Ticket #619: whether the Region is this seat's home.
+    fn ai_home_is(&self, seat: Seat, sid: StateId) -> bool {
+        self.seat(seat).home_region == Some(sid)
+    }
+
+    /// Ticket #619: **how much a rival's climb lifts a held Region for its holder**: 1 + 2 x the
+    /// climb (the Standing over the price, capped at 1), the home Region doubled (the designer's
+    /// "weighed double", read as the weight on the list); no climb, 1.
+    pub fn ai_defence_lift(&self, seat: Seat, sid: StateId) -> f64 {
+        let Some((climber, top)) = self.ai_defence(seat, sid) else { return 1.0 };
+        let home = if self.ai_home_is(seat, sid) { 2.0 } else { 1.0 };
+        Self::climb_lift(self.ai_climb_against(climber, sid, top)) * home
+    }
+
+    /// Ticket #619: **the Standing the home Region still wants to reach its floor** (`home_floor`),
+    /// so a capital's price starts above the bare threshold; 0 at or over it, or with no home held.
+    pub fn ai_home_topup(&self, seat: Seat) -> i64 {
+        let Some(home) = self.seat(seat).home_region.filter(|h| self.state(*h).control.controller() == Some(seat)) else { return 0 };
+        (self.tables.ai.thresholds.home_floor - self.seat(seat).influence.get(&Place::State(home)).copied().unwrap_or(0)).max(0)
+    }
+
+    /// Ticket #620 (version 0.1.0.5), at the designer's word: **the turn this seat wins at the rate it
+    /// has made its first Victory part so far** -- this turn plus the rest of the bar over that rate.
+    /// None with nothing made yet, and None for a Stabilization run, which is no race against the
+    /// Collapse: its win is the cure.
+    pub fn ai_win_turn(&self, seat: Seat) -> Option<u32> {
+        if self.first_kind(seat) == VictoryFirstKind::StabilizationRun || self.turn == 0 {
+            return None;
+        }
+        let p = self.progress(seat);
+        if p.first_value <= 0.0 {
+            return None;
+        }
+        let rate = p.first_value / self.turn as f64;
+        // Clamped to the game's last turn: a tiny rate must not wrap the cast (the review).
+        let last = self.tables.victory.turns;
+        Some(self.turn.saturating_add(((p.first_bar - p.first_value).max(0.0) / rate).ceil().min(last as f64) as u32).min(last))
+    }
+
+    /// Ticket #620: **whether the Collapse on the climate's heading falls at or before this seat's
+    /// win turn** -- the race it would lose by emitting on. No Collapse on the heading, or no win
+    /// turn, is no race; a win within `win_in_sight` turns is run for the line.
+    pub fn ai_loses_the_race(&self, seat: Seat) -> bool {
+        let Some(collapse) = self.projection().collapse_turn else { return false };
+        let Some(win) = self.ai_win_turn(seat) else { return false };
+        if win.saturating_sub(self.turn) <= self.tables.ai.thresholds.win_in_sight {
+            return false;
+        }
+        collapse <= win
+    }
+
+    /// Ticket #620: **the weight an order takes while the race is lost**: `collapse_emit_weight` on
+    /// an emitting one (a Strip Permit, an Industry Level, a Facility whose card carries Emissions,
+    /// built or restarted), `collapse_clean_weight` on a cleaner one (a Facility with a sink, the
+    /// Wind Farm, a Leapfrog, an emitter mothballed), 1 on the rest.
+    pub fn ai_collapse_weight(&self, o: &Order) -> f64 {
+        let th = &self.tables.ai.thresholds;
+        let emits = |kind: FacilityKind| self.tables.facility(kind).emissions > 0.0;
+        match o {
+            Order::StripPermit { .. } | Order::RaiseIndustry { .. } => th.collapse_emit_weight,
+            Order::Leapfrog { .. } => th.collapse_clean_weight,
+            Order::BuildFacility { kind, .. } => {
+                let card = self.tables.facility(*kind);
+                if emits(*kind) {
+                    th.collapse_emit_weight
+                } else if card.sink_per_turn > 0.0 || *kind == FacilityKind::WindFarm {
+                    th.collapse_clean_weight
+                } else {
+                    1.0
+                }
+            }
+            // The review: a Mothball of an emitter cleans and its Restart emits; a Module off Earth
+            // is neither, the Collapse being Earth's air.
+            Order::Change { building: BuildingRef::Facility(sid, i), what } => match (self.state(*sid).facilities.get(*i).map(|f| emits(f.kind)), what) {
+                (Some(true), BuildingChange::Mothball) => th.collapse_clean_weight,
+                (Some(true), BuildingChange::Restart) => th.collapse_emit_weight,
+                _ => 1.0,
+            },
+            _ => 1.0,
+        }
+    }
+
+    /// Ticket #619: the Influence a held Region wants this turn -- enough to put the wall (the
+    /// greater of the threshold and the seat's Standing plus the climber's margin) back above the
+    /// climber's Standing plus their Allotment, and at home the floor's top-up, whichever is more;
+    /// 0 where nothing is wanted. Where the threshold alone already stands above the reach, nothing
+    /// (the review: the first draft spent against the Standing wall while the threshold held).
+    pub fn ai_defence_wanted(&self, seat: Seat, sid: StateId) -> i64 {
+        let target = Place::State(sid);
+        let have = self.seat(seat).influence.get(&target).copied().unwrap_or(0);
+        let defend = self
+            .ai_defence(seat, sid)
+            .map(|(climber, top)| {
+                let reach = top + self.seat(climber).allotment;
+                if self.influence_threshold_for(climber, target) > reach { 0 } else { reach + 1 - (have + self.challenge_margin_for(Some(climber), target)) }
+            })
+            .unwrap_or(0);
+        let floor = if self.ai_home_is(seat, sid) { self.ai_home_topup(seat) } else { 0 };
+        defend.max(floor)
+    }
+
     /// Ticket #394 (version 0.09.3): the places a computer seat weighs spending Influence on, best
     /// first -- extracted from the planner so the order can be witnessed. A Region by its Influence
     /// value and Industry Level, closest first, a held one at a fraction of a neutral one (#75); a
-    /// rival's Colony by the price this seat would pay, cheapest first (#336), times its bounty (#394).
+    /// rival's Colony by the price this seat would pay, cheapest first (#336), times its bounty
+    /// (#394); a neutral Region a rival is climbing lifted for the seats that answer it (#618).
     pub fn ai_influence_targets(&self, seat: Seat) -> Vec<(Place, f64)> {
         let th = &self.tables.ai.thresholds;
         let mut targets: Vec<(Place, f64)> = Vec::new();
@@ -1176,6 +1352,13 @@ impl Game {
         for sid in StateId::ALL {
             let st = self.state(sid);
             if st.control.controller() == Some(seat) {
+                // Ticket #619 (version 0.1.0.5): a held Region is a target while a rival climbs it,
+                // or while it is the home under its floor; held and quiet, it is skipped as before.
+                if self.ai_defence(seat, sid).is_none() && !(self.ai_home_is(seat, sid) && self.ai_home_topup(seat) > 0) {
+                    continue;
+                }
+                let value = (self.state_influence_value(sid) + st.industry_level as i64) as f64;
+                targets.push((Place::State(sid), value * self.ai_defence_lift(seat, sid)));
                 continue;
             }
             let card = self.tables.state(sid);
@@ -1187,7 +1370,8 @@ impl Game {
             let neutral_bonus = if st.control == Control::Neutral { 1.0 } else { th.held_state_weight };
             // Ticket #446 (version 0.09.6): a heavy emitter's Region weighs more to the Custodians.
             let lift = st.control.controller().map(|r| self.hostile_lift(seat, r)).unwrap_or(1.0);
-            targets.push((Place::State(sid), value * neutral_bonus * lift));
+            // Ticket #618 (version 0.1.0.5): a rival's climb on a neutral Region lifts it.
+            targets.push((Place::State(sid), value * neutral_bonus * lift * self.ai_contest_lift(seat, sid)));
         }
         // Ticket #50: any rival's Colony. Ticket #336 (version 0.09.0): weighed by THE PRICE THIS
         // SEAT WOULD PAY, cheapest first, where the rule was `3.0 - min(colonists, 2)` -- fewest
@@ -1434,7 +1618,13 @@ impl Game {
         // The ferry's SPENDING lift pauses while a site is ready and the Archive is not yet ordered:
         // measured, its Colony Ships spent every Material, and the 50 the Archive wants was never in
         // hand. The route does not pause -- nobody is landed where the Archive cannot use them.
-        let site_ready = kind == FactionKind::Archivists && !homeless_archive && !self.archive_ordered(seat) && !self.archive_built(seat);
+        // Ticket #625 (version 0.1.0.5): a site is a place that may hold the Archive AND has climbed
+        // to the tier the Archive asks for (the Colony tier). An Outpost of theirs off Earth is a
+        // home, not a site: the lift stays on, so people keep arriving and the place can climb.
+        // Measured without this: the lift paused at the first Outpost, and no computer Archive stood
+        // in 80 games (43 before the tier).
+        let site_stands = self.colonies.iter().any(|c| c.control.director() == Some(seat) && self.may_site_archive(c));
+        let site_ready = kind == FactionKind::Archivists && !homeless_archive && site_stands && !self.archive_ordered(seat) && !self.archive_built(seat);
         let ferry_lift = ferrying && !site_ready;
         let archive_body: Option<BodyId> = if kind == FactionKind::Archivists {
             self.archive_colony(seat)
@@ -2276,10 +2466,20 @@ impl Game {
             // and the state card.
             let needed = self.influence_needed_for(seat, *target);
             let base = self.base_weight(seat, Cat::Influence) * (1.0 - 0.15 * rank as f64).max(0.3);
-            let opp = if needed - have <= step { m.opportunity } else { 1.0 };
+            // Ticket #618 (version 0.1.0.5): on a contested Region the steps that would pass the
+            // climber's Standing this turn take the opportunity multiplier -- enough to outbid where
+            // the Allotment allows, else all of it -- so the planner stacks them ahead of the rest.
+            let to_outbid = match target {
+                Place::State(sid) if self.ai_contested(seat, *sid) => self.ai_climb_on(seat, *sid).map(|(_, top)| (top - have) / step + 1).unwrap_or(0).max(1),
+                // Ticket #619 (version 0.1.0.5): on a held Region, the steps that answer the climb
+                // or reach the home floor.
+                Place::State(sid) if self.state(*sid).control.controller() == Some(seat) => (self.ai_defence_wanted(seat, *sid) + step - 1) / step,
+                _ => 0,
+            };
             let bought = if self.tables.ducats.per_influence > 0.0 { (self.seat(seat).stockpile.ducats / self.tables.ducats.per_influence).floor() as i64 } else { 0 };
             let copies = ((allotment + bought) / step).max(0);
-            for _ in 0..copies {
+            for i in 0..copies {
+                let opp = if needed - have <= step || i < to_outbid { m.opportunity } else { 1.0 };
                 push(vec![Order::Influence { target: *target, amount: step, break_accord: false }], Cat::Influence, base, 1.0, 1.0, opp, format!("spend {} Influence on {}", step, self.place_name(*target)), None);
             }
         }
@@ -2552,11 +2752,12 @@ impl Game {
                 // of every one of 80 measured games, at a station with nobody on it; without this it
                 // would simply spend that turn on a refused order, every turn, until somebody moved
                 // in. The first place with enough people, oldest first as before.
-                let want = self.tables.archive.colonists_to_order;
+                // Ticket #625 (version 0.1.0.5): the first place that has climbed to the tier the
+                // Archive asks for (the Colony tier), where it was the first with four people.
                 let home = self
                     .colonies
                     .iter()
-                    .filter(|c| c.control.director() == Some(seat) && self.may_hold_archive(c) && c.colonists >= want)
+                    .filter(|c| c.control.director() == Some(seat) && self.may_site_archive(c))
                     .min_by_key(|c| (c.founded_turn, c.id.0))
                     .map(|c| c.id);
                 if let Some(cid) = home {
@@ -3937,6 +4138,18 @@ impl Game {
             }
         }
 
+        // Ticket #620 (version 0.1.0.5): while the Collapse falls before the seat's own win, what
+        // emits weighs less and what cleans weighs more, across the whole list.
+        if self.ai_loses_the_race(seat) {
+            for c in cands.iter_mut() {
+                if let [o] = c.orders.as_slice() {
+                    c.base *= self.ai_collapse_weight(o);
+                }
+            }
+            self.log(format!("AI {}: the Collapse falls before the win; emitting x{}, cleaner x{}", self.seat_name(seat), th.collapse_emit_weight, th.collapse_clean_weight));
+            self.war.collapse_weighed[seat.index()] += 1;
+        }
+
         // --- Sort and spend greedily; Stances last, one per stack.
         cands.sort_by(|a, b| b.score().partial_cmp(&a.score()).unwrap_or(std::cmp::Ordering::Equal));
         let mut chosen: Vec<Order> = Vec::new();
@@ -4191,6 +4404,15 @@ impl Game {
         // above, before it takes the Influence budget, so the next candidate gets the Influence it
         // used to waste; measured 19 / 49 / 4 / 8 from 9 / 59 / 5 / 7. The other five are dropped here.
         chosen.retain(|o| self.order_crosses(seat, o).is_none());
+        // Ticket #618 (version 0.1.0.5): the contests, once a Region a turn, for the sweep. Counted on
+        // the orders chosen, before `end_turn` commits them, so a step it refuses is counted still.
+        let mut contested: Vec<StateId> = Vec::new();
+        for sid in chosen.iter().filter_map(|o| if let Order::Influence { target: Place::State(sid), .. } = o { Some(*sid) } else { None }) {
+            if !contested.contains(&sid) && self.ai_contested(seat, sid) {
+                contested.push(sid);
+            }
+        }
+        self.war.contests[seat.index()] += contested.len() as u32;
         // Ticket #58: the scored list is the AI's own head, so it stays in the log. What the Report
         // shows is built from the orders this seat actually commits, in `end_turn`.
         chosen

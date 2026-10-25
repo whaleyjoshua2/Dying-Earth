@@ -1,10 +1,66 @@
 //! Research and the shared Tech Tree (spec 12).
 
+use crate::data::{TechCard, TECH_BRANCH_ORDER};
 use crate::ids::*;
 use crate::state::*;
 
 impl Game {
     /// Techs whose prerequisites are met and that are not done or under research.
+    /// Ticket #617 (version 0.1.0.5): the text tool's Tech tree, by branch in the window's band
+    /// order, each Tech a line with its cost, rung, state and effect, a locked one naming what it
+    /// needs and a Victory gate its Faction; the Research Lead's line last.
+    pub fn tech_tree_lines(&self) -> Vec<String> {
+        // The window's reading: with a shortlist drawn, only its Techs are "available"; one whose
+        // prerequisites stand but which the draw left out says so rather than naming needs it has.
+        let pickable = self.pickable_techs();
+        let unlocked = self.available_techs();
+        let mut lines = Vec::new();
+        for branch in self.tech_branches() {
+            lines.push(branch.clone());
+            // In the window's order within a rung: a card's `stack`, then the tree's own.
+            let mut techs: Vec<&TechCard> = TechId::ALL.into_iter().map(|t| self.tables.tech(t)).filter(|c| c.branch == branch).collect();
+            techs.sort_by_key(|c| (c.rung, c.stack));
+            for c in techs {
+                let state = if self.research.done.contains(&c.id) {
+                    "done".to_string()
+                } else if self.research.current == Some(c.id) && !self.research.pick_committed {
+                    format!("chosen this turn, {}/{}", self.research.progress, c.cost)
+                } else if self.research.current == Some(c.id) {
+                    format!("under research {}/{}", self.research.progress, c.cost)
+                } else if pickable.contains(&c.id) {
+                    "available".to_string()
+                } else if unlocked.contains(&c.id) {
+                    "unlocked, not on this pick's shortlist".to_string()
+                } else {
+                    let needs: Vec<String> = c.needs.iter().map(|n| self.tables.tech(*n).name.clone()).collect();
+                    format!("locked, needs {}", Game::and_list(&needs))
+                };
+                let gate = match c.gate_for {
+                    Some(kind) => format!("the {}' gate; ", self.tables.faction(kind).name),
+                    None => String::new(),
+                };
+                lines.push(format!("  {} ({}, rung {}): {state}; {gate}{}", c.name, c.cost, c.rung, c.effect));
+            }
+        }
+        lines.push(self.research_lead_text());
+        lines
+    }
+
+    /// Ticket #617 (version 0.1.0.5): the tree's branches in drawing order (`TECH_BRANCH_ORDER`,
+    /// any branch the table adds beyond it last), read from the cards so none can be forgotten. The
+    /// window's tree and the text tool's share it.
+    pub fn tech_branches(&self) -> Vec<String> {
+        let mut branches: Vec<String> = Vec::new();
+        for t in TechId::ALL {
+            let b = &self.tables.tech(t).branch;
+            if !branches.contains(b) {
+                branches.push(b.clone());
+            }
+        }
+        branches.sort_by_key(|b| TECH_BRANCH_ORDER.iter().position(|x| x == b).unwrap_or(TECH_BRANCH_ORDER.len()));
+        branches
+    }
+
     pub fn available_techs(&self) -> Vec<TechId> {
         TechId::ALL
             .into_iter()

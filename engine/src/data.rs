@@ -417,6 +417,10 @@ pub struct RepairCard {
     pub materials_per_point: i64,
 }
 
+/// Ticket #617 (version 0.1.0.5): the order the Tech tree's branches are drawn in, the window's
+/// bands (settled on ticket #424) and the text tool's lines alike.
+pub const TECH_BRANCH_ORDER: [&str; 5] = ["Society", "Stewardship", "Off-world Living", "Extraction", "Propulsion"];
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct TechCard {
     pub id: TechId,
@@ -729,8 +733,9 @@ pub struct FactionCard {
     pub production_moved_factor: f64,
     pub signature: String,
     /// Ticket #594 (version 0.1.0.4), at the designer's word: the Faction's **signature moves**,
-    /// one line, shown on turn one in the Report's place. `{your}` reads "your" to the Faction's
-    /// own player and "their" to a rival.
+    /// shown on turn one in the Report's place. Ticket #607 (version 0.1.0.5): two sentences, the
+    /// first turn's orders then the second's, read by the Faction's own player alone, so no
+    /// placeholder.
     #[serde(default)]
     pub opening_moves: String,
     /// Ticket #412 (version 0.09.4): what the Faction wins each time it leads a Tech to completion,
@@ -1197,6 +1202,10 @@ pub struct InfluenceTable {
     /// founder still directs it. See `influence.toml`.
     pub first_settled_allotment: i64,
     pub occupation_turns: u32,
+    /// Ticket #615 (version 0.1.0.5), at the designer's word: the share of their Standing at the place
+    /// the prior holder keeps the turn an Occupation begins (rounded down), every time one begins; a
+    /// broken Occupation hands the place back and restores nothing. See `influence.toml`.
+    pub occupation_standing_kept: f64,
     pub destruction_chance: f64,
     /// Ticket #187 (version 0.08.0): how far a place's schooling bends what an outsider's Influence
     /// buys there. See `influence.toml`.
@@ -1612,6 +1621,28 @@ pub struct AiThresholds {
     pub greenwash_relations_cost: f64,
     /// Ticket #75: a held state's worth on the Influence target list, as a share of a neutral one's.
     pub held_state_weight: f64,
+    /// Ticket #618 (version 0.1.0.5): a rival's Standing on a neutral Region at or over this share
+    /// of its threshold is a climb the computer contests (`Game::ai_climb_on`).
+    #[serde(default = "contest_from_default")]
+    pub contest_from: f64,
+    /// Ticket #619 (version 0.1.0.5): a rival's Standing on a Region the seat holds at or over this
+    /// share of the price to take it is a climb the seat defends against (`Game::ai_defence`); on
+    /// the home Region, `defend_home_from`. `home_floor` is the Standing the seat keeps at home.
+    #[serde(default = "defend_from_default")]
+    pub defend_from: f64,
+    #[serde(default = "defend_home_from_default")]
+    pub defend_home_from: f64,
+    #[serde(default = "home_floor_default")]
+    pub home_floor: i64,
+    /// Ticket #620 (version 0.1.0.5): while the Collapse on the climate's heading falls at or
+    /// before the seat's own win turn, an emitting order weighs `collapse_emit_weight` and a cleaner
+    /// one `collapse_clean_weight`; within `win_in_sight` turns of the bar the weighing is off.
+    #[serde(default = "collapse_emit_weight_default")]
+    pub collapse_emit_weight: f64,
+    #[serde(default = "collapse_clean_weight_default")]
+    pub collapse_clean_weight: f64,
+    #[serde(default = "win_in_sight_default")]
+    pub win_in_sight: u32,
     /// Ticket #336 (version 0.09.0): the price a rival's Colony is weighed against on the same
     /// list -- the weight is this over what the seat would pay, so the cheapest place ranks first.
     #[serde(default = "colony_price_pivot_default")]
@@ -1767,6 +1798,10 @@ pub struct StripPermitTable {
     pub unrest: f64,
     /// Ticket #537 (version 0.1.0.1): its price in Ducats, where it was free.
     pub ducats: i64,
+    /// Ticket #622 (version 0.1.0.5), at the designer's word: the points off Relations with every
+    /// rival the turn a permit is spent -- a flat fall on the deeds score, never an Offence, so it
+    /// breaks no Accord.
+    pub relations: i64,
 }
 
 /// Ticket #53 (version 0.05): Neutral Development, in `nation_states.toml` under `[development]`.
@@ -1875,8 +1910,10 @@ pub struct CapitalBuildingCard {
 #[serde(deny_unknown_fields)]
 pub struct ArchiveCard {
     pub research: i64,
-    /// Ticket #192 (version 0.08.0): Colonists who must live at the place before it may be ORDERED.
-    pub colonists_to_order: u32,
+    /// Ticket #192 (version 0.08.0): what the place must be before the Archive may be ORDERED. Four
+    /// Colonists living there until ticket #625 (version 0.1.0.5), at the designer's word; since then
+    /// the name of the tier it must have climbed to (`[[tiers]]`), a higher one counting.
+    pub tier_to_order: String,
     /// Ticket #565 (version 0.1.0.3), at the designer's word: the most Colonists that upload in one
     /// turn, pending Uploads counted.
     pub upload_per_turn: u32,
@@ -2492,6 +2529,10 @@ impl Tables {
             return Err(err("modules.toml", "each tier must allow more slots, and want no fewer Colonists, than the one before".to_string()));
         }
         check_rows("modules.toml", &CapitalBuilding::ALL, self.capital_buildings.iter().map(|b| b.id))?;
+        // Ticket #625 (version 0.1.0.5): the tier the Archive asks for is one of the tiers.
+        if !self.tiers.iter().any(|t| t.name == self.archive.tier_to_order) {
+            return Err(err("modules.toml", format!("[archive] tier_to_order {:?} names no [[tiers]] row", self.archive.tier_to_order)));
+        }
         // Ticket #58: every sentence the Report says, with every placeholder the engine supplies.
         self.report.check().map_err(|m| err("report.toml", m))?;
         // Every fixed id must have exactly one row, in the engine's order.
@@ -2667,6 +2708,10 @@ impl Tables {
         let n = &self.nuke;
         if !(0.0..=1.0).contains(&n.destruction_chance) {
             return Err(err("units.toml", "[nuke] destruction_chance must be between 0 and 1"));
+        }
+        // Ticket #615 (version 0.1.0.5): a share kept over 1 would raise the holder's Standing on an Occupation.
+        if !(0.0..=1.0).contains(&self.influence.occupation_standing_kept) {
+            return Err(err("influence.toml", "occupation_standing_kept must be between 0 and 1"));
         }
         if !(0.0..=1.0).contains(&n.people_min) || !(0.0..=1.0).contains(&n.people_max) || n.people_min > n.people_max {
             return Err(err("units.toml", "[nuke] people_min and people_max must be between 0 and 1, and people_min no greater than people_max"));
@@ -2982,8 +3027,9 @@ impl Tables {
     /// price and a Mothball's Unrest. A text that names none of them reads as written.
     /// Ticket #594 (version 0.1.0.4): the Faction's signature moves, as its own player (`yours`) or
     /// a rival reads them.
-    pub fn opening_moves(&self, kind: FactionKind, yours: bool) -> String {
-        crate::report::render(&self.faction(kind).opening_moves, &[("your", if yours { "your" } else { "their" }.to_string())])
+    /// Ticket #607 (version 0.1.0.5): the player's own Faction alone reads it, so no "your"/"their" placeholder.
+    pub fn opening_moves(&self, kind: FactionKind) -> String {
+        self.faction(kind).opening_moves.clone()
     }
 
     pub fn signature(&self, kind: FactionKind) -> String {
@@ -3035,6 +3081,12 @@ impl Tables {
     }
     pub fn ai_tech_picks(&self, kind: FactionKind) -> &AiTechPicks {
         &self.ai.tech_picks[&kind]
+    }
+
+    /// Ticket #625 (version 0.1.0.5): the index of the tier a place must have climbed to before the
+    /// Archive may be ordered there; `validate` holds that the name is a tier's.
+    pub fn archive_tier(&self) -> u32 {
+        self.tiers.iter().position(|t| t.name == self.archive.tier_to_order).expect("validate holds that [archive] tier_to_order names a tier") as u32
     }
 
     /// Ticket #84 (version 0.06.0): the Tech that opens this Faction's Victory Condition, if one does.
@@ -3189,6 +3241,34 @@ fn relations_margin_cap_default() -> i64 {
 /// Ticket #336 (version 0.09.0): the price a starting two-Colonist place is worth, 40 + 20 x 2.
 fn colony_price_pivot_default() -> f64 {
     80.0
+}
+
+fn contest_from_default() -> f64 {
+    0.5
+}
+
+fn defend_from_default() -> f64 {
+    0.5
+}
+
+fn defend_home_from_default() -> f64 {
+    0.25
+}
+
+fn home_floor_default() -> i64 {
+    20
+}
+
+fn collapse_emit_weight_default() -> f64 {
+    0.5
+}
+
+fn collapse_clean_weight_default() -> f64 {
+    1.5
+}
+
+fn win_in_sight_default() -> u32 {
+    3
 }
 
 

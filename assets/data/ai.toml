@@ -387,25 +387,28 @@ bounty_least = 1.0
 # (the Fund 3,500, 18 off Earth), with the game at fifty turns.
 # Ticket #580 (version 0.1.0.3): every figure x 4250/3500 with the bar, the turns as they were.
 # Ticket #584 (version 0.1.0.4): every figure x 5000/4250 with the bar, the turns as they were.
+# Ticket #625 (version 0.1.0.5): every people pace to 20 with Off-world Presence, the Arkwrights' first
+# x 44/42 with the Diaspora, the turns as they were; the Archivists' paces unmoved.
+# Ticket #623 (version 0.1.0.5): the Prospectors' first x 6250/5000 with the bar, the turns as they were.
 [pace.prospectors]
-first = [[12, 667], [25, 1667], [37, 3000], [47, 5000]]
-colonists = [[17, 6], [31, 18]]
+first = [[12, 834], [25, 2084], [37, 3750], [47, 6250]]
+colonists = [[17, 7], [31, 20]]
 
 [pace.custodians]
 within_ppm = 4.0
 # Ticket #506: 17 and 25, from 12 and 18.
 within_by_turn = 17
 under_sink_by_turn = 25
-colonists = [[17, 6], [31, 18]]
+colonists = [[17, 7], [31, 20]]
 
 # Ticket #51: Diaspora is 30 Colonists off Earth, so the pace runs to 30.
 # Ticket #506 (version 0.1.0.0): stretched by 50/36 to the Diaspora's 42 and four Bodies.
 [pace.arkwrights]
-first = [[8, 6], [17, 17], [25, 31], [33, 42]]
+first = [[8, 6], [17, 18], [25, 32], [33, 44]]
 # Ticket #449 (version 0.09.6): the Bodies their second part asks for, which nothing paced: one by
 # turn 18, two by 24, three by 30, read as every schedule is (a seat with none is behind at once).
 bodies = [[25, 1], [33, 2], [40, 3], [47, 4]]
-colonists = [[17, 6], [31, 18]]
+colonists = [[17, 7], [31, 20]]
 
 # Ticket #51: the pace is in the Archive's first Victory part. Ticket #68 (version 0.05.5): that is
 # Research paid into the Archive, 80 in all, over a thirty-six-turn game. Ticket #439 (version 0.09.6):
@@ -556,6 +559,35 @@ greenwash_relations_cost = 5.0
 # target list, as a share of a neutral one's worth. 0.6 until now; at 0.3 a held place is attacked
 # only when no neutral one is worth having.
 held_state_weight = 0.3
+# Ticket #618 (version 0.1.0.5), at the designer's word: a rival's Standing on a neutral Region at or
+# over this share of its threshold is a climb, and the computer seat with the most Standing there, or
+# one holding a neighbour, contests it -- the Region's weight x2 at half the threshold, x3 at it, and
+# every Influence step there at the opportunity multiplier. Any rival: the human's climbs and a
+# computer seat's snipes alike. Measured before: no computer seat read a rival's Standing at all.
+contest_from = 0.5
+# Ticket #619 (version 0.1.0.5), at the designer's word: a rival's Standing on a Region the seat HOLDS
+# at or over `defend_from` of the price to take it (the greater of the threshold and the holder's
+# Standing plus the margin), or `defend_home_from` of it on the home Region, puts the Region on the
+# seat's target list -- x2 at half the price, x3 at it, the home doubled -- with the steps that put
+# the price back above the climber's Standing plus their Allotment at the opportunity multiplier.
+# And the home floor: the home Region is topped up to `home_floor` Standing, so a capital's price
+# starts above the bare threshold. Measured before: a held place was never spent on, a home started
+# with no Standing banked, and the designer took two computer capitals in one turn each.
+defend_from = 0.5
+defend_home_from = 0.25
+home_floor = 20
+# Ticket #620 (version 0.1.0.5), at the designer's word: every computer seat weighs the Collapse it
+# drives toward. While the Collapse on the climate's heading falls at or before the seat's own win
+# turn (this turn plus the rest of its first bar at the rate it has made it so far), an emitting order
+# -- a Strip Permit, an Industry Level, a Facility whose card carries Emissions -- weighs
+# `collapse_emit_weight`, and a cleaner one -- a Wind Farm, a Scrubber, a Nature Reserve, a Leapfrog
+# -- `collapse_clean_weight`; within `win_in_sight` turns of the bar the race is run for the line and
+# the weighing is off. A Stabilization run is no race against the Collapse: its win is the cure.
+# Measured before: the computer read no Collapse at all. The designer: "A rational Prospector loses
+# too if the world collapses. They just need to achieve victory before collapse."
+collapse_emit_weight = 0.5
+collapse_clean_weight = 1.5
+win_in_sight = 3
 # Ticket #336 (version 0.09.0): what a rival's Colony is worth on the same list, read as this price
 # divided by the price the seat would actually pay for it -- CHEAPEST FIRST, where the rule from
 # ticket #50 ranked by fewest Colonists and never read the threshold at all. Without this the
@@ -591,7 +623,10 @@ race_lab_weight = 1.0
 # / 30, to 1). Every hostile act on the leader weighs x(1 + pressure); from half pressure the leader
 # is cause in itself; no Accord or Trade with it, none renewed, and the Custodians sell it no
 # credits; the pack's own Accords take a bar `gang_accept_relax` x the pressure lower.
-gang_from = 0.5
+# Ticket #621 (version 0.1.0.5), at the designer's word: the pack forms at 40%, from 50%; the ramp runs 0
+# at 40% to 1 at the end, so a leader at 80% reads two thirds where it read 0.6. `gang_ahead` and
+# `gang_full` as they were.
+gang_from = 0.4
 gang_ahead = 0.2
 gang_full = 0.3
 gang_cause = 0.5

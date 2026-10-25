@@ -1291,7 +1291,7 @@ impl Game {
             // Ticket #343 (version 0.09.1): a Warhead is priced flat, the Faction's Ship discount
             // left out. The discount is a shipwright's, and reloading is not shipbuilding.
             BuildItem::Warhead(_) => (t.nuke.rearm_widgets, 1.0),
-            // Ticket #559 (version 0.1.0.3): a Replace is half the kind's Widgets, 4 of the Wind Farm's 8.
+            // Ticket #559 (version 0.1.0.3): a Replace is half the kind's Widgets, 5 of the Wind Farm's 10 (4 of 8 before ticket #610).
             BuildItem::Replace(k) => (t.facility(k).widgets / 2, fac.facility_materials_multiplier),
         };
         ((row as f64 * m).floor() as u32).max(1)
@@ -1529,6 +1529,8 @@ impl Game {
         let mut off_earth = 0;
         let mut doubled_turns = 0;
         let mut sources: Vec<(String, Resource, f64)> = Vec::new();
+        // Ticket #609 (version 0.1.0.5): Energy by place, beside the source lines.
+        let mut energy_by_place: Vec<(String, f64, f64)> = Vec::new();
         // Ticket #575 (version 0.1.0.3): the buildings whose Fuel was not there, for the Report.
         let mut fuel_short: Vec<String> = Vec::new();
         for p in &producers {
@@ -1569,6 +1571,15 @@ impl Game {
             if !p.online {
                 continue;
             }
+            // Ticket #609 (version 0.1.0.5): the place's plain name, for the Energy-by-place lines.
+            let plain = where_.clone();
+            let mut energy_at = |made: f64, upkeep: f64| match energy_by_place.iter_mut().find(|(n, _, _)| *n == plain) {
+                Some(e) => {
+                    e.1 += made;
+                    e.2 += upkeep;
+                }
+                None => energy_by_place.push((plain.clone(), made, upkeep)),
+            };
             // Ticket #82: a doubled Module says what doubled it, and is counted for the measurement.
             let where_ = match p.doubled_by {
                 Some(f) => {
@@ -1594,7 +1605,10 @@ impl Game {
                 match res {
                     Resource::Materials => gained.materials += v,
                     Resource::Fuel => gained.fuel += v,
-                    Resource::Energy => gained.energy += v,
+                    Resource::Energy => {
+                        gained.energy += v;
+                        energy_at(v, 0.0);
+                    }
                     Resource::Ducats => gained.ducats += v,
                     Resource::Research => labs_research += v,
                     Resource::Widgets => {}
@@ -1603,6 +1617,7 @@ impl Game {
             }
             if p.upkeep > 0.0 {
                 sources.push((format!("{} in {} (upkeep)", p.name, where_), Resource::Energy, -p.upkeep));
+                energy_at(0.0, p.upkeep);
             }
             // Ticket #561 (version 0.1.0.3): a Ducat upkeep, the Scrubber's, charged beside it.
             if p.ducats_upkeep > 0.0 {
@@ -1623,6 +1638,14 @@ impl Game {
         let unit_upkeep = self.unit_upkeep(seat);
         if unit_upkeep > 0.0 {
             sources.push(("Ships and Armies (upkeep)".to_string(), Resource::Energy, -unit_upkeep));
+        }
+        // Ticket #609 (version 0.1.0.5): the units' upkeep as a place of its own, even at nought,
+        // and the Reactor's relief as one (the review): without it the lines could not sum to the
+        // Income's Energy while a Reactor stands.
+        energy_by_place.push(("Ships and Armies".to_string(), 0.0, unit_upkeep));
+        let relief = self.reactor_relief(seat, &producers);
+        if relief > 0.0 {
+            energy_by_place.push(("Reactor relief".to_string(), relief, 0.0));
         }
         // Ticket #35: every controlled state's economy pays Ducats, gdp x Industry Level / 10.
         for sid in self.controlled_states(seat) {
@@ -1783,6 +1806,7 @@ impl Game {
             total.ducats = tenth(total.ducats + ducats);
         }
         self.seat_mut(seat).income_sources = sources;
+        self.seat_mut(seat).energy_by_place = energy_by_place;
         let before = self.seat(seat).stockpile;
         let clamped = balance.max(0.0);
         {

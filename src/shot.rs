@@ -392,13 +392,23 @@ fn build_board(session: &mut Session) {
         // Ticket #279 (version 0.08.5): `battle:earth` fights it in Earth orbit instead and runs a
         // second quiet turn, so the Climate Panel's War line has last turn's Battle to show.
         let earth_battle = std::env::args().any(|a| a == "battle:earth");
-        if std::env::args().any(|a| a == "battle:1") || earth_battle {
+        // Ticket #614 (version 0.1.0.5): `battle:two` brings seats 0 and 1 alone, so the Battle
+        // Moment can be photographed in its two-party form, the one that says who won.
+        let two_party = std::env::args().any(|a| a == "battle:two");
+        if std::env::args().any(|a| a == "battle:1") || earth_battle || two_party {
             let body = if earth_battle { BodyId::Earth } else { BodyId::Mars };
-            for seat in [Seat(0), Seat(1), Seat(2)] {
+            for seat in &[Seat(0), Seat(1), Seat(2)][..if two_party { 2 } else { 3 }] {
+                let seat = *seat;
                 let id = ShipId(g.fresh_id());
                 let built_turn = g.turn;
                 let name = g.next_ship_name(UnitKind::Frigate);
                 g.ships.push(Ship { id, name, kind: UnitKind::Frigate, seat, damage: 0, at: ShipAt::Body(body), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Attack, escaped: false, arrived_this_turn: false, built_turn, fuel: 30.0, slot: None });
+            }
+            // The two-party form wants two parties: the other seats' Ships leave the Body for Earth.
+            if two_party {
+                for s in g.ships.iter_mut().filter(|s| s.at == ShipAt::Body(body) && s.seat != Seat(0) && s.seat != Seat(1)) {
+                    s.at = ShipAt::Body(BodyId::Earth);
+                }
             }
             for s in g.ships.iter_mut().filter(|s| s.at == ShipAt::Body(body)) {
                 s.stance = Stance::Attack;
@@ -688,19 +698,20 @@ fn build_board(session: &mut Session) {
             }
         }
         // `rival:1` (a building aid, ticket #261, version 0.08.4): seat 1 stands three quarters of
-        // the way to its Victory Condition -- fourteen Colonists on the Moon of eighteen, and, for
-        // the Prospectors it usually is, the Fund at 3800 of 5000 (ticket #584, version 0.1.0.4;
-        // 3230 of 4250 since ticket #580, from the review: 2625 of 3500 since ticket #506, nine of
-        // twelve and 2000 of 2500 before; at the 4,250 bar 2625 scored 0.67 and the Moment never
-        // fired) -- and a quiet turn runs so the rival's Moment fires and `moment:rival` can open it
-        // in the Report picture.
+        // the way to its Victory Condition -- sixteen Colonists on the Moon of twenty, and, for the
+        // Prospectors it usually is, the Fund at 5000 of 6250, the figures the Moment test stands on
+        // (ticket #623, version 0.1.0.5, from the review: fourteen of eighteen and 3800 of 5000 since
+        // ticket #584 scored 0.70 under the 0.75 bar with the gate shut, so the Moment never fired;
+        // 3230 of 4250 since ticket #580, 2625 of 3500 since ticket #506, nine of twelve and 2000 of
+        // 2500 before) -- and a quiet turn runs so the rival's Moment fires and `moment:rival` can
+        // open it in the Report picture.
         if std::env::args().any(|a| a == "rival:1") {
             let rival = Seat(1);
             let slot = g.free_slots_on(BodyId::Moon).first().copied().unwrap_or(0);
             let id = ColonyId(g.fresh_id());
             let modules = vec![Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Habitat)];
-            g.colonies.push(Colony { id, body: BodyId::Moon, slot, control: Control::Controlled(rival), modules, colonists: 14, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, tier: 0, in_orbit: false });
-            g.seats[1].venture_fund = 3800.0;
+            g.colonies.push(Colony { id, body: BodyId::Moon, slot, control: Control::Controlled(rival), modules, colonists: 16, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, tier: 0, in_orbit: false });
+            g.seats[1].venture_fund = 5000.0;
             g.seats[1].stabilization_run = 4;
             run_one_quiet_turn(g);
         }

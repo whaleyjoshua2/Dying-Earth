@@ -16,7 +16,8 @@
 id = "factory"
 name = "Factory"
 materials = 22
-widgets = 4
+# Ticket #610 (version 0.1.0.5), at the designer's word: a fifth more, 5 from 4.
+widgets = 5
 energy_upkeep = 2
 produces = { resource = "widgets", amount = 4 }
 emissions = 0.75
@@ -25,7 +26,8 @@ emissions = 0.75
 id = "power_plant"
 name = "Power Plant"
 materials = 27.5
-widgets = 8
+# Ticket #610 (version 0.1.0.5), at the designer's word: a fifth more, 10 from 8.
+widgets = 10
 energy_upkeep = 0
 # Ticket #575 (version 0.1.0.3), at the designer's word: it burns 0.8 Fuel a turn, as the Reactor
 # and the Generator do; short of Fuel it runs at a quarter.
@@ -37,7 +39,8 @@ emissions = 1.5
 id = "refinery"
 name = "Refinery"
 materials = 22
-widgets = 4
+# Ticket #610 (version 0.1.0.5), at the designer's word: a fifth more, 5 from 4.
+widgets = 5
 energy_upkeep = 3
 # Ticket #421 (version 0.09.4): 4 Fuel on Earth, where it was 3, to pay for a Colony Ship's
 # 40-Fuel tank, at the designer's word.
@@ -48,7 +51,8 @@ emissions = 1.5
 id = "research_lab"
 name = "Research Lab"
 materials = 27.5
-widgets = 4
+# Ticket #610 (version 0.1.0.5), at the designer's word: a fifth more, 5 from 4.
+widgets = 5
 energy_upkeep = 3
 produces = { resource = "research", amount = 2 }
 emissions = 0.0
@@ -57,7 +61,8 @@ emissions = 0.0
 id = "launch_site"
 name = "Launch Site"
 materials = 33
-widgets = 8
+# Ticket #610 (version 0.1.0.5), at the designer's word: a fifth more, 10 from 8.
+widgets = 10
 energy_upkeep = 2
 does = "lifts Pioneers and Armies from here to any orbit of Earth and to a Space Station over Earth, and a station over Earth can be built from here"
 emissions = 0.0
@@ -67,7 +72,8 @@ emissions = 0.0
 id = "bank"
 name = "Bank"
 materials = 27.5
-widgets = 4
+# Ticket #610 (version 0.1.0.5), at the designer's word: a fifth more, 5 from 4.
+widgets = 5
 energy_upkeep = 2
 produces = { resource = "ducats", amount = 4 }
 emissions = 0.0
@@ -78,7 +84,8 @@ emissions = 0.0
 id = "embassy"
 name = "Embassy"
 materials = 33
-widgets = 4
+# Ticket #610 (version 0.1.0.5), at the designer's word: a fifth more, 5 from 4.
+widgets = 5
 energy_upkeep = 2
 emissions = 0.0
 influence_allotment = 2
@@ -91,7 +98,8 @@ standing_per_turn = 2
 id = "constabulary"
 name = "Constabulary"
 materials = 27.5
-widgets = 4
+# Ticket #610 (version 0.1.0.5), at the designer's word: a fifth more, 5 from 4.
+widgets = 5
 energy_upkeep = 2
 # Ticket #408 (version 0.09.4): said as the engine does it, a flat half point off each rise, refugees
 # included, now that the card's own sentence is gone.
@@ -109,7 +117,8 @@ emissions = 0.0
 id = "scrubber"
 name = "Scrubber"
 materials = 33
-widgets = 8
+# Ticket #610 (version 0.1.0.5), at the designer's word: a fifth more, 10 from 8.
+widgets = 10
 # Ticket #561 (version 0.1.0.3), at the designer's word: 4 Energy and 1 Ducat a turn (3 Energy and
 # nothing before). The 0.1.0.2 playtest won two Custodian games on Scrubbers alone.
 energy_upkeep = 4
@@ -132,7 +141,8 @@ no_slot = true
 id = "sea_wall"
 name = "Sea Wall"
 materials = 22
-widgets = 8
+# Ticket #610 (version 0.1.0.5), at the designer's word: a fifth more, 10 from 8.
+widgets = 10
 energy_upkeep = 1
 does = "holds every Sea Level threshold off this state while it works, and a Storm Surge it holds cuts its coastal Facilities' output by 30% for one turn; no build slot, one to a state; each rise held adds 0.5 Materials a turn to its keep"
 emissions = 0.0
@@ -148,7 +158,8 @@ no_slot = true
 id = "school"
 name = "School"
 materials = 27.5
-widgets = 8
+# Ticket #610 (version 0.1.0.5), at the designer's word: a fifth more, 10 from 8.
+widgets = 10
 energy_upkeep = 2
 does = "raises this state's Education Level 0.20 a turn, to 2.0; it falls back at the same rate when the School stops"
 emissions = 0.0
@@ -169,7 +180,8 @@ emissions = 0.0
 id = "investment_bank"
 name = "Investment Bank"
 materials = 27.5
-widgets = 4
+# Ticket #610 (version 0.1.0.5), at the designer's word: a fifth more, 5 from 4.
+widgets = 5
 energy_upkeep = 2
 does = "banks 1% of the Venture Capital Fund's balance back into it each turn, never less than 1 across all your Investment Banks"
 produces = { resource = "ducats", amount = 4 }
@@ -181,7 +193,8 @@ emissions = 0.0
 id = "spaceport"
 name = "Spaceport"
 materials = 33
-widgets = 8
+# Ticket #610 (version 0.1.0.5), at the designer's word: a fifth more, 10 from 8.
+widgets = 10
 energy_upkeep = 2
 does = "does a Launch Site's work, and every Pioneer it lifts off Earth adds 1 Influence to next turn's Allotment"
 emissions = 0.0
@@ -192,7 +205,8 @@ emissions = 0.0
 id = "reactor"
 name = "Reactor"
 materials = 27.5
-widgets = 8
+# Ticket #610 (version 0.1.0.5), at the designer's word: a fifth more, 10 from 8.
+widgets = 10
 energy_upkeep = 0
 # Ticket #575 (version 0.1.0.3): 0.8 Fuel a turn, as a Power Plant.
 fuel_upkeep = 0.8
@@ -206,7 +220,8 @@ emissions = 1.5
 id = "academy"
 name = "Academy"
 materials = 27.5
-widgets = 8
+# Ticket #610 (version 0.1.0.5), at the designer's word: a fifth more, 10 from 8.
+widgets = 10
 energy_upkeep = 2
 does = "does a School's work and pays 1 Ducat a turn while it is online"
 emissions = 0.0
@@ -221,7 +236,8 @@ emissions = 0.0
 id = "mine"
 name = "Mine"
 materials = 22
-widgets = 4
+# Ticket #610 (version 0.1.0.5), at the designer's word: a fifth more, 5 from 4.
+widgets = 5
 energy_upkeep = 2
 # Ticket #537 (version 0.1.0.1): 4.4, where it was 4 -- an Earth Mine makes a tenth more.
 produces = { resource = "materials", amount = 4.4 }
@@ -233,15 +249,17 @@ emissions = 0.85
 # million since ticket #333 (version 0.09.0; five million from ticket #143, version 0.07.3, when this
 # was 40), so 200 units is the two hundred million each Scrubber wants:
 # clamp(round(population / per_population), min, max). Ticket #561 (version 0.1.0.3), at the
-# designer's word: one per 300 million with a floor of 1 (200 and 2 before): India at 1660 holds 6,
-# China at 1370 holds 5, the Regions about 500 hold 2, the rest 1.
+# designer's word: one per 300 million with a floor of 1 (200 and 2 before): India at 1660 held 6, China at 1370
+# held 5, the Regions about 500 two, the rest one; one per 200 million again since ticket #612 (version 0.1.0.5).
 [scrubber]
 # Ticket #445 (version 0.09.6): a Scrubber runs whole under the Custodians, at `captured_share` in any
 # other Faction's hands (its Sink and its calm, credited to the holder, the upkeep whole), and at
 # `neutral_share` in a neutral Region (to nobody's Blame, no upkeep). It is no longer destroyed.
 captured_share = 0.5
 neutral_share = 0.25
-per_population = 300.0
+# Ticket #612 (version 0.1.0.5), at the designer's word: one per 200 million, from 300 -- every Region over 300
+# million holds two or more (India 8, China 7, Nigeria 3), the twelve under it one still.
+per_population = 200.0
 min = 1
 max = 10
 
@@ -380,7 +398,8 @@ neutral_share = 0.5
 id = "stadium"
 name = "Stadium"
 materials = 22
-widgets = 4
+# Ticket #610 (version 0.1.0.5), at the designer's word: a fifth more, 5 from 4.
+widgets = 5
 energy_upkeep = 1
 does = "halves what the climate adds to this state's Unrest, after a Constabulary's half point (a heat rise of one lands as a quarter with both); an Agitate is untouched"
 emissions = 0.0
@@ -394,7 +413,8 @@ emissions = 0.0
 id = "nature_reserve"
 name = "Nature Reserve"
 materials = 33
-widgets = 5
+# Ticket #610 (version 0.1.0.5), at the designer's word: a fifth more, 6 from 5.
+widgets = 6
 energy_upkeep = 0
 does = "+1 ppm on the Natural Sink a turn; a sixth off what the climate adds to Unrest here"
 emissions = 0.0
@@ -411,7 +431,8 @@ sink_per_turn = 1.0
 id = "wind_farm"
 name = "Wind Farm"
 materials = 25
-widgets = 8
+# Ticket #610 (version 0.1.0.5), at the designer's word: a fifth more, 10 from 8.
+widgets = 10
 energy_upkeep = 0
 ducats_upkeep = 1
 produces = { resource = "energy", amount = 3 }

@@ -577,6 +577,8 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("launch_hit", &["faction", "ship", "place", "lost", "dead"]),
     ("launch_miss", &["faction", "ship", "place", "dead"]),
     ("occupation_begun", &["faction", "place"]),
+    // Ticket #615 (version 0.1.0.5): the same where a holder's Standing was halved, naming them.
+    ("occupation_begun_held", &["faction", "place", "holder", "standing"]),
     ("occupation_ended", &["place", "faction"]),
     // Ticket #299 (version 0.08.6): a broken Occupation, at a cost.
     ("occupation_broken", &["place", "faction", "holder", "unrest", "standing"]),
@@ -598,7 +600,8 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("refugees_net_out", &["n", "state", "why"]),
     ("refugees_net_out_mostly", &["n", "state", "why"]),
     ("resettled", &["faction", "state", "standing"]),
-    ("strip_permit", &["faction", "state", "turns"]),
+    // Ticket #622 (version 0.1.0.5): and the Relations fall.
+    ("strip_permit", &["faction", "state", "turns", "fall"]),
     ("strip_permit_ended", &["state", "baseline"]),
     ("building_changed_state", &["faction", "done", "building", "state"]),
     ("building_decommissioned_state", &["faction", "building", "state", "refund"]),

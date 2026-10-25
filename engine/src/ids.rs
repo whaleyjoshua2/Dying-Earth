@@ -85,6 +85,20 @@ pub enum MoonStep {
 }
 
 impl MoonStep {
+    /// Ticket #617 (version 0.1.0.5): the step in the race block's words, which the window drew and
+    /// the text tool now prints too.
+    pub fn words(self) -> &'static str {
+        match self {
+            MoonStep::NoShipyard => "no Shipyard",
+            MoonStep::Shipyard => "has a Shipyard",
+            MoonStep::ColonyShip => "has a Colony Ship",
+            MoonStep::Aboard => "Colonists aboard",
+            MoonStep::Bound => "on the way",
+            MoonStep::InOrbit => "in the Moon's orbit",
+            MoonStep::Landed => "landed",
+        }
+    }
+
     /// The `[phrase]` in `report.toml` that says a rival stood here when the race was won.
     pub fn key(self) -> &'static str {
         match self {

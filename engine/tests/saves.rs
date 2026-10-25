@@ -202,7 +202,11 @@ fn a_save_without_this_versions_fields_still_loads() {
     // Ticket #559 (version 0.1.0.3): a Facility's `replacing` is cut too.
     // Ticket #602 (version 0.1.0.4, the closing ticket): and the capital buildings chosen and those
     // not yet told (#590), so a 0.1.0.3 save loads.
-    for name in ["under_sink_eased", "opening_gap", "best_gap_closed", "best_run", "lead_windfall", "card_price_by", "by", "places", "colony_growth", "offline_cause", "produced_total", "opening_met_turn", "opening_run", "launch_site_owed", "archives_lost", "archive_fund_lost", "tier", "offers", "refusals", "greenwash_spent", "home_region", "ended_by", "refused_by", "replacing", "capital_buildings", "capital_built_now"] {
+    // Ticket #624 (version 0.1.0.5, the closing ticket): and the Energy by place (#609) and the
+    // contest, home and Collapse counters (#618, #619, #620), so a 0.1.0.4 save loads. A Battle
+    // party's unit names (#614) default the same way, but a turn-four save holds no Battle to cut
+    // them from.
+    for name in ["under_sink_eased", "opening_gap", "best_gap_closed", "best_run", "lead_windfall", "card_price_by", "by", "places", "colony_growth", "offline_cause", "produced_total", "opening_met_turn", "opening_run", "launch_site_owed", "archives_lost", "archive_fund_lost", "tier", "offers", "refusals", "greenwash_spent", "home_region", "ended_by", "refused_by", "replacing", "capital_buildings", "capital_built_now", "energy_by_place", "contests", "homes_lost", "homes_taken", "collapse_weighed"] {
         let before = older.len();
         older = cut(&older, name);
         assert!(older.len() < before, "{name} was in the save and is cut");

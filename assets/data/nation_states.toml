@@ -73,12 +73,18 @@ coastal_per_exposure = 2
 [strip_permit]
 turns = 3
 multiplier = 2.0
-baseline_rise = 0.2
+# Ticket #622 (version 0.1.0.5), at the designer's word ("a bit more co2 output"): 0.3, from 0.2.
+baseline_rise = 0.3
 # Ticket #460 (version 0.09.7): 2, where it was 3.
 unrest = 2.0
 # Ticket #537 (version 0.1.0.1): its price, where it was free (the playtest's 2.3: the Prospectors
 # overtuned by a free order).
 ducats = 25
+# Ticket #622 (version 0.1.0.5), at the designer's word ("a bit more damage to relations", and "I
+# don't want it to break an accord"): a flat point off Relations with every rival the turn it is
+# spent, on the deeds score and never an Offence, so no Non-Aggression Accord breaks over it. The
+# same ticket: the Region does not grow while the permit runs (the heat's loss still bites).
+relations = 1
 
 [development]
 # Ticket #506 (version 0.1.0.0): every tenth turn, from the ninth, with the game at fifty turns.

@@ -158,6 +158,9 @@ bombard_miss = "{faction} bombarded {place} from {ship}: the {module} was struck
 launch_hit = "{faction} launched a Warhead from {ship} at {place}: {lost} destroyed{dead}."
 launch_miss = "{faction} launched a Warhead from {ship} at {place}: nothing of it burned{dead}."
 occupation_begun = "{faction} occupy {place}."
+# Ticket #615 (version 0.1.0.5): a held place; {holder} is the prior holder, whose Standing there is
+# halved, and {standing} what they keep.
+occupation_begun_held = "{faction} occupy {place}; {holder}' Standing there falls to {standing}."
 occupation_ended = "{faction} Occupation of {place} ended."
 # Ticket #299 (version 0.08.6): a break costs. {holder} is the previous holder, or nobody.
 occupation_broken = "{faction}' Occupation of {place} broke: +{unrest} Unrest."
@@ -189,7 +192,8 @@ refugees_net_in_gross = "{state} took in {n} of {gross} arriving."
 refugees_net_out = "{state} lost {n} people to neighbours: {why}."
 refugees_net_out_mostly = "{state} lost {n} people to neighbours: mostly {why}."
 resettled = "{faction} resettled this turn's refugees in {state} (+{standing} Standing)."
-strip_permit = "{faction} issued a Strip Permit in {state}: its Facilities produce double for {turns}."
+# Ticket #622 (version 0.1.0.5): the point off with every rival, and no growth there meanwhile.
+strip_permit = "{faction} issued a Strip Permit in {state}: its Facilities produce double for {turns}, nobody grows there meanwhile, and {fall} off with every rival."
 strip_permit_ended = "The Strip Permit in {state} ended: Baseline Emissions now {baseline} for good."
 building_changed_state = "{faction} {done} the {building} in {state}."
 building_decommissioned_state = "{faction} decommissioned the {building} in {state}: {refund} Materials back, slot free."
@@ -524,7 +528,8 @@ figure = "{figure}"
 
 [moments.decisive_battle]
 on = true
-text = "A Battle at {place}: {result}"
+# Ticket #614 (version 0.1.0.5): {result} is the whole sentence, who destroyed whom, and {figure} the verdict.
+text = "Battle at {place}: {result}"
 figure = "{figure}"
 
 # Ticket #281 (version 0.08.5): buildings burned on a taking, under their own name. The Battle's

@@ -1,0 +1,627 @@
+# Dying Earth — version 0.1.0.5, the pushback version
+
+Amendments to the specification, one section per decision. Each section names the ticket whose
+resolution comment is the authority; where this document and a ticket disagree, the ticket is right.
+The map is [Map: version 0.1.0.5](https://github.com/whaleyjoshua2/Dying-Earth/issues/606), and the
+pictures and sweeps that decided it are in
+[`docs/dev-diary/2026-10-24-version-0.1.0.5/`](../dev-diary/2026-10-24-version-0.1.0.5/).
+
+**The baseline** is 0.1.0.4's closing board,
+[`final-0.1.0.4.txt`](../dev-diary/2026-10-21-version-0.1.0.4/sweeps/final-0.1.0.4.txt):
+**23 / 42 / 4 / 10 and 1 collapse**, against the designer's 15 each and 20.
+
+**What the version is.** Version 0.1.0.4 with the designer's list of 2026-10-24, most of it pushing
+back. **The computer pushes back**: it contests a rival's climb on a neutral Region, the human's and
+a computer's alike (§15), defends a Region it holds and keeps a floor at home (§16), weighs the
+Collapse against its own win (§17), and packs on a runaway leader at 40% (§2). **The figures**:
+every off-world population bar up by 2 and the Archive at Colony tier (§1), a fourth slot on the
+Moon, Phobos and Deimos (§4), the Strip Permit's three costs (§5), a fifth more Widgets on every
+building and a Frigate at 6 (§6), the Scrubber cap at one per 200 million (§11), the Fund at 6,250
+(§18); **the rules**: an Occupation halving the holder's Standing (§3). **The interface pushed back
+to its figures**: the signature moves as one sentence of the player's own Faction (§7), the Region
+card's threshold line and its doubled hover (§8), the top bar's Widgets and Energy hovers by place
+(§9), three texts (§10), the Battle Moment naming the winner (§12), nine hovers cut to a line each
+(§13), and the text tool's first landing, race and Tech tree (§14).
+
+**What it did to the win column** (80 games, per Faction; every section's own sweep is in it):
+
+| | 0.1.0.4 | §1 the bars | §2 the pack | §3 Occupation | §4 the slots | §5 the Permit | §6 Widgets | §11 Scrubbers | §15 the contest | §16 the defence | §17 Collapse | §18 the Fund: closing | the ideal |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Custodians | 23 | 26 | 25 | 26 | 29 | 27 | 25 | 23 | 37 | 19 | 17 | **18** | 15 |
+| Prospectors | 42 | 48 | 50 | 49 | 51 | 49 | 51 | 53 | 39 | 58 | 58 | **61** | 15 |
+| Arkwrights | 4 | 2 | 2 | 2 | 0 | 3 | 2 | 1 | 1 | 2 | 2 | **0** | 15 |
+| Archivists | 10 | 2 | 2 | 2 | 0 | 0 | 0 | 0 | 2 | 1 | 2 | **1** | 15 |
+| collapses | 1 | 2 | 1 | 1 | 0 | 0 | 2 | 3 | 1 | 0 | 1 | **0** | 20 |
+
+**The closing board** ([`sweeps/final-0.1.0.5.txt`](../dev-diary/2026-10-24-version-0.1.0.5/sweeps/final-0.1.0.5.txt)):
+**18 / 61 / 0 / 1 and 0 collapses**, §18's board to the figure, since nothing that moves a rule
+changed after it; from 0.1.0.4's 23 / 42 / 4 / 10 and 1. Two moves made the column. The Archive at
+Colony tier (§1) took the Archivists from 10 wins to 2 and they never came back: the computer
+Archivist's ferry paused at an Outpost and 11 Archives stood in 80 games where 43 had (reported in
+§1 and left). The contest (§15) and the defence (§16) pulled against each other: the contest swung
+the Custodians up 14 and the Prospectors down 14, the defence swung them back 18 and 19, the
+Allotment being one budget and a seat that defends taking fewer Regions, which costs the
+Custodians their Victory and the Prospectors nothing. The Prospectors at 61 are the farthest from
+the ideal the version has been; the Arkwrights at 0 and the Archivists at 1 the next; the
+collapses at 0 against 20 wanted the third figure to watch. The Fund at 6,250 (§18) did not bite:
+the computer banks to its pace. `GAME_VERSION` is 0.1.0.5; `SAVE_VERSION` stays at 12: every
+field the version added to the save (the Energy by place, §9; a Battle party's names, §12; the
+contest, home and Collapse counters, §15 to §17) reads a default, so a 0.1.0.4 save and those
+before it to 0.1.0.0 load.
+
+## 1. Every off-world population bar up by 2, and the Archive at a place of Colony tier
+
+Ticket: [Every off-world population bar up by 2](https://github.com/whaleyjoshua2/Dying-Earth/issues/625).
+
+The designer: *"lets raise the offworld pop requirement by 2 across the board"*; and, asked whether the
+Archivists' Upload counts, *"leave at 16 they go in groups of four but they need something too"*;
+offered a tier under the Archive, living people kept beside the Upload, or a Research cost rising with
+the count: *"option 1 but make it a colony"*.
+
+- **Off-world Presence is 20** (`victory.toml`, from 18): the Custodians' and the Prospectors' second
+  part, one figure. The Diaspora is **44** (`factions.toml`, from 42), **the four on each of four Bodies
+  kept**: it was first built at six on a misread answer and put back at the designer's word the same
+  day (*"I'm pretty sure i'd asked to keep Diaspora with four on each of four bodies"*). The Upload
+  **stays at 16**, in fours.
+- **The Archive may be ordered only at a place of Colony tier** (`modules.toml [archive]
+  tier_to_order = "Colony"`, in place of `colonists_to_order = 4`). The tier is read, not the people:
+  a place never falls back a tier, so eighteen who climbed it and then left still leave a Colony;
+  a Colonial Capital counts, a station never (the Archive is ground-only already). Checked once, at
+  the order, as the four-Colonist rule was. The refusal reads *"the Archive wants a place of Colony
+  tier; Olympus Mons on Mars is an Outpost"*. The loader refuses a tier name that is no tier's.
+- **The computer's paces** move with the bars on the same turns (`ai.toml`): every people pace to
+  `[[17, 7], [31, 20]]`; the Arkwrights' first x 44/42, `[[8, 6], [17, 18], [25, 32], [33, 44]]`; the
+  Archivists' unmoved. The test that holds every schedule to its bar passes.
+- **The computer Archivists** name only a Colony-tier place for the Archive, and their ferry's
+  spending lift (the x5 on a Habitat at the Archive's Body, ticket #361) now stays on until a
+  Colony-tier site stands, where it paused at the first Outpost that could hold the Archive.
+  Measured with the rule alone (`sweeps/ticket-625-ferry-paused.txt`): **25 / 52 / 2 / 0 and 1**, no
+  computer Archive standing in any of 80 games (43 of 80 on the baseline), the Archivists' fund full
+  at 250 in every game with nowhere to spend it.
+- **The texts that carried the figures**: the long `victory` sentences on the Custodians', Arkwrights'
+  and Archivists' rows (20; 44 and 6; "at a place of Colony tier"), the tutorial's two notes (twenty),
+  the tool's `build archive` help, the glossary (Diaspora, Off-world Presence, the Archive, the
+  Archivists).
+- **Swept** (`sweeps/ticket-625.txt`, 20 seeds x four seatings, the four on each Body kept): **26 / 48
+  / 2 / 2 and 2 collapses**, from 23 / 42 / 4 / 10 and 1. The computer's Archive stands in **11 of 80**
+  games at a median turn 35 (43 of 80 at about 30 on the baseline; 0 with the ferry paused; 13 with
+  six on each Body, `sweeps/ticket-625-six-each.txt`, 25 / 50 / 2 / 3), so the Archivists win 2 from
+  10; the Arkwrights, at 44, 2 from 4; the Prospectors take the games both lose, 48 from 42, six
+  past noise. Colony-tier places at the end over the batch 34 (23 on the baseline), Capitals 28 (16).
+  **The miss is reported and left**: the Colony tier is the designer's word, and the computer
+  Archivists reach it in about one game in seven; what more the computer should do to climb, or
+  whether the tier should be the Settlement's, is the designer's call.
+
+## 2. The pack on a runaway leader forms at 40% of Victory
+
+Ticket: [The pack on a runaway leader forms at 40% of Victory, not 50%](https://github.com/whaleyjoshua2/Dying-Earth/issues/621).
+
+The designer: *"Drop threshold for gang-ups from 50% to 40%"*.
+
+- **`gang_from` is 0.4** (`ai.toml [thresholds]`, from 0.5; ticket #531's pack). A rival is a seat's
+  leader at 40% of its Victory or more and 20 points or more above the seat (`gang_ahead` 0.2, as it
+  was), and the leader's ramp runs 0 at 40% to 1 at the end, so a leader at 80% reads two thirds
+  where it read 0.6; the seat's trail over `gang_full` (0.3) is unchanged. Every hostile act on the
+  leader weighs x(1 + pressure), the leader is cause from half pressure, no Accord or Trade with it,
+  the pack's own Accords `gang_accept_relax` (3) x the pressure easier, as before.
+- **The tests** that pinned the ramp at 0.6 and the lift at x1.6 moved to two thirds, watched red on
+  the old figure first; a leader at 45% is a leader now, at 39% not.
+- **Swept** (`sweeps/ticket-621.txt`, 20 seeds x four seatings): **25 / 50 / 2 / 2 and 1 collapse**,
+  from the same day's 26 / 48 / 2 / 2 and 2 (§1): noise. The pack forming ten points sooner did not
+  bite on the Prospectors, who lead most games from the Moon's claim: Accords struck over the batch
+  620 from 620, games with an orbital Battle 24 from 27. The computer's Archive 9 of 80 (11 before),
+  noise. Reported and left: the figure is the designer's word, and what the pack does with its
+  earlier start is a question for the contest and defence tickets, which give it Influence to spend.
+
+## 3. An Occupation halves the prior holder's Standing
+
+Ticket: [An Occupation halves the prior holder's Standing](https://github.com/whaleyjoshua2/Dying-Earth/issues/615).
+
+The designer: *"upon occupation prior holder loses half their influence"*; on the ticket's questions,
+*"q1 that q2 yes q3 loss stands"*.
+
+- **The turn an Occupation begins**, the prior holder's Standing at that place is halved, rounded down
+  (`influence.toml [influence] occupation_standing_kept = 0.5`, the share kept). A neutral place has no
+  prior holder and nothing halves. Their Allotment and stockpile are untouched; so are the occupier's
+  banked Standing and Pacification, which reads the occupier's Standing against the bare threshold.
+- **Every Occupation** halves it again, by another seat or the same one after a break: 41 to 20 to 10.
+- **A broken Occupation** hands the place back and restores nothing: the loss stands.
+- **The Report's occupation line** carries it where a holder lost: *"Arkwrights occupy Japan; Custodians'
+  Standing there falls to 20."* (`occupation_begun_held`), read by every seat; a neutral place keeps the
+  plain line. The tool prints the Report. No Moment of its own.
+- **The computer** reads Standing from the table: a prior holder's retake is priced on what it has left,
+  and nothing in `ai.rs` carried a copy.
+- **Swept** (`sweeps/ticket-615.txt`, 20 seeds x four seatings): **26 / 49 / 2 / 2 and 1 collapse**,
+  from the same day's 25 / 50 / 2 / 2 and 1 (§2): noise. Occupations begun over the batch 204 from
+  197, broken 37 from 36: the computer occupies no more and no less for the halving, and the win
+  column does not move. Reported and left.
+
+## 4. One more Colony Slot on the Moon, Phobos and Deimos
+
+Ticket: [One more Colony Slot on the Moon, and one each on Phobos and Deimos](https://github.com/whaleyjoshua2/Dying-Earth/issues/613).
+
+The designer: *"add one additional slot for a lunar colony"*, *"add one on Deimos and Phobos as well"*;
+the names as proposed, *"those three"*.
+
+- **Three rows in `bodies.toml`**: the Moon's fifth slot **Oceanus Procellarum** (lon -57, lat 18),
+  Phobos's third **Todd** (lon -153, lat -9), Deimos's second **Voltaire** (lon 3.5, lat -22). A slot
+  carries no yield of its own; the Body's yields are per Colony, and the computer reads the free slots
+  from the table, so the Moon stays open one founding longer and the Mars moons offer two more landings.
+  `SAVE_VERSION` stays at 12: a 0.1.0.4 save loads with the new slots free, their yields the Body's
+  flat figures rather than a drawn spread, since the spread is drawn at a game's start.
+- **The pictures** (`ticket-613/slots-moon.png`, `slots-phobos.png`, `slots-deimos.png`): each globe
+  with its new site drawn clear of the others.
+- **Swept** (`sweeps/ticket-613.txt`, 20 seeds x four seatings): **29 / 51 / 0 / 0 and 0 collapses**,
+  from the same day's 26 / 49 / 2 / 2 and 1 (§3). The Arkwrights' and Archivists' two each to nought
+  is within noise, but their seats have now read 2, 2, 2, 0 and 0 across the version's five sweeps.
+  The landings moved as the slots meant them to: ground Colonies at the end over the batch on Phobos
+  165 from 127, on Deimos 57 from 40, on the Moon 290 from 270. Reported and left.
+
+## 5. The Strip Permit: more CO2, a point off with every rival, and no growth while it runs
+
+Ticket: [The Strip Permit: a little more CO2, a little more damage to Relations](https://github.com/whaleyjoshua2/Dying-Earth/issues/622).
+
+The designer: *"Nudge strip permit a bit more co2 output and a bit more damage to relations"*; on the
+ticket's questions, *"q1 a q2 c I don't want it to break an accord; Can we also add a 0% pop growth
+during the strip minned turns"*.
+
+- **The permanent rise is 0.3** in the Region's Baseline Emissions when the permit ends
+  (`nation_states.toml [strip_permit] baseline_rise`, from 0.2); the three doubled turns emit as they
+  did.
+- **A point off Relations with every rival** the turn the permit is spent (`relations = 1`): a flat
+  fall on the deeds score, as a card's is, and never an Offence, so no Non-Aggression Accord breaks
+  over it and nothing goes on the Offence ledger.
+- **No growth while it runs**: a Region under a running permit does not grow for its three turns; the
+  heat's loss, folded into the same rate, still bites. Growth returns when the permit ends.
+- **The Report**: *"Prospectors issued a Strip Permit in Brazil: its Facilities produce double for 3
+  turns, nobody grows there meanwhile, and 1 point off with every rival."* The tool prints the same.
+- **The computer Prospectors** weigh the permit as before and read every figure from the table.
+- **The texts**: the Prospectors' signature sentence (0.3, the point, no growth), the order's note, the
+  running permit's hover ("and no growth"), the glossary.
+- **Swept** (`sweeps/ticket-622.txt`, 20 seeds x four seatings): **27 / 49 / 3 / 0 and 0 collapses**,
+  from the same day's 29 / 51 / 0 / 0 and 0 (§4): noise. Accords struck over the batch 616 from 613,
+  so the point off breaks nothing and costs the Prospectors no partner. Reported and left.
+
+## 6. Every Facility and Module costs a fifth more Widgets, and a Frigate 6
+
+Ticket: [Every building costs a fifth more Widgets, never less than one more, and a Frigate 6](https://github.com/whaleyjoshua2/Dying-Earth/issues/610).
+
+The designer: *"20% increase in widget cost for buildings rounded to nearest integer but no building
+get less than a +1"* and *"A frigate is 6 widgets"*; on the ticket's questions, *"q1 facilities and
+modules only q2 frigate alone"*.
+
+- **Every Facility and Module row's Widgets** rise by a fifth, rounded to the nearest whole
+  (`facilities.toml`, `modules.toml`): 4 to 5, 5 to 6 (the Nature Reserve), 8 to 10, the Archive's 12
+  to 14 (14.4). The +1 floor binds nowhere, since 4 x 0.2 rounds up. The Core's nought stays.
+- **The Colony tiers** (4, 6, 8) and **Industry Level** (4, +1 a step) stay: a place growing is not a
+  building, and the Capital was repriced in 0.1.0.4.
+- **The Frigate is 6 Widgets**, from 4; every other Ship, the Army and a Rearm stay.
+- **What follows from the tables**: the Prospectors' 15% off and the Arkwrights' Module discount floor
+  the new rows (a Power Plant 8 for the Prospectors, a Shipyard 7 for the Arkwrights); the Archive
+  takes four Resolutions at a Core's four Widgets a turn, where it took three; every hover reads the
+  figure through its placeholder, and the computer reads every price from the table.
+- **Swept** (`sweeps/ticket-610.txt`, 20 seeds x four seatings): **25 / 51 / 2 / 0 and 2 collapses**,
+  from the same day's 27 / 49 / 3 / 0 and 0 (§5): noise. Dearer builds take their fifth where it
+  shows: Widgets applied a game (median, the player's seating) 353 / 517 / 180 / 174 from 302 / 440 /
+  158 / 167, and production over the batch, gross, Materials / Energy:
+
+  | | Custodians | Prospectors | Arkwrights | Archivists |
+  |---|---|---|---|---|
+  | before (§5) | 175,237 / 295,249 | 190,479 / 234,734 | 62,935 / 136,177 | 39,090 / 81,859 |
+  | after | 164,820 / 276,074 | 178,668 / 229,114 | 62,393 / 132,979 | 36,970 / 81,883 |
+
+  Six per cent off the Custodians' and the Prospectors' Materials, the Arkwrights' and the Archivists'
+  within two; the computer's Archive stands in 3 of 80 (9 before), at the edge of its noise. Reported
+  and left.
+
+## 7. Turn one's signature moves: one sentence, the player's Faction alone
+
+Ticket: [Turn one's signature moves: one sentence, the player's Faction alone, a direction for turns one and two](https://github.com/whaleyjoshua2/Dying-Earth/issues/607).
+
+The designer: *"signature moves - make a sentence and show only the selected faction and give them some
+direction to go in for the first and second turn e.g. build power plant, recruit pioneers"*; on the
+ticket's questions, *"those but remove the Turn one:/Turn two: q2 yes"*.
+
+- **Each Faction's `opening_moves`** (`factions.toml`) is two sentences, the first turn's orders then
+  the second's, with no turn labels:
+  - Custodians: *"Build a Scrubber at home and spend your Influence. Leapfrog a Region you hold and
+    recruit Pioneers."*
+  - Prospectors: *"Build an Investment Bank and set your Venture share. Raise Industry Level and
+    recruit Pioneers."*
+  - Arkwrights: *"Build a Space Station over Earth and recruit Pioneers. Put a Shipyard on it, for
+    the Colony Ship that takes them to the Moon."*
+  - Archivists: *"Build a Research Lab and set the Directive. Recruit Pioneers and build a Habitat on
+    Axiom."*
+
+  The Custodians' Leapfrog is refused before turn four (Three Turns Held) and costs 50 Ducats they do not
+  open with; raised from the review, the designer kept the line: *"just leave it"*. The last two at the
+  designer's second word (*"Archivists needs to say Build a Research Lab and Set
+  Directive. Recruit Prioneers and build a Habitat on Axiom. For the Arkwrights just add the word Put
+  at the start of the second sentence"*), "Set Directive" read as the window's own "set the Directive".
+- **The turn-one window** shows the player's Faction alone: "Signature moves", the Faction's glyph
+  and name, the two sentences under it, "Go on". The rivals' rows go; the Faction card's signature
+  rule says what each does. The `{your}` placeholder goes with them, the line having one reader.
+- **The text tool's `new`** prints the one line, *"Custodians (you): Build a Scrubber ..."*.
+- **The pictures** (`ticket-607/<faction>-report.png`, four): the window for each Faction, over the
+  Earth map where the Report would stand.
+- No rule moves; no sweep.
+
+## 8. The Region card's threshold lines cut to the hover, and one hover per element
+
+Ticket: [The Region card's threshold line reads as a subtraction, and its Standing and threshold hovers stack](https://github.com/whaleyjoshua2/Dying-Earth/issues/608).
+
+The designer: *"threshold calculation is off e.g threshold 31 next line 31-20+10 for size 1 +1 for
+regions held. what is being calculated here because its not threshold that always the first term
+regardless of cost. do we even need this line?"* and *"mouse over on standing: or threshold on nation
+card procs two mouse overs one on top of another, check and fix"*; on the ticket's questions, *"q1
+cut it move to hover q2 yes"*.
+
+- **The card's two weak lines go**: *"Threshold 31 - 20 + 10 for size 1 + 1 for Regions held"* and,
+  on a held place, *"Held by the Archivists: 58 - 38 + 20 (margin) + 5 (Constabulary)"*. Their dash
+  was a separator read as a minus; the arithmetic was right. The challenger sentence (*"The
+  Prospectors stand at 31; they take this at 54."*), the threat line and the conversion line stay.
+- **The terms ride the threshold label's hover as sums**, its first lines: *"Threshold 31 = 20 + 10
+  for size 1 + 1 for Regions held"* (then *", x1.10 (Blame)"* and *", cut by Green Consensus"* while
+  they bite), and on a held place *"The Prospectors take it at 58 = 38 (your Standing) + 20 (margin) + 5
+  (Constabulary)"* (the cheapest rival named) or *"Take at 58 = 38 (their Standing) + 20 (margin)"*;
+  where the threshold stands over that sum the line says so. The sentence that said the same in
+  words is cut, the rule line is one rendered line, and a held place's tip carries no further
+  sentence, so every tip stays under six lines with a Constabulary, relations, Blame or Green
+  Consensus in it (the review found the first shape could reach seven or eight).
+- **One hover per element**: the row's own tip, which fired under the label's and the Standings
+  chips', goes, for the player and the spectator alike; its decay figures are on the Standings tip.
+- **The pictures** (`ticket-608/neutral-earth.png`, `own-earth.png`): the hover on a neutral
+  Region's "Threshold 40" and on the player's own Region's "A rival takes it at".
+- The tool prints its own Standing line and no breakdown; untouched. No rule moves; no sweep.
+
+## 9. The top bar's Widgets hover in the Fuel's shape, and the Energy hover by place
+
+Ticket: [The top bar's Widgets hover in the Fuel's shape, and the Energy hover naming where it comes from](https://github.com/whaleyjoshua2/Dying-Earth/issues/609).
+
+The designer: *"the n/x configuration in the top bar for widgets what does applied at last resolution
+mean can we clean up that mouse over its very clunky, make it closer to the fuel or duckets one"* and
+*"fix mouse over on power too I want to see where i'm getting it than have a line that just says
+upkeep -x only show moduls in danger of going off line if the next turn will result in negative
+energy"*; on the ticket's questions, *"q1 yes but keep the /n part q2 b"*.
+
+- **Widgets**: the figure stays *"12 / 10"* (made a turn, applied at the last Resolution). The hover
+  is the Fuel's shape: *"Made a turn: 12"*, then one line a maker, *"+4  the Factory (China)"*, *"+4
+  the Region itself (China)"*, *"+4  Core Module (ISS over Earth)"*, closing *"10 went into builds
+  last turn."* The per-place queue lines go; every hatched tile carries its own.
+- **Energy**: the Income keeps, beside its source lines, each place's Energy made and upkeep
+  (`energy_by_place`, a `serde(default)` field recomputed every Income, so `SAVE_VERSION` stays), the
+  Ships' and Armies' upkeep as a place of its own. The hover is one line a place, net, the parts in
+  brackets: *"Last Income:"*, *"+8  China (12 made, 4 upkeep)"*, *"-1  ISS over Earth"*, *"-3  Ships
+  and Armies"*. While this turn's orders forecast a shortfall the figure turns red as before, and what
+  goes dark is appended under the lines, where it replaced them. From the review: a Reactor's relief
+  is a line of its own (*"+6  Reactor relief"*), so the lines sum to the Income's Energy while one
+  stands; a line is bare where only one side has a figure; and the places past the fourth fold into
+  one net line (*"+12  3 more places (30 made, 18 upkeep)"*), so the hover is six lines at most
+  before the dark list. The makers' lines read *"+4  the Factory (China)"*, the place in brackets.
+- **The pictures** (`ticket-609/widgets-earth.png`, `energy-earth.png`): the two hovers on turn one.
+- No rule moves; no sweep.
+
+## 10. Three texts: the Cheap Ore refusal said once, "breaks Accord", a Refinery's refuelling said on its card
+
+Ticket: [Three texts: the Cheap Ore refusal said once, "breaks Accord", and a Refinery's refuelling said at the start](https://github.com/whaleyjoshua2/Dying-Earth/issues/611).
+
+The designer: *"cheap ore offer rejection text is says the same thing twice"*; *"rather than 'breaks your
+accord with prospectors' it should just say 'breaks accord'"*; *"Say at the start that a Colony with a
+Refinery refuels ships in its low orbit. I found out at G2 T23 from a refusal message."*; on the
+ticket's questions, *"q1 button q2 yes q3 b"*.
+
+- **The Cheap Ore Offer** (`events.toml`): the refuse button's face is *"Let it go"* alone; the figure
+  stands once, on the line the card generates under it (*"Materials a third off for you next turn"*),
+  which the old face repeated. (A choice card's `effect` field is drawn nowhere, so it is untouched.)
+- **"breaks Accord"**: the red note beside the Influence button, the armed button (*"Break the Accord
+  and spend 17"*), the tool's price line (*"17; breaks Accord"*) and its refusal (*"breaks Accord:
+  order it with break to break it"*); the partner's name nowhere, the Accord row naming them.
+- **The Refinery**: its row's card line (`modules.toml`, `does`) reads *"refuels its Faction's Ships
+  in low orbit"*, drawn through the yield's text on the tile's line and the build hover's "once it
+  stands" line, as the Habitat's is; owner-neutral, since a rival's tile draws the same line. The text
+  tool's `refuel` help names a Colony with a working Refinery beside a station.
+- **The pictures** (`ticket-611/ore-earth.png`, `accord-earth.png`): the card with its bare refuse
+  button over the generated line, and "breaks Accord" in red beside the Spend and Max buttons under
+  a Non-Aggression Accord with the Region's holder. The Refinery's line has no picture: no aid plants
+  a Refinery Colony on turn one's board.
+- No rule moves; no sweep.
+
+## 11. The Scrubber cap: one per 200 million
+
+Ticket: [The Scrubber cap by population: more than one in most Regions](https://github.com/whaleyjoshua2/Dying-Earth/issues/612).
+
+The designer: *"check scrubber build count it seems its only one per country should be based on
+population"*; on the ticket's questions, *"q1 200 q2 as they are"*.
+
+- **The cap was already by population**: a Region's people over `per_population`, rounded, within a
+  floor of 1 and a ceiling of 10; at 300 million a Scrubber fifteen of the twenty Regions held one.
+- **`per_population` is 200** (`facilities.toml [scrubber]`, from 300): India 8, China 7, Nigeria, the
+  European Union and South Africa 3, Indonesia, the United States and Iran 2, the twelve Regions
+  under 300 million one still. The floor of 1 and the ceiling of 10 stay.
+- The computer Custodians build to the cap; the card's *"Scrubber (1 of 2)"* and the signature
+  sentence read the figures from the table.
+- **The picture** (`ticket-612/cap-factions.png`): the Custodians' Faction card, whose signature rule
+  reads the cap from the table, *"one per 200M people, 1 to 10"*; the Region card's *"Scrubber (2 of
+  7)"* button sits below the fold at the shot's height.
+- **Swept** (`sweeps/ticket-612.txt`, 20 seeds x four seatings): **23 / 53 / 1 / 0 and 3 collapses**,
+  from the same day's 25 / 51 / 2 / 0 and 2 (§6): noise. Scrubbers built over the batch 2,262 from
+  2,113, seven per cent more; the end Temperatures by seating +2.47 / +2.29 / +2.23 / +2.04 from +2.45
+  / +2.24 / +2.18 / +1.99, and the Natural Sink at the end mixed, both ways within noise. The seven per cent
+  reads as the cap binding in few Regions, an inference from the count, not a measured one. Reported and left.
+
+## 12. The Battle Moment says who won
+
+Ticket: [The Battle Moment says who won: a Battle you won read as one you lost](https://github.com/whaleyjoshua2/Dying-Earth/issues/614).
+
+The designer: *"getting a popup I lost a battle I did not lose - my tsv defiant beat the pmv valiant"*;
+on the ticket's questions, *"q1 a q2 yes"*.
+
+- **The card as it was**: *"A Battle at Mars low orbit: PMV Valiant destroyed"* over the figure *"1
+  lost"*, the figure counting everybody's losses, so a Battle the player won read as theirs. The
+  designer's own game was not replayed (no save was to hand): the diagnosis is read from the code,
+  and the test builds the case by hand, the Defiant sinking the Valiant and losing nothing.
+- **"Won" is read off the losses**: the side that lost nothing while the other lost a unit; both
+  losing, or neither, is no verdict. The engine records no field-holder and starts none.
+- **The wording**: with the player's units in it, *"Battle at Mars low orbit: your TSV Defiant
+  destroyed the Prospectors' PMV Valiant."* and the figure *"you won"*, or *"the Prospectors' PMV
+  Valiant destroyed your TSV Defiant."* and *"you lost"*, or both sides' losses named and *"both sides
+  lost a unit"*; with the player out of it, *"the Custodians' ARK Defiant destroyed the Prospectors' PMV
+  Valiant and PMV Aurora."* and the figure *"2 destroyed"*.
+- **The record**: each party now keeps its units' names beside its losses (`BattleParty.names`, a
+  `serde(default)` field, so `SAVE_VERSION` stays); a party without them, or a neutral one, or a
+  three-sided Battle, reads the losses alone; a unit that escaped is no destroyer and is left out of
+  the names, unless every unit of its side escaped, when the side is named whole (the kills were made
+  before it left; the diary shot read *"your  destroyed"* otherwise). A bloodless Battle is no Moment,
+  as before. A bombardment's and a Launch's Moments keep
+  their own sentences, and their figures count *"destroyed"* where they read *"lost"* (from the
+  review: the same misreading on those two cards). The Report line is unchanged.
+- **The picture** (`ticket-614/battle-report.png`): the card from the `battle:two` aid, which brings
+  seats 0 and 1 alone to Mars: *"you won"* over *"Battle at Mars orbit: your TSV Valiant and TSV
+  Vanguard destroyed the Prospectors' PMV Magellan and PMV Indomitable."*
+- No rule moves; no sweep.
+
+## 13. Nine hovers cut to the designer's lines
+
+Ticket: [The window's hovers cut: the Accord's notice, the first landing, Pioneers waiting, the Blockade, the Directive, the standing order, the Allotment, Unrest, Overcrowded](https://github.com/whaleyjoshua2/Dying-Earth/issues/616).
+
+The designer's cuts are on the map's Notes, from the 0.1.0.2 playtest's mouse-over dump; on the
+ticket's questions, *"q1 c q2 that q3 yes q4 keep 587s q5 b q6 b q7 yes"*.
+
+- **The Accord's notice** (the *"Declare it over"* button): *"Lapses next turn. Breaking a term sooner
+  costs 3 Relations and ends it."* Both facts of the two cuts given; the 3 is `break_accord`'s offence
+  weight.
+- **The first landing** (a Body card's windfall line): *"First to land here: +{standing} Influence a
+  turn while held."* over a second line, *"A station claims nothing."*, the one clause of the old
+  hover that bites.
+- **Pioneers waiting**: *"Waiting. A Launch Site lifts them; once the ice opens, ships take them to
+  Antarctica."*
+- **The starved line**: the line already names the cause and the squeeze (*"Blockaded by the
+  Prospectors: producing nothing, upkeep still paid."*), so the hover says what it does not: *"Nobody
+  dies, nothing is destroyed. Each turn is an offence against you."* The designer's cut repeated the
+  line.
+- **The Directive** (both the condensed widget and the Faction window's control): *"Share of your
+  Research paid into the shared Tech from the next Income. Research kept back counts nothing toward
+  the Research Lead."*
+- **The standing order** (the *"every turn"* checkbox): *"Spend your whole Allotment here every turn
+  until cancelled."*
+- **The Allotment** (a Region card's Influence value): the figures by source, the top bar's "of N
+  left" lines, on one line: *"Influence each turn: Regions and buildings 14. Unspent is lost."* On
+  turn one, before any Income has recorded them, `allotment_lines` reads the parts live, so the top
+  bar's hover has them on turn one too (from the review, which found the fallback copied in the
+  window).
+- **Unrest**: *"Unrest to 10: Army stops at 4, Facilities halve at 7, revolt at 10. Falls 1.5 a
+  turn."*, the figures from `unrest.toml`.
+- **Overcrowded**: *"Overcrowded: everything but Energy at half. Restart a Habitat."*
+- **The Upload** keeps ticket #587's line, *"Read into the Archive; {} stay. Cannot be undone."*, the
+  later word.
+- **The Blame tag**: *"[BLAME_HOVER]"* is the dump's label for the constant; the screen draws it bare
+  (`ticket-616/blame-climate-earth.png`). The dump was made by hand from the source, which is why the
+  developer notes (two code comments and four test names) appear in it; none is drawn.
+- Every cut hover is drawn through `rule_tip`, so the `tip:` aid can photograph it; the standing
+  order's greyed box keeps its own words, *"Click a Region or a Colony first."*, by a branch (from the
+  review, which found it left on `on_hover_text`). The starved and overcrowded lines have no picture:
+  no aid starves or overfills a Colony on turn one's board.
+- **The pictures** (`ticket-616/`): `pioneers-earth.png`, `unrest-earth.png`, `allotment-earth.png`,
+  `order-earth.png` (China's card and the Influence block's checkbox), `landing-moon.png` (the Moon's card), `accord-factions-mars.png` (the Prospectors'
+  page under `accord:some`), `directive-tech-mars.png` (the Tech Tree window), `blame-climate-earth.png`
+  (the Climate Panel's heading).
+- No rule moves; no sweep.
+
+## 14. The text tool shows the first landing, the race to the Moon and the Tech tree
+
+Ticket: [The text tool shows the race for a Body and the Tech tree](https://github.com/whaleyjoshua2/Dying-Earth/issues/617).
+
+The designer: *"The window has a 'race to the Moon' panel and a Tech Tree; the text tool has
+neither. (tool)"*; on the ticket's questions, *"q1 a q2 yes q3 a q4 a"*.
+
+- **The first landing**, one line under every Body in the FREE SLOTS block but Earth, whose windfall
+  is 0: *"first landing: nobody yet, 5 Influence to the first"*; claimed, *"first landing: the
+  Prospectors, turn 13"*, the turn being the first Colony's founding turn (a first's Colony is never
+  removed, ticket #586). The build first named the place, on the mistaken premise that no turn was
+  kept; the review found the turn, and the line took the form the designer had said yes to.
+- **The race to the Moon**, under the Moon's line, the window's block in one line: *"race to the
+  Moon: Custodians no Shipyard, Prospectors no Shipyard, Arkwrights no Shipyard, Archivists no
+  Shipyard"*, leader first, in the steps' own words (now `MoonStep::words`, which the window reads
+  too); gone once somebody lands. The ticket's draft, a Colony-Ship-bound line for every Body, was
+  not what the window has and was not taken.
+- **The Tech tree**, behind `show --techs` as the costs are behind `--costs`, since the board print
+  is long already: by branch in the window's band order (`tech_branches`, now the engine's and read
+  by the window) and within a rung in the window's order (a card's `stack` first), each Tech a line,
+  *"Clean Power (32, rung 2): locked, needs Efficient Grids; Power Plant Emissions x0.5; unlocks the
+  Wind Farm"*; the states *done*, *under research 10/18*, *chosen this turn, 0/32*, *available* (the
+  window's reading: with a shortlist drawn, only its Techs), *unlocked, not on this pick's shortlist*
+  (where the window says *locked*; the tool names no needs a Tech has met), *locked, needs ...*
+  (joined as an and-list); a Victory gate marked *"the Archivists' gate"*; the Research Lead's line
+  last.
+- The lines are the engine's (`first_landing_line`, `moon_race_line`, `tech_tree_lines`), held by
+  three tests; the tool prints them. `help` says where the tree is; the module doc lists `show`'s
+  three flags; `docs/playtest/PLAYTEST.txt` has a line on it. Coastal Engineering's effect loses the
+  one full stop in the table, which the tree's lines showed up.
+- **The artifacts** (`ticket-617/bodies.txt`, `tech-tree.txt`): the tool's two outputs on turn one.
+- No rule moves; no sweep.
+
+## 15. The computer contests a rival's climb on a neutral Region
+
+Ticket: [The computer contests a rival's climb on a neutral Region, the human's and a computer's alike](https://github.com/whaleyjoshua2/Dying-Earth/issues/618).
+
+The designer: *"The AI Prospectors snipe Regions the human is visibly climbing. That's fine, but
+other AIs should push back (counter-Influence, agitate), not just the human."* and *"Contest the
+human's Influence target: if a human has Standing over half the threshold on a neutral Region, the AI
+should outbid. In four games the AI contested one Region of mine once."*; on the ticket's questions,
+*"q1 yes q2 yes q3 a q4 yes"*.
+
+- **The trigger**: a rival's Standing on a neutral Region at or over `contest_from` (0.5, `ai.toml
+  [thresholds]`) of the Region's threshold. Any rival: the human's climbs and a computer seat's
+  snipes alike. Before this no computer seat read a rival's Standing on a Region at all.
+- **Who answers** (the designer's a): the computer seat with the most Standing on that Region among
+  the seats not climbing (strictly the most, and some), and any computer seat holding a neighbour.
+  Four seats piling onto one Region is the pack's job (ticket #531), not this.
+- **The answer**: the Region's weight on the seat's Influence target list x(1 + 2 x the climb), so
+  x2 at half the threshold and x3 at it (`Game::ai_contest_lift`; the climb is the climber's
+  Standing over the threshold as the climber reads it, capped at 1); and the Influence steps that
+  would pass the climber's Standing this turn take the opportunity multiplier, enough to outbid
+  where the Allotment allows, else all of it (from the review: the first build lifted every step
+  alike and sized nothing). Agitate is not a lever here: it is an order against a Region a rival
+  HOLDS, and a neutral one has no holder to raise Unrest against.
+- **The measure**: `war.contests`, by seat, a contest counted once a Region a turn when the seat's
+  chosen orders place Influence on a contested Region (counted before End Turn commits them, so a
+  refused step counts still); the sweep prints it beside the escapes. The ticket's baseline figure,
+  23 / 42 / 4 / 10, was the version's opening sweep; the comparison here is to the latest, §11's.
+- **Swept** (`sweeps/ticket-618.txt`, 20 seeds x four seatings): **41 / 36 / 2 / 0 and 1 collapse**,
+  from the same day's 23 / 53 / 1 / 0 and 3 (§11). Not noise: the Custodians gain 18 wins and the
+  Prospectors lose 17, the swing in the three seatings where the Custodians do not sit first
+  (10 / 15 / 15 from 5 / 10 / 8, the Prospectors 10 / 4 / 5 from 15 / 10 / 12); the Custodians' own
+  seating is unchanged (1 / 17 / 1 / 0 from 0 / 16 / 1 / 0). Contests over a seating's 20 games run
+  466 to 609 across the four seats (76 to 213 by seat), about 25 a game across the table, so the
+  rule fires every turn somewhere. That sweep was of the first build, every step lifted alike;
+  **the sized spend re-swept** (`sweeps/ticket-618-sized.txt`): **37 / 39 / 1 / 2 and 1 collapse**,
+  the Custodians 1 / 9 / 13 / 14 by seating and the Prospectors 16 / 11 / 6 / 6, contests 436 to
+  535 a seating, Places taken by Influence 373 / 430 / 413 / 419. The two builds sit within noise
+  of each other; the swing is the rule's, not the sizing's.
+  Places taken by Influence 398 / 414 / 460 / 411 by seating from 394 / 404 / 402 / 401. The
+  reading: the Prospectors' snipes were the sniping, and a contest on them costs the sniper more
+  than the contest on the Custodians' slower climbs costs them. Reported and left: the figure is
+  the designer's to move (a higher `contest_from`, or a smaller lift), and the balance target is
+  15 / 15 / 15 / 15 and 20 collapses.
+
+## 16. The computer defends its Regions, and keeps a floor at home
+
+Ticket: [The computer defends its Regions: a rival's climb is answered with Influence](https://github.com/whaleyjoshua2/Dying-Earth/issues/619).
+
+The designer: *"Defend the home Region: answer a rival's Standing climb with Influence. I took two
+AI capitals in one turn each."*; on the ticket's questions, *"q1 yes q2 yes q3 b q4 yes"*.
+
+- **The premise, corrected**: a seat's home Region does NOT start with no Standing. Ticket #75 banks
+  the threshold there on turn one (40 for a size-2 Region), so a capital's price opens at 60, the
+  Standing plus the margin, and decays a point a turn; the computer never spent on a place it held,
+  so by the twenties a capital stood at about the threshold and one Allotment took it. The question
+  put to the designer said "the bare threshold"; the floor was chosen on that reading.
+- **The trigger**: a rival's Standing on a Region the seat holds at or over `defend_from` (0.5) of
+  the price that rival would pay, the greater of the threshold and the holder's Standing plus the
+  margin; on the home Region `defend_home_from` (0.25). `ai.toml [thresholds]`.
+- **The answer**: the held Region enters the seat's Influence target list (a held place was skipped
+  outright before), lifted x(1 + 2 x the climb), the home doubled (`Game::ai_defence_lift`: x2 at
+  half the price, x3 at it, x6 at it on the home; the ticket's "weighed double" read as the weight on
+  the list); the Influence steps that put the wall back above the climber's Standing plus the
+  climber's Allotment take the opportunity multiplier (`ai_defence_wanted`), within the seat's
+  means, and none where the threshold alone stands above that reach (from the review). The ticket's
+  draft sized the answer by "the rival's last turn's gain plus the decay"; no Standing history is
+  kept, and the question put to the designer, which they said yes to, sized it by the rival's
+  Allotment instead.
+- **The home floor**: the home Region is topped up to `home_floor` (20) Standing whenever it falls
+  under it, the top-up's steps at the opportunity multiplier. With the start at 40 and a point's
+  decay a turn, the floor first bites about turn 20; before that the defence alone answers.
+- **The measure**: `war.homes_lost` and `homes_taken`, by seat, counted at `transfer_control`
+  (by Influence or by force), printed by the sweep beside the contests.
+- **Swept** (`sweeps/ticket-619.txt`, 20 seeds x four seatings): **19 / 58 / 2 / 1 and 0
+  collapses**, from §15's 37 / 39 / 1 / 2 and 1. Not noise, and the other way: the Custodians 0 / 3
+  / 7 / 9 by seating from 1 / 9 / 13 / 14, the Prospectors 19 / 17 / 11 / 11 from 16 / 11 / 6 / 6.
+  Home Regions lost over a seating's 20 games: 14 / 25 / 16 / 25, the Prospectors losing the most
+  over the batch (5 / 16 / 10 / 11) and the Custodians taking the most (3 / 14 / 9 / 21, the first
+  seating the other way round); seat 0's start state lost
+  in 7 / 13 / 4 / 5 of 20 seeds from 11 / 18 / 11 / 9. Places taken by Influence 338 / 359 / 359 /
+  374 from 373 / 430 / 413 / 419. The reading: the Allotment is one budget, and a seat that defends
+  takes fewer Regions; the Custodians, whose Victory is Regions on Earth, pay for their defence in
+  wins, while the Prospectors lose their homes most and win regardless, their Victory being the
+  Fund and people off Earth. Reported and left: the triggers, the lifts and the floor are the
+  designer's levers, against the 15 / 15 / 15 / 15 target. The review's build (the threshold
+  guard in `ai_defence_wanted`) was re-swept and came out identical, every figure.
+
+## 17. The computer weighs the Collapse against its own win
+
+Ticket: [The computer Prospectors weigh Collapse: win before the world collapses](https://github.com/whaleyjoshua2/Dying-Earth/issues/620).
+
+The designer: *"AI Prospectors should weigh Collapse (they took the world to 'collapses on turn 34'
+in G3). A rational Prospector loses too if the world collapses. They just need to achieve victory
+before collapse."*; on the ticket's questions, *"q1 yes q2 a q3 a q4 yes q5 yes"*.
+
+- **The reading** (`Game::ai_win_turn`, `ai_loses_the_race`): the Collapse turn on the climate's
+  heading (`projection().collapse_turn`), against the seat's own win turn, this turn plus the rest
+  of its first Victory bar at the rate it has made it so far. The race is lost while the Collapse
+  falls at or before the win. A Stabilization run has no win turn and never loses the race: its win
+  is the cure. The rate is averaged from turn one, so a part that opens late (the Arkwrights'
+  Colonists off Earth, the Archivists' fund) reads slower than it is and its seat loses the race
+  sooner; the pace tables would read it finer, and are the lever if that proves too eager. The win
+  turn is clamped to the game's last turn (from the review: a tiny rate wrapped the cast). Before
+  this the computer read no Collapse at all.
+- **The answer** (`ai_collapse_weight`): while the race is lost, every candidate's weight is
+  multiplied once, across the whole list: an emitting order (a Strip Permit, an Industry Level, a
+  Facility whose card carries Emissions: the Factory, Mine, Power Plant, Refinery and Reactor,
+  built or restarted) by `collapse_emit_weight` (0.5), a cleaner one (a Facility with a sink, the
+  Scrubber and the Nature Reserve; the Wind Farm; a Leapfrog; an emitter mothballed) by
+  `collapse_clean_weight` (1.5), the rest by 1. In full the moment the race is lost, no scaling
+  (the designer's a). `ai.toml [thresholds]`. The ticket's draft had named a Mothball and "Clean
+  Power on the Directive" among the cleaners; the question put to the designer named the four
+  buildings, the Mothball and the Restart came back from the review, and the Directive is a
+  Research pick the Lead makes, not a build the planner weighs, so it stays out.
+- **Who reads it**: every computer seat (the designer's a); in play the Prospectors most, and the
+  Custodians never, their Victory being the run under the Sink.
+- **A win in sight**: within `win_in_sight` (3) turns of the bar at the current rate, the weighing is
+  off and the seat runs for the line.
+- **The measure**: `war.collapse_weighed`, the turns a seat weighed, by seat, printed by the sweep;
+  with the collapses, the end Temperature and the wins.
+- **Swept** (`sweeps/ticket-620.txt`, 20 seeds x four seatings): **17 / 58 / 2 / 2 and 1 collapse**,
+  from §16's 19 / 58 / 2 / 1 and 0: noise. The end Temperatures +2.50 / +2.37 / +2.32 / +2.05 by
+  seating from +2.50 / +2.40 / +2.33 / +2.07: within noise, a hair cooler. The rule fires: turns
+  weighed by seat 0 / 201 / 154 / 38, 180 / 0 / 65 / 3, 8 / 0 / 121 / 59 and 0 / 0 / 3 / 0, the
+  Prospectors' seat the most in every seating and the Custodians' never; about a fifth of the
+  Prospectors' turns in the two hot seatings, three turns in the cool fourth, where a Collapse is
+  seldom on the heading. Nature Reserves over a seating 64 / 58 / 29 / 6 from 36 / 57 / 15 / 10, Leapfrogs
+  359 / 586 / 809 / 689 from 303 / 575 / 876 / 683. The reading: the sweep's worlds seldom head for
+  a Collapse (0 to 3 of 80 all version), so the rule has little to weigh there; it bites in a game
+  like the designer's, where the heading said turn 34. Reported and left. The review's build (the
+  Mothball and Restart weights) was re-swept and came out identical, every figure: the computer
+  mothballs no emitter while the race is lost in those 80 games.
+
+## 18. The Prospectors' Venture Fund at 6,250
+
+Ticket: [The Prospectors' Venture Fund at 6,250](https://github.com/whaleyjoshua2/Dying-Earth/issues/623).
+
+The designer, while charting: *"prospectors fund requires 6250"*; on the build, *"make sure the seat
+is repaced"*.
+
+- **The bar**: `factions.toml`, `victory_first = { kind = "venture_fund", bar = 6250, weight = 0.7 }`,
+  from 5,000 (ticket #584). The Faction card, the Victory window, the turn-one line and the text
+  tool read it from the table: *"6,250 in the Venture Capital Fund, plus 20 living beyond Earth
+  orbit."*
+- **The seat repaced**: `ai.toml [pace.prospectors] first = [[12, 834], [25, 2084], [37, 3750],
+  [47, 6250]]`, every figure x 6250/5000 on the same turns, as the bar's last two moves were; the
+  test that holds the pace to the bar moved first and was watched red.
+- The fixtures that stood on the bar moved with it: the Moment at three quarters now reads *"5000
+  of 6250"*; the share test's fat output is 300 Ducats a turn, where 200 over the 34 turns from the
+  first waypoint wanted 92% and the seat maxed (the AI reading the new bar, as at #256);
+  `docs/playtest/PLAYTEST.txt` and `CONTEXT.md` say 6,250. The `rival:1` shot aid, from the review,
+  plants the Moment test's own figures, sixteen Colonists of twenty and 5,000 of 6,250 (0.752): its
+  old fourteen of eighteen and 3,800 of 5,000 scored 0.70 under the 0.75 bar with the gate shut, so
+  the Moment it exists for had not fired since the gate rule; the build had rescaled a dead figure.
+- **The pictures** (`ticket-623/fund-faction.png`, `rival-report.png`): the Faction choice screen,
+  the Prospectors' Victory Condition reading the new bar; and the rival's Moment from the mended
+  aid, *"5000 of 6250"* over *"Prospectors are three quarters of the way to Victory: Venture
+  Capital Fund at 5000 of 6250."*
+- **Swept** (`sweeps/ticket-623.txt`, 20 seeds x four seatings): **18 / 61 / 0 / 1 and 0 collapses**,
+  from §17's 17 / 58 / 2 / 2 and 1: noise. **The bar does not bite**: the Fund at the end a median
+  6,775 / 6,716 / 6,459 / 6,368 by seating of the 6,250 asked, from 5,344 / 5,311 / 5,117 / 5,026 of
+  5,000, the computer banking to its pace, as the ticket foresaw of #584; the Prospectors' gate
+  completed in 80 of 80, median turn 29, unchanged. The reading: a bar the computer paces to moves
+  nothing on the sweep board; it bites on the human Prospector, whose Fund is not paced. Reported
+  and left.

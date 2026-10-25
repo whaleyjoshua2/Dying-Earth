@@ -49,19 +49,21 @@ production_moved_factor = 2.08
 # costs 3 and is paid in Widgets); and the last sentence says their lever on Earth and its price.
 signature = "The Scrubber, Leapfrog and Production Moved. Only they build a Scrubber, in a Region they control, without a slot: {scrubber_materials} Materials, {scrubber_widgets} Widgets, {scrubber_upkeep} Energy and {scrubber_ducats} Ducat upkeep. Online it adds {scrubber_sink} ppm a turn to the Natural Sink and takes {scrubber_fall} off the Region's Unrest; one per {scrubber_people} people, {scrubber_min} to {scrubber_max}; half if another Faction takes the Region, a quarter if it goes neutral. A Leapfrog costs {leapfrog} Ducats and cuts a Region's Emissions for good. Production Moved: while a Factory, Mine, Power Plant, Refinery or Research Lab of theirs stands mothballed, a matching Module of theirs off Earth makes x{moved_factor}, one for one. Their lever on Earth is switching industry off, at home or in a Region they have taken: each Mothball there costs +{mothball} Unrest."
 # Ticket #594 (version 0.1.0.4), at the designer's word: the signature moves turn one opens with,
-# in the Report's place. {your} is "their" on a rival's row; the Archive's line names no Body.
-opening_moves = "Build Scrubbers and Nature Reserves; Leapfrog {your} Regions"
+# in the Report's place. Ticket #607 (version 0.1.0.5), at the designer's word: two sentences, the first
+# turn's orders then the second's, no turn labels, shown to the player's own Faction alone.
+opening_moves = "Build a Scrubber at home and spend your Influence. Leapfrog a Region you hold and recruit Pioneers."
 # Ticket #203 (version 0.08.1): the Unique Facility in one sentence, for the Faction card and the
 # Faction window. Ticket #186 built the Academy; nothing on any card named it until now.
 unique = "Academy -- replaces the School and the Institute, and pays +1 Ducat a turn while it is online."
-victory = "Stabilization (4 consecutive Climate phases with net Emissions below the Natural Sink) plus 18 Colonists living beyond Earth orbit."
+victory = "Stabilization (4 consecutive Climate phases with net Emissions below the Natural Sink) plus 20 Colonists living beyond Earth orbit."
 # Ticket #350 (version 0.09.1): the Condition in one clause for the turn-1 Report line, in the
 # designer's approved words. {first}, {second} and {bodies} are filled from the bars below, so a
 # moved bar moves the line; the old line told every Faction "get twelve Colonists off Earth".
 victory_short = "reach Stabilization, {first} Climate phases running with Emissions under the Natural Sink, with {second} Colonists living beyond Earth orbit,"
 # Ticket #506 (version 0.1.0.0): a run of four and 18 off Earth, with the game at fifty turns.
 victory_first = { kind = "stabilization_run", bar = 4 }
-victory_second = { kind = "off_world_presence", bar = 18 }
+# Ticket #625 (version 0.1.0.5), at the designer's word: 20, from 18.
+victory_second = { kind = "off_world_presence", bar = 20 }
 # Ticket #471 (version 0.09.7): the Opening Objective -- no deadline, met once, rewarded once.
 opening = { kind = "scrubber_working", reward = 0.5, text = "Have a Scrubber working", reward_text = "+0.5 ppm on the Natural Sink, for good" }
 # Ticket #504 (version 0.1.0.0): the Second Objective, open once the Opening Objective is met.
@@ -109,8 +111,10 @@ market_multiplier = 0.85
 resentment = 0.0
 # Ticket #535 (version 0.1.0.1): Relations lost per 10 Influence another spends on a Greenwash.
 greenwash_resentment = 0.05
-signature = "Cheap Industry and the Strip Permit. Raising Industry Level costs them 15 Materials rather than 30, every Facility and Module 15% less; their Regions pay a fifth more Ducats and the Trading window sells to them at 15% off. A Strip Permit costs 25 Ducats and may be taken once in a Region's whole life: for three turns every Facility there produces double, and when it ends that Region's Baseline Emissions rise by 0.2 for good and its Unrest by 2. The Venture Capital Fund: each turn they set what share of their Ducat income is banked in it, 0% to 80% in whole percents; a withdrawal returns nine tenths. They open with {start_materials} Materials, where others hold {common_materials}."
-opening_moves = "Investment Banks + Venture share"
+# Ticket #622 (version 0.1.0.5), at the designer's word: the rise 0.3, a point off with every rival, no growth
+# while it runs, in the sentence.
+signature = "Cheap Industry and the Strip Permit. Raising Industry Level costs them 15 Materials rather than 30, every Facility and Module 15% less; their Regions pay a fifth more Ducats and the Trading window sells to them at 15% off. A Strip Permit costs 25 Ducats and may be taken once in a Region's whole life: for three turns every Facility there produces double and nobody grows there, every rival likes them a point less, and when it ends that Region's Baseline Emissions rise by 0.3 for good and its Unrest by 2. The Venture Capital Fund: each turn they set what share of their Ducat income is banked in it, 0% to 80% in whole percents; a withdrawal returns nine tenths. They open with {start_materials} Materials, where others hold {common_materials}."
+opening_moves = "Build an Investment Bank and set your Venture share. Raise Industry Level and recruit Pioneers."
 # Ticket #203 (version 0.08.1). The building is ticket #182's.
 unique = "Investment Bank -- replaces the Bank, and banks 1% interest a turn on the Venture Capital Fund's balance, one building per Region paying, never less than 1 Ducat in all. Off Earth, the Exchange -- replaces the Trade Post, and pays 1 more Ducat a turn."
 # Ticket #72: the Extraction Total is retired; the first part is Ducats banked in the Fund.
@@ -134,8 +138,11 @@ victory_short = "put {first} Ducats in the Venture Capital Fund with {second} Co
 # Moon (#564) putting the Prospectors first there in 16 to 19 games of 20 and at 56 wins of 80.
 # Ticket #584 (version 0.1.0.4), at the designer's word: 5,000, with the Prospectors at 41 wins of 80 on
 # 0.1.0.3's closing board and the 4,250 bar not biting (the computer banks to its pace).
-victory_first = { kind = "venture_fund", bar = 5000, weight = 0.7 }
-victory_second = { kind = "off_world_presence", bar = 18 }
+# Ticket #623 (version 0.1.0.5), at the designer's word: 6,250 ("prospectors fund requires 6250"), with the
+# Prospectors at 36 to 58 wins of 80 through the version's sweeps and the Fund ending a median 5,026 to
+# 5,344, just over the 5,000 bar: the computer banks to its pace.
+victory_first = { kind = "venture_fund", bar = 6250, weight = 0.7 }
+victory_second = { kind = "off_world_presence", bar = 20 }
 # Ticket #471 (version 0.09.7): the Opening Objective -- no deadline, met once, rewarded once.
 # Ticket #478 (version 0.09.8): 75 Ducats to 50, and the three Banks must work three Incomes running.
 opening = { kind = "investment_banks", count = 3, turns = 3, reward = 50.0, text = "Keep a working Investment Bank in three places for three turns", reward_text = "50 Ducats into the Venture Capital Fund" }
@@ -212,7 +219,7 @@ start_extra_facilities = ["power_plant"]
 # Ticket #407 (version 0.09.4): audited against the data: 16 with Generation Ships too, and a
 # Colony Ship at 25.5 since figures are carried to a tenth.
 signature = "Coach Class. A Colony Ship carries 6 Colonists, 9 with Expanded Habitats and 12 with Generation Ships too, and their Habitats hold half again as many, 6 and 12. They recruit 3 Pioneers a turn in each state where others recruit 2, but every Pioneer takes half again the population. Every Ship costs them 15% less, a Colony Ship 28.1 Materials; a transit burns three quarters of the Fuel; and, starting with no station, a Space Station costs them 22 Materials and a Module three quarters. They draw +{per_body} Research a turn for each Body they have settled."
-opening_moves = "Colony Ships to four Bodies"
+opening_moves = "Build a Space Station over Earth and recruit Pioneers. Put a Shipyard on it, for the Colony Ship that takes them to the Moon."
 # Ticket #419 (version 0.09.4): Unrest off every Region they hold, a whole point for each ground
 # Colony they found off Earth (Antarctica excepted) and half a point for each Space Station they
 # build; a place taken counts for nothing.
@@ -220,14 +227,16 @@ found_colony_unrest_ease = 1.0
 found_station_unrest_ease = 0.5
 # Ticket #203 (version 0.08.1). The building is ticket #183's.
 unique = "Spaceport -- replaces the Launch Site, and pays +1 Influence into next turn's Allotment for every Pioneer it lifts off Earth. Off Earth, the Chorus -- replaces the Relay, and adds +1 Influence to the Allotment for every 6 Colonists at its Colony."
-victory = "Diaspora: 42 Colonists living beyond Earth orbit, on Colonies spread over at least four Bodies with at least 4 Colonists each, one of them holding a Colonial Capital of yours (Earth is not one of the four)."
+victory = "Diaspora: 44 Colonists living beyond Earth orbit, on Colonies spread over at least four Bodies with at least 4 Colonists each, one of them holding a Colonial Capital of yours (Earth is not one of the four)."
 victory_short = "get {first} Colonists living beyond Earth orbit, spread over {bodies} Bodies, one holding a Colonial Capital,"
 # Ticket #506 (version 0.1.0.0): 42 (30 x 50/36) and four Bodies, with the game at fifty turns.
 # Ticket #555 (version 0.1.0.2): the Colonists off Earth count 0.6 of the score, the Bodies 0.4.
 # Ticket #567 (version 0.1.0.3): the Capital they must hold is a tenth of the score -- 0.6 Colonists,
 # 0.3 Bodies, 0.1 Capital -- so both bars met without one reads 90%, where it read 100%. Ticket #601
 # (version 0.1.0.4): the parts are 94% of the whole beside the gate's 6%, so that reads 91%.
-victory_first = { kind = "colonists_off_earth", bar = 42, weight = 0.6, capital_weight = 0.1 }
+# Ticket #625 (version 0.1.0.5), at the designer's word: 44, from 42, the four on each Body kept -- every
+# off-world population bar up by 2.
+victory_first = { kind = "colonists_off_earth", bar = 44, weight = 0.6, capital_weight = 0.1 }
 victory_second = { kind = "colonies_on_bodies", bodies = 4, colonists_each = 4 }
 # Ticket #514 (version 0.1.0.0): and a Colonial Capital of theirs must stand, at a Colony they direct
 # off Earth, before they win -- a gate on the win like the gate Tech, at the designer's word ("add a
@@ -275,7 +284,7 @@ influence_multiplier = 1.0
 # Ticket #407 (version 0.09.4): audited against the data: the 75% contribution of ticket #235,
 # which the text had never said.
 signature = "Provisional Findings. While at least {provisional}% of their Research went to the shared Tech last turn, they already have half the effect of the Tech under research: a multiplier x reads 1 + (x - 1) / 2, an addition reads half rounded down, and immunities do not carry. Keeping back more switches it off for the turn after. Their Research is x1.5 on Earth and x1.75 off it, an Observatory on a station over Earth counting as off."
-opening_moves = "Labs + Directive; Archive"
+opening_moves = "Build a Research Lab and set the Directive. Recruit Pioneers and build a Habitat on Axiom."
 # Ticket #412 (version 0.09.4): each time they lead a Tech to completion, 5 Influence at once and
 # half a point of Unrest off every Region they hold.
 lead_influence = 5
@@ -286,7 +295,7 @@ unique = "Reactor -- replaces the Power Plant, and takes a quarter off the Energ
 # Ticket #347 (version 0.09.1): 125 of it, and the fund holds the whole figure from the first turn.
 # This bar IS `[archive] research` in modules.toml -- one figure written in two files, the Archive's
 # cost and the Archivists' bar, and a test asserts the two are equal so they cannot drift.
-victory = "Build the Archive on the ground beyond Earth orbit (55 Materials, three turns, and four Colonists must live there to begin it), pay {first} Research into it and keep it running, then upload {second} Colonists into it, four a turn at most, from the people living where it stands."
+victory = "Build the Archive on the ground beyond Earth orbit (55 Materials, three turns, at a place of Colony tier), pay {first} Research into it and keep it running, then upload {second} Colonists into it, four a turn at most, from the people living where it stands."
 victory_short = "build the Archive on the ground beyond Earth orbit, pay {first} Research into it, and upload {second} Colonists,"
 # Ticket #506 (version 0.1.0.0): 225 and 18 uploads, at the designer's word, with the game at fifty turns.
 # Ticket #555 (version 0.1.0.2): the Archive fund counts 0.4 of the score, the uploads 0.6.

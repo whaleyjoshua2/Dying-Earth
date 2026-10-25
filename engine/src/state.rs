@@ -1171,6 +1171,12 @@ pub struct SeatState {
     pub produced: Stockpile,
     /// Last Income by source (ticket #31): "Factory in Asia", the resource, the amount; upkeep as negatives.
     pub income_sources: Vec<(String, Resource, f64)>,
+    /// Ticket #609 (version 0.1.0.5): last Income's Energy BY PLACE -- the place's name, the Energy
+    /// its buildings made, the upkeep they paid -- in the order the Income met them, the Ships' and
+    /// Armies' upkeep last as a place of its own. The top bar's Energy hover reads it, one line a
+    /// place. Recomputed every Income, so an older save loads with it empty until its first.
+    #[serde(default)]
+    pub energy_by_place: Vec<(String, f64, f64)>,
     /// Ticket #51: Research banked for the Archive, capped at what its remaining stages still need.
     pub archive_fund: i64,
     /// Ticket #51: Fund the Archive was ordered this turn, so this turn's Lab Research went to the
@@ -1298,6 +1304,20 @@ pub struct WarCounters {
     /// Ticket #297 (version 0.08.6): Dig In orders committed, by seat.
     #[serde(default)]
     pub dig_ins: [u32; SEAT_COUNT],
+    /// Ticket #618 (version 0.1.0.5): contests -- a computer seat's Influence placed on a neutral
+    /// Region a rival stands at over `contest_from` of the threshold -- by seat, once a Region a turn.
+    #[serde(default)]
+    pub contests: [u32; SEAT_COUNT],
+    /// Ticket #619 (version 0.1.0.5): home Regions lost, by the seat that lost one, and taken, by
+    /// the seat that took one.
+    #[serde(default)]
+    pub homes_lost: [u32; SEAT_COUNT],
+    #[serde(default)]
+    pub homes_taken: [u32; SEAT_COUNT],
+    /// Ticket #620 (version 0.1.0.5): turns on which a seat weighed its orders against the Collapse
+    /// (the Collapse on the heading before its own win), by seat.
+    #[serde(default)]
+    pub collapse_weighed: [u32; SEAT_COUNT],
     /// Ticket #300 (version 0.08.6): Armies landed from a Carrier at a Colony, by seat. Never
     /// counted before; the reviews measured no Army carried by anybody in eighty games.
     #[serde(default)]
@@ -1404,6 +1424,10 @@ impl WarCounters {
             self.orbit_attacks_off_earth[i] += o.orbit_attacks_off_earth[i];
             self.escapes[i] += o.escapes[i];
             self.dig_ins[i] += o.dig_ins[i];
+            self.contests[i] += o.contests[i];
+            self.homes_lost[i] += o.homes_lost[i];
+            self.homes_taken[i] += o.homes_taken[i];
+            self.collapse_weighed[i] += o.collapse_weighed[i];
             self.armies_landed[i] += o.armies_landed[i];
             self.interceptions[i] += o.interceptions[i];
             self.batteries_lost[i] += o.batteries_lost[i];
@@ -1454,6 +1478,11 @@ pub struct BattleParty {
     /// and is wiped at the next, so no save carries a first-round figure under this name for long.
     #[serde(default)]
     pub odds: Option<f64>,
+    /// Ticket #614 (version 0.1.0.5): every unit of the party by name, destroyed or not, so the
+    /// Moment can say who destroyed whom; `units` is prose and `destroyed` the losses alone. Empty
+    /// on a bombardment or a Launch, and in a save from before this ticket.
+    #[serde(default)]
+    pub names: Vec<String>,
 }
 
 /// One line of the Battle Report (spec 10.3), amended by ticket #50: every party present.
@@ -1889,6 +1918,7 @@ impl Game {
             income_last_turn: Stockpile::default(),
             produced: Stockpile::default(),
             income_sources: Vec::new(),
+            energy_by_place: Vec::new(),
             archive_fund: 0,
             funding_archive: false,
             research_directive: 0,
@@ -2447,6 +2477,13 @@ impl Game {
     /// Body -- no station will do, over Earth or anywhere.
     pub fn may_hold_archive(&self, c: &Colony) -> bool {
         c.body != BodyId::Earth && !c.in_orbit
+    }
+
+    /// Ticket #625 (version 0.1.0.5): a SITE for the Archive -- a place that may hold it and has
+    /// climbed to the tier it asks for (the Colony tier; a higher one counts). Read by the order's
+    /// check and by the computer Archivists, who name a site and ferry people until one stands.
+    pub fn may_site_archive(&self, c: &Colony) -> bool {
+        self.may_hold_archive(c) && c.tier >= self.tables.archive_tier()
     }
 
     /// Ticket #209 (version 0.08.1): the Archivists have nowhere to put the Archive and have not
@@ -4412,13 +4449,42 @@ impl Game {
 
     /// Ticket #522 (version 0.1.0.0): where this turn's Allotment came from, a line a part, the first
     /// bare and the rest signed -- *"Regions and buildings 14"*, *"Spaceport lifts +9"*. Six at most.
+    /// Ticket #616 (version 0.1.0.5): on turn one no Income has recorded them, so the parts are read
+    /// live; the top bar's hover and the Region card's read one list.
     pub fn allotment_lines(&self, seat: Seat) -> Vec<String> {
-        self.seat(seat).allotment_parts.iter().take(6).enumerate().map(|(i, (label, n))| if i == 0 { format!("{label} {n}") } else { format!("{label} {n:+}") }).collect()
+        let recorded = &self.seat(seat).allotment_parts;
+        let live;
+        let parts = if recorded.is_empty() { live = self.influence_allotment_parts(seat); &live } else { recorded };
+        parts.iter().take(6).enumerate().map(|(i, (label, n))| if i == 0 { format!("{label} {n}") } else { format!("{label} {n:+}") }).collect()
     }
 
     /// Ticket #345 (version 0.09.1): which seat was first to a Body, and at which Colony.
     pub fn first_at(&self, body: BodyId) -> Option<(Seat, ColonyId)> {
         self.body_firsts.iter().find(|f| f.body == body).map(|f| (f.seat, f.colony))
+    }
+
+    /// Ticket #617 (version 0.1.0.5): the text tool's line under a Body -- who landed first and
+    /// when (the Colony's founding turn: a first's Colony is never removed, ticket #586), or the
+    /// prize still open. None for a Body with no first to claim (Earth's windfall is 0).
+    pub fn first_landing_line(&self, body: BodyId) -> Option<String> {
+        let card = self.tables.body(body);
+        if card.first_windfall == 0 {
+            return None;
+        }
+        Some(match self.first_at(body) {
+            Some((seat, colony)) => match self.colony(colony) {
+                Some(c) => format!("first landing: the {}, turn {}", self.seat_name(seat), c.founded_turn),
+                None => format!("first landing: the {}", self.seat_name(seat)),
+            },
+            None => format!("first landing: nobody yet, {} Influence to the first", card.first_windfall),
+        })
+    }
+
+    /// Ticket #617 (version 0.1.0.5): the window's race block in one line, leader first, in the
+    /// steps' own words; gone once somebody lands, as the block is.
+    pub fn moon_race_line(&self) -> Option<String> {
+        let race = self.moon_race()?;
+        Some(format!("race to the Moon: {}", race.iter().map(|(seat, step)| format!("{} {}", self.seat_name(*seat), step.words())).collect::<Vec<_>>().join(", ")))
     }
 
     /// Ticket #481 (version 0.09.8): **how far a Faction has got toward landing on the Moon**: the
@@ -5776,6 +5842,20 @@ impl Game {
     /// is what keeps the spirit of 0.08.0's per-turn charge while giving the designer the
     /// proportionality they asked for: a turn pushing on three of a rival's places genuinely costs
     /// three times a turn pushing on one.
+    /// Ticket #622 (version 0.1.0.5): **a move on the deeds score with every rival at once**, by
+    /// `delta`, clamped to the scale -- never an Offence, so nothing goes on the ledger and no
+    /// Accord breaks. A card's `RelationsAllRivals` and the Strip Permit's point off both read it.
+    pub fn move_deeds_with_every_rival(&mut self, seat: Seat, delta: i64) {
+        let c = self.tables.relations.clone();
+        for rival in Seat::ALL {
+            if rival == seat {
+                continue;
+            }
+            let (v, o) = (rival.index(), seat.index());
+            self.relations.score[v][o] = (self.relations.score[v][o] + delta).clamp(c.worst, c.deeds_ceiling);
+        }
+    }
+
     pub fn offend_by(&mut self, offender: Seat, victim: Seat, weight: i64) {
         if offender == victim || weight <= 0 {
             return;

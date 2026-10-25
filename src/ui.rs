@@ -2836,7 +2836,7 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
             // Ticket #332 (version 0.09.0): Widgets, the work half of every build, beside the
             // Materials half. The figure is MADE / APPLIED -- what every place the player directs
             // makes a turn, and what was applied at the last Resolution -- Faction-wide, at the
-            // designer's word; the hover lists each place's rate, its makers and its queue. Drawn
+            // designer's word; the hover (ticket #609, version 0.1.0.5) lists the makers and what went into builds. Drawn
             // by hand rather than through `bar_resource`, so the hover goes through `rule_tip` and
             // the `tip:` aid can photograph it.
             {
@@ -2864,29 +2864,28 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
             ui.separator();
             // Ticket #351 (version 0.09.1): the Shortfall alarm. While the next Income would shut
             // anything -- counting what this turn's orders do to the Energy -- the figure turns red and
-            // its hover names what goes dark, in order, in place of the Last Income breakdown.
+            // its hover names what goes dark, in order -- under the Last Income lines since ticket #609.
             let energy = format!("{} ({})", figure(left.energy), signed(inc.energy));
-            match (!session.spectator).then(|| game.shortfall_forecast(Seat(0), &session.pending)).flatten() {
-                Some(f) => {
-                    let resp = ui
-                        .horizontal(|ui| {
-                            ui.spacing_mut().item_spacing.x = 4.0;
-                            match icons.image("energy", 16.0) {
-                                Some(image) => {
-                                    ui.add(image);
-                                    ui.label(RichText::new(energy).strong().color(SHORT_RED));
-                                }
-                                None => {
-                                    ui.label(RichText::new(format!("Energy {energy}")).strong().color(SHORT_RED));
-                                }
-                            }
-                        })
-                        .response
-                        .interact(egui::Sense::hover());
-                    rule_tip(resp, shortfall_hover(&f));
-                }
-                None => bar_resource(ui, icons, "energy", "Energy", energy, sources(dying_earth_engine::Resource::Energy)),
-            }
+            // Ticket #609 (version 0.1.0.5): one drawing for both cases, through `rule_tip` as the
+            // Widgets figure is, so the hover reads the same shape short or not and the `tip:` aid
+            // can photograph it; the figure turns red while a shortfall is forecast, as before, and
+            // what goes dark is appended under the sources rather than replacing them.
+            let short = (!session.spectator).then(|| game.shortfall_forecast(Seat(0), &session.pending)).flatten();
+            let resp = ui
+                .horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = 4.0;
+                    let text = match icons.image("energy", 16.0) {
+                        Some(image) => {
+                            ui.add(image);
+                            RichText::new(energy).strong()
+                        }
+                        None => RichText::new(format!("Energy {energy}")).strong(),
+                    };
+                    ui.label(if short.is_some() { text.color(SHORT_RED) } else { text });
+                })
+                .response
+                .interact(egui::Sense::hover());
+            rule_tip(resp, energy_bar_hover(game, short.as_ref()));
             ui.separator();
             bar_resource(ui, icons, "ducats", "Ducats", format!("{} ({})", figure(left.ducats), signed(inc.ducats)), sources(dying_earth_engine::Resource::Ducats));
             // Ticket #72: the Prospectors' Fund stood beside their Materials from version 0.05.5,
@@ -4108,12 +4107,8 @@ fn first_to_body_line(ui: &mut Ui, session: &Session, game: &Game, body: BodyId)
     };
     rule_tip(
         resp,
-        format!(
-            // Measured on the capture: the first draft of this hover ran to seven rendered lines
-            // against a ceiling of six, so it lost the words that said where the windfall lands and
-            // whose Allotment the trickle joins. Both are on the Colony's own card.
-            "Paid once, after the landing, to the first Faction ever to settle this world's ground; that Colony's Core then adds +{standing} Influence a turn while they direct it.\nA station claims nothing, the other slots stay open, and retaking a lost Colony never pays again."
-        ),
+        // Ticket #616 (version 0.1.0.5): cut to the designer's line, with the clause that bites kept.
+        first_landing_hover(standing),
     );
 }
 
@@ -4130,16 +4125,8 @@ fn moon_race_block(ui: &mut Ui, session: &Session, game: &Game, body: BodyId) {
         "How far each Faction has got toward landing here, the leader first. Everyone sees it, until somebody lands.".to_string(),
     );
     for (seat, step) in race {
-        let words = match step {
-            MoonStep::NoShipyard => "no Shipyard",
-            MoonStep::Shipyard => "has a Shipyard",
-            MoonStep::ColonyShip => "has a Colony Ship",
-            MoonStep::Aboard => "Colonists aboard",
-            MoonStep::Bound => "on the way",
-            MoonStep::InOrbit => "in the Moon's orbit",
-            MoonStep::Landed => "landed",
-        };
-        ui.label(RichText::new(format!("{}: {words}", game.seat_name(seat))).color(seat_colour(session, seat)));
+        // Ticket #617 (version 0.1.0.5): the words are the step's own, shared with the text tool.
+        ui.label(RichText::new(format!("{}: {}", game.seat_name(seat), step.words())).color(seat_colour(session, seat)));
     }
 }
 
@@ -4895,9 +4882,9 @@ fn command_cluster(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewS
                 };
                 let can_tick = on || target.is_some();
                 let resp = ui.add_enabled(can_tick, egui::Checkbox::new(&mut on, label));
-                let resp = resp
-                    .on_hover_text("Spend your whole Allotment on this place at the start of every turn from now on. It is placed as an ordinary order you can read and cancel before ending the turn, never spent behind your back; cancelling it, or losing the place, ends it.")
-                    .on_disabled_hover_text("Click a Region or a Colony first.");
+                // Ticket #616 (version 0.1.0.5): through `rule_tip`, which hovers both states alike, so
+                // the greyed box keeps its own words by the branch here.
+                let resp = rule_tip(resp, if can_tick { ALLOTMENT_ORDER_HOVER.to_string() } else { "Click a Region or a Colony first.".to_string() });
                 if resp.changed() {
                     if let Some(i) = session.pending.iter().position(|o| matches!(o, Order::SetMaxStanding { .. })) {
                         actions.push(Action::Cancel(i));
@@ -5784,7 +5771,8 @@ fn order_text(game: &Game, earlier: &[Order], o: &Order) -> String {
         // Ticket #54.
         Order::Change { building, what } => format!("{} the {} at {}", what.name(), building_name(game, *building), game.place_name(building.place())),
         Order::Leapfrog { state } => format!("Leapfrog {}: its people emit {:.2} less per hundred million", game.tables.state(*state).name, game.tables.climate.population_emissions_per_level * game.tables.units_per_hundred_million()),
-        Order::StripPermit { state } => format!("Strip Permit in {}: three turns of double output", game.tables.state(*state).name),
+        // Ticket #622 (version 0.1.0.5): the growth and the point, in the note.
+        Order::StripPermit { state } => format!("Strip Permit in {}: three turns of double output, no growth there, a point off with every rival", game.tables.state(*state).name),
         Order::ExodusCall { state } => format!("Exodus Call in {}: a doubled muster at the ordinary cost in people", game.tables.state(*state).name),
         // Ticket #192 (version 0.08.0): the Upload.
         Order::Upload { colony, n } => format!("Upload {} into the Archive at {}", counted(n, "Colonist", "Colonists"), game.place_name(Place::Colony(*colony))),
@@ -5965,18 +5953,20 @@ fn tip_fires(ctx: &egui::Context, text: &str) -> bool {
 const ACCORD_BREAK: Color32 = Color32::from_rgb(236, 88, 76);
 
 /// Ticket #569 (version 0.1.0.3): the words for an Influence spend that would break an Accord --
-/// the red note beside the button, "breaks your Accord with X", and the face the armed button
-/// wears, "Break the Accord with X and spend N" -- or `None` where the spend crosses nobody.
+/// the red note beside the button, "breaks Accord", and the face the armed button wears, "Break the
+/// Accord and spend N" (both named the partner until ticket #611) -- or `None` where the spend
+/// crosses nobody.
 fn influence_break(game: &Game, target: Place, amount: i64) -> Option<(String, String)> {
-    let partner = game.order_crosses(Seat(0), &Order::Influence { target, amount, break_accord: false })?;
-    let name = game.seat_name(partner);
-    Some((format!("breaks your Accord with {name}"), format!("Break the Accord with {name} and spend {amount}")))
+    // Ticket #611 (version 0.1.0.5), at the designer's word: "breaks Accord", no name -- the Accord
+    // row names the partner -- on the note and on the armed button alike.
+    game.order_crosses(Seat(0), &Order::Influence { target, amount, break_accord: false })?;
+    Some(("breaks Accord".to_string(), format!("Break the Accord and spend {amount}")))
 }
 
 /// Ticket #569 (version 0.1.0.3), at the designer's word: an Influence button. A spend that crosses
 /// nobody is placed at the first click. One that would break an Accord carries the red note beside
 /// it and in its hover, and wants two clicks: the first arms it -- this place at this amount, the
-/// review -- and it reads "Break the Accord with X and spend N" in red; the second places the order
+/// review -- and it reads "Break the Accord and spend N" in red; the second places the order
 /// with the break meant, which the engine's door otherwise refuses. Returns the order to place. The
 /// hover goes through `rule_tip`, the refusal first and the words after it (ticket #380).
 #[allow(clippy::too_many_arguments)]
@@ -6825,19 +6815,53 @@ fn eye_source(game: &Game, seat: Seat, body: BodyId) -> String {
     }
 }
 
-/// Ticket #332: the top bar's Widgets hover -- the two figures explained, then a line per place
+/// Ticket #332: the top bar's Widgets hover -- until ticket #609 the two figures explained, then a line per place
 /// the player directs with its rate, its makers and its queue.
+/// Ticket #609 (version 0.1.0.5), at the designer's word: the Fuel's shape -- "Made a turn:" then
+/// one line a maker, "+4  the Factory (China)", closing with what went into builds at the last
+/// Resolution; the queue lines go, every hatched tile carrying its own.
 fn widgets_bar_hover(game: &Game, made: i64, applied: i64) -> String {
-    let mut lines = vec![format!(
-        "Widgets: {made} made a turn across the places you direct, {applied} applied at the last Resolution."
-    )];
+    let mut lines = vec![format!("Made a turn: {made}")];
     for place in directed_places(game, Seat(0)) {
-        let rate = game.widgets_at(place);
-        let makers = widget_makers(game, place);
-        let breakdown = if makers.is_empty() { "nothing makes any".to_string() } else { makers.iter().map(|(name, n)| format!("{n} from {name}")).collect::<Vec<_>>().join(", ") };
-        let queue: Vec<String> = game.queue_at(place).iter().zip(game.queue_estimates(place)).map(|(b, t)| queue_line(game, place, b, t)).collect();
-        let queue = if queue.is_empty() { "nothing under way".to_string() } else { queue.join("; ") };
-        lines.push(format!("{}: {rate} a turn ({breakdown}). {queue}.", game.place_name(place)));
+        for (name, n) in widget_makers(game, place) {
+            lines.push(format!("{}  {name} ({})", signed(n as f64), game.place_name(place)));
+        }
+    }
+    if lines.len() == 1 {
+        lines[0] = "Nothing makes Widgets at the places you direct.".to_string();
+    }
+    lines.push(format!("{applied} went into builds last turn."));
+    lines.join("\n")
+}
+
+/// Ticket #609 (version 0.1.0.5), at the designer's word: the top bar's Energy hover, one line a
+/// place, net, its parts in brackets -- "+8  China (12 made, 4 upkeep)", "-3  Ships and Armies" --
+/// from the figures the Income kept by place; what goes dark is appended under it only while the
+/// coming Resolution's forecast is short, where it replaced the list.
+fn energy_bar_hover(game: &Game, short: Option<&dying_earth_engine::ShortfallForecast>) -> String {
+    // A line is bare where only one side has a figure ("-1  ISS over Earth", "+6  Reactor relief");
+    // the brackets only where both do.
+    let line = |place: &str, made: f64, upkeep: f64| {
+        let net = signed(made - upkeep);
+        if made == 0.0 || upkeep == 0.0 { format!("{net}  {place}") } else { format!("{net}  {place} ({} made, {} upkeep)", figure(made), figure(upkeep)) }
+    };
+    let places: Vec<&(String, f64, f64)> = game.seat(Seat(0)).energy_by_place.iter().filter(|(_, made, upkeep)| *made != 0.0 || *upkeep != 0.0).collect();
+    // Six lines (the review): the heading and at most five lines under it, the places past the
+    // fourth folded into one net line, so a wide board does not run the hover down the screen.
+    const SHOWN: usize = 4;
+    let mut lines: Vec<String> = places.iter().take(if places.len() > SHOWN + 1 { SHOWN } else { places.len() }).map(|(p, m, u)| line(p, *m, *u)).collect();
+    if places.len() > SHOWN + 1 {
+        let rest = &places[SHOWN..];
+        let (made, upkeep) = rest.iter().fold((0.0, 0.0), |(m, u), (_, pm, pu)| (m + pm, u + pu));
+        lines.push(line(&format!("{} more places", rest.len()), made, upkeep));
+    }
+    if lines.is_empty() {
+        lines.push("No Energy made or owed last turn.".to_string());
+    } else {
+        lines.insert(0, "Last Income:".to_string());
+    }
+    if let Some(f) = short {
+        lines.push(shortfall_hover(f));
     }
     lines.join("\n")
 }
@@ -7043,13 +7067,9 @@ fn stance_row(ui: &mut Ui, game: &Game, pending: &[Order], current: Stance, make
 fn influence_row(ui: &mut Ui, game: &Game, session: &Session, view: &mut ViewState, target: Place, controls: bool, actions: &mut Vec<Action>) {
     // Ticket #64: a spectator reads every Faction's Standing here and spends nothing.
     if session.spectator {
-        let threshold = game.influence_threshold(target);
-        // Ticket #372 (version 0.09.2): the margin as the rule reads it, not the flat base.
-        let explain = match game.place_control(target).controller() {
-            Some(c) => format!("Held by the {}. A rival needs their Standing plus {}, and at least the threshold. Decays {} a turn for the holder.", game.seat_name(c), margin_words(game, None, target), game.tables.influence.decay_controlled),
-            None => format!("First to {threshold} takes it. Decays {} a turn.", game.tables.influence.decay),
-        };
-        standings_row(ui, game, session, target, threshold, explain);
+        // Ticket #608 (version 0.1.0.5): the row's own hover went with the player's; the spectator
+        // reads the label's tip, the sums in it.
+        standings_row(ui, game, session, target);
         return;
     }
     if controls {
@@ -7096,17 +7116,10 @@ fn influence_row(ui: &mut Ui, game: &Game, session: &Session, view: &mut ViewSta
     // over that relays the same information in far fewer words."*
     // Ticket #372 (version 0.09.2): the price by the rule that takes the place, and the margin as
     // that rule reads it. On the player's own place this quoted the PLAYER's price as a rival's.
-    let explain = match game.place_control(target).controller() {
-        Some(Seat(0)) => format!(
-            "A rival takes it at {}: your Standing plus {}, and at least their threshold. Decays {} a turn.",
-            cheapest_rival(game, target).1,
-            margin_words(game, Some(cheapest_rival(game, target).0), target),
-            game.tables.influence.decay_controlled
-        ),
-        Some(_) => format!("You take it at {}: their Standing plus {}, and at least your threshold. Decays {} a turn.", game.influence_needed_for(Seat(0), target), margin_words(game, Some(Seat(0)), target), game.tables.influence.decay),
-        None => format!("First to {threshold} takes it. Decays {} a turn.", game.tables.influence.decay),
-    };
-    standings_row(ui, game, session, target, threshold, explain);
+    // Ticket #608 (version 0.1.0.5), at the designer's word: the row's own hover goes (it fired
+    // under the label's and the chips'), and the sentence it carried with it: the label's tip and
+    // the Standings tip say the same, the decay among them.
+    standings_row(ui, game, session, target);
     threshold_breakdown(ui, game, target);
     // Ticket #53: on every Region the player does not hold, what its Blame is costing it here.
     let blame_mult = game.blame_threshold_multiplier_on(Seat(0), target);
@@ -7143,23 +7156,30 @@ fn influence_row(ui: &mut Ui, game: &Game, session: &Session, view: &mut ViewSta
 /// Your Influence converts at 0.91
 /// ```
 ///
-/// Ticket #336 (version 0.09.0): off Earth the first line names the base the place used, since a
-/// station's replaces a Colony's rather than sitting on top of it -- `Threshold 80 - 40 for the
-/// station + 40 for 2 Colonists`, and on the ground `40 for the Colony` in its place.
+/// Ticket #608 (version 0.1.0.5), at the designer's word: the first two lines are CUT from the card
+/// -- their dash read as a minus ("31 - 20 + 10 for size 1") -- and their terms ride as sums on the
+/// hover of the row's threshold label (`threshold_terms`, `held_price_terms`). The card keeps the
+/// challenger sentence, the threat line and the conversion line.
 ///
-/// It replaces a single sentence that named neither Blame nor Green Consensus though both already
-/// moved the figure. Blame and Green Consensus join the threshold line as further terms only while
-/// they are BITING, which keeps the common case to three lines: measured, Blame sits at exactly
-/// x1.00 in 66% of takes. The conversion line is new with Resistance (ticket #187) and belongs
-/// beside the threshold rather than inside it: it prices what your SPENDING is worth here, where the
-/// other two lines price the gate.
-fn threshold_breakdown(ui: &mut Ui, game: &Game, target: Place) {
+/// Ticket #336 (version 0.09.0): off Earth the threshold's terms name the base the place used, since
+/// a station's replaces a Colony's rather than sitting on top of it -- `80 = 40 for the station + 40
+/// for 2 Colonists`, and on the ground `40 for the Colony` in its place.
+///
+/// Blame and Green Consensus join the terms only while they are BITING: measured, Blame sits at
+/// exactly x1.00 in 66% of takes. The conversion line is Resistance's (ticket #187) and stays on the
+/// card beside the challenger sentence: it prices what your SPENDING is worth here, where the sums
+/// on the hover price the gate.
+///
+/// Ticket #608 (version 0.1.0.5): the threshold's terms as a SUM, for the threshold label's hover --
+/// `Threshold 31 = 20 + 10 for size 1 + 1 for Regions held`, then `, x1.10 (Blame)` and `, cut by
+/// Green Consensus` while they bite. Off Earth the base is the station's or the Colony's (#336).
+fn threshold_terms(game: &Game, target: Place) -> String {
     let t = &game.tables.influence;
     let threshold = game.influence_threshold_for(Seat(0), target);
     let mut line = match target {
         Place::State(s) => {
             let size = game.tables.state(s).size as i64;
-            let mut line = format!("Threshold {threshold} - {} + {} for size {size}", t.state_threshold_base, t.state_threshold_per_size * size);
+            let mut line = format!("Threshold {threshold} = {} + {} for size {size}", t.state_threshold_base, t.state_threshold_per_size * size);
             // Ticket #591 (version 0.1.0.4), at the designer's word: the Regions-held term, hidden at +0.
             let held = game.regions_held_term(Seat(0), target);
             if held > 0 {
@@ -7170,14 +7190,12 @@ fn threshold_breakdown(ui: &mut Ui, game: &Game, target: Place) {
         Place::Colony(c) => {
             let people = game.colony(c).map(|x| x.colonists).unwrap_or(0) as i64;
             let station = game.colony(c).map(|x| x.in_orbit).unwrap_or(false);
-            // Ticket #336 (version 0.09.0): a base under every place off Earth, the station's in
-            // place of the Colony's rather than on top of it, so the line names the base it used.
             let base = if station { format!("{} for the station", t.station_threshold_base) } else { format!("{} for the Colony", t.colony_threshold_base) };
-            format!("Threshold {threshold} - {base} + {} for {}", t.colony_threshold_per_colonist * people, counted(people, "Colonist", "Colonists"))
+            format!("Threshold {threshold} = {base} + {} for {}", t.colony_threshold_per_colonist * people, counted(people, "Colonist", "Colonists"))
         }
     };
     // Ticket #53 and ticket #43: the two multipliers that already moved this figure and never said
-    // so. Shown only while they bite, so the usual card is three lines.
+    // so. Shown only while they bite.
     let blame = game.blame_threshold_multiplier_on(Seat(0), target);
     if blame > 1.0 {
         line.push_str(&format!(", x{blame:.2} (Blame)"));
@@ -7185,32 +7203,42 @@ fn threshold_breakdown(ui: &mut Ui, game: &Game, target: Place) {
     if game.research.done.contains(&TechId::GreenConsensus) {
         line.push_str(", cut by Green Consensus");
     }
-    ui.label(RichText::new(line).weak());
+    line
+}
 
-    // The second line: what the holder's Standing and the margin make of it.
+/// Ticket #608 (version 0.1.0.5): on a held place, the price to take it as a SUM of the holder's
+/// Standing and the margin -- `Take at 58 = 38 (their Standing) + 20 (margin) + 5 (Constabulary)` --
+/// for the label's hover; where the threshold stands over that sum, it says so. None on a neutral place.
+fn held_price_terms(game: &Game, target: Place) -> Option<String> {
+    let c = game.place_control(target).controller()?;
+    let standing = game.seat(c).influence.get(&target).copied().unwrap_or(0);
+    // Ticket #372 (version 0.09.2): the margin and the price of the challenger the row names -- the
+    // player on a rival's place, the cheapest rival on the player's own -- in the engine's parts.
+    let (challenger, needed) = if c == Seat(0) { cheapest_rival(game, target) } else { (Seat(0), game.influence_needed_for(Seat(0), target)) };
+    let (base, relations, guard) = game.challenge_margin_parts(Some(challenger), target);
+    let margin = base + relations + guard;
+    let whose = if c == Seat(0) { "your Standing" } else { "their Standing" };
+    // On the player's own place the cheapest rival is named in the sum's head, so nothing is
+    // appended after it (the review: a clause after the under-threshold sentence read "stands., the").
+    let head = if c == Seat(0) { format!("The {} take it at", game.seat_name(challenger)) } else { "Take at".to_string() };
+    // A holder with little Standing is protected by the THRESHOLD rather than by the margin, and the
+    // line has to say so or it reads as bad arithmetic: "80 = 0 + 20" is not 80.
+    if standing + margin < needed {
+        return Some(format!("{head} {needed}: {whose} {standing} + the margin {margin} is {}, under the threshold, which stands", standing + margin));
+    }
+    let mut line = format!("{head} {needed} = {standing} ({whose}) + {base} (margin)");
+    if relations > 0 {
+        line.push_str(&format!(" + {relations} (relations)"));
+    }
+    if guard > 0 {
+        line.push_str(&format!(" + {guard} (Constabulary)"));
+    }
+    Some(line)
+}
+
+fn threshold_breakdown(ui: &mut Ui, game: &Game, target: Place) {
     if let Some(c) = game.place_control(target).controller() {
         let standing = game.seat(c).influence.get(&target).copied().unwrap_or(0);
-        // Ticket #372 (version 0.09.2): the margin and the price of the challenger the row names --
-        // the player on a rival's place, the cheapest rival on the player's own -- in the engine's
-        // parts, where this read the margin with no challenger and the player's own price on the
-        // player's own place, which agreed with the row only by coincidence.
-        let (challenger, needed) = if c == Seat(0) { cheapest_rival(game, target) } else { (Seat(0), game.influence_needed_for(Seat(0), target)) };
-        let (base, relations, guard) = game.challenge_margin_parts(Some(challenger), target);
-        let margin = base + relations + guard;
-        let held = if c == Seat(0) { "Held by you".to_string() } else { format!("Held by the {}", game.seat_name(c)) };
-        let mut second = format!("{held}: {needed} - {standing} + {base} (margin)");
-        if relations > 0 {
-            second.push_str(&format!(" + {relations} (relations)"));
-        }
-        if guard > 0 {
-            second.push_str(&format!(" + {guard} (Constabulary)"));
-        }
-        // A holder with little Standing is protected by the THRESHOLD rather than by the margin, and
-        // the line has to say so or it reads as bad arithmetic: "80 - 0 + 20" is not 80.
-        if standing + margin < needed {
-            second.push_str(&format!(" comes to {}, under the threshold, so the threshold stands", standing + margin));
-        }
-        ui.label(RichText::new(second).weak());
         // Ticket #262 (version 0.08.4): **the challenger line**, on a place the player holds: the
         // rival nearest to taking it -- nearest its OWN price, since Blame and Relations move one
         // rival's price and not another's -- and how far off it stands. The designer's sentence,
@@ -7290,7 +7318,7 @@ Spending here raises the bar; doing nothing lowers it, yours decaying {} a turn 
         }
     }
 
-    // The third: Resistance, which taxes the spending rather than the gate.
+    // Resistance, which taxes the spending rather than the gate.
     let convert = 1.0 / game.resistance(target).max(1e-9);
     let own = game.place_control(target).controller() == Some(Seat(0));
     ui.label(
@@ -7332,8 +7360,11 @@ fn margin_words(game: &Game, challenger: Option<Seat>, target: Place) -> String 
 /// hold or take the place as a hover on the line -- the figure (ticket #60: the engine's own, which
 /// the Resolution and the AI read too) stays in view, and the reasoning is one hover away.
 /// Ticket #372 (version 0.09.2): on a held place the figure is the price to take it.
-fn standings_row(ui: &mut Ui, game: &Game, session: &Session, target: Place, threshold: i64, explain: String) {
-    let row = ui.horizontal_wrapped(|ui| {
+/// Ticket #608 (version 0.1.0.5), at the designer's word: one hover per element -- the row carried
+/// a tip of its own that fired under the label's and the chips', two hovers one over the other --
+/// and the threshold label's tip carries the sums the card's cut lines held.
+fn standings_row(ui: &mut Ui, game: &Game, session: &Session, target: Place) {
+    ui.horizontal_wrapped(|ui| {
         // Ticket #598 (version 0.1.0.4), at the designer's word: where no Faction has Standing the
         // row is the threshold alone, where it read "Standings: nobody has any yet".
         let any = Seat::ALL.into_iter().any(|s| game.seat(s).influence.get(&target).copied().unwrap_or(0) > 0);
@@ -7393,48 +7424,58 @@ fn standings_row(ui: &mut Ui, game: &Game, session: &Session, target: Place, thr
         if any {
             ui.label(RichText::new("·").weak());
         }
-        // Ticket #161: what a threshold IS and what sets it. The line's hover uses the word and
-        // never defines it.
-        let t = &game.tables.influence;
-        let from = match target {
-            // Ticket #591 (version 0.1.0.4), at the designer's word: the Regions-held term in the rule,
-            // and the size clause cut (the breakdown line beside it names the size).
-            Place::State(_) => format!("{}, plus {} a size step and {} a Region you hold past your first.", t.state_threshold_base, t.state_threshold_per_size, t.threshold_per_region_held),
-            // Ticket #336 (version 0.09.0): the base is the station's on a station and the Colony's
-            // on the ground, and one replaces the other, so the sentence names one figure and not two.
-            Place::Colony(_) => format!(
-                "{} for the {} itself, plus {} a Colonist living here.",
-                if game.colony(match target { Place::Colony(c) => c, _ => unreachable!() }).map(|c| c.in_orbit).unwrap_or(false) { t.station_threshold_base } else { t.colony_threshold_base },
-                if game.colony(match target { Place::Colony(c) => c, _ => unreachable!() }).map(|c| c.in_orbit).unwrap_or(false) { "station" } else { "Colony" },
-                t.colony_threshold_per_colonist
-            ),
-        };
+        // Ticket #161: what a threshold IS and what sets it; ticket #608 (version 0.1.0.5): one line.
+        let from = threshold_rule(game, target);
         // Ticket #372 (version 0.09.2): on a held place the row's figure is THE PRICE TO TAKE IT --
         // the greater of the threshold and the holder's Standing plus the margin, read by the rule
         // that takes it -- where it was the bare threshold whatever the holder stood at, so a
         // place held on 47 read "Threshold 50" when the price was 67. On the player's own place it
         // is the lowest price a rival pays; on nobody's it is still the threshold.
-        let holder = game.place_control(target).controller();
-        let (label, tip) = match holder {
-            Some(Seat(0)) if !session.spectator => {
-                let (r, price) = cheapest_rival(game, target);
-                (
-                    format!("A rival takes it at {price}"),
-                    format!("The lowest price a rival pays to take this from you: the {}, at the greater of their threshold and your Standing plus {}.\nThreshold: {from}", game.seat_name(r), margin_words(game, Some(r), target)),
-                )
-            }
-            Some(_) if !session.spectator => (
-                format!("Take at {}", game.influence_needed_for(Seat(0), target)),
-                format!("The greater of your threshold, {threshold}, and the holder's Standing plus {}.\nThreshold: {from}\nGreen Consensus cuts a quarter off it; your Blame adds to it.", margin_words(game, Some(Seat(0)), target)),
-            ),
-            _ => (
-                format!("Threshold {threshold}"),
-                format!("What a Standing must reach to take this place: {from}\nGreen Consensus cuts a quarter off it; your Blame adds to it on places you do not hold.\nA held place also wants the holder's Standing plus {}.", margin_words(game, None, target)),
-            ),
-        };
+        let (label, tip) = threshold_label(game, target, session.spectator, &from);
         rule_tip(ui.label(label), tip);
     });
-    rule_tip(row.response, explain);
+}
+
+/// Ticket #372 (version 0.09.2): on a held place the row's figure is THE PRICE TO TAKE IT, read by
+/// the rule that takes it; on the player's own place the lowest price a rival pays; on nobody's the
+/// threshold. Ticket #608 (version 0.1.0.5), at the designer's word: the tip opens on the sums the
+/// card's cut lines held (the price as the holder's Standing plus the margin, the threshold as its
+/// terms), then the rule in `from`, and the sentence that repeated the sums in words is gone, so the
+/// whole stays under six lines.
+fn threshold_label(game: &Game, target: Place, spectator: bool, from: &str) -> (String, String) {
+    let threshold = game.influence_threshold_for(Seat(0), target);
+    let terms = threshold_terms(game, target);
+    // Six lines at most (the review): the held sum and the terms run to two rendered lines each
+    // with a Constabulary, relations or Blame in them, the rule one, so a held place's tip carries
+    // no further sentence; the neutral tip, with no sum, keeps the Green Consensus line.
+    match game.place_control(target).controller() {
+        Some(Seat(0)) if !spectator => {
+            let (_, price) = cheapest_rival(game, target);
+            let held = held_price_terms(game, target).unwrap_or_default();
+            (format!("A rival takes it at {price}"), format!("{held}\n{terms}\nThreshold: {from}"))
+        }
+        Some(_) if !spectator => {
+            let held = held_price_terms(game, target).unwrap_or_default();
+            (format!("Take at {}", game.influence_needed_for(Seat(0), target)), format!("{held}\n{terms}\nThreshold: {from}"))
+        }
+        _ => (format!("Threshold {threshold}"), format!("{terms}\nThreshold: {from}\nGreen Consensus cuts a quarter off it; your Blame adds to it.")),
+    }
+}
+
+/// Ticket #161 (version 0.07.5): what a threshold IS and what sets it, for the label's hover. Ticket
+/// #591 (version 0.1.0.4): the Regions-held term. Ticket #608 (version 0.1.0.5): one rendered line,
+/// so the tip it closes stays under six.
+fn threshold_rule(game: &Game, target: Place) -> String {
+    let t = &game.tables.influence;
+    match target {
+        Place::State(_) => format!("{} + {} a size step + {} a Region held past your first", t.state_threshold_base, t.state_threshold_per_size, t.threshold_per_region_held),
+        // Ticket #336 (version 0.09.0): the base is the station's on a station and the Colony's on
+        // the ground, and one replaces the other, so the sentence names one figure and not two.
+        Place::Colony(c) => {
+            let station = game.colony(c).map(|x| x.in_orbit).unwrap_or(false);
+            format!("{} for the {} + {} a Colonist living here", if station { t.station_threshold_base } else { t.colony_threshold_base }, if station { "station" } else { "Colony" }, t.colony_threshold_per_colonist)
+        }
+    }
 }
 
 /// Ticket #390 (version 0.09.3): what a standing Scrubber or Sea Wall says on its one line --
@@ -7989,25 +8030,13 @@ This turn {:+.2}%: {:+.1} million.", c.population_growth * 100.0, c.population_l
     // Ticket #391 (version 0.09.3): what the Region made this turn, under its population.
     output_row(ui, game, Place::State(sid));
     // Ticket #161 (version 0.07.5): what an Allotment is, which this line names and never explains.
-    // Ticket #345 (version 0.09.1): and what ELSE an Allotment is. This hover named the base and the
-    // Regions and stopped there, so it had been wrong since ticket #36 built the Embassy -- it left
-    // out the Embassy, the Relay, the Chorus and (from ticket #183) the Spaceport's lift clause, and
-    // this ticket would have added two more sources to a list it does not keep. There is no page in
-    // the game that breaks an Allotment down line by line, so pointing at one was not open; and a
-    // signpost line is the thing the designer cut from the Faction window in ticket #306. So the
-    // hover NAMES EVERY SOURCE, briefly, and pays for the room by dropping the words that told the
-    // player where the Trading window is -- the Trading button's own hover says that.
-    // The ceiling is six rendered lines and this sits at it; a seventh source wants a shorter list,
-    // not a seventh line.
+    // Ticket #345 (version 0.09.1) named every source in words, there being no page that broke an
+    // Allotment down; ticket #522 (version 0.1.0.0) gave the top bar that breakdown, and ticket #616
+    // (version 0.1.0.5) reads it here, the figures by source on one line.
     rule_tip(
         icon_word(ui, "influence", format!("Influence value {}: what it adds to its controller's Allotment each turn (+1 per Industry Level raised)", game.state_influence_value(sid))),
-        format!(
-            "The Allotment is what you receive each turn: {}, your Regions, your Embassies, Relays and Choruses, your Spaceports' lifts, a first landing's windfall, +{} a Body you were first to and still hold, +{} a Capital.\nIt does not carry over: what is unspent at End Turn is lost. Ducats buy more, two a point.",
-            game.tables.influence.allotment_base,
-            game.tables.influence.first_settled_allotment,
-            // Ticket #503 (version 0.1.0.0): the Colonial Capital's own figure, beside the first's.
-            game.tables.tiers.iter().map(|t| t.influence).max().unwrap_or(0)
-        ),
+        // Ticket #616 (version 0.1.0.5): the figures by source, as the top bar draws them, on one line.
+        allotment_hover(game),
     );
     // Ticket #426 (version 0.09.5): the player's own Bank by name (the Prospectors' Investment Bank),
     // at its real figure, the Faction's output multiplier and Commodity Finance included.
@@ -8054,7 +8083,8 @@ This turn {:+.2}%: {:+.1} million.", c.population_growth * 100.0, c.population_l
                     "Strip Permit: the last doubled turn. At this Resolution its Baseline Emissions rise {:.1} for good and its Unrest by {}.",
                     t.baseline_rise, Game::unrest_figure(t.unrest)
                 ),
-                n => format!("Strip Permit: {} left of double output, then +{:.1} Baseline Emissions for good and +{} Unrest.", counted(n, "turn", "turns"), t.baseline_rise, Game::unrest_figure(t.unrest)),
+                // Ticket #622 (version 0.1.0.5): and no growth while it runs.
+                n => format!("Strip Permit: {} left of double output and no growth, then +{:.1} Baseline Emissions for good and +{} Unrest.", counted(n, "turn", "turns"), t.baseline_rise, Game::unrest_figure(t.unrest)),
             },
         );
     } else if st.baseline_rise > 0.0 {
@@ -8096,10 +8126,8 @@ This turn {:+.2}%: {:+.1} million.", c.population_growth * 100.0, c.population_l
                 "" => format!("Unrest {}", game.unrest_text(sid)),
                 note => format!("Unrest {}: {note}", game.unrest_text(sid)),
             }),
-            format!(
-                "Unrest runs 0 to {:.0}, in quarters, with three thresholds:\nat {:.0} the Standing Army stops replenishing,\nat {:.0} every Facility here runs at half,\nat {:.0} the state throws its controller off.\nIt falls {:.1} a turn on its own, except the turn the state changed hands.",
-                u.max, u.army_threshold, u.facility_threshold, u.max, u.natural_fall
-            ),
+            // Ticket #616 (version 0.1.0.5): the thresholds in a line, the ceiling first.
+            unrest_hover(u),
         );
         // Ticket #269 (version 0.08.4): Agitate, on a Region a rival holds -- Relief's mirror, at
         // the top of the card where the holder's Relief would be on their own.
@@ -8436,9 +8464,7 @@ fn pioneers_block(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, act
     // -- in the Influence block, some way up the card, and only while it was above zero -- so a
     // player who mustered and then looked for the result found the line had simply not been
     // there a moment ago. At nought it now says so, which is the answer to "did that work?".
-    ui.label(format!("Pioneers waiting: {}", st.emigrants)).on_hover_text(
-        "Recruited here and not yet lifted or sent: a working Launch Site lifts them onto a Ship or straight to a station of yours over Earth, and once the ice is open the sea takes them to Antarctica.",
-    );
+    rule_tip(ui.label(format!("Pioneers waiting: {}", st.emigrants)), PIONEERS_WAITING_HOVER.to_string());
     // Ticket #196 (version 0.08.0): as many as this state's people can pay for, where the button
     // always asked for the whole batch. Coach Class costs the Arkwrights twice the population for
     // twice the batch -- 16.0 people -- and Australia carries 10.1 to 12.6, so the button was dead
@@ -8735,20 +8761,14 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     // Ticket #278 (version 0.08.5): a starved Colony says so, in the designer's words, and how.
     if let Some(by) = game.starved_by(cid) {
         let how = if col.in_orbit { format!("Blockaded by the {}", game.seat_name(by)) } else { format!("Under the {}' Orbital Control", game.seat_name(by)) };
-        ui.label(RichText::new(format!("{how}: producing nothing, upkeep still paid.")).color(Color32::from_rgb(230, 110, 90))).on_hover_text(
-            // Ticket #335 (version 0.09.0): a Blockade shuts the ORBIT it is given in, so a station
-            // starves under a Blockade of its own ring and the ground starves under one in low
-            // orbit; a stack blockading elsewhere at the Body starves nothing.
-            "A warship stack on Blockade in a station's orbit starves it. A ground Colony starves while one rival alone holds Orbital Control of low orbit.\nStarved, every Module makes nothing and still pays upkeep; nobody dies, nothing is destroyed. Each turn is an offence against you.",
-        );
+        // Ticket #616 (version 0.1.0.5): the line names the cause; the hover says what it does not.
+        rule_tip(ui.label(RichText::new(format!("{how}: producing nothing, upkeep still paid.")).color(Color32::from_rgb(230, 110, 90))), STARVED_HOVER.to_string());
     }
     // Ticket #359 (version 0.09.1): an occupied Habitat standing shut halves the Colony, and the
     // Module rows below still read their whole figures, so the card says so where the starved
     // line says its own squeeze.
     if game.habitat_halves(cid) {
-        ui.label(RichText::new("A shut Habitat houses people here: everything but Energy at half.").color(Color32::from_rgb(230, 170, 90))).on_hover_text(
-            "A Habitat mothballed, or dark for want of Energy, still houses its Colonists. While more live here than the working Habitats and the Core can hold, the Colony makes everything at half but its Energy. Restart it, or keep an empty one to mothball.",
-        );
+        rule_tip(ui.label(RichText::new("A shut Habitat houses people here: everything but Energy at half.").color(Color32::from_rgb(230, 170, 90))), OVERCROWDED_HOVER.to_string());
     }
     // Ticket #164 (version 0.07.5): the room is the Core Module's four and the Habitats' eight
     // each, so the line no longer names Habitats alone.
@@ -10242,15 +10262,9 @@ fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, ac
     // Ticket #424 (version 0.09.5): Industry renamed STEWARDSHIP and lifted to second, directly above
     // Off-world Living, at the designer's word -- "bring that whole branch up above off world
     // living". Each Faction's Victory Tech now ends a band of its own.
-    const BAND_ORDER: [&str; 5] = ["Society", "Stewardship", "Off-world Living", "Extraction", "Propulsion"];
-    let mut branches: Vec<String> = Vec::new();
-    for t in TechId::ALL {
-        let b = &game.tables.tech(t).branch;
-        if !branches.contains(b) {
-            branches.push(b.clone());
-        }
-    }
-    branches.sort_by_key(|b| BAND_ORDER.iter().position(|x| x == b).unwrap_or(BAND_ORDER.len()));
+    // Ticket #617 (version 0.1.0.5): the list and its order are the engine's, so the text tool's
+    // tree runs the same.
+    let branches = game.tech_branches();
     let rungs = TechId::ALL.iter().map(|t| game.tables.tech(*t).rung).max().unwrap_or(1).max(1) as usize;
     // Ticket #56: a branch may hold more than one Tech on a rung (Efficient Grids and Coastal
     // Engineering both sit on Industry 1). Ticket #133: they sat SIDE BY SIDE. Ticket #156
@@ -11292,7 +11306,7 @@ fn condensed_fund(ui: &mut Ui, session: &Session, game: &Game, actions: &mut Vec
             ui.add_space(10.0);
             ui.horizontal(|ui| {
                 ui.spacing_mut().item_spacing.x = 6.0;
-                icon_word(ui, "research", format!("{contribution}%")).on_hover_text(DIRECTIVE_SENTENCE);
+                rule_tip(icon_word(ui, "research", format!("{contribution}%")), DIRECTIVE_SENTENCE.to_string());
                 let resp = condensed_rail(ui, &mut contribution, RAIL, |r, painter| {
                     // The unreachable part below the floor, dimmed as the full rail dims it; the
                     // Archivists' floor is nought with the shipped table, so nothing paints.
@@ -11400,8 +11414,31 @@ fn fund_bar(ui: &mut Ui, colour: Color32, fund: f64, bar: f64, width: f32, what:
 }
 
 /// Ticket #382: the two full controls' own sentences, on the condensed widget's hover.
-const DIRECTIVE_SENTENCE: &str = "The share of your Research that goes to the shared Tech, from the next Income until you set it again. What you keep back never reaches the Tech, so it counts nothing toward the Research Lead -- and the Lead is the only seat that picks what the table researches next.";
+/// Ticket #616 (version 0.1.0.5): the Directive's cut to the designer's line, with a short first
+/// sentence kept to say what the slider is.
+const DIRECTIVE_SENTENCE: &str = "Share of your Research paid into the shared Tech from the next Income. Research kept back counts nothing toward the Research Lead.";
 const VENTURE_SENTENCE: &str = "The share of each turn's Ducat income that goes into the Fund at Income, before you can spend a coin of it, from the next Income until you set it again. Ducats got by selling are not income and never reach it.";
+// Ticket #616 (version 0.1.0.5): hovers cut to the designer's lines, from the 0.1.0.2 playtest's
+// mouse-over dump. The 3 is `break_accord`'s offence weight, written out as the old text wrote it.
+const ACCORD_NOTICE_HOVER: &str = "Lapses next turn. Breaking a term sooner costs 3 Relations and ends it.";
+const PIONEERS_WAITING_HOVER: &str = "Waiting. A Launch Site lifts them; once the ice opens, ships take them to Antarctica.";
+/// On the starved line, which already says who starves the place and that it makes nothing: the
+/// hover says what the line does not (the designer's cut repeated the line).
+const STARVED_HOVER: &str = "Nobody dies, nothing is destroyed. Each turn is an offence against you.";
+const ALLOTMENT_ORDER_HOVER: &str = "Spend your whole Allotment here every turn until cancelled.";
+const OVERCROWDED_HOVER: &str = "Overcrowded: everything but Energy at half. Restart a Habitat.";
+/// The first landing's windfall line keeps the one clause that bites, a station claiming nothing.
+fn first_landing_hover(standing: i64) -> String {
+    format!("First to land here: +{standing} Influence a turn while held.\nA station claims nothing.")
+}
+/// The Allotment by source, the lines the top bar's "of N left" draws, on one line.
+fn allotment_hover(game: &Game) -> String {
+    format!("Influence each turn: {}. Unspent is lost.", game.allotment_lines(Seat(0)).join(", "))
+}
+/// Unrest's three thresholds and its fall in a line, the ceiling first.
+fn unrest_hover(u: &dying_earth_engine::data::UnrestTable) -> String {
+    format!("Unrest to {:.0}: Army stops at {:.0}, Facilities halve at {:.0}, revolt at {:.0}. Falls {:.1} a turn.", u.max, u.army_threshold, u.facility_threshold, u.max, u.natural_fall)
+}
 
 /// Ticket #235 (version 0.08.3): the **Research Directive** -- the share of a Faction's Research
 /// that goes somewhere other than the shared Tech, chosen as a percentage and standing until it is
@@ -11430,7 +11467,7 @@ fn research_directive_control(ui: &mut Ui, session: &Session, game: &Game, actio
     });
     let mut contribution = pending_set.unwrap_or(standing);
 
-    ui.label(RichText::new(format!("Research Directive: {contribution}%")).strong()).on_hover_text(DIRECTIVE_SENTENCE);
+    rule_tip(ui.label(RichText::new(format!("Research Directive: {contribution}%")).strong()), DIRECTIVE_SENTENCE.to_string());
 
     // The scale is 0 to 100 for EVERY Faction, so the four controls read alike and the Archivists'
     // extra reach is visible rather than implied: their slider runs the whole way, and everyone
@@ -11832,11 +11869,7 @@ fn accords_block(ui: &mut Ui, session: &Session, game: &Game, other: Seat, actio
             let placed = session.pending.contains(&order);
             if placed {
                 ui.label(RichText::new("You have declared it over this turn.").weak());
-            } else if ui
-                .button("Declare it over")
-                .on_hover_text("Free, and it takes a turn's notice: it lapses at the start of the next turn and you may act then. Acting against a term while it still stands is another matter -- it costs 3 and ends the whole Accord at once.")
-                .clicked()
-            {
+            } else if rule_tip(ui.button("Declare it over"), ACCORD_NOTICE_HOVER.to_string()).clicked() {
                 actions.push(Action::Place(order));
             }
         }
@@ -13043,22 +13076,19 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
         }
         // Ticket #594 (version 0.1.0.4), at the designer's word: turn one's signature moves, every
         // Faction's in one line, the player's own first and strong.
+        // Ticket #607 (version 0.1.0.5), at the designer's word: the player's own Faction alone, its
+        // name as the heading and the two sentences under it; the rivals' rows go.
         Popup::Opening => {
             egui::Modal::new("opening".into()).show(ctx, |ui| {
                 ui.set_width(520.0);
                 ui.label(RichText::new("Signature moves").size(26.0).strong().color(Color32::from_rgb(255, 220, 150)));
                 ui.add_space(4.0);
-                for seat in Seat::ALL {
-                    let mine = seat == Seat(0) && !session.spectator;
-                    let line = session.tables.opening_moves(game.kind(seat), mine);
-                    ui.horizontal(|ui| {
-                        faction_glyph(ui, session, game, Some(seat), 22.0);
-                        let name = RichText::new(game.seat_name(seat)).size(17.0).strong().color(seat_colour(session, seat));
-                        ui.label(name);
-                        let words = RichText::new(line).size(17.0);
-                        ui.label(if mine { words.strong() } else { words });
-                    });
-                }
+                let seat = Seat(0);
+                ui.horizontal(|ui| {
+                    faction_glyph(ui, session, game, Some(seat), 22.0);
+                    ui.label(RichText::new(game.seat_name(seat)).size(17.0).strong().color(seat_colour(session, seat)));
+                });
+                ui.label(RichText::new(session.tables.opening_moves(game.kind(seat))).size(17.0));
                 ui.add_space(8.0);
                 if ui.button("Go on").clicked() {
                     advance_popup(view, 0, false, false);
@@ -13427,8 +13457,7 @@ mod tests {
         let theirs = Place::State(g.controlled_states(Seat(1))[0]);
         assert_eq!(influence_break(&g, theirs, 17), None, "no Accord: nothing to say");
         g.strike_accord(Seat(0), Seat(1), vec![Term::NonAggression]).unwrap();
-        let name = g.seat_name(Seat(1));
-        assert_eq!(influence_break(&g, theirs, 17), Some((format!("breaks your Accord with {name}"), format!("Break the Accord with {name} and spend 17"))));
+        assert_eq!(influence_break(&g, theirs, 17), Some(("breaks Accord".to_string(), "Break the Accord and spend 17".to_string())), "ticket #611 (version 0.1.0.5): no name on the note or the button");
         let mine = Place::State(g.controlled_states(Seat(0))[0]);
         assert_eq!(influence_break(&g, mine, 17), None, "a place of your own crosses nobody");
     }
@@ -13864,4 +13893,152 @@ fn colony_growth_words(game: &Game, col: &dying_earth_engine::Colony) -> String 
     let banked = game.colony_growth.get(&col.id).copied().unwrap_or(0.0);
     let turns = ((1.0 - banked) / per).ceil().max(1.0) as u32;
     format!("Growing: {:+.1} a turn, next Colonist in {} turn{}.", per, turns, if turns == 1 { "" } else { "s" })
+}
+
+/// Ticket #608 (version 0.1.0.5), at the designer's word: the Region card's threshold line and its
+/// held-place line are cut, and their terms ride the threshold label's hover as sums.
+#[cfg(test)]
+mod ticket_608 {
+    use super::*;
+    use dying_earth_engine::data::{default_data_dir, Tables};
+    use dying_earth_engine::{FactionKind, NewGame, StateId};
+
+    #[test]
+    fn the_threshold_terms_are_a_sum_on_the_hover_and_the_tip_stays_under_six_lines() {
+        let tables = std::sync::Arc::new(Tables::load(&default_data_dir()).expect("tables load"));
+        let g = Game::new(tables, NewGame { seed: 7, player: FactionKind::Custodians, player_is_ai: false, player_start: StateId::EastAsia });
+        let home = Place::State(StateId::EastAsia);
+        let terms = threshold_terms(&g, home);
+        assert!(terms.starts_with("Threshold ") && terms.contains(" = ") && !terms.contains(" - "), "a sum, never a dash: {terms}");
+        let held = held_price_terms(&g, home).expect("the home Region is held");
+        assert!(held.contains(" take it at ") && held.contains("(your Standing)") && held.contains("(margin)"), "the cheapest rival named, then the sum: {held}");
+        let neutral = StateId::ALL.into_iter().find(|s| g.state(*s).control.controller().is_none()).expect("a neutral Region");
+        assert_eq!(held_price_terms(&g, Place::State(neutral)), None, "nothing to take from on a neutral place");
+        // Every tip the label carries, the sums in it, stays within the six-line rule: the player's
+        // own Region, a neutral one, and a rival's, with the rule line the card passes in; then again
+        // with Green Consensus standing and the holder's Standing under the threshold (the longer
+        // sentence), the two cases the review found could push a tip to a seventh line.
+        let rivals = StateId::ALL.into_iter().find(|s| g.state(*s).control.controller().is_some_and(|c| c != Seat(0))).expect("a rival's Region");
+        let mut g = g;
+        for pass in 0..2 {
+            if pass == 1 {
+                g.research.done.push(TechId::GreenConsensus);
+                g.seats[0].influence.insert(home, 1);
+                let holder = g.state(rivals).control.controller().unwrap();
+                g.seats[holder.index()].influence.insert(Place::State(rivals), 1);
+            }
+            for (place, word) in [(home, "A rival takes it at"), (Place::State(neutral), "Threshold "), (Place::State(rivals), "Take at ")] {
+                let from = threshold_rule(&g, place);
+                assert!(hover_lines_estimate(&from) == 1, "the rule on one line: {from}");
+                let (label, tip) = threshold_label(&g, place, false, &from);
+                assert!(label.starts_with(word), "{label}");
+                assert!(hover_lines_estimate(&tip) <= 6, "{} lines: {tip}", hover_lines_estimate(&tip));
+                assert!(tip.contains(" = ") && !tip.contains(" - ") && !tip.contains(".,"), "the sums, never a dash or a stray stop: {tip}");
+            }
+        }
+    }
+}
+
+/// Ticket #609 (version 0.1.0.5), at the designer's word: the top bar's Widgets hover in the Fuel's
+/// shape, and the Energy hover one line a place with what goes dark appended only when short.
+#[cfg(test)]
+mod ticket_609 {
+    use super::*;
+    use dying_earth_engine::data::{default_data_dir, Tables};
+    use dying_earth_engine::{FactionKind, NewGame, ShortfallForecast, StateId};
+
+    #[test]
+    fn the_widgets_and_energy_hovers_read_makers_and_places_not_queues() {
+        let tables = std::sync::Arc::new(Tables::load(&default_data_dir()).expect("tables load"));
+        let mut g = Game::new(tables, NewGame { seed: 7, player: FactionKind::Custodians, player_is_ai: false, player_start: StateId::EastAsia });
+        let w = widgets_bar_hover(&g, 12, 10);
+        assert!(w.starts_with("Made a turn: 12\n+"), "{w}");
+        assert!(w.ends_with("10 went into builds last turn."), "{w}");
+        assert!(!w.contains("under way") && !w.contains("applied at the last Resolution"), "the queues and the old sentence are gone: {w}");
+        // Energy: the Income's figures by place, net first, the parts in brackets; the units bare.
+        g.seats[0].energy_by_place = vec![("China".to_string(), 12.0, 4.0), ("ISS over Earth".to_string(), 0.0, 1.0), ("Ships and Armies".to_string(), 0.0, 3.0), ("Nowhere".to_string(), 0.0, 0.0), ("Reactor relief".to_string(), 6.0, 0.0)];
+        let e = energy_bar_hover(&g, None);
+        assert_eq!(e, "Last Income:\n+8  China (12 made, 4 upkeep)\n-1  ISS over Earth\n-3  Ships and Armies\n+6  Reactor relief", "{e}");
+        // Six lines: a wide board folds its places past the fourth into one net line.
+        g.seats[0].energy_by_place = (1..=7).map(|i| (format!("Place {i}"), 10.0, i as f64)).collect();
+        let e = energy_bar_hover(&g, None);
+        assert_eq!(e.lines().count(), 6, "{e}");
+        assert!(e.ends_with("+12  3 more places (30 made, 18 upkeep)"), "{e}");
+        g.seats[0].energy_by_place = (1..=5).map(|i| (format!("Place {i}"), 10.0, i as f64)).collect();
+        assert_eq!(energy_bar_hover(&g, None).lines().count(), 6, "five places fit without folding");
+        // Short: the same lines, then what goes dark.
+        g.seats[0].energy_by_place = vec![("China".to_string(), 12.0, 4.0)];
+        let f = ShortfallForecast { short_by: 2.0, dark: vec![] };
+        let e = energy_bar_hover(&g, Some(&f));
+        assert!(e.starts_with("Last Income:\n+8  China") && e.contains("Next Income is 2 Energy short"), "{e}");
+        g.seats[0].energy_by_place.clear();
+        assert_eq!(energy_bar_hover(&g, None), "No Energy made or owed last turn.");
+    }
+}
+
+/// Ticket #611 (version 0.1.0.5), at the designer's word: a Refinery says, on its tile's line and on
+/// its build button's hover, that it refuels Ships in its Colony's low orbit.
+#[cfg(test)]
+mod ticket_611 {
+    use super::*;
+    use dying_earth_engine::data::{default_data_dir, Tables};
+    use dying_earth_engine::{BodyId, Colony, ColonyId, Control, FactionKind, NewGame, StateId};
+
+    #[test]
+    fn a_refinery_says_it_refuels_ships_in_low_orbit() {
+        let tables = std::sync::Arc::new(Tables::load(&default_data_dir()).expect("tables load"));
+        let mut g = Game::new(tables, NewGame { seed: 7, player: FactionKind::Custodians, player_is_ai: false, player_start: StateId::EastAsia });
+        let id = ColonyId(g.fresh_id());
+        let slot = g.free_slots_on(BodyId::Mars)[0];
+        g.colonies.push(Colony { id, body: BodyId::Mars, slot, control: Control::Controlled(Seat(0)), modules: vec![Module::new(ModuleKind::Refinery), Module::new(ModuleKind::Core)], colonists: 4, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, tier: 0, in_orbit: false });
+        let col = g.colony(id).unwrap().clone();
+        // The sentence is the row's `does`, read through the yield's text as the Habitat's is, and
+        // owner-neutral: a rival's Refinery fills nothing of yours (the review).
+        assert_eq!(g.tables.module(ModuleKind::Refinery).does.as_deref(), Some("refuels its Faction's Ships in low orbit"));
+        let line = module_line(&g, &col, id, 0, Some(Seat(0)));
+        assert!(line.starts_with("Refinery: ") && line.contains(", refuels its Faction's Ships in low orbit, "), "the sentence rides the yield's text, between the Fuel and the upkeep: {line}");
+        assert!(!module_line(&g, &col, id, 1, Some(Seat(0))).contains("refuels"), "the Core says nothing of it");
+        assert!(!line.contains("your Ships"), "never 'your': the line is drawn on a rival's tile too");
+    }
+}
+
+/// Ticket #616 (version 0.1.0.5): nine hovers cut to the designer's lines, each within the ceiling.
+#[cfg(test)]
+mod ticket_616 {
+    use super::*;
+    use dying_earth_engine::data::{default_data_dir, Tables};
+    use dying_earth_engine::{FactionKind, NewGame, StateId};
+
+    fn fresh() -> Game {
+        let tables = std::sync::Arc::new(Tables::load(&default_data_dir()).expect("tables load"));
+        Game::new(tables, NewGame { seed: 7, player: FactionKind::Custodians, player_is_ai: false, player_start: StateId::EastAsia })
+    }
+
+    #[test]
+    fn the_fixed_hovers_are_the_designers_lines() {
+        assert_eq!(ACCORD_NOTICE_HOVER, "Lapses next turn. Breaking a term sooner costs 3 Relations and ends it.");
+        assert_eq!(PIONEERS_WAITING_HOVER, "Waiting. A Launch Site lifts them; once the ice opens, ships take them to Antarctica.");
+        assert_eq!(STARVED_HOVER, "Nobody dies, nothing is destroyed. Each turn is an offence against you.");
+        assert_eq!(ALLOTMENT_ORDER_HOVER, "Spend your whole Allotment here every turn until cancelled.");
+        assert_eq!(OVERCROWDED_HOVER, "Overcrowded: everything but Energy at half. Restart a Habitat.");
+        assert_eq!(DIRECTIVE_SENTENCE, "Share of your Research paid into the shared Tech from the next Income. Research kept back counts nothing toward the Research Lead.");
+        // Each under half the six-line ceiling; the Directive's two sentences run to three.
+        for text in [ACCORD_NOTICE_HOVER, PIONEERS_WAITING_HOVER, STARVED_HOVER, ALLOTMENT_ORDER_HOVER, OVERCROWDED_HOVER, DIRECTIVE_SENTENCE] {
+            assert!(hover_lines_estimate(text) <= 3, "{} lines: {text}", hover_lines_estimate(text));
+        }
+    }
+
+    #[test]
+    fn the_figured_hovers_carry_their_figures() {
+        let g = fresh();
+        assert_eq!(first_landing_hover(2), "First to land here: +2 Influence a turn while held.\nA station claims nothing.");
+        // Turn one, before any Income has recorded the parts: the engine reads them live.
+        assert_eq!(allotment_hover(&g), "Influence each turn: Regions and buildings 14. Unspent is lost.");
+        let mut g = g;
+        g.seats[0].allotment_parts = vec![("Regions and buildings".to_string(), 14), ("Spaceport lifts".to_string(), 9)];
+        assert_eq!(allotment_hover(&g), "Influence each turn: Regions and buildings 14, Spaceport lifts +9. Unspent is lost.");
+        // The shipped line, not the format it is built from (the review: a tautology passes with
+        // the thresholds swapped).
+        assert_eq!(unrest_hover(&g.tables.unrest), "Unrest to 10: Army stops at 4, Facilities halve at 7, revolt at 10. Falls 1.5 a turn.");
+    }
 }
