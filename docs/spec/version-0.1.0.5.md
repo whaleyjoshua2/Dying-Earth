@@ -487,9 +487,13 @@ AI capitals in one turn each."*; on the ticket's questions, *"q1 yes q2 yes q3 b
   margin; on the home Region `defend_home_from` (0.25). `ai.toml [thresholds]`.
 - **The answer**: the held Region enters the seat's Influence target list (a held place was skipped
   outright before), lifted x(1 + 2 x the climb), the home doubled (`Game::ai_defence_lift`: x2 at
-  half the price, x3 at it, x6 at it on the home); the Influence steps that put the price back above
-  the climber's Standing plus the climber's Allotment take the opportunity multiplier
-  (`ai_defence_wanted`), within the seat's means.
+  half the price, x3 at it, x6 at it on the home; the ticket's "weighed double" read as the weight on
+  the list); the Influence steps that put the wall back above the climber's Standing plus the
+  climber's Allotment take the opportunity multiplier (`ai_defence_wanted`), within the seat's
+  means, and none where the threshold alone stands above that reach (from the review). The ticket's
+  draft sized the answer by "the rival's last turn's gain plus the decay"; no Standing history is
+  kept, and the question put to the designer, which they said yes to, sized it by the rival's
+  Allotment instead.
 - **The home floor**: the home Region is topped up to `home_floor` (20) Standing whenever it falls
   under it, the top-up's steps at the opportunity multiplier. With the start at 40 and a point's
   decay a turn, the floor first bites about turn 20; before that the defence alone answers.
@@ -499,10 +503,12 @@ AI capitals in one turn each."*; on the ticket's questions, *"q1 yes q2 yes q3 b
   collapses**, from §15's 37 / 39 / 1 / 2 and 1. Not noise, and the other way: the Custodians 0 / 3
   / 7 / 9 by seating from 1 / 9 / 13 / 14, the Prospectors 19 / 17 / 11 / 11 from 16 / 11 / 6 / 6.
   Home Regions lost over a seating's 20 games: 14 / 25 / 16 / 25, the Prospectors losing the most
-  (5 / 16 / 10 / 11) and the Custodians taking the most (3 / 14 / 9 / 21); seat 0's start state lost
+  over the batch (5 / 16 / 10 / 11) and the Custodians taking the most (3 / 14 / 9 / 21, the first
+  seating the other way round); seat 0's start state lost
   in 7 / 13 / 4 / 5 of 20 seeds from 11 / 18 / 11 / 9. Places taken by Influence 338 / 359 / 359 /
   374 from 373 / 430 / 413 / 419. The reading: the Allotment is one budget, and a seat that defends
   takes fewer Regions; the Custodians, whose Victory is Regions on Earth, pay for their defence in
   wins, while the Prospectors lose their homes most and win regardless, their Victory being the
   Fund and people off Earth. Reported and left: the triggers, the lifts and the floor are the
-  designer's levers, against the 15 / 15 / 15 / 15 target.
+  designer's levers, against the 15 / 15 / 15 / 15 target. The review's build (the threshold
+  guard in `ai_defence_wanted`) was re-swept and came out identical, every figure.

@@ -25883,15 +25883,20 @@ fn ticket_619_a_computer_seat_defends_a_held_region_and_keeps_a_floor_at_home() 
     g.seats[0].influence.insert(Place::State(home), (home_price + 3) / 4);
     let at_home = g.ai_defence_lift(holder, home);
     assert!((2.9..3.3).contains(&at_home), "the home Region, at a quarter: {at_home}");
-    // The orders: the steps that put the price back above the climber's Standing plus their
-    // Allotment are taken, within the seat's means.
+    // What the Region wants: nothing while the climber's reach (their Standing plus Allotment)
+    // falls short of the wall; at the price less one, with ten to spend, ten more (the review: the
+    // first draft asserted on a case that wanted nothing).
     g.seats[0].allotment = 10;
     g.seats[0].influence.remove(&Place::State(home));
+    assert_eq!(g.ai_defence_wanted(holder, other), 0, "at half the price the reach is {} against a wall of {price}", half_way + 10);
+    g.seats[0].influence.insert(Place::State(other), price - 1);
+    let wanted = g.ai_defence_wanted(holder, other);
+    assert_eq!(wanted, 10, "the reach is {} against a wall of {price}", price + 9);
+    // The orders: the steps that put the wall back above the reach are taken, within the seat's means.
     g.seats[holder.index()].allotment = price + 10;
     let orders = g.ai_orders(holder);
     let spent: i64 = orders.iter().filter_map(|o| if let Order::Influence { target: Place::State(s), amount, .. } = o { (*s == other).then_some(*amount) } else { None }).sum();
-    let wall = 30 + spent + g.challenge_margin_for(Some(Seat(0)), Place::State(other));
-    assert!(wall > half_way + 10, "the wall ({wall}) stands above the climber ({half_way}) plus their Allotment (10): spent {spent}; {orders:?}");
+    assert!(spent >= wanted, "the seat spends what the Region wants ({wanted}): spent {spent}; {orders:?}");
     // A home lost is counted, by loser and by taker.
     g.transfer_control(Place::State(home), Seat(0), "Influence");
     assert_eq!((g.war.homes_lost[holder.index()], g.war.homes_taken[0]), (1, 1));

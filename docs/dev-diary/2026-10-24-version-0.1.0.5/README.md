@@ -341,3 +341,14 @@ its floor now.
   lose theirs most and win regardless, the Custodians take the most homes and win least. The
   reading is that the Allotment is one budget and a seat that defends takes fewer Regions.
   Reported and left for the designer: the triggers, the lifts and the floor are the levers.
+
+**The review** (an agent that did not build it) found the wanted figure spending against the
+Standing wall while the threshold alone still held (a holder decayed to 10 with a climber at 25
+and ten to spend reached 35 against a threshold of 50, and bought six for nothing), and the test's
+orders clause asserting on a case that wanted nothing. Both fixed: nothing is wanted where the
+threshold stands above the climber's reach, and the test puts the climber at the price less one and
+sees ten bought. Also from the review: the ticket's draft had sized the answer by the rival's last
+turn's gain, which no record keeps, and the question the designer said yes to sized it by the
+rival's Allotment; the spec says so now, and that the doubling is on the list's weight. The
+top-rival line and the lift were pulled into helpers shared with the contest. The fixed build was
+re-swept and came out identical to the figure, so the duplicate file was not kept.

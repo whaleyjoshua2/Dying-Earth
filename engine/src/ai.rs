@@ -1177,9 +1177,21 @@ impl Game {
             return None;
         }
         let target = Place::State(sid);
-        let (climber, top) = Seat::ALL.into_iter().filter(|s| *s != seat).map(|s| (s, self.seat(s).influence.get(&target).copied().unwrap_or(0))).max_by_key(|(_, n)| *n)?;
+        let (climber, top) = self.ai_top_rival_on(seat, target)?;
         let threshold = self.influence_threshold_for(climber, target).max(1);
         (top as f64 / threshold as f64 >= self.tables.ai.thresholds.contest_from).then_some((climber, top))
+    }
+
+    /// Tickets #618 and #619: the rival with the most Standing at a place, and that Standing; the
+    /// last seat on a tie. None only with no rival at all.
+    fn ai_top_rival_on(&self, seat: Seat, target: Place) -> Option<(Seat, i64)> {
+        Seat::ALL.into_iter().filter(|s| *s != seat).map(|s| (s, self.seat(s).influence.get(&target).copied().unwrap_or(0))).max_by_key(|(_, n)| *n)
+    }
+
+    /// Tickets #618 and #619: what a climb lifts a Region by -- 1 + 2 x the climb, the climb capped
+    /// at 1, so x2 at half the figure and x3 at it.
+    fn climb_lift(climb: f64) -> f64 {
+        1.0 + 2.0 * climb.min(1.0)
     }
 
     /// Ticket #618: **how much a rival's climb lifts a neutral Region for this seat.** The climb is
@@ -1195,7 +1207,7 @@ impl Game {
         let mine = standing(seat);
         let most = mine > 0 && Seat::ALL.into_iter().filter(|s| *s != seat && *s != climber).all(|s| standing(s) < mine);
         let next_door = self.tables.state(sid).neighbours.iter().any(|n| self.state(*n).control.controller() == Some(seat));
-        if most || next_door { 1.0 + 2.0 * (top as f64 / self.influence_threshold_for(climber, target).max(1) as f64).min(1.0) } else { 1.0 }
+        if most || next_door { Self::climb_lift(top as f64 / self.influence_threshold_for(climber, target).max(1) as f64) } else { 1.0 }
     }
 
     /// Ticket #618: whether this seat contests the Region -- the lift is more than 1.
@@ -1213,24 +1225,32 @@ impl Game {
         if self.state(sid).control.controller() != Some(seat) {
             return None;
         }
-        let target = Place::State(sid);
-        let (climber, top) = Seat::ALL.into_iter().filter(|s| *s != seat).map(|s| (s, self.seat(s).influence.get(&target).copied().unwrap_or(0))).max_by_key(|(_, n)| *n)?;
+        let (climber, top) = self.ai_top_rival_on(seat, Place::State(sid))?;
         if top <= 0 {
             return None;
         }
-        let price = self.influence_needed_for(climber, target).max(1);
         let th = &self.tables.ai.thresholds;
-        let from = if self.seat(seat).home_region == Some(sid) { th.defend_home_from } else { th.defend_from };
-        (top as f64 / price as f64 >= from).then_some((climber, top))
+        let from = if self.ai_home_is(seat, sid) { th.defend_home_from } else { th.defend_from };
+        (self.ai_climb_against(climber, sid, top) >= from).then_some((climber, top))
+    }
+
+    /// Ticket #619: the climb as a share of the price the climber would pay for the held Region.
+    fn ai_climb_against(&self, climber: Seat, sid: StateId, top: i64) -> f64 {
+        top as f64 / self.influence_needed_for(climber, Place::State(sid)).max(1) as f64
+    }
+
+    /// Ticket #619: whether the Region is this seat's home.
+    fn ai_home_is(&self, seat: Seat, sid: StateId) -> bool {
+        self.seat(seat).home_region == Some(sid)
     }
 
     /// Ticket #619: **how much a rival's climb lifts a held Region for its holder**: 1 + 2 x the
-    /// climb (the Standing over the price, capped at 1), the home Region doubled; no climb, 1.
+    /// climb (the Standing over the price, capped at 1), the home Region doubled (the designer's
+    /// "weighed double", read as the weight on the list); no climb, 1.
     pub fn ai_defence_lift(&self, seat: Seat, sid: StateId) -> f64 {
         let Some((climber, top)) = self.ai_defence(seat, sid) else { return 1.0 };
-        let price = self.influence_needed_for(climber, Place::State(sid)).max(1);
-        let home = if self.seat(seat).home_region == Some(sid) { 2.0 } else { 1.0 };
-        (1.0 + 2.0 * (top as f64 / price as f64).min(1.0)) * home
+        let home = if self.ai_home_is(seat, sid) { 2.0 } else { 1.0 };
+        Self::climb_lift(self.ai_climb_against(climber, sid, top)) * home
     }
 
     /// Ticket #619: **the Standing the home Region still wants to reach its floor** (`home_floor`),
@@ -1240,15 +1260,23 @@ impl Game {
         (self.tables.ai.thresholds.home_floor - self.seat(seat).influence.get(&Place::State(home)).copied().unwrap_or(0)).max(0)
     }
 
-    /// Ticket #619: the Influence a held Region wants this turn -- enough to put the price (the
-    /// seat's Standing plus the climber's margin) back above the climber's Standing plus their
-    /// Allotment, and at home the floor's top-up, whichever is more; 0 where nothing is wanted.
+    /// Ticket #619: the Influence a held Region wants this turn -- enough to put the wall (the
+    /// greater of the threshold and the seat's Standing plus the climber's margin) back above the
+    /// climber's Standing plus their Allotment, and at home the floor's top-up, whichever is more;
+    /// 0 where nothing is wanted. Where the threshold alone already stands above the reach, nothing
+    /// (the review: the first draft spent against the Standing wall while the threshold held).
     pub fn ai_defence_wanted(&self, seat: Seat, sid: StateId) -> i64 {
         let target = Place::State(sid);
         let have = self.seat(seat).influence.get(&target).copied().unwrap_or(0);
-        let defend = self.ai_defence(seat, sid).map(|(climber, top)| top + self.seat(climber).allotment + 1 - (have + self.challenge_margin_for(Some(climber), target))).unwrap_or(0);
-        let floor = if self.seat(seat).home_region == Some(sid) { self.ai_home_topup(seat) } else { 0 };
-        defend.max(floor).max(0)
+        let defend = self
+            .ai_defence(seat, sid)
+            .map(|(climber, top)| {
+                let reach = top + self.seat(climber).allotment;
+                if self.influence_threshold_for(climber, target) > reach { 0 } else { reach + 1 - (have + self.challenge_margin_for(Some(climber), target)) }
+            })
+            .unwrap_or(0);
+        let floor = if self.ai_home_is(seat, sid) { self.ai_home_topup(seat) } else { 0 };
+        defend.max(floor)
     }
 
     /// Ticket #394 (version 0.09.3): the places a computer seat weighs spending Influence on, best
@@ -1265,7 +1293,7 @@ impl Game {
             if st.control.controller() == Some(seat) {
                 // Ticket #619 (version 0.1.0.5): a held Region is a target while a rival climbs it,
                 // or while it is the home under its floor; held and quiet, it is skipped as before.
-                if self.ai_defence(seat, sid).is_none() && !(self.seat(seat).home_region == Some(sid) && self.ai_home_topup(seat) > 0) {
+                if self.ai_defence(seat, sid).is_none() && !(self.ai_home_is(seat, sid) && self.ai_home_topup(seat) > 0) {
                     continue;
                 }
                 let value = (self.state_influence_value(sid) + st.industry_level as i64) as f64;
