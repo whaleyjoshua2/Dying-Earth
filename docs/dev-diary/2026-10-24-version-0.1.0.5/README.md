@@ -250,3 +250,12 @@ heading ([`blame-climate-earth.png`](ticket-616/blame-climate-earth.png)), drawn
 photographs the Faction CHOICE screen, `factions:1` opens the Factions window under the Earth view's
 Climate Panel, and the Directive is in the Tech Tree window (`tech:1`), not the Faction window. No
 picture of the starved or overcrowded lines: no aid starves or overfills a Colony on turn one's board.
+
+**The review** (an agent that did not build it) found the standing order's checkbox still on
+`on_hover_text`, kept there for its greyed words; it is on `rule_tip` now with a branch for them, and
+photographed ([`order-earth.png`](ticket-616/order-earth.png)). It found the turn-one fallback a copy
+of the engine's `allotment_lines` closure, moved into the engine, so the top bar's "of N left" hover
+has its lines on turn one too; the Unrest test a tautology (built from the format it was checked
+against), now the shipped line; the Allotment's ordinary branch unpinned, now pinned; a stale comment
+above the Region card's Allotment line, rewritten; and the new block wedged between the two sentences
+ticket #382's doc comment introduced, moved after them.

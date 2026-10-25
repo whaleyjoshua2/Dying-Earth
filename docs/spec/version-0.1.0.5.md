@@ -372,7 +372,9 @@ ticket's questions, *"q1 c q2 that q3 yes q4 keep 587s q5 b q6 b q7 yes"*.
   until cancelled."*
 - **The Allotment** (a Region card's Influence value): the figures by source, the top bar's "of N
   left" lines, on one line: *"Influence each turn: Regions and buildings 14. Unspent is lost."* On
-  turn one, before any Income has recorded them, the parts are read live.
+  turn one, before any Income has recorded them, `allotment_lines` reads the parts live, so the top
+  bar's hover has them on turn one too (from the review, which found the fallback copied in the
+  window).
 - **Unrest**: *"Unrest to 10: Army stops at 4, Facilities halve at 7, revolt at 10. Falls 1.5 a
   turn."*, the figures from `unrest.toml`.
 - **Overcrowded**: *"Overcrowded: everything but Energy at half. Restart a Habitat."*
@@ -381,10 +383,12 @@ ticket's questions, *"q1 c q2 that q3 yes q4 keep 587s q5 b q6 b q7 yes"*.
 - **The Blame tag**: *"[BLAME_HOVER]"* is the dump's label for the constant; the screen draws it bare
   (`ticket-616/blame-climate-earth.png`). The dump was made by hand from the source, which is why the
   developer notes (two code comments and four test names) appear in it; none is drawn.
-- Every cut hover is drawn through `rule_tip`, so the `tip:` aid can photograph it. The starved and
-  overcrowded lines have no picture: no aid starves or overfills a Colony on turn one's board.
-- **The pictures** (`ticket-616/`): `pioneers-earth.png`, `unrest-earth.png`, `allotment-earth.png`
-  (China's card), `landing-moon.png` (the Moon's card), `accord-factions-mars.png` (the Prospectors'
+- Every cut hover is drawn through `rule_tip`, so the `tip:` aid can photograph it; the standing
+  order's greyed box keeps its own words, *"Click a Region or a Colony first."*, by a branch (from the
+  review, which found it left on `on_hover_text`). The starved and overcrowded lines have no picture:
+  no aid starves or overfills a Colony on turn one's board.
+- **The pictures** (`ticket-616/`): `pioneers-earth.png`, `unrest-earth.png`, `allotment-earth.png`,
+  `order-earth.png` (China's card and the Influence block's checkbox), `landing-moon.png` (the Moon's card), `accord-factions-mars.png` (the Prospectors'
   page under `accord:some`), `directive-tech-mars.png` (the Tech Tree window), `blame-climate-earth.png`
   (the Climate Panel's heading).
 - No rule moves; no sweep.

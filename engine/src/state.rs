@@ -4431,8 +4431,13 @@ impl Game {
 
     /// Ticket #522 (version 0.1.0.0): where this turn's Allotment came from, a line a part, the first
     /// bare and the rest signed -- *"Regions and buildings 14"*, *"Spaceport lifts +9"*. Six at most.
+    /// Ticket #616 (version 0.1.0.5): on turn one no Income has recorded them, so the parts are read
+    /// live; the top bar's hover and the Region card's read one list.
     pub fn allotment_lines(&self, seat: Seat) -> Vec<String> {
-        self.seat(seat).allotment_parts.iter().take(6).enumerate().map(|(i, (label, n))| if i == 0 { format!("{label} {n}") } else { format!("{label} {n:+}") }).collect()
+        let recorded = &self.seat(seat).allotment_parts;
+        let live;
+        let parts = if recorded.is_empty() { live = self.influence_allotment_parts(seat); &live } else { recorded };
+        parts.iter().take(6).enumerate().map(|(i, (label, n))| if i == 0 { format!("{label} {n}") } else { format!("{label} {n:+}") }).collect()
     }
 
     /// Ticket #345 (version 0.09.1): which seat was first to a Body, and at which Colony.

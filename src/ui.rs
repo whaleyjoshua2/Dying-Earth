@@ -4890,9 +4890,9 @@ fn command_cluster(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewS
                 };
                 let can_tick = on || target.is_some();
                 let resp = ui.add_enabled(can_tick, egui::Checkbox::new(&mut on, label));
-                let resp = resp
-                    .on_hover_text(ALLOTMENT_ORDER_HOVER)
-                    .on_disabled_hover_text("Click a Region or a Colony first.");
+                // Ticket #616 (version 0.1.0.5): through `rule_tip`, which hovers both states alike, so
+                // the greyed box keeps its own words by the branch here.
+                let resp = rule_tip(resp, if can_tick { ALLOTMENT_ORDER_HOVER.to_string() } else { "Click a Region or a Colony first.".to_string() });
                 if resp.changed() {
                     if let Some(i) = session.pending.iter().position(|o| matches!(o, Order::SetMaxStanding { .. })) {
                         actions.push(Action::Cancel(i));
@@ -8038,16 +8038,9 @@ This turn {:+.2}%: {:+.1} million.", c.population_growth * 100.0, c.population_l
     // Ticket #391 (version 0.09.3): what the Region made this turn, under its population.
     output_row(ui, game, Place::State(sid));
     // Ticket #161 (version 0.07.5): what an Allotment is, which this line names and never explains.
-    // Ticket #345 (version 0.09.1): and what ELSE an Allotment is. This hover named the base and the
-    // Regions and stopped there, so it had been wrong since ticket #36 built the Embassy -- it left
-    // out the Embassy, the Relay, the Chorus and (from ticket #183) the Spaceport's lift clause, and
-    // this ticket would have added two more sources to a list it does not keep. There is no page in
-    // the game that breaks an Allotment down line by line, so pointing at one was not open; and a
-    // signpost line is the thing the designer cut from the Faction window in ticket #306. So the
-    // hover NAMES EVERY SOURCE, briefly, and pays for the room by dropping the words that told the
-    // player where the Trading window is -- the Trading button's own hover says that.
-    // The ceiling is six rendered lines and this sits at it; a seventh source wants a shorter list,
-    // not a seventh line.
+    // Ticket #345 (version 0.09.1) named every source in words, there being no page that broke an
+    // Allotment down; ticket #522 (version 0.1.0.0) gave the top bar that breakdown, and ticket #616
+    // (version 0.1.0.5) reads it here, the figures by source on one line.
     rule_tip(
         icon_word(ui, "influence", format!("Influence value {}: what it adds to its controller's Allotment each turn (+1 per Industry Level raised)", game.state_influence_value(sid))),
         // Ticket #616 (version 0.1.0.5): the figures by source, as the top bar draws them, on one line.
@@ -11438,6 +11431,7 @@ fn fund_bar(ui: &mut Ui, colour: Color32, fund: f64, bar: f64, width: f32, what:
 /// Ticket #616 (version 0.1.0.5): the Directive's cut to the designer's line, with a short first
 /// sentence kept to say what the slider is.
 const DIRECTIVE_SENTENCE: &str = "Share of your Research paid into the shared Tech from the next Income. Research kept back counts nothing toward the Research Lead.";
+const VENTURE_SENTENCE: &str = "The share of each turn's Ducat income that goes into the Fund at Income, before you can spend a coin of it, from the next Income until you set it again. Ducats got by selling are not income and never reach it.";
 // Ticket #616 (version 0.1.0.5): hovers cut to the designer's lines, from the 0.1.0.2 playtest's
 // mouse-over dump. The 3 is `break_accord`'s offence weight, written out as the old text wrote it.
 const ACCORD_NOTICE_HOVER: &str = "Lapses next turn. Breaking a term sooner costs 3 Relations and ends it.";
@@ -11451,19 +11445,14 @@ const OVERCROWDED_HOVER: &str = "Overcrowded: everything but Energy at half. Res
 fn first_landing_hover(standing: i64) -> String {
     format!("First to land here: +{standing} Influence a turn while held.\nA station claims nothing.")
 }
-/// The Allotment by source, the figures the top bar's "of N left" already draws, on one line.
-/// Turn one has had no Income, so nothing is recorded yet: the parts are then read live.
+/// The Allotment by source, the lines the top bar's "of N left" draws, on one line.
 fn allotment_hover(game: &Game) -> String {
-    let mut from = game.allotment_lines(Seat(0));
-    if from.is_empty() {
-        from = game.influence_allotment_parts(Seat(0)).iter().take(6).enumerate().map(|(i, (label, n))| if i == 0 { format!("{label} {n}") } else { format!("{label} {n:+}") }).collect();
-    }
-    format!("Influence each turn: {}. Unspent is lost.", from.join(", "))
+    format!("Influence each turn: {}. Unspent is lost.", game.allotment_lines(Seat(0)).join(", "))
 }
+/// Unrest's three thresholds and its fall in a line, the ceiling first.
 fn unrest_hover(u: &dying_earth_engine::data::UnrestTable) -> String {
     format!("Unrest to {:.0}: Army stops at {:.0}, Facilities halve at {:.0}, revolt at {:.0}. Falls {:.1} a turn.", u.max, u.army_threshold, u.facility_threshold, u.max, u.natural_fall)
 }
-const VENTURE_SENTENCE: &str = "The share of each turn's Ducat income that goes into the Fund at Income, before you can spend a coin of it, from the next Income until you set it again. Ducats got by selling are not income and never reach it.";
 
 /// Ticket #235 (version 0.08.3): the **Research Directive** -- the share of a Faction's Research
 /// that goes somewhere other than the shared Tech, chosen as a percentage and standing until it is
@@ -14057,13 +14046,13 @@ mod ticket_616 {
     fn the_figured_hovers_carry_their_figures() {
         let g = fresh();
         assert_eq!(first_landing_hover(2), "First to land here: +2 Influence a turn while held.\nA station claims nothing.");
-        let allotment = allotment_hover(&g);
-        assert!(allotment.starts_with("Influence each turn: ") && allotment.ends_with(". Unspent is lost."), "{allotment}");
-        assert!(allotment.chars().any(|c| c.is_ascii_digit()), "the figures, not the sources' names: {allotment}");
-        assert!(hover_lines_estimate(&allotment) <= HOVER_LINE_CEILING, "{allotment}");
-        let u = &g.tables.unrest;
-        let unrest = unrest_hover(u);
-        assert_eq!(unrest, format!("Unrest to {:.0}: Army stops at {:.0}, Facilities halve at {:.0}, revolt at {:.0}. Falls {:.1} a turn.", u.max, u.army_threshold, u.facility_threshold, u.max, u.natural_fall));
-        assert!(hover_lines_estimate(&unrest) <= 2, "{unrest}");
+        // Turn one, before any Income has recorded the parts: the engine reads them live.
+        assert_eq!(allotment_hover(&g), "Influence each turn: Regions and buildings 14. Unspent is lost.");
+        let mut g = g;
+        g.seats[0].allotment_parts = vec![("Regions and buildings".to_string(), 14), ("Spaceport lifts".to_string(), 9)];
+        assert_eq!(allotment_hover(&g), "Influence each turn: Regions and buildings 14, Spaceport lifts +9. Unspent is lost.");
+        // The shipped line, not the format it is built from (the review: a tautology passes with
+        // the thresholds swapped).
+        assert_eq!(unrest_hover(&g.tables.unrest), "Unrest to 10: Army stops at 4, Facilities halve at 7, revolt at 10. Falls 1.5 a turn.");
     }
 }
