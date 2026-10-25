@@ -1881,8 +1881,8 @@ fn the_last_turn_ranks_every_seat_by_score() {
     g.turn = g.tables.victory.turns;
     // Each seat is scored on its own two parts (ticket #51), since ticket #555 (version 0.1.0.2) by a
     // weighted mean of them. Custodians: 6 Colonists off Earth of 18 but no Stabilization run.
-    // Prospectors: 9 of 18 and half the Venture Capital Fund (ticket #584: the bars are 18 and
-    // 5,000). Arkwrights: 3 Colonists of 42 and no Body with 4 on it. Archivists: nothing. The
+    // Prospectors: 9 of 18 and half the Venture Capital Fund (ticket #623: the bars are 20 and
+    // 6,250). Arkwrights: 3 Colonists of 42 and no Body with 4 on it. Archivists: nothing. The
     // Prospectors' score is the highest of the four.
     colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat], 6);
     let p = colony(&mut g, Seat(1), BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 9);
@@ -6439,8 +6439,8 @@ fn the_moons_four_yields_are_up_a_tenth() {
 }
 
 /// Ticket #72 (e): the Prospector AI plays the share as a strategy: nothing before the pace's first
-/// waypoint (turn 9: it builds first), then the smallest step that reaches 750 by turn 34 at its
-/// current output, and 80 when nothing less will do.
+/// waypoint (turn 12 now: it builds first), then the smallest step that reaches the bar by the
+/// pace's last turn at its current output, and 80 when nothing less will do.
 #[test]
 fn the_prospector_ai_sets_its_share_to_reach_the_fund_in_time_and_maxes_it_when_behind() {
     let mut g = game();
@@ -11979,7 +11979,7 @@ fn a_rival_closing_on_its_victory_condition_interrupts_the_player_once_a_step() 
     g.seats[pro.index()].venture_fund = 5000.0;
     // Ticket #555 (version 0.1.0.2): the score is the mean of the parts, past three quarters; the
     // Fund is still the shorter part, which the Moment names. Ticket #567 (version 0.1.0.3): the Fund
-    // counts 0.7 of it, 0.7 x 0.76 + 0.3 x 14/18; ticket #625 (version 0.1.0.5): 16 of 20.
+    // counts 0.7 of it, 0.7 x 0.8 + 0.3 x 16/20 (ticket #625: 16 of 20; ticket #623: 5,000 of 6,250).
     assert!((g.progress(pro).score() - 0.94 * (0.7 * 5000.0 / 6250.0 + 0.3 * 16.0 / 20.0)).abs() < 1e-9, "{}", g.progress(pro).score());
     assert!(g.progress(pro).score() >= 0.75);
     g.end_phase();

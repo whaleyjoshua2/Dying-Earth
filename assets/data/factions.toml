@@ -139,8 +139,8 @@ victory_short = "put {first} Ducats in the Venture Capital Fund with {second} Co
 # Ticket #584 (version 0.1.0.4), at the designer's word: 5,000, with the Prospectors at 41 wins of 80 on
 # 0.1.0.3's closing board and the 4,250 bar not biting (the computer banks to its pace).
 # Ticket #623 (version 0.1.0.5), at the designer's word: 6,250 ("prospectors fund requires 6250"), with the
-# Prospectors at 53 to 58 wins of 80 through the version's sweeps and the Fund ending a median 5,000 to
-# 5,350, just over the 5,000 bar: the computer banks to its pace.
+# Prospectors at 36 to 58 wins of 80 through the version's sweeps and the Fund ending a median 5,026 to
+# 5,344, just over the 5,000 bar: the computer banks to its pace.
 victory_first = { kind = "venture_fund", bar = 6250, weight = 0.7 }
 victory_second = { kind = "off_world_presence", bar = 20 }
 # Ticket #471 (version 0.09.7): the Opening Objective -- no deadline, met once, rewarded once.

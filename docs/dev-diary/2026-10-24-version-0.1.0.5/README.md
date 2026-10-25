@@ -397,3 +397,12 @@ Faction choice screen, "6,250 in the Venture Capital Fund, plus 20 living beyond
   17 / 58 / 2 / 2 and 1: noise. The bar does not bite: the Fund ends a median 6,368 to 6,775 of the
   6,250 asked, over it by the same margin it was over 5,000, the computer banking to its pace. It
   bites on the human Prospector, whose Fund is not paced. Reported and left.
+
+**The review** (an agent that did not build it) found the `rival:1` shot aid's figure dead: its
+fourteen Colonists of eighteen and 3,800 of 5,000 scored 0.70 under the Moment's 0.75 bar once the
+gate rule (#601) took its six per cent, so the Moment the aid exists for had not fired since, and the
+build had rescaled it to 4,750 of 6,250 without noticing. The aid plants the Moment test's own
+figures now, sixteen of twenty and 5,000 of 6,250, and the Moment fires
+([`ticket-623/rival-report.png`](ticket-623/rival-report.png), looked at). Also from the review: two
+readers of 5,000 in `CONTEXT.md` moved; three stale comments; an invented range in the table's
+comment ("53 to 58 wins" where the version's sweeps run 36 to 58) made the measured one.

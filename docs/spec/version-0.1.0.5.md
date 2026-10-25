@@ -575,10 +575,15 @@ is repaced"*.
   test that holds the pace to the bar moved first and was watched red.
 - The fixtures that stood on the bar moved with it: the Moment at three quarters now reads *"5000
   of 6250"*; the share test's fat output is 300 Ducats a turn, where 200 over the 34 turns from the
-  first waypoint wanted 92% and the seat maxed (the AI reading the new bar, as at #256); the
-  `rival:1` shot aid plants 4,750 of 6,250; `docs/playtest/PLAYTEST.txt` says 6,250.
-- **The picture** (`ticket-623/fund-faction.png`): the Faction choice screen, the Prospectors' Victory
-  Condition reading the new bar.
+  first waypoint wanted 92% and the seat maxed (the AI reading the new bar, as at #256);
+  `docs/playtest/PLAYTEST.txt` and `CONTEXT.md` say 6,250. The `rival:1` shot aid, from the review,
+  plants the Moment test's own figures, sixteen Colonists of twenty and 5,000 of 6,250 (0.752): its
+  old fourteen of eighteen and 3,800 of 5,000 scored 0.70 under the 0.75 bar with the gate shut, so
+  the Moment it exists for had not fired since the gate rule; the build had rescaled a dead figure.
+- **The pictures** (`ticket-623/fund-faction.png`, `rival-report.png`): the Faction choice screen,
+  the Prospectors' Victory Condition reading the new bar; and the rival's Moment from the mended
+  aid, *"5000 of 6250"* over *"Prospectors are three quarters of the way to Victory: Venture
+  Capital Fund at 5000 of 6250."*
 - **Swept** (`sweeps/ticket-623.txt`, 20 seeds x four seatings): **18 / 61 / 0 / 1 and 0 collapses**,
   from §17's 17 / 58 / 2 / 2 and 1: noise. **The bar does not bite**: the Fund at the end a median
   6,775 / 6,716 / 6,459 / 6,368 by seating of the 6,250 asked, from 5,344 / 5,311 / 5,117 / 5,026 of

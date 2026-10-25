@@ -698,20 +698,20 @@ fn build_board(session: &mut Session) {
             }
         }
         // `rival:1` (a building aid, ticket #261, version 0.08.4): seat 1 stands three quarters of
-        // the way to its Victory Condition -- fourteen Colonists on the Moon of eighteen, and, for
-        // the Prospectors it usually is, the Fund at 4750 of 6250 (ticket #623, version 0.1.0.5;
-        // 3800 of 5000 since ticket #584, 3230 of 4250 since ticket #580, from the review: 2625 of
-        // 3500 since ticket #506, nine of
-        // twelve and 2000 of 2500 before; at the 4,250 bar 2625 scored 0.67 and the Moment never
-        // fired) -- and a quiet turn runs so the rival's Moment fires and `moment:rival` can open it
-        // in the Report picture.
+        // the way to its Victory Condition -- sixteen Colonists on the Moon of twenty, and, for the
+        // Prospectors it usually is, the Fund at 5000 of 6250, the figures the Moment test stands on
+        // (ticket #623, version 0.1.0.5, from the review: fourteen of eighteen and 3800 of 5000 since
+        // ticket #584 scored 0.70 under the 0.75 bar with the gate shut, so the Moment never fired;
+        // 3230 of 4250 since ticket #580, 2625 of 3500 since ticket #506, nine of twelve and 2000 of
+        // 2500 before) -- and a quiet turn runs so the rival's Moment fires and `moment:rival` can
+        // open it in the Report picture.
         if std::env::args().any(|a| a == "rival:1") {
             let rival = Seat(1);
             let slot = g.free_slots_on(BodyId::Moon).first().copied().unwrap_or(0);
             let id = ColonyId(g.fresh_id());
             let modules = vec![Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Habitat)];
-            g.colonies.push(Colony { id, body: BodyId::Moon, slot, control: Control::Controlled(rival), modules, colonists: 14, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, tier: 0, in_orbit: false });
-            g.seats[1].venture_fund = 4750.0;
+            g.colonies.push(Colony { id, body: BodyId::Moon, slot, control: Control::Controlled(rival), modules, colonists: 16, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, tier: 0, in_orbit: false });
+            g.seats[1].venture_fund = 5000.0;
             g.seats[1].stabilization_run = 4;
             run_one_quiet_turn(g);
         }
