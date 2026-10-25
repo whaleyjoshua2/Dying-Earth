@@ -1,0 +1,36 @@
+--- TECH TREE ---
+Society
+  Large Language Models (18, rung 1): available; Region, Lab and Observatory Research x1.5; Breakthrough gives 25; stances hold through Comms Blackout; a Labour Dispute idles one Facility only
+  Civil Defense (32, rung 2): locked, needs Large Language Models; A Constabulary adds 10 to the challenge margin instead of 5
+  Orbital Data Centers (32, rung 2): locked, needs Large Language Models; Observatory Research x1.25; every pick from 4 Techs
+  Superconductors (48, rung 3): locked, needs Orbital Data Centers; Energy output x1.25
+  The Upload (62, rung 4): locked, needs Civil Defense and Superconductors; the Archivists' gate; Opens the Archivists' Victory Condition; Region, Lab and Observatory Research x1.25
+Stewardship
+  Efficient Grids (18, rung 1): available; Power Plant, Wind Farm and Generator output x1.5
+  Coastal Engineering (15, rung 1): available; Unlocks the Sea Wall.
+  Clean Power (32, rung 2): locked, needs Efficient Grids; Power Plant Emissions x0.5; unlocks the Wind Farm
+  Green Consensus (32, rung 2): locked, needs Efficient Grids; Per-person Emissions x0.5; Influence thresholds x0.75; Heatwave loss halved
+  Clean Manufacturing (48, rung 3): locked, needs Clean Power; Factory and Refinery Emissions x0.4; Wildfire adds no Emissions
+  Planetary Stewardship (62, rung 4): locked, needs Clean Manufacturing and Green Consensus; the Custodians' gate; Natural Sink +1.5 ppm
+Off-world Living
+  Expanded Habitats (18, rung 1): available; Each Habitat holds +4 Colonists; a Colony Ship carries +2 Colonists
+  Closed-Loop Colonies (32, rung 2): locked, needs Expanded Habitats; Module Energy upkeep x0.75; immune to Grid Failure
+  Relay Networks (32, rung 2): locked, needs Expanded Habitats; A Relay adds 2 Influence to the Allotment instead of 1
+  Regolith Printing (48, rung 3): locked, needs Closed-Loop Colonies; Modules off Earth cost x0.75 Materials and x0.85 Widgets
+  Generation Ships (62, rung 4): locked, needs Regolith Printing and Relay Networks; the Arkwrights' gate; Opens the Arkwrights' Victory Condition; a Colony Ship carries +2 Colonists
+Extraction
+  Deep Mining (18, rung 1): available; Mine output x1.5, on Earth and off it; Rich Seam gives x3
+  Automated Refining (32, rung 2): locked, needs Deep Mining; Refinery output x1.5; Ice Deposit gives x3
+  Beneficiation (32, rung 2): locked, needs Deep Mining; Mine output x1.1, wherever the Mine stands
+  Commodity Finance (32, rung 2): locked, needs Deep Mining; Bank, Investment Bank, Trade Post and Exchange Ducats x1.15
+  Rail Gun Freight (48, rung 3): locked, needs Automated Refining; Each working Mass Driver pays 3 Ducats a turn
+  The Extraction Charter (62, rung 4): locked, needs Rail Gun Freight and Commodity Finance; the Prospectors' gate; Opens the Prospectors' Victory Condition; Mine output x1.25
+Propulsion
+  Clean Propellant (18, rung 1): available; Launch Emissions 0.8; a Launch Pad Fire closes no Launch Site; every Ship's tank +5 Fuel
+  Orbital Refuelling (22, rung 1): available; Transit times x0.9; stacks with Nuclear Rockets
+  Efficient Transit (32, rung 2): locked, needs Clean Propellant; Transit Fuel x0.75; transits advance through Solar Storm
+  Cryogenic Tanks (32, rung 2): locked, needs Orbital Refuelling; Every Ship's tank +15 Fuel
+  Hardened Hulls (48, rung 3): locked, needs Efficient Transit; Every Ship +2 strength; immune to Radiation Surge
+  Nuclear Rockets (48, rung 3): locked, needs Cryogenic Tanks; Transit times x0.8 (a Mars crossing four turns at the window, Venus two); Fuel unchanged
+  Missile Technology (58, rung 4): locked, needs Nuclear Rockets and Hardened Hulls; Unlocks the Missile Carrier: the first weapon Tech, and the whole table sees it
+Next pick: random among the tied.

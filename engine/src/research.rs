@@ -5,6 +5,47 @@ use crate::state::*;
 
 impl Game {
     /// Techs whose prerequisites are met and that are not done or under research.
+    /// Ticket #617 (version 0.1.0.5): the text tool's Tech tree, by branch in the window's band
+    /// order, each Tech a line with its cost, rung, state and effect, a locked one naming what it
+    /// needs and a Victory gate its Faction; the Research Lead's line last.
+    pub fn tech_tree_lines(&self) -> Vec<String> {
+        let available = self.available_techs();
+        let mut branches: Vec<&str> = Vec::new();
+        for t in TechId::ALL {
+            let b = self.tables.tech(t).branch.as_str();
+            if !branches.contains(&b) {
+                branches.push(b);
+            }
+        }
+        branches.sort_by_key(|b| TECH_BRANCH_ORDER.iter().position(|x| x == b).unwrap_or(TECH_BRANCH_ORDER.len()));
+        let mut lines = Vec::new();
+        for branch in branches {
+            lines.push(branch.to_string());
+            let mut techs: Vec<&crate::data::TechCard> = TechId::ALL.into_iter().map(|t| self.tables.tech(t)).filter(|c| c.branch == branch).collect();
+            techs.sort_by_key(|c| c.rung);
+            for c in techs {
+                let state = if self.research.done.contains(&c.id) {
+                    "done".to_string()
+                } else if self.research.current == Some(c.id) && !self.research.pick_committed {
+                    format!("chosen this turn, {}/{}", self.research.progress, c.cost)
+                } else if self.research.current == Some(c.id) {
+                    format!("under research {}/{}", self.research.progress, c.cost)
+                } else if available.contains(&c.id) {
+                    "available".to_string()
+                } else {
+                    format!("locked, needs {}", c.needs.iter().map(|n| self.tables.tech(*n).name.clone()).collect::<Vec<_>>().join(" and "))
+                };
+                let gate = match c.gate_for {
+                    Some(kind) => format!("the {}' gate; ", self.tables.faction(kind).name),
+                    None => String::new(),
+                };
+                lines.push(format!("  {} ({}, rung {}): {state}; {gate}{}", c.name, c.cost, c.rung, c.effect));
+            }
+        }
+        lines.push(self.research_lead_text());
+        lines
+    }
+
     pub fn available_techs(&self) -> Vec<TechId> {
         TechId::ALL
             .into_iter()

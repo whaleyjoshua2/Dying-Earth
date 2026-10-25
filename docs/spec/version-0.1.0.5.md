@@ -392,3 +392,30 @@ ticket's questions, *"q1 c q2 that q3 yes q4 keep 587s q5 b q6 b q7 yes"*.
   page under `accord:some`), `directive-tech-mars.png` (the Tech Tree window), `blame-climate-earth.png`
   (the Climate Panel's heading).
 - No rule moves; no sweep.
+
+## 14. The text tool shows the first landing, the race to the Moon and the Tech tree
+
+Ticket: [The text tool shows the race for a Body and the Tech tree](https://github.com/whaleyjoshua2/Dying-Earth/issues/617).
+
+The designer: *"The window has a 'race to the Moon' panel and a Tech Tree; the text tool has
+neither. (tool)"*; on the ticket's questions, *"q1 a q2 yes q3 a q4 a"*.
+
+- **The first landing**, one line under every Body in the FREE SLOTS block but Earth, whose windfall
+  is 0: *"first landing: nobody yet, 5 Influence to the first"*; claimed, *"first landing: the
+  Prospectors, at Olympus Mons"*. The engine keeps no turn for a first, so the place names it where
+  the ticket's draft had a turn.
+- **The race to the Moon**, under the Moon's line, the window's block in one line: *"race to the
+  Moon: Custodians no Shipyard, Prospectors no Shipyard, Arkwrights no Shipyard, Archivists no
+  Shipyard"*, leader first, in the steps' own words (now `MoonStep::words`, which the window reads
+  too); gone once somebody lands. The ticket's draft, a Colony-Ship-bound line for every Body, was
+  not what the window has and was not taken.
+- **The Tech tree**, behind `show --techs` as the costs are behind `--costs`, since the board print
+  is long already: by branch in the window's band order (`TECH_BRANCH_ORDER`, now the engine's and
+  read by the window), each Tech a line, *"Clean Power (32, rung 2): locked, needs Efficient Grids;
+  Power Plant Emissions x0.5; unlocks the Wind Farm"*; the states *done*, *under research 10/18*,
+  *chosen this turn, 0/32*, *available*, *locked, needs ...*; a Victory gate marked *"the Archivists'
+  gate"*; the Research Lead's line last.
+- The lines are the engine's (`first_landing_line`, `moon_race_line`, `tech_tree_lines`), held by
+  three tests; the tool prints them. `help` says where the tree is.
+- **The artifacts** (`ticket-617/bodies.txt`, `tech-tree.txt`): the tool's two outputs on turn one.
+- No rule moves; no sweep.

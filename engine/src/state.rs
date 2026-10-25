@@ -4445,6 +4445,26 @@ impl Game {
         self.body_firsts.iter().find(|f| f.body == body).map(|f| (f.seat, f.colony))
     }
 
+    /// Ticket #617 (version 0.1.0.5): the text tool's line under a Body -- who landed first and
+    /// where, or the prize still open. None for a Body with no first to claim (Earth's windfall is 0).
+    pub fn first_landing_line(&self, body: BodyId) -> Option<String> {
+        let card = self.tables.body(body);
+        if card.first_windfall == 0 {
+            return None;
+        }
+        Some(match self.first_at(body) {
+            Some((seat, colony)) => format!("first landing: the {}, at {}", self.seat_name(seat), self.place_name(Place::Colony(colony))),
+            None => format!("first landing: nobody yet, {} Influence to the first", card.first_windfall),
+        })
+    }
+
+    /// Ticket #617 (version 0.1.0.5): the window's race block in one line, leader first, in the
+    /// steps' own words; gone once somebody lands, as the block is.
+    pub fn moon_race_line(&self) -> Option<String> {
+        let race = self.moon_race()?;
+        Some(format!("race to the Moon: {}", race.iter().map(|(seat, step)| format!("{} {}", self.seat_name(*seat), step.words())).collect::<Vec<_>>().join(", ")))
+    }
+
     /// Ticket #481 (version 0.09.8): **how far a Faction has got toward landing on the Moon**: the
     /// furthest step it stands on. Read off the board, and the same for every seat.
     pub fn moon_step(&self, seat: Seat) -> MoonStep {

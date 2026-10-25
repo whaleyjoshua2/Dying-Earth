@@ -4125,16 +4125,8 @@ fn moon_race_block(ui: &mut Ui, session: &Session, game: &Game, body: BodyId) {
         "How far each Faction has got toward landing here, the leader first. Everyone sees it, until somebody lands.".to_string(),
     );
     for (seat, step) in race {
-        let words = match step {
-            MoonStep::NoShipyard => "no Shipyard",
-            MoonStep::Shipyard => "has a Shipyard",
-            MoonStep::ColonyShip => "has a Colony Ship",
-            MoonStep::Aboard => "Colonists aboard",
-            MoonStep::Bound => "on the way",
-            MoonStep::InOrbit => "in the Moon's orbit",
-            MoonStep::Landed => "landed",
-        };
-        ui.label(RichText::new(format!("{}: {words}", game.seat_name(seat))).color(seat_colour(session, seat)));
+        // Ticket #617 (version 0.1.0.5): the words are the step's own, shared with the text tool.
+        ui.label(RichText::new(format!("{}: {}", game.seat_name(seat), step.words())).color(seat_colour(session, seat)));
     }
 }
 
@@ -10270,7 +10262,8 @@ fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, ac
     // Ticket #424 (version 0.09.5): Industry renamed STEWARDSHIP and lifted to second, directly above
     // Off-world Living, at the designer's word -- "bring that whole branch up above off world
     // living". Each Faction's Victory Tech now ends a band of its own.
-    const BAND_ORDER: [&str; 5] = ["Society", "Stewardship", "Off-world Living", "Extraction", "Propulsion"];
+    // Ticket #617 (version 0.1.0.5): the order is the engine's, so the text tool's tree runs the same.
+    const BAND_ORDER: [&str; 5] = dying_earth_engine::TECH_BRANCH_ORDER;
     let mut branches: Vec<String> = Vec::new();
     for t in TechId::ALL {
         let b = &game.tables.tech(t).branch;

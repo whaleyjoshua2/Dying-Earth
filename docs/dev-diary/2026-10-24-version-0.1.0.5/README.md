@@ -259,3 +259,22 @@ has its lines on turn one too; the Unrest test a tautology (built from the forma
 against), now the shipped line; the Allotment's ordinary branch unpinned, now pinned; a stale comment
 above the Region card's Allotment line, rewritten; and the new block wedged between the two sentences
 ticket #382's doc comment introduced, moved after them.
+
+## The text tool shows the first landing, the race to the Moon and the Tech tree
+
+Ticket [#617](https://github.com/whaleyjoshua2/Dying-Earth/issues/617), spec §14.
+
+Four questions, answered *"q1 a q2 yes q3 a q4 a"*: the race mirrors the window's ladder rather than
+the ticket's per-Body draft, every Body gets its first-landing line, the tree sits behind `show
+--techs`, and runs by branch with every Tech's effect. The three texts went into the engine, tested
+red first on the missing functions, so the tool and the tests read one line; the step's words moved
+from the window onto `MoonStep` and the band order onto `TECH_BRANCH_ORDER`, the window reading both.
+The tree test's first failure was its own: it left the progress at 10 after moving the pick, and the
+engine's *"chosen this turn, 10/32"* was right.
+
+**The artifacts** ([`ticket-617/bodies.txt`](ticket-617/bodies.txt),
+[`tech-tree.txt`](ticket-617/tech-tree.txt)): the tool's Bodies block and tree on a fresh seed-7
+game, looked at: the Moon carries *"first landing: nobody yet, 5 Influence to the first"* over
+*"race to the Moon: Custodians no Shipyard, ..."*, Earth carries neither, and the tree opens on
+Society with Large Language Models available and The Upload locked behind two Techs with the
+Archivists' gate marked.

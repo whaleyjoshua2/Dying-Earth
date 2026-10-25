@@ -1,0 +1,37 @@
+--- FREE SLOTS ---
+Earth   ground: 0 Antarctic Peninsula [M 1.44 G 0.69 R 2.19 S 1.20]; 1 Lake Vostok [M 1.56 G 0.59 R 1.88 S 0.93]; 2 Ross Ice Shelf [M 1.45 G 0.63 R 1.99 S 1.01]
+        orbital: 3 Orbital Reef; 4 Starlab; 5 Earth L4; 6 Earth L5
+        orbits to fly to: low | 0 ISS | 1 Tiangong | 2 Axiom | 3 Orbital Reef | 4 Starlab | 5 Earth L4 | 6 Earth L5
+the Moon ground: 0 Mare Tranquillitatis [M 1.15 G 1.41 R 0.61 S 1.02]; 1 Mare Imbrium [M 1.11 G 1.28 R 0.82 S 0.98]; 2 Tycho [M 1.11 G 1.24 R 0.69 S 0.92]; 3 South Pole-Aitken Basin [M 1.39 G 1.33 R 0.61 S 1.00]; 4 Oceanus Procellarum [M 1.19 G 1.12 R 0.73 S 1.06]
+        orbital: 0 Gateway; 1 Selene
+        orbits to fly to: low | 0 Gateway | 1 Selene
+        first landing: nobody yet, 5 Influence to the first
+        race to the Moon: Custodians no Shipyard, Prospectors no Shipyard, Arkwrights no Shipyard, Archivists no Shipyard
+Mars    ground: 0 Olympus Mons [M 1.01 G 0.87 R 1.60 S 1.44]; 1 Valles Marineris [M 0.86 G 0.72 R 1.70 S 1.62]; 2 Chryse Planitia [M 1.08 G 0.77 R 1.58 S 1.39]; 3 Hellas Planitia [M 0.93 G 0.81 R 1.34 S 1.29]; 4 Isidis Planitia [M 1.15 G 0.70 R 1.76 S 1.46]; 5 Elysium Planitia [M 1.04 G 0.68 R 1.37 S 1.14]
+        orbital: 0 Mars Base Camp; 1 Ares; 2 Hermes
+        orbits to fly to: low | 0 Mars Base Camp | 1 Ares | 2 Hermes
+        first landing: nobody yet, 15 Influence to the first
+Phobos  ground: 0 Stickney [M 1.32 G 1.45 R 0.63 S 1.16]; 1 Roche [M 1.47 G 1.36 R 0.55 S 1.33]; 2 Todd [M 1.42 G 0.96 R 0.70 S 1.10]
+        orbital: 0 Phobos Gateway
+        orbits to fly to: low | 0 Phobos Gateway
+        first landing: nobody yet, 20 Influence to the first
+Deimos  ground: 0 Swift [M 1.04 G 1.11 R 0.52 S 1.06]; 1 Voltaire [M 1.16 G 0.93 R 0.51 S 1.10]
+        orbital: 0 Deimos Gateway
+        orbits to fly to: low | 0 Deimos Gateway
+        first landing: nobody yet, 20 Influence to the first
+Venus   ground: none
+        orbital: 0 Ishtar; 1 Aphrodite; 2 Lada
+        orbits to fly to: 0 Ishtar | 1 Aphrodite | 2 Lada
+Mercury ground: 0 Caloris Planitia [M 1.53 G 2.02 R 0.51 S 1.19]; 1 Borealis Planitia [M 1.50 G 2.00 R 0.56 S 1.21]; 2 Prokofiev [M 1.26 G 2.04 R 0.52 S 1.60]; 3 Rachmaninoff [M 1.30 G 2.63 R 0.60 S 1.33]; 4 Raditladi [M 1.45 G 2.44 R 0.49 S 1.28]; 5 Rembrandt [M 1.74 G 2.16 R 0.57 S 1.38]
+        orbital: 0 Messenger; 1 Mariner
+        orbits to fly to: low | 0 Messenger | 1 Mariner
+        first landing: nobody yet, 20 Influence to the first
+Ceres   ground: 0 Occator [M 0.59 G 0.69 R 1.92 S 1.29]; 1 Ahuna Mons [M 0.78 G 0.62 R 1.94 S 1.15]; 2 Ernutet [M 0.66 G 0.52 R 2.05 S 1.09]; 3 Oxo [M 0.71 G 0.63 R 2.26 S 1.52]; 4 Kerwan [M 0.83 G 0.64 R 2.20 S 1.07]; 5 Yalode [M 0.81 G 0.64 R 2.09 S 1.47]
+        orbital: 0 Piazzi; 1 Dawn
+        orbits to fly to: low | 0 Piazzi | 1 Dawn
+        first landing: nobody yet, 25 Influence to the first
+Vesta   ground: 0 Rheasilvia [M 1.93 G 0.53 R 0.56 S 1.04]; 1 Veneneia [M 1.83 G 0.68 R 0.50 S 1.32]; 2 Divalia Fossae [M 1.60 G 0.61 R 0.55 S 1.20]; 3 Marcia [M 1.70 G 0.48 R 0.55 S 1.12]; 4 Arruntia [M 2.00 G 0.58 R 0.59 S 1.12]; 5 Bellicia [M 1.93 G 0.67 R 0.61 S 1.09]
+        orbital: 0 Olbers; 1 Vestalia
+        orbits to fly to: low | 0 Olbers | 1 Vestalia
+        first landing: nobody yet, 25 Influence to the first
+

@@ -25703,3 +25703,57 @@ fn ticket_614_a_side_that_left_whole_is_still_named_as_the_destroyer() {
     let m = g.report.moments.iter().find(|m| m.kind == MomentKind::DecisiveBattle).expect("a Moment");
     assert_eq!((m.text.as_str(), m.figure.as_str()), (format!("Battle at Mars low orbit: your TSV Defiant and TSV Beagle destroyed the {pro_name}' PMV Valiant.").as_str(), "you won"), "nobody stayed, so the whole side is named");
 }
+
+// Ticket #617 (version 0.1.0.5): the text tool gets what the window has -- the first landing and
+// the race to the Moon on the Bodies block, and the Tech tree behind `show --techs`. The lines are
+// the engine's, so the tool and the test read one text.
+#[test]
+fn ticket_617_the_first_landing_line_names_the_prize_then_the_first() {
+    let mut g = game();
+    assert_eq!(g.first_landing_line(BodyId::Earth), None, "Earth has no first: its windfall is 0");
+    assert_eq!(g.first_landing_line(BodyId::Moon).as_deref(), Some("first landing: nobody yet, 5 Influence to the first"));
+    assert_eq!(g.first_landing_line(BodyId::Mars).as_deref(), Some("first landing: nobody yet, 15 Influence to the first"));
+    let id = ColonyId(g.fresh_id());
+    let slot = g.free_slots_on(BodyId::Moon)[0];
+    g.colonies.push(Colony { id, body: BodyId::Moon, slot, control: Control::Controlled(Seat(1)), modules: vec![Module::new(ModuleKind::Core)], colonists: 2, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, tier: 0, in_orbit: false });
+    g.body_firsts.push(BodyFirst { body: BodyId::Moon, seat: Seat(1), colony: id });
+    let line = g.first_landing_line(BodyId::Moon).unwrap();
+    assert_eq!(line, format!("first landing: the {}, at {}", g.seat_name(Seat(1)), g.place_name(Place::Colony(id))));
+}
+
+#[test]
+fn ticket_617_the_race_to_the_moon_is_a_line_until_somebody_lands() {
+    let mut g = game();
+    let line = g.moon_race_line().expect("a race while nobody has landed");
+    assert!(line.starts_with("race to the Moon: "), "{line}");
+    for s in Seat::ALL {
+        assert!(line.contains(&format!("{} no Shipyard", g.seat_name(s))) || line.contains(&format!("{} has a Shipyard", g.seat_name(s))), "every seat, in the window's words: {line}");
+    }
+    assert_eq!(line.matches(", ").count(), 3, "four seats, comma-separated: {line}");
+    let id = ColonyId(g.fresh_id());
+    g.body_firsts.push(BodyFirst { body: BodyId::Moon, seat: Seat(2), colony: id });
+    assert_eq!(g.moon_race_line(), None, "gone once somebody lands");
+}
+
+#[test]
+fn ticket_617_the_tech_tree_lines_run_by_branch_with_each_techs_state() {
+    let mut g = game();
+    g.research.current = Some(TechId::EfficientGrids);
+    g.research.progress = 10;
+    g.research.pick_committed = true;
+    let lines = g.tech_tree_lines();
+    let branches: Vec<&String> = lines.iter().filter(|l| !l.starts_with("  ")).collect();
+    assert_eq!(branches.iter().take(5).map(|s| s.as_str()).collect::<Vec<_>>(), ["Society", "Stewardship", "Off-world Living", "Extraction", "Propulsion"], "the window's band order; the Lead line last");
+    assert!(lines.contains(&"  Efficient Grids (18, rung 1): under research 10/18; Power Plant, Wind Farm and Generator output x1.5".to_string()), "{lines:?}");
+    assert!(lines.contains(&"  Clean Power (32, rung 2): locked, needs Efficient Grids; Power Plant Emissions x0.5; unlocks the Wind Farm".to_string()), "{lines:?}");
+    assert!(lines.iter().any(|l| l.contains("rung 1): available; ")), "a rung-1 Tech with nothing before it is available: {lines:?}");
+    assert!(lines.iter().any(|l| l.contains("' gate; ")), "a Victory gate is marked: {lines:?}");
+    assert_eq!(lines.last().unwrap(), &g.research_lead_text(), "the Lead line last");
+    g.research.done.push(TechId::EfficientGrids);
+    g.research.current = Some(TechId::CleanPower);
+    g.research.pick_committed = false;
+    g.research.progress = 0;
+    let lines = g.tech_tree_lines();
+    assert!(lines.contains(&"  Efficient Grids (18, rung 1): done; Power Plant, Wind Farm and Generator output x1.5".to_string()), "{lines:?}");
+    assert!(lines.contains(&"  Clean Power (32, rung 2): chosen this turn, 0/32; Power Plant Emissions x0.5; unlocks the Wind Farm".to_string()), "{lines:?}");
+}

@@ -4,6 +4,7 @@
 //!   cargo run -q -p dying-earth-engine --example play -- new --save G.ron --seed 7 \
 //!       --faction custodians --start europe
 //!   cargo run -q -p dying-earth-engine --example play -- show --save G.ron
+//!   cargo run -q -p dying-earth-engine --example play -- show --save G.ron --techs
 //!   cargo run -q -p dying-earth-engine --example play -- turn --save G.ron --orders turn.txt
 //!   cargo run -q -p dying-earth-engine --example play -- help
 //!
@@ -424,7 +425,8 @@ const GRAMMAR: &str = r#"ORDER LINES (one per line; `#` starts a comment; blank 
                                        and what each side does; a seat that cannot pay the offer may
                                        only refuse.
 
-  tech <tech>                          pick the next shared Tech (when the board says one is awaited), by its name
+  tech <tech>                          pick the next shared Tech (when the board says one is awaited), by its name;
+                                       `show --techs` prints the whole tree, each Tech's state and effect
 
   build facility <state> <facility>    e.g. build facility europe factory
   build facility-ducats <state> <facility>
@@ -1739,6 +1741,14 @@ fn print_board(g: &Game) {
             if orbit.is_empty() { "none".into() } else { orbit.join("; ") },
             orbits.join(" | ")
         );
+        // Ticket #617 (version 0.1.0.5): what the window's Body card says above its slots -- the
+        // first landing, and under the Moon the race for it while nobody has landed.
+        if let Some(line) = g.first_landing_line(b) {
+            println!("        {line}");
+        }
+        if let Some(line) = g.moon_race_line().filter(|_| b == BodyId::Moon) {
+            println!("        {line}");
+        }
     }
 
     println!("\n--- SHIPS AND ARMIES ---");
@@ -1930,6 +1940,14 @@ fn main() {
             print_board(&game);
             if args.iter().any(|a| a == "--costs") {
                 print_costs(&game);
+            }
+            // Ticket #617 (version 0.1.0.5): the Tech tree, the window's on demand, behind a flag
+            // as the costs are, since the board print is long already.
+            if args.iter().any(|a| a == "--techs") {
+                println!("\n--- TECH TREE ---");
+                for line in game.tech_tree_lines() {
+                    println!("{line}");
+                }
             }
             if let Some(n) = flag(&args, "log").and_then(|s| s.parse::<usize>().ok()) {
                 println!("\n--- LOG, last {} ---", dying_earth_engine::counted(n, "line", "lines"));
