@@ -2696,6 +2696,10 @@ impl Game {
                 // from, taking the first name no Ship on the board is using. This is the ONE place a
                 // Ship comes into a real game, so it is the one place a name is given.
                 let name = self.next_ship_name(kind);
+                // Ticket #629 (version 0.1.0.6): a nuclear hull, counted for the sweep.
+                if b.nuclear {
+                    self.war.nuclear_hulls_built[b.seat.index()] += 1;
+                }
                 if kind.is_warship() {
                     self.war.warships_built[b.seat.index()] += 1;
                 }
@@ -2729,6 +2733,15 @@ impl Game {
                     // comes empty, as it does to a Ship already flying. A build older than the
                     // record carries nought and fills as it always did.
                     fuel: if b.fuel > 0.0 { b.fuel.min(self.tank_of(b.seat, kind)) } else { self.tank_of(b.seat, kind) },
+                    // Ticket #629 (version 0.1.0.6): a nuclear hull, built holding the second tank
+                    // paid for at the order -- what was paid less a Missile Carrier's Warhead.
+                    nuclear: b.nuclear,
+                    fissionables: if b.nuclear {
+                        let warhead = if kind == UnitKind::MissileCarrier { self.tables.nuke.fissionables } else { 0.0 };
+                        tenth((b.fissionables - warhead).max(0.0).min(self.fission_tank_of(b.seat, kind)))
+                    } else {
+                        0.0
+                    },
                 });
             }
             _ => {}

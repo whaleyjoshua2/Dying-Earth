@@ -329,6 +329,13 @@ pub struct Build {
     /// the field, where the Ship is filled to its tank as it always was.
     #[serde(default)]
     pub fuel: f64,
+    /// Ticket #629 (version 0.1.0.6): a Ship built as a nuclear hull.
+    #[serde(default)]
+    pub nuclear: bool,
+    /// Ticket #629: the Fissionables paid at the order -- a nuclear hull's second tank and a
+    /// Warhead's half -- which a cancel refunds; the hull is built holding its tank's share.
+    #[serde(default)]
+    pub fissionables: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -637,6 +644,14 @@ pub struct Ship {
     /// Warhead to carry and can never be given one.
     #[serde(default)]
     pub warhead: bool,
+    /// Ticket #629 (version 0.1.0.6): a **nuclear hull**, built once Nuclear Rockets stands: it alone
+    /// takes the Tech's shorter crossings, and every leg burns a tenth of its Fuel in Fissionables
+    /// from its second tank as well. False on a chemical hull and in a save from before.
+    #[serde(default)]
+    pub nuclear: bool,
+    /// Ticket #629: the second tank's Fissionables; nought on a chemical hull.
+    #[serde(default)]
+    pub fissionables: f64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -1333,6 +1348,9 @@ pub struct WarCounters {
     /// (the Collapse on the heading before its own win), by seat.
     #[serde(default)]
     pub collapse_weighed: [u32; SEAT_COUNT],
+    /// Ticket #629 (version 0.1.0.6): nuclear hulls built, by seat, for the sweep.
+    #[serde(default)]
+    pub nuclear_hulls_built: [u32; SEAT_COUNT],
     /// Ticket #300 (version 0.08.6): Armies landed from a Carrier at a Colony, by seat. Never
     /// counted before; the reviews measured no Army carried by anybody in eighty games.
     #[serde(default)]
@@ -1443,6 +1461,7 @@ impl WarCounters {
             self.homes_lost[i] += o.homes_lost[i];
             self.homes_taken[i] += o.homes_taken[i];
             self.collapse_weighed[i] += o.collapse_weighed[i];
+            self.nuclear_hulls_built[i] += o.nuclear_hulls_built[i];
             self.armies_landed[i] += o.armies_landed[i];
             self.interceptions[i] += o.interceptions[i];
             self.batteries_lost[i] += o.batteries_lost[i];
@@ -2372,6 +2391,18 @@ impl Game {
             + self.tech_addition_of(seat, TechId::CryogenicTanks, self.tables.tech(TechId::CryogenicTanks).tank_fuel) as f64
     }
 
+    /// Ticket #629 (version 0.1.0.6): a nuclear hull's second tank, of Fissionables: a share of its
+    /// Fuel tank (`[nuclear_hull] tank_share`, a tenth), so it grows with the Fuel tank's Techs.
+    pub fn fission_tank_of(&self, seat: Seat, kind: UnitKind) -> f64 {
+        tenth(self.tank_of(seat, kind) * self.tables.nuclear_hull.tank_share)
+    }
+
+    /// Ticket #629: the Fissionables a leg of `fuel` burns from this hull's second tank -- the same
+    /// share of the Fuel on a nuclear hull, nought on a chemical one.
+    pub fn leg_fissionables(&self, s: &Ship, fuel: f64) -> f64 {
+        if s.nuclear { tenth(fuel * self.tables.nuclear_hull.tank_share) } else { 0.0 }
+    }
+
     /// An additive Tech read for one seat: its full value once done, half rounded down under
     /// Provisional Findings, and 0 otherwise.
     pub fn tech_addition(&self, seat: Seat, t: TechId) -> i64 {
@@ -2678,6 +2709,14 @@ impl Game {
         tenth(want.min(available.max(0.0)))
     }
 
+    /// Ticket #629 (version 0.1.0.6): the same for a nuclear hull's second tank, from the Fissionables
+    /// available (Q4: Refuel fills both); nought on a chemical hull.
+    pub fn refuel_fission_from(&self, ship: ShipId, available: f64) -> f64 {
+        let Some(s) = self.ship(ship).filter(|s| s.nuclear) else { return 0.0 };
+        let want = (self.fission_tank_of(s.seat, s.kind) - s.fissionables).max(0.0);
+        tenth(want.min(available.max(0.0)))
+    }
+
     /// Ticket #87: the cheapest leg a seat's Ship can fly from this Body today, in Fuel.
     pub fn cheapest_leg_from(&self, seat: Seat, body: BodyId) -> Option<f64> {
         self.cheapest_leg_from_at(seat, body, self.turn)
@@ -2700,11 +2739,15 @@ impl Game {
         // in another orbit rescues this Ship only while the tank can still pay the orbit change
         // that would reach it. A dry tank in the wrong orbit is stranded with a station in sight.
         // Ticket #396 (version 0.09.3): or a Refinery Colony under the low orbit it sits in.
-        if self.refuel_station_at(s.seat, body) && (self.depot_in_orbit(s.seat, body, self.ship_orbit(s)).is_some() || s.fuel >= self.tables.orbit_change_fuel as f64) {
+        // Ticket #629 (version 0.1.0.6), from the review: a nuclear hull's change of orbit wants its
+        // Fissionables as well.
+        let change = self.tables.orbit_change_fuel as f64;
+        if self.refuel_station_at(s.seat, body) && (self.depot_in_orbit(s.seat, body, self.ship_orbit(s)).is_some() || (s.fuel >= change && s.fissionables >= self.leg_fissionables(s, change))) {
             return false;
         }
+        // Ticket #629 (version 0.1.0.6): a nuclear hull pays its Fissionables as well, both apply.
         match self.cheapest_leg_from(s.seat, body) {
-            Some(cheapest) => s.fuel < cheapest,
+            Some(cheapest) => s.fuel < cheapest || s.fissionables < self.leg_fissionables(s, cheapest),
             None => false,
         }
     }
@@ -2720,9 +2763,12 @@ impl Game {
     pub fn arrival_leaves_stranded(&self, seat: Seat, ship: ShipId, to: BodyId, slot: Option<u32>) -> Option<f64> {
         let s = self.ship(ship)?;
         let ShipAt::Body(from) = s.at else { return None };
-        let (turns, fuel) = self.transit_cost_for(seat, from, to);
+        // Ticket #629 (version 0.1.0.6), from the review: the hull's own leg, a nuclear hull's turns,
+        // and its second tank after the leg as well.
+        let (turns, fuel) = self.transit_leg(seat, s, from, to, slot);
         let left = tenth(s.fuel - fuel);
-        if left < 0.0 {
+        let left_fission = tenth(s.fissionables - self.leg_fissionables(s, fuel));
+        if left < 0.0 || left_fission < 0.0 {
             return None;
         }
         // Ticket #396 (version 0.09.3): a Refinery Colony under low orbit is a depot too.
@@ -2731,7 +2777,7 @@ impl Game {
             return None;
         }
         let cheapest = self.cheapest_leg_from_at(seat, to, self.turn + turns)?;
-        if left < cheapest { Some(left) } else { None }
+        if left < cheapest || left_fission < self.leg_fissionables(s, cheapest) { Some(left) } else { None }
     }
 
     /// Ticket #86 (version 0.06.0): how many Colonists a Colony Ship at Earth may take beyond its
@@ -4849,7 +4895,7 @@ impl Game {
     /// the orbit it sits in to the orbit named: a far orbit at either end is that end, a place of
     /// its own, and not its Body.
     pub fn transit_leg(&self, seat: Seat, s: &Ship, from: BodyId, to: BodyId, slot: Option<u32>) -> (u32, f64) {
-        self.journey_cost_for_at(seat, self.port(from, self.ship_orbit(s)), self.port(to, Orbit::of(slot)), self.turn)
+        self.journey_cost_hull(seat, self.port(from, self.ship_orbit(s)), self.port(to, Orbit::of(slot)), self.turn, s.nuclear)
     }
 
     /// Ticket #480: a station's place by name -- "ISS over Earth", and a far orbit's alone,
@@ -5184,8 +5230,10 @@ impl Game {
     pub fn transit_cost_at(&self, from: BodyId, to: BodyId, turn: u32) -> (u32, f64) {
         let tech = if self.has_tech(TechId::EfficientTransit) { self.tables.tech(TechId::EfficientTransit).value } else { 1.0 };
         // Ticket #413 (version 0.09.4): Orbital Refuelling's tenth multiplies Nuclear Rockets' fifth.
+        // Ticket #629 (version 0.1.0.6): Nuclear Rockets is a nuclear hull's alone now, so the
+        // table's own quote -- the window hover, the Report's window line -- is a chemical hull's.
         let days = |t: TechId| if self.has_tech(t) { self.tables.tech(t).value } else { 1.0 };
-        let days_factor = days(TechId::NuclearRockets) * days(TechId::OrbitalRefuelling);
+        let days_factor = days(TechId::OrbitalRefuelling);
         self.transit_cost_with(from, to, 1.0, tech, days_factor, turn)
     }
 
@@ -5303,8 +5351,16 @@ impl Game {
     /// multiplier, Efficient Transit, the turns as the seat reads Nuclear Rockets, and a Mass
     /// Driver of the seat's at the Body it leaves.
     pub fn journey_cost_for_at(&self, seat: Seat, from: Port, to: Port, turn: u32) -> (u32, f64) {
+        self.journey_cost_hull(seat, from, to, turn, false)
+    }
+
+    /// Ticket #629 (version 0.1.0.6), at the designer's word: the same for a hull of a kind -- only a
+    /// NUCLEAR hull reads Nuclear Rockets' shorter crossing; a chemical one, and every quote made for
+    /// no hull in particular, flies at the old speed.
+    pub fn journey_cost_hull(&self, seat: Seat, from: Port, to: Port, turn: u32, nuclear: bool) -> (u32, f64) {
         let faction = self.tables.faction(self.kind(seat)).transit_fuel_multiplier;
-        let (turns, fuel) = self.journey_with(from, to, faction, self.tech_multiplier(seat, TechId::EfficientTransit), self.tech_multiplier(seat, TechId::NuclearRockets) * self.tech_multiplier(seat, TechId::OrbitalRefuelling), turn);
+        let rockets = if nuclear { self.tech_multiplier(seat, TechId::NuclearRockets) } else { 1.0 };
+        let (turns, fuel) = self.journey_with(from, to, faction, self.tech_multiplier(seat, TechId::EfficientTransit), rockets * self.tech_multiplier(seat, TechId::OrbitalRefuelling), turn);
         // Ticket #92 (version 0.06.0): a working Mass Driver of the seat's at the Body it leaves
         // takes Fuel off the leg, after the multipliers. Ticket #486 (version 0.09.8), at the
         // designer's word: a quarter of it, to the tenth, where it was a flat 4 with a floor of 1.

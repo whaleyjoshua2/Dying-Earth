@@ -195,8 +195,12 @@ _Avoid_: research, upgrade, invention
 The game's first weapon Tech, since version 0.09.1: Propulsion, rung 4 at 58 Research since version 0.1.0.0 (rung 3 at 48 before), needing both Nuclear Rockets and Hardened Hulls, and the first Tech that gates a Ship -- it opens the Missile Carrier and does nothing else. Like every Tech it is the whole table's once researched, so the Research Lead decides whether to open the door at all.
 _Avoid_: nukes, nuclear weapons, weapons tech
 
+**Nuclear hull**:
+A Ship built, since version 0.1.0.6, once Nuclear Rockets stands, beside the **chemical hull** the yard has always built: it alone takes the Tech's shorter crossing. It carries a second tank, of Fissionables, a tenth of its Fuel tank -- so the Fuel tank's Techs grow it too -- filled at the build for Fissionables paid at the order, as the Fuel tank is, and refilled by the same Refuel; every leg it flies burns a tenth of its Fuel in Fissionables beside the Fuel, crossings and changes of orbit alike, never a Battle's charge. Short of either, it does not fly the leg.
+_Avoid_: nuclear ship, NTR, fast hull
+
 **Nuclear Rockets**:
-The Tech, since version 0.09.3, that shortens a Transit: Propulsion, rung 3 at 48 Research since version 0.1.0.0, needing Cryogenic Tanks (rung 2 at 38 before, needing Clean Propellant). It cuts a crossing's days by a fifth before the days are rounded up to turns, so a Mars crossing at the Launch Window takes four turns where it took five; a one-turn hop inside a system stays one; the Fuel of a leg is untouched, and a flight already under way keeps its turns. Missile Technology needs it and Hardened Hulls both, since version 0.1.0.0.
+The Tech, since version 0.09.3, that shortens a Transit: Propulsion, rung 3 at 48 Research since version 0.1.0.0, needing Cryogenic Tanks (rung 2 at 38 before, needing Clean Propellant). It cuts a crossing's days by a fifth before the days are rounded up to turns, so a Mars crossing at the Launch Window takes four turns where it took five -- since version 0.1.0.6 for a **nuclear hull** alone, the one it opens at the yard, a chemical hull flying at the old speed; a one-turn hop inside a system stays one; the Fuel of a leg is untouched, and a flight already under way keeps its turns. Missile Technology needs it and Hardened Hulls both, since version 0.1.0.0.
 _Avoid_: nuclear drive, NTR, fast transit, engines
 
 **Orbital Refuelling**:
@@ -409,11 +413,11 @@ The fifth Ship type, since version 0.09.1: the hull that carries one Warhead and
 _Avoid_: missile boat, nuke ship, ICBM, bomber
 
 **Warhead**:
-The one shot a Missile Carrier carries, since version 0.09.1, and the first thing in the game that is spent by using it. It comes with the hull at the build and is gone the moment it is fired, whether or not anything burned; a Rearm loads another, at a Colony or station of the hull's own Faction with a working Shipyard, in that place's own orbit, for Materials and Widgets -- so a carrier that has fired is out of the war for the round trip home.
+The one shot a Missile Carrier carries, since version 0.09.1, and the first thing in the game that is spent by using it. It comes with the hull at the build and is gone the moment it is fired, whether or not anything burned; a Rearm loads another, at a Colony or station of the hull's own Faction with a working Shipyard, in that place's own orbit, for Materials and Widgets, and since version 0.1.0.6 half a Fissionable at the build and at every Rearm -- so a carrier that has fired is out of the war for the round trip home.
 _Avoid_: missile, payload, ammunition, bomb, reload
 
 **Rearm**:
-The Orders-phase order, since version 0.09.1, that loads a fresh Warhead into a Missile Carrier that has fired: at a Colony or station of its own Faction with a working Shipyard, the hull in that place's own orbit, queued in the yard like a build for 40 Materials and 8 Widgets -- most of a second hull, so that firing is a commitment. It is the Ship's one order of the turn.
+The Orders-phase order, since version 0.09.1, that loads a fresh Warhead into a Missile Carrier that has fired: at a Colony or station of its own Faction with a working Shipyard, the hull in that place's own orbit, queued in the yard like a build for 40 Materials and 8 Widgets, and half a Fissionable since version 0.1.0.6 -- most of a second hull, so that firing is a commitment. It is the Ship's one order of the turn.
 _Avoid_: reload, resupply, refit
 
 **Army**:

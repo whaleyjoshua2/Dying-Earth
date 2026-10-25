@@ -1665,6 +1665,10 @@ pub struct AiThresholds {
     pub collapse_clean_weight: f64,
     #[serde(default = "win_in_sight_default")]
     pub win_in_sight: u32,
+    /// Ticket #629 (version 0.1.0.6): a computer seat builds a nuclear hull when its Stockpile holds
+    /// the second tank's fill and this many tanks more; a chemical one otherwise.
+    #[serde(default = "nuclear_hull_reserve_tanks_default")]
+    pub nuclear_hull_reserve_tanks: f64,
     /// Ticket #336 (version 0.09.0): the price a rival's Colony is weighed against on the same
     /// list -- the weight is this over what the seat would pay, so the cheapest place ranks first.
     #[serde(default = "colony_price_pivot_default")]
@@ -2043,6 +2047,7 @@ struct UnitsFile {
     dig_in: DigInCard,
     army: ArmyCard,
     nuke: NukeCard,
+    nuclear_hull: NuclearHullCard,
 }
 
 /// Ticket #343 (version 0.09.1): every figure a Launch reads (`units.toml`). They live in
@@ -2069,6 +2074,15 @@ pub struct NukeCard {
     /// What a Rearm costs at a Shipyard of the firing Faction.
     pub rearm_materials: i64,
     pub rearm_widgets: u32,
+    /// Ticket #629 (version 0.1.0.6): the Fissionables a Warhead costs, at the Missile Carrier's
+    /// build and at every Rearm.
+    pub fissionables: f64,
+}
+
+/// Ticket #629 (version 0.1.0.6): the nuclear hull's second tank, this share of its Fuel tank.
+#[derive(Debug, Clone, Deserialize)]
+pub struct NuclearHullCard {
+    pub tank_share: f64,
 }
 
 /// Ticket #86 (version 0.06.0): a warming Earth fills the Colony Ships. `per_step` Colonists
@@ -2358,6 +2372,8 @@ pub struct Tables {
     pub army: ArmyCard,
     /// Ticket #343 (version 0.09.1): every figure a Launch reads.
     pub nuke: NukeCard,
+    /// Ticket #629 (version 0.1.0.6).
+    pub nuclear_hull: NuclearHullCard,
     pub techs: Vec<TechCard>,
     pub events: EventsTable,
     pub factions: Vec<FactionCard>,
@@ -2516,6 +2532,7 @@ impl Tables {
             dig_in: units.dig_in,
             army: units.army,
             nuke: units.nuke,
+            nuclear_hull: units.nuclear_hull,
             techs: techs.tech,
             shortlist: techs.shortlist,
             events,
@@ -3292,6 +3309,10 @@ fn collapse_clean_weight_default() -> f64 {
 
 fn win_in_sight_default() -> u32 {
     3
+}
+
+fn nuclear_hull_reserve_tanks_default() -> f64 {
+    2.0
 }
 
 

@@ -454,7 +454,8 @@ stack = -1
 rung = 3
 cost = 48
 needs = ["cryogenic_tanks"]
-effect = "Transit times x0.8 (a Mars crossing four turns at the window, Venus two); Fuel unchanged"
+# Ticket #629 (version 0.1.0.6): the x0.8 is a nuclear hull's alone, which the Tech opens at the yard.
+effect = "Opens the nuclear hull: its crossings x0.8 (Mars four turns at the window, Venus two)"
 value = 0.8
 
 # Ticket #413 (version 0.09.4): the twenty-third Tech, appended last with its enum variant.

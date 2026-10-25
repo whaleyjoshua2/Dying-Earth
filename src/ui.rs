@@ -5420,9 +5420,11 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, seat: Seat, marks: boo
             // a Battle halves a hull whose tank cannot pay its charge and `ship_strength` does not
             // know it. The dry clause below says why the figure has dropped.
             let mut text = format!(
-                "{}{} ({}) at {} - strength {}, {}/{}",
+                "{}{} ({}{}) at {} - strength {}, {}/{}",
                 tag("Ship"),
                 game.ship_name(s),
+                // Ticket #629 (version 0.1.0.6): a nuclear hull says so.
+                if s.nuclear { "nuclear " } else { "" },
                 s.kind.name().to_lowercase(),
                 game.tables.body(body).name,
                 game.ship_fighting_strength(s),
@@ -5705,7 +5707,8 @@ fn order_text(game: &Game, earlier: &[Order], o: &Order) -> String {
         // Ticket #490 (version 0.09.9).
         Order::RaiseTier { colony } => format!("Upgrade {}{}", game.place_name(Place::Colony(*colony)), game.colony(*colony).and_then(|c| game.next_tier(c)).map(|t| format!(" to a {}", t.name)).unwrap_or_default()),
         Order::BuildModule { colony, kind } => format!("Build {} at {}", kind.name(), game.place_name(Place::Colony(*colony))),
-        Order::BuildShip { site, kind } => format!("Build {} at {}", kind.name(), game.place_name(*site)),
+        // Ticket #629 (version 0.1.0.6): a nuclear hull says so.
+        Order::BuildShip { site, kind, nuclear } => format!("Build {}{} at {}", if *nuclear { "nuclear " } else { "" }, kind.name(), game.place_name(*site)),
         Order::BuildArmy { place } => format!("Build Army at {}", game.place_name(*place)),
         Order::Repair { unit, points } => format!("Repair {} on {}", counted(points, "point", "points"), unit_name(game, unit)),
         // Ticket #335 (version 0.09.0): a leg names the ORBIT it ends in, low orbit included.
@@ -6522,7 +6525,8 @@ fn attack_hover(ctx: &egui::Context, game: &Game, place: Place, name: &str, atta
 /// Ticket #489 (version 0.09.9): `colonists` are the people a founding takes, drawn last in the
 /// price behind the population glyph.
 fn priced_button(ui: &mut Ui, enabled: bool, label: &str, cost: &dying_earth_engine::Cost, widgets: u32, colonists: u32) -> egui::Response {
-    let parts: Vec<(&str, f64)> = [("materials", cost.materials), ("fuel", cost.fuel), ("energy", cost.energy), ("influence", cost.influence as f64), ("ducats", cost.ducats), ("widgets", widgets as f64), ("population", colonists as f64)]
+    // Ticket #629 (version 0.1.0.6): and Fissionables, a nuclear hull's tank or a Warhead's half.
+    let parts: Vec<(&str, f64)> = [("materials", cost.materials), ("fuel", cost.fuel), ("fissionables", cost.fissionables), ("energy", cost.energy), ("influence", cost.influence as f64), ("ducats", cost.ducats), ("widgets", widgets as f64), ("population", colonists as f64)]
         .into_iter()
         .filter(|(_, n)| *n > 0.0)
         .collect();
@@ -6578,7 +6582,7 @@ fn build_item_of(game: &Game, order: &Order) -> Option<(Place, BuildItem, bool)>
         Order::BuildModule { colony, kind } => Some((Place::Colony(*colony), BuildItem::Module(*kind), false)),
         Order::BuildModuleWithDucats { colony, kind } => Some((Place::Colony(*colony), BuildItem::Module(*kind), true)),
         Order::BuildArchive { colony } => Some((Place::Colony(*colony), BuildItem::Module(ModuleKind::Archive), false)),
-        Order::BuildShip { site, kind } => Some((*site, BuildItem::Unit(*kind), false)),
+        Order::BuildShip { site, kind, .. } => Some((*site, BuildItem::Unit(*kind), false)),
         Order::BuildArmy { place } => Some((*place, BuildItem::Unit(UnitKind::Army), false)),
         // Ticket #343 (version 0.09.1): a Warhead is a build in the Shipyard's own queue, so the
         // button wears the cog and the hover says the Materials, the Widgets and the turns, exactly
@@ -6618,7 +6622,9 @@ fn build_words(game: &Game, order: &Order) -> Option<String> {
     // Ticket #455 (version 0.09.6): a Ship's price carries its tank, so the hover says so. The
     // caller ends the text with the full stop.
     if matches!(order, Order::BuildShip { .. }) && cost.fuel > 0.0 {
-        return Some(format!("{} Materials, {widgets} Widgets, {when}.\nBuilt full: {} Fuel", cost.materials, cost.fuel));
+        // Ticket #629 (version 0.1.0.6): and a nuclear hull's second tank, or a Warhead's half.
+        let fission = if cost.fissionables > 0.0 { format!(", {} Fissionables", figure(cost.fissionables)) } else { String::new() };
+        return Some(format!("{} Materials, {widgets} Widgets, {when}.\nBuilt full: {} Fuel{fission}", cost.materials, cost.fuel));
     }
     Some(format!("{} Materials, {widgets} Widgets{people}, {when}", cost.materials))
 }
@@ -8986,8 +8992,15 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
         }
         if col.modules.iter().any(|m| m.kind == ModuleKind::Shipyard) {
             card_heading(ui, "warship", "Ships (Shipyard)");
+            // Ticket #629 (version 0.1.0.6): once Nuclear Rockets stands, a nuclear hull beside each.
+            let rockets = game.has_tech(TechId::NuclearRockets);
             for uk in UnitKind::SHIPS {
-                cost_button(ui, game, &session.pending, Order::BuildShip { site: Place::Colony(cid), kind: uk }, uk.name(), actions);
+                ui.horizontal(|ui| {
+                    cost_button(ui, game, &session.pending, Order::BuildShip { nuclear: false, site: Place::Colony(cid), kind: uk }, uk.name(), actions);
+                    if rockets {
+                        cost_button(ui, game, &session.pending, Order::BuildShip { nuclear: true, site: Place::Colony(cid), kind: uk }, "Nuclear", actions);
+                    }
+                });
             }
         }
     }
@@ -9344,7 +9357,10 @@ fn body_dropdown(ui: &mut Ui, session: &Session, game: &Game, body: BodyId, to: 
     let header = if here {
         format!("{} (here): change orbit, {} Fuel", game.tables.body(to).name, game.tables.orbit_change_fuel)
     } else {
-        format!("To {}: {}, {} Fuel", game.tables.body(to).name, counted(turns, "turn", "turns"), figure(fuel))
+        // Ticket #629 (version 0.1.0.6): a nuclear hull's leg burns its tenth in Fissionables too.
+        let burn = one.map(|s| game.leg_fissionables(s, fuel)).unwrap_or(0.0);
+        let fission = if burn > 0.0 { format!(", {} Fissionables", figure(burn)) } else { String::new() };
+        format!("To {}: {}, {} Fuel{fission}", game.tables.body(to).name, counted(turns, "turn", "turns"), figure(fuel))
     };
     let shown = egui::CollapsingHeader::new(RichText::new(header).strong()).id_salt(("moves", salt, to)).default_open(open).show(ui, |ui| {
         if here {
@@ -9411,8 +9427,10 @@ fn transit_lines(ui: &mut Ui, session: &Session, game: &Game, body: BodyId, to: 
     // two turns' figures stand beside it so the drift is visible -- the playtest read 4 turns and
     // 17 Fuel, launched later, and paid 6 and 26. The header carries this turn's figures; the drift
     // is the first line inside, read before any button under it.
-    let (t1, f1) = game.transit_cost_for_at(Seat(0), body, to, game.turn + 1);
-    let (t2, f2) = game.transit_cost_for_at(Seat(0), body, to, game.turn + 2);
+    // Ticket #629 (version 0.1.0.6), from the review: one nuclear hull's drift is a nuclear hull's.
+    let nuclear = one.is_some_and(|s| s.nuclear);
+    let (t1, f1) = game.journey_cost_hull(Seat(0), Port::Body(body), Port::Body(to), game.turn + 1, nuclear);
+    let (t2, f2) = game.journey_cost_hull(Seat(0), Port::Body(body), Port::Body(to), game.turn + 2, nuclear);
     ui.label(RichText::new(format!("{} Fuel each from the tank if launched this turn, whichever orbit it ends in (next turn {t1}t/{}F, then {t2}t/{}F).", figure(fuel), figure(f1), figure(f2))).weak());
     for orbit in game.orbits_of(to) {
         ui.horizontal_wrapped(|ui| {
@@ -9490,7 +9508,8 @@ fn ship_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
     // Ticket #346: the strength it would FIGHT at, dry hulls halved; the Tank block says why.
     ui.horizontal_wrapped(|ui| {
         ui.horizontal(|ui| {
-            ui.label(format!("{}: {}", s.kind.name(), ship_line(game, s)));
+            // Ticket #629 (version 0.1.0.6): a nuclear hull says so.
+            ui.label(format!("{}{}: {}", if s.nuclear { "Nuclear " } else { "" }, if s.nuclear { s.kind.name().to_lowercase() } else { s.kind.name().to_string() }, ship_line(game, s)));
             if let Some(room) = colonist_room(game, &session.pending, s) {
                 colonist_room_label(ui, &room);
             }
@@ -9533,7 +9552,12 @@ fn ship_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
         tanks.scroll_to_me(Some(egui::Align::Min));
     }
     ui.horizontal_wrapped(|ui| {
-        let fuel = format!("{}/{} Fuel", figure(s.fuel), figure(game.tank_of(s.seat, s.kind)));
+        // Ticket #629 (version 0.1.0.6): and a nuclear hull's second tank.
+        let fuel = if s.nuclear {
+            format!("{}/{} Fuel, {}/{} Fissionables", figure(s.fuel), figure(game.tank_of(s.seat, s.kind)), figure(s.fissionables), figure(game.fission_tank_of(s.seat, s.kind)))
+        } else {
+            format!("{}/{} Fuel", figure(s.fuel), figure(game.tank_of(s.seat, s.kind)))
+        };
         match s.at {
             ShipAt::Body(b) => {
                 // Ticket #335 (version 0.09.0): a station fuels only a Ship in its OWN orbit, so a
@@ -13417,7 +13441,7 @@ mod tests {
     fn a_colony_ship_short_of_four_says_four_found_a_colony() {
         let tables = std::sync::Arc::new(dying_earth_engine::data::Tables::load(&dying_earth_engine::data::default_data_dir()).unwrap());
         let g = Game::new(tables, NewGame { seed: 7, player: FactionKind::Custodians, player_is_ai: false, player_start: StateId::EastAsia });
-        let mut s = Ship { name: String::new(), id: ShipId(901), kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Moon), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None };
+        let mut s = Ship { nuclear: false, fissionables: 0.0, name: String::new(), id: ShipId(901), kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Moon), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None };
         for (n, short) in [(0, false), (1, true), (3, true), (4, false)] {
             s.colonists = n;
             let r = colonist_room(&g, &[], &s).unwrap();
@@ -13568,7 +13592,7 @@ mod tests {
         let tables = std::sync::Arc::new(dying_earth_engine::data::Tables::load(&dying_earth_engine::data::default_data_dir()).unwrap());
         let mut g = Game::new(tables, NewGame { seed: 7, player: FactionKind::Custodians, player_is_ai: false, player_start: StateId::EastAsia });
         let base = g.colony_ship_capacity(Seat(0));
-        let ship = |id: u32, kind: UnitKind, at: ShipAt, colonists: u32| Ship { name: String::new(), id: ShipId(id), kind, seat: Seat(0), damage: 0, at, colonists, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None };
+        let ship = |id: u32, kind: UnitKind, at: ShipAt, colonists: u32| Ship { nuclear: false, fissionables: 0.0, name: String::new(), id: ShipId(id), kind, seat: Seat(0), damage: 0, at, colonists, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None };
         let at_moon = ship(901, UnitKind::ColonyShip, ShipAt::Body(BodyId::Moon), 3);
         let room = colonist_room(&g, &[], &at_moon).expect("a Colony Ship shows its room");
         // Ticket #543 (version 0.1.0.1): three aboard is short of the four that found a Colony.
@@ -13594,7 +13618,7 @@ mod tests {
     fn a_colony_ships_figure_counts_this_turns_loads_and_unloads() {
         let tables = std::sync::Arc::new(dying_earth_engine::data::Tables::load(&dying_earth_engine::data::default_data_dir()).unwrap());
         let g = Game::new(tables, NewGame { seed: 7, player: FactionKind::Custodians, player_is_ai: false, player_start: StateId::EastAsia });
-        let s = Ship { name: String::new(), id: ShipId(901), kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 2, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None };
+        let s = Ship { nuclear: false, fissionables: 0.0, name: String::new(), id: ShipId(901), kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 2, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None };
         let load = |ship: u32, n: u32| Order::Load { ship: ShipId(ship), colonists: n, from: LoadSource::State(StateId::EastAsia), army: None };
         let pending = [load(901, 3), load(901, 1), load(902, 5)];
         let r = colonist_room(&g, &pending, &s).unwrap();
@@ -13780,7 +13804,7 @@ mod tests {
     /// A loaded hull and a warship never do.
     #[test]
     fn an_empty_colony_ship_or_carrier_is_named_and_a_loaded_one_or_a_warship_is_not() {
-        let hull = |kind: UnitKind, colonists: u32, army: Option<ArmyId>| Ship {
+        let hull = |kind: UnitKind, colonists: u32, army: Option<ArmyId>| Ship { nuclear: false, fissionables: 0.0,
             id: ShipId(1), name: String::new(), kind, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists, warhead: false, colonists_education: 1.0, army,
             stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None,
         };

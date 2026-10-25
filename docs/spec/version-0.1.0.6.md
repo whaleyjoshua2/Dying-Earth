@@ -11,17 +11,18 @@ pictures and sweeps that decided it are in
 **18 / 61 / 0 / 1 and 0 collapses**, against the designer's 15 each and 20.
 
 **What the version is.** Version 0.1.0.5 with the designer's list of 2026-10-25. Its spine is a new
-resource, **Fissionables**, found off Earth and richest in the far worlds (§1).
+resource, **Fissionables**, found off Earth and richest in the far worlds (§1), which a nuclear hull
+is built and flown with and a Warhead is loaded with (§2).
 
 **What it did to the win column** (80 games, per Faction; every section's own sweep is in it):
 
-| | 0.1.0.5 | §1 Fissionables | the ideal |
-|---|---|---|---|
-| Custodians | 18 | 23 | 15 |
-| Prospectors | 61 | 51 | 15 |
-| Arkwrights | 0 | 3 | 15 |
-| Archivists | 1 | 1 | 15 |
-| collapses | 0 | 2 | 20 |
+| | 0.1.0.5 | §1 Fissionables | §2 the nuclear hull | the ideal |
+|---|---|---|---|---|
+| Custodians | 18 | 23 | 19 | 15 |
+| Prospectors | 61 | 51 | 56 | 15 |
+| Arkwrights | 0 | 3 | 2 | 15 |
+| Archivists | 1 | 1 | 1 | 15 |
+| collapses | 0 | 2 | 2 | 20 |
 
 ## 1. Fissionables, the seventh resource, and Deep Mining and Rich Seam moved
 
@@ -85,3 +86,50 @@ Materials (the Prospectors 2,618 to 2,046 a game, the Custodians 2,135 to 1,781)
 fell 10 wins. Fissionables made, a game, net: the Custodians 56.5, the Prospectors 36.9, the
 Arkwrights 2.5, the Archivists 2.2. (The first build's sweep read the Custodians at 111.7, Production
 Moved doubling their Mars Mines' Fissionables; the win column was the same to the game.)
+
+## 2. What Fissionables buy: the nuclear hull, its second tank, and the Warhead
+
+Ticket: [What Fissionables buy: Ships after Nuclear Rockets, their second fuel, and the nuke](https://github.com/whaleyjoshua2/Dying-Earth/issues/629).
+
+**The nuclear hull** (the designer's Q1 b). Once Nuclear Rockets stands, the yard offers each Ship as
+a chemical hull, as before, or a **nuclear hull** (`Order::BuildShip { nuclear }`, a saved
+`Ship::nuclear`). **Nuclear Rockets' x0.8 reaches a nuclear hull alone**: a chemical hull, and every
+quote made for no hull in particular -- the seat's, the table's, the launch-window hover, the Report's
+window line -- flies at the old speed (`journey_cost_hull`). Hulls built before the Tech are chemical.
+
+**Its second tank** holds Fissionables, `[nuclear_hull] tank_share` (0.1) of its Fuel tank, so the Fuel
+tank's Techs grow it too: a Colony Ship's 3.2, a warship's 3. **The build pays to fill it**, as it pays
+the Fuel (the designer: *"as with fuel the cost is the tank so that cost matches tank increases
+w/tech"*), and the hull is built holding what was paid; a cancel refunds it.
+
+**Every leg burns a tenth of its Fuel in Fissionables** from that tank, beside the Fuel (*"both
+apply"*): crossings and changes of orbit; never a Battle's charge. A leg the second tank cannot pay is
+refused, *needs 2.1 Fissionables aboard, 1.5 left*; a nuclear hull that can pay neither its cheapest
+leg's Fuel nor its Fissionables, with no depot, is **Stranded**. **Refuel fills both tanks** from the
+Stockpile, as far as it pays (Q4 a).
+
+**The Warhead** costs **half a Fissionable** (`[nuke] fissionables`), at the Missile Carrier's build,
+which loads its first, and at every Rearm (Q5). A nuclear Missile Carrier pays both.
+
+**The window.** Each Ship row of a yard gets a second button, **Nuclear**, its price on its face with
+the Fissionables glyph, from the turn Nuclear Rockets stands; its hover says *Built full: 30 Fuel, 3
+Fissionables*. A nuclear hull's card says *Nuclear frigate* and *30/30 Fuel, 1.5/3 Fissionables*, each
+leg's heading names its Fissionables, and the roster says *(nuclear frigate)*. The order list says
+*Build nuclear Frigate at ...*. The text tool takes `build ship <colony> <kind> nuclear` and prints
+`nuclear, Fi 1.5/3` on the hull's line.
+
+**The computer** (Q6) builds a nuclear hull when its Stockpile holds the second tank's fill and
+`nuclear_hull_reserve_tanks` (2) tanks more, `ai_builds_nuclear`, and a chemical one otherwise; its
+Refuel tops up a nuclear hull's second tank as well. It does not buy Fissionables for a hull or a
+Warhead: a computer seat with none builds no Missile Carrier. That is
+[The computer chases Fissionables](https://github.com/whaleyjoshua2/Dying-Earth/issues/643).
+
+**Saves.** `SAVE_VERSION` stays 12: a Ship, a Build and a Ship order from before read chemical with
+an empty second tank.
+
+**Measured** ([`sweeps/ticket-629.txt`](../dev-diary/2026-10-25-version-0.1.0.6/sweeps/ticket-629.txt)):
+**19 / 56 / 2 / 1 and 2 collapses**, from §1's 23 / 51 / 3 / 1 and 2. Nuclear hulls built over the 80
+games: the Prospectors 176, the Custodians 95, the Arkwrights 5, the Archivists 2. Launches 24, from
+18. Fissionables made a game, net: the Custodians 57.3, the Prospectors 32.7, the Arkwrights 2.6, the
+Archivists 2.1 -- the Prospectors built the most nuclear hulls on the fewer, not the more. Every hull
+without them flies Nuclear Rockets' crossing no more. Reported, not tuned.

@@ -206,7 +206,7 @@ fn a_save_without_this_versions_fields_still_loads() {
     // contest, home and Collapse counters (#618, #619, #620), so a 0.1.0.4 save loads. A Battle
     // party's unit names (#614) default the same way, but a turn-four save holds no Battle to cut
     // them from.
-    for name in ["under_sink_eased", "opening_gap", "best_gap_closed", "best_run", "lead_windfall", "card_price_by", "by", "places", "colony_growth", "offline_cause", "produced_total", "opening_met_turn", "opening_run", "launch_site_owed", "archives_lost", "archive_fund_lost", "tier", "offers", "refusals", "greenwash_spent", "home_region", "ended_by", "refused_by", "replacing", "capital_buildings", "capital_built_now", "energy_by_place", "contests", "homes_lost", "homes_taken", "collapse_weighed"] {
+    for name in ["under_sink_eased", "opening_gap", "best_gap_closed", "best_run", "lead_windfall", "card_price_by", "by", "places", "colony_growth", "offline_cause", "produced_total", "opening_met_turn", "opening_run", "launch_site_owed", "archives_lost", "archive_fund_lost", "tier", "offers", "refusals", "greenwash_spent", "home_region", "ended_by", "refused_by", "replacing", "capital_buildings", "capital_built_now", "energy_by_place", "contests", "homes_lost", "homes_taken", "collapse_weighed", "nuclear", "nuclear_hulls_built"] {
         let before = older.len();
         older = cut(&older, name);
         assert!(older.len() < before, "{name} was in the save and is cut");
@@ -363,7 +363,7 @@ fn a_ship_saved_in_venus_low_orbit_loads_into_its_first_ring() {
     let mut game = played_to(3, 2);
     let id = ShipId(game.fresh_id());
     let fuel = game.tank_of(Seat(0), UnitKind::ColonyShip);
-    game.ships.push(Ship { id, name: String::new(), kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Venus), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel, slot: None });
+    game.ships.push(Ship { nuclear: false, fissionables: 0.0, id, name: String::new(), kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Venus), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel, slot: None });
     let dir = TempDir::new("venus-low");
     let path = save::save_to(dir.path(), &game, SaveKind::Manual).expect("the save is written");
     let loaded = save::load_from(&path, tables()).expect("the save is read back");

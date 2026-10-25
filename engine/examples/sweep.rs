@@ -822,6 +822,8 @@ fn main() {
                             println!("      Home Regions lost over the batch, by the seat that lost one {:?}, by the seat that took one {:?}", warc.homes_lost, warc.homes_taken);
                             // Ticket #620 (version 0.1.0.5): turns on which a seat weighed its orders against the Collapse.
                             println!("      Turns weighed against the Collapse over the batch, by seat {:?}", warc.collapse_weighed);
+                            // Ticket #629 (version 0.1.0.6).
+                            println!("      Nuclear hulls built over the batch, by seat {:?}", warc.nuclear_hulls_built);
                             // Ticket #300 (version 0.08.6): Armies landed from a Carrier, by seat.
                             println!("      Armies landed at a Colony over the batch, by seat {:?}", warc.armies_landed);
                             // Ticket #319 (version 0.08.8): interceptions fought, by the intercepting seat.

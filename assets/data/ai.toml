@@ -588,6 +588,10 @@ home_floor = 20
 collapse_emit_weight = 0.5
 collapse_clean_weight = 1.5
 win_in_sight = 3
+# Ticket #629 (version 0.1.0.6), at the designer's word: a computer seat builds a nuclear hull when its
+# Stockpile holds the second tank's fill and this many tanks more -- two crossings' worth -- and a
+# chemical one otherwise. Taught to chase Fissionables on its own ticket.
+nuclear_hull_reserve_tanks = 2.0
 # Ticket #336 (version 0.09.0): what a rival's Colony is worth on the same list, read as this price
 # divided by the price the seat would actually pay for it -- CHEAPEST FIRST, where the rule from
 # ticket #50 ranked by fewest Colonists and never read the threshold at all. Without this the

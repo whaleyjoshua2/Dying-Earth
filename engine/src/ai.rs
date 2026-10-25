@@ -1083,7 +1083,7 @@ impl Game {
             Order::BuildFacility { state, kind } => Some((Place::State(*state), BuildItem::Facility(*kind))),
             Order::RaiseIndustry { state } => Some((Place::State(*state), BuildItem::IndustryLevel)),
             Order::BuildModule { colony, kind } => Some((Place::Colony(*colony), BuildItem::Module(*kind))),
-            Order::BuildShip { site, kind } => Some((*site, BuildItem::Unit(*kind))),
+            Order::BuildShip { site, kind, .. } => Some((*site, BuildItem::Unit(*kind))),
             Order::BuildArmy { place } => Some((*place, BuildItem::Unit(UnitKind::Army))),
             _ => None,
         }
@@ -1264,6 +1264,18 @@ impl Game {
     /// has made its first Victory part so far** -- this turn plus the rest of the bar over that rate.
     /// None with nothing made yet, and None for a Stabilization run, which is no race against the
     /// Collapse: its win is the cure.
+    /// Ticket #629 (version 0.1.0.6), at the designer's word: **whether a computer seat builds this
+    /// Ship as a nuclear hull** -- once Nuclear Rockets stands, when its Stockpile holds the second
+    /// tank's fill and `nuclear_hull_reserve_tanks` tanks more, two crossings' worth. A chemical hull
+    /// otherwise. It is taught to chase Fissionables on its own ticket (#643).
+    pub fn ai_builds_nuclear(&self, seat: Seat, kind: UnitKind) -> bool {
+        if !self.has_tech(TechId::NuclearRockets) || !UnitKind::SHIPS.contains(&kind) {
+            return false;
+        }
+        let fill = self.fission_tank_of(seat, kind);
+        fill > 0.0 && self.seat(seat).stockpile.fissionables + 1e-9 >= fill * (1.0 + self.tables.ai.thresholds.nuclear_hull_reserve_tanks)
+    }
+
     pub fn ai_win_turn(&self, seat: Seat) -> Option<u32> {
         if self.first_kind(seat) == VictoryFirstKind::StabilizationRun || self.turn == 0 {
             return None;
@@ -2441,7 +2453,7 @@ impl Game {
                 };
                 // Ticket #421 (version 0.09.4): a Colony Ship short of the Fuel its tank takes buys
                 // the rest at the market in the same breath, at the Ship's weight.
-                let build = Order::BuildShip { site: Place::Colony(cid), kind: uk };
+                let build = Order::BuildShip { site: Place::Colony(cid), kind: uk, nuclear: self.ai_builds_nuclear(seat, uk) };
                 // Ticket #455 (version 0.09.6): every Ship, a warship included, where the Colony Ship alone
                 // was planned for and a warship short of its tank was refused for want of Fuel.
                 let orders = match self.ai_fuel_top_up(seat, self.tank_of(seat, uk) + self.fuel_reserve(seat)) {
@@ -3437,7 +3449,9 @@ impl Game {
             let top_up = self.ai_fuel_top_up(seat, self.tank_of(seat, s.kind) - s.fuel + fuel_reserve);
             // Ticket #533 (version 0.1.0.1): a refuel never uses the Ship's turn, so a ready Missile
             // Carrier fills its tank beside its Launch; only the orbit change below still waits on it.
-            if s.fuel < self.tank_of(seat, s.kind) && self.refuelling_station(seat, body, orbit) {
+            // Ticket #629 (version 0.1.0.6): a nuclear hull short in its second tank refuels too.
+            let wants_fission = s.nuclear && s.fissionables < self.fission_tank_of(seat, s.kind) && self.seat(seat).stockpile.fissionables > 0.0;
+            if (s.fuel < self.tank_of(seat, s.kind) || wants_fission) && self.refuelling_station(seat, body, orbit) {
                 let note = format!("refuel {} at {} ({} of {} in the tank)", ship_name, self.orbit_name(body, orbit), figure(s.fuel), figure(self.tank_of(seat, s.kind)));
                 if let Some(buy) = top_up {
                     push(vec![buy, Order::Refuel { ship: s.id }], Cat::Transit, self.base_weight(seat, Cat::Transit), gap_for(Cat::Transit, None), 1.0, 1.0, format!("{note}, buying the rest"), None);
@@ -3466,7 +3480,9 @@ impl Game {
                 // very turn the carrier fired, and the Launch failed with the orbit given up.
                 let on_the_lane = s.kind.is_warship() && orbit.is_low() && self.ai_wants_the_ground(seat, body) && self.ai_low_orbit_garrison(seat, body).contains(&s.id);
                 let can_fight = s.fuel >= self.tables.melee.battle_fuel as f64;
-                if s.fuel < self.tank_of(seat, s.kind) && self.seat(seat).stockpile.fuel > 0.0 && !self.refuelling_station(seat, body, orbit) && !(on_the_lane && can_fight) && !ready_to_fire {
+                // Ticket #629 (version 0.1.0.6), from the review: a nuclear hull short in its second
+                // tank goes to a depot too.
+                if ((s.fuel < self.tank_of(seat, s.kind) && self.seat(seat).stockpile.fuel > 0.0) || wants_fission) && !self.refuelling_station(seat, body, orbit) && !(on_the_lane && can_fight) && !ready_to_fire {
                     // Ticket #396 (version 0.09.3): a Refinery Colony's depot is its low orbit.
                     for c in self.colonies.iter().filter(|c| c.body == body && self.fuels_for(c, seat)) {
                         wants.push((self.colony_orbit(c), format!("to refuel at {}", self.place_name(Place::Colony(c.id))), Cat::Transit, self.base_weight(seat, Cat::Transit)));

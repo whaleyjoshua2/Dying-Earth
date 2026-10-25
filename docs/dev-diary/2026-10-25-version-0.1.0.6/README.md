@@ -72,3 +72,56 @@ column the same to the game. Five smaller findings were mended: the Deep Core Su
 is still Fuel, and the game-over table has a Fissionables column. A Mass Driver beside the Mine is
 pinned not to lift them. The computer's reading of a Colony's worth leaves Fissionables out, on
 purpose, until the computer is taught them.
+
+## What Fissionables buy: the nuclear hull and the Warhead
+
+Ticket [#629](https://github.com/whaleyjoshua2/Dying-Earth/issues/629), spec §2.
+
+Decided in one round. The recommendation for the second fuel was a bill on the Stockpile at each leg,
+no tank; the designer chose the tank (Q4 a) and set its fill as the Fuel tank's is, a share that grows
+with the tank's Techs. The yard's shape -- a second button per row, *Nuclear* -- was left to me and
+shown.
+
+**Built test first.** Five tests went red on their missing names: the Tech's gate and the fill, the
+leg's burn and the nuclear hull's crossing, Refuel's two tanks, the Warhead's half, and the computer's
+choice. They passed when built, so the rules were broken on purpose: the hull's leg read as chemical,
+the burn left in the tank, Refuel's second fill dropped. Two tests went red (the crossing and the
+burn in one, Refuel in the other) and green again on restoring.
+
+Nine older tests moved. Nuclear Rockets reaches a nuclear hull alone, so its five tests read the
+Tech's turns off a nuclear hull's quote; the table's own quote -- the window hover and the Report's
+window line -- is a chemical hull's, and one test says so. Four Missile Carrier tests stood their
+seat on no Fissionables, so the Warhead's half was refused; each was given some. The computer's
+Missile Carrier test showed the rule's other side: a computer seat with no Fissionables arms no
+carrier, which the computer's chase ticket takes up.
+
+**The first pictures caught two things.** The yard's Nuclear buttons showed Materials, Fuel and
+Widgets and no Fissionables, since the button face draws its own list of figures; and every button was
+greyed, the aid's Stockpile 29.6 Fuel against tanks of 30 and more. The second picture's nuclear
+Frigate read *To Earth: 6 turns*: checked, a chemical hull's leg that turn is 7.
+
+![The yard: a Nuclear button beside every Ship, its Fissionables on its face](ticket-629/yard-mars.png)
+
+![A nuclear Frigate: its two tanks, and each leg's Fissionables](ticket-629/hull-mars.png)
+
+**The sweep** ([`sweeps/ticket-629.txt`](sweeps/ticket-629.txt)): **19 / 56 / 2 / 1 and 2
+collapses**, from the last ticket's 23 / 51 / 3 / 1 and 2. Income a game, net of upkeep, by Faction:
+
+| | Materials | Fuel | Energy | Ducats | Research | Fissionables | Nuclear hulls built (80 games) |
+|---|---|---|---|---|---|---|---|
+| Custodians | 1,806 | 572 | 1,084 | 1,266 | 1,122 | 57.3 | 95 |
+| Prospectors | 2,052 | 470 | 575 | 1,821 | 350 | 32.7 | 176 |
+| Arkwrights | 725 | 155 | 206 | 2,982 | 318 | 2.6 | 5 |
+| Archivists | 404 | 235 | 27 | 513 | 739 | 2.1 | 2 |
+
+Launches rose from 18 to 24 over the 80 games. Reported, not tuned.
+
+**The review** (a reader who did not build it) found one defect the tests had missed: Refuel was
+refused while a nuclear hull's Fuel tank stood full, so a hull filled when the Stockpile held no
+Fissionables could never fill its second tank and never fly again, the computer's top-up refused with
+it. A test went red, and Refuel now fills while either tank wants it and says which good is missing.
+Four lesser findings were mended: Nuclear Rockets' line says it opens the nuclear hull; a nuclear
+hull's drift line, its solar-view marker and the arrival-stranded warning read its own turns and its
+Fissionables; and a change of orbit rescues a stranded hull only if it can pay its Fissionables too.
+The sweep, run again, matched the first to the game.
+

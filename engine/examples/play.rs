@@ -438,7 +438,7 @@ const GRAMMAR: &str = r#"ORDER LINES (one per line; `#` starts a comment; blank 
   build facility-ducats <state> <facility>
   build module <colony> <module>       e.g. build module iss habitat
   build module-ducats <colony> <module>
-  build ship <colony> <ship>           at a Colony or station of yours with a WORKING SHIPYARD:
+  build ship <colony> <ship> [nuclear] at a Colony or station of yours with a WORKING SHIPYARD:
                                        never in a Nation State, whatever its Launch
                                        Site. The new Ship starts in the orbit of the yard that built
                                        it -- a station's own orbit, or low orbit for a ground Colony.
@@ -753,7 +753,8 @@ fn parse_line(g: &Game, line: &str) -> Result<Line, String> {
                 "facility-ducats" => Order::BuildFacilityWithDucats { state: pick_state(at(2)?)?, kind: pick(&FacilityKind::ALL, at(3)?)? },
                 "module" => Order::BuildModule { colony: colony_id(g, at(2)?)?, kind: pick(&ModuleKind::BUILDABLE, at(3)?)? },
                 "module-ducats" => Order::BuildModuleWithDucats { colony: colony_id(g, at(2)?)?, kind: pick(&ModuleKind::BUILDABLE, at(3)?)? },
-                "ship" => Order::BuildShip { site: place(g, at(2)?)?, kind: pick(&UnitKind::SHIPS, at(3)?)? },
+                // Ticket #629 (version 0.1.0.6): `nuclear` after the kind, a nuclear hull.
+                "ship" => Order::BuildShip { nuclear: at(4).is_ok_and(|w| w.eq_ignore_ascii_case("nuclear")), site: place(g, at(2)?)?, kind: pick(&UnitKind::SHIPS, at(3)?)? },
                 "army" => Order::BuildArmy { place: place(g, at(2)?)? },
                 // Ticket #571 (version 0.1.0.3), from the review: the ring by name or colony id
                 // too, as every order that takes an orbit.
@@ -1777,13 +1778,15 @@ fn print_board(g: &Game) {
         // a station's ring can be told from one in low orbit without doing the arithmetic.
         // Ticket #586 (version 0.1.0.4): by its name, the word an order takes, never its id.
         println!(
-            "{:<22} {:<16} seat {} at {:<34} tank {}/{} | colonists {} | army {} | hp {} | {}{}",
+            "{:<22} {:<16} seat {} at {:<34} tank {}/{}{} | colonists {} | army {} | hp {} | {}{}",
             g.ship_name(sh),
             sh.kind.name(),
             sh.seat.0,
             ship_at_text(g, sh),
             sh.fuel,
             figure(g.tank_of(sh.seat, sh.kind)),
+            // Ticket #629 (version 0.1.0.6): a nuclear hull's second tank.
+            if sh.nuclear { format!(" nuclear, Fi {}/{}", figure(sh.fissionables), figure(g.fission_tank_of(sh.seat, sh.kind))) } else { String::new() },
             // Ticket #543 (version 0.1.0.1): a Colony Ship's aboard/room, and the founding rule
             // where it is short of it.
             colonists_text(g, sh),
