@@ -29,6 +29,11 @@ breakthrough_research = 15
 breakthrough_research_public_science = 25
 discovery_multiplier = 2.0
 discovery_multiplier_with_tech = 3.0
+# Ticket #628 (version 0.1.0.6), at the designer's word: Rich Seam alone x1.5, x2 with Deep Mining
+# ("rich seam 1.5/2"), where it read the two figures above. It lifts a Mine's Materials and never its
+# Fissionables: "the techs will effect fisionables but not the card".
+rich_seam_multiplier = 1.5
+rich_seam_multiplier_with_tech = 2.0
 discovery_turns = 2
 heatwave_loss = 0.05
 heatwave_loss_green_consensus = 0.025
@@ -126,7 +131,7 @@ id = "rich_seam"
 name = "Rich Seam"
 kind = "discovery"
 target = "body"
-effect = "Its Mines produce x2 for two turns"
+effect = "Its Mines produce x1.5 Materials for two turns"
 blunted_by = "deep_mining"
 copies = 1
 off_earth = true
@@ -717,7 +722,7 @@ target = "seat"
 effect = "Fund a survey under a Colony of yours, or save the Ducats"
 copies = 1
 [event.choice]
-question = "Surveyors offer to probe for a seam under a Colony of yours, for 30 Ducats: its Mines x1.5 for four turns. Fund it?"
+question = "Surveyors offer to probe for a seam under a Colony of yours, for 30 Ducats: its Mines x1.5 Materials for four turns. Fund it?"
 take = "Fund it"
 refuse = "Save the Ducats"
 take_when = { rule = "ducats_at_least", ducats = 60 }

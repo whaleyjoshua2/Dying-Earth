@@ -448,7 +448,7 @@ pub struct ViewState {
     pub hab_tile: Option<HabTile>,
     /// Ticket #146 (version 0.07.3): the slot box clicked on the selected Region's card.
     pub slot_box: Option<SlotBox>,
-    pub trade_amounts: [i64; 4],
+    pub trade_amounts: [i64; 5],
     /// Ticket #572 (version 0.1.0.3): the counter-offer's amounts in the offers prompt, by the
     /// offering seat's index -- what you give, what you get -- prefilled from the offer.
     pub counters: std::collections::BTreeMap<usize, (i64, i64)>,
@@ -559,7 +559,7 @@ impl Default for ViewState {
             capital_later: None,
             hab_tile: None,
             slot_box: None,
-            trade_amounts: [5, 10, 10, 10],
+            trade_amounts: [5, 10, 10, 10, 2],
             counters: std::collections::BTreeMap::new(),
             lift_state: None,
             launch_target: None,

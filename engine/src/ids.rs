@@ -723,6 +723,10 @@ pub enum Resource {
     /// Stockpile, never traded. The variant exists so a `produces` row can name it and a `Yield`
     /// can carry it through the same multipliers as any other output.
     Widgets,
+    /// Ticket #628 (version 0.1.0.6): **Fissionables**, the seventh resource, held in the Stockpile and
+    /// traded like Fuel; made by a Mine beside its Materials on a site off Earth that holds them.
+    /// Appended last, so a saved name never shifts.
+    Fissionables,
 }
 
 impl Resource {
@@ -734,6 +738,7 @@ impl Resource {
             Resource::Research => "Research",
             Resource::Ducats => "Ducats",
             Resource::Widgets => "Widgets",
+            Resource::Fissionables => "Fissionables",
         }
     }
 }

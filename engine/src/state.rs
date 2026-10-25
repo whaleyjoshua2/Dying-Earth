@@ -20,6 +20,9 @@ pub struct Stockpile {
     pub energy: f64,
     /// Version 0.03 (ticket #35).
     pub ducats: f64,
+    /// Ticket #628 (version 0.1.0.6): a save from before holds none.
+    #[serde(default)]
+    pub fissionables: f64,
 }
 
 impl Stockpile {
@@ -31,6 +34,7 @@ impl Stockpile {
             Resource::Materials => Some(&mut self.materials),
             Resource::Fuel => Some(&mut self.fuel),
             Resource::Energy => Some(&mut self.energy),
+            Resource::Fissionables => Some(&mut self.fissionables),
             _ => None,
         }
     }
@@ -43,7 +47,7 @@ impl Stockpile {
     /// Ticket #387 (version 0.09.3): every figure settled to a tenth, the one shape a stockpile is
     /// ever stored in. A pay, a refund and an income all come through here.
     pub fn settled(self) -> Stockpile {
-        Stockpile { materials: tenth(self.materials), fuel: tenth(self.fuel), energy: tenth(self.energy), ducats: tenth(self.ducats) }
+        Stockpile { materials: tenth(self.materials), fuel: tenth(self.fuel), energy: tenth(self.energy), ducats: tenth(self.ducats), fissionables: tenth(self.fissionables) }
     }
 }
 
@@ -466,6 +470,11 @@ impl Date {
     }
 }
 
+/// Ticket #628 (version 0.1.0.6): what the Fissionables dice add to the game's seed, so they are dice
+/// of their own and the game's never move for them. Any fixed figure would do; this one is
+/// "FISSIONB" in ASCII.
+const FISSIONABLES_DICE: u64 = 0x4649_5353_494F_4E42;
+
 /// Ticket #57: a draw from a triangular distribution centred on 1.0 with `spread` either side, from
 /// a uniform draw in 0..1. The distribution is symmetric, so its median is its mode and half the
 /// draws fall each side; nothing ever falls outside 1 +/- spread.
@@ -488,12 +497,16 @@ pub struct SlotYields {
     pub refinery: f64,
     /// Ticket #140 (version 0.07.3): Research, for an Observatory; the Habitat yield until then.
     pub research: f64,
+    /// Ticket #628 (version 0.1.0.6): Fissionables, which a Mine makes beside its Materials; nought
+    /// at a site without them, in orbit, and in a save from before until the load draws them.
+    #[serde(default)]
+    pub fissionables: f64,
 }
 
 impl SlotYields {
     /// The Body's own figures, which a station in orbit and any slot off the table read.
     pub fn of_body(card: &crate::data::BodyCard) -> SlotYields {
-        SlotYields { mine: card.mine_yield, generator: card.generator_yield, refinery: card.refinery_yield, research: card.research_yield }
+        SlotYields { mine: card.mine_yield, generator: card.generator_yield, refinery: card.refinery_yield, research: card.research_yield, fissionables: card.fissionables_yield }
     }
 
     pub fn of_module(&self, kind: ModuleKind) -> f64 {
@@ -513,7 +526,9 @@ impl SlotYields {
 
     /// "M 1.31 G 0.68 R 1.52 H 1.44", the figures the Surface Map writes under a slot's name.
     pub fn text(&self) -> String {
-        format!("M {:.2} G {:.2} R {:.2} S {:.2}", self.mine, self.generator, self.refinery, self.research)
+        // Ticket #628 (version 0.1.0.6): and Fi where the site holds Fissionables ("F" would read as Fuel).
+        let f = if self.fissionables > 0.0 { format!(" Fi {:.2}", self.fissionables) } else { String::new() };
+        format!("M {:.2} G {:.2} R {:.2} S {:.2}{f}", self.mine, self.generator, self.refinery, self.research)
     }
 }
 
@@ -1689,11 +1704,14 @@ pub struct PriceCut {
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Market {
-    /// The live price of Materials, Fuel and Energy, in that order. Zero means "not opened yet" and
-    /// is read as the card figure, so a fresh game and an old save behave alike.
-    pub price: [i64; 3],
+    /// The live price of Materials, Fuel, Energy and (ticket #628, version 0.1.0.6) Fissionables, in
+    /// that order. Zero means "not opened yet" and is read as the card figure, so a fresh game and an
+    /// old save behave alike: a save from before carries three rows, and the fourth reads nought.
+    #[serde(deserialize_with = "padded")]
+    pub price: [i64; MARKET_ROWS],
     /// Net units of each bought less sold this turn, across the whole table.
-    pub net: [i64; 3],
+    #[serde(deserialize_with = "padded")]
+    pub net: [i64; MARKET_ROWS],
     /// Ticket #337 (version 0.09.0): a price a choice card has OVERRIDDEN, and the LAST TURN it
     /// stands on. Nought is no override. The override is outside the band on purpose -- a Materials
     /// price of 1 is the whole point of the Cheap Ore Offer -- and it is recorded here rather than
@@ -1703,14 +1721,49 @@ pub struct Market {
     /// The last turn rather than a countdown, because the answer lands at the Resolution of the
     /// turn it was given in, AFTER that turn's trading: a countdown decremented at the settle would
     /// spend one of its turns before any order had been priced at it.
-    #[serde(default)]
-    pub card_price: [i64; 3],
-    #[serde(default)]
-    pub card_price_until: [u32; 3],
+    #[serde(default, deserialize_with = "padded")]
+    pub card_price: [i64; MARKET_ROWS],
+    #[serde(default, deserialize_with = "padded")]
+    pub card_price_until: [u32; MARKET_ROWS],
     /// Ticket #404 (version 0.09.4): the card that set each override, so the Market line can name
     /// it. A save from before names none.
-    #[serde(default)]
-    pub card_price_by: [Option<EventId>; 3],
+    #[serde(default, deserialize_with = "padded")]
+    pub card_price_by: [Option<EventId>; MARKET_ROWS],
+}
+
+/// Ticket #628 (version 0.1.0.6): the market's rows -- Materials, Fuel, Energy and Fissionables.
+pub const MARKET_ROWS: usize = 4;
+
+/// Ticket #628: a market row array read from a save that may hold fewer rows than this build has
+/// (three, before Fissionables), the missing rows at their default. More rows than the build knows
+/// is a save from a later build, refused.
+fn padded<'de, D, T, const N: usize>(d: D) -> Result<[T; N], D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Deserialize<'de> + Default + Copy,
+{
+    // An array is written as a tuple (`(4, 2, 2)` in RON), so it is read as one, as many entries
+    // as the save holds.
+    struct Rows<T, const N: usize>(std::marker::PhantomData<T>);
+    impl<'de, T: Deserialize<'de> + Default + Copy, const N: usize> serde::de::Visitor<'de> for Rows<T, N> {
+        type Value = [T; N];
+        fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            write!(f, "at most {N} market rows")
+        }
+        fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<[T; N], A::Error> {
+            let mut out = [T::default(); N];
+            let mut n = 0;
+            while let Some(v) = seq.next_element::<T>()? {
+                if n == N {
+                    return Err(serde::de::Error::invalid_length(n + 1, &self));
+                }
+                out[n] = v;
+                n += 1;
+            }
+            Ok(out)
+        }
+    }
+    d.deserialize_tuple(N, Rows::<T, N>(std::marker::PhantomData))
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -4685,8 +4738,44 @@ impl Game {
                     generator: draw(card.generator_yield),
                     refinery: draw(card.refinery_yield),
                     research: draw(card.research_yield),
+                    fissionables: 0.0,
                 };
                 self.slot_yields.insert((body, slot), y);
+            }
+        }
+        self.draw_fissionables();
+    }
+
+    /// Ticket #628 (version 0.1.0.6): which sites hold Fissionables and how rich each is, drawn on
+    /// dice of their own seeded from the game's seed, so the game's own dice -- every yield above and
+    /// every roll after -- fall as they did before the resource existed, and a save from before draws
+    /// the same sites on load. Every site of a Body with a figure but one marked `no_fissionables`;
+    /// where the card gives `fissionables_sites`, that many and no more, chosen at random.
+    pub fn draw_fissionables(&mut self) {
+        use rand::{Rng, SeedableRng};
+        let spread = self.tables.slot_yield_spread;
+        let mut dice = rand_chacha::ChaCha8Rng::seed_from_u64(self.seed ^ FISSIONABLES_DICE);
+        for body in BodyId::ALL {
+            let card = self.tables.body(body).clone();
+            if card.fissionables_yield <= 0.0 {
+                continue;
+            }
+            let mut sites: Vec<u32> = (0..card.colony_slots()).filter(|s| !card.slots.get(*s as usize).is_some_and(|c| c.no_fissionables)).collect();
+            if let Some([fewest, most]) = card.fissionables_sites {
+                let n = dice.random_range(fewest..=most) as usize;
+                let mut chosen = Vec::new();
+                while chosen.len() < n.min(sites.len()) {
+                    chosen.push(sites.remove(dice.random_range(0..sites.len())));
+                }
+                chosen.sort();
+                sites = chosen;
+            }
+            for slot in sites {
+                let u: f64 = dice.random_range(0.0..1.0);
+                let f = (card.fissionables_yield * triangular(u, spread) * 100.0).round() / 100.0;
+                if let Some(y) = self.slot_yields.get_mut(&(body, slot)) {
+                    y.fissionables = f;
+                }
             }
         }
     }
@@ -4701,7 +4790,8 @@ impl Game {
     /// station's Habitats take no Body yield at all (ticket #46).
     pub fn colony_yields(&self, c: &Colony) -> SlotYields {
         if c.in_orbit {
-            SlotYields::of_body(self.tables.body(c.body))
+            // Ticket #628 (version 0.1.0.6): Fissionables are in the ground; a station mines none.
+            SlotYields { fissionables: 0.0, ..SlotYields::of_body(self.tables.body(c.body)) }
         } else {
             self.slot_yields(c.body, c.slot)
         }

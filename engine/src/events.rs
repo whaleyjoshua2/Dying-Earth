@@ -369,6 +369,7 @@ impl Game {
             Resource::Fuel => s.fuel,
             Resource::Energy => s.energy,
             Resource::Ducats => s.ducats,
+            Resource::Fissionables => s.fissionables,
             // Research is the table's pool and never a seat's stock, so nothing is ever held in it.
             Resource::Research | Resource::Widgets => 0.0,
         }
@@ -543,6 +544,7 @@ impl Game {
                     Resource::Fuel => s.fuel = tenth((s.fuel - bill).max(0.0)),
                     Resource::Energy => s.energy = tenth((s.energy - bill).max(0.0)),
                     Resource::Ducats => s.ducats = tenth((s.ducats - bill).max(0.0)),
+                    Resource::Fissionables => s.fissionables = tenth((s.fissionables - bill).max(0.0)),
                     Resource::Research | Resource::Widgets => {}
                 }
             }
@@ -850,9 +852,10 @@ impl Game {
                     .collect();
                 match self.pick_uniform(&bodies) {
                     Some(b) => {
-                        let tech = if id == EventId::RichSeam { TechId::DeepMining } else { TechId::AutomatedRefining };
-                        let m = if self.has_tech(tech) { t.events.discovery_multiplier_with_tech } else { t.events.discovery_multiplier };
-                        (EventTarget::Body(b), format!("{} on {}: its {}s produce x{} for {}.", card.name, t.body(b).name, kind.name(), m, crate::counted(t.events.discovery_turns, "turn", "turns")))
+                        let m = self.discovery_multiplier_of(id);
+                        // Ticket #628 (version 0.1.0.6): a Mine's Materials, never its Fissionables.
+                        let what = if id == EventId::RichSeam { " Materials" } else { "" };
+                        (EventTarget::Body(b), format!("{} on {}: its {}s produce x{m}{what} for {}.", card.name, t.body(b).name, kind.name(), crate::counted(t.events.discovery_turns, "turn", "turns")))
                     }
                     None => (EventTarget::None, format!("{}: no {} exists off Earth, so nothing happens.", card.name, kind.name())),
                 }
@@ -978,6 +981,19 @@ impl Game {
         matches!(&self.last_event, Some(DrawnEvent { card: Card::Event(e), target, .. }) if *e == id && *target != EventTarget::None)
     }
 
+    /// Ticket #628 (version 0.1.0.6): what a Rich Seam or an Ice Deposit multiplies its Body's Mines
+    /// or Refineries by, the Tech that lifts each card read: Rich Seam on its own figures (x1.5, x2
+    /// with Deep Mining), the Ice Deposit on the shared ones (x2, x3 with Automated Refining).
+    fn discovery_multiplier_of(&self, id: EventId) -> f64 {
+        let e = &self.tables.events;
+        match id {
+            EventId::RichSeam if self.has_tech(TechId::DeepMining) => e.rich_seam_multiplier_with_tech,
+            EventId::RichSeam => e.rich_seam_multiplier,
+            _ if self.has_tech(TechId::AutomatedRefining) => e.discovery_multiplier_with_tech,
+            _ => e.discovery_multiplier,
+        }
+    }
+
     /// Resolution (h): the card effects that act now, in card text order.
     pub fn apply_event_now(&mut self) {
         let Some(ev) = self.last_event.clone() else { return };
@@ -1049,8 +1065,7 @@ impl Game {
             }
             (EventId::RichSeam, EventTarget::Body(b)) | (EventId::IceDeposit, EventTarget::Body(b)) => {
                 let kind = if id == EventId::RichSeam { ModuleKind::Mine } else { ModuleKind::Refinery };
-                let tech = if id == EventId::RichSeam { TechId::DeepMining } else { TechId::AutomatedRefining };
-                let m = if self.has_tech(tech) { t.events.discovery_multiplier_with_tech } else { t.events.discovery_multiplier };
+                let m = self.discovery_multiplier_of(id);
                 self.discoveries.push(Discovery { body: b, kind, multiplier: m, turns_left: t.events.discovery_turns });
             }
             // Ticket #76: the Moon's Generators, as Rich Seam does for a Body's Mines.

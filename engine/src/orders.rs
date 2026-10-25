@@ -277,6 +277,8 @@ pub struct Cost {
     pub energy: f64,
     pub influence: i64,
     pub ducats: f64,
+    /// Ticket #628 (version 0.1.0.6): bought or sold in the market; nothing is priced in them yet.
+    pub fissionables: f64,
 }
 
 impl Cost {
@@ -286,6 +288,7 @@ impl Cost {
         self.energy += other.energy;
         self.influence += other.influence;
         self.ducats += other.ducats;
+        self.fissionables += other.fissionables;
     }
     pub fn text(&self) -> String {
         let parts = self.parts();
@@ -303,6 +306,9 @@ impl Cost {
         }
         if self.energy > 0.0 {
             parts.push(format!("{} Energy", figure(self.energy)));
+        }
+        if self.fissionables > 0.0 {
+            parts.push(format!("{} Fissionables", figure(self.fissionables)));
         }
         if self.influence > 0 {
             parts.push(format!("{} Influence", self.influence));
@@ -611,7 +617,7 @@ impl Game {
     fn tradeable(&self, g: TradeGood) -> Result<(), OrderError> {
         match g {
             TradeGood::Goods(r, n) if n > 0 && Stockpile::default().of_mut(r).is_some() => Ok(()),
-            TradeGood::Goods(..) => Err(OrderError("a Trade is in Ducats, Materials, Fuel, Energy or a place".into())),
+            TradeGood::Goods(..) => Err(OrderError("a Trade is in Ducats, Materials, Fuel, Energy, Fissionables or a place".into())),
             TradeGood::Place(_) => Ok(()),
         }
     }
@@ -735,6 +741,7 @@ impl Game {
                     Resource::Materials => Cost { materials: -*amount as f64, ducats, ..Default::default() },
                     Resource::Fuel => Cost { fuel: -*amount as f64, ducats, ..Default::default() },
                     Resource::Energy => Cost { energy: -*amount as f64, ducats, ..Default::default() },
+                    Resource::Fissionables => Cost { fissionables: -*amount as f64, ducats, ..Default::default() },
                     _ => Cost::default(),
                 }
             }
@@ -743,6 +750,7 @@ impl Game {
                 match resource {
                     Resource::Materials => Cost { materials: *amount as f64, ducats, ..Default::default() },
                     Resource::Fuel => Cost { fuel: *amount as f64, ducats, ..Default::default() },
+                    Resource::Fissionables => Cost { fissionables: *amount as f64, ducats, ..Default::default() },
                     _ => Cost::default(),
                 }
             }
@@ -758,12 +766,14 @@ impl Game {
     }
 
     /// Ticket #220 (version 0.08.2): which row of the market a resource is, or `None` for one that
-    /// is not for sale at all. Materials, Fuel and Energy, in that order.
+    /// is not for sale at all. Materials, Fuel and Energy, in that order; Fissionables fourth
+    /// (ticket #628, version 0.1.0.6).
     pub fn market_row(resource: Resource) -> Option<usize> {
         match resource {
             Resource::Materials => Some(0),
             Resource::Fuel => Some(1),
             Resource::Energy => Some(2),
+            Resource::Fissionables => Some(3),
             _ => None,
         }
     }
@@ -771,7 +781,7 @@ impl Game {
     /// The card figure for a row: the MIDPOINT of that resource's band since ticket #220.
     pub fn market_base(&self, row: usize) -> i64 {
         let d = &self.tables.ducats;
-        [d.per_materials, d.per_fuel, d.per_energy][row]
+        [d.per_materials, d.per_fuel, d.per_energy, d.per_fissionables][row]
     }
 
     /// The live price. A zero in `market.price` means the market has not opened yet -- a fresh game,
@@ -842,10 +852,11 @@ impl Game {
             format!("{name} {}{note}", figure(p))
         };
         format!(
-            "Market: {}, {}, {} Ducats each; Influence {} Ducats a point; Relief {} Ducats",
+            "Market: {}, {}, {}, {} Ducats each; Influence {} Ducats a point; Relief {} Ducats",
             price(Resource::Materials, "Materials"),
             price(Resource::Fuel, "Fuel"),
             price(Resource::Energy, "Energy"),
+            price(Resource::Fissionables, "Fissionables"),
             self.tables.ducats.per_influence,
             self.tables.unrest.relief_ducats
         )
@@ -911,7 +922,7 @@ impl Game {
         let step = self.tables.ducats.price_step_units.max(1);
         // Ticket #337 (version 0.09.0): an override whose last turn has been played is forgotten
         // here, and the band -- which never stopped moving -- is the price again from the next turn.
-        for row in 0..3 {
+        for row in 0..crate::state::MARKET_ROWS {
             if self.market.card_price[row] > 0 && self.turn >= self.market.card_price_until[row] {
                 self.market.card_price[row] = 0;
                 self.market.card_price_until[row] = 0;
@@ -922,7 +933,7 @@ impl Game {
         for s in &mut self.seats {
             s.price_cuts.retain(|c| turn < c.until);
         }
-        for row in 0..3 {
+        for row in 0..crate::state::MARKET_ROWS {
             let base = self.market_base(row);
             let mut price = self.banded_price_at(row);
             let net = self.market.net[row];
@@ -957,7 +968,7 @@ impl Game {
     /// the good, as its Buys are; the review found a cut seat's flat Buys sold back up the price
     /// they raised, 100 bought for 200 and sold for 221.
     pub fn sale_price_after(&self, seat: Seat, resource: Resource, amount: i64, ahead: i64) -> f64 {
-        if !matches!(resource, Resource::Materials | Resource::Fuel) {
+        if !matches!(resource, Resource::Materials | Resource::Fuel | Resource::Fissionables) {
             return 0.0;
         }
         let d = &self.tables.ducats;
@@ -1001,7 +1012,7 @@ impl Game {
         let s = self.seat(seat).stockpile;
         // Ticket #387 (version 0.09.3): settled to the tenth, as every stockpile figure is.
         (
-            Stockpile { materials: s.materials - cost.materials, fuel: s.fuel - cost.fuel, energy: s.energy - cost.energy, ducats: s.ducats - cost.ducats }.settled(),
+            Stockpile { materials: s.materials - cost.materials, fuel: s.fuel - cost.fuel, energy: s.energy - cost.energy, ducats: s.ducats - cost.ducats, fissionables: s.fissionables - cost.fissionables }.settled(),
             self.seat(seat).allotment + bought - cost.influence,
         )
     }
@@ -1072,6 +1083,9 @@ impl Game {
         }
         if cost.energy > left.energy {
             return fail(format!("needs {} Energy, {} left", figure(cost.energy), figure(left.energy)));
+        }
+        if cost.fissionables > left.fissionables {
+            return fail(format!("needs {} Fissionables, {} left", figure(cost.fissionables), figure(left.fissionables)));
         }
         if cost.influence > influence_left {
             return fail(format!("needs {} Influence, {} left", cost.influence, influence_left));
@@ -1220,8 +1234,9 @@ impl Game {
                 if *amount <= 0 {
                     return fail("sell a positive amount");
                 }
-                if !matches!(resource, Resource::Materials | Resource::Fuel) {
-                    return fail("the window buys only Materials and Fuel");
+                // Ticket #628 (version 0.1.0.6): and Fissionables, sold as Fuel is.
+                if !matches!(resource, Resource::Materials | Resource::Fuel | Resource::Fissionables) {
+                    return fail("the window buys only Materials, Fuel and Fissionables");
                 }
                 // Ticket #339 (version 0.09.0): a lot larger than what is left is refused by the
                 // affordability check, which runs AFTER this one now and says "needs N Materials,
@@ -2943,7 +2958,7 @@ impl Game {
             {
                 // Ticket #387 (version 0.09.3): settled, so a tenth paid from a tenth leaves a tenth.
                 let st = &mut self.seat_mut(seat).stockpile;
-                *st = Stockpile { materials: st.materials - cost.materials, fuel: st.fuel - cost.fuel, energy: st.energy - cost.energy, ducats: st.ducats - cost.ducats }.settled();
+                *st = Stockpile { materials: st.materials - cost.materials, fuel: st.fuel - cost.fuel, energy: st.energy - cost.energy, ducats: st.ducats - cost.ducats, fissionables: st.fissionables - cost.fissionables }.settled();
             }
             self.seat_mut(seat).allotment -= cost.influence;
             let turn = self.turn;

@@ -130,10 +130,10 @@ fn main() {
     let mut all_leads = [0u32; 4];
     // Ticket #563 (version 0.1.0.3), at the designer's word: Income over the batch per Faction --
     // Materials, Fuel, Energy, Ducats, Research.
-    let mut all_produced = [[0f64; 5]; 4];
+    let mut all_produced = [[0f64; 6]; 4];
     // At the designer's word (version 0.1.0.4): production over the batch, per Faction, TOTALS --
     // Materials, Fuel, Energy, Ducats gross at Income before upkeep, Research, Widgets made.
-    let mut all_gross = [[0f64; 6]; 4];
+    let mut all_gross = [[0f64; 7]; 4];
     let mut all_start_lost = [[0u32; 2]; 4];
     // Ticket #343 (version 0.09.1): the nuke's counters across every seating, so the closing
     // review has ONE total to quote rather than four blocks to add up by hand.
@@ -233,8 +233,8 @@ fn main() {
                         let mut cell_unrest = [[0u32; 3]; 4];
                         let mut cell_throw_offs = [0u32; 4];
                         let mut cell_leads = [0u32; 4];
-                        let mut cell_produced = [[0f64; 5]; 4];
-                        let mut cell_gross = [[0f64; 6]; 4];
+                        let mut cell_produced = [[0f64; 6]; 4];
+                        let mut cell_gross = [[0f64; 7]; 4];
                         let mut cell_start_lost = [0u32; 2];
                         let mut war_ppm: [Vec<f64>; 4] = Default::default();
                         let mut war_nobody: Vec<f64> = Vec::new();
@@ -503,11 +503,11 @@ fn main() {
                                 cell_throw_offs[s.index()] += r.throw_offs_by_seat[s.index()];
                                 cell_leads[s.index()] += r.leads_by_seat[s.index()];
                                 let p = r.produced_by_seat[s.index()];
-                                for (c, v) in cell_produced[s.index()].iter_mut().zip([p.materials, p.fuel, p.energy, p.ducats, r.research_by_seat[s.index()] as f64]) {
+                                for (c, v) in cell_produced[s.index()].iter_mut().zip([p.materials, p.fuel, p.energy, p.ducats, r.research_by_seat[s.index()] as f64, p.fissionables]) {
                                     *c += v;
                                 }
                                 let g = r.gross_by_seat[s.index()];
-                                for (c, v) in cell_gross[s.index()].iter_mut().zip([g.materials, g.fuel, g.energy, g.ducats, r.research_by_seat[s.index()] as f64, r.widgets_made[s.index()] as f64]) {
+                                for (c, v) in cell_gross[s.index()].iter_mut().zip([g.materials, g.fuel, g.energy, g.ducats, r.research_by_seat[s.index()] as f64, r.widgets_made[s.index()] as f64, g.fissionables]) {
                                     *c += v;
                                 }
                                 cell_scores[s.index()].push(r.final_score[s.index()]);
@@ -925,26 +925,27 @@ fn main() {
         );
         // Ticket #563 (version 0.1.0.3), at the designer's word: what each Faction was paid at Income
         // over a game, net of its buildings' upkeep, the mean over the batch.
-        println!("  Income over the batch, per Faction, mean a game (Materials / Fuel / Energy / Ducats / Research):");
+        // Ticket #628 (version 0.1.0.6): and Fissionables, to a tenth, since a game's are few.
+        println!("  Income over the batch, per Faction, mean a game (Materials / Fuel / Energy / Ducats / Research / Fissionables):");
         for (i, k) in FactionKind::ALL.into_iter().enumerate() {
             let p = all_produced[i].map(|v| v / all_games.max(1) as f64);
-            println!("  {:>12}: {:>7.0} / {:>7.0} / {:>7.0} / {:>7.0} / {:>6.0}", k.name(), p[0], p[1], p[2], p[3], p[4]);
+            println!("  {:>12}: {:>7.0} / {:>7.0} / {:>7.0} / {:>7.0} / {:>6.0} / {:>6.1}", k.name(), p[0], p[1], p[2], p[3], p[4], p[5]);
         }
         // At the designer's word (version 0.1.0.4): production TOTALS over the batch, per Faction and
         // for the whole table -- gross, made at Income before any upkeep, so what the buildings made
         // rather than what was left -- and the whole table's net of upkeep beside it.
-        println!("  Production over the batch, totals, gross before upkeep (Materials / Fuel / Energy / Ducats / Research / Widgets made):");
-        let mut world = [0f64; 6];
+        println!("  Production over the batch, totals, gross before upkeep (Materials / Fuel / Energy / Ducats / Research / Widgets made / Fissionables):");
+        let mut world = [0f64; 7];
         for (i, k) in FactionKind::ALL.into_iter().enumerate() {
             let p = all_gross[i];
             for (w, v) in world.iter_mut().zip(p) {
                 *w += v;
             }
-            println!("  {:>12}: {:>9.0} / {:>8.0} / {:>9.0} / {:>8.0} / {:>8.0} / {:>9.0}", k.name(), p[0], p[1], p[2], p[3], p[4], p[5]);
+            println!("  {:>12}: {:>9.0} / {:>8.0} / {:>9.0} / {:>8.0} / {:>8.0} / {:>9.0} / {:>7.0}", k.name(), p[0], p[1], p[2], p[3], p[4], p[5], p[6]);
         }
-        println!("  {:>12}: {:>9.0} / {:>8.0} / {:>9.0} / {:>8.0} / {:>8.0} / {:>9.0}", "all four", world[0], world[1], world[2], world[3], world[4], world[5]);
-        let net: Vec<f64> = (0..5).map(|j| all_produced.iter().map(|p| p[j]).sum()).collect();
-        println!("  {:>12}: {:>9.0} / {:>8.0} / {:>9.0} / {:>8.0} / {:>8.0}   (net of upkeep, all four)", "net", net[0], net[1], net[2], net[3], net[4]);
+        println!("  {:>12}: {:>9.0} / {:>8.0} / {:>9.0} / {:>8.0} / {:>8.0} / {:>9.0} / {:>7.0}", "all four", world[0], world[1], world[2], world[3], world[4], world[5], world[6]);
+        let net: Vec<f64> = (0..6).map(|j| all_produced.iter().map(|p| p[j]).sum()).collect();
+        println!("  {:>12}: {:>9.0} / {:>8.0} / {:>9.0} / {:>8.0} / {:>8.0} / {:>9} / {:>7.0}   (net of upkeep, all four)", "net", net[0], net[1], net[2], net[3], net[4], "", net[5]);
         // Ticket #593 (version 0.1.0.4): order lists whose first refusal at the commit was for want
         // of Ducats (the turn logs only a list's first dropped order), so a floor on the orders.
         println!("  order lists with an order dropped for want of Ducats over the batch: {all_ducat_drops}");

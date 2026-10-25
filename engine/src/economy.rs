@@ -37,6 +37,9 @@ struct Producer {
     fuel_upkeep: f64,
     fuel_paid: bool,
     output: Option<(Resource, f64)>,
+    /// Ticket #628 (version 0.1.0.6): the Fissionables a Mine makes beside its Materials; nought
+    /// for every other building.
+    fissionables: f64,
     /// Materials or Fuel from a Mine, Refinery or Factory count toward the Extraction Total.
     research: i64,
     online: bool,
@@ -52,6 +55,9 @@ pub struct Yield {
     /// Ticket #387 (version 0.09.3): to a tenth for the four stockpile resources; a Widget figure
     /// is still a whole number, floored as it was.
     pub amount: f64,
+    /// Ticket #628 (version 0.1.0.6): Fissionables, made by a Mine beside its Materials at a site that
+    /// holds them, to a tenth; nought for every other building.
+    pub fissionables: f64,
     pub research: i64,
     /// Ticket #387: Energy upkeep, to a tenth once a multiplier has touched it.
     pub upkeep: f64,
@@ -243,7 +249,11 @@ impl Yield {
             Some(Resource::Ducats) => parts.push(format!("+{} Ducats", figure(self.amount))),
             // Ticket #332 (version 0.09.0): a Factory's Widgets, the work half of every build.
             Some(Resource::Widgets) => parts.push(format!("+{} Widgets", figure(self.amount))),
+            Some(Resource::Fissionables) => parts.push(format!("+{} Fissionables", figure(self.amount))),
             Some(Resource::Research) | None => {}
+        }
+        if self.fissionables > 0.0 {
+            parts.push(format!("+{} Fissionables", figure(self.fissionables)));
         }
         if self.research > 0 {
             parts.push(format!("+{} Research", self.research));
@@ -300,6 +310,8 @@ enum ProducerPlace {
 impl PlaceOutput {
     /// Ticket #394 (version 0.09.3): what the place makes a turn as one figure -- the row summed,
     /// Energy only where the place makes more than it eats (the figure is net of upkeep).
+    /// Ticket #628 (version 0.1.0.6): Fissionables are left out, since nothing spends them yet and the
+    /// computer's Colony worth reads this; the computer is taught them on their own ticket (#643).
     pub fn made(&self) -> f64 {
         self.materials + self.widgets + self.fuel + self.energy.max(0.0) + self.ducats + self.research
     }
@@ -313,6 +325,8 @@ pub struct PlaceOutput {
     pub ducats: f64,
     pub widgets: f64,
     pub research: f64,
+    /// Ticket #628 (version 0.1.0.6).
+    pub fissionables: f64,
 }
 
 impl Game {
@@ -541,7 +555,7 @@ impl Game {
         let fac = t.faction(self.kind(seat));
         let card = t.state(sid);
         let fc = t.facility(kind);
-        let mut y = Yield { resource: None, amount: 0.0, research: 0, upkeep: fc.energy_upkeep as f64, ducats_upkeep: fc.ducats_upkeep, fuel_upkeep: fc.fuel_upkeep, emissions: 0.0, allotment: fc.influence_allotment, standing: fc.standing_per_turn, doubled_by: None, doubled_factor: 1.0, detail: None, does: fc.does.clone(), chain: Chain::default(), allotment_outside: 0 };
+        let mut y = Yield { resource: None, amount: 0.0, fissionables: 0.0, research: 0, upkeep: fc.energy_upkeep as f64, ducats_upkeep: fc.ducats_upkeep, fuel_upkeep: fc.fuel_upkeep, emissions: 0.0, allotment: fc.influence_allotment, standing: fc.standing_per_turn, doubled_by: None, doubled_factor: 1.0, detail: None, does: fc.does.clone(), chain: Chain::default(), allotment_outside: 0 };
         if let Some(p) = &fc.produces {
             match p.resource {
                 Resource::Research => {
@@ -643,7 +657,7 @@ impl Game {
         let fac = t.faction(self.kind(seat));
         let mc = t.module(kind);
         // Ticket #559 (version 0.1.0.3): a Module's Ducat upkeep (the Wind Farm's), as a Facility's.
-        let mut y = Yield { resource: None, amount: 0.0, research: 0, upkeep: mc.energy_upkeep as f64, ducats_upkeep: mc.ducats_upkeep, fuel_upkeep: mc.fuel_upkeep, emissions: 0.0, allotment: mc.influence_allotment, standing: mc.standing_per_turn, doubled_by: None, doubled_factor: 1.0, detail: None, does: mc.does.clone(), chain: Chain::default(), allotment_outside: 0 };
+        let mut y = Yield { resource: None, amount: 0.0, fissionables: 0.0, research: 0, upkeep: mc.energy_upkeep as f64, ducats_upkeep: mc.ducats_upkeep, fuel_upkeep: mc.fuel_upkeep, emissions: 0.0, allotment: mc.influence_allotment, standing: mc.standing_per_turn, doubled_by: None, doubled_factor: 1.0, detail: None, does: mc.does.clone(), chain: Chain::default(), allotment_outside: 0 };
         // Ticket #239 (version 0.08.3): a Unique Module does its sibling's job, so every lookup
         // keyed by kind -- the Techs that multiply it, the slot's yield, a Discovery on it --
         // reads the COMMON kind. Without this the Arkwrights' Chorus would be the one Relay in
@@ -781,6 +795,19 @@ impl Game {
                     y.amount = v.plus(t.mass_driver.mine_bonus, "for the Mass Driver");
                 }
                 y.chain = v;
+                // Ticket #628 (version 0.1.0.6), at the designer's word: a Mine makes Fissionables
+                // beside its Materials ("we're using the existing mine"), one a turn times its site's
+                // figure -- nought in orbit and at a site without them -- times the Faction's output
+                // and the Mine's Techs ("the techs will effect fisionables but not the card"), and
+                // nothing else the designer did not name: no Discovery, no Mass Driver, and (the
+                // review) neither Production Moved's factor nor a shut Habitat's halving, which act on
+                // the Module's figure below and leave this one where it is.
+                if mc.fissionables > 0.0 {
+                    let site = self.colony_yields(col).fissionables;
+                    if site > 0.0 {
+                        y.fissionables = tenth(mc.fissionables * site * fac.output_multiplier * self.tech_output_multiplier_module(seat, job));
+                    }
+                }
             }
         }
         // Ticket #92: a Mass Driver makes nothing itself; the card says what it does.
@@ -854,7 +881,7 @@ impl Game {
     /// `doubled_modules`, named for the Facility whose mothball pays for it.
     pub fn module_yield_at(&self, seat: Seat, cid: ColonyId, index: usize) -> Yield {
         let Some(kind) = self.colony(cid).and_then(|c| c.modules.get(index)).map(|m| m.kind) else {
-            return Yield { resource: None, amount: 0.0, research: 0, upkeep: 0.0, ducats_upkeep: 0.0, fuel_upkeep: 0.0, emissions: 0.0, allotment: 0, standing: 0, doubled_by: None, doubled_factor: 1.0, detail: None, does: None, chain: Chain::default(), allotment_outside: 0 };
+            return Yield { resource: None, amount: 0.0, fissionables: 0.0, research: 0, upkeep: 0.0, ducats_upkeep: 0.0, fuel_upkeep: 0.0, emissions: 0.0, allotment: 0, standing: 0, doubled_by: None, doubled_factor: 1.0, detail: None, does: None, chain: Chain::default(), allotment_outside: 0 };
         };
         let mut y = self.module_yield(seat, cid, kind);
         if self.doubled_modules(seat).contains(&(cid, index)) {
@@ -960,13 +987,14 @@ impl Game {
                 Resource::Energy => out.energy += v,
                 Resource::Ducats => out.ducats += v,
                 Resource::Research => out.research += v,
+                Resource::Fissionables => out.fissionables += v,
                 // The Widgets are the place's own figure below: a Factory's are only part of
                 // them, the Industry Level or the Core Module making the rest.
                 Resource::Widgets => {}
             }
         }
         out.widgets = self.widgets_at(place) as f64;
-        Some(PlaceOutput { materials: tenth(out.materials), fuel: tenth(out.fuel), energy: tenth(out.energy), ducats: tenth(out.ducats), widgets: out.widgets, research: out.research })
+        Some(PlaceOutput { materials: tenth(out.materials), fuel: tenth(out.fuel), energy: tenth(out.energy), ducats: tenth(out.ducats), widgets: out.widgets, research: out.research, fissionables: tenth(out.fissionables) })
     }
 
     /// Ticket #415 (version 0.09.4): what made each figure of `place_output`, source by source --
@@ -994,6 +1022,10 @@ impl Game {
                 && v.abs() > 1e-9
             {
                 out.push((r, p.name.to_string(), v));
+            }
+            // Ticket #628 (version 0.1.0.6): a Mine's Fissionables, beside its Materials.
+            if p.fissionables > 1e-9 {
+                out.push((Resource::Fissionables, p.name.to_string(), p.fissionables));
             }
             if p.research > 0 {
                 out.push((Resource::Research, p.name.to_string(), p.research as f64));
@@ -1089,6 +1121,7 @@ impl Game {
                     fuel_upkeep: y.fuel_upkeep,
                     fuel_paid,
                     output: y.resource.map(|r| (r, if r == Resource::Widgets { (y.amount * scale).floor() } else { quarter(halve(y.amount)) })),
+                    fissionables: 0.0,
                     research: halve_whole(y.research),
                     online: !f.offline_until_resolution,
                     doubled_by: None,
@@ -1126,6 +1159,8 @@ impl Game {
                     fuel_upkeep: y.fuel_upkeep,
                     fuel_paid,
                     output: if starved { None } else { y.resource.map(|r| (r, quarter(y.amount))) },
+                    // Ticket #628 (version 0.1.0.6): a Mine's Fissionables; a starved Colony makes none.
+                    fissionables: if starved { 0.0 } else { y.fissionables },
                     // Ticket #80: an Observatory's Research. Ticket #359: halved in `module_yield_at`.
                     research: if starved { 0 } else { y.research },
                     online: !dark.contains(&i) && !col.grid_failed && !m.offline_until_resolution && !(m.kind == ModuleKind::Archive && occupied),
@@ -1155,6 +1190,7 @@ impl Game {
                     ducats_upkeep: 0.0,
                     fuel_upkeep: 0.0,
                     fuel_paid: true,
+                    fissionables: 0.0,
                     output: (!research).then_some((res, v)),
                     research: if research { v as i64 } else { 0 },
                     online: true,
@@ -1601,7 +1637,9 @@ impl Game {
             // Ticket #332 (version 0.09.0): Widgets are a rate, not a stock. They are made and spent
             // at their place at Resolution (`widgets_at`, `resolve_builds`); Income neither banks
             // them nor lists them among the sources.
-            if let Some((res, v)) = p.output.filter(|(r, _)| *r != Resource::Widgets) {
+            // Ticket #628 (version 0.1.0.6): and a Mine's Fissionables beside its Materials.
+            let second = (p.fissionables > 0.0).then_some((Resource::Fissionables, p.fissionables));
+            for (res, v) in p.output.filter(|(r, _)| *r != Resource::Widgets).into_iter().chain(second) {
                 match res {
                     Resource::Materials => gained.materials += v,
                     Resource::Fuel => gained.fuel += v,
@@ -1611,6 +1649,7 @@ impl Game {
                     }
                     Resource::Ducats => gained.ducats += v,
                     Resource::Research => labs_research += v,
+                    Resource::Fissionables => gained.fissionables += v,
                     Resource::Widgets => {}
                 }
                 sources.push((format!("{} in {}", p.name, where_), res, v));
@@ -1804,6 +1843,8 @@ impl Game {
             total.fuel = tenth(total.fuel + fuel);
             total.energy = tenth(total.energy + energy);
             total.ducats = tenth(total.ducats + ducats);
+            // Ticket #628 (version 0.1.0.6): and the Fissionables made, for the sweep.
+            total.fissionables = tenth(total.fissionables + made(Resource::Fissionables));
         }
         self.seat_mut(seat).income_sources = sources;
         self.seat_mut(seat).energy_by_place = energy_by_place;
@@ -1815,6 +1856,7 @@ impl Game {
             s.stockpile.fuel = tenth(s.stockpile.fuel + gained.fuel);
             s.stockpile.energy = clamped;
             s.stockpile.ducats = tenth(s.stockpile.ducats + gained.ducats);
+            s.stockpile.fissionables = tenth(s.stockpile.fissionables + gained.fissionables);
             // Ticket #563 (version 0.1.0.3): the game's running total, for the sweep.
             s.produced.materials += gained.materials;
             s.produced.fuel += gained.fuel;
@@ -1823,11 +1865,13 @@ impl Game {
             // carried gross Energy. The net is what the Income left: the balance less what was stored.
             s.produced.energy += balance - before.energy;
             s.produced.ducats += gained.ducats;
+            s.produced.fissionables += gained.fissionables;
             s.income_last_turn = Stockpile {
                 materials: gained.materials,
                 fuel: gained.fuel,
                 energy: tenth(clamped - before.energy),
                 ducats: gained.ducats,
+                fissionables: tenth(gained.fissionables),
             };
             s.research_last_turn = research;
             // Ticket #50: every seat keeps both running totals; a Faction's card says which one its

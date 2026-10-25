@@ -914,7 +914,7 @@ fn found_button(ui: &mut Ui, yields: &dying_earth_engine::SlotYields, label: &st
                         ui.label(RichText::new(label).color(visuals.text_color()));
                     });
                     // Ticket #258 (version 0.08.4): drawn glyph-first; see `slot_yield_row`.
-                    slot_yield_row(ui, slot_yield_figures(yields), 13.0, visuals.text_color());
+                    slot_yield_row(ui, &slot_yield_figures(yields), 13.0, visuals.text_color());
                 });
             });
     })
@@ -2862,6 +2862,9 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
             }
             bar_resource(ui, icons, "fuel", "Fuel", format!("{} ({})", figure(left.fuel), signed(inc.fuel)), sources(dying_earth_engine::Resource::Fuel));
             ui.separator();
+            // Ticket #628 (version 0.1.0.6): Fissionables beside Fuel, its hover the Fuel's shape.
+            bar_resource(ui, icons, "fissionables", "Fissionables", format!("{} ({})", figure(left.fissionables), signed(inc.fissionables)), sources(dying_earth_engine::Resource::Fissionables));
+            ui.separator();
             // Ticket #351 (version 0.09.1): the Shortfall alarm. While the next Income would shut
             // anything -- counting what this turn's orders do to the Energy -- the figure turns red and
             // its hover names what goes dark, in order -- under the Last Income lines since ticket #609.
@@ -3949,7 +3952,7 @@ const SLOT_YIELD_SIZE: f32 = 14.0;
 /// "Materials x1.37" has the figure after the word. Ticket #218 promised glyphs on the button's
 /// face and a picture on this ticket was the first to show it had none. Drawn directly, glyph then
 /// figure, so it cannot fall through that rule again.
-fn slot_yield_row(ui: &mut Ui, figures: [(&str, f64); 4], size: f32, tint: Color32) {
+fn slot_yield_row(ui: &mut Ui, figures: &[(&str, f64)], size: f32, tint: Color32) {
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 3.0;
         for (i, (key, v)) in figures.iter().enumerate() {
@@ -3973,8 +3976,13 @@ fn slot_yield_row(ui: &mut Ui, figures: [(&str, f64); 4], size: f32, tint: Color
     });
 }
 
-fn slot_yield_figures(y: &dying_earth_engine::SlotYields) -> [(&'static str, f64); 4] {
-    [("materials", y.mine), ("energy", y.generator), ("fuel", y.refinery), ("research", y.research)]
+fn slot_yield_figures(y: &dying_earth_engine::SlotYields) -> Vec<(&'static str, f64)> {
+    let mut f = vec![("materials", y.mine), ("energy", y.generator), ("fuel", y.refinery), ("research", y.research)];
+    // Ticket #628 (version 0.1.0.6): a fifth, where the site holds Fissionables, and nothing where not.
+    if y.fissionables > 0.0 {
+        f.push(("fissionables", y.fissionables));
+    }
+    f
 }
 
 /// The block the glyph line fills, and its figures laid out, so a map label can be measured before
@@ -4141,7 +4149,8 @@ fn colonies_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSt
     let (ink, weak) = (ui.visuals().text_color(), ui.visuals().weak_text_color());
     ui.horizontal(|ui| {
         ui.label(RichText::new(format!("{} as a whole:", card.name)).weak());
-        slot_yield_row(ui, [("materials", card.mine_yield), ("energy", card.generator_yield), ("fuel", card.refinery_yield), ("research", card.research_yield)], 14.0, weak);
+        // Ticket #628 (version 0.1.0.6): a Body's line reads its card, Fissionables where it has them.
+        slot_yield_row(ui, &slot_yield_figures(&dying_earth_engine::SlotYields::of_body(card)), 14.0, weak);
     });
     first_to_body_line(ui, session, game, body);
     // Ticket #481 (version 0.09.8): the race to the Moon, under the line that says nobody has landed.
@@ -4170,7 +4179,7 @@ fn colonies_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSt
         }
         ui.horizontal(|ui| {
             ui.add_space(12.0);
-            slot_yield_row(ui, slot_yield_figures(&game.slot_yields(body, slot)), 13.0, ink);
+            slot_yield_row(ui, &slot_yield_figures(&game.slot_yields(body, slot)), 13.0, ink);
         });
     }
     ui.add_space(4.0);
@@ -6187,8 +6196,10 @@ fn hover_with_icons(ui: &mut Ui, text: &str) {
 /// Ticket #392 (version 0.09.3): and Colonists, who are people, so `4 Colonists` on a Habitat's or
 /// a Trade Post's hover wears the head Earth's population does; and the singular `1 Ducat` an
 /// Academy pays, which read as a word beside the `+6.8 Ducats` a Bank makes only for its number.
-const ICON_WORDS: [(&str, &str); 14] = [
+const ICON_WORDS: [(&str, &str); 15] = [
     ("Materials", "materials"),
+    // Ticket #628 (version 0.1.0.6).
+    ("Fissionables", "fissionables"),
     ("Widgets", "widgets"),
     ("Fuel", "fuel"),
     ("Energy", "energy"),
@@ -6693,7 +6704,7 @@ fn output_row(ui: &mut Ui, game: &Game, place: Place) {
     // The card's own Widget makers, bare-named and without a nought line, as the other figures read.
     let widgets: Vec<(String, f64)> = widget_makers(game, place).into_iter().filter(|(_, v)| *v != 0).map(|(n, v)| (n.strip_prefix("the ").map(str::to_string).unwrap_or(n), v as f64)).collect();
     let mut parts: Vec<RowPart> = Vec::new();
-    for (v, icon, r) in [(o.materials, "materials", Resource::Materials), (o.widgets, "widgets", Resource::Widgets), (o.fuel, "fuel", Resource::Fuel), (o.energy, "energy", Resource::Energy), (o.ducats, "ducats", Resource::Ducats), (o.research, "research", Resource::Research)] {
+    for (v, icon, r) in [(o.materials, "materials", Resource::Materials), (o.widgets, "widgets", Resource::Widgets), (o.fuel, "fuel", Resource::Fuel), (o.fissionables, "fissionables", Resource::Fissionables), (o.energy, "energy", Resource::Energy), (o.ducats, "ducats", Resource::Ducats), (o.research, "research", Resource::Research)] {
         if v.abs() > 1e-9 {
             let list: Vec<(String, f64)> = if r == Resource::Widgets { widgets.clone() } else { sources.iter().filter(|(x, ..)| *x == r).map(|(_, n, v)| (n.clone(), *v)).collect() };
             parts.push(RowPart { before: figure(v), icon: Some(icon), after: String::new(), hover: Some(output_sources_hover(&list)) });
@@ -8721,7 +8732,7 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
         let ink = ui.visuals().text_color();
         ui.horizontal(|ui| {
             ui.label(RichText::new("Yields here:").weak());
-            slot_yield_row(ui, slot_yield_figures(&game.slot_yields(col.body, col.slot)), 13.0, ink);
+            slot_yield_row(ui, &slot_yield_figures(&game.slot_yields(col.body, col.slot)), 13.0, ink);
         });
     }
     let owner = match col.control {
@@ -9015,7 +9026,7 @@ fn slot_panel(ui: &mut Ui, session: &Session, game: &Game, body: BodyId, slot: u
     let ink = ui.visuals().text_color();
     ui.horizontal(|ui| {
         ui.label("Yields here:");
-        slot_yield_row(ui, slot_yield_figures(&y), 14.0, ink);
+        slot_yield_row(ui, &slot_yield_figures(&y), 14.0, ink);
     });
     for s in game.ships.iter().filter(|s| !session.spectator && s.seat == Seat(0) && s.at == ShipAt::Body(body) && s.kind == UnitKind::ColonyShip && s.colonists > 0) {
         // Ticket #409 (version 0.09.4): how many land, on a slider up to what a new Colony takes.
@@ -9901,7 +9912,8 @@ fn ship_weapons_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut Vi
 
 /// Ticket #42: the trading window. Ducats buy Influence, Materials, Fuel and Energy at the table
 /// prices, spendable in this turn's orders; Materials and Fuel sell back at half; buildings are
-/// bought for Ducats from their own build buttons.
+/// bought for Ducats from their own build buttons. Ticket #628 (version 0.1.0.6): and Fissionables,
+/// bought and sold back as Fuel is.
 /// Ticket #369 (version 0.09.2): a Trading window button whose face is a verb and a Ducat figure
 /// with its glyph -- "Buy for 48 [ducats]" -- greyed with the engine's refusal on hover when the
 /// order is refused. Through `priced_button`, which is how a glyph reaches a button face; but that
@@ -9943,7 +9955,7 @@ fn trading_window(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSt
             _ => 0,
         }).sum()
     };
-    let lines: [(usize, Option<dying_earth_engine::Resource>, &str, &str); 4] = [(0, None, "influence", "Influence"), (1, Some(dying_earth_engine::Resource::Materials), "materials", "Materials"), (2, Some(dying_earth_engine::Resource::Fuel), "fuel", "Fuel"), (3, Some(dying_earth_engine::Resource::Energy), "energy", "Energy")];
+    let lines: [(usize, Option<dying_earth_engine::Resource>, &str, &str); 5] = [(0, None, "influence", "Influence"), (1, Some(dying_earth_engine::Resource::Materials), "materials", "Materials"), (2, Some(dying_earth_engine::Resource::Fuel), "fuel", "Fuel"), (3, Some(dying_earth_engine::Resource::Energy), "energy", "Energy"), (4, Some(dying_earth_engine::Resource::Fissionables), "fissionables", "Fissionables")];
     egui::Grid::new("trade_grid").num_columns(5).spacing((12.0, 6.0)).show(ui, |ui| {
         ui.label(RichText::new("Line").strong());
         // Ticket #593 (version 0.1.0.4): the rule the price column follows, on its head.
@@ -9961,7 +9973,7 @@ Everyone's trading moves next turn's price.", n = d.price_step_units, b = d.pric
                 Some(r) => game.lot_ducats(Seat(0), r, 1, ahead(r)) as f64,
             };
             icon_word(ui, key, name);
-            let sells = matches!(res, Some(dying_earth_engine::Resource::Materials) | Some(dying_earth_engine::Resource::Fuel));
+            let sells = matches!(res, Some(dying_earth_engine::Resource::Materials) | Some(dying_earth_engine::Resource::Fuel) | Some(dying_earth_engine::Resource::Fissionables));
             // Ticket #83: the Prospectors' 15% off is taken over the lot, so the button's figure is
             // the price; the line says so. Ticket #577 (version 0.1.0.3): and the seat's own cut
             // from a card, beside it.
@@ -11765,7 +11777,8 @@ fn greenwash_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewS
 /// ask of them, the same way. The choice lives in egui's memory under the pair, as the Accord's
 /// ticks do; it is a scratch choice, not game state.
 fn trade_block(ui: &mut Ui, session: &Session, game: &Game, other: Seat, actions: &mut Vec<Action>) {
-    const GOODS: [ResourceKind; 4] = [ResourceKind::Ducats, ResourceKind::Materials, ResourceKind::Fuel, ResourceKind::Energy];
+    // Ticket #628 (version 0.1.0.6): and Fissionables, traded as the other Stockpile goods are.
+    const GOODS: [ResourceKind; 5] = [ResourceKind::Ducats, ResourceKind::Materials, ResourceKind::Fuel, ResourceKind::Energy, ResourceKind::Fissionables];
     ui.label(RichText::new("Trade").strong());
     let side = |ui: &mut Ui, key: &str, owner: Seat| -> TradeGood {
         let id = egui::Id::new(("trade", key, other.index()));
@@ -12028,6 +12041,7 @@ fn faction_window(ctx: &egui::Context, session: &Session, game: &Game, view: &mu
             &[
                 RowPart { before: signed(inc.materials), icon: Some("materials"), after: String::new(), hover: Some(hover(dying_earth_engine::Resource::Materials, "Materials")) },
                 RowPart { before: signed(inc.fuel), icon: Some("fuel"), after: String::new(), hover: Some(hover(dying_earth_engine::Resource::Fuel, "Fuel")) },
+                RowPart { before: signed(inc.fissionables), icon: Some("fissionables"), after: String::new(), hover: Some(hover(dying_earth_engine::Resource::Fissionables, "Fissionables")) },
                 RowPart { before: signed(inc.energy), icon: Some("energy"), after: String::new(), hover: Some(hover(dying_earth_engine::Resource::Energy, "Energy")) },
                 RowPart { before: signed(inc.ducats), icon: Some("ducats"), after: String::new(), hover: Some(hover(dying_earth_engine::Resource::Ducats, "Ducats")) },
                 RowPart { before: signed(research), icon: Some("research"), after: String::new(), hover: Some(hover(dying_earth_engine::Resource::Research, "Research")) },
@@ -13320,7 +13334,7 @@ fn chronicle_screen(root: &mut Ui, session: &Session, actions: &mut Vec<Action>)
             // says least about a Faction that spent well, which is why the other five are here.
             ui.label(RichText::new("What each Faction made and held").size(20.0).strong());
             ui.add_space(4.0);
-            egui::Grid::new("chronicle_table").num_columns(10).spacing((18.0, 6.0)).striped(true).show(ui, |ui| {
+            egui::Grid::new("chronicle_table").num_columns(11).spacing((18.0, 6.0)).striped(true).show(ui, |ui| {
                 let head = |ui: &mut Ui, text: &str, hover: &str| {
                     ui.label(RichText::new(text).strong()).on_hover_text(hover);
                 };
@@ -13329,6 +13343,8 @@ fn chronicle_screen(root: &mut Ui, session: &Session, actions: &mut Vec<Action>)
                 // at the end in brackets, where the Stockpile stood alone.
                 head(ui, "Materials", "Materials made over the whole game, before upkeep. In brackets: the Stockpile at the end.");
                 head(ui, "Fuel", "Fuel made over the whole game. In brackets: the Stockpile at the end.");
+                // Ticket #628 (version 0.1.0.6), from the review.
+                head(ui, "Fissionables", "Fissionables made over the whole game. In brackets: the Stockpile at the end.");
                 head(ui, "Energy", "Energy made over the whole game, before upkeep. In brackets: the Stockpile at the end.");
                 head(ui, "Ducats", "Ducats made over the whole game, sales apart. In brackets: the Stockpile at the end.");
                 head(ui, "Off Earth", "Colonists living off Earth: in Colonies away from Earth and on stations over it. Antarctica is on Earth.");
@@ -13342,6 +13358,7 @@ fn chronicle_screen(root: &mut Ui, session: &Session, actions: &mut Vec<Action>)
                     ui.label(RichText::new(game.seat_name(*seat)).strong().color(seat_colour(session, *seat)));
                     ui.label(made_and_held(s.produced_total.materials, s.stockpile.materials));
                     ui.label(made_and_held(s.produced_total.fuel, s.stockpile.fuel));
+                    ui.label(made_and_held(s.produced_total.fissionables, s.stockpile.fissionables));
                     ui.label(made_and_held(s.produced_total.energy, s.stockpile.energy));
                     ui.label(made_and_held(s.produced_total.ducats, s.stockpile.ducats));
                     ui.label(format!("{}", game.off_world_colonists(*seat)));

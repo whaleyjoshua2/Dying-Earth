@@ -634,6 +634,45 @@ fn build_board(session: &mut Session) {
             g.seats[0].stockpile.materials = 120.0;
             g.seats[0].stockpile.energy = 60.0;
         }
+        // `fission:1` (a building aid, ticket #628, version 0.1.0.6): seat 0 founds a Colony on a Mars
+        // site that holds Fissionables, a Mine stands there, and a turn is played, so the top bar,
+        // the Colony's Output row and its Mine carry the seventh resource.
+        if std::env::args().any(|a| a == "fission:1") {
+            let body = BodyId::Mars;
+            let slot = g.free_slots_on(body).into_iter().find(|s| g.slot_yields(body, *s).fissionables > 0.0).unwrap_or(0);
+            let id = ShipId(g.fresh_id());
+            let built_turn = g.turn;
+            let name = g.next_ship_name(UnitKind::ColonyShip);
+            g.ships.push(Ship { id, name, kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(body), colonists: 8, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: g.tank_of(Seat(0), UnitKind::ColonyShip), slot: None });
+            for seat in Seat::ALL.into_iter().skip(1) {
+                g.seats[seat.index()].ai = false;
+            }
+            let mut orders: [Vec<Order>; SEAT_COUNT] = std::array::from_fn(|_| Vec::new());
+            orders[0] = vec![Order::Unload { ship: id, colonists: 8, army: false, into: UnloadTarget::Slot(body, slot) }];
+            refuse_any_card(g);
+            g.end_turn(orders).expect("the screenshot harness picks a Tech before it drives turns");
+            let Some(cid) = g.colonies.iter().find(|c| c.body == body && !c.in_orbit && c.control.director() == Some(Seat(0))).map(|c| c.id) else {
+                eprintln!("fission:1 founded nothing on Mars");
+                std::process::exit(3);
+            };
+            if let Some(col) = g.colony_mut(cid) {
+                col.modules.push(Module::new(ModuleKind::Mine));
+            }
+            g.seats[0].stockpile.energy = 60.0;
+            // The computer seats back before the second turn: the Lead among them owes a pick.
+            for seat in Seat::ALL.into_iter().skip(1) {
+                g.seats[seat.index()].ai = true;
+            }
+            refuse_any_card(g);
+            if g.research.current.is_none()
+                && let Some(first) = g.available_techs().first().copied()
+            {
+                g.pick_tech(Seat(0), first).ok();
+            }
+            g.end_turn(std::array::from_fn(|_| Vec::new())).expect("a second turn");
+            // And a card drawn on it answered, so no question stands over the picture.
+            refuse_any_card(g);
+        }
         // `drybar:1` (a building aid, ticket #346, version 0.09.1): **the board the Battle bar is
         // photographed on.** Seat 0 keeps a DRY Frigate -- 1 Fuel, under the 2 a Battle charges --
         // and a full Battleship in the SAME orbit over Mars, so one picture carries both readings

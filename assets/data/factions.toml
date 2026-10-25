@@ -583,6 +583,9 @@ per_materials = 3
 # Ticket #421 (version 0.09.4): a quarter off, 4 to 3, its band 2 to 4 (1 to 5 since #593).
 per_fuel = 3
 per_energy = 2
+# Ticket #628 (version 0.1.0.6), at the designer's word: Fissionables bought and sold as Fuel is, dear,
+# so Earth may run on bought ones at a cost.
+per_fissionables = 8
 # Ticket #593 (version 0.1.0.4), at the designer's word: 2 either side, from 1, and every lot priced at
 # the seat's own running net this turn, every `price_step_units` a Ducat (never under 1); the whole
 # table's net is banked at the settle.

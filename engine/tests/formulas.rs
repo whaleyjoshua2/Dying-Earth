@@ -808,7 +808,7 @@ fn only_a_carrier_carries_an_army_and_a_colony_ship_carries_only_colonists() {
 #[test]
 fn the_trading_window_sells_materials_fuel_and_energy_at_the_table_prices() {
     let mut g = game();
-    g.seats[0].stockpile = Stockpile { materials: 0.0, fuel: 0.0, energy: 0.0, ducats: 100.0 };
+    g.seats[0].stockpile = Stockpile { materials: 0.0, fuel: 0.0, energy: 0.0, ducats: 100.0, fissionables: 0.0 };
     let m = Order::Buy { resource: Resource::Materials, amount: 10 };
     assert_eq!(g.order_cost(Seat(0), &m).ducats, 30.0, "Materials are 3 Ducats each since ticket #220");
     // Bought Materials are spendable at once: a Factory (22 Materials since ticket #537) is affordable with the buy pending.
@@ -827,13 +827,13 @@ fn the_trading_window_sells_materials_fuel_and_energy_at_the_table_prices() {
     assert!(g.check_order(Seat(0), &[], &Order::Buy { resource: Resource::Ducats, amount: 5 }).is_err(), "Ducats are not for sale");
     assert!(g.check_order(Seat(0), &[], &Order::Buy { resource: Resource::Materials, amount: 34 }).is_err(), "116 Ducats needed (20 at 3, 14 at 4), 100 held");
     g.commit_orders(Seat(0), &[m, f, e]);
-    assert_eq!(g.seats[0].stockpile, Stockpile { materials: 10.0, fuel: 2.0, energy: 5.0, ducats: 54.0 }, "Fuel at 3 since ticket #421");
+    assert_eq!(g.seats[0].stockpile, Stockpile { materials: 10.0, fuel: 2.0, energy: 5.0, ducats: 54.0, fissionables: 0.0 }, "Fuel at 3 since ticket #421");
 }
 
 #[test]
 fn a_building_bought_for_ducats_costs_twice_its_materials_and_queues_like_a_materials_build() {
     let mut g = game();
-    g.seats[0].stockpile = Stockpile { materials: 0.0, fuel: 0.0, energy: 50.0, ducats: 44.0 };
+    g.seats[0].stockpile = Stockpile { materials: 0.0, fuel: 0.0, energy: 50.0, ducats: 44.0, fissionables: 0.0 };
     let order = Order::BuildFacilityWithDucats { state: StateId::EastAsia, kind: FacilityKind::Factory };
     let cost = g.order_cost(Seat(0), &order);
     assert_eq!((cost.materials, cost.ducats), (0.0, 44.0), "a 22-Materials Factory is 44 Ducats");
@@ -859,7 +859,7 @@ fn a_building_bought_for_ducats_costs_twice_its_materials_and_queues_like_a_mate
 #[test]
 fn selling_materials_or_fuel_returns_half_the_buying_price() {
     let mut g = game();
-    g.seats[0].stockpile = Stockpile { materials: 10.0, fuel: 2.0, energy: 20.0, ducats: 0.0 };
+    g.seats[0].stockpile = Stockpile { materials: 10.0, fuel: 2.0, energy: 20.0, ducats: 0.0, fissionables: 0.0 };
     let m = Order::Sell { resource: Resource::Materials, amount: 10 };
     assert_eq!(g.order_cost(Seat(0), &m).ducats, -15.0, "half of 3 Ducats each since ticket #220");
     let f = Order::Sell { resource: Resource::Fuel, amount: 2 };
@@ -872,7 +872,7 @@ fn selling_materials_or_fuel_returns_half_the_buying_price() {
     assert_eq!((left.materials, left.ducats), (0.0, 15.0));
     assert!(g.check_order(Seat(0), &pending, &Order::BuyInfluence { amount: 3 }).is_ok(), "13.5 of the 15 Ducats");
     g.commit_orders(Seat(0), &[m, f]);
-    assert_eq!(g.seats[0].stockpile, Stockpile { materials: 0.0, fuel: 0.0, energy: 20.0, ducats: 18.0 }, "15 and 3, Fuel at 3 since ticket #421");
+    assert_eq!(g.seats[0].stockpile, Stockpile { materials: 0.0, fuel: 0.0, energy: 20.0, ducats: 18.0, fissionables: 0.0 }, "15 and 3, Fuel at 3 since ticket #421");
 }
 
 // ---------------------------------------------------------------- #36 Embassies and Relays
@@ -1337,7 +1337,7 @@ fn income_of(g: &mut Game, seat: Seat) -> Stockpile {
     g.income_phase();
     let after = g.seat(seat).stockpile;
     // Ticket #387 (version 0.09.3): a difference of two exact tenths can drift in the last place, so it is settled.
-    Stockpile { materials: tenth(after.materials - before.materials), fuel: tenth(after.fuel - before.fuel), energy: tenth(after.energy - 1000.0), ducats: tenth(after.ducats - before.ducats) }
+    Stockpile { materials: tenth(after.materials - before.materials), fuel: tenth(after.fuel - before.fuel), energy: tenth(after.energy - 1000.0), ducats: tenth(after.ducats - before.ducats), fissionables: tenth(after.fissionables - before.fissionables) }
 }
 
 #[test]
@@ -1454,7 +1454,9 @@ fn tech_deep_mining_raises_mine_output_on_earth_and_off_it() {
     assert_eq!(income_of(&mut g, Seat(0)).materials, 11.6); // Ticket #537: the Earth Mine 4.4 x 1.5 = 6.6; ticket #554: the Moon Mine 4 x 1.25 = 5
     with_tech(&mut g, TechId::DeepMining);
     // Ticket #537: the Earth Mine 4.4 x 1.5 x 1.5 = 9.9; ticket #554: the Moon Mine 4 x 1.25 x 1.5 = 7.5.
-    assert_eq!(income_of(&mut g, Seat(0)).materials, 17.4);
+    // Ticket #628 (version 0.1.0.6): Deep Mining x1.25, so 4.4 x 1.5 x 1.25 = 8.25, to the tenth 8.3,
+    // and 4 x 1.25 x 1.25 = 6.25, to the tenth 6.3.
+    assert_eq!(income_of(&mut g, Seat(0)).materials, 14.6);
 }
 
 #[test]
@@ -1659,7 +1661,7 @@ fn every_neutral_state_starts_with_its_start_facilities() {
         assert_eq!(card.start_facilities.iter().filter(|k| **k == FacilityKind::Factory).count() as u32 + lone, mines, "{}: a Mine beside every Factory", card.name);
         assert_eq!(card.start_facilities.len() as u32 - labs - mines, card.industry_level, "{}: as many as the Industry Level, plus a start Lab and the Mines", card.name);
     }
-    assert_eq!(g.seats[0].stockpile, Stockpile { materials: 80.0, fuel: 20.0, energy: 20.0, ducats: 0.0 });
+    assert_eq!(g.seats[0].stockpile, Stockpile { materials: 80.0, fuel: 20.0, energy: 20.0, ducats: 0.0, fissionables: 0.0 });
 }
 
 #[test]
@@ -8123,6 +8125,8 @@ fn the_custodian_ai_weighs_a_mine_off_earth_by_the_doubling_an_idle_earth_mine_w
 /// Ticket #554 (version 0.1.0.2): the Moon's Mine went to 1.25, so a Moon Mine and Mass Driver make
 /// 6.0, and no off-world Mine meets 6.6 any more. The even trade is restored with Phobos under Deep
 /// Mining: East Asia's Mine 4.4 x 1.5 x 1.5 = 9.9; a Phobos Mine 4 x 1.4875 x 1.5 = 8.9, + 1 = 9.9.
+/// Ticket #628 (version 0.1.0.6): Deep Mining x1.25 parts them by a tenth: East Asia 4.4 x 1.5 x 1.25 =
+/// 8.25, to the tenth 8.3; Phobos 4 x 1.4875 x 1.25 = 7.44, + 1 = 8.4. A tenth over even, still taken.
 #[test]
 fn the_custodian_ai_idles_an_earth_mine_for_an_even_trade() {
     let mut g = game();
@@ -8133,7 +8137,7 @@ fn the_custodian_ai_idles_an_earth_mine_for_an_even_trade() {
     let phobos = colony(&mut g, Seat(0), BodyId::Phobos, &[ModuleKind::Mine, ModuleKind::Generator, ModuleKind::MassDriver], 0);
     g.state_mut(StateId::EastAsia).facilities.push(facility(FacilityKind::Mine));
     let i = g.state(StateId::EastAsia).facilities.len() - 1;
-    assert_eq!((g.module_yield_at(Seat(0), phobos, 0).amount, g.facility_yield(Seat(0), StateId::EastAsia, FacilityKind::Mine).amount), (9.9, 9.9), "the premise: even");
+    assert_eq!((g.module_yield_at(Seat(0), phobos, 0).amount, g.facility_yield(Seat(0), StateId::EastAsia, FacilityKind::Mine).amount), (8.4, 8.3), "the premise: a tenth over even");
     let orders = g.ai_orders(Seat(0));
     assert!(
         orders.iter().any(|o| matches!(o, Order::Change { building: BuildingRef::Facility(StateId::EastAsia, j), what: BuildingChange::Mothball } if *j == i)),
@@ -8257,8 +8261,11 @@ fn the_race_sends_its_runner_to_mars_over_the_ships_own_moves() {
     assert!(g.first_at(BodyId::Moon).is_some() && g.first_at(BodyId::Mars).is_none(), "the premise: the Moon claimed, Mars not");
     g.log.clear();
     let orders = g.ai_orders(ark);
+    // Ticket #628 (version 0.1.0.6): with Deep Mining at x1.25 this seed's runner had left before
+    // turn 10, six Colonists aboard and five turns out; a runner under way is the race run as well.
+    let under_way = g.ships.iter().any(|s| s.seat == ark && s.colonists > 0 && matches!(s.at, ShipAt::Transit { to: BodyId::Mars, .. }));
     assert!(
-        orders.iter().any(|o| matches!(o, Order::Transit { to: BodyId::Mars, .. })),
+        under_way || orders.iter().any(|o| matches!(o, Order::Transit { to: BodyId::Mars, .. })),
         "the Arkwrights' runner to Mars on turn 10: {:?}",
         g.log.iter().filter(|l| l.contains("Colony Ship")).collect::<Vec<_>>()
     );
@@ -11316,7 +11323,10 @@ fn a_research_agreement_wants_friendship_first() {
 fn beneficiation_adds_one_to_every_mine_once_deep_mining_stands() {
     // Ticket #554 (version 0.1.0.2): the Moon's Mine yield 1.25, so 4 x 1.25 x 1.5 = 7.5; x 1.1 = 8.25,
     // to the tenth 8.3; x 1.25 = 10.3125, to the tenth 10.3.
-    for (body, deep, with_ben, all_three) in [(BodyId::Earth, 8.9, 9.8, 12.3), (BodyId::Moon, 7.5, 8.3, 10.3), (BodyId::Mars, 6.4, 7.0, 8.8), (BodyId::Phobos, 8.9, 9.8, 12.3)] {
+    // Ticket #628 (version 0.1.0.6): Deep Mining x1.25, the chain tenthed once at its end: Earth and
+    // Phobos 4 x 1.4875 x 1.25 = 7.44, x 1.1 = 8.18, x 1.25 = 10.23; the Moon 4 x 1.25 x 1.25 = 6.25,
+    // 6.875, 8.59; Mars 4 x 1.0625 x 1.25 = 5.31, 5.84, 7.30.
+    for (body, deep, with_ben, all_three) in [(BodyId::Earth, 7.4, 8.2, 10.2), (BodyId::Moon, 6.3, 6.9, 8.6), (BodyId::Mars, 5.3, 5.8, 7.3), (BodyId::Phobos, 7.4, 8.2, 10.2)] {
         let mut g = game();
         let seat = Seat(0);
         let c = colony(&mut g, seat, body, &[ModuleKind::Mine], 4);
@@ -11342,7 +11352,10 @@ fn beneficiation_reaches_an_antarctic_mine_too() {
     let seat = Seat(0);
     let c = colony(&mut g, seat, BodyId::Earth, &[ModuleKind::Mine], 4);
     with_tech(&mut g, TechId::DeepMining);
-    let before = g.module_yield(seat, c, ModuleKind::Mine).amount;
+    // Ticket #628 (version 0.1.0.6): the chain's figure before its one tenth, from the card, since at
+    // Deep Mining's x1.25 the tenthed 7.4 x 1.1 is 8.1 where the chain's 7.4375 x 1.1 is 8.2.
+    let before = 4.0 * g.tables.body(BodyId::Earth).mine_yield * g.tables.tech(TechId::DeepMining).value;
+    assert_eq!(tenth(before), g.module_yield(seat, c, ModuleKind::Mine).amount, "the premise: Deep Mining alone");
     with_tech(&mut g, TechId::Beneficiation);
     assert_eq!(g.module_yield(seat, c, ModuleKind::Mine).amount, tenth(before * 1.1), "an Antarctic Mine reads the Tech exactly as one off Earth does"); // Ticket #387: a tenth more, to the tenth, where it added one whole
     assert_eq!(g.tables.tech(TechId::Beneficiation).effect, "Mine output x1.1, wherever the Mine stands", "and the effect line says so, because the name no longer can");
@@ -13407,7 +13420,8 @@ fn four_makers_the_factory_makes_widgets_the_mine_makes_materials_and_the_start_
     g.state_mut(sid).facilities = vec![facility(FacilityKind::Mine)];
     assert_eq!(income_of(&mut g, Seat(0)).materials, 6.6, "a Mine in China makes 4.4 x 1.5 = 6.6");
     with_tech(&mut g, TechId::DeepMining);
-    assert_eq!(income_of(&mut g, Seat(0)).materials, 9.9, "and 9.9 with Deep Mining");
+    // Ticket #628 (version 0.1.0.6): Deep Mining x1.25, 6.6 x 1.25 = 8.25, to the tenth 8.3.
+    assert_eq!(income_of(&mut g, Seat(0)).materials, 8.3, "and 8.3 with Deep Mining");
     g.state_mut(sid).facilities = vec![facility(FacilityKind::Factory)];
     assert_eq!(income_of(&mut g, Seat(0)).materials, 0.0, "a Factory makes no Materials");
     // Clean Manufacturing follows the Factory; the Mine's smoke is not thinned.
@@ -15425,7 +15439,7 @@ fn an_ordinary_card_is_held_in_silence_and_lands_where_it_always_did() {
 #[test]
 fn a_refusal_names_the_rule_before_the_price() {
     let mut g = game();
-    g.seats[0].stockpile = Stockpile { materials: 0.0, fuel: 0.0, energy: 0.0, ducats: 0.0 };
+    g.seats[0].stockpile = Stockpile { materials: 0.0, fuel: 0.0, energy: 0.0, ducats: 0.0, fissionables: 0.0 };
     // Sub-Saharan Africa is nobody's, so a Factory there is forbidden -- and unaffordable as well.
     let forbidden = Order::BuildFacility { state: StateId::SubSaharanAfrica, kind: FacilityKind::Factory };
     assert!(g.order_cost(Seat(0), &forbidden).materials > 0.0, "the order has a price it could be told instead");
@@ -21125,7 +21139,7 @@ fn a_seat_keeps_a_gross_total_of_what_it_has_produced() {
     assert_eq!(g.seats[0].produced_total, Stockpile::default(), "nothing made before the first Income");
     g.income_phase();
     let gross = |g: &Game, r: Resource| -> f64 { g.seats[0].income_sources.iter().filter(|(_, res, n)| *res == r && *n > 0.0).map(|(_, _, n)| n).sum() };
-    let first = Stockpile { materials: gross(&g, Resource::Materials), fuel: gross(&g, Resource::Fuel), energy: gross(&g, Resource::Energy), ducats: gross(&g, Resource::Ducats) };
+    let first = Stockpile { materials: gross(&g, Resource::Materials), fuel: gross(&g, Resource::Fuel), energy: gross(&g, Resource::Energy), ducats: gross(&g, Resource::Ducats), fissionables: 0.0 };
     assert!(first.materials > 0.0 && first.energy > 0.0 && first.ducats > 0.0, "the premise: the start Region makes things: {first:?} {:?}", g.seats[0].income_sources);
     assert!(g.seats[0].income_sources.iter().any(|(_, _, n)| *n < 0.0), "the premise: and something is paid out of it");
     let total = g.seats[0].produced_total;
@@ -23601,7 +23615,7 @@ fn a_poor_seat_still_finds_materials_scarcest_at_the_new_prices() {
         id, name, kind: UnitKind::ColonyShip, seat: s, damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false,
         colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 40.0, slot: None,
     });
-    g.seats[0].stockpile = Stockpile { materials: 10.0, fuel: 6.0, energy: 500.0, ducats: 0.0 };
+    g.seats[0].stockpile = Stockpile { materials: 10.0, fuel: 6.0, energy: 500.0, ducats: 0.0, fissionables: 0.0 };
     assert_eq!(g.scarcest(s), Resource::Materials, "10 Materials against three 22s, Fuel 6 of 6");
 }
 
@@ -25973,4 +25987,186 @@ fn ticket_620_a_computer_seat_weighs_collapse_against_its_win() {
     let cus = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Custodians).unwrap();
     assert_eq!(g.ai_win_turn(cus), None);
     assert!(!g.ai_loses_the_race(cus));
+}
+
+// ---------------------------------------------------------------- #628 Fissionables (version 0.1.0.6)
+
+/// Ticket #628 (version 0.1.0.6), at the designer's word: a seventh resource, Fissionables, none on
+/// Earth, the Moon 0.25, Mars 0.80, its moons 1.1, Mercury 1.3, Ceres 1.6 ("Eris" in the list; the
+/// designer: "yeah Ceres"), Vesta 1.8. Venus has no ground and so none.
+#[test]
+fn ticket_628_every_body_carries_its_fissionables_figure() {
+    let g = fresh();
+    let want = [
+        (BodyId::Earth, 0.0),
+        (BodyId::Moon, 0.25),
+        (BodyId::Mars, 0.8),
+        (BodyId::Phobos, 1.1),
+        (BodyId::Deimos, 1.1),
+        (BodyId::Venus, 0.0),
+        (BodyId::Mercury, 1.3),
+        (BodyId::Ceres, 1.6),
+        (BodyId::Vesta, 1.8),
+    ];
+    for (b, f) in want {
+        assert_eq!(g.tables.body(b).fissionables_yield, f, "{b:?}");
+    }
+    assert_eq!(Resource::Fissionables.name(), "Fissionables");
+}
+
+/// Ticket #628: which slots hold them. Every ground slot of Mars but Hellas Planitia (the designer:
+/// "pick one mars slot to not have it"), every one of Phobos, Deimos, Mercury, Ceres and Vesta, and
+/// two or three of the Moon's five, drawn with the game, never more, never fewer. Each figure takes
+/// the slot's own spread, as the other four yields do.
+#[test]
+fn ticket_628_the_slots_that_hold_fissionables() {
+    let spread = fresh().tables.slot_yield_spread;
+    let mut moon_counts = std::collections::BTreeSet::new();
+    for seed in 1..=40 {
+        let g = with_seed(seed);
+        for b in BodyId::ALL {
+            let card = g.tables.body(b);
+            let mut holding = 0;
+            for slot in 0..card.colony_slots() {
+                let f = g.slot_yields(b, slot).fissionables;
+                let name = &card.slots[slot as usize].name;
+                if f > 0.0 {
+                    holding += 1;
+                    let base = card.fissionables_yield;
+                    assert!(f >= base * (1.0 - spread) - 0.005 && f <= base * (1.0 + spread) + 0.005, "{b:?} {name}: {f} against {base}");
+                }
+                match b {
+                    BodyId::Mars => assert_eq!(f > 0.0, name != "Hellas Planitia", "seed {seed}, {name}: {f}"),
+                    BodyId::Phobos | BodyId::Deimos | BodyId::Mercury | BodyId::Ceres | BodyId::Vesta => assert!(f > 0.0, "seed {seed}, {b:?} {name}"),
+                    BodyId::Earth | BodyId::Venus => assert_eq!(f, 0.0, "seed {seed}, {b:?} {name}"),
+                    BodyId::Moon => {}
+                }
+            }
+            if b == BodyId::Moon {
+                assert!((2..=3).contains(&holding), "seed {seed}: {holding} Moon sites");
+                moon_counts.insert(holding);
+            }
+        }
+    }
+    assert_eq!(moon_counts.into_iter().collect::<Vec<_>>(), vec![2, 3], "both two and three come up");
+}
+
+/// Ticket #628: the draw takes nothing from the game's own dice, so a seed's other yields and every
+/// roll after are the ones the version before drew. Pinned against 0.1.0.5 (seed 7, Mars's first
+/// slot, read before the resource existed).
+#[test]
+fn ticket_628_the_draw_leaves_the_games_dice_alone() {
+    let g = fresh();
+    let y = g.slot_yields(BodyId::Mars, 0);
+    assert_eq!((y.mine, y.generator, y.refinery, y.research), (1.01, 0.87, 1.6, 1.44));
+    assert_eq!(g.slot_yields(BodyId::Vesta, 5).mine, 1.93, "the last slot drawn");
+    assert_eq!(g.deck.cards[..4], [Card::Event(EventId::SolarStorm), Card::Event(EventId::SalvageRights), Card::Event(EventId::TheHardWinter), Card::Event(EventId::OrbitalDebris)], "the deck, shuffled before the slots");
+    // And the game's own dice stand where 0.1.0.5 left them after the start: the next roll, read from
+    // that version's code.
+    use rand::Rng;
+    assert_eq!(g.rng.clone().random::<u64>(), 16944384647078824630, "the game's next roll");
+}
+
+/// Ticket #628: the Mine makes Fissionables beside its Materials (the designer: "we're using the
+/// existing mine"), 1 a turn times the slot's figure, times the Faction's output and the Mine's Techs
+/// (the designer: "the techs will effect fisionables but not the card"). A station's Mine makes none.
+#[test]
+fn ticket_628_a_mine_makes_fissionables_beside_its_materials() {
+    let mut g = game();
+    let c = colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Mine], 2);
+    let slot = g.colony(c).unwrap().slot;
+    let y = g.slot_yields(BodyId::Mars, slot);
+    assert_eq!(y.fissionables, 0.8, "the test pins the slot to Mars's own figure");
+    let mine = g.module_yield_at(Seat(0), c, 0);
+    assert_eq!((mine.resource, mine.fissionables), (Some(Resource::Materials), 0.8));
+    // The Colony's Output row reads it, named for the Mine (the first picture showed the row without it).
+    assert_eq!(g.place_output(Place::Colony(c)).map(|o| o.fissionables), Some(0.8));
+    assert!(g.place_output_sources(Place::Colony(c)).unwrap().iter().any(|(r, n, v)| *r == Resource::Fissionables && n == "Mine" && *v == 0.8));
+    g.seats[0].stockpile.fissionables = 0.0;
+    let before = income_of(&mut g, Seat(0));
+    assert_eq!(before.fissionables, 0.8);
+    assert_eq!(g.seat(Seat(0)).stockpile.fissionables, 0.8, "banked");
+    // Deep Mining, x1.25 since this ticket: 0.8 x 1.25 = 1.0; the Materials lifted with it.
+    with_tech(&mut g, TechId::DeepMining);
+    assert_eq!(g.tables.tech(TechId::DeepMining).value, 1.25);
+    let lifted = income_of(&mut g, Seat(0));
+    assert_eq!(lifted.fissionables, 1.0);
+    assert!(lifted.materials > before.materials);
+    // A Discovery (Rich Seam, the Deep Core Survey) lifts the Materials alone.
+    g.discoveries.push(Discovery { body: BodyId::Mars, kind: ModuleKind::Mine, multiplier: 2.0, turns_left: 2 });
+    let seam = income_of(&mut g, Seat(0));
+    assert_eq!(seam.fissionables, 1.0, "no card lifts the Fissionables");
+    assert!(seam.materials > lifted.materials);
+    // A Mine on a station over Mars makes Materials at the Body's yield and no Fissionables.
+    let st = colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Mine], 2);
+    g.colony_mut(st).unwrap().in_orbit = true;
+    assert_eq!(g.module_yield_at(Seat(0), st, 0).fissionables, 0.0);
+    // A Moon slot without them makes none.
+    let moon = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Mine], 2);
+    let ms = g.colony(moon).unwrap().slot;
+    let bare = SlotYields { fissionables: 0.0, ..g.slot_yields(BodyId::Moon, ms) };
+    g.slot_yields.insert((BodyId::Moon, ms), bare);
+    assert_eq!(g.module_yield_at(Seat(0), moon, 0).fissionables, 0.0);
+}
+
+/// Ticket #628, from the review: the designer named three things that lift a Mine's Fissionables --
+/// its site, the Faction's output, the Mine's Techs -- and Production Moved is none of them. The
+/// Custodians' idle Earth Mine doubles a Mars Mine's Materials (x2.08) and leaves its Fissionables.
+#[test]
+fn ticket_628_production_moved_doubles_the_materials_alone() {
+    let mut g = game();
+    assert_eq!(g.kind(Seat(0)), FactionKind::Custodians, "the premise: the Production Moved seat");
+    let c = colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Mine], 2);
+    let plain = g.module_yield_at(Seat(0), c, 0);
+    let mut idle = facility(FacilityKind::Mine);
+    idle.mothballed = true;
+    g.state_mut(StateId::EastAsia).facilities.push(idle);
+    let doubled = g.module_yield_at(Seat(0), c, 0);
+    assert!(doubled.doubled_factor > 1.0 && doubled.amount > plain.amount, "the premise: the Mine is doubled");
+    assert_eq!((plain.fissionables, doubled.fissionables), (0.8, 0.8));
+    // Nor a Mass Driver beside it, which adds to the Materials alone (the review: nothing pinned it).
+    g.colony_mut(c).unwrap().modules.push(Module::new(ModuleKind::MassDriver));
+    let driven = g.module_yield_at(Seat(0), c, 0);
+    assert!(driven.amount > doubled.amount, "the premise: the Mass Driver adds");
+    assert_eq!(driven.fissionables, 0.8);
+}
+
+/// Ticket #628, at the designer's word: Rich Seam x1.5, x2 with Deep Mining (x2 and x3 before); the
+/// Ice Deposit and the Helium-3 Vein keep the shared figures.
+#[test]
+fn ticket_628_rich_seam_is_one_and_a_half_and_two_with_deep_mining() {
+    let mut g = game();
+    colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Mine], 2);
+    drawn(&mut g, EventId::RichSeam, EventTarget::Body(BodyId::Mars));
+    g.apply_event_now();
+    assert_eq!(g.discoveries.last().map(|d| (d.kind, d.multiplier)), Some((ModuleKind::Mine, 1.5)));
+    with_tech(&mut g, TechId::DeepMining);
+    drawn(&mut g, EventId::RichSeam, EventTarget::Body(BodyId::Mars));
+    g.apply_event_now();
+    assert_eq!(g.discoveries.last().map(|d| d.multiplier), Some(2.0));
+    assert_eq!((g.tables.events.discovery_multiplier, g.tables.events.discovery_multiplier_with_tech), (2.0, 3.0), "the other two cards' figures");
+    assert!(g.tables.tech(TechId::DeepMining).effect.contains("x1.25"), "{}", g.tables.tech(TechId::DeepMining).effect);
+    assert!(g.tables.event(EventId::RichSeam).effect.contains("x1.5"), "{}", g.tables.event(EventId::RichSeam).effect);
+}
+
+/// Ticket #628: Fissionables are bought, sold and traded like Fuel, their band's midpoint 8 Ducats.
+#[test]
+fn ticket_628_fissionables_are_bought_and_sold() {
+    let mut g = game();
+    assert_eq!(Game::market_row(Resource::Fissionables), Some(3));
+    assert_eq!(g.trade_price(Resource::Fissionables), Some(8));
+    g.seats[0].stockpile.ducats = 100.0;
+    g.seats[0].stockpile.fissionables = 0.0;
+    let buy = Order::Buy { resource: Resource::Fissionables, amount: 2 };
+    g.check_order(Seat(0), &[], &buy).expect("buyable");
+    let left = g.remaining(Seat(0), std::slice::from_ref(&buy)).0;
+    assert_eq!(left.fissionables, 2.0);
+    assert!(left.ducats < 100.0);
+    g.seats[0].stockpile.fissionables = 5.0;
+    let sell = Order::Sell { resource: Resource::Fissionables, amount: 2 };
+    g.check_order(Seat(0), &[], &sell).expect("sellable");
+    let left = g.remaining(Seat(0), std::slice::from_ref(&sell)).0;
+    assert_eq!(left.fissionables, 3.0);
+    assert!(left.ducats > 100.0);
+    assert!(g.market_line(Seat(0)).contains("Fissionables"), "{}", g.market_line(Seat(0)));
 }

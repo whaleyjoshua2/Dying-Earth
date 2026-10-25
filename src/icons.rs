@@ -31,9 +31,11 @@ pub struct Credit {
 
 /// The icons in use, their authors, and the names they carry at game-icons.net. Anything added to
 /// `assets/icons/` belongs here too: the credit is the licence's price, not a courtesy.
-pub const CREDITS: [Credit; 44] = [
+pub const CREDITS: [Credit; 45] = [
     Credit { resource: "Materials", icon: "Mine Wagon", author: "Delapouite" },
     Credit { resource: "Fuel", icon: "Jerrycan", author: "Delapouite" },
+    // Ticket #628 (version 0.1.0.6): the seventh resource, off the designer's sheet at 1A.
+    Credit { resource: "Fissionables", icon: "Radioactive", author: "Lorc" },
     Credit { resource: "Energy", icon: "Electric", author: "Sbed" },
     Credit { resource: "Research", icon: "Microscope", author: "Lord Berandas" },
     Credit { resource: "Ducats", icon: "Banknote", author: "Delapouite" },
@@ -386,10 +388,16 @@ impl Icons {
 /// Research figure's light cyan and Influence's lavender and is well clear of the Materials' grey
 /// it stands beside on the bar, which is the pair it must never be mistaken for: the two are the
 /// two halves of every build's price.
-const FIGURES: [(&str, [u8; 3]); 10] = [
+///
+/// Ticket #628 (version 0.1.0.6): an eleventh, **fissionables**, a lime, the designer's 1A off a
+/// sheet of six glyphs in four colours. Measured in CIELAB it is 48.6 from Energy and 49.9 from
+/// Ducats, its nearest, and 79 or more from every Faction's colour: the worst pair on the board is
+/// still Materials against Research at 25.
+const FIGURES: [(&str, [u8; 3]); 11] = [
     ("materials", [168, 176, 186]),
     ("widgets", [108, 148, 232]),
     ("fuel", [226, 88, 62]),
+    ("fissionables", [140, 235, 60]),
     ("energy", [245, 222, 92]),
     ("research", [118, 206, 232]),
     ("ducats", [120, 214, 150]),

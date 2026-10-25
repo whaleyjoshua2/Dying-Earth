@@ -179,8 +179,10 @@ branch = "Extraction"
 rung = 1
 cost = 18
 needs = []
-effect = "Mine output x1.5, on Earth and off it; Rich Seam gives x3"
-value = 1.5
+# Ticket #628 (version 0.1.0.6), at the designer's word: x1.25, from x1.5, and it lifts a Mine's
+# Fissionables as it lifts its Materials; Rich Seam x2 with it, from x3.
+effect = "Mine output x1.25, Fissionables too, on Earth and off it; Rich Seam gives x2"
+value = 1.25
 
 [[tech]]
 id = "automated_refining"

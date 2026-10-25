@@ -425,7 +425,11 @@ impl SavedGame {
 
     /// The saved state against the tables on disk.
     pub fn into_game(self, tables: Arc<Tables>) -> Game {
-        Game {
+        // Ticket #628 (version 0.1.0.6): a save from before Fissionables holds none in any slot; the
+        // load draws the sites its seed would have drawn, on their own dice, so the game's own dice
+        // are untouched and a fresh game of the same seed agrees with it.
+        let before_fissionables = !self.slot_yields.values().any(|y| y.fissionables > 0.0);
+        let mut game = Game {
             tables,
             seed: self.seed,
             rng: self.rng,
@@ -474,7 +478,11 @@ impl SavedGame {
             log: self.log,
             reveal_all: false,
             waiting_last: Vec::new(),
+        };
+        if before_fissionables {
+            game.draw_fissionables();
         }
+        game
     }
 }
 

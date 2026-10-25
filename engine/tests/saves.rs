@@ -217,6 +217,48 @@ fn a_save_without_this_versions_fields_still_loads() {
     assert_eq!(loaded.turn, game.turn);
 }
 
+/// Ticket #628 (version 0.1.0.6): a 0.1.0.5 save holds no Fissionables -- none in a Stockpile, none
+/// in a slot's yields -- and a market of three rows, where this build has four. It loads, the fourth
+/// row at nought, and the load draws the sites the seed would have drawn, on their own dice.
+#[test]
+fn a_save_from_before_fissionables_loads_and_draws_its_sites() {
+    let dir = TempDir::new("before-fissionables");
+    let game = played_to(5, 4);
+    let text = save::to_text(&game, SaveKind::Manual).unwrap();
+    let key = "fissionables:";
+    let mut older = String::new();
+    for line in text.lines() {
+        if !line.trim_start().starts_with(key) {
+            older.push_str(line);
+            older.push('\n');
+        }
+    }
+    assert!(older.len() < text.len() && !older.contains(key), "every Fissionables line was in the save and is cut");
+    // The market's rows, four to three: the last entry of each of its five arrays dropped.
+    let m = older.find("market:").expect("the market is saved");
+    let end = m + older[m..].find("\n  ),").expect("the market's close");
+    let mut market = older[m..end].to_string();
+    for field in ["price", "net", "card_price", "card_price_until", "card_price_by"] {
+        // Each is written on one line, `    price: (4, 2, 2, 8),`: its last entry goes.
+        let open = market.find(&format!("    {field}: (")).unwrap_or_else(|| panic!("{field} in {market}"));
+        let close = open + market[open..].find("),").expect("the line's close");
+        assert_eq!(market[open..close].matches(", ").count(), 3, "four rows: {}", &market[open..close]);
+        let cut = open + market[open..close].rfind(", ").expect("a last entry");
+        market = format!("{}{}", &market[..cut], &market[close..]);
+    }
+    older = format!("{}{}{}", &older[..m], market, &older[end..]);
+    let path = dir.path().join("save-5-turn-4-before-fissionables.ron");
+    std::fs::write(&path, &older).unwrap();
+    let loaded = save::load_from(&path, tables()).expect("a save from before Fissionables loads");
+    assert_eq!(loaded.market.price[3], 0, "the fourth row opens at its card figure");
+    assert_eq!(loaded.trade_price(Resource::Fissionables), Some(8));
+    assert!(Seat::ALL.iter().all(|s| loaded.seat(*s).stockpile.fissionables == 0.0));
+    for (k, y) in &game.slot_yields {
+        assert_eq!(loaded.slot_yields[k].fissionables, y.fissionables, "{k:?}: the seed's own sites");
+    }
+    assert!(loaded.slot_yields.values().any(|y| y.fissionables > 0.0));
+}
+
 /// (d) The autosave cadence and the rotation: turns 3, 6, 9 and 12 each write one, and only the
 /// last three of a game's autosaves are kept.
 #[test]

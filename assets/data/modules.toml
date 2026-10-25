@@ -15,6 +15,10 @@ materials = 22
 widgets = 5
 energy_upkeep = 3
 produces = { resource = "materials", amount = 4 }
+# Ticket #628 (version 0.1.0.6), at the designer's word: and one Fissionable a turn beside the Materials,
+# times its site's Fissionables figure (bodies.toml), the Faction's output and the Mine's Techs; no
+# Discovery and no Mass Driver reach it. A site without them, and a station, makes none.
+fissionables = 1.0
 # Version 0.04 (ticket #44): on Earth (Antarctica) a Module emits as its counterpart Facility does.
 # Ticket #604 (version 0.1.0.4), at the designer's word: 0.85, the Region Mine's, where it was 1.0.
 earth_emissions = 0.85

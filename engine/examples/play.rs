@@ -109,7 +109,14 @@ fn pick_named<T: Copy + std::fmt::Debug>(list: &[T], word: &str, name: impl Fn(T
     }
 }
 
-const RESOURCES: [Resource; 5] = [Resource::Materials, Resource::Fuel, Resource::Energy, Resource::Research, Resource::Ducats];
+// Ticket #628 (version 0.1.0.6): and Fissionables, bought, sold and traded.
+const RESOURCES: [Resource; 6] = [Resource::Materials, Resource::Fuel, Resource::Energy, Resource::Research, Resource::Ducats, Resource::Fissionables];
+
+/// Ticket #628, from the review: a resource by name, a lone `f` still the Fuel it meant before
+/// Fissionables shared its letter.
+fn resource(word: &str) -> Result<Resource, String> {
+    if norm(word) == "f" { Ok(Resource::Fuel) } else { pick(&RESOURCES, word) }
+}
 // Ticket #278 (version 0.08.5) and ticket #297 (version 0.08.6): a Blockade is a STANCE a Ship
 // stack is given, and Dig In is an Army's. The driver offered neither, so seat 0 could not give a
 // Blockade at all -- the very move ticket #335 handed the player an orbit to give it from.
@@ -539,8 +546,8 @@ const GRAMMAR: &str = r#"ORDER LINES (one per line; `#` starts a comment; blank 
   max <place>                          repeat next turn's WHOLE Allotment on one place you hold,
   max off                              turn after turn until it is switched off. Free, and it
                                        spends nothing by itself.
-  buy <resource> <amount>              materials|fuel|energy
-  sell <resource> <amount>             materials|fuel
+  buy <resource> <amount>              materials|fuel|energy|fissionables
+  sell <resource> <amount>             materials|fuel|fissionables
 
 CAMPAIGNS AND CARBON CREDITS -- the Blame ledger the Influence thresholds read (`show` prints it)
 
@@ -583,7 +590,7 @@ DIPLOMACY (`show` prints Relations both ways and every Accord standing)
                                        warns of that turn ("ends after this turn"). Let it run out
                                        while they would have renewed, and they count it a refusal:
                                        no offer from them for {refusedturns}.
-  trade <faction> <give> for <ask>     one thing for one thing: `<n> ducats|materials|fuel|energy`
+  trade <faction> <give> for <ask>     one thing for one thing: `<n> ducats|materials|fuel|energy|fissionables`
                                        or a Colony; answered at the head of their next turn, the
                                        goods moving only if both still hold them.
   trade accept|refuse <faction>        answer a Trade a Faction offered you.
@@ -896,8 +903,8 @@ fn parse_line(g: &Game, line: &str) -> Result<Line, String> {
             if counter {
                 let amount = |words: &[&str]| -> Result<(Resource, u32), String> {
                     match words {
-                        [n, r] => Ok((pick(&[Resource::Ducats, Resource::Materials, Resource::Fuel, Resource::Energy], r)?, count(n)?)),
-                        _ => Err("each side of a counter is `<n> <ducats|materials|fuel|energy>`".into()),
+                        [n, r] => Ok((pick(&[Resource::Ducats, Resource::Materials, Resource::Fuel, Resource::Energy, Resource::Fissionables], r)?, count(n)?)),
+                        _ => Err("each side of a counter is `<n> <ducats|materials|fuel|energy|fissionables>`".into()),
                     }
                 };
                 return Ok(Line::Counter(to, amount(&rest[..split])?, amount(&rest[split + 1..])?));
@@ -905,11 +912,11 @@ fn parse_line(g: &Game, line: &str) -> Result<Line, String> {
             let good = |words: &[&str]| -> Result<dying_earth_engine::TradeGood, String> {
                 match words {
                     [n, r] => {
-                        let r = pick(&[Resource::Ducats, Resource::Materials, Resource::Fuel, Resource::Energy], r)?;
+                        let r = pick(&[Resource::Ducats, Resource::Materials, Resource::Fuel, Resource::Energy, Resource::Fissionables], r)?;
                         Ok(dying_earth_engine::TradeGood::Goods(r, count(n)?))
                     }
                     [c] => Ok(dying_earth_engine::TradeGood::Place(colony_id(g, c)?)),
-                    _ => Err("each side is `<n> <ducats|materials|fuel|energy>` or a Colony".into()),
+                    _ => Err("each side is `<n> <ducats|materials|fuel|energy|fissionables>` or a Colony".into()),
                 }
             };
             Order::ProposeTrade { to, give: good(&rest[..split])?, get: good(&rest[split + 1..])? }
@@ -924,8 +931,8 @@ fn parse_line(g: &Game, line: &str) -> Result<Line, String> {
             };
             Order::Tribute { to, materials }
         }
-        "buy" => Order::Buy { resource: pick(&RESOURCES, at(1)?)?, amount: number(at(2)?)? },
-        "sell" => Order::Sell { resource: pick(&RESOURCES, at(1)?)?, amount: number(at(2)?)? },
+        "buy" => Order::Buy { resource: resource(at(1)?)?, amount: number(at(2)?)? },
+        "sell" => Order::Sell { resource: resource(at(1)?)?, amount: number(at(2)?)? },
         "relief" => Order::Relief { state: pick_state(at(1)?)? },
         // Ticket #269 (version 0.08.4): Relief's mirror, on a Region a rival holds.
         "agitate" => Order::Agitate { state: pick_state(at(1)?)? },
@@ -1457,16 +1464,18 @@ fn print_board(g: &Game) {
     let s = g.seat(me);
     println!("\n--- YOU: seat 0, the {} ---", g.seat_name(me));
     println!(
-        "Stockpile: {} Materials, {} Fuel, {} Energy, {} Ducats",
-        figure(s.stockpile.materials), figure(s.stockpile.fuel), figure(s.stockpile.energy), figure(s.stockpile.ducats)
+        "Stockpile: {} Materials, {} Fuel, {} Energy, {} Ducats, {} Fissionables",
+        figure(s.stockpile.materials), figure(s.stockpile.fuel), figure(s.stockpile.energy), figure(s.stockpile.ducats), figure(s.stockpile.fissionables)
     );
     // Ticket #404 (version 0.09.4): the Market every turn, a card's price named with the card.
     println!("{}", g.market_line(me));
     println!(
-        "Last income: {}M {}F {}E {}D",
-        figure(s.income_last_turn.materials), figure(s.income_last_turn.fuel), figure(s.income_last_turn.energy), figure(s.income_last_turn.ducats)
+        "Last income: {}M {}F {}E {}D {}Fi",
+        figure(s.income_last_turn.materials), figure(s.income_last_turn.fuel), figure(s.income_last_turn.energy), figure(s.income_last_turn.ducats), figure(s.income_last_turn.fissionables)
     );
-    let sources: Vec<String> = s.income_sources.iter().map(|(what, r, n)| format!("{what} {}{}", signed(*n), &r.name()[..1])).collect();
+    // Ticket #628 (version 0.1.0.6): Fissionables as "Fi", since "F" is the Fuel's.
+    let short = |r: Resource| if r == Resource::Fissionables { "Fi" } else { &r.name()[..1] };
+    let sources: Vec<String> = s.income_sources.iter().map(|(what, r, n)| format!("{what} {}{}", signed(*n), short(*r))).collect();
     if !sources.is_empty() {
         println!("  from: {}", sources.join(", "));
     }

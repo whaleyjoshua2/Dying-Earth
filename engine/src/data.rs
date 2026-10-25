@@ -35,6 +35,10 @@ pub struct SlotCard {
     pub name: String,
     pub lon: f32,
     pub lat: f32,
+    /// Ticket #628 (version 0.1.0.6): a site of a Body that has Fissionables where they are not --
+    /// Hellas Planitia, the one Mars site without them.
+    #[serde(default)]
+    pub no_fissionables: bool,
 }
 
 /// Ticket #485 (version 0.09.8): a leg's Fuel -- its delta-v in km/s times the scale, to a tenth,
@@ -114,6 +118,14 @@ pub struct BodyCard {
     /// Ticket #140 (version 0.07.3): the fourth yield is Research, multiplying an Observatory; it
     /// was the Habitat yield, which multiplied a Habitat's room, until the designer traded it.
     pub research_yield: f64,
+    /// Ticket #628 (version 0.1.0.6): the fifth yield, Fissionables, which a Mine makes beside its
+    /// Materials on the ground; nought on Earth and Venus.
+    #[serde(default)]
+    pub fissionables_yield: f64,
+    /// Ticket #628: where only some sites hold them (the Moon), how many do, fewest and most, drawn
+    /// with the game. None: every site but one marked `no_fissionables`.
+    #[serde(default)]
+    pub fissionables_sites: Option<[u32; 2]>,
     /// Ticket #345 (version 0.09.1): the Influence the Faction that founds this Body's FIRST ground
     /// Colony is paid, once, in the Income after the landing. No `#[serde(default)]` on purpose: a
     /// Body row that has not been given a figure is a rule this build cannot price, and the load
@@ -334,6 +346,10 @@ pub struct ModuleCard {
     pub widgets: u32,
     pub energy_upkeep: i64,
     pub produces: Option<Produces>,
+    /// Ticket #628 (version 0.1.0.6): the Fissionables a turn it makes beside its own output, before
+    /// its site's figure -- the Mine's one; nought for every other Module.
+    #[serde(default)]
+    pub fissionables: f64,
     /// Ticket #280 (version 0.08.5): what the Module does, in a sentence, where it is not a
     /// resource or beside one.
     #[serde(default)]
@@ -671,6 +687,10 @@ pub struct EventsTable {
     pub breakthrough_research_public_science: i64,
     pub discovery_multiplier: f64,
     pub discovery_multiplier_with_tech: f64,
+    /// Ticket #628 (version 0.1.0.6): Rich Seam's own figures, x1.5 and x2 with Deep Mining, where it
+    /// read the two above with the Ice Deposit and the Helium-3 Vein.
+    pub rich_seam_multiplier: f64,
+    pub rich_seam_multiplier_with_tech: f64,
     pub discovery_turns: u32,
     pub heatwave_loss: f64,
     pub heatwave_loss_green_consensus: f64,
@@ -1044,6 +1064,8 @@ pub struct DucatsCard {
     pub per_materials: i64,
     pub per_fuel: i64,
     pub per_energy: i64,
+    /// Ticket #628 (version 0.1.0.6): the fourth row of the market.
+    pub per_fissionables: i64,
     pub sell_divisor: i64,
     pub per_building_material: i64,
     pub bank_per_gdp_tenth: f64,
@@ -2992,6 +3014,7 @@ impl Tables {
             fuel: self.start.fuel as f64,
             energy: self.start.energy as f64,
             ducats: f.start_ducats.unwrap_or(self.start.ducats) as f64,
+            fissionables: 0.0,
         }
     }
     /// Ticket #350 (version 0.09.1): the Faction's Victory Condition in one clause, its figures
