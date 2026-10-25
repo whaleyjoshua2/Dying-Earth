@@ -1314,6 +1314,10 @@ pub struct WarCounters {
     pub homes_lost: [u32; SEAT_COUNT],
     #[serde(default)]
     pub homes_taken: [u32; SEAT_COUNT],
+    /// Ticket #620 (version 0.1.0.5): turns on which a seat weighed its orders against the Collapse
+    /// (the Collapse on the heading before its own win), by seat.
+    #[serde(default)]
+    pub collapse_weighed: [u32; SEAT_COUNT],
     /// Ticket #300 (version 0.08.6): Armies landed from a Carrier at a Colony, by seat. Never
     /// counted before; the reviews measured no Army carried by anybody in eighty games.
     #[serde(default)]
@@ -1423,6 +1427,7 @@ impl WarCounters {
             self.contests[i] += o.contests[i];
             self.homes_lost[i] += o.homes_lost[i];
             self.homes_taken[i] += o.homes_taken[i];
+            self.collapse_weighed[i] += o.collapse_weighed[i];
             self.armies_landed[i] += o.armies_landed[i];
             self.interceptions[i] += o.interceptions[i];
             self.batteries_lost[i] += o.batteries_lost[i];

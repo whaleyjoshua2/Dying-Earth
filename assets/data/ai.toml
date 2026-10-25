@@ -575,6 +575,18 @@ contest_from = 0.5
 defend_from = 0.5
 defend_home_from = 0.25
 home_floor = 20
+# Ticket #620 (version 0.1.0.5), at the designer's word: every computer seat weighs the Collapse it
+# drives toward. While the Collapse on the climate's heading falls at or before the seat's own win
+# turn (this turn plus the rest of its first bar at the rate it has made it so far), an emitting order
+# -- a Strip Permit, an Industry Level, a Facility whose card carries Emissions -- weighs
+# `collapse_emit_weight`, and a cleaner one -- a Wind Farm, a Scrubber, a Nature Reserve, a Leapfrog
+# -- `collapse_clean_weight`; within `win_in_sight` turns of the bar the race is run for the line and
+# the weighing is off. A Stabilization run is no race against the Collapse: its win is the cure.
+# Measured before: the computer read no Collapse at all. The designer: "A rational Prospector loses
+# too if the world collapses. They just need to achieve victory before collapse."
+collapse_emit_weight = 0.5
+collapse_clean_weight = 1.5
+win_in_sight = 3
 # Ticket #336 (version 0.09.0): what a rival's Colony is worth on the same list, read as this price
 # divided by the price the seat would actually pay for it -- CHEAPEST FIRST, where the rule from
 # ticket #50 ranked by fewest Colonists and never read the threshold at all. Without this the

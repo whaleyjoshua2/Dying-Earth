@@ -1260,6 +1260,57 @@ impl Game {
         (self.tables.ai.thresholds.home_floor - self.seat(seat).influence.get(&Place::State(home)).copied().unwrap_or(0)).max(0)
     }
 
+    /// Ticket #620 (version 0.1.0.5), at the designer's word: **the turn this seat wins at the rate it
+    /// has made its first Victory part so far** -- this turn plus the rest of the bar over that rate.
+    /// None with nothing made yet, and None for a Stabilization run, which is no race against the
+    /// Collapse: its win is the cure.
+    pub fn ai_win_turn(&self, seat: Seat) -> Option<u32> {
+        if self.first_kind(seat) == VictoryFirstKind::StabilizationRun || self.turn == 0 {
+            return None;
+        }
+        let p = self.progress(seat);
+        if p.first_value <= 0.0 {
+            return None;
+        }
+        let rate = p.first_value / self.turn as f64;
+        Some(self.turn + ((p.first_bar - p.first_value).max(0.0) / rate).ceil() as u32)
+    }
+
+    /// Ticket #620: **whether the Collapse on the climate's heading falls at or before this seat's
+    /// win turn** -- the race it would lose by emitting on. No Collapse on the heading, or no win
+    /// turn, is no race; a win within `win_in_sight` turns is run for the line.
+    pub fn ai_loses_the_race(&self, seat: Seat) -> bool {
+        let Some(collapse) = self.projection().collapse_turn else { return false };
+        let Some(win) = self.ai_win_turn(seat) else { return false };
+        if win.saturating_sub(self.turn) <= self.tables.ai.thresholds.win_in_sight {
+            return false;
+        }
+        collapse <= win
+    }
+
+    /// Ticket #620: **the weight an order takes while the race is lost**: `collapse_emit_weight` on
+    /// an emitting one (a Strip Permit, an Industry Level, a Facility whose card carries Emissions),
+    /// `collapse_clean_weight` on a cleaner one (a Facility with a sink, the Wind Farm, a Leapfrog),
+    /// 1 on the rest.
+    pub fn ai_collapse_weight(&self, o: &Order) -> f64 {
+        let th = &self.tables.ai.thresholds;
+        match o {
+            Order::StripPermit { .. } | Order::RaiseIndustry { .. } => th.collapse_emit_weight,
+            Order::Leapfrog { .. } => th.collapse_clean_weight,
+            Order::BuildFacility { kind, .. } => {
+                let card = self.tables.facility(*kind);
+                if card.emissions > 0.0 {
+                    th.collapse_emit_weight
+                } else if card.sink_per_turn > 0.0 || *kind == FacilityKind::WindFarm {
+                    th.collapse_clean_weight
+                } else {
+                    1.0
+                }
+            }
+            _ => 1.0,
+        }
+    }
+
     /// Ticket #619: the Influence a held Region wants this turn -- enough to put the wall (the
     /// greater of the threshold and the seat's Standing plus the climber's margin) back above the
     /// climber's Standing plus their Allotment, and at home the floor's top-up, whichever is more;
@@ -4075,6 +4126,18 @@ impl Game {
                 c.pace = (soonest as f64 / *turns as f64).clamp(m.build_pace_floor, 1.0);
                 c.note.push_str(&format!(" ({turns} turn{} here)", if *turns == 1 { "" } else { "s" }));
             }
+        }
+
+        // Ticket #620 (version 0.1.0.5): while the Collapse falls before the seat's own win, what
+        // emits weighs less and what cleans weighs more, across the whole list.
+        if self.ai_loses_the_race(seat) {
+            for c in cands.iter_mut() {
+                if let Some(first) = c.orders.first() {
+                    c.base *= self.ai_collapse_weight(first);
+                }
+            }
+            self.log(format!("AI {}: the Collapse falls before the win; emitting x{}, cleaner x{}", self.seat_name(seat), th.collapse_emit_weight, th.collapse_clean_weight));
+            self.war.collapse_weighed[seat.index()] += 1;
         }
 
         // --- Sort and spend greedily; Stances last, one per stack.

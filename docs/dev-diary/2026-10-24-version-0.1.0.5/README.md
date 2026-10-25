@@ -352,3 +352,21 @@ turn's gain, which no record keeps, and the question the designer said yes to si
 rival's Allotment; the spec says so now, and that the doubling is on the list's weight. The
 top-rival line and the lift were pulled into helpers shared with the contest. The fixed build was
 re-swept and came out identical to the figure, so the duplicate file was not kept.
+
+## The computer weighs the Collapse against its own win
+
+Ticket [#620](https://github.com/whaleyjoshua2/Dying-Earth/issues/620), spec §17.
+
+Five questions, answered *"q1 yes q2 a q3 a q4 yes q5 yes"*. The test was written first (no
+Collapse on turn one's heading, the win turn from a fund of 1,000 at turn 10, the air at a
+Collapse's worth of CO2 and the race lost, the weight of each order kind, a win in sight, the
+Custodians never) and watched red on the six missing names; the build passed it first time. The
+first sweep could not say whether the rule fired, so a counter of turns weighed went into the War
+block and the sweep, and the sweep was run again (the counter changes no decision; the wins came out
+the same).
+
+- **The sweep** ([`sweeps/ticket-620.txt`](sweeps/ticket-620.txt)): **17 / 58 / 2 / 2 and 1**,
+  from 19 / 58 / 2 / 1 and 0, the Temperatures a hair cooler: noise. The rule fires on about a
+  fifth of the Prospectors' turns in the two hot seatings and almost never in the cool fourth,
+  since the sweep's worlds seldom head for a Collapse. It bites in a game like the designer's G3.
+  Reported and left.

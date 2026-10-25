@@ -25902,3 +25902,58 @@ fn ticket_619_a_computer_seat_defends_a_held_region_and_keeps_a_floor_at_home() 
     assert_eq!((g.war.homes_lost[holder.index()], g.war.homes_taken[0]), (1, 1));
     assert_eq!(g.war.homes_lost[0], 0);
 }
+
+// Ticket #620 (version 0.1.0.5), at the designer's word: **a computer seat weighs the Collapse it
+// drives toward.** The Collapse turn on the climate's heading, against the seat's own win turn read
+// off its progress so far; while the Collapse falls at or before the win, emitting orders weigh
+// `collapse_emit_weight` and cleaner ones `collapse_clean_weight`; within `win_in_sight` turns of
+// the bar the weighing is off. Every computer seat reads it. Before this the computer read no Collapse.
+#[test]
+fn ticket_620_a_computer_seat_weighs_collapse_against_its_win() {
+    let mut g = game();
+    calm(&mut g);
+    let th = g.tables.ai.thresholds.clone();
+    assert!((th.collapse_emit_weight - 0.5).abs() < 1e-9 && (th.collapse_clean_weight - 1.5).abs() < 1e-9 && th.win_in_sight == 3, "the designer's figures, in ai.toml");
+    let pro = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Prospectors).expect("the Prospectors sit at the table");
+    let bar = g.tables.faction(FactionKind::Prospectors).victory_first.bar;
+    assert_eq!(g.projection().collapse_turn, None, "the premise: no Collapse on turn one's heading");
+    assert!(!g.ai_loses_the_race(pro), "no Collapse, no race lost");
+    // The win turn: 1,000 of the bar banked by turn 10 is 100 a turn, the rest 40 turns off.
+    g.turn = 10;
+    g.seats[pro.index()].venture_fund = 1000.0;
+    assert_eq!(g.ai_win_turn(pro), Some(10 + ((bar - 1000.0) / 100.0).ceil() as u32));
+    assert!(!g.ai_loses_the_race(pro), "still no Collapse on the heading");
+    // The air at a Collapse's worth of CO2: the heading reaches +3.0 within a few turns, well before
+    // the win, and the race is lost.
+    g.climate.co2 = 2700.0;
+    g.climate.last = EmissionsBreakdown::default();
+    let collapse = g.projection().collapse_turn.expect("a Collapse on this heading");
+    assert!(collapse < g.ai_win_turn(pro).unwrap(), "the Collapse ({collapse}) before the win");
+    assert!(g.ai_loses_the_race(pro));
+    // The weights an order takes while the race is lost: emitting x0.5, cleaner x1.5, the rest x1.
+    let sid = g.seats[pro.index()].home_region.unwrap();
+    let w = |o: Order| g.ai_collapse_weight(&o);
+    assert!((w(Order::StripPermit { state: sid }) - 0.5).abs() < 1e-9, "a Strip Permit");
+    assert!((w(Order::RaiseIndustry { state: sid }) - 0.5).abs() < 1e-9, "an Industry Level");
+    for kind in [FacilityKind::Factory, FacilityKind::Mine, FacilityKind::PowerPlant, FacilityKind::Refinery, FacilityKind::Reactor] {
+        assert!((w(Order::BuildFacility { state: sid, kind }) - 0.5).abs() < 1e-9, "{kind:?} carries Emissions on its card");
+    }
+    for kind in [FacilityKind::WindFarm, FacilityKind::NatureReserve, FacilityKind::Scrubber] {
+        assert!((w(Order::BuildFacility { state: sid, kind }) - 1.5).abs() < 1e-9, "{kind:?} is cleaner");
+    }
+    assert!((w(Order::Leapfrog { state: sid }) - 1.5).abs() < 1e-9, "a Leapfrog");
+    assert!((w(Order::BuildFacility { state: sid, kind: FacilityKind::ResearchLab }) - 1.0).abs() < 1e-9, "a Lab is neither");
+    assert!((w(Order::Influence { target: Place::State(sid), amount: 5, break_accord: false }) - 1.0).abs() < 1e-9, "Influence is neither");
+    // A turn weighed is counted for the sweep.
+    g.ai_orders(pro);
+    assert_eq!(g.war.collapse_weighed[pro.index()], 1);
+    // A win in sight switches it off: 50 short of the bar at 165 a turn is next turn.
+    g.turn = 30;
+    g.seats[pro.index()].venture_fund = bar - 50.0;
+    assert_eq!(g.ai_win_turn(pro), Some(31));
+    assert!(!g.ai_loses_the_race(pro), "the race is won before the world ends");
+    // A Stabilization run is no race against the Collapse: its win is the cure.
+    let cus = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Custodians).unwrap();
+    assert_eq!(g.ai_win_turn(cus), None);
+    assert!(!g.ai_loses_the_race(cus));
+}

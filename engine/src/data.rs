@@ -1634,6 +1634,15 @@ pub struct AiThresholds {
     pub defend_home_from: f64,
     #[serde(default = "home_floor_default")]
     pub home_floor: i64,
+    /// Ticket #620 (version 0.1.0.5): while the Collapse on the climate's heading falls at or
+    /// before the seat's own win turn, an emitting order weighs `collapse_emit_weight` and a cleaner
+    /// one `collapse_clean_weight`; within `win_in_sight` turns of the bar the weighing is off.
+    #[serde(default = "collapse_emit_weight_default")]
+    pub collapse_emit_weight: f64,
+    #[serde(default = "collapse_clean_weight_default")]
+    pub collapse_clean_weight: f64,
+    #[serde(default = "win_in_sight_default")]
+    pub win_in_sight: u32,
     /// Ticket #336 (version 0.09.0): the price a rival's Colony is weighed against on the same
     /// list -- the weight is this over what the seat would pay, so the cheapest place ranks first.
     #[serde(default = "colony_price_pivot_default")]
@@ -3248,6 +3257,18 @@ fn defend_home_from_default() -> f64 {
 
 fn home_floor_default() -> i64 {
     20
+}
+
+fn collapse_emit_weight_default() -> f64 {
+    0.5
+}
+
+fn collapse_clean_weight_default() -> f64 {
+    1.5
+}
+
+fn win_in_sight_default() -> u32 {
+    3
 }
 
 
