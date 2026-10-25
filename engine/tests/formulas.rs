@@ -26477,3 +26477,120 @@ fn ticket_630_the_computer_mothballs_only_the_reactors_it_cannot_feed() {
     g.seats[0].stockpile.fissionables = 5.0;
     assert!(g.ai_may_restart_reactor(Seat(0)));
 }
+
+// ---------------------------------------------------------------- #643 The computer chases Fissionables (version 0.1.0.6)
+
+/// Ticket #643 (version 0.1.0.6), at the designer's word (Q1): a site's Fissionables count toward its
+/// worth to a computer seat, at the Mine yield's weight, once Clean Power or Nuclear Rockets stands;
+/// nothing before, when nothing spends them.
+#[test]
+fn ticket_643_a_sites_fissionables_count_once_something_spends_them() {
+    let mut g = game();
+    let y = SlotYields { mine: 1.0, generator: 1.0, refinery: 1.0, research: 1.0, fissionables: 1.6 };
+    assert_eq!(g.ai_fission_worth(&y), 0.0, "nothing spends them yet");
+    with_tech(&mut g, TechId::NuclearRockets);
+    assert_eq!(g.ai_fission_worth(&y), 1.6);
+    let mut g = game();
+    with_tech(&mut g, TechId::CleanPower);
+    assert_eq!(g.ai_fission_worth(&y), 1.6);
+}
+
+/// Ticket #643 (Q2, Q3): **the reserve a computer seat keeps** -- ten turns of its running Reactors,
+/// each nuclear hull's second tank topped up, and half a Fissionable for each Missile Carrier with no
+/// Warhead; while it holds less, a Mine on a Fissionables site is lifted and the shortfall bought.
+#[test]
+fn ticket_643_the_reserve_is_ten_turns_of_reactors_the_hulls_refills_and_the_warheads() {
+    let mut g = game();
+    calm(&mut g);
+    g.state_mut(StateId::EastAsia).facilities = (0..3).map(|_| facility(FacilityKind::FissionReactor)).collect();
+    with_tech(&mut g, TechId::NuclearRockets);
+    let (hull, _) = colony_ship_ready(&mut g, BodyId::Earth);
+    {
+        let s = g.ship_mut(hull).unwrap();
+        s.nuclear = true;
+        s.fissionables = 1.2;
+    }
+    let carrier = carrier_in(&mut g, Seat(0), BodyId::Mars, None, false);
+    assert!(!g.ship(carrier).unwrap().warhead, "the premise: an empty carrier");
+    // 3 x 0.1 x 10 = 3; the Colony Ship's tank 3.2 less 1.2 = 2; a Warhead 0.5.
+    assert_eq!(g.ai_fission_reserve(Seat(0)), 5.5);
+    let c = colony(&mut g, Seat(0), BodyId::Mars, &[], 4);
+    g.seats[0].stockpile.fissionables = 0.0;
+    assert!(g.ai_fission_mine_lift(Seat(0), c) > 1.0, "short: a Mars Mine is lifted");
+    g.seats[0].stockpile.fissionables = 6.0;
+    assert_eq!(g.ai_fission_mine_lift(Seat(0), c), 1.0, "the reserve held: no lift");
+}
+
+/// Ticket #643 (Q3, Q4): the computer buys the Fissionables its reserve is short, when its Ducats
+/// allow, and sells what it holds beyond twenty turns of its Reactors and two tanks.
+#[test]
+fn ticket_643_the_computer_buys_its_shortfall_and_sells_its_surplus() {
+    let mut g = game();
+    calm(&mut g);
+    g.state_mut(StateId::EastAsia).facilities = (0..3).map(|_| facility(FacilityKind::FissionReactor)).collect();
+    with_tech(&mut g, TechId::CleanPower);
+    g.seats[0].stockpile.fissionables = 0.0;
+    g.seats[0].stockpile.ducats = 1000.0;
+    let orders = g.ai_orders(Seat(0));
+    assert!(orders.iter().any(|o| matches!(o, Order::Buy { resource: Resource::Fissionables, amount } if *amount >= 3)), "buys its three: {orders:?}");
+    let mut g = game();
+    calm(&mut g);
+    g.state_mut(StateId::EastAsia).facilities = vec![facility(FacilityKind::FissionReactor)];
+    with_tech(&mut g, TechId::CleanPower);
+    g.seats[0].stockpile.fissionables = 100.0;
+    let keep = g.ai_fission_keep(Seat(0));
+    let orders = g.ai_orders(Seat(0));
+    assert!(orders.iter().any(|o| matches!(o, Order::Sell { resource: Resource::Fissionables, amount } if *amount as f64 <= 100.0 - keep && *amount > 0)), "sells beyond {keep}: {orders:?}");
+}
+
+/// Ticket #643 (Q5, at the designer's word): Fissionables join the computer's trade goods. A seat
+/// short of its reserve -- never of a fixed figure, which every seat's few Fissionables would be --
+/// asks the shortfall of a Faction it stands well with, giving what it holds long.
+#[test]
+fn ticket_643_the_computer_asks_its_fissionables_shortfall_in_a_trade() {
+    let mut g = game();
+    calm(&mut g);
+    g.state_mut(StateId::EastAsia).facilities = (0..3).map(|_| facility(FacilityKind::FissionReactor)).collect();
+    with_tech(&mut g, TechId::CleanPower);
+    g.seats[0].stockpile.fissionables = 0.0;
+    g.seats[0].stockpile.ducats = 0.0;
+    g.seats[0].stockpile.materials = 2000.0;
+    g.seats[0].stockpile.fuel = 500.0;
+    g.seats[0].stockpile.energy = 500.0;
+    let orders = g.ai_orders(Seat(0));
+    assert!(
+        orders.iter().any(|o| matches!(o, Order::ProposeTrade { get: TradeGood::Goods(Resource::Fissionables, n), .. } if *n == 3)),
+        "asks its three: {orders:?}"
+    );
+}
+
+/// Ticket #643, from the review: the keep covers what the computer means to spend -- the nuclear
+/// hull's build gate (the fill and two tanks more, the largest hull's) once Nuclear Rockets stands,
+/// and every Reactor standing, mothballed or not, so a restart is never sold out from under it.
+#[test]
+fn ticket_643_the_keep_covers_the_nuclear_gate_and_every_reactor_standing() {
+    let mut g = game();
+    with_tech(&mut g, TechId::NuclearRockets);
+    let gate = UnitKind::SHIPS.iter().map(|k| g.fission_tank_of(Seat(0), *k)).fold(0.0, f64::max) * (1.0 + g.tables.ai.thresholds.nuclear_hull_reserve_tanks);
+    assert!(g.ai_fission_keep(Seat(0)) + 1e-9 >= gate, "{} against the gate's {gate}", g.ai_fission_keep(Seat(0)));
+    let mut g = game();
+    g.state_mut(StateId::EastAsia).facilities = (0..3).map(|_| { let mut f = facility(FacilityKind::FissionReactor); f.mothballed = true; f }).collect();
+    assert_eq!(g.ai_fission_keep(Seat(0)), 6.0, "three idle Reactors' twenty turns");
+    assert_eq!(g.ai_fission_reserve(Seat(0)), 0.0, "and none of it bought while they stand idle");
+}
+
+/// Ticket #643, from the review: a computer partner never trades away its own reserve.
+#[test]
+fn ticket_643_a_partner_keeps_its_own_reserve() {
+    let mut g = game();
+    calm(&mut g);
+    let partner = Seat(1);
+    let home = g.directed_states(partner)[0];
+    g.state_mut(home).facilities.extend((0..3).map(|_| facility(FacilityKind::FissionReactor)));
+    g.seats[partner.index()].stockpile.fissionables = 3.5;
+    let give = TradeGood::Goods(Resource::Materials, 500);
+    let get = TradeGood::Goods(Resource::Fissionables, 1);
+    assert!(!g.trade_acceptable_at(partner, Seat(0), give, get, 1.0), "3.5 less 1 is under its reserve of 3");
+    g.seats[partner.index()].stockpile.fissionables = 10.0;
+    assert!(g.trade_acceptable_at(partner, Seat(0), give, get, 1.0));
+}

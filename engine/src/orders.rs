@@ -3595,6 +3595,10 @@ impl Game {
                         self.market.net[row] += amount;
                     }
                     self.seat_mut(seat).bought_units += amount;
+                    // Ticket #643 (version 0.1.0.6): for the sweep.
+                    if *resource == Resource::Fissionables {
+                        self.war.fission_bought[seat.index()] += amount;
+                    }
                     self.log(format!("{} bought {} {} for {} Ducats.", self.seat_name(seat), amount, resource.name(), cost.ducats));
                 }
                 Order::Sell { resource, amount } => {
@@ -3602,6 +3606,9 @@ impl Game {
                         self.market.net[row] -= amount;
                     }
                     self.seat_mut(seat).sold_units += amount;
+                    if *resource == Resource::Fissionables {
+                        self.war.fission_sold[seat.index()] += amount;
+                    }
                     self.log(format!("{} sold {} {} for {} Ducats.", self.seat_name(seat), amount, resource.name(), -cost.ducats));
                 }
             }

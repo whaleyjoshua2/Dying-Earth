@@ -721,14 +721,61 @@ impl Game {
         // Ticket #140 (version 0.07.3): a Habitat holds the same everywhere now, so a slot is worth
         // the same to Presence wherever it is, and the Energy that runs the Habitats decides; the
         // fourth yield is Research, which the science-first Factions read.
-        match behind {
-            Behind::Presence => y.generator,
-            Behind::First => match self.first_kind(seat) {
-                VictoryFirstKind::VentureFund => y.mine + y.refinery,
-                VictoryFirstKind::ColonistsOffEarth => y.generator,
-                VictoryFirstKind::StabilizationRun | VictoryFirstKind::ResearchProduced | VictoryFirstKind::ArchiveResearch => y.generator + y.research,
-            },
-        }
+        // Ticket #643 (version 0.1.0.6), at the designer's word: and the site's Fissionables, once
+        // something spends them, whatever the Victory.
+        let fission = self.ai_fission_worth(&y);
+        fission
+            + match behind {
+                Behind::Presence => y.generator,
+                Behind::First => match self.first_kind(seat) {
+                    VictoryFirstKind::VentureFund => y.mine + y.refinery,
+                    VictoryFirstKind::ColonistsOffEarth => y.generator,
+                    VictoryFirstKind::StabilizationRun | VictoryFirstKind::ResearchProduced | VictoryFirstKind::ArchiveResearch => y.generator + y.research,
+                },
+            }
+    }
+
+    /// Ticket #643 (version 0.1.0.6), at the designer's word (Q1): **what a site's Fissionables add to
+    /// its worth** -- the figure, at the Mine yield's weight, once Clean Power or Nuclear Rockets
+    /// stands; nought before, when nothing spends them.
+    pub fn ai_fission_worth(&self, y: &SlotYields) -> f64 {
+        if self.has_tech(TechId::CleanPower) || self.has_tech(TechId::NuclearRockets) { y.fissionables } else { 0.0 }
+    }
+
+    /// Ticket #643 (Q2, Q3): **the Fissionables a computer seat keeps in hand** -- `reactor_reserve_turns`
+    /// of its running Reactors, each of its nuclear hulls' second tanks topped up, and a Warhead's half
+    /// for each Missile Carrier that has none.
+    pub fn ai_fission_reserve(&self, seat: Seat) -> f64 {
+        let th = &self.tables.ai.thresholds;
+        let upkeep = self.tables.facility(FacilityKind::FissionReactor).fissionables_upkeep;
+        let running = self.ai_reactors(seat).iter().filter(|(_, m)| !*m).count() as f64;
+        let refills: f64 = self.ships.iter().filter(|s| s.seat == seat && s.nuclear).map(|s| (self.fission_tank_of(seat, s.kind) - s.fissionables).max(0.0)).sum();
+        let warheads = self.ships.iter().filter(|s| s.seat == seat && s.kind == UnitKind::MissileCarrier && !s.warhead).count() as f64 * self.tables.nuke.fissionables;
+        tenth(running * upkeep * th.reactor_reserve_turns + refills + warheads)
+    }
+
+    /// Ticket #643 (Q4): **what a computer seat keeps before it sells** -- `fission_keep_turns` of its
+    /// running Reactors and two tanks (a Frigate's, once Nuclear Rockets stands), over its reserve.
+    pub fn ai_fission_keep(&self, seat: Seat) -> f64 {
+        let th = &self.tables.ai.thresholds;
+        let upkeep = self.tables.facility(FacilityKind::FissionReactor).fissionables_upkeep;
+        // From the review: every Reactor standing, mothballed or not, and every one on order, so a
+        // restart or a first Reactor is never sold out from under itself.
+        let standing = self.ai_reactors(seat).len() as f64;
+        let ordered = self.states.iter().flat_map(|s| s.queue.iter()).chain(self.colonies.iter().flat_map(|c| c.queue.iter())).filter(|b| b.seat == seat && matches!(b.item, BuildItem::Facility(FacilityKind::FissionReactor) | BuildItem::Module(ModuleKind::FissionReactor))).count() as f64;
+        // From the review: and the nuclear hull's build gate -- the fill and two tanks more of the
+        // largest hull -- which "two tanks" kept short of, so the Fissionables saved for a hull were sold.
+        let tanks = if self.has_tech(TechId::NuclearRockets) { UnitKind::SHIPS.iter().map(|k| self.fission_tank_of(seat, *k)).fold(0.0, f64::max) * (1.0 + th.nuclear_hull_reserve_tanks) } else { 0.0 };
+        tenth(((standing + ordered) * upkeep * th.fission_keep_turns + tanks).max(self.ai_fission_reserve(seat)))
+    }
+
+    /// Ticket #643 (Q2): **the lift a Mine at this Colony takes for its Fissionables** -- one plus the
+    /// site's figure while the seat holds less than its reserve, and nothing otherwise, so a seat that
+    /// has enough does not dig for more.
+    pub fn ai_fission_mine_lift(&self, seat: Seat, cid: ColonyId) -> f64 {
+        let Some(col) = self.colony(cid) else { return 1.0 };
+        let site = self.colony_yields(col).fissionables;
+        if site > 0.0 && self.seat(seat).stockpile.fissionables + 1e-9 < self.ai_fission_reserve(seat) { 1.0 + site } else { 1.0 }
     }
 
     /// Ticket #82, the 0.06.0 AI sweep (ticket #94): a Module off Earth whose kind an idle Facility
@@ -2304,6 +2351,8 @@ impl Game {
                             let plain = (with - self.tables.mass_driver.mine_bonus as f64).max(1.0);
                             w *= with / plain;
                         }
+                        // Ticket #643 (version 0.1.0.6): the site's Fissionables, while short.
+                        w *= self.ai_fission_mine_lift(seat, cid);
                         (Cat::Producer, w)
                     }
                     ModuleKind::Generator | ModuleKind::Refinery => (Cat::Producer, self.base_weight(seat, Cat::Producer) * self.production_moved_boost(seat, &col, mk)),
@@ -3123,17 +3172,30 @@ impl Game {
         {
             let th = &self.tables.ai.thresholds;
             let s = self.seat(seat).stockpile;
-            let goods = [(Resource::Materials, s.materials), (Resource::Fuel, s.fuel), (Resource::Energy, s.energy), (Resource::Ducats, s.ducats)];
+            // Ticket #643 (version 0.1.0.6), at the designer's word (Q5): and Fissionables, short only
+            // below the seat's own reserve -- a fixed figure would find every seat's few short -- and
+            // asked as that shortfall; first among the short, since they power and arm.
+            let fission_reserve = self.ai_fission_reserve(seat);
+            let goods = [(Resource::Materials, s.materials), (Resource::Fuel, s.fuel), (Resource::Energy, s.energy), (Resource::Ducats, s.ducats), (Resource::Fissionables, s.fissionables)];
             let price = |r: Resource| if r == Resource::Ducats { 1.0 } else { self.trade_price(r).unwrap_or(1) as f64 };
-            let short = goods.iter().filter(|(r, n)| *r != Resource::Ducats && *n < th.trade_short).min_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal)).map(|(r, _)| *r);
-            let long = goods.iter().filter(|(r, n)| Some(*r) != short && n * price(*r) > th.trade_long).max_by(|a, b| (a.1 * price(a.0)).partial_cmp(&(b.1 * price(b.0))).unwrap_or(std::cmp::Ordering::Equal)).map(|(r, _)| *r);
+            // From the review: a Trade asks for them only where the head-of-turn Buy cannot pay
+            // for one, so the same shortfall is never bought twice, and only where no other good is
+            // short, so a seat that cannot pay does not crowd out every other Trade.
+            let one = Order::Buy { resource: Resource::Fissionables, amount: 1 };
+            let fission_short = s.fissionables + 1e-9 < fission_reserve && self.order_cost(seat, &one).ducats > s.ducats;
+            let other_short = goods.iter().filter(|(r, n)| !matches!(r, Resource::Ducats | Resource::Fissionables) && *n < th.trade_short).min_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal)).map(|(r, _)| *r);
+            let short = other_short.or(fission_short.then_some(Resource::Fissionables));
+            // From the review: Fissionables offered only from beyond the keep.
+            let fission_spare = (s.fissionables - self.ai_fission_keep(seat)).max(0.0);
+            let goods_long = goods.map(|(r, n)| if r == Resource::Fissionables { (r, fission_spare) } else { (r, n) });
+            let long = goods_long.iter().filter(|(r, n)| Some(*r) != short && n * price(*r) > th.trade_long).max_by(|a, b| (a.1 * price(a.0)).partial_cmp(&(b.1 * price(b.0))).unwrap_or(std::cmp::Ordering::Equal)).map(|(r, _)| *r);
             let partner = Seat::ALL
                 .into_iter()
                 .filter(|o| *o != seat && !self.hostile(seat, *o) && !self.offer_waits(seat, *o) && !self.refused_recently(seat, *o) && self.ai_gang_pressure(seat, *o) == 0.0)
                 .filter(|o| !matches!((short, long), (Some(s), Some(l)) if self.trade_refused_before(seat, *o, l, s)))
                 .max_by_key(|o| self.relations_score(seat, *o));
             if let (Some(short), Some(long), Some(other)) = (short, long, partner) {
-                let ask = th.trade_ask;
+                let ask = if short == Resource::Fissionables { (fission_reserve - s.fissionables).ceil().max(1.0) as u32 } else { th.trade_ask };
                 let give = ((ask as f64 * price(short)) / price(long)).ceil() as u32;
                 let (give, get) = (crate::orders::TradeGood::Goods(long, give.max(1)), crate::orders::TradeGood::Goods(short, ask));
                 if self.holds_good(seat, give).is_ok() {
@@ -4285,6 +4347,23 @@ impl Game {
         let mut chosen: Vec<Order> = Vec::new();
         let mut stacks_done: Vec<String> = Vec::new();
         let mut lines: Vec<String> = Vec::new();
+        // Ticket #643 (version 0.1.0.6), at the designer's word (Q3): the Fissionables the reserve is
+        // short are bought FIRST, when the Ducats allow, since they power and arm what the turn's
+        // spending stands on; left to the end of the turn the Ducats were already spent.
+        let reserve_f = self.ai_fission_reserve(seat);
+        let held_f = self.seat(seat).stockpile.fissionables;
+        if held_f + 1e-9 < reserve_f {
+            // From the review: as many of the shortfall as the Ducats allow, not all or nothing.
+            let mut short = (reserve_f - held_f).ceil() as i64;
+            while short > 0 && self.trade_cost(seat, &chosen, &Order::Buy { resource: Resource::Fissionables, amount: short }).ducats > self.remaining(seat, &chosen).0.ducats {
+                short -= 1;
+            }
+            let buy = Order::Buy { resource: Resource::Fissionables, amount: short };
+            if short > 0 && self.check_order(seat, &chosen, &buy).is_ok() {
+                lines.push(format!("  take          buy {short} Fissionables for the reserve ({reserve_f:.1})"));
+                chosen.push(buy);
+            }
+        }
         // Saving: once a legal, higher-scored action is out of reach now but within four more turns
         // of Materials income, Materials are held for it rather than spent on lower-scored actions
         // (ticket #56: one turn let a Factory bought every turn starve the Colony Ship for good).
@@ -4485,6 +4564,29 @@ impl Game {
                 if self.check_order(seat, &chosen, &sell).is_ok() {
                     lines.push(format!("  take          sell {surplus} Fuel, beyond {keep:.0} kept"));
                     chosen.push(sell);
+                }
+            }
+            // Ticket #643 (version 0.1.0.6), at the designer's word: the Fissionables the reserve is
+            // short are bought when the Ducats allow (Q3); what stands beyond the keep is sold (Q4).
+            // The buy went at the head of the turn; the sale waits for the turn's end.
+            let left = self.remaining(seat, &chosen).0;
+            let bought_fission = chosen.iter().any(|o| matches!(o, Order::Buy { resource: Resource::Fissionables, .. }));
+            // From the review: never below the band's midpoint, as Materials and Fuel are sold, and
+            // never the units a Trade offered this turn.
+            let offered: f64 = chosen.iter().filter_map(|o| match o {
+                Order::ProposeTrade { give: crate::orders::TradeGood::Goods(Resource::Fissionables, n), .. } => Some(*n as f64),
+                _ => None,
+            }).sum();
+            let fission_row = Game::market_row(Resource::Fissionables).unwrap_or(3);
+            if !bought_fission && self.market_price_at(fission_row) >= self.market_base(fission_row) {
+                let keep = self.ai_fission_keep(seat) + offered;
+                let surplus = (left.fissionables - keep).floor() as i64;
+                if surplus > 0 {
+                    let sell = Order::Sell { resource: Resource::Fissionables, amount: surplus };
+                    if self.check_order(seat, &chosen, &sell).is_ok() {
+                        lines.push(format!("  take          sell {surplus} Fissionables, beyond {keep:.1} kept"));
+                        chosen.push(sell);
+                    }
                 }
             }
         }

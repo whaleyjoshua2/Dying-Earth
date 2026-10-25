@@ -13,17 +13,17 @@ pictures and sweeps that decided it are in
 **What the version is.** Version 0.1.0.5 with the designer's list of 2026-10-25. Its spine is a new
 resource, **Fissionables**, found off Earth and richest in the far worlds (§1), which a nuclear hull
 is built and flown with and a Warhead is loaded with (§2), and a new common Reactor burns, the
-Archivists' own building renamed the Accumulator (§3).
+Archivists' own building renamed the Accumulator (§3); and the computer is taught to chase them (§4).
 
 **What it did to the win column** (80 games, per Faction; every section's own sweep is in it):
 
-| | 0.1.0.5 | §1 Fissionables | §2 the nuclear hull | §3 the Reactor | the ideal |
-|---|---|---|---|---|---|
-| Custodians | 18 | 23 | 19 | 28 | 15 |
-| Prospectors | 61 | 51 | 56 | 47 | 15 |
-| Arkwrights | 0 | 3 | 2 | 1 | 15 |
-| Archivists | 1 | 1 | 1 | 1 | 15 |
-| collapses | 0 | 2 | 2 | 3 | 20 |
+| | 0.1.0.5 | §1 Fissionables | §2 the nuclear hull | §3 the Reactor | §4 the chase | the ideal |
+|---|---|---|---|---|---|---|
+| Custodians | 18 | 23 | 19 | 28 | 22 | 15 |
+| Prospectors | 61 | 51 | 56 | 47 | 56 | 15 |
+| Arkwrights | 0 | 3 | 2 | 1 | 1 | 15 |
+| Archivists | 1 | 1 | 1 | 1 | 1 | 15 |
+| collapses | 0 | 2 | 2 | 3 | 0 | 20 |
 
 ## 1. Fissionables, the seventh resource, and Deep Mining and Rich Seam moved
 
@@ -186,3 +186,39 @@ the 80 games: the Custodians 699, the Prospectors 431, the Arkwrights 53, the Ar
 first build's sweep, before the review's mending, read 31 / 46 / 1 / 1 and 1, with 842 Custodian
 Reactors: the computer had not counted its Reactor Modules' Energy and so built more.) Reported, not
 tuned.
+
+## 4. The computer chases Fissionables
+
+Ticket: [The computer chases Fissionables](https://github.com/whaleyjoshua2/Dying-Earth/issues/643).
+
+**The site** (Q1). A site's Fissionables count toward a computer seat's worth of it, at the Mine yield's
+weight, whatever its Victory, once Clean Power or Nuclear Rockets stands (`ai_fission_worth`); nought
+before, when nothing spends them.
+
+**The reserve** (`ai_fission_reserve`): `reactor_reserve_turns` (10) of its running Reactors, each
+nuclear hull's second tank topped up, and half a Fissionable for each Missile Carrier with no Warhead.
+
+- **The Mine** (Q2). While the seat holds less than its reserve, a Mine on a site that holds them is
+  weighed up by one plus the site's figure (`ai_fission_mine_lift`); bounded by the figure (1.8 at most)
+  and off once the reserve is met.
+- **The buy** (Q3). The shortfall is bought at the HEAD of the turn's orders, as far as the Ducats go:
+  left to the turn's end, the Ducats had gone on Influence and no Buy was ever made.
+- **The sale** (Q4). What stands beyond the **keep** is sold at the turn's end, at the band's midpoint
+  or better (`ai_fission_keep`, `fission_keep_turns` 20): twenty turns of every Reactor standing or on
+  order, mothballed or not, and once Nuclear Rockets stands the nuclear hull's build gate -- the
+  largest hull's fill and two tanks more. The designer's "two tanks" is read as two beyond the fill, as
+  §2's build gate reads; at two in all, the sale sold what the gate was saving. Never the units a Trade
+  offered the same turn.
+- **The Trade** (Q5). Fissionables join its trade goods. It asks for them only where the head-of-turn
+  Buy cannot pay for one and no other good is short, asked as the shortfall; it offers them only from
+  beyond its keep; and a computer partner never trades away its own reserve.
+
+**Unchanged** (Q6): no plan to settle the far worlds for their yield, no change to the Tech pick lists.
+
+**The measure** (Q7): Fissionables bought and sold at the market by seat, in the sweep.
+
+**Measured** ([`sweeps/ticket-643.txt`](../dev-diary/2026-10-25-version-0.1.0.6/sweeps/ticket-643.txt)):
+**22 / 56 / 1 / 1 and 0 collapses**, from §3's 28 / 47 / 1 / 1 and 3. Over the 80 games, by Faction,
+bought / sold: the Custodians 43 / 3,776, the Prospectors 110 / 1,144, the Arkwrights 39 / 45, the
+Archivists 2 / 25. Nuclear hulls: the Prospectors 210, the Custodians 164, the Arkwrights 19, the
+Archivists none. Reported, not tuned.

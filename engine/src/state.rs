@@ -1351,6 +1351,11 @@ pub struct WarCounters {
     /// Ticket #629 (version 0.1.0.6): nuclear hulls built, by seat, for the sweep.
     #[serde(default)]
     pub nuclear_hulls_built: [u32; SEAT_COUNT],
+    /// Ticket #643 (version 0.1.0.6): Fissionables bought and sold at the market, by seat.
+    #[serde(default)]
+    pub fission_bought: [i64; SEAT_COUNT],
+    #[serde(default)]
+    pub fission_sold: [i64; SEAT_COUNT],
     /// Ticket #300 (version 0.08.6): Armies landed from a Carrier at a Colony, by seat. Never
     /// counted before; the reviews measured no Army carried by anybody in eighty games.
     #[serde(default)]
@@ -1462,6 +1467,8 @@ impl WarCounters {
             self.homes_taken[i] += o.homes_taken[i];
             self.collapse_weighed[i] += o.collapse_weighed[i];
             self.nuclear_hulls_built[i] += o.nuclear_hulls_built[i];
+            self.fission_bought[i] += o.fission_bought[i];
+            self.fission_sold[i] += o.fission_sold[i];
             self.armies_landed[i] += o.armies_landed[i];
             self.interceptions[i] += o.interceptions[i];
             self.batteries_lost[i] += o.batteries_lost[i];
@@ -6374,6 +6381,12 @@ impl Game {
         }
         // Ticket #531 (version 0.1.0.1): nothing to a runaway leader.
         if self.ai_gang_pressure(seat, from) > 0.0 {
+            return false;
+        }
+        // Ticket #643 (version 0.1.0.6), from the review: never its own Fissionables reserve.
+        if let crate::orders::TradeGood::Goods(Resource::Fissionables, n) = get
+            && self.seat(seat).stockpile.fissionables - n as f64 + 1e-9 < self.ai_fission_reserve(seat)
+        {
             return false;
         }
         self.trade_value(give) * margin + 1e-9 >= self.trade_value(get)

@@ -597,6 +597,12 @@ nuclear_hull_reserve_tanks = 2.0
 # Stockpile holds this many turns of a Reactor's 0.1 Fissionables, one Fissionable; a Power Plant or a
 # Wind Farm otherwise. A Reactor short of them is mothballed, and restarted once they are back.
 reactor_reserve_turns = 10.0
+# Ticket #643 (version 0.1.0.6), at the designer's word: the computer chases Fissionables. It keeps a
+# RESERVE -- `reactor_reserve_turns` of its running Reactors, each nuclear hull's second tank topped
+# up, half a Fissionable for each Missile Carrier with no Warhead -- buying the shortfall when its
+# Ducats allow and lifting a Mine on a Fissionables site while short; and it sells what it holds
+# beyond this many turns of its Reactors and two tanks.
+fission_keep_turns = 20.0
 # Ticket #336 (version 0.09.0): what a rival's Colony is worth on the same list, read as this price
 # divided by the price the seat would actually pay for it -- CHEAPEST FIRST, where the rule from
 # ticket #50 ranked by fewest Colonists and never read the threshold at all. Without this the

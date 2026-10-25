@@ -178,3 +178,37 @@ game, net of upkeep, by Faction:
 The Custodians rose nine wins and stand the most Reactors, about nine a game; the Prospectors' Energy
 rose by half (575 a game to 866) and they fell nine. Launches 12, from 24. Reported, not tuned.
 
+## The computer chases Fissionables
+
+Ticket [#643](https://github.com/whaleyjoshua2/Dying-Earth/issues/643), spec §4. The designer's aside on
+the Fissionables ticket, charted then: *"we need to teach the computer to chase this resource but that
+might be better after its uses are built out."*
+
+Decided in two rounds; Q5 and Q6 came back after a first sweep run on Q1 to Q4 alone.
+
+**Built test first**, every test red on its missing names or its figure first. The buy test went red on
+behaviour: the computer had spent its Ducats on Influence before the turn's end, where the Buy stood,
+so the Buy moved to the head of the turn. Two were broken on purpose after passing: the site worth's
+Tech gate and the Mine lift's reserve check.
+
+**The review** found eight things. The worst: the sale kept two tanks where the nuclear build gate wants
+a fill and two more, so a seat sold the Fissionables it was saving for a hull. The keep now covers the
+gate, and every Reactor standing, mothballed or on order, which a restart had been selling out from
+under itself. A Trade asked for the same shortfall the Buy had paid for, and crowded out every other
+Trade while the seat could not pay; a partner gave away its own reserve; the Buy was all or nothing;
+the sale had no price floor; and units offered in a Trade could be sold the same turn. Each is mended,
+two with tests that went red first.
+
+**The sweep** ([`sweeps/ticket-643.txt`](sweeps/ticket-643.txt)): **22 / 56 / 1 / 1 and 0 collapses**,
+from the Reactor's 28 / 47 / 1 / 1 and 3. By Faction, over the 80 games:
+
+| | Fissionables a game, net | Bought | Sold | Reactors standing at the end | Nuclear hulls built |
+|---|---|---|---|---|---|
+| Custodians | 97.4 | 43 | 3,776 | 705 | 164 |
+| Prospectors | 55.8 | 110 | 1,144 | 490 | 210 |
+| Arkwrights | 5.7 | 39 | 45 | 96 | 19 |
+| Archivists | 2.0 | 2 | 25 | 1 | 0 |
+
+The Custodians mine the most and sell most of it; the Prospectors build the most nuclear hulls (181 to
+210 once the keep stopped selling their savings) and won nine more. The Archivists stand one Reactor in
+eighty games. Reported, not tuned.

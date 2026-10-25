@@ -1680,6 +1680,10 @@ pub struct AiThresholds {
     /// Plant once Clean Power stands and its Stockpile holds this many turns of a Reactor's upkeep.
     #[serde(default = "reactor_reserve_turns_default")]
     pub reactor_reserve_turns: f64,
+    /// Ticket #643 (version 0.1.0.6): a computer seat sells the Fissionables it holds beyond this
+    /// many turns of its running Reactors and two tanks.
+    #[serde(default = "fission_keep_turns_default")]
+    pub fission_keep_turns: f64,
     /// Ticket #336 (version 0.09.0): the price a rival's Colony is weighed against on the same
     /// list -- the weight is this over what the seat would pay, so the cheapest place ranks first.
     #[serde(default = "colony_price_pivot_default")]
@@ -3328,6 +3332,10 @@ fn nuclear_hull_reserve_tanks_default() -> f64 {
 
 fn reactor_reserve_turns_default() -> f64 {
     10.0
+}
+
+fn fission_keep_turns_default() -> f64 {
+    20.0
 }
 
 
