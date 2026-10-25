@@ -25673,3 +25673,17 @@ fn ticket_614_the_battle_moment_says_who_won() {
     g.battle_line_and_moment(&line(vec![party(Some(Seat(0)), &["TSV Defiant"], &[]), party(Some(pro), &["PMV Valiant"], &[])]));
     assert!(g.report.moments.iter().all(|m| m.kind != MomentKind::DecisiveBattle), "a bloodless Battle stops nobody's turn");
 }
+
+/// Ticket #614 (version 0.1.0.5), from the review: a unit that escaped destroyed nothing, so it is
+/// left out of the destroyers' names.
+#[test]
+fn ticket_614_an_escaped_unit_is_no_destroyer() {
+    let mut g = game();
+    let pro = Seat(1);
+    let pro_name = g.seat_name(pro);
+    let a = BattleParty { seat: Some(Seat(0)), aggressor: true, units: String::new(), strength: 3, hits: 1, destroyed: Vec::new(), escaped: vec!["TSV Beagle".to_string()], odds: None, names: vec!["TSV Defiant".to_string(), "TSV Beagle".to_string()] };
+    let b = BattleParty { seat: Some(pro), aggressor: false, units: String::new(), strength: 3, hits: 0, destroyed: vec!["PMV Valiant".to_string()], escaped: Vec::new(), odds: None, names: vec!["PMV Valiant".to_string()] };
+    g.battle_line_and_moment(&BattleLine { place: "Mars low orbit".to_string(), parties: vec![a, b], result: "2 rounds.".to_string(), at: Some(ReportPlace::Body(BodyId::Mars)), log: None, fought_now: false });
+    let m = g.report.moments.iter().find(|m| m.kind == MomentKind::DecisiveBattle).expect("a Moment");
+    assert_eq!((m.text.as_str(), m.figure.as_str()), (format!("Battle at Mars low orbit: your TSV Defiant destroyed the {pro_name}' PMV Valiant.").as_str(), "you won"), "the Beagle, which fled, is no destroyer");
+}

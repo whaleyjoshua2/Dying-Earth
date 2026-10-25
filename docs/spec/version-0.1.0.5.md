@@ -317,7 +317,8 @@ on the ticket's questions, *"q1 a q2 yes"*.
 
 - **The card as it was**: *"A Battle at Mars low orbit: PMV Valiant destroyed"* over the figure *"1
   lost"*, the figure counting everybody's losses, so a Battle the player won read as theirs. The
-  designer's own case was not replayed (no save was to hand); the test reproduces it from the record.
+  designer's own game was not replayed (no save was to hand): the diagnosis is read from the code,
+  and the test builds the case by hand, the Defiant sinking the Valiant and losing nothing.
 - **"Won" is read off the losses**: the side that lost nothing while the other lost a unit; both
   losing, or neither, is no verdict. The engine records no field-holder and starts none.
 - **The wording**: with the player's units in it, *"Battle at Mars low orbit: your TSV Defiant
@@ -327,6 +328,8 @@ on the ticket's questions, *"q1 a q2 yes"*.
   Valiant and PMV Aurora."* and the figure *"2 destroyed"*.
 - **The record**: each party now keeps its units' names beside its losses (`BattleParty.names`, a
   `serde(default)` field, so `SAVE_VERSION` stays); a party without them, or a neutral one, or a
-  three-sided Battle, reads the losses alone. A bloodless Battle is no Moment, as before; a
-  bombardment's and a Launch's Moments are their own and unchanged. The Report line is unchanged.
+  three-sided Battle, reads the losses alone; a unit that escaped is no destroyer and is left out of
+  the names. A bloodless Battle is no Moment, as before. A bombardment's and a Launch's Moments keep
+  their own sentences, and their figures count *"destroyed"* where they read *"lost"* (from the
+  review: the same misreading on those two cards). The Report line is unchanged.
 - No rule moves; no sweep.

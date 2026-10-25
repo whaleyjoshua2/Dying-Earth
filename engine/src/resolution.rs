@@ -1067,6 +1067,7 @@ impl Game {
     /// with a Ship destroyed when a unit died, unranked when nobody lost one -- and a Moment when a
     /// unit died, naming it. Until now a Battle was a block at the foot of the dispatch and nothing
     /// else: no headline, and no Moment unless a building burned.
+    /// Ticket #614 (version 0.1.0.5): `pub`, so the formula tests can hand it a Battle record.
     pub fn battle_line_and_moment(&mut self, line: &BattleLine) {
         let lost: Vec<String> = line.parties.iter().flat_map(|p| p.destroyed.iter().cloned()).collect();
         let aggressors: Vec<String> = line.parties.iter().filter(|p| p.aggressor).map(|p| p.seat.map(|s| self.seat_name(s)).unwrap_or_else(|| "neutral".to_string())).collect();
@@ -1097,15 +1098,18 @@ impl Game {
     fn battle_moment_words(&self, line: &BattleLine) -> (String, String) {
         let human = (!self.seat(Seat(0)).ai && !self.spectator).then_some(Seat(0));
         let lost: Vec<String> = line.parties.iter().flat_map(|p| p.destroyed.iter().cloned()).collect();
-        // "your TSV Defiant", "the Prospectors' PMV Valiant" (every Faction's name ends in s).
+        // "your TSV Defiant", "the Prospectors' PMV Valiant" (every Faction's name ends in s). A
+        // neutral party never reaches this: it reads the losses alone, below.
         let owned = |p: &BattleParty, names: &[String]| -> String {
             let prefix = match p.seat {
                 Some(s) if Some(s) == human => "your ".to_string(),
                 Some(s) => format!("the {}' ", self.seat_name(s)),
-                None => "the neutral ".to_string(),
+                None => String::new(),
             };
             format!("{prefix}{}", Game::and_list(names))
         };
+        // The destroyers are the side's units that stayed: one that escaped destroyed nothing.
+        let stayed = |p: &BattleParty| -> Vec<String> { p.names.iter().filter(|n| !p.escaped.contains(n)).cloned().collect() };
         let plain = (format!("{} destroyed.", Game::and_list(&lost)), format!("{} destroyed", lost.len()));
         let [a, b] = line.parties.as_slice() else { return plain };
         if a.seat.is_none() || b.seat.is_none() || a.names.is_empty() || b.names.is_empty() {
@@ -1123,8 +1127,8 @@ impl Game {
         };
         match (a_lost, b_lost) {
             (true, true) => (format!("{} and {} destroyed.", owned(a, &a.destroyed), owned(b, &b.destroyed)), figure(None)),
-            (false, true) => (format!("{} destroyed {}.", owned(a, &a.names), owned(b, &b.destroyed)), figure(Some(a.seat == human))),
-            (true, false) => (format!("{} destroyed {}.", owned(b, &b.names), owned(a, &a.destroyed)), figure(Some(b.seat == human))),
+            (false, true) => (format!("{} destroyed {}.", owned(a, &stayed(a)), owned(b, &b.destroyed)), figure(Some(a.seat == human))),
+            (true, false) => (format!("{} destroyed {}.", owned(b, &stayed(b)), owned(a, &a.destroyed)), figure(Some(b.seat == human))),
             (false, false) => plain,
         }
     }
@@ -1389,11 +1393,12 @@ impl Game {
             };
             self.log(text.clone());
             // Ticket #335 (version 0.09.0): the record lives at the orbit the strike was given from.
+                // Ticket #614 (version 0.1.0.5): a count, never "lost" -- the figure read as the player's loss whoever's it was.
             let at = Some(ReportPlace::Orbit(body, orbit));
             self.report_line(if hit { LineKind::DecisiveBattle } else { LineKind::Battle }, at, text.clone());
             if hit {
                 let result = format!("bombarded by the {}: the {} destroyed{}", self.seat_name(seat), module_name, if dead > 0 { format!(", {} dead", crate::counted(dead, "Colonist", "Colonists")) } else { String::new() });
-                self.moment(MomentKind::DecisiveBattle, &[("place", place.clone()), ("result", result), ("figure", "1 lost".to_string())], at);
+                self.moment(MomentKind::DecisiveBattle, &[("place", place.clone()), ("result", result), ("figure", "1 destroyed".to_string())], at);
             }
             // The Battle mark and the band's row read the Battle record, so a Bombard is one.
             let outcome = if hit { format!("the {module_name} destroyed") } else { format!("the {module_name} struck, standing") };
@@ -1528,7 +1533,8 @@ impl Game {
             let at = Some(ReportPlace::Orbit(body, orbit));
             self.report_line(if hit { LineKind::DecisiveBattle } else { LineKind::Battle }, at, text.clone());
             let result = format!("struck from orbit by the {}: {}", self.seat_name(seat), if hit { lost.join(", ") + " destroyed" } else { "the buildings stood".to_string() });
-            self.moment(MomentKind::DecisiveBattle, &[("place", place.clone()), ("result", result), ("figure", format!("{} lost", lost.len()))], at);
+            // Ticket #614 (version 0.1.0.5): a count, never "lost".
+            self.moment(MomentKind::DecisiveBattle, &[("place", place.clone()), ("result", result), ("figure", format!("{} destroyed", lost.len()))], at);
             let outcome = if hit { format!("{} destroyed", lost.join(", ")) } else { "the buildings stood".to_string() };
             self.report.battles.push(BattleLine {
                 place: format!("{} (Launch)", self.orbit_battle_name(body, orbit)),
