@@ -180,3 +180,16 @@ The top-bar ticket's review (#609) found the Reactor's relief missing from the p
 could not sum to the Income's Energy while one stood, and the hover unbounded on a wide board; both
 fixed, with the window test grown to cover the relief line, the fold past the fourth place and the
 five-place case, and the three comments the review found stale.
+
+## The Scrubber cap: one per 200 million
+
+Ticket [#612](https://github.com/whaleyjoshua2/Dying-Earth/issues/612), spec §11.
+
+One figure, `per_population` 300 -> 200, at the designer's word from a table of what 300, 200 and 150
+give every Region. The cap test's pins moved first (India eight, a Region of 380 two) and were watched
+red on the 300, then green. No picture: a figure the card reads from the table.
+
+- **The sweep** ([`sweeps/ticket-612.txt`](sweeps/ticket-612.txt)): **23 / 53 / 1 / 0 and 3
+  collapses**, from 25 / 51 / 2 / 0 and 2: noise. Scrubbers built over the batch 2,262 from 2,113,
+  seven per cent more, the end Temperatures within a few hundredths: the cap bound in few Regions, the
+  computer Custodians not having built to it where it stood at one. Reported and left.

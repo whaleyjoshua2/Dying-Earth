@@ -505,7 +505,7 @@ The Arkwrights' Unique Module since version 0.08.3, replacing the Relay at the c
 _Avoid_: choir, broadcast, transmitter, crowd
 
 **Scrubber**:
-The Custodians' signature Facility, which only they build and only in a Region they control. It takes no build slot, draws Energy and (since version 0.1.0.3) a Ducat a turn, emits nothing, and while it is online it enlarges the Natural Sink and lowers its state's Unrest every turn. How many one state may hold follows its population: since version 0.1.0.3 one per 300 million, one at least. They were destroyed outright if the state changed hands; since version 0.09.6 they stand, running at half (the Sink, the calm and the Blame credit the holder's, the upkeep whole) in another Faction's hands and at a quarter (to nobody's Blame, no upkeep) in a neutral Region, and whole again under the Custodians.
+The Custodians' signature Facility, which only they build and only in a Region they control. It takes no build slot, draws Energy and (since version 0.1.0.3) a Ducat a turn, emits nothing, and while it is online it enlarges the Natural Sink and lowers its state's Unrest every turn. How many one state may hold follows its population: since version 0.1.0.3 one per 200 million since version 0.1.0.5 (300 from version 0.1.0.3, 200 with a floor of two before), one at least. They were destroyed outright if the state changed hands; since version 0.09.6 they stand, running at half (the Sink, the calm and the Blame credit the holder's, the upkeep whole) in another Faction's hands and at a quarter (to nobody's Blame, no upkeep) in a neutral Region, and whole again under the Custodians.
 _Avoid_: carbon capture, cleanup, restoration (the retired rule), terraforming, filter
 
 **Leapfrog**:

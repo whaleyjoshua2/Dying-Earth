@@ -4022,14 +4022,16 @@ fn e_a_scrubber_enlarges_the_sink_and_is_capped_captured_at_half_and_calming() {
     // before), and one per 300 million people with a floor of 1 (200 and 2 before).
     assert_eq!((card.materials, card.widgets, card.energy_upkeep, card.ducats_upkeep, card.emissions), (33.0, 10, 4, 1.0, 0.0));
     assert!(card.no_slot, "a Scrubber takes no build slot");
-    // The cap: one per three hundred million people (ticket #333, version 0.09.0: units of one
-    // million), with a floor of 1 and a ceiling of 10.
-    assert_eq!((g.tables.scrubber.per_population, g.tables.scrubber.min), (300.0, 1), "three hundred million people a Scrubber, one at least");
-    assert_eq!(g.scrubber_cap(StateId::Russia), 1, "Russia at 150 rounds to one");
+    // The cap: one per two hundred million people since ticket #612 (version 0.1.0.5; three hundred
+    // before; ticket #333, version 0.09.0: units of one million), with a floor of 1 and a ceiling of 10.
+    assert_eq!((g.tables.scrubber.per_population, g.tables.scrubber.min), (200.0, 1), "two hundred million people a Scrubber (ticket #612; 300 before), one at least");
+    assert_eq!(g.scrubber_cap(StateId::Russia), 1, "Russia at 150 takes the floor of one");
     g.state_mut(StateId::Russia).population = 50.0;
     assert_eq!(g.scrubber_cap(StateId::Russia), 1, "the smallest Region takes the floor");
     g.state_mut(StateId::Russia).population = 150.0;
-    assert_eq!(g.scrubber_cap(StateId::SouthAsia), 6, "India at 1660: six");
+    assert_eq!(g.scrubber_cap(StateId::SouthAsia), 8, "India at 1660: eight (six at 300)");
+    g.state_mut(StateId::SouthAsia).population = 380.0;
+    assert_eq!(g.scrubber_cap(StateId::SouthAsia), 2, "a Region of 380 holds two, where it held one");
     g.state_mut(StateId::SouthAsia).population = 3300.0;
     assert_eq!(g.scrubber_cap(StateId::SouthAsia), 10, "the ceiling");
     g.state_mut(StateId::SouthAsia).population = 1660.0;

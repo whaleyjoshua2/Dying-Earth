@@ -287,3 +287,23 @@ ticket's questions, *"q1 button q2 yes q3 b"*.
   stands" line, as the Habitat's is; owner-neutral, since a rival's tile draws the same line. The text
   tool's `refuel` help names a Colony with a working Refinery beside a station.
 - No rule moves; no sweep.
+
+## 11. The Scrubber cap: one per 200 million
+
+Ticket: [The Scrubber cap by population: more than one in most Regions](https://github.com/whaleyjoshua2/Dying-Earth/issues/612).
+
+The designer: *"check scrubber build count it seems its only one per country should be based on
+population"*; on the ticket's questions, *"q1 200 q2 as they are"*.
+
+- **The cap was already by population**: a Region's people over `per_population`, rounded, within a
+  floor of 1 and a ceiling of 10; at 300 million a Scrubber twelve of the twenty Regions held one.
+- **`per_population` is 200** (`facilities.toml [scrubber]`, from 300): India 8, China 7, Nigeria, the
+  European Union and South Africa 3, Indonesia, the United States and Iran 2, the twelve Regions
+  under 300 million one still. The floor of 1 and the ceiling of 10 stay.
+- The computer Custodians build to the cap; the card's *"Scrubber (1 of 2)"* and the signature
+  sentence read the figures from the table.
+- **Swept** (`sweeps/ticket-612.txt`, 20 seeds x four seatings): **23 / 53 / 1 / 0 and 3 collapses**,
+  from the same day's 25 / 51 / 2 / 0 and 2 (§6): noise. Scrubbers built over the batch 2,262 from
+  2,113, seven per cent more; the end Temperatures by seating +2.47 / +2.29 / +2.23 / +2.04 from +2.45
+  / +2.24 / +2.18 / +1.99. The cap was binding in few Regions: the computer Custodians were not
+  building to it where it stood at one. Reported and left.
