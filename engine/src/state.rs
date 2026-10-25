@@ -1304,6 +1304,10 @@ pub struct WarCounters {
     /// Ticket #297 (version 0.08.6): Dig In orders committed, by seat.
     #[serde(default)]
     pub dig_ins: [u32; SEAT_COUNT],
+    /// Ticket #618 (version 0.1.0.5): contests -- a computer seat's Influence placed on a neutral
+    /// Region a rival stands at over `contest_from` of the threshold -- by seat, once a Region a turn.
+    #[serde(default)]
+    pub contests: [u32; SEAT_COUNT],
     /// Ticket #300 (version 0.08.6): Armies landed from a Carrier at a Colony, by seat. Never
     /// counted before; the reviews measured no Army carried by anybody in eighty games.
     #[serde(default)]
@@ -1410,6 +1414,7 @@ impl WarCounters {
             self.orbit_attacks_off_earth[i] += o.orbit_attacks_off_earth[i];
             self.escapes[i] += o.escapes[i];
             self.dig_ins[i] += o.dig_ins[i];
+            self.contests[i] += o.contests[i];
             self.armies_landed[i] += o.armies_landed[i];
             self.interceptions[i] += o.interceptions[i];
             self.batteries_lost[i] += o.batteries_lost[i];

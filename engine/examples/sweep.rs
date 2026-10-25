@@ -816,6 +816,8 @@ fn main() {
                             );
                             // Ticket #297 (version 0.08.6): Dig In orders committed, by seat.
                             println!("      Dig In orders over the batch, by seat {:?}", warc.dig_ins);
+                            // Ticket #618 (version 0.1.0.5): contests of a rival's climb on a neutral Region.
+                            println!("      Contests of a rival's climb on a neutral Region over the batch, by seat {:?}", warc.contests);
                             // Ticket #300 (version 0.08.6): Armies landed from a Carrier, by seat.
                             println!("      Armies landed at a Colony over the batch, by seat {:?}", warc.armies_landed);
                             // Ticket #319 (version 0.08.8): interceptions fought, by the intercepting seat.

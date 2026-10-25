@@ -1169,6 +1169,33 @@ impl Game {
     /// first -- extracted from the planner so the order can be witnessed. A Region by its Influence
     /// value and Industry Level, closest first, a held one at a fraction of a neutral one (#75); a
     /// rival's Colony by the price this seat would pay, cheapest first (#336), times its bounty (#394).
+    /// Ticket #618 (version 0.1.0.5), at the designer's word: **how much a rival's climb on a
+    /// neutral Region lifts it for this seat.** The climb is the highest rival Standing there over
+    /// the Region's threshold; under `contest_from` it is nothing. It is answered by the computer
+    /// seat with the most Standing there among the seats not climbing (strictly the most, and some),
+    /// and by any computer seat holding a neighbour: 1 + 2 x the climb, so x2 at half the threshold
+    /// and x3 at it. A held Region, a climber's own reading, a seat with no claim: 1. Any rival: the
+    /// human's climbs and a computer seat's snipes alike. Before this no computer seat read a
+    /// rival's Standing at all, and the one contest the designer saw in four games was a coincidence
+    /// of the Region's value.
+    pub fn ai_contest(&self, seat: Seat, sid: StateId) -> f64 {
+        if self.state(sid).control != Control::Neutral {
+            return 1.0;
+        }
+        let target = Place::State(sid);
+        let standing = |s: Seat| self.seat(s).influence.get(&target).copied().unwrap_or(0);
+        let Some((climber, top)) = Seat::ALL.into_iter().filter(|s| *s != seat).map(|s| (s, standing(s))).max_by_key(|(_, n)| *n) else { return 1.0 };
+        let threshold = self.influence_threshold(target).max(1);
+        let climb = top as f64 / threshold as f64;
+        if climb < self.tables.ai.thresholds.contest_from {
+            return 1.0;
+        }
+        let mine = standing(seat);
+        let most = mine > 0 && Seat::ALL.into_iter().filter(|s| *s != seat && *s != climber).all(|s| standing(s) < mine);
+        let next_door = self.tables.state(sid).neighbours.iter().any(|n| self.state(*n).control.controller() == Some(seat));
+        if most || next_door { 1.0 + 2.0 * climb.min(1.0) } else { 1.0 }
+    }
+
     pub fn ai_influence_targets(&self, seat: Seat) -> Vec<(Place, f64)> {
         let th = &self.tables.ai.thresholds;
         let mut targets: Vec<(Place, f64)> = Vec::new();
@@ -1187,7 +1214,8 @@ impl Game {
             let neutral_bonus = if st.control == Control::Neutral { 1.0 } else { th.held_state_weight };
             // Ticket #446 (version 0.09.6): a heavy emitter's Region weighs more to the Custodians.
             let lift = st.control.controller().map(|r| self.hostile_lift(seat, r)).unwrap_or(1.0);
-            targets.push((Place::State(sid), value * neutral_bonus * lift));
+            // Ticket #618 (version 0.1.0.5): a rival's climb on a neutral Region lifts it.
+            targets.push((Place::State(sid), value * neutral_bonus * lift * self.ai_contest(seat, sid)));
         }
         // Ticket #50: any rival's Colony. Ticket #336 (version 0.09.0): weighed by THE PRICE THIS
         // SEAT WOULD PAY, cheapest first, where the rule was `3.0 - min(colonists, 2)` -- fewest
@@ -2282,7 +2310,10 @@ impl Game {
             // and the state card.
             let needed = self.influence_needed_for(seat, *target);
             let base = self.base_weight(seat, Cat::Influence) * (1.0 - 0.15 * rank as f64).max(0.3);
-            let opp = if needed - have <= step { m.opportunity } else { 1.0 };
+            // Ticket #618 (version 0.1.0.5): and on a contested Region every step takes it, so the
+            // planner stacks steps there and the spend outbids where the Allotment allows.
+            let contested = matches!(target, Place::State(sid) if self.ai_contest(seat, *sid) > 1.0);
+            let opp = if needed - have <= step || contested { m.opportunity } else { 1.0 };
             let bought = if self.tables.ducats.per_influence > 0.0 { (self.seat(seat).stockpile.ducats / self.tables.ducats.per_influence).floor() as i64 } else { 0 };
             let copies = ((allotment + bought) / step).max(0);
             for _ in 0..copies {
@@ -4198,6 +4229,14 @@ impl Game {
         // above, before it takes the Influence budget, so the next candidate gets the Influence it
         // used to waste; measured 19 / 49 / 4 / 8 from 9 / 59 / 5 / 7. The other five are dropped here.
         chosen.retain(|o| self.order_crosses(seat, o).is_none());
+        // Ticket #618 (version 0.1.0.5): the contests, once a Region a turn, for the sweep.
+        let mut contested: Vec<StateId> = Vec::new();
+        for sid in chosen.iter().filter_map(|o| if let Order::Influence { target: Place::State(sid), .. } = o { Some(*sid) } else { None }) {
+            if !contested.contains(&sid) && self.ai_contest(seat, sid) > 1.0 {
+                contested.push(sid);
+            }
+        }
+        self.war.contests[seat.index()] += contested.len() as u32;
         // Ticket #58: the scored list is the AI's own head, so it stays in the log. What the Report
         // shows is built from the orders this seat actually commits, in `end_turn`.
         chosen

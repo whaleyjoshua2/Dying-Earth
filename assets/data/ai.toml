@@ -558,6 +558,12 @@ greenwash_relations_cost = 5.0
 # target list, as a share of a neutral one's worth. 0.6 until now; at 0.3 a held place is attacked
 # only when no neutral one is worth having.
 held_state_weight = 0.3
+# Ticket #618 (version 0.1.0.5), at the designer's word: a rival's Standing on a neutral Region at or
+# over this share of its threshold is a climb, and the computer seat with the most Standing there, or
+# one holding a neighbour, contests it -- the Region's weight x2 at half the threshold, x3 at it, and
+# every Influence step there at the opportunity multiplier. Any rival: the human's climbs and a
+# computer seat's snipes alike. Measured before: no computer seat read a rival's Standing at all.
+contest_from = 0.5
 # Ticket #336 (version 0.09.0): what a rival's Colony is worth on the same list, read as this price
 # divided by the price the seat would actually pay for it -- CHEAPEST FIRST, where the rule from
 # ticket #50 ranked by fewest Colonists and never read the threshold at all. Without this the

@@ -25765,3 +25765,52 @@ fn ticket_617_the_tech_tree_lines_run_by_branch_with_each_techs_state() {
     assert!(lines.contains(&"  Efficient Grids (18, rung 1): done; Power Plant, Wind Farm and Generator output x1.5".to_string()), "{lines:?}");
     assert!(lines.contains(&"  Clean Power (32, rung 2): chosen this turn, 0/32; Power Plant Emissions x0.5; unlocks the Wind Farm".to_string()), "{lines:?}");
 }
+
+// Ticket #618 (version 0.1.0.5), at the designer's word: **a computer seat contests a rival's climb
+// on a neutral Region**, the human's and a computer's alike. A rival's Standing at or over
+// `contest_from` of the Region's threshold lifts the Region on the target list of the computer seat
+// with the most Standing there, and of any computer seat holding a neighbour: x2 at half, x3 at the
+// threshold; the spend there takes the opportunity multiplier. Counted per seat in `war.contests`.
+#[test]
+fn ticket_618_a_computer_seat_contests_a_rivals_climb_on_a_neutral_region() {
+    let mut g = game();
+    calm(&mut g);
+    let sid = StateId::NorthAfrica;
+    assert_eq!(g.state(sid).control, Control::Neutral, "the premise: Egypt is neutral");
+    assert!((g.tables.ai.thresholds.contest_from - 0.5).abs() < 1e-9, "the designer's figure, in ai.toml");
+    let th = g.influence_threshold(Place::State(sid));
+    let contester = Seat(1);
+    g.seats[contester.index()].influence.insert(Place::State(sid), 3);
+    let weight = |g: &Game| g.ai_influence_targets(contester).into_iter().find(|(p, _)| *p == Place::State(sid)).map(|(_, w)| w).expect("a neutral Region is a target");
+    let quiet = weight(&g);
+    assert!((g.ai_contest(contester, sid) - 1.0).abs() < 1e-9, "nobody climbing: no contest");
+    // The human climbs to half the threshold: x2 for the seat with the most Standing there.
+    g.seats[0].influence.insert(Place::State(sid), (th as f64 * 0.5).ceil() as i64);
+    let half = g.ai_contest(contester, sid);
+    assert!((2.0..2.1).contains(&half), "x2 at half: {half}");
+    assert!(weight(&g) > quiet * 1.9, "and the Region's weight rises with it: {} from {quiet}", weight(&g));
+    // A seat with less Standing there and no neighbour does not answer; one holding a neighbour does
+    // (Egypt's neighbours include Europe, a starting Region, so the aloof seat is found, not named).
+    let neighbours = g.tables.state(sid).neighbours.clone();
+    let holds_next_door = |g: &Game, s: Seat| neighbours.iter().any(|n| g.state(*n).control.controller() == Some(s));
+    let aloof = Seat::ALL.into_iter().find(|s| *s != Seat(0) && *s != contester && !holds_next_door(&g, *s)).expect("a computer seat holding no neighbour of Egypt");
+    assert!((g.ai_contest(aloof, sid) - 1.0).abs() < 1e-9, "{} has less Standing there and no neighbour", g.seat_name(aloof));
+    g.state_mut(neighbours[0]).control = Control::Controlled(aloof);
+    assert!(g.ai_contest(aloof, sid) > 1.9, "holding a neighbour, it answers");
+    // At the threshold, x3.
+    g.seats[0].influence.insert(Place::State(sid), th);
+    let full = g.ai_contest(contester, sid);
+    assert!((full - 3.0).abs() < 1e-9, "x3 at the threshold: {full}");
+    // A computer rival's climb is contested the same way: the Prospectors' snipes too.
+    g.seats[0].influence.remove(&Place::State(sid));
+    g.seats[2].influence.insert(Place::State(sid), th);
+    assert!((g.ai_contest(contester, sid) - 3.0).abs() < 1e-9, "the climber's seat does not matter");
+    assert!((g.ai_contest(Seat(2), sid) - 1.0).abs() < 1e-9, "the climber does not contest itself");
+    // The orders: the contester spends there, and the contest is counted once a Region a turn.
+    g.seats[contester.index()].allotment = 10;
+    let orders = g.ai_orders(contester);
+    let spent: i64 = orders.iter().filter_map(|o| if let Order::Influence { target: Place::State(s), amount, .. } = o { (*s == sid).then_some(*amount) } else { None }).sum();
+    assert!(spent >= 5, "the seat spends on the contested Region: {orders:?}");
+    assert_eq!(g.war.contests[contester.index()], 1, "counted once for the Region this turn");
+    assert_eq!(g.war.contests[0], 0);
+}

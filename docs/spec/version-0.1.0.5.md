@@ -425,3 +425,38 @@ neither. (tool)"*; on the ticket's questions, *"q1 a q2 yes q3 a q4 a"*.
   one full stop in the table, which the tree's lines showed up.
 - **The artifacts** (`ticket-617/bodies.txt`, `tech-tree.txt`): the tool's two outputs on turn one.
 - No rule moves; no sweep.
+
+## 15. The computer contests a rival's climb on a neutral Region
+
+Ticket: [The computer contests a rival's climb on a neutral Region, the human's and a computer's alike](https://github.com/whaleyjoshua2/Dying-Earth/issues/618).
+
+The designer: *"The AI Prospectors snipe Regions the human is visibly climbing. That's fine, but
+other AIs should push back (counter-Influence, agitate), not just the human."* and *"Contest the
+human's Influence target: if a human has Standing over half the threshold on a neutral Region, the AI
+should outbid. In four games the AI contested one Region of mine once."*; on the ticket's questions,
+*"q1 yes q2 yes q3 a q4 yes"*.
+
+- **The trigger**: a rival's Standing on a neutral Region at or over `contest_from` (0.5, `ai.toml
+  [thresholds]`) of the Region's threshold. Any rival: the human's climbs and a computer seat's
+  snipes alike. Before this no computer seat read a rival's Standing on a Region at all.
+- **Who answers** (the designer's a): the computer seat with the most Standing on that Region among
+  the seats not climbing (strictly the most, and some), and any computer seat holding a neighbour.
+  Four seats piling onto one Region is the pack's job (ticket #531), not this.
+- **The answer**: the Region's weight on the seat's Influence target list x(1 + 2 x the climb), so
+  x2 at half the threshold and x3 at it (`Game::ai_contest`); and every Influence step on it takes
+  the opportunity multiplier, so the planner stacks steps there and outbids where the Allotment
+  allows. Agitate is not a lever here: it is an order against a Region a rival HOLDS, and a neutral
+  one has no holder to raise Unrest against.
+- **The measure**: `war.contests`, by seat, a contest counted once a Region a turn when the seat's
+  chosen orders place Influence on a contested Region; the sweep prints it beside the escapes.
+- **Swept** (`sweeps/ticket-618.txt`, 20 seeds x four seatings): **41 / 36 / 2 / 0 and 1 collapse**,
+  from the same day's 23 / 53 / 1 / 0 and 3 (§11). Not noise: the Custodians gain 18 wins and the
+  Prospectors lose 17, the swing in the three seatings where the Custodians do not sit first
+  (10 / 15 / 15 from 5 / 10 / 8, the Prospectors 10 / 4 / 5 from 15 / 10 / 12); the Custodians' own
+  seating is unchanged (1 / 17 / 1 / 0 from 0 / 16 / 1 / 0). Contests over a seating's 20 games run
+  380 to 610 by seat, about 25 a game across the table, so the rule fires every turn somewhere.
+  Places taken by Influence 398 / 414 / 460 / 411 by seating from 394 / 404 / 402 / 401. The
+  reading: the Prospectors' snipes were the sniping, and a contest on them costs the sniper more
+  than the contest on the Custodians' slower climbs costs them. Reported and left: the figure is
+  the designer's to move (a higher `contest_from`, or a smaller lift), and the balance target is
+  15 / 15 / 15 / 15 and 20 collapses.

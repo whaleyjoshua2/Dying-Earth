@@ -291,3 +291,20 @@ and the module doc silent on the flag, and one effect with a full stop. All fixe
 (rung, stack), reads the shortlist and says "unlocked, not on this pick's shortlist" for the rest,
 joins needs as an and-list; the race test pins the exact line and then a Shipyard leading it; the
 window and the tool read one `tech_branches`.
+
+## The computer contests a rival's climb on a neutral Region
+
+Ticket [#618](https://github.com/whaleyjoshua2/Dying-Earth/issues/618), spec §15.
+
+Four questions, answered *"q1 yes q2 yes q3 a q4 yes"*. The test was written first on a neutral
+Egypt (a contester with a little Standing, the human climbing to half the threshold then to it, a
+computer rival climbing instead, an aloof seat, a neighbour's holder, the orders and the count) and
+watched red on the three missing names; its first failure after the build was its own premise, a
+named seat held Europe, Egypt's neighbour, so the aloof seat is now found rather than named. Agitate
+dropped out of the answer on a read of the order: it wants a holder.
+
+- **The sweep** ([`sweeps/ticket-618.txt`](sweeps/ticket-618.txt)): **41 / 36 / 2 / 0 and 1
+  collapse**, from 23 / 53 / 1 / 0 and 3. Not noise. The whole swing is in the three seatings where
+  the Custodians do not sit first; the Custodians' own seating is unchanged. Contests run about 25 a
+  game across the table. The reading is that the Prospectors were the snipers and a contest costs
+  the sniper most. Reported and left for the designer: `contest_from` and the lift are the levers.

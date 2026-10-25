@@ -1621,6 +1621,10 @@ pub struct AiThresholds {
     pub greenwash_relations_cost: f64,
     /// Ticket #75: a held state's worth on the Influence target list, as a share of a neutral one's.
     pub held_state_weight: f64,
+    /// Ticket #618 (version 0.1.0.5): a rival's Standing on a neutral Region at or over this share
+    /// of its threshold is a climb the computer contests (`Game::ai_contest`).
+    #[serde(default = "contest_from_default")]
+    pub contest_from: f64,
     /// Ticket #336 (version 0.09.0): the price a rival's Colony is weighed against on the same
     /// list -- the weight is this over what the seat would pay, so the cheapest place ranks first.
     #[serde(default = "colony_price_pivot_default")]
@@ -3219,6 +3223,10 @@ fn relations_margin_cap_default() -> i64 {
 /// Ticket #336 (version 0.09.0): the price a starting two-Colonist place is worth, 40 + 20 x 2.
 fn colony_price_pivot_default() -> f64 {
     80.0
+}
+
+fn contest_from_default() -> f64 {
+    0.5
 }
 
 
