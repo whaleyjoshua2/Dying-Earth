@@ -686,6 +686,8 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("build_complete", &["faction", "building", "place"]),
     ("energy_short", &["faction", "buildings", "sink"]),
     ("fuel_short", &["faction", "buildings"]),
+    // Ticket #630 (version 0.1.0.6): a Reactor short of Fissionables.
+    ("fission_short", &["faction", "buildings"]),
     ("energy_zero", &["faction"]),
 ];
 

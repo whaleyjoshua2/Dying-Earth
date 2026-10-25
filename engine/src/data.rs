@@ -196,6 +196,10 @@ pub struct FacilityCard {
     /// Energy; the Power Plant and the Reactor burn 0.8. Short of Fuel the building runs at a quarter.
     #[serde(default)]
     pub fuel_upkeep: f64,
+    /// Ticket #630 (version 0.1.0.6): Fissionables a turn while online, the Reactor's 0.1; short of
+    /// them it runs at a quarter, as a building short of Fuel.
+    #[serde(default)]
+    pub fissionables_upkeep: f64,
     pub produces: Option<Produces>,
     /// Ticket #280 (version 0.08.5): what the building does, in a sentence, where it is not a
     /// resource or beside one; drawn where the row said "no output" before.
@@ -392,6 +396,9 @@ pub struct ModuleCard {
     /// Ticket #575 (version 0.1.0.3): Fuel a turn while online; the Generator burns 0.8.
     #[serde(default)]
     pub fuel_upkeep: f64,
+    /// Ticket #630 (version 0.1.0.6): Fissionables a turn while online, the Reactor Module's 0.1.
+    #[serde(default)]
+    pub fissionables_upkeep: f64,
 }
 
 /// Ticket #92 (version 0.06.0): the Mass Driver's figures: the Fuel it takes off the owner's
@@ -1669,6 +1676,10 @@ pub struct AiThresholds {
     /// the second tank's fill and this many tanks more; a chemical one otherwise.
     #[serde(default = "nuclear_hull_reserve_tanks_default")]
     pub nuclear_hull_reserve_tanks: f64,
+    /// Ticket #630 (version 0.1.0.6): a computer seat builds a Reactor where it would build a Power
+    /// Plant once Clean Power stands and its Stockpile holds this many turns of a Reactor's upkeep.
+    #[serde(default = "reactor_reserve_turns_default")]
+    pub reactor_reserve_turns: f64,
     /// Ticket #336 (version 0.09.0): the price a rival's Colony is weighed against on the same
     /// list -- the weight is this over what the seat would pay, so the cheapest place ranks first.
     #[serde(default = "colony_price_pivot_default")]
@@ -3313,6 +3324,10 @@ fn win_in_sight_default() -> u32 {
 
 fn nuclear_hull_reserve_tanks_default() -> f64 {
     2.0
+}
+
+fn reactor_reserve_turns_default() -> f64 {
+    10.0
 }
 
 

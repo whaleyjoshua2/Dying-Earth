@@ -369,3 +369,22 @@ fn a_ship_saved_in_venus_low_orbit_loads_into_its_first_ring() {
     let loaded = save::load_from(&path, tables()).expect("the save is read back");
     assert_eq!(loaded.ships.iter().find(|s| s.id == id).unwrap().slot, Some(0), "into Ishtar's ring");
 }
+
+/// Ticket #630 (version 0.1.0.6): the Archivists' building was the Reactor, and a save from before
+/// names it `reactor`; it loads as the Accumulator, the name the common Reactor took being
+/// `fission_reactor`.
+#[test]
+fn a_save_naming_the_archivists_reactor_loads_it_as_the_accumulator() {
+    let dir = TempDir::new("accumulator");
+    let mut game = played_to(5, 4);
+    game.states[0].facilities.push(Facility::new(FacilityKind::Accumulator));
+    let text = save::to_text(&game, SaveKind::Manual).unwrap();
+    assert!(text.contains("Accumulator") || text.contains("accumulator"), "the premise: it is saved by its name");
+    let older = text.replace("kind: Accumulator", "kind: reactor").replace("kind: accumulator", "kind: reactor");
+    assert_ne!(older, text, "the premise: the name was rewritten");
+    let path = dir.path().join("save-5-turn-4-reactor.ron");
+    std::fs::write(&path, &older).unwrap();
+    let loaded = save::load_from(&path, tables()).expect("a save naming the reactor loads");
+    assert!(loaded.states[0].facilities.iter().any(|f| f.kind == FacilityKind::Accumulator));
+    assert!(!loaded.states[0].facilities.iter().any(|f| f.kind == FacilityKind::FissionReactor));
+}

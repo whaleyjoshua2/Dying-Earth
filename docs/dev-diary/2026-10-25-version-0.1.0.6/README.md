@@ -125,3 +125,56 @@ hull's drift line, its solar-view marker and the arrival-stranded warning read i
 Fissionables; and a change of orbit rescues a stranded hull only if it can pay its Fissionables too.
 The sweep, run again, matched the first to the game.
 
+## The Reactor and the Accumulator
+
+Ticket [#630](https://github.com/whaleyjoshua2/Dying-Earth/issues/630), spec §3.
+
+Decided in two rounds. The designer gated the Reactor behind Clean Power where I had recommended no
+gate, asked for more names than my four, and took **the Accumulator** from seven.
+
+**A thing I had wrong.** I told the designer the Archivists' building wore a cooling tower and that the
+tower would go to the new Reactor. The candidate sheet, with the two reference pictures at its head,
+showed otherwise: the Archivists' building wore the trefoil, and the cooling tower is the Power
+Plant's. The decision still holds -- the trefoil goes with the name to the Reactor -- but the Reactor's
+trefoil and the Fissionables glyph are now near kin, off-white on a building tile and lime beside a
+figure; the Module's picture below shows both at once.
+
+![The Accumulator candidates, the Power Plant and the trefoil at the head](ticket-630/accumulator-glyph-candidates.png)
+
+**Built test first.** Four tests went red on their missing names: the cards and the rename, the
+Reactor's burn and its quarter without Fissionables, the Clean Power gate and the Module's indifference
+to the sun, and the computer's ten turns. A fifth, a save naming the Archivists' `reactor` loading it as
+the Accumulator, passed first. Each was broken on purpose and went red: the alias removed, the
+Reactor taken out of the Energy multipliers (8 where 15), and the Fissionables left out of the upkeep
+reservation (a starved Reactor burning -0.1). Five older tests moved: the Facility count, the order of
+the appended kinds on both lists, and the Report's word ceiling by the nine of *Fissionables ran short*.
+
+![China, the Archivists' Accumulator first in its row](ticket-630/region-earth.png)
+
+![A Reactor Module at Mars: +12 Energy with Efficient Grids, 2 Ducats and 0.1 Fissionables upkeep](ticket-630/module-mars.png)
+
+**The review** (a reader who did not build it) found one high defect and five lesser. The high one:
+the computer counted a Generator's Energy and never a Reactor Module's, so a seat powered by Reactor
+Modules read itself short of power for ever and went on building them -- which the first sweep's 842
+Custodian Reactors fitted. A test went red (0 where 8) and the count was mended, standing and on
+order. The others: the mothball shut every Reactor when only some could not be fed, and could
+mothball and restart in a cycle -- now only the unfed are shut, and a restart waits for ten turns of
+every running Reactor and itself (a test pins both); the Shortfall forecast read the Fissionables
+before this turn's orders spent them; a dark or blockaded Reactor Module burned Fissionables it had
+not reserved, which could take the Stockpile below nought; the Collapse weighting gave a Reactor no
+clean preference; and a window test's fixture still said *Reactor relief*.
+
+**The sweep** ([`sweeps/ticket-630.txt`](sweeps/ticket-630.txt)), after the mending: **28 / 47 / 1 / 1
+and 3 collapses**, from 19 / 56 / 2 / 1 and 2 (the first build's read 31 / 46 / 1 / 1 and 1). Income a
+game, net of upkeep, by Faction:
+
+| | Materials | Fuel | Energy | Ducats | Research | Fissionables | Reactors standing at the end (80 games) | Nuclear hulls built (80 games) |
+|---|---|---|---|---|---|---|---|---|
+| Custodians | 2,231 | 630 | 1,002 | 1,118 | 1,079 | 88.9 | 699 | 158 |
+| Prospectors | 2,205 | 512 | 866 | 1,628 | 360 | 40.9 | 431 | 170 |
+| Arkwrights | 727 | 158 | 207 | 2,798 | 290 | 5.5 | 53 | 17 |
+| Archivists | 397 | 234 | 35 | 504 | 707 | 1.1 | 4 | 0 |
+
+The Custodians rose nine wins and stand the most Reactors, about nine a game; the Prospectors' Energy
+rose by half (575 a game to 866) and they fell nine. Launches 12, from 24. Reported, not tuned.
+

@@ -31,7 +31,7 @@ pub struct Credit {
 
 /// The icons in use, their authors, and the names they carry at game-icons.net. Anything added to
 /// `assets/icons/` belongs here too: the credit is the licence's price, not a courtesy.
-pub const CREDITS: [Credit; 45] = [
+pub const CREDITS: [Credit; 46] = [
     Credit { resource: "Materials", icon: "Mine Wagon", author: "Delapouite" },
     Credit { resource: "Fuel", icon: "Jerrycan", author: "Delapouite" },
     // Ticket #628 (version 0.1.0.6): the seventh resource, off the designer's sheet at 1A.
@@ -105,7 +105,10 @@ pub const CREDITS: [Credit; 45] = [
     // and no new name.
     Credit { resource: "Facility Investment Bank", icon: "Strongbox", author: "Delapouite" },
     Credit { resource: "Facility Spaceport", icon: "Space Shuttle", author: "Delapouite" },
+    // Ticket #630 (version 0.1.0.6): the trefoil goes with the name to the common Reactor; the
+    // Archivists' building, the Accumulator now, wears a storage cell of its own.
     Credit { resource: "Facility Reactor", icon: "Nuclear", author: "Sbed" },
+    Credit { resource: "Facility Accumulator", icon: "Energy Tank", author: "Delapouite" },
     // The Academy took two rounds: the telescope says astronomy, which is the Observatory's job, and
     // the open book is the Archive's. The designer picked the test tubes, knowing they are the
     // Research Lab's round-bottom flask's sibling -- the one pair on the board worth re-reading at
@@ -140,7 +143,9 @@ pub fn facility_icon(kind: dying_earth_engine::FacilityKind) -> &'static str {
         // grey boxes with a small Faction mark is not a thing a player reads.
         InvestmentBank => "facility_investment_bank",
         Spaceport => "facility_spaceport",
-        Reactor => "facility_reactor",
+        // Ticket #630 (version 0.1.0.6): the trefoil is the common Reactor's now.
+        Accumulator => "facility_accumulator",
+        FissionReactor => "facility_reactor",
         Academy => "facility_academy",
         // Ticket #332 (version 0.09.0): the Mine Facility wears the Mine Module's picture for now,
         // as the Refinery wears its Module's; the interface lane settles the glyphs.
@@ -185,6 +190,8 @@ pub fn module_icon(kind: dying_earth_engine::ModuleKind) -> &'static str {
         Factory => "facility_factory",
         // Ticket #559 (version 0.1.0.3): the Wind Farm Module wears the Facility's turbine.
         WindFarm => "facility_wind_farm",
+        // Ticket #630 (version 0.1.0.6): the Reactor Module wears the Facility's trefoil.
+        FissionReactor => "facility_reactor",
         // Ticket #164 (version 0.07.5): the Core Module wears the station glyph the game drew for
         // itself on ticket #135 -- two solar panels on a bar with a module between them, which is
         // what a core module is. It owes no credit. A ground Colony's Core Module wears it too,

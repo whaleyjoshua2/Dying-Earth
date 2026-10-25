@@ -498,3 +498,17 @@ mars_only = true
 one_mine = 0.75
 two_mines = 0.6
 floor = 0.5
+
+# Ticket #630 (version 0.1.0.6), at the designer's word: the REACTOR Module, the Facility's figures off
+# Earth ("Need an off world counterpart. Asteroid belt is after all too far away for solar"), at any
+# Colony or station, no sunlight and no site yield, behind Clean Power. Appended last.
+[[module]]
+id = "fission_reactor"
+name = "Reactor"
+materials = 27.5
+widgets = 10
+energy_upkeep = 0
+ducats_upkeep = 2
+fissionables_upkeep = 0.1
+produces = { resource = "energy", amount = 8 }
+needs_tech = "clean_power"

@@ -290,6 +290,7 @@ fn main() {
                         let mut uniq = [0u32; 4];
                         // Ticket #324 (version 0.08.8): Batteries standing at the end over the batch, by seat.
                         let mut batteries = [0u32; 4];
+                        let mut reactors = [0u32; 4];
                         // Ticket #89: Solar Arrays standing at the end over the batch.
                         let mut solar_arrays = 0u32;
                         // Ticket #90: Trade Posts standing at the end over the batch.
@@ -418,6 +419,7 @@ fn main() {
                                 d_below[i] += r.directive_turns_below[i];
                                 uniq[i] += r.uniques[i];
                                 batteries[i] += r.batteries[i];
+                                reactors[i] += r.reactors[i];
                             }
                             trade_posts += r.trade_posts;
                             mass_drivers += r.mass_drivers;
@@ -655,6 +657,8 @@ fn main() {
                             println!("      Exodus Calls sounded over the batch: {ex_calls}, worth {ex_pioneers} Pioneers");
                             println!("      Unique Modules standing at the end over the batch: Academy {}, Heliostat {}, Exchange {}, Chorus {}", uniq[0], uniq[1], uniq[2], uniq[3]);
                             println!("      Batteries standing at the end over the batch, by seat {batteries:?}");
+                            // Ticket #630 (version 0.1.0.6).
+                            println!("      Reactors standing at the end over the batch, Facilities and Modules, by seat {reactors:?}");
                             println!("      Venus: {venus_stations} stations at the end over the batch, {venus_colonists} Colonists living there");
                             println!("      {}", off_earth_line(&tables, &ground_by_body, &stations_by_body, &mut first_by_body, &mut ground_off_earth_per_game, seeds));
                             println!(

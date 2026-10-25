@@ -36,6 +36,9 @@ struct Producer {
     /// producers were gathered; unpaid, the output above is already a quarter.
     fuel_upkeep: f64,
     fuel_paid: bool,
+    /// Ticket #630 (version 0.1.0.6): Fissionables a turn while online, the Reactor's; paid with the
+    /// Fuel under the one `fuel_paid`, a building short of either running at a quarter.
+    fission_upkeep: f64,
     output: Option<(Resource, f64)>,
     /// Ticket #628 (version 0.1.0.6): the Fissionables a Mine makes beside its Materials; nought
     /// for every other building.
@@ -65,6 +68,8 @@ pub struct Yield {
     pub ducats_upkeep: f64,
     /// Ticket #575 (version 0.1.0.3): Fuel a turn while online, the power buildings' 0.8.
     pub fuel_upkeep: f64,
+    /// Ticket #630 (version 0.1.0.6): Fissionables a turn while online, the Reactor's 0.1.
+    pub fissionables_upkeep: f64,
     pub emissions: f64,
     /// Ticket #36: Influence Allotment added while it stands, and standing raised each turn.
     pub allotment: i64,
@@ -285,6 +290,9 @@ impl Yield {
         }
         if self.ducats_upkeep > 0.0 {
             parts.push(crate::counted(figure(self.ducats_upkeep), "Ducat upkeep", "Ducats upkeep"));
+        }
+        if self.fissionables_upkeep > 0.0 {
+            parts.push(format!("{} Fissionables upkeep", figure(self.fissionables_upkeep)));
         }
         if self.fuel_upkeep > 0.0 {
             parts.push(format!("{} Fuel upkeep", figure(self.fuel_upkeep)));
@@ -555,7 +563,7 @@ impl Game {
         let fac = t.faction(self.kind(seat));
         let card = t.state(sid);
         let fc = t.facility(kind);
-        let mut y = Yield { resource: None, amount: 0.0, fissionables: 0.0, research: 0, upkeep: fc.energy_upkeep as f64, ducats_upkeep: fc.ducats_upkeep, fuel_upkeep: fc.fuel_upkeep, emissions: 0.0, allotment: fc.influence_allotment, standing: fc.standing_per_turn, doubled_by: None, doubled_factor: 1.0, detail: None, does: fc.does.clone(), chain: Chain::default(), allotment_outside: 0 };
+        let mut y = Yield { resource: None, amount: 0.0, fissionables: 0.0, research: 0, upkeep: fc.energy_upkeep as f64, ducats_upkeep: fc.ducats_upkeep, fuel_upkeep: fc.fuel_upkeep, fissionables_upkeep: fc.fissionables_upkeep, emissions: 0.0, allotment: fc.influence_allotment, standing: fc.standing_per_turn, doubled_by: None, doubled_factor: 1.0, detail: None, does: fc.does.clone(), chain: Chain::default(), allotment_outside: 0 };
         if let Some(p) = &fc.produces {
             match p.resource {
                 Resource::Research => {
@@ -657,7 +665,7 @@ impl Game {
         let fac = t.faction(self.kind(seat));
         let mc = t.module(kind);
         // Ticket #559 (version 0.1.0.3): a Module's Ducat upkeep (the Wind Farm's), as a Facility's.
-        let mut y = Yield { resource: None, amount: 0.0, fissionables: 0.0, research: 0, upkeep: mc.energy_upkeep as f64, ducats_upkeep: mc.ducats_upkeep, fuel_upkeep: mc.fuel_upkeep, emissions: 0.0, allotment: mc.influence_allotment, standing: mc.standing_per_turn, doubled_by: None, doubled_factor: 1.0, detail: None, does: mc.does.clone(), chain: Chain::default(), allotment_outside: 0 };
+        let mut y = Yield { resource: None, amount: 0.0, fissionables: 0.0, research: 0, upkeep: mc.energy_upkeep as f64, ducats_upkeep: mc.ducats_upkeep, fuel_upkeep: mc.fuel_upkeep, fissionables_upkeep: mc.fissionables_upkeep, emissions: 0.0, allotment: mc.influence_allotment, standing: mc.standing_per_turn, doubled_by: None, doubled_factor: 1.0, detail: None, does: mc.does.clone(), chain: Chain::default(), allotment_outside: 0 };
         // Ticket #239 (version 0.08.3): a Unique Module does its sibling's job, so every lookup
         // keyed by kind -- the Techs that multiply it, the slot's yield, a Discovery on it --
         // reads the COMMON kind. Without this the Arkwrights' Chorus would be the one Relay in
@@ -881,7 +889,7 @@ impl Game {
     /// `doubled_modules`, named for the Facility whose mothball pays for it.
     pub fn module_yield_at(&self, seat: Seat, cid: ColonyId, index: usize) -> Yield {
         let Some(kind) = self.colony(cid).and_then(|c| c.modules.get(index)).map(|m| m.kind) else {
-            return Yield { resource: None, amount: 0.0, fissionables: 0.0, research: 0, upkeep: 0.0, ducats_upkeep: 0.0, fuel_upkeep: 0.0, emissions: 0.0, allotment: 0, standing: 0, doubled_by: None, doubled_factor: 1.0, detail: None, does: None, chain: Chain::default(), allotment_outside: 0 };
+            return Yield { resource: None, amount: 0.0, fissionables: 0.0, research: 0, upkeep: 0.0, ducats_upkeep: 0.0, fuel_upkeep: 0.0, fissionables_upkeep: 0.0, emissions: 0.0, allotment: 0, standing: 0, doubled_by: None, doubled_factor: 1.0, detail: None, does: None, chain: Chain::default(), allotment_outside: 0 };
         };
         let mut y = self.module_yield(seat, cid, kind);
         if self.doubled_modules(seat).contains(&(cid, index)) {
@@ -1065,24 +1073,29 @@ impl Game {
     }
 
     fn producers_of(&self, seat: Seat) -> Vec<Producer> {
-        self.producers_with_tank(seat, self.seat(seat).stockpile.fuel)
+        self.producers_with_tank(seat, self.seat(seat).stockpile.fuel, self.seat(seat).stockpile.fissionables)
     }
 
     /// The producers with the Fuel budget given, which the shortfall forecast reads from what this
     /// turn's orders leave (the review of #575: a pending Refuel spends the tank before the Income).
-    fn producers_with_tank(&self, seat: Seat, tank: f64) -> Vec<Producer> {
+    fn producers_with_tank(&self, seat: Seat, tank: f64, fission: f64) -> Vec<Producer> {
         let mut out = Vec::new();
         // Ticket #575 (version 0.1.0.3): the Fuel in the tank pays each burning building in turn, as
         // far as it goes; a building it does not reach runs at a quarter this Income. A building the
         // Energy shortfall later shuts keeps its reservation, uncharged: no burning building carries
         // an Energy upkeep today, so none is ever shut that way.
         let mut fuel_budget = tank;
-        let mut pay = |fuel: f64| -> bool {
-            if fuel <= 0.0 {
+        // Ticket #630 (version 0.1.0.6): and the Fissionables a Reactor burns, from the Stockpile, a
+        // building short of either good running at a quarter and burning neither.
+        // From the review: what this turn's orders leave, as the Fuel is, for the forecast.
+        let mut fission_budget = fission;
+        let mut pay = |fuel: f64, fission: f64| -> bool {
+            if fuel <= 0.0 && fission <= 0.0 {
                 return true;
             }
-            if fuel_budget + 1e-9 >= fuel {
-                fuel_budget = tenth(fuel_budget - fuel);
+            if fuel_budget + 1e-9 >= fuel && fission_budget + 1e-9 >= fission {
+                fuel_budget = tenth(fuel_budget - fuel.max(0.0));
+                fission_budget = tenth(fission_budget - fission.max(0.0));
                 true
             } else {
                 false
@@ -1110,7 +1123,8 @@ impl Game {
                 // Ticket #387 (version 0.09.3): to the tenth, where it was floored; Research whole.
                 let halve = |v: f64| if scale < 1.0 { tenth(v * scale) } else { v };
                 let halve_whole = |v: i64| if scale < 1.0 { (v as f64 * scale).floor() as i64 } else { v };
-                let fuel_paid = f.offline_until_resolution || pay(y.fuel_upkeep);
+                let idle = f.offline_until_resolution;
+                let fuel_paid = idle || pay(y.fuel_upkeep, y.fissionables_upkeep);
                 let quarter = |v: f64| if fuel_paid { v } else { tenth(v * 0.25) };
                 out.push(Producer {
                     place: ProducerPlace::Facility(sid, i),
@@ -1119,6 +1133,7 @@ impl Game {
                     upkeep: y.upkeep,
                     ducats_upkeep: y.ducats_upkeep,
                     fuel_upkeep: y.fuel_upkeep,
+                    fission_upkeep: if idle { 0.0 } else { y.fissionables_upkeep },
                     fuel_paid,
                     output: y.resource.map(|r| (r, if r == Resource::Widgets { (y.amount * scale).floor() } else { quarter(halve(y.amount)) })),
                     fissionables: 0.0,
@@ -1147,7 +1162,8 @@ impl Game {
                 // Ticket #82: the doubling, if this Module has one, is on the figure.
                 let y = self.module_yield_at(seat, cid, i);
                 // The review of #565: a dark Module burns nothing, so it reserves nothing.
-                let fuel_paid = dark.contains(&i) || starved || col.grid_failed || m.offline_until_resolution || pay(y.fuel_upkeep);
+                let idle = dark.contains(&i) || starved || col.grid_failed || m.offline_until_resolution;
+                let fuel_paid = idle || pay(y.fuel_upkeep, y.fissionables_upkeep);
                 let quarter = |v: f64| if fuel_paid { v } else { tenth(v * 0.25) };
                 out.push(Producer {
                     place: ProducerPlace::Module(cid, i),
@@ -1157,6 +1173,9 @@ impl Game {
                     // Ticket #559 (version 0.1.0.3): the Wind Farm Module's Ducat, charged as a Facility's.
                     ducats_upkeep: y.ducats_upkeep,
                     fuel_upkeep: y.fuel_upkeep,
+                    // Ticket #630, from the review: one that reserved nothing burns nothing, so the
+                    // Stockpile never goes below nought.
+                    fission_upkeep: if idle { 0.0 } else { y.fissionables_upkeep },
                     fuel_paid,
                     output: if starved { None } else { y.resource.map(|r| (r, quarter(y.amount))) },
                     // Ticket #628 (version 0.1.0.6): a Mine's Fissionables; a starved Colony makes none.
@@ -1189,6 +1208,7 @@ impl Game {
                     upkeep: 0.0,
                     ducats_upkeep: 0.0,
                     fuel_upkeep: 0.0,
+                    fission_upkeep: 0.0,
                     fuel_paid: true,
                     fissionables: 0.0,
                     output: (!research).then_some((res, v)),
@@ -1224,7 +1244,8 @@ impl Game {
         }
         match kind {
             // Ticket #505 (version 0.1.0.0): Superconductors, on every Energy output, in this chain.
-            FacilityKind::PowerPlant | FacilityKind::WindFarm => m *= self.tech_multiplier(seat, TechId::EfficientGrids) * self.tech_multiplier(seat, TechId::Superconductors),
+            // Ticket #630 (version 0.1.0.6): and the Reactor, which takes no Solar Maximum.
+            FacilityKind::PowerPlant | FacilityKind::WindFarm | FacilityKind::FissionReactor => m *= self.tech_multiplier(seat, TechId::EfficientGrids) * self.tech_multiplier(seat, TechId::Superconductors),
             // Ticket #332 (version 0.09.0): Deep Mining follows the Materials to the Mine; the
             // Factory makes Widgets now and no Tech lifts those.
             FacilityKind::Mine => m *= self.tech_multiplier(seat, TechId::DeepMining),
@@ -1248,7 +1269,7 @@ impl Game {
         }
         match kind {
             // Ticket #505 (version 0.1.0.0): Superconductors, on every Energy output, in this chain.
-            ModuleKind::Generator | ModuleKind::SolarArray | ModuleKind::WindFarm => m *= self.tech_multiplier(seat, TechId::EfficientGrids) * self.tech_multiplier(seat, TechId::Superconductors),
+            ModuleKind::Generator | ModuleKind::SolarArray | ModuleKind::WindFarm | ModuleKind::FissionReactor => m *= self.tech_multiplier(seat, TechId::EfficientGrids) * self.tech_multiplier(seat, TechId::Superconductors),
             // Ticket #84: the Extraction Charter stacks on Deep Mining.
             // Ticket #232 (version 0.08.3): and Beneficiation stacks on both, INSIDE this one
             // chain, so the whole product is floored once by the caller. A tenth applied after a
@@ -1438,13 +1459,13 @@ impl Game {
     pub fn shortfall_forecast(&self, seat: Seat, pending: &[crate::orders::Order]) -> Option<ShortfallForecast> {
         let left = self.remaining(seat, pending).0;
         let stored = left.energy;
-        let mut producers = self.producers_with_tank(seat, left.fuel);
+        let mut producers = self.producers_with_tank(seat, left.fuel, left.fissionables);
         let (_, shut) = self.apply_shortfall(seat, &mut producers, stored);
         if shut.is_empty() {
             return None;
         }
         // The deficit is the balance with everything still running, read before a single thing is shut.
-        let short_by = -self.energy_balance(seat, &self.producers_with_tank(seat, left.fuel), stored);
+        let short_by = -self.energy_balance(seat, &self.producers_with_tank(seat, left.fuel, left.fissionables), stored);
         let dark = shut
             .into_iter()
             .map(|i| GoesDark { name: producers[i].name.to_string(), at: self.producer_place_text(&producers[i]) })
@@ -1481,7 +1502,7 @@ impl Game {
     fn reactor_relief(&self, seat: Seat, producers: &[Producer]) -> f64 {
         let lit = producers.iter().any(|p| {
             p.online
-                && p.name == FacilityKind::Reactor.name()
+                && p.name == FacilityKind::Accumulator.name()
                 && matches!(p.place, ProducerPlace::Facility(sid, _) if self.state(sid).control == Control::Controlled(seat))
         });
         if !lit {
@@ -1569,6 +1590,7 @@ impl Game {
         let mut energy_by_place: Vec<(String, f64, f64)> = Vec::new();
         // Ticket #575 (version 0.1.0.3): the buildings whose Fuel was not there, for the Report.
         let mut fuel_short: Vec<String> = Vec::new();
+        let mut fission_short: Vec<String> = Vec::new();
         for p in &producers {
             let where_ = match p.place {
                 ProducerPlace::Facility(sid, i) => {
@@ -1673,6 +1695,15 @@ impl Game {
                     fuel_short.push(format!("{} in {}", p.name, where_));
                 }
             }
+            // Ticket #630 (version 0.1.0.6): and the Fissionables a Reactor burns, the same way.
+            if p.fission_upkeep > 0.0 {
+                if p.fuel_paid {
+                    gained.fissionables -= p.fission_upkeep;
+                    sources.push((format!("{} in {} (upkeep)", p.name, where_), Resource::Fissionables, -p.fission_upkeep));
+                } else {
+                    fission_short.push(format!("{} in {}", p.name, where_));
+                }
+            }
         }
         let unit_upkeep = self.unit_upkeep(seat);
         if unit_upkeep > 0.0 {
@@ -1684,7 +1715,7 @@ impl Game {
         energy_by_place.push(("Ships and Armies".to_string(), 0.0, unit_upkeep));
         let relief = self.reactor_relief(seat, &producers);
         if relief > 0.0 {
-            energy_by_place.push(("Reactor relief".to_string(), relief, 0.0));
+            energy_by_place.push(("Accumulator relief".to_string(), relief, 0.0));
         }
         // Ticket #35: every controlled state's economy pays Ducats, gdp x Industry Level / 10.
         for sid in self.controlled_states(seat) {
@@ -1911,6 +1942,13 @@ impl Game {
             let line = format!("{}: Fuel ran short; {} ran at a quarter.", self.seat_name(seat), fuel_short.join(", "));
             self.log(line);
             let text = self.say("fuel_short", &[("faction", self.seat_name(seat)), ("buildings", Game::and_list(&fuel_short))]);
+            self.report_line_of(seat, LineKind::YourWorks, LineKind::Note, None, text);
+        }
+        // Ticket #630 (version 0.1.0.6).
+        if !fission_short.is_empty() {
+            let line = format!("{}: Fissionables ran short; {} ran at a quarter.", self.seat_name(seat), fission_short.join(", "));
+            self.log(line);
+            let text = self.say("fission_short", &[("faction", self.seat_name(seat)), ("buildings", Game::and_list(&fission_short))]);
             self.report_line_of(seat, LineKind::YourWorks, LineKind::Note, None, text);
         }
         if !shut.is_empty() {

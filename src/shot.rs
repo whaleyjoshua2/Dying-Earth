@@ -659,6 +659,10 @@ fn build_board(session: &mut Session) {
                 col.modules.push(Module::new(ModuleKind::Mine));
                 // Ticket #629 (version 0.1.0.6): and a Shipyard, so the yard's rows are in the picture.
                 col.modules.push(Module::new(ModuleKind::Shipyard));
+                // Ticket #630 (version 0.1.0.6): `reactor:1`, and a Reactor Module, for its tile.
+                if std::env::args().any(|a| a == "reactor:1") {
+                    col.modules.push(Module::new(ModuleKind::FissionReactor));
+                }
             }
             // Ticket #629: and a nuclear Frigate in low orbit, its second tank half full, for its card.
             let id = ShipId(g.fresh_id());

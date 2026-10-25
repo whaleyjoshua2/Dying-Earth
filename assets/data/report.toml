@@ -315,6 +315,8 @@ capital_building = "{faction} built the {building} at {place}."
 energy_short = "{faction}: Energy ran short; shut down {buildings}{sink}."
 # Ticket #575 (version 0.1.0.3): a power building whose Fuel was not there ran at a quarter.
 fuel_short = "{faction}: Fuel ran short; {buildings} ran at a quarter."
+# Ticket #630 (version 0.1.0.6): a Reactor whose Fissionables were not there ran at a quarter.
+fission_short = "{faction}: Fissionables ran short; {buildings} ran at a quarter."
 energy_zero = "{faction}: Energy at zero with every producer off."
 
 # ---------------------------------------------------------------- fragments other sentences use

@@ -4861,7 +4861,8 @@ fn f_coastal_engineering_is_the_thirteenth_tech() {
     // Ticket #332 (version 0.09.0): and the Mine, sixteen. Ticket #389 (version 0.09.3): and the
     // Stadium, seventeen. Ticket #411 (version 0.09.4): and the Nature Reserve, eighteen. Ticket
     // #559 (version 0.1.0.3): and the Wind Farm, nineteen, behind Clean Power.
-    assert_eq!(FacilityKind::ALL.len(), 19, "nineteen Facilities");
+    // Ticket #630 (version 0.1.0.6): and the Reactor, twenty.
+    assert_eq!(FacilityKind::ALL.len(), 20, "twenty Facilities");
     assert_eq!(g.tables.facility(FacilityKind::WindFarm).needs_tech, Some(TechId::CleanPower));
 }
 
@@ -10185,7 +10186,7 @@ fn a_unique_facility_costs_and_makes_what_the_common_one_does() {
     for (unique, common) in [
         (FacilityKind::InvestmentBank, FacilityKind::Bank),
         (FacilityKind::Spaceport, FacilityKind::LaunchSite),
-        (FacilityKind::Reactor, FacilityKind::PowerPlant),
+        (FacilityKind::Accumulator, FacilityKind::PowerPlant),
         (FacilityKind::Academy, FacilityKind::School),
     ] {
         assert_eq!(unique.common(), Some(common), "{} replaces {}", unique.name(), common.name());
@@ -10498,12 +10499,12 @@ fn a_reactor_takes_a_quarter_off_the_whole_energy_bill_but_never_off_the_archive
     assert!(want > 0.0, "the premise: there is a bill to take a quarter off, {bill}");
 
     let i = g.state(sid).facilities.iter().position(|f| f.kind == FacilityKind::PowerPlant).unwrap();
-    g.state_mut(sid).facilities[i].kind = FacilityKind::Reactor;
+    g.state_mut(sid).facilities[i].kind = FacilityKind::Accumulator;
     g.income_phase();
     assert_eq!(g.seats[arc.index()].income_last_turn.energy - plain, want, "off the total, floored once");
 
     // No stacking: a second Reactor is worth its 6 Energy and nothing more.
-    g.state_mut(sid).facilities.push(Facility::new(FacilityKind::Reactor));
+    g.state_mut(sid).facilities.push(Facility::new(FacilityKind::Accumulator));
     g.income_phase();
     let two = g.seats[arc.index()].income_last_turn.energy;
     g.state_mut(sid).facilities.pop();
@@ -10511,7 +10512,7 @@ fn a_reactor_takes_a_quarter_off_the_whole_energy_bill_but_never_off_the_archive
     let one = g.seats[arc.index()].income_last_turn.energy;
     // What a Reactor actually makes here, not the row figure: this Region leans Energy, so its
     // power stations pay half again.
-    let makes = g.facility_yield(arc, sid, FacilityKind::Reactor).amount;
+    let makes = g.facility_yield(arc, sid, FacilityKind::Accumulator).amount;
     assert_eq!(two - one, makes, "the second Reactor pays its Energy and no second discount");
 
     // And the Archive pays in full: it is left out of the sum the relief is taken from, so adding it
@@ -13393,12 +13394,15 @@ fn four_makers_the_factory_makes_widgets_the_mine_makes_materials_and_the_start_
     // Ticket #389 (version 0.09.3): the Stadium stands after the Mine now, appended last in its turn;
     // ticket #411 (version 0.09.4): and the Nature Reserve after it; ticket #559 (version 0.1.0.3):
     // and the Wind Farm after that, on both lists.
-    assert_eq!(FacilityKind::ALL[FacilityKind::ALL.len() - 4], FacilityKind::Mine, "appended after every kind before it");
-    assert_eq!(FacilityKind::ALL[FacilityKind::ALL.len() - 3], FacilityKind::Stadium);
-    assert_eq!(FacilityKind::ALL[FacilityKind::ALL.len() - 2], FacilityKind::NatureReserve);
-    assert_eq!(FacilityKind::ALL.last(), Some(&FacilityKind::WindFarm), "appended last");
-    assert_eq!(ModuleKind::ALL[ModuleKind::ALL.len() - 2], ModuleKind::Factory, "appended after every kind before it");
-    assert_eq!(ModuleKind::ALL.last(), Some(&ModuleKind::WindFarm), "appended last");
+    // Ticket #630 (version 0.1.0.6): and the Reactor after the Wind Farm, on both lists.
+    assert_eq!(FacilityKind::ALL[FacilityKind::ALL.len() - 5], FacilityKind::Mine, "appended after every kind before it");
+    assert_eq!(FacilityKind::ALL[FacilityKind::ALL.len() - 4], FacilityKind::Stadium);
+    assert_eq!(FacilityKind::ALL[FacilityKind::ALL.len() - 3], FacilityKind::NatureReserve);
+    assert_eq!(FacilityKind::ALL[FacilityKind::ALL.len() - 2], FacilityKind::WindFarm);
+    assert_eq!(FacilityKind::ALL.last(), Some(&FacilityKind::FissionReactor), "appended last");
+    assert_eq!(ModuleKind::ALL[ModuleKind::ALL.len() - 3], ModuleKind::Factory, "appended after every kind before it");
+    assert_eq!(ModuleKind::ALL[ModuleKind::ALL.len() - 2], ModuleKind::WindFarm);
+    assert_eq!(ModuleKind::ALL.last(), Some(&ModuleKind::FissionReactor), "appended last");
     assert!(ModuleKind::BUILDABLE.contains(&ModuleKind::Factory));
     assert_eq!((FacilityKind::Mine.name(), ModuleKind::Factory.name()), ("Mine", "Factory"), "one name in both lists");
     let t = &g.tables;
@@ -19631,7 +19635,7 @@ fn a_captured_mothballed_reactor_doubles_a_custodian_generator_as_a_power_plant_
     let cus = Seat(0);
     assert_eq!(g.kind(cus), FactionKind::Custodians);
     let moon = colony(&mut g, cus, BodyId::Moon, &[ModuleKind::Generator], 0);
-    g.state_mut(StateId::EastAsia).facilities.push(facility(FacilityKind::Reactor));
+    g.state_mut(StateId::EastAsia).facilities.push(facility(FacilityKind::Accumulator));
     assert!(g.doubled_modules(cus).is_empty(), "a Reactor at work doubles nothing");
     let i = g.state(StateId::EastAsia).facilities.len() - 1;
     g.state_mut(StateId::EastAsia).facilities[i].mothballed = true;
@@ -19648,7 +19652,7 @@ fn the_custodian_ai_keeps_a_held_reactor_idle_while_it_doubles_a_generator() {
     let cus = Seat(0);
     g.seats[0].stockpile.energy = 500.0;
     colony(&mut g, cus, BodyId::Phobos, &[ModuleKind::Generator], 0);
-    g.state_mut(StateId::EastAsia).facilities.push(facility(FacilityKind::Reactor));
+    g.state_mut(StateId::EastAsia).facilities.push(facility(FacilityKind::Accumulator));
     let i = g.state(StateId::EastAsia).facilities.len() - 1;
     g.state_mut(StateId::EastAsia).facilities[i].mothballed = true;
     assert_eq!(g.doubled_modules(cus).len(), 1, "the premise: the idle Reactor doubles the Generator");
@@ -20255,7 +20259,7 @@ fn power_burns_fuel_and_runs_at_a_quarter_without_it() {
     let cus = seat_of(&g, FactionKind::Custodians);
     let sid = g.controlled_states(cus)[0];
     let t = g.tables.clone();
-    assert_eq!((t.facility(FacilityKind::PowerPlant).fuel_upkeep, t.facility(FacilityKind::Reactor).fuel_upkeep, t.module(ModuleKind::Generator).fuel_upkeep), (0.8, 0.8, 0.8), "the premise: the three burn 0.8");
+    assert_eq!((t.facility(FacilityKind::PowerPlant).fuel_upkeep, t.facility(FacilityKind::Accumulator).fuel_upkeep, t.module(ModuleKind::Generator).fuel_upkeep), (0.8, 0.8, 0.8), "the premise: the three burn 0.8");
     assert_eq!((t.module(ModuleKind::SolarArray).fuel_upkeep, t.facility(FacilityKind::WindFarm).fuel_upkeep, t.module(ModuleKind::WindFarm).fuel_upkeep), (0.0, 0.0, 0.0), "and the clean three nothing");
     // One Power Plant standing: 0.8 Fuel off the Income, named.
     g.seats[cus.index()].stockpile.fuel = 50.0;
@@ -21081,7 +21085,8 @@ fn the_reports_templates_stay_under_their_word_ceiling() {
     // Ticket #544 (version 0.1.0.1): and by the 33 of a window next turn and the Report's head.
     // Ticket #615 (version 0.1.0.5): and by the 9 of an Occupation that halves the holder's Standing.
     // Ticket #622 (version 0.1.0.5): and by the 10 of a Strip Permit's growth and Relations clauses.
-    assert!(words <= 1976, "the Report's templates hold {words} words; the ceiling is 1,976 (10 for a Strip Permit's clauses, 9 for an Occupation's holder, 15 for a rival on yours, 33 for a window and the head, 46 for an Accord's end, 9 for a place handed over twice, 9 for an Army inherited, 12 for an Accord broken, 15% off 2,031, 54 for the race to the Moon, 2 for a rival's upgrade, 8 for an Accord answered, less a word of slack, 17 for a Trade, 9 for a Capital refunded, 5 for an Accord let lapse, 7 for Terms added, 5 for a renewal)");
+    // Ticket #630 (version 0.1.0.6): and by the 9 of a Reactor short of Fissionables.
+    assert!(words <= 1985, "the Report's templates hold {words} words; the ceiling is 1,985 (9 for Fissionables run short, 10 for a Strip Permit's clauses, 9 for an Occupation's holder, 15 for a rival on yours, 33 for a window and the head, 46 for an Accord's end, 9 for a place handed over twice, 9 for an Army inherited, 12 for an Accord broken, 15% off 2,031, 54 for the race to the Moon, 2 for a rival's upgrade, 8 for an Accord answered, less a word of slack, 17 for a Trade, 9 for a Capital refunded, 5 for an Accord let lapse, 7 for Terms added, 5 for a renewal)");
     // "The" is gone before a Faction's name, which is drawn in its colour instead.
     assert!(!text.contains("he {faction}"), "a template still says \"the {{faction}}\"");
 }
@@ -24157,7 +24162,8 @@ fn the_pack_presses_the_leader_and_draws_together() {
 #[test]
 fn the_wind_farm_rows_need_clean_power_and_carry_a_ducat_a_turn() {
     let g = game();
-    assert_eq!(FacilityKind::ALL.last(), Some(&FacilityKind::WindFarm), "appended last, for Tables::facility");
+    // Ticket #630 (version 0.1.0.6): the Reactor appended after it.
+    assert_eq!(FacilityKind::ALL[FacilityKind::ALL.len() - 2], FacilityKind::WindFarm, "appended last in its turn, for Tables::facility");
     assert_eq!(FacilityKind::WindFarm.name(), "Wind Farm");
     assert_eq!((FacilityKind::WindFarm.common(), FacilityKind::WindFarm.unique_to()), (None, None), "a common kind, and not a Power Plant");
     assert!(!FacilityKind::WindFarm.does_the_job_of(FacilityKind::PowerPlant), "Production Moved and the Reactor's rule read the Power Plant's job; the Wind Farm is not it");
@@ -24169,7 +24175,8 @@ fn the_wind_farm_rows_need_clean_power_and_carry_a_ducat_a_turn() {
     assert!(g.takes_slot(FacilityKind::WindFarm), "a slot, as a Power Plant takes");
     let p = g.tables.facility(FacilityKind::PowerPlant);
     assert_eq!((p.materials, p.widgets, p.emissions, p.ducats_upkeep), (27.5, 10, 1.5, 0.0), "the premise: the Power Plant as it was (10 Widgets since ticket #610, 8 before)");
-    assert_eq!(ModuleKind::ALL.last(), Some(&ModuleKind::WindFarm), "appended last, for Tables::module");
+    // Ticket #630 (version 0.1.0.6): the Reactor Module appended after it.
+    assert_eq!(ModuleKind::ALL[ModuleKind::ALL.len() - 2], ModuleKind::WindFarm, "appended last in its turn, for Tables::module");
     assert!(ModuleKind::BUILDABLE.contains(&ModuleKind::WindFarm));
     assert_eq!(ModuleKind::WindFarm.name(), "Wind Farm", "one name in both lists");
     assert!(!ModuleKind::WindFarm.stands_on_a_station(), "the ground of Mars, never a station");
@@ -24313,7 +24320,7 @@ fn a_power_plant_is_replaced_with_a_wind_farm_through_the_queue_at_half_price() 
     calm(&mut g);
     let sid = StateId::EastAsia;
     directed(&mut g, sid);
-    g.state_mut(sid).facilities = vec![Facility::in_coastal_slot(FacilityKind::PowerPlant), facility(FacilityKind::Factory), facility(FacilityKind::Reactor), facility(FacilityKind::PowerPlant)];
+    g.state_mut(sid).facilities = vec![Facility::in_coastal_slot(FacilityKind::PowerPlant), facility(FacilityKind::Factory), facility(FacilityKind::Accumulator), facility(FacilityKind::PowerPlant)];
     let replace = |i| Order::Change { building: BuildingRef::Facility(sid, i), what: BuildingChange::Replace };
     let err = g.check_order(Seat(0), &[], &replace(0)).expect_err("refused without Clean Power").0;
     assert!(err.contains("Clean Power"), "{err}");
@@ -25969,7 +25976,7 @@ fn ticket_620_a_computer_seat_weighs_collapse_against_its_win() {
     let w = |o: Order| g.ai_collapse_weight(&o);
     assert!((w(Order::StripPermit { state: sid }) - 0.5).abs() < 1e-9, "a Strip Permit");
     assert!((w(Order::RaiseIndustry { state: sid }) - 0.5).abs() < 1e-9, "an Industry Level");
-    for kind in [FacilityKind::Factory, FacilityKind::Mine, FacilityKind::PowerPlant, FacilityKind::Refinery, FacilityKind::Reactor] {
+    for kind in [FacilityKind::Factory, FacilityKind::Mine, FacilityKind::PowerPlant, FacilityKind::Refinery, FacilityKind::Accumulator] {
         assert!((w(Order::BuildFacility { state: sid, kind }) - 0.5).abs() < 1e-9, "{kind:?} carries Emissions on its card");
     }
     for kind in [FacilityKind::WindFarm, FacilityKind::NatureReserve, FacilityKind::Scrubber] {
@@ -26357,4 +26364,116 @@ fn ticket_629_the_computer_builds_nuclear_when_it_can_keep_the_tank_filled() {
     assert!(g.ai_builds_nuclear(Seat(0), UnitKind::Frigate));
     g.seats[0].stockpile.fissionables = tenth(fill * 3.0 - 0.1);
     assert!(!g.ai_builds_nuclear(Seat(0), UnitKind::Frigate));
+}
+
+// ---------------------------------------------------------------- #630 The Reactor and the Accumulator (version 0.1.0.6)
+
+/// Ticket #630 (version 0.1.0.6), at the designer's word: **the Reactor**, a common power station
+/// that burns Fissionables -- 8 Energy a turn for 0.1 Fissionables and 2 Ducats, no Emissions, at the
+/// Power Plant's price, behind Clean Power as the Wind Farm is ("gate it clean power with the wind")
+/// -- and a Reactor Module of the same figures off Earth. The Archivists' own building, the Reactor
+/// until now, is renamed **the Accumulator**, its rule untouched.
+#[test]
+fn ticket_630_the_reactor_and_the_accumulator_on_their_cards() {
+    let g = game();
+    let r = g.tables.facility(FacilityKind::FissionReactor);
+    assert_eq!(r.name, "Reactor");
+    assert_eq!((r.materials, r.widgets, r.energy_upkeep, r.ducats_upkeep, r.fissionables_upkeep, r.emissions), (27.5, 10, 0, 2.0, 0.1, 0.0));
+    assert_eq!(r.produces.as_ref().map(|p| (p.resource, p.amount)), Some((Resource::Energy, 8.0)));
+    assert_eq!(r.needs_tech, Some(TechId::CleanPower));
+    let m = g.tables.module(ModuleKind::FissionReactor);
+    assert_eq!(m.name, "Reactor");
+    assert_eq!((m.materials, m.widgets, m.energy_upkeep, m.ducats_upkeep, m.fissionables_upkeep), (27.5, 10, 0, 2.0, 0.1));
+    assert_eq!(m.produces.as_ref().map(|p| (p.resource, p.amount)), Some((Resource::Energy, 8.0)));
+    assert_eq!(m.needs_tech, Some(TechId::CleanPower));
+    assert!(!m.sun_scaled && !m.station_only);
+    assert_eq!(FacilityKind::FissionReactor.unique_to(), None, "every Faction's");
+    assert_eq!(FacilityKind::Accumulator.name(), "Accumulator");
+    assert_eq!(g.tables.facility(FacilityKind::Accumulator).name, "Accumulator");
+    assert_eq!((FacilityKind::Accumulator.unique_to(), FacilityKind::Accumulator.common()), (Some(FactionKind::Archivists), Some(FacilityKind::PowerPlant)));
+    assert_eq!(FacilityKind::FissionReactor.built_by(FactionKind::Archivists), FacilityKind::FissionReactor, "the Archivists build the common Reactor too");
+}
+
+/// Ticket #630: the Reactor's Energy takes Efficient Grids and Superconductors and not Solar Maximum;
+/// it burns its Fissionables and Ducats at Income, and short of Fissionables it runs at a quarter
+/// and burns none, as a Power Plant short of Fuel does.
+#[test]
+fn ticket_630_a_reactor_burns_fissionables_and_runs_at_a_quarter_without_them() {
+    let mut g = game();
+    g.state_mut(StateId::EastAsia).facilities = vec![facility(FacilityKind::FissionReactor)];
+    let y = g.facility_yield(Seat(0), StateId::EastAsia, FacilityKind::FissionReactor);
+    assert_eq!((y.resource, y.amount, y.fissionables_upkeep, y.ducats_upkeep, y.emissions), (Some(Resource::Energy), 8.0, 0.1, 2.0, 0.0));
+    with_tech(&mut g, TechId::EfficientGrids);
+    with_tech(&mut g, TechId::Superconductors);
+    assert_eq!(g.facility_yield(Seat(0), StateId::EastAsia, FacilityKind::FissionReactor).amount, 15.0, "8 x 1.5 x 1.25");
+    g.seats[0].stockpile.fissionables = 1.0;
+    let fed = income_of(&mut g, Seat(0));
+    assert_eq!(fed.fissionables, -0.1, "a tenth burned");
+    g.seats[0].stockpile.fissionables = 0.0;
+    let starved = income_of(&mut g, Seat(0));
+    assert_eq!(starved.fissionables, 0.0, "nothing to burn");
+    assert_eq!(tenth(fed.energy - starved.energy), tenth(15.0 - tenth(15.0 * 0.25)), "a quarter of its Energy");
+}
+
+/// Ticket #630: the Reactor waits on Clean Power, on Earth and off it; the Module makes its 8
+/// wherever it stands, the sunlight of the Body nothing to it.
+#[test]
+fn ticket_630_the_reactor_waits_on_clean_power_and_the_module_ignores_the_sun() {
+    let mut g = game();
+    g.seats[0].stockpile.materials = 500.0;
+    let build = Order::BuildFacility { state: StateId::EastAsia, kind: FacilityKind::FissionReactor };
+    let err = g.check_order(Seat(0), &[], &build).unwrap_err().0;
+    assert!(err.contains("Clean Power"), "{err}");
+    with_tech(&mut g, TechId::CleanPower);
+    g.check_order(Seat(0), &[], &build).expect("ordered once Clean Power stands");
+    let vesta = colony(&mut g, Seat(0), BodyId::Vesta, &[ModuleKind::FissionReactor], 2);
+    let mars = colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::FissionReactor], 2);
+    assert_eq!(g.module_yield_at(Seat(0), vesta, 0).amount, 8.0);
+    assert_eq!(g.module_yield_at(Seat(0), mars, 0).amount, 8.0);
+}
+
+/// Ticket #630 (Q8): the computer builds a Reactor where it would build a Power Plant once Clean Power
+/// stands and its Stockpile holds ten turns of the upkeep, and a Power Plant or Wind Farm otherwise.
+#[test]
+fn ticket_630_the_computer_feeds_a_reactor_only_with_ten_turns_in_hand() {
+    let mut g = game();
+    assert_eq!(g.tables.ai.thresholds.reactor_reserve_turns, 10.0);
+    g.seats[0].stockpile.fissionables = 5.0;
+    assert!(!g.ai_feeds_reactors(Seat(0)), "not before Clean Power");
+    with_tech(&mut g, TechId::CleanPower);
+    assert!(g.ai_feeds_reactors(Seat(0)));
+    g.seats[0].stockpile.fissionables = 0.9;
+    assert!(!g.ai_feeds_reactors(Seat(0)), "short of ten turns' 1.0");
+}
+
+/// Ticket #630, from the review: the computer counts a Reactor Module's Energy, standing and on
+/// order, where it counted the Generator's alone and so read a seat of Reactors as short of power
+/// for ever, building more.
+#[test]
+fn ticket_630_the_computer_counts_its_reactor_modules_energy() {
+    let mut g = game();
+    let c = colony(&mut g, Seat(0), BodyId::Mars, &[], 4);
+    let before = g.energy_production(Seat(0));
+    g.colony_mut(c).unwrap().modules.push(Module::new(ModuleKind::FissionReactor));
+    assert_eq!(g.energy_production(Seat(0)) - before, 8, "the Module's 8");
+}
+
+/// Ticket #630, from the review: a seat short of Fissionables mothballs only the Reactors it cannot
+/// feed this Income, and restarts one only once it can feed the ones running and that one for the
+/// reserve's ten turns, so the two never chase each other turn on turn.
+#[test]
+fn ticket_630_the_computer_mothballs_only_the_reactors_it_cannot_feed() {
+    let mut g = game();
+    g.state_mut(StateId::EastAsia).facilities = (0..5).map(|_| facility(FacilityKind::FissionReactor)).collect();
+    g.seats[0].stockpile.fissionables = 0.4;
+    assert_eq!(g.ai_reactors_to_mothball(Seat(0)), 1, "four of five can be fed");
+    g.seats[0].stockpile.fissionables = 0.5;
+    assert_eq!(g.ai_reactors_to_mothball(Seat(0)), 0);
+    // Four running and one idle: a restart wants ten turns of five, 5 Fissionables.
+    g.state_mut(StateId::EastAsia).facilities[4].mothballed = true;
+    with_tech(&mut g, TechId::CleanPower);
+    g.seats[0].stockpile.fissionables = 4.9;
+    assert!(!g.ai_may_restart_reactor(Seat(0)));
+    g.seats[0].stockpile.fissionables = 5.0;
+    assert!(g.ai_may_restart_reactor(Seat(0)));
 }

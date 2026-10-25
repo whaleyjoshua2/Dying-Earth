@@ -900,7 +900,7 @@ impl Game {
     }
 
     /// Energy the seat's producers make in a turn, at current multipliers.
-    fn energy_production(&self, seat: Seat) -> i64 {
+    pub fn energy_production(&self, seat: Seat) -> i64 {
         let fac = self.tables.faction(self.kind(seat)).output_multiplier;
         let grids = if self.has_tech(TechId::EfficientGrids) { self.tables.tech(TechId::EfficientGrids).value } else { 1.0 };
         let mut e = 0.0;
@@ -924,6 +924,13 @@ impl Game {
                 if m.kind == ModuleKind::Generator {
                     // Ticket #57: the Colony's slot makes the Energy, not the Body's average.
                     e += (5.0 * self.colony_yields(col).generator * fac * grids).floor();
+                }
+                // Ticket #630 (version 0.1.0.6), from the review: a Reactor Module's card figure, no
+                // site yield; uncounted, a seat of Reactors read itself short of power for ever.
+                if m.kind == ModuleKind::FissionReactor
+                    && let Some(p) = &self.tables.module(m.kind).produces
+                {
+                    e += (p.amount * fac * grids).floor();
                 }
             }
         }
@@ -1268,6 +1275,59 @@ impl Game {
     /// Ship as a nuclear hull** -- once Nuclear Rockets stands, when its Stockpile holds the second
     /// tank's fill and `nuclear_hull_reserve_tanks` tanks more, two crossings' worth. A chemical hull
     /// otherwise. It is taught to chase Fissionables on its own ticket (#643).
+    /// Ticket #630 (version 0.1.0.6), at the designer's word: **whether a computer seat can keep a
+    /// Reactor fed** -- Clean Power standing, and its Stockpile holding `reactor_reserve_turns` turns
+    /// of a Reactor's upkeep. While it can, a Reactor takes the Power Plant's place on its build list
+    /// (and the Reactor Module the Generator's); while it cannot, no Reactor is offered.
+    pub fn ai_feeds_reactors(&self, seat: Seat) -> bool {
+        let upkeep = self.tables.facility(FacilityKind::FissionReactor).fissionables_upkeep;
+        self.has_tech(TechId::CleanPower) && self.seat(seat).stockpile.fissionables + 1e-9 >= upkeep * self.tables.ai.thresholds.reactor_reserve_turns
+    }
+
+    /// Ticket #630, from the review: the seat's Reactors, Facilities and Modules, each with whether
+    /// it is mothballed.
+    fn ai_reactors(&self, seat: Seat) -> Vec<(BuildingRef, bool)> {
+        let mut out = Vec::new();
+        for sid in self.directed_states(seat) {
+            for (i, f) in self.state(sid).facilities.iter().enumerate() {
+                if f.kind == FacilityKind::FissionReactor {
+                    out.push((BuildingRef::Facility(sid, i), f.mothballed));
+                }
+            }
+        }
+        for cid in self.directed_colonies(seat) {
+            if let Some(c) = self.colony(cid) {
+                for (i, m) in c.modules.iter().enumerate() {
+                    if m.kind == ModuleKind::FissionReactor {
+                        out.push((BuildingRef::Module(cid, i), m.mothballed));
+                    }
+                }
+            }
+        }
+        out
+    }
+
+    /// Ticket #630, from the review: **how many running Reactors this seat cannot feed this Income**,
+    /// the Stockpile over a Reactor's upkeep, whole -- those and no more are mothballed.
+    pub fn ai_reactors_to_mothball(&self, seat: Seat) -> usize {
+        let upkeep = self.tables.facility(FacilityKind::FissionReactor).fissionables_upkeep;
+        let running = self.ai_reactors(seat).iter().filter(|(_, m)| !*m).count();
+        if upkeep <= 0.0 {
+            return 0;
+        }
+        let fed = ((self.seat(seat).stockpile.fissionables + 1e-9) / upkeep).floor() as usize;
+        running.saturating_sub(fed)
+    }
+
+    /// Ticket #630, from the review: **whether an idle Reactor may be restarted** -- once the Stockpile
+    /// holds the reserve's turns for every running Reactor and this one, so a restart is never undone
+    /// by the next Income.
+    pub fn ai_may_restart_reactor(&self, seat: Seat) -> bool {
+        let upkeep = self.tables.facility(FacilityKind::FissionReactor).fissionables_upkeep;
+        let running = self.ai_reactors(seat).iter().filter(|(_, m)| !*m).count() as f64;
+        self.has_tech(TechId::CleanPower) && self.seat(seat).stockpile.fissionables + 1e-9 >= upkeep * self.tables.ai.thresholds.reactor_reserve_turns * (running + 1.0)
+    }
+
     pub fn ai_builds_nuclear(&self, seat: Seat, kind: UnitKind) -> bool {
         if !self.has_tech(TechId::NuclearRockets) || !UnitKind::SHIPS.contains(&kind) {
             return false;
@@ -1316,7 +1376,7 @@ impl Game {
                 let card = self.tables.facility(*kind);
                 if emits(*kind) {
                     th.collapse_emit_weight
-                } else if card.sink_per_turn > 0.0 || *kind == FacilityKind::WindFarm {
+                } else if card.sink_per_turn > 0.0 || matches!(kind, FacilityKind::WindFarm | FacilityKind::FissionReactor) {
                     th.collapse_clean_weight
                 } else {
                     1.0
@@ -1539,6 +1599,7 @@ impl Game {
         // trades the Power Plant's figure for the Wind Farm's.
         let energy_of = |k: FacilityKind| self.tables.facility(k).produces.as_ref().filter(|p| p.resource == Resource::Energy).map_or(0.0, |p| p.amount);
         let generator = self.tables.module(ModuleKind::Generator).produces.as_ref().map_or(0.0, |p| p.amount);
+        let reactor_module = self.tables.module(ModuleKind::FissionReactor).produces.as_ref().map_or(0.0, |p| p.amount);
         let queued_power: i64 = (self
             .states
             .iter()
@@ -1550,7 +1611,9 @@ impl Game {
                 _ => 0.0,
             })
             .sum::<f64>()
-            + self.colonies.iter().flat_map(|c| c.queue.iter()).filter(|b| b.seat == seat && b.item == BuildItem::Module(ModuleKind::Generator)).count() as f64 * generator)
+            + self.colonies.iter().flat_map(|c| c.queue.iter()).filter(|b| b.seat == seat && b.item == BuildItem::Module(ModuleKind::Generator)).count() as f64 * generator
+            // Ticket #630 (version 0.1.0.6), from the review: and a Reactor Module on order.
+            + self.colonies.iter().flat_map(|c| c.queue.iter()).filter(|b| b.seat == seat && b.item == BuildItem::Module(ModuleKind::FissionReactor)).count() as f64 * reactor_module)
             .floor() as i64;
         let energy_short = self.energy_production(seat) + queued_power < self.total_upkeep(seat) + 2;
         // Bootstrap needs: a producer of one of these counts as advancing whatever the seat is behind on.
@@ -1741,7 +1804,8 @@ impl Game {
             // counts as advancing whichever part the Faction is behind on.
             // Ticket #426 (version 0.09.5): and the Archivists' Reactor, which is a Power Plant
             // everywhere -- a Faction building carries its base building's reasons to be built.
-            let energy_producer = cat == Cat::Producer && matches!(item, Some("Power Plant") | Some("Reactor") | Some("Generator"));
+            // Ticket #630 (version 0.1.0.6): the Accumulator by its new name, and the Reactor.
+            let energy_producer = cat == Cat::Producer && matches!(item, Some("Power Plant") | Some("Accumulator") | Some("Reactor") | Some("Generator"));
             if energy_producer && needs.contains(&Resource::Energy) {
                 return gap;
             }
@@ -1815,10 +1879,28 @@ impl Game {
                     // is wanted and the Wind Farm's 3 is not. The Archivists' first Reactor is still a
                     // Reactor -- its clause is the upkeep cut, which no Wind Farm gives -- and a second
                     // is an ordinary power station, so it gives way as the Power Plant does.
+                    // Ticket #630 (version 0.1.0.6): the Reactor, while the seat can keep it fed, in
+                    // the Power Plant's and the Wind Farm's place; never otherwise. The Archivists'
+                    // first Accumulator keeps its own reason, the upkeep cut.
+                    let feeds = self.ai_feeds_reactors(seat);
+                    if job == FacilityKind::FissionReactor && !feeds {
+                        continue;
+                    }
+                    if feeds && job == FacilityKind::WindFarm {
+                        continue;
+                    }
+                    if feeds && job == FacilityKind::PowerPlant {
+                        let first_accumulator = fk == FacilityKind::Accumulator
+                            && !self.directed_states(seat).iter().any(|s| self.state(*s).facilities.iter().any(|f| f.kind == FacilityKind::Accumulator))
+                            && !self.states.iter().flat_map(|s| s.queue.iter()).any(|b| b.seat == seat && b.item == BuildItem::Facility(FacilityKind::Accumulator));
+                        if !first_accumulator {
+                            continue;
+                        }
+                    }
                     if job == FacilityKind::PowerPlant && self.has_tech(TechId::CleanPower) && !tight {
-                        let first_reactor = fk == FacilityKind::Reactor
-                            && !self.directed_states(seat).iter().any(|s| self.state(*s).facilities.iter().any(|f| f.kind == FacilityKind::Reactor))
-                            && !self.states.iter().flat_map(|s| s.queue.iter()).any(|b| b.seat == seat && b.item == BuildItem::Facility(FacilityKind::Reactor));
+                        let first_reactor = fk == FacilityKind::Accumulator
+                            && !self.directed_states(seat).iter().any(|s| self.state(*s).facilities.iter().any(|f| f.kind == FacilityKind::Accumulator))
+                            && !self.states.iter().flat_map(|s| s.queue.iter()).any(|b| b.seat == seat && b.item == BuildItem::Facility(FacilityKind::Accumulator));
                         if !first_reactor {
                             continue;
                         }
@@ -1830,7 +1912,7 @@ impl Game {
                         // Ticket #332 (version 0.09.0): the Mine is a producer as the Factory was;
                         // the Factory, making Widgets now, keeps its arm behind the queue test above.
                         // Ticket #559 (version 0.1.0.3): and the Wind Farm, an Energy producer.
-                        FacilityKind::Factory | FacilityKind::Mine | FacilityKind::PowerPlant | FacilityKind::WindFarm | FacilityKind::Refinery | FacilityKind::Bank => (Cat::Producer, self.base_weight(seat, Cat::Producer)),
+                        FacilityKind::Factory | FacilityKind::Mine | FacilityKind::PowerPlant | FacilityKind::WindFarm | FacilityKind::FissionReactor | FacilityKind::Refinery | FacilityKind::Bank => (Cat::Producer, self.base_weight(seat, Cat::Producer)),
                         FacilityKind::ResearchLab => (Cat::ResearchLab, self.base_weight(seat, Cat::ResearchLab)),
                         // Ticket #185 (version 0.08.0): the School is a Research building in all but
                         // name, so it is weighed as one. Ticket #416 (version 0.09.4): every Region
@@ -1877,7 +1959,7 @@ impl Game {
                         // the Scrubber rather than here among the slot-takers.
                         FacilityKind::SeaWall => continue,
                         // Unreachable: every Unique Facility was mapped to its common job above.
-                        FacilityKind::InvestmentBank | FacilityKind::Spaceport | FacilityKind::Reactor | FacilityKind::Academy => continue,
+                        FacilityKind::InvestmentBank | FacilityKind::Spaceport | FacilityKind::Accumulator | FacilityKind::Academy => continue,
                     };
                     // Ticket #181: a slight bias toward a seat's own Unique Facility over the common
                     // counterpart -- the designer's words, and deliberately small, because ticket #41
@@ -2090,6 +2172,12 @@ impl Game {
                     continue;
                 }
                 let module_job = mk.common().unwrap_or(mk);
+                // Ticket #630 (version 0.1.0.6): the Reactor Module in the Generator's and the Wind
+                // Farm's place while the seat can keep it fed; never otherwise.
+                let feeds = self.ai_feeds_reactors(seat);
+                if (module_job == ModuleKind::FissionReactor && !feeds) || (feeds && matches!(module_job, ModuleKind::Generator | ModuleKind::WindFarm)) {
+                    continue;
+                }
                 // Ticket #332 (version 0.09.0): a Factory Module speeds the Colony's whole queue.
                 let mut speeds_the_queue = false;
                 let (cat, mut base) = match module_job {
@@ -2219,6 +2307,8 @@ impl Game {
                         (Cat::Producer, w)
                     }
                     ModuleKind::Generator | ModuleKind::Refinery => (Cat::Producer, self.base_weight(seat, Cat::Producer) * self.production_moved_boost(seat, &col, mk)),
+                    // Ticket #630 (version 0.1.0.6).
+                    ModuleKind::FissionReactor => (Cat::Producer, self.base_weight(seat, Cat::Producer)),
                     // Ticket #232 (version 0.08.3): the Relay has the same disease the Mine had and
                     // worse -- a flat weight reading nothing about what a Relay produces, and ONE
                     // Relay built in forty games. Relay Networks would have changed the computer's
@@ -3208,9 +3298,33 @@ impl Game {
                     }
                 }
             }
+            // Ticket #630 (version 0.1.0.6), at the designer's word: a Reactor short of Fissionables --
+            // the Stockpile below what every online Reactor burns this Income -- is mothballed, so it
+            // stops costing its Ducats for a quarter's Energy; restarted below once the seat can feed it.
+            let is_reactor = |b: &BuildingRef| match b {
+                BuildingRef::Facility(sid, i) => self.state(*sid).facilities.get(*i).is_some_and(|f| f.kind == FacilityKind::FissionReactor),
+                BuildingRef::Module(cid, i) => self.colony(*cid).and_then(|c| c.modules.get(*i)).is_some_and(|m| m.kind == ModuleKind::FissionReactor),
+            };
+            // From the review: the ones it cannot feed and no more.
+            let unfed = self.ai_reactors_to_mothball(seat);
+            if unfed > 0 {
+                for (b, name, _, _, _) in standing.iter().filter(|(b, _, moth, _, _)| !*moth && is_reactor(b)).take(unfed) {
+                    push(
+                        vec![Order::Change { building: *b, what: BuildingChange::Mothball }],
+                        Cat::Mothball,
+                        self.base_weight(seat, Cat::Mothball),
+                        1.0,
+                        1.0,
+                        1.0,
+                        format!("mothball the {} at {} (short of Fissionables)", name, self.place_name(b.place())),
+                        None,
+                    );
+                }
+            }
             // Restart once Energy is back above two turns of upkeep; otherwise scrap it for half.
             let restart_ok = self.seat(seat).stockpile.energy > 2.0 * self.total_upkeep(seat) as f64;
-            for (b, name, mothballed, _, _) in standing.iter().filter(|(_, _, moth, _, _)| *moth) {
+            let feeds = self.ai_may_restart_reactor(seat);
+            for (b, name, mothballed, _, _) in standing.iter().filter(|(b, _, moth, _, _)| *moth && (feeds || !is_reactor(b))) {
                 // Ticket #82: not a Facility whose idleness is doubling a Module off Earth.
                 if let BuildingRef::Facility(sid, i) = b
                     && self.state(*sid).facilities.get(*i).map(|f| in_use.contains(&job(f.kind))).unwrap_or(false)

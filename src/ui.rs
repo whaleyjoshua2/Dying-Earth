@@ -6856,7 +6856,7 @@ fn widgets_bar_hover(game: &Game, made: i64, applied: i64) -> String {
 /// from the figures the Income kept by place; what goes dark is appended under it only while the
 /// coming Resolution's forecast is short, where it replaced the list.
 fn energy_bar_hover(game: &Game, short: Option<&dying_earth_engine::ShortfallForecast>) -> String {
-    // A line is bare where only one side has a figure ("-1  ISS over Earth", "+6  Reactor relief");
+    // A line is bare where only one side has a figure ("-1  ISS over Earth", "+6  Accumulator relief");
     // the brackets only where both do.
     let line = |place: &str, made: f64, upkeep: f64| {
         let net = signed(made - upkeep);
@@ -13997,9 +13997,9 @@ mod ticket_609 {
         assert!(w.ends_with("10 went into builds last turn."), "{w}");
         assert!(!w.contains("under way") && !w.contains("applied at the last Resolution"), "the queues and the old sentence are gone: {w}");
         // Energy: the Income's figures by place, net first, the parts in brackets; the units bare.
-        g.seats[0].energy_by_place = vec![("China".to_string(), 12.0, 4.0), ("ISS over Earth".to_string(), 0.0, 1.0), ("Ships and Armies".to_string(), 0.0, 3.0), ("Nowhere".to_string(), 0.0, 0.0), ("Reactor relief".to_string(), 6.0, 0.0)];
+        g.seats[0].energy_by_place = vec![("China".to_string(), 12.0, 4.0), ("ISS over Earth".to_string(), 0.0, 1.0), ("Ships and Armies".to_string(), 0.0, 3.0), ("Nowhere".to_string(), 0.0, 0.0), ("Accumulator relief".to_string(), 6.0, 0.0)];
         let e = energy_bar_hover(&g, None);
-        assert_eq!(e, "Last Income:\n+8  China (12 made, 4 upkeep)\n-1  ISS over Earth\n-3  Ships and Armies\n+6  Reactor relief", "{e}");
+        assert_eq!(e, "Last Income:\n+8  China (12 made, 4 upkeep)\n-1  ISS over Earth\n-3  Ships and Armies\n+6  Accumulator relief", "{e}");
         // Six lines: a wide board folds its places past the fourth into one net line.
         g.seats[0].energy_by_place = (1..=7).map(|i| (format!("Place {i}"), 10.0, i as f64)).collect();
         let e = energy_bar_hover(&g, None);

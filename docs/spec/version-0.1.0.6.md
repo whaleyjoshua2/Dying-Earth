@@ -12,17 +12,18 @@ pictures and sweeps that decided it are in
 
 **What the version is.** Version 0.1.0.5 with the designer's list of 2026-10-25. Its spine is a new
 resource, **Fissionables**, found off Earth and richest in the far worlds (§1), which a nuclear hull
-is built and flown with and a Warhead is loaded with (§2).
+is built and flown with and a Warhead is loaded with (§2), and a new common Reactor burns, the
+Archivists' own building renamed the Accumulator (§3).
 
 **What it did to the win column** (80 games, per Faction; every section's own sweep is in it):
 
-| | 0.1.0.5 | §1 Fissionables | §2 the nuclear hull | the ideal |
-|---|---|---|---|---|
-| Custodians | 18 | 23 | 19 | 15 |
-| Prospectors | 61 | 51 | 56 | 15 |
-| Arkwrights | 0 | 3 | 2 | 15 |
-| Archivists | 1 | 1 | 1 | 15 |
-| collapses | 0 | 2 | 2 | 20 |
+| | 0.1.0.5 | §1 Fissionables | §2 the nuclear hull | §3 the Reactor | the ideal |
+|---|---|---|---|---|---|
+| Custodians | 18 | 23 | 19 | 28 | 15 |
+| Prospectors | 61 | 51 | 56 | 47 | 15 |
+| Arkwrights | 0 | 3 | 2 | 1 | 15 |
+| Archivists | 1 | 1 | 1 | 1 | 15 |
+| collapses | 0 | 2 | 2 | 3 | 20 |
 
 ## 1. Fissionables, the seventh resource, and Deep Mining and Rich Seam moved
 
@@ -133,3 +134,55 @@ games: the Prospectors 176, the Custodians 95, the Arkwrights 5, the Archivists 
 18. Fissionables made a game, net: the Custodians 57.3, the Prospectors 32.7, the Arkwrights 2.6, the
 Archivists 2.1 -- the Prospectors built the most nuclear hulls on the fewer, not the more. Every hull
 without them flies Nuclear Rockets' crossing no more. Reported, not tuned.
+
+## 3. The Reactor, a common Fissionables power station, and the Archivists' Accumulator
+
+Ticket: [The Reactor: a common Fissionables power plant on Earth and off it, and the Archivists' building renamed](https://github.com/whaleyjoshua2/Dying-Earth/issues/630).
+
+**The Reactor** (Q1). A common Facility, every Faction's: **8 Energy a turn for 0.1 Fissionables and 2
+Ducats, no Emissions**, at the Power Plant's price (27.5 Materials, 10 Widgets), one slot, no Energy
+upkeep. **Behind Clean Power** (Q2, the designer: *"gate it clean power with the wind"*). Short of
+Fissionables it runs at a quarter and burns none, as a Power Plant short of Fuel does: the Income pays
+a building's Fuel and Fissionables from one reservation, and a building short of either is quartered;
+the Report says *Fissionables ran short; the Reactor in China ran at a quarter.*
+
+**The Reactor Module** (Q3): the same figures off Earth, at any Colony **or station**, with no sunlight
+and no site yield, so it makes its 8 at Vesta and Ceres as at Mars.
+
+**What lifts it** (Q4): Efficient Grids and Superconductors, as every power station; not Solar Maximum.
+
+**The Accumulator** (Q5, the designer's pick of seven names). The Archivists' Unique Facility, the
+Reactor until now, renamed; its rule untouched -- three quarters of the holder's whole Energy upkeep,
+the Archive excepted, a second an ordinary power station. Its id is `accumulator`, and a save's
+`reactor` loads as it (`#[serde(alias)]`); the common Reactor's id is `fission_reactor`. The
+Archivists build the common Reactor as anyone does (Q6). The Income's line for its cut reads
+*Accumulator relief*.
+
+**The pictures** (Q7). The trefoil that was the Archivists' building's goes with the name to the
+Reactor, Facility and Module. (I had told the designer it was a cooling tower; the sheet showed it is
+the trefoil, and the cooling tower is the Power Plant's.) The Accumulator wears an energy tank,
+provisional, off a sheet of nine for the designer:
+[`ticket-630/accumulator-glyph-candidates.png`](../dev-diary/2026-10-25-version-0.1.0.6/ticket-630/accumulator-glyph-candidates.png).
+
+**The computer** (Q8). `ai_feeds_reactors`: once Clean Power stands and its Stockpile holds
+`reactor_reserve_turns` (10) turns of a Reactor's upkeep, one Fissionable, a Reactor takes the Power
+Plant's and the Wind Farm's place on its build list, and the Reactor Module the Generator's and the
+Wind Farm Module's; otherwise no Reactor is offered. The Archivists' first Accumulator keeps its own
+reason, the upkeep cut. From the review: it counts a Reactor Module's 8 in its Energy, standing and on
+order (`energy_production`), where it counted the Generator's alone; it mothballs only the Reactors its
+Stockpile cannot feed this Income (`ai_reactors_to_mothball`), and restarts one only once the Stockpile
+holds the reserve's turns for every running Reactor and that one (`ai_may_restart_reactor`); and it
+weighs a Reactor as clean while it is losing the race to the Collapse, as the Wind Farm is.
+
+**From the review, the rest.** The Shortfall forecast reads the Fissionables this turn's orders leave,
+as it reads the Fuel; a Reactor that is dark, blockaded or knocked offline reserves and burns no
+Fissionables, so the Stockpile never goes below nought.
+
+**Saves.** `SAVE_VERSION` stays 12.
+
+**Measured** ([`sweeps/ticket-630.txt`](../dev-diary/2026-10-25-version-0.1.0.6/sweeps/ticket-630.txt)):
+**28 / 47 / 1 / 1 and 3 collapses**, from §2's 19 / 56 / 2 / 1 and 2. Reactors standing at the end over
+the 80 games: the Custodians 699, the Prospectors 431, the Arkwrights 53, the Archivists 4. (The
+first build's sweep, before the review's mending, read 31 / 46 / 1 / 1 and 1, with 842 Custodian
+Reactors: the computer had not counted its Reactor Modules' Energy and so built more.) Reported, not
+tuned.

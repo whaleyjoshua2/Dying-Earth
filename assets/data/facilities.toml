@@ -201,16 +201,18 @@ emissions = 0.0
 
 # Ticket #184: the Archivists' Power Plant. While one stands and is online, its holder pays 75% of
 # the total Energy upkeep of everything it owns, the Archive excepted; off the total, once, floored.
+# Ticket #630 (version 0.1.0.6), at the designer's word: the ACCUMULATOR, where it was the Reactor, the
+# name going to the common Fissionables power station appended below; its rule untouched.
 [[facility]]
-id = "reactor"
-name = "Reactor"
+id = "accumulator"
+name = "Accumulator"
 materials = 27.5
 # Ticket #610 (version 0.1.0.5), at the designer's word: a fifth more, 10 from 8.
 widgets = 10
 energy_upkeep = 0
 # Ticket #575 (version 0.1.0.3): 0.8 Fuel a turn, as a Power Plant.
 fuel_upkeep = 0.8
-does = "pays three quarters of your whole Energy upkeep, the Archive excepted; a second Reactor is an ordinary power station"
+does = "pays three quarters of your whole Energy upkeep, the Archive excepted; a second Accumulator is an ordinary power station"
 produces = { resource = "energy", amount = 6 }
 emissions = 1.5
 
@@ -436,5 +438,25 @@ widgets = 10
 energy_upkeep = 0
 ducats_upkeep = 1
 produces = { resource = "energy", amount = 3 }
+emissions = 0.0
+needs_tech = "clean_power"
+
+# Ticket #630 (version 0.1.0.6), at the designer's word: the REACTOR, a common power station that burns
+# Fissionables -- 8 Energy a turn for 0.1 Fissionables and 2 Ducats, no Emissions ("Reactor is now a
+# new powerplant that requires .1 fissionables in upkeep + 2 duckets 8 energy a turn no emissions"),
+# at the Power Plant's price, one slot, behind Clean Power as the Wind Farm is ("gate it clean power
+# with the wind"). Its output takes Efficient Grids and Superconductors, not Solar Maximum. Short of
+# Fissionables it runs at a quarter and burns none, as a Power Plant short of Fuel. Every Faction's,
+# the Archivists' too. Its id is `fission_reactor`: a save's `reactor` is the Accumulator. Appended
+# last with its enum variant.
+[[facility]]
+id = "fission_reactor"
+name = "Reactor"
+materials = 27.5
+widgets = 10
+energy_upkeep = 0
+ducats_upkeep = 2
+fissionables_upkeep = 0.1
+produces = { resource = "energy", amount = 8 }
 emissions = 0.0
 needs_tech = "clean_power"
