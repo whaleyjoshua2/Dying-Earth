@@ -509,3 +509,48 @@ Three more rules broken on purpose, each red.
 **The sweep** ([`sweeps/ticket-644.txt`](sweeps/ticket-644.txt)), after the review's mends: **32 / 45 / 1 /
 2 and 0 collapses**, the same wins as #637's; 33 hulls refitted, nearly all the Prospectors' and
 Custodians'.
+
+## Two more Nation States, and the climate swept with them
+
+Ticket [#639](https://github.com/whaleyjoshua2/Dying-Earth/issues/639), spec §14. The draft offered
+Pakistan and Korea; the designer chose Canada with Greenland, and Ethiopia with the Horn. Three
+rounds. Two facts reshaped the draft: a Nation State is cut out of another's ground, so it adds no
+people and moves the climate only by its own card; and "climate sweep" meant, the designer said,
+"find a step that optimizes" -- the `ppm_step` re-sweep every board change has had.
+
+**Built.** The flags fetched from flag-icons, as every flag but Vietnam's and Argentina's was; the
+Natural Earth borders fetched for the run and not kept. Before the change the generator redrew the
+committed mask from that file to the pixel (0 of 2,097,152 differ), so the new mask's change is the
+split's alone: 81,326 pixels from the United States' to Canada's, 4,888 from South Africa's and 392
+(Eritrea) from Egypt's to Ethiopia's, nothing else.
+
+![The mask preview: Canada and Greenland in magenta, the Horn in green](ticket-639/mask.png)
+![Canada's card on the globe, held by the Arkwrights](ticket-639/canada-earth.png)
+![Ethiopia's card, the Horn between Egypt's and South Africa's](ticket-639/ethiopia-earth.png)
+
+**What moved under the tests.** Fourteen failed on the new board, and each was read:
+- **Counts** (twenty-two, 60 coastal slots, Influence 37, the United States worth 6) and the
+  parents' pools.
+- **Canada's start card** broke the rule a Mine stands beside every start Factory; it now follows it.
+- **A computer seat now opens in Canada**, an untouched Industry 3, where the fourth seat had opened
+  in Australia. Asked (Q11), the designer kept it. Three tests that named Australia, or the seat
+  there, were moved to the new seats.
+- **Seeded states re-pinned:** a Lab's yield (the United States' smaller people), the dice after the
+  start, the race to Mars (seed 1 on turn 16 now) and the Relations game, which parts on turn 8, not
+  7. Nobody buys a credit within it now, so what parts the boards is another of Relations' readings,
+  not traced.
+
+**The review** found no defect, and three re-pins weaker than they read. The Relations test asserted
+a credit refusal that no longer happens in it; the computer seats' orders were traced turn by turn,
+and what parts the two games now is that the hostile seats Smear one another and propose no Accord,
+which the test now asserts (red when the hostile game is made neutral). The dice pin is called a
+snapshot of this version, which it is. The race re-pin hid what the Canada start did to the
+Arkwrights; over 80 games at the same step (620): Opening Objectives met 27 where 17, first to Mars
+12 where 17, wins 4 where 1 -- mixed, not the cost the first seating alone suggested. Stale comments
+mended.
+
+**The step sweep**: 620 0 collapses, 560 2, 500 5, 440 9, 380 19, 320 32; set at 380. The standing
+sweep at 380 matches the cell figure for figure.
+
+**The sweep** ([`sweeps/ticket-639.txt`](sweeps/ticket-639.txt)): **35 / 25 / 1 / 0 and 19 collapses**,
+from 32 / 45 / 1 / 2 and 0. The collapses are where the designer asked; the win column is not.

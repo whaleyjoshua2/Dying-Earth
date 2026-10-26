@@ -72,7 +72,10 @@ const SOUTH_AFRICA: u8 = 19;
 // Ticket #510 (version 0.1.0.0).
 const VIETNAM: u8 = 20;
 const ARGENTINA: u8 = 21;
-const VALUES: usize = 22;
+// Ticket #639 (version 0.1.0.6): Canada's and Ethiopia's.
+const CANADA: u8 = 22;
+const ETHIOPIA: u8 = 23;
+const VALUES: usize = 24;
 
 /// The Region a country belongs to, by Natural Earth's `ADM0_A3`, then by its `SUBREGION`, then by
 /// its `CONTINENT`. Every case the research flagged is decided here by name, so the table can be
@@ -90,11 +93,16 @@ fn region_for(adm0: &str, subregion: &str, continent: &str) -> u8 {
         // 0.09.9): and East Africa and the Horn with them -- Kenya, Tanzania, Uganda, Rwanda, Burundi,
         // Ethiopia, Somalia with Somaliland, and Djibouti -- while Angola goes back to Nigeria's.
         "ZAF" | "NAM" | "BWA" | "LSO" | "SWZ" | "ZMB" | "ZWE" | "MWI" | "MOZ" | "MDG" => return SOUTH_AFRICA,
-        "KEN" | "TZA" | "UGA" | "RWA" | "BDI" | "ETH" | "SOM" | "SOL" | "DJI" => return SOUTH_AFRICA,
+        "KEN" | "TZA" | "UGA" | "RWA" | "BDI" => return SOUTH_AFRICA,
+        // Ticket #639 (version 0.1.0.6): the Horn -- Ethiopia, Somalia with Somaliland, Djibouti and,
+        // from Egypt's Region, Eritrea -- is the Region called Ethiopia.
+        "ETH" | "SOM" | "SOL" | "DJI" | "ERI" => return ETHIOPIA,
         // Cyprus is in the European Union: the designer's one exception to the subregion rule.
         "CYP" => return EUROPE,
-        // Greenland stays with the United States' Region, as it always was.
-        "GRL" | "USA" | "CAN" | "BMU" | "SPM" => return NORTH_AMERICA,
+        // Ticket #639 (version 0.1.0.6): Canada and Greenland, with Saint Pierre and Miquelon off
+        // its coast, are the Region called Canada; the United States keeps Bermuda.
+        "CAN" | "GRL" | "SPM" => return CANADA,
+        "USA" | "BMU" => return NORTH_AMERICA,
         "MEX" => return CENTRAL_AMERICA,
         // Ticket #453 (version 0.09.6): Pakistan and Afghanistan leave India's Region and the five
         // Central Asian republics leave China's, for the Region called Pakistan; the United Kingdom,
@@ -107,7 +115,7 @@ fn region_for(adm0: &str, subregion: &str, continent: &str) -> u8 {
         "IND" | "BGD" | "LKA" | "NPL" | "BTN" | "MDV" => return SOUTH_ASIA,
         // North Africa: Morocco to Egypt and down through Sudan, as the table has always said.
         // Ticket #492 (version 0.09.9): and Eritrea.
-        "EGY" | "LBY" | "TUN" | "DZA" | "MAR" | "ESH" | "SDN" | "ERI" => return NORTH_AFRICA,
+        "EGY" | "LBY" | "TUN" | "DZA" | "MAR" | "ESH" | "SDN" => return NORTH_AFRICA,
         "RUS" => return RUSSIA,
         "ATA" => return ANTARCTICA,
         // Ticket #510 (version 0.1.0.0): the South-East Asian mainland leaves Indonesia's Region for
@@ -353,7 +361,7 @@ fn main() {
     mask.save(out.join("earth_states.png")).expect("save mask");
     let unassigned: Vec<&(String, u8)> = table.iter().filter(|(_, v)| *v == 0).collect();
     println!("wrote earth_states.png from {} countries; {} land pixels took the nearest Region by flood", table.len(), filled);
-    println!("pixel counts water/SSA/AN/EA/AU/EU/NA/SA/RU/ME/NAF/SAS/SEA/CAC/JK/ARB/KAZ/UK/TUR/ZAF/VN/AR ={counts:?}");
+    println!("pixel counts water/SSA/AN/EA/AU/EU/NA/SA/RU/ME/NAF/SAS/SEA/CAC/JK/ARB/KAZ/UK/TUR/ZAF/VN/AR/CA/ET ={counts:?}");
     if !unassigned.is_empty() {
         println!("left to the flood, having no Region of their own: {}", unassigned.iter().map(|(n, _)| n.as_str()).collect::<Vec<_>>().join(", "));
     }
@@ -385,6 +393,8 @@ fn main() {
             Some(StateId::SouthAfrica),
             Some(StateId::Vietnam),
             Some(StateId::Argentina),
+            Some(StateId::Canada),
+            Some(StateId::Ethiopia),
         ];
         let colours: Vec<[u8; 3]> = MASK_IDS
             .iter()

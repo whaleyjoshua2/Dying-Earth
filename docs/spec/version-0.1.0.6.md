@@ -479,3 +479,53 @@ The designer: *"allow chemical hulls to be upgraded"*.
 **Measured** ([`sweeps/ticket-644.txt`](../dev-diary/2026-10-25-version-0.1.0.6/sweeps/ticket-644.txt)):
 **32 / 45 / 1 / 2 and 0 collapses**, the same wins as §12's. Hulls refitted over the 80 games: the
 Prospectors 20, the Custodians 12, the Archivists 1, the Arkwrights none. Reported, not tuned.
+
+## 14. Two more Nation States, and the climate swept with them
+
+Ticket: [Two more Nation States, and the climate swept with them](https://github.com/whaleyjoshua2/Dying-Earth/issues/639).
+The designer: *"+2 countries & climate sweep"*; the two: *"canada and greenland from the US and
+Ethiopia, from South Africa's Region, along with the Horn"*.
+
+- **The ground.** Canada and Greenland (with Saint Pierre and Miquelon) leave the United States'
+  Region, which keeps Bermuda; the Horn -- Ethiopia, Somalia with Somaliland, Djibouti and, from
+  Egypt's Region, Eritrea (Q8) -- leaves South Africa's. Repainted from Natural Earth 1:50m by
+  `prep_assets --mask-only`; the same file redraws the old mask to the pixel, and the new one moves
+  only those three kinds of ground.
+- **The cards** (Q7), shared by the real countries so the world keeps 7,860 million:
+
+  | | People | GDP | Influence | Industry | Lean | Emissions | Education | Size / coast | Start |
+  |---|---|---|---|---|---|---|---|---|---|
+  | Canada | 39 | 2 | 1 | 3 | Materials | 0.4 | 1.5 | 3 / 1 | Refinery, Power Plant, Factory, Mine |
+  | the United States | 341 | 21 | 6 | as before | | | | | |
+  | Ethiopia | 150 | 1 (added) | 1 (added) | 1 | Energy | 0.2 | 0.6 | 2 / 1 | Power Plant |
+  | South Africa | 371 | 1 | 1 | as before | | | | | |
+  | Egypt | 260 | as before | | | | | | | |
+
+  Canada's start follows the standing rule (as many as its Industry Level, a Mine beside each
+  Factory), where the approved draft had read Mine, Refinery, Power Plant. Ethiopia is 150, not the
+  drafted 149: the three shares round by the largest remainder so nobody is lost. World Influence 37
+  (Q9). Neighbours: Canada the United States, Russia and the United Kingdom; Ethiopia South Africa,
+  Egypt and Saudi Arabia, which no longer faces South Africa. Flags flag-icons' `ca` and `et`, as
+  the older flags (Q6).
+- **A computer seat opens in Canada** (Q11 a): the start pick reads Industry before people, and
+  Canada is an untouched Industry 3 once East Asia and Europe are taken. The fourth seat had opened in
+  Australia. What it did to the Arkwrights, over 80 games at the same step (620): Opening Objectives
+  met 27 where 17, first to Mars 12 where 17, wins 4 where 1.
+- **The climate** (Q2 a). The cards land as they are: the net Emissions on the opening board read
+  +34.4 ppm a turn where they read +33.1.
+- **The step** (Q3, Q10). `ppm_step` re-swept on the new board, Sink 8, 80 games a cell:
+
+  | step | collapses | Custodians | Prospectors | Arkwrights | Archivists |
+  |---|---|---|---|---|---|
+  | 620 | 0 | 17 | 54 | 4 | 5 |
+  | 560 | 2 | 30 | 44 | 2 | 1 |
+  | 500 | 5 | 33 | 40 | 2 | 0 |
+  | 440 | 9 | 30 | 40 | 1 | 0 |
+  | **380** | **19** | **35** | **25** | **1** | **0** |
+  | 320 | 32 | 38 | 10 | 0 | 0 |
+
+  **Set at 380**, the nearest to the designer's 20 collapses. The win column is not retuned.
+- **Saves** (Q5). `SAVE_VERSION` 13; a 0.1.0.5 save does not load.
+
+**Measured** ([`sweeps/ticket-639.txt`](../dev-diary/2026-10-25-version-0.1.0.6/sweeps/ticket-639.txt),
+the 380 cell): **35 / 25 / 1 / 0 and 19 collapses**, from §13's 32 / 45 / 1 / 2 and 0.

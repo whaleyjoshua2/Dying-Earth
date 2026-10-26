@@ -109,6 +109,10 @@ pub fn state_lonlat(state: StateId) -> (f32, f32) {
         // Chao Phraya; Argentina's on the pampas, clear of Brazil's over the Mato Grosso.
         StateId::Vietnam => (103.0, 17.0),
         StateId::Argentina => (-65.0, -33.0),
+        // Ticket #639 (version 0.1.0.6): Canada's on the prairies north of the border; Ethiopia's on
+        // its highlands. The United States' own stays over the plains.
+        StateId::Canada => (-105.0, 57.0),
+        StateId::Ethiopia => (40.0, 9.0),
     }
 }
 

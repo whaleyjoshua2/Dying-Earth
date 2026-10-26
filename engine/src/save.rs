@@ -39,7 +39,7 @@ use std::sync::Arc;
 /// Ticket #510 (version 0.1.0.0): moved to **12**. Two Regions joined the board (Vietnam,
 /// Argentina), and `Game.states` is indexed by `StateId`: a save of eighteen rows would index out
 /// of range on the nineteenth.
-pub const SAVE_VERSION: u32 = 12;
+pub const SAVE_VERSION: u32 = 13;
 
 /// The rules version this executable plays, named beside the file's own in a refusal.
 ///

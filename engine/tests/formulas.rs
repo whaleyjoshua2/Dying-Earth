@@ -479,7 +479,8 @@ fn the_allotment_is_the_base_plus_each_controlled_states_value_times_the_faction
     // Ticket #453 (version 0.09.6): Europe is 4 since the United Kingdom took one: 10 + 4 = 14.
     assert_eq!(g.influence_allotment(Seat(1)), 14);
     g.state_mut(StateId::NorthAmerica).control = Control::Controlled(Seat(1));
-    assert_eq!(g.influence_allotment(Seat(1)), 21, "North America adds 7");
+    // Ticket #639 (version 0.1.0.6): 6 since Canada took one of its 7.
+    assert_eq!(g.influence_allotment(Seat(1)), 20, "North America adds 6");
     // Raising East Asia's Industry Level adds one to its value.
     g.state_mut(StateId::EastAsia).industry_level += 1;
     assert_eq!(g.state_influence_value(StateId::EastAsia), 4);
@@ -489,7 +490,9 @@ fn the_allotment_is_the_base_plus_each_controlled_states_value_times_the_faction
     // Ticket #482 (version 0.09.8): 35. South Africa's 1 was added, at the designer's word, where
     // every split before it shared its parent's; Nigeria's card had only the 1 to give.
     // Ticket #510 (version 0.1.0.0): 36, Vietnam's 1 added the same way; Indonesia's card had only the 1 to give.
-    assert_eq!(total, 36, "the eight totalled 34, shared out exactly until South Africa added 1 and Vietnam 1");
+    // Ticket #639 (version 0.1.0.6): 37, Ethiopia's 1 added the same way; Canada's 1 came out of the
+    // United States' 7.
+    assert_eq!(total, 37, "the eight totalled 34, shared out exactly until South Africa, Vietnam and Ethiopia added 1 each");
 }
 
 // ---------------------------------------------------------------- #35 Ducats
@@ -749,7 +752,7 @@ fn antarctica_is_three_colony_slots_on_earth_whose_colonists_stay_on_earth_and_w
     // Ticket #56 re-cut them: abundant ore and Fuel under the ice.
     assert_eq!((earth.mine_yield, earth.generator_yield, earth.refinery_yield, earth.research_yield), (1.4875, 0.75, 2.0, 1.0), "the Mine 1.75 x 0.85 since ticket #537");
     assert_eq!(g.free_slots_on(BodyId::Earth).len(), 3);
-    assert_eq!(StateId::ALL.len(), 20, "twenty Regions since ticket #510, eighteen since #482, and Antarctica is none of them");
+    assert_eq!(StateId::ALL.len(), 22, "twenty-two Regions since ticket #639, twenty since #510, eighteen since #482, and Antarctica is none of them");
     let m = g.tables.faction(FactionKind::Custodians).emissions_multiplier;
     let before = g.emissions_now();
     // Ticket #604 (version 0.1.0.4): the same board under Clean Manufacturing, for the Mine below.
@@ -2040,17 +2043,23 @@ fn the_ai_seats_take_start_states_not_adjacent_to_any_taken_one() {
     // against Australia at 0.5.
     // Ticket #482 (version 0.09.8): a third stands at Industry 2 now, South Africa, with more
     // people than either, and takes the pick.
-    assert_eq!(held(Seat(2)), vec![StateId::SouthAfrica]);
+    // Ticket #639 (version 0.1.0.6), at the designer's word (Q11 a): Canada, untouched at Industry 3,
+    // takes it ahead of every Industry 2.
+    assert_eq!(held(Seat(2)), vec![StateId::Canada]);
     // Then the untouched states are all at Industry 1, so the tie goes to the most populous:
     // Sub-Saharan Africa at 11.4.
     // The peninsula's neighbours join the adjacent set; Australia is the last at Industry 2.
     // Ticket #492 (version 0.09.9): the peninsula touches South Africa now, across the Red Sea from
-    // the Horn, so it is taken off the table with it, and Australia is the pick.
-    assert_eq!(held(Seat(3)), vec![StateId::Australia]);
+    // the Horn, so it is taken off the table with it, and Australia is the pick. (Ticket #639: no
+    // longer -- Canada takes the third pick and South Africa the fourth.)
+    // Ticket #639: with Canada third, South Africa is the fourth.
+    assert_eq!(held(Seat(3)), vec![StateId::SouthAfrica]);
     // The fallback, when every free state touches a taken one: the highest Industry Level free
     // state, ties by population. With everything above taken, North America at 3 wins.
     // Ticket #492 (version 0.09.9): with South Africa, since the peninsula touches it and no longer Nigeria.
-    let taken = [StateId::Europe, StateId::EastAsia, StateId::Australia, StateId::SubSaharanAfrica, StateId::SouthAfrica, StateId::SouthAmerica, StateId::CentralAmerica];
+    // Ticket #639: and Canada, which would otherwise be an untouched Industry 3, and the peninsula,
+    // which no longer touches South Africa.
+    let taken = [StateId::Europe, StateId::EastAsia, StateId::Australia, StateId::SubSaharanAfrica, StateId::SouthAfrica, StateId::SouthAmerica, StateId::CentralAmerica, StateId::Canada, StateId::ArabianPeninsula];
     assert_eq!(g.ai_start_state(&taken), StateId::NorthAmerica, "the fallback picks the best free state");
     // Every seat's start carries a Launch Site.
     for seat in Seat::ALL {
@@ -3474,7 +3483,7 @@ fn the_ai_pays_relief_and_raises_a_constabulary_where_unrest_has_taken_hold() {
 fn twelve_nation_states_share_out_the_eight_they_came_from() {
     let g = game();
     let t = &g.tables;
-    assert_eq!(StateId::ALL.len(), 20, "twenty since ticket #510");
+    assert_eq!(StateId::ALL.len(), 22, "twenty-two since ticket #639, twenty since #510");
     let card = |s: StateId| t.state(s);
     // Asia's 30 GDP and 7 Influence go to East Asia, South Asia and South-East Asia -- and since
     // ticket #125 (version 0.07.2) to Japan and Korea, cut out of East Asia with 6 and 1 of them.
@@ -3486,11 +3495,14 @@ fn twelve_nation_states_share_out_the_eight_they_came_from() {
     assert_eq!(asia.iter().map(|s| card(*s).influence).sum::<i64>(), 7 + 4 + 1, "Asia's Influence value, and the Middle East's, and Vietnam's 1 added by ticket #510 as South Africa's was");
     // Africa's 3 and 2 split at the Sahara; ticket #482 cut South Africa out of the south, and its
     // Influence of 1 is the one figure in the world that was added and not shared.
-    let africa = [StateId::SubSaharanAfrica, StateId::NorthAfrica, StateId::SouthAfrica];
-    assert_eq!(africa.iter().map(|s| card(*s).gdp).sum::<i64>(), 3);
-    assert_eq!(africa.iter().map(|s| card(*s).influence).sum::<i64>(), 2 + 1);
-    // North America's 25 and 8 split with Central America and the Caribbean.
-    let america = [StateId::NorthAmerica, StateId::CentralAmerica];
+    // Ticket #639 (version 0.1.0.6): and Ethiopia, cut out of South Africa's and Egypt's, its GDP
+    // and Influence of 1 each added, the cards it came from having only the 1 to give.
+    let africa = [StateId::SubSaharanAfrica, StateId::NorthAfrica, StateId::SouthAfrica, StateId::Ethiopia];
+    assert_eq!(africa.iter().map(|s| card(*s).gdp).sum::<i64>(), 3 + 1);
+    assert_eq!(africa.iter().map(|s| card(*s).influence).sum::<i64>(), 2 + 1 + 1);
+    // North America's 25 and 8 split with Central America and the Caribbean. Ticket #639 (version
+    // 0.1.0.6): and with Canada, by the real countries.
+    let america = [StateId::NorthAmerica, StateId::CentralAmerica, StateId::Canada];
     assert_eq!(america.iter().map(|s| card(*s).gdp).sum::<i64>(), 25);
     assert_eq!(america.iter().map(|s| card(*s).influence).sum::<i64>(), 8);
     // The world still holds about 7.9 billion people, as the eight states did: 7,860 units of one
@@ -4562,7 +4574,9 @@ fn b_coastal_slots_are_two_an_exposure_capped_and_a_raise_is_inland() {
     // Ticket #482 (version 0.09.8): Kazakhstan has no coast (two fewer than Pakistan's card had),
     // Turkey is Exposure 1 (two) and South Africa Exposure 2 (four).
     // Ticket #510 (version 0.1.0.0): Vietnam is Exposure 2 (four) and Argentina Exposure 1 (two).
-    assert_eq!(world, 56, "56 coastal slots in the world: 50 until ticket #510's two Regions brought six");
+    // Ticket #639 (version 0.1.0.6): Canada and Ethiopia are Exposure 1 (two each), their parents'
+    // cards unmoved.
+    assert_eq!(world, 60, "60 coastal slots in the world: 56 until ticket #639's two Regions brought four");
     // Ticket #70: Europe's Refinery and North America's Factory, third on their cards with an
     // Exposure of 1, now stand inland from the first turn. Ticket #377 (version 0.09.2): Europe is
     // the Prospectors' home and stands with the package (Power Plant, Factory, Mine, Refinery,
@@ -5875,7 +5889,9 @@ fn a_spectated_game_seats_four_computers_and_deals_seat_zero_by_the_spreading_ru
     // Ticket #482 (version 0.09.8): South Africa, at Industry 2 with more people than either, is
     // the third; the peninsula the fourth; Australia no seat's.
     // Ticket #492 (version 0.09.9): the peninsula touches South Africa now; Australia is the fourth.
-    assert_eq!(taken, vec![StateId::EastAsia, StateId::Europe, StateId::SouthAfrica, StateId::Australia]);
+    // Ticket #639 (version 0.1.0.6), Q11 a: Canada, untouched at Industry 3, is the third; South
+    // Africa the fourth; Australia no seat's.
+    assert_eq!(taken, vec![StateId::EastAsia, StateId::Europe, StateId::Canada, StateId::SouthAfrica]);
     for seat in Seat::ALL {
         assert_eq!(g.controlled_states(seat), vec![taken[seat.index()]], "{seat:?} starts where the rule put it");
     }
@@ -6105,15 +6121,16 @@ fn a_neutral_states_lab_pays_half_its_yield_into_the_tech_and_nobodys_lead() {
         st.facilities.retain(|f| f.kind != FacilityKind::ResearchLab);
     }
     g.state_mut(StateId::NorthAmerica).control = Control::Neutral;
-    // North America's own: 1 x 1.114 x 1.5 = 1.671; nobody's, at half, 0.836.
-    assert!((g.world_research(StateId::NorthAmerica) - 0.8355).abs() < 1e-3, "{}", g.world_research(StateId::NorthAmerica));
-    // With a Lab, x1.5: 2.507, at half 1.253.
+    // North America's own: 1 x 1.102 x 1.5 = 1.653 (1.114 and 1.671 until ticket #639 took Canada's
+    // people out of it); nobody's, at half, 0.827.
+    assert!((g.world_research(StateId::NorthAmerica) - 0.826725).abs() < 1e-3, "{}", g.world_research(StateId::NorthAmerica));
+    // With a Lab, x1.5: 2.480, at half 1.240.
     g.state_mut(StateId::NorthAmerica).facilities.push(facility(FacilityKind::ResearchLab));
-    assert!((g.world_research(StateId::NorthAmerica) - 1.25325).abs() < 1e-3, "{}", g.world_research(StateId::NorthAmerica));
-    // One Lab's share for the world, which its box shows: 1.671 x 0.5 x 0.5 = 0.418.
-    assert!((g.world_lab_share(StateId::NorthAmerica) - 0.41775).abs() < 1e-3, "{}", g.world_lab_share(StateId::NorthAmerica));
+    assert!((g.world_research(StateId::NorthAmerica) - 1.2400875).abs() < 1e-3, "{}", g.world_research(StateId::NorthAmerica));
+    // One Lab's share for the world, which its box shows: 1.653 x 0.5 x 0.5 = 0.413.
+    assert!((g.world_lab_share(StateId::NorthAmerica) - 0.4133625).abs() < 1e-3, "{}", g.world_lab_share(StateId::NorthAmerica));
     let world: f64 = StateId::ALL.into_iter().map(|s| g.world_research(s)).sum();
-    assert!(world > 1.25325, "every neutral Region pays, not only the one with a Lab: {world}");
+    assert!(world > 1.2400875, "every neutral Region pays, not only the one with a Lab: {world}");
     let before = g.research.progress;
     g.research.contributions = [0; 4];
     g.income_phase();
@@ -6122,17 +6139,17 @@ fn a_neutral_states_lab_pays_half_its_yield_into_the_tech_and_nobodys_lead() {
     assert_eq!(g.research.contributions.iter().sum::<i64>(), seats, "and the world's share counts toward nobody's Lead");
     // Ticket #431 (version 0.09.5): the Report no longer says so -- cut at the designer's word.
     assert!(!g.report.lines.iter().any(|l| l.text.contains("Regions in no one's hands")), "no line for it: {:?}", g.report.lines);
-    // Occupied: the occupier takes the Region's own; the Lab's share, 1.671 x 0.5, goes to the
-    // world at half, 0.42; the occupier pays the 3 Energy and draws no Lab share.
+    // Occupied: the occupier takes the Region's own; the Lab's share, 1.653 x 0.5, goes to the
+    // world at half, 0.41; the occupier pays the 3 Energy and draws no Lab share.
     g.state_mut(StateId::NorthAmerica).control = Control::Occupied { occupier: Seat(2), previous: None, turns: 1, banked: 0 };
     let y = g.facility_yield(Seat(2), StateId::NorthAmerica, FacilityKind::ResearchLab);
     assert_eq!((y.amount, y.upkeep), (0.0, 3.0), "the occupier pays for a Lab that works for the world");
-    assert!((g.world_research(StateId::NorthAmerica) - 0.41775).abs() < 1e-3, "{}", g.world_research(StateId::NorthAmerica));
-    assert!((g.region_research(Seat(2), StateId::NorthAmerica) - 1.671).abs() < 1e-3, "the occupier's own: {}", g.region_research(Seat(2), StateId::NorthAmerica));
-    // Neutral again, at Unrest 7: halved, 1.253 to 0.627.
+    assert!((g.world_research(StateId::NorthAmerica) - 0.4133625).abs() < 1e-3, "{}", g.world_research(StateId::NorthAmerica));
+    assert!((g.region_research(Seat(2), StateId::NorthAmerica) - 1.65345).abs() < 1e-3, "the occupier's own: {}", g.region_research(Seat(2), StateId::NorthAmerica));
+    // Neutral again, at Unrest 7: halved, 1.240 to 0.620.
     g.state_mut(StateId::NorthAmerica).control = Control::Neutral;
     g.state_mut(StateId::NorthAmerica).unrest = 7.0;
-    assert!((g.world_research(StateId::NorthAmerica) - 0.626625).abs() < 1e-3, "{}", g.world_research(StateId::NorthAmerica));
+    assert!((g.world_research(StateId::NorthAmerica) - 0.62004375).abs() < 1e-3, "{}", g.world_research(StateId::NorthAmerica));
     g.state_mut(StateId::NorthAmerica).unrest = 0.0;
     // Held: the holder's own and its Lab's share, 0.836, to the tenth 0.8; nothing to the world.
     g.state_mut(StateId::NorthAmerica).control = Control::Controlled(Seat(2));
@@ -8258,9 +8275,12 @@ fn every_computer_seat_races_for_mars_once_the_moon_is_claimed() {
 /// no state where only the race weight sent a runner. It holds the behaviour, the runner leaving.
 #[test]
 fn the_race_sends_its_runner_to_mars_over_the_ships_own_moves() {
+    // Ticket #639 (version 0.1.0.6): the Arkwrights open in Canada on the twenty-two-Region board, at
+    // step 380, and seed 1's game stands at the premise with its runner under way on turn 16, not 10
+    // (measured over seeds 1 to 8: the only one by turn 25).
     let mut g = Game::new(tables(), NewGame { seed: 1, player: FactionKind::Prospectors, player_is_ai: true, player_start: StateId::EastAsia });
     g.start();
-    while g.turn < 10 {
+    while g.turn < 16 {
         g.end_turn(std::array::from_fn(|_| Vec::new())).unwrap();
     }
     let ark = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Arkwrights).unwrap();
@@ -8272,7 +8292,7 @@ fn the_race_sends_its_runner_to_mars_over_the_ships_own_moves() {
     let under_way = g.ships.iter().any(|s| s.seat == ark && s.colonists > 0 && matches!(s.at, ShipAt::Transit { to: BodyId::Mars, .. }));
     assert!(
         under_way || orders.iter().any(|o| matches!(o, Order::Transit { to: BodyId::Mars, .. })),
-        "the Arkwrights' runner to Mars on turn 10: {:?}",
+        "the Arkwrights' runner to Mars on turn 16: {:?}",
         g.log.iter().filter(|l| l.contains("Colony Ship")).collect::<Vec<_>>()
     );
 }
@@ -10736,7 +10756,12 @@ fn relations_do_nothing_mechanical_in_this_version() {
     // Ticket #332 (version 0.09.0): seven turns, where six parted the boards before. Widgets
     // slow the opening builds, so the first credit purchase of the neutral game, which is the
     // divergence, comes a turn later; measured at seven on this seed when the ticket was built.
-    for _ in 0..7 {
+    // Ticket #639 (version 0.1.0.6): eight on the twenty-two-Region board, measured over seeds 1 to
+    // 11 (six or eight). Within them nobody buys a credit in either game; what parts the boards now,
+    // traced from the computer seats' orders turn by turn (from the review), is that the hostile
+    // seats propose no Accord and Smear one another from turn 2, where the neutral ones propose
+    // Non-Aggression and spend that Influence on the United States' Region.
+    for _ in 0..8 {
         pick_a_tech(&mut a);
         answer_the_card(&mut a);
         pick_a_tech(&mut b);
@@ -10744,9 +10769,11 @@ fn relations_do_nothing_mechanical_in_this_version() {
         a.end_turn(std::array::from_fn(|_| Vec::new())).unwrap();
         b.end_turn(std::array::from_fn(|_| Vec::new())).unwrap();
     }
-    // The hostile game proposes no purchase at all -- the Custodians will not sell to a Hostile
-    // buyer -- so the computer seats' choices, and with them the board, part from the neutral game's.
-    assert_ne!(picture(&a), picture(&b), "seven turns of the worst possible blood now change the board: {:?}", picture(&a));
+    // Relations steer the computer seats' Influence: Smears in the hostile game, none in the neutral
+    // one, and the board parts with them.
+    let smeared = |g: &Game| Seat::ALL.into_iter().map(|s| g.seat(s).blame_smeared).sum::<f64>();
+    assert!(smeared(&b) > 0.0 && smeared(&a) == 0.0, "Smears only where Relations are Hostile: {} and {}", smeared(&b), smeared(&a));
+    assert_ne!(picture(&a), picture(&b), "eight turns of the worst possible blood now change the board: {:?}", picture(&a));
     assert_eq!(Seat::ALL.into_iter().map(|s| b.seat(s).credits_bought).sum::<f64>(), 0.0, "and nobody bought a credit in it");
 }
 
@@ -18778,7 +18805,8 @@ fn a_throw_off_of_the_player_is_under_your_works() {
 fn an_occupation_begun_or_broken_by_the_player_is_under_your_works() {
     let occupation = |g: &Game| g.report.lines.iter().find(|l| l.kind == LineKind::Occupation).map(|l| (l.mine, l.text.clone())).expect("an Occupation line");
     // Ticket #492 (version 0.09.9): the fourth seat starts in Australia now, not the peninsula.
-    for (home, mine) in [(StateId::EastAsia, true), (StateId::Australia, false)] {
+    // Ticket #639 (version 0.1.0.6): a rival seat starts in Canada now, and none in Australia.
+    for (home, mine) in [(StateId::EastAsia, true), (StateId::Canada, false)] {
         let mut g = game();
         g.armies.retain(|a| a.home != ArmyHome::State(StateId::Europe));
         let army = occupier_in(&mut g, home, StateId::Europe);
@@ -20887,7 +20915,7 @@ fn an_offline_building_records_why() {
 fn the_regions_are_redrawn_around_iran_to_eighteen() {
     let g = game();
     let t = &g.tables;
-    assert_eq!(StateId::ALL.len(), 20, "twenty since ticket #510");
+    assert_eq!(StateId::ALL.len(), 22, "twenty-two since ticket #639, twenty since #510");
     let card = |s: StateId| t.state(s);
     let (ir, tr, kz, za, ng, uk) = (card(StateId::MiddleEast), card(StateId::Turkey), card(StateId::Kazakhstan), card(StateId::SouthAfrica), card(StateId::SubSaharanAfrica), card(StateId::UnitedKingdom));
     assert_eq!([ir.name.as_str(), tr.name.as_str(), kz.name.as_str(), za.name.as_str(), ng.name.as_str(), uk.name.as_str()], ["Iran", "Turkey", "Kazakhstan", "South Africa", "Nigeria", "The United Kingdom"]);
@@ -20901,12 +20929,14 @@ fn the_regions_are_redrawn_around_iran_to_eighteen() {
     assert_eq!((kz.population, kz.gdp, kz.influence, kz.industry_level, kz.size, kz.coastal_exposure), (70.0, 1, 1, 1, 2, 0));
     // Nigeria's 1,140 people and 2 GDP, shared two ways; its 1 Influence kept, and 1 added. Ticket
     // #492 (version 0.09.9): the people three ways, Eritrea's to Egypt's 260.
-    assert_eq!(ng.population + za.population + card(StateId::NorthAfrica).population, 1140.0 + 260.0);
+    // Ticket #639 (version 0.1.0.6): four ways, the Horn's to Ethiopia's.
+    assert_eq!(ng.population + za.population + card(StateId::NorthAfrica).population + card(StateId::Ethiopia).population, 1140.0 + 260.0);
     assert_eq!((ng.gdp + za.gdp, ng.influence, za.influence), (2, 1, 1));
     // Ticket #492 (version 0.09.9): East Africa and the Horn to South Africa, Angola back, Eritrea
     // to Egypt: 517, 619 and 264; the rest stands.
-    assert_eq!((za.population, za.gdp, za.industry_level, za.size, za.coastal_exposure), (517.0, 1, 2, 2, 2));
-    assert_eq!((ng.population, card(StateId::NorthAfrica).population), (619.0, 264.0));
+    // Ticket #639 (version 0.1.0.6): the Horn to Ethiopia, Eritrea with it: 371 and 260 left.
+    assert_eq!((za.population, za.gdp, za.industry_level, za.size, za.coastal_exposure), (371.0, 1, 2, 2, 2));
+    assert_eq!((ng.population, card(StateId::NorthAfrica).population), (619.0, 260.0));
     // The United Kingdom's share of the European Union's, as ticket #453 left it.
     let two = [StateId::Europe, StateId::UnitedKingdom];
     assert_eq!(two.iter().map(|s| card(*s).population).sum::<f64>(), 600.0);
@@ -20928,8 +20958,10 @@ fn the_regions_are_redrawn_around_iran_to_eighteen() {
     assert_eq!(tr.neighbours, vec![StateId::Europe, StateId::Russia, StateId::NorthAfrica, StateId::ArabianPeninsula, StateId::MiddleEast]);
     assert_eq!(kz.neighbours, vec![StateId::Russia, StateId::EastAsia, StateId::MiddleEast]);
     // Ticket #492 (version 0.09.9): the Horn's, Egypt's Region and Arabia across the Red Sea.
-    assert_eq!(za.neighbours, vec![StateId::SubSaharanAfrica, StateId::NorthAfrica, StateId::ArabianPeninsula]);
-    assert_eq!(uk.neighbours, vec![StateId::Europe, StateId::NorthAmerica]);
+    // Ticket #639 (version 0.1.0.6): the Horn is Ethiopia's now, and Arabia faces it, not South Africa.
+    assert_eq!(za.neighbours, vec![StateId::SubSaharanAfrica, StateId::NorthAfrica, StateId::Ethiopia]);
+    // Ticket #639: and Canada's, across Greenland and Iceland.
+    assert_eq!(uk.neighbours, vec![StateId::Europe, StateId::NorthAmerica, StateId::Canada]);
     for a in StateId::ALL {
         for b in &card(a).neighbours {
             assert!(card(*b).neighbours.contains(&a), "{a:?} lists {b:?}, and {b:?} must list it back");
@@ -22890,8 +22922,9 @@ fn superconductors_lift_every_energy_output_by_a_quarter() {
 fn vietnam_and_argentina_are_cut_out_of_indonesias_and_brazils_regions() {
     let g = game();
     let t = &g.tables;
-    assert_eq!(StateId::ALL.len(), 20);
-    assert_eq!(t.states.len(), 20, "twenty rows in nation_states.toml");
+    // Ticket #639 (version 0.1.0.6): twenty-two since Canada and Ethiopia.
+    assert_eq!(StateId::ALL.len(), 22);
+    assert_eq!(t.states.len(), 22, "twenty-two rows in nation_states.toml");
     let card = |s: StateId| t.state(s);
     let (vn, id, ar, br) = (card(StateId::Vietnam), card(StateId::SouthEastAsia), card(StateId::Argentina), card(StateId::SouthAmerica));
     assert_eq!([vn.name.as_str(), id.name.as_str(), ar.name.as_str(), br.name.as_str()], ["Vietnam", "Indonesia", "Argentina", "Brazil"]);
@@ -26017,11 +26050,17 @@ fn ticket_618_a_computer_seat_contests_a_rivals_climb_on_a_neutral_region() {
     assert!((full - 3.0).abs() < 1e-9, "x3 at the threshold: {full}");
     g.seats[0].influence.insert(Place::State(sid), th * 2);
     assert!((g.ai_contest_lift(contester, sid) - 3.0).abs() < 1e-9, "capped at x3");
-    // A computer rival's climb is contested the same way: the Prospectors' snipes too.
+    // A computer rival's climb is contested the same way: the Prospectors' snipes too. Ticket #639
+    // (version 0.1.0.6): the climber is the seat that is neither the contester nor the aloof one,
+    // which seat 2 had been until South Africa's seat came to border Egypt.
+    let climber = Seat::ALL.into_iter().find(|s| *s != Seat(0) && *s != contester && *s != aloof).unwrap();
+    // The neighbour the aloof seat was handed above goes back to nobody, so the climb below is read
+    // on the board the test began with.
+    g.state_mut(neighbours[0]).control = Control::Neutral;
     g.seats[0].influence.remove(&Place::State(sid));
-    g.seats[2].influence.insert(Place::State(sid), th);
+    g.seats[climber.index()].influence.insert(Place::State(sid), th);
     assert!((g.ai_contest_lift(contester, sid) - 3.0).abs() < 1e-9, "the climber's seat does not matter");
-    assert!((g.ai_contest_lift(Seat(2), sid) - 1.0).abs() < 1e-9, "the climber does not contest itself");
+    assert!((g.ai_contest_lift(climber, sid) - 1.0).abs() < 1e-9, "the climber does not contest itself");
     // The orders: sized to outbid. The climber stands at the threshold, the contester at 3, so the
     // steps that pass it are lifted and, with the Allotment for them, all go there; the contest is
     // counted once for the Region, however many steps.
@@ -26238,13 +26277,15 @@ fn ticket_628_the_slots_that_hold_fissionables() {
 fn ticket_628_the_draw_leaves_the_games_dice_alone() {
     let g = fresh();
     let y = g.slot_yields(BodyId::Mars, 0);
-    assert_eq!((y.mine, y.generator, y.refinery, y.research), (1.01, 0.87, 1.6, 1.44));
-    assert_eq!(g.slot_yields(BodyId::Vesta, 5).mine, 1.93, "the last slot drawn");
-    assert_eq!(g.deck.cards[..4], [Card::Event(EventId::SolarStorm), Card::Event(EventId::SalvageRights), Card::Event(EventId::TheHardWinter), Card::Event(EventId::OrbitalDebris)], "the deck, shuffled before the slots");
-    // And the game's own dice stand where 0.1.0.5 left them after the start: the next roll, read from
-    // that version's code.
+    // Ticket #639 (version 0.1.0.6): a snapshot re-read from this version's own code on the twenty-
+    // two-Region board, not from an older version's as the 0.1.0.5 figures were: it holds the draws
+    // where they stand, and says nothing of why the start moved them.
+    assert_eq!((y.mine, y.generator, y.refinery, y.research), (1.06, 0.62, 1.52, 1.43));
+    assert_eq!(g.slot_yields(BodyId::Vesta, 5).mine, 1.48, "the last slot drawn");
+    assert_eq!(g.deck.cards[..4], [Card::Event(EventId::Drought), Card::Event(EventId::CarbonLevy), Card::Event(EventId::RefugeeConvoy), Card::Event(EventId::StrikeAtTheRefineries)], "the deck, shuffled before the slots");
+    // And the game's own dice stand where the start leaves them: the next roll.
     use rand::Rng;
-    assert_eq!(g.rng.clone().random::<u64>(), 16944384647078824630, "the game's next roll");
+    assert_eq!(g.rng.clone().random::<u64>(), 15575124227675032591, "the game's next roll");
 }
 
 /// Ticket #628: the Mine makes Fissionables beside its Materials (the designer: "we're using the
@@ -27856,4 +27897,35 @@ fn ticket_644_a_queued_refit_blocks_a_scrap_and_fills_only_to_the_tank() {
     let s = g.ship(ship).unwrap();
     assert!(s.nuclear);
     assert_eq!(s.fissionables, tank, "to the tank and no further");
+}
+
+// ---------------------------------------------------------------- 0.1.0.6 ticket #639: Canada and Ethiopia
+
+/// Ticket #639 (version 0.1.0.6), at the designer's word: **two more Regions, twenty-two.** Canada
+/// (with Greenland) is cut out of the United States' Region and Ethiopia (the Horn, Eritrea with it)
+/// out of South Africa's and Egypt's. Each takes its parents' people by the real countries, so the
+/// world still holds 7,860; Canada takes 2 of the United States' 23 GDP and 1 of its 7 Influence;
+/// Ethiopia's GDP and Influence of 1 are added. Every neighbour edge is listed both ways.
+#[test]
+fn ticket_639_canada_and_ethiopia_are_cut_out_of_their_parents() {
+    let g = game();
+    let card = |s: StateId| g.tables.state(s).clone();
+    let (ca, us, et, za, eg) = (card(StateId::Canada), card(StateId::NorthAmerica), card(StateId::Ethiopia), card(StateId::SouthAfrica), card(StateId::NorthAfrica));
+    assert_eq!((ca.name.as_str(), et.name.as_str()), ("Canada", "Ethiopia"));
+    assert_eq!((ca.population + us.population, ca.gdp + us.gdp, ca.influence + us.influence), (380.0, 23, 7), "the United States' Region's 380, 23 and 7, shared");
+    assert_eq!((ca.population, ca.gdp, ca.influence, ca.industry_level, ca.size, ca.coastal_exposure), (39.0, 2, 1, 3, 3, 1));
+    assert_eq!(ca.resource_lean, Resource::Materials);
+    assert_eq!(et.population + za.population + eg.population, 517.0 + 264.0, "South Africa's 517 and Egypt's 264, shared three ways");
+    assert_eq!((et.population, et.gdp, et.influence, et.industry_level, et.size, et.coastal_exposure), (150.0, 1, 1, 1, 2, 1));
+    assert_eq!(et.resource_lean, Resource::Energy);
+    assert_eq!((za.gdp, za.influence, eg.population), (1, 1, 260.0), "South Africa keeps its 1 and 1; Egypt gives Eritrea's 3.7");
+    assert_eq!(ca.neighbours, vec![StateId::NorthAmerica, StateId::Russia, StateId::UnitedKingdom]);
+    assert_eq!(et.neighbours, vec![StateId::SouthAfrica, StateId::NorthAfrica, StateId::ArabianPeninsula]);
+    assert!(!za.neighbours.contains(&StateId::ArabianPeninsula), "the Horn faces Arabia, and it is Ethiopia's");
+    assert_eq!(StateId::ALL.iter().map(|s| card(*s).population).sum::<f64>(), 7860.0, "nobody was invented");
+    for a in StateId::ALL {
+        for b in &card(a).neighbours {
+            assert!(card(*b).neighbours.contains(&a), "{a:?} lists {b:?}, and {b:?} must list it back");
+        }
+    }
 }

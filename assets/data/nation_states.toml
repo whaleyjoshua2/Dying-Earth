@@ -125,7 +125,8 @@ demonym = "Egyptian"
 name = "Egypt"
 flag = "eg"
 colour = [0.94, 0.71, 0.78]
-population = 264.0
+# Ticket #639 (version 0.1.0.6): and leave it again for Ethiopia's Region, so 260; it touches Ethiopia's.
+population = 260.0
 industry_level = 1
 resource_lean = "fuel"
 baseline_emissions = 0.4
@@ -133,7 +134,7 @@ education_level = 0.85
 size = 2
 coastal_exposure = 1
 # Ticket #492 (version 0.09.9): Eritrea's 3.7 million join it, so 264; and it touches South Africa's.
-neighbours = ["sub_saharan_africa", "europe", "turkey", "arabian_peninsula", "south_africa"]
+neighbours = ["sub_saharan_africa", "europe", "turkey", "arabian_peninsula", "south_africa", "ethiopia"]
 start_facilities = ["refinery"]
 influence = 1
 gdp = 1
@@ -249,26 +250,29 @@ influence = 4
 gdp = 17
 unrest = 0.0
 
-# North America: the United States and Canada, about 375 million people.
+# North America: the United States and Canada, about 375 million people (until ticket #639).
+# Ticket #639 (version 0.1.0.6): the United States alone now (Bermuda kept), Canada and Greenland
+# having left for the Region called Canada with 39 of its people, 2 of its 23 GDP and 1 of its 7
+# Influence, by the real countries.
 [[state]]
 id = "north_america"
 demonym = "American"
 name = "The United States"
 flag = "us"
 colour = [0.31, 0.75, 0.35]
-population = 380.0
+population = 341.0
 industry_level = 3
 resource_lean = "fuel"
 baseline_emissions = 0.4
 education_level = 1.5
 size = 3
 coastal_exposure = 1
-neighbours = ["europe", "russia", "central_america", "united_kingdom"]
+neighbours = ["europe", "russia", "central_america", "united_kingdom", "canada"]
 # Ticket #69 (version 0.05.5): a Research Lab added to the start Facilities (as in South-East Asia),
 # standing inland; while the state is neutral it pays half its yield into the shared Tech.
 start_facilities = ["refinery", "power_plant", "factory", "mine", "research_lab"]
-influence = 7
-gdp = 23
+influence = 6
+gdp = 21
 unrest = 0.0
 
 # Central America and the Caribbean: Mexico down to Panama and the islands, about 220 million
@@ -331,7 +335,7 @@ baseline_emissions = 0.4
 education_level = 1.35
 size = 3
 coastal_exposure = 1
-neighbours = ["europe", "east_asia", "north_america", "japan", "kazakhstan", "turkey"]
+neighbours = ["europe", "east_asia", "north_america", "japan", "kazakhstan", "turkey", "canada"]
 start_facilities = ["refinery", "power_plant"]
 influence = 4
 gdp = 3
@@ -401,7 +405,8 @@ unrest = 0.0
 # hand for the designer to veto: it leans Fuel and starts with a Refinery and a Power Plant,
 # its Baseline Emissions are the Middle East's, and its Gulf coast is exposed. It borders the Middle
 # East across the Gulf and Iraq, North Africa across the Red Sea at the Sinai, and Sub-Saharan
-# Africa across the strait to the Horn, which is the adjacency the Middle East used to hold.
+# Africa across the strait to the Horn, which is the adjacency the Middle East used to hold (the
+# Horn is Ethiopia's since ticket #639).
 [[state]]
 id = "arabian_peninsula"
 demonym = "Saudi"
@@ -415,8 +420,9 @@ baseline_emissions = 0.5
 education_level = 1.0
 size = 2
 coastal_exposure = 1
-# Ticket #492 (version 0.09.9): across the Red Sea from the Horn, now South Africa's.
-neighbours = ["middle_east", "turkey", "north_africa", "south_africa"]
+# Ticket #492 (version 0.09.9): across the Red Sea from the Horn, then South Africa's; ticket #639
+# (version 0.1.0.6): Ethiopia's now.
+neighbours = ["middle_east", "turkey", "north_africa", "ethiopia"]
 start_facilities = ["refinery", "power_plant"]
 influence = 2
 gdp = 2
@@ -469,7 +475,7 @@ baseline_emissions = 0.3
 education_level = 1.5
 size = 1
 coastal_exposure = 2
-neighbours = ["europe", "north_america"]
+neighbours = ["europe", "north_america", "canada"]
 start_facilities = ["refinery", "power_plant", "factory", "mine"]
 influence = 1
 gdp = 3
@@ -518,14 +524,16 @@ demonym = "South African"
 name = "South Africa"
 flag = "za"
 colour = [0.24, 0.52, 0.36]
-population = 517.0
+# Ticket #639 (version 0.1.0.6): Ethiopia, Somalia and Djibouti's 145.7 million leave for the Region
+# called Ethiopia, so 371; it no longer faces Arabia, and touches Ethiopia's.
+population = 371.0
 industry_level = 2
 resource_lean = "materials"
 baseline_emissions = 0.4
 education_level = 0.7
 size = 2
 coastal_exposure = 2
-neighbours = ["sub_saharan_africa", "north_africa", "arabian_peninsula"]
+neighbours = ["sub_saharan_africa", "north_africa", "ethiopia"]
 start_facilities = ["mine", "power_plant", "factory"]
 influence = 1
 gdp = 1
@@ -583,4 +591,61 @@ neighbours = ["south_america", "central_america"]
 start_facilities = ["factory", "mine"]
 influence = 1
 gdp = 2
+unrest = 0.0
+
+# Ticket #639 (version 0.1.0.6): two more Regions, at the designer's word ("+2 countries"; the two
+# chosen: "canada and greenland from the US and Ethiopia, from South Africa's Region, along with the
+# Horn"). Appended last with their enum variants, so no older index moves. Each is cut out of a
+# larger Region and takes its share of that Region's people, GDP and Influence by the real countries,
+# so the world still holds 7,860; its Industry, Education, lean, start Facilities and coast are its
+# own, approved on the ticket. Neither is anybody's fixed start.
+
+# Canada: Canada and Greenland (and Saint Pierre and Miquelon), out of the United States' Region:
+# 39 million people, 2 of its 23 GDP and 1 of its 7 Influence. Ore, oil sands and timber, so it leans
+# Materials and starts with a Refinery, a Power Plant and a Factory, with the Mine every start Factory
+# stands beside; rich and schooled as its neighbour,
+# with the same Emissions per head. It touches the United States' Region, Russia's across the Arctic
+# and the United Kingdom's by Greenland and Iceland.
+[[state]]
+id = "canada"
+demonym = "Canadian"
+name = "Canada"
+flag = "ca"
+colour = [0.95, 0.2, 0.7]
+population = 39.0
+industry_level = 3
+resource_lean = "materials"
+baseline_emissions = 0.4
+education_level = 1.5
+size = 3
+coastal_exposure = 1
+neighbours = ["north_america", "russia", "united_kingdom"]
+start_facilities = ["refinery", "power_plant", "factory", "mine"]
+influence = 1
+gdp = 2
+unrest = 0.0
+
+# Ethiopia: Ethiopia, Somalia with Somaliland, Djibouti and Eritrea -- the Horn -- out of South
+# Africa's Region (145.7 million) and, for Eritrea, Egypt's (3.7): 150 million, the three shares
+# rounded by the largest remainder so the world keeps its 7,860. Its GDP and Influence of 1 are
+# added, not taken: a Region worth nothing is a dead card, so the world's Influence is 37. It leans
+# Energy for the Nile's dams and starts with a Power Plant; poor and young. It touches South
+# Africa's Region, Egypt's along Sudan, and faces Arabia across the Bab-el-Mandeb.
+[[state]]
+id = "ethiopia"
+demonym = "Ethiopian"
+name = "Ethiopia"
+flag = "et"
+colour = [0.25, 0.95, 0.2]
+population = 150.0
+industry_level = 1
+resource_lean = "energy"
+baseline_emissions = 0.2
+education_level = 0.6
+size = 2
+coastal_exposure = 1
+neighbours = ["south_africa", "north_africa", "arabian_peninsula"]
+start_facilities = ["power_plant"]
+influence = 1
+gdp = 1
 unrest = 0.0

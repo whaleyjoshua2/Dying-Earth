@@ -216,10 +216,15 @@ pub enum StateId {
     // has been, so no older index moves.
     Vietnam,
     Argentina,
+    // Version 0.1.0.6 (ticket #639): Canada (with Greenland) cut out of the United States' Region,
+    // Ethiopia (with the Horn) out of South Africa's and, for Eritrea, Egypt's. Appended, as every
+    // split has been, so no older index moves.
+    Canada,
+    Ethiopia,
 }
 
 impl StateId {
-    pub const ALL: [StateId; 20] = [
+    pub const ALL: [StateId; 22] = [
         StateId::SubSaharanAfrica,
         StateId::NorthAfrica,
         StateId::EastAsia,
@@ -240,6 +245,8 @@ impl StateId {
         StateId::SouthAfrica,
         StateId::Vietnam,
         StateId::Argentina,
+        StateId::Canada,
+        StateId::Ethiopia,
     ];
     pub fn index(self) -> usize {
         self as usize
