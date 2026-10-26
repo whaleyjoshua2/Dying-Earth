@@ -1,4 +1,4 @@
-DYING EARTH - playtest build, version 0.1.0.5
+DYING EARTH - playtest build, version 0.1.0.6
 =============================================
 
 Thanks for playing. This is an early build of a turn-based strategy game about colonizing
@@ -16,57 +16,56 @@ HOW TO RUN
 4. The very first launch shows a blank dark window for up to ten seconds while it
    compiles graphics. Later launches are quick.
 5. Needs Windows 10 or 11, 64-bit, and any graphics card from the last ten years.
-6. Saves from 0.1.0.4, 0.1.0.3, 0.1.0.2, 0.1.0.1 and 0.1.0.0 load. Saves from 0.09.9 and
-   before do not: the Load screen says so.
+6. Saves from 0.1.0.5 and before do not load: two Nation States joined the board, and the
+   Load screen says so.
 7. This version ships for Windows and for Linux. On Linux, read RUN-ON-LINUX.txt in the
    folder instead of steps 2 to 5.
 
-WHAT CHANGED SINCE 0.1.0.4
+WHAT CHANGED SINCE 0.1.0.5
 --------------------------
-The pushback version: the computer pushes back, and the interface is cut back to its figures.
+The fission version: a new resource, and people who move on their own.
 
-THE COMPUTER PUSHES BACK
-- A COMPUTER FACTION CONTESTS YOUR CLIMB: when your Standing on a neutral Region passes
-  half its threshold, the computer seat with the most Standing there, or one holding a
-  neighbour, spends to outbid you. It does the same to another computer's climb.
-- IT DEFENDS ITS OWN REGIONS: a rival at half the price of a Region it holds, or a quarter
-  on its home Region, is answered with Influence; and it keeps its home Region's Standing
-  topped up to a floor of 20, so a capital is no longer one turn's spend.
-- IT WEIGHS COLLAPSE: a computer seat that reads the world collapsing before its own win
-  builds less that emits and more that cleans, until its win is in sight.
-- THE PACK forms against a runaway leader at 40% of Victory, where it formed at 50%.
+FISSIONABLES
+- A SEVENTH RESOURCE, found off Earth only: a Mine makes them beside its Materials, by its
+  site's figure (the Moon has two or three sites with any; Mars, its moons, Mercury, Ceres
+  and Vesta are richer). Bought, sold and traded like Fuel.
+- NUCLEAR HULLS: once Nuclear Rockets is researched a Ship may be built nuclear, with a
+  second tank of Fissionables (a tenth of its Fuel tank) filled at the build. It alone gets
+  the Tech's shorter crossings, and each leg burns a tenth of its Fuel in Fissionables too.
+  A chemical hull can be REFITTED nuclear at a Shipyard in its orbit (Refit nuclear on the
+  Ship card). A Warhead costs half a Fissionable.
+- THE REACTOR: a new power plant for everyone, on Earth and as a Module off it, behind Clean
+  Power: 8 Energy a turn for 0.1 Fissionables and 2 Ducats, no emissions. The Archivists'
+  own building, which was called the Reactor, is the ACCUMULATOR now; its rule is unchanged.
 
-THE FIGURES
-- THE PROSPECTORS' bar is 6,250 Ducats in the Venture Fund (5,000 before).
-- OFF-WORLD PRESENCE is 20 Colonists for the Custodians and the Prospectors (18); THE
-  DIASPORA is 44, still four on each of four Bodies (42). THE ARCHIVE may be ordered only at
-  a place of COLONY tier, where it wanted four Colonists living there.
-- EVERY FACILITY AND MODULE costs a fifth more Widgets (5, 6, 10 and 14 where 4, 5, 8 and
-  12), and a Frigate 6.
-- THE SCRUBBER cap is one per 200 million people in a Region (300 before), one to ten.
-- THE STRIP PERMIT raises the Region's Baseline Emissions by 0.3 for good (0.2), costs a
-  point of Relations with every rival (never an Accord), and the Region does not grow while
-  it runs.
-- AN OCCUPATION halves the holder's Standing at the place the turn it begins.
-- ONE MORE COLONY SLOT on the Moon (Oceanus Procellarum), Phobos (Todd) and Deimos
-  (Voltaire).
+PEOPLE WHO MOVE ON THEIR OWN
+- FERRY ROUTES: a Colony Ship can be set to ferry between where it stands and a Colony or
+  station of yours: it loads, flies, unloads and comes back, refuelling at each depot and
+  waiting for windows. The card says the round trip's Fuel.
+- THE REFUGEE CONVOY has a third answer, "Send them to the stars": six refugees become
+  Pioneers and lift to your Ships and stations in orbit with room; the rest are lost.
+- THE FIRST CHILD BORN OFF EARTH is a Moment and +5 Influence, once a game.
+- AN EMPTY COLONY SHIP over a Colony of yours can be SCRAPPED into a free Habitat there -
+  the way out for a stranded one.
 
-THE INTERFACE
-- TURN ONE opens on your own Faction's SIGNATURE MOVES as one sentence, no longer all four.
-- THE REGION CARD's Standing line is one line; what each figure means is on its hover.
-- THE TOP BAR's Widgets and Energy figures have hovers that say where each turn's came from,
-  place by place.
-- THE BATTLE MOMENT says who won: "your TSV Defiant destroyed the Prospectors' PMV Valiant"
-  over "you won".
-- The CHEAP ORE card's refusal is a button, "Let it go"; a spend that would break an Accord
-  reads "breaks Accord"; a Refinery's card says it refuels your Ships in low orbit.
-- NINE HOVERS cut to a line each: the Accord's notice, the first landing, Pioneers waiting,
-  the Blockade, the Research Directive, the standing order, the Allotment, Unrest and
-  Overcrowded.
+WAR OVER COLONIES
+- A COLONY CARD names its THREATS: rival warships in orbit, Armies aboard Carriers, Ships on
+  their way, and a rival's Standing at half the price.
+- A NEW ARMY joins the stance of your Armies at its place (dug in at once, if they are).
+- AN INHERITED ARMY stays on Hold until you order it: it no longer attacks on its own.
 
-THE TEXT TOOL
-- `show --techs` prints the Tech tree by branch, each Tech's state and effect; the Bodies
-  block says who landed first on each world and, until somebody lands, the race to the Moon.
+THE FIGURES AND THE BOARD
+- THE ARKWRIGHTS: transit x0.8, Habitats and Colony Ships x1.25 (5, 7 and 10 aboard),
+  stations x0.75, 50 Fuel to start. THE ARCHIVISTS start with 25 Ducats. THE PROSPECTORS'
+  bar is 6,500.
+- TWO MORE NATION STATES: CANADA (with Greenland) and ETHIOPIA (the Horn), 22 in all.
+- THE CLIMATE was re-swept with them: the world heats faster, and about a quarter of
+  computer games now end in Collapse.
+
+THE WINDOW
+- The eight CAPITAL BUILDINGS have pictures.
+- Cards and bars are a touch lighter; the time of day sits beside End Turn; a Standing
+  chip is a pill.
 
 WHAT WE WANT TO KNOW
 --------------------

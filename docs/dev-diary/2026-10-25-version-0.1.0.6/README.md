@@ -621,3 +621,21 @@ keeping its stroke and margins, every panel on the playing screen at 41, the chi
 its frame -- was checked against egui's source and found fine.
 
 **The sweep** ([`sweeps/ticket-641.txt`](sweeps/ticket-641.txt)) is identical to #640's.
+
+## Closing the version
+
+Ticket [#642](https://github.com/whaleyjoshua2/Dying-Earth/issues/642).
+
+- **The closing sweep** ([`sweeps/final-0.1.0.6.txt`](sweeps/final-0.1.0.6.txt)): **35 / 25 / 1 / 0
+  and 19 collapses**, #639's board to the figure, since nothing that moves a rule changed after it;
+  from 0.1.0.5's 18 / 61 / 0 / 1 and 0. The collapses sit at the designer's 20 for the first time
+  since 0.1.0.0, by the step re-swept to 380 on the twenty-two-Region board. The win column is not
+  retuned: the Prospectors fell from 61 to 25 over the version, most of it at the Faction figures
+  (#638, 56 to 46) and the step (#639, 45 to 25); the Custodians rose from 18 to 35; the Arkwrights
+  and the Archivists stand at 1 and 0.
+- **`GAME_VERSION` 0.1.0.6; `SAVE_VERSION` 13**, moved by the two Regions (#639): a 0.1.0.5 save is
+  refused and the Load screen says so. Every other field the version added reads a default.
+- **The glossary** audited against the version by an agent that did not write it; its findings are
+  in the version's resolution on the ticket.
+- **The playtest note** rewritten; the Windows kit built here into `dist/`, the Linux kit from the
+  release-kits run.

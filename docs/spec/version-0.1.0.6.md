@@ -13,17 +13,31 @@ pictures and sweeps that decided it are in
 **What the version is.** Version 0.1.0.5 with the designer's list of 2026-10-25. Its spine is a new
 resource, **Fissionables**, found off Earth and richest in the far worlds (§1), which a nuclear hull
 is built and flown with and a Warhead is loaded with (§2), and a new common Reactor burns, the
-Archivists' own building renamed the Accumulator (§3); and the computer is taught to chase them (§4). Beside it, Colony Ships run standing ferry routes (§5), two Factions' figures and the Prospectors' bar move (§6), the first child born off Earth is a Moment (§7), the Refugee Convoy may be sent to the stars (§8), and a Colony's card names its threats (§9).
+Archivists' own building renamed the Accumulator (§3); and the computer is taught to chase them (§4). Beside it, Colony Ships run standing ferry routes (§5), two Factions' figures and the Prospectors' bar move (§6), the first child born off Earth is a Moment (§7), the Refugee Convoy may be sent to the stars (§8), and a Colony's card names its threats (§9). A new Army joins its stack's stance (§10), an inherited Army stays on Hold until ordered (§11), an empty Colony Ship is scrapped into a Habitat (§12), a chemical hull is refitted nuclear (§13), Canada and Ethiopia join the board and the climate step is re-swept to 380 (§14), the capital buildings have their art (§15), and the window is lightened and tidied (§16).
 
 **What it did to the win column** (80 games, per Faction; every section's own sweep is in it):
 
-| | 0.1.0.5 | §1 Fissionables | §2 the nuclear hull | §3 the Reactor | §4 the chase | §5 ferry routes | §6 the figures | §7 the first-born | §8 the convoy | §9 threats | the ideal |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| Custodians | 18 | 23 | 19 | 28 | 22 | 22 | 30 | 31 | 30 | 30 | 15 |
-| Prospectors | 61 | 51 | 56 | 47 | 56 | 55 | 46 | 45 | 46 | 46 | 15 |
-| Arkwrights | 0 | 3 | 2 | 1 | 1 | 2 | 1 | 1 | 1 | 1 | 15 |
-| Archivists | 1 | 1 | 1 | 1 | 1 | 1 | 3 | 3 | 3 | 3 | 15 |
-| collapses | 0 | 2 | 2 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 20 |
+| | 0.1.0.5 | §1 Fissionables | §2 the nuclear hull | §3 the Reactor | §4 the chase | §5 ferry routes | §6 the figures | §7 the first-born | §8 the convoy | §9 threats | §10 the stack | §11 inherited | §12 scrap | §13 refit | §14 two Regions, step 380 | §15 art | §16 the window | **closing** | the ideal |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Custodians | 18 | 23 | 19 | 28 | 22 | 22 | 30 | 31 | 30 | 30 | 30 | 29 | 32 | 32 | 35 | 35 | 35 | **35** | 15 |
+| Prospectors | 61 | 51 | 56 | 47 | 56 | 55 | 46 | 45 | 46 | 46 | 47 | 48 | 45 | 45 | 25 | 25 | 25 | **25** | 15 |
+| Arkwrights | 0 | 3 | 2 | 1 | 1 | 2 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 1 | 1 | 1 | **1** | 15 |
+| Archivists | 1 | 1 | 1 | 1 | 1 | 1 | 3 | 3 | 3 | 3 | 3 | 2 | 2 | 2 | 0 | 0 | 0 | **0** | 15 |
+| collapses | 0 | 2 | 2 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 19 | 19 | 19 | **19** | 20 |
+
+**The closing board** ([`final-0.1.0.6.txt`](../dev-diary/2026-10-25-version-0.1.0.6/sweeps/final-0.1.0.6.txt)):
+**35 / 25 / 1 / 0 and 19 collapses**, §14's board to the figure, since nothing that moves a rule changed
+after it. The collapses are at the designer's 20 for the first time since 0.1.0.0; the win column is
+not: the Prospectors fell from 61 to 25 and the Custodians rose from 18 to 35 over the version, the
+Arkwrights and the Archivists are at 1 and 0. Income over the batch, per Faction, mean a game, net of
+upkeep (Materials / Fuel / Energy / Ducats / Research / Fissionables): the Custodians 1623 / 459 /
+1038 / 992 / 933 / 44.9, the Prospectors 1414 / 437 / 748 / 1224 / 205 / 42.3, the Arkwrights 538 / 46
+/ 229 / 2531 / 281 / 1.2, the Archivists 301 / 104 / 25 / 272 / 360 / 0.3 -- every figure but the
+Fissionables down on 0.1.0.5's, the games that collapse being shorter.
+
+`GAME_VERSION` is 0.1.0.6; `SAVE_VERSION` is **13**, moved by §14's two Regions (`Game.states` is
+indexed by Region), so a 0.1.0.5 save does not load and the Load screen says so. Every other field
+the version added reads a default.
 
 ## 1. Fissionables, the seventh resource, and Deep Mining and Rich Seam moved
 

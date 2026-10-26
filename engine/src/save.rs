@@ -166,7 +166,7 @@ pub const SAVE_VERSION: u32 = 13;
 /// every field the version added to the save (the Energy by place, #609; a Battle party's unit
 /// names, #614; the contest, home and Collapse counters, #618 to #620) reads a default from an
 /// older file, so a 0.1.0.4 save and those before it to 0.1.0.0 load.
-pub const GAME_VERSION: &str = "0.1.0.5";
+pub const GAME_VERSION: &str = "0.1.0.6";
 
 /// The game autosaves at the start of the Report phase of every third turn.
 pub const AUTOSAVE_EVERY: u32 = 3;
