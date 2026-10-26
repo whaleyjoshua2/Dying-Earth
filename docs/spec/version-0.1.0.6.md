@@ -400,3 +400,31 @@ Barracks that raise and repair on their own; the designer: not the point.)
 **Measured** ([`sweeps/ticket-635.txt`](../dev-diary/2026-10-25-version-0.1.0.6/sweeps/ticket-635.txt)):
 **30 / 47 / 0 / 3 and 0 collapses**, from §9's 30 / 46 / 1 / 3 and 0. One game moved: seed 5 with the
 Prospectors seated first, the Arkwrights' only win there, now the Prospectors'. Reported, not tuned.
+
+## 11. An inherited Army stays on Hold until its holder orders it
+
+Ticket: [An inherited Army stays on Hold until its holder orders it](https://github.com/whaleyjoshua2/Dying-Earth/issues/636).
+Tester 2: *"they attacked Kazakhstan without my order"*. China passed to them by Influence while its
+Armies stood in Kazakhstan, the Prospectors'; 0.1.0.0's grace held them on Hold one turn, and the
+rule that counts an Army on Hold in a rival's held Region as on Attack (ticket #320) did the rest.
+
+- **The rule** (Q1). An inherited Army abroad is never counted on Attack by that rule until its
+  holder orders it.
+- **What ends it** (Q2 b). A march, a boarding, or an Attack or Evade order at its place. An ordered
+  Hold or Dig In keeps the peace.
+- **The squatter** (Q3 a). Accepted: a Region's holder cannot open a Battle in their own Region, so an
+  Army left on Hold there stays until its own holder moves it.
+- **Stranded** (Q4). The previous holder's Armies standing in a Region when it passes to another
+  holder -- not a partner under Passage -- are kept on Hold the same way. A third seat's Army there
+  keeps its stance, and an Occupation completed strands nobody.
+- **Boarding** ends it where the Army boards, after the ground Battles, not at the order.
+- **The reminder** (Q5). Each turn after the first, while it stands on Hold: *the 1st Chinese Army
+  waits on Hold in Kazakhstan.*
+- **No Relations cost** for standing there: none existed, though the ticket's draft supposed one.
+- **The witness** (Q6). No save of tester 2's game was kept; a test builds the case instead.
+
+**Measured** ([`sweeps/ticket-636.txt`](../dev-diary/2026-10-25-version-0.1.0.6/sweeps/ticket-636.txt)):
+**29 / 48 / 1 / 2 and 0 collapses**, from §10's 30 / 47 / 0 / 3 and 0. Fewer Battles in every seating:
+37, 102, 38 and 26, from 42, 110, 39 and 27. Reported, not tuned. Not measured: how often a computer
+seat's inherited Army now waits abroad for good -- the review reads `ai.rs` as never marching an
+Army home.

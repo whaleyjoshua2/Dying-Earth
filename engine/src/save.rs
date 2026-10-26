@@ -277,7 +277,8 @@ pub struct SavedGame {
     /// Ticket #572 (version 0.1.0.3): the last Trade refused per pair, by its goods.
     #[serde(default)]
     pub refused_trades: Vec<crate::state::RefusedTrade>,
-    /// Ticket #519 (version 0.1.0.0): Armies inherited abroad, and the turn, for their turn's grace.
+    /// Ticket #519 (version 0.1.0.0): Armies inherited abroad, and the turn they were; exempt from
+    /// the guest's Attack until ordered since ticket #636 (version 0.1.0.6).
     #[serde(default)]
     pub armies_inherited: Vec<(ArmyId, u32)>,
     /// Ticket #272 (version 0.08.4): the sweep's count of Events drawn with nowhere to land.

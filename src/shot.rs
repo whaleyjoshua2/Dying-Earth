@@ -1844,6 +1844,40 @@ fn build_board(session: &mut Session) {
             g.seats[seat.index()].ai = true;
         }
     }
+    // `inherit:1` (a building aid, ticket #636): seat 1 holds the first neighbour of seat 0's start
+    // state and a neighbour of that; the second's Army stands in the first, and the second passes
+    // to seat 0, so seat 0 inherits an Army abroad in a rival's Region. Two quiet turns run, so the
+    // Report carries the reminder that it waits on Hold.
+    if std::env::args().any(|a| a == "inherit:1")
+        && let Some(g) = session.game.as_mut()
+        && let Some(sid) = g.directed_states(Seat(0)).first().copied()
+        && let Some(n) = g.tables.state(sid).neighbours.first().copied()
+        && let Some(m) = g.tables.state(n).neighbours.iter().copied().find(|m| *m != sid)
+    {
+        g.take_control(n, Seat(1));
+        g.take_control(m, Seat(1));
+        let army = g.raise_army(Place::State(m), false);
+        if let Some(a) = g.army_mut(army) {
+            a.at = ArmyAt::Place(Place::State(n));
+        }
+        g.take_control(m, Seat(0));
+        g.armies_change_hands(m, Some(Seat(1)), Some(Seat(0)));
+        for seat in Seat::ALL.into_iter().skip(1) {
+            g.seats[seat.index()].ai = false;
+        }
+        for _ in 0..2 {
+            if let Some(seat) = g.tech_owed_by()
+                && let Some(first) = g.available_techs().first().copied()
+            {
+                g.pick_tech(seat, first).ok();
+            }
+            refuse_any_card(g);
+            g.end_turn(std::array::from_fn(|_| Vec::new())).expect("the screenshot harness picks a Tech before it drives turns");
+        }
+        for seat in Seat::ALL.into_iter().skip(1) {
+            g.seats[seat.index()].ai = true;
+        }
+    }
     // `threat:1` (a building aid, ticket #310): seat 1 takes the first neighbour of seat 0's start
     // state and raises an Army there, so the threat line on seat 0's card can be photographed.
     if std::env::args().any(|a| a == "threat:1")

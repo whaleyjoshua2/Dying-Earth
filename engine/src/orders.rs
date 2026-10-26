@@ -3261,6 +3261,11 @@ impl Game {
                 }
                 Order::ArmyStance { place, stance } => {
                     let ids = self.armies_of_seat_at(seat, *place);
+                    // Ticket #636 (version 0.1.0.6), Q2 (b): an Attack or Evade ends an inherited
+                    // Army's Hold; an ordered Hold or Dig In keeps it.
+                    if matches!(stance, Stance::Attack | Stance::Evade) {
+                        self.armies_inherited.retain(|(id, _)| !ids.contains(id));
+                    }
                     let was_dug_in = self.armies.iter().any(|a| ids.contains(&a.id) && a.stance == Stance::DigIn);
                     for a in self.armies.iter_mut().filter(|a| ids.contains(&a.id)) {
                         a.stance = *stance;
@@ -3273,6 +3278,8 @@ impl Game {
                     }
                 }
                 Order::MoveArmy { army, to } => {
+                    // Ticket #636 (Q2 b): a march ends an inherited Army's Hold.
+                    self.armies_inherited.retain(|(id, _)| id != army);
                     if let Some(a) = self.army_mut(*army) {
                         a.move_to = Some(*to);
                     }

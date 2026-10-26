@@ -429,3 +429,31 @@ Standing Army's return joins the stack too, which Q1 did not name.
 **The sweep** ([`sweeps/ticket-635.txt`](sweeps/ticket-635.txt)): **30 / 47 / 0 / 3 and 0 collapses**,
 from 30 / 46 / 1 / 3. One game moved, seed 5 with the Prospectors seated first, from the Arkwrights to
 the Prospectors.
+
+## An inherited Army stays on Hold until its holder orders it
+
+Ticket [#636](https://github.com/whaleyjoshua2/Dying-Earth/issues/636), spec §11. The designer had
+asked *"didn't we fix this awhile ago"*: 0.1.0.0 did, for one turn. Reading the code turned up two
+things the ticket's draft did not know: a Region's holder can never open a Battle in their own Region,
+so an Army left on Hold there is a squatter nobody can fight (the designer accepted that, Q3 a); and
+standing in a rival's Region cost no Relations, as the draft supposed. Decided in one round. The
+order that ends the peace is a march, a boarding, or Attack or Evade, never Hold, since *I ordered
+Hold and it attacked* would be the same complaint again.
+
+**Built.** The grace's one-turn clock is gone; the orders clear it. Tester 2's game kept no save, so a
+test builds it: three quiet Resolutions, no Battle, a reminder each turn.
+
+**The review** found the boarding cleared at the order, while a load waiting on the cargo step boards
+after the ground Battles: the Army was put on Attack and fought first, the tester's complaint again.
+It now clears where the Army boards. Q4 had reached any other seat's Army in the Region, a third
+seat's besiegers and a completed Occupation's defenders among them; narrowed to the previous holder's.
+The reminder skips an Army its holder dug in by order; two stale comments. Tests added for boarding,
+marching, the narrowed Q4 and the reminder; six rules broken on purpose, each red, the first being the
+review's fault restored. Left for the designer: the review reads `ai.rs` as never marching an Army
+home, so a computer seat's inherited Army may wait abroad for good; not measured.
+
+![The Report: the 2nd European Army waits on Hold in Russia, on turn 3](ticket-636/waits-report.png)
+
+**The sweep** ([`sweeps/ticket-636.txt`](sweeps/ticket-636.txt)), after the review's mends: **29 / 48 / 1 / 2
+and 0 collapses**, from 30 / 47 / 0 / 3, with fewer Battles in every seating: 37 from 42, 102 from 110,
+38 from 39, 26 from 27.

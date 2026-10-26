@@ -21107,7 +21107,8 @@ fn the_reports_templates_stay_under_their_word_ceiling() {
     // end, and a rival's route set and ended.
     // Ticket #633 (version 0.1.0.6): and by the 18 of the first child born off Earth, its line and Moment.
     // Ticket #632 (version 0.1.0.6): and by the 28 of refugees sent to the stars, and the lack.
-    assert!(words <= 2070, "the Report's templates hold {words} words; the ceiling is 2,070 (28 for refugees sent to the stars, 18 for the first child born off Earth, 39 for a ferry route, 9 for Fissionables run short, 10 for a Strip Permit's clauses, 9 for an Occupation's holder, 15 for a rival on yours, 33 for a window and the head, 46 for an Accord's end, 9 for a place handed over twice, 9 for an Army inherited, 12 for an Accord broken, 15% off 2,031, 54 for the race to the Moon, 2 for a rival's upgrade, 8 for an Accord answered, less a word of slack, 17 for a Trade, 9 for a Capital refunded, 5 for an Accord let lapse, 7 for Terms added, 5 for a renewal)");
+    // Ticket #636 (version 0.1.0.6): and by the 6 of an inherited Army waiting on Hold.
+    assert!(words <= 2076, "the Report's templates hold {words} words; the ceiling is 2,076 (6 for an Army waiting on Hold, 28 for refugees sent to the stars, 18 for the first child born off Earth, 39 for a ferry route, 9 for Fissionables run short, 10 for a Strip Permit's clauses, 9 for an Occupation's holder, 15 for a rival on yours, 33 for a window and the head, 46 for an Accord's end, 9 for a place handed over twice, 9 for an Army inherited, 12 for an Accord broken, 15% off 2,031, 54 for the race to the Moon, 2 for a rival's upgrade, 8 for an Accord answered, less a word of slack, 17 for a Trade, 9 for a Capital refunded, 5 for an Accord let lapse, 7 for Terms added, 5 for a renewal)");
     // "The" is gone before a Faction's name, which is drawn in its colour instead.
     assert!(!text.contains("he {faction}"), "a template still says \"the {{faction}}\"");
 }
@@ -23442,14 +23443,13 @@ fn an_influence_spend_offends_whoever_directed_the_place_when_it_was_given() {
     assert!(!g.relations.offended[partner.index()][me.index()]);
 }
 
-/// Ticket #519 (Q3 A): an Army inherited abroad in a rival's Region has a turn's grace from the rule
-/// that turns an Army on Hold there to Attack (ticket #320); the turn after, the rule applies.
-#[test]
-fn an_inherited_army_abroad_in_a_rivals_region_has_a_turns_grace() {
-    let mut g = game();
-    calm(&mut g);
-    // North Africa's Army stands in another Region of its holder's, at peace there until North
-    // Africa is taken: then it stands in a rival's Region.
+/// Ticket #519 (Q3 A) gave an Army inherited abroad in a rival's Region a turn's grace from the
+/// rule that turns an Army on Hold there to Attack (ticket #320); ticket #636 (version 0.1.0.6), at
+/// the designer's word, makes it last until its holder orders it (Q1). Tester 2's case (Q6): China
+/// taken by Influence while its Armies stood in a Region the Prospectors held, on Attack two turns
+/// later with no order. Here three Resolutions pass with no order and no Battle, and the holder is
+/// reminded each turn after the first (Q5).
+fn inherited_abroad(g: &mut Game) -> (ArmyId, StateId) {
     let (me, them) = (Seat(0), Seat(1));
     g.state_mut(StateId::NorthAfrica).control = Control::Controlled(them);
     let abroad = g.controlled_states(them).into_iter().find(|s| *s != StateId::NorthAfrica).unwrap();
@@ -23460,12 +23460,141 @@ fn an_inherited_army_abroad_in_a_rivals_region_has_a_turns_grace() {
     g.resolution_phase();
     assert_eq!(g.state(StateId::NorthAfrica).control, Control::Controlled(me));
     assert_eq!(g.army(army).unwrap().stance, Stance::Hold);
+    (army, abroad)
+}
+
+#[test]
+fn ticket_636_an_inherited_army_keeps_hold_until_its_holder_orders_it() {
+    let mut g = game();
+    calm(&mut g);
+    let (army, abroad) = inherited_abroad(&mut g);
+    let name = g.army(army).unwrap().name.clone();
+    for n in 1..=3 {
+        g.turn += 1;
+        g.report.lines.clear();
+        g.resolution_phase();
+        let a = g.army(army).expect("no Battle took it");
+        assert_eq!((a.stance, a.damage), (Stance::Hold, 0), "turn {n} after it was inherited: on Hold, unfought");
+        assert!(g.report.lines.iter().any(|l| l.text.contains(&name) && l.text.contains("waits on Hold")), "turn {n}: {:?}", g.report.lines.iter().map(|l| &l.text).collect::<Vec<_>>());
+    }
+    // Q2 (b): an ordered Hold or Dig In keeps the peace.
+    for stance in [Stance::Hold, Stance::DigIn] {
+        g.turn += 1;
+        g.commit_orders(Seat(0), &[Order::ArmyStance { place: Place::State(abroad), stance }]);
+        g.resolution_phase();
+        assert_eq!(g.army(army).unwrap().stance, stance, "ordered {stance:?}, it stays so");
+        // From the review: dug in by order, it is no longer reminded of waiting on Hold.
+        g.turn += 1;
+        g.report.lines.clear();
+        g.resolution_phase();
+        assert_eq!(g.report.lines.iter().any(|l| l.text.contains("waits on Hold")), stance == Stance::Hold, "{stance:?}");
+    }
+}
+
+/// Ticket #636 (Q2 b): an Attack or Evade order ends the exemption, after which the old rule reads
+/// the Army as any Army of a seat's in a rival's Region.
+#[test]
+fn ticket_636_an_evade_order_ends_the_exemption() {
+    let mut g = game();
+    calm(&mut g);
+    let (army, abroad) = inherited_abroad(&mut g);
     g.turn += 1;
+    g.commit_orders(Seat(0), &[Order::ArmyStance { place: Place::State(abroad), stance: Stance::Evade }]);
     g.resolution_phase();
-    assert_eq!(g.army(army).map(|a| a.stance), Some(Stance::Hold), "the turn after it was inherited: still on Hold");
+    assert_eq!(g.army(army).unwrap().stance, Stance::Evade);
+    assert!(!g.armies_inherited.iter().any(|(id, _)| *id == army), "the Evade ended it");
     g.turn += 1;
+    g.commit_orders(Seat(0), &[Order::ArmyStance { place: Place::State(abroad), stance: Stance::Hold }]);
     g.resolution_phase();
-    assert!(g.army(army).is_none_or(|a| a.stance == Stance::Attack), "and then the old rule: on Attack in a rival's Region");
+    assert!(g.army(army).is_none_or(|a| a.stance == Stance::Attack), "ordered once, it is the old rule's: on Attack in a rival's Region");
+}
+
+/// Ticket #636 (Q4): an Army standing in its seat's own Region when a rival takes that Region is
+/// stranded abroad by the change of hands; it is kept on Hold as an inherited Army is.
+#[test]
+fn ticket_636_an_army_stranded_by_a_change_of_hands_keeps_hold() {
+    let mut g = game();
+    calm(&mut g);
+    let (me, them) = (Seat(0), Seat(1));
+    let home = g.controlled_states(me)[0];
+    let army = g.armies.iter().find(|a| a.home == ArmyHome::State(home)).map(|a| a.id).unwrap();
+    // A second Region of the player's, with the player's Army standing in it.
+    g.state_mut(StateId::NorthAfrica).control = Control::Controlled(me);
+    g.army_mut(army).unwrap().at = ArmyAt::Place(Place::State(StateId::NorthAfrica));
+    g.seats[them.index()].influence.insert(Place::State(StateId::NorthAfrica), 400);
+    g.seats[them.index()].influenced_this_turn.push(Place::State(StateId::NorthAfrica));
+    g.resolution_phase();
+    assert_eq!(g.state(StateId::NorthAfrica).control, Control::Controlled(them), "the premise: taken from under it");
+    for n in 1..=3 {
+        g.turn += 1;
+        g.resolution_phase();
+        let a = g.army(army).expect("no Battle took it");
+        assert_eq!((a.stance, a.damage), (Stance::Hold, 0), "turn {n}: on Hold, unfought");
+    }
+    // Q5: its holder is reminded, as of an inherited Army.
+    g.turn += 1;
+    g.report.lines.clear();
+    g.resolution_phase();
+    assert!(g.report.lines.iter().any(|l| l.text.contains("waits on Hold")), "{:?}", g.report.lines.iter().map(|l| &l.text).collect::<Vec<_>>());
+}
+
+/// Ticket #636 (Q4), from the review: only the previous holder's Armies are stranded; a third
+/// seat's standing in the Region on Attack keeps its Attack, and a change from nobody (an Occupation
+/// completed) strands nobody.
+#[test]
+fn ticket_636_only_the_previous_holders_armies_are_stranded() {
+    let mut g = game();
+    let (me, them, third) = (Seat(0), Seat(1), Seat(2));
+    let s = StateId::NorthAfrica;
+    let place = Place::State(s);
+    let mine = g.armies.iter().find(|a| a.home == ArmyHome::State(g.controlled_states(me)[0])).map(|a| a.id).unwrap();
+    let theirs = g.armies.iter().find(|a| a.home == ArmyHome::State(g.controlled_states(third)[0])).map(|a| a.id).unwrap();
+    for id in [mine, theirs] {
+        let a = g.army_mut(id).unwrap();
+        a.at = ArmyAt::Place(place);
+        a.stance = Stance::Attack;
+    }
+    g.armies_change_hands(s, None, Some(them));
+    assert_eq!(g.army(mine).unwrap().stance, Stance::Attack, "held by nobody just before: nobody stranded");
+    g.armies_change_hands(s, Some(me), Some(them));
+    assert_eq!(g.army(mine).unwrap().stance, Stance::Hold, "the previous holder's: stranded, on Hold");
+    assert!(g.armies_inherited.iter().any(|(id, _)| *id == mine));
+    assert_eq!(g.army(theirs).unwrap().stance, Stance::Attack, "a third seat's keeps its Attack");
+    assert!(!g.armies_inherited.iter().any(|(id, _)| *id == theirs));
+}
+
+/// Ticket #636 (Q2 b), from the review: boarding a Carrier ends the exemption where the Army boards,
+/// not at the order -- a load that waits on the cargo step boards after the ground Battles, and
+/// cleared at the order the Army was put on Attack and fought first.
+#[test]
+fn ticket_636_an_inherited_army_boards_unfought() {
+    let mut g = game();
+    calm(&mut g);
+    let (army, abroad) = inherited_abroad(&mut g);
+    // A raised Army: a Region's own stays at home.
+    g.army_mut(army).unwrap().standing = false;
+    let carrier = ship_in(&mut g, Seat(0), UnitKind::Carrier, BodyId::Earth, None, Stance::Hold);
+    let board = Order::Load { ship: carrier, colonists: 0, from: LoadSource::State(abroad), army: Some(army) };
+    assert!(g.check_order(Seat(0), &[], &board).is_ok(), "{:?}", g.check_order(Seat(0), &[], &board));
+    g.turn += 1;
+    g.commit_orders(Seat(0), &[board]);
+    g.resolution_phase();
+    let a = g.army(army).expect("no Battle took it");
+    assert_eq!((a.at, a.damage), (ArmyAt::Aboard(carrier), 0), "aboard, unfought");
+    assert!(!g.armies_inherited.iter().any(|(id, _)| *id == army), "boarded, it is ordered");
+}
+
+/// Ticket #636 (Q2 b): a march ends the exemption.
+#[test]
+fn ticket_636_a_march_ends_the_exemption() {
+    let mut g = game();
+    calm(&mut g);
+    let (army, abroad) = inherited_abroad(&mut g);
+    let to = g.tables.state(abroad).neighbours.clone().into_iter().find(|n| g.check_order(Seat(0), &[], &Order::MoveArmy { army, to: *n }).is_ok()).expect("a march it may make");
+    g.turn += 1;
+    g.commit_orders(Seat(0), &[Order::MoveArmy { army, to }]);
+    g.resolution_phase();
+    assert!(!g.armies_inherited.iter().any(|(id, _)| *id == army), "marched, it is ordered");
 }
 
 /// Ticket #521 (version 0.1.0.0): the Carbon Levy's half point landed before the turn's natural

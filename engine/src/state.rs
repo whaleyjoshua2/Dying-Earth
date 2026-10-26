@@ -1939,7 +1939,9 @@ pub struct Game {
     /// turn it happened, its Colony and the turn. Empty until then. In the save.
     pub first_born: Vec<(Seat, ColonyId, u32)>,
     /// Ticket #519 (version 0.1.0.0): Armies abroad that changed hands with their Region, and the
-    /// turn they did: a turn's grace from the rule that puts a rival's guest on Attack. In the save.
+    /// turn they did, exempt from the rule that puts a rival's guest on Attack -- for a turn then,
+    /// and since ticket #636 (version 0.1.0.6) until their holder marches, boards or orders them to
+    /// Attack or Evade. In the save.
     pub armies_inherited: Vec<(ArmyId, u32)>,
     /// Ticket #495: refusals remembered, so a refused Faction does not offer again at once.
     pub refusals: Vec<Refusal>,
