@@ -31,7 +31,7 @@ pub struct Credit {
 
 /// The icons in use, their authors, and the names they carry at game-icons.net. Anything added to
 /// `assets/icons/` belongs here too: the credit is the licence's price, not a courtesy.
-pub const CREDITS: [Credit; 46] = [
+pub const CREDITS: [Credit; 54] = [
     Credit { resource: "Materials", icon: "Mine Wagon", author: "Delapouite" },
     Credit { resource: "Fuel", icon: "Jerrycan", author: "Delapouite" },
     // Ticket #628 (version 0.1.0.6): the seventh resource, off the designer's sheet at 1A.
@@ -114,7 +114,31 @@ pub const CREDITS: [Credit; 46] = [
     // Research Lab's round-bottom flask's sibling -- the one pair on the board worth re-reading at
     // 16 pixels whenever the icon sheet is next photographed.
     Credit { resource: "Facility Academy", icon: "Test Tubes", author: "Lorc" },
+    // Ticket #640 (version 0.1.0.6): the eight capital buildings, off the designer's sheet.
+    Credit { resource: "Capital Stock Market", icon: "Histogram", author: "Delapouite" },
+    Credit { resource: "Capital Assay Office", icon: "Scales", author: "Lorc" },
+    Credit { resource: "Capital Fuel Depot", icon: "Gas Pump", author: "Delapouite" },
+    Credit { resource: "Capital Central Grid", icon: "Pylon", author: "Delapouite" },
+    Credit { resource: "Capital Great Library", icon: "Bookshelf", author: "Delapouite" },
+    Credit { resource: "Capital Chancery", icon: "Wax Seal", author: "Lorc" },
+    Credit { resource: "Capital Spaceport", icon: "Defense Satellite", author: "Delapouite" },
+    Credit { resource: "Capital Arcology", icon: "Artificial Hive", author: "Lorc" },
 ];
+
+/// Ticket #640 (version 0.1.0.6): the icon key a capital building's tile wears.
+pub fn capital_icon(b: dying_earth_engine::CapitalBuilding) -> &'static str {
+    use dying_earth_engine::CapitalBuilding::*;
+    match b {
+        StockMarket => "capital_stock_market",
+        AssayOffice => "capital_assay_office",
+        FuelDepot => "capital_fuel_depot",
+        CentralGrid => "capital_central_grid",
+        GreatLibrary => "capital_great_library",
+        Chancery => "capital_chancery",
+        Spaceport => "capital_spaceport",
+        Arcology => "capital_arcology",
+    }
+}
 
 /// Ticket #146 (version 0.07.3): the icon key a Facility's slot box wears on a Region's card.
 pub fn facility_icon(kind: dying_earth_engine::FacilityKind) -> &'static str {

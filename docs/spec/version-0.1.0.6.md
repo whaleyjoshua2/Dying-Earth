@@ -529,3 +529,21 @@ Ethiopia, from South Africa's Region, along with the Horn"*.
 
 **Measured** ([`sweeps/ticket-639.txt`](../dev-diary/2026-10-25-version-0.1.0.6/sweeps/ticket-639.txt),
 the 380 cell): **35 / 25 / 1 / 0 and 19 collapses**, from §13's 32 / 45 / 1 / 2 and 0.
+
+## 15. Art for the eight capital buildings
+
+Ticket: [Art for the eight capital buildings](https://github.com/whaleyjoshua2/Dying-Earth/issues/640).
+The designer: *"Need art for colonial capital buildings"*.
+
+- **The style** (Q1). Each capital building is drawn as a Module tile, its picture on the tile, told
+  from a Module by a capital's gold edge.
+- **The pictures** (Q2), game-icons.net under CC BY 3.0 like every icon, credited on the Credits
+  screen, chosen from a sheet of four each: the Stock Market a histogram, the Assay Office scales,
+  the Fuel Depot a gas pump, the Central Grid a pylon, the Great Library a bookshelf, the Chancery a
+  wax seal, the Spaceport a defence satellite (Q3), the Arcology an artificial hive.
+- **The edge under the pointer** (Q4). A tile with an edge of its own keeps it when hovered,
+  brightened, where it turned grey.
+- The pick window still lists the buildings by name.
+
+**Measured** ([`sweeps/ticket-640.txt`](../dev-diary/2026-10-25-version-0.1.0.6/sweeps/ticket-640.txt)):
+identical to §14's, figure for figure: the art changes what a player sees, not what any seat does.

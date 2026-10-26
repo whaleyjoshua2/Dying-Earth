@@ -483,7 +483,10 @@ fn build_board(session: &mut Session) {
             let moon = place(g, Seat(0), BodyId::Moon, capital, vec![Module::new(ModuleKind::Core), Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Mine), Module::new(ModuleKind::Generator), Module::new(ModuleKind::Shipyard)], 9);
             place(g, Seat(0), BodyId::Moon, 0, vec![Module::new(ModuleKind::Core), Module::new(ModuleKind::Mine)], 4);
             let mars = place(g, Seat(1), BodyId::Mars, capital, vec![Module::new(ModuleKind::Core), Module::new(ModuleKind::Habitat)], 6);
-            g.pick_capital_building(Seat(1), mars, CapitalBuilding::StockMarket).ok();
+            // Ticket #640 (version 0.1.0.6): the Arcology where seat 0 asks for the Stock Market, so
+            // every building's tile can be photographed on seat 0's card.
+            let rival = if CapitalBuilding::parse(&arg) == Some(CapitalBuilding::StockMarket) { CapitalBuilding::Arcology } else { CapitalBuilding::StockMarket };
+            g.pick_capital_building(Seat(1), mars, rival).ok();
             if let Some(b) = CapitalBuilding::parse(&arg) {
                 g.pick_capital_building(Seat(0), moon, b).ok();
             }

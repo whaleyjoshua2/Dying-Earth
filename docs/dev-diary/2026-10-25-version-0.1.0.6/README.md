@@ -554,3 +554,28 @@ sweep at 380 matches the cell figure for figure.
 
 **The sweep** ([`sweeps/ticket-639.txt`](sweeps/ticket-639.txt)): **35 / 25 / 1 / 0 and 19 collapses**,
 from 32 / 45 / 1 / 2 and 0. The collapses are where the designer asked; the win column is not.
+
+## Art for the eight capital buildings
+
+Ticket [#640](https://github.com/whaleyjoshua2/Dying-Earth/issues/640), spec §15, a prototype ticket.
+Thirty-two game-icons.net candidates, four a building, chosen for each one's job and none already
+on the board (three Spaceport first choices were the Spaceport's, the Launch Site's and the Colony
+Ship's own and were swapped out), drawn large and at tile size in a capital's gold edge. The first
+sheet was the `icon_sheet` example's one long row, unreadable at a glance; it was redrawn as a grid
+of eight rows, and the first message about it pointed at a file on this machine the designer could
+not see. It went up on the throwaway branch `prototype/640-capital-art` instead. The designer took
+the recommended seven and the artificial hive for the Arcology (*"I'd like the Arcology to be
+8d"*), which also keeps the habitat dome -- the Habitat Module's own icon -- off a second tile.
+
+**The review** found the Spaceport's pick, the moon in orbit, is the Arkwrights' own symbol: the
+sheet's duplicate check had compared the files' bytes, and the game's copies differ from a fresh
+download, so it passed. The designer's second choice, the spaceship, was the warship's for the same
+reason; thirteen more were screened against the credits list, which names every icon in use, and
+the defence satellite chosen. The review also found the gold edge turned grey under the pointer, as
+every tile's edge did; at the designer's word it now brightens instead.
+
+![The sheet the designer chose from](ticket-640/candidates.png)
+![The eight tiles as they stand on a Colony card](ticket-640/tiles.png)
+![The Arcology in a Colonial Capital's grid, beside its Modules](ticket-640/arcology-moon.png)
+
+**The sweep** ([`sweeps/ticket-640.txt`](sweeps/ticket-640.txt)) is identical to #639's.

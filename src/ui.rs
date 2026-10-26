@@ -10815,6 +10815,9 @@ enum TileState {
     Flooded,
 }
 
+/// Ticket #640 (version 0.1.0.6): the edge a capital building's tile wears.
+const CAPITAL_GOLD: Color32 = Color32::from_rgb(212, 175, 55);
+
 /// Ticket #145 (version 0.07.3): one tile of the Hab View -- a picture on a dark tile with its name
 /// beneath: dimmed while mothballed, hatched while building, dashed and empty for a free slot. Returns
 /// the click response so the window can open the strip for it. Since ticket #150 (version 0.07.4)
@@ -10825,10 +10828,12 @@ fn hab_tile(ui: &mut Ui, rect: egui::Rect, id: egui::Id, key: Option<&str>, name
     let painter = ui.painter();
     // Ticket #146: a slot box on a Region's card carries the coast's blue as its edge; a tile in
     // the Hab View has none of its own. The selection and the hover still win over it.
+    // Ticket #640 (version 0.1.0.6), at the designer's word: a tile with an edge of its own keeps it
+    // under the pointer, brightened, so a capital's gold does not vanish when it is pointed at.
     let outline = if selected {
         Color32::from_rgb(250, 210, 130)
     } else if resp.hovered() {
-        Color32::from_gray(200)
+        edge.map(|e| e.lerp_to_gamma(Color32::WHITE, 0.35)).unwrap_or(Color32::from_gray(200))
     } else {
         edge.unwrap_or(Color32::from_gray(120))
     };
@@ -11193,7 +11198,10 @@ fn module_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
             None if mine => ("Choose".to_string(), "Choose a capital building: click.".to_string()),
             None => ("Capital".to_string(), "No capital building chosen yet.".to_string()),
         };
-        if hab_tile(ui, tile_rect(i), ui.id().with("hab-capital"), None, &label, TileState::Standing, false, None, tip).clicked() && mine && game.capital_building_at(cid).is_none() && view.popup == Popup::None {
+        // Ticket #640 (version 0.1.0.6), at the designer's word: a capital building is drawn as a
+        // Module is, its own picture on the tile, and told from one by a capital's gold edge.
+        let icon = game.capital_building_at(cid).map(crate::icons::capital_icon);
+        if hab_tile(ui, tile_rect(i), ui.id().with("hab-capital"), icon, &label, TileState::Standing, false, Some(CAPITAL_GOLD), tip).clicked() && mine && game.capital_building_at(cid).is_none() && view.popup == Popup::None {
             view.popup = Popup::Capital;
         }
         i += 1;
