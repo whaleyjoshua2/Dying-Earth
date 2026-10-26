@@ -1736,6 +1736,10 @@ fn print_board(g: &Game) {
         if let Some(line) = standings_text(g, Place::Colony(c.id)) {
             println!("    {line}");
         }
+        // Ticket #634 (version 0.1.0.6): what threatens it, for its holder.
+        if let Some(line) = g.threat_line(me, c.id) {
+            println!("    {line}");
+        }
         // Ticket #335: the ORBIT a Ship must sit in to touch this place -- its own for a station,
         // low orbit for a Colony on the ground, since low orbit is what touches the ground.
         let reached = if c.in_orbit {

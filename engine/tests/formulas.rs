@@ -27295,3 +27295,96 @@ fn ticket_632_a_spaceport_lifts_them_first_and_a_lift_of_nobody_is_no_launch() {
     assert_eq!(g.climate.launches_pending[0], launches, "a lift of nobody is no launch");
     assert_eq!(g.pending_question().unwrap().stars[0].map(|s| (s.1, s.2)), Some((0, 6)), "all six lost");
 }
+
+/// Ticket #634 (version 0.1.0.6), at the designer's word: **a Colony's threats** -- rival warships in
+/// any orbit of its Body, a rival Army aboard a Carrier there, rival warships or loaded Carriers
+/// bound for it, and a rival's Standing at half its price or more; never an Accord partner, never a
+/// Ship the reader cannot see, and nothing at all where nothing threatens.
+#[test]
+fn ticket_634_a_colonys_threats_line_names_what_threatens_it() {
+    let mut g = game();
+    let mars = colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat], 4);
+    assert_eq!(g.threat_line(Seat(0), mars), None, "nothing threatens it: no line");
+    // Two Prospector warships in low orbit; an Arkwright Army aboard a Carrier in a ring.
+    let pro = Seat(1);
+    ship_in(&mut g, pro, UnitKind::Frigate, BodyId::Mars, None, Stance::Hold);
+    ship_in(&mut g, pro, UnitKind::Frigate, BodyId::Mars, None, Stance::Hold);
+    let carrier = ship_in(&mut g, Seat(2), UnitKind::Carrier, BodyId::Mars, Some(0), Stance::Hold);
+    let army = ArmyId(g.fresh_id());
+    g.armies.push(Army { id: army, name: "the 1st".to_string(), home: ArmyHome::State(StateId::EastAsia), at: ArmyAt::Aboard(carrier), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None, levy: false, raised_strength: 2 });
+    g.ship_mut(carrier).unwrap().army = Some(army);
+    // An Archivist warship two turns out, and the Prospectors' Standing at the Colony, half its price.
+    let inbound = ship_in(&mut g, Seat(3), UnitKind::Frigate, BodyId::Earth, None, Stance::Hold);
+    g.ship_mut(inbound).unwrap().at = ShipAt::Transit { from: BodyId::Earth, to: BodyId::Mars, turns_left: 2 };
+    let price = g.influence_needed_for(pro, Place::Colony(mars));
+    g.seats[pro.index()].influence.insert(Place::Colony(mars), (price + 1) / 2);
+    g.reveal_all = true;
+    let line = g.threat_line(Seat(0), mars).expect("threatened");
+    assert!(line.starts_with("Threats: "), "{line}");
+    for words in ["2 Prospector warships in low orbit", "an Arkwright Army aboard a Carrier", "an Archivist warship arriving in 2 turns", &format!("Prospectors at {} of {price} Standing", (price + 1) / 2)] {
+        assert!(line.contains(words), "{words}: {line}");
+    }
+    assert!(g.threat_hover(Seat(0), mars).len() <= 6, "the six-line ceiling");
+    assert!(g.colony_threatened(Seat(0), mars));
+    // Under half the price, the Standing is no threat.
+    g.seats[pro.index()].influence.insert(Place::Colony(mars), (price + 1) / 2 - 1);
+    assert!(!g.threat_line(Seat(0), mars).unwrap().contains("Standing"));
+    // An Accord partner threatens nothing.
+    g.strike_accord(Seat(0), pro, vec![Term::NonAggression]).expect("struck");
+    assert!(!g.threat_line(Seat(0), mars).unwrap().contains("Prospector"), "{:?}", g.threat_line(Seat(0), mars));
+    // A Ship the reader cannot see is not named: the one in flight, its books shut.
+    g.reveal_all = false;
+    assert!(!g.threat_line(Seat(0), mars).unwrap().contains("arriving"), "{:?}", g.threat_line(Seat(0), mars));
+    // A station's own ring is named first.
+    let station = ColonyId(g.fresh_id());
+    g.colonies.push(Colony { id: station, body: BodyId::Mars, slot: 0, control: Control::Controlled(Seat(0)), modules: vec![Module::new(ModuleKind::Core)], colonists: 2, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, tier: 0, in_orbit: true });
+    // An Archivist warship in low orbit, which comes before the rings in the Body's own order.
+    ship_in(&mut g, Seat(3), UnitKind::Frigate, BodyId::Mars, None, Stance::Hold);
+    let ground = g.threat_line(Seat(0), mars).unwrap();
+    assert!(ground.starts_with("Threats: an Archivist warship in low orbit"), "low orbit first for the ground: {ground}");
+    let ring = g.threat_line(Seat(0), station).unwrap();
+    assert!(ring.starts_with("Threats: an Arkwright Army aboard a Carrier"), "its own ring first: {ring}");
+}
+
+/// Ticket #634, from the review: an Occupied Colony's threats are its holder's, not the occupier's;
+/// a seat's arrivals name its warships and its Armies apart; Carriers in one orbit are one entry, the
+/// hover giving the Army's strength; and a Ship that fled a Battle threatens nothing.
+#[test]
+fn ticket_634_the_line_speaks_for_the_holder_and_counts_each_kind_apart() {
+    let mut g = game();
+    g.reveal_all = true;
+    let mars = colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat], 4);
+    // Two Arkwright Carriers, each with an Army aboard, in low orbit: one entry.
+    let army = |g: &mut Game, ship: ShipId| {
+        let id = ArmyId(g.fresh_id());
+        g.armies.push(Army { id, name: format!("the {}th", id.0), home: ArmyHome::State(StateId::EastAsia), at: ArmyAt::Aboard(ship), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None, levy: false, raised_strength: 3 });
+        g.ship_mut(ship).unwrap().army = Some(id);
+    };
+    for _ in 0..2 {
+        let c = ship_in(&mut g, Seat(2), UnitKind::Carrier, BodyId::Mars, None, Stance::Hold);
+        army(&mut g, c);
+    }
+    // A Prospector Frigate and a loaded Carrier both two turns out: named apart.
+    let f = ship_in(&mut g, Seat(1), UnitKind::Frigate, BodyId::Earth, None, Stance::Hold);
+    let c = ship_in(&mut g, Seat(1), UnitKind::Carrier, BodyId::Earth, None, Stance::Hold);
+    army(&mut g, c);
+    for s in [f, c] {
+        g.ship_mut(s).unwrap().at = ShipAt::Transit { from: BodyId::Earth, to: BodyId::Mars, turns_left: 2 };
+    }
+    // A fled Archivist Frigate.
+    let fled = ship_in(&mut g, Seat(3), UnitKind::Frigate, BodyId::Mars, None, Stance::Hold);
+    g.ship_mut(fled).unwrap().escaped = true;
+    let line = g.threat_line(Seat(0), mars).unwrap();
+    assert!(line.contains("2 Arkwright Armies aboard Carriers in low orbit"), "{line}");
+    assert!(line.contains("a Prospector warship and an Army arriving in 2 turns"), "{line}");
+    assert!(!line.contains("Archivist"), "a fled Ship is no threat: {line}");
+    assert!(g.threat_hover(Seat(0), mars).iter().any(|l| l.contains("aboard, strength")), "{:?}", g.threat_hover(Seat(0), mars));
+    // Occupied by the Arkwrights: still the holder's line, and the holder never threatens itself.
+    let my_frigate = ship_in(&mut g, Seat(0), UnitKind::Frigate, BodyId::Mars, None, Stance::Hold);
+    let _ = my_frigate;
+    g.seats[0].influence.insert(Place::Colony(mars), 50);
+    g.colony_mut(mars).unwrap().control = Control::Occupied { occupier: Seat(2), turns: 1, previous: Some(Seat(0)), banked: 0 };
+    assert_eq!(g.threat_holder(mars), Some(Seat(0)));
+    let line = g.threat_line(Seat(0), mars).unwrap();
+    assert!(!line.contains("Custodian"), "the holder's own Ships and Standing are no threat to it: {line}");
+}

@@ -371,3 +371,28 @@ from 31 / 45 / 1 / 3 and 0.
 | Archivists | 5 | 452 | 260 | 31 | 648 | 718 | 3.5 |
 
 The goods are each Faction's income a game, net of upkeep. Reported, not tuned.
+
+## A Colony card's threats line
+
+Ticket [#634](https://github.com/whaleyjoshua2/Dying-Earth/issues/634), spec §9. Decided in one round; the
+designer took a loaded Carrier and the Ships bound for the Body as threats too, and the roster's mark.
+
+**Built**, the engine's line shared by the card, the roster and the text tool, then each rule broken
+on purpose: seven, and an eighth after the first run showed the order rule was tested by luck --
+by the time the station was read, an Accord had removed the only other threat, so its own ring was
+first either way.
+
+![The Colony card's threats line](ticket-634/card-mars.png)
+![The roster's mark, on the threatened Colony and not on the ISS](ticket-634/roster-earth.png)
+
+**The review** found eight. The worst two: an Occupied Colony's line was read for its occupier, so the
+player's own warships and Standing were called its threats; and on a rival's card the player's own
+Ships were named. The line now speaks for the holder, and shows on the player's own places only (every
+seat's when spectating). Mended besides: a seat's arrivals name warships and Armies apart; Carriers
+in one orbit are one entry; the hover gives a loaded Carrier's Army strength; a fled Ship is no
+threat; the card reads the threats once a frame. Each with a test that went red on the old code.
+Left for the designer: an armed Missile Carrier over the Colony is not named, since the game's
+`warship` is a Frigate or a Battleship.
+
+**The sweep** ([`sweeps/ticket-634.txt`](sweeps/ticket-634.txt)): **30 / 46 / 1 / 3 and 0 collapses**,
+identical to the convoy's, as a change to what is read and not to what is done should be.

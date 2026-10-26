@@ -689,6 +689,16 @@ fn build_board(session: &mut Session) {
             g.seats[0].stockpile.fuel = 100.0;
             g.seats[0].stockpile.fissionables = tenth(g.seats[0].stockpile.fissionables + 5.0);
         }
+        // `threat:1` (a building aid, ticket #634, version 0.1.0.6): two Prospector Frigates in low
+        // orbit over Mars, so a Colony of seat 0's there (`fission:1`, with `hab:ground`) shows its
+        // threats line and the roster its mark.
+        if std::env::args().any(|a| a == "threat:1") {
+            for _ in 0..2 {
+                let id = ShipId(g.fresh_id());
+                let name = g.next_ship_name(UnitKind::Frigate);
+                g.ships.push(Ship { nuclear: false, fissionables: 0.0, id, name, kind: UnitKind::Frigate, seat: Seat(1), damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: g.turn, fuel: 30.0, slot: None });
+            }
+        }
         // `ferry:pick` or `ferry:set` (a building aid, ticket #631, version 0.1.0.6): a full Colony
         // Ship of seat 0's in its station's ring over Earth and a Colony of seat 0's on Mars with a
         // Refinery, so the Ship card's Ferry block has a far end to pick (`pick`), or a route stands

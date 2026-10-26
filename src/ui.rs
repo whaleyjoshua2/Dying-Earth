@@ -5600,6 +5600,9 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, seat: Seat, marks: boo
             counted(c.modules.iter().filter(|m| m.kind != ModuleKind::Core && m.kind != ModuleKind::Archive).count(), "Module", "Modules"),
             if building > 0 { format!(", {building} building") } else { String::new() }
         );
+        // Ticket #634 (version 0.1.0.6): a threatened place says so on its row (Q6).
+        // From the review: only a place the player holds, read through its holder's eyes.
+        let text = if marks && game.threat_holder(c.id) == Some(Seat(0)) && game.colony_threatened(Seat(0), c.id) { format!("{text} (threatened)") } else { text };
         colony_rows.push(RosterRow { kind: Kind::of_colony(c), text, tip: None, mark: marks.then_some(!ordered), jump: Some((View::Surface(c.body), Selection::Colony(c.id))), room: None });
     }
     roster_group(ui, RosterGroup { name: "Colonies and stations", empty: "  none; a Colony Ship founds one" }, colony_rows, marks, jump);
@@ -8786,6 +8789,22 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
         Control::Occupied { occupier, turns, .. } => format!("Occupied by the {} (turn {})", game.seat_name(occupier), turns),
     };
     ui.label(owner);
+    // Ticket #634 (version 0.1.0.6), at the designer's word: **what threatens it**, under who holds
+    // it, only where something does; each hull on the hover. From the review: on the player's own
+    // places, and for every seat's when spectating, read through its holder's eyes -- on a rival's
+    // card it would name the player's own Ships as the threat. The threats are read once a frame.
+    let holder = game.threat_holder(cid);
+    let reader = if session.spectator { holder } else { holder.filter(|h| *h == Seat(0)) };
+    if let Some(reader) = reader {
+        let threats = game.colony_threats(reader, cid);
+        if let Some(line) = game.threat_line_of(cid, &threats) {
+            let resp = ui.label(RichText::new(line).color(Color32::from_rgb(230, 120, 90)));
+            let hulls = game.threat_hover_of(&threats);
+            if !hulls.is_empty() {
+                resp.on_hover_text(hulls.join("\n"));
+            }
+        }
+    }
     // Ticket #345 (version 0.09.1): **this Colony was the first ever raised on the ground of its
     // Body**, under the line that says who holds it, because the two are read together: the +1 is
     // the FOUNDER'S and pays only while the founder directs the place. So a Colony its founder still

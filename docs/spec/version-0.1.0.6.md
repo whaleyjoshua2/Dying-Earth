@@ -13,17 +13,17 @@ pictures and sweeps that decided it are in
 **What the version is.** Version 0.1.0.5 with the designer's list of 2026-10-25. Its spine is a new
 resource, **Fissionables**, found off Earth and richest in the far worlds (§1), which a nuclear hull
 is built and flown with and a Warhead is loaded with (§2), and a new common Reactor burns, the
-Archivists' own building renamed the Accumulator (§3); and the computer is taught to chase them (§4). Beside it, Colony Ships run standing ferry routes (§5), two Factions' figures and the Prospectors' bar move (§6), the first child born off Earth is a Moment (§7), and the Refugee Convoy may be sent to the stars (§8).
+Archivists' own building renamed the Accumulator (§3); and the computer is taught to chase them (§4). Beside it, Colony Ships run standing ferry routes (§5), two Factions' figures and the Prospectors' bar move (§6), the first child born off Earth is a Moment (§7), the Refugee Convoy may be sent to the stars (§8), and a Colony's card names its threats (§9).
 
 **What it did to the win column** (80 games, per Faction; every section's own sweep is in it):
 
-| | 0.1.0.5 | §1 Fissionables | §2 the nuclear hull | §3 the Reactor | §4 the chase | §5 ferry routes | §6 the figures | §7 the first-born | §8 the convoy | the ideal |
-|---|---|---|---|---|---|---|---|---|---|---|
-| Custodians | 18 | 23 | 19 | 28 | 22 | 22 | 30 | 31 | 30 | 15 |
-| Prospectors | 61 | 51 | 56 | 47 | 56 | 55 | 46 | 45 | 46 | 15 |
-| Arkwrights | 0 | 3 | 2 | 1 | 1 | 2 | 1 | 1 | 1 | 15 |
-| Archivists | 1 | 1 | 1 | 1 | 1 | 1 | 3 | 3 | 3 | 15 |
-| collapses | 0 | 2 | 2 | 3 | 0 | 0 | 0 | 0 | 0 | 20 |
+| | 0.1.0.5 | §1 Fissionables | §2 the nuclear hull | §3 the Reactor | §4 the chase | §5 ferry routes | §6 the figures | §7 the first-born | §8 the convoy | §9 threats | the ideal |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| Custodians | 18 | 23 | 19 | 28 | 22 | 22 | 30 | 31 | 30 | 30 | 15 |
+| Prospectors | 61 | 51 | 56 | 47 | 56 | 55 | 46 | 45 | 46 | 46 | 15 |
+| Arkwrights | 0 | 3 | 2 | 1 | 1 | 2 | 1 | 1 | 1 | 1 | 15 |
+| Archivists | 1 | 1 | 1 | 1 | 1 | 1 | 3 | 3 | 3 | 3 | 15 |
+| collapses | 0 | 2 | 2 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 20 |
 
 ## 1. Fissionables, the seventh resource, and Deep Mining and Rich Seam moved
 
@@ -352,3 +352,27 @@ Ticket: [The Refugee Convoy's third answer](https://github.com/whaleyjoshua2/Dyi
 **30 / 46 / 1 / 3 and 0 collapses**, from §7's 31 / 45 / 1 / 3 and 0. Convoys sent to the stars over
 the 80 games: the Arkwrights 12, the Prospectors 7, the Custodians 5, the Archivists 5; none lost.
 Reported, not tuned.
+
+## 9. A Colony card's threats line
+
+Ticket: [A Colony card's threats line](https://github.com/whaleyjoshua2/Dying-Earth/issues/634).
+
+- **What counts** (Q1). Rival warships in any orbit of the Colony's Body; rival Armies aboard
+  Carriers there; rival warships and loaded Carriers bound for the Body, by the turns to go; a rival's
+  Standing at the Colony at half its price or more (`influence_needed_for`, the figure the Standing
+  chips' hover gives). Never an Accord partner under non-aggression, never a Ship that fled a Battle,
+  never a Ship the reader cannot see.
+- **For whom.** The Colony's holder -- the seat that formally controls it, so an Occupied Colony's
+  threats are its holder's. The card shows the line on the player's own places, and on every seat's
+  when spectating.
+- **When and how** (Q2, Q3). Only when something threatens: *Threats: 2 Prospector warships in low
+  orbit; a Prospector warship and an Army arriving in 2 turns; Prospectors at 14 of 30 Standing.*
+  Each hull on the hover, a Carrier by the Army aboard, within six lines.
+- **Order** (Q4). The orbit that touches the place first -- a station's own ring, a ground Colony's
+  low orbit -- then the Body's other orbits.
+- **The text tool and the roster** (Q5, Q6). The line under the Colony in `show`; *(threatened)* on
+  a threatened place's roster row.
+
+**Measured** ([`sweeps/ticket-634.txt`](../dev-diary/2026-10-25-version-0.1.0.6/sweeps/ticket-634.txt)):
+**30 / 46 / 1 / 3 and 0 collapses**, the same board as §8's, figure for figure: the line changes what
+a player reads, not what any seat does.
