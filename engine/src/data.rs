@@ -544,11 +544,29 @@ pub struct ChoiceCard {
     pub take_does: Vec<CardEffect>,
     #[serde(default)]
     pub refuse_does: Vec<CardEffect>,
+    /// Ticket #632 (version 0.1.0.6): a third answer some cards offer -- its button, what it does,
+    /// and the rule a computer seat chooses it by, read before `take_when`.
+    #[serde(default)]
+    pub third: Option<String>,
+    #[serde(default)]
+    pub third_does: Vec<CardEffect>,
+    #[serde(default)]
+    pub third_when: Option<CardRule>,
 }
 
 impl ChoiceCard {
     pub fn side(&self, taken: bool) -> &[CardEffect] {
         if taken { &self.take_does } else { &self.refuse_does }
+    }
+
+    /// Ticket #632: the effects of an answer, the third included; nothing for an unasked seat.
+    pub fn side_of(&self, answer: crate::state::CardAnswer) -> &[CardEffect] {
+        match answer {
+            crate::state::CardAnswer::Taken => &self.take_does,
+            crate::state::CardAnswer::Refused => &self.refuse_does,
+            crate::state::CardAnswer::Third => &self.third_does,
+            crate::state::CardAnswer::NothingToDecide => &[],
+        }
     }
 }
 
@@ -575,6 +593,9 @@ pub enum CardRule {
     LandingUnderWay,
     /// No landing is under way, which is the other half of the same question.
     NoLandingUnderWay,
+    /// Ticket #632 (version 0.1.0.6): the room over Earth -- the seat's Colony Ships at Earth and its
+    /// stations' Habitats in Earth's near orbits -- holds at least this many.
+    StarsRoomAtLeast { people: u32 },
 }
 
 /// Ticket #337 (version 0.09.0): **the effect vocabulary**. One side of one card is a list of
@@ -602,6 +623,11 @@ pub enum CardEffect {
     PerUnitCost { per: CardThing, resource: Resource, amount: i64 },
     /// Units of population into the seat's most populous held Region.
     PopulationToMostPopulous { population: f64 },
+    /// Ticket #632 (version 0.1.0.6): **to the stars**. This many become Pioneers at a working
+    /// Launch Site of the seat's and are lifted at once into the room over Earth, its Colony Ships
+    /// first and then its stations' Habitats; each who does not fit is lost, raising the Launch
+    /// Site Region's Unrest by `unrest_per_lost`. A launch, and the Spaceport's, as a lift is.
+    ToTheStars { people: u32, unrest_per_lost: f64 },
     /// ppm added at the next Climate phase, through the same field the Methane Burst uses.
     EmissionsNext { ppm: f64 },
     /// A change to the seat's Standing in every Region it holds, or in its most populous one.
@@ -2992,6 +3018,18 @@ impl Tables {
                 }
                 (None, EventKind::Choice) => {
                     return Err(err("events.toml", format!("{}: kind = \"choice\" wants a [choice] table saying what it asks", e.name)));
+                }
+                // Ticket #632 (version 0.1.0.6), from the review: a third answer is a button, what it
+                // does and nothing dead; and one lift to the stars a side, its rule no larger.
+                (Some(c), _) if c.third.is_some() != !c.third_does.is_empty() || (c.third.is_none() && c.third_when.is_some()) => {
+                    return Err(err("events.toml", format!("{}: a third answer wants `third`, `third_does` and nothing without them", e.name)));
+                }
+                (Some(c), _) if [&c.take_does, &c.refuse_does, &c.third_does].iter().any(|side| side.iter().filter(|x| matches!(x, CardEffect::ToTheStars { .. })).count() > 1) => {
+                    return Err(err("events.toml", format!("{}: one `to_the_stars` a side", e.name)));
+                }
+                (Some(c), _) if matches!(c.third_when, Some(CardRule::StarsRoomAtLeast { people: want })
+                    if c.third_does.iter().all(|x| !matches!(x, CardEffect::ToTheStars { people, .. } if *people >= want))) => {
+                    return Err(err("events.toml", format!("{}: `stars_room_at_least` asks more room than the third answer sends", e.name)));
                 }
                 _ => {}
             }

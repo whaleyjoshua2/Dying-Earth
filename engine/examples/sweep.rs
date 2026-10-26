@@ -834,6 +834,8 @@ fn main() {
                             println!("      Ferry routes set / Colonists ferried / deliveries over the batch, by seat {:?} / {:?} / {:?}", warc.routes_set, warc.ferried, warc.ferry_trips);
                             // Ticket #633 (version 0.1.0.6).
                             println!("      Games with the first child born off Earth, by seat {:?}", warc.first_born);
+                            // Ticket #632 (version 0.1.0.6).
+                            println!("      Refugee Convoys sent to the stars / refugees lost over the batch, by seat {:?} / {:?}", warc.stars_sent, warc.stars_lost);
                             // Ticket #300 (version 0.08.6): Armies landed from a Carrier, by seat.
                             println!("      Armies landed at a Colony over the batch, by seat {:?}", warc.armies_landed);
                             // Ticket #319 (version 0.08.8): interceptions fought, by the intercepting seat.

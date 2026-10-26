@@ -16891,7 +16891,7 @@ fn a_turn_whose_loudest_line_is_a_card_answer_still_opens_with_a_headline() {
     // The engine files them there itself: every seat's answer, and the question that was asked.
     let card = EventId::ALL.into_iter().find(|id| g.tables.event(*id).asks()).expect("a card that asks");
     g.report.lines.clear();
-    g.question = Some(Question { card, answers: [Some(CardAnswer::Refused); SEAT_COUNT], held: [None; SEAT_COUNT] });
+    g.question = Some(Question { card, answers: [Some(CardAnswer::Refused); SEAT_COUNT], held: [None; SEAT_COUNT], stars: [None; SEAT_COUNT] });
     g.apply_card_answers();
     assert_eq!(g.report.lines.len(), SEAT_COUNT, "four answers: {:?}", g.report.lines.iter().map(|l| &l.text).collect::<Vec<_>>());
     for l in &g.report.lines {
@@ -17265,19 +17265,22 @@ fn no_card_of_either_kind_is_drawn_on_the_first_turn_and_the_deck_is_untouched()
 /// most populous Region for half a ppm, where it was 400,000 for two ppm. The figures are the
 /// card's own in `events.toml`, pinned here; the refusal and the computer's rule are unchanged.
 #[test]
-fn the_refugee_convoy_gives_a_million_people_for_half_a_ppm() {
+fn the_refugee_convoy_gives_six_million_people_for_half_a_ppm() {
     let g = fresh();
     let card = g.tables.event(EventId::RefugeeConvoy);
     let c = card.choice.as_ref().expect("a card that asks");
-    let (mut people, mut ppm) = (None, None);
+    let (mut people, mut ppm, mut unrest) = (None, None, None);
     for e in &c.take_does {
         match e {
             CardEffect::PopulationToMostPopulous { population } => people = Some(*population),
             CardEffect::EmissionsNext { ppm: n } => ppm = Some(*n),
+            // Ticket #632 (version 0.1.0.6): a point of Unrest where they settle.
+            CardEffect::UnrestAtMostPopulous { unrest: n } => unrest = Some(*n),
             other => panic!("an effect the ticket did not decide: {other:?}"),
         }
     }
-    assert_eq!(people, Some(1.0), "a million people, one unit");
+    // Ticket #632 (version 0.1.0.6): six, the convoy on every answer, where it was one.
+    assert_eq!((people, unrest), (Some(6.0), Some(1.0)), "six million people, and a point of Unrest");
     assert_eq!(ppm, Some(0.5), "half a ppm, once");
     assert!(matches!(c.refuse_does.as_slice(), [CardEffect::StandingAllHeld { standing }] if *standing == -5), "the refusal is untouched: {:?}", c.refuse_does);
     assert!(matches!(c.take_when, CardRule::UnrestBelow { unrest } if unrest == 4.0), "the computer's rule is untouched: {:?}", c.take_when);
@@ -21097,7 +21100,8 @@ fn the_reports_templates_stay_under_their_word_ceiling() {
     // Ticket #631 (version 0.1.0.6): and by the 39 of a ferry route's delivery, its four waits, its
     // end, and a rival's route set and ended.
     // Ticket #633 (version 0.1.0.6): and by the 18 of the first child born off Earth, its line and Moment.
-    assert!(words <= 2042, "the Report's templates hold {words} words; the ceiling is 2,042 (18 for the first child born off Earth, 39 for a ferry route, 9 for Fissionables run short, 10 for a Strip Permit's clauses, 9 for an Occupation's holder, 15 for a rival on yours, 33 for a window and the head, 46 for an Accord's end, 9 for a place handed over twice, 9 for an Army inherited, 12 for an Accord broken, 15% off 2,031, 54 for the race to the Moon, 2 for a rival's upgrade, 8 for an Accord answered, less a word of slack, 17 for a Trade, 9 for a Capital refunded, 5 for an Accord let lapse, 7 for Terms added, 5 for a renewal)");
+    // Ticket #632 (version 0.1.0.6): and by the 28 of refugees sent to the stars, and the lack.
+    assert!(words <= 2070, "the Report's templates hold {words} words; the ceiling is 2,070 (28 for refugees sent to the stars, 18 for the first child born off Earth, 39 for a ferry route, 9 for Fissionables run short, 10 for a Strip Permit's clauses, 9 for an Occupation's holder, 15 for a rival on yours, 33 for a window and the head, 46 for an Accord's end, 9 for a place handed over twice, 9 for an Army inherited, 12 for an Accord broken, 15% off 2,031, 54 for the race to the Moon, 2 for a rival's upgrade, 8 for an Accord answered, less a word of slack, 17 for a Trade, 9 for a Capital refunded, 5 for an Accord let lapse, 7 for Terms added, 5 for a renewal)");
     // "The" is gone before a Faction's name, which is drawn in its colour instead.
     assert!(!text.contains("he {faction}"), "a template still says \"the {{faction}}\"");
 }
@@ -27183,4 +27187,111 @@ fn ticket_633_the_computer_arkwrights_chase_the_first_birth() {
     assert_eq!(g.ai_first_birth_chase(ark, theirs), 1.0, "and at a Colony of their own");
     g.first_born.push((other, theirs, g.turn));
     assert_eq!(g.ai_first_birth_chase(ark, moon), 1.0, "once somebody has it, the chase ends");
+}
+
+/// Ticket #632 (version 0.1.0.6), at the designer's word: the Refugee Convoy is six people on every
+/// answer; taking them in costs a point of Unrest where they settle; and a third answer, *Send them
+/// to the stars*, lifts them from a Launch Site into the room over Earth, the rest lost.
+#[test]
+fn ticket_632_the_convoy_has_three_answers_and_six_people() {
+    let g = game();
+    let card = g.tables.event(EventId::RefugeeConvoy).choice.clone().unwrap();
+    assert!(card.take_does.iter().any(|e| matches!(e, dying_earth_engine::data::CardEffect::PopulationToMostPopulous { population } if *population == 6.0)), "{:?}", card.take_does);
+    assert!(card.take_does.iter().any(|e| matches!(e, dying_earth_engine::data::CardEffect::UnrestAtMostPopulous { unrest } if *unrest == 1.0)), "{:?}", card.take_does);
+    assert_eq!(card.third.as_deref(), Some("Send them to the stars"));
+    assert!(matches!(card.third_does.as_slice(), [dying_earth_engine::data::CardEffect::ToTheStars { people: 6, unrest_per_lost }] if *unrest_per_lost == 0.5), "{:?}", card.third_does);
+    assert!(matches!(card.third_when, Some(dying_earth_engine::data::CardRule::StarsRoomAtLeast { people: 6 })), "{:?}", card.third_when);
+}
+
+/// Ticket #632 (Q3, Q4, Q5): sent to the stars, the six are lifted from a Launch Site of the seat's
+/// into its Colony Ships over Earth first, then its stations' Habitats over Earth; each who does not
+/// fit is lost and raises the Launch Site Region's Unrest by half a point. It counts as a launch.
+#[test]
+fn ticket_632_sent_to_the_stars_they_fill_the_room_over_earth_and_the_rest_are_lost() {
+    let mut g = game();
+    calm(&mut g);
+    ask_the_card(&mut g, EventId::RefugeeConvoy);
+    let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
+    g.colony_mut(iss).unwrap().colonists = 2;
+    let ship = ship_in(&mut g, Seat(0), UnitKind::ColonyShip, BodyId::Earth, None, Stance::Hold);
+    g.ship_mut(ship).unwrap().colonists = 1;
+    let cap = g.colony_ship_capacity(Seat(0));
+    let room = (cap - 1) + (g.habitat_room(g.colony(iss).unwrap()) - 2);
+    assert_eq!(g.stars_room(Seat(0)), room);
+    assert!(room < 6, "the board: room for {room} of six");
+    let site = g.stars_site(Seat(0)).expect("a Launch Site of the seat's");
+    let (unrest, launches) = (g.state(site).unrest, g.climate.launches_pending[0]);
+    assert_eq!(g.may_answer_third(Seat(0)), Ok(()));
+    g.answer_card_as(Seat(0), CardAnswer::Third).expect("sent to the stars");
+    // Lifted at once, at the answer, into the room the button showed.
+    assert_eq!(g.ship(ship).unwrap().colonists, cap, "aboard the moment the answer is given");
+    // A flight given after cannot take the room from under them.
+    g.ship_mut(ship).unwrap().at = ShipAt::Transit { from: BodyId::Earth, to: BodyId::Moon, turns_left: 1 };
+    g.apply_card_answers();
+    assert_eq!(g.ship(ship).unwrap().colonists, cap, "the Colony Ship filled first");
+    assert_eq!(g.colony(iss).unwrap().colonists, g.habitat_room(g.colony(iss).unwrap()), "then the station");
+    let lost = 6 - room;
+    // A card's Unrest lands with the Resolution's Unrest, as every card's does.
+    let _ = unrest;
+    assert!(g.pending.card_unrest.iter().any(|(s, n, _)| *s == site && (*n - 0.5 * lost as f64).abs() < 1e-9), "half a point for each of the {lost} lost: {:?}", g.pending.card_unrest);
+    assert_eq!(g.climate.launches_pending[0], launches + 1, "one launch");
+    assert!(g.report.lines.iter().any(|l| l.text.contains(&format!("{lost} lost"))), "{:?}", g.report.lines.iter().map(|l| &l.text).collect::<Vec<_>>());
+}
+
+/// Ticket #632 (Q3): with no working Launch Site the third answer is shut, with the reason; and the
+/// computer sends them when the room holds all six, otherwise answers as before (Q6).
+#[test]
+fn ticket_632_the_third_answer_wants_a_launch_site_and_the_computer_wants_room_for_all_six() {
+    let mut g = game();
+    calm(&mut g);
+    ask_the_card(&mut g, EventId::RefugeeConvoy);
+    for s in g.controlled_states(Seat(0)) {
+        g.state_mut(s).facilities.retain(|f| !f.kind.does_the_job_of(FacilityKind::LaunchSite));
+    }
+    let why = g.may_answer_third(Seat(0)).unwrap_err();
+    assert!(why.contains("Launch Site"), "{why}");
+    assert!(g.answer_card_as(Seat(0), CardAnswer::Third).is_err());
+
+    let ai = Seat(1);
+    let theirs = station_of(&g, ai, BodyId::Earth).unwrap();
+    g.colony_mut(theirs).unwrap().colonists = 0;
+    let room = g.stars_room(ai);
+    if room < 6 {
+        for _ in 0..2 {
+            ship_in(&mut g, ai, UnitKind::ColonyShip, BodyId::Earth, None, Stance::Hold);
+        }
+    }
+    assert!(g.stars_room(ai) >= 6);
+    g.ai_answer_card(ai);
+    assert_eq!(g.pending_question().unwrap().answer_of(ai), Some(CardAnswer::Third), "room for all six: to the stars");
+    let other = Seat(2);
+    g.colonies.retain(|c| !(c.in_orbit && c.body == BodyId::Earth && c.control.director() == Some(other)));
+    g.ships.retain(|s| s.seat != other);
+    assert!(g.stars_room(other) < 6);
+    g.ai_answer_card(other);
+    assert_eq!(g.pending_question().unwrap().answer_of(other), Some(CardAnswer::Taken), "calm, and no room: taken in as before");
+}
+
+/// Ticket #632, from the review: the refugees leave from a Region with a working Spaceport first, so
+/// it pays for them as for any lift; and with no room at all nobody is lifted and nothing launches.
+#[test]
+fn ticket_632_a_spaceport_lifts_them_first_and_a_lift_of_nobody_is_no_launch() {
+    let mut g = game();
+    calm(&mut g);
+    ask_the_card(&mut g, EventId::RefugeeConvoy);
+    let home = StateId::EastAsia;
+    let other = second_region(&mut g, Seat(0));
+    g.state_mut(other).population = 0.5;
+    g.state_mut(other).facilities.push(facility(FacilityKind::Spaceport));
+    assert!(g.state(home).population > g.state(other).population);
+    assert_eq!(g.stars_site(Seat(0)), Some(other), "the Spaceport's Region, though the smaller");
+    // No room over Earth: nobody lifted, and no launch.
+    let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
+    let full = g.habitat_room(g.colony(iss).unwrap());
+    g.colony_mut(iss).unwrap().colonists = full;
+    assert_eq!(g.stars_room(Seat(0)), 0);
+    let launches = g.climate.launches_pending[0];
+    g.answer_card_as(Seat(0), CardAnswer::Third).expect("sent, though there is no room");
+    assert_eq!(g.climate.launches_pending[0], launches, "a lift of nobody is no launch");
+    assert_eq!(g.pending_question().unwrap().stars[0].map(|s| (s.1, s.2)), Some((0, 6)), "all six lost");
 }

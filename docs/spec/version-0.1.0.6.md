@@ -13,17 +13,17 @@ pictures and sweeps that decided it are in
 **What the version is.** Version 0.1.0.5 with the designer's list of 2026-10-25. Its spine is a new
 resource, **Fissionables**, found off Earth and richest in the far worlds (§1), which a nuclear hull
 is built and flown with and a Warhead is loaded with (§2), and a new common Reactor burns, the
-Archivists' own building renamed the Accumulator (§3); and the computer is taught to chase them (§4). Beside it, Colony Ships run standing ferry routes (§5), two Factions' figures and the Prospectors' bar move (§6), and the first child born off Earth is a Moment (§7).
+Archivists' own building renamed the Accumulator (§3); and the computer is taught to chase them (§4). Beside it, Colony Ships run standing ferry routes (§5), two Factions' figures and the Prospectors' bar move (§6), the first child born off Earth is a Moment (§7), and the Refugee Convoy may be sent to the stars (§8).
 
 **What it did to the win column** (80 games, per Faction; every section's own sweep is in it):
 
-| | 0.1.0.5 | §1 Fissionables | §2 the nuclear hull | §3 the Reactor | §4 the chase | §5 ferry routes | §6 the figures | §7 the first-born | the ideal |
-|---|---|---|---|---|---|---|---|---|---|
-| Custodians | 18 | 23 | 19 | 28 | 22 | 22 | 30 | 31 | 15 |
-| Prospectors | 61 | 51 | 56 | 47 | 56 | 55 | 46 | 45 | 15 |
-| Arkwrights | 0 | 3 | 2 | 1 | 1 | 2 | 1 | 1 | 15 |
-| Archivists | 1 | 1 | 1 | 1 | 1 | 1 | 3 | 3 | 15 |
-| collapses | 0 | 2 | 2 | 3 | 0 | 0 | 0 | 0 | 20 |
+| | 0.1.0.5 | §1 Fissionables | §2 the nuclear hull | §3 the Reactor | §4 the chase | §5 ferry routes | §6 the figures | §7 the first-born | §8 the convoy | the ideal |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Custodians | 18 | 23 | 19 | 28 | 22 | 22 | 30 | 31 | 30 | 15 |
+| Prospectors | 61 | 51 | 56 | 47 | 56 | 55 | 46 | 45 | 46 | 15 |
+| Arkwrights | 0 | 3 | 2 | 1 | 1 | 2 | 1 | 1 | 1 | 15 |
+| Archivists | 1 | 1 | 1 | 1 | 1 | 1 | 3 | 3 | 3 | 15 |
+| collapses | 0 | 2 | 2 | 3 | 0 | 0 | 0 | 0 | 0 | 20 |
 
 ## 1. Fissionables, the seventh resource, and Deep Mining and Rich Seam moved
 
@@ -325,3 +325,30 @@ Ticket: [The first humans born off Earth](https://github.com/whaleyjoshua2/Dying
 **31 / 45 / 1 / 3 and 0 collapses**, from §6's 30 / 46 / 1 / 3 and 0. The first child born off Earth,
 in games of 80: the Custodians 29, the Prospectors 22, the Arkwrights 16, the Archivists 13. Reported,
 not tuned.
+
+## 8. The Refugee Convoy's third answer: Send them to the stars
+
+Ticket: [The Refugee Convoy's third answer](https://github.com/whaleyjoshua2/Dying-Earth/issues/632).
+
+- **The convoy** (Q1, Q2). Six people on every answer. *Take them in*: +6 population in the most
+  populous Region, +1 Unrest there, 0.5 ppm next turn. *Turn them away*: -5 Standing everywhere held,
+  unchanged.
+- **Send them to the stars** (Q3). A choice card may now carry a **third answer** (`third`,
+  `third_does`, `third_when` in `events.toml`; the loader refuses a half-made one). The convoy's is
+  `to_the_stars`: the six become Pioneers at a Launch Site of the seat's -- a Region with a working
+  Spaceport first, then the most populous -- and are lifted **when the answer is given** into the
+  room over Earth: its Colony Ships at Earth, then its stations' Habitats in Earth's near orbits.
+  No Region pays population for them. It is a launch (when anyone is lifted) and the Spaceport's,
+  as a lift is. With no working Launch Site the answer is shut, with the reason.
+- **The lost** (Q4). Each who does not fit is lost, +0.5 Unrest in the Launch Site's Region, landing
+  with the Resolution's card Unrest; the Report names the lifted, the lost and the Spaceport's pay.
+- **The button** (Q5). *Send them to the stars (room for 2 of 6)*, and what it does beneath.
+- **The computer** (Q6). It sends them when the room holds all six (`stars_room_at_least`, read
+  before `take_when`); otherwise it answers as before.
+- **The text tool**: `answer third`.
+- **The measure**: convoys sent to the stars and refugees lost, by seat.
+
+**Measured** ([`sweeps/ticket-632.txt`](../dev-diary/2026-10-25-version-0.1.0.6/sweeps/ticket-632.txt)):
+**30 / 46 / 1 / 3 and 0 collapses**, from §7's 31 / 45 / 1 / 3 and 0. Convoys sent to the stars over
+the 80 games: the Arkwrights 12, the Prospectors 7, the Custodians 5, the Archivists 5; none lost.
+Reported, not tuned.

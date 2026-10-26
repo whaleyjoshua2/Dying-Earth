@@ -332,3 +332,42 @@ from 30 / 46 / 1 / 3 and 0.
 
 The goods are each Faction's income a game, net of upkeep. There was no count of first births before
 this ticket, so the Arkwrights' 16 has nothing to be set against. Reported, not tuned.
+
+## The Refugee Convoy sent to the stars
+
+Ticket [#632](https://github.com/whaleyjoshua2/Dying-Earth/issues/632), spec §8. Decided in one round: six
+people, a point of Unrest for taking them in, and the third answer as the ticket drew it.
+
+**Built test first**, red on its missing names; six rules then broken on purpose to watch their tests
+fail. A choice card had two answers wired through the engine, the computer, the window and the text
+tool; the third is general, a card's own button with its own effects and rule.
+
+**The first sweep caught a fault**: the computer sends the convoy only when its room holds all six,
+yet it lost 50 refugees. The room was read at the answer and the lift made at the Resolution, by
+which time the turn's own flights had taken the Ships away. The designer's words were *lifted at
+once*, so the lift is made when the answer is given, into the room the button showed, and the
+Unrest and Report line land at the Resolution. A test flies the Ship off after the answer; the
+next sweep lost nobody.
+
+![The convoy's three answers, room for 2 of 6](ticket-632/card-earth.png)
+
+**The review** found nothing that blocks. Mended: the lift prefers a Region with a Spaceport, so the
+Arkwrights are paid for it as for any lift, and the line says what the Spaceport paid; a lift of
+nobody is no launch; the loader refuses a third answer without its button or effects, two lifts on a
+side, or a room rule larger than the convoy; the answer is said in the Report before what it did;
+the `cardanswer:` shot aid takes `third`; and two texts that said a card has two sides say less.
+The sweep's took / refused counts do not count a third answer; the convoys sent stand for it.
+Left as it is, for the designer: the refugees board knowing the neutral Education, not the Launch
+Site Region's, since they were never its people.
+
+**The sweep** ([`sweeps/ticket-632.txt`](sweeps/ticket-632.txt)): **30 / 46 / 1 / 3 and 0 collapses**,
+from 31 / 45 / 1 / 3 and 0.
+
+| | Convoys to the stars | Materials | Fuel | Energy | Ducats | Research | Fissionables |
+|---|---|---|---|---|---|---|---|
+| Custodians | 5 | 2,404 | 685 | 1,052 | 1,067 | 1,215 | 75.7 |
+| Prospectors | 7 | 1,864 | 460 | 619 | 1,601 | 271 | 64.0 |
+| Arkwrights | 12 | 674 | 108 | 207 | 2,600 | 262 | 1.5 |
+| Archivists | 5 | 452 | 260 | 31 | 648 | 718 | 3.5 |
+
+The goods are each Faction's income a game, net of upkeep. Reported, not tuned.

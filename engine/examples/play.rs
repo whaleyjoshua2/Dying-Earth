@@ -710,8 +710,9 @@ fn grammar(t: Option<&Tables>) -> String {
 enum Line {
     Order(Box<Order>),
     Tech(TechId),
-    /// Ticket #337: this seat's answer to the turn's Choice Card -- taken, or refused.
-    Answer(bool),
+    /// Ticket #337: this seat's answer to the turn's Choice Card -- taken, or refused; ticket #632,
+    /// or the third way.
+    Answer(CardAnswer),
     /// Ticket #495 (version 0.09.9): this seat's answer to the Accord a Faction offered it; ticket
     /// #496, or the Trade (`true` in the last field).
     Offer(Seat, bool, bool),
@@ -747,9 +748,11 @@ fn parse_line(g: &Game, line: &str) -> Result<Line, String> {
         "answer" => {
             let side = at(1)?.to_ascii_lowercase();
             return match side.as_str() {
-                "take" => Ok(Line::Answer(true)),
-                "refuse" => Ok(Line::Answer(false)),
-                _ => Err(format!("`answer` wants `take` or `refuse`, not {side:?}")),
+                "take" => Ok(Line::Answer(CardAnswer::Taken)),
+                "refuse" => Ok(Line::Answer(CardAnswer::Refused)),
+                // Ticket #632 (version 0.1.0.6): a card's third way.
+                "third" => Ok(Line::Answer(CardAnswer::Third)),
+                _ => Err(format!("`answer` wants `take`, `refuse` or `third`, not {side:?}")),
             };
         }
         "build" => {
@@ -1042,6 +1045,8 @@ fn card_effect_text(e: &CardEffect) -> String {
             format!("{amount} {} for every {thing}", resource.name())
         }
         CardEffect::PopulationToMostPopulous { population } => format!("{population:+.1} population in your most populous Region"),
+        // Ticket #632 (version 0.1.0.6).
+        CardEffect::ToTheStars { people, unrest_per_lost } => format!("{people} lifted from a Launch Site into your room over Earth; {unrest_per_lost:+.1} Unrest there for each who does not fit"),
         CardEffect::EmissionsNext { ppm } => format!("{ppm:+.1} ppm of Emissions next turn"),
         CardEffect::StandingAllHeld { standing } => format!("{standing:+} Standing in every Region you hold"),
         CardEffect::StandingAtMostPopulous { standing } => format!("{standing:+} Standing in your most populous Region"),
@@ -1117,13 +1122,22 @@ fn print_question(g: &Game) {
     }
     println!("  `answer take`    {}: {}", c.take, card_side_text(&c.take_does));
     println!("  `answer refuse`  {}: {}", c.refuse, card_side_text(&c.refuse_does));
+    // Ticket #632 (version 0.1.0.6): a card's third way, with the room it would fill, or why it is shut.
+    if let Some(third) = &c.third {
+        let state = match g.may_answer_third(me) {
+            Ok(()) if c.third_does.iter().any(|e| matches!(e, CardEffect::ToTheStars { .. })) => format!(" (room for {} over Earth)", g.stars_room(me)),
+            Ok(()) => String::new(),
+            Err(why) => format!(" -- SHUT: {why}"),
+        };
+        println!("  `answer third`   {third}: {}{state}", card_side_text(&c.third_does));
+    }
     match q.answer_of(me) {
         Some(a) => println!("  Your answer is given: you {a_word}.", a_word = a.word()),
         None if !g.may_take_card(me) => {
             // Ticket #366 (version 0.09.2): the good and the shortfall, named.
             println!("  *** THE OFFER IS CLOSED TO YOU: {}, so `answer refuse` is your only move. ***", g.card_shortfall(me).unwrap_or_else(|| "you cannot pay what it asks".to_string()))
         }
-        None => println!("  *** UNANSWERED. Both sides are open to you. The turn cannot end until an `answer` line is given. ***"),
+        None => println!("  *** UNANSWERED. The turn cannot end until an `answer` line is given. ***"),
     }
 }
 
@@ -2019,8 +2033,8 @@ fn main() {
                     }
                     // Ticket #337 (version 0.09.0): answered the moment the line is read, as a
                     // `tech` pick is, so it is given before the turn it holds can end.
-                    Ok(Line::Answer(taken)) => match game.answer_card(Seat(0), taken) {
-                        Ok(()) => println!("line {}: answered: you {}", n + 1, if taken { "take the offer" } else { "refuse it" }),
+                    Ok(Line::Answer(answer)) => match game.answer_card_as(Seat(0), answer) {
+                        Ok(()) => println!("line {}: answered: you {}", n + 1, answer.word()),
                         Err(e) => {
                             println!("line {}: REFUSED `{line}`: {e}", n + 1);
                             bad += 1;

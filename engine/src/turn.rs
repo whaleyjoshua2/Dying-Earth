@@ -140,7 +140,7 @@ impl Game {
             for seat in Seat::ALL {
                 if !self.seat(seat).ai && q.answer_of(seat).is_none() {
                     owed.push(format!(
-                        "{} is asking the {} a question, and it has not been answered. Take the offer or refuse it.",
+                        "{} is asking the {} a question, and it has not been answered. Answer it.",
                         self.tables.event(q.card).name,
                         self.seat_name(seat)
                     ));

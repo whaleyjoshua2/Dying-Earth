@@ -2011,12 +2011,14 @@ fn build_board(session: &mut Session) {
             eprintln!("card:{id:?} never came up in two hundred rolls");
             std::process::exit(3);
         }
-        if let Some(taken) = std::env::args().find_map(|a| match a.strip_prefix("cardanswer:") {
-            Some("take") => Some(true),
-            Some("refuse") => Some(false),
+        // Ticket #632 (version 0.1.0.6): or `cardanswer:third`.
+        if let Some(answer) = std::env::args().find_map(|a| match a.strip_prefix("cardanswer:") {
+            Some("take") => Some(CardAnswer::Taken),
+            Some("refuse") => Some(CardAnswer::Refused),
+            Some("third") => Some(CardAnswer::Third),
             _ => None,
         }) {
-            if let Err(e) = g.answer_card(Seat(0), taken) {
+            if let Err(e) = g.answer_card_as(Seat(0), answer) {
                 eprintln!("cardanswer: {e}");
                 std::process::exit(3);
             }

@@ -950,6 +950,9 @@ pub enum CardAnswer {
     /// Neither side of the card reaches this seat, so it was never asked: it does not hold the turn
     /// and the Report says so for it, rather than a small Faction being made to refuse.
     NothingToDecide,
+    /// Ticket #632 (version 0.1.0.6): the third answer a card may offer. Added last, so a save
+    /// written before still loads.
+    Third,
 }
 
 impl CardAnswer {
@@ -959,6 +962,7 @@ impl CardAnswer {
             CardAnswer::Taken => "took it",
             CardAnswer::Refused => "refused it",
             CardAnswer::NothingToDecide => "had nothing to decide",
+            CardAnswer::Third => "chose the third way",
         }
     }
 }
@@ -974,6 +978,11 @@ pub struct Question {
     /// pinned at the answer so the one the card named is the one held, whatever is ordered after.
     #[serde(default)]
     pub held: [Option<ShipId>; SEAT_COUNT],
+    /// Ticket #632 (version 0.1.0.6): refugees sent to the stars are lifted the moment the answer is
+    /// given, into the room there is then; this is the Launch Site, how many were lifted, how many
+    /// lost and what the Spaceport paid, for the Resolution's Unrest and Report line.
+    #[serde(default)]
+    pub stars: [Option<(StateId, u32, u32, u32)>; SEAT_COUNT],
 }
 
 impl Question {
@@ -1370,6 +1379,11 @@ pub struct WarCounters {
     /// Ticket #633 (version 0.1.0.6): games in which the seat had the first child born off Earth.
     #[serde(default)]
     pub first_born: [u32; SEAT_COUNT],
+    /// Ticket #632 (version 0.1.0.6): Refugee Convoys sent to the stars, and refugees lost, by seat.
+    #[serde(default)]
+    pub stars_sent: [u32; SEAT_COUNT],
+    #[serde(default)]
+    pub stars_lost: [u32; SEAT_COUNT],
     /// Ticket #300 (version 0.08.6): Armies landed from a Carrier at a Colony, by seat. Never
     /// counted before; the reviews measured no Army carried by anybody in eighty games.
     #[serde(default)]
@@ -1487,6 +1501,8 @@ impl WarCounters {
             self.ferried[i] += o.ferried[i];
             self.ferry_trips[i] += o.ferry_trips[i];
             self.first_born[i] += o.first_born[i];
+            self.stars_sent[i] += o.stars_sent[i];
+            self.stars_lost[i] += o.stars_lost[i];
             self.armies_landed[i] += o.armies_landed[i];
             self.interceptions[i] += o.interceptions[i];
             self.batteries_lost[i] += o.batteries_lost[i];

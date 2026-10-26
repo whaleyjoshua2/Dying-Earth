@@ -444,7 +444,7 @@ enum Action {
     PickCapital(ColonyId, CapitalBuilding),
     /// Ticket #337 (version 0.09.0): seat 0 answered this turn's choice card. A PLACEHOLDER, so
     /// the card can be answered at all while the interface for it is built in its own lane.
-    AnswerCard(bool),
+    AnswerCard(CardAnswer),
     /// Ticket #495 (version 0.09.9): an Accord offered to the player, by its index, accepted or not.
     AnswerOffer(usize, bool),
     /// Ticket #572 (version 0.1.0.3): a Trade offered to the player countered, by its index, with
@@ -1739,8 +1739,8 @@ pub fn draw(
             // Ticket #337 (version 0.09.0): the answer goes to the engine, which records it, stops
             // refusing End Turn and applies the side chosen at this turn's Resolution. The modal
             // hands on to the turn's Moments and its Report as it goes (`Popup::Card`).
-            Action::AnswerCard(taken) => {
-                let result = session.game.as_mut().map(|g| g.answer_card(Seat(0), taken));
+            Action::AnswerCard(answer) => {
+                let result = session.game.as_mut().map(|g| g.answer_card_as(Seat(0), answer));
                 if let Some(Err(e)) = result {
                     session.last_error = Some(e);
                 }
@@ -12409,6 +12409,8 @@ fn card_effect_text(e: &CardEffect) -> String {
             format!("{amount} {} for every {thing}", resource.name())
         }
         CardEffect::PopulationToMostPopulous { population } => format!("{population:+.1} population in your most populous Region"),
+        // Ticket #632 (version 0.1.0.6).
+        CardEffect::ToTheStars { people, unrest_per_lost } => format!("{people} lifted from a Launch Site into your room over Earth; {unrest_per_lost:+.1} Unrest there for each who does not fit"),
         CardEffect::EmissionsNext { ppm } => format!("{ppm:+.1} ppm of Emissions next turn"),
         CardEffect::StandingAllHeld { standing } => format!("{standing:+} Standing in every Region you hold"),
         CardEffect::StandingAtMostPopulous { standing } => format!("{standing:+} Standing in your most populous Region"),
@@ -12924,18 +12926,35 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                     ui.label(RichText::new(held).weak());
                 }
                 ui.add_space(10.0);
-                let sides = [(&choice.take, &choice.take_does, true), (&choice.refuse, &choice.refuse_does, false)];
-                ui.columns(2, |cols| {
-                    for (i, (face, does, taken)) in sides.into_iter().enumerate() {
+                // Ticket #632 (version 0.1.0.6): and the third way, where the card has one, with the
+                // room it would fill on its face so the risk is read before it is taken.
+                let mut sides = vec![(choice.take.clone(), &choice.take_does, CardAnswer::Taken), (choice.refuse.clone(), &choice.refuse_does, CardAnswer::Refused)];
+                if let Some(third) = &choice.third {
+                    let face = if choice.third_does.iter().any(|e| matches!(e, CardEffect::ToTheStars { .. })) {
+                        let people: u32 = choice.third_does.iter().map(|e| if let CardEffect::ToTheStars { people, .. } = e { *people } else { 0 }).sum();
+                        format!("{third} (room for {} of {people})", game.stars_room(Seat(0)).min(people))
+                    } else {
+                        third.clone()
+                    };
+                    sides.push((face, &choice.third_does, CardAnswer::Third));
+                }
+                let third_shut = game.may_answer_third(Seat(0)).err();
+                ui.columns(sides.len(), |cols| {
+                    for (i, (face, does, answer)) in sides.into_iter().enumerate() {
                         let ui = &mut cols[i];
                         let width = ui.available_width();
                         let text = format!("{face}\n{}", card_side_text(does));
                         let button = egui::Button::new(RichText::new(text).size(14.0)).wrap_mode(egui::TextWrapMode::Wrap).min_size(egui::vec2(width, 68.0));
-                        let live = !taken || may_take;
+                        let live = match answer {
+                            CardAnswer::Taken => may_take,
+                            CardAnswer::Third => third_shut.is_none(),
+                            _ => true,
+                        };
                         // Ticket #366 (version 0.09.2): the good and the shortfall, named.
-                        let why_text = match game.card_shortfall(Seat(0)) {
-                            Some(s) => format!("You cannot take this side of the card: {s}. Refusing is your only move this turn."),
-                            None => "You cannot pay what this side of the card asks. Refusing is your only move this turn.".to_string(),
+                        let why_text = match (answer, game.card_shortfall(Seat(0)), &third_shut) {
+                            (CardAnswer::Third, _, Some(why)) => format!("You cannot choose this: {why}."),
+                            (_, Some(s), _) => format!("You cannot take this side of the card: {s}. Refusing is your only move this turn."),
+                            _ => "You cannot pay what this side of the card asks. Refusing is your only move this turn.".to_string(),
                         };
                         let why = why_text.as_str();
                         let resp = ui.add_enabled(live, button);
@@ -12944,7 +12963,7 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                         }
                         let resp = resp.on_disabled_hover_text(why);
                         if resp.clicked() {
-                            actions.push(Action::AnswerCard(taken));
+                            actions.push(Action::AnswerCard(answer));
                             // The answer is given, so the card hands on to the turn's Moments and
                             // its Report. The order it is applied in comes later, at the Resolution.
                             let moments = view.moments_of(&session.tables, &game.report).len();

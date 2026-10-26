@@ -304,13 +304,28 @@ copies = 1
 question = "A convoy of climate refugees asks to land. Take them in?"
 take = "Take them in"
 refuse = "Turn them away"
+# Ticket #632 (version 0.1.0.6), at the designer's word: a third way, "Send them to the stars": the
+# refugees become Pioneers at a Launch Site of the seat's and are lifted at once into the room over
+# Earth -- its Colony Ships, then its stations' Habitats -- and those who do not fit are lost, half a
+# point of Unrest each in the Launch Site's Region. The computer sends them when the room holds all.
+third = "Send them to the stars"
+third_when = { rule = "stars_room_at_least", people = 6 }
 # A calm Faction has room for them; a restive one does not, and pays for saying so.
 take_when = { rule = "unrest_below", unrest = 4.0 }
+[[event.choice.third_does]]
+effect = "to_the_stars"
+people = 6
+unrest_per_lost = 0.5
 # Ticket #376 (version 0.09.2): a million people for half a ppm, where it was 400,000 for two -- the
 # playtest's "which nobody would take twice". The refusal and the computer's rule are unchanged.
+# Ticket #632 (version 0.1.0.6), at the designer's word: six, the convoy on every answer, and a point
+# of Unrest where they settle, which the third answer is the way round.
 [[event.choice.take_does]]
 effect = "population_to_most_populous"
-population = 1.0
+population = 6.0
+[[event.choice.take_does]]
+effect = "unrest_at_most_populous"
+unrest = 1.0
 [[event.choice.take_does]]
 effect = "emissions_next"
 ppm = 0.5

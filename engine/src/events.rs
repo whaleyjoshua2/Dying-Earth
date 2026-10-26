@@ -114,7 +114,7 @@ impl Game {
             return;
         }
         self.draw = CardDraw::Choice(id);
-        let mut q = Question { card: id, answers: [None; SEAT_COUNT], held: [None; SEAT_COUNT] };
+        let mut q = Question { card: id, answers: [None; SEAT_COUNT], held: [None; SEAT_COUNT], stars: [None; SEAT_COUNT] };
         for seat in Seat::ALL {
             // A seat the card cannot touch is NOT asked: its answer is recorded as nothing to
             // decide, it never holds the turn, and the Report says so for it.
@@ -144,6 +144,16 @@ impl Game {
     /// Ticket #337: record one seat's answer. Refused where no card is asking, where the seat has
     /// already answered, and where the card was never the seat's to answer.
     pub fn answer_card(&mut self, seat: Seat, taken: bool) -> Result<(), String> {
+        self.answer_card_as(seat, if taken { CardAnswer::Taken } else { CardAnswer::Refused })
+    }
+
+    /// Ticket #632 (version 0.1.0.6): record one seat's answer, the third way included. Refused as
+    /// `answer_card` refuses, and the third where the card has none or it has nothing to land on.
+    pub fn answer_card_as(&mut self, seat: Seat, answer: CardAnswer) -> Result<(), String> {
+        if answer == CardAnswer::NothingToDecide {
+            return Err("nothing to decide is no answer".to_string());
+        }
+        let taken = answer == CardAnswer::Taken;
         let Some(q) = self.question.as_ref() else {
             return Err("No card is asking anything this turn.".to_string());
         };
@@ -163,17 +173,31 @@ impl Game {
             let why = self.card_shortfall(seat).unwrap_or_else(|| "they cannot pay what it asks".to_string());
             return Err(format!("The {} cannot take {name}: {why}; they may only refuse.", self.seat_name(seat)));
         }
-        let answer = if taken { CardAnswer::Taken } else { CardAnswer::Refused };
+        if answer == CardAnswer::Third
+            && let Err(why) = self.may_answer_third(seat)
+        {
+            return Err(format!("The {} cannot choose that on {name}: {why}.", self.seat_name(seat)));
+        }
         // Ticket #375 (version 0.09.2): the Ship a taken call turns aside, pinned now.
         let held = if taken && self.tables.event(q.card).choice.as_ref().is_some_and(|c| c.holds_a_ship()) { self.card_would_hold(seat) } else { None };
         if let Some(q) = self.question.as_mut() {
             q.answers[seat.index()] = Some(answer);
             q.held[seat.index()] = held;
         }
-        if taken {
-            self.choice_taken[seat.index()] += 1;
-        } else {
-            self.choice_refused[seat.index()] += 1;
+        match answer {
+            CardAnswer::Taken => self.choice_taken[seat.index()] += 1,
+            CardAnswer::Refused => self.choice_refused[seat.index()] += 1,
+            _ => {}
+        }
+        // Ticket #632 (version 0.1.0.6): to the stars "at once", into the room there is now -- the
+        // room the button showed. Left to the Resolution, the turn's own flights had taken the
+        // Ships away first: measured, the computer lost refugees it had room for when it answered.
+        let people: u32 = self.question.as_ref().and_then(|q| self.tables.event(q.card).choice.as_ref()).map(|c| c.side_of(answer).iter().map(|e| if let CardEffect::ToTheStars { people, .. } = e { *people } else { 0 }).sum()).unwrap_or(0);
+        if people > 0 {
+            let lift = self.lift_to_the_stars(seat, people);
+            if let Some(q) = self.question.as_mut() {
+                q.stars[seat.index()] = lift;
+            }
         }
         self.log(format!("{name}: the {} {}.", self.seat_name(seat), answer.word()));
         Ok(())
@@ -187,10 +211,113 @@ impl Game {
             return;
         }
         let Some(rule) = self.tables.event(q.card).choice.as_ref().map(|c| c.take_when.clone()) else { return };
+        // Ticket #632 (version 0.1.0.6): a card's third way is chosen first, where its own rule holds.
+        let third = self.tables.event(q.card).choice.as_ref().and_then(|c| c.third_when.clone());
+        if let Some(third) = third
+            && self.card_rule_holds(seat, &third)
+            && self.may_answer_third(seat).is_ok()
+            && self.answer_card_as(seat, CardAnswer::Third).is_ok()
+        {
+            return;
+        }
         // Ticket #337: the card's rule says whether the seat WANTS the offer; it takes it only if
         // it can also pay for it.
         let take = self.card_rule_holds(seat, &rule) && self.may_take_card(seat);
         self.answer_card(seat, take).ok();
+    }
+
+    /// Ticket #632 (version 0.1.0.6): whether this seat may choose the card's third way -- the card
+    /// offers one and every effect of it has something of the seat's to land on -- or why not.
+    pub fn may_answer_third(&self, seat: Seat) -> Result<(), String> {
+        let q = self.question.as_ref().ok_or("No card is asking anything this turn.")?;
+        let c = self.tables.event(q.card).choice.as_ref().ok_or("No card is asking anything this turn.")?;
+        if c.third.is_none() {
+            return Err("this card has no third answer".to_string());
+        }
+        match c.third_does.iter().find_map(|e| self.card_effect_lack(e, seat)) {
+            Some(lack) => Err(format!("you {lack}")),
+            None => Ok(()),
+        }
+    }
+
+    /// Ticket #632 (version 0.1.0.6): **the room over Earth** -- what the seat's Colony Ships at Earth
+    /// have room for, and its stations' Habitats in Earth's near orbits.
+    pub fn stars_room(&self, seat: Seat) -> u32 {
+        let cap = self.colony_ship_capacity(seat);
+        let ships: u32 = self.ships.iter().filter(|s| s.seat == seat && s.kind == UnitKind::ColonyShip && s.at == ShipAt::Body(BodyId::Earth)).map(|s| cap.saturating_sub(s.colonists)).sum();
+        let stations: u32 = self.colonies.iter().filter(|c| c.control.director() == Some(seat) && self.in_earth_orbit(c)).map(|c| self.habitat_room(c).saturating_sub(c.colonists)).sum();
+        ships + stations
+    }
+
+    /// Ticket #632: the Region the refugees are lifted from: the seat's most populous Region with a
+    /// working Launch Site (a Spaceport counting as one), one with a working Spaceport first, so the
+    /// Arkwrights are paid for the lift as for their own (from the review).
+    pub fn stars_site(&self, seat: Seat) -> Option<StateId> {
+        let working = |s: StateId, k: FacilityKind| self.state(s).facilities.iter().any(|f| f.kind.does_the_job_of(k) && f.working());
+        self.controlled_states(seat)
+            .into_iter()
+            .filter(|s| working(*s, FacilityKind::LaunchSite))
+            .max_by(|a, b| {
+                let spaceport = |s: StateId| self.state(s).facilities.iter().any(|f| f.kind == FacilityKind::Spaceport && f.working());
+                spaceport(*a).cmp(&spaceport(*b)).then(self.state(*a).population.partial_cmp(&self.state(*b).population).unwrap_or(std::cmp::Ordering::Equal)).then(b.index().cmp(&a.index()))
+            })
+    }
+
+    /// Ticket #632: lift `people` to the stars from the seat's Launch Site, when the answer is given:
+    /// its Colony Ships at Earth first, then its stations over Earth. Returns the site, how many were
+    /// lifted and how many lost.
+    fn lift_to_the_stars(&mut self, seat: Seat, people: u32) -> Option<(StateId, u32, u32, u32)> {
+        let site = self.stars_site(seat)?;
+        let cap = self.colony_ship_capacity(seat);
+        let mut left = people;
+        let ships: Vec<ShipId> = self.ships.iter().filter(|s| s.seat == seat && s.kind == UnitKind::ColonyShip && s.at == ShipAt::Body(BodyId::Earth)).map(|s| s.id).collect();
+        for id in ships {
+            let Some(s) = self.ship_mut(id) else { continue };
+            let n = cap.saturating_sub(s.colonists).min(left);
+            if n > 0 {
+                // They know the neutral figure: a convoy's schooling is nobody's yet.
+                s.colonists_education = (s.colonists_education * s.colonists as f64 + n as f64) / (s.colonists + n) as f64;
+                s.colonists += n;
+                left -= n;
+            }
+        }
+        let stations: Vec<ColonyId> = self.colonies.iter().filter(|c| c.control.director() == Some(seat) && self.in_earth_orbit(c)).map(|c| c.id).collect();
+        for cid in stations {
+            let Some(c) = self.colony(cid) else { continue };
+            let n = self.habitat_room(c).saturating_sub(c.colonists).min(left);
+            if n > 0 {
+                self.settle_people(cid, n, 1.0);
+                left -= n;
+            }
+        }
+        let lifted = people - left;
+        self.war.stars_sent[seat.index()] += 1;
+        self.war.stars_lost[seat.index()] += left;
+        // A launch, as a lift is, and the Spaceport's (Q3); a lift of nobody is no launch (the review).
+        if lifted > 0 {
+            self.climate.launches_pending[seat.index()] += 1;
+        }
+        let paid = self.pay_spaceport(seat, site, lifted);
+        self.log(format!("The {} lifted {lifted} refugees to the stars from {}; {left} lost.", self.seat_name(seat), self.tables.state(site).name));
+        Some((site, lifted, left, paid))
+    }
+
+    /// Ticket #632: at the Resolution, the Unrest for those lost and the Report line, from the lift
+    /// made when the answer was given.
+    fn land_to_the_stars(&mut self, seat: Seat, unrest_per_lost: f64) {
+        let Some((site, lifted, left, paid)) = self.question.as_ref().and_then(|q| q.stars[seat.index()]) else { return };
+        // From the review: what the Spaceport paid, on the line, as an ordinary lift says it.
+        let spaceport = if paid > 0 { self.phrase("spaceport_pays", &[("n", paid.to_string())]) } else { String::new() };
+        if left > 0 {
+            self.card_unrest(site, unrest_per_lost * left as f64);
+        }
+        let (faction, state) = (self.seat_name(seat), self.tables.state(site).name.clone());
+        let text = if left == 0 {
+            self.say("stars_lifted", &[("faction", faction), ("n", lifted.to_string()), ("state", state), ("spaceport", spaceport)])
+        } else {
+            self.say("stars_lost", &[("faction", faction), ("n", lifted.to_string()), ("lost", left.to_string()), ("state", state), ("unrest", figure(unrest_per_lost * left as f64)), ("spaceport", spaceport)])
+        };
+        self.report_line_of(seat, LineKind::YourWorks, LineKind::Card, None, text);
     }
 
     /// Ticket #337 R4: whether the card's rule holds on this seat's board. The predicates are the
@@ -206,6 +333,7 @@ impl Game {
             CardRule::BlameAtLeast { blame } => self.blame(seat) >= *blame,
             CardRule::LandingUnderWay => self.ships.iter().any(|s| s.seat == seat && matches!(s.at, ShipAt::Transit { .. })),
             CardRule::NoLandingUnderWay => !self.ships.iter().any(|s| s.seat == seat && matches!(s.at, ShipAt::Transit { .. })),
+            CardRule::StarsRoomAtLeast { people } => self.stars_room(seat) >= *people,
         }
     }
 
@@ -214,12 +342,8 @@ impl Game {
     /// Ticket #337: the effects of the side this seat answered with, or nothing.
     pub fn card_effects(&self, seat: Seat) -> &[CardEffect] {
         let Some(q) = self.question.as_ref() else { return &[] };
-        let taken = match q.answers[seat.index()] {
-            Some(CardAnswer::Taken) => true,
-            Some(CardAnswer::Refused) => false,
-            _ => return &[],
-        };
-        self.tables.event(q.card).choice.as_ref().map(|c| c.side(taken)).unwrap_or(&[])
+        let Some(answer) = q.answers[seat.index()] else { return &[] };
+        self.tables.event(q.card).choice.as_ref().map(|c| c.side_of(answer)).unwrap_or(&[])
     }
 
     /// Ticket #337: **whether this card has a question for this seat at all.** Each side reaches a
@@ -330,6 +454,8 @@ impl Game {
                 lacks(self.card_most_populous(seat).is_some(), "lack_populated_region", &[])
             }
             CardEffect::StandingAllHeld { .. } | CardEffect::UnrestAllHeld { .. } => lacks(!self.controlled_states(seat).is_empty(), "lack_region", &[]),
+            // Ticket #632 (version 0.1.0.6).
+            CardEffect::ToTheStars { .. } => lacks(self.stars_site(seat).is_some(), "lack_launch_site", &[]),
             CardEffect::UnrestAtBusiest { .. } | CardEffect::WidgetsNow { .. } => lacks(self.card_busiest(seat).is_some(), "lack_busy_region", &[]),
             CardEffect::HoldShips | CardEffect::HoldOneShip => lacks(self.ships.iter().any(|s| s.seat == seat), "lack_ship", &[]),
             CardEffect::DamageShips { in_orbit, .. } => lacks(
@@ -488,16 +614,17 @@ impl Game {
         let Some(choice) = self.tables.event(q.card).choice.clone() else { return };
         let name = self.tables.event(q.card).name.clone();
         for seat in Seat::ALL {
-            let taken = match q.answers[seat.index()] {
-                Some(CardAnswer::Taken) => true,
-                Some(CardAnswer::Refused) => false,
+            let answer = match q.answers[seat.index()] {
+                Some(a @ (CardAnswer::Taken | CardAnswer::Refused | CardAnswer::Third)) => a,
                 _ => continue,
             };
-            for e in choice.side(taken) {
-                self.apply_card_effect(seat, e);
-            }
-            let word = if taken { CardAnswer::Taken } else { CardAnswer::Refused }.word();
-            let text = self.say("card_answered", &[("card", name.clone()), ("faction", self.seat_name(seat)), ("answer", word.to_string())]);
+            // Ticket #632 (version 0.1.0.6): the third way named by its own button; and, from the
+            // review, the answer said before what it did.
+            let word = match (answer, choice.third.as_ref()) {
+                (CardAnswer::Third, Some(face)) => format!("chose: {face}"),
+                _ => answer.word().to_string(),
+            };
+            let text = self.say("card_answered", &[("card", name.clone()), ("faction", self.seat_name(seat)), ("answer", word)]);
             // Ticket #353 (version 0.09.1): a rival's answer is `LineKind::Card`, which has no
             // headline rank, where it was an Event line at rank 7 and headlined a quiet turn. The
             // interface filtered it out of `headline()` afterwards and got `None` back, so the
@@ -505,6 +632,9 @@ impl Game {
             // interface's guard is gone. The player's own answer stays under Your works, which never
             // headlined either; the four are drawn together in their own block below.
             self.report_line_of(seat, LineKind::YourWorks, LineKind::Card, None, text);
+            for e in choice.side_of(answer) {
+                self.apply_card_effect(seat, e);
+            }
         }
         // A seat that was never asked is named too, so the Report does not simply pass it over.
         // Ticket #388 (version 0.09.3): with the reason, and that neither side applied.
@@ -553,6 +683,7 @@ impl Game {
                     self.state_mut(sid).population += population;
                 }
             }
+            CardEffect::ToTheStars { unrest_per_lost, .. } => self.land_to_the_stars(seat, *unrest_per_lost),
             // The Methane Burst's own field: ppm charged at the next Climate phase, worldwide.
             CardEffect::EmissionsNext { ppm } => {
                 self.climate.card_emissions_next += ppm;

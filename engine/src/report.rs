@@ -521,6 +521,9 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     // Ticket #405 (version 0.09.4): the world under the Sink for the first time.
     ("under_the_sink_eases", &["ease", "custodians"]),
     ("disembarked", &["n", "colony"]),
+    // Ticket #632 (version 0.1.0.6).
+    ("stars_lifted", &["faction", "n", "state", "spaceport"]),
+    ("stars_lost", &["faction", "n", "lost", "state", "unrest", "spaceport"]),
     // Ticket #633 (version 0.1.0.6).
     ("first_born", &["faction", "colony", "n"]),
     // Ticket #631 (version 0.1.0.6).
@@ -658,6 +661,7 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("lack_facility", &["facility"]),
     ("lack_colony_module", &["module"]),
     ("lack_colony_room", &["module"]),
+    ("lack_launch_site", &[]),
     ("break_fired", &["temperature", "name", "happened", "text"]),
     ("break_coastal", &["states", "exposure", "percent", "unrest"]),
     ("break_baseline", &["state", "rise"]),
