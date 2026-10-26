@@ -741,6 +741,26 @@ fn build_board(session: &mut Session) {
             let fuel = g.tank_of(Seat(0), UnitKind::Frigate);
             g.ships.push(Ship { nuclear: false, fissionables: 0.0, id, name, kind: UnitKind::Frigate, seat: Seat(0), damage: 0, at: ShipAt::Body(body), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: g.turn, fuel, slot: None });
         }
+        // `tidy:<card>,<bar>,<clock>,<chip>` (a building aid, ticket #641, version 0.1.0.6): the
+        // card's and the bars' background greys, whether the time-of-day clock sits in the command cluster (1),
+        // and the Standing chip's corner radius (255 for the buttons' own), so each look can be
+        // photographed before the designer decides.
+        if let Some(v) = std::env::args().find_map(|a| a.strip_prefix("tidy:").map(str::to_owned)) {
+            use std::sync::atomic::Ordering::Relaxed;
+            let p: Vec<&str> = v.split(',').collect();
+            if let Some(n) = p.first().and_then(|s| s.parse().ok()) {
+                crate::ui::CARD_FILL.store(n, Relaxed);
+            }
+            if let Some(n) = p.get(1).and_then(|s| s.parse().ok()) {
+                crate::ui::BAR_FILL.store(n, Relaxed);
+            }
+            if let Some(n) = p.get(2) {
+                crate::ui::CLOCK_IN_CLUSTER.store(*n == "1", Relaxed);
+            }
+            if let Some(n) = p.get(3).and_then(|s| s.parse().ok()) {
+                crate::ui::CHIP_RADIUS.store(n, Relaxed);
+            }
+        }
         // `scrap:1` (a building aid, ticket #637, version 0.1.0.6): the playtest's case -- an empty
         // Colony Ship of seat 0's stranded in Mercury's low orbit with 0.6 Fuel, over a Colony of seat
         // 0's -- so its card (`stack:mercury ship:1`) carries the Scrap button.

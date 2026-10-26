@@ -8,6 +8,7 @@ use crate::scene::{Globe, MainCamera, SceneHandles, GLOBE_RADIUS};
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use bevy_egui::{egui, EguiContexts};
+use std::sync::atomic::{AtomicBool, AtomicU8, Ordering::Relaxed};
 // Ticket #337 (version 0.09.0): a Choice Card's two sides are lists of effects composed in the
 // table, and the modal that asks the card says what each side does, so the interface reads them.
 use dying_earth_engine::data::{CardEffect, CardThing};
@@ -2805,8 +2806,24 @@ fn bar_button(text: impl Into<String>) -> egui::Button<'static> {
 const BAR_BUTTON_TEXT: f32 = 15.0;
 const BAR_BUTTON_PADDING: egui::Vec2 = egui::vec2(10.0, 5.0);
 
+/// Ticket #641 (version 0.1.0.6): the window's look, chosen from pictures at the designer's word --
+/// the card's background grey and the bars' (41, half again the dark theme's 27: the 34 asked for
+/// did not register to the eye), the time-of-day clock in the command cluster rather than the top
+/// bar (the turn and the game's date stay in the bar), and the Standing chip a pill at radius 8
+/// (255 reads the buttons' own). The `tidy:` shot aid moves them
+/// for a picture; what stands here is the window.
+pub static CARD_FILL: AtomicU8 = AtomicU8::new(41);
+pub static BAR_FILL: AtomicU8 = AtomicU8::new(41);
+pub static CLOCK_IN_CLUSTER: AtomicBool = AtomicBool::new(true);
+pub static CHIP_RADIUS: AtomicU8 = AtomicU8::new(8);
+
+/// A panel's frame at one of the greys above.
+fn panel_frame(style: &egui::Style, grey: u8) -> egui::Frame {
+    egui::Frame::side_top_panel(style).fill(Color32::from_gray(grey))
+}
+
 fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, icons: &Icons, actions: &mut Vec<Action>) {
-    let bar = egui::Panel::top("top_bar").show(root, |ui| {
+    let bar = egui::Panel::top("top_bar").frame(panel_frame(root.style(), BAR_FILL.load(Relaxed))).show(root, |ui| {
         // Ticket #64: the spectator's bar names the table instead of a Faction of their own, and
         // says whose Stockpile the numbers beside it are.
         if session.spectator {
@@ -3127,9 +3144,12 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
             // Ticket #382 (version 0.09.2): the fund at a glance, to the right of the buttons.
             condensed_fund(ui, session, game, actions);
             // Ticket #466 (version 0.09.7): the time of day on this machine, at the row's right
-            // end, well clear of the in-game date on the row above. Its hover says how long this
-            // sitting has run.
+            // end; its hover says how long this sitting has run. Ticket #641 (version 0.1.0.6), at
+            // the designer's word: in the command cluster instead, beside End Turn, where it is
+            // never left out -- except for a spectator, who has no cluster (from the review) and
+            // keeps it here.
             let since = *view.played_since.get_or_insert_with(std::time::Instant::now);
+            if !CLOCK_IN_CLUSTER.load(Relaxed) || session.spectator {
             let clock = crate::saves::clock_text(std::time::SystemTime::now());
             let wide = ui.painter().layout_no_wrap(clock.clone(), egui::TextStyle::Body.resolve(ui.style()), Color32::GRAY).size().x;
             // Painted at the row's right edge rather than flowed: a wrapping row sends a widget it
@@ -3145,6 +3165,7 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
                 ui.interact(rect, ui.id().with("clock"), egui::Sense::hover()).on_hover_text(crate::saves::playing_text(since.elapsed()));
                 // The minute turns over whether or not the player touches anything.
                 ui.ctx().request_repaint_after(std::time::Duration::from_secs(5));
+            }
             }
         });
     });
@@ -4911,6 +4932,20 @@ fn command_cluster(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewS
                     }
                 }
             });
+            // Ticket #641 (version 0.1.0.6), at the designer's word -- "move the clock to the command
+            // cluster bottom just left of the end turn button": the time of day on this machine
+            // (ticket #466), on a row of its own under Max, pushed right, so it stands beside the
+            // sun; its hover still says how long this sitting has run. In the top bar it was left
+            // out whenever the button row was full, which at 1280 wide it usually was.
+            if CLOCK_IN_CLUSTER.load(Relaxed) {
+                let since = *view.played_since.get_or_insert_with(std::time::Instant::now);
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    ui.label(RichText::new(crate::saves::clock_text(std::time::SystemTime::now())).color(Color32::GRAY))
+                        .on_hover_text(crate::saves::playing_text(since.elapsed()));
+                });
+                // The minute turns over whether or not the player touches anything.
+                ui.ctx().request_repaint_after(std::time::Duration::from_secs(5));
+            }
         });
         // End Turn, where a hand already is. Ticket #128 (version 0.07.2): named for its key.
         // Ticket #294 (version 0.08.6): a sun, the words beneath it and the key on the hover, at the
@@ -5136,15 +5171,15 @@ fn side_panel(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     // table instead -- all four Factions' boards -- and whatever has been clicked opens on the
     // left, where nothing of the spectator's own has to share the room with it.
     if session.spectator {
-        egui::Panel::left("spectator_card").default_size(400.0).resizable(true).show(root, |ui| {
+        egui::Panel::left("spectator_card").default_size(400.0).resizable(true).frame(panel_frame(root.style(), CARD_FILL.load(Relaxed))).show(root, |ui| {
             egui::ScrollArea::vertical().show(ui, |ui| selection_card(ui, session, game, view, actions));
         });
-        egui::Panel::right("side").default_size(360.0).resizable(true).show(root, |ui| {
+        egui::Panel::right("side").default_size(360.0).resizable(true).frame(panel_frame(root.style(), CARD_FILL.load(Relaxed))).show(root, |ui| {
             egui::ScrollArea::vertical().show(ui, |ui| roster(ui, session, game, view));
         });
         return;
     }
-    egui::Panel::right("side").default_size(360.0).resizable(true).show(root, |ui| {
+    egui::Panel::right("side").default_size(360.0).resizable(true).frame(panel_frame(root.style(), CARD_FILL.load(Relaxed))).show(root, |ui| {
         // Ticket #114, kept by ticket #134 for Max: the standing order, applied here, once a turn,
         // before anything is drawn. It places an ordinary pending order rather than spending
         // anything, so the spend arrives in the turn's order list where it can be read and
@@ -5179,7 +5214,7 @@ fn side_panel(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
         // Ticket #114: the cluster is shown BEFORE the scrolling column, so it reserves its strip
         // at the foot of the panel and the card or the roster scrolls above it rather than pushing
         // it off the bottom. That is the whole point of a command cluster: it is always there.
-        egui::Panel::bottom("command_cluster").show(ui, |ui| command_cluster(ui, session, game, view, actions));
+        egui::Panel::bottom("command_cluster").frame(panel_frame(ui.style(), CARD_FILL.load(Relaxed))).show(ui, |ui| command_cluster(ui, session, game, view, actions));
         egui::ScrollArea::vertical().show(ui, |ui| {
             selection_card(ui, session, game, view, actions);
             if view.selection == Selection::None {
@@ -7453,7 +7488,18 @@ fn standings_row(ui: &mut Ui, game: &Game, session: &Session, target: Place) {
             if v <= 0 {
                 continue;
             }
-            let chip = ui.label(RichText::new(format!(" {} {} ", game.seat_name(s), v)).color(Color32::BLACK).background_color(seat_colour(session, s)));
+            // Ticket #641 (version 0.1.0.6): the chip is a frame of its own, so its corners can be
+            // rounded -- the designer: "round the edges" -- where a label's background is square.
+            let radius = match CHIP_RADIUS.load(Relaxed) {
+                255 => ui.visuals().widgets.inactive.corner_radius,
+                r => egui::CornerRadius::same(r),
+            };
+            let chip = egui::Frame::NONE
+                .fill(seat_colour(session, s))
+                .corner_radius(radius)
+                .inner_margin(egui::Margin::symmetric(4, 1))
+                .show(ui, |ui| ui.label(RichText::new(format!("{} {}", game.seat_name(s), v)).color(Color32::BLACK)))
+                .response;
             // Ticket #161 (version 0.07.5): a chip of its own says whose the Standing is and how far
             // it has to go, which the line's hover -- written for the player's own case -- cannot.
             // The designer asked that the player's own chip, on a place they hold, say instead what
@@ -11570,8 +11616,10 @@ fn condensed_fund(ui: &mut Ui, session: &Session, game: &Game, actions: &mut Vec
     }
     let me = Seat(0);
     // Ticket #466 (version 0.09.7): 120 until the clock took the row's right end; at half that, the
-    // fund and the clock both fit at 1280 wide. The full control, with its Withdraw, is unchanged.
-    const RAIL: f32 = 60.0;
+    // fund and the clock both fit at 1280 wide. Ticket #641 (version 0.1.0.6): 120 again, at the
+    // designer's word, the clock having left the row for the command cluster. The full control,
+    // with its Withdraw, is unchanged.
+    const RAIL: f32 = 120.0;
     let colour = seat_colour(session, me);
     match game.kind(me) {
         FactionKind::Archivists => {

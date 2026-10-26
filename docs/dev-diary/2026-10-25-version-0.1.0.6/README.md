@@ -579,3 +579,39 @@ every tile's edge did; at the designer's word it now brightens instead.
 ![The Arcology in a Colonial Capital's grid, beside its Modules](ticket-640/arcology-moon.png)
 
 **The sweep** ([`sweeps/ticket-640.txt`](sweeps/ticket-640.txt)) is identical to #639's.
+
+## The window lightened and tidied
+
+Ticket [#641](https://github.com/whaleyjoshua2/Dying-Earth/issues/641), spec §16, a prototype ticket.
+The card's grey is egui's own dark theme, 27, set nowhere in the tree; four knobs went in as statics
+a shot aid can move, and seven shots of China's card were composed into three sheets on the throwaway
+branch `prototype/641-window-look`: the backgrounds at 27, 34, 41 and card-only; the clock before
+and after; the chip square, at the buttons' radius and as a pill.
+
+![The four greys, side by side](ticket-641/backgrounds.png)
+![The chip three ways, magnified](ticket-641/chips.png)
+
+The designer took 41 (*"q1 c"*), the move, and the pill. The first build moved the wrong clock: the
+turn and date, which the ticket's draft had taken for "the clock", where the designer meant the time
+of day at the right of the button row (ticket #466) -- *"put the turn counter and game date back - I
+meant the actual real time clock showing what time it is"*. Put right: the turn and date are back in
+the bar, and the time of day sits beside End Turn, where it is never left out as it was in a full
+bar.
+
+![The clock, before and after](ticket-641/clock.png)
+![China's card in the chosen look](ticket-641/final-earth.png)
+
+The designer then asked for what the clock had cost: *"when we added the clock we shrunk the gauge
+for faction victory can we revert that"* -- the condensed fund's rail on the button row, 120 until
+ticket #466 halved it. It is 120 again, and fits with room beside it.
+
+![The top bar with the fund rail at 120 and the clock gone from the row](ticket-641/gauge.png)
+
+**The review** found a spectator would lose the clock altogether, having no command cluster; a
+spectator keeps it in the top bar -- where, photographed at 1280 wide, it is still beyond the edge:
+the spectator's bar overflows the window (*Earth 7.94B* cut at its right), as it did before this
+ticket. Left as found, and said to the designer. Two stale comments mended. Everything else -- the panel frame
+keeping its stroke and margins, every panel on the playing screen at 41, the chip's hover through
+its frame -- was checked against egui's source and found fine.
+
+**The sweep** ([`sweeps/ticket-641.txt`](sweeps/ticket-641.txt)) is identical to #640's.

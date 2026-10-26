@@ -547,3 +547,27 @@ The designer: *"Need art for colonial capital buildings"*.
 
 **Measured** ([`sweeps/ticket-640.txt`](../dev-diary/2026-10-25-version-0.1.0.6/sweeps/ticket-640.txt)):
 identical to §14's, figure for figure: the art changes what a player sees, not what any seat does.
+
+## 16. The window lightened and tidied
+
+Ticket: [The window lightened and tidied: card backgrounds, bars, the clock, the Standing highlight](https://github.com/whaleyjoshua2/Dying-Earth/issues/641).
+The designer: *"make the card backgrounds 25% lighter maybe the tool bars too let me see before I
+decide"*, *"move the clock to the command cluster bottom just left of the end turn button"*, *"when
+highlighting the standing on place cards can you round the edges"*.
+
+- **The backgrounds** (Q1 c). The card, the command cluster and the top bar at grey 41, from the
+  dark theme's 27: the 34 a quarter lighter would have given did not register to the eye on the
+  sheet, and 41, half again, is the smallest step that does. Windows and popups are untouched.
+- **The clock** (Q2). The time of day on this machine (ticket #466) sits at the foot of the command
+  cluster, right-aligned beside End Turn, its hover still the length of the sitting. In the top bar
+  it was left out whenever the button row was full, which at 1280 wide it usually was. The turn and
+  the game's date stay in the top bar: the first build moved those, and the designer said which
+  clock was meant.
+- **The Standing chip** (Q3). A pill, radius 8, where it was a square label background.
+- **The fund gauge**, at the designer's word: the condensed fund's rail on the button row is 120
+  pixels again, as before ticket #466 halved it to fit the clock beside it.
+- **A spectator** has no command cluster and keeps the time of day in the top bar (from the review).
+- The `tidy:<card>,<bar>,<clock>,<chip>` shot aid moves each for a picture.
+
+**Measured** ([`sweeps/ticket-641.txt`](../dev-diary/2026-10-25-version-0.1.0.6/sweeps/ticket-641.txt)):
+identical to §15's: the window changes what a player sees, not what any seat does.
