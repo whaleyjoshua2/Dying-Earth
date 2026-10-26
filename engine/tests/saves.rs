@@ -206,7 +206,7 @@ fn a_save_without_this_versions_fields_still_loads() {
     // contest, home and Collapse counters (#618, #619, #620), so a 0.1.0.4 save loads. A Battle
     // party's unit names (#614) default the same way, but a turn-four save holds no Battle to cut
     // them from.
-    for name in ["under_sink_eased", "opening_gap", "best_gap_closed", "best_run", "lead_windfall", "card_price_by", "by", "places", "colony_growth", "offline_cause", "produced_total", "opening_met_turn", "opening_run", "launch_site_owed", "archives_lost", "archive_fund_lost", "tier", "offers", "refusals", "greenwash_spent", "home_region", "ended_by", "refused_by", "replacing", "capital_buildings", "capital_built_now", "energy_by_place", "contests", "homes_lost", "homes_taken", "collapse_weighed", "nuclear", "nuclear_hulls_built", "fission_bought", "fission_sold"] {
+    for name in ["under_sink_eased", "opening_gap", "best_gap_closed", "best_run", "lead_windfall", "card_price_by", "by", "places", "colony_growth", "offline_cause", "produced_total", "opening_met_turn", "opening_run", "launch_site_owed", "archives_lost", "archive_fund_lost", "tier", "offers", "refusals", "greenwash_spent", "home_region", "ended_by", "refused_by", "replacing", "capital_buildings", "capital_built_now", "energy_by_place", "contests", "homes_lost", "homes_taken", "collapse_weighed", "nuclear", "nuclear_hulls_built", "fission_bought", "fission_sold", "routes", "ferried_to", "routes_set", "ferried", "ferry_trips"] {
         let before = older.len();
         older = cut(&older, name);
         assert!(older.len() < before, "{name} was in the save and is cut");
@@ -215,6 +215,25 @@ fn a_save_without_this_versions_fields_still_loads() {
     std::fs::write(&path, &older).unwrap();
     let loaded = save::load_from(&path, tables()).expect("a save without this version's fields loads");
     assert_eq!(loaded.turn, game.turn);
+}
+
+/// Ticket #631 (version 0.1.0.6): a ferry route travels with the save, its counts and its last
+/// wait named with it.
+#[test]
+fn a_ferry_route_is_saved_and_loaded() {
+    let dir = TempDir::new("ferry-route");
+    let mut game = played_to(5, 4);
+    let ship = ShipId(game.fresh_id());
+    let name = game.next_ship_name(UnitKind::ColonyShip);
+    game.ships.push(Ship { nuclear: false, fissionables: 0.0, id: ship, name, kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None });
+    let far = game.colonies[0].id;
+    let mut r = Route::new(ship, BodyId::Earth, None, far, true);
+    (r.waited, r.idle, r.said) = (2, 1, Some(RouteWait::Window));
+    game.routes.push(r.clone());
+    let path = dir.path().join("ferry.ron");
+    std::fs::write(&path, save::to_text(&game, SaveKind::Manual).unwrap()).unwrap();
+    let loaded = save::load_from(&path, tables()).expect("the save loads");
+    assert_eq!(loaded.routes, vec![r]);
 }
 
 /// Ticket #628 (version 0.1.0.6): a 0.1.0.5 save holds no Fissionables -- none in a Stockpile, none

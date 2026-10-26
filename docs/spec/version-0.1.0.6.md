@@ -13,17 +13,17 @@ pictures and sweeps that decided it are in
 **What the version is.** Version 0.1.0.5 with the designer's list of 2026-10-25. Its spine is a new
 resource, **Fissionables**, found off Earth and richest in the far worlds (§1), which a nuclear hull
 is built and flown with and a Warhead is loaded with (§2), and a new common Reactor burns, the
-Archivists' own building renamed the Accumulator (§3); and the computer is taught to chase them (§4).
+Archivists' own building renamed the Accumulator (§3); and the computer is taught to chase them (§4). Beside it, Colony Ships run standing ferry routes (§5).
 
 **What it did to the win column** (80 games, per Faction; every section's own sweep is in it):
 
-| | 0.1.0.5 | §1 Fissionables | §2 the nuclear hull | §3 the Reactor | §4 the chase | the ideal |
-|---|---|---|---|---|---|---|
-| Custodians | 18 | 23 | 19 | 28 | 22 | 15 |
-| Prospectors | 61 | 51 | 56 | 47 | 56 | 15 |
-| Arkwrights | 0 | 3 | 2 | 1 | 1 | 15 |
-| Archivists | 1 | 1 | 1 | 1 | 1 | 15 |
-| collapses | 0 | 2 | 2 | 3 | 0 | 20 |
+| | 0.1.0.5 | §1 Fissionables | §2 the nuclear hull | §3 the Reactor | §4 the chase | §5 ferry routes | the ideal |
+|---|---|---|---|---|---|---|---|
+| Custodians | 18 | 23 | 19 | 28 | 22 | 22 | 15 |
+| Prospectors | 61 | 51 | 56 | 47 | 56 | 55 | 15 |
+| Arkwrights | 0 | 3 | 2 | 1 | 1 | 2 | 15 |
+| Archivists | 1 | 1 | 1 | 1 | 1 | 1 | 15 |
+| collapses | 0 | 2 | 2 | 3 | 0 | 0 | 20 |
 
 ## 1. Fissionables, the seventh resource, and Deep Mining and Rich Seam moved
 
@@ -222,3 +222,55 @@ nuclear hull's second tank topped up, and half a Fissionable for each Missile Ca
 bought / sold: the Custodians 43 / 3,776, the Prospectors 110 / 1,144, the Arkwrights 39 / 45, the
 Archivists 2 / 25. Nuclear hulls: the Prospectors 210, the Custodians 164, the Arkwrights 19, the
 Archivists none. Reported, not tuned.
+
+## 5. Standing ferry routes for Colony Ships
+
+Ticket: [Standing ferry routes for Colony Ships](https://github.com/whaleyjoshua2/Dying-Earth/issues/631).
+
+A Colony Ship given a **ferry route** carries people from its home end to its far end and comes back,
+turn after turn (`engine/src/route.rs`).
+
+- **The ends** (Q1, Q4). The **home end** is the orbit the Ship stands in when the route is set:
+  over Earth, low orbit or a station's ring of the seat's own; elsewhere, an orbit that touches a
+  Colony or station of the seat's. The **far end** is a Colony or station of the seat's, picked on
+  the Ship card. A free slot is not a far end.
+- **Loading** (Q2, Q3). Over Earth it lifts Pioneers from every Region that reaches its orbit, the
+  most waiting first, until full. At a Colony or station it takes only the Colonists beyond one for
+  each Module built there, the Core included; a Module under way counts nothing.
+- **Leaving** (Q5). It leaves home full, or once it has waited `ferry.wait_turns` (3) turns with
+  anyone aboard.
+- **Unloading** (Q4). At the far end it puts down as many as there is room for. With people still
+  aboard and no room, it waits there.
+- **Refuelling** (Q6). At each end that is a depot it fills both tanks before it leaves, as an
+  ordinary Refuel.
+- **The window** (Q13, Q14). With **Wait for window**, ticked by default, a leg leaves only where its
+  Fuel is at most `ferry.window_slack` (0.25) over the window's. Each leg is judged on its own window,
+  and inside one system there is none.
+- **Never stranded** (Q8). Toward an end that fills no tank, it leaves only with the leg there and
+  the leg back aboard.
+- **The waits** (Q8). It waits where it is for nobody to load, no room, short of Fuel, or the window,
+  and the Report names each wait once to the player who runs it.
+- **The gate** (Q7). A route needs a depot at one end at least. With one depot alone the round trip
+  must fit the tank, and with the depot at the far end the first leg must fit the tank as it stands.
+  With both, one leg must fit. Each leg is priced on the turn it would leave.
+- **The card** (Q7). *Round trip 34.7 Fuel, tank 32; refuels at both ends; leaves in 5 turns*,
+  Fissionables beside it for a nuclear hull, and the reason in words where the route cannot be set.
+- **The orders** (Q9). Each turn's step is placed at the head of the turn as ordinary orders, as Max
+  places the Allotment; cancelling one skips that turn alone. **End route** ends it, and it ends when
+  an end or the Ship is lost.
+- **Showing it** (Q10). *Ferry: Earth ↔ Olympus Mons on Mars* on the card and the roster row (a routed
+  Ship wants no order of its own); a dashed line between the two Bodies in the solar view; *TSV
+  Endeavour ferried 4 Colonists to …* in the Report.
+- **The computer** (Q11, Q15, Q16). When it sends a full Colony Ship to a Colony or station of its own
+  it has delivered to before, it sets a route there, waiting for windows. From the review: not to a
+  ground Colony on a Body with a free slot, where the flight may be a founding, which stays with the
+  planner. It ends a route whose far end has had no room for `ferry_idle_turns` (3) turns. A routed
+  Ship is no runner in the planner's races.
+- **The text tool** (Q12). `route <ship> <colony> [now]` and `route <ship> off`; each turn's step is
+  placed after the player's own lines.
+- **The measure** (Q17). Routes set, Colonists ferried and deliveries, by seat.
+
+**Measured** ([`sweeps/ticket-631.txt`](../dev-diary/2026-10-25-version-0.1.0.6/sweeps/ticket-631.txt)):
+**22 / 55 / 2 / 1 and 0 collapses**, from §4's 22 / 56 / 1 / 1 and 0. Over the 80 games, routes set /
+Colonists ferried / deliveries: the Custodians 1 / 6 / 1, the Prospectors 8 / 29 / 5, the Arkwrights
+7 / 12 / 1, the Archivists 18 / 132 / 23. Reported, not tuned.

@@ -1245,6 +1245,10 @@ pub struct SeatState {
     /// save, the way the Venture share and the Archive's funding do.
     #[serde(default)]
     pub max_standing: Option<Target>,
+    /// Ticket #631 (version 0.1.0.6): the Colonies and stations of its own a Colony Ship of the
+    /// seat's has delivered people to, so a computer seat sends the next full Ship on a route.
+    #[serde(default)]
+    pub ferried_to: Vec<ColonyId>,
     /// Ticket #51: Provisional Findings is in force this turn, because last turn's Research went to
     /// the shared Tech. True at the start of the game.
     pub provisional_findings: bool,
@@ -1356,6 +1360,13 @@ pub struct WarCounters {
     pub fission_bought: [i64; SEAT_COUNT],
     #[serde(default)]
     pub fission_sold: [i64; SEAT_COUNT],
+    /// Ticket #631 (version 0.1.0.6): ferry routes set, Colonists ferried and deliveries, by seat.
+    #[serde(default)]
+    pub routes_set: [u32; SEAT_COUNT],
+    #[serde(default)]
+    pub ferried: [u32; SEAT_COUNT],
+    #[serde(default)]
+    pub ferry_trips: [u32; SEAT_COUNT],
     /// Ticket #300 (version 0.08.6): Armies landed from a Carrier at a Colony, by seat. Never
     /// counted before; the reviews measured no Army carried by anybody in eighty games.
     #[serde(default)]
@@ -1469,6 +1480,9 @@ impl WarCounters {
             self.nuclear_hulls_built[i] += o.nuclear_hulls_built[i];
             self.fission_bought[i] += o.fission_bought[i];
             self.fission_sold[i] += o.fission_sold[i];
+            self.routes_set[i] += o.routes_set[i];
+            self.ferried[i] += o.ferried[i];
+            self.ferry_trips[i] += o.ferry_trips[i];
             self.armies_landed[i] += o.armies_landed[i];
             self.interceptions[i] += o.interceptions[i];
             self.batteries_lost[i] += o.batteries_lost[i];
@@ -1899,6 +1913,8 @@ pub struct Game {
     pub accords: Vec<Accord>,
     /// Ticket #495 (version 0.09.9): the Accords offered and not yet answered.
     pub offers: Vec<Offer>,
+    /// Ticket #631 (version 0.1.0.6): the Colony Ships' standing ferry routes. In the save.
+    pub routes: Vec<crate::route::Route>,
     /// Ticket #519 (version 0.1.0.0): Armies abroad that changed hands with their Region, and the
     /// turn they did: a turn's grace from the rule that puts a rival's guest on Attack. In the save.
     pub armies_inherited: Vec<(ArmyId, u32)>,
@@ -2004,6 +2020,7 @@ impl Game {
             directive_last_income: 0,
             directive_remainder: 0.0,
             max_standing: None,
+            ferried_to: Vec::new(),
             provisional_findings: true,
             resettle_to: None,
             blame_emitted: 0.0,
@@ -2167,6 +2184,7 @@ impl Game {
             market: Market::default(),
             accords: Vec::new(),
             offers: Vec::new(),
+            routes: Vec::new(),
             armies_inherited: Vec::new(),
             refusals: Vec::new(),
             refused_trades: Vec::new(),

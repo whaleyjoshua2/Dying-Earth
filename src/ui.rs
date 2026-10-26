@@ -3680,6 +3680,14 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
             if let Some((at, text)) = window_line {
                 tags.fixed(label_on_screen(painter, at, &text, Color32::from_rgb(255, 220, 140), 13.0), None);
             }
+            // Ticket #631 (version 0.1.0.6), at the designer's word (Q10): each of the player's ferry
+            // routes, a dashed line between its two Bodies in the player's colour.
+            for r in game.routes.iter().filter(|r| game.ship(r.ship).is_some_and(|s| s.seat == Seat(0))) {
+                let Some(far) = game.colony(r.far).filter(|c| c.body != r.home) else { continue };
+                if let (Some(a), Some(b)) = (project(geo::solar_place(game, r.home)), project(geo::solar_place(game, far.body))) {
+                    painter.extend(egui::Shape::dashed_line(&[a, b], egui::Stroke::new(1.5, seat_colour(session, Seat(0)).gamma_multiply(0.7)), 6.0, 5.0));
+                }
+            }
             // Ticket #430 (version 0.09.5): a rival Ship in flight only with its books open.
             for s in game.ships.iter().filter(|s| !hidden_ship(game, s)) {
                 if let ShipAt::Transit { from, to, turns_left } = s.at {
@@ -5155,6 +5163,19 @@ fn side_panel(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
                 }
             }
         }
+        // Ticket #631 (version 0.1.0.6), at the designer's word: each ferry route's step, placed here
+        // once a turn as ordinary orders, as Max places the Allotment; a cancelled step skips that
+        // turn alone.
+        if !session.spectator && view.routes_placed != Some(game.turn) {
+            view.routes_placed = Some(game.turn);
+            let mut pend = session.pending.clone();
+            for r in game.routes.iter().filter(|r| game.ship(r.ship).is_some_and(|s| s.seat == Seat(0))) {
+                for o in game.route_step_with(Seat(0), r, &pend).orders {
+                    pend.push(o.clone());
+                    actions.push(Action::Place(o));
+                }
+            }
+        }
         // Ticket #114: the cluster is shown BEFORE the scrolling column, so it reserves its strip
         // at the foot of the panel and the card or the roster scrolls above it rather than pushing
         // it off the bottom. That is the whole point of a command cluster: it is always there.
@@ -5444,6 +5465,11 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, seat: Seat, marks: boo
             if let Some(words) = warhead_words(s) {
                 text.push_str(&format!(", {words}"));
             }
+            // Ticket #631 (version 0.1.0.6): and its ferry route, which places its orders itself.
+            if let Some(r) = game.route_of(s.id) {
+                text.push_str(&format!(", {}", game.route_text(r)));
+            }
+            let ordered = ordered || game.route_of(s.id).is_some();
             // Stranded is now per-SHIP rather than the old all-or-nothing warning on the stack,
             // which is strictly more accurate: one hull can be dry while another beside it is full.
             // Ticket #313 (version 0.08.7): the stance word in brackets, as an Army's row has it,
@@ -5491,7 +5517,16 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, seat: Seat, marks: boo
             // the Solar System Map labels the transit, which is the point of naming it in both.
             ships_rows.push(RosterRow {
                 kind: Kind::of_unit(s.kind),
-                text: format!("{}{} ({}) - in transit to {}, {} left", tag("Ship"), game.ship_name(s), s.kind.name().to_lowercase(), game.tables.body(to).name, counted(turns_left, "turn", "turns")),
+                text: format!(
+                    "{}{} ({}) - in transit to {}, {} left{}",
+                    tag("Ship"),
+                    game.ship_name(s),
+                    s.kind.name().to_lowercase(),
+                    game.tables.body(to).name,
+                    counted(turns_left, "turn", "turns"),
+                    // Ticket #631 (version 0.1.0.6): and its ferry route.
+                    game.route_of(s.id).map(|r| format!(", {}", game.route_text(r))).unwrap_or_default()
+                ),
                 tip: Some("A Ship in transit cannot be ordered and cannot be intercepted. It arrives at its Resolution, Holding, with whatever Fuel it has left.".to_string()),
                 mark: None,
                 // Ticket #374 (version 0.09.2): a Ship in flight has a card too, so the row opens it
@@ -5754,6 +5789,8 @@ fn order_text(game: &Game, earlier: &[Order], o: &Order) -> String {
         Order::BuildArchive { colony } => format!("Build the Archive at {}", game.place_name(Place::Colony(*colony))),
         Order::SetMaxStanding { target: Some(p) } => format!("Spend your whole Allotment on {}, every turn", game.place_name(*p)),
         Order::SetMaxStanding { target: None } => "Place your Influence by hand again".to_string(),
+        Order::SetRoute { route: Some(r), .. } => format!("Set {}", game.route_text(r).replacen("Ferry: ", "a ferry route: ", 1)),
+        Order::SetRoute { ship, route: None } => format!("End {}'s ferry route", game.ship(*ship).map(|s| game.ship_name(s)).unwrap_or_else(|| "a Ship".into())),
         Order::SetResearchDirective { percent: 0 } => "Pay all your Research into the shared Tech from the next Income".to_string(),
         Order::SetResearchDirective { percent } => format!("Direct {percent}% of your Research from the next Income"),
         // Ticket #73.
@@ -9599,12 +9636,120 @@ fn ship_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
     }
     move_dropdowns(ui, session, game, body, &[s], Some(s), view.stack_scroll, &format!("ship{}", s.id.0), actions);
     ship_cargo_block(ui, session, game, s, body, actions);
+    ship_ferry_block(ui, session, game, view, s, body, actions);
     if s.damage > 0 {
         ui.label(RichText::new("Repair").strong());
         cost_button(ui, game, &session.pending, Order::Repair { unit: UnitRef::Ship(s.id), points: s.damage }, "Repair fully", actions);
         cost_button(ui, game, &session.pending, Order::RepairWithDucats { unit: UnitRef::Ship(s.id), points: s.damage }, "Repair fully with Ducats", actions);
     }
     ship_weapons_block(ui, session, game, view, s, body, actions);
+}
+
+/// Ticket #631 (version 0.1.0.6), at the designer's word: **a Colony Ship's ferry route**. On a
+/// route, the route and its End button; otherwise the far end to pick, the Wait for window box, the
+/// round trip beside the button, and the button, greyed with the reason where it cannot be set.
+fn ship_ferry_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, s: &Ship, body: BodyId, actions: &mut Vec<Action>) {
+    if s.kind != UnitKind::ColonyShip {
+        return;
+    }
+    ui.label(RichText::new("Ferry").strong());
+    let ordered = session.pending.iter().find_map(|o| match o {
+        Order::SetRoute { ship, route } if *ship == s.id => Some(route.clone()),
+        _ => None,
+    });
+    match (ordered, game.route_of(s.id)) {
+        (Some(Some(r)), _) => {
+            ui.label(format!("{}, from End Turn.", game.route_text(&r)));
+            return;
+        }
+        (Some(None), _) => {
+            ui.label("Route ends at End Turn.");
+            return;
+        }
+        (None, Some(r)) => {
+            ui.horizontal_wrapped(|ui| {
+                ui.label(format!("{}; {}", game.route_text(r), depot_words(game.route_depots(Seat(0), r))));
+                if ui.button("End route").clicked() {
+                    actions.push(Action::Place(Order::SetRoute { ship: s.id, route: None }));
+                }
+            });
+            return;
+        }
+        (None, None) => {}
+    }
+    let orbit = game.ship_orbit(s);
+    let ends: Vec<ColonyId> = game.colonies.iter().filter(|c| c.control.director() == Some(Seat(0)) && !(c.body == body && game.colony_orbit(c) == orbit)).map(|c| c.id).collect();
+    let Some(first) = ends.first().copied() else {
+        ui.label(RichText::new("No Colony or station of yours to ferry to.").weak());
+        return;
+    };
+    // From the review: the picks are this Ship's, so they do not carry to the next card.
+    let picked = |view: &ViewState| view.ferry_far.filter(|(x, c)| *x == s.id && ends.contains(c)).map(|(_, c)| c).unwrap_or(first);
+    let far = picked(view);
+    let mut wait = !view.ferry_now.contains(&s.id);
+    ui.horizontal_wrapped(|ui| {
+        egui::ComboBox::from_id_salt(("ferry-far", s.id.0)).selected_text(game.place_name(Place::Colony(far))).show_ui(ui, |ui| {
+            for c in &ends {
+                if ui.selectable_label(*c == far, game.place_name(Place::Colony(*c))).clicked() {
+                    view.ferry_far = Some((s.id, *c));
+                }
+            }
+        });
+        if ui.checkbox(&mut wait, "Wait for window").changed() {
+            view.ferry_now.retain(|x| *x != s.id);
+            if !wait {
+                view.ferry_now.push(s.id);
+            }
+        }
+    });
+    let far = picked(view);
+    let refusal = game.route_refusal(Seat(0), s.id, far, wait);
+    ui.horizontal_wrapped(|ui| {
+        let resp = ui.add_enabled(refusal.is_none(), egui::Button::new("Set route"));
+        if resp.clicked() {
+            let r = Route::new(s.id, body, s.slot, far, wait);
+            let set = Order::SetRoute { ship: s.id, route: Some(r.clone()) };
+            let mut pend = session.pending.clone();
+            pend.push(set.clone());
+            actions.push(Action::Place(set));
+            for o in game.route_step_with(Seat(0), &r, &pend).orders {
+                pend.push(o.clone());
+                actions.push(Action::Place(o));
+            }
+        }
+        if let Some(q) = game.route_quote(Seat(0), s.id, far, wait) {
+            ui.label(ferry_quote_words(&q));
+        }
+    });
+    // From the review: the reason in words, not on a hover alone.
+    if let Some(why) = refusal {
+        ui.label(RichText::new(format!("{}.", capitalised(&why))).weak());
+    }
+}
+
+/// Ticket #631 (Q1), from the review: which ends fill the tank.
+fn depot_words((home, far): (bool, bool)) -> &'static str {
+    match (home, far) {
+        (true, true) => "refuels at both ends",
+        (true, false) => "refuels at home",
+        (false, true) => "refuels at the far end",
+        (false, false) => "refuels nowhere",
+    }
+}
+
+/// Ticket #631 (Q7): *round trip 22 Fuel, tank 32*, a nuclear hull's Fissionables, and when it
+/// leaves where it waits for a window.
+fn ferry_quote_words(q: &dying_earth_engine::RouteQuote) -> String {
+    let mut words = format!("Round trip {} Fuel, tank {}; {}", figure(q.fuel), figure(q.tank), depot_words((q.home_depot, q.far_depot)));
+    if q.fission_tank > 0.0 {
+        words.push_str(&format!("; {} Fissionables, tank {}", figure(q.fissionables), figure(q.fission_tank)));
+    }
+    match q.leaves_in {
+        Some(0) => {}
+        Some(n) => words.push_str(&format!("; leaves in {}", counted(n, "turn", "turns"))),
+        None => words.push_str("; no window within a cycle"),
+    }
+    words
 }
 
 /// Ticket #374: **an orbit named without its Body**, for a line inside that Body's drop-down, at

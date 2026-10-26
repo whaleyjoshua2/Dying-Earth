@@ -3245,7 +3245,21 @@ impl Game {
                                 }
                                 let line = format!("{} Colonists disembarked into {}.", n, self.place_name(Place::Colony(cid)));
                                 self.log(line);
-                                let text = self.say("disembarked", &[("n", crate::counted(n, "Colonist", "Colonists")), ("colony", self.place_name(Place::Colony(cid)))]);
+                                // Ticket #631 (version 0.1.0.6): a routed Ship's delivery is a ferry's, named by
+                                // the Ship, and counted; and any delivery is remembered by the seat.
+                                let (people, colony) = (crate::counted(n, "Colonist", "Colonists"), self.place_name(Place::Colony(cid)));
+                                let ferry = self.ship(ship).filter(|_| n > 0 && self.route_of(ship).is_some()).map(|s| self.ship_name(s));
+                                let text = match ferry {
+                                    Some(name) => {
+                                        self.war.ferried[seat.index()] += n;
+                                        self.war.ferry_trips[seat.index()] += 1;
+                                        self.say("ferried", &[("ship", name), ("n", people), ("colony", colony)])
+                                    }
+                                    None => self.say("disembarked", &[("n", people), ("colony", colony)]),
+                                };
+                                if n > 0 && !self.seat(seat).ferried_to.contains(&cid) {
+                                    self.seat_mut(seat).ferried_to.push(cid);
+                                }
                                 self.report_line_of(seat, LineKind::YourWorks, LineKind::Ship, Some(ReportPlace::Colony(cid)), text);
                                 // Ticket #353 (version 0.09.1): the FOURTH clamp site, which the
                                 // specification did not list -- unloading into a Colony that already

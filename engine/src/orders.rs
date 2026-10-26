@@ -207,6 +207,10 @@ pub enum Order {
     /// place as an ordinary order for the player to look at. (Version 0.07.1's Defence split, the
     /// standing order this replaces, lasted two versions.)
     SetMaxStanding { target: Option<Target> },
+    /// Ticket #631 (version 0.1.0.6), at the designer's word: set a Colony Ship's standing ferry
+    /// route from the orbit it stands in, or `None` end it. Free; the route places each turn's step
+    /// as ordinary orders.
+    SetRoute { ship: ShipId, route: Option<crate::route::Route> },
     /// Version 0.05.5 (ticket #73): muster Emigrants, the built Colonists, in a Nation State the
     /// seat directs: up to four a turn per Faction, in one state, at a tenth of a person each.
     BuildEmigrants { state: StateId, n: u32 },
@@ -1314,6 +1318,34 @@ impl Game {
                     && !self.directs(seat, *place)
                 {
                     return fail("Max repeats only on a place you hold");
+                }
+                Ok(cost)
+            }
+            Order::SetRoute { ship, route } => {
+                if pending.iter().any(|o| matches!(o, Order::SetRoute { ship: x, .. } if x == ship)) {
+                    return fail("this Ship's route is already set this turn");
+                }
+                match route {
+                    None => {
+                        if self.route_of(*ship).is_none() || self.ship(*ship).is_none_or(|s| s.seat != seat) {
+                            return fail("this Ship runs no route");
+                        }
+                    }
+                    Some(r) => {
+                        if r.ship != *ship {
+                            return fail("the route names another Ship");
+                        }
+                        let here = self.ship(*ship).and_then(|s| match s.at {
+                            ShipAt::Body(b) => Some((b, s.slot)),
+                            ShipAt::Transit { .. } => None,
+                        });
+                        if here.is_some() && here != Some((r.home, r.home_slot)) {
+                            return fail("a route starts from the orbit the Ship stands in");
+                        }
+                        if let Some(why) = self.route_refusal(seat, *ship, r.far, r.wait_window) {
+                            return fail(why);
+                        }
+                    }
                 }
                 Ok(cost)
             }
@@ -3319,6 +3351,20 @@ impl Game {
                     };
                     self.log(line);
                 }
+                Order::SetRoute { ship, route } => {
+                    self.routes.retain(|r| r.ship != *ship);
+                    let name = self.ship(*ship).map(|s| self.ship_name(s)).unwrap_or_default();
+                    match route {
+                        Some(r) => {
+                            let r = crate::route::Route::new(r.ship, r.home, r.home_slot, r.far, r.wait_window);
+                            let line = format!("{name}: {}.", self.route_text(&r));
+                            self.routes.push(r);
+                            self.war.routes_set[seat.index()] += 1;
+                            self.log(line);
+                        }
+                        None => self.log(format!("{name}: ferry route ended.")),
+                    }
+                }
                 Order::SetResearchDirective { percent } => {
                     self.seat_mut(seat).research_directive = *percent;
                     let line = if *percent == 0 {
@@ -3820,6 +3866,13 @@ impl Game {
                 Some(p) => r("max_on", &[("place", place(*p))]),
                 None => r("max_off", &[]),
             },
+            Order::SetRoute { ship, route } => {
+                let ship = self.ship(*ship).map(|s| self.ship_name(s)).unwrap_or_else(|| "a Colony Ship".into());
+                match route {
+                    Some(rt) => r("route_on", &[("ship", ship), ("colony", self.colony(rt.far).map(|c| place(Place::Colony(c.id))).unwrap_or_default())]),
+                    None => r("route_off", &[("ship", ship)]),
+                }
+            }
             Order::Repair { unit, .. } | Order::RepairWithDucats { unit, .. } => r("repair", &[("unit", unit_of(*unit))]),
             Order::Transit { ship, to, .. } => {
                 let unit = self.ship(*ship).map(|s| s.kind.name().to_string()).unwrap_or_else(|| "Ship".into());

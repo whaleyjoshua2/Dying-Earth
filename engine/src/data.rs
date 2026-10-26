@@ -1684,6 +1684,10 @@ pub struct AiThresholds {
     /// many turns of its running Reactors and two tanks.
     #[serde(default = "fission_keep_turns_default")]
     pub fission_keep_turns: f64,
+    /// Ticket #631 (version 0.1.0.6): a computer seat ends a ferry route whose far end has had no
+    /// room for this many turns.
+    #[serde(default = "ferry_idle_turns_default")]
+    pub ferry_idle_turns: u32,
     /// Ticket #336 (version 0.09.0): the price a rival's Colony is weighed against on the same
     /// list -- the weight is this over what the seat would pay, so the cheapest place ranks first.
     #[serde(default = "colony_price_pivot_default")]
@@ -2063,6 +2067,7 @@ struct UnitsFile {
     army: ArmyCard,
     nuke: NukeCard,
     nuclear_hull: NuclearHullCard,
+    ferry: FerryCard,
 }
 
 /// Ticket #343 (version 0.09.1): every figure a Launch reads (`units.toml`). They live in
@@ -2098,6 +2103,15 @@ pub struct NukeCard {
 #[derive(Debug, Clone, Deserialize)]
 pub struct NuclearHullCard {
     pub tank_share: f64,
+}
+
+/// Ticket #631 (version 0.1.0.6): a ferry route's two figures.
+#[derive(Debug, Clone, Deserialize)]
+pub struct FerryCard {
+    /// Turns a routed Colony Ship waits at home with anyone aboard before it leaves short of full.
+    pub wait_turns: u32,
+    /// How much dearer than on its window a leg may be and still leave, when it waits for one.
+    pub window_slack: f64,
 }
 
 /// Ticket #86 (version 0.06.0): a warming Earth fills the Colony Ships. `per_step` Colonists
@@ -2389,6 +2403,8 @@ pub struct Tables {
     pub nuke: NukeCard,
     /// Ticket #629 (version 0.1.0.6).
     pub nuclear_hull: NuclearHullCard,
+    /// Ticket #631 (version 0.1.0.6).
+    pub ferry: FerryCard,
     pub techs: Vec<TechCard>,
     pub events: EventsTable,
     pub factions: Vec<FactionCard>,
@@ -2548,6 +2564,7 @@ impl Tables {
             army: units.army,
             nuke: units.nuke,
             nuclear_hull: units.nuclear_hull,
+            ferry: units.ferry,
             techs: techs.tech,
             shortlist: techs.shortlist,
             events,
@@ -3336,6 +3353,10 @@ fn reactor_reserve_turns_default() -> f64 {
 
 fn fission_keep_turns_default() -> f64 {
     20.0
+}
+
+fn ferry_idle_turns_default() -> u32 {
+    3
 }
 
 

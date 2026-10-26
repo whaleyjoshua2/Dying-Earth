@@ -21086,7 +21086,9 @@ fn the_reports_templates_stay_under_their_word_ceiling() {
     // Ticket #615 (version 0.1.0.5): and by the 9 of an Occupation that halves the holder's Standing.
     // Ticket #622 (version 0.1.0.5): and by the 10 of a Strip Permit's growth and Relations clauses.
     // Ticket #630 (version 0.1.0.6): and by the 9 of a Reactor short of Fissionables.
-    assert!(words <= 1985, "the Report's templates hold {words} words; the ceiling is 1,985 (9 for Fissionables run short, 10 for a Strip Permit's clauses, 9 for an Occupation's holder, 15 for a rival on yours, 33 for a window and the head, 46 for an Accord's end, 9 for a place handed over twice, 9 for an Army inherited, 12 for an Accord broken, 15% off 2,031, 54 for the race to the Moon, 2 for a rival's upgrade, 8 for an Accord answered, less a word of slack, 17 for a Trade, 9 for a Capital refunded, 5 for an Accord let lapse, 7 for Terms added, 5 for a renewal)");
+    // Ticket #631 (version 0.1.0.6): and by the 39 of a ferry route's delivery, its four waits, its
+    // end, and a rival's route set and ended.
+    assert!(words <= 2024, "the Report's templates hold {words} words; the ceiling is 2,024 (39 for a ferry route, 9 for Fissionables run short, 10 for a Strip Permit's clauses, 9 for an Occupation's holder, 15 for a rival on yours, 33 for a window and the head, 46 for an Accord's end, 9 for a place handed over twice, 9 for an Army inherited, 12 for an Accord broken, 15% off 2,031, 54 for the race to the Moon, 2 for a rival's upgrade, 8 for an Accord answered, less a word of slack, 17 for a Trade, 9 for a Capital refunded, 5 for an Accord let lapse, 7 for Terms added, 5 for a renewal)");
     // "The" is gone before a Faction's name, which is drawn in its colour instead.
     assert!(!text.contains("he {faction}"), "a template still says \"the {{faction}}\"");
 }
@@ -26594,3 +26596,475 @@ fn ticket_643_a_partner_keeps_its_own_reserve() {
     g.seats[partner.index()].stockpile.fissionables = 10.0;
     assert!(g.trade_acceptable_at(partner, Seat(0), give, get, 1.0));
 }
+
+// ---------------------------------------------------------------- Ticket #631: ferry routes
+
+/// Ticket #631 (version 0.1.0.6): a Colony Ship in the ISS's ring over Earth, a depot, and a
+/// Colony of the seat's on the Moon with two Habitats and no Refinery, with Fuel in the Stockpile.
+fn ferry_board(g: &mut Game) -> (ShipId, u32, ColonyId) {
+    let iss = station_of(g, Seat(0), BodyId::Earth).unwrap();
+    let ring = g.colony(iss).unwrap().slot;
+    let ship = ship_in(g, Seat(0), UnitKind::ColonyShip, BodyId::Earth, Some(ring), Stance::Hold);
+    let moon = colony(g, Seat(0), BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Habitat], 0);
+    g.seats[0].stockpile.fuel = 200.0;
+    (ship, ring, moon)
+}
+
+/// The route a Ship would take from the orbit it stands in.
+fn route_from_here(g: &Game, ship: ShipId, far: ColonyId, wait_window: bool) -> Route {
+    let s = g.ship(ship).unwrap();
+    let ShipAt::Body(b) = s.at else { panic!("in transit") };
+    Route::new(ship, b, s.slot, far, wait_window)
+}
+
+fn transit_of(orders: &[Order], ship: ShipId) -> Option<(BodyId, Option<u32>)> {
+    orders.iter().find_map(|o| match o {
+        Order::Transit { ship: x, to, slot } if *x == ship => Some((*to, *slot)),
+        _ => None,
+    })
+}
+
+fn loads_of(orders: &[Order], ship: ShipId) -> Vec<(LoadSource, u32)> {
+    orders.iter().filter_map(|o| match o {
+        Order::Load { ship: x, colonists, from, .. } if *x == ship => Some((*from, *colonists)),
+        _ => None,
+    }).collect()
+}
+
+/// A second Region for the seat, beside its start.
+fn second_region(g: &mut Game, seat: Seat) -> StateId {
+    let mine = g.directed_states(seat);
+    let id = g.states.iter().map(|s| s.id).find(|id| !mine.contains(id) && g.state(*id).control == Control::Neutral).expect("a neutral Region");
+    g.state_mut(id).control = Control::Controlled(seat);
+    assert!(g.directed_states(seat).contains(&id));
+    id
+}
+
+/// Ticket #631, at the designer's word: three turns' wait with anyone aboard (Q5), a quarter over
+/// the window (Q13), and the computer's three turns with no room (Q15).
+#[test]
+fn ticket_631_the_ferry_figures_are_the_designers() {
+    let g = game();
+    assert_eq!(g.tables.ferry.wait_turns, 3);
+    assert_eq!(g.tables.ferry.window_slack, 0.25);
+    assert_eq!(g.tables.ai.thresholds.ferry_idle_turns, 3);
+}
+
+/// Ticket #631 (Q1, Q4, Q7): a route runs from the orbit the Ship stands in to a Colony or station
+/// of its own; it wants a depot at one end at least, and with one alone the round trip must fit the
+/// tank. The card's figure is the leg out and the leg back.
+#[test]
+fn ticket_631_a_route_wants_a_depot_at_one_end_and_a_round_trip_its_tank_holds() {
+    let mut g = game();
+    let (ship, ring, moon) = ferry_board(&mut g);
+    let q = g.route_quote(Seat(0), ship, moon, true).unwrap();
+    assert!(q.home_depot && !q.far_depot, "the ISS's ring fills a tank, the Moon without a Refinery none");
+    assert_eq!(q.leaves_in, Some(0), "no window inside the Earth system");
+    let (turns, out) = g.journey_cost_hull(Seat(0), g.port(BodyId::Earth, Orbit::Slot(ring)), Port::Body(BodyId::Moon), g.turn, false);
+    let (_, back) = g.journey_cost_hull(Seat(0), Port::Body(BodyId::Moon), g.port(BodyId::Earth, Orbit::Slot(ring)), g.turn + turns + 1, false);
+    assert!((q.fuel - (out + back)).abs() < 0.05, "round trip {} = {out} out + {back} back", q.fuel);
+    assert_eq!(q.tank, g.tank_of(Seat(0), UnitKind::ColonyShip));
+    assert_eq!(g.route_refusal(Seat(0), ship, moon, true), None);
+
+    // Low orbit over Earth fills no tank, nor does the Moon: refused, until the Moon has a Refinery.
+    let low = ship_in(&mut g, Seat(0), UnitKind::ColonyShip, BodyId::Earth, None, Stance::Hold);
+    let why = g.route_refusal(Seat(0), low, moon, true).expect("no depot at either end");
+    assert!(why.contains("depot"), "{why}");
+    g.colony_mut(moon).unwrap().modules.push(Module::new(ModuleKind::Refinery));
+    assert_eq!(g.route_refusal(Seat(0), low, moon, true), None, "the Moon's low orbit is a depot now");
+
+    // One depot and a round trip past the tank: to Mars, with no depot there, off its window.
+    let mars = colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat], 0);
+    let tr = &g.tables.transit;
+    let cycle = (tr.synodic_days / tr.days_per_turn).ceil() as u32;
+    g.turn = g.next_window_turn(1) + cycle / 2;
+    let q = g.route_quote(Seat(0), ship, mars, false).unwrap();
+    assert!(q.fuel > q.tank, "the board: round trip {} against a tank of {}", q.fuel, q.tank);
+    let why = g.route_refusal(Seat(0), ship, mars, false).expect("past the tank");
+    assert!(why.contains("round trip"), "{why}");
+
+    // Only a Colony Ship ferries; the far end is the seat's own; off Earth there must be something
+    // of its own to load from.
+    let frigate = ship_in(&mut g, Seat(0), UnitKind::Frigate, BodyId::Earth, Some(ring), Stance::Hold);
+    assert!(g.route_refusal(Seat(0), frigate, moon, true).unwrap().contains("Colony Ship"));
+    let theirs = colony(&mut g, Seat(1), BodyId::Moon, &[ModuleKind::Habitat], 0);
+    assert!(g.route_refusal(Seat(0), ship, theirs, true).unwrap().contains("yours"));
+    let away = ship_in(&mut g, Seat(0), UnitKind::ColonyShip, BodyId::Ceres, None, Stance::Hold);
+    assert!(g.route_refusal(Seat(0), away, moon, true).unwrap().contains("nothing to load"));
+
+    // The order: from the orbit the Ship stands in, and set once a turn.
+    let r = route_from_here(&g, ship, moon, true);
+    let set = Order::SetRoute { ship, route: Some(r.clone()) };
+    g.check_order(Seat(0), &[], &set).expect("the route stands");
+    assert!(g.check_order(Seat(0), std::slice::from_ref(&set), &set).is_err(), "once a turn");
+    let elsewhere = Order::SetRoute { ship, route: Some(Route::new(ship, BodyId::Earth, None, moon, true)) };
+    assert!(g.check_order(Seat(0), &[], &elsewhere).is_err(), "home is where it stands");
+    assert!(g.check_order(Seat(0), &[], &Order::SetRoute { ship, route: None }).is_err(), "nothing to end");
+    g.commit_orders(Seat(0), &[set]);
+    assert_eq!(g.route_of(ship), Some(&r));
+    assert_eq!(g.war.routes_set[0], 1);
+    g.check_order(Seat(0), &[], &Order::SetRoute { ship, route: None }).expect("an End route");
+    g.commit_orders(Seat(0), &[Order::SetRoute { ship, route: None }]);
+    assert_eq!(g.route_of(ship), None);
+}
+
+/// Ticket #631 (Q2, Q5): over Earth it lifts Pioneers from every Region that reaches its orbit, the
+/// most waiting first; it leaves when full, or once it has waited three turns with anyone aboard.
+#[test]
+fn ticket_631_over_earth_it_lifts_the_most_waiting_first_and_leaves_full_or_after_three_turns() {
+    let mut g = game();
+    let (_, _, moon) = ferry_board(&mut g);
+    g.colony_mut(moon).unwrap().modules.push(Module::new(ModuleKind::Refinery));
+    let ship = ship_in(&mut g, Seat(0), UnitKind::ColonyShip, BodyId::Earth, None, Stance::Hold);
+    let cap = g.colony_ship_capacity(Seat(0));
+    let a = StateId::EastAsia;
+    let b = second_region(&mut g, Seat(0));
+    for s in &mut g.states {
+        s.emigrants = 0;
+    }
+    g.state_mut(a).emigrants = 1;
+    g.state_mut(b).emigrants = cap + 2;
+    let r = route_from_here(&g, ship, moon, true);
+    let step = g.route_step_with(Seat(0), &r, &[]);
+    assert_eq!(loads_of(&step.orders, ship), vec![(LoadSource::State(b), cap)], "the larger muster, as far as it fills the hold");
+    assert_eq!(transit_of(&step.orders, ship), Some((BodyId::Moon, None)), "full, it leaves: {:?}", step.orders);
+    assert_eq!(step.wait, None);
+    assert!(!step.orders.iter().any(|o| matches!(o, Order::Refuel { .. })), "low orbit over Earth fills no tank");
+    if let Err((i, e)) = g.check_orders(Seat(0), &step.orders) {
+        panic!("the step is ordinary orders (order {i}): {}", e.0);
+    }
+
+    // Short of full it loads and waits; after three turns' wait it goes with what it has.
+    g.state_mut(b).emigrants = 1;
+    let step = g.route_step_with(Seat(0), &r, &[]);
+    assert_eq!(loads_of(&step.orders, ship).len(), 2, "both Regions: {:?}", step.orders);
+    assert_eq!(transit_of(&step.orders, ship), None, "two aboard of {cap}: it waits");
+    assert_eq!(step.wait, None, "filling is no wait the Report names");
+    let mut waited = r.clone();
+    waited.waited = 3;
+    assert!(transit_of(&g.route_step_with(Seat(0), &waited, &[]).orders, ship).is_some(), "three turns waited");
+    waited.waited = 2;
+    assert!(transit_of(&g.route_step_with(Seat(0), &waited, &[]).orders, ship).is_none(), "two are not three");
+
+    // Nobody to carry: it waits, and says so.
+    for s in &mut g.states {
+        s.emigrants = 0;
+    }
+    let step = g.route_step_with(Seat(0), &r, &[]);
+    assert!(step.orders.is_empty(), "{:?}", step.orders);
+    assert_eq!(step.wait, Some(RouteWait::Nobody));
+}
+
+/// Ticket #631, at the designer's word (Q3): from a Colony or station it takes only the Colonists
+/// beyond one for each Module built there, the Core included; a Module under way does not count.
+#[test]
+fn ticket_631_from_a_colony_it_leaves_one_colonist_for_each_module_built() {
+    let mut g = game();
+    let home = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Mine], 7);
+    let mars = colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Refinery], 0);
+    let ship = ship_in(&mut g, Seat(0), UnitKind::ColonyShip, BodyId::Moon, None, Stance::Hold);
+    let cap = g.colony_ship_capacity(Seat(0));
+    assert!(cap >= 4);
+    let r = route_from_here(&g, ship, mars, false);
+    assert_eq!(loads_of(&g.route_step_with(Seat(0), &r, &[]).orders, ship), vec![(LoadSource::Colony(home), 4)], "seven, less the Habitat, the Mine and the Core");
+    g.colony_mut(home).unwrap().colonists = 4;
+    g.colony_mut(home).unwrap().queue.push(Build { nuclear: false, fissionables: 0.0, item: BuildItem::Module(ModuleKind::Habitat), seat: Seat(0), widgets: 5, done: 0, coastal: false, fuel: 0.0 });
+    assert_eq!(loads_of(&g.route_step_with(Seat(0), &r, &[]).orders, ship), vec![(LoadSource::Colony(home), 1)], "a Habitat under way keeps nobody");
+    g.colony_mut(home).unwrap().colonists = 3;
+    assert_eq!(g.route_step_with(Seat(0), &r, &[]).wait, Some(RouteWait::Nobody));
+}
+
+/// Ticket #631 (Q4, Q6, Q8): at the far end it unloads what there is room for, and waits while
+/// there is none; empty, it refuels at a depot and flies home.
+#[test]
+fn ticket_631_at_the_far_end_it_unloads_what_there_is_room_for_and_goes_home_empty() {
+    let mut g = game();
+    let (_, ring, moon) = ferry_board(&mut g);
+    let runner = ship_in(&mut g, Seat(0), UnitKind::ColonyShip, BodyId::Earth, Some(ring), Stance::Hold);
+    let home = route_from_here(&g, runner, moon, true);
+    let ship = home.ship;
+    {
+        let s = g.ship_mut(ship).unwrap();
+        s.at = ShipAt::Body(BodyId::Moon);
+        s.slot = None;
+        s.colonists = 6;
+    }
+    let room = g.habitat_room(g.colony(moon).unwrap());
+    g.colony_mut(moon).unwrap().colonists = room - 2;
+    let step = g.route_step_with(Seat(0), &home, &[]);
+    assert!(step.orders.contains(&Order::Unload { ship, colonists: 2, army: false, into: UnloadTarget::Colony(moon) }), "{:?}", step.orders);
+    assert_eq!(transit_of(&step.orders, ship), None, "an unload is the turn's action");
+    g.colony_mut(moon).unwrap().colonists = room;
+    let step = g.route_step_with(Seat(0), &home, &[]);
+    assert!(step.orders.is_empty(), "{:?}", step.orders);
+    assert_eq!(step.wait, Some(RouteWait::NoRoom));
+
+    // Empty, at a far end that is a depot: it fills the tank and goes home to the ring.
+    g.colony_mut(moon).unwrap().modules.push(Module::new(ModuleKind::Refinery));
+    {
+        let s = g.ship_mut(ship).unwrap();
+        s.colonists = 0;
+        s.fuel = 5.0;
+    }
+    let step = g.route_step_with(Seat(0), &home, &[]);
+    assert!(step.orders.contains(&Order::Refuel { ship }), "{:?}", step.orders);
+    assert_eq!(transit_of(&step.orders, ship), Some((BodyId::Earth, Some(ring))));
+    if let Err((i, e)) = g.check_orders(Seat(0), &step.orders) {
+        panic!("the step is ordinary orders (order {i}): {}", e.0);
+    }
+}
+
+/// Ticket #631, at the designer's word (Q13, Q14): waiting for the window, a leg leaves only where it
+/// costs at most a quarter more than on its window, each leg on its own; the card says when.
+#[test]
+fn ticket_631_it_waits_for_each_legs_window_and_the_card_says_when_it_leaves() {
+    let mut g = game();
+    let (ship, ring, _) = ferry_board(&mut g);
+    let mars = colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Refinery], 0);
+    let cap = g.colony_ship_capacity(Seat(0));
+    g.ship_mut(ship).unwrap().colonists = cap;
+    let window = g.next_window_turn(1);
+    let tr = &g.tables.transit;
+    let cycle = (tr.synodic_days / tr.days_per_turn).ceil() as u32;
+    let (from, to) = (g.port(BodyId::Earth, Orbit::Slot(ring)), Port::Body(BodyId::Mars));
+    g.turn = window + cycle / 2;
+    assert!(!g.route_window_ok(from, to, g.turn), "half a cycle off the window");
+    let r = route_from_here(&g, ship, mars, true);
+    let step = g.route_step_with(Seat(0), &r, &[]);
+    assert_eq!(step.wait, Some(RouteWait::Window));
+    assert_eq!(transit_of(&step.orders, ship), None);
+    let n = g.route_leaves_in(from, to, g.turn).expect("within a cycle");
+    assert!(n > 0);
+    assert!(g.route_window_ok(from, to, g.turn + n) && !g.route_window_ok(from, to, g.turn + n - 1), "the first turn it may leave");
+    assert_eq!(g.route_quote(Seat(0), ship, mars, true).unwrap().leaves_in, Some(n));
+    // The slack: on the first turn it may leave the leg is within a quarter of the window's Fuel.
+    let at = |t: u32| g.journey_cost_hull(Seat(0), from, to, t, false).1;
+    assert!(at(g.turn + n) <= at(window + cycle) * 1.25 + 0.15, "{} against {}", at(g.turn + n), at(window + cycle));
+    // Not waiting, it does not wait for a window.
+    let mut now = r.clone();
+    now.wait_window = false;
+    assert_ne!(g.route_step_with(Seat(0), &now, &[]).wait, Some(RouteWait::Window));
+    // On the window it goes.
+    g.turn = window;
+    let step = g.route_step_with(Seat(0), &r, &[]);
+    assert_eq!(transit_of(&step.orders, ship), Some((BodyId::Mars, None)), "{:?} {:?}", step.orders, step.wait);
+    // The leg home has a window of its own: at Mars, empty, it waits on the return window.
+    {
+        let s = g.ship_mut(ship).unwrap();
+        s.at = ShipAt::Body(BodyId::Mars);
+        s.slot = None;
+        s.colonists = 0;
+    }
+    let back = (Port::Body(BodyId::Mars), from);
+    let off = (window..window + cycle).find(|t| !g.route_window_ok(back.0, back.1, *t)).unwrap();
+    let on = (window..window + cycle).find(|t| g.route_window_ok(back.0, back.1, *t)).unwrap();
+    g.turn = off;
+    assert_eq!(g.route_step_with(Seat(0), &r, &[]).wait, Some(RouteWait::Window));
+    g.turn = on;
+    assert_eq!(transit_of(&g.route_step_with(Seat(0), &r, &[]).orders, ship), Some((BodyId::Earth, Some(ring))));
+}
+
+/// Ticket #631 (Q8): it never strands itself -- toward an end that fills no tank it leaves only with
+/// the leg there and the leg back aboard, and with no depot here and no Fuel it waits.
+#[test]
+fn ticket_631_a_route_never_strands_its_ship() {
+    let mut g = game();
+    let (ship, ring, moon) = ferry_board(&mut g);
+    let cap = g.colony_ship_capacity(Seat(0));
+    g.seats[0].stockpile.fuel = 0.0;
+    let r = route_from_here(&g, ship, moon, true);
+    let (from, to) = (g.port(BodyId::Earth, Orbit::Slot(ring)), Port::Body(BodyId::Moon));
+    let (turns, out) = g.journey_cost_hull(Seat(0), from, to, g.turn, false);
+    let back = g.journey_cost_hull(Seat(0), to, from, g.turn + turns + 1, false).1;
+    {
+        let s = g.ship_mut(ship).unwrap();
+        s.colonists = cap;
+        s.fuel = out + back - 0.2;
+    }
+    let step = g.route_step_with(Seat(0), &r, &[]);
+    assert_eq!(step.wait, Some(RouteWait::Fuel), "the leg out, but not back: {:?}", step.orders);
+    assert_eq!(transit_of(&step.orders, ship), None);
+    g.ship_mut(ship).unwrap().fuel = out + back + 0.1;
+    assert!(transit_of(&g.route_step_with(Seat(0), &r, &[]).orders, ship).is_some());
+    // With Fuel in the Stockpile, the refuel at the ring pays the way.
+    g.ship_mut(ship).unwrap().fuel = 0.5;
+    g.seats[0].stockpile.fuel = 100.0;
+    let step = g.route_step_with(Seat(0), &r, &[]);
+    assert!(step.orders.contains(&Order::Refuel { ship }) && transit_of(&step.orders, ship).is_some(), "{:?}", step.orders);
+    // At the Moon, which fills no tank, with too little for the leg home: it waits.
+    {
+        let s = g.ship_mut(ship).unwrap();
+        s.at = ShipAt::Body(BodyId::Moon);
+        s.slot = None;
+        s.colonists = 0;
+        s.fuel = 0.1;
+    }
+    assert_eq!(g.route_step_with(Seat(0), &r, &[]).wait, Some(RouteWait::Fuel));
+}
+
+/// Ticket #631 (Q5, Q8, Q9): each turn's head counts the turns waited at home and names a wait in
+/// the Report once; a route ends when its far end is lost, and goes with its Ship.
+#[test]
+fn ticket_631_the_turns_head_counts_the_wait_says_it_once_and_ends_a_route_with_its_end() {
+    let mut g = game();
+    let (ship, _, moon) = ferry_board(&mut g);
+    for s in &mut g.states {
+        s.emigrants = 0;
+    }
+    let set = Order::SetRoute { ship, route: Some(route_from_here(&g, ship, moon, true)) };
+    g.commit_orders(Seat(0), &[set]);
+    let said = |g: &Game, words: &str| g.report.lines.iter().filter(|l| l.text.contains(words)).count();
+    g.tend_routes();
+    assert_eq!(said(&g, "nobody to carry"), 1, "{:?}", g.report.lines.iter().map(|l| &l.text).collect::<Vec<_>>());
+    g.tend_routes();
+    assert_eq!(said(&g, "nobody to carry"), 1, "said once");
+    g.ship_mut(ship).unwrap().colonists = 1;
+    g.tend_routes();
+    g.tend_routes();
+    assert_eq!(g.route_of(ship).unwrap().waited, 2, "two turns at home with one aboard");
+    g.ship_mut(ship).unwrap().at = ShipAt::Transit { from: BodyId::Earth, to: BodyId::Moon, turns_left: 1 };
+    g.tend_routes();
+    assert_eq!(g.route_of(ship).unwrap().waited, 0, "away from home the count starts again");
+    g.ship_mut(ship).unwrap().at = ShipAt::Body(BodyId::Earth);
+
+    // The far end lost: the route ends, and the Report says so.
+    g.colony_mut(moon).unwrap().control = Control::Controlled(Seat(1));
+    g.tend_routes();
+    assert_eq!(g.route_of(ship), None);
+    assert_eq!(said(&g, "ferry route ended"), 1);
+    // A route whose Ship is gone goes with it.
+    g.colony_mut(moon).unwrap().control = Control::Controlled(Seat(0));
+    g.routes.push(route_from_here(&g, ship, moon, true));
+    g.ships.retain(|s| s.id != ship);
+    g.tend_routes();
+    assert!(g.routes.is_empty());
+}
+
+/// Ticket #631 (Q10, Q17): a routed Ship's delivery is named in the Report as a ferry's and counted
+/// by seat, and the seat remembers the place it delivered to.
+#[test]
+fn ticket_631_a_delivery_is_named_and_counted() {
+    let mut g = game();
+    calm(&mut g);
+    pick_a_tech(&mut g);
+    answer_the_card(&mut g);
+    let (ship, _, moon) = ferry_board(&mut g);
+    let r = route_from_here(&g, ship, moon, true);
+    g.routes.push(r.clone());
+    {
+        let s = g.ship_mut(ship).unwrap();
+        s.at = ShipAt::Body(BodyId::Moon);
+        s.slot = None;
+        s.colonists = 4;
+    }
+    let step = g.route_step_with(Seat(0), &r, &[]);
+    g.end_turn([step.orders, Vec::new(), Vec::new(), Vec::new()]).expect("the turn ends");
+    assert_eq!(g.colony(moon).unwrap().colonists, 4);
+    assert_eq!((g.war.ferried[0], g.war.ferry_trips[0]), (4, 1));
+    assert!(g.report.lines.iter().any(|l| l.text.contains("ferried 4 Colonists to")), "{:?}", g.report.lines.iter().map(|l| &l.text).collect::<Vec<_>>());
+    assert!(g.seat(Seat(0)).ferried_to.contains(&moon));
+}
+
+/// Ticket #631, at the designer's word (Q15, Q16): a computer seat runs its routes as a player's
+/// would run, ends one whose far end has had no room for three turns, and sends a full Colony Ship
+/// for a place of its own it has delivered to before on a route there, waiting for windows.
+#[test]
+fn ticket_631_the_computer_runs_its_routes_ends_a_full_one_and_sets_one_on_a_repeat_delivery() {
+    let mut g = game();
+    let ai = Seat(1);
+    let moon = colony(&mut g, ai, BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Refinery], 0);
+    let ship = ship_in(&mut g, ai, UnitKind::ColonyShip, BodyId::Moon, None, Stance::Hold);
+    g.ship_mut(ship).unwrap().colonists = 4;
+    let mut r = Route::new(ship, BodyId::Earth, None, moon, true);
+    g.routes.push(r.clone());
+    let orders = g.ai_orders(ai);
+    assert!(orders.contains(&Order::Unload { ship, colonists: 4, army: false, into: UnloadTarget::Colony(moon) }), "{orders:?}");
+    r.idle = 3;
+    g.routes = vec![r];
+    let orders = g.ai_orders(ai);
+    assert!(orders.contains(&Order::SetRoute { ship, route: None }), "{orders:?}");
+    assert!(!orders.iter().any(|o| matches!(o, Order::Unload { ship: x, .. } if *x == ship)));
+
+    // The repeat delivery: full, leaving Earth for the Moon, where it has delivered before.
+    g.routes.clear();
+    let runner = ship_in(&mut g, ai, UnitKind::ColonyShip, BodyId::Earth, None, Stance::Hold);
+    g.ship_mut(runner).unwrap().colonists = g.colony_ship_capacity(ai);
+    let go = vec![Order::Transit { ship: runner, to: BodyId::Moon, slot: None }];
+    assert!(g.ai_routes_to_set(ai, &go).is_empty(), "never delivered there");
+    g.seat_mut(ai).ferried_to.push(moon);
+    // From the review: low orbit touches the free slots too, so while one is free the flight may be
+    // a founding, which stays the planner's.
+    assert!(g.ai_routes_to_set(ai, &go).is_empty(), "a slot is free on the Moon");
+    while !g.free_slots_on(BodyId::Moon).is_empty() {
+        colony(&mut g, Seat(2), BodyId::Moon, &[], 1);
+    }
+    let set = g.ai_routes_to_set(ai, &go);
+    assert_eq!(set, vec![(0, Order::SetRoute { ship: runner, route: Some(Route::new(runner, BodyId::Earth, None, moon, true)) })]);
+    g.ship_mut(runner).unwrap().colonists = 1;
+    assert!(g.ai_routes_to_set(ai, &go).is_empty(), "not full");
+}
+
+/// Ticket #631, found in the first picture: with a depot at both ends one leg must fit the tank, and
+/// a route that waits for the window is priced on it -- off the window this turn's Mars leg passes the
+/// tank, the window's does not.
+#[test]
+fn ticket_631_two_depots_are_priced_on_the_window_the_route_waits_for() {
+    let mut g = game();
+    let (ship, _, _) = ferry_board(&mut g);
+    let mars = colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Refinery], 0);
+    let tr = &g.tables.transit;
+    let cycle = (tr.synodic_days / tr.days_per_turn).ceil() as u32;
+    g.turn = g.next_window_turn(1) + cycle / 2;
+    let s = g.ship(ship).unwrap();
+    let now = g.transit_fuel(Seat(0), s, BodyId::Earth, BodyId::Mars, None);
+    assert!(now > g.tank_of(Seat(0), UnitKind::ColonyShip), "the board: this turn's leg {now} passes the tank");
+    assert_eq!(g.route_refusal(Seat(0), ship, mars, true), None, "waiting, it flies the window's leg");
+    let why = g.route_refusal(Seat(0), ship, mars, false).expect("not waiting, this turn's leg");
+    assert!(why.contains("a leg needs"), "{why}");
+}
+
+/// Ticket #631, from the review: over Earth a route's home is low orbit or a ring of the seat's own,
+/// and a route whose home ring is lost ends; with no depot at home the first leg flies on the tank as
+/// it stands; and an orbit change at one Body refuels first.
+#[test]
+fn ticket_631_the_home_end_is_the_seats_and_a_route_at_one_body_refuels() {
+    let mut g = game();
+    let (ship, ring, moon) = ferry_board(&mut g);
+    let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
+    g.colony_mut(moon).unwrap().modules.push(Module::new(ModuleKind::Refinery));
+    let theirs = station_of(&g, Seat(1), BodyId::Earth).expect("a rival station over Earth");
+    let rival_ring = g.colony(theirs).unwrap().slot;
+    let guest = ship_in(&mut g, Seat(0), UnitKind::ColonyShip, BodyId::Earth, Some(rival_ring), Stance::Hold);
+    assert!(g.route_refusal(Seat(0), guest, moon, true).unwrap().contains("must be yours"));
+    g.routes.push(route_from_here(&g, ship, moon, true));
+    g.colony_mut(iss).unwrap().control = Control::Controlled(Seat(1));
+    g.tend_routes();
+    assert_eq!(g.route_of(ship), None, "the ISS lost, the route ends");
+    let _ = ring;
+
+    // Low orbit over Earth fills no tank: the first leg is paid from what the tank holds.
+    let low = ship_in(&mut g, Seat(0), UnitKind::ColonyShip, BodyId::Earth, None, Stance::Hold);
+    g.ship_mut(low).unwrap().fuel = 1.0;
+    assert!(g.route_refusal(Seat(0), low, moon, true).unwrap().contains("first leg"));
+    g.ship_mut(low).unwrap().fuel = 30.0;
+    assert_eq!(g.route_refusal(Seat(0), low, moon, true), None);
+
+    // At one Body: a Mars Colony with a Refinery and a station of the seat's over Mars.
+    let ground = colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Refinery], 9);
+    let station = ColonyId(g.fresh_id());
+    g.colonies.push(Colony { id: station, body: BodyId::Mars, slot: 0, control: Control::Controlled(Seat(0)), modules: vec![Module::new(ModuleKind::Core), Module::new(ModuleKind::Habitat)], colonists: 0, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, tier: 0, in_orbit: true });
+    let hop = ship_in(&mut g, Seat(0), UnitKind::ColonyShip, BodyId::Mars, None, Stance::Hold);
+    let cap = g.colony_ship_capacity(Seat(0)).min(4);
+    {
+        let s = g.ship_mut(hop).unwrap();
+        s.fuel = 0.0;
+        s.colonists = cap;
+    }
+    g.seats[0].stockpile.fuel = 100.0;
+    let _ = ground;
+    let mut r = route_from_here(&g, hop, station, true);
+    r.waited = 3;
+    let step = g.route_step_with(Seat(0), &r, &[]);
+    assert!(step.orders.contains(&Order::Refuel { ship: hop }) && step.orders.contains(&Order::ChangeOrbit { ship: hop, slot: Some(0) }), "{:?} {:?}", step.orders, step.wait);
+}
+

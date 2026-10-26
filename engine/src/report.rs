@@ -513,6 +513,13 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     // Ticket #405 (version 0.09.4): the world under the Sink for the first time.
     ("under_the_sink_eases", &["ease", "custodians"]),
     ("disembarked", &["n", "colony"]),
+    // Ticket #631 (version 0.1.0.6).
+    ("ferried", &["ship", "n", "colony"]),
+    ("ferry_wait_nobody", &["ship", "colony"]),
+    ("ferry_wait_room", &["ship", "colony"]),
+    ("ferry_wait_fuel", &["ship", "colony"]),
+    ("ferry_wait_window", &["ship", "colony"]),
+    ("ferry_ended", &["ship", "place"]),
     ("station_built", &["faction", "station"]),
     ("accord_struck", &["faction"]),
     // Ticket #517 (version 0.1.0.0).
@@ -816,6 +823,8 @@ pub const RIVAL_ARGS: &[(&str, &[&str])] = &[
     ("unfund_archive", &[]),
     ("max_on", &["place"]),
     ("max_off", &[]),
+    ("route_on", &["ship", "colony"]),
+    ("route_off", &["ship"]),
     ("build_emigrants", &["n", "state"]),
     ("send_antarctica", &["n", "state"]),
     ("lift_station", &["n", "state", "station"]),

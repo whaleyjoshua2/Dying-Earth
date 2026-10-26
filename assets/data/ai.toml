@@ -603,6 +603,10 @@ reactor_reserve_turns = 10.0
 # Ducats allow and lifting a Mine on a Fissionables site while short; and it sells what it holds
 # beyond this many turns of its Reactors and two tanks.
 fission_keep_turns = 20.0
+# Ticket #631 (version 0.1.0.6), at the designer's word: a computer seat sends a full Colony Ship to a
+# place of its own it has delivered to before on a ferry route, and ends the route once the far end
+# has had no room for this many turns.
+ferry_idle_turns = 3
 # Ticket #336 (version 0.09.0): what a rival's Colony is worth on the same list, read as this price
 # divided by the price the seat would actually pay for it -- CHEAPEST FIRST, where the rule from
 # ticket #50 ranked by fewest Colonists and never read the threshold at all. Without this the

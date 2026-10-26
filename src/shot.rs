@@ -687,6 +687,29 @@ fn build_board(session: &mut Session) {
             g.seats[0].stockpile.fuel = 100.0;
             g.seats[0].stockpile.fissionables = tenth(g.seats[0].stockpile.fissionables + 5.0);
         }
+        // `ferry:pick` or `ferry:set` (a building aid, ticket #631, version 0.1.0.6): a full Colony
+        // Ship of seat 0's in its station's ring over Earth and a Colony of seat 0's on Mars with a
+        // Refinery, so the Ship card's Ferry block has a far end to pick (`pick`), or a route stands
+        // between them (`set`) for the card, the roster and the solar view's line. With
+        // `stack:earth ship:<n>` the card is open.
+        if let Some(mode) = std::env::args().find_map(|a| a.strip_prefix("ferry:").map(str::to_string)) {
+            // `ferry:moon` sets it to the Moon, with no window to wait for, so the turn's head places its step.
+            let body = if mode == "moon" { BodyId::Moon } else { BodyId::Mars };
+            let slot = g.free_slots_on(body)[0];
+            let cid = ColonyId(g.fresh_id());
+            let modules = [ModuleKind::Core, ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Refinery].map(Module::new).to_vec();
+            g.colonies.push(Colony { id: cid, body, slot, control: Control::Controlled(Seat(0)), modules, colonists: 4, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: g.turn, tier: 0, in_orbit: false });
+            if let Some(ring) = g.colonies.iter().find(|c| c.in_orbit && c.body == BodyId::Earth && c.control.director() == Some(Seat(0))).map(|c| c.slot) {
+                let id = ShipId(g.fresh_id());
+                let name = g.next_ship_name(UnitKind::ColonyShip);
+                let colonists = g.colony_ship_capacity(Seat(0));
+                g.ships.push(Ship { nuclear: false, fissionables: 0.0, id, name, kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: g.turn, fuel: g.tank_of(Seat(0), UnitKind::ColonyShip), slot: Some(ring) });
+                if mode != "pick" {
+                    g.routes.push(Route::new(id, BodyId::Earth, Some(ring), cid, true));
+                }
+            }
+            g.seats[0].stockpile.fuel = 100.0;
+        }
         // `drybar:1` (a building aid, ticket #346, version 0.09.1): **the board the Battle bar is
         // photographed on.** Seat 0 keeps a DRY Frigate -- 1 Fuel, under the 2 a Battle charges --
         // and a full Battleship in the SAME orbit over Mars, so one picture carries both readings

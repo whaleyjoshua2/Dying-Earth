@@ -1627,7 +1627,8 @@ impl Game {
         // computer's first Moon landing came at median turn 15 to 32 against the human's 6 to 10;
         // a race for any unclaimed Body sent the first Ships past the Moon (see `best_body_for`).
         let moon_race = {
-            let has_colony_ship = self.ships.iter().any(|s| s.seat == seat && s.kind == UnitKind::ColonyShip) || self.queues_of(seat).any(|b| b.item == BuildItem::Unit(UnitKind::ColonyShip));
+            // Ticket #631 (version 0.1.0.6), from the review: a Colony Ship on a ferry route is busy.
+            let has_colony_ship = self.ships.iter().any(|s| s.seat == seat && s.kind == UnitKind::ColonyShip && self.route_of(s.id).is_none()) || self.queues_of(seat).any(|b| b.item == BuildItem::Unit(UnitKind::ColonyShip));
             let unclaimed = self.first_at(BodyId::Moon).is_none() && !self.free_slots_on(BodyId::Moon).is_empty();
             if !has_colony_ship && unclaimed { th.moon_race_weight } else { 1.0 }
         };
@@ -1636,7 +1637,7 @@ impl Game {
         // Mars, or on order, is the seat's runner already.
         let mars_race = {
             // The review: one flying home to Earth is the runner too, a turn from free.
-            let runner = self.ships.iter().any(|s| s.seat == seat && s.kind == UnitKind::ColonyShip && !matches!(s.at, ShipAt::Transit { to, .. } if to != BodyId::Mars && to != BodyId::Earth))
+            let runner = self.ships.iter().any(|s| s.seat == seat && s.kind == UnitKind::ColonyShip && self.route_of(s.id).is_none() && !matches!(s.at, ShipAt::Transit { to, .. } if to != BodyId::Mars && to != BodyId::Earth))
                 || self.queues_of(seat).any(|b| b.item == BuildItem::Unit(UnitKind::ColonyShip));
             if self.mars_race_open() && !runner { th.mars_race_weight.max(1.0) } else { 1.0 }
         };
@@ -3591,7 +3592,8 @@ impl Game {
         }
 
         // --- Ships: load, unload, found, transit
-        let ships: Vec<Ship> = self.ships.iter().filter(|s| s.seat == seat && matches!(s.at, ShipAt::Body(_)) && !s.arrived_this_turn).cloned().collect();
+        // Ticket #631 (version 0.1.0.6): a Ship on a ferry route is the route's, not the planner's.
+        let ships: Vec<Ship> = self.ships.iter().filter(|s| s.seat == seat && matches!(s.at, ShipAt::Body(_)) && !s.arrived_this_turn && self.route_of(s.id).is_none()).cloned().collect();
         for s in &ships {
             let ShipAt::Body(body) = s.at else { continue };
             let card = self.tables.unit(s.kind);
@@ -4364,6 +4366,25 @@ impl Game {
                 chosen.push(buy);
             }
         }
+        // Ticket #631 (version 0.1.0.6), at the designer's word (Q15): its ferry routes run next,
+        // each turn's step placed as a player's is; a route whose far end has had no room for
+        // `ferry_idle_turns` turns is ended, and the Ship goes back to the planner next turn.
+        let routes: Vec<crate::route::Route> = self.routes.iter().filter(|r| self.ship(r.ship).is_some_and(|s| s.seat == seat)).cloned().collect();
+        for r in routes {
+            if r.idle >= self.tables.ai.thresholds.ferry_idle_turns {
+                let end = Order::SetRoute { ship: r.ship, route: None };
+                if self.check_order(seat, &chosen, &end).is_ok() {
+                    lines.push(format!("  take          end the ferry route of {}", self.ship(r.ship).map(|s| self.ship_name(s)).unwrap_or_default()));
+                    chosen.push(end);
+                }
+                continue;
+            }
+            for o in self.route_step_with(seat, &r, &chosen).orders {
+                if self.check_order(seat, &chosen, &o).is_ok() {
+                    chosen.push(o);
+                }
+            }
+        }
         // Saving: once a legal, higher-scored action is out of reach now but within four more turns
         // of Materials income, Materials are held for it rather than spent on lower-scored actions
         // (ticket #56: one turn let a Factory bought every turn starve the Colony Ship for good).
@@ -4645,9 +4666,45 @@ impl Game {
             }
         }
         self.war.contests[seat.index()] += contested.len() as u32;
+        // Ticket #631 (version 0.1.0.6), at the designer's word (Q15): a full Colony Ship sent to a
+        // place of its own it has delivered to before goes on a route there, waiting for windows.
+        for (i, o) in self.ai_routes_to_set(seat, &chosen).into_iter().rev() {
+            chosen.insert(i, o);
+        }
         // Ticket #58: the scored list is the AI's own head, so it stays in the log. What the Report
         // shows is built from the orders this seat actually commits, in `end_turn`.
         chosen
+    }
+
+    /// Ticket #631 (Q15): the routes a computer seat sets from its chosen orders, each with the
+    /// place in the list it goes, before the Ship's flight: a Colony Ship of its own with no route,
+    /// leaving full for a Body where a Colony or station of its own it has delivered to before has
+    /// room and stands in the orbit the flight names. Founding stays with the planner.
+    pub fn ai_routes_to_set(&self, seat: Seat, chosen: &[Order]) -> Vec<(usize, Order)> {
+        let mut out = Vec::new();
+        for (i, o) in chosen.iter().enumerate() {
+            let Order::Transit { ship, to, slot } = o else { continue };
+            let Some(s) = self.ship(*ship).filter(|s| s.seat == seat && s.kind == UnitKind::ColonyShip && self.route_of(s.id).is_none()) else { continue };
+            let ShipAt::Body(body) = s.at else { continue };
+            let loading: u32 = chosen.iter().filter_map(|o| match o {
+                Order::Load { ship: x, colonists, .. } if x == ship => Some(*colonists),
+                _ => None,
+            }).sum();
+            if s.colonists + loading < self.colony_ship_capacity(seat) {
+                continue;
+            }
+            // From the review: low orbit touches every ground Colony on the Body and every free slot,
+            // so while a slot is free the flight may be a founding, and founding is the planner's.
+            let far = self.seat(seat).ferried_to.iter().filter_map(|c| self.colony(*c)).find(|c| {
+                c.body == *to && self.colony_orbit(c) == Orbit::of(*slot) && c.control.director() == Some(seat) && self.habitat_room(c) > c.colonists && (c.in_orbit || self.free_slots_on(c.body).is_empty())
+            });
+            let Some(far) = far else { continue };
+            if self.route_refusal(seat, s.id, far.id, true).is_some() {
+                continue;
+            }
+            out.push((i, Order::SetRoute { ship: s.id, route: Some(crate::route::Route::new(s.id, body, s.slot, far.id, true)) }));
+        }
+        out
     }
 
     /// Ticket #517 (version 0.1.0.0): the Faction this seat holds non-aggression with that this order

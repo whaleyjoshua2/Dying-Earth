@@ -244,3 +244,11 @@ fissionables = 0.5
 # never the Battle's charge; Refuel fills both. Only a nuclear hull takes Nuclear Rockets' x0.8.
 [nuclear_hull]
 tank_share = 0.1
+
+# Ticket #631 (version 0.1.0.6), at the designer's word: a Colony Ship's standing FERRY ROUTE. It
+# leaves home full, or with anyone aboard once it has waited `wait_turns` ("leaves when full, or
+# after waiting three turns with anyone aboard"); and when it waits for the window it leaves only
+# where the leg costs at most `window_slack` more Fuel than on the window ("at most a quarter more").
+[ferry]
+wait_turns = 3
+window_slack = 0.25

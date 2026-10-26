@@ -512,6 +512,12 @@ pub struct ViewState {
     /// Ticket #114 (version 0.07.1), Max since ticket #134: the last turn the standing order was placed, so it is
     /// placed once a turn and not once a frame.
     pub max_placed: Option<u32>,
+    /// Ticket #631 (version 0.1.0.6): the last turn the ferry routes' steps were placed, once a
+    /// turn as Max's; and the Ship card's picks for a route not yet set.
+    pub routes_placed: Option<u32>,
+    pub ferry_far: Option<(ShipId, ColonyId)>,
+    /// The Ships whose Wait for window box is unticked; ticked by default.
+    pub ferry_now: Vec<ShipId>,
     /// Ticket #569 (version 0.1.0.3): the place and amount whose Influence button has been clicked
     /// once where the spend would break an Accord; the second click places the order with the break
     /// meant. The review: keyed on the amount too, and disarmed by any click elsewhere and by End
@@ -575,6 +581,9 @@ impl Default for ViewState {
             force_hover: None,
             card_aside: false,
             max_placed: None,
+            routes_placed: None,
+            ferry_far: None,
+            ferry_now: Vec::new(),
             accord_break_armed: None,
             hotkey: None,
             start_hover: None,

@@ -266,6 +266,9 @@ pub struct SavedGame {
     /// Ticket #495 (version 0.09.9): the offers waiting on an answer, and refusals remembered.
     #[serde(default)]
     pub offers: Vec<crate::state::Offer>,
+    /// Ticket #631 (version 0.1.0.6): the ferry routes.
+    #[serde(default)]
+    pub routes: Vec<crate::route::Route>,
     #[serde(default)]
     pub refusals: Vec<crate::state::Refusal>,
     /// Ticket #572 (version 0.1.0.3): the last Trade refused per pair, by its goods.
@@ -363,6 +366,7 @@ impl SavedGame {
             market,
             accords,
             offers,
+            routes,
             refusals,
             refused_trades,
             armies_inherited,
@@ -407,6 +411,7 @@ impl SavedGame {
             market: market.clone(),
             accords: accords.clone(),
             offers: offers.clone(),
+            routes: routes.clone(),
             refusals: refusals.clone(),
             refused_trades: refused_trades.clone(),
             armies_inherited: armies_inherited.clone(),
@@ -467,6 +472,7 @@ impl SavedGame {
             market: self.market,
             accords: self.accords,
             offers: self.offers,
+            routes: self.routes,
             refusals: self.refusals,
             refused_trades: self.refused_trades,
             armies_inherited: self.armies_inherited,

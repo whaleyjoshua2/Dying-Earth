@@ -212,3 +212,49 @@ from the Reactor's 28 / 47 / 1 / 1 and 3. By Faction, over the 80 games:
 The Custodians mine the most and sell most of it; the Prospectors build the most nuclear hulls (181 to
 210 once the keep stopped selling their savings) and won nine more. The Archivists stand one Reactor in
 eighty games. Reported, not tuned.
+
+## Standing ferry routes
+
+Ticket [#631](https://github.com/whaleyjoshua2/Dying-Earth/issues/631), spec §5. The designer: *"Standing
+ferry routes for colony ships that return to a specified orbit - takes its people and return. should
+include auto refuel and button to enable should give a indication of round trip fuel requirements"*.
+
+Decided in three rounds. The designer loosened what a Colony keeps from its Habitats' room to one
+Colonist per Module built, added waiting for a window, and gave the computer routes.
+
+**Built test first**, then each rule broken on purpose to watch its test fail: eleven at the build and
+four from the review. One test caught a real fault on its first run: a Ship in flight kept its count
+of turns waited at home.
+
+**The first picture** caught the gate pricing a Mars route at this turn's leg, 43.2 Fuel against a
+tank of 32, when it waits for a window whose leg fits: **Set route** was greyed. Each leg is priced on
+the turn it would leave now, with a test that is red on the old pricing. The route's arrow, ⇄, drew
+as an empty box; ↔ draws.
+
+![The Ship card's Ferry block](ticket-631/card-earth.png)
+![A route standing](ticket-631/route-earth.png)
+![The route in the solar view](ticket-631/route-solar.png)
+![The roster row and the step placed at the turn's head](ticket-631/roster-earth.png)
+
+**The review** found six things. The computer would have turned a flight meant to found a second ground
+Colony into a route to the first, since low orbit touches both. The card never said which end refuels.
+An Earth home ring lost to a rival never ended the route, and a route could be set from a rival's
+ring. A route between two orbits of one Body neither refuelled nor checked it could get back. A routed
+Ship still counted as the planner's runner. A home with no depot passed the gate on a tank that could
+not fly the first leg. Each is mended, the four in the engine with tests that went red first. Of the
+minor points: a delivery of nobody is no ferry's; a flight refused for another reason is no Fuel wait;
+the turn's head places nothing for a spectator; the reason a route cannot be set is in words; and the
+card's picks belong to one Ship.
+
+**The sweep** ([`sweeps/ticket-631.txt`](sweeps/ticket-631.txt)): **22 / 55 / 2 / 1 and 0 collapses**,
+from 22 / 56 / 1 / 1 and 0. By Faction, over the 80 games:
+
+| | Routes set | Colonists ferried | Deliveries | Materials | Fuel | Energy | Ducats | Research | Fissionables |
+|---|---|---|---|---|---|---|---|---|---|
+| Custodians | 1 | 6 | 1 | 2,217 | 633 | 989 | 1,071 | 1,056 | 97.6 |
+| Prospectors | 8 | 29 | 5 | 2,187 | 507 | 864 | 1,606 | 343 | 55.8 |
+| Arkwrights | 7 | 12 | 1 | 732 | 159 | 186 | 2,771 | 299 | 6.7 |
+| Archivists | 18 | 132 | 23 | 400 | 244 | 40 | 504 | 701 | 2.0 |
+
+The six goods are each Faction's income a game, net of upkeep. The Archivists run the most routes;
+34 routes in 80 games is few, and why was not measured. Reported, not tuned.

@@ -19,6 +19,7 @@
 use dying_earth_engine::data::{default_data_dir, CardEffect, CardThing, Tables};
 use dying_earth_engine::ids::*;
 use dying_earth_engine::orders::{BuildingRef, LoadSource, Order, UnitRef, UnloadTarget};
+use dying_earth_engine::route::Route;
 use dying_earth_engine::save::{self, SaveKind};
 use dying_earth_engine::state::*;
 use std::path::{Path, PathBuf};
@@ -491,6 +492,12 @@ const GRAMMAR: &str = r#"ORDER LINES (one per line; `#` starts a comment; blank 
                                        another station's ring, refuels at nothing until it moves.
                                        FREE OF THE SHIP'S TURN: give the refuel first
                                        and the transit after it, in one turn; it fills before it goes.
+  route <ship> <colony> [now]          a Colony Ship's standing FERRY ROUTE from the orbit it stands in
+                                       to a Colony or station of yours: it loads, flies, unloads and
+                                       comes back, refuelling at each end that is a depot, and waits
+                                       for each leg's window unless `now`. Its step is placed for you
+                                       each turn after your own lines, which stand first.
+                                       `route <ship> off` ends it.
   load <ship> <n> from <place> [army <army>]
                                        FREE OF THE SHIP'S TURN: a load
                                        off any place, Region, Colony or station, stands beside the
@@ -809,6 +816,19 @@ fn parse_line(g: &Game, line: &str) -> Result<Line, String> {
             Order::ChangeOrbit { ship, slot: orbit_arg(g, body, at(2)?)? }
         }
         "refuel" => Order::Refuel { ship: ship_id(g, at(1)?)? },
+        // Ticket #631 (version 0.1.0.6): the ferry route, from the orbit the Ship stands in.
+        "route" => {
+            let ship = ship_id(g, at(1)?)?;
+            let word = at(2)?;
+            if word.eq_ignore_ascii_case("off") {
+                Order::SetRoute { ship, route: None }
+            } else {
+                let far = colony_id(g, word)?;
+                let s = g.ship(ship).ok_or("no such Ship")?;
+                let ShipAt::Body(home) = s.at else { return Err(format!("{} is in transit", g.ship_called(ship))) };
+                Order::SetRoute { ship, route: Some(Route::new(ship, home, s.slot, far, !at(3).is_ok_and(|w| w.eq_ignore_ascii_case("now")))) }
+            }
+        }
         // Ticket #328 (version 0.08.8), and ticket #335 (version 0.09.0) for the orbit: the
         // Battleship acts in the orbit it sits in, so the line names no orbit of its own.
         "bombard" => Order::Bombard { ship: ship_id(g, at(1)?)?, colony: colony_id(g, at(2)?)? },
@@ -1806,6 +1826,10 @@ fn print_board(g: &Game) {
             if !dry.is_empty() {
                 println!("         would arrive stranded at: {}", dry.join("; "));
             }
+            // Ticket #631 (version 0.1.0.6): its ferry route.
+            if let Some(r) = g.route_of(sh.id) {
+                println!("         {}{}", g.route_text(r), if r.wait_window { ", waiting for windows" } else { "" });
+            }
         }
     }
     for a in &g.armies {
@@ -2067,6 +2091,15 @@ fn main() {
                             bad += 1;
                         }
                     },
+                }
+            }
+            // Ticket #631 (version 0.1.0.6): each ferry route's step, placed after the lines as the
+            // window places it at the turn's head; a line given the Ship this turn stands first.
+            let routes: Vec<Route> = game.routes.iter().filter(|r| game.ship(r.ship).is_some_and(|s| s.seat == Seat(0))).cloned().collect();
+            for r in &routes {
+                for o in game.route_step_with(Seat(0), r, &kept).orders {
+                    println!("route of {}: {o:?}", game.ship_called(r.ship));
+                    kept.push(o);
                 }
             }
             let (left, influence) = game.remaining(Seat(0), &kept);
