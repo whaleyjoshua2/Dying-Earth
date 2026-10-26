@@ -193,6 +193,8 @@ impl Game {
                 BuildingRef::Facility(s, _) => ReportPlace::State(*s),
                 BuildingRef::Module(c, _) => ReportPlace::Colony(*c),
             }),
+            // Ticket #637 (version 0.1.0.6), from the review: seen where the Colony is.
+            Order::Scrap { colony, .. } => Some(ReportPlace::Colony(*colony)),
             _ => None,
         }
     }

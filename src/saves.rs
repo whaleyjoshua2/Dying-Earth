@@ -167,7 +167,7 @@ mod tests {
         assert_eq!(civil_text(1_709_208_000), "29 February 2024, 12:00", "the leap day");
     }
 
-    /// Ticket #466 (version 0.09.7): the top bar's clock, twelve-hour, and how long a sitting has run.
+    /// Ticket #466 (version 0.09.7): the clock, the command cluster's since ticket #641 (the top bar's for a spectator), twelve-hour, and how long a sitting has run.
     #[test]
     fn the_clock_reads_twelve_hours_and_the_sitting_reads_hours_and_minutes() {
         let at = |h: i64, m: i64| clock_of(1_789_050_720 / 86_400 * 86_400 + h * 3_600 + m * 60 + 59);

@@ -479,7 +479,8 @@ fn the_allotment_is_the_base_plus_each_controlled_states_value_times_the_faction
     // Ticket #453 (version 0.09.6): Europe is 4 since the United Kingdom took one: 10 + 4 = 14.
     assert_eq!(g.influence_allotment(Seat(1)), 14);
     g.state_mut(StateId::NorthAmerica).control = Control::Controlled(Seat(1));
-    assert_eq!(g.influence_allotment(Seat(1)), 21, "North America adds 7");
+    // Ticket #639 (version 0.1.0.6): 6 since Canada took one of its 7.
+    assert_eq!(g.influence_allotment(Seat(1)), 20, "North America adds 6");
     // Raising East Asia's Industry Level adds one to its value.
     g.state_mut(StateId::EastAsia).industry_level += 1;
     assert_eq!(g.state_influence_value(StateId::EastAsia), 4);
@@ -489,7 +490,9 @@ fn the_allotment_is_the_base_plus_each_controlled_states_value_times_the_faction
     // Ticket #482 (version 0.09.8): 35. South Africa's 1 was added, at the designer's word, where
     // every split before it shared its parent's; Nigeria's card had only the 1 to give.
     // Ticket #510 (version 0.1.0.0): 36, Vietnam's 1 added the same way; Indonesia's card had only the 1 to give.
-    assert_eq!(total, 36, "the eight totalled 34, shared out exactly until South Africa added 1 and Vietnam 1");
+    // Ticket #639 (version 0.1.0.6): 37, Ethiopia's 1 added the same way; Canada's 1 came out of the
+    // United States' 7.
+    assert_eq!(total, 37, "the eight totalled 34, shared out exactly until South Africa, Vietnam and Ethiopia added 1 each");
 }
 
 // ---------------------------------------------------------------- #35 Ducats
@@ -569,7 +572,7 @@ fn ducats_pay_for_a_leapfrog_and_repairs_at_the_table_rates() {
     g.commit_orders(Seat(0), &[r]);
     assert_eq!(g.seats[0].stockpile.ducats, 10.0);
     // A repair: 10 Ducats a point, same legality as a Materials repair.
-    g.ships.push(Ship { name: String::new(), id: ShipId(1), kind: UnitKind::Frigate, seat: Seat(0), damage: 1, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None });
+    g.ships.push(Ship { nuclear: false, fissionables: 0.0, name: String::new(), id: ShipId(1), kind: UnitKind::Frigate, seat: Seat(0), damage: 1, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None });
     let fix = Order::RepairWithDucats { unit: UnitRef::Ship(ShipId(1)), points: 1 };
     assert_eq!(g.order_cost(Seat(0), &fix).ducats, 10.0);
     assert!(g.check_order(Seat(0), &[], &fix).is_ok());
@@ -648,7 +651,7 @@ fn a_station_is_built_for_materials_in_an_orbital_slot_and_holds_only_a_shipyard
 fn ships_are_built_only_at_shipyards_and_lifts_need_a_launch_site() {
     let mut g = game();
     let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
-    let frigate = |site: Place| Order::BuildShip { site, kind: UnitKind::Frigate };
+    let frigate = |site: Place| Order::BuildShip { nuclear: false, site, kind: UnitKind::Frigate };
     assert!(g.check_order(Seat(0), &[], &frigate(Place::State(StateId::EastAsia))).is_err(), "a Launch Site builds no Ship now");
     assert!(g.check_order(Seat(0), &[], &frigate(Place::Colony(iss))).is_err(), "no Shipyard on the ISS yet");
     g.colony_mut(iss).unwrap().modules.push(Module::new(ModuleKind::Shipyard));
@@ -658,7 +661,7 @@ fn ships_are_built_only_at_shipyards_and_lifts_need_a_launch_site() {
     // Lifts: a Ship at Earth loads Colonists only from a state with a Launch Site, and each lift is a launch.
     // Ticket #443 (version 0.09.6): in a station's ring, since low orbit needs no Launch Site now.
     let ship = ShipId(g.fresh_id());
-    g.ships.push(Ship { name: String::new(), id: ship, kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: Some(0) });
+    g.ships.push(Ship { nuclear: false, fissionables: 0.0, name: String::new(), id: ship, kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: Some(0) });
     g.state_mut(StateId::NorthAfrica).control = Control::Controlled(Seat(0));
     g.state_mut(StateId::NorthAfrica).facilities.retain(|f| f.kind != FacilityKind::LaunchSite);
     // Ticket #73: a lift takes Emigrants already mustered, so both states hold some.
@@ -749,7 +752,7 @@ fn antarctica_is_three_colony_slots_on_earth_whose_colonists_stay_on_earth_and_w
     // Ticket #56 re-cut them: abundant ore and Fuel under the ice.
     assert_eq!((earth.mine_yield, earth.generator_yield, earth.refinery_yield, earth.research_yield), (1.4875, 0.75, 2.0, 1.0), "the Mine 1.75 x 0.85 since ticket #537");
     assert_eq!(g.free_slots_on(BodyId::Earth).len(), 3);
-    assert_eq!(StateId::ALL.len(), 20, "twenty Regions since ticket #510, eighteen since #482, and Antarctica is none of them");
+    assert_eq!(StateId::ALL.len(), 22, "twenty-two Regions since ticket #639, twenty since #510, eighteen since #482, and Antarctica is none of them");
     let m = g.tables.faction(FactionKind::Custodians).emissions_multiplier;
     let before = g.emissions_now();
     // Ticket #604 (version 0.1.0.4): the same board under Clean Manufacturing, for the Mine below.
@@ -784,7 +787,7 @@ fn only_a_carrier_carries_an_army_and_a_colony_ship_carries_only_colonists() {
     let mut g = game();
     let army = ArmyId(g.fresh_id());
     g.armies.push(Army { name: String::new(), id: army, home: ArmyHome::State(StateId::EastAsia), at: ArmyAt::Place(Place::State(StateId::EastAsia)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None, levy: false, raised_strength: 0 });
-    let ship = |id: u32, kind: UnitKind| Ship { name: String::new(), id: ShipId(id), kind, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None };
+    let ship = |id: u32, kind: UnitKind| Ship { nuclear: false, fissionables: 0.0, name: String::new(), id: ShipId(id), kind, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None };
     g.ships.extend([ship(101, UnitKind::ColonyShip), ship(102, UnitKind::Battleship), ship(103, UnitKind::Carrier)]);
     let load_army = |s: u32| Order::Load { ship: ShipId(s), colonists: 0, from: LoadSource::State(StateId::EastAsia), army: Some(army) };
     assert!(g.check_order(Seat(0), &[], &load_army(101)).is_err(), "a Colony Ship carries Colonists only");
@@ -808,7 +811,7 @@ fn only_a_carrier_carries_an_army_and_a_colony_ship_carries_only_colonists() {
 #[test]
 fn the_trading_window_sells_materials_fuel_and_energy_at_the_table_prices() {
     let mut g = game();
-    g.seats[0].stockpile = Stockpile { materials: 0.0, fuel: 0.0, energy: 0.0, ducats: 100.0 };
+    g.seats[0].stockpile = Stockpile { materials: 0.0, fuel: 0.0, energy: 0.0, ducats: 100.0, fissionables: 0.0 };
     let m = Order::Buy { resource: Resource::Materials, amount: 10 };
     assert_eq!(g.order_cost(Seat(0), &m).ducats, 30.0, "Materials are 3 Ducats each since ticket #220");
     // Bought Materials are spendable at once: a Factory (22 Materials since ticket #537) is affordable with the buy pending.
@@ -827,13 +830,13 @@ fn the_trading_window_sells_materials_fuel_and_energy_at_the_table_prices() {
     assert!(g.check_order(Seat(0), &[], &Order::Buy { resource: Resource::Ducats, amount: 5 }).is_err(), "Ducats are not for sale");
     assert!(g.check_order(Seat(0), &[], &Order::Buy { resource: Resource::Materials, amount: 34 }).is_err(), "116 Ducats needed (20 at 3, 14 at 4), 100 held");
     g.commit_orders(Seat(0), &[m, f, e]);
-    assert_eq!(g.seats[0].stockpile, Stockpile { materials: 10.0, fuel: 2.0, energy: 5.0, ducats: 54.0 }, "Fuel at 3 since ticket #421");
+    assert_eq!(g.seats[0].stockpile, Stockpile { materials: 10.0, fuel: 2.0, energy: 5.0, ducats: 54.0, fissionables: 0.0 }, "Fuel at 3 since ticket #421");
 }
 
 #[test]
 fn a_building_bought_for_ducats_costs_twice_its_materials_and_queues_like_a_materials_build() {
     let mut g = game();
-    g.seats[0].stockpile = Stockpile { materials: 0.0, fuel: 0.0, energy: 50.0, ducats: 44.0 };
+    g.seats[0].stockpile = Stockpile { materials: 0.0, fuel: 0.0, energy: 50.0, ducats: 44.0, fissionables: 0.0 };
     let order = Order::BuildFacilityWithDucats { state: StateId::EastAsia, kind: FacilityKind::Factory };
     let cost = g.order_cost(Seat(0), &order);
     assert_eq!((cost.materials, cost.ducats), (0.0, 44.0), "a 22-Materials Factory is 44 Ducats");
@@ -859,7 +862,7 @@ fn a_building_bought_for_ducats_costs_twice_its_materials_and_queues_like_a_mate
 #[test]
 fn selling_materials_or_fuel_returns_half_the_buying_price() {
     let mut g = game();
-    g.seats[0].stockpile = Stockpile { materials: 10.0, fuel: 2.0, energy: 20.0, ducats: 0.0 };
+    g.seats[0].stockpile = Stockpile { materials: 10.0, fuel: 2.0, energy: 20.0, ducats: 0.0, fissionables: 0.0 };
     let m = Order::Sell { resource: Resource::Materials, amount: 10 };
     assert_eq!(g.order_cost(Seat(0), &m).ducats, -15.0, "half of 3 Ducats each since ticket #220");
     let f = Order::Sell { resource: Resource::Fuel, amount: 2 };
@@ -872,7 +875,7 @@ fn selling_materials_or_fuel_returns_half_the_buying_price() {
     assert_eq!((left.materials, left.ducats), (0.0, 15.0));
     assert!(g.check_order(Seat(0), &pending, &Order::BuyInfluence { amount: 3 }).is_ok(), "13.5 of the 15 Ducats");
     g.commit_orders(Seat(0), &[m, f]);
-    assert_eq!(g.seats[0].stockpile, Stockpile { materials: 0.0, fuel: 0.0, energy: 20.0, ducats: 18.0 }, "15 and 3, Fuel at 3 since ticket #421");
+    assert_eq!(g.seats[0].stockpile, Stockpile { materials: 0.0, fuel: 0.0, energy: 20.0, ducats: 18.0, fissionables: 0.0 }, "15 and 3, Fuel at 3 since ticket #421");
 }
 
 // ---------------------------------------------------------------- #36 Embassies and Relays
@@ -975,8 +978,9 @@ fn occupation_of_a_controlled_state_returns_it_to_its_owner_when_broken() {
 fn meet_first(g: &mut Game, seat: Seat) {
     match g.kind(seat) {
         // Ticket #506 (version 0.1.0.0): the fifty-turn bars. Ticket #580 (version 0.1.0.3): 4,250.
-        // Ticket #584 (version 0.1.0.4): 5,000. Ticket #623 (version 0.1.0.5): 6,250.
-        FactionKind::Prospectors => g.seats[seat.index()].venture_fund = 6250.0,
+        // Ticket #584 (version 0.1.0.4): 5,000. Ticket #623 (version 0.1.0.5): 6,250. Ticket #638
+        // (version 0.1.0.6): 6,500.
+        FactionKind::Prospectors => g.seats[seat.index()].venture_fund = 6500.0,
         FactionKind::Custodians => g.seats[seat.index()].stabilization_run = 4,
         FactionKind::Arkwrights => {}
         // Ticket #579 (the review): the first part is scored on the fund, read from the table.
@@ -1147,7 +1151,7 @@ fn launch_pad_fire_closes_a_launch_site_unless_clean_propellant_is_known() {
     g.resolution_phase();
     assert!(!g.state(StateId::EastAsia).facilities.iter().find(|f| f.kind == FacilityKind::LaunchSite).unwrap().online, "the Launch Site is offline");
     let ship = ShipId(g.fresh_id());
-    g.ships.push(Ship { name: String::new(), id: ship, kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None });
+    g.ships.push(Ship { nuclear: false, fissionables: 0.0, name: String::new(), id: ship, kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None });
     assert!(g.check_order(Seat(0), &[], &Order::Load { ship, colonists: 2, from: LoadSource::State(StateId::EastAsia), army: None }).is_err(), "nothing lifts from a closed Launch Site");
     // With Clean Propellant the Launch Site stays open.
     let mut g = game();
@@ -1250,7 +1254,7 @@ fn the_methane_burst_adds_scaled_emissions_next_turn_on_the_cards_line_and_again
 #[test]
 fn meteor_shower_hits_ships_in_orbit_not_in_transit_and_hardened_hulls_shrug() {
     let mut g = game();
-    let mk = |id: u32, at: ShipAt| Ship { name: String::new(), id: ShipId(id), kind: UnitKind::Frigate, seat: Seat(0), damage: 0, at, colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None };
+    let mk = |id: u32, at: ShipAt| Ship { nuclear: false, fissionables: 0.0, name: String::new(), id: ShipId(id), kind: UnitKind::Frigate, seat: Seat(0), damage: 0, at, colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None };
     g.ships.push(mk(1, ShipAt::Body(BodyId::Earth)));
     g.ships.push(mk(2, ShipAt::Transit { from: BodyId::Earth, to: BodyId::Mars, turns_left: 2 }));
     drawn(&mut g, EventId::MeteorShower, EventTarget::Everyone);
@@ -1337,7 +1341,7 @@ fn income_of(g: &mut Game, seat: Seat) -> Stockpile {
     g.income_phase();
     let after = g.seat(seat).stockpile;
     // Ticket #387 (version 0.09.3): a difference of two exact tenths can drift in the last place, so it is settled.
-    Stockpile { materials: tenth(after.materials - before.materials), fuel: tenth(after.fuel - before.fuel), energy: tenth(after.energy - 1000.0), ducats: tenth(after.ducats - before.ducats) }
+    Stockpile { materials: tenth(after.materials - before.materials), fuel: tenth(after.fuel - before.fuel), energy: tenth(after.energy - 1000.0), ducats: tenth(after.ducats - before.ducats), fissionables: tenth(after.fissionables - before.fissionables) }
 }
 
 #[test]
@@ -1401,7 +1405,7 @@ fn tech_efficient_transit_cuts_fuel() {
 #[test]
 fn tech_hardened_hulls_adds_two_strength_to_every_ship_but_a_colony_ship_stays_at_zero() {
     let mut g = game();
-    let f = Ship { name: String::new(), id: ShipId(1), kind: UnitKind::Frigate, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None };
+    let f = Ship { nuclear: false, fissionables: 0.0, name: String::new(), id: ShipId(1), kind: UnitKind::Frigate, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None };
     let c = Ship { name: String::new(), kind: UnitKind::ColonyShip, ..f.clone() };
     assert_eq!(g.ship_strength(&f), 3);
     with_tech(&mut g, TechId::HardenedHulls);
@@ -1454,7 +1458,9 @@ fn tech_deep_mining_raises_mine_output_on_earth_and_off_it() {
     assert_eq!(income_of(&mut g, Seat(0)).materials, 11.6); // Ticket #537: the Earth Mine 4.4 x 1.5 = 6.6; ticket #554: the Moon Mine 4 x 1.25 = 5
     with_tech(&mut g, TechId::DeepMining);
     // Ticket #537: the Earth Mine 4.4 x 1.5 x 1.5 = 9.9; ticket #554: the Moon Mine 4 x 1.25 x 1.5 = 7.5.
-    assert_eq!(income_of(&mut g, Seat(0)).materials, 17.4);
+    // Ticket #628 (version 0.1.0.6): Deep Mining x1.25, so 4.4 x 1.5 x 1.25 = 8.25, to the tenth 8.3,
+    // and 4 x 1.25 x 1.25 = 6.25, to the tenth 6.3.
+    assert_eq!(income_of(&mut g, Seat(0)).materials, 14.6);
 }
 
 #[test]
@@ -1550,7 +1556,7 @@ fn colony_attack_turns(seed: u64) -> Option<u32> {
         let attacker = ArmyId(g.fresh_id());
         let ship = ShipId(g.fresh_id());
         g.armies.push(Army { name: String::new(), id: attacker, home: ArmyHome::State(StateId::EastAsia), at: ArmyAt::Aboard(ship), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None, levy: false, raised_strength: 0 });
-        g.ships.push(Ship { name: String::new(), id: ship, kind, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Moon), colonists: 0, warhead: false, colonists_education: 1.0, army: Some(attacker), stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None });
+        g.ships.push(Ship { nuclear: false, fissionables: 0.0, name: String::new(), id: ship, kind, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Moon), colonists: 0, warhead: false, colonists_education: 1.0, army: Some(attacker), stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None });
         attackers.push(attacker);
         ships.push(ship);
     }
@@ -1659,7 +1665,7 @@ fn every_neutral_state_starts_with_its_start_facilities() {
         assert_eq!(card.start_facilities.iter().filter(|k| **k == FacilityKind::Factory).count() as u32 + lone, mines, "{}: a Mine beside every Factory", card.name);
         assert_eq!(card.start_facilities.len() as u32 - labs - mines, card.industry_level, "{}: as many as the Industry Level, plus a start Lab and the Mines", card.name);
     }
-    assert_eq!(g.seats[0].stockpile, Stockpile { materials: 80.0, fuel: 20.0, energy: 20.0, ducats: 0.0 });
+    assert_eq!(g.seats[0].stockpile, Stockpile { materials: 80.0, fuel: 20.0, energy: 20.0, ducats: 0.0, fissionables: 0.0 });
 }
 
 #[test]
@@ -1724,7 +1730,7 @@ fn only_climate_cards_scale_with_the_temperature() {
     }
     assert_eq!(seen, 4);
     // And a Meteor Shower does one damage at +3.0 as at +1.2.
-    let mk = |id: u32| Ship { name: String::new(), id: ShipId(id), kind: UnitKind::Frigate, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None };
+    let mk = |id: u32| Ship { nuclear: false, fissionables: 0.0, name: String::new(), id: ShipId(id), kind: UnitKind::Frigate, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None };
     g.ships.push(mk(1));
     drawn(&mut g, EventId::MeteorShower, EventTarget::Everyone);
     g.apply_event_now();
@@ -1826,7 +1832,7 @@ fn a_partys_hits_are_spread_across_the_enemy_parties_in_proportion_to_their_stre
 #[test]
 fn orbital_control_needs_the_only_engaged_warship_at_the_body() {
     let mut g = game();
-    let warship = |id: u32, seat: Seat| Ship {
+    let warship = |id: u32, seat: Seat| Ship { nuclear: false, fissionables: 0.0,
         name: String::new(), id: ShipId(id),
         kind: UnitKind::Frigate,
         seat,
@@ -1944,7 +1950,7 @@ fn the_prospectors_fund_counts_seven_tenths_of_their_score() {
     assert_eq!(g.kind(pro), FactionKind::Prospectors);
     bare_stations(&mut g);
     colony(&mut g, pro, BodyId::Mars, &[ModuleKind::Habitat; 4], 20);
-    g.seats[1].venture_fund = 1062.5; // 0.17 x 6,250 (ticket #623)
+    g.seats[1].venture_fund = 1105.0; // 0.17 x 6,500 (ticket #638; 6,250 in ticket #623)
     let p = g.progress(pro);
     assert!((p.first_fraction() - 0.17).abs() < 1e-9 && p.second_fraction() == 1.0, "the premise: the Fund at 17%, the Presence full: {p:?}");
     // Ticket #601 (version 0.1.0.4): of the 94% the parts share, the gate not standing: 39%.
@@ -2037,17 +2043,23 @@ fn the_ai_seats_take_start_states_not_adjacent_to_any_taken_one() {
     // against Australia at 0.5.
     // Ticket #482 (version 0.09.8): a third stands at Industry 2 now, South Africa, with more
     // people than either, and takes the pick.
-    assert_eq!(held(Seat(2)), vec![StateId::SouthAfrica]);
+    // Ticket #639 (version 0.1.0.6), at the designer's word (Q11 a): Canada, untouched at Industry 3,
+    // takes it ahead of every Industry 2.
+    assert_eq!(held(Seat(2)), vec![StateId::Canada]);
     // Then the untouched states are all at Industry 1, so the tie goes to the most populous:
     // Sub-Saharan Africa at 11.4.
     // The peninsula's neighbours join the adjacent set; Australia is the last at Industry 2.
     // Ticket #492 (version 0.09.9): the peninsula touches South Africa now, across the Red Sea from
-    // the Horn, so it is taken off the table with it, and Australia is the pick.
-    assert_eq!(held(Seat(3)), vec![StateId::Australia]);
+    // the Horn, so it is taken off the table with it, and Australia is the pick. (Ticket #639: no
+    // longer -- Canada takes the third pick and South Africa the fourth.)
+    // Ticket #639: with Canada third, South Africa is the fourth.
+    assert_eq!(held(Seat(3)), vec![StateId::SouthAfrica]);
     // The fallback, when every free state touches a taken one: the highest Industry Level free
     // state, ties by population. With everything above taken, North America at 3 wins.
     // Ticket #492 (version 0.09.9): with South Africa, since the peninsula touches it and no longer Nigeria.
-    let taken = [StateId::Europe, StateId::EastAsia, StateId::Australia, StateId::SubSaharanAfrica, StateId::SouthAfrica, StateId::SouthAmerica, StateId::CentralAmerica];
+    // Ticket #639: and Canada, which would otherwise be an untouched Industry 3, and the peninsula,
+    // which no longer touches South Africa.
+    let taken = [StateId::Europe, StateId::EastAsia, StateId::Australia, StateId::SubSaharanAfrica, StateId::SouthAfrica, StateId::SouthAmerica, StateId::CentralAmerica, StateId::Canada, StateId::ArabianPeninsula];
     assert_eq!(g.ai_start_state(&taken), StateId::NorthAmerica, "the fallback picks the best free state");
     // Every seat's start carries a Launch Site.
     for seat in Seat::ALL {
@@ -2179,7 +2191,7 @@ fn a_tie_between_seats_is_drawn_from_the_seed_and_is_the_same_every_replay() {
     assert!((8..=32).contains(&firsts), "seat 0 took {firsts} of 40 draws; a draw should be near half");
     // Greater strength still decides before the draw.
     let mut g = with_seed(3);
-    g.ships.push(Ship {
+    g.ships.push(Ship { nuclear: false, fissionables: 0.0,
         name: String::new(), id: ShipId(301),
         kind: UnitKind::Frigate,
         seat: Seat(1),
@@ -2203,7 +2215,7 @@ fn a_tie_between_seats_is_drawn_from_the_seed_and_is_the_same_every_replay() {
 /// A Colony Ship of one seat, sitting at a Body.
 fn a_colony_ship(g: &mut Game, seat: Seat, body: BodyId) -> ShipId {
     let id = ShipId(g.fresh_id());
-    g.ships.push(Ship {
+    g.ships.push(Ship { nuclear: false, fissionables: 0.0,
         id,
         name: String::new(),
         kind: UnitKind::ColonyShip,
@@ -2241,19 +2253,20 @@ fn archive_at(g: &mut Game, seat: Seat, body: BodyId, paid: i64, colonists: u32)
 }
 
 #[test]
-fn coach_class_doubles_an_arkwright_colony_ships_load_and_cuts_its_price() {
+fn coach_class_raises_an_arkwright_colony_ships_load_and_cuts_its_price() {
     let mut g = game();
     // Capacity: the card figure for everyone else, twice it for the Arkwrights, and Expanded
     // Habitats adds its two before the doubling.
     assert_eq!(g.colony_ship_capacity(Seat(0)), 4);
-    // Ticket #513 (version 0.1.0.0): half again, where it was twice (8).
-    assert_eq!(g.colony_ship_capacity(Seat(2)), 6, "Coach Class carries half again");
+    // Ticket #513 (version 0.1.0.0): half again, where it was twice (8). Ticket #638 (version
+    // 0.1.0.6): a quarter again.
+    assert_eq!(g.colony_ship_capacity(Seat(2)), 5, "Coach Class carries a quarter again");
     g.research.done.push(TechId::ExpandedHabitats);
     assert_eq!(g.colony_ship_capacity(Seat(0)), 6);
-    assert_eq!(g.colony_ship_capacity(Seat(2)), 9, "(4 + 2) x 1.5, 12 until ticket #513");
+    assert_eq!(g.colony_ship_capacity(Seat(2)), 7, "(4 + 2) x 1.25 = 7.5, rounded down (9 until ticket #638, 12 until #513)");
     // Price: 30 Materials on the units.toml row; ticket #83 (version 0.06.0): the Arkwrights' 20
     // is retired and every Ship costs them 15% less, so 25.
-    let build = Order::BuildShip { site: Place::State(StateId::EastAsia), kind: UnitKind::ColonyShip };
+    let build = Order::BuildShip { nuclear: false, site: Place::State(StateId::EastAsia), kind: UnitKind::ColonyShip };
     assert_eq!(g.order_cost(Seat(0), &build).materials, 33.0, "30 x 1.1 since ticket #537");
     assert_eq!(g.order_cost(Seat(2), &build).materials, 28.1); // Ticket #537: 33 x 0.85 = 28.05, to the tenth
     // And the Load order holds them to it.
@@ -2264,25 +2277,26 @@ fn coach_class_doubles_an_arkwright_colony_ships_load_and_cuts_its_price() {
     g.state_mut(sid).emigrants = 13;
     let ship = a_colony_ship(&mut g, Seat(2), BodyId::Earth);
     let load = |n: u32| Order::Load { ship, colonists: n, from: LoadSource::State(sid), army: None };
-    // Ticket #513 (version 0.1.0.0): nine with Expanded Habitats, where it was twelve.
-    assert!(g.check_order(Seat(2), &[], &load(9)).is_ok());
-    let err = g.check_order(Seat(2), &[], &load(10)).unwrap_err();
-    assert_eq!(err.0, "this Ship carries at most 9 Colonists");
+    // Ticket #513 (version 0.1.0.0): nine with Expanded Habitats, where it was twelve; seven since
+    // ticket #638.
+    assert!(g.check_order(Seat(2), &[], &load(7)).is_ok());
+    let err = g.check_order(Seat(2), &[], &load(8)).unwrap_err();
+    assert_eq!(err.0, "this Ship carries at most 7 Colonists");
 }
 
 #[test]
-fn an_arkwright_muster_takes_twice_the_population_out_of_its_state() {
+fn an_arkwright_muster_takes_the_ordinary_population_out_of_its_state() {
     let mut g = game();
     g.state_mut(StateId::NorthAfrica).control = Control::Controlled(Seat(2));
     g.state_mut(StateId::NorthAfrica).facilities.retain(|f| f.kind != FacilityKind::LaunchSite);
     g.state_mut(StateId::NorthAfrica).facilities.push(facility(FacilityKind::LaunchSite));
     assert!((g.lift_population(Seat(0), 4) - 4.0).abs() < 1e-9, "one unit each: one million people since ticket #333 (version 0.09.0), five million from ticket #143 (version 0.07.3)");
-    assert!((g.lift_population(Seat(2), 4) - 6.0).abs() < 1e-9, "Coach Class costs the state half again (twice until ticket #513)");
+    assert!((g.lift_population(Seat(2), 4) - 4.0).abs() < 1e-9, "a Pioneer costs them what it costs anybody since ticket #638 (half again until then, twice until #513)");
     // Ticket #73: the population is paid when the Emigrants muster, and the lift takes none.
     let before = g.state(StateId::NorthAfrica).population;
     g.commit_orders(Seat(2), &[Order::BuildEmigrants { state: StateId::NorthAfrica, n: 4 }]);
     let taken = before - g.state(StateId::NorthAfrica).population;
-    assert!((taken - 6.0).abs() < 1e-9, "the recruit took {taken}, not 6.0 (one and a half units of one million per Pioneer under Coach Class since ticket #513)");
+    assert!((taken - 4.0).abs() < 1e-9, "the recruit took {taken}, not 4.0 (one unit of one million per Pioneer since ticket #638)");
     let after_muster = g.state(StateId::NorthAfrica).population;
     let ship = a_colony_ship(&mut g, Seat(2), BodyId::Earth);
     g.commit_orders(Seat(2), &[Order::Load { ship, colonists: 4, from: LoadSource::State(StateId::NorthAfrica), army: None }]);
@@ -2292,7 +2306,7 @@ fn an_arkwright_muster_takes_twice_the_population_out_of_its_state() {
 }
 
 #[test]
-fn an_arkwright_habitat_holds_twelve() {
+fn an_arkwright_habitat_holds_a_quarter_again() {
     let mut g = game();
     // Ticket #80 (version 0.06.0): a Habitat holds 8, the Arkwrights' 12. The Moon's Habitat yield
     // of 1.1 made those 8 and 13 until ticket #140 (version 0.07.3) traded the yield away: a
@@ -2304,32 +2318,33 @@ fn an_arkwright_habitat_holds_twelve() {
     let core = g.tables.module(ModuleKind::Core).holds_colonists;
     // Ticket #207 (version 0.08.1): 4 and 6, and with Expanded Habitats 8 and 12.
     assert_eq!(g.habitat_room(g.colony(mine).unwrap()), 4 + core);
-    assert_eq!(g.habitat_room(g.colony(theirs).unwrap()), 6 + core, "half again for the Arkwrights");
+    assert_eq!(g.habitat_room(g.colony(theirs).unwrap()), 5 + core, "a quarter again for the Arkwrights (ticket #638; half again before)");
     g.research.done.push(TechId::ExpandedHabitats);
     assert_eq!(g.habitat_room(g.colony(mine).unwrap()), 8 + core);
-    assert_eq!(g.habitat_room(g.colony(theirs).unwrap()), 12 + core, "(4 + 4) x 1.5, and the Core Module still four");
+    assert_eq!(g.habitat_room(g.colony(theirs).unwrap()), 10 + core, "(4 + 4) x 1.25, and the Core Module still four");
 }
 
 #[test]
-fn an_arkwright_pays_half_for_a_station_and_three_quarters_for_a_module() {
+fn an_arkwright_pays_three_quarters_for_a_station_and_for_a_module() {
     let mut g = game();
     let station = g.station_order(Seat(0), BodyId::Earth, 3, &[]);
     assert_eq!(g.order_cost(Seat(0), &station).materials, 44.0, "40 x 1.1 since ticket #537");
-    assert_eq!(g.order_cost(Seat(2), &station).materials, 22.0, "they start with no station");
+    assert_eq!(g.order_cost(Seat(2), &station).materials, 33.0, "they start with no station: x0.75 since ticket #638, x0.5 before");
     let cid = colony(&mut g, Seat(2), BodyId::Moon, &[], 0);
     let mine = colony(&mut g, Seat(0), BodyId::Moon, &[], 0);
     for (kind, full, theirs) in [(ModuleKind::Habitat, 27.5, 20.6), (ModuleKind::Mine, 22.0, 16.5), (ModuleKind::Shipyard, 38.5, 28.9)] {
         assert_eq!(g.order_cost(Seat(0), &Order::BuildModule { colony: mine, kind }).materials, full);
         assert_eq!(g.order_cost(Seat(2), &Order::BuildModule { colony: cid, kind }).materials, theirs, "{} x 0.75, to the tenth (ticket #387)", kind.name());
     }
-    // Transit Fuel too: three quarters, then Efficient Transit on top of that. Ticket #57: on the
-    // window the crossing pays the card's Fuel, and both multipliers apply after the window factor.
+    // Transit Fuel too: four fifths since ticket #638 (three quarters before), then Efficient Transit
+    // on top of that. Ticket #57: on the window the crossing pays the card's Fuel, and both
+    // multipliers apply after the window factor.
     at_window(&mut g);
     assert_eq!(g.transit_cost_for(Seat(0), BodyId::Earth, BodyId::Mars).1, 18.1);
-    assert_eq!(g.transit_cost_for(Seat(2), BodyId::Earth, BodyId::Mars).1, 13.6);
+    assert_eq!(g.transit_cost_for(Seat(2), BodyId::Earth, BodyId::Mars).1, 14.5, "18.1 x 0.8, to the tenth");
     g.research.done.push(TechId::EfficientTransit);
     // Ticket #527 (version 0.1.0.0): Efficient Transit x0.75, from x0.6.
-    assert_eq!(g.transit_cost_for(Seat(2), BodyId::Earth, BodyId::Mars).1, 10.2, "18.1 x 0.75 x 0.75, to the tenth");
+    assert_eq!(g.transit_cost_for(Seat(2), BodyId::Earth, BodyId::Mars).1, 10.9, "18.1 x 0.8 x 0.75, to the tenth");
 }
 
 #[test]
@@ -2800,7 +2815,7 @@ fn the_ai_buys_fuel_for_a_colony_ship_or_a_refuel() {
     g.colony_mut(iss).unwrap().modules.push(Module::new(ModuleKind::Shipyard));
     // Ticket #596 (version 0.1.0.4): 32. 33 left would pay it, so the third Buy is one more.
     let queued = vec![Order::Buy { resource: Resource::Fuel, amount: 24 }, refuel.clone(), Order::Buy { resource: Resource::Fuel, amount: 31 }];
-    assert!(g.check_order(Seat(0), &queued, &Order::BuildShip { site: Place::Colony(iss), kind: UnitKind::ColonyShip }).is_err(), "32 wanted since ticket #596, 31 left");
+    assert!(g.check_order(Seat(0), &queued, &Order::BuildShip { nuclear: false, site: Place::Colony(iss), kind: UnitKind::ColonyShip }).is_err(), "32 wanted since ticket #596, 31 left");
     g.seats[0].stockpile.fuel = 0.0;
     // And the computer takes it, where Influence cannot outbid it for the Ducats.
     let mut t = Tables::load(&default_data_dir()).expect("tables load");
@@ -2909,7 +2924,7 @@ fn the_archivist_ai_builds_its_way_off_earth_and_then_the_archive() {
 /// the first landing is over for it and its Shipyard and Colony Ship weigh their base. A budget
 /// test that ranks other builds reads its figures without the race in the way.
 fn parked_colony_ship(g: &mut Game, seat: Seat, body: BodyId) {
-    g.ships.push(Ship { name: String::new(), id: ShipId(9000 + seat.index() as u32), kind: UnitKind::ColonyShip, seat, damage: 0, at: ShipAt::Body(body), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 35.0, slot: None });
+    g.ships.push(Ship { nuclear: false, fissionables: 0.0, name: String::new(), id: ShipId(9000 + seat.index() as u32), kind: UnitKind::ColonyShip, seat, damage: 0, at: ShipAt::Body(body), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 35.0, slot: None });
 }
 
 fn calm(g: &mut Game) {
@@ -3230,7 +3245,7 @@ fn e_four_stops_replenishment_seven_halves_output_ten_throws_the_controller_off(
     g.take_control(StateId::Europe, Seat(0));
     g.seats[0].influence.insert(Place::State(StateId::NorthAfrica), 42);
     g.seats[1].influence.insert(Place::State(StateId::NorthAfrica), 17);
-    g.state_mut(StateId::NorthAfrica).queue.push(Build { item: BuildItem::Facility(FacilityKind::Bank), seat: Seat(0), coastal: false, fuel: 0.0, widgets: 99, done: 0 });
+    g.state_mut(StateId::NorthAfrica).queue.push(Build { nuclear: false, fissionables: 0.0, item: BuildItem::Facility(FacilityKind::Bank), seat: Seat(0), coastal: false, fuel: 0.0, widgets: 99, done: 0 });
     let id = ArmyId(g.fresh_id());
     g.armies.push(Army { name: String::new(), id, home: ArmyHome::State(StateId::Europe), at: ArmyAt::Place(Place::State(StateId::NorthAfrica)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None, levy: false, raised_strength: 0 });
     g.raise_unrest(StateId::NorthAfrica, 10.0, UnrestSource::Plain);
@@ -3468,7 +3483,7 @@ fn the_ai_pays_relief_and_raises_a_constabulary_where_unrest_has_taken_hold() {
 fn twelve_nation_states_share_out_the_eight_they_came_from() {
     let g = game();
     let t = &g.tables;
-    assert_eq!(StateId::ALL.len(), 20, "twenty since ticket #510");
+    assert_eq!(StateId::ALL.len(), 22, "twenty-two since ticket #639, twenty since #510");
     let card = |s: StateId| t.state(s);
     // Asia's 30 GDP and 7 Influence go to East Asia, South Asia and South-East Asia -- and since
     // ticket #125 (version 0.07.2) to Japan and Korea, cut out of East Asia with 6 and 1 of them.
@@ -3480,11 +3495,14 @@ fn twelve_nation_states_share_out_the_eight_they_came_from() {
     assert_eq!(asia.iter().map(|s| card(*s).influence).sum::<i64>(), 7 + 4 + 1, "Asia's Influence value, and the Middle East's, and Vietnam's 1 added by ticket #510 as South Africa's was");
     // Africa's 3 and 2 split at the Sahara; ticket #482 cut South Africa out of the south, and its
     // Influence of 1 is the one figure in the world that was added and not shared.
-    let africa = [StateId::SubSaharanAfrica, StateId::NorthAfrica, StateId::SouthAfrica];
-    assert_eq!(africa.iter().map(|s| card(*s).gdp).sum::<i64>(), 3);
-    assert_eq!(africa.iter().map(|s| card(*s).influence).sum::<i64>(), 2 + 1);
-    // North America's 25 and 8 split with Central America and the Caribbean.
-    let america = [StateId::NorthAmerica, StateId::CentralAmerica];
+    // Ticket #639 (version 0.1.0.6): and Ethiopia, cut out of South Africa's and Egypt's, its GDP
+    // and Influence of 1 each added, the cards it came from having only the 1 to give.
+    let africa = [StateId::SubSaharanAfrica, StateId::NorthAfrica, StateId::SouthAfrica, StateId::Ethiopia];
+    assert_eq!(africa.iter().map(|s| card(*s).gdp).sum::<i64>(), 3 + 1);
+    assert_eq!(africa.iter().map(|s| card(*s).influence).sum::<i64>(), 2 + 1 + 1);
+    // North America's 25 and 8 split with Central America and the Caribbean. Ticket #639 (version
+    // 0.1.0.6): and with Canada, by the real countries.
+    let america = [StateId::NorthAmerica, StateId::CentralAmerica, StateId::Canada];
     assert_eq!(america.iter().map(|s| card(*s).gdp).sum::<i64>(), 25);
     assert_eq!(america.iter().map(|s| card(*s).influence).sum::<i64>(), 8);
     // The world still holds about 7.9 billion people, as the eight states did: 7,860 units of one
@@ -4556,7 +4574,9 @@ fn b_coastal_slots_are_two_an_exposure_capped_and_a_raise_is_inland() {
     // Ticket #482 (version 0.09.8): Kazakhstan has no coast (two fewer than Pakistan's card had),
     // Turkey is Exposure 1 (two) and South Africa Exposure 2 (four).
     // Ticket #510 (version 0.1.0.0): Vietnam is Exposure 2 (four) and Argentina Exposure 1 (two).
-    assert_eq!(world, 56, "56 coastal slots in the world: 50 until ticket #510's two Regions brought six");
+    // Ticket #639 (version 0.1.0.6): Canada and Ethiopia are Exposure 1 (two each), their parents'
+    // cards unmoved.
+    assert_eq!(world, 60, "60 coastal slots in the world: 56 until ticket #639's two Regions brought four");
     // Ticket #70: Europe's Refinery and North America's Factory, third on their cards with an
     // Exposure of 1, now stand inland from the first turn. Ticket #377 (version 0.09.2): Europe is
     // the Prospectors' home and stands with the package (Power Plant, Factory, Mine, Refinery,
@@ -4859,7 +4879,8 @@ fn f_coastal_engineering_is_the_thirteenth_tech() {
     // Ticket #332 (version 0.09.0): and the Mine, sixteen. Ticket #389 (version 0.09.3): and the
     // Stadium, seventeen. Ticket #411 (version 0.09.4): and the Nature Reserve, eighteen. Ticket
     // #559 (version 0.1.0.3): and the Wind Farm, nineteen, behind Clean Power.
-    assert_eq!(FacilityKind::ALL.len(), 19, "nineteen Facilities");
+    // Ticket #630 (version 0.1.0.6): and the Reactor, twenty.
+    assert_eq!(FacilityKind::ALL.len(), 20, "twenty Facilities");
     assert_eq!(g.tables.facility(FacilityKind::WindFarm).needs_tech, Some(TechId::CleanPower));
 }
 
@@ -4876,7 +4897,7 @@ fn g_antarctica_opens_at_one_point_six_and_stays_open() {
     // A Colony Ship at Earth cannot found there yet.
     let id = ShipId(g.fresh_id());
     let turn = g.turn;
-    g.ships.push(Ship {
+    g.ships.push(Ship { nuclear: false, fissionables: 0.0,
         id,
         name: String::new(),
         kind: UnitKind::ColonyShip,
@@ -5411,7 +5432,7 @@ fn the_ai_banks_fuel_when_the_mars_window_is_within_two_turns() {
         for kind in [UnitKind::ColonyShip, UnitKind::Frigate] {
             let id = ShipId(g.fresh_id());
             let colonists = if kind == UnitKind::ColonyShip { 4 } else { 0 };
-            g.ships.push(Ship {
+            g.ships.push(Ship { nuclear: false, fissionables: 0.0,
                 id,
                 name: String::new(),
                 kind,
@@ -5484,7 +5505,7 @@ fn a_loaded_colony_ship_goes_to_the_moon_when_mars_is_a_year_away() {
     let (mars_turns, _) = g.transit_cost_for(cust, BodyId::Earth, BodyId::Mars);
     assert!(mars_turns >= 8, "off the window Mars is far: {mars_turns} turns");
     let ship = ShipId(900);
-    g.ships.push(Ship { name: String::new(), id: ship, kind: UnitKind::ColonyShip, seat: cust, damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 4, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None });
+    g.ships.push(Ship { nuclear: false, fissionables: 0.0, name: String::new(), id: ship, kind: UnitKind::ColonyShip, seat: cust, damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 4, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None });
     g.seats[cust.index()].stockpile.fuel = 100.0;
     g.seats[cust.index()].stockpile.energy = 200.0;
     let orders = g.ai_orders(cust);
@@ -5504,7 +5525,7 @@ fn colony_ship_ready(g: &mut Game, body: BodyId) -> (ShipId, Order) {
     let id = ShipId(g.fresh_id());
     let turn = g.turn;
     let arrival = g.arrival_slot(Seat(0), body);
-    g.ships.push(Ship {
+    g.ships.push(Ship { nuclear: false, fissionables: 0.0,
         id,
         name: String::new(),
         kind: UnitKind::ColonyShip,
@@ -5575,7 +5596,7 @@ fn every_report_line_carries_its_kind_and_place_and_falls_under_the_right_headin
     // The player's own Factory completes this turn, a Colony is founded at the Moon, and the
     // Climate phase that opens the next turn fires every Break at the Temperature.
     // Ticket #332 (version 0.09.0): a build whose Widgets are all done completes at this Resolution.
-    g.state_mut(StateId::EastAsia).queue.push(Build {
+    g.state_mut(StateId::EastAsia).queue.push(Build { nuclear: false, fissionables: 0.0,
         item: BuildItem::Facility(FacilityKind::Factory),
         seat: Seat(0),
         widgets: 4,
@@ -5632,7 +5653,7 @@ fn a_rivals_paragraph_names_its_visible_orders_and_none_of_its_scores() {
     let colony = colony(&mut g, seat, BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Shipyard], 4);
     let ship = ShipId(g.fresh_id());
     let turn = g.turn;
-    g.ships.push(Ship {
+    g.ships.push(Ship { nuclear: false, fissionables: 0.0,
         name: String::new(), id: ship,
         kind: UnitKind::ColonyShip,
         seat,
@@ -5653,7 +5674,7 @@ fn a_rivals_paragraph_names_its_visible_orders_and_none_of_its_scores() {
         Order::RaiseIndustry { state: StateId::EastAsia },
         Order::BuildModule { colony, kind: ModuleKind::Mine },
         Order::BuildModuleWithDucats { colony, kind: ModuleKind::Relay },
-        Order::BuildShip { site: Place::Colony(colony), kind: UnitKind::Frigate },
+        Order::BuildShip { nuclear: false, site: Place::Colony(colony), kind: UnitKind::Frigate },
         Order::BuildArmy { place: Place::State(StateId::EastAsia) },
         g.station_order(Seat(0), BodyId::Mars, 0, &[]),
         Order::BuildArchive { colony },
@@ -5868,7 +5889,9 @@ fn a_spectated_game_seats_four_computers_and_deals_seat_zero_by_the_spreading_ru
     // Ticket #482 (version 0.09.8): South Africa, at Industry 2 with more people than either, is
     // the third; the peninsula the fourth; Australia no seat's.
     // Ticket #492 (version 0.09.9): the peninsula touches South Africa now; Australia is the fourth.
-    assert_eq!(taken, vec![StateId::EastAsia, StateId::Europe, StateId::SouthAfrica, StateId::Australia]);
+    // Ticket #639 (version 0.1.0.6), Q11 a: Canada, untouched at Industry 3, is the third; South
+    // Africa the fourth; Australia no seat's.
+    assert_eq!(taken, vec![StateId::EastAsia, StateId::Europe, StateId::Canada, StateId::SouthAfrica]);
     for seat in Seat::ALL {
         assert_eq!(g.controlled_states(seat), vec![taken[seat.index()]], "{seat:?} starts where the rule put it");
     }
@@ -6098,15 +6121,16 @@ fn a_neutral_states_lab_pays_half_its_yield_into_the_tech_and_nobodys_lead() {
         st.facilities.retain(|f| f.kind != FacilityKind::ResearchLab);
     }
     g.state_mut(StateId::NorthAmerica).control = Control::Neutral;
-    // North America's own: 1 x 1.114 x 1.5 = 1.671; nobody's, at half, 0.836.
-    assert!((g.world_research(StateId::NorthAmerica) - 0.8355).abs() < 1e-3, "{}", g.world_research(StateId::NorthAmerica));
-    // With a Lab, x1.5: 2.507, at half 1.253.
+    // North America's own: 1 x 1.102 x 1.5 = 1.653 (1.114 and 1.671 until ticket #639 took Canada's
+    // people out of it); nobody's, at half, 0.827.
+    assert!((g.world_research(StateId::NorthAmerica) - 0.826725).abs() < 1e-3, "{}", g.world_research(StateId::NorthAmerica));
+    // With a Lab, x1.5: 2.480, at half 1.240.
     g.state_mut(StateId::NorthAmerica).facilities.push(facility(FacilityKind::ResearchLab));
-    assert!((g.world_research(StateId::NorthAmerica) - 1.25325).abs() < 1e-3, "{}", g.world_research(StateId::NorthAmerica));
-    // One Lab's share for the world, which its box shows: 1.671 x 0.5 x 0.5 = 0.418.
-    assert!((g.world_lab_share(StateId::NorthAmerica) - 0.41775).abs() < 1e-3, "{}", g.world_lab_share(StateId::NorthAmerica));
+    assert!((g.world_research(StateId::NorthAmerica) - 1.2400875).abs() < 1e-3, "{}", g.world_research(StateId::NorthAmerica));
+    // One Lab's share for the world, which its box shows: 1.653 x 0.5 x 0.5 = 0.413.
+    assert!((g.world_lab_share(StateId::NorthAmerica) - 0.4133625).abs() < 1e-3, "{}", g.world_lab_share(StateId::NorthAmerica));
     let world: f64 = StateId::ALL.into_iter().map(|s| g.world_research(s)).sum();
-    assert!(world > 1.25325, "every neutral Region pays, not only the one with a Lab: {world}");
+    assert!(world > 1.2400875, "every neutral Region pays, not only the one with a Lab: {world}");
     let before = g.research.progress;
     g.research.contributions = [0; 4];
     g.income_phase();
@@ -6115,17 +6139,17 @@ fn a_neutral_states_lab_pays_half_its_yield_into_the_tech_and_nobodys_lead() {
     assert_eq!(g.research.contributions.iter().sum::<i64>(), seats, "and the world's share counts toward nobody's Lead");
     // Ticket #431 (version 0.09.5): the Report no longer says so -- cut at the designer's word.
     assert!(!g.report.lines.iter().any(|l| l.text.contains("Regions in no one's hands")), "no line for it: {:?}", g.report.lines);
-    // Occupied: the occupier takes the Region's own; the Lab's share, 1.671 x 0.5, goes to the
-    // world at half, 0.42; the occupier pays the 3 Energy and draws no Lab share.
+    // Occupied: the occupier takes the Region's own; the Lab's share, 1.653 x 0.5, goes to the
+    // world at half, 0.41; the occupier pays the 3 Energy and draws no Lab share.
     g.state_mut(StateId::NorthAmerica).control = Control::Occupied { occupier: Seat(2), previous: None, turns: 1, banked: 0 };
     let y = g.facility_yield(Seat(2), StateId::NorthAmerica, FacilityKind::ResearchLab);
     assert_eq!((y.amount, y.upkeep), (0.0, 3.0), "the occupier pays for a Lab that works for the world");
-    assert!((g.world_research(StateId::NorthAmerica) - 0.41775).abs() < 1e-3, "{}", g.world_research(StateId::NorthAmerica));
-    assert!((g.region_research(Seat(2), StateId::NorthAmerica) - 1.671).abs() < 1e-3, "the occupier's own: {}", g.region_research(Seat(2), StateId::NorthAmerica));
-    // Neutral again, at Unrest 7: halved, 1.253 to 0.627.
+    assert!((g.world_research(StateId::NorthAmerica) - 0.4133625).abs() < 1e-3, "{}", g.world_research(StateId::NorthAmerica));
+    assert!((g.region_research(Seat(2), StateId::NorthAmerica) - 1.65345).abs() < 1e-3, "the occupier's own: {}", g.region_research(Seat(2), StateId::NorthAmerica));
+    // Neutral again, at Unrest 7: halved, 1.240 to 0.620.
     g.state_mut(StateId::NorthAmerica).control = Control::Neutral;
     g.state_mut(StateId::NorthAmerica).unrest = 7.0;
-    assert!((g.world_research(StateId::NorthAmerica) - 0.626625).abs() < 1e-3, "{}", g.world_research(StateId::NorthAmerica));
+    assert!((g.world_research(StateId::NorthAmerica) - 0.62004375).abs() < 1e-3, "{}", g.world_research(StateId::NorthAmerica));
     g.state_mut(StateId::NorthAmerica).unrest = 0.0;
     // Held: the holder's own and its Lab's share, 0.836, to the tenth 0.8; nothing to the world.
     g.state_mut(StateId::NorthAmerica).control = Control::Controlled(Seat(2));
@@ -6408,20 +6432,21 @@ fn twenty_five_hundred_ducats_in_the_fund_is_the_prospectors_first_part() {
     // Ticket #506 (version 0.1.0.0): 3,500, from 2,500. Ticket #580 (version 0.1.0.3), at the
     // designer's word: 4,250, with the race for the Moon putting the Prospectors at 56 wins of 80.
     // Ticket #584 (version 0.1.0.4), at the designer's word: 5,000, the Prospectors at 41 of 80 on
-    // 0.1.0.3's closing board. Ticket #623 (version 0.1.0.5), at the designer's word: 6,250.
-    assert_eq!((card.kind, card.bar), (dying_earth_engine::data::VictoryFirstKind::VentureFund, 6250.0));
+    // 0.1.0.3's closing board. Ticket #623 (version 0.1.0.5), at the designer's word: 6,250. Ticket
+    // #638 (version 0.1.0.6), at the designer's word: 6,500.
+    assert_eq!((card.kind, card.bar), (dying_earth_engine::data::VictoryFirstKind::VentureFund, 6500.0));
     assert_eq!(card.kind.name(), "Venture Capital Fund");
     // Ticket #580: the card's long text reads the bar, where it carried a typed copy; the
     // computer Prospectors' pace stretches with it (467 / 1167 / 2100 / 3500 before, then
     // 567 / 1417 / 2550 / 4250).
-    assert_eq!(g.tables.victory_text(FactionKind::Prospectors), "6,250 Ducats in the Venture Capital Fund, plus 20 Colonists living beyond Earth orbit.");
-    assert_eq!(g.tables.ai_pace(FactionKind::Prospectors).first, vec![[12, 834], [25, 2084], [37, 3750], [47, 6250]], "scaled by 6250/5000, the turns as they were");
-    g.seats[pro.index()].venture_fund = 2500.0;
+    assert_eq!(g.tables.victory_text(FactionKind::Prospectors), "6,500 Ducats in the Venture Capital Fund, plus 20 Colonists living beyond Earth orbit.");
+    assert_eq!(g.tables.ai_pace(FactionKind::Prospectors).first, vec![[12, 867], [25, 2167], [37, 3900], [47, 6500]], "scaled by 6500/6250, the turns as they were");
+    g.seats[pro.index()].venture_fund = 2600.0; // four tenths of 6,500 (ticket #638)
     let p = g.progress(pro);
-    assert_eq!((p.first_value, p.first_bar), (2500.0, 6250.0));
+    assert_eq!((p.first_value, p.first_bar), (2600.0, 6500.0));
     assert!((p.first_fraction() - 0.4).abs() < 1e-9);
     colony(&mut g, pro, BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 20);
-    g.seats[pro.index()].venture_fund = 6250.0;
+    g.seats[pro.index()].venture_fund = 6500.0;
     open_gates(&mut g);
     assert!(g.progress(pro).met());
     g.end_phase();
@@ -6593,7 +6618,7 @@ fn emigrants_muster_four_a_turn_per_faction_in_one_state_at_one_unit_of_populati
     assert_eq!(g.emigrants_per_turn(Seat(0)), 2);
     // Ticket #513 (version 0.1.0.0): three a state at half again the population, from four at twice.
     assert_eq!(g.emigrants_per_turn(Seat(2)), 3, "the Arkwrights recruit three a state");
-    assert!((g.lift_population(Seat(2), 4) - 6.0).abs() < 1e-9, "at half again the population");
+    assert!((g.lift_population(Seat(2), 4) - 4.0).abs() < 1e-9, "at the ordinary population since ticket #638");
 }
 
 /// Ticket #73 (b): a Launch Site lifts only the Emigrants waiting in its state; the population was
@@ -6861,7 +6886,7 @@ fn observatory_stands_on_a_station_and_a_barracks_does_not() {
 /// four -- neither the Arkwrights' multiplier nor Expanded Habitats reaches it. So every figure here
 /// is the Habitat's, plus the same four.
 #[test]
-fn a_habitat_holds_four_and_six_for_the_arkwrights_and_the_core_module_four_flat() {
+fn a_habitat_holds_four_and_five_for_the_arkwrights_and_the_core_module_four_flat() {
     let mut g = game();
     let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
     let core = g.tables.module(ModuleKind::Core).holds_colonists;
@@ -6871,9 +6896,9 @@ fn a_habitat_holds_four_and_six_for_the_arkwrights_and_the_core_module_four_flat
     assert_eq!(g.habitat_room(g.colony(iss).unwrap()), 4 + core);
     // The Arkwrights (seat 2) start with no station: hand them the ISS for the reading.
     g.colony_mut(iss).unwrap().control = Control::Controlled(Seat(2));
-    assert_eq!(g.habitat_room(g.colony(iss).unwrap()), 6 + core, "half again for the Arkwrights, and the Core Module flat");
+    assert_eq!(g.habitat_room(g.colony(iss).unwrap()), 5 + core, "a quarter again for the Arkwrights (ticket #638), and the Core Module flat");
     with_tech(&mut g, TechId::ExpandedHabitats);
-    assert_eq!(g.habitat_room(g.colony(iss).unwrap()), 12 + core, "(4 + 4) x 1.5, and the Core Module still four");
+    assert_eq!(g.habitat_room(g.colony(iss).unwrap()), 10 + core, "(4 + 4) x 1.25, and the Core Module still four");
 }
 
 // ---------------------------------------------------------------- 0.06.0 ticket #81: the Archivists' card
@@ -7203,7 +7228,7 @@ fn the_gates_general_bonuses_are_for_everyone() {
     assert_eq!(g.colony_ship_capacity(cus), 4);
     with_tech(&mut g, TechId::GenerationShips);
     assert_eq!(g.colony_ship_capacity(cus), 6);
-    assert_eq!(g.colony_ship_capacity(Seat(2)), 9, "(4 + 2) x 1.5 for the Arkwrights (ticket #513; x 2 = 12 before)");
+    assert_eq!(g.colony_ship_capacity(Seat(2)), 7, "(4 + 2) x 1.25 for the Arkwrights, rounded down (ticket #638; x 1.5 = 9 before)");
     let sink = g.emissions_now().sink;
     with_tech(&mut g, TechId::PlanetaryStewardship);
     assert!((g.emissions_now().sink - sink - 1.5).abs() < 1e-9, "the Sink grows by 1.5: {} then {}", sink, g.emissions_now().sink);
@@ -7276,7 +7301,7 @@ fn a_warming_earth_lets_a_colony_ship_lift_beyond_its_capacity() {
     }
     g.climate.temperature = 2.6;
     assert_eq!(g.colony_ship_crowded_capacity(Seat(0)), 8, "4 + 4");
-    assert_eq!(g.colony_ship_crowded_capacity(Seat(2)), 10, "the Arkwrights' 6 + 4, not + 6 (8 + 4 until ticket #513)");
+    assert_eq!(g.colony_ship_crowded_capacity(Seat(2)), 9, "the Arkwrights' 5 + 4 (6 + 4 until ticket #638)");
     g.state_mut(StateId::EastAsia).emigrants = 12;
     let (ship, _) = colony_ship_ready(&mut g, BodyId::Earth);
     g.ship_mut(ship).unwrap().colonists = 0;
@@ -7397,7 +7422,7 @@ fn a_ship_is_built_with_a_full_tank_paid_from_the_stockpile() {
     g.seats[0].stockpile.materials = 100.0;
     g.seats[0].stockpile.energy = 200.0;
     g.seats[0].stockpile.fuel = 20.0;
-    let build = Order::BuildShip { site: Place::Colony(iss), kind: UnitKind::Frigate };
+    let build = Order::BuildShip { nuclear: false, site: Place::Colony(iss), kind: UnitKind::Frigate };
     assert_eq!(g.order_cost(Seat(0), &build).fuel, 30.0, "the tank is filled at the yard");
     assert!(g.check_order(Seat(0), &[], &build).is_err(), "20 Fuel cannot fill a tank of 30");
     g.seats[0].stockpile.fuel = 50.0;
@@ -7538,7 +7563,7 @@ fn modules_cost_less_at_a_colony_with_working_mines() {
     // Antarctica counts; a Ship and a station do not take it.
     let vostok = colony(&mut g, cus, BodyId::Earth, &[ModuleKind::Mine, ModuleKind::Shipyard], 0);
     assert_eq!(g.order_cost(cus, &habitat(vostok)).materials, 20.6); // Ticket #537: 27.5 x 0.75
-    assert_eq!(g.order_cost(cus, &Order::BuildShip { site: Place::Colony(vostok), kind: UnitKind::Frigate }).materials, 27.5, "Ships untouched");
+    assert_eq!(g.order_cost(cus, &Order::BuildShip { nuclear: false, site: Place::Colony(vostok), kind: UnitKind::Frigate }).materials, 27.5, "Ships untouched");
     assert_eq!(g.order_cost(cus, &g.station_order(Seat(0), BodyId::Moon, 0, &[])).materials, 44.0, "stations untouched");
     // The Archive at a Colony with two Mines: 55 x 0.6 = 33.
     let arc = Seat(3);
@@ -7737,7 +7762,7 @@ fn a_mass_driver_cuts_the_owners_departures_by_a_quarter_and_gives_its_mines_one
     assert_eq!(g.transit_cost_for(Seat(1), BodyId::Moon, BodyId::Earth).1, 3.7, "a rival pays the leg");
     let ark = Seat(2);
     colony(&mut g, ark, BodyId::Moon, &[ModuleKind::MassDriver], 0);
-    assert_eq!(g.transit_cost_for(ark, BodyId::Moon, BodyId::Earth).1, 2.1, "3.7 x 0.75 = 2.8 for the Arkwrights, x 0.75 again");
+    assert_eq!(g.transit_cost_for(ark, BodyId::Moon, BodyId::Earth).1, 2.3, "3.7 x 0.8 = 3.0 for the Arkwrights (ticket #638), x 0.75 again");
     assert_eq!(g.module_yield(cus, moon, ModuleKind::Mine).amount, 6.0, "4 x 1.25 = 5, +1 (ticket #554)");
     g.colony_mut(moon).unwrap().modules[1].mothballed = true;
     assert_eq!(g.transit_cost_for(cus, BodyId::Moon, BodyId::Earth).1, 3.7, "mothballed, it throws nothing");
@@ -8123,6 +8148,8 @@ fn the_custodian_ai_weighs_a_mine_off_earth_by_the_doubling_an_idle_earth_mine_w
 /// Ticket #554 (version 0.1.0.2): the Moon's Mine went to 1.25, so a Moon Mine and Mass Driver make
 /// 6.0, and no off-world Mine meets 6.6 any more. The even trade is restored with Phobos under Deep
 /// Mining: East Asia's Mine 4.4 x 1.5 x 1.5 = 9.9; a Phobos Mine 4 x 1.4875 x 1.5 = 8.9, + 1 = 9.9.
+/// Ticket #628 (version 0.1.0.6): Deep Mining x1.25 parts them by a tenth: East Asia 4.4 x 1.5 x 1.25 =
+/// 8.25, to the tenth 8.3; Phobos 4 x 1.4875 x 1.25 = 7.44, + 1 = 8.4. A tenth over even, still taken.
 #[test]
 fn the_custodian_ai_idles_an_earth_mine_for_an_even_trade() {
     let mut g = game();
@@ -8133,7 +8160,7 @@ fn the_custodian_ai_idles_an_earth_mine_for_an_even_trade() {
     let phobos = colony(&mut g, Seat(0), BodyId::Phobos, &[ModuleKind::Mine, ModuleKind::Generator, ModuleKind::MassDriver], 0);
     g.state_mut(StateId::EastAsia).facilities.push(facility(FacilityKind::Mine));
     let i = g.state(StateId::EastAsia).facilities.len() - 1;
-    assert_eq!((g.module_yield_at(Seat(0), phobos, 0).amount, g.facility_yield(Seat(0), StateId::EastAsia, FacilityKind::Mine).amount), (9.9, 9.9), "the premise: even");
+    assert_eq!((g.module_yield_at(Seat(0), phobos, 0).amount, g.facility_yield(Seat(0), StateId::EastAsia, FacilityKind::Mine).amount), (8.4, 8.3), "the premise: a tenth over even");
     let orders = g.ai_orders(Seat(0));
     assert!(
         orders.iter().any(|o| matches!(o, Order::Change { building: BuildingRef::Facility(StateId::EastAsia, j), what: BuildingChange::Mothball } if *j == i)),
@@ -8167,7 +8194,7 @@ fn every_computer_seat_races_for_the_first_landing_until_it_holds_a_colony_ship(
     g.colony_mut(iss).unwrap().modules.push(Module::new(ModuleKind::Shipyard));
     let ship_racing = weight_of(&mut g, "Colony Ship");
     // The seat's first Colony Ship ends the lift on both.
-    g.ships.push(Ship { name: String::new(), id: ShipId(960), kind: UnitKind::ColonyShip, seat: cus, damage: 0, at: ShipAt::Body(body), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 35.0, slot: Some(slot) });
+    g.ships.push(Ship { nuclear: false, fissionables: 0.0, name: String::new(), id: ShipId(960), kind: UnitKind::ColonyShip, seat: cus, damage: 0, at: ShipAt::Body(body), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 35.0, slot: Some(slot) });
     let ship_plain = weight_of(&mut g, "Colony Ship");
     g.colony_mut(iss).unwrap().modules.retain(|m| m.kind != ModuleKind::Shipyard);
     let yard_plain = weight_of(&mut g, "Shipyard");
@@ -8219,7 +8246,7 @@ fn every_computer_seat_races_for_mars_once_the_moon_is_claimed() {
     calm(&mut g);
     let rival = colony(&mut g, Seat(1), BodyId::Moon, &[], 2);
     g.body_firsts.push(BodyFirst { body: BodyId::Moon, seat: Seat(1), colony: rival });
-    g.ships.push(Ship { name: String::new(), id: ShipId(961), kind: UnitKind::ColonyShip, seat: cus, damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 4, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 32.0, slot: None });
+    g.ships.push(Ship { nuclear: false, fissionables: 0.0, name: String::new(), id: ShipId(961), kind: UnitKind::ColonyShip, seat: cus, damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 4, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 32.0, slot: None });
     let to_mars = |g: &mut Game| g.ai_orders(cus).iter().any(|o| matches!(o, Order::Transit { ship: ShipId(961), to: BodyId::Mars, .. }));
     let w = g.next_window_turn(g.turn);
     g.turn = w;
@@ -8232,7 +8259,7 @@ fn every_computer_seat_races_for_mars_once_the_moon_is_claimed() {
     assert!(g.transit_cost_for(cus, BodyId::Earth, BodyId::Mars).1 > 32.0, "the premise: off the window, past the tank");
     assert!(!to_mars(&mut g), "past what the tank pays it waits");
     // The review: only the seat's runner is held for Mars; a second loaded Ship founds elsewhere.
-    g.ships.push(Ship { name: String::new(), id: ShipId(962), kind: UnitKind::ColonyShip, seat: cus, damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 4, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 32.0, slot: None });
+    g.ships.push(Ship { nuclear: false, fissionables: 0.0, name: String::new(), id: ShipId(962), kind: UnitKind::ColonyShip, seat: cus, damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 4, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 32.0, slot: None });
     g.seats[0].stockpile.fuel = 200.0;
     let orders = g.ai_orders(cus);
     assert!(!orders.iter().any(|o| matches!(o, Order::Transit { ship: ShipId(961), .. })), "the runner waits for the window: {orders:?}");
@@ -8248,18 +8275,24 @@ fn every_computer_seat_races_for_mars_once_the_moon_is_claimed() {
 /// no state where only the race weight sent a runner. It holds the behaviour, the runner leaving.
 #[test]
 fn the_race_sends_its_runner_to_mars_over_the_ships_own_moves() {
+    // Ticket #639 (version 0.1.0.6): the Arkwrights open in Canada on the twenty-two-Region board, at
+    // step 380, and seed 1's game stands at the premise with its runner under way on turn 16, not 10
+    // (measured over seeds 1 to 8: the only one by turn 25).
     let mut g = Game::new(tables(), NewGame { seed: 1, player: FactionKind::Prospectors, player_is_ai: true, player_start: StateId::EastAsia });
     g.start();
-    while g.turn < 10 {
+    while g.turn < 16 {
         g.end_turn(std::array::from_fn(|_| Vec::new())).unwrap();
     }
     let ark = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Arkwrights).unwrap();
     assert!(g.first_at(BodyId::Moon).is_some() && g.first_at(BodyId::Mars).is_none(), "the premise: the Moon claimed, Mars not");
     g.log.clear();
     let orders = g.ai_orders(ark);
+    // Ticket #628 (version 0.1.0.6): with Deep Mining at x1.25 this seed's runner had left before
+    // turn 10, six Colonists aboard and five turns out; a runner under way is the race run as well.
+    let under_way = g.ships.iter().any(|s| s.seat == ark && s.colonists > 0 && matches!(s.at, ShipAt::Transit { to: BodyId::Mars, .. }));
     assert!(
-        orders.iter().any(|o| matches!(o, Order::Transit { to: BodyId::Mars, .. })),
-        "the Arkwrights' runner to Mars on turn 10: {:?}",
+        under_way || orders.iter().any(|o| matches!(o, Order::Transit { to: BodyId::Mars, .. })),
+        "the Arkwrights' runner to Mars on turn 16: {:?}",
         g.log.iter().filter(|l| l.contains("Colony Ship")).collect::<Vec<_>>()
     );
 }
@@ -8351,7 +8384,7 @@ fn a_colony_holds_one_module_for_each_colonist_and_none_without() {
     assert!(g.check_order(Seat(0), &[], &order).is_ok(), "mothballing frees Energy, never room");
     assert_eq!(g.module_slots_used(g.colony(c).unwrap()), 2);
     // One under construction reserves its slot.
-    g.colony_mut(c).unwrap().queue.push(Build { item: BuildItem::Module(ModuleKind::Mine), seat: Seat(0), widgets: 4, done: 0, coastal: false, fuel: 0.0 });
+    g.colony_mut(c).unwrap().queue.push(Build { nuclear: false, fissionables: 0.0, item: BuildItem::Module(ModuleKind::Mine), seat: Seat(0), widgets: 4, done: 0, coastal: false, fuel: 0.0 });
     assert_eq!(g.module_slots_used(g.colony(c).unwrap()), 3);
     assert!(g.check_order(Seat(0), &[], &order).is_err(), "the one building holds the last slot");
     // The Archive is exempt, and counted on neither side of the sum.
@@ -8751,14 +8784,14 @@ fn a_warship_blockades_the_orbital_slot_it_sits_in_and_nothing_more() {
     g.colony_mut(station).unwrap().modules.push(Module::new(ModuleKind::Habitat));
     // A rival Frigate arrives at the Body at large: it blockades nothing.
     let rival = ShipId(g.fresh_id());
-    g.ships.push(Ship {
+    g.ships.push(Ship { nuclear: false, fissionables: 0.0,
         name: String::new(), id: rival, kind: UnitKind::Frigate, seat: Seat(1), damage: 0, at: ShipAt::Body(body), colonists: 0, warhead: false, colonists_education: 1.0, army: None,
         stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None,
     });
     // A warship of ours contests the orbit, so nobody holds Orbital Control and the ground is open:
     // that isolates the slot rule from the ground rule.
     let mine = ShipId(g.fresh_id());
-    g.ships.push(Ship {
+    g.ships.push(Ship { nuclear: false, fissionables: 0.0,
         name: String::new(), id: mine, kind: UnitKind::Frigate, seat: Seat(0), damage: 0, at: ShipAt::Body(body), colonists: 0, warhead: false, colonists_education: 1.0, army: None,
         stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None,
     });
@@ -8798,7 +8831,7 @@ fn a_rival_blockade_of_low_orbit_shuts_the_ground_and_control_alone_does_not() {
     let body = BodyId::Moon;
     let push = |g: &mut Game, seat: Seat, stance: Stance| {
         let id = ShipId(g.fresh_id());
-        g.ships.push(Ship {
+        g.ships.push(Ship { nuclear: false, fissionables: 0.0,
             id,
             name: String::new(), kind: UnitKind::Frigate, seat, damage: 0, at: ShipAt::Body(body), colonists: 0, warhead: false, colonists_education: 1.0, army: None,
             stance, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None,
@@ -8855,7 +8888,7 @@ fn the_war_is_counted_at_the_event() {
     g.destroy_army(built, "battle", None);
     assert_eq!(g.war.armies_lost[0], 1, "a built Army of seat 0's");
     let frigate = ShipId(g.fresh_id());
-    g.ships.push(Ship { name: String::new(), id: frigate, kind: UnitKind::Frigate, seat: Seat(2), damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None });
+    g.ships.push(Ship { nuclear: false, fissionables: 0.0, name: String::new(), id: frigate, kind: UnitKind::Frigate, seat: Seat(2), damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None });
     g.destroy_ship(frigate, "battle");
     assert_eq!(g.war.warships_lost[2], 1);
     // Through the save.
@@ -9116,7 +9149,7 @@ fn a_battle_on_earth_pollutes_by_hits_and_buildings_burned_and_one_at_mars_does_
     // A Battle in Mars orbit fouls nobody's air.
     let push = |g: &mut Game, seat: Seat| {
         let id = ShipId(g.fresh_id());
-        g.ships.push(Ship {
+        g.ships.push(Ship { nuclear: false, fissionables: 0.0,
             id,
             name: String::new(), kind: UnitKind::Frigate, seat, damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, warhead: false, colonists_education: 1.0, army: None,
             stance: Stance::Attack, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None,
@@ -9145,7 +9178,7 @@ fn a_blockade_is_ordered_and_starves_the_station_in_its_slot_upkeep_still_paid()
     g.colony_mut(station).unwrap().modules.push(Module::new(ModuleKind::SolarArray));
     g.colony_mut(station).unwrap().modules.push(Module::new(ModuleKind::Observatory));
     let rival = ShipId(g.fresh_id());
-    g.ships.push(Ship {
+    g.ships.push(Ship { nuclear: false, fissionables: 0.0,
         name: String::new(), id: rival, kind: UnitKind::Frigate, seat: Seat(1), damage: 0, at: ShipAt::Body(body), colonists: 0, warhead: false, colonists_education: 1.0, army: None,
         stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None,
     });
@@ -9192,7 +9225,7 @@ fn a_ground_colony_starves_under_outright_orbital_control_with_a_blockading_stac
     let cid = colony(&mut g, Seat(0), body, &[ModuleKind::Mine], 4);
     let push = |g: &mut Game, seat: Seat, stance: Stance| {
         let id = ShipId(g.fresh_id());
-        g.ships.push(Ship {
+        g.ships.push(Ship { nuclear: false, fissionables: 0.0,
             id,
             name: String::new(), kind: UnitKind::Frigate, seat, damage: 0, at: ShipAt::Body(body), colonists: 0, warhead: false, colonists_education: 1.0, army: None,
             stance, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None,
@@ -9218,7 +9251,7 @@ fn the_computer_orders_a_blockade_where_its_warship_sits_in_a_rival_stations_slo
     let station = g.colonies.iter().find(|c| c.in_orbit && c.control.director() == Some(Seat(0))).map(|c| c.id).expect("a station over Earth");
     let (body, slot) = { let c = g.colony(station).unwrap(); (c.body, c.slot) };
     let id = ShipId(g.fresh_id());
-    g.ships.push(Ship {
+    g.ships.push(Ship { nuclear: false, fissionables: 0.0,
         name: String::new(), id, kind: UnitKind::Frigate, seat: Seat(1), damage: 0, at: ShipAt::Body(body), colonists: 0, warhead: false, colonists_education: 1.0, army: None,
         stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: Some(slot),
     });
@@ -9241,14 +9274,14 @@ fn a_blockade_stops_refuelling_and_holds_an_empty_slot_against_a_builder() {
     g.seats[0].stockpile.fuel = 100.0;
     g.seats[0].stockpile.materials = 500.0;
     let mine = ShipId(g.fresh_id());
-    g.ships.push(Ship {
+    g.ships.push(Ship { nuclear: false, fissionables: 0.0,
         name: String::new(), id: mine, kind: UnitKind::Frigate, seat: Seat(0), damage: 0, at: ShipAt::Body(body), colonists: 0, warhead: false, colonists_education: 1.0, army: None,
         stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 5.0, slot: Some(slot),
     });
     // Ticket #335 (version 0.09.0): at the station's own ring, which is the orbit it fuels from.
     assert!(g.check_order(Seat(0), &[], &Order::Refuel { ship: mine }).is_ok(), "an unblockaded station fuels it");
     let rival = ShipId(g.fresh_id());
-    g.ships.push(Ship {
+    g.ships.push(Ship { nuclear: false, fissionables: 0.0,
         name: String::new(), id: rival, kind: UnitKind::Frigate, seat: Seat(1), damage: 0, at: ShipAt::Body(body), colonists: 0, warhead: false, colonists_education: 1.0, army: None,
         stance: Stance::Blockade, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: Some(slot),
     });
@@ -9321,6 +9354,7 @@ fn an_order_after_a_launch_rearm_or_bombard_is_refused() {
     let iss = g.colonies.iter().find(|c| c.in_orbit && c.body == BodyId::Earth && c.control.director() == Some(Seat(0))).map(|c| c.slot).expect("the ISS");
     let ship = carrier_in(&mut g, Seat(0), BodyId::Earth, Some(iss), true);
     g.seats[0].stockpile.fuel = 100.0;
+    g.seats[0].stockpile.fissionables = 100.0; // Ticket #629 (version 0.1.0.6): a Warhead's half a Fissionable.
     g.ship_mut(ship).unwrap().fuel = 20.0;
     // Each of the three is lawful on its own, so a refusal can only be the one-order rule.
     for t in [Order::ChangeOrbit { ship, slot: None }, Order::Transit { ship, to: BodyId::Moon, slot: None }, Order::Refuel { ship }] {
@@ -9478,7 +9512,7 @@ fn the_archivists_ferry_their_people_off_earth() {
 fn a_transit_names_the_slot_it_arrives_into() {
     let mut g = game();
     let ship = ShipId(g.fresh_id());
-    g.ships.push(Ship {
+    g.ships.push(Ship { nuclear: false, fissionables: 0.0,
         name: String::new(), id: ship, kind: UnitKind::Frigate, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false, colonists_education: 1.0, army: None,
         stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None,
     });
@@ -10177,7 +10211,7 @@ fn a_unique_facility_costs_and_makes_what_the_common_one_does() {
     for (unique, common) in [
         (FacilityKind::InvestmentBank, FacilityKind::Bank),
         (FacilityKind::Spaceport, FacilityKind::LaunchSite),
-        (FacilityKind::Reactor, FacilityKind::PowerPlant),
+        (FacilityKind::Accumulator, FacilityKind::PowerPlant),
         (FacilityKind::Academy, FacilityKind::School),
     ] {
         assert_eq!(unique.common(), Some(common), "{} replaces {}", unique.name(), common.name());
@@ -10490,12 +10524,12 @@ fn a_reactor_takes_a_quarter_off_the_whole_energy_bill_but_never_off_the_archive
     assert!(want > 0.0, "the premise: there is a bill to take a quarter off, {bill}");
 
     let i = g.state(sid).facilities.iter().position(|f| f.kind == FacilityKind::PowerPlant).unwrap();
-    g.state_mut(sid).facilities[i].kind = FacilityKind::Reactor;
+    g.state_mut(sid).facilities[i].kind = FacilityKind::Accumulator;
     g.income_phase();
     assert_eq!(g.seats[arc.index()].income_last_turn.energy - plain, want, "off the total, floored once");
 
     // No stacking: a second Reactor is worth its 6 Energy and nothing more.
-    g.state_mut(sid).facilities.push(Facility::new(FacilityKind::Reactor));
+    g.state_mut(sid).facilities.push(Facility::new(FacilityKind::Accumulator));
     g.income_phase();
     let two = g.seats[arc.index()].income_last_turn.energy;
     g.state_mut(sid).facilities.pop();
@@ -10503,7 +10537,7 @@ fn a_reactor_takes_a_quarter_off_the_whole_energy_bill_but_never_off_the_archive
     let one = g.seats[arc.index()].income_last_turn.energy;
     // What a Reactor actually makes here, not the row figure: this Region leans Energy, so its
     // power stations pay half again.
-    let makes = g.facility_yield(arc, sid, FacilityKind::Reactor).amount;
+    let makes = g.facility_yield(arc, sid, FacilityKind::Accumulator).amount;
     assert_eq!(two - one, makes, "the second Reactor pays its Energy and no second discount");
 
     // And the Archive pays in full: it is left out of the sum the relief is taken from, so adding it
@@ -10722,7 +10756,12 @@ fn relations_do_nothing_mechanical_in_this_version() {
     // Ticket #332 (version 0.09.0): seven turns, where six parted the boards before. Widgets
     // slow the opening builds, so the first credit purchase of the neutral game, which is the
     // divergence, comes a turn later; measured at seven on this seed when the ticket was built.
-    for _ in 0..7 {
+    // Ticket #639 (version 0.1.0.6): eight on the twenty-two-Region board, measured over seeds 1 to
+    // 11 (six or eight). Within them nobody buys a credit in either game; what parts the boards now,
+    // traced from the computer seats' orders turn by turn (from the review), is that the hostile
+    // seats propose no Accord and Smear one another from turn 2, where the neutral ones propose
+    // Non-Aggression and spend that Influence on the United States' Region.
+    for _ in 0..8 {
         pick_a_tech(&mut a);
         answer_the_card(&mut a);
         pick_a_tech(&mut b);
@@ -10730,9 +10769,11 @@ fn relations_do_nothing_mechanical_in_this_version() {
         a.end_turn(std::array::from_fn(|_| Vec::new())).unwrap();
         b.end_turn(std::array::from_fn(|_| Vec::new())).unwrap();
     }
-    // The hostile game proposes no purchase at all -- the Custodians will not sell to a Hostile
-    // buyer -- so the computer seats' choices, and with them the board, part from the neutral game's.
-    assert_ne!(picture(&a), picture(&b), "seven turns of the worst possible blood now change the board: {:?}", picture(&a));
+    // Relations steer the computer seats' Influence: Smears in the hostile game, none in the neutral
+    // one, and the board parts with them.
+    let smeared = |g: &Game| Seat::ALL.into_iter().map(|s| g.seat(s).blame_smeared).sum::<f64>();
+    assert!(smeared(&b) > 0.0 && smeared(&a) == 0.0, "Smears only where Relations are Hostile: {} and {}", smeared(&b), smeared(&a));
+    assert_ne!(picture(&a), picture(&b), "eight turns of the worst possible blood now change the board: {:?}", picture(&a));
     assert_eq!(Seat::ALL.into_iter().map(|s| b.seat(s).credits_bought).sum::<f64>(), 0.0, "and nobody bought a credit in it");
 }
 
@@ -10963,7 +11004,7 @@ fn a_ship_is_named_from_the_list_its_kind_draws_from() {
     // A name in use is skipped, and uniqueness is across the WHOLE BOARD, not per Faction: the
     // Ship below is seat 0's and still blocks the name for everyone.
     let id = ShipId(g.fresh_id());
-    g.ships.push(Ship {
+    g.ships.push(Ship { nuclear: false, fissionables: 0.0,
         id,
         name: colony_first.clone(),
         kind: UnitKind::ColonyShip,
@@ -10997,7 +11038,7 @@ fn an_exhausted_ship_name_list_wraps_with_a_numeral() {
     let names = g.tables.ship_names.colony.names.clone();
     for (i, n) in names.iter().enumerate() {
         let id = ShipId(g.fresh_id());
-        g.ships.push(Ship {
+        g.ships.push(Ship { nuclear: false, fissionables: 0.0,
             id,
             name: n.clone(),
             kind: UnitKind::ColonyShip,
@@ -11076,7 +11117,7 @@ fn cryogenic_tanks_adds_fifteen_to_every_tank_on_clean_propellants_five() {
     assert_eq!(tanks(&g), (52.0, 50.0, 50.0));
     assert_eq!(g.tank_of(Seat(0), UnitKind::Army), 0.0, "an Army has no tank");
     let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
-    assert_eq!(g.order_cost(Seat(0), &Order::BuildShip { site: Place::Colony(iss), kind: UnitKind::ColonyShip }).fuel, 52.0, "the build fills the whole tank: 32 since ticket #596");
+    assert_eq!(g.order_cost(Seat(0), &Order::BuildShip { nuclear: false, site: Place::Colony(iss), kind: UnitKind::ColonyShip }).fuel, 52.0, "the build fills the whole tank: 32 since ticket #596");
     // Under Provisional Findings, the Archivists', half of 15, rounded down: 7.
     let mut g = game();
     let arc = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Archivists).unwrap();
@@ -11316,7 +11357,10 @@ fn a_research_agreement_wants_friendship_first() {
 fn beneficiation_adds_one_to_every_mine_once_deep_mining_stands() {
     // Ticket #554 (version 0.1.0.2): the Moon's Mine yield 1.25, so 4 x 1.25 x 1.5 = 7.5; x 1.1 = 8.25,
     // to the tenth 8.3; x 1.25 = 10.3125, to the tenth 10.3.
-    for (body, deep, with_ben, all_three) in [(BodyId::Earth, 8.9, 9.8, 12.3), (BodyId::Moon, 7.5, 8.3, 10.3), (BodyId::Mars, 6.4, 7.0, 8.8), (BodyId::Phobos, 8.9, 9.8, 12.3)] {
+    // Ticket #628 (version 0.1.0.6): Deep Mining x1.25, the chain tenthed once at its end: Earth and
+    // Phobos 4 x 1.4875 x 1.25 = 7.44, x 1.1 = 8.18, x 1.25 = 10.23; the Moon 4 x 1.25 x 1.25 = 6.25,
+    // 6.875, 8.59; Mars 4 x 1.0625 x 1.25 = 5.31, 5.84, 7.30.
+    for (body, deep, with_ben, all_three) in [(BodyId::Earth, 7.4, 8.2, 10.2), (BodyId::Moon, 6.3, 6.9, 8.6), (BodyId::Mars, 5.3, 5.8, 7.3), (BodyId::Phobos, 7.4, 8.2, 10.2)] {
         let mut g = game();
         let seat = Seat(0);
         let c = colony(&mut g, seat, body, &[ModuleKind::Mine], 4);
@@ -11342,7 +11386,10 @@ fn beneficiation_reaches_an_antarctic_mine_too() {
     let seat = Seat(0);
     let c = colony(&mut g, seat, BodyId::Earth, &[ModuleKind::Mine], 4);
     with_tech(&mut g, TechId::DeepMining);
-    let before = g.module_yield(seat, c, ModuleKind::Mine).amount;
+    // Ticket #628 (version 0.1.0.6): the chain's figure before its one tenth, from the card, since at
+    // Deep Mining's x1.25 the tenthed 7.4 x 1.1 is 8.1 where the chain's 7.4375 x 1.1 is 8.2.
+    let before = 4.0 * g.tables.body(BodyId::Earth).mine_yield * g.tables.tech(TechId::DeepMining).value;
+    assert_eq!(tenth(before), g.module_yield(seat, c, ModuleKind::Mine).amount, "the premise: Deep Mining alone");
     with_tech(&mut g, TechId::Beneficiation);
     assert_eq!(g.module_yield(seat, c, ModuleKind::Mine).amount, tenth(before * 1.1), "an Antarctic Mine reads the Tech exactly as one off Earth does"); // Ticket #387: a tenth more, to the tenth, where it added one whole
     assert_eq!(g.tables.tech(TechId::Beneficiation).effect, "Mine output x1.1, wherever the Mine stands", "and the effect line says so, because the name no longer can");
@@ -11884,17 +11931,17 @@ fn what_a_faction_has_under_way_lists_its_builds_and_transits_soonest_first() {
     // Plant of 8 is two Resolutions off; the Moon Colony makes its Core Module's 4, so a Mine with
     // one Widget left lands next turn.
     assert_eq!(g.widgets_at(Place::State(sid)), 7, "a flat 4 and Europe's Industry Level");
-    g.state_mut(sid).queue.push(Build { item: BuildItem::Facility(FacilityKind::PowerPlant), seat: Seat(0), widgets: 8, done: 0, coastal: false, fuel: 0.0 });
+    g.state_mut(sid).queue.push(Build { nuclear: false, fissionables: 0.0, item: BuildItem::Facility(FacilityKind::PowerPlant), seat: Seat(0), widgets: 8, done: 0, coastal: false, fuel: 0.0 });
     let cid = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Habitat], 4);
     assert_eq!(g.widgets_at(Place::Colony(cid)), 4, "the Core Module's four");
-    g.colony_mut(cid).unwrap().queue.push(Build { item: BuildItem::Module(ModuleKind::Mine), seat: Seat(0), widgets: 4, done: 3, coastal: false, fuel: 0.0 });
+    g.colony_mut(cid).unwrap().queue.push(Build { nuclear: false, fissionables: 0.0, item: BuildItem::Module(ModuleKind::Mine), seat: Seat(0), widgets: 4, done: 3, coastal: false, fuel: 0.0 });
     // A rival's build in a Region the player directs is the rival's, not the player's.
-    g.state_mut(sid).queue.push(Build { item: BuildItem::Facility(FacilityKind::Bank), seat: Seat(1), widgets: 4, done: 0, coastal: false, fuel: 0.0 });
+    g.state_mut(sid).queue.push(Build { nuclear: false, fissionables: 0.0, item: BuildItem::Facility(FacilityKind::Bank), seat: Seat(1), widgets: 4, done: 0, coastal: false, fuel: 0.0 });
     // Two Ships: one on the road to Mars with three turns left, one arriving next turn, and one at rest.
     let put = |g: &mut Game, kind: UnitKind| -> ShipId {
         let id = ShipId(g.fresh_id());
         let name = g.next_ship_name(kind);
-        g.ships.push(Ship { name, id, kind, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None });
+        g.ships.push(Ship { nuclear: false, fissionables: 0.0, name, id, kind, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None });
         id
     };
     let far = put(&mut g, UnitKind::Frigate);
@@ -11976,23 +12023,23 @@ fn a_rival_closing_on_its_victory_condition_interrupts_the_player_once_a_step() 
     // since Presence is 20 and 15 of 20 would read under three quarters. Ticket #623 (version
     // 0.1.0.5): 5,000 of 6,250, the same four fifths.
     colony(&mut g, pro, BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 16);
-    g.seats[pro.index()].venture_fund = 5000.0;
+    g.seats[pro.index()].venture_fund = 5200.0; // four fifths of 6,500 (ticket #638)
     // Ticket #555 (version 0.1.0.2): the score is the mean of the parts, past three quarters; the
     // Fund is still the shorter part, which the Moment names. Ticket #567 (version 0.1.0.3): the Fund
     // counts 0.7 of it, 0.7 x 0.8 + 0.3 x 16/20 (ticket #625: 16 of 20; ticket #623: 5,000 of 6,250).
-    assert!((g.progress(pro).score() - 0.94 * (0.7 * 5000.0 / 6250.0 + 0.3 * 16.0 / 20.0)).abs() < 1e-9, "{}", g.progress(pro).score());
+    assert!((g.progress(pro).score() - 0.94 * (0.7 * 5200.0 / 6500.0 + 0.3 * 16.0 / 20.0)).abs() < 1e-9, "{}", g.progress(pro).score());
     assert!(g.progress(pro).score() >= 0.75);
     g.end_phase();
     assert_eq!(fired(&g), 1, "three quarters: the Moment fires: {:?}", g.report.moments);
     let m = g.report.moments.iter().find(|m| m.kind == MomentKind::RivalProgress).unwrap();
     assert!(m.text.contains("Prospectors") && m.text.contains("three quarters"), "{}", m.text);
     // Ticket #506 (version 0.1.0.0): the Fund, at 0.75, is the shorter part now; Presence is 14 of 18 (16 of 20 since ticket #625).
-    assert!(m.text.contains("5000 of 6250"), "the part still short is the figure: {}", m.text);
-    assert_eq!(m.figure, "5000 of 6250");
+    assert!(m.text.contains("5200 of 6500"), "the part still short is the figure: {}", m.text);
+    assert_eq!(m.figure, "5200 of 6500");
     g.end_phase();
     assert_eq!(fired(&g), 1, "once: it does not fire again while the seat sits there");
     // The Fund full but its gate shut is held back, not met.
-    g.seats[pro.index()].venture_fund = 6250.0;
+    g.seats[pro.index()].venture_fund = 6500.0;
     g.end_phase();
     assert_eq!(fired(&g), 1, "a part held back by its gate Tech is not a part met");
     // The gate open: one part met, the other short.
@@ -12010,7 +12057,7 @@ fn a_rival_closing_on_its_victory_condition_interrupts_the_player_once_a_step() 
     g.end_phase();
     assert_eq!(fired(&g), 2, "rivals only: {:?}", g.report.moments);
     assert_eq!(MomentKind::RivalProgress.rank(), 5, "between a Battle (4) and a Tech (6)");
-    assert_eq!(MomentKind::ALL.len(), 13, "ticket #281 (version 0.08.5) added a place taken by force, #345 (0.09.1) a Body settled first, #405 (0.09.4) the world under the Sink, and #538 (0.1.0.1) an Accord ended");
+    assert_eq!(MomentKind::ALL.len(), 14, "ticket #281 (version 0.08.5) added a place taken by force, #345 (0.09.1) a Body settled first, #405 (0.09.4) the world under the Sink, #538 (0.1.0.1) an Accord ended, and #633 (0.1.0.6) the first child born off Earth");
     assert!(g.tables.report.moment_on(MomentKind::RivalProgress), "on by default");
 }
 
@@ -12256,7 +12303,7 @@ fn the_shared_pots_penalty_never_scars_a_pair() {
 /// deepened the very thing that leaves them winning 3 games of 80. So a Call SUSPENDS the double
 /// charge while it runs: they move twice the people at the ordinary price in population.
 #[test]
-fn an_exodus_call_doubles_the_muster_and_suspends_the_double_cost() {
+fn an_exodus_call_doubles_the_muster_at_the_ordinary_cost() {
     let mut g = game();
     let ark = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Arkwrights).unwrap();
     let sid = g.controlled_states(ark)[0];
@@ -12271,10 +12318,11 @@ fn an_exodus_call_doubles_the_muster_and_suspends_the_double_cost() {
     assert!(g.exodus_call_running(sid), "it runs from the turn it is sounded");
     assert_eq!(g.emigrants_per_turn_in(ark, sid), plain * 2, "six, not three (eight, not four, until ticket #513)");
 
-    // The whole point: eight people cost what eight people cost anybody else.
+    // Eight people cost what eight people cost anybody else. Ticket #638 (version 0.1.0.6): Coach
+    // Class charges no more than that now, so the suspension changes nothing.
     let each = g.tables.emigrants.population_each;
-    assert!((g.muster_population_in(ark, sid, 8) - each * 8.0).abs() < 1e-9, "the ordinary price, not their double");
-    assert!(g.muster_population_in(ark, sid, 8) < g.lift_population(ark, 8), "which is strictly less than Coach Class charges");
+    assert!((g.muster_population_in(ark, sid, 8) - each * 8.0).abs() < 1e-9, "the ordinary price");
+    assert!((g.muster_population_in(ark, sid, 8) - g.lift_population(ark, 8)).abs() < 1e-9, "which is what Coach Class charges since ticket #638");
 
     // Elsewhere they are unchanged: the Call is a Region's, not a Faction's.
     let other = g.controlled_states(ark).into_iter().find(|s| *s != sid);
@@ -12499,7 +12547,7 @@ fn an_army_landed_at_a_rivals_colony_fights_or_occupies_the_turn_it_lands() {
     let army = ArmyId(g.fresh_id());
     let ship = ShipId(g.fresh_id());
     g.armies.push(Army { name: String::new(), id: army, home: ArmyHome::State(StateId::EastAsia), at: ArmyAt::Aboard(ship), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None, levy: false, raised_strength: 0 });
-    g.ships.push(Ship { name: String::new(), id: ship, kind: UnitKind::Carrier, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Moon), colonists: 0, warhead: false, colonists_education: 1.0, army: Some(army), stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None });
+    g.ships.push(Ship { nuclear: false, fissionables: 0.0, name: String::new(), id: ship, kind: UnitKind::Carrier, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Moon), colonists: 0, warhead: false, colonists_education: 1.0, army: Some(army), stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None });
     g.commit_orders(Seat(0), &[Order::Unload { ship, colonists: 0, army: true, into: UnloadTarget::Colony(cid) }]);
     g.resolution_phase();
     let a = g.army(army).unwrap();
@@ -12516,7 +12564,7 @@ fn an_army_landed_at_a_rivals_colony_fights_or_occupies_the_turn_it_lands() {
     let army = ArmyId(g.fresh_id());
     let ship = ShipId(g.fresh_id());
     g.armies.push(Army { name: String::new(), id: army, home: ArmyHome::State(StateId::EastAsia), at: ArmyAt::Aboard(ship), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None, levy: false, raised_strength: 0 });
-    g.ships.push(Ship { name: String::new(), id: ship, kind: UnitKind::Carrier, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Moon), colonists: 0, warhead: false, colonists_education: 1.0, army: Some(army), stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None });
+    g.ships.push(Ship { nuclear: false, fissionables: 0.0, name: String::new(), id: ship, kind: UnitKind::Carrier, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Moon), colonists: 0, warhead: false, colonists_education: 1.0, army: Some(army), stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None });
     let battles = g.war.battles[0];
     g.commit_orders(Seat(0), &[Order::Unload { ship, colonists: 0, army: true, into: UnloadTarget::Colony(cid) }]);
     g.resolution_phase();
@@ -12528,7 +12576,7 @@ fn an_army_landed_at_a_rivals_colony_fights_or_occupies_the_turn_it_lands() {
     let army = ArmyId(g.fresh_id());
     let ship = ShipId(g.fresh_id());
     g.armies.push(Army { name: String::new(), id: army, home: ArmyHome::State(StateId::EastAsia), at: ArmyAt::Aboard(ship), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None, levy: false, raised_strength: 0 });
-    g.ships.push(Ship { name: String::new(), id: ship, kind: UnitKind::Carrier, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Moon), colonists: 0, warhead: false, colonists_education: 1.0, army: Some(army), stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None });
+    g.ships.push(Ship { nuclear: false, fissionables: 0.0, name: String::new(), id: ship, kind: UnitKind::Carrier, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Moon), colonists: 0, warhead: false, colonists_education: 1.0, army: Some(army), stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None });
     g.commit_orders(Seat(0), &[Order::Unload { ship, colonists: 0, army: true, into: UnloadTarget::Colony(cid) }]);
     g.resolution_phase();
     assert_eq!(g.army(army).unwrap().stance, Stance::Hold, "at its own Colony it lands on Hold");
@@ -12865,7 +12913,7 @@ fn a_blockade_does_not_shut_out_a_partner_under_passage() {
     let station = g.colonies.iter().find(|c| c.in_orbit && c.body == BodyId::Earth && c.control.director() == Some(Seat(0))).expect("seat 0's station").clone();
     let id = ShipId(g.fresh_id());
     let name = g.next_ship_name(UnitKind::Frigate);
-    g.ships.push(Ship { id, name, kind: UnitKind::Frigate, seat: Seat(1), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Blockade, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: Some(station.slot) });
+    g.ships.push(Ship { nuclear: false, fissionables: 0.0, id, name, kind: UnitKind::Frigate, seat: Seat(1), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Blockade, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: Some(station.slot) });
     assert!(g.slot_blockaded_against(Seat(0), BodyId::Earth, station.slot), "a rival's warship on Blockade shuts the slot");
     g.strike_accord(Seat(0), Seat(1), vec![Term::Passage]).expect("Passage struck");
     assert!(!g.slot_blockaded_against(Seat(0), BodyId::Earth, station.slot), "not against a partner under Passage");
@@ -12925,11 +12973,17 @@ fn the_computer_marches_a_stack_where_one_army_alone_would_not_clear_the_bar() {
         a.stance = Stance::DigIn;
     }
     let first = g.raise_army(Place::State(home), false);
+    // Ticket #635 (version 0.1.0.6): a new Army now joins China's dug-in stance and cannot march
+    // until the stance changes (in play a computer seat that keeps digging in at a threatened home
+    // keeps its new Armies there, measured nowhere yet); these two are put on Hold, free to march,
+    // which is the massing this test weighs.
     g.armies.iter_mut().find(|a| a.id == first).unwrap().raised_strength = 4;
+    g.army_mut(first).unwrap().stance = Stance::Hold;
     let alone: Vec<Order> = g.ai_orders(Seat(0));
     assert!(!alone.iter().any(|o| matches!(o, Order::MoveArmy { to, .. } if *to == target)), "one Army alone does not march on Russia: {alone:?}");
     let second = g.raise_army(Place::State(home), false);
     g.armies.iter_mut().find(|a| a.id == second).unwrap().raised_strength = 4;
+    g.army_mut(second).unwrap().stance = Stance::Hold;
     let together: Vec<Order> = g.ai_orders(Seat(0));
     let marched: Vec<ArmyId> = together.iter().filter_map(|o| match o { Order::MoveArmy { army, to } if *to == target => Some(*army), _ => None }).collect();
     assert!(marched.contains(&first) && marched.contains(&second), "the stack of two marches on Russia together: {together:?}");
@@ -12949,7 +13003,7 @@ fn a_battery_denies_orbital_control_and_the_blockade_and_falls_in_a_battle() {
     g.ships.retain(|s| s.at != ShipAt::Body(BodyId::Earth));
     let id = ShipId(g.fresh_id());
     let name = g.next_ship_name(UnitKind::Frigate);
-    g.ships.push(Ship { id, name, kind: UnitKind::Frigate, seat: Seat(1), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Blockade, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: Some(slot) });
+    g.ships.push(Ship { nuclear: false, fissionables: 0.0, id, name, kind: UnitKind::Frigate, seat: Seat(1), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Blockade, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: Some(slot) });
     // Ticket #335 (version 0.09.0): the frigate sits in the STATION'S orbit, so it blockades that
     // station and holds nothing of low orbit, which is what Orbital Control is of now.
     assert_eq!(g.orbital_control(BodyId::Earth), None, "a warship at a station's ring holds no Control of low orbit");
@@ -12970,7 +13024,7 @@ fn a_battery_denies_orbital_control_and_the_blockade_and_falls_in_a_battle() {
     // a Battery to the orbit it covers, at the designer's word.
     let low = ShipId(g.fresh_id());
     let name = g.next_ship_name(UnitKind::Frigate);
-    g.ships.push(Ship { id: low, name, kind: UnitKind::Frigate, seat: Seat(1), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None });
+    g.ships.push(Ship { nuclear: false, fissionables: 0.0, id: low, name, kind: UnitKind::Frigate, seat: Seat(1), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None });
     assert_eq!(g.orbital_control(BodyId::Earth), Some(Seat(1)), "a lone rival warship in low orbit holds Orbital Control");
     assert!(g.may_land(Seat(0), BodyId::Earth), "ticket #570 (version 0.1.0.3): on Hold it shuts no landing");
     g.ships.retain(|s| s.id != low);
@@ -12988,7 +13042,7 @@ fn a_battery_denies_orbital_control_and_the_blockade_and_falls_in_a_battle() {
     for _ in 0..2 {
         let id = ShipId(g.fresh_id());
         let name = g.next_ship_name(UnitKind::Frigate);
-        g.ships.push(Ship { id, name, kind: UnitKind::Frigate, seat: Seat(1), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Attack, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: Some(slot) });
+        g.ships.push(Ship { nuclear: false, fissionables: 0.0, id, name, kind: UnitKind::Frigate, seat: Seat(1), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Attack, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: Some(slot) });
     }
     for s in g.ships.iter_mut().filter(|s| s.seat == Seat(1) && s.at == ShipAt::Body(BodyId::Earth)) {
         s.stance = Stance::Attack;
@@ -13031,7 +13085,7 @@ fn the_computer_wants_a_battery_where_a_rival_warship_stands() {
     assert!(!before.iter().any(|o| matches!(o, Order::BuildModule { kind: ModuleKind::Battery, .. })), "no rival warship here, no Battery: {before:?}");
     let id = ShipId(g.fresh_id());
     let name = g.next_ship_name(UnitKind::Frigate);
-    g.ships.push(Ship { id, name, kind: UnitKind::Frigate, seat: Seat(1), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None });
+    g.ships.push(Ship { nuclear: false, fissionables: 0.0, id, name, kind: UnitKind::Frigate, seat: Seat(1), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None });
     let after: Vec<Order> = g.ai_orders(Seat(0));
     assert!(after.iter().any(|o| matches!(o, Order::BuildModule { colony, kind: ModuleKind::Battery } if *colony == station)), "a rival warship at the Body: {after:?}");
     g.colony_mut(station).unwrap().modules.push(Module::new(ModuleKind::Battery));
@@ -13054,7 +13108,7 @@ fn a_refuel_accord_opens_a_partners_station() {
     let name = g.next_ship_name(UnitKind::Frigate);
     // Ticket #335 (version 0.09.0): the Frigate stands at the partner station's own ring, which is
     // the orbit a station fuels from.
-    g.ships.push(Ship { id, name, kind: UnitKind::Frigate, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 0.0, slot: Some(0) });
+    g.ships.push(Ship { nuclear: false, fissionables: 0.0, id, name, kind: UnitKind::Frigate, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 0.0, slot: Some(0) });
     g.seats[0].stockpile.fuel = 40.0;
     let refuel = Order::Refuel { ship: id };
     assert!(!g.own_station_at(Seat(0), BodyId::Mars));
@@ -13076,7 +13130,7 @@ fn a_refuel_accord_opens_a_partners_station() {
     g.ships.iter_mut().find(|s| s.id == id).unwrap().fuel = 0.0;
     let blockader = ShipId(g.fresh_id());
     let name = g.next_ship_name(UnitKind::Frigate);
-    g.ships.push(Ship { id: blockader, name, kind: UnitKind::Frigate, seat: Seat(2), damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Blockade, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: Some(0) });
+    g.ships.push(Ship { nuclear: false, fissionables: 0.0, id: blockader, name, kind: UnitKind::Frigate, seat: Seat(2), damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Blockade, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: Some(0) });
     assert!(g.check_order(Seat(0), &[], &refuel).is_err(), "blockaded against its holder, it fuels nobody");
 }
 
@@ -13150,21 +13204,21 @@ fn a_battleship_bombards_a_rival_colony_from_an_orbit_it_holds() {
     g.ships.retain(|s| s.at != ShipAt::Body(BodyId::Mars));
     let ship = ShipId(g.fresh_id());
     let name = g.next_ship_name(UnitKind::Battleship);
-    g.ships.push(Ship { id: ship, name, kind: UnitKind::Battleship, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None });
+    g.ships.push(Ship { nuclear: false, fissionables: 0.0, id: ship, name, kind: UnitKind::Battleship, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None });
     let bombard = Order::Bombard { ship, colony };
     assert_eq!(g.orbital_control(BodyId::Mars), Some(Seat(0)));
     assert!(g.check_order(Seat(0), &[], &bombard).is_ok(), "held outright, a rival's Colony at the Body");
     // Not with the orbit contested.
     let rival = ShipId(g.fresh_id());
     let name = g.next_ship_name(UnitKind::Frigate);
-    g.ships.push(Ship { id: rival, name, kind: UnitKind::Frigate, seat: Seat(2), damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None });
+    g.ships.push(Ship { nuclear: false, fissionables: 0.0, id: rival, name, kind: UnitKind::Frigate, seat: Seat(2), damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None });
     assert!(g.check_order(Seat(0), &[], &bombard).is_err(), "the orbit is contested");
     g.ships.retain(|s| s.id != rival);
     // Never over Earth, from any hull.
     let over_earth = g.colonies.iter().find(|c| c.in_orbit && c.body == BodyId::Earth && c.control.director() == Some(Seat(1))).map(|c| c.id).expect("seat 1's station");
     let earth_ship = ShipId(g.fresh_id());
     let name = g.next_ship_name(UnitKind::Battleship);
-    g.ships.push(Ship { id: earth_ship, name, kind: UnitKind::Battleship, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None });
+    g.ships.push(Ship { nuclear: false, fissionables: 0.0, id: earth_ship, name, kind: UnitKind::Battleship, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None });
     assert!(g.check_order(Seat(0), &[], &Order::Bombard { ship: earth_ship, colony: over_earth }).is_err(), "no Bombard over Earth");
     g.ships.retain(|s| s.id != earth_ship);
     // The strike, at a certain chance: one Module burns, never the Core, and the people beyond the room left die.
@@ -13197,7 +13251,7 @@ fn the_computer_bombards_with_cause_and_the_orbit_held() {
     g.ships.retain(|s| s.at != ShipAt::Body(BodyId::Mars));
     let ship = ShipId(g.fresh_id());
     let name = g.next_ship_name(UnitKind::Battleship);
-    g.ships.push(Ship { id: ship, name, kind: UnitKind::Battleship, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 10.0, slot: None });
+    g.ships.push(Ship { nuclear: false, fissionables: 0.0, id: ship, name, kind: UnitKind::Battleship, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 10.0, slot: None });
     // Ticket #486 (version 0.09.8): the hull holds 10 Fuel, short of the leg home. With a full tank
     // it now flies to blockade the rival's station over Earth instead, the homeward leg being cheap.
     let calm_orders: Vec<Order> = g.ai_orders(Seat(0));
@@ -13379,12 +13433,15 @@ fn four_makers_the_factory_makes_widgets_the_mine_makes_materials_and_the_start_
     // Ticket #389 (version 0.09.3): the Stadium stands after the Mine now, appended last in its turn;
     // ticket #411 (version 0.09.4): and the Nature Reserve after it; ticket #559 (version 0.1.0.3):
     // and the Wind Farm after that, on both lists.
-    assert_eq!(FacilityKind::ALL[FacilityKind::ALL.len() - 4], FacilityKind::Mine, "appended after every kind before it");
-    assert_eq!(FacilityKind::ALL[FacilityKind::ALL.len() - 3], FacilityKind::Stadium);
-    assert_eq!(FacilityKind::ALL[FacilityKind::ALL.len() - 2], FacilityKind::NatureReserve);
-    assert_eq!(FacilityKind::ALL.last(), Some(&FacilityKind::WindFarm), "appended last");
-    assert_eq!(ModuleKind::ALL[ModuleKind::ALL.len() - 2], ModuleKind::Factory, "appended after every kind before it");
-    assert_eq!(ModuleKind::ALL.last(), Some(&ModuleKind::WindFarm), "appended last");
+    // Ticket #630 (version 0.1.0.6): and the Reactor after the Wind Farm, on both lists.
+    assert_eq!(FacilityKind::ALL[FacilityKind::ALL.len() - 5], FacilityKind::Mine, "appended after every kind before it");
+    assert_eq!(FacilityKind::ALL[FacilityKind::ALL.len() - 4], FacilityKind::Stadium);
+    assert_eq!(FacilityKind::ALL[FacilityKind::ALL.len() - 3], FacilityKind::NatureReserve);
+    assert_eq!(FacilityKind::ALL[FacilityKind::ALL.len() - 2], FacilityKind::WindFarm);
+    assert_eq!(FacilityKind::ALL.last(), Some(&FacilityKind::FissionReactor), "appended last");
+    assert_eq!(ModuleKind::ALL[ModuleKind::ALL.len() - 3], ModuleKind::Factory, "appended after every kind before it");
+    assert_eq!(ModuleKind::ALL[ModuleKind::ALL.len() - 2], ModuleKind::WindFarm);
+    assert_eq!(ModuleKind::ALL.last(), Some(&ModuleKind::FissionReactor), "appended last");
     assert!(ModuleKind::BUILDABLE.contains(&ModuleKind::Factory));
     assert_eq!((FacilityKind::Mine.name(), ModuleKind::Factory.name()), ("Mine", "Factory"), "one name in both lists");
     let t = &g.tables;
@@ -13407,7 +13464,8 @@ fn four_makers_the_factory_makes_widgets_the_mine_makes_materials_and_the_start_
     g.state_mut(sid).facilities = vec![facility(FacilityKind::Mine)];
     assert_eq!(income_of(&mut g, Seat(0)).materials, 6.6, "a Mine in China makes 4.4 x 1.5 = 6.6");
     with_tech(&mut g, TechId::DeepMining);
-    assert_eq!(income_of(&mut g, Seat(0)).materials, 9.9, "and 9.9 with Deep Mining");
+    // Ticket #628 (version 0.1.0.6): Deep Mining x1.25, 6.6 x 1.25 = 8.25, to the tenth 8.3.
+    assert_eq!(income_of(&mut g, Seat(0)).materials, 8.3, "and 8.3 with Deep Mining");
     g.state_mut(sid).facilities = vec![facility(FacilityKind::Factory)];
     assert_eq!(income_of(&mut g, Seat(0)).materials, 0.0, "a Factory makes no Materials");
     // Clean Manufacturing follows the Factory; the Mine's smoke is not thinned.
@@ -13582,7 +13640,7 @@ fn turns_to_build_estimates_at_the_places_rate_behind_its_queue() {
     assert_eq!(g.widgets_at(place), 7, "a flat 4 and Industry Level 3");
     assert_eq!(g.turns_to_build(Seat(0), place, bank), 1, "4 Widgets at 7 a turn");
     assert_eq!(g.turns_to_build(Seat(0), place, BuildItem::IndustryLevel), 1);
-    g.state_mut(sid).queue.push(Build { item: BuildItem::Facility(FacilityKind::PowerPlant), seat: Seat(0), widgets: 8, done: 0, coastal: false, fuel: 0.0 });
+    g.state_mut(sid).queue.push(Build { nuclear: false, fissionables: 0.0, item: BuildItem::Facility(FacilityKind::PowerPlant), seat: Seat(0), widgets: 8, done: 0, coastal: false, fuel: 0.0 });
     assert_eq!(g.turns_to_build(Seat(0), place, bank), 2, "8 owed ahead and 4 more: 12 at 7 a turn, rounded up");
     assert_eq!(g.queue_estimates(place), vec![2], "the Power Plant itself: 8 at 7, rounded up");
     g.state_mut(sid).facilities.push(facility(FacilityKind::Factory));
@@ -13675,7 +13733,7 @@ fn the_ai_wants_a_factory_module_where_a_colonys_queue_is_two_deep() {
     // Shipyard at 54 on the Moon ahead of everything; a Ship parked there ends the race.
     parked_colony_ship(&mut g, cust, BodyId::Moon);
     for _ in 0..2 {
-        g.colony_mut(moon).unwrap().queue.push(Build { item: BuildItem::Module(ModuleKind::Habitat), seat: cust, widgets: 4, done: 0, coastal: false, fuel: 0.0 });
+        g.colony_mut(moon).unwrap().queue.push(Build { nuclear: false, fissionables: 0.0, item: BuildItem::Module(ModuleKind::Habitat), seat: cust, widgets: 4, done: 0, coastal: false, fuel: 0.0 });
     }
     let orders = g.ai_orders(cust);
     let (factory, mine) = (scored(&g, "build Factory at Mare"), scored(&g, "build Mine at Mare"));
@@ -14013,7 +14071,7 @@ fn a_destroyed_raised_army_returns_nobody() {
 fn ship_in(g: &mut Game, seat: Seat, kind: UnitKind, body: BodyId, slot: Option<u32>, stance: Stance) -> ShipId {
     let id = ShipId(g.fresh_id());
     let name = g.next_ship_name(kind);
-    g.ships.push(Ship {
+    g.ships.push(Ship { nuclear: false, fissionables: 0.0,
         id, name, kind, seat, damage: 0, at: ShipAt::Body(body), colonists: 0, warhead: false, colonists_education: 1.0, army: None,
         stance, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot,
     });
@@ -14024,7 +14082,7 @@ fn ship_in(g: &mut Game, seat: Seat, kind: UnitKind, body: BodyId, slot: Option<
 /// Shipyard's queue is the one door a Ship comes into a real game through, and ticket #335 makes
 /// the orbit it comes into the yard's own.
 fn build_now(g: &mut Game, place: Place, item: BuildItem, seat: Seat) {
-    let b = Build { item, seat, widgets: 0, done: 0, coastal: false, fuel: 0.0 };
+    let b = Build { nuclear: false, fissionables: 0.0, item, seat, widgets: 0, done: 0, coastal: false, fuel: 0.0 };
     match place {
         Place::State(s) => g.state_mut(s).queue.push(b),
         Place::Colony(c) => g.colony_mut(c).unwrap().queue.push(b),
@@ -14418,7 +14476,7 @@ fn the_free_launch_site_passes_over_a_region_building_one() {
     g.seats[ark.index()].stockpile.energy = 500.0;
     g.take_control(StateId::SouthAsia, ark);
     g.state_mut(StateId::SouthAsia).facilities.retain(|f| !f.kind.does_the_job_of(FacilityKind::LaunchSite));
-    g.state_mut(StateId::SouthAsia).queue.push(Build { item: BuildItem::Facility(FacilityKind::Spaceport), seat: ark, coastal: false, fuel: 0.0, widgets: 99, done: 0 });
+    g.state_mut(StateId::SouthAsia).queue.push(Build { nuclear: false, fissionables: 0.0, item: BuildItem::Facility(FacilityKind::Spaceport), seat: ark, coastal: false, fuel: 0.0, widgets: 99, done: 0 });
     colony(&mut g, ark, BodyId::Moon, &[ModuleKind::Habitat], 2);
     g.income_phase();
     assert!(g.seat(ark).opening_met_turn.is_some(), "the premise: the Moon Colony meets the Objective");
@@ -15327,7 +15385,7 @@ fn grounding_the_fleet_holds_that_seats_transits_and_nobody_elses() {
     let mut g = game();
     let mk = |g: &mut Game, seat: Seat| {
         let id = ShipId(g.fresh_id());
-        g.ships.push(Ship {
+        g.ships.push(Ship { nuclear: false, fissionables: 0.0,
             name: String::new(), id, kind: UnitKind::Frigate, seat, damage: 0,
             at: ShipAt::Transit { from: BodyId::Earth, to: BodyId::Moon, turns_left: 1 },
             colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false,
@@ -15425,7 +15483,7 @@ fn an_ordinary_card_is_held_in_silence_and_lands_where_it_always_did() {
 #[test]
 fn a_refusal_names_the_rule_before_the_price() {
     let mut g = game();
-    g.seats[0].stockpile = Stockpile { materials: 0.0, fuel: 0.0, energy: 0.0, ducats: 0.0 };
+    g.seats[0].stockpile = Stockpile { materials: 0.0, fuel: 0.0, energy: 0.0, ducats: 0.0, fissionables: 0.0 };
     // Sub-Saharan Africa is nobody's, so a Factory there is forbidden -- and unaffordable as well.
     let forbidden = Order::BuildFacility { state: StateId::SubSaharanAfrica, kind: FacilityKind::Factory };
     assert!(g.order_cost(Seat(0), &forbidden).materials > 0.0, "the order has a price it could be told instead");
@@ -15614,7 +15672,8 @@ fn a_missile_carrier_waits_for_missile_technology() {
     // Ticket #87: a Ship is built with a full tank, so the yard needs the Fuel for one.
     g.seats[0].stockpile.materials = 10_000.0;
     g.seats[0].stockpile.fuel = 10_000.0;
-    let order = Order::BuildShip { site: Place::Colony(yard), kind: UnitKind::MissileCarrier };
+    g.seats[0].stockpile.fissionables = 100.0; // Ticket #629 (version 0.1.0.6): a Warhead's half a Fissionable.
+    let order = Order::BuildShip { nuclear: false, site: Place::Colony(yard), kind: UnitKind::MissileCarrier };
     let err = g.check_order(Seat(0), &[], &order).unwrap_err().0;
     assert!(err.contains("Missile Technology"), "the refusal names the Tech: {err}");
     with_tech(&mut g, TechId::MissileTechnology);
@@ -15801,6 +15860,7 @@ fn a_launch_guts_a_region_and_leaves_the_occupations_roll_alone() {
 fn rearming_wants_a_working_shipyard_in_the_hulls_own_orbit() {
     let mut g = game();
     calm(&mut g);
+    g.seats[0].stockpile.fissionables = 100.0; // Ticket #629 (version 0.1.0.6): a Warhead's half a Fissionable.
     g.ships.retain(|s| s.at != ShipAt::Body(BodyId::Mars));
     let ship = carrier_in(&mut g, Seat(0), BodyId::Mars, None, false);
     let order = Order::Rearm { ship };
@@ -15895,6 +15955,7 @@ fn the_computer_builds_a_missile_carrier_and_launches_with_cause() {
         g.relations.score[0][1] = score;
         g.seats[0].stockpile.materials = 10_000.0;
         g.seats[0].stockpile.fuel = 10_000.0;
+        g.seats[0].stockpile.fissionables = 100.0; // Ticket #629 (version 0.1.0.6): a Warhead's half a Fissionable.
         g
     };
     // No cause: no appetite, however rich the rival's Colony.
@@ -15936,7 +15997,7 @@ fn the_computer_builds_a_missile_carrier_and_launches_with_cause() {
 fn lander(g: &mut Game, seat: Seat, body: BodyId, slot: u32) -> (ShipId, Order) {
     let id = ShipId(g.fresh_id());
     let name = g.next_ship_name(UnitKind::ColonyShip);
-    g.ships.push(Ship {
+    g.ships.push(Ship { nuclear: false, fissionables: 0.0,
         id, name, kind: UnitKind::ColonyShip, seat, damage: 0, at: ShipAt::Body(body), colonists: 4, warhead: false, colonists_education: 1.0,
         army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None,
     });
@@ -16211,7 +16272,7 @@ fn ticket_345_the_computer_sends_its_colony_ship_to_a_world_nobody_has_settled()
             }
             let id = ShipId(g.fresh_id());
             let name = g.next_ship_name(UnitKind::ColonyShip);
-            g.ships.push(Ship {
+            g.ships.push(Ship { nuclear: false, fissionables: 0.0,
                 id, name, kind: UnitKind::ColonyShip, seat: Seat(1), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 4, warhead: false,
                 colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 40.0, slot: None,
             });
@@ -16670,12 +16731,12 @@ fn ticket_346_a_melee_without_its_fuel_figures_refuses_the_table() {
 fn a_shipyard_refusal_says_whether_it_is_absent_shut_or_still_building() {
     let mut g = game();
     let cid = colony(&mut g, Seat(0), BodyId::Moon, &[], 4);
-    let order = Order::BuildShip { site: Place::Colony(cid), kind: UnitKind::Frigate };
+    let order = Order::BuildShip { nuclear: false, site: Place::Colony(cid), kind: UnitKind::Frigate };
     // No Shipyard at all: the old sentence, which is true here and only here.
     let why = g.check_order(Seat(0), &[], &order).unwrap_err().0;
     assert_eq!(why, "no Shipyard here", "with no Shipyard the refusal names the absence");
     // One in the queue. It is not absent, it is not finished, and the refusal says which.
-    g.colony_mut(cid).unwrap().queue.push(Build { item: BuildItem::Module(ModuleKind::Shipyard), seat: Seat(0), widgets: 6, done: 0, coastal: false, fuel: 0.0 });
+    g.colony_mut(cid).unwrap().queue.push(Build { nuclear: false, fissionables: 0.0, item: BuildItem::Module(ModuleKind::Shipyard), seat: Seat(0), widgets: 6, done: 0, coastal: false, fuel: 0.0 });
     let why = g.check_order(Seat(0), &[], &order).unwrap_err().0;
     assert!(why.contains("still building"), "a Shipyard under way is not an absent one: {why}");
     assert!(!why.contains("no Shipyard"), "and the refusal never denies what the player can see in the queue: {why}");
@@ -16863,7 +16924,7 @@ fn a_turn_whose_loudest_line_is_a_card_answer_still_opens_with_a_headline() {
     // The engine files them there itself: every seat's answer, and the question that was asked.
     let card = EventId::ALL.into_iter().find(|id| g.tables.event(*id).asks()).expect("a card that asks");
     g.report.lines.clear();
-    g.question = Some(Question { card, answers: [Some(CardAnswer::Refused); SEAT_COUNT], held: [None; SEAT_COUNT] });
+    g.question = Some(Question { card, answers: [Some(CardAnswer::Refused); SEAT_COUNT], held: [None; SEAT_COUNT], stars: [None; SEAT_COUNT] });
     g.apply_card_answers();
     assert_eq!(g.report.lines.len(), SEAT_COUNT, "four answers: {:?}", g.report.lines.iter().map(|l| &l.text).collect::<Vec<_>>());
     for l in &g.report.lines {
@@ -16942,8 +17003,9 @@ fn ticket_350_the_turn_one_line_names_each_factions_own_condition() {
             "Build, spread Influence and reach Stabilization, four Climate phases running with Emissions under the Natural Sink, with 20 Colonists living beyond Earth orbit, before +3.0 C.",
         ),
         // Ticket #506 (version 0.1.0.0): the fifty-turn bars.
-        // Ticket #584 (version 0.1.0.4): the Fund 5,000. Ticket #623 (version 0.1.0.5): 6,250.
-        (FactionKind::Prospectors, "Build, spread Influence and put 6,250 Ducats in the Venture Capital Fund with 20 Colonists living beyond Earth orbit, before +3.0 C."),
+        // Ticket #584 (version 0.1.0.4): the Fund 5,000. Ticket #623 (version 0.1.0.5): 6,250. Ticket
+        // #638 (version 0.1.0.6): 6,500.
+        (FactionKind::Prospectors, "Build, spread Influence and put 6,500 Ducats in the Venture Capital Fund with 20 Colonists living beyond Earth orbit, before +3.0 C."),
         // Ticket #514 (version 0.1.0.0): and a Colonial Capital.
         (FactionKind::Arkwrights, "Build, spread Influence and get 44 Colonists living beyond Earth orbit, spread over four Bodies, one holding a Colonial Capital, before +3.0 C."),
         (FactionKind::Archivists, "Build, spread Influence and build the Archive on the ground beyond Earth orbit, pay 250 Research into it, and upload 16 Colonists, before +3.0 C."), // Ticket #565 (version 0.1.0.3): 16, from 18; ticket #579: 250, from 225
@@ -17236,19 +17298,22 @@ fn no_card_of_either_kind_is_drawn_on_the_first_turn_and_the_deck_is_untouched()
 /// most populous Region for half a ppm, where it was 400,000 for two ppm. The figures are the
 /// card's own in `events.toml`, pinned here; the refusal and the computer's rule are unchanged.
 #[test]
-fn the_refugee_convoy_gives_a_million_people_for_half_a_ppm() {
+fn the_refugee_convoy_gives_six_million_people_for_half_a_ppm() {
     let g = fresh();
     let card = g.tables.event(EventId::RefugeeConvoy);
     let c = card.choice.as_ref().expect("a card that asks");
-    let (mut people, mut ppm) = (None, None);
+    let (mut people, mut ppm, mut unrest) = (None, None, None);
     for e in &c.take_does {
         match e {
             CardEffect::PopulationToMostPopulous { population } => people = Some(*population),
             CardEffect::EmissionsNext { ppm: n } => ppm = Some(*n),
+            // Ticket #632 (version 0.1.0.6): a point of Unrest where they settle.
+            CardEffect::UnrestAtMostPopulous { unrest: n } => unrest = Some(*n),
             other => panic!("an effect the ticket did not decide: {other:?}"),
         }
     }
-    assert_eq!(people, Some(1.0), "a million people, one unit");
+    // Ticket #632 (version 0.1.0.6): six, the convoy on every answer, where it was one.
+    assert_eq!((people, unrest), (Some(6.0), Some(1.0)), "six million people, and a point of Unrest");
     assert_eq!(ppm, Some(0.5), "half a ppm, once");
     assert!(matches!(c.refuse_does.as_slice(), [CardEffect::StandingAllHeld { standing }] if *standing == -5), "the refusal is untouched: {:?}", c.refuse_does);
     assert!(matches!(c.take_when, CardRule::UnrestBelow { unrest } if unrest == 4.0), "the computer's rule is untouched: {:?}", c.take_when);
@@ -17721,7 +17786,7 @@ fn an_attack_is_fought_before_the_transits_land() {
     ship_in(&mut g, Seat(1), UnitKind::Frigate, BodyId::Mars, None, Stance::Attack);
     let arriving = ShipId(g.fresh_id());
     let name = g.next_ship_name(UnitKind::Frigate);
-    g.ships.push(Ship {
+    g.ships.push(Ship { nuclear: false, fissionables: 0.0,
         id: arriving, name, kind: UnitKind::Frigate, seat: Seat(0), damage: 0, at: ShipAt::Transit { from: BodyId::Earth, to: BodyId::Mars, turns_left: 1 }, colonists: 0, warhead: false,
         colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None,
     });
@@ -17875,13 +17940,16 @@ fn nuclear_rockets_takes_a_turn_off_a_crossing_and_none_off_a_hop() {
     let venus = g.transit_cost_at(BodyId::Earth, BodyId::Venus, venus_window);
     assert_eq!((mars.0, phobos.0, venus.0), (5, 5, 3), "the premise: five, five and three turns at the windows");
     g.research.done.push(TechId::NuclearRockets);
-    assert_eq!(g.transit_cost_at(BodyId::Earth, BodyId::Mars, window), (4, mars.1), "Mars: a turn off, the Fuel as it was");
-    assert_eq!(g.transit_cost_at(BodyId::Earth, BodyId::Phobos, window), (4, phobos.1), "Phobos rides the same crossing");
-    assert_eq!(g.transit_cost_at(BodyId::Earth, BodyId::Venus, venus_window), (2, venus.1), "Venus: a turn off");
-    assert_eq!(g.transit_cost_at(BodyId::Earth, BodyId::Moon, window).0, 1, "a hop stays one turn");
-    assert_eq!(g.transit_cost_at(BodyId::Mars, BodyId::Phobos, window).0, 1, "and so does a moon's");
-    // The seat's own quote reads the same turns, and the Fuel multipliers as before.
-    assert_eq!(g.transit_cost_for_at(Seat(0), BodyId::Earth, BodyId::Mars, window).0, 4);
+    // Ticket #629 (version 0.1.0.6), at the designer's word: a NUCLEAR hull's crossing; the table's
+    // quote and a chemical hull's are the old ones. The Custodians' Fuel multiplier is 1.
+    let nuke = |g: &Game, from: BodyId, to: BodyId, t: u32| g.journey_cost_hull(Seat(0), Port::Body(from), Port::Body(to), t, true);
+    assert_eq!(nuke(&g, BodyId::Earth, BodyId::Mars, window), (4, mars.1), "Mars: a turn off, the Fuel as it was");
+    assert_eq!(nuke(&g, BodyId::Earth, BodyId::Phobos, window), (4, phobos.1), "Phobos rides the same crossing");
+    assert_eq!(nuke(&g, BodyId::Earth, BodyId::Venus, venus_window), (2, venus.1), "Venus: a turn off");
+    assert_eq!(nuke(&g, BodyId::Earth, BodyId::Moon, window).0, 1, "a hop stays one turn");
+    assert_eq!(nuke(&g, BodyId::Mars, BodyId::Phobos, window).0, 1, "and so does a moon's");
+    assert_eq!(g.transit_cost_at(BodyId::Earth, BodyId::Mars, window).0, 5, "the table's quote is a chemical hull's");
+    assert_eq!(g.transit_cost_for_at(Seat(0), BodyId::Earth, BodyId::Mars, window).0, 5, "and so is the seat's");
 }
 
 /// Ticket #393: **Hardened Hulls needs Efficient Transit AND Nuclear Rockets**, the two rung-2
@@ -17952,9 +18020,12 @@ fn a_flight_flies_the_turns_its_seat_was_quoted_under_provisional_findings() {
     g.turn = g.next_window_turn(1);
     g.seats[arc.index()].provisional_findings = true;
     g.research.findings_tech = Some(TechId::NuclearRockets);
-    let quoted = g.transit_cost_for(arc, BodyId::Earth, BodyId::Mars).0;
-    assert_eq!((g.transit_cost(BodyId::Earth, BodyId::Mars).0, quoted), (5, 4), "the premise: the table reads five, the seat four");
+    // Ticket #629 (version 0.1.0.6): on a nuclear hull, the one that reads Nuclear Rockets now.
+    let quoted = g.journey_cost_hull(arc, Port::Body(BodyId::Earth), Port::Body(BodyId::Mars), g.turn, true).0;
+    assert_eq!((g.transit_cost(BodyId::Earth, BodyId::Mars).0, quoted), (5, 4), "the premise: the table reads five, the seat's nuclear hull four");
     let ship = a_colony_ship(&mut g, arc, BodyId::Earth);
+    g.ship_mut(ship).unwrap().nuclear = true;
+    g.ship_mut(ship).unwrap().fissionables = g.fission_tank_of(arc, UnitKind::ColonyShip);
     g.ship_mut(ship).unwrap().fuel = g.tables.unit(UnitKind::ColonyShip).tank as f64;
     let o = Order::Transit { ship, to: BodyId::Mars, slot: None };
     g.check_order(arc, &[], &o).expect("a full tank at the window can fly to Mars");
@@ -17975,8 +18046,10 @@ fn nuclear_rockets_shortens_mars_on_every_turn_and_venus_on_thirty_one() {
     let before: Vec<((u32, f64), (u32, f64))> = (1..=turns).map(|t| (g.transit_cost_at(BodyId::Earth, BodyId::Mars, t), g.transit_cost_at(BodyId::Earth, BodyId::Venus, t))).collect();
     g.research.done.push(TechId::NuclearRockets);
     let (mut mars_shorter, mut venus_shorter) = (0, 0);
+    // Ticket #629 (version 0.1.0.6): read off a nuclear hull, the Tech's alone now.
+    let nuke = |t: u32, to: BodyId| g.journey_cost_hull(Seat(0), Port::Body(BodyId::Earth), Port::Body(to), t, true);
     for t in 1..=turns {
-        let (m, v) = (g.transit_cost_at(BodyId::Earth, BodyId::Mars, t), g.transit_cost_at(BodyId::Earth, BodyId::Venus, t));
+        let (m, v) = (nuke(t, BodyId::Mars), nuke(t, BodyId::Venus));
         let (bm, bv) = before[(t - 1) as usize];
         assert!(m.0 <= bm.0 && v.0 <= bv.0, "turn {t}: never longer");
         assert_eq!((m.1, v.1), (bm.1, bv.1), "turn {t}: the Fuel as it was");
@@ -18345,7 +18418,7 @@ fn a_ship_built_at_a_low_gravity_yard_with_a_working_mine_takes_build_where_you_
     let full = g.ship_materials(Seat(0), UnitKind::Frigate);
     let row = t.unit(UnitKind::Frigate).materials;
     let faction = t.faction(g.kind(Seat(0))).ship_materials_multiplier;
-    let price = |g: &Game, site: Place, kind: UnitKind| g.order_cost(Seat(0), &Order::BuildShip { site, kind });
+    let price = |g: &Game, site: Place, kind: UnitKind| g.order_cost(Seat(0), &Order::BuildShip { nuclear: false, site, kind });
     // The Moon, one working Mine: three quarters.
     let moon = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Mine, ModuleKind::Shipyard], 4);
     let c = price(&g, Place::Colony(moon), UnitKind::Frigate);
@@ -18732,7 +18805,8 @@ fn a_throw_off_of_the_player_is_under_your_works() {
 fn an_occupation_begun_or_broken_by_the_player_is_under_your_works() {
     let occupation = |g: &Game| g.report.lines.iter().find(|l| l.kind == LineKind::Occupation).map(|l| (l.mine, l.text.clone())).expect("an Occupation line");
     // Ticket #492 (version 0.09.9): the fourth seat starts in Australia now, not the peninsula.
-    for (home, mine) in [(StateId::EastAsia, true), (StateId::Australia, false)] {
+    // Ticket #639 (version 0.1.0.6): a rival seat starts in Canada now, and none in Australia.
+    for (home, mine) in [(StateId::EastAsia, true), (StateId::Canada, false)] {
         let mut g = game();
         g.armies.retain(|a| a.home != ArmyHome::State(StateId::Europe));
         let army = occupier_in(&mut g, home, StateId::Europe);
@@ -19148,7 +19222,7 @@ fn a_computer_seat_answers_unrest_from_four_and_raises_a_stadium_alone_where_slo
     assert!(!offers(&mut g, 4.75, FacilityKind::Stadium), "and never under five");
     // A Constabulary on order already has that slot: no Stadium alone beside it.
     let widgets = g.build_widgets(Seat(1), BuildItem::Facility(FacilityKind::Constabulary));
-    g.state_mut(sid).queue.push(Build { item: BuildItem::Facility(FacilityKind::Constabulary), seat: Seat(1), widgets, done: 0, coastal: false, fuel: 0.0 });
+    g.state_mut(sid).queue.push(Build { nuclear: false, fissionables: 0.0, item: BuildItem::Facility(FacilityKind::Constabulary), seat: Seat(1), widgets, done: 0, coastal: false, fuel: 0.0 });
     assert!(!offers(&mut g, 9.0, FacilityKind::Stadium), "a Constabulary on order takes the last slot");
 }
 
@@ -19241,7 +19315,8 @@ fn orbital_refuelling_stacks_with_nuclear_rockets_and_clean_propellant_widens_th
     let needing: Vec<TechId> = g.tables.techs.iter().filter(|t| t.needs.contains(&TechId::OrbitalRefuelling)).map(|t| t.id).collect();
     assert_eq!(needing, vec![TechId::CryogenicTanks], "needed by Cryogenic Tanks alone");
     // The multipliers stack: 0.9 alone, 0.72 with Nuclear Rockets.
-    let turns = |g: &Game, turn: u32| g.transit_cost_for_at(Seat(0), BodyId::Earth, BodyId::Mars, turn).0;
+    // Ticket #629 (version 0.1.0.6): on a nuclear hull, the one Nuclear Rockets reaches now.
+    let turns = |g: &Game, turn: u32| g.journey_cost_hull(Seat(0), Port::Body(BodyId::Earth), Port::Body(BodyId::Mars), turn, true).0;
     let base: Vec<u32> = (1..=36).map(|t| turns(&g, t)).collect();
     g.research.done.push(TechId::NuclearRockets);
     let nuclear: Vec<u32> = (1..=36).map(|t| turns(&g, t)).collect();
@@ -19253,7 +19328,7 @@ fn orbital_refuelling_stacks_with_nuclear_rockets_and_clean_propellant_widens_th
     let alone: Vec<u32> = (1..=36).map(|t| turns(&g, t)).collect();
     assert!(alone.iter().zip(&base).any(|(a, b)| a < b), "Orbital Refuelling alone shortens a crossing");
     // The spec's table: at the window, Mars 5 / 4 / 4 / 4 and Venus 3 / 3 / 2 / 2.
-    let window = |g: &Game, to: BodyId| (1..=36).map(|turn| g.transit_cost_at(BodyId::Earth, to, turn).0).min().unwrap();
+    let window = |g: &Game, to: BodyId| (1..=36).map(|turn| g.journey_cost_hull(Seat(0), Port::Body(BodyId::Earth), Port::Body(to), turn, true).0).min().unwrap();
     let mut t = game();
     let row = |t: &mut Game, techs: &[TechId]| {
         t.research.done.retain(|x| *x != TechId::NuclearRockets && *x != TechId::OrbitalRefuelling);
@@ -19604,7 +19679,7 @@ fn a_captured_mothballed_reactor_doubles_a_custodian_generator_as_a_power_plant_
     let cus = Seat(0);
     assert_eq!(g.kind(cus), FactionKind::Custodians);
     let moon = colony(&mut g, cus, BodyId::Moon, &[ModuleKind::Generator], 0);
-    g.state_mut(StateId::EastAsia).facilities.push(facility(FacilityKind::Reactor));
+    g.state_mut(StateId::EastAsia).facilities.push(facility(FacilityKind::Accumulator));
     assert!(g.doubled_modules(cus).is_empty(), "a Reactor at work doubles nothing");
     let i = g.state(StateId::EastAsia).facilities.len() - 1;
     g.state_mut(StateId::EastAsia).facilities[i].mothballed = true;
@@ -19621,7 +19696,7 @@ fn the_custodian_ai_keeps_a_held_reactor_idle_while_it_doubles_a_generator() {
     let cus = Seat(0);
     g.seats[0].stockpile.energy = 500.0;
     colony(&mut g, cus, BodyId::Phobos, &[ModuleKind::Generator], 0);
-    g.state_mut(StateId::EastAsia).facilities.push(facility(FacilityKind::Reactor));
+    g.state_mut(StateId::EastAsia).facilities.push(facility(FacilityKind::Accumulator));
     let i = g.state(StateId::EastAsia).facilities.len() - 1;
     g.state_mut(StateId::EastAsia).facilities[i].mothballed = true;
     assert_eq!(g.doubled_modules(cus).len(), 1, "the premise: the idle Reactor doubles the Generator");
@@ -19866,7 +19941,7 @@ fn a_computer_seat_ignores_a_rival_carrier_in_flight_it_cannot_see() {
     // Victory, so a seat with nobody beyond it reads itself behind on Presence; one on the Moon.
     colony(&mut g, Seat(0), BodyId::Moon, &[], 1);
     let name = g.next_ship_name(UnitKind::Carrier);
-    g.ships.push(Ship { id, name, kind: UnitKind::Carrier, seat: Seat(1), damage: 0, at: ShipAt::Transit { from: BodyId::Moon, to: BodyId::Earth, turns_left: 1 }, colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None });
+    g.ships.push(Ship { nuclear: false, fissionables: 0.0, id, name, kind: UnitKind::Carrier, seat: Seat(1), damage: 0, at: ShipAt::Transit { from: BodyId::Moon, to: BodyId::Earth, turns_left: 1 }, colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None });
     let battery = |orders: &[Order]| orders.iter().any(|o| matches!(o, Order::BuildModule { colony, kind: ModuleKind::Battery } if *colony == station));
     assert!(!g.sees_books(Seat(0), Seat(1)), "the premise: their books are shut");
     assert!(!battery(&g.ai_orders(Seat(0))), "a Carrier in flight it cannot see presses nothing");
@@ -20058,7 +20133,7 @@ fn a_shipyard_wants_one_factory_module_and_no_more() {
     assert_eq!(scored(&g, "build Factory at Mare"), 0.0, "a second Factory beside a standing one is not wanted");
     // One on order instead: the same.
     g.colony_mut(moon).unwrap().modules.retain(|m| m.kind != ModuleKind::Factory);
-    g.colony_mut(moon).unwrap().queue.push(Build { item: BuildItem::Module(ModuleKind::Factory), seat: cust, widgets: 4, done: 0, coastal: false, fuel: 0.0 });
+    g.colony_mut(moon).unwrap().queue.push(Build { nuclear: false, fissionables: 0.0, item: BuildItem::Module(ModuleKind::Factory), seat: cust, widgets: 4, done: 0, coastal: false, fuel: 0.0 });
     g.log.clear();
     g.ai_orders(cust);
     assert_eq!(scored(&g, "build Factory at Mare"), 0.0, "nor beside one on order");
@@ -20085,7 +20160,7 @@ fn a_ship_is_built_with_the_tank_it_was_paid_for() {
     g.seats[0].stockpile.materials = 100.0;
     g.seats[0].stockpile.energy = 200.0;
     g.seats[0].stockpile.fuel = 50.0;
-    let build = Order::BuildShip { site: Place::Colony(iss), kind: UnitKind::Frigate };
+    let build = Order::BuildShip { nuclear: false, site: Place::Colony(iss), kind: UnitKind::Frigate };
     g.commit_orders(Seat(0), std::slice::from_ref(&build));
     assert_eq!(g.seats[0].stockpile.fuel, 20.0, "30 paid at the order");
     // Cryogenic Tanks completes before the yard finishes: the tank is now 45.
@@ -20112,7 +20187,7 @@ fn cancelling_a_ship_build_refunds_its_tanks_fuel() {
     g.seats[0].stockpile.materials = 100.0;
     g.seats[0].stockpile.energy = 200.0;
     g.seats[0].stockpile.fuel = 50.0;
-    let build = Order::BuildShip { site: Place::Colony(iss), kind: UnitKind::Frigate };
+    let build = Order::BuildShip { nuclear: false, site: Place::Colony(iss), kind: UnitKind::Frigate };
     g.commit_orders(Seat(0), std::slice::from_ref(&build));
     assert_eq!(g.seats[0].stockpile.fuel, 20.0);
     let index = g.colony(iss).unwrap().queue.len() - 1;
@@ -20183,7 +20258,7 @@ fn the_computer_keeps_fuel_on_hand_for_its_power() {
     let (body, slot) = (col.body, col.slot);
     let _ = cid;
     let tank = g.tank_of(cus, UnitKind::ColonyShip);
-    let ship = Ship { name: String::new(), id: ShipId(950), kind: UnitKind::ColonyShip, seat: cus, damage: 0, at: ShipAt::Body(body), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: tank - 15.0, slot: Some(slot) };
+    let ship = Ship { nuclear: false, fissionables: 0.0, name: String::new(), id: ShipId(950), kind: UnitKind::ColonyShip, seat: cus, damage: 0, at: ShipAt::Body(body), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: tank - 15.0, slot: Some(slot) };
     g.ships.push(ship);
     // The want is 15. With the reserve and 10 above it, no Refuel: it would take the reserve too.
     g.seats[cus.index()].stockpile.fuel = reserve + 10.0;
@@ -20228,7 +20303,7 @@ fn power_burns_fuel_and_runs_at_a_quarter_without_it() {
     let cus = seat_of(&g, FactionKind::Custodians);
     let sid = g.controlled_states(cus)[0];
     let t = g.tables.clone();
-    assert_eq!((t.facility(FacilityKind::PowerPlant).fuel_upkeep, t.facility(FacilityKind::Reactor).fuel_upkeep, t.module(ModuleKind::Generator).fuel_upkeep), (0.8, 0.8, 0.8), "the premise: the three burn 0.8");
+    assert_eq!((t.facility(FacilityKind::PowerPlant).fuel_upkeep, t.facility(FacilityKind::Accumulator).fuel_upkeep, t.module(ModuleKind::Generator).fuel_upkeep), (0.8, 0.8, 0.8), "the premise: the three burn 0.8");
     assert_eq!((t.module(ModuleKind::SolarArray).fuel_upkeep, t.facility(FacilityKind::WindFarm).fuel_upkeep, t.module(ModuleKind::WindFarm).fuel_upkeep), (0.0, 0.0, 0.0), "and the clean three nothing");
     // One Power Plant standing: 0.8 Fuel off the Income, named.
     g.seats[cus.index()].stockpile.fuel = 50.0;
@@ -20307,7 +20382,7 @@ fn a_captured_scrubber_runs_at_half_and_whole_again_when_retaken() {
     g.take_control(sid, cust);
     g.state_mut(sid).facilities.push(facility(FacilityKind::Scrubber));
     g.state_mut(sid).facilities.push(facility(FacilityKind::Scrubber));
-    g.state_mut(sid).queue.push(Build { item: BuildItem::Facility(FacilityKind::Scrubber), seat: cust, widgets: 8, done: 0, coastal: false, fuel: 0.0 });
+    g.state_mut(sid).queue.push(Build { nuclear: false, fissionables: 0.0, item: BuildItem::Facility(FacilityKind::Scrubber), seat: cust, widgets: 8, done: 0, coastal: false, fuel: 0.0 });
     let fall = g.tables.unrest.scrubber_fall;
     assert_eq!(g.scrubber_removal_by_seat()[cust.index()], 6.0, "two whole Scrubbers, 3.0 each");
     assert_eq!(g.calming_fall(sid), fall);
@@ -20661,7 +20736,8 @@ fn the_arkwrights_computer_is_paced_in_bodies() {
     g.state_mut(home).emigrants = 4;
     let slot = g.free_orbital_slots(BodyId::Earth)[0];
     let id = ColonyId(g.fresh_id());
-    let modules: Vec<Module> = std::iter::once(ModuleKind::Core).chain(std::iter::repeat_n(ModuleKind::Habitat, 5)).map(Module::new).collect();
+    // Ticket #638 (version 0.1.0.6): six Habitats, which hold 30 at a quarter again, where five held 30 at half again.
+    let modules: Vec<Module> = std::iter::once(ModuleKind::Core).chain(std::iter::repeat_n(ModuleKind::Habitat, 6)).map(Module::new).collect();
     g.colonies.push(Colony { id, body: BodyId::Earth, slot, control: Control::Controlled(ark), modules, colonists: 32, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, tier: 0, in_orbit: true });
     // Ticket #506 (version 0.1.0.0): read at turn 25, where the pace wants one Body and 31 off Earth:
     // thirty-two aboard are on pace for the first part and short of a Body, which is what halves the
@@ -20723,7 +20799,7 @@ fn blockade_the_iss(g: &mut Game, by: Seat) -> ColonyId {
     let iss = station_of(g, Seat(0), BodyId::Earth).unwrap();
     let slot = g.colony(iss).unwrap().slot;
     let id = ShipId(g.fresh_id());
-    g.ships.push(Ship { name: String::new(), id, kind: UnitKind::Frigate, seat: by, damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Blockade, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: Some(slot) });
+    g.ships.push(Ship { nuclear: false, fissionables: 0.0, name: String::new(), id, kind: UnitKind::Frigate, seat: by, damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Blockade, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: Some(slot) });
     assert_eq!(g.starved_by(iss), Some(by), "the premise: the station is blockaded");
     iss
 }
@@ -20763,7 +20839,7 @@ fn a_seat_with_a_yard_wants_two_warships() {
         g.seats[0].stockpile.fuel = 300.0;
         for _ in 0..warships {
             let id = ShipId(g.fresh_id());
-            g.ships.push(Ship { name: String::new(), id, kind: UnitKind::Frigate, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None });
+            g.ships.push(Ship { nuclear: false, fissionables: 0.0, name: String::new(), id, kind: UnitKind::Frigate, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None });
         }
         g.ai_orders(Seat(0));
         scored(&g, "build Frigate at")
@@ -20839,7 +20915,7 @@ fn an_offline_building_records_why() {
 fn the_regions_are_redrawn_around_iran_to_eighteen() {
     let g = game();
     let t = &g.tables;
-    assert_eq!(StateId::ALL.len(), 20, "twenty since ticket #510");
+    assert_eq!(StateId::ALL.len(), 22, "twenty-two since ticket #639, twenty since #510");
     let card = |s: StateId| t.state(s);
     let (ir, tr, kz, za, ng, uk) = (card(StateId::MiddleEast), card(StateId::Turkey), card(StateId::Kazakhstan), card(StateId::SouthAfrica), card(StateId::SubSaharanAfrica), card(StateId::UnitedKingdom));
     assert_eq!([ir.name.as_str(), tr.name.as_str(), kz.name.as_str(), za.name.as_str(), ng.name.as_str(), uk.name.as_str()], ["Iran", "Turkey", "Kazakhstan", "South Africa", "Nigeria", "The United Kingdom"]);
@@ -20853,12 +20929,14 @@ fn the_regions_are_redrawn_around_iran_to_eighteen() {
     assert_eq!((kz.population, kz.gdp, kz.influence, kz.industry_level, kz.size, kz.coastal_exposure), (70.0, 1, 1, 1, 2, 0));
     // Nigeria's 1,140 people and 2 GDP, shared two ways; its 1 Influence kept, and 1 added. Ticket
     // #492 (version 0.09.9): the people three ways, Eritrea's to Egypt's 260.
-    assert_eq!(ng.population + za.population + card(StateId::NorthAfrica).population, 1140.0 + 260.0);
+    // Ticket #639 (version 0.1.0.6): four ways, the Horn's to Ethiopia's.
+    assert_eq!(ng.population + za.population + card(StateId::NorthAfrica).population + card(StateId::Ethiopia).population, 1140.0 + 260.0);
     assert_eq!((ng.gdp + za.gdp, ng.influence, za.influence), (2, 1, 1));
     // Ticket #492 (version 0.09.9): East Africa and the Horn to South Africa, Angola back, Eritrea
     // to Egypt: 517, 619 and 264; the rest stands.
-    assert_eq!((za.population, za.gdp, za.industry_level, za.size, za.coastal_exposure), (517.0, 1, 2, 2, 2));
-    assert_eq!((ng.population, card(StateId::NorthAfrica).population), (619.0, 264.0));
+    // Ticket #639 (version 0.1.0.6): the Horn to Ethiopia, Eritrea with it: 371 and 260 left.
+    assert_eq!((za.population, za.gdp, za.industry_level, za.size, za.coastal_exposure), (371.0, 1, 2, 2, 2));
+    assert_eq!((ng.population, card(StateId::NorthAfrica).population), (619.0, 260.0));
     // The United Kingdom's share of the European Union's, as ticket #453 left it.
     let two = [StateId::Europe, StateId::UnitedKingdom];
     assert_eq!(two.iter().map(|s| card(*s).population).sum::<f64>(), 600.0);
@@ -20880,8 +20958,10 @@ fn the_regions_are_redrawn_around_iran_to_eighteen() {
     assert_eq!(tr.neighbours, vec![StateId::Europe, StateId::Russia, StateId::NorthAfrica, StateId::ArabianPeninsula, StateId::MiddleEast]);
     assert_eq!(kz.neighbours, vec![StateId::Russia, StateId::EastAsia, StateId::MiddleEast]);
     // Ticket #492 (version 0.09.9): the Horn's, Egypt's Region and Arabia across the Red Sea.
-    assert_eq!(za.neighbours, vec![StateId::SubSaharanAfrica, StateId::NorthAfrica, StateId::ArabianPeninsula]);
-    assert_eq!(uk.neighbours, vec![StateId::Europe, StateId::NorthAmerica]);
+    // Ticket #639 (version 0.1.0.6): the Horn is Ethiopia's now, and Arabia faces it, not South Africa.
+    assert_eq!(za.neighbours, vec![StateId::SubSaharanAfrica, StateId::NorthAfrica, StateId::Ethiopia]);
+    // Ticket #639: and Canada's, across Greenland and Iceland.
+    assert_eq!(uk.neighbours, vec![StateId::Europe, StateId::NorthAmerica, StateId::Canada]);
     for a in StateId::ALL {
         for b in &card(a).neighbours {
             assert!(card(*b).neighbours.contains(&a), "{a:?} lists {b:?}, and {b:?} must list it back");
@@ -21054,7 +21134,15 @@ fn the_reports_templates_stay_under_their_word_ceiling() {
     // Ticket #544 (version 0.1.0.1): and by the 33 of a window next turn and the Report's head.
     // Ticket #615 (version 0.1.0.5): and by the 9 of an Occupation that halves the holder's Standing.
     // Ticket #622 (version 0.1.0.5): and by the 10 of a Strip Permit's growth and Relations clauses.
-    assert!(words <= 1976, "the Report's templates hold {words} words; the ceiling is 1,976 (10 for a Strip Permit's clauses, 9 for an Occupation's holder, 15 for a rival on yours, 33 for a window and the head, 46 for an Accord's end, 9 for a place handed over twice, 9 for an Army inherited, 12 for an Accord broken, 15% off 2,031, 54 for the race to the Moon, 2 for a rival's upgrade, 8 for an Accord answered, less a word of slack, 17 for a Trade, 9 for a Capital refunded, 5 for an Accord let lapse, 7 for Terms added, 5 for a renewal)");
+    // Ticket #630 (version 0.1.0.6): and by the 9 of a Reactor short of Fissionables.
+    // Ticket #631 (version 0.1.0.6): and by the 39 of a ferry route's delivery, its four waits, its
+    // end, and a rival's route set and ended.
+    // Ticket #633 (version 0.1.0.6): and by the 18 of the first child born off Earth, its line and Moment.
+    // Ticket #632 (version 0.1.0.6): and by the 28 of refugees sent to the stars, and the lack.
+    // Ticket #636 (version 0.1.0.6): and by the 6 of an inherited Army waiting on Hold.
+    // Ticket #637 (version 0.1.0.6): and by the 7 of a Colony Ship scrapped.
+    // Ticket #644 (version 0.1.0.6): and by the 4 of a refit begun.
+    assert!(words <= 2087, "the Report's templates hold {words} words; the ceiling is 2,087 (4 for a refit, 7 for a scrapped hull, 6 for an Army waiting on Hold, 28 for refugees sent to the stars, 18 for the first child born off Earth, 39 for a ferry route, 9 for Fissionables run short, 10 for a Strip Permit's clauses, 9 for an Occupation's holder, 15 for a rival on yours, 33 for a window and the head, 46 for an Accord's end, 9 for a place handed over twice, 9 for an Army inherited, 12 for an Accord broken, 15% off 2,031, 54 for the race to the Moon, 2 for a rival's upgrade, 8 for an Accord answered, less a word of slack, 17 for a Trade, 9 for a Capital refunded, 5 for an Accord let lapse, 7 for Terms added, 5 for a renewal)");
     // "The" is gone before a Faction's name, which is drawn in its colour instead.
     assert!(!text.contains("he {faction}"), "a template still says \"the {{faction}}\"");
 }
@@ -21125,7 +21213,7 @@ fn a_seat_keeps_a_gross_total_of_what_it_has_produced() {
     assert_eq!(g.seats[0].produced_total, Stockpile::default(), "nothing made before the first Income");
     g.income_phase();
     let gross = |g: &Game, r: Resource| -> f64 { g.seats[0].income_sources.iter().filter(|(_, res, n)| *res == r && *n > 0.0).map(|(_, _, n)| n).sum() };
-    let first = Stockpile { materials: gross(&g, Resource::Materials), fuel: gross(&g, Resource::Fuel), energy: gross(&g, Resource::Energy), ducats: gross(&g, Resource::Ducats) };
+    let first = Stockpile { materials: gross(&g, Resource::Materials), fuel: gross(&g, Resource::Fuel), energy: gross(&g, Resource::Energy), ducats: gross(&g, Resource::Ducats), fissionables: 0.0 };
     assert!(first.materials > 0.0 && first.energy > 0.0 && first.ducats > 0.0, "the premise: the start Region makes things: {first:?} {:?}", g.seats[0].income_sources);
     assert!(g.seats[0].income_sources.iter().any(|(_, _, n)| *n < 0.0), "the premise: and something is paid out of it");
     let total = g.seats[0].produced_total;
@@ -21801,7 +21889,7 @@ fn a_module_refused_at_the_tiers_cap_says_to_upgrade() {
 /// Ticket #503: a Frigate of the seat's holding at a Body, for the fleet that parts a tie.
 fn give_warship(g: &mut Game, seat: Seat, body: BodyId) {
     let id = ShipId(g.fresh_id());
-    g.ships.push(Ship {
+    g.ships.push(Ship { nuclear: false, fissionables: 0.0,
         name: String::new(), id,
         kind: UnitKind::Frigate,
         seat,
@@ -22567,7 +22655,7 @@ fn a_traded_place_takes_its_standing_and_builds_to_the_new_holder() {
     calm(&mut g);
     let c = colony(&mut g, Seat(0), BodyId::Moon, &[], 6);
     g.seats[0].influence.insert(Place::Colony(c), 30);
-    g.colony_mut(c).unwrap().queue.push(Build { item: BuildItem::Module(ModuleKind::Habitat), seat: Seat(0), widgets: 4, done: 1, coastal: false, fuel: 0.0 });
+    g.colony_mut(c).unwrap().queue.push(Build { nuclear: false, fissionables: 0.0, item: BuildItem::Module(ModuleKind::Habitat), seat: Seat(0), widgets: 4, done: 1, coastal: false, fuel: 0.0 });
     g.seats[1].stockpile.ducats = 10_000.0;
     g.offers.push(Offer { from: Seat(1), to: Seat(0), terms: Vec::new(), trade: Some((TradeGood::Goods(Resource::Ducats, 1), TradeGood::Place(c))), turn: g.turn, ask: AccordAsk::New });
     g.answer_offer(Seat(0), 0, true).unwrap();
@@ -22685,7 +22773,8 @@ fn the_new_worlds_are_reached_on_their_real_windows() {
     // eight turns.
     let mut fast = game();
     fast.research.done.push(TechId::NuclearRockets);
-    assert_eq!(fast.transit_cost_at(BodyId::Ceres, BodyId::Vesta, 1).0, 8, "Ceres to Vesta under Nuclear Rockets");
+    // Ticket #629 (version 0.1.0.6): on a nuclear hull.
+    assert_eq!(fast.journey_cost_hull(Seat(0), Port::Body(BodyId::Ceres), Port::Body(BodyId::Vesta), 1, true).0, 8, "Ceres to Vesta under Nuclear Rockets");
     // Mercury laps Earth in under two turns: its window is open more turns than not.
     let open = (1..=36).filter(|t| g.crossing_offset(BodyId::Earth, BodyId::Mercury, *t) == Some(0.0)).count();
     assert!(open >= 18, "Earth to Mercury is on its window {open} turns of 36");
@@ -22833,8 +22922,9 @@ fn superconductors_lift_every_energy_output_by_a_quarter() {
 fn vietnam_and_argentina_are_cut_out_of_indonesias_and_brazils_regions() {
     let g = game();
     let t = &g.tables;
-    assert_eq!(StateId::ALL.len(), 20);
-    assert_eq!(t.states.len(), 20, "twenty rows in nation_states.toml");
+    // Ticket #639 (version 0.1.0.6): twenty-two since Canada and Ethiopia.
+    assert_eq!(StateId::ALL.len(), 22);
+    assert_eq!(t.states.len(), 22, "twenty-two rows in nation_states.toml");
     let card = |s: StateId| t.state(s);
     let (vn, id, ar, br) = (card(StateId::Vietnam), card(StateId::SouthEastAsia), card(StateId::Argentina), card(StateId::SouthAmerica));
     assert_eq!([vn.name.as_str(), id.name.as_str(), ar.name.as_str(), br.name.as_str()], ["Vietnam", "Indonesia", "Argentina", "Brazil"]);
@@ -23077,10 +23167,10 @@ fn the_arkwright_computer_gathers_people_at_its_capital_candidate() {
     assert!((mine_lifted - mine_plain * chase).abs() < 1e-6, "the candidate's Module at {chase}x: {mine_lifted} against {mine_plain}");
     // The log carries a score to a tenth, so the lifted figure is within three tenths of the product.
     assert!((crossing_lifted - crossing_plain * chase).abs() <= 0.3, "the crossing to its Body at {chase}x: {crossing_lifted} against {crossing_plain}");
-    // No room at the candidate (the Core's 4 and two Arkwright Habitats of 6): the crossing falls
+    // No room at the candidate (the Core's 4 and two Arkwright Habitats of 5): the crossing falls
     // back, the Module does not.
     let room = g.habitat_room(g.colony(mars).unwrap());
-    assert_eq!(room, 16, "4 + 6 + 6");
+    assert_eq!(room, 14, "4 + 5 + 5 (ticket #638)");
     g.colony_mut(mars).unwrap().colonists = room;
     g.log.clear();
     g.ai_orders(ark);
@@ -23123,7 +23213,7 @@ fn the_computer_keeps_slots_at_a_ground_colony_for_the_habitats_its_next_tier_ne
     g.ai_orders(s);
     assert_eq!(scored(&g, &format!("build Mine at {name}")), 0.0, "the two free slots are the Habitats': {:?}", g.log.iter().filter(|l| l.contains(&name)).collect::<Vec<_>>());
     // One on order counts against the reserve.
-    g.colony_mut(moon).unwrap().queue.push(Build { item: BuildItem::Module(ModuleKind::Habitat), seat: s, widgets: 4, done: 0, coastal: false, fuel: 0.0 });
+    g.colony_mut(moon).unwrap().queue.push(Build { nuclear: false, fissionables: 0.0, item: BuildItem::Module(ModuleKind::Habitat), seat: s, widgets: 4, done: 0, coastal: false, fuel: 0.0 });
     assert_eq!(g.habitats_to_reserve(g.colony(moon).unwrap()), 1, "one still wanted beyond the one on order");
     g.colony_mut(moon).unwrap().queue.clear();
     // Two Habitats standing reserve nothing, and the Mine is back.
@@ -23388,14 +23478,13 @@ fn an_influence_spend_offends_whoever_directed_the_place_when_it_was_given() {
     assert!(!g.relations.offended[partner.index()][me.index()]);
 }
 
-/// Ticket #519 (Q3 A): an Army inherited abroad in a rival's Region has a turn's grace from the rule
-/// that turns an Army on Hold there to Attack (ticket #320); the turn after, the rule applies.
-#[test]
-fn an_inherited_army_abroad_in_a_rivals_region_has_a_turns_grace() {
-    let mut g = game();
-    calm(&mut g);
-    // North Africa's Army stands in another Region of its holder's, at peace there until North
-    // Africa is taken: then it stands in a rival's Region.
+/// Ticket #519 (Q3 A) gave an Army inherited abroad in a rival's Region a turn's grace from the
+/// rule that turns an Army on Hold there to Attack (ticket #320); ticket #636 (version 0.1.0.6), at
+/// the designer's word, makes it last until its holder orders it (Q1). Tester 2's case (Q6): China
+/// taken by Influence while its Armies stood in a Region the Prospectors held, on Attack two turns
+/// later with no order. Here three Resolutions pass with no order and no Battle, and the holder is
+/// reminded each turn after the first (Q5).
+fn inherited_abroad(g: &mut Game) -> (ArmyId, StateId) {
     let (me, them) = (Seat(0), Seat(1));
     g.state_mut(StateId::NorthAfrica).control = Control::Controlled(them);
     let abroad = g.controlled_states(them).into_iter().find(|s| *s != StateId::NorthAfrica).unwrap();
@@ -23406,12 +23495,141 @@ fn an_inherited_army_abroad_in_a_rivals_region_has_a_turns_grace() {
     g.resolution_phase();
     assert_eq!(g.state(StateId::NorthAfrica).control, Control::Controlled(me));
     assert_eq!(g.army(army).unwrap().stance, Stance::Hold);
+    (army, abroad)
+}
+
+#[test]
+fn ticket_636_an_inherited_army_keeps_hold_until_its_holder_orders_it() {
+    let mut g = game();
+    calm(&mut g);
+    let (army, abroad) = inherited_abroad(&mut g);
+    let name = g.army(army).unwrap().name.clone();
+    for n in 1..=3 {
+        g.turn += 1;
+        g.report.lines.clear();
+        g.resolution_phase();
+        let a = g.army(army).expect("no Battle took it");
+        assert_eq!((a.stance, a.damage), (Stance::Hold, 0), "turn {n} after it was inherited: on Hold, unfought");
+        assert!(g.report.lines.iter().any(|l| l.text.contains(&name) && l.text.contains("waits on Hold")), "turn {n}: {:?}", g.report.lines.iter().map(|l| &l.text).collect::<Vec<_>>());
+    }
+    // Q2 (b): an ordered Hold or Dig In keeps the peace.
+    for stance in [Stance::Hold, Stance::DigIn] {
+        g.turn += 1;
+        g.commit_orders(Seat(0), &[Order::ArmyStance { place: Place::State(abroad), stance }]);
+        g.resolution_phase();
+        assert_eq!(g.army(army).unwrap().stance, stance, "ordered {stance:?}, it stays so");
+        // From the review: dug in by order, it is no longer reminded of waiting on Hold.
+        g.turn += 1;
+        g.report.lines.clear();
+        g.resolution_phase();
+        assert_eq!(g.report.lines.iter().any(|l| l.text.contains("waits on Hold")), stance == Stance::Hold, "{stance:?}");
+    }
+}
+
+/// Ticket #636 (Q2 b): an Attack or Evade order ends the exemption, after which the old rule reads
+/// the Army as any Army of a seat's in a rival's Region.
+#[test]
+fn ticket_636_an_evade_order_ends_the_exemption() {
+    let mut g = game();
+    calm(&mut g);
+    let (army, abroad) = inherited_abroad(&mut g);
     g.turn += 1;
+    g.commit_orders(Seat(0), &[Order::ArmyStance { place: Place::State(abroad), stance: Stance::Evade }]);
     g.resolution_phase();
-    assert_eq!(g.army(army).map(|a| a.stance), Some(Stance::Hold), "the turn after it was inherited: still on Hold");
+    assert_eq!(g.army(army).unwrap().stance, Stance::Evade);
+    assert!(!g.armies_inherited.iter().any(|(id, _)| *id == army), "the Evade ended it");
     g.turn += 1;
+    g.commit_orders(Seat(0), &[Order::ArmyStance { place: Place::State(abroad), stance: Stance::Hold }]);
     g.resolution_phase();
-    assert!(g.army(army).is_none_or(|a| a.stance == Stance::Attack), "and then the old rule: on Attack in a rival's Region");
+    assert!(g.army(army).is_none_or(|a| a.stance == Stance::Attack), "ordered once, it is the old rule's: on Attack in a rival's Region");
+}
+
+/// Ticket #636 (Q4): an Army standing in its seat's own Region when a rival takes that Region is
+/// stranded abroad by the change of hands; it is kept on Hold as an inherited Army is.
+#[test]
+fn ticket_636_an_army_stranded_by_a_change_of_hands_keeps_hold() {
+    let mut g = game();
+    calm(&mut g);
+    let (me, them) = (Seat(0), Seat(1));
+    let home = g.controlled_states(me)[0];
+    let army = g.armies.iter().find(|a| a.home == ArmyHome::State(home)).map(|a| a.id).unwrap();
+    // A second Region of the player's, with the player's Army standing in it.
+    g.state_mut(StateId::NorthAfrica).control = Control::Controlled(me);
+    g.army_mut(army).unwrap().at = ArmyAt::Place(Place::State(StateId::NorthAfrica));
+    g.seats[them.index()].influence.insert(Place::State(StateId::NorthAfrica), 400);
+    g.seats[them.index()].influenced_this_turn.push(Place::State(StateId::NorthAfrica));
+    g.resolution_phase();
+    assert_eq!(g.state(StateId::NorthAfrica).control, Control::Controlled(them), "the premise: taken from under it");
+    for n in 1..=3 {
+        g.turn += 1;
+        g.resolution_phase();
+        let a = g.army(army).expect("no Battle took it");
+        assert_eq!((a.stance, a.damage), (Stance::Hold, 0), "turn {n}: on Hold, unfought");
+    }
+    // Q5: its holder is reminded, as of an inherited Army.
+    g.turn += 1;
+    g.report.lines.clear();
+    g.resolution_phase();
+    assert!(g.report.lines.iter().any(|l| l.text.contains("waits on Hold")), "{:?}", g.report.lines.iter().map(|l| &l.text).collect::<Vec<_>>());
+}
+
+/// Ticket #636 (Q4), from the review: only the previous holder's Armies are stranded; a third
+/// seat's standing in the Region on Attack keeps its Attack, and a change from nobody (an Occupation
+/// completed) strands nobody.
+#[test]
+fn ticket_636_only_the_previous_holders_armies_are_stranded() {
+    let mut g = game();
+    let (me, them, third) = (Seat(0), Seat(1), Seat(2));
+    let s = StateId::NorthAfrica;
+    let place = Place::State(s);
+    let mine = g.armies.iter().find(|a| a.home == ArmyHome::State(g.controlled_states(me)[0])).map(|a| a.id).unwrap();
+    let theirs = g.armies.iter().find(|a| a.home == ArmyHome::State(g.controlled_states(third)[0])).map(|a| a.id).unwrap();
+    for id in [mine, theirs] {
+        let a = g.army_mut(id).unwrap();
+        a.at = ArmyAt::Place(place);
+        a.stance = Stance::Attack;
+    }
+    g.armies_change_hands(s, None, Some(them));
+    assert_eq!(g.army(mine).unwrap().stance, Stance::Attack, "held by nobody just before: nobody stranded");
+    g.armies_change_hands(s, Some(me), Some(them));
+    assert_eq!(g.army(mine).unwrap().stance, Stance::Hold, "the previous holder's: stranded, on Hold");
+    assert!(g.armies_inherited.iter().any(|(id, _)| *id == mine));
+    assert_eq!(g.army(theirs).unwrap().stance, Stance::Attack, "a third seat's keeps its Attack");
+    assert!(!g.armies_inherited.iter().any(|(id, _)| *id == theirs));
+}
+
+/// Ticket #636 (Q2 b), from the review: boarding a Carrier ends the exemption where the Army boards,
+/// not at the order -- a load that waits on the cargo step boards after the ground Battles, and
+/// cleared at the order the Army was put on Attack and fought first.
+#[test]
+fn ticket_636_an_inherited_army_boards_unfought() {
+    let mut g = game();
+    calm(&mut g);
+    let (army, abroad) = inherited_abroad(&mut g);
+    // A raised Army: a Region's own stays at home.
+    g.army_mut(army).unwrap().standing = false;
+    let carrier = ship_in(&mut g, Seat(0), UnitKind::Carrier, BodyId::Earth, None, Stance::Hold);
+    let board = Order::Load { ship: carrier, colonists: 0, from: LoadSource::State(abroad), army: Some(army) };
+    assert!(g.check_order(Seat(0), &[], &board).is_ok(), "{:?}", g.check_order(Seat(0), &[], &board));
+    g.turn += 1;
+    g.commit_orders(Seat(0), &[board]);
+    g.resolution_phase();
+    let a = g.army(army).expect("no Battle took it");
+    assert_eq!((a.at, a.damage), (ArmyAt::Aboard(carrier), 0), "aboard, unfought");
+    assert!(!g.armies_inherited.iter().any(|(id, _)| *id == army), "boarded, it is ordered");
+}
+
+/// Ticket #636 (Q2 b): a march ends the exemption.
+#[test]
+fn ticket_636_a_march_ends_the_exemption() {
+    let mut g = game();
+    calm(&mut g);
+    let (army, abroad) = inherited_abroad(&mut g);
+    let to = g.tables.state(abroad).neighbours.clone().into_iter().find(|n| g.check_order(Seat(0), &[], &Order::MoveArmy { army, to: *n }).is_ok()).expect("a march it may make");
+    g.turn += 1;
+    g.commit_orders(Seat(0), &[Order::MoveArmy { army, to }]);
+    g.resolution_phase();
+    assert!(!g.armies_inherited.iter().any(|(id, _)| *id == army), "marched, it is ordered");
 }
 
 /// Ticket #521 (version 0.1.0.0): the Carbon Levy's half point landed before the turn's natural
@@ -23597,11 +23815,11 @@ fn a_poor_seat_still_finds_materials_scarcest_at_the_new_prices() {
     let s = Seat(0);
     let id = ShipId(g.fresh_id());
     let name = g.next_ship_name(UnitKind::ColonyShip);
-    g.ships.push(Ship {
+    g.ships.push(Ship { nuclear: false, fissionables: 0.0,
         id, name, kind: UnitKind::ColonyShip, seat: s, damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false,
         colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 40.0, slot: None,
     });
-    g.seats[0].stockpile = Stockpile { materials: 10.0, fuel: 6.0, energy: 500.0, ducats: 0.0 };
+    g.seats[0].stockpile = Stockpile { materials: 10.0, fuel: 6.0, energy: 500.0, ducats: 0.0, fissionables: 0.0 };
     assert_eq!(g.scarcest(s), Resource::Materials, "10 Materials against three 22s, Fuel 6 of 6");
 }
 
@@ -24045,7 +24263,7 @@ fn prospectors_at_eighty(g: &mut Game) -> Seat {
     let w = g.tables.faction(FactionKind::Prospectors).victory_first.weight;
     // Ticket #601 (version 0.1.0.4): the parts are 94% of the score, the gate not standing.
     let parts = 0.8 / (1.0 - g.tables.victory.gate_weight);
-    g.seats[1].venture_fund = 6250.0 * (parts - (1.0 - w) * presence) / w; // ticket #623: the bar 6,250
+    g.seats[1].venture_fund = 6500.0 * (parts - (1.0 - w) * presence) / w; // ticket #638: the bar 6,500
     assert!((g.progress(pro).score() - 0.8).abs() < 1e-9, "the premise: 80%, {}", g.progress(pro).score());
     pro
 }
@@ -24129,7 +24347,8 @@ fn the_pack_presses_the_leader_and_draws_together() {
 #[test]
 fn the_wind_farm_rows_need_clean_power_and_carry_a_ducat_a_turn() {
     let g = game();
-    assert_eq!(FacilityKind::ALL.last(), Some(&FacilityKind::WindFarm), "appended last, for Tables::facility");
+    // Ticket #630 (version 0.1.0.6): the Reactor appended after it.
+    assert_eq!(FacilityKind::ALL[FacilityKind::ALL.len() - 2], FacilityKind::WindFarm, "appended last in its turn, for Tables::facility");
     assert_eq!(FacilityKind::WindFarm.name(), "Wind Farm");
     assert_eq!((FacilityKind::WindFarm.common(), FacilityKind::WindFarm.unique_to()), (None, None), "a common kind, and not a Power Plant");
     assert!(!FacilityKind::WindFarm.does_the_job_of(FacilityKind::PowerPlant), "Production Moved and the Reactor's rule read the Power Plant's job; the Wind Farm is not it");
@@ -24141,7 +24360,8 @@ fn the_wind_farm_rows_need_clean_power_and_carry_a_ducat_a_turn() {
     assert!(g.takes_slot(FacilityKind::WindFarm), "a slot, as a Power Plant takes");
     let p = g.tables.facility(FacilityKind::PowerPlant);
     assert_eq!((p.materials, p.widgets, p.emissions, p.ducats_upkeep), (27.5, 10, 1.5, 0.0), "the premise: the Power Plant as it was (10 Widgets since ticket #610, 8 before)");
-    assert_eq!(ModuleKind::ALL.last(), Some(&ModuleKind::WindFarm), "appended last, for Tables::module");
+    // Ticket #630 (version 0.1.0.6): the Reactor Module appended after it.
+    assert_eq!(ModuleKind::ALL[ModuleKind::ALL.len() - 2], ModuleKind::WindFarm, "appended last in its turn, for Tables::module");
     assert!(ModuleKind::BUILDABLE.contains(&ModuleKind::WindFarm));
     assert_eq!(ModuleKind::WindFarm.name(), "Wind Farm", "one name in both lists");
     assert!(!ModuleKind::WindFarm.stands_on_a_station(), "the ground of Mars, never a station");
@@ -24285,7 +24505,7 @@ fn a_power_plant_is_replaced_with_a_wind_farm_through_the_queue_at_half_price() 
     calm(&mut g);
     let sid = StateId::EastAsia;
     directed(&mut g, sid);
-    g.state_mut(sid).facilities = vec![Facility::in_coastal_slot(FacilityKind::PowerPlant), facility(FacilityKind::Factory), facility(FacilityKind::Reactor), facility(FacilityKind::PowerPlant)];
+    g.state_mut(sid).facilities = vec![Facility::in_coastal_slot(FacilityKind::PowerPlant), facility(FacilityKind::Factory), facility(FacilityKind::Accumulator), facility(FacilityKind::PowerPlant)];
     let replace = |i| Order::Change { building: BuildingRef::Facility(sid, i), what: BuildingChange::Replace };
     let err = g.check_order(Seat(0), &[], &replace(0)).expect_err("refused without Clean Power").0;
     assert!(err.contains("Clean Power"), "{err}");
@@ -24640,7 +24860,8 @@ fn the_prospectors_open_with_60_materials_where_the_others_hold_80() {
         let s = &g.seats[seat];
         let want = if s.kind == FactionKind::Prospectors { 60.0 } else { 80.0 };
         assert_eq!(s.stockpile.materials, want, "{:?} opens with {} Materials", s.kind, s.stockpile.materials);
-        assert_eq!(s.stockpile.fuel, t.start.fuel as f64, "{:?} Fuel", s.kind);
+        // Ticket #638 (version 0.1.0.6): the Arkwrights' 50 Fuel.
+        assert_eq!(s.stockpile.fuel, if s.kind == FactionKind::Arkwrights { 50.0 } else { t.start.fuel as f64 }, "{:?} Fuel", s.kind);
         assert_eq!(s.stockpile.energy, t.start.energy as f64, "{:?} Energy", s.kind);
         assert_eq!(s.stockpile, t.start_stockpile(s.kind), "{:?} reads start_stockpile", s.kind);
     }
@@ -24650,17 +24871,22 @@ fn the_prospectors_open_with_60_materials_where_the_others_hold_80() {
 }
 
 /// Ticket #585 (version 0.1.0.4), at the designer's word: the Arkwrights and the Archivists open with
-/// 10 Ducats where the table gives none, the card's `start_ducats` read in place of the table's as
+/// 10 Ducats (the Archivists 25 since ticket #638) where the table gives none, the card's `start_ducats` read in place of the table's as
 /// `start_materials` is; the Custodians and the Prospectors open with the table's 0. The signature
 /// texts do not say it: the card's glyph line does. Red with both rows silent: every seat at 0.
 #[test]
-fn the_arkwrights_and_archivists_open_with_10_ducats() {
+fn the_arkwrights_open_with_10_ducats_and_the_archivists_with_25() {
     let g = fresh();
     let t = &g.tables;
     assert_eq!(t.start.ducats, 0);
     for seat in 0..4 {
         let s = &g.seats[seat];
-        let want = if matches!(s.kind, FactionKind::Arkwrights | FactionKind::Archivists) { 10.0 } else { 0.0 };
+        // Ticket #638 (version 0.1.0.6): the Archivists' 25.
+        let want = match s.kind {
+            FactionKind::Arkwrights => 10.0,
+            FactionKind::Archivists => 25.0,
+            _ => 0.0,
+        };
         assert_eq!(s.stockpile.ducats, want, "{:?} opens with {} Ducats", s.kind, s.stockpile.ducats);
         assert_eq!(s.stockpile, t.start_stockpile(s.kind), "{:?} reads start_stockpile", s.kind);
     }
@@ -24855,7 +25081,7 @@ fn the_door_reads_the_parts_without_the_gate() {
     assert_eq!(g.kind(pro), FactionKind::Prospectors);
     bare_stations(&mut g);
     colony(&mut g, pro, BodyId::Mars, &[ModuleKind::Habitat; 4], 20);
-    g.seats[1].venture_fund = 6250.0; // ticket #623: the bar 6,250
+    g.seats[1].venture_fund = 6500.0; // ticket #638: the bar 6,500
     let p = g.progress(pro);
     assert!(!p.gate_open && (p.score_as_it_stands() - 0.94).abs() < 1e-9, "the premise: both bars, no gate, 94%");
     // The Arkwrights near too, so no runaway lead refuses first: only the door can.
@@ -25184,7 +25410,7 @@ fn capital_at(g: &mut Game, seat: Seat, body: BodyId, colonists: u32) -> ColonyI
 /// rival place on its ground starves.
 fn blockade_ground(g: &mut Game, seat: Seat, body: BodyId) {
     let id = ShipId(g.fresh_id());
-    g.ships.push(Ship {
+    g.ships.push(Ship { nuclear: false, fissionables: 0.0,
         id,
         name: String::new(), kind: UnitKind::Frigate, seat, damage: 0, at: ShipAt::Body(body), colonists: 0, warhead: false, colonists_education: 1.0, army: None,
         stance: Stance::Blockade, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None,
@@ -25824,11 +26050,17 @@ fn ticket_618_a_computer_seat_contests_a_rivals_climb_on_a_neutral_region() {
     assert!((full - 3.0).abs() < 1e-9, "x3 at the threshold: {full}");
     g.seats[0].influence.insert(Place::State(sid), th * 2);
     assert!((g.ai_contest_lift(contester, sid) - 3.0).abs() < 1e-9, "capped at x3");
-    // A computer rival's climb is contested the same way: the Prospectors' snipes too.
+    // A computer rival's climb is contested the same way: the Prospectors' snipes too. Ticket #639
+    // (version 0.1.0.6): the climber is the seat that is neither the contester nor the aloof one,
+    // which seat 2 had been until South Africa's seat came to border Egypt.
+    let climber = Seat::ALL.into_iter().find(|s| *s != Seat(0) && *s != contester && *s != aloof).unwrap();
+    // The neighbour the aloof seat was handed above goes back to nobody, so the climb below is read
+    // on the board the test began with.
+    g.state_mut(neighbours[0]).control = Control::Neutral;
     g.seats[0].influence.remove(&Place::State(sid));
-    g.seats[2].influence.insert(Place::State(sid), th);
+    g.seats[climber.index()].influence.insert(Place::State(sid), th);
     assert!((g.ai_contest_lift(contester, sid) - 3.0).abs() < 1e-9, "the climber's seat does not matter");
-    assert!((g.ai_contest_lift(Seat(2), sid) - 1.0).abs() < 1e-9, "the climber does not contest itself");
+    assert!((g.ai_contest_lift(climber, sid) - 1.0).abs() < 1e-9, "the climber does not contest itself");
     // The orders: sized to outbid. The climber stands at the threshold, the contester at 3, so the
     // steps that pass it are lifted and, with the Allotment for them, all go there; the contest is
     // counted once for the Region, however many steps.
@@ -25925,8 +26157,9 @@ fn ticket_620_a_computer_seat_weighs_collapse_against_its_win() {
     assert!(!g.ai_loses_the_race(pro), "no Collapse, no race lost");
     // The win turn: 1,250 of the bar banked by turn 10 is 125 a turn, the rest 40 turns off.
     g.turn = 10;
-    g.seats[pro.index()].venture_fund = 1250.0;
-    assert_eq!(bar, 6250.0, "the premise: the Fund's bar (ticket #623)");
+    // Ticket #638 (version 0.1.0.6): 1,300 of 6,500, 130 a turn, the same forty turns off.
+    g.seats[pro.index()].venture_fund = 1300.0;
+    assert_eq!(bar, 6500.0, "the premise: the Fund's bar (ticket #638)");
     assert_eq!(g.ai_win_turn(pro), Some(50));
     assert!(!g.ai_loses_the_race(pro), "still no Collapse on the heading");
     // The air at a Collapse's worth of CO2: the heading reaches +3.0 within a few turns, well before
@@ -25941,7 +26174,7 @@ fn ticket_620_a_computer_seat_weighs_collapse_against_its_win() {
     let w = |o: Order| g.ai_collapse_weight(&o);
     assert!((w(Order::StripPermit { state: sid }) - 0.5).abs() < 1e-9, "a Strip Permit");
     assert!((w(Order::RaiseIndustry { state: sid }) - 0.5).abs() < 1e-9, "an Industry Level");
-    for kind in [FacilityKind::Factory, FacilityKind::Mine, FacilityKind::PowerPlant, FacilityKind::Refinery, FacilityKind::Reactor] {
+    for kind in [FacilityKind::Factory, FacilityKind::Mine, FacilityKind::PowerPlant, FacilityKind::Refinery, FacilityKind::Accumulator] {
         assert!((w(Order::BuildFacility { state: sid, kind }) - 0.5).abs() < 1e-9, "{kind:?} carries Emissions on its card");
     }
     for kind in [FacilityKind::WindFarm, FacilityKind::NatureReserve, FacilityKind::Scrubber] {
@@ -25973,4 +26206,1726 @@ fn ticket_620_a_computer_seat_weighs_collapse_against_its_win() {
     let cus = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Custodians).unwrap();
     assert_eq!(g.ai_win_turn(cus), None);
     assert!(!g.ai_loses_the_race(cus));
+}
+
+// ---------------------------------------------------------------- #628 Fissionables (version 0.1.0.6)
+
+/// Ticket #628 (version 0.1.0.6), at the designer's word: a seventh resource, Fissionables, none on
+/// Earth, the Moon 0.25, Mars 0.80, its moons 1.1, Mercury 1.3, Ceres 1.6 ("Eris" in the list; the
+/// designer: "yeah Ceres"), Vesta 1.8. Venus has no ground and so none.
+#[test]
+fn ticket_628_every_body_carries_its_fissionables_figure() {
+    let g = fresh();
+    let want = [
+        (BodyId::Earth, 0.0),
+        (BodyId::Moon, 0.25),
+        (BodyId::Mars, 0.8),
+        (BodyId::Phobos, 1.1),
+        (BodyId::Deimos, 1.1),
+        (BodyId::Venus, 0.0),
+        (BodyId::Mercury, 1.3),
+        (BodyId::Ceres, 1.6),
+        (BodyId::Vesta, 1.8),
+    ];
+    for (b, f) in want {
+        assert_eq!(g.tables.body(b).fissionables_yield, f, "{b:?}");
+    }
+    assert_eq!(Resource::Fissionables.name(), "Fissionables");
+}
+
+/// Ticket #628: which slots hold them. Every ground slot of Mars but Hellas Planitia (the designer:
+/// "pick one mars slot to not have it"), every one of Phobos, Deimos, Mercury, Ceres and Vesta, and
+/// two or three of the Moon's five, drawn with the game, never more, never fewer. Each figure takes
+/// the slot's own spread, as the other four yields do.
+#[test]
+fn ticket_628_the_slots_that_hold_fissionables() {
+    let spread = fresh().tables.slot_yield_spread;
+    let mut moon_counts = std::collections::BTreeSet::new();
+    for seed in 1..=40 {
+        let g = with_seed(seed);
+        for b in BodyId::ALL {
+            let card = g.tables.body(b);
+            let mut holding = 0;
+            for slot in 0..card.colony_slots() {
+                let f = g.slot_yields(b, slot).fissionables;
+                let name = &card.slots[slot as usize].name;
+                if f > 0.0 {
+                    holding += 1;
+                    let base = card.fissionables_yield;
+                    assert!(f >= base * (1.0 - spread) - 0.005 && f <= base * (1.0 + spread) + 0.005, "{b:?} {name}: {f} against {base}");
+                }
+                match b {
+                    BodyId::Mars => assert_eq!(f > 0.0, name != "Hellas Planitia", "seed {seed}, {name}: {f}"),
+                    BodyId::Phobos | BodyId::Deimos | BodyId::Mercury | BodyId::Ceres | BodyId::Vesta => assert!(f > 0.0, "seed {seed}, {b:?} {name}"),
+                    BodyId::Earth | BodyId::Venus => assert_eq!(f, 0.0, "seed {seed}, {b:?} {name}"),
+                    BodyId::Moon => {}
+                }
+            }
+            if b == BodyId::Moon {
+                assert!((2..=3).contains(&holding), "seed {seed}: {holding} Moon sites");
+                moon_counts.insert(holding);
+            }
+        }
+    }
+    assert_eq!(moon_counts.into_iter().collect::<Vec<_>>(), vec![2, 3], "both two and three come up");
+}
+
+/// Ticket #628: the draw takes nothing from the game's own dice, so a seed's other yields and every
+/// roll after are the ones the version before drew. Pinned against 0.1.0.5 (seed 7, Mars's first
+/// slot, read before the resource existed).
+#[test]
+fn ticket_628_the_draw_leaves_the_games_dice_alone() {
+    let g = fresh();
+    let y = g.slot_yields(BodyId::Mars, 0);
+    // Ticket #639 (version 0.1.0.6): a snapshot re-read from this version's own code on the twenty-
+    // two-Region board, not from an older version's as the 0.1.0.5 figures were: it holds the draws
+    // where they stand, and says nothing of why the start moved them.
+    assert_eq!((y.mine, y.generator, y.refinery, y.research), (1.06, 0.62, 1.52, 1.43));
+    assert_eq!(g.slot_yields(BodyId::Vesta, 5).mine, 1.48, "the last slot drawn");
+    assert_eq!(g.deck.cards[..4], [Card::Event(EventId::Drought), Card::Event(EventId::CarbonLevy), Card::Event(EventId::RefugeeConvoy), Card::Event(EventId::StrikeAtTheRefineries)], "the deck, shuffled before the slots");
+    // And the game's own dice stand where the start leaves them: the next roll.
+    use rand::Rng;
+    assert_eq!(g.rng.clone().random::<u64>(), 15575124227675032591, "the game's next roll");
+}
+
+/// Ticket #628: the Mine makes Fissionables beside its Materials (the designer: "we're using the
+/// existing mine"), 1 a turn times the slot's figure, times the Faction's output and the Mine's Techs
+/// (the designer: "the techs will effect fisionables but not the card"). A station's Mine makes none.
+#[test]
+fn ticket_628_a_mine_makes_fissionables_beside_its_materials() {
+    let mut g = game();
+    let c = colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Mine], 2);
+    let slot = g.colony(c).unwrap().slot;
+    let y = g.slot_yields(BodyId::Mars, slot);
+    assert_eq!(y.fissionables, 0.8, "the test pins the slot to Mars's own figure");
+    let mine = g.module_yield_at(Seat(0), c, 0);
+    assert_eq!((mine.resource, mine.fissionables), (Some(Resource::Materials), 0.8));
+    // The Colony's Output row reads it, named for the Mine (the first picture showed the row without it).
+    assert_eq!(g.place_output(Place::Colony(c)).map(|o| o.fissionables), Some(0.8));
+    assert!(g.place_output_sources(Place::Colony(c)).unwrap().iter().any(|(r, n, v)| *r == Resource::Fissionables && n == "Mine" && *v == 0.8));
+    g.seats[0].stockpile.fissionables = 0.0;
+    let before = income_of(&mut g, Seat(0));
+    assert_eq!(before.fissionables, 0.8);
+    assert_eq!(g.seat(Seat(0)).stockpile.fissionables, 0.8, "banked");
+    // Deep Mining, x1.25 since this ticket: 0.8 x 1.25 = 1.0; the Materials lifted with it.
+    with_tech(&mut g, TechId::DeepMining);
+    assert_eq!(g.tables.tech(TechId::DeepMining).value, 1.25);
+    let lifted = income_of(&mut g, Seat(0));
+    assert_eq!(lifted.fissionables, 1.0);
+    assert!(lifted.materials > before.materials);
+    // A Discovery (Rich Seam, the Deep Core Survey) lifts the Materials alone.
+    g.discoveries.push(Discovery { body: BodyId::Mars, kind: ModuleKind::Mine, multiplier: 2.0, turns_left: 2 });
+    let seam = income_of(&mut g, Seat(0));
+    assert_eq!(seam.fissionables, 1.0, "no card lifts the Fissionables");
+    assert!(seam.materials > lifted.materials);
+    // A Mine on a station over Mars makes Materials at the Body's yield and no Fissionables.
+    let st = colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Mine], 2);
+    g.colony_mut(st).unwrap().in_orbit = true;
+    assert_eq!(g.module_yield_at(Seat(0), st, 0).fissionables, 0.0);
+    // A Moon slot without them makes none.
+    let moon = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Mine], 2);
+    let ms = g.colony(moon).unwrap().slot;
+    let bare = SlotYields { fissionables: 0.0, ..g.slot_yields(BodyId::Moon, ms) };
+    g.slot_yields.insert((BodyId::Moon, ms), bare);
+    assert_eq!(g.module_yield_at(Seat(0), moon, 0).fissionables, 0.0);
+}
+
+/// Ticket #628, from the review: the designer named three things that lift a Mine's Fissionables --
+/// its site, the Faction's output, the Mine's Techs -- and Production Moved is none of them. The
+/// Custodians' idle Earth Mine doubles a Mars Mine's Materials (x2.08) and leaves its Fissionables.
+#[test]
+fn ticket_628_production_moved_doubles_the_materials_alone() {
+    let mut g = game();
+    assert_eq!(g.kind(Seat(0)), FactionKind::Custodians, "the premise: the Production Moved seat");
+    let c = colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Mine], 2);
+    let plain = g.module_yield_at(Seat(0), c, 0);
+    let mut idle = facility(FacilityKind::Mine);
+    idle.mothballed = true;
+    g.state_mut(StateId::EastAsia).facilities.push(idle);
+    let doubled = g.module_yield_at(Seat(0), c, 0);
+    assert!(doubled.doubled_factor > 1.0 && doubled.amount > plain.amount, "the premise: the Mine is doubled");
+    assert_eq!((plain.fissionables, doubled.fissionables), (0.8, 0.8));
+    // Nor a Mass Driver beside it, which adds to the Materials alone (the review: nothing pinned it).
+    g.colony_mut(c).unwrap().modules.push(Module::new(ModuleKind::MassDriver));
+    let driven = g.module_yield_at(Seat(0), c, 0);
+    assert!(driven.amount > doubled.amount, "the premise: the Mass Driver adds");
+    assert_eq!(driven.fissionables, 0.8);
+}
+
+/// Ticket #628, at the designer's word: Rich Seam x1.5, x2 with Deep Mining (x2 and x3 before); the
+/// Ice Deposit and the Helium-3 Vein keep the shared figures.
+#[test]
+fn ticket_628_rich_seam_is_one_and_a_half_and_two_with_deep_mining() {
+    let mut g = game();
+    colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Mine], 2);
+    drawn(&mut g, EventId::RichSeam, EventTarget::Body(BodyId::Mars));
+    g.apply_event_now();
+    assert_eq!(g.discoveries.last().map(|d| (d.kind, d.multiplier)), Some((ModuleKind::Mine, 1.5)));
+    with_tech(&mut g, TechId::DeepMining);
+    drawn(&mut g, EventId::RichSeam, EventTarget::Body(BodyId::Mars));
+    g.apply_event_now();
+    assert_eq!(g.discoveries.last().map(|d| d.multiplier), Some(2.0));
+    assert_eq!((g.tables.events.discovery_multiplier, g.tables.events.discovery_multiplier_with_tech), (2.0, 3.0), "the other two cards' figures");
+    assert!(g.tables.tech(TechId::DeepMining).effect.contains("x1.25"), "{}", g.tables.tech(TechId::DeepMining).effect);
+    assert!(g.tables.event(EventId::RichSeam).effect.contains("x1.5"), "{}", g.tables.event(EventId::RichSeam).effect);
+}
+
+/// Ticket #628: Fissionables are bought, sold and traded like Fuel, their band's midpoint 8 Ducats.
+#[test]
+fn ticket_628_fissionables_are_bought_and_sold() {
+    let mut g = game();
+    assert_eq!(Game::market_row(Resource::Fissionables), Some(3));
+    assert_eq!(g.trade_price(Resource::Fissionables), Some(8));
+    g.seats[0].stockpile.ducats = 100.0;
+    g.seats[0].stockpile.fissionables = 0.0;
+    let buy = Order::Buy { resource: Resource::Fissionables, amount: 2 };
+    g.check_order(Seat(0), &[], &buy).expect("buyable");
+    let left = g.remaining(Seat(0), std::slice::from_ref(&buy)).0;
+    assert_eq!(left.fissionables, 2.0);
+    assert!(left.ducats < 100.0);
+    g.seats[0].stockpile.fissionables = 5.0;
+    let sell = Order::Sell { resource: Resource::Fissionables, amount: 2 };
+    g.check_order(Seat(0), &[], &sell).expect("sellable");
+    let left = g.remaining(Seat(0), std::slice::from_ref(&sell)).0;
+    assert_eq!(left.fissionables, 3.0);
+    assert!(left.ducats > 100.0);
+    assert!(g.market_line(Seat(0)).contains("Fissionables"), "{}", g.market_line(Seat(0)));
+}
+
+// ---------------------------------------------------------------- #629 What Fissionables buy (version 0.1.0.6)
+
+/// Ticket #629 (version 0.1.0.6), at the designer's word: once Nuclear Rockets stands the yard
+/// offers a **nuclear hull** beside the chemical one (Q1 b). It carries a second tank, Fissionables,
+/// a tenth of its Fuel tank, so it grows with the Fuel tank's Techs, and the build pays to fill it
+/// as it pays the Fuel (the designer: "as with fuel the cost is the tank so that cost matches tank
+/// increases w/tech"). A chemical hull costs what it did.
+#[test]
+fn ticket_629_a_nuclear_hull_waits_on_nuclear_rockets_and_is_built_with_its_second_tank_full() {
+    let mut g = game();
+    let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
+    g.colony_mut(iss).unwrap().modules.push(Module::new(ModuleKind::Shipyard));
+    g.colony_mut(iss).unwrap().modules.push(Module::new(ModuleKind::Factory));
+    g.seats[0].stockpile.materials = 200.0;
+    g.seats[0].stockpile.energy = 200.0;
+    g.seats[0].stockpile.fuel = 100.0;
+    g.seats[0].stockpile.fissionables = 10.0;
+    let nuclear = Order::BuildShip { site: Place::Colony(iss), kind: UnitKind::ColonyShip, nuclear: true };
+    let chemical = Order::BuildShip { site: Place::Colony(iss), kind: UnitKind::ColonyShip, nuclear: false };
+    let err = g.check_order(Seat(0), &[], &nuclear).unwrap_err().0;
+    assert!(err.contains("Nuclear Rockets"), "{err}");
+    with_tech(&mut g, TechId::NuclearRockets);
+    assert_eq!(g.tables.nuclear_hull.tank_share, 0.1);
+    assert_eq!(g.fission_tank_of(Seat(0), UnitKind::ColonyShip), 3.2, "a tenth of the Colony Ship's 32");
+    assert_eq!(g.order_cost(Seat(0), &nuclear).fissionables, 3.2);
+    assert_eq!(g.order_cost(Seat(0), &nuclear).fuel, 32.0, "and its Fuel tank as before");
+    assert_eq!(g.order_cost(Seat(0), &chemical).fissionables, 0.0);
+    // The tank's Techs raise both tanks: Clean Propellant's Fuel on the Colony Ship's 32.
+    with_tech(&mut g, TechId::CleanPropellant);
+    let tank = g.tank_of(Seat(0), UnitKind::ColonyShip);
+    assert!(tank > 32.0);
+    assert_eq!(g.fission_tank_of(Seat(0), UnitKind::ColonyShip), tenth(tank * 0.1));
+    // Short of the fill, the order is refused.
+    g.seats[0].stockpile.fissionables = 1.0;
+    let err = g.check_order(Seat(0), &[], &nuclear).unwrap_err().0;
+    assert!(err.contains("Fissionables"), "{err}");
+    g.seats[0].stockpile.fissionables = 10.0;
+    let fill = g.order_cost(Seat(0), &nuclear).fissionables;
+    g.commit_orders(Seat(0), std::slice::from_ref(&nuclear));
+    assert_eq!(g.seats[0].stockpile.fissionables, tenth(10.0 - fill), "paid at the order");
+    for _ in 0..4 {
+        g.resolution_phase();
+        if g.ships.iter().any(|s| s.kind == UnitKind::ColonyShip && s.seat == Seat(0) && s.nuclear) {
+            break;
+        }
+        g.turn += 1;
+    }
+    let s = g.ships.iter().find(|s| s.kind == UnitKind::ColonyShip && s.seat == Seat(0) && s.nuclear).expect("built nuclear");
+    assert_eq!(s.fissionables, fill, "built holding what was paid");
+}
+
+/// Ticket #629: a nuclear hull's every leg burns a tenth of its Fuel in Fissionables from the second
+/// tank (Q3: crossings and orbit changes, both apply), and only a nuclear hull takes Nuclear Rockets'
+/// x0.8 on the crossing (Q1 b). A chemical hull burns none and flies at the old speed.
+#[test]
+fn ticket_629_a_nuclear_hull_burns_a_tenth_of_each_legs_fuel_and_alone_flies_faster() {
+    let mut g = game();
+    at_window(&mut g);
+    with_tech(&mut g, TechId::NuclearRockets);
+    let (chem, _) = colony_ship_ready(&mut g, BodyId::Earth);
+    let (nuke, _) = colony_ship_ready(&mut g, BodyId::Earth);
+    g.ship_mut(chem).unwrap().fuel = 32.0;
+    {
+        let s = g.ship_mut(nuke).unwrap();
+        s.fuel = 32.0;
+        s.nuclear = true;
+        s.fissionables = 3.2;
+    }
+    let (t_chem, f_chem) = g.transit_leg(Seat(0), g.ship(chem).unwrap(), BodyId::Earth, BodyId::Mars, None);
+    let (t_nuke, f_nuke) = g.transit_leg(Seat(0), g.ship(nuke).unwrap(), BodyId::Earth, BodyId::Mars, None);
+    assert_eq!(f_chem, f_nuke, "the Fuel is the same");
+    assert!(t_nuke < t_chem, "the nuclear hull alone takes Nuclear Rockets: {t_nuke} against {t_chem}");
+    let burn = g.leg_fissionables(g.ship(nuke).unwrap(), f_nuke);
+    assert_eq!(burn, tenth(f_nuke * 0.1));
+    assert_eq!(g.leg_fissionables(g.ship(chem).unwrap(), f_chem), 0.0);
+    g.commit_orders(Seat(0), &[Order::Transit { ship: chem, to: BodyId::Mars, slot: None }, Order::Transit { ship: nuke, to: BodyId::Mars, slot: None }]);
+    assert_eq!(g.ship(nuke).unwrap().fissionables, tenth(3.2 - burn));
+    assert_eq!(g.ship(chem).unwrap().fissionables, 0.0);
+    assert!(matches!(g.ship(nuke).unwrap().at, ShipAt::Transit { turns_left, .. } if turns_left == t_nuke));
+    assert!(matches!(g.ship(chem).unwrap().at, ShipAt::Transit { turns_left, .. } if turns_left == t_chem));
+    // Short of Fissionables, the leg is refused and says why.
+    let (other, _) = colony_ship_ready(&mut g, BodyId::Earth);
+    {
+        let s = g.ship_mut(other).unwrap();
+        s.fuel = 32.0;
+        s.nuclear = true;
+        s.fissionables = 0.5;
+    }
+    let err = g.check_order(Seat(0), &[], &Order::Transit { ship: other, to: BodyId::Mars, slot: None }).unwrap_err().0;
+    assert!(err.contains("Fissionables"), "{err}");
+    // An orbit change burns its tenth too.
+    let ring = Order::ChangeOrbit { ship: other, slot: Some(0) };
+    let fuel = g.orbit_change_cost(Seat(0), BodyId::Earth, g.ship_orbit(g.ship(other).unwrap()), Orbit::of(Some(0)));
+    g.commit_orders(Seat(0), std::slice::from_ref(&ring));
+    assert_eq!(g.ship(other).unwrap().fissionables, tenth(0.5 - tenth(fuel * 0.1)));
+}
+
+/// Ticket #629: Refuel fills both tanks from the Stockpile, as far as it pays (Q4 a).
+#[test]
+fn ticket_629_refuel_fills_both_tanks() {
+    let mut g = game();
+    let (ship, _) = colony_ship_ready(&mut g, BodyId::Earth);
+    let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
+    let ring = g.colony(iss).unwrap().slot;
+    {
+        let s = g.ship_mut(ship).unwrap();
+        s.nuclear = true;
+        s.fuel = 10.0;
+        s.fissionables = 1.0;
+        s.slot = Some(ring);
+    }
+    g.seats[0].stockpile.fuel = 100.0;
+    g.seats[0].stockpile.fissionables = 1.5;
+    let refuel = Order::Refuel { ship };
+    let cost = g.order_cost(Seat(0), &refuel);
+    assert_eq!((cost.fuel, cost.fissionables), (22.0, 1.5), "Fuel to the 32; Fissionables as far as the 1.5 pays toward 3.2");
+    g.commit_orders(Seat(0), std::slice::from_ref(&refuel));
+    let s = g.ship(ship).unwrap();
+    assert_eq!((s.fuel, s.fissionables), (32.0, 2.5));
+    assert_eq!(g.seats[0].stockpile.fissionables, 0.0);
+    // The review: a full Fuel tank and a second tank short -- and no Fuel at all in the Stockpile --
+    // still refuels the second tank; and a hull full in both is refused.
+    g.turn += 1;
+    g.seats[0].stockpile.fuel = 0.0;
+    g.seats[0].stockpile.fissionables = 5.0;
+    let cost = g.check_order(Seat(0), &[], &refuel).expect("the second tank alone wants filling");
+    assert_eq!((cost.fuel, cost.fissionables), (0.0, 0.7));
+    g.ship_mut(ship).unwrap().fissionables = 3.2;
+    assert!(g.check_order(Seat(0), &[], &refuel).is_err(), "both tanks full");
+    // And with Fissionables none in the Stockpile, a hull short only in its second tank is refused.
+    g.ship_mut(ship).unwrap().fissionables = 1.0;
+    g.seats[0].stockpile.fissionables = 0.0;
+    let err = g.check_order(Seat(0), &[], &refuel).unwrap_err().0;
+    assert!(err.contains("Fissionables"), "{err}");
+}
+
+/// Ticket #629, at the designer's word (Q5): a nuke costs 0.5 Fissionables, at the Missile Carrier's
+/// build, which loads its first Warhead, and at every Rearm.
+#[test]
+fn ticket_629_a_warhead_costs_half_a_fissionable() {
+    let mut g = game();
+    calm(&mut g);
+    assert_eq!(g.tables.nuke.fissionables, 0.5);
+    with_tech(&mut g, TechId::MissileTechnology);
+    let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
+    g.colony_mut(iss).unwrap().modules.push(Module::new(ModuleKind::Shipyard));
+    let build = Order::BuildShip { site: Place::Colony(iss), kind: UnitKind::MissileCarrier, nuclear: false };
+    assert_eq!(g.order_cost(Seat(0), &build).fissionables, 0.5, "a chemical carrier's Warhead");
+    let ship = carrier_in(&mut g, Seat(0), BodyId::Mars, None, false);
+    colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Shipyard], 4);
+    let rearm = Order::Rearm { ship };
+    assert_eq!(g.order_cost(Seat(0), &rearm).fissionables, 0.5);
+    g.seats[0].stockpile.materials = 10_000.0;
+    g.seats[0].stockpile.fissionables = 0.0;
+    let err = g.check_order(Seat(0), &[], &rearm).unwrap_err().0;
+    assert!(err.contains("Fissionables"), "{err}");
+}
+
+/// Ticket #629 (Q6): the computer builds a nuclear hull when its Stockpile covers the second tank's
+/// fill and two more tanks, and a chemical one otherwise; never before Nuclear Rockets.
+#[test]
+fn ticket_629_the_computer_builds_nuclear_when_it_can_keep_the_tank_filled() {
+    let mut g = game();
+    assert_eq!(g.tables.ai.thresholds.nuclear_hull_reserve_tanks, 2.0);
+    g.seats[0].stockpile.fissionables = 100.0;
+    assert!(!g.ai_builds_nuclear(Seat(0), UnitKind::Frigate), "not before the Tech");
+    with_tech(&mut g, TechId::NuclearRockets);
+    let fill = g.fission_tank_of(Seat(0), UnitKind::Frigate);
+    g.seats[0].stockpile.fissionables = tenth(fill * 3.0);
+    assert!(g.ai_builds_nuclear(Seat(0), UnitKind::Frigate));
+    g.seats[0].stockpile.fissionables = tenth(fill * 3.0 - 0.1);
+    assert!(!g.ai_builds_nuclear(Seat(0), UnitKind::Frigate));
+}
+
+// ---------------------------------------------------------------- #630 The Reactor and the Accumulator (version 0.1.0.6)
+
+/// Ticket #630 (version 0.1.0.6), at the designer's word: **the Reactor**, a common power station
+/// that burns Fissionables -- 8 Energy a turn for 0.1 Fissionables and 2 Ducats, no Emissions, at the
+/// Power Plant's price, behind Clean Power as the Wind Farm is ("gate it clean power with the wind")
+/// -- and a Reactor Module of the same figures off Earth. The Archivists' own building, the Reactor
+/// until now, is renamed **the Accumulator**, its rule untouched.
+#[test]
+fn ticket_630_the_reactor_and_the_accumulator_on_their_cards() {
+    let g = game();
+    let r = g.tables.facility(FacilityKind::FissionReactor);
+    assert_eq!(r.name, "Reactor");
+    assert_eq!((r.materials, r.widgets, r.energy_upkeep, r.ducats_upkeep, r.fissionables_upkeep, r.emissions), (27.5, 10, 0, 2.0, 0.1, 0.0));
+    assert_eq!(r.produces.as_ref().map(|p| (p.resource, p.amount)), Some((Resource::Energy, 8.0)));
+    assert_eq!(r.needs_tech, Some(TechId::CleanPower));
+    let m = g.tables.module(ModuleKind::FissionReactor);
+    assert_eq!(m.name, "Reactor");
+    assert_eq!((m.materials, m.widgets, m.energy_upkeep, m.ducats_upkeep, m.fissionables_upkeep), (27.5, 10, 0, 2.0, 0.1));
+    assert_eq!(m.produces.as_ref().map(|p| (p.resource, p.amount)), Some((Resource::Energy, 8.0)));
+    assert_eq!(m.needs_tech, Some(TechId::CleanPower));
+    assert!(!m.sun_scaled && !m.station_only);
+    assert_eq!(FacilityKind::FissionReactor.unique_to(), None, "every Faction's");
+    assert_eq!(FacilityKind::Accumulator.name(), "Accumulator");
+    assert_eq!(g.tables.facility(FacilityKind::Accumulator).name, "Accumulator");
+    assert_eq!((FacilityKind::Accumulator.unique_to(), FacilityKind::Accumulator.common()), (Some(FactionKind::Archivists), Some(FacilityKind::PowerPlant)));
+    assert_eq!(FacilityKind::FissionReactor.built_by(FactionKind::Archivists), FacilityKind::FissionReactor, "the Archivists build the common Reactor too");
+}
+
+/// Ticket #630: the Reactor's Energy takes Efficient Grids and Superconductors and not Solar Maximum;
+/// it burns its Fissionables and Ducats at Income, and short of Fissionables it runs at a quarter
+/// and burns none, as a Power Plant short of Fuel does.
+#[test]
+fn ticket_630_a_reactor_burns_fissionables_and_runs_at_a_quarter_without_them() {
+    let mut g = game();
+    g.state_mut(StateId::EastAsia).facilities = vec![facility(FacilityKind::FissionReactor)];
+    let y = g.facility_yield(Seat(0), StateId::EastAsia, FacilityKind::FissionReactor);
+    assert_eq!((y.resource, y.amount, y.fissionables_upkeep, y.ducats_upkeep, y.emissions), (Some(Resource::Energy), 8.0, 0.1, 2.0, 0.0));
+    with_tech(&mut g, TechId::EfficientGrids);
+    with_tech(&mut g, TechId::Superconductors);
+    assert_eq!(g.facility_yield(Seat(0), StateId::EastAsia, FacilityKind::FissionReactor).amount, 15.0, "8 x 1.5 x 1.25");
+    g.seats[0].stockpile.fissionables = 1.0;
+    let fed = income_of(&mut g, Seat(0));
+    assert_eq!(fed.fissionables, -0.1, "a tenth burned");
+    g.seats[0].stockpile.fissionables = 0.0;
+    let starved = income_of(&mut g, Seat(0));
+    assert_eq!(starved.fissionables, 0.0, "nothing to burn");
+    assert_eq!(tenth(fed.energy - starved.energy), tenth(15.0 - tenth(15.0 * 0.25)), "a quarter of its Energy");
+}
+
+/// Ticket #630: the Reactor waits on Clean Power, on Earth and off it; the Module makes its 8
+/// wherever it stands, the sunlight of the Body nothing to it.
+#[test]
+fn ticket_630_the_reactor_waits_on_clean_power_and_the_module_ignores_the_sun() {
+    let mut g = game();
+    g.seats[0].stockpile.materials = 500.0;
+    let build = Order::BuildFacility { state: StateId::EastAsia, kind: FacilityKind::FissionReactor };
+    let err = g.check_order(Seat(0), &[], &build).unwrap_err().0;
+    assert!(err.contains("Clean Power"), "{err}");
+    with_tech(&mut g, TechId::CleanPower);
+    g.check_order(Seat(0), &[], &build).expect("ordered once Clean Power stands");
+    let vesta = colony(&mut g, Seat(0), BodyId::Vesta, &[ModuleKind::FissionReactor], 2);
+    let mars = colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::FissionReactor], 2);
+    assert_eq!(g.module_yield_at(Seat(0), vesta, 0).amount, 8.0);
+    assert_eq!(g.module_yield_at(Seat(0), mars, 0).amount, 8.0);
+}
+
+/// Ticket #630 (Q8): the computer builds a Reactor where it would build a Power Plant once Clean Power
+/// stands and its Stockpile holds ten turns of the upkeep, and a Power Plant or Wind Farm otherwise.
+#[test]
+fn ticket_630_the_computer_feeds_a_reactor_only_with_ten_turns_in_hand() {
+    let mut g = game();
+    assert_eq!(g.tables.ai.thresholds.reactor_reserve_turns, 10.0);
+    g.seats[0].stockpile.fissionables = 5.0;
+    assert!(!g.ai_feeds_reactors(Seat(0)), "not before Clean Power");
+    with_tech(&mut g, TechId::CleanPower);
+    assert!(g.ai_feeds_reactors(Seat(0)));
+    g.seats[0].stockpile.fissionables = 0.9;
+    assert!(!g.ai_feeds_reactors(Seat(0)), "short of ten turns' 1.0");
+}
+
+/// Ticket #630, from the review: the computer counts a Reactor Module's Energy, standing and on
+/// order, where it counted the Generator's alone and so read a seat of Reactors as short of power
+/// for ever, building more.
+#[test]
+fn ticket_630_the_computer_counts_its_reactor_modules_energy() {
+    let mut g = game();
+    let c = colony(&mut g, Seat(0), BodyId::Mars, &[], 4);
+    let before = g.energy_production(Seat(0));
+    g.colony_mut(c).unwrap().modules.push(Module::new(ModuleKind::FissionReactor));
+    assert_eq!(g.energy_production(Seat(0)) - before, 8, "the Module's 8");
+}
+
+/// Ticket #630, from the review: a seat short of Fissionables mothballs only the Reactors it cannot
+/// feed this Income, and restarts one only once it can feed the ones running and that one for the
+/// reserve's ten turns, so the two never chase each other turn on turn.
+#[test]
+fn ticket_630_the_computer_mothballs_only_the_reactors_it_cannot_feed() {
+    let mut g = game();
+    g.state_mut(StateId::EastAsia).facilities = (0..5).map(|_| facility(FacilityKind::FissionReactor)).collect();
+    g.seats[0].stockpile.fissionables = 0.4;
+    assert_eq!(g.ai_reactors_to_mothball(Seat(0)), 1, "four of five can be fed");
+    g.seats[0].stockpile.fissionables = 0.5;
+    assert_eq!(g.ai_reactors_to_mothball(Seat(0)), 0);
+    // Four running and one idle: a restart wants ten turns of five, 5 Fissionables.
+    g.state_mut(StateId::EastAsia).facilities[4].mothballed = true;
+    with_tech(&mut g, TechId::CleanPower);
+    g.seats[0].stockpile.fissionables = 4.9;
+    assert!(!g.ai_may_restart_reactor(Seat(0)));
+    g.seats[0].stockpile.fissionables = 5.0;
+    assert!(g.ai_may_restart_reactor(Seat(0)));
+}
+
+// ---------------------------------------------------------------- #643 The computer chases Fissionables (version 0.1.0.6)
+
+/// Ticket #643 (version 0.1.0.6), at the designer's word (Q1): a site's Fissionables count toward its
+/// worth to a computer seat, at the Mine yield's weight, once Clean Power or Nuclear Rockets stands;
+/// nothing before, when nothing spends them.
+#[test]
+fn ticket_643_a_sites_fissionables_count_once_something_spends_them() {
+    let mut g = game();
+    let y = SlotYields { mine: 1.0, generator: 1.0, refinery: 1.0, research: 1.0, fissionables: 1.6 };
+    assert_eq!(g.ai_fission_worth(&y), 0.0, "nothing spends them yet");
+    with_tech(&mut g, TechId::NuclearRockets);
+    assert_eq!(g.ai_fission_worth(&y), 1.6);
+    let mut g = game();
+    with_tech(&mut g, TechId::CleanPower);
+    assert_eq!(g.ai_fission_worth(&y), 1.6);
+}
+
+/// Ticket #643 (Q2, Q3): **the reserve a computer seat keeps** -- ten turns of its running Reactors,
+/// each nuclear hull's second tank topped up, and half a Fissionable for each Missile Carrier with no
+/// Warhead; while it holds less, a Mine on a Fissionables site is lifted and the shortfall bought.
+#[test]
+fn ticket_643_the_reserve_is_ten_turns_of_reactors_the_hulls_refills_and_the_warheads() {
+    let mut g = game();
+    calm(&mut g);
+    g.state_mut(StateId::EastAsia).facilities = (0..3).map(|_| facility(FacilityKind::FissionReactor)).collect();
+    with_tech(&mut g, TechId::NuclearRockets);
+    let (hull, _) = colony_ship_ready(&mut g, BodyId::Earth);
+    {
+        let s = g.ship_mut(hull).unwrap();
+        s.nuclear = true;
+        s.fissionables = 1.2;
+    }
+    let carrier = carrier_in(&mut g, Seat(0), BodyId::Mars, None, false);
+    assert!(!g.ship(carrier).unwrap().warhead, "the premise: an empty carrier");
+    // 3 x 0.1 x 10 = 3; the Colony Ship's tank 3.2 less 1.2 = 2; a Warhead 0.5.
+    assert_eq!(g.ai_fission_reserve(Seat(0)), 5.5);
+    let c = colony(&mut g, Seat(0), BodyId::Mars, &[], 4);
+    g.seats[0].stockpile.fissionables = 0.0;
+    assert!(g.ai_fission_mine_lift(Seat(0), c) > 1.0, "short: a Mars Mine is lifted");
+    g.seats[0].stockpile.fissionables = 6.0;
+    assert_eq!(g.ai_fission_mine_lift(Seat(0), c), 1.0, "the reserve held: no lift");
+}
+
+/// Ticket #643 (Q3, Q4): the computer buys the Fissionables its reserve is short, when its Ducats
+/// allow, and sells what it holds beyond twenty turns of its Reactors and two tanks.
+#[test]
+fn ticket_643_the_computer_buys_its_shortfall_and_sells_its_surplus() {
+    let mut g = game();
+    calm(&mut g);
+    g.state_mut(StateId::EastAsia).facilities = (0..3).map(|_| facility(FacilityKind::FissionReactor)).collect();
+    with_tech(&mut g, TechId::CleanPower);
+    g.seats[0].stockpile.fissionables = 0.0;
+    g.seats[0].stockpile.ducats = 1000.0;
+    let orders = g.ai_orders(Seat(0));
+    assert!(orders.iter().any(|o| matches!(o, Order::Buy { resource: Resource::Fissionables, amount } if *amount >= 3)), "buys its three: {orders:?}");
+    let mut g = game();
+    calm(&mut g);
+    g.state_mut(StateId::EastAsia).facilities = vec![facility(FacilityKind::FissionReactor)];
+    with_tech(&mut g, TechId::CleanPower);
+    g.seats[0].stockpile.fissionables = 100.0;
+    let keep = g.ai_fission_keep(Seat(0));
+    let orders = g.ai_orders(Seat(0));
+    assert!(orders.iter().any(|o| matches!(o, Order::Sell { resource: Resource::Fissionables, amount } if *amount as f64 <= 100.0 - keep && *amount > 0)), "sells beyond {keep}: {orders:?}");
+}
+
+/// Ticket #643 (Q5, at the designer's word): Fissionables join the computer's trade goods. A seat
+/// short of its reserve -- never of a fixed figure, which every seat's few Fissionables would be --
+/// asks the shortfall of a Faction it stands well with, giving what it holds long.
+#[test]
+fn ticket_643_the_computer_asks_its_fissionables_shortfall_in_a_trade() {
+    let mut g = game();
+    calm(&mut g);
+    g.state_mut(StateId::EastAsia).facilities = (0..3).map(|_| facility(FacilityKind::FissionReactor)).collect();
+    with_tech(&mut g, TechId::CleanPower);
+    g.seats[0].stockpile.fissionables = 0.0;
+    g.seats[0].stockpile.ducats = 0.0;
+    g.seats[0].stockpile.materials = 2000.0;
+    g.seats[0].stockpile.fuel = 500.0;
+    g.seats[0].stockpile.energy = 500.0;
+    let orders = g.ai_orders(Seat(0));
+    assert!(
+        orders.iter().any(|o| matches!(o, Order::ProposeTrade { get: TradeGood::Goods(Resource::Fissionables, n), .. } if *n == 3)),
+        "asks its three: {orders:?}"
+    );
+}
+
+/// Ticket #643, from the review: the keep covers what the computer means to spend -- the nuclear
+/// hull's build gate (the fill and two tanks more, the largest hull's) once Nuclear Rockets stands,
+/// and every Reactor standing, mothballed or not, so a restart is never sold out from under it.
+#[test]
+fn ticket_643_the_keep_covers_the_nuclear_gate_and_every_reactor_standing() {
+    let mut g = game();
+    with_tech(&mut g, TechId::NuclearRockets);
+    let gate = UnitKind::SHIPS.iter().map(|k| g.fission_tank_of(Seat(0), *k)).fold(0.0, f64::max) * (1.0 + g.tables.ai.thresholds.nuclear_hull_reserve_tanks);
+    assert!(g.ai_fission_keep(Seat(0)) + 1e-9 >= gate, "{} against the gate's {gate}", g.ai_fission_keep(Seat(0)));
+    let mut g = game();
+    g.state_mut(StateId::EastAsia).facilities = (0..3).map(|_| { let mut f = facility(FacilityKind::FissionReactor); f.mothballed = true; f }).collect();
+    assert_eq!(g.ai_fission_keep(Seat(0)), 6.0, "three idle Reactors' twenty turns");
+    assert_eq!(g.ai_fission_reserve(Seat(0)), 0.0, "and none of it bought while they stand idle");
+}
+
+/// Ticket #643, from the review: a computer partner never trades away its own reserve.
+#[test]
+fn ticket_643_a_partner_keeps_its_own_reserve() {
+    let mut g = game();
+    calm(&mut g);
+    let partner = Seat(1);
+    let home = g.directed_states(partner)[0];
+    g.state_mut(home).facilities.extend((0..3).map(|_| facility(FacilityKind::FissionReactor)));
+    g.seats[partner.index()].stockpile.fissionables = 3.5;
+    let give = TradeGood::Goods(Resource::Materials, 500);
+    let get = TradeGood::Goods(Resource::Fissionables, 1);
+    assert!(!g.trade_acceptable_at(partner, Seat(0), give, get, 1.0), "3.5 less 1 is under its reserve of 3");
+    g.seats[partner.index()].stockpile.fissionables = 10.0;
+    assert!(g.trade_acceptable_at(partner, Seat(0), give, get, 1.0));
+}
+
+// ---------------------------------------------------------------- Ticket #631: ferry routes
+
+/// Ticket #631 (version 0.1.0.6): a Colony Ship in the ISS's ring over Earth, a depot, and a
+/// Colony of the seat's on the Moon with two Habitats and no Refinery, with Fuel in the Stockpile.
+fn ferry_board(g: &mut Game) -> (ShipId, u32, ColonyId) {
+    let iss = station_of(g, Seat(0), BodyId::Earth).unwrap();
+    let ring = g.colony(iss).unwrap().slot;
+    let ship = ship_in(g, Seat(0), UnitKind::ColonyShip, BodyId::Earth, Some(ring), Stance::Hold);
+    let moon = colony(g, Seat(0), BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Habitat], 0);
+    g.seats[0].stockpile.fuel = 200.0;
+    (ship, ring, moon)
+}
+
+/// The route a Ship would take from the orbit it stands in.
+fn route_from_here(g: &Game, ship: ShipId, far: ColonyId, wait_window: bool) -> Route {
+    let s = g.ship(ship).unwrap();
+    let ShipAt::Body(b) = s.at else { panic!("in transit") };
+    Route::new(ship, b, s.slot, far, wait_window)
+}
+
+fn transit_of(orders: &[Order], ship: ShipId) -> Option<(BodyId, Option<u32>)> {
+    orders.iter().find_map(|o| match o {
+        Order::Transit { ship: x, to, slot } if *x == ship => Some((*to, *slot)),
+        _ => None,
+    })
+}
+
+fn loads_of(orders: &[Order], ship: ShipId) -> Vec<(LoadSource, u32)> {
+    orders.iter().filter_map(|o| match o {
+        Order::Load { ship: x, colonists, from, .. } if *x == ship => Some((*from, *colonists)),
+        _ => None,
+    }).collect()
+}
+
+/// A second Region for the seat, beside its start.
+fn second_region(g: &mut Game, seat: Seat) -> StateId {
+    let mine = g.directed_states(seat);
+    let id = g.states.iter().map(|s| s.id).find(|id| !mine.contains(id) && g.state(*id).control == Control::Neutral).expect("a neutral Region");
+    g.state_mut(id).control = Control::Controlled(seat);
+    assert!(g.directed_states(seat).contains(&id));
+    id
+}
+
+/// Ticket #631, at the designer's word: three turns' wait with anyone aboard (Q5), a quarter over
+/// the window (Q13), and the computer's three turns with no room (Q15).
+#[test]
+fn ticket_631_the_ferry_figures_are_the_designers() {
+    let g = game();
+    assert_eq!(g.tables.ferry.wait_turns, 3);
+    assert_eq!(g.tables.ferry.window_slack, 0.25);
+    assert_eq!(g.tables.ai.thresholds.ferry_idle_turns, 3);
+}
+
+/// Ticket #631 (Q1, Q4, Q7): a route runs from the orbit the Ship stands in to a Colony or station
+/// of its own; it wants a depot at one end at least, and with one alone the round trip must fit the
+/// tank. The card's figure is the leg out and the leg back.
+#[test]
+fn ticket_631_a_route_wants_a_depot_at_one_end_and_a_round_trip_its_tank_holds() {
+    let mut g = game();
+    let (ship, ring, moon) = ferry_board(&mut g);
+    let q = g.route_quote(Seat(0), ship, moon, true).unwrap();
+    assert!(q.home_depot && !q.far_depot, "the ISS's ring fills a tank, the Moon without a Refinery none");
+    assert_eq!(q.leaves_in, Some(0), "no window inside the Earth system");
+    let (turns, out) = g.journey_cost_hull(Seat(0), g.port(BodyId::Earth, Orbit::Slot(ring)), Port::Body(BodyId::Moon), g.turn, false);
+    let (_, back) = g.journey_cost_hull(Seat(0), Port::Body(BodyId::Moon), g.port(BodyId::Earth, Orbit::Slot(ring)), g.turn + turns + 1, false);
+    assert!((q.fuel - (out + back)).abs() < 0.05, "round trip {} = {out} out + {back} back", q.fuel);
+    assert_eq!(q.tank, g.tank_of(Seat(0), UnitKind::ColonyShip));
+    assert_eq!(g.route_refusal(Seat(0), ship, moon, true), None);
+
+    // Low orbit over Earth fills no tank, nor does the Moon: refused, until the Moon has a Refinery.
+    let low = ship_in(&mut g, Seat(0), UnitKind::ColonyShip, BodyId::Earth, None, Stance::Hold);
+    let why = g.route_refusal(Seat(0), low, moon, true).expect("no depot at either end");
+    assert!(why.contains("depot"), "{why}");
+    g.colony_mut(moon).unwrap().modules.push(Module::new(ModuleKind::Refinery));
+    assert_eq!(g.route_refusal(Seat(0), low, moon, true), None, "the Moon's low orbit is a depot now");
+
+    // One depot and a round trip past the tank: to Mars, with no depot there, off its window.
+    let mars = colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat], 0);
+    let tr = &g.tables.transit;
+    let cycle = (tr.synodic_days / tr.days_per_turn).ceil() as u32;
+    g.turn = g.next_window_turn(1) + cycle / 2;
+    let q = g.route_quote(Seat(0), ship, mars, false).unwrap();
+    assert!(q.fuel > q.tank, "the board: round trip {} against a tank of {}", q.fuel, q.tank);
+    let why = g.route_refusal(Seat(0), ship, mars, false).expect("past the tank");
+    assert!(why.contains("round trip"), "{why}");
+
+    // Only a Colony Ship ferries; the far end is the seat's own; off Earth there must be something
+    // of its own to load from.
+    let frigate = ship_in(&mut g, Seat(0), UnitKind::Frigate, BodyId::Earth, Some(ring), Stance::Hold);
+    assert!(g.route_refusal(Seat(0), frigate, moon, true).unwrap().contains("Colony Ship"));
+    let theirs = colony(&mut g, Seat(1), BodyId::Moon, &[ModuleKind::Habitat], 0);
+    assert!(g.route_refusal(Seat(0), ship, theirs, true).unwrap().contains("yours"));
+    let away = ship_in(&mut g, Seat(0), UnitKind::ColonyShip, BodyId::Ceres, None, Stance::Hold);
+    assert!(g.route_refusal(Seat(0), away, moon, true).unwrap().contains("nothing to load"));
+
+    // The order: from the orbit the Ship stands in, and set once a turn.
+    let r = route_from_here(&g, ship, moon, true);
+    let set = Order::SetRoute { ship, route: Some(r.clone()) };
+    g.check_order(Seat(0), &[], &set).expect("the route stands");
+    assert!(g.check_order(Seat(0), std::slice::from_ref(&set), &set).is_err(), "once a turn");
+    let elsewhere = Order::SetRoute { ship, route: Some(Route::new(ship, BodyId::Earth, None, moon, true)) };
+    assert!(g.check_order(Seat(0), &[], &elsewhere).is_err(), "home is where it stands");
+    assert!(g.check_order(Seat(0), &[], &Order::SetRoute { ship, route: None }).is_err(), "nothing to end");
+    g.commit_orders(Seat(0), &[set]);
+    assert_eq!(g.route_of(ship), Some(&r));
+    assert_eq!(g.war.routes_set[0], 1);
+    g.check_order(Seat(0), &[], &Order::SetRoute { ship, route: None }).expect("an End route");
+    g.commit_orders(Seat(0), &[Order::SetRoute { ship, route: None }]);
+    assert_eq!(g.route_of(ship), None);
+}
+
+/// Ticket #631 (Q2, Q5): over Earth it lifts Pioneers from every Region that reaches its orbit, the
+/// most waiting first; it leaves when full, or once it has waited three turns with anyone aboard.
+#[test]
+fn ticket_631_over_earth_it_lifts_the_most_waiting_first_and_leaves_full_or_after_three_turns() {
+    let mut g = game();
+    let (_, _, moon) = ferry_board(&mut g);
+    g.colony_mut(moon).unwrap().modules.push(Module::new(ModuleKind::Refinery));
+    let ship = ship_in(&mut g, Seat(0), UnitKind::ColonyShip, BodyId::Earth, None, Stance::Hold);
+    let cap = g.colony_ship_capacity(Seat(0));
+    let a = StateId::EastAsia;
+    let b = second_region(&mut g, Seat(0));
+    for s in &mut g.states {
+        s.emigrants = 0;
+    }
+    g.state_mut(a).emigrants = 1;
+    g.state_mut(b).emigrants = cap + 2;
+    let r = route_from_here(&g, ship, moon, true);
+    let step = g.route_step_with(Seat(0), &r, &[]);
+    assert_eq!(loads_of(&step.orders, ship), vec![(LoadSource::State(b), cap)], "the larger muster, as far as it fills the hold");
+    assert_eq!(transit_of(&step.orders, ship), Some((BodyId::Moon, None)), "full, it leaves: {:?}", step.orders);
+    assert_eq!(step.wait, None);
+    assert!(!step.orders.iter().any(|o| matches!(o, Order::Refuel { .. })), "low orbit over Earth fills no tank");
+    if let Err((i, e)) = g.check_orders(Seat(0), &step.orders) {
+        panic!("the step is ordinary orders (order {i}): {}", e.0);
+    }
+
+    // Short of full it loads and waits; after three turns' wait it goes with what it has.
+    g.state_mut(b).emigrants = 1;
+    let step = g.route_step_with(Seat(0), &r, &[]);
+    assert_eq!(loads_of(&step.orders, ship).len(), 2, "both Regions: {:?}", step.orders);
+    assert_eq!(transit_of(&step.orders, ship), None, "two aboard of {cap}: it waits");
+    assert_eq!(step.wait, None, "filling is no wait the Report names");
+    let mut waited = r.clone();
+    waited.waited = 3;
+    assert!(transit_of(&g.route_step_with(Seat(0), &waited, &[]).orders, ship).is_some(), "three turns waited");
+    waited.waited = 2;
+    assert!(transit_of(&g.route_step_with(Seat(0), &waited, &[]).orders, ship).is_none(), "two are not three");
+
+    // Nobody to carry: it waits, and says so.
+    for s in &mut g.states {
+        s.emigrants = 0;
+    }
+    let step = g.route_step_with(Seat(0), &r, &[]);
+    assert!(step.orders.is_empty(), "{:?}", step.orders);
+    assert_eq!(step.wait, Some(RouteWait::Nobody));
+}
+
+/// Ticket #631, at the designer's word (Q3): from a Colony or station it takes only the Colonists
+/// beyond one for each Module built there, the Core included; a Module under way does not count.
+#[test]
+fn ticket_631_from_a_colony_it_leaves_one_colonist_for_each_module_built() {
+    let mut g = game();
+    let home = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Mine], 7);
+    let mars = colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Refinery], 0);
+    let ship = ship_in(&mut g, Seat(0), UnitKind::ColonyShip, BodyId::Moon, None, Stance::Hold);
+    let cap = g.colony_ship_capacity(Seat(0));
+    assert!(cap >= 4);
+    let r = route_from_here(&g, ship, mars, false);
+    assert_eq!(loads_of(&g.route_step_with(Seat(0), &r, &[]).orders, ship), vec![(LoadSource::Colony(home), 4)], "seven, less the Habitat, the Mine and the Core");
+    g.colony_mut(home).unwrap().colonists = 4;
+    g.colony_mut(home).unwrap().queue.push(Build { nuclear: false, fissionables: 0.0, item: BuildItem::Module(ModuleKind::Habitat), seat: Seat(0), widgets: 5, done: 0, coastal: false, fuel: 0.0 });
+    assert_eq!(loads_of(&g.route_step_with(Seat(0), &r, &[]).orders, ship), vec![(LoadSource::Colony(home), 1)], "a Habitat under way keeps nobody");
+    g.colony_mut(home).unwrap().colonists = 3;
+    assert_eq!(g.route_step_with(Seat(0), &r, &[]).wait, Some(RouteWait::Nobody));
+}
+
+/// Ticket #631 (Q4, Q6, Q8): at the far end it unloads what there is room for, and waits while
+/// there is none; empty, it refuels at a depot and flies home.
+#[test]
+fn ticket_631_at_the_far_end_it_unloads_what_there_is_room_for_and_goes_home_empty() {
+    let mut g = game();
+    let (_, ring, moon) = ferry_board(&mut g);
+    let runner = ship_in(&mut g, Seat(0), UnitKind::ColonyShip, BodyId::Earth, Some(ring), Stance::Hold);
+    let home = route_from_here(&g, runner, moon, true);
+    let ship = home.ship;
+    {
+        let s = g.ship_mut(ship).unwrap();
+        s.at = ShipAt::Body(BodyId::Moon);
+        s.slot = None;
+        s.colonists = 6;
+    }
+    let room = g.habitat_room(g.colony(moon).unwrap());
+    g.colony_mut(moon).unwrap().colonists = room - 2;
+    let step = g.route_step_with(Seat(0), &home, &[]);
+    assert!(step.orders.contains(&Order::Unload { ship, colonists: 2, army: false, into: UnloadTarget::Colony(moon) }), "{:?}", step.orders);
+    assert_eq!(transit_of(&step.orders, ship), None, "an unload is the turn's action");
+    g.colony_mut(moon).unwrap().colonists = room;
+    let step = g.route_step_with(Seat(0), &home, &[]);
+    assert!(step.orders.is_empty(), "{:?}", step.orders);
+    assert_eq!(step.wait, Some(RouteWait::NoRoom));
+
+    // Empty, at a far end that is a depot: it fills the tank and goes home to the ring.
+    g.colony_mut(moon).unwrap().modules.push(Module::new(ModuleKind::Refinery));
+    {
+        let s = g.ship_mut(ship).unwrap();
+        s.colonists = 0;
+        s.fuel = 5.0;
+    }
+    let step = g.route_step_with(Seat(0), &home, &[]);
+    assert!(step.orders.contains(&Order::Refuel { ship }), "{:?}", step.orders);
+    assert_eq!(transit_of(&step.orders, ship), Some((BodyId::Earth, Some(ring))));
+    if let Err((i, e)) = g.check_orders(Seat(0), &step.orders) {
+        panic!("the step is ordinary orders (order {i}): {}", e.0);
+    }
+}
+
+/// Ticket #631, at the designer's word (Q13, Q14): waiting for the window, a leg leaves only where it
+/// costs at most a quarter more than on its window, each leg on its own; the card says when.
+#[test]
+fn ticket_631_it_waits_for_each_legs_window_and_the_card_says_when_it_leaves() {
+    let mut g = game();
+    let (ship, ring, _) = ferry_board(&mut g);
+    let mars = colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Refinery], 0);
+    let cap = g.colony_ship_capacity(Seat(0));
+    g.ship_mut(ship).unwrap().colonists = cap;
+    let window = g.next_window_turn(1);
+    let tr = &g.tables.transit;
+    let cycle = (tr.synodic_days / tr.days_per_turn).ceil() as u32;
+    let (from, to) = (g.port(BodyId::Earth, Orbit::Slot(ring)), Port::Body(BodyId::Mars));
+    g.turn = window + cycle / 2;
+    assert!(!g.route_window_ok(from, to, g.turn), "half a cycle off the window");
+    let r = route_from_here(&g, ship, mars, true);
+    let step = g.route_step_with(Seat(0), &r, &[]);
+    assert_eq!(step.wait, Some(RouteWait::Window));
+    assert_eq!(transit_of(&step.orders, ship), None);
+    let n = g.route_leaves_in(from, to, g.turn).expect("within a cycle");
+    assert!(n > 0);
+    assert!(g.route_window_ok(from, to, g.turn + n) && !g.route_window_ok(from, to, g.turn + n - 1), "the first turn it may leave");
+    assert_eq!(g.route_quote(Seat(0), ship, mars, true).unwrap().leaves_in, Some(n));
+    // The slack: on the first turn it may leave the leg is within a quarter of the window's Fuel.
+    let at = |t: u32| g.journey_cost_hull(Seat(0), from, to, t, false).1;
+    assert!(at(g.turn + n) <= at(window + cycle) * 1.25 + 0.15, "{} against {}", at(g.turn + n), at(window + cycle));
+    // Not waiting, it does not wait for a window.
+    let mut now = r.clone();
+    now.wait_window = false;
+    assert_ne!(g.route_step_with(Seat(0), &now, &[]).wait, Some(RouteWait::Window));
+    // On the window it goes.
+    g.turn = window;
+    let step = g.route_step_with(Seat(0), &r, &[]);
+    assert_eq!(transit_of(&step.orders, ship), Some((BodyId::Mars, None)), "{:?} {:?}", step.orders, step.wait);
+    // The leg home has a window of its own: at Mars, empty, it waits on the return window.
+    {
+        let s = g.ship_mut(ship).unwrap();
+        s.at = ShipAt::Body(BodyId::Mars);
+        s.slot = None;
+        s.colonists = 0;
+    }
+    let back = (Port::Body(BodyId::Mars), from);
+    let off = (window..window + cycle).find(|t| !g.route_window_ok(back.0, back.1, *t)).unwrap();
+    let on = (window..window + cycle).find(|t| g.route_window_ok(back.0, back.1, *t)).unwrap();
+    g.turn = off;
+    assert_eq!(g.route_step_with(Seat(0), &r, &[]).wait, Some(RouteWait::Window));
+    g.turn = on;
+    assert_eq!(transit_of(&g.route_step_with(Seat(0), &r, &[]).orders, ship), Some((BodyId::Earth, Some(ring))));
+}
+
+/// Ticket #631 (Q8): it never strands itself -- toward an end that fills no tank it leaves only with
+/// the leg there and the leg back aboard, and with no depot here and no Fuel it waits.
+#[test]
+fn ticket_631_a_route_never_strands_its_ship() {
+    let mut g = game();
+    let (ship, ring, moon) = ferry_board(&mut g);
+    let cap = g.colony_ship_capacity(Seat(0));
+    g.seats[0].stockpile.fuel = 0.0;
+    let r = route_from_here(&g, ship, moon, true);
+    let (from, to) = (g.port(BodyId::Earth, Orbit::Slot(ring)), Port::Body(BodyId::Moon));
+    let (turns, out) = g.journey_cost_hull(Seat(0), from, to, g.turn, false);
+    let back = g.journey_cost_hull(Seat(0), to, from, g.turn + turns + 1, false).1;
+    {
+        let s = g.ship_mut(ship).unwrap();
+        s.colonists = cap;
+        s.fuel = out + back - 0.2;
+    }
+    let step = g.route_step_with(Seat(0), &r, &[]);
+    assert_eq!(step.wait, Some(RouteWait::Fuel), "the leg out, but not back: {:?}", step.orders);
+    assert_eq!(transit_of(&step.orders, ship), None);
+    g.ship_mut(ship).unwrap().fuel = out + back + 0.1;
+    assert!(transit_of(&g.route_step_with(Seat(0), &r, &[]).orders, ship).is_some());
+    // With Fuel in the Stockpile, the refuel at the ring pays the way.
+    g.ship_mut(ship).unwrap().fuel = 0.5;
+    g.seats[0].stockpile.fuel = 100.0;
+    let step = g.route_step_with(Seat(0), &r, &[]);
+    assert!(step.orders.contains(&Order::Refuel { ship }) && transit_of(&step.orders, ship).is_some(), "{:?}", step.orders);
+    // At the Moon, which fills no tank, with too little for the leg home: it waits.
+    {
+        let s = g.ship_mut(ship).unwrap();
+        s.at = ShipAt::Body(BodyId::Moon);
+        s.slot = None;
+        s.colonists = 0;
+        s.fuel = 0.1;
+    }
+    assert_eq!(g.route_step_with(Seat(0), &r, &[]).wait, Some(RouteWait::Fuel));
+}
+
+/// Ticket #631 (Q5, Q8, Q9): each turn's head counts the turns waited at home and names a wait in
+/// the Report once; a route ends when its far end is lost, and goes with its Ship.
+#[test]
+fn ticket_631_the_turns_head_counts_the_wait_says_it_once_and_ends_a_route_with_its_end() {
+    let mut g = game();
+    let (ship, _, moon) = ferry_board(&mut g);
+    for s in &mut g.states {
+        s.emigrants = 0;
+    }
+    let set = Order::SetRoute { ship, route: Some(route_from_here(&g, ship, moon, true)) };
+    g.commit_orders(Seat(0), &[set]);
+    let said = |g: &Game, words: &str| g.report.lines.iter().filter(|l| l.text.contains(words)).count();
+    g.tend_routes();
+    assert_eq!(said(&g, "nobody to carry"), 1, "{:?}", g.report.lines.iter().map(|l| &l.text).collect::<Vec<_>>());
+    g.tend_routes();
+    assert_eq!(said(&g, "nobody to carry"), 1, "said once");
+    g.ship_mut(ship).unwrap().colonists = 1;
+    g.tend_routes();
+    g.tend_routes();
+    assert_eq!(g.route_of(ship).unwrap().waited, 2, "two turns at home with one aboard");
+    g.ship_mut(ship).unwrap().at = ShipAt::Transit { from: BodyId::Earth, to: BodyId::Moon, turns_left: 1 };
+    g.tend_routes();
+    assert_eq!(g.route_of(ship).unwrap().waited, 0, "away from home the count starts again");
+    g.ship_mut(ship).unwrap().at = ShipAt::Body(BodyId::Earth);
+
+    // The far end lost: the route ends, and the Report says so.
+    g.colony_mut(moon).unwrap().control = Control::Controlled(Seat(1));
+    g.tend_routes();
+    assert_eq!(g.route_of(ship), None);
+    assert_eq!(said(&g, "ferry route ended"), 1);
+    // A route whose Ship is gone goes with it.
+    g.colony_mut(moon).unwrap().control = Control::Controlled(Seat(0));
+    g.routes.push(route_from_here(&g, ship, moon, true));
+    g.ships.retain(|s| s.id != ship);
+    g.tend_routes();
+    assert!(g.routes.is_empty());
+}
+
+/// Ticket #631 (Q10, Q17): a routed Ship's delivery is named in the Report as a ferry's and counted
+/// by seat, and the seat remembers the place it delivered to.
+#[test]
+fn ticket_631_a_delivery_is_named_and_counted() {
+    let mut g = game();
+    calm(&mut g);
+    pick_a_tech(&mut g);
+    answer_the_card(&mut g);
+    let (ship, _, moon) = ferry_board(&mut g);
+    let r = route_from_here(&g, ship, moon, true);
+    g.routes.push(r.clone());
+    {
+        let s = g.ship_mut(ship).unwrap();
+        s.at = ShipAt::Body(BodyId::Moon);
+        s.slot = None;
+        s.colonists = 4;
+    }
+    let step = g.route_step_with(Seat(0), &r, &[]);
+    g.end_turn([step.orders, Vec::new(), Vec::new(), Vec::new()]).expect("the turn ends");
+    assert_eq!(g.colony(moon).unwrap().colonists, 4);
+    assert_eq!((g.war.ferried[0], g.war.ferry_trips[0]), (4, 1));
+    assert!(g.report.lines.iter().any(|l| l.text.contains("ferried 4 Colonists to")), "{:?}", g.report.lines.iter().map(|l| &l.text).collect::<Vec<_>>());
+    assert!(g.seat(Seat(0)).ferried_to.contains(&moon));
+}
+
+/// Ticket #631, at the designer's word (Q15, Q16): a computer seat runs its routes as a player's
+/// would run, ends one whose far end has had no room for three turns, and sends a full Colony Ship
+/// for a place of its own it has delivered to before on a route there, waiting for windows.
+#[test]
+fn ticket_631_the_computer_runs_its_routes_ends_a_full_one_and_sets_one_on_a_repeat_delivery() {
+    let mut g = game();
+    let ai = Seat(1);
+    let moon = colony(&mut g, ai, BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Refinery], 0);
+    let ship = ship_in(&mut g, ai, UnitKind::ColonyShip, BodyId::Moon, None, Stance::Hold);
+    g.ship_mut(ship).unwrap().colonists = 4;
+    let mut r = Route::new(ship, BodyId::Earth, None, moon, true);
+    g.routes.push(r.clone());
+    let orders = g.ai_orders(ai);
+    assert!(orders.contains(&Order::Unload { ship, colonists: 4, army: false, into: UnloadTarget::Colony(moon) }), "{orders:?}");
+    r.idle = 3;
+    g.routes = vec![r];
+    let orders = g.ai_orders(ai);
+    assert!(orders.contains(&Order::SetRoute { ship, route: None }), "{orders:?}");
+    assert!(!orders.iter().any(|o| matches!(o, Order::Unload { ship: x, .. } if *x == ship)));
+
+    // The repeat delivery: full, leaving Earth for the Moon, where it has delivered before.
+    g.routes.clear();
+    let runner = ship_in(&mut g, ai, UnitKind::ColonyShip, BodyId::Earth, None, Stance::Hold);
+    g.ship_mut(runner).unwrap().colonists = g.colony_ship_capacity(ai);
+    let go = vec![Order::Transit { ship: runner, to: BodyId::Moon, slot: None }];
+    assert!(g.ai_routes_to_set(ai, &go).is_empty(), "never delivered there");
+    g.seat_mut(ai).ferried_to.push(moon);
+    // From the review: low orbit touches the free slots too, so while one is free the flight may be
+    // a founding, which stays the planner's.
+    assert!(g.ai_routes_to_set(ai, &go).is_empty(), "a slot is free on the Moon");
+    while !g.free_slots_on(BodyId::Moon).is_empty() {
+        colony(&mut g, Seat(2), BodyId::Moon, &[], 1);
+    }
+    let set = g.ai_routes_to_set(ai, &go);
+    assert_eq!(set, vec![(0, Order::SetRoute { ship: runner, route: Some(Route::new(runner, BodyId::Earth, None, moon, true)) })]);
+    g.ship_mut(runner).unwrap().colonists = 1;
+    assert!(g.ai_routes_to_set(ai, &go).is_empty(), "not full");
+}
+
+/// Ticket #631, found in the first picture: with a depot at both ends one leg must fit the tank, and
+/// a route that waits for the window is priced on it -- off the window this turn's Mars leg passes the
+/// tank, the window's does not.
+#[test]
+fn ticket_631_two_depots_are_priced_on_the_window_the_route_waits_for() {
+    let mut g = game();
+    let (ship, _, _) = ferry_board(&mut g);
+    let mars = colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Refinery], 0);
+    let tr = &g.tables.transit;
+    let cycle = (tr.synodic_days / tr.days_per_turn).ceil() as u32;
+    g.turn = g.next_window_turn(1) + cycle / 2;
+    let s = g.ship(ship).unwrap();
+    let now = g.transit_fuel(Seat(0), s, BodyId::Earth, BodyId::Mars, None);
+    assert!(now > g.tank_of(Seat(0), UnitKind::ColonyShip), "the board: this turn's leg {now} passes the tank");
+    assert_eq!(g.route_refusal(Seat(0), ship, mars, true), None, "waiting, it flies the window's leg");
+    let why = g.route_refusal(Seat(0), ship, mars, false).expect("not waiting, this turn's leg");
+    assert!(why.contains("a leg needs"), "{why}");
+}
+
+/// Ticket #631, from the review: over Earth a route's home is low orbit or a ring of the seat's own,
+/// and a route whose home ring is lost ends; with no depot at home the first leg flies on the tank as
+/// it stands; and an orbit change at one Body refuels first.
+#[test]
+fn ticket_631_the_home_end_is_the_seats_and_a_route_at_one_body_refuels() {
+    let mut g = game();
+    let (ship, ring, moon) = ferry_board(&mut g);
+    let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
+    g.colony_mut(moon).unwrap().modules.push(Module::new(ModuleKind::Refinery));
+    let theirs = station_of(&g, Seat(1), BodyId::Earth).expect("a rival station over Earth");
+    let rival_ring = g.colony(theirs).unwrap().slot;
+    let guest = ship_in(&mut g, Seat(0), UnitKind::ColonyShip, BodyId::Earth, Some(rival_ring), Stance::Hold);
+    assert!(g.route_refusal(Seat(0), guest, moon, true).unwrap().contains("must be yours"));
+    g.routes.push(route_from_here(&g, ship, moon, true));
+    g.colony_mut(iss).unwrap().control = Control::Controlled(Seat(1));
+    g.tend_routes();
+    assert_eq!(g.route_of(ship), None, "the ISS lost, the route ends");
+    let _ = ring;
+
+    // Low orbit over Earth fills no tank: the first leg is paid from what the tank holds.
+    let low = ship_in(&mut g, Seat(0), UnitKind::ColonyShip, BodyId::Earth, None, Stance::Hold);
+    g.ship_mut(low).unwrap().fuel = 1.0;
+    assert!(g.route_refusal(Seat(0), low, moon, true).unwrap().contains("first leg"));
+    g.ship_mut(low).unwrap().fuel = 30.0;
+    assert_eq!(g.route_refusal(Seat(0), low, moon, true), None);
+
+    // At one Body: a Mars Colony with a Refinery and a station of the seat's over Mars.
+    let ground = colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Refinery], 9);
+    let station = ColonyId(g.fresh_id());
+    g.colonies.push(Colony { id: station, body: BodyId::Mars, slot: 0, control: Control::Controlled(Seat(0)), modules: vec![Module::new(ModuleKind::Core), Module::new(ModuleKind::Habitat)], colonists: 0, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, tier: 0, in_orbit: true });
+    let hop = ship_in(&mut g, Seat(0), UnitKind::ColonyShip, BodyId::Mars, None, Stance::Hold);
+    let cap = g.colony_ship_capacity(Seat(0)).min(4);
+    {
+        let s = g.ship_mut(hop).unwrap();
+        s.fuel = 0.0;
+        s.colonists = cap;
+    }
+    g.seats[0].stockpile.fuel = 100.0;
+    let _ = ground;
+    let mut r = route_from_here(&g, hop, station, true);
+    r.waited = 3;
+    let step = g.route_step_with(Seat(0), &r, &[]);
+    assert!(step.orders.contains(&Order::Refuel { ship: hop }) && step.orders.contains(&Order::ChangeOrbit { ship: hop, slot: Some(0) }), "{:?} {:?}", step.orders, step.wait);
+}
+
+
+/// Ticket #638 (version 0.1.0.6), at the designer's word: the Arkwrights' transit Fuel x0.8, Habitats and
+/// Colony Ships x1.25, no lift population multiplier, station Materials x0.75 and 50 Fuel at the start;
+/// the Archivists 25 Ducats; the Venture Capital Fund's bar 6,500, the computer's pace scaled with it.
+#[test]
+fn ticket_638_the_faction_figures_are_the_designers() {
+    let mut g = game();
+    let seat = |g: &Game, k: FactionKind| Seat::ALL.into_iter().find(|s| g.kind(*s) == k).unwrap();
+    let (ark, arc, cus) = (seat(&g, FactionKind::Arkwrights), seat(&g, FactionKind::Archivists), seat(&g, FactionKind::Custodians));
+    let card = g.tables.faction(FactionKind::Arkwrights).clone();
+    assert_eq!(
+        (card.transit_fuel_multiplier, card.habitat_capacity_multiplier, card.colony_ship_capacity_multiplier, card.lift_population_multiplier, card.station_materials_multiplier),
+        (0.8, 1.25, 1.25, 1.0, 0.75)
+    );
+    assert_eq!(g.seat(ark).stockpile.fuel, 50.0, "the Arkwrights open with 50 Fuel");
+    assert_eq!(g.seat(cus).stockpile.fuel, 20.0, "the others keep the table's 20");
+    assert_eq!(g.seat(arc).stockpile.ducats, 25.0, "the Archivists open with 25 Ducats");
+    assert_eq!(g.colony_ship_capacity(ark), 5, "four, a quarter again");
+    assert!((g.lift_population(ark, 4) - g.lift_population(cus, 4)).abs() < 1e-9, "a Pioneer costs them what it costs anybody");
+    let c = colony(&mut g, ark, BodyId::Moon, &[ModuleKind::Habitat], 0);
+    assert_eq!(g.habitat_room(g.colony(c).unwrap()), 4 + 5, "the Core's four, and a Habitat's four a quarter again");
+    let pro = g.tables.faction(FactionKind::Prospectors).victory_first;
+    assert_eq!(pro.bar, 6500.0);
+    assert_eq!(g.tables.ai_pace(FactionKind::Prospectors).first, vec![[12, 867], [25, 2167], [37, 3900], [47, 6500]], "x6500/6250, the turns as they were");
+    // The card says the new figures.
+    for words in ["5 Colonists, 7 with Expanded Habitats and 10 with Generation Ships", "a quarter again as many, 5 and 10", "four fifths of the Fuel", "33 Materials"] {
+        assert!(card.signature.contains(words), "{words}: {}", card.signature);
+    }
+    assert!(!card.signature.contains("population"), "no Pioneer costs them more: {}", card.signature);
+}
+
+/// Ticket #633 (version 0.1.0.6), at the designer's word: **the first humans born off Earth**. The
+/// first Colonist ever grown at a Colony beyond Earth orbit is a Moment, and its seat gets 5 Influence
+/// once, into the Allotment it is about to spend; two on one turn are both first. A birth on a station
+/// over Earth, or in Antarctica, is no birth off Earth.
+#[test]
+fn ticket_633_the_first_child_born_off_earth_pays_five_influence_once() {
+    let mut g = game();
+    assert_eq!(g.tables.climate.first_born_influence, 5);
+    // Over Earth and in Antarctica: births, but not off Earth.
+    let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
+    g.colony_mut(iss).unwrap().modules.extend([Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Habitat)]);
+    g.colony_mut(iss).unwrap().colonists = 6;
+    g.colony_growth.insert(iss, 0.9);
+    let ice = colony(&mut g, Seat(1), BodyId::Earth, &[ModuleKind::Habitat], 4);
+    g.colony_growth.insert(ice, 0.95);
+    g.colony_growth_step();
+    assert!(g.colony(iss).unwrap().colonists > 6 && g.colony(ice).unwrap().colonists > 4, "both grew");
+    assert!(g.first_born.is_empty(), "neither is off Earth: {:?}", g.first_born);
+    assert!(!g.report.moments.iter().any(|m| m.kind == MomentKind::FirstBorn));
+
+    // Two Colonies beyond Earth orbit cross a whole Colonist on one turn: both are first.
+    let tycho = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Habitat], 4);
+    let mars = colony(&mut g, Seat(2), BodyId::Mars, &[ModuleKind::Habitat], 4);
+    let slow = colony(&mut g, Seat(3), BodyId::Mars, &[ModuleKind::Habitat], 4);
+    // From the review: the hover shows six parts, so a seat with six already still sees this one.
+    g.seat_mut(Seat(0)).allotment_parts = (0..7).map(|i| (format!("part {i}"), 1)).collect();
+    g.colony_growth.insert(tycho, 0.95);
+    g.colony_growth.insert(mars, 0.95);
+    let before = (g.seat(Seat(0)).allotment, g.seat(Seat(2)).allotment, g.seat(Seat(3)).allotment);
+    g.colony_growth_step();
+    assert_eq!(g.colony(tycho).unwrap().colonists, 5);
+    let mut firsts: Vec<Seat> = g.first_born.iter().map(|f| f.0).collect();
+    firsts.sort();
+    assert_eq!(firsts, vec![Seat(0), Seat(2)]);
+    assert_eq!((g.seat(Seat(0)).allotment, g.seat(Seat(2)).allotment, g.seat(Seat(3)).allotment), (before.0 + 5, before.1 + 5, before.2), "5 each, into the Allotment now");
+    assert!(g.allotment_lines(Seat(0)).iter().any(|l| l == "First child born off Earth +5"), "{:?}", g.allotment_lines(Seat(0)));
+    let moments: Vec<&Moment> = g.report.moments.iter().filter(|m| m.kind == MomentKind::FirstBorn).collect();
+    assert_eq!(moments.len(), 2, "one for each");
+    assert!(moments.iter().any(|m| m.text.starts_with("Yours:")), "{:?}", moments.iter().map(|m| &m.text).collect::<Vec<_>>());
+    assert!(moments.iter().all(|m| m.text.contains("first child born off Earth") && m.figure == "+5 Influence"));
+
+    // Once a game: a later first at another seat pays nothing.
+    g.colony_growth.insert(slow, 0.95);
+    let (n, moments) = (g.seat(Seat(3)).allotment, g.report.moments.len());
+    g.colony_growth_step();
+    assert_eq!(g.colony(slow).unwrap().colonists, 5);
+    assert_eq!((g.seat(Seat(3)).allotment, g.report.moments.len()), (n, moments));
+}
+
+/// Ticket #633, at the designer's word (Q7, Q8): until somebody has the first birth, the computer
+/// Arkwrights weigh a Habitat at, and a landing into, a Colony of theirs beyond Earth orbit x1.25.
+#[test]
+fn ticket_633_the_computer_arkwrights_chase_the_first_birth() {
+    let mut g = game();
+    assert_eq!(g.tables.ai.thresholds.first_birth_chase, 1.25);
+    let ark = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Arkwrights).unwrap();
+    let moon = colony(&mut g, ark, BodyId::Moon, &[ModuleKind::Habitat], 4);
+    // From the review: the other seat chosen by its Faction, not by its number.
+    let other = Seat::ALL.into_iter().find(|s| *s != ark).unwrap();
+    let theirs = colony(&mut g, other, BodyId::Moon, &[ModuleKind::Habitat], 4);
+    let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
+    g.colony_mut(iss).unwrap().control = Control::Controlled(ark);
+    assert_eq!(g.ai_first_birth_chase(ark, moon), 1.25);
+    assert_eq!(g.ai_first_birth_chase(ark, iss), 1.0, "over Earth is no birth off Earth");
+    assert_eq!(g.ai_first_birth_chase(other, theirs), 1.0, "the Arkwrights' alone");
+    assert_eq!(g.ai_first_birth_chase(ark, theirs), 1.0, "and at a Colony of their own");
+    g.first_born.push((other, theirs, g.turn));
+    assert_eq!(g.ai_first_birth_chase(ark, moon), 1.0, "once somebody has it, the chase ends");
+}
+
+/// Ticket #632 (version 0.1.0.6), at the designer's word: the Refugee Convoy is six people on every
+/// answer; taking them in costs a point of Unrest where they settle; and a third answer, *Send them
+/// to the stars*, lifts them from a Launch Site into the room over Earth, the rest lost.
+#[test]
+fn ticket_632_the_convoy_has_three_answers_and_six_people() {
+    let g = game();
+    let card = g.tables.event(EventId::RefugeeConvoy).choice.clone().unwrap();
+    assert!(card.take_does.iter().any(|e| matches!(e, dying_earth_engine::data::CardEffect::PopulationToMostPopulous { population } if *population == 6.0)), "{:?}", card.take_does);
+    assert!(card.take_does.iter().any(|e| matches!(e, dying_earth_engine::data::CardEffect::UnrestAtMostPopulous { unrest } if *unrest == 1.0)), "{:?}", card.take_does);
+    assert_eq!(card.third.as_deref(), Some("Send them to the stars"));
+    assert!(matches!(card.third_does.as_slice(), [dying_earth_engine::data::CardEffect::ToTheStars { people: 6, unrest_per_lost }] if *unrest_per_lost == 0.5), "{:?}", card.third_does);
+    assert!(matches!(card.third_when, Some(dying_earth_engine::data::CardRule::StarsRoomAtLeast { people: 6 })), "{:?}", card.third_when);
+}
+
+/// Ticket #632 (Q3, Q4, Q5): sent to the stars, the six are lifted from a Launch Site of the seat's
+/// into its Colony Ships over Earth first, then its stations' Habitats over Earth; each who does not
+/// fit is lost and raises the Launch Site Region's Unrest by half a point. It counts as a launch.
+#[test]
+fn ticket_632_sent_to_the_stars_they_fill_the_room_over_earth_and_the_rest_are_lost() {
+    let mut g = game();
+    calm(&mut g);
+    ask_the_card(&mut g, EventId::RefugeeConvoy);
+    let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
+    g.colony_mut(iss).unwrap().colonists = 2;
+    let ship = ship_in(&mut g, Seat(0), UnitKind::ColonyShip, BodyId::Earth, None, Stance::Hold);
+    g.ship_mut(ship).unwrap().colonists = 1;
+    let cap = g.colony_ship_capacity(Seat(0));
+    let room = (cap - 1) + (g.habitat_room(g.colony(iss).unwrap()) - 2);
+    assert_eq!(g.stars_room(Seat(0)), room);
+    assert!(room < 6, "the board: room for {room} of six");
+    let site = g.stars_site(Seat(0)).expect("a Launch Site of the seat's");
+    let (unrest, launches) = (g.state(site).unrest, g.climate.launches_pending[0]);
+    assert_eq!(g.may_answer_third(Seat(0)), Ok(()));
+    g.answer_card_as(Seat(0), CardAnswer::Third).expect("sent to the stars");
+    // Lifted at once, at the answer, into the room the button showed.
+    assert_eq!(g.ship(ship).unwrap().colonists, cap, "aboard the moment the answer is given");
+    // A flight given after cannot take the room from under them.
+    g.ship_mut(ship).unwrap().at = ShipAt::Transit { from: BodyId::Earth, to: BodyId::Moon, turns_left: 1 };
+    g.apply_card_answers();
+    assert_eq!(g.ship(ship).unwrap().colonists, cap, "the Colony Ship filled first");
+    assert_eq!(g.colony(iss).unwrap().colonists, g.habitat_room(g.colony(iss).unwrap()), "then the station");
+    let lost = 6 - room;
+    // A card's Unrest lands with the Resolution's Unrest, as every card's does.
+    let _ = unrest;
+    assert!(g.pending.card_unrest.iter().any(|(s, n, _)| *s == site && (*n - 0.5 * lost as f64).abs() < 1e-9), "half a point for each of the {lost} lost: {:?}", g.pending.card_unrest);
+    assert_eq!(g.climate.launches_pending[0], launches + 1, "one launch");
+    assert!(g.report.lines.iter().any(|l| l.text.contains(&format!("{lost} lost"))), "{:?}", g.report.lines.iter().map(|l| &l.text).collect::<Vec<_>>());
+}
+
+/// Ticket #632 (Q3): with no working Launch Site the third answer is shut, with the reason; and the
+/// computer sends them when the room holds all six, otherwise answers as before (Q6).
+#[test]
+fn ticket_632_the_third_answer_wants_a_launch_site_and_the_computer_wants_room_for_all_six() {
+    let mut g = game();
+    calm(&mut g);
+    ask_the_card(&mut g, EventId::RefugeeConvoy);
+    for s in g.controlled_states(Seat(0)) {
+        g.state_mut(s).facilities.retain(|f| !f.kind.does_the_job_of(FacilityKind::LaunchSite));
+    }
+    let why = g.may_answer_third(Seat(0)).unwrap_err();
+    assert!(why.contains("Launch Site"), "{why}");
+    assert!(g.answer_card_as(Seat(0), CardAnswer::Third).is_err());
+
+    let ai = Seat(1);
+    let theirs = station_of(&g, ai, BodyId::Earth).unwrap();
+    g.colony_mut(theirs).unwrap().colonists = 0;
+    let room = g.stars_room(ai);
+    if room < 6 {
+        for _ in 0..2 {
+            ship_in(&mut g, ai, UnitKind::ColonyShip, BodyId::Earth, None, Stance::Hold);
+        }
+    }
+    assert!(g.stars_room(ai) >= 6);
+    g.ai_answer_card(ai);
+    assert_eq!(g.pending_question().unwrap().answer_of(ai), Some(CardAnswer::Third), "room for all six: to the stars");
+    let other = Seat(2);
+    g.colonies.retain(|c| !(c.in_orbit && c.body == BodyId::Earth && c.control.director() == Some(other)));
+    g.ships.retain(|s| s.seat != other);
+    assert!(g.stars_room(other) < 6);
+    g.ai_answer_card(other);
+    assert_eq!(g.pending_question().unwrap().answer_of(other), Some(CardAnswer::Taken), "calm, and no room: taken in as before");
+}
+
+/// Ticket #632, from the review: the refugees leave from a Region with a working Spaceport first, so
+/// it pays for them as for any lift; and with no room at all nobody is lifted and nothing launches.
+#[test]
+fn ticket_632_a_spaceport_lifts_them_first_and_a_lift_of_nobody_is_no_launch() {
+    let mut g = game();
+    calm(&mut g);
+    ask_the_card(&mut g, EventId::RefugeeConvoy);
+    let home = StateId::EastAsia;
+    let other = second_region(&mut g, Seat(0));
+    g.state_mut(other).population = 0.5;
+    g.state_mut(other).facilities.push(facility(FacilityKind::Spaceport));
+    assert!(g.state(home).population > g.state(other).population);
+    assert_eq!(g.stars_site(Seat(0)), Some(other), "the Spaceport's Region, though the smaller");
+    // No room over Earth: nobody lifted, and no launch.
+    let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
+    let full = g.habitat_room(g.colony(iss).unwrap());
+    g.colony_mut(iss).unwrap().colonists = full;
+    assert_eq!(g.stars_room(Seat(0)), 0);
+    let launches = g.climate.launches_pending[0];
+    g.answer_card_as(Seat(0), CardAnswer::Third).expect("sent, though there is no room");
+    assert_eq!(g.climate.launches_pending[0], launches, "a lift of nobody is no launch");
+    assert_eq!(g.pending_question().unwrap().stars[0].map(|s| (s.1, s.2)), Some((0, 6)), "all six lost");
+}
+
+/// Ticket #634 (version 0.1.0.6), at the designer's word: **a Colony's threats** -- rival warships in
+/// any orbit of its Body, a rival Army aboard a Carrier there, rival warships or loaded Carriers
+/// bound for it, and a rival's Standing at half its price or more; never an Accord partner, never a
+/// Ship the reader cannot see, and nothing at all where nothing threatens.
+#[test]
+fn ticket_634_a_colonys_threats_line_names_what_threatens_it() {
+    let mut g = game();
+    let mars = colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat], 4);
+    assert_eq!(g.threat_line(Seat(0), mars), None, "nothing threatens it: no line");
+    // Two Prospector warships in low orbit; an Arkwright Army aboard a Carrier in a ring.
+    let pro = Seat(1);
+    ship_in(&mut g, pro, UnitKind::Frigate, BodyId::Mars, None, Stance::Hold);
+    ship_in(&mut g, pro, UnitKind::Frigate, BodyId::Mars, None, Stance::Hold);
+    let carrier = ship_in(&mut g, Seat(2), UnitKind::Carrier, BodyId::Mars, Some(0), Stance::Hold);
+    let army = ArmyId(g.fresh_id());
+    g.armies.push(Army { id: army, name: "the 1st".to_string(), home: ArmyHome::State(StateId::EastAsia), at: ArmyAt::Aboard(carrier), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None, levy: false, raised_strength: 2 });
+    g.ship_mut(carrier).unwrap().army = Some(army);
+    // An Archivist warship two turns out, and the Prospectors' Standing at the Colony, half its price.
+    let inbound = ship_in(&mut g, Seat(3), UnitKind::Frigate, BodyId::Earth, None, Stance::Hold);
+    g.ship_mut(inbound).unwrap().at = ShipAt::Transit { from: BodyId::Earth, to: BodyId::Mars, turns_left: 2 };
+    let price = g.influence_needed_for(pro, Place::Colony(mars));
+    g.seats[pro.index()].influence.insert(Place::Colony(mars), (price + 1) / 2);
+    g.reveal_all = true;
+    let line = g.threat_line(Seat(0), mars).expect("threatened");
+    assert!(line.starts_with("Threats: "), "{line}");
+    for words in ["2 Prospector warships in low orbit", "an Arkwright Army aboard a Carrier", "an Archivist warship arriving in 2 turns", &format!("Prospectors at {} of {price} Standing", (price + 1) / 2)] {
+        assert!(line.contains(words), "{words}: {line}");
+    }
+    assert!(g.threat_hover(Seat(0), mars).len() <= 6, "the six-line ceiling");
+    assert!(g.colony_threatened(Seat(0), mars));
+    // Under half the price, the Standing is no threat.
+    g.seats[pro.index()].influence.insert(Place::Colony(mars), (price + 1) / 2 - 1);
+    assert!(!g.threat_line(Seat(0), mars).unwrap().contains("Standing"));
+    // An Accord partner threatens nothing.
+    g.strike_accord(Seat(0), pro, vec![Term::NonAggression]).expect("struck");
+    assert!(!g.threat_line(Seat(0), mars).unwrap().contains("Prospector"), "{:?}", g.threat_line(Seat(0), mars));
+    // A Ship the reader cannot see is not named: the one in flight, its books shut.
+    g.reveal_all = false;
+    assert!(!g.threat_line(Seat(0), mars).unwrap().contains("arriving"), "{:?}", g.threat_line(Seat(0), mars));
+    // A station's own ring is named first.
+    let station = ColonyId(g.fresh_id());
+    g.colonies.push(Colony { id: station, body: BodyId::Mars, slot: 0, control: Control::Controlled(Seat(0)), modules: vec![Module::new(ModuleKind::Core)], colonists: 2, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, tier: 0, in_orbit: true });
+    // An Archivist warship in low orbit, which comes before the rings in the Body's own order.
+    ship_in(&mut g, Seat(3), UnitKind::Frigate, BodyId::Mars, None, Stance::Hold);
+    let ground = g.threat_line(Seat(0), mars).unwrap();
+    assert!(ground.starts_with("Threats: an Archivist warship in low orbit"), "low orbit first for the ground: {ground}");
+    let ring = g.threat_line(Seat(0), station).unwrap();
+    assert!(ring.starts_with("Threats: an Arkwright Army aboard a Carrier"), "its own ring first: {ring}");
+}
+
+/// Ticket #634, from the review: an Occupied Colony's threats are its holder's, not the occupier's;
+/// a seat's arrivals name its warships and its Armies apart; Carriers in one orbit are one entry, the
+/// hover giving the Army's strength; and a Ship that fled a Battle threatens nothing.
+#[test]
+fn ticket_634_the_line_speaks_for_the_holder_and_counts_each_kind_apart() {
+    let mut g = game();
+    g.reveal_all = true;
+    let mars = colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat], 4);
+    // Two Arkwright Carriers, each with an Army aboard, in low orbit: one entry.
+    let army = |g: &mut Game, ship: ShipId| {
+        let id = ArmyId(g.fresh_id());
+        g.armies.push(Army { id, name: format!("the {}th", id.0), home: ArmyHome::State(StateId::EastAsia), at: ArmyAt::Aboard(ship), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None, levy: false, raised_strength: 3 });
+        g.ship_mut(ship).unwrap().army = Some(id);
+    };
+    for _ in 0..2 {
+        let c = ship_in(&mut g, Seat(2), UnitKind::Carrier, BodyId::Mars, None, Stance::Hold);
+        army(&mut g, c);
+    }
+    // A Prospector Frigate and a loaded Carrier both two turns out: named apart.
+    let f = ship_in(&mut g, Seat(1), UnitKind::Frigate, BodyId::Earth, None, Stance::Hold);
+    let c = ship_in(&mut g, Seat(1), UnitKind::Carrier, BodyId::Earth, None, Stance::Hold);
+    army(&mut g, c);
+    for s in [f, c] {
+        g.ship_mut(s).unwrap().at = ShipAt::Transit { from: BodyId::Earth, to: BodyId::Mars, turns_left: 2 };
+    }
+    // A fled Archivist Frigate.
+    let fled = ship_in(&mut g, Seat(3), UnitKind::Frigate, BodyId::Mars, None, Stance::Hold);
+    g.ship_mut(fled).unwrap().escaped = true;
+    let line = g.threat_line(Seat(0), mars).unwrap();
+    assert!(line.contains("2 Arkwright Armies aboard Carriers in low orbit"), "{line}");
+    assert!(line.contains("a Prospector warship and an Army arriving in 2 turns"), "{line}");
+    assert!(!line.contains("Archivist"), "a fled Ship is no threat: {line}");
+    assert!(g.threat_hover(Seat(0), mars).iter().any(|l| l.contains("aboard, strength")), "{:?}", g.threat_hover(Seat(0), mars));
+    // Occupied by the Arkwrights: still the holder's line, and the holder never threatens itself.
+    let my_frigate = ship_in(&mut g, Seat(0), UnitKind::Frigate, BodyId::Mars, None, Stance::Hold);
+    let _ = my_frigate;
+    g.seats[0].influence.insert(Place::Colony(mars), 50);
+    g.colony_mut(mars).unwrap().control = Control::Occupied { occupier: Seat(2), turns: 1, previous: Some(Seat(0)), banked: 0 };
+    assert_eq!(g.threat_holder(mars), Some(Seat(0)));
+    let line = g.threat_line(Seat(0), mars).unwrap();
+    assert!(!line.contains("Custodian"), "the holder's own Ships and Standing are no threat to it: {line}");
+}
+
+// ---------------------------------------------------------------- 0.1.0.6 ticket #635: a new Army joins its stack
+
+fn newest_army(g: &Game) -> Army {
+    g.armies.iter().max_by_key(|a| a.id.0).expect("an Army").clone()
+}
+
+/// Ticket #635 (Q1, Q2): a newly finished Army takes the stance of its side's Armies at its place,
+/// a dug-in stack's newcomer dug in from the turn it is finished.
+#[test]
+fn ticket_635_a_new_army_joins_its_stacks_stance() {
+    for stance in [Stance::DigIn, Stance::Evade] {
+        let mut g = game();
+        let place = Place::State(StateId::EastAsia);
+        for id in g.armies_of_seat_at(Seat(0), place) {
+            g.army_mut(id).unwrap().stance = stance;
+        }
+        assert!(!g.armies_of_seat_at(Seat(0), place).is_empty(), "the Standing Army stands there");
+        build_now(&mut g, place, BuildItem::Unit(UnitKind::Army), Seat(0));
+        g.resolution_phase();
+        let new = newest_army(&g);
+        assert_eq!(new.at, ArmyAt::Place(place));
+        assert_eq!(new.stance, stance, "{} joined the stack", new.name);
+        // Q2, from the review: dug in from the turn it is finished, with Dig In's restraint.
+        if stance == Stance::DigIn {
+            let refusal = g.check_order(Seat(0), &[], &Order::MoveArmy { army: new.id, to: StateId::Russia }).unwrap_err().0;
+            assert!(refusal.contains("dug in"), "{refusal}");
+        }
+    }
+}
+
+/// Ticket #635 (Q1): with none of its side's Armies at its place -- a rival's there does not count --
+/// a new Army stands on Hold.
+#[test]
+fn ticket_635_a_new_army_alone_stands_on_hold() {
+    let mut g = game();
+    g.seats[0].stockpile.materials = 2000.0;
+    let c = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Barracks], 3);
+    for a in g.armies.iter_mut() {
+        a.stance = Stance::DigIn;
+    }
+    let rival = g.armies.iter().find(|a| g.army_seat(a).is_some_and(|s| s != Seat(0))).expect("a rival's Army").id;
+    g.army_mut(rival).unwrap().at = ArmyAt::Place(Place::Colony(c));
+    build_now(&mut g, Place::Colony(c), BuildItem::Unit(UnitKind::Army), Seat(0));
+    g.resolution_phase();
+    let new = newest_army(&g);
+    assert_eq!(new.at, ArmyAt::Place(Place::Colony(c)));
+    assert_eq!(new.stance, Stance::Hold, "{} has no stack of its own side to join", new.name);
+}
+
+/// Ticket #635 (Q3): a stack on mixed stances gives the newcomer the stance most of it holds, and on
+/// a tie the first-raised Army's, the one its card shows.
+#[test]
+fn ticket_635_a_mixed_stack_gives_the_most_held_stance() {
+    let mut g = game();
+    let place = Place::State(StateId::EastAsia);
+    let first = g.armies_of_seat_at(Seat(0), place)[0];
+    g.army_mut(first).unwrap().stance = Stance::Evade;
+    let second = g.raise_army(place, false);
+    g.army_mut(second).unwrap().stance = Stance::DigIn;
+    let tie = g.raise_army(place, false);
+    assert_eq!(g.army(tie).unwrap().stance, Stance::Evade, "a tie goes to the first raised");
+    g.army_mut(tie).unwrap().stance = Stance::DigIn;
+    let most = g.raise_army(place, false);
+    assert_eq!(g.army(most).unwrap().stance, Stance::DigIn, "two of three are dug in");
+}
+
+// ---------------------------------------------------------------- 0.1.0.6 ticket #637: scrapping a Colony Ship
+
+/// Ticket #637 (version 0.1.0.6), at the designer's word: an empty Colony Ship in the orbit that
+/// touches a Colony of its seat's is broken up into a free Habitat there (Q2, Q3); what is left in
+/// its tank is lost (Q4).
+#[test]
+fn ticket_637_an_empty_colony_ship_scraps_into_a_habitat() {
+    let mut g = game();
+    let c = colony(&mut g, Seat(0), BodyId::Moon, &[], 3);
+    let ship = ship_in(&mut g, Seat(0), UnitKind::ColonyShip, BodyId::Moon, None, Stance::Hold);
+    g.ship_mut(ship).unwrap().colonists = 0;
+    let habitats = |g: &Game| g.colony(c).unwrap().modules.iter().filter(|m| m.kind == ModuleKind::Habitat).count();
+    let before = habitats(&g);
+    let scrap = Order::Scrap { ship, colony: c };
+    assert_eq!(g.check_order(Seat(0), &[], &scrap).map(|c| c.materials), Ok(0.0), "free");
+    g.commit_orders(Seat(0), &[scrap]);
+    g.resolution_phase();
+    assert!(g.ship(ship).is_none(), "the hull is gone");
+    assert_eq!(habitats(&g), before + 1, "a Habitat stands");
+}
+
+/// Ticket #637 (Q5, Q8): a Colony Ship only, empty, in the orbit that touches the seat's own Colony,
+/// with a slot free.
+#[test]
+fn ticket_637_scrapping_is_refused_where_it_does_not_apply() {
+    let mut g = game();
+    let c = colony(&mut g, Seat(0), BodyId::Moon, &[], 3);
+    let ship = ship_in(&mut g, Seat(0), UnitKind::ColonyShip, BodyId::Moon, None, Stance::Hold);
+    g.ship_mut(ship).unwrap().colonists = 0;
+    let err = |g: &Game, o: Order| g.check_order(Seat(0), &[], &o).unwrap_err().0;
+    let frigate = ship_in(&mut g, Seat(0), UnitKind::Frigate, BodyId::Moon, None, Stance::Hold);
+    assert!(err(&g, Order::Scrap { ship: frigate, colony: c }).contains("Colony Ship"));
+    g.ship_mut(ship).unwrap().colonists = 2;
+    assert!(err(&g, Order::Scrap { ship, colony: c }).contains("empty"));
+    g.ship_mut(ship).unwrap().colonists = 0;
+    g.ship_mut(ship).unwrap().slot = Some(0);
+    assert!(err(&g, Order::Scrap { ship, colony: c }).contains("orbit"));
+    g.ship_mut(ship).unwrap().slot = None;
+    let theirs = colony(&mut g, Seat(1), BodyId::Moon, &[], 3);
+    assert!(err(&g, Order::Scrap { ship, colony: theirs }).contains("direct"));
+    let rival_hull = ship_in(&mut g, Seat(1), UnitKind::ColonyShip, BodyId::Moon, None, Stance::Hold);
+    g.ship_mut(rival_hull).unwrap().colonists = 0;
+    assert!(err(&g, Order::Scrap { ship: rival_hull, colony: c }).contains("not your Ship"));
+    // Q8: no free slot.
+    while g.free_module_slots(g.colony(c).unwrap()) > 0 {
+        g.colony_mut(c).unwrap().modules.push(Module::new(ModuleKind::Mine));
+    }
+    assert!(err(&g, Order::Scrap { ship, colony: c }).contains("full"));
+}
+
+/// Ticket #637 (Q7): a computer seat scraps an empty Colony Ship stranded three turns or more over
+/// a Colony of its own.
+#[test]
+fn ticket_637_the_computer_scraps_a_ship_stranded_three_turns() {
+    let mut g = game();
+    let seat = Seat(1);
+    assert!(g.seat(seat).ai);
+    let c = colony(&mut g, seat, BodyId::Mercury, &[], 3);
+    let ship = ship_in(&mut g, seat, UnitKind::ColonyShip, BodyId::Mercury, None, Stance::Hold);
+    { let s = g.ship_mut(ship).unwrap(); s.colonists = 0; s.fuel = 0.6; }
+    assert!(g.stranded(ship), "the premise: stranded");
+    let scraps = |g: &mut Game| g.ai_orders(seat).iter().any(|o| matches!(o, Order::Scrap { ship: s, colony: x } if *s == ship && *x == c));
+    for _ in 0..2 {
+        g.resolution_phase();
+        g.turn += 1;
+        g.ship_mut(ship).unwrap().fuel = 0.6;
+        assert!(!scraps(&mut g.clone()), "not before three turns");
+    }
+    g.resolution_phase();
+    g.turn += 1;
+    g.ship_mut(ship).unwrap().fuel = 0.6;
+    assert!(scraps(&mut g.clone()), "stranded three turns: scrapped");
+    // Rescued, then stranded again: the count starts afresh.
+    g.ship_mut(ship).unwrap().fuel = 1000.0;
+    assert!(!g.stranded(ship), "rescued");
+    g.resolution_phase();
+    g.turn += 1;
+    g.ship_mut(ship).unwrap().fuel = 0.6;
+    g.resolution_phase();
+    g.turn += 1;
+    g.ship_mut(ship).unwrap().fuel = 0.6;
+    assert!(!scraps(&mut g.clone()), "stranded again a turn: not yet");
+}
+
+/// Ticket #637, from the review: the cases the first tests left open. A station's ring is the
+/// orbit that touches the station; an Army aboard, a hull in transit, a slot taken by a build
+/// ordered this turn, and any other order naming the hull refuse it, and a Scrap refuses those
+/// orders in turn; the Stockpile gains nothing from the tank; the computer leaves a stranded hull
+/// with people aboard.
+#[test]
+fn ticket_637_the_reviews_cases() {
+    let mut g = game();
+    let iss = station_of(&g, Seat(0), BodyId::Earth).expect("the ISS");
+    let ring = g.colony(iss).unwrap().slot;
+    let ship = ship_in(&mut g, Seat(0), UnitKind::ColonyShip, BodyId::Earth, Some(ring), Stance::Hold);
+    g.ship_mut(ship).unwrap().colonists = 0;
+    let scrap = Order::Scrap { ship, colony: iss };
+    assert!(g.check_order(Seat(0), &[], &scrap).is_ok(), "from the station's ring: {:?}", g.check_order(Seat(0), &[], &scrap));
+    let err = |g: &Game, pending: &[Order], o: &Order| g.check_order(Seat(0), pending, o).unwrap_err().0;
+    // Every other order on the hull refuses the Scrap, and the Scrap refuses them.
+    let others = [
+        Order::Refuel { ship },
+        Order::Load { ship, colonists: 1, from: LoadSource::Colony(iss), army: None },
+        Order::SetRoute { ship, route: None },
+        Order::Transit { ship, to: BodyId::Moon, slot: None },
+    ];
+    for o in &others {
+        assert!(err(&g, std::slice::from_ref(o), &scrap).contains("already has an order"), "{o:?} then Scrap");
+        if !matches!(o, Order::Transit { .. }) {
+            assert!(err(&g, std::slice::from_ref(&scrap), o).contains("scrapped"), "Scrap then {o:?}");
+        }
+    }
+    // A build ordered this turn takes the last slot.
+    let col = g.colony(iss).unwrap().clone();
+    while g.free_module_slots(g.colony(iss).unwrap()) > 1 {
+        g.colony_mut(iss).unwrap().modules.push(Module::new(ModuleKind::Habitat));
+    }
+    let build = Order::BuildModule { colony: iss, kind: ModuleKind::Habitat };
+    assert!(g.check_order(Seat(0), &[], &build).is_ok());
+    assert!(err(&g, std::slice::from_ref(&build), &scrap).contains("full"));
+    g.colony_mut(iss).unwrap().modules = col.modules;
+    // The tank is lost: the Stockpile's Fuel does not move.
+    let fuel = g.seats[0].stockpile.fuel;
+    g.commit_orders(Seat(0), std::slice::from_ref(&scrap));
+    assert!(g.ship(ship).is_none());
+    assert_eq!(g.seats[0].stockpile.fuel, fuel, "nothing from the tank");
+    // An Army aboard, and a hull in transit.
+    let carrier_like = ship_in(&mut g, Seat(0), UnitKind::ColonyShip, BodyId::Earth, Some(ring), Stance::Hold);
+    g.ship_mut(carrier_like).unwrap().colonists = 0;
+    let army = g.armies[0].id;
+    g.ship_mut(carrier_like).unwrap().army = Some(army);
+    assert!(err(&g, &[], &Order::Scrap { ship: carrier_like, colony: iss }).contains("empty"));
+    g.ship_mut(carrier_like).unwrap().army = None;
+    g.ship_mut(carrier_like).unwrap().at = ShipAt::Transit { from: BodyId::Moon, to: BodyId::Earth, turns_left: 2 };
+    assert!(err(&g, &[], &Order::Scrap { ship: carrier_like, colony: iss }).contains("orbit"));
+    // The computer leaves a stranded hull with people aboard.
+    let seat = Seat(1);
+    let c = colony(&mut g, seat, BodyId::Mercury, &[], 3);
+    let full = ship_in(&mut g, seat, UnitKind::ColonyShip, BodyId::Mercury, None, Stance::Hold);
+    { let s = g.ship_mut(full).unwrap(); s.colonists = 2; s.fuel = 0.6; }
+    g.stranded_since.push((full, 0));
+    g.turn += 5;
+    assert!(!g.clone().ai_orders(seat).iter().any(|o| matches!(o, Order::Scrap { ship: s, colony: x } if *s == full && *x == c)), "people aboard: no scrap");
+}
+
+// ---------------------------------------------------------------- 0.1.0.6 ticket #644: refitting a chemical hull nuclear
+
+/// A chemical Frigate of seat 0's in the Moon's low orbit over a Colony of seat 0's with a Shipyard,
+/// Nuclear Rockets standing and Fissionables to spare.
+fn refit_yard(g: &mut Game) -> (ColonyId, ShipId) {
+    let yard = colony(g, Seat(0), BodyId::Moon, &[ModuleKind::Shipyard], 3);
+    let ship = ship_in(g, Seat(0), UnitKind::Frigate, BodyId::Moon, None, Stance::Hold);
+    with_tech(g, TechId::NuclearRockets);
+    g.seats[0].stockpile.fissionables = 100.0;
+    (yard, ship)
+}
+
+/// Ticket #644 (version 0.1.0.6), at the designer's word: a chemical hull is refitted nuclear at a
+/// yard of its seat's in the orbit that touches it (Q1), once Nuclear Rockets stands (Q2), for the
+/// second tank's fill of Fissionables and a quarter of the hull's Widgets, rounded up (Q3). The work
+/// is queued as a Rearm is and lands on the hull wherever it is (Q4): nuclear, its second tank full.
+#[test]
+fn ticket_644_a_chemical_hull_is_refitted_nuclear() {
+    let mut g = game();
+    let (yard, ship) = refit_yard(&mut g);
+    let fill = g.fission_tank_of(Seat(0), UnitKind::Frigate);
+    let refit = Order::Refit { ship };
+    let cost = g.check_order(Seat(0), &[], &refit).expect("a refit");
+    assert_eq!((cost.materials, cost.fissionables), (0.0, fill), "the second tank's fill, no Materials");
+    let held = g.seats[0].stockpile.fissionables;
+    g.commit_orders(Seat(0), &[refit]);
+    assert_eq!(g.seats[0].stockpile.fissionables, tenth(held - fill));
+    let b = g.colony(yard).unwrap().queue.iter().find(|b| b.item == BuildItem::Refit(ship)).expect("queued at the yard").clone();
+    assert_eq!(b.widgets, g.tables.unit(UnitKind::Frigate).widgets.div_ceil(4), "a quarter of the hull's Widgets, rounded up");
+    // Q4: the Ship is free meanwhile; the refit lands on it wherever it is.
+    g.ship_mut(ship).unwrap().at = ShipAt::Body(BodyId::Mars);
+    for _ in 0..10 {
+        if g.ship(ship).unwrap().nuclear {
+            break;
+        }
+        g.resolution_phase();
+        g.turn += 1;
+    }
+    let s = g.ship(ship).unwrap();
+    assert!(s.nuclear, "refitted");
+    assert_eq!(s.fissionables, fill, "its second tank full");
+}
+
+/// Ticket #644: refused before Nuclear Rockets, on a nuclear hull (Q5: one way), away from a yard of
+/// its own, in transit, twice, and beside another order on the hull.
+#[test]
+fn ticket_644_a_refit_is_refused_where_it_does_not_apply() {
+    let mut g = game();
+    let (yard, ship) = refit_yard(&mut g);
+    let refit = Order::Refit { ship };
+    let err = |g: &Game, pending: &[Order]| g.check_order(Seat(0), pending, &Order::Refit { ship }).unwrap_err().0;
+    g.research.done.retain(|t| *t != TechId::NuclearRockets);
+    assert!(err(&g, &[]).contains("Nuclear Rockets"));
+    with_tech(&mut g, TechId::NuclearRockets);
+    g.ship_mut(ship).unwrap().nuclear = true;
+    assert!(err(&g, &[]).contains("already nuclear"));
+    g.ship_mut(ship).unwrap().nuclear = false;
+    g.colony_mut(yard).unwrap().modules.retain(|m| m.kind != ModuleKind::Shipyard);
+    assert!(err(&g, &[]).contains("Shipyard"));
+    g.colony_mut(yard).unwrap().modules.push(Module::new(ModuleKind::Shipyard));
+    g.ship_mut(ship).unwrap().slot = Some(0);
+    assert!(err(&g, &[]).contains("no place of yours"));
+    g.ship_mut(ship).unwrap().slot = None;
+    assert!(err(&g, std::slice::from_ref(&refit)).contains("already has an order"));
+    assert!(err(&g, &[Order::Transit { ship, to: BodyId::Mars, slot: None }]).contains("already has an order"));
+    g.commit_orders(Seat(0), std::slice::from_ref(&refit));
+    assert!(err(&g, &[]).contains("under way"), "queued already");
+    g.colony_mut(yard).unwrap().queue.clear();
+    g.ship_mut(ship).unwrap().at = ShipAt::Transit { from: BodyId::Earth, to: BodyId::Moon, turns_left: 2 };
+    assert!(err(&g, &[]).contains("in transit"));
+}
+
+/// Ticket #644 (Q6): a computer seat refits a chemical hull standing at its own yard when it can
+/// build nuclear (the second tank's fill and two tanks more in Fissionables).
+#[test]
+fn ticket_644_the_computer_refits_when_it_can_keep_the_tank_filled() {
+    let mut g = game();
+    let seat = Seat(1);
+    colony(&mut g, seat, BodyId::Moon, &[ModuleKind::Shipyard], 3);
+    let ship = ship_in(&mut g, seat, UnitKind::Frigate, BodyId::Moon, None, Stance::Hold);
+    with_tech(&mut g, TechId::NuclearRockets);
+    let fill = g.fission_tank_of(seat, UnitKind::Frigate);
+    let refits = |g: &Game| g.clone().ai_orders(seat).iter().any(|o| matches!(o, Order::Refit { ship: s } if *s == ship));
+    g.seats[seat.index()].stockpile.fissionables = tenth(fill * 3.0 - 0.1);
+    assert!(!refits(&g), "short of the reserve");
+    g.seats[seat.index()].stockpile.fissionables = 100.0;
+    // From the review: a move the planner wants goes first; the refit waits for a turn with none.
+    let flies = g.clone().ai_orders(seat).iter().any(|o| matches!(o, Order::Transit { ship: s, .. } if *s == ship));
+    assert!(flies && !refits(&g), "with a full tank it flies, and is not refitted");
+    g.ship_mut(ship).unwrap().fuel = 0.0;
+    assert!(refits(&g), "grounded, with the reserve: refitted");
+}
+
+/// Ticket #644, from the review: a hull whose refit is queued is not scrapped, which would throw its
+/// Fissionables away; and the refit fills the second tank to the tank and no further.
+#[test]
+fn ticket_644_a_queued_refit_blocks_a_scrap_and_fills_only_to_the_tank() {
+    let mut g = game();
+    let yard = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Shipyard], 3);
+    let ship = ship_in(&mut g, Seat(0), UnitKind::ColonyShip, BodyId::Moon, None, Stance::Hold);
+    g.ship_mut(ship).unwrap().colonists = 0;
+    with_tech(&mut g, TechId::NuclearRockets);
+    g.seats[0].stockpile.fissionables = 100.0;
+    let tank = g.fission_tank_of(Seat(0), UnitKind::ColonyShip);
+    // Fissionables already aboard, from a market's odd delivery: the refit tops up, not over.
+    g.ship_mut(ship).unwrap().fissionables = tank;
+    g.commit_orders(Seat(0), &[Order::Refit { ship }]);
+    g.turn += 1;
+    assert!(g.check_order(Seat(0), &[], &Order::Scrap { ship, colony: yard }).unwrap_err().0.contains("refit is under way"));
+    for _ in 0..10 {
+        if g.ship(ship).unwrap().nuclear {
+            break;
+        }
+        g.resolution_phase();
+        g.turn += 1;
+    }
+    let s = g.ship(ship).unwrap();
+    assert!(s.nuclear);
+    assert_eq!(s.fissionables, tank, "to the tank and no further");
+}
+
+// ---------------------------------------------------------------- 0.1.0.6 ticket #639: Canada and Ethiopia
+
+/// Ticket #639 (version 0.1.0.6), at the designer's word: **two more Regions, twenty-two.** Canada
+/// (with Greenland) is cut out of the United States' Region and Ethiopia (the Horn, Eritrea with it)
+/// out of South Africa's and Egypt's. Each takes its parents' people by the real countries, so the
+/// world still holds 7,860; Canada takes 2 of the United States' 23 GDP and 1 of its 7 Influence;
+/// Ethiopia's GDP and Influence of 1 are added. Every neighbour edge is listed both ways.
+#[test]
+fn ticket_639_canada_and_ethiopia_are_cut_out_of_their_parents() {
+    let g = game();
+    let card = |s: StateId| g.tables.state(s).clone();
+    let (ca, us, et, za, eg) = (card(StateId::Canada), card(StateId::NorthAmerica), card(StateId::Ethiopia), card(StateId::SouthAfrica), card(StateId::NorthAfrica));
+    assert_eq!((ca.name.as_str(), et.name.as_str()), ("Canada", "Ethiopia"));
+    assert_eq!((ca.population + us.population, ca.gdp + us.gdp, ca.influence + us.influence), (380.0, 23, 7), "the United States' Region's 380, 23 and 7, shared");
+    assert_eq!((ca.population, ca.gdp, ca.influence, ca.industry_level, ca.size, ca.coastal_exposure), (39.0, 2, 1, 3, 3, 1));
+    assert_eq!(ca.resource_lean, Resource::Materials);
+    assert_eq!(et.population + za.population + eg.population, 517.0 + 264.0, "South Africa's 517 and Egypt's 264, shared three ways");
+    assert_eq!((et.population, et.gdp, et.influence, et.industry_level, et.size, et.coastal_exposure), (150.0, 1, 1, 1, 2, 1));
+    assert_eq!(et.resource_lean, Resource::Energy);
+    assert_eq!((za.gdp, za.influence, eg.population), (1, 1, 260.0), "South Africa keeps its 1 and 1; Egypt gives Eritrea's 3.7");
+    assert_eq!(ca.neighbours, vec![StateId::NorthAmerica, StateId::Russia, StateId::UnitedKingdom]);
+    assert_eq!(et.neighbours, vec![StateId::SouthAfrica, StateId::NorthAfrica, StateId::ArabianPeninsula]);
+    assert!(!za.neighbours.contains(&StateId::ArabianPeninsula), "the Horn faces Arabia, and it is Ethiopia's");
+    assert_eq!(StateId::ALL.iter().map(|s| card(*s).population).sum::<f64>(), 7860.0, "nobody was invented");
+    for a in StateId::ALL {
+        for b in &card(a).neighbours {
+            assert!(card(*b).neighbours.contains(&a), "{a:?} lists {b:?}, and {b:?} must list it back");
+        }
+    }
 }

@@ -130,6 +130,8 @@ fn moment_from_id(name: &str) -> Option<MomentKind> {
         "sink" => Some(MomentKind::UnderTheSink),
         // Ticket #538 (version 0.1.0.1): staged by the `moment:accord` aid.
         "accord" => Some(MomentKind::AccordEnded),
+        // Ticket #633 (version 0.1.0.6): staged by the `moment:born` aid.
+        "born" => Some(MomentKind::FirstBorn),
         _ => None,
     }
 }
@@ -330,7 +332,7 @@ fn build_board(session: &mut Session) {
             // Ticket #210 (version 0.08.1): a planted Ship is named as a built one is, so a picture
             // shows what a game shows.
             let name = g.next_ship_name(kind);
-            g.ships.push(Ship { id, name, kind, seat, damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: g.tank_of(seat, kind), slot: None });
+            g.ships.push(Ship { nuclear: false, fissionables: 0.0, id, name, kind, seat, damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: g.tank_of(seat, kind), slot: None });
         }
         // `levy:1` (a building aid, ticket #282, version 0.08.5): seat 0 raises a built Army in
         // China, so the neutral neighbours -- India among them -- are threatened, and a quiet turn
@@ -360,7 +362,7 @@ fn build_board(session: &mut Session) {
                 let id = ShipId(g.fresh_id());
                 let built_turn = g.turn;
                 let name = g.next_ship_name(kind);
-                g.ships.push(Ship { id, name, kind, seat, damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance, escaped: false, arrived_this_turn: false, built_turn, fuel: g.tank_of(seat, kind), slot });
+                g.ships.push(Ship { nuclear: false, fissionables: 0.0, id, name, kind, seat, damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance, escaped: false, arrived_this_turn: false, built_turn, fuel: g.tank_of(seat, kind), slot });
             }
             // And, over EARTH, a Colony Ship of seat 0's at the ISS's own ring rather than in low
             // orbit. Ticket #335 photographed the Region card's lift door SHUT on it; since ticket
@@ -369,7 +371,7 @@ fn build_board(session: &mut Session) {
                 let id = ShipId(g.fresh_id());
                 let built_turn = g.turn;
                 let name = g.next_ship_name(UnitKind::ColonyShip);
-                g.ships.push(Ship { id, name, kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: g.tank_of(Seat(0), UnitKind::ColonyShip), slot: Some(slot) });
+                g.ships.push(Ship { nuclear: false, fissionables: 0.0, id, name, kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: g.tank_of(Seat(0), UnitKind::ColonyShip), slot: Some(slot) });
             }
             g.seats[0].stockpile.materials = 200.0;
             g.seats[0].stockpile.energy = 80.0;
@@ -385,7 +387,7 @@ fn build_board(session: &mut Session) {
             let id = ShipId(g.fresh_id());
             let built_turn = g.turn;
             let name = g.next_ship_name(UnitKind::Frigate);
-            g.ships.push(Ship { id, name, kind: UnitKind::Frigate, seat, damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Blockade, escaped: false, arrived_this_turn: false, built_turn, fuel: 30.0, slot: Some(station.slot) });
+            g.ships.push(Ship { nuclear: false, fissionables: 0.0, id, name, kind: UnitKind::Frigate, seat, damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Blockade, escaped: false, arrived_this_turn: false, built_turn, fuel: 30.0, slot: Some(station.slot) });
         }
         // `battle:1` (a building aid): three seats bring a Frigate to Mars with Attack stances and
         // one more turn runs, so the Report carries a three-party Battle (ticket #50).
@@ -402,7 +404,7 @@ fn build_board(session: &mut Session) {
                 let id = ShipId(g.fresh_id());
                 let built_turn = g.turn;
                 let name = g.next_ship_name(UnitKind::Frigate);
-                g.ships.push(Ship { id, name, kind: UnitKind::Frigate, seat, damage: 0, at: ShipAt::Body(body), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Attack, escaped: false, arrived_this_turn: false, built_turn, fuel: 30.0, slot: None });
+                g.ships.push(Ship { nuclear: false, fissionables: 0.0, id, name, kind: UnitKind::Frigate, seat, damage: 0, at: ShipAt::Body(body), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Attack, escaped: false, arrived_this_turn: false, built_turn, fuel: 30.0, slot: None });
             }
             // The two-party form wants two parties: the other seats' Ships leave the Body for Earth.
             if two_party {
@@ -443,7 +445,7 @@ fn build_board(session: &mut Session) {
             let mut modules = vec![Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Generator), Module::new(ModuleKind::Mine)];
             let mut queue = Vec::new();
             if point == 0 {
-                queue.push(Build { item: BuildItem::Module(ModuleKind::Archive), seat: Seat(0), widgets: 12, done: 4, coastal: false, fuel: 0.0 });
+                queue.push(Build { nuclear: false, fissionables: 0.0, item: BuildItem::Module(ModuleKind::Archive), seat: Seat(0), widgets: 12, done: 4, coastal: false, fuel: 0.0 });
             } else {
                 modules.push(Module::new(ModuleKind::Archive));
             }
@@ -481,7 +483,10 @@ fn build_board(session: &mut Session) {
             let moon = place(g, Seat(0), BodyId::Moon, capital, vec![Module::new(ModuleKind::Core), Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Mine), Module::new(ModuleKind::Generator), Module::new(ModuleKind::Shipyard)], 9);
             place(g, Seat(0), BodyId::Moon, 0, vec![Module::new(ModuleKind::Core), Module::new(ModuleKind::Mine)], 4);
             let mars = place(g, Seat(1), BodyId::Mars, capital, vec![Module::new(ModuleKind::Core), Module::new(ModuleKind::Habitat)], 6);
-            g.pick_capital_building(Seat(1), mars, CapitalBuilding::StockMarket).ok();
+            // Ticket #640 (version 0.1.0.6): the Arcology where seat 0 asks for the Stock Market, so
+            // every building's tile can be photographed on seat 0's card.
+            let rival = if CapitalBuilding::parse(&arg) == Some(CapitalBuilding::StockMarket) { CapitalBuilding::Arcology } else { CapitalBuilding::StockMarket };
+            g.pick_capital_building(Seat(1), mars, rival).ok();
             if let Some(b) = CapitalBuilding::parse(&arg) {
                 g.pick_capital_building(Seat(0), moon, b).ok();
             }
@@ -500,7 +505,7 @@ fn build_board(session: &mut Session) {
             let sid = ShipId(g.fresh_id());
             let name = g.next_ship_name(UnitKind::Frigate);
             let built_turn = g.turn;
-            g.ships.push(Ship { id: sid, name, kind: UnitKind::Frigate, seat: Seat(1), damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: 30.0, slot: None });
+            g.ships.push(Ship { nuclear: false, fissionables: 0.0, id: sid, name, kind: UnitKind::Frigate, seat: Seat(1), damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: 30.0, slot: None });
             g.seats[0].stockpile.materials = 120.0;
             g.seats[0].stockpile.energy = 60.0;
         }
@@ -527,7 +532,7 @@ fn build_board(session: &mut Session) {
             let sid = ShipId(g.fresh_id());
             let name = g.next_ship_name(UnitKind::Frigate);
             let built_turn = g.turn;
-            g.ships.push(Ship { id: sid, name, kind: UnitKind::Frigate, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: 0.0, slot: None });
+            g.ships.push(Ship { nuclear: false, fissionables: 0.0, id: sid, name, kind: UnitKind::Frigate, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: 0.0, slot: None });
             let _ = g.strike_accord(Seat(0), Seat(1), vec![Term::NonAggression, Term::Refuel]);
             g.seats[0].stockpile.fuel = 40.0;
         }
@@ -544,7 +549,7 @@ fn build_board(session: &mut Session) {
             let sid = ShipId(g.fresh_id());
             let name = g.next_ship_name(UnitKind::Battleship);
             let built_turn = g.turn;
-            g.ships.push(Ship { id: sid, name, kind: UnitKind::Battleship, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: 30.0, slot: None });
+            g.ships.push(Ship { nuclear: false, fissionables: 0.0, id: sid, name, kind: UnitKind::Battleship, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: 30.0, slot: None });
         }
         // `nuke:1` (a building aid, ticket #343, version 0.09.1): **the board the Missile Carrier is
         // photographed on**, and it is EARTH's, because Earth is the one Body a Bombard is refused
@@ -579,7 +584,7 @@ fn build_board(session: &mut Session) {
                 let id = ShipId(g.fresh_id());
                 let built_turn = g.turn;
                 let name = g.next_ship_name(kind);
-                g.ships.push(Ship { id, name, kind, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: g.tank_of(Seat(0), kind), slot });
+                g.ships.push(Ship { nuclear: false, fissionables: 0.0, id, name, kind, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: g.tank_of(Seat(0), kind), slot });
             }
             // Enough of each to pay for a hull and a Warhead, so the Shipyard's own Missile Carrier
             // button and the Rearm are both LIVE in the picture rather than greyed for want of
@@ -610,7 +615,7 @@ fn build_board(session: &mut Session) {
             let id = ShipId(g.fresh_id());
             let built_turn = g.turn;
             let name = g.next_ship_name(UnitKind::ColonyShip);
-            g.ships.push(Ship { id, name, kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(body), colonists: 8, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: g.tank_of(Seat(0), UnitKind::ColonyShip), slot: None });
+            g.ships.push(Ship { nuclear: false, fissionables: 0.0, id, name, kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(body), colonists: 8, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: g.tank_of(Seat(0), UnitKind::ColonyShip), slot: None });
             for seat in Seat::ALL.into_iter().skip(1) {
                 g.seats[seat.index()].ai = false;
             }
@@ -633,6 +638,141 @@ fn build_board(session: &mut Session) {
             }
             g.seats[0].stockpile.materials = 120.0;
             g.seats[0].stockpile.energy = 60.0;
+        }
+        // `fission:1` (a building aid, ticket #628, version 0.1.0.6): seat 0 founds a Colony on a Mars
+        // site that holds Fissionables, a Mine stands there, and a turn is played, so the top bar,
+        // the Colony's Output row and its Mine carry the seventh resource.
+        if std::env::args().any(|a| a == "fission:1") {
+            let body = BodyId::Mars;
+            let slot = g.free_slots_on(body).into_iter().find(|s| g.slot_yields(body, *s).fissionables > 0.0).unwrap_or(0);
+            let id = ShipId(g.fresh_id());
+            let built_turn = g.turn;
+            let name = g.next_ship_name(UnitKind::ColonyShip);
+            g.ships.push(Ship { nuclear: false, fissionables: 0.0, id, name, kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(body), colonists: 8, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: g.tank_of(Seat(0), UnitKind::ColonyShip), slot: None });
+            for seat in Seat::ALL.into_iter().skip(1) {
+                g.seats[seat.index()].ai = false;
+            }
+            let mut orders: [Vec<Order>; SEAT_COUNT] = std::array::from_fn(|_| Vec::new());
+            orders[0] = vec![Order::Unload { ship: id, colonists: 8, army: false, into: UnloadTarget::Slot(body, slot) }];
+            refuse_any_card(g);
+            g.end_turn(orders).expect("the screenshot harness picks a Tech before it drives turns");
+            let Some(cid) = g.colonies.iter().find(|c| c.body == body && !c.in_orbit && c.control.director() == Some(Seat(0))).map(|c| c.id) else {
+                eprintln!("fission:1 founded nothing on Mars");
+                std::process::exit(3);
+            };
+            if let Some(col) = g.colony_mut(cid) {
+                col.modules.push(Module::new(ModuleKind::Mine));
+                // Ticket #629 (version 0.1.0.6): and a Shipyard, so the yard's rows are in the picture.
+                col.modules.push(Module::new(ModuleKind::Shipyard));
+                // Ticket #630 (version 0.1.0.6): `reactor:1`, and a Reactor Module, for its tile.
+                if std::env::args().any(|a| a == "reactor:1") {
+                    col.modules.push(Module::new(ModuleKind::FissionReactor));
+                }
+            }
+            // Ticket #629: and a nuclear Frigate in low orbit, its second tank half full, for its card.
+            let id = ShipId(g.fresh_id());
+            let name = g.next_ship_name(UnitKind::Frigate);
+            let (tank, second) = (g.tank_of(Seat(0), UnitKind::Frigate), g.fission_tank_of(Seat(0), UnitKind::Frigate));
+            g.ships.push(Ship { nuclear: true, fissionables: (second / 2.0 * 10.0).round() / 10.0, id, name, kind: UnitKind::Frigate, seat: Seat(0), damage: 0, at: ShipAt::Body(body), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: g.turn, fuel: tank, slot: None });
+            g.seats[0].stockpile.energy = 60.0;
+            // The computer seats back before the second turn: the Lead among them owes a pick.
+            for seat in Seat::ALL.into_iter().skip(1) {
+                g.seats[seat.index()].ai = true;
+            }
+            refuse_any_card(g);
+            if g.research.current.is_none()
+                && let Some(first) = g.available_techs().first().copied()
+            {
+                g.pick_tech(Seat(0), first).ok();
+            }
+            g.end_turn(std::array::from_fn(|_| Vec::new())).expect("a second turn");
+            // And a card drawn on it answered, so no question stands over the picture.
+            refuse_any_card(g);
+            // Ticket #629: Fuel and Fissionables enough that the yard's rows are live.
+            g.seats[0].stockpile.fuel = 100.0;
+            g.seats[0].stockpile.fissionables = tenth(g.seats[0].stockpile.fissionables + 5.0);
+        }
+        // `threat:1` (a building aid, ticket #634, version 0.1.0.6): two Prospector Frigates in low
+        // orbit over Mars, so a Colony of seat 0's there (`fission:1`, with `hab:ground`) shows its
+        // threats line and the roster its mark.
+        if std::env::args().any(|a| a == "threat:1") {
+            for _ in 0..2 {
+                let id = ShipId(g.fresh_id());
+                let name = g.next_ship_name(UnitKind::Frigate);
+                g.ships.push(Ship { nuclear: false, fissionables: 0.0, id, name, kind: UnitKind::Frigate, seat: Seat(1), damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: g.turn, fuel: 30.0, slot: None });
+            }
+        }
+        // `ferry:pick` or `ferry:set` (a building aid, ticket #631, version 0.1.0.6): a full Colony
+        // Ship of seat 0's in its station's ring over Earth and a Colony of seat 0's on Mars with a
+        // Refinery, so the Ship card's Ferry block has a far end to pick (`pick`), or a route stands
+        // between them (`set`) for the card, the roster and the solar view's line. With
+        // `stack:earth ship:<n>` the card is open.
+        if let Some(mode) = std::env::args().find_map(|a| a.strip_prefix("ferry:").map(str::to_string)) {
+            // `ferry:moon` sets it to the Moon, with no window to wait for, so the turn's head places its step.
+            let body = if mode == "moon" { BodyId::Moon } else { BodyId::Mars };
+            let slot = g.free_slots_on(body)[0];
+            let cid = ColonyId(g.fresh_id());
+            let modules = [ModuleKind::Core, ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Refinery].map(Module::new).to_vec();
+            g.colonies.push(Colony { id: cid, body, slot, control: Control::Controlled(Seat(0)), modules, colonists: 4, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: g.turn, tier: 0, in_orbit: false });
+            if let Some(ring) = g.colonies.iter().find(|c| c.in_orbit && c.body == BodyId::Earth && c.control.director() == Some(Seat(0))).map(|c| c.slot) {
+                let id = ShipId(g.fresh_id());
+                let name = g.next_ship_name(UnitKind::ColonyShip);
+                let colonists = g.colony_ship_capacity(Seat(0));
+                g.ships.push(Ship { nuclear: false, fissionables: 0.0, id, name, kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: g.turn, fuel: g.tank_of(Seat(0), UnitKind::ColonyShip), slot: Some(ring) });
+                if mode != "pick" {
+                    g.routes.push(Route::new(id, BodyId::Earth, Some(ring), cid, true));
+                }
+            }
+            g.seats[0].stockpile.fuel = 100.0;
+        }
+        // `refit:1` (a building aid, ticket #644, version 0.1.0.6): Nuclear Rockets stands, seat 0
+        // holds Fissionables, and a chemical Frigate of seat 0's sits in the Moon's low orbit over a
+        // Colony of seat 0's with a Shipyard, so its card (`stack:moon ship:1`) carries Refit nuclear.
+        if std::env::args().any(|a| a == "refit:1") {
+            let body = BodyId::Moon;
+            let slot = g.free_slots_on(body)[0];
+            let cid = ColonyId(g.fresh_id());
+            let modules = [ModuleKind::Core, ModuleKind::Shipyard].map(Module::new).to_vec();
+            g.colonies.push(Colony { id: cid, body, slot, control: Control::Controlled(Seat(0)), modules, colonists: 4, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: g.turn, tier: 0, in_orbit: false });
+            g.research.done.push(TechId::NuclearRockets);
+            g.seats[0].stockpile.fissionables = 20.0;
+            let id = ShipId(g.fresh_id());
+            let name = g.next_ship_name(UnitKind::Frigate);
+            let fuel = g.tank_of(Seat(0), UnitKind::Frigate);
+            g.ships.push(Ship { nuclear: false, fissionables: 0.0, id, name, kind: UnitKind::Frigate, seat: Seat(0), damage: 0, at: ShipAt::Body(body), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: g.turn, fuel, slot: None });
+        }
+        // `tidy:<card>,<bar>,<clock>,<chip>` (a building aid, ticket #641, version 0.1.0.6): the
+        // card's and the bars' background greys, whether the time-of-day clock sits in the command cluster (1),
+        // and the Standing chip's corner radius (255 for the buttons' own), so each look can be
+        // photographed before the designer decides.
+        if let Some(v) = std::env::args().find_map(|a| a.strip_prefix("tidy:").map(str::to_owned)) {
+            use std::sync::atomic::Ordering::Relaxed;
+            let p: Vec<&str> = v.split(',').collect();
+            if let Some(n) = p.first().and_then(|s| s.parse().ok()) {
+                crate::ui::CARD_FILL.store(n, Relaxed);
+            }
+            if let Some(n) = p.get(1).and_then(|s| s.parse().ok()) {
+                crate::ui::BAR_FILL.store(n, Relaxed);
+            }
+            if let Some(n) = p.get(2) {
+                crate::ui::CLOCK_IN_CLUSTER.store(*n == "1", Relaxed);
+            }
+            if let Some(n) = p.get(3).and_then(|s| s.parse().ok()) {
+                crate::ui::CHIP_RADIUS.store(n, Relaxed);
+            }
+        }
+        // `scrap:1` (a building aid, ticket #637, version 0.1.0.6): the playtest's case -- an empty
+        // Colony Ship of seat 0's stranded in Mercury's low orbit with 0.6 Fuel, over a Colony of seat
+        // 0's -- so its card (`stack:mercury ship:1`) carries the Scrap button.
+        if std::env::args().any(|a| a == "scrap:1") {
+            let body = BodyId::Mercury;
+            let slot = g.free_slots_on(body)[0];
+            let cid = ColonyId(g.fresh_id());
+            let modules = [ModuleKind::Core, ModuleKind::Mine].map(Module::new).to_vec();
+            g.colonies.push(Colony { id: cid, body, slot, control: Control::Controlled(Seat(0)), modules, colonists: 4, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: g.turn, tier: 0, in_orbit: false });
+            let id = ShipId(g.fresh_id());
+            let name = g.next_ship_name(UnitKind::ColonyShip);
+            g.ships.push(Ship { nuclear: false, fissionables: 0.0, id, name, kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(body), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: g.turn, fuel: 0.6, slot: None });
         }
         // `drybar:1` (a building aid, ticket #346, version 0.09.1): **the board the Battle bar is
         // photographed on.** Seat 0 keeps a DRY Frigate -- 1 Fuel, under the 2 a Battle charges --
@@ -657,7 +797,7 @@ fn build_board(session: &mut Session) {
                 let id = ShipId(g.fresh_id());
                 let built_turn = g.turn;
                 let name = g.next_ship_name(kind);
-                g.ships.push(Ship { id, name, kind, seat, damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel, slot: None });
+                g.ships.push(Ship { nuclear: false, fissionables: 0.0, id, name, kind, seat, damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel, slot: None });
             }
             g.seats[0].stockpile.fuel = 60.0;
         }
@@ -775,7 +915,7 @@ fn build_board(session: &mut Session) {
             let id = ShipId(g.fresh_id());
             let built_turn = g.turn;
             let name = g.next_ship_name(UnitKind::ColonyShip);
-            g.ships.push(Ship {
+            g.ships.push(Ship { nuclear: false, fissionables: 0.0,
                 id,
                 name,
                 kind: UnitKind::ColonyShip,
@@ -801,7 +941,7 @@ fn build_board(session: &mut Session) {
             let id = ShipId(g.fresh_id());
             let built_turn = g.turn;
             let name = g.next_ship_name(UnitKind::ColonyShip);
-            g.ships.push(Ship {
+            g.ships.push(Ship { nuclear: false, fissionables: 0.0,
                 id,
                 name,
                 kind: UnitKind::ColonyShip,
@@ -1004,7 +1144,7 @@ fn build_board(session: &mut Session) {
             let id = ShipId(g.fresh_id());
             let built_turn = g.turn;
             let name = g.next_ship_name(UnitKind::ColonyShip);
-            g.ships.push(Ship { id, name, kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: g.tank_of(Seat(0), UnitKind::ColonyShip), slot: None });
+            g.ships.push(Ship { nuclear: false, fissionables: 0.0, id, name, kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: g.tank_of(Seat(0), UnitKind::ColonyShip), slot: None });
         }
         // `venusstation:1` (a building aid, ticket #436, version 0.09.6): the designer's crash save in
         // little. Seat 0 holds Aphrodite, station slot 1 over Venus, with room for four, and a Colony
@@ -1021,7 +1161,7 @@ fn build_board(session: &mut Session) {
             let id = ShipId(g.fresh_id());
             let built_turn = g.turn;
             let name = g.next_ship_name(UnitKind::ColonyShip);
-            g.ships.push(Ship { id, name, kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Venus), colonists: 4, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: g.tank_of(Seat(0), UnitKind::ColonyShip), slot: (v != "low").then_some(1) });
+            g.ships.push(Ship { nuclear: false, fissionables: 0.0, id, name, kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Venus), colonists: 4, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: g.tank_of(Seat(0), UnitKind::ColonyShip), slot: (v != "low").then_some(1) });
         }
         // `offline:<case>` (a building aid, ticket #451, version 0.09.6): one way a building of seat
         // 0's makes nothing, so its hover's cause line can be photographed. `card`: the home Region's
@@ -1057,7 +1197,7 @@ fn build_board(session: &mut Session) {
                     if let Some(slot) = g.colonies.iter().find(|c| c.in_orbit && c.body == BodyId::Earth && c.control.director() == Some(Seat(0))).map(|c| c.slot) {
                         let id = ShipId(g.fresh_id());
                         let name = g.next_ship_name(UnitKind::Frigate);
-                        g.ships.push(Ship { id, name, kind: UnitKind::Frigate, seat: Seat(1), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Blockade, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: Some(slot) });
+                        g.ships.push(Ship { nuclear: false, fissionables: 0.0, id, name, kind: UnitKind::Frigate, seat: Seat(1), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Blockade, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: Some(slot) });
                     }
                 }
                 _ => {}
@@ -1069,7 +1209,7 @@ fn build_board(session: &mut Session) {
             let id = ShipId(g.fresh_id());
             let built_turn = g.turn;
             let name = g.next_ship_name(UnitKind::ColonyShip);
-            g.ships.push(Ship { id, name, kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Venus), colonists: 4, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: g.tank_of(Seat(0), UnitKind::ColonyShip), slot: Some(0) });
+            g.ships.push(Ship { nuclear: false, fissionables: 0.0, id, name, kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Venus), colonists: 4, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: g.tank_of(Seat(0), UnitKind::ColonyShip), slot: Some(0) });
         }
         // `marsstation:1` (a building aid, ticket #442, version 0.09.6): a station of seat 0's over
         // Mars with six aboard and a Habitat, so a ground slot's card offers "Build a Colony here
@@ -1108,7 +1248,7 @@ fn build_board(session: &mut Session) {
             let id = ShipId(g.fresh_id());
             let built_turn = g.turn;
             let name = g.next_ship_name(UnitKind::ColonyShip);
-            g.ships.push(Ship { id, name, kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: g.tank_of(Seat(0), UnitKind::ColonyShip), slot: Some(slot) });
+            g.ships.push(Ship { nuclear: false, fissionables: 0.0, id, name, kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: g.tank_of(Seat(0), UnitKind::ColonyShip), slot: Some(slot) });
         }
         // `shut:1` (a building aid, ticket #359, version 0.09.1), given with `barracks:1`: that Moon
         // Colony's Habitat and Barracks are mothballed and six live there, two more than the Core
@@ -1132,7 +1272,7 @@ fn build_board(session: &mut Session) {
             let id = ShipId(g.fresh_id());
             let turn = g.turn;
             let name = g.next_ship_name(UnitKind::ColonyShip);
-            g.ships.push(Ship {
+            g.ships.push(Ship { nuclear: false, fissionables: 0.0,
                 id,
                 name,
                 slot: None,
@@ -1159,7 +1299,7 @@ fn build_board(session: &mut Session) {
             let id = ShipId(g.fresh_id());
             let turn = g.turn;
             let name = g.next_ship_name(UnitKind::ColonyShip);
-            g.ships.push(Ship {
+            g.ships.push(Ship { nuclear: false, fissionables: 0.0,
                 id,
                 name,
                 slot: None,
@@ -1234,15 +1374,15 @@ fn build_board(session: &mut Session) {
         if std::env::args().any(|a| a == "underway:1") {
             let turn = g.turn;
             if let Some(sid) = g.directed_states(Seat(0)).first().copied() {
-                g.state_mut(sid).queue.push(Build { item: BuildItem::Facility(FacilityKind::Factory), seat: Seat(0), widgets: 4, done: 0, coastal: false, fuel: 0.0 });
+                g.state_mut(sid).queue.push(Build { nuclear: false, fissionables: 0.0, item: BuildItem::Facility(FacilityKind::Factory), seat: Seat(0), widgets: 4, done: 0, coastal: false, fuel: 0.0 });
             }
             let slot = g.free_slots_on(BodyId::Moon).first().copied().unwrap_or(0);
             let id = ColonyId(g.fresh_id());
-            let queue = vec![Build { item: BuildItem::Module(ModuleKind::Mine), seat: Seat(0), widgets: 4, done: 3, coastal: false, fuel: 0.0 }];
+            let queue = vec![Build { nuclear: false, fissionables: 0.0, item: BuildItem::Module(ModuleKind::Mine), seat: Seat(0), widgets: 4, done: 3, coastal: false, fuel: 0.0 }];
             g.colonies.push(Colony { id, body: BodyId::Moon, slot, control: Control::Controlled(Seat(0)), modules: vec![Module::new(ModuleKind::Habitat)], colonists: 4, education: 1.0, settler_education: 1.0, queue, grid_failed: false, founded_turn: 1, tier: 0, in_orbit: false });
             let sid = ShipId(g.fresh_id());
             let name = g.next_ship_name(UnitKind::Frigate);
-            g.ships.push(Ship {
+            g.ships.push(Ship { nuclear: false, fissionables: 0.0,
                 id: sid,
                 name,
                 slot: None,
@@ -1273,16 +1413,16 @@ fn build_board(session: &mut Session) {
             if let Some(sid) = g.directed_states(Seat(0)).first().copied() {
                 for (kind, seat, widgets, done) in [(FacilityKind::PowerPlant, Seat(0), 8, 3), (FacilityKind::ResearchLab, Seat(0), 4, 0), (FacilityKind::Bank, Seat(1), 8, 2)] {
                     let coastal = g.next_slot_is_coastal(sid, kind, 0, 0).unwrap_or(false);
-                    g.state_mut(sid).queue.push(Build { item: BuildItem::Facility(kind), seat, widgets, done, coastal, fuel: 0.0 });
+                    g.state_mut(sid).queue.push(Build { nuclear: false, fissionables: 0.0, item: BuildItem::Facility(kind), seat, widgets, done, coastal, fuel: 0.0 });
                 }
             }
             let slot = g.free_slots_on(BodyId::Moon).first().copied().unwrap_or(0);
             let id = ColonyId(g.fresh_id());
             let modules = vec![Module::new(ModuleKind::Core), Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Generator), Module::new(ModuleKind::Factory)];
             let queue = vec![
-                Build { item: BuildItem::Module(ModuleKind::Habitat), seat: Seat(0), widgets: 4, done: 2, coastal: false, fuel: 0.0 },
-                Build { item: BuildItem::Module(ModuleKind::Mine), seat: Seat(0), widgets: 4, done: 0, coastal: false, fuel: 0.0 },
-                Build { item: BuildItem::Module(ModuleKind::Refinery), seat: Seat(1), widgets: 8, done: 1, coastal: false, fuel: 0.0 },
+                Build { nuclear: false, fissionables: 0.0, item: BuildItem::Module(ModuleKind::Habitat), seat: Seat(0), widgets: 4, done: 2, coastal: false, fuel: 0.0 },
+                Build { nuclear: false, fissionables: 0.0, item: BuildItem::Module(ModuleKind::Mine), seat: Seat(0), widgets: 4, done: 0, coastal: false, fuel: 0.0 },
+                Build { nuclear: false, fissionables: 0.0, item: BuildItem::Module(ModuleKind::Refinery), seat: Seat(1), widgets: 8, done: 1, coastal: false, fuel: 0.0 },
             ];
             g.colonies.push(Colony { id, body: BodyId::Moon, slot, control: Control::Controlled(Seat(0)), modules, colonists: 8, education: 1.0, settler_education: 1.0, queue, grid_failed: false, founded_turn: 1, tier: 0, in_orbit: false });
             g.seats[0].stockpile.materials = 200.0;
@@ -1440,7 +1580,7 @@ fn build_board(session: &mut Session) {
             let id = ShipId(g.fresh_id());
             let built_turn = g.turn;
             let name = g.next_ship_name(UnitKind::ColonyShip);
-            g.ships.push(Ship {
+            g.ships.push(Ship { nuclear: false, fissionables: 0.0,
                 id,
                 name,
                 kind: UnitKind::ColonyShip,
@@ -1472,7 +1612,7 @@ fn build_board(session: &mut Session) {
             let id = ShipId(g.fresh_id());
             let built_turn = g.turn;
             let name = g.next_ship_name(UnitKind::ColonyShip);
-            g.ships.push(Ship {
+            g.ships.push(Ship { nuclear: false, fissionables: 0.0,
                 id,
                 name,
                 kind: UnitKind::ColonyShip,
@@ -1498,6 +1638,25 @@ fn build_board(session: &mut Session) {
             g.climate.natural_sink = 1000.0;
             refuse_any_card(g);
             g.end_turn(std::array::from_fn(|_| Vec::new())).expect("the screenshot harness picks a Tech before it drives turns");
+        }
+        // `moment:born` (a building aid, ticket #633, version 0.1.0.6): a Colony of seat 0's on the
+        // Moon a hair short of its first child, so the next turn's growth is the first birth off
+        // Earth and the Report carries the Moment.
+        if std::env::args().any(|a| a == "moment:born") {
+            let body = BodyId::Moon;
+            let slot = g.free_slots_on(body)[0];
+            let cid = ColonyId(g.fresh_id());
+            let modules = [ModuleKind::Core, ModuleKind::Habitat].map(Module::new).to_vec();
+            g.colonies.push(Colony { id: cid, body, slot, control: Control::Controlled(Seat(0)), modules, colonists: 4, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: g.turn, tier: 0, in_orbit: false });
+            g.colony_growth.insert(cid, 0.95);
+            refuse_any_card(g);
+            g.end_turn(std::array::from_fn(|_| Vec::new())).expect("the screenshot harness picks a Tech before it drives turns");
+            // The Accords offered on the turn it ends are refused, so no modal stands over the Moment.
+            while let Some((i, _)) = g.offers_to(Seat(0)).first().copied() {
+                g.answer_offer(Seat(0), i, false).ok();
+            }
+            // And a card drawn on it answered, for the same reason.
+            refuse_any_card(g);
         }
         // `moment:tech` (a building aid, ticket #58): a rival seat pushes the Tech under research
         // over the line, so the Report carries a Tech Moment with the Lead, the margin and the AI's
@@ -1632,7 +1791,7 @@ fn build_board(session: &mut Session) {
             let id = ShipId(g.fresh_id());
             let name = g.next_ship_name(UnitKind::ColonyShip);
             let (built_turn, fuel) = (g.turn, g.tank_of(Seat(0), UnitKind::ColonyShip));
-            g.ships.push(Ship { id, name, kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel, slot: None });
+            g.ships.push(Ship { nuclear: false, fissionables: 0.0, id, name, kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel, slot: None });
             id
         });
         g.state_mut(sid).emigrants = 4;
@@ -1664,6 +1823,19 @@ fn build_board(session: &mut Session) {
         eprintln!("morder:{name} was refused");
         std::process::exit(3);
     }
+    // `scrap:order` (ticket #637): the Scrap of `scrap:1`'s Colony Ship is placed, so the Colony's
+    // grid carries the Habitat it will become.
+    if std::env::args().any(|a| a == "scrap:order")
+        && let Some((ship, colony)) = session.game.as_ref().and_then(|g| {
+            let ship = g.ships.iter().find(|s| s.seat == Seat(0) && s.kind == UnitKind::ColonyShip && s.at == ShipAt::Body(BodyId::Mercury))?.id;
+            let colony = g.colonies.iter().find(|c| c.body == BodyId::Mercury && c.control.director() == Some(Seat(0)))?.id;
+            Some((ship, colony))
+        })
+        && !session.place(Order::Scrap { ship, colony })
+    {
+        eprintln!("scrap:order was refused");
+        std::process::exit(3);
+    }
     // `bombard:order` (ticket #328): the Bombard of `bombard:1`'s Battleship at the rival Colony
     // is placed, for `commit:1` to resolve.
     if std::env::args().any(|a| a == "bombard:order")
@@ -1693,6 +1865,19 @@ fn build_board(session: &mut Session) {
     {
         g.raise_army(Place::State(sid), false);
     }
+    // `army:dugin` (a building aid, ticket #635): seat 0's Armies in its start state dig in, then a
+    // new Army is raised there, so the card shows the newcomer joining the dug-in stack.
+    if std::env::args().any(|a| a == "army:dugin")
+        && let Some(g) = session.game.as_mut()
+        && let Some(sid) = g.directed_states(Seat(0)).first().copied()
+    {
+        for id in g.armies_of_seat_at(Seat(0), Place::State(sid)) {
+            if let Some(a) = g.army_mut(id) {
+                a.stance = Stance::DigIn;
+            }
+        }
+        g.raise_army(Place::State(sid), false);
+    }
     // `passage:1` (a building aid, ticket #320): a Passage Accord stands between seat 0 and seat 1,
     // so a partner's Region reads "move to" on seat 0's card and its hover says why.
     if std::env::args().any(|a| a == "passage:1")
@@ -1720,6 +1905,40 @@ fn build_board(session: &mut Session) {
         orders[0] = vec![Order::MoveArmy { army: mine, to: n }];
         refuse_any_card(g);
         g.end_turn(orders).expect("the screenshot harness picks a Tech before it drives turns");
+        for seat in Seat::ALL.into_iter().skip(1) {
+            g.seats[seat.index()].ai = true;
+        }
+    }
+    // `inherit:1` (a building aid, ticket #636): seat 1 holds the first neighbour of seat 0's start
+    // state and a neighbour of that; the second's Army stands in the first, and the second passes
+    // to seat 0, so seat 0 inherits an Army abroad in a rival's Region. Two quiet turns run, so the
+    // Report carries the reminder that it waits on Hold.
+    if std::env::args().any(|a| a == "inherit:1")
+        && let Some(g) = session.game.as_mut()
+        && let Some(sid) = g.directed_states(Seat(0)).first().copied()
+        && let Some(n) = g.tables.state(sid).neighbours.first().copied()
+        && let Some(m) = g.tables.state(n).neighbours.iter().copied().find(|m| *m != sid)
+    {
+        g.take_control(n, Seat(1));
+        g.take_control(m, Seat(1));
+        let army = g.raise_army(Place::State(m), false);
+        if let Some(a) = g.army_mut(army) {
+            a.at = ArmyAt::Place(Place::State(n));
+        }
+        g.take_control(m, Seat(0));
+        g.armies_change_hands(m, Some(Seat(1)), Some(Seat(0)));
+        for seat in Seat::ALL.into_iter().skip(1) {
+            g.seats[seat.index()].ai = false;
+        }
+        for _ in 0..2 {
+            if let Some(seat) = g.tech_owed_by()
+                && let Some(first) = g.available_techs().first().copied()
+            {
+                g.pick_tech(seat, first).ok();
+            }
+            refuse_any_card(g);
+            g.end_turn(std::array::from_fn(|_| Vec::new())).expect("the screenshot harness picks a Tech before it drives turns");
+        }
         for seat in Seat::ALL.into_iter().skip(1) {
             g.seats[seat.index()].ai = true;
         }
@@ -1768,7 +1987,7 @@ fn build_board(session: &mut Session) {
             let id = ShipId(g.fresh_id());
             let name = g.next_ship_name(UnitKind::Frigate);
             let built_turn = g.turn;
-            g.ships.push(Ship { id, name, kind: UnitKind::Frigate, seat, damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: 30.0, slot });
+            g.ships.push(Ship { nuclear: false, fissionables: 0.0, id, name, kind: UnitKind::Frigate, seat, damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: 30.0, slot });
         }
     }
     // Ticket #496 (version 0.09.9): `offer:trade` (a building aid): the Prospectors offer the player
@@ -1812,7 +2031,7 @@ fn build_board(session: &mut Session) {
         let id = ShipId(g.fresh_id());
         let name = g.next_ship_name(UnitKind::Frigate);
         let built_turn = g.turn;
-        g.ships.push(Ship { id, name, kind: UnitKind::Frigate, seat: Seat(1), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Blockade, escaped: false, arrived_this_turn: false, built_turn, fuel: 30.0, slot: Some(slot) });
+        g.ships.push(Ship { nuclear: false, fissionables: 0.0, id, name, kind: UnitKind::Frigate, seat: Seat(1), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Blockade, escaped: false, arrived_this_turn: false, built_turn, fuel: 30.0, slot: Some(slot) });
     }
     // Ticket #398 (version 0.09.3): `yard:1` (a building aid): seat 0's first ground Colony gains a
     // working Mine and a Shipyard, so the Build Where You Dig note and the Ship buttons at a
@@ -1840,7 +2059,7 @@ fn build_board(session: &mut Session) {
         let name = g.next_ship_name(UnitKind::Frigate);
         let built_turn = g.turn;
         let half = g.tank_of(Seat(0), UnitKind::Frigate) / 2.0;
-        g.ships.push(Ship { id, name, kind: UnitKind::Frigate, seat: Seat(0), damage: 0, at: ShipAt::Body(body), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: half, slot: None });
+        g.ships.push(Ship { nuclear: false, fissionables: 0.0, id, name, kind: UnitKind::Frigate, seat: Seat(0), damage: 0, at: ShipAt::Body(body), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: half, slot: None });
     }
     // Ticket #337 (version 0.09.0): `ducats:<n>` (a building aid): seat 0 holds exactly n Ducats.
     // A card whose offer costs more than a seat holds greys its take button, and that is the state
@@ -1857,7 +2076,7 @@ fn build_board(session: &mut Session) {
         for (seat, at, colonists) in [(Seat(1), ShipAt::Body(BodyId::Moon), 4), (Seat(2), ShipAt::Transit { from: BodyId::Earth, to: BodyId::Moon, turns_left: 1 }, 4), (Seat(3), ShipAt::Body(BodyId::Earth), 0)] {
             let id = ShipId(g.fresh_id());
             let name = g.next_ship_name(UnitKind::ColonyShip);
-            g.ships.push(Ship { id, name, kind: UnitKind::ColonyShip, seat, damage: 0, at, colonists, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: turn, fuel: 20.0, slot: None });
+            g.ships.push(Ship { nuclear: false, fissionables: 0.0, id, name, kind: UnitKind::ColonyShip, seat, damage: 0, at, colonists, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: turn, fuel: 20.0, slot: None });
         }
         if mode == "won"
             && let Some(slot) = g.free_slots_on(BodyId::Moon).first().copied()
@@ -1914,12 +2133,14 @@ fn build_board(session: &mut Session) {
             eprintln!("card:{id:?} never came up in two hundred rolls");
             std::process::exit(3);
         }
-        if let Some(taken) = std::env::args().find_map(|a| match a.strip_prefix("cardanswer:") {
-            Some("take") => Some(true),
-            Some("refuse") => Some(false),
+        // Ticket #632 (version 0.1.0.6): or `cardanswer:third`.
+        if let Some(answer) = std::env::args().find_map(|a| match a.strip_prefix("cardanswer:") {
+            Some("take") => Some(CardAnswer::Taken),
+            Some("refuse") => Some(CardAnswer::Refused),
+            Some("third") => Some(CardAnswer::Third),
             _ => None,
         }) {
-            if let Err(e) = g.answer_card(Seat(0), taken) {
+            if let Err(e) = g.answer_card_as(Seat(0), answer) {
                 eprintln!("cardanswer: {e}");
                 std::process::exit(3);
             }

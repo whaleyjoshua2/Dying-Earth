@@ -31,9 +31,11 @@ pub struct Credit {
 
 /// The icons in use, their authors, and the names they carry at game-icons.net. Anything added to
 /// `assets/icons/` belongs here too: the credit is the licence's price, not a courtesy.
-pub const CREDITS: [Credit; 44] = [
+pub const CREDITS: [Credit; 54] = [
     Credit { resource: "Materials", icon: "Mine Wagon", author: "Delapouite" },
     Credit { resource: "Fuel", icon: "Jerrycan", author: "Delapouite" },
+    // Ticket #628 (version 0.1.0.6): the seventh resource, off the designer's sheet at 1A.
+    Credit { resource: "Fissionables", icon: "Radioactive", author: "Lorc" },
     Credit { resource: "Energy", icon: "Electric", author: "Sbed" },
     Credit { resource: "Research", icon: "Microscope", author: "Lord Berandas" },
     Credit { resource: "Ducats", icon: "Banknote", author: "Delapouite" },
@@ -103,13 +105,40 @@ pub const CREDITS: [Credit; 44] = [
     // and no new name.
     Credit { resource: "Facility Investment Bank", icon: "Strongbox", author: "Delapouite" },
     Credit { resource: "Facility Spaceport", icon: "Space Shuttle", author: "Delapouite" },
+    // Ticket #630 (version 0.1.0.6): the trefoil goes with the name to the common Reactor; the
+    // Archivists' building, the Accumulator now, wears a storage cell of its own.
     Credit { resource: "Facility Reactor", icon: "Nuclear", author: "Sbed" },
+    Credit { resource: "Facility Accumulator", icon: "Energy Tank", author: "Delapouite" },
     // The Academy took two rounds: the telescope says astronomy, which is the Observatory's job, and
     // the open book is the Archive's. The designer picked the test tubes, knowing they are the
     // Research Lab's round-bottom flask's sibling -- the one pair on the board worth re-reading at
     // 16 pixels whenever the icon sheet is next photographed.
     Credit { resource: "Facility Academy", icon: "Test Tubes", author: "Lorc" },
+    // Ticket #640 (version 0.1.0.6): the eight capital buildings, off the designer's sheet.
+    Credit { resource: "Capital Stock Market", icon: "Histogram", author: "Delapouite" },
+    Credit { resource: "Capital Assay Office", icon: "Scales", author: "Lorc" },
+    Credit { resource: "Capital Fuel Depot", icon: "Gas Pump", author: "Delapouite" },
+    Credit { resource: "Capital Central Grid", icon: "Pylon", author: "Delapouite" },
+    Credit { resource: "Capital Great Library", icon: "Bookshelf", author: "Delapouite" },
+    Credit { resource: "Capital Chancery", icon: "Wax Seal", author: "Lorc" },
+    Credit { resource: "Capital Spaceport", icon: "Defense Satellite", author: "Delapouite" },
+    Credit { resource: "Capital Arcology", icon: "Artificial Hive", author: "Lorc" },
 ];
+
+/// Ticket #640 (version 0.1.0.6): the icon key a capital building's tile wears.
+pub fn capital_icon(b: dying_earth_engine::CapitalBuilding) -> &'static str {
+    use dying_earth_engine::CapitalBuilding::*;
+    match b {
+        StockMarket => "capital_stock_market",
+        AssayOffice => "capital_assay_office",
+        FuelDepot => "capital_fuel_depot",
+        CentralGrid => "capital_central_grid",
+        GreatLibrary => "capital_great_library",
+        Chancery => "capital_chancery",
+        Spaceport => "capital_spaceport",
+        Arcology => "capital_arcology",
+    }
+}
 
 /// Ticket #146 (version 0.07.3): the icon key a Facility's slot box wears on a Region's card.
 pub fn facility_icon(kind: dying_earth_engine::FacilityKind) -> &'static str {
@@ -138,7 +167,9 @@ pub fn facility_icon(kind: dying_earth_engine::FacilityKind) -> &'static str {
         // grey boxes with a small Faction mark is not a thing a player reads.
         InvestmentBank => "facility_investment_bank",
         Spaceport => "facility_spaceport",
-        Reactor => "facility_reactor",
+        // Ticket #630 (version 0.1.0.6): the trefoil is the common Reactor's now.
+        Accumulator => "facility_accumulator",
+        FissionReactor => "facility_reactor",
         Academy => "facility_academy",
         // Ticket #332 (version 0.09.0): the Mine Facility wears the Mine Module's picture for now,
         // as the Refinery wears its Module's; the interface lane settles the glyphs.
@@ -183,6 +214,8 @@ pub fn module_icon(kind: dying_earth_engine::ModuleKind) -> &'static str {
         Factory => "facility_factory",
         // Ticket #559 (version 0.1.0.3): the Wind Farm Module wears the Facility's turbine.
         WindFarm => "facility_wind_farm",
+        // Ticket #630 (version 0.1.0.6): the Reactor Module wears the Facility's trefoil.
+        FissionReactor => "facility_reactor",
         // Ticket #164 (version 0.07.5): the Core Module wears the station glyph the game drew for
         // itself on ticket #135 -- two solar panels on a bar with a module between them, which is
         // what a core module is. It owes no credit. A ground Colony's Core Module wears it too,
@@ -386,10 +419,16 @@ impl Icons {
 /// Research figure's light cyan and Influence's lavender and is well clear of the Materials' grey
 /// it stands beside on the bar, which is the pair it must never be mistaken for: the two are the
 /// two halves of every build's price.
-const FIGURES: [(&str, [u8; 3]); 10] = [
+///
+/// Ticket #628 (version 0.1.0.6): an eleventh, **fissionables**, a lime, the designer's 1A off a
+/// sheet of six glyphs in four colours. Measured in CIELAB it is 48.6 from Energy and 49.9 from
+/// Ducats, its nearest, and 79 or more from every Faction's colour: the worst pair on the board is
+/// still Materials against Research at 25.
+const FIGURES: [(&str, [u8; 3]); 11] = [
     ("materials", [168, 176, 186]),
     ("widgets", [108, 148, 232]),
     ("fuel", [226, 88, 62]),
+    ("fissionables", [140, 235, 60]),
     ("energy", [245, 222, 92]),
     ("research", [118, 206, 232]),
     ("ducats", [120, 214, 150]),

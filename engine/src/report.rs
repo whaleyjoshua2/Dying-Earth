@@ -242,10 +242,13 @@ pub enum MomentKind {
     /// Ticket #538 (version 0.1.0.1): an Accord the player is party to has ended, and why. Always
     /// shown, past the cap of two a turn.
     AccordEnded,
+    /// Ticket #633 (version 0.1.0.6): the first child born beyond Earth orbit. Added last, so a save
+    /// written before still loads.
+    FirstBorn,
 }
 
 impl MomentKind {
-    pub const ALL: [MomentKind; 13] = [
+    pub const ALL: [MomentKind; 14] = [
         MomentKind::ColonyFounded,
         MomentKind::ControlChanged,
         MomentKind::ClimateThreshold,
@@ -259,6 +262,7 @@ impl MomentKind {
         MomentKind::FirstToABody,
         MomentKind::UnderTheSink,
         MomentKind::AccordEnded,
+        MomentKind::FirstBorn,
     ];
 
     /// The key its table carries in `report.toml`.
@@ -277,6 +281,7 @@ impl MomentKind {
             MomentKind::FirstToABody => "first_to_body",
             MomentKind::UnderTheSink => "under_the_sink",
             MomentKind::AccordEnded => "accord_ended",
+            MomentKind::FirstBorn => "first_born",
         }
     }
 
@@ -296,6 +301,7 @@ impl MomentKind {
             MomentKind::FirstToABody => "A Body settled for the first time",
             MomentKind::UnderTheSink => "The world under the Natural Sink",
             MomentKind::AccordEnded => "An Accord of yours ended",
+            MomentKind::FirstBorn => "The first child born off Earth",
         }
     }
 
@@ -306,6 +312,8 @@ impl MomentKind {
             // Ticket #345 (version 0.09.1): the first landing on a world reads with the founding
             // it came out of, and before it, since it is the rarer half of the same news.
             MomentKind::FirstToABody => 0,
+            // Ticket #633 (version 0.1.0.6): a first of the same kind, and as rare.
+            MomentKind::FirstBorn => 0,
             MomentKind::ColonyFounded => 1,
             // Ticket #86: lives lost read before a place changing hands.
             MomentKind::LostInTransit => 2,
@@ -513,12 +521,25 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     // Ticket #405 (version 0.09.4): the world under the Sink for the first time.
     ("under_the_sink_eases", &["ease", "custodians"]),
     ("disembarked", &["n", "colony"]),
+    // Ticket #632 (version 0.1.0.6).
+    ("stars_lifted", &["faction", "n", "state", "spaceport"]),
+    ("stars_lost", &["faction", "n", "lost", "state", "unrest", "spaceport"]),
+    // Ticket #633 (version 0.1.0.6).
+    ("first_born", &["faction", "colony", "n"]),
+    // Ticket #631 (version 0.1.0.6).
+    ("ferried", &["ship", "n", "colony"]),
+    ("ferry_wait_nobody", &["ship", "colony"]),
+    ("ferry_wait_room", &["ship", "colony"]),
+    ("ferry_wait_fuel", &["ship", "colony"]),
+    ("ferry_wait_window", &["ship", "colony"]),
+    ("ferry_ended", &["ship", "place"]),
     ("station_built", &["faction", "station"]),
     ("accord_struck", &["faction"]),
     // Ticket #517 (version 0.1.0.0).
     ("accord_broken", &["faction"]),
     ("accord_you_broke", &["faction"]),
     ("army_inherited", &["army", "place"]),
+    ("army_waits", &["army", "place"]),
     ("accord_refused", &["faction"]),
     // Ticket #509 (version 0.1.0.0): an Accord the other side would not renew.
     ("accord_let_lapse", &["faction"]),
@@ -641,6 +662,7 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("lack_facility", &["facility"]),
     ("lack_colony_module", &["module"]),
     ("lack_colony_room", &["module"]),
+    ("lack_launch_site", &[]),
     ("break_fired", &["temperature", "name", "happened", "text"]),
     ("break_coastal", &["states", "exposure", "percent", "unrest"]),
     ("break_baseline", &["state", "rise"]),
@@ -686,6 +708,8 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("build_complete", &["faction", "building", "place"]),
     ("energy_short", &["faction", "buildings", "sink"]),
     ("fuel_short", &["faction", "buildings"]),
+    // Ticket #630 (version 0.1.0.6): a Reactor short of Fissionables.
+    ("fission_short", &["faction", "buildings"]),
     ("energy_zero", &["faction"]),
 ];
 
@@ -814,6 +838,10 @@ pub const RIVAL_ARGS: &[(&str, &[&str])] = &[
     ("unfund_archive", &[]),
     ("max_on", &["place"]),
     ("max_off", &[]),
+    ("route_on", &["ship", "colony"]),
+    ("route_off", &["ship"]),
+    ("scrap", &["ship", "colony"]),
+    ("refit", &["ship"]),
     ("build_emigrants", &["n", "state"]),
     ("send_antarctica", &["n", "state"]),
     ("lift_station", &["n", "state", "station"]),
@@ -861,6 +889,8 @@ pub const RIVAL_ARGS: &[(&str, &[&str])] = &[
 /// The arguments a Moment's `text` and `figure` may use, by kind.
 pub const MOMENT_ARGS: &[(&str, &[&str])] = &[
     ("colony_founded", &["faction", "colony", "note", "n"]),
+    // Ticket #633 (version 0.1.0.6).
+    ("first_born", &["faction", "colony", "n"]),
     ("lost_in_transit", &["faction", "ship", "body", "n", "of"]),
     ("control_changed", &["place", "faction"]),
     ("climate_threshold", &["what", "figure"]),

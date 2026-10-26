@@ -74,6 +74,13 @@ mine_yield = 1.4875
 generator_yield = 0.75
 refinery_yield = 2.0
 research_yield = 1.0
+# Ticket #628 (version 0.1.0.6), at the designer's word: **Fissionables**, the seventh resource,
+# which a Mine makes beside its Materials -- 1 a turn times this figure, each slot drawing its own
+# within `slot_yield_spread` as the other four yields do. None on Earth ("not available on earth"),
+# the Moon 0.25, Mars 0.80, its moons 1.1, Mercury 1.3, Ceres 1.6 ("Eris" in the list, the one far
+# world it left out; the designer: "yeah Ceres"), Vesta 1.8. A station's Mine reads none: they are
+# in the ground. Venus has no ground slots and so none.
+fissionables_yield = 0.0
 orbital_slots = 7
 stations = ["ISS", "Tiangong", "Axiom", "Orbital Reef", "Starlab", "Earth L4", "Earth L5"]
 far_slots = 2
@@ -104,6 +111,10 @@ generator_yield = 1.3
 # Ticket #421 (version 0.09.4): the three low-gravity worlds' Refinery yield a quarter up.
 refinery_yield = 0.6875
 research_yield = 1.0
+fissionables_yield = 0.25
+# Ticket #628: on the Moon only some sites hold them, two or three of the five, drawn with the game
+# ("between 2 and 3 never more never less").
+fissionables_sites = [2, 3]
 orbital_slots = 2
 stations = ["Gateway", "Selene"]
 slots = [
@@ -127,13 +138,16 @@ mine_yield = 1.0625
 generator_yield = 0.75
 refinery_yield = 1.5
 research_yield = 1.3
+fissionables_yield = 0.8
 orbital_slots = 3
 stations = ["Mars Base Camp", "Ares", "Hermes"]
 slots = [
     { name = "Olympus Mons", lon = -133.8, lat = 18.7 },
     { name = "Valles Marineris", lon = -70.0, lat = -14.0 },
     { name = "Chryse Planitia", lon = -30.0, lat = 28.0 },
-    { name = "Hellas Planitia", lon = 70.0, lat = -42.4 },
+    # Ticket #628 (version 0.1.0.6): the one Mars site without Fissionables (the designer: "pick one mars
+    # slot to not have it"), the deep impact basin under its own fill.
+    { name = "Hellas Planitia", lon = 70.0, lat = -42.4, no_fissionables = true },
     { name = "Isidis Planitia", lon = 88.0, lat = 12.9 },
     { name = "Elysium Planitia", lon = 135.0, lat = 3.0 },
 ]
@@ -159,6 +173,7 @@ mine_yield = 1.4875
 generator_yield = 1.2
 refinery_yield = 0.625
 research_yield = 1.2
+fissionables_yield = 1.1
 orbital_slots = 1
 stations = ["Phobos Gateway"]
 slots = [
@@ -187,6 +202,7 @@ mine_yield = 1.01
 generator_yield = 1.1
 refinery_yield = 0.52
 research_yield = 1.15
+fissionables_yield = 1.1
 orbital_slots = 1
 stations = ["Deimos Gateway"]
 slots = [
@@ -214,6 +230,7 @@ mine_yield = 0.85
 generator_yield = 1.0
 refinery_yield = 1.0
 research_yield = 1.3
+fissionables_yield = 0.0
 orbital_slots = 3
 stations = ["Ishtar", "Aphrodite", "Lada"]
 slots = []
@@ -236,6 +253,7 @@ mine_yield = 1.46625
 generator_yield = 2.3
 refinery_yield = 0.575
 research_yield = 1.38
+fissionables_yield = 1.3
 orbital_slots = 2
 stations = ["Messenger", "Mariner"]
 slots = [
@@ -260,6 +278,7 @@ mine_yield = 0.733125
 generator_yield = 0.575
 refinery_yield = 2.0125
 research_yield = 1.265
+fissionables_yield = 1.6
 orbital_slots = 2
 stations = ["Piazzi", "Dawn"]
 slots = [
@@ -285,6 +304,7 @@ mine_yield = 1.710625
 generator_yield = 0.575
 refinery_yield = 0.575
 research_yield = 1.15
+fissionables_yield = 1.8
 orbital_slots = 2
 stations = ["Olbers", "Vestalia"]
 slots = [

@@ -15,6 +15,10 @@ materials = 22
 widgets = 5
 energy_upkeep = 3
 produces = { resource = "materials", amount = 4 }
+# Ticket #628 (version 0.1.0.6), at the designer's word: and one Fissionable a turn beside the Materials,
+# times its site's Fissionables figure (bodies.toml), the Faction's output and the Mine's Techs; no
+# Discovery and no Mass Driver reach it. A site without them, and a station, makes none.
+fissionables = 1.0
 # Version 0.04 (ticket #44): on Earth (Antarctica) a Module emits as its counterpart Facility does.
 # Ticket #604 (version 0.1.0.4), at the designer's word: 0.85, the Region Mine's, where it was 1.0.
 earth_emissions = 0.85
@@ -494,3 +498,17 @@ mars_only = true
 one_mine = 0.75
 two_mines = 0.6
 floor = 0.5
+
+# Ticket #630 (version 0.1.0.6), at the designer's word: the REACTOR Module, the Facility's figures off
+# Earth ("Need an off world counterpart. Asteroid belt is after all too far away for solar"), at any
+# Colony or station, no sunlight and no site yield, behind Clean Power. Appended last.
+[[module]]
+id = "fission_reactor"
+name = "Reactor"
+materials = 27.5
+widgets = 10
+energy_upkeep = 0
+ducats_upkeep = 2
+fissionables_upkeep = 0.1
+produces = { resource = "energy", amount = 8 }
+needs_tech = "clean_power"

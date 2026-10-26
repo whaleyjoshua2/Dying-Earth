@@ -84,7 +84,13 @@ degrees_per_ppm_step = 0.5
 # (`docs/dev-diary/2026-10-07-version-0.1.0.0/sweeps/co2-grid.md`): at 440 46 collapses, 500 40,
 # 560 33, 620 22; a Sink of 10 reads 42, 33, 23, 14. 620 is the nearest to 20 at the Sink the world
 # has. The win column is not retuned here.
-ppm_step = 620.0
+# Ticket #639 (version 0.1.0.6): **step 380**, the Sink still 8, re-swept at the designer's word ("find
+# a step that optimizes") once Canada and Ethiopia joined the board, twenty-two Regions, and a
+# computer seat came to open in Canada. Six cells, 80 games each
+# (`docs/dev-diary/2026-10-25-version-0.1.0.6/sweeps/ticket-639-step-*.txt`): 620 reads 0 collapses,
+# 560 2, 500 5, 440 9, 380 19, 320 32. 380 is the nearest to the designer's 20. The win column is not
+# retuned here: at 380 it reads Custodians 35, Prospectors 25, Arkwrights 1, Archivists 0.
+ppm_step = 380.0
 natural_sink = 8.0
 collapse_line = 3.0
 temperature_lag_fraction = 0.5
@@ -96,6 +102,10 @@ colony_growth = 0.02
 # Ticket #588 (version 0.1.0.4), at the designer's word ("population growth there is 1/3rd faster",
 # made an even 0.03): the share instead at a station in Earth's near orbits -- not Earth L4 or L5.
 colony_growth_earth_orbit = 0.03
+# Ticket #633 (version 0.1.0.6), at the designer's word: the first Colonist ever grown at a Colony
+# beyond Earth orbit is a Moment, and its seat gets this much Influence once ("give the seat who did
+# it a one time +5 influence"), into the Allotment it is about to spend.
+first_born_influence = 5
 colony_decline = 1
 # Ticket #333 (version 0.09.0): the population figure's unit, in people. A Region's figure, a
 # Colonist and a Pioneer are all counted in it, so `Region population 380.0` is 380 million people

@@ -206,7 +206,7 @@ fn a_save_without_this_versions_fields_still_loads() {
     // contest, home and Collapse counters (#618, #619, #620), so a 0.1.0.4 save loads. A Battle
     // party's unit names (#614) default the same way, but a turn-four save holds no Battle to cut
     // them from.
-    for name in ["under_sink_eased", "opening_gap", "best_gap_closed", "best_run", "lead_windfall", "card_price_by", "by", "places", "colony_growth", "offline_cause", "produced_total", "opening_met_turn", "opening_run", "launch_site_owed", "archives_lost", "archive_fund_lost", "tier", "offers", "refusals", "greenwash_spent", "home_region", "ended_by", "refused_by", "replacing", "capital_buildings", "capital_built_now", "energy_by_place", "contests", "homes_lost", "homes_taken", "collapse_weighed"] {
+    for name in ["under_sink_eased", "opening_gap", "best_gap_closed", "best_run", "lead_windfall", "card_price_by", "by", "places", "colony_growth", "offline_cause", "produced_total", "opening_met_turn", "opening_run", "launch_site_owed", "archives_lost", "archive_fund_lost", "tier", "offers", "refusals", "greenwash_spent", "home_region", "ended_by", "refused_by", "replacing", "capital_buildings", "capital_built_now", "energy_by_place", "contests", "homes_lost", "homes_taken", "collapse_weighed", "nuclear", "nuclear_hulls_built", "fission_bought", "fission_sold", "routes", "ferried_to", "routes_set", "ferried", "ferry_trips", "first_born", "stars_sent", "stars_lost", "stranded_since", "scrapped", "refits"] {
         let before = older.len();
         older = cut(&older, name);
         assert!(older.len() < before, "{name} was in the save and is cut");
@@ -215,6 +215,67 @@ fn a_save_without_this_versions_fields_still_loads() {
     std::fs::write(&path, &older).unwrap();
     let loaded = save::load_from(&path, tables()).expect("a save without this version's fields loads");
     assert_eq!(loaded.turn, game.turn);
+}
+
+/// Ticket #631 (version 0.1.0.6): a ferry route travels with the save, its counts and its last
+/// wait named with it.
+#[test]
+fn a_ferry_route_is_saved_and_loaded() {
+    let dir = TempDir::new("ferry-route");
+    let mut game = played_to(5, 4);
+    let ship = ShipId(game.fresh_id());
+    let name = game.next_ship_name(UnitKind::ColonyShip);
+    game.ships.push(Ship { nuclear: false, fissionables: 0.0, id: ship, name, kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30.0, slot: None });
+    let far = game.colonies[0].id;
+    let mut r = Route::new(ship, BodyId::Earth, None, far, true);
+    (r.waited, r.idle, r.said) = (2, 1, Some(RouteWait::Window));
+    game.routes.push(r.clone());
+    let path = dir.path().join("ferry.ron");
+    std::fs::write(&path, save::to_text(&game, SaveKind::Manual).unwrap()).unwrap();
+    let loaded = save::load_from(&path, tables()).expect("the save loads");
+    assert_eq!(loaded.routes, vec![r]);
+}
+
+/// Ticket #628 (version 0.1.0.6): a 0.1.0.5 save holds no Fissionables -- none in a Stockpile, none
+/// in a slot's yields -- and a market of three rows, where this build has four. It loads, the fourth
+/// row at nought, and the load draws the sites the seed would have drawn, on their own dice.
+#[test]
+fn a_save_from_before_fissionables_loads_and_draws_its_sites() {
+    let dir = TempDir::new("before-fissionables");
+    let game = played_to(5, 4);
+    let text = save::to_text(&game, SaveKind::Manual).unwrap();
+    let key = "fissionables:";
+    let mut older = String::new();
+    for line in text.lines() {
+        if !line.trim_start().starts_with(key) {
+            older.push_str(line);
+            older.push('\n');
+        }
+    }
+    assert!(older.len() < text.len() && !older.contains(key), "every Fissionables line was in the save and is cut");
+    // The market's rows, four to three: the last entry of each of its five arrays dropped.
+    let m = older.find("market:").expect("the market is saved");
+    let end = m + older[m..].find("\n  ),").expect("the market's close");
+    let mut market = older[m..end].to_string();
+    for field in ["price", "net", "card_price", "card_price_until", "card_price_by"] {
+        // Each is written on one line, `    price: (4, 2, 2, 8),`: its last entry goes.
+        let open = market.find(&format!("    {field}: (")).unwrap_or_else(|| panic!("{field} in {market}"));
+        let close = open + market[open..].find("),").expect("the line's close");
+        assert_eq!(market[open..close].matches(", ").count(), 3, "four rows: {}", &market[open..close]);
+        let cut = open + market[open..close].rfind(", ").expect("a last entry");
+        market = format!("{}{}", &market[..cut], &market[close..]);
+    }
+    older = format!("{}{}{}", &older[..m], market, &older[end..]);
+    let path = dir.path().join("save-5-turn-4-before-fissionables.ron");
+    std::fs::write(&path, &older).unwrap();
+    let loaded = save::load_from(&path, tables()).expect("a save from before Fissionables loads");
+    assert_eq!(loaded.market.price[3], 0, "the fourth row opens at its card figure");
+    assert_eq!(loaded.trade_price(Resource::Fissionables), Some(8));
+    assert!(Seat::ALL.iter().all(|s| loaded.seat(*s).stockpile.fissionables == 0.0));
+    for (k, y) in &game.slot_yields {
+        assert_eq!(loaded.slot_yields[k].fissionables, y.fissionables, "{k:?}: the seed's own sites");
+    }
+    assert!(loaded.slot_yields.values().any(|y| y.fissionables > 0.0));
 }
 
 /// (d) The autosave cadence and the rotation: turns 3, 6, 9 and 12 each write one, and only the
@@ -321,9 +382,28 @@ fn a_ship_saved_in_venus_low_orbit_loads_into_its_first_ring() {
     let mut game = played_to(3, 2);
     let id = ShipId(game.fresh_id());
     let fuel = game.tank_of(Seat(0), UnitKind::ColonyShip);
-    game.ships.push(Ship { id, name: String::new(), kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Venus), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel, slot: None });
+    game.ships.push(Ship { nuclear: false, fissionables: 0.0, id, name: String::new(), kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Venus), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel, slot: None });
     let dir = TempDir::new("venus-low");
     let path = save::save_to(dir.path(), &game, SaveKind::Manual).expect("the save is written");
     let loaded = save::load_from(&path, tables()).expect("the save is read back");
     assert_eq!(loaded.ships.iter().find(|s| s.id == id).unwrap().slot, Some(0), "into Ishtar's ring");
+}
+
+/// Ticket #630 (version 0.1.0.6): the Archivists' building was the Reactor, and a save from before
+/// names it `reactor`; it loads as the Accumulator, the name the common Reactor took being
+/// `fission_reactor`.
+#[test]
+fn a_save_naming_the_archivists_reactor_loads_it_as_the_accumulator() {
+    let dir = TempDir::new("accumulator");
+    let mut game = played_to(5, 4);
+    game.states[0].facilities.push(Facility::new(FacilityKind::Accumulator));
+    let text = save::to_text(&game, SaveKind::Manual).unwrap();
+    assert!(text.contains("Accumulator") || text.contains("accumulator"), "the premise: it is saved by its name");
+    let older = text.replace("kind: Accumulator", "kind: reactor").replace("kind: accumulator", "kind: reactor");
+    assert_ne!(older, text, "the premise: the name was rewritten");
+    let path = dir.path().join("save-5-turn-4-reactor.ron");
+    std::fs::write(&path, &older).unwrap();
+    let loaded = save::load_from(&path, tables()).expect("a save naming the reactor loads");
+    assert!(loaded.states[0].facilities.iter().any(|f| f.kind == FacilityKind::Accumulator));
+    assert!(!loaded.states[0].facilities.iter().any(|f| f.kind == FacilityKind::FissionReactor));
 }

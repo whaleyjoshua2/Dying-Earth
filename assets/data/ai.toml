@@ -391,7 +391,8 @@ bounty_least = 1.0
 # x 44/42 with the Diaspora, the turns as they were; the Archivists' paces unmoved.
 # Ticket #623 (version 0.1.0.5): the Prospectors' first x 6250/5000 with the bar, the turns as they were.
 [pace.prospectors]
-first = [[12, 834], [25, 2084], [37, 3750], [47, 6250]]
+# Ticket #638 (version 0.1.0.6): x6500/6250 with the bar, rounded, the turns as they were.
+first = [[12, 867], [25, 2167], [37, 3900], [47, 6500]]
 colonists = [[17, 7], [31, 20]]
 
 [pace.custodians]
@@ -588,6 +589,32 @@ home_floor = 20
 collapse_emit_weight = 0.5
 collapse_clean_weight = 1.5
 win_in_sight = 3
+# Ticket #629 (version 0.1.0.6), at the designer's word: a computer seat builds a nuclear hull when its
+# Stockpile holds the second tank's fill and this many tanks more -- two crossings' worth -- and a
+# chemical one otherwise. Taught to chase Fissionables on its own ticket.
+nuclear_hull_reserve_tanks = 2.0
+# Ticket #630 (version 0.1.0.6), at the designer's word: a computer seat builds a Reactor where it would
+# build a Power Plant (and a Reactor Module where it would a Generator) once Clean Power stands and its
+# Stockpile holds this many turns of a Reactor's 0.1 Fissionables, one Fissionable; a Power Plant or a
+# Wind Farm otherwise. A Reactor short of them is mothballed, and restarted once they are back.
+reactor_reserve_turns = 10.0
+# Ticket #643 (version 0.1.0.6), at the designer's word: the computer chases Fissionables. It keeps a
+# RESERVE -- `reactor_reserve_turns` of its running Reactors, each nuclear hull's second tank topped
+# up, half a Fissionable for each Missile Carrier with no Warhead -- buying the shortfall when its
+# Ducats allow and lifting a Mine on a Fissionables site while short; and it sells what it holds
+# beyond this many turns of its Reactors and two tanks.
+fission_keep_turns = 20.0
+# Ticket #631 (version 0.1.0.6), at the designer's word: a computer seat sends a full Colony Ship to a
+# place of its own it has delivered to before on a ferry route, and ends the route once the far end
+# has had no room for this many turns.
+ferry_idle_turns = 3
+# Ticket #637 (version 0.1.0.6), at the designer's word: a computer seat scraps an empty Colony Ship
+# stranded this many turns or more over a Colony of its own, into a Habitat there.
+scrap_stranded_turns = 3
+# Ticket #633 (version 0.1.0.6), at the designer's word: until somebody has the first child born off
+# Earth, the computer Arkwrights weigh a Habitat at, and a landing into, a Colony of theirs beyond
+# Earth orbit by this.
+first_birth_chase = 1.25
 # Ticket #336 (version 0.09.0): what a rival's Colony is worth on the same list, read as this price
 # divided by the price the seat would actually pay for it -- CHEAPEST FIRST, where the rule from
 # ticket #50 ranked by fewest Colonists and never read the threshold at all. Without this the

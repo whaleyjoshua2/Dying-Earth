@@ -64,7 +64,14 @@ pub enum Order {
     /// its Widgets queue, once enough people live there.
     RaiseTier { colony: ColonyId },
     BuildModule { colony: ColonyId, kind: ModuleKind },
-    BuildShip { site: Place, kind: UnitKind },
+    /// Ticket #629 (version 0.1.0.6): `nuclear`, a nuclear hull, once Nuclear Rockets stands; an
+    /// order from before the field is a chemical hull.
+    BuildShip {
+        site: Place,
+        kind: UnitKind,
+        #[serde(default)]
+        nuclear: bool,
+    },
     BuildArmy { place: Place },
     Repair { unit: UnitRef, points: u32 },
     /// Ticket #99 (version 0.07.0): a Ship may name the Orbital Slot it arrives into. A warship
@@ -200,6 +207,10 @@ pub enum Order {
     /// place as an ordinary order for the player to look at. (Version 0.07.1's Defence split, the
     /// standing order this replaces, lasted two versions.)
     SetMaxStanding { target: Option<Target> },
+    /// Ticket #631 (version 0.1.0.6), at the designer's word: set a Colony Ship's standing ferry
+    /// route from the orbit it stands in, or `None` end it. Free; the route places each turn's step
+    /// as ordinary orders.
+    SetRoute { ship: ShipId, route: Option<crate::route::Route> },
     /// Version 0.05.5 (ticket #73): muster Emigrants, the built Colonists, in a Nation State the
     /// seat directs: up to four a turn per Faction, in one state, at a tenth of a person each.
     BuildEmigrants { state: StateId, n: u32 },
@@ -242,6 +253,12 @@ pub enum Order {
     /// control, once per state EVER. While it runs it doubles what they may recruit there and
     /// suspends Coach Class's double population charge.
     ExodusCall { state: StateId },
+    /// Ticket #637 (version 0.1.0.6), at the designer's word: an empty Colony Ship in the orbit that
+    /// touches a Colony of its seat's is broken up into a free Habitat there; its tank is lost.
+    Scrap { ship: ShipId, colony: ColonyId },
+    /// Ticket #644 (version 0.1.0.6), at the designer's word: a chemical hull refitted nuclear at a
+    /// yard of its seat's in its own orbit, once Nuclear Rockets stands. One way.
+    Refit { ship: ShipId },
 }
 
 impl Order {
@@ -263,6 +280,8 @@ impl Order {
     pub fn build_module(&self) -> Option<(ColonyId, ModuleKind)> {
         match self {
             Order::BuildModule { colony, kind } | Order::BuildModuleWithDucats { colony, kind } => Some((*colony, *kind)),
+            // Ticket #637: a scrapped hull's Habitat takes its slot as a build ordered this turn does.
+            Order::Scrap { colony, .. } => Some((*colony, ModuleKind::Habitat)),
             _ => None,
         }
     }
@@ -277,6 +296,8 @@ pub struct Cost {
     pub energy: f64,
     pub influence: i64,
     pub ducats: f64,
+    /// Ticket #628 (version 0.1.0.6): bought or sold in the market; nothing is priced in them yet.
+    pub fissionables: f64,
 }
 
 impl Cost {
@@ -286,6 +307,7 @@ impl Cost {
         self.energy += other.energy;
         self.influence += other.influence;
         self.ducats += other.ducats;
+        self.fissionables += other.fissionables;
     }
     pub fn text(&self) -> String {
         let parts = self.parts();
@@ -303,6 +325,9 @@ impl Cost {
         }
         if self.energy > 0.0 {
             parts.push(format!("{} Energy", figure(self.energy)));
+        }
+        if self.fissionables > 0.0 {
+            parts.push(format!("{} Fissionables", figure(self.fissionables)));
         }
         if self.influence > 0 {
             parts.push(format!("{} Influence", self.influence));
@@ -353,7 +378,8 @@ pub fn is_load(o: &Order, ship: ShipId) -> bool {
 }
 
 /// Ticket #533: a Ship's **one action** a turn, which a load and a refuel stand beside: a flight, a
-/// change of orbit, an unload or a founding, a Bombard, a Launch or a Rearm. Ticket #568 (version
+/// change of orbit, an unload or a founding, a Bombard, a Launch, a Rearm, and since version 0.1.0.6
+/// a Refit or a Scrap. Ticket #568 (version
 /// 0.1.0.3): a load off a Colony or station was the action until then; it is free now, as a lift.
 pub fn is_ship_action(o: &Order, ship: ShipId) -> bool {
     match o {
@@ -362,7 +388,9 @@ pub fn is_ship_action(o: &Order, ship: ShipId) -> bool {
         | Order::Unload { ship: x, .. }
         | Order::Bombard { ship: x, .. }
         | Order::Launch { ship: x, .. }
-        | Order::Rearm { ship: x } => *x == ship,
+        | Order::Rearm { ship: x }
+        | Order::Refit { ship: x }
+        | Order::Scrap { ship: x, .. } => *x == ship,
         _ => false,
     }
 }
@@ -497,6 +525,7 @@ impl Game {
             Order::BuildShip { kind, .. } => Some(BuildItem::Unit(*kind)),
             Order::BuildArmy { .. } => Some(BuildItem::Unit(UnitKind::Army)),
             Order::Rearm { ship } => Some(BuildItem::Warhead(*ship)),
+            Order::Refit { ship } => Some(BuildItem::Refit(*ship)),
             _ => None,
         };
         // A Launch spends the Warhead and no Fuel.
@@ -611,7 +640,7 @@ impl Game {
     fn tradeable(&self, g: TradeGood) -> Result<(), OrderError> {
         match g {
             TradeGood::Goods(r, n) if n > 0 && Stockpile::default().of_mut(r).is_some() => Ok(()),
-            TradeGood::Goods(..) => Err(OrderError("a Trade is in Ducats, Materials, Fuel, Energy or a place".into())),
+            TradeGood::Goods(..) => Err(OrderError("a Trade is in Ducats, Materials, Fuel, Energy, Fissionables or a place".into())),
             TradeGood::Place(_) => Ok(()),
         }
     }
@@ -651,7 +680,14 @@ impl Game {
             Order::BuildModule { colony, kind } => Cost { materials: self.module_materials_at(seat, *colony, *kind), ..Default::default() },
             // Ticket #87: a Ship is built with a full tank, its Fuel paid at the build.
             // Ticket #398 (version 0.09.3): at the yard's price, so a low-gravity yard with a Mine is cheaper.
-            Order::BuildShip { site, kind } => Cost { materials: self.ship_materials_at(seat, *site, *kind), fuel: self.tank_of(seat, *kind), ..Default::default() },
+            // Ticket #629 (version 0.1.0.6): a nuclear hull's second tank, filled at the build as the
+            // Fuel tank is, and a Missile Carrier's first Warhead.
+            Order::BuildShip { site, kind, nuclear } => Cost {
+                materials: self.ship_materials_at(seat, *site, *kind),
+                fuel: self.tank_of(seat, *kind),
+                fissionables: tenth(if *nuclear { self.fission_tank_of(seat, *kind) } else { 0.0 } + if *kind == UnitKind::MissileCarrier { self.tables.nuke.fissionables } else { 0.0 }),
+                ..Default::default()
+            },
             Order::BuildArmy { .. } => Cost { materials: t.unit(UnitKind::Army).materials, ..Default::default() },
             Order::Repair { points, .. } => {
                 Cost { materials: (t.repair.materials_per_point * *points as i64) as f64, ..Default::default() }
@@ -668,13 +704,16 @@ impl Game {
             // paid for at the build. A Rearm costs the table's Materials, and its Widgets are the
             // build's, paid by the yard's place over the turns it takes.
             Order::Launch { .. } => Cost::default(),
-            Order::Rearm { .. } => Cost { materials: t.nuke.rearm_materials as f64, ..Default::default() },
+            // Ticket #629 (version 0.1.0.6): and the Warhead's half a Fissionable.
+            Order::Rearm { .. } => Cost { materials: t.nuke.rearm_materials as f64, fissionables: t.nuke.fissionables, ..Default::default() },
+            // Ticket #644 (version 0.1.0.6), Q3: the second tank's fill, as a nuclear build pays.
+            Order::Refit { ship } => Cost { fissionables: self.ship(*ship).map_or(0.0, |s| self.fission_tank_of(seat, s.kind)), ..Default::default() },
             // Ticket #404 (version 0.09.4): a tribute is paid from the Stockpile with the order's
             // cost, so the confirm names it and the running total counts it; it was taken at the
             // commit, outside the cost, and the driver said `costs free`.
             Order::Tribute { materials: true, .. } => Cost { materials: t.relations.tribute_materials as f64, ..Default::default() },
             Order::Tribute { materials: false, .. } => Cost { ducats: t.relations.tribute_ducats as f64, ..Default::default() },
-            Order::Refuel { ship } => Cost { fuel: self.refuel_amount(seat, *ship), ..Default::default() },
+            Order::Refuel { ship } => Cost { fuel: self.refuel_amount(seat, *ship), fissionables: self.refuel_fission_from(*ship, self.seat(seat).stockpile.fissionables), ..Default::default() },
             Order::Influence { amount, .. } => Cost { influence: *amount, ..Default::default() },
             Order::Smear { amount, .. } => Cost { influence: *amount, ..Default::default() },
             Order::Greenwash { amount } => Cost { influence: *amount, ducats: (*amount * self.tables.influence.greenwash.ducats_per_influence) as f64, ..Default::default() },
@@ -694,7 +733,13 @@ impl Game {
             Order::BuildFacilityWithDucats { kind, .. } => Cost { ducats: self.market_price(seat, self.facility_materials(seat, *kind) * t.ducats.per_building_material as f64), ..Default::default() },
             // Ticket #332 (version 0.09.0): the refund is a negative cost, as a purchase is, so
             // `remaining` and `commit_orders` credit it without a special case.
-            Order::CancelBuild { place, index } => Cost { materials: -self.cancel_refund(seat, *place, *index), fuel: -self.cancel_fuel_refund(*place, *index), ..Default::default() },
+            // Ticket #629 (version 0.1.0.6): and the Fissionables paid at the order.
+            Order::CancelBuild { place, index } => Cost {
+                materials: -self.cancel_refund(seat, *place, *index),
+                fuel: -self.cancel_fuel_refund(*place, *index),
+                fissionables: -self.queue_at(*place).get(*index).map(|b| b.fissionables).unwrap_or(0.0),
+                ..Default::default()
+            },
             Order::BuildStation { .. } => Cost { materials: self.station_materials(seat), ..Default::default() },
             // Ticket #442 (version 0.09.6): a ground Colony from a station, at the station's price.
             Order::BuildColony { .. } => Cost { materials: self.station_materials(seat), ..Default::default() },
@@ -735,6 +780,7 @@ impl Game {
                     Resource::Materials => Cost { materials: -*amount as f64, ducats, ..Default::default() },
                     Resource::Fuel => Cost { fuel: -*amount as f64, ducats, ..Default::default() },
                     Resource::Energy => Cost { energy: -*amount as f64, ducats, ..Default::default() },
+                    Resource::Fissionables => Cost { fissionables: -*amount as f64, ducats, ..Default::default() },
                     _ => Cost::default(),
                 }
             }
@@ -743,6 +789,7 @@ impl Game {
                 match resource {
                     Resource::Materials => Cost { materials: *amount as f64, ducats, ..Default::default() },
                     Resource::Fuel => Cost { fuel: *amount as f64, ducats, ..Default::default() },
+                    Resource::Fissionables => Cost { fissionables: *amount as f64, ducats, ..Default::default() },
                     _ => Cost::default(),
                 }
             }
@@ -758,12 +805,14 @@ impl Game {
     }
 
     /// Ticket #220 (version 0.08.2): which row of the market a resource is, or `None` for one that
-    /// is not for sale at all. Materials, Fuel and Energy, in that order.
+    /// is not for sale at all. Materials, Fuel and Energy, in that order; Fissionables fourth
+    /// (ticket #628, version 0.1.0.6).
     pub fn market_row(resource: Resource) -> Option<usize> {
         match resource {
             Resource::Materials => Some(0),
             Resource::Fuel => Some(1),
             Resource::Energy => Some(2),
+            Resource::Fissionables => Some(3),
             _ => None,
         }
     }
@@ -771,7 +820,7 @@ impl Game {
     /// The card figure for a row: the MIDPOINT of that resource's band since ticket #220.
     pub fn market_base(&self, row: usize) -> i64 {
         let d = &self.tables.ducats;
-        [d.per_materials, d.per_fuel, d.per_energy][row]
+        [d.per_materials, d.per_fuel, d.per_energy, d.per_fissionables][row]
     }
 
     /// The live price. A zero in `market.price` means the market has not opened yet -- a fresh game,
@@ -842,10 +891,11 @@ impl Game {
             format!("{name} {}{note}", figure(p))
         };
         format!(
-            "Market: {}, {}, {} Ducats each; Influence {} Ducats a point; Relief {} Ducats",
+            "Market: {}, {}, {}, {} Ducats each; Influence {} Ducats a point; Relief {} Ducats",
             price(Resource::Materials, "Materials"),
             price(Resource::Fuel, "Fuel"),
             price(Resource::Energy, "Energy"),
+            price(Resource::Fissionables, "Fissionables"),
             self.tables.ducats.per_influence,
             self.tables.unrest.relief_ducats
         )
@@ -911,7 +961,7 @@ impl Game {
         let step = self.tables.ducats.price_step_units.max(1);
         // Ticket #337 (version 0.09.0): an override whose last turn has been played is forgotten
         // here, and the band -- which never stopped moving -- is the price again from the next turn.
-        for row in 0..3 {
+        for row in 0..crate::state::MARKET_ROWS {
             if self.market.card_price[row] > 0 && self.turn >= self.market.card_price_until[row] {
                 self.market.card_price[row] = 0;
                 self.market.card_price_until[row] = 0;
@@ -922,7 +972,7 @@ impl Game {
         for s in &mut self.seats {
             s.price_cuts.retain(|c| turn < c.until);
         }
-        for row in 0..3 {
+        for row in 0..crate::state::MARKET_ROWS {
             let base = self.market_base(row);
             let mut price = self.banded_price_at(row);
             let net = self.market.net[row];
@@ -957,7 +1007,7 @@ impl Game {
     /// the good, as its Buys are; the review found a cut seat's flat Buys sold back up the price
     /// they raised, 100 bought for 200 and sold for 221.
     pub fn sale_price_after(&self, seat: Seat, resource: Resource, amount: i64, ahead: i64) -> f64 {
-        if !matches!(resource, Resource::Materials | Resource::Fuel) {
+        if !matches!(resource, Resource::Materials | Resource::Fuel | Resource::Fissionables) {
             return 0.0;
         }
         let d = &self.tables.ducats;
@@ -982,6 +1032,14 @@ impl Game {
         }
     }
 
+    /// Ticket #629 (version 0.1.0.6): the same for a nuclear hull's second tank.
+    pub fn fission_after_refuel(&self, seat: Seat, pending: &[Order], s: &Ship) -> f64 {
+        match pending.iter().position(|o| matches!(o, Order::Refuel { ship } if *ship == s.id)) {
+            Some(i) => tenth(s.fissionables + self.refuel_fission_from(s.id, self.remaining(seat, &pending[..i]).0.fissionables)),
+            None => s.fissionables,
+        }
+    }
+
     pub fn remaining(&self, seat: Seat, pending: &[Order]) -> (Stockpile, i64) {
         let mut cost = Cost::default();
         let mut bought = 0;
@@ -990,7 +1048,11 @@ impl Game {
             // pays it, not what the Stockpile held before the orders ahead of it. Ticket #593
             // (version 0.1.0.4): a trade, after the trades ahead of it.
             let c = match o {
-                Order::Refuel { ship } => Cost { fuel: self.refuel_amount_from(*ship, self.seat(seat).stockpile.fuel - cost.fuel), ..Default::default() },
+                Order::Refuel { ship } => Cost {
+                    fuel: self.refuel_amount_from(*ship, self.seat(seat).stockpile.fuel - cost.fuel),
+                    fissionables: self.refuel_fission_from(*ship, self.seat(seat).stockpile.fissionables - cost.fissionables),
+                    ..Default::default()
+                },
                 _ => self.trade_cost(seat, &pending[..i], o),
             };
             cost.add(c);
@@ -1001,7 +1063,7 @@ impl Game {
         let s = self.seat(seat).stockpile;
         // Ticket #387 (version 0.09.3): settled to the tenth, as every stockpile figure is.
         (
-            Stockpile { materials: s.materials - cost.materials, fuel: s.fuel - cost.fuel, energy: s.energy - cost.energy, ducats: s.ducats - cost.ducats }.settled(),
+            Stockpile { materials: s.materials - cost.materials, fuel: s.fuel - cost.fuel, energy: s.energy - cost.energy, ducats: s.ducats - cost.ducats, fissionables: s.fissionables - cost.fissionables }.settled(),
             self.seat(seat).allotment + bought - cost.influence,
         )
     }
@@ -1073,6 +1135,9 @@ impl Game {
         if cost.energy > left.energy {
             return fail(format!("needs {} Energy, {} left", figure(cost.energy), figure(left.energy)));
         }
+        if cost.fissionables > left.fissionables {
+            return fail(format!("needs {} Fissionables, {} left", figure(cost.fissionables), figure(left.fissionables)));
+        }
         if cost.influence > influence_left {
             return fail(format!("needs {} Influence, {} left", cost.influence, influence_left));
         }
@@ -1088,7 +1153,10 @@ impl Game {
         // Ticket #421 (version 0.09.4): a Refuel is priced at the Fuel left after the pending orders;
         // ticket #593 (version 0.1.0.4), a trade after the pending trades.
         let cost = match order {
-            Order::Refuel { ship } => Cost { fuel: self.refuel_amount_from(*ship, self.remaining(seat, pending).0.fuel), ..Default::default() },
+            Order::Refuel { ship } => {
+                let left = self.remaining(seat, pending).0;
+                Cost { fuel: self.refuel_amount_from(*ship, left.fuel), fissionables: self.refuel_fission_from(*ship, left.fissionables), ..Default::default() }
+            }
             _ => self.trade_cost(seat, pending, order),
         };
         match order {
@@ -1220,8 +1288,9 @@ impl Game {
                 if *amount <= 0 {
                     return fail("sell a positive amount");
                 }
-                if !matches!(resource, Resource::Materials | Resource::Fuel) {
-                    return fail("the window buys only Materials and Fuel");
+                // Ticket #628 (version 0.1.0.6): and Fissionables, sold as Fuel is.
+                if !matches!(resource, Resource::Materials | Resource::Fuel | Resource::Fissionables) {
+                    return fail("the window buys only Materials, Fuel and Fissionables");
                 }
                 // Ticket #339 (version 0.09.0): a lot larger than what is left is refused by the
                 // affordability check, which runs AFTER this one now and says "needs N Materials,
@@ -1263,6 +1332,70 @@ impl Game {
                     && !self.directs(seat, *place)
                 {
                     return fail("Max repeats only on a place you hold");
+                }
+                Ok(cost)
+            }
+            Order::Scrap { ship, colony } => {
+                let Some(s) = self.ship(*ship) else { return fail("no such Ship") };
+                if s.seat != seat {
+                    return fail("not your Ship");
+                }
+                if s.kind != UnitKind::ColonyShip {
+                    return fail("only a Colony Ship is scrapped");
+                }
+                if s.colonists > 0 || s.army.is_some() {
+                    return fail("only an empty Colony Ship is scrapped");
+                }
+                let Some(col) = self.colony(*colony) else { return fail("no such Colony") };
+                if col.control.director() != Some(seat) {
+                    return fail("you do not direct this Colony");
+                }
+                if s.at != ShipAt::Body(col.body) || self.ship_orbit(s) != self.colony_orbit(col) {
+                    return fail(format!("only from {}, the orbit that touches {}", self.orbit_name(col.body, self.colony_orbit(col)), self.place_name(Place::Colony(*colony))));
+                }
+                // From the review: nor a load, a refuel or a route beside it, which the hull's
+                // removal would leave paid for and dangling.
+                if pending.iter().any(|o| is_ship_action(o, *ship) || is_load(o, *ship) || matches!(o, Order::Refuel { ship: x } | Order::SetRoute { ship: x, .. } if x == ship)) {
+                    return fail("this Ship already has an order");
+                }
+                // Ticket #644 (version 0.1.0.6), from the review: not a hull whose refit is queued,
+                // whose Fissionables the scrap would throw away.
+                if self.colonies.iter().any(|c| c.queue.iter().any(|b| b.item == BuildItem::Refit(*ship))) {
+                    return fail("its refit is under way");
+                }
+                // The Habitat's own rules: a slot free, among them.
+                self.check_order_rules(seat, pending, &Order::BuildModule { colony: *colony, kind: ModuleKind::Habitat })?;
+                Ok(Cost::default())
+            }
+            Order::SetRoute { ship, route } => {
+                // Ticket #637 (version 0.1.0.6), from the review: not a hull being scrapped.
+                if pending.iter().any(|o| matches!(o, Order::Scrap { ship: x, .. } if x == ship)) {
+                    return fail("this Ship is being scrapped");
+                }
+                if pending.iter().any(|o| matches!(o, Order::SetRoute { ship: x, .. } if x == ship)) {
+                    return fail("this Ship's route is already set this turn");
+                }
+                match route {
+                    None => {
+                        if self.route_of(*ship).is_none() || self.ship(*ship).is_none_or(|s| s.seat != seat) {
+                            return fail("this Ship runs no route");
+                        }
+                    }
+                    Some(r) => {
+                        if r.ship != *ship {
+                            return fail("the route names another Ship");
+                        }
+                        let here = self.ship(*ship).and_then(|s| match s.at {
+                            ShipAt::Body(b) => Some((b, s.slot)),
+                            ShipAt::Transit { .. } => None,
+                        });
+                        if here.is_some() && here != Some((r.home, r.home_slot)) {
+                            return fail("a route starts from the orbit the Ship stands in");
+                        }
+                        if let Some(why) = self.route_refusal(seat, *ship, r.far, r.wait_window) {
+                            return fail(why);
+                        }
+                    }
                 }
                 Ok(cost)
             }
@@ -1770,7 +1903,7 @@ impl Game {
                 }
                 Ok(cost)
             }
-            Order::BuildShip { site, kind } => {
+            Order::BuildShip { site, kind, nuclear } => {
                 if !UnitKind::SHIPS.contains(kind) {
                     return fail("not a Ship");
                 }
@@ -1781,6 +1914,10 @@ impl Game {
                     && !self.has_tech(t)
                 {
                     return fail(format!("a {} needs {} first", kind.name(), self.tables.tech(t).name));
+                }
+                // Ticket #629 (version 0.1.0.6): a nuclear hull waits on Nuclear Rockets.
+                if *nuclear && !self.has_tech(TechId::NuclearRockets) {
+                    return fail(format!("a nuclear hull needs {} first", self.tables.tech(TechId::NuclearRockets).name));
                 }
                 match site {
                     // Ticket #46: Ships are built only at Shipyards, on a station or a Colony.
@@ -1963,6 +2100,12 @@ impl Game {
                 if tank < fuel {
                     return fail(format!("the tank holds {} Fuel of {}; this leg needs {}", figure(tank), figure(self.tank_of(seat, s.kind)), figure(fuel)));
                 }
+                // Ticket #629 (version 0.1.0.6): a nuclear hull pays its Fissionables as well.
+                let burn = self.leg_fissionables(s, fuel);
+                let held = self.fission_after_refuel(seat, pending, s);
+                if held < burn {
+                    return fail(format!("needs {} Fissionables aboard, {} left", figure(burn), figure(held)));
+                }
                 Ok(cost)
             }
             // Ticket #335 (version 0.09.0): an orbit change, at a Body, to an orbit of that Body
@@ -1997,6 +2140,12 @@ impl Game {
                 if tank < fuel {
                     return fail(format!("the tank holds {} Fuel; an orbit change needs {}", figure(tank), figure(fuel)));
                 }
+                // Ticket #629 (version 0.1.0.6): and a nuclear hull its Fissionables.
+                let burn = self.leg_fissionables(s, fuel);
+                let held = self.fission_after_refuel(seat, pending, s);
+                if held < burn {
+                    return fail(format!("needs {} Fissionables aboard, {} left", figure(burn), figure(held)));
+                }
                 if pending.iter().any(|o| is_ship_action(o, *ship)) {
                     return fail("this Ship already has an order");
                 }
@@ -2006,6 +2155,10 @@ impl Game {
                 let Some(s) = self.ship(*ship) else { return fail("no such Ship") };
                 if s.seat != seat {
                     return fail("not your Ship");
+                }
+                // Ticket #637 (version 0.1.0.6), from the review: not a hull being scrapped.
+                if pending.iter().any(|o| matches!(o, Order::Scrap { ship: x, .. } if x == ship)) {
+                    return fail("this Ship is being scrapped");
                 }
                 let ShipAt::Body(body) = s.at else { return fail("in transit") };
                 // Ticket #325 (version 0.08.8): or a partner's station under a Refuel Accord.
@@ -2029,11 +2182,15 @@ impl Game {
                         None => format!("every station or Refinery Colony that fuels you over {} is blockaded", self.tables.body(body).name),
                     });
                 }
-                if s.fuel >= self.tank_of(seat, s.kind) {
-                    return fail("the tank is full");
+                // Ticket #629 (version 0.1.0.6), from the review: a nuclear hull refuels while either
+                // tank wants filling, and says which good is missing.
+                let fuel_full = s.fuel >= self.tank_of(seat, s.kind);
+                let fission_full = !s.nuclear || s.fissionables >= self.fission_tank_of(seat, s.kind);
+                if fuel_full && fission_full {
+                    return fail(if s.nuclear { "both tanks are full" } else { "the tank is full" });
                 }
-                if cost.fuel <= 0.0 {
-                    return fail("no Fuel in the Stockpile to fill it with");
+                if cost.fuel <= 0.0 && cost.fissionables <= 0.0 {
+                    return fail(if fuel_full { "no Fissionables in the Stockpile to fill it with" } else { "no Fuel in the Stockpile to fill it with" });
                 }
                 // Ticket #533 (version 0.1.0.1): a refuel never uses the Ship's turn; it fills where
                 // the Ship sits, before it moves. Once a turn.
@@ -2161,6 +2318,34 @@ impl Game {
                 }
                 Ok(cost)
             }
+            Order::Refit { ship } => {
+                let Some(s) = self.ship(*ship) else { return fail("no such Ship") };
+                if s.seat != seat {
+                    return fail("not your Ship");
+                }
+                if !self.has_tech(TechId::NuclearRockets) {
+                    return fail(format!("a refit needs {} first", self.tables.tech(TechId::NuclearRockets).name));
+                }
+                // Q5: one way.
+                if s.nuclear {
+                    return fail("already nuclear");
+                }
+                if !matches!(s.at, ShipAt::Body(_)) {
+                    return fail("in transit");
+                }
+                match self.rearm_site(seat, *ship) {
+                    RearmSite::Yard(_) => {}
+                    RearmSite::NoPlace => return fail("no place of yours in this orbit to refit at"),
+                    RearmSite::NoShipyard => return fail("no working Shipyard here"),
+                }
+                if pending.iter().any(|o| is_ship_action(o, *ship)) {
+                    return fail("this Ship already has an order");
+                }
+                if self.colonies.iter().any(|c| c.queue.iter().any(|b| b.item == BuildItem::Refit(*ship))) {
+                    return fail("its refit is under way");
+                }
+                Ok(cost)
+            }
             Order::ShipStance { body, stance } => {
                 if self.ships_at(seat, *body).is_empty() {
                     return fail("no Ships of yours there");
@@ -2251,6 +2436,10 @@ impl Game {
                 let Some(s) = self.ship(*ship) else { return fail("no such Ship") };
                 if s.seat != seat {
                     return fail("not your Ship");
+                }
+                // Ticket #637 (version 0.1.0.6), from the review: not a hull being scrapped.
+                if pending.iter().any(|o| matches!(o, Order::Scrap { ship: x, .. } if x == ship)) {
+                    return fail("this Ship is being scrapped");
                 }
                 let ShipAt::Body(body) = s.at else { return fail("in transit") };
                 let card = self.tables.unit(s.kind);
@@ -2943,7 +3132,7 @@ impl Game {
             {
                 // Ticket #387 (version 0.09.3): settled, so a tenth paid from a tenth leaves a tenth.
                 let st = &mut self.seat_mut(seat).stockpile;
-                *st = Stockpile { materials: st.materials - cost.materials, fuel: st.fuel - cost.fuel, energy: st.energy - cost.energy, ducats: st.ducats - cost.ducats }.settled();
+                *st = Stockpile { materials: st.materials - cost.materials, fuel: st.fuel - cost.fuel, energy: st.energy - cost.energy, ducats: st.ducats - cost.ducats, fissionables: st.fissionables - cost.fissionables }.settled();
             }
             self.seat_mut(seat).allotment -= cost.influence;
             let turn = self.turn;
@@ -2961,18 +3150,18 @@ impl Game {
                     let done = if matches!(order, Order::BuildFacilityWithDucats { .. }) { widgets } else { 0 };
                     // Ticket #56: the build reserves the slot it will stand in, coastal or inland.
                     let coastal = self.next_slot_is_coastal(*state, kind, 0, 0).unwrap_or(false);
-                    self.state_mut(*state).queue.push(Build { item: BuildItem::Facility(kind), seat, widgets, done, coastal, fuel: 0.0 });
+                    self.state_mut(*state).queue.push(Build { nuclear: false, fissionables: 0.0, item: BuildItem::Facility(kind), seat, widgets, done, coastal, fuel: 0.0 });
                 }
                 Order::RaiseIndustry { state } => {
                     let widgets = self.industry_widgets(seat, *state);
-                    self.state_mut(*state).queue.push(Build { item: BuildItem::IndustryLevel, seat, widgets, done: 0, coastal: false, fuel: 0.0 });
+                    self.state_mut(*state).queue.push(Build { nuclear: false, fissionables: 0.0, item: BuildItem::IndustryLevel, seat, widgets, done: 0, coastal: false, fuel: 0.0 });
                 }
                 // Ticket #490 (version 0.09.9): the upgrade joins the place's queue like a Module.
                 Order::RaiseTier { colony } => {
                     if let Some(item) = self.tier_build(*colony) {
                         let widgets = self.build_widgets(seat, item);
                         if let Some(c) = self.colony_mut(*colony) {
-                            c.queue.push(Build { item, seat, widgets, done: 0, coastal: false, fuel: 0.0 });
+                            c.queue.push(Build { nuclear: false, fissionables: 0.0, item, seat, widgets, done: 0, coastal: false, fuel: 0.0 });
                         }
                     }
                 }
@@ -2984,14 +3173,14 @@ impl Game {
                     let widgets = self.build_widgets_at(seat, Place::Colony(*colony), BuildItem::Module(kind));
                     let done = if matches!(order, Order::BuildModuleWithDucats { .. }) { widgets } else { 0 };
                     if let Some(c) = self.colony_mut(*colony) {
-                        c.queue.push(Build { item: BuildItem::Module(kind), seat, widgets, done, coastal: false, fuel: 0.0 });
+                        c.queue.push(Build { nuclear: false, fissionables: 0.0, item: BuildItem::Module(kind), seat, widgets, done, coastal: false, fuel: 0.0 });
                     }
                 }
-                Order::BuildShip { site, kind } => {
+                Order::BuildShip { site, kind, nuclear } => {
                     // Ticket #590 (version 0.1.0.4): at its site's figure (a Spaceport).
                     let widgets = self.build_widgets_at(seat, *site, BuildItem::Unit(*kind));
                     // Ticket #455 (version 0.09.6): the tank's Fuel paid just above rides with the build.
-                    let b = Build { item: BuildItem::Unit(*kind), seat, widgets, done: 0, coastal: false, fuel: cost.fuel };
+                    let b = Build { item: BuildItem::Unit(*kind), seat, widgets, done: 0, coastal: false, fuel: cost.fuel, nuclear: *nuclear, fissionables: cost.fissionables };
                     match site {
                         Place::State(s) => self.state_mut(*s).queue.push(b),
                         Place::Colony(c) => {
@@ -3003,7 +3192,7 @@ impl Game {
                 }
                 Order::BuildArmy { place } => {
                     let widgets = self.build_widgets(seat, BuildItem::Unit(UnitKind::Army));
-                    let b = Build { item: BuildItem::Unit(UnitKind::Army), seat, widgets, done: 0, coastal: false, fuel: 0.0 };
+                    let b = Build { nuclear: false, fissionables: 0.0, item: BuildItem::Unit(UnitKind::Army), seat, widgets, done: 0, coastal: false, fuel: 0.0 };
                     // Ticket #334 (version 0.09.0): the people go under arms at the order, as a
                     // Pioneer's population is paid at the recruit: a Region's unit of population, a
                     // Colony's Colonist. Nobody returns when the Army dies or marches.
@@ -3058,11 +3247,19 @@ impl Game {
                 Order::Launch { ship, target } => self.pending.launches.push((seat, *ship, *target)),
                 // Ticket #343: the Warhead is a build in the yard's queue, so it takes the yard's
                 // Widgets in queue order like anything else and lands at the Resolution they reach it.
+                Order::Refit { ship } => {
+                    if let RearmSite::Yard(c) = self.rearm_site(seat, *ship) {
+                        let widgets = self.build_widgets(seat, BuildItem::Refit(*ship));
+                        if let Some(col) = self.colony_mut(c) {
+                            col.queue.push(Build { item: BuildItem::Refit(*ship), seat, widgets, done: 0, coastal: false, fuel: 0.0, nuclear: false, fissionables: cost.fissionables });
+                        }
+                    }
+                }
                 Order::Rearm { ship } => {
                     if let RearmSite::Yard(c) = self.rearm_site(seat, *ship) {
                         let widgets = self.build_widgets(seat, BuildItem::Warhead(*ship));
                         if let Some(col) = self.colony_mut(c) {
-                            col.queue.push(Build { item: BuildItem::Warhead(*ship), seat, widgets, done: 0, coastal: false, fuel: 0.0 });
+                            col.queue.push(Build { item: BuildItem::Warhead(*ship), seat, widgets, done: 0, coastal: false, fuel: 0.0, nuclear: false, fissionables: cost.fissionables });
                         }
                     }
                 }
@@ -3078,9 +3275,12 @@ impl Game {
                     // Ticket #486 (version 0.09.8): the leg from the orbit it sits in to the orbit named.
                     let (turns, fuel) = self.ship(*ship).map(|s| self.transit_leg(seat, s, from, *to, *slot)).unwrap_or_else(|| self.transit_cost_for(seat, from, *to));
                     let name = self.tables.body(*to).name.clone();
+                    // Ticket #629 (version 0.1.0.6): and a nuclear hull's Fissionables.
+                    let burn = self.ship(*ship).map(|s| self.leg_fissionables(s, fuel)).unwrap_or(0.0);
                     if let Some(s) = self.ship_mut(*ship) {
                         s.at = ShipAt::Transit { from, to: *to, turns_left: turns };
                         s.fuel = tenth((s.fuel - fuel).max(0.0));
+                        s.fissionables = tenth((s.fissionables - burn).max(0.0));
                         // Ticket #99: it arrives into the orbit the leg named. Ticket #335
                         // (version 0.09.0): a leg that names none arrives in LOW ORBIT, which is
                         // what `None` has always meant and is now drawn and named.
@@ -3107,8 +3307,10 @@ impl Game {
                         (Some(b), Some(s)) => self.orbit_change_cost(seat, b, self.ship_orbit(s), Orbit::of(*slot)),
                         _ => self.tables.orbit_change_fuel as f64,
                     };
+                    let burn = self.ship(*ship).map(|s| self.leg_fissionables(s, fuel)).unwrap_or(0.0);
                     if let Some(s) = self.ship_mut(*ship) {
                         s.fuel = tenth((s.fuel - fuel).max(0.0));
+                        s.fissionables = tenth((s.fissionables - burn).max(0.0));
                     }
                     self.pending.orbit_changes.push((seat, *ship, *slot));
                     if let Some(b) = body {
@@ -3120,8 +3322,13 @@ impl Game {
                 Order::Refuel { ship } => {
                     let amount = cost.fuel;
                     let tank = self.ship(*ship).map(|s| self.tank_of(seat, s.kind)).unwrap_or(0.0);
+                    // Ticket #629 (version 0.1.0.6): and a nuclear hull's second tank.
+                    let second = self.ship(*ship).map(|s| self.fission_tank_of(seat, s.kind)).unwrap_or(0.0);
                     if let Some(s) = self.ship_mut(*ship) {
                         s.fuel = tenth((s.fuel + amount).min(tank));
+                        if s.nuclear {
+                            s.fissionables = tenth((s.fissionables + cost.fissionables).min(second));
+                        }
                     }
                     // Ticket #325 (version 0.08.8): said when it is a partner's station, so the
                     // sweep can count it apart from a refuel at one's own. Ticket #396 (version
@@ -3148,6 +3355,11 @@ impl Game {
                 }
                 Order::ArmyStance { place, stance } => {
                     let ids = self.armies_of_seat_at(seat, *place);
+                    // Ticket #636 (version 0.1.0.6), Q2 (b): an Attack or Evade ends an inherited
+                    // Army's Hold; an ordered Hold or Dig In keeps it.
+                    if matches!(stance, Stance::Attack | Stance::Evade) {
+                        self.armies_inherited.retain(|(id, _)| !ids.contains(id));
+                    }
                     let was_dug_in = self.armies.iter().any(|a| ids.contains(&a.id) && a.stance == Stance::DigIn);
                     for a in self.armies.iter_mut().filter(|a| ids.contains(&a.id)) {
                         a.stance = *stance;
@@ -3160,6 +3372,8 @@ impl Game {
                     }
                 }
                 Order::MoveArmy { army, to } => {
+                    // Ticket #636 (Q2 b): a march ends an inherited Army's Hold.
+                    self.armies_inherited.retain(|(id, _)| id != army);
                     if let Some(a) = self.army_mut(*army) {
                         a.move_to = Some(*to);
                     }
@@ -3223,7 +3437,7 @@ impl Game {
                     // Ticket #505 (version 0.1.0.0): at the Colony's figure (Regolith Printing).
                     let widgets = self.build_widgets_at(seat, Place::Colony(*colony), BuildItem::Module(ModuleKind::Archive));
                     if let Some(c) = self.colony_mut(*colony) {
-                        c.queue.push(Build { item: BuildItem::Module(ModuleKind::Archive), seat, widgets, done: 0, coastal: false, fuel: 0.0 });
+                        c.queue.push(Build { nuclear: false, fissionables: 0.0, item: BuildItem::Module(ModuleKind::Archive), seat, widgets, done: 0, coastal: false, fuel: 0.0 });
                     }
                     let line = format!("The {} began the Archive at {}.", self.seat_name(seat), self.place_name(Place::Colony(*colony)));
                     self.log(line);
@@ -3237,6 +3451,31 @@ impl Game {
                         None => format!("The {} will place their Influence by hand again.", self.seat_name(seat)),
                     };
                     self.log(line);
+                }
+                Order::Scrap { ship, colony } => {
+                    let name = self.ship(*ship).map(|s| self.ship_name(s)).unwrap_or_default();
+                    self.ships.retain(|s| s.id != *ship);
+                    self.routes.retain(|r| r.ship != *ship);
+                    self.stranded_since.retain(|(id, _)| id != ship);
+                    if let Some(c) = self.colony_mut(*colony) {
+                        c.modules.push(Module::new(ModuleKind::Habitat));
+                    }
+                    self.war.scrapped[seat.index()] += 1;
+                    self.log(format!("{name} was scrapped into a Habitat at {}.", self.place_name(Place::Colony(*colony))));
+                }
+                Order::SetRoute { ship, route } => {
+                    self.routes.retain(|r| r.ship != *ship);
+                    let name = self.ship(*ship).map(|s| self.ship_name(s)).unwrap_or_default();
+                    match route {
+                        Some(r) => {
+                            let r = crate::route::Route::new(r.ship, r.home, r.home_slot, r.far, r.wait_window);
+                            let line = format!("{name}: {}.", self.route_text(&r));
+                            self.routes.push(r);
+                            self.war.routes_set[seat.index()] += 1;
+                            self.log(line);
+                        }
+                        None => self.log(format!("{name}: ferry route ended.")),
+                    }
                 }
                 Order::SetResearchDirective { percent } => {
                     self.seat_mut(seat).research_directive = *percent;
@@ -3275,7 +3514,7 @@ impl Game {
                     if let Some(f) = self.state_mut(*sid).facilities.get_mut(*i) {
                         f.replacing = true;
                     }
-                    self.state_mut(*sid).queue.push(Build { item: BuildItem::Replace(FacilityKind::WindFarm), seat, widgets, done: 0, coastal: false, fuel: 0.0 });
+                    self.state_mut(*sid).queue.push(Build { nuclear: false, fissionables: 0.0, item: BuildItem::Replace(FacilityKind::WindFarm), seat, widgets, done: 0, coastal: false, fuel: 0.0 });
                 }
                 // A Replace on a Module is refused by `check_change`; nothing to record.
                 Order::Change { building: BuildingRef::Module(..), what: BuildingChange::Replace } => {}
@@ -3426,7 +3665,7 @@ impl Game {
                     }
                     let per = self.emigrants_per_turn_in(seat, *state);
                     let line = format!(
-                        "The {} sounded an Exodus Call in {}: {} Pioneers a turn for {} turns, at the ordinary cost in people.",
+                        "The {} sounded an Exodus Call in {}: {} Pioneers a turn for {} turns.",
                         self.seat_name(seat),
                         self.tables.state(*state).name,
                         per,
@@ -3514,6 +3753,10 @@ impl Game {
                         self.market.net[row] += amount;
                     }
                     self.seat_mut(seat).bought_units += amount;
+                    // Ticket #643 (version 0.1.0.6): for the sweep.
+                    if *resource == Resource::Fissionables {
+                        self.war.fission_bought[seat.index()] += amount;
+                    }
                     self.log(format!("{} bought {} {} for {} Ducats.", self.seat_name(seat), amount, resource.name(), cost.ducats));
                 }
                 Order::Sell { resource, amount } => {
@@ -3521,6 +3764,9 @@ impl Game {
                         self.market.net[row] -= amount;
                     }
                     self.seat_mut(seat).sold_units += amount;
+                    if *resource == Resource::Fissionables {
+                        self.war.fission_sold[seat.index()] += amount;
+                    }
                     self.log(format!("{} sold {} {} for {} Ducats.", self.seat_name(seat), amount, resource.name(), -cost.ducats));
                 }
             }
@@ -3686,7 +3932,7 @@ impl Game {
             Order::BuildModuleWithDucats { colony, kind } => {
                 r("build_module_ducats", &[("building", kind.name().to_string()), ("colony", place(Place::Colony(*colony)))])
             }
-            Order::BuildShip { site, kind } => r("build_ship", &[("unit", kind.name().to_string()), ("place", place(*site))]),
+            Order::BuildShip { site, kind, .. } => r("build_ship", &[("unit", kind.name().to_string()), ("place", place(*site))]),
             // Ticket #334 (version 0.09.0): and the people it took.
             Order::BuildArmy { place: p } => r("build_army", &[("place", place(*p)), ("people", self.army_people_text(*p))]),
             // Ticket #332 (version 0.09.0): told before the order commits, so the index still names
@@ -3732,6 +3978,17 @@ impl Game {
                 Some(p) => r("max_on", &[("place", place(*p))]),
                 None => r("max_off", &[]),
             },
+            Order::Scrap { ship, colony } => {
+                let ship = self.ship(*ship).map(|s| self.ship_name(s)).unwrap_or_else(|| "a Colony Ship".into());
+                r("scrap", &[("ship", ship), ("colony", place(Place::Colony(*colony)))])
+            }
+            Order::SetRoute { ship, route } => {
+                let ship = self.ship(*ship).map(|s| self.ship_name(s)).unwrap_or_else(|| "a Colony Ship".into());
+                match route {
+                    Some(rt) => r("route_on", &[("ship", ship), ("colony", self.colony(rt.far).map(|c| place(Place::Colony(c.id))).unwrap_or_default())]),
+                    None => r("route_off", &[("ship", ship)]),
+                }
+            }
             Order::Repair { unit, .. } | Order::RepairWithDucats { unit, .. } => r("repair", &[("unit", unit_of(*unit))]),
             Order::Transit { ship, to, .. } => {
                 let unit = self.ship(*ship).map(|s| s.kind.name().to_string()).unwrap_or_else(|| "Ship".into());
@@ -3757,6 +4014,7 @@ impl Game {
             // Ticket #343 (version 0.09.1).
             Order::Launch { target, .. } => r("launch", &[("place", place(*target))]),
             Order::Rearm { .. } => r("rearm", &[]),
+            Order::Refit { ship } => r("refit", &[("ship", self.ship(*ship).map(|s| self.ship_name(s)).unwrap_or_else(|| "a hull".into()))]),
             Order::ShipStance { body, stance } => {
                 r("ship_stance", &[("body", self.tables.body(*body).name.clone()), ("stance", stance.name().to_string())])
             }

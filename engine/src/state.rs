@@ -20,6 +20,9 @@ pub struct Stockpile {
     pub energy: f64,
     /// Version 0.03 (ticket #35).
     pub ducats: f64,
+    /// Ticket #628 (version 0.1.0.6): a save from before holds none.
+    #[serde(default)]
+    pub fissionables: f64,
 }
 
 impl Stockpile {
@@ -31,6 +34,7 @@ impl Stockpile {
             Resource::Materials => Some(&mut self.materials),
             Resource::Fuel => Some(&mut self.fuel),
             Resource::Energy => Some(&mut self.energy),
+            Resource::Fissionables => Some(&mut self.fissionables),
             _ => None,
         }
     }
@@ -43,7 +47,7 @@ impl Stockpile {
     /// Ticket #387 (version 0.09.3): every figure settled to a tenth, the one shape a stockpile is
     /// ever stored in. A pay, a refund and an income all come through here.
     pub fn settled(self) -> Stockpile {
-        Stockpile { materials: tenth(self.materials), fuel: tenth(self.fuel), energy: tenth(self.energy), ducats: tenth(self.ducats) }
+        Stockpile { materials: tenth(self.materials), fuel: tenth(self.fuel), energy: tenth(self.energy), ducats: tenth(self.ducats), fissionables: tenth(self.fissionables) }
     }
 }
 
@@ -287,6 +291,10 @@ pub enum BuildItem {
     /// flagged `replacing` becomes this kind (the Wind Farm) at the Resolution it completes. Half the
     /// kind's Widgets; it takes no slot of its own, the Power Plant's being the one it stands in.
     Replace(FacilityKind),
+    /// Ticket #644 (version 0.1.0.6), at the designer's word: a chemical hull **refitted** as a
+    /// nuclear one at a yard of its Faction's, queued as a Warhead is; it lands on the hull wherever
+    /// it is, its second tank filled with the Fissionables paid at the order.
+    Refit(ShipId),
 }
 
 impl BuildItem {
@@ -299,6 +307,7 @@ impl BuildItem {
             BuildItem::Module(k) => k.name().to_string(),
             BuildItem::Unit(k) => k.name().to_string(),
             BuildItem::Warhead(_) => "Warhead".to_string(),
+            BuildItem::Refit(_) => "Nuclear refit".to_string(),
         }
     }
 }
@@ -325,6 +334,13 @@ pub struct Build {
     /// the field, where the Ship is filled to its tank as it always was.
     #[serde(default)]
     pub fuel: f64,
+    /// Ticket #629 (version 0.1.0.6): a Ship built as a nuclear hull.
+    #[serde(default)]
+    pub nuclear: bool,
+    /// Ticket #629: the Fissionables paid at the order -- a nuclear hull's second tank and a
+    /// Warhead's half -- which a cancel refunds; the hull is built holding its tank's share.
+    #[serde(default)]
+    pub fissionables: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -466,6 +482,11 @@ impl Date {
     }
 }
 
+/// Ticket #628 (version 0.1.0.6): what the Fissionables dice add to the game's seed, so they are dice
+/// of their own and the game's never move for them. Any fixed figure would do; this one is
+/// "FISSIONB" in ASCII.
+const FISSIONABLES_DICE: u64 = 0x4649_5353_494F_4E42;
+
 /// Ticket #57: a draw from a triangular distribution centred on 1.0 with `spread` either side, from
 /// a uniform draw in 0..1. The distribution is symmetric, so its median is its mode and half the
 /// draws fall each side; nothing ever falls outside 1 +/- spread.
@@ -488,12 +509,16 @@ pub struct SlotYields {
     pub refinery: f64,
     /// Ticket #140 (version 0.07.3): Research, for an Observatory; the Habitat yield until then.
     pub research: f64,
+    /// Ticket #628 (version 0.1.0.6): Fissionables, which a Mine makes beside its Materials; nought
+    /// at a site without them, in orbit, and in a save from before until the load draws them.
+    #[serde(default)]
+    pub fissionables: f64,
 }
 
 impl SlotYields {
     /// The Body's own figures, which a station in orbit and any slot off the table read.
     pub fn of_body(card: &crate::data::BodyCard) -> SlotYields {
-        SlotYields { mine: card.mine_yield, generator: card.generator_yield, refinery: card.refinery_yield, research: card.research_yield }
+        SlotYields { mine: card.mine_yield, generator: card.generator_yield, refinery: card.refinery_yield, research: card.research_yield, fissionables: card.fissionables_yield }
     }
 
     pub fn of_module(&self, kind: ModuleKind) -> f64 {
@@ -513,7 +538,9 @@ impl SlotYields {
 
     /// "M 1.31 G 0.68 R 1.52 H 1.44", the figures the Surface Map writes under a slot's name.
     pub fn text(&self) -> String {
-        format!("M {:.2} G {:.2} R {:.2} S {:.2}", self.mine, self.generator, self.refinery, self.research)
+        // Ticket #628 (version 0.1.0.6): and Fi where the site holds Fissionables ("F" would read as Fuel).
+        let f = if self.fissionables > 0.0 { format!(" Fi {:.2}", self.fissionables) } else { String::new() };
+        format!("M {:.2} G {:.2} R {:.2} S {:.2}{f}", self.mine, self.generator, self.refinery, self.research)
     }
 }
 
@@ -622,6 +649,14 @@ pub struct Ship {
     /// Warhead to carry and can never be given one.
     #[serde(default)]
     pub warhead: bool,
+    /// Ticket #629 (version 0.1.0.6): a **nuclear hull**, built once Nuclear Rockets stands: it alone
+    /// takes the Tech's shorter crossings, and every leg burns a tenth of its Fuel in Fissionables
+    /// from its second tank as well. False on a chemical hull and in a save from before.
+    #[serde(default)]
+    pub nuclear: bool,
+    /// Ticket #629: the second tank's Fissionables; nought on a chemical hull.
+    #[serde(default)]
+    pub fissionables: f64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -920,6 +955,9 @@ pub enum CardAnswer {
     /// Neither side of the card reaches this seat, so it was never asked: it does not hold the turn
     /// and the Report says so for it, rather than a small Faction being made to refuse.
     NothingToDecide,
+    /// Ticket #632 (version 0.1.0.6): the third answer a card may offer. Added last, so a save
+    /// written before still loads.
+    Third,
 }
 
 impl CardAnswer {
@@ -929,6 +967,7 @@ impl CardAnswer {
             CardAnswer::Taken => "took it",
             CardAnswer::Refused => "refused it",
             CardAnswer::NothingToDecide => "had nothing to decide",
+            CardAnswer::Third => "chose the third way",
         }
     }
 }
@@ -944,6 +983,11 @@ pub struct Question {
     /// pinned at the answer so the one the card named is the one held, whatever is ordered after.
     #[serde(default)]
     pub held: [Option<ShipId>; SEAT_COUNT],
+    /// Ticket #632 (version 0.1.0.6): refugees sent to the stars are lifted the moment the answer is
+    /// given, into the room there is then; this is the Launch Site, how many were lifted, how many
+    /// lost and what the Spaceport paid, for the Resolution's Unrest and Report line.
+    #[serde(default)]
+    pub stars: [Option<(StateId, u32, u32, u32)>; SEAT_COUNT],
 }
 
 impl Question {
@@ -1215,6 +1259,10 @@ pub struct SeatState {
     /// save, the way the Venture share and the Archive's funding do.
     #[serde(default)]
     pub max_standing: Option<Target>,
+    /// Ticket #631 (version 0.1.0.6): the Colonies and stations of its own a Colony Ship of the
+    /// seat's has delivered people to, so a computer seat sends the next full Ship on a route.
+    #[serde(default)]
+    pub ferried_to: Vec<ColonyId>,
     /// Ticket #51: Provisional Findings is in force this turn, because last turn's Research went to
     /// the shared Tech. True at the start of the game.
     pub provisional_findings: bool,
@@ -1318,6 +1366,35 @@ pub struct WarCounters {
     /// (the Collapse on the heading before its own win), by seat.
     #[serde(default)]
     pub collapse_weighed: [u32; SEAT_COUNT],
+    /// Ticket #629 (version 0.1.0.6): nuclear hulls built, by seat, for the sweep.
+    #[serde(default)]
+    pub nuclear_hulls_built: [u32; SEAT_COUNT],
+    /// Ticket #643 (version 0.1.0.6): Fissionables bought and sold at the market, by seat.
+    #[serde(default)]
+    pub fission_bought: [i64; SEAT_COUNT],
+    #[serde(default)]
+    pub fission_sold: [i64; SEAT_COUNT],
+    /// Ticket #631 (version 0.1.0.6): ferry routes set, Colonists ferried and deliveries, by seat.
+    #[serde(default)]
+    pub routes_set: [u32; SEAT_COUNT],
+    #[serde(default)]
+    pub ferried: [u32; SEAT_COUNT],
+    #[serde(default)]
+    pub ferry_trips: [u32; SEAT_COUNT],
+    /// Ticket #637 (version 0.1.0.6): Colony Ships scrapped into Habitats, by seat.
+    #[serde(default)]
+    pub scrapped: [u32; SEAT_COUNT],
+    /// Ticket #644 (version 0.1.0.6): chemical hulls refitted nuclear, by seat.
+    #[serde(default)]
+    pub refits: [u32; SEAT_COUNT],
+    /// Ticket #633 (version 0.1.0.6): games in which the seat had the first child born off Earth.
+    #[serde(default)]
+    pub first_born: [u32; SEAT_COUNT],
+    /// Ticket #632 (version 0.1.0.6): Refugee Convoys sent to the stars, and refugees lost, by seat.
+    #[serde(default)]
+    pub stars_sent: [u32; SEAT_COUNT],
+    #[serde(default)]
+    pub stars_lost: [u32; SEAT_COUNT],
     /// Ticket #300 (version 0.08.6): Armies landed from a Carrier at a Colony, by seat. Never
     /// counted before; the reviews measured no Army carried by anybody in eighty games.
     #[serde(default)]
@@ -1428,6 +1505,17 @@ impl WarCounters {
             self.homes_lost[i] += o.homes_lost[i];
             self.homes_taken[i] += o.homes_taken[i];
             self.collapse_weighed[i] += o.collapse_weighed[i];
+            self.nuclear_hulls_built[i] += o.nuclear_hulls_built[i];
+            self.fission_bought[i] += o.fission_bought[i];
+            self.fission_sold[i] += o.fission_sold[i];
+            self.routes_set[i] += o.routes_set[i];
+            self.ferried[i] += o.ferried[i];
+            self.ferry_trips[i] += o.ferry_trips[i];
+            self.scrapped[i] += o.scrapped[i];
+            self.refits[i] += o.refits[i];
+            self.first_born[i] += o.first_born[i];
+            self.stars_sent[i] += o.stars_sent[i];
+            self.stars_lost[i] += o.stars_lost[i];
             self.armies_landed[i] += o.armies_landed[i];
             self.interceptions[i] += o.interceptions[i];
             self.batteries_lost[i] += o.batteries_lost[i];
@@ -1689,11 +1777,14 @@ pub struct PriceCut {
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Market {
-    /// The live price of Materials, Fuel and Energy, in that order. Zero means "not opened yet" and
-    /// is read as the card figure, so a fresh game and an old save behave alike.
-    pub price: [i64; 3],
+    /// The live price of Materials, Fuel, Energy and (ticket #628, version 0.1.0.6) Fissionables, in
+    /// that order. Zero means "not opened yet" and is read as the card figure, so a fresh game and an
+    /// old save behave alike: a save from before carries three rows, and the fourth reads nought.
+    #[serde(deserialize_with = "padded")]
+    pub price: [i64; MARKET_ROWS],
     /// Net units of each bought less sold this turn, across the whole table.
-    pub net: [i64; 3],
+    #[serde(deserialize_with = "padded")]
+    pub net: [i64; MARKET_ROWS],
     /// Ticket #337 (version 0.09.0): a price a choice card has OVERRIDDEN, and the LAST TURN it
     /// stands on. Nought is no override. The override is outside the band on purpose -- a Materials
     /// price of 1 is the whole point of the Cheap Ore Offer -- and it is recorded here rather than
@@ -1703,14 +1794,49 @@ pub struct Market {
     /// The last turn rather than a countdown, because the answer lands at the Resolution of the
     /// turn it was given in, AFTER that turn's trading: a countdown decremented at the settle would
     /// spend one of its turns before any order had been priced at it.
-    #[serde(default)]
-    pub card_price: [i64; 3],
-    #[serde(default)]
-    pub card_price_until: [u32; 3],
+    #[serde(default, deserialize_with = "padded")]
+    pub card_price: [i64; MARKET_ROWS],
+    #[serde(default, deserialize_with = "padded")]
+    pub card_price_until: [u32; MARKET_ROWS],
     /// Ticket #404 (version 0.09.4): the card that set each override, so the Market line can name
     /// it. A save from before names none.
-    #[serde(default)]
-    pub card_price_by: [Option<EventId>; 3],
+    #[serde(default, deserialize_with = "padded")]
+    pub card_price_by: [Option<EventId>; MARKET_ROWS],
+}
+
+/// Ticket #628 (version 0.1.0.6): the market's rows -- Materials, Fuel, Energy and Fissionables.
+pub const MARKET_ROWS: usize = 4;
+
+/// Ticket #628: a market row array read from a save that may hold fewer rows than this build has
+/// (three, before Fissionables), the missing rows at their default. More rows than the build knows
+/// is a save from a later build, refused.
+fn padded<'de, D, T, const N: usize>(d: D) -> Result<[T; N], D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Deserialize<'de> + Default + Copy,
+{
+    // An array is written as a tuple (`(4, 2, 2)` in RON), so it is read as one, as many entries
+    // as the save holds.
+    struct Rows<T, const N: usize>(std::marker::PhantomData<T>);
+    impl<'de, T: Deserialize<'de> + Default + Copy, const N: usize> serde::de::Visitor<'de> for Rows<T, N> {
+        type Value = [T; N];
+        fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            write!(f, "at most {N} market rows")
+        }
+        fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<[T; N], A::Error> {
+            let mut out = [T::default(); N];
+            let mut n = 0;
+            while let Some(v) = seq.next_element::<T>()? {
+                if n == N {
+                    return Err(serde::de::Error::invalid_length(n + 1, &self));
+                }
+                out[n] = v;
+                n += 1;
+            }
+            Ok(out)
+        }
+    }
+    d.deserialize_tuple(N, Rows::<T, N>(std::marker::PhantomData))
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -1820,8 +1946,18 @@ pub struct Game {
     pub accords: Vec<Accord>,
     /// Ticket #495 (version 0.09.9): the Accords offered and not yet answered.
     pub offers: Vec<Offer>,
+    /// Ticket #631 (version 0.1.0.6): the Colony Ships' standing ferry routes. In the save.
+    pub routes: Vec<crate::route::Route>,
+    /// Ticket #633 (version 0.1.0.6): the first children born off Earth -- each seat first on the
+    /// turn it happened, its Colony and the turn. Empty until then. In the save.
+    pub first_born: Vec<(Seat, ColonyId, u32)>,
+    /// Ticket #637 (version 0.1.0.6): each stranded Ship and the turn it was first found so, for
+    /// the computer's scrap. Read at the end of every Resolution. In the save.
+    pub stranded_since: Vec<(ShipId, u32)>,
     /// Ticket #519 (version 0.1.0.0): Armies abroad that changed hands with their Region, and the
-    /// turn they did: a turn's grace from the rule that puts a rival's guest on Attack. In the save.
+    /// turn they did, exempt from the rule that puts a rival's guest on Attack -- for a turn then,
+    /// and since ticket #636 (version 0.1.0.6) until their holder marches, boards or orders them to
+    /// Attack or Evade. In the save.
     pub armies_inherited: Vec<(ArmyId, u32)>,
     /// Ticket #495: refusals remembered, so a refused Faction does not offer again at once.
     pub refusals: Vec<Refusal>,
@@ -1925,6 +2061,7 @@ impl Game {
             directive_last_income: 0,
             directive_remainder: 0.0,
             max_standing: None,
+            ferried_to: Vec::new(),
             provisional_findings: true,
             resettle_to: None,
             blame_emitted: 0.0,
@@ -2088,6 +2225,9 @@ impl Game {
             market: Market::default(),
             accords: Vec::new(),
             offers: Vec::new(),
+            routes: Vec::new(),
+            first_born: Vec::new(),
+            stranded_since: Vec::new(),
             armies_inherited: Vec::new(),
             refusals: Vec::new(),
             refused_trades: Vec::new(),
@@ -2319,6 +2459,18 @@ impl Game {
             + self.tech_addition_of(seat, TechId::CryogenicTanks, self.tables.tech(TechId::CryogenicTanks).tank_fuel) as f64
     }
 
+    /// Ticket #629 (version 0.1.0.6): a nuclear hull's second tank, of Fissionables: a share of its
+    /// Fuel tank (`[nuclear_hull] tank_share`, a tenth), so it grows with the Fuel tank's Techs.
+    pub fn fission_tank_of(&self, seat: Seat, kind: UnitKind) -> f64 {
+        tenth(self.tank_of(seat, kind) * self.tables.nuclear_hull.tank_share)
+    }
+
+    /// Ticket #629: the Fissionables a leg of `fuel` burns from this hull's second tank -- the same
+    /// share of the Fuel on a nuclear hull, nought on a chemical one.
+    pub fn leg_fissionables(&self, s: &Ship, fuel: f64) -> f64 {
+        if s.nuclear { tenth(fuel * self.tables.nuclear_hull.tank_share) } else { 0.0 }
+    }
+
     /// An additive Tech read for one seat: its full value once done, half rounded down under
     /// Provisional Findings, and 0 otherwise.
     pub fn tech_addition(&self, seat: Seat, t: TechId) -> i64 {
@@ -2521,7 +2673,8 @@ impl Game {
     }
 
     /// Ticket #237: the population a muster takes HERE. A Call suspends Coach Class's double
-    /// charge for as long as it runs, which is the whole point of it.
+    /// charge for as long as it runs, which is the whole point of it. Ticket #638 (version 0.1.0.6):
+    /// Coach Class charges no extra population now, so the suspension changes nothing.
     ///
     /// Measured before it was decided: the Arkwrights' home state runs 20 units to 1 over a game
     /// as it is, because Coach Class charges them twice a head, so an order that only doubled the
@@ -2537,7 +2690,7 @@ impl Game {
     }
 
     /// What one Colony Ship of this seat carries: the card figure, +2 with Expanded Habitats
-    /// (version 0.04 section 4), times the Faction's own multiplier (Coach Class's 1.5 since ticket #513, 2.0 before).
+    /// (version 0.04 section 4), times the Faction's own multiplier (Coach Class's 1.25 since ticket #638, 1.5 from ticket #513, 2.0 before).
     pub fn colony_ship_capacity(&self, seat: Seat) -> u32 {
         // Ticket #84: Generation Ships stacks on Expanded Habitats.
         let base = self.tables.unit(UnitKind::ColonyShip).carries_colonists as i64 + self.tech_addition(seat, TechId::ExpandedHabitats) + self.tech_addition(seat, TechId::GenerationShips);
@@ -2625,6 +2778,14 @@ impl Game {
         tenth(want.min(available.max(0.0)))
     }
 
+    /// Ticket #629 (version 0.1.0.6): the same for a nuclear hull's second tank, from the Fissionables
+    /// available (Q4: Refuel fills both); nought on a chemical hull.
+    pub fn refuel_fission_from(&self, ship: ShipId, available: f64) -> f64 {
+        let Some(s) = self.ship(ship).filter(|s| s.nuclear) else { return 0.0 };
+        let want = (self.fission_tank_of(s.seat, s.kind) - s.fissionables).max(0.0);
+        tenth(want.min(available.max(0.0)))
+    }
+
     /// Ticket #87: the cheapest leg a seat's Ship can fly from this Body today, in Fuel.
     pub fn cheapest_leg_from(&self, seat: Seat, body: BodyId) -> Option<f64> {
         self.cheapest_leg_from_at(seat, body, self.turn)
@@ -2647,11 +2808,15 @@ impl Game {
         // in another orbit rescues this Ship only while the tank can still pay the orbit change
         // that would reach it. A dry tank in the wrong orbit is stranded with a station in sight.
         // Ticket #396 (version 0.09.3): or a Refinery Colony under the low orbit it sits in.
-        if self.refuel_station_at(s.seat, body) && (self.depot_in_orbit(s.seat, body, self.ship_orbit(s)).is_some() || s.fuel >= self.tables.orbit_change_fuel as f64) {
+        // Ticket #629 (version 0.1.0.6), from the review: a nuclear hull's change of orbit wants its
+        // Fissionables as well.
+        let change = self.tables.orbit_change_fuel as f64;
+        if self.refuel_station_at(s.seat, body) && (self.depot_in_orbit(s.seat, body, self.ship_orbit(s)).is_some() || (s.fuel >= change && s.fissionables >= self.leg_fissionables(s, change))) {
             return false;
         }
+        // Ticket #629 (version 0.1.0.6): a nuclear hull pays its Fissionables as well, both apply.
         match self.cheapest_leg_from(s.seat, body) {
-            Some(cheapest) => s.fuel < cheapest,
+            Some(cheapest) => s.fuel < cheapest || s.fissionables < self.leg_fissionables(s, cheapest),
             None => false,
         }
     }
@@ -2667,9 +2832,12 @@ impl Game {
     pub fn arrival_leaves_stranded(&self, seat: Seat, ship: ShipId, to: BodyId, slot: Option<u32>) -> Option<f64> {
         let s = self.ship(ship)?;
         let ShipAt::Body(from) = s.at else { return None };
-        let (turns, fuel) = self.transit_cost_for(seat, from, to);
+        // Ticket #629 (version 0.1.0.6), from the review: the hull's own leg, a nuclear hull's turns,
+        // and its second tank after the leg as well.
+        let (turns, fuel) = self.transit_leg(seat, s, from, to, slot);
         let left = tenth(s.fuel - fuel);
-        if left < 0.0 {
+        let left_fission = tenth(s.fissionables - self.leg_fissionables(s, fuel));
+        if left < 0.0 || left_fission < 0.0 {
             return None;
         }
         // Ticket #396 (version 0.09.3): a Refinery Colony under low orbit is a depot too.
@@ -2678,7 +2846,7 @@ impl Game {
             return None;
         }
         let cheapest = self.cheapest_leg_from_at(seat, to, self.turn + turns)?;
-        if left < cheapest { Some(left) } else { None }
+        if left < cheapest || left_fission < self.leg_fissionables(s, cheapest) { Some(left) } else { None }
     }
 
     /// Ticket #86 (version 0.06.0): how many Colonists a Colony Ship at Earth may take beyond its
@@ -2809,7 +2977,7 @@ impl Game {
         }
     }
 
-    /// The population a lift from a Launch Site takes for this many Colonists (Coach Class's 1.5 since ticket #513, 2.0 before).
+    /// The population a lift from a Launch Site takes for this many Colonists (Coach Class's 1.5 from ticket #513, 2.0 before, and none since ticket #638).
     pub fn lift_population(&self, seat: Seat, colonists: u32) -> f64 {
         // Ticket #73: paid when the Emigrants muster, not when a Ship lifts them.
         self.tables.emigrants.population_each * colonists as f64 * self.tables.faction(self.kind(seat)).lift_population_multiplier
@@ -3092,7 +3260,12 @@ impl Game {
 
     /// Which seat an Army fights for, if any: it follows its home (spec 8.4).
     pub fn army_seat(&self, a: &Army) -> Option<Seat> {
-        match a.home {
+        self.home_seat(a.home)
+    }
+
+    /// The seat an Army raised from this home answers to.
+    pub fn home_seat(&self, home: ArmyHome) -> Option<Seat> {
+        match home {
             ArmyHome::State(s) => match self.state(s).control {
                 Control::Controlled(seat) => Some(seat),
                 _ => None,
@@ -3288,8 +3461,23 @@ impl Game {
             }
         };
         let raised_strength = if standing { 0 } else { self.raised_strength_at(place) };
-        self.armies.push(Army { id, name, home, at: ArmyAt::Place(place), damage: 0, standing, stance: Stance::Hold, escaped: false, move_to: None, levy: false, raised_strength });
+        // Ticket #635 (version 0.1.0.6), at the designer's word: a new Army joins its stack's stance,
+        // where it had stood on Hold beside a dug-in or attacking stack while the card showed the
+        // stack's. Hold only where none of its side's Armies stand.
+        let stance = self.home_seat(home).and_then(|seat| self.stack_stance(seat, place)).unwrap_or(Stance::Hold);
+        self.armies.push(Army { id, name, home, at: ArmyAt::Place(place), damage: 0, standing, stance, escaped: false, move_to: None, levy: false, raised_strength });
         id
+    }
+
+    /// Ticket #635 (Q3): the stance a seat's Armies at a place hold, as a newcomer joins it: the one
+    /// most of them hold, and on a tie the one the earliest raised of the tied holds (from the
+    /// review: not always the card's, which shows the first Army's whatever the count). Armies
+    /// standing down are no part of the stack, as the Region card reads it.
+    pub fn stack_stance(&self, seat: Seat, place: Place) -> Option<Stance> {
+        let stack: Vec<Stance> = self.armies.iter().filter(|a| a.at == ArmyAt::Place(place) && self.army_seat(a) == Some(seat) && !self.army_stands_down(a)).map(|a| a.stance).collect();
+        let count = |s: Stance| stack.iter().filter(|x| **x == s).count();
+        let most = stack.iter().map(|s| count(*s)).max()?;
+        stack.iter().copied().find(|s| count(*s) == most)
     }
 
     /// Ticket #270: what an Army is called -- its name, or for a save from before names the old form.
@@ -4685,8 +4873,44 @@ impl Game {
                     generator: draw(card.generator_yield),
                     refinery: draw(card.refinery_yield),
                     research: draw(card.research_yield),
+                    fissionables: 0.0,
                 };
                 self.slot_yields.insert((body, slot), y);
+            }
+        }
+        self.draw_fissionables();
+    }
+
+    /// Ticket #628 (version 0.1.0.6): which sites hold Fissionables and how rich each is, drawn on
+    /// dice of their own seeded from the game's seed, so the game's own dice -- every yield above and
+    /// every roll after -- fall as they did before the resource existed, and a save from before draws
+    /// the same sites on load. Every site of a Body with a figure but one marked `no_fissionables`;
+    /// where the card gives `fissionables_sites`, that many and no more, chosen at random.
+    pub fn draw_fissionables(&mut self) {
+        use rand::{Rng, SeedableRng};
+        let spread = self.tables.slot_yield_spread;
+        let mut dice = rand_chacha::ChaCha8Rng::seed_from_u64(self.seed ^ FISSIONABLES_DICE);
+        for body in BodyId::ALL {
+            let card = self.tables.body(body).clone();
+            if card.fissionables_yield <= 0.0 {
+                continue;
+            }
+            let mut sites: Vec<u32> = (0..card.colony_slots()).filter(|s| !card.slots.get(*s as usize).is_some_and(|c| c.no_fissionables)).collect();
+            if let Some([fewest, most]) = card.fissionables_sites {
+                let n = dice.random_range(fewest..=most) as usize;
+                let mut chosen = Vec::new();
+                while chosen.len() < n.min(sites.len()) {
+                    chosen.push(sites.remove(dice.random_range(0..sites.len())));
+                }
+                chosen.sort();
+                sites = chosen;
+            }
+            for slot in sites {
+                let u: f64 = dice.random_range(0.0..1.0);
+                let f = (card.fissionables_yield * triangular(u, spread) * 100.0).round() / 100.0;
+                if let Some(y) = self.slot_yields.get_mut(&(body, slot)) {
+                    y.fissionables = f;
+                }
             }
         }
     }
@@ -4701,7 +4925,8 @@ impl Game {
     /// station's Habitats take no Body yield at all (ticket #46).
     pub fn colony_yields(&self, c: &Colony) -> SlotYields {
         if c.in_orbit {
-            SlotYields::of_body(self.tables.body(c.body))
+            // Ticket #628 (version 0.1.0.6): Fissionables are in the ground; a station mines none.
+            SlotYields { fissionables: 0.0, ..SlotYields::of_body(self.tables.body(c.body)) }
         } else {
             self.slot_yields(c.body, c.slot)
         }
@@ -4759,7 +4984,7 @@ impl Game {
     /// the orbit it sits in to the orbit named: a far orbit at either end is that end, a place of
     /// its own, and not its Body.
     pub fn transit_leg(&self, seat: Seat, s: &Ship, from: BodyId, to: BodyId, slot: Option<u32>) -> (u32, f64) {
-        self.journey_cost_for_at(seat, self.port(from, self.ship_orbit(s)), self.port(to, Orbit::of(slot)), self.turn)
+        self.journey_cost_hull(seat, self.port(from, self.ship_orbit(s)), self.port(to, Orbit::of(slot)), self.turn, s.nuclear)
     }
 
     /// Ticket #480: a station's place by name -- "ISS over Earth", and a far orbit's alone,
@@ -5094,8 +5319,10 @@ impl Game {
     pub fn transit_cost_at(&self, from: BodyId, to: BodyId, turn: u32) -> (u32, f64) {
         let tech = if self.has_tech(TechId::EfficientTransit) { self.tables.tech(TechId::EfficientTransit).value } else { 1.0 };
         // Ticket #413 (version 0.09.4): Orbital Refuelling's tenth multiplies Nuclear Rockets' fifth.
+        // Ticket #629 (version 0.1.0.6): Nuclear Rockets is a nuclear hull's alone now, so the
+        // table's own quote -- the window hover, the Report's window line -- is a chemical hull's.
         let days = |t: TechId| if self.has_tech(t) { self.tables.tech(t).value } else { 1.0 };
-        let days_factor = days(TechId::NuclearRockets) * days(TechId::OrbitalRefuelling);
+        let days_factor = days(TechId::OrbitalRefuelling);
         self.transit_cost_with(from, to, 1.0, tech, days_factor, turn)
     }
 
@@ -5213,8 +5440,16 @@ impl Game {
     /// multiplier, Efficient Transit, the turns as the seat reads Nuclear Rockets, and a Mass
     /// Driver of the seat's at the Body it leaves.
     pub fn journey_cost_for_at(&self, seat: Seat, from: Port, to: Port, turn: u32) -> (u32, f64) {
+        self.journey_cost_hull(seat, from, to, turn, false)
+    }
+
+    /// Ticket #629 (version 0.1.0.6), at the designer's word: the same for a hull of a kind -- only a
+    /// NUCLEAR hull reads Nuclear Rockets' shorter crossing; a chemical one, and every quote made for
+    /// no hull in particular, flies at the old speed.
+    pub fn journey_cost_hull(&self, seat: Seat, from: Port, to: Port, turn: u32, nuclear: bool) -> (u32, f64) {
         let faction = self.tables.faction(self.kind(seat)).transit_fuel_multiplier;
-        let (turns, fuel) = self.journey_with(from, to, faction, self.tech_multiplier(seat, TechId::EfficientTransit), self.tech_multiplier(seat, TechId::NuclearRockets) * self.tech_multiplier(seat, TechId::OrbitalRefuelling), turn);
+        let rockets = if nuclear { self.tech_multiplier(seat, TechId::NuclearRockets) } else { 1.0 };
+        let (turns, fuel) = self.journey_with(from, to, faction, self.tech_multiplier(seat, TechId::EfficientTransit), rockets * self.tech_multiplier(seat, TechId::OrbitalRefuelling), turn);
         // Ticket #92 (version 0.06.0): a working Mass Driver of the seat's at the Body it leaves
         // takes Fuel off the leg, after the multipliers. Ticket #486 (version 0.09.8), at the
         // designer's word: a quarter of it, to the tenth, where it was a flat 4 with a floor of 1.
@@ -6228,6 +6463,12 @@ impl Game {
         }
         // Ticket #531 (version 0.1.0.1): nothing to a runaway leader.
         if self.ai_gang_pressure(seat, from) > 0.0 {
+            return false;
+        }
+        // Ticket #643 (version 0.1.0.6), from the review: never its own Fissionables reserve.
+        if let crate::orders::TradeGood::Goods(Resource::Fissionables, n) = get
+            && self.seat(seat).stockpile.fissionables - n as f64 + 1e-9 < self.ai_fission_reserve(seat)
+        {
             return false;
         }
         self.trade_value(give) * margin + 1e-9 >= self.trade_value(get)

@@ -81,6 +81,18 @@ first_to_body_eases = "The first Colony on {body} eased Unrest by {ease} in ever
 # Ticket #405 (version 0.09.4): the world under the Natural Sink for the first time, once a game.
 under_the_sink_eases = "First turn under the Natural Sink: Unrest eased by {ease} in every Region, {custodians} in the Custodians'."
 disembarked = "{n} disembarked into {colony}."
+# Ticket #632 (version 0.1.0.6): the Refugee Convoy sent to the stars.
+stars_lifted = "{faction} lifted {n} refugees from {state} to the stars{spaceport}."
+stars_lost = "{faction} lifted {n} refugees from {state} to the stars{spaceport}; {lost} lost, +{unrest} Unrest there."
+# Ticket #633 (version 0.1.0.6): the first child born beyond Earth orbit; {faction} is "Yours" for the player.
+first_born = "{faction}: the first child born off Earth, at {colony}. +{n} Influence."
+# Ticket #631 (version 0.1.0.6): a ferry route's delivery, its waits, each said once, and its end.
+ferried = "{ship} ferried {n} to {colony}."
+ferry_wait_nobody = "{ship} waits: nobody to carry."
+ferry_wait_room = "{ship} waits: no room at {colony}."
+ferry_wait_fuel = "{ship} waits: short of Fuel."
+ferry_wait_window = "{ship} waits for the window."
+ferry_ended = "{ship}'s ferry route ended: {place} lost."
 station_built = "{faction} built {station}."
 # Ticket #495 (version 0.09.9): an Accord answered, in the player's own section.
 accord_struck = "Accord struck with {faction}."
@@ -89,6 +101,8 @@ accord_broken = "{faction} broke their Accord with you."
 accord_you_broke = "You broke your Accord with {faction}."
 # Ticket #519 (version 0.1.0.0): an Army of a Region taken, standing away from home, now the player's.
 army_inherited = "{army}, in {place}, now answers to you, on Hold."
+# Ticket #636 (version 0.1.0.6): the reminder each later turn it stands there unordered.
+army_waits = "{army} waits on Hold in {place}."
 accord_refused = "{faction} refused your Accord."
 # Ticket #509 (version 0.1.0.0): an Accord in its last turn the other side would not renew.
 accord_let_lapse = "{faction} let your Accord lapse."
@@ -137,7 +151,8 @@ archive_destroyed = "The Archive at {place} was destroyed with its Colony; {fact
 archive_funded = "{faction} are funding the Archive: {banked} Research banked, {fund} of {cap}."
 # Ticket #235 (version 0.08.3): the other three Research Directives. Each says what was given up as
 # well as what was got, because the whole of the decision is the trade.
-exodus_call = "{faction} sounded an Exodus Call in {state}: {n} a turn for {turns}, at the usual cost."
+# Ticket #638 (version 0.1.0.6): Coach Class charges no extra population, so "at the usual cost" went.
+exodus_call = "{faction} sounded an Exodus Call in {state}: {n} a turn for {turns}."
 exodus_call_order = "sounded an Exodus Call in {state}"
 directive_sink = "{faction} directed {research} Research into the Natural Sink: +{ppm} ppm for good, now {sink} a turn."
 directive_ducats = "{faction} directed {research} Research into their coffers: {n} Ducats."
@@ -245,6 +260,8 @@ lack_busy_region = "hold no Region making Widgets"
 lack_facility = "have no {facility}"
 lack_colony_module = "have no Colony with a {module}"
 lack_colony_room = "have no room for a {module}"
+# Ticket #632 (version 0.1.0.6).
+lack_launch_site = "have no working Launch Site"
 # Ticket #259 (version 0.08.4) announced the turn the off-Earth cards join the deck; ticket #463
 # (version 0.09.7) cut the line: "we dont even have to announce they've entered play".
 # Ticket #261 (version 0.08.4): the rival's Moment, two steps. {part} is the part still short.
@@ -315,6 +332,8 @@ capital_building = "{faction} built the {building} at {place}."
 energy_short = "{faction}: Energy ran short; shut down {buildings}{sink}."
 # Ticket #575 (version 0.1.0.3): a power building whose Fuel was not there ran at a quarter.
 fuel_short = "{faction}: Fuel ran short; {buildings} ran at a quarter."
+# Ticket #630 (version 0.1.0.6): a Reactor whose Fissionables were not there ran at a quarter.
+fission_short = "{faction}: Fissionables ran short; {buildings} ran at a quarter."
 energy_zero = "{faction}: Energy at zero with every producer off."
 
 # ---------------------------------------------------------------- fragments other sentences use
@@ -445,6 +464,12 @@ directive_fuel_order = "directed its Research into propellant"
 unfund_archive = "returned its Research to the shared Tech"
 max_on = "set its whole Allotment on {place} every turn"
 max_off = "set its Influence to be placed by hand again"
+route_on = "set {ship} to ferry to {colony}"
+route_off = "ended {ship}'s ferry route"
+# Ticket #637 (version 0.1.0.6): an empty Colony Ship broken up into a Habitat.
+scrap = "scrapped {ship} into a Habitat at {colony}"
+# Ticket #644 (version 0.1.0.6): a chemical hull's nuclear refit begun.
+refit = "began refitting {ship} nuclear"
 build_emigrants = "recruited {n} in {state}"
 send_antarctica = "sent {n} from {state} to Antarctica by sea"
 lift_station = "lifted {n} from {state} to {station}"
@@ -496,6 +521,13 @@ founded = "founded {colony}"
 on = true
 text = "{faction} founded {colony}, {note}."
 figure = "{n}"
+
+# Ticket #633 (version 0.1.0.6), at the designer's word: the first child born beyond Earth orbit.
+# {faction} reads "Yours" where it is the player's.
+[moments.first_born]
+on = true
+text = "{faction}: the first child born off Earth, at {colony}."
+figure = "+{n} Influence"
 
 # Ticket #345 (version 0.09.1): the first Faction to put a Colony on the ground of a world.
 [moments.first_to_body]

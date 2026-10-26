@@ -231,3 +231,24 @@ sink_rise = 0.25
 # a carrier that has fired is out of the war for the round trip home.
 rearm_materials = 40
 rearm_widgets = 8
+# Ticket #629 (version 0.1.0.6), at the designer's word: a nuke costs half a Fissionable ("Nuclear
+# weapons now cost .5 fissionables"), at the Missile Carrier's build, which loads its first Warhead,
+# and at every Rearm.
+fissionables = 0.5
+
+# Ticket #629 (version 0.1.0.6), at the designer's word: once Nuclear Rockets stands, the yard offers a
+# NUCLEAR HULL beside the chemical one. It carries a second tank, of Fissionables, this share of its
+# Fuel tank -- so it grows as the Fuel tank's Techs grow it -- which the build pays to fill as it
+# pays the Fuel ("as with fuel the cost is the tank so that cost matches tank increases w/tech");
+# every leg burns this share of its Fuel from it as well ("both apply"), crossings and orbit changes,
+# never the Battle's charge; Refuel fills both. Only a nuclear hull takes Nuclear Rockets' x0.8.
+[nuclear_hull]
+tank_share = 0.1
+
+# Ticket #631 (version 0.1.0.6), at the designer's word: a Colony Ship's standing FERRY ROUTE. It
+# leaves home full, or with anyone aboard once it has waited `wait_turns` ("leaves when full, or
+# after waiting three turns with anyone aboard"); and when it waits for the window it leaves only
+# where the leg costs at most `window_slack` more Fuel than on the window ("at most a quarter more").
+[ferry]
+wait_turns = 3
+window_slack = 0.25

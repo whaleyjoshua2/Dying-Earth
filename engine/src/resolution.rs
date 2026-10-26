@@ -96,6 +96,14 @@ impl Game {
         for a in &mut self.armies {
             a.move_to = None;
         }
+        // Ticket #637 (version 0.1.0.6): each stranded Ship, and the turn it was first found so.
+        let stranded: Vec<ShipId> = self.ships.iter().map(|s| s.id).filter(|id| self.stranded(*id)).collect();
+        self.stranded_since.retain(|(id, _)| stranded.contains(id));
+        for id in stranded {
+            if !self.stranded_since.iter().any(|(x, _)| *x == id) {
+                self.stranded_since.push((id, self.turn));
+            }
+        }
     }
 
     /// Ticket #370 (version 0.09.2): **the player's Colonists still aboard a Ship off Earth are
@@ -527,9 +535,12 @@ impl Game {
         // guest whose Accord ended, at the designer's word. A guest under Passage stands as it is.
         // Ticket #519 (version 0.1.0.0): an Army inherited by a change of hands has a turn's grace,
         // on Hold where it stands, for its new holder to order it home, at the designer's word.
+        // Ticket #636 (version 0.1.0.6), at the designer's word: the grace lasts until its holder
+        // marches it, boards it or orders it to Attack or Evade -- tester 2's inherited Armies
+        // attacked Kazakhstan the turn the grace ran out -- and the holder is reminded each turn.
         if only_landed.is_none() {
-            let turn = self.turn;
-            self.armies_inherited.retain(|(_, t)| t + 1 >= turn);
+            self.armies_inherited.retain(|(id, _)| self.armies.iter().any(|a| a.id == *id));
+            self.remind_inherited_armies();
             let turned: Vec<ArmyId> = self
                 .armies
                 .iter()
@@ -1725,12 +1736,61 @@ impl Game {
         }
     }
 
+    /// Ticket #636 (version 0.1.0.6), Q5: each turn after the one it was inherited, a player is
+    /// reminded of every inherited Army standing on Hold in a rival's Region -- on Hold, unordered;
+    /// one its holder has dug in there was ordered so (from the review).
+    fn remind_inherited_armies(&mut self) {
+        let turn = self.turn;
+        let lines: Vec<(Seat, String)> = self
+            .armies_inherited
+            .iter()
+            .filter(|(_, t)| *t < turn)
+            .filter_map(|(id, _)| self.army(*id))
+            .filter_map(|a| {
+                let seat = self.army_seat(a)?;
+                let ArmyAt::Place(at @ Place::State(s)) = a.at else { return None };
+                if a.stance != Stance::Hold {
+                    return None;
+                }
+                let rivals = matches!(self.state(s).control, Control::Controlled(h) if h != seat && !self.accord_has(seat, h, Term::Passage));
+                (rivals && !self.seat(seat).ai).then(|| (seat, self.say("army_waits", &[("army", self.army_name(a)), ("place", self.place_name(at))])))
+            })
+            .collect();
+        for (seat, text) in lines {
+            self.report_line_of(seat, LineKind::YourWorks, LineKind::Note, None, text);
+        }
+    }
+
     /// Ticket #519 (version 0.1.0.0): a Region changed hands. Every Army of it stands on Hold where
     /// it is -- an Army abroad on Attack fought that turn in its new holder's name, unordered -- and a
     /// player who now directs it reads a line for each one away from home. At the designer's word:
     /// Hold, stay where they stand, and say so.
-    pub fn armies_change_hands(&mut self, s: StateId, new: Option<Seat>) {
+    pub fn armies_change_hands(&mut self, s: StateId, was: Option<Seat>, new: Option<Seat>) {
         let home = Place::State(s);
+        // Ticket #636 (version 0.1.0.6), Q4: the previous holder's Armies standing in the Region
+        // when it passes to another holder are stranded in a rival's Region by the change, and kept
+        // on Hold as an inherited Army is -- not a partner's under Passage, whom the old rule never
+        // turns. From the review: the previous holder's alone, so a third seat besieging the Region
+        // keeps its Attack, and an Occupation completed (held by nobody just before) strands nobody.
+        if let (Some(old), Some(holder)) = (was, new)
+            && old != holder
+            && !self.accord_has(old, holder, Term::Passage)
+        {
+            let stranded: Vec<ArmyId> = self
+                .armies
+                .iter()
+                .filter(|a| a.at == ArmyAt::Place(home) && a.home != ArmyHome::State(s) && self.army_seat(a) == Some(old))
+                .map(|a| a.id)
+                .collect();
+            for id in stranded {
+                if let Some(a) = self.army_mut(id) {
+                    a.stance = Stance::Hold;
+                    a.move_to = None;
+                }
+                self.armies_inherited.retain(|(x, _)| *x != id);
+                self.armies_inherited.push((id, self.turn));
+            }
+        }
         let mut abroad: Vec<(String, Place)> = Vec::new();
         for a in self.armies.iter_mut().filter(|a| a.home == ArmyHome::State(s)) {
             a.stance = Stance::Hold;
@@ -1768,7 +1828,7 @@ impl Game {
                 // start and nobody at the hand-over).
                 let owner = |c: Control| match c { Control::Controlled(seat) => Some(seat), _ => None };
                 if owner(was) != owner(control) {
-                    self.armies_change_hands(s, owner(control));
+                    self.armies_change_hands(s, owner(was), owner(control));
                 }
             }
             Place::Colony(c) => {
@@ -2672,6 +2732,19 @@ impl Game {
                     hull.warhead = true;
                 }
             }
+            // Ticket #644 (version 0.1.0.6), Q4: the refit lands on the hull wherever it is, its
+            // second tank filled with what the order paid; a hull lost meanwhile loses it.
+            (_, BuildItem::Refit(id)) => {
+                if let Some((seat, kind)) = self.ship(id).map(|h| (h.seat, h.kind)) {
+                    // From the review: never past the tank, as a new nuclear hull is filled.
+                    let tank = self.fission_tank_of(seat, kind);
+                    if let Some(hull) = self.ship_mut(id) {
+                        hull.nuclear = true;
+                        hull.fissionables = tenth((hull.fissionables + b.fissionables).min(tank));
+                    }
+                    self.war.refits[seat.index()] += 1;
+                }
+            }
             (_, BuildItem::Unit(UnitKind::Army)) => {
                 // Ticket #270 (version 0.08.4): raised through the one door, and named there.
                 self.raise_army(place, false);
@@ -2696,6 +2769,10 @@ impl Game {
                 // from, taking the first name no Ship on the board is using. This is the ONE place a
                 // Ship comes into a real game, so it is the one place a name is given.
                 let name = self.next_ship_name(kind);
+                // Ticket #629 (version 0.1.0.6): a nuclear hull, counted for the sweep.
+                if b.nuclear {
+                    self.war.nuclear_hulls_built[b.seat.index()] += 1;
+                }
                 if kind.is_warship() {
                     self.war.warships_built[b.seat.index()] += 1;
                 }
@@ -2729,6 +2806,15 @@ impl Game {
                     // comes empty, as it does to a Ship already flying. A build older than the
                     // record carries nought and fills as it always did.
                     fuel: if b.fuel > 0.0 { b.fuel.min(self.tank_of(b.seat, kind)) } else { self.tank_of(b.seat, kind) },
+                    // Ticket #629 (version 0.1.0.6): a nuclear hull, built holding the second tank
+                    // paid for at the order -- what was paid less a Missile Carrier's Warhead.
+                    nuclear: b.nuclear,
+                    fissionables: if b.nuclear {
+                        let warhead = if kind == UnitKind::MissileCarrier { self.tables.nuke.fissionables } else { 0.0 };
+                        tenth((b.fissionables - warhead).max(0.0).min(self.fission_tank_of(b.seat, kind)))
+                    } else {
+                        0.0
+                    },
                 });
             }
             _ => {}
@@ -3232,7 +3318,21 @@ impl Game {
                                 }
                                 let line = format!("{} Colonists disembarked into {}.", n, self.place_name(Place::Colony(cid)));
                                 self.log(line);
-                                let text = self.say("disembarked", &[("n", crate::counted(n, "Colonist", "Colonists")), ("colony", self.place_name(Place::Colony(cid)))]);
+                                // Ticket #631 (version 0.1.0.6): a routed Ship's delivery is a ferry's, named by
+                                // the Ship, and counted; and any delivery is remembered by the seat.
+                                let (people, colony) = (crate::counted(n, "Colonist", "Colonists"), self.place_name(Place::Colony(cid)));
+                                let ferry = self.ship(ship).filter(|_| n > 0 && self.route_of(ship).is_some()).map(|s| self.ship_name(s));
+                                let text = match ferry {
+                                    Some(name) => {
+                                        self.war.ferried[seat.index()] += n;
+                                        self.war.ferry_trips[seat.index()] += 1;
+                                        self.say("ferried", &[("ship", name), ("n", people), ("colony", colony)])
+                                    }
+                                    None => self.say("disembarked", &[("n", people), ("colony", colony)]),
+                                };
+                                if n > 0 && !self.seat(seat).ferried_to.contains(&cid) {
+                                    self.seat_mut(seat).ferried_to.push(cid);
+                                }
                                 self.report_line_of(seat, LineKind::YourWorks, LineKind::Ship, Some(ReportPlace::Colony(cid)), text);
                                 // Ticket #353 (version 0.09.1): the FOURTH clamp site, which the
                                 // specification did not list -- unloading into a Colony that already
@@ -3644,6 +3744,10 @@ impl Game {
                     a.at = ArmyAt::Aboard(ship);
                     a.move_to = None;
                 }
+                // Ticket #636 (Q2 b): boarding ends an inherited Army's Hold -- here, where it
+                // boards, and not at the order (from the review): a load waiting on the cargo step
+                // boards after the ground Battles, which would have put it on Attack first.
+                self.armies_inherited.retain(|(id, _)| *id != aid);
                 if let Some(s) = self.ship_mut(ship) {
                     s.army = Some(aid);
                 }

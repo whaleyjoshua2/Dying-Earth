@@ -58,7 +58,8 @@ pub struct Textures {
 /// correctly for the Regions that did not move. Ticket #482 (version 0.09.8) appended two more
 /// (Turkey, South Africa); value 16 is Kazakhstan's now.
 /// Ticket #510 (version 0.1.0.0): values 20 and 21 are Vietnam's and Argentina's.
-const MASK_STATES: [Option<StateId>; 21] = [
+/// Ticket #639 (version 0.1.0.6): 22 and 23, Canada's and Ethiopia's.
+const MASK_STATES: [Option<StateId>; 23] = [
     Some(StateId::SubSaharanAfrica),
     None,
     Some(StateId::EastAsia),
@@ -80,6 +81,8 @@ const MASK_STATES: [Option<StateId>; 21] = [
     Some(StateId::SouthAfrica),
     Some(StateId::Vietnam),
     Some(StateId::Argentina),
+    Some(StateId::Canada),
+    Some(StateId::Ethiopia),
 ];
 
 impl Textures {

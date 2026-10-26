@@ -721,14 +721,61 @@ impl Game {
         // Ticket #140 (version 0.07.3): a Habitat holds the same everywhere now, so a slot is worth
         // the same to Presence wherever it is, and the Energy that runs the Habitats decides; the
         // fourth yield is Research, which the science-first Factions read.
-        match behind {
-            Behind::Presence => y.generator,
-            Behind::First => match self.first_kind(seat) {
-                VictoryFirstKind::VentureFund => y.mine + y.refinery,
-                VictoryFirstKind::ColonistsOffEarth => y.generator,
-                VictoryFirstKind::StabilizationRun | VictoryFirstKind::ResearchProduced | VictoryFirstKind::ArchiveResearch => y.generator + y.research,
-            },
-        }
+        // Ticket #643 (version 0.1.0.6), at the designer's word: and the site's Fissionables, once
+        // something spends them, whatever the Victory.
+        let fission = self.ai_fission_worth(&y);
+        fission
+            + match behind {
+                Behind::Presence => y.generator,
+                Behind::First => match self.first_kind(seat) {
+                    VictoryFirstKind::VentureFund => y.mine + y.refinery,
+                    VictoryFirstKind::ColonistsOffEarth => y.generator,
+                    VictoryFirstKind::StabilizationRun | VictoryFirstKind::ResearchProduced | VictoryFirstKind::ArchiveResearch => y.generator + y.research,
+                },
+            }
+    }
+
+    /// Ticket #643 (version 0.1.0.6), at the designer's word (Q1): **what a site's Fissionables add to
+    /// its worth** -- the figure, at the Mine yield's weight, once Clean Power or Nuclear Rockets
+    /// stands; nought before, when nothing spends them.
+    pub fn ai_fission_worth(&self, y: &SlotYields) -> f64 {
+        if self.has_tech(TechId::CleanPower) || self.has_tech(TechId::NuclearRockets) { y.fissionables } else { 0.0 }
+    }
+
+    /// Ticket #643 (Q2, Q3): **the Fissionables a computer seat keeps in hand** -- `reactor_reserve_turns`
+    /// of its running Reactors, each of its nuclear hulls' second tanks topped up, and a Warhead's half
+    /// for each Missile Carrier that has none.
+    pub fn ai_fission_reserve(&self, seat: Seat) -> f64 {
+        let th = &self.tables.ai.thresholds;
+        let upkeep = self.tables.facility(FacilityKind::FissionReactor).fissionables_upkeep;
+        let running = self.ai_reactors(seat).iter().filter(|(_, m)| !*m).count() as f64;
+        let refills: f64 = self.ships.iter().filter(|s| s.seat == seat && s.nuclear).map(|s| (self.fission_tank_of(seat, s.kind) - s.fissionables).max(0.0)).sum();
+        let warheads = self.ships.iter().filter(|s| s.seat == seat && s.kind == UnitKind::MissileCarrier && !s.warhead).count() as f64 * self.tables.nuke.fissionables;
+        tenth(running * upkeep * th.reactor_reserve_turns + refills + warheads)
+    }
+
+    /// Ticket #643 (Q4): **what a computer seat keeps before it sells** -- `fission_keep_turns` of its
+    /// running Reactors and two tanks (a Frigate's, once Nuclear Rockets stands), over its reserve.
+    pub fn ai_fission_keep(&self, seat: Seat) -> f64 {
+        let th = &self.tables.ai.thresholds;
+        let upkeep = self.tables.facility(FacilityKind::FissionReactor).fissionables_upkeep;
+        // From the review: every Reactor standing, mothballed or not, and every one on order, so a
+        // restart or a first Reactor is never sold out from under itself.
+        let standing = self.ai_reactors(seat).len() as f64;
+        let ordered = self.states.iter().flat_map(|s| s.queue.iter()).chain(self.colonies.iter().flat_map(|c| c.queue.iter())).filter(|b| b.seat == seat && matches!(b.item, BuildItem::Facility(FacilityKind::FissionReactor) | BuildItem::Module(ModuleKind::FissionReactor))).count() as f64;
+        // From the review: and the nuclear hull's build gate -- the fill and two tanks more of the
+        // largest hull -- which "two tanks" kept short of, so the Fissionables saved for a hull were sold.
+        let tanks = if self.has_tech(TechId::NuclearRockets) { UnitKind::SHIPS.iter().map(|k| self.fission_tank_of(seat, *k)).fold(0.0, f64::max) * (1.0 + th.nuclear_hull_reserve_tanks) } else { 0.0 };
+        tenth(((standing + ordered) * upkeep * th.fission_keep_turns + tanks).max(self.ai_fission_reserve(seat)))
+    }
+
+    /// Ticket #643 (Q2): **the lift a Mine at this Colony takes for its Fissionables** -- one plus the
+    /// site's figure while the seat holds less than its reserve, and nothing otherwise, so a seat that
+    /// has enough does not dig for more.
+    pub fn ai_fission_mine_lift(&self, seat: Seat, cid: ColonyId) -> f64 {
+        let Some(col) = self.colony(cid) else { return 1.0 };
+        let site = self.colony_yields(col).fissionables;
+        if site > 0.0 && self.seat(seat).stockpile.fissionables + 1e-9 < self.ai_fission_reserve(seat) { 1.0 + site } else { 1.0 }
     }
 
     /// Ticket #82, the 0.06.0 AI sweep (ticket #94): a Module off Earth whose kind an idle Facility
@@ -900,7 +947,7 @@ impl Game {
     }
 
     /// Energy the seat's producers make in a turn, at current multipliers.
-    fn energy_production(&self, seat: Seat) -> i64 {
+    pub fn energy_production(&self, seat: Seat) -> i64 {
         let fac = self.tables.faction(self.kind(seat)).output_multiplier;
         let grids = if self.has_tech(TechId::EfficientGrids) { self.tables.tech(TechId::EfficientGrids).value } else { 1.0 };
         let mut e = 0.0;
@@ -924,6 +971,13 @@ impl Game {
                 if m.kind == ModuleKind::Generator {
                     // Ticket #57: the Colony's slot makes the Energy, not the Body's average.
                     e += (5.0 * self.colony_yields(col).generator * fac * grids).floor();
+                }
+                // Ticket #630 (version 0.1.0.6), from the review: a Reactor Module's card figure, no
+                // site yield; uncounted, a seat of Reactors read itself short of power for ever.
+                if m.kind == ModuleKind::FissionReactor
+                    && let Some(p) = &self.tables.module(m.kind).produces
+                {
+                    e += (p.amount * fac * grids).floor();
                 }
             }
         }
@@ -1083,7 +1137,7 @@ impl Game {
             Order::BuildFacility { state, kind } => Some((Place::State(*state), BuildItem::Facility(*kind))),
             Order::RaiseIndustry { state } => Some((Place::State(*state), BuildItem::IndustryLevel)),
             Order::BuildModule { colony, kind } => Some((Place::Colony(*colony), BuildItem::Module(*kind))),
-            Order::BuildShip { site, kind } => Some((*site, BuildItem::Unit(*kind))),
+            Order::BuildShip { site, kind, .. } => Some((*site, BuildItem::Unit(*kind))),
             Order::BuildArmy { place } => Some((*place, BuildItem::Unit(UnitKind::Army))),
             _ => None,
         }
@@ -1264,6 +1318,71 @@ impl Game {
     /// has made its first Victory part so far** -- this turn plus the rest of the bar over that rate.
     /// None with nothing made yet, and None for a Stabilization run, which is no race against the
     /// Collapse: its win is the cure.
+    /// Ticket #629 (version 0.1.0.6), at the designer's word: **whether a computer seat builds this
+    /// Ship as a nuclear hull** -- once Nuclear Rockets stands, when its Stockpile holds the second
+    /// tank's fill and `nuclear_hull_reserve_tanks` tanks more, two crossings' worth. A chemical hull
+    /// otherwise. It is taught to chase Fissionables on its own ticket (#643).
+    /// Ticket #630 (version 0.1.0.6), at the designer's word: **whether a computer seat can keep a
+    /// Reactor fed** -- Clean Power standing, and its Stockpile holding `reactor_reserve_turns` turns
+    /// of a Reactor's upkeep. While it can, a Reactor takes the Power Plant's place on its build list
+    /// (and the Reactor Module the Generator's); while it cannot, no Reactor is offered.
+    pub fn ai_feeds_reactors(&self, seat: Seat) -> bool {
+        let upkeep = self.tables.facility(FacilityKind::FissionReactor).fissionables_upkeep;
+        self.has_tech(TechId::CleanPower) && self.seat(seat).stockpile.fissionables + 1e-9 >= upkeep * self.tables.ai.thresholds.reactor_reserve_turns
+    }
+
+    /// Ticket #630, from the review: the seat's Reactors, Facilities and Modules, each with whether
+    /// it is mothballed.
+    fn ai_reactors(&self, seat: Seat) -> Vec<(BuildingRef, bool)> {
+        let mut out = Vec::new();
+        for sid in self.directed_states(seat) {
+            for (i, f) in self.state(sid).facilities.iter().enumerate() {
+                if f.kind == FacilityKind::FissionReactor {
+                    out.push((BuildingRef::Facility(sid, i), f.mothballed));
+                }
+            }
+        }
+        for cid in self.directed_colonies(seat) {
+            if let Some(c) = self.colony(cid) {
+                for (i, m) in c.modules.iter().enumerate() {
+                    if m.kind == ModuleKind::FissionReactor {
+                        out.push((BuildingRef::Module(cid, i), m.mothballed));
+                    }
+                }
+            }
+        }
+        out
+    }
+
+    /// Ticket #630, from the review: **how many running Reactors this seat cannot feed this Income**,
+    /// the Stockpile over a Reactor's upkeep, whole -- those and no more are mothballed.
+    pub fn ai_reactors_to_mothball(&self, seat: Seat) -> usize {
+        let upkeep = self.tables.facility(FacilityKind::FissionReactor).fissionables_upkeep;
+        let running = self.ai_reactors(seat).iter().filter(|(_, m)| !*m).count();
+        if upkeep <= 0.0 {
+            return 0;
+        }
+        let fed = ((self.seat(seat).stockpile.fissionables + 1e-9) / upkeep).floor() as usize;
+        running.saturating_sub(fed)
+    }
+
+    /// Ticket #630, from the review: **whether an idle Reactor may be restarted** -- once the Stockpile
+    /// holds the reserve's turns for every running Reactor and this one, so a restart is never undone
+    /// by the next Income.
+    pub fn ai_may_restart_reactor(&self, seat: Seat) -> bool {
+        let upkeep = self.tables.facility(FacilityKind::FissionReactor).fissionables_upkeep;
+        let running = self.ai_reactors(seat).iter().filter(|(_, m)| !*m).count() as f64;
+        self.has_tech(TechId::CleanPower) && self.seat(seat).stockpile.fissionables + 1e-9 >= upkeep * self.tables.ai.thresholds.reactor_reserve_turns * (running + 1.0)
+    }
+
+    pub fn ai_builds_nuclear(&self, seat: Seat, kind: UnitKind) -> bool {
+        if !self.has_tech(TechId::NuclearRockets) || !UnitKind::SHIPS.contains(&kind) {
+            return false;
+        }
+        let fill = self.fission_tank_of(seat, kind);
+        fill > 0.0 && self.seat(seat).stockpile.fissionables + 1e-9 >= fill * (1.0 + self.tables.ai.thresholds.nuclear_hull_reserve_tanks)
+    }
+
     pub fn ai_win_turn(&self, seat: Seat) -> Option<u32> {
         if self.first_kind(seat) == VictoryFirstKind::StabilizationRun || self.turn == 0 {
             return None;
@@ -1304,7 +1423,7 @@ impl Game {
                 let card = self.tables.facility(*kind);
                 if emits(*kind) {
                     th.collapse_emit_weight
-                } else if card.sink_per_turn > 0.0 || *kind == FacilityKind::WindFarm {
+                } else if card.sink_per_turn > 0.0 || matches!(kind, FacilityKind::WindFarm | FacilityKind::FissionReactor) {
                     th.collapse_clean_weight
                 } else {
                     1.0
@@ -1508,7 +1627,8 @@ impl Game {
         // computer's first Moon landing came at median turn 15 to 32 against the human's 6 to 10;
         // a race for any unclaimed Body sent the first Ships past the Moon (see `best_body_for`).
         let moon_race = {
-            let has_colony_ship = self.ships.iter().any(|s| s.seat == seat && s.kind == UnitKind::ColonyShip) || self.queues_of(seat).any(|b| b.item == BuildItem::Unit(UnitKind::ColonyShip));
+            // Ticket #631 (version 0.1.0.6), from the review: a Colony Ship on a ferry route is busy.
+            let has_colony_ship = self.ships.iter().any(|s| s.seat == seat && s.kind == UnitKind::ColonyShip && self.route_of(s.id).is_none()) || self.queues_of(seat).any(|b| b.item == BuildItem::Unit(UnitKind::ColonyShip));
             let unclaimed = self.first_at(BodyId::Moon).is_none() && !self.free_slots_on(BodyId::Moon).is_empty();
             if !has_colony_ship && unclaimed { th.moon_race_weight } else { 1.0 }
         };
@@ -1517,7 +1637,7 @@ impl Game {
         // Mars, or on order, is the seat's runner already.
         let mars_race = {
             // The review: one flying home to Earth is the runner too, a turn from free.
-            let runner = self.ships.iter().any(|s| s.seat == seat && s.kind == UnitKind::ColonyShip && !matches!(s.at, ShipAt::Transit { to, .. } if to != BodyId::Mars && to != BodyId::Earth))
+            let runner = self.ships.iter().any(|s| s.seat == seat && s.kind == UnitKind::ColonyShip && self.route_of(s.id).is_none() && !matches!(s.at, ShipAt::Transit { to, .. } if to != BodyId::Mars && to != BodyId::Earth))
                 || self.queues_of(seat).any(|b| b.item == BuildItem::Unit(UnitKind::ColonyShip));
             if self.mars_race_open() && !runner { th.mars_race_weight.max(1.0) } else { 1.0 }
         };
@@ -1527,6 +1647,7 @@ impl Game {
         // trades the Power Plant's figure for the Wind Farm's.
         let energy_of = |k: FacilityKind| self.tables.facility(k).produces.as_ref().filter(|p| p.resource == Resource::Energy).map_or(0.0, |p| p.amount);
         let generator = self.tables.module(ModuleKind::Generator).produces.as_ref().map_or(0.0, |p| p.amount);
+        let reactor_module = self.tables.module(ModuleKind::FissionReactor).produces.as_ref().map_or(0.0, |p| p.amount);
         let queued_power: i64 = (self
             .states
             .iter()
@@ -1538,7 +1659,9 @@ impl Game {
                 _ => 0.0,
             })
             .sum::<f64>()
-            + self.colonies.iter().flat_map(|c| c.queue.iter()).filter(|b| b.seat == seat && b.item == BuildItem::Module(ModuleKind::Generator)).count() as f64 * generator)
+            + self.colonies.iter().flat_map(|c| c.queue.iter()).filter(|b| b.seat == seat && b.item == BuildItem::Module(ModuleKind::Generator)).count() as f64 * generator
+            // Ticket #630 (version 0.1.0.6), from the review: and a Reactor Module on order.
+            + self.colonies.iter().flat_map(|c| c.queue.iter()).filter(|b| b.seat == seat && b.item == BuildItem::Module(ModuleKind::FissionReactor)).count() as f64 * reactor_module)
             .floor() as i64;
         let energy_short = self.energy_production(seat) + queued_power < self.total_upkeep(seat) + 2;
         // Bootstrap needs: a producer of one of these counts as advancing whatever the seat is behind on.
@@ -1729,7 +1852,8 @@ impl Game {
             // counts as advancing whichever part the Faction is behind on.
             // Ticket #426 (version 0.09.5): and the Archivists' Reactor, which is a Power Plant
             // everywhere -- a Faction building carries its base building's reasons to be built.
-            let energy_producer = cat == Cat::Producer && matches!(item, Some("Power Plant") | Some("Reactor") | Some("Generator"));
+            // Ticket #630 (version 0.1.0.6): the Accumulator by its new name, and the Reactor.
+            let energy_producer = cat == Cat::Producer && matches!(item, Some("Power Plant") | Some("Accumulator") | Some("Reactor") | Some("Generator"));
             if energy_producer && needs.contains(&Resource::Energy) {
                 return gap;
             }
@@ -1803,10 +1927,28 @@ impl Game {
                     // is wanted and the Wind Farm's 3 is not. The Archivists' first Reactor is still a
                     // Reactor -- its clause is the upkeep cut, which no Wind Farm gives -- and a second
                     // is an ordinary power station, so it gives way as the Power Plant does.
+                    // Ticket #630 (version 0.1.0.6): the Reactor, while the seat can keep it fed, in
+                    // the Power Plant's and the Wind Farm's place; never otherwise. The Archivists'
+                    // first Accumulator keeps its own reason, the upkeep cut.
+                    let feeds = self.ai_feeds_reactors(seat);
+                    if job == FacilityKind::FissionReactor && !feeds {
+                        continue;
+                    }
+                    if feeds && job == FacilityKind::WindFarm {
+                        continue;
+                    }
+                    if feeds && job == FacilityKind::PowerPlant {
+                        let first_accumulator = fk == FacilityKind::Accumulator
+                            && !self.directed_states(seat).iter().any(|s| self.state(*s).facilities.iter().any(|f| f.kind == FacilityKind::Accumulator))
+                            && !self.states.iter().flat_map(|s| s.queue.iter()).any(|b| b.seat == seat && b.item == BuildItem::Facility(FacilityKind::Accumulator));
+                        if !first_accumulator {
+                            continue;
+                        }
+                    }
                     if job == FacilityKind::PowerPlant && self.has_tech(TechId::CleanPower) && !tight {
-                        let first_reactor = fk == FacilityKind::Reactor
-                            && !self.directed_states(seat).iter().any(|s| self.state(*s).facilities.iter().any(|f| f.kind == FacilityKind::Reactor))
-                            && !self.states.iter().flat_map(|s| s.queue.iter()).any(|b| b.seat == seat && b.item == BuildItem::Facility(FacilityKind::Reactor));
+                        let first_reactor = fk == FacilityKind::Accumulator
+                            && !self.directed_states(seat).iter().any(|s| self.state(*s).facilities.iter().any(|f| f.kind == FacilityKind::Accumulator))
+                            && !self.states.iter().flat_map(|s| s.queue.iter()).any(|b| b.seat == seat && b.item == BuildItem::Facility(FacilityKind::Accumulator));
                         if !first_reactor {
                             continue;
                         }
@@ -1818,7 +1960,7 @@ impl Game {
                         // Ticket #332 (version 0.09.0): the Mine is a producer as the Factory was;
                         // the Factory, making Widgets now, keeps its arm behind the queue test above.
                         // Ticket #559 (version 0.1.0.3): and the Wind Farm, an Energy producer.
-                        FacilityKind::Factory | FacilityKind::Mine | FacilityKind::PowerPlant | FacilityKind::WindFarm | FacilityKind::Refinery | FacilityKind::Bank => (Cat::Producer, self.base_weight(seat, Cat::Producer)),
+                        FacilityKind::Factory | FacilityKind::Mine | FacilityKind::PowerPlant | FacilityKind::WindFarm | FacilityKind::FissionReactor | FacilityKind::Refinery | FacilityKind::Bank => (Cat::Producer, self.base_weight(seat, Cat::Producer)),
                         FacilityKind::ResearchLab => (Cat::ResearchLab, self.base_weight(seat, Cat::ResearchLab)),
                         // Ticket #185 (version 0.08.0): the School is a Research building in all but
                         // name, so it is weighed as one. Ticket #416 (version 0.09.4): every Region
@@ -1865,7 +2007,7 @@ impl Game {
                         // the Scrubber rather than here among the slot-takers.
                         FacilityKind::SeaWall => continue,
                         // Unreachable: every Unique Facility was mapped to its common job above.
-                        FacilityKind::InvestmentBank | FacilityKind::Spaceport | FacilityKind::Reactor | FacilityKind::Academy => continue,
+                        FacilityKind::InvestmentBank | FacilityKind::Spaceport | FacilityKind::Accumulator | FacilityKind::Academy => continue,
                     };
                     // Ticket #181: a slight bias toward a seat's own Unique Facility over the common
                     // counterpart -- the designer's words, and deliberately small, because ticket #41
@@ -2078,6 +2220,12 @@ impl Game {
                     continue;
                 }
                 let module_job = mk.common().unwrap_or(mk);
+                // Ticket #630 (version 0.1.0.6): the Reactor Module in the Generator's and the Wind
+                // Farm's place while the seat can keep it fed; never otherwise.
+                let feeds = self.ai_feeds_reactors(seat);
+                if (module_job == ModuleKind::FissionReactor && !feeds) || (feeds && matches!(module_job, ModuleKind::Generator | ModuleKind::WindFarm)) {
+                    continue;
+                }
                 // Ticket #332 (version 0.09.0): a Factory Module speeds the Colony's whole queue.
                 let mut speeds_the_queue = false;
                 let (cat, mut base) = match module_job {
@@ -2204,9 +2352,13 @@ impl Game {
                             let plain = (with - self.tables.mass_driver.mine_bonus as f64).max(1.0);
                             w *= with / plain;
                         }
+                        // Ticket #643 (version 0.1.0.6): the site's Fissionables, while short.
+                        w *= self.ai_fission_mine_lift(seat, cid);
                         (Cat::Producer, w)
                     }
                     ModuleKind::Generator | ModuleKind::Refinery => (Cat::Producer, self.base_weight(seat, Cat::Producer) * self.production_moved_boost(seat, &col, mk)),
+                    // Ticket #630 (version 0.1.0.6).
+                    ModuleKind::FissionReactor => (Cat::Producer, self.base_weight(seat, Cat::Producer)),
                     // Ticket #232 (version 0.08.3): the Relay has the same disease the Mine had and
                     // worse -- a flat weight reading nothing about what a Relay produces, and ONE
                     // Relay built in forty games. Relay Networks would have changed the computer's
@@ -2234,7 +2386,8 @@ impl Game {
                     // Colony, where the ferry lands and the uploads draw. Measured: no eligible Colony
                     // ever held more than the Core's four, so a ferry had nowhere to land them.
                     ModuleKind::Habitat if ferry_lift && archive_body == Some(col.body) && self.may_hold_archive(&col) => (Cat::Habitat, self.base_weight(seat, Cat::Habitat) * homeless_bonus),
-                    ModuleKind::Habitat => (Cat::Habitat, self.base_weight(seat, Cat::Habitat)),
+                    // Ticket #633 (version 0.1.0.6): the Arkwrights' chase of the first birth off Earth.
+                    ModuleKind::Habitat => (Cat::Habitat, self.base_weight(seat, Cat::Habitat) * self.ai_first_birth_chase(seat, cid)),
                     ModuleKind::Shipyard => {
                         if col.modules.iter().any(|m| m.kind == ModuleKind::Shipyard) {
                             continue;
@@ -2441,7 +2594,7 @@ impl Game {
                 };
                 // Ticket #421 (version 0.09.4): a Colony Ship short of the Fuel its tank takes buys
                 // the rest at the market in the same breath, at the Ship's weight.
-                let build = Order::BuildShip { site: Place::Colony(cid), kind: uk };
+                let build = Order::BuildShip { site: Place::Colony(cid), kind: uk, nuclear: self.ai_builds_nuclear(seat, uk) };
                 // Ticket #455 (version 0.09.6): every Ship, a warship included, where the Colony Ship alone
                 // was planned for and a warship short of its tank was refused for want of Fuel.
                 let orders = match self.ai_fuel_top_up(seat, self.tank_of(seat, uk) + self.fuel_reserve(seat)) {
@@ -3021,17 +3174,30 @@ impl Game {
         {
             let th = &self.tables.ai.thresholds;
             let s = self.seat(seat).stockpile;
-            let goods = [(Resource::Materials, s.materials), (Resource::Fuel, s.fuel), (Resource::Energy, s.energy), (Resource::Ducats, s.ducats)];
+            // Ticket #643 (version 0.1.0.6), at the designer's word (Q5): and Fissionables, short only
+            // below the seat's own reserve -- a fixed figure would find every seat's few short -- and
+            // asked as that shortfall; first among the short, since they power and arm.
+            let fission_reserve = self.ai_fission_reserve(seat);
+            let goods = [(Resource::Materials, s.materials), (Resource::Fuel, s.fuel), (Resource::Energy, s.energy), (Resource::Ducats, s.ducats), (Resource::Fissionables, s.fissionables)];
             let price = |r: Resource| if r == Resource::Ducats { 1.0 } else { self.trade_price(r).unwrap_or(1) as f64 };
-            let short = goods.iter().filter(|(r, n)| *r != Resource::Ducats && *n < th.trade_short).min_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal)).map(|(r, _)| *r);
-            let long = goods.iter().filter(|(r, n)| Some(*r) != short && n * price(*r) > th.trade_long).max_by(|a, b| (a.1 * price(a.0)).partial_cmp(&(b.1 * price(b.0))).unwrap_or(std::cmp::Ordering::Equal)).map(|(r, _)| *r);
+            // From the review: a Trade asks for them only where the head-of-turn Buy cannot pay
+            // for one, so the same shortfall is never bought twice, and only where no other good is
+            // short, so a seat that cannot pay does not crowd out every other Trade.
+            let one = Order::Buy { resource: Resource::Fissionables, amount: 1 };
+            let fission_short = s.fissionables + 1e-9 < fission_reserve && self.order_cost(seat, &one).ducats > s.ducats;
+            let other_short = goods.iter().filter(|(r, n)| !matches!(r, Resource::Ducats | Resource::Fissionables) && *n < th.trade_short).min_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal)).map(|(r, _)| *r);
+            let short = other_short.or(fission_short.then_some(Resource::Fissionables));
+            // From the review: Fissionables offered only from beyond the keep.
+            let fission_spare = (s.fissionables - self.ai_fission_keep(seat)).max(0.0);
+            let goods_long = goods.map(|(r, n)| if r == Resource::Fissionables { (r, fission_spare) } else { (r, n) });
+            let long = goods_long.iter().filter(|(r, n)| Some(*r) != short && n * price(*r) > th.trade_long).max_by(|a, b| (a.1 * price(a.0)).partial_cmp(&(b.1 * price(b.0))).unwrap_or(std::cmp::Ordering::Equal)).map(|(r, _)| *r);
             let partner = Seat::ALL
                 .into_iter()
                 .filter(|o| *o != seat && !self.hostile(seat, *o) && !self.offer_waits(seat, *o) && !self.refused_recently(seat, *o) && self.ai_gang_pressure(seat, *o) == 0.0)
                 .filter(|o| !matches!((short, long), (Some(s), Some(l)) if self.trade_refused_before(seat, *o, l, s)))
                 .max_by_key(|o| self.relations_score(seat, *o));
             if let (Some(short), Some(long), Some(other)) = (short, long, partner) {
-                let ask = th.trade_ask;
+                let ask = if short == Resource::Fissionables { (fission_reserve - s.fissionables).ceil().max(1.0) as u32 } else { th.trade_ask };
                 let give = ((ask as f64 * price(short)) / price(long)).ceil() as u32;
                 let (give, get) = (crate::orders::TradeGood::Goods(long, give.max(1)), crate::orders::TradeGood::Goods(short, ask));
                 if self.holds_good(seat, give).is_ok() {
@@ -3196,9 +3362,33 @@ impl Game {
                     }
                 }
             }
+            // Ticket #630 (version 0.1.0.6), at the designer's word: a Reactor short of Fissionables --
+            // the Stockpile below what every online Reactor burns this Income -- is mothballed, so it
+            // stops costing its Ducats for a quarter's Energy; restarted below once the seat can feed it.
+            let is_reactor = |b: &BuildingRef| match b {
+                BuildingRef::Facility(sid, i) => self.state(*sid).facilities.get(*i).is_some_and(|f| f.kind == FacilityKind::FissionReactor),
+                BuildingRef::Module(cid, i) => self.colony(*cid).and_then(|c| c.modules.get(*i)).is_some_and(|m| m.kind == ModuleKind::FissionReactor),
+            };
+            // From the review: the ones it cannot feed and no more.
+            let unfed = self.ai_reactors_to_mothball(seat);
+            if unfed > 0 {
+                for (b, name, _, _, _) in standing.iter().filter(|(b, _, moth, _, _)| !*moth && is_reactor(b)).take(unfed) {
+                    push(
+                        vec![Order::Change { building: *b, what: BuildingChange::Mothball }],
+                        Cat::Mothball,
+                        self.base_weight(seat, Cat::Mothball),
+                        1.0,
+                        1.0,
+                        1.0,
+                        format!("mothball the {} at {} (short of Fissionables)", name, self.place_name(b.place())),
+                        None,
+                    );
+                }
+            }
             // Restart once Energy is back above two turns of upkeep; otherwise scrap it for half.
             let restart_ok = self.seat(seat).stockpile.energy > 2.0 * self.total_upkeep(seat) as f64;
-            for (b, name, mothballed, _, _) in standing.iter().filter(|(_, _, moth, _, _)| *moth) {
+            let feeds = self.ai_may_restart_reactor(seat);
+            for (b, name, mothballed, _, _) in standing.iter().filter(|(b, _, moth, _, _)| *moth && (feeds || !is_reactor(b))) {
                 // Ticket #82: not a Facility whose idleness is doubling a Module off Earth.
                 if let BuildingRef::Facility(sid, i) = b
                     && self.state(*sid).facilities.get(*i).map(|f| in_use.contains(&job(f.kind))).unwrap_or(false)
@@ -3403,7 +3593,8 @@ impl Game {
         }
 
         // --- Ships: load, unload, found, transit
-        let ships: Vec<Ship> = self.ships.iter().filter(|s| s.seat == seat && matches!(s.at, ShipAt::Body(_)) && !s.arrived_this_turn).cloned().collect();
+        // Ticket #631 (version 0.1.0.6): a Ship on a ferry route is the route's, not the planner's.
+        let ships: Vec<Ship> = self.ships.iter().filter(|s| s.seat == seat && matches!(s.at, ShipAt::Body(_)) && !s.arrived_this_turn && self.route_of(s.id).is_none()).cloned().collect();
         for s in &ships {
             let ShipAt::Body(body) = s.at else { continue };
             let card = self.tables.unit(s.kind);
@@ -3437,7 +3628,9 @@ impl Game {
             let top_up = self.ai_fuel_top_up(seat, self.tank_of(seat, s.kind) - s.fuel + fuel_reserve);
             // Ticket #533 (version 0.1.0.1): a refuel never uses the Ship's turn, so a ready Missile
             // Carrier fills its tank beside its Launch; only the orbit change below still waits on it.
-            if s.fuel < self.tank_of(seat, s.kind) && self.refuelling_station(seat, body, orbit) {
+            // Ticket #629 (version 0.1.0.6): a nuclear hull short in its second tank refuels too.
+            let wants_fission = s.nuclear && s.fissionables < self.fission_tank_of(seat, s.kind) && self.seat(seat).stockpile.fissionables > 0.0;
+            if (s.fuel < self.tank_of(seat, s.kind) || wants_fission) && self.refuelling_station(seat, body, orbit) {
                 let note = format!("refuel {} at {} ({} of {} in the tank)", ship_name, self.orbit_name(body, orbit), figure(s.fuel), figure(self.tank_of(seat, s.kind)));
                 if let Some(buy) = top_up {
                     push(vec![buy, Order::Refuel { ship: s.id }], Cat::Transit, self.base_weight(seat, Cat::Transit), gap_for(Cat::Transit, None), 1.0, 1.0, format!("{note}, buying the rest"), None);
@@ -3466,7 +3659,9 @@ impl Game {
                 // very turn the carrier fired, and the Launch failed with the orbit given up.
                 let on_the_lane = s.kind.is_warship() && orbit.is_low() && self.ai_wants_the_ground(seat, body) && self.ai_low_orbit_garrison(seat, body).contains(&s.id);
                 let can_fight = s.fuel >= self.tables.melee.battle_fuel as f64;
-                if s.fuel < self.tank_of(seat, s.kind) && self.seat(seat).stockpile.fuel > 0.0 && !self.refuelling_station(seat, body, orbit) && !(on_the_lane && can_fight) && !ready_to_fire {
+                // Ticket #629 (version 0.1.0.6), from the review: a nuclear hull short in its second
+                // tank goes to a depot too.
+                if ((s.fuel < self.tank_of(seat, s.kind) && self.seat(seat).stockpile.fuel > 0.0) || wants_fission) && !self.refuelling_station(seat, body, orbit) && !(on_the_lane && can_fight) && !ready_to_fire {
                     // Ticket #396 (version 0.09.3): a Refinery Colony's depot is its low orbit.
                     for c in self.colonies.iter().filter(|c| c.body == body && self.fuels_for(c, seat)) {
                         wants.push((self.colony_orbit(c), format!("to refuel at {}", self.place_name(Place::Colony(c.id))), Cat::Transit, self.base_weight(seat, Cat::Transit)));
@@ -3659,6 +3854,8 @@ impl Game {
                             let (weight, gap) = if over_earth { (self.base_weight(seat, Cat::LoadUnload) * 0.5, 1.0) } else { (self.base_weight(seat, Cat::LoadUnload), gap_for(Cat::LoadUnload, None)) };
                             // Ticket #514 (version 0.1.0.0): a landing at the Capital candidate, chased or not.
                             let weight = if capital_candidate == Some(c.id) { weight * capital_chase } else { weight };
+                            // Ticket #633 (version 0.1.0.6): and the Arkwrights' chase of the first birth off Earth.
+                            let weight = weight * self.ai_first_birth_chase(seat, c.id);
                             push(vec![Order::Unload { ship: s.id, colonists: n, army: false, into: UnloadTarget::Colony(c.id) }], Cat::LoadUnload, weight, gap, 1.0, opp, format!("disembark {} Colonists into {}", n, self.place_name(Place::Colony(c.id))), None);
                         }
                     }
@@ -4155,6 +4352,58 @@ impl Game {
         let mut chosen: Vec<Order> = Vec::new();
         let mut stacks_done: Vec<String> = Vec::new();
         let mut lines: Vec<String> = Vec::new();
+        // Ticket #643 (version 0.1.0.6), at the designer's word (Q3): the Fissionables the reserve is
+        // short are bought FIRST, when the Ducats allow, since they power and arm what the turn's
+        // spending stands on; left to the end of the turn the Ducats were already spent.
+        let reserve_f = self.ai_fission_reserve(seat);
+        let held_f = self.seat(seat).stockpile.fissionables;
+        if held_f + 1e-9 < reserve_f {
+            // From the review: as many of the shortfall as the Ducats allow, not all or nothing.
+            let mut short = (reserve_f - held_f).ceil() as i64;
+            while short > 0 && self.trade_cost(seat, &chosen, &Order::Buy { resource: Resource::Fissionables, amount: short }).ducats > self.remaining(seat, &chosen).0.ducats {
+                short -= 1;
+            }
+            let buy = Order::Buy { resource: Resource::Fissionables, amount: short };
+            if short > 0 && self.check_order(seat, &chosen, &buy).is_ok() {
+                lines.push(format!("  take          buy {short} Fissionables for the reserve ({reserve_f:.1})"));
+                chosen.push(buy);
+            }
+        }
+        // Ticket #631 (version 0.1.0.6), at the designer's word (Q15): its ferry routes run next,
+        // each turn's step placed as a player's is; a route whose far end has had no room for
+        // `ferry_idle_turns` turns is ended, and the Ship goes back to the planner next turn.
+        let routes: Vec<crate::route::Route> = self.routes.iter().filter(|r| self.ship(r.ship).is_some_and(|s| s.seat == seat)).cloned().collect();
+        for r in routes {
+            if r.idle >= self.tables.ai.thresholds.ferry_idle_turns {
+                let end = Order::SetRoute { ship: r.ship, route: None };
+                if self.check_order(seat, &chosen, &end).is_ok() {
+                    lines.push(format!("  take          end the ferry route of {}", self.ship(r.ship).map(|s| self.ship_name(s)).unwrap_or_default()));
+                    chosen.push(end);
+                }
+                continue;
+            }
+            for o in self.route_step_with(seat, &r, &chosen).orders {
+                if self.check_order(seat, &chosen, &o).is_ok() {
+                    chosen.push(o);
+                }
+            }
+        }
+        // Ticket #637 (version 0.1.0.6), at the designer's word (Q7): an empty Colony Ship stranded
+        // `scrap_stranded_turns` turns or more over a Colony of its own is scrapped into a Habitat,
+        // at the first of those Colonies with room.
+        let stranded: Vec<ShipId> = self
+            .stranded_since
+            .iter()
+            .filter(|(id, since)| self.turn >= since + self.tables.ai.thresholds.scrap_stranded_turns && self.ship(*id).is_some_and(|s| s.seat == seat))
+            .map(|(id, _)| *id)
+            .collect();
+        for ship in stranded {
+            let colonies: Vec<ColonyId> = self.colonies.iter().filter(|c| c.control.director() == Some(seat)).map(|c| c.id).collect();
+            if let Some(scrap) = colonies.into_iter().map(|colony| Order::Scrap { ship, colony }).find(|o| self.check_order(seat, &chosen, o).is_ok()) {
+                lines.push(format!("  take          scrap {} into a Habitat", self.ship(ship).map(|s| self.ship_name(s)).unwrap_or_default()));
+                chosen.push(scrap);
+            }
+        }
         // Saving: once a legal, higher-scored action is out of reach now but within four more turns
         // of Materials income, Materials are held for it rather than spent on lower-scored actions
         // (ticket #56: one turn let a Factory bought every turn starve the Colony Ship for good).
@@ -4279,6 +4528,26 @@ impl Game {
                 stacks_done.push(key);
             }
         }
+        // Ticket #644 (version 0.1.0.6), at the designer's word (Q6): a chemical hull standing at a
+        // yard of its own, with no order this turn, is refitted nuclear where the seat could build
+        // nuclear -- the second tank's fill and `nuclear_hull_reserve_tanks` more in Fissionables,
+        // read after the turn's other spending. From the review: after the candidates, so a move
+        // the planner wanted goes first; and never a hull on a ferry route or given a load, a
+        // refuel or a route this turn.
+        let hulls: Vec<ShipId> = self.ships.iter().filter(|s| s.seat == seat && !s.nuclear && !s.escaped && UnitKind::SHIPS.contains(&s.kind) && !self.routes.iter().any(|r| r.ship == s.id)).map(|s| s.id).collect();
+        for ship in hulls {
+            let Some(kind) = self.ship(ship).map(|s| s.kind) else { continue };
+            if chosen.iter().any(|o| crate::orders::is_load(o, ship) || matches!(o, Order::Refuel { ship: x } | Order::SetRoute { ship: x, .. } if *x == ship)) {
+                continue;
+            }
+            let fill = self.fission_tank_of(seat, kind);
+            let left = self.seat(seat).stockpile.fissionables - chosen.iter().map(|o| self.order_cost(seat, o).fissionables).sum::<f64>();
+            let refit = Order::Refit { ship };
+            if self.has_tech(TechId::NuclearRockets) && fill > 0.0 && left + 1e-9 >= fill * (1.0 + self.tables.ai.thresholds.nuclear_hull_reserve_tanks) && self.check_order(seat, &chosen, &refit).is_ok() {
+                lines.push(format!("  take          refit {} nuclear", self.ship(ship).map(|s| self.ship_name(s)).unwrap_or_default()));
+                chosen.push(refit);
+            }
+        }
         // Ticket #268 (version 0.08.4): the computer Custodians' carbon-credit offer, a standing
         // figure re-set whenever it should move. They offer their whole credit while their own share
         // of the table's Blame is under the fair quarter, and withdraw the offer when it is not --
@@ -4357,6 +4626,29 @@ impl Game {
                     chosen.push(sell);
                 }
             }
+            // Ticket #643 (version 0.1.0.6), at the designer's word: the Fissionables the reserve is
+            // short are bought when the Ducats allow (Q3); what stands beyond the keep is sold (Q4).
+            // The buy went at the head of the turn; the sale waits for the turn's end.
+            let left = self.remaining(seat, &chosen).0;
+            let bought_fission = chosen.iter().any(|o| matches!(o, Order::Buy { resource: Resource::Fissionables, .. }));
+            // From the review: never below the band's midpoint, as Materials and Fuel are sold, and
+            // never the units a Trade offered this turn.
+            let offered: f64 = chosen.iter().filter_map(|o| match o {
+                Order::ProposeTrade { give: crate::orders::TradeGood::Goods(Resource::Fissionables, n), .. } => Some(*n as f64),
+                _ => None,
+            }).sum();
+            let fission_row = Game::market_row(Resource::Fissionables).unwrap_or(3);
+            if !bought_fission && self.market_price_at(fission_row) >= self.market_base(fission_row) {
+                let keep = self.ai_fission_keep(seat) + offered;
+                let surplus = (left.fissionables - keep).floor() as i64;
+                if surplus > 0 {
+                    let sell = Order::Sell { resource: Resource::Fissionables, amount: surplus };
+                    if self.check_order(seat, &chosen, &sell).is_ok() {
+                        lines.push(format!("  take          sell {surplus} Fissionables, beyond {keep:.1} kept"));
+                        chosen.push(sell);
+                    }
+                }
+            }
         }
         if first_kind == VictoryFirstKind::VentureFund {
             let v = self.tables.venture.clone();
@@ -4413,9 +4705,54 @@ impl Game {
             }
         }
         self.war.contests[seat.index()] += contested.len() as u32;
+        // Ticket #631 (version 0.1.0.6), at the designer's word (Q15): a full Colony Ship sent to a
+        // place of its own it has delivered to before goes on a route there, waiting for windows.
+        for (i, o) in self.ai_routes_to_set(seat, &chosen).into_iter().rev() {
+            chosen.insert(i, o);
+        }
         // Ticket #58: the scored list is the AI's own head, so it stays in the log. What the Report
         // shows is built from the orders this seat actually commits, in `end_turn`.
         chosen
+    }
+
+    /// Ticket #633 (version 0.1.0.6), at the designer's word: **the computer Arkwrights chase the
+    /// first child born off Earth** -- until somebody has it, a Habitat at, and a landing into, a
+    /// Colony of theirs beyond Earth orbit weighs `first_birth_chase`; nothing otherwise.
+    pub fn ai_first_birth_chase(&self, seat: Seat, colony: ColonyId) -> f64 {
+        // From the review: a Colony of the seat's own, not left to the callers' filters.
+        let beyond = self.colony(colony).is_some_and(|c| c.control.director() == Some(seat) && self.off_earth(c) && !self.in_earth_orbit(c));
+        if self.kind(seat) == FactionKind::Arkwrights && self.first_born.is_empty() && beyond { self.tables.ai.thresholds.first_birth_chase } else { 1.0 }
+    }
+
+    /// Ticket #631 (Q15): the routes a computer seat sets from its chosen orders, each with the
+    /// place in the list it goes, before the Ship's flight: a Colony Ship of its own with no route,
+    /// leaving full for a Body where a Colony or station of its own it has delivered to before has
+    /// room and stands in the orbit the flight names. Founding stays with the planner.
+    pub fn ai_routes_to_set(&self, seat: Seat, chosen: &[Order]) -> Vec<(usize, Order)> {
+        let mut out = Vec::new();
+        for (i, o) in chosen.iter().enumerate() {
+            let Order::Transit { ship, to, slot } = o else { continue };
+            let Some(s) = self.ship(*ship).filter(|s| s.seat == seat && s.kind == UnitKind::ColonyShip && self.route_of(s.id).is_none()) else { continue };
+            let ShipAt::Body(body) = s.at else { continue };
+            let loading: u32 = chosen.iter().filter_map(|o| match o {
+                Order::Load { ship: x, colonists, .. } if x == ship => Some(*colonists),
+                _ => None,
+            }).sum();
+            if s.colonists + loading < self.colony_ship_capacity(seat) {
+                continue;
+            }
+            // From the review: low orbit touches every ground Colony on the Body and every free slot,
+            // so while a slot is free the flight may be a founding, and founding is the planner's.
+            let far = self.seat(seat).ferried_to.iter().filter_map(|c| self.colony(*c)).find(|c| {
+                c.body == *to && self.colony_orbit(c) == Orbit::of(*slot) && c.control.director() == Some(seat) && self.habitat_room(c) > c.colonists && (c.in_orbit || self.free_slots_on(c.body).is_empty())
+            });
+            let Some(far) = far else { continue };
+            if self.route_refusal(seat, s.id, far.id, true).is_some() {
+                continue;
+            }
+            out.push((i, Order::SetRoute { ship: s.id, route: Some(crate::route::Route::new(s.id, body, s.slot, far.id, true)) }));
+        }
+        out
     }
 
     /// Ticket #517 (version 0.1.0.0): the Faction this seat holds non-aggression with that this order

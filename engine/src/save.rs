@@ -39,7 +39,7 @@ use std::sync::Arc;
 /// Ticket #510 (version 0.1.0.0): moved to **12**. Two Regions joined the board (Vietnam,
 /// Argentina), and `Game.states` is indexed by `StateId`: a save of eighteen rows would index out
 /// of range on the nineteenth.
-pub const SAVE_VERSION: u32 = 12;
+pub const SAVE_VERSION: u32 = 13;
 
 /// The rules version this executable plays, named beside the file's own in a refusal.
 ///
@@ -166,7 +166,7 @@ pub const SAVE_VERSION: u32 = 12;
 /// every field the version added to the save (the Energy by place, #609; a Battle party's unit
 /// names, #614; the contest, home and Collapse counters, #618 to #620) reads a default from an
 /// older file, so a 0.1.0.4 save and those before it to 0.1.0.0 load.
-pub const GAME_VERSION: &str = "0.1.0.5";
+pub const GAME_VERSION: &str = "0.1.0.6";
 
 /// The game autosaves at the start of the Report phase of every third turn.
 pub const AUTOSAVE_EVERY: u32 = 3;
@@ -266,12 +266,22 @@ pub struct SavedGame {
     /// Ticket #495 (version 0.09.9): the offers waiting on an answer, and refusals remembered.
     #[serde(default)]
     pub offers: Vec<crate::state::Offer>,
+    /// Ticket #631 (version 0.1.0.6): the ferry routes.
+    #[serde(default)]
+    pub routes: Vec<crate::route::Route>,
+    /// Ticket #633 (version 0.1.0.6): the first children born off Earth.
+    #[serde(default)]
+    pub first_born: Vec<(Seat, ColonyId, u32)>,
+    /// Ticket #637 (version 0.1.0.6): each stranded Ship and the turn it was first found so.
+    #[serde(default)]
+    pub stranded_since: Vec<(ShipId, u32)>,
     #[serde(default)]
     pub refusals: Vec<crate::state::Refusal>,
     /// Ticket #572 (version 0.1.0.3): the last Trade refused per pair, by its goods.
     #[serde(default)]
     pub refused_trades: Vec<crate::state::RefusedTrade>,
-    /// Ticket #519 (version 0.1.0.0): Armies inherited abroad, and the turn, for their turn's grace.
+    /// Ticket #519 (version 0.1.0.0): Armies inherited abroad, and the turn they were; exempt from
+    /// the guest's Attack until ordered since ticket #636 (version 0.1.0.6).
     #[serde(default)]
     pub armies_inherited: Vec<(ArmyId, u32)>,
     /// Ticket #272 (version 0.08.4): the sweep's count of Events drawn with nowhere to land.
@@ -363,6 +373,9 @@ impl SavedGame {
             market,
             accords,
             offers,
+            routes,
+            first_born,
+            stranded_since,
             refusals,
             refused_trades,
             armies_inherited,
@@ -407,6 +420,9 @@ impl SavedGame {
             market: market.clone(),
             accords: accords.clone(),
             offers: offers.clone(),
+            routes: routes.clone(),
+            first_born: first_born.clone(),
+            stranded_since: stranded_since.clone(),
             refusals: refusals.clone(),
             refused_trades: refused_trades.clone(),
             armies_inherited: armies_inherited.clone(),
@@ -425,7 +441,11 @@ impl SavedGame {
 
     /// The saved state against the tables on disk.
     pub fn into_game(self, tables: Arc<Tables>) -> Game {
-        Game {
+        // Ticket #628 (version 0.1.0.6): a save from before Fissionables holds none in any slot; the
+        // load draws the sites its seed would have drawn, on their own dice, so the game's own dice
+        // are untouched and a fresh game of the same seed agrees with it.
+        let before_fissionables = !self.slot_yields.values().any(|y| y.fissionables > 0.0);
+        let mut game = Game {
             tables,
             seed: self.seed,
             rng: self.rng,
@@ -463,6 +483,9 @@ impl SavedGame {
             market: self.market,
             accords: self.accords,
             offers: self.offers,
+            routes: self.routes,
+            first_born: self.first_born,
+            stranded_since: self.stranded_since,
             refusals: self.refusals,
             refused_trades: self.refused_trades,
             armies_inherited: self.armies_inherited,
@@ -474,7 +497,11 @@ impl SavedGame {
             log: self.log,
             reveal_all: false,
             waiting_last: Vec::new(),
+        };
+        if before_fissionables {
+            game.draw_fissionables();
         }
+        game
     }
 }
 

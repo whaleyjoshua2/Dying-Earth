@@ -19,6 +19,7 @@
 use dying_earth_engine::data::{default_data_dir, CardEffect, CardThing, Tables};
 use dying_earth_engine::ids::*;
 use dying_earth_engine::orders::{BuildingRef, LoadSource, Order, UnitRef, UnloadTarget};
+use dying_earth_engine::route::Route;
 use dying_earth_engine::save::{self, SaveKind};
 use dying_earth_engine::state::*;
 use std::path::{Path, PathBuf};
@@ -109,7 +110,14 @@ fn pick_named<T: Copy + std::fmt::Debug>(list: &[T], word: &str, name: impl Fn(T
     }
 }
 
-const RESOURCES: [Resource; 5] = [Resource::Materials, Resource::Fuel, Resource::Energy, Resource::Research, Resource::Ducats];
+// Ticket #628 (version 0.1.0.6): and Fissionables, bought, sold and traded.
+const RESOURCES: [Resource; 6] = [Resource::Materials, Resource::Fuel, Resource::Energy, Resource::Research, Resource::Ducats, Resource::Fissionables];
+
+/// Ticket #628, from the review: a resource by name, a lone `f` still the Fuel it meant before
+/// Fissionables shared its letter.
+fn resource(word: &str) -> Result<Resource, String> {
+    if norm(word) == "f" { Ok(Resource::Fuel) } else { pick(&RESOURCES, word) }
+}
 // Ticket #278 (version 0.08.5) and ticket #297 (version 0.08.6): a Blockade is a STANCE a Ship
 // stack is given, and Dig In is an Army's. The driver offered neither, so seat 0 could not give a
 // Blockade at all -- the very move ticket #335 handed the player an orbit to give it from.
@@ -431,7 +439,7 @@ const GRAMMAR: &str = r#"ORDER LINES (one per line; `#` starts a comment; blank 
   build facility-ducats <state> <facility>
   build module <colony> <module>       e.g. build module iss habitat
   build module-ducats <colony> <module>
-  build ship <colony> <ship>           at a Colony or station of yours with a WORKING SHIPYARD:
+  build ship <colony> <ship> [nuclear] at a Colony or station of yours with a WORKING SHIPYARD:
                                        never in a Nation State, whatever its Launch
                                        Site. The new Ship starts in the orbit of the yard that built
                                        it -- a station's own orbit, or low orbit for a ground Colony.
@@ -484,6 +492,14 @@ const GRAMMAR: &str = r#"ORDER LINES (one per line; `#` starts a comment; blank 
                                        another station's ring, refuels at nothing until it moves.
                                        FREE OF THE SHIP'S TURN: give the refuel first
                                        and the transit after it, in one turn; it fills before it goes.
+  route <ship> <colony> [now]          a Colony Ship's standing FERRY ROUTE from the orbit it stands in
+                                       to a Colony or station of yours: it loads, flies, unloads and
+                                       comes back, refuelling at each end that is a depot, and waits
+                                       for each leg's window unless `now`. Its step is placed for you
+                                       each turn after your own lines, which stand first.
+                                       `route <ship> off` ends it.
+  scrap <ship> [colony]                an empty Colony Ship broken up into a free Habitat at your
+                                       Colony below (the colony named, else the first with room)
   load <ship> <n> from <place> [army <army>]
                                        FREE OF THE SHIP'S TURN: a load
                                        off any place, Region, Colony or station, stands beside the
@@ -533,14 +549,17 @@ const GRAMMAR: &str = r#"ORDER LINES (one per line; `#` starts a comment; blank 
   rearm <ship>                         load another Warhead, at a Colony or station of yours with a
                                        working Shipyard, in that place's own orbit. It is a build
                                        in that yard's queue: Materials now, Widgets over the turns.
+  refit <ship>                         refit a chemical hull nuclear, once Nuclear Rockets stands, at
+                                       the same kind of yard: the second tank's Fissionables now, a
+                                       quarter of the hull's Widgets in the queue. One way.
 
   influence <place> <amount> [break]   `break` means it, where the spend would break an Accord
   buy-influence <amount>
   max <place>                          repeat next turn's WHOLE Allotment on one place you hold,
   max off                              turn after turn until it is switched off. Free, and it
                                        spends nothing by itself.
-  buy <resource> <amount>              materials|fuel|energy
-  sell <resource> <amount>             materials|fuel
+  buy <resource> <amount>              materials|fuel|energy|fissionables
+  sell <resource> <amount>             materials|fuel|fissionables
 
 CAMPAIGNS AND CARBON CREDITS -- the Blame ledger the Influence thresholds read (`show` prints it)
 
@@ -583,7 +602,7 @@ DIPLOMACY (`show` prints Relations both ways and every Accord standing)
                                        warns of that turn ("ends after this turn"). Let it run out
                                        while they would have renewed, and they count it a refusal:
                                        no offer from them for {refusedturns}.
-  trade <faction> <give> for <ask>     one thing for one thing: `<n> ducats|materials|fuel|energy`
+  trade <faction> <give> for <ask>     one thing for one thing: `<n> ducats|materials|fuel|energy|fissionables`
                                        or a Colony; answered at the head of their next turn, the
                                        goods moving only if both still hold them.
   trade accept|refuse <faction>        answer a Trade a Faction offered you.
@@ -645,8 +664,7 @@ RESEARCH, THE ARCHIVE AND THE FACTION ORDERS
                                        Unrest rise for good
   exodus-call <state>                  the Arkwrights only, on a Region they control, once per Region
                                        EVER, for {exodus} Ducats: while it runs it doubles what they may
-                                       recruit there and suspends Coach Class's double population
-                                       charge.
+                                       recruit there.
 
 A FACTION is named by its own name, shortened as far as it stays unique (`ark` is the Arkwrights),
 or by its seat number. `show` prints both beside every Faction.
@@ -697,8 +715,9 @@ fn grammar(t: Option<&Tables>) -> String {
 enum Line {
     Order(Box<Order>),
     Tech(TechId),
-    /// Ticket #337: this seat's answer to the turn's Choice Card -- taken, or refused.
-    Answer(bool),
+    /// Ticket #337: this seat's answer to the turn's Choice Card -- taken, or refused; ticket #632,
+    /// or the third way.
+    Answer(CardAnswer),
     /// Ticket #495 (version 0.09.9): this seat's answer to the Accord a Faction offered it; ticket
     /// #496, or the Trade (`true` in the last field).
     Offer(Seat, bool, bool),
@@ -734,9 +753,11 @@ fn parse_line(g: &Game, line: &str) -> Result<Line, String> {
         "answer" => {
             let side = at(1)?.to_ascii_lowercase();
             return match side.as_str() {
-                "take" => Ok(Line::Answer(true)),
-                "refuse" => Ok(Line::Answer(false)),
-                _ => Err(format!("`answer` wants `take` or `refuse`, not {side:?}")),
+                "take" => Ok(Line::Answer(CardAnswer::Taken)),
+                "refuse" => Ok(Line::Answer(CardAnswer::Refused)),
+                // Ticket #632 (version 0.1.0.6): a card's third way.
+                "third" => Ok(Line::Answer(CardAnswer::Third)),
+                _ => Err(format!("`answer` wants `take`, `refuse` or `third`, not {side:?}")),
             };
         }
         "build" => {
@@ -746,7 +767,8 @@ fn parse_line(g: &Game, line: &str) -> Result<Line, String> {
                 "facility-ducats" => Order::BuildFacilityWithDucats { state: pick_state(at(2)?)?, kind: pick(&FacilityKind::ALL, at(3)?)? },
                 "module" => Order::BuildModule { colony: colony_id(g, at(2)?)?, kind: pick(&ModuleKind::BUILDABLE, at(3)?)? },
                 "module-ducats" => Order::BuildModuleWithDucats { colony: colony_id(g, at(2)?)?, kind: pick(&ModuleKind::BUILDABLE, at(3)?)? },
-                "ship" => Order::BuildShip { site: place(g, at(2)?)?, kind: pick(&UnitKind::SHIPS, at(3)?)? },
+                // Ticket #629 (version 0.1.0.6): `nuclear` after the kind, a nuclear hull.
+                "ship" => Order::BuildShip { nuclear: at(4).is_ok_and(|w| w.eq_ignore_ascii_case("nuclear")), site: place(g, at(2)?)?, kind: pick(&UnitKind::SHIPS, at(3)?)? },
                 "army" => Order::BuildArmy { place: place(g, at(2)?)? },
                 // Ticket #571 (version 0.1.0.3), from the review: the ring by name or colony id
                 // too, as every order that takes an orbit.
@@ -801,6 +823,37 @@ fn parse_line(g: &Game, line: &str) -> Result<Line, String> {
             Order::ChangeOrbit { ship, slot: orbit_arg(g, body, at(2)?)? }
         }
         "refuel" => Order::Refuel { ship: ship_id(g, at(1)?)? },
+        // Ticket #631 (version 0.1.0.6): the ferry route, from the orbit the Ship stands in.
+        "route" => {
+            let ship = ship_id(g, at(1)?)?;
+            let word = at(2)?;
+            if word.eq_ignore_ascii_case("off") {
+                Order::SetRoute { ship, route: None }
+            } else {
+                let far = colony_id(g, word)?;
+                let s = g.ship(ship).ok_or("no such Ship")?;
+                let ShipAt::Body(home) = s.at else { return Err(format!("{} is in transit", g.ship_called(ship))) };
+                Order::SetRoute { ship, route: Some(Route::new(ship, home, s.slot, far, !at(3).is_ok_and(|w| w.eq_ignore_ascii_case("now")))) }
+            }
+        }
+        // Ticket #637 (version 0.1.0.6): an empty Colony Ship broken up into a Habitat at the Colony
+        // named, or at the first of the player's the orbit touches that has room.
+        "scrap" => {
+            let ship = ship_id(g, at(1)?)?;
+            match at(2) {
+                Ok(word) => Order::Scrap { ship, colony: colony_id(g, word)? },
+                Err(_) => {
+                    let orders: Vec<Order> = g.colonies.iter().filter(|c| c.control.director() == Some(Seat(0))).map(|c| Order::Scrap { ship, colony: c.id }).collect();
+                    match orders.iter().find(|o| g.check_order(Seat(0), &[], o).is_ok()) {
+                        Some(o) => o.clone(),
+                        None => return Err(match orders.first().map(|o| g.check_order(Seat(0), &[], o)) {
+                            Some(Err(e)) => e.0,
+                            _ => "no Colony of yours to scrap into".to_string(),
+                        }),
+                    }
+                }
+            }
+        }
         // Ticket #328 (version 0.08.8), and ticket #335 (version 0.09.0) for the orbit: the
         // Battleship acts in the orbit it sits in, so the line names no orbit of its own.
         "bombard" => Order::Bombard { ship: ship_id(g, at(1)?)?, colony: colony_id(g, at(2)?)? },
@@ -808,6 +861,8 @@ fn parse_line(g: &Game, line: &str) -> Result<Line, String> {
         // another at a yard of its own. Both act in the orbit the hull sits in.
         "launch" => Order::Launch { ship: ship_id(g, at(1)?)?, target: place(g, at(2)?)? },
         "rearm" => Order::Rearm { ship: ship_id(g, at(1)?)? },
+        // Ticket #644 (version 0.1.0.6): a chemical hull refitted nuclear at a yard in its orbit.
+        "refit" => Order::Refit { ship: ship_id(g, at(1)?)? },
         "load" => {
             let ship = ship_id(g, at(1)?)?;
             let colonists = count(at(2)?)?;
@@ -896,8 +951,8 @@ fn parse_line(g: &Game, line: &str) -> Result<Line, String> {
             if counter {
                 let amount = |words: &[&str]| -> Result<(Resource, u32), String> {
                     match words {
-                        [n, r] => Ok((pick(&[Resource::Ducats, Resource::Materials, Resource::Fuel, Resource::Energy], r)?, count(n)?)),
-                        _ => Err("each side of a counter is `<n> <ducats|materials|fuel|energy>`".into()),
+                        [n, r] => Ok((pick(&[Resource::Ducats, Resource::Materials, Resource::Fuel, Resource::Energy, Resource::Fissionables], r)?, count(n)?)),
+                        _ => Err("each side of a counter is `<n> <ducats|materials|fuel|energy|fissionables>`".into()),
                     }
                 };
                 return Ok(Line::Counter(to, amount(&rest[..split])?, amount(&rest[split + 1..])?));
@@ -905,11 +960,11 @@ fn parse_line(g: &Game, line: &str) -> Result<Line, String> {
             let good = |words: &[&str]| -> Result<dying_earth_engine::TradeGood, String> {
                 match words {
                     [n, r] => {
-                        let r = pick(&[Resource::Ducats, Resource::Materials, Resource::Fuel, Resource::Energy], r)?;
+                        let r = pick(&[Resource::Ducats, Resource::Materials, Resource::Fuel, Resource::Energy, Resource::Fissionables], r)?;
                         Ok(dying_earth_engine::TradeGood::Goods(r, count(n)?))
                     }
                     [c] => Ok(dying_earth_engine::TradeGood::Place(colony_id(g, c)?)),
-                    _ => Err("each side is `<n> <ducats|materials|fuel|energy>` or a Colony".into()),
+                    _ => Err("each side is `<n> <ducats|materials|fuel|energy|fissionables>` or a Colony".into()),
                 }
             };
             Order::ProposeTrade { to, give: good(&rest[..split])?, get: good(&rest[split + 1..])? }
@@ -924,8 +979,8 @@ fn parse_line(g: &Game, line: &str) -> Result<Line, String> {
             };
             Order::Tribute { to, materials }
         }
-        "buy" => Order::Buy { resource: pick(&RESOURCES, at(1)?)?, amount: number(at(2)?)? },
-        "sell" => Order::Sell { resource: pick(&RESOURCES, at(1)?)?, amount: number(at(2)?)? },
+        "buy" => Order::Buy { resource: resource(at(1)?)?, amount: number(at(2)?)? },
+        "sell" => Order::Sell { resource: resource(at(1)?)?, amount: number(at(2)?)? },
         "relief" => Order::Relief { state: pick_state(at(1)?)? },
         // Ticket #269 (version 0.08.4): Relief's mirror, on a Region a rival holds.
         "agitate" => Order::Agitate { state: pick_state(at(1)?)? },
@@ -1015,6 +1070,8 @@ fn card_effect_text(e: &CardEffect) -> String {
             format!("{amount} {} for every {thing}", resource.name())
         }
         CardEffect::PopulationToMostPopulous { population } => format!("{population:+.1} population in your most populous Region"),
+        // Ticket #632 (version 0.1.0.6).
+        CardEffect::ToTheStars { people, unrest_per_lost } => format!("{people} lifted from a Launch Site into your room over Earth; {unrest_per_lost:+.1} Unrest there for each who does not fit"),
         CardEffect::EmissionsNext { ppm } => format!("{ppm:+.1} ppm of Emissions next turn"),
         CardEffect::StandingAllHeld { standing } => format!("{standing:+} Standing in every Region you hold"),
         CardEffect::StandingAtMostPopulous { standing } => format!("{standing:+} Standing in your most populous Region"),
@@ -1090,13 +1147,22 @@ fn print_question(g: &Game) {
     }
     println!("  `answer take`    {}: {}", c.take, card_side_text(&c.take_does));
     println!("  `answer refuse`  {}: {}", c.refuse, card_side_text(&c.refuse_does));
+    // Ticket #632 (version 0.1.0.6): a card's third way, with the room it would fill, or why it is shut.
+    if let Some(third) = &c.third {
+        let state = match g.may_answer_third(me) {
+            Ok(()) if c.third_does.iter().any(|e| matches!(e, CardEffect::ToTheStars { .. })) => format!(" (room for {} over Earth)", g.stars_room(me)),
+            Ok(()) => String::new(),
+            Err(why) => format!(" -- SHUT: {why}"),
+        };
+        println!("  `answer third`   {third}: {}{state}", card_side_text(&c.third_does));
+    }
     match q.answer_of(me) {
         Some(a) => println!("  Your answer is given: you {a_word}.", a_word = a.word()),
         None if !g.may_take_card(me) => {
             // Ticket #366 (version 0.09.2): the good and the shortfall, named.
             println!("  *** THE OFFER IS CLOSED TO YOU: {}, so `answer refuse` is your only move. ***", g.card_shortfall(me).unwrap_or_else(|| "you cannot pay what it asks".to_string()))
         }
-        None => println!("  *** UNANSWERED. Both sides are open to you. The turn cannot end until an `answer` line is given. ***"),
+        None => println!("  *** UNANSWERED. The turn cannot end until an `answer` line is given. ***"),
     }
 }
 
@@ -1457,16 +1523,18 @@ fn print_board(g: &Game) {
     let s = g.seat(me);
     println!("\n--- YOU: seat 0, the {} ---", g.seat_name(me));
     println!(
-        "Stockpile: {} Materials, {} Fuel, {} Energy, {} Ducats",
-        figure(s.stockpile.materials), figure(s.stockpile.fuel), figure(s.stockpile.energy), figure(s.stockpile.ducats)
+        "Stockpile: {} Materials, {} Fuel, {} Energy, {} Ducats, {} Fissionables",
+        figure(s.stockpile.materials), figure(s.stockpile.fuel), figure(s.stockpile.energy), figure(s.stockpile.ducats), figure(s.stockpile.fissionables)
     );
     // Ticket #404 (version 0.09.4): the Market every turn, a card's price named with the card.
     println!("{}", g.market_line(me));
     println!(
-        "Last income: {}M {}F {}E {}D",
-        figure(s.income_last_turn.materials), figure(s.income_last_turn.fuel), figure(s.income_last_turn.energy), figure(s.income_last_turn.ducats)
+        "Last income: {}M {}F {}E {}D {}Fi",
+        figure(s.income_last_turn.materials), figure(s.income_last_turn.fuel), figure(s.income_last_turn.energy), figure(s.income_last_turn.ducats), figure(s.income_last_turn.fissionables)
     );
-    let sources: Vec<String> = s.income_sources.iter().map(|(what, r, n)| format!("{what} {}{}", signed(*n), &r.name()[..1])).collect();
+    // Ticket #628 (version 0.1.0.6): Fissionables as "Fi", since "F" is the Fuel's.
+    let short = |r: Resource| if r == Resource::Fissionables { "Fi" } else { &r.name()[..1] };
+    let sources: Vec<String> = s.income_sources.iter().map(|(what, r, n)| format!("{what} {}{}", signed(*n), short(*r))).collect();
     if !sources.is_empty() {
         println!("  from: {}", sources.join(", "));
     }
@@ -1693,6 +1761,10 @@ fn print_board(g: &Game) {
         if let Some(line) = standings_text(g, Place::Colony(c.id)) {
             println!("    {line}");
         }
+        // Ticket #634 (version 0.1.0.6): what threatens it, for its holder.
+        if let Some(line) = g.threat_line(me, c.id) {
+            println!("    {line}");
+        }
         // Ticket #335: the ORBIT a Ship must sit in to touch this place -- its own for a station,
         // low orbit for a Colony on the ground, since low orbit is what touches the ground.
         let reached = if c.in_orbit {
@@ -1768,13 +1840,15 @@ fn print_board(g: &Game) {
         // a station's ring can be told from one in low orbit without doing the arithmetic.
         // Ticket #586 (version 0.1.0.4): by its name, the word an order takes, never its id.
         println!(
-            "{:<22} {:<16} seat {} at {:<34} tank {}/{} | colonists {} | army {} | hp {} | {}{}",
+            "{:<22} {:<16} seat {} at {:<34} tank {}/{}{} | colonists {} | army {} | hp {} | {}{}",
             g.ship_name(sh),
             sh.kind.name(),
             sh.seat.0,
             ship_at_text(g, sh),
             sh.fuel,
             figure(g.tank_of(sh.seat, sh.kind)),
+            // Ticket #629 (version 0.1.0.6): a nuclear hull's second tank.
+            if sh.nuclear { format!(" nuclear, Fi {}/{}", figure(sh.fissionables), figure(g.fission_tank_of(sh.seat, sh.kind))) } else { String::new() },
             // Ticket #543 (version 0.1.0.1): a Colony Ship's aboard/room, and the founding rule
             // where it is short of it.
             colonists_text(g, sh),
@@ -1793,6 +1867,10 @@ fn print_board(g: &Game) {
                 .collect();
             if !dry.is_empty() {
                 println!("         would arrive stranded at: {}", dry.join("; "));
+            }
+            // Ticket #631 (version 0.1.0.6): its ferry route.
+            if let Some(r) = g.route_of(sh.id) {
+                println!("         {}{}", g.route_text(r), if r.wait_window { ", waiting for windows" } else { "" });
             }
         }
     }
@@ -1984,8 +2062,8 @@ fn main() {
                     }
                     // Ticket #337 (version 0.09.0): answered the moment the line is read, as a
                     // `tech` pick is, so it is given before the turn it holds can end.
-                    Ok(Line::Answer(taken)) => match game.answer_card(Seat(0), taken) {
-                        Ok(()) => println!("line {}: answered: you {}", n + 1, if taken { "take the offer" } else { "refuse it" }),
+                    Ok(Line::Answer(answer)) => match game.answer_card_as(Seat(0), answer) {
+                        Ok(()) => println!("line {}: answered: you {}", n + 1, answer.word()),
                         Err(e) => {
                             println!("line {}: REFUSED `{line}`: {e}", n + 1);
                             bad += 1;
@@ -2055,6 +2133,15 @@ fn main() {
                             bad += 1;
                         }
                     },
+                }
+            }
+            // Ticket #631 (version 0.1.0.6): each ferry route's step, placed after the lines as the
+            // window places it at the turn's head; a line given the Ship this turn stands first.
+            let routes: Vec<Route> = game.routes.iter().filter(|r| game.ship(r.ship).is_some_and(|s| s.seat == Seat(0))).cloned().collect();
+            for r in &routes {
+                for o in game.route_step_with(Seat(0), r, &kept).orders {
+                    println!("route of {}: {o:?}", game.ship_called(r.ship));
+                    kept.push(o);
                 }
             }
             let (left, influence) = game.remaining(Seat(0), &kept);

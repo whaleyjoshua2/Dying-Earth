@@ -216,10 +216,15 @@ pub enum StateId {
     // has been, so no older index moves.
     Vietnam,
     Argentina,
+    // Version 0.1.0.6 (ticket #639): Canada (with Greenland) cut out of the United States' Region,
+    // Ethiopia (with the Horn) out of South Africa's and, for Eritrea, Egypt's. Appended, as every
+    // split has been, so no older index moves.
+    Canada,
+    Ethiopia,
 }
 
 impl StateId {
-    pub const ALL: [StateId; 20] = [
+    pub const ALL: [StateId; 22] = [
         StateId::SubSaharanAfrica,
         StateId::NorthAfrica,
         StateId::EastAsia,
@@ -240,6 +245,8 @@ impl StateId {
         StateId::SouthAfrica,
         StateId::Vietnam,
         StateId::Argentina,
+        StateId::Canada,
+        StateId::Ethiopia,
     ];
     pub fn index(self) -> usize {
         self as usize
@@ -279,10 +286,13 @@ pub enum FacilityKind {
     /// Version 0.08.0 (ticket #183): the Spaceport, the Arkwrights' Unique Facility, which replaces
     /// the Launch Site and pays +1 Influence for every Emigrant it lifts off Earth.
     Spaceport,
-    /// Version 0.08.0 (ticket #184): the Reactor, the Archivists' Unique Facility, which replaces
-    /// the Power Plant and takes 75% off the total Energy upkeep of everything its holder owns,
-    /// the Archive excepted.
-    Reactor,
+    /// Version 0.08.0 (ticket #184): the Archivists' Unique Facility, which replaces the Power Plant
+    /// and takes 75% off the total Energy upkeep of everything its holder owns, the Archive
+    /// excepted. Ticket #630 (version 0.1.0.6), at the designer's word: **the Accumulator**, where it
+    /// was the Reactor, the name going to the new common power station; a save from before calls it
+    /// `reactor` and loads it as this.
+    #[serde(alias = "reactor")]
+    Accumulator,
     /// Version 0.08.0 (ticket #186): the Academy, the Custodians' Unique Facility, which replaces
     /// the School and pays +1 Ducat a turn on top of the schooling. Off Earth it is a Unique
     /// Module of the same name, replacing the Institute.
@@ -310,10 +320,14 @@ pub enum FacilityKind {
     /// Reactor's rule does not read it. A standing Power Plant may be **Replaced** with one. Appended
     /// last, for `Tables::facility`.
     WindFarm,
+    /// Ticket #630 (version 0.1.0.6): the **Reactor**, a common power station that burns Fissionables:
+    /// 8 Energy for 0.1 Fissionables and 2 Ducats a turn, no Emissions, behind Clean Power. Its id is
+    /// `fission_reactor`, since a save's `reactor` is the Accumulator. Appended last.
+    FissionReactor,
 }
 
 impl FacilityKind {
-    pub const ALL: [FacilityKind; 19] = [
+    pub const ALL: [FacilityKind; 20] = [
         FacilityKind::Factory,
         FacilityKind::PowerPlant,
         FacilityKind::Refinery,
@@ -327,12 +341,13 @@ impl FacilityKind {
         FacilityKind::School,
         FacilityKind::InvestmentBank,
         FacilityKind::Spaceport,
-        FacilityKind::Reactor,
+        FacilityKind::Accumulator,
         FacilityKind::Academy,
         FacilityKind::Mine,
         FacilityKind::Stadium,
         FacilityKind::NatureReserve,
         FacilityKind::WindFarm,
+        FacilityKind::FissionReactor,
     ];
     pub fn name(self) -> &'static str {
         match self {
@@ -349,13 +364,14 @@ impl FacilityKind {
             FacilityKind::School => "School",
             FacilityKind::InvestmentBank => "Investment Bank",
             FacilityKind::Spaceport => "Spaceport",
-            FacilityKind::Reactor => "Reactor",
+            FacilityKind::Accumulator => "Accumulator",
             FacilityKind::Academy => "Academy",
             // Ticket #332 (version 0.09.0): one name in both lists, by the Refinery precedent.
             FacilityKind::Mine => "Mine",
             FacilityKind::Stadium => "Stadium",
             FacilityKind::NatureReserve => "Nature Reserve",
             FacilityKind::WindFarm => "Wind Farm",
+            FacilityKind::FissionReactor => "Reactor",
         }
     }
 
@@ -367,7 +383,7 @@ impl FacilityKind {
         match self {
             FacilityKind::InvestmentBank => Some(FactionKind::Prospectors),
             FacilityKind::Spaceport => Some(FactionKind::Arkwrights),
-            FacilityKind::Reactor => Some(FactionKind::Archivists),
+            FacilityKind::Accumulator => Some(FactionKind::Archivists),
             FacilityKind::Academy => Some(FactionKind::Custodians),
             _ => None,
         }
@@ -381,7 +397,7 @@ impl FacilityKind {
         match self {
             FacilityKind::InvestmentBank => Some(FacilityKind::Bank),
             FacilityKind::Spaceport => Some(FacilityKind::LaunchSite),
-            FacilityKind::Reactor => Some(FacilityKind::PowerPlant),
+            FacilityKind::Accumulator => Some(FacilityKind::PowerPlant),
             FacilityKind::Academy => Some(FacilityKind::School),
             _ => None,
         }
@@ -474,10 +490,14 @@ pub enum ModuleKind {
     /// base, scaled by the site's Generator yield as every Module is, no emissions, a Ducat a turn,
     /// behind Clean Power. Appended last, as the Factory was, for `Tables::module`.
     WindFarm,
+    /// Ticket #630 (version 0.1.0.6): the **Reactor** Module, the Facility's figures off Earth: 8
+    /// Energy for 0.1 Fissionables and 2 Ducats, behind Clean Power, at any Colony or station, no
+    /// sunlight and no site yield. Appended last.
+    FissionReactor,
 }
 
 impl ModuleKind {
-    pub const ALL: [ModuleKind; 21] = [
+    pub const ALL: [ModuleKind; 22] = [
         ModuleKind::Mine,
         ModuleKind::Generator,
         ModuleKind::Refinery,
@@ -499,9 +519,10 @@ impl ModuleKind {
         ModuleKind::Battery,
         ModuleKind::Factory,
         ModuleKind::WindFarm,
+        ModuleKind::FissionReactor,
     ];
     /// The Modules an ordinary build order may place (ticket #51: the Archive is not one of them).
-    pub const BUILDABLE: [ModuleKind; 19] = [
+    pub const BUILDABLE: [ModuleKind; 20] = [
         ModuleKind::Mine,
         ModuleKind::Generator,
         ModuleKind::Refinery,
@@ -521,6 +542,7 @@ impl ModuleKind {
         ModuleKind::Battery,
         ModuleKind::Factory,
         ModuleKind::WindFarm,
+        ModuleKind::FissionReactor,
     ];
     pub fn name(self) -> &'static str {
         match self {
@@ -547,6 +569,8 @@ impl ModuleKind {
             ModuleKind::Factory => "Factory",
             // Ticket #559 (version 0.1.0.3): one name in both lists, as the Factory and the Mine.
             ModuleKind::WindFarm => "Wind Farm",
+            // Ticket #630 (version 0.1.0.6): one name in both lists.
+            ModuleKind::FissionReactor => "Reactor",
         }
     }
 
@@ -607,7 +631,8 @@ impl ModuleKind {
     pub fn stands_on_a_station(self) -> bool {
         matches!(
             self.common().unwrap_or(self),
-            ModuleKind::Shipyard | ModuleKind::Habitat | ModuleKind::Observatory | ModuleKind::SolarArray | ModuleKind::TradePost | ModuleKind::Institute | ModuleKind::Battery | ModuleKind::Factory
+            // Ticket #630 (version 0.1.0.6): and the Reactor, at any Colony or station.
+            ModuleKind::Shipyard | ModuleKind::Habitat | ModuleKind::Observatory | ModuleKind::SolarArray | ModuleKind::TradePost | ModuleKind::Institute | ModuleKind::Battery | ModuleKind::Factory | ModuleKind::FissionReactor
         )
     }
 }
@@ -723,6 +748,10 @@ pub enum Resource {
     /// Stockpile, never traded. The variant exists so a `produces` row can name it and a `Yield`
     /// can carry it through the same multipliers as any other output.
     Widgets,
+    /// Ticket #628 (version 0.1.0.6): **Fissionables**, the seventh resource, held in the Stockpile and
+    /// traded like Fuel; made by a Mine beside its Materials on a site off Earth that holds them.
+    /// Appended last, so a saved name never shifts.
+    Fissionables,
 }
 
 impl Resource {
@@ -734,6 +763,7 @@ impl Resource {
             Resource::Research => "Research",
             Resource::Ducats => "Ducats",
             Resource::Widgets => "Widgets",
+            Resource::Fissionables => "Fissionables",
         }
     }
 }

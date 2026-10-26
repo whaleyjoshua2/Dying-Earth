@@ -304,6 +304,9 @@ pub struct SimResult {
     pub uniques: [u32; 4],
     /// Ticket #324 (version 0.08.8): Batteries standing at the end, by the seat directing them.
     pub batteries: [u32; SEAT_COUNT],
+    /// Ticket #630 (version 0.1.0.6): Reactors standing at the end, Facilities and Modules, by the
+    /// seat directing them.
+    pub reactors: [u32; SEAT_COUNT],
     /// The turn the whole Tech Tree completed, if it did. A research agreement pays two seats a
     /// tenth more, and the tree already finished with the game half run. Ticket #416 (version
     /// 0.09.4): the turn the LAST Tech completed, read inside the turn loop; it was the game's last
@@ -706,6 +709,12 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         .map(|k| game.colonies.iter().map(|c| c.modules.iter().filter(|m| m.kind == k).count() as u32).sum());
     let batteries: [u32; SEAT_COUNT] =
         std::array::from_fn(|i| game.colonies.iter().filter(|c| c.control.director() == Some(Seat(i as u8))).map(|c| c.modules.iter().filter(|m| m.kind == ModuleKind::Battery).count() as u32).sum());
+    let reactors: [u32; SEAT_COUNT] = std::array::from_fn(|i| {
+        let seat = Seat(i as u8);
+        let on_earth: u32 = game.states.iter().filter(|s| s.control.director() == Some(seat)).map(|s| s.facilities.iter().filter(|f| f.kind == FacilityKind::FissionReactor).count() as u32).sum();
+        let off: u32 = game.colonies.iter().filter(|c| c.control.director() == Some(seat)).map(|c| c.modules.iter().filter(|m| m.kind == ModuleKind::FissionReactor).count() as u32).sum();
+        on_earth + off
+    });
     let directive_mean: [f64; SEAT_COUNT] = std::array::from_fn(|i| if directive_samples == 0 { 0.0 } else { directive_sum[i] / directive_samples as f64 });
     let leads_by_seat = Seat::ALL.map(|s| {
         let tail = format!(" The {} led (", game.seat_name(s));
@@ -906,6 +915,7 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         accords_struck,
         uniques,
         batteries,
+        reactors,
         tree_done_turn,
         tech_done_turns,
         research_by_source,

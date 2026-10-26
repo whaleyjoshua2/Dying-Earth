@@ -35,6 +35,10 @@ pub struct SlotCard {
     pub name: String,
     pub lon: f32,
     pub lat: f32,
+    /// Ticket #628 (version 0.1.0.6): a site of a Body that has Fissionables where they are not --
+    /// Hellas Planitia, the one Mars site without them.
+    #[serde(default)]
+    pub no_fissionables: bool,
 }
 
 /// Ticket #485 (version 0.09.8): a leg's Fuel -- its delta-v in km/s times the scale, to a tenth,
@@ -114,6 +118,14 @@ pub struct BodyCard {
     /// Ticket #140 (version 0.07.3): the fourth yield is Research, multiplying an Observatory; it
     /// was the Habitat yield, which multiplied a Habitat's room, until the designer traded it.
     pub research_yield: f64,
+    /// Ticket #628 (version 0.1.0.6): the fifth yield, Fissionables, which a Mine makes beside its
+    /// Materials on the ground; nought on Earth and Venus.
+    #[serde(default)]
+    pub fissionables_yield: f64,
+    /// Ticket #628: where only some sites hold them (the Moon), how many do, fewest and most, drawn
+    /// with the game. None: every site but one marked `no_fissionables`.
+    #[serde(default)]
+    pub fissionables_sites: Option<[u32; 2]>,
     /// Ticket #345 (version 0.09.1): the Influence the Faction that founds this Body's FIRST ground
     /// Colony is paid, once, in the Income after the landing. No `#[serde(default)]` on purpose: a
     /// Body row that has not been given a figure is a rule this build cannot price, and the load
@@ -184,6 +196,10 @@ pub struct FacilityCard {
     /// Energy; the Power Plant and the Reactor burn 0.8. Short of Fuel the building runs at a quarter.
     #[serde(default)]
     pub fuel_upkeep: f64,
+    /// Ticket #630 (version 0.1.0.6): Fissionables a turn while online, the Reactor's 0.1; short of
+    /// them it runs at a quarter, as a building short of Fuel.
+    #[serde(default)]
+    pub fissionables_upkeep: f64,
     pub produces: Option<Produces>,
     /// Ticket #280 (version 0.08.5): what the building does, in a sentence, where it is not a
     /// resource or beside one; drawn where the row said "no output" before.
@@ -334,6 +350,10 @@ pub struct ModuleCard {
     pub widgets: u32,
     pub energy_upkeep: i64,
     pub produces: Option<Produces>,
+    /// Ticket #628 (version 0.1.0.6): the Fissionables a turn it makes beside its own output, before
+    /// its site's figure -- the Mine's one; nought for every other Module.
+    #[serde(default)]
+    pub fissionables: f64,
     /// Ticket #280 (version 0.08.5): what the Module does, in a sentence, where it is not a
     /// resource or beside one.
     #[serde(default)]
@@ -376,6 +396,9 @@ pub struct ModuleCard {
     /// Ticket #575 (version 0.1.0.3): Fuel a turn while online; the Generator burns 0.8.
     #[serde(default)]
     pub fuel_upkeep: f64,
+    /// Ticket #630 (version 0.1.0.6): Fissionables a turn while online, the Reactor Module's 0.1.
+    #[serde(default)]
+    pub fissionables_upkeep: f64,
 }
 
 /// Ticket #92 (version 0.06.0): the Mass Driver's figures: the Fuel it takes off the owner's
@@ -521,11 +544,29 @@ pub struct ChoiceCard {
     pub take_does: Vec<CardEffect>,
     #[serde(default)]
     pub refuse_does: Vec<CardEffect>,
+    /// Ticket #632 (version 0.1.0.6): a third answer some cards offer -- its button, what it does,
+    /// and the rule a computer seat chooses it by, read before `take_when`.
+    #[serde(default)]
+    pub third: Option<String>,
+    #[serde(default)]
+    pub third_does: Vec<CardEffect>,
+    #[serde(default)]
+    pub third_when: Option<CardRule>,
 }
 
 impl ChoiceCard {
     pub fn side(&self, taken: bool) -> &[CardEffect] {
         if taken { &self.take_does } else { &self.refuse_does }
+    }
+
+    /// Ticket #632: the effects of an answer, the third included; nothing for an unasked seat.
+    pub fn side_of(&self, answer: crate::state::CardAnswer) -> &[CardEffect] {
+        match answer {
+            crate::state::CardAnswer::Taken => &self.take_does,
+            crate::state::CardAnswer::Refused => &self.refuse_does,
+            crate::state::CardAnswer::Third => &self.third_does,
+            crate::state::CardAnswer::NothingToDecide => &[],
+        }
     }
 }
 
@@ -552,6 +593,9 @@ pub enum CardRule {
     LandingUnderWay,
     /// No landing is under way, which is the other half of the same question.
     NoLandingUnderWay,
+    /// Ticket #632 (version 0.1.0.6): the room over Earth -- the seat's Colony Ships at Earth and its
+    /// stations' Habitats in Earth's near orbits -- holds at least this many.
+    StarsRoomAtLeast { people: u32 },
 }
 
 /// Ticket #337 (version 0.09.0): **the effect vocabulary**. One side of one card is a list of
@@ -579,6 +623,11 @@ pub enum CardEffect {
     PerUnitCost { per: CardThing, resource: Resource, amount: i64 },
     /// Units of population into the seat's most populous held Region.
     PopulationToMostPopulous { population: f64 },
+    /// Ticket #632 (version 0.1.0.6): **to the stars**. This many become Pioneers at a working
+    /// Launch Site of the seat's and are lifted at once into the room over Earth, its Colony Ships
+    /// first and then its stations' Habitats; each who does not fit is lost, raising the Launch
+    /// Site Region's Unrest by `unrest_per_lost`. A launch, and the Spaceport's, as a lift is.
+    ToTheStars { people: u32, unrest_per_lost: f64 },
     /// ppm added at the next Climate phase, through the same field the Methane Burst uses.
     EmissionsNext { ppm: f64 },
     /// A change to the seat's Standing in every Region it holds, or in its most populous one.
@@ -671,6 +720,10 @@ pub struct EventsTable {
     pub breakthrough_research_public_science: i64,
     pub discovery_multiplier: f64,
     pub discovery_multiplier_with_tech: f64,
+    /// Ticket #628 (version 0.1.0.6): Rich Seam's own figures, x1.5 and x2 with Deep Mining, where it
+    /// read the two above with the Ice Deposit and the Helium-3 Vein.
+    pub rich_seam_multiplier: f64,
+    pub rich_seam_multiplier_with_tech: f64,
     pub discovery_turns: u32,
     pub heatwave_loss: f64,
     pub heatwave_loss_green_consensus: f64,
@@ -780,7 +833,7 @@ pub struct FactionCard {
     /// Ticket #100 (version 0.07.0), renamed on ticket #195 (version 0.08.0): the Region the start
     /// screen opens its globe on. It has ONE reader, and its only job is pointing the start globe's
     /// camera, which the old name `home` did not say -- it read as a starting position, which it has
-    /// never been: any of the twenty may still be chosen.
+    /// never been: any of the twenty-two may still be chosen.
     pub opens_on: StateId,
     /// Ticket #46: the station over Earth the Faction starts with, by name in bodies.toml.
     /// Ticket #50: the Arkwrights start with none, so this is optional.
@@ -812,6 +865,10 @@ pub struct FactionCard {
     /// rows say 10 where the table says 0.
     #[serde(default)]
     pub start_ducats: Option<i64>,
+    /// Ticket #638 (version 0.1.0.6), at the designer's word: the Fuel this Faction opens with, read
+    /// in place of `[start] fuel` where a row carries one; the Arkwrights' says 50.
+    #[serde(default)]
+    pub start_fuel: Option<i64>,
     // Ticket #51: the per-Faction figures the Arkwrights' card carries. Every one is neutral by
     // default, so a card that names none plays exactly as it did before.
     /// What a Habitat here holds, times this.
@@ -1044,6 +1101,8 @@ pub struct DucatsCard {
     pub per_materials: i64,
     pub per_fuel: i64,
     pub per_energy: i64,
+    /// Ticket #628 (version 0.1.0.6): the fourth row of the market.
+    pub per_fissionables: i64,
     pub sell_divisor: i64,
     pub per_building_material: i64,
     pub bank_per_gdp_tenth: f64,
@@ -1137,6 +1196,9 @@ pub struct ClimateTable {
     pub colony_growth: f64,
     /// Ticket #588 (version 0.1.0.4): the growth share instead at a station in Earth's near orbits.
     pub colony_growth_earth_orbit: f64,
+    /// Ticket #633 (version 0.1.0.6): the Influence the first child born beyond Earth orbit pays its
+    /// seat, once a game.
+    pub first_born_influence: i64,
     pub colony_decline: u32,
     /// Ticket #333 (version 0.09.0): the population figure's unit, in people. A Region's figure, a
     /// Colonist and a Pioneer are all counted in it, so `Region population 380.0` is 380 million
@@ -1643,6 +1705,29 @@ pub struct AiThresholds {
     pub collapse_clean_weight: f64,
     #[serde(default = "win_in_sight_default")]
     pub win_in_sight: u32,
+    /// Ticket #629 (version 0.1.0.6): a computer seat builds a nuclear hull when its Stockpile holds
+    /// the second tank's fill and this many tanks more; a chemical one otherwise.
+    #[serde(default = "nuclear_hull_reserve_tanks_default")]
+    pub nuclear_hull_reserve_tanks: f64,
+    /// Ticket #630 (version 0.1.0.6): a computer seat builds a Reactor where it would build a Power
+    /// Plant once Clean Power stands and its Stockpile holds this many turns of a Reactor's upkeep.
+    #[serde(default = "reactor_reserve_turns_default")]
+    pub reactor_reserve_turns: f64,
+    /// Ticket #643 (version 0.1.0.6): a computer seat sells the Fissionables it holds beyond this
+    /// many turns of its running Reactors and two tanks.
+    #[serde(default = "fission_keep_turns_default")]
+    pub fission_keep_turns: f64,
+    /// Ticket #631 (version 0.1.0.6): a computer seat ends a ferry route whose far end has had no
+    /// room for this many turns.
+    #[serde(default = "ferry_idle_turns_default")]
+    pub ferry_idle_turns: u32,
+    /// Ticket #637 (version 0.1.0.6): a computer seat scraps an empty Colony Ship stranded this
+    /// many turns over a Colony of its own.
+    #[serde(default = "scrap_stranded_turns_default")]
+    pub scrap_stranded_turns: u32,
+    /// Ticket #633 (version 0.1.0.6): the computer Arkwrights' chase of the first birth off Earth.
+    #[serde(default = "first_birth_chase_default")]
+    pub first_birth_chase: f64,
     /// Ticket #336 (version 0.09.0): the price a rival's Colony is weighed against on the same
     /// list -- the weight is this over what the seat would pay, so the cheapest place ranks first.
     #[serde(default = "colony_price_pivot_default")]
@@ -2021,6 +2106,8 @@ struct UnitsFile {
     dig_in: DigInCard,
     army: ArmyCard,
     nuke: NukeCard,
+    nuclear_hull: NuclearHullCard,
+    ferry: FerryCard,
 }
 
 /// Ticket #343 (version 0.09.1): every figure a Launch reads (`units.toml`). They live in
@@ -2047,6 +2134,24 @@ pub struct NukeCard {
     /// What a Rearm costs at a Shipyard of the firing Faction.
     pub rearm_materials: i64,
     pub rearm_widgets: u32,
+    /// Ticket #629 (version 0.1.0.6): the Fissionables a Warhead costs, at the Missile Carrier's
+    /// build and at every Rearm.
+    pub fissionables: f64,
+}
+
+/// Ticket #629 (version 0.1.0.6): the nuclear hull's second tank, this share of its Fuel tank.
+#[derive(Debug, Clone, Deserialize)]
+pub struct NuclearHullCard {
+    pub tank_share: f64,
+}
+
+/// Ticket #631 (version 0.1.0.6): a ferry route's two figures.
+#[derive(Debug, Clone, Deserialize)]
+pub struct FerryCard {
+    /// Turns a routed Colony Ship waits at home with anyone aboard before it leaves short of full.
+    pub wait_turns: u32,
+    /// How much dearer than on its window a leg may be and still leave, when it waits for one.
+    pub window_slack: f64,
 }
 
 /// Ticket #86 (version 0.06.0): a warming Earth fills the Colony Ships. `per_step` Colonists
@@ -2336,6 +2441,10 @@ pub struct Tables {
     pub army: ArmyCard,
     /// Ticket #343 (version 0.09.1): every figure a Launch reads.
     pub nuke: NukeCard,
+    /// Ticket #629 (version 0.1.0.6).
+    pub nuclear_hull: NuclearHullCard,
+    /// Ticket #631 (version 0.1.0.6).
+    pub ferry: FerryCard,
     pub techs: Vec<TechCard>,
     pub events: EventsTable,
     pub factions: Vec<FactionCard>,
@@ -2494,6 +2603,8 @@ impl Tables {
             dig_in: units.dig_in,
             army: units.army,
             nuke: units.nuke,
+            nuclear_hull: units.nuclear_hull,
+            ferry: units.ferry,
             techs: techs.tech,
             shortlist: techs.shortlist,
             events,
@@ -2592,6 +2703,9 @@ impl Tables {
             }
             if f.start_materials.is_some_and(|m| m < 0) {
                 return Err(err("factions.toml", format!("row {}: start_materials must not be negative", f.name)));
+            }
+            if f.start_fuel.is_some_and(|d| d < 0) {
+                return Err(err("factions.toml", format!("row {}: start_fuel must not be negative", f.name)));
             }
             if f.start_ducats.is_some_and(|d| d < 0) {
                 return Err(err("factions.toml", format!("row {}: start_ducats must not be negative", f.name)));
@@ -2909,6 +3023,18 @@ impl Tables {
                 (None, EventKind::Choice) => {
                     return Err(err("events.toml", format!("{}: kind = \"choice\" wants a [choice] table saying what it asks", e.name)));
                 }
+                // Ticket #632 (version 0.1.0.6), from the review: a third answer is a button, what it
+                // does and nothing dead; and one lift to the stars a side, its rule no larger.
+                (Some(c), _) if c.third.is_some() != !c.third_does.is_empty() || (c.third.is_none() && c.third_when.is_some()) => {
+                    return Err(err("events.toml", format!("{}: a third answer wants `third`, `third_does` and nothing without them", e.name)));
+                }
+                (Some(c), _) if [&c.take_does, &c.refuse_does, &c.third_does].iter().any(|side| side.iter().filter(|x| matches!(x, CardEffect::ToTheStars { .. })).count() > 1) => {
+                    return Err(err("events.toml", format!("{}: one `to_the_stars` a side", e.name)));
+                }
+                (Some(c), _) if matches!(c.third_when, Some(CardRule::StarsRoomAtLeast { people: want })
+                    if c.third_does.iter().all(|x| !matches!(x, CardEffect::ToTheStars { people, .. } if *people >= want))) => {
+                    return Err(err("events.toml", format!("{}: `stars_room_at_least` asks more room than the third answer sends", e.name)));
+                }
                 _ => {}
             }
         }
@@ -2989,9 +3115,10 @@ impl Tables {
         let f = self.faction(kind);
         crate::state::Stockpile {
             materials: f.start_materials.unwrap_or(self.start.materials) as f64,
-            fuel: self.start.fuel as f64,
+            fuel: f.start_fuel.unwrap_or(self.start.fuel) as f64,
             energy: self.start.energy as f64,
             ducats: f.start_ducats.unwrap_or(self.start.ducats) as f64,
+            fissionables: 0.0,
         }
     }
     /// Ticket #350 (version 0.09.1): the Faction's Victory Condition in one clause, its figures
@@ -3269,6 +3396,30 @@ fn collapse_clean_weight_default() -> f64 {
 
 fn win_in_sight_default() -> u32 {
     3
+}
+
+fn nuclear_hull_reserve_tanks_default() -> f64 {
+    2.0
+}
+
+fn reactor_reserve_turns_default() -> f64 {
+    10.0
+}
+
+fn fission_keep_turns_default() -> f64 {
+    20.0
+}
+
+fn ferry_idle_turns_default() -> u32 {
+    3
+}
+
+fn scrap_stranded_turns_default() -> u32 {
+    3
+}
+
+fn first_birth_chase_default() -> f64 {
+    1.25
 }
 
 

@@ -140,7 +140,7 @@ impl Game {
             for seat in Seat::ALL {
                 if !self.seat(seat).ai && q.answer_of(seat).is_none() {
                     owed.push(format!(
-                        "{} is asking the {} a question, and it has not been answered. Take the offer or refuse it.",
+                        "{} is asking the {} a question, and it has not been answered. Answer it.",
                         self.tables.event(q.card).name,
                         self.seat_name(seat)
                     ));
@@ -313,6 +313,9 @@ impl Game {
         // Ticket #400 (version 0.09.3): the net Unrest lines are written here, after the Climate
         // phase, so the heat and the sea are causes on them; they stood at the Resolution's end.
         self.report_unrest_net();
+        // Ticket #631 (version 0.1.0.6): the ferry routes, after the Income has mustered the
+        // Pioneers and filled the Stockpile their refuels draw on.
+        self.tend_routes();
         // Ticket #524 (version 0.1.0.0): a bar the Income or the Climate met wins now, not after a
         // turn of orders.
         self.victory_at_head();
